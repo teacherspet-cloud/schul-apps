@@ -121,8 +121,14 @@ export interface KurztestMeta {
    */
   bilingual?: { an: boolean; sprache: 'en' | 'fr' }
 
-  /** 1 = eine Fassung, 2 = A/B, 3 = A/B/C */
+  /** 1 = eine Fassung, 2 = A/B, 3 = A/B/C, 4 = A–D (06.10.2026) */
   varianten: number
+  /**
+   * Wie die weiteren Fassungen entstehen (06.10.2026): `parallel` = die KI schreibt jede Fassung
+   * mit anderen Zahlen und Beispielen (wie bisher), `umgestellt` = ohne KI aus Fassung A
+   * (shared/testFassungen.ts). Fehlt = parallel.
+   */
+  fassungsArt?: import('../../../shared/testFassungen').FassungsArt
 
   nachteilsausgleich: Nachteilsausgleich
   /** Versuch mit Protokoll (29.09.2026, arbeitsblatt/model/protokoll.ts) – fehlt = keiner */

@@ -1,4 +1,5 @@
 import OnlinetestKnopf from '../../onlinetest/OnlinetestKnopf'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import {
   ActionIcon,
@@ -24,7 +25,7 @@ import { LANGUAGES } from '../model/types'
 import { fragenAusVokabeln } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
-import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconAdjustments, IconArrowDown, IconArrowUp, IconDots, IconPlus, IconRowInsertBottom, IconRowInsertTop, IconTrash } from '@tabler/icons-react'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
 import { vokabelWunschHinweis, vokabelWunschKontext } from '../wunsch'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -67,7 +68,21 @@ import './editor.css'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { aufgabeBeheben } from '../auftraege'
 
+/**
+ * Standardmodus (07.10.2026): Texte bearbeiten, Aufgabe überarbeiten/neu erzeugen, einfügen, löschen, verschieben und die
+ * Ausgabe bleiben. Einstellungen je Aufgabe, Seitenformat je Abschnitt, Lernplattform und die feineren Kopf-/Blattoptionen
+ * gibt es im Expertenmodus oder über „Alle Werkzeuge".
+ */
 export default function EditorStep(): React.JSX.Element {
+  return (
+    <OptionenBereich>
+      <EditorInhalt />
+    </OptionenBereich>
+  )
+}
+
+function EditorInhalt(): React.JSX.Element {
+  const voll = useAlleOptionen()
   const {
     doc: gespeichert,
     updateDoc,
@@ -176,6 +191,45 @@ export default function EditorStep(): React.JSX.Element {
       blocks.splice(index + delta, 0, b)
     })
 
+  /**
+   * Neue Aufgabe eines Typs – unten („Aufgabe hinzufügen") oder an einer Stelle (Menü „⋯" am
+   * Baustein: darüber/darunter einfügen, 06.10.2026 wie in Klassenarbeit und Grammatiktest).
+   */
+  const aufgabeHinzufuegen = async (typ: TaskTypeId, stelle?: number): Promise<void> => {
+    setAdding(true)
+    try {
+      const { block, vocab } = await createAdditionalBlock(doc, variant, typ, 5, aiCall, await pictureOptions(doc.settings.pictureSource))
+      updateDoc((d) => {
+        d.vocab = vocab
+        const liste = d.variants.find((v) => v.id === variant.id)!.blocks
+        if (stelle === undefined) liste.push(block)
+        else liste.splice(Math.max(0, Math.min(liste.length, stelle)), 0, block)
+      })
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  /** Untermenü mit allen Aufgabentypen – wie „Darüber/Darunter einfügen" in den anderen Programmen */
+  const einfuegenMenue = (titel: 'Darüber einfügen' | 'Darunter einfügen', stelle: number): React.ReactNode => (
+    <Menu.Sub position="left-start">
+      <Menu.Sub.Target>
+        <Menu.Sub.Item leftSection={titel === 'Darüber einfügen' ? <IconRowInsertTop size={14} /> : <IconRowInsertBottom size={14} />}>{titel}</Menu.Sub.Item>
+      </Menu.Sub.Target>
+      <Menu.Sub.Dropdown>
+        <ScrollArea.Autosize mah={360}>
+          {TASK_TYPE_LIST.map((def) => (
+            <Menu.Item key={def.id} onClick={() => void aufgabeHinzufuegen(def.id as TaskTypeId, stelle)}>
+              {def.label}
+            </Menu.Item>
+          ))}
+        </ScrollArea.Autosize>
+      </Menu.Sub.Dropdown>
+    </Menu.Sub>
+  )
+
   const baseName = safeFileName(`${doc.header.title}${listName ? ` - ${listName}` : doc.settings.topic ? ` - ${doc.settings.topic}` : ''}`)
 
   const wrapBlock = (block: Block, index: number, content: React.JSX.Element): React.ReactNode => (
@@ -208,7 +262,9 @@ export default function EditorStep(): React.JSX.Element {
             <IconArrowDown size={14} />
           </ActionIcon>
         </Tooltip>
-        <BlockSettings block={block} doc={doc} variantId={variant.id} />
+        <NurExperte>
+          <BlockSettings block={block} doc={doc} variantId={variant.id} />
+        </NurExperte>
         {/*
          * Zauberstab „Überarbeiten" und Kreis „Neu erzeugen" mit Änderungswunsch (30.09.2026) –
          * vorher nur der Kreis „Ganze Aufgabe neu generieren" ohne Wunsch. Ein Rückgängig-Schritt.
@@ -237,22 +293,39 @@ export default function EditorStep(): React.JSX.Element {
             }
           />
         )}
-        <Tooltip label="Aufgabe löschen">
-          <ActionIcon
-            size="sm"
-            variant="default"
-            color="red"
-            aria-label={`Aufgabe ${index + 1} löschen`}
-            onClick={() =>
-              updateDoc(
-                (d) =>
-                  (d.variants.find((v) => v.id === variant.id)!.blocks = d.variants.find((v) => v.id === variant.id)!.blocks.filter((b) => b.id !== block.id))
-              )
-            }
-          >
-            <IconTrash size={14} />
-          </ActionIcon>
-        </Tooltip>
+        {/*
+         * „⋯" wie am Baustein in Klassenarbeit, Grammatiktest und Lernzielkontrolle (06.10.2026):
+         * darüber/darunter einfügen, löschen. Duplizieren fehlt bewusst – dieselben Vokabeln
+         * zweimal abzufragen, ergibt im Vokabeltest keinen Sinn.
+         */}
+        <Menu position="left-start" withArrow shadow="md">
+          <Menu.Target>
+            <Tooltip label="Weitere Aktionen" position="right">
+              <ActionIcon size="sm" variant="default" aria-label={`Weitere Aktionen (Aufgabe ${index + 1})`} loading={adding}>
+                <IconDots size={14} />
+              </ActionIcon>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Label>Aufgabe</Menu.Label>
+            {einfuegenMenue('Darüber einfügen', index)}
+            {einfuegenMenue('Darunter einfügen', index + 1)}
+            <Menu.Divider />
+            <Menu.Item
+              color="red"
+              leftSection={<IconTrash size={14} />}
+              aria-label={`Aufgabe ${index + 1} löschen`}
+              onClick={() =>
+                updateDoc(
+                  (d) =>
+                    (d.variants.find((v) => v.id === variant.id)!.blocks = d.variants.find((v) => v.id === variant.id)!.blocks.filter((b) => b.id !== block.id))
+                )
+              }
+            >
+              Aufgabe löschen
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
       </div>
       {content}
     </div>
@@ -309,20 +382,22 @@ export default function EditorStep(): React.JSX.Element {
         ausgabe={{ onWord: () => setExportOpen('docx'), onPdf: () => setExportOpen('pdf'), onDrucken: () => setExportOpen('print') }}
         extras={
           <>
-            <LmsExport
-              titel={doc.header.title}
-              bericht={() =>
-                fragenAusVokabeln(
-                  doc.vocab,
-                  LANGUAGES.find((l) => l.value === doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })?.label ??
-                    'Zielsprache'
-                )
-              }
-              ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, {
-                jahrgang: doc.settings.grade,
-                thema: doc.settings.topic
-              })}
-            />
+            <NurExperte>
+              <LmsExport
+                titel={doc.header.title}
+                bericht={() =>
+                  fragenAusVokabeln(
+                    doc.vocab,
+                    LANGUAGES.find((l) => l.value === doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })?.label ??
+                      'Zielsprache'
+                  )
+                }
+                ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, {
+                  jahrgang: doc.settings.grade,
+                  thema: doc.settings.topic
+                })}
+              />
+            </NurExperte>
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
             {/* Onlinetest (02.10.2026) – nur mit dem Schul-Apps-Server */}
             <OnlinetestKnopf doc={doc} listName={listName} />
@@ -342,7 +417,7 @@ export default function EditorStep(): React.JSX.Element {
                   variant={variant}
                   layout={(view === 'key' ? layouts?.key : layouts?.student)?.get(variant.id)}
                   wrapBlock={view === 'key' ? undefined : wrapBlock}
-                  seitenWerkzeug={view === 'key' ? undefined : seitenFormatWerkzeug(variant, (id, fn) => updateBlock(variant.id, id, fn))}
+                  seitenWerkzeug={view === 'key' || !voll ? undefined : seitenFormatWerkzeug(variant, (id, fn) => updateBlock(variant.id, id, fn))}
                   footer={
                     view === 'key' ? null : (
                       <Group justify="center" mt="xl" className="editor-add">
@@ -355,30 +430,7 @@ export default function EditorStep(): React.JSX.Element {
                           <Menu.Dropdown>
                             <ScrollArea.Autosize mah={400}>
                               {TASK_TYPE_LIST.map((def) => (
-                                <Menu.Item
-                                  key={def.id}
-                                  onClick={async () => {
-                                    setAdding(true)
-                                    try {
-                                      const { block, vocab } = await createAdditionalBlock(
-                                        doc,
-                                        variant,
-                                        def.id as TaskTypeId,
-                                        5,
-                                        aiCall,
-                                        await pictureOptions(doc.settings.pictureSource)
-                                      )
-                                      updateDoc((d) => {
-                                        d.vocab = vocab
-                                        d.variants.find((v) => v.id === variant.id)!.blocks.push(block)
-                                      })
-                                    } catch (e) {
-                                      notifyError(e)
-                                    } finally {
-                                      setAdding(false)
-                                    }
-                                  }}
-                                >
+                                <Menu.Item key={def.id} onClick={() => void aufgabeHinzufuegen(def.id as TaskTypeId)}>
                                   <Text size="sm">{def.label}</Text>
                                   <Text size="xs" c="dimmed">
                                     {def.usesVocab ? 'mit bis zu 5 noch nicht abgefragten Vokabeln' : 'ohne KI'}
@@ -663,19 +715,21 @@ function HeaderSettingsInhalt({
         onBlur={(e) => onChange((d) => (d.header.subtitle = e.currentTarget.value))}
       />
       <TextInput size="xs" label="Schulname" defaultValue={h.schoolName} onBlur={(e) => onChange((d) => (d.header.schoolName = e.currentTarget.value))} />
-      <Group gap="md">
-        {toggle('showName', 'Name')}
-        {toggle('showClass', 'Klasse')}
-        {toggle('showDate', 'Datum')}
-      </Group>
-      <Group gap="md">
-        {toggle('showSchool', 'Schule')}
-        {toggle('showVariant', 'Variante')}
-        {toggle('showPoints', 'Punkte')}
-        {toggle('showGrade', 'Note')}
-      </Group>
-      {/* Maskottchen (27.09.2026): winkend am Kopf, jubelnd am Schluss – wie bei Arbeiten; Vorschlag nach Jahrgang */}
-      <MaskottchenSchalter doc={doc} onChange={onChange} />
+      <NurExperte>
+        <Group gap="md">
+          {toggle('showName', 'Name')}
+          {toggle('showClass', 'Klasse')}
+          {toggle('showDate', 'Datum')}
+        </Group>
+        <Group gap="md">
+          {toggle('showSchool', 'Schule')}
+          {toggle('showVariant', 'Variante')}
+          {toggle('showPoints', 'Punkte')}
+          {toggle('showGrade', 'Note')}
+        </Group>
+        {/* Maskottchen (27.09.2026): winkend am Kopf, jubelnd am Schluss – wie bei Arbeiten; Vorschlag nach Jahrgang */}
+        <MaskottchenSchalter doc={doc} onChange={onChange} />
+      </NurExperte>
       {/* KI-Vermerk (Großprogramm 0.4) – nur, wenn eine KI mitgewirkt hat */}
       {doc.ki && (
         <Select
@@ -691,21 +745,23 @@ function HeaderSettingsInhalt({
           allowDeselect={false}
         />
       )}
-      {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
-      <VorlagenfarbeSchalter
-        size="xs"
-        fach={doc.settings.targetLanguage}
-        vorlagenname="Schwarz"
-        checked={Boolean(h.vorlagenfarbe)}
-        onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
-      />
-      {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
-      <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
-      <ZahlFeld size="xs" label="Schriftgröße (pt)" min={9} max={16} value={doc.fontSize} onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))} />
-      <Text size="xs" fw={500}>
-        Seitenumfang je Test
-      </Text>
-      <SeitenVorgabe size="xs" limit={doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT} onChange={(next) => onChange((d) => (d.settings.pageLimit = next))} />
+      <NurExperte>
+        {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
+        <VorlagenfarbeSchalter
+          size="xs"
+          fach={doc.settings.targetLanguage}
+          vorlagenname="Schwarz"
+          checked={Boolean(h.vorlagenfarbe)}
+          onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
+        />
+        {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
+        <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
+        <ZahlFeld size="xs" label="Schriftgröße (pt)" min={9} max={16} value={doc.fontSize} onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))} />
+        <Text size="xs" fw={500}>
+          Seitenumfang je Test
+        </Text>
+        <SeitenVorgabe size="xs" limit={doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT} onChange={(next) => onChange((d) => (d.settings.pageLimit = next))} />
+      </NurExperte>
     </Stack>
   )
 }
@@ -721,7 +777,9 @@ function PageLimitNotice({ layouts }: { layouts: TestLayouts }): React.JSX.Eleme
       <Alert color="orange" mx="xl" mt="md" title={`Vorgabe „${target}“ nicht erreicht`}>
         {pageCount > limit.pages
           ? `Der Test braucht auch mit kleinerer Schrift (${font} pt) und engeren Abständen ${pageCount} Seiten. Bitte Aufgaben entfernen, Schreiblinien verringern oder weniger Vokabeln abfragen.`
-          : `Der Test hat zu wenige Aufgaben, um ${pageLimitMin(limit)} Seiten zu füllen (${pageCount} ${pageCount === 1 ? 'Seite' : 'Seiten'}). Bitte Aufgaben hinzufügen.`}
+          : `Der Test hat zu wenige Aufgaben, um ${pageLimitMin(limit)} Seiten zu füllen (${pageCount} ${
+              pageCount === 1 ? 'Seite' : 'Seiten'
+            }). Bitte Aufgaben hinzufügen.`}
       </Alert>
     )
   }

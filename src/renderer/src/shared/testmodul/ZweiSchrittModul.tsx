@@ -8,6 +8,7 @@
  * den Hinweis, solange ein Hintergrund-Auftrag das Dokument sperrt. Bis dahin stand diese Hülle
  * dreimal fast gleich im Code.
  */
+import { OptionenBereich } from '../components/NurExperte'
 import { AppKopf } from '../components/AppKopf'
 import { Box, ScrollArea, Stepper } from '@mantine/core'
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
@@ -17,6 +18,7 @@ import { sichereAlles } from '../autosave'
 import AuftragsHinweis from '../components/AuftragsHinweis'
 import { useZwischenstaende, type Zwischenstand } from '../zwischenstand'
 import UndoRedoButtons from '../components/UndoRedoButtons'
+import RueckwegKnopf from '../components/RueckwegKnopf'
 import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../navigation'
 import { useUndoKeys } from '../useUndoKeys'
 import { notifyError } from '../util'
@@ -163,7 +165,13 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
           meine={{ label: p.texte.meine, onClick: () => setLibrary(true), kennung: p.modulId }}
           neu={{ label: p.texte.neu, onClick: startNew, kennung: p.modulId }}
           // Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt)
-          zusaetze={step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
+          zusaetze={
+            <>
+              {/* Rückweg, z. B. „Zurück zur Reihe" nach „Test hier erstellen" (06.10.2026) */}
+              <RueckwegKnopf modul={p.modulId} />
+              {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
+            </>
+          }
           links={
             <Stepper active={step} onStepClick={setStep} size="sm" allowNextStepsSelect={false}>
               <Stepper.Step label={p.schritte[0].label} description={p.schritte[0].description} />
@@ -182,7 +190,8 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
         ) : zeigeLive ? (
           <AuftragsHinweis auftrag={zeigeLive} vorschau={p.vorschau} onAusblenden={() => setAusgeblendet(zeigeLive.id)} />
         ) : step === 0 ? (
-          p.einstellen
+          // Standardmodus (07.10.2026): „Alle Optionen" gilt für den Einstellschritt dieses Vorgangs
+          <OptionenBereich>{p.einstellen}</OptionenBereich>
         ) : (
           step === 1 && hatAufgaben && dok && p.bearbeiten(dok)
         )}

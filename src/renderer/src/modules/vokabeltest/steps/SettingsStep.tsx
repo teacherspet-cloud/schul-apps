@@ -1,4 +1,5 @@
 import { genugFuerVarianten } from '../generation/distribute'
+import { NurExperte, OptionenBereich } from '../../../shared/components/NurExperte'
 import {
   Alert,
   Badge,
@@ -237,420 +238,446 @@ export default function SettingsStep(): React.JSX.Element {
   )
 
   return (
-    <FormularSeite fuss={fuss}>
-      <ScrollArea h="100%">
-        <Container size="xl" py="lg">
-          <Title order={2} mb="md">
-            Test einstellen
-          </Title>
+    <OptionenBereich>
+      <FormularSeite fuss={fuss}>
+        <ScrollArea h="100%">
+          <Container size="xl" py="lg">
+            <Title order={2} mb="md">
+              Test einstellen
+            </Title>
 
-          {!hasKey && (
-            <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
-              Zum Erstellen der Aufgaben wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt.{' '}
-              <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
-            </Alert>
-          )}
+            {!hasKey && (
+              <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
+                Zum Erstellen der Aufgaben wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt.{' '}
+                <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
+              </Alert>
+            )}
 
-          {/* Die Zusammenfassung steht oben; der Knopf dazu fest in der Fußleiste (Paket 6) */}
-          <Card withBorder mb="lg">
-            <Text size="sm">
-              <b>{requested}</b> Vokabeln in <b>{settings.tasks.length}</b> Aufgaben, <b>{settings.variantCount}</b>{' '}
-              {settings.variantCount === 1 ? 'Variante' : 'Varianten'}, Niveau <b>{settings.level}</b> · ca. {aiCalls} KI-Anfragen
-            </Text>
-          </Card>
+            {/* Die Zusammenfassung steht oben; der Knopf dazu fest in der Fußleiste (Paket 6) */}
+            <Card withBorder mb="lg">
+              <Text size="sm">
+                <b>{requested}</b> Vokabeln in <b>{settings.tasks.length}</b> Aufgaben, <b>{settings.variantCount}</b>{' '}
+                {settings.variantCount === 1 ? 'Variante' : 'Varianten'}, Niveau <b>{settings.level}</b> · ca. {aiCalls} KI-Anfragen
+              </Text>
+            </Card>
 
-          <Grid gap="lg">
-            <Grid.Col span={{ base: 12, md: 5 }}>
-              <Stack>
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Lerngruppe & Sprachniveau
-                  </Title>
-                  <Stack gap="sm">
-                    <Select
-                      label="Zielsprache"
-                      data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
-                      value={settings.targetLanguage}
-                      onChange={(v) => {
-                        if (!v) return
-                        // Aufgaben, die es in der neuen Sprache nicht gibt, fallen weg (30.09.2026); bleibt keine, gelten die Standardaufgaben
-                        const bleiben = settings.tasks.filter((t) => passtZurSprache(t.type, v))
-                        patch({ targetLanguage: v, tasks: bleiben.length ? bleiben : aufgabenFuer(v, settings.vocabCount) })
-                      }}
-                      allowDeselect={false}
-                    />
-                    {settings.targetLanguage === 'grc' && (
-                      <Switch
-                        label="Umschrift hinter den griechischen Wörtern"
-                        description="z. B. λόγος [logos] – Hilfe für den Anfangsunterricht; Nennformen und Bedeutungen bleiben griechisch bzw. deutsch."
-                        checked={Boolean(settings.umschrift)}
-                        onChange={(e) => patch({ umschrift: e.currentTarget.checked })}
-                        data-umschrift
+            <Grid gap="lg">
+              <Grid.Col span={{ base: 12, md: 5 }}>
+                <Stack>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Lerngruppe & Sprachniveau
+                    </Title>
+                    <Stack gap="sm">
+                      <Select
+                        label="Zielsprache"
+                        data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
+                        value={settings.targetLanguage}
+                        onChange={(v) => {
+                          if (!v) return
+                          // Aufgaben, die es in der neuen Sprache nicht gibt, fallen weg (30.09.2026); bleibt keine, gelten die Standardaufgaben
+                          const bleiben = settings.tasks.filter((t) => passtZurSprache(t.type, v))
+                          patch({ targetLanguage: v, tasks: bleiben.length ? bleiben : aufgabenFuer(v, settings.vocabCount) })
+                        }}
+                        allowDeselect={false}
                       />
-                    )}
-                    {table.states.length > 0 ? (
-                      <>
-                        <SchulAngabe
-                          stateId={settings.stateId}
-                          stateName={table.states.find((s) => s.id === settings.stateId)?.name ?? settings.stateId}
-                          schoolTypeId={settings.schoolTypeId}
-                          schoolTypeName={state?.schoolTypes.find((t) => t.id === settings.schoolTypeId)?.name ?? ''}
-                        >
+                      <NurExperte>
+                        {settings.targetLanguage === 'grc' && (
+                          <Switch
+                            label="Umschrift hinter den griechischen Wörtern"
+                            description="z. B. λόγος [logos] – Hilfe für den Anfangsunterricht; Nennformen und Bedeutungen bleiben griechisch bzw. deutsch."
+                            checked={Boolean(settings.umschrift)}
+                            onChange={(e) => patch({ umschrift: e.currentTarget.checked })}
+                            data-umschrift
+                          />
+                        )}
+                      </NurExperte>
+                      {table.states.length > 0 ? (
+                        <>
+                          <SchulAngabe
+                            stateId={settings.stateId}
+                            stateName={table.states.find((s) => s.id === settings.stateId)?.name ?? settings.stateId}
+                            schoolTypeId={settings.schoolTypeId}
+                            schoolTypeName={state?.schoolTypes.find((t) => t.id === settings.schoolTypeId)?.name ?? ''}
+                          >
+                            <Group grow>
+                              <HaeufigSelect
+                                art="bundesland"
+                                label="Bundesland"
+                                maxDropdownHeight={400}
+                                data={table.states.map((s) => ({ value: s.id, label: s.name }))}
+                                value={settings.stateId}
+                                onChange={(v) =>
+                                  v && applyGradeContext({ stateId: v, schoolTypeId: table.states.find((s) => s.id === v)?.schoolTypes[0]?.id ?? '' })
+                                }
+                                allowDeselect={false}
+                              />
+                              <HaeufigSelect
+                                art="schulform"
+                                label="Schulform"
+                                data={(state?.schoolTypes ?? []).map((s) => ({ value: s.id, label: s.name }))}
+                                value={settings.schoolTypeId}
+                                onChange={(v) => v && applyGradeContext({ schoolTypeId: v })}
+                                allowDeselect={false}
+                              />
+                            </Group>
+                          </SchulAngabe>
                           <Group grow>
-                            <HaeufigSelect
-                              art="bundesland"
-                              label="Bundesland"
-                              maxDropdownHeight={400}
-                              data={table.states.map((s) => ({ value: s.id, label: s.name }))}
-                              value={settings.stateId}
-                              onChange={(v) =>
-                                v && applyGradeContext({ stateId: v, schoolTypeId: table.states.find((s) => s.id === v)?.schoolTypes[0]?.id ?? '' })
-                              }
-                              allowDeselect={false}
-                            />
-                            <HaeufigSelect
-                              art="schulform"
-                              label="Schulform"
-                              data={(state?.schoolTypes ?? []).map((s) => ({ value: s.id, label: s.name }))}
-                              value={settings.schoolTypeId}
-                              onChange={(v) => v && applyGradeContext({ schoolTypeId: v })}
+                            <NurExperte>
+                              <Select
+                                label="Fremdsprache"
+                                data={tracks.map((t) => ({ value: String(t.order), label: `${t.order}. Fremdsprache (ab Kl. ${t.startGrade})` }))}
+                                value={String(settings.languageOrder)}
+                                onChange={(v) => v && applyGradeContext({ languageOrder: Number(v) })}
+                                allowDeselect={false}
+                              />
+                            </NurExperte>
+                            <Select
+                              label="Klasse"
+                              data={grades.map((g) => ({ value: g.value, label: g.label }))}
+                              value={String(settings.grade)}
+                              onChange={(v) => v && applyGradeContext({ grade: Number(v) })}
                               allowDeselect={false}
                             />
                           </Group>
-                        </SchulAngabe>
-                        <Group grow>
-                          <Select
-                            label="Fremdsprache"
-                            data={tracks.map((t) => ({ value: String(t.order), label: `${t.order}. Fremdsprache (ab Kl. ${t.startGrade})` }))}
-                            value={String(settings.languageOrder)}
-                            onChange={(v) => v && applyGradeContext({ languageOrder: Number(v) })}
-                            allowDeselect={false}
-                          />
-                          <Select
-                            label="Klasse"
-                            data={grades.map((g) => ({ value: g.value, label: g.label }))}
-                            value={String(settings.grade)}
-                            onChange={(v) => v && applyGradeContext({ grade: Number(v) })}
-                            allowDeselect={false}
-                          />
-                        </Group>
-                      </>
-                    ) : (
-                      <ZahlFeld label="Klasse" min={1} max={13} value={settings.grade} onChange={(v) => patch({ grade: Number(v) || 1 })} />
-                    )}
-                    <Select
-                      label="GER-Niveau für die Aufgaben"
-                      description={
-                        suggestion
-                          ? `Vorschlag laut Tabelle: ${suggestion.level} (Grundlage: ${suggestion.basis}). Ziel am Ende des Schuljahres.`
-                          : 'Niveau manuell wählen'
-                      }
-                      data={[...CEFR_SCALE]}
-                      value={settings.level}
-                      onChange={(v) => v && patch({ level: v as CefrLevel })}
-                      allowDeselect={false}
-                    />
-                  </Stack>
-                </Card>
+                        </>
+                      ) : (
+                        <ZahlFeld label="Klasse" min={1} max={13} value={settings.grade} onChange={(v) => patch({ grade: Number(v) || 1 })} />
+                      )}
+                      <NurExperte>
+                        <Select
+                          label="GER-Niveau für die Aufgaben"
+                          description={
+                            suggestion
+                              ? `Vorschlag laut Tabelle: ${suggestion.level} (Grundlage: ${suggestion.basis}). Ziel am Ende des Schuljahres.`
+                              : 'Niveau manuell wählen'
+                          }
+                          data={[...CEFR_SCALE]}
+                          value={settings.level}
+                          onChange={(v) => v && patch({ level: v as CefrLevel })}
+                          allowDeselect={false}
+                        />
+                      </NurExperte>
+                    </Stack>
+                  </Card>
 
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Umfang & Varianten
-                  </Title>
-                  <Stack gap="sm">
-                    <Group align="end">
-                      <ZahlFeld
-                        label="Anzahl abzufragender Vokabeln"
-                        description={`${usable.length} Vokabeln stehen in der Liste auf „abfragen“`}
-                        min={1}
-                        max={usable.length}
-                        value={settings.vocabCount}
-                        onChange={(v) => patch({ vocabCount: Number(v) || 1 })}
-                        style={{ flex: 1 }}
-                      />
-                      <Button variant="light" onClick={() => patch({ tasks: distributeEvenly(settings.tasks, settings.vocabCount) })}>
-                        Auf Aufgaben verteilen
-                      </Button>
-                    </Group>
-                    {requested !== settings.vocabCount && (
-                      <Text size="xs" c="orange">
-                        Die Aufgaben fragen zusammen {requested} Vokabeln ab.
-                      </Text>
-                    )}
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Anzahl Varianten
-                      </Text>
-                      <SegmentedControl
-                        data={['1', '2', '3', '4']}
-                        value={String(settings.variantCount)}
-                        onChange={(v) => patch({ variantCount: Number(v) })}
-                      />
-                    </div>
-                    {settings.variantCount > 1 && (
-                      <Radio.Group value={settings.variantMode} onChange={(v) => patch({ variantMode: v as TestSettings['variantMode'] })}>
-                        <Stack gap={6}>
-                          <Radio value="sameVocab" label="Gleiche Vokabeln, andere Sätze und Reihenfolge (gleich schwer)" />
-                          <Radio
-                            value="differentVocab"
-                            label="Unterschiedliche Vokabeln je Variante"
-                            // Seit 02.10.2026 überschneiden sich die Varianten (etwa ein Drittel gemeinsam) – es genügt ein Drittel neue Wörter
-                            disabled={!genugFuerVarianten(usable.length, requested)}
-                            description={
-                              genugFuerVarianten(usable.length, requested)
-                                ? 'Etwa ein Drittel der Vokabeln kommt auch in anderen Varianten vor, der Rest ist neu.'
-                                : 'Dafür ist die Liste zu kurz.'
-                            }
-                          />
-                        </Stack>
-                      </Radio.Group>
-                    )}
-                    <TextInput
-                      label="Thema / Kontext (optional)"
-                      placeholder="z. B. Unit 3: A trip to London"
-                      value={settings.topic}
-                      onChange={(e) => patch({ topic: e.currentTarget.value })}
-                    />
-                  </Stack>
-                </Card>
-
-                {/* Selten Geändertes eingeklappt (Paket 6); die Überschrift nennt, was vom Standard abweicht */}
-                <WeitereOptionen modul="vokabeltest" geaendert={geaenderteOptionen(settings, review)}>
-                  <Stack gap="sm">
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Seitenumfang je Test
-                      </Text>
-                      <SeitenVorgabe limit={pageLimit} onChange={setPageLimit} />
-                      <MehrText
-                        mt={4}
-                        text="Gilt für das Schülerblatt jeder Variante. Passt der Test nicht, werden Abstände und Schrift verkleinert; bei „genau“ wird der Inhalt gleichmäßig auf die Seiten verteilt, bei „von–bis“ nur dann, wenn er die Untergrenze nicht erreicht. Die Vorgabe lässt sich auch später im Editor ändern."
-                      />
-                    </div>
-                    <Checkbox label="Lösungsblatt erstellen" checked={settings.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                    <Checkbox
-                      label="Aufgaben zusätzlich von der KI prüfen lassen (empfohlen)"
-                      description={
-                        economy
-                          ? 'Sparmodus ist an: alle Aufgaben einer Variante in einer KI-Anfrage. Die Prüfung läuft trotzdem – sie kostet je Variante eine weitere Anfrage.'
-                          : 'Jede Aufgabe wird nach dem Erstellen noch einmal geprüft; das verdoppelt die Zahl der Anfragen.'
-                      }
-                      checked={review}
-                      onChange={(e) => setReview(e.currentTarget.checked)}
-                    />
-                    {economy && (
-                      <Text size="xs" c="dimmed">
-                        Sparmodus ist eingeschaltet (<EinstellungenLink tab="ki">Einstellungen → KI-Zugang</EinstellungenLink>): Die Aufgaben einer Variante
-                        entstehen in einer einzigen Anfrage.
-                      </Text>
-                    )}
-                  </Stack>
-                </WeitereOptionen>
-              </Stack>
-            </Grid.Col>
-
-            <Grid.Col span={{ base: 12, md: 7 }}>
-              <Card withBorder>
-                <Group justify="space-between" align="center" mb={4}>
-                  <Title order={4}>Aufgabentypen</Title>
-                  {!istAlteSprache(settings.targetLanguage) && (
-                    <Button
-                      size="xs"
-                      variant="light"
-                      leftSection={<IconRefresh size={14} />}
-                      loading={vorschlag.laeuft}
-                      disabled={usable.length < 2}
-                      onClick={() => void schlageVor(settings, false, table, hasKey)}
-                      data-zusammensetzung
-                    >
-                      {hasKey ? 'KI-Vorschlag neu' : 'Vorschlag neu'}
-                    </Button>
-                  )}
-                </Group>
-                {vorschlag.laeuft ? (
-                  <Group gap="xs" mb="sm">
-                    <Loader size="xs" />
-                    <Text size="sm" c="dimmed">
-                      Die KI stellt die Aufgaben für die gewählten Vokabeln zusammen ({STANDARD_UMFANG.min}–{STANDARD_UMFANG.max} Vokabeln) …
-                    </Text>
-                  </Group>
-                ) : (
-                  (vorschlag.klasse || vorschlag.gruende.length > 0) && (
-                    <Alert variant="light" color="blue" p="xs" mb="sm" icon={<IconSparkles size={16} />} data-vorschlag>
-                      {vorschlag.klasse && <Text size="xs">{vorschlag.klasse}. Die Klasse bestimmt die Schwierigkeit der vorgeschlagenen Formate mit.</Text>}
-                      {vorschlag.gruende.map((g, i) => (
-                        <Text key={i} size="xs" c="dimmed">
-                          {g}
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Umfang & Varianten
+                    </Title>
+                    <Stack gap="sm">
+                      <Group align="end">
+                        <ZahlFeld
+                          label="Anzahl abzufragender Vokabeln"
+                          description={`${usable.length} Vokabeln stehen in der Liste auf „abfragen“`}
+                          min={1}
+                          max={usable.length}
+                          value={settings.vocabCount}
+                          onChange={(v) => patch({ vocabCount: Number(v) || 1 })}
+                          style={{ flex: 1 }}
+                        />
+                        <NurExperte>
+                          <Button variant="light" onClick={() => patch({ tasks: distributeEvenly(settings.tasks, settings.vocabCount) })}>
+                            Auf Aufgaben verteilen
+                          </Button>
+                        </NurExperte>
+                      </Group>
+                      {requested !== settings.vocabCount && (
+                        <Text size="xs" c="orange">
+                          Die Aufgaben fragen zusammen {requested} Vokabeln ab.
                         </Text>
-                      ))}
-                      <Text size="xs" c="dimmed" mt={4}>
-                        Vorschlag – Aufgaben, Anzahl und Punkte bleiben frei änderbar.
+                      )}
+                      <div>
+                        <Text size="sm" fw={500} mb={4}>
+                          Anzahl Varianten
+                        </Text>
+                        <SegmentedControl
+                          data={['1', '2', '3', '4']}
+                          value={String(settings.variantCount)}
+                          onChange={(v) => patch({ variantCount: Number(v) })}
+                        />
+                      </div>
+                      <NurExperte geaendert={settings.variantCount > 1 && settings.variantMode === 'differentVocab' && 'andere Vokabeln je Variante'}>
+                        {settings.variantCount > 1 && (
+                          <Radio.Group value={settings.variantMode} onChange={(v) => patch({ variantMode: v as TestSettings['variantMode'] })}>
+                            <Stack gap={6}>
+                              <Radio value="sameVocab" label="Gleiche Vokabeln, andere Sätze und Reihenfolge (gleich schwer)" />
+                              <Radio
+                                value="differentVocab"
+                                label="Unterschiedliche Vokabeln je Variante"
+                                // Seit 02.10.2026 überschneiden sich die Varianten (etwa ein Drittel gemeinsam) – es genügt ein Drittel neue Wörter
+                                disabled={!genugFuerVarianten(usable.length, requested)}
+                                description={
+                                  genugFuerVarianten(usable.length, requested)
+                                    ? 'Etwa ein Drittel der Vokabeln kommt auch in anderen Varianten vor, der Rest ist neu.'
+                                    : 'Dafür ist die Liste zu kurz.'
+                                }
+                              />
+                            </Stack>
+                          </Radio.Group>
+                        )}
+                      </NurExperte>
+                      <TextInput
+                        label="Thema / Kontext (optional)"
+                        placeholder="z. B. Unit 3: A trip to London"
+                        value={settings.topic}
+                        onChange={(e) => patch({ topic: e.currentTarget.value })}
+                      />
+                    </Stack>
+                  </Card>
+
+                  {/* Selten Geändertes eingeklappt (Paket 6); die Überschrift nennt, was vom Standard abweicht */}
+                  <WeitereOptionen modul="vokabeltest" geaendert={geaenderteOptionen(settings, review)}>
+                    <Stack gap="sm">
+                      <div>
+                        <Text size="sm" fw={500} mb={4}>
+                          Seitenumfang je Test
+                        </Text>
+                        <SeitenVorgabe limit={pageLimit} onChange={setPageLimit} />
+                        <MehrText
+                          mt={4}
+                          text="Gilt für das Schülerblatt jeder Variante. Passt der Test nicht, werden Abstände und Schrift verkleinert; bei „genau“ wird der Inhalt gleichmäßig auf die Seiten verteilt, bei „von–bis“ nur dann, wenn er die Untergrenze nicht erreicht. Die Vorgabe lässt sich auch später im Editor ändern."
+                        />
+                      </div>
+                      <Checkbox label="Lösungsblatt erstellen" checked={settings.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                      <Checkbox
+                        label="Aufgaben zusätzlich von der KI prüfen lassen (empfohlen)"
+                        description={
+                          economy
+                            ? 'Sparmodus ist an: alle Aufgaben einer Variante in einer KI-Anfrage. Die Prüfung läuft trotzdem – sie kostet je Variante eine weitere Anfrage.'
+                            : 'Jede Aufgabe wird nach dem Erstellen noch einmal geprüft; das verdoppelt die Zahl der Anfragen.'
+                        }
+                        checked={review}
+                        onChange={(e) => setReview(e.currentTarget.checked)}
+                      />
+                      {economy && (
+                        <Text size="xs" c="dimmed">
+                          Sparmodus ist eingeschaltet (<EinstellungenLink tab="ki">Einstellungen → KI-Zugang</EinstellungenLink>): Die Aufgaben einer Variante
+                          entstehen in einer einzigen Anfrage.
+                        </Text>
+                      )}
+                    </Stack>
+                  </WeitereOptionen>
+                </Stack>
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 7 }}>
+                <Card withBorder>
+                  <Group justify="space-between" align="center" mb={4}>
+                    <Title order={4}>Aufgabentypen</Title>
+                    {!istAlteSprache(settings.targetLanguage) && (
+                      <Button
+                        size="xs"
+                        variant="light"
+                        leftSection={<IconRefresh size={14} />}
+                        loading={vorschlag.laeuft}
+                        disabled={usable.length < 2}
+                        onClick={() => void schlageVor(settings, false, table, hasKey)}
+                        data-zusammensetzung
+                      >
+                        {hasKey ? 'KI-Vorschlag neu' : 'Vorschlag neu'}
+                      </Button>
+                    )}
+                  </Group>
+                  {vorschlag.laeuft ? (
+                    <Group gap="xs" mb="sm">
+                      <Loader size="xs" />
+                      <Text size="sm" c="dimmed">
+                        Die KI stellt die Aufgaben für die gewählten Vokabeln zusammen ({STANDARD_UMFANG.min}–{STANDARD_UMFANG.max} Vokabeln) …
                       </Text>
-                    </Alert>
-                  )
-                )}
-                <Text size="sm" c="dimmed" mb="md">
-                  Alle Aufgaben prüfen die Vokabeln im Kontext der Zielsprache. Die Zahl gibt an, wie viele Vokabeln in der Aufgabe vorkommen.
-                </Text>
-                <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="sm">
-                  {/*
+                    </Group>
+                  ) : (
+                    (vorschlag.klasse || vorschlag.gruende.length > 0) && (
+                      <Alert variant="light" color="blue" p="xs" mb="sm" icon={<IconSparkles size={16} />} data-vorschlag>
+                        {vorschlag.klasse && <Text size="xs">{vorschlag.klasse}. Die Klasse bestimmt die Schwierigkeit der vorgeschlagenen Formate mit.</Text>}
+                        {vorschlag.gruende.map((g, i) => (
+                          <Text key={i} size="xs" c="dimmed">
+                            {g}
+                          </Text>
+                        ))}
+                        <Text size="xs" c="dimmed" mt={4}>
+                          Vorschlag – Aufgaben, Anzahl und Punkte bleiben frei änderbar.
+                        </Text>
+                      </Alert>
+                    )
+                  )}
+                  <Text size="sm" c="dimmed" mb="md">
+                    Alle Aufgaben prüfen die Vokabeln im Kontext der Zielsprache. Die Zahl gibt an, wie viele Vokabeln in der Aufgabe vorkommen.
+                  </Text>
+                  <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="sm">
+                    {/*
                   Latein bekommt andere Aufgabenarten als die modernen Fremdsprachen: keine
                   Sprech- und Schreibformate, dafür Nennformen, Wortbildung und Lehnwörter.
                   Begründung und Belege in `didactics/latein.ts`.
                 */}
-                  {TASK_TYPE_LIST.filter((d) => d.id !== 'freeText' && passtZurSprache(d.id, settings.targetLanguage)).map((def) => {
-                    const sel = settings.tasks.find((t) => t.type === def.id)
-                    const tooEasyLevel = !levelAtLeast(settings.level, def.minLevel)
-                    const formText = formStand ? formHinweis(def.id, formStand) : undefined
-                    return (
-                      <Card key={def.id} withBorder padding="sm" className={sel ? 'task-card-selected' : undefined}>
-                        <Group justify="space-between" wrap="nowrap" align="start">
-                          <Checkbox
-                            checked={Boolean(sel)}
-                            onChange={(e) => toggleTask(def.id, e.currentTarget.checked)}
-                            label={
-                              <Text fw={600} size="sm">
-                                {aufgabenLabel(def, settings.targetLanguage)}
-                              </Text>
-                            }
-                            description={def.description}
-                          />
-                          <Tooltip label={tooEasyLevel ? `Empfohlen ab ${def.minLevel}` : `Geeignet ab ${def.minLevel}`}>
-                            <Badge variant="light" color={tooEasyLevel ? 'orange' : 'gray'} style={{ flexShrink: 0 }}>
-                              ab {def.minLevel}
-                            </Badge>
-                          </Tooltip>
-                        </Group>
-                        {formText && (
-                          <Text size="xs" mt={4} c={formStand && formZuSchwer(def.id, formStand) ? 'orange' : 'dimmed'} data-formhinweis>
-                            {formText}
-                          </Text>
-                        )}
-                        {/*
+                    {TASK_TYPE_LIST.filter((d) => d.id !== 'freeText' && passtZurSprache(d.id, settings.targetLanguage)).map((def) => {
+                      const sel = settings.tasks.find((t) => t.type === def.id)
+                      const tooEasyLevel = !levelAtLeast(settings.level, def.minLevel)
+                      const formText = formStand ? formHinweis(def.id, formStand) : undefined
+                      return (
+                        <Card key={def.id} withBorder padding="sm" className={sel ? 'task-card-selected' : undefined}>
+                          <Group justify="space-between" wrap="nowrap" align="start">
+                            <Checkbox
+                              checked={Boolean(sel)}
+                              onChange={(e) => toggleTask(def.id, e.currentTarget.checked)}
+                              label={
+                                <Text fw={600} size="sm">
+                                  {aufgabenLabel(def, settings.targetLanguage)}
+                                </Text>
+                              }
+                              description={def.description}
+                            />
+                            <Tooltip label={tooEasyLevel ? `Empfohlen ab ${def.minLevel}` : `Geeignet ab ${def.minLevel}`}>
+                              <Badge variant="light" color={tooEasyLevel ? 'orange' : 'gray'} style={{ flexShrink: 0 }}>
+                                ab {def.minLevel}
+                              </Badge>
+                            </Tooltip>
+                          </Group>
+                          {formText && (
+                            <Text size="xs" mt={4} c={formStand && formZuSchwer(def.id, formStand) ? 'orange' : 'dimmed'} data-formhinweis>
+                              {formText}
+                            </Text>
+                          )}
+                          {/*
                           Unregelmäßige Verben (30.09.2026): statt der Vokabelzahl die Auswahl aus der
                           Verbliste des Lehrwerks – nur Formate ohne KI, je Form ein Punkt.
                         */}
-                        {sel && def.id === 'irregularVerbs' && istVerbSprache(settings.targetLanguage) && (
-                          <Stack mt="xs" gap="xs">
-                            {((h) =>
-                              h ? (
-                                <Text size="xs" c="orange" data-verb-vorwissen>
-                                  {h}
-                                </Text>
-                              ) : null)(
-                              vorwissenHinweis(
-                                settings.verbAufgabe ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings)),
-                                settings,
-                                listContext?.known
-                              )
+                          <NurExperte>
+                            {sel && def.id === 'irregularVerbs' && istVerbSprache(settings.targetLanguage) && (
+                              <Stack mt="xs" gap="xs">
+                                {((h) =>
+                                  h ? (
+                                    <Text size="xs" c="orange" data-verb-vorwissen>
+                                      {h}
+                                    </Text>
+                                  ) : null)(
+                                  vorwissenHinweis(
+                                    settings.verbAufgabe ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings)),
+                                    settings,
+                                    listContext?.known
+                                  )
+                                )}
+                                <VerbAufgabeWahl
+                                  wert={
+                                    settings.verbAufgabe?.sprache === settings.targetLanguage
+                                      ? settings.verbAufgabe
+                                      : verbAufgabeFuer(settings, usable, 1) ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings))
+                                  }
+                                  onChange={(verbAufgabe) => patch({ verbAufgabe })}
+                                  nurOhneKi
+                                  vokabeln={usable}
+                                  lehrwerkName={listContext?.bookName}
+                                />
+                                <ZahlFeld
+                                  size="xs"
+                                  label="Punkte je Form"
+                                  min={0}
+                                  step={0.5}
+                                  decimalScale={1}
+                                  value={sel.pointsPerItem}
+                                  onChange={(v) =>
+                                    patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })
+                                  }
+                                />
+                              </Stack>
                             )}
-                            <VerbAufgabeWahl
-                              wert={
-                                settings.verbAufgabe?.sprache === settings.targetLanguage
-                                  ? settings.verbAufgabe
-                                  : (verbAufgabeFuer(settings, usable, 1) ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings)))
-                              }
-                              onChange={(verbAufgabe) => patch({ verbAufgabe })}
-                              nurOhneKi
-                              vokabeln={usable}
-                              lehrwerkName={listContext?.bookName}
-                            />
-                            <ZahlFeld
-                              size="xs"
-                              label="Punkte je Form"
-                              min={0}
-                              step={0.5}
-                              decimalScale={1}
-                              value={sel.pointsPerItem}
-                              onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })}
-                            />
-                          </Stack>
-                        )}
-                        {sel && def.id !== 'irregularVerbs' && (
-                          <Group mt="xs" grow>
-                            <ZahlFeld
-                              size="xs"
-                              label="Vokabeln"
-                              min={def.minItems ?? 1}
-                              max={usable.length}
-                              value={sel.count}
-                              onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, count: Number(v) || 1 } : t)) })}
-                            />
-                            <ZahlFeld
-                              size="xs"
-                              label="Punkte je Vokabel"
-                              min={0}
-                              step={0.5}
-                              decimalScale={1}
-                              value={sel.pointsPerItem}
-                              onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })}
-                            />
-                          </Group>
-                        )}
-                        {sel && def.id === 'mindmap' && (
-                          <Stack gap={4} mt="xs">
-                            {/* Mindmap (02.10.2026): Wahl der Lehrkraft – „beides wählbar" */}
-                            <SegmentedControl
-                              size="xs"
-                              fullWidth
-                              data={[
-                                { value: 'oberbegriffe', label: 'Mit Oberbegriffen' },
-                                { value: 'offen', label: 'Ganz offen' }
-                              ]}
-                              value={settings.mindmapVariante ?? 'oberbegriffe'}
-                              onChange={(v) => patch({ mindmapVariante: v as TestSettings['mindmapVariante'] })}
-                            />
-                            <Text size="xs" c="dimmed">
-                              {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe'
-                                ? 'Die KI schlägt 3–5 Oberbegriffe für die Äste vor; an jedem Ast so viele Linien wie Wörter.'
-                                : 'Äste und Linien bleiben leer – die Lernenden ordnen und beschriften selbst.'}
-                            </Text>
-                            {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe' && (
-                              <Checkbox
+                          </NurExperte>
+                          <NurExperte>
+                            {sel && def.id !== 'irregularVerbs' && (
+                              <Group mt="xs" grow>
+                                <ZahlFeld
+                                  size="xs"
+                                  label="Vokabeln"
+                                  min={def.minItems ?? 1}
+                                  max={usable.length}
+                                  value={sel.count}
+                                  onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, count: Number(v) || 1 } : t)) })}
+                                />
+                                <ZahlFeld
+                                  size="xs"
+                                  label="Punkte je Vokabel"
+                                  min={0}
+                                  step={0.5}
+                                  decimalScale={1}
+                                  value={sel.pointsPerItem}
+                                  onChange={(v) =>
+                                    patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })
+                                  }
+                                />
+                              </Group>
+                            )}
+                          </NurExperte>
+                          <NurExperte>
+                            {sel && def.id === 'mindmap' && (
+                              <Stack gap={4} mt="xs">
+                                {/* Mindmap (02.10.2026): Wahl der Lehrkraft – „beides wählbar" */}
+                                <SegmentedControl
+                                  size="xs"
+                                  fullWidth
+                                  data={[
+                                    { value: 'oberbegriffe', label: 'Mit Oberbegriffen' },
+                                    { value: 'offen', label: 'Ganz offen' }
+                                  ]}
+                                  value={settings.mindmapVariante ?? 'oberbegriffe'}
+                                  onChange={(v) => patch({ mindmapVariante: v as TestSettings['mindmapVariante'] })}
+                                />
+                                <Text size="xs" c="dimmed">
+                                  {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe'
+                                    ? 'Die KI schlägt 3–5 Oberbegriffe für die Äste vor; an jedem Ast so viele Linien wie Wörter.'
+                                    : 'Äste und Linien bleiben leer – die Lernenden ordnen und beschriften selbst.'}
+                                </Text>
+                                {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe' && (
+                                  <Checkbox
+                                    size="xs"
+                                    label="Zusätzlich ein freier Ast für eigene Wörter"
+                                    checked={Boolean(settings.mindmapFreierAst)}
+                                    onChange={(e) => patch({ mindmapFreierAst: e.currentTarget.checked })}
+                                  />
+                                )}
+                              </Stack>
+                            )}
+                          </NurExperte>
+                          <NurExperte>
+                            {sel && def.id === 'pictureLabel' && (
+                              <Select
+                                mt="xs"
                                 size="xs"
-                                label="Zusätzlich ein freier Ast für eigene Wörter"
-                                checked={Boolean(settings.mindmapFreierAst)}
-                                onChange={(e) => patch({ mindmapFreierAst: e.currentTarget.checked })}
+                                label="Bilder automatisch aus"
+                                description="In dieser Reihenfolge: Piktogramm, Clipart aus dem Internet, sonst KI-Bild – jedes Bild wird von der KI auf Eindeutigkeit geprüft."
+                                data={[
+                                  { value: 'auto', label: 'Piktogramme, Cliparts und KI-Bilder (empfohlen)' },
+                                  { value: 'ai', label: 'nur KI-erzeugte Cliparts' },
+                                  { value: 'none', label: 'Keine – selbst im Editor wählen' }
+                                ]}
+                                value={settings.pictureSource === 'openmoji' ? 'auto' : settings.pictureSource}
+                                onChange={(v) => v && patch({ pictureSource: v as TestSettings['pictureSource'] })}
+                                allowDeselect={false}
                               />
                             )}
-                          </Stack>
-                        )}
-                        {sel && def.id === 'pictureLabel' && (
-                          <Select
-                            mt="xs"
-                            size="xs"
-                            label="Bilder automatisch aus"
-                            description="In dieser Reihenfolge: Piktogramm, Clipart aus dem Internet, sonst KI-Bild – jedes Bild wird von der KI auf Eindeutigkeit geprüft."
-                            data={[
-                              { value: 'auto', label: 'Piktogramme, Cliparts und KI-Bilder (empfohlen)' },
-                              { value: 'ai', label: 'nur KI-erzeugte Cliparts' },
-                              { value: 'none', label: 'Keine – selbst im Editor wählen' }
-                            ]}
-                            value={settings.pictureSource === 'openmoji' ? 'auto' : settings.pictureSource}
-                            onChange={(v) => v && patch({ pictureSource: v as TestSettings['pictureSource'] })}
-                            allowDeselect={false}
-                          />
-                        )}
-                        {sel && def.id === 'pictureLabel' && (
-                          <Checkbox
-                            mt="xs"
-                            size="xs"
-                            label="Wortkasten als Hilfe"
-                            description="Die gesuchten Wörter stehen mit überzähligen Wörtern im Kasten. Ohne Kasten müssen die Lernenden die Wörter selbst abrufen."
-                            checked={Boolean(settings.pictureWordBank)}
-                            onChange={(e) => patch({ pictureWordBank: e.currentTarget.checked })}
-                          />
-                        )}
-                      </Card>
-                    )
-                  })}
-                </SimpleGrid>
-              </Card>
-            </Grid.Col>
-          </Grid>
-        </Container>
-      </ScrollArea>
-    </FormularSeite>
+                          </NurExperte>
+                          <NurExperte>
+                            {sel && def.id === 'pictureLabel' && (
+                              <Checkbox
+                                mt="xs"
+                                size="xs"
+                                label="Wortkasten als Hilfe"
+                                description="Die gesuchten Wörter stehen mit überzähligen Wörtern im Kasten. Ohne Kasten müssen die Lernenden die Wörter selbst abrufen."
+                                checked={Boolean(settings.pictureWordBank)}
+                                onChange={(e) => patch({ pictureWordBank: e.currentTarget.checked })}
+                              />
+                            )}
+                          </NurExperte>
+                        </Card>
+                      )
+                    })}
+                  </SimpleGrid>
+                </Card>
+              </Grid.Col>
+            </Grid>
+          </Container>
+        </ScrollArea>
+      </FormularSeite>
+    </OptionenBereich>
   )
 }
 

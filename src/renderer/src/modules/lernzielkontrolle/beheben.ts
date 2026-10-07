@@ -20,6 +20,12 @@ import { worksheetMetaForKurztest } from './render/kurztestWorksheet'
 import { bausteinNachWunsch } from '../arbeitsblatt/generation/wunsch'
 import type { WunschArt } from '../../shared/kiWunsch'
 import { hoertextWunschLzk } from './hoertext'
+import { addVersion } from '../arbeitsblatt/model/versions'
+import { describeBlock } from '../arbeitsblatt/generation/describe'
+import { newBlock } from '../arbeitsblatt/model/factory'
+import type { TableBlock } from '../arbeitsblatt/model/types'
+import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../shared/bewertung/raster'
+import { rasterAufteilung } from '../arbeitsblatt/auftraege'
 
 /**
  * Zauberstab „Überarbeiten" bzw. Kreis „Neu erzeugen" an einem Baustein (30.09.2026) – mit dem
@@ -65,10 +71,59 @@ export function bausteinNachWunschAuftrag(test: Kurztest, docId: string, variant
       )
     },
     abschluss: () => (art === 'neu' ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
+    // Der bisherige Stand bleibt als Fassung des Bausteins abrufbar (06.10.2026, wie Arbeitsblatt und Klassenarbeit)
     ablegen: (neu, t) =>
       legeKurztestAb(docId, t, (aktuell) => ({
         ...aktuell,
-        varianten: aktuell.varianten.map((v, i) => (i === variante ? { ...v, blocks: v.blocks.map((b) => (b.id === blockId ? neu : b)) } : v))
+        varianten: aktuell.varianten.map((v, i) => (i === variante ? { ...v, blocks: v.blocks.map((b) => (b.id === blockId ? addVersion(b, neu) : b)) } : v))
+      }))
+  })
+}
+
+/**
+ * Bewertungsraster zu einer Aufgabe (06.10.2026, wie Arbeitsblatt und Klassenarbeit): als Tabelle
+ * hinter der Aufgabe in dieser Fassung, nur im Lösungsteil.
+ */
+export function rasterAuftragLzk(test: Kurztest, docId: string, variante: number, blockId: string): void {
+  if (!test.varianten[variante]) return
+  void starteAuftrag({
+    moduleId: 'lernzielkontrolle',
+    docId,
+    titel: test.meta.title.trim() || test.meta.thema.trim() || 'Lernzielkontrolle',
+    art: 'Bewertungsraster erstellen',
+    eingabe: test,
+    istOffen: () => kurztestOffen(docId),
+    sperrt: false,
+    schluessel: `raster-${blockId}`,
+    fehlerTitel: 'Das Bewertungsraster konnte nicht erstellt werden',
+    arbeit: async (t, k) => {
+      const v = t.varianten[variante]
+      const aufgabe = v?.blocks.find((b) => b.id === blockId)
+      if (aufgabe?.type !== 'task') throw new Error('Die Aufgabe ist nicht mehr vorhanden.')
+      k.melde('Die KI entwirft das Bewertungsraster …')
+      const antwort = await k.ai<unknown>(
+        rasterAnfrage({
+          system: kurztestPrompt(t, v.label),
+          aufgabe: describeBlock(aufgabe),
+          loesung: aufgabe.solution,
+          punkte: aufgabe.points ?? 0,
+          aufteilung: rasterAufteilung(t.meta.subjectId, Boolean(aufgabe.brief))
+        })
+      )
+      return rasterAus(antwort, 'Bewertungsraster', aufgabe.points ?? 0)
+    },
+    abschluss: () => 'Fertig – das Raster steht hinter der Aufgabe (im Lösungsteil)',
+    ablegen: (raster, t) =>
+      legeKurztestAb(docId, t, (aktuell) => ({
+        ...aktuell,
+        varianten: aktuell.varianten.map((v, i) => {
+          if (i !== variante || !v.blocks.some((b) => b.id === blockId)) return v
+          const id = `raster-${blockId}`
+          const tabelle = { ...(newBlock('table') as TableBlock), id, ...rasterAlsTabelle(raster), nurLoesung: true }
+          const blocks = v.blocks.filter((b) => b.id !== id)
+          blocks.splice(blocks.findIndex((b) => b.id === blockId) + 1, 0, tabelle)
+          return { ...v, blocks }
+        })
       }))
   })
 }

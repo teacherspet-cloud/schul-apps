@@ -18,7 +18,7 @@ import {
 } from './library'
 import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
-import { useAppSettings } from '../../shared/settingsStore'
+import { useAppSettings, useExperte } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
@@ -39,6 +39,11 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
   // Sek II: Der Auftrag wartet auf die Wahl der Quelle
   const quellenFrage = useRueckfrage(docId, QUELLENAUSWAHL)
   const [area, setArea] = useState<'create' | 'designs'>('create')
+  /*
+   * Standardmodus (07.10.2026): zwei Schritte – „Arbeitsblatt erstellen" überspringt die Gliederung. Wer sie doch
+   * plant („Erst Gliederung planen"), sieht wieder alle drei.
+   */
+  const experte = useExperte()
   // Beim Öffnen die Bibliothek zeigen, wenn schon Arbeitsblätter gespeichert sind
   const [library, setLibrary] = useState(false)
   const logo = useAppSettings((s) => s.logoDataUrl)
@@ -135,7 +140,19 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
               links={
                 <Group gap="lg" wrap="nowrap" align="center">
                   {reiter}
-                  {area === 'create' && (
+                  {area === 'create' && !experte && step !== 1 && (
+                    <Stepper
+                      active={step === 2 ? 1 : 0}
+                      onStepClick={(i) => setStep(i === 1 ? 2 : 0)}
+                      size="sm"
+                      style={{ flex: 1 }}
+                      allowNextStepsSelect={false}
+                    >
+                      <Stepper.Step label="Thema & Lerngruppe" description="Jahrgang, Schulform, Material" />
+                      <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(worksheet?.sheets.length)} />
+                    </Stepper>
+                  )}
+                  {area === 'create' && (experte || step === 1) && (
                     <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
                       <Stepper.Step label="Thema & Lerngruppe" description="Jahrgang, Schulform, Material" />
                       <Stepper.Step label="Gliederung" description="Lernziele und Bausteine" allowStepSelect={Boolean(worksheet?.outline)} />

@@ -8,7 +8,7 @@ import { ueberthemaVon } from '../../shared/ueberthema'
 import { chosenGrammarTopics } from '../arbeitsblatt/didactics/grammar'
 import { erzeugeBibliothek } from '../../shared/testmodul/bibliothek'
 import type { GrammarTest } from './model/types'
-import { istVerbTest, testHasContent, testPoints, testTaskCount } from './model/types'
+import { istVerbTest, testFassungen, testHasContent, testPoints, testTaskCount } from './model/types'
 import { useGrammatiktest } from './store'
 
 /** Die geprüften Formen ausgeschrieben – in der Übersicht ist das die eigentliche Kennzeichnung. */
@@ -32,7 +32,7 @@ export function testStats(test: GrammarTest): SavedGrammarTestStats {
     points: testPoints(test),
     minutes: test.meta.minutes,
     graded: test.meta.graded,
-    varianten: test.blocksB?.length ? 2 : 1,
+    varianten: testFassungen(test).length,
     stateId: test.meta.stateId,
     schoolTypeId: test.meta.schoolTypeId,
     ...(ueberthemaVon(test.meta) ? { ueberthema: ueberthemaVon(test.meta) } : {})

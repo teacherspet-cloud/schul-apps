@@ -39,7 +39,8 @@ async function baseSettings(previous: TestSettings | null, context: VocabListCon
  * (im Buch grau) kommt mit, wird aber wie überall nicht abgefragt (Paket 7; vorher setzte
  * dieser Weg ALLES auf „abfragen").
  */
-export function AutoCreateButton({ selection }: { selection?: BookSelection | null }): React.JSX.Element {
+/** `haupt`: als Hauptknopf (Standardmodus, 07.10.2026 – dort der übliche Weg nach der Vokabelwahl) */
+export function AutoCreateButton({ selection, haupt }: { selection?: BookSelection | null; haupt?: boolean }): React.JSX.Element {
   const { vocab, setVocab, listName, setListName, setListContext } = useVokabeltest()
   const [opened, setOpened] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -74,7 +75,15 @@ export function AutoCreateButton({ selection }: { selection?: BookSelection | nu
 
   return (
     <>
-      <Button variant="light" leftSection={<IconSparkles size={16} />} disabled={!ready} loading={loading} onClick={() => void open()}>
+      <Button
+        variant={haupt ? 'filled' : 'light'}
+        size={haupt ? 'md' : undefined}
+        leftSection={<IconSparkles size={haupt ? 18 : 16} />}
+        disabled={!ready}
+        loading={loading}
+        onClick={() => void open()}
+        data-auto-erstellen
+      >
         Test automatisch erstellen
       </Button>
       <AutoCreateModal opened={opened} onClose={() => setOpened(false)} />
@@ -176,7 +185,9 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
       },
       abschluss: (result) => {
         const total = result.variants[0] ? variantPoints(result.variants[0]) : 0
-        return `Test erstellt: ${result.settings.tasks.map((t) => `${TASK_TYPES[t.type].label} (${t.count})`).join(', ')} – ${formatPoints(total)} Punkte${total !== points ? ` (Vorgabe ${points})` : ''}.`
+        return `Test erstellt: ${result.settings.tasks.map((t) => `${TASK_TYPES[t.type].label} (${t.count})`).join(', ')} – ${formatPoints(total)} Punkte${
+          total !== points ? ` (Vorgabe ${points})` : ''
+        }.`
       }
     })
     onClose()
@@ -189,16 +200,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
           Die KI wählt passende Aufgabenformate für die {usable.length} abgefragten Vokabeln und verteilt die Punkte. Der fertige Test lässt sich anschließend
           bearbeiten.
         </Text>
-        <ZahlFeld
-          label="Gesamtpunktzahl"
-          min={2}
-          max={200}
-          step={1}
-          value={points}
-          onChange={(v) => setPoints(Math.max(2, Number(v) || 2))}
-
-          data-autofocus
-        />
+        <ZahlFeld label="Gesamtpunktzahl" min={2} max={200} step={1} value={points} onChange={(v) => setPoints(Math.max(2, Number(v) || 2))} data-autofocus />
         <Text size="xs" c="dimmed">
           {tested < usable.length
             ? `Bei ${points} Punkten werden ${tested} der ${usable.length} Vokabeln abgefragt (1 Punkt je Vokabel).`
@@ -258,7 +260,6 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
               placeholder={analysis.result?.topic ? `z. B. ${analysis.result.topic}` : 'z. B. Urlaub am Meer, Schule in England'}
               value={base.topic}
               onChange={(e) => patch({ topic: e.currentTarget.value })}
-
               rightSectionWidth={analysis.result?.topic && !base.topic ? 90 : undefined}
               rightSection={
                 analysis.result?.topic && !base.topic ? (

@@ -367,3 +367,48 @@ describe('Ergebnis ablegen', () => {
     expect(t.gesichert).toEqual([{ id: 'd', name: null, dok: { a: 99, b: 'schnappschuss' } }])
   })
 })
+
+describe('Sichtbar warten (k.pausiere, 06.10.2026)', () => {
+  it('steht als „wartend" mit Grund in der Leiste und läuft danach weiter', async () => {
+    let weiter: () => void = () => undefined
+    const lauf = starteAuftrag({
+      moduleId: 'vokabelliste',
+      docId: 'd-warten',
+      titel: 'Unit 1',
+      art: 'Aussprache erzeugen',
+      eingabe: {},
+      sperrt: false,
+      arbeit: async (_e, k) => {
+        await k.pausiere('Die Sprach-KI ist ausgelastet – wartet bis 14:35', new Promise<void>((ok) => (weiter = ok)))
+        k.melde('Weiter')
+        return 1
+      },
+      ablegen: async () => undefined
+    })
+    await tick()
+    await tick()
+    expect(auftrag()?.status).toBe('wartend')
+    expect(auftrag()?.wartegrund).toBe('Die Sprach-KI ist ausgelastet – wartet bis 14:35')
+    weiter()
+    await expect(lauf).resolves.toBe(1)
+    expect(auftrag()?.status).toBe('fertig')
+  })
+
+  it('ein Abbruch beendet das Warten sofort', async () => {
+    const lauf = starteAuftrag({
+      moduleId: 'vokabelliste',
+      docId: 'd-warten-ab',
+      titel: 'Unit 2',
+      art: 'Aussprache erzeugen',
+      eingabe: {},
+      sperrt: false,
+      arbeit: async (_e, k) => k.pausiere('wartet', new Promise<number>(() => undefined)),
+      ablegen: async () => undefined
+    })
+    await tick()
+    await tick()
+    brichAb(auftrag()!.id)
+    await expect(lauf).resolves.toBeNull()
+    expect(auftrag()?.status).toBe('abgebrochen')
+  })
+})

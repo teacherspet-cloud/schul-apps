@@ -14,11 +14,12 @@
  * mal gefüllt, „Eigenes Fenster" mal da, mal nicht.
  */
 import { DokumentSuche } from './AppSuche'
-import { ActionIcon, Button, Group, Paper, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Badge, Button, Group, Paper, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconChevronUp, IconFolder, IconPlus } from '@tabler/icons-react'
 import { createContext, useContext, useState } from 'react'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import type { ProgrammIcon } from './ProgrammSymbol'
+import { useAppSettings, useExperte } from '../settingsStore'
 
 /** Name, Beschreibung, Farbe und Bild des Programms aus der Registry (App.tsx) */
 export const ProgrammInfo = createContext<{ name: string; description: string; color: string; icon?: ProgrammIcon; bild?: string } | null>(null)
@@ -161,6 +162,7 @@ export function AppKopf({
                 {name}
               </Title>
               <EigenesFensterKnopf name={name} />
+              <ModusAbzeichen />
             </Group>
             {text && !ohneBeschreibung && !kompakt && (
               <Text c="dimmed" size="sm" className="app-kopf-beschreibung" lineClamp={2}>
@@ -170,7 +172,7 @@ export function AppKopf({
           </div>
         </Group>
         <Group gap="xs" wrap="wrap" justify="flex-end">
-          {suche === false ? null : (suche ?? <DokumentSuche />)}
+          {suche === false ? null : suche ?? <DokumentSuche />}
           {zusaetze}
           {meine && (
             <Button
@@ -229,3 +231,29 @@ export function AppKopf({
 
 /** Farbe des Programms (Registry) – für eigene Hauptknöpfe im Kopf */
 export const useProgrammFarbe = (): string => useContext(ProgrammInfo)?.color ?? 'blue'
+
+/**
+ * Sichtbarer Modus (07.10.2026): Im Standardmodus steht „Standard" neben dem Titel – ein Modus soll nie ein
+ * unsichtbarer Zustand sein. Ein Klick schaltet in den Expertenmodus.
+ */
+function ModusAbzeichen(): React.JSX.Element | null {
+  const experte = useExperte()
+  const update = useAppSettings((s) => s.update)
+  if (experte) return null
+  return (
+    <Tooltip label="Standardmodus: nur das Wichtigste. Klick zeigt alle Optionen (Expertenmodus)." withArrow>
+      <Badge
+        component="button"
+        variant="light"
+        color="gray"
+        size="sm"
+        ml={6}
+        style={{ cursor: 'pointer', flexShrink: 0 }}
+        onClick={() => void update({ oberflaeche: 'experte' })}
+        data-modus-abzeichen
+      >
+        Standard
+      </Badge>
+    </Tooltip>
+  )
+}

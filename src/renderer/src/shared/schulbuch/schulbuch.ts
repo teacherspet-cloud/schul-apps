@@ -28,6 +28,13 @@ export interface SchulbuchAbschnitt {
   /** Erkannter Wortlaut (bei Bildern: kurze Beschreibung) */
   text: string
   wahl: AbschnittWahl
+  /**
+   * Lage auf dem Seitenbild in Prozent (nur mit `mitBereich`, Reihe aus Schulbuch 06.10.2026) – für einen
+   * Bildausschnitt, den die Lehrkraft ausdrücklich je Abschnitt wählt
+   */
+  bereich?: { x: number; y: number; b: number; h: number }
+  /** Welches Seitenbild (Index im Aufruf) */
+  bild?: number
 }
 
 export interface Schulbuch {
@@ -70,11 +77,34 @@ const SCHEMA = {
   additionalProperties: false
 }
 
+/** Schema mit Lage je Abschnitt (Prozent des Seitenbilds) – für Bildausschnitte */
+const SCHEMA_MIT_BEREICH = (() => {
+  const s = structuredClone(SCHEMA) as unknown as { properties: { abschnitte: { items: { properties: Record<string, unknown>; required: string[] } } } }
+  const item = s.properties.abschnitte.items
+  item.properties.bild = { type: 'integer' }
+  item.properties.bereich = {
+    type: 'object',
+    properties: { x: { type: 'number' }, y: { type: 'number' }, b: { type: 'number' }, h: { type: 'number' } },
+    required: ['x', 'y', 'b', 'h'],
+    additionalProperties: false
+  }
+  item.required = [...item.required, 'bild', 'bereich']
+  return s as unknown as typeof SCHEMA
+})()
+
+const prozent = (n: unknown): number => Math.min(100, Math.max(0, Number(n) || 0))
+
 /** Sehen die Seiten wie ein Schulbuch aus? Dann Abschnitte mit Wortlaut – sonst null */
-export async function erkenneSchulbuch(bilder: string[], ki: Ki): Promise<Schulbuch | null> {
+export async function erkenneSchulbuch(bilder: string[], ki: Ki, opts: { mitBereich?: boolean } = {}): Promise<Schulbuch | null> {
   const seiten = bilder.filter((b) => b.startsWith('data:image/')).slice(0, 6)
   if (!seiten.length) return null
-  const d = await ki<{ istSchulbuch: boolean; titel: string; verlag: string; seiten: string; abschnitte: Omit<SchulbuchAbschnitt, 'wahl'>[] }>({
+  const d = await ki<{
+    istSchulbuch: boolean
+    titel: string
+    verlag: string
+    seiten: string
+    abschnitte: (Omit<SchulbuchAbschnitt, 'wahl'> & { bild?: number })[]
+  }>({
     system:
       'Du prüfst Seitenbilder, die eine Lehrkraft hochgeladen hat, und erkennst Schulbuchseiten (gedrucktes Lehrwerk mit Seitenzahlen, Verfassertexten, nummerierten Materialien/Quellen wie VT1, M2, Q3, D1, Aufgabenblöcken). Arbeitsblätter, Handschrift, Fotos von Tafeln oder einzelne Bilder sind KEINE Schulbuchseiten.',
     user: [
@@ -84,11 +114,16 @@ export async function erkenneSchulbuch(bilder: string[], ki: Ki): Promise<Schulb
       '- "seite": Seitenzahl wie gedruckt.',
       '- "text": bei Texten der vollständige Wortlaut (Absätze mit Leerzeile, keine Silbentrennung am Zeilenende); bei Bildern, Karten, Grafiken eine sachliche Beschreibung in zwei bis drei Sätzen samt Bildunterschrift.',
       '- "titel": Überschrift des Abschnitts; "titel"/"verlag"/"seiten" oben: Buch, Verlag und Seitenbereich, soweit erkennbar (sonst leer).',
+      ...(opts.mitBereich
+        ? [
+            '- "bild": Nummer des Seitenbilds (ab 0), auf dem der Abschnitt steht; "bereich": seine Lage auf diesem Bild in Prozent (x, y = linke obere Ecke, b = Breite, h = Höhe), großzügig mit etwas Rand.'
+          ]
+        : []),
       'Sonst: "istSchulbuch": false, alles andere leer.'
     ].join('\n'),
     images: seiten,
     schemaName: 'schulbuch_erkennung',
-    schema: SCHEMA
+    schema: opts.mitBereich ? SCHEMA_MIT_BEREICH : SCHEMA
   })
   if (!d?.istSchulbuch || !d.abschnitte?.length) return null
   return {
@@ -103,7 +138,13 @@ export async function erkenneSchulbuch(bilder: string[], ki: Ki): Promise<Schulb
         seite: String(a.seite ?? '').trim(),
         text: String(a.text ?? '').trim(),
         // Vorgabe: verweisen (die Lernenden haben das Buch); Aufgabenblöcke des Buchs weglassen
-        wahl: (/aufgabe/i.test(String(a.art)) ? 'weg' : 'verweis') as AbschnittWahl
+        wahl: (/aufgabe/i.test(String(a.art)) ? 'weg' : 'verweis') as AbschnittWahl,
+        ...(opts.mitBereich && a.bereich && Number(a.bereich.b) > 0 && Number(a.bereich.h) > 0
+          ? {
+              bereich: { x: prozent(a.bereich.x), y: prozent(a.bereich.y), b: prozent(a.bereich.b), h: prozent(a.bereich.h) },
+              bild: Math.min(seiten.length - 1, Math.max(0, Math.round(Number(a.bild) || 0)))
+            }
+          : {})
       }))
       .slice(0, 40)
   }

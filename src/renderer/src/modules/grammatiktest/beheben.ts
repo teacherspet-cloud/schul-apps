@@ -12,7 +12,13 @@ import { anredeFuerMeta } from '../arbeitsblatt/didactics/anrede'
 import { repariereBausteine } from '../arbeitsblatt/generation/reparatur'
 import { testPrompt } from './generation/generateTest'
 import { legeTestAb, testOffen } from './library'
-import type { GrammarTest } from './model/types'
+import { alleTestBloecke, testFassungen, type GrammarTest } from './model/types'
+import { addVersion } from '../arbeitsblatt/model/versions'
+import { describeBlock } from '../arbeitsblatt/generation/describe'
+import { newBlock } from '../arbeitsblatt/model/factory'
+import type { TableBlock, WsBlock } from '../arbeitsblatt/model/types'
+import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../shared/bewertung/raster'
+import { rasterAufteilung } from '../arbeitsblatt/auftraege'
 import { worksheetMetaForTest } from './render/testWorksheet'
 import { bausteinNachWunsch } from '../arbeitsblatt/generation/wunsch'
 import type { WunschArt } from '../../shared/kiWunsch'
@@ -39,8 +45,8 @@ export function testBausteinNachWunsch(test: GrammarTest, docId: string, blockId
       const anrede = anredeFuerMeta(meta)
       return bausteinNachWunsch(
         {
-          // Beide Gruppen (30.09.2026): Der Baustein kann auch in Gruppe B stehen
-          bloecke: [...t.blocks, ...(t.blocksB ?? [])],
+          // Alle Gruppen (30.09.2026, A–D seit 06.10.2026): Der Baustein kann in jeder Fassung stehen
+          bloecke: alleTestBloecke(t),
           blockId,
           art,
           wunsch,
@@ -57,12 +63,62 @@ export function testBausteinNachWunsch(test: GrammarTest, docId: string, blockId
       )
     },
     abschluss: () => (art === 'neu' ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
-    ablegen: (neu, t) =>
-      legeTestAb(docId, t, (aktuell) => ({
-        ...aktuell,
-        blocks: aktuell.blocks.map((b) => (b.id === blockId ? neu : b)),
-        ...(aktuell.blocksB ? { blocksB: aktuell.blocksB.map((b) => (b.id === blockId ? neu : b)) } : {})
-      }))
+    // Der bisherige Stand bleibt als Fassung des Bausteins abrufbar (06.10.2026, wie Arbeitsblatt und Klassenarbeit)
+    ablegen: (neu, t) => legeTestAb(docId, t, (aktuell) => jedeFassung(aktuell, (liste) => liste.map((b) => (b.id === blockId ? addVersion(b, neu) : b))))
+  })
+}
+
+/** Dieselbe Änderung in jeder Fassung – Ergebnis mit `weitereFassungen` (eine alte Gruppe B wird übernommen) */
+function jedeFassung(test: GrammarTest, fn: (liste: WsBlock[]) => WsBlock[]): GrammarTest {
+  const [a, ...weitere] = testFassungen(test).map(fn)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { blocksB, ...rest } = test
+  return { ...rest, blocks: a, ...(weitere.length ? { weitereFassungen: weitere } : {}) }
+}
+
+/**
+ * Bewertungsraster zu einer Aufgabe (06.10.2026, wie Arbeitsblatt und Klassenarbeit): als Tabelle
+ * hinter der Aufgabe, nur im Lösungsteil.
+ */
+export function testRasterAuftrag(test: GrammarTest, docId: string, blockId: string): void {
+  void starteAuftrag({
+    moduleId: 'grammatiktest',
+    docId,
+    titel: test.meta.title?.trim() || 'Grammatiktest',
+    art: 'Bewertungsraster erstellen',
+    eingabe: test,
+    istOffen: () => testOffen(docId),
+    sperrt: false,
+    schluessel: `raster-${blockId}`,
+    fehlerTitel: 'Das Bewertungsraster konnte nicht erstellt werden',
+    arbeit: async (t, k) => {
+      const aufgabe = alleTestBloecke(t).find((b) => b.id === blockId)
+      if (aufgabe?.type !== 'task') throw new Error('Die Aufgabe ist nicht mehr vorhanden.')
+      k.melde('Die KI entwirft das Bewertungsraster …')
+      const meta = worksheetMetaForTest(t)
+      const antwort = await k.ai<unknown>(
+        rasterAnfrage({
+          system: testPrompt(t),
+          aufgabe: describeBlock(aufgabe),
+          loesung: aufgabe.solution,
+          punkte: aufgabe.points ?? 0,
+          aufteilung: rasterAufteilung(meta.subjectId, Boolean(aufgabe.brief))
+        })
+      )
+      return rasterAus(antwort, 'Bewertungsraster', aufgabe.points ?? 0)
+    },
+    abschluss: () => 'Fertig – das Raster steht hinter der Aufgabe (im Lösungsteil)',
+    ablegen: (raster, t) =>
+      legeTestAb(docId, t, (aktuell) =>
+        jedeFassung(aktuell, (liste) => {
+          if (!liste.some((b) => b.id === blockId)) return liste
+          const id = `raster-${blockId}`
+          const tabelle = { ...(newBlock('table') as TableBlock), id, ...rasterAlsTabelle(raster), nurLoesung: true }
+          const neu = liste.filter((b) => b.id !== id)
+          neu.splice(neu.findIndex((b) => b.id === blockId) + 1, 0, tabelle)
+          return neu
+        })
+      )
   })
 }
 
@@ -84,7 +140,8 @@ export function testHinweiseBeheben(test: GrammarTest, docId: string, hinweise: 
       const anrede = anredeFuerMeta(meta)
       return repariereBausteine(
         {
-          bloecke: t.blocks,
+          // Alle Fassungen (06.10.2026): Ein Hinweis kann an einem Baustein in B … hängen
+          bloecke: alleTestBloecke(t),
           hinweise,
           kontext: {
             material: 'Grammatiktest',
@@ -100,6 +157,16 @@ export function testHinweiseBeheben(test: GrammarTest, docId: string, hinweise: 
       )
     },
     abschluss: (e) => (e.erklaerung ? `Behoben: ${e.erklaerung}` : 'Fertig – im Test übernommen'),
-    ablegen: (e, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks: wendeReparaturAn(aktuell.blocks, e.aenderungen) }))
+    // Jede Änderung nur in der Fassung, in der ihr Baustein steht; ohne Fundort (neuer Baustein am Ende) in A
+    ablegen: (e, t) =>
+      legeTestAb(docId, t, (aktuell) => {
+        const alle = alleTestBloecke(aktuell)
+        return jedeFassung(aktuell, (liste) =>
+          wendeReparaturAn(
+            liste,
+            e.aenderungen.filter((a) => liste.some((b) => b.id === a.anker) || (liste === aktuell.blocks && !alle.some((b) => b.id === a.anker)))
+          )
+        )
+      })
   })
 }

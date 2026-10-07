@@ -1,7 +1,8 @@
 /**
- * Einen Schritt der Unterrichtsreihe bearbeiten: Inhalt je Art, Rolle (Pflicht/Wahl/Förder/Forder),
+ * Einen Schritt der Unterrichtsreihe bearbeiten: Inhalt je Art, Rolle (Pflicht/Optional/Wahl/Förder/Forder),
  * Erfolg, Haltepunkt, Abschnitt und Lernziele des Schritts.
  */
+import { AlleOptionen, NurExperte, OptionenBereich, useAlleOptionen } from '../../shared/components/NurExperte'
 import { IconBook } from '@tabler/icons-react'
 import { quelleVon } from '../../shared/schulbuch/schulbuch'
 import { schulbuchAusDateien } from '../../shared/schulbuch/SchulbuchDialog'
@@ -91,138 +92,186 @@ export function SchrittBearbeiten({
   ]
   return (
     <Modal opened onClose={schliessen} title={`${art?.label ?? 'Schritt'} bearbeiten`} size="xl">
-      <Stack>
-        <TextInput label="Titel (sehen die Lernenden)" value={s.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-schritt-titel />
-        <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} beschaeftigt={beschaeftigt} />
-        <Divider />
-        <LernzieleFeld
-          titel="Lernziele dieses Schritts"
-          ziele={s.lernziele}
-          setze={(l) => setze({ lernziele: l })}
-          vorschlagen={() => schrittLernziele(reihe, s, beschreibung(s.inhalt), ki)}
-        />
-        <Divider />
-        <Group grow align="start">
-          <Select
-            label="Rolle"
-            value={s.rolle}
-            onChange={(v) => v && setze({ rolle: v as Schritt['rolle'] })}
-            allowDeselect={false}
-            data={[
-              { value: 'pflicht', label: 'Pflicht' },
-              { value: 'wahl', label: 'Wahl („wähle n von …")' },
-              { value: 'foerder', label: 'Förderschritt (bei Bedarf)' },
-              { value: 'forder', label: 'Forderschritt ★ (freiwillig)' }
-            ]}
+      <OptionenBereich>
+        <Stack>
+          <TextInput label="Titel (sehen die Lernenden)" value={s.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-schritt-titel />
+          <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} beschaeftigt={beschaeftigt} />
+          <Divider />
+          <LernzieleFeld
+            titel="Lernziele dieses Schritts"
+            ziele={s.lernziele}
+            setze={(l) => setze({ lernziele: l })}
+            vorschlagen={() => schrittLernziele(reihe, s, beschreibung(s.inhalt), ki)}
           />
-          {s.rolle === 'wahl' && (
-            <>
-              <TextInput
-                label="Wahlgruppe"
-                description="Gleicher Name = eine Gruppe"
-                value={s.wahlGruppe ?? ''}
-                onChange={(e) => setze({ wahlGruppe: e.currentTarget.value })}
-              />
-              <NumberInput label="Davon nötig" min={1} max={10} value={s.wahlMindestens ?? 1} onChange={(v) => setze({ wahlMindestens: Number(v) || 1 })} />
-            </>
-          )}
-          {s.rolle === 'foerder' && (
-            <Select
-              label="Fördert bei"
-              data={andere.filter((x) => x.rolle !== 'foerder').map((x) => ({ value: x.id, label: x.titel || x.id }))}
-              value={s.foerderFuer ?? null}
-              onChange={(v) => setze({ foerderFuer: v ?? undefined })}
-            />
-          )}
-        </Group>
-        <Group grow align="start">
-          <Select
-            label="Teil"
-            description="Abzeichen, sobald alle Pflichtschritte eines Teils geschafft sind"
-            data={teile}
-            value={s.abschnitt ?? null}
-            onChange={(v) => setze({ abschnitt: v ?? undefined })}
-            clearable
-            placeholder="ohne Teil"
-            data-schritt-teil
-          />
-          <Select
-            label="Haltepunkt davor"
-            value={s.halt?.art ?? 'kein'}
-            onChange={(v) =>
-              setze({ halt: v === 'freigabe' ? { art: 'freigabe' } : v === 'datum' ? { art: 'datum', ab: new Date().toISOString().slice(0, 10) } : undefined })
-            }
-            allowDeselect={false}
-            data={[
-              { value: 'kein', label: 'kein Haltepunkt' },
-              { value: 'freigabe', label: 'nach gemeinsamer Besprechung (ich gebe frei)' },
-              { value: 'datum', label: 'ab einem Datum' }
-            ]}
-          />
-          {s.halt?.art === 'datum' && (
-            <TextInput label="ab" type="date" value={s.halt.ab.slice(0, 10)} onChange={(e) => setze({ halt: { art: 'datum', ab: e.currentTarget.value } })} />
-          )}
-        </Group>
-        {!['lernkarten', 'reflexion', 'hefter', 'diagnose', 'praesenz'].includes(s.inhalt.art) && (
-          <Group align="end">
-            <Select
-              label="Geschafft, wenn …"
-              value={s.erfolg.art}
-              allowDeselect={false}
-              data={erfolgWahl}
-              onChange={(v) =>
-                setze({
-                  erfolg:
-                    v === 'ki'
-                      ? { art: 'ki', schwelle: 'teilweise' }
-                      : v === 'punkte'
-                        ? { art: 'punkte', prozent: 60 }
-                        : v === 'lehrkraft'
-                          ? { art: 'lehrkraft' }
-                          : { art: 'abgabe' }
-                })
-              }
-              w={240}
-            />
-            {s.erfolg.art === 'ki' && (
-              <Select
-                label="alle Kriterien mindestens"
-                value={s.erfolg.schwelle}
-                allowDeselect={false}
-                data={[
-                  { value: 'teilweise', label: 'teilweise erfüllt' },
-                  { value: 'sicher', label: 'sicher erfüllt' }
-                ]}
-                onChange={(v) => setze({ erfolg: { art: 'ki', schwelle: (v as 'teilweise' | 'sicher') ?? 'teilweise' } })}
-                w={220}
-              />
+          <Divider />
+          <Group grow align="start">
+            {/* Pflicht/optional klar wählbar (06.10.2026); Wahl/Förder/Forder wie bisher unter „Weitere" */}
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                Rolle
+              </Text>
+              <RolleWahl rolle={s.rolle} setze={(rolle) => setze({ rolle })} />
+              {s.rolle === 'optional' && (
+                <Text size="xs" c="dimmed">
+                  Wird in der Reihenfolge freigeschaltet, ist aber nie Voraussetzung für die nächsten Schritte. Wie viele optionale Schritte für den Abschluss
+                  nötig sind, stellst du an der Reihe ein.
+                </Text>
+              )}
+              {s.rolle !== 'pflicht' && s.rolle !== 'optional' && (
+                <Select
+                  value={s.rolle}
+                  onChange={(v) => v && setze({ rolle: v as Schritt['rolle'] })}
+                  allowDeselect={false}
+                  aria-label="Weitere Rolle"
+                  data={[
+                    { value: 'wahl', label: 'Wahl („wähle n von …")' },
+                    { value: 'foerder', label: 'Förderschritt (bei Bedarf)' },
+                    { value: 'forder', label: 'Forderschritt ★ (freiwillig)' }
+                  ]}
+                />
+              )}
+            </Stack>
+            {s.rolle === 'wahl' && (
+              <>
+                <TextInput
+                  label="Wahlgruppe"
+                  description="Gleicher Name = eine Gruppe"
+                  value={s.wahlGruppe ?? ''}
+                  onChange={(e) => setze({ wahlGruppe: e.currentTarget.value })}
+                />
+                <NumberInput label="Davon nötig" min={1} max={10} value={s.wahlMindestens ?? 1} onChange={(v) => setze({ wahlMindestens: Number(v) || 1 })} />
+              </>
             )}
-            {s.erfolg.art === 'punkte' && (
-              <NumberInput
-                label="mindestens (%)"
-                min={0}
-                max={100}
-                value={s.erfolg.prozent}
-                onChange={(v) => setze({ erfolg: { art: 'punkte', prozent: Number(v) || 0 } })}
-                w={160}
+            {s.rolle === 'foerder' && (
+              <Select
+                label="Fördert bei"
+                data={andere.filter((x) => x.rolle !== 'foerder').map((x) => ({ value: x.id, label: x.titel || x.id }))}
+                value={s.foerderFuer ?? null}
+                onChange={(v) => setze({ foerderFuer: v ?? undefined })}
               />
             )}
           </Group>
-        )}
-        <Group justify="flex-end">
-          <Button variant="default" onClick={schliessen}>
-            Abbrechen
-          </Button>
-          <Button onClick={() => speichern(s)} disabled={!s.titel.trim() || setzt > 0} loading={setzt > 0} data-schritt-speichern>
-            Übernehmen
-          </Button>
-        </Group>
-      </Stack>
+          <NurExperte geaendert={(Boolean(s.abschnitt) || Boolean(s.halt)) && 'Teil/Haltepunkt'}>
+            <Group grow align="start">
+              <Select
+                label="Teil"
+                description="Abzeichen, sobald alle Pflichtschritte eines Teils geschafft sind"
+                data={teile}
+                value={s.abschnitt ?? null}
+                onChange={(v) => setze({ abschnitt: v ?? undefined })}
+                clearable
+                placeholder="ohne Teil"
+                data-schritt-teil
+              />
+              <Select
+                label="Haltepunkt davor"
+                value={s.halt?.art ?? 'kein'}
+                onChange={(v) =>
+                  setze({
+                    halt: v === 'freigabe' ? { art: 'freigabe' } : v === 'datum' ? { art: 'datum', ab: new Date().toISOString().slice(0, 10) } : undefined
+                  })
+                }
+                allowDeselect={false}
+                data={[
+                  { value: 'kein', label: 'kein Haltepunkt' },
+                  { value: 'freigabe', label: 'nach gemeinsamer Besprechung (ich gebe frei)' },
+                  { value: 'datum', label: 'ab einem Datum' }
+                ]}
+              />
+              {s.halt?.art === 'datum' && (
+                <TextInput
+                  label="ab"
+                  type="date"
+                  value={s.halt.ab.slice(0, 10)}
+                  onChange={(e) => setze({ halt: { art: 'datum', ab: e.currentTarget.value } })}
+                />
+              )}
+            </Group>
+          </NurExperte>
+          {!['lernkarten', 'reflexion', 'hefter', 'diagnose', 'praesenz'].includes(s.inhalt.art) && (
+            <Group align="end">
+              <Select
+                label="Geschafft, wenn …"
+                value={s.erfolg.art}
+                allowDeselect={false}
+                data={erfolgWahl}
+                onChange={(v) =>
+                  setze({
+                    erfolg:
+                      v === 'ki'
+                        ? { art: 'ki', schwelle: 'teilweise' }
+                        : v === 'punkte'
+                        ? { art: 'punkte', prozent: 60 }
+                        : v === 'lehrkraft'
+                        ? { art: 'lehrkraft' }
+                        : { art: 'abgabe' }
+                  })
+                }
+                w={240}
+              />
+              {s.erfolg.art === 'ki' && (
+                <Select
+                  label="alle Kriterien mindestens"
+                  value={s.erfolg.schwelle}
+                  allowDeselect={false}
+                  data={[
+                    { value: 'teilweise', label: 'teilweise erfüllt' },
+                    { value: 'sicher', label: 'sicher erfüllt' }
+                  ]}
+                  onChange={(v) => setze({ erfolg: { art: 'ki', schwelle: (v as 'teilweise' | 'sicher') ?? 'teilweise' } })}
+                  w={220}
+                />
+              )}
+              {s.erfolg.art === 'punkte' && (
+                <NumberInput
+                  label="mindestens (%)"
+                  min={0}
+                  max={100}
+                  value={s.erfolg.prozent}
+                  onChange={(v) => setze({ erfolg: { art: 'punkte', prozent: Number(v) || 0 } })}
+                  w={160}
+                />
+              )}
+            </Group>
+          )}
+          <AlleOptionen />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={schliessen}>
+              Abbrechen
+            </Button>
+            <Button onClick={() => speichern(s)} disabled={!s.titel.trim() || setzt > 0} loading={setzt > 0} data-schritt-speichern>
+              Übernehmen
+            </Button>
+          </Group>
+        </Stack>
+      </OptionenBereich>
     </Modal>
   )
 }
 
 /** Auswahl aus einer Ablage */
+/**
+ * Rolle des Schritts. Standardmodus (07.10.2026): nur Pflicht / Optional – Wahl-, Förder- und Forderschritte
+ * („Weitere …") gibt es im Expertenmodus bzw. über „Alle Optionen". Hat ein Schritt schon eine solche Rolle,
+ * bleibt sie sichtbar, damit nichts Verstecktes wirkt.
+ */
+function RolleWahl({ rolle, setze }: { rolle: Schritt['rolle']; setze: (rolle: Schritt['rolle']) => void }): React.JSX.Element {
+  const voll = useAlleOptionen()
+  const einfach = rolle === 'pflicht' || rolle === 'optional'
+  return (
+    <SegmentedControl
+      value={einfach ? rolle : 'weitere'}
+      onChange={(v) => setze(v === 'weitere' ? 'wahl' : (v as Schritt['rolle']))}
+      data={[
+        { value: 'pflicht', label: 'Pflicht' },
+        { value: 'optional', label: 'Optional' },
+        ...(voll || !einfach ? [{ value: 'weitere', label: 'Weitere …' }] : [])
+      ]}
+      data-schritt-rolle
+    />
+  )
+}
+
 function AusAblage(props: {
   label: string
   laden: () => Promise<{ id: string; name: string }[]>
@@ -350,7 +399,7 @@ function Inhalt({
         <Stack gap="xs">
           <AusAblage
             label="Rückmeldung (Aufgabe mit Erwartung)"
-            aktuell={i.vorlage ? ((i.vorlage as { meta?: { title?: string } }).meta?.title ?? 'gewählt') : undefined}
+            aktuell={i.vorlage ? (i.vorlage as { meta?: { title?: string } }).meta?.title ?? 'gewählt' : undefined}
             laden={async () => (await window.api.rueckmeldungen.list()).map((m) => ({ id: m.id, name: m.name }))}
             gewaehlt={async (id) => {
               const d = await window.api.rueckmeldungen.get(id)
@@ -367,13 +416,20 @@ function Inhalt({
     case 'onlinetest':
       return (
         <Stack gap="xs">
+          {/* Lernzielkontrolle aus „Test hier erstellen" (06.10.2026): fertige Onlinefassungen */}
+          {i.blatt && (
+            <Alert variant="light" p="xs" data-onlinetest-blatt>
+              {i.blatt.art} „{s.titel}“ – {i.blatt.fassungen.length} {i.blatt.fassungen.length === 1 ? 'Fassung' : 'Fassungen'} als Onlinetest. Änderungen im
+              Programm {i.blatt.art} übernimmt dieser Schritt nicht von selbst.
+            </Alert>
+          )}
           <AusAblage
             label="Vokabeltest"
-            aktuell={i.test ? ((i.test as { header?: { title?: string } }).header?.title ?? 'gewählt') : undefined}
+            aktuell={i.test ? (i.test as { header?: { title?: string } }).header?.title ?? 'gewählt' : undefined}
             laden={async () => (await window.api.tests.list()).map((m) => ({ id: m.id, name: m.name }))}
             gewaehlt={async (id) => {
               const t = await window.api.tests.get(id)
-              setzeInhalt({ test: t.payload })
+              setzeInhalt({ test: t.payload, blatt: undefined })
               if (!s.titel) setze({ titel: t.name })
             }}
           />
@@ -402,6 +458,22 @@ function Inhalt({
             value={i.material}
             onChange={(e) => setzeInhalt({ material: e.currentTarget.value })}
           />
+          {/* Bildausschnitte aus dem Schulbuch (06.10.2026, je Abschnitt ausdrücklich gewählt) */}
+          {(i.bilder ?? []).length > 0 && (
+            <Group gap="xs" data-aufgabe-bilder>
+              {(i.bilder ?? []).map((b, n) => (
+                <Stack key={n} gap={2} align="center">
+                  <img src={b.src} alt={b.quelle} style={{ maxHeight: 90, maxWidth: 160, borderRadius: 4 }} />
+                  <Text size="xs" c="dimmed" maw={160} lineClamp={1}>
+                    {b.quelle}
+                  </Text>
+                  <Button size="compact-xs" variant="subtle" color="red" onClick={() => setzeInhalt({ bilder: (i.bilder ?? []).filter((_, k) => k !== n) })}>
+                    entfernen
+                  </Button>
+                </Stack>
+              ))}
+            </Group>
+          )}
           {/* Schulbuchseite einbinden (Phase 6b): verweisen → Leseauftrag vor dem Auftrag, übernehmen → Material mit Quelle */}
           <FileButton
             multiple

@@ -29,7 +29,8 @@ import {
   serverWert,
   setzeServerGeheimnis,
   setzeServerWert,
-  sitzungenDesNutzersBeenden
+  sitzungenDesNutzersBeenden,
+  datenbank
 } from './datenbank'
 import { passwortHash, zufallsPasswort } from './geheim'
 import { iservEinstellung, ISERV_STANDARD, type IservEinstellung } from './anmeldung'
@@ -82,7 +83,9 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
       const iserv = iservEinstellung()
       return (
         json(res, 200, {
-          nutzer: alleNutzer().map(({ gruppen, ...n }) => ({ ...n, gruppen: gruppen.length })),
+          nutzer: alleNutzer().map(({ gruppen, ...n }) => ({ ...n, gruppen: gruppen.length, klasse: gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? '' })),
+          // Bekannte Klassen für die Zuordnung von Schülerkonten (06.10.2026)
+          klassen: bekannteKlassen(),
           schluessel: TEILBARE_SCHLUESSEL.map((name) => ({ name, hinterlegt: verdeckt(serverGeheimnis(`schluessel:${name}`)), fuerAlle: Boolean(freigaben[name]) })),
           iserv: { ...iserv, geheimnis: Boolean(serverGeheimnis('iserv-client')) },
           notzugang: serverWert('notzugang', true),
@@ -163,7 +166,17 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     const eigenes = typeof k0.passwort === 'string' ? k0.passwort : ''
     if (eigenes && eigenes.length < 10) return (json(res, 400, { fehler: 'Das vorübergehende Passwort braucht mindestens 10 Zeichen.' }), true)
     const passwort = eigenes || zufallsPasswort()
-    const neu = nutzerAnlegen({ benutzer, name: String(k0.name ?? '').trim().slice(0, 80) || benutzer, rolle, quelle: 'lokal', passwortHash: passwortHash(passwort), passwortWechseln: true })
+    // Schülerkonto gleich einer Klasse zuordnen (06.10.2026) – so findet es jede Lerngruppe dieser Klasse
+    const klasse = rolle === 'schueler' ? String(k0.klasse ?? '').trim().slice(0, 40) : ''
+    const neu = nutzerAnlegen({
+      benutzer,
+      name: String(k0.name ?? '').trim().slice(0, 80) || benutzer,
+      rolle,
+      quelle: 'lokal',
+      passwortHash: passwortHash(passwort),
+      passwortWechseln: true,
+      ...(klasse ? { gruppen: [klassenGruppe(klasse)] } : {})
+    })
     registerVergessen()
     protokolliereServer('verwaltung', `Konto angelegt (${rolle}, vorübergehendes Passwort)`, ich)
     return (json(res, 200, { benutzer: neu.benutzer, passwort, id: neu.id }), true)
@@ -200,9 +213,16 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     if (!n) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     const rolle = ['admin', 'lehrkraft', 'schueler'].includes(String(k0.rolle)) ? (k0.rolle as Rolle) : undefined
     if (n.id === ich && (rolle && rolle !== 'admin')) return (json(res, 400, { fehler: 'Die eigene Admin-Rolle lässt sich nicht abgeben.' }), true)
-    nutzerAendern(n.id, { ...(rolle ? { rolle } : {}), ...(typeof k0.gesperrt === 'boolean' ? { gesperrt: k0.gesperrt } : {}) })
+    // Klasse eines Schülerkontos setzen oder entfernen (leer); andere Gruppen (IServ) bleiben
+    const klasse = typeof k0.klasse === 'string' ? k0.klasse.trim().slice(0, 40) : undefined
+    const gruppen = klasse === undefined ? undefined : [...n.gruppen.filter((g) => !g.id.startsWith('klasse:')), ...(klasse ? [klassenGruppe(klasse)] : [])]
+    nutzerAendern(n.id, { ...(rolle ? { rolle } : {}), ...(typeof k0.gesperrt === 'boolean' ? { gesperrt: k0.gesperrt } : {}), ...(gruppen ? { gruppen } : {}) })
     if (k0.gesperrt === true) sitzungenDesNutzersBeenden(n.id)
-    protokolliereServer('verwaltung', `Konto geändert${rolle ? ` (Rolle ${rolle})` : ''}${typeof k0.gesperrt === 'boolean' ? ` (${k0.gesperrt ? 'gesperrt' : 'entsperrt'})` : ''}`, ich)
+    protokolliereServer(
+      'verwaltung',
+      `Konto geändert${rolle ? ` (Rolle ${rolle})` : ''}${typeof k0.gesperrt === 'boolean' ? ` (${k0.gesperrt ? 'gesperrt' : 'entsperrt'})` : ''}${klasse !== undefined ? ` (Klasse ${klasse || 'entfernt'})` : ''}`,
+      ich
+    )
     return (json(res, 200, { ok: true }), true)
   }
   if (was === 'schluessel') {
@@ -252,3 +272,16 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
 }
 
 declare const __APP_VERSION__: string
+
+/** Klassen aus den Schülerkonten (Klassenliste, Verwaltung) und den Lerngruppen der Lehrkräfte */
+function bekannteKlassen(): string[] {
+  const namen = new Map<string, string>()
+  for (const n of alleNutzer()) for (const g of n.gruppen) if (g.id.startsWith('klasse:')) namen.set(g.id, g.name)
+  try {
+    const zeilen = datenbank().prepare('SELECT DISTINCT name FROM lerngruppen').all() as { name: string }[]
+    for (const z of zeilen) if (z.name.trim()) namen.set(klassenGruppe(z.name).id, namen.get(klassenGruppe(z.name).id) ?? z.name.trim())
+  } catch {
+    // Tabelle fehlt (noch keine Lerngruppe) – nur die Konten
+  }
+  return [...namen.values()].sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+}

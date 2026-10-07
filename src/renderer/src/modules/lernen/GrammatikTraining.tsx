@@ -7,6 +7,7 @@
  *    freigeben. Freigegeben wird nie ungesehen.
  *  - Lernstand je Person (sicher / heute fällig / aktiv in den letzten 7 Tagen), Problemaufgaben, Regelkarten.
  */
+import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import {
   ActionIcon,
@@ -42,8 +43,10 @@ import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { starteAuftrag } from '../../shared/auftraege'
 import { useAppSettings } from '../../shared/settingsStore'
+import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { grammarTopicsFor, hasGrammar, teilformenAuftrag, teilformenFuer } from '../arbeitsblatt/didactics/grammar'
+import { GRAMMAR_TOPICS, hasGrammar, teilformenAuftrag } from '../arbeitsblatt/didactics/grammar'
+import GrammatikAuswahl from '../arbeitsblatt/steps/GrammatikAuswahl'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -104,7 +107,11 @@ function useEntwuerfe(): Entwurf[] {
   return l
 }
 
-/** Sprachfächer mit Grammatik-Katalog (auch Latein, Griechisch, Deutsch, DaZ): die eigenen der Lehrkraft, sonst alle */
+/**
+ * Sprachfächer mit Grammatik-Katalog (auch Latein, Griechisch, Deutsch, DaZ): alle, die eigenen der Lehrkraft zuerst.
+ * Seit 07.10.2026 bleiben die übrigen wählbar (Fachfeld: im Standardmodus nur die eigenen, weitere per Eintippen);
+ * verglichen wird über die Kennung – vorher über den Namen, und „DaZ" galt so nie als eigenes Fach.
+ */
 const SPRACHE_OHNE_FS: Record<string, string> = { latein: 'la', griechisch: 'grc', deutsch: 'de', daz: 'de' }
 function useSprachFaecher(): { id: string; label: string; sprache: string }[] {
   const eigene = useAppSettings((s) => s.settings.eigeneFaecher)
@@ -114,8 +121,8 @@ function useSprachFaecher(): { id: string; label: string; sprache: string }[] {
       label: s.label,
       sprache: s.foreignLanguage ?? SPRACHE_OHNE_FS[s.id] ?? 'de'
     }))
-    const meine = alle.filter((s) => (eigene ?? []).some((f) => f.toLowerCase() === s.label.toLowerCase()))
-    return meine.length ? meine : alle
+    const meine = new Set(eigene ?? [])
+    return [...alle.filter((s) => meine.has(s.id)), ...alle.filter((s) => !meine.has(s.id))]
   }, [eigene])
 }
 
@@ -257,20 +264,14 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const { gruppen } = useLerngruppen()
   const alleLernenden = useAlleLernenden()
   const fach = faecher.find((f) => f.id === fachId)
-  const themen = useMemo(
-    () =>
-      fachId
-        ? grammarTopicsFor({ subjectId: fachId, grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId })
-        : [],
-    [fachId, jahrgang, settings.defaults?.schoolTypeId, settings.defaults?.stateId]
-  )
-  const thema = themaId === 'eigenes' ? eigenes.trim() : (themen.find((t) => t.id === themaId)?.label ?? '')
+  // Themenauswahl wie im Arbeitsblatt (GrammatikAuswahl, abgestimmt 06.10.2026) – hier genau ein Thema
+  const [eigenesAn, setEigenesAn] = useState(false)
+  const gewaehltesThema = !eigenesAn && themaId ? GRAMMAR_TOPICS.find((t) => t.id === themaId && t.subject === fachId) : undefined
+  const thema = eigenesAn ? eigenes.trim() : gewaehltesThema?.label ?? ''
   // Teilformen des Themas (Recherche 06.10.2026): keine gewählt = alle, die zur Klasse passen
   const [teilWahl, setTeilWahl] = useState<string[]>([])
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
-  const gewaehltesThema = themen.find((t) => t.id === themaId)
-  const teile = gewaehltesThema ? teilformenFuer(gewaehltesThema, query) : []
-  const gruppenName = art === 'gruppe' ? (gruppen.find((g) => g.id === gruppe)?.name ?? '') : art === 'einzeln' ? `${einzelne.length} Lernende` : 'QR-Code'
+  const gruppenName = art === 'gruppe' ? gruppen.find((g) => g.id === gruppe)?.name ?? '' : art === 'einzeln' ? `${einzelne.length} Lernende` : 'QR-Code'
   const bereit = Boolean(fach && thema && (art === 'gruppe' ? gruppe : art === 'einzeln' ? einzelne.length : true))
   const erstellen = (): void => {
     if (!fach || !bereit) return
@@ -308,106 +309,114 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
     schliessen()
   }
   return (
-    <Modal opened onClose={schliessen} title="Grammatik zum Üben freigeben" size="lg">
-      <Stack>
-        <Group grow align="flex-end">
-          <Select
-            label="Fach"
-            allowDeselect={false}
-            data={faecher.map((f) => ({ value: f.id, label: f.label }))}
-            value={fachId}
-            onChange={(v) => (setFachId(v), setThemaId(null))}
-            data-grammatik-fach
+    <Modal opened onClose={schliessen} title="Grammatik zum Üben freigeben" size="xl">
+      <OptionenBereich>
+        <Stack>
+          <Group grow align="flex-end">
+            <HaeufigSelect
+              art="fach"
+              label="Fach"
+              allowDeselect={false}
+              data={faecher.map((f) => ({ value: f.id, label: f.label }))}
+              value={fachId}
+              onChange={(v) => (setFachId(v), setThemaId(null))}
+              data-grammatik-fach
+            />
+            <NumberInput
+              label="Klasse"
+              min={1}
+              max={13}
+              value={jahrgang}
+              onChange={(v) => (setJahrgang(Number(v) || 6), setThemaId(null))}
+              data-grammatik-jahrgang
+            />
+          </Group>
+          {fachId && !eigenesAn && (
+            <div data-grammatik-thema>
+              <GrammatikAuswahl
+                key={fachId}
+                einzeln
+                query={query}
+                wahl={{ themen: themaId ? [themaId] : [], teilformen: teilWahl }}
+                onChange={(w) => (setThemaId(w.themen[0] ?? null), setTeilWahl(w.teilformen))}
+                beschreibung="Ein Thema wählen; ohne Teilform-Auswahl übt die KI alle, die zur Klasse passen – „nur erkennen“ kommt nur in Auswahl- und Fehleraufgaben vor."
+              />
+            </div>
+          )}
+          <NurExperte geaendert={eigenesAn && 'eigenes Thema'}>
+            <Switch
+              label="Eigenes Thema statt Katalog"
+              checked={eigenesAn}
+              onChange={(e) => setEigenesAn(e.currentTarget.checked)}
+              data-grammatik-eigenes-schalter
+            />
+          </NurExperte>
+          {eigenesAn && (
+            <TextInput
+              label="Eigenes Thema"
+              value={eigenes}
+              onChange={(e) => setEigenes(e.currentTarget.value)}
+              placeholder="z. B. Present perfect vs. simple past"
+              data-grammatik-eigenes
+            />
+          )}
+          <Textarea
+            label="Besonders üben (optional)"
+            autosize
+            minRows={2}
+            value={wunsch}
+            onChange={(e) => setWunsch(e.currentTarget.value)}
+            placeholder="z. B. Verneinung und Fragen, unregelmäßige Verben aus Unit 3"
           />
-          <NumberInput
-            label="Klasse"
-            min={1}
-            max={13}
-            value={jahrgang}
-            onChange={(v) => (setJahrgang(Number(v) || 6), setThemaId(null))}
-            data-grammatik-jahrgang
+          <SegmentedControl
+            value={art}
+            onChange={(v) => (setArt(v as typeof art), setEinzelne([]))}
+            data={[
+              { value: 'gruppe', label: 'Lerngruppe' },
+              { value: 'einzeln', label: 'Einzelne Lernende' },
+              { value: 'code', label: 'Nur per QR-Code' }
+            ]}
           />
-        </Group>
-        <Select
-          label="Thema"
-          searchable
-          allowDeselect={false}
-          data={[...themen.map((t) => ({ value: t.id, label: t.label })), { value: 'eigenes', label: 'Eigenes Thema …' }]}
-          value={themaId}
-          onChange={(v) => (setThemaId(v), setTeilWahl([]))}
-          placeholder={themen.length ? 'Thema aus dem Lehrplan wählen …' : 'Eigenes Thema …'}
-          data-grammatik-thema
-        />
-        {themaId === 'eigenes' && (
-          <TextInput
-            label="Eigenes Thema"
-            value={eigenes}
-            onChange={(e) => setEigenes(e.currentTarget.value)}
-            placeholder="z. B. Present perfect vs. simple past"
-            data-grammatik-eigenes
-          />
-        )}
-        {teile.length > 0 && (
-          <MultiSelect
-            label="Teilformen (optional)"
-            description="Ohne Auswahl übt die KI alle Teilformen, die zur Klasse passen; „nur erkennen“ kommt nur in Auswahl- und Fehleraufgaben vor."
-            data={teile.map(({ teil, status }) => ({
-              value: `${gewaehltesThema!.id}/${teil.id}`,
-              label: `${teil.label}${status === 'erkennen' ? ' (nur erkennen)' : status === 'spaeter' ? ' (eigentlich später)' : ''}`
-            }))}
-            value={teilWahl}
-            onChange={setTeilWahl}
-            searchable
-            clearable
-            placeholder="alle passenden"
-            data-grammatik-teilformen
-          />
-        )}
-        <Textarea
-          label="Besonders üben (optional)"
-          autosize
-          minRows={2}
-          value={wunsch}
-          onChange={(e) => setWunsch(e.currentTarget.value)}
-          placeholder="z. B. Verneinung und Fragen, unregelmäßige Verben aus Unit 3"
-        />
-        <SegmentedControl
-          value={art}
-          onChange={(v) => (setArt(v as typeof art), setEinzelne([]))}
-          data={[
-            { value: 'gruppe', label: 'Lerngruppe' },
-            { value: 'einzeln', label: 'Einzelne Lernende' },
-            { value: 'code', label: 'Nur per QR-Code' }
-          ]}
-        />
-        {art === 'gruppe' ? (
-          <Select
-            label="Lerngruppe"
-            data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
-            value={gruppe}
-            onChange={setGruppe}
-            placeholder="wählen …"
-            data-grammatik-gruppe
-          />
-        ) : art === 'einzeln' ? (
-          <MultiSelect label="Lernende" data={alleLernenden.daten} value={einzelne} onChange={setEinzelne} searchable clearable placeholder="Namen suchen …" />
-        ) : (
-          <Text size="sm" c="dimmed">
-            Wer den QR-Code scannt, übt mit – mit Konto direkt, sonst mit Vorname und Anfangsbuchstabe.
-          </Text>
-        )}
-        {art !== 'code' && <Switch label="Zusätzlich per QR-Code / Code zugänglich" checked={qr} onChange={(e) => setQr(e.currentTarget.checked)} />}
-        <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} />
-        <Alert variant="light" icon={<IconSparkles size={16} />}>
-          Die KI erstellt mit dem eigenen KI-Zugang Regelkarten und rund 40 Aufgaben und prüft sie. Das dauert ein bis zwei Minuten im Hintergrund; danach wird
-          der Pool hier angesehen und erst dann freigegeben.
-        </Alert>
-        <Group justify="flex-end">
-          <Button leftSection={<IconSparkles size={16} />} disabled={!bereit} onClick={erstellen} data-grammatik-erstellen>
-            Aufgaben erstellen
-          </Button>
-        </Group>
-      </Stack>
+          {art === 'gruppe' ? (
+            <Select
+              label="Lerngruppe"
+              data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+              value={gruppe}
+              onChange={setGruppe}
+              placeholder="wählen …"
+              data-grammatik-gruppe
+            />
+          ) : art === 'einzeln' ? (
+            <MultiSelect
+              label="Lernende"
+              data={alleLernenden.daten}
+              value={einzelne}
+              onChange={setEinzelne}
+              searchable
+              clearable
+              placeholder="Namen suchen …"
+            />
+          ) : (
+            <Text size="sm" c="dimmed">
+              Wer den QR-Code scannt, übt mit – mit Konto direkt, sonst mit Vorname und Anfangsbuchstabe.
+            </Text>
+          )}
+          <NurExperte geaendert={art !== 'code' && qr && 'zusätzlich per QR-Code'}>
+            {art !== 'code' && <Switch label="Zusätzlich per QR-Code / Code zugänglich" checked={qr} onChange={(e) => setQr(e.currentTarget.checked)} />}
+          </NurExperte>
+          <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} />
+          <AlleOptionen />
+          <Alert variant="light" icon={<IconSparkles size={16} />}>
+            Die KI erstellt mit dem eigenen KI-Zugang Regelkarten und rund 40 Aufgaben und prüft sie. Das dauert ein bis zwei Minuten im Hintergrund; danach
+            wird der Pool hier angesehen und erst dann freigegeben.
+          </Alert>
+          <Group justify="flex-end">
+            <Button leftSection={<IconSparkles size={16} />} disabled={!bereit} onClick={erstellen} data-grammatik-erstellen>
+              Aufgaben erstellen
+            </Button>
+          </Group>
+        </Stack>
+      </OptionenBereich>
     </Modal>
   )
 }

@@ -448,7 +448,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
     images: {
       searchOpenMoji: (q: string) => call<OpenMojiHit[]>('images:openmoji-search', q),
       openMojiSvg: (hex: string) => call<string>('images:openmoji-svg', hex),
-      searchOnline: (q: string, source: OnlineImageSource) => call<OnlineImageHit[]>('images:online-search', q, source),
+      searchOnline: (q: string, source: OnlineImageSource, optionen?: { bildart?: 'photo' | 'illustration' | 'vector' }) =>
+        call<OnlineImageHit[]>('images:online-search', q, source, optionen),
       fetch: (url: string) => call<string>('images:fetch', url)
     },
     sources: {
@@ -472,7 +473,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Maskottchen für Illustrationen (26.09.2026) – Ablage im Profil unter maskottchen/ */
     maskottchen: {
       list: () => call<MaskottchenInfo[]>('maskottchen:list'),
-      save: (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) =>
+      save: (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string; schule?: boolean }) =>
         call<MaskottchenInfo>('maskottchen:save', eingabe),
       pose: (id: string, pose: string, dataUrl: string) => call<MaskottchenInfo>('maskottchen:pose', id, pose, dataUrl),
       deletePose: (id: string, pose: string) => call<MaskottchenInfo | null>('maskottchen:delete-pose', id, pose),

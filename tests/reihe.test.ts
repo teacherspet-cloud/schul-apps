@@ -119,3 +119,61 @@ describe('Unterrichtsreihe – Überarbeitung, Niveau, Ampeln', () => {
     expect(ampelAbweichungen(stand)).toEqual([0, 2])
   })
 })
+
+/* Optionale Schritte (06.10.2026): in der Reihenfolge freigeschaltet, nie Voraussetzung, „mindestens X" für den Abschluss */
+describe('Unterrichtsreihe – optionale Schritte', () => {
+  const opt = (id: string): Schritt => schritt(id, 'aufgabe', { rolle: 'optional' })
+  it('optionaler Schritt blockiert den nächsten Schritt nie', () => {
+    const r = reihe([schritt('a', 'aufgabe'), opt('o'), schritt('b', 'aufgabe')])
+    // a offen → o und b gesperrt (Reihenfolge gilt auch für optionale Schritte)
+    expect(berechneWeg(r, { schritte: {} }, {}, []).schritte.map((s) => s.status)).toEqual(['offen', 'gesperrt', 'gesperrt'])
+    // a geschafft → o UND b offen, obwohl o nicht erledigt ist
+    const w = berechneWeg(r, { schritte: { a: { eingereicht: 1 } } }, {}, [])
+    expect(w.schritte.map((s) => s.status)).toEqual(['geschafft', 'offen', 'offen'])
+  })
+  it('ohne Mindestzahl: Reihe fertig ohne optionale Schritte, Zähler trotzdem da', () => {
+    const r = reihe([schritt('a', 'aufgabe'), opt('o1'), opt('o2')])
+    const w = berechneWeg(r, { schritte: { a: { eingereicht: 1 }, o1: { eingereicht: 1 } } }, {}, [])
+    expect(w.fertig).toBe(true)
+    expect(w.fortschritt).toBe(1)
+    expect(w.optional).toEqual({ geschafft: 1, gesamt: 2, noetig: 0 })
+  })
+  it('mit Mindestzahl: fertig erst mit genug optionalen; Fortschritt zählt sie bis zur Mindestzahl', () => {
+    const r = { ...reihe([schritt('a', 'aufgabe'), opt('o1'), opt('o2'), opt('o3'), schritt('b', 'aufgabe')]), optionalMindestens: 2 }
+    let w = berechneWeg(r, { schritte: { a: { eingereicht: 1 }, b: { eingereicht: 1 } } }, {}, [])
+    expect(w.fertig).toBe(false)
+    expect(w.fortschritt).toBeCloseTo(2 / 4)
+    expect(w.optional).toEqual({ geschafft: 0, gesamt: 3, noetig: 2 })
+    w = berechneWeg(r, { schritte: { a: { eingereicht: 1 }, b: { eingereicht: 1 }, o1: { eingereicht: 1 }, o3: { eingereicht: 1 } } }, {}, [])
+    expect(w.fertig).toBe(true)
+    expect(w.fortschritt).toBe(1)
+    // mehr als nötig zählt nicht über 100 %
+    w = berechneWeg(
+      r,
+      { schritte: { a: { eingereicht: 1 }, b: { eingereicht: 1 }, o1: { eingereicht: 1 }, o2: { eingereicht: 1 }, o3: { eingereicht: 1 } } },
+      {},
+      []
+    )
+    expect(w.fortschritt).toBe(1)
+    expect(w.optional?.geschafft).toBe(3)
+  })
+  it('Mindestzahl über der Zahl der optionalen Schritte wird gekappt; Abzeichen nur aus Pflichtschritten', () => {
+    const r = { ...reihe([schritt('a', 'aufgabe', { abschnitt: 'T' }), schritt('o', 'aufgabe', { rolle: 'optional', abschnitt: 'T' })]), optionalMindestens: 5 }
+    let w = berechneWeg(r, { schritte: { a: { eingereicht: 1 } } }, {}, [])
+    expect(w.abzeichen).toEqual(['T'])
+    expect(w.fertig).toBe(false)
+    expect(w.optional?.noetig).toBe(1)
+    w = berechneWeg(r, { schritte: { a: { eingereicht: 1 }, o: { hand: 'geschafft' } } }, {}, [])
+    expect(w.fertig).toBe(true)
+  })
+  it('nur optionale Schritte: Reihe zählt sie nur bei Mindestzahl', () => {
+    const r = reihe([opt('o1'), opt('o2')])
+    expect(berechneWeg(r, { schritte: {} }, {}, []).schritte.map((s) => s.status)).toEqual(['offen', 'offen'])
+    expect(berechneWeg({ ...r, optionalMindestens: 1 }, { schritte: { o2: { eingereicht: 1 } } }, {}, []).fertig).toBe(true)
+  })
+  it('Haltepunkt an einem optionalen Schritt hält nur ihn selbst', () => {
+    const r = reihe([schritt('a', 'aufgabe'), schritt('o', 'aufgabe', { rolle: 'optional', halt: { art: 'freigabe' } }), schritt('b', 'aufgabe')])
+    const w = berechneWeg(r, { schritte: { a: { eingereicht: 1 } } }, {}, [])
+    expect(w.schritte.map((s) => s.status)).toEqual(['geschafft', 'gesperrt', 'offen'])
+  })
+})

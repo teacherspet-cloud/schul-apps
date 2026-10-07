@@ -1,4 +1,6 @@
 import { schulbuchAusSeiten } from '../../../shared/schulbuch/SchulbuchDialog'
+import { useExperte } from '../../../shared/settingsStore'
+import { NurExperte, OptionenBereich } from '../../../shared/components/NurExperte'
 import InterkulturSchalter from './InterkulturSchalter'
 import VideoTranskript, { videoMaterialArt } from './VideoTranskript'
 import { sehtextQuelle } from '../didactics/sehtext'
@@ -56,7 +58,7 @@ import { CourseLevel, courseLevelOptions, gradeRange } from '../didactics/school
 import SchulortFelder from '../../../shared/components/SchulortFelder'
 import { mitLerngruppe } from '../../../shared/lerngruppe'
 import { appendCompetence, suggestCompetence } from '../generation/competences'
-import { planeGliederung } from '../auftraege'
+import { erstelleDirekt, planeGliederung } from '../auftraege'
 import AbiturCard from './AbiturCard'
 import BilingualSchalter from './BilingualSchalter'
 import VorwissenChips from './VorwissenChips'
@@ -239,7 +241,7 @@ export default function TopicStep(): React.JSX.Element {
   const [vocabOpen, setVocabOpen] = useState(false)
   const [vocabAvailable, setVocabAvailable] = useState(false)
   const languageOfSubject = worksheet
-    ? (subjectById(worksheet.meta.subjectId).foreignLanguage ?? (worksheet.meta.subjectId === 'daz' ? 'de' : undefined))
+    ? subjectById(worksheet.meta.subjectId).foreignLanguage ?? (worksheet.meta.subjectId === 'daz' ? 'de' : undefined)
     : undefined
   useEffect(() => {
     if (!languageOfSubject) {
@@ -256,6 +258,8 @@ export default function TopicStep(): React.JSX.Element {
   }, [languageOfSubject])
 
   const profile = useMemo(() => (worksheet ? profileFromMeta(worksheet.meta) : null), [worksheet])
+  // Standardmodus (07.10.2026) – vor der frühen Rückkehr: Hooks stehen immer in derselben Reihenfolge
+  const experte = useExperte()
   if (!worksheet || !profile) return <Container py="xl">Wird geladen …</Container>
 
   const meta = worksheet.meta
@@ -332,6 +336,14 @@ export default function TopicStep(): React.JSX.Element {
    * Formulars einen Hinweis mit „Abbrechen" – und über „Neues Arbeitsblatt" geht es weiter.
    */
   const plan = (): void => planeGliederung(worksheet, useArbeitsblatt.getState().docId)
+  /*
+   * Standardmodus (07.10.2026): gleich das ganze Blatt – Gliederung und Ausformulieren in einem Auftrag,
+   * mit inhaltlicher Prüfung wie im Gliederungsschritt voreingestellt. Die Gliederung bleibt erreichbar.
+   */
+  const direkt = async (): Promise<void> => {
+    const economy = Boolean((await window.api.ai.status().catch(() => null))?.economy)
+    erstelleDirekt(worksheet, useArbeitsblatt.getState().docId, { review: true, economy })
+  }
 
   // Der Hauptknopf steht fest unten und sagt, was fehlt (Paket 6)
   const sperrgrund = ersterGrund(
@@ -346,1043 +358,1133 @@ export default function TopicStep(): React.JSX.Element {
           Zur bestehenden Gliederung
         </Button>
       )}
-      <Button size="md" leftSection={<IconListDetails size={18} />} disabled={Boolean(sperrgrund)} onClick={plan}>
-        Gliederung planen
-      </Button>
+      {experte ? (
+        <Button size="md" leftSection={<IconListDetails size={18} />} disabled={Boolean(sperrgrund)} onClick={plan}>
+          Gliederung planen
+        </Button>
+      ) : (
+        <>
+          <Button variant="default" leftSection={<IconListDetails size={18} />} disabled={Boolean(sperrgrund)} onClick={plan} data-erst-gliederung>
+            Erst Gliederung planen
+          </Button>
+          <Button size="md" leftSection={<IconSparkles size={18} />} disabled={Boolean(sperrgrund)} onClick={() => void direkt()} data-direkt-erstellen>
+            Arbeitsblatt erstellen
+          </Button>
+        </>
+      )}
     </Formularfuss>
   )
 
   return (
-    <FormularSeite fuss={fuss}>
-      <ScrollArea h="100%">
-        <Container size="xl" py="lg">
-          <Group justify="space-between" mb="md">
-            <div>
-              <Title order={2}>Thema &amp; Lerngruppe</Title>
-              <Text c="dimmed" size="sm">
-                Jahrgang, Schulform und Bundesland bestimmen Sprache, Anforderungen, Aufgabenformate und Layout.
-              </Text>
-            </div>
-          </Group>
+    <OptionenBereich>
+      <FormularSeite fuss={fuss}>
+        <ScrollArea h="100%">
+          <Container size="xl" py="lg">
+            <Group justify="space-between" mb="md">
+              <div>
+                <Title order={2}>Thema &amp; Lerngruppe</Title>
+                <Text c="dimmed" size="sm">
+                  Jahrgang, Schulform und Bundesland bestimmen Sprache, Anforderungen, Aufgabenformate und Layout.
+                </Text>
+              </div>
+            </Group>
 
-          {!hasKey && (
-            <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
-              Zum Erzeugen wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt.{' '}
-              <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
-            </Alert>
-          )}
+            {!hasKey && (
+              <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
+                Zum Erzeugen wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt.{' '}
+                <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
+              </Alert>
+            )}
 
-          <Grid gap="lg">
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Stack>
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Thema
-                  </Title>
-                  <Stack gap="sm">
-                    <Group grow>
-                      <HaeufigSelect
-                        art="fach"
-                        label="Fach"
-                        data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
-                        value={meta.subjectId}
-                        onChange={(v) => {
-                          if (!v) return
-                          const s = subjectById(v)
-                          patchGroup({ subjectId: v, subjectLabel: s.id === 'anderes' ? '' : s.label, languageOrder: s.id === 'englisch' ? 1 : 2 })
-                        }}
-                        allowDeselect={false}
-                        maxDropdownHeight={380}
+            <Grid gap="lg">
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Thema
+                    </Title>
+                    <Stack gap="sm">
+                      <Group grow>
+                        <HaeufigSelect
+                          art="fach"
+                          label="Fach"
+                          data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
+                          value={meta.subjectId}
+                          onChange={(v) => {
+                            if (!v) return
+                            const s = subjectById(v)
+                            patchGroup({ subjectId: v, subjectLabel: s.id === 'anderes' ? '' : s.label, languageOrder: s.id === 'englisch' ? 1 : 2 })
+                          }}
+                          allowDeselect={false}
+                          maxDropdownHeight={380}
+                        />
+                        {meta.subjectId === 'anderes' && (
+                          <TextInput label="Fachbezeichnung" value={meta.subjectLabel} onChange={(e) => patch({ subjectLabel: e.currentTarget.value })} />
+                        )}
+                      </Group>
+                      <TextInput
+                        label="Thema"
+                        placeholder="z. B. Fotosynthese, Present Perfect, Lineare Funktionen"
+                        required
+                        value={meta.topic}
+                        onChange={(e) => patch({ topic: e.currentTarget.value })}
                       />
-                      {meta.subjectId === 'anderes' && (
-                        <TextInput label="Fachbezeichnung" value={meta.subjectLabel} onChange={(e) => patch({ subjectLabel: e.currentTarget.value })} />
-                      )}
-                    </Group>
-                    <TextInput
-                      label="Thema"
-                      placeholder="z. B. Fotosynthese, Present Perfect, Lineare Funktionen"
-                      required
-                      value={meta.topic}
-                      onChange={(e) => patch({ topic: e.currentTarget.value })}
-                    />
-                  </Stack>
-                </Card>
+                    </Stack>
+                  </Card>
 
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Lerngruppe
-                  </Title>
-                  <Stack gap="sm">
-                    <SchulortFelder
-                      table={table}
-                      stateId={meta.stateId}
-                      schoolTypeId={meta.schoolTypeId}
-                      schoolTypeName={meta.schoolTypeName}
-                      onChange={patchGroup}
-                    />
-                    <Group grow align="start">
-                      <Select
-                        label="Jahrgang"
-                        description={range.note}
-                        data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({ value: String(range.min + i), label: `Klasse ${range.min + i}` }))}
-                        value={String(meta.grade)}
-                        onChange={(v) => v && patchGroup({ grade: Number(v) })}
-                        allowDeselect={false}
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Lerngruppe
+                    </Title>
+                    <Stack gap="sm">
+                      <SchulortFelder
+                        table={table}
+                        stateId={meta.stateId}
+                        schoolTypeId={meta.schoolTypeId}
+                        schoolTypeName={meta.schoolTypeName}
+                        onChange={patchGroup}
                       />
-                      {courseOptions && (
+                      <Group grow align="start">
                         <Select
-                          label="Kursniveau"
-                          data={courseOptions}
-                          value={meta.courseLevel}
-                          onChange={(v) => v && patchGroup({ courseLevel: v as CourseLevel })}
+                          label="Jahrgang"
+                          description={range.note}
+                          data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({
+                            value: String(range.min + i),
+                            label: `Klasse ${range.min + i}`
+                          }))}
+                          value={String(meta.grade)}
+                          onChange={(v) => v && patchGroup({ grade: Number(v) })}
                           allowDeselect={false}
                         />
-                      )}
-                    </Group>
-                    {/*
+                        <NurExperte>
+                          {courseOptions && (
+                            <Select
+                              label="Kursniveau"
+                              data={courseOptions}
+                              value={meta.courseLevel}
+                              onChange={(v) => v && patchGroup({ courseLevel: v as CourseLevel })}
+                              allowDeselect={false}
+                            />
+                          )}
+                        </NurExperte>
+                      </Group>
+                      {/*
                     Abiturbezogene Uebungsaufgaben – gewuenscht am 24.09.2026: „per Knopfdruck
                     unter Kompetenzniveau". Der Schalter erscheint nur dort, wo er etwas
                     bedeutet: ab Jahrgang 12 und in Faechern, fuer die belegte Vorgaben
                     vorliegen. In der Einfuehrungsphase waere eine Abituraufgabe verfrueht.
                   */}
-                    {abiturMoeglich(meta) && (
-                      <Switch
-                        label="An Abituraufgaben angelehnt"
-                        description="Stellt Aufgabenart, Anforderungsbereiche, Material und Erwartungshorizont auf die Vorgaben des Faches um."
-                        checked={Boolean(meta.abitur?.an)}
-                        onChange={(e) => patch({ abitur: abiturStandard(meta, e.currentTarget.checked) })}
-                      />
-                    )}
-                    {subject.foreignLanguage ? (
-                      <Group grow align="start">
-                        {tracks.length > 0 && (
+                      <NurExperte geaendert={meta.abitur?.an && 'Abitur'}>
+                        {abiturMoeglich(meta) && (
+                          <Switch
+                            label="An Abituraufgaben angelehnt"
+                            description="Stellt Aufgabenart, Anforderungsbereiche, Material und Erwartungshorizont auf die Vorgaben des Faches um."
+                            checked={Boolean(meta.abitur?.an)}
+                            onChange={(e) => patch({ abitur: abiturStandard(meta, e.currentTarget.checked) })}
+                          />
+                        )}
+                      </NurExperte>
+                      {subject.foreignLanguage ? (
+                        <Group grow align="start">
+                          {tracks.length > 0 && (
+                            <Select
+                              label="Fremdsprache"
+                              data={tracks.map((t) => ({ value: String(t.order), label: `${t.order}. Fremdsprache` }))}
+                              value={String(meta.languageOrder)}
+                              onChange={(v) => v && patchGroup({ languageOrder: Number(v) })}
+                              allowDeselect={false}
+                            />
+                          )}
                           <Select
-                            label="Fremdsprache"
-                            data={tracks.map((t) => ({ value: String(t.order), label: `${t.order}. Fremdsprache` }))}
-                            value={String(meta.languageOrder)}
-                            onChange={(v) => v && patchGroup({ languageOrder: Number(v) })}
+                            label="Sprachniveau (GER)"
+                            description={cefrSuggestion ? `Vorschlag: ${cefrSuggestion.level} (${cefrSuggestion.basis})` : undefined}
+                            data={[...CEFR_SCALE]}
+                            value={meta.cefrLevel}
+                            onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
+                            allowDeselect={false}
+                          />
+                        </Group>
+                      ) : (
+                        <Select
+                          label="Sprachniveau"
+                          description={LANGUAGE_MODES.find((m) => m.value === meta.languageMode)?.description}
+                          data={LANGUAGE_MODES.map((m) => ({ value: m.value, label: m.label }))}
+                          value={meta.languageMode}
+                          onChange={(v) => v && patch({ languageMode: v as LanguageMode })}
+                          allowDeselect={false}
+                        />
+                      )}
+                      {/* Bilingualer Sachfachunterricht – erscheint nur bei Sachfächern (didactics/bilingual.ts) */}
+                      <NurExperte geaendert={meta.bilingual?.an && 'Bilingual'}>
+                        <BilingualSchalter meta={meta} onChange={(bilingual) => patch({ bilingual })} />
+                      </NurExperte>
+                      {(subject.foreignLanguage || hasGrammar(meta.subjectId)) && (
+                        <Select
+                          label="Kompetenzschwerpunkt"
+                          description={skillFocusOptions(meta.subjectId).find((f) => f.value === (meta.skillFocus ?? 'mixed'))?.description}
+                          data={skillFocusOptions(meta.subjectId).map((f) => ({ value: f.value, label: f.label }))}
+                          value={meta.skillFocus ?? 'mixed'}
+                          onChange={(v) => v && patch({ skillFocus: v as LanguageSkill | 'mixed' })}
+                          allowDeselect={false}
+                        />
+                      )}
+                      {/* Interkulturelle Kompetenz (02.10.2026): eigener Schwerpunkt (nur Teilbereiche) oder Zusatzschalter */}
+                      <NurExperte geaendert={meta.interkulturell?.aktiv && meta.skillFocus !== 'interkulturell' && 'Interkulturell'}>
+                        {subject.foreignLanguage && (
+                          <InterkulturSchalter
+                            meta={meta}
+                            nurBereiche={meta.skillFocus === 'interkulturell'}
+                            onChange={(interkulturell) => patch({ interkulturell })}
+                          />
+                        )}
+                      </NurExperte>
+                      {/* Sprechen (01.10.2026): Teile des Vorbereitungsblatts, voreingestellt alle vier (didactics/sprechen.ts) */}
+                      <NurExperte>
+                        {istSprechblatt(meta) && (
+                          <MultiSelect
+                            label="Teile des Blattes zur Sprechprüfung"
+                            description="Musterdialog: Der Hörtext entsteht vorab mit zwei Stimmen und lässt sich im Reiter „Hörtexte“ vertonen."
+                            data={SPRECH_TEILE}
+                            value={sprechTeile(meta)}
+                            onChange={(v) => patch({ sprechTeile: (v.length ? v : ['karten']) as SprechTeil[] })}
+                          />
+                        )}
+                      </NurExperte>
+                      {/*
+                       * Deutsch: Zuhoeren hat zwei Bauformen. Die muendliche ist die einzige, die
+                       * in den Bildungsstandards als Aufgabenbeispiel vorkommt; die schriftliche
+                       * ist aus der Fremdsprachendidaktik uebertragen und fuer Klassenarbeiten
+                       * gedacht. Siehe didactics/zuhoeren.ts.
+                       */}
+                      <NurExperte>
+                        {istDeutschZuhoeren(meta) && (
+                          <Select
+                            label="Bauform des Zuhoeren-Blattes"
+                            description={ZUHOEREN_MODES.find((m) => m.value === (meta.listeningMode ?? 'muendlich'))?.description}
+                            data={ZUHOEREN_MODES.map((m) => ({ value: m.value, label: m.label }))}
+                            value={meta.listeningMode ?? 'muendlich'}
+                            onChange={(v) => v && patch({ listeningMode: v as ZuhoerenMode })}
                             allowDeselect={false}
                           />
                         )}
-                        <Select
-                          label="Sprachniveau (GER)"
-                          description={cefrSuggestion ? `Vorschlag: ${cefrSuggestion.level} (${cefrSuggestion.basis})` : undefined}
-                          data={[...CEFR_SCALE]}
-                          value={meta.cefrLevel}
-                          onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
-                          allowDeselect={false}
-                        />
-                      </Group>
-                    ) : (
-                      <Select
-                        label="Sprachniveau"
-                        description={LANGUAGE_MODES.find((m) => m.value === meta.languageMode)?.description}
-                        data={LANGUAGE_MODES.map((m) => ({ value: m.value, label: m.label }))}
-                        value={meta.languageMode}
-                        onChange={(v) => v && patch({ languageMode: v as LanguageMode })}
-                        allowDeselect={false}
-                      />
-                    )}
-                    {/* Bilingualer Sachfachunterricht – erscheint nur bei Sachfächern (didactics/bilingual.ts) */}
-                    <BilingualSchalter meta={meta} onChange={(bilingual) => patch({ bilingual })} />
-                    {(subject.foreignLanguage || hasGrammar(meta.subjectId)) && (
-                      <Select
-                        label="Kompetenzschwerpunkt"
-                        description={skillFocusOptions(meta.subjectId).find((f) => f.value === (meta.skillFocus ?? 'mixed'))?.description}
-                        data={skillFocusOptions(meta.subjectId).map((f) => ({ value: f.value, label: f.label }))}
-                        value={meta.skillFocus ?? 'mixed'}
-                        onChange={(v) => v && patch({ skillFocus: v as LanguageSkill | 'mixed' })}
-                        allowDeselect={false}
-                      />
-                    )}
-                    {/* Interkulturelle Kompetenz (02.10.2026): eigener Schwerpunkt (nur Teilbereiche) oder Zusatzschalter */}
-                    {subject.foreignLanguage && (
-                      <InterkulturSchalter
-                        meta={meta}
-                        nurBereiche={meta.skillFocus === 'interkulturell'}
-                        onChange={(interkulturell) => patch({ interkulturell })}
-                      />
-                    )}
-                    {/* Sprechen (01.10.2026): Teile des Vorbereitungsblatts, voreingestellt alle vier (didactics/sprechen.ts) */}
-                    {istSprechblatt(meta) && (
-                      <MultiSelect
-                        label="Teile des Blattes zur Sprechprüfung"
-                        description="Musterdialog: Der Hörtext entsteht vorab mit zwei Stimmen und lässt sich im Reiter „Hörtexte“ vertonen."
-                        data={SPRECH_TEILE}
-                        value={sprechTeile(meta)}
-                        onChange={(v) => patch({ sprechTeile: (v.length ? v : ['karten']) as SprechTeil[] })}
-                      />
-                    )}
-                    {/*
-                     * Deutsch: Zuhoeren hat zwei Bauformen. Die muendliche ist die einzige, die
-                     * in den Bildungsstandards als Aufgabenbeispiel vorkommt; die schriftliche
-                     * ist aus der Fremdsprachendidaktik uebertragen und fuer Klassenarbeiten
-                     * gedacht. Siehe didactics/zuhoeren.ts.
-                     */}
-                    {istDeutschZuhoeren(meta) && (
-                      <Select
-                        label="Bauform des Zuhoeren-Blattes"
-                        description={ZUHOEREN_MODES.find((m) => m.value === (meta.listeningMode ?? 'muendlich'))?.description}
-                        data={ZUHOEREN_MODES.map((m) => ({ value: m.value, label: m.label }))}
-                        value={meta.listeningMode ?? 'muendlich'}
-                        onChange={(v) => v && patch({ listeningMode: v as ZuhoerenMode })}
-                        allowDeselect={false}
-                      />
-                    )}
-                    {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
-                      <MultiSelect
-                        label={meta.skillFocus === 'listening' ? 'Formate für das Hör-/Sehverstehen' : 'Formate für das Leseverstehen'}
-                        description="Belegte Prüfungsformate der KMK-Bildungsstandards und der Kerncurricula; leer lassen = Vorschlag nach Jahrgang."
-                        data={comprehensionFormatsFor(meta.skillFocus === 'listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
-                          value: f.id,
-                          label: `${f.label} (${f.openness})`
-                        }))}
-                        value={meta.comprehensionFormats ?? []}
-                        onChange={(v) => patch({ comprehensionFormats: v })}
-                        placeholder={defaultComprehensionFormats(meta.skillFocus === 'listening' ? 'listening' : 'reading', meta.grade)
-                          .map((id) => comprehensionFormatById(id)?.label)
-                          .filter(Boolean)
-                          .join(' · ')}
-                        clearable
-                      />
-                    )}
-                    {/* Wunsch der Lehrkraft (02.10.2026): nur die gewählten Formate zum vorgegebenen Hör-/Sehtext bzw. Text */}
-                    {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
-                      <Checkbox
-                        label="Nur die gewählten Formate erstellen"
-                        description="Keine Vorentlastung und keine weiterführende Aufgabe – nur Verstehensaufgaben zum vorgegebenen Text bzw. Video."
-                        checked={Boolean(meta.nurGewaehlteFormate)}
-                        onChange={(e) => patch({ nurGewaehlteFormate: e.currentTarget.checked || undefined })}
-                        data-nur-formate
-                      />
-                    )}
-                    {meta.skillFocus === 'listening' && sehtextQuelle(meta, worksheet.sources) && (
-                      <Text size="xs" c="dimmed" data-sehtext-hinweis>
-                        Hör-/Sehtext ist das Video „{sehtextQuelle(meta, worksheet.sources)!.fileName}“ aus dem Material – es entsteht kein eigener Hörtext;
-                        Link und QR-Code kommen auf das Blatt.
-                      </Text>
-                    )}
-                    {meta.skillFocus === 'grammar' && <GrammarPicker meta={meta} onChange={patch} />}
-                    {/* Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste, von der App angehängt */}
-                    {meta.skillFocus === 'grammar' && <VerbAufgabeKarte meta={meta} onChange={patch} />}
-                    {/* Beim Schwerpunkt „Vokabeln" ist der Wortschatz das Thema selbst – dort
-                      steht die ausführliche Auswahl weiter unten, nicht dieses Pop-up. */}
-                    {subject.foreignLanguage && meta.skillFocus !== 'vocabulary' && vocabAvailable && (
-                      <div>
-                        <Group justify="space-between" align="center" mb={4}>
-                          <Text size="sm" fw={500}>
-                            Vokabeln für dieses Blatt
-                          </Text>
-                          {vocabCount > 0 && (
-                            <Badge variant="light" size="sm" color="teal">
-                              {vocabCount} gewählt
-                            </Badge>
-                          )}
-                        </Group>
-                        <Button variant="light" size="compact-sm" leftSection={<IconBook2 size={14} />} onClick={() => setVocabOpen(true)}>
-                          {vocabCount ? 'Auswahl ändern …' : 'Vokabellisten und Wörter wählen …'}
-                        </Button>
-                        <Text size="xs" c="dimmed" mt={4}>
-                          {vocabCount
-                            ? `Diese Wörter kommen in Texten, Hörtexten und Aufgaben bevorzugt vor${meta.knownVocab ? `; Wortschatz nach „${meta.knownVocab.source}" wird vorausgesetzt` : ''}.`
-                            : 'Aus dem Schulbuch oder den gespeicherten Listen – die KI baut sie dann bevorzugt ein.'}
+                      </NurExperte>
+                      <NurExperte geaendert={(Boolean(meta.comprehensionFormats?.length) || meta.nurGewaehlteFormate) && 'Formate'}>
+                        {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
+                          <MultiSelect
+                            label={meta.skillFocus === 'listening' ? 'Formate für das Hör-/Sehverstehen' : 'Formate für das Leseverstehen'}
+                            description="Belegte Prüfungsformate der KMK-Bildungsstandards und der Kerncurricula; leer lassen = Vorschlag nach Jahrgang."
+                            data={comprehensionFormatsFor(meta.skillFocus === 'listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
+                              value: f.id,
+                              label: `${f.label} (${f.openness})`
+                            }))}
+                            value={meta.comprehensionFormats ?? []}
+                            onChange={(v) => patch({ comprehensionFormats: v })}
+                            placeholder={defaultComprehensionFormats(meta.skillFocus === 'listening' ? 'listening' : 'reading', meta.grade)
+                              .map((id) => comprehensionFormatById(id)?.label)
+                              .filter(Boolean)
+                              .join(' · ')}
+                            clearable
+                          />
+                        )}
+                        {/* Wunsch der Lehrkraft (02.10.2026): nur die gewählten Formate zum vorgegebenen Hör-/Sehtext bzw. Text */}
+                        {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
+                          <Checkbox
+                            label="Nur die gewählten Formate erstellen"
+                            description="Keine Vorentlastung und keine weiterführende Aufgabe – nur Verstehensaufgaben zum vorgegebenen Text bzw. Video."
+                            checked={Boolean(meta.nurGewaehlteFormate)}
+                            onChange={(e) => patch({ nurGewaehlteFormate: e.currentTarget.checked || undefined })}
+                            data-nur-formate
+                          />
+                        )}
+                      </NurExperte>
+                      {meta.skillFocus === 'listening' && sehtextQuelle(meta, worksheet.sources) && (
+                        <Text size="xs" c="dimmed" data-sehtext-hinweis>
+                          Hör-/Sehtext ist das Video „{sehtextQuelle(meta, worksheet.sources)!.fileName}“ aus dem Material – es entsteht kein eigener Hörtext;
+                          Link und QR-Code kommen auf das Blatt.
                         </Text>
-                      </div>
-                    )}
-                    {(subject.foreignLanguage || subject.uebersetzungssprache) && (
-                      <Select
-                        label={subject.uebersetzungssprache ? 'Hilfsblatt mit Übersetzungshilfen' : 'Hilfsblatt mit nützlichen Ausdrücken'}
-                        description={
-                          meta.phraseSheet === 'blatt'
-                            ? 'Eigenes Blatt am Ende: Die Lernenden behalten es, während die Aufgaben wechseln.'
-                            : meta.phraseSheet === 'inline'
-                              ? 'Auf dem Aufgabenblatt, vor der ersten Aufgabe, die es braucht – spart Papier.'
-                              : subject.uebersetzungssprache
+                      )}
+                      {meta.skillFocus === 'grammar' && <GrammarPicker meta={meta} onChange={patch} />}
+                      {/* Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste, von der App angehängt */}
+                      <NurExperte>{meta.skillFocus === 'grammar' && <VerbAufgabeKarte meta={meta} onChange={patch} />}</NurExperte>
+                      {/* Beim Schwerpunkt „Vokabeln" ist der Wortschatz das Thema selbst – dort
+                      steht die ausführliche Auswahl weiter unten, nicht dieses Pop-up. */}
+                      {subject.foreignLanguage && meta.skillFocus !== 'vocabulary' && vocabAvailable && (
+                        <div>
+                          <Group justify="space-between" align="center" mb={4}>
+                            <Text size="sm" fw={500}>
+                              Vokabeln für dieses Blatt
+                            </Text>
+                            {vocabCount > 0 && (
+                              <Badge variant="light" size="sm" color="teal">
+                                {vocabCount} gewählt
+                              </Badge>
+                            )}
+                          </Group>
+                          <Button variant="light" size="compact-sm" leftSection={<IconBook2 size={14} />} onClick={() => setVocabOpen(true)}>
+                            {vocabCount ? 'Auswahl ändern …' : 'Vokabellisten und Wörter wählen …'}
+                          </Button>
+                          <Text size="xs" c="dimmed" mt={4}>
+                            {vocabCount
+                              ? `Diese Wörter kommen in Texten, Hörtexten und Aufgaben bevorzugt vor${
+                                  meta.knownVocab ? `; Wortschatz nach „${meta.knownVocab.source}" wird vorausgesetzt` : ''
+                                }.`
+                              : 'Aus dem Schulbuch oder den gespeicherten Listen – die KI baut sie dann bevorzugt ein.'}
+                          </Text>
+                        </div>
+                      )}
+                      <NurExperte geaendert={meta.phraseSheet && meta.phraseSheet !== 'aus' && 'Hilfsblatt'}>
+                        {(subject.foreignLanguage || subject.uebersetzungssprache) && (
+                          <Select
+                            label={subject.uebersetzungssprache ? 'Hilfsblatt mit Übersetzungshilfen' : 'Hilfsblatt mit nützlichen Ausdrücken'}
+                            description={
+                              meta.phraseSheet === 'blatt'
+                                ? 'Eigenes Blatt am Ende: Die Lernenden behalten es, während die Aufgaben wechseln.'
+                                : meta.phraseSheet === 'inline'
+                                ? 'Auf dem Aufgabenblatt, vor der ersten Aufgabe, die es braucht – spart Papier.'
+                                : subject.uebersetzungssprache
                                 ? 'Die Konstruktionen des Textes mit ihren deutschen Wiedergaben, nach Konstruktion geordnet.'
                                 : 'Wendungen und Wortschatz für die Aufgaben, nach Sprachhandlung geordnet.'
-                        }
-                        data={[
-                          { value: 'aus', label: 'Kein Hilfsblatt' },
-                          { value: 'blatt', label: 'Als eigenes Blatt' },
-                          { value: 'inline', label: 'Auf dem Aufgabenblatt' }
-                        ]}
-                        value={meta.phraseSheet ?? 'aus'}
-                        onChange={(v) => v && patch({ phraseSheet: v as WorksheetMeta['phraseSheet'] })}
-                        allowDeselect={false}
-                      />
-                    )}
-                    {subject.foreignLanguage && (
-                      <>
-                        <Switch
-                          label="Arbeitsanweisungen auf Deutsch"
-                          checked={meta.instructionsInGerman}
-                          onChange={(e) => patch({ instructionsInGerman: e.currentTarget.checked })}
-                        />
-                        {(meta.skillFocus === 'mediation' || meta.skillFocus === 'writing') && (
+                            }
+                            data={[
+                              { value: 'aus', label: 'Kein Hilfsblatt' },
+                              { value: 'blatt', label: 'Als eigenes Blatt' },
+                              { value: 'inline', label: 'Auf dem Aufgabenblatt' }
+                            ]}
+                            value={meta.phraseSheet ?? 'aus'}
+                            onChange={(v) => v && patch({ phraseSheet: v as WorksheetMeta['phraseSheet'] })}
+                            allowDeselect={false}
+                          />
+                        )}
+                      </NurExperte>
+                      <NurExperte geaendert={(Boolean(meta.materialWords) || Boolean(meta.studentWords)) && 'Wortzahl'}>
+                        {subject.foreignLanguage && (
                           <>
                             <Switch
-                              label="Wortvorgabe für die Schüler"
-                              description={
-                                meta.wordLimit
-                                  ? `Die Aufgabe nennt die erwartete Wortzahl (Vorschlag für ${meta.cefrLevel}: ca. ${writingWords(meta)} Wörter).`
-                                  : 'Die Aufgabe nennt keine Wortzahl; der Umfang ergibt sich aus den Inhaltspunkten und dem Schreibraum.'
-                              }
-                              checked={meta.wordLimit ?? false}
-                              onChange={(e) => patch({ wordLimit: e.currentTarget.checked })}
+                              label="Arbeitsanweisungen auf Deutsch"
+                              checked={meta.instructionsInGerman}
+                              onChange={(e) => patch({ instructionsInGerman: e.currentTarget.checked })}
                             />
-                            <Select
-                              label="Textsorte des Schülertextes"
-                              description="In welcher Form schreiben die Lernenden ihren eigenen Text?"
-                              data={STUDENT_TEXT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                              value={meta.studentTextType ?? ''}
-                              onChange={(v) => patch({ studentTextType: v ?? '' })}
-                              allowDeselect={false}
-                            />
-                            {/*
-                             * Notizentabelle: Entscheidung der Lehrkraft, nicht der KI.
-                             *
-                             * Die Abschlussprüfungen geben die Inhaltspunkte als Spiegelstrich-
-                             * liste vor; eine Notizentabelle ist dort in keiner eingesehenen
-                             * Aufgabe belegt, im Unterricht aber verbreitet. Beides ist
-                             * vertretbar – also wird gefragt statt geraten.
-                             */}
-                            {/* Hilfen für Lernende (01.10.2026): auf dem Arbeitsblatt wie bisher an, abschaltbar fürs Prüfungsformat */}
-                            <Switch
-                              label="Hilfen für Lernende"
-                              description="Kasten „Adressat · Textsorte · Zweck“, inhaltliche Teilpunkte, Notizentabelle und Formhinweise auf dem Blatt. Ohne Hilfen (Prüfungsformat) stehen sie nur im Lösungsblatt."
-                              checked={meta.lernhilfen !== false}
-                              onChange={(e) => patch({ lernhilfen: e.currentTarget.checked ? undefined : false })}
-                            />
-                            <Checkbox
-                              label="Notizentabelle zur Schreibaufgabe"
-                              description="Zwei Spalten mit Stichpunkten und offenen Impulsen („Positives: …“), aus denen die Lernenden auswählen. Ohne Haken stehen die Inhaltspunkte als Liste – so wie in den Abschlussprüfungen."
-                              checked={meta.writingNotes ?? false}
-                              onChange={(e) => patch({ writingNotes: e.currentTarget.checked })}
-                            />
-                            <div>
-                              <Text size="sm" fw={500}>
-                                Umfang des Ausgangstextes: {sourceTextWords(meta)} Wörter
-                              </Text>
-                              <Text size="xs" c="dimmed" mb={4}>
-                                {meta.materialWords ? 'Eigene Vorgabe' : `Automatisch nach Niveau ${meta.cefrLevel}`} – so lang wird der Text, den die Lernenden
-                                für die Aufgabe lesen. Richtwert: Lässt sich eine Quelle nicht sinnvoll kürzen, darf sie bis zu ein Viertel länger werden.
-                              </Text>
-                              <Slider
-                                min={MATERIAL_WORDS.min}
-                                max={MATERIAL_WORDS.max}
-                                step={MATERIAL_WORDS.step}
-                                value={sourceTextWords(meta)}
-                                onChange={(v) => patch({ materialWords: v })}
-                                marks={[
-                                  { value: 100, label: '100' },
-                                  { value: 250, label: '250' },
-                                  { value: 400, label: '400' },
-                                  { value: 600, label: '600' }
-                                ]}
-                              />
-                              {Boolean(meta.materialWords) && (
-                                <Button size="compact-xs" variant="subtle" mt={18} onClick={() => patch({ materialWords: 0 })}>
-                                  Automatisch nach Niveau
-                                </Button>
-                              )}
-                            </div>
-                            {/*
-                             * Umfang des SCHÜLERTEXTES – eigener Regler.
-                             *
-                             * Der automatische Wert richtet sich allein nach dem GER-Niveau: B1
-                             * ergibt 140 Wörter. Eine Abschlussaufgabe der Klasse 10 verlangt
-                             * aber eher 250–300. Der Wert steuert Schreibraum, Inhaltspunkte und
-                             * Erwartungshorizont – auf dem Blatt steht er nur mit Wortvorgabe.
-                             */}
-                            <div>
-                              <Text size="sm" fw={500}>
-                                Umfang des Schülertextes: {writingWords(meta)} Wörter
-                              </Text>
-                              <Text size="xs" c="dimmed" mb={4}>
-                                {meta.studentWords ? 'Eigene Vorgabe' : `Automatisch nach Niveau ${meta.cefrLevel}`} – so lang soll der Text werden, den die
-                                Lernenden schreiben. Bestimmt Schreibraum und Erwartungshorizont. Richtwert: Verlangen die Inhaltspunkte mehr, darf er bis zu
-                                ein Viertel länger werden.
-                              </Text>
-                              <Slider
-                                min={STUDENT_WORDS.min}
-                                max={STUDENT_WORDS.max}
-                                step={STUDENT_WORDS.step}
-                                value={writingWords(meta)}
-                                onChange={(v) => patch({ studentWords: v })}
-                                marks={[
-                                  { value: 80, label: '80' },
-                                  { value: 150, label: '150' },
-                                  { value: 250, label: '250' },
-                                  { value: 400, label: '400' }
-                                ]}
-                              />
-                              {Boolean(meta.studentWords) && (
-                                <Button size="compact-xs" variant="subtle" mt={18} onClick={() => patch({ studentWords: 0 })}>
-                                  Automatisch nach Niveau
-                                </Button>
-                              )}
-                            </div>
+                            {(meta.skillFocus === 'mediation' || meta.skillFocus === 'writing') && (
+                              <>
+                                <Switch
+                                  label="Wortvorgabe für die Schüler"
+                                  description={
+                                    meta.wordLimit
+                                      ? `Die Aufgabe nennt die erwartete Wortzahl (Vorschlag für ${meta.cefrLevel}: ca. ${writingWords(meta)} Wörter).`
+                                      : 'Die Aufgabe nennt keine Wortzahl; der Umfang ergibt sich aus den Inhaltspunkten und dem Schreibraum.'
+                                  }
+                                  checked={meta.wordLimit ?? false}
+                                  onChange={(e) => patch({ wordLimit: e.currentTarget.checked })}
+                                />
+                                <Select
+                                  label="Textsorte des Schülertextes"
+                                  description="In welcher Form schreiben die Lernenden ihren eigenen Text?"
+                                  data={STUDENT_TEXT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                                  value={meta.studentTextType ?? ''}
+                                  onChange={(v) => patch({ studentTextType: v ?? '' })}
+                                  allowDeselect={false}
+                                />
+                                {/*
+                                 * Notizentabelle: Entscheidung der Lehrkraft, nicht der KI.
+                                 *
+                                 * Die Abschlussprüfungen geben die Inhaltspunkte als Spiegelstrich-
+                                 * liste vor; eine Notizentabelle ist dort in keiner eingesehenen
+                                 * Aufgabe belegt, im Unterricht aber verbreitet. Beides ist
+                                 * vertretbar – also wird gefragt statt geraten.
+                                 */}
+                                {/* Hilfen für Lernende (01.10.2026): auf dem Arbeitsblatt wie bisher an, abschaltbar fürs Prüfungsformat */}
+                                <Switch
+                                  label="Hilfen für Lernende"
+                                  description="Kasten „Adressat · Textsorte · Zweck“, inhaltliche Teilpunkte, Notizentabelle und Formhinweise auf dem Blatt. Ohne Hilfen (Prüfungsformat) stehen sie nur im Lösungsblatt."
+                                  checked={meta.lernhilfen !== false}
+                                  onChange={(e) => patch({ lernhilfen: e.currentTarget.checked ? undefined : false })}
+                                />
+                                <Checkbox
+                                  label="Notizentabelle zur Schreibaufgabe"
+                                  description="Zwei Spalten mit Stichpunkten und offenen Impulsen („Positives: …“), aus denen die Lernenden auswählen. Ohne Haken stehen die Inhaltspunkte als Liste – so wie in den Abschlussprüfungen."
+                                  checked={meta.writingNotes ?? false}
+                                  onChange={(e) => patch({ writingNotes: e.currentTarget.checked })}
+                                />
+                                <div>
+                                  <Text size="sm" fw={500}>
+                                    Umfang des Ausgangstextes: {sourceTextWords(meta)} Wörter
+                                  </Text>
+                                  <Text size="xs" c="dimmed" mb={4}>
+                                    {meta.materialWords ? 'Eigene Vorgabe' : `Automatisch nach Niveau ${meta.cefrLevel}`} – so lang wird der Text, den die
+                                    Lernenden für die Aufgabe lesen. Richtwert: Lässt sich eine Quelle nicht sinnvoll kürzen, darf sie bis zu ein Viertel länger
+                                    werden.
+                                  </Text>
+                                  <Slider
+                                    min={MATERIAL_WORDS.min}
+                                    max={MATERIAL_WORDS.max}
+                                    step={MATERIAL_WORDS.step}
+                                    value={sourceTextWords(meta)}
+                                    onChange={(v) => patch({ materialWords: v })}
+                                    marks={[
+                                      { value: 100, label: '100' },
+                                      { value: 250, label: '250' },
+                                      { value: 400, label: '400' },
+                                      { value: 600, label: '600' }
+                                    ]}
+                                  />
+                                  {Boolean(meta.materialWords) && (
+                                    <Button size="compact-xs" variant="subtle" mt={18} onClick={() => patch({ materialWords: 0 })}>
+                                      Automatisch nach Niveau
+                                    </Button>
+                                  )}
+                                </div>
+                                {/*
+                                 * Umfang des SCHÜLERTEXTES – eigener Regler.
+                                 *
+                                 * Der automatische Wert richtet sich allein nach dem GER-Niveau: B1
+                                 * ergibt 140 Wörter. Eine Abschlussaufgabe der Klasse 10 verlangt
+                                 * aber eher 250–300. Der Wert steuert Schreibraum, Inhaltspunkte und
+                                 * Erwartungshorizont – auf dem Blatt steht er nur mit Wortvorgabe.
+                                 */}
+                                <div>
+                                  <Text size="sm" fw={500}>
+                                    Umfang des Schülertextes: {writingWords(meta)} Wörter
+                                  </Text>
+                                  <Text size="xs" c="dimmed" mb={4}>
+                                    {meta.studentWords ? 'Eigene Vorgabe' : `Automatisch nach Niveau ${meta.cefrLevel}`} – so lang soll der Text werden, den die
+                                    Lernenden schreiben. Bestimmt Schreibraum und Erwartungshorizont. Richtwert: Verlangen die Inhaltspunkte mehr, darf er bis
+                                    zu ein Viertel länger werden.
+                                  </Text>
+                                  <Slider
+                                    min={STUDENT_WORDS.min}
+                                    max={STUDENT_WORDS.max}
+                                    step={STUDENT_WORDS.step}
+                                    value={writingWords(meta)}
+                                    onChange={(v) => patch({ studentWords: v })}
+                                    marks={[
+                                      { value: 80, label: '80' },
+                                      { value: 150, label: '150' },
+                                      { value: 250, label: '250' },
+                                      { value: 400, label: '400' }
+                                    ]}
+                                  />
+                                  {Boolean(meta.studentWords) && (
+                                    <Button size="compact-xs" variant="subtle" mt={18} onClick={() => patch({ studentWords: 0 })}>
+                                      Automatisch nach Niveau
+                                    </Button>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </>
                         )}
-                      </>
-                    )}
-                  </Stack>
-                </Card>
+                      </NurExperte>
+                    </Stack>
+                  </Card>
 
-                <AbiturCard meta={meta} onChange={(abitur) => patch({ abitur })} />
+                  <NurExperte>
+                    <AbiturCard meta={meta} onChange={(abitur) => patch({ abitur })} />
+                  </NurExperte>
 
-                {/*
+                  {/*
                 Lernziele und Vorwissen stehen UNTER der Lerngruppe, nicht unter dem Thema.
                 Beide haengen an der Lerngruppe: Wer sie ausfuellt, bevor Jahrgang, Schulform
                 und Niveau feststehen, schreibt Ziele, die nachher nicht passen.
               */}
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Lernziele &amp; Vorwissen
-                  </Title>
-                  <Stack gap="sm">
-                    <Textarea
-                      label="Lernziele (optional)"
-                      description={
-                        <Group gap={6} wrap="nowrap">
-                          <span>Eine Kompetenz je Zeile.</span>
-                          <Button
-                            size="compact-xs"
-                            variant="light"
-                            leftSection={<IconSparkles size={13} />}
-                            loading={competenceBusy}
-                            disabled={!meta.topic.trim()}
-                            title={meta.topic.trim() ? undefined : 'Bitte zuerst ein Thema eintragen'}
-                            onClick={async () => {
-                              setCompetenceBusy(true)
-                              try {
-                                const existing = meta.learningGoals
-                                  .split('\n')
-                                  .map((l) => l.trim())
-                                  .filter(Boolean)
-                                const res = await suggestCompetence(meta, profile, existing, aiCall)
-                                patch({ learningGoals: appendCompetence(meta.learningGoals, res.competence) })
-                              } catch (e) {
-                                notifyError(e, 'Kompetenz konnte nicht vorgeschlagen werden')
-                              } finally {
-                                setCompetenceBusy(false)
-                              }
-                            }}
-                          >
-                            Kompetenz vorschlagen
-                          </Button>
-                        </Group>
-                      }
-                      autosize
-                      minRows={2}
-                      placeholder="Die Schülerinnen und Schüler können …"
-                      value={meta.learningGoals}
-                      onChange={(e) => patch({ learningGoals: e.currentTarget.value })}
-                    />
-                    <Textarea
-                      label="Vorwissen der Lerngruppe (optional)"
-                      description="Eine Angabe je Zeile. „Fehlvorstellung: …“ greift das Blatt gezielt auf, „Noch nicht behandelt: …“ setzt es nicht voraus."
-                      autosize
-                      minRows={1}
-                      value={meta.priorKnowledge}
-                      onChange={(e) => patch({ priorKnowledge: e.currentTarget.value })}
-                    />
-                    {/* Vorschläge zum Vorwissen (didactics/vorwissen) – Wunsch vom 25.09.2026 */}
-                    <VorwissenChips
-                      anfrage={vorwissenAnfrage}
-                      wert={meta.priorKnowledge}
-                      onChange={(priorKnowledge) => patch({ priorKnowledge })}
-                      ai={aiCall}
-                    />
-                  </Stack>
-                </Card>
-              </Stack>
-            </Grid.Col>
-
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Stack>
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Art &amp; Umfang
-                  </Title>
-                  <Stack gap="sm">
-                    <Select
-                      label="Art des Arbeitsblatts"
-                      data={SHEET_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                      value={meta.sheetType}
-                      onChange={(v) => v && patch({ sheetType: v as SheetType })}
-                      allowDeselect={false}
-                    />
-                    {/* Seitenzahl: automatisch, genau oder von–bis (Paket 7, didactics/seiten.ts) */}
-                    <SeitenWahl meta={meta} patch={patch} />
-                    <ZahlFeld
-                      label="Bearbeitungszeit (Min.)"
-                      min={5}
-                      max={180}
-                      step={5}
-                      value={meta.minutes}
-                      onChange={(v) => patch({ minutes: Number(v) || 45 })}
-                    />
-                    {/* Leer lassen heißt „Richtwert des Altersbands" – eine eingetragene Zahl gilt genau. */}
-                    <ZahlFeld
-                      label="Zahl der Aufgaben"
-                      description={
-                        meta.taskCount
-                          ? `Es entstehen genau ${meta.taskCount} Aufgaben. Leeren, um wieder den Richtwert zu nutzen.`
-                          : `Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * seitenBereich(meta).min}–${profile.tasks.perPage[1] * seitenBereich(meta).max} Aufgaben auf ${seitenText(meta)}.`
-                      }
-                      placeholder={`automatisch (${profile.tasks.perPage[0] * seitenBereich(meta).min}–${profile.tasks.perPage[1] * seitenBereich(meta).max})`}
-                      min={1}
-                      max={20}
-                      value={meta.taskCount || ''}
-                      onChange={(v) => patch({ taskCount: Number(v) || 0 })}
-                    />
-                    {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
-                      <ZahlFeld
-                        label={meta.skillFocus === 'listening' ? 'Fragen je Hörtext' : 'Fragen zum Text'}
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Lernziele &amp; Vorwissen
+                    </Title>
+                    <Stack gap="sm">
+                      <Textarea
+                        label="Lernziele (optional)"
                         description={
-                          meta.itemCount
-                            ? `Genau ${meta.itemCount} Fragen${meta.skillFocus === 'listening' && (meta.audioCount ?? 1) > 1 ? ` zu jedem der ${meta.audioCount} Hörtexte` : ''}.`
-                            : `Leer lassen: Richtwert für Niveau ${meta.cefrLevel} sind ${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]} Fragen je Text.`
+                          <Group gap={6} wrap="nowrap">
+                            <span>Eine Kompetenz je Zeile.</span>
+                            <Button
+                              size="compact-xs"
+                              variant="light"
+                              leftSection={<IconSparkles size={13} />}
+                              loading={competenceBusy}
+                              disabled={!meta.topic.trim()}
+                              title={meta.topic.trim() ? undefined : 'Bitte zuerst ein Thema eintragen'}
+                              onClick={async () => {
+                                setCompetenceBusy(true)
+                                try {
+                                  const existing = meta.learningGoals
+                                    .split('\n')
+                                    .map((l) => l.trim())
+                                    .filter(Boolean)
+                                  const res = await suggestCompetence(meta, profile, existing, aiCall)
+                                  patch({ learningGoals: appendCompetence(meta.learningGoals, res.competence) })
+                                } catch (e) {
+                                  notifyError(e, 'Kompetenz konnte nicht vorgeschlagen werden')
+                                } finally {
+                                  setCompetenceBusy(false)
+                                }
+                              }}
+                            >
+                              Kompetenz vorschlagen
+                            </Button>
+                          </Group>
                         }
-                        placeholder={`automatisch (${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]})`}
-                        min={1}
-                        max={20}
-                        value={meta.itemCount || ''}
-                        onChange={(v) => patch({ itemCount: Number(v) || 0 })}
+                        autosize
+                        minRows={2}
+                        placeholder="Die Schülerinnen und Schüler können …"
+                        value={meta.learningGoals}
+                        onChange={(e) => patch({ learningGoals: e.currentTarget.value })}
                       />
-                    )}
-                    {subject.foreignLanguage && (
-                      <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
-                        <Checkbox
-                          label="Hörtext von der KI schreiben lassen"
-                          description={
-                            tts
-                              ? 'Die KI schreibt vor dem Blatt einen Hörtext; die Aufgaben entstehen dann zu diesem Text. Vertont wird er danach im Reiter „Hörtexte“.'
-                              : 'Die KI schreibt den Hörtext, die Aufgaben entstehen dazu. Vertonen geht erst mit einem ElevenLabs-Schlüssel – ohne ihn bleibt das Skript als Lesetext für die Lehrkraft.'
-                          }
-                          checked={Boolean(meta.audioAi)}
-                          onChange={(e) => patch({ audioAi: e.currentTarget.checked })}
+                      <Textarea
+                        label="Vorwissen der Lerngruppe (optional)"
+                        description="Eine Angabe je Zeile. „Fehlvorstellung: …“ greift das Blatt gezielt auf, „Noch nicht behandelt: …“ setzt es nicht voraus."
+                        autosize
+                        minRows={1}
+                        value={meta.priorKnowledge}
+                        onChange={(e) => patch({ priorKnowledge: e.currentTarget.value })}
+                      />
+                      <NurExperte>
+                        {/* Vorschläge zum Vorwissen (didactics/vorwissen) – Wunsch vom 25.09.2026 */}
+                        <VorwissenChips
+                          anfrage={vorwissenAnfrage}
+                          wert={meta.priorKnowledge}
+                          onChange={(priorKnowledge) => patch({ priorKnowledge })}
+                          ai={aiCall}
                         />
-                        {meta.audioAi && (
-                          <Stack gap="sm" mt="sm">
-                            <Select
-                              size="sm"
-                              label="Hörtextsorte"
-                              description={
-                                listeningFormatById(meta.audioFormat ?? '')?.description ??
-                                `Automatisch: Die KI wählt eine Textsorte, die zu Thema und Niveau ${meta.cefrLevel} passt.`
-                              }
-                              data={[
-                                { value: 'auto', label: 'automatisch (passend zum Niveau)' },
-                                ...listeningFormatsFor(meta.cefrLevel).map((f) => ({
-                                  value: f.id,
-                                  label: `${f.label} · ${f.mode === 'dialog' ? 'dialogisch' : 'monologisch'}, ${f.seconds[0]}–${f.seconds[1]} s`
-                                }))
-                              ]}
-                              value={meta.audioFormat ?? 'auto'}
-                              onChange={(v) => v && patch({ audioFormat: v })}
-                              allowDeselect={false}
-                            />
-                            <Group grow>
-                              <Select
-                                size="sm"
-                                label="Zahl der Hörtexte"
-                                description="Die Aufgaben stehen nach Hörtext gruppiert"
-                                data={[
-                                  { value: '1', label: 'ein Hörtext' },
-                                  { value: '2', label: 'zwei Hörtexte' },
-                                  { value: '3', label: 'drei Hörtexte' }
-                                ]}
-                                value={String(listeningCount(meta))}
-                                onChange={(v) => v && patch({ audioCount: Number(v) })}
-                                allowDeselect={false}
-                              />
-                              <ZahlFeld
-                                size="sm"
-                                label="Länge je Hörtext (Sek.)"
-                                description={meta.audioSeconds ? 'Eigene Vorgabe' : `Leer: nach Niveau ${meta.cefrLevel}`}
-                                placeholder={`${listeningRules(meta.cefrLevel).seconds[0]}–${listeningRules(meta.cefrLevel).seconds[1]}`}
-                                min={LISTENING_SECONDS_RANGE.min}
-                                max={LISTENING_SECONDS_RANGE.max}
-                                step={LISTENING_SECONDS_RANGE.step}
-                                value={meta.audioSeconds || ''}
-                                onChange={(v) => patch({ audioSeconds: Number(v) || undefined })}
-                              />
-                            </Group>
-                            {textOptions.length > 1 && (
-                              <Select
-                                size="sm"
-                                label="KI für den Hörtext"
-                                description="Ein Hörtext ist der anspruchsvollste Teil eines Sprachenblatts – hier lohnt sich ein stärkeres Modell. Nur dieser eine Auftrag geht dorthin."
-                                data={[
-                                  { value: '', label: 'wie in den Einstellungen' },
-                                  ...textOptions.map((o) => ({ value: `${o.provider}|${o.model}`, label: o.label }))
-                                ]}
-                                value={meta.audioProvider ? `${meta.audioProvider}|${meta.audioModel ?? ''}` : ''}
-                                onChange={(v) => {
-                                  const [provider, model] = (v ?? '').split('|')
-                                  patch({ audioProvider: (provider || undefined) as WorksheetMeta['audioProvider'], audioModel: model || undefined })
-                                }}
-                                allowDeselect={false}
-                              />
-                            )}
-                            <Text size="xs" c="dimmed">
-                              {(() => {
-                                const r = listeningRules(meta.cefrLevel)
-                                const [minW, maxW] = listeningWords(meta.cefrLevel, subject.foreignLanguage, meta.audioSeconds)
-                                const [minS, maxS] = listeningSeconds(meta.cefrLevel, meta.audioSeconds)
-                                return `Niveau ${meta.cefrLevel}: ${minS}–${maxS} Sekunden je Hörtext (etwa ${minW}–${maxW} Wörter), ${r.speakers[0]}–${r.speakers[1]} Sprechende, ${r.plays}× hören, ${r.items[0]}–${r.items[1]} Aufgaben je Text.`
-                              })()}
-                            </Text>
-                            {(() => {
-                              // Was das Bundesland vorschreibt, steht sichtbar dabei – sonst
-                              // erfährt die Lehrkraft erst am fertigen Blatt, warum etwas fehlt.
-                              const sr = listeningStateRules(meta.stateId)
-                              const sek2 = stageForGrade(meta.grade, meta.schoolTypeId) === 'sek2'
-                              const part = sek2 ? sr.sek2 : sr.sek1
-                              return (
-                                <Text size="xs" c={hasStateRules(meta.stateId) ? 'teal' : 'dimmed'}>
-                                  {hasStateRules(meta.stateId)
-                                    ? `${sr.curriculum}: „${sr.competenceName}“ · ${part.trueFalse ? 'Richtig/Falsch zugelassen' : 'ohne Richtig/Falsch'} · ${part.plays}× hören`
-                                    : 'Für dieses Bundesland ist keine eigene Vorgabe hinterlegt – es gelten die KMK-Bildungsstandards.'}
+                      </NurExperte>
+                    </Stack>
+                  </Card>
+                </Stack>
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Art &amp; Umfang
+                    </Title>
+                    <Stack gap="sm">
+                      <Select
+                        label="Art des Arbeitsblatts"
+                        data={SHEET_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                        value={meta.sheetType}
+                        onChange={(v) => v && patch({ sheetType: v as SheetType })}
+                        allowDeselect={false}
+                      />
+                      {/* Seitenzahl: automatisch, genau oder von–bis (Paket 7, didactics/seiten.ts) */}
+                      <NurExperte>
+                        <SeitenWahl meta={meta} patch={patch} />
+                      </NurExperte>
+                      <ZahlFeld
+                        label="Bearbeitungszeit (Min.)"
+                        min={5}
+                        max={180}
+                        step={5}
+                        value={meta.minutes}
+                        onChange={(v) => patch({ minutes: Number(v) || 45 })}
+                      />
+                      <NurExperte geaendert={Boolean(meta.taskCount) && `${meta.taskCount} Aufgaben`}>
+                        {/* Leer lassen heißt „Richtwert des Altersbands" – eine eingetragene Zahl gilt genau. */}
+                        <ZahlFeld
+                          label="Zahl der Aufgaben"
+                          description={
+                            meta.taskCount
+                              ? `Es entstehen genau ${meta.taskCount} Aufgaben. Leeren, um wieder den Richtwert zu nutzen.`
+                              : `Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * seitenBereich(meta).min}–${
+                                  profile.tasks.perPage[1] * seitenBereich(meta).max
+                                } Aufgaben auf ${seitenText(meta)}.`
+                          }
+                          placeholder={`automatisch (${profile.tasks.perPage[0] * seitenBereich(meta).min}–${
+                            profile.tasks.perPage[1] * seitenBereich(meta).max
+                          })`}
+                          min={1}
+                          max={20}
+                          value={meta.taskCount || ''}
+                          onChange={(v) => patch({ taskCount: Number(v) || 0 })}
+                        />
+                      </NurExperte>
+                      <NurExperte geaendert={Boolean(meta.itemCount) && `${meta.itemCount} Fragen`}>
+                        {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
+                          <ZahlFeld
+                            label={meta.skillFocus === 'listening' ? 'Fragen je Hörtext' : 'Fragen zum Text'}
+                            description={
+                              meta.itemCount
+                                ? `Genau ${meta.itemCount} Fragen${
+                                    meta.skillFocus === 'listening' && (meta.audioCount ?? 1) > 1 ? ` zu jedem der ${meta.audioCount} Hörtexte` : ''
+                                  }.`
+                                : `Leer lassen: Richtwert für Niveau ${meta.cefrLevel} sind ${listeningRules(meta.cefrLevel).items[0]}–${
+                                    listeningRules(meta.cefrLevel).items[1]
+                                  } Fragen je Text.`
+                            }
+                            placeholder={`automatisch (${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]})`}
+                            min={1}
+                            max={20}
+                            value={meta.itemCount || ''}
+                            onChange={(v) => patch({ itemCount: Number(v) || 0 })}
+                          />
+                        )}
+                      </NurExperte>
+                      {subject.foreignLanguage && (
+                        <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
+                          <Checkbox
+                            label="Hörtext von der KI schreiben lassen"
+                            description={
+                              tts
+                                ? 'Die KI schreibt vor dem Blatt einen Hörtext; die Aufgaben entstehen dann zu diesem Text. Vertont wird er danach im Reiter „Hörtexte“.'
+                                : 'Die KI schreibt den Hörtext, die Aufgaben entstehen dazu. Vertonen geht erst mit einem ElevenLabs-Schlüssel – ohne ihn bleibt das Skript als Lesetext für die Lehrkraft.'
+                            }
+                            checked={Boolean(meta.audioAi)}
+                            onChange={(e) => patch({ audioAi: e.currentTarget.checked })}
+                          />
+                          <NurExperte
+                            geaendert={
+                              meta.audioAi &&
+                              (Boolean(meta.audioSeconds) ||
+                                Boolean(meta.audioProvider) ||
+                                (meta.audioFormat ?? 'auto') !== 'auto' ||
+                                (meta.audioCount ?? 1) > 1) &&
+                              'Hörtext'
+                            }
+                          >
+                            {meta.audioAi && (
+                              <Stack gap="sm" mt="sm">
+                                <Select
+                                  size="sm"
+                                  label="Hörtextsorte"
+                                  description={
+                                    listeningFormatById(meta.audioFormat ?? '')?.description ??
+                                    `Automatisch: Die KI wählt eine Textsorte, die zu Thema und Niveau ${meta.cefrLevel} passt.`
+                                  }
+                                  data={[
+                                    { value: 'auto', label: 'automatisch (passend zum Niveau)' },
+                                    ...listeningFormatsFor(meta.cefrLevel).map((f) => ({
+                                      value: f.id,
+                                      label: `${f.label} · ${f.mode === 'dialog' ? 'dialogisch' : 'monologisch'}, ${f.seconds[0]}–${f.seconds[1]} s`
+                                    }))
+                                  ]}
+                                  value={meta.audioFormat ?? 'auto'}
+                                  onChange={(v) => v && patch({ audioFormat: v })}
+                                  allowDeselect={false}
+                                />
+                                <Group grow>
+                                  <Select
+                                    size="sm"
+                                    label="Zahl der Hörtexte"
+                                    description="Die Aufgaben stehen nach Hörtext gruppiert"
+                                    data={[
+                                      { value: '1', label: 'ein Hörtext' },
+                                      { value: '2', label: 'zwei Hörtexte' },
+                                      { value: '3', label: 'drei Hörtexte' }
+                                    ]}
+                                    value={String(listeningCount(meta))}
+                                    onChange={(v) => v && patch({ audioCount: Number(v) })}
+                                    allowDeselect={false}
+                                  />
+                                  <ZahlFeld
+                                    size="sm"
+                                    label="Länge je Hörtext (Sek.)"
+                                    description={meta.audioSeconds ? 'Eigene Vorgabe' : `Leer: nach Niveau ${meta.cefrLevel}`}
+                                    placeholder={`${listeningRules(meta.cefrLevel).seconds[0]}–${listeningRules(meta.cefrLevel).seconds[1]}`}
+                                    min={LISTENING_SECONDS_RANGE.min}
+                                    max={LISTENING_SECONDS_RANGE.max}
+                                    step={LISTENING_SECONDS_RANGE.step}
+                                    value={meta.audioSeconds || ''}
+                                    onChange={(v) => patch({ audioSeconds: Number(v) || undefined })}
+                                  />
+                                </Group>
+                                {textOptions.length > 1 && (
+                                  <Select
+                                    size="sm"
+                                    label="KI für den Hörtext"
+                                    description="Ein Hörtext ist der anspruchsvollste Teil eines Sprachenblatts – hier lohnt sich ein stärkeres Modell. Nur dieser eine Auftrag geht dorthin."
+                                    data={[
+                                      { value: '', label: 'wie in den Einstellungen' },
+                                      ...textOptions.map((o) => ({ value: `${o.provider}|${o.model}`, label: o.label }))
+                                    ]}
+                                    value={meta.audioProvider ? `${meta.audioProvider}|${meta.audioModel ?? ''}` : ''}
+                                    onChange={(v) => {
+                                      const [provider, model] = (v ?? '').split('|')
+                                      patch({ audioProvider: (provider || undefined) as WorksheetMeta['audioProvider'], audioModel: model || undefined })
+                                    }}
+                                    allowDeselect={false}
+                                  />
+                                )}
+                                <Text size="xs" c="dimmed">
+                                  {(() => {
+                                    const r = listeningRules(meta.cefrLevel)
+                                    const [minW, maxW] = listeningWords(meta.cefrLevel, subject.foreignLanguage, meta.audioSeconds)
+                                    const [minS, maxS] = listeningSeconds(meta.cefrLevel, meta.audioSeconds)
+                                    return `Niveau ${meta.cefrLevel}: ${minS}–${maxS} Sekunden je Hörtext (etwa ${minW}–${maxW} Wörter), ${r.speakers[0]}–${r.speakers[1]} Sprechende, ${r.plays}× hören, ${r.items[0]}–${r.items[1]} Aufgaben je Text.`
+                                  })()}
                                 </Text>
-                              )
-                            })()}
+                                {(() => {
+                                  // Was das Bundesland vorschreibt, steht sichtbar dabei – sonst
+                                  // erfährt die Lehrkraft erst am fertigen Blatt, warum etwas fehlt.
+                                  const sr = listeningStateRules(meta.stateId)
+                                  const sek2 = stageForGrade(meta.grade, meta.schoolTypeId) === 'sek2'
+                                  const part = sek2 ? sr.sek2 : sr.sek1
+                                  return (
+                                    <Text size="xs" c={hasStateRules(meta.stateId) ? 'teal' : 'dimmed'}>
+                                      {hasStateRules(meta.stateId)
+                                        ? `${sr.curriculum}: „${sr.competenceName}“ · ${
+                                            part.trueFalse ? 'Richtig/Falsch zugelassen' : 'ohne Richtig/Falsch'
+                                          } · ${part.plays}× hören`
+                                        : 'Für dieses Bundesland ist keine eigene Vorgabe hinterlegt – es gelten die KMK-Bildungsstandards.'}
+                                    </Text>
+                                  )
+                                })()}
+                              </Stack>
+                            )}
+                          </NurExperte>
+                        </Card>
+                      )}
+                      {meta.skillFocus === 'vocabulary' && (
+                        // Beim Schwerpunkt Vokabeln ist die Frage nach Quellen unpassend –
+                        // stattdessen zählt, wie die Wortschatzarbeit angelegt sein soll.
+                        <>
+                          <Select
+                            label="Wortschatzarbeit"
+                            description={VOCAB_WORK.find((v) => v.value === (meta.vocabWork ?? 'introduce'))?.description}
+                            data={VOCAB_WORK.map((v) => ({ value: v.value, label: v.label }))}
+                            value={meta.vocabWork ?? 'introduce'}
+                            onChange={(v) => v && patch({ vocabWork: v as VocabWorkMode })}
+                            allowDeselect={false}
+                          />
+                          <VocabWordsPicker
+                            meta={meta}
+                            hint={
+                              targetWordCount(meta).own
+                                ? `Eigene Obergrenze: bis zu ${targetWordCount(meta).max} Wörter.`
+                                : `Leer lassen: Die KI wählt zum Thema passende Wörter. Vorgesehen sind ${targetWordCount(meta).min}–${
+                                    targetWordCount(meta).max
+                                  } Wörter.`
+                            }
+                            onChange={(vocabWords) => patch({ vocabWords })}
+                            onKnown={(knownVocab) => patch({ knownVocab })}
+                          />
+                          <NurExperte geaendert={Boolean(meta.vocabMaxWords) && 'mehr Wörter'}>
+                            <Group align="flex-end" gap="sm">
+                              <Checkbox
+                                label="Mehr Wörter als empfohlen"
+                                description={`Empfohlen sind ${recommendedWordCount(meta).min}–${recommendedWordCount(meta).max} Wörter für Klasse ${
+                                  meta.grade
+                                }.`}
+                                checked={Boolean(meta.vocabMaxWords)}
+                                onChange={(e) => patch({ vocabMaxWords: e.currentTarget.checked ? recommendedWordCount(meta).max * 2 : 0 })}
+                              />
+                              {Boolean(meta.vocabMaxWords) && (
+                                <ZahlFeld
+                                  label="Höchstzahl"
+                                  w={120}
+                                  min={1}
+                                  max={80}
+                                  clampBehavior="blur"
+                                  value={meta.vocabMaxWords ?? 0}
+                                  onChange={(v) => patch({ vocabMaxWords: Number(v) || 0 })}
+                                />
+                              )}
+                            </Group>
+                          </NurExperte>
+                        </>
+                      )}
+                    </Stack>
+                  </Card>
+
+                  {/*
+                   * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Lösungsblatt, Hilfekarten, Tafelbild,
+                   * Differenzierung und Bilder entscheidet man bei fast jedem Blatt neu – unter „Weitere
+                   * Optionen“ eingeklappt, wurden sie leicht übersehen.
+                   */}
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Lösung, Differenzierung &amp; Bilder
+                    </Title>
+                    <Stack gap="sm">
+                      <Stack gap={6}>
+                        <Checkbox label="Lösungsblatt erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                        <NurExperte geaendert={meta.helpCards === false && 'ohne Hilfekarten'}>
+                          <Checkbox
+                            label="Tipp- und Hilfekarten anlegen"
+                            description="gestufte Karten auf einer eigenen Schlussseite, nicht zwischen den Aufgaben"
+                            checked={meta.helpCards !== false}
+                            onChange={(e) => patch({ helpCards: e.currentTarget.checked })}
+                          />
+                        </NurExperte>
+                        <NurExperte geaendert={Boolean(meta.boardPlan) && 'Tafelbild'}>
+                          <Checkbox
+                            label="Tafelbild zur Sicherung mit erstellen"
+                            description="aus dem Vergleich der Aufgaben, für die Lehrkraft"
+                            checked={Boolean(meta.boardPlan)}
+                            onChange={(e) => patch({ boardPlan: e.currentTarget.checked })}
+                          />
+                        </NurExperte>
+                      </Stack>
+                      <div>
+                        <Text size="sm" fw={500} mb={4}>
+                          Differenzierung{' '}
+                          {profile.suggestDifferentiation && (
+                            <Text span c="teal" size="xs">
+                              (für gemischte Lerngruppen empfohlen)
+                            </Text>
+                          )}
+                        </Text>
+                        <SegmentedControl
+                          data={[
+                            { value: '1', label: 'ein Niveau' },
+                            { value: '2', label: '★ / ★★' },
+                            { value: '3', label: '★ / ★★ / ★★★' }
+                          ]}
+                          value={String(meta.differentiation.levels)}
+                          onChange={(v) => patch({ differentiation: { ...meta.differentiation, levels: Number(v) as 1 | 2 | 3 } })}
+                        />
+                      </div>
+                      {/*
+                       * Schwierigkeit (27.09.2026, didactics/schwierigkeit.ts): Anspruch und Sprache
+                       * getrennt, jeweils relativ zum Jahrgang. Bei einem Niveau fürs ganze Blatt,
+                       * bei ★/★★ je Fassung – vorher war ★ fest grundlegend und ★★ fest mittel.
+                       */}
+                      <NurExperte>
+                        {meta.differentiation.levels === 1 && (
+                          <StufenWahl
+                            titel="Schwierigkeit"
+                            value={stufeFuer(meta, null)}
+                            onChange={(s) => patch({ differentiation: { ...meta.differentiation, schwierigkeit: s } })}
+                          />
+                        )}
+                      </NurExperte>
+                      <NurExperte>
+                        {meta.differentiation.levels === 2 && meta.differentiation.mode === 'separate' && (
+                          <Stack gap={6}>
+                            {([1, 2] as const).map((stern) => (
+                              <StufenWahl
+                                key={stern}
+                                titel={stern === 1 ? 'Schwierigkeit ★' : 'Schwierigkeit ★★'}
+                                hinweis={stern === 2}
+                                value={stufeFuer(meta, stern)}
+                                onChange={(s) =>
+                                  patch({
+                                    differentiation: {
+                                      ...meta.differentiation,
+                                      stufen: { ...STANDARD_STUFEN, ...meta.differentiation.stufen, [stern]: s }
+                                    }
+                                  })
+                                }
+                              />
+                            ))}
                           </Stack>
                         )}
-                      </Card>
-                    )}
-                    {meta.skillFocus === 'vocabulary' && (
-                      // Beim Schwerpunkt Vokabeln ist die Frage nach Quellen unpassend –
-                      // stattdessen zählt, wie die Wortschatzarbeit angelegt sein soll.
-                      <>
+                      </NurExperte>
+                      {meta.differentiation.levels > 1 && (
+                        <Radio.Group
+                          value={meta.differentiation.mode}
+                          onChange={(v) => patch({ differentiation: { ...meta.differentiation, mode: v as 'separate' | 'combined' } })}
+                        >
+                          <Stack gap={6}>
+                            <Radio value="separate" label="Getrennte Blätter je Niveau (gleiches Layout, gleiches Lernziel)" />
+                            <Radio value="combined" label="Ein Blatt mit ★-markierten Zusatzaufgaben" />
+                          </Stack>
+                        </Radio.Group>
+                      )}
+                      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                        {/*
+                         * Wie viele Bilder – getrennt davon, WOHER sie kommen.
+                         *
+                         * Ohne diese Wahl entschied allein die KI, und sie entschied oft gegen
+                         * ein Bild. Bildersuche und KI-Erzeugung liefen dann ins Leere: Es gab
+                         * schlicht keinen Bedarf zu füllen.
+                         */}
                         <Select
-                          label="Wortschatzarbeit"
-                          description={VOCAB_WORK.find((v) => v.value === (meta.vocabWork ?? 'introduce'))?.description}
-                          data={VOCAB_WORK.map((v) => ({ value: v.value, label: v.label }))}
-                          value={meta.vocabWork ?? 'introduce'}
-                          onChange={(v) => v && patch({ vocabWork: v as VocabWorkMode })}
+                          label="Bilder auf dem Blatt"
+                          description={
+                            (meta.imageAmount ?? 'auto') === 'min1'
+                              ? 'Die KI plant ein Bild an der Stelle ein, an der es am meisten trägt.'
+                              : 'Ohne Wunsch entscheidet die KI – und entscheidet sich oft gegen ein Bild.'
+                          }
+                          data={[
+                            { value: 'auto', label: 'Nur wo die KI eines für nötig hält' },
+                            { value: 'min1', label: 'Mindestens ein Bild je Seite' },
+                            { value: 'keine', label: 'Keine Bilder' }
+                          ]}
+                          value={meta.imageAmount ?? 'auto'}
+                          onChange={(v) => v && patch({ imageAmount: v as 'auto' | 'min1' | 'keine' })}
                           allowDeselect={false}
                         />
-                        <VocabWordsPicker
-                          meta={meta}
-                          hint={
-                            targetWordCount(meta).own
-                              ? `Eigene Obergrenze: bis zu ${targetWordCount(meta).max} Wörter.`
-                              : `Leer lassen: Die KI wählt zum Thema passende Wörter. Vorgesehen sind ${targetWordCount(meta).min}–${targetWordCount(meta).max} Wörter.`
+                        <NurExperte geaendert={meta.imageSource !== 'auto' && 'Bildherkunft'}>
+                          <Select
+                            label="Woher die Bilder kommen"
+                            disabled={meta.imageAmount === 'keine'}
+                            data={[
+                              { value: 'auto', label: 'Automatisch: freie Bilder aus dem Internet, sonst KI-Bild' },
+                              { value: 'web', label: 'Nur freie Bilder aus dem Internet' },
+                              { value: 'ai', label: 'Nur KI-Bilder' },
+                              { value: 'placeholder', label: 'Platzhalter (selbst wählen)' }
+                            ]}
+                            value={meta.imageSource}
+                            onChange={(v) => v && patch({ imageSource: v as WorksheetImageSource })}
+                            allowDeselect={false}
+                          />
+                        </NurExperte>
+                      </SimpleGrid>
+                      <NurExperte geaendert={meta.decorImage === false && 'ohne Schmuckbild'}>
+                        <Switch
+                          label="Ein Schmuckbild zulassen"
+                          description={
+                            meta.decorImage === false
+                              ? 'Jedes Bild trägt Information, die eine Aufgabe braucht.'
+                              : 'Höchstens eines, thematisch gebunden, freundlich und nie am Blattanfang – nur unter diesen Bedingungen ist es unschädlich.'
                           }
-                          onChange={(vocabWords) => patch({ vocabWords })}
-                          onKnown={(knownVocab) => patch({ knownVocab })}
+                          checked={meta.decorImage !== false}
+                          onChange={(e) => patch({ decorImage: e.currentTarget.checked })}
                         />
-                        <Group align="flex-end" gap="sm">
-                          <Checkbox
-                            label="Mehr Wörter als empfohlen"
-                            description={`Empfohlen sind ${recommendedWordCount(meta).min}–${recommendedWordCount(meta).max} Wörter für Klasse ${meta.grade}.`}
-                            checked={Boolean(meta.vocabMaxWords)}
-                            onChange={(e) => patch({ vocabMaxWords: e.currentTarget.checked ? recommendedWordCount(meta).max * 2 : 0 })}
-                          />
-                          {Boolean(meta.vocabMaxWords) && (
-                            <ZahlFeld
-                              label="Höchstzahl"
-                              w={120}
-                              min={1}
-                              max={80}
-                              clampBehavior="blur"
-                              value={meta.vocabMaxWords ?? 0}
-                              onChange={(v) => patch({ vocabMaxWords: Number(v) || 0 })}
-                            />
-                          )}
-                        </Group>
-                      </>
-                    )}
-                  </Stack>
-                </Card>
-
-                {/*
-                 * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Lösungsblatt, Hilfekarten, Tafelbild,
-                 * Differenzierung und Bilder entscheidet man bei fast jedem Blatt neu – unter „Weitere
-                 * Optionen“ eingeklappt, wurden sie leicht übersehen.
-                 */}
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Lösung, Differenzierung &amp; Bilder
-                  </Title>
-                  <Stack gap="sm">
-                    <Stack gap={6}>
-                      <Checkbox label="Lösungsblatt erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                      <Checkbox
-                        label="Tipp- und Hilfekarten anlegen"
-                        description="gestufte Karten auf einer eigenen Schlussseite, nicht zwischen den Aufgaben"
-                        checked={meta.helpCards !== false}
-                        onChange={(e) => patch({ helpCards: e.currentTarget.checked })}
-                      />
-                      <Checkbox
-                        label="Tafelbild zur Sicherung mit erstellen"
-                        description="aus dem Vergleich der Aufgaben, für die Lehrkraft"
-                        checked={Boolean(meta.boardPlan)}
-                        onChange={(e) => patch({ boardPlan: e.currentTarget.checked })}
-                      />
+                      </NurExperte>
                     </Stack>
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Differenzierung{' '}
-                        {profile.suggestDifferentiation && (
-                          <Text span c="teal" size="xs">
-                            (für gemischte Lerngruppen empfohlen)
-                          </Text>
-                        )}
-                      </Text>
-                      <SegmentedControl
-                        data={[
-                          { value: '1', label: 'ein Niveau' },
-                          { value: '2', label: '★ / ★★' },
-                          { value: '3', label: '★ / ★★ / ★★★' }
-                        ]}
-                        value={String(meta.differentiation.levels)}
-                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, levels: Number(v) as 1 | 2 | 3 } })}
-                      />
-                    </div>
-                    {/*
-                     * Schwierigkeit (27.09.2026, didactics/schwierigkeit.ts): Anspruch und Sprache
-                     * getrennt, jeweils relativ zum Jahrgang. Bei einem Niveau fürs ganze Blatt,
-                     * bei ★/★★ je Fassung – vorher war ★ fest grundlegend und ★★ fest mittel.
-                     */}
-                    {meta.differentiation.levels === 1 && (
-                      <StufenWahl
-                        titel="Schwierigkeit"
-                        value={stufeFuer(meta, null)}
-                        onChange={(s) => patch({ differentiation: { ...meta.differentiation, schwierigkeit: s } })}
-                      />
-                    )}
-                    {meta.differentiation.levels === 2 && meta.differentiation.mode === 'separate' && (
-                      <Stack gap={6}>
-                        {([1, 2] as const).map((stern) => (
-                          <StufenWahl
-                            key={stern}
-                            titel={stern === 1 ? 'Schwierigkeit ★' : 'Schwierigkeit ★★'}
-                            hinweis={stern === 2}
-                            value={stufeFuer(meta, stern)}
-                            onChange={(s) =>
-                              patch({
-                                differentiation: {
-                                  ...meta.differentiation,
-                                  stufen: { ...STANDARD_STUFEN, ...meta.differentiation.stufen, [stern]: s }
-                                }
-                              })
-                            }
-                          />
-                        ))}
-                      </Stack>
-                    )}
-                    {meta.differentiation.levels > 1 && (
-                      <Radio.Group
-                        value={meta.differentiation.mode}
-                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, mode: v as 'separate' | 'combined' } })}
-                      >
-                        <Stack gap={6}>
-                          <Radio value="separate" label="Getrennte Blätter je Niveau (gleiches Layout, gleiches Lernziel)" />
-                          <Radio value="combined" label="Ein Blatt mit ★-markierten Zusatzaufgaben" />
-                        </Stack>
-                      </Radio.Group>
-                    )}
-                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                      {/*
-                       * Wie viele Bilder – getrennt davon, WOHER sie kommen.
-                       *
-                       * Ohne diese Wahl entschied allein die KI, und sie entschied oft gegen
-                       * ein Bild. Bildersuche und KI-Erzeugung liefen dann ins Leere: Es gab
-                       * schlicht keinen Bedarf zu füllen.
-                       */}
-                      <Select
-                        label="Bilder auf dem Blatt"
-                        description={
-                          (meta.imageAmount ?? 'auto') === 'min1'
-                            ? 'Die KI plant ein Bild an der Stelle ein, an der es am meisten trägt.'
-                            : 'Ohne Wunsch entscheidet die KI – und entscheidet sich oft gegen ein Bild.'
-                        }
-                        data={[
-                          { value: 'auto', label: 'Nur wo die KI eines für nötig hält' },
-                          { value: 'min1', label: 'Mindestens ein Bild je Seite' },
-                          { value: 'keine', label: 'Keine Bilder' }
-                        ]}
-                        value={meta.imageAmount ?? 'auto'}
-                        onChange={(v) => v && patch({ imageAmount: v as 'auto' | 'min1' | 'keine' })}
-                        allowDeselect={false}
-                      />
-                      <Select
-                        label="Woher die Bilder kommen"
-                        disabled={meta.imageAmount === 'keine'}
-                        data={[
-                          { value: 'auto', label: 'Automatisch: freie Bilder aus dem Internet, sonst KI-Bild' },
-                          { value: 'web', label: 'Nur freie Bilder aus dem Internet' },
-                          { value: 'ai', label: 'Nur KI-Bilder' },
-                          { value: 'placeholder', label: 'Platzhalter (selbst wählen)' }
-                        ]}
-                        value={meta.imageSource}
-                        onChange={(v) => v && patch({ imageSource: v as WorksheetImageSource })}
-                        allowDeselect={false}
-                      />
-                    </SimpleGrid>
-                    <Switch
-                      label="Ein Schmuckbild zulassen"
-                      description={
-                        meta.decorImage === false
-                          ? 'Jedes Bild trägt Information, die eine Aufgabe braucht.'
-                          : 'Höchstens eines, thematisch gebunden, freundlich und nie am Blattanfang – nur unter diesen Bedingungen ist es unschädlich.'
-                      }
-                      checked={meta.decorImage !== false}
-                      onChange={(e) => patch({ decorImage: e.currentTarget.checked })}
-                    />
-                  </Stack>
-                </Card>
+                  </Card>
 
-                <Card withBorder>
-                  <Title order={4} mb={4}>
-                    Eigenes Material (optional)
-                  </Title>
-                  <Text size="sm" c="dimmed" mb="sm">
-                    Texte, Buchseiten, Arbeitsblätter oder Bilder, auf denen das Arbeitsblatt aufbauen soll.
-                  </Text>
-                  <DropZone
-                    onFiles={addFiles}
-                    accept={MATERIAL_ACCEPT}
-                    title={reading ?? 'Dateien hierher ziehen oder klicken'}
-                    hint="PDF, Word, Bilder, Text"
-                    loading={Boolean(reading)}
-                    minHeight={80}
-                  />
-                  {/* Internetadresse als Material – Webseite oder Video (26.09.2026) */}
-                  <UrlQuelleEingabe
-                    mt="xs"
-                    onInhalt={(c) =>
-                      setWorksheet({ ...worksheet, sources: [...worksheet.sources, { id: newId(), ...c, useAsBasis: true, embedImage: false }] })
-                    }
-                  />
-                  <Stack gap={6} mt="sm">
-                    {worksheet.sources.map((s, i) => (
-                      <Group key={s.id} justify="space-between" wrap="nowrap" className="picker-tile" px="sm" py={6}>
-                        <div style={{ minWidth: 0 }}>
-                          <Text size="sm" fw={500} truncate>
-                            {s.fileName}
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            {s.kind === 'pdf'
-                              ? `PDF, ${s.pagesRead.length} von ${s.pageCount} Seiten gelesen`
-                              : s.kind === 'image'
+                  <Card withBorder>
+                    <Title order={4} mb={4}>
+                      Eigenes Material (optional)
+                    </Title>
+                    <Text size="sm" c="dimmed" mb="sm">
+                      Texte, Buchseiten, Arbeitsblätter oder Bilder, auf denen das Arbeitsblatt aufbauen soll.
+                    </Text>
+                    <DropZone
+                      onFiles={addFiles}
+                      accept={MATERIAL_ACCEPT}
+                      title={reading ?? 'Dateien hierher ziehen oder klicken'}
+                      hint="PDF, Word, Bilder, Text"
+                      loading={Boolean(reading)}
+                      minHeight={80}
+                    />
+                    {/* Internetadresse als Material – Webseite oder Video (26.09.2026) */}
+                    <UrlQuelleEingabe
+                      mt="xs"
+                      onInhalt={(c) =>
+                        setWorksheet({ ...worksheet, sources: [...worksheet.sources, { id: newId(), ...c, useAsBasis: true, embedImage: false }] })
+                      }
+                    />
+                    <Stack gap={6} mt="sm">
+                      {worksheet.sources.map((s, i) => (
+                        <Group key={s.id} justify="space-between" wrap="nowrap" className="picker-tile" px="sm" py={6}>
+                          <div style={{ minWidth: 0 }}>
+                            <Text size="sm" fw={500} truncate>
+                              {s.fileName}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              {s.kind === 'pdf'
+                                ? `PDF, ${s.pagesRead.length} von ${s.pageCount} Seiten gelesen`
+                                : s.kind === 'image'
                                 ? 'Bild'
                                 : s.kind === 'docx'
-                                  ? 'Word-Dokument'
-                                  : s.kind === 'video'
-                                    ? videoMaterialArt(s.text)
-                                    : s.kind === 'web'
-                                      ? 'Webseite'
-                                      : 'Text'}
-                            {s.text
-                              ? ` · ${s.text.length.toLocaleString('de-DE')} Zeichen`
-                              : s.pageImages.length
+                                ? 'Word-Dokument'
+                                : s.kind === 'video'
+                                ? videoMaterialArt(s.text)
+                                : s.kind === 'web'
+                                ? 'Webseite'
+                                : 'Text'}
+                              {s.text
+                                ? ` · ${s.text.length.toLocaleString('de-DE')} Zeichen`
+                                : s.pageImages.length
                                 ? ` · ${s.pageImages.length} Seitenbild(er)`
                                 : ''}
-                          </Text>
-                        </div>
-                        <Group gap="xs" wrap="nowrap">
-                          {s.kind === 'video' && (
-                            <VideoTranskript
-                              text={s.text}
-                              onChange={(text) => setWorksheet({ ...worksheet, sources: worksheet.sources.map((x, j) => (j === i ? { ...x, text } : x)) })}
-                            />
-                          )}
-                          <Checkbox
-                            size="xs"
-                            label="Grundlage"
-                            checked={s.useAsBasis}
-                            onChange={(e) =>
-                              setWorksheet({
-                                ...worksheet,
-                                sources: worksheet.sources.map((x, j) => (j === i ? { ...x, useAsBasis: e.currentTarget.checked } : x))
-                              })
-                            }
-                          />
-                          {s.kind === 'image' && (
+                            </Text>
+                          </div>
+                          <Group gap="xs" wrap="nowrap">
+                            {s.kind === 'video' && (
+                              <VideoTranskript
+                                text={s.text}
+                                onChange={(text) => setWorksheet({ ...worksheet, sources: worksheet.sources.map((x, j) => (j === i ? { ...x, text } : x)) })}
+                              />
+                            )}
                             <Checkbox
                               size="xs"
-                              label="Bild übernehmen"
-                              checked={s.embedImage}
+                              label="Grundlage"
+                              checked={s.useAsBasis}
                               onChange={(e) =>
                                 setWorksheet({
                                   ...worksheet,
-                                  sources: worksheet.sources.map((x, j) => (j === i ? { ...x, embedImage: e.currentTarget.checked } : x))
+                                  sources: worksheet.sources.map((x, j) => (j === i ? { ...x, useAsBasis: e.currentTarget.checked } : x))
                                 })
                               }
                             />
-                          )}
-                          <Button
-                            size="compact-xs"
-                            variant="subtle"
-                            color="red"
-                            aria-label={`${s.fileName} entfernen`}
-                            onClick={() => setWorksheet({ ...worksheet, sources: worksheet.sources.filter((_, j) => j !== i) })}
-                          >
-                            <IconTrash size={14} />
-                          </Button>
+                            {s.kind === 'image' && (
+                              <Checkbox
+                                size="xs"
+                                label="Bild übernehmen"
+                                checked={s.embedImage}
+                                onChange={(e) =>
+                                  setWorksheet({
+                                    ...worksheet,
+                                    sources: worksheet.sources.map((x, j) => (j === i ? { ...x, embedImage: e.currentTarget.checked } : x))
+                                  })
+                                }
+                              />
+                            )}
+                            <Button
+                              size="compact-xs"
+                              variant="subtle"
+                              color="red"
+                              aria-label={`${s.fileName} entfernen`}
+                              onClick={() => setWorksheet({ ...worksheet, sources: worksheet.sources.filter((_, j) => j !== i) })}
+                            >
+                              <IconTrash size={14} />
+                            </Button>
+                          </Group>
                         </Group>
-                      </Group>
-                    ))}
-                  </Stack>
-                  {materialChars > MATERIAL_WARN_CHARS && (
-                    <Alert color="orange" mt="sm" p="xs">
-                      Das Material ist sehr umfangreich ({materialChars.toLocaleString('de-DE')} Zeichen). Es wird vollständig an die KI geschickt; das kann
-                      teuer werden. Nicht benötigte Dateien besser abwählen.
-                    </Alert>
-                  )}
-                </Card>
-              </Stack>
-            </Grid.Col>
-          </Grid>
+                      ))}
+                    </Stack>
+                    {materialChars > MATERIAL_WARN_CHARS && (
+                      <Alert color="orange" mt="sm" p="xs">
+                        Das Material ist sehr umfangreich ({materialChars.toLocaleString('de-DE')} Zeichen). Es wird vollständig an die KI geschickt; das kann
+                        teuer werden. Nicht benötigte Dateien besser abwählen.
+                      </Alert>
+                    )}
+                  </Card>
+                </Stack>
+              </Grid.Col>
+            </Grid>
 
-          {/*
-           * Selten Geändertes eingeklappt (Paket 6, Wunsch der Lehrkraft): Oben bleibt, was jedes
-           * Blatt braucht. Die Überschrift nennt, was hier vom Standard abweicht.
-           */}
-          {/* Versuch mit Protokoll (29.09.2026) – nur in Fächern mit Versuchen, Messungen, Beobachtungen */}
-          {hatProtokolle(meta.subjectId) && (
+            {/*
+             * Selten Geändertes eingeklappt (Paket 6, Wunsch der Lehrkraft): Oben bleibt, was jedes
+             * Blatt braucht. Die Überschrift nennt, was hier vom Standard abweicht.
+             */}
+            {/* Versuch mit Protokoll (29.09.2026) – nur in Fächern mit Versuchen, Messungen, Beobachtungen */}
+            <NurExperte geaendert={meta.versuch?.aktiv && 'Versuch'}>
+              {hatProtokolle(meta.subjectId) && (
+                <Box mt="lg">
+                  <VersuchKarte
+                    lerngruppe={meta}
+                    versuch={meta.versuch}
+                    patchVersuch={(versuch) => patch({ versuch })}
+                    ausarbeiten={() => versuchAuftrag(useArbeitsblatt.getState().worksheet ?? worksheet, useArbeitsblatt.getState().docId)}
+                  />
+                </Box>
+              )}
+            </NurExperte>
             <Box mt="lg">
-              <VersuchKarte
-                lerngruppe={meta}
-                versuch={meta.versuch}
-                patchVersuch={(versuch) => patch({ versuch })}
-                ausarbeiten={() => versuchAuftrag(useArbeitsblatt.getState().worksheet ?? worksheet, useArbeitsblatt.getState().docId)}
-              />
-            </Box>
-          )}
-          <Box mt="lg">
-            <WeitereOptionen modul="arbeitsblatt" geaendert={geaenderteOptionen(meta, worksheet.design, designs)}>
-              <Grid gap="lg">
-                <Grid.Col span={12}>
-                  <ProfileCard profile={profile} meta={meta} onOverrides={(overrides) => patch({ overrides })} />
-                </Grid.Col>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Stack gap="sm">
-                    <MultiSelect
-                      label="Bevorzugte Sozialformen (optional)"
-                      data={[
-                        { value: 'EA', label: 'Einzelarbeit' },
-                        { value: 'PA', label: 'Partnerarbeit' },
-                        { value: 'GA', label: 'Gruppenarbeit' },
-                        { value: 'Plenum', label: 'Klassengespräch' },
-                        { value: 'Rollenspiel', label: 'Rollenspiel' }
-                      ]}
-                      value={meta.socialForms}
-                      onChange={(v) => patch({ socialForms: v as SocialForm[] })}
-                    />
-                    {meta.socialForms.includes('Rollenspiel') && (
-                      <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
+              <WeitereOptionen modul="arbeitsblatt" geaendert={geaenderteOptionen(meta, worksheet.design, designs)}>
+                <Grid gap="lg">
+                  <Grid.Col span={12}>
+                    <ProfileCard profile={profile} meta={meta} onOverrides={(overrides) => patch({ overrides })} />
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <Stack gap="sm">
+                      <MultiSelect
+                        label="Bevorzugte Sozialformen (optional)"
+                        data={[
+                          { value: 'EA', label: 'Einzelarbeit' },
+                          { value: 'PA', label: 'Partnerarbeit' },
+                          { value: 'GA', label: 'Gruppenarbeit' },
+                          { value: 'Plenum', label: 'Klassengespräch' },
+                          { value: 'Rollenspiel', label: 'Rollenspiel' }
+                        ]}
+                        value={meta.socialForms}
+                        onChange={(v) => patch({ socialForms: v as SocialForm[] })}
+                      />
+                      {meta.socialForms.includes('Rollenspiel') && (
+                        <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
+                          <Select
+                            size="sm"
+                            label="Form des Rollenspiels"
+                            description={
+                              rolePlayTypeById(meta.rolePlayType ?? '')
+                                ? `${rolePlayTypeById(meta.rolePlayType!)!.purpose}. Fallstrick: ${rolePlayTypeById(meta.rolePlayType!)!.pitfall}`
+                                : 'Automatisch: Die KI wählt eine Form, die zum Thema und zum Fach passt.'
+                            }
+                            data={[
+                              { value: '', label: 'automatisch (passend zum Thema)' },
+                              ...rolePlayTypesFor(meta.subjectId).map((t) => ({
+                                value: t.id,
+                                label: `${t.label} · ${t.roles[0]}${t.roles[1] !== t.roles[0] ? `–${t.roles[1]}` : ''} Rollen`
+                              }))
+                            ]}
+                            value={meta.rolePlayType ?? ''}
+                            onChange={(v) => patch({ rolePlayType: v || undefined })}
+                            allowDeselect={false}
+                          />
+                          <Text size="xs" c="dimmed" mt="xs">
+                            Das Blatt bekommt Rollenkarten mit Interessen, Zielen, Machtmitteln und Grenzen des Verhandelbaren, einen Beobachtungsbogen, einen
+                            Schritt zur Entrollung und Reflexionsfragen – auch eines ohne Rolle.
+                          </Text>
+                          {isSensitiveForRolePlay(meta.topic) && (
+                            <Text size="xs" c="orange" mt="xs">
+                              Zu diesem Thema dürfen keine Opfer- oder Täterrollen gespielt werden. Die App erzeugt stattdessen ein Format darüber – etwa eine
+                              Redaktionssitzung oder eine Debatte über das Gedenken.
+                            </Text>
+                          )}
+                          {WITHOUT_ESTABLISHED_PRACTICE.includes(meta.subjectId) && (
+                            <Text size="xs" c="dimmed" mt="xs">
+                              Für {meta.subjectLabel} gibt es keine etablierte Rollenspiel-Didaktik. Die App weist im Lehrerteil darauf hin.
+                            </Text>
+                          )}
+                        </Card>
+                      )}
+                      <Stack gap="sm">
+                        <TextInput
+                          label="Nummer des Arbeitsblatts (optional)"
+                          placeholder="z. B. 3"
+                          value={meta.sheetNumber}
+                          onChange={(e) => patch({ sheetNumber: e.currentTarget.value })}
+                        />
+                      </Stack>
+                    </Stack>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <Stack gap="sm">
+                      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                         <Select
-                          size="sm"
-                          label="Form des Rollenspiels"
-                          description={
-                            rolePlayTypeById(meta.rolePlayType ?? '')
-                              ? `${rolePlayTypeById(meta.rolePlayType!)!.purpose}. Fallstrick: ${rolePlayTypeById(meta.rolePlayType!)!.pitfall}`
-                              : 'Automatisch: Die KI wählt eine Form, die zum Thema und zum Fach passt.'
-                          }
-                          data={[
-                            { value: '', label: 'automatisch (passend zum Thema)' },
-                            ...rolePlayTypesFor(meta.subjectId).map((t) => ({
-                              value: t.id,
-                              label: `${t.label} · ${t.roles[0]}${t.roles[1] !== t.roles[0] ? `–${t.roles[1]}` : ''} Rollen`
-                            }))
-                          ]}
-                          value={meta.rolePlayType ?? ''}
-                          onChange={(v) => patch({ rolePlayType: v || undefined })}
+                          label="Designvorlage"
+                          data={designs.map((d) => ({ value: d.id, label: d.name + (d.isDefault ? ' (Standard)' : '') }))}
+                          value={worksheet.design?.id}
+                          onChange={(v) => {
+                            const d = designs.find((x) => x.id === v)
+                            if (d) setWorksheet({ ...worksheet, design: d })
+                          }}
                           allowDeselect={false}
                         />
-                        <Text size="xs" c="dimmed" mt="xs">
-                          Das Blatt bekommt Rollenkarten mit Interessen, Zielen, Machtmitteln und Grenzen des Verhandelbaren, einen Beobachtungsbogen, einen
-                          Schritt zur Entrollung und Reflexionsfragen – auch eines ohne Rolle.
-                        </Text>
-                        {isSensitiveForRolePlay(meta.topic) && (
-                          <Text size="xs" c="orange" mt="xs">
-                            Zu diesem Thema dürfen keine Opfer- oder Täterrollen gespielt werden. Die App erzeugt stattdessen ein Format darüber – etwa eine
-                            Redaktionssitzung oder eine Debatte über das Gedenken.
-                          </Text>
-                        )}
-                        {WITHOUT_ESTABLISHED_PRACTICE.includes(meta.subjectId) && (
-                          <Text size="xs" c="dimmed" mt="xs">
-                            Für {meta.subjectLabel} gibt es keine etablierte Rollenspiel-Didaktik. Die App weist im Lehrerteil darauf hin.
-                          </Text>
-                        )}
-                      </Card>
-                    )}
-                    <Stack gap="sm">
-                      <TextInput
-                        label="Nummer des Arbeitsblatts (optional)"
-                        placeholder="z. B. 3"
-                        value={meta.sheetNumber}
-                        onChange={(e) => patch({ sheetNumber: e.currentTarget.value })}
-                      />
+                      </SimpleGrid>
+                      <Stack gap="sm">
+                        <Switch
+                          label="Piktogramme an den Arbeitsanweisungen"
+                          description="Symbole für schreiben, lesen, markieren, vergleichen … Bewusst nicht automatisch nach Jahrgang: Ob sie der Lerngruppe helfen, entscheidet die Lehrkraft."
+                          checked={Boolean(meta.pictograms)}
+                          onChange={(e) => patch({ pictograms: e.currentTarget.checked })}
+                        />
+                      </Stack>
+                      {meta.skillFocus !== 'vocabulary' && (
+                        <Select
+                          label="Originalquellen"
+                          description={`Authentische Text- und Bildquellen aus frei zugänglichen Archiven (z. B. Wikisource, Wikimedia Commons). ${originalSourcesHint(
+                            meta
+                          )}`}
+                          data={[
+                            { value: 'auto', label: 'Automatisch nach Fach und Jahrgang' },
+                            { value: 'on', label: 'Ja, Originalquellen einbauen' },
+                            { value: 'off', label: 'Nein, nur Autorentexte' }
+                          ]}
+                          value={meta.originalSources ?? 'auto'}
+                          onChange={(v) => v && patch({ originalSources: v as OriginalSourcesMode })}
+                          allowDeselect={false}
+                        />
+                      )}
                     </Stack>
-                  </Stack>
-                </Grid.Col>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Stack gap="sm">
-                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                      <Select
-                        label="Designvorlage"
-                        data={designs.map((d) => ({ value: d.id, label: d.name + (d.isDefault ? ' (Standard)' : '') }))}
-                        value={worksheet.design?.id}
-                        onChange={(v) => {
-                          const d = designs.find((x) => x.id === v)
-                          if (d) setWorksheet({ ...worksheet, design: d })
-                        }}
-                        allowDeselect={false}
-                      />
-                    </SimpleGrid>
-                    <Stack gap="sm">
-                      <Switch
-                        label="Piktogramme an den Arbeitsanweisungen"
-                        description="Symbole für schreiben, lesen, markieren, vergleichen … Bewusst nicht automatisch nach Jahrgang: Ob sie der Lerngruppe helfen, entscheidet die Lehrkraft."
-                        checked={Boolean(meta.pictograms)}
-                        onChange={(e) => patch({ pictograms: e.currentTarget.checked })}
-                      />
-                    </Stack>
-                    {meta.skillFocus !== 'vocabulary' && (
-                      <Select
-                        label="Originalquellen"
-                        description={`Authentische Text- und Bildquellen aus frei zugänglichen Archiven (z. B. Wikisource, Wikimedia Commons). ${originalSourcesHint(meta)}`}
-                        data={[
-                          { value: 'auto', label: 'Automatisch nach Fach und Jahrgang' },
-                          { value: 'on', label: 'Ja, Originalquellen einbauen' },
-                          { value: 'off', label: 'Nein, nur Autorentexte' }
-                        ]}
-                        value={meta.originalSources ?? 'auto'}
-                        onChange={(v) => v && patch({ originalSources: v as OriginalSourcesMode })}
-                        allowDeselect={false}
-                      />
-                    )}
-                  </Stack>
-                </Grid.Col>
-                <Grid.Col span={12}>
-                  <VideoCard meta={meta} patch={patch} foreignLanguage={Boolean(subject.foreignLanguage)} />
-                </Grid.Col>
-              </Grid>
-            </WeitereOptionen>
-          </Box>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <VideoCard meta={meta} patch={patch} foreignLanguage={Boolean(subject.foreignLanguage)} />
+                  </Grid.Col>
+                </Grid>
+              </WeitereOptionen>
+            </Box>
 
-          <Box h="lg" />
-        </Container>
+            <Box h="lg" />
+          </Container>
 
-        <VocabFocusModal
-          opened={vocabOpen}
-          meta={meta}
-          onClose={() => setVocabOpen(false)}
-          onTake={(vocabWords, vocabWork, knownVocab) => {
-            // Die Obergrenze nur setzen, wenn eine Quelle sie liefert – eine vorhandene nicht löschen
-            patch({ vocabWords, vocabWork, ...(knownVocab ? { knownVocab } : {}) })
-            setVocabOpen(false)
-          }}
-        />
-      </ScrollArea>
-    </FormularSeite>
+          <VocabFocusModal
+            opened={vocabOpen}
+            meta={meta}
+            onClose={() => setVocabOpen(false)}
+            onTake={(vocabWords, vocabWork, knownVocab) => {
+              // Die Obergrenze nur setzen, wenn eine Quelle sie liefert – eine vorhandene nicht löschen
+              patch({ vocabWords, vocabWork, ...(knownVocab ? { knownVocab } : {}) })
+              setVocabOpen(false)
+            }}
+          />
+        </ScrollArea>
+      </FormularSeite>
+    </OptionenBereich>
   )
 }
 
@@ -1522,15 +1624,21 @@ function VideoCard({
               v.during === 'auto' || !v.during
                 ? kind?.reason
                 : during === 'keine'
-                  ? 'Es entstehen nur Aufgaben vor und nach dem Sehen.'
-                  : during === 'ankreuzen'
-                    ? 'Höchstens zwei Aufgaben, nur zum Ankreuzen, Abhaken oder Eintragen.'
-                    : 'Kurze, prüfbare Fragen in der Reihenfolge des Videos; das Video darf angehalten werden.'
+                ? 'Es entstehen nur Aufgaben vor und nach dem Sehen.'
+                : during === 'ankreuzen'
+                ? 'Höchstens zwei Aufgaben, nur zum Ankreuzen, Abhaken oder Eintragen.'
+                : 'Kurze, prüfbare Fragen in der Reihenfolge des Videos; das Video darf angehalten werden.'
             }
             data={[
               {
                 value: 'auto',
-                label: `nach Art des Videos (${VIDEO_KINDS.find((k) => k.id === v.kind)?.during === 'keine' ? 'keine' : VIDEO_KINDS.find((k) => k.id === v.kind)?.during === 'leitfragen' ? 'Leitfragen' : 'Ankreuzaufgaben'})`
+                label: `nach Art des Videos (${
+                  VIDEO_KINDS.find((k) => k.id === v.kind)?.during === 'keine'
+                    ? 'keine'
+                    : VIDEO_KINDS.find((k) => k.id === v.kind)?.during === 'leitfragen'
+                    ? 'Leitfragen'
+                    : 'Ankreuzaufgaben'
+                })`
               },
               { value: 'keine', label: 'keine – erst danach notieren' },
               { value: 'ankreuzen', label: 'wenige Ankreuzaufgaben' },

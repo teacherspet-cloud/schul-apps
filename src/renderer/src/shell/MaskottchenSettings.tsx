@@ -24,7 +24,7 @@ import { BESCHREIBUNGS_AUFTRAG, MASKOTTCHEN_POSEN, maskottchenId, posePrompt, vo
 import { obj, str } from '../shared/aiSchema'
 import { starteAuftrag } from '../shared/auftraege'
 import { cleanImageBackground } from '../shared/imageCleanup'
-import { useMaskottchen } from '../shared/maskottchenStore'
+import { useMaskottchen, useMaskottchenZiel } from '../shared/maskottchenStore'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../shared/util'
 import { ILLUSTRATIONEN_BIS_KLASSE } from '../modules/arbeitsblatt/generation/illustrationen'
 import { hatClient } from '../shared/plattform'
@@ -50,8 +50,23 @@ import { hatClient } from '../shared/plattform'
 /** Bilder auf eine handliche Größe bringen – 1,5 MB je Pose wären auf jedem Blatt zu viel */
 const handlich = (dataUrl: string): Promise<string> => normalizeImage(dataUrl, 640, 'png')
 
-export default function MaskottchenSettings({ settings, update }: { settings: AppSettings; update: (patch: Partial<AppSettings>) => void }): React.JSX.Element {
-  const liste = useMaskottchen((s) => s.liste)
+/**
+ * `schule`: Ansicht in der Verwaltung (Admin) – nur die Figuren der Schule, ohne die persönlichen Einstellungen.
+ * Sonst (Einstellungen der Lehrkraft): die eigenen Figuren bearbeitbar, die der Schule nur zum Ansehen und als Standard wählbar.
+ */
+export default function MaskottchenSettings({
+  settings,
+  update,
+  schule = false
+}: {
+  settings: AppSettings
+  update: (patch: Partial<AppSettings>) => void
+  schule?: boolean
+}): React.JSX.Element {
+  const alle = useMaskottchen((s) => s.liste)
+  const liste = alle.filter((m) => Boolean(m.schule) === schule)
+  const derSchule = schule ? [] : alle.filter((m) => m.schule)
+  const modul = schule ? 'verwaltung' : 'einstellungen'
   const geladen = useMaskottchen((s) => s.geladen)
   const setze = useMaskottchen((s) => s.setze)
   const [name, setName] = useState('')
@@ -65,17 +80,27 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
     if (!geladen) void useMaskottchen.getState().lade()
   }, [geladen])
 
+  // „Öffnen" aus der Auftragsleiste: die gerade gezeichnete Figur/Pose groß zeigen
+  const ziel = useMaskottchenZiel((s) => s.ziel)
+  useEffect(() => {
+    if (!ziel || !alle.some((m) => m.id === ziel.figurId && Boolean(m.schule) === schule)) return
+    setAnsicht(ziel)
+    useMaskottchenZiel.getState().setze(null)
+    window.setTimeout(() => document.querySelector(`[data-maskottchen="${ziel.figurId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
+  }, [ziel, alle, schule])
+
   const posenZeichnen = (figur: MaskottchenInfo, nur?: string[]): void => {
     const posen = MASKOTTCHEN_POSEN.filter((p) => !nur || nur.includes(p.id))
     void starteAuftrag<MaskottchenInfo, MaskottchenInfo>({
-      moduleId: 'einstellungen',
+      moduleId: modul,
       docId: `maskottchen-${figur.id}`,
       titel: figur.name,
       art: posen.length === 1 ? `Pose „${posen[0].label}" zeichnen` : 'Posen zeichnen',
       eingabe: figur,
       istOffen: () => true,
       sperrt: false,
-      schluessel: `maskottchen-${figur.id}`,
+      // Figur und (erste) Pose – „Öffnen" zeigt genau dieses Bild groß
+      schluessel: `maskottchen-${figur.id}:${posen[0]?.id ?? 'winkend'}`,
       fehlerTitel: 'Die Posen konnten nicht gezeichnet werden',
       arbeit: async (f, k) => {
         let beschreibung = f.beschreibung
@@ -113,7 +138,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
   const neuPerKi = async (): Promise<void> => {
     if (!name.trim() || !angabe.trim()) return
     const id = maskottchenId(name)
-    if (liste.some((m) => m.id === id)) {
+    if (alle.some((m) => m.id === id)) {
       notifyError(new Error('Eine Figur mit diesem Namen gibt es schon.'))
       return
     }
@@ -121,14 +146,14 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
     setName('')
     setAngabe('')
     void starteAuftrag<typeof eingabe, MaskottchenInfo>({
-      moduleId: 'einstellungen',
+      moduleId: modul,
       docId: `maskottchen-${id}`,
       titel: eingabe.name,
       art: 'Maskottchen zeichnen',
       eingabe,
       istOffen: () => true,
       sperrt: false,
-      schluessel: `maskottchen-${id}`,
+      schluessel: `maskottchen-${id}:winkend`,
       fehlerTitel: 'Das Maskottchen konnte nicht gezeichnet werden',
       arbeit: async (e, k) => {
         k.melde('Die Bild-KI zeichnet die Vorlage …', 0, 2)
@@ -143,7 +168,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
           schema: obj({ beschreibung: str() })
         })
         const vorlage = await handlich(sauber)
-        await window.api.maskottchen.save({ id: e.id, name: e.name, beschreibung: String(d.beschreibung ?? e.angabe).trim(), quelle: 'ki', vorlage })
+        await window.api.maskottchen.save({ id: e.id, name: e.name, beschreibung: String(d.beschreibung ?? e.angabe).trim(), quelle: 'ki', vorlage, schule })
         // Die Vorlage winkt – sie ist zugleich die erste Pose
         return window.api.maskottchen.pose(e.id, 'winkend', vorlage)
       },
@@ -158,7 +183,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
     if (!file) return
     const figurName = name.trim() || file.name.replace(/\.[^.]+$/, '')
     const id = maskottchenId(figurName)
-    if (liste.some((m) => m.id === id)) {
+    if (alle.some((m) => m.id === id)) {
       notifyError(new Error('Eine Figur mit diesem Namen gibt es schon.'))
       return
     }
@@ -167,7 +192,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
       const roh = await readFileAsDataUrl(file)
       const sauber = (await cleanImageBackground(roh)).dataUrl
       const vorlage = await handlich(sauber)
-      await window.api.maskottchen.save({ id, name: figurName, beschreibung: '', quelle: 'upload', vorlage })
+      await window.api.maskottchen.save({ id, name: figurName, beschreibung: '', quelle: 'upload', vorlage, schule })
       setze(await window.api.maskottchen.list())
       setName('')
       notifySuccess(`${figurName} ist angelegt. „Posen zeichnen" lässt die KI die Figur beschreiben und in zwölf Posen zeichnen.`)
@@ -187,7 +212,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
     }
   }
 
-  const standardId = illu.standardId ?? liste[0]?.id
+  const standardId = illu.standardId ?? alle[0]?.id
 
   // Exe „Schul-Apps Online": Figuren der Exe ohne Server am selben PC auf den Server übernehmen (02.10.2026)
   const [uebertrage, setUebertrage] = useState(false)
@@ -214,13 +239,37 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
   return (
     <Card withBorder padding="lg">
       <Title order={4} mb={4}>
-        Maskottchen und Illustrationen
+        {schule ? 'Maskottchen und Illustrationen der Schule' : derSchule.length ? 'Eigene Maskottchen und Illustrationen' : 'Maskottchen und Illustrationen'}
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Für jüngere Jahrgänge setzen die Programme altersgerechte Figuren auf die Materialien – an Merkkästen, Aufgaben und als Begrüßung; auf Arbeiten nur am
-        Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).
+        {schule
+          ? 'Diese Figuren stehen allen Lehrkräften zur Verfügung; nur Admins bearbeiten sie. Lehrkräfte können sich in ihren Einstellungen zusätzlich eigene Figuren anlegen.'
+          : 'Für jüngere Jahrgänge setzen die Programme altersgerechte Figuren auf die Materialien – an Merkkästen, Aufgaben und als Begrüßung; auf Arbeiten nur am Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).'}
       </Text>
-      {hatClient() && window.__schulappsClient?.lokaleMaskottchen && (
+      {!schule && derSchule.length > 0 && (
+        <Card withBorder padding="sm" mb="md" data-maskottchen-schule>
+          <Text size="sm" fw={600} mb={6}>
+            Figuren der Schule
+          </Text>
+          <Group gap="md">
+            {derSchule.map((m) => (
+              <Tooltip key={m.id} label={`${m.name} – von der Schule (Verwaltung), hier nur ansehen`}>
+                <Stack gap={2} align="center" style={{ cursor: 'pointer' }} onClick={() => setAnsicht({ figurId: m.id, poseId: 'winkend' })}>
+                  <Image src={m.vorlage || m.posen.winkend} w={56} h={72} fit="contain" alt={m.name} />
+                  <Text size="xs">
+                    {m.name}
+                    {standardId === m.id ? ' ★' : ''}
+                  </Text>
+                </Stack>
+              </Tooltip>
+            ))}
+          </Group>
+          <Text size="xs" c="dimmed" mt={6}>
+            Als Standardfigur wählbar. Eigene Figuren entstehen unten.
+          </Text>
+        </Card>
+      )}
+      {!schule && hatClient() && window.__schulappsClient?.lokaleMaskottchen && (
         <Group mb="md">
           <Button variant="light" leftSection={<IconUpload size={16} />} loading={uebertrage} onClick={() => void ausExeUebernehmen()} data-figuren-uebernehmen>
             Figuren aus der Exe an diesem PC übernehmen
@@ -230,7 +279,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
           </Text>
         </Group>
       )}
-      <Group align="flex-end" mb="md">
+      <Group align="flex-end" mb="md" display={schule ? 'none' : undefined}>
         <ZahlFeld
           label="Illustrationen bis Klasse"
           description="Darüber nur, wenn sie am Blatt eingeschaltet werden"
@@ -242,7 +291,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
         />
         <Select
           label="Standardfigur"
-          data={liste.map((m) => ({ value: m.id, label: m.name }))}
+          data={alle.map((m) => ({ value: m.id, label: m.schule ? `${m.name} (Schule)` : m.name }))}
           value={standardId ?? null}
           onChange={(v) => v && update({ illustrationen: { ...illu, standardId: v } })}
           placeholder="Noch keine Figur"
@@ -263,7 +312,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
                     <Text fw={600} truncate>
                       {m.name}
                     </Text>
-                    {standardId === m.id && <Badge size="xs">Standard</Badge>}
+                    {!schule && standardId === m.id && <Badge size="xs">Standard</Badge>}
                     <Badge size="xs" variant="light" color={fertig === MASKOTTCHEN_POSEN.length ? 'green' : 'gray'}>
                       {fertig} / {MASKOTTCHEN_POSEN.length} Posen
                     </Badge>
@@ -295,7 +344,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
                     >
                       {fehlend.length ? `${fehlend.length} fehlende Posen zeichnen` : 'Alle Posen neu zeichnen'}
                     </Button>
-                    {standardId !== m.id && (
+                    {!schule && standardId !== m.id && (
                       <Button
                         size="compact-xs"
                         variant="subtle"
@@ -305,7 +354,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
                         Als Standard
                       </Button>
                     )}
-                    {standardId === m.id && <IconStarFilled size={14} color="var(--mantine-color-yellow-6)" />}
+                    {!schule && standardId === m.id && <IconStarFilled size={14} color="var(--mantine-color-yellow-6)" />}
                     <Button size="compact-xs" variant="subtle" color="red" leftSection={<IconTrash size={12} />} onClick={() => void loeschen(m)}>
                       Löschen
                     </Button>
@@ -359,7 +408,8 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
 
       <PosenAnsicht
         ansicht={ansicht}
-        liste={liste}
+        liste={alle}
+        nurAnsehen={Boolean(ansicht && alle.find((m) => m.id === ansicht.figurId)?.schule) && !schule}
         onWechsel={setAnsicht}
         onZeichnen={(m, poseId) => {
           posenZeichnen(m, [poseId])
@@ -378,10 +428,12 @@ function PosenAnsicht({
   ansicht,
   liste,
   onWechsel,
-  onZeichnen
+  onZeichnen,
+  nurAnsehen = false
 }: {
   ansicht: { figurId: string; poseId: string } | null
   liste: MaskottchenInfo[]
+  nurAnsehen?: boolean
   onWechsel: (a: { figurId: string; poseId: string } | null) => void
   onZeichnen: (figur: MaskottchenInfo, poseId: string) => void
 }): React.JSX.Element {
@@ -442,9 +494,11 @@ function PosenAnsicht({
             <Button variant="default" onClick={() => onWechsel(null)}>
               Schließen
             </Button>
-            <Button leftSection={<IconSparkles size={14} />} onClick={() => onZeichnen(figur, pose.id)}>
-              {bild ? 'Pose neu zeichnen lassen' : 'Pose zeichnen lassen'}
-            </Button>
+            {!nurAnsehen && (
+              <Button leftSection={<IconSparkles size={14} />} onClick={() => onZeichnen(figur, pose.id)}>
+                {bild ? 'Pose neu zeichnen lassen' : 'Pose zeichnen lassen'}
+              </Button>
+            )}
           </Group>
         </Stack>
       )}

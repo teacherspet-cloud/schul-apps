@@ -67,6 +67,15 @@ async function stelleFrei(liste: MaskottchenInfo[]): Promise<void> {
   if (geaendert) useMaskottchen.setState({ liste: await window.api.maskottchen.list() })
 }
 
+/**
+ * „Öffnen" eines fertigen Maskottchen-Auftrags (06.10.2026): Die Auftragsleiste führte in eine leere Seite, weil der
+ * Auftrag „einstellungen" als Programm nannte. Jetzt öffnet navigation.ts die Einstellungen bzw. die Verwaltung und
+ * legt hier die Figur (und Pose) ab; MaskottchenSettings zeigt sie groß.
+ */
+export const useMaskottchenZiel = create<{ ziel: { figurId: string; poseId: string } | null; setze: (z: { figurId: string; poseId: string } | null) => void }>(
+  (set) => ({ ziel: null, setze: (ziel) => set({ ziel }) })
+)
+
 /** Standardfigur: die in den Einstellungen gewählte, sonst die erste. */
 export function standardMaskottchen(): MaskottchenInfo | undefined {
   const { liste } = useMaskottchen.getState()

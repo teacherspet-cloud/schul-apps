@@ -44,7 +44,9 @@ export const SENSIBEL: Record<string, string[]> = {
   vok_zuweisungen: ['schueler'],
   vok_stand: ['daten'],
   vok_laufbahn: ['daten'],
-  tafel_freigaben: ['schueler']
+  tafel_freigaben: ['schueler'],
+  // Schüler-Startseite (06.10.2026): Wochen-Schnappschuss und Lerntipp je Person (lernstand.ts)
+  lern_wochen: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

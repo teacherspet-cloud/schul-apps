@@ -30,6 +30,10 @@ import { FallendeWoerter, Kreuzwort, Suchsel, Wortraten } from './SpieleSchreibe
 import { BildRaetsel, hatWortAufnahme, HoerQuiz } from './SpieleMedien'
 import { HoerenSchreiben, mitSatzLuecke, SatzLuecke, Wortduell } from './SpieleNeu'
 import { hatSatzAufnahme } from '../medienCache'
+import { ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
+
+/** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
+export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell']
 
 const SYMBOL: Record<SpielId, React.ReactNode> = {
   memory: <IconCards size={22} />,
@@ -116,6 +120,8 @@ export function Spielwahl({
   spielt?: (an: boolean) => void
 }): React.JSX.Element {
   const farbe = useVtFarbe()
+  // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
+  const { d: wahl } = useDarstellung()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
   const setSpiel = (s: SpielId | null): void => {
     setSpielRoh(s)
@@ -137,6 +143,7 @@ export function Spielwahl({
       const id = spiel
       const rekord = istRekord(id, wert, rekorde[id])
       setErgebnis({ spiel: id, wert, rekord, fehler: fehler.length })
+      ton('geschafft')
       setSpiel(null)
       void senden<{ rekorde: Record<string, number>; ansehen: string[] }>('/s/api/vokabeln/spiel', { id: listeId, spiel: id, wert, fehler }).then(
         aktualisieren,
@@ -146,6 +153,13 @@ export function Spielwahl({
     [spiel, rekorde, listeId, aktualisieren]
   )
   const info = (id: SpielId) => SPIELE.find((s) => s.id === id)!
+
+  if (!wahl.spiele && !spiel && !ergebnis)
+    return (
+      <Text size="sm" c="dimmed" ta="center" data-spiele-aus>
+        Spiele sind in deinen Einstellungen ausgeschaltet.
+      </Text>
+    )
 
   if (spiel) {
     const props = { woerter: pool, sprache, ende }
@@ -266,7 +280,7 @@ export function Spielwahl({
             {art === 'erkennen' ? 'Erkennen' : 'Schreiben'}
           </Text>
           <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
-            {SPIELE.filter((s) => s.art === art).map((s) => {
+            {SPIELE.filter((s) => s.art === art && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id))).map((s) => {
               const gesperrt =
                 s.id === 'satzluecke'
                   ? mitSatzLuecke(woerter).length < 3

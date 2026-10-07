@@ -10,6 +10,7 @@
  * Etappe 4 (02.10.2026): an die ganze Lerngruppe ODER an einzelne Lernende; auf Wunsch Gäste per
  * QR-Code und Namen (solange IServ nicht eingerichtet ist). KI: Zugang der Lehrkraft, auch Abo.
  */
+import { NurExperte } from '../../../shared/components/NurExperte'
 import { Alert, Badge, Button, Card, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, Title } from '@mantine/core'
 import { IconDownload, IconQrcode, IconSend } from '@tabler/icons-react'
 import { Zugang } from '../../onlinetest/OnlinetestModule'
@@ -51,11 +52,17 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
     )
   }, [gruppe])
   const laden = useCallback(() => {
-    void holen<{ freigaben: FreigabeListe[] }>('/server/feedback').then((d) => setListe(d.freigaben), () => setListe([]))
+    void holen<{ freigaben: FreigabeListe[] }>('/server/feedback').then(
+      (d) => setListe(d.freigaben),
+      () => setListe([])
+    )
   }, [])
   useEffect(() => {
     if (!aufServer()) return
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then((d) => setGruppen(d.gruppen), () => setGruppen([]))
+    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+      (d) => setGruppen(d.gruppen),
+      () => setGruppen([])
+    )
     laden()
   }, [laden])
   if (!aufServer()) return null
@@ -139,7 +146,9 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           placeholder={gruppen.length ? 'wählen …' : 'in der App „Onlinetest“ anlegen'}
           w={220}
         />
-        <NumberInput label="Feedback-Runden je Person" min={1} max={10} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={180} />
+        <NurExperte>
+          <NumberInput label="Feedback-Runden je Person" min={1} max={10} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={180} />
+        </NurExperte>
         <Button
           leftSection={<IconSend size={16} />}
           disabled={(!gruppe && !gaeste) || !r.grundlage.aufgaben.trim()}
@@ -149,28 +158,32 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           Freigeben
         </Button>
       </Group>
-      {gruppe && (
-        <MultiSelect
-          mb="sm"
-          label="Nur für einzelne Lernende"
-          description="Leer lassen = die ganze Lerngruppe."
-          data={mitglieder.map((m) => ({ value: m.benutzer, label: m.name }))}
-          value={einzelne}
-          onChange={setEinzelne}
-          searchable
-          clearable
-          placeholder={mitglieder.length ? 'alle' : 'noch niemand in der Lerngruppe'}
-          data-einzelne
+      <NurExperte>
+        {gruppe && (
+          <MultiSelect
+            mb="sm"
+            label="Nur für einzelne Lernende"
+            description="Leer lassen = die ganze Lerngruppe."
+            data={mitglieder.map((m) => ({ value: m.benutzer, label: m.name }))}
+            value={einzelne}
+            onChange={setEinzelne}
+            searchable
+            clearable
+            placeholder={mitglieder.length ? 'alle' : 'noch niemand in der Lerngruppe'}
+            data-einzelne
+          />
+        )}
+      </NurExperte>
+      <NurExperte geaendert={gaeste && 'Gäste'}>
+        <Checkbox
+          mb="md"
+          label="Auch Gäste per QR-Code und Namen (ohne Konto)"
+          description="Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstaben ein. Lernende mit Konto kommen über denselben Code direkt hinein."
+          checked={gaeste}
+          onChange={(e) => setGaeste(e.currentTarget.checked)}
+          data-feedback-gaeste
         />
-      )}
-      <Checkbox
-        mb="md"
-        label="Auch Gäste per QR-Code und Namen (ohne Konto)"
-        description="Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstaben ein. Lernende mit Konto kommen über denselben Code direkt hinein."
-        checked={gaeste}
-        onChange={(e) => setGaeste(e.currentTarget.checked)}
-        data-feedback-gaeste
-      />
+      </NurExperte>
       {!r.grundlage.aufgaben.trim() && (
         <Alert color="orange" mb="sm">
           Zuerst die Aufgabenstellung eintragen – sie sehen die Lernenden.
@@ -213,7 +226,11 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
                 size="xs"
                 variant="subtle"
                 color="gray"
-                onClick={() => void senden(`/server/feedback/${f.id}/status`, { status: f.status === 'offen' ? 'beendet' : 'offen' }).then(laden, (e: unknown) => notifyError(e))}
+                onClick={() =>
+                  void senden(`/server/feedback/${f.id}/status`, { status: f.status === 'offen' ? 'beendet' : 'offen' }).then(laden, (e: unknown) =>
+                    notifyError(e)
+                  )
+                }
               >
                 {f.status === 'offen' ? 'Beenden' : 'Wieder öffnen'}
               </Button>

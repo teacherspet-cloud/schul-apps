@@ -134,7 +134,8 @@ const nachCode = (code: string): Zeile | null =>
 const gaesteVon = (zid: string): NutzerInfo[] =>
   (db().prepare('SELECT nutzer_id FROM gram_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
     .map((g) => nutzerNachId(g.nutzer_id))
-    .filter((n): n is NutzerInfo => Boolean(n))
+    // Vorschaukonten (vorschau.ts) zählen nie mit
+    .filter((n): n is NutzerInfo => Boolean(n && n.quelle !== 'vorschau'))
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 
 function istFuer(z: Zeile, ich: NutzerInfo): boolean {
@@ -167,6 +168,14 @@ export function grammatikFuer(ich: NutzerInfo): { id: string; titel: string; fac
   return (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
     .filter((z) => istOffen(z) && istFuer(z, ich))
     .map((z) => ({ id: z.id, titel: z.titel, fach: z.fach, uebersicht: uebersicht(karten(paketVon(z)), standVon(z.id, ich.id).aufgaben) }))
+}
+
+/** Vorschaukonto („Als Schüler ansehen", vorschau.ts): Beispielstand je offenem Training – `stand` bekommt die Kennungen der Aufgaben */
+export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => { aufgaben: Record<string, WortStand>; tage: string[] }): void {
+  for (const z of (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[]).filter(
+    (z) => istOffen(z) && istFuer(z, ich)
+  ))
+    standSpeichern(z.id, ich.id, stand(karten(paketVon(z)).map((k) => k.id)))
 }
 
 /**

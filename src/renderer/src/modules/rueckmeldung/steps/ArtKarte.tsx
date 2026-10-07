@@ -1,4 +1,5 @@
 import { Alert, Card, Checkbox, Radio, SegmentedControl, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core'
+import { NurExperte } from '../../../shared/components/NurExperte'
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react'
 import { EBENEN, EINSTUFUNGEN, einstufungGesperrt, einstufungVon, ebeneVon, formenVon, FORMEN } from '../art'
 import { einstufungsHinweise } from '../laenderRegeln'
@@ -57,7 +58,9 @@ export default function ArtKarte(): React.JSX.Element | null {
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6} verticalSpacing={6}>
               {EINSTUFUNGEN.map((e) => {
                 const gesperrt = einstufungGesperrt(e.id, r.meta)
-                const knopf = <Radio value={e.id} label={e.label} description={e.beispiel} disabled={Boolean(gesperrt) && art !== e.id} data-einstufung={e.id} />
+                const knopf = (
+                  <Radio value={e.id} label={e.label} description={e.beispiel} disabled={Boolean(gesperrt) && art !== e.id} data-einstufung={e.id} />
+                )
                 return gesperrt ? (
                   <Tooltip key={e.id} label={gesperrt} multiline w={260}>
                     <div>{knopf}</div>
@@ -69,32 +72,31 @@ export default function ArtKarte(): React.JSX.Element | null {
             </SimpleGrid>
           </Radio.Group>
         </div>
-        {art !== 'keine' && (
-          <div>
-            <Text size="sm" fw={600} mb={4}>
-              Einstufung gilt für
-            </Text>
-            <SegmentedControl
-              size="xs"
-              data={EBENEN}
-              value={ebeneVon(r.meta)}
-              onChange={(v) => update((d) => (d.meta.ebene = v as EinstufungsEbene))}
-            />
-            <Text size="xs" c="dimmed" mt={6}>
-              Die KI schlägt nur vor (mit Begründung); die Einstufung wird vor dem Export bestätigt. Noten folgen dem Notenschlüssel aus den Einstellungen.
-            </Text>
-          </div>
-        )}
-        <Checkbox
-          checked={Boolean(r.meta.elternfassung)}
-          onChange={(e) => {
-            const an = e.currentTarget.checked
-            update((d) => (d.meta.elternfassung = an))
-          }}
-          label="Elternfassung"
-          description="Kurze Fassung in einfacher Sprache für die Eltern, übersetzbar in die Familiensprache"
-          data-rm-eltern
-        />
+        <NurExperte>
+          {art !== 'keine' && (
+            <div>
+              <Text size="sm" fw={600} mb={4}>
+                Einstufung gilt für
+              </Text>
+              <SegmentedControl size="xs" data={EBENEN} value={ebeneVon(r.meta)} onChange={(v) => update((d) => (d.meta.ebene = v as EinstufungsEbene))} />
+              <Text size="xs" c="dimmed" mt={6}>
+                Die KI schlägt nur vor (mit Begründung); die Einstufung wird vor dem Export bestätigt. Noten folgen dem Notenschlüssel aus den Einstellungen.
+              </Text>
+            </div>
+          )}
+        </NurExperte>
+        <NurExperte geaendert={Boolean(r.meta.elternfassung) && 'Elternfassung'}>
+          <Checkbox
+            checked={Boolean(r.meta.elternfassung)}
+            onChange={(e) => {
+              const an = e.currentTarget.checked
+              update((d) => (d.meta.elternfassung = an))
+            }}
+            label="Elternfassung"
+            description="Kurze Fassung in einfacher Sprache für die Eltern, übersetzbar in die Familiensprache"
+            data-rm-eltern
+          />
+        </NurExperte>
         {einstufungGesperrt(art, r.meta) && (
           <Alert color="orange" variant="light" p="xs" icon={<IconAlertTriangle size={16} />}>
             <Text size="xs">{einstufungGesperrt(art, r.meta)}</Text>

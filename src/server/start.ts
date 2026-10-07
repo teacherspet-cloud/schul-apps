@@ -15,6 +15,7 @@
  */
 import { grammatikRoute } from './grammatik'
 import { klassenRoute } from './klassen'
+import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
 import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
@@ -34,6 +35,7 @@ import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
 import { medienRoute } from './medien'
 import { lehrkraftRoute, schuelerRoute } from './onlinetest'
+import { lernstandRoute } from './lernstand'
 import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
 import { fachordnerRoute } from './fachordner'
 import { feedbackRoute } from './schuelerfeedback'
@@ -116,6 +118,8 @@ async function main(): Promise<void> {
     weiche: env.SCHULAPPS_WEICHE === '1',
     aufruf,
     tls,
+    // „Als Schüler ansehen“ (06.10.2026): Vorschau-Schlüssel nur mit der Sitzung der Lehrkraft
+    vorschau: kontoZumSchluessel,
     routen: [
       hoertextRoute,
       // Medienbank der Vokabeln für Lernende (05.10.2026)
@@ -129,10 +133,14 @@ async function main(): Promise<void> {
       // Grammatik-Lern-App (06.10.2026)
       grammatikRoute(adresse),
       lernenRoute(),
+      // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
+      lernstandRoute(aufruf),
       schuelerRoute(aufruf),
       lehrkraftRoute(aufruf, adresse),
       fachschaftRoute(),
       // „Meine Klassen" (06.10.2026)
+      // Musterschüler-Vorschau vor den Klassen (/server/klassen/<id>/vorschau)
+      vorschauRoute(),
       klassenRoute(),
       fachordnerRoute(),
       verwaltungsRoute

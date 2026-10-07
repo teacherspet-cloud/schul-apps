@@ -1,4 +1,6 @@
 import InterkulturSchalter from '../../arbeitsblatt/steps/InterkulturSchalter'
+import { useExperte } from '../../../shared/settingsStore'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
 import SprechpruefungKarte from './SprechpruefungKarte'
 import { sprechpruefungAlsArbeit } from '../generation/sprechpruefung'
@@ -41,7 +43,7 @@ import Formularfuss, { ersterGrund, FormularSeite } from '../../../shared/compon
 import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import { amtlicheListe, anlageWunsch } from '../didactics/operatorenliste'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -50,7 +52,8 @@ import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import { comprehensionFormatById, comprehensionFormatsFor, defaultComprehensionFormats } from '../../arbeitsblatt/didactics/comprehensionFormats'
-import { grammarTopicsFor } from '../../arbeitsblatt/didactics/grammar'
+import { findGrammarTopic } from '../../arbeitsblatt/didactics/grammar'
+import GrammatikAuswahl from '../../arbeitsblatt/steps/GrammatikAuswahl'
 import { AIDS_SUGGESTIONS } from '../model/aids'
 import { listeningFormatById, listeningFormatsFor, listeningRules } from '../../arbeitsblatt/didactics/listeningFormats'
 import { defaultExamMeta, defaultMinutes } from '../model/defaults'
@@ -157,6 +160,13 @@ export default function FrameStep(): React.JSX.Element {
   const available = useMemo(() => (exam ? formatsFor(exam.meta.subjectId, exam.meta.grade, exam.meta.stateId) : []), [exam])
   // Vor der frühen Rückkehr: Hooks stehen immer in derselben Reihenfolge
   const lehrplan = useLehrplanVorschlaege(exam?.meta.stateId ?? '', exam?.meta.schoolTypeId, exam?.meta.subjectId ?? '', exam?.meta.grade ?? 0)
+  // Standardmodus: Aufbau automatisch (siehe fillParts unten; die Funktion steht erst dort fest)
+  const experte = useExperte()
+  const fuelleAufbau = useRef<() => void>(() => undefined)
+  const aufbauLeer = exam ? exam.parts.length === 0 : false
+  useEffect(() => {
+    if (!experte && aufbauLeer) fuelleAufbau.current()
+  }, [experte, aufbauLeer, exam?.meta.subjectId, exam?.meta.grade])
   if (!exam) return <Container py="xl">Wird geladen …</Container>
 
   const meta = exam.meta
@@ -171,15 +181,12 @@ export default function FrameStep(): React.JSX.Element {
       ? suggestLevel(table, exam.meta.stateId, exam.meta.schoolTypeId, sprachfolge(exam.meta), exam.meta.grade)
       : null
   const patchGruppe = (p: Partial<ExamMeta>): void =>
-    update(
-      (d) => {
-        // Schulform, Jahrgang und Kursniveau folgen nach denselben Regeln wie in den anderen Programmen (shared/lerngruppe.ts)
-        Object.assign(d.meta, mitLerngruppe(table, d.meta, p))
-        const level = istFremdsprache(d.meta.subjectId) ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade) : null
-        if (level) d.meta.cefrLevel = level.level
-      },
-      `angaben:${Object.keys(p).sort().join(',')}`
-    )
+    update((d) => {
+      // Schulform, Jahrgang und Kursniveau folgen nach denselben Regeln wie in den anderen Programmen (shared/lerngruppe.ts)
+      Object.assign(d.meta, mitLerngruppe(table, d.meta, p))
+      const level = istFremdsprache(d.meta.subjectId) ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade) : null
+      if (level) d.meta.cefrLevel = level.level
+    }, `angaben:${Object.keys(p).sort().join(',')}`)
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const courseOptions = courseLevelOptions(meta.stateId, meta.schoolTypeId, meta.grade)
   const pointsPlanned = examPoints(exam)
@@ -250,20 +257,28 @@ export default function FrameStep(): React.JSX.Element {
 
   const fillParts = (): void =>
     update((d) => {
-      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes, appSettings.schreibanteil?.[d.meta.subjectId], d.meta.stateId).map((p): ExamPart => ({
-        id: newId(),
-        formatId: p.formatId,
-        label: formatById(p.formatId)?.label ?? '',
-        competence: formatById(p.formatId)?.competence ?? '',
-        weight: p.weight,
-        points: p.points,
-        minutes: p.minutes,
-        gradeGroup: p.gradeGroup,
-        ...(p.contentShare ? { contentShare: p.contentShare } : {}),
-        afbMix: { I: 30, II: 45, III: 25 },
-        blocks: []
-      }))
+      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes, appSettings.schreibanteil?.[d.meta.subjectId], d.meta.stateId).map(
+        (p): ExamPart => ({
+          id: newId(),
+          formatId: p.formatId,
+          label: formatById(p.formatId)?.label ?? '',
+          competence: formatById(p.formatId)?.competence ?? '',
+          weight: p.weight,
+          points: p.points,
+          minutes: p.minutes,
+          gradeGroup: p.gradeGroup,
+          ...(p.contentShare ? { contentShare: p.contentShare } : {}),
+          afbMix: { I: 30, II: 45, III: 25 },
+          blocks: []
+        })
+      )
     })
+
+  /*
+   * Standardmodus (07.10.2026): Der Aufbau entsteht von selbst aus Fach, Jahrgang, Punkten und Dauer – wie
+   * „Vorschlag erzeugen". Fach- oder Jahrgangswechsel leeren ihn, dann kommt der neue Vorschlag.
+   */
+  fuelleAufbau.current = fillParts
 
   // Der Hauptknopf steht fest unten und sagt, was fehlt (Paket 6)
   const sperrgrund = ersterGrund(
@@ -279,992 +294,1075 @@ export default function FrameStep(): React.JSX.Element {
   )
 
   return (
-    <FormularSeite fuss={fuss}>
-      <ScrollArea h="100%">
-        <Container size="xl" py="lg">
-          <Group justify="space-between" align="flex-start" mb="md">
-            <div>
-              <Title order={2}>Rahmen der Arbeit</Title>
-              <Text c="dimmed" size="sm">
-                Fach, Jahrgang und Dauer bestimmen die Aufgabenformate, die Punkteverteilung und die Anforderungsbereiche.
-              </Text>
-            </div>
-          </Group>
+    <OptionenBereich>
+      <FormularSeite fuss={fuss}>
+        <ScrollArea h="100%">
+          <Container size="xl" py="lg">
+            <Group justify="space-between" align="flex-start" mb="md">
+              <div>
+                <Title order={2}>Rahmen der Arbeit</Title>
+                <Text c="dimmed" size="sm">
+                  Fach, Jahrgang und Dauer bestimmen die Aufgabenformate, die Punkteverteilung und die Anforderungsbereiche.
+                </Text>
+              </div>
+            </Group>
 
-          <Grid>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Stack>
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Fach &amp; Inhalt
-                  </Title>
-                  <Stack gap="sm">
-                    <Group grow>
-                      <HaeufigSelect
-                        art="fach"
-                        label="Fach"
-                        data={SUBJECTS}
-                        value={meta.subjectId}
-                        onChange={(v) =>
-                          v &&
-                          update((d) => {
-                            d.meta.subjectId = v as ExamSubjectId
-                            d.meta.subjectLabel = SUBJECTS.find((s) => s.value === v)?.label ?? ''
-                            d.parts = []
-                            // Wechsel in eine Fremdsprache: Niveau passend zu Jahrgang und Fremdsprachenfolge
-                            const level = istFremdsprache(v)
-                              ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
-                              : null
-                            if (level) d.meta.cefrLevel = level.level
-                            // 29.09.2026: eigene Teilnote für Schreiben (Fremdsprachen) bzw. Übersetzung (Latein, Griechisch)
-                            d.meta.separateWritingGrade = istFremdsprache(v) || istAlteSprache(v)
-                            const art = fachDerArbeit(v).art
-                            if (art === 'mathematik') d.meta.aids = 'Taschenrechner (nicht grafikfähig), Formelsammlung'
-                            else if (art === 'alte-sprache') d.meta.aids = 'Wortangaben'
-                            else if (art === 'naturwissenschaft') d.meta.aids = 'Taschenrechner'
-                            else if (v === 'erdkunde') d.meta.aids = 'Atlas'
-                            // Befund F8: Oberstufe Fremdsprache ein- und zweisprachiges Wörterbuch, sonst keine Hilfsmittel
-                            else if (art === 'fremdsprache' && d.meta.grade >= 11) d.meta.aids = 'ein- und zweisprachiges Wörterbuch'
-                            else d.meta.aids = 'keine Hilfsmittel'
-                          })
-                        }
-                        allowDeselect={false}
+            <Grid>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Fach &amp; Inhalt
+                    </Title>
+                    <Stack gap="sm">
+                      <Group grow>
+                        <HaeufigSelect
+                          art="fach"
+                          label="Fach"
+                          data={SUBJECTS}
+                          value={meta.subjectId}
+                          onChange={(v) =>
+                            v &&
+                            update((d) => {
+                              d.meta.subjectId = v as ExamSubjectId
+                              d.meta.subjectLabel = SUBJECTS.find((s) => s.value === v)?.label ?? ''
+                              d.parts = []
+                              // Wechsel in eine Fremdsprache: Niveau passend zu Jahrgang und Fremdsprachenfolge
+                              const level = istFremdsprache(v)
+                                ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
+                                : null
+                              if (level) d.meta.cefrLevel = level.level
+                              // 29.09.2026: eigene Teilnote für Schreiben (Fremdsprachen) bzw. Übersetzung (Latein, Griechisch)
+                              d.meta.separateWritingGrade = istFremdsprache(v) || istAlteSprache(v)
+                              const art = fachDerArbeit(v).art
+                              if (art === 'mathematik') d.meta.aids = 'Taschenrechner (nicht grafikfähig), Formelsammlung'
+                              else if (art === 'alte-sprache') d.meta.aids = 'Wortangaben'
+                              else if (art === 'naturwissenschaft') d.meta.aids = 'Taschenrechner'
+                              else if (v === 'erdkunde') d.meta.aids = 'Atlas'
+                              // Befund F8: Oberstufe Fremdsprache ein- und zweisprachiges Wörterbuch, sonst keine Hilfsmittel
+                              else if (art === 'fremdsprache' && d.meta.grade >= 11) d.meta.aids = 'ein- und zweisprachiges Wörterbuch'
+                              else d.meta.aids = 'keine Hilfsmittel'
+                            })
+                          }
+                          allowDeselect={false}
+                        />
+                        <Select
+                          label="Jahrgang"
+                          data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({
+                            value: String(range.min + i),
+                            label: `Klasse ${range.min + i}`
+                          }))}
+                          value={String(meta.grade)}
+                          onChange={(v) => {
+                            if (!v) return
+                            const grade = Number(v)
+                            const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, sprachfolge(meta), grade)
+                            update((d) => {
+                              d.meta.grade = grade
+                              d.meta.minutes = defaultMinutes(grade)
+                              if (level && istFremdsprache(d.meta.subjectId)) d.meta.cefrLevel = level.level
+                              d.parts = []
+                            })
+                          }}
+                          allowDeselect={false}
+                        />
+                      </Group>
+                      {/* Paket 12: Titel rechts neben dem Thema, Jahrgang neben dem Fach – was zusammen gelesen wird, steht zusammen */}
+                      <Group align="flex-start" gap="sm" wrap="wrap">
+                        <Autocomplete
+                          style={{ flex: 2, minWidth: 220 }}
+                          label="Thema"
+                          required
+                          description={
+                            themenVorschlaege.length
+                              ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
+                              : undefined
+                          }
+                          placeholder={fachDerArbeit(meta.subjectId).beispiel}
+                          data={themenVorschlaege}
+                          value={meta.topic}
+                          onChange={(v) => patch({ topic: v })}
+                          limit={40}
+                          filter={suggestAll}
+                        />
+                        <NurExperte>
+                          <TextInput
+                            style={{ flex: 1, minWidth: 180 }}
+                            label="Titel der Arbeit (optional)"
+                            placeholder="z. B. 2. Klassenarbeit"
+                            value={meta.title}
+                            onChange={(e) => patch({ title: e.currentTarget.value })}
+                          />
+                        </NurExperte>
+                      </Group>
+                      {meta.subjectId === 'geschichte' && !lehrplan.ausDatei && (
+                        <Text size="xs" c="dimmed">
+                          {source ? (
+                            <>
+                              Quelle der Themenliste: {source.title}.{' '}
+                              <Anchor href={source.url} target="_blank" size="xs">
+                                Lehrplan öffnen
+                              </Anchor>
+                              {curriculum[0]?.gradeLabel ? ` · ${curriculum[0].gradeLabel}` : ''}
+                            </>
+                          ) : (
+                            'Für dieses Bundesland und diese Schulform sind noch keine Lehrplanthemen hinterlegt – Thema bitte frei eintragen.'
+                          )}
+                        </Text>
+                      )}
+                      {istFremdsprache(meta.subjectId) && exam.parts.some((p) => formatArt(p.formatId) === 'grammar') && (
+                        // Dieselbe Themenauswahl wie Arbeitsblatt/Grammatiktest (06.10.2026), hier ein Thema; gespeichert bleibt der Name
+                        <Stack gap={4}>
+                          <GrammatikAuswahl
+                            einzeln
+                            teilformenWaehlbar={false}
+                            query={{
+                              subjectId: meta.subjectId,
+                              grade: meta.grade,
+                              schoolTypeId: meta.schoolTypeId,
+                              stateId: meta.stateId,
+                              cefrLevel: meta.cefrLevel
+                            }}
+                            wahl={{ themen: [findGrammarTopic(meta.subjectId, meta.grammarTopic)?.id ?? ''].filter(Boolean), teilformen: [] }}
+                            onChange={(w) => patch({ grammarTopic: w.themen[0] ? findGrammarTopic(meta.subjectId, w.themen[0])?.label ?? '' : '' })}
+                            lehrwerk={meta.vocab.find((v) => v.known?.buch)?.known}
+                            beschreibung="Grammatikthema der Arbeit – aus der Liste wählen oder unten frei eintragen."
+                          />
+                          <TextInput
+                            size="xs"
+                            label="Grammatikthema der Arbeit"
+                            description="Wie es in den Auftrag geht; frei änderbar"
+                            value={meta.grammarTopic}
+                            onChange={(e) => patch({ grammarTopic: e.currentTarget.value })}
+                            data-ka-grammatikthema
+                          />
+                        </Stack>
+                      )}
+                      <Textarea
+                        label="Inhalte der Unterrichtseinheit"
+                        description="Worauf sich die Arbeit bezieht – Themen, Texte, Grammatik, Begriffe. Nur Geübtes wird geprüft."
+                        autosize
+                        minRows={3}
+                        value={meta.content}
+                        onChange={(e) => patch({ content: e.currentTarget.value })}
                       />
-                      <Select
-                        label="Jahrgang"
-                        data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({
-                          value: String(range.min + i),
-                          label: `Klasse ${range.min + i}`
-                        }))}
-                        value={String(meta.grade)}
-                        onChange={(v) => {
-                          if (!v) return
-                          const grade = Number(v)
-                          const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, sprachfolge(meta), grade)
-                          update((d) => {
-                            d.meta.grade = grade
-                            d.meta.minutes = defaultMinutes(grade)
-                            if (level && istFremdsprache(d.meta.subjectId)) d.meta.cefrLevel = level.level
-                            d.parts = []
-                          })
-                        }}
-                        allowDeselect={false}
-                      />
-                    </Group>
-                    {/* Paket 12: Titel rechts neben dem Thema, Jahrgang neben dem Fach – was zusammen gelesen wird, steht zusammen */}
-                    <Group align="flex-start" gap="sm" wrap="wrap">
-                      <Autocomplete
-                        style={{ flex: 2, minWidth: 220 }}
-                        label="Thema"
-                        required
-                        description={
-                          themenVorschlaege.length
-                            ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
-                            : undefined
-                        }
-                        placeholder={fachDerArbeit(meta.subjectId).beispiel}
-                        data={themenVorschlaege}
-                        value={meta.topic}
-                        onChange={(v) => patch({ topic: v })}
-                        limit={40}
-                        filter={suggestAll}
-                      />
-                      <TextInput
-                        style={{ flex: 1, minWidth: 180 }}
-                        label="Titel der Arbeit (optional)"
-                        placeholder="z. B. 2. Klassenarbeit"
-                        value={meta.title}
-                        onChange={(e) => patch({ title: e.currentTarget.value })}
-                      />
-                    </Group>
-                    {meta.subjectId === 'geschichte' && !lehrplan.ausDatei && (
-                      <Text size="xs" c="dimmed">
-                        {source ? (
-                          <>
-                            Quelle der Themenliste: {source.title}.{' '}
-                            <Anchor href={source.url} target="_blank" size="xs">
-                              Lehrplan öffnen
-                            </Anchor>
-                            {curriculum[0]?.gradeLabel ? ` · ${curriculum[0].gradeLabel}` : ''}
-                          </>
-                        ) : (
-                          'Für dieses Bundesland und diese Schulform sind noch keine Lehrplanthemen hinterlegt – Thema bitte frei eintragen.'
-                        )}
-                      </Text>
-                    )}
-                    {istFremdsprache(meta.subjectId) && exam.parts.some((p) => formatArt(p.formatId) === 'grammar') && (
-                      <Autocomplete
-                        label="Grammatikthema der Arbeit"
-                        description="Aus der Liste wählen oder frei eintippen"
-                        data={grammarTopicsFor({
+                      {/* Hier meint das Feld den geprüften Stoff: typische Inhalte der Einheit statt Vorwissen */}
+                      <VorwissenChips
+                        modus="stoff"
+                        anfrage={{
                           subjectId: meta.subjectId,
+                          topic: meta.topic,
                           grade: meta.grade,
-                          schoolTypeId: meta.schoolTypeId,
                           stateId: meta.stateId,
-                          cefrLevel: meta.cefrLevel
-                        }).map((t) => t.label)}
-                        value={meta.grammarTopic}
-                        onChange={(v) => patch({ grammarTopic: v })}
-                        limit={40}
-                        filter={suggestAll}
+                          schoolTypeId: meta.schoolTypeId,
+                          // Englisch mit Lehrwerk: Thema und Grammatik der gewählten Unit
+                          lehrwerkStand: lehrwerkStandAus(meta.vocab),
+                          // GER-Kennzeichen an den Chips (Paket 12): Richtwert ist das Niveau der Arbeit
+                          gerRichtwert: istFremdsprache(meta.subjectId) ? meta.cefrLevel : undefined
+                        }}
+                        wert={meta.content}
+                        onChange={(content) => patch({ content })}
+                        ai={aiCall}
                       />
-                    )}
-                    <Textarea
-                      label="Inhalte der Unterrichtseinheit"
-                      description="Worauf sich die Arbeit bezieht – Themen, Texte, Grammatik, Begriffe. Nur Geübtes wird geprüft."
-                      autosize
-                      minRows={3}
-                      value={meta.content}
-                      onChange={(e) => patch({ content: e.currentTarget.value })}
-                    />
-                    {/* Hier meint das Feld den geprüften Stoff: typische Inhalte der Einheit statt Vorwissen */}
-                    <VorwissenChips
-                      modus="stoff"
-                      anfrage={{
-                        subjectId: meta.subjectId,
-                        topic: meta.topic,
-                        grade: meta.grade,
-                        stateId: meta.stateId,
-                        schoolTypeId: meta.schoolTypeId,
-                        // Englisch mit Lehrwerk: Thema und Grammatik der gewählten Unit
-                        lehrwerkStand: lehrwerkStandAus(meta.vocab),
-                        // GER-Kennzeichen an den Chips (Paket 12): Richtwert ist das Niveau der Arbeit
-                        gerRichtwert: istFremdsprache(meta.subjectId) ? meta.cefrLevel : undefined
-                      }}
-                      wert={meta.content}
-                      onChange={(content) => patch({ content })}
-                      ai={aiCall}
-                    />
-                    {/*
+                      {/*
                     Unterlagen aus dem Unterricht hineinziehen – wie in der Lernzielkontrolle
                     (Wunsch der Lehrkraft, 25.09.2026). Text und Seitenbilder gehen in jede
                     Anfrage der Erzeugung mit (generation/generateExam.ts, unterlagenTeil).
                   */}
-                    <StoffQuellen
-                      quellen={meta.materialQuellen ?? []}
-                      onHinzu={(neu) =>
-                        update((d) => {
-                          d.meta.materialQuellen = [...(d.meta.materialQuellen ?? []), ...neu]
-                        })
-                      }
-                      onAktiv={(id, aktiv) =>
-                        update((d) => {
-                          const q = d.meta.materialQuellen?.find((x) => x.id === id)
-                          if (q) q.aktiv = aktiv
-                        })
-                      }
-                      onEntfernen={(id) =>
-                        update((d) => {
-                          d.meta.materialQuellen = (d.meta.materialQuellen ?? []).filter((x) => x.id !== id)
-                        })
-                      }
-                      title="Material aus dem Unterricht hierher ziehen"
-                      hint="Arbeitsblatt, Buchseite, Tafelbild, Text – PDF, Word, Foto oder Textdatei"
-                      erklaerung="Die KI prüft nur, was im Unterricht dran war – Begriffe und Beispiele aus diesen Unterlagen werden übernommen, Texte daraus aber nicht wörtlich abgedruckt."
-                    />
-                    {/*
+                      <StoffQuellen
+                        quellen={meta.materialQuellen ?? []}
+                        onHinzu={(neu) =>
+                          update((d) => {
+                            d.meta.materialQuellen = [...(d.meta.materialQuellen ?? []), ...neu]
+                          })
+                        }
+                        onAktiv={(id, aktiv) =>
+                          update((d) => {
+                            const q = d.meta.materialQuellen?.find((x) => x.id === id)
+                            if (q) q.aktiv = aktiv
+                          })
+                        }
+                        onEntfernen={(id) =>
+                          update((d) => {
+                            d.meta.materialQuellen = (d.meta.materialQuellen ?? []).filter((x) => x.id !== id)
+                          })
+                        }
+                        title="Material aus dem Unterricht hierher ziehen"
+                        hint="Arbeitsblatt, Buchseite, Tafelbild, Text – PDF, Word, Foto oder Textdatei"
+                        erklaerung="Die KI prüft nur, was im Unterricht dran war – Begriffe und Beispiele aus diesen Unterlagen werden übernommen, Texte daraus aber nicht wörtlich abgedruckt."
+                      />
+                      {/*
                     Bilingual (nur Sachfächer, hier also Geschichte). Das Glossar liegt der Arbeit als
                     Hilfsmittel bei und steht deshalb von selbst bei den erlaubten Hilfsmitteln.
                   */}
-                    <BilingualSchalter
-                      pruefung
-                      meta={meta}
-                      onChange={(bilingual) => patch({ bilingual, aids: mitGlossar(meta.aids, Boolean(bilingual?.an)) })}
-                    />
-                    {istFremdsprache(meta.subjectId) && (
-                      <div>
-                        <Text size="sm" fw={500}>
-                          Vokabeln für die Arbeit
-                        </Text>
-                        <Text size="xs" c="dimmed" mb="xs">
-                          Nur diese Vokabeln dürfen in der Arbeit vorkommen – geprüft wird, was geübt wurde.
-                        </Text>
-                        <ExamVocabPicker language={fachDerArbeit(meta.subjectId).sprache} vocab={meta.vocab} onChange={(vocab) => patch({ vocab })} />
-                      </div>
-                    )}
-                  </Stack>
-                </Card>
-
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Lerngruppe
-                  </Title>
-                  <Stack gap="sm">
-                    <SchulortFelder
-                      table={table}
-                      stateId={meta.stateId}
-                      schoolTypeId={meta.schoolTypeId}
-                      schoolTypeName={meta.schoolTypeName}
-                      onChange={patchGruppe}
-                    />
-                    {(courseOptions || istFremdsprache(meta.subjectId)) && (
-                      <Group grow>
-                        {courseOptions && (
-                          <Select
-                            label="Kursniveau"
-                            data={courseOptions}
-                            value={meta.courseLevel}
-                            onChange={(v) => v && patch({ courseLevel: v as ExamMeta['courseLevel'] })}
-                            allowDeselect={false}
-                          />
-                        )}
-                        {/* Französisch/Spanisch: 2. oder 3. Fremdsprache – bestimmt den GER-Vorschlag (Phase G) */}
-                        {istFremdsprache(meta.subjectId) && meta.subjectId !== 'englisch' && (
-                          <Select
-                            label="Fremdsprache"
-                            data={[
-                              { value: '2', label: '2. Fremdsprache' },
-                              { value: '3', label: '3. Fremdsprache' }
-                            ]}
-                            value={String(meta.languageOrder ?? 2)}
-                            onChange={(v) =>
-                              v &&
-                              update((d) => {
-                                d.meta.languageOrder = Number(v)
-                                const level = suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
-                                if (level) d.meta.cefrLevel = level.level
-                              })
-                            }
-                            allowDeselect={false}
-                          />
-                        )}
-                        {istFremdsprache(meta.subjectId) && (
-                          <Select
-                            label="Sprachniveau (GER)"
-                            description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
-                            data={[...CEFR_SCALE]}
-                            value={meta.cefrLevel}
-                            onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
-                            allowDeselect={false}
-                          />
-                        )}
-                      </Group>
-                    )}
-                  </Stack>
-                </Card>
-              </Stack>
-            </Grid.Col>
-
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Stack>
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Rahmen
-                  </Title>
-                  <Stack gap="sm">
-                    <Group grow>
-                      <ZahlFeld
-                        label="Dauer (Minuten)"
-                        min={20}
-                        max={300}
-                        step={5}
-                        value={meta.minutes}
-                        onChange={(v) => patch({ minutes: Number(v) || 45 })}
+                      <BilingualSchalter
+                        pruefung
+                        meta={meta}
+                        onChange={(bilingual) => patch({ bilingual, aids: mitGlossar(meta.aids, Boolean(bilingual?.an)) })}
                       />
-                      {!istFremdsprache(meta.subjectId) && (
-                        <ZahlFeld
-                          label="Gesamtpunkte"
-                          min={10}
-                          max={200}
-                          step={5}
-                          value={meta.points}
-                          onChange={(v) => patch({ points: Number(v) || 60 })}
-                        />
+                      {istFremdsprache(meta.subjectId) && (
+                        <div>
+                          <Text size="sm" fw={500}>
+                            Vokabeln für die Arbeit
+                          </Text>
+                          <Text size="xs" c="dimmed" mb="xs">
+                            Nur diese Vokabeln dürfen in der Arbeit vorkommen – geprüft wird, was geübt wurde.
+                          </Text>
+                          <ExamVocabPicker language={fachDerArbeit(meta.subjectId).sprache} vocab={meta.vocab} onChange={(vocab) => patch({ vocab })} />
+                        </div>
                       )}
-                    </Group>
-                    {/*
+                    </Stack>
+                  </Card>
+
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Lerngruppe
+                    </Title>
+                    <Stack gap="sm">
+                      <SchulortFelder
+                        table={table}
+                        stateId={meta.stateId}
+                        schoolTypeId={meta.schoolTypeId}
+                        schoolTypeName={meta.schoolTypeName}
+                        onChange={patchGruppe}
+                      />
+                      <NurExperte>
+                        {(courseOptions || istFremdsprache(meta.subjectId)) && (
+                          <Group grow>
+                            {courseOptions && (
+                              <Select
+                                label="Kursniveau"
+                                data={courseOptions}
+                                value={meta.courseLevel}
+                                onChange={(v) => v && patch({ courseLevel: v as ExamMeta['courseLevel'] })}
+                                allowDeselect={false}
+                              />
+                            )}
+                            {/* Französisch/Spanisch: 2. oder 3. Fremdsprache – bestimmt den GER-Vorschlag (Phase G) */}
+                            {istFremdsprache(meta.subjectId) && meta.subjectId !== 'englisch' && (
+                              <Select
+                                label="Fremdsprache"
+                                data={[
+                                  { value: '2', label: '2. Fremdsprache' },
+                                  { value: '3', label: '3. Fremdsprache' }
+                                ]}
+                                value={String(meta.languageOrder ?? 2)}
+                                onChange={(v) =>
+                                  v &&
+                                  update((d) => {
+                                    d.meta.languageOrder = Number(v)
+                                    const level = suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
+                                    if (level) d.meta.cefrLevel = level.level
+                                  })
+                                }
+                                allowDeselect={false}
+                              />
+                            )}
+                            {istFremdsprache(meta.subjectId) && (
+                              <Select
+                                label="Sprachniveau (GER)"
+                                description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
+                                data={[...CEFR_SCALE]}
+                                value={meta.cefrLevel}
+                                onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
+                                allowDeselect={false}
+                              />
+                            )}
+                          </Group>
+                        )}
+                      </NurExperte>
+                    </Stack>
+                  </Card>
+                </Stack>
+              </Grid.Col>
+
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Rahmen
+                    </Title>
+                    <Stack gap="sm">
+                      <Group grow>
+                        <ZahlFeld
+                          label="Dauer (Minuten)"
+                          min={20}
+                          max={300}
+                          step={5}
+                          value={meta.minutes}
+                          onChange={(v) => patch({ minutes: Number(v) || 45 })}
+                        />
+                        <NurExperte>
+                          {!istFremdsprache(meta.subjectId) && (
+                            <ZahlFeld
+                              label="Gesamtpunkte"
+                              min={10}
+                              max={200}
+                              step={5}
+                              value={meta.points}
+                              onChange={(v) => patch({ points: Number(v) || 60 })}
+                            />
+                          )}
+                        </NurExperte>
+                      </Group>
+                      {/*
                     Fassungen wie in der Lernzielkontrolle. Bis 25.09.2026 stand hier ein Feld
                     „Varianten (A/B)", das nichts bewirkte. Was „gleichwertig" heißt, steht in
                     model/fassungen.ts.
                   */}
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Fassungen
-                      </Text>
-                      <SegmentedControl
-                        fullWidth
-                        size="sm"
-                        aria-label="Fassungen"
-                        value={String(Math.min(3, Math.max(1, meta.variants)))}
-                        onChange={(v) => patch({ variants: Number(v) })}
-                        data={[
-                          { value: '1', label: 'eine' },
-                          { value: '2', label: 'A / B' },
-                          { value: '3', label: 'A / B / C' }
-                        ]}
-                      />
-                      {meta.variants > 1 && (
-                        <MehrText
-                          mt={4}
-                          text="Gleichwertige Parallelaufgaben: gleiche Operatoren, Anforderungsbereiche und Punkte. Hörtexte und Quellen bleiben für alle gleich, Lese- und Sprachmittlungstexte werden als Paralleltexte gleicher Länge geschrieben. Jede Fassung hat ihren eigenen Erwartungshorizont."
-                        />
-                      )}
-                    </div>
-                    <Autocomplete
-                      label="Erlaubte Hilfsmittel"
-                      description="Vorschlag wählen oder frei eintragen"
-                      data={AIDS_SUGGESTIONS}
-                      value={meta.aids}
-                      onChange={(v) => patch({ aids: v })}
-                      limit={12}
-                      filter={suggestAll}
-                    />
-                    {exam.parts.some((p) => formatArt(p.formatId) === 'listening') && (
-                      <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
-                        <Checkbox
-                          label="Hörtext von der KI schreiben lassen"
-                          description={
-                            tts
-                              ? 'Der Hörtext entsteht vor der Arbeit in einer eigenen Anfrage; die Aufgaben werden dann zu ihm gebaut. Vertont wird er danach im Reiter „Hörtexte“.'
-                              : 'Die KI schreibt den Hörtext, die Aufgaben entstehen dazu. Vertonen geht erst mit einem ElevenLabs-Schlüssel – ohne ihn bleibt das Skript als Lesetext für die Lehrkraft.'
-                          }
-                          checked={Boolean(meta.audioAi)}
-                          onChange={(e) => patch({ audioAi: e.currentTarget.checked })}
-                        />
-                        {meta.audioAi && (
-                          <Stack gap="sm" mt="sm">
-                            <Select
-                              size="sm"
-                              label="Hörtextsorte"
-                              description={
-                                listeningFormatById(meta.audioFormat ?? '')?.description ?? `Automatisch: passend zu Thema und Niveau ${meta.cefrLevel}.`
-                              }
-                              data={[
-                                { value: 'auto', label: 'automatisch (passend zum Niveau)' },
-                                ...listeningFormatsFor(meta.cefrLevel).map((f) => ({
-                                  value: f.id,
-                                  label: `${f.label} · ${f.mode === 'dialog' ? 'dialogisch' : 'monologisch'}, ${f.seconds[0]}–${f.seconds[1]} s`
-                                }))
-                              ]}
-                              value={meta.audioFormat ?? 'auto'}
-                              onChange={(v) => v && patch({ audioFormat: v })}
-                              allowDeselect={false}
+                      <NurExperte geaendert={meta.variants > 1 && `Fassungen ${meta.variants}`}>
+                        <div>
+                          <Text size="sm" fw={500} mb={4}>
+                            Fassungen
+                          </Text>
+                          <SegmentedControl
+                            fullWidth
+                            size="sm"
+                            aria-label="Fassungen"
+                            value={String(Math.min(3, Math.max(1, meta.variants)))}
+                            onChange={(v) => patch({ variants: Number(v) })}
+                            data={[
+                              { value: '1', label: 'eine' },
+                              { value: '2', label: 'A / B' },
+                              { value: '3', label: 'A / B / C' }
+                            ]}
+                          />
+                          {meta.variants > 1 && (
+                            <MehrText
+                              mt={4}
+                              text="Gleichwertige Parallelaufgaben: gleiche Operatoren, Anforderungsbereiche und Punkte. Hörtexte und Quellen bleiben für alle gleich, Lese- und Sprachmittlungstexte werden als Paralleltexte gleicher Länge geschrieben. Jede Fassung hat ihren eigenen Erwartungshorizont."
                             />
-                            {textOptions.length > 1 && (
-                              <Select
-                                size="sm"
-                                label="KI für den Hörtext"
-                                description="Nur dieser eine Auftrag geht an das gewählte Modell."
-                                data={[
-                                  { value: '', label: 'wie in den Einstellungen' },
-                                  ...textOptions.map((o) => ({ value: `${o.provider}|${o.model}`, label: o.label }))
-                                ]}
-                                value={meta.audioProvider ? `${meta.audioProvider}|${meta.audioModel ?? ''}` : ''}
-                                onChange={(v) => {
-                                  const [provider, model] = (v ?? '').split('|')
-                                  patch({ audioProvider: (provider || undefined) as ExamMeta['audioProvider'], audioModel: model || undefined })
-                                }}
-                                allowDeselect={false}
-                              />
-                            )}
-                          </Stack>
-                        )}
-                      </Card>
-                    )}
-                  </Stack>
-                </Card>
-
-                <Card withBorder>
-                  <Group justify="space-between" mb="sm">
-                    <Title order={4}>Aufbau der Arbeit</Title>
-                    <Group gap="xs">
-                      {exam.parts.length > 0 && examWeight(exam) !== 100 && (
-                        <Button size="compact-sm" variant="subtle" onClick={normalizeWeights}>
-                          Anteile auf 100 %
-                        </Button>
-                      )}
-                      <Button size="compact-sm" variant="light" onClick={fillParts}>
-                        Vorschlag erzeugen
-                      </Button>
-                      {/* Sprechprüfung statt schriftlicher Arbeit (01.10.2026) – nur, wo das Fach sie kennt */}
-                      {available.some((f) => formatArt(f.id) === 'speaking') && (
-                        <Button size="compact-sm" variant="light" onClick={() => update((d) => sprechpruefungAlsArbeit(d))}>
-                          Sprechprüfung
-                        </Button>
-                      )}
-                    </Group>
-                  </Group>
-                  {exam.parts.length === 0 ? (
-                    <Text size="sm" c="dimmed">
-                      Noch keine Teile geplant. „Vorschlag erzeugen“ verteilt die üblichen Formate des Fachs auf {meta.points} Punkte und {meta.minutes}{' '}
-                      Minuten.
-                    </Text>
-                  ) : (
-                    <Stack gap="xs">
-                      {exam.parts.map((part, i) => {
-                        const format = formatById(part.formatId)
-                        return (
-                          <Card key={part.id} withBorder padding="sm">
-                            <Group justify="space-between" align="flex-start" wrap="nowrap">
-                              <div style={{ minWidth: 0 }}>
-                                <Group gap="xs">
-                                  <Badge variant="light">Teil {i + 1}</Badge>
-                                  <Text fw={600}>{format?.label ?? part.label}</Text>
-                                  <Badge variant="outline" color="gray">
-                                    {part.competence}
-                                  </Badge>
-                                  <Badge variant="outline" color="gray">
-                                    AFB {format?.afb.join('/') ?? '–'}
-                                  </Badge>
-                                  {istFremdsprache(meta.subjectId) && meta.separateWritingGrade && (
-                                    <Badge variant="light" color={part.gradeGroup === 'writing' ? 'grape' : 'blue'}>
-                                      {part.gradeGroup === 'writing' ? 'Note Schreiben' : 'Note weitere Kompetenzen'}
-                                    </Badge>
-                                  )}
-                                </Group>
-                                <Text size="xs" c="dimmed" mt={4}>
-                                  {format?.description}
-                                </Text>
-                                {format?.note && (
-                                  <Text size="xs" c="dimmed" mt={2}>
-                                    Hinweis: {format.note}
-                                  </Text>
-                                )}
-                                {typeof part.contentShare === 'number' && (
-                                  <Group gap={6} align="flex-end" mt="xs">
-                                    <ZahlFeld
-                                      size="xs"
-                                      w={110}
-                                      label="Inhalt %"
-                                      min={10}
-                                      max={90}
-                                      step={5}
-                                      value={part.contentShare}
-                                      onChange={(v) =>
-                                        update((d) => (d.parts[i].contentShare = Math.max(10, Math.min(90, Number(v) || inhaltsanteil(d.meta.subjectId)))))
-                                      }
-                                    />
-                                    <Text size="xs" c="dimmed" pb={6}>
-                                      {zweiterTeil(meta.subjectId)} {100 - (part.contentShare ?? inhaltsanteil(meta.subjectId))} %
-                                      {part.points > 0
-                                        ? ` · ${Math.round((part.points * (part.contentShare ?? inhaltsanteil(meta.subjectId))) / 100)} von ${part.points} Punkten auf den Inhalt`
-                                        : ' · Bewertung über Inhalt und Sprache, nicht über Punkte'}
-                                    </Text>
-                                  </Group>
-                                )}
-                                {typeof part.contentShare === 'number' && (
+                          )}
+                        </div>
+                      </NurExperte>
+                      <NurExperte>
+                        <Autocomplete
+                          label="Erlaubte Hilfsmittel"
+                          description="Vorschlag wählen oder frei eintragen"
+                          data={AIDS_SUGGESTIONS}
+                          value={meta.aids}
+                          onChange={(v) => patch({ aids: v })}
+                          limit={12}
+                          filter={suggestAll}
+                        />
+                      </NurExperte>
+                      {exam.parts.some((p) => formatArt(p.formatId) === 'listening') && (
+                        <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
+                          <Checkbox
+                            label="Hörtext von der KI schreiben lassen"
+                            description={
+                              tts
+                                ? 'Der Hörtext entsteht vor der Arbeit in einer eigenen Anfrage; die Aufgaben werden dann zu ihm gebaut. Vertont wird er danach im Reiter „Hörtexte“.'
+                                : 'Die KI schreibt den Hörtext, die Aufgaben entstehen dazu. Vertonen geht erst mit einem ElevenLabs-Schlüssel – ohne ihn bleibt das Skript als Lesetext für die Lehrkraft.'
+                            }
+                            checked={Boolean(meta.audioAi)}
+                            onChange={(e) => patch({ audioAi: e.currentTarget.checked })}
+                          />
+                          <NurExperte geaendert={meta.audioAi && ((meta.audioFormat ?? 'auto') !== 'auto' || Boolean(meta.audioProvider)) && 'Hörtext'}>
+                            {meta.audioAi && (
+                              <Stack gap="sm" mt="sm">
+                                <Select
+                                  size="sm"
+                                  label="Hörtextsorte"
+                                  description={
+                                    listeningFormatById(meta.audioFormat ?? '')?.description ?? `Automatisch: passend zu Thema und Niveau ${meta.cefrLevel}.`
+                                  }
+                                  data={[
+                                    { value: 'auto', label: 'automatisch (passend zum Niveau)' },
+                                    ...listeningFormatsFor(meta.cefrLevel).map((f) => ({
+                                      value: f.id,
+                                      label: `${f.label} · ${f.mode === 'dialog' ? 'dialogisch' : 'monologisch'}, ${f.seconds[0]}–${f.seconds[1]} s`
+                                    }))
+                                  ]}
+                                  value={meta.audioFormat ?? 'auto'}
+                                  onChange={(v) => v && patch({ audioFormat: v })}
+                                  allowDeselect={false}
+                                />
+                                {textOptions.length > 1 && (
                                   <Select
-                                    mt="xs"
-                                    size="xs"
-                                    label="Textsorte des Schülertextes"
-                                    data={textsortenFuer(meta.subjectId).map((t) => ({
-                                      value: t.value,
-                                      label: t.label
-                                    }))}
-                                    value={part.studentTextType ?? ''}
-                                    onChange={(v) => update((d) => (d.parts[i].studentTextType = v ?? ''))}
+                                    size="sm"
+                                    label="KI für den Hörtext"
+                                    description="Nur dieser eine Auftrag geht an das gewählte Modell."
+                                    data={[
+                                      { value: '', label: 'wie in den Einstellungen' },
+                                      ...textOptions.map((o) => ({ value: `${o.provider}|${o.model}`, label: o.label }))
+                                    ]}
+                                    value={meta.audioProvider ? `${meta.audioProvider}|${meta.audioModel ?? ''}` : ''}
+                                    onChange={(v) => {
+                                      const [provider, model] = (v ?? '').split('|')
+                                      patch({ audioProvider: (provider || undefined) as ExamMeta['audioProvider'], audioModel: model || undefined })
+                                    }}
                                     allowDeselect={false}
                                   />
                                 )}
-                                {/* Grammatik ausdrücklich mitprüfen – nur im Schreibteil der Fremdsprachen (29.09.2026) */}
-                                {istFremdsprache(meta.subjectId) && formatArt(part.formatId) === 'writing' && (
-                                  <SchreibGrammatikFeld
-                                    exam={exam}
-                                    part={part}
-                                    setzen={(g) =>
-                                      update((d) => {
-                                        if (g) d.parts[i].grammatik = g
-                                        else delete d.parts[i].grammatik
-                                      })
-                                    }
-                                  />
-                                )}
-                                <Textarea
-                                  mt="xs"
-                                  size="xs"
-                                  label="Nähere Vorgaben (optional)"
-                                  description="Was dieser Teil genau enthalten soll – Thema des Materials, Schwerpunkt, Textsorte, zu prüfende Struktur."
-                                  placeholder={
-                                    typeof part.contentShare === 'number'
-                                      ? 'z. B. Die Schüler schreiben an ihren Austauschpartner über einen Schulausflug.'
-                                      : 'z. B. Sachtext über ein Musikfestival, Aufgaben auch zu impliziten Aussagen.'
-                                  }
-                                  autosize
-                                  minRows={2}
-                                  defaultValue={part.notes ?? ''}
-                                  onBlur={(e) => update((d) => (d.parts[i].notes = e.currentTarget.value))}
-                                />
-                                {formatArt(part.formatId) === 'speaking' && (
-                                  <SprechpruefungKarte exam={exam} part={part} setzen={(s) => update((d) => (d.parts[i].sprechen = s), `sprechen:${part.id}`)} />
-                                )}
-                                {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
-                                  <MultiSelect
-                                    mt="xs"
-                                    size="xs"
-                                    label="Aufgabenformate"
-                                    data={comprehensionFormatsFor(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
-                                      value: f.id,
-                                      label: `${f.label} (${f.openness})`
-                                    }))}
-                                    value={part.formats ?? []}
-                                    onChange={(v) => update((d) => (d.parts[i].formats = v))}
-                                    placeholder={defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade)
-                                      .map((id) => comprehensionFormatById(id)?.label)
-                                      .filter(Boolean)
-                                      .join(' · ')}
-                                    clearable
-                                  />
-                                )}
-                                {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
-                                  <ZahlFeld
-                                    mt="xs"
-                                    size="xs"
-                                    w={220}
-                                    label="Zahl der Items"
-                                    description={
-                                      part.items
-                                        ? `Genau ${part.items} Items, ein Punkt je Item – der Teil hat damit ${part.items} Punkte.`
-                                        : 'Leer lassen: Zahl nach Niveau. Eingetragen gilt sie genau und setzt die Punkte des Teils (ein Punkt je Item).'
-                                    }
-                                    placeholder={`automatisch (${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]})`}
-                                    min={1}
-                                    max={30}
-                                    value={part.items || ''}
-                                    onChange={(v) =>
-                                      update((d) => {
-                                        const n = Number(v) || 0
-                                        d.parts[i].items = n
-                                        // Ein Item = ein Punkt: Sonst stünde im Erwartungshorizont
-                                        // eine Punktzahl, die zur Zahl der Items nicht passt.
-                                        if (n > 0) d.parts[i].points = n
-                                      })
-                                    }
-                                  />
-                                )}
-                              </div>
-                              <Group gap={6} wrap="nowrap">
-                                <ZahlFeld
-                                  size="xs"
-                                  w={78}
-                                  label="Anteil %"
-                                  min={5}
-                                  max={100}
-                                  step={5}
-                                  suffix=" %"
-                                  clampBehavior="blur"
-                                  value={part.weight}
-                                  onChange={(v) => {
-                                    const weight = typeof v === 'number' ? v : Number(v)
-                                    if (!Number.isFinite(weight)) return
-                                    update((d) => {
-                                      d.parts[i].weight = weight
-                                      d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
-                                      // In Geschichte ergibt sich die eine Note aus den Punkten, dort folgen sie dem Anteil
-                                      if (!istFremdsprache(d.meta.subjectId)) d.parts[i].points = pointsFromWeight(weight, d.meta.points)
-                                    })
-                                  }}
-                                />
-                                {(!istFremdsprache(meta.subjectId) || part.points > 0) && (
-                                  <ZahlFeld
-                                    size="xs"
-                                    w={78}
-                                    label="Punkte"
-                                    min={0}
-                                    max={200}
-                                    clampBehavior="blur"
-                                    value={part.points}
-                                    onChange={(v) => update((d) => (d.parts[i].points = Number(v) || 0))}
-                                  />
-                                )}
-                                <ZahlFeld
-                                  size="xs"
-                                  w={70}
-                                  label="Minuten"
-                                  min={1}
-                                  max={meta.minutes}
-                                  value={part.minutes}
-                                  onChange={(v) => update((d) => (d.parts[i].minutes = Number(v) || 1))}
-                                />
-                                <Tooltip label="Teil entfernen">
-                                  <ActionIcon
-                                    mt={22}
-                                    variant="subtle"
-                                    color="red"
-                                    onClick={() =>
-                                      update((d) => {
-                                        d.parts.splice(i, 1)
-                                        applyWeights(d)
-                                      })
-                                    }
-                                  >
-                                    <IconTrash size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                              </Group>
-                            </Group>
-                          </Card>
-                        )
-                      })}
+                              </Stack>
+                            )}
+                          </NurExperte>
+                        </Card>
+                      )}
                     </Stack>
-                  )}
+                  </Card>
 
-                  <Select
-                    mt="sm"
-                    size="xs"
-                    label="Weiteren Teil hinzufügen"
-                    placeholder="Aufgabenformat wählen"
-                    data={available.map((f) => ({
-                      value: f.id,
-                      label: `${f.label} – ${f.competence}`
-                    }))}
-                    value={null}
-                    onChange={(v) => {
-                      const f = formatById(v ?? '')
-                      if (!f) return
-                      update((d) => {
-                        const weight = Math.max(5, Math.min(100, f.share))
-                        d.parts.push({
-                          id: newId(),
-                          formatId: f.id,
-                          label: f.label,
-                          competence: f.competence,
-                          weight,
-                          points: istFremdsprache(d.meta.subjectId) ? (f.defaultPoints ?? 0) : pointsFromWeight(weight, d.meta.points),
-                          minutes: Math.max(1, Math.round((d.meta.minutes * weight) / 100)),
-                          gradeGroup: formatArt(f.id) === 'writing' ? 'writing' : 'other',
-                          ...(f.productive ? { contentShare: inhaltsanteil(d.meta.subjectId) } : {}),
-                          afbMix: { I: 30, II: 45, III: 25 },
-                          blocks: []
-                        })
-                        // Der Schreibteil bekommt 70 % (Klasse 5: 60 %), die weitere Kompetenz den Rest
-                        applyWeights(d)
-                      })
-                    }}
-                  />
+                  <Card withBorder>
+                    <Group justify="space-between" mb="sm">
+                      <Title order={4}>Aufbau der Arbeit</Title>
+                      <NurExperte>
+                        <Group gap="xs">
+                          {exam.parts.length > 0 && examWeight(exam) !== 100 && (
+                            <Button size="compact-sm" variant="subtle" onClick={normalizeWeights}>
+                              Anteile auf 100 %
+                            </Button>
+                          )}
+                          <Button size="compact-sm" variant="light" onClick={fillParts}>
+                            Vorschlag erzeugen
+                          </Button>
+                          {/* Sprechprüfung statt schriftlicher Arbeit (01.10.2026) – nur, wo das Fach sie kennt */}
+                          {available.some((f) => formatArt(f.id) === 'speaking') && (
+                            <Button size="compact-sm" variant="light" onClick={() => update((d) => sprechpruefungAlsArbeit(d))}>
+                              Sprechprüfung
+                            </Button>
+                          )}
+                        </Group>
+                      </NurExperte>
+                    </Group>
+                    <AufbauKurz exam={exam} neu={fillParts} />
+                    <NurExperte>
+                      {exam.parts.length === 0 ? (
+                        <Text size="sm" c="dimmed">
+                          Noch keine Teile geplant. „Vorschlag erzeugen“ verteilt die üblichen Formate des Fachs auf {meta.points} Punkte und {meta.minutes}{' '}
+                          Minuten.
+                        </Text>
+                      ) : (
+                        <Stack gap="xs">
+                          {exam.parts.map((part, i) => {
+                            const format = formatById(part.formatId)
+                            return (
+                              <Card key={part.id} withBorder padding="sm">
+                                <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                  <div style={{ minWidth: 0 }}>
+                                    <Group gap="xs">
+                                      <Badge variant="light">Teil {i + 1}</Badge>
+                                      <Text fw={600}>{format?.label ?? part.label}</Text>
+                                      <Badge variant="outline" color="gray">
+                                        {part.competence}
+                                      </Badge>
+                                      <Badge variant="outline" color="gray">
+                                        AFB {format?.afb.join('/') ?? '–'}
+                                      </Badge>
+                                      {istFremdsprache(meta.subjectId) && meta.separateWritingGrade && (
+                                        <Badge variant="light" color={part.gradeGroup === 'writing' ? 'grape' : 'blue'}>
+                                          {part.gradeGroup === 'writing' ? 'Note Schreiben' : 'Note weitere Kompetenzen'}
+                                        </Badge>
+                                      )}
+                                    </Group>
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                      {format?.description}
+                                    </Text>
+                                    {format?.note && (
+                                      <Text size="xs" c="dimmed" mt={2}>
+                                        Hinweis: {format.note}
+                                      </Text>
+                                    )}
+                                    {typeof part.contentShare === 'number' && (
+                                      <Group gap={6} align="flex-end" mt="xs">
+                                        <ZahlFeld
+                                          size="xs"
+                                          w={110}
+                                          label="Inhalt %"
+                                          min={10}
+                                          max={90}
+                                          step={5}
+                                          value={part.contentShare}
+                                          onChange={(v) =>
+                                            update((d) => (d.parts[i].contentShare = Math.max(10, Math.min(90, Number(v) || inhaltsanteil(d.meta.subjectId)))))
+                                          }
+                                        />
+                                        <Text size="xs" c="dimmed" pb={6}>
+                                          {zweiterTeil(meta.subjectId)} {100 - (part.contentShare ?? inhaltsanteil(meta.subjectId))} %
+                                          {part.points > 0
+                                            ? ` · ${Math.round((part.points * (part.contentShare ?? inhaltsanteil(meta.subjectId))) / 100)} von ${
+                                                part.points
+                                              } Punkten auf den Inhalt`
+                                            : ' · Bewertung über Inhalt und Sprache, nicht über Punkte'}
+                                        </Text>
+                                      </Group>
+                                    )}
+                                    {typeof part.contentShare === 'number' && (
+                                      <Select
+                                        mt="xs"
+                                        size="xs"
+                                        label="Textsorte des Schülertextes"
+                                        data={textsortenFuer(meta.subjectId).map((t) => ({
+                                          value: t.value,
+                                          label: t.label
+                                        }))}
+                                        value={part.studentTextType ?? ''}
+                                        onChange={(v) => update((d) => (d.parts[i].studentTextType = v ?? ''))}
+                                        allowDeselect={false}
+                                      />
+                                    )}
+                                    {/* Grammatik ausdrücklich mitprüfen – nur im Schreibteil der Fremdsprachen (29.09.2026) */}
+                                    {istFremdsprache(meta.subjectId) && formatArt(part.formatId) === 'writing' && (
+                                      <SchreibGrammatikFeld
+                                        exam={exam}
+                                        part={part}
+                                        setzen={(g) =>
+                                          update((d) => {
+                                            if (g) d.parts[i].grammatik = g
+                                            else delete d.parts[i].grammatik
+                                          })
+                                        }
+                                      />
+                                    )}
+                                    <Textarea
+                                      mt="xs"
+                                      size="xs"
+                                      label="Nähere Vorgaben (optional)"
+                                      description="Was dieser Teil genau enthalten soll – Thema des Materials, Schwerpunkt, Textsorte, zu prüfende Struktur."
+                                      placeholder={
+                                        typeof part.contentShare === 'number'
+                                          ? 'z. B. Die Schüler schreiben an ihren Austauschpartner über einen Schulausflug.'
+                                          : 'z. B. Sachtext über ein Musikfestival, Aufgaben auch zu impliziten Aussagen.'
+                                      }
+                                      autosize
+                                      minRows={2}
+                                      defaultValue={part.notes ?? ''}
+                                      onBlur={(e) => update((d) => (d.parts[i].notes = e.currentTarget.value))}
+                                    />
+                                    {formatArt(part.formatId) === 'speaking' && (
+                                      <SprechpruefungKarte
+                                        exam={exam}
+                                        part={part}
+                                        setzen={(s) => update((d) => (d.parts[i].sprechen = s), `sprechen:${part.id}`)}
+                                      />
+                                    )}
+                                    {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
+                                      <MultiSelect
+                                        mt="xs"
+                                        size="xs"
+                                        label="Aufgabenformate"
+                                        data={comprehensionFormatsFor(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade).map(
+                                          (f) => ({
+                                            value: f.id,
+                                            label: `${f.label} (${f.openness})`
+                                          })
+                                        )}
+                                        value={part.formats ?? []}
+                                        onChange={(v) => update((d) => (d.parts[i].formats = v))}
+                                        placeholder={defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade)
+                                          .map((id) => comprehensionFormatById(id)?.label)
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                        clearable
+                                      />
+                                    )}
+                                    {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
+                                      <ZahlFeld
+                                        mt="xs"
+                                        size="xs"
+                                        w={220}
+                                        label="Zahl der Items"
+                                        description={
+                                          part.items
+                                            ? `Genau ${part.items} Items, ein Punkt je Item – der Teil hat damit ${part.items} Punkte.`
+                                            : 'Leer lassen: Zahl nach Niveau. Eingetragen gilt sie genau und setzt die Punkte des Teils (ein Punkt je Item).'
+                                        }
+                                        placeholder={`automatisch (${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]})`}
+                                        min={1}
+                                        max={30}
+                                        value={part.items || ''}
+                                        onChange={(v) =>
+                                          update((d) => {
+                                            const n = Number(v) || 0
+                                            d.parts[i].items = n
+                                            // Ein Item = ein Punkt: Sonst stünde im Erwartungshorizont
+                                            // eine Punktzahl, die zur Zahl der Items nicht passt.
+                                            if (n > 0) d.parts[i].points = n
+                                          })
+                                        }
+                                      />
+                                    )}
+                                  </div>
+                                  <Group gap={6} wrap="nowrap">
+                                    <ZahlFeld
+                                      size="xs"
+                                      w={78}
+                                      label="Anteil %"
+                                      min={5}
+                                      max={100}
+                                      step={5}
+                                      suffix=" %"
+                                      clampBehavior="blur"
+                                      value={part.weight}
+                                      onChange={(v) => {
+                                        const weight = typeof v === 'number' ? v : Number(v)
+                                        if (!Number.isFinite(weight)) return
+                                        update((d) => {
+                                          d.parts[i].weight = weight
+                                          d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
+                                          // In Geschichte ergibt sich die eine Note aus den Punkten, dort folgen sie dem Anteil
+                                          if (!istFremdsprache(d.meta.subjectId)) d.parts[i].points = pointsFromWeight(weight, d.meta.points)
+                                        })
+                                      }}
+                                    />
+                                    {(!istFremdsprache(meta.subjectId) || part.points > 0) && (
+                                      <ZahlFeld
+                                        size="xs"
+                                        w={78}
+                                        label="Punkte"
+                                        min={0}
+                                        max={200}
+                                        clampBehavior="blur"
+                                        value={part.points}
+                                        onChange={(v) => update((d) => (d.parts[i].points = Number(v) || 0))}
+                                      />
+                                    )}
+                                    <ZahlFeld
+                                      size="xs"
+                                      w={70}
+                                      label="Minuten"
+                                      min={1}
+                                      max={meta.minutes}
+                                      value={part.minutes}
+                                      onChange={(v) => update((d) => (d.parts[i].minutes = Number(v) || 1))}
+                                    />
+                                    <Tooltip label="Teil entfernen">
+                                      <ActionIcon
+                                        mt={22}
+                                        variant="subtle"
+                                        color="red"
+                                        onClick={() =>
+                                          update((d) => {
+                                            d.parts.splice(i, 1)
+                                            applyWeights(d)
+                                          })
+                                        }
+                                      >
+                                        <IconTrash size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  </Group>
+                                </Group>
+                              </Card>
+                            )
+                          })}
+                        </Stack>
+                      )}
 
-                  {exam.parts.length > 0 && (minutesPlanned !== meta.minutes || (!istFremdsprache(meta.subjectId) && pointsPlanned !== meta.points)) && (
-                    <Alert color="orange" mt="sm" icon={<IconAlertTriangle size={16} />} p="xs">
-                      <Text size="sm">
-                        Geplant sind {minutesPlanned} von {meta.minutes} Minuten
-                        {!istFremdsprache(meta.subjectId) ? ` und ${pointsPlanned} von ${meta.points} Punkten` : ''}.
-                      </Text>
-                    </Alert>
-                  )}
-                </Card>
+                      <Select
+                        mt="sm"
+                        size="xs"
+                        label="Weiteren Teil hinzufügen"
+                        placeholder="Aufgabenformat wählen"
+                        data={available.map((f) => ({
+                          value: f.id,
+                          label: `${f.label} – ${f.competence}`
+                        }))}
+                        value={null}
+                        onChange={(v) => {
+                          const f = formatById(v ?? '')
+                          if (!f) return
+                          update((d) => {
+                            const weight = Math.max(5, Math.min(100, f.share))
+                            d.parts.push({
+                              id: newId(),
+                              formatId: f.id,
+                              label: f.label,
+                              competence: f.competence,
+                              weight,
+                              points: istFremdsprache(d.meta.subjectId) ? f.defaultPoints ?? 0 : pointsFromWeight(weight, d.meta.points),
+                              minutes: Math.max(1, Math.round((d.meta.minutes * weight) / 100)),
+                              gradeGroup: formatArt(f.id) === 'writing' ? 'writing' : 'other',
+                              ...(f.productive ? { contentShare: inhaltsanteil(d.meta.subjectId) } : {}),
+                              afbMix: { I: 30, II: 45, III: 25 },
+                              blocks: []
+                            })
+                            // Der Schreibteil bekommt 70 % (Klasse 5: 60 %), die weitere Kompetenz den Rest
+                            applyWeights(d)
+                          })
+                        }}
+                      />
 
-                {/*
+                      {exam.parts.length > 0 && (minutesPlanned !== meta.minutes || (!istFremdsprache(meta.subjectId) && pointsPlanned !== meta.points)) && (
+                        <Alert color="orange" mt="sm" icon={<IconAlertTriangle size={16} />} p="xs">
+                          <Text size="sm">
+                            Geplant sind {minutesPlanned} von {meta.minutes} Minuten
+                            {!istFremdsprache(meta.subjectId) ? ` und ${pointsPlanned} von ${meta.points} Punkten` : ''}.
+                          </Text>
+                        </Alert>
+                      )}
+                    </NurExperte>
+                  </Card>
+
+                  {/*
                   Material FÜR die Arbeit (Wunsch der Lehrkraft, 27.09.2026): Dateien hineinziehen oder
                   eine Webseite angeben; der Inhalt wird in der Arbeit verwendet – als Lesetext bei
                   textgebundenen Teilen (die App setzt ihn wörtlich ein) oder als Grundlage für Schreib-
                   und Mediationsaufgaben (generation/generateExam.ts, arbeitsmaterialTeil).
                 */}
-                <Card withBorder>
-                  <Title order={4} mb={4}>
-                    Material für die Arbeit (optional)
-                  </Title>
-                  <Text size="xs" c="dimmed" mb="sm">
-                    Ein Text, eine Buchseite oder eine Webseite, die in der Arbeit selbst verwendet wird – anders als die Unterlagen aus dem Unterricht oben
-                    links.
-                  </Text>
-                  <StoffQuellen
-                    quellen={meta.arbeitsmaterial ?? []}
-                    onHinzu={(neu) =>
-                      update((d) => {
-                        d.meta.arbeitsmaterial = [...(d.meta.arbeitsmaterial ?? []), ...neu]
-                      })
-                    }
-                    onAktiv={(id, aktiv) =>
-                      update((d) => {
-                        const q = d.meta.arbeitsmaterial?.find((x) => x.id === id)
-                        if (q) q.aktiv = aktiv
-                      })
-                    }
-                    onEntfernen={(id) =>
-                      update((d) => {
-                        d.meta.arbeitsmaterial = (d.meta.arbeitsmaterial ?? []).filter((x) => x.id !== id)
-                      })
-                    }
-                    title="Material hierher ziehen oder eine Webseite angeben"
-                    hint="Lesetext, Quelle, Artikel – PDF, Word, Foto, Textdatei oder Internetadresse"
-                    erklaerung="Bei Lese-, Quellen- und Mediationsteilen steht das erste Material wörtlich mit Quellenangabe auf der Arbeit; Schreib- und andere Teile bauen inhaltlich darauf auf."
-                  />
-                </Card>
-
-                {/* Fachbesonderheiten (29.09.2026): Mathe Teil A, Informatik am Rechner, Versuch mit Protokoll */}
-                <FachKarte exam={exam} patch={patch} />
-
-                {(istFremdsprache(meta.subjectId) || istAlteSprache(meta.subjectId)) && exam.parts.length > 0 && (
                   <Card withBorder>
-                    <Group justify="space-between" mb="sm">
-                      <Title order={4}>Noten</Title>
-                      <Switch
-                        size="xs"
-                        label={istAlteSprache(meta.subjectId) ? 'Übersetzung mit eigener Note' : 'Schreibteil mit eigener Note'}
-                        checked={meta.separateWritingGrade}
-                        onChange={(e) => patch({ separateWritingGrade: e.currentTarget.checked })}
-                      />
-                    </Group>
-                    <Stack gap="xs">
-                      {meta.separateWritingGrade ? (
-                        grades.map((g) => (
-                          <div key={g.group}>
-                            <Group justify="space-between">
-                              <Text size="sm" fw={600}>
-                                {g.label}
-                              </Text>
-                              <Text size="sm" c="dimmed">
-                                {g.points > 0
-                                  ? `Teilnote aus ${g.points} Punkten`
-                                  : istAlteSprache(meta.subjectId)
-                                    ? 'Teilnote aus der Fehlerquote'
-                                    : 'Teilnote aus Inhalt und Sprache'}{' '}
-                                · zählt {g.weight} %
-                                {g.content !== undefined ? ` · Inhalt ${g.content} / Sprache ${g.language} Punkte` : ''}
-                              </Text>
-                            </Group>
-                            {g.points > 0 && (
-                              <Text size="xs" c="dimmed">
-                                Notenschlüssel: {scaleLineFuer(meta, g.points)}
-                              </Text>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <Text size="sm" c="dimmed">
-                            Eine Gesamtnote über alle Teile ({examWeight(exam)} % · {pointsPlanned} Punkte).
-                          </Text>
-                          {pointsPlanned > 0 && (
-                            <Text size="xs" c="dimmed">
-                              Notenschlüssel: {scaleLineFuer(meta, pointsPlanned)}
-                            </Text>
-                          )}
-                        </>
-                      )}
-                      {examWeight(exam) !== 100 && (
-                        <Alert color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
-                          <Text size="sm">Die Anteile ergeben {examWeight(exam)} % statt 100 %.</Text>
-                        </Alert>
-                      )}
-                      {istAlteSprache(meta.subjectId) && <FehlerquoteFelder exam={exam} patch={patch} />}
-                      <MehrText
-                        text={`In Niedersachsen erhält der Schreibteil eine eigenständige Note; die übrigen geprüften Kompetenzen ergeben zusammen die zweite Note. Jeder Teil hat eigene Punkte – daraus entsteht seine Teilnote, und erst die Teilnoten werden nach ihrem Anteil verrechnet: ${writingWeightFor(meta.grade, appSettings.schreibanteil?.[meta.subjectId])} % Schreiben und ${100 - writingWeightFor(meta.grade, appSettings.schreibanteil?.[meta.subjectId])} % weitere Kompetenz in Klasse ${meta.grade} (Voreinstellung der Fachschaft, änderbar unter Einstellungen › Material). Leseverstehen und Hörverstehen sind mit 21 Punkten vorbelegt. Schreiben und Sprachmittlung werden im Verhältnis ${CONTENT_SHARE} % Inhalt zu ${100 - CONTENT_SHARE} % Sprache bewertet.`}
-                      />
-                    </Stack>
-                  </Card>
-                )}
-
-                {/*
-                 * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Ob und wie ausführlich ein
-                 * Erwartungshorizont entsteht und ob die Schreibaufgabe Formulierungshilfen bekommt,
-                 * wird bei jeder Arbeit entschieden – eingeklappt ging das unter.
-                 */}
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Erwartungshorizont und Hilfen
-                  </Title>
-                  <Stack gap="sm">
-                    <Switch label="Erwartungshorizont erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                    {/* Operatorenliste als Anlage (27.09.2026): Sek II von selbst, Sek I per Schalter – nur amtliche Definitionen */}
-                    <Switch
-                      label="Operatorenliste anhängen"
-                      description={
-                        amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))
-                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))!.quelle}) auf der ersten Aufgabenseite${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
-                          : 'Für dieses Land und Fach ist keine amtliche Operatorenliste hinterlegt – der Baustein bleibt leer'
+                    <Title order={4} mb={4}>
+                      Material für die Arbeit (optional)
+                    </Title>
+                    <Text size="xs" c="dimmed" mb="sm">
+                      Ein Text, eine Buchseite oder eine Webseite, die in der Arbeit selbst verwendet wird – anders als die Unterlagen aus dem Unterricht oben
+                      links.
+                    </Text>
+                    <StoffQuellen
+                      quellen={meta.arbeitsmaterial ?? []}
+                      onHinzu={(neu) =>
+                        update((d) => {
+                          d.meta.arbeitsmaterial = [...(d.meta.arbeitsmaterial ?? []), ...neu]
+                        })
                       }
-                      checked={meta.operatorenliste ?? upperSecondary(meta)}
-                      onChange={(e) => patch({ operatorenliste: e.currentTarget.checked })}
+                      onAktiv={(id, aktiv) =>
+                        update((d) => {
+                          const q = d.meta.arbeitsmaterial?.find((x) => x.id === id)
+                          if (q) q.aktiv = aktiv
+                        })
+                      }
+                      onEntfernen={(id) =>
+                        update((d) => {
+                          d.meta.arbeitsmaterial = (d.meta.arbeitsmaterial ?? []).filter((x) => x.id !== id)
+                        })
+                      }
+                      title="Material hierher ziehen oder eine Webseite angeben"
+                      hint="Lesetext, Quelle, Artikel – PDF, Word, Foto, Textdatei oder Internetadresse"
+                      erklaerung="Bei Lese-, Quellen- und Mediationsteilen steht das erste Material wörtlich mit Quellenangabe auf der Arbeit; Schreib- und andere Teile bauen inhaltlich darauf auf."
                     />
-                    {/* Interkultureller Schwerpunkt (02.10.2026) – in der Klassenarbeit nur integrativ */}
-                    <InterkulturSchalter meta={meta} klassenarbeit onChange={(interkulturell) => patch({ interkulturell })} />
-                    {meta.answerKey && (
-                      <Select
-                        label="Ausführlichkeit des Erwartungshorizonts"
-                        description={ANSWER_KEY_DETAILS.find((d) => d.value === meta.answerKeyDetail)?.description}
-                        data={ANSWER_KEY_DETAILS.map((d) => ({
-                          value: d.value,
-                          label: d.label
-                        }))}
-                        value={meta.answerKeyDetail}
-                        onChange={(v) =>
-                          v &&
-                          patch({
-                            answerKeyDetail: v as ExamMeta['answerKeyDetail']
-                          })
-                        }
-                        allowDeselect={false}
-                      />
-                    )}
-                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
-                      <Checkbox
-                        label="Formulierungshilfen zur Schreibaufgabe mit abdrucken"
-                        description="In den Abschlussprüfungen gibt es sie nicht; in Bayern zählen übernommene Wendungen ausdrücklich nicht für die sprachliche Bandbreite. Für eine Übungsarbeit kann es trotzdem sinnvoll sein."
-                        checked={Boolean(meta.writingScaffold)}
-                        onChange={(e) => patch({ writingScaffold: e.currentTarget.checked })}
-                      />
-                    )}
-                    {/* Hilfen für Lernende (01.10.2026): in Klassenarbeiten standardmäßig aus – Rahmenzeile und Teilpunkte stehen dann im Erwartungshorizont */}
-                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
-                      <Checkbox
-                        label="Hilfen für Lernende bei Schreiben und Sprachmittlung"
-                        description="Kasten „Adressat · Textsorte · Zweck“ und inhaltliche Teilpunkte auf dem Schülerblatt. In den amtlichen Aufgabenformaten (NI, NRW, IQB) stehen Situation, Adressat und Auftrag im Fließtext der Aufgabe; ohne Haken erscheinen Teilpunkte und Zweck nur im Erwartungshorizont."
-                        checked={Boolean(meta.lernhilfen)}
-                        onChange={(e) => patch({ lernhilfen: e.currentTarget.checked })}
-                        data-testid="lernhilfen-schalter"
-                      />
-                    )}
-                  </Stack>
-                </Card>
+                  </Card>
 
-                {(warnings.length > 0 || rules) && (
+                  {/* Fachbesonderheiten (29.09.2026): Mathe Teil A, Informatik am Rechner, Versuch mit Protokoll */}
+                  <FachKarte exam={exam} patch={patch} />
+
+                  <NurExperte geaendert={meta.separateWritingGrade && 'eigene Schreibnote'}>
+                    {(istFremdsprache(meta.subjectId) || istAlteSprache(meta.subjectId)) && exam.parts.length > 0 && (
+                      <Card withBorder>
+                        <Group justify="space-between" mb="sm">
+                          <Title order={4}>Noten</Title>
+                          <Switch
+                            size="xs"
+                            label={istAlteSprache(meta.subjectId) ? 'Übersetzung mit eigener Note' : 'Schreibteil mit eigener Note'}
+                            checked={meta.separateWritingGrade}
+                            onChange={(e) => patch({ separateWritingGrade: e.currentTarget.checked })}
+                          />
+                        </Group>
+                        <Stack gap="xs">
+                          {meta.separateWritingGrade ? (
+                            grades.map((g) => (
+                              <div key={g.group}>
+                                <Group justify="space-between">
+                                  <Text size="sm" fw={600}>
+                                    {g.label}
+                                  </Text>
+                                  <Text size="sm" c="dimmed">
+                                    {g.points > 0
+                                      ? `Teilnote aus ${g.points} Punkten`
+                                      : istAlteSprache(meta.subjectId)
+                                      ? 'Teilnote aus der Fehlerquote'
+                                      : 'Teilnote aus Inhalt und Sprache'}{' '}
+                                    · zählt {g.weight} %{g.content !== undefined ? ` · Inhalt ${g.content} / Sprache ${g.language} Punkte` : ''}
+                                  </Text>
+                                </Group>
+                                {g.points > 0 && (
+                                  <Text size="xs" c="dimmed">
+                                    Notenschlüssel: {scaleLineFuer(meta, g.points)}
+                                  </Text>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <>
+                              <Text size="sm" c="dimmed">
+                                Eine Gesamtnote über alle Teile ({examWeight(exam)} % · {pointsPlanned} Punkte).
+                              </Text>
+                              {pointsPlanned > 0 && (
+                                <Text size="xs" c="dimmed">
+                                  Notenschlüssel: {scaleLineFuer(meta, pointsPlanned)}
+                                </Text>
+                              )}
+                            </>
+                          )}
+                          {examWeight(exam) !== 100 && (
+                            <Alert color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
+                              <Text size="sm">Die Anteile ergeben {examWeight(exam)} % statt 100 %.</Text>
+                            </Alert>
+                          )}
+                          {istAlteSprache(meta.subjectId) && <FehlerquoteFelder exam={exam} patch={patch} />}
+                          <MehrText
+                            text={`In Niedersachsen erhält der Schreibteil eine eigenständige Note; die übrigen geprüften Kompetenzen ergeben zusammen die zweite Note. Jeder Teil hat eigene Punkte – daraus entsteht seine Teilnote, und erst die Teilnoten werden nach ihrem Anteil verrechnet: ${writingWeightFor(
+                              meta.grade,
+                              appSettings.schreibanteil?.[meta.subjectId]
+                            )} % Schreiben und ${
+                              100 - writingWeightFor(meta.grade, appSettings.schreibanteil?.[meta.subjectId])
+                            } % weitere Kompetenz in Klasse ${
+                              meta.grade
+                            } (Voreinstellung der Fachschaft, änderbar unter Einstellungen › Material). Leseverstehen und Hörverstehen sind mit 21 Punkten vorbelegt. Schreiben und Sprachmittlung werden im Verhältnis ${CONTENT_SHARE} % Inhalt zu ${
+                              100 - CONTENT_SHARE
+                            } % Sprache bewertet.`}
+                          />
+                        </Stack>
+                      </Card>
+                    )}
+                  </NurExperte>
+
+                  {/*
+                   * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Ob und wie ausführlich ein
+                   * Erwartungshorizont entsteht und ob die Schreibaufgabe Formulierungshilfen bekommt,
+                   * wird bei jeder Arbeit entschieden – eingeklappt ging das unter.
+                   */}
                   <Card withBorder>
                     <Title order={4} mb="sm">
-                      Vorgaben in {STATES.find((x) => x.id === meta.stateId)?.name ?? meta.stateId}
+                      Erwartungshorizont und Hilfen
                     </Title>
-                    <Stack gap="xs">
-                      <Group gap="xs" align="flex-end" wrap="nowrap" data-nachweis>
-                        <Select
-                          size="xs"
-                          label="Art des Leistungsnachweises"
-                          data={[...new Set([nachweis.bezeichnung, ...NACHWEIS_BEZEICHNUNGEN, ...(meta.nachweis ? [meta.nachweis] : [])])]}
-                          value={meta.nachweis ?? nachweis.bezeichnung}
-                          onChange={(v) => patch({ nachweis: v && v !== nachweis.bezeichnung ? v : undefined })}
-                          searchable
-                          allowDeselect={false}
-                          w={260}
+                    <Stack gap="sm">
+                      <Switch label="Erwartungshorizont erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                      <NurExperte>
+                        {/* Operatorenliste als Anlage (27.09.2026): Sek II von selbst, Sek I per Schalter – nur amtliche Definitionen */}
+                        <Switch
+                          label="Operatorenliste anhängen"
+                          description={
+                            amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))
+                              ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${
+                                  amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))!.quelle
+                                }) auf der ersten Aufgabenseite${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
+                              : 'Für dieses Land und Fach ist keine amtliche Operatorenliste hinterlegt – der Baustein bleibt leer'
+                          }
+                          checked={meta.operatorenliste ?? upperSecondary(meta)}
+                          onChange={(e) => patch({ operatorenliste: e.currentTarget.checked })}
                         />
-                        {mitZweig && (
+                      </NurExperte>
+                      {/* Interkultureller Schwerpunkt (02.10.2026) – in der Klassenarbeit nur integrativ */}
+                      <NurExperte geaendert={meta.interkulturell?.aktiv && 'Interkulturell'}>
+                        <InterkulturSchalter meta={meta} klassenarbeit onChange={(interkulturell) => patch({ interkulturell })} />
+                      </NurExperte>
+                      <NurExperte>
+                        {meta.answerKey && (
                           <Select
-                            size="xs"
-                            label="Ausbildungsrichtung"
-                            placeholder="nicht angegeben"
-                            data={BY_GYM_ZWEIGE.map((z) => ({ value: z.zweig, label: `${z.zweig} – ${z.name}` }))}
-                            value={meta.ausbildungsrichtung ?? null}
-                            onChange={(v) => patch({ ausbildungsrichtung: (v as ByZweig | null) ?? undefined })}
-                            clearable
-                            w={260}
-                            data-ausbildungsrichtung
+                            label="Ausführlichkeit des Erwartungshorizonts"
+                            description={ANSWER_KEY_DETAILS.find((d) => d.value === meta.answerKeyDetail)?.description}
+                            data={ANSWER_KEY_DETAILS.map((d) => ({
+                              value: d.value,
+                              label: d.label
+                            }))}
+                            value={meta.answerKeyDetail}
+                            onChange={(v) =>
+                              v &&
+                              patch({
+                                answerKeyDetail: v as ExamMeta['answerKeyDetail']
+                              })
+                            }
+                            allowDeselect={false}
                           />
                         )}
-                        <Text size="xs" c="dimmed">
-                          {[nachweis.dauer, nachweis.anzahl].filter(Boolean).join(' · ')}
-                          {nachweis.quelle ? ` (${nachweis.quelle})` : ''}
-                          {nachweis.nichtGesichert ? ' – nicht gesichert' : ''}
-                        </Text>
-                      </Group>
-                      {nachweis.hinweis && !warnings.includes(nachweis.hinweis) && (
-                        <Text size="xs" c="dimmed">
-                          {nachweis.hinweis}
-                        </Text>
-                      )}
-                      {warnings.map((w, i) => (
-                        <Alert key={i} color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
-                          <Text size="sm">{w}</Text>
-                        </Alert>
-                      ))}
-                      {rules && (
-                        <Text size="sm" c="dimmed">
-                          Zahl: {fachDerArbeit(meta.subjectId).hauptfach ? rules.mainSubject : rules.otherSubject} · Dauer: {rules.duration} · Ankündigung:{' '}
-                          {rules.announce} · {taktZeile(rules)} · Korrektur: {rules.correction}
-                          <br />
-                          Gewichtung: {rules.weighting}
-                        </Text>
-                      )}
-                      {rules && rules.notes.length > 0 && (
-                        <MehrText
-                          kurz={
-                            rules.notes.length === 1 ? 'Ein weiterer Hinweis zur Landesvorgabe.' : `${rules.notes.length} weitere Hinweise zur Landesvorgabe.`
-                          }
-                        >
-                          {rules.notes.map((n, i) => (
-                            <Text key={i} size="xs" c="dimmed">
-                              · {n}
-                            </Text>
-                          ))}
-                        </MehrText>
-                      )}
+                      </NurExperte>
+                      <NurExperte geaendert={Boolean(meta.writingScaffold) && 'Formulierungshilfen'}>
+                        {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
+                          <Checkbox
+                            label="Formulierungshilfen zur Schreibaufgabe mit abdrucken"
+                            description="In den Abschlussprüfungen gibt es sie nicht; in Bayern zählen übernommene Wendungen ausdrücklich nicht für die sprachliche Bandbreite. Für eine Übungsarbeit kann es trotzdem sinnvoll sein."
+                            checked={Boolean(meta.writingScaffold)}
+                            onChange={(e) => patch({ writingScaffold: e.currentTarget.checked })}
+                          />
+                        )}
+                      </NurExperte>
+                      <NurExperte geaendert={Boolean(meta.lernhilfen) && 'Hilfen für Lernende'}>
+                        {/* Hilfen für Lernende (01.10.2026): in Klassenarbeiten standardmäßig aus – Rahmenzeile und Teilpunkte stehen dann im Erwartungshorizont */}
+                        {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
+                          <Checkbox
+                            label="Hilfen für Lernende bei Schreiben und Sprachmittlung"
+                            description="Kasten „Adressat · Textsorte · Zweck“ und inhaltliche Teilpunkte auf dem Schülerblatt. In den amtlichen Aufgabenformaten (NI, NRW, IQB) stehen Situation, Adressat und Auftrag im Fließtext der Aufgabe; ohne Haken erscheinen Teilpunkte und Zweck nur im Erwartungshorizont."
+                            checked={Boolean(meta.lernhilfen)}
+                            onChange={(e) => patch({ lernhilfen: e.currentTarget.checked })}
+                            data-testid="lernhilfen-schalter"
+                          />
+                        )}
+                      </NurExperte>
                     </Stack>
                   </Card>
-                )}
-              </Stack>
-            </Grid.Col>
-          </Grid>
 
-          {/*
-           * Selten Geändertes eingeklappt (Paket 6): Darstellung, Notenschlüssel, Design und
-           * Wortzahl. Die Überschrift nennt, was vom Standard abweicht. Erwartungshorizont und
-           * Formulierungshilfen stehen seit Paket 7 wieder oben.
-           */}
-          <Box mt="md">
-            <WeitereOptionen modul="klassenarbeit" geaendert={geaenderteOptionen(exam, designs)}>
-              <Grid>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Stack gap="sm">
-                    <Group>
-                      <Switch label="Kopfkasten auf der Arbeit" checked={meta.infoBox} onChange={(e) => patch({ infoBox: e.currentTarget.checked })} />
-                      <Switch
-                        label="Notenschlüssel auch auf der Arbeit"
-                        description="Er steht ohnehin im Erwartungshorizont – hier zusätzlich auf dem Schülermaterial."
-                        checked={meta.gradeScale}
-                        onChange={(e) => patch({ gradeScale: e.currentTarget.checked })}
+                  {(warnings.length > 0 || rules) && (
+                    <Card withBorder>
+                      <Title order={4} mb="sm">
+                        Vorgaben in {STATES.find((x) => x.id === meta.stateId)?.name ?? meta.stateId}
+                      </Title>
+                      <Stack gap="xs">
+                        <NurExperte>
+                          <Group gap="xs" align="flex-end" wrap="nowrap" data-nachweis>
+                            <Select
+                              size="xs"
+                              label="Art des Leistungsnachweises"
+                              data={[...new Set([nachweis.bezeichnung, ...NACHWEIS_BEZEICHNUNGEN, ...(meta.nachweis ? [meta.nachweis] : [])])]}
+                              value={meta.nachweis ?? nachweis.bezeichnung}
+                              onChange={(v) => patch({ nachweis: v && v !== nachweis.bezeichnung ? v : undefined })}
+                              searchable
+                              allowDeselect={false}
+                              w={260}
+                            />
+                            {mitZweig && (
+                              <Select
+                                size="xs"
+                                label="Ausbildungsrichtung"
+                                placeholder="nicht angegeben"
+                                data={BY_GYM_ZWEIGE.map((z) => ({ value: z.zweig, label: `${z.zweig} – ${z.name}` }))}
+                                value={meta.ausbildungsrichtung ?? null}
+                                onChange={(v) => patch({ ausbildungsrichtung: (v as ByZweig | null) ?? undefined })}
+                                clearable
+                                w={260}
+                                data-ausbildungsrichtung
+                              />
+                            )}
+                            <Text size="xs" c="dimmed">
+                              {[nachweis.dauer, nachweis.anzahl].filter(Boolean).join(' · ')}
+                              {nachweis.quelle ? ` (${nachweis.quelle})` : ''}
+                              {nachweis.nichtGesichert ? ' – nicht gesichert' : ''}
+                            </Text>
+                          </Group>
+                        </NurExperte>
+                        {nachweis.hinweis && !warnings.includes(nachweis.hinweis) && (
+                          <Text size="xs" c="dimmed">
+                            {nachweis.hinweis}
+                          </Text>
+                        )}
+                        {warnings.map((w, i) => (
+                          <Alert key={i} color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
+                            <Text size="sm">{w}</Text>
+                          </Alert>
+                        ))}
+                        {rules && (
+                          <Text size="sm" c="dimmed">
+                            Zahl: {fachDerArbeit(meta.subjectId).hauptfach ? rules.mainSubject : rules.otherSubject} · Dauer: {rules.duration} · Ankündigung:{' '}
+                            {rules.announce} · {taktZeile(rules)} · Korrektur: {rules.correction}
+                            <br />
+                            Gewichtung: {rules.weighting}
+                          </Text>
+                        )}
+                        {rules && rules.notes.length > 0 && (
+                          <MehrText
+                            kurz={
+                              rules.notes.length === 1 ? 'Ein weiterer Hinweis zur Landesvorgabe.' : `${rules.notes.length} weitere Hinweise zur Landesvorgabe.`
+                            }
+                          >
+                            {rules.notes.map((n, i) => (
+                              <Text key={i} size="xs" c="dimmed">
+                                · {n}
+                              </Text>
+                            ))}
+                          </MehrText>
+                        )}
+                      </Stack>
+                    </Card>
+                  )}
+                </Stack>
+              </Grid.Col>
+            </Grid>
+
+            {/*
+             * Selten Geändertes eingeklappt (Paket 6): Darstellung, Notenschlüssel, Design und
+             * Wortzahl. Die Überschrift nennt, was vom Standard abweicht. Erwartungshorizont und
+             * Formulierungshilfen stehen seit Paket 7 wieder oben.
+             */}
+            <Box mt="md">
+              <WeitereOptionen modul="klassenarbeit" geaendert={geaenderteOptionen(exam, designs)}>
+                <Grid>
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <Stack gap="sm">
+                      <Group>
+                        <Switch label="Kopfkasten auf der Arbeit" checked={meta.infoBox} onChange={(e) => patch({ infoBox: e.currentTarget.checked })} />
+                        <Switch
+                          label="Notenschlüssel auch auf der Arbeit"
+                          description="Er steht ohnehin im Erwartungshorizont – hier zusätzlich auf dem Schülermaterial."
+                          checked={meta.gradeScale}
+                          onChange={(e) => patch({ gradeScale: e.currentTarget.checked })}
+                        />
+                        {notenpunkteFuer(meta) ? (
+                          /* Sekundarstufe II: Notenpunkte 0–15 nach dem Raster des Landes – nicht frei einstellbar (26.09.2026) */
+                          <Text size="xs" c="dimmed" style={{ flexBasis: '100%' }}>
+                            Sekundarstufe II: Bewertung mit 0–15 Notenpunkten. {notenpunkteFuer(meta)!.hinweis}
+                          </Text>
+                        ) : (
+                          <Button size="compact-sm" variant="light" onClick={() => setScaleOpen(true)}>
+                            Notenschlüssel bearbeiten
+                          </Button>
+                        )}
+                      </Group>
+                    </Stack>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <Stack gap="sm">
+                      <Select
+                        label="Designvorlage"
+                        data={designs.map((d) => ({ value: d.id, label: d.name }))}
+                        value={exam.design?.id}
+                        onChange={(v) => {
+                          const d = designs.find((x) => x.id === v)
+                          if (d) update((draft) => (draft.design = d))
+                        }}
+                        allowDeselect={false}
                       />
-                      {notenpunkteFuer(meta) ? (
-                        /* Sekundarstufe II: Notenpunkte 0–15 nach dem Raster des Landes – nicht frei einstellbar (26.09.2026) */
-                        <Text size="xs" c="dimmed" style={{ flexBasis: '100%' }}>
-                          Sekundarstufe II: Bewertung mit 0–15 Notenpunkten. {notenpunkteFuer(meta)!.hinweis}
-                        </Text>
-                      ) : (
-                        <Button size="compact-sm" variant="light" onClick={() => setScaleOpen(true)}>
-                          Notenschlüssel bearbeiten
-                        </Button>
+                      {/* Paket 10a: dezent in der Fachfarbe, auch im Erwartungshorizont – hier abschaltbar */}
+                      <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
+                      {/* Paket 11: Überthema im Kopf der Arbeit – standardmäßig der Themenbereich */}
+                      <UeberthemaFeldFuer moduleId="klassenarbeit" docId={useKlassenarbeit.getState().docId} werte={meta} onChange={(p) => patch(p)} />
+                      {/*
+                       * Formulierungshilfen in einer ARBEIT – bewusst abschaltbar und aus.
+                       *
+                       * In keiner der eingesehenen amtlichen Abschlussprüfungen bekommen die
+                       * Prüflinge ein sprachliches Gerüst. Bayern nimmt aus der Angabe
+                       * übernommene Wendungen sogar von der Bewertung der Bandbreite aus. Die
+                       * Beschreibung sagt das, damit die Entscheidung nicht blind fällt.
+                       */}
+                      {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
+                        <Checkbox
+                          label="Wortzahl auf der Arbeit nennen"
+                          description={
+                            wortzahlErlaubt(meta.stateId, meta.subjectId)
+                              ? 'Der geplante Umfang steuert immer Schreibraum und Erwartungshorizont. Ob er den Lernenden auch genannt wird, wird hier entschieden.'
+                              : WORTZAHL_GRUND
+                          }
+                          checked={wortzahlErlaubt(meta.stateId, meta.subjectId) && Boolean(meta.wordLimit)}
+                          disabled={!wortzahlErlaubt(meta.stateId, meta.subjectId)}
+                          onChange={(e) => patch({ wordLimit: e.currentTarget.checked })}
+                        />
                       )}
-                    </Group>
-                  </Stack>
-                </Grid.Col>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Stack gap="sm">
-                    <Select
-                      label="Designvorlage"
-                      data={designs.map((d) => ({ value: d.id, label: d.name }))}
-                      value={exam.design?.id}
-                      onChange={(v) => {
-                        const d = designs.find((x) => x.id === v)
-                        if (d) update((draft) => (draft.design = d))
-                      }}
-                      allowDeselect={false}
-                    />
-                    {/* Paket 10a: dezent in der Fachfarbe, auch im Erwartungshorizont – hier abschaltbar */}
-                    <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
-                    {/* Paket 11: Überthema im Kopf der Arbeit – standardmäßig der Themenbereich */}
-                    <UeberthemaFeldFuer moduleId="klassenarbeit" docId={useKlassenarbeit.getState().docId} werte={meta} onChange={(p) => patch(p)} />
-                    {/*
-                     * Formulierungshilfen in einer ARBEIT – bewusst abschaltbar und aus.
-                     *
-                     * In keiner der eingesehenen amtlichen Abschlussprüfungen bekommen die
-                     * Prüflinge ein sprachliches Gerüst. Bayern nimmt aus der Angabe
-                     * übernommene Wendungen sogar von der Bewertung der Bandbreite aus. Die
-                     * Beschreibung sagt das, damit die Entscheidung nicht blind fällt.
-                     */}
-                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
-                      <Checkbox
-                        label="Wortzahl auf der Arbeit nennen"
-                        description={
-                          wortzahlErlaubt(meta.stateId, meta.subjectId)
-                            ? 'Der geplante Umfang steuert immer Schreibraum und Erwartungshorizont. Ob er den Lernenden auch genannt wird, wird hier entschieden.'
-                            : WORTZAHL_GRUND
-                        }
-                        checked={wortzahlErlaubt(meta.stateId, meta.subjectId) && Boolean(meta.wordLimit)}
-                        disabled={!wortzahlErlaubt(meta.stateId, meta.subjectId)}
-                        onChange={(e) => patch({ wordLimit: e.currentTarget.checked })}
-                      />
-                    )}
-                  </Stack>
-                </Grid.Col>
-              </Grid>
-            </WeitereOptionen>
-          </Box>
-          <Box h="md" />
-          <GradeScaleModal
-            opened={scaleOpen}
-            onClose={() => setScaleOpen(false)}
-            points={gradeScaleGroups(exam)[0]?.points ?? pointsPlanned}
-            thresholds={meta.gradeScaleThresholds}
-            onChange={(gradeScaleThresholds) => patch({ gradeScaleThresholds })}
-          />
-        </Container>
-      </ScrollArea>
-    </FormularSeite>
+                    </Stack>
+                  </Grid.Col>
+                </Grid>
+              </WeitereOptionen>
+            </Box>
+            <Box h="md" />
+            <GradeScaleModal
+              opened={scaleOpen}
+              onClose={() => setScaleOpen(false)}
+              points={gradeScaleGroups(exam)[0]?.points ?? pointsPlanned}
+              thresholds={meta.gradeScaleThresholds}
+              onChange={(gradeScaleThresholds) => patch({ gradeScaleThresholds })}
+            />
+          </Container>
+        </ScrollArea>
+      </FormularSeite>
+    </OptionenBereich>
+  )
+}
+
+/** Standardmodus: der Aufbau in einer Zeile statt des Teile-Editors (der steht unter „Alle Optionen") */
+function AufbauKurz({ exam, neu }: { exam: Exam; neu: () => void }): React.JSX.Element | null {
+  if (useAlleOptionen()) return null
+  if (!exam.parts.length)
+    return (
+      <Text size="sm" c="dimmed">
+        Für dieses Fach liegt kein Vorschlag vor – unter „Alle Optionen“ Teile selbst anlegen.
+      </Text>
+    )
+  return (
+    <Group justify="space-between" wrap="nowrap" data-aufbau-kurz>
+      <Text size="sm">
+        {exam.parts.map((p) => p.label).join(' · ')} — {examMinutes(exam)} Min.
+      </Text>
+      <Button size="compact-sm" variant="subtle" onClick={neu}>
+        Neu vorschlagen
+      </Button>
+    </Group>
   )
 }
 

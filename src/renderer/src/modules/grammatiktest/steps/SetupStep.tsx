@@ -1,4 +1,5 @@
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
+import { NurExperte } from '../../../shared/components/NurExperte'
 import { Alert, Box, Button, Card, Container, Grid, Group, ScrollArea, SegmentedControl, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react'
@@ -17,10 +18,11 @@ import { mitLerngruppe } from '../../../shared/lerngruppe'
 import GrammarPicker from '../../arbeitsblatt/steps/GrammarPicker'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import type { WorksheetMeta } from '../../arbeitsblatt/model/types'
-import { generateTest, generateVerbTest } from '../generation/generateTest'
+import { fassungsZahl, generateTest, generateTestFassungen, generateVerbTest } from '../generation/generateTest'
 import { newTest } from '../model/defaults'
 import { suggestedFormats, testingRules } from '../model/testRules'
-import type { GrammarTest, GrammarTestMeta } from '../model/types'
+import { mitFassungen, type GrammarTest, type GrammarTestMeta } from '../model/types'
+import FassungenWahl from '../../../shared/components/FassungenWahl'
 import { useGrammatiktest } from '../store'
 import { starteAuftrag } from '../../../shared/auftraege'
 import { defaultTestName, legeTestAb, testOffen } from '../library'
@@ -148,16 +150,23 @@ export default function SetupStep(): React.JSX.Element {
         eingabe: test,
         istOffen: () => testOffen(docId),
         fehlerTitel: 'Der Test konnte nicht erstellt werden',
-        arbeit: (t, k) => generateVerbTest(t, brauchtKi(t.meta.verben!) ? k.ai : null, (m) => k.melde(m), (blocks) => k.zeige({ ...t, blocks }, { was: 'Gruppe A steht' })),
+        arbeit: (t, k) =>
+          generateVerbTest(
+            t,
+            brauchtKi(t.meta.verben!) ? k.ai : null,
+            (m) => k.melde(m),
+            (fassungen) =>
+              k.zeige(mitFassungen(t, fassungen), {
+                was: fassungen.length > 1 ? `Gruppe ${String.fromCharCode(64 + fassungen.length)} steht` : 'Gruppe A steht'
+              })
+          ),
         // Punkte je Form: Die Summe steht danach auch in den Angaben
         ablegen: (r, t) =>
           legeTestAb(
             docId,
             t,
             (aktuell) => ({
-              ...aktuell,
-              blocks: r.blocks,
-              blocksB: r.blocksB,
+              ...mitFassungen(aktuell, [r.blocks, ...(r.weitereFassungen ?? [])]),
               meta: { ...aktuell.meta, points: r.blocks.reduce((n, b) => n + (b.type === 'task' ? b.points : 0), 0) || aktuell.meta.points }
             }),
             1
@@ -173,9 +182,20 @@ export default function SetupStep(): React.JSX.Element {
       eingabe: test,
       istOffen: () => testOffen(docId),
       fehlerTitel: 'Der Test konnte nicht erstellt werden',
-      arbeit: (t, k) => generateTest(t, k.ai, (m) => k.melde(m), (blocks) => k.zeige({ ...t, blocks }, { was: 'Aufgaben stehen – Ankreuzfragen werden geprüft' })),
+      arbeit: async (t, k) => {
+        const blocks = await generateTest(
+          t,
+          k.ai,
+          (m) => k.melde(m),
+          (b) => k.zeige(mitFassungen(t, [b]), { was: 'Aufgaben stehen – Ankreuzfragen werden geprüft' })
+        )
+        // Fassungen B–D (06.10.2026): eine weitere Anfrage für alle, oder ohne KI umgestellt
+        if (fassungsZahl(t) < 2) return [blocks]
+        k.zeige(mitFassungen(t, [blocks]), { was: 'Fassung A steht' })
+        return [blocks, ...(await generateTestFassungen(t, blocks, k.ai, (m) => k.melde(m)))]
+      },
       // Ein eigener Verlaufsschritt: Strg+Z holt die vorigen Aufgaben zurück
-      ablegen: (blocks, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks }), 1)
+      ablegen: (fassungen, t) => legeTestAb(docId, t, (aktuell) => mitFassungen(aktuell, fassungen), 1)
     })
   }
 
@@ -224,7 +244,10 @@ export default function SetupStep(): React.JSX.Element {
                             formats: [],
                             languageOrder: folgeFuer(v),
                             // Die Verbliste gehört zur Sprache – beim Fachwechsel neu anlegen (bzw. zurück zu den Formen)
-                            verben: SPRACHE_DES_FACHS[v] && meta.modus === 'verben' ? neueVerbAufgabe(SPRACHE_DES_FACHS[v], verbLernjahr({ ...meta, subjectId: v, languageOrder: folgeFuer(v) })) : undefined,
+                            verben:
+                              SPRACHE_DES_FACHS[v] && meta.modus === 'verben'
+                                ? neueVerbAufgabe(SPRACHE_DES_FACHS[v], verbLernjahr({ ...meta, subjectId: v, languageOrder: folgeFuer(v) }))
+                                : undefined,
                             ...(SPRACHE_DES_FACHS[v] ? {} : { modus: 'formen' as const })
                           })
                         }}
@@ -238,25 +261,35 @@ export default function SetupStep(): React.JSX.Element {
                         allowDeselect={false}
                       />
                     </Group>
-                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGruppe} />
+                    <SchulortFelder
+                      table={table}
+                      stateId={meta.stateId}
+                      schoolTypeId={meta.schoolTypeId}
+                      schoolTypeName={meta.schoolTypeName}
+                      onChange={patchGruppe}
+                    />
                     <Group grow>
-                      {subjectById(meta.subjectId).foreignLanguage && (
+                      <NurExperte>
+                        {subjectById(meta.subjectId).foreignLanguage && (
+                          <Select
+                            label="Fremdsprache"
+                            data={[1, 2, 3].map((n) => ({ value: String(n), label: `${n}. Fremdsprache` }))}
+                            value={String(meta.languageOrder)}
+                            onChange={(v) => v && patchGruppe({ languageOrder: Number(v) })}
+                            allowDeselect={false}
+                          />
+                        )}
+                      </NurExperte>
+                      <NurExperte>
                         <Select
-                          label="Fremdsprache"
-                          data={[1, 2, 3].map((n) => ({ value: String(n), label: `${n}. Fremdsprache` }))}
-                          value={String(meta.languageOrder)}
-                          onChange={(v) => v && patchGruppe({ languageOrder: Number(v) })}
+                          label="Sprachniveau (GER)"
+                          description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
+                          data={[...CEFR_SCALE]}
+                          value={meta.cefrLevel}
+                          onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
                           allowDeselect={false}
                         />
-                      )}
-                      <Select
-                        label="Sprachniveau (GER)"
-                        description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
-                        data={[...CEFR_SCALE]}
-                        value={meta.cefrLevel}
-                        onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
-                        allowDeselect={false}
-                      />
+                      </NurExperte>
                     </Group>
                   </Stack>
                 </Card>
@@ -269,7 +302,11 @@ export default function SetupStep(): React.JSX.Element {
                       <SegmentedControl
                         size="xs"
                         value={verbModus ? 'verben' : 'formen'}
-                        onChange={(v) => patch(v === 'verben' ? { modus: 'verben', verben: meta.verben ?? neueVerbAufgabe(verbSprache, verbLernjahr(meta)) } : { modus: 'formen' })}
+                        onChange={(v) =>
+                          patch(
+                            v === 'verben' ? { modus: 'verben', verben: meta.verben ?? neueVerbAufgabe(verbSprache, verbLernjahr(meta)) } : { modus: 'formen' }
+                          )
+                        }
                         data={[
                           { value: 'formen', label: 'Grammatikformen' },
                           { value: 'verben', label: 'Unregelmäßige Verben' }
@@ -281,22 +318,9 @@ export default function SetupStep(): React.JSX.Element {
                   {verbModus && meta.verben ? (
                     <Stack gap="sm">
                       <VerbAufgabeWahl wert={meta.verben} onChange={(verben) => patch({ verben })} />
-                      <Group gap="sm" align="center">
-                        <Text size="sm">Fassungen:</Text>
-                        <SegmentedControl
-                          size="xs"
-                          value={String(meta.fassungen ?? 1)}
-                          onChange={(v) => patch({ fassungen: v === '2' ? 2 : 1 })}
-                          data={[
-                            { value: '1', label: 'eine' },
-                            { value: '2', label: 'Gruppe A und B' }
-                          ]}
-                          data-fassungen
-                        />
-                        <Text size="xs" c="dimmed">
-                          {vorschauPunkte(test)}
-                        </Text>
-                      </Group>
+                      <Text size="xs" c="dimmed">
+                        {vorschauPunkte(test)}
+                      </Text>
                     </Stack>
                   ) : (
                     <GrammarPicker
@@ -315,12 +339,14 @@ export default function SetupStep(): React.JSX.Element {
                     Anlage des Tests
                   </Title>
                   <Stack gap="sm">
-                    <TextInput
-                      label="Titel (optional)"
-                      placeholder={meta.subjectId === 'englisch' ? 'Grammar test' : 'Grammatiktest'}
-                      value={meta.title}
-                      onChange={(e) => patch({ title: e.currentTarget.value })}
-                    />
+                    <NurExperte>
+                      <TextInput
+                        label="Titel (optional)"
+                        placeholder={meta.subjectId === 'englisch' ? 'Grammar test' : 'Grammatiktest'}
+                        value={meta.title}
+                        onChange={(e) => patch({ title: e.currentTarget.value })}
+                      />
+                    </NurExperte>
                     <Group grow>
                       <ZahlFeld
                         label="Bearbeitungszeit (Minuten)"
@@ -329,7 +355,9 @@ export default function SetupStep(): React.JSX.Element {
                         value={meta.minutes}
                         onChange={(v) => patch({ minutes: Number(v) || 20 })}
                       />
-                      <ZahlFeld label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
+                      <NurExperte>
+                        <ZahlFeld label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
+                      </NurExperte>
                     </Group>
                     {/* Immer sichtbar (Paket 7, Nachtrag der Lehrkraft) – samt Notenschlüssel, der an der Benotung hängt */}
                     <Switch
@@ -348,23 +376,38 @@ export default function SetupStep(): React.JSX.Element {
                         </Button>
                       </Group>
                     )}
-                    {meta.graded && (
-                      <Switch
-                        label="Notenschlüssel auch auf dem Testblatt"
-                        description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
-                        checked={meta.gradeScaleOnSheet}
-                        onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
-                      />
-                    )}
+                    <NurExperte geaendert={meta.graded && meta.gradeScaleOnSheet && 'Notenschlüssel auf dem Blatt'}>
+                      {meta.graded && (
+                        <Switch
+                          label="Notenschlüssel auch auf dem Testblatt"
+                          description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
+                          checked={meta.gradeScaleOnSheet}
+                          onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
+                        />
+                      )}
+                    </NurExperte>
 
-                    {!verbModus && (
-                      <Switch
-                        label="In einen Zusammenhang einbetten"
-                      description="Die Aufgaben hängen an einem durchlaufenden Text statt an unverbundenen Einzelsätzen – näher am Sprachgebrauch und in mehr Ländern als Leistung verwendbar."
-                        checked={meta.embedded}
-                        onChange={(e) => patch({ embedded: e.currentTarget.checked })}
+                    <NurExperte geaendert={fassungsZahl(test) > 1 && `${fassungsZahl(test)} Fassungen`}>
+                      {/* Fassungen A–D (06.10.2026, wie im Vokabeltest) – bei den Verben bekommt jede Gruppe andere Verben */}
+                      <FassungenWahl
+                        anzahl={fassungsZahl(test)}
+                        onAnzahl={(fassungen) => patch({ fassungen })}
+                        {...(verbModus
+                          ? { hinweis: 'Jede Gruppe bekommt andere Verben aus der Liste, sofern sie reicht.' }
+                          : { art: meta.fassungsArt, onArt: (fassungsArt) => patch({ fassungsArt }) })}
+                        kiText="andere Sätze (KI)"
                       />
-                    )}
+                    </NurExperte>
+                    <NurExperte geaendert={!verbModus && meta.embedded && 'eingebettet'}>
+                      {!verbModus && (
+                        <Switch
+                          label="In einen Zusammenhang einbetten"
+                          description="Die Aufgaben hängen an einem durchlaufenden Text statt an unverbundenen Einzelsätzen – näher am Sprachgebrauch und in mehr Ländern als Leistung verwendbar."
+                          checked={meta.embedded}
+                          onChange={(e) => patch({ embedded: e.currentTarget.checked })}
+                        />
+                      )}
+                    </NurExperte>
                   </Stack>
                 </Card>
 

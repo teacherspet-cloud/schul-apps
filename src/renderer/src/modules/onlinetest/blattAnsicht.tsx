@@ -35,10 +35,10 @@ function marke(b: Bewertung, einheit: string): string {
         ? '(✓)'
         : '✓'
       : x.status === 'falsch' && x.frage
-        ? '?'
-        : x.status === 'falsch' && !(x.pruefen && x.quelle !== 'lehrkraft')
-          ? '✗'
-          : '?'
+      ? '?'
+      : x.status === 'falsch' && !(x.pruefen && x.quelle !== 'lehrkraft')
+      ? '✗'
+      : '?'
   return ` ${z}⟦${einheit}⟧`
 }
 
@@ -70,13 +70,20 @@ export function mitAntworten(v: Variant, a: Antworten, b: Bewertung = {}): Varia
         })
         break
       }
+      // Kästchen-Aufgaben (07.10.2026): das Zeichen steht hinter dem Wort bzw. dem Satz – im Kästchen ist kein Platz
       case 'match':
-        k.left.forEach((l) => (l.answerId = a[feldId(k.id, l.id)] ?? ''))
+        k.left.forEach((l) => {
+          const f = feldId(k.id, l.id)
+          l.answerId = a[f] ?? ''
+          l.text = `${l.text}${marke(b, f)}`
+        })
         break
       case 'choice':
         k.items.forEach((it) => {
-          const w = a[feldId(k.id, it.id)]
+          const f = feldId(k.id, it.id)
+          const w = a[f]
           it.correct = w === undefined || w === '' ? -1 : Number(w)
+          it.after = `${it.after}${marke(b, f)}`
         })
         break
       case 'open':
@@ -86,18 +93,30 @@ export function mitAntworten(v: Variant, a: Antworten, b: Bewertung = {}): Varia
         k.items.forEach((it) => {
           const w = feldId(k.id, it.id, 'w')
           it.isTrue = a[w] === 'true'
-          // Mit Zeichen der Einheit (06.10.2026) – so lässt sich die Korrektur im Blatt finden und entscheiden
-          it.correction = text(feldId(k.id, it.id, 'k'), w)
+          // Mit Zeichen der Einheit (06.10.2026) – so lässt sich die Korrektur im Blatt finden und entscheiden.
+          // Ohne sichtbare Korrekturzeile (nicht verlangt oder „richtig" angekreuzt) steht das Zeichen hinter der Aussage.
+          if (k.askCorrection && !it.isTrue) it.correction = text(feldId(k.id, it.id, 'k'), w)
+          else it.statement = `${it.statement}${marke(b, w)}`
         })
         break
       case 'oddOneOut':
         k.items.forEach((it) => {
-          it.answer = a[feldId(k.id, it.id, 'w')] ?? ''
-          it.reason = text(feldId(k.id, it.id, 'r'), feldId(k.id, it.id, 'w'))
+          const w = feldId(k.id, it.id, 'w')
+          it.answer = a[w] ?? ''
+          if (k.askReason) it.reason = text(feldId(k.id, it.id, 'r'), w)
+          else {
+            // Ohne Begründung trägt das gewählte Wort das Zeichen
+            const i = it.words.indexOf(it.answer)
+            if (i >= 0) it.answer = it.words[i] = `${it.answer}${marke(b, w)}`
+          }
         })
         break
       case 'categorize':
-        k.words.forEach((w) => (w.categoryId = a[feldId(k.id, w.id)] ?? ''))
+        k.words.forEach((w) => {
+          const f = feldId(k.id, w.id)
+          w.categoryId = a[f] ?? ''
+          w.text = `${w.text}${marke(b, f)}`
+        })
         break
       case 'mindmap':
         k.items.forEach((it) => (it.answer = text(feldId(k.id, it.id))))
@@ -205,7 +224,7 @@ export function AbgabeBlatt({
     // Satz/Aussage (eine Einheit des Blatts); ist sie ein langer Text, nur die Lücke selbst
     const satz = marke.closest<HTMLElement>('[data-unit]')
     const luecke = marke.parentElement
-    const bereich = satz && (satz.textContent ?? '').length <= 260 ? satz : (luecke ?? marke)
+    const bereich = satz && (satz.textContent ?? '').length <= 260 ? satz : luecke ?? marke
     bereich.classList.add('vt-fokus')
     if (luecke && luecke !== bereich) luecke.classList.add('vt-fokus-luecke')
     const r = bereich.getBoundingClientRect()
@@ -345,12 +364,12 @@ const ENTSCHEIDEN_KNOPF = (farbe: string): React.CSSProperties => ({
 })
 
 const dokument = (kopf: BlattKopf, variants: Variant[]): TestDocument =>
-  ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' }) as unknown as TestDocument
+  ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' } as unknown as TestDocument)
 
 /** Druck/PDF: ein Blatt je Abgabe, jedes auf eigenen Seiten */
 export function abgabenHtml(kopf: BlattKopf, abgaben: { variante: Variant; antworten: Antworten; bewertung: Bewertung; abgabe: Abgabe }[]): string {
   const seiten = abgaben.map(({ variante, antworten, bewertung, abgabe }) => blattHtml(kopf, variante, antworten, bewertung, abgabe))
-  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
   return `<!doctype html>
 <html lang="${esc(kopf.settings.targetLanguage || 'en')}"><head><meta charset="utf-8"><title>${esc(kopf.header.title)}</title>
 <style>

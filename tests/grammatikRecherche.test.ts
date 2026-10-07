@@ -94,3 +94,22 @@ describe('Grammatik-Recherche: Teilformen', () => {
     expect(k9.some((x) => x.status === 'bilden')).toBe(false)
   })
 })
+
+describe('Englisch: be und have (got) getrennt (06.10.2026)', () => {
+  it('be behält die Kennung, have (got) ist ein eigenes Thema', () => {
+    const be = GRAMMAR_TOPICS.find((t) => t.id === 'en.verb.be_have')
+    const have = GRAMMAR_TOPICS.find((t) => t.id === 'en.verb.have_got')
+    expect(be?.label).toBe('Das Verb be')
+    expect(have?.label).toBe('Das Verb have (got)')
+    expect(be?.teilformen?.every((x) => x.id.startsWith('be-'))).toBe(true)
+    expect(have?.teilformen?.map((x) => x.id)).toEqual(['have-got', 'have-got-fragen', 'have-do'])
+  })
+})
+
+describe('Deutsch: Nachrecherche (06.10.2026)', () => {
+  it('führt die neuen Themen mit Teilformen', () => {
+    const de = GRAMMAR_TOPICS.filter((t) => t.subject === 'deutsch')
+    expect(de.length).toBeGreaterThanOrEqual(73)
+    expect(de.reduce((n, t) => n + (t.teilformen?.length ?? 0), 0)).toBeGreaterThanOrEqual(560)
+  })
+})

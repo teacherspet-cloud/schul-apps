@@ -33,6 +33,7 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <title>Schul-Apps – Anmelden</title>
 <style>${STIL}</style>
 </head>
@@ -71,6 +72,7 @@ export function passwortSeite(o: { name: string; fehler: string; ziel: string })
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <title>Schul-Apps – Eigenes Passwort</title>
 <style>${STIL}</style>
 </head>

@@ -21,6 +21,11 @@ const pruefe = (ok, text) => {
 }
 const KOPF = { 'x-schulapps-token': 'server' }
 const KLASSE = `6m${Date.now() % 1000}`
+// Medienaufträge laufen seit 06.10.2026 in der Auftragsleiste unten rechts: Leiste aufklappen, fertige Zeile abwarten
+const auftragFertig = async (p, art, ms = 180000) => {
+  if (await p.locator('.auftrags-pille').isVisible().catch(() => false)) await p.locator('.auftrags-pille').click()
+  return da(p.locator('.auftrags-zeile[data-status="fertig"]', { hasText: art }).first(), ms)
+}
 const da = (l, ms = 15000) =>
   l.waitFor({ timeout: ms }).then(
     () => true,
@@ -64,22 +69,22 @@ try {
   pruefe(await da(p.locator('[data-gemeinsam]')), 'Green Line ist als „gemeinsam" gekennzeichnet')
   pruefe(await da(p.locator('[data-medien-leiste]')), 'Admin sieht die Leiste der Medienbank')
   woerter = await p
-    .locator('.module-container:not([hidden]) .vokabel-tabelle input[data-feld="term"]')
+    .locator('.module-container:not([hidden]) .vokabel-tabelle [data-feld="term"]')
     .evaluateAll((e) => e.map((x) => x.value).filter(Boolean))
   pruefe(woerter.length >= 4, `Abschnitt mit ${woerter.length} Wörtern`)
   await p.screenshot({ path: join(out, '1-admin.png') })
   await p.locator('[data-medien-bilder]').click()
-  pruefe(await da(p.getByText(/Beispielbilder: \d+ von \d+ erledigt/), 180000), 'Beispielbilder gesucht (KI wählt aus)')
+  pruefe(await auftragFertig(p, 'Beispielbilder suchen'), 'Beispielbilder gesucht (KI wählt aus)')
   await p.waitForTimeout(800)
   const bilder = await p.locator('[data-beispielbild] img').count()
   pruefe(bilder >= 1, `Beispielbilder in der Tabelle: ${bilder}`)
   await p.locator('[data-medien-aussprache]').click()
-  pruefe(await da(p.getByText(/Aussprache: \d+ von \d+ erledigt/), 180000), 'Aussprache erzeugt')
+  pruefe(await auftragFertig(p, 'Aussprache erzeugen'), 'Aussprache erzeugt')
   await p.waitForTimeout(800)
   pruefe((await p.locator('[data-aussprache="wort"]').count()) >= 1, 'Aussprache-Knöpfe in der Tabelle')
   if (await p.locator('[data-medien-satz]').isEnabled()) {
     await p.locator('[data-medien-satz]').click()
-    pruefe(await da(p.getByText(/Satz-Aussprache: \d+ von \d+ erledigt/), 180000), 'Satz-Aussprache erzeugt')
+    pruefe(await auftragFertig(p, 'Satz-Aussprache erzeugen'), 'Satz-Aussprache erzeugt')
     await p.waitForTimeout(800)
     pruefe((await p.locator('[data-aussprache="satz"]').count()) >= 1, 'Satz-Aussprache-Knöpfe in der Tabelle')
   }
@@ -88,7 +93,7 @@ try {
   await p.locator('[data-beispielbild]:has(img)').first().click()
   pruefe(await da(p.locator('[data-bild-kandidat]').first()), 'Pop-up zeigt die gefundenen Bilder zum Umwählen')
   await p.locator('[data-bild-ki]').click()
-  pruefe(await da(p.getByText('Bild erzeugt.')), '„Von der KI erzeugen" ersetzt das Bild')
+  pruefe(await auftragFertig(p, 'Beispielbild von der KI'), '„Von der KI erzeugen" ersetzt das Bild')
   await p.screenshot({ path: join(out, '3-bilddialog.png') })
   await p.keyboard.press('Escape')
 
@@ -105,7 +110,7 @@ try {
   pruefe((await q.locator('[data-medien-leiste]').count()) === 0, 'Lehrkraft: keine Leiste der Medienbank')
   pruefe(
     await q
-      .locator('.module-container:not([hidden]) .vokabel-tabelle input[data-feld="term"]')
+      .locator('.module-container:not([hidden]) .vokabel-tabelle [data-feld="term"]')
       .first()
       .evaluate((e) => e.readOnly),
     'Lehrkraft: Felder schreibgeschützt'

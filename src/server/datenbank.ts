@@ -153,11 +153,28 @@ export const passwortHashVon = (benutzer: string): string | null =>
   (datenbank().prepare('SELECT passwort_hash FROM nutzer WHERE benutzer = ?').get(benutzer.toLowerCase()) as { passwort_hash: string | null } | undefined)
     ?.passwort_hash ?? null
 
-export function alleNutzer(): NutzerInfo[] {
+/**
+ * Alle Konten – OHNE die Vorschaukonten („Als Schüler ansehen", vorschau.ts): Die zählen nie in
+ * Listen, Auswertungen, Lerngruppen oder im Namensschutz. `mitVorschau` nur für vorschau.ts selbst.
+ */
+export function alleNutzer(mitVorschau = false): NutzerInfo[] {
   // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
-  return (datenbank().prepare('SELECT * FROM nutzer').all() as unknown as NutzerZeile[])
+  return (datenbank().prepare(mitVorschau ? 'SELECT * FROM nutzer' : "SELECT * FROM nutzer WHERE quelle != 'vorschau'").all() as unknown as NutzerZeile[])
     .map(alsInfo)
     .sort((a, b) => a.rolle.localeCompare(b.rolle) || a.benutzer.localeCompare(b.benutzer))
+}
+
+/** SQL-Bedingung für Auswertungen, z. B. `schueler_id ${OHNE_VORSCHAU}`: Abgaben der Vorschaukonten zählen nie */
+export const OHNE_VORSCHAU = "NOT IN (SELECT id FROM nutzer WHERE quelle = 'vorschau')"
+
+/** Kennungen der Vorschaukonten (zum Herausfiltern von Zeilen, die nach Person gehen) */
+export const vorschauIds = (): Set<string> =>
+  new Set((datenbank().prepare("SELECT id FROM nutzer WHERE quelle = 'vorschau'").all() as { id: string }[]).map((z) => z.id))
+
+/** Zeilen ohne die der Vorschaukonten */
+export function ohneVorschau<T>(zeilen: T[], id: (z: T) => string): T[] {
+  const v = vorschauIds()
+  return v.size ? zeilen.filter((z) => !v.has(id(z))) : zeilen
 }
 
 /** Neue Kennung für einen Nutzer: Kleinbuchstaben/Ziffern (taugt als Ordnername) */

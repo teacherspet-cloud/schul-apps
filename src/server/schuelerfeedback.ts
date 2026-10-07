@@ -23,7 +23,7 @@ import { getSettings } from '../main/services/storage/settings'
 import { bogenAnfrage, bogenAus, ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { bogenKontextAus, rueckmeldungSystem } from '../renderer/src/modules/rueckmeldung/system'
 import type { Abgabe, Bogen, Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, OHNE_VORSCHAU, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { alleLernenden, gastName, gehoertZu, klasseVon, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
@@ -137,8 +137,10 @@ function gesamtVon(f: Freigabe): number {
   const ids = new Set<string>()
   if (nur.length) for (const n of alleNutzer()) if (nur.includes(n.benutzer)) ids.add(n.id)
   if (!nur.length && g) for (const n of mitgliederVon(g)) ids.add(n.id)
-  for (const x of db().prepare('SELECT nutzer_id FROM feedback_gaeste WHERE freigabe_id = ?').all(f.id) as { nutzer_id: string }[]) ids.add(x.nutzer_id)
-  for (const x of db().prepare('SELECT schueler_id FROM feedback_abgaben WHERE freigabe_id = ?').all(f.id) as { schueler_id: string }[]) ids.add(x.schueler_id)
+  for (const x of db().prepare(`SELECT nutzer_id FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id ${OHNE_VORSCHAU}`).all(f.id) as { nutzer_id: string }[])
+    ids.add(x.nutzer_id)
+  for (const x of db().prepare(`SELECT schueler_id FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`).all(f.id) as { schueler_id: string }[])
+    ids.add(x.schueler_id)
   return ids.size
 }
 
@@ -435,7 +437,7 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             lerngruppe: (f.lerngruppe_id ? lerngruppe(f.lerngruppe_id)?.name : '') ?? '',
             schueler: schuelerVon(f).length,
             ...(f.code ? { code: f.code, link: link(f.code) } : {}),
-            abgaben: (db().prepare('SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ?').get(f.id) as { n: number }).n,
+            abgaben: (db().prepare(`SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`).get(f.id) as { n: number }).n,
             // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
             gesamt: gesamtVon(f)
           }))
@@ -499,7 +501,7 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (req.method === 'GET' && teile.length === 1) {
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
       const abgaben = (
-        db().prepare('SELECT * FROM feedback_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(f.id) as unknown as {
+        db().prepare(`SELECT * FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU} ORDER BY aktualisiert DESC`).all(f.id) as unknown as {
           schueler_id: string
           fassungen: string
           aktualisiert: string

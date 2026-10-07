@@ -1,4 +1,6 @@
-import { Button, Container, Stack, Box, ScrollArea } from '@mantine/core'
+import { Button, Container, Stack, Box, Menu, ScrollArea } from '@mantine/core'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
+import { IconCopy, IconTable, IconTrash } from '@tabler/icons-react'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
@@ -27,9 +29,15 @@ import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { testHeadBlock, testToWorksheet } from '../render/testWorksheet'
-import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import { KiMenue, VersionSwitcher } from '../../arbeitsblatt/steps/BlockRevision'
+import { BlockSettings } from '../../arbeitsblatt/steps/BlockSettings'
+import { EinfuegenUntermenue } from '../../arbeitsblatt/steps/EinfuegenMenue'
+import LevelnMenue from '../../arbeitsblatt/steps/LevelnMenue'
+import WarningButton from '../../../shared/components/WarningButton'
+import { dupliziereBaustein, newBlock } from '../../arbeitsblatt/model/factory'
+import { switchVersion } from '../../arbeitsblatt/model/versions'
 import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
-import { testPoints, testTaskCount } from '../model/types'
+import { alleFassungsListen, alleTestBloecke, fassungsListe, testFassungen, testPoints, testTaskCount } from '../model/types'
 import { aiCall, useGrammatiktest } from '../store'
 import { GRAMMATIKTEST_FILTER, serializeGrammarTest } from '../project'
 import { defaultTestName } from '../library'
@@ -44,7 +52,7 @@ import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
-import { testBausteinNachWunsch, testHinweiseBeheben } from '../beheben'
+import { testBausteinNachWunsch, testHinweiseBeheben, testRasterAuftrag } from '../beheben'
 
 /**
  * Schritt 2: Test ansehen, bearbeiten und ausgeben.
@@ -52,7 +60,17 @@ import { testBausteinNachWunsch, testHinweiseBeheben } from '../beheben'
  * Bearbeitet wird unmittelbar auf der Seite – dieselbe Darstellung wie im Arbeitsblatt. Der
  * Lösungsteil trägt den Notenschlüssel und das Fehlerprofil; beides erscheint nur dort.
  */
+/** Standardmodus (07.10.2026): wie im Arbeitsblatt – Leveln, Raster, Baustein-Einstellungen, Lernplattform und feinere Blattoptionen über „Alle Werkzeuge" */
 export default function TestEditorStep(): React.JSX.Element {
+  return (
+    <OptionenBereich>
+      <TestEditorInhalt />
+    </OptionenBereich>
+  )
+}
+
+function TestEditorInhalt(): React.JSX.Element {
+  const voll = useAlleOptionen()
   const { test, setStep, update, undo, redo, verlauf, docName, savedAt, setDocName } = useGrammatiktest()
   // Blattoptionen, KI-Test-Dialog – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
@@ -63,7 +81,7 @@ export default function TestEditorStep(): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [view, setView] = useState<'student' | 'key'>('student')
-  // Gruppe A/B (30.09.2026, unregelmäßige Verben): welche Fassung der Editor zeigt
+  // Gruppe A–D (30.09.2026, A–D seit 06.10.2026): welche Fassung der Editor zeigt
   const [fassung, setFassung] = useState(0)
   /*
    * Word, PDF und Drucken fragen jetzt nach den Lösungen (ohne / anhängen / eigene Datei) –
@@ -110,7 +128,16 @@ export default function TestEditorStep(): React.JSX.Element {
 
   const sheet = ws.sheets[Math.min(fassung, ws.sheets.length - 1)]
   /** Die Bausteine der angezeigten Fassung im Entwurf */
-  const bloeckeVon = (d: typeof test): WsBlock[] => (ws.sheets.indexOf(sheet) === 1 && d.blocksB ? d.blocksB : d.blocks)
+  const fassungsIndex = Math.max(0, ws.sheets.indexOf(sheet))
+  const bloeckeVon = (d: typeof test): WsBlock[] => fassungsListe(d, fassungsIndex)
+  /** Eine Änderung an der Liste der angezeigten Fassung, an der Stelle des Bausteins */
+  const anDerStelle = (id: string, fn: (liste: WsBlock[], i: number) => void): void =>
+    update((d) => {
+      const liste = bloeckeVon(d)
+      const i = liste.findIndex((b) => b.id === id)
+      if (i >= 0) fn(liste, i)
+    })
+  const eigeneBloecke = alleTestBloecke(test)
   const key = view === 'key'
   const points = testPoints(test)
 
@@ -149,18 +176,80 @@ export default function TestEditorStep(): React.JSX.Element {
           ;[liste[i], liste[j]] = [liste[j], liste[i]]
         })
       }
+      busy={laufend.has(block.id)}
       extras={
-        // Zauberstab und Kreis mit Änderungswunsch (30.09.2026) – nicht am errechneten Kopfkasten
-        [...test.blocks, ...(test.blocksB ?? [])].some((b) => b.id === block.id) ? (
-          <KiWunschKnoepfe
-            blockId={block.id}
-            kontext={() => wunschKontextFuer(block, ws.meta, 'Grammatiktest')}
-            busy={laufend.has(block.id)}
-            onAusfuehren={(art, wunsch) => testBausteinNachWunsch(test, docId, block.id, art, wunsch)}
-          />
+        /*
+         * Dieselben Werkzeuge wie in der Klassenarbeit (06.10.2026): Hinweise, KI-Menü (Überarbeiten,
+         * Neu erzeugen, Leveln, Bewertungsraster), Einstellungen – nicht am errechneten Kopfkasten.
+         */
+        eigeneBloecke.some((b) => b.id === block.id) ? (
+          <>
+            {!key && block.warnings && block.warnings.length > 0 && (
+              <WarningButton
+                warnings={block.warnings}
+                onDismiss={() => anDerStelle(block.id, (liste, i) => (liste[i].warnings = []))}
+                onBeheben={(liste) => testHinweiseBeheben(test, docId, liste)}
+                laeuft={laufend.has('beheben')}
+              />
+            )}
+            <KiMenue
+              block={block}
+              busy={laufend.has(block.id) || laufend.has(`raster-${block.id}`)}
+              kontext={() => wunschKontextFuer(block, ws.meta, 'Grammatiktest')}
+              onWunsch={(art, wunsch) => testBausteinNachWunsch(test, docId, block.id, art, wunsch)}
+            >
+              <NurExperte>
+                <LevelnMenue block={block} meta={ws.meta} onRevise={(anweisung) => testBausteinNachWunsch(test, docId, block.id, 'ueberarbeiten', anweisung)} />
+              </NurExperte>
+              <NurExperte>
+                {block.type === 'task' && (
+                  <Menu.Item leftSection={<IconTable size={14} />} onClick={() => testRasterAuftrag(test, docId, block.id)} data-raster-erstellen>
+                    Bewertungsraster erstellen
+                  </Menu.Item>
+                )}
+              </NurExperte>
+            </KiMenue>
+            <NurExperte>
+              <BlockSettings
+                block={block}
+                combined={false}
+                update={(fn, gruppe) =>
+                  update((d) => {
+                    const b = bloeckeVon(d).find((x) => x.id === block.id)
+                    if (b) fn(b)
+                  }, gruppe)
+                }
+              />
+            </NurExperte>
+          </>
+        ) : undefined
+      }
+      menue={
+        eigeneBloecke.some((b) => b.id === block.id) ? (
+          <>
+            <Menu.Label>Baustein</Menu.Label>
+            <Menu.Item
+              leftSection={<IconCopy size={14} />}
+              onClick={() => anDerStelle(block.id, (liste, i) => void liste.splice(i + 1, 0, dupliziereBaustein(liste[i])))}
+            >
+              Duplizieren
+            </Menu.Item>
+            <EinfuegenUntermenue titel="Darüber einfügen" onWaehlen={(typ) => anDerStelle(block.id, (liste, i) => void liste.splice(i, 0, newBlock(typ)))} />
+            <EinfuegenUntermenue
+              titel="Darunter einfügen"
+              onWaehlen={(typ) => anDerStelle(block.id, (liste, i) => void liste.splice(i + 1, 0, newBlock(typ)))}
+            />
+            <Menu.Divider />
+            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => anDerStelle(block.id, (liste, i) => void liste.splice(i, 1))}>
+              Baustein löschen
+            </Menu.Item>
+          </>
         ) : undefined
       }
     >
+      {!placed.continued && !key && eigeneBloecke.some((b) => b.id === block.id) && (
+        <VersionSwitcher block={block} onSwitch={(v) => anDerStelle(block.id, (liste, i) => (liste[i] = switchVersion(liste[i], v)))} />
+      )}
       {content}
     </BausteinRahmen>
   )
@@ -182,7 +271,9 @@ export default function TestEditorStep(): React.JSX.Element {
         d.meta.kopfText = entwurf.body
         return
       }
-      const block = [...d.blocks, ...(d.blocksB ?? [])].find((b) => b.id === blockId)
+      const block = alleFassungsListen(d)
+        .flat()
+        .find((b) => b.id === blockId)
       if (block) fn(block)
     })
 
@@ -217,30 +308,42 @@ export default function TestEditorStep(): React.JSX.Element {
             kiVermerk={{ wert: test.meta.kiVermerk, ki: test.meta.ki, onChange: (v) => update((d) => (d.meta.kiVermerk = v)) }}
             schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
-            notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}
+            notizrand={voll ? { checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) } : undefined}
             anmerkungen={
-              hatAnmerkungen([...test.blocks, ...(test.blocksB ?? [])])
-                ? { wert: anmerkungsArt(test.meta), onChange: (art) => update((d) => (d.meta.anmerkungen = art)) }
+              voll
+                ? hatAnmerkungen(alleTestBloecke(test))
+                  ? { wert: anmerkungsArt(test.meta), onChange: (art) => update((d) => (d.meta.anmerkungen = art)) }
+                  : undefined
                 : undefined
             }
-            blocksatz={{ checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) }}
-            fach={test.meta.subjectId}
-            vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}
-            ueberthema={{ werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') }}
-            vorKiTest={
-              test.meta.kopfText?.trim() ? (
-                <Button size="compact-xs" variant="subtle" onClick={() => update((d) => (d.meta.kopfText = undefined))}>
-                  Kopfkasten wieder berechnen
-                </Button>
-              ) : null
+            blocksatz={
+              voll ? { checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) } : undefined
             }
-            kiTest={{
-              an: Boolean(test.meta.aiCanary),
-              woerter: test.meta.aiCanaryWords,
-              vorschlagFuer: `${test.meta.title}|${test.meta.topics.join(', ')}`,
-              onEin: () => setCanaryOffen(true),
-              onAus: () => update((d) => (d.meta.aiCanary = false))
-            }}
+            fach={test.meta.subjectId}
+            vorlagenfarbe={voll ? { checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) } : undefined}
+            ueberthema={
+              voll ? { werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') } : undefined
+            }
+            vorKiTest={
+              voll ? (
+                test.meta.kopfText?.trim() ? (
+                  <Button size="compact-xs" variant="subtle" onClick={() => update((d) => (d.meta.kopfText = undefined))}>
+                    Kopfkasten wieder berechnen
+                  </Button>
+                ) : null
+              ) : undefined
+            }
+            kiTest={
+              voll
+                ? {
+                    an: Boolean(test.meta.aiCanary),
+                    woerter: test.meta.aiCanaryWords,
+                    vorschlagFuer: `${test.meta.title}|${test.meta.topics.join(', ')}`,
+                    onEin: () => setCanaryOffen(true),
+                    onAus: () => update((d) => (d.meta.aiCanary = false))
+                  }
+                : undefined
+            }
           />
         }
         info={`${testTaskCount(test)} Aufgaben · ${points} Punkte`}
@@ -272,7 +375,9 @@ export default function TestEditorStep(): React.JSX.Element {
                 fassungen: () => fassungenAusBlatt(testToWorksheet(test), logo, settings.schoolName)
               })}
             />
-            <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} ziel={quelle.ziel} />
+            <NurExperte>
+              <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} ziel={quelle.ziel} />
+            </NurExperte>
           </>
         }
       />
@@ -305,23 +410,24 @@ export default function TestEditorStep(): React.JSX.Element {
                 befunde={formen}
                 onUmsetzen={() =>
                   update((d) => {
-                    operatorformenUmsetzen(d.blocks)
-                    if (d.blocksB) operatorformenUmsetzen(d.blocksB)
+                    for (const liste of alleFassungsListen(d)) operatorformenUmsetzen(liste)
                   })
                 }
               />
             )}
             {/* Ankreuzfragen zu einem Lese- oder Hörtext ohne Blindprobe (01.10.2026) – nur ausgewiesene Verstehensaufgaben */}
             <McBlindHinweis
-              listen={[test.blocks, ...(test.blocksB ? [test.blocksB] : [])]}
+              listen={testFassungen(test)}
               ai={aiCall}
               streng
               uebernehmen={(ergebnisse) =>
                 update((d) => {
                   const vorher = ergebnisse.flatMap((e) => e.vorher)
                   const nachher = ergebnisse.flatMap((e) => e.nachher)
-                  d.blocks = uebernimmBlindprobe(d.blocks, vorher, nachher)
-                  if (d.blocksB) d.blocksB = uebernimmBlindprobe(d.blocksB, vorher, nachher)
+                  alleFassungsListen(d).forEach((liste, i) => {
+                    const neu = uebernimmBlindprobe(liste, vorher, nachher)
+                    fassungsListe(d, i).splice(0, liste.length, ...neu)
+                  })
                 })
               }
             />
@@ -336,7 +442,7 @@ export default function TestEditorStep(): React.JSX.Element {
                   // Textauswahl-Menü (01.10.2026): neuer Baustein hinter dem Material – in jeder Fassung, die es enthält
                   einfuegenNach: (anker, neu) =>
                     update((d) => {
-                      for (const liste of [d.blocks, d.blocksB ?? []]) {
+                      for (const liste of alleFassungsListen(d)) {
                         const i = liste.findIndex((b) => b.id === anker)
                         if (i >= 0) liste.splice(i + 1, 0, structuredClone(neu))
                       }

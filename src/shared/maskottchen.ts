@@ -64,6 +64,8 @@ export interface MaskottchenInfo extends MaskottchenMeta {
   vorlage: string
   /** Pose → Bild */
   posen: Record<string, string>
+  /** Figur der Schule (am Server, vom Admin in der Verwaltung gepflegt) – für Lehrkräfte nur lesbar (06.10.2026) */
+  schule?: boolean
 }
 
 /**

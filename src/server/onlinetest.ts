@@ -46,7 +46,7 @@ import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/s
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
 import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { iservBereit } from './anmeldung'
@@ -163,8 +163,15 @@ export function lerngruppe(id: string): Lerngruppe | null {
 /** Gehört die Schülerin/der Schüler zur Lerngruppe? (IServ-Gruppe oder von Hand eingetragen) */
 export function gehoertZu(g: Lerngruppe, n: Pick<NutzerInfo, 'benutzer' | 'gruppen'>): boolean {
   if (g.mitglieder.includes(n.benutzer)) return true
+  // Vorschaukonto („Als Schüler ansehen", vorschau.ts): gehört zu allen Lerngruppen gleichen Namens seiner Lehrkraft
+  const vorschau = vorschauGruppe(g.lehrkraft_id, g.name)
+  if (n.gruppen.some((x) => x.id === vorschau)) return true
   return Boolean(g.iserv_gruppe) && n.gruppen.some((x) => x.id === g.iserv_gruppe)
 }
+
+/** Gruppenkennung des Vorschaukontos einer Klasse (Lerngruppen gleichen Namens, wie klassenSchluessel in klassen.ts) */
+export const vorschauGruppe = (lehrkraftId: string, klassenName: string): string =>
+  `vorschau:${lehrkraftId}:${klassenName.trim().toLowerCase().replace(/\s+/g, ' ')}`
 
 /**
  * Alle Schülerkonten der Schule (03.10.2026): Einzelne Lernende lassen sich auch ohne eigene
@@ -446,8 +453,11 @@ function teilnahme(id: string): TeilnahmeZeile | null {
   return (db().prepare('SELECT * FROM teilnahmen WHERE id = ?').get(id) as TeilnahmeZeile | undefined) ?? null
 }
 
-function teilnahmenVon(testId: string): TeilnahmeZeile[] {
-  return db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? ORDER BY rowid').all(testId) as unknown as TeilnahmeZeile[]
+/** Teilnahmen eines Tests – ohne die der Vorschaukonten (zählen nie in Listen, Noten, Abschreibliste); `mitVorschau` für Zeit und KI */
+function teilnahmenVon(testId: string, mitVorschau = false): TeilnahmeZeile[] {
+  return db()
+    .prepare(`SELECT * FROM teilnahmen WHERE test_id = ?${mitVorschau ? '' : ` AND schueler_id ${OHNE_VORSCHAU}`} ORDER BY rowid`)
+    .all(testId) as unknown as TeilnahmeZeile[]
 }
 
 /** Endgültig abgeben: Antworten festschreiben, sofort bewerten, was eindeutig ist – den Rest danach die KI */
@@ -490,7 +500,7 @@ function teilnahmeAnlegen(test: Test, schuelerId: string): TeilnahmeZeile {
 }
 
 function abgelaufeneAbschliessen(test: Test): void {
-  for (const t of teilnahmenVon(test.id))
+  for (const t of teilnahmenVon(test.id, true))
     if (!t.abgabe && t.beginn > 0 && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
 }
 
@@ -546,7 +556,7 @@ type Fall = KiFall & { teilnahme: string; einheit: string; feld: string; art: 'k
  * Urteile der Lehrkraft werden nie überschrieben.
  */
 async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): Promise<{ anfragen: number; bewertet: number }> {
-  const alle = teilnahmenVon(test.id).filter((t) => t.abgabe)
+  const alle = teilnahmenVon(test.id, true).filter((t) => t.abgabe)
   let anfragen = 0
   let bewertet = 0
   for (let v = 0; v < test.fassungen.length; v++) {
@@ -959,6 +969,11 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
         const g = lerngruppe(test.lerngruppe_id)
         if (g && !gehoertZu(g, ich) && ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Dieser Test ist für eine andere Lerngruppe.' }), true)
       }
+      // Vorschaukonto (vorschau.ts): nur Tests der eigenen Klasse – nie fremde per Code
+      if (ich.quelle === 'vorschau') {
+        const g = test.lerngruppe_id ? lerngruppe(test.lerngruppe_id) : null
+        if (!g || !gehoertZu(g, ich)) return (json(res, 403, { fehler: 'In der Vorschau nur Tests dieser Klasse.' }), true)
+      }
       abgelaufeneAbschliessen(test)
       let t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, ich.id) as TeilnahmeZeile | undefined
       if (!t) {
@@ -1345,7 +1360,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         .prepare('UPDATE onlinetests SET status = ?, beendet = ? WHERE id = ?')
         .run(status, status === 'beendet' ? new Date().toISOString() : null, test.id)
       if (status === 'beendet') {
-        for (const t of teilnahmenVon(test.id)) {
+        for (const t of teilnahmenVon(test.id, true)) {
           if (t.abgabe) continue
           // Nie gestartet: Die Wartenden haben nichts geschrieben – ihre Teilnahme entfällt
           if (t.beginn === 0) db().prepare('DELETE FROM teilnahmen WHERE id = ?').run(t.id)
@@ -1617,10 +1632,21 @@ export type { Nutzer }
 // ---------------------------------------------------------------- Unterrichtsreihe (Etappe 6)
 
 /** Test für eine Reihe: eigenes Tempo – sofort offen, Ergebnis gleich nach der Abgabe */
-export function reihenTestAnlegen(lehrkraftId: string, e: { titel: string; test: TestDocument; lerngruppeId?: string; zeitMin: number }): string {
+export function reihenTestAnlegen(
+  lehrkraftId: string,
+  /** Vokabeltest (`test`) oder – seit 06.10.2026 – Lernzielkontrolle/Grammatiktest als Onlinefassungen (`blatt`) */
+  e: { titel: string; test?: TestDocument; blatt?: Parameters<typeof testErstellen>[1]['blatt']; thema?: string; lerngruppeId?: string; zeitMin: number }
+): string {
   const lehrkraft = nutzerNachId(lehrkraftId)
   if (!lehrkraft) throw new Error('Unbekannte Lehrkraft.')
-  const t = testErstellen(lehrkraft, { titel: e.titel, test: e.test, lerngruppeId: e.lerngruppeId, zeitMin: e.zeitMin, gaeste: false, handschrift: true })
+  const t = testErstellen(lehrkraft, {
+    titel: e.titel,
+    ...(e.blatt ? { blatt: e.blatt, ...(e.thema ? { thema: e.thema } : {}) } : { test: e.test }),
+    lerngruppeId: e.lerngruppeId,
+    zeitMin: e.zeitMin,
+    gaeste: false,
+    handschrift: true
+  })
   db().prepare("UPDATE onlinetests SET status = 'offen' WHERE id = ?").run(t.id)
   einstellungenSetzen(t, { gestartet: Date.now(), ergebnisFrei: true, reihe: true })
   return t.id

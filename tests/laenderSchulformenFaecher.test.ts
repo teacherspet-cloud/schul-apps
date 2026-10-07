@@ -217,7 +217,8 @@ describe('Fächer', () => {
   })
 
   it('Sprachprogramme: Programmsichtbarkeit passt zu den Sprachen von Vokabeltest und Grammatiktest', () => {
-    const vokabel = [...LANGUAGES.map((l) => FACH_ZU_SPRACHE[l.value]), 'daz'].sort()
+    // Deutsch (DaZ) seit 06.10.2026 in LANGUAGES: Vokabellisten auf Deutsch gehören zu DaZ
+    const vokabel = [...new Set([...LANGUAGES.map((l) => (l.value === 'de' ? 'daz' : FACH_ZU_SPRACHE[l.value])), 'daz'])].sort()
     expect([...SPRACH_FAECHER].sort()).toEqual(vokabel)
     expect([...GRAMMATIK_FAECHER].sort()).toEqual([...GRAMMAR_SUBJECTS].sort())
     for (const id of [...SPRACH_FAECHER, ...GRAMMATIK_FAECHER]) expect(SPRACHFAECHER.includes(id) || id === 'deutsch', id).toBe(true)

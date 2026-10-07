@@ -1,5 +1,5 @@
 import { Alert, Badge, Box, Button, Card, Chip, Collapse, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconCheck, IconChevronRight, IconDeviceFloppy, IconListDetails } from '@tabler/icons-react'
+import { IconCheck, IconChevronRight, IconDeviceFloppy, IconListDetails, IconStack2 } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../../shared/useUndoKeys'
@@ -15,7 +15,8 @@ import type { VocabRow } from './VocabRow'
 import { istVerbSprache } from '@shared/verben'
 import VerbListeDialog from '../../../shared/verben/VerbListeDialog'
 import { aufServer } from '../../../shared/plattform'
-import { MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
+import { AbschnitteDialog, MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
+import { setzeVokabelAnsicht, zielBuch } from '../../../shared/medien/medienAuftrag'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
 function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
@@ -37,7 +38,18 @@ function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
  * Gespeichert wird von selbst, kurz nach jeder Änderung. Vorher verwarf schon der Wechsel
  * der Unit alles Getippte – ohne Hinweis.
  */
-export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: string; onBack: () => void; aktiv?: boolean }): React.JSX.Element {
+export default function BookEditor({
+  bookId,
+  onBack,
+  aktiv = true,
+  start
+}: {
+  bookId: string
+  onBack: () => void
+  aktiv?: boolean
+  /** Gleich diesen Abschnitt zeigen („Öffnen" eines Medienauftrags, 06.10.2026); `n` zählt hoch, damit auch derselbe Sprung wirkt */
+  start?: { unit: string; abschnitt: string; n: number }
+}): React.JSX.Element {
   const [book, setBook] = useState<Textbook | null>(null)
   const [unit, setUnit] = useState('')
   const [section, setSection] = useState('')
@@ -50,6 +62,8 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   const [angabenOffen, setAngabenOffen] = useState(false)
   // Liste unregelmäßiger Verben dieses Bandes (30.09.2026) – eigene Ablage neben dem Buch
   const [verbenOffen, setVerbenOffen] = useState(false)
+  // Medienaufträge für mehrere Abschnitte auf einmal (06.10.2026)
+  const [abschnitteOffen, setAbschnitteOffen] = useState(false)
   // Alle Lehrwerke – Vorschlagslisten für Reihe, Verlag, Landesausgabe, Ausgabe
   const [alle, setAlle] = useState<TextbookMeta[]>([])
   /*
@@ -83,12 +97,38 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
       .get(bookId)
       .then((b) => {
         setBook(b)
-        setUnit(b.units[0]?.name ?? '')
-        setSection(b.units[0]?.sections[0]?.name ?? '')
+        // „Öffnen" eines Medienauftrags: gleich der Abschnitt, an dem er gearbeitet hat
+        const u = (start && b.units.find((x) => x.name === start.unit)) || b.units[0]
+        const s = (start && u?.sections.find((x) => x.name === start.abschnitt)) || u?.sections[0]
+        setUnit(u?.name ?? '')
+        setSection(s?.name ?? '')
         setGeladen((n) => n + 1)
       })
       .catch(notifyError)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId])
+
+  // Sprung zu einem Abschnitt, während das Buch schon offen ist (erst das Getippte sichern)
+  useEffect(() => {
+    if (!start || !book) return
+    const u = book.units.find((x) => x.name === start.unit)
+    if (!u || !u.sections.some((x) => x.name === start.abschnitt)) return
+    if (u.name === unit && start.abschnitt === section) return
+    void wechsle(() => {
+      setUnit(u.name)
+      setSection(start.abschnitt)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start?.n])
+
+  // Diese Stelle ist gerade zu sehen – „Öffnen" in der Auftragsleiste wechselt dann nur ins Programm
+  const medienZiel = book ? zielBuch(book.id, book.name, unit, section, book.grade) : null
+  const ansicht = medienZiel?.docId ?? null
+  useEffect(() => {
+    if (!aktiv || !ansicht) return
+    setzeVokabelAnsicht(ansicht)
+    return () => setzeVokabelAnsicht(null)
+  }, [ansicht, aktiv])
 
   // Abschnitt wechseln: Zeilen aus dem Buch holen
   useEffect(() => {
@@ -330,8 +370,8 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
             {gesperrt
               ? 'Gemeinsames Lehrwerk der Schule – nur Admins können es bearbeiten. Für eigene Änderungen eine eigene Vokabelliste anlegen.'
               : gemeinsam
-                ? 'Gemeinsames Lehrwerk der Schule: Änderungen gelten sofort für alle Lehrkräfte und Lernenden. „Änderungen verwerfen" stellt die mitgelieferte Fassung wieder her.'
-                : 'Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.'}
+              ? 'Gemeinsames Lehrwerk der Schule: Änderungen gelten sofort für alle Lehrkräfte und Lernenden. „Änderungen verwerfen" stellt die mitgelieferte Fassung wieder her.'
+              : 'Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.'}
           </Text>
         </Alert>
       )}
@@ -358,12 +398,37 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
             />
           )}
         </Group>
-        {admin && (
+        {admin && medienZiel && (
           <MedienLeiste
             sprache={book.language}
             vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example }))}
             daten={medien.daten}
-            neuLaden={medien.laden}
+            ziel={medienZiel}
+            mehr={
+              <Button size="xs" variant="light" leftSection={<IconStack2 size={14} />} onClick={() => setAbschnitteOffen(true)} data-medien-mehrere>
+                Mehrere Abschnitte …
+              </Button>
+            }
+          />
+        )}
+        {admin && (
+          <AbschnitteDialog
+            opened={abschnitteOffen}
+            onClose={() => setAbschnitteOffen(false)}
+            sprache={book.language}
+            abschnitte={book.units.flatMap((u) =>
+              u.sections.map((s) => ({
+                unit: u.name,
+                abschnitt: s.name,
+                // Der offene Abschnitt mit dem Getippten, die übrigen aus dem Buch
+                vokabeln: (u.name === unit && s.name === section ? rows : s.entries).map((e) => ({
+                  term: e.term,
+                  translation: e.translation,
+                  example: e.example
+                })),
+                ziel: zielBuch(book.id, book.name, u.name, s.name, book.grade)
+              }))
+            )}
           />
         )}
         {/* Schulbücher führen den Beispielsatz in einem eigenen Feld, nicht im Hinweis */}
@@ -373,7 +438,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
           mitVerlauf
           sprache={book.language}
           nurLesen={gesperrt}
-          medien={{ sprache: book.language, daten: medien.daten, admin, neuLaden: medien.laden }}
+          medien={{ sprache: book.language, daten: medien.daten, admin, neuLaden: medien.laden, ...(medienZiel ? { ziel: medienZiel } : {}) }}
           onChange={(r, gruppe) => {
             verlauf.setze(r, gruppe)
             geaendert()

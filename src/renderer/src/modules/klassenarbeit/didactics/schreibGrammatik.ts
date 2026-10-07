@@ -97,14 +97,22 @@ export function strukturenFuer(m: Meta): { topic: GrammarTopic; eingefuehrt: boo
   }))
 }
 
-/** Voreinstellung nach Land und Lernjahr (Bericht 5.5) */
+/**
+ * Voreinstellung nach Land und Lernjahr (Bericht 5.5).
+ *
+ * Die ART der Vorgabe steht seit 06.10.2026 überall auf „Bandbreite" (Wunsch der Lehrkraft): Wer
+ * Grammatik ausdrücklich mitprüft, beginnt mit „Use a variety of …" und wählt eine feste Anzahl
+ * oder die Erinnerung bewusst. Bewertung und Mindestanzahl folgen weiter Land und Lernjahr – sie
+ * gelten, sobald auf „Mit Anzahl" umgestellt wird. Gespeicherte Arbeiten behalten ihre Wahl
+ * (`part.grammatik`); der Vorschlag greift nur beim Einschalten.
+ */
 export function vorschlag(m: Meta): SchreibGrammatik {
   const lj = lernjahr(m)
-  if (m.stateId === 'NI') return { themen: [], modus: 'erinnerung', bewertung: 'integriert' }
+  if (m.stateId === 'NI') return { themen: [], modus: 'bandbreite', bewertung: 'integriert' }
   if (m.grade >= 11 || lj >= 5) return { themen: [], modus: 'bandbreite', bewertung: 'integriert' }
   // Saarland, Gymnasium Kl. 9/10 Englisch (1. und 2. FS): Raster im Lehrplan 2025 – „Bandbreite ist … der ausschlaggebende Faktor"
   if (m.stateId === 'SL' && m.schoolTypeId === 'gymnasium' && m.subjectId === 'englisch' && m.grade >= 9) return { themen: [], modus: 'bandbreite', bewertung: 'integriert' }
-  return { themen: [], modus: lj <= 4 ? 'anzahl' : 'bandbreite', anzahl: lj <= 2 ? 3 : 2, bewertung: 'kriterium' }
+  return { themen: [], modus: 'bandbreite', anzahl: lj <= 2 ? 3 : 2, bewertung: 'kriterium' }
 }
 
 /** Landesregeln aus der Nachrecherche 29.09.2026 (Bericht, Abschnitt „Nachrecherche 29.09.") */

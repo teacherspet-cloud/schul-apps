@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useMaskottchenZiel } from './maskottchenStore'
 import type { MutableRefObject } from 'react'
 import { create } from 'zustand'
 import { sichereAlles } from './autosave'
@@ -253,6 +254,16 @@ export function findeBaustein(schluessel: string, wurzel: ParentNode = document)
  * – wenn er an einem Baustein arbeitet – dessen Schritt und der Baustein selbst.
  */
 export async function geheZuDokument(moduleId: string, docId: string, schonOffen: boolean, ziel?: DokumentZiel): Promise<void> {
+  // Maskottchen-Aufträge: keine Dokumente, sondern Figuren in den Einstellungen (eigene) bzw. der Verwaltung (Schule)
+  if (docId.startsWith('maskottchen-')) {
+    const [figur, pose] = (ziel?.baustein ?? docId).replace(/^maskottchen-/, '').split(':')
+    if (moduleId === 'verwaltung') {
+      useNavigation.getState().openModule('verwaltung')
+      zielZeiger.get('verwaltung')?.({ baustein: 'maskottchen' })
+    } else openSettings('material')
+    useMaskottchenZiel.getState().setze({ figurId: figur, poseId: pose || 'winkend' })
+    return
+  }
   if (schonOffen) useNavigation.getState().openModule(moduleId)
   else await useNavigation.getState().openDocument(moduleId, docId)
   // Das Programm zeigt das Dokument (nicht seine Bibliothek) und – bei einem Baustein – den Schritt mit dem Blatt

@@ -6,9 +6,14 @@
  * 512 px) gespeichert, die übrigen Kandidaten bleiben zum Umwählen. Alternativ erzeugt die Bild-KI eines.
  * Aussprache: die Sprach-KI (ElevenLabs bzw. OpenAI-Stimme) mit der Standardstimme der Sprache.
  * Alle Wege laufen über die vorhandenen Kanäle – mit Schlüsseln, Namensschutz und Verbrauch wie sonst.
+ *
+ * Seit 06.10.2026 laufen sie als Hintergrund-Aufträge (medienAuftrag.ts): Die KI-Aufrufe kommen dann über den
+ * Auftrag (`Ki`), damit Fortschritt, Warteplatz und Abbruch in der Auftragsleiste stimmen. Für jüngere Lernende
+ * (bis Klasse 6) sucht die Bildsuche zuerst Cliparts und Illustrationen, Fotos nur als Rückfall.
  */
-import type { OnlineImageHit, OnlineImageSource } from '@shared/types'
+import type { OnlineImageHit, OnlineImageSource, StructuredRequest } from '@shared/types'
 import type { MedienKandidat, TonArt } from '@shared/medienbank'
+import { istBegrenzung } from './medienWarten'
 
 export interface Vokabel {
   term: string
@@ -16,7 +21,35 @@ export interface Vokabel {
   example?: string
 }
 
-const SPRACHE_NAME: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', nl: 'Niederländisch', pl: 'Polnisch', ru: 'Russisch', tr: 'Türkisch' }
+/** Wie die Abläufe die KI erreichen – im Auftrag über dessen Kontext, sonst direkt */
+export interface Ki {
+  ai: <T>(req: StructuredRequest) => Promise<T>
+  bild: (prompt: string) => Promise<string>
+}
+const direkt = (): Ki => ({ ai: (req) => window.api.ai.structured(req), bild: (prompt) => window.api.ai.image(prompt) })
+
+/** Wer die Vokabeln lernt – steuert Bildart und Bildsprache */
+export interface Lernende {
+  /** Klassenstufe aus Liste oder Lehrwerk (fehlt = unbekannt) */
+  klasse?: number
+}
+
+/** Bis zu dieser Klasse bevorzugt die Bildsuche Cliparts (Wunsch der Lehrkraft, 06.10.2026) */
+export const CLIPART_BIS_KLASSE = 6
+export const clipartZuerst = (l?: Lernende): boolean => Boolean(l?.klasse && l.klasse <= CLIPART_BIS_KLASSE)
+
+const SPRACHE_NAME: Record<string, string> = {
+  de: 'Deutsch',
+  en: 'Englisch',
+  fr: 'Französisch',
+  es: 'Spanisch',
+  it: 'Italienisch',
+  la: 'Latein',
+  nl: 'Niederländisch',
+  pl: 'Polnisch',
+  ru: 'Russisch',
+  tr: 'Türkisch'
+}
 
 /** Bild verkleinern (JPEG, höchstens `max` px) – die Medienbank bleibt klein, Laden geht schnell */
 export async function verkleinern(dataUrl: string, max = 512): Promise<string> {
@@ -39,33 +72,78 @@ export async function verkleinern(dataUrl: string, max = 512): Promise<string> {
 
 const nachweisVon = (k: MedienKandidat): string => [k.titel, k.urheber, k.lizenz, k.quelle].filter(Boolean).join(' · ')
 
-/** Kandidaten aus der Bildsuche – englischer Begriff bei Englisch, sonst die deutsche Bedeutung */
-export async function bildKandidaten(sprache: string, v: Vokabel): Promise<MedienKandidat[]> {
-  const suche = sprache === 'en' ? v.term : v.translation || v.term
-  const quellen: OnlineImageSource[] = ['openverse', 'wikimedia', 'pixabay']
-  const treffer: OnlineImageHit[] = []
-  for (const q of quellen) {
-    const t = await window.api.images.searchOnline(suche, q).catch(() => [] as OnlineImageHit[])
-    treffer.push(...t.slice(0, 4))
+/** Eine Suchanfrage: Quelle und – bei Pixabay – die Bildart */
+type Suche = { quelle: OnlineImageSource; bildart?: 'photo' | 'illustration' | 'vector' }
+
+/**
+ * Reihenfolge der Suchen. Jüngere Lernende: zuerst Cliparts (Openverse-Illustrationen, Pixabay Illustration und
+ * Vektor), Fotos nur, wenn das zu wenig liefert. Ältere: wie bisher Fotos und Grafiken gemischt.
+ */
+export function suchReihe(l?: Lernende): { zuerst: Suche[]; rueckfall: Suche[] } {
+  const fotos: Suche[] = [{ quelle: 'openverse' }, { quelle: 'wikimedia' }, { quelle: 'pixabay' }]
+  if (!clipartZuerst(l)) return { zuerst: fotos, rueckfall: [] }
+  return {
+    zuerst: [{ quelle: 'clipart' }, { quelle: 'pixabay', bildart: 'vector' }, { quelle: 'pixabay', bildart: 'illustration' }],
+    rueckfall: [{ quelle: 'openverse' }, { quelle: 'pixabay', bildart: 'photo' }]
   }
+}
+
+/** Suchbegriff: der englische Begriff bei Englisch (und das Wort selbst bei Deutsch), sonst die deutsche Bedeutung */
+const suchbegriff = (sprache: string, v: Vokabel): string => (sprache === 'en' || sprache === 'de' ? v.term : v.translation || v.term)
+
+/**
+ * Kandidaten aus der Bildsuche. Scheitern ALLE Quellen an einer Begrenzung (z. B. Pixabay 429) und es gibt
+ * keinen Treffer, kommt der Fehler durch – dann wartet der Auftrag, statt das Wort als „ohne Bild" abzuhaken.
+ */
+export async function bildKandidaten(sprache: string, v: Vokabel, lernende?: Lernende): Promise<MedienKandidat[]> {
+  const suche = suchbegriff(sprache, v)
+  const { zuerst, rueckfall } = suchReihe(lernende)
+  const treffer: OnlineImageHit[] = []
+  const begrenzt: unknown[] = []
+  const hole = async (reihe: Suche[]): Promise<void> => {
+    for (const s of reihe) {
+      const t = await window.api.images.searchOnline(suche, s.quelle, s.bildart ? { bildart: s.bildart } : undefined).catch((e: unknown) => {
+        if (istBegrenzung(e instanceof Error ? e.message : String(e))) begrenzt.push(e)
+        return [] as OnlineImageHit[]
+      })
+      treffer.push(...t.slice(0, 4))
+    }
+  }
+  await hole(zuerst)
+  // Zu wenig Cliparts: Fotos als Rückfall
+  if (treffer.length < 4 && rueckfall.length) await hole(rueckfall)
+  if (!treffer.length && begrenzt.length) throw begrenzt[0]
   const gesehen = new Set<string>()
-  return treffer
-    // https – oder kleine data-Bilder (KI-Attrappe der Tests)
-    .filter((h) => (/^https:\/\//.test(h.url) || (h.url.startsWith('data:image/') && h.url.length < 4000)) && !gesehen.has(h.url) && gesehen.add(h.url))
-    .slice(0, 10)
-    .map((h) => ({ url: h.url, vorschau: h.thumbnail || h.url, titel: h.title, urheber: h.creator, lizenz: h.license, quelle: h.source }))
+  return (
+    treffer
+      // https – oder kleine data-Bilder (KI-Attrappe der Tests)
+      .filter((h) => (/^https:\/\//.test(h.url) || (h.url.startsWith('data:image/') && h.url.length < 4000)) && !gesehen.has(h.url) && gesehen.add(h.url))
+      .slice(0, 10)
+      .map((h) => ({ url: h.url, vorschau: h.thumbnail || h.url, titel: h.title, urheber: h.creator, lizenz: h.license, quelle: h.source }))
+  )
+}
+
+/** Hinweis an die KI zur Bildart, je nach Alter der Lernenden */
+export function bildartHinweis(l?: Lernende): string {
+  if (clipartZuerst(l))
+    return `Die Lernenden sind in Klasse ${l!.klasse} (etwa ${l!.klasse! + 5}–${
+      l!.klasse! + 6
+    } Jahre): Bevorzuge klare, freundliche Cliparts oder Illustrationen; ein Foto nur, wenn kein Clipart die Bedeutung eindeutig zeigt.`
+  return 'Fotos und klare Grafiken sind gleichermaßen geeignet.'
 }
 
 /** Die KI wählt aus den Vorschauen das Bild, das die Bedeutung am eindeutigsten zeigt; -1 = keines */
-export async function kiWaehlt(sprache: string, v: Vokabel, kandidaten: MedienKandidat[]): Promise<number> {
+export async function kiWaehlt(sprache: string, v: Vokabel, kandidaten: MedienKandidat[], lernende?: Lernende, ki: Ki = direkt()): Promise<number> {
   const vorschauen: { i: number; dataUrl: string }[] = []
   for (const [i, k] of kandidaten.slice(0, 6).entries()) {
     const d = await window.api.images.fetch(k.vorschau).catch(() => '')
     if (d) vorschauen.push({ i, dataUrl: await verkleinern(d, 256).catch(() => d) })
   }
   if (!vorschauen.length) return -1
-  const antwort = await window.api.ai.structured<{ wahl: number; begruendung: string }>({
-    system: 'Du wählst Beispielbilder für Vokabelkarten. Ein gutes Bild zeigt die Bedeutung eindeutig, ohne Text, kindgerecht und ohne bekannte Marken oder erkennbare Personen im Mittelpunkt.',
+  const antwort = await ki.ai<{ wahl: number; begruendung: string }>({
+    system: `Du wählst Beispielbilder für Vokabelkarten. Ein gutes Bild zeigt die Bedeutung eindeutig, ohne Text, kindgerecht und ohne bekannte Marken oder erkennbare Personen im Mittelpunkt. ${bildartHinweis(
+      lernende
+    )}`,
     user: [
       `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`,
       `Die ${vorschauen.length} Bilder sind von 1 bis ${vorschauen.length} nummeriert (in dieser Reihenfolge).`,
@@ -87,23 +165,23 @@ export async function kiWaehlt(sprache: string, v: Vokabel, kandidaten: MedienKa
 /** Ein Kandidat als Bild der Medienbank (in voller Größe geladen, dann verkleinert) */
 export async function kandidatUebernehmen(sprache: string, wort: string, k: MedienKandidat, alle?: MedienKandidat[]): Promise<void> {
   const d = await window.api.images.fetch(k.url).catch(() => window.api.images.fetch(k.vorschau))
-  await window.api.medien.bildSetzen(sprache, wort, { dataUrl: await verkleinern(d), herkunft: 'suche', nachweis: nachweisVon(k), ...(alle ? { kandidaten: alle } : {}) })
+  await window.api.medien.bildSetzen(sprache, wort, {
+    dataUrl: await verkleinern(d),
+    herkunft: 'suche',
+    nachweis: nachweisVon(k),
+    ...(alle ? { kandidaten: alle } : {})
+  })
 }
 
-/** Suchen, wählen lassen, speichern. false = kein geeignetes Bild gefunden */
-export async function bildSuchenUndSetzen(sprache: string, v: Vokabel): Promise<boolean> {
-  const kandidaten = await bildKandidaten(sprache, v)
-  if (!kandidaten.length) return false
-  const i = await kiWaehlt(sprache, v, kandidaten)
-  if (i < 0) return false
-  await kandidatUebernehmen(sprache, v.term, kandidaten[i], kandidaten)
-  return true
-}
-
-/** Bild von der Bild-KI erzeugen lassen */
-export async function bildErzeugen(sprache: string, v: Vokabel): Promise<void> {
-  const prompt = `Simple, friendly illustration for a vocabulary flashcard showing "${v.translation || v.term}" (${SPRACHE_NAME[sprache] ?? sprache} word: "${v.term}"). Clear single subject, plain light background, no text, no letters, no logos.`
-  const d = await window.api.ai.image(prompt)
+/** Bild von der Bild-KI erzeugen lassen – für jüngere Lernende im Clipart-Stil */
+export async function bildErzeugen(sprache: string, v: Vokabel, lernende?: Lernende, ki: Ki = direkt()): Promise<void> {
+  const stil = clipartZuerst(lernende)
+    ? 'Cheerful cartoon clipart for young learners, bold clean outlines, flat friendly colours'
+    : 'Simple, friendly illustration'
+  const prompt = `${stil} for a vocabulary flashcard showing "${v.translation || v.term}" (${SPRACHE_NAME[sprache] ?? sprache} word: "${
+    v.term
+  }"). Clear single subject, plain light background, no text, no letters, no logos.`
+  const d = await ki.bild(prompt)
   await window.api.medien.bildSetzen(sprache, v.term, { dataUrl: await verkleinern(d), herkunft: 'ki', nachweis: 'KI-generiert' })
 }
 

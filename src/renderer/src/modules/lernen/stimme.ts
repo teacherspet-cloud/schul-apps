@@ -7,6 +7,8 @@
  * gewählt: Stimmen der Sprache, natürliche/neuronale vor älteren, die gewünschte Region vor anderen.
  * Gibt es gar keine Stimme der Sprache, wird nicht vorgelesen (lieber still als falsch).
  */
+import { gewaehlteStimme } from '../onlinetest/schuelerDarstellung'
+
 const GUETE = [/natural|neural|online/i, /google/i, /premium|enhanced|siri/i, /microsoft/i]
 
 let geladen: SpeechSynthesisVoice[] = []
@@ -23,6 +25,10 @@ export function besteStimme(lang: string): SpeechSynthesisVoice | null {
   const sprache = lang.slice(0, 2).toLowerCase()
   const passend = stimmen().filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(sprache))
   if (!passend.length) return null
+  // Selbst gewählte Stimme (Einstellungen › Lesen und Hören, 06.10.2026) – sofern auf diesem Gerät vorhanden
+  const wahl = gewaehlteStimme(sprache)
+  const gewaehlt = wahl ? passend.find((v) => v.name === wahl) : undefined
+  if (gewaehlt) return gewaehlt
   const punkte = (v: SpeechSynthesisVoice): number => {
     let p = 0
     GUETE.forEach((re, i) => {

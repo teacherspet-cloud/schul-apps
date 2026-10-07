@@ -28,6 +28,7 @@ import SettingsPage from './shell/SettingsPage'
 import Themenuebersicht from './shell/Themenuebersicht'
 import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
+import ModusSchalter from './shell/ModusSchalter'
 import AuftragsLayer from './shell/AuftragsLayer'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
@@ -337,37 +338,45 @@ export default function App(): React.JSX.Element {
               ))}
           </AppShell.Section>
           <AppShell.Section>
-            {!schmalerBildschirm && (
-              <Tooltip label={breit ? 'Leiste einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  className="leiste-umschalter"
-                  onClick={umschalten}
-                  aria-label={breit ? 'Leiste einklappen' : 'Leiste ausklappen'}
-                  aria-expanded={breit}
-                  size={36}
-                  mb={6}
-                >
-                  {breit ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
-                </ActionIcon>
-              </Tooltip>
+            {/*
+              Namen ein-/ausklappen und (iPad) Leiste ausblenden in EINER Zeile (07.10.2026) – vorher zwei Zeilen;
+              Farbe aus den Leisten-Variablen, damit das Symbol auch auf der farbigen Leiste zu sehen ist.
+            */}
+            {(!schmalerBildschirm || touch) && (
+              <div className="leiste-umschalter-zeile">
+                {!schmalerBildschirm && (
+                  <Tooltip label={breit ? 'Namen einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
+                    <ActionIcon
+                      variant="subtle"
+                      className="leiste-umschalter"
+                      onClick={umschalten}
+                      aria-label={breit ? 'Namen einklappen' : 'Leiste mit Namen ausklappen'}
+                      aria-expanded={breit}
+                      size={36}
+                    >
+                      {breit ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {/* Mit dem Finger (iPad): die Leiste ganz ausblenden – dann mehr Platz für das Blatt */}
+                {touch && (
+                  <Tooltip label="Seitenleiste ganz ausblenden" position="right" withArrow>
+                    <ActionIcon
+                      variant="subtle"
+                      className="leiste-umschalter"
+                      onClick={() => leisteAusblenden(true)}
+                      aria-label="Seitenleiste ausblenden"
+                      size={44}
+                      data-leiste-ausblenden
+                    >
+                      <IconChevronsLeft size={20} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </div>
             )}
-            {/* Mit dem Finger (iPad): die Leiste ganz ausblenden – dann mehr Platz für das Blatt */}
-            {touch && (
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                className="leiste-umschalter"
-                onClick={() => leisteAusblenden(true)}
-                aria-label="Seitenleiste ausblenden"
-                size={44}
-                mb={6}
-                data-leiste-ausblenden
-              >
-                <IconChevronsLeft size={20} />
-              </ActionIcon>
-            )}
+            {/* Standard- / Expertenmodus (07.10.2026): links Standard, rechts Experte */}
+            <ModusSchalter breit={breit} />
             <NavIcon label="Einstellungen" breit={breit} active={active === 'settings'} onClick={() => openModule('settings')}>
               <IconSettings size={22} />
             </NavIcon>

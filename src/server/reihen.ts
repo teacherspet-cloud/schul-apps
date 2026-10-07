@@ -315,6 +315,15 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
           runden: i.runden,
           art: 'reihe'
         })
+      else if (i.art === 'onlinetest' && i.blatt?.fassungen?.length)
+        // Lernzielkontrolle als Onlinetest („Test hier erstellen", 06.10.2026)
+        v[s.id] = reihenTestAnlegen(z.lehrkraft_id, {
+          titel: s.titel,
+          blatt: { art: i.blatt.art, fach: i.blatt.fach, fassungen: i.blatt.fassungen as never },
+          thema: i.blatt.thema,
+          lerngruppeId: z.lerngruppe_id,
+          zeitMin: i.zeitMin
+        })
       else if (i.art === 'onlinetest' && i.test)
         v[s.id] = reihenTestAnlegen(z.lehrkraft_id, { titel: s.titel, test: i.test as TestDocument, lerngruppeId: z.lerngruppe_id, zeitMin: i.zeitMin })
       else if (i.art === 'vokabeln' && i.woerter.length)

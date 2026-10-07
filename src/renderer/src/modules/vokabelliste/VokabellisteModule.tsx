@@ -37,6 +37,7 @@ import { passtZurSuche } from '../../shared/bibliothek'
 import { testAusListe } from '../vokabeltest/library'
 import { ZUSATZ } from '../vokabeltest/steps/VokabelTabelle'
 import { vokabellistenApi } from './listenApi'
+import { leseBuchZiel } from '../../shared/medien/medienAuftrag'
 import {
   FILTER_FELDER,
   filterOptionen,
@@ -81,12 +82,25 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
   const [books, setBooks] = useState<TextbookMeta[]>([])
   const [openList, setOpenList] = useState<SavedVocabList | null>(null)
   const [openBook, setOpenBook] = useState<string | null>(null)
+  // Abschnitt, den der Buch-Editor gleich zeigen soll („Öffnen" eines Medienauftrags, 06.10.2026)
+  const [buchStart, setBuchStart] = useState<{ unit: string; abschnitt: string; n: number } | undefined>(undefined)
   const [wizard, setWizard] = useState(false)
   // Aufgeklappte Reihen (Paket 15): anfangs alle zu; bleibt beim Wechsel in den Buch-Editor und zurück erhalten
   const [offeneReihen, setOffeneReihen] = useState<string[]>([])
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   useDokumentOeffner('vokabelliste', async (id) => {
+    // Medienauftrag in einem Schulbuch-Abschnitt: Buch öffnen und zum Abschnitt springen
+    const buch = leseBuchZiel(id)
+    if (buch) {
+      setOpenList(null)
+      setWizard(false)
+      setBuchStart((s) => ({ unit: buch.unit, abschnitt: buch.abschnitt, n: (s?.n ?? 0) + 1 }))
+      setOpenBook(buch.buchId)
+      return
+    }
+    // Allgemeiner Medienauftrag ohne Stelle: nur das Programm
+    if (id === 'vokabeln') return
     const alle = await window.api.library.list()
     const liste = alle.find((l) => l.id === id)
     if (!liste) throw new Error('Die Liste gibt es nicht mehr.')
@@ -128,8 +142,10 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
           <BookEditor
             bookId={openBook}
             aktiv={active}
+            start={buchStart}
             onBack={() => {
               setOpenBook(null)
+              setBuchStart(undefined)
               window.api.textbooks.list().then(setBooks).catch(notifyError)
             }}
           />
@@ -159,7 +175,7 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
   }
 
   const schoolTypes = schoolTypesForState(table, choice.stateId)
-  const schoolTypeId = schoolTypes.some((t) => t.value === choice.schoolTypeId) ? choice.schoolTypeId : (schoolTypes[0]?.value ?? '')
+  const schoolTypeId = schoolTypes.some((t) => t.value === choice.schoolTypeId) ? choice.schoolTypeId : schoolTypes[0]?.value ?? ''
   // Passende Lehrwerke: Sprache des Faches; Land und Schulform, soweit das Buch sie nennt
   const matching = books.filter(
     (b) => b.language === choice.language && (!b.stateId || b.stateId === choice.stateId) && (!b.schoolTypeId || b.schoolTypeId === schoolTypeId)
@@ -231,7 +247,10 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
           reihen={reihen}
           offen={offeneReihen}
           onOffen={setOffeneReihen}
-          onBearbeiten={setOpenBook}
+          onBearbeiten={(id) => {
+            setBuchStart(undefined)
+            setOpenBook(id)
+          }}
         />
 
         <EigeneListen sprache={choice.language} languageLabel={languageLabel} onBearbeiten={setOpenList} />

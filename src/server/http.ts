@@ -80,6 +80,11 @@ export interface ServerOptionen {
    */
   tls?: { cert: string; key: string; domain?: { namen: string[]; cert: string; key: string } }
   routen?: Zusatzroute[]
+  /**
+   * Musterschüler-Vorschau (vorschau.ts): Vorschaukonto zum Schlüssel – nur zusammen mit der Cookie-Sitzung der
+   * Lehrkraft, an die er gebunden ist. Sonst null.
+   */
+  vorschau?: (schluessel: string, lehrkraft: NutzerInfo) => NutzerInfo | null
 }
 
 const COOKIE = 'sa_sitzung'
@@ -149,6 +154,7 @@ const TYPEN: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.ico': 'image/x-icon',
   '.jpg': 'image/jpeg',
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
@@ -200,6 +206,35 @@ export function webManifest(fuerSchueler: boolean): string {
   })
 }
 
+/**
+ * Vorschau als Musterschüler (vorschau.ts): Läuft die Seite einer Lehrkraft im Schülerbereich mit einem Vorschau-Schlüssel
+ * (Parameter „vs" bzw. gemerkt im sessionStorage des Fensters), lädt dieses Stück das Ich des Vorschaukontos nach –
+ * per document.write, damit es vor der Oberfläche feststeht und das Ich der Lehrkraft ersetzt.
+ */
+const VORSCHAU_HAKEN = `(function(){try{if(location.pathname.indexOf('/s/')!==0||window.__saVorschau)return;var v=new URLSearchParams(location.search).get('vs');
+if(v)sessionStorage.setItem('sa-vorschau',v);else v=sessionStorage.getItem('sa-vorschau');if(!v)return;window.__saVorschau=v;
+document.write('<scr'+'ipt src="/server/ich.js?vs='+encodeURIComponent(v)+'"></scr'+'ipt>')}catch(e){}})();`
+
+/** Schlüssel abgelaufen oder fremd: nicht angemeldet, Hinweis statt der Oberfläche */
+const VORSCHAU_ABGELAUFEN = (adresse: string): string =>
+  `window.__schulappsServer={angemeldet:false,adresse:${JSON.stringify(adresse)}};try{sessionStorage.removeItem('sa-vorschau')}catch(e){}
+document.addEventListener('DOMContentLoaded',function(){document.body.innerHTML='<p style="font:16px system-ui;padding:24px">Diese Vorschau ist abgelaufen. Bitte in „Meine Klassen“ erneut „Als Schüler ansehen“ wählen.</p>'});`
+
+/**
+ * Im Vorschaukonto: Schlüssel an jeden Aufruf der eigenen Adresse hängen – fetch als Kopfzeile, Bilder/Ton/Beacons als
+ * Parameter „vs" (die laden ohne fetch). Das Cookie der Lehrkraft bleibt, wie es ist.
+ */
+const vorschauSkript = (vs: string): string =>
+  `(function(){var v=${JSON.stringify(vs).replace(/</g, '')};window.__saVorschau=v;try{sessionStorage.setItem('sa-vorschau',v)}catch(e){}
+var eigen=function(u){try{return new URL(u,location.href).origin===location.origin}catch(e){return false}};
+var mitVs=function(u){try{var x=new URL(u,location.href);if(x.origin!==location.origin||x.pathname.indexOf('/s/')!==0||x.searchParams.has('vs'))return u;x.searchParams.set('vs',v);return x.toString()}catch(e){return u}};
+var f=window.fetch;window.fetch=function(i,o){try{var u=typeof i==='string'?i:i instanceof URL?i.href:i&&i.url;if(u&&eigen(u)){o=Object.assign({},o||{});
+var h=new Headers(o.headers||(i instanceof Request?i.headers:undefined));h.set('x-schulapps-vorschau',v);o.headers=h}}catch(e){}return f.call(this,i,o)};
+var sa=Element.prototype.setAttribute;Element.prototype.setAttribute=function(n,w){if(n==='src'&&typeof w==='string')w=mitVs(w);return sa.call(this,n,w)};
+[window.HTMLImageElement,window.HTMLMediaElement,window.HTMLSourceElement].forEach(function(K){var d=K&&Object.getOwnPropertyDescriptor(K.prototype,'src');
+if(d&&d.set)Object.defineProperty(K.prototype,'src',{configurable:true,enumerable:d.enumerable,get:d.get,set:function(w){d.set.call(this,typeof w==='string'?mitVs(w):w)}})});
+if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){return sb(mitVs(u),d)}}})();`
+
 /** Die Seite der Programme mit dem Skript, das den angemeldeten Nutzer bekannt macht */
 const seitenZwischenspeicher = new Map<boolean, { mtime: number; html: string }>()
 function programmSeite(fuerSchueler = false): string {
@@ -220,6 +255,10 @@ function programmSeite(fuerSchueler = false): string {
       `<meta name="apple-mobile-web-app-title" content="${fuerSchueler ? 'Onlinetest' : 'Schul-Apps'}" />`,
       '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
       '<meta name="theme-color" content="#0f7b6c" />',
+      // Symbol im Browser-Reiter (07.10.2026): ausdrücklich das von Schul-Apps – ohne Angabe zeigte der Browser unter
+      // meineschulapps.de das gemerkte Symbol von Gywem Aviation (gleicher Server, /favicon.ico kam als Seite zurück)
+      '<link rel="icon" href="/favicon.ico" sizes="any" />',
+      '<link rel="icon" type="image/png" sizes="192x192" href="/web-app/icon-192.png" />',
       '<link rel="apple-touch-icon" href="/web-app/apple-touch-icon.png" />',
       '<script src="/server/ich.js"></script>'
     ].join('\n    ')
@@ -271,7 +310,35 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     const ip = opts.weiche && echt && WEICHEN_NETZ.test(direkt) ? echt : direkt
     const keks = cookies(req)[COOKIE] ?? ''
     const s = keks ? sitzungPruefen(keks) : null
-    const sitzung = s ? { nutzer: s.nutzer, kennung: s.kennung } : null
+    let sitzung = s ? { nutzer: s.nutzer, kennung: s.kennung } : null
+    /*
+     * Vorschau als Musterschüler (vorschau.ts, 06.10.2026): Das Vorschaufenster schickt seinen Schlüssel als Kopfzeile
+     * (alle fetch-Aufrufe) bzw. als Parameter „vs" (Seiten, Bilder, Ton im Schülerbereich). Gilt nur zusammen mit der
+     * Cookie-Sitzung der Lehrkraft, an die er gebunden ist – dann läuft die Anfrage als Vorschaukonto (Rolle schueler).
+     * Das Cookie bleibt unberührt: Die Lehrkraft bleibt in der Haupt-App angemeldet.
+     */
+    const vsKopf = req.headers['x-schulapps-vorschau']
+    const vs =
+      typeof vsKopf === 'string'
+        ? vsKopf
+        : url.pathname.startsWith('/s/') || url.pathname === '/s' || url.pathname === '/server/ich.js'
+        ? url.searchParams.get('vs') ?? ''
+        : ''
+    const inVorschau = Boolean(vs)
+    if (inVorschau) {
+      const konto = sitzung && opts.vorschau ? opts.vorschau(vs, sitzung.nutzer) : null
+      if (!konto) {
+        if (req.method === 'GET' && url.pathname === '/server/ich.js') {
+          res.writeHead(200, { 'content-type': TYPEN['.js'], 'cache-control': 'no-store' })
+          return void res.end(VORSCHAU_ABGELAUFEN(opts.adresse))
+        }
+        return json(res, 403, { fehler: 'Die Vorschau ist abgelaufen. Bitte in „Meine Klassen“ erneut öffnen.' })
+      }
+      sitzung = { nutzer: konto, kennung: `vorschau-${konto.id.slice(0, 12)}` }
+    }
+    // Kein Zugriff auf fremdes Material: Beitritt per Code (QR) gibt es in der Vorschau nicht
+    if (inVorschau && req.method === 'POST' && /^\/s\/api\/(?:gast|(?:blatt|aufgabe|reihe|vokabeln|grammatik)\/(?:gast|wieder))$/.test(url.pathname))
+      return json(res, 403, { fehler: 'In der Vorschau gibt es nur das Material dieser Klasse.' })
     let koerperCache: Promise<unknown> | null = null
     const k: Anfrage = {
       req,
@@ -290,12 +357,15 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       return void res.end(webManifest(url.pathname.startsWith('/s/')))
     }
 
+    // ---------- Symbole für Browser-Reiter und Home-Bildschirm (ohne Anmeldung – auch die Anmeldeseite zeigt sie)
+    if (req.method === 'GET' && (url.pathname === '/favicon.ico' || /^\/web-app\/[\w-]+\.png$/.test(url.pathname))) return void statisch(res, url.pathname)
+
     // ---------- Anmeldung
     if (req.method === 'GET' && url.pathname === '/anmelden') {
       res.writeHead(200, {
         'content-type': TYPEN['.html'],
         'cache-control': 'no-store',
-        'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
+        'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
       })
       return void res.end(
         anmeldeSeite({
@@ -356,13 +426,17 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         res.writeHead(303, { location: nutzer.passwortWechseln ? `/passwort?ziel=${encodeURIComponent(weiter)}` : weiter })
       } catch (e) {
         res.writeHead(303, {
-          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(ziel)}`
+          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(
+            ziel
+          )}`
         })
       }
       return void res.end()
     }
     if (req.method === 'POST' && url.pathname === '/auth/abmelden') {
       if (!mitKopf) return json(res, 403, { fehler: 'Nur aus der App.' })
+      // Abmelden in der Vorschau beendet nie die Sitzung der Lehrkraft
+      if (inVorschau) return json(res, 200, { ok: true, vorschau: true })
       if (keks) sitzungBeenden(keks)
       if (sitzung) sitzungVergessen(sitzung.kennung)
       loescheCookie(res, sicher)
@@ -376,7 +450,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       res.writeHead(200, {
         'content-type': TYPEN['.html'],
         'cache-control': 'no-store',
-        'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
+        'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
       })
       return void res.end(
         passwortSeite({
@@ -399,12 +473,12 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         nurMitAltem && !passwortPruefen(form.get('alt') ?? '', passwortHashVon(sitzung.nutzer.benutzer))
           ? 'Das bisherige Passwort stimmt nicht.'
           : neu.length < 10
-            ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
-            : neu !== form.get('neu2')
-              ? 'Die beiden neuen Passwörter stimmen nicht überein.'
-              : passwortPruefen(neu, passwortHashVon(sitzung.nutzer.benutzer))
-                ? 'Bitte ein anderes als das vorübergehende Passwort wählen.'
-                : ''
+          ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
+          : neu !== form.get('neu2')
+          ? 'Die beiden neuen Passwörter stimmen nicht überein.'
+          : passwortPruefen(neu, passwortHashVon(sitzung.nutzer.benutzer))
+          ? 'Bitte ein anderes als das vorübergehende Passwort wählen.'
+          : ''
       if (fehler) return void res.writeHead(303, { location: `/passwort?fehler=${encodeURIComponent(fehler)}&ziel=${encodeURIComponent(ziel)}` }).end()
       nutzerAendern(sitzung.nutzer.id, { passwortHash: passwortHash(neu), passwortWechseln: false })
       protokolliereServer('anmeldung', 'Eigenes Passwort gesetzt', sitzung.nutzer.id)
@@ -414,6 +488,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     if (req.method === 'POST' && url.pathname === '/konto/passwort') {
       if (!mitKopf) return void res.writeHead(403).end()
       if (!sitzung || sitzung.nutzer.quelle === 'gast') return json(res, 401, { fehler: 'Bitte zuerst anmelden.' })
+      if (sitzung.nutzer.quelle === 'vorschau') return json(res, 400, { fehler: 'In der Vorschau gibt es kein Passwort.' })
       if (sitzung.nutzer.quelle === 'iserv') return json(res, 400, { fehler: 'Dein Passwort verwaltest du in IServ.' })
       const sperre = `pw:${sitzung.nutzer.id}`
       if (gesperrtWegenVersuchen(sperre)) return json(res, 429, { fehler: 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.' })
@@ -429,10 +504,10 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         neu.length < 10
           ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
           : neu !== String(k0.neu2 ?? '')
-            ? 'Die beiden neuen Passwörter stimmen nicht überein.'
-            : neu === alt
-              ? 'Das neue Passwort ist dasselbe wie das bisherige.'
-              : ''
+          ? 'Die beiden neuen Passwörter stimmen nicht überein.'
+          : neu === alt
+          ? 'Das neue Passwort ist dasselbe wie das bisherige.'
+          : ''
       if (fehler) return json(res, 400, { fehler, feld: 'neu' })
       nutzerAendern(sitzung.nutzer.id, { passwortHash: passwortHash(neu), passwortWechseln: false })
       // Andere Geräte abmelden (wer das Passwort ändert, will oft genau das), dieses bleibt angemeldet
@@ -462,7 +537,18 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           farbe: wahl(k0.farbe, ['blue', 'teal', 'grape', 'orange', 'pink', 'green'], 'blue'),
           ruhig: k0.ruhig === true,
           // Vokabeltraining: Fachfarbe oder eigene Farbe (03.10.2026)
-          design: wahl(k0.design, ['fach', 'eigen'], 'fach')
+          design: wahl(k0.design, ['fach', 'eigen'], 'fach'),
+          // Lesen und Hören, Lernen (06.10.2026). Die lesefreundliche Schrift und die Stimme bleiben nur auf dem Gerät
+          // (keine Angaben, die nach Diagnose aussehen, auf dem Server; Stimmen gibt es je Gerät).
+          zeilen: wahl(k0.zeilen, ['normal', 'weit', 'sehrweit'], 'normal'),
+          kontrast: k0.kontrast === true,
+          vorlesen: k0.vorlesen === true,
+          tempo: wahl(k0.tempo, ['langsam', 'normal', 'schnell'], 'normal'),
+          wochenziel: Math.max(1, Math.min(7, Math.round(Number(k0.wochenziel) || 3))),
+          tipps: k0.tipps !== false,
+          spiele: k0.spiele !== false,
+          zeitdruck: k0.zeitdruck !== false,
+          toene: k0.toene === true
         }
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,
@@ -490,7 +576,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             rolle: sitzung.nutzer.rolle,
             quelle: sitzung.nutzer.quelle,
             eingerichtet: sitzung.nutzer.eingerichtet,
-            adresse: opts.adresse
+            adresse: opts.adresse,
+            ...(inVorschau ? { vorschau: true } : {})
           }
         : { angemeldet: false, adresse: opts.adresse }
       /*
@@ -504,7 +591,10 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         "var m=d.modus||'dunkel';if(m==='auto'&&!d.dunkelVorgabe)m='dunkel';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
         "var s=document.createElement('style');s.id='sa-frueh';s.textContent=dk?':where(html,body){background:#242424;color-scheme:dark}':':where(html,body){background:#fff}';" +
         'document.head.appendChild(s)}catch(e){}})();'
-      return void res.end(`window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};${frueh}`)
+      return void res.end(
+        `window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};${frueh}` +
+          (inVorschau ? vorschauSkript(vs) : sitzung && sitzung.nutzer.rolle !== 'schueler' && opts.vorschau ? VORSCHAU_HAKEN : '')
+      )
     }
 
     // ---------- Zusatzrouten (Verwaltung, Onlinetest, Hörtexte, Schülerbereich)

@@ -1,4 +1,5 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../../shared/components/NurExperte'
 import { querBausteine } from '../../model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../../shared/export/lms/fragen'
@@ -31,7 +32,7 @@ import { loesungsVorgabe } from '../../../../shared/components/LoesungsWahl'
 import { meldeAblage, speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../../shared/export/ausgabe'
 import { ablageZiel } from '../../../../shared/export/ablageZiel'
 import FitToWidth from '../../../../shared/render/FitToWidth'
-import { useAppSettings } from '../../../../shared/settingsStore'
+import { useAppSettings, useExperte } from '../../../../shared/settingsStore'
 import { notifyError, notifySuccess, safeFileName } from '../../../../shared/util'
 import { checkTasksPerPage } from '../../didactics/checks'
 import { browserDocxDeps } from '../../export/browserDeps'
@@ -98,7 +99,23 @@ import { useDruck } from '../../../../shared/navigation'
 import { BlattHinweise } from './hinweise'
 import { ExportModal } from './exportDialog'
 
+/**
+ * Standardmodus (07.10.2026): Im Editor bleiben Text bearbeiten, KI-Überarbeiten/Neu erzeugen, Einfügen, Löschen,
+ * Ausgabe und Freigabe. Leveln, Bewertungsraster, Beispiellösung, Maskottchen, Hörfassung, Baustein-Einstellungen,
+ * Stundenverlauf und die feineren Blattoptionen erscheinen im Expertenmodus oder über „Alle Werkzeuge" in der Leiste.
+ */
 export function EditorStep(): React.JSX.Element {
+  return (
+    <OptionenBereich>
+      <EditorInhalt />
+    </OptionenBereich>
+  )
+}
+
+function EditorInhalt(): React.JSX.Element {
+  const voll = useAlleOptionen()
+  // Zurück: im Standardmodus zum ersten Schritt (die Gliederung ist dort kein eigener Schritt)
+  const experte = useExperte()
   const { worksheet: gespeichert, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
   const logo = useAppSettings((s) => s.logoDataUrl)
   const schoolName = useAppSettings((s) => s.settings.schoolName)
@@ -297,12 +314,12 @@ export function EditorStep(): React.JSX.Element {
     v.art === 'hilfenAufKarten'
       ? sheet.blocks.some((b) => b.type === 'scaffold' && b.variant !== 'hilfekarten')
       : v.art === 'schreibraumKnapper'
-        ? schreibraumBausteine(sheet.blocks).length > 0
-        : v.art === 'bilderKleiner'
-          ? bildBausteine(sheet.blocks).length > 0
-          : v.art === 'vertiefung' || v.art === 'sicherung' || v.art === 'transfer'
-            ? true
-            : Boolean(v.blockId && sheet.blocks.some((b) => b.id === v.blockId))
+      ? schreibraumBausteine(sheet.blocks).length > 0
+      : v.art === 'bilderKleiner'
+      ? bildBausteine(sheet.blocks).length > 0
+      : v.art === 'vertiefung' || v.art === 'sicherung' || v.art === 'transfer'
+      ? true
+      : Boolean(v.blockId && sheet.blocks.some((b) => b.id === v.blockId))
   const seitenUmsetzen = (liste: SeitenVorschlag[]): void => {
     const lokal = liste.filter(lokalUmsetzbar)
     if (lokal.length) {
@@ -504,23 +521,29 @@ export function EditorStep(): React.JSX.Element {
             onWunsch={(art, wunsch) => reviseBlock(block, wunsch, art)}
           >
             {/* Leveln (Großprogramm 0.4, F1): leichter, anspruchsvoller, Einfache/Leichte Sprache, GER-Stufe, DaZ-Worterklärungen */}
-            <LevelnMenue block={block} meta={ws.meta} onRevise={(instruction) => reviseBlock(block, instruction)} />
+            <NurExperte>
+              <LevelnMenue block={block} meta={ws.meta} onRevise={(instruction) => reviseBlock(block, instruction)} />
+            </NurExperte>
             {/*
              * Gelöstes Beispiel (Punkt 0) – auf Knopfdruck von der KI. ÖSZ 2024 empfiehlt es für
              * jede Aufgabenstellung; ob es hier trägt, entscheidet die Lehrkraft an der fertigen
              * Aufgabe. Deshalb nachträglich und je Aufgabe; entfernen steht im „⋯“-Menü.
              */}
             {/* Bewertungsraster (Großprogramm 0.4, F2): als Tabelle hinter der Aufgabe, im Lösungsteil */}
-            {block.type === 'task' && (
-              <Menu.Item leftSection={<IconTable size={14} />} onClick={() => rasterAuftrag(ws, docId, block, profile)} data-raster-erstellen>
-                Bewertungsraster erstellen
-              </Menu.Item>
-            )}
-            {block.type === 'task' && !block.example && (
-              <Menu.Item leftSection={<IconCircleNumber0 size={14} />} onClick={() => addExample(block)}>
-                Beispiellösung in Aufgabe hinzufügen
-              </Menu.Item>
-            )}
+            <NurExperte>
+              {block.type === 'task' && (
+                <Menu.Item leftSection={<IconTable size={14} />} onClick={() => rasterAuftrag(ws, docId, block, profile)} data-raster-erstellen>
+                  Bewertungsraster erstellen
+                </Menu.Item>
+              )}
+            </NurExperte>
+            <NurExperte>
+              {block.type === 'task' && !block.example && (
+                <Menu.Item leftSection={<IconCircleNumber0 size={14} />} onClick={() => addExample(block)}>
+                  Beispiellösung in Aufgabe hinzufügen
+                </Menu.Item>
+              )}
+            </NurExperte>
             {/* Platzhalter einer Zeitleiste: die App zeichnet sie aus der Beschreibung (generation/zeitleiste.ts) */}
             {block.type === 'image' && !block.image && istZeitleiste(block) && (
               <Menu.Item leftSection={<IconTimeline size={14} />} onClick={() => zeitleisteZeichnen(block)}>
@@ -537,7 +560,9 @@ export function EditorStep(): React.JSX.Element {
               </Menu.Item>
             )}
           </KiMenue>
-          <BlockSettings block={block} combined={combined} update={(fn, gruppe) => updateBlock(sheet.id, block.id, fn, gruppe)} />
+          <NurExperte>
+            <BlockSettings block={block} combined={combined} update={(fn, gruppe) => updateBlock(sheet.id, block.id, fn, gruppe)} />
+          </NurExperte>
           {block.type === 'image' && (
             <Tooltip label="Bild wählen" position="right">
               <ActionIcon size="sm" variant="default" aria-label="Bild wählen" onClick={() => setPicker(block.id)}>
@@ -553,11 +578,13 @@ export function EditorStep(): React.JSX.Element {
           <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => duplizieren(block.id)}>
             Duplizieren
           </Menu.Item>
-          {block.type !== 'illustration' && (
-            <Menu.Item leftSection={<IconMoodSmile size={14} />} onClick={() => setIlluBlockId(block.id)}>
-              {block.illustration ? 'Maskottchen ändern …' : 'Maskottchen anheften …'}
-            </Menu.Item>
-          )}
+          <NurExperte>
+            {block.type !== 'illustration' && (
+              <Menu.Item leftSection={<IconMoodSmile size={14} />} onClick={() => setIlluBlockId(block.id)}>
+                {block.illustration ? 'Maskottchen ändern …' : 'Maskottchen anheften …'}
+              </Menu.Item>
+            )}
+          </NurExperte>
           <EinfuegenUntermenue
             titel="Darüber einfügen"
             onWaehlen={(typ) => einfuegen(block.id, 0, typ)}
@@ -578,11 +605,13 @@ export function EditorStep(): React.JSX.Element {
            * In den Sprachen wäre ein vorgelesener Lesetext widersinnig – dort ist der Text
            * der Prüfgegenstand.
            */}
-          {block.type === 'text' && !hoerenIstPruefgegenstand(ws.meta.subjectId) && (
-            <Menu.Item leftSection={<IconHeadphones size={14} />} onClick={() => addReadAloud(block)}>
-              Hörfassung anlegen
-            </Menu.Item>
-          )}
+          <NurExperte>
+            {block.type === 'text' && !hoerenIstPruefgegenstand(ws.meta.subjectId) && (
+              <Menu.Item leftSection={<IconHeadphones size={14} />} onClick={() => addReadAloud(block)}>
+                Hörfassung anlegen
+              </Menu.Item>
+            )}
+          </NurExperte>
           <Menu.Divider />
           <Menu.Item
             color="red"
@@ -635,7 +664,7 @@ export function EditorStep(): React.JSX.Element {
         />
       )}
       <EditorLeiste
-        zurueck={{ label: 'Gliederung', onClick: () => setStep(1) }}
+        zurueck={experte ? { label: 'Gliederung', onClick: () => setStep(1) } : { label: 'Thema & Lerngruppe', onClick: () => setStep(0) }}
         undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
         fassungen={
           ws.sheets.length > 1 && view !== 'board' && view !== 'verlauf' && view !== 'audio'
@@ -648,9 +677,10 @@ export function EditorStep(): React.JSX.Element {
           data: [
             { value: 'student', label: 'Arbeitsblatt' },
             { value: 'key', label: 'Lösungen' },
-            { value: 'board', label: ws.board ? 'Tafelbild' : 'Tafelbild +' },
+            // Standardmodus: Tafelbild nur, wenn es eins gibt; Stundenverlauf nur im Expertenmodus (oder wenn er gerade offen ist)
+            ...(voll || ws.board || view === 'board' ? [{ value: 'board', label: ws.board ? 'Tafelbild' : 'Tafelbild +' }] : []),
             // Stundenverlauf (Großprogramm 0.4, F4) – für die Lehrkraft, nie auf den Blättern
-            { value: 'verlauf', label: ws.stundenverlauf ? 'Verlauf' : 'Verlauf +' },
+            ...(voll || view === 'verlauf' ? [{ value: 'verlauf', label: ws.stundenverlauf ? 'Verlauf' : 'Verlauf +' }] : []),
             ...(hasAudio ? [{ value: 'audio', label: 'Hörtexte' }] : [])
           ]
         }}
@@ -689,45 +719,55 @@ export function EditorStep(): React.JSX.Element {
             }
             kiVermerk={{ wert: ws.meta.kiVermerk, ki: ws.meta.ki, onChange: (v) => update((w) => (w.meta.kiVermerk = v)) }}
             schulangaben={{ checked: ws.meta.showSchool !== false, onChange: (an) => update((w) => (w.meta.showSchool = an)) }}
-            nachSchule={<IllustrationenOption ws={ws} update={update} />}
-            korrekturrand={{ checked: Boolean(ws.meta.correctionMargin), onChange: (an) => update((w) => (w.meta.correctionMargin = an)) }}
-            notizrand={{ checked: Boolean(ws.meta.notesMargin), onChange: (an) => update((w) => (w.meta.notesMargin = an)) }}
+            nachSchule={voll ? <IllustrationenOption ws={ws} update={update} /> : undefined}
+            korrekturrand={voll ? { checked: Boolean(ws.meta.correctionMargin), onChange: (an) => update((w) => (w.meta.correctionMargin = an)) } : undefined}
+            notizrand={voll ? { checked: Boolean(ws.meta.notesMargin), onChange: (an) => update((w) => (w.meta.notesMargin = an)) } : undefined}
             anmerkungen={
-              hatAnmerkungen(ws.sheets.flatMap((s) => s.blocks))
+              voll && hatAnmerkungen(ws.sheets.flatMap((s) => s.blocks))
                 ? { wert: anmerkungsArt(ws.meta), onChange: (art) => update((w) => (w.meta.anmerkungen = art)) }
                 : undefined
             }
-            blocksatz={{ checked: ws.design.page.justifyText !== false, onChange: (an) => update((w) => (w.design.page.justifyText = an)) }}
+            blocksatz={voll ? { checked: ws.design.page.justifyText !== false, onChange: (an) => update((w) => (w.design.page.justifyText = an)) } : undefined}
             fach={ws.meta.subjectId}
-            vorlagenfarbe={{ checked: Boolean(ws.meta.vorlagenfarbe), onChange: (an) => update((w) => (w.meta.vorlagenfarbe = an)) }}
-            ueberthema={{ werte: ws.meta, bereich: bereich?.name ?? '', onChange: (patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema') }}
-            vorKiTest={
-              <>
-                {/* Ganzes Blatt leveln (Großprogramm 0.4, F1): jeder Lesetext eine neue Fassung, Originalquellen bleiben */}
-                <BlattLeveln
-                  bloecke={sheet.blocks}
-                  meta={ws.meta}
-                  onLeveln={(liste, instruction) => {
-                    for (const b of liste) reviseBlock(b, instruction)
-                    notifySuccess(`${liste.length} Text${liste.length === 1 ? '' : 'e'} werden umformuliert – jeweils als neue Fassung.`)
-                  }}
-                />
-                <Checkbox
-                  size="sm"
-                  label="Deckblatt"
-                  description="Ein Deckblatt als Seite 0 vor die Arbeitsblätter stellen – für Lehrkräfte, nicht für Lernende"
-                  checked={Boolean(ws.meta.coverPage)}
-                  onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
-                />
-              </>
+            vorlagenfarbe={voll ? { checked: Boolean(ws.meta.vorlagenfarbe), onChange: (an) => update((w) => (w.meta.vorlagenfarbe = an)) } : undefined}
+            ueberthema={
+              voll
+                ? { werte: ws.meta, bereich: bereich?.name ?? '', onChange: (patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema') }
+                : undefined
             }
-            kiTest={{
-              an: Boolean(ws.meta.aiCanary),
-              woerter: ws.meta.aiCanaryWords,
-              vorschlagFuer: `${ws.meta.title}|${ws.meta.topic}`,
-              onEin: () => setCanaryOffen(true),
-              onAus: () => update((w) => (w.meta.aiCanary = false))
-            }}
+            vorKiTest={
+              voll && (
+                <>
+                  {/* Ganzes Blatt leveln (Großprogramm 0.4, F1): jeder Lesetext eine neue Fassung, Originalquellen bleiben */}
+                  <BlattLeveln
+                    bloecke={sheet.blocks}
+                    meta={ws.meta}
+                    onLeveln={(liste, instruction) => {
+                      for (const b of liste) reviseBlock(b, instruction)
+                      notifySuccess(`${liste.length} Text${liste.length === 1 ? '' : 'e'} werden umformuliert – jeweils als neue Fassung.`)
+                    }}
+                  />
+                  <Checkbox
+                    size="sm"
+                    label="Deckblatt"
+                    description="Ein Deckblatt als Seite 0 vor die Arbeitsblätter stellen – für Lehrkräfte, nicht für Lernende"
+                    checked={Boolean(ws.meta.coverPage)}
+                    onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
+                  />
+                </>
+              )
+            }
+            kiTest={
+              voll
+                ? {
+                    an: Boolean(ws.meta.aiCanary),
+                    woerter: ws.meta.aiCanaryWords,
+                    vorschlagFuer: `${ws.meta.title}|${ws.meta.topic}`,
+                    onEin: () => setCanaryOffen(true),
+                    onAus: () => update((w) => (w.meta.aiCanary = false))
+                  }
+                : undefined
+            }
           />
         }
         name={{ value: docName, placeholder: defaultWorksheetName(ws), onChange: setDocName }}
@@ -954,11 +994,11 @@ export function EditorStep(): React.JSX.Element {
           const suffix = nurTafelbild
             ? ' - Tafelbild'
             : ws.sheets.length > 1
-              ? ` - ${ws.sheets
-                  .filter((s) => sheetIds.includes(s.id))
-                  .map((s) => '★'.repeat(s.stars ?? 1))
-                  .join(' ')}`
-              : ''
+            ? ` - ${ws.sheets
+                .filter((s) => sheetIds.includes(s.id))
+                .map((s) => '★'.repeat(s.stars ?? 1))
+                .join(' ')}`
+            : ''
           // Wohin das Tafelbild gehört, entscheidet `tafelbildZiel` – dieselbe Funktion beschriftet den Dialog
           const tafel = tafelbildZiel({
             tafelbild: includeBoard,

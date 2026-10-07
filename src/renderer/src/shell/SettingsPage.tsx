@@ -357,6 +357,23 @@ export function AppearanceCard({ settings, update }: { settings: AppSettings; up
         Darstellung
       </Title>
       <div>
+        {/* Standard-/Expertenmodus (07.10.2026) – auch hier, damit man ihn findet; Schalter sonst links in der Leiste */}
+        <Text size="sm" fw={500} mb={4}>
+          Bedienung
+        </Text>
+        <SegmentedControl
+          value={settings.oberflaeche === 'standard' ? 'standard' : 'experte'}
+          onChange={(v) => update({ oberflaeche: v as 'standard' | 'experte' })}
+          data={[
+            { value: 'standard', label: 'Standardmodus' },
+            { value: 'experte', label: 'Expertenmodus' }
+          ]}
+          data-modus-einstellung
+        />
+        <Text size="xs" c="dimmed" mt={4} mb="lg">
+          Der Standardmodus zeigt in jedem Programm nur das Wichtigste; Feineinstellungen öffnet „Alle Optionen“ am Ende des Schritts. Der Expertenmodus zeigt
+          alles. Einstellungen gehen beim Wechsel nicht verloren. Umschalten auch links in der Leiste.
+        </Text>
         <Text size="sm" fw={500} mb={4}>
           Modus
         </Text>
@@ -848,8 +865,8 @@ function ModelSelect({
     list?.source === 'builtin'
       ? 'Vorläufige Liste – nach Eingabe des Schlüssels wird die aktuelle Liste des Anbieters geladen.'
       : list?.fetchedAt
-        ? `Liste vom Anbieter, Stand ${new Date(list.fetchedAt).toLocaleString('de-DE')}`
-        : ''
+      ? `Liste vom Anbieter, Stand ${new Date(list.fetchedAt).toLocaleString('de-DE')}`
+      : ''
 
   return (
     <Group align="end" wrap="nowrap">

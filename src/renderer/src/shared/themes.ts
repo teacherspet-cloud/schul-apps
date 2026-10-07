@@ -382,7 +382,12 @@ export function buildMantineTheme(t: AppTheme): MantineThemeOverride {
   })
 }
 
+/** Hellmodus: Arbeitsbereich hellgrau statt fast weiß (Wunsch der Lehrkraft 06.10.2026) – Karten heben sich deutlicher ab. */
+const HELLGRAU = '#c8cbd0'
+const arbeitsflaeche = (p: ThemePalette, scheme: 'light' | 'dark'): string => (scheme === 'light' && p.bg.startsWith('#') ? mix(p.bg, HELLGRAU, 0.38) : p.bg)
+
 function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<string, string> {
+  const bg = arbeitsflaeche(p, scheme)
   return {
     '--mantine-color-body': p.surface,
     '--mantine-color-text': p.text,
@@ -390,14 +395,14 @@ function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<str
     '--mantine-color-default': scheme === 'light' ? p.surface : mix(p.surface, p.border, 0.3),
     '--mantine-color-default-hover': mix(p.surface, p.border, scheme === 'light' ? 0.35 : 0.6),
     '--mantine-color-default-border': p.border,
-    '--app-bg': p.bg,
+    '--app-bg': bg,
     '--app-surface': p.surface,
     '--app-border': p.border,
     '--app-nav-bg': p.nav,
     '--app-nav-solid': solid(p.nav),
     '--app-hero': p.hero,
     '--editor-canvas': p.canvas,
-    '--app-pattern-color': mix(p.bg, p.text, scheme === 'light' ? 0.09 : 0.12)
+    '--app-pattern-color': mix(bg, p.text, scheme === 'light' ? 0.09 : 0.12)
   }
 }
 

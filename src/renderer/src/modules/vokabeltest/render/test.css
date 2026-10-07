@@ -274,6 +274,12 @@
   text-underline-offset: 3px;
   font-weight: 600;
 }
+/* Lösungsblatt und korrigierte Abgabe (07.10.2026): das falsche Wort im Satz durchgestrichen, wie es die Lernenden tun sollen */
+.vt-key .vt-wrong {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  font-weight: 700;
+}
 .vt-gap-short {
   min-width: 5em;
 }

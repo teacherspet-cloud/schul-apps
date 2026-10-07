@@ -78,7 +78,11 @@ async function materialBeschaffen(ws: Worksheet, k: AuftragsKontext) {
         text: eigene.text.replace(/^\s*(?:(?:Webseite|Adresse|Titel):[^\n]*\n?)+\s*/i, ''),
         seitentitel: eigene.fileName,
         url: eigene.url,
-        ziel: { min: Math.round(woerter * 0.85), max: Math.round(woerter * 1.25), grund: 'Umfang des Ausgangstextes aus Schritt 1 (Richtwert, bis ein Viertel mehr)' },
+        ziel: {
+          min: Math.round(woerter * 0.85),
+          max: Math.round(woerter * 1.25),
+          grund: 'Umfang des Ausgangstextes aus Schritt 1 (Richtwert, bis ein Viertel mehr)'
+        },
         thema: meta.topic,
         leitgedanke: meta.learningGoals,
         sprache: materialSprache(fach, meta.skillFocus === 'mediation'),
@@ -141,42 +145,72 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
     },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Gliederung konnte nicht erstellt werden',
-    arbeit: async (ws, k) => {
-      const material = await materialBeschaffen(ws, k).catch((e) => {
-        if (istAbbruch(e) || k.signal.aborted) throw e
-        notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)
-        return null
-      })
-      // Live-Vorschau: der gefundene Ausgangstext, während die Gliederung entsteht
-      if (material) k.zeige({ material }, { was: `Material gefunden: „${material.titel}"` })
-      // Versuch (29.09.2026): zuerst ausarbeiten, damit Gliederung und Aufgaben zu ihm passen
-      const versuch = ws.meta.versuch?.aktiv && !ws.meta.versuch.daten ? await versuchAusarbeiten(ws.meta, k) : null
-      // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext (02.10.2026, didactics/sehtext.ts)
-      const meta = mitSehtext(versuch ? { ...ws.meta, versuch: { ...ws.meta.versuch!, daten: versuch } } : ws.meta, ws.sources)
-      k.melde('Die KI plant Lernziele, Bausteine und Aufgaben passend zur Lerngruppe …')
-      const outline = await generateOutline(meta, profileFromMeta(meta), ws.sources, k.ai, material)
-      return { outline, material, versuch }
+    arbeit: planen,
+    ablegen: (plan, ws) => legeArbeitsblattAb(docId, ws, (aktuell) => mitPlan(aktuell, plan), 1)
+  })
+}
+
+type Kontext = AuftragsKontext
+interface Plan {
+  outline: NonNullable<Worksheet['outline']>
+  material: Awaited<ReturnType<typeof materialBeschaffen>> | null
+  versuch: VersuchDaten | null
+}
+
+/** Material, Versuch, Gliederung – Schritt 1 → 2 (auch Teil des Direktwegs im Standardmodus) */
+async function planen(ws: Worksheet, k: Kontext): Promise<Plan> {
+  const material = await materialBeschaffen(ws, k).catch((e) => {
+    if (istAbbruch(e) || k.signal.aborted) throw e
+    notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)
+    return null
+  })
+  // Live-Vorschau: der gefundene Ausgangstext, während die Gliederung entsteht
+  if (material) k.zeige({ material }, { was: `Material gefunden: „${material.titel}"` })
+  // Versuch (29.09.2026): zuerst ausarbeiten, damit Gliederung und Aufgaben zu ihm passen
+  const versuch = ws.meta.versuch?.aktiv && !ws.meta.versuch.daten ? await versuchAusarbeiten(ws.meta, k) : null
+  // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext (02.10.2026, didactics/sehtext.ts)
+  const meta = mitSehtext(versuch ? { ...ws.meta, versuch: { ...ws.meta.versuch!, daten: versuch } } : ws.meta, ws.sources)
+  k.melde('Die KI plant Lernziele, Bausteine und Aufgaben passend zur Lerngruppe …')
+  const outline = await generateOutline(meta, profileFromMeta(meta), ws.sources, k.ai, material)
+  return { outline, material, versuch }
+}
+
+/** Ersetzt wird nur, was geplant wurde; Titel nur, wenn noch keiner dasteht */
+function mitPlan(aktuell: Worksheet, { outline, material, versuch }: Plan): Worksheet {
+  return {
+    ...aktuell,
+    outline,
+    originalMaterial: material ?? undefined,
+    meta: {
+      ...aktuell.meta,
+      ...(versuch && aktuell.meta.versuch ? { versuch: { ...aktuell.meta.versuch, daten: versuch } } : {}),
+      title: aktuell.meta.title || outline.title,
+      teacherNote: outline.teacherNote,
+      // Überthema aus der Planung – nur, wenn die Lehrkraft keins gesetzt oder abgeschaltet hat
+      ...(outline.ueberthema && !aktuell.meta.ueberthema?.trim() && !aktuell.meta.ueberthemaAus ? { ueberthema: outline.ueberthema } : {})
+    }
+  }
+}
+
+/**
+ * Standardmodus (07.10.2026, abgestimmt): Schritt 1 → 3 in EINEM Auftrag – Gliederung planen und gleich
+ * ausformulieren, ohne den Prüfschritt dazwischen. Die Gliederung bleibt im Blatt (Strg+Z bzw. Expertenmodus).
+ */
+export function erstelleDirekt(worksheet: Worksheet, docId: string, optionen: { review: boolean; economy: boolean }): void {
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: 'Arbeitsblatt erstellen',
+    eingabe: worksheet,
+    fortsetzen: {
+      art: 'arbeitsblatt.erstelleDirekt',
+      args: [worksheet, docId, optionen]
     },
-    // Ersetzt wird nur, was geplant wurde; Titel nur, wenn noch keiner dasteht
-    ablegen: ({ outline, material, versuch }, ws) =>
-      legeArbeitsblattAb(
-        docId,
-        ws,
-        (aktuell) => ({
-          ...aktuell,
-          outline,
-          originalMaterial: material ?? undefined,
-          meta: {
-            ...aktuell.meta,
-            ...(versuch && aktuell.meta.versuch ? { versuch: { ...aktuell.meta.versuch, daten: versuch } } : {}),
-            title: aktuell.meta.title || outline.title,
-            teacherNote: outline.teacherNote,
-            // Überthema aus der Planung – nur, wenn die Lehrkraft keins gesetzt oder abgeschaltet hat
-            ...(outline.ueberthema && !aktuell.meta.ueberthema?.trim() && !aktuell.meta.ueberthemaAus ? { ueberthema: outline.ueberthema } : {})
-          }
-        }),
-        1
-      )
+    istOffen: () => blattOffen(docId),
+    fehlerTitel: 'Arbeitsblatt konnte nicht erstellt werden',
+    arbeit: async (ws, k) => ausformulieren(mitPlan(ws, await planen(ws, k)), k, optionen),
+    ablegen: (result, ws) => legeArbeitsblattAb(docId, ws, () => result, 2)
   })
 }
 
@@ -233,30 +267,7 @@ export function formuliereAus(worksheet: Worksheet, docId: string, optionen: { r
     },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Arbeitsblatt konnte nicht erstellt werden',
-    arbeit: async (eingabe, k) => {
-      // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext – samt Adresse für QR-Code und Link (didactics/sehtext.ts)
-      const ws = { ...eingabe, meta: mitSehtext(eingabe.meta, eingabe.sources) }
-      const profile = profileFromMeta(ws.meta)
-      // Live-Vorschau: sofort das Blatt mit Platzhaltern je Gliederungspunkt (generateWorksheet) – die erste Antwort dauert oft über eine Minute
-      // Die inhaltliche Prüfung läuft auch im Sparmodus: Ein Blatt mit falschen Verweisen
-      // oder unlösbaren Aufgaben spart kein Kontingent, sondern kostet Unterrichtszeit.
-      const result = await generateWorksheet(ws, profile, {
-        ai: k.ai,
-        review: optionen.review,
-        combined: optionen.economy,
-        onProgress: (message, done, total) => k.melde(message, done, total, 'formulate'),
-        zwischenstand: (stand, was) => k.zeige(stand, { was })
-      })
-      k.zeige(result, { was: 'Ausformuliert – Quellen und Bilder folgen' })
-      await finishWorksheet(
-        result,
-        profile,
-        { ai: k.ai, images: await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild }), sources: browserSourceServices() },
-        (message, done, total) => k.melde(message, done, total, 'finish'),
-        (stand, was) => k.zeige(stand, { was })
-      )
-      return result
-    },
+    arbeit: (eingabe, k) => ausformulieren(eingabe, k, optionen),
     /*
      * Das ausformulierte Blatt ersetzt den Stand vollständig: Es wurde aus genau diesem Stand
      * erzeugt, und während des Laufs war das Blatt gesperrt. Ist es offen, geht es als ein
@@ -264,6 +275,31 @@ export function formuliereAus(worksheet: Worksheet, docId: string, optionen: { r
      */
     ablegen: (result, ws) => legeArbeitsblattAb(docId, ws, () => result, 2)
   })
+}
+
+async function ausformulieren(eingabe: Worksheet, k: Kontext, optionen: { review: boolean; economy: boolean }): Promise<Worksheet> {
+  // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext – samt Adresse für QR-Code und Link (didactics/sehtext.ts)
+  const ws = { ...eingabe, meta: mitSehtext(eingabe.meta, eingabe.sources) }
+  const profile = profileFromMeta(ws.meta)
+  // Live-Vorschau: sofort das Blatt mit Platzhaltern je Gliederungspunkt (generateWorksheet) – die erste Antwort dauert oft über eine Minute
+  // Die inhaltliche Prüfung läuft auch im Sparmodus: Ein Blatt mit falschen Verweisen
+  // oder unlösbaren Aufgaben spart kein Kontingent, sondern kostet Unterrichtszeit.
+  const result = await generateWorksheet(ws, profile, {
+    ai: k.ai,
+    review: optionen.review,
+    combined: optionen.economy,
+    onProgress: (message, done, total) => k.melde(message, done, total, 'formulate'),
+    zwischenstand: (stand, was) => k.zeige(stand, { was })
+  })
+  k.zeige(result, { was: 'Ausformuliert – Quellen und Bilder folgen' })
+  await finishWorksheet(
+    result,
+    profile,
+    { ai: k.ai, images: await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild }), sources: browserSourceServices() },
+    (message, done, total) => k.melde(message, done, total, 'finish'),
+    (stand, was) => k.zeige(stand, { was })
+  )
+  return result
 }
 
 /** Ändert den Baustein `blockId` in jedem Blatt, das ihn hat (Gruppenfassungen teilen Material). */
@@ -471,7 +507,10 @@ export function rasterAufteilung(fach: string, schreibaufgabe: boolean): { inhal
 }
 
 /** Den Versuch der Karte „Versuch" ausarbeiten (29.09.2026, didactics/protokoll.ts) */
-export async function versuchAusarbeiten(meta: WorksheetMeta, k: { melde: (m: string) => void; ai: <T>(req: import('@shared/types').StructuredRequest) => Promise<T> }): Promise<VersuchDaten> {
+export async function versuchAusarbeiten(
+  meta: WorksheetMeta,
+  k: { melde: (m: string) => void; ai: <T>(req: import('@shared/types').StructuredRequest) => Promise<T> }
+): Promise<VersuchDaten> {
   k.melde(meta.versuch?.quelle === 'datei' ? 'Die KI überträgt die Versuchsanleitung …' : 'Die KI arbeitet den Versuch aus …')
   return versuchAus(await k.ai<unknown>(versuchAnfrage(meta, meta.versuch!)))
 }
@@ -490,7 +529,9 @@ export function versuchAuftrag(worksheet: Worksheet, docId: string): void {
     arbeit: (ws, k) => versuchAusarbeiten(ws.meta, k),
     abschluss: (d) => `Versuch „${d.titel}" ausgearbeitet – Sicherheitsangaben bitte prüfen.`,
     ablegen: (daten, ws) =>
-      legeArbeitsblattAb(docId, ws, (aktuell) => (aktuell.meta.versuch ? { ...aktuell, meta: { ...aktuell.meta, versuch: { ...aktuell.meta.versuch, daten } } } : aktuell))
+      legeArbeitsblattAb(docId, ws, (aktuell) =>
+        aktuell.meta.versuch ? { ...aktuell, meta: { ...aktuell.meta, versuch: { ...aktuell.meta.versuch, daten } } } : aktuell
+      )
   })
 }
 
@@ -501,5 +542,6 @@ export function versuchAuftrag(worksheet: Worksheet, docId: string): void {
 registriereFortsetzung('arbeitsblatt.planeGliederung', planeGliederung)
 registriereFortsetzung('arbeitsblatt.planeNeu', planeNeu)
 registriereFortsetzung('arbeitsblatt.formuliereAus', formuliereAus)
+registriereFortsetzung('arbeitsblatt.erstelleDirekt', erstelleDirekt)
 registriereFortsetzung('arbeitsblatt.maskottchen', maskottchenZeichnen)
 registriereFortsetzung('arbeitsblatt.versuch', versuchAuftrag)

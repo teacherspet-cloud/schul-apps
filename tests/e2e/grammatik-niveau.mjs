@@ -47,9 +47,9 @@ const waehle = async (name, option) => {
 /** GER-Kennzeichen der angebotenen Grammatikthemen (ohne „Alle Themen des Fachs") */
 const themenNiveaus = () =>
   page.evaluate(() =>
-    [...document.querySelectorAll('.mantine-Checkbox-root')]
+    [...document.querySelectorAll('[data-thema]')]
       .filter((c) => c.offsetParent)
-      .map((c) => c.querySelector('.mantine-Badge-root')?.textContent ?? '')
+      .map((c) => c.querySelector('[data-niveau]')?.textContent ?? '')
       .filter(Boolean)
   )
 const ueberA1 = (liste) => liste.filter((l) => /^(A2|B1|B2)/.test(l))
@@ -68,22 +68,72 @@ try {
   const k5 = await themenNiveaus()
   pruefe(k5.length > 5 && ueberA1(k5).length === 0, `Klasse 5, A1: ${k5.length} Themen, keins über A1 (${[...new Set(k5)].join(', ')})`)
   await page.screenshot({ path: join(out, 'grammatik-niveau-klasse5.png') })
-  // Teilformen (Recherche 06.10.2026): Thema wählen → Teilformen aufklappen, mit Status für die Lerngruppe
-  const ersteKiste = sichtbar(page.locator('.mantine-Checkbox-root')).first()
+  // Teilformen (Recherche 06.10.2026; Auswahl als Master-Detail seit 06.10.2026 abends): Thema wählen → rechts
+  // Teilformen mit Status, Zähler „n/m" in der Zeile
+  const ersteKiste = sichtbar(page.locator('[data-thema-wahl]')).first()
+  const ersteId = await ersteKiste.getAttribute('data-thema-wahl')
   await ersteKiste.click()
   await page.waitForTimeout(400)
-  const auf = sichtbar(page.locator('[data-teilformen-auf]')).first()
-  pruefe(await auf.isVisible().catch(() => false), `Gewähltes Thema zeigt „Teilformen" (${await auf.innerText().catch(() => '')})`)
-  await auf.click()
-  const teile = await sichtbar(page.locator('[data-teilform]')).count()
-  pruefe(teile >= 3, `Teilformen aufgeklappt: ${teile}`)
-  await sichtbar(page.locator('[data-teilform]')).first().click()
+  const teile = await sichtbar(page.locator('[data-thema-detail] [data-teilform]')).count()
+  pruefe(teile >= 3, `Gewähltes Thema zeigt rechts seine Teilformen: ${teile}`)
+  const zaehler = sichtbar(page.locator(`[data-teil-zaehler="${ersteId}"]`)).first()
+  const vorher = await zaehler.innerText()
+  await sichtbar(page.locator('[data-thema-detail] [data-teilform]')).first().click()
   await page.waitForTimeout(300)
-  pruefe(/1 gewählt/.test(await auf.innerText()), 'Eine Teilform gewählt')
-  await page.screenshot({ path: join(out, 'grammatik-niveau-teilformen.png'), fullPage: true })
-  await sichtbar(page.locator('[data-teilform]')).first().click()
-  await auf.click()
-  await ersteKiste.click()
+  const nachher = await zaehler.innerText()
+  pruefe(/^\d+\/\d+$/.test(vorher) && nachher !== vorher, `Zähler der Teilformen: ${vorher} → ${nachher}`)
+  pruefe(/1 Thema/.test(await page.locator('[data-auswahl-zaehler]').innerText()), 'Auswahl als Chip mit Zähler sichtbar')
+  await page.locator('[data-grammatik-auswahl]').screenshot({ path: join(out, 'grammatik-niveau-teilformen.png') })
+  await sichtbar(page.locator('[data-teil-bilden]')).first().click()
+  await page.waitForTimeout(200)
+  // Suche deutsch/englisch
+  await feld('Grammatikthema').fill('Perfekt')
+  await page.waitForTimeout(300)
+  pruefe((await sichtbar(page.locator('[data-thema="en.verb.present_perfect"]')).count()) === 1, 'Suche „Perfekt" findet present perfect')
+  await feld('Grammatikthema').fill('passive')
+  await page.waitForTimeout(300)
+  pruefe((await sichtbar(page.locator('[data-thema="en.verb.passive_basic"]')).count()) === 1, 'Suche „passive" findet das Passiv')
+  await feld('Grammatikthema').fill('')
+  // Lehrwerk-Schnellwahl
+  await sichtbar(page.locator('[data-lehrwerk-buch]')).first().click()
+  await sichtbar(page.getByRole('option', { name: 'Green Line 2', exact: true }))
+    .first()
+    .click()
+  await sichtbar(page.locator('[data-lehrwerk-unit]')).first().click()
+  await sichtbar(page.getByRole('option', { name: 'Unit 4', exact: true }))
+    .first()
+    .click()
+  await sichtbar(page.locator('[data-unit-nur]')).first().click()
+  await page.waitForTimeout(400)
+  const hinweis = await sichtbar(page.locator('[data-unit-hinweis]')).first().innerText()
+  pruefe(/übernommen/.test(hinweis) && /nicht sicher/.test(hinweis), `„Nur Unit 4": ${hinweis}`)
+  pruefe((await sichtbar(page.locator('[data-auswahl-chip="en.cond.type1"]')).count()) === 1, 'if-Satz Typ 1 aus Unit 4 übernommen')
+  pruefe((await sichtbar(page.locator('[data-auswahl-chip="en.syn.linking"]')).count()) === 0, 'Unsichere Zuordnung („Bindewörter") nicht selbst gewählt')
+  await page.locator('[data-grammatik-auswahl]').screenshot({ path: join(out, 'grammatik-niveau-unit.png') })
+  await sichtbar(page.locator('[data-favorit="en.cond.type1"]')).first().click()
+  await sichtbar(page.locator('[data-unit-alle]')).first().click()
+  pruefe((await sichtbar(page.locator('[data-schnellwahl="en.cond.type1"]')).count()) >= 1, 'Favorit erscheint in der Schnellwahl')
+  // Schmal (iPad hochkant): Master-Detail stapelt sich – das Fenster lässt sich nicht so schmal ziehen, deshalb die Auswahl selbst begrenzen
+  await page.evaluate(() => {
+    const a = document.querySelector('[data-grammatik-auswahl]')
+    if (a) a.style.maxWidth = '480px'
+  })
+  await page.waitForTimeout(600)
+  const lagen = await page.evaluate(() => {
+    const l = document.querySelector('[data-themenliste]')?.closest('.mantine-Paper-root')?.getBoundingClientRect()
+    const d = document.querySelector('[data-thema-detail]')?.getBoundingClientRect()
+    return l && d ? { listeUnten: l.bottom, detailOben: d.top } : null
+  })
+  pruefe(Boolean(lagen && lagen.detailOben >= lagen.listeUnten - 1), `Schmal: Detail unter der Liste (${JSON.stringify(lagen)})`)
+  await page.locator('[data-grammatik-auswahl]').screenshot({ path: join(out, 'grammatik-niveau-schmal.png') })
+  await page.evaluate(() => {
+    const a = document.querySelector('[data-grammatik-auswahl]')
+    if (a) a.style.maxWidth = ''
+  })
+  await page.waitForTimeout(400)
+  await sichtbar(page.getByRole('button', { name: 'Auswahl leeren' }))
+    .first()
+    .click()
   await page.waitForTimeout(300)
   await waehle('Jahrgang', 'Klasse 9')
   pruefe((await wert('Sprachniveau (GER)')) === 'B1', `Klasse 9: Niveau → ${await wert('Sprachniveau (GER)')}`)

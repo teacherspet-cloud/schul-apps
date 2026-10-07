@@ -14,7 +14,7 @@ import { useAppSettings } from '../../shared/settingsStore'
 import { notifySuccess } from '../../shared/util'
 import { defaultMeta } from '../arbeitsblatt/model/defaults'
 import { subjectById } from '../arbeitsblatt/model/subjects'
-import type { Worksheet, WorksheetMeta } from '../arbeitsblatt/model/types'
+import type { SourceMaterial, Worksheet, WorksheetMeta } from '../arbeitsblatt/model/types'
 import { presetDesigns } from '@shared/design'
 import { generateOutline, generateWorksheet } from '../arbeitsblatt/generation/generate'
 import { finishWorksheet } from '../arbeitsblatt/generation/finish'
@@ -34,6 +34,17 @@ export function horcheReihe(reiheId: string, fn: Aenderung): () => void {
   return () => {
     if (horcher.get(reiheId) === fn) horcher.delete(reiheId)
   }
+}
+
+/**
+ * Änderung an einem Schritt ablegen (auch für „Test hier erstellen", 06.10.2026): im offenen Editor, sonst in der
+ * gespeicherten Reihe am Server.
+ */
+export async function schrittAendernUeberall(reiheId: string, schrittId: string, patch: Partial<Schritt>): Promise<void> {
+  const offen = horcher.get(reiheId)
+  if (offen) return offen(schrittId, patch)
+  const { reihe } = await holen<{ reihe: Reihe }>(`/server/reihen/${reiheId}`)
+  await senden('/server/reihen/speichern', { reihe: { ...reihe, schritte: reihe.schritte.map((x) => (x.id === schrittId ? { ...x, ...patch } : x)) } })
 }
 
 export const platzhalterSchluessel = (reiheId: string, schrittId: string): string => `reihe:${reiheId}:${schrittId}`
@@ -66,6 +77,43 @@ export function blattMeta(r: Reihe, s: Schritt): WorksheetMeta {
   }
 }
 
+/**
+ * Reihe aus Schulbuchseiten (06.10.2026): Was die KI zu den Buchabschnitten wissen muss (verweisen/übernehmen) als
+ * Textquelle; ausdrücklich gewählte Bildausschnitte als eingebettete Bilder mit Quellenangabe im Dateinamen.
+ * Ganze Seiten kommen nie aufs Blatt.
+ */
+export function buchQuellen(s: Schritt): SourceMaterial[] {
+  const p = s.platzhalter
+  if (!p?.buch) return []
+  const leer = { pageCount: 0, pagesRead: [] as number[], useAsBasis: true }
+  return [
+    {
+      id: `buch-${s.id}`,
+      fileName: 'Schulbuch (Verweise und Übernahmen)',
+      kind: 'text',
+      text: p.buch,
+      format: 'plain',
+      pageImages: [],
+      embedImage: false,
+      ...leer
+    },
+    ...(p.uebernahme ?? [])
+      .filter((u) => u.bild)
+      .map(
+        (u, i): SourceMaterial => ({
+          id: `buchbild-${s.id}-${i}`,
+          fileName: `${u.kennung} – Quelle: ${u.quelle}`,
+          kind: 'image',
+          text: `Bildausschnitt ${u.kennung} aus dem Schulbuch. Quelle: ${u.quelle}`,
+          format: 'plain',
+          pageImages: [u.bild!],
+          embedImage: true,
+          ...leer
+        })
+      )
+  ]
+}
+
 /** Erzeugung anstoßen – die Reihe muss gespeichert sein (Kennung) */
 export function erzeugeBlattFuerPlatzhalter(r: Reihe, s: Schritt): void {
   if (!r.id) throw new Error('Bitte die Reihe zuerst speichern.')
@@ -83,8 +131,17 @@ export function erzeugeBlattFuerPlatzhalter(r: Reihe, s: Schritt): void {
     arbeit: async (m, k) => {
       const profile = profileFromMeta(m)
       k.melde('Die KI plant das Arbeitsblatt …')
-      const ws: Worksheet = { version: 1, meta: m, design: presetDesigns()[0], outline: null, sheets: [], sources: [], createdAt: new Date().toISOString() }
-      ws.outline = await generateOutline(m, profile, [], k.ai)
+      const quellen = buchQuellen(s)
+      const ws: Worksheet = {
+        version: 1,
+        meta: m,
+        design: presetDesigns()[0],
+        outline: null,
+        sheets: [],
+        sources: quellen,
+        createdAt: new Date().toISOString()
+      }
+      ws.outline = await generateOutline(m, profile, quellen, k.ai)
       const result = await generateWorksheet(ws, profile, {
         ai: k.ai,
         review: true,

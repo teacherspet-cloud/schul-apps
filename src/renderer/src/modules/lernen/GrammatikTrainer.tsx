@@ -22,6 +22,10 @@ import { sitzungsWoerter, STUFEN, uebersicht, type Urteil, type Vokabel, type Wo
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { useVtFarbe } from './vtFarben'
+import { ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
+
+/** Spiele mit ablaufender Uhr – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (Einstellungen der Lernenden, 06.10.2026) */
+const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle']
 
 interface Daten {
   id: string
@@ -101,6 +105,7 @@ function Kasten({
   const heute = sitzungsWoerter(karten, d.staende)
   const [regeln, setRegeln] = useState(false)
   const [spiel, setSpiel] = useState<GrammatikSpielId | null>(null)
+  const { d: wahl } = useDarstellung()
   const ich = window.__schulappsServer
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
   const nachId = new Map(d.paket.aufgaben.map((a) => [a.id, a]))
@@ -191,16 +196,18 @@ function Kasten({
           ))}
         </SimpleGrid>
       )}
-      <Title order={4} mt="sm">
-        Spiele
-      </Title>
-      {heute.length > 0 && (
+      {wahl.spiele && (
+        <Title order={4} mt="sm">
+          Spiele
+        </Title>
+      )}
+      {wahl.spiele && heute.length > 0 && (
         <Text size="sm" c="dimmed">
           Die Spiele gibt es nach der Übung für heute.
         </Text>
       )}
       <SimpleGrid cols={{ base: 2, sm: 4 }}>
-        {GRAMMATIK_SPIELE.map((s) => {
+        {GRAMMATIK_SPIELE.filter((s) => wahl.spiele && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id))).map((s) => {
           const genug = s.id === 'regelzuordnen' ? d.paket.regeln.length >= 2 : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
           return (
             <UnstyledButton key={s.id} disabled={heute.length > 0 || !genug} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
@@ -257,6 +264,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       setStaende((s) => ({ ...s, [a.id]: e.stand }))
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
+      if (e.urteil === 'richtig') ton('richtig')
     } finally {
       setLaeuft(false)
     }
@@ -578,6 +586,7 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
           fehler: f
         })
         setEnde({ rekord: r.rekord })
+        ton('geschafft')
         d.rekorde = r.rekorde
       } catch {
         setEnde({ rekord: false })

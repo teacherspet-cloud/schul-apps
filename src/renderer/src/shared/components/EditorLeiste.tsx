@@ -1,4 +1,5 @@
 import { ActionIcon, Box, Button, Divider, Group, Popover, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
+import { useNotausgang } from './NurExperte'
 import { IconAdjustmentsHorizontal, IconArrowLeft, IconDeviceFloppy, IconFileTypeDocx, IconFileTypePdf, IconPrinter } from '@tabler/icons-react'
 import { useState } from 'react'
 import UndoRedoButtons from './UndoRedoButtons'
@@ -61,6 +62,8 @@ export default function EditorLeiste({
   rechts?: React.ReactNode
 }): React.JSX.Element {
   const [optionenOffen, setOptionenOffen] = useState(false)
+  // Standardmodus (07.10.2026): Notausgang „Alle Werkzeuge" – nur in Editoren mit OptionenBereich (bisher das Arbeitsblatt)
+  const notausgang = useNotausgang()
   return (
     <Group px="md" py={8} gap="xs" className="app-toolbar editor-leiste" data-testid="editor-leiste">
       <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} onClick={zurueck.onClick}>
@@ -106,6 +109,19 @@ export default function EditorLeiste({
         </Popover>
       )}
       {extras}
+      {notausgang && (
+        <Tooltip label="Leveln, Bewertungsraster, Baustein-Einstellungen, Stundenverlauf und weitere Blattoptionen – nur für dieses Blatt">
+          <Button
+            size="xs"
+            variant={notausgang.offen ? 'light' : 'subtle'}
+            onClick={() => notausgang.setOffen(!notausgang.offen)}
+            aria-pressed={notausgang.offen}
+            data-alle-werkzeuge
+          >
+            {notausgang.offen ? 'Weniger Werkzeuge' : 'Alle Werkzeuge'}
+          </Button>
+        </Tooltip>
+      )}
       <Box style={{ flex: 1 }} />
       {info && (
         <Text size="xs" c="dimmed">

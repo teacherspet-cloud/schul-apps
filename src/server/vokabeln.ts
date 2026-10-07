@@ -132,7 +132,8 @@ const nachCode = (code: string): Zeile | null =>
 const gaesteVon = (zid: string): NutzerInfo[] =>
   (db().prepare('SELECT nutzer_id FROM vok_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
     .map((g) => nutzerNachId(g.nutzer_id))
-    .filter((n): n is NutzerInfo => Boolean(n))
+    // Vorschaukonten (vorschau.ts) zählen nie mit
+    .filter((n): n is NutzerInfo => Boolean(n && n.quelle !== 'vorschau'))
 /** Gäste lernen über Wochen: Sitzung bis zum Ende des Zeitraums (höchstens 120 Tage, mindestens 1 Tag) */
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 

@@ -2,13 +2,35 @@
  * Medienbank in den Vokabeltabellen (05.10.2026): Spalten „Beispielbild", „Aussprache", „Satz-Aussprache",
  * das Bild-Pop-up (löschen, ein anderes gefundenes wählen, von der KI erzeugen lassen) und die Leiste der
  * Admins für die angezeigten Wörter. Lehrkräfte sehen und hören – bearbeiten dürfen nur Admins.
+ *
+ * Seit 06.10.2026 laufen Suchen und Erzeugen als Hintergrund-Aufträge in der Auftragsleiste (medienAuftrag.ts):
+ * Die Leiste stößt nur an, das Pop-up darf während „Von der KI erzeugen" geschlossen werden, und bei
+ * Schulbüchern lassen sich mehrere Abschnitte auf einmal in Auftrag geben (`AbschnitteDialog`).
  */
-import { ActionIcon, Alert, Badge, Button, Group, Image, Loader, Modal, Progress, SimpleGrid, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconPhoto, IconPhotoSearch, IconPlayerStop, IconSparkles, IconTrash, IconVolume, IconMessage2 } from '@tabler/icons-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { istGanzerSatz, satzSchluessel, sprachKurz, type MedienKandidat, type MedienSicht, type TonArt } from '@shared/medienbank'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Image,
+  Loader,
+  Modal,
+  ScrollArea,
+  SimpleGrid,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton
+} from '@mantine/core'
+import { IconListCheck, IconPhoto, IconPhotoSearch, IconSparkles, IconTrash, IconVolume, IconMessage2 } from '@tabler/icons-react'
+import { useCallback, useEffect, useState } from 'react'
+import { istGanzerSatz, sprachKurz, type MedienKandidat, type MedienSicht, type TonArt } from '@shared/medienbank'
 import { notifyError, notifySuccess } from '../util'
-import { abspielen, bildErzeugen, bildKandidaten, bildSuchenUndSetzen, kandidatUebernehmen, tonErzeugen, type Vokabel } from './medienbank'
+import { useLaufendeSchluessel } from '../auftraege'
+import { abspielen, bildKandidaten, kandidatUebernehmen, type Vokabel } from './medienbank'
+import { aufMedienAenderung, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from './medienAuftrag'
 
 let adminZwischen: Promise<boolean> | null = null
 /** Darf diese Person die Medienbank bearbeiten? (einmal je Sitzung gefragt) */
@@ -30,6 +52,20 @@ export function useMedienbank(sprache: string | undefined, woerter: string[]): {
     void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001')).then(setDaten, () => setDaten({}))
   }, [sprache, schluessel])
   useEffect(() => laden(), [laden])
+  // Medienaufträge im Hintergrund melden jedes erledigte Wort – kurz gesammelt neu laden
+  useEffect(() => {
+    if (!sprache) return
+    let t: ReturnType<typeof setTimeout> | undefined
+    const weg = aufMedienAenderung((sp) => {
+      if (sp !== sprachKurz(sprache)) return
+      clearTimeout(t)
+      t = setTimeout(laden, 400)
+    })
+    return () => {
+      clearTimeout(t)
+      weg()
+    }
+  }, [sprache, laden])
   return { daten, laden }
 }
 
@@ -45,7 +81,9 @@ export function BildZelle({ sicht, wort, onOeffnen }: { sicht?: MedienSicht; wor
       {b?.dataUrl || b?.url ? (
         <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" />
       ) : (
-        <div style={{ width: 44, height: 44, borderRadius: 4, border: '1px dashed var(--mantine-color-default-border)', display: 'grid', placeItems: 'center' }}>
+        <div
+          style={{ width: 44, height: 44, borderRadius: 4, border: '1px dashed var(--mantine-color-default-border)', display: 'grid', placeItems: 'center' }}
+        >
           <IconPhoto size={16} color="var(--mantine-color-dimmed)" />
         </div>
       )}
@@ -79,7 +117,12 @@ export function TonZelle({
         </ActionIcon>
       </Tooltip>
     )
-  if (!admin) return <Text size="xs" c="dimmed">–</Text>
+  if (!admin)
+    return (
+      <Text size="xs" c="dimmed">
+        –
+      </Text>
+    )
   return (
     <Tooltip label={veraltet ? 'Der Text hat sich geändert – neu erzeugen' : 'Aussprache von der Sprach-KI erzeugen'}>
       <ActionIcon
@@ -107,6 +150,7 @@ export function BildDialog({
   v,
   sicht,
   admin,
+  ziel,
   schliessen,
   geaendert
 }: {
@@ -114,11 +158,15 @@ export function BildDialog({
   v: Vokabel
   sicht?: MedienSicht
   admin: boolean
+  /** Stelle der Vokabel – Ziel von „Öffnen" in der Auftragsleiste */
+  ziel: MedienZiel
   schliessen: () => void
   geaendert: () => void
 }): React.JSX.Element {
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [kandidaten, setKandidaten] = useState<MedienKandidat[]>(sicht?.bild?.kandidaten ?? [])
+  // „Von der KI erzeugen" läuft als Auftrag weiter, auch wenn das Pop-up zugeht
+  const kiLaeuft = useLaufendeSchluessel(ziel.docId).has(medienSchluessel('bildKi', v.term))
   const b = sicht?.bild
   const tun = async (was: string, fn: () => Promise<unknown>, meldung?: string): Promise<void> => {
     setLaeuft(was)
@@ -168,7 +216,7 @@ export function BildDialog({
                 loading={laeuft === 'suchen'}
                 onClick={() =>
                   void tun('suchen', async () => {
-                    const k = await bildKandidaten(sprache, v)
+                    const k = await bildKandidaten(sprache, v, { klasse: ziel.klasse })
                     setKandidaten(k)
                     if (!k.length) throw new Error('Die Bildsuche hat nichts gefunden.')
                   })
@@ -179,13 +227,18 @@ export function BildDialog({
               </Button>
               <Button
                 leftSection={<IconSparkles size={16} />}
-                loading={laeuft === 'ki'}
-                onClick={() => void tun('ki', () => bildErzeugen(sprache, v), 'Bild erzeugt.')}
+                loading={kiLaeuft}
+                onClick={() => void starteMedienAuftrag({ art: 'bildKi', sprache, vokabeln: [v], ziel, einzeln: true })}
                 data-bild-ki
               >
                 Von der KI erzeugen
               </Button>
             </Group>
+            {kiLaeuft && (
+              <Text size="xs" c="dimmed" ta="center" data-bild-ki-hintergrund>
+                Die Bild-KI arbeitet im Hintergrund (Auftragsleiste unten rechts) – das Pop-up kann geschlossen werden.
+              </Text>
+            )}
             {kandidaten.length > 0 && (
               <>
                 <Text size="sm" fw={600}>
@@ -217,57 +270,61 @@ export function BildDialog({
   )
 }
 
-type Lauf = { was: string; fertig: number; gesamt: number; fehler: number; leer: number } | null
+/** Hinweis, wenn für die Aussprache noch keine Stimme gewählt ist */
+function useStandardstimme(sprache: string): string | null {
+  const [stimme, setStimme] = useState<string | null>(null)
+  const sp = sprachKurz(sprache)
+  useEffect(() => {
+    void window.api.medien.stimmen().then(
+      (s) => setStimme(s[sp] ?? ''),
+      () => setStimme('')
+    )
+  }, [sp])
+  return stimme
+}
 
-/** Leiste für Admins: Bilder suchen, Aussprache von Wörtern und Beispielsätzen erzeugen – für die angezeigten Wörter */
+/**
+ * Leiste für Admins: Bilder suchen, Aussprache von Wörtern und Beispielsätzen erzeugen – für die angezeigten
+ * Wörter. Jeder Knopf gibt einen Auftrag in die Auftragsleiste; solange er läuft, ist der Knopf gesperrt.
+ * `mehr`: weitere Knöpfe (bei Schulbüchern „Mehrere Abschnitte …").
+ */
 export function MedienLeiste({
   sprache,
   vokabeln,
   daten,
-  neuLaden
+  ziel,
+  mehr
 }: {
   sprache: string
   vokabeln: Vokabel[]
   daten: Record<string, MedienSicht>
-  neuLaden: () => void
+  ziel: MedienZiel
+  mehr?: React.ReactNode
 }): React.JSX.Element {
-  const [lauf, setLauf] = useState<Lauf>(null)
-  const [stimme, setStimme] = useState<string | null>(null)
-  const stopp = useRef(false)
+  const stimme = useStandardstimme(sprache)
+  const laufend = useLaufendeSchluessel(ziel.docId)
   const sp = sprachKurz(sprache)
-  useEffect(() => {
-    void window.api.medien.stimmen().then((s) => setStimme(s[sp] ?? ''), () => setStimme(''))
-  }, [sp])
   const woerter = vokabeln.filter((v) => v.term.trim())
-  const ohneBild = woerter.filter((v) => !daten[v.term]?.bild)
-  const ohneTon = woerter.filter((v) => !daten[v.term]?.ton || daten[v.term]?.ton?.text.trim() !== v.term.trim())
-  const ohneSatz = woerter.filter((v) => istGanzerSatz(v.example) && !daten[v.term]?.saetze?.[satzSchluessel(v.example!)])
-
-  const reihe = async (was: string, liste: Vokabel[], fn: (v: Vokabel) => Promise<boolean | void>): Promise<void> => {
-    stopp.current = false
-    let fertig = 0
-    let fehler = 0
-    let leer = 0
-    setLauf({ was, fertig, gesamt: liste.length, fehler, leer })
-    for (const v of liste) {
-      if (stopp.current) break
-      try {
-        const ok = await fn(v)
-        if (ok === false) leer++
-      } catch (e) {
-        fehler++
-        if (fehler === 1) notifyError(e, `${was}: Fehler bei „${v.term}“`)
-      }
-      fertig++
-      setLauf({ was, fertig, gesamt: liste.length, fehler, leer })
-      // Zwischendurch zeigen, was schon da ist
-      if (fertig % 3 === 0) neuLaden()
-    }
-    neuLaden()
-    notifySuccess(`${was}: ${fertig - fehler - leer} von ${liste.length} erledigt${leer ? `, ${leer} ohne passendes Bild` : ''}${fehler ? `, ${fehler} Fehler` : ''}.`)
-    setLauf(null)
-  }
+  const ohneBild = offeneVokabeln('bilder', woerter, daten)
+  const ohneTon = offeneVokabeln('aussprache', woerter, daten)
+  const ohneSatz = offeneVokabeln('satz', woerter, daten)
   const ohneStimme = stimme === ''
+  const start = (art: MedienArt, liste: Vokabel[]): void => void starteMedienAuftrag({ art, sprache: sp, vokabeln: liste, ziel })
+  const knopf = (art: MedienArt, label: string, liste: Vokabel[], icon: React.ReactNode, kennung: string, braucheStimme = false): React.JSX.Element => {
+    const laeuft = laufend.has(medienSchluessel(art))
+    return (
+      <Button
+        size="xs"
+        leftSection={icon}
+        loading={laeuft}
+        disabled={laeuft || !liste.length || (braucheStimme && ohneStimme)}
+        onClick={() => start(art, liste)}
+        {...{ [kennung]: true }}
+      >
+        {label} ({liste.length})
+      </Button>
+    )
+  }
   return (
     <Alert color="violet" variant="light" p="xs" mb="xs" data-medien-leiste>
       <Stack gap={6}>
@@ -276,54 +333,130 @@ export function MedienLeiste({
             Admin
           </Badge>
           <Text size="sm">Medienbank für die angezeigten {woerter.length} Wörter:</Text>
-          <Button
-            size="xs"
-            leftSection={<IconPhotoSearch size={14} />}
-            disabled={!!lauf || !ohneBild.length}
-            onClick={() => void reihe('Beispielbilder', ohneBild, (v) => bildSuchenUndSetzen(sp, v))}
-            data-medien-bilder
-          >
-            Beispielbilder suchen ({ohneBild.length})
-          </Button>
-          <Button
-            size="xs"
-            leftSection={<IconVolume size={14} />}
-            disabled={!!lauf || !ohneTon.length || ohneStimme}
-            onClick={() => void reihe('Aussprache', ohneTon, (v) => tonErzeugen(sp, v.term, 'wort', v.term, stimme!))}
-            data-medien-aussprache
-          >
-            Aussprache erzeugen ({ohneTon.length})
-          </Button>
-          <Button
-            size="xs"
-            leftSection={<IconMessage2 size={14} />}
-            disabled={!!lauf || !ohneSatz.length || ohneStimme}
-            onClick={() => void reihe('Satz-Aussprache', ohneSatz, (v) => tonErzeugen(sp, v.term, 'satz', v.example!, stimme!))}
-            data-medien-satz
-          >
-            Satz-Aussprache erzeugen ({ohneSatz.length})
-          </Button>
-          {lauf && (
-            <Button size="xs" variant="subtle" color="red" leftSection={<IconPlayerStop size={14} />} onClick={() => (stopp.current = true)}>
-              Anhalten
-            </Button>
-          )}
+          {knopf('bilder', 'Beispielbilder suchen', ohneBild, <IconPhotoSearch size={14} />, 'data-medien-bilder')}
+          {knopf('aussprache', 'Aussprache erzeugen', ohneTon, <IconVolume size={14} />, 'data-medien-aussprache', true)}
+          {knopf('satz', 'Satz-Aussprache erzeugen', ohneSatz, <IconMessage2 size={14} />, 'data-medien-satz', true)}
+          {mehr}
         </Group>
         {ohneStimme && (
           <Text size="xs" c="orange.8">
             Für die Aussprache fehlt eine Standardstimme für diese Sprache – Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“.
           </Text>
         )}
-        {lauf && (
-          <Group gap="xs" wrap="nowrap">
-            <Progress value={(lauf.fertig / Math.max(1, lauf.gesamt)) * 100} style={{ flex: 1 }} animated />
-            <Text size="xs">
-              {lauf.was}: {lauf.fertig}/{lauf.gesamt}
-            </Text>
-          </Group>
-        )}
+        <Text size="xs" c="dimmed">
+          Läuft im Hintergrund – Fortschritt in der Auftragsleiste unten rechts. Bei ausgelasteten Diensten wartet der Auftrag und macht danach weiter.
+          {ziel.klasse && ziel.klasse <= 6 ? ' Für jüngere Lernende werden zuerst Cliparts gesucht.' : ''}
+        </Text>
       </Stack>
     </Alert>
   )
 }
 
+/** Ein Abschnitt eines Schulbuchs für den Sammelauftrag */
+export interface MedienAbschnitt {
+  unit: string
+  abschnitt: string
+  vokabeln: Vokabel[]
+  ziel: MedienZiel
+}
+
+/**
+ * Mehrere Abschnitte eines Schulbuchs auf einmal in Auftrag geben (06.10.2026): je Abschnitt und Art ein Auftrag
+ * in der Auftragsleiste – so führt „Öffnen" jeweils genau zu seinem Abschnitt. Es laufen höchstens zwei zugleich.
+ */
+export function AbschnitteDialog({
+  opened,
+  onClose,
+  sprache,
+  abschnitte
+}: {
+  opened: boolean
+  onClose: () => void
+  sprache: string
+  abschnitte: MedienAbschnitt[]
+}): React.JSX.Element {
+  const [wahl, setWahl] = useState<string[]>([])
+  const [arten, setArten] = useState<MedienArt[]>(['bilder', 'aussprache'])
+  const stimme = useStandardstimme(sprache)
+  const key = (a: MedienAbschnitt): string => a.ziel.docId
+  const alle = wahl.length === abschnitte.length && abschnitte.length > 0
+  const tonOhneStimme = stimme === '' && arten.some((a) => a === 'aussprache' || a === 'satz')
+  const starten = (): void => {
+    let n = 0
+    for (const a of abschnitte.filter((x) => wahl.includes(key(x)))) {
+      for (const art of arten) {
+        if (stimme === '' && (art === 'aussprache' || art === 'satz')) continue
+        void starteMedienAuftrag({ art, sprache: sprachKurz(sprache), vokabeln: a.vokabeln, ziel: a.ziel })
+        n++
+      }
+    }
+    if (n) notifySuccess(`${n} ${n === 1 ? 'Auftrag' : 'Aufträge'} in der Auftragsleiste – sie laufen nacheinander im Hintergrund.`)
+    setWahl([])
+    onClose()
+  }
+  return (
+    <Modal opened={opened} onClose={onClose} title="Mehrere Abschnitte bearbeiten" size="lg" data-medien-abschnitte>
+      <Stack>
+        <Group gap="md">
+          {(
+            [
+              ['bilder', 'Beispielbilder suchen'],
+              ['aussprache', 'Aussprache'],
+              ['satz', 'Satz-Aussprache']
+            ] as [MedienArt, string][]
+          ).map(([art, label]) => (
+            <Checkbox
+              key={art}
+              label={label}
+              checked={arten.includes(art)}
+              onChange={(e) => {
+                const an = e.currentTarget.checked
+                setArten((x) => (an ? [...x, art] : x.filter((y) => y !== art)))
+              }}
+              data-medien-art={art}
+            />
+          ))}
+        </Group>
+        {tonOhneStimme && (
+          <Text size="xs" c="orange.8">
+            Ohne Standardstimme für diese Sprache wird keine Aussprache erzeugt (Einstellungen › Bilder und Hörtexte).
+          </Text>
+        )}
+        <Checkbox
+          label="Alle Abschnitte"
+          checked={alle}
+          indeterminate={wahl.length > 0 && !alle}
+          onChange={(e) => setWahl(e.currentTarget.checked ? abschnitte.map(key) : [])}
+        />
+        <ScrollArea.Autosize mah={360} type="auto">
+          <Stack gap={4}>
+            {abschnitte.map((a) => (
+              <Checkbox
+                key={key(a)}
+                label={`${a.unit} · ${a.abschnitt} (${a.vokabeln.filter((v) => v.term.trim()).length} Wörter)`}
+                checked={wahl.includes(key(a))}
+                onChange={(e) => {
+                  const an = e.currentTarget.checked
+                  setWahl((x) => (an ? [...x, key(a)] : x.filter((y) => y !== key(a))))
+                }}
+                data-medien-abschnitt={key(a)}
+              />
+            ))}
+          </Stack>
+        </ScrollArea.Autosize>
+        <Text size="xs" c="dimmed">
+          Je Abschnitt und Art entsteht ein Auftrag; bearbeitet wird nur, was noch fehlt. Bei ausgelasteten Diensten (zu viele Anfragen, Kontingent) warten die
+          Aufträge und machen danach von selbst weiter.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button leftSection={<IconListCheck size={16} />} disabled={!wahl.length || !arten.length} onClick={starten} data-medien-abschnitte-start>
+            In Auftrag geben
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}

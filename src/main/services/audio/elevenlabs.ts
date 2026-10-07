@@ -98,8 +98,16 @@ async function pruefeAntwort(res: Response): Promise<Response> {
     // Eigene Meldung vor die von ElevenLabs stellen, aber deren Wortlaut mitgeben:
     // Sie benennt den Fehler oft genauer, als eine allgemeine Meldung es könnte.
     if (res.status === 401) throw new Error(`ElevenLabs lehnt den Schlüssel ab. Bitte in den Einstellungen prüfen.${message ? ` (${message})` : ''}`)
-    if (res.status === 429)
-      throw new Error(`Das ElevenLabs-Kontingent ist erschöpft oder es laufen zu viele Anfragen gleichzeitig.${message ? ` (${message})` : ''}`)
+    if (res.status === 429) {
+      /*
+       * Wartezeit mitgeben (06.10.2026): Medienaufträge der Vokabellisten warten bei einer Begrenzung und machen
+       * danach weiter (renderer/shared/medien/medienWarten.ts liest „erneut versuchen in N s"). Ohne Angabe des
+       * Dienstes wartet der Auftrag schrittweise länger.
+       */
+      const nach = Number(res.headers.get('retry-after'))
+      const warte = Number.isFinite(nach) && nach > 0 ? ` – erneut versuchen in ${Math.ceil(nach)} s` : ''
+      throw new Error(`Das ElevenLabs-Kontingent ist erschöpft oder es laufen zu viele Anfragen gleichzeitig (429)${warte}.${message ? ` (${message})` : ''}`)
+    }
     throw new Error(message || `ElevenLabs meldet einen Fehler (${res.status}). ${body.slice(0, 200)}`)
   }
   return res

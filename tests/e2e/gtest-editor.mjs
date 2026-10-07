@@ -46,6 +46,32 @@ const seen = await page.evaluate(() => ({
 console.log('Seiten:', seen.seiten, '· Aufgaben:', seen.aufgaben)
 await page.screenshot({ path: join(out, 'test.png'), fullPage: false })
 
+/*
+ * Bausteinleiste wie in der Klassenarbeit (06.10.2026): KI-Menü, Einstellungen und „⋯" mit
+ * Duplizieren, Einfügen, Löschen – nicht am errechneten Kopfkasten. Duplizieren ohne KI prüfen.
+ */
+const aufgabe = page.locator('.ws-editor-pages .editor-block', { hasText: 'since 2019' }).last()
+await aufgabe.hover()
+await aufgabe.hover()
+await page.waitForTimeout(300)
+const leiste = {
+  ki: await aufgabe.locator('[aria-label="KI-Aktionen"]').count(),
+  einstellen: await aufgabe.locator('[aria-label="Baustein einstellen"]').count(),
+  weitere: await aufgabe.locator('[aria-label="Weitere Aktionen"]').count(),
+  kopf: await page.locator('.ws-editor-pages .editor-block', { hasText: 'Time:' }).locator('[aria-label="Weitere Aktionen"]').count()
+}
+console.log('Leiste:', JSON.stringify(leiste))
+const vorher = await page.locator('.ws-editor-pages .ws-task').count()
+await aufgabe.locator('[aria-label="Weitere Aktionen"]').first().click()
+await page.waitForTimeout(300)
+await page.getByRole('menuitem', { name: 'Duplizieren' }).click()
+await page.waitForTimeout(1200)
+const nachher = await page.locator('.ws-editor-pages .ws-task').count()
+await page.locator('.ws-editor-pages').click({ position: { x: 5, y: 5 } })
+await page.keyboard.press('Control+z')
+await page.waitForTimeout(1000)
+const zurueck = await page.locator('.ws-editor-pages .ws-task').count()
+
 // Lösungsansicht: dort stehen Notenschlüssel und Fehlerprofil
 await page.getByText('Lösungen', { exact: true }).first().click()
 await page.waitForTimeout(1200)
@@ -55,6 +81,10 @@ await page.screenshot({ path: join(out, 'loesungen.png'), fullPage: false })
 const problems = []
 if (!seen.seiten) problems.push('Keine Seite dargestellt')
 if (seen.aufgaben < 2) problems.push(`Nur ${seen.aufgaben} Aufgabe(n) dargestellt`)
+if (!leiste.ki || !leiste.einstellen || !leiste.weitere) problems.push(`Bausteinleiste unvollständig: ${JSON.stringify(leiste)}`)
+if (leiste.kopf) problems.push('Der errechnete Kopfkasten hat ein „⋯“-Menü')
+if (nachher !== vorher + 1) problems.push(`Duplizieren: ${vorher} → ${nachher} Aufgaben`)
+if (zurueck !== vorher) problems.push(`Strg+Z nach Duplizieren: ${zurueck} statt ${vorher} Aufgaben`)
 // Genau der Fehler, der den Editor unsichtbar machte
 const react185 = errors.filter((e) => /Maximum update depth|error #185/i.test(e))
 if (react185.length) problems.push(`Endlosschleife beim Rendern: ${react185[0].slice(0, 120)}`)

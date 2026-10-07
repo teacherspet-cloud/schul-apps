@@ -5,9 +5,10 @@
  *  - Je Eintrag Kopf (Titel, Art, Status, Ablegen ▾), Kurzangaben, Ampel-Balken, aufklappbare Details.
  * Dazu die Ampelfarben, die überall in „Meine Klassen" gelten (wie in der Lernenden-Tabelle).
  */
+import { useExperte } from '../../shared/settingsStore'
 import { ActionIcon, Badge, Button, Card, Checkbox, Collapse, Group, Menu, Progress, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconChevronDown, IconChevronRight, IconFilter, IconRestore } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 /** Ampel wie in der Lernenden-Tabelle: unter 30 % rot, unter 60 % gelb, sonst grün */
 export const ampel = (x: number | null | undefined): string => (x == null ? 'gray' : x < 0.3 ? 'red' : x < 0.6 ? 'yellow' : 'teal')
@@ -88,9 +89,16 @@ export function MaterialListe({
     return [...gefiltert].sort((a, b) => (sortierung.ab ? v(b, a) : v(a, b)) || standardFolge(a, b))
   }, [eintraege, filter, sortierung, kategorien]) // eslint-disable-line react-hooks/exhaustive-deps
   const aktiv = Object.values(filter).some((l) => l?.length) || sortierung
+  // Standardmodus (07.10.2026): ohne Sortier- und Filterpfeile – die Liste steht in der Standardfolge (offen nach Frist, fertig nach Datum)
+  const experte = useExperte()
+  useEffect(() => {
+    if (experte) return
+    setSortierung(null)
+    setFilter({})
+  }, [experte])
   return (
     <Stack gap="xs" data-material-liste>
-      <Group gap={6} wrap="wrap" className="mk-kategorien">
+      <Group gap={6} wrap="wrap" className="mk-kategorien" display={experte ? undefined : 'none'}>
         {kategorien.map((k) => {
           const gefiltert = Boolean(filter[k]?.length)
           const pfeil = (ab: boolean): React.JSX.Element => (

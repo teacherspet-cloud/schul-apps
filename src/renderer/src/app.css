@@ -154,12 +154,39 @@ body {
   display: none;
 }
 
-.app-leiste .leiste-umschalter {
+.app-leiste .leiste-umschalter-zeile {
   display: flex;
-  margin-inline: auto;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 6px;
 }
-.app-leiste[data-breit='true'] .leiste-umschalter {
-  margin-inline: 10px auto;
+.app-leiste[data-breit='true'] .leiste-umschalter-zeile {
+  justify-content: flex-start;
+  padding-inline-start: 10px;
+}
+/* Standard-/Expertenmodus (07.10.2026): Wörter in der Farbe der Gruppenköpfe, Schalter mit hellem Rand auf farbiger Leiste */
+.app-leiste .modus-schalter {
+  margin: 0 0 8px;
+  color: var(--leiste-kopf-text);
+}
+.app-leiste .modus-schalter[data-breit='true'] {
+  padding-inline-start: 12px;
+}
+.app-leiste .modus-schalter-wort {
+  cursor: pointer;
+  user-select: none;
+}
+:root[data-app-nav='filled'] .app-leiste .modus-schalter-knopf .mantine-Switch-track {
+  border-color: rgba(255, 255, 255, 0.75);
+}
+/* Wie die Gruppenköpfe gefärbt – auf der farbigen Leiste hell statt Grau auf Blau */
+.app-leiste .leiste-umschalter {
+  --ai-color: var(--leiste-kopf-text);
+  --ai-hover: var(--leiste-kopf-hover);
+  color: var(--leiste-kopf-text);
+}
+.app-leiste .leiste-umschalter:hover {
+  background: var(--leiste-kopf-hover);
 }
 
 /* Breite Leiste: Symbol und Name nebeneinander, lange Namen werden gekürzt statt umbrochen */

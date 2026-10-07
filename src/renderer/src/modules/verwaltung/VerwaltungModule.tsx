@@ -15,6 +15,7 @@ import { AppKopf } from '../../shared/components/AppKopf'
 import {
   ActionIcon,
   Alert,
+  Autocomplete,
   Badge,
   Button,
   Card,
@@ -42,6 +43,9 @@ import { notifyError, notifySuccess } from '../../shared/util'
 import { KlassenlisteKarte } from './Klassenliste'
 import { serverIch } from '../../shared/plattform'
 import { DatenUndMaterial } from './DatenUndMaterial'
+import MaskottchenSettings from '../../shell/MaskottchenSettings'
+import { useAppSettings } from '../../shared/settingsStore'
+import { useZielZeiger } from '../../shared/navigation'
 
 interface Uebersicht {
   nutzer: {
@@ -55,7 +59,11 @@ interface Uebersicht {
     zuletzt: string | null
     gruppen: number
     passwortWechseln?: boolean
+    /** Klasse eines Schülerkontos (Gruppe „klasse:…") */
+    klasse?: string
   }[]
+  /** Bekannte Klassen (Schülerkonten und Lerngruppen) für die Zuordnung */
+  klassen?: string[]
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
   iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean }
   notzugang: boolean
@@ -83,6 +91,10 @@ const gb = (b: number): string => `${(b / 1024 / 1024 / 1024).toFixed(1).replace
 export default function VerwaltungModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [d, setD] = useState<Uebersicht | null>(null)
   const [reiter, setReiter] = useState<string | null>('daten')
+  const settings = useAppSettings((s) => s.settings)
+  const update = useAppSettings((s) => s.update)
+  // „Öffnen" eines Maskottchen-Auftrags führt in den Reiter Maskottchen
+  useZielZeiger('verwaltung', (z) => z.baustein === 'maskottchen' && setReiter('maskottchen'))
   const laden = useCallback(() => {
     void holen<Uebersicht>('/server/verwaltung/uebersicht')
       .then(setD)
@@ -110,6 +122,7 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
               <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
               <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
               <Tabs.Tab value="hoertexte">Hörtexte</Tabs.Tab>
+              <Tabs.Tab value="maskottchen">Maskottchen</Tabs.Tab>
               <Tabs.Tab value="server">Server</Tabs.Tab>
             </Tabs.List>
           }
@@ -133,6 +146,9 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
             <Tabs.Panel value="hoertexte">
               <Hoertexte />
             </Tabs.Panel>
+            <Tabs.Panel value="maskottchen">
+              <MaskottchenSettings settings={settings} update={(p) => void update(p)} schule />
+            </Tabs.Panel>
             <Tabs.Panel value="server">
               <Server d={d} />
             </Tabs.Panel>
@@ -143,10 +159,34 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
   )
 }
 
+/** Klasse eines Schülerkontos: wählen oder neu eintippen; gespeichert wird beim Verlassen des Felds bzw. mit Enter */
+function KlasseFeld({ wert, klassen, speichern }: { wert: string; klassen: string[]; speichern: (klasse: string) => void }): React.JSX.Element {
+  const [text, setText] = useState(wert)
+  useEffect(() => setText(wert), [wert])
+  const fertig = (v = text): void => {
+    if (v.trim() !== wert) speichern(v.trim())
+  }
+  return (
+    <Autocomplete
+      size="xs"
+      w={120}
+      placeholder="keine"
+      data={klassen}
+      value={text}
+      onChange={setText}
+      onOptionSubmit={(v) => (setText(v), fertig(v))}
+      onBlur={() => fertig()}
+      onKeyDown={(e) => e.key === 'Enter' && fertig()}
+      aria-label="Klasse"
+      data-klasse-feld
+    />
+  )
+}
+
 function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
   const [konto, setKonto] = useState<{ benutzer: string; passwort: string; titel?: string } | null>(null)
   const [rolle, setRolle] = useState<string>('lehrkraft')
-  const [neuerNutzer, setNeuerNutzer] = useState({ benutzer: '', name: '', rolle: 'lehrkraft', passwort: '' })
+  const [neuerNutzer, setNeuerNutzer] = useState({ benutzer: '', name: '', rolle: 'lehrkraft', passwort: '', klasse: '' })
   const ich = serverIch()?.benutzer
   // Gäste aus Onlinetests (ohne IServ) nur als Zahl – sonst würde die Liste mit jedem Test länger
   const gaeste = d.nutzer.filter((n) => n.quelle === 'gast').length
@@ -155,7 +195,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
     try {
       const r = await senden<{ benutzer: string; passwort: string }>('/server/verwaltung/nutzer-anlegen', neuerNutzer)
       setKonto({ ...r, titel: 'Nutzer angelegt' })
-      setNeuerNutzer({ benutzer: '', name: '', rolle: neuerNutzer.rolle, passwort: '' })
+      setNeuerNutzer({ benutzer: '', name: '', rolle: neuerNutzer.rolle, passwort: '', klasse: neuerNutzer.klasse })
       neu()
     } catch (e) {
       notifyError(e)
@@ -223,6 +263,17 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
             autoComplete="off"
             data-feld="passwort"
           />
+          {neuerNutzer.rolle === 'schueler' && (
+            <Autocomplete
+              label="Klasse"
+              description="Vorhandene wählen oder neue eintippen (z. B. 7a) – das Konto erscheint dann in jeder Lerngruppe dieser Klasse"
+              placeholder="z. B. 7a"
+              data={d.klassen ?? []}
+              value={neuerNutzer.klasse}
+              onChange={(v) => setNeuerNutzer({ ...neuerNutzer, klasse: v })}
+              data-feld="klasse"
+            />
+          )}
         </SimpleGrid>
         <Group justify="space-between" mt="sm">
           <Text size="xs" c="dimmed">
@@ -260,6 +311,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           <Table.Tr>
             <Table.Th>Konto</Table.Th>
             <Table.Th>Rolle</Table.Th>
+            <Table.Th>Klasse</Table.Th>
             <Table.Th>Anmeldung</Table.Th>
             <Table.Th>Zuletzt</Table.Th>
             <Table.Th />
@@ -288,6 +340,15 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
                   onChange={(v) => v && aendern(n.id, { rolle: v })}
                   allowDeselect={false}
                 />
+              </Table.Td>
+              <Table.Td>
+                {n.rolle === 'schueler' ? (
+                  <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendern(n.id, { klasse })} />
+                ) : (
+                  <Text size="xs" c="dimmed">
+                    –
+                  </Text>
+                )}
               </Table.Td>
               <Table.Td>
                 <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : n.quelle === 'lokal' ? 'teal' : 'orange'}>

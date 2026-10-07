@@ -71,8 +71,20 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
     )
   const lernende = [...d.lernende].sort((a, b) => a.name.localeCompare(b.name, 'de'))
   const csv = (): void => {
-    const kopf = ['Name', ...d.reihe.schritte.map((s) => s.titel), 'Fortschritt']
-    const zeilen = lernende.map((l) => [l.name, ...l.weg.schritte.map((x) => STATUS[x.status].text), `${Math.round(l.weg.fortschritt * 100)} %`])
+    const kopf = [
+      'Name',
+      ...d.reihe.schritte.map((s) => (s.rolle === 'optional' ? `${s.titel} (optional)` : s.titel)),
+      'Fortschritt',
+      'Optional',
+      'Abgeschlossen'
+    ]
+    const zeilen = lernende.map((l) => [
+      l.name,
+      ...l.weg.schritte.map((x) => STATUS[x.status].text),
+      `${Math.round(l.weg.fortschritt * 100)} %`,
+      l.weg.optional ? `${l.weg.optional.geschafft}/${l.weg.optional.gesamt}` : '',
+      l.weg.fertig ? 'ja' : 'nein'
+    ])
     const text = [kopf, ...zeilen].map((z) => z.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(';')).join('\r\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
@@ -175,10 +187,11 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
               <Table.Th>Name</Table.Th>
               {d.reihe.schritte.map((s, i) => (
                 <Table.Th key={s.id} style={{ minWidth: 44, textAlign: 'center' }}>
-                  <Tooltip label={`${s.titel}${s.halt ? ' (nach Haltepunkt)' : ''}`}>
-                    <Text size="xs" fw={700}>
+                  <Tooltip label={`${s.titel}${s.rolle === 'optional' ? ' (optional)' : ''}${s.halt ? ' (nach Haltepunkt)' : ''}`}>
+                    <Text size="xs" fw={700} c={s.rolle === 'optional' ? 'teal' : undefined} fs={s.rolle === 'optional' ? 'italic' : undefined}>
                       {s.halt?.art === 'freigabe' && !d.zuweisung.halteFrei.includes(s.id) ? '⏸' : ''}
                       {i + 1}
+                      {s.rolle === 'optional' ? '°' : ''}
                     </Text>
                   </Tooltip>
                 </Table.Th>
@@ -226,7 +239,9 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
                 ))}
                 <Table.Td>
                   <Text size="sm">
+                    {l.weg.fertig ? '✓ ' : ''}
                     {Math.round(l.weg.fortschritt * 100)} %{l.weg.abzeichen.length ? ` · ${l.weg.abzeichen.map(() => '🏅').join('')}` : ''}
+                    {l.weg.optional ? ` · opt. ${l.weg.optional.geschafft}/${l.weg.optional.gesamt}` : ''}
                   </Text>
                 </Table.Td>
               </Table.Tr>
@@ -236,8 +251,8 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
       </ScrollArea>
       {lernende.length === 0 && <Alert>In der Lerngruppe ist noch niemand. Schülerkonten legt die Verwaltung aus der Klassenliste an.</Alert>}
       <Text size="xs" c="dimmed">
-        ✓ geschafft · ○ offen · ⏳ eingereicht (wartet ggf. auf dich) · ✗ nicht geschafft · 🔒 gesperrt · » übersprungen (Diagnose). Klick auf ein Feld: Details
-        und Freischalten.
+        ° optionaler Schritt · ✓ geschafft · ○ offen · ⏳ eingereicht (wartet ggf. auf dich) · ✗ nicht geschafft · 🔒 gesperrt · » übersprungen (Diagnose).
+        Klick auf ein Feld: Details und Freischalten.
       </Text>
       {det && (
         <Detail

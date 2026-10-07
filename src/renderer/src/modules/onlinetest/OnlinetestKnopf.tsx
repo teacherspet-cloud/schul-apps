@@ -4,6 +4,7 @@
  * Verteilung der Fassungen, Figur; danach Code, Link und QR-Code für die Lernenden. Gestartet
  * wird in der App „Onlinetest" – für alle gemeinsam.
  */
+import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -199,79 +200,90 @@ export function Erstellen({
           </Group>
         </Stack>
       ) : (
-        <Stack>
-          <TextInput
-            label="Name des Tests"
-            description="So steht er in der Liste der Onlinetests und bei den Lernenden."
-            value={titel}
-            onChange={(e) => (setTitel(e.currentTarget.value), setTitelVonHand(true))}
-            data-onlinetest-name
-          />
-          <Select
-            label="Lerngruppe"
-            description="Nur Mitglieder dieser Lerngruppe können teilnehmen; die Ergebnisse stehen in ihrer Historie. Ohne Lerngruppe: jeder mit Code."
-            data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
-            value={gruppe}
-            onChange={(g) => {
-              setGruppe(g)
-              if (!titelVonHand) setTitel(nameFuer(gruppen.find((x) => x.id === g)?.name ?? ''))
-            }}
-            clearable
-            placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
-          />
-          <Radio.Group
-            label="Wer darf teilnehmen?"
-            value={gaeste ? 'gaeste' : 'konto'}
-            onChange={(v) => setGaeste(v === 'gaeste')}
-            description="Nur mit Konto: Die Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben per QR-Code nur ihren Namen ein (Vorname + Anfangsbuchstabe)."
-          >
-            <Group mt={6}>
-              <Radio value="konto" label="nur mit Schülerkonto" data-nur-konto />
-              <Radio value="gaeste" label="auch Gäste mit Namen" />
-            </Group>
-          </Radio.Group>
-          <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
-          {(doc ? doc.variants.length : blatt!.varianten.length) > 1 && (
-            <Select
-              label="Fassungen verteilen"
-              data={[
-                { value: 'abwechselnd', label: 'abwechselnd (A, B, A, B … nach Reihenfolge des Startens)' },
-                { value: 'zufall', label: 'zufällig' },
-                ...(doc ? doc.variants.map((v) => v.label) : blatt!.varianten).map((l, i) => ({ value: String(i), label: `alle Fassung ${l}` }))
-              ]}
-              value={zuteilung}
-              onChange={(v) => v && setZuteilung(v)}
-              allowDeselect={false}
+        <OptionenBereich>
+          <Stack>
+            <TextInput
+              label="Name des Tests"
+              description="So steht er in der Liste der Onlinetests und bei den Lernenden."
+              value={titel}
+              onChange={(e) => (setTitel(e.currentTarget.value), setTitelVonHand(true))}
+              data-onlinetest-name
             />
-          )}
-          {winkend && (
-            <Group gap="sm" wrap="nowrap">
+            <Select
+              label="Lerngruppe"
+              description="Nur Mitglieder dieser Lerngruppe können teilnehmen; die Ergebnisse stehen in ihrer Historie. Ohne Lerngruppe: jeder mit Code."
+              data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+              value={gruppe}
+              onChange={(g) => {
+                setGruppe(g)
+                if (!titelVonHand) setTitel(nameFuer(gruppen.find((x) => x.id === g)?.name ?? ''))
+              }}
+              clearable
+              placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
+            />
+            <NurExperte geaendert={gaeste && 'auch Gäste'}>
+              <Radio.Group
+                label="Wer darf teilnehmen?"
+                value={gaeste ? 'gaeste' : 'konto'}
+                onChange={(v) => setGaeste(v === 'gaeste')}
+                description="Nur mit Konto: Die Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben per QR-Code nur ihren Namen ein (Vorname + Anfangsbuchstabe)."
+              >
+                <Group mt={6}>
+                  <Radio value="konto" label="nur mit Schülerkonto" data-nur-konto />
+                  <Radio value="gaeste" label="auch Gäste mit Namen" />
+                </Group>
+              </Radio.Group>
+            </NurExperte>
+            <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
+            <NurExperte geaendert={zuteilung !== 'abwechselnd' && 'Fassungen verteilen'}>
+              {(doc ? doc.variants.length : blatt!.varianten.length) > 1 && (
+                <Select
+                  label="Fassungen verteilen"
+                  data={[
+                    { value: 'abwechselnd', label: 'abwechselnd (A, B, A, B … nach Reihenfolge des Startens)' },
+                    { value: 'zufall', label: 'zufällig' },
+                    ...(doc ? doc.variants.map((v) => v.label) : blatt!.varianten).map((l, i) => ({ value: String(i), label: `alle Fassung ${l}` }))
+                  ]}
+                  value={zuteilung}
+                  onChange={(v) => v && setZuteilung(v)}
+                  allowDeselect={false}
+                />
+              )}
+            </NurExperte>
+            <NurExperte>
+              {winkend && (
+                <Group gap="sm" wrap="nowrap">
+                  <Checkbox
+                    label="Figur zeigen (Wartebildschirm, Kopf, Ergebnis)"
+                    checked={mitFigur}
+                    onChange={(e) => setMitFigur(e.currentTarget.checked)}
+                    data-figur-wahl
+                  />
+                  {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
+                </Group>
+              )}
+            </NurExperte>
+            <NurExperte geaendert={handschrift && 'Handschrift'}>
               <Checkbox
-                label="Figur zeigen (Wartebildschirm, Kopf, Ergebnis)"
-                checked={mitFigur}
-                onChange={(e) => setMitFigur(e.currentTarget.checked)}
-                data-figur-wahl
+                label="Handschrift erlauben (Stift oder Finger, mit Erkennung)"
+                description="Die Erkennung läuft über den eigenen KI-Zugang (API-Schlüssel oder Abo). Die Schrift bleibt gespeichert und ist in der Durchsicht zu sehen."
+                checked={handschrift}
+                onChange={(e) => setHandschrift(e.currentTarget.checked)}
+                data-handschrift-wahl
               />
-              {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
+            </NurExperte>
+            <AlleOptionen />
+            <Alert variant="light">
+              Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang,
+              ohne Namen); kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
+            </Alert>
+            <Group justify="flex-end">
+              <Button loading={laeuft} onClick={() => void erstellen()}>
+                Onlinetest erstellen
+              </Button>
             </Group>
-          )}
-          <Checkbox
-            label="Handschrift erlauben (Stift oder Finger, mit Erkennung)"
-            description="Die Erkennung läuft über den eigenen KI-Zugang (API-Schlüssel oder Abo). Die Schrift bleibt gespeichert und ist in der Durchsicht zu sehen."
-            checked={handschrift}
-            onChange={(e) => setHandschrift(e.currentTarget.checked)}
-            data-handschrift-wahl
-          />
-          <Alert variant="light">
-            Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang,
-            ohne Namen); kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
-          </Alert>
-          <Group justify="flex-end">
-            <Button loading={laeuft} onClick={() => void erstellen()}>
-              Onlinetest erstellen
-            </Button>
-          </Group>
-        </Stack>
+          </Stack>
+        </OptionenBereich>
       )}
     </Modal>
   )

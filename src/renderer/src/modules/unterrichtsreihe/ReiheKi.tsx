@@ -22,7 +22,8 @@ import {
   Textarea,
   Tooltip
 } from '@mantine/core'
-import { IconBook, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { IconArrowRight, IconBook, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigation'
 import { useEffect, useState } from 'react'
 import { SCHRITT_ARTEN, STUNDEN_MINUTEN, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -275,8 +276,8 @@ function PlanZeile({ s }: { s: Schritt }): React.JSX.Element {
           </Badge>
         )}
         {s.rolle !== 'pflicht' && (
-          <Badge size="xs" color={s.rolle === 'foerder' ? 'orange' : 'yellow'} variant="light">
-            {s.rolle === 'foerder' ? 'Förderung' : '★ Forder'}
+          <Badge size="xs" color={s.rolle === 'foerder' ? 'orange' : s.rolle === 'optional' ? 'teal' : 'yellow'} variant="light">
+            {s.rolle === 'foerder' ? 'Förderung' : s.rolle === 'optional' ? 'Optional' : s.rolle === 'wahl' ? 'Wahl' : '★ Forder'}
           </Badge>
         )}
       </Group>
@@ -303,6 +304,26 @@ export function PlatzhalterKnopf({
   const [laeuft, setLaeuft] = useState(false)
   const imHintergrund = useErzeugtGerade(reihe.id, s.id)
   if (!s.platzhalter) return null
+  // Test aus der Reihe (06.10.2026): entsteht im Test-Programm – dorthin springen
+  if (s.test) {
+    const ziel = s.test
+    return (
+      <Button
+        size="compact-xs"
+        variant="light"
+        color="grape"
+        leftSection={<IconArrowRight size={13} />}
+        onClick={(e) => {
+          e.stopPropagation()
+          useNavigation.getState().setRueckweg({ fuer: ziel.modul, nach: 'unterrichtsreihe', name: 'Zurück zur Reihe' })
+          void dokumentOeffnenWennBereit(ziel.modul, ziel.docId)
+        }}
+        data-zum-test
+      >
+        Zum Test
+      </Button>
+    )
+  }
   const art = s.inhalt.art
   const geht = art === 'arbeitsblatt' || direktErzeugbar(art)
   return (

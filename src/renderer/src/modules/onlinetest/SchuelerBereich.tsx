@@ -92,6 +92,8 @@ import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import { holen, senden } from './serverApi'
+import { Begruessung, Lernstand, TippKarte } from './SchuelerStart'
+import type { LernstandAntwort } from '@shared/lernstand'
 
 interface Beitritt {
   id: string
@@ -245,7 +247,7 @@ export default function SchuelerBereich(): React.JSX.Element {
           Zur Unterrichtsreihe
         </Button>
       )}
-      {inhalt}
+      <div data-vorlese-bereich>{inhalt}</div>
     </Container>
   )
 }
@@ -347,6 +349,17 @@ function Startseite(): React.JSX.Element {
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   const [reihen, setReihen] = useState<{ id: string; titel: string; fortschritt: number; fertig: boolean }[] | null>(null)
   const [vok, setVok] = useState<{ id: string; titel: string; uebersicht: { faellig: number; sicher: number; gesamt: number } }[] | null>(null)
+  // Lernstand, Begrüßung und Lerntipp (06.10.2026, SchuelerStart.tsx / server/lernstand.ts)
+  const [stand, setStand] = useState<LernstandAntwort | null>(null)
+  const standLaden = useCallback(
+    () =>
+      void holen<LernstandAntwort>('/s/api/lernstand').then(
+        (d) => setStand(d),
+        () => undefined
+      ),
+    []
+  )
+  useEffect(() => standLaden(), [standLaden])
   useEffect(() => {
     void holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
       (d) => setVok(d.listen ?? []),
@@ -380,10 +393,6 @@ function Startseite(): React.JSX.Element {
   const faelligeVok = vok?.filter((v) => v.uebersicht.faellig > 0) ?? []
   const faelligGesamt = faelligeVok.reduce((n, v) => n + v.uebersicht.faellig, 0)
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
-  const stunde = new Date().getHours()
-  const gruss = stunde < 11 ? 'Guten Morgen' : stunde < 17 ? 'Hallo' : 'Guten Abend'
-  const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
-  const geladen = tests && aufgaben && blaetter && reihen
   // Das Wichtigste zuerst: ein laufender Test, dann die Reihe, dann Blätter und Aufgaben
   const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string } | null = offeneTests[0]
     ? {
@@ -437,27 +446,13 @@ function Startseite(): React.JSX.Element {
           </Anchor>
         </Alert>
       )}
-      <div className="sa-kopf">
-        <svg className="sa-formen" viewBox="0 0 400 160" preserveAspectRatio="none" aria-hidden>
-          <circle className="sa-schwebt" cx="340" cy="30" r="38" fill="rgba(255,255,255,0.13)" />
-          <circle className="sa-schwebt2" cx="372" cy="118" r="20" fill="rgba(255,255,255,0.18)" />
-          <rect className="sa-schwebt2" x="250" y="96" width="34" height="34" rx="8" fill="rgba(255,255,255,0.12)" transform="rotate(18 267 113)" />
-          <path className="sa-schwebt" d="M300 70 l6 12 13 2 -9 9 2 13 -12-6 -12 6 2-13 -9-9 13-2z" fill="rgba(255,236,153,0.55)" />
-          <path d="M0 140 C 90 110, 170 170, 260 135 S 380 120, 400 132 L400 160 L0 160 Z" fill="rgba(255,255,255,0.10)" />
-        </svg>
-        <Text className="sa-datum">{heute}</Text>
-        <Title order={2} className="sa-gruss" data-gruss>
-          {gruss}
-          {vorname ? `, ${vorname}` : ''}!
-        </Title>
-        <Text className="sa-unter">
-          {!geladen
-            ? '…'
-            : naechstes
-              ? 'Schön, dass du da bist. Hier ist, was ansteht:'
-              : 'Gerade ist nichts offen – gut gemacht! Schau gern in deine Ergebnisse.'}
-        </Text>
-      </div>
+      <Begruessung vorname={vorname} stand={stand} naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null} />
+      {stand && (
+        <TippKarte
+          stand={stand}
+          gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)}
+        />
+      )}
 
       {naechstes && (
         <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
@@ -484,6 +479,8 @@ function Startseite(): React.JSX.Element {
           </Group>
         </Paper>
       )}
+
+      {stand && <Lernstand stand={stand} reihen={reihen ?? []} />}
 
       <a href="/s/lernen" className="sa-lernraum" data-kachel="lernen">
         <div className="sa-tueren" aria-hidden>
@@ -584,17 +581,10 @@ function Startseite(): React.JSX.Element {
 }
 
 const STARTSEITE_CSS = `
-.sa-kopf { position: relative; overflow: hidden; border-radius: 24px; padding: 26px 24px 30px; color: #fff;
-  background: linear-gradient(135deg, #4c6ef5 0%, #7048e8 45%, #15aabf 100%); box-shadow: 0 10px 30px rgba(76,110,245,0.25); }
-.sa-formen { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.sa-gruss { color: #fff; position: relative; font-size: clamp(1.6rem, 5vw, 2.2rem); }
-.sa-datum { position: relative; opacity: 0.85; font-size: 0.85rem; text-transform: capitalize; }
-.sa-unter { position: relative; opacity: 0.95; margin-top: 4px; }
-@keyframes sa-schweben { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
-.sa-schwebt { animation: sa-schweben 6s ease-in-out infinite; }
-.sa-schwebt2 { animation: sa-schweben 8s ease-in-out infinite reverse; }
 @keyframes sa-pulsieren { 0%,100% { box-shadow: 0 0 0 0 rgba(76,110,245,0.35) } 50% { box-shadow: 0 0 0 10px rgba(76,110,245,0) } }
-.sa-puls { animation: sa-pulsieren 2.4s ease-out infinite; }
+/* Einmal pulsieren (Animation unter 2 s, 06.10.2026) */
+.sa-puls { animation: sa-pulsieren 1.6s ease-out 1; }
+html.sa-ruhig .sa-puls { animation: none; }
 .sa-naechstes { background: var(--mantine-color-body); }
 .sa-kachel { position: relative; overflow: hidden; display: block; text-decoration: none; color: inherit; border-radius: 22px; padding: 18px;
   transition: transform .18s ease, box-shadow .18s ease; min-height: 128px;
@@ -615,7 +605,7 @@ const STARTSEITE_CSS = `
 .sa-lernraum:hover .sa-tueren span:nth-child(2) { transform: rotateY(-25deg); transition-delay: .05s; }
 .sa-lernraum:hover .sa-tueren span:nth-child(3) { transform: rotateY(-15deg); transition-delay: .1s; }
 .sa-blase { position: absolute; right: -30px; bottom: -40px; width: 140px; height: 140px; border-radius: 50%; opacity: 0.18; }
-@media (prefers-reduced-motion: reduce) { .sa-schwebt, .sa-schwebt2, .sa-puls { animation: none } .sa-kachel, .sa-kachel img { transition: none } }
+@media (prefers-reduced-motion: reduce) { .sa-puls { animation: none } .sa-kachel, .sa-kachel img { transition: none } }
 `
 
 const datumText = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })

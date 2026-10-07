@@ -258,6 +258,12 @@ export interface AppSettings {
    */
   eigeneFaecher?: string[]
   /**
+   * Bedienung (07.10.2026): „standard" blendet Feineinstellungen aus (renderer/shared/components/NurExperte.tsx),
+   * „experte" zeigt alles wie bisher. Fehlt das Feld (bestehende Installationen), gilt „experte" – nichts verschwindet
+   * plötzlich; die Einrichtung neuer Nutzer setzt „standard". Umschalter in der linken Leiste.
+   */
+  oberflaeche?: 'standard' | 'experte'
+  /**
    * „Programme anzeigen": eigene Wahl je Programm, geht der Regel nach Fächern vor
    * (true = immer zeigen, false = immer ausblenden; fehlt = nach den eigenen Fächern). Ein
    * mitgeschicktes null nimmt die Festlegung zurück – der Hauptprozess löscht den Eintrag.

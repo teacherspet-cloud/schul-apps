@@ -514,6 +514,15 @@ export const LANGUAGES: { value: string; label: string; english: string }[] = [
   { value: 'da', label: 'Dänisch', english: 'Danish' },
   { value: 'el', label: 'Neugriechisch', english: 'Modern Greek' },
   /*
+   * Deutsch für DaZ (06.10.2026, Wunsch der Lehrkraft): Das Wort steht auf Deutsch, die zweite Spalte enthält statt einer
+   * Übersetzung die Bedeutung – eine einfache deutsche Erklärung (oder, wenn die Lehrkraft es so einträgt, die Herkunftssprache).
+   */
+  {
+    value: 'de',
+    label: 'Deutsch (DaZ)',
+    english: 'German (German as a second language: the meaning column holds a short, simple German explanation instead of a translation)'
+  },
+  /*
    * Latein arbeitet anders als die modernen Fremdsprachen: nur Lateinisch → Deutsch, keine
    * Sprech- und Schreibformate, dafür Nennformen, Wortbildung und Sprachvergleich.
    * Siehe `didactics/latein.ts`.

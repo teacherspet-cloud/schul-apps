@@ -154,6 +154,12 @@ export interface AuftragsKontext {
    * gedrosselt angezeigt, nie abgelegt. `geaendert` fehlt meist – dann vergleicht die App selbst.
    */
   zeige: (stand: unknown, hinweis?: { geaendert?: string[]; was?: string }) => void
+  /**
+   * Sichtbar warten (06.10.2026, Medienbank der Vokabeln): Der Auftrag steht als „wartend" mit `grund`
+   * in der Leiste (z. B. „Sprach-KI ausgelastet – wartet bis 14:35"), bis `warten` erfüllt ist; ein
+   * Abbruch beendet das Warten sofort.
+   */
+  pausiere: <T>(grund: string, warten: Promise<T>) => Promise<T>
 }
 
 export interface AuftragsStart<I, E> {
@@ -197,6 +203,8 @@ interface Laufzeit {
   legtAb?: boolean
   istOffen?: () => boolean
   erneut?: () => void
+  /** Wartet gerade sichtbar (`k.pausiere`) – mit diesem Grund */
+  pause?: string
 }
 
 const laufzeit = new Map<string, Laufzeit>()
@@ -367,6 +375,7 @@ export function nimmUnterbrocheneAuf(): number {
 /** Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend". */
 function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund'> {
   if (!laeuft(a)) return { status: a.status, wartegrund: undefined }
+  if (lz.pause) return { status: 'wartend', wartegrund: lz.pause }
   const ids = [...lz.anfragen]
   const wartet = ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id))
   return { status: wartet ? 'wartend' : 'laufend', wartegrund: wartet ? warteGrund(ids.map((id) => wartendeAnfragen.get(id)!)) : undefined }
@@ -546,6 +555,16 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     signal,
     zeige: (stand, hinweis) => {
       if (!signal.aborted) vorschau.zeige(stand, hinweis)
+    },
+    pausiere: async <T>(grund: string, warten: Promise<T>): Promise<T> => {
+      lz.pause = grund
+      aktualisiere()
+      try {
+        return await rennen(warten, signal)
+      } finally {
+        lz.pause = undefined
+        if (!signal.aborted) aktualisiere()
+      }
     },
     ai: <T>(req: StructuredRequest) =>
       anfrage(

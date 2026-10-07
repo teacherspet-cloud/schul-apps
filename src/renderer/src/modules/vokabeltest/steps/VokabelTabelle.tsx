@@ -1,7 +1,7 @@
 import { satzSchluessel, sprachKurz, type MedienSicht, type TonArt } from '@shared/medienbank'
 import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
-import { tonErzeugen } from '../../../shared/medien/medienbank'
-import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, TextInput, Tooltip } from '@mantine/core'
+import { starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
+import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { newId } from '../model/random'
@@ -46,7 +46,7 @@ type Feld = 'term' | 'translation' | 'pos' | 'example' | 'note'
 
 export const ZUSATZ = 'Zusatzwortschatz (im Buch grau)'
 
-export const leereZeile = <T extends TabellenZeile>(): T => ({ id: newId(), term: '', translation: '' }) as T
+export const leereZeile = <T extends TabellenZeile>(): T => ({ id: newId(), term: '', translation: '' } as T)
 
 /**
  * Sprache der Tabelle (30.09.2026): Schrift, Schreibrichtung und Sonderzeichen der Wortspalte,
@@ -106,7 +106,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   /** Nur ansehen (gemeinsames Lehrwerk für Lehrkräfte, 05.10.2026) */
   nurLesen?: boolean
   /** Medienbank: Spalten Beispielbild, Aussprache, Satz-Aussprache (05.10.2026, shared/medien) */
-  medien?: { sprache: string; daten: Record<string, MedienSicht>; admin: boolean; neuLaden: () => void }
+  medien?: { sprache: string; daten: Record<string, MedienSicht>; admin: boolean; neuLaden: () => void; ziel?: MedienZiel }
 }): React.JSX.Element {
   // Stabile Rückrufe: Sonst zeichnet die Tabelle (oft weit über hundert Zeilen) bei jedem
   // Tastendruck ALLE Zeilen neu, und das Tippen wird spürbar zäh.
@@ -120,6 +120,10 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   const medienSprache = medien ? sprachKurz(medien.sprache) : ''
   const medienAdmin = Boolean(medien?.admin)
   const neuLaden = medien?.neuLaden
+  // Stelle der Tabelle für die Auftragsleiste („Öffnen" führt dorthin) – ohne Angabe die Vokabellisten allgemein
+  const ziel: MedienZiel = medien?.ziel ?? { docId: 'vokabeln', titel: 'Vokabeln' }
+  const zielRef = useRef(ziel)
+  zielRef.current = ziel
   useEffect(() => {
     if (medienAdmin && medienSprache)
       void window.api.medien.stimmen().then(
@@ -127,10 +131,22 @@ export default function VokabelTabelle<T extends TabellenZeile>({
         () => setStimme('')
       )
   }, [medienAdmin, medienSprache])
+  /*
+   * Einzelne Aussprache (06.10.2026): als Auftrag in der Auftragsleiste – mit Warten bei ausgelasteter Sprach-KI.
+   * Die Zelle dreht, bis er fertig ist; Fehler meldet der Auftrag selbst.
+   */
   const tonErzeugenFuer = useCallback(
     async (wort: string, art: TonArt, text: string): Promise<void> => {
       if (!stimme) throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte).')
-      await tonErzeugen(medienSprache, wort, art, text, stimme)
+      const zeile = aktuell.current.zeilen.find((z) => z.term === wort)
+      await starteMedienAuftrag({
+        art: art === 'wort' ? 'aussprache' : 'satz',
+        sprache: medienSprache,
+        vokabeln: [{ term: wort, translation: zeile?.translation ?? '', example: art === 'satz' ? text : zeile?.example }],
+        ziel: zielRef.current,
+        stimme,
+        einzeln: true
+      })
       neuLaden?.()
     },
     [stimme, medienSprache, neuLaden]
@@ -202,10 +218,10 @@ export default function VokabelTabelle<T extends TabellenZeile>({
               )}
               <Table.Th w={36}>#</Table.Th>
               <Table.Th>Wort / Ausdruck</Table.Th>
-              <Table.Th>Deutsch</Table.Th>
+              <Table.Th>{sprache === 'de' ? 'Bedeutung' : 'Deutsch'}</Table.Th>
               <Table.Th w={sprache && DRITTE_SPALTE[sprache] ? 160 : 110}>{(sprache && DRITTE_SPALTE[sprache]) || 'Wortart'}</Table.Th>
               {mitBeispiel && (
-                <Table.Th>
+                <Table.Th miw={200}>
                   <Tooltip label="Beispielsatz aus dem Schulbuch, darunter seine Übersetzung" withArrow>
                     <span>Beispielsatz</span>
                   </Tooltip>
@@ -259,6 +275,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
           v={{ term: bildOffen.term, translation: bildOffen.translation, example: bildOffen.example }}
           sicht={medien.daten[bildOffen.term]}
           admin={medienAdmin}
+          ziel={ziel}
           schliessen={() => setBildOffen(null)}
           geaendert={() => medien.neuLaden()}
         />
@@ -288,6 +305,17 @@ interface ZeilenProps {
   tonErzeugen: (wort: string, art: TonArt, text: string) => Promise<void>
 }
 
+/** Mitwachsende Felder: eng wie eine Eingabezeile, ohne Ziehgriff, Umbruch auch in langen Wörtern */
+const UMBRUCH: React.CSSProperties = {
+  resize: 'none',
+  overflow: 'hidden',
+  overflowWrap: 'anywhere',
+  paddingTop: 6,
+  paddingBottom: 6,
+  lineHeight: 1.35,
+  minHeight: 0
+}
+
 const Zeile = memo(function Zeile({
   zeile: v,
   nr,
@@ -311,11 +339,19 @@ const Zeile = memo(function Zeile({
   const abgefragt = v.include !== false
   // Wort, Beispiel und Nennform/Lesung in der Schrift der Sprache; Deutsch und Hinweis bleiben, wie sie sind
   const zielsprachig = (f: Feld): boolean => f === 'term' || f === 'example' || f === 'pos'
+  /*
+   * Zeilenumbruch statt Abschneiden (06.10.2026, Wunsch der Lehrkraft): Lange Beispielsätze, Hinweise und Wendungen
+   * waren in den festen Spalten nur halb zu sehen. Die Felder sind jetzt mitwachsende Textfelder – der Text bricht
+   * an der Spaltenbreite um und bleibt immer ganz sichtbar. Enter springt weiterhin in die nächste Zeile.
+   * Nur die kurze Wortart-Spalte bleibt einzeilig.
+   */
   const feld = (f: Feld, label: string, placeholder?: string, letztesFeld = false): React.JSX.Element => {
     const attr = zielsprachig(f) ? sprachAttribute(sprache) : {}
+    const Feldart = f === 'pos' ? TextInput : Textarea
     return (
-      <TextInput
+      <Feldart
         variant="unstyled"
+        {...(f === 'pos' ? {} : { autosize: true, minRows: 1 })}
         aria-label={`${label} in Zeile ${nr}`}
         placeholder={placeholder}
         value={(v[f] as string | undefined) ?? ''}
@@ -326,6 +362,7 @@ const Zeile = memo(function Zeile({
         dir={attr.dir}
         styles={{
           input: {
+            ...(f === 'pos' ? {} : UMBRUCH),
             ...(f === 'term' && v.grey ? { color: 'var(--mantine-color-dimmed)' } : {}),
             ...(attr.style ?? {})
           }
@@ -380,15 +417,17 @@ const Zeile = memo(function Zeile({
           )}
         </Group>
       </Table.Td>
-      <Table.Td>{feld('translation', 'Deutsch', 'erkunden')}</Table.Td>
+      <Table.Td>{sprache === 'de' ? feld('translation', 'Bedeutung', 'einfache Erklärung') : feld('translation', 'Deutsch', 'erkunden')}</Table.Td>
       <Table.Td>{feld('pos', 'Wortart')}</Table.Td>
       {mitBeispiel && (
         <Table.Td>
           {feld('example', 'Beispielsatz')}
-          <TextInput
+          <Textarea
             variant="unstyled"
             size="xs"
-            styles={{ input: { color: 'var(--mantine-color-dimmed)' } }}
+            autosize
+            minRows={1}
+            styles={{ input: { ...UMBRUCH, color: 'var(--mantine-color-dimmed)' } }}
             placeholder="Übersetzung des Beispielsatzes"
             aria-label={`Übersetzung des Beispielsatzes in Zeile ${nr}`}
             value={v.exampleTranslation ?? ''}

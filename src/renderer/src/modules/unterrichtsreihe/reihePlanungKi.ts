@@ -111,7 +111,7 @@ const PLAN_SCHEMA = {
               properties: {
                 titel: { type: 'string' },
                 art: { type: 'string', enum: KI_ARTEN },
-                rolle: { type: 'string', enum: ['pflicht', 'foerder', 'forder'] },
+                rolle: { type: 'string', enum: ['pflicht', 'optional', 'foerder', 'forder'] },
                 stunde: { type: 'integer' },
                 minuten: { type: 'integer' },
                 beschreibung: { type: 'string' },
@@ -204,7 +204,7 @@ export async function planeReihe(
       '- Fortschreitend vom Einfachen zum Komplexen; jeder Schritt baut auf den vorigen auf; Anforderungsbereiche I bis III kommen vor.',
       '- Wechsel der Sozial- und Arbeitsformen (Stillarbeit im Lernpfad UND "praesenz" für Gespräch, Gruppenarbeit, Experiment).',
       '- Höchstens eine Eingangsdiagnose am Anfang; Selbsteinschätzung am Ende eines Teils; ein Abschlussprodukt oder eine Sicherung am Ende der Reihe.',
-      '- Je Teil höchstens ein Förderschritt ("foerder") und höchstens ein freiwilliger Forderschritt ("forder"); alles andere "pflicht".',
+      '- Je Teil höchstens ein Förderschritt ("foerder") und höchstens ein freiwilliger Forderschritt ("forder"); Vertiefungen und Differenzierung, die nicht alle brauchen, als "optional" (blockiert den Weg nie); alles andere "pflicht".',
       '- VORHANDENES MATERIAL: nur einsetzen, wenn es didaktisch und pädagogisch passt (Jahrgang, Niveau, Lernziele, Anforderung) – an der Stelle der Reihe, an die es inhaltlich gehört. Dann art "arbeitsblatt", "material" = Kennung, "begruendung" = warum es passt und warum an dieser Stelle (ein Satz). Ungeeignetes weglassen. Jedes Material höchstens einmal.',
       '- Alle anderen Schritte sind PLATZHALTER: "material" leer; "beschreibung" sagt so genau, dass daraus später allein Material entstehen kann: Gegenstand, Ziel, Aufgabenformate/Operatoren, Anforderung, ggf. Materialart (Quelle, Grafik, Text …). "begruendung": didaktische Funktion an dieser Stelle (ein Satz).',
       '- Titel kurz und für Lernende verständlich (keine Nummern).',
@@ -242,7 +242,7 @@ export function planUebernehmen(d: PlanRoh, r: Pick<Reihe, 'lernziele' | 'stunde
       const art = (KI_ARTEN as string[]).includes(x.art) ? (x.art as SchrittArt) : 'aufgabe'
       const lernziele: Lernziel[] = [...new Set(x.lernziele ?? [])].map((i) => r.lernziele[i]).filter((l): l is Lernziel => Boolean(l))
       const stunde = Math.min(n - 1, Math.max(0, Math.round(Number(x.stunde) || 1) - 1))
-      const rolle: Schritt['rolle'] = x.rolle === 'foerder' || x.rolle === 'forder' ? x.rolle : 'pflicht'
+      const rolle: Schritt['rolle'] = x.rolle === 'foerder' || x.rolle === 'forder' || x.rolle === 'optional' ? x.rolle : 'pflicht'
       const titel = String(x.titel ?? '').trim() || 'Schritt'
       const m = art === 'arbeitsblatt' && x.material && !benutzt.has(x.material) ? materialien.find((k) => k.id === x.material.trim()) : undefined
       const basis: Schritt = {
@@ -401,6 +401,10 @@ export async function erzeugeSchrittInhalt(r: Reihe, schritt: Schritt, ki: Ki): 
       schritt.platzhalter?.beschreibung ? `WAS ENTSTEHEN SOLL: ${schritt.platzhalter.beschreibung}` : '',
       schritt.lernziele.length ? `LERNZIELE: ${schritt.lernziele.map((l) => l.text).join('; ')}` : '',
       davor(r, schritt) ? `DAVOR IN DER REIHE: ${davor(r, schritt)}` : '',
+      // Reihe aus Schulbuchseiten (06.10.2026): verweisen; Übernommenes steht schon im Material
+      schritt.platzhalter?.buch
+        ? `${schritt.platzhalter.buch}\nWörtlich übernommene Abschnitte und Bildausschnitte setzt die App selbst mit Quelle ins Material – NICHT noch einmal abschreiben; Verweise genau so in die Anweisung.`
+        : '',
       `REGEL: ${vorgabe.regel}`
     ]
       .filter(Boolean)
@@ -410,16 +414,22 @@ export async function erzeugeSchrittInhalt(r: Reihe, schritt: Schritt, ki: Ki): 
   })
   const leer = leererInhalt(art)
   switch (leer.art) {
-    case 'aufgabe':
+    case 'aufgabe': {
+      // Übernommene Buchabschnitte (nur auf ausdrücklichen Wunsch) mit Quellenangabe ins Material
+      const ueb = schritt.platzhalter?.uebernahme ?? []
+      const texte = ueb.filter((u) => u.text).map((u) => `${u.kennung}\n${u.text}\n(Quelle: ${u.quelle})`)
+      const bilder = ueb.filter((u) => u.bild).map((u) => ({ src: u.bild!, quelle: u.quelle }))
       return {
         ...leer,
         anweisung: s(d.anweisung),
-        material: s(d.material),
+        material: [s(d.material), ...texte].filter(Boolean).join('\n\n'),
+        ...(bilder.length ? { bilder } : {}),
         fragen: ((d.fragen as unknown[]) ?? []).map(s).filter(Boolean).slice(0, 6),
         antwort: d.antwort === 'foto' || d.antwort === 'beides' ? d.antwort : 'text',
         erwartung: s(d.erwartung),
         musterloesung: s(d.musterloesung) || undefined
       }
+    }
     case 'lernkarten':
       return {
         ...leer,

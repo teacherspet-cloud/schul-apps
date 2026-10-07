@@ -166,7 +166,11 @@ await page.keyboard.press('Control+0')
 await page.locator('.home-material', { hasText: 'Wache Hauptapp Liste' }).click()
 await page.waitForTimeout(1000)
 pruefe((await aktiv(page, 'Vokabellisten')) === 'true', 'Die Vokabelliste öffnet im Programm Vokabellisten')
-pruefe((await page.locator('input[value="castle"]').filter({ visible: true }).count()) > 0, '…und zwar die Liste selbst, nicht nur die Übersicht')
+// Die Vokabelfelder sind seit 06.10.2026 mehrzeilig (Textarea) – gesucht wird über den Wert, nicht das Attribut
+const listeOffen = await page.evaluate(() =>
+  [...document.querySelectorAll('input, textarea')].some((e) => (e).value === 'castle' && (e).offsetParent !== null)
+)
+pruefe(listeOffen, '…und zwar die Liste selbst, nicht nur die Übersicht')
 
 // ---------- Strg+1 … 9 (Reihenfolge seit 30.09.2026: Arbeitsblatt, Vokabeltest, Grammatiktest, LZK, Klassenarbeiten, Rückmeldung, Tafelbilder, Elternbriefe, Vokabellisten)
 await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
@@ -184,7 +188,7 @@ await page.waitForTimeout(300)
 pruefe((await aktiv(page, 'Arbeitsblatt')) === 'true', 'Strg+1 öffnet das Arbeitsblatt')
 
 // ---------- Leiste ausklappen, Fenster verkleinern – beides gemerkt
-await page.getByRole('button', { name: 'Leiste ausklappen' }).click()
+await page.getByRole('button', { name: 'Leiste mit Namen ausklappen' }).click()
 await page.waitForTimeout(400)
 const navText = await page.locator('.mantine-AppShell-navbar').innerText()
 pruefe(navText.includes('Lernzielkontrolle') && navText.includes('Einstellungen'), 'Die ausgeklappte Leiste zeigt die Namen')
@@ -197,11 +201,40 @@ await app.evaluate(({ BrowserWindow }) => {
 })
 await page.waitForTimeout(300)
 await app.close()
-
 ;({ app, page } = await starte([fixture]))
 const bounds = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds())
 pruefe(bounds.width === 1240 && bounds.height === 820, `Die Fenstergröße ist gemerkt (${bounds.width}×${bounds.height})`)
-pruefe((await page.getByRole('button', { name: 'Leiste einklappen' }).count()) === 1, 'Die ausgeklappte Leiste ist gemerkt')
+pruefe((await page.getByRole('button', { name: 'Namen einklappen' }).count()) === 1, 'Die ausgeklappte Leiste ist gemerkt')
+
+// ---------- Standard-/Expertenmodus (07.10.2026): Schalter links, Feineinstellungen weg, „Alle Optionen" als Notausgang
+{
+  const schalter = page.locator('[data-modus-schalter]').first()
+  pruefe((await schalter.getAttribute('data-modus')) === 'experte', 'Ohne Wahl gilt der Expertenmodus (bestehende Nutzer)')
+  await page.keyboard.press('Control+1')
+  await page.waitForTimeout(1200)
+  // Mit gespeichertem Blatt öffnet das Programm die Bibliothek bzw. das Blatt – ein neues Blatt zeigt das Formular
+  const neuBlatt = page.getByRole('button', { name: 'Neues Arbeitsblatt' }).filter({ visible: true })
+  if (await neuBlatt.count()) await neuBlatt.first().click()
+  await page.waitForSelector('text=Thema & Lerngruppe')
+  pruefe(await page.getByLabel('Zahl der Aufgaben').isVisible(), 'Expertenmodus: Zahl der Aufgaben sichtbar')
+  await page.locator('.modus-schalter-knopf').filter({ visible: true }).first().click()
+  await page.waitForTimeout(400)
+  pruefe((await schalter.getAttribute('data-modus')) === 'standard', 'Der Schalter stellt auf Standardmodus')
+  pruefe((await page.getByLabel('Zahl der Aufgaben').count()) === 0, 'Standardmodus: Zahl der Aufgaben ausgeblendet')
+  pruefe(await page.locator('[data-direkt-erstellen]').filter({ visible: true }).first().isVisible(), 'Standardmodus: „Arbeitsblatt erstellen" ohne Gliederungsschritt')
+  pruefe(await page.locator('[data-modus-abzeichen]').filter({ visible: true }).first().isVisible(), 'Standardmodus: Abzeichen „Standard" im Kopf')
+  const schritte = await page.locator('.mantine-Stepper-stepLabel').filter({ visible: true }).allTextContents()
+  pruefe(!schritte.includes('Gliederung') && schritte.includes('Bearbeiten & Export'), `Standardmodus: Schrittanzeige ohne Gliederung (${schritte.join(' · ')})`)
+  await page.locator('[data-alle-optionen] .weitere-optionen-kopf').filter({ visible: true }).first().click()
+  await page.waitForTimeout(400)
+  pruefe(await page.getByLabel('Zahl der Aufgaben').isVisible(), '„Alle Optionen" zeigt die Feineinstellungen dieses Schritts')
+  await page.screenshot({ path: join(out, 'standardmodus-arbeitsblatt.png') })
+  await page.locator('.modus-schalter-knopf').filter({ visible: true }).first().click()
+  await page.waitForTimeout(400)
+  pruefe((await schalter.getAttribute('data-modus')) === 'experte', 'Zurück im Expertenmodus')
+  await page.keyboard.press('Control+0')
+  await page.waitForTimeout(400)
+}
 
 // ---------- Strg+P: nur, wenn im vorderen Programm ein Editor mit Druck offen ist
 await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())

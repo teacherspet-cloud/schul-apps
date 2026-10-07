@@ -27,6 +27,8 @@ import type { GrammarTest } from '../model/types'
 import { brauchtKi, erzeugeVerbBloecke } from '../../../shared/verben/aufgaben'
 import { VERB_SPALTEN } from '@shared/verben'
 import { blindprobeAktiv, blindprobeBloecke } from '../../../shared/verstehen/blindprobe'
+import { describeBlock } from '../../arbeitsblatt/generation/describe'
+import { abweichungZuA, begrenzteFassungen, fassungsBuchstabe, umgestellteFassung, umgestellteFassungen, wieA } from '../../../shared/testFassungen'
 
 /**
  * Schrift und Varietät der neuen Schulfremdsprachen (30.09.2026): Was die KI sonst uneinheitlich
@@ -174,23 +176,24 @@ const TEST_ANSWER = obj({
   solutionRows: arr(arr(str()), 'tableFill: Lösungen der leeren Zellen')
 })
 
-export const TEST_SCHEMA = obj({
-  blocks: arr(
-    obj({
-      type: enumOf(['text', 'task']),
-      title: str('text: Überschrift des Materials; bei Aufgaben leer'),
-      body: str('text: der zusammenhängende Text; bei Aufgaben leer'),
-      instruction: str('task: knappe, eindeutige Arbeitsanweisung'),
-      answer: TEST_ANSWER,
-      parts: arr(obj({ instruction: str(), answer: TEST_ANSWER, solution: str() }), 'task: Teilaufgaben oder leer'),
-      solution: str('task: die richtige Lösung, bei mehreren Möglichkeiten alle'),
-      minutes: int('task: geschätzte Bearbeitungszeit'),
-      grammarTopicId: str('task: Kennung der geprüften Form; bei Material leer'),
-      grammarError: str('task: Stolperstelle im Wortlaut der Vorgabe; bei Material leer'),
-      pageFormat: PAGE_FORMAT_FIELD
-    })
-  )
+const TEST_BLOCK = obj({
+  type: enumOf(['text', 'task']),
+  title: str('text: Überschrift des Materials; bei Aufgaben leer'),
+  body: str('text: der zusammenhängende Text; bei Aufgaben leer'),
+  instruction: str('task: knappe, eindeutige Arbeitsanweisung'),
+  answer: TEST_ANSWER,
+  parts: arr(obj({ instruction: str(), answer: TEST_ANSWER, solution: str() }), 'task: Teilaufgaben oder leer'),
+  solution: str('task: die richtige Lösung, bei mehreren Möglichkeiten alle'),
+  minutes: int('task: geschätzte Bearbeitungszeit'),
+  grammarTopicId: str('task: Kennung der geprüften Form; bei Material leer'),
+  grammarError: str('task: Stolperstelle im Wortlaut der Vorgabe; bei Material leer'),
+  pageFormat: PAGE_FORMAT_FIELD
 })
+
+export const TEST_SCHEMA = obj({ blocks: arr(TEST_BLOCK) })
+
+/** Alle weiteren Fassungen in EINER Antwort (06.10.2026) – je Fassung die Bausteine wie in TEST_SCHEMA */
+export const FASSUNGEN_SCHEMA = obj({ fassungen: arr(obj({ blocks: arr(TEST_BLOCK) }), 'je weitere Fassung (B, C, D) ein Eintrag, in dieser Reihenfolge') })
 
 /**
  * Verteilt die Punkte gleichmäßig auf die Aufgaben.
@@ -206,6 +209,27 @@ export function spreadPoints(blocks: WsBlock[], total: number): void {
     t.points = base + (rest > 0 ? 1 : 0)
     if (rest > 0) rest--
   }
+}
+
+/** Rohbausteine der KI → Bausteine des Tests, Aufgaben mit geprüfter Form und Stolperstelle */
+function bloeckeAusAntwort(test: GrammarTest, roh: Record<string, unknown>[]): WsBlock[] {
+  const rng = createRng(Date.now())
+  const topics = chosenGrammarTopics({ ...test.meta, grammarTopics: test.meta.topics } as never)
+  const blocks: WsBlock[] = []
+  for (const raw of roh) {
+    const block = convertBlock(raw, rng, [])
+    if (!block) continue
+    block.id = block.id || newId(rng)
+    if (block.type === 'task') {
+      const topicId = String(raw.grammarTopicId ?? '')
+      const error = String(raw.grammarError ?? '').trim()
+      // Nur zuordnen, was es wirklich gibt – sonst stünde im Fehlerprofil eine erfundene Form
+      const topic = topics.find((t) => t.id === topicId) ?? (topics.length === 1 ? topics[0] : undefined)
+      if (topic && error) block.grammar = { topicId: topic.id, error }
+    }
+    blocks.push(block)
+  }
+  return blocks
 }
 
 export async function generateTest(
@@ -226,22 +250,7 @@ export async function generateTest(
     ...(test.meta.model ? { model: test.meta.model } : {})
   })
 
-  const rng = createRng(Date.now())
-  const topics = chosenGrammarTopics({ ...test.meta, grammarTopics: test.meta.topics } as never)
-  const blocks: WsBlock[] = []
-  for (const raw of data?.blocks ?? []) {
-    const block = convertBlock(raw, rng, [])
-    if (!block) continue
-    block.id = block.id || newId(rng)
-    if (block.type === 'task') {
-      const topicId = String(raw.grammarTopicId ?? '')
-      const error = String(raw.grammarError ?? '').trim()
-      // Nur zuordnen, was es wirklich gibt – sonst stünde im Fehlerprofil eine erfundene Form
-      const topic = topics.find((t) => t.id === topicId) ?? (topics.length === 1 ? topics[0] : undefined)
-      if (topic && error) block.grammar = { topicId: topic.id, error }
-    }
-    blocks.push(block)
-  }
+  const blocks = bloeckeAusAntwort(test, data?.blocks ?? [])
   /*
    * Lieber laut scheitern als still nichts liefern.
    *
@@ -266,26 +275,124 @@ export async function generateTest(
 /** Hinweise, die beim Erstellen oben stehen (Landesvorgaben und Anlage des Tests). */
 export const testHints = (test: GrammarTest): string[] => testingRules(test.meta).map((r) => (r.suggestion ? `${r.text} ${r.suggestion}` : r.text))
 
+/** Zahl der Fassungen eines Tests (1–4) */
+export const fassungsZahl = (test: Pick<GrammarTest, 'meta'>): number => begrenzteFassungen(test.meta.fassungen ?? 1)
+
+/**
+ * Der Auftrag für die weiteren Fassungen: Fassung A als Vorlage, je Aufgabe Antwortform, Items
+ * und Punkte, die gleich bleiben müssen. Die Sätze und Wörter sind andere.
+ */
+export function fassungenAuftrag(test: GrammarTest, a: WsBlock[], anzahl: number): string {
+  const labels = Array.from({ length: anzahl - 1 }, (_, i) => fassungsBuchstabe(i + 1))
+  const aufgaben = a.filter((b): b is Extract<WsBlock, { type: 'task' }> => b.type === 'task')
+  const zeile = (t: Extract<WsBlock, { type: 'task' }>, i: number): string =>
+    `${i + 1}. Antwortform ${t.answer.kind}${t.parts.length ? `, ${t.parts.length} Teilaufgaben` : ''}, ${t.points} Punkte${t.grammar ? `, Stolperstelle „${t.grammar.error}"` : ''}`
+  return [
+    `PARALLELFASSUNGEN ${labels.join(', ')} (gegen Abschreiben):`,
+    `Der Test wird in ${anzahl} Fassungen geschrieben; benachbarte Lernende bekommen verschiedene Fassungen. Unten steht Fassung A. Schreibe Fassung${labels.length > 1 ? 'en' : ''} ${labels.join(', ')} – jede GLEICHWERTIG zu A:`,
+    `- Gleich viele Aufgaben (${aufgaben.length}) in derselben Reihenfolge, jede mit DERSELBEN Antwortform, gleich vielen Items bzw. Teilaufgaben, DERSELBEN geprüften Form und Stolperstelle.`,
+    '- Andere Sätze, andere Wörter, andere Situationen: Keine Lösung darf sich aus einer anderen Fassung übernehmen lassen.',
+    '- Gleiche Schwierigkeit: gleiches Niveau, nur bekannter Wortschatz, gleich lange Sätze.',
+    test.meta.embedded
+      ? '- Eingebettet: Jede Fassung bekommt ihren eigenen zusammenhängenden Text (gleiche Textsorte, gleiche Länge, anderer Inhalt) als Baustein „text" vor den Aufgaben.'
+      : '',
+    '- Die Fassungen unterscheiden sich auch untereinander.',
+    `- Gib im Feld fassungen genau ${anzahl - 1} Einträge zurück, in der Reihenfolge ${labels.join(', ')}.`,
+    '',
+    `AUFGABEN DER FASSUNG A (bleiben in Form und Punkten gleich):\n${aufgaben.map(zeile).join('\n')}`,
+    '',
+    `VORLAGE – FASSUNG A:\n${a.map(describeBlock).join('\n\n')}`
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * Die weiteren Fassungen B … eines Tests zu Grammatikformen (06.10.2026).
+ *
+ * - `umgestellt`: ohne KI aus A (shared/testFassungen.ts).
+ * - `parallel`: EINE Anfrage für alle weiteren Fassungen. Passt eine Fassung nicht zu A (andere
+ *   Zahl oder Form der Aufgaben), tritt dafür die umgestellte Fassung ein – mit Hinweis am
+ *   ersten Baustein, damit die Lehrkraft es sieht. Punkte und Stolperstellen kommen aus A.
+ */
+export async function generateTestFassungen(
+  test: GrammarTest,
+  a: WsBlock[],
+  ai: AiCall,
+  onStep: (message: string) => void = () => undefined
+): Promise<WsBlock[][]> {
+  const anzahl = fassungsZahl(test)
+  if (anzahl < 2) return []
+  const items = !test.meta.embedded
+  if (test.meta.fassungsArt === 'umgestellt') {
+    const r = umgestellteFassungen(a, anzahl, { items })
+    r.fassungen.forEach((f, i) => r.hinweise[i] && markiere(f, r.hinweise[i]))
+    return r.fassungen
+  }
+  onStep(`Fassung${anzahl > 2 ? 'en' : ''} ${Array.from({ length: anzahl - 1 }, (_, i) => fassungsBuchstabe(i + 1)).join(', ')} werden geschrieben …`)
+  const data = await ai<{ fassungen?: { blocks?: Record<string, unknown>[] }[] }>({
+    system: testPrompt(test),
+    user: fassungenAuftrag(test, a, anzahl),
+    schemaName: 'grammar_test_versions',
+    schema: FASSUNGEN_SCHEMA as Record<string, unknown>,
+    ...(test.meta.provider ? { provider: test.meta.provider } : {}),
+    ...(test.meta.model ? { model: test.meta.model } : {})
+  })
+  const roh = Array.isArray(data?.fassungen) ? data.fassungen : []
+  const out: WsBlock[][] = []
+  for (let i = 1; i < anzahl; i++) {
+    const bloecke = verschluesseleMaterialverweise(bloeckeAusAntwort(test, roh[i - 1]?.blocks ?? []))
+    const abweichung = bloecke.some((b) => b.type === 'task') ? abweichungZuA(a, bloecke) : 'keine Aufgaben'
+    if (abweichung) {
+      // Lieber eine umgestellte Fassung als eine ungleichwertige – und offen sagen, warum
+      const ersatz = umgestellteFassung(a, i, { items }).bloecke
+      markiere(ersatz, `Fassung ${fassungsBuchstabe(i)}: Die KI lieferte keine gleichwertige Parallelfassung (${abweichung}). Hier steht Fassung A umgestellt – auf Wunsch einzelne Aufgaben neu erzeugen.`)
+      out.push(ersatz)
+      continue
+    }
+    wieA(a, bloecke)
+    out.push(bloecke)
+  }
+  // Ankreuzfragen zu einem Text: Blindprobe wie in Fassung A (nur ausgewiesene Verstehensaufgaben)
+  if (blindprobeAktiv()) {
+    for (let i = 0; i < out.length; i++) {
+      const probe = await blindprobeBloecke(out[i], ai, { melde: onStep, streng: true }).catch(() => null)
+      if (probe?.geprueft) out[i] = probe.bloecke
+    }
+  }
+  return out
+}
+
+/** Hinweis an die erste Aufgabe einer Fassung hängen (steht am Baustein, „Hinweise") */
+function markiere(bloecke: WsBlock[], hinweis: string): void {
+  const erste = bloecke.find((b) => b.type === 'task') ?? bloecke[0]
+  if (erste) erste.warnings = [...(erste.warnings ?? []), hinweis]
+}
+
 /**
  * Test zu unregelmäßigen Verben (30.09.2026): Tabellen, Ankreuzen, Fehler finden und Zuordnen
  * entstehen ohne KI aus der Verbliste; nur Sätze im Zusammenhang schreibt die KI (shared/verben).
- * Bei zwei Fassungen bekommt Gruppe B andere Verben, sofern die Auswahl reicht.
+ * Bei mehreren Fassungen (bis D, 06.10.2026) bekommt jede andere Verben, sofern die Auswahl reicht.
  */
 export async function generateVerbTest(
   test: GrammarTest,
   ai: AiCall | null,
   onStep: (message: string) => void = () => undefined,
-  /** Live-Vorschau (02.10.2026): Gruppe A, sobald sie steht */
-  zwischenstand?: (blocks: WsBlock[]) => void
-): Promise<{ blocks: WsBlock[]; blocksB?: WsBlock[] }> {
+  /** Live-Vorschau (02.10.2026): die Fassungen, sobald sie stehen */
+  zwischenstand?: (fassungen: WsBlock[][]) => void
+): Promise<{ blocks: WsBlock[]; weitereFassungen?: WsBlock[][] }> {
   const a = test.meta.verben
   if (!a) throw new Error('Es sind keine Verben gewählt.')
   const anrede = anredeFuer(test.meta.grade, test.meta.schoolTypeId, test.meta.stateId)
-  const n = test.meta.fassungen === 2 ? 2 : 1
+  const n = fassungsZahl(test)
   onStep(brauchtKi(a) ? 'Tabellen entstehen, die KI schreibt die Sätze …' : 'Die Aufgaben entstehen aus der Verbliste …')
   const blocks = await erzeugeVerbBloecke(a, anrede, ai, 0, n)
   if (n < 2) return { blocks }
-  zwischenstand?.(blocks)
-  onStep('Gruppe B wird erstellt …')
-  return { blocks, blocksB: await erzeugeVerbBloecke(a, anrede, ai, 1, n) }
+  const weitere: WsBlock[][] = []
+  for (let i = 1; i < n; i++) {
+    zwischenstand?.([blocks, ...weitere])
+    onStep(`Gruppe ${fassungsBuchstabe(i)} wird erstellt …`)
+    weitere.push(await erzeugeVerbBloecke(a, anrede, ai, i, n))
+  }
+  return { blocks, weitereFassungen: weitere }
 }

@@ -5,6 +5,8 @@
  * Genutzt von „Zum Lernen freigeben" und vom Reihen-Schritt „Vokabeln".
  */
 import { useAppSettings } from '../../shared/settingsStore'
+import HaeufigSelect from '../../shared/components/HaeufigSelect'
+import { eigeneWerte } from '../../shared/haeufig'
 import { Group, Loader, MultiSelect, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useState } from 'react'
 import type { Textbook, TextbookMeta } from '@shared/types'
@@ -33,7 +35,9 @@ const FACH_ZU: Record<string, string> = {
   tr: 'Türkisch',
   zh: 'Chinesisch',
   pl: 'Polnisch',
-  cs: 'Tschechisch'
+  cs: 'Tschechisch',
+  // Kurzname = Fachkennung „daz" – so passt der Abgleich mit den eigenen Fächern
+  de: 'DaZ'
 }
 
 /** Passendes OpenMoji für ein konkretes englisches Wort (nur eindeutige Treffer) */
@@ -90,9 +94,14 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
   }, [])
   // Fremdsprachen der Lehrkraft, für die es Lehrwerke gibt (ohne Angabe: alle mit Lehrwerk)
   const vorhanden = [...new Set(buecher.map((b) => b.language))]
-  const eigene = vorhanden.filter((code) => (eigeneFaecher ?? []).some((f) => f.toLowerCase() === (FACH_ZU[code] ?? code).toLowerCase()))
-  const sprachen = (eigene.length ? eigene : vorhanden).sort((a, b) => (FACH_ZU[a] ?? a).localeCompare(FACH_ZU[b] ?? b, 'de'))
-  const spracheJetzt = sprache && sprachen.includes(sprache) ? sprache : sprachen.length === 1 ? sprachen[0] : null
+  // Seit 07.10.2026 alle Sprachen wählbar – die eigenen stehen im Fachfeld oben (im Standardmodus nur sie, weitere per Eintippen)
+  const eigene = eigeneWerte(
+    eigeneFaecher ?? [],
+    vorhanden.map((code) => ({ value: code, label: FACH_ZU[code] ?? code }))
+  )
+  const sprachen = vorhanden.sort((a, b) => (FACH_ZU[a] ?? a).localeCompare(FACH_ZU[b] ?? b, 'de'))
+  const vorschlag = sprachen.length === 1 ? sprachen[0] : eigene.length === 1 ? eigene[0] : null
+  const spracheJetzt = sprache && sprachen.includes(sprache) ? sprache : vorschlag
   const reiheVon = (b: TextbookMeta): string => b.reihe || b.name.replace(/\s*\d+\s*$/, '') || b.name
   const reihen = [...new Set(buecher.filter((b) => b.language === spracheJetzt).map(reiheVon))].sort((a, b) => a.localeCompare(b, 'de'))
   const baende = buecher
@@ -167,7 +176,8 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
       {art === 'buch' ? (
         <>
           {sprachen.length > 1 && (
-            <Select
+            <HaeufigSelect
+              art="fach"
               label="Fach"
               data={sprachen.map((c) => ({ value: c, label: FACH_ZU[c] ?? c }))}
               value={spracheJetzt}

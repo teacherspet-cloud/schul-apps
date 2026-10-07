@@ -108,3 +108,6 @@ function deepMerge<T>(base: T, patch: DeepPartial<T>): T {
   }
   return out as T
 }
+
+/** Expertenmodus (07.10.2026): alle Optionen sichtbar. Fehlt die Einstellung, gilt er – so bleibt bei bestehenden Nutzern alles, wie es war. */
+export const useExperte = (): boolean => useAppSettings((s) => s.settings.oberflaeche !== 'standard')

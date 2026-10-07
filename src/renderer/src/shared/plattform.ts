@@ -62,8 +62,10 @@ export interface ServerIch {
   benutzer?: string
   name?: string
   rolle?: 'admin' | 'lehrkraft' | 'schueler'
-  quelle?: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast'
+  quelle?: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast' | 'vorschau'
   eingerichtet?: boolean
+  /** Vorschau als Musterschüler (server/vorschau.ts): Fenster der Lehrkraft mit Vorschaukonto */
+  vorschau?: boolean
   /** öffentliche Adresse des Servers (QR-Codes) */
   adresse: string
 }

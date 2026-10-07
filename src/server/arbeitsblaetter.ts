@@ -27,6 +27,7 @@ import {
   nutzerLoeschen,
   nutzerNachBenutzer,
   nutzerNachId,
+  OHNE_VORSCHAU,
   protokolliereServer,
   sitzungAnlegen,
   SITZUNG_MS,
@@ -568,13 +569,13 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             fach: (z as Zeile & { fach?: string }).fach ?? '',
             // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite)
             zuletzt:
-              (db().prepare('SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0').get(z.id) as { t: number | null }).t ?? 0,
+              (db().prepare(`SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { t: number | null }).t ?? 0,
             lerngruppe: (z.lerngruppe_id ? lerngruppe(z.lerngruppe_id)?.name : '') ?? '',
             schueler: json_(z.schueler, [] as string[]).length,
             einstellungen: einstellungenVon(z),
             ...(z.code ? { code: z.code, link: link(z.code) } : {}),
-            abgaben: (db().prepare('SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0').get(z.id) as { n: number }).n,
-            begonnen: (db().prepare('SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND aktualisiert > 0').get(z.id) as { n: number }).n,
+            abgaben: (db().prepare(`SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { n: number }).n,
+            begonnen: (db().prepare(`SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND aktualisiert > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { n: number }).n,
             // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
             gesamt: gesamtVon(z)
           }))
@@ -688,7 +689,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const perCode = new Set(
         (db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
       )
-      const zeilen = db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(z.id) as unknown as Abgabe[]
+      const zeilen = db().prepare(`SELECT * FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU} ORDER BY aktualisiert DESC`).all(z.id) as unknown as Abgabe[]
       const nummern = json_(z.aufgaben, [] as BlattAufgabe[]).map((x) => x.nr)
       // Ampel je Aufgabe und Person (05.10.2026)
       const ampeln = (a: Abgabe): Record<string, Ampel> => {
@@ -883,7 +884,7 @@ interface GespeicherteAuswertung {
 function auswertungsDaten(z: Zeile): { aufgaben: BlattAufgabe[]; roh: PersonRoh[] } {
   const aufgaben = json_(z.aufgaben, [] as BlattAufgabe[])
   const namen = new Map(alleNutzer().map((n) => [n.id, n.name || n.benutzer]))
-  const zeilen = db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as unknown as Abgabe[]
+  const zeilen = db().prepare(`SELECT * FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`).all(z.id) as unknown as Abgabe[]
   const roh = zeilen
     .map((a): PersonRoh => {
       const verlauf = json_(a.aufgaben_feedback ?? '{}', {} as Record<string, { einschaetzung: string; gelungen?: string; fehlt?: string; schritt?: string }[]>)
@@ -934,9 +935,10 @@ function gesamtVon(z: Zeile): number {
   const ids = new Set<string>()
   if (nur.length) for (const n of alleNutzer()) if (nur.includes(n.benutzer)) ids.add(n.id)
   if (!nur.length && g) for (const n of mitgliederVon(g)) ids.add(n.id)
-  for (const x of db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[]) ids.add(x.nutzer_id)
+  for (const x of db().prepare(`SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id ${OHNE_VORSCHAU}`).all(z.id) as { nutzer_id: string }[])
+    ids.add(x.nutzer_id)
   // Wer schon dabei ist, zählt immer mit (z. B. später aus der Gruppe genommen)
-  for (const x of db().prepare('SELECT schueler_id FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as { schueler_id: string }[]) ids.add(x.schueler_id)
+  for (const x of db().prepare(`SELECT schueler_id FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`).all(z.id) as { schueler_id: string }[]) ids.add(x.schueler_id)
   return ids.size
 }
 
@@ -954,6 +956,8 @@ export function blattStand(freigabeId: string, schuelerId: string): { eingereich
 }
 
 export { freigabe as blattFreigabe }
+/** Kurzfassung eines Blatts für Lernende (Schüler-Startseite: Lernstand, 06.10.2026) */
+export { kurz as blattKurz }
 
 /** Blatt für einen Schritt einer Unterrichtsreihe freigeben (gleiche Ablage, nicht in der Liste „Arbeitsblätter") */
 export function reihenBlattAnlegen(e: {
@@ -1110,7 +1114,7 @@ export function blaetterDerGruppe(
   const mitglieder = g ? mitgliederVon(g) : []
   return zeilen.map((z) => {
     const abgaben = db()
-      .prepare('SELECT schueler_id, abgaben, aktualisiert, aufgaben_feedback, freigeschaltet FROM blatt_abgaben WHERE freigabe_id = ?')
+      .prepare(`SELECT schueler_id, abgaben, aktualisiert, aufgaben_feedback, freigeschaltet FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`)
       .all(z.id) as {
       schueler_id: string
       abgaben: number

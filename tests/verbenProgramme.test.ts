@@ -22,7 +22,7 @@ import type { Worksheet } from '../src/renderer/src/modules/arbeitsblatt/model/t
 
 const design = { id: 'd', name: 'Standard', header: {}, page: {}, tasks: {} } as never
 
-function verbTest(fassungen: 1 | 2): GrammarTest {
+function verbTest(fassungen: 1 | 2 | 3 | 4): GrammarTest {
   const t = newTest(design, 'NW', 'gymnasium', 'Gymnasium')
   const verben = { ...neueVerbAufgabe('en', 3, 11), quelle: 'lehrwerk' as const, listeId: 'green-line-3', listenName: 'Green Line 3', formate: ['tabelle' as const, 'auswahl' as const] }
   return { ...t, meta: { ...t.meta, grade: 7, modus: 'verben', verben, fassungen } }
@@ -33,8 +33,8 @@ describe('Grammatiktest „Unregelmäßige Verben"', () => {
     const t = verbTest(2)
     const r = await generateVerbTest(t, null)
     expect(r.blocks.some((b) => b.type === 'task' && b.answer.kind === 'tableFill')).toBe(true)
-    expect(r.blocksB).toBeDefined()
-    const fertig: GrammarTest = { ...t, blocks: r.blocks, blocksB: r.blocksB }
+    expect(r.weitereFassungen).toHaveLength(1)
+    const fertig: GrammarTest = { ...t, blocks: r.blocks, weitereFassungen: r.weitereFassungen }
     const ws = testToWorksheet(fertig)
     expect(ws.sheets.map((s) => s.label)).toEqual(['Gruppe A', 'Gruppe B'])
     const tabelle = r.blocks.find((b) => b.type === 'task' && b.answer.kind === 'tableFill')
@@ -49,6 +49,17 @@ describe('Grammatiktest „Unregelmäßige Verben"', () => {
     expect(testTopicLine(fertig)).toBe('Unregelmäßige Verben (Green Line 3)')
     // Der Lösungsteil bekommt den Bewertungshinweis
     expect(r.blocks.at(-1)).toMatchObject({ type: 'infoBox', nurLoesung: true })
+  })
+
+  it('bis Gruppe D (06.10.2026): vier Fassungen, je ein Blatt; alte Gruppe B wird weiter gelesen', async () => {
+    const t = verbTest(4)
+    const r = await generateVerbTest(t, null)
+    expect(r.weitereFassungen).toHaveLength(3)
+    const ws = testToWorksheet({ ...t, blocks: r.blocks, weitereFassungen: r.weitereFassungen })
+    expect(ws.sheets.map((s) => s.label)).toEqual(['Gruppe A', 'Gruppe B', 'Gruppe C', 'Gruppe D'])
+    // Gespeichert vor 06.10.2026: Gruppe B im alten Feld
+    const alt = testToWorksheet({ ...t, blocks: r.blocks, blocksB: r.weitereFassungen![0] })
+    expect(alt.sheets.map((s) => s.label)).toEqual(['Gruppe A', 'Gruppe B'])
   })
 
   it('Zauberstab und Kreis arbeiten mit der Liste als verbindlicher Vorgabe', () => {

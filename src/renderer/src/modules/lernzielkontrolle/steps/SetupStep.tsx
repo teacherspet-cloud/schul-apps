@@ -1,4 +1,5 @@
 import VersuchKarte from '../../arbeitsblatt/steps/VersuchKarte'
+import { NurExperte } from '../../../shared/components/NurExperte'
 import { hatProtokolle, versuchAnfrage, versuchAus } from '../../arbeitsblatt/didactics/protokoll'
 import { lzkLerngruppe } from '../model/versuch'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
@@ -61,6 +62,8 @@ import { emptyKurztest, stufeFuerJahrgang } from '../model/defaults'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import type { KurztestMeta } from '../model/types'
 import { variantenLabel } from '../model/types'
+import FassungenWahl from '../../../shared/components/FassungenWahl'
+import { umgestellteFassung } from '../../../shared/testFassungen'
 import { aiCall, useLernzielkontrolle } from '../store'
 import VorwissenChips from '../../arbeitsblatt/steps/VorwissenChips'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
@@ -189,6 +192,14 @@ export default function SetupStep(): React.JSX.Element {
           // Fortschritt über ALLE Fassungen – sonst spränge der Balken je Fassung auf null zurück
           const vorschau = (blocks: WsBlock[], was: string): void =>
             k.zeige({ ...t, varianten: [...varianten, { id: `v${i + 1}`, label, blocks }] }, { was: anzahl > 1 ? `${label}: ${was}` : was })
+          // Ohne KI (06.10.2026): B … aus A umgestellt – Teilaufgaben bleiben in ihrer Folge (b baut oft auf a auf)
+          if (i > 0 && t.meta.fassungsArt === 'umgestellt') {
+            const blocks = umgestellteFassung(varianten[0].blocks, i, { items: false }).bloecke
+            vorschau(blocks, 'umgestellt')
+            varianten.push({ id: `v${i + 1}`, label, blocks })
+            k.melde(`${i + 1} von ${anzahl} Fassungen fertig`, i + 1, anzahl)
+            continue
+          }
           const blocks = await generateKurztest(
             t,
             label,
@@ -277,74 +288,76 @@ export default function SetupStep(): React.JSX.Element {
                   </Stack>
                 </Card>
 
-                <Card withBorder>
-                  <Title order={4} mb="sm">
-                    Format
-                  </Title>
-                  <Stack gap="sm">
-                    {formate.length > 0 ? (
-                      <Select
-                        label={`So heißt das Format in ${STATES.find((s) => s.id === m.stateId)?.name}`}
-                        data={formate.map((f) => ({ value: f.id, label: f.bezeichnung }))}
-                        value={m.formatId}
-                        onChange={(v) => {
-                          const f = KURZTEST_FORMATE.find((x) => x.id === v)
-                          if (f) patch({ formatId: f.id, bezeichnung: f.bezeichnung, minutes: standardMinuten(f) })
-                        }}
-                        allowDeselect={false}
-                      />
-                    ) : (
-                      <Alert color="gray" icon={<IconInfoCircle size={16} />}>
-                        Für dieses Bundesland wurde kein eigenes Kurztestformat ermittelt. Die Bezeichnung auf dem Blatt lässt sich frei wählen.
-                      </Alert>
-                    )}
-                    {format && (
-                      <Card withBorder padding="xs" bg="var(--mantine-color-default-hover)">
-                        <Stack gap={4}>
-                          <Group gap="xs">
-                            <Badge
-                              size="sm"
-                              variant="light"
-                              color={format.ankuendigung === 'unangekuendigt' ? 'orange' : format.ankuendigung === 'pflicht' ? 'blue' : 'gray'}
-                            >
-                              {format.ankuendigung === 'unangekuendigt'
-                                ? 'darf unangekündigt sein'
-                                : format.ankuendigung === 'pflicht'
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Format
+                    </Title>
+                    <Stack gap="sm">
+                      {formate.length > 0 ? (
+                        <Select
+                          label={`So heißt das Format in ${STATES.find((s) => s.id === m.stateId)?.name}`}
+                          data={formate.map((f) => ({ value: f.id, label: f.bezeichnung }))}
+                          value={m.formatId}
+                          onChange={(v) => {
+                            const f = KURZTEST_FORMATE.find((x) => x.id === v)
+                            if (f) patch({ formatId: f.id, bezeichnung: f.bezeichnung, minutes: standardMinuten(f) })
+                          }}
+                          allowDeselect={false}
+                        />
+                      ) : (
+                        <Alert color="gray" icon={<IconInfoCircle size={16} />}>
+                          Für dieses Bundesland wurde kein eigenes Kurztestformat ermittelt. Die Bezeichnung auf dem Blatt lässt sich frei wählen.
+                        </Alert>
+                      )}
+                      {format && (
+                        <Card withBorder padding="xs" bg="var(--mantine-color-default-hover)">
+                          <Stack gap={4}>
+                            <Group gap="xs">
+                              <Badge
+                                size="sm"
+                                variant="light"
+                                color={format.ankuendigung === 'unangekuendigt' ? 'orange' : format.ankuendigung === 'pflicht' ? 'blue' : 'gray'}
+                              >
+                                {format.ankuendigung === 'unangekuendigt'
+                                  ? 'darf unangekündigt sein'
+                                  : format.ankuendigung === 'pflicht'
                                   ? `${format.fristTage} Tage vorher ankündigen`
                                   : 'Ankündigung nicht geregelt'}
-                            </Badge>
-                            <Badge size="sm" variant="light" color="gray">
-                              {format.maxMinuten ? `höchstens ${format.maxMinuten} Minuten` : 'Dauer nicht normiert'}
-                            </Badge>
-                            {format.stoffStunden && (
-                              <Badge size="sm" variant="light" color="gray">
-                                Stoff aus höchstens {format.stoffStunden} Stunden
                               </Badge>
-                            )}
-                            {!format.amtlich && (
-                              <Tooltip label="Die Fundstelle stammt von einem privaten Spiegel, nicht aus einer amtlichen Verkündung.">
-                                <Badge size="sm" variant="light" color="yellow">
-                                  nicht amtlich abgerufen
+                              <Badge size="sm" variant="light" color="gray">
+                                {format.maxMinuten ? `höchstens ${format.maxMinuten} Minuten` : 'Dauer nicht normiert'}
+                              </Badge>
+                              {format.stoffStunden && (
+                                <Badge size="sm" variant="light" color="gray">
+                                  Stoff aus höchstens {format.stoffStunden} Stunden
                                 </Badge>
-                              </Tooltip>
-                            )}
-                          </Group>
-                          {/* Rechtliche Einzelheiten hinter „Mehr“ – vollständig, nur nicht mehr alle auf einmal (Paket 6) */}
-                          <MehrText kurz={format.anzahl}>
-                            <Text size="xs" c="dimmed">
-                              Quelle: {format.fundstelle}
-                            </Text>
-                            {format.hinweis && (
-                              <Text size="xs" c="orange.8" mt={4}>
-                                {format.hinweis}
+                              )}
+                              {!format.amtlich && (
+                                <Tooltip label="Die Fundstelle stammt von einem privaten Spiegel, nicht aus einer amtlichen Verkündung.">
+                                  <Badge size="sm" variant="light" color="yellow">
+                                    nicht amtlich abgerufen
+                                  </Badge>
+                                </Tooltip>
+                              )}
+                            </Group>
+                            {/* Rechtliche Einzelheiten hinter „Mehr“ – vollständig, nur nicht mehr alle auf einmal (Paket 6) */}
+                            <MehrText kurz={format.anzahl}>
+                              <Text size="xs" c="dimmed">
+                                Quelle: {format.fundstelle}
                               </Text>
-                            )}
-                          </MehrText>
-                        </Stack>
-                      </Card>
-                    )}
-                  </Stack>
-                </Card>
+                              {format.hinweis && (
+                                <Text size="xs" c="orange.8" mt={4}>
+                                  {format.hinweis}
+                                </Text>
+                              )}
+                            </MehrText>
+                          </Stack>
+                        </Card>
+                      )}
+                    </Stack>
+                  </Card>
+                </NurExperte>
 
                 <Card withBorder>
                   <Title order={4} mb="sm">
@@ -370,19 +383,21 @@ export default function SetupStep(): React.JSX.Element {
                        * vermischt da. Standard bleibt „alle Zweige": Wer den Unterschied nicht
                        * kennt, bekommt lieber zu viel als das Falsche.
                        */}
-                      {zweige.length > 1 && (
-                        <Select
-                          size="xs"
-                          label="Zweig laut Lehrplan"
-                          description="Bestimmt nur, welche Themen vorgeschlagen werden."
-                          data={[{ value: '', label: 'Alle Zweige' }, ...zweige.map((z) => ({ value: z, label: z }))]}
-                          value={zweig}
-                          onChange={(v) => setZweig(v ?? '')}
-                          allowDeselect={false}
-                          mb="xs"
-                          style={{ maxWidth: 360 }}
-                        />
-                      )}
+                      <NurExperte>
+                        {zweige.length > 1 && (
+                          <Select
+                            size="xs"
+                            label="Zweig laut Lehrplan"
+                            description="Bestimmt nur, welche Themen vorgeschlagen werden."
+                            data={[{ value: '', label: 'Alle Zweige' }, ...zweige.map((z) => ({ value: z, label: z }))]}
+                            value={zweig}
+                            onChange={(v) => setZweig(v ?? '')}
+                            allowDeselect={false}
+                            mb="xs"
+                            style={{ maxWidth: 360 }}
+                          />
+                        )}
+                      </NurExperte>
                       <TagsInput
                         label="Thema"
                         placeholder={m.thema ? '' : 'z. B. Potenzgesetze'}
@@ -437,29 +452,18 @@ export default function SetupStep(): React.JSX.Element {
                       erklaerung="Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen."
                     />
                     <Group grow align="flex-start">
-                      <ZahlFeld
-                        label="Bearbeitungszeit (Minuten)"
-                        min={5}
-                        max={60}
-                        value={m.minutes}
-                        onChange={(v) => patch({ minutes: Number(v) || 20 })}
-                      />
-                      <div>
-                        <Text size="sm" fw={500} mb={4}>
-                          Fassungen
-                        </Text>
-                        <SegmentedControl
-                          fullWidth
-                          size="sm"
-                          value={String(m.varianten)}
-                          onChange={(v) => patch({ varianten: Number(v) })}
-                          data={[
-                            { value: '1', label: 'eine' },
-                            { value: '2', label: 'A / B' },
-                            { value: '3', label: 'A / B / C' }
-                          ]}
+                      <ZahlFeld label="Bearbeitungszeit (Minuten)" min={5} max={60} value={m.minutes} onChange={(v) => patch({ minutes: Number(v) || 20 })} />
+                      <NurExperte geaendert={m.varianten > 1 && `${m.varianten} Fassungen`}>
+                        {/* Fassungen A–D (06.10.2026, wie im Vokabeltest): andere Beispiele von der KI oder ohne KI umgestellt */}
+                        <FassungenWahl
+                          anzahl={m.varianten}
+                          onAnzahl={(varianten) => patch({ varianten })}
+                          art={m.fassungsArt}
+                          onArt={(fassungsArt) => patch({ fassungsArt })}
+                          kiText="andere Beispiele (KI)"
+                          hinweis="Gleiche Inhalte und Aufgabentypen, andere Zahlen und Beispiele – je Fassung eine KI-Anfrage."
                         />
-                      </div>
+                      </NurExperte>
                     </Group>
                     {zeit && (
                       <Alert
@@ -472,80 +476,86 @@ export default function SetupStep(): React.JSX.Element {
                   </Stack>
                 </Card>
                 {/* Versuch mit Protokoll (29.09.2026) – in Fächern mit Versuchen, Messungen, Beobachtungen */}
-                {hatProtokolle(m.subjectId) && (
-                  <VersuchKarte lerngruppe={lzkLerngruppe(m)} versuch={m.versuch} patchVersuch={(versuch) => patch({ versuch })} pruefung />
-                )}
+                <NurExperte geaendert={m.versuch?.aktiv && 'Versuch'}>
+                  {hatProtokolle(m.subjectId) && (
+                    <VersuchKarte lerngruppe={lzkLerngruppe(m)} versuch={m.versuch} patchVersuch={(versuch) => patch({ versuch })} pruefung />
+                  )}
+                </NurExperte>
               </Stack>
             </Grid.Col>
 
             <Grid.Col span={{ base: 12, md: 5 }}>
               <Stack>
-                <Card withBorder>
-                  <Group justify="space-between" mb="sm">
-                    <Title order={4}>Operatoren</Title>
-                    {profil && (
-                      <Group gap={6}>
-                        {/* Eine Anhoerfassung ist ein Entwurf und kann sich noch aendern – das gehoert sichtbar hierher */}
-                        {/anhörfassung|entwurf|arbeitsfassung/i.test(profil.stand) && (
-                          <Badge size="sm" variant="filled" color="yellow">
-                            Entwurf
+                <NurExperte geaendert={Boolean(m.bevorzugteOperatoren?.length) && `${m.bevorzugteOperatoren!.length} Operatoren`}>
+                  <Card withBorder>
+                    <Group justify="space-between" mb="sm">
+                      <Title order={4}>Operatoren</Title>
+                      {profil && (
+                        <Group gap={6}>
+                          {/* Eine Anhoerfassung ist ein Entwurf und kann sich noch aendern – das gehoert sichtbar hierher */}
+                          {/anhörfassung|entwurf|arbeitsfassung/i.test(profil.stand) && (
+                            <Badge size="sm" variant="filled" color="yellow">
+                              Entwurf
+                            </Badge>
+                          )}
+                          {/* Herkunft der Liste: Land, Verweis des Landes, KMK/IQB des Fachs, Oberstufenliste oder fachüblich */}
+                          <Badge size="sm" variant="light" color={kennzeichnung(profil).farbe}>
+                            {kennzeichnung(profil).text}
                           </Badge>
-                        )}
-                        {/* Herkunft der Liste: Land, Verweis des Landes, KMK/IQB des Fachs, Oberstufenliste oder fachüblich */}
-                        <Badge size="sm" variant="light" color={kennzeichnung(profil).farbe}>
-                          {kennzeichnung(profil).text}
-                        </Badge>
-                      </Group>
-                    )}
-                  </Group>
-                  {profil ? (
-                    <Stack gap={6}>
-                      {/*
-                       * Anklickbar: Die Lehrkraft wählt die Operatoren aus, die sie in diesem Test
-                       * sehen möchte. Die Auswahl ist ein VORSCHLAG an die KI, kein Zwang – manche
-                       * Antwortformen verlangen einen bestimmten Operator, und ein erzwungener
-                       * erzeugte genau den Fehler, den die App sonst meldet.
-                       * Gemeinsame Auswahl aller Programme (30.09.2026): nach AFB gruppiert, bilingual getrennt.
-                       */}
-                      <OperatorenWahl
-                        eintraege={wahl}
-                        gewaehlt={m.bevorzugteOperatoren ?? []}
-                        onChange={(bevorzugteOperatoren) => patch({ bevorzugteOperatoren })}
-                        quelle={profil.quelle}
-                        stand={profil.stand}
-                        auswahlText={(n) => (n ? `${n} bevorzugt – als Vorschlag, nicht als Zwang` : 'Anklicken, um Operatoren für diesen Test vorzuschlagen')}
-                        bilingual={
-                          bilingualMoeglich(m.subjectId)
-                            ? {
-                                an: bilingualAn,
-                                sprache: m.bilingual?.sprache ?? 'en',
-                                sprachen: BILINGUALE_SPRACHEN,
-                                // Die Auswahl gilt nur für die Liste, aus der sie stammt
-                                onChange: (an, sprache) =>
-                                  patch({
-                                    bilingual: {
-                                      an,
-                                      sprache: sprache as 'en' | 'fr'
-                                    },
-                                    bevorzugteOperatoren: []
-                                  })
-                              }
-                            : undefined
-                        }
-                      />
-                      {!profil.oeffnungsklausel && (
-                        <Text size="xs" c="orange.8">
-                          Diese Liste hat keine Öffnungsklausel – nur die genannten Operatoren sind zulässig.
-                        </Text>
+                        </Group>
                       )}
-                      {profil.hinweis && <MehrText text={profil.hinweis} />}
-                    </Stack>
-                  ) : (
-                    <Text size="sm" c="dimmed">
-                      {keineListeText(m.stateId, m.subjectId)}
-                    </Text>
-                  )}
-                </Card>
+                    </Group>
+                    {profil ? (
+                      <Stack gap={6}>
+                        {/*
+                         * Anklickbar: Die Lehrkraft wählt die Operatoren aus, die sie in diesem Test
+                         * sehen möchte. Die Auswahl ist ein VORSCHLAG an die KI, kein Zwang – manche
+                         * Antwortformen verlangen einen bestimmten Operator, und ein erzwungener
+                         * erzeugte genau den Fehler, den die App sonst meldet.
+                         * Gemeinsame Auswahl aller Programme (30.09.2026): nach AFB gruppiert, bilingual getrennt.
+                         */}
+                        <OperatorenWahl
+                          eintraege={wahl}
+                          gewaehlt={m.bevorzugteOperatoren ?? []}
+                          onChange={(bevorzugteOperatoren) => patch({ bevorzugteOperatoren })}
+                          quelle={profil.quelle}
+                          stand={profil.stand}
+                          auswahlText={(n) =>
+                            n ? `${n} bevorzugt – als Vorschlag, nicht als Zwang` : 'Anklicken, um Operatoren für diesen Test vorzuschlagen'
+                          }
+                          bilingual={
+                            bilingualMoeglich(m.subjectId)
+                              ? {
+                                  an: bilingualAn,
+                                  sprache: m.bilingual?.sprache ?? 'en',
+                                  sprachen: BILINGUALE_SPRACHEN,
+                                  // Die Auswahl gilt nur für die Liste, aus der sie stammt
+                                  onChange: (an, sprache) =>
+                                    patch({
+                                      bilingual: {
+                                        an,
+                                        sprache: sprache as 'en' | 'fr'
+                                      },
+                                      bevorzugteOperatoren: []
+                                    })
+                                }
+                              : undefined
+                          }
+                        />
+                        {!profil.oeffnungsklausel && (
+                          <Text size="xs" c="orange.8">
+                            Diese Liste hat keine Öffnungsklausel – nur die genannten Operatoren sind zulässig.
+                          </Text>
+                        )}
+                        {profil.hinweis && <MehrText text={profil.hinweis} />}
+                      </Stack>
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        {keineListeText(m.stateId, m.subjectId)}
+                      </Text>
+                    )}
+                  </Card>
+                </NurExperte>
 
                 {/*
                  * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Punkte, Lösungsblatt und sprachliche
@@ -556,67 +566,71 @@ export default function SetupStep(): React.JSX.Element {
                     Blatt und Hilfen
                   </Title>
                   <Stack gap="sm">
-                    <Switch
-                      label="Punkte je Aufgabe auf dem Blatt"
-                      checked={m.bewertung.punkteAufBlatt}
-                      onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
-                    />
-                    {m.bewertung.punkteAufBlatt && (
-                      <>
-                        <Switch
-                          label="Punktzahl vorgeben"
-                          description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
-                          checked={Boolean(m.bewertung.bereich)}
-                          onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
-                        />
-                        {m.bewertung.bereich && (
-                          <Group grow>
-                            <ZahlFeld
-                              label="von"
-                              min={1}
-                              max={100}
-                              value={m.bewertung.bereich.min}
-                              onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
-                            />
-                            <ZahlFeld
-                              label="bis"
-                              min={1}
-                              max={100}
-                              value={m.bewertung.bereich.max}
-                              onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
-                            />
-                          </Group>
-                        )}
-                      </>
-                    )}
+                    <NurExperte geaendert={Boolean(m.bewertung.bereich) && 'Punktzahl vorgegeben'}>
+                      <Switch
+                        label="Punkte je Aufgabe auf dem Blatt"
+                        checked={m.bewertung.punkteAufBlatt}
+                        onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
+                      />
+                      {m.bewertung.punkteAufBlatt && (
+                        <>
+                          <Switch
+                            label="Punktzahl vorgeben"
+                            description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
+                            checked={Boolean(m.bewertung.bereich)}
+                            onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
+                          />
+                          {m.bewertung.bereich && (
+                            <Group grow>
+                              <ZahlFeld
+                                label="von"
+                                min={1}
+                                max={100}
+                                value={m.bewertung.bereich.min}
+                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
+                              />
+                              <ZahlFeld
+                                label="bis"
+                                min={1}
+                                max={100}
+                                value={m.bewertung.bereich.max}
+                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
+                              />
+                            </Group>
+                          )}
+                        </>
+                      )}
+                    </NurExperte>
                     <Switch label="Lösungsblatt für die Lehrkraft" checked={m.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                    <Switch
-                      label="Sprachliche Hilfen zulassen"
-                      description="Nachteilsausgleich – sonst enthält das Blatt nur Aufgaben und Material, keine Wortspeicher und keine Satzanfänge."
-                      checked={m.nachteilsausgleich.aktiv}
-                      onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
-                    />
-                    {m.nachteilsausgleich.aktiv && (
-                      <>
-                        <Checkbox.Group
-                          value={m.nachteilsausgleich.hilfen}
-                          onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
-                        >
-                          <Stack gap={6}>
-                            {AUSGLEICH_HILFEN.map((h) => (
-                              <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
-                            ))}
-                          </Stack>
-                        </Checkbox.Group>
-                        <TextInput
-                          label="Vermerk für die Lehrkraft"
-                          placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
-                          value={m.nachteilsausgleich.vermerk ?? ''}
-                          onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
-                        />
-                        <MehrText text="Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen einen Teil der geprüften Leistung vorweg." />
-                      </>
-                    )}
+                    <NurExperte geaendert={m.nachteilsausgleich.aktiv && 'sprachliche Hilfen'}>
+                      <Switch
+                        label="Sprachliche Hilfen zulassen"
+                        description="Nachteilsausgleich – sonst enthält das Blatt nur Aufgaben und Material, keine Wortspeicher und keine Satzanfänge."
+                        checked={m.nachteilsausgleich.aktiv}
+                        onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
+                      />
+                      {m.nachteilsausgleich.aktiv && (
+                        <>
+                          <Checkbox.Group
+                            value={m.nachteilsausgleich.hilfen}
+                            onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
+                          >
+                            <Stack gap={6}>
+                              {AUSGLEICH_HILFEN.map((h) => (
+                                <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
+                              ))}
+                            </Stack>
+                          </Checkbox.Group>
+                          <TextInput
+                            label="Vermerk für die Lehrkraft"
+                            placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
+                            value={m.nachteilsausgleich.vermerk ?? ''}
+                            onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
+                          />
+                          <MehrText text="Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen einen Teil der geprüften Leistung vorweg." />
+                        </>
+                      )}
+                    </NurExperte>
                   </Stack>
                 </Card>
               </Stack>
@@ -752,8 +766,8 @@ export function geaenderteOptionen(m: KurztestMeta, formatBezeichnung?: string):
       ? b.schluessel === 'keiner'
         ? 'kein Notenschlüssel'
         : b.schluessel === 'eigen'
-          ? 'eigener Notenschlüssel'
-          : `Schlüssel ${schluesselById(b.schluessel)?.name ?? b.schluessel}`
+        ? 'eigener Notenschlüssel'
+        : `Schlüssel ${schluesselById(b.schluessel)?.name ?? b.schluessel}`
       : '',
     m.nameFeld ? '' : 'ohne Namensfelder',
     m.vorlagenfarbe ? 'Farbe der Vorlage' : ''

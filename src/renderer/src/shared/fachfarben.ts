@@ -127,7 +127,8 @@ export const FACH_VORSCHLAG: Record<string, string> = Object.fromEntries(
 export const WEITERE_FAECHER: { id: string; label: string }[] = [];
 
 /** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) – aus dem Katalog */
-export const FACH_ZU_SPRACHE: Record<string, string> = KATALOG_SPRACHE;
+// Vokabellisten auf Deutsch gehören zu DaZ (06.10.2026) – Deutsch selbst hat keine Vokabellisten
+export const FACH_ZU_SPRACHE: Record<string, string> = { ...KATALOG_SPRACHE, de: "daz" };
 
 // ---------- Farbrechnung (sRGB, WCAG 2.1, CIELAB) ----------
 

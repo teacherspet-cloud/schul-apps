@@ -20,6 +20,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { AlleOptionen, NurExperte } from '../../../shared/components/NurExperte'
 import { IconChalkboard, IconFolderOpen, IconInfoCircle, IconX } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { operatorenAuswahl } from '@shared/operatoren/zugriff'
@@ -41,7 +42,17 @@ import BilingualSchalter from '../../arbeitsblatt/steps/BilingualSchalter'
 import { setzeUndPruefe, tafelbildErzeugen } from '../auftrag'
 import { FORMAT_IDS, formatInfo, type FormatId } from '../formate'
 import { inhaltAusBoardPlan, ladeAppMaterial, tafelbilderDesBlatts, texteAus } from '../material'
-import { standardSprache, standardStil, STRUKTUREN, type Regler, type Sprachniveau, type StrukturWahl, type Tafelbild, type TafelbildMeta, type ZeichnungQuelle } from '../model'
+import {
+  standardSprache,
+  standardStil,
+  STRUKTUREN,
+  type Regler,
+  type Sprachniveau,
+  type StrukturWahl,
+  type Tafelbild,
+  type TafelbildMeta,
+  type ZeichnungQuelle
+} from '../model'
 import { useTafelbild } from '../store'
 import { MASSSTAB_NAMEN, type ZeitMassstab } from '../zeitleiste'
 import '../tafelbild.css'
@@ -61,7 +72,14 @@ const stufe = (label: string, wert: number, data: string[], onChange: (v: number
     <Text size="sm" fw={500} mb={4}>
       {label}
     </Text>
-    <SegmentedControl fullWidth size="xs" value={String(wert)} onChange={(v) => onChange(Number(v))} data={data.map((l, i) => ({ value: String(i + start), label: l }))} data-tb-regler={attr} />
+    <SegmentedControl
+      fullWidth
+      size="xs"
+      value={String(wert)}
+      onChange={(v) => onChange(Number(v))}
+      data={data.map((l, i) => ({ value: String(i + start), label: l }))}
+      data-tb-regler={attr}
+    />
   </div>
 )
 
@@ -88,7 +106,8 @@ export default function Einrichten(): React.JSX.Element | null {
   )
   if (!t || !m) return null
 
-  const patch = (next: Partial<TafelbildMeta>, gruppe?: string): void => update((d) => Object.assign(d.meta, next), gruppe ?? `tb-meta:${Object.keys(next).join(',')}`)
+  const patch = (next: Partial<TafelbildMeta>, gruppe?: string): void =>
+    update((d) => Object.assign(d.meta, next), gruppe ?? `tb-meta:${Object.keys(next).join(',')}`)
   const regler = (next: Partial<Regler>): void => update((d) => Object.assign(d.meta.regler, next))
   const range = gradeRange(LEERE_TABELLE, m.stateId, m.schoolTypeId)
   const jahrgaenge = Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i)
@@ -115,7 +134,10 @@ export default function Einrichten(): React.JSX.Element | null {
       const text = texteAus(payload)
       update((d) => {
         d.meta.appMaterial = [...d.meta.appMaterial.filter((a) => !(a.moduleId === moduleId && a.id === id)), { moduleId, id, name, text, aktiv: true }]
-        if (!d.meta.thema.trim()) d.meta.thema = String((payload as { meta?: { topic?: string; thema?: string } })?.meta?.topic ?? (payload as { meta?: { thema?: string } })?.meta?.thema ?? '')
+        if (!d.meta.thema.trim())
+          d.meta.thema = String(
+            (payload as { meta?: { topic?: string; thema?: string } })?.meta?.topic ?? (payload as { meta?: { thema?: string } })?.meta?.thema ?? ''
+          )
       })
       if (moduleId === 'arbeitsblatt' && tafelbilderDesBlatts(payload as Worksheet).length) setBlattTafeln({ name, ws: payload as Worksheet })
     } catch (e) {
@@ -227,8 +249,8 @@ export default function Einrichten(): React.JSX.Element | null {
                     />
                     {foto && (
                       <Alert color="blue" icon={<IconInfoCircle size={16} />} p="xs">
-                        Ein Foto des echten (auch handgeschriebenen) Tafelbilds hierunter hineinziehen: Die KI überträgt Texte, Kästen, Pfeile und Farben in ein sauberes,
-                        bearbeitbares Tafelbild.
+                        Ein Foto des echten (auch handgeschriebenen) Tafelbilds hierunter hineinziehen: Die KI überträgt Texte, Kästen, Pfeile und Farben in ein
+                        sauberes, bearbeitbares Tafelbild.
                       </Alert>
                     )}
                     <TextInput
@@ -302,7 +324,9 @@ export default function Einrichten(): React.JSX.Element | null {
                           variant="subtle"
                           color="gray"
                           aria-label={`${a.name} entfernen`}
-                          onClick={() => update((d) => void (d.meta.appMaterial = d.meta.appMaterial.filter((y) => !(y.id === a.id && y.moduleId === a.moduleId))))}
+                          onClick={() =>
+                            update((d) => void (d.meta.appMaterial = d.meta.appMaterial.filter((y) => !(y.id === a.id && y.moduleId === a.moduleId))))
+                          }
                         >
                           <IconX size={14} />
                         </ActionIcon>
@@ -345,150 +369,168 @@ export default function Einrichten(): React.JSX.Element | null {
                   </Chip.Group>
                 </Card>
 
-                <Card withBorder>
-                  <Title order={4} mb="xs">
-                    Struktur
-                  </Title>
-                  <Select
-                    data={STRUKTUREN.map((s) => ({ value: s.value, label: s.label }))}
-                    value={m.struktur}
-                    onChange={(v) => v && patch({ struktur: v as StrukturWahl })}
-                    allowDeselect={false}
-                    description={STRUKTUREN.find((s) => s.value === m.struktur)?.beschreibung}
-                    data-tb-struktur
-                  />
-                  {(m.struktur === 'zeitleiste' || m.struktur === 'auto') && (
-                    <div style={{ marginTop: 8 }}>
-                      <Text size="sm" fw={500} mb={4}>
-                        Abstände auf einer Zeitleiste
-                      </Text>
-                      <SegmentedControl
-                        fullWidth
-                        size="xs"
-                        value={m.zeitachse ?? 'auto'}
-                        onChange={(v) => patch({ zeitachse: v as ZeitMassstab })}
-                        data={(Object.keys(MASSSTAB_NAMEN) as ZeitMassstab[]).map((z) => ({ value: z, label: MASSSTAB_NAMEN[z] }))}
-                        data-tb-zeitachse
-                      />
-                      <Text size="xs" c="dimmed" mt={2}>
-                        {m.zeitachse === 'massstab'
-                          ? 'Marken im wahren Zeitabstand.'
-                          : m.zeitachse === 'gleich'
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="xs">
+                      Struktur
+                    </Title>
+                    <Select
+                      data={STRUKTUREN.map((s) => ({ value: s.value, label: s.label }))}
+                      value={m.struktur}
+                      onChange={(v) => v && patch({ struktur: v as StrukturWahl })}
+                      allowDeselect={false}
+                      description={STRUKTUREN.find((s) => s.value === m.struktur)?.beschreibung}
+                      data-tb-struktur
+                    />
+                    {(m.struktur === 'zeitleiste' || m.struktur === 'auto') && (
+                      <div style={{ marginTop: 8 }}>
+                        <Text size="sm" fw={500} mb={4}>
+                          Abstände auf einer Zeitleiste
+                        </Text>
+                        <SegmentedControl
+                          fullWidth
+                          size="xs"
+                          value={m.zeitachse ?? 'auto'}
+                          onChange={(v) => patch({ zeitachse: v as ZeitMassstab })}
+                          data={(Object.keys(MASSSTAB_NAMEN) as ZeitMassstab[]).map((z) => ({ value: z, label: MASSSTAB_NAMEN[z] }))}
+                          data-tb-zeitachse
+                        />
+                        <Text size="xs" c="dimmed" mt={2}>
+                          {m.zeitachse === 'massstab'
+                            ? 'Marken im wahren Zeitabstand.'
+                            : m.zeitachse === 'gleich'
                             ? 'Marken im gleichen Abstand – gut bei sehr ungleichen Zeiträumen.'
                             : 'Maßstabsgerecht, wenn die Jahreszahlen dabei lesbar bleiben; sonst gleiche Abstände.'}
-                      </Text>
-                    </div>
-                  )}
-                </Card>
+                        </Text>
+                      </div>
+                    )}
+                  </Card>
+                </NurExperte>
 
-                <Card withBorder>
-                  <Title order={4} mb="xs">
-                    Umfang und Sprache
-                  </Title>
-                  <Stack gap="sm">
-                    {stufe('Detailgrad', m.regler.detail, ['knapp', 'mittel', 'ausführlich'], (v) => regler({ detail: v as 1 | 2 | 3 }), 'detail')}
-                    {stufe('Zeichnungen und Symbole', m.regler.zeichnungen, ['keine', 'einige', 'viele'], (v) => regler({ zeichnungen: v as 0 | 1 | 2 }), 'zeichnungen', 0)}
-                    {stufe('Textmenge', m.regler.textmenge, ['knapp', 'mittel', 'viel'], (v) => regler({ textmenge: v as 1 | 2 | 3 }), 'textmenge')}
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Textschwierigkeit
-                      </Text>
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="xs">
+                      Umfang und Sprache
+                    </Title>
+                    <Stack gap="sm">
+                      {stufe('Detailgrad', m.regler.detail, ['knapp', 'mittel', 'ausführlich'], (v) => regler({ detail: v as 1 | 2 | 3 }), 'detail')}
+                      {stufe(
+                        'Zeichnungen und Symbole',
+                        m.regler.zeichnungen,
+                        ['keine', 'einige', 'viele'],
+                        (v) => regler({ zeichnungen: v as 0 | 1 | 2 }),
+                        'zeichnungen',
+                        0
+                      )}
+                      {stufe('Textmenge', m.regler.textmenge, ['knapp', 'mittel', 'viel'], (v) => regler({ textmenge: v as 1 | 2 | 3 }), 'textmenge')}
+                      <div>
+                        <Text size="sm" fw={500} mb={4}>
+                          Textschwierigkeit
+                        </Text>
+                        <SegmentedControl
+                          fullWidth
+                          size="xs"
+                          value={m.regler.sprache}
+                          onChange={(v) => regler({ sprache: v as Sprachniveau, spracheGewaehlt: true })}
+                          data={[
+                            { value: 'einfach', label: 'Einfache Sprache' },
+                            { value: 'standard', label: 'Standard' },
+                            { value: 'fach', label: 'Fachsprache' }
+                          ]}
+                        />
+                        <Text size="xs" c="dimmed" mt={2}>
+                          {m.regler.spracheGewaehlt ? 'Von Hand gewählt' : `Voreingestellt nach Klasse ${m.grade} und Schulform`}
+                        </Text>
+                      </div>
                       <SegmentedControl
                         fullWidth
                         size="xs"
-                        value={m.regler.sprache}
-                        onChange={(v) => regler({ sprache: v as Sprachniveau, spracheGewaehlt: true })}
+                        value={m.regler.stil}
+                        onChange={(v) => regler({ stil: v as Regler['stil'], stilGewaehlt: true })}
                         data={[
-                          { value: 'einfach', label: 'Einfache Sprache' },
-                          { value: 'standard', label: 'Standard' },
-                          { value: 'fach', label: 'Fachsprache' }
+                          { value: 'stichpunkte', label: 'Stichpunkte' },
+                          { value: 'ausformuliert', label: 'Ausformuliert' }
                         ]}
+                        data-tb-stil
                       />
-                      <Text size="xs" c="dimmed" mt={2}>
-                        {m.regler.spracheGewaehlt ? 'Von Hand gewählt' : `Voreingestellt nach Klasse ${m.grade} und Schulform`}
+                    </Stack>
+                  </Card>
+                </NurExperte>
+
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="xs">
+                      Zeichnungen aus
+                    </Title>
+                    <Stack gap={6}>
+                      {QUELLEN.map((q) => (
+                        <Checkbox
+                          key={q.value}
+                          label={q.label}
+                          description={q.beschreibung}
+                          checked={m.quellen.includes(q.value)}
+                          disabled={m.regler.zeichnungen === 0}
+                          onChange={(e) => {
+                            const an = e.currentTarget.checked
+                            update((d) => void (d.meta.quellen = an ? [...d.meta.quellen, q.value] : d.meta.quellen.filter((x) => x !== q.value)))
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Card>
+                </NurExperte>
+
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="xs">
+                      Varianten
+                    </Title>
+                    <Stack gap={6}>
+                      {(
+                        [
+                          ['luecke', 'Lückentafelbild', 'Fachbegriffe als gleich lange Lücken, mit Wortspeicher'],
+                          ['schritte', 'Schrittweiser Aufbau', 'Reihenfolge der Elemente = Präsentationsschritte, mit Planungshilfe'],
+                          ['niveaus', 'Differenziert ★ / ★★ / ★★★', 'Kern für alle, Aspekte und Vertiefung zuschaltbar'],
+                          ['merksatz', 'Merksatz- / Sicherungskasten', 'Ein einprägsamer Merksatz (höchstens 25 Wörter)']
+                        ] as const
+                      ).map(([k, label, text]) => (
+                        <Switch
+                          key={k}
+                          label={label}
+                          description={text}
+                          checked={m.varianten[k]}
+                          onChange={(e) => {
+                            const an = e.currentTarget.checked
+                            update((d) => void (d.meta.varianten[k] = an))
+                          }}
+                          data-tb-variante={k}
+                        />
+                      ))}
+                    </Stack>
+                  </Card>
+                </NurExperte>
+
+                <NurExperte>
+                  <Card withBorder>
+                    <Title order={4} mb="xs">
+                      Operatoren für Impuls und Hausaufgabe
+                    </Title>
+                    {eintraege.length ? (
+                      <OperatorenWahl
+                        eintraege={eintraege}
+                        gewaehlt={m.operatoren}
+                        onChange={(operatoren) => patch({ operatoren })}
+                        quelle={auswahl?.quelle}
+                        stand={auswahl?.stand}
+                      />
+                    ) : (
+                      <Text size="xs" c="dimmed">
+                        Für dieses Fach und Land liegt keine Operatorenliste vor – die KI formuliert Arbeitsaufträge mit gängigen Operatoren.
                       </Text>
-                    </div>
-                    <SegmentedControl
-                      fullWidth
-                      size="xs"
-                      value={m.regler.stil}
-                      onChange={(v) => regler({ stil: v as Regler['stil'], stilGewaehlt: true })}
-                      data={[
-                        { value: 'stichpunkte', label: 'Stichpunkte' },
-                        { value: 'ausformuliert', label: 'Ausformuliert' }
-                      ]}
-                      data-tb-stil
-                    />
-                  </Stack>
-                </Card>
-
-                <Card withBorder>
-                  <Title order={4} mb="xs">
-                    Zeichnungen aus
-                  </Title>
-                  <Stack gap={6}>
-                    {QUELLEN.map((q) => (
-                      <Checkbox
-                        key={q.value}
-                        label={q.label}
-                        description={q.beschreibung}
-                        checked={m.quellen.includes(q.value)}
-                        disabled={m.regler.zeichnungen === 0}
-                        onChange={(e) => {
-                          const an = e.currentTarget.checked
-                          update((d) => void (d.meta.quellen = an ? [...d.meta.quellen, q.value] : d.meta.quellen.filter((x) => x !== q.value)))
-                        }}
-                      />
-                    ))}
-                  </Stack>
-                </Card>
-
-                <Card withBorder>
-                  <Title order={4} mb="xs">
-                    Varianten
-                  </Title>
-                  <Stack gap={6}>
-                    {(
-                      [
-                        ['luecke', 'Lückentafelbild', 'Fachbegriffe als gleich lange Lücken, mit Wortspeicher'],
-                        ['schritte', 'Schrittweiser Aufbau', 'Reihenfolge der Elemente = Präsentationsschritte, mit Planungshilfe'],
-                        ['niveaus', 'Differenziert ★ / ★★ / ★★★', 'Kern für alle, Aspekte und Vertiefung zuschaltbar'],
-                        ['merksatz', 'Merksatz- / Sicherungskasten', 'Ein einprägsamer Merksatz (höchstens 25 Wörter)']
-                      ] as const
-                    ).map(([k, label, text]) => (
-                      <Switch
-                        key={k}
-                        label={label}
-                        description={text}
-                        checked={m.varianten[k]}
-                        onChange={(e) => {
-                          const an = e.currentTarget.checked
-                          update((d) => void (d.meta.varianten[k] = an))
-                        }}
-                        data-tb-variante={k}
-                      />
-                    ))}
-                  </Stack>
-                </Card>
-
-                <Card withBorder>
-                  <Title order={4} mb="xs">
-                    Operatoren für Impuls und Hausaufgabe
-                  </Title>
-                  {eintraege.length ? (
-                    <OperatorenWahl
-                      eintraege={eintraege}
-                      gewaehlt={m.operatoren}
-                      onChange={(operatoren) => patch({ operatoren })}
-                      quelle={auswahl?.quelle}
-                      stand={auswahl?.stand}
-                    />
-                  ) : (
-                    <Text size="xs" c="dimmed">
-                      Für dieses Fach und Land liegt keine Operatorenliste vor – die KI formuliert Arbeitsaufträge mit gängigen Operatoren.
-                    </Text>
-                  )}
-                </Card>
+                    )}
+                  </Card>
+                </NurExperte>
+                <AlleOptionen />
               </Stack>
             </Grid.Col>
           </Grid>

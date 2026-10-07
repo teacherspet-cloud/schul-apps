@@ -68,7 +68,7 @@ export function getOpenMojiSvg(hexcode: string): string {
   return svg
 }
 
-export async function searchOnline(query: string, source: OnlineImageSource, pixabayKey?: string): Promise<OnlineImageHit[]> {
+export async function searchOnline(query: string, source: OnlineImageSource, pixabayKey?: string, bildart?: string): Promise<OnlineImageHit[]> {
   if (source === 'wikimedia') return searchWikimedia(query)
   if (source === 'openverse' || source === 'clipart') {
     // Cliparts: gemeinfreie Illustrationen (v. a. rawpixel und svgsilh) – klar, freigestellt, ohne Lizenzauflagen
@@ -101,8 +101,12 @@ export async function searchOnline(query: string, source: OnlineImageSource, pix
     }))
   }
   if (!pixabayKey) throw new Error('Für die Pixabay-Suche wird ein API-Schlüssel benötigt (Einstellungen).')
-  const url = `https://pixabay.com/api/?key=${encodeURIComponent(pixabayKey)}&q=${encodeURIComponent(query)}&safesearch=true&per_page=30`
+  // Bildart (06.10.2026, Medienbank der Vokabeln): Cliparts für jüngere Lernende über image_type=illustration/vector
+  const art = bildart === 'photo' || bildart === 'illustration' || bildart === 'vector' ? `&image_type=${bildart}` : ''
+  const url = `https://pixabay.com/api/?key=${encodeURIComponent(pixabayKey)}&q=${encodeURIComponent(query)}&safesearch=true&per_page=30${art}`
   const res = await abrufe(url)
+  // 429 mit Wartezeit melden – die Medienaufträge warten dann, statt abzubrechen (shared/medien/medienWarten.ts)
+  if (res.status === 429) throw new Error(`Pixabay: zu viele Anfragen (429) – erneut versuchen in ${Number(res.headers.get('x-ratelimit-reset')) || 60} s.`)
   if (!res.ok) throw new Error(`Pixabay-Suche fehlgeschlagen (${res.status}).`)
   const json = (await res.json()) as {
     hits: { id: number; previewURL: string; webformatURL: string; tags: string; user: string }[]

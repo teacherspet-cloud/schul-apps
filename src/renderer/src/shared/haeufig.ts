@@ -116,7 +116,7 @@ export function zaehleWahl(art: HaeufigArt, value: string): void {
  * Sprachkürzel („en", „la"). Beide sollen die eigenen Fächer oben zeigen – deshalb wird hier
  * übersetzt statt in jedem Formular.
  */
-export function eigeneWerte(eigeneFaecher: string[], data: { value: string }[]): string[] {
+export function eigeneWerte(eigeneFaecher: string[], data: { value: string; label?: string }[]): string[] {
   if (!eigeneFaecher.length) return []
   const passend = new Set<string>()
   for (const id of eigeneFaecher) {
@@ -124,6 +124,34 @@ export function eigeneWerte(eigeneFaecher: string[], data: { value: string }[]):
     const fach = SUBJECTS.find((s) => s.id === id)
     if (fach?.foreignLanguage) passend.add(fach.foreignLanguage)
     if (fach?.uebersetzungssprache) passend.add(fach.uebersetzungssprache)
+    // Manche Auswahlen führen die Beschriftung als Wert (Onlinetest, Meine Klassen)
+    if (fach) passend.add(fach.label)
   }
-  return data.map((d) => d.value).filter((v) => passend.has(v))
+  return data.filter((d) => passend.has(d.value) || (d.label !== undefined && passend.has(d.label))).map((d) => d.value)
+}
+
+/** Platzhalter-Eintrag am Ende der verkürzten Fachliste (nicht wählbar) */
+export const WEITERE_FAECHER_HINWEIS = '__weitere-faecher'
+
+type Option = { value: string; label: string; disabled?: boolean }
+type OptionOderGruppe = Option | { group: unknown; items: Option[] }
+
+/**
+ * Fachauswahl im Standardmodus (07.10.2026, Wunsch der Lehrkraft): Ohne Suchtext stehen nur die eigenen
+ * Fächer (und das gerade gewählte) in der Liste, darunter der Hinweis, dass weitere Fächer per
+ * Eintippen erreichbar sind. Mit Suchtext übernimmt `mitSuche` – dann sind alle Fächer wählbar.
+ */
+export function nurEigeneFaecher<T extends OptionOderGruppe>(
+  optionen: T[],
+  suche: string,
+  eigene: Set<string>,
+  gewaehlt: string | null | undefined,
+  mitSuche: (optionen: T[], suche: string) => T[]
+): OptionOderGruppe[] {
+  if (suche.trim()) return mitSuche(optionen, suche)
+  const flach = optionen.flatMap((o) => ('group' in o ? o.items : [o as Option]))
+  const oben = flach.filter((o) => eigene.has(o.value) || o.value === gewaehlt)
+  if (!oben.length) return optionen
+  const gibtWeitere = flach.some((o) => !eigene.has(o.value) && o.value !== gewaehlt)
+  return gibtWeitere ? [...oben, { value: WEITERE_FAECHER_HINWEIS, label: 'Weitere Fächer: Namen eintippen …', disabled: true }] : oben
 }

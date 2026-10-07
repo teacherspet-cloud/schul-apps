@@ -12,12 +12,12 @@ import { chosenGrammarTopics } from '../../arbeitsblatt/didactics/grammar'
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import type { GrammarTest } from '../model/types'
-import { istVerbTest, testPoints } from '../model/types'
+import { istVerbTest, testFassungen, testPoints } from '../model/types'
 import { TITEL } from '../../../shared/verben/formate'
 import { gradeScaleLine } from '../../../shared/gradeScale'
 import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 
-/** Kopfkasten: Zeit, Punkte und – auf Wunsch – der Notenschlüssel. `gruppe` = „A"/„B" bei zwei Fassungen. */
+/** Kopfkasten: Zeit, Punkte und – auf Wunsch – der Notenschlüssel. `gruppe` = „A" … „D" bei mehreren Fassungen. */
 export function testHeadBlock(test: GrammarTest, gruppe = ''): WsBlock | null {
   const m = test.meta
   if (!m.infoBox) return null
@@ -114,8 +114,8 @@ export function testToWorksheet(test: GrammarTest): Worksheet {
   return platziereKopfUndSchluss(testToWorksheetOhneIllustration(test))
 }
 
-/** Die Fassungen des Tests: eine, oder Gruppe A und B (30.09.2026, unregelmäßige Verben) */
-export const fassungenVon = (test: GrammarTest): WsBlock[][] => (test.blocksB?.length ? [test.blocks, test.blocksB] : [test.blocks])
+/** Die Fassungen des Tests: eine, oder Gruppe A–D (06.10.2026; liest auch die alte Gruppe B) */
+export const fassungenVon = (test: GrammarTest): WsBlock[][] => testFassungen(test)
 
 /** Kennung des Blattes einer Fassung – A heißt wie bisher „test" */
 export const blattIdVon = (index: number): string => (index === 0 ? 'test' : `test-${String.fromCharCode(97 + index)}`)

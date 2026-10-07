@@ -64,7 +64,7 @@ export default function BlattoptionenFelder({
    */
   anmerkungen?: { wert: 'fussnoten' | 'endnoten'; onChange: (art: 'fussnoten' | 'endnoten') => void }
   fach: string | undefined
-  vorlagenfarbe: Schalter
+  vorlagenfarbe?: Schalter
   ueberthema?: { werte: UeberthemaFelder; bereich: string; onChange: (patch: Pick<UeberthemaFelder, 'ueberthema' | 'ueberthemaAus'>) => void }
   vorKiTest?: React.ReactNode
   kiTest?: KiTestOption
@@ -135,7 +135,7 @@ export default function BlattoptionenFelder({
           data-testid="blattoption-anmerkungen"
         />
       )}
-      <VorlagenfarbeSchalter fach={fach} checked={vorlagenfarbe.checked} onChange={vorlagenfarbe.onChange} />
+      {vorlagenfarbe && <VorlagenfarbeSchalter fach={fach} checked={vorlagenfarbe.checked} onChange={vorlagenfarbe.onChange} />}
       {ueberthema && <UeberthemaFeld werte={ueberthema.werte} bereich={ueberthema.bereich} onChange={ueberthema.onChange} />}
       {vorKiTest}
       {kiTest && (

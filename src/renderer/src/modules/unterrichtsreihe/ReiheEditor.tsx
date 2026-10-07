@@ -2,6 +2,7 @@
  * Eine Unterrichtsreihe bauen: Titel, Fach, Oberthema (Kerncurriculum des Landes), übergeordnete
  * Lernziele, Schritte (hinzufügen, ordnen, bearbeiten) und zuweisen.
  */
+import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useAlleLernenden } from '../lernen/LernendeWahl'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import {
@@ -66,7 +67,10 @@ import { Zugang } from '../onlinetest/OnlinetestModule'
 import { DruckMenue, PlanenFenster, PlatzhalterKnopf, StundenLeiste } from './ReiheKi'
 import { horcheReihe } from './platzhalterAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
-import { IconSparkles } from '@tabler/icons-react'
+import { IconBook, IconSparkles } from '@tabler/icons-react'
+import { ReiheAusSchulbuch, type BuchReihe } from './SchulbuchReiheFenster'
+import { TestHierKnopf } from './TestHierKnopf'
+import { fuegeEin } from './reiheTest'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -74,7 +78,8 @@ const ROLLE: Record<Schritt['rolle'], { label: string; farbe: string }> = {
   pflicht: { label: 'Pflicht', farbe: 'blue' },
   wahl: { label: 'Wahl', farbe: 'grape' },
   foerder: { label: 'Förderung', farbe: 'orange' },
-  forder: { label: '★ Forder', farbe: 'yellow' }
+  forder: { label: '★ Forder', farbe: 'yellow' },
+  optional: { label: 'Optional', farbe: 'teal' }
 }
 
 /** Alle Zeilen unter einem Knoten (Unterthemen, auch tiefer) */
@@ -89,6 +94,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
   const [laeuft, setLaeuft] = useState(false)
   const [kc, setKc] = useState<KatalogKnoten[]>([])
   const [planen, setPlanen] = useState(false)
+  const [ausBuch, setAusBuch] = useState(false)
   const setze = (teil: Partial<Reihe>): void => {
     setR((x) => ({ ...x, ...teil }))
     setGeaendert(true)
@@ -111,11 +117,11 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
     ? { zeilen: [gewaehlt.wortlaut ?? gewaehlt.name, ...zeilenVon(gewaehlt)].slice(0, 60), quelle: `Kerncurriculum ${r.stateId} ${r.fachLabel}` }
     : null
 
-  const speichern = async (): Promise<Reihe | null> => {
+  const speichern = async (stand: Reihe = r): Promise<Reihe | null> => {
     setLaeuft(true)
     try {
-      const a = await senden<{ id: string; geaendert: string }>('/server/reihen/speichern', { reihe: r })
-      const neu = { ...r, id: a.id, geaendert: a.geaendert }
+      const a = await senden<{ id: string; geaendert: string }>('/server/reihen/speichern', { reihe: stand })
+      const neu = { ...stand, id: a.id, geaendert: a.geaendert }
       setR(neu)
       setGeaendert(false)
       notifySuccess('Gespeichert.')
@@ -145,6 +151,27 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
     const neueTeile = [...alteTeile, ...plan.teile.filter((t) => !alteTeile.includes(t))]
     setzeSchritte([...(ersetzen ? [] : r.schritte), ...plan.schritte], neueTeile)
     notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
+  }
+  /** Reihe aus Schulbuchseiten (06.10.2026): Stundenraster, ggf. Lernziele und Schritte übernehmen */
+  const buchUebernehmen = (b: BuchReihe, ersetzen: boolean): void => {
+    const alteTeile = ersetzen ? [] : teileVon(r)
+    const neueTeile = [...alteTeile, ...b.teile.filter((t) => !alteTeile.includes(t))]
+    // Beim Anhängen kommen die neuen Stunden hinter die vorhandenen
+    const versatz = ersetzen ? 0 : r.stunden?.length ?? 0
+    const neu = b.schritte.map((x) => ({ ...x, stunde: (x.stunde ?? 0) + versatz }))
+    setze({
+      stunden: ersetzen ? b.stunden : [...(r.stunden ?? []), ...b.stunden],
+      lernziele: r.lernziele.length ? r.lernziele : b.lernziele,
+      schritte: ordneNachTeilen([...(ersetzen ? [] : r.schritte), ...neu], neueTeile),
+      teile: neueTeile
+    })
+    notifySuccess(`${neu.length} Schritte aus dem Schulbuch übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
+  }
+  /** „Test hier erstellen" (06.10.2026): Platzhalter an der Stelle einfügen und gleich speichern */
+  const testEinfuegen = async (s: Schritt, nach: string | null): Promise<Reihe | null> => {
+    const neu = { ...r, schritte: ordneNachTeilen(fuegeEin(r.schritte, nach, s), teileVon(r)) }
+    setR(neu)
+    return speichern(neu)
   }
   // Teile (03.10.2026): angelegte Teile + an Schritten genannte; Schritte stehen immer in der Reihenfolge der Teile
   const teile = teileVon(r)
@@ -221,316 +248,365 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
   const [gezogen, setGezogen] = useState<string | null>(null)
   const [ueber, setUeber] = useState<string | null>(null)
   const nummer = new Map(r.schritte.map((x, k) => [x.id, k + 1]))
+  const anzahlOptional = r.schritte.filter((x) => x.rolle === 'optional' && x.inhalt.art !== 'hefter').length
 
   return (
-    <Stack data-reihe-editor>
-      <Group justify="space-between">
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck}>
-          Alle Reihen
-        </Button>
-        <Group gap="xs">
-          <Button
-            variant="light"
-            leftSection={<IconDeviceFloppy size={16} />}
-            loading={laeuft}
-            disabled={!r.titel.trim()}
-            onClick={() => void speichern()}
-            data-reihe-speichern
-          >
-            Speichern{geaendert ? ' *' : ''}
+    <OptionenBereich>
+      <Stack data-reihe-editor>
+        <Group justify="space-between">
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck}>
+            Alle Reihen
           </Button>
-          {r.schritte.length > 0 && <DruckMenue reihe={r} />}
-          <Button variant="default" leftSection={<IconEye size={16} />} disabled={!r.schritte.length} onClick={() => setVorschau(true)} data-schuelervorschau>
-            Als Schüler ansehen
-          </Button>
-          <Button
-            leftSection={<IconSend size={16} />}
-            disabled={!r.titel.trim() || !r.schritte.length}
-            onClick={async () => {
-              const neu = geaendert || !r.id ? await speichern() : r
-              if (neu) setZuweisen(true)
-            }}
-            data-reihe-zuweisen
-          >
-            Zuweisen
-          </Button>
-        </Group>
-      </Group>
-      <Card withBorder>
-        <Stack gap="sm">
-          <Group grow align="start">
-            <TextInput label="Titel der Reihe" value={r.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-reihe-titel />
-            <HaeufigSelect
-              art="fach"
-              label="Fach"
-              searchable
-              data={FAECHER.map((f) => ({ value: f.id, label: f.label }))}
-              value={r.fachId}
-              onChange={(v) => v && setze({ fachId: v, fachLabel: FAECHER.find((f) => f.id === v)?.label ?? v })}
-              allowDeselect={false}
-            />
-            <NumberInput label="Jahrgang" min={1} max={13} value={r.grade} onChange={(v) => setze({ grade: Number(v) || r.grade })} w={110} />
+          <Group gap="xs">
+            <Button
+              variant="light"
+              leftSection={<IconDeviceFloppy size={16} />}
+              loading={laeuft}
+              disabled={!r.titel.trim()}
+              onClick={() => void speichern()}
+              data-reihe-speichern
+            >
+              Speichern{geaendert ? ' *' : ''}
+            </Button>
+            {r.schritte.length > 0 && <DruckMenue reihe={r} />}
+            <Button variant="default" leftSection={<IconEye size={16} />} disabled={!r.schritte.length} onClick={() => setVorschau(true)} data-schuelervorschau>
+              Als Schüler ansehen
+            </Button>
+            <Button
+              leftSection={<IconSend size={16} />}
+              disabled={!r.titel.trim() || !r.schritte.length}
+              onClick={async () => {
+                const neu = geaendert || !r.id ? await speichern() : r
+                if (neu) setZuweisen(true)
+              }}
+              data-reihe-zuweisen
+            >
+              Zuweisen
+            </Button>
           </Group>
-          <Select
-            label="Oberthema"
-            description={
-              kc.length
-                ? `Themenfelder des Kerncurriculums (${r.stateId}, Jahrgang ${r.grade}) – oder eigenes eintippen`
-                : 'Kein Kerncurriculum für diese Auswahl gefunden – eigenes Oberthema eintippen'
-            }
-            searchable
-            data={[...new Set([...kc.map((k) => k.name), ...(r.oberthema ? [r.oberthema] : [])])]}
-            value={r.oberthema || null}
-            onChange={(v) => setze({ oberthema: v ?? '' })}
-            onSearchChange={(t) => {
-              if (t && !kc.some((k) => k.name === t)) setR((x) => ({ ...x, oberthema: t }))
-            }}
-            clearable
-            data-reihe-oberthema
-          />
-          <LernzieleFeld
-            titel="Lernziele der Reihe (sehen die Lernenden oben in der Reihe)"
-            ziele={r.lernziele}
-            setze={(l) => setze({ lernziele: l })}
-            kc={auszug}
-            vorschlagen={() => reihenLernziele(r, { auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }, ki)}
-            ichKann={(z) => ichKannFormulieren(r, z, ki)}
-          />
-          <StundenLeiste stunden={r.stunden ?? []} setze={(stunden) => setze({ stunden })} />
-        </Stack>
-      </Card>
-
-      <Group justify="space-between">
-        <Text fw={700}>Schritte</Text>
-        <Group gap="xs">
-          <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setPlanen(true)} data-reihe-planen>
-            Mit KI planen
-          </Button>
-          <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
-            Teil hinzufügen
-          </Button>
-          <SchrittMenue neu={(art) => neuerSchritt(art)} />
         </Group>
-      </Group>
-      {r.schritte.length === 0 && teile.length === 0 && (
-        <Text c="dimmed" size="sm">
-          Noch keine Schritte. Zum Beispiel: Teil 1 „Grundlagen“ mit Eingangsdiagnose → Arbeitsblatt → Lernkarten, Teil 2 „Anwenden“ mit Zwischenaufgabe → Test
-          → Selbsteinschätzung. Schritte lassen sich mit der Maus in einen anderen Teil ziehen.
-        </Text>
-      )}
-      {[undefined, ...teile].map((teil) => {
-        const schritte = r.schritte.filter((x) => (teil ? x.abschnitt === teil : !x.abschnitt || !teile.includes(x.abschnitt)))
-        if (!teil && !schritte.length) return null
-        const zielKennung = `teil:${teil ?? ''}`
-        return (
-          <Paper
-            key={teil ?? '__ohne'}
-            withBorder={Boolean(teil)}
-            p={teil ? 'sm' : 0}
-            radius="md"
-            bg={teil ? 'var(--mantine-color-default-hover)' : undefined}
-            data-teil={teil ?? ''}
-            onDragOver={(e) => {
-              if (!gezogen) return
-              e.preventDefault()
-              setUeber(zielKennung)
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              if (gezogen && ueber === zielKennung) verschiebeNach(gezogen, teil, null)
-              setGezogen(null)
-              setUeber(null)
-            }}
-            style={{ outline: ueber === zielKennung ? '2px dashed var(--mantine-color-blue-5)' : undefined }}
-          >
-            {teil && (
-              <TeilKopf
-                name={teil}
-                abzeichen
-                erster={teile[0] === teil}
-                letzter={teile[teile.length - 1] === teil}
-                umbenennen={(n) => teilUmbenennen(teil, n)}
-                hoch={() => teilVerschieben(teil, -1)}
-                runter={() => teilVerschieben(teil, 1)}
-                loeschen={() => teilLoeschen(teil)}
-                neu={(art) => neuerSchritt(art, teil)}
+        <Card withBorder>
+          <Stack gap="sm">
+            <Group grow align="start">
+              <TextInput label="Titel der Reihe" value={r.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-reihe-titel />
+              <HaeufigSelect
+                art="fach"
+                label="Fach"
+                searchable
+                data={FAECHER.map((f) => ({ value: f.id, label: f.label }))}
+                value={r.fachId}
+                onChange={(v) => v && setze({ fachId: v, fachLabel: FAECHER.find((f) => f.id === v)?.label ?? v })}
+                allowDeselect={false}
               />
-            )}
-            <Stack gap={6} mt={teil ? 'xs' : 0}>
-              {teil && schritte.length === 0 && (
-                <Text size="xs" c="dimmed" ta="center" py="xs">
-                  Noch leer – Schritt hinzufügen oder hierher ziehen.
-                </Text>
+              <NumberInput label="Jahrgang" min={1} max={13} value={r.grade} onChange={(v) => setze({ grade: Number(v) || r.grade })} w={110} />
+            </Group>
+            <Select
+              label="Oberthema"
+              description={
+                kc.length
+                  ? `Themenfelder des Kerncurriculums (${r.stateId}, Jahrgang ${r.grade}) – oder eigenes eintippen`
+                  : 'Kein Kerncurriculum für diese Auswahl gefunden – eigenes Oberthema eintippen'
+              }
+              searchable
+              data={[...new Set([...kc.map((k) => k.name), ...(r.oberthema ? [r.oberthema] : [])])]}
+              value={r.oberthema || null}
+              onChange={(v) => setze({ oberthema: v ?? '' })}
+              onSearchChange={(t) => {
+                if (t && !kc.some((k) => k.name === t)) setR((x) => ({ ...x, oberthema: t }))
+              }}
+              clearable
+              data-reihe-oberthema
+            />
+            <LernzieleFeld
+              titel="Lernziele der Reihe (sehen die Lernenden oben in der Reihe)"
+              ziele={r.lernziele}
+              setze={(l) => setze({ lernziele: l })}
+              kc={auszug}
+              vorschlagen={() => reihenLernziele(r, { auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }, ki)}
+              ichKann={(z) => ichKannFormulieren(r, z, ki)}
+            />
+            <StundenLeiste stunden={r.stunden ?? []} setze={(stunden) => setze({ stunden })} />
+          </Stack>
+        </Card>
+
+        <Group justify="space-between">
+          <Text fw={700}>Schritte</Text>
+          <Group gap="xs">
+            <Button variant="light" color="grape" leftSection={<IconBook size={16} />} onClick={() => setAusBuch(true)} data-reihe-aus-buch-knopf>
+              Aus Schulbuch
+            </Button>
+            <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setPlanen(true)} data-reihe-planen>
+              Mit KI planen
+            </Button>
+            <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
+              Teil hinzufügen
+            </Button>
+            <SchrittMenue neu={(art) => neuerSchritt(art)} />
+          </Group>
+        </Group>
+        {r.schritte.length === 0 && teile.length === 0 && (
+          <Text c="dimmed" size="sm">
+            Noch keine Schritte. Am schnellsten: „Aus Schulbuch“ – Seiten der Einheit hochladen, die KI plant daraus. Oder von Hand, zum Beispiel: Teil 1
+            „Grundlagen“ mit Eingangsdiagnose → Arbeitsblatt → Lernkarten, Teil 2 „Anwenden“ mit Zwischenaufgabe → Test → Selbsteinschätzung. Schritte lassen
+            sich mit der Maus in einen anderen Teil ziehen.
+          </Text>
+        )}
+        {[undefined, ...teile].map((teil) => {
+          const schritte = r.schritte.filter((x) => (teil ? x.abschnitt === teil : !x.abschnitt || !teile.includes(x.abschnitt)))
+          if (!teil && !schritte.length) return null
+          const zielKennung = `teil:${teil ?? ''}`
+          return (
+            <Paper
+              key={teil ?? '__ohne'}
+              withBorder={Boolean(teil)}
+              p={teil ? 'sm' : 0}
+              radius="md"
+              bg={teil ? 'var(--mantine-color-default-hover)' : undefined}
+              data-teil={teil ?? ''}
+              onDragOver={(e) => {
+                if (!gezogen) return
+                e.preventDefault()
+                setUeber(zielKennung)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (gezogen && ueber === zielKennung) verschiebeNach(gezogen, teil, null)
+                setGezogen(null)
+                setUeber(null)
+              }}
+              style={{ outline: ueber === zielKennung ? '2px dashed var(--mantine-color-blue-5)' : undefined }}
+            >
+              {teil && (
+                <TeilKopf
+                  name={teil}
+                  abzeichen
+                  erster={teile[0] === teil}
+                  letzter={teile[teile.length - 1] === teil}
+                  umbenennen={(n) => teilUmbenennen(teil, n)}
+                  hoch={() => teilVerschieben(teil, -1)}
+                  runter={() => teilVerschieben(teil, 1)}
+                  loeschen={() => teilLoeschen(teil)}
+                  neu={(art) => neuerSchritt(art, teil)}
+                />
               )}
-              {schritte.map((s) => {
-                const art = SCHRITT_ARTEN.find((a) => a.id === s.inhalt.art)
-                const imTeil = schritte.indexOf(s)
-                return (
-                  <Stack key={s.id} gap={4}>
-                    {s.halt && (
-                      <Text size="xs" c="orange.7">
-                        ⏸ Haltepunkt: {s.halt.art === 'freigabe' ? 'nach gemeinsamer Besprechung' : `ab ${new Date(s.halt.ab).toLocaleDateString('de-DE')}`}
-                      </Text>
-                    )}
-                    <Paper
-                      withBorder
-                      p="sm"
-                      radius="md"
-                      data-schritt={s.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.effectAllowed = 'move'
-                        e.dataTransfer.setData('text/plain', s.id)
-                        setGezogen(s.id)
-                      }}
-                      onDragEnd={() => {
-                        setGezogen(null)
-                        setUeber(null)
-                      }}
-                      onDragOver={(e) => {
-                        if (!gezogen || gezogen === s.id) return
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setUeber(s.id)
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        if (gezogen) verschiebeNach(gezogen, s.abschnitt && teile.includes(s.abschnitt) ? s.abschnitt : undefined, s.id)
-                        setGezogen(null)
-                        setUeber(null)
-                      }}
-                      style={{
-                        cursor: 'grab',
-                        opacity: gezogen === s.id ? 0.4 : 1,
-                        borderTop: ueber === s.id ? '3px solid var(--mantine-color-blue-5)' : undefined
-                      }}
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                          <IconGripVertical size={16} color="var(--mantine-color-dimmed)" />
-                          <Badge variant="filled" color="gray" circle>
-                            {nummer.get(s.id)}
-                          </Badge>
-                          <div style={{ minWidth: 0 }}>
-                            <Group gap={6}>
-                              <Text fw={600} truncate>
-                                {s.titel || '(ohne Titel)'}
-                              </Text>
-                              <Badge size="xs" variant="light">
-                                {art?.label}
-                              </Badge>
-                              <Badge size="xs" variant="light" color={ROLLE[s.rolle].farbe}>
-                                {ROLLE[s.rolle].label}
-                                {s.rolle === 'wahl' && s.wahlGruppe ? ` ${s.wahlGruppe} (${s.wahlMindestens ?? 1})` : ''}
-                              </Badge>
-                              {s.stunde !== undefined && (r.stunden?.length ?? 0) > 0 && (
-                                <Badge size="xs" variant="outline" color="gray">
-                                  Std. {s.stunde + 1}
-                                  {s.minuten ? ` · ${s.minuten} min` : ''}
+              <Stack gap={6} mt={teil ? 'xs' : 0}>
+                {teil && schritte.length === 0 && (
+                  <Text size="xs" c="dimmed" ta="center" py="xs">
+                    Noch leer – Schritt hinzufügen oder hierher ziehen.
+                  </Text>
+                )}
+                {schritte.map((s) => {
+                  const art = SCHRITT_ARTEN.find((a) => a.id === s.inhalt.art)
+                  const imTeil = schritte.indexOf(s)
+                  return (
+                    <Stack key={s.id} gap={4}>
+                      {s.halt && (
+                        <Text size="xs" c="orange.7">
+                          ⏸ Haltepunkt: {s.halt.art === 'freigabe' ? 'nach gemeinsamer Besprechung' : `ab ${new Date(s.halt.ab).toLocaleDateString('de-DE')}`}
+                        </Text>
+                      )}
+                      <Paper
+                        withBorder
+                        p="sm"
+                        radius="md"
+                        data-schritt={s.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move'
+                          e.dataTransfer.setData('text/plain', s.id)
+                          setGezogen(s.id)
+                        }}
+                        onDragEnd={() => {
+                          setGezogen(null)
+                          setUeber(null)
+                        }}
+                        onDragOver={(e) => {
+                          if (!gezogen || gezogen === s.id) return
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setUeber(s.id)
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (gezogen) verschiebeNach(gezogen, s.abschnitt && teile.includes(s.abschnitt) ? s.abschnitt : undefined, s.id)
+                          setGezogen(null)
+                          setUeber(null)
+                        }}
+                        style={{
+                          cursor: 'grab',
+                          opacity: gezogen === s.id ? 0.4 : 1,
+                          borderTop: ueber === s.id ? '3px solid var(--mantine-color-blue-5)' : undefined
+                        }}
+                      >
+                        <Group justify="space-between" wrap="nowrap">
+                          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                            <IconGripVertical size={16} color="var(--mantine-color-dimmed)" />
+                            <Badge variant="filled" color="gray" circle>
+                              {nummer.get(s.id)}
+                            </Badge>
+                            <div style={{ minWidth: 0 }}>
+                              <Group gap={6}>
+                                <Text fw={600} truncate>
+                                  {s.titel || '(ohne Titel)'}
+                                </Text>
+                                <Badge size="xs" variant="light">
+                                  {art?.label}
                                 </Badge>
-                              )}
-                              {s.platzhalter && (
-                                <Badge size="xs" variant="light" color="orange" data-platzhalter>
-                                  Platzhalter
-                                </Badge>
-                              )}
-                              <PlatzhalterKnopf
-                                reihe={r}
-                                s={s}
-                                setze={(p) => schrittAendern(s.id, p)}
-                                speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
-                              />
-                            </Group>
-                            <Text size="xs" c="dimmed" truncate>
-                              {s.platzhalter
-                                ? s.platzhalter.beschreibung
-                                : s.lernziele.length
+                                {s.rolle === 'pflicht' || s.rolle === 'optional' ? (
+                                  <Tooltip label={s.rolle === 'pflicht' ? 'Klick: optional machen' : 'Klick: Pflicht machen'}>
+                                    <Badge
+                                      size="xs"
+                                      variant="light"
+                                      color={ROLLE[s.rolle].farbe}
+                                      style={{ cursor: 'pointer' }}
+                                      onClick={() => schrittAendern(s.id, { rolle: s.rolle === 'pflicht' ? 'optional' : 'pflicht' })}
+                                      data-rolle-umschalten={s.rolle}
+                                    >
+                                      {ROLLE[s.rolle].label}
+                                    </Badge>
+                                  </Tooltip>
+                                ) : (
+                                  <Badge size="xs" variant="light" color={ROLLE[s.rolle].farbe}>
+                                    {ROLLE[s.rolle].label}
+                                    {s.rolle === 'wahl' && s.wahlGruppe ? ` ${s.wahlGruppe} (${s.wahlMindestens ?? 1})` : ''}
+                                  </Badge>
+                                )}
+                                {s.stunde !== undefined && (r.stunden?.length ?? 0) > 0 && (
+                                  <Badge size="xs" variant="outline" color="gray">
+                                    Std. {s.stunde + 1}
+                                    {s.minuten ? ` · ${s.minuten} min` : ''}
+                                  </Badge>
+                                )}
+                                {s.platzhalter && (
+                                  <Badge size="xs" variant="light" color="orange" data-platzhalter>
+                                    Platzhalter
+                                  </Badge>
+                                )}
+                                <PlatzhalterKnopf
+                                  reihe={r}
+                                  s={s}
+                                  setze={(p) => schrittAendern(s.id, p)}
+                                  speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
+                                />
+                              </Group>
+                              <Text size="xs" c="dimmed" truncate>
+                                {s.platzhalter
+                                  ? s.platzhalter.beschreibung
+                                  : s.lernziele.length
                                   ? s.lernziele.map((l) => l.ichKann || l.text).join(' · ')
                                   : 'ohne Lernziele'}
-                            </Text>
-                          </div>
+                              </Text>
+                            </div>
+                          </Group>
+                          <Group gap={2} wrap="nowrap">
+                            <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, -1)} disabled={imTeil === 0} aria-label="nach oben">
+                              <IconArrowUp size={16} />
+                            </ActionIcon>
+                            <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, 1)} disabled={imTeil === schritte.length - 1} aria-label="nach unten">
+                              <IconArrowDown size={16} />
+                            </ActionIcon>
+                            {!s.platzhalter && <DruckMenue schritt={s} />}
+                            <Tooltip label="Bearbeiten">
+                              <ActionIcon variant="subtle" onClick={() => setBearbeiten(s)} aria-label="bearbeiten" data-schritt-bearbeiten>
+                                <IconPencil size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Verdoppeln">
+                              <ActionIcon
+                                variant="subtle"
+                                onClick={() => {
+                                  const i = r.schritte.findIndex((x) => x.id === s.id)
+                                  setzeSchritte([
+                                    ...r.schritte.slice(0, i + 1),
+                                    { ...structuredClone(s), id: neueSchrittId(), titel: `${s.titel} (Kopie)` },
+                                    ...r.schritte.slice(i + 1)
+                                  ])
+                                }}
+                                aria-label="verdoppeln"
+                              >
+                                <IconCopy size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Entfernen">
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={() => setzeSchritte(r.schritte.filter((x) => x.id !== s.id))}
+                                aria-label="entfernen"
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
                         </Group>
-                        <Group gap={2} wrap="nowrap">
-                          <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, -1)} disabled={imTeil === 0} aria-label="nach oben">
-                            <IconArrowUp size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, 1)} disabled={imTeil === schritte.length - 1} aria-label="nach unten">
-                            <IconArrowDown size={16} />
-                          </ActionIcon>
-                          {!s.platzhalter && <DruckMenue schritt={s} />}
-                          <Tooltip label="Bearbeiten">
-                            <ActionIcon variant="subtle" onClick={() => setBearbeiten(s)} aria-label="bearbeiten" data-schritt-bearbeiten>
-                              <IconPencil size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                          <Tooltip label="Verdoppeln">
-                            <ActionIcon
-                              variant="subtle"
-                              onClick={() => {
-                                const i = r.schritte.findIndex((x) => x.id === s.id)
-                                setzeSchritte([
-                                  ...r.schritte.slice(0, i + 1),
-                                  { ...structuredClone(s), id: neueSchrittId(), titel: `${s.titel} (Kopie)` },
-                                  ...r.schritte.slice(i + 1)
-                                ])
-                              }}
-                              aria-label="verdoppeln"
-                            >
-                              <IconCopy size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                          <Tooltip label="Entfernen">
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              onClick={() => setzeSchritte(r.schritte.filter((x) => x.id !== s.id))}
-                              aria-label="entfernen"
-                            >
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        </Group>
-                      </Group>
-                    </Paper>
-                  </Stack>
-                )
-              })}
-            </Stack>
-          </Paper>
-        )
-      })}
-      {teile.length > 0 && (
-        <Text size="xs" c="dimmed">
-          Abzeichen gibt es für jeden geschafften Teil: {teile.join(', ')}.
-        </Text>
-      )}
-      {bearbeiten && (
-        <SchrittBearbeiten
-          reihe={r}
-          schritt={bearbeiten}
-          schliessen={() => setBearbeiten(null)}
-          teile={teile}
-          speichern={(s) => {
-            const da = r.schritte.some((x) => x.id === s.id)
-            setzeSchritte(
-              da ? r.schritte.map((x) => (x.id === s.id ? s : x)) : [...r.schritte, { ...s, ...(neuIn && !s.abschnitt ? { abschnitt: neuIn } : {}) }]
-            )
-            setBearbeiten(null)
-          }}
-        />
-      )}
-      {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
-      {planen && (
-        <PlanenFenster
-          reihe={r}
-          kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
-          schliessen={() => setPlanen(false)}
-          uebernehmen={planUebernehmen}
-        />
-      )}
-      {vorschau && <Vorschau reihe={r} schliessen={() => setVorschau(false)} />}
-    </Stack>
+                      </Paper>
+                      {!s.test && <TestHierKnopf reihe={r} nach={s.id} einfuegen={testEinfuegen} />}
+                    </Stack>
+                  )
+                })}
+              </Stack>
+            </Paper>
+          )
+        })}
+        {teile.length > 0 && (
+          <Text size="xs" c="dimmed">
+            Abzeichen gibt es für jeden geschafften Teil: {teile.join(', ')}.
+          </Text>
+        )}
+        <NurExperte geaendert={Boolean(r.optionalMindestens) && 'Mindestzahl optionaler Schritte'}>
+          {anzahlOptional > 0 && (
+            <Group gap="xs" data-optional-mindestens>
+              <Text size="sm">Die Reihe ist abgeschlossen, wenn alle Pflichtschritte und mindestens</Text>
+              <NumberInput
+                size="xs"
+                w={70}
+                min={0}
+                max={anzahlOptional}
+                value={Math.min(anzahlOptional, r.optionalMindestens ?? 0)}
+                onChange={(v) => setze({ optionalMindestens: Math.max(0, Math.min(anzahlOptional, Number(v) || 0)) })}
+                aria-label="Mindestens optionale Schritte"
+              />
+              <Text size="sm">von {anzahlOptional} optionalen Schritten geschafft sind.</Text>
+            </Group>
+          )}
+        </NurExperte>
+        {bearbeiten && (
+          <SchrittBearbeiten
+            reihe={r}
+            schritt={bearbeiten}
+            schliessen={() => setBearbeiten(null)}
+            teile={teile}
+            speichern={(s) => {
+              const da = r.schritte.some((x) => x.id === s.id)
+              setzeSchritte(
+                da ? r.schritte.map((x) => (x.id === s.id ? s : x)) : [...r.schritte, { ...s, ...(neuIn && !s.abschnitt ? { abschnitt: neuIn } : {}) }]
+              )
+              setBearbeiten(null)
+            }}
+          />
+        )}
+        {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
+        {planen && (
+          <PlanenFenster
+            reihe={r}
+            kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
+            schliessen={() => setPlanen(false)}
+            uebernehmen={planUebernehmen}
+          />
+        )}
+        {ausBuch && (
+          <ReiheAusSchulbuch
+            reihe={r}
+            kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
+            schliessen={() => setAusBuch(false)}
+            uebernehmen={buchUebernehmen}
+          />
+        )}
+        {vorschau && <Vorschau reihe={r} schliessen={() => setVorschau(false)} />}
+        <AlleOptionen />
+      </Stack>
+    </OptionenBereich>
   )
 }
 
@@ -608,18 +684,20 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
               placeholder="wählen …"
               data-zuweisen-gruppe
             />
-            {gruppe && (
-              <MultiSelect
-                label="Nur für einzelne aus der Lerngruppe"
-                description="Leer = die ganze Lerngruppe (auch wer später dazukommt)."
-                data={inGruppe.map((m) => ({ value: m.benutzer, label: m.name }))}
-                value={einzelne}
-                onChange={setEinzelne}
-                searchable
-                clearable
-                placeholder="alle"
-              />
-            )}
+            <NurExperte>
+              {gruppe && (
+                <MultiSelect
+                  label="Nur für einzelne aus der Lerngruppe"
+                  description="Leer = die ganze Lerngruppe (auch wer später dazukommt)."
+                  data={inGruppe.map((m) => ({ value: m.benutzer, label: m.name }))}
+                  value={einzelne}
+                  onChange={setEinzelne}
+                  searchable
+                  clearable
+                  placeholder="alle"
+                />
+              )}
+            </NurExperte>
           </>
         ) : art === 'gaeste' ? (
           <Text size="sm">
@@ -640,14 +718,16 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
             data-zuweisen-einzelne
           />
         )}
-        {art !== 'gaeste' && (
-          <Checkbox
-            label="Zusätzlich Gäste per QR-Code zulassen"
-            checked={mitGaesten}
-            onChange={(e) => setMitGaesten(e.currentTarget.checked)}
-            data-zuweisen-gaeste
-          />
-        )}
+        <NurExperte>
+          {art !== 'gaeste' && (
+            <Checkbox
+              label="Zusätzlich Gäste per QR-Code zulassen"
+              checked={mitGaesten}
+              onChange={(e) => setMitGaesten(e.currentTarget.checked)}
+              data-zuweisen-gaeste
+            />
+          )}
+        </NurExperte>
         <Group justify="flex-end">
           <Button
             loading={laeuft}
@@ -776,6 +856,13 @@ function Vorschau({ reihe, schliessen }: { reihe: Reihe; schliessen: () => void 
           So sieht der Weg für Lernende aus. Mit den Knöpfen simulierst du Ergebnisse – gespeichert wird nichts.
         </Text>
         <Progress value={weg.fortschritt * 100} size="lg" radius="xl" />
+        {weg.optional && (
+          <Text size="xs" c="dimmed" data-vorschau-optional>
+            {weg.optional.geschafft} von {weg.optional.gesamt} optionalen geschafft
+            {weg.optional.noetig ? ` · ${weg.optional.noetig} nötig für den Abschluss` : ''}
+            {weg.fertig ? ' · Reihe abgeschlossen' : ''}
+          </Text>
+        )}
         {reihe.lernziele.length > 0 && (
           <Text size="sm">
             <b>Am Ende der Reihe:</b> {reihe.lernziele.map((l) => l.ichKann || l.text).join(' · ')}
@@ -791,7 +878,15 @@ function Vorschau({ reihe, schliessen }: { reihe: Reihe; schliessen: () => void 
                   <Text fw={600} size="sm">
                     {l.status === 'geschafft' ? '✓ ' : l.status === 'gesperrt' ? '🔒 ' : l.status === 'uebersprungen' ? '» ' : `${i + 1}. `}
                     {s.titel}
-                    {s.rolle === 'foerder' ? ' (Übung)' : s.rolle === 'forder' ? ' ★' : s.rolle === 'wahl' ? ' (Wahl)' : ''}
+                    {s.rolle === 'foerder'
+                      ? ' (Übung)'
+                      : s.rolle === 'forder'
+                      ? ' ★'
+                      : s.rolle === 'wahl'
+                      ? ' (Wahl)'
+                      : s.rolle === 'optional'
+                      ? ' (optional)'
+                      : ''}
                   </Text>
                   <Text size="xs" c="dimmed">
                     {l.status}

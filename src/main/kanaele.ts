@@ -479,7 +479,10 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('images:openmoji-search', (q: string) => searchOpenMoji(q))
   handle('images:openmoji-svg', (hex: string) => getOpenMojiSvg(hex))
   // In den Oberflächentests mit Attrappe (nie im Betrieb) kommen die Treffer ohne Netz aus der Attrappe
-  handle('images:online-search', (q: string, source: OnlineImageSource) => attrappeBildsuche() ?? searchOnline(q, source, getSecret('pixabay')))
+  // Bildart (Pixabay image_type) für Cliparts der Medienbank, 06.10.2026
+  handle('images:online-search', (q: string, source: OnlineImageSource, o?: { bildart?: string }) =>
+    attrappeBildsuche() ?? searchOnline(q, source, getSecret('pixabay'), o?.bildart)
+  )
   handle('images:fetch', (url: string) => (attrappeAktiv() && url.startsWith('data:image/') ? url : fetchAsDataUrl(url)))
   handle('sources:check-quote', (url: string, quote: string) => checkQuote(url, quote))
   // Ton-/Filmquellen: erreichbar, und handelt die Seite von dem, was die KI behauptet?
@@ -502,7 +505,7 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('sources:video', (url: string) => ladeVideo(url))
   // Maskottchen für Illustrationen (26.09.2026)
   handle('maskottchen:list', () => listMaskottchen())
-  handle('maskottchen:save', (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) =>
+  handle('maskottchen:save', (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string; schule?: boolean }) =>
     saveMaskottchen(eingabe)
   )
   handle('maskottchen:pose', (id: string, pose: string, dataUrl: string) => savePose(id, pose, dataUrl))

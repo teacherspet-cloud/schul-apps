@@ -421,7 +421,8 @@ if (seen.dollar.length) problems.push(`Dollarzeichen auf dem Blatt: ${seen.dolla
 if (seen.formeln < 2) problems.push(`Nur ${seen.formeln} gesetzte Formeln auf dem Blatt`)
 
 // Die Bezeichnung des Landesformats gehört in die Kopfzeile – Bayern: Stegreifaufgabe
-if (!/Stegreifaufgabe/.test(seen.kopfzeile)) problems.push(`Die Kopfzeile nennt das Landesformat nicht: „${seen.kopfzeile.slice(0, 60)}"`)
+// Weiche Trennstriche (Silbentrennung auf dem Blatt) stören den Textvergleich nicht
+if (!/Stegreifaufgabe/.test(seen.kopfzeile.replace(/­/g, ''))) problems.push(`Die Kopfzeile nennt das Landesformat nicht: „${seen.kopfzeile.slice(0, 60)}"`)
 
 // Die vier Befunde, die das Programm finden MUSS
 const alle = seen.befunde.join(' ')

@@ -14,6 +14,7 @@ import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
 import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
+import RueckwegKnopf from '../../shared/components/RueckwegKnopf'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import { TestVorschau } from './render/TestVorschau'
@@ -83,6 +84,8 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
       <Box px="lg" pt="sm" pb={step === 2 ? 'xs' : 0} display={libraryOpen ? 'none' : undefined}>
         <AppKopf
           kompakt={step === 2}
+          // Rückweg, z. B. „Zurück zur Reihe" nach „Test hier erstellen" (06.10.2026)
+          zusaetze={<RueckwegKnopf modul="vokabeltest" />}
           // Zurück zur Übersicht – vorher ließ sich die Bibliothek nur in Schritt 1 öffnen
           meine={{ label: 'Meine Vokabeltests', onClick: () => setLibraryOpen(true), kennung: 'vokabeltest' }}
           // Von vorn beginnen; der bisherige Test wird vorher gesichert

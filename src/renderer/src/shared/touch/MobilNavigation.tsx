@@ -1,4 +1,5 @@
 import { ActionIcon, Button, Drawer, Indicator, Stack, Text } from '@mantine/core'
+import ModusSchalter from '../../shell/ModusSchalter'
 import { IconApps, IconHome, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
 import { useEffect } from 'react'
 import type { SchulModule } from '../../modules/registry'
@@ -73,6 +74,8 @@ export function ProgrammSchublade({
           {daten.programme.map((p) => eintrag(p.id, p.name, <Bild p={p} groesse={36} />))}
           {eintrag('settings', 'Einstellungen', <IconSettings size={30} />)}
         </div>
+        {/* Standard-/Expertenmodus (07.10.2026) – wie links in der Leiste am PC */}
+        <ModusSchalter breit />
         {onLeisteEinblenden && (
           <Button
             variant="light"

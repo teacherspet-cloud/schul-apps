@@ -1,4 +1,5 @@
 import LernendeKarte from './LernendeKarte'
+import { AlleOptionen, NurExperte } from '../../../shared/components/NurExperte'
 import {
   ActionIcon,
   Badge,
@@ -137,7 +138,8 @@ export default function Einrichten(): React.JSX.Element | null {
       })
       // Fremdsprachen: Teile und Antwortsprache je Teil gleich erkennen (29.09.2026) – die Klassenarbeit bringt sie schon mit
       const aktuell = useRueckmeldung.getState().dok
-      if (aktuell && fremdsprachlich(aktuell.meta.subjectId) && !aktuell.grundlage.teile?.length && aktuell.grundlage.aufgaben.trim()) teileErkennen(aktuell, docId)
+      if (aktuell && fremdsprachlich(aktuell.meta.subjectId) && !aktuell.grundlage.teile?.length && aktuell.grundlage.aufgaben.trim())
+        teileErkennen(aktuell, docId)
     } catch (e) {
       notifyError(e, 'Das Material konnte nicht geladen werden')
     }
@@ -193,12 +195,12 @@ export default function Einrichten(): React.JSX.Element | null {
   const grund = !r.grundlage.aufgaben.trim()
     ? 'Grundlage fehlt'
     : !r.abgaben.length
-      ? 'Noch keine Abgabe'
-      : hatForm(r.meta, 'tabelle') && !r.tabelle?.kriterien.length
-        ? 'Bewertungstabelle fehlt'
-        : !offen
-          ? 'Alle Abgaben haben einen Bogen'
-          : ''
+    ? 'Noch keine Abgabe'
+    : hatForm(r.meta, 'tabelle') && !r.tabelle?.kriterien.length
+    ? 'Bewertungstabelle fehlt'
+    : !offen
+    ? 'Alle Abgaben haben einen Bogen'
+    : ''
 
   return (
     <Stack h="100%" gap={0}>
@@ -292,38 +294,44 @@ export default function Einrichten(): React.JSX.Element | null {
                     data-rm-aufgaben
                   />
                   <AntwortSpracheZeile r={r} update={update} />
-                  {quelle === 'frei' && (
-                    <DropZone
-                      onFiles={(f) => void materialLesen(f, 'erwartung')}
-                      accept={MATERIAL_ACCEPT}
-                      title={leseErwartung ?? 'Lösung oder Erwartungshorizont hierher ziehen (optional)'}
-                      hint="Wird übertragen und ersetzt den Text darunter"
-                      loading={Boolean(leseErwartung)}
-                      minHeight={50}
+                  <NurExperte>
+                    {quelle === 'frei' && (
+                      <DropZone
+                        onFiles={(f) => void materialLesen(f, 'erwartung')}
+                        accept={MATERIAL_ACCEPT}
+                        title={leseErwartung ?? 'Lösung oder Erwartungshorizont hierher ziehen (optional)'}
+                        hint="Wird übertragen und ersetzt den Text darunter"
+                        loading={Boolean(leseErwartung)}
+                        minHeight={50}
+                      />
+                    )}
+                  </NurExperte>
+                  <NurExperte geaendert={Boolean(r.grundlage.erwartung?.trim()) && 'Erwartungshorizont'}>
+                    <Textarea
+                      label="Erwartungshorizont (optional)"
+                      autosize
+                      minRows={2}
+                      maxRows={8}
+                      value={r.grundlage.erwartung ?? ''}
+                      onChange={(e) => {
+                        const x = e.currentTarget.value
+                        update((d) => (d.grundlage.erwartung = x), 'rm-erwartung')
+                      }}
                     />
-                  )}
-                  <Textarea
-                    label="Erwartungshorizont (optional)"
-                    autosize
-                    minRows={2}
-                    maxRows={8}
-                    value={r.grundlage.erwartung ?? ''}
-                    onChange={(e) => {
-                      const x = e.currentTarget.value
-                      update((d) => (d.grundlage.erwartung = x), 'rm-erwartung')
-                    }}
-                  />
-                  <Textarea
-                    label="Schwerpunkt der Rückmeldung (optional)"
-                    placeholder="z. B. Aufbau der Argumentation, Zeitformen, Belege aus dem Text"
-                    autosize
-                    minRows={1}
-                    value={r.meta.schwerpunkt}
-                    onChange={(e) => {
-                      const x = e.currentTarget.value
-                      update((d) => (d.meta.schwerpunkt = x), 'rm-schwerpunkt')
-                    }}
-                  />
+                  </NurExperte>
+                  <NurExperte geaendert={Boolean(r.meta.schwerpunkt?.trim()) && 'Schwerpunkt'}>
+                    <Textarea
+                      label="Schwerpunkt der Rückmeldung (optional)"
+                      placeholder="z. B. Aufbau der Argumentation, Zeitformen, Belege aus dem Text"
+                      autosize
+                      minRows={1}
+                      value={r.meta.schwerpunkt}
+                      onChange={(e) => {
+                        const x = e.currentTarget.value
+                        update((d) => (d.meta.schwerpunkt = x), 'rm-schwerpunkt')
+                      }}
+                    />
+                  </NurExperte>
                 </Stack>
               </Card>
               <Card withBorder>
@@ -363,26 +371,30 @@ export default function Einrichten(): React.JSX.Element | null {
                     onChange={(v) => v && update((d) => ((d.meta.grade = Number(v)), delete d.meta.erkannt))}
                     allowDeselect={false}
                   />
-                  <Select
-                    label="Anrede"
-                    data={ANREDE_OPTIONEN}
-                    value={r.meta.anrede}
-                    onChange={(v) => v && update((d) => (d.meta.anrede = v as Anrede))}
-                    allowDeselect={false}
-                  />
+                  <NurExperte>
+                    <Select
+                      label="Anrede"
+                      data={ANREDE_OPTIONEN}
+                      value={r.meta.anrede}
+                      onChange={(v) => v && update((d) => (d.meta.anrede = v as Anrede))}
+                      allowDeselect={false}
+                    />
+                  </NurExperte>
                 </Group>
-                {/* Bilingualer Sachfachunterricht – nur bei Sachfächern, wie im Arbeitsblatt (30.09.2026) */}
-                <Stack mt="xs">
-                  <BilingualSchalter
-                    meta={r.meta}
-                    onChange={(bilingual) =>
-                      update((d) => {
-                        if (bilingual) d.meta.bilingual = bilingual
-                        else delete d.meta.bilingual
-                      })
-                    }
-                  />
-                </Stack>
+                <NurExperte geaendert={r.meta.bilingual?.an && 'Bilingual'}>
+                  {/* Bilingualer Sachfachunterricht – nur bei Sachfächern, wie im Arbeitsblatt (30.09.2026) */}
+                  <Stack mt="xs">
+                    <BilingualSchalter
+                      meta={r.meta}
+                      onChange={(bilingual) =>
+                        update((d) => {
+                          if (bilingual) d.meta.bilingual = bilingual
+                          else delete d.meta.bilingual
+                        })
+                      }
+                    />
+                  </Stack>
+                </NurExperte>
                 {r.meta.erkannt && (
                   <Text size="xs" c="teal" mt={6} data-rm-erkannt>
                     {r.meta.erkannt}
@@ -591,6 +603,7 @@ export default function Einrichten(): React.JSX.Element | null {
               </Stack>
             </Card>
           </SimpleGrid>
+          <AlleOptionen />
         </Container>
       </ScrollArea>
       <AusgleichFenster

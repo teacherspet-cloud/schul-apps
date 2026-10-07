@@ -81,6 +81,11 @@ export default function Einrichtung(): React.JSX.Element | null {
     }
   }, [settings.schoolName, geprueft])
 
+  // Neue Nutzer beginnen im Standardmodus (07.10.2026); wer schon gewählt hat, behält seine Wahl
+  useEffect(() => {
+    if (offen && !settings.oberflaeche) void update({ oberflaeche: 'standard' })
+  }, [offen])
+
   if (!offen) return null
 
   /** Schließen – auf dem Server zugleich „eingerichtet" merken (der Assistent kommt nicht wieder) */
@@ -143,8 +148,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       label: 'Hörtexte',
       beschreibung: 'Hörtexte vertonen',
       icon: <IconHeadphones size={18} />,
-      hinweis:
-        'Optional: Für Hörverstehen spricht eine Stimme das Skript ein. Ohne Stimme bleibt das Skript als Lesetext für die Lehrkraft erhalten.',
+      hinweis: 'Optional: Für Hörverstehen spricht eine Stimme das Skript ein. Ohne Stimme bleibt das Skript als Lesetext für die Lehrkraft erhalten.',
       inhalt: <HoertextCard settings={settings} update={update} />
     },
     // Nur iPad: wohin erstellte Dateien kommen (IServ steht als eigener Schritt vorn)
@@ -162,7 +166,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       : []),
     {
       label: 'Aussehen',
-      beschreibung: 'Farben der Oberfläche',
+      beschreibung: 'Bedienung und Farben',
       icon: <IconPalette size={18} />,
       /*
        * Bis 25.09.2026 stand hier „Logo und Design" und „Betrifft nur das Aussehen der
@@ -170,7 +174,7 @@ export default function Einrichtung(): React.JSX.Element | null {
        * und Tests bleiben unberührt, und das Logo gehört zu Schritt 1.
        */
       hinweis:
-        'Betrifft nur die Oberfläche des Programms – Blätter und Tests sehen unverändert aus. Das Schullogo steht in Schritt 1. Lässt sich jederzeit in den Einstellungen ändern.',
+        'Betrifft nur die Oberfläche des Programms – Blätter und Tests sehen unverändert aus. Zum Start gilt der Standardmodus mit dem Wichtigsten; der Expertenmodus zeigt alle Feineinstellungen. Das Schullogo steht in Schritt 1. Lässt sich jederzeit in den Einstellungen ändern.',
       inhalt: <AppearanceCard settings={settings} update={update} />
     }
   ]

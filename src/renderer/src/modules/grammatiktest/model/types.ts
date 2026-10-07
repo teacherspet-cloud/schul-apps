@@ -65,8 +65,17 @@ export interface GrammarTestMeta {
   modus?: 'formen' | 'verben'
   /** Einstellungen der Verb-Aufgabe (nur bei modus = 'verben') */
   verben?: import('../../../shared/verben/formate').VerbAufgabe
-  /** Zwei Fassungen (Gruppe A und B) – bisher nur bei den unregelmäßigen Verben */
-  fassungen?: 1 | 2
+  /**
+   * Fassungen A–D (06.10.2026, wie im Vokabeltest; bis dahin nur A/B bei den unregelmäßigen
+   * Verben). Fehlt = eine.
+   */
+  fassungen?: 1 | 2 | 3 | 4
+  /**
+   * Wie die weiteren Fassungen entstehen (nur bei Grammatikformen): `parallel` = andere Sätze von
+   * der KI (eine Anfrage für alle), `umgestellt` = ohne KI, Optionen und Items in anderer
+   * Reihenfolge (shared/testFassungen.ts). Fehlt = parallel. Verben: andere Verben aus der Liste.
+   */
+  fassungsArt?: import('../../../shared/testFassungen').FassungsArt
 
   /** Geprüfte Grammatikthemen (Kennungen aus grammarTopics.ts) */
   topics: string[]
@@ -116,9 +125,50 @@ export interface GrammarTest {
   design: DesignTemplate
   /** Die Aufgaben des Tests – dieselben Bausteine wie im Arbeitsblatt */
   blocks: WsBlock[]
-  /** Gruppe B (30.09.2026, unregelmäßige Verben) – fehlt bei einer einzigen Fassung */
+  /** Fassungen B, C, D (06.10.2026) – fehlt bei einer einzigen Fassung */
+  weitereFassungen?: WsBlock[][]
+  /**
+   * Gruppe B der Tests vom 30.09.2026 (unregelmäßige Verben). Nur noch gelesen: Wer den Test
+   * ändert, schreibt Gruppe B nach `weitereFassungen` (`fassungsListe`).
+   */
   blocksB?: WsBlock[]
   createdAt: string
+}
+
+/** Die Bausteinlisten aller Fassungen (A zuerst) – liest auch die alte Gruppe B */
+export function testFassungen(test: Pick<GrammarTest, 'blocks' | 'weitereFassungen' | 'blocksB'>): WsBlock[][] {
+  const weitere = test.weitereFassungen?.length ? test.weitereFassungen : test.blocksB?.length ? [test.blocksB] : []
+  return [test.blocks, ...weitere.filter((l) => Array.isArray(l))]
+}
+
+/** Alle Bausteine über alle Fassungen */
+export const alleTestBloecke = (test: Pick<GrammarTest, 'blocks' | 'weitereFassungen' | 'blocksB'>): WsBlock[] => testFassungen(test).flat()
+
+/**
+ * Die Liste der Fassung `index` im ENTWURF (0 = A) – zum Ändern an Ort und Stelle. Eine alte
+ * Gruppe B wird dabei nach `weitereFassungen` übernommen.
+ */
+export function fassungsListe(d: GrammarTest, index: number): WsBlock[] {
+  if (index <= 0) return d.blocks
+  if (d.blocksB && !d.weitereFassungen?.length) d.weitereFassungen = [d.blocksB]
+  delete d.blocksB
+  const weitere = (d.weitereFassungen ??= [])
+  while (weitere.length < index) weitere.push([])
+  return weitere[index - 1]
+}
+
+/** Alle Listen des Entwurfs zum Ändern (A zuerst) – übernimmt eine alte Gruppe B */
+export function alleFassungsListen(d: GrammarTest): WsBlock[][] {
+  const n = testFassungen(d).length
+  return Array.from({ length: n }, (_, i) => fassungsListe(d, i))
+}
+
+/** Ein Test mit neuen Fassungen: A in `blocks`, B … daneben; die alte Gruppe B entfällt */
+export function mitFassungen(test: GrammarTest, fassungen: WsBlock[][]): GrammarTest {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { blocksB, weitereFassungen, ...rest } = test
+  const [a = [], ...weitere] = fassungen
+  return { ...rest, blocks: a, ...(weitere.length ? { weitereFassungen: weitere } : {}) }
 }
 
 /** Summe der vergebenen Punkte über alle Aufgaben. */

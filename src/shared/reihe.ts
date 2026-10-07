@@ -108,7 +108,17 @@ export type SchrittInhalt =
       }[]
     }
   | { art: 'rueckmeldung'; vorlage: unknown; runden: number }
-  | { art: 'onlinetest'; test: unknown; zeitMin: number }
+  | {
+      art: 'onlinetest'
+      /** Vokabeltest (TestDocument) */
+      test: unknown
+      zeitMin: number
+      /**
+       * Lernzielkontrolle/Grammatiktest als fertige Onlinefassungen (06.10.2026, „Test hier erstellen") – statt `test`;
+       * `quelle` = Kennung des Dokuments in der Ablage
+       */
+      blatt?: { art: string; fach: string; thema?: string; fassungen: unknown[]; quelle?: string }
+    }
   | {
       art: 'aufgabe'
       anweisung: string
@@ -120,6 +130,8 @@ export type SchrittInhalt =
       feedback: boolean
       /** Musterlösung – sehen die Lernenden nach dem Abgeben (03.10.2026) */
       musterloesung?: string
+      /** Bildausschnitte aus Schulbuchseiten (06.10.2026, nur auf ausdrücklichen Wunsch je Abschnitt) – mit Quellenangabe */
+      bilder?: { src: string; quelle: string }[]
     }
   | { art: 'lernkarten'; karten: { vorne: string; hinten: string }[] }
   | { art: 'reflexion'; frage: string }
@@ -141,8 +153,12 @@ export interface Schritt {
   id: string
   titel: string
   lernziele: Lernziel[]
-  /** pflicht: muss geschafft werden; wahl: aus einer Wahlgruppe; foerder: öffnet sich bei Bedarf; forder: freiwillig (★) */
-  rolle: 'pflicht' | 'wahl' | 'foerder' | 'forder'
+  /**
+   * pflicht: muss geschafft werden; wahl: aus einer Wahlgruppe; foerder: öffnet sich bei Bedarf; forder: freiwillig (★);
+   * optional (06.10.2026): in der Reihenfolge freigeschaltet wie andere, aber NIE Voraussetzung für folgende Schritte –
+   * zählt nur über `Reihe.optionalMindestens` für den Abschluss der Reihe
+   */
+  rolle: 'pflicht' | 'wahl' | 'foerder' | 'forder' | 'optional'
   /** Wahl: Kennung der Gruppe und wie viele daraus nötig sind */
   wahlGruppe?: string
   wahlMindestens?: number
@@ -164,9 +180,27 @@ export interface Schritt {
    * Platzhalter aus der KI-Planung (05.10.2026): Was hier entstehen soll – erzeugt per Knopf
    * „Mit KI erstellen"; danach entfällt die Marke.
    */
-  platzhalter?: { beschreibung: string; begruendung?: string }
+  platzhalter?: {
+    beschreibung: string
+    begruendung?: string
+    /** Reihe aus Schulbuchseiten (06.10.2026): was die KI zu den Buchabschnitten wissen muss (verweisen/übernehmen) */
+    buch?: string
+    /** Je Abschnitt ausdrücklich gewählte Übernahme (Abschrift oder Bildausschnitt) – kommt mit Quellenangabe ins Material */
+    uebernahme?: BuchUebernahme[]
+  }
   /** Begründung der KI, warum vorhandenes Material an dieser Stelle steht */
   begruendung?: string
+  /** Test aus der Reihe (06.10.2026): Herkunft in der Ablage – Klassenarbeit, Lernzielkontrolle, Vokabeltest */
+  test?: { modul: 'klassenarbeit' | 'lernzielkontrolle' | 'vokabeltest'; docId: string }
+}
+
+/** Wörtlich übernommener Buchabschnitt (Abschrift) oder Bildausschnitt aus dem Scan – immer mit Quelle */
+export interface BuchUebernahme {
+  kennung: string
+  quelle: string
+  text?: string
+  /** Bildausschnitt als data:-URL */
+  bild?: string
 }
 
 export type StundenArt = 'einzel' | 'doppel'
@@ -192,6 +226,11 @@ export interface Reihe {
   geaendert?: string
   /** Stundenraster (05.10.2026): Einzel- (45 min) und Doppelstunden in ihrer Reihenfolge */
   stunden?: StundenArt[]
+  /**
+   * Optionale Schritte (06.10.2026): so viele davon müssen geschafft sein, damit die Reihe als abgeschlossen gilt
+   * (fehlt/0 = keine nötig; mehr als vorhanden zählt nur bis zur vorhandenen Zahl)
+   */
+  optionalMindestens?: number
 }
 
 /** Teile der Reihe: die angelegten, dazu die nur an Schritten genannten */
@@ -273,6 +312,8 @@ export interface Weg {
   fortschritt: number
   abzeichen: string[]
   fertig: boolean
+  /** Optionale Schritte (06.10.2026): geschafft, vorhanden, für den Abschluss nötig – nur, wenn es welche gibt */
+  optional?: { geschafft: number; gesamt: number; noetig: number }
 }
 
 const RANG: Record<string, number> = { 'noch nicht': 0, teilweise: 1, sicher: 2 }
@@ -390,12 +431,18 @@ export function berechneWeg(r: Reihe, stand: Stand, extern: Record<string, Exter
   })
   // Wissensspeicher zählt nicht als Aufgabe
   const zaehlend = r.schritte.filter((s) => (s.rolle === 'pflicht' || s.rolle === 'wahl') && s.inhalt.art !== 'hefter')
+  // Optionale Schritte: blockieren nie, zählen aber bis zur nötigen Zahl für Fortschritt und Abschluss
+  const optionale = r.schritte.filter((s) => s.rolle === 'optional' && s.inhalt.art !== 'hefter')
+  const optGeschafft = optionale.filter((s) => ['geschafft', 'uebersprungen'].includes(lage.get(s.id)!.status)).length
+  const optNoetig = Math.min(optionale.length, Math.max(0, Math.round(r.optionalMindestens ?? 0)))
   // Wahlgruppen zählen nur bis zur nötigen Zahl
   const wahlGruppen = [...new Set(zaehlend.filter((s) => s.rolle === 'wahl').map((s) => s.wahlGruppe ?? s.id))]
   const noetig =
+    optNoetig +
     zaehlend.filter((s) => s.rolle === 'pflicht').length +
     wahlGruppen.reduce((n, g) => n + (r.schritte.find((s) => s.wahlGruppe === g && s.rolle === 'wahl')?.wahlMindestens ?? 1), 0)
   const geschafftZaehlend =
+    Math.min(optNoetig, optGeschafft) +
     zaehlend.filter((s) => s.rolle === 'pflicht' && ['geschafft', 'uebersprungen'].includes(lage.get(s.id)!.status)).length +
     wahlGruppen.reduce((n, g) => n + Math.min(r.schritte.find((s) => s.wahlGruppe === g && s.rolle === 'wahl')?.wahlMindestens ?? 1, wahlStand.get(g) ?? 0), 0)
   const abschnitte = [...new Set(r.schritte.map((s) => s.abschnitt).filter((a): a is string => Boolean(a)))]
@@ -407,7 +454,8 @@ export function berechneWeg(r: Reihe, stand: Stand, extern: Record<string, Exter
     schritte: r.schritte.map((s) => lage.get(s.id)!),
     fortschritt: noetig ? Math.min(1, geschafftZaehlend / noetig) : 0,
     abzeichen,
-    fertig: noetig > 0 && geschafftZaehlend >= noetig
+    fertig: noetig > 0 && geschafftZaehlend >= noetig,
+    ...(optionale.length ? { optional: { geschafft: optGeschafft, gesamt: optionale.length, noetig: optNoetig } } : {})
   }
 }
 
@@ -441,6 +489,7 @@ export function inhaltFuerLernende(i: SchrittInhalt): Record<string, unknown> {
         fragen: i.fragen,
         antwort: i.antwort,
         feedback: i.feedback,
+        ...(i.bilder?.length ? { bilder: i.bilder } : {}),
         hatMusterloesung: Boolean(i.musterloesung?.trim())
       }
     case 'diagnose':

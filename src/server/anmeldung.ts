@@ -209,7 +209,9 @@ export async function iservRueckruf(
   let nutzer = nutzerNachBenutzer(benutzer)
   if (nutzer) {
     // Ein Admin bleibt Admin, auch wenn IServ nur „Lehrer" meldet; gesperrt bleibt gesperrt
-    nutzerAendern(nutzer.id, { name, gruppen, rolle: nutzer.rolle === 'admin' ? 'admin' : rolle, quelle: nutzer.quelle === 'test' ? 'test' : 'iserv' })
+    // Von der Verwaltung zugeordnete Klasse („klasse:…") bleibt erhalten, IServ liefert sie nicht
+    const zugeordnet = nutzer.gruppen.filter((g) => g.id.startsWith('klasse:') && !gruppen.some((x) => x.id === g.id))
+    nutzerAendern(nutzer.id, { name, gruppen: [...gruppen, ...zugeordnet], rolle: nutzer.rolle === 'admin' ? 'admin' : rolle, quelle: nutzer.quelle === 'test' ? 'test' : 'iserv' })
     nutzer = nutzerNachBenutzer(benutzer)!
   } else nutzer = nutzerAnlegen({ benutzer, name, rolle, quelle: 'iserv', gruppen })
   // Neue oder geänderte Namen sofort im Namensschutz (namensschutz.ts)

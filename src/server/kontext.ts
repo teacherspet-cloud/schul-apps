@@ -22,7 +22,7 @@ export interface Nutzer {
   name: string
   rolle: Rolle
   /** Woher die Anmeldung kommt */
-  quelle: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast'
+  quelle: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast' | 'vorschau'
   /** Kennung der Sitzung (für Ereignisse und Aufträge) */
   sitzung?: string
 }

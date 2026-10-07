@@ -83,10 +83,10 @@ describe('Grammatik in Schreibaufgaben', () => {
     expect(liste.every((x) => !x.topic.receptive)).toBe(true)
   })
 
-  it('Voreinstellung: NI als Erinnerung ohne eigene Punkte, Oberstufe Bandbreite, sonst Anzahl mit Kriterium', () => {
-    expect(vorschlag(arbeit('englisch', { stateId: 'NI' }).meta)).toMatchObject({ modus: 'erinnerung', bewertung: 'integriert' })
+  it('Voreinstellung: überall Bandbreite (06.10.2026); NI ohne eigene Punkte, sonst Kriterium mit Mindestanzahl für den Wechsel', () => {
+    expect(vorschlag(arbeit('englisch', { stateId: 'NI' }).meta)).toMatchObject({ modus: 'bandbreite', bewertung: 'integriert' })
     expect(vorschlag(arbeit('englisch', { grade: 12 }).meta).modus).toBe('bandbreite')
-    expect(vorschlag(arbeit('englisch', { grade: 6 }).meta)).toMatchObject({ modus: 'anzahl', bewertung: 'kriterium' })
+    expect(vorschlag(arbeit('englisch', { grade: 6 }).meta)).toMatchObject({ modus: 'bandbreite', anzahl: 3, bewertung: 'kriterium' })
   })
 
   it('NI warnt vor eigenem Kriterium; der Auftrag nennt Muster in der Zielsprache und das Kriterium', () => {
@@ -123,7 +123,7 @@ describe('Grammatik in Schreibaufgaben: Nachrecherche MV, RP, SL, SN, ST, TH', (
     expect(texte({ stateId: 'SL', grade: 10 })).toMatch(/Inhalt : Sprache 40 : 60/)
     expect(texte({ stateId: 'SL', grade: 10, schoolTypeId: 'gemeinschaftsschule' })).not.toMatch(/40 : 60/)
     expect(vorschlag(arbeit('englisch', { stateId: 'SL', grade: 9, languageOrder: 2 }).meta)).toMatchObject({ modus: 'bandbreite', bewertung: 'integriert' })
-    expect(vorschlag(arbeit('englisch', { stateId: 'NW', grade: 9, languageOrder: 2 }).meta).modus).toBe('anzahl')
+    expect(vorschlag(arbeit('englisch', { stateId: 'NW', grade: 9, languageOrder: 2 }).meta)).toMatchObject({ modus: 'bandbreite', bewertung: 'kriterium' })
   })
 
   it('SN: Kommunikationsfähigkeit oberstes Kriterium; Matrix mit „Strukturen" und „Sprachliche Korrektheit"', () => {

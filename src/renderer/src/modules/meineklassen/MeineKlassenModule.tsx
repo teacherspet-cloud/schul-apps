@@ -24,7 +24,6 @@ import {
   Modal,
   Popover,
   Progress,
-  Select,
   SimpleGrid,
   Stack,
   Table,
@@ -65,9 +64,11 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, type FertigesBlatt } from './klassenMaterial'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
+import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from './MaterialListe'
 import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
+import { AlsSchuelerAnsehen } from './SchuelerVorschau'
 
 interface FachKurz {
   id: string
@@ -358,14 +359,16 @@ function Kennzahl({ wert, text }: { wert: string; text: string }): React.JSX.Ele
 /** „+ Fach hinzufügen": eigene Fächer zuerst, dann alle; legt das Fach mit denselben Lernenden an */
 function FachHinzufuegen({ k, fertig }: { k: KlasseKurz; fertig: (id: string) => void }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
-  const eigene = useAppSettings((s) => s.settings.eigeneFaecher) ?? []
   const vorhanden = new Set(k.faecher.map((f) => f.fach.toLowerCase()))
   const farbe = useProgrammFarbe()
-  const data = useMemo(() => {
-    const alle = FAECHER.map((f) => f.label).filter((l) => !vorhanden.has(l.toLowerCase()))
-    const meine = eigene.filter((l) => !vorhanden.has(l.toLowerCase()))
-    return [...(meine.length ? [{ group: 'Eigene Fächer', items: meine }] : []), { group: 'Alle Fächer', items: alle.filter((l) => !meine.includes(l)) }]
-  }, [eigene, k.faecher]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Wert ist der Fachname; die eigenen Fächer stellt HaeufigSelect nach oben (im Standardmodus nur sie, weitere per Eintippen)
+  const data = useMemo(
+    () =>
+      FAECHER.map((f) => f.label)
+        .filter((l) => !vorhanden.has(l.toLowerCase()))
+        .map((l) => ({ value: l, label: l })),
+    [k.faecher] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const waehlen = async (fach: string | null): Promise<void> => {
     if (!fach) return
     // Lerngruppe ohne Fach bekommt es; sonst entsteht eine neue mit denselben Lernenden
@@ -386,7 +389,8 @@ function FachHinzufuegen({ k, fertig }: { k: KlasseKurz; fertig: (id: string) =>
         </Button>
       </Popover.Target>
       <Popover.Dropdown>
-        <Select
+        <HaeufigSelect
+          art="fach"
           label="Fach"
           placeholder="Fach wählen …"
           searchable
@@ -414,31 +418,34 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
       </Group>
       <Title order={2}>{/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}</Title>
 
-      {/* ---------- Fach-Leiste über dem Handlungsbedarf */}
-      <Group gap="xs" className="mk-faecher" data-fach-leiste>
-        {k.faecher.length > 0 && (
-          <Tabs value={aktiv?.id ?? null} onChange={(v) => setze({ gruppe: v })} variant="pills" radius="xl" color={farbe}>
-            <Tabs.List>
-              {k.faecher.map((f) => (
-                <Tabs.Tab
-                  key={f.id}
-                  value={f.id}
-                  rightSection={
-                    f.bedarf > 0 ? (
-                      <Badge size="xs" color="orange" circle>
-                        {f.bedarf}
-                      </Badge>
-                    ) : undefined
-                  }
-                  data-fach={f.fach}
-                >
-                  {f.fach}
-                </Tabs.Tab>
-              ))}
-            </Tabs.List>
-          </Tabs>
-        )}
-        <FachHinzufuegen k={k} fertig={(id) => (setze({ gruppe: id }), neu())} />
+      {/* ---------- Fach-Leiste über dem Handlungsbedarf, rechts daneben „Als Schüler ansehen" (ganze Klasse) */}
+      <Group justify="space-between" align="flex-start" gap="xs">
+        <Group gap="xs" className="mk-faecher" data-fach-leiste>
+          {k.faecher.length > 0 && (
+            <Tabs value={aktiv?.id ?? null} onChange={(v) => setze({ gruppe: v })} variant="pills" radius="xl" color={farbe}>
+              <Tabs.List>
+                {k.faecher.map((f) => (
+                  <Tabs.Tab
+                    key={f.id}
+                    value={f.id}
+                    rightSection={
+                      f.bedarf > 0 ? (
+                        <Badge size="xs" color="orange" circle>
+                          {f.bedarf}
+                        </Badge>
+                      ) : undefined
+                    }
+                    data-fach={f.fach}
+                  >
+                    {f.fach}
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+            </Tabs>
+          )}
+          <FachHinzufuegen k={k} fertig={(id) => (setze({ gruppe: id }), neu())} />
+        </Group>
+        {k.gruppen.length > 0 && <AlsSchuelerAnsehen gruppe={aktiv?.id ?? k.gruppen[0]} klasse={k.name} />}
       </Group>
 
       {!aktiv ? (

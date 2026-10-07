@@ -1,4 +1,5 @@
 import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, Text, TextInput, Title } from '@mantine/core'
+import { useExperte } from '../../../shared/settingsStore'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import { IconArrowRight, IconBook2, IconClipboard, IconDeviceFloppy, IconFileUpload, IconList } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -93,19 +94,33 @@ export default function VocabStep(): React.JSX.Element {
   const sprache = settings?.targetLanguage || listContext?.language || loadLastChoice('vokabeltest').targetLanguage || ''
 
   const zaehler = `${selected.length} von ${filled.length} werden abgefragt`
+  /*
+   * Standardmodus (07.10.2026): „Test automatisch erstellen" ist der Hauptknopf – die KI stellt Aufgaben,
+   * Niveau und Punkte zusammen. Die Testeinstellungen bleiben über den zweiten Knopf erreichbar.
+   */
+  const experte = useExperte()
+  const weiter = (
+    <Button
+      size={experte ? 'md' : undefined}
+      variant={experte ? 'filled' : 'default'}
+      rightSection={<IconArrowRight size={experte ? 18 : 16} />}
+      disabled={selected.length < 2}
+      onClick={() => setStep(1)}
+    >
+      {experte ? 'Weiter zu den Testeinstellungen' : 'Selbst einstellen'}
+    </Button>
+  )
   const fuss = (
     <Formularfuss
       grund={selected.length < 2 ? (filled.length ? 'Mindestens zwei Vokabeln abfragen' : 'Noch keine Vokabeln') : undefined}
-      links={<AutoCreateButton selection={bookSelection} />}
+      links={experte ? <AutoCreateButton selection={bookSelection} /> : weiter}
     >
       {selected.length >= 2 && (
         <Text size="sm" c="dimmed" data-testid="abfrage-fuss">
           {zaehler}
         </Text>
       )}
-      <Button size="md" rightSection={<IconArrowRight size={18} />} disabled={selected.length < 2} onClick={() => setStep(1)}>
-        Weiter zu den Testeinstellungen
-      </Button>
+      {experte ? weiter : <AutoCreateButton selection={bookSelection} haupt />}
     </Formularfuss>
   )
 

@@ -19,6 +19,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
@@ -137,7 +138,21 @@ function aendereBaustein(d: Exam, id: string, fn: (b: WsBlock) => void): void {
  *
  * Für Darstellung und Export wird die Arbeit in die Struktur des Arbeitsblatts übersetzt.
  */
+/**
+ * Standardmodus (07.10.2026): Bearbeiten, KI-Überarbeiten, Neu erzeugen, Einfügen, Löschen, Ausgabe, Rückmeldung und
+ * Transkript bleiben. Leveln, Bewertungsraster, Zusatzfragen, Baustein-Einstellungen, Aufgaben aus Material, Lernplattform
+ * und die feineren Blattoptionen gibt es im Expertenmodus oder über „Alle Werkzeuge".
+ */
 export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
+  return (
+    <OptionenBereich>
+      <TasksInhalt exam={exam} />
+    </OptionenBereich>
+  )
+}
+
+function TasksInhalt({ exam }: { exam: Exam }): React.JSX.Element {
+  const voll = useAlleOptionen()
   const { setStep, fassung: gewaehlt, setFassung, loesung, setLoesung, undo, redo, verlauf, docName, savedAt, setDocName } = useKlassenarbeit()
   // Blattoptionen, KI-Test-Dialog und Hörtext-Ansicht – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
@@ -516,7 +531,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
       arbeit: async (e, k) => {
         k.melde('Die KI entwirft das Bewertungsraster …')
         const ws = examToWorksheet(e, f)
-        const punkte = block.points > 0 ? block.points : (teil?.points ?? 0)
+        const punkte = block.points > 0 ? block.points : teil?.points ?? 0
         const antwort = await k.ai<unknown>(
           rasterAnfrage({
             system: systemPrompt(ws.meta, profileFromMeta(ws.meta)),
@@ -603,21 +618,29 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               kontext={() => wunschKontextFuer(block, worksheet.meta, 'Klassenarbeit')}
               onWunsch={(wie, wunsch) => bausteinUeberarbeiten(block, wunsch, wie)}
             >
-              {block.type === 'task' && (
-                <Menu.Item onClick={() => rasterErstellen(block)} data-raster-erstellen>
-                  Bewertungsraster erstellen
-                </Menu.Item>
-              )}
-              {/* Hör-/Leseverstehen: weitere Items im gleichen Format mit Stufenmix (29.09.2026) */}
-              {block.type === 'task' && (block.skill === 'listening' || block.skill === 'reading' || block.audioId) && (
-                <Menu.Item leftSection={<IconPlaylistAdd size={14} />} onClick={() => setZusatzFuer(block.id)}>
-                  Weitere Fragen im gleichen Format …
-                </Menu.Item>
-              )}
+              <NurExperte>
+                {block.type === 'task' && (
+                  <Menu.Item onClick={() => rasterErstellen(block)} data-raster-erstellen>
+                    Bewertungsraster erstellen
+                  </Menu.Item>
+                )}
+              </NurExperte>
+              <NurExperte>
+                {/* Hör-/Leseverstehen: weitere Items im gleichen Format mit Stufenmix (29.09.2026) */}
+                {block.type === 'task' && (block.skill === 'listening' || block.skill === 'reading' || block.audioId) && (
+                  <Menu.Item leftSection={<IconPlaylistAdd size={14} />} onClick={() => setZusatzFuer(block.id)}>
+                    Weitere Fragen im gleichen Format …
+                  </Menu.Item>
+                )}
+              </NurExperte>
               {/* Leveln (Großprogramm 0.4, F1) – etwa für eine Fassung mit Nachteilsausgleich */}
-              <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
+              <NurExperte>
+                <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
+              </NurExperte>
             </KiMenue>
-            <BlockSettings block={block} combined={false} update={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)} />
+            <NurExperte>
+              <BlockSettings block={block} combined={false} update={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)} />
+            </NurExperte>
           </>
         }
         menue={
@@ -691,30 +714,42 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             kiVermerk={{ wert: meta.kiVermerk, ki: meta.ki, onChange: (v) => updateExam((d) => (d.meta.kiVermerk = v)) }}
             schulangaben={{ checked: meta.showSchool !== false, onChange: (an) => updateExam((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(meta.correctionMargin), onChange: (an) => updateExam((d) => (d.meta.correctionMargin = an)) }}
-            notizrand={{ checked: Boolean(meta.notesMargin), onChange: (an) => updateExam((d) => (d.meta.notesMargin = an)) }}
+            notizrand={voll ? { checked: Boolean(meta.notesMargin), onChange: (an) => updateExam((d) => (d.meta.notesMargin = an)) } : undefined}
             anmerkungen={
-              hatAnmerkungen(exam.parts.flatMap((p) => alleFassungen(p).flat()))
-                ? { wert: anmerkungsArt(meta), onChange: (art) => updateExam((d) => (d.meta.anmerkungen = art)) }
+              voll
+                ? hatAnmerkungen(exam.parts.flatMap((p) => alleFassungen(p).flat()))
+                  ? { wert: anmerkungsArt(meta), onChange: (art) => updateExam((d) => (d.meta.anmerkungen = art)) }
+                  : undefined
                 : undefined
             }
-            blocksatz={{ checked: exam.design.page.justifyText !== false, onChange: (an) => updateExam((d) => (d.design.page.justifyText = an)) }}
-            fach={meta.subjectId}
-            vorlagenfarbe={{ checked: Boolean(meta.vorlagenfarbe), onChange: (an) => updateExam((d) => (d.meta.vorlagenfarbe = an)) }}
-            ueberthema={{ werte: meta, bereich: bereich ?? '', onChange: (patch) => updateExam((d) => Object.assign(d.meta, patch), 'ueberthema') }}
-            vorKiTest={
-              meta.kopfText?.trim() ? (
-                <Button size="compact-xs" variant="subtle" onClick={() => updateExam((d) => (d.meta.kopfText = undefined))}>
-                  Kopfkasten wieder berechnen
-                </Button>
-              ) : null
+            blocksatz={
+              voll ? { checked: exam.design.page.justifyText !== false, onChange: (an) => updateExam((d) => (d.design.page.justifyText = an)) } : undefined
             }
-            kiTest={{
-              an: Boolean(meta.aiCanary),
-              woerter: meta.aiCanaryWords,
-              vorschlagFuer: `${meta.title}|${meta.topic}`,
-              onEin: () => setCanaryOffen(true),
-              onAus: () => updateExam((d) => (d.meta.aiCanary = false))
-            }}
+            fach={meta.subjectId}
+            vorlagenfarbe={voll ? { checked: Boolean(meta.vorlagenfarbe), onChange: (an) => updateExam((d) => (d.meta.vorlagenfarbe = an)) } : undefined}
+            ueberthema={
+              voll ? { werte: meta, bereich: bereich ?? '', onChange: (patch) => updateExam((d) => Object.assign(d.meta, patch), 'ueberthema') } : undefined
+            }
+            vorKiTest={
+              voll ? (
+                meta.kopfText?.trim() ? (
+                  <Button size="compact-xs" variant="subtle" onClick={() => updateExam((d) => (d.meta.kopfText = undefined))}>
+                    Kopfkasten wieder berechnen
+                  </Button>
+                ) : null
+              ) : undefined
+            }
+            kiTest={
+              voll
+                ? {
+                    an: Boolean(meta.aiCanary),
+                    woerter: meta.aiCanaryWords,
+                    vorschlagFuer: `${meta.title}|${meta.topic}`,
+                    onEin: () => setCanaryOffen(true),
+                    onAus: () => updateExam((d) => (d.meta.aiCanary = false))
+                  }
+                : undefined
+            }
           />
         }
         extras={
@@ -725,18 +760,26 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                 Neu erzeugen
               </Button>
             )}
-            {/* Verlagsmaterial zerlegen und Aufgaben auswählen (29.09.2026) */}
-            {hasContent && (
-              <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
-                <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
-                  Aufgaben aus Material
-                </Button>
-              </Tooltip>
-            )}
+            <NurExperte>
+              {/* Verlagsmaterial zerlegen und Aufgaben auswählen (29.09.2026) */}
+              {hasContent && (
+                <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
+                  <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
+                    Aufgaben aus Material
+                  </Button>
+                </Tooltip>
+              )}
+            </NurExperte>
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
-            {hasContent && (
-              <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} ziel={quelle(false).ziel} />
-            )}
+            <NurExperte>
+              {hasContent && (
+                <LmsExport
+                  titel={exam.meta.title || exam.meta.topic}
+                  bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))}
+                  ziel={quelle(false).ziel}
+                />
+              )}
+            </NurExperte>
             {audioBlocks.length > 0 && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>
@@ -916,7 +959,9 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                         <Text size="sm" c="dimmed">
                           {part.points > 0
                             ? `${part.points} Punkte`
-                            : `Bewertung: ${part.contentShare ?? inhaltsanteil(exam.meta.subjectId)} % Inhalt, ${100 - (part.contentShare ?? inhaltsanteil(exam.meta.subjectId))} % ${zweiterTeil(exam.meta.subjectId)}`}{' '}
+                            : `Bewertung: ${part.contentShare ?? inhaltsanteil(exam.meta.subjectId)} % Inhalt, ${
+                                100 - (part.contentShare ?? inhaltsanteil(exam.meta.subjectId))
+                              } % ${zweiterTeil(exam.meta.subjectId)}`}{' '}
                           · {part.minutes} Minuten
                           {formats.length ? ` · Formate: ${formats.join(', ')}` : ''}
                         </Text>

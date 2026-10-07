@@ -53,7 +53,7 @@ import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 interface SchrittSicht {
   id: string
   titel: string
-  rolle: 'pflicht' | 'wahl' | 'foerder' | 'forder'
+  rolle: 'pflicht' | 'wahl' | 'foerder' | 'forder' | 'optional'
   abschnitt?: string
   erfolg: string
   lernziele: { ichKann: string }[]
@@ -184,6 +184,17 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
           <Progress value={d.weg.fortschritt * 100} style={{ flex: 1 }} size="lg" color={d.weg.fertig ? 'green' : 'blue'} data-fortschritt />
           <Text fw={700}>{Math.round(d.weg.fortschritt * 100)} %</Text>
         </Group>
+        {/* Optionale Schritte (06.10.2026): Zähler und was für den Abschluss nötig ist */}
+        {d.weg.optional && (
+          <Text size="sm" c="dimmed" mt={4} data-optional-zaehler>
+            {d.weg.optional.geschafft} von {d.weg.optional.gesamt} optionalen geschafft
+            {d.weg.optional.noetig > 0
+              ? d.weg.optional.geschafft >= d.weg.optional.noetig
+                ? ' – genug für den Abschluss'
+                : ` – für den Abschluss brauchst du ${d.weg.optional.noetig}`
+              : ''}
+          </Text>
+        )}
         {d.weg.abzeichen.length > 0 && (
           <Group gap={6} mt="sm" data-abzeichen>
             {d.weg.abzeichen.map((a) => (
@@ -292,6 +303,11 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
                     {s.rolle === 'foerder' && (
                       <Badge size="xs" color="orange" variant="light">
                         Übung für dich
+                      </Badge>
+                    )}
+                    {s.rolle === 'optional' && (
+                      <Badge size="xs" color="teal" variant="light" data-optional>
+                        optional
                       </Badge>
                     )}
                   </Group>
@@ -536,6 +552,18 @@ function Abgabe({
             </Text>
           </Paper>
         )}
+        {/* Bildausschnitte aus dem Schulbuch (06.10.2026) – immer mit Quellenangabe */}
+        {Array.isArray(i.bilder) &&
+          (i.bilder as { src: string; quelle: string }[]).map((b, n) => (
+            <figure key={n} style={{ margin: '12px 0 0' }} data-buch-bild>
+              <img src={b.src} alt={b.quelle} style={{ maxWidth: '100%', borderRadius: 6 }} />
+              <figcaption>
+                <Text size="xs" c="dimmed">
+                  Quelle: {b.quelle}
+                </Text>
+              </figcaption>
+            </figure>
+          ))}
         {Boolean(i.link) && (
           <Button component="a" href={String(i.link)} target="_blank" rel="noopener" variant="light" mt="sm" w="fit-content">
             Material öffnen

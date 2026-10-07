@@ -14,6 +14,7 @@ import { besteStimme } from './stimme'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
+import { tempoFaktor, ton } from '../onlinetest/schuelerDarstellung'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import {
   ActionIcon,
@@ -131,7 +132,8 @@ export function sprich(text: string, sprache: string): void {
     const u = new SpeechSynthesisUtterance(ohneAngaben(text).replace(/\([^)]*\)/g, ''))
     u.voice = stimme
     u.lang = stimme.lang
-    u.rate = 0.85
+    // Sprechtempo aus den Einstellungen der Lernenden (06.10.2026)
+    u.rate = 0.85 * tempoFaktor()
     window.speechSynthesis.speak(u)
   } catch {
     // ohne Sprachausgabe geht es auch
@@ -480,6 +482,8 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
       setStaende((s) => ({ ...s, [v.id]: e.stand }))
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
+      // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
+      if (e.urteil === 'richtig') ton('richtig')
     } finally {
       setLaeuft(false)
     }

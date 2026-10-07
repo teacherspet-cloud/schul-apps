@@ -57,6 +57,18 @@ export async function schliesseAssistent(page) {
   }
   await spaeter.click()
   await page.waitForTimeout(500)
+  await expertenmodus(page)
+}
+
+/**
+ * Die Wachen prüfen die volle Oberfläche: Neue Profile beginnen seit 07.10.2026 im Standardmodus
+ * (Einrichtung), der Feineinstellungen ausblendet – hier zurück in den Expertenmodus. Die Wache
+ * `hauptapp.mjs` prüft den Standardmodus selbst.
+ */
+export async function expertenmodus(page) {
+  if (!(await page.locator('[data-modus-schalter][data-modus="standard"]').count())) return
+  await page.locator('.modus-schalter-knopf').filter({ visible: true }).first().click()
+  await page.waitForTimeout(300)
 }
 
 /**

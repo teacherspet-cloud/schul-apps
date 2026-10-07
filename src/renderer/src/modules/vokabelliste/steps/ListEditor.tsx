@@ -1,6 +1,6 @@
 import { Badge, Button, Card, Group, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconCheck, IconClipboard, IconDeviceFloppy, IconSparkles } from '@tabler/icons-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
@@ -18,6 +18,7 @@ import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/Voka
 import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelUebernahme'
 import type { VocabRow } from './VocabRow'
 import { MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
+import { setzeVokabelAnsicht, zielListe } from '../../../shared/medien/medienAuftrag'
 
 /** Eine leere Liste bekommt gleich eine Zeile zum Eintippen */
 const toRows = (list: SavedVocabList): VocabRow[] => {
@@ -61,6 +62,13 @@ export default function ListEditor({
     rows.map((r) => r.term)
   )
   const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
+  // Ziel der Medienaufträge (06.10.2026): „Öffnen" in der Auftragsleiste führt zu dieser Liste; die Klasse steuert die Bildart
+  const medienZiel = zielListe(list.id, name, grade || undefined)
+  useEffect(() => {
+    if (!aktiv) return
+    setzeVokabelAnsicht(list.id)
+    return () => setzeVokabelAnsicht(null)
+  }, [list.id, aktiv])
   const [dirty, setDirty] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
   const [review, setReview] = useState<VocabEntry[] | null>(null)
@@ -267,19 +275,14 @@ export default function ListEditor({
           />
         </Group>
         {medienAdmin && (
-          <MedienLeiste
-            sprache={language}
-            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation }))}
-            daten={medien.daten}
-            neuLaden={medien.laden}
-          />
+          <MedienLeiste sprache={language} vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation }))} daten={medien.daten} ziel={medienZiel} />
         )}
         <VokabelTabelle
           zeilen={rows}
           onChange={setRows}
           mitVerlauf
           sprache={language}
-          medien={{ sprache: language, daten: medien.daten, admin: medienAdmin, neuLaden: medien.laden }}
+          medien={{ sprache: language, daten: medien.daten, admin: medienAdmin, neuLaden: medien.laden, ziel: medienZiel }}
         />
       </Card>
 

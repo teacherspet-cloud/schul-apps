@@ -1,4 +1,5 @@
-import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { Accordion, Alert, Badge, Card, Container, Group, Menu, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
@@ -6,7 +7,7 @@ import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { BlattOnlinetestKnopf } from '../../onlinetest/OnlinetestKnopf'
 import { fassungenAusBlatt } from '../../onlinetest/blattOnline'
-import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCircleCheck, IconCopy, IconInfoCircle, IconTable, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -42,13 +43,18 @@ import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
-import { befundBehebbar, befundeBeheben, bausteinNachWunschAuftrag } from '../beheben'
+import { befundBehebbar, befundeBeheben, bausteinNachWunschAuftrag, rasterAuftragLzk } from '../beheben'
 import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
 import McBlindHinweis from '../../../shared/components/McBlindHinweis'
 import { uebernimmBlindprobe } from '../../../shared/verstehen/blindprobe'
 import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
 import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
-import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import { KiMenue, VersionSwitcher } from '../../arbeitsblatt/steps/BlockRevision'
+import { BlockSettings } from '../../arbeitsblatt/steps/BlockSettings'
+import { EinfuegenUntermenue } from '../../arbeitsblatt/steps/EinfuegenMenue'
+import LevelnMenue from '../../arbeitsblatt/steps/LevelnMenue'
+import { dupliziereBaustein, newBlock } from '../../arbeitsblatt/model/factory'
+import { switchVersion } from '../../arbeitsblatt/model/versions'
 import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
 
 /**
@@ -101,7 +107,17 @@ function BefundListe({ befunde, onBeheben, laeuft }: { befunde: Befund[]; onBehe
   )
 }
 
+/** Standardmodus (07.10.2026): wie im Arbeitsblatt – Leveln, Raster, Baustein-Einstellungen, Lernplattform und feinere Blattoptionen über „Alle Werkzeuge" */
 export default function EditorStep(): React.JSX.Element {
+  return (
+    <OptionenBereich>
+      <EditorInhalt />
+    </OptionenBereich>
+  )
+}
+
+function EditorInhalt(): React.JSX.Element {
+  const voll = useAlleOptionen()
   const { test, setStep, update, variante, setVariante, loesung, setLoesung, undo, redo, verlauf, docName, savedAt, setDocName } = useLernzielkontrolle()
   // Blattoptionen, KI-Test-Dialog – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
@@ -179,7 +195,9 @@ export default function EditorStep(): React.JSX.Element {
   const anzahl = teilaufgaben(blocks)
   const dauer = dauerSchaetzung(blocks)
   const { warnungen, hinweise } = zaehleBefunde(befunde)
-  const dateiname = `${test.meta.title || test.meta.thema || test.meta.bezeichnung}${test.varianten[variante]?.label ? ` ${test.varianten[variante].label}` : ''}`
+  const dateiname = `${test.meta.title || test.meta.thema || test.meta.bezeichnung}${
+    test.varianten[variante]?.label ? ` ${test.varianten[variante].label}` : ''
+  }`
 
   const mehrereFassungen = test.varianten.length > 1
 
@@ -227,6 +245,14 @@ export default function EditorStep(): React.JSX.Element {
    * Bis 24.09.2026 gab es hier gar keine Bausteinsteuerung: Das Blatt ließ sich nur im Text
    * bearbeiten. Die Lehrkraft wollte es „überall von Hand" haben.
    */
+  /** Eine Änderung an der Liste der angezeigten Fassung, an der Stelle des Bausteins */
+  const anDerStelle = (id: string, fn: (liste: WsBlock[], i: number) => void): void =>
+    update((d) => {
+      const liste = d.varianten[variante]?.blocks
+      const i = liste?.findIndex((b) => b.id === id) ?? -1
+      if (liste && i >= 0) fn(liste, i)
+    })
+
   const wrapBlock = (block: WsBlock, placed: PlacedItem, content: React.ReactNode): React.ReactNode => (
     <BausteinRahmen
       block={block}
@@ -247,18 +273,77 @@ export default function EditorStep(): React.JSX.Element {
           ;[liste[i], liste[j]] = [liste[j], liste[i]]
         })
       }
+      busy={laufend.has(block.id)}
       extras={
-        // Zauberstab und Kreis mit Änderungswunsch (30.09.2026) – nur an Bausteinen der Kontrolle, nicht am errechneten Schlüssel
+        /*
+         * Dieselben Werkzeuge wie in Klassenarbeit und Grammatiktest (06.10.2026): KI-Menü (Überarbeiten,
+         * Neu erzeugen, Leveln, Bewertungsraster) und Einstellungen – nicht am errechneten Schlüssel.
+         * Hinweise stehen hier gesammelt in der Prüfliste über dem Blatt.
+         */
         blocks.some((b) => b.id === block.id) ? (
-          <KiWunschKnoepfe
-            blockId={block.id}
-            kontext={() => wunschKontextFuer(block, ws.meta, 'Lernzielkontrolle')}
-            busy={laufend.has(block.id)}
-            onAusfuehren={(art, wunsch) => bausteinNachWunschAuftrag(test, docId, variante, block.id, art, wunsch)}
-          />
+          <>
+            <KiMenue
+              block={block}
+              busy={laufend.has(block.id) || laufend.has(`raster-${block.id}`)}
+              kontext={() => wunschKontextFuer(block, ws.meta, 'Lernzielkontrolle')}
+              onWunsch={(art, wunsch) => bausteinNachWunschAuftrag(test, docId, variante, block.id, art, wunsch)}
+            >
+              <NurExperte>
+                <LevelnMenue
+                  block={block}
+                  meta={ws.meta}
+                  onRevise={(anweisung) => bausteinNachWunschAuftrag(test, docId, variante, block.id, 'ueberarbeiten', anweisung)}
+                />
+              </NurExperte>
+              <NurExperte>
+                {block.type === 'task' && (
+                  <Menu.Item leftSection={<IconTable size={14} />} onClick={() => rasterAuftragLzk(test, docId, variante, block.id)} data-raster-erstellen>
+                    Bewertungsraster erstellen
+                  </Menu.Item>
+                )}
+              </NurExperte>
+            </KiMenue>
+            <NurExperte>
+              <BlockSettings
+                block={block}
+                combined={false}
+                update={(fn, gruppe) =>
+                  update((d) => {
+                    const b = d.varianten[variante]?.blocks.find((x) => x.id === block.id)
+                    if (b) fn(b)
+                  }, gruppe)
+                }
+              />
+            </NurExperte>
+          </>
+        ) : undefined
+      }
+      menue={
+        blocks.some((b) => b.id === block.id) ? (
+          <>
+            <Menu.Label>Baustein</Menu.Label>
+            <Menu.Item
+              leftSection={<IconCopy size={14} />}
+              onClick={() => anDerStelle(block.id, (liste, i) => void liste.splice(i + 1, 0, dupliziereBaustein(liste[i])))}
+            >
+              Duplizieren
+            </Menu.Item>
+            <EinfuegenUntermenue titel="Darüber einfügen" onWaehlen={(typ) => anDerStelle(block.id, (liste, i) => void liste.splice(i, 0, newBlock(typ)))} />
+            <EinfuegenUntermenue
+              titel="Darunter einfügen"
+              onWaehlen={(typ) => anDerStelle(block.id, (liste, i) => void liste.splice(i + 1, 0, newBlock(typ)))}
+            />
+            <Menu.Divider />
+            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => anDerStelle(block.id, (liste, i) => void liste.splice(i, 1))}>
+              Baustein löschen
+            </Menu.Item>
+          </>
         ) : undefined
       }
     >
+      {!placed.continued && !loesung && blocks.some((b) => b.id === block.id) && (
+        <VersionSwitcher block={block} onSwitch={(v) => anDerStelle(block.id, (liste, i) => (liste[i] = switchVersion(liste[i], v)))} />
+      )}
       {content}
     </BausteinRahmen>
   )
@@ -294,23 +379,33 @@ export default function EditorStep(): React.JSX.Element {
             kiVermerk={{ wert: test.meta.kiVermerk, ki: test.meta.ki, onChange: (v) => update((d) => (d.meta.kiVermerk = v)) }}
             schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
-            notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}
+            notizrand={voll ? { checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) } : undefined}
             anmerkungen={
-              hatAnmerkungen(test.varianten.flatMap((v) => v.blocks))
-                ? { wert: anmerkungsArt(test.meta), onChange: (art) => update((d) => (d.meta.anmerkungen = art)) }
+              voll
+                ? hatAnmerkungen(test.varianten.flatMap((v) => v.blocks))
+                  ? { wert: anmerkungsArt(test.meta), onChange: (art) => update((d) => (d.meta.anmerkungen = art)) }
+                  : undefined
                 : undefined
             }
-            blocksatz={{ checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) }}
+            blocksatz={
+              voll ? { checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) } : undefined
+            }
             fach={test.meta.subjectId}
-            vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}
-            ueberthema={{ werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') }}
-            kiTest={{
-              an: Boolean(test.meta.aiCanary),
-              woerter: test.meta.aiCanaryWords,
-              vorschlagFuer: `${test.meta.title}|${test.meta.thema}`,
-              onEin: () => setCanaryOffen(true),
-              onAus: () => update((d) => (d.meta.aiCanary = false))
-            }}
+            vorlagenfarbe={voll ? { checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) } : undefined}
+            ueberthema={
+              voll ? { werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') } : undefined
+            }
+            kiTest={
+              voll
+                ? {
+                    an: Boolean(test.meta.aiCanary),
+                    woerter: test.meta.aiCanaryWords,
+                    vorschlagFuer: `${test.meta.title}|${test.meta.thema}`,
+                    onEin: () => setCanaryOffen(true),
+                    onAus: () => update((d) => (d.meta.aiCanary = false))
+                  }
+                : undefined
+            }
           />
         }
         info={undefined}
@@ -345,11 +440,13 @@ export default function EditorStep(): React.JSX.Element {
                 }
               }}
             />
-            <LmsExport
-              titel={test.meta.title || test.meta.thema}
-              bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))}
-              ziel={quelle(false).ziel}
-            />
+            <NurExperte>
+              <LmsExport
+                titel={test.meta.title || test.meta.thema}
+                bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))}
+                ziel={quelle(false).ziel}
+              />
+            </NurExperte>
           </>
         }
       />
