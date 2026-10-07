@@ -418,9 +418,16 @@ export default function App(): React.JSX.Element {
           ))}
       </AppShell.Main>
 
-      {telefon && !einzeln && <MobilTabs daten={navDaten} onProgramme={schubladeAuf} />}
+      {telefon && !einzeln && (
+        <MobilTabs
+          daten={navDaten}
+          mehrOffen={schublade}
+          setMehrOffen={setSchublade}
+          {...(aufServer() ? { abmelden: () => void abmelden(), benutzer: serverIch()?.benutzer ?? '' } : {})}
+        />
+      )}
       {!telefon && ohneLeiste && !einzeln && <LeistenGriff onClick={schubladeAuf} />}
-      {ohneLeiste && !einzeln && (
+      {!telefon && ohneLeiste && !einzeln && (
         <ProgrammSchublade
           offen={schublade}
           onClose={() => setSchublade(false)}

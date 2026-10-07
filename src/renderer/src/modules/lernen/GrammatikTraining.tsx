@@ -51,7 +51,10 @@ import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { holen, senden } from '../onlinetest/serverApi'
 import { useAlleLernenden } from './LernendeWahl'
-import { erzeugeGrammatikPaket } from './grammatikErzeugen'
+import { lateinVorschau } from './LateinAufgaben'
+import { VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
+import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
+import { erzeugeGrammatikPaket, lateinLernjahr } from './grammatikErzeugen'
 import { ausFeld, useLerngruppen } from './VokabelTraining'
 
 interface Zuweisung {
@@ -256,6 +259,12 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const [themenIds, setThemenIds] = useState<string[]>([])
   const [eigenes, setEigenes] = useState('')
   const [wunsch, setWunsch] = useState('')
+  /*
+   * Wortschatz der Aufgaben (07.10.2026, abgestimmt für Latein, gilt für alle Sprachen): frei (zur Klasse passend),
+   * mitgelieferter Grundwortschatz (Latein) oder aus Lehrwerk bzw. eigener Vokabelliste.
+   */
+  const [wortArt, setWortArt] = useState<'frei' | 'grund' | 'liste'>('frei')
+  const [wortListe, setWortListe] = useState<VokabelAuswahl | null>(null)
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code'>('gruppe')
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [einzelne, setEinzelne] = useState<string[]>([])
@@ -297,6 +306,12 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         sprache: fach.sprache,
         jahrgang,
         wunsch: wunsch.trim() || undefined,
+        ...(wortArt === 'grund' && fach.sprache === 'la'
+          ? { woerter: grundwortschatzBis(lateinLernjahr(jahrgang)), wortQuelle: `Grundwortschatz Latein bis ${lateinLernjahr(jahrgang)}. Lernjahr` }
+          : {}),
+        ...(wortArt === 'liste' && wortListe?.woerter.length
+          ? { woerter: wortListe.woerter.map((v) => `${v.term} – ${v.translation}`).slice(0, 300), wortQuelle: wortListe.titel }
+          : {}),
         teilformen: gewaehlteThemen.length ? teilformenAuftrag(gewaehlteThemen, query, teilWahl) || undefined : undefined
       },
       sperrt: false,
@@ -363,6 +378,26 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
               data-grammatik-eigenes
             />
           )}
+          <Stack gap={6} data-grammatik-wortschatz>
+            <Text size="sm" fw={500}>
+              Wortschatz der Aufgaben
+            </Text>
+            <SegmentedControl
+              value={wortArt}
+              onChange={(v) => setWortArt(v as typeof wortArt)}
+              data={[
+                { value: 'frei', label: 'Zur Klasse passend' },
+                ...(fach?.sprache === 'la' ? [{ value: 'grund', label: 'Grundwortschatz' }] : []),
+                { value: 'liste', label: 'Lehrwerk / Vokabelliste' }
+              ]}
+            />
+            {wortArt === 'grund' && fach?.sprache === 'la' && (
+              <Text size="xs" c="dimmed">
+                Mitgelieferte Lernwörter bis zum {lateinLernjahr(jahrgang)}. Lernjahr ({grundwortschatzBis(lateinLernjahr(jahrgang)).length} Wörter).
+              </Text>
+            )}
+            {wortArt === 'liste' && <VokabelQuelle wahl={setWortListe} />}
+          </Stack>
           <Textarea
             label="Besonders üben (optional)"
             autosize
@@ -484,7 +519,7 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">
-                    {a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz}
+                    {lateinVorschau(a)?.aufgabe ?? (a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz)}
                     {a.vorgabe ? (
                       <Text span c="dimmed">
                         {' '}
@@ -493,7 +528,7 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
                     ) : null}
                   </Text>
                   <Text size="xs" c="teal">
-                    → {a.loesungen.join(' | ')}
+                    → {lateinVorschau(a)?.loesung ?? a.loesungen.join(' | ')}
                     {a.art === 'fehler' && a.fehlerWort ? ` (statt „${a.fehlerWort}")` : ''}
                   </Text>
                 </Table.Td>

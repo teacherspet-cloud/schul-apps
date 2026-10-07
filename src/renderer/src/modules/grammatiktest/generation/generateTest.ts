@@ -20,6 +20,7 @@ import { verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/int
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { knownVocabRulesDe } from '../../../shared/knownVocab'
+import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
 import { anredeRegel } from '../../../shared/anrede'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { errorTargets, testingRules } from '../model/testRules'
@@ -51,7 +52,19 @@ export const SPRACHREGELN: Record<string, string[]> = {
     '- Einheitlich europäisches Portugiesisch (tu, estar a + Infinitiv, Enklise), außer der Test nennt ausdrücklich Brasilien.',
     '- Wo die brasilianische Form ebenfalls richtig ist, nennt die Lösung beide.'
   ],
-  niederlaendisch: ['- Standardniederländisch; wo in Belgien eine andere Form üblich und korrekt ist, nennt die Lösung beide.']
+  niederlaendisch: ['- Standardniederländisch; wo in Belgien eine andere Form üblich und korrekt ist, nennt die Lösung beide.'],
+  /*
+   * Latein (07.10.2026, abgestimmt mit der Lehrkraft nach Recherche – KC Niedersachsen 2017, Pontes/Campus/prima):
+   * Anweisungen immer deutsch, Längenzeichen in den Formen, Bestimmungen mit ALLEN Lesarten (Teilpunkte).
+   */
+  latein: [
+    '- Arbeitsanweisungen immer auf Deutsch; lateinische Formen MIT Längenzeichen (ā ē ī ō ū) wie im Vokabelverzeichnis – in der Lösung ebenso.',
+    '- Abkürzungen: Nom./Gen./Dat./Akk./Abl./Vok.; Sg./Pl.; m./f./n.; 1./2./3. Person; Präs./Impf./Fut. I/Perf./Plusqpf./Fut. II; Ind./Konj./Imp.; Akt./Pass.',
+    '- Formen bestimmen als Tabelle (tableFill, Kopf z. B. Form | Kasus | Numerus | Genus bzw. Form | Person | Numerus | Tempus | Genus verbi). Bei einer EINZELNEN Form verlangt die Lösung ALLE Lesarten (rosae: Gen. Sg. f. / Dat. Sg. f. / Nom. Pl. f.) – Teilpunkte je Lesart; steht die Form in einem Satz, gilt nur die Lesart im Satz.',
+    '- Mehrdeutige Endungen gezielt prüfen (-ae, -is, -a, -us, -um, -es, -ī; regit/reget, -ba-/-bi-, -era-).',
+    '- Weitere übliche Formen: Paradigma ergänzen (tableFill Sg./Pl.), umformen nach Vorgabe („in den Plural", „ins Imperfekt", „ins Passiv"), KNG-Kongruenz bilden (magnus + templum → Gen. Pl.), Präposition mit Kasus, Wortgruppen mit Kasusfunktion übersetzen.',
+    '- Nur Formen und Wörter, die zum Lernjahr passen; die Aufgabentexte sind lateinische Wörter, Wortgruppen oder kurze Sätze.'
+  ]
 }
 
 /** Auftrag an die KI. */
@@ -118,9 +131,9 @@ export function testPrompt(test: GrammarTest): string {
     '- Keine unbekannte Lexik: Der Test prüft die Form, nicht den Wortschatz. Wer ein Wort nicht kennt, scheitert sonst aus dem falschen Grund.',
     german ? '' : `- Die Aufgabentexte stehen auf ${target}.`,
     ...(SPRACHREGELN[m.subjectId] ?? []),
-    m.instructionsInGerman ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
+    m.instructionsInGerman || m.subjectId === 'latein' ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
     // Anrede der Lernenden (Paket 8b): nur wo die Anweisungen deutsch sind – Sek I du, Sek II Sie
-    german || m.instructionsInGerman ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId, m.stateId)) : '',
+    german || m.instructionsInGerman || m.subjectId === 'latein' ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId, m.stateId)) : '',
     '',
     formats.length ? `AUFGABENFORMEN – nutze genau diese: ${formats.join(', ')}.` : '',
     '- Steigere die Anforderung: erst Erkennen und Zuordnen, dann Umformen und Ergänzen, zuletzt eigenes Bilden.',
@@ -139,7 +152,13 @@ export function testPrompt(test: GrammarTest): string {
           .map((t) => t.label)
           .join(', ')} – dazu keine Aufgabe, die die Form selbst bilden lässt.`
       : '',
-    m.knownVocab ? knownVocabRulesDe(m.knownVocab) : '',
+    m.knownVocab
+      ? knownVocabRulesDe(m.knownVocab)
+      : // Latein ohne Lehrwerkswortschatz: mitgelieferter Grundwortschatz bis zum Lernjahr (07.10.2026)
+        m.subjectId === 'latein'
+        ? `WORTSCHATZ (Grundwortschatz Latein bis ${Math.max(1, m.grade - 5)}. Lernjahr) – verwende nur diese Wörter, dazu Eigennamen:
+${grundwortschatzBis(Math.max(1, m.grade - 5)).join('; ')}`
+        : '',
     '',
     'Gib NUR Bausteine vom Typ „task" aus – und, wenn eingebettet, genau einen Baustein „text" davor.'
   ]

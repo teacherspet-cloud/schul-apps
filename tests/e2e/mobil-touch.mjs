@@ -347,6 +347,12 @@ async function lauf(name, breite, hoehe) {
   const telefon = breite <= 700
   const bild = (n) => page.screenshot({ path: join(out, `${name}-${n}.png`) })
   const sichtbar = (sel) => page.locator(sel).filter({ visible: true }).first()
+  // Telefon (07.10.2026): „Meine …" liegt im Blatt hinter ⋮ des Programmkopfs
+  const meineOeffnen = async (text) => {
+    const knopf = page.locator(`button:has-text("${text}")`).filter({ visible: true })
+    if (!(await knopf.count())) await sichtbar('[data-app-kopf-mehr]').tap()
+    await sichtbar(`button:has-text("${text}")`).tap()
+  }
 
   // Finger über CDP (Playwright kennt nur das einfache Tippen)
   const finger = (type, punkte) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: punkte.map((p, i) => ({ x: p.x, y: p.y, id: i })) })
@@ -381,7 +387,10 @@ async function lauf(name, breite, hoehe) {
       if (await direkt.count()) await direkt.first().tap({ timeout: 8000 })
       else {
         await sichtbar('[data-programme-knopf], [data-leiste-griff]').tap()
-        await sichtbar(`.mobil-programm[aria-label="${label}"]`).tap()
+        // Telefon (07.10.2026): Einstellungen stehen in „Mehr" als eigener Knopf unter den Programmen
+        if (label === 'Einstellungen' && (await page.locator('[data-mehr-einstellungen]').filter({ visible: true }).count()))
+          await sichtbar('[data-mehr-einstellungen]').tap()
+        else await sichtbar(`.mobil-programm[aria-label="${label}"]`).tap()
       }
       await page.waitForTimeout(600)
       // Auf dem iPhone steht nicht jedes Programm unten – dann genügt ein Versuch
@@ -541,7 +550,15 @@ async function lauf(name, breite, hoehe) {
     }
 
     // ---------- 5b. Druckvorschau: Zwei-Finger-Zoom auf den Seitenbildern
-    await sichtbar('.editor-leiste button:has-text("Drucken")').tap()
+    // Telefon (07.10.2026): Ausgaben stecken im Menü „Teilen" – sonst lägen sie rechts außerhalb des Bildschirms
+    const teilen = page.locator('[data-editor-teilen]').filter({ visible: true })
+    if (await teilen.count()) {
+      pruefe(true, `${name}: „Teilen" mit den Ausgaben sichtbar in der Editorleiste`)
+      await teilen.first().tap()
+      await page.waitForTimeout(400)
+      await bild('5a-teilen')
+      await page.getByRole('menuitem', { name: 'Drucken' }).tap({ timeout: 8000 })
+    } else await sichtbar('.editor-leiste button:has-text("Drucken")').tap()
     // Vorfrage zu den Lösungen (Arbeitsblatt)
     const weiter = page.getByRole('button', { name: 'Weiter zur Druckvorschau' })
     await weiter.waitFor({ timeout: 5000 }).catch(() => undefined)
@@ -585,7 +602,7 @@ async function lauf(name, breite, hoehe) {
     await page.evaluate(() => window.__selftest.lzkSheet())
     await page.evaluate(() => window.__selftest.lzkSpeichern('Touch-Probe'))
     await page.waitForTimeout(500)
-    await sichtbar('button:has-text("Meine Lernzielkontrollen")').tap()
+    await meineOeffnen('Meine Lernzielkontrollen')
     await page.waitForTimeout(800)
     const eintrag = sichtbar('[data-bibliothek-eintrag="Touch-Probe"]')
     await eintrag.waitFor({ timeout: 5000 })

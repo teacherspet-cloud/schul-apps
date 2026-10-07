@@ -14,8 +14,9 @@
  * mal gefüllt, „Eigenes Fenster" mal da, mal nicht.
  */
 import { DokumentSuche } from './AppSuche'
-import { ActionIcon, Badge, Button, Group, Paper, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconChevronUp, IconFolder, IconPlus } from '@tabler/icons-react'
+import { ActionIcon, Badge, Button, Drawer, Group, Paper, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
+import { IconChevronDown, IconChevronUp, IconDotsVertical, IconFolder, IconPlus } from '@tabler/icons-react'
+import { useTelefon } from '../touch/touchModus'
 import { createContext, useContext, useState } from 'react'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import type { ProgrammIcon } from './ProgrammSymbol'
@@ -72,6 +73,8 @@ export function AppKopf({
   suche?: React.ReactNode | false
 }): React.JSX.Element {
   const info = useContext(ProgrammInfo)
+  const telefon = useTelefon()
+  const [blatt, setBlatt] = useState(false)
   const name = titel ?? info?.name ?? ''
   const text = beschreibung ?? info?.description ?? ''
   const farbe = info?.color ?? 'blue'
@@ -95,6 +98,103 @@ export function AppKopf({
     } catch {
       // ohne Browserspeicher: nur für diese Sitzung
     }
+  }
+  /*
+   * Telefon (07.10.2026, Recherche Material 3 / Apple HIG): EINE Zeile – Bild, Titel, ⋮. Suche, Zusätze, „Meine …" und
+   * der eigene Hauptknopf liegen im Blatt hinter ⋮ (im Daumenbereich); „Neu …" wird zum runden Knopf unten rechts über
+   * der Tab-Leiste. Vorher brachen bis zu vier Zeilen Knöpfe über dem Inhalt um.
+   */
+  if (telefon) {
+    const hatBlatt = suche !== false || Boolean(zusaetze) || Boolean(meine) || Boolean(hauptknopf)
+    return (
+      <Paper
+        radius="md"
+        p={6}
+        mb={kompakt ? 0 : 'xs'}
+        withBorder
+        className="app-kopf app-kopf-telefon"
+        data-app-kopf
+        data-app-kopf-telefon
+        style={{
+          background: `linear-gradient(135deg, var(--mantine-color-${farbe}-light) 0%, transparent 70%)`,
+          borderColor: 'var(--mantine-color-default-border)'
+        }}
+      >
+        <Group gap={8} wrap="nowrap">
+          {info?.bild ? (
+            <img src={info.bild} alt="" width={28} height={28} style={{ borderRadius: 7, flex: '0 0 auto' }} />
+          ) : Symbol ? (
+            <Symbol size={26} />
+          ) : null}
+          <Text fw={700} size="md" truncate style={{ flex: 1, minWidth: 0 }} className="app-kopf-titel">
+            {name}
+          </Text>
+          <ModusAbzeichen />
+          {hatBlatt && (
+            <ActionIcon variant="subtle" color="gray" size="lg" radius="md" onClick={() => setBlatt(true)} aria-label="Weitere Aktionen" data-app-kopf-mehr>
+              <IconDotsVertical size={20} />
+            </ActionIcon>
+          )}
+        </Group>
+        {(links || rechts) && (
+          <div className="app-kopf-zeile app-kopf-zeile-telefon">
+            {links && <div style={{ minWidth: 0, overflowX: 'auto' }}>{links}</div>}
+            {rechts && (
+              <Group gap="xs" wrap="wrap" mt={4}>
+                {rechts}
+              </Group>
+            )}
+          </div>
+        )}
+        {neu && (
+          <ActionIcon
+            className="app-kopf-fab"
+            color={farbe}
+            variant="filled"
+            size={56}
+            radius="xl"
+            onClick={neu.onClick}
+            disabled={neu.disabled}
+            aria-label={neu.label}
+            title={neu.label}
+            data-app-neu={neu.kennung ?? ''}
+          >
+            {neu.icon ?? <IconPlus size={26} />}
+          </ActionIcon>
+        )}
+        <Drawer
+          opened={blatt}
+          onClose={() => setBlatt(false)}
+          position="bottom"
+          size="auto"
+          title={name}
+          zIndex={300}
+          styles={{ content: { borderRadius: '16px 16px 0 0', maxHeight: '85dvh' } }}
+          data-app-kopf-blatt
+        >
+          <Stack gap="sm" onClick={(e) => (e.target as HTMLElement).closest('button:not([aria-haspopup])') && setBlatt(false)}>
+            {suche === false ? null : suche ?? <DokumentSuche />}
+            {meine && (
+              <Button
+                variant="default"
+                leftSection={<IconFolder size={16} />}
+                onClick={meine.onClick}
+                disabled={meine.disabled}
+                data-app-meine={meine.kennung ?? ''}
+              >
+                {meine.label}
+              </Button>
+            )}
+            {zusaetze && (
+              <Group gap="xs" wrap="wrap">
+                {zusaetze}
+              </Group>
+            )}
+            {hauptknopf}
+          </Stack>
+        </Drawer>
+      </Paper>
+    )
   }
   if (zu)
     return (

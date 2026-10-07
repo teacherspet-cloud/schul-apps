@@ -21,6 +21,7 @@ import { alsKarten } from '@shared/grammatiktrainer'
 import { sitzungsWoerter, STUFEN, uebersicht, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
+import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
 import { useVtFarbe } from './vtFarben'
 import { ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
 
@@ -256,11 +257,17 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const [frage, setFrage] = useState(0)
   const [regel, setRegel] = useState(false)
   const a = schlange[0]
-  const antworten = async (antwort: string, wort?: string): Promise<void> => {
+  const antworten = async (antwort: string, wort?: string, selbst?: Urteil): Promise<void> => {
     if (!a || laeuft || ergebnis) return
     setLaeuft(true)
     try {
-      const e = await senden<Ergebnis>('/s/api/grammatik/antwort', { id: d.id, aufgabeId: a.id, antwort, ...(wort !== undefined ? { wort } : {}) })
+      const e = await senden<Ergebnis>('/s/api/grammatik/antwort', {
+        id: d.id,
+        aufgabeId: a.id,
+        antwort,
+        ...(wort !== undefined ? { wort } : {}),
+        ...(selbst ? { selbst } : {})
+      })
       setStaende((s) => ({ ...s, [a.id]: e.stand }))
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
@@ -333,7 +340,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       </Group>
       <Progress value={(zaehler.gesamt / Math.max(1, zaehler.gesamt + schlange.length)) * 100} radius="xl" size="lg" color={farbe.a} />
       <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
-        <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w) => void antworten(x, w)} ergebnis={ergebnis} />
+        <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
       </div>
       {r && (
         <Button
@@ -352,7 +359,15 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       {ergebnis && (
         <Alert color={ergebnis.urteil === 'richtig' ? 'green' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
           <Text fw={700}>
-            {ergebnis.urteil === 'richtig' ? 'Richtig!' : ergebnis.urteil === 'fast' ? 'Fast – achte auf die Schreibweise.' : 'Leider falsch.'}
+            {ergebnis.urteil === 'richtig'
+              ? 'Richtig!'
+              : ergebnis.urteil === 'fast'
+              ? a.art === 'bestimmen' || a.art === 'mehrfach' || a.art === 'tabelle'
+                ? 'Teilweise richtig.'
+                : a.art === 'uebersetzen'
+                ? 'Fast.'
+                : 'Fast – achte auf die Schreibweise.'
+              : 'Leider falsch.'}
           </Text>
           {ergebnis.urteil !== 'richtig' && <Text size="sm">Richtig: {ergebnis.richtig}</Text>}
           {ergebnis.erklaerung && <Text size="sm">{ergebnis.erklaerung}</Text>}
@@ -369,6 +384,57 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
 
 /** Eine Aufgabe je nach Art – auch von den Spielen genutzt */
 function Aufgabe({
+  a,
+  gesperrt,
+  antworten,
+  ergebnis
+}: {
+  a: GrammatikAufgabe
+  gesperrt: boolean
+  antworten: (antwort: string, wort?: string, selbst?: Urteil) => void
+  ergebnis?: { urteil: Urteil } | null
+}): React.JSX.Element {
+  // Latein (07.10.2026): eigene Bedienelemente
+  if (a.art === 'bestimmen')
+    return (
+      <AufgabenRahmen a={a}>
+        <BestimmenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'mehrfach')
+    return (
+      <AufgabenRahmen a={a}>
+        <MehrfachAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'tabelle')
+    return (
+      <AufgabenRahmen a={a}>
+        <TabellenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'uebersetzen')
+    return (
+      <AufgabenRahmen a={a}>
+        <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} />
+}
+
+/** Anweisung über der Aufgabe */
+function AufgabenRahmen({ a, children }: { a: GrammatikAufgabe; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <Stack gap="sm" data-aufgabe={a.art}>
+      <Text c="dimmed" size="sm">
+        {a.anweisung || ART_NAME[a.art]}
+      </Text>
+      {children}
+    </Stack>
+  )
+}
+
+function AufgabeAllgemein({
   a,
   gesperrt,
   antworten,

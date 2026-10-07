@@ -88,6 +88,7 @@ import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
+import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
@@ -162,6 +163,13 @@ export default function SchuelerBereich(): React.JSX.Element {
   const ich = window.__schulappsServer
   // Gäste (Beitritt mit Namen) haben kein Konto zum Abmelden – sie gehören nur zu diesem Test
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
+  /*
+   * Untere Leiste auf dem Telefon (07.10.2026, SchuelerTabs.tsx) – nicht im laufenden Onlinetest, beim Üben, beim
+   * Ausfüllen eines Blattes, beim Beitreten per Code und nicht für Gäste: dort zählt der Fokus.
+   */
+  const telefon = useSchuelerTelefon()
+  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln)
+  const mitTabs = telefon && !gast && !fokus
   const inhalt = code ? (
     <TestAblauf code={code.toUpperCase()} />
   ) : fbCode ? (
@@ -228,7 +236,7 @@ export default function SchuelerBereich(): React.JSX.Element {
                       : ''
             : ''}
         </Text>
-        <Group gap={4}>
+        <Group gap={4} style={mitTabs ? { display: 'none' } : undefined}>
           <ModusKnopf />
           {(!gast || ich?.angemeldet) && (
             <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
@@ -248,6 +256,13 @@ export default function SchuelerBereich(): React.JSX.Element {
         </Button>
       )}
       <div data-vorlese-bereich>{inhalt}</div>
+      {mitTabs && (
+        <>
+          {/* Platz für die Leiste unten */}
+          <div style={{ height: 'calc(76px + env(safe-area-inset-bottom, 0px))' }} aria-hidden />
+          <SchuelerTabs abmelden={() => void abmelden()} />
+        </>
+      )}
     </Container>
   )
 }

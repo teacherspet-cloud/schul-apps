@@ -111,7 +111,8 @@ export default function GrammatikAuswahl({
   const voll = useAlleOptionen()
 
   // Lehrwerk: das der Lerngruppe, sonst das zuletzt gewählte (nur Bände mit hinterlegter Unit-Grammatik)
-  const baende = useMemo(() => (fach === 'englisch' ? lehrwerkeMitGrammatik() : []), [fach])
+  // Lehrwerke je Fach und Land (Englisch: Green Line; Latein: Pontes, Campus, prima – 07.10.2026)
+  const baende = useMemo(() => (fach === 'englisch' || fach === 'latein' ? lehrwerkeMitGrammatik(fach, query.stateId) : []), [fach, query.stateId])
   const startBuch =
     lehrwerk?.buch && baende.includes(lehrwerk.buch) ? lehrwerk.buch : gemerkt.lehrwerk && baende.includes(gemerkt.lehrwerk.buch) ? gemerkt.lehrwerk.buch : null
   const [buch, setBuch] = useState<string | null>(startBuch)

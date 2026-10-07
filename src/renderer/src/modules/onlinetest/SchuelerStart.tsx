@@ -295,7 +295,7 @@ function Kurzstatistik({ a }: { a: LernstandAntwort }): React.JSX.Element {
     { name: 'letzter Test', wert: a.zahlen.testsZuletzt === null ? '–' : `${a.zahlen.testsZuletzt} %` }
   ]
   return (
-    <SimpleGrid cols={{ base: 2, xs: 4 }} spacing={8} mt="md" data-kurzstatistik>
+    <SimpleGrid cols={{ base: 2, xs: 4 }} spacing={8} mt="md" data-kurzstatistik data-zweispaltig>
       {werte.map((w) => (
         <div key={w.name} className="sl-zahl">
           <Text fw={800} size="lg">

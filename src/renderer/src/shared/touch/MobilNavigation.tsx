@@ -1,8 +1,8 @@
 import { ActionIcon, Button, Drawer, Indicator, Stack, Text } from '@mantine/core'
 import ModusSchalter from '../../shell/ModusSchalter'
-import { IconApps, IconHome, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
-import { useEffect } from 'react'
-import type { SchulModule } from '../../modules/registry'
+import { IconApps, IconChalkboard, IconDots, IconFolders, IconHome, IconLayoutSidebarLeftExpand, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react'
+import { useEffect, useState } from 'react'
+import { MODUL_GRUPPEN, type SchulModule } from '../../modules/registry'
 
 /**
  * Navigation mit dem Finger (30.09.2026, recherche/mobile-bedienung-2026-09-30.md).
@@ -15,6 +15,13 @@ import type { SchulModule } from '../../modules/registry'
  *
  * Die Programmliste ist eine Schublade mit Bild UND Namen – die Symbole allein sind nicht für
  * jedes Programm selbsterklärend (Wunsch der Lehrkraft, 25.09.2026).
+ *
+ * Telefon seit 07.10.2026 (Recherche: Material 3 Navigation Bar 3–5 Ziele, Apple HIG Tab Bar, NN/g zu versteckter
+ * Navigation; abgestimmt mit der Lehrkraft): fünf Ziele unten – Start · Unterricht · ＋ Erstellen (mittig) ·
+ * Meine Materialien · Mehr. „Unterricht" und „Erstellen" öffnen ein Blatt von unten mit den passenden Programmen
+ * (Gruppen aus registry.ts), „Meine Materialien" die Übersicht aller eigenen Materialien (Themenbereiche), „Mehr"
+ * alle Programme in Gruppen, dazu Standard/Experte, Einstellungen und Abmelden. Vorher fehlte das Abmelden auf dem
+ * Telefon ganz, und der Tab des offenen Programms tat nichts.
  */
 
 type Programm = Pick<SchulModule, 'id' | 'name' | 'icon' | 'leistenbild'>
@@ -96,39 +103,207 @@ export function ProgrammSchublade({
   )
 }
 
-/** Tab-Leiste unten (iPhone): Startseite, offenes Programm, Programme, Einstellungen */
-export function MobilTabs({ daten, onProgramme }: { daten: NavigationsDaten; onProgramme: () => void }): React.JSX.Element {
-  const offen = daten.programme.find((p) => p.id === daten.active)
-  const laeuftWo = daten.programme.some((p) => daten.laufpunkte[p.id])
+/** Programme der Ziele „Unterricht" und „Erstellen" (in dieser Reihenfolge, nur sichtbare) */
+export const UNTERRICHT_APPS = ['meineklassen', ...(MODUL_GRUPPEN.find((g) => g.id === 'unterricht')?.apps ?? [])]
+export const ERSTELLEN_GRUPPEN = [
+  ...MODUL_GRUPPEN.filter((g) => g.id === 'planung' || g.id === 'pruefung'),
+  { id: 'briefe', name: 'Briefe', apps: ['elternbrief'] }
+]
+const ERSTELLEN_APPS = ERSTELLEN_GRUPPEN.flatMap((g) => g.apps)
+
+type Blatt = 'unterricht' | 'erstellen' | 'mehr' | null
+
+/** Blatt von unten mit Programmen in Gruppen */
+function ProgrammBlatt({
+  titel,
+  offen,
+  onClose,
+  gruppen,
+  daten,
+  fuss,
+  kennung
+}: {
+  titel: string
+  offen: boolean
+  onClose: () => void
+  gruppen: { id: string; name: string; programme: Programm[] }[]
+  daten: NavigationsDaten
+  fuss?: React.ReactNode
+  kennung: string
+}): React.JSX.Element {
+  const waehle = (id: string): void => {
+    daten.oeffnen(id)
+    onClose()
+  }
   return (
-    <nav className="mobil-tabs" aria-label="Navigation" data-mobil-tabs>
-      <button
-        type="button"
-        className="mobil-tab"
-        data-aktiv={daten.active === 'home' || daten.active === 'themen'}
-        onClick={() => daten.oeffnen('home')}
-        aria-label="Startseite"
-      >
-        <IconHome size={24} />
-        Start
-      </button>
-      {offen && (
-        <button type="button" className="mobil-tab" data-aktiv onClick={() => daten.oeffnen(offen.id)} aria-label={offen.name}>
-          <Bild p={offen} groesse={28} />
-          <span style={{ maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{offen.name}</span>
-        </button>
-      )}
-      <button type="button" className="mobil-tab" onClick={onProgramme} aria-label="Programme" data-programme-knopf>
-        <Indicator disabled={!laeuftWo} size={9} processing color="orange" position="top-end">
-          <IconApps size={24} />
-        </Indicator>
-        Programme
-      </button>
-      <button type="button" className="mobil-tab" data-aktiv={daten.active === 'settings'} onClick={() => daten.oeffnen('settings')} aria-label="Einstellungen">
-        <IconSettings size={24} />
-        Einstellungen
-      </button>
-    </nav>
+    <Drawer
+      opened={offen}
+      onClose={onClose}
+      position="bottom"
+      size="auto"
+      title={titel}
+      zIndex={300}
+      styles={{ content: { borderRadius: '16px 16px 0 0', maxHeight: '85dvh' } }}
+      {...{ [kennung]: true }}
+    >
+      <Stack gap="md">
+        {gruppen
+          .filter((g) => g.programme.length)
+          .map((g) => (
+            <div key={g.id} data-blatt-gruppe={g.id}>
+              {gruppen.length > 1 && (
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={6}>
+                  {g.name}
+                </Text>
+              )}
+              <div className="mobil-programme">
+                {g.programme.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="mobil-programm"
+                    data-aktiv={daten.active === p.id}
+                    onClick={() => waehle(p.id)}
+                    aria-label={p.name}
+                  >
+                    <Indicator disabled={!daten.laufpunkte[p.id]} size={10} processing color="orange" position="top-end">
+                      <Bild p={p} groesse={36} />
+                    </Indicator>
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        {fuss}
+      </Stack>
+    </Drawer>
+  )
+}
+
+/**
+ * Tab-Leiste unten (Telefon, 07.10.2026): Start · Unterricht · ＋ Erstellen · Meine Materialien · Mehr.
+ * `mehrOffen`/`setMehrOffen`: „Mehr" öffnet auch das Wischen vom linken Rand (App.tsx).
+ */
+export function MobilTabs({
+  daten,
+  mehrOffen,
+  setMehrOffen,
+  abmelden,
+  benutzer
+}: {
+  daten: NavigationsDaten
+  mehrOffen: boolean
+  setMehrOffen: (offen: boolean) => void
+  /** Nur am Server */
+  abmelden?: () => void
+  benutzer?: string
+}): React.JSX.Element {
+  const [blatt, setBlatt] = useState<Blatt>(null)
+  const offenesBlatt: Blatt = mehrOffen ? 'mehr' : blatt
+  const schliessen = (): void => {
+    setBlatt(null)
+    setMehrOffen(false)
+  }
+  const nach = (ids: string[]): Programm[] => ids.flatMap((id) => daten.programme.filter((p) => p.id === id))
+  const unterricht = nach(UNTERRICHT_APPS)
+  const erstellen = ERSTELLEN_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))
+  const gruppiert = MODUL_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))
+  const uebrige = daten.programme.filter((p) => !MODUL_GRUPPEN.some((g) => g.apps.includes(p.id)))
+  const alle = uebrige.length ? [...gruppiert, { id: 'weitere', name: 'Weitere', programme: uebrige }] : gruppiert
+  const laeuft = (liste: Programm[]): boolean => liste.some((p) => daten.laufpunkte[p.id])
+  const inUnterricht = unterricht.some((p) => p.id === daten.active)
+  const inErstellen = ERSTELLEN_APPS.includes(daten.active)
+  const tab = (
+    name: string,
+    symbol: React.ReactNode,
+    aktiv: boolean,
+    onClick: () => void,
+    extra: Record<string, unknown> = {},
+    punkt = false,
+    klasse = 'mobil-tab'
+  ): React.JSX.Element => (
+    <button type="button" className={klasse} data-aktiv={aktiv} onClick={onClick} aria-label={name} {...extra}>
+      <Indicator disabled={!punkt} size={9} processing color="orange" position="top-end">
+        {symbol}
+      </Indicator>
+      <span className="mobil-tab-name">{name}</span>
+    </button>
+  )
+  return (
+    <>
+      <nav className="mobil-tabs" aria-label="Navigation" data-mobil-tabs>
+        {tab('Start', <IconHome size={24} />, daten.active === 'home', () => daten.oeffnen('home'), { 'data-tab': 'start', 'aria-label': 'Startseite' })}
+        {unterricht.length > 0 &&
+          tab('Unterricht', <IconChalkboard size={24} />, inUnterricht, () => setBlatt('unterricht'), { 'data-tab': 'unterricht' }, laeuft(unterricht))}
+        {tab(
+          'Erstellen',
+          <span className="mobil-tab-plus">
+            <IconPlus size={24} />
+          </span>,
+          inErstellen,
+          () => setBlatt('erstellen'),
+          { 'data-tab': 'erstellen' },
+          laeuft(erstellen.flatMap((g) => g.programme)),
+          'mobil-tab mobil-tab-erstellen'
+        )}
+        {tab('Materialien', <IconFolders size={24} />, daten.active === 'themen', () => daten.oeffnen('themen'), { 'data-tab': 'materialien' })}
+        {tab(
+          'Mehr',
+          <IconDots size={24} />,
+          daten.active === 'settings' || (!inUnterricht && !inErstellen && !['home', 'themen'].includes(daten.active)),
+          () => setMehrOffen(true),
+          { 'data-tab': 'mehr', 'data-programme-knopf': true },
+          laeuft(uebrige) || laeuft(gruppiert.flatMap((g) => g.programme))
+        )}
+      </nav>
+      <ProgrammBlatt
+        titel="Unterricht"
+        kennung="data-blatt-unterricht"
+        offen={offenesBlatt === 'unterricht'}
+        onClose={schliessen}
+        gruppen={[{ id: 'unterricht', name: 'Unterricht', programme: unterricht }]}
+        daten={daten}
+      />
+      <ProgrammBlatt
+        titel="Neu erstellen"
+        kennung="data-blatt-erstellen"
+        offen={offenesBlatt === 'erstellen'}
+        onClose={schliessen}
+        gruppen={erstellen}
+        daten={daten}
+      />
+      <ProgrammBlatt
+        titel="Alle Programme"
+        kennung="data-programm-schublade"
+        offen={offenesBlatt === 'mehr'}
+        onClose={schliessen}
+        gruppen={alle}
+        daten={daten}
+        fuss={
+          <Stack gap="xs" data-mehr-fuss>
+            {/* Standard-/Expertenmodus (07.10.2026) – wie links in der Leiste am PC */}
+            <ModusSchalter breit />
+            <Button
+              variant="default"
+              leftSection={<IconSettings size={18} />}
+              onClick={() => {
+                daten.oeffnen('settings')
+                schliessen()
+              }}
+              data-mehr-einstellungen
+            >
+              Einstellungen
+            </Button>
+            {abmelden && (
+              <Button variant="default" color="red" leftSection={<IconLogout size={18} />} onClick={abmelden} data-mehr-abmelden>
+                Abmelden{benutzer ? ` (${benutzer})` : ''}
+              </Button>
+            )}
+          </Stack>
+        }
+      />
+    </>
   )
 }
 

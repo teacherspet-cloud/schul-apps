@@ -12,7 +12,23 @@
  */
 import { abstand, type Urteil } from './vokabeltrainer'
 
-export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau'
+export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau' | 'bestimmen' | 'mehrfach' | 'tabelle' | 'uebersetzen'
+
+/*
+ * Aufgabenarten für Latein (07.10.2026, abgestimmt mit der Lehrkraft nach Recherche – KC Niedersachsen 2017,
+ * Pontes/Campus/prima, Navigium):
+ *  - bestimmen: eine Form nach Merkmalen bestimmen (Kasus/Numerus/Genus bzw. Person/Numerus/Tempus/Modus/Genus verbi).
+ *    Einzelne Form: ALLE Lesarten verlangt (rosae = Gen. Sg./Dat. Sg./Nom. Pl.), Teilpunkte je richtiger Lesart; steht
+ *    die Form in einem Satz, gilt nur die eine passende Lesart.
+ *  - mehrfach: Auswahl mit mehreren richtigen Möglichkeiten.
+ *  - tabelle: Paradigma bzw. Formentabelle ausfüllen (vorgegebene Zellen stehen schon da).
+ *  - uebersetzen: Übersetzung (z. B. mit Kasusfunktion) – stimmt sie nicht wörtlich mit einer Musterlösung überein,
+ *    vergleichen die Lernenden selbst mit der Musterlösung (die Lernenden lösen keine KI-Anfragen aus).
+ * Längenzeichen (ā ē ī ō ū) zählen bei Antworten nicht – angezeigt werden sie trotzdem.
+ */
+
+/** Eine Lesart: je Merkmal ein Wert, in der Reihenfolge von `merkmale` */
+export type Lesart = string[]
 
 export interface GrammatikRegel {
   id: string
@@ -42,6 +58,18 @@ export interface GrammatikAufgabe {
   teile?: string[]
   /** Warum (kurz, deutsch) – nach der Antwort gezeigt */
   erklaerung?: string
+  /** bestimmen: die Form (steht sie im `satz`, gilt nur die Lesart im Satz) */
+  form?: string
+  /** bestimmen: Merkmale in Reihenfolge, z. B. ["Kasus", "Numerus", "Genus"] */
+  merkmale?: string[]
+  /** bestimmen: wählbare Werte je Merkmal (gleiche Reihenfolge wie `merkmale`) */
+  werte?: string[][]
+  /** bestimmen: alle richtigen Lesarten */
+  lesarten?: Lesart[]
+  /** tabelle: Spaltenköpfe (ohne die erste Spalte mit den Zeilennamen), z. B. ["Singular", "Plural"] */
+  spalten?: string[]
+  /** tabelle: Zeilen mit Namen (z. B. „Nom."), Lösungen je Spalte und vorgegebenen Zellen */
+  zeilen?: { name: string; loesungen: string[]; vorgabe?: boolean[] }[]
 }
 
 export interface GrammatikPaket {
@@ -50,13 +78,17 @@ export interface GrammatikPaket {
   aufgaben: GrammatikAufgabe[]
 }
 
-export const ARTEN: AufgabenArt[] = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau']
+export const ARTEN: AufgabenArt[] = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'bestimmen', 'mehrfach', 'tabelle', 'uebersetzen']
 export const ART_NAME: Record<AufgabenArt, string> = {
   luecke: 'Lücke',
   auswahl: 'Auswahl',
   umformen: 'Umformen',
   fehler: 'Fehler finden',
-  satzbau: 'Satzbau'
+  satzbau: 'Satzbau',
+  bestimmen: 'Bestimmen',
+  mehrfach: 'Mehrfachauswahl',
+  tabelle: 'Tabelle',
+  uebersetzen: 'Übersetzen'
 }
 
 const text = (x: unknown, n = 400): string =>
@@ -100,7 +132,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     const a: GrammatikAufgabe = {
       id: `a${i + 1}`,
       art,
-      regelId: regelIds.has(String(y.regelId)) ? String(y.regelId) : (regeln[0]?.id ?? ''),
+      regelId: regelIds.has(String(y.regelId)) ? String(y.regelId) : regeln[0]?.id ?? '',
       anweisung: text(y.anweisung, 200),
       satz: text(y.satz, 400),
       ...(text(y.vorgabe, 200) ? { vorgabe: text(y.vorgabe, 200) } : {}),
@@ -111,13 +143,43 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
       ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
-    if (!a.satz && art !== 'satzbau') continue
+    if (art === 'bestimmen') {
+      a.form = text(y.form, 80)
+      a.merkmale = liste(y.merkmale, 6, 40)
+      a.werte = (Array.isArray(y.werte) ? y.werte : []).slice(0, a.merkmale.length).map((w) => liste(w, 12, 40))
+      // Lesarten nur mit Werten, die es zur Auswahl gibt; doppelte weg
+      const lesarten = (Array.isArray(y.lesarten) ? y.lesarten : [])
+        .map((l) => liste(l, 6, 40))
+        .filter((l) => l.length === a.merkmale!.length && l.every((w, j) => a.werte![j]?.some((x) => gleich(x, w))))
+      a.lesarten = lesarten.filter((l, i) => lesarten.findIndex((m) => lesartGleich(l, m)) === i).slice(0, 8)
+      if (!a.form || a.merkmale.length < 1 || a.werte.length !== a.merkmale.length || !a.lesarten.length) continue
+      a.loesungen = a.lesarten.map((l) => l.join(' '))
+    }
+    if (art === 'mehrfach') {
+      a.optionen = liste(y.optionen, 8, 120)
+      a.loesungen = a.loesungen.filter((l) => a.optionen!.some((o) => gleich(o, l)))
+      if (a.optionen.length < 3 || !a.loesungen.length) continue
+    }
+    if (art === 'tabelle') {
+      a.spalten = liste(y.spalten, 6, 40)
+      a.zeilen = (Array.isArray(y.zeilen) ? y.zeilen : []).slice(0, 12).map((z) => {
+        const q = (z ?? {}) as Record<string, unknown>
+        const loes = (Array.isArray(q.loesungen) ? q.loesungen : []).slice(0, a.spalten!.length).map((x) => text(x, 80))
+        const vorgabe = Array.isArray(q.vorgabe) ? q.vorgabe.slice(0, a.spalten!.length).map(Boolean) : []
+        return { name: text(q.name, 40), loesungen: loes, ...(vorgabe.some(Boolean) ? { vorgabe } : {}) }
+      })
+      const offen = a.zeilen.flatMap((z) => z.loesungen.filter((l, j) => l && !z.vorgabe?.[j]))
+      if (!a.spalten.length || a.zeilen.length < 2 || a.zeilen.some((z) => z.loesungen.length !== a.spalten!.length) || offen.length < 2) continue
+      a.loesungen = [offen.join(' | ')]
+    }
+    if (art === 'uebersetzen' && !a.satz) continue
+    if (!a.satz && art !== 'satzbau' && art !== 'bestimmen' && art !== 'tabelle' && art !== 'mehrfach') continue
     if (!a.loesungen.length) continue
     if ((art === 'luecke' || art === 'auswahl') && !a.satz.includes('___')) continue
     if (art === 'auswahl' && (!a.optionen || a.optionen.length < 2 || !a.optionen.some((o) => gleich(o, a.loesungen[0])))) continue
     if (art === 'fehler' && (!a.fehlerWort || !woerterVon(a.satz).some((w) => gleich(w, a.fehlerWort!)))) continue
     if (art === 'satzbau' && (a.teile?.length ?? 0) < 3) continue
-    const schluessel = `${art}|${a.satz}|${a.loesungen[0]}`.toLowerCase()
+    const schluessel = `${art}|${a.satz}|${a.form ?? ''}|${a.loesungen[0]}`.toLowerCase()
     if (gesehen.has(schluessel)) continue
     gesehen.add(schluessel)
     aufgaben.push(a)
@@ -126,9 +188,16 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
   return { thema: text(r.thema, 160) || thema, regeln, aufgaben }
 }
 
-/** Für den Vergleich: Kleinschreibung, typografische Zeichen vereinheitlicht, Satzzeichen am Ende egal */
+/** Längenzeichen (Makron, Breve) weg: „rosā" = „rosa" – zählen bei Antworten nicht (Latein, 07.10.2026) */
+export const ohneLaengen = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0304\u0306]/g, '')
+    .normalize('NFC')
+
+/** Für den Vergleich: Kleinschreibung, typografische Zeichen vereinheitlicht, Satzzeichen am Ende und Längenzeichen egal */
 export function normiert(s: string): string {
-  return s
+  return ohneLaengen(s)
     .normalize('NFC')
     .replace(/[’‘`´]/g, "'")
     .replace(/[“”„]/g, '"')
@@ -138,6 +207,77 @@ export function normiert(s: string): string {
     .toLowerCase()
 }
 const gleich = (a: string, b: string): boolean => normiert(a) === normiert(b)
+/** Merkmalswerte vergleichen: „Gen." = „Genitiv" = „gen" (Abkürzung oder ausgeschrieben, Punkt egal) */
+const KURZ: Record<string, string> = {
+  sg: 'singular',
+  pl: 'plural',
+  m: 'maskulinum',
+  f: 'femininum',
+  n: 'neutrum',
+  akt: 'aktiv',
+  pass: 'passiv',
+  präs: 'präsens',
+  impf: 'imperfekt',
+  perf: 'perfekt',
+  plusqpf: 'plusquamperfekt',
+  fut: 'futur',
+  ind: 'indikativ',
+  konj: 'konjunktiv',
+  imp: 'imperativ',
+  nom: 'nominativ',
+  gen: 'genitiv',
+  dat: 'dativ',
+  akk: 'akkusativ',
+  abl: 'ablativ',
+  vok: 'vokativ'
+}
+/** Wert ausgeschrieben: „Fut. I" → „futur i", „Sg." → „singular" */
+const ausgeschrieben = (s: string): string =>
+  normiert(s)
+    .replace(/\./g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => KURZ[t] ?? t)
+    .join(' ')
+const wertGleich = (a: string, b: string): boolean => ausgeschrieben(a) === ausgeschrieben(b)
+const lesartGleich = (a: Lesart, b: Lesart): boolean => a.length === b.length && a.every((w, i) => wertGleich(w, b[i]))
+
+/** Antwort einer Bestimmungs-, Mehrfach- oder Tabellenaufgabe aus dem Text (JSON) lesen */
+function jsonListe(s: string): unknown[] {
+  try {
+    const x = JSON.parse(s)
+    return Array.isArray(x) ? x : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Bestimmung bewerten (Teilpunkte): Anteil der richtigen Lesarten, falsche ziehen ab.
+ * 1 = alle Lesarten und keine falsche; 0 = keine richtige.
+ */
+export function bestimmungsAnteil(a: GrammatikAufgabe, angegeben: Lesart[]): { anteil: number; richtig: number; falsch: number; gesamt: number } {
+  const soll = a.lesarten ?? []
+  const eindeutig = angegeben.filter((l, i) => angegeben.findIndex((m) => lesartGleich(l, m)) === i)
+  const richtig = soll.filter((s) => eindeutig.some((l) => lesartGleich(l, s))).length
+  const falsch = eindeutig.filter((l) => !soll.some((s) => lesartGleich(l, s))).length
+  const anteil = soll.length ? Math.max(0, (richtig - falsch) / soll.length) : 0
+  return { anteil, richtig, falsch, gesamt: soll.length }
+}
+
+/** Tabelle bewerten: Anteil der richtig gefüllten offenen Zellen (Längenzeichen egal, Varianten mit „/") */
+export function tabellenAnteil(a: GrammatikAufgabe, zellen: string[][]): number {
+  let n = 0
+  let ok = 0
+  for (const [i, z] of (a.zeilen ?? []).entries())
+    for (const [j, l] of z.loesungen.entries()) {
+      if (!l || z.vorgabe?.[j]) continue
+      n++
+      const ant = String(zellen[i]?.[j] ?? '')
+      if (l.split('/').some((v) => gleich(v, ant))) ok++
+    }
+  return n ? ok / n : 0
+}
 
 /** Wörter eines Satzes (Satzzeichen ab) – für „Fehler finden" */
 export function woerterVon(satz: string): string[] {
@@ -153,8 +293,33 @@ export function woerterVon(satz: string): string[] {
  * `antwort` je Art: luecke/umformen/fehler = Text (bei fehler die Korrektur), auswahl = gewählte Möglichkeit,
  * satzbau = Teile in gelegter Reihenfolge, mit Leerzeichen verbunden.
  */
-export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltesWort?: string): { urteil: Urteil; richtig: string } {
+export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltesWort?: string, selbst?: Urteil): { urteil: Urteil; richtig: string } {
   const richtig = a.loesungen[0] ?? ''
+  if (a.art === 'bestimmen') {
+    const angegeben = jsonListe(antwort)
+      .filter(Array.isArray)
+      .map((l) => (l as unknown[]).map((w) => String(w ?? '')))
+    const b = bestimmungsAnteil(a, angegeben)
+    const alle = (a.lesarten ?? []).map((l) => l.join(' ')).join(' / ')
+    return { urteil: b.anteil >= 1 ? 'richtig' : b.richtig > 0 ? 'fast' : 'falsch', richtig: alle }
+  }
+  if (a.art === 'mehrfach') {
+    const gewaehlt = jsonListe(antwort).map(String)
+    const soll = a.loesungen
+    const treffer = soll.filter((s) => gewaehlt.some((g) => gleich(g, s))).length
+    const falsch = gewaehlt.filter((g) => !soll.some((s) => gleich(g, s))).length
+    return { urteil: treffer === soll.length && !falsch ? 'richtig' : treffer > falsch ? 'fast' : 'falsch', richtig: soll.join(' / ') }
+  }
+  if (a.art === 'tabelle') {
+    const zellen = jsonListe(antwort).map((z) => (Array.isArray(z) ? z.map((w) => String(w ?? '')) : []))
+    const anteil = tabellenAnteil(a, zellen)
+    return { urteil: anteil >= 1 ? 'richtig' : anteil >= 0.75 ? 'fast' : 'falsch', richtig }
+  }
+  if (a.art === 'uebersetzen') {
+    // Wörtlich wie eine Musterlösung = richtig; sonst entscheidet der Vergleich der Lernenden (`selbst`)
+    if (a.loesungen.some((l) => gleich(l, antwort))) return { urteil: 'richtig', richtig }
+    return { urteil: selbst ?? 'falsch', richtig }
+  }
   if (a.art === 'fehler' && gewaehltesWort !== undefined && a.fehlerWort && !gleich(gewaehltesWort, a.fehlerWort)) return { urteil: 'falsch', richtig }
   const ant = normiert(antwort)
   if (!ant) return { urteil: 'falsch', richtig }
@@ -165,7 +330,7 @@ export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltes
 
 /** Ids der Aufgaben als „Vokabeln" – damit Übersicht und Tagesration des Vokabeltrainers sie verwalten können */
 export const alsKarten = (aufgaben: GrammatikAufgabe[]): { id: string; term: string; translation: string }[] =>
-  aufgaben.map((a) => ({ id: a.id, term: a.satz || a.loesungen[0], translation: a.loesungen[0] }))
+  aufgaben.map((a) => ({ id: a.id, term: a.satz || a.form || a.anweisung || a.loesungen[0], translation: a.loesungen[0] }))
 
 // ---------------------------------------------------------------- Spiele
 

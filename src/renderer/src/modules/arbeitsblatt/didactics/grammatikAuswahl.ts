@@ -12,6 +12,7 @@
  */
 import { GRAMMAR_TOPICS, einfuehrungsNiveau, defaultSequence, teilformenFuer, topicStart, type GrammarQuery, type GrammarTopic } from './grammar'
 import { LEHRWERK_THEMEN, kapitelFolge } from '../../../shared/lehrwerkThemen'
+import { ohneHinweis, ZUORDNUNG_LA } from './zuordnungLatein'
 import { grammatikStationen, LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 
 /** Kleinbuchstaben, Umlaute ausgeschrieben, Akzente weg – damit „Präsens", „praesens" und „présent" zusammenfinden */
@@ -242,6 +243,12 @@ export const ZUORDNUNG_KENNUNGEN = ZUORDNUNG_EN.map((z) => ({ ids: z.ids, teile:
 
 /** Grammatikangabe eines Kapitels in Einzelteile zerlegen – Kommas in Klammern trennen nicht */
 export function zerlegeGrammatik(text: string): string[] {
+  // Mit „;" getrennt (Latein-Synopsen): nur daran trennen – Kommas gehören dort zur Angabe („Abl. loc., sep., soc.")
+  if (text.includes(';'))
+    return text
+      .split(';')
+      .map((t) => t.trim())
+      .filter(Boolean)
   const teile: string[] = []
   let tiefe = 0
   let aktuell = ''
@@ -274,6 +281,16 @@ export function ordneZu(subjectId: string, phrase: string, band = ''): { ids: st
   const n = normalisiere(phrase).trim()
   const fach = GRAMMAR_TOPICS.filter((t) => t.subject === subjectId)
   const gibt = new Set(fach.map((t) => t.id))
+  // Latein (07.10.2026): Synopsen der Verlage, eigene Tabelle (zuordnungLatein.ts)
+  if (subjectId === 'latein') {
+    const nl = normalisiere(ohneHinweis(phrase)).trim()
+    const z = ZUORDNUNG_LA.find((x) => x.muster.test(nl))
+    if (z) {
+      const ids = z.ids.filter((id) => gibt.has(id))
+      const teile = ids.length === 1 && z.teile ? z.teile.map((t) => `${ids[0]}/${t}`) : []
+      if (ids.length) return { ids, teile, sicher: !z.unsicher }
+    }
+  }
   if (subjectId === 'englisch') {
     const z = ZUORDNUNG_EN.find((x) => x.muster.test(n) && (!x.baende || x.baende.includes(band)))
     if (z) {
@@ -293,9 +310,17 @@ export function ordneZu(subjectId: string, phrase: string, band = ''): { ids: st
   }
 }
 
-/** Bände, für die Unit-Grammatik hinterlegt ist */
-export function lehrwerkeMitGrammatik(): string[] {
-  return Object.keys(LEHRWERK_THEMEN).filter((b) => Object.values(LEHRWERK_THEMEN[b].kapitel).some((k) => k.grammatik))
+/**
+ * Bände, für die Unit-Grammatik hinterlegt ist – je Fach (Englisch, seit 07.10.2026 auch Latein) und, wenn ein Land
+ * bekannt ist, nur Ausgaben für dieses Land (Länderausgaben unterscheiden sich, Wunsch der Lehrkraft).
+ */
+export function lehrwerkeMitGrammatik(fach = 'englisch', land?: string): string[] {
+  return Object.keys(LEHRWERK_THEMEN).filter((b) => {
+    const w = LEHRWERK_THEMEN[b]
+    if ((w.fach ?? 'englisch') !== fach) return false
+    if (land && w.laender && !w.laender.includes(land)) return false
+    return Object.values(w.kapitel).some((k) => k.grammatik)
+  })
 }
 
 /** Kapitel eines Bandes mit Grammatikangabe, in Buchreihenfolge */

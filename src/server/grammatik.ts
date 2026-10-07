@@ -357,8 +357,10 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (!istOffen(z)) return (json(res, 409, { fehler: 'Dieses Training ist abgeschlossen.' }), true)
         const a = p.aufgaben.find((x) => x.id === k0.aufgabeId)
         if (!a) return (json(res, 400, { fehler: 'Unbekannte Aufgabe.' }), true)
-        const antwort = String(k0.antwort ?? '').slice(0, 600)
-        const e = pruefeGrammatik(a, antwort, typeof k0.wort === 'string' ? k0.wort : undefined)
+        // Tabellen und Bestimmungen kommen als JSON – deshalb mehr Platz als für einen Satz
+        const antwort = String(k0.antwort ?? '').slice(0, 4000)
+        const selbst = k0.selbst === 'richtig' || k0.selbst === 'fast' || k0.selbst === 'falsch' ? k0.selbst : undefined
+        const e = pruefeGrammatik(a, antwort, typeof k0.wort === 'string' ? k0.wort : undefined, selbst)
         const jetzt = Date.now()
         const neu = nachAbfrage(
           st.aufgaben[a.id] ?? { fach: 0, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche: 0, falsch: 0, fehlerTexte: [], zuletzt: 0 },

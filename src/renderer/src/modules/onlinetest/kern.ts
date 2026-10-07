@@ -101,9 +101,14 @@ export const ganzePunkte = (p: number): number => Math.max(1, Math.round(Number.
 
 const ARTIKEL = /^(to|a|an|the|le|la|les|l'|l’|un|une|des|el|los|las|il|lo|gli|i|der|die|das|ein|eine|de|het)\s+/i
 
-/** Normalisieren für den genauen Vergleich: Leerzeichen, typografische Zeichen, Schlusspunkt – NICHT die Groß-/Kleinschreibung */
+/**
+ * Normalisieren für den genauen Vergleich: Leerzeichen, typografische Zeichen, Schlusspunkt, Längenzeichen (Latein:
+ * „rosā" = „rosa", 07.10.2026) – NICHT die Groß-/Kleinschreibung
+ */
 export function normalisiere(s: string): string {
   return String(s ?? '')
+    .normalize('NFD')
+    .replace(/[̄̆]/g, '')
     .normalize('NFC')
     .replace(/[‘’ʼ`´]/g, "'")
     .replace(/[“”„«»]/g, '"')

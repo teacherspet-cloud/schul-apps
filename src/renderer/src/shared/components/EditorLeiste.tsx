@@ -1,6 +1,7 @@
-import { ActionIcon, Box, Button, Divider, Group, Popover, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Button, Divider, Group, Menu, Popover, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
+import { useTelefon } from '../touch/touchModus'
 import { useNotausgang } from './NurExperte'
-import { IconAdjustmentsHorizontal, IconArrowLeft, IconDeviceFloppy, IconFileTypeDocx, IconFileTypePdf, IconPrinter } from '@tabler/icons-react'
+import { IconAdjustmentsHorizontal, IconArrowLeft, IconDeviceFloppy, IconFileTypeDocx, IconFileTypePdf, IconPrinter, IconShare } from '@tabler/icons-react'
 import { useState } from 'react'
 import UndoRedoButtons from './UndoRedoButtons'
 
@@ -64,12 +65,42 @@ export default function EditorLeiste({
   const [optionenOffen, setOptionenOffen] = useState(false)
   // Standardmodus (07.10.2026): Notausgang „Alle Werkzeuge" – nur in Editoren mit OptionenBereich (bisher das Arbeitsblatt)
   const notausgang = useNotausgang()
+  /*
+   * Telefon (07.10.2026): Die Leiste scrollt waagerecht – Word, PDF und Drucken lagen ganz rechts außerhalb des
+   * Bildschirms. Deshalb vorn ein Knopf „Teilen" mit allen Ausgaben; der Name wird schmaler.
+   */
+  const telefon = useTelefon()
   return (
     <Group px="md" py={8} gap="xs" className="app-toolbar editor-leiste" data-testid="editor-leiste">
       <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} onClick={zurueck.onClick}>
         {zurueck.label}
       </Button>
       {undo && <UndoRedoButtons canUndo={undo.canUndo} canRedo={undo.canRedo} onUndo={undo.onUndo} onRedo={undo.onRedo} />}
+      {telefon && (
+        <Menu position="bottom-start" withinPortal zIndex={300}>
+          <Menu.Target>
+            <Button size="xs" leftSection={<IconShare size={14} />} data-editor-teilen>
+              Teilen
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item leftSection={<IconFileTypePdf size={16} />} onClick={ausgabe.onPdf}>
+              PDF
+            </Menu.Item>
+            <Menu.Item leftSection={<IconFileTypeDocx size={16} />} onClick={ausgabe.onWord}>
+              Word
+            </Menu.Item>
+            <Menu.Item leftSection={<IconPrinter size={16} />} onClick={ausgabe.onDrucken}>
+              Drucken
+            </Menu.Item>
+            {dateiSpeichern && (
+              <Menu.Item leftSection={<IconDeviceFloppy size={16} />} onClick={dateiSpeichern.onClick}>
+                Als Datei speichern
+              </Menu.Item>
+            )}
+          </Menu.Dropdown>
+        </Menu>
+      )}
       <Divider orientation="vertical" />
       {fassungen && fassungen.data.length > 1 && (
         <SegmentedControl size="xs" aria-label={fassungen.ariaLabel ?? 'Fassung'} value={fassungen.value} onChange={fassungen.onChange} data={fassungen.data} />
@@ -131,7 +162,7 @@ export default function EditorLeiste({
       {name && (
         <TextInput
           size="xs"
-          w={220}
+          w={telefon ? 150 : 220}
           aria-label="Name in der App"
           placeholder={name.placeholder}
           value={name.value}
@@ -143,22 +174,26 @@ export default function EditorLeiste({
           {gesichertAm ? `gesichert ${new Date(gesichertAm).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : 'wird gesichert …'}
         </Text>
       )}
-      {dateiSpeichern && (
+      {dateiSpeichern && !telefon && (
         <Tooltip label={dateiSpeichern.tooltip}>
           <ActionIcon size="md" variant="default" aria-label="Als Datei speichern" onClick={dateiSpeichern.onClick}>
             <IconDeviceFloppy size={16} />
           </ActionIcon>
         </Tooltip>
       )}
-      <Button size="xs" leftSection={<IconFileTypeDocx size={14} />} onClick={ausgabe.onWord}>
-        Word
-      </Button>
-      <Button size="xs" leftSection={<IconFileTypePdf size={14} />} onClick={ausgabe.onPdf}>
-        PDF
-      </Button>
-      <Button size="xs" variant="light" leftSection={<IconPrinter size={14} />} onClick={ausgabe.onDrucken}>
-        Drucken
-      </Button>
+      {!telefon && (
+        <>
+          <Button size="xs" leftSection={<IconFileTypeDocx size={14} />} onClick={ausgabe.onWord}>
+            Word
+          </Button>
+          <Button size="xs" leftSection={<IconFileTypePdf size={14} />} onClick={ausgabe.onPdf}>
+            PDF
+          </Button>
+          <Button size="xs" variant="light" leftSection={<IconPrinter size={14} />} onClick={ausgabe.onDrucken}>
+            Drucken
+          </Button>
+        </>
+      )}
       {rechts}
     </Group>
   )

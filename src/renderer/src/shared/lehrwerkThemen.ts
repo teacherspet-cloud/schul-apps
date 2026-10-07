@@ -15,17 +15,31 @@
  */
 
 import { grammatikText, LEHRWERK_GRAMMATIK, QUELLE_NDS } from './lehrwerkGrammatik'
+import { LEHRWERKE_LATEIN } from './lehrwerkeLatein'
 
 export interface KapitelThema {
   titel: string
   thema?: string
   ort?: string
   grammatik?: string
+  /** Lernjahr, in dem das Kapitel meist behandelt wird (Latein, aus den Synopsen) */
+  lernjahr?: number
 }
 
 const KLETT = 'Klett, Green Line Bundesausgabe ab 2021 (Produktseite und Planungsmuster)'
 
-export const LEHRWERK_THEMEN: Record<string, { quelle: string; kapitel: Record<string, KapitelThema> }> = {
+export const LEHRWERK_THEMEN: Record<
+  string,
+  {
+    quelle: string
+    kapitel: Record<string, KapitelThema>
+    /** Fach (fehlt = Englisch) – Latein seit 07.10.2026 */
+    fach?: string
+    /** Länder, für die die Ausgabe gilt (fehlt = Niedersachsen, so recherchiert) */
+    laender?: string[]
+    ausgabe?: string
+  }
+> = {
   'Green Line 1': {
     quelle: KLETT,
     kapitel: {
@@ -220,6 +234,9 @@ export const LEHRWERK_THEMEN: Record<string, { quelle: string; kapitel: Record<s
     }
   }
 }
+
+// Lateinische Lehrwerke (07.10.2026): Pontes, Campus A, prima., prima.nova – lehrwerkeLatein.ts
+Object.assign(LEHRWERK_THEMEN, LEHRWERKE_LATEIN)
 
 /*
  * Grammatik nach der Liste der Lehrkraft (Niedersachsen, je Station – lehrwerkGrammatik.ts, 07.10.2026) ersetzt die

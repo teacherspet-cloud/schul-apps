@@ -435,6 +435,30 @@ html[data-touch] .fit-to-width {
   color: #fff;
   background: rgba(255, 255, 255, 0.2);
 }
+/* Fünf Ziele (07.10.2026): Namen kürzer setzen, „Erstellen" mittig hervorgehoben */
+.mobil-tab-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.mobil-tab-plus {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast, #fff);
+}
+:root[data-app-nav='filled'] .mobil-tab-plus {
+  background: #fff;
+  color: var(--mantine-primary-color-filled);
+}
+.mobil-tab-erstellen[data-aktiv='true'] {
+  background: transparent;
+}
 /* Platz für die Leiste unten */
 /* (Mantine gibt dem Hauptbereich min-height: 100dvh – das muss mit herunter) */
 html[data-touch] .app-main[data-mobil-tabs] {
@@ -466,7 +490,10 @@ html[data-tastatur] .mobil-tabs {
   color: var(--mantine-color-text);
   font: 600 14px/1.2 system-ui, -apple-system, sans-serif;
   text-align: left;
-  overflow-wrap: anywhere;
+  /* Lange Namen mit deutscher Silbentrennung statt mitten im Wort („Unterrichts-reihe", 07.10.2026) */
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
   cursor: pointer;
 }
 .mobil-programm[data-aktiv='true'] {
@@ -628,9 +655,12 @@ html[data-tastatur] .mobil-tabs {
     max-width: 100% !important;
   }
 
-  /* Eine Spalte statt zwei */
-  html[data-touch] .mantine-SimpleGrid-root {
+  /* Eine Spalte statt zwei – außer bei kleinen Kennzahl-Rastern, die ausdrücklich zweispaltig bleiben (data-zweispaltig, 07.10.2026) */
+  html[data-touch] .mantine-SimpleGrid-root:not([data-zweispaltig]) {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+  html[data-touch] .mantine-SimpleGrid-root[data-zweispaltig] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   html[data-touch] .mantine-Grid-col {
     flex-basis: 100% !important;
@@ -643,6 +673,18 @@ html[data-tastatur] .mobil-tabs {
   }
   html[data-touch] .mantine-Stepper-stepDescription {
     display: none;
+  }
+  /* „Schritt 2 · Einstellungen" am aktuellen Schritt (07.10.2026) – die Kreise zeigen, wie viele es insgesamt sind */
+  html[data-touch] .mantine-Stepper-steps {
+    counter-reset: schritt;
+  }
+  html[data-touch] .mantine-Stepper-step {
+    counter-increment: schritt;
+  }
+  html[data-touch] .mantine-Stepper-step[data-progress] .mantine-Stepper-stepLabel::before {
+    content: 'Schritt ' counter(schritt) ' · ';
+    font-weight: 400;
+    opacity: 0.75;
   }
   html[data-touch] .mantine-Stepper-separator {
     margin-inline: 6px;
@@ -659,4 +701,62 @@ html[data-tastatur] .mobil-tabs {
     flex: 1 1 100%;
     width: 100%;
   }
+}
+
+/* ---------- Telefon (07.10.2026): Kopf in einer Zeile, Neu als runder Knopf, Aufträge über der Tab-Leiste */
+.app-kopf-zeile-telefon {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+.app-kopf-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 140;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+html[data-touch]:has(.mobil-tabs) .app-kopf-fab {
+  bottom: calc(62px + 14px + env(safe-area-inset-bottom, 0px));
+}
+html[data-tastatur] .app-kopf-fab,
+html[data-touch]:has(.editor-leiste) .app-kopf-fab {
+  /* Im Editor verdeckte der Knopf die Zoom-Leiste – „Neu …" braucht es dort nicht */
+  display: none;
+}
+@media (max-width: 700px) {
+  /* Auftragsleiste: Pille unten LINKS über der Tab-Leiste (rechts steht der Neu-Knopf), offen als Blatt in voller Breite */
+  html[data-touch] .auftrags-layer {
+    left: 8px;
+    right: auto;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 145;
+  }
+  html[data-touch]:has(.mobil-tabs) .auftrags-layer {
+    bottom: calc(62px + 8px + env(safe-area-inset-bottom, 0px));
+  }
+  html[data-touch] .auftrags-layer[data-offen='true'] {
+    left: 0;
+    right: 0;
+    max-width: none;
+  }
+  html[data-touch] .auftrags-layer[data-offen='true'] .auftrags-liste {
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+  }
+  html[data-touch] .auftrags-pille .mantine-Text-root {
+    max-width: 52vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+/* Schülerbereich: Ziele sind Verweise */
+.schueler-tabs .mobil-tab {
+  text-decoration: none;
+}
+
+/* Grammatikauswahl (07.10.2026): Bereichskacheln fingergroß (vorher 37 Punkte hoch) */
+html[data-touch] [data-grammatik-auswahl] [data-bereich] {
+  min-height: 44px;
 }
