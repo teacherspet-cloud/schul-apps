@@ -11,6 +11,8 @@
  * Hier die reinen Regeln (ohne Oberfläche) für Server, Oberfläche und Tests.
  */
 import { abstand, type Urteil } from './vokabeltrainer'
+import { bereinigeVerbKarten, type VerbKarte } from './verbTraining'
+import { istVerbSprache, type VerbSprache } from './verben'
 
 export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau' | 'bestimmen' | 'mehrfach' | 'tabelle' | 'uebersetzen'
 
@@ -76,6 +78,9 @@ export interface GrammatikPaket {
   thema: string
   regeln: GrammatikRegel[]
   aufgaben: GrammatikAufgabe[]
+  /** Unregelmäßige Verben (07.10.2026): die Karten für die Verbspiele und die Sprache der Liste */
+  verben?: VerbKarte[]
+  verbSprache?: VerbSprache
 }
 
 export const ARTEN: AufgabenArt[] = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'bestimmen', 'mehrfach', 'tabelle', 'uebersetzen']
@@ -169,7 +174,9 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
         return { name: text(q.name, 40), loesungen: loes, ...(vorgabe.some(Boolean) ? { vorgabe } : {}) }
       })
       const offen = a.zeilen.flatMap((z) => z.loesungen.filter((l, j) => l && !z.vorgabe?.[j]))
-      if (!a.spalten.length || a.zeilen.length < 2 || a.zeilen.some((z) => z.loesungen.length !== a.spalten!.length) || offen.length < 2) continue
+      // Verbkarten (07.10.2026) haben eine Zeile mit mindestens einer offenen Form
+      const minZeilen = a.regelId === 'verben' ? 1 : 2
+      if (!a.spalten.length || a.zeilen.length < minZeilen || a.zeilen.some((z) => z.loesungen.length !== a.spalten!.length) || offen.length < minZeilen) continue
       a.loesungen = [offen.join(' | ')]
     }
     if (art === 'uebersetzen' && !a.satz) continue
@@ -185,7 +192,15 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     aufgaben.push(a)
     if (aufgaben.length >= 80) break
   }
-  return { thema: text(r.thema, 160) || thema, regeln, aufgaben }
+  // Verben (07.10.2026): Karten bereinigt übernehmen
+  const verbSprache = istVerbSprache(String(r.verbSprache ?? '')) ? (String(r.verbSprache) as VerbSprache) : undefined
+  const verben: VerbKarte[] = bereinigeVerbKarten(r.verben)
+  return {
+    thema: text(r.thema, 160) || thema,
+    regeln,
+    aufgaben,
+    ...(verben.length && verbSprache ? { verben, verbSprache } : {})
+  }
 }
 
 /** Längenzeichen (Makron, Breve) weg: „rosā" = „rosa" – zählen bei Antworten nicht (Latein, 07.10.2026) */
@@ -274,7 +289,8 @@ export function tabellenAnteil(a: GrammatikAufgabe, zellen: string[][]): number 
       if (!l || z.vorgabe?.[j]) continue
       n++
       const ant = String(zellen[i]?.[j] ?? '')
-      if (l.split('/').some((v) => gleich(v, ant))) ok++
+      // Eine Variante („was") oder die ganze Zelle („was/were", auch mit Leerzeichen) zählt
+      if (gleich(l.replace(/\s*\/\s*/g, '/'), ant.replace(/\s*\/\s*/g, '/')) || l.split('/').some((v) => gleich(v, ant))) ok++
     }
   return n ? ok / n : 0
 }
@@ -334,9 +350,18 @@ export const alsKarten = (aufgaben: GrammatikAufgabe[]): { id: string; term: str
 
 // ---------------------------------------------------------------- Spiele
 
-export type GrammatikSpielId = 'fehlerjagd' | 'satzbaupuzzle' | 'formenblitz' | 'regelzuordnen'
+export type GrammatikSpielId = 'fehlerjagd' | 'satzbaupuzzle' | 'formenblitz' | 'regelzuordnen' | 'verbtrio' | 'verbblitz' | 'bildverb' | 'muster'
 
-export const GRAMMATIK_SPIELE: { id: GrammatikSpielId; name: string; einheit: string; kleinerBesser: boolean; beschreibung: string; braucht: AufgabenArt[] }[] =
+export const GRAMMATIK_SPIELE: {
+  id: GrammatikSpielId
+  name: string
+  einheit: string
+  kleinerBesser: boolean
+  beschreibung: string
+  braucht: AufgabenArt[]
+  /** Verbspiel (07.10.2026): nur bei der Freigabe „Unregelmäßige Verben" */
+  verben?: true
+}[] =
   [
     {
       id: 'fehlerjagd',
@@ -369,7 +394,12 @@ export const GRAMMATIK_SPIELE: { id: GrammatikSpielId; name: string; einheit: st
       kleinerBesser: false,
       beschreibung: 'Zum Beispielsatz die passende Regel finden.',
       braucht: []
-    }
+    },
+    // Unregelmäßige Verben (07.10.2026, Plan-Modus mit der Lehrkraft)
+    { id: 'verbtrio', name: 'Stammformen-Trio', einheit: 'Züge', kleinerBesser: true, beschreibung: 'Die Formen eines Verbs zusammen aufdecken.', braucht: [], verben: true },
+    { id: 'verbblitz', name: 'Formen-Blitz', einheit: 'richtig', kleinerBesser: false, beschreibung: '60 Sekunden: Welche Form hast du gehört?', braucht: [], verben: true },
+    { id: 'bildverb', name: 'Bild-Verb', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Zum Bild die Formen des Verbs nennen.', braucht: [], verben: true },
+    { id: 'muster', name: 'Muster sortieren', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Verben nach ihrem Formenmuster ordnen.', braucht: [], verben: true }
   ]
 
 export const grammatikRekord = (spiel: GrammatikSpielId, wert: number, bisher: number | undefined): boolean =>

@@ -52,6 +52,9 @@ import { Zugang } from '../onlinetest/OnlinetestModule'
 import { holen, senden } from '../onlinetest/serverApi'
 import { useAlleLernenden } from './LernendeWahl'
 import { lateinVorschau } from './LateinAufgaben'
+import { VerbFreigabe } from './VerbFreigabe'
+import { istVerbSprache, type VerbEintrag } from '@shared/verben'
+import { formSpalten, verbAufgaben, verbKarten } from '@shared/verbTraining'
 import { VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
 import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
 import { erzeugeGrammatikPaket, lateinLernjahr } from './grammatikErzeugen'
@@ -266,6 +269,9 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const [wortArt, setWortArt] = useState<'frei' | 'grund' | 'liste'>('frei')
   const [wortListe, setWortListe] = useState<VokabelAuswahl | null>(null)
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code'>('gruppe')
+  // Unregelmäßige Verben statt Grammatikthema (07.10.2026) – ohne KI aus der Verbliste
+  const [modus, setModus] = useState<'thema' | 'verben'>('thema')
+  const [verbWahl, setVerbWahl] = useState<{ verben: VerbEintrag[]; titel: string }>({ verben: [], titel: '' })
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [qr, setQr] = useState(false)
@@ -284,7 +290,10 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const [teilWahl, setTeilWahl] = useState<string[]>([])
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
   const gruppenName = art === 'gruppe' ? gruppen.find((g) => g.id === gruppe)?.name ?? '' : art === 'einzeln' ? `${einzelne.length} Lernende` : 'QR-Code'
-  const bereit = Boolean(fach && thema && (art === 'gruppe' ? gruppe : art === 'einzeln' ? einzelne.length : true))
+  const verbSprache = fach && istVerbSprache(fach.sprache) ? fach.sprache : null
+  const mitVerben = modus === 'verben' && verbSprache
+  const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : true
+  const bereit = Boolean(fach && (mitVerben ? verbWahl.verben.length >= 4 : thema) && empfaengerDa)
   const erstellen = (): void => {
     if (!fach || !bereit) return
     const empfaenger = {
@@ -293,6 +302,31 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
       gaeste: art === 'code' || qr,
       bis: ausFeld(bis, '23:59:00'),
       gruppe: gruppenName
+    }
+    if (mitVerben) {
+      // Ohne KI: je Verb eine Karte, dazu die Karten der Verbspiele – als Entwurf zum Ansehen wie bei Themen
+      const karten = verbKarten(verbWahl.verben, verbSprache)
+      const spalten = formSpalten(verbSprache)
+      const paket: GrammatikPaket = {
+        thema: verbWahl.titel,
+        regeln: [
+          {
+            id: 'verben',
+            titel: 'Unregelmäßige Verben',
+            erklaerung: `Unregelmäßige Verben bilden ihre Formen nicht nach der Regel – sie werden gelernt: ${spalten.map((s) => s.label).join(' – ')}.`,
+            beispiele: karten.slice(0, 3).map((k) => spalten.map((s) => k.formen[s.id]).filter(Boolean).join(' – '))
+          }
+        ],
+        aufgaben: verbAufgaben(karten, verbSprache),
+        verben: karten,
+        verbSprache
+      }
+      speichereEntwuerfe([
+        ...ladeEntwuerfe(),
+        { schluessel: `${Date.now()}`, titel: verbWahl.titel, fach: fach.label, sprache: fach.sprache, thema: verbWahl.titel, empfaenger, paket }
+      ])
+      notifySuccess(`${karten.length} Verben stehen als Entwurf bereit – ansehen und freigeben.`)
+      return schliessen()
     }
     const titel = `${thema}`
     void starteAuftrag({
@@ -349,7 +383,26 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
               data-grammatik-jahrgang
             />
           </Group>
-          {fachId && !eigenesAn && (
+          {verbSprache && (
+            <SegmentedControl
+              value={modus}
+              onChange={(v) => setModus(v as typeof modus)}
+              data={[
+                { value: 'thema', label: 'Grammatikthema' },
+                { value: 'verben', label: 'Unregelmäßige Verben' }
+              ]}
+              data-grammatik-modus
+            />
+          )}
+          {mitVerben && (
+            <VerbFreigabe
+              key={verbSprache}
+              sprache={verbSprache}
+              lernjahr={verbSprache === 'la' ? lateinLernjahr(jahrgang) : Math.max(1, jahrgang - 4)}
+              wahl={(verben, titel) => setVerbWahl({ verben, titel })}
+            />
+          )}
+          {fachId && !eigenesAn && !mitVerben && (
             <div data-grammatik-thema>
               <GrammatikAuswahl
                 key={fachId}

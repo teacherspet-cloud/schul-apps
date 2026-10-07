@@ -10,7 +10,10 @@
 import { aufnahmeSpielen, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
 import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
-import { besteStimme } from './stimme'
+import { besteStimme, stimmeVorhanden } from './stimme'
+import type { VerbSprache } from '@shared/verben'
+import { formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
+import { useVerbDaten } from './verbDaten'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
@@ -86,6 +89,8 @@ interface Liste {
   farbe?: string | null
   /** Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026) */
   klasse?: number | null
+  /** Unregelmäßige Verben der Liste (07.10.2026) – Stammformen-Nachfrage und Verbspiele */
+  verben?: { sprache: VerbSprache; karten: VerbKarte[] } | null
   /** Vokabelweg (03.10.2026): die Freischalt-Leiter */
   weg?: WegKurz
 }
@@ -122,6 +127,15 @@ const FACH_FARBEN = ['#cbd5e1', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#34
  * Vorlesen: zuerst die Aufnahme aus der Medienbank (Sprach-KI, 05.10.2026, medienCache.ts), sonst mit der
  * Stimme des Geräts (kostenlos, ohne Server).
  */
+/** Kann das Gerät diese Sprache vorlesen? (Hörspiele ohne Aufnahme, 07.10.2026) */
+export const kannSprechen = (sprache: string): boolean => {
+  try {
+    return 'speechSynthesis' in window && Boolean(STIMME[sprache]) && stimmeVorhanden(STIMME[sprache])
+  } catch {
+    return false
+  }
+}
+
 export function sprich(text: string, sprache: string): void {
   if (aufnahmeSpielen(text)) return
   try {
@@ -282,6 +296,16 @@ function Kasten({
     const alt = uebersicht(d.woerter, vorher).faecher
     return u.faecher.map((n, i) => (i > 0 ? Math.max(0, n - alt[i]) : 0))
   }, [vorher, d.woerter, u.faecher])
+  /*
+   * Verbspiele (07.10.2026): nur Verben, deren Vokabel schon im Kasten eingeführt ist; geschrieben statt gewählt ab
+   * Fach 3 der Vokabel (abgestimmt).
+   */
+  const fachDesVerbs = (k: VerbKarte): number => {
+    const w = d.woerter.find((x) => verbSchluesselVonWort(x.term) === k.schluessel.toLowerCase())
+    return w ? (d.staende[w.id]?.fach ?? 0) : 0
+  }
+  const bekannteVerben = useMemo(() => (d.verben?.karten ?? []).filter((k) => fachDesVerbs(k) >= 1), [d.verben, d.staende]) // eslint-disable-line react-hooks/exhaustive-deps
+  const verbDaten = useVerbDaten(bekannteVerben, d.verben?.sprache, d.klasse, (k) => fachDesVerbs(k) >= 3)
   const ich = window.__schulappsServer
   // Gäste (per QR-Code) haben keinen Lernraum – zurück zu ihrer Übersicht
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -431,6 +455,7 @@ function Kasten({
             listeId={d.id}
             aktualisieren={aktualisieren}
             spielt={setSpielt}
+            verben={verbDaten}
           />
         </>
       )}
@@ -476,6 +501,7 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
    * „Richtig". Deshalb wird die Übung nur beim Wechsel der Frage bestimmt.
    */
   const uebung = useMemo<Uebung>(() => (v && st ? uebungFuer(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
+  const verbKarte = v ? d.verben?.karten.find((k) => k.schluessel.toLowerCase() === verbSchluesselVonWort(v.term)) : undefined
 
   const antworten = async (wert: { antwort?: string; gewusst?: boolean; gezeigt?: string }): Promise<void> => {
     if (!v || laeuft) return
@@ -592,12 +618,68 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
         )}
       </div>
       {ergebnis && uebung !== 'karte' && <Rueckmeldung e={ergebnis} v={v} sprache={d.sprache} />}
+      {/* Unregelmäßige Verben (07.10.2026): ab Fach 2 nach der Antwort noch die Formen */}
+      {ergebnis && verbKarte && (st?.fach ?? 0) >= 2 && d.verben && (
+        <StammformenNachfrage key={v.id} karte={verbKarte} sprache={d.verben.sprache} tonSprache={d.sprache} />
+      )}
       {ergebnis && (
         <Button size="lg" radius="xl" className="vt-los" onClick={weiter} data-weiter autoFocus>
           Weiter
         </Button>
       )}
     </Stack>
+  )
+}
+
+/** Stammformen nach der Antwort (07.10.2026): Formen eintragen, sofort prüfen, alle hören – zählt nicht im Kasten */
+function StammformenNachfrage({ karte, sprache, tonSprache }: { karte: VerbKarte; sprache: VerbSprache; tonSprache: string }): React.JSX.Element {
+  const spalten = formSpalten(sprache).filter((s) => karte.formen[s.id])
+  const grund = spalten[0]?.id
+  const [eingaben, setEingaben] = useState<Record<string, string>>({})
+  const [geprueft, setGeprueft] = useState(false)
+  const offen = spalten.filter((s) => s.id !== grund)
+  return (
+    <Card withBorder radius="lg" padding="sm" data-stammformen>
+      <Text fw={700} size="sm" mb={6}>
+        Und die Formen? (unregelmäßiges Verb)
+      </Text>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          setGeprueft(true)
+          sprich(sprechtext(spalten.map((s) => karte.formen[s.id]).join(', ')), tonSprache)
+        }}
+      >
+        <Group gap="xs" align="flex-end" wrap="wrap">
+          <TextInput label={spalten[0]?.label} value={karte.formen[grund ?? ''] ?? ''} readOnly w={140} />
+          {offen.map((s) => {
+            const ok = geprueft ? formPasst(eingaben[s.id] ?? '', karte.formen[s.id]) : undefined
+            return (
+              <TextInput
+                key={s.id}
+                label={s.label}
+                w={140}
+                value={eingaben[s.id] ?? ''}
+                onChange={(e) => setEingaben({ ...eingaben, [s.id]: e.currentTarget.value })}
+                disabled={geprueft}
+                error={ok === false ? karte.formen[s.id] : undefined}
+                styles={ok ? { input: { borderColor: 'var(--vt-gut-rand)' } } : undefined}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-stammform={s.id}
+              />
+            )
+          })}
+          {!geprueft && (
+            <Button type="submit" variant="light" data-stammformen-pruefen>
+              Prüfen
+            </Button>
+          )}
+        </Group>
+      </form>
+    </Card>
   )
 }
 

@@ -22,18 +22,21 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useMemo, useState } from 'react'
 import type { Vokabel, WortStand } from '@shared/vokabeltrainer'
-import { istRekord, SPIELE, spielWoerter, type SpielId } from '@shared/vokabelSpiele'
+import { istRekord, SPIELE, spielWoerter, VERBSPIELE, type SpielId } from '@shared/vokabelSpiele'
 import { senden } from '../../onlinetest/serverApi'
 import { useVtFarbe } from '../vtFarben'
 import { Blitzrunde, Memory, Satzpuzzle, Zuordnen } from './SpieleErkennen'
 import { FallendeWoerter, Kreuzwort, Suchsel, Wortraten } from './SpieleSchreiben'
 import { BildRaetsel, hatWortAufnahme, HoerQuiz } from './SpieleMedien'
 import { HoerenSchreiben, mitSatzLuecke, SatzLuecke, Wortduell } from './SpieleNeu'
+import { BildAufdecken, BildMemory, BuchstabenPuzzle, HoerBingo, HoerMemory, RichtigGehoert, WasFehlt, WortBild } from './SpieleHoerenBild'
+import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './SpieleVerben'
+import { kannSprechen } from '../VokabelTrainer'
 import { hatSatzAufnahme } from '../medienCache'
 import { ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 
 /** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
-export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell']
+export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell', 'richtiggehoert', 'aufdecken', 'formenblitz']
 
 const SYMBOL: Record<SpielId, React.ReactNode> = {
   memory: <IconCards size={22} />,
@@ -49,7 +52,19 @@ const SYMBOL: Record<SpielId, React.ReactNode> = {
   satzhoeren: <IconMessage2 size={22} />,
   diktat: <IconEar size={22} />,
   satzluecke: <IconMessage2 size={22} />,
-  duell: <IconBolt size={22} />
+  duell: <IconBolt size={22} />,
+  hoermemory: <IconCards size={22} />,
+  richtiggehoert: <IconEar size={22} />,
+  buchstaben: <IconTypography size={22} />,
+  hoerbingo: <IconGridDots size={22} />,
+  bildmemory: <IconCards size={22} />,
+  wasfehlt: <IconPhoto size={22} />,
+  aufdecken: <IconPhoto size={22} />,
+  wortbild: <IconPhoto size={22} />,
+  verbtrio: <IconCards size={22} />,
+  formenblitz: <IconBolt size={22} />,
+  bildverb: <IconPhoto size={22} />,
+  muster: <IconLayoutGrid size={22} />
 }
 /** KI-Bilder der Spiele (03.10.2026, über die Bild-KI der Exe erzeugt); ohne Bild das Symbol */
 const BILDER = import.meta.glob<string>('../../../assets/programme/spiel-*.webp', { eager: true, import: 'default' })
@@ -69,7 +84,19 @@ const FARBE: Record<SpielId, string> = {
   satzhoeren: 'violet',
   diktat: 'blue',
   satzluecke: 'cyan',
-  duell: 'orange'
+  duell: 'orange',
+  hoermemory: 'blue',
+  richtiggehoert: 'teal',
+  buchstaben: 'indigo',
+  hoerbingo: 'grape',
+  bildmemory: 'orange',
+  wasfehlt: 'pink',
+  aufdecken: 'yellow',
+  wortbild: 'lime',
+  verbtrio: 'red',
+  formenblitz: 'yellow',
+  bildverb: 'orange',
+  muster: 'cyan'
 }
 
 export const SPIELE_CSS = `
@@ -107,7 +134,9 @@ export function Spielwahl({
   ansehen,
   listeId,
   aktualisieren,
-  spielt
+  spielt,
+  verben,
+  nurVerben
 }: {
   woerter: Vokabel[]
   staende: Record<string, WortStand>
@@ -118,6 +147,10 @@ export function Spielwahl({
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
   /** Spiel läuft (Kasten ausblenden) */
   spielt?: (an: boolean) => void
+  /** Unregelmäßige Verben der Liste (07.10.2026) – dann gibt es die Verbspiele */
+  verben?: VerbDaten
+  /** Nur die Verbspiele (Grammatiktraining „Unregelmäßige Verben") */
+  nurVerben?: boolean
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
@@ -136,6 +169,11 @@ export function Spielwahl({
   // Medienbank (05.10.2026): Bilder und Aufnahmen – aus allen Wörtern der Liste, nicht nur den gelernten
   const mitBild = woerter.filter((w) => w.bild).length
   const mitTon = woerter.filter(hatWortAufnahme).length
+  // Hörspiele (07.10.2026): Aufnahme ODER Stimme des Geräts
+  const geraet = kannSprechen(sprache)
+  const hoerbar = geraet ? woerter.length : mitTon
+  const verbZahl = verben?.karten.length ?? 0
+  const verbBilder = verben ? verben.karten.filter((k) => verben.bild(k)).length : 0
   const mitSatzTon = woerter.filter((w) => w.example && w.example.split(/\s+/).length >= 3 && hatSatzAufnahme(w.example)).length
   const ende = useCallback(
     (wert: number, fehler: string[]) => {
@@ -162,7 +200,9 @@ export function Spielwahl({
     )
 
   if (spiel) {
-    const props = { woerter: pool, sprache, ende }
+    const props = { woerter: pool, sprache, ende, staende }
+    // Hörspiele ohne Gerätestimme nur mit Wörtern, die eine Aufnahme haben
+    const hoerWoerter = geraet ? woerter : woerter.filter(hatWortAufnahme)
     return (
       <Stack data-spiel-laeuft={spiel}>
         <style>{SPIELE_CSS}</style>
@@ -199,6 +239,30 @@ export function Spielwahl({
             <SatzLuecke {...props} woerter={mitSatzLuecke(pool).length >= 3 ? pool : woerter} />
           ) : spiel === 'duell' ? (
             <Wortduell {...props} />
+          ) : spiel === 'hoermemory' ? (
+            <HoerMemory {...props} woerter={hoerWoerter} />
+          ) : spiel === 'richtiggehoert' ? (
+            <RichtigGehoert {...props} woerter={hoerWoerter} />
+          ) : spiel === 'buchstaben' ? (
+            <BuchstabenPuzzle {...props} woerter={hoerWoerter} />
+          ) : spiel === 'hoerbingo' ? (
+            <HoerBingo {...props} woerter={hoerWoerter} />
+          ) : spiel === 'bildmemory' ? (
+            <BildMemory {...props} woerter={woerter} />
+          ) : spiel === 'wasfehlt' ? (
+            <WasFehlt {...props} woerter={woerter} />
+          ) : spiel === 'aufdecken' ? (
+            <BildAufdecken {...props} woerter={woerter} />
+          ) : spiel === 'wortbild' ? (
+            <WortBild {...props} woerter={woerter} />
+          ) : spiel === 'verbtrio' && verben ? (
+            <StammformenTrio verben={verben} ende={ende} />
+          ) : spiel === 'formenblitz' && verben ? (
+            <FormenBlitz verben={verben} ende={ende} />
+          ) : spiel === 'bildverb' && verben ? (
+            <BildVerb verben={verben} ende={ende} />
+          ) : spiel === 'muster' && verben ? (
+            <MusterSortieren verben={verben} ende={ende} />
           ) : (
             <Suchsel {...props} />
           )}
@@ -280,19 +344,45 @@ export function Spielwahl({
             {art === 'erkennen' ? 'Erkennen' : 'Schreiben'}
           </Text>
           <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
-            {SPIELE.filter((s) => s.art === art && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id))).map((s) => {
+            {SPIELE.filter((s) => s.art === art && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && (!nurVerben || VERBSPIELE.includes(s.id))).map((s) => {
+              // Ohne Verben keine Verbspiele; Verbspiele nach ihren Daten (07.10.2026)
+              if (VERBSPIELE.includes(s.id) && !verbZahl) return null
+              const gesperrtNeu =
+                s.id === 'hoermemory'
+                  ? hoerbar < 6
+                  : s.id === 'richtiggehoert' || s.id === 'buchstaben'
+                  ? hoerbar < 4
+                  : s.id === 'hoerbingo'
+                  ? hoerbar < 9
+                  : s.id === 'bildmemory' || s.id === 'wasfehlt'
+                  ? mitBild < 6
+                  : s.id === 'aufdecken' || s.id === 'wortbild'
+                  ? mitBild < 4
+                  : s.id === 'verbtrio' || s.id === 'muster'
+                  ? verbZahl < 4 || (s.id === 'muster' && !verben?.mitMuster)
+                  : s.id === 'formenblitz'
+                  ? verbZahl < 4 || !(geraet || verben?.mitTon)
+                  : s.id === 'bildverb'
+                  ? verbBilder < 4
+                  : s.id === 'diktat'
+                  ? hoerbar < 4
+                  : undefined
+              // Medienspiele erst zeigen, wenn es Bilder bzw. Ton gibt
+              if (gesperrtNeu) return null
               const gesperrt =
-                s.id === 'satzluecke'
+                gesperrtNeu === false
+                  ? pool.length < 4 && !VERBSPIELE.includes(s.id)
+                  : s.id === 'satzluecke'
                   ? mitSatzLuecke(woerter).length < 3
                   : s.id === 'satz'
-                    ? mitSatz < 1
-                    : s.id === 'bildwort'
-                      ? mitBild < 4
-                      : s.id === 'hoeren'
-                        ? mitTon < 4 || woerter.length < 4
-                        : s.id === 'satzhoeren'
-                          ? mitSatzTon < 1
-                          : pool.length < 4
+                  ? mitSatz < 1
+                  : s.id === 'bildwort'
+                  ? mitBild < 4
+                  : s.id === 'hoeren'
+                  ? mitTon < 4 || woerter.length < 4
+                  : s.id === 'satzhoeren'
+                  ? mitSatzTon < 1
+                  : pool.length < 4
               // Spiele der Medienbank erst zeigen, wenn es Bilder bzw. Aufnahmen gibt
               if (gesperrt && (s.id === 'bildwort' || s.id === 'hoeren' || s.id === 'satzhoeren')) return null
               return (

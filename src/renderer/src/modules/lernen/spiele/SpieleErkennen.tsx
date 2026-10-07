@@ -7,7 +7,7 @@ import { hatSatzAufnahme } from '../medienCache'
 import { HoerKnopf } from './SpieleMedien'
 import { Badge, Button, Group, Progress, SimpleGrid, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { auswahlOptionen, type Vokabel } from '@shared/vokabeltrainer'
+import { auswahlOptionen, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { satzTeile, spielform } from '@shared/vokabelSpiele'
 import { useVtFarbe } from '../vtFarben'
 
@@ -15,6 +15,8 @@ export interface SpielProps {
   woerter: Vokabel[]
   sprache: string
   ende: (wert: number, fehler: string[]) => void
+  /** Stand im Kasten – für die Antwortform nach Fach (07.10.2026) */
+  staende?: Record<string, WortStand>
 }
 
 export const gemischt = <T,>(l: readonly T[]): T[] => [...l].sort(() => Math.random() - 0.5)

@@ -151,6 +151,11 @@ export function MehrfachAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
   )
 }
 
+/** Eine Variante oder die ganze Zelle („was/were") – wie die Prüfung in shared/grammatiktrainer.ts */
+const zelleRichtig = (loesung: string, antwort: string): boolean =>
+  normiert(loesung.replace(/\s*\/\s*/g, '/')) === normiert(antwort.replace(/\s*\/\s*/g, '/')) ||
+  loesung.split('/').some((v) => normiert(v) === normiert(antwort))
+
 export function TabellenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
   const zeilen = a.zeilen ?? []
   const [zellen, setZellen] = useState<string[][]>(() => zeilen.map((z) => z.loesungen.map((l, j) => (z.vorgabe?.[j] ? l : ''))))
@@ -184,9 +189,9 @@ export function TabellenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
                   {z.vorgabe?.[j] ? (
                     <Text size="sm">{l}</Text>
                   ) : gesperrt ? (
-                    <Text size="sm" c={l.split('/').some((v) => normiert(v) === normiert(zellen[i]?.[j] ?? '')) ? 'green' : 'red'}>
+                    <Text size="sm" c={zelleRichtig(l, zellen[i]?.[j] ?? '') ? 'green' : 'red'}>
                       {zellen[i]?.[j] || '–'}
-                      {l.split('/').some((v) => normiert(v) === normiert(zellen[i]?.[j] ?? '')) ? '' : ` → ${l}`}
+                      {zelleRichtig(l, zellen[i]?.[j] ?? '') ? '' : ` → ${l}`}
                     </Text>
                   ) : (
                     <TextInput

@@ -26,6 +26,19 @@ export async function medienLaden(sprache: string, woerter: string[], klasse?: n
   return medien
 }
 
+/**
+ * Weitere Medien dazuladen, ohne die der Liste zu verwerfen (07.10.2026): Bild und Aussprache der unregelmäßigen
+ * Verben liegen unter ihrer Grundform, die Formen als „Sätze".
+ */
+export async function medienErgaenzen(sprache: string, woerter: string[], klasse?: number | null): Promise<void> {
+  const fehlen = [...new Set(woerter)].filter((w) => w && !medien[w]).slice(0, 600)
+  if (!fehlen.length) return
+  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe: stufeVon(klasse) })
+  for (const w of fehlen) q.append('w', w)
+  const d = await holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).catch(() => ({ medien: {} }))
+  medien = { ...medien, ...(d.medien ?? {}) }
+}
+
 export const medium = (wort: string): MedienSicht | undefined => medien[wort]
 
 /** Gespeicherte Aufnahme abspielen; false = keine da (dann spricht das Gerät) */

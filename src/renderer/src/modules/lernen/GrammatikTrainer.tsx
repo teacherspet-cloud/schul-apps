@@ -22,6 +22,9 @@ import { sitzungsWoerter, STUFEN, uebersicht, type Urteil, type Vokabel, type Wo
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
+import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './spiele/SpieleVerben'
+import { SPIELE_CSS } from './spiele/Spiele'
+import { useVerbDaten } from './verbDaten'
 import { useVtFarbe } from './vtFarben'
 import { ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
 
@@ -113,6 +116,32 @@ function Kasten({
   const tagesAufgaben = heute.map((k) => nachId.get(k.id)!).filter(Boolean)
   // Spiele nur mit Aufgaben, die der Kasten schon eingeführt hat (wie bei den Vokabeln)
   const bekannt = useMemo(() => ({ ...d.paket, aufgaben: d.paket.aufgaben.filter((a) => (d.staende[a.id]?.fach ?? 0) > 0) }), [d.paket, d.staende])
+  /*
+   * Verbspiele (07.10.2026): Karte i gehört zur i-ten Verbaufgabe (verbAufgaben, gleiche Reihenfolge). Gespielt wird mit
+   * den schon eingeführten Verben; geschrieben statt gewählt ab Fach 3.
+   */
+  const verbAufgabe = useMemo(() => {
+    const auf = d.paket.aufgaben.filter((a) => a.regelId === 'verben')
+    return new Map((d.paket.verben ?? []).map((k, i) => [k.id, auf[i]?.id ?? '']))
+  }, [d.paket])
+  const bekannteVerben = useMemo(
+    () => (d.paket.verben ?? []).filter((k) => (d.staende[verbAufgabe.get(k.id) ?? '']?.fach ?? 0) > 0),
+    [d.paket.verben, d.staende, verbAufgabe]
+  )
+  const verbDaten = useVerbDaten(bekannteVerben, d.paket.verbSprache, null, (k) => (d.staende[verbAufgabe.get(k.id) ?? '']?.fach ?? 0) >= 3)
+  if (spiel && GRAMMATIK_SPIELE.find((s) => s.id === spiel)?.verben && verbDaten)
+    return (
+      <VerbSpielLauf
+        d={d}
+        spiel={spiel}
+        daten={verbDaten}
+        aufgabeVon={(id) => verbAufgabe.get(id) ?? ''}
+        fertig={(r) => {
+          setSpiel(null)
+          if (r) aktualisieren(r)
+        }}
+      />
+    )
   if (spiel)
     return (
       <Spiel
@@ -208,8 +237,21 @@ function Kasten({
         </Text>
       )}
       <SimpleGrid cols={{ base: 2, sm: 4 }}>
-        {GRAMMATIK_SPIELE.filter((s) => wahl.spiele && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id))).map((s) => {
-          const genug = s.id === 'regelzuordnen' ? d.paket.regeln.length >= 2 : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
+        {GRAMMATIK_SPIELE.filter(
+          (s) => wahl.spiele && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length)
+        ).map((s) => {
+          const genug = s.verben
+            ? Boolean(verbDaten) &&
+              (s.id === 'bildverb'
+                ? verbDaten!.karten.filter((k) => verbDaten!.bild(k)).length >= 4
+                : s.id === 'verbblitz'
+                  ? verbDaten!.karten.length >= 4 && verbDaten!.mitTon
+                  : s.id === 'muster'
+                    ? verbDaten!.mitMuster
+                    : verbDaten!.karten.length >= 4)
+            : s.id === 'regelzuordnen'
+              ? d.paket.regeln.length >= 2
+              : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
           return (
             <UnstyledButton key={s.id} disabled={heute.length > 0 || !genug} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
               <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 || !genug ? 0.5 : 1, height: '100%' }}>
@@ -227,6 +269,77 @@ function Kasten({
           )
         })}
       </SimpleGrid>
+    </Stack>
+  )
+}
+
+/** Ein Verbspiel im Grammatiktraining – Ergebnis und Fehler wie bei den übrigen Spielen an den Server */
+function VerbSpielLauf({
+  d,
+  spiel,
+  daten,
+  aufgabeVon,
+  fertig
+}: {
+  d: Daten
+  spiel: GrammatikSpielId
+  daten: VerbDaten
+  aufgabeVon: (verbId: string) => string
+  fertig: (r?: Partial<Daten>) => void
+}): React.JSX.Element {
+  const farbe = useVtFarbe()
+  const info = GRAMMATIK_SPIELE.find((s) => s.id === spiel)!
+  const [ende, setEnde] = useState<{ wert: number; rekord: boolean } | null>(null)
+  const abschliessen = (wert: number, fehler: string[]): void => {
+    void senden<{ rekord: boolean; rekorde: Record<string, number> }>('/s/api/grammatik/spiel', {
+      id: d.id,
+      spiel,
+      wert,
+      fehler: fehler.map(aufgabeVon).filter(Boolean)
+    }).then(
+      (r) => {
+        d.rekorde = r.rekorde
+        ton('geschafft')
+        setEnde({ wert, rekord: r.rekord })
+      },
+      () => setEnde({ wert, rekord: false })
+    )
+  }
+  if (ende)
+    return (
+      <Stack align="center" py="xl" className="vt vt-rein" data-spiel-ende>
+        <style>{CSS}</style>
+        <IconTrophy size={48} color={ende.rekord ? '#f59e0b' : 'gray'} />
+        <Title order={2}>
+          {ende.wert} {info.einheit}
+        </Title>
+        {ende.rekord && <Badge color="yellow">Neuer Rekord!</Badge>}
+        <Button size="lg" radius="xl" className="vt-los" onClick={() => fertig({ rekorde: d.rekorde })}>
+          Zurück zum Kasten
+        </Button>
+      </Stack>
+    )
+  return (
+    <Stack className="vt" data-verbspiel={spiel}>
+      <style>{CSS}</style>
+      <style>{SPIELE_CSS}</style>
+      <Group justify="space-between">
+        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4}>
+          Beenden
+        </Button>
+        <Text fw={800}>{info.name}</Text>
+      </Group>
+      <div className="vt-buehne">
+        {spiel === 'verbtrio' ? (
+          <StammformenTrio verben={daten} ende={abschliessen} />
+        ) : spiel === 'verbblitz' ? (
+          <FormenBlitz verben={daten} ende={abschliessen} />
+        ) : spiel === 'bildverb' ? (
+          <BildVerb verben={daten} ende={abschliessen} />
+        ) : (
+          <MusterSortieren verben={daten} ende={abschliessen} />
+        )}
+      </div>
     </Stack>
   )
 }

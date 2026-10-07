@@ -23,6 +23,20 @@ export type SpielId =
   | 'diktat'
   | 'satzluecke'
   | 'duell'
+  // Hör- und Bilderspiele (07.10.2026, Plan-Modus mit der Lehrkraft)
+  | 'hoermemory'
+  | 'richtiggehoert'
+  | 'buchstaben'
+  | 'hoerbingo'
+  | 'bildmemory'
+  | 'wasfehlt'
+  | 'aufdecken'
+  | 'wortbild'
+  // Verbspiele (07.10.2026) – mit den unregelmäßigen Verben der Liste
+  | 'verbtrio'
+  | 'formenblitz'
+  | 'bildverb'
+  | 'muster'
 
 export interface SpielInfo {
   id: SpielId
@@ -93,8 +107,32 @@ export const SPIELE: SpielInfo[] = [
     kleinerBesser: false,
     beschreibung: 'Das passende Wort in den Beispielsatz einsetzen.'
   },
-  { id: 'duell', name: 'Wortduell', art: 'erkennen', einheit: 's', kleinerBesser: true, beschreibung: 'Passt das Paar? 20 Runden gegen deine Bestzeit.' }
+  { id: 'duell', name: 'Wortduell', art: 'erkennen', einheit: 's', kleinerBesser: true, beschreibung: 'Passt das Paar? 20 Runden gegen deine Bestzeit.' },
+  // Hören und Bilder (07.10.2026, abgestimmt im Plan-Modus)
+  { id: 'hoermemory', name: 'Hör-Memory', art: 'erkennen', einheit: 'Züge', kleinerBesser: true, beschreibung: 'Zu jedem Ton das passende Wort aufdecken.' },
+  {
+    id: 'richtiggehoert',
+    name: 'Richtig gehört?',
+    art: 'erkennen',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: '60 Sekunden: Passt das Bild zum gehörten Wort?'
+  },
+  { id: 'buchstaben', name: 'Buchstaben-Puzzle', art: 'schreiben', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Hinhören und das Wort aus Buchstaben legen.' },
+  { id: 'hoerbingo', name: 'Hör-Bingo', art: 'erkennen', einheit: 'Aufrufe', kleinerBesser: true, beschreibung: 'Gehörte Wörter antippen – eine volle Reihe ist Bingo.' },
+  { id: 'bildmemory', name: 'Bild-Memory', art: 'erkennen', einheit: 'Züge', kleinerBesser: true, beschreibung: 'Bild und Wort als Paar aufdecken.' },
+  { id: 'wasfehlt', name: 'Was fehlt?', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Bilder einprägen – welches ist verschwunden?' },
+  { id: 'aufdecken', name: 'Bild aufdecken', art: 'erkennen', einheit: 'Punkte', kleinerBesser: false, beschreibung: 'Das Wort erraten, bevor das Bild ganz frei ist.' },
+  { id: 'wortbild', name: 'Wort → Bild', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Zum Wort das passende Bild tippen.' },
+  // Unregelmäßige Verben (07.10.2026)
+  { id: 'verbtrio', name: 'Stammformen-Trio', art: 'erkennen', einheit: 'Züge', kleinerBesser: true, beschreibung: 'Die Formen eines Verbs zusammen aufdecken.' },
+  { id: 'formenblitz', name: 'Formen-Blitz', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: '60 Sekunden: Welche Form hast du gehört?' },
+  { id: 'bildverb', name: 'Bild-Verb', art: 'schreiben', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Zum Bild die Formen des Verbs nennen.' },
+  { id: 'muster', name: 'Muster sortieren', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Verben nach ihrem Formenmuster ordnen.' }
 ]
+
+/** Verbspiele: nur, wenn die Liste unregelmäßige Verben hat (07.10.2026) */
+export const VERBSPIELE: readonly SpielId[] = ['verbtrio', 'formenblitz', 'bildverb', 'muster']
 
 /** Schreibweise eines Wortes im Spiel: erste Variante, ohne Angaben */
 export const spielform = (term: string): string => ohneAngaben(varianten(term)[0] ?? term)

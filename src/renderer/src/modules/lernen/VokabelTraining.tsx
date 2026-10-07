@@ -44,6 +44,30 @@ import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { mitBildern, VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
+import { istVerbSprache } from '@shared/verben'
+import { verbKarten, type VerbKarte } from '@shared/verbTraining'
+import { ladeVerbPool, verbenAusVokabeln } from '../../shared/verben/quellen'
+
+/**
+ * Unregelmäßige Verben einer Liste (07.10.2026, abgestimmt: automatisch im Vokabeltraining): aus der Verbliste des
+ * Lehrwerks (mit früheren Bänden), sonst aus der Standardliste – für Stammformen-Übung und Verbspiele der Lernenden.
+ */
+export async function verbenDerListe(a: VokabelAuswahl): Promise<{ sprache: string; karten: VerbKarte[] } | null> {
+  if (!istVerbSprache(a.sprache)) return null
+  try {
+    const pool = await ladeVerbPool({
+      quelle: a.quelle?.lehrwerk ? 'lehrwerk' : 'standard',
+      listeId: a.quelle?.lehrwerk,
+      kumulativ: true,
+      sprache: a.sprache,
+      lernjahr: 6
+    })
+    const karten = verbKarten(verbenAusVokabeln(a.woerter, pool, a.sprache), a.sprache)
+    return karten.length ? { sprache: a.sprache, karten } : null
+  } catch {
+    return null
+  }
+}
 
 interface ZuweisungKurz {
   id: string
@@ -215,6 +239,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
     setLaeuft(true)
     try {
       const mit = await mitBildern(auswahl)
+      const verben = await verbenDerListe(mit)
       await senden('/server/vokabeln/freigeben', {
         titel: titel || auswahl.titel,
         sprache: mit.sprache,
@@ -225,7 +250,8 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         testTermin: ausFeld(termin, '08:00:00'),
         bis: ausFeld(bis, '23:59:00'),
         gaeste: art === 'code' || qr,
-        ...(auswahl.quelle ? { quelle: auswahl.quelle } : {})
+        ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
+        ...(verben ? { verben } : {})
       })
       notifySuccess(
         art === 'code' || qr

@@ -24,6 +24,8 @@ import { getSettings } from '../main/services/storage/settings'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
+import { bereinigeVerbKarten } from '../shared/verbTraining'
+import { istVerbSprache } from '../shared/verben'
 import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -81,6 +83,8 @@ export const db = () => {
     if (!spalten.has('bis')) d.exec('ALTER TABLE vok_zuweisungen ADD COLUMN bis INTEGER')
     // Herkunft aus dem Lehrwerk (Vokabelweg, 03.10.2026): {lehrwerk, unit, abschnitte}
     if (!spalten.has('quelle')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN quelle TEXT NOT NULL DEFAULT ''")
+    // Unregelmäßige Verben der Liste (07.10.2026): {sprache, karten} – für Stammformen-Übung und Verbspiele
+    if (!spalten.has('verben')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN verben TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -112,6 +116,8 @@ export interface Zeile {
   bis: number | null
   /** Herkunft aus dem Lehrwerk (JSON), leer bei eigenen Listen */
   quelle?: string
+  /** Unregelmäßige Verben der Liste (JSON {sprache, karten}, 07.10.2026) */
+  verben?: string
 }
 
 /** Offen = nicht beendet und Zeitraum nicht abgelaufen */
@@ -227,6 +233,14 @@ function quelleBereinigt(roh: unknown): string {
   })
 }
 
+/** Verben der Liste prüfen: {sprache, karten} */
+function verbenBereinigt(roh: unknown): string {
+  const v = (roh ?? {}) as Record<string, unknown>
+  if (!istVerbSprache(v.sprache)) return ''
+  const karten = bereinigeVerbKarten(v.karten)
+  return karten.length ? JSON.stringify({ sprache: v.sprache, karten }) : ''
+}
+
 /** Neue Zuweisung anlegen (auch für einen Schritt einer Unterrichtsreihe) */
 export function vokabelnZuweisen(e: {
   lehrkraftId: string
@@ -241,13 +255,15 @@ export function vokabelnZuweisen(e: {
   gaeste?: boolean
   bis?: number | null
   quelle?: unknown
+  /** Unregelmäßige Verben der Liste (07.10.2026) */
+  verben?: unknown
 }): string {
   const id = randomBytes(8).toString('hex')
   const woerter = bereinigeWoerter(e.woerter)
   if (!woerter.length) throw new Error('Die Liste hat keine Vokabeln.')
   db()
     .prepare(
-      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?)"
+      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle, verben) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?)"
     )
     .run(
       id,
@@ -263,7 +279,8 @@ export function vokabelnZuweisen(e: {
       new Date().toISOString(),
       e.gaeste ? neuerCode() : '',
       e.bis ?? null,
-      quelleBereinigt(e.quelle)
+      quelleBereinigt(e.quelle),
+      verbenBereinigt(e.verben)
     )
   return id
 }
@@ -452,6 +469,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             woerter,
             staende: st.woerter,
             farbe: await fachfarbeDerLehrkraft(z),
+            // Unregelmäßige Verben der Liste (07.10.2026)
+            verben: json_(z.verben, null as unknown),
             // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
             klasse: klasseFuer(z, ich),
             rekorde: st.rekorde ?? {},
@@ -534,6 +553,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           sprache: String(k0.sprache ?? ''),
           fach: String(k0.fach ?? ''),
           woerter: k0.woerter,
+          verben: k0.verben,
           testTermin: typeof k0.testTermin === 'number' ? k0.testTermin : null,
           gaeste: mitGaesten,
           bis,

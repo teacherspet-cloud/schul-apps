@@ -11,29 +11,16 @@ import { ActionIcon, Alert, Badge, Button, Group, Text, Tooltip } from '@mantine
 import { IconMessage2, IconPhotoSearch, IconSparkles, IconVolume } from '@tabler/icons-react'
 import { useState } from 'react'
 import { saetzeVon, satzSchluessel, sprachKurz, STIMMLAGE_NAME, type MedienSicht, type Stimmlage } from '@shared/medienbank'
-import { grundformVon, VERB_SPALTEN, type VerbEintrag, type VerbSprache } from '@shared/verben'
+import { VERB_SPALTEN, type VerbEintrag, type VerbSprache } from '@shared/verben'
 import { notifyError } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
 import { tonErzeugen, type Vokabel } from '../medien/medienbank'
 import { lagenVon, medienGeaendert, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from '../medien/medienAuftrag'
 import { spiele, useStandardstimmen } from '../medien/MedienUi'
 
-/** Schlüssel in der Medienbank: die Grundform ohne „(to)"/„to" und ohne Klammerzusätze */
-export function verbSchluessel(e: VerbEintrag, sprache: VerbSprache): string {
-  return grundformVon(e, sprache)
-    .replace(/^\s*\(to\)\s*|^\s*to\s+/i, '')
-    .replace(/\s*\([^)]*\)\s*/g, ' ')
-    .split('/')[0]
-    .trim()
-}
-
-/** So wird eine Zelle gesprochen: „burnt/burned" → „burnt, burned", Klammern ohne Klammerzeichen */
-export const sprechtext = (s: string): string =>
-  s
-    .replace(/\s*\/\s*/g, ', ')
-    .replace(/[()]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+/** Schlüssel in der Medienbank und gesprochener Text – gemeinsam mit den Lernenden (shared/verbTraining.ts, 07.10.2026) */
+export { medienSchluesselVerb as verbSchluessel, sprechtext } from '@shared/verbTraining'
+import { medienSchluesselVerb as verbSchluessel, sprechtext } from '@shared/verbTraining'
 
 /** Die gesprochenen Formen einer Zeile (ohne die deutsche Bedeutung) */
 export function sprechFormen(e: VerbEintrag, sprache: VerbSprache): { label: string; text: string }[] {
