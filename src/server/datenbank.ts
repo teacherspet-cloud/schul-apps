@@ -16,6 +16,7 @@ import { DATEN, ordner } from './pfade'
 import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
 import { geschuetzt, migriere, SENSIBEL } from './feldschutz'
+import { wartungAusfuehren } from './wartung'
 
 let db: DatabaseSync | null = null
 
@@ -66,6 +67,12 @@ export function datenbank(datei = join(DATEN, 'schulapps.db')): DatabaseSync {
   // Personenbezogenes nur verschlüsselt (feldschutz.ts): alle vorhandenen Tabellen gleich beim Start umschreiben
   for (const t of Object.keys(SENSIBEL)) migriere(roh, t)
   db = geschuetzt(roh)
+  // Einmalige Datenwartung (wartung.ts) – darf den Start nie verhindern
+  try {
+    wartungAusfuehren(db)
+  } catch {
+    /* beim nächsten Start erneut */
+  }
   return db
 }
 

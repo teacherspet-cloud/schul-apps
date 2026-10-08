@@ -229,6 +229,7 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
   }
   const [runde, setRunde] = useState(neueRunde)
   const [gut, setGut] = useState(0)
+  const [abzug, setAbzug] = useState(0)
   const [rueck, setRueck] = useState<boolean | null>(null)
   const fehler = useRef(new Set<string>())
   const fertig = useRef(false)
@@ -236,17 +237,22 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
     sprich(runde.v.term, sprache)
   }, [runde]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (sek >= DAUER && !fertig.current) {
+    if (sek + abzug >= DAUER && !fertig.current) {
       fertig.current = true
       ende(gut, [...fehler.current])
     }
-  }, [sek]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sek, abzug]) // eslint-disable-line react-hooks/exhaustive-deps
   const antwort = (passt: boolean): void => {
     if (rueck !== null || fertig.current) return
     const richtig = passt === (runde.v.id === runde.zeige.id)
     setRueck(richtig)
     if (richtig) setGut((g) => g + 1)
-    else fehler.current.add(runde.v.id)
+    else {
+      // Falsch auf Zeit (08.10.2026, Wunsch der Lehrkraft): ein Punkt und eine Sekunde weniger
+      fehler.current.add(runde.v.id)
+      setGut((g) => Math.max(0, g - 1))
+      setAbzug((a) => a + 1)
+    }
     setTimeout(() => {
       setRueck(null)
       setRunde(neueRunde())
@@ -258,7 +264,7 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
         <Badge color={farbe.a} variant="light" size="lg">
           {gut} richtig
         </Badge>
-        <Text fw={700}>{Math.max(0, DAUER - sek)} s</Text>
+        <Text fw={700}>{Math.max(0, DAUER - sek - abzug)} s</Text>
       </Group>
       <Progress value={(Math.min(sek, DAUER) / DAUER) * 100} w="100%" radius="xl" color={farbe.a} />
       <ActionIcon size={64} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(runde.v.term, sprache)} aria-label="Noch einmal anhören">

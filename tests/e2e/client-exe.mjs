@@ -32,12 +32,11 @@ try {
   await page.waitForURL(/\/anmelden/, { timeout: 20000 })
   pruefe(true, 'Exe zeigt die Anmeldeseite des Servers')
   await page.evaluate(() => {
-    const d = document.querySelector('details')
-    if (d) d.open = true
+    document.querySelectorAll('details').forEach((d) => (d.open = true))
   })
   await page.fill('#benutzer', konto.benutzer)
   await page.fill('#passwort', konto.passwort)
-  await page.click('button[type=submit]')
+  await page.click('form[action=\"/auth/lokal\"] button[type=submit]')
   await page.waitForURL((u) => !u.pathname.startsWith('/anmelden'), { timeout: 20000 })
   await page.waitForTimeout(2500)
   const spaeter = page.getByRole('button', { name: 'Später einrichten' })

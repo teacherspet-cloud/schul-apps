@@ -14,6 +14,7 @@
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
 import { grammatikRoute } from './grammatik'
+import { rekordbuchRoute } from './rekordbuch'
 import { klassenRoute } from './klassen'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
@@ -132,6 +133,8 @@ async function main(): Promise<void> {
       vokabelRoute(adresse),
       // Grammatik-Lern-App (06.10.2026)
       grammatikRoute(adresse),
+      // Rekordbuch der Lernenden (08.10.2026)
+      rekordbuchRoute(),
       lernenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
       lernstandRoute(aufruf),

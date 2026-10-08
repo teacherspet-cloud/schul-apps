@@ -23,6 +23,8 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { RekordKnopf } from './Rekorde'
+import { useAuffrischen } from '../../shared/auffrischen'
 import { useAufsicht, useZeitraum, vorfallSender } from './aufsicht'
 import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
 import { tuerKlick } from '../lernen/tuer'
@@ -238,6 +240,8 @@ export default function SchuelerBereich(): React.JSX.Element {
         </Text>
         <Group gap={4} style={mitTabs ? { display: 'none' } : undefined}>
           <ModusKnopf />
+          {/* Meine Rekorde (08.10.2026): links von „Einstellungen" */}
+          {(!gast || ich?.angemeldet) && <RekordKnopf />}
           {(!gast || ich?.angemeldet) && (
             <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
               Einstellungen
@@ -375,7 +379,8 @@ function Startseite(): React.JSX.Element {
     []
   )
   useEffect(() => standLaden(), [standLaden])
-  useEffect(() => {
+  // Neue Freigaben ohne Neuladen (08.10.2026): beim Zurückkehren und jede Minute frisch
+  const alleLaden = useCallback(() => {
     void holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
       (d) => setVok(d.listen ?? []),
       () => setVok([])
@@ -401,6 +406,8 @@ function Startseite(): React.JSX.Element {
       () => setReihen([])
     )
   }, [])
+  useEffect(alleLaden, [alleLaden])
+  useAuffrischen(() => (alleLaden(), standLaden()))
   const offeneTests = tests?.filter((t) => !t.abgegeben) ?? []
   const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden) ?? []
   const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
@@ -945,7 +952,7 @@ function GastStart(): React.JSX.Element {
     | null
   >(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
-  useEffect(() => {
+  const gastLaden = useCallback(() => {
     // Grammatiktraining (06.10.2026) in derselben Liste – Kennzeichen g
     void Promise.all([
       holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
@@ -962,6 +969,9 @@ function GastStart(): React.JSX.Element {
       () => setBlaetter([])
     )
   }, [])
+  useEffect(gastLaden, [gastLaden])
+  // Neue Freigaben ohne Neuladen (08.10.2026)
+  useAuffrischen(gastLaden)
   const name = window.__schulappsServer?.name
   const leer = vok?.length === 0 && blaetter?.length === 0
   return (
@@ -1068,6 +1078,17 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
   const [scannen, setScannen] = useState(false)
   // Ohne Anmeldung (Beitritt mit Namen): nur Code eingeben oder scannen
   const angemeldet = Boolean(window.__schulappsServer?.angemeldet)
+  // Schon angemeldet (z. B. per Code vom Zettel): ein kleiner Knopf statt des großen Feldes (08.10.2026)
+  const [codeOffen, setCodeOffen] = useState(!angemeldet)
+  // Code von der Startseite (Anmeldeseite „Mit Code öffnen", ohne Skript: /s/?code=…) gleich öffnen
+  useEffect(() => {
+    const roh = new URLSearchParams(window.location.search).get('code')
+    const c = (roh ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    if (c.length >= 4) {
+      window.history.replaceState(null, '', window.location.pathname)
+      void oeffneCode(c)
+    }
+  }, [])
   useEffect(() => {
     if (!angemeldet) return setTests([])
     void holen<{ tests: typeof tests }>('/s/api/tests')
@@ -1077,31 +1098,43 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
   return (
     <Stack>
       {!ohneZurueck && <ZurStartseite />}
-      <Card withBorder padding="lg">
-        <Title order={4} mb="xs">
-          Mit Code öffnen
-        </Title>
-        <Group align="end">
-          <TextInput
-            style={{ flex: 1 }}
-            label="Code (steht an der Tafel oder du hast ihn von deiner Lehrkraft erhalten)"
-            description="für Test, Arbeitsblatt oder Vokabeln"
-            value={code}
-            onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            size="md"
-          />
-          <Button size="md" disabled={code.length < 4} onClick={() => void oeffneCode(code)}>
-            Öffnen
+      {!codeOffen ? (
+        <Group gap="xs">
+          <Button variant="light" size="sm" radius="xl" onClick={() => setCodeOffen(true)} data-weiterer-code>
+            Weiteren Code eingeben
           </Button>
+          <Button variant="subtle" size="sm" radius="xl" onClick={() => setScannen(true)} data-code-scannen>
+            QR-Code scannen
+          </Button>
+          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
         </Group>
-        <Button mt="sm" variant="light" fullWidth size="md" onClick={() => setScannen(true)} data-code-scannen>
-          QR-Code scannen
-        </Button>
-        {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
-      </Card>
+      ) : (
+        <Card withBorder padding="lg">
+          <Title order={4} mb="xs">
+            Mit Code öffnen
+          </Title>
+          <Group align="end">
+            <TextInput
+              style={{ flex: 1 }}
+              label="Code (steht an der Tafel oder du hast ihn von deiner Lehrkraft erhalten)"
+              description="für Test, Arbeitsblatt oder Vokabeln"
+              value={code}
+              onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              size="md"
+            />
+            <Button size="md" disabled={code.length < 4} onClick={() => void oeffneCode(code)}>
+              Öffnen
+            </Button>
+          </Group>
+          <Button mt="sm" variant="light" fullWidth size="md" onClick={() => setScannen(true)} data-code-scannen>
+            QR-Code scannen
+          </Button>
+          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
+        </Card>
+      )}
       {aufAppleMobil() && !alsWebApp() && (
         <Alert variant="light" color="blue" data-home-tipp>
           Tipp: Über „Teilen“ › „Zum Home-Bildschirm“ wird der Onlinetest zur App. Dort dann „QR-Code scannen“ nutzen – die Kamera-App öffnet sonst immer

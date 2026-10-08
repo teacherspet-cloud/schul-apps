@@ -355,7 +355,19 @@ interface Fallend {
   tempo: number
 }
 
-export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Element {
+/**
+ * Tempo nach Klasse (08.10.2026, Wunsch der Lehrkraft): jüngere Klassen beginnen sehr langsam, mit jedem Treffer wird es
+ * etwas schneller (5 % kürzere Fallzeit), höhere Jahrgänge starten und enden schneller. Fallzeit in Sekunden.
+ */
+export function fallTempo(klasse: number | null | undefined, treffer: number): { fallzeit: number; abstand: number } {
+  const k = klasse ?? 6
+  const [start, schnellstens] = k <= 6 ? [18, 7] : k <= 8 ? [13, 5] : k <= 10 ? [10, 4] : [8, 3]
+  const fallzeit = Math.max(schnellstens, start * Math.pow(0.95, treffer))
+  // Neue Wörter etwa im Abstand einer halben Fallzeit – so stehen höchstens zwei bis drei Wörter gleichzeitig da
+  return { fallzeit, abstand: Math.max(1300, fallzeit * 500) }
+}
+
+export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
   const [fallen, setFallen] = useState<Fallend[]>([])
   const [leben, setLeben] = useState(3)
@@ -365,36 +377,47 @@ export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Elemen
   const fehler = useRef(new Set<string>())
   const fertig = useRef(false)
   const feld = useRef<HTMLInputElement>(null)
+  // Liste als Ref (08.10.2026): Der Takt rechnet ohne Nebenwirkungen in einer Zustandsberechnung – vorher zog das
+  // Verlieren eines Lebens innerhalb von setFallen ein zweites setState nach sich (in React nicht vorgesehen)
+  const liste = useRef<Fallend[]>([])
+  const woerterRef = useRef(woerter)
+  woerterRef.current = woerter
   const v = (id: string) => woerter.find((w) => w.id === id)!
   useEffect(() => {
     feld.current?.focus()
     const schritt = setInterval(() => {
-      setFallen((liste) => {
-        const weiter: Fallend[] = []
-        for (const f of liste) {
-          const y = f.y + f.tempo
-          if (y >= 1) {
-            fehler.current.add(f.id)
-            setLeben((l) => l - 1)
-          } else weiter.push({ ...f, y })
-        }
-        return weiter
-      })
+      if (fertig.current) return
+      let verloren = 0
+      const weiter: Fallend[] = []
+      for (const f of liste.current) {
+        const y = f.y + f.tempo
+        if (y >= 1) {
+          fehler.current.add(f.id)
+          verloren++
+        } else weiter.push({ ...f, y })
+      }
+      liste.current = weiter
+      setFallen(weiter)
+      if (verloren) setLeben((l) => l - verloren)
     }, 50)
     return () => clearInterval(schritt)
   }, [])
-  // Neue Wörter: anfangs alle 3 s, mit jedem Treffer etwas schneller
+  // Neue Wörter im Takt des Tempos (nach Klasse, mit jedem Treffer schneller)
   useEffect(() => {
     if (leben <= 0) return
+    const { fallzeit, abstand } = fallTempo(klasse, geschafft)
     const neu = (): void => {
-      const w = woerter[Math.floor(Math.random() * woerter.length)]
+      const l = woerterRef.current
+      const w = l[Math.floor(Math.random() * l.length)]
+      if (!w) return
       zaehler.current++
-      setFallen((l) => [...l, { key: zaehler.current, id: w.id, y: 0, x: 0.08 + Math.random() * 0.6, tempo: 0.0055 + Math.min(0.009, geschafft * 0.0004) }])
+      liste.current = [...liste.current, { key: zaehler.current, id: w.id, y: 0, x: 0.08 + Math.random() * 0.6, tempo: 1 / (fallzeit * 20) }]
+      setFallen(liste.current)
     }
     if (!zaehler.current) neu()
-    const t = setInterval(neu, Math.max(1300, 3000 - geschafft * 90))
+    const t = setInterval(neu, abstand)
     return () => clearInterval(t)
-  }, [geschafft, leben, woerter])
+  }, [geschafft, leben, klasse])
   useEffect(() => {
     if (leben <= 0 && !fertig.current) {
       fertig.current = true
@@ -403,9 +426,10 @@ export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Elemen
   }, [leben, geschafft, ende])
   const eingeben = (wert: string): void => {
     setText(wert)
-    const treffer = fallen.find((f) => bewerte(wert, v(f.id).term).urteil === 'richtig')
+    const treffer = liste.current.find((f) => bewerte(wert, v(f.id).term).urteil === 'richtig')
     if (!treffer) return
-    setFallen((l) => l.filter((f) => f.key !== treffer.key))
+    liste.current = liste.current.filter((f) => f.key !== treffer.key)
+    setFallen(liste.current)
     setGeschafft((g) => g + 1)
     setText('')
   }

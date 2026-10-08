@@ -9,6 +9,7 @@
  *    (SchuelerBereich.tsx) – dort zählt der Fokus.
  * Die Ziele sind die vorhandenen Seiten (/s/…); nichts fällt weg.
  */
+import { RekordKnopf } from './Rekorde'
 import { Badge, Button, Drawer, Group, Indicator, Stack, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconBook2, IconChecklist, IconHome, IconLogout, IconSettings, IconTrophy, IconUser } from '@tabler/icons-react'
@@ -121,6 +122,7 @@ export default function SchuelerTabs({ abmelden }: { abmelden: () => void }): Re
         data-schueler-blatt-ich
       >
         <Stack gap="xs">
+          <RekordKnopf gross />
           <Button component="a" href="/s/einstellungen" variant="default" size="md" leftSection={<IconSettings size={18} />}>
             Einstellungen
           </Button>

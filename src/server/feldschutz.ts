@@ -46,6 +46,8 @@ export const SENSIBEL: Record<string, string[]> = {
   vok_laufbahn: ['daten'],
   // Persönlicher Zugangscode der Gäste – für die Lehrkraft lesbar (08.10.2026), sonst nur als Prüfwert
   vok_gaeste: ['code_v'],
+  // Rekordbuch der Lernenden (08.10.2026)
+  rekord_buch: ['daten'],
   tafel_freigaben: ['schueler'],
   // Schüler-Startseite (06.10.2026): Wochen-Schnappschuss und Lerntipp je Person (lernstand.ts)
   lern_wochen: ['daten']

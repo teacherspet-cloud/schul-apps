@@ -8,11 +8,12 @@
  *    umdrehen) und Mappen je Themenbereich (umblättern: Arbeitsblätter mit Feedback, Tafelbilder,
  *    Schreibaufgaben, Tests, Lernprodukte).
  */
+import { useAuffrischen } from '../../shared/auffrischen'
 import { mitTuer } from './tuer'
 import { VokabelwegKarten } from './VokabelLeiter'
 import { ActionIcon, Alert, Badge, Button, Center, Group, Loader, Modal, Stack, Text, Title } from '@mantine/core'
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconExternalLink } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fachFarbe } from '../../shared/fachfarben'
 import type { Uebersicht } from '@shared/vokabeltrainer'
 import { holen } from '../onlinetest/serverApi'
@@ -107,12 +108,17 @@ const CSS = `
 export default function LernRaum({ fach }: { fach?: string }): React.JSX.Element {
   const [raeume, setRaeume] = useState<Raum[] | null>(null)
   const [offen, setOffen] = useState<string | null>(null)
-  useEffect(() => {
-    void holen<{ raeume: Raum[] }>('/s/api/lernen').then(
-      (d) => setRaeume(d.raeume),
-      () => setRaeume([])
-    )
-  }, [])
+  const laden = useCallback(
+    () =>
+      void holen<{ raeume: Raum[] }>('/s/api/lernen').then(
+        (d) => setRaeume(d.raeume),
+        () => setRaeume((r) => r ?? [])
+      ),
+    []
+  )
+  useEffect(laden, [laden])
+  // Neue Freigaben ohne Neuladen (08.10.2026)
+  useAuffrischen(laden)
   if (!raeume)
     return (
       <Center py="xl">

@@ -27,6 +27,7 @@ import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from '.
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
 import {
+  klasseFuer,
   kursGastAufnehmen,
   kursHaken,
   lernendeVon as vokLernende,
@@ -38,6 +39,7 @@ import {
   zeile as vokZeile
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
+import { rekordEintragen } from './rekordbuch'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 
 const SCHEMA = `
@@ -678,6 +680,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           return json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true
         const rekord = grammatikRekord(spiel, wert, st.rekorde?.[spiel])
         if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
+        // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres
+        const v = vokVon(z)
+        rekordEintragen(ich, `gram:${spiel}`, wert, v ? klasseFuer(v, ich) : klasseFuer({ lerngruppe_id: z.lerngruppe_id }, ich))
         // Fehler wie bei den Vokabelspielen: wackelig, gleich wieder dran; sichere ein Fach zurück
         const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((x) => p.aufgaben.some((a) => a.id === x))
         st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)

@@ -56,7 +56,7 @@ async function lernende(klasse, vorname, lk) {
   const p = await ctx.newPage()
   await p.goto(`${A}/anmelden?ziel=/s/&benutzer=${encodeURIComponent(k.benutzer)}`)
   await p.fill('#passwort', k.passwort)
-  await p.click('button[type=submit]')
+  await p.click('form[action="/auth/lokal"] button[type=submit]')
   await p.waitForURL(/\/passwort/, { timeout: 15000 })
   await p.fill('#neu', 'Probe-Passwort-2026')
   await p.fill('#neu2', 'Probe-Passwort-2026')

@@ -4,6 +4,7 @@
  * danach Spiele (Fehler finden, Satzbau-Puzzle, Formen-Blitz, Regel zuordnen) mit eigenem Rekord.
  * Regeln in shared/grammatiktrainer.ts, Server in server/grammatik.ts. Keine KI-Anfragen.
  */
+import { useAuffrischen } from '../../shared/auffrischen'
 import {
   Alert,
   Badge,
@@ -111,6 +112,8 @@ export default function GrammatikTrainer({ id }: { id: string }): React.JSX.Elem
     })
   }, [id])
   useEffect(laden, [laden])
+  // Änderungen der Lehrkraft ohne Neuladen (08.10.2026) – nicht mitten in einer Runde oder einem Spiel
+  useAuffrischen(() => !document.querySelector('[data-spiel], [data-verbspiel], [data-sitzung]') && laden(), !sitzung)
   if (d === undefined)
     return (
       <Center py="xl">
@@ -562,6 +565,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const [laeuft, setLaeuft] = useState(false)
   const [frage, setFrage] = useState(0)
   const [regel, setRegel] = useState(false)
+  const [netz, setNetz] = useState('')
   // Tipp vor der Antwort (Förderaufgaben, 08.10.2026) – gilt für die aktuelle Frage
   const [tippFuer, setTippFuer] = useState<string | null>(null)
   const a = schlange[0]
@@ -580,6 +584,10 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       if (e.urteil === 'richtig') ton('richtig')
+      setNetz('')
+    } catch (e) {
+      // Verbindung trotz Wiederholung weg (08.10.2026): sagen statt scheinbar hängen – nochmal tippen geht
+      setNetz(e instanceof Error ? e.message : String(e))
     } finally {
       setLaeuft(false)
     }
@@ -647,6 +655,11 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
         </Group>
       </Group>
       <Progress value={(zaehler.gesamt / Math.max(1, zaehler.gesamt + schlange.length)) * 100} radius="xl" size="lg" color={farbe.a} />
+      {netz && (
+        <Alert color="orange" data-netz-fehler>
+          {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.
+        </Alert>
+      )}
       <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
         <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
       </div>
@@ -990,7 +1003,9 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
   }, [rest, zeitSpiel, punkte, fehler, abschliessen])
   const naechste = (ok: boolean, aufgabeId?: string): void => {
     setUrteil(ok ? 'richtig' : 'falsch')
-    const p = punkte + (ok ? 1 : 0)
+    // Zeitspiele: Falsch auf Zeit (08.10.2026, Wunsch der Lehrkraft): ein Punkt und eine Sekunde weniger
+    const p = ok ? punkte + 1 : zeitSpiel ? Math.max(0, punkte - 1) : punkte
+    if (!ok && zeitSpiel) setRest((r) => r - 1)
     const f = !ok && aufgabeId ? [...fehler, aufgabeId] : fehler
     setPunkte(p)
     setFehler(f)

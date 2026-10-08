@@ -48,7 +48,12 @@ export function RichtigFalsch({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[]
     if (ok) {
       setPunkte((p) => p + 1)
       ton('richtig')
-    } else fehler.current.push(s.aufgabeId)
+    } else {
+      // Falsch auf Zeit (08.10.2026, Wunsch der Lehrkraft): ein Punkt und eine Sekunde weniger
+      fehler.current.push(s.aufgabeId)
+      setPunkte((p) => Math.max(0, p - 1))
+      setRest((r) => r - 1)
+    }
     setRueck(ok ? 'gut' : 'schlecht')
     setTimeout(() => (setRueck(null), setI((x) => x + 1)), ok ? 350 : 1100)
   }

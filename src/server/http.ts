@@ -16,6 +16,7 @@
  */
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
+import { berichtErlaubt, protokoll } from './diagnose'
 import { createSecureContext, type SecureContext } from 'node:tls'
 import { createReadStream, existsSync, readFileSync, statSync, watchFile } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
@@ -300,6 +301,24 @@ function statisch(res: ServerResponse, pfad: string): void {
 /** Lokale und private Adressen (auch als ::ffff:-Form) – von dort kommt die Weiche */
 const WEICHEN_NETZ = /^(::1|(::ffff:)?(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.))/
 
+/**
+ * Jede Anfrage mit Zeitmessung (08.10.2026): über 1 Sekunde ins Diagnose-Protokoll – Ereignisströme (/ereignisse)
+ * und Hintergrundaufträge laufen absichtlich lange und zählen nicht. Fehler wie bisher als 500.
+ */
+function gemessen(req: IncomingMessage, res: ServerResponse, arbeit: () => Promise<void>): void {
+  const ab = Date.now()
+  const pfad = String(req.url ?? '').split('?')[0]
+  res.on('finish', () => {
+    const ms = Date.now() - ab
+    if (ms > 1000 && !/^\/(ereignisse|auftrag\/)/.test(pfad)) protokoll('langsam', `${ms} ms ${req.method} ${pfad} ${res.statusCode}`)
+  })
+  arbeit().catch((e: unknown) => {
+    protokoll('langsam', `FEHLER ${req.method} ${pfad}: ${e instanceof Error ? e.message : String(e)}`)
+    if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
+    else res.end()
+  })
+}
+
 export function starteServer(opts: ServerOptionen): Promise<Server> {
   const sicher = Boolean(opts.tls)
   const rueckruf = `${opts.adresse.replace(/\/$/, '')}/auth/rueckruf`
@@ -365,6 +384,24 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
     // Aufrufe mit Wirkung nur mit der eigenen Kopfzeile (siehe oben)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
+
+    // ---------- Fehlerberichte aus den Browsern der Lernenden (08.10.2026) – klein, begrenzt, ohne Namen
+    if (req.method === 'POST' && url.pathname === '/s/api/fehlerbericht') {
+      if (!berichtErlaubt(ip)) return void res.writeHead(204).end()
+      const roh = await leseKoerper(req).catch(() => '')
+      let b: Record<string, unknown> = {}
+      try {
+        b = JSON.parse(String(roh).slice(0, 4000)) as Record<string, unknown>
+      } catch {
+        /* unlesbar */
+      }
+      const t = (x: unknown, n: number): string => String(x ?? '').slice(0, n)
+      protokoll(
+        'browser',
+        `${t(b.art, 20)} ${t(b.seite, 120)} | ${t(b.meldung, 400)} | ${t(b.ort, 300)} | ${sitzung?.nutzer.rolle ?? 'ohne'} | ${t(req.headers['user-agent'], 160)}`
+      )
+      return void res.writeHead(204).end()
+    }
 
     // ---------- Web-App-Manifest (ohne Anmeldung – der Home-Bildschirm fragt vorher)
     if (req.method === 'GET' && (url.pathname === '/manifest.webmanifest' || url.pathname === '/s/manifest.webmanifest')) {
@@ -759,17 +796,11 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           SNICallback: (name, fertig) => fertig(null, domainKontext && domainNamen.has(String(name).toLowerCase()) ? domainKontext : undefined)
         },
         (req, res) => {
-          behandle(req, res).catch((e: unknown) => {
-            if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
-            else res.end()
-          })
+          gemessen(req, res, () => behandle(req, res))
         }
       )
     : createHttpServer((req, res) => {
-        behandle(req, res).catch((e: unknown) => {
-          if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
-          else res.end()
-        })
+        gemessen(req, res, () => behandle(req, res))
       })
   server.keepAliveTimeout = 65_000
   server.headersTimeout = 70_000

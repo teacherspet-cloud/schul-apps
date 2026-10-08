@@ -7,6 +7,7 @@
  * legen, frei schreiben (mit Akzentleiste), Diktat, Lückensatz. Falsches kommt in der Sitzung wieder.
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
+import { useAuffrischen } from '../../shared/auffrischen'
 import { aufnahmeSpielen, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
 import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
@@ -69,6 +70,7 @@ import {
   SCHRITT,
   sitzungsWoerter,
   weitereNeue,
+  freiwilligeWoerter,
   uebersicht,
   uebungFuer,
   varianten,
@@ -222,6 +224,8 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
+  // Freiwillig weiter üben (08.10.2026): Antworten rücken nur eingeschränkt vor (shared/vokabeltrainer nachFreiwillig)
+  const [freiwillig, setFreiwillig] = useState(false)
   const [vorher, setVorher] = useState<Record<string, WortStand> | null>(null)
   const laden = useCallback(() => {
     void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}`).then(
@@ -241,6 +245,8 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
     )
   }, [id])
   useEffect(laden, [laden])
+  // Neue Vokabeln ohne Neuladen (08.10.2026) – nicht mitten in einer Runde oder einem Spiel
+  useAuffrischen(() => !document.querySelector('[data-spiel], [data-verbspiel], [data-sitzung]') && laden(), !sitzung)
   if (d === undefined)
     return (
       <Center py="xl">
@@ -251,9 +257,14 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
   return (
     <TrainerFarben fach={d.fach} fachFarbe={d.farbe}>
       {sitzung ? (
-        <Sitzung d={d} woerter={sitzung} fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), setSitzung(null))} />
+        <Sitzung d={d} woerter={sitzung} freiwillig={freiwillig} fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), setSitzung(null))} />
       ) : (
-        <Kasten d={d} starten={(w) => (setVorher(null), setSitzung(w))} aktualisieren={(r) => setD({ ...d, ...r })} vorher={vorher} />
+        <Kasten
+          d={d}
+          starten={(w, frei) => (setVorher(null), setFreiwillig(Boolean(frei)), setSitzung(w))}
+          aktualisieren={(r) => setD({ ...d, ...r })}
+          vorher={vorher}
+        />
       )}
     </TrainerFarben>
   )
@@ -285,7 +296,7 @@ function Kasten({
   vorher
 }: {
   d: Liste
-  starten: (w: Vokabel[]) => void
+  starten: (w: Vokabel[], freiwillig?: boolean) => void
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
   /** Stand vor der letzten Runde (für den Aufstieg) */
   vorher?: Record<string, WortStand> | null
@@ -297,6 +308,7 @@ function Kasten({
   const heute = sitzungsWoerter(d.woerter, d.staende, Date.now(), ziel, ziel + 25)
   const schritt = heute.slice(0, SCHRITT)
   const weitere = heute.length ? [] : weitereNeue(d.woerter, d.staende)
+  const freiwilligListe = heute.length ? [] : freiwilligeWoerter(d.woerter, d.staende)
   const max = Math.max(1, ...u.faecher)
   const tage = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const anteil = Math.round((u.sicher / Math.max(1, u.gesamt)) * 100)
@@ -502,6 +514,19 @@ function Kasten({
               Freiwillig: {weitere.length} weitere neue Vokabeln üben
             </Button>
           )}
+          {/* Freiwillig weiter üben (08.10.2026, abgestimmt): heutige Fehler, wackelige, dann alle übrigen geübten */}
+          {!spielt && !heute.length && freiwilligListe.length > 0 && (
+            <Button
+              size="md"
+              radius="xl"
+              variant="default"
+              leftSection={<IconPlayerPlay size={18} />}
+              onClick={() => starten(freiwilligListe, true)}
+              data-freiwillig-ueben
+            >
+              Freiwillig weiter üben · {freiwilligListe.length} {freiwilligListe.length === 1 ? 'Wort' : 'Wörter'}
+            </Button>
+          )}
           {/* Spiele mit den gelernten Wörtern (03.10.2026, abgestimmt) */}
           <Spielwahl
             vorDerRunde={heute.length > 0}
@@ -514,6 +539,7 @@ function Kasten({
             aktualisieren={aktualisieren}
             spielt={setSpielt}
             verben={verbDaten}
+            klasse={d.klasse}
           />
         </>
       )}
@@ -540,13 +566,24 @@ interface Ergebnis {
   sicher: boolean
 }
 
-function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig: (st: Record<string, WortStand>) => void }): React.JSX.Element {
+function Sitzung({
+  d,
+  woerter,
+  fertig,
+  freiwillig = false
+}: {
+  d: Liste
+  woerter: Vokabel[]
+  fertig: (st: Record<string, WortStand>) => void
+  freiwillig?: boolean
+}): React.JSX.Element {
   const farbe = useVtFarbe()
   const [warteschlange, setWarteschlange] = useState<Vokabel[]>(woerter)
   const [staende, setStaende] = useState<Record<string, WortStand>>(d.staende)
   const [ergebnis, setErgebnis] = useState<Ergebnis | null>(null)
   const [zaehler, setZaehler] = useState({ richtig: 0, gesamt: 0, wiederholt: new Map<string, number>() })
   const [laeuft, setLaeuft] = useState(false)
+  const [netz, setNetz] = useState('')
   // Zählt die gestellten Fragen: Die Übungsart gilt für eine Frage und wechselt erst mit „Weiter"
   const [frage, setFrage] = useState(0)
   const v = warteschlange[0]
@@ -567,7 +604,7 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
     if (!v || laeuft) return
     setLaeuft(true)
     try {
-      const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', { id: d.id, wortId: v.id, uebung, ...wert })
+      const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', { id: d.id, wortId: v.id, uebung, ...wert, ...(freiwillig ? { freiwillig: true } : {}) })
       setStaende((s) => ({ ...s, [v.id]: e.stand }))
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
@@ -575,6 +612,10 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
       // Lernkarte („Wusste ich" / „Noch nicht gewusst", 08.10.2026): gleich weiter, ohne Weiter-Knopf
       if (uebung === 'karte') return weiterMit(e)
       setErgebnis(e)
+      setNetz('')
+    } catch (e) {
+      // Verbindung trotz Wiederholung weg (08.10.2026): sagen statt scheinbar hängen – nochmal tippen geht
+      setNetz(e instanceof Error ? e.message : String(e))
     } finally {
       setLaeuft(false)
     }
@@ -660,6 +701,11 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
         </Badge>
       </Group>
       <Progress value={fortschritt} radius="xl" size="lg" color={farbe.a} />
+      {netz && (
+        <Alert color="orange" data-netz-fehler>
+          {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.
+        </Alert>
+      )}
       <div key={`${v.id}-${frage}`} className="vt-rein vt-buehne">
         {uebung === 'karte' ? (
           <Karte v={v} sprache={d.sprache} gewusst={(g) => void antworten({ gewusst: g })} gesperrt={Boolean(ergebnis) || laeuft} />

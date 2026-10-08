@@ -65,6 +65,12 @@ const dunkelImSystem = (): boolean => window.matchMedia?.('(prefers-color-scheme
 
 /** Lesen und Hören: Zeilenabstand, Kontrast, lesefreundliche Schrift – für den ganzen Schülerbereich */
 const LESEN_CSS = `
+/* Versehentliches Markieren (08.10.2026, Befund im Unterricht): In Übungen, Spielen und Menüs blockierte markierter Text
+   die Knöpfe (der Browser zog die Markierung statt zu klicken) – dort ist Text nicht markierbar. Eingaben bleiben es. */
+.vt, [data-spiel], [data-verbspiel], [data-sitzung], [data-spielwahl], [data-grammatik-kasten], [data-vokabel-kasten],
+button, [role="button"], .mantine-Tabs-list, .mantine-SegmentedControl-root, .mantine-Menu-dropdown, nav {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.vt input, .vt textarea, [data-spiel] input, [data-sitzung] input, [data-sitzung] textarea { -webkit-user-select: text; user-select: text; }
 html.sa-zeilen-weit body { --mantine-line-height: 1.75; line-height: 1.75; }
 html.sa-zeilen-weit .mantine-Text-root, html.sa-zeilen-weit p, html.sa-zeilen-weit li { line-height: 1.75; }
 html.sa-zeilen-sehrweit body { --mantine-line-height: 2.05; line-height: 2.05; }
@@ -112,7 +118,76 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
       <style>{LESEN_CSS}</style>
       {children}
       {d.vorlesen && <VorleseLeiste />}
+      <VerbindungsHinweis />
     </MantineProvider>
+  )
+}
+
+/**
+ * Verbindung unterbrochen (08.10.2026, Befund im Unterricht): serverApi.ts wiederholt Aufrufe selbst und meldet das –
+ * hier steht dann oben ein kleiner Hinweis statt einer scheinbar hängenden Seite. Dazu gehen Fehler im Browser
+ * (Ausnahmen, abgelehnte Zusagen) als kurzer Bericht an den Server (Diagnose, ohne Namen; höchstens 5 je Seite).
+ */
+function VerbindungsHinweis(): React.JSX.Element | null {
+  const [gestoert, setGestoert] = useState(false)
+  useEffect(() => {
+    const an = (e: Event): void => setGestoert(Boolean((e as CustomEvent<{ gestoert: boolean }>).detail?.gestoert))
+    window.addEventListener('schulapps-verbindung', an)
+    let gemeldet = 0
+    const berichten = (art: string, meldung: string, ort: string): void => {
+      if (gemeldet++ >= 5) return
+      const daten = JSON.stringify({ art, seite: window.location.pathname, meldung: meldung.slice(0, 400), ort: ort.slice(0, 300) })
+      try {
+        if (!navigator.sendBeacon?.('/s/api/fehlerbericht', new Blob([daten], { type: 'application/json' })))
+          void fetch('/s/api/fehlerbericht', { method: 'POST', body: daten, keepalive: true }).catch(() => undefined)
+      } catch {
+        /* Diagnose darf nichts stören */
+      }
+    }
+    const fehler = (e: ErrorEvent): void => berichten('fehler', e.message || String(e.error), `${e.filename ?? ''}:${e.lineno ?? ''} ${String(e.error?.stack ?? '').slice(0, 200)}`)
+    const zusage = (e: PromiseRejectionEvent): void => {
+      const g = e.reason as { message?: string; stack?: string } | undefined
+      berichten('zusage', g?.message ?? String(e.reason), String(g?.stack ?? '').slice(0, 250))
+    }
+    window.addEventListener('error', fehler)
+    window.addEventListener('unhandledrejection', zusage)
+    // Ein Druck auf einen Knopf hebt eine noch bestehende Markierung auf – sonst kommt der Klick nicht an
+    const markierungWeg = (e: PointerEvent): void => {
+      const t = e.target as HTMLElement | null
+      if (!t?.closest?.('button, [role="button"], a, label, .vt-option, [data-spiel] *, [data-zeitform], [data-rf]')) return
+      const sel = window.getSelection()
+      if (sel && !sel.isCollapsed) sel.removeAllRanges()
+    }
+    document.addEventListener('pointerdown', markierungWeg, true)
+    return () => {
+      window.removeEventListener('schulapps-verbindung', an)
+      window.removeEventListener('error', fehler)
+      window.removeEventListener('unhandledrejection', zusage)
+      document.removeEventListener('pointerdown', markierungWeg, true)
+    }
+  }, [])
+  if (!gestoert) return null
+  return (
+    <div
+      role="status"
+      data-verbindung-gestoert
+      style={{
+        position: 'fixed',
+        top: 8,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 3000,
+        background: 'var(--mantine-color-yellow-6)',
+        color: '#222',
+        padding: '6px 14px',
+        borderRadius: 999,
+        fontSize: 14,
+        fontWeight: 600,
+        boxShadow: '0 4px 14px rgba(0,0,0,.25)'
+      }}
+    >
+      Verbindung unterbrochen – es wird erneut versucht …
+    </div>
   )
 }
 

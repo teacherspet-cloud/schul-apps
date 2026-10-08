@@ -3,7 +3,7 @@
  * den schon gelernten Wörtern, je Spiel der eigene Rekord – keine Ranglisten. Wörter, die im Spiel danebengingen,
  * landen auf „nochmal ansehen" und (seit 06.10.2026) wackelig im Kasten; Treffer befördern nichts.
  */
-import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
+import { Badge, Button, Card, Group, Modal, SimpleGrid, Stack, Table, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import {
   IconArrowLeft,
   IconBolt,
@@ -162,6 +162,46 @@ const GRUPPEN: { id: string; name: string; text: string; offen: boolean; spiele:
   { id: 'verben', name: 'Unregelmäßige Verben', text: 'Stammformen üben', offen: false, spiele: ['verbtrio', 'formenblitz', 'bildverb', 'muster'] }
 ]
 
+/** Wörter, die in Spielen danebengingen: ein kleiner Knopf, die Liste erst auf Nachfrage */
+function NochmalAnsehen({ ids, woerter }: { ids: string[]; woerter: Vokabel[] }): React.JSX.Element | null {
+  const farbe = useVtFarbe()
+  const [offen, setOffen] = useState(false)
+  // Neueste zuerst, jedes Wort einmal
+  const liste = [...new Set([...ids].reverse())].map((id) => woerter.find((w) => w.id === id)).filter((w): w is Vokabel => Boolean(w))
+  if (!liste.length) return null
+  return (
+    <Card radius="lg" withBorder padding="sm" style={{ borderColor: 'var(--vt-a-rand)', background: 'var(--vt-a-hell)' }} data-nochmal-ansehen>
+      <Group justify="space-between" wrap="nowrap" gap="sm">
+        <Text size="sm">Diese Wörter gingen in Spielen daneben – sie kommen im Karteikasten bald wieder dran.</Text>
+        <Button size="xs" radius="xl" variant="white" color={farbe.a} onClick={() => setOffen(true)} style={{ flex: 'none' }} data-nochmal-knopf>
+          Wörter zum Wiederholen ({liste.length})
+        </Button>
+      </Group>
+      <Modal opened={offen} onClose={() => setOffen(false)} title={`Wörter zum Wiederholen (${liste.length})`} size="md">
+        <Text size="sm" c="dimmed" mb="sm">
+          Schau sie dir in Ruhe an. Die neuesten stehen oben.
+        </Text>
+        <Table striped data-nochmal-liste>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Wort</Table.Th>
+              <Table.Th>Bedeutung</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {liste.map((w) => (
+              <Table.Tr key={w.id}>
+                <Table.Td fw={700}>{w.term}</Table.Td>
+                <Table.Td>{w.translation}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Modal>
+    </Card>
+  )
+}
+
 export function Spielwahl({
   woerter,
   staende,
@@ -173,7 +213,8 @@ export function Spielwahl({
   spielt,
   verben,
   nurVerben,
-  vorDerRunde
+  vorDerRunde,
+  klasse
 }: {
   woerter: Vokabel[]
   staende: Record<string, WortStand>
@@ -190,6 +231,8 @@ export function Spielwahl({
   nurVerben?: boolean
   /** Von der Lehrkraft für heute freigeschaltet, die Tagesrunde steht noch aus (08.10.2026) */
   vorDerRunde?: boolean
+  /** Klasse der Lernenden (Tempo der Spiele) */
+  klasse?: number | null
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
@@ -239,7 +282,7 @@ export function Spielwahl({
     )
 
   if (spiel) {
-    const props = { woerter: pool, sprache, ende, staende }
+    const props = { woerter: pool, sprache, ende, staende, klasse }
     // Hörspiele ohne Gerätestimme nur mit Wörtern, die eine Aufnahme haben
     const hoerWoerter = geraet ? woerter : woerter.filter(hatWortAufnahme)
     return (
@@ -445,23 +488,8 @@ export function Spielwahl({
           ein paar sicheren Wörtern. Was im Spiel danebengeht, kommt im Karteikasten bald wieder dran.
         </Text>
       </div>
-      {ansehen.length > 0 && (
-        <Card radius="lg" withBorder style={{ borderColor: 'var(--vt-a-rand)', background: 'var(--vt-a-hell)' }} data-nochmal-ansehen>
-          <Text fw={700} size="sm" mb={6}>
-            Nochmal ansehen
-          </Text>
-          <Group gap={6}>
-            {ansehen
-              .map((id) => woerter.find((w) => w.id === id))
-              .filter((w): w is Vokabel => Boolean(w))
-              .map((w) => (
-                <Badge key={w.id} variant="white" color={farbe.a} size="lg" tt="none">
-                  {w.term} – {w.translation}
-                </Badge>
-              ))}
-          </Group>
-        </Card>
-      )}
+      {/* Nochmal ansehen (08.10.2026, Befund im Unterricht: lange Liste, schwer verständlich) – nur auf Nachfrage */}
+      {ansehen.length > 0 && <NochmalAnsehen ids={ansehen} woerter={woerter} />}
       {GRUPPEN.map((g) => {
         const karten = g.spiele
           .map((id) => SPIELE.find((s) => s.id === id))

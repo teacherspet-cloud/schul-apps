@@ -48,6 +48,8 @@ export interface WortStand {
   zuletzt: number
   /** Erster Kontakt (ms) – für die Tagesration neuer Wörter (08.10.2026); fehlt bei älteren Ständen */
   erstmals?: number
+  /** Zuletzt in ein höheres Fach gerückt (ms) – freiwilliges Üben rückt am selben Tag nicht noch einmal vor */
+  vor?: number
 }
 
 export const TAG = 86_400_000
@@ -271,7 +273,10 @@ export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antw
     if (urteil === 'richtig') st.erkannt++
   }
   if (uebung === 'karte') {
-    if (urteil === 'richtig') st.fach = 1
+    if (urteil === 'richtig' && st.fach < 1) {
+      st.fach = 1
+      st.vor = jetzt
+    }
     st.faellig = urteil === 'richtig' ? jetzt + TAG : jetzt
     return st
   }
@@ -290,12 +295,56 @@ export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antw
   // richtig
   if ((uebung === 'frei' || uebung === 'diktat' || uebung === 'luecke') && st.fach >= 2) st.frei = [...st.frei, jetzt].slice(-6)
   const ziel = erkennen ? Math.min(Math.max(st.fach, 0) + 1, 2) : Math.min(st.fach + 1, 6)
+  const vorher = st.fach
   st.fach = Math.max(st.fach === 0 ? 1 : st.fach, ziel)
+  if (st.fach > vorher) st.vor = jetzt
   let faellig = jetzt + ABSTAENDE[st.fach] * TAG
   // Termin-Anker: vor dem Test noch einmal fällig (spätestens 2 Tage vorher, nicht vor morgen)
   if (testTermin && testTermin > jetzt && faellig > testTermin - 2 * TAG) faellig = Math.max(jetzt + TAG, Math.min(faellig, testTermin - 2 * TAG))
   st.faellig = faellig
   return st
+}
+
+/**
+ * Freiwillig weiter üben (08.10.2026, abgestimmt): Richtig rückt nur vor, wenn das Wort fällig ist und heute noch nicht
+ * vorgerückt ist – sonst reine Übung. Falsch stuft nicht zurück, wird aber gemerkt (Fehlertexte, bald wieder dran).
+ */
+export function nachFreiwillig(st0: WortStand, uebung: Uebung, urteil: Urteil, antwort: string, jetzt = Date.now(), testTermin?: number): WortStand {
+  const heuteVorgerueckt = Boolean(st0.vor && tagVon(st0.vor) === tagVon(jetzt))
+  if (urteil === 'richtig' && st0.faellig <= jetzt && !heuteVorgerueckt) return nachAbfrage(st0, uebung, urteil, antwort, jetzt, testTermin)
+  const st: WortStand = { ...st0, frei: [...st0.frei], fehlerTexte: [...st0.fehlerTexte], versuche: st0.versuche + 1, zuletzt: jetzt }
+  if (ERKENNEN.includes(uebung)) {
+    st.erkennenVersuche++
+    if (urteil === 'richtig') st.erkannt++
+  }
+  if (urteil === 'falsch') {
+    st.falsch++
+    if (antwort.trim()) st.fehlerTexte = [...st.fehlerTexte, antwort.trim().slice(0, 60)].slice(-5)
+  }
+  // Nicht gewusst: spätestens morgen wieder im Kasten (wackelig) – das Fach bleibt
+  if (urteil !== 'richtig' && st.faellig > jetzt + TAG) st.faellig = jetzt + TAG
+  return st
+}
+
+/**
+ * Wörter für das freiwillige Üben (abgestimmt): zuerst die heute falsch beantworteten bzw. nicht gewussten, dann die
+ * wackeligen (Fach 1–2), danach alle übrigen schon geübten – je Runde `n`. Nie geübte Wörter kommen über „weitere neue".
+ */
+export function freiwilligeWoerter(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), n = 10): Vokabel[] {
+  const heute = tagVon(jetzt)
+  const geuebt = liste.filter((v) => (staende[v.id]?.versuche ?? 0) > 0)
+  const st = (v: Vokabel): WortStand => staende[v.id]
+  const rang = (v: Vokabel): number => {
+    const s = st(v)
+    // Heute daneben: heute geübt und danach noch fällig (richtig Beantwortete sind erst morgen wieder dran)
+    const heuteDaneben = tagVon(s.zuletzt) === heute && s.faellig <= jetzt
+    return heuteDaneben ? 0 : s.fach <= 2 ? 1 : 2
+  }
+  return geuebt
+    .map((v) => ({ v, r: rang(v), z: streu(`${heute}|${v.id}|frei`) }))
+    .sort((a, b) => a.r - b.r || a.z - b.z)
+    .slice(0, n)
+    .map((x) => x.v)
 }
 
 /** Tag in Deutschland (JJJJ-MM-TT) – Grenze der Tagesration */

@@ -34,6 +34,7 @@ import {
   abfrageAuswerten,
   standardVerben,
   spieleHeuteFrei,
+  klasseFuer,
   tageszielVon,
   db,
   fachfarbeDerLehrkraft,
@@ -279,7 +280,7 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
       )
     const k0 = (await k.koerper()) as Record<string, unknown>
     if (url.pathname === '/s/api/vokabeln/spiel') {
-      const r = spielEintragen(ws, k0, (wid) => woerter.some((v) => v.id === wid))
+      const r = spielEintragen(ws, k0, (wid) => woerter.some((v) => v.id === wid), { ich, klasse: klasseFuer({ lerngruppe_id: '' }, ich) })
       if (!r) return (json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true)
       wegSpeichern(ich.id, w.key, ws)
       return (json(res, 200, { rekord: r.rekord, rekorde: ws.rekorde ?? {}, ansehen: ws.ansehen }), true)
@@ -293,7 +294,7 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
       const z = zeile(zid)
       if (!z || !vokIstFuer(z, ich)) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       const st = standVon(z.id, ich.id)
-      const r = abfrageAuswerten({ ...v, id: original }, k0, st, z.test_termin ?? undefined)
+      const r = abfrageAuswerten({ ...v, id: original }, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich) })
       if (!r) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
       standSpeichern(z.id, ich.id, st)
       // Auch der Weg merkt sich den Tag (Aktivität) und streicht „nochmal ansehen"
@@ -301,7 +302,7 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
       wegSpeichern(ich.id, w.key, ws)
       return (json(res, 200, { ...r.ergebnis, stand: r.neu, sicher: false }), true)
     }
-    const r = abfrageAuswerten(v, k0, ws)
+    const r = abfrageAuswerten(v, k0, ws, undefined, { ich, klasse: klasseFuer({ lerngruppe_id: '' }, ich) })
     if (!r) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
     wegSpeichern(ich.id, w.key, ws)
     return (json(res, 200, { ...r.ergebnis, stand: r.neu, sicher: false }), true)

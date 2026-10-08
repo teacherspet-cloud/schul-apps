@@ -23,6 +23,9 @@ details { margin-top: 20px; border-top: 1px solid var(--rand); padding-top: 14px
 summary { cursor: pointer; color: var(--leise); }
 .fehler { background: color-mix(in srgb, var(--fehler) 12%, transparent); color: var(--fehler); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
 .hinweis { font-size: .85rem; color: var(--leise); margin-top: 18px; }
+form.code button { margin-top: 10px; background: var(--akzent); color: #08201c; border: 0; }
+details.anmelden { margin-top: 28px; font-size: .95rem; }
+details.anmelden > summary { font-size: .9rem; }
 `
 
 export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: string; ziel: string; benutzer?: string }): string {
@@ -40,8 +43,17 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
 <body>
 <main>
   <h1>Schul-Apps</h1>
-  <p class="leise">${fuerSchueler ? 'Anmelden – zu den eigenen Arbeitsblättern, Vokabeln, Tests und Aufgaben.' : 'Anmelden mit dem Zugang der Schule.'}</p>
   ${o.fehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
+  <!-- Mit Code öffnen (08.10.2026, Befund im Unterricht): der übliche Weg der Lernenden, deshalb oben und groß -->
+  <form method="get" action="/s/" class="code">
+    <label for="code">Mit Code öffnen</label>
+    <input id="code" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" required
+      placeholder="z. B. AB12CD" style="text-transform:uppercase;font-size:1.3rem;letter-spacing:.08em">
+    <button type="submit">Öffnen</button>
+  </form>
+  <details class="anmelden"${o.fehler || o.benutzer ? ' open' : ''}>
+  <summary>Anmelden (IServ oder Konto)</summary>
+  <p class="leise">${fuerSchueler ? 'Zu den eigenen Arbeitsblättern, Vokabeln, Tests und Aufgaben.' : 'Mit dem Zugang der Schule.'}</p>
   ${
     o.iserv
       ? `<a class="knopf" href="/auth/iserv?ziel=${encodeURIComponent(ziel)}">Mit IServ anmelden</a>
@@ -58,6 +70,7 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
       <input id="passwort" name="passwort" type="password" autocomplete="current-password" required>
       <button type="submit">Anmelden</button>
     </form>
+  </details>
   </details>
 </main>
 </body>

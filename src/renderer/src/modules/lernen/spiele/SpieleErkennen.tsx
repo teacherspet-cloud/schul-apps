@@ -17,6 +17,8 @@ export interface SpielProps {
   ende: (wert: number, fehler: string[]) => void
   /** Stand im Kasten – für die Antwortform nach Fach (07.10.2026) */
   staende?: Record<string, WortStand>
+  /** Klasse der Lernenden – Tempo der Spiele (08.10.2026: „Fallende Wörter" in jüngeren Klassen langsamer) */
+  klasse?: number | null
 }
 
 export const gemischt = <T,>(l: readonly T[]): T[] => [...l].sort(() => Math.random() - 0.5)
@@ -109,6 +111,7 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
   const [geschafft, setGeschafft] = useState(0)
   const fehler = useRef(new Set<string>())
   const sek = useSekunden(geschafft < vorrat.length)
+  const [strafe, setStrafe] = useState(0)
   const v = (id: string): Vokabel => vorrat.find((x) => x.id === id)!
   const tippen = (seite: 'l' | 'r', id: string): void => {
     if (!wahl || wahl.seite === seite) return setWahl({ seite, id })
@@ -117,6 +120,8 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
     setWahl(null)
     if (l !== r) {
       fehler.current.add(l)
+      // Falsch auf Zeit (08.10.2026): eine Strafsekunde
+      setStrafe((s) => s + 1)
       setFalsch(`${l}|${r}`)
       setTimeout(() => setFalsch(null), 500)
       return
@@ -133,7 +138,7 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
     setNaechster((n) => n + 1)
     const g = geschafft + 1
     setGeschafft(g)
-    if (g === vorrat.length) setTimeout(() => ende(sek, [...fehler.current]), 500)
+    if (g === vorrat.length) setTimeout(() => ende(sek + strafe, [...fehler.current]), 500)
   }
   const knopf = (seite: 'l' | 'r', id: string): React.JSX.Element => {
     const an = wahl?.seite === seite && wahl.id === id
@@ -163,7 +168,7 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
           Tippe ein Wort und seine Übersetzung.
         </Text>
         <Badge color={farbe.a} variant="light" size="lg">
-          {sek} s · {geschafft}/{vorrat.length}
+          {sek + strafe} s · {geschafft}/{vorrat.length}
         </Badge>
       </Group>
       <SimpleGrid cols={2} spacing="sm">
@@ -206,7 +211,12 @@ export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
     if (rest <= 0) return
     const gut = o === frage.translation
     if (gut) setTreffer((t) => t + 1)
-    else fehler.current.add(frage.id)
+    else {
+      // Falsch auf Zeit (08.10.2026, Wunsch der Lehrkraft): ein Punkt und eine Sekunde weniger
+      fehler.current.add(frage.id)
+      setTreffer((t) => Math.max(0, t - 1))
+      setRest((r) => r - 1)
+    }
     setBlitz(gut ? 'gut' : 'schlecht')
     setTimeout(() => setBlitz(null), 250)
     weiter()

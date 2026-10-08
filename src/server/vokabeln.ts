@@ -30,10 +30,12 @@ import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
+import { rekordEintragen, woerterEintragen } from './rekordbuch'
 import {
   bewerte,
   istSicher,
   nachAbfrage,
+  nachFreiwillig,
   neuerStand,
   satzMitLuecke,
   TAG,
@@ -267,7 +269,7 @@ export function standSpeichern(zid: string, sid: string, s: VokStand): void {
 }
 
 /** Klassenstufe der Lernenden zu einer Freigabe – Name der Lerngruppe („7a"), sonst die IServ-Gruppen; null = unbekannt */
-function klasseFuer(z: Pick<Zeile, 'lerngruppe_id'>, ich: NutzerInfo): number | null {
+export function klasseFuer(z: Pick<Zeile, 'lerngruppe_id'>, ich: NutzerInfo): number | null {
   const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
   const aus = [g?.name, ...ich.gruppen.map((x) => x.name)].map((n) => jahrgangAus(n)).find((j) => j && j >= 1 && j <= 13)
   return aus ?? null
@@ -445,7 +447,9 @@ export function abfrageAuswerten(
   v: Vokabel,
   k0: Record<string, unknown>,
   stand: VokStand,
-  testTermin?: number
+  testTermin?: number,
+  /** Rekordbuch (08.10.2026): wer übt, in welcher Klasse */
+  buch?: { ich: NutzerInfo; klasse: number | null }
 ): { ergebnis: { urteil: Urteil; hinweis?: string; richtig: string }; neu: WortStand } | null {
   const uebung = String(k0.uebung ?? '') as Uebung
   if (!UEBUNGEN.includes(uebung)) return null
@@ -459,7 +463,9 @@ export function abfrageAuswerten(
       ? { urteil: (antwort === 'stimmt') === paarStimmt ? 'richtig' : 'falsch', richtig: `${v.term} – ${v.translation}` }
       : bewerte(antwort, loesungFuer(v, uebung), uebung === 'auswahlFs')
   const jetzt = Date.now()
-  const neu = nachAbfrage(
+  const alt = stand.woerter[v.id]
+  // Freiwillig weiter üben (08.10.2026): rückt nur vor, wenn fällig und heute noch nicht vorgerückt; Fehler ohne Zurückstufen
+  const neu = (k0.freiwillig === true ? nachFreiwillig : nachAbfrage)(
     stand.woerter[v.id] ?? neuerStand(),
     uebung,
     ergebnis.urteil,
@@ -469,6 +475,9 @@ export function abfrageAuswerten(
     testTermin
   )
   stand.woerter[v.id] = neu
+  // Rekordbuch: neu gelernt (erster Kontakt) und sicher geworden – je Schuljahr
+  if (buch)
+    woerterEintragen(buch.ich, { gelernt: !alt?.versuche ? 1 : 0, sicher: istSicher(neu) && !(alt && istSicher(alt)) ? 1 : 0 }, buch.klasse, jetzt)
   // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
   if (ergebnis.urteil === 'richtig' && stand.ansehen?.includes(v.id)) stand.ansehen = stand.ansehen.filter((x) => x !== v.id)
   const heute = new Date(jetzt).toISOString().slice(0, 10)
@@ -477,7 +486,12 @@ export function abfrageAuswerten(
 }
 
 /** Spiel beendet: Rekord und „nochmal ansehen" in einen Stand eintragen */
-export function spielEintragen(stand: VokStand, k0: Record<string, unknown>, gueltig: (wortId: string) => boolean): { rekord: boolean } | null {
+export function spielEintragen(
+  stand: VokStand,
+  k0: Record<string, unknown>,
+  gueltig: (wortId: string) => boolean,
+  buch?: { ich: NutzerInfo; klasse: number | null }
+): { rekord: boolean } | null {
   const spiel = String(k0.spiel ?? '') as SpielId
   const wert = Number(k0.wert)
   if (!SPIELE.some((x) => x.id === spiel) || !Number.isFinite(wert) || wert < 0 || wert > 100000) return null
@@ -490,6 +504,8 @@ export function spielEintragen(stand: VokStand, k0: Record<string, unknown>, gue
   for (const id of new Set(fehler)) if (stand.woerter[id]) stand.woerter[id] = nachSpielfehler(stand.woerter[id], jetzt)
   const heute = new Date().toISOString().slice(0, 10)
   if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
+  // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres über alle Trainings
+  if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt)
   return { rekord }
 }
 
@@ -632,7 +648,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         )
       // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
-        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid))
+        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), { ich, klasse: klasseFuer(z, ich) })
         if (!r) return json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true
         standSpeichern(z.id, ich.id, st)
         return json(res, 200, { rekord: r.rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true
@@ -641,7 +657,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (!istOffen(z)) return json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
-        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined) : null
+        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich) }) : null
         if (!r) return json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true
         standSpeichern(z.id, ich.id, st)
         const { ergebnis, neu } = r
