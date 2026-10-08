@@ -1,12 +1,16 @@
 /**
  * Lernziele bearbeiten (Reihe und Schritt): auswählen aus dem Kerncurriculum, von der KI vorschlagen
  * lassen, von Hand schreiben. Je Ziel die Fassung für die Lehrkraft und „Ich kann …" für die Lernenden.
+ *
+ * Kompakt (08.10.2026, Plan „Übersicht" B2): Im Standardmodus steht je Ziel eine Zeile „Ich kann …"; die
+ * Kompetenzformulierung erscheint erst beim Bearbeiten (Stift) – im Expertenmodus wie bisher beide Felder.
  */
 import { ActionIcon, Button, Checkbox, Group, Modal, Paper, Stack, Text, TextInput, Tooltip } from '@mantine/core'
-import { IconBook2, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconBook2, IconCheck, IconPencil, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { Lernziel } from '@shared/reihe'
 import { notifyError } from '../../shared/util'
+import { useExperte } from '../../shared/settingsStore'
 
 export interface KcAuszug {
   /** Zeilen des Kerncurriculums zum gewählten Oberthema (Unterthemen, Kompetenzsätze) */
@@ -28,6 +32,13 @@ export function LernzieleFeld(props: {
   const [vorschlaege, setVorschlaege] = useState<{ ziele: Lernziel[]; gewaehlt: boolean[] } | null>(null)
   const [kcOffen, setKcOffen] = useState(false)
   const [kcWahl, setKcWahl] = useState<boolean[]>([])
+  const experte = useExperte()
+  // Im Standardmodus aufgeklappte Ziele (Bearbeiten); neue, leere Ziele stehen immer offen
+  const [offen, setOffen] = useState<number[]>([])
+  const entfernen = (i: number): void => {
+    props.setze(props.ziele.filter((_, k) => k !== i))
+    setOffen((o) => o.filter((k) => k !== i).map((k) => (k > i ? k - 1 : k)))
+  }
   const aendern = (i: number, teil: Partial<Lernziel>): void => props.setze(props.ziele.map((z, k) => (k === i ? { ...z, ...teil } : z)))
   const ki = async (): Promise<void> => {
     if (!props.vorschlagen) return
@@ -86,7 +97,15 @@ export function LernzieleFeld(props: {
               KI schlägt vor
             </Button>
           )}
-          <Button size="xs" variant="subtle" leftSection={<IconPlus size={14} />} onClick={() => props.setze([...props.ziele, { text: '', ichKann: '' }])}>
+          <Button
+            size="xs"
+            variant="subtle"
+            leftSection={<IconPlus size={14} />}
+            onClick={() => {
+              setOffen((o) => [...o, props.ziele.length])
+              props.setze([...props.ziele, { text: '', ichKann: '' }])
+            }}
+          >
             Eigenes
           </Button>
         </Group>
@@ -96,31 +115,63 @@ export function LernzieleFeld(props: {
           Noch keine Lernziele.
         </Text>
       )}
-      {props.ziele.map((z, i) => (
-        <Paper key={i} withBorder p={6} radius="sm">
-          <Group gap={6} wrap="nowrap" align="start">
-            <Stack gap={4} style={{ flex: 1 }}>
-              <TextInput size="xs" placeholder="Kompetenz (für die Lehrkraft)" value={z.text} onChange={(e) => aendern(i, { text: e.currentTarget.value })} />
-              <TextInput
-                size="xs"
-                placeholder="Ich kann … (sehen die Lernenden)"
-                value={z.ichKann}
-                onChange={(e) => aendern(i, { ichKann: e.currentTarget.value })}
-              />
-              {z.quelle && (
-                <Text size="xs" c="dimmed">
-                  {z.quelle}
-                </Text>
+      {props.ziele.map((z, i) =>
+        experte || offen.includes(i) || (!z.text.trim() && !z.ichKann.trim()) ? (
+          <Paper key={i} withBorder p={6} radius="sm" data-lernziel-offen>
+            <Group gap={6} wrap="nowrap" align="start">
+              <Stack gap={4} style={{ flex: 1 }}>
+                <TextInput size="xs" placeholder="Kompetenz (für die Lehrkraft)" value={z.text} onChange={(e) => aendern(i, { text: e.currentTarget.value })} />
+                <TextInput
+                  size="xs"
+                  placeholder="Ich kann … (sehen die Lernenden)"
+                  value={z.ichKann}
+                  onChange={(e) => aendern(i, { ichKann: e.currentTarget.value })}
+                />
+                {z.quelle && (
+                  <Text size="xs" c="dimmed">
+                    {z.quelle}
+                  </Text>
+                )}
+              </Stack>
+              {!experte && offen.includes(i) && (
+                <Tooltip label="Fertig">
+                  <ActionIcon variant="subtle" color="gray" onClick={() => setOffen((o) => o.filter((k) => k !== i))} aria-label="Lernziel fertig">
+                    <IconCheck size={14} />
+                  </ActionIcon>
+                </Tooltip>
               )}
-            </Stack>
+              <Tooltip label="Entfernen">
+                <ActionIcon variant="subtle" color="gray" onClick={() => entfernen(i)} aria-label="Lernziel entfernen">
+                  <IconTrash size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Paper>
+        ) : (
+          <Group key={i} gap={6} wrap="nowrap" className="lernziel-zeile" data-lernziel-zeile>
+            <Text size="sm" style={{ flex: 1, minWidth: 0 }} title={z.text && z.ichKann ? `Kompetenz: ${z.text}` : z.quelle}>
+              {z.ichKann.trim() || (
+                <>
+                  {z.text}{' '}
+                  <Text span size="xs" c="dimmed">
+                    (noch ohne „Ich kann …")
+                  </Text>
+                </>
+              )}
+            </Text>
+            <Tooltip label="Bearbeiten (auch die Fassung für die Lehrkraft)">
+              <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setOffen((o) => [...o, i])} aria-label="Lernziel bearbeiten" data-lernziel-bearbeiten>
+                <IconPencil size={14} />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Entfernen">
-              <ActionIcon variant="subtle" color="gray" onClick={() => props.setze(props.ziele.filter((_, k) => k !== i))} aria-label="Lernziel entfernen">
+              <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => entfernen(i)} aria-label="Lernziel entfernen">
                 <IconTrash size={14} />
               </ActionIcon>
             </Tooltip>
           </Group>
-        </Paper>
-      ))}
+        )
+      )}
       {laeuft === 'ich' && (
         <Text size="xs" c="dimmed">
           „Ich kann …" wird formuliert …

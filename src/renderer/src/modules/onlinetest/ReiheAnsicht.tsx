@@ -6,6 +6,8 @@
  *                     (gesperrte grau mit „was fehlt noch"), Hefter, „Ich brauche Hilfe"
  *  /s/r/<ZID>/<SID>   ein Schritt, der hier bearbeitet wird (Zwischenaufgabe, Lernkarten,
  *                     Selbsteinschätzung, Diagnose, Abschlussprodukt, Sprechaufgabe …)
+ *  /s/r/<ZID>/hefter        Hefter als eigene Seite, mit PDF (08.10.2026 – am Handy statt Fenster und Druckdialog)
+ *  /s/r/<ZID>/materialien   alle Arbeitsblätter der Reihe und „Meine Abgaben" mit Rückmeldungen (08.10.2026, Plan G.3)
  * Arbeitsblatt, Schreibaufgabe und Test öffnen ihre eigenen Seiten (mit „Zur Reihe").
  * Abgestimmt: ganzer Weg sichtbar, Abzeichen für Abschnitte, KEINE Ranglisten oder Vergleiche.
  */
@@ -34,6 +36,8 @@ import {
   IconArrowLeft,
   IconBook,
   IconCheck,
+  IconDownload,
+  IconFileText,
   IconHandStop,
   IconLock,
   IconMedal,
@@ -46,6 +50,7 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMediaQuery } from '@mantine/hooks'
 import type { SchrittStand, Stand, Status, Weg } from '@shared/reihe'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
@@ -69,6 +74,8 @@ interface ReiheDaten {
   titel: string
   oberthema: string
   fach: string
+  /** Reihenart (08.10.2026): digital = alles am Gerät, geschafft nach Ergebnis */
+  art?: 'digital' | 'gemischt' | 'planung'
   lernziele: { ichKann: string }[]
   schritte: SchrittSicht[]
   weg: Weg
@@ -161,13 +168,14 @@ export function ReiheWeg({ zid, schritt }: { zid: string; schritt?: string }): R
       </Center>
     )
   if (!d) return <Alert color="orange">{fehler || 'Diese Reihe gibt es nicht.'}</Alert>
+  if (schritt === 'hefter') return <HefterSeite d={d} />
+  if (schritt === 'materialien') return <MaterialSeite d={d} />
   const s = schritt ? d.schritte.find((x) => x.id === schritt) : undefined
   if (s) return <SchrittSeite d={d} s={s} neu={laden} />
   return <Weg d={d} neu={laden} />
 }
 
 function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element {
-  const [hefter, setHefter] = useState(false)
   const [hilfe, setHilfe] = useState(false)
   const lage = new Map(d.weg.schritte.map((l) => [l.id, l]))
   return (
@@ -221,12 +229,22 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
             ))}
           </Stack>
         )}
+        {d.art === 'digital' && (
+          <Text size="sm" c="dimmed" mt="sm" data-reihe-digital>
+            Du arbeitest alles am Gerät. Ein Schritt ist geschafft, sobald dein Ergebnis passt – sonst überarbeitest du ihn oder bekommst
+            eine Übung dazu. Kommst du nicht weiter, tippe auf „Ich brauche Hilfe".
+          </Text>
+        )}
         <Group mt="md" gap="xs">
+          {/* Hefter und Materialien als eigene Seiten (08.10.2026) – am Handy kein Fenster über dem Weg */}
           {d.hefter.length > 0 && (
-            <Button variant="light" leftSection={<IconBook size={16} />} onClick={() => setHefter(true)} data-hefter-knopf>
+            <Button component="a" href={`/s/r/${d.id}/hefter`} variant="light" leftSection={<IconBook size={16} />} data-hefter-knopf>
               Mein Hefter ({d.hefter.length})
             </Button>
           )}
+          <Button component="a" href={`/s/r/${d.id}/materialien`} variant="light" leftSection={<IconFileText size={16} />} data-materialien-knopf>
+            Materialien und Abgaben
+          </Button>
           {d.stand.hilfe ? (
             <Button
               variant="light"
@@ -250,7 +268,9 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
         const gesperrt = l.status === 'gesperrt'
         // Förderschritte zeigen sich nur, wenn sie gebraucht werden
         if (s.rolle === 'foerder' && gesperrt) return null
-        const href = !gesperrt ? (s.link ? mitReihe(s.link, d.id) : `/s/r/${d.id}/${s.id}`) : undefined
+        // Blatt als Selbsteinschätzung oder Abschluss (08.10.2026): erst die Schrittseite (Ampel bzw. Raster), von dort zum Blatt
+        const ueberSchritt = s.inhalt?.zweck === 'reflexion' || s.inhalt?.zweck === 'abschluss'
+        const href = !gesperrt ? (s.link && !ueberSchritt ? mitReihe(s.link, d.id) : `/s/r/${d.id}/${s.id}`) : undefined
         return (
           <Stack key={s.id} gap={4}>
             {neuerAbschnitt && (
@@ -263,7 +283,7 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
             )}
             <Paper
               withBorder
-              p="md"
+              p={{ base: 'sm', xs: 'md' }}
               radius="lg"
               component={href ? 'a' : 'div'}
               {...(href ? { href } : {})}
@@ -288,8 +308,11 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
                   )}
                 </ThemeIcon>
                 <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-                  <Group gap={6}>
-                    <Text fw={700}>{s.titel}</Text>
+                  {/* Schmale Schirme (08.10.2026): Titel und Marken brechen um statt überzulaufen */}
+                  <Group gap={6} wrap="wrap" style={{ rowGap: 2 }}>
+                    <Text fw={700} style={{ overflowWrap: 'anywhere', minWidth: 0 }}>
+                      {s.titel}
+                    </Text>
                     {s.rolle === 'wahl' && (
                       <Badge size="xs" color="grape" variant="light">
                         Wahl
@@ -328,35 +351,6 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
         )
       })}
 
-      {hefter && (
-        <Modal opened onClose={() => setHefter(false)} title="Mein Hefter" size="lg">
-          <Stack>
-            {d.hefter.map((h, i) => (
-              <Card key={i} withBorder>
-                <Text fw={700}>{h.titel}</Text>
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                  {h.text}
-                </Text>
-              </Card>
-            ))}
-            <Button
-              variant="light"
-              onClick={() => {
-                const w = window.open('', '_blank')
-                if (!w) return
-                const esc = (t: string): string => t.replace(/[&<>]/g, (z) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[z]!)
-                w.document.write(
-                  `<!doctype html><meta charset="utf-8"><title>Hefter – ${esc(d.titel)}</title><style>body{font:12pt/1.5 system-ui;margin:20mm}h2{margin-top:1.4em}p{white-space:pre-wrap}</style><h1>${esc(d.titel)}</h1>${d.hefter.map((h) => `<h2>${esc(h.titel)}</h2><p>${esc(h.text)}</p>`).join('')}`
-                )
-                w.document.close()
-                w.print()
-              }}
-            >
-              Drucken / als PDF
-            </Button>
-          </Stack>
-        </Modal>
-      )}
       {hilfe && <HilfeDialog d={d} schliessen={() => setHilfe(false)} fertig={neu} />}
     </Stack>
   )
@@ -436,7 +430,32 @@ function Inhalt({ d, s, st, status, neu }: { d: ReiheDaten; s: SchrittSicht; st:
     senden('/s/api/reihe/schritt', { id: d.id, schritt: s.id, aktion, ...mehr })
   switch (i.art) {
     case 'arbeitsblatt':
-      return <NiveauWahl d={d} s={s} st={st} schicke={schicke} />
+      // Rolle des Blatts (08.10.2026, Plan G.2): Abschluss mit Raster, Selbsteinschätzung mit Ampel und Lerntagebuch daneben
+      return (
+        <Stack>
+          {i.zweck === 'abschluss' && Array.isArray(i.raster) && i.raster.length > 0 && (
+            <Card withBorder padding="sm" data-blatt-raster>
+              <Text size="sm" fw={600}>
+                Darauf kommt es an:
+              </Text>
+              {(i.raster as string[]).map((k, n) => (
+                <Text key={n} size="sm">
+                  • {k}
+                </Text>
+              ))}
+            </Card>
+          )}
+          <NiveauWahl d={d} s={s} st={st} schicke={schicke} />
+          {i.zweck === 'reflexion' && (
+            <>
+              <Text size="sm" c="dimmed">
+                Bearbeite das Blatt und schätze dich danach hier ein.
+              </Text>
+              <Reflexion d={d} s={s} st={st} schicke={schicke} neu={neu} />
+            </>
+          )}
+        </Stack>
+      )
     case 'aufgabe':
     case 'abschluss':
     case 'sprechen':
@@ -507,6 +526,9 @@ function Abgabe({
   const [laeuft, setLaeuft] = useState('')
   const [fehler, setFehler] = useState('')
   const [bogen, setBogen] = useState<FeedbackBogen | null>(null)
+  const [geprueft, setGeprueft] = useState<boolean | null>(null)
+  // Abschlussprodukt in einer digitalen Reihe (08.10.2026): Die KI prüft nach dem Raster – die Punkte sieht nur die Lehrkraft
+  const kiPrueft = Boolean(i.feedback) || (i.art === 'abschluss' && d.art === 'digital')
   const textErlaubt = i.art !== 'sprechen' && (i.art === 'abschluss' || i.antwort !== 'foto')
   const fotoErlaubt = i.art === 'abschluss' || i.antwort === 'foto' || i.antwort === 'beides'
   const fertig = status === 'geschafft'
@@ -534,6 +556,7 @@ function Abgabe({
     try {
       const r = await schicke('abgeben', { antworten })
       if (r.bogen) setBogen(r.bogen as FeedbackBogen)
+      if (typeof r.geprueft === 'boolean') setGeprueft(r.geprueft)
       neu()
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
@@ -662,9 +685,14 @@ function Abgabe({
           {st.eingereicht ? 'Erneut abgeben' : 'Abgeben'}
         </Button>
       )}
-      {laeuft === 'abgabe' && Boolean(i.feedback) && (
+      {laeuft === 'abgabe' && kiPrueft && (
         <Text size="sm" c="dimmed">
-          Das Feedback wird geschrieben – das dauert etwa eine Minute.
+          {i.art === 'abschluss' ? 'Dein Produkt wird angesehen – das dauert etwa eine Minute.' : 'Das Feedback wird geschrieben – das dauert etwa eine Minute.'}
+        </Text>
+      )}
+      {geprueft === false && (
+        <Text size="sm" c="dimmed" data-abschluss-lehrkraft>
+          Deine Lehrkraft sieht sich dein Produkt an.
         </Text>
       )}
     </Stack>
@@ -817,6 +845,9 @@ function Reflexion({
   const [ampel, setAmpel] = useState<Record<string, 'gruen' | 'gelb' | 'rot'>>(st.ampel ?? {})
   const [tagebuch, setTagebuch] = useState(st.tagebuch ?? '')
   const [laeuft, setLaeuft] = useState(false)
+  const [impuls, setImpuls] = useState(st.impuls?.text ?? '')
+  // Handy (08.10.2026): die drei Ampelstufen untereinander statt gequetscht nebeneinander
+  const schmal = useMediaQuery('(max-width: 480px)') ?? false
   return (
     <Stack data-reflexion>
       {ziele.map((z, n) => (
@@ -826,6 +857,7 @@ function Reflexion({
           </Text>
           <SegmentedControl
             fullWidth
+            orientation={schmal ? 'vertical' : 'horizontal'}
             value={ampel[String(n)] ?? ''}
             onChange={(v) => setAmpel({ ...ampel, [String(n)]: v as 'gruen' | 'gelb' | 'rot' })}
             data={[
@@ -846,13 +878,29 @@ function Reflexion({
         onClick={() => {
           setLaeuft(true)
           void schicke('abgeben', { ampel, tagebuch })
-            .then(neu)
+            .then((r) => {
+              if (typeof r.impuls === 'string' && r.impuls) setImpuls(r.impuls)
+              neu()
+            })
             .finally(() => setLaeuft(false))
         }}
         data-reflexion-abgeben
       >
         {st.eingereicht ? 'Aktualisieren' : 'Fertig'}
       </Button>
+      {laeuft && tagebuch.trim().length >= 15 && (
+        <Text size="sm" c="dimmed">
+          Einen Moment – du bekommst gleich einen Gedanken zu deinem Eintrag.
+        </Text>
+      )}
+      {/* KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6): freundlich, ohne Bewertung */}
+      {impuls && (
+        <Alert color="grape" variant="light" title="Ein Gedanke zu deinem Eintrag" data-reflexion-impuls>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+            {impuls}
+          </Text>
+        </Alert>
+      )}
     </Stack>
   )
 }
@@ -1037,9 +1085,9 @@ function Fragen({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () => void
         </Paper>
       ))}
       {offen ? (
-        <Group align="end" wrap="nowrap">
+        <Group align="end" wrap="wrap">
           <Textarea
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 220px', minWidth: 0 }}
             autosize
             minRows={1}
             label="Deine Frage an die Lehrkraft"
@@ -1065,6 +1113,253 @@ function Fragen({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () => void
         <Button variant="subtle" size="xs" w="fit-content" onClick={() => setOffen(true)} data-frage-knopf>
           Frage zu diesem Schritt stellen
         </Button>
+      )}
+    </Stack>
+  )
+}
+
+// ---------------------------------------------------------------- Hefter, Materialien und Abgaben (08.10.2026)
+
+const zurueckZurReihe = (d: ReiheDaten): React.JSX.Element => (
+  <Button variant="subtle" component="a" href={`/s/r/${d.id}`} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+    {d.titel}
+  </Button>
+)
+
+/** iPad/iPhone laden ein Blob-PDF nicht herunter – dort öffnet es sich (Teilen › Drucken/Sichern), wie beim Arbeitsblatt */
+const istIos = (): boolean => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+/** PDF speichern: herunterladen bzw. auf iPad/iPhone im vorher geöffneten Fenster zeigen */
+function pdfSpeichern(blob: Blob, name: string, fenster: Window | null): void {
+  const url = URL.createObjectURL(blob)
+  if (fenster) fenster.location.href = url
+  else {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.click()
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/** Mein Hefter als eigene Seite – mit PDF vom Server statt `window.open` + Druckdialog (am Handy unzuverlässig) */
+function HefterSeite({ d }: { d: ReiheDaten }): React.JSX.Element {
+  const [laeuft, setLaeuft] = useState(false)
+  const [fehler, setFehler] = useState('')
+  const pdf = async (): Promise<void> => {
+    setLaeuft(true)
+    setFehler('')
+    // Fenster gleich beim Tippen öffnen – nach dem Warten ließe Safari es nicht mehr zu
+    const fenster = istIos() ? window.open('', '_blank') : null
+    try {
+      const r = await fetch('/s/api/reihe/hefter-pdf', {
+        method: 'POST',
+        headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
+        body: JSON.stringify({ id: d.id })
+      })
+      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { fehler?: string }).fehler ?? 'Das PDF konnte nicht erstellt werden.')
+      pdfSpeichern(await r.blob(), `Hefter – ${d.titel}`.replace(/[\\/:*?"<>|]+/g, '-') + '.pdf', fenster)
+    } catch (e) {
+      fenster?.close()
+      setFehler(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Stack data-hefter-seite>
+      {zurueckZurReihe(d)}
+      <Title order={3}>Mein Hefter</Title>
+      {!d.hefter.length && <Text c="dimmed">Noch leer – Merkkästen erscheinen hier, sobald du auf dem Weg so weit bist.</Text>}
+      {d.hefter.map((h, i) => (
+        <Card key={i} withBorder>
+          <Text fw={700} style={{ overflowWrap: 'anywhere' }}>
+            {h.titel}
+          </Text>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {h.text}
+          </Text>
+        </Card>
+      ))}
+      {d.hefter.length > 0 && (
+        <Button variant="light" leftSection={<IconDownload size={16} />} loading={laeuft} onClick={() => void pdf()} w="fit-content" data-hefter-pdf>
+          Als PDF speichern oder drucken
+        </Button>
+      )}
+      {fehler && <Alert color="red">{fehler}</Alert>}
+    </Stack>
+  )
+}
+
+interface MaterialSicht {
+  schritt: string
+  titel: string
+  zweck?: string
+  gesperrt: boolean
+  link?: string
+  stufeWaehlen?: boolean
+  eingereicht: number
+  loesung: boolean
+}
+
+interface AbgabeSicht {
+  schritt: string
+  titel: string
+  art: string
+  zeit?: number
+  link?: string
+  eingereicht: number
+  text?: string
+  dateien?: number
+  feedback?: { staerken?: string[]; schritte?: string[] }
+  bewertung?: { text: string; geschafft: boolean }
+  tagebuch?: string
+  impuls?: string
+  prozent?: number
+}
+
+const ZWECK: Record<string, string> = { abschluss: 'Abschluss', reflexion: 'Selbsteinschätzung', einfuehrung: 'Einführung' }
+const ART: Record<string, string> = {
+  arbeitsblatt: 'Arbeitsblatt',
+  rueckmeldung: 'Schreibaufgabe',
+  onlinetest: 'Test',
+  aufgabe: 'Aufgabe',
+  abschluss: 'Abschlussprodukt',
+  sprechen: 'Sprechaufgabe',
+  reflexion: 'Selbsteinschätzung'
+}
+
+/** Alle Arbeitsblätter der Reihe und „Meine Abgaben" mit Rückmeldungen (Plan G.3) */
+function MaterialSeite({ d }: { d: ReiheDaten }): React.JSX.Element {
+  const [daten, setDaten] = useState<{ materialien: MaterialSicht[]; abgaben: AbgabeSicht[] } | null>(null)
+  const [fehler, setFehler] = useState('')
+  const [reiter, setReiter] = useState<'materialien' | 'abgaben'>(() =>
+    new URLSearchParams(window.location.search).get('reiter') === 'abgaben' ? 'abgaben' : 'materialien'
+  )
+  useEffect(() => {
+    void holen<{ materialien: MaterialSicht[]; abgaben: AbgabeSicht[] }>(`/s/api/reihe/materialien?id=${encodeURIComponent(d.id)}`).then(setDaten, (e: unknown) =>
+      setFehler(e instanceof Error ? e.message : String(e))
+    )
+  }, [d.id])
+  return (
+    <Stack data-material-seite>
+      {zurueckZurReihe(d)}
+      <Title order={3}>Materialien und Abgaben</Title>
+      <SegmentedControl
+        value={reiter}
+        onChange={(v) => setReiter(v as 'materialien' | 'abgaben')}
+        data={[
+          { value: 'materialien', label: `Materialien${daten ? ` (${daten.materialien.length})` : ''}` },
+          { value: 'abgaben', label: `Meine Abgaben${daten ? ` (${daten.abgaben.length})` : ''}` }
+        ]}
+        data-material-reiter
+      />
+      {fehler && <Alert color="orange">{fehler}</Alert>}
+      {!daten && !fehler && <Loader />}
+      {daten && reiter === 'materialien' && (
+        <Stack gap="xs" data-materialien>
+          {!daten.materialien.length && <Text c="dimmed">In dieser Reihe gibt es (noch) keine Arbeitsblätter.</Text>}
+          <Text size="xs" c="dimmed">
+            Im Blatt kannst du es ausfüllen, drucken oder als PDF speichern. Lösungen siehst du dort nach dem Einreichen.
+          </Text>
+          {daten.materialien.map((m) => {
+            const href = m.link ? mitReihe(m.link, d.id) : m.stufeWaehlen ? `/s/r/${d.id}/${m.schritt}` : undefined
+            return (
+              <Paper key={m.schritt} withBorder p="sm" radius="md" style={{ opacity: m.gesperrt ? 0.6 : 1 }} data-material={m.schritt}>
+                <Group justify="space-between" wrap="wrap" gap="xs">
+                  <Stack gap={2} style={{ minWidth: 0, flex: '1 1 200px' }}>
+                    <Group gap={6} wrap="wrap">
+                      <Text fw={700} style={{ overflowWrap: 'anywhere' }}>
+                        {m.titel}
+                      </Text>
+                      {m.zweck && ZWECK[m.zweck] && (
+                        <Badge size="xs" variant="light" color="grape">
+                          {ZWECK[m.zweck]}
+                        </Badge>
+                      )}
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {m.gesperrt
+                        ? 'noch gesperrt – kommt auf deinem Weg noch'
+                        : m.eingereicht
+                          ? `eingereicht${m.eingereicht > 1 ? ` (${m.eingereicht}×)` : ''}${m.loesung ? ' · Lösung im Blatt' : ''}`
+                          : 'noch nicht eingereicht'}
+                    </Text>
+                  </Stack>
+                  {href && (
+                    <Button component="a" href={href} size="xs" variant="light" leftSection={<IconFileText size={14} />} data-material-oeffnen>
+                      {m.stufeWaehlen ? 'Stufe wählen' : m.eingereicht ? 'Ansehen' : 'Öffnen'}
+                    </Button>
+                  )}
+                </Group>
+              </Paper>
+            )
+          })}
+        </Stack>
+      )}
+      {daten && reiter === 'abgaben' && (
+        <Stack gap="xs" data-abgaben>
+          {!daten.abgaben.length && <Text c="dimmed">Du hast in dieser Reihe noch nichts abgegeben.</Text>}
+          {daten.abgaben.map((a) => (
+            <Card key={a.schritt} withBorder padding="sm" data-abgabe={a.art}>
+              <Group justify="space-between" wrap="wrap" gap="xs">
+                <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                  <Text fw={700} style={{ overflowWrap: 'anywhere' }}>
+                    {a.titel}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {ART[a.art] ?? a.art}
+                    {a.zeit ? ` · ${new Date(a.zeit).toLocaleDateString('de-DE')}` : ''}
+                    {a.eingereicht > 1 ? ` · ${a.eingereicht}× abgegeben` : ''}
+                    {a.prozent !== undefined ? ` · ${a.prozent} %` : ''}
+                    {a.dateien ? ` · ${a.dateien} Datei${a.dateien === 1 ? '' : 'en'}` : ''}
+                  </Text>
+                </div>
+                {a.link && (
+                  <Button component="a" href={mitReihe(a.link, d.id)} size="xs" variant="subtle">
+                    Ansehen
+                  </Button>
+                )}
+              </Group>
+              {a.text && (
+                <Text size="sm" mt={6} lineClamp={4} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                  {a.text}
+                </Text>
+              )}
+              {a.tagebuch && (
+                <Text size="sm" mt={6} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                  <b>Lerntagebuch:</b> {a.tagebuch}
+                </Text>
+              )}
+              {a.impuls && (
+                <Text size="sm" mt={6} c="grape.8" style={{ whiteSpace: 'pre-wrap' }}>
+                  {a.impuls}
+                </Text>
+              )}
+              {a.feedback && (a.feedback.staerken?.length || a.feedback.schritte?.length) ? (
+                <Stack gap={2} mt={6} data-abgabe-feedback>
+                  {(a.feedback.staerken ?? []).slice(0, 3).map((x, i) => (
+                    <Text key={`s${i}`} size="sm" c="green.8">
+                      ✓ {x}
+                    </Text>
+                  ))}
+                  {(a.feedback.schritte ?? []).slice(0, 3).map((x, i) => (
+                    <Text key={`n${i}`} size="sm">
+                      → {x}
+                    </Text>
+                  ))}
+                </Stack>
+              ) : null}
+              {a.bewertung && (
+                <Alert mt={6} color={a.bewertung.geschafft ? 'green' : 'orange'} variant="light" p="xs">
+                  <Text size="sm">
+                    <b>Deine Lehrkraft:</b> {a.bewertung.text || (a.bewertung.geschafft ? 'geschafft' : 'noch nicht ganz')}
+                  </Text>
+                </Alert>
+              )}
+            </Card>
+          ))}
+        </Stack>
       )}
     </Stack>
   )

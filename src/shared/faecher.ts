@@ -248,3 +248,25 @@ export function fachAusName(wert: string): Fach | undefined {
   const w = wert.trim().toLocaleLowerCase('de')
   return FAECHER.find((f) => f.id === w || f.label.toLocaleLowerCase('de') === w || f.auch?.some((a) => a.toLocaleLowerCase('de') === w))
 }
+
+/**
+ * Fachname in der Schreibweise des Katalogs (08.10.2026, Befund der Lehrkraft in „Meine Klassen": ältere Lerngruppen
+ * hießen „englisch" – gewählt, bevor es den Fächerkatalog gab). Für Anzeige und Speichern:
+ *  - Anzeigename in anderer Schreibweise („englisch", „ENGLISCH") → „Englisch";
+ *  - Landesname in anderer Schreibweise („erdkunde") → dessen Schreibweise („Erdkunde") – der von der Lehrkraft gewählte
+ *    Name bleibt, aus „Erdkunde" wird nicht „Erdkunde / Geographie";
+ *  - Kennung („werte-und-normen") → Anzeigename („Werte und Normen");
+ *  - alles andere (eigene Fächer, leer) bleibt unverändert.
+ */
+export function fachSchreibweise(wert: string): string {
+  const w = (wert ?? '').trim().toLocaleLowerCase('de')
+  if (!w) return wert
+  const label = FAECHER.find((f) => f.id !== 'anderes' && f.label.toLocaleLowerCase('de') === w)
+  if (label) return label.label
+  for (const f of FAECHER) {
+    const auch = f.auch?.find((a) => a.toLocaleLowerCase('de') === w)
+    if (auch) return auch
+  }
+  const id = FAECHER.find((f) => f.id !== 'anderes' && f.id === w)
+  return id ? id.label : wert
+}

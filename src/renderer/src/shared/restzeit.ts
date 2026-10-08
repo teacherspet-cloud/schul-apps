@@ -141,6 +141,41 @@ export function erwarteteDauer(verlauf: DauerVerlauf, art: string, ki: string): 
 }
 
 /**
+ * Gemerkte Dauer eines GANZEN Auftrags dieser Art (Median der letzten Läufe, ohne Wartezeit) – für Vorschauen wie
+ * „9 Aufträge · etwa 12 min" (08.10.2026, „Alle Platzhalter erstellen"). null = noch kein Lauf gemerkt.
+ */
+export function typischeAuftragsDauer(art: string, verlauf: DauerVerlauf = leseVerlauf()): number | null {
+  const proben = verlauf.auftraege[art]
+  return proben?.length ? median(proben.map((p) => p.ms)) : null
+}
+
+/**
+ * Geschätzte Gesamtdauer mehrerer Aufträge, die sich die KI-Plätze teilen (08.10.2026, „Alle Platzhalter erstellen"):
+ * je Auftrag die gemerkte Dauer seiner Art; zusammen höchstens `plaetze` zugleich – also die Summe geteilt durch die
+ * Plätze, mindestens aber der längste. `unbekannt` zählt die Aufträge, deren Art noch nie lief (gehen nicht ein).
+ */
+export function schaetzeGesamtdauer(
+  arten: string[],
+  dauer: (art: string) => number | null = (art) => typischeAuftragsDauer(art),
+  plaetze = 3
+): { ms: number | null; unbekannt: number } {
+  const bekannt = arten.map(dauer).filter((ms): ms is number => ms !== null)
+  const unbekannt = arten.length - bekannt.length
+  if (!bekannt.length) return { ms: null, unbekannt }
+  const summe = bekannt.reduce((a, b) => a + b, 0)
+  return { ms: Math.max(Math.max(...bekannt), summe / Math.max(1, Math.min(plaetze, bekannt.length))), unbekannt }
+}
+
+/** Dauer grob in Worten: „etwa 40 Sek.", „etwa 3 min", „etwa 1 h 10 min" */
+export function dauerWorte(ms: number): string {
+  const s = Math.max(1, Math.round(ms / 1000))
+  if (s < 60) return `etwa ${s} Sek.`
+  const min = Math.round(s / 60)
+  if (min < 60) return `etwa ${min} min`
+  return `etwa ${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`
+}
+
+/**
  * Erwartete Zahl von Anfragen je Art für einen Auftrag dieser Art und dieses Umfangs –
  * aus der Mischung früherer Läufe, je Umfangseinheit (Median), mal jetzigem Umfang.
  * Vom Anbieter unabhängig: Wie viele Bilder ein Blatt braucht, ändert kein Modellwechsel.

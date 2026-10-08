@@ -6,13 +6,16 @@ import { AlignmentType, Document, Packer, PageOrientation, Paragraph, ShadingTyp
 import { kiWordEigenschaften, type KiHerkunft } from '@shared/kiKennzeichnung'
 import { A4_HEIGHT, A4_WIDTH, ALL_BORDERS, imageRun, MM } from '../export/docxKit'
 import { bildKennzeichnung, IMPULS_ARTEN, lizenzHinweis, type Einstiegsimpuls } from './einstiegsimpuls'
-import type { Stundenverlauf } from './stundenverlauf'
+import type { Stundenverlauf, VerlaufsPhase } from './stundenverlauf'
 import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 const RAND = Math.round(14 * MM)
 
-export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: string, ki?: KiHerkunft): Promise<Uint8Array> {
-  const breite = A4_HEIGHT - 2 * RAND
+/** Satzbreite einer A4-Querseite mit dem Rand dieses Exports */
+export const VERLAUF_BREITE = A4_HEIGHT - 2 * RAND
+
+/** Nur die Verlaufstabelle (auch für die Unterrichtsplanung einer Reihe, 08.10.2026) */
+export function verlaufTabelle(phasen: Pick<VerlaufsPhase, 'phase' | 'minuten' | 'geschehen' | 'sozialform' | 'medien'>[], breite = VERLAUF_BREITE): Table {
   const anteile = [0.14, 0.06, 0.53, 0.09, 0.18]
   const spalten = anteile.map((a) => Math.round(breite * a))
   const zelle = (text: string, i: number, kopf = false): TableCell =>
@@ -26,7 +29,12 @@ export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: 
     tableHeader: true,
     children: ['Phase', 'Zeit', 'Geplantes Geschehen', 'Sozialform', 'Medien / Material'].map((t, i) => zelle(t, i, true))
   })
-  const zeilen = v.phasen.map((p) => new TableRow({ children: [p.phase, `${p.minuten}′`, p.geschehen, p.sozialform, p.medien].map((t, i) => zelle(t, i)) }))
+  const zeilen = phasen.map((p) => new TableRow({ children: [p.phase, `${p.minuten}′`, p.geschehen, p.sozialform, p.medien].map((t, i) => zelle(t, i)) }))
+  return new Table({ layout: TableLayoutType.FIXED, width: { size: breite, type: WidthType.DXA }, columnWidths: spalten, rows: [kopf, ...zeilen] })
+}
+
+export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: string, ki?: KiHerkunft): Promise<Uint8Array> {
+  const breite = VERLAUF_BREITE
   const doc = new Document({
     creator: 'Schul-Apps',
     // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
@@ -46,7 +54,7 @@ export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: 
           new Paragraph({ children: [new TextRun({ text: `Stundenverlauf – ${titel}`, bold: true, size: 30 })] }),
           new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: `${untertitel} · ${v.dauer} Minuten`, color: '555555', size: 20 })] }),
           ...(v.ziel ? [new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: 'Stundenziel: ', bold: true }), new TextRun(v.ziel)] })] : []),
-          new Table({ layout: TableLayoutType.FIXED, width: { size: breite, type: WidthType.DXA }, columnWidths: spalten, rows: [kopf, ...zeilen] }),
+          verlaufTabelle(v.phasen, breite),
           ...(v.hinweise
             ? [
                 new Paragraph({

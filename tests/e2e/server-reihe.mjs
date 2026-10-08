@@ -161,6 +161,9 @@ try {
   await p.mouse.move(800, 700)
   await p.locator('[data-reihe-karte="Weather around the world"] [data-reihe-oeffnen]').click()
   await p.locator('[data-reihe-editor]').waitFor({ timeout: 15000 })
+  // Kopf einer Reihe mit Schritten ist eingeklappt (08.10.2026) – aufklappen
+  pruefe(await p.locator('[data-reihe-kopf-zeile]').isVisible(), 'Kopf der Reihe mit Schritten eingeklappt (eine Zeile)')
+  await p.locator('[data-reihe-kopf-auf]').click()
   // Lernziele der Reihe: KI schlägt vor
   await p.locator('[data-lernziele-ki]').first().click()
   await p.locator('[data-vorschlaege-uebernehmen]').click()

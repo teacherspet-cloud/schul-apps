@@ -73,7 +73,9 @@ const BEDARF_TEXT: Record<string, string> = {
   hilfe: 'braucht Hilfe',
   praesenz: 'im Unterricht abhaken',
   halt: 'Haltepunkt',
-  abweichung: 'Selbsteinschätzung weicht ab'
+  abweichung: 'Selbsteinschätzung weicht ab',
+  // Digitale Reihe (08.10.2026): KI-Vorschlag zum Abschlussprodukt – bei Gelegenheit bestätigen
+  vorschlag: 'KI-Vorschläge bestätigen'
 }
 
 /** Eine Reihe als Karte – auch auf der Startseite */

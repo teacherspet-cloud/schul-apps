@@ -2,6 +2,10 @@
 // Fenster schließt, Reihe gespeichert, Ergebnis über die Auftragsleiste in derselben Reihe), vorhandenes Material
 // eingesetzt, Platzhalter direkt erzeugt („reihe_schritt_aufgabe"), Auswahl je Schritt (KI-Vorschlag „reihe_auswahl",
 // übernehmen) – Lernende sehen keine Platzhalter, ausgeblendete Aufgaben fehlen, freiwillige sind markiert.
+// 08.10.2026 (Plan A + D): Platzhalter als Aufträge mit Plakette an der Schrittkarte („Wartet – Platz …"/„Entsteht: …" →
+// „Fertig – ansehen"), „Alle Platzhalter erstellen" mit Schätzung, Verknüpfung sofort gespeichert, Marke „KI-Entwurf",
+// neues Blatt heißt „<Reihe> – <Schritt>", liegt im Themenbereich des Oberthemas und öffnet sich über „Öffnen";
+// „Materialien der Reihe (n)".
 // Vorher: Server lokal mit KI-Attrappe. Der Test trägt seine Antworten selbst in die Attrappe ein und stellt sie danach wieder her.
 // Vorlage: jüngstes echtes Arbeitsblatt mit mind. drei Aufgaben (nur gelesen).
 // Aufruf: node tests/e2e/server-reihe-ki.mjs <Ausgabeordner> [adresse] [admin] [passwort]
@@ -40,6 +44,32 @@ const BLATT_ID = 'reihe-ki-blatt'
 const attrappePfad = process.env.SCHULAPPS_KI_ATTRAPPE ?? join(process.env.TEMP ?? '', 'attrappe.json')
 const attrappeAlt = readFileSync(attrappePfad, 'utf8')
 const attrappe = JSON.parse(attrappeAlt)
+// Arbeitsblatt-Pipeline der Attrappe (wie tests/e2e/hintergrund-auftraege.mjs)
+const leer = { kind: 'none', lines: 0, gapText: '', options: [], correctIndex: -1, pairs: [], items: [], rows: [], statements: [], labels: [] }
+const baustein = (patch) => ({
+  outlineIndex: 0,
+  type: 'task',
+  title: '',
+  body: '',
+  lineNumbers: false,
+  items: [],
+  imageDescription: '',
+  sourceImageIndex: -1,
+  instruction: '',
+  operator: '',
+  afb: '',
+  afbReason: '',
+  socialForm: 'EA',
+  minutes: 5,
+  points: 0,
+  solution: '',
+  answer: leer,
+  parts: [],
+  headers: [],
+  rows: [],
+  heightMm: 0,
+  ...patch
+})
 const schritt = (o) => ({ rolle: 'pflicht', minuten: 20, lernziele: [0], begruendung: 'passt hier', beschreibung: '', material: '', ...o })
 attrappe.antworten = {
   ...attrappe.antworten,
@@ -71,6 +101,30 @@ attrappe.antworten = {
     erwartung: 'drei sinnvolle Stichpunkte',
     musterloesung: 'individuell'
   },
+  worksheet_outline: {
+    title: 'Neues Übungsblatt',
+    learningGoals: ['Ich kann A anwenden.'],
+    minutes: 20,
+    teacherNote: '',
+    items: [
+      { type: 'text', purpose: 'Sachtext', afb: '', operator: '', socialForm: 'EA', stars: 0, answerKind: 'none' },
+      { type: 'task', purpose: 'Informationen entnehmen', afb: 'I', operator: 'nennen', socialForm: 'EA', stars: 0, answerKind: 'lines' }
+    ]
+  },
+  worksheet: {
+    blocks: [
+      baustein({ type: 'text', title: 'Zum Lesen', body: 'Ein kurzer Text.\n\nNoch ein Absatz.' }),
+      baustein({
+        outlineIndex: 1,
+        instruction: '**Nenne** zwei Dinge aus dem Text.',
+        operator: 'nennen',
+        afb: 'I',
+        solution: 'zwei Dinge',
+        answer: { ...leer, kind: 'lines', lines: 3 }
+      })
+    ]
+  },
+  worksheet_review: { problems: [] },
   reihe_auswahl: {
     eintraege: [
       { schluessel: aufgaben[1].id, stufe: 'aus', grund: 'sprengt die Zeit' },
@@ -179,13 +233,80 @@ try {
   await p.locator('[data-plan-uebernehmen]').click()
   await p.waitForTimeout(500)
   pruefe((await p.locator('[data-plan-bereit]').count()) === 0, 'Nach dem Übernehmen kein bereitliegender Plan mehr')
-  pruefe((await p.locator('[data-stunde]').count()) === 2, 'Stunden aus der gespeicherten Reihe erhalten')
+  // Übersicht (08.10.2026): Kopf eingeklappt zu einer Zeile, Stundenansicht, Hinweis der Planung gespeichert, Grundlage-Chips
+  const kopf = (await p.locator('[data-reihe-kopf-zeile]').textContent().catch(() => '')) ?? ''
+  pruefe(kopf.includes('2 Stunden') && kopf.includes('1 Lernziel'), `Kopf nach dem Übernehmen eingeklappt („${kopf.trim()}")`)
+  pruefe((await p.locator('[data-plan-hinweis]').count()) === 1, 'Hinweis der KI-Planung am Kopf abrufbar')
+  pruefe((await p.locator('[data-stunde-gruppe]').count()) === 2, 'Stundenansicht: zwei Stunden mit ihren Schritten')
+  pruefe((await p.locator('[data-schritt]').first().locator('[data-grundlage-chip]').count()) >= 2, 'Grundlage-Chips am Platzhalter')
+  pruefe((await p.locator('[data-test-hier]').count()) === 0, '„Test hier erstellen" nicht mehr dauerhaft unter jedem Schritt')
   pruefe((await p.locator('[data-schritt]').count()) === 3, `Drei Schritte übernommen (${await p.locator('[data-schritt]').count()})`)
   pruefe((await p.locator('[data-platzhalter]').count()) === 2, 'Zwei Platzhalter markiert')
-  // Platzhalter Zwischenaufgabe direkt erzeugen
-  await p.locator('[data-schritt]').first().locator('[data-platzhalter-erstellen]').click()
-  await p.waitForTimeout(1500)
-  pruefe((await p.locator('[data-platzhalter]').count()) === 1, 'Zwischenaufgabe erstellt – noch ein Platzhalter')
+  // „Alle Platzhalter erstellen" (08.10.2026): Rückfrage mit Zahl und Schätzung – hier nur ansehen und abbrechen
+  const alle = p.locator('[data-alle-platzhalter]')
+  pruefe((await alle.getAttribute('data-alle-platzhalter', { timeout: 5000 }).catch(() => null)) === '2', 'Knopf „Alle Platzhalter erstellen (2)“')
+  if (await alle.isVisible().catch(() => false)) {
+    await alle.click()
+    const schaetzung = await p
+      .locator('[data-alle-schaetzung]')
+      .innerText()
+      .catch(() => '')
+    pruefe(/^2 Aufträge · /.test(schaetzung), `Rückfrage nennt Zahl und Dauer („${schaetzung}“)`)
+    await p.getByRole('dialog').getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  }
+  // Platzhalter als Aufträge mit Plakette statt Drehkreis (08.10.2026): erst das Arbeitsblatt, dann die Zwischenaufgabe
+  const blattKarte = p.locator('[data-schritt]').filter({ hasText: 'Neues Übungsblatt' })
+  const ersteKarte = p.locator('[data-schritt]').first()
+  await blattKarte.locator('[data-platzhalter-erstellen]').click()
+  await blattKarte.locator('[data-ki-status]').first().waitFor({ timeout: 15000 })
+  const status0 = (await blattKarte.locator('[data-ki-status]').first().innerText()).replace(/\s+/g, ' ')
+  pruefe(/^(Wartet|Entsteht|Fertig)/.test(status0), `Plakette am Blatt-Schritt („${status0}“)`)
+  pruefe(
+    (await blattKarte.locator('[data-platzhalter-erstellen]').count()) === 0,
+    'Solange der Auftrag läuft oder wartet, kein zweiter „Mit KI erstellen“-Knopf'
+  )
+  await ersteKarte.locator('[data-platzhalter-erstellen]').click()
+  // Wartet eine Anfrage, steht ihr Platz an der Plakette („Wartet – Platz n")
+  const wartet = await p
+    .locator('[data-ki-status="wartend"]')
+    .first()
+    .innerText({ timeout: 3000 })
+    .catch(() => '')
+  if (wartet) pruefe(/Platz \d|abgebrochen|Wartet/.test(wartet), `Wartende Plakette: „${wartet}“`)
+  await ersteKarte.locator('[data-ki-status="fertig"]').waitFor({ timeout: 60000 })
+  pruefe(true, 'Zwischenaufgabe als Auftrag erstellt – Plakette „Fertig – ansehen“')
+  await blattKarte.locator('[data-ki-status="fertig"]').waitFor({ timeout: 120000 })
+  await p.screenshot({ path: join(out, '1-platzhalter.png'), fullPage: true })
+  pruefe((await p.locator('[data-platzhalter]').count()) === 0, 'Beide Platzhalter gefüllt')
+  pruefe((await p.locator('[data-ki-entwurf]').count()) === 2, `Marke „KI-Entwurf“ an beiden (${await p.locator('[data-ki-entwurf]').count()})`)
+  // Verknüpfung sofort gespeichert – ohne „Speichern“ zu drücken
+  const sofort = (await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()).reihe
+  const neuSchritt = sofort.schritte.find((x) => x.titel === 'Neues Übungsblatt')
+  const neuBlattId = neuSchritt?.inhalt?.quelle ?? ''
+  pruefe(
+    Boolean(neuBlattId) && !neuSchritt.platzhalter && neuSchritt.kiEntwurf === true,
+    `Blatt-Verknüpfung sofort am Server gespeichert (${neuBlattId})`
+  )
+  pruefe(sofort.schritte.filter((x) => x.platzhalter).length === 0, 'Auch die Zwischenaufgabe ist schon gespeichert')
+  // „Meine Arbeitsblätter“: Name „<Reihe> – <Schritt>“, Themenbereich = Oberthema
+  const apiWert = async (channel, args = []) =>
+    JSON.parse((await (await lk.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).text()).trim()).value
+  const neuMeta = ((await apiWert('sheets:list')) ?? []).find((b) => b.id === neuBlattId)
+  pruefe(neuMeta?.name === 'KI-Reihe Probe – Neues Übungsblatt', `Name in der Bibliothek („${neuMeta?.name}“)`)
+  const themen = await apiWert('themen:list')
+  const bereichId = themen?.zuordnungen?.[`arbeitsblatt:${neuBlattId}`]?.bereichId
+  const bereich = (themen?.bereiche ?? []).find((b) => b.id === bereichId)
+  pruefe(bereich?.name === meta.topic, `Themenbereich = Oberthema („${bereich?.name}“)`)
+  pruefe((await blattKarte.locator('[data-blatt-oeffnen]').count()) > 0, 'Schrittkarte bietet „Öffnen“ für das Blatt')
+  // Materialien der Reihe: vorhandenes und neues Blatt
+  await p.locator('[data-reihe-materialien]').click()
+  await p.locator('[data-reihe-materialien-liste]').waitFor({ timeout: 5000 })
+  const mats = await p.locator('[data-material-oeffnen]').count()
+  pruefe(mats === 2, `„Materialien der Reihe“ listet ${mats} Blätter`)
+  await p.keyboard.press('Escape')
+  // Geprüft: Marke an der Zwischenaufgabe entfernen
+  await ersteKarte.locator('[data-ki-geprueft]').click()
+  pruefe((await p.locator('[data-ki-entwurf]').count()) === 1, '„Geprüft“ entfernt die Marke')
   // Auswahl im Material-Schritt: KI-Vorschlag übernehmen
   await p.locator('[data-schritt]').nth(1).locator('[data-schritt-bearbeiten]').click()
   await p.locator('[data-auswahl-feld] button').first().click()
@@ -232,12 +353,27 @@ try {
   await p.locator('[data-druck-art="pdf"]').click()
   const datei = await dl
   pruefe(Boolean(datei && datei.suggestedFilename().endsWith('.pdf')), `Reihe als PDF gespeichert (${datei?.suggestedFilename() ?? 'kein Download'})`)
+  // „Öffnen“ an der Schrittkarte führt in den Arbeitsblatt-Editor (08.10.2026)
+  await blattKarte.locator('[data-blatt-oeffnen]').first().click()
+  const imEditor = await p
+    .locator('.module-container:not([hidden]) [data-baustein]')
+    .first()
+    .waitFor({ timeout: 20000 })
+    .then(() => true)
+    .catch(() => false)
+  pruefe(imEditor && !(await p.locator('[data-reihe-editor]').isVisible().catch(() => false)), 'Blatt öffnet sich im Arbeitsblatt-Editor')
+  await p.screenshot({ path: join(out, '4-blatt-geoeffnet.png') })
   // Antwort mit Lebenszeichen davor (Leerzeichen) – erst trimmen
   const original = JSON.parse((await (await lk.request.post(`${A}/api`, { headers: KOPF, data: { channel: 'sheets:get', args: [BLATT_ID] } })).text()).trim())
   const origBlocks = original.value?.payload?.sheets?.[0]?.blocks ?? []
   pruefe(origBlocks.filter((b) => b.type === 'task').length === aufgaben.length, 'Original-Arbeitsblatt unverändert')
 
   // Zuweisen und als Lernender ansehen: Platzhalter erscheint nicht
+  // „Als Schüler ansehen" (08.10.2026): echte Schülerseite als Musterschüler – vor dem Zuweisen über eine unsichtbare Zuweisung
+  const vs = await (await lk.request.post(`${A}/server/reihen/${gesp.id}/vorschau`, { headers: KOPF, data: { zustand: 'neu' } })).json()
+  pruefe(String(vs.adresse ?? '').includes('ziel=%2Fs%2Fr%2F'), `Musterschüler-Vorschau der Reihe (${vs.adresse ?? vs.fehler})`)
+  const ohneVorschau = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen.find((x) => x.id === gesp.id)
+  pruefe((ohneVorschau?.zuweisungen ?? []).length === 0, 'Vorschau-Zuweisung erscheint in keiner Liste')
   const z = await (await lk.request.post(`${A}/server/reihen/${gesp.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: gruppe.id } })).json()
   const reihen = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen
   const zid = z.id ?? reihen.find((x) => x.id === gesp.id)?.zuweisungen?.[0]?.id
@@ -249,7 +385,7 @@ try {
     maxRedirects: 0
   })
   const sicht = await (await sb.request.get(`${A}/s/api/reihe?id=${zid}`)).json()
-  pruefe((sicht.schritte ?? []).length === 2, `Lernende: 2 Schritte ohne Platzhalter (${(sicht.schritte ?? []).length})`)
+  pruefe((sicht.schritte ?? []).length === 3, `Lernende: alle 3 Schritte, keine Platzhalter mehr (${(sicht.schritte ?? []).length})`)
   await sb.close()
 
   // Gäste per QR-Code (05.10.2026): Beitritt mit Namen, Zugang zur Reihe UND zum verknüpften Blatt, entfernbar
@@ -269,7 +405,7 @@ try {
   await lk.request.post(`${A}/server/reihen/z/${zq.id}/aktion`, { headers: KOPF, data: { art: 'freischalten', schueler: gastId0, schritt: blattSchrittId } })
   const gsicht = await (await gast.request.get(`${A}/s/api/reihe?id=${zq.id}`)).json()
   const blattLink = (gsicht.schritte ?? []).map((x) => x.link).find((l) => String(l ?? '').startsWith('/s/b/'))
-  pruefe((gsicht.schritte ?? []).length === 2 && Boolean(blattLink), `Gast sieht die Reihe mit Blatt-Link (${blattLink})`)
+  pruefe((gsicht.schritte ?? []).length === 3 && Boolean(blattLink), `Gast sieht die Reihe mit Blatt-Link (${blattLink})`)
   const gblatt = await gast.request.get(`${A}/s/api/blatt?id=${String(blattLink).slice(5)}`)
   pruefe(gblatt.ok(), `Gast öffnet das verknüpfte Arbeitsblatt (${gblatt.status()})`)
   const seite = await gast.newPage()

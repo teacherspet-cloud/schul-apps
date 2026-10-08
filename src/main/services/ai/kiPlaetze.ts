@@ -13,9 +13,19 @@
  * sogar eine Textanfrage (Vektorgrafik). Die Bildsuche im Netz (Openverse, OpenMoji) ist
  * keine KI und zählt nicht.
  *
- * Wer warten muss, steht in einer Warteschlange und wird der Reihe nach bedient. Die
- * Oberfläche erfährt über `melde`, ob eine Anfrage wartet oder läuft – so kann die
- * Auftragsleiste „wartet auf freien Platz" zeigen, statt einen stehenden Balken.
+ * Wer warten muss, steht in einer Warteschlange. Die Oberfläche erfährt über `melde`, ob eine
+ * Anfrage wartet oder läuft – so kann die Auftragsleiste „wartet auf freien Platz" zeigen, statt
+ * einen stehenden Balken.
+ *
+ * Reihenfolge (08.10.2026, Befund in der Unterrichtsreihe): Ein Arbeitsblatt besteht aus vielen
+ * Anfragen. Der Reihe nach bedient, wartete das zweite Blatt hinter ALLEN Anfragen des ersten – und
+ * mehrere Blätter bremsten sich gegenseitig aus. Jetzt gilt:
+ * - Anfragen ohne Auftrag (Planung, Knöpfe, die sofort eine Antwort brauchen) kommen zuerst dran;
+ * - Anfragen MIT Auftrag (Kennung „<auftrag>~<anfrage>", siehe `gruppeVon`) im Wechsel je Auftrag
+ *   (Round-Robin): Der Auftrag, der am längsten nicht bedient wurde, ist als Nächster dran; innerhalb
+ *   eines Auftrags der Reihe nach.
+ * Jede Wartende erfährt ihren Platz in der Schlange (`PlatzInfo.platz`, 1 = als Nächste dran) – die
+ * Schrittkarte der Reihe zeigt „Wartet – Platz 2".
  *
  * Diese Datei kennt Electron nicht, damit sie sich ohne Programm prüfen lässt.
  */
@@ -35,12 +45,30 @@ export type PlatzZustand = 'wartend' | 'laufend'
 export interface PlatzInfo {
   abgebrochen: number
   abgebrocheneBilder: number
+  /** Platz in der Warteschlange (1 = als Nächste dran) – nur bei „wartend" (08.10.2026) */
+  platz?: number
 }
 
 interface Wartender {
   id?: string
+  /** Auftrag, zu dem die Anfrage gehört (Round-Robin); fehlt = vorrangig */
+  gruppe?: string
   los: () => void
   weg: (e: Error) => void
+}
+
+/** Trennzeichen zwischen Auftrag und Anfrage in der Kennung (renderer/shared/auftraege.ts) */
+export const GRUPPEN_TRENNER = '~'
+
+/**
+ * Auftrag einer Anfrage aus ihrer Kennung: alles vor dem letzten „~" – samt Vorsatz aus dem Netz
+ * („netz-<sitzung>-…"), damit gleiche Auftragsnummern verschiedener Geräte getrennt bleiben.
+ * Ohne „~" gehört die Anfrage zu keinem Auftrag.
+ */
+export function gruppeVon(id: string | undefined): string | undefined {
+  if (!id) return undefined
+  const i = id.lastIndexOf(GRUPPEN_TRENNER)
+  return i > 0 ? id.slice(0, i) : undefined
 }
 
 /** So lange merkt sich der Begrenzer einen Abbruch für eine Kennung, die noch nicht angekommen ist. */
@@ -53,6 +81,9 @@ export class KiPlaetze {
   private vorzeitig = new Map<string, number>()
   /** Art je belegtem Platz einer abgebrochenen, aber noch rechnenden Anfrage */
   private verwaist: string[] = []
+  /** Wann (laufende Nummer) ein Auftrag zuletzt bedient wurde – für den Wechsel je Auftrag */
+  private bedient = new Map<string, number>()
+  private takt = 0
 
   constructor(
     readonly max: number,
@@ -63,9 +94,67 @@ export class KiPlaetze {
     return { abgebrochen: this.verwaist.length, abgebrocheneBilder: this.verwaist.filter((a) => a === 'bild').length }
   }
 
-  /** Allen Wartenden den neuen Stand sagen – etwa, dass ein Platz jetzt einer abgebrochenen Anfrage gehört. */
+  /**
+   * Die Wartenden in der Reihenfolge, in der sie drankommen: erst die ohne Auftrag (der Reihe nach),
+   * dann im Wechsel je Auftrag – wer am längsten nicht bedient wurde (nie = zuerst), bei Gleichstand der
+   * zuerst Wartende.
+   */
+  private reihenfolge(): Wartender[] {
+    const ergebnis = this.schlange.filter((w) => !w.gruppe)
+    const gruppen = new Map<string, Wartender[]>()
+    for (const w of this.schlange) if (w.gruppe) gruppen.set(w.gruppe, [...(gruppen.get(w.gruppe) ?? []), w])
+    const zuletzt = new Map(this.bedient)
+    let t = this.takt
+    while (gruppen.size) {
+      let wahl = ''
+      let beste = Infinity
+      for (const g of gruppen.keys()) {
+        const z = zuletzt.get(g) ?? -1
+        if (z < beste) {
+          beste = z
+          wahl = g
+        }
+      }
+      const liste = gruppen.get(wahl)!
+      ergebnis.push(liste.shift()!)
+      zuletzt.set(wahl, ++t)
+      if (!liste.length) gruppen.delete(wahl)
+    }
+    return ergebnis
+  }
+
+  /** Kennungen der Wartenden in der Reihenfolge, in der sie drankommen (für Tests und Anzeige) */
+  warteliste(): (string | undefined)[] {
+    return this.reihenfolge().map((w) => w.id)
+  }
+
+  /** Den Nächsten aus der Schlange nehmen und seinen Auftrag als bedient vermerken */
+  private naechster(): Wartender | undefined {
+    const w = this.reihenfolge()[0]
+    if (!w) return undefined
+    this.schlange.splice(this.schlange.indexOf(w), 1)
+    this.vermerke(w.gruppe)
+    return w
+  }
+
+  /** Ein Auftrag kommt gerade dran (aus der Schlange oder sofort) – für den Wechsel je Auftrag */
+  private vermerke(gruppe: string | undefined): void {
+    if (!gruppe) return
+    this.bedient.set(gruppe, ++this.takt)
+    // Nicht endlos wachsen: Aufträge ohne Wartende vergessen, wenn es zu viele werden
+    if (this.bedient.size > 500) for (const g of [...this.bedient.keys()]) if (!this.schlange.some((x) => x.gruppe === g)) this.bedient.delete(g)
+  }
+
+  /**
+   * Allen Wartenden den neuen Stand sagen – ihren Platz in der Schlange und etwa, dass ein Platz jetzt
+   * einer abgebrochenen Anfrage gehört.
+   */
   private meldeWartende(): void {
-    for (const w of this.schlange) if (w.id) this.melde?.(w.id, 'wartend', this.info())
+    if (!this.melde) return
+    const info = this.info()
+    this.reihenfolge().forEach((w, i) => {
+      if (w.id) this.melde?.(w.id, 'wartend', { ...info, platz: i + 1 })
+    })
   }
 
   /** Laufende und wartende Anfragen (für Tests und Anzeige). */
@@ -94,18 +183,23 @@ export class KiPlaetze {
     }
     try {
       if (this.laufend >= this.max) {
-        if (id) this.melde?.(id, 'wartend', this.info())
+        // Beim Freiwerden belegt der Freigebende den Platz gleich für diese Anfrage (`laufend` zählt dort hoch)
         await new Promise<void>((los, weg) => {
-          const eintrag: Wartender = { id, los, weg }
+          const eintrag: Wartender = { id, gruppe: gruppeVon(id), los, weg }
           this.schlange.push(eintrag)
+          this.meldeWartende()
           steuerung.signal.addEventListener('abort', () => {
             const i = this.schlange.indexOf(eintrag)
-            if (i >= 0) this.schlange.splice(i, 1)
+            if (i < 0) return
+            this.schlange.splice(i, 1)
             weg(new AbbruchFehler())
+            this.meldeWartende()
           })
         })
+      } else {
+        this.laufend++
+        this.vermerke(gruppeVon(id))
       }
-      this.laufend++
       if (id) this.melde?.(id, 'laufend')
       let lauf: Promise<T>
       try {
@@ -132,8 +226,12 @@ export class KiPlaetze {
           steuerung.signal.removeEventListener('abort', beiAbbruch)
           if (verwaist) this.verwaist.splice(this.verwaist.indexOf(art), 1)
           this.laufend--
-          this.schlange.shift()?.los()
-          if (verwaist) this.meldeWartende()
+          const naechster = this.naechster()
+          if (naechster) {
+            this.laufend++
+            naechster.los()
+          }
+          if (verwaist || naechster) this.meldeWartende()
         })
       return await mitAbbruch(lauf, steuerung.signal)
     } finally {

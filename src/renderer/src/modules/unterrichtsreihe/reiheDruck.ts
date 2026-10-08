@@ -21,7 +21,7 @@ const kopf = (): { logo: string | null; schule: string } => {
   return { logo: logoDataUrl ?? null, schule: settings.schoolName ?? '' }
 }
 
-const dateiname = (t: string): string => t.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Material'
+export const dateiname = (t: string): string => t.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Material'
 
 /** Fassung des Schritts (Auswahl, Korrekturrand) samt gemessener Seiten – null ohne Arbeitsblatt */
 async function fassungVon(s: Schritt): Promise<{ ws: Worksheet; layouts: Map<string, PagePlan[]> } | null> {
@@ -87,10 +87,10 @@ export function auftragsSeite(s: Schritt, nr: number, mitLoesung: boolean): stri
   return `<div class="ws-page" style="width:210mm;min-height:297mm;box-sizing:border-box;padding:20mm;font:11pt/1.45 system-ui,'Segoe UI',sans-serif;background:#fff"><h2 style="margin-top:0">${nr}. ${esc(s.titel)}</h2>${teile.join('')}</div>`
 }
 
-const koerper = (html: string): string => html.slice(html.indexOf('<body>') + 6, html.lastIndexOf('</body>'))
+export const koerper = (html: string): string => html.slice(html.indexOf('<body>') + 6, html.lastIndexOf('</body>'))
 
 /** Druck-HTML eines Schritts (Arbeitsblatt in der Schrittfassung oder Auftragsseite) */
-async function schrittHtml(s: Schritt, nr: number, mitLoesung: boolean): Promise<string> {
+export async function schrittHtml(s: Schritt, nr: number, mitLoesung: boolean): Promise<string> {
   const f = await fassungVon(s)
   if (!f) {
     const seite = auftragsSeite(s, nr, mitLoesung)
@@ -101,7 +101,7 @@ async function schrittHtml(s: Schritt, nr: number, mitLoesung: boolean): Promise
   return buildWorksheetHtml(f.ws, f.layouts, { sheetIds: [sheet.id], includeKey: mitLoesung }, logo, schule)
 }
 
-async function ausgeben(html: string, name: string, art: DruckArt, word?: () => Promise<Uint8Array>): Promise<void> {
+export async function ausgeben(html: string, name: string, art: DruckArt, word?: () => Promise<Uint8Array>): Promise<void> {
   if (art === 'drucken') return window.api.exporter.print(html)
   if (art === 'word' && word) {
     await speichereAusgabe([{ name: `${name}.docx`, daten: word, filter: WORD_FILTER }], 'Word-Datei gespeichert')

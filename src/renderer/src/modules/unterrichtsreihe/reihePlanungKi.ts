@@ -16,6 +16,7 @@
  */
 import type { StructuredRequest } from '@shared/types'
 import {
+  artVon,
   leererInhalt,
   neueSchrittId,
   standardErfolg,
@@ -29,11 +30,16 @@ import {
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { describeBlock } from '../arbeitsblatt/generation/describe'
 import { blattAlsSchritt, blattAlsSchrittGemessen } from './schrittAusBlatt'
+import { grundlageEingabe, grundlageZeilen, kcAuszugFuer } from './grundlage'
+import type { KcAuszug } from './Lernziele'
 
 type Ki = <T>(req: StructuredRequest) => Promise<T>
 
 /** Schrittarten, die die KI planen und als Platzhalter selbst füllen kann */
 export const KI_ARTEN: SchrittArt[] = ['arbeitsblatt', 'aufgabe', 'lernkarten', 'diagnose', 'reflexion', 'hefter', 'abschluss', 'sprechen', 'praesenz']
+
+/** Schrittarten der KI-Planung je Reihenart (08.10.2026, Plan E): digitale Reihen ohne „Im Unterricht" */
+export const kiArtenFuer = (r: Pick<Reihe, 'art'>): SchrittArt[] => (artVon(r) === 'digital' ? KI_ARTEN.filter((a) => a !== 'praesenz') : KI_ARTEN)
 
 export interface MaterialKandidat {
   id: string
@@ -95,7 +101,7 @@ const ARTEN_TEXT: Record<string, string> = {
   praesenz: 'Im Unterricht (Experiment, Gruppenarbeit, Vortrag – Lehrkraft hakt ab)'
 }
 
-const PLAN_SCHEMA = {
+const planSchema = (arten: SchrittArt[]): Record<string, unknown> => ({
   type: 'object',
   properties: {
     teile: {
@@ -110,7 +116,7 @@ const PLAN_SCHEMA = {
               type: 'object',
               properties: {
                 titel: { type: 'string' },
-                art: { type: 'string', enum: KI_ARTEN },
+                art: { type: 'string', enum: arten },
                 rolle: { type: 'string', enum: ['pflicht', 'optional', 'foerder', 'forder'] },
                 stunde: { type: 'integer' },
                 minuten: { type: 'integer' },
@@ -132,7 +138,7 @@ const PLAN_SCHEMA = {
   },
   required: ['teile', 'hinweis'],
   additionalProperties: false
-}
+})
 
 interface PlanRoh {
   teile: {
@@ -175,6 +181,8 @@ export async function planeReihe(
   schulbuch = ''
 ): Promise<ReihenPlan> {
   const stunden = r.stunden ?? []
+  const arten = kiArtenFuer(r)
+  const digital = artVon(r) === 'digital'
   const d = await ki<PlanRoh>({
     system: `Du planst als erfahrene Lehrkraft eine realistische Unterrichtsreihe (${r.fachLabel}, Klasse ${r.grade}, Schulform ${r.schoolTypeId}, Bundesland ${r.stateId}), die die Lernenden Schritt für Schritt in einem digitalen Lernpfad bearbeiten.`,
     user: [
@@ -197,12 +205,14 @@ export async function planeReihe(
         ? `${schulbuch.trim()}\nIn der Planung: Schritte zu diesen Buchabschnitten verweisen in ihrer "beschreibung" ausdrücklich auf sie (z. B. „Lies VT1 auf S. 39 …"); übernommene Texte werden dort Material.`
         : '',
       'SCHRITTARTEN:',
-      ...KI_ARTEN.map((a) => `- ${a}: ${ARTEN_TEXT[a]}`),
+      ...arten.map((a) => `- ${a}: ${ARTEN_TEXT[a]}`),
       'REGELN:',
       '- Gliedere in 2 bis 5 sinnvolle Teile (z. B. Einstieg/Grundlagen, Erarbeitung, Vertiefung/Anwendung, Sicherung/Abschluss) mit kurzen Namen.',
       '- Verteile die Schritte auf GENAU die angegebenen Stunden ("stunde" = Nummer ab 1). "minuten" ist die realistische Bearbeitungszeit; die Summe je Stunde passt in deren Länge (Einstieg, Besprechung und Sicherung im Plenum mitbedenken – etwa ein Viertel der Zeit).',
       '- Fortschreitend vom Einfachen zum Komplexen; jeder Schritt baut auf den vorigen auf; Anforderungsbereiche I bis III kommen vor.',
-      '- Wechsel der Sozial- und Arbeitsformen (Stillarbeit im Lernpfad UND "praesenz" für Gespräch, Gruppenarbeit, Experiment).',
+      digital
+        ? '- DIGITALE REIHE: Die Lernenden bearbeiten ALLES selbstständig am Gerät (PC, Tablet, Handy) – keine Präsenzphasen. Jeder Schritt erklärt sich selbst (Einführung, Beispiel, Hilfen); Abwechslung über die Schrittarten.'
+        : '- Wechsel der Sozial- und Arbeitsformen (Stillarbeit im Lernpfad UND "praesenz" für Gespräch, Gruppenarbeit, Experiment).',
       '- Höchstens eine Eingangsdiagnose am Anfang; Selbsteinschätzung am Ende eines Teils; ein Abschlussprodukt oder eine Sicherung am Ende der Reihe.',
       '- Je Teil höchstens ein Förderschritt ("foerder") und höchstens ein freiwilliger Forderschritt ("forder"); Vertiefungen und Differenzierung, die nicht alle brauchen, als "optional" (blockiert den Weg nie); alles andere "pflicht".',
       '- VORHANDENES MATERIAL: nur einsetzen, wenn es didaktisch und pädagogisch passt (Jahrgang, Niveau, Lernziele, Anforderung) – an der Stelle der Reihe, an die es inhaltlich gehört. Dann art "arbeitsblatt", "material" = Kennung, "begruendung" = warum es passt und warum an dieser Stelle (ein Satz). Ungeeignetes weglassen. Jedes Material höchstens einmal.',
@@ -213,7 +223,7 @@ export async function planeReihe(
       .filter(Boolean)
       .join('\n'),
     schemaName: 'reihe_planung',
-    schema: PLAN_SCHEMA
+    schema: planSchema(arten)
   })
   const plan = planUebernehmen(d, r, materialien)
   // Eingesetzte Materialien mit gemessenen Seiten (wie im Editor) – nicht der ungeprüfte Druckweg
@@ -229,8 +239,13 @@ export async function planeReihe(
 }
 
 /** KI-Plan in Schritte der Reihe übersetzen (geprüft: Stunden, Lernziele, Material, Arten) */
-export function planUebernehmen(d: PlanRoh, r: Pick<Reihe, 'lernziele' | 'stunden'>, materialien: Pick<MaterialKandidat, 'id' | 'ws' | 'name'>[]): ReihenPlan {
+export function planUebernehmen(
+  d: PlanRoh,
+  r: Pick<Reihe, 'lernziele' | 'stunden'> & Pick<Partial<Reihe>, 'art'>,
+  materialien: Pick<MaterialKandidat, 'id' | 'ws' | 'name'>[]
+): ReihenPlan {
   const n = Math.max(1, r.stunden?.length ?? 1)
+  const arten = kiArtenFuer(r)
   const benutzt = new Set<string>()
   const teile: string[] = []
   const schritte: Schritt[] = []
@@ -239,7 +254,7 @@ export function planUebernehmen(d: PlanRoh, r: Pick<Reihe, 'lernziele' | 'stunde
     while (teile.includes(name)) name = `${name} (2)`
     teile.push(name)
     for (const x of t.schritte ?? []) {
-      const art = (KI_ARTEN as string[]).includes(x.art) ? (x.art as SchrittArt) : 'aufgabe'
+      const art = (arten as string[]).includes(x.art) ? (x.art as SchrittArt) : 'aufgabe'
       const lernziele: Lernziel[] = [...new Set(x.lernziele ?? [])].map((i) => r.lernziele[i]).filter((l): l is Lernziel => Boolean(l))
       const stunde = Math.min(n - 1, Math.max(0, Math.round(Number(x.stunde) || 1) - 1))
       const rolle: Schritt['rolle'] = x.rolle === 'foerder' || x.rolle === 'forder' || x.rolle === 'optional' ? x.rolle : 'pflicht'
@@ -250,7 +265,7 @@ export function planUebernehmen(d: PlanRoh, r: Pick<Reihe, 'lernziele' | 'stunde
         titel,
         lernziele,
         rolle,
-        erfolg: standardErfolg(art),
+        erfolg: standardErfolg(art, artVon(r)),
         inhalt: leererInhalt(art),
         abschnitt: name,
         stunde,
@@ -376,39 +391,43 @@ const SCHEMATA: Partial<Record<SchrittArt, { schema: Record<string, unknown>; re
 /** Kann die KI diese Art direkt (ohne Hintergrund-Auftrag) füllen? */
 export const direktErzeugbar = (art: SchrittArt): boolean => Boolean(SCHEMATA[art])
 
-/** Was vor diesem Schritt in der Reihe liegt – damit der Inhalt anschließt */
-const davor = (r: Reihe, schritt: Schritt): string =>
-  r.schritte
-    .slice(
-      0,
-      r.schritte.findIndex((x) => x.id === schritt.id)
-    )
-    .map((x) => x.titel)
-    .filter(Boolean)
-    .slice(-8)
-    .join('; ')
-
-/** Inhalt eines Platzhalters (außer Arbeitsblatt) von der KI */
-export async function erzeugeSchrittInhalt(r: Reihe, schritt: Schritt, ki: Ki): Promise<SchrittInhalt> {
+/**
+ * Anfrage für einen Platzhalter (außer Arbeitsblatt). Eingaben vereinheitlicht (08.10.2026, grundlage.ts): dazu
+ * Lerngruppe, Lernziele der Reihe, Kerncurriculum-Auszug, Minuten, didaktische Funktion, Anspruch – ohne die vor dem
+ * Erstellen abgewählten Chips. Auch für die Vorschau der Eingabe im Expertenmodus.
+ */
+export function schrittAnfrage(r: Reihe, schritt: Schritt, kc: KcAuszug | null = kcAuszugFuer(r)): { system: string; user: string } | null {
   const art = schritt.inhalt.art
   const vorgabe = SCHEMATA[art]
-  if (!vorgabe) throw new Error('Diese Schrittart erzeugt die KI nicht direkt.')
-  const d = await ki<Record<string, unknown>>({
+  if (!vorgabe) return null
+  const g = grundlageEingabe(r, schritt, kc)
+  return {
     system: `Du erstellst einen Schritt eines digitalen Lernpfads (${r.fachLabel}, Klasse ${r.grade}, Schulform ${r.schoolTypeId}, Bundesland ${r.stateId}). Die Lernenden bearbeiten ihn selbstständig; sprich sie mit „du" an. Fachlich korrekt, altersgerecht, ohne Personennamen realer Personen aus dem Umfeld der Schule.`,
     user: [
       `REIHE: ${r.titel} (Oberthema: ${r.oberthema})`,
       `SCHRITT: ${schritt.titel} – ${ARTEN_TEXT[art] ?? art}`,
       schritt.platzhalter?.beschreibung ? `WAS ENTSTEHEN SOLL: ${schritt.platzhalter.beschreibung}` : '',
-      schritt.lernziele.length ? `LERNZIELE: ${schritt.lernziele.map((l) => l.text).join('; ')}` : '',
-      davor(r, schritt) ? `DAVOR IN DER REIHE: ${davor(r, schritt)}` : '',
+      g.schrittZiele.length ? `LERNZIELE: ${g.schrittZiele.join('; ')}` : '',
+      ...grundlageZeilen(g),
       // Reihe aus Schulbuchseiten (06.10.2026): verweisen; Übernommenes steht schon im Material
-      schritt.platzhalter?.buch
-        ? `${schritt.platzhalter.buch}\nWörtlich übernommene Abschnitte und Bildausschnitte setzt die App selbst mit Quelle ins Material – NICHT noch einmal abschreiben; Verweise genau so in die Anweisung.`
+      g.buch
+        ? `${g.buch}\nWörtlich übernommene Abschnitte und Bildausschnitte setzt die App selbst mit Quelle ins Material – NICHT noch einmal abschreiben; Verweise genau so in die Anweisung.`
         : '',
       `REGEL: ${vorgabe.regel}`
     ]
       .filter(Boolean)
-      .join('\n'),
+      .join('\n')
+  }
+}
+
+/** Inhalt eines Platzhalters (außer Arbeitsblatt) von der KI */
+export async function erzeugeSchrittInhalt(r: Reihe, schritt: Schritt, ki: Ki): Promise<SchrittInhalt> {
+  const art = schritt.inhalt.art
+  const vorgabe = SCHEMATA[art]
+  const anfrage = schrittAnfrage(r, schritt)
+  if (!vorgabe || !anfrage) throw new Error('Diese Schrittart erzeugt die KI nicht direkt.')
+  const d = await ki<Record<string, unknown>>({
+    ...anfrage,
     schemaName: `reihe_schritt_${art}`,
     schema: vorgabe.schema
   })

@@ -59,7 +59,7 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
-import { FAECHER, fachAusName } from '@shared/faecher'
+import { FAECHER, fachAusName, fachSchreibweise } from '@shared/faecher'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { neuAnlegen, openDocument, openModule, useNavigation } from '../../shared/navigation'
@@ -276,6 +276,50 @@ const BEDARF_SYMBOL: Record<Bedarf['art'], React.ReactNode> = {
 }
 const BEDARF_FARBE: Record<Bedarf['art'], string> = { entscheiden: 'orange', foerdern: 'red', inaktiv: 'gray', termin: 'blue', reihe: 'violet', blatt: 'cyan' }
 
+/** „2 Punkte Handlungsbedarf" */
+const bedarfText = (n: number): string => `${n} ${n === 1 ? 'Punkt' : 'Punkte'} Handlungsbedarf`
+
+/**
+ * Zahl des Handlungsbedarfs (08.10.2026, Befund der Lehrkraft: die eingekreiste Zahl neben dem Fach war unklar):
+ * kleines oranges Abzeichen mit Warnzeichen und Zahl, Erklärung beim Darüberfahren.
+ */
+function BedarfZahl({ n, size = 'sm' }: { n: number; size?: 'xs' | 'sm' }): React.JSX.Element {
+  return (
+    <Tooltip label={bedarfText(n)} withinPortal>
+      <Badge
+        size={size}
+        color="orange"
+        variant="filled"
+        leftSection={<IconAlertTriangle size={size === 'xs' ? 10 : 12} />}
+        style={{ flexShrink: 0 }}
+        aria-label={bedarfText(n)}
+        data-bedarf-zahl={n}
+      >
+        {n}
+      </Badge>
+    </Tooltip>
+  )
+}
+
+/**
+ * Klick auf ein Fach mit Handlungsbedarf: den Abschnitt „Handlungsbedarf" dieses Fachs ins Bild holen, falls er nicht
+ * zu sehen ist. Die Fachansicht lädt erst – deshalb kurz warten, bis der Abschnitt der gewählten Lerngruppe steht.
+ */
+function zeigeHandlungsbedarf(gruppeId: string): void {
+  const bis = Date.now() + 4000
+  const versuch = (): void => {
+    const el = document.querySelector<HTMLElement>(`[data-handlungsbedarf][data-gruppe="${CSS.escape(gruppeId)}"]`)
+    if (!el) {
+      if (Date.now() < bis) window.setTimeout(versuch, 80)
+      return
+    }
+    const r = el.getBoundingClientRect()
+    const sichtbar = r.top >= 0 && r.bottom <= window.innerHeight
+    if (!sichtbar) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  window.setTimeout(versuch, 0)
+}
+
 export default function MeineKlassenModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [klassen, setKlassen] = useState<KlasseKurz[] | null>(null)
   const { klasse, setze } = useSicht()
@@ -334,9 +378,7 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
           {/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}
         </Text>
         {k.bedarf > 0 ? (
-          <Badge color="orange" leftSection={<IconAlertTriangle size={12} />}>
-            {k.bedarf}
-          </Badge>
+          <BedarfZahl n={k.bedarf} />
         ) : (
           <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>
             alles ruhig
@@ -357,7 +399,7 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
           k.faecher.map((f) => (
             <Group key={f.id} gap={6} wrap="nowrap" data-klasse-fach={f.fach}>
               <Badge variant="light" style={{ flexShrink: 0 }}>
-                {f.fach}
+                {fachSchreibweise(f.fach)}
               </Badge>
               {f.vokabelnSicher !== null && (
                 <Tooltip label={`Vokabeln ${prozent(f.vokabelnSicher)} sicher`}>
@@ -373,11 +415,7 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
                   .filter(Boolean)
                   .join(' · ')}
               </Text>
-              {f.bedarf > 0 && (
-                <Badge size="xs" color="orange" variant="light" style={{ flexShrink: 0 }}>
-                  {f.bedarf}
-                </Badge>
-              )}
+              {f.bedarf > 0 && <BedarfZahl n={f.bedarf} size="xs" />}
             </Group>
           ))
         )}
@@ -402,14 +440,13 @@ function Kennzahl({ wert, text }: { wert: string; text: string }): React.JSX.Ele
 /** „+ Fach hinzufügen": eigene Fächer zuerst, dann alle; legt das Fach mit denselben Lernenden an */
 function FachHinzufuegen({ k, fertig }: { k: KlasseKurz; fertig: (id: string) => void }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
-  const vorhanden = new Set(k.faecher.map((f) => f.fach.toLowerCase()))
+  // Vorhandene Fächer über den Katalog erkennen – auch ältere Schreibweisen („englisch")
+  const vorhanden = new Set(k.faecher.map((f) => fachAusName(f.fach)?.id ?? f.fach.trim().toLowerCase()))
   const farbe = useProgrammFarbe()
   // Wert ist der Fachname; die eigenen Fächer stellt HaeufigSelect nach oben (im Standardmodus nur sie, weitere per Eintippen)
   const data = useMemo(
     () =>
-      FAECHER.map((f) => f.label)
-        .filter((l) => !vorhanden.has(l.toLowerCase()))
-        .map((l) => ({ value: l, label: l })),
+      FAECHER.filter((f) => f.id !== 'anderes' && !vorhanden.has(f.id) && !vorhanden.has(f.label.toLowerCase())).map((f) => ({ value: f.label, label: f.label })),
     [k.faecher] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const waehlen = async (fach: string | null): Promise<void> => {
@@ -471,16 +508,12 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
                   <Tabs.Tab
                     key={f.id}
                     value={f.id}
-                    rightSection={
-                      f.bedarf > 0 ? (
-                        <Badge size="xs" color="orange" circle>
-                          {f.bedarf}
-                        </Badge>
-                      ) : undefined
-                    }
+                    rightSection={f.bedarf > 0 ? <BedarfZahl n={f.bedarf} size="xs" /> : undefined}
+                    onClick={() => f.bedarf > 0 && zeigeHandlungsbedarf(f.id)}
+                    aria-label={f.bedarf > 0 ? `${fachSchreibweise(f.fach)}, ${bedarfText(f.bedarf)}` : undefined}
                     data-fach={f.fach}
                   >
-                    {f.fach}
+                    {fachSchreibweise(f.fach)}
                   </Tabs.Tab>
                 ))}
               </Tabs.List>
@@ -626,7 +659,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
   return (
     <Stack data-klasse-detail={d.titel}>
       {/* ---------- Handlungsbedarf */}
-      <Card withBorder radius="md" padding="md" data-handlungsbedarf>
+      <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
         <Group gap={6} mb="xs">
           <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
           <Text fw={700}>Handlungsbedarf</Text>

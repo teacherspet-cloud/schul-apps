@@ -4,7 +4,7 @@
  *  - Vokabeln / Vocabulary …: Vokabeltrainings (Konten zusätzlich die Vokabelwege des Fachs)
  *  - Grammatik / Grammar …: Grammatiktrainings
  *  - Materialien / Materials …: Arbeitsblätter, Onlinetests, Rückmeldungen (Schreibaufgaben), dazu bei Konten Mappen
- *    (Ergebnisse, Tafelbilder, Lernprodukte) und Merkzettel
+ *    (Ergebnisse, Tafelbilder, Lernprodukte) und Merkzettel; Arbeitsblätter aus Unterrichtsreihen je Reihe (08.10.2026)
  * Registerwechsel blättert um; ruhige Darstellung ohne Bewegung.
  */
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
@@ -183,6 +183,7 @@ export function zuTun(o: FachOrdner, r: Register): number {
   if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
   return (
     o.blaetter.filter((b) => b.offen && b.genutzt < b.runden && !b.begonnen).length +
+    o.reihen.reduce((n, r) => n + (r.offen ? r.materialien.filter((m) => !m.gesperrt && !m.eingereicht).length : 0), 0) +
     o.tests.filter((t) => !t.abgegeben).length +
     o.aufgaben.filter((a) => a.offen !== false && !a.fassungen.length).length
   )
@@ -277,6 +278,45 @@ function Materialien({ o }: { o: FachOrdner }): React.JSX.Element {
           ))}
         </Abschnitt>
       )}
+      {/* Unterrichtsreihen (08.10.2026, Plan G.3): ihre Arbeitsblätter, je Reihe – mit Weg zu „Meine Abgaben" */}
+      {o.reihen.map((r) => (
+        <Abschnitt key={r.zid} titel={`Reihe: ${r.titel}`}>
+          {r.materialien.map((m) => {
+            const href = m.link ? `${m.link}${m.link.includes('?') ? '&' : '?'}reihe=${r.zid}` : m.stufeWaehlen ? `/s/r/${r.zid}/${m.schritt}` : undefined
+            return (
+              <a
+                key={m.schritt}
+                className="og-karte"
+                {...(href ? { href } : {})}
+                style={{ opacity: m.gesperrt ? 0.6 : 1, cursor: href ? undefined : 'default' }}
+                data-ordner-reihe-blatt
+              >
+                <Group justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0 }}>
+                    <Text fw={700}>{m.titel}</Text>
+                    <Text size="sm" c="dimmed">
+                      {m.gesperrt ? 'noch gesperrt' : m.eingereicht ? `eingereicht${m.loesung ? ' · Lösung im Blatt' : ''}` : 'noch offen'}
+                    </Text>
+                  </div>
+                  {href && (
+                    <Badge variant="light" style={{ flex: 'none' }}>
+                      {m.eingereicht ? 'Ansehen' : 'Öffnen'}
+                    </Badge>
+                  )}
+                </Group>
+              </a>
+            )
+          })}
+          <Group gap="xs">
+            <Button component="a" href={`/s/r/${r.zid}`} size="xs" variant="subtle">
+              Zur Reihe
+            </Button>
+            <Button component="a" href={`/s/r/${r.zid}/materialien?reiter=abgaben`} size="xs" variant="subtle" data-ordner-reihe-abgaben>
+              Meine Abgaben
+            </Button>
+          </Group>
+        </Abschnitt>
+      ))}
       {o.aufgaben.length > 0 && (
         <Abschnitt titel="Rückmeldungen">
           {o.aufgaben.map((a) => (

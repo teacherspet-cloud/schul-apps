@@ -1492,7 +1492,7 @@ function Liste(p: {
         return (
           <Card key={g.nr} withBorder padding="md">
             <Group justify="space-between" mb={6} wrap="nowrap" align="start">
-              <Text fw={700}>
+              <Text fw={700} style={{ flex: 1, minWidth: 0 }}>
                 {g.nr ? `Aufgabe ${g.nr}` : 'Weitere Felder'}
                 {g.aufgabe?.anweisung ? (
                   <Text span fw={400}>
@@ -1508,6 +1508,7 @@ function Liste(p: {
                   color="yellow"
                   leftSection={<IconHelp size={14} />}
                   onClick={() => p.hilfeOeffnen!(g.aufgabe!)}
+                  style={{ flexShrink: 0 }}
                   data-hilfe-nr={g.nr}
                 >
                   Hilfe
@@ -1520,6 +1521,8 @@ function Liste(p: {
                   loading={p.laeuft === `a${g.nr}`}
                   onClick={() => void p.pruefen!(g.nr)}
                   leftSection={<IconMessageCircle size={14} />}
+                  style={{ flexShrink: 0 }}
+                  data-listen-pruefen={g.nr}
                 >
                   Prüfen
                 </Button>
@@ -1546,6 +1549,7 @@ function Liste(p: {
                       checked={Boolean(p.antworten[f.id])}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.checked ? 'x' : '')}
+                      data-listen-feld={f.id}
                     />
                   ) : f.art === 'zeilen' && (f.zeilen ?? 1) > 1 ? (
                     <Textarea
@@ -1556,6 +1560,7 @@ function Liste(p: {
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
                       spellCheck={false}
@@ -1569,6 +1574,7 @@ function Liste(p: {
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
                       spellCheck={false}
@@ -1580,6 +1586,7 @@ function Liste(p: {
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
                       autoCapitalize="none"

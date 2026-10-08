@@ -1,5 +1,5 @@
 /**
- * Knopf „Test hier erstellen" zwischen den Schritten (06.10.2026, reiheTest.ts): Klassenarbeit, Lernzielkontrolle oder
+ * „Test hier erstellen" an einem Schritt (06.10.2026, reiheTest.ts; seit 08.10.2026 im Menü „⋯" des Schritts): Klassenarbeit, Lernzielkontrolle oder
  * Vokabeltest aus allem bis zu dieser Stelle – auf Wunsch mit 10–20 % Wiederholung früherer Reihen.
  */
 import { Alert, Button, Checkbox, Group, Menu, Modal, MultiSelect, Slider, Stack, Text } from '@mantine/core'
@@ -13,53 +13,34 @@ import { merkeOffenenTest, oeffneTestEditor, starteTestWaechter } from './reiheT
 
 starteTestWaechter()
 
-export function TestHierKnopf({
-  reihe,
-  nach,
-  einfuegen
-}: {
-  reihe: Reihe
-  /** Schritt, hinter dem der Test steht (null = ganz vorn) */
-  nach: string | null
-  /** Platzhalter einfügen und die Reihe speichern – liefert die gespeicherte Reihe */
-  einfuegen: (s: Schritt, nach: string | null) => Promise<Reihe | null>
-}): React.JSX.Element {
-  const [ziel, setZiel] = useState<TestZiel | null>(null)
+/**
+ * „Test hier erstellen" als Einträge im Menü „⋯" eines Schritts (08.10.2026, statt dauerhaft unter jedem Schritt): das
+ * Fenster (`TestFenster`) hält der Editor selbst – das Menü schließt sich beim Klick.
+ */
+export function TestHierPunkte({ waehle, nach }: { waehle: (ziel: TestZiel) => void; nach: string | null }): React.JSX.Element {
   return (
     <>
-      <Group
-        justify="center"
-        className="reihe-test-hier"
-        style={{ opacity: 0.45 }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
-      >
-        <Menu position="bottom" withinPortal>
-          <Menu.Target>
-            <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconClipboardCheck size={13} />} data-test-hier={nach ?? ''}>
-              Test hier erstellen
-            </Button>
-          </Menu.Target>
-          <Menu.Dropdown>
-            {TEST_ZIELE.map((t) => (
-              <Menu.Item key={t.id} onClick={() => setZiel(t.id)} data-test-ziel={t.id}>
-                <Text size="sm" fw={600}>
-                  {t.label}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {t.text}
-                </Text>
-              </Menu.Item>
-            ))}
-          </Menu.Dropdown>
-        </Menu>
-      </Group>
-      {ziel && <TestFenster reihe={reihe} nach={nach} ziel={ziel} einfuegen={einfuegen} schliessen={() => setZiel(null)} />}
+      <Menu.Label>
+        <Group gap={4} wrap="nowrap">
+          <IconClipboardCheck size={13} />
+          Test hier erstellen
+        </Group>
+      </Menu.Label>
+      {TEST_ZIELE.map((t) => (
+        <Menu.Item key={t.id} onClick={() => waehle(t.id)} data-test-ziel={t.id} data-test-hier={nach ?? ''}>
+          <Text size="sm" fw={600}>
+            {t.label}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {t.text}
+          </Text>
+        </Menu.Item>
+      ))}
     </>
   )
 }
 
-function TestFenster({
+export function TestFenster({
   reihe,
   nach,
   ziel,

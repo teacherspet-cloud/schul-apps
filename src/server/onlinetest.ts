@@ -44,7 +44,7 @@ import {
 import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/src/modules/onlinetest/kiBewertung'
 import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
-import { FAECHER } from '@shared/faecher'
+import { FAECHER, fachSchreibweise } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
 import { alleNutzer, datenbank, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
@@ -148,6 +148,8 @@ export interface Lerngruppe {
 
 const alsGruppe = (z: Record<string, unknown>): Lerngruppe => ({
   ...(z as unknown as Lerngruppe),
+  // Fach in der Schreibweise des Katalogs („englisch" → „Englisch", 08.10.2026; gespeichert wird es ebenso, wartung.ts)
+  fach: fachSchreibweise(String(z.fach ?? '')),
   mitglieder: json_(String(z.mitglieder ?? '[]'), [] as string[])
 })
 
@@ -1222,7 +1224,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
             id,
             ich.id,
             name,
-            String(k0.fach ?? '').slice(0, 40),
+            fachSchreibweise(String(k0.fach ?? '')).slice(0, 40),
             String(k0.iservGruppe ?? '').slice(0, 120),
             JSON.stringify(mitglieder),
             new Date().toISOString()
@@ -1243,7 +1245,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           .prepare('UPDATE lerngruppen SET name = ?, fach = ?, iserv_gruppe = ?, mitglieder = ? WHERE id = ?')
           .run(
             String(k0.name ?? g.name).slice(0, 80),
-            String(k0.fach ?? g.fach).slice(0, 40),
+            fachSchreibweise(String(k0.fach ?? g.fach)).slice(0, 40),
             String(k0.iservGruppe ?? g.iserv_gruppe).slice(0, 120),
             JSON.stringify(mitglieder),
             g.id
@@ -1661,7 +1663,7 @@ export function testDetailsDerGruppe(g: Lerngruppe): Record<
 export function fachHinzufuegen(lehrkraftId: string, gruppeId: string, fach: string): string {
   const g = lerngruppe(gruppeId)
   if (!g || g.lehrkraft_id !== lehrkraftId) throw new Error('Diese Lerngruppe gibt es nicht.')
-  const f = fach.trim().slice(0, 40)
+  const f = fachSchreibweise(fach.trim()).slice(0, 40)
   if (!f) throw new Error('Bitte ein Fach wählen.')
   const name = g.name.trim().toLowerCase()
   const gleich = lerngruppenVon(lehrkraftId).find((x) => x.name.trim().toLowerCase() === name && x.fach.trim().toLowerCase() === f.toLowerCase())

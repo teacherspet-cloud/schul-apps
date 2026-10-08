@@ -12,11 +12,13 @@ import {
   Button,
   Checkbox,
   Divider,
+  Switch,
   FileButton,
   Group,
   Modal,
   MultiSelect,
   NumberInput,
+  Paper,
   SegmentedControl,
   Select,
   Stack,
@@ -26,12 +28,13 @@ import {
 } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import type { Erfolg, Reihe, Schritt, SchrittInhalt } from '@shared/reihe'
-import { SCHRITT_ARTEN } from '@shared/reihe'
+import { artVon, BLATT_FAEHIG, blattZweckFuer, SCHRITT_ARTEN } from '@shared/reihe'
 import { notifyError } from '../../shared/util'
 import { ladeBlattAlsSchritt } from './schrittAusBlatt'
 import { AuswahlFeld } from './AuswahlFeld'
 import { LernzieleFeld } from './Lernziele'
 import { schrittLernziele } from './lernzieleKi'
+import { GrundlageZeile } from './GrundlageChips'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -85,6 +88,8 @@ export function SchrittBearbeiten({
   const andere = reihe.schritte.filter((x) => x.id !== s.id)
   const erfolgWahl: { value: Erfolg['art']; label: string }[] = [
     ...(['arbeitsblatt', 'rueckmeldung', 'aufgabe'].includes(s.inhalt.art) ? [{ value: 'ki' as const, label: 'KI-Rückmeldung' }] : []),
+    // Abschlussprodukt (08.10.2026, Plan E.6): KI-Vorschlag nach dem Raster entscheidet – die Lehrkraft bestätigt die Bewertung
+    ...(s.inhalt.art === 'abschluss' ? [{ value: 'ki' as const, label: 'KI-Vorschlag nach dem Raster' }] : []),
     ...(s.inhalt.art === 'onlinetest' ? [{ value: 'punkte' as const, label: 'Mindestpunkte' }] : []),
     ...(s.inhalt.art === 'vokabeln' ? [{ value: 'punkte' as const, label: 'Anteil eingeübter Wörter' }] : []),
     { value: 'lehrkraft', label: 'Lehrkraft bestätigt' },
@@ -95,6 +100,7 @@ export function SchrittBearbeiten({
       <OptionenBereich>
         <Stack>
           <TextInput label="Titel (sehen die Lernenden)" value={s.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-schritt-titel />
+          {s.platzhalter && <KiErstellung reihe={reihe} s={s} setze={setze} />}
           <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} beschaeftigt={beschaeftigt} />
           <Divider />
           <LernzieleFeld
@@ -246,6 +252,104 @@ export function SchrittBearbeiten({
         </Stack>
       </OptionenBereich>
     </Modal>
+  )
+}
+
+/**
+ * Platzhalter (08.10.2026, „Was benutzt die KI?"): Grundlage-Chips (abwählbar) und – Expertenmodus bzw. „Alle Optionen" –
+ * der Auftrag „Was entstehen soll", Anspruch und Niveaustufen. Erstellt wird an der Schrittkarte („Mit KI erstellen").
+ */
+function KiErstellung({ reihe, s, setze }: { reihe: Reihe; s: Schritt; setze: (t: Partial<Schritt>) => void }): React.JSX.Element {
+  const p = s.platzhalter!
+  const voll = useAlleOptionen()
+  const vorgabe = s.kiVorgabe ?? {}
+  const vorgabeSetzen = (v: Partial<NonNullable<Schritt['kiVorgabe']>>): void => {
+    const neu = { ...vorgabe, ...v }
+    if (!neu.niveau || neu.niveau === 'mittel') delete neu.niveau
+    if (!neu.stufen || neu.stufen === 1) delete neu.stufen
+    if (!neu.alsBlatt) delete neu.alsBlatt
+    setze({ kiVorgabe: Object.keys(neu).length ? neu : undefined })
+  }
+  // Plan G.2 (08.10.2026): digital immer als Arbeitsblatt, gemischt auf Wunsch
+  const blattFaehig = BLATT_FAEHIG.includes(s.inhalt.art) && artVon(reihe) !== 'planung'
+  const alsBlatt = blattZweckFuer(reihe, s) !== null
+  return (
+    <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default-hover)" data-ki-erstellung>
+      <Stack gap="xs">
+        <Text size="sm" fw={600}>
+          Platzhalter – entsteht mit KI
+        </Text>
+        {!voll && (
+          <Text size="sm" c="dimmed">
+            {p.beschreibung}
+          </Text>
+        )}
+        <GrundlageZeile reihe={reihe} schritt={s} setze={setze} />
+        {blattFaehig &&
+          (artVon(reihe) === 'digital' ? (
+            <Text size="sm" c="dimmed" data-als-blatt="digital">
+              Entsteht als vollwertiges Arbeitsblatt (Erklärung mit Beispiel, Hilfekarten, Lösungen) – die Lernenden bearbeiten es
+              am Gerät mit KI-Feedback je Aufgabe.
+            </Text>
+          ) : (
+            <Switch
+              checked={alsBlatt}
+              onChange={(e) => vorgabeSetzen({ alsBlatt: e.currentTarget.checked })}
+              label="Als vollwertiges Arbeitsblatt erstellen"
+              description="Mit Aufgabentypen, Hilfekarten, Merkkasten und Lösungen; Lernende bearbeiten es am Gerät mit KI-Feedback je Aufgabe."
+              data-als-blatt
+            />
+          ))}
+        <NurExperte geaendert={Boolean(s.kiVorgabe) && 'Anspruch/Niveaustufen'}>
+          <Textarea
+            label="Was entstehen soll"
+            description="Auftrag an die KI – Gegenstand, Ziel, Aufgabenformate, Anforderung"
+            autosize
+            minRows={2}
+            maxRows={8}
+            value={p.beschreibung}
+            onChange={(e) => setze({ platzhalter: { ...p, beschreibung: e.currentTarget.value } })}
+            data-platzhalter-beschreibung
+          />
+          <Group align="end">
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                Anspruch
+              </Text>
+              <SegmentedControl
+                size="xs"
+                value={vorgabe.niveau ?? 'mittel'}
+                onChange={(v) => vorgabeSetzen({ niveau: v as 'grundlegend' | 'mittel' | 'anspruchsvoll' })}
+                data={[
+                  { value: 'grundlegend', label: 'grundlegend' },
+                  { value: 'mittel', label: 'jahrgangsgemäß' },
+                  { value: 'anspruchsvoll', label: 'anspruchsvoll' }
+                ]}
+                data-ki-niveau
+              />
+            </Stack>
+            {s.inhalt.art === 'arbeitsblatt' && (
+              <Stack gap={4}>
+                <Text size="sm" fw={500}>
+                  Niveaustufen
+                </Text>
+                <SegmentedControl
+                  size="xs"
+                  value={String(vorgabe.stufen ?? 1)}
+                  onChange={(v) => vorgabeSetzen({ stufen: Number(v) as 1 | 2 | 3 })}
+                  data={[
+                    { value: '1', label: 'eine' },
+                    { value: '2', label: 'zwei' },
+                    { value: '3', label: 'drei' }
+                  ]}
+                  data-ki-stufen
+                />
+              </Stack>
+            )}
+          </Group>
+        </NurExperte>
+      </Stack>
+    </Paper>
   )
 }
 

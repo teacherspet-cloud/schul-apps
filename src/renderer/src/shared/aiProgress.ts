@@ -74,9 +74,12 @@ export class AiProgressTracker {
     })
   }
 
-  /** Meldet eine neue Anfrage an und liefert deren Kennung für `progressId`. */
-  begin(kind: string): string {
-    const id = `p${++counter}-${Date.now()}`
+  /**
+   * Meldet eine neue Anfrage an und liefert deren Kennung für `progressId`. `vorsatz` (08.10.2026): Aufträge setzen
+   * ihre Kennung davor („<auftrag>~"), damit der Hauptprozess im Wechsel je Auftrag bedient (kiPlaetze.ts).
+   */
+  begin(kind: string, vorsatz = ''): string {
+    const id = `${vorsatz}p${++counter}-${Date.now()}`
     this.kinds.set(id, kind)
     this.chars.set(id, 0)
     return id

@@ -31,6 +31,7 @@ import { IconArrowLeft, IconCheck, IconDownload, IconHandStop, IconLock, IconPla
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
 import type { Reihe, SchrittLage, Stand, Status, Weg } from '@shared/reihe'
+import { vorschlagSumme } from '@shared/reiheKiFeedback'
 import { notifyError } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 
@@ -149,7 +150,7 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
                     Abhaken
                   </Button>
                 )}
-                {(b.art === 'bewerten' || b.art === 'hilfe') && b.schueler && b.schritt && (
+                {(b.art === 'bewerten' || b.art === 'hilfe' || b.art === 'vorschlag') && b.schueler && b.schritt && (
                   <Button size="xs" variant="light" onClick={() => setDetail({ schueler: b.schueler!, schritt: b.schritt! })} data-bedarf-ansehen>
                     Ansehen
                   </Button>
@@ -365,6 +366,48 @@ function Detail({
           </Text>
         )}
         {st.diagnose && <Text size="sm">Diagnose: {st.diagnose.prozent} % richtig</Text>}
+        {/* KI-Vorschlag zum Abschlussprodukt (08.10.2026, Plan E.6) – nur hier; die Lernenden sehen erst deine Bewertung */}
+        {st.kiVorschlag && (
+          <Alert color={st.kiVorschlag.fehler ? 'gray' : 'violet'} variant="light" title="KI-Vorschlag nach dem Raster" data-ki-vorschlag>
+            {st.kiVorschlag.fehler ? (
+              <Text size="sm">Die KI konnte nicht prüfen: {st.kiVorschlag.fehler}</Text>
+            ) : (
+              <Stack gap={4}>
+                {st.kiVorschlag.kriterien.map((k, i) => (
+                  <Text key={i} size="sm">
+                    <b>
+                      {k.kriterium}: {k.punkte}/{k.max}
+                    </b>{' '}
+                    – {k.begruendung}
+                  </Text>
+                ))}
+                <Text size="sm" fw={600}>
+                  Zusammen: {vorschlagSumme(st.kiVorschlag).punkte} von {vorschlagSumme(st.kiVorschlag).max} Punkten
+                </Text>
+                {st.kiVorschlag.gesamt && (
+                  <Text size="sm" c="dimmed">
+                    {st.kiVorschlag.gesamt}
+                  </Text>
+                )}
+                <Button
+                  size="xs"
+                  variant="light"
+                  w="fit-content"
+                  onClick={() => {
+                    const v = st.kiVorschlag!
+                    const sum = vorschlagSumme(v)
+                    setText(
+                      [`${sum.punkte} von ${sum.max} Punkten.`, ...v.kriterien.map((k) => `${k.kriterium}: ${k.punkte}/${k.max} – ${k.begruendung}`)].join('\n')
+                    )
+                  }}
+                  data-vorschlag-uebernehmen
+                >
+                  In die Rückmeldung übernehmen
+                </Button>
+              </Stack>
+            )}
+          </Alert>
+        )}
         {st.ampel && (
           <Stack gap={4} data-ampeln>
             <Text fw={600} size="sm">
@@ -407,6 +450,11 @@ function Detail({
         {st.tagebuch && (
           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
             <b>Lerntagebuch:</b> {st.tagebuch}
+          </Text>
+        )}
+        {st.impuls && (
+          <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap' }} data-impuls-lehrkraft>
+            <b>KI-Impuls an die Person:</b> {st.impuls.text}
           </Text>
         )}
         {s.inhalt.art === 'abschluss' && s.inhalt.raster.length > 0 && (

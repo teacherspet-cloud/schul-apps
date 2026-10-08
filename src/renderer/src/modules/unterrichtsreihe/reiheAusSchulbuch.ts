@@ -17,6 +17,7 @@ import { SCHULFORMEN, type SchulProfil } from '@shared/schulformen'
 import {
   leererInhalt,
   neueSchrittId,
+  artVon,
   standardErfolg,
   type BuchUebernahme,
   type Lernziel,
@@ -419,7 +420,7 @@ export interface BuchPlan extends ReihenPlan {
 const s = (t: unknown): string => String(t ?? '').trim()
 
 /** Antwort der KI prüfen und in Schritte übersetzen (alle als Platzhalter, die per Knopf entstehen) */
-export function buchPlanUebernehmen(d: BuchPlanRoh, r: Pick<Reihe, 'lernziele'>, buch: BuchErkennung, stunden: StundenArt[]): BuchPlan {
+export function buchPlanUebernehmen(d: BuchPlanRoh, r: Pick<Reihe, 'lernziele' | 'art'>, buch: BuchErkennung, stunden: StundenArt[]): BuchPlan {
   const n = Math.max(1, stunden.length)
   const neueZiele: Lernziel[] = r.lernziele.length
     ? []
@@ -449,7 +450,7 @@ export function buchPlanUebernehmen(d: BuchPlanRoh, r: Pick<Reihe, 'lernziele'>,
         titel,
         lernziele: [...new Set(x.lernziele ?? [])].map((i) => ziele[i]).filter((l): l is Lernziel => Boolean(l)),
         rolle,
-        erfolg: standardErfolg(art),
+        erfolg: standardErfolg(art, artVon(r)),
         inhalt: leererInhalt(art),
         abschnitt: name,
         stunde: Math.min(n - 1, Math.max(0, Math.round(Number(x.stunde) || 1) - 1)),

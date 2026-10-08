@@ -26,7 +26,7 @@ import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
 import { fassungenAusBlatt } from './blattOnline'
 import { Erstellen, type BlattQuelleOnline } from './OnlinetestKnopf'
 import { AppKopf } from '../../shared/components/AppKopf'
-import { FAECHER } from '@shared/faecher'
+import { FAECHER, fachSchreibweise } from '@shared/faecher'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import type { TestDocument } from '../vokabeltest/model/types'
@@ -1673,7 +1673,7 @@ function Lerngruppen(): React.JSX.Element {
           <Card key={g.id} withBorder style={{ cursor: 'pointer' }} onClick={() => setGewaehlt(g.id)}>
             <Text fw={700}>{g.name}</Text>
             <Text size="sm" c="dimmed">
-              {[g.fach, g.iserv_gruppe ? `IServ: ${g.iserv_gruppe}` : '', `${g.anzahl} Schüler/innen angemeldet`].filter(Boolean).join(' · ')}
+              {[fachSchreibweise(g.fach), g.iserv_gruppe ? `IServ: ${g.iserv_gruppe}` : '', `${g.anzahl} Schüler/innen angemeldet`].filter(Boolean).join(' · ')}
             </Text>
           </Card>
         ))}

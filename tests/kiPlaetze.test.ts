@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { KiPlaetze } from '../src/main/services/ai/kiPlaetze'
+import { KiPlaetze, gruppeVon } from '../src/main/services/ai/kiPlaetze'
 import { ABBRUCH_MELDUNG, istAbbruch } from '../src/shared/abbruch'
 
 /**
@@ -141,10 +141,10 @@ describe('KI-Plätze: abbrechen', () => {
     const text = steuerbar()
     const lauf2 = plaetze.platz('t', text.arbeit)
     await tick()
-    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0 })
+    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0, platz: 1 })
     plaetze.abbrechen('b')
     await expect(lauf).rejects.toThrow(ABBRUCH_MELDUNG)
-    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 1, abgebrocheneBilder: 1 })
+    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 1, abgebrocheneBilder: 1, platz: 1 })
     expect(text.gestartet()).toBe(false)
     bild.fertig('spätes Bild')
     await tick()
@@ -159,5 +159,108 @@ describe('KI-Plätze: abbrechen', () => {
   it('erkennt den Abbruch auch am bloßen Meldungstext (so kommt er über die Brücke an)', () => {
     expect(istAbbruch(new Error(ABBRUCH_MELDUNG))).toBe(true)
     expect(istAbbruch(new Error('Anthropic: Limit erreicht (429).'))).toBe(false)
+  })
+})
+
+/*
+ * Fairere Warteschlange (08.10.2026, Unterrichtsreihe): Anfragen ohne Auftrag zuerst, sonst im Wechsel je Auftrag
+ * (Kennung „<auftrag>~<anfrage>"); jede Wartende erfährt ihren Platz.
+ */
+describe('KI-Plätze: Wechsel je Auftrag und Platznummer', () => {
+  it('liest den Auftrag aus der Kennung – auch mit Vorsatz aus dem Netz', () => {
+    expect(gruppeVon('a1-x~p3-99')).toBe('a1-x')
+    expect(gruppeVon('netz-s1-a1-x~p3-99')).toBe('netz-s1-a1-x')
+    expect(gruppeVon('p3-99')).toBeUndefined()
+    expect(gruppeVon(undefined)).toBeUndefined()
+  })
+
+  it('bedient wartende Aufträge im Wechsel statt alle Anfragen des ersten zuerst', async () => {
+    const plaetze = new KiPlaetze(1)
+    const reihenfolge: string[] = []
+    const erste = steuerbar()
+    const lauf1 = plaetze.platz('x', erste.arbeit)
+    const ids = ['A~1', 'A~2', 'A~3', 'B~1', 'B~2', 'C~1']
+    const spaeter = ids.map((id) =>
+      plaetze.platz(id, async () => {
+        reihenfolge.push(id)
+        return id
+      })
+    )
+    await tick()
+    expect(plaetze.warteliste()).toEqual(['A~1', 'B~1', 'C~1', 'A~2', 'B~2', 'A~3'])
+    erste.fertig('ok')
+    await lauf1
+    await Promise.all(spaeter)
+    expect(reihenfolge).toEqual(['A~1', 'B~1', 'C~1', 'A~2', 'B~2', 'A~3'])
+  })
+
+  it('zieht Anfragen ohne Auftrag (Planung, Knöpfe) vor', async () => {
+    const plaetze = new KiPlaetze(1)
+    const erste = steuerbar()
+    const lauf1 = plaetze.platz('A~0', erste.arbeit)
+    const reihenfolge: string[] = []
+    const merke = (id: string) => async (): Promise<string> => {
+      reihenfolge.push(id)
+      return id
+    }
+    const spaeter = [plaetze.platz('A~1', merke('A~1')), plaetze.platz('B~1', merke('B~1')), plaetze.platz('frage', merke('frage'))]
+    await tick()
+    expect(plaetze.warteliste()).toEqual(['frage', 'B~1', 'A~1'])
+    erste.fertig('ok')
+    await lauf1
+    await Promise.all(spaeter)
+    // Auftrag A wurde eben bedient (A~0) – B ist vor A dran
+    expect(reihenfolge).toEqual(['frage', 'B~1', 'A~1'])
+  })
+
+  it('meldet jeder Wartenden ihren Platz und rückt nach, wenn eine abgebrochen wird oder drankommt', async () => {
+    const meldungen: { id: string; zustand: string; platz?: number }[] = []
+    const plaetze = new KiPlaetze(1, (id, zustand, info) => meldungen.push({ id, zustand, platz: info?.platz }))
+    const zuletzt = (id: string): { zustand: string; platz?: number } | undefined => {
+      const m = meldungen.filter((x) => x.id === id).at(-1)
+      return m && (m.platz === undefined ? { zustand: m.zustand } : { zustand: m.zustand, platz: m.platz })
+    }
+    const erste = steuerbar()
+    const lauf1 = plaetze.platz('A~1', erste.arbeit)
+    const b = steuerbar()
+    const c = steuerbar()
+    const d = steuerbar()
+    const laufB = plaetze.platz('B~1', b.arbeit)
+    const laufC = plaetze.platz('C~1', c.arbeit)
+    const laufD = plaetze.platz('D~1', d.arbeit)
+    await tick()
+    expect(zuletzt('B~1')).toEqual({ zustand: 'wartend', platz: 1 })
+    expect(zuletzt('C~1')).toEqual({ zustand: 'wartend', platz: 2 })
+    expect(zuletzt('D~1')).toEqual({ zustand: 'wartend', platz: 3 })
+    plaetze.abbrechen('C~1')
+    await expect(laufC).rejects.toThrow(ABBRUCH_MELDUNG)
+    expect(zuletzt('D~1')).toEqual({ zustand: 'wartend', platz: 2 })
+    erste.fertig('ok')
+    await lauf1
+    await tick()
+    expect(zuletzt('B~1')?.zustand).toBe('laufend')
+    expect(zuletzt('D~1')).toEqual({ zustand: 'wartend', platz: 1 })
+    b.fertig('b')
+    await laufB
+    await tick()
+    expect(zuletzt('D~1')?.zustand).toBe('laufend')
+    d.fertig('d')
+    await laufD
+    expect(plaetze.stand()).toEqual({ laufend: 0, wartend: 0 })
+  })
+
+  it('lässt nie mehr als die erlaubten Anfragen zugleich laufen, auch beim Weiterreichen des Platzes', async () => {
+    const plaetze = new KiPlaetze(2)
+    let gleichzeitig = 0
+    let hoechstens = 0
+    const arbeit = async (): Promise<void> => {
+      gleichzeitig++
+      hoechstens = Math.max(hoechstens, gleichzeitig)
+      await tick()
+      gleichzeitig--
+    }
+    await Promise.all(Array.from({ length: 12 }, (_, i) => plaetze.platz(`${'ABC'[i % 3]}~${i}`, arbeit)))
+    expect(hoechstens).toBe(2)
+    expect(plaetze.stand()).toEqual({ laufend: 0, wartend: 0 })
   })
 })

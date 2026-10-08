@@ -324,7 +324,8 @@ try {
   // Schüler-Vorschau im Editor
   await p.locator('[data-reihe-karte="Weather words"] [data-reihe-oeffnen]').click()
   await p.locator('[data-reihe-editor]').waitFor({ timeout: 15000 })
-  await p.locator('[data-schuelervorschau]').click()
+  // Ablauf-Simulator heißt seit 08.10.2026 „Ablauf testen" (Expertenmodus); „Als Schüler ansehen" öffnet die echte Schülerseite
+  await p.locator('[data-ablauf-testen]').click()
   await p.locator('[data-vorschau]').waitFor()
   await p.locator('[data-vorschau-geschafft]').first().click()
   pruefe((await p.locator('[data-vorschau-station="geschafft"]').count()) === 1, 'Schüler-Vorschau: simuliertes „geschafft"')

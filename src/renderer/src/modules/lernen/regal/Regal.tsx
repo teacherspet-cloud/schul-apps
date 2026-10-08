@@ -55,7 +55,7 @@ export const registerVon = (o: FachOrdner): ('vok' | 'gram' | 'mat')[] =>
   [
     o.vokabeln.length ? ('vok' as const) : null,
     o.grammatik.length ? ('gram' as const) : null,
-    o.blaetter.length || o.tests.length || o.aufgaben.length || o.mappen.length || o.merk.length ? ('mat' as const) : null
+    o.blaetter.length || o.tests.length || o.aufgaben.length || o.reihen.length || o.mappen.length || o.merk.length ? ('mat' as const) : null
   ].filter((x): x is 'vok' | 'gram' | 'mat' => Boolean(x))
 
 export const ordnerLink = (fach: string): string => `/s/ordner/${encodeURIComponent(fach)}`

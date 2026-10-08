@@ -14,7 +14,8 @@
  *
  *   POST /server/klassen/<gruppe>/vorschau   {zustand}              → {schluessel, adresse}
  *   POST /server/vorschau/zuruecksetzen      {schluessel, zustand}  Daten löschen, Lernstand neu erzeugen
- *   GET  /vorschau?vs=…                      Fenster: Streifen (Gerät, Lernstand, Zurücksetzen) + Ansicht
+ *   GET  /vorschau?vs=…[&ziel=/s/…]          Fenster: Streifen (Gerät, Lernstand, Zurücksetzen) + Ansicht
+ *   POST /server/reihen/<id>/vorschau        {zustand}  → {schluessel, adresse}  (reihen.ts, 08.10.2026: Reihe als Musterschüler)
  *
  * Lernstand beim Öffnen wählbar (neu / fleißig, noch unsicher / erfolgreich / länger nicht da): Beispieldaten für
  * Vokabel- und Grammatikkästen, Übungstage und Wochen-Schnappschüsse, so dass die Zustandslogik (shared/lernstand.ts)
@@ -234,7 +235,10 @@ export const VORSCHAU_WOCHE = 'vorschau'
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
-function fensterSeite(schluessel: string, klasse: string, zustand: string): string {
+/** Startseite der Ansicht im Fenster (08.10.2026: z. B. gleich die Reihe `/s/r/<Zuweisung>`) – nur Seiten des Schülerbereichs */
+export const vorschauZiel = (wert: string | null): string => (wert && /^\/s\/[A-Za-z0-9/_-]*$/.test(wert) ? wert : '/s/')
+
+function fensterSeite(schluessel: string, klasse: string, zustand: string, ziel = '/s/'): string {
   const titel = `Vorschau als Musterschüler ${klasse}`
   const wahl = ZUSTAENDE.map((z) => `<option value="${z}"${z === zustand ? ' selected' : ''}>${esc(ZUSTAND_TEXT[z])}</option>`).join('')
   return `<!doctype html>
@@ -274,10 +278,10 @@ function fensterSeite(schluessel: string, klasse: string, zustand: string): stri
     <span class="meldung" id="meldung" role="status"></span>
   </span>
 </div>
-<div class="buehne" id="buehne" data-geraet="tablet"><iframe id="ansicht" title="Schülersicht" src="/s/?vs=${encodeURIComponent(schluessel)}"></iframe></div>
+<div class="buehne" id="buehne" data-geraet="tablet"><iframe id="ansicht" title="Schülersicht" src="${esc(ziel)}?vs=${encodeURIComponent(schluessel)}"></iframe></div>
 <script>
 (function () {
-  var schluessel = ${JSON.stringify(schluessel).replace(/</g, '\\u003c')};
+  var schluessel = ${JSON.stringify(schluessel).replace(/</g, '\\u003c')}, ziel = ${JSON.stringify(ziel)};
   try { sessionStorage.setItem('sa-vorschau', schluessel) } catch (e) {}
   var buehne = document.getElementById('buehne'), ansicht = document.getElementById('ansicht'), meldung = document.getElementById('meldung');
   var hoehe = function () { document.documentElement.style.setProperty('--streifen', document.getElementById('streifen').offsetHeight + 'px') };
@@ -307,7 +311,7 @@ function fensterSeite(schluessel: string, klasse: string, zustand: string): stri
       .then(function () {
         if (nr !== laufend) return;
         meldung.textContent = fertig;
-        ansicht.src = '/s/?vs=' + encodeURIComponent(schluessel) + '&t=' + Date.now();
+        ansicht.src = ziel + '?vs=' + encodeURIComponent(schluessel) + '&t=' + Date.now();
         setTimeout(function () { if (nr === laufend) meldung.textContent = '' }, 2500)
       })
       .catch(function (e) { if (nr === laufend) meldung.textContent = e.message })
@@ -341,7 +345,7 @@ export function vorschauRoute(): (k: Anfrage) => Promise<boolean> {
       const konto = kontoZumSchluessel(schluessel, ich)
       const z = konto ? (db().prepare('SELECT * FROM vorschau_konten WHERE nutzer_id = ?').get(konto.id) as KontoZeile | undefined) : undefined
       res.writeHead(konto && z ? 200 : 403, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
-      return (res.end(konto && z ? fensterSeite(schluessel, z.anzeige, z.zustand) : abgelaufenSeite()), true)
+      return (res.end(konto && z ? fensterSeite(schluessel, z.anzeige, z.zustand, vorschauZiel(url.searchParams.get('ziel'))) : abgelaufenSeite()), true)
     }
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
     if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)

@@ -46,6 +46,12 @@ import { useZwischenstaende, zwischenstandsMelder } from './zwischenstand'
 
 export type AuftragsStatus = 'wartend' | 'laufend' | 'fertig' | 'fehler' | 'abgebrochen'
 
+/** Ein Dokument, das ein Auftrag beim Ablegen angelegt hat (08.10.2026) */
+export interface AuftragsZiel {
+  moduleId: string
+  docId: string
+}
+
 /** Eine offene Frage des Auftrags an die Lehrkraft (z. B. welche Quelle genommen wird) */
 export interface Rueckfrage {
   art: string
@@ -77,6 +83,10 @@ export interface Auftrag {
   kannErneut: boolean
   /** Warum er wartet, falls das mehr ist als „alle Plätze belegt" (siehe `warteGrund`) */
   wartegrund?: string
+  /** Wartend: Platz in der Warteschlange des Hauptprozesses (1 = als Nächster dran; 08.10.2026) */
+  platz?: number
+  /** Fertig: wohin „Öffnen" führt, wenn nicht ins Dokument `docId` (z. B. das neue Arbeitsblatt eines Reihen-Schritts) */
+  ziel?: AuftragsZiel
   /** Geschätzter Zeitpunkt des Endes (ms seit 1970) – fehlt, solange keine belastbare Zahl vorliegt */
   restBis?: number
   /** Der Auftrag läuft länger als alle gemerkten Läufe seiner Art */
@@ -170,8 +180,11 @@ export interface AuftragsStart<I, E> {
   /** Eingaben zum Startzeitpunkt – werden tief kopiert */
   eingabe: I
   arbeit: (eingabe: I, k: AuftragsKontext) => Promise<E>
-  /** Ergebnis im Dokument `docId` ablegen (siehe `legeAb`) */
-  ablegen: (ergebnis: E, eingabe: I) => Promise<void>
+  /**
+   * Ergebnis im Dokument `docId` ablegen (siehe `legeAb`). Legt es dabei ein eigenes Dokument an, kann es dessen Ort
+   * liefern – „Öffnen" in der Leiste führt dann dorthin (`Auftrag.ziel`).
+   */
+  ablegen: (ergebnis: E, eingabe: I) => Promise<void | AuftragsZiel>
   /** Ist das Dokument gerade offen? Dann öffnet „Öffnen" nur das Programm. */
   istOffen?: () => boolean
   /** Standard: sperrt das Dokument */
@@ -212,7 +225,7 @@ const laufzeit = new Map<string, Laufzeit>()
  * Anfragen, die auf einen freien Platz warten (Meldung des Hauptprozesses) – mit der Zahl der
  * Plätze, die dabei noch abgebrochene Anfragen halten (davon Bilder).
  */
-const wartendeAnfragen = new Map<string, { abgebrochen: number; bilder: number }>()
+const wartendeAnfragen = new Map<string, { abgebrochen: number; bilder: number; platz?: number }>()
 let zaehler = 0
 
 /**
@@ -251,8 +264,8 @@ const platzHoerer = new Set<() => void>()
 let platzAbo: (() => void) | null = null
 function horchePlatz(): void {
   if (platzAbo || typeof window === 'undefined' || !window.api?.ai.onPlatz) return
-  platzAbo = window.api.ai.onPlatz(({ id, zustand, abgebrochen, abgebrocheneBilder }) => {
-    if (zustand === 'wartend') wartendeAnfragen.set(id, { abgebrochen: abgebrochen ?? 0, bilder: abgebrocheneBilder ?? 0 })
+  platzAbo = window.api.ai.onPlatz(({ id, zustand, abgebrochen, abgebrocheneBilder, platz }) => {
+    if (zustand === 'wartend') wartendeAnfragen.set(id, { abgebrochen: abgebrochen ?? 0, bilder: abgebrocheneBilder ?? 0, platz })
     else wartendeAnfragen.delete(id)
     if (anfrageWarten.has(id)) merkeWartezustand(id, zustand === 'wartend')
     for (const fn of platzHoerer) fn()
@@ -399,12 +412,16 @@ export function nimmUnterbrocheneAuf(): number {
 }
 
 /** Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend". */
-function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund'> {
-  if (!laeuft(a)) return { status: a.status, wartegrund: undefined }
-  if (lz.pause) return { status: 'wartend', wartegrund: lz.pause }
+function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund' | 'platz'> {
+  if (!laeuft(a)) return { status: a.status, wartegrund: undefined, platz: undefined }
+  if (lz.pause) return { status: 'wartend', wartegrund: lz.pause, platz: undefined }
   const ids = [...lz.anfragen]
   const wartet = ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id))
-  return { status: wartet ? 'wartend' : 'laufend', wartegrund: wartet ? warteGrund(ids.map((id) => wartendeAnfragen.get(id)!)) : undefined }
+  if (!wartet) return { status: 'laufend', wartegrund: undefined, platz: undefined }
+  const lagen = ids.map((id) => wartendeAnfragen.get(id)!)
+  // Der vorderste Platz seiner Anfragen – mit ihm geht es weiter
+  const plaetze = lagen.map((l) => l.platz).filter((p): p is number => typeof p === 'number' && p > 0)
+  return { status: 'wartend', wartegrund: warteGrund(lagen), platz: plaetze.length ? Math.min(...plaetze) : undefined }
 }
 
 /**
@@ -574,7 +591,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
 
   const anfrage = async <T>(art: string, senden: (anfrageId: string) => Promise<T>, req?: StructuredRequest): Promise<T> => {
     if (signal.aborted) throw new AbbruchFehler()
-    const anfrageId = tracker.begin(art)
+    // Kennung „<auftrag>~<anfrage>": Der Hauptprozess bedient wartende Anfragen im Wechsel je Auftrag (kiPlaetze.ts)
+    const anfrageId = tracker.begin(art, `${id}~`)
     anfrageWarten.set(anfrageId, { summe: 0 })
     lz.anfragen.add(anfrageId)
     buch.laufend.set(anfrageId, { art, ki: kiFuer(art, req), start: Date.now() })
@@ -677,7 +695,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       if (signal.aborted) throw new AbbruchFehler()
       lz.legtAb = true
       aendere(id, (a) => ({ ...a, meldung: 'Wird abgelegt …' }))
-      await start.ablegen(ergebnis, eingabe)
+      const ziel = (await start.ablegen(ergebnis, eingabe)) as AuftragsZiel | undefined
       const ende = Date.now()
       pruefeWarten(ende)
       // Aus diesem Lauf lernen: Dauer (ohne Wartezeit), Umfang und Mischung der Anfragen dieser Auftragsart
@@ -687,6 +705,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
         status: 'fertig',
         anteil: 1,
         ende,
+        platz: undefined,
+        ...(ziel ? { ziel } : {}),
         rueckfrage: undefined,
         restBis: undefined,
         restLage: undefined,

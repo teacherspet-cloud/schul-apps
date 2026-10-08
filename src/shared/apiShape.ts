@@ -322,7 +322,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
        * Meldet, ob eine Anfrage auf einen freien Platz wartet (höchstens drei laufen zugleich).
        * Beim Warten steht dabei, wie viele Plätze abgebrochene Anfragen noch halten (davon Bilder).
        */
-      onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number }) => void) =>
+      onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number; platz?: number }) => void) =>
         extras.subscribe('ai:platz', cb as (value: unknown) => void),
       /**
        * Nur über das Netz (iPad-App „Abo über den PC", Browser, 30.09.2026): Die Verbindung zum PC

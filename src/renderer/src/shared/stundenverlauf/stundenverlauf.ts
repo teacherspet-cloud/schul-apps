@@ -110,17 +110,35 @@ const SCHEMA = obj({
 const OHNE_META: ImpulsMeta = { subjectId: '', subjectLabel: '', grade: 7, topic: '' }
 
 /**
+ * Rahmen der Anfrage (08.10.2026, Planungsreihe): Eine Stunde einer Unterrichtsreihe hat kein einzelnes Blatt, sondern
+ * die Schritte/Materialien dieser Stunde samt Zusammenhang der Reihe – Einleitung und Materialregel sind dann andere.
+ */
+export interface VerlaufsRahmen {
+  /** Ersetzt den ersten Satz („Plane den Verlauf einer Unterrichtsstunde …") */
+  einleitung?: string
+  /** Ersetzt die Regel, wie das Material in den Phasen genannt wird */
+  materialRegel?: string
+}
+
+/**
  * Anfrage an die KI. `material` ist die Beschreibung des Materials (Aufgaben, Texte), `system`
  * das Lerngruppen-Profil des Programms.
  */
-export function verlaufsAnfrage(system: string, material: string, dauer: number, wunsch = '', lerngruppe: ImpulsMeta = OHNE_META): StructuredRequest {
+export function verlaufsAnfrage(
+  system: string,
+  material: string,
+  dauer: number,
+  wunsch = '',
+  lerngruppe: ImpulsMeta = OHNE_META,
+  rahmen: VerlaufsRahmen = {}
+): StructuredRequest {
   return {
     system,
     user: [
-      `Plane den Verlauf einer Unterrichtsstunde von ${dauer} Minuten, in der das folgende Material eingesetzt wird.`,
+      rahmen.einleitung ?? `Plane den Verlauf einer Unterrichtsstunde von ${dauer} Minuten, in der das folgende Material eingesetzt wird.`,
       'REGELN:',
       '- Übliche Phasen: Einstieg (Motivation, Problemstellung), Erarbeitung (mit den Aufgaben des Materials), Sicherung (Ergebnisse zusammentragen), bei Bedarf Transfer oder Vertiefung und Hausaufgabe.',
-      '- Jede Aufgabe und jedes Material des Blattes kommt in einer Phase vor; nenne sie mit ihrer Nummer (M1, Aufgabe 2).',
+      rahmen.materialRegel ?? '- Jede Aufgabe und jedes Material des Blattes kommt in einer Phase vor; nenne sie mit ihrer Nummer (M1, Aufgabe 2).',
       '- Realistische Zeiten: Lesezeit der Texte, Bearbeitungszeit der Aufgaben, Zeit für Wechsel der Sozialform.',
       `- Die Minuten aller Phasen ergeben zusammen GENAU ${dauer}.`,
       '- Sozialformen abwechseln, wo es der Sache dient; keine Methode um ihrer selbst willen.',
@@ -172,17 +190,24 @@ export function verlaufAus(daten: unknown, dauer: number): Stundenverlauf {
   })
 }
 
-/** Druckfassung (HTML für PDF und Druck) */
-export function verlaufHtml(v: Stundenverlauf, titel: string, untertitel: string, ki?: KiHerkunft): string {
-  const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const zeilen = v.phasen
+const escHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** Nur die Verlaufstabelle (auch für die Unterrichtsplanung einer Reihe, 08.10.2026) – Stil: `table`, `th`, `td`, `td.z` */
+export function verlaufTabelleHtml(phasen: Pick<VerlaufsPhase, 'phase' | 'minuten' | 'geschehen' | 'sozialform' | 'medien'>[]): string {
+  const zeilen = phasen
     .map(
       (p) =>
-        `<tr><td><b>${esc(p.phase)}</b></td><td class="z">${p.minuten}′</td><td>${esc(p.geschehen).replace(/ · /g, '<br>')}</td><td>${esc(
+        `<tr><td><b>${escHtml(p.phase)}</b></td><td class="z">${p.minuten}′</td><td>${escHtml(p.geschehen).replace(/ · /g, '<br>')}</td><td>${escHtml(
           p.sozialform
-        )}</td><td>${esc(p.medien)}</td></tr>`
+        )}</td><td>${escHtml(p.medien)}</td></tr>`
     )
     .join('')
+  return `<table><thead><tr><th style="width:14%">Phase</th><th style="width:6%">Zeit</th><th>Geplantes Geschehen</th><th style="width:9%">Sozialform</th><th style="width:18%">Medien / Material</th></tr></thead><tbody>${zeilen}</tbody></table>`
+}
+
+/** Druckfassung (HTML für PDF und Druck) */
+export function verlaufHtml(v: Stundenverlauf, titel: string, untertitel: string, ki?: KiHerkunft): string {
+  const esc = escHtml
   const impulse = v.phasen.filter((p) => p.impuls).map((p) => impulsHtml(p.impuls!, p.phase, esc))
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Stundenverlauf – ${esc(titel)}</title>${kiMetaTag(ki)}<style>
 @page { size: A4 landscape; margin: 14mm; }
@@ -195,7 +220,7 @@ th { background: #eee; } td.z { white-space: nowrap; } .h { margin-top: 4mm; }
 .impuls ul, .impuls ol { margin: 1mm 0 2mm 5mm; padding-left: 4mm; } .impuls p { margin: 1mm 0; }
 </style></head><body><h1>Stundenverlauf – ${esc(titel)}</h1><p class="u">${esc(untertitel)} · ${v.dauer} Minuten</p>
 ${v.ziel ? `<p><b>Stundenziel:</b> ${esc(v.ziel)}</p>` : ''}
-<table><thead><tr><th style="width:14%">Phase</th><th style="width:6%">Zeit</th><th>Geplantes Geschehen</th><th style="width:9%">Sozialform</th><th style="width:18%">Medien / Material</th></tr></thead><tbody>${zeilen}</tbody></table>
+${verlaufTabelleHtml(v.phasen)}
 ${v.hinweise ? `<p class="h"><b>Hinweise:</b> ${esc(v.hinweise)}</p>` : ''}${impulse.join('')}</body></html>`
 }
 

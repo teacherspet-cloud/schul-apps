@@ -297,8 +297,9 @@ export async function vorschauenNachtragen(eintraege: { id: string; thumb?: stri
  * Ein außerhalb des Editors erzeugtes Blatt als NEUES Dokument ablegen (05.10.2026, Platzhalter der
  * Unterrichtsreihe) – das offene Blatt bleibt unberührt. Liefert die Kennung.
  */
-export async function speichereNeuesArbeitsblatt(ws: Worksheet, logo: string | null, schoolName: string): Promise<string> {
+export async function speichereNeuesArbeitsblatt(ws: Worksheet, logo: string | null, schoolName: string, name?: string): Promise<string> {
   const thumb = ws.sheets.length ? await worksheetThumb(ws, new Map(), logo, schoolName).catch(() => undefined) : undefined
-  const meta = await window.api.sheets.save({ id: newId(), name: defaultWorksheetName(ws), stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
+  // `name` (08.10.2026): Blätter aus der Unterrichtsreihe heißen „<Reihe> – <Schritt>"
+  const meta = await window.api.sheets.save({ id: newId(), name: name || defaultWorksheetName(ws), stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
   return meta.id
 }

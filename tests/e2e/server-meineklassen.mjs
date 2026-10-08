@@ -187,6 +187,12 @@ try {
   const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
   const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
   pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
+  // Bedarfszahl am Fach (08.10.2026): oranges Abzeichen mit Warnzeichen, Erklärung als Bezeichnung des Reiters
+  const mitBedarf = p.locator('[data-fach-leiste] [data-fach]:has([data-bedarf-zahl])').first()
+  if (await mitBedarf.count()) {
+    const bez = (await mitBedarf.getAttribute('aria-label')) ?? ''
+    pruefe(/\d+ Punkte? Handlungsbedarf$/.test(bez), `Bedarfszahl erklärt (${bez})`)
+  }
   // Fach-Reiter (mit Bedarfszahl) zählen nicht
   const reiter = (await p.locator('[data-klasse-detail] [role="tab"]').allInnerTexts()).map((r) => r.trim())
   pruefe(

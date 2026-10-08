@@ -56,6 +56,15 @@ export interface Mappe {
   titel: string
   seiten: MappenSeite[]
 }
+/** Arbeitsblätter einer Unterrichtsreihe (08.10.2026, Plan G.3) – im Register „Materialien" nach Reihe gebündelt */
+export interface ReiheMaterialien {
+  zid: string
+  titel: string
+  fach: string
+  oberthema: string
+  offen: boolean
+  materialien: { schritt: string; titel: string; zweck?: string; gesperrt: boolean; link?: string; stufeWaehlen?: boolean; eingereicht: number; loesung: boolean }[]
+}
 export interface Merkkasten {
   art: 'merkzettel'
   titel: string
@@ -70,6 +79,8 @@ export interface FachOrdner {
   blaetter: BlattEintrag[]
   tests: TestEintrag[]
   aufgaben: AufgabeEintrag[]
+  /** Arbeitsblätter aus Unterrichtsreihen, je Reihe (08.10.2026) */
+  reihen: ReiheMaterialien[]
   /** Nur Konten: Mappen ohne Arbeitsblätter und Schreibaufgaben (die stehen oben schon) */
   mappen: Mappe[]
   merk: Merkkasten[]
@@ -87,6 +98,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
       holen<{ blaetter: BlattEintrag[] }>('/s/api/blaetter').then((d) => d.blaetter ?? [], leer<BlattEintrag>),
       holen<{ tests: TestEintrag[] }>('/s/api/tests').then((d) => d.tests ?? [], leer<TestEintrag>),
       holen<{ aufgaben: AufgabeEintrag[] }>('/s/api/aufgaben').then((d) => d.aufgaben ?? [], leer<AufgabeEintrag>),
+      holen<{ reihen: ReiheMaterialien[] }>('/s/api/reihen/materialien').then((d) => d.reihen ?? [], leer<ReiheMaterialien>),
       holen<{ farben: Record<string, string> }>('/s/api/regal/farben').then(
         (d) => d.farben ?? {},
         () => ({}) as Record<string, string>
@@ -96,7 +108,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
             '/s/api/lernen'
           ).then((d) => d.raeume ?? [], leer<{ fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }>)
         : leer<{ fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }>()
-    ]).then(([vok, gram, blaetter, tests, aufgaben, farben, raeume]) => {
+    ]).then(([vok, gram, blaetter, tests, aufgaben, reihen, farben, raeume]) => {
       const nach = new Map<string, FachOrdner>()
       const o = (f: string | undefined): FachOrdner => {
         const n = fachName(f ?? '')
@@ -110,6 +122,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
             blaetter: [],
             tests: [],
             aufgaben: [],
+            reihen: [],
             mappen: [],
             merk: []
           }
@@ -122,6 +135,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
       for (const b of blaetter) o(b.fach).blaetter.push(b)
       for (const t of tests) o(t.fach).tests.push(t)
       for (const a of aufgaben) o(a.fach).aufgaben.push(a)
+      for (const r of reihen) o(r.fach).reihen.push(r)
       for (const r of raeume) {
         const mappen = r.mappen
           .map((m) => ({ ...m, seiten: m.seiten.filter((s) => s.art !== 'blatt' && s.art !== 'schreiben') }))

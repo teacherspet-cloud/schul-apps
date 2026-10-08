@@ -14,13 +14,15 @@
  */
 import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
-import { json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { imNutzer } from './kontext'
+import { pdfOhneSkripte } from './druck'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { gastEntfernen } from './gaeste'
-import { blattFassung, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
-import { blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
+import { blattFassung, blattFassungen, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
+import { blattFreigabe, blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
 import { vokabelnZuweisen, vokabelStand } from './vokabeln'
 import { PULS_MS } from '../main/services/lanServer'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
@@ -37,9 +39,23 @@ import {
   type Weg,
   alleLernziele,
   ampelAbweichungen,
-  niveauEmpfehlung
+  artVon,
+  niveauEmpfehlung,
+  standFuerLernende,
+  type AbschlussVorschlag
 } from '../shared/reihe'
+import {
+  abschlussVorschlagAnfrage,
+  abschlussVorschlagAus,
+  ohneEigenenNamen,
+  reflexionImpulsAnfrage,
+  reflexionImpulsAus,
+  vorschlagSumme,
+  type AbschlussEingabe
+} from '../shared/reiheKiFeedback'
+import type { StructuredRequest } from '../shared/types'
 import type { BlattAufgabe } from '../shared/blattFreigabe'
+import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type VorschauZustand } from './vorschau'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reihen (
@@ -93,6 +109,12 @@ const db = () => {
     d.exec(
       'CREATE TABLE IF NOT EXISTS reihe_gaeste (zuweisung_id TEXT NOT NULL REFERENCES reihen_zuweisungen(id) ON DELETE CASCADE, nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE, PRIMARY KEY (zuweisung_id, nutzer_id))'
     )
+    // Musterschüler-Vorschau einer noch nicht zugewiesenen Reihe (08.10.2026): unsichtbare Zuweisung, zählt nirgends
+    try {
+      d.exec('ALTER TABLE reihen_zuweisungen ADD COLUMN vorschau INTEGER NOT NULL DEFAULT 0')
+    } catch {
+      /* schon da */
+    }
     bereit = true
   }
   return d
@@ -162,7 +184,12 @@ export interface ZuweisungZeile {
   erstellt: string
   /** QR-Code für Gäste (05.10.2026) */
   code?: string | null
+  /** 1 = Zuweisung nur für den Musterschüler („Als Schüler ansehen", 08.10.2026) – erscheint in keiner Liste */
+  vorschau?: number
 }
+
+/** Klassenname des Vorschaukontos für Reihen, die noch keiner eigenen Lerngruppe zugewiesen sind */
+export const REIHEN_VORSCHAU_KLASSE = 'Unterrichtsreihe'
 
 /**
  * Reihe aus der Datenbank. Platzhalter der KI-Planung (05.10.2026) sind noch leer – für Lernende,
@@ -413,11 +440,229 @@ const standKurz = (s: Stand): Stand => ({ ...s, schritte: Object.fromEntries(Obj
 
 const MAX_DATEI = 12 * 1024 * 1024
 
+/** Fotos einer Abgabe als data:-URLs (höchstens 4) – für die KI */
+function fotosVon(st: SchrittStand): string[] {
+  return (st.dateien ?? [])
+    .filter((d) => d.typ.startsWith('image/'))
+    .slice(0, 4)
+    .flatMap((d) => {
+      const z0 = db().prepare('SELECT typ, daten FROM reihen_dateien WHERE id = ?').get(d.id) as { typ: string; daten: Uint8Array } | undefined
+      return z0 ? [`data:${z0.typ};base64,${Buffer.from(z0.daten).toString('base64')}`] : []
+    })
+}
+
+/** KI-Aufruf im Namen der Lehrkraft der Zuweisung (ihr Zugang und Kontingent; der Namensfilter liegt zentral um `aufruf`) */
+async function alsLehrkraft(z: ZuweisungZeile, aufruf: Aufruf, anfrage: StructuredRequest): Promise<unknown> {
+  const lk = nutzerNachId(z.lehrkraft_id)
+  if (!lk) throw new Error('Die Lehrkraft gibt es nicht mehr.')
+  return imNutzer(alsNutzer(lk), () => aufruf('ai:structured', [anfrage]))
+}
+
+/**
+ * KI-Vorschlag zur Bewertung eines Abschlussprodukts (08.10.2026, Plan E.6): Teilpunkte + Begründung je Kriterium, nur
+ * für die Lehrkraft. Wird gespeichert, solange inzwischen nicht neu abgegeben wurde.
+ */
+async function abschlussVorschlagErzeugen(r: Reihe, z: ZuweisungZeile, s: Schritt, schueler: NutzerInfo, aufruf: Aufruf): Promise<AbschlussVorschlag | null> {
+  if (s.inhalt.art !== 'abschluss') return null
+  const st = standVon(z.id, schueler.id).schritte[s.id]
+  if (!st?.eingereicht) return null
+  const bei = st.eingereicht
+  const text = ohneEigenenNamen(Object.values(st.antworten ?? {}).join('\n\n'), schueler.name)
+  const bilder = fotosVon(st)
+  const eingabe: AbschlussEingabe = {
+    titel: s.titel,
+    anweisung: s.inhalt.anweisung,
+    raster: s.inhalt.raster,
+    lernziele: [...s.lernziele, ...r.lernziele].map((l) => l.text || l.ichKann),
+    fach: r.fachLabel,
+    jahrgang: r.grade,
+    text,
+    bilder,
+    andereDateien: (st.dateien ?? []).filter((d) => !d.typ.startsWith('image/')).length
+  }
+  let v: AbschlussVorschlag
+  if (!text.trim() && !bilder.length) v = { kriterien: [], zeit: Date.now(), fehler: 'Nur Dateien, die die KI nicht ansehen kann – bitte selbst ansehen.' }
+  else
+    try {
+      v = abschlussVorschlagAus(await alsLehrkraft(z, aufruf, abschlussVorschlagAnfrage(eingabe)), eingabe)
+    } catch (e) {
+      v = { kriterien: [], zeit: Date.now(), fehler: e instanceof Error ? e.message : String(e) }
+    }
+  const neu = standVon(z.id, schueler.id)
+  const nst = neu.schritte[s.id]
+  // Inzwischen neu abgegeben oder zurückgesetzt: dieser Vorschlag gilt nicht mehr
+  if (!nst || nst.eingereicht !== bei) return null
+  nst.kiVorschlag = v
+  standSpeichern(z.id, schueler.id, neu)
+  protokolliereServer('reihe', v.fehler ? 'KI-Vorschlag zum Abschlussprodukt nicht möglich' : 'KI-Vorschlag zum Abschlussprodukt erstellt', schueler.id)
+  return v
+}
+
+/** Frage fürs Lerntagebuch – Reflexion oder Selbsteinschätzung als Arbeitsblatt */
+const tagebuchFrage = (s: Schritt): string =>
+  s.inhalt.art === 'reflexion' ? s.inhalt.frage : s.inhalt.art === 'arbeitsblatt' && s.inhalt.zweck === 'reflexion' ? (s.inhalt.frage ?? '') : ''
+
+/** Kurzer KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6) – kein Urteil, keine Note; ohne Namen */
+async function reflexionImpulsErzeugen(r: Reihe, z: ZuweisungZeile, s: Schritt, st: SchrittStand, schueler: NutzerInfo, aufruf: Aufruf): Promise<string> {
+  const ziele = alleLernziele(r)
+  const ampel = Object.entries(st.ampel ?? {}).flatMap(([k, farbe]) => {
+    const z0 = ziele[Number(k)]
+    return z0 ? [{ ziel: z0.ichKann || z0.text, farbe }] : []
+  })
+  const roh = await alsLehrkraft(
+    z,
+    aufruf,
+    reflexionImpulsAnfrage({
+      frage: tagebuchFrage(s) || 'Was hast du gelernt?',
+      tagebuch: ohneEigenenNamen(st.tagebuch ?? '', schueler.name),
+      ampel,
+      fach: r.fachLabel,
+      jahrgang: r.grade
+    })
+  )
+  return reflexionImpulsAus(roh)
+}
+
+/** Ein Arbeitsblatt der Reihe für die Lernenden (Abschnitt „Materialien", 08.10.2026, Plan G.3) */
+export interface MaterialEintrag {
+  schritt: string
+  titel: string
+  zweck?: string
+  gesperrt: boolean
+  /** Link zum Blatt (fehlt: gesperrt oder Stufe noch nicht gewählt – dann über den Schritt) */
+  link?: string
+  /** Niveaustufen: erst im Schritt eine Stufe wählen */
+  stufeWaehlen?: boolean
+  eingereicht: number
+  /** Lösungsblatt vorhanden – sichtbar im Blatt nach dem ersten Einreichen */
+  loesung: boolean
+}
+
+function materialienFuer(r: Reihe, z: ZuweisungZeile, sid: string, stand: Stand, weg: Weg): MaterialEintrag[] {
+  const lage = new Map(weg.schritte.map((l) => [l.id, l]))
+  const ex = externVon(r, z, sid, stand)
+  return r.schritte.flatMap((s): MaterialEintrag[] => {
+    const i = s.inhalt
+    if (i.art !== 'arbeitsblatt' || (!i.html && !i.varianten?.length)) return []
+    const gesperrt = !lage.get(s.id) || lage.get(s.id)!.status === 'gesperrt'
+    // Förderschritte zeigen sich nur, wenn sie gebraucht werden
+    if (s.rolle === 'foerder' && gesperrt) return []
+    const link = gesperrt ? undefined : linkFuer(s, z, stand)
+    const n = stand.schritte[s.id]?.niveau
+    const loesung = Boolean((n !== undefined ? i.varianten?.[n]?.loesung : undefined) ?? i.loesung)
+    return [
+      {
+        schritt: s.id,
+        titel: s.titel || i.titel,
+        ...(i.zweck ? { zweck: i.zweck } : {}),
+        gesperrt,
+        ...(link ? { link } : {}),
+        ...(!gesperrt && !link && (i.varianten?.length ?? 0) > 1 ? { stufeWaehlen: true } : {}),
+        eingereicht: ex[s.id]?.eingereicht ?? 0,
+        loesung
+      }
+    ]
+  })
+}
+
+/** Eine eigene Abgabe in der Reihe mit Rückmeldung („Meine Abgaben", 08.10.2026, Plan G.3) */
+export interface AbgabeEintrag {
+  schritt: string
+  titel: string
+  art: string
+  zeit?: number
+  link?: string
+  eingereicht: number
+  text?: string
+  dateien?: number
+  feedback?: { staerken?: string[]; schritte?: string[] }
+  /** Von der Lehrkraft bestätigte Bewertung */
+  bewertung?: { text: string; geschafft: boolean }
+  tagebuch?: string
+  impuls?: string
+  prozent?: number
+}
+
+function abgabenFuer(r: Reihe, z: ZuweisungZeile, sid: string, stand: Stand): AbgabeEintrag[] {
+  const ex = externVon(r, z, sid, stand)
+  const v = json_(z.verknuepft, {} as Record<string, string>)
+  const letzterBogen = (fid: string | undefined): { feedback?: AbgabeEintrag['feedback']; zeit?: number } => {
+    if (!fid) return {}
+    const f = blattFassungen(fid, sid)
+      .filter((x) => x.bogen)
+      .at(-1)
+    return f?.bogen ? { feedback: { staerken: f.bogen.staerken, schritte: f.bogen.schritte }, zeit: Date.parse(f.zeit) || undefined } : {}
+  }
+  return r.schritte.flatMap((s): AbgabeEintrag[] => {
+    const st = stand.schritte[s.id]
+    const e = ex[s.id]
+    const basis = { schritt: s.id, titel: s.titel, art: s.inhalt.art }
+    const bewertung = st?.bewertung ? { bewertung: { text: st.bewertung.text, geschafft: st.bewertung.geschafft } } : {}
+    const tagebuch = st?.tagebuch?.trim() ? { tagebuch: st.tagebuch } : {}
+    const impuls = st?.impuls ? { impuls: st.impuls.text } : {}
+    switch (s.inhalt.art) {
+      case 'arbeitsblatt': {
+        if (!e?.eingereicht && !st?.eingereicht) return []
+        const id = verknuepfteId(s, z, stand)
+        const b = id ? letzterBogen(blattFreigabe(id)?.rueckmeldung_id) : {}
+        const link = linkFuer(s, z, stand)
+        return [{ ...basis, eingereicht: e?.eingereicht ?? 0, ...b, ...(link ? { link } : {}), ...bewertung, ...tagebuch, ...impuls }]
+      }
+      case 'rueckmeldung': {
+        if (!e?.eingereicht) return []
+        const id = verknuepfteId(s, z, stand)
+        const link = linkFuer(s, z, stand)
+        return [{ ...basis, eingereicht: e.eingereicht, ...letzterBogen(id), ...(link ? { link } : {}), ...bewertung }]
+      }
+      case 'onlinetest': {
+        if (!e?.eingereicht) return []
+        const link = linkFuer(s, z, stand)
+        return [{ ...basis, eingereicht: e.eingereicht, ...(e.prozent !== undefined ? { prozent: e.prozent } : {}), ...(link ? { link } : {}) }]
+      }
+      case 'aufgabe':
+      case 'abschluss':
+      case 'sprechen': {
+        if (!st?.eingereicht) return []
+        const text = Object.values(st.antworten ?? {})
+          .join('\n')
+          .trim()
+          .slice(0, 1200)
+        return [
+          {
+            ...basis,
+            eingereicht: st.eingereicht,
+            ...(st.zeit ? { zeit: st.zeit } : {}),
+            ...(text ? { text } : {}),
+            ...(st.dateien?.length ? { dateien: st.dateien.length } : {}),
+            ...(s.inhalt.art === 'aufgabe' && s.inhalt.feedback ? letzterBogen(v[s.id]) : {}),
+            ...bewertung
+          }
+        ]
+      }
+      case 'reflexion':
+        return st?.eingereicht ? [{ ...basis, eingereicht: st.eingereicht, ...(st.zeit ? { zeit: st.zeit } : {}), ...tagebuch, ...impuls }] : []
+      default:
+        return []
+    }
+  })
+}
+
+const esc = (t: string): string => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+/** Hefter einer Reihe als druckfertiges HTML (PDF über den Server, 08.10.2026 – statt `window.open` am Handy) */
+function hefterHtml(titel: string, eintraege: { titel: string; text: string }[]): string {
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Hefter – ${esc(titel)}</title><style>@page{size:A4;margin:20mm}body{font:12pt/1.5 system-ui,sans-serif;color:#111}h1{font-size:20pt;margin:0 0 12pt}h2{font-size:14pt;margin:18pt 0 4pt;break-after:avoid}p{white-space:pre-wrap;margin:0}</style></head><body><h1>${esc(titel)}</h1>${eintraege.map((h) => `<h2>${esc(h.titel)}</h2><p>${esc(h.text)}</p>`).join('')}</body></html>`
+}
+
 export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promise<boolean> {
   const reiheLink = (code: string): string => `${adresse.replace(/\/$/, '')}/s/rq/${code}`
   return async (k) => {
     const { url, req, res, sitzung } = k
-    const schueler = url.pathname === '/s/api/reihen' || url.pathname === '/s/api/reihe' || url.pathname.startsWith('/s/api/reihe/')
+    const schueler =
+      url.pathname === '/s/api/reihen' ||
+      url.pathname === '/s/api/reihen/materialien' ||
+      url.pathname === '/s/api/reihe' ||
+      url.pathname.startsWith('/s/api/reihe/')
     const lehrer = url.pathname === '/server/reihen' || url.pathname.startsWith('/server/reihen/')
     if (!schueler && !lehrer) return false
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
@@ -477,6 +722,23 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         })
         return (json(res, 200, { reihen }), true)
       }
+      /*
+       * Fachordner (08.10.2026, Plan G.3): je Reihe die Arbeitsblätter für das Register „Materialien" – auch aus
+       * beendeten Reihen (zum Nachlesen), gesperrte ohne Link.
+       */
+      if (req.method === 'GET' && url.pathname === '/s/api/reihen/materialien') {
+        const alle = (db().prepare('SELECT * FROM reihen_zuweisungen ORDER BY erstellt DESC').all() as unknown as ZuweisungZeile[]).filter((z) =>
+          istFuer(z, ich)
+        )
+        const reihen = alle.flatMap((z) => {
+          const r = reiheVon(z.reihe_id)
+          if (!r) return []
+          const stand = standVon(z.id, ich.id)
+          const materialien = materialienFuer(r, z, ich.id, stand, wegVon(r, z, ich.id, stand))
+          return materialien.length ? [{ zid: z.id, titel: r.titel, fach: r.fachLabel, oberthema: r.oberthema, offen: z.status === 'offen', materialien }] : []
+        })
+        return (json(res, 200, { reihen }), true)
+      }
       const zid = req.method === 'GET' ? String(url.searchParams.get('id') ?? '') : String(((await k.koerper()) as Record<string, unknown>).id ?? '')
       const z = zuweisung(zid)
       if (!z || !istFuer(z, ich)) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe ist nicht für dich freigegeben.' }), true)
@@ -496,6 +758,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             titel: r.titel,
             oberthema: r.oberthema,
             fach: r.fachLabel,
+            // Digital: alles am Gerät, geschafft nach Ergebnis (08.10.2026)
+            art: artVon(r),
             lernziele: r.lernziele.map((l) => ({ ichKann: l.ichKann || l.text })),
             schritte: r.schritte.map((s) => ({
               id: s.id,
@@ -521,7 +785,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
                 : {})
             })),
             weg,
-            stand: standKurz(stand),
+            // Ohne den KI-Vorschlag zur Bewertung – Lernende sehen erst die bestätigte Bewertung
+            stand: standKurz(standFuerLernende(stand)),
             hefter: r.schritte
               .filter((s) => s.inhalt.art === 'hefter' && sichtbar(s))
               .map((s) => ({ titel: s.titel, text: (s.inhalt as { text: string }).text }))
@@ -536,6 +801,33 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         if (!d) return (json(res, 404, { fehler: 'Unbekannte Datei.' }), true)
         res.writeHead(200, { 'content-type': d.typ, 'cache-control': 'private, no-store' })
         return (res.end(Buffer.from(d.daten)), true)
+      }
+      // Materialien der Reihe und „Meine Abgaben" (08.10.2026, Plan G.3)
+      if (req.method === 'GET' && url.pathname === '/s/api/reihe/materialien') {
+        const weg = wegVon(r, z, ich.id, stand)
+        return (json(res, 200, { materialien: materialienFuer(r, z, ich.id, stand, weg), abgaben: abgabenFuer(r, z, ich.id, stand) }), true)
+      }
+      // Hefter als PDF (08.10.2026): am Handy statt eines Druckfensters – der Server setzt das Blatt selbst (kein fremdes HTML)
+      if (req.method === 'POST' && url.pathname === '/s/api/reihe/hefter-pdf') {
+        const weg = wegVon(r, z, ich.id, stand)
+        const lage = new Map(weg.schritte.map((l) => [l.id, l]))
+        const eintraege = r.schritte
+          .filter(
+            (s) =>
+              s.inhalt.art === 'hefter' &&
+              lage.get(s.id)?.status !== 'gesperrt' &&
+              (!s.nach || ['geschafft', 'uebersprungen'].includes(lage.get(s.nach)?.status ?? ''))
+          )
+          .map((s) => ({ titel: s.titel, text: (s.inhalt as { text: string }).text }))
+        if (!eintraege.length) return (json(res, 400, { fehler: 'Dein Hefter ist noch leer.' }), true)
+        try {
+          const pdf = await pdfOhneSkripte(hefterHtml(r.titel, eintraege))
+          res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store', 'content-length': pdf.byteLength })
+          res.end(Buffer.from(pdf))
+        } catch (e) {
+          json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
+        }
+        return true
       }
       if (req.method !== 'POST' || url.pathname !== '/s/api/reihe/schritt') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       if (z.status !== 'offen') return (json(res, 409, { fehler: 'Diese Reihe ist abgeschlossen.' }), true)
@@ -644,13 +936,39 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         return (json(res, 200, { prozent: st.diagnose.prozent, bestanden: st.diagnose.prozent >= s.inhalt.schwelle }), true)
       }
       if (aktion === 'abgeben') {
-        if (s.inhalt.art === 'reflexion') {
+        // Selbsteinschätzung – auch neben einem Arbeitsblatt in dieser Rolle (08.10.2026, Plan G.2)
+        if (s.inhalt.art === 'reflexion' || (s.inhalt.art === 'arbeitsblatt' && s.inhalt.zweck === 'reflexion')) {
+          const vorher = st.tagebuch ?? ''
           if (k0.ampel && typeof k0.ampel === 'object') st.ampel = k0.ampel as SchrittStand['ampel']
           if (typeof k0.tagebuch === 'string') st.tagebuch = k0.tagebuch.slice(0, 4000)
           st.eingereicht = (st.eingereicht ?? 0) + 1
           st.zeit = Date.now()
           standSpeichern(z.id, ich.id, stand)
-          return (json(res, 200, { ok: true }), true)
+          /*
+           * KI-Impuls zum Lerntagebuch (Plan E.6): nur bei einem neuen, nicht ganz kurzen Eintrag und höchstens dreimal je
+           * Schritt (Kontingent der Lehrkraft); kein Urteil, keine Note. Ohne Eintrag bleibt es beim schlichten „Fertig".
+           */
+          const eintrag = (st.tagebuch ?? '').trim()
+          if (eintrag.length < 15 || eintrag === vorher.trim() || st.eingereicht > 3) return (json(res, 200, { ok: true, ...(st.impuls ? { impuls: st.impuls.text } : {}) }), true)
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          const puls = setInterval(() => res.write(' '), PULS_MS)
+          res.on('close', () => clearInterval(puls))
+          try {
+            const impuls = await reflexionImpulsErzeugen(r, z, s, st, nutzerNachId(ich.id) ?? ich, aufruf)
+            if (impuls) {
+              const neu = standVon(z.id, ich.id)
+              neu.schritte[s.id] = { ...(neu.schritte[s.id] ?? {}), impuls: { text: impuls, zeit: Date.now() } }
+              standSpeichern(z.id, ich.id, neu)
+              protokolliereServer('reihe', 'KI-Impuls zum Lerntagebuch', ich.id)
+            }
+            res.end(JSON.stringify({ ok: true, ...(impuls ? { impuls } : {}) }))
+          } catch (e) {
+            // Ohne Impuls ist die Selbsteinschätzung trotzdem abgegeben
+            res.end(JSON.stringify({ ok: true, impulsFehler: e instanceof Error ? e.message : String(e) }))
+          } finally {
+            clearInterval(puls)
+          }
+          return true
         }
         if (s.inhalt.art !== 'aufgabe' && s.inhalt.art !== 'abschluss' && s.inhalt.art !== 'sprechen')
           return (json(res, 400, { fehler: 'Dieser Schritt wird anders erledigt.' }), true)
@@ -662,9 +980,34 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           return (json(res, 409, { fehler: 'Du hast diese Aufgabe schon dreimal eingereicht.' }), true)
         st.eingereicht = (st.eingereicht ?? 0) + 1
         st.zeit = Date.now()
-        // Neu eingereicht: alte Bewertung der Lehrkraft gilt nicht mehr
+        // Neu eingereicht: alte Bewertung der Lehrkraft und alter KI-Vorschlag gelten nicht mehr
         delete st.bewertung
+        delete st.kiVorschlag
         standSpeichern(z.id, ich.id, stand)
+        /*
+         * Abschlussprodukt (08.10.2026, Plan E.6): KI-Vorschlag nach dem Raster für die Lehrkraft. Digital entscheidet er über
+         * „geschafft" – dort wartet die Abgabe darauf (die Lernenden sehen nur das Ergebnis, nicht die Punkte); gemischt
+         * entsteht er im Hintergrund, die Lehrkraft bestätigt wie bisher.
+         */
+        if (s.inhalt.art === 'abschluss') {
+          const person = nutzerNachId(ich.id) ?? ich
+          if (artVon(r) !== 'digital') {
+            void abschlussVorschlagErzeugen(r, z, s, person, aufruf).catch(() => undefined)
+            return (json(res, 200, { ok: true }), true)
+          }
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          const puls = setInterval(() => res.write(' '), PULS_MS)
+          res.on('close', () => clearInterval(puls))
+          try {
+            const v = await abschlussVorschlagErzeugen(r, z, s, person, aufruf)
+            res.end(JSON.stringify({ ok: true, geprueft: Boolean(v && !v.fehler) }))
+          } catch {
+            res.end(JSON.stringify({ ok: true, geprueft: false }))
+          } finally {
+            clearInterval(puls)
+          }
+          return true
+        }
         const fid = json_(z.verknuepft, {} as Record<string, string>)[s.id]
         if (s.inhalt.art !== 'aufgabe' || !s.inhalt.feedback || !fid) return (json(res, 200, { ok: true }), true)
         // Zwischenaufgabe mit KI-Feedback (Bogen wie in der Rückmeldungs-App)
@@ -672,13 +1015,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         const abgabeText = fragen.length
           ? fragen.map((f, i) => `${i + 1}. ${f}\n${st.antworten?.[String(i)] ?? ''}`).join('\n\n')
           : (st.antworten?.['0'] ?? text)
-        const bilder = (st.dateien ?? [])
-          .filter((d) => d.typ.startsWith('image/'))
-          .slice(0, 4)
-          .flatMap((d) => {
-            const z0 = db().prepare('SELECT typ, daten FROM reihen_dateien WHERE id = ?').get(d.id) as { typ: string; daten: Uint8Array } | undefined
-            return z0 ? [`data:${z0.typ};base64,${Buffer.from(z0.daten).toString('base64')}`] : []
-          })
+        const bilder = fotosVon(st)
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
         const puls = setInterval(() => res.write(' '), PULS_MS)
         res.on('close', () => clearInterval(puls))
@@ -716,7 +1053,9 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         json(res, 200, {
           reihen: liste.map((x) => {
             const r = json_(x.daten, {} as Reihe)
-            const zw = db().prepare('SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? ORDER BY erstellt').all(x.id) as unknown as ZuweisungZeile[]
+            const zw = db()
+              .prepare('SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND COALESCE(vorschau, 0) = 0 ORDER BY erstellt')
+              .all(x.id) as unknown as ZuweisungZeile[]
             return {
               id: x.id,
               titel: r.titel,
@@ -749,7 +1088,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
      */
     if (req.method === 'GET' && teile[0] === 'laufend') {
       const alle = db()
-        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' AND COALESCE(vorschau, 0) = 0 ORDER BY erstellt DESC")
         .all(ich.id) as unknown as ZuweisungZeile[]
       const reihen = alle.flatMap((z) => {
         const r = reiheVon(z.reihe_id)
@@ -785,7 +1124,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
     // Korrektur-Eingang über alle Reihen (03.10.2026, Idee aus LearningView)
     if (req.method === 'GET' && teile[0] === 'eingang') {
       const alle = db()
-        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' AND COALESCE(vorschau, 0) = 0 ORDER BY erstellt DESC")
         .all(ich.id) as unknown as ZuweisungZeile[]
       const eintraege = alle.flatMap((z) => {
         const r = reiheVon(z.reihe_id)
@@ -805,7 +1144,17 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       const alt = r.id ? reiheVon(r.id, true) : null
       if (alt && alt.lehrkraftId !== ich.id) return (json(res, 403, { fehler: 'Diese Reihe gehört einer anderen Lehrkraft.' }), true)
       const id = alt ? alt.id : neueId()
-      const neu = { ...r, id, geaendert: jetzt }
+      /*
+       * Reihenart (08.10.2026, Plan E): Unbekanntes fällt weg (= gemischt). Eine zugewiesene Reihe kann keine Planungsreihe
+       * werden – sonst fänden Lernende ihre Reihe ohne Schritte bzw. nur mit Phasen der Lehrkraft.
+       */
+      const art = r.art === 'digital' || r.art === 'gemischt' || r.art === 'planung' ? r.art : undefined
+      if (art === 'planung' && alt) {
+        const n = (db().prepare('SELECT COUNT(*) AS n FROM reihen_zuweisungen WHERE reihe_id = ? AND COALESCE(vorschau, 0) = 0').get(id) as { n: number }).n
+        if (n > 0) return (json(res, 409, { fehler: 'Die Reihe ist zugewiesen – eine zugewiesene Reihe kann keine Planungsreihe werden.' }), true)
+      }
+      const { art: _art, ...ohneArt } = r
+      const neu = { ...ohneArt, ...(art ? { art } : {}), id, geaendert: jetzt }
       if (alt) db().prepare('UPDATE reihen SET titel = ?, daten = ?, geaendert = ? WHERE id = ?').run(r.titel.slice(0, 200), JSON.stringify(neu), jetzt, id)
       else
         db()
@@ -960,6 +1309,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       return (json(res, 200, { reihe: rein }), true)
     }
     if (req.method === 'POST' && teile[1] === 'zuweisen') {
+      // Planungsreihe (08.10.2026, Plan E4): nur für die Lehrkraft – wird nicht zugewiesen
+      if (r.art === 'planung') return (json(res, 400, { fehler: 'Eine Planungsreihe wird nicht zugewiesen – erst die Art auf „Digital“ oder „Gemischt“ ändern.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       const gid = String(k0.lerngruppeId ?? '')
       const g = gid ? lerngruppe(gid) : null
@@ -981,6 +1332,56 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       verknuepfe(zuweisung(id)!, r)
       protokolliereServer('reihe', 'Unterrichtsreihe zugewiesen', ich.id)
       return (json(res, 200, { id, ...(code ? { code, link: reiheLink(code) } : {}) }), true)
+    }
+    /*
+     * „Als Schüler ansehen" (08.10.2026, Plan G.1): die echte Schülerseite als Musterschüler (server/vorschau.ts). Ist die
+     * Reihe schon einer eigenen Lerngruppe (ganz) zugewiesen, nimmt sie den Musterschüler dieser Klasse; sonst ein eigenes
+     * Vorschaukonto „Unterrichtsreihe" mit einer unsichtbaren Zuweisung (vorschau = 1) – sie erscheint in keiner Liste,
+     * keinem Handlungsbedarf und keiner Auswertung. Platzhalter sieht der Musterschüler wie Lernende nicht.
+     */
+    if (req.method === 'POST' && teile[1] === 'vorschau') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const zustand = ZUSTAENDE.includes(k0.zustand as VorschauZustand) ? (k0.zustand as VorschauZustand) : null
+      const offene = db()
+        .prepare("SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND status = 'offen' AND COALESCE(vorschau, 0) = 0 AND lerngruppe_id != '' ORDER BY erstellt DESC")
+        .all(r.id) as unknown as ZuweisungZeile[]
+      const klassenZuweisung = offene.find((z) => {
+        const g = lerngruppe(z.lerngruppe_id)
+        return g && g.lehrkraft_id === ich.id && !json_(z.schueler, [] as string[]).length
+      })
+      const g = klassenZuweisung ? lerngruppe(klassenZuweisung.lerngruppe_id) : null
+      const konto = vorschauKonto(ich.id, g ? g.name : REIHEN_VORSCHAU_KLASSE)
+      let z = klassenZuweisung ?? null
+      if (!z) {
+        z = (db().prepare('SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND vorschau = 1').get(r.id) as ZuweisungZeile | undefined) ?? null
+        if (z && !json_(z.schueler, [] as string[]).includes(konto.benutzer)) {
+          // Vorschaukonto neu angelegt (z. B. nach dem Löschen) – alte Vorschau-Zuweisung verwerfen
+          db().prepare('DELETE FROM reihen_zuweisungen WHERE id = ?').run(z.id)
+          z = null
+        }
+        if (!z) {
+          const id = neueId()
+          db()
+            .prepare(
+              'INSERT INTO reihen_zuweisungen (id, reihe_id, lehrkraft_id, lerngruppe_id, schueler, halte_frei, verknuepft, status, erstellt, code, vorschau) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)'
+            )
+            .run(id, r.id, ich.id, '', JSON.stringify([konto.benutzer]), '[]', '{}', 'offen', new Date().toISOString(), null)
+          z = zuweisung(id)!
+        }
+        // Immer der jetzige Stand der Reihe (neue Schritte verknüpfen; Haltepunkte bleiben wie bei Lernenden)
+        verknuepfe(z, reiheVon(r.id)!)
+      }
+      if (zustand) vorschauAufsetzen(konto, zustand)
+      const schluessel = vorschauSchluessel(konto.id, ich.id)
+      protokolliereServer('vorschau', `Reihe als Musterschüler geöffnet (${g ? 'Klasse' : 'ohne Zuweisung'})`, ich.id)
+      return (
+        json(res, 200, {
+          schluessel,
+          adresse: `/vorschau?vs=${encodeURIComponent(schluessel)}&ziel=${encodeURIComponent(`/s/r/${z.id}`)}`,
+          klasse: g ? g.name.trim() : REIHEN_VORSCHAU_KLASSE
+        }),
+        true
+      )
     }
     if (req.method === 'POST' && teile[1] === 'loeschen') {
       db().prepare('DELETE FROM reihen WHERE id = ?').run(r.id)
@@ -1043,13 +1444,33 @@ export function bedarfFuer(
   verknuepfe(z, r)
   const halteFrei = json_(z.halte_frei, [] as string[])
   const bedarf: Bedarf[] = []
+  const digital = artVon(r) === 'digital'
   const lernende = lernendeVon(z).map((n) => {
     const stand = standVon(z.id, n.id)
     const weg = wegVon(r, z, n.id, stand)
     for (const l of weg.schritte) {
       const s = r.schritte.find((x) => x.id === l.id)!
+      // KI-Vorschlag zum Abschlussprodukt (08.10.2026, Plan E.6): Summe gleich im Eingang
+      const vorschlag = stand.schritte[s.id]?.kiVorschlag
+      const summe = vorschlag && !vorschlag.fehler && vorschlag.kriterien.length ? vorschlagSumme(vorschlag) : null
+      const vorschlagText = summe ? ` · KI-Vorschlag: ${summe.punkte} von ${summe.max} Punkten` : ''
       if (l.wartet && l.status === 'eingereicht')
-        bedarf.push({ art: 'bewerten', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: eingereicht – bitte ansehen und bestätigen` })
+        bedarf.push({
+          art: 'bewerten',
+          schueler: n.id,
+          name: n.name,
+          schritt: s.id,
+          text: `${s.titel}: eingereicht – bitte ansehen und bestätigen${vorschlagText}`
+        })
+      // Digital geschafft nach dem KI-Vorschlag: Die Bewertung bestätigt die Lehrkraft bei Gelegenheit (sehen die Lernenden erst dann)
+      else if (digital && summe && s.inhalt.art === 'abschluss' && !stand.schritte[s.id]?.bewertung)
+        bedarf.push({
+          art: 'vorschlag',
+          schueler: n.id,
+          name: n.name,
+          schritt: s.id,
+          text: `${s.titel}: KI-Vorschlag zur Bewertung bereit (${summe.punkte} von ${summe.max} Punkten) – bei Gelegenheit bestätigen`
+        })
       if (s.inhalt.art === 'praesenz' && l.status === 'offen')
         bedarf.push({ art: 'praesenz', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: im Unterricht abhaken` })
       if (l.status === 'nicht_geschafft' && !r.schritte.some((f) => f.rolle === 'foerder' && f.foerderFuer === s.id))

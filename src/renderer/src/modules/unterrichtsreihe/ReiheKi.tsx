@@ -29,12 +29,11 @@ import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigatio
 import { useEffect, useState } from 'react'
 import { SCHRITT_ARTEN, STUNDEN_MINUTEN, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { direktErzeugbar, erzeugeSchrittInhalt, materialKandidaten, type MaterialKandidat, type ReihenPlan } from './reihePlanungKi'
+import { direktErzeugbar, materialKandidaten, type MaterialKandidat, type ReihenPlan } from './reihePlanungKi'
 import { starteReihenPlanung, usePlaene, usePlantGerade, type PlanErgebnis } from './planungAuftrag'
-import { erzeugeBlattFuerPlatzhalter, useErzeugtGerade } from './platzhalterAuftrag'
+import { erzeugeFuerPlatzhalter, useErzeugtGerade } from './platzhalterAuftrag'
+import { KiEntwurfMarke, SchrittKiStatus } from './SchrittStatus'
 import { reiheAusgeben, schrittAusgeben, type DruckArt } from './reiheDruck'
-
-const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
 const stundenName = (a: StundenArt): string => (a === 'doppel' ? 'Doppelstunde' : 'Einzelstunde')
 
@@ -49,7 +48,7 @@ export function StundenLeiste({
   setze,
   liste
 }: {
-  reihe: Pick<Reihe, 'stunden' | 'schritte'>
+  reihe: Pick<Reihe, 'stunden' | 'schritte'> & Pick<Partial<Reihe>, 'verlauf'>
   setze: (p: StundenPatch) => void
   liste?: boolean
 }): React.JSX.Element {
@@ -60,10 +59,14 @@ export function StundenLeiste({
   /** Leere Stunden gleich entfernen, belegte erst nach Rückfrage */
   const entfernen = (i: number): void => {
     const n = schritteInStunde(reihe, i)
+    // Planungsreihe (08.10.2026): Der Verlauf der Stunde entfällt mit ihr
+    const phasen = reihe.verlauf?.[String(i)]?.phasen.length ?? 0
     if (
-      n &&
+      (n || phasen) &&
       !window.confirm(
-        `In der ${i + 1}. Stunde ${n === 1 ? 'liegt ein Schritt' : `liegen ${n} Schritte`}. Stunde trotzdem entfernen? Die Schritte bleiben erhalten, nur ohne Stundenangabe.`
+        n
+          ? `In der ${i + 1}. Stunde ${n === 1 ? 'liegt ein Schritt' : `liegen ${n} Schritte`}${phasen ? ' und ihr Verlauf' : ''}. Stunde trotzdem entfernen? Die Schritte bleiben erhalten, nur ohne Stundenangabe.`
+          : `Die ${i + 1}. Stunde hat einen Verlauf (${phasen} Phasen). Stunde samt Verlauf entfernen?`
       )
     )
       return
@@ -447,22 +450,37 @@ function PlanZeile({ s }: { s: Schritt }): React.JSX.Element {
   )
 }
 
-/** Knopf am Platzhalter: Arbeitsblatt im Hintergrund, alles andere direkt */
+/**
+ * Knopf am Platzhalter (08.10.2026: alle Schrittarten als Auftrag im Hintergrund) mit dem Stand der KI-Erstellung:
+ * Solange für den Schritt ein Auftrag in der Leiste steht, zeigt die Plakette „Wartet – Platz 2", „Entsteht: …",
+ * „Fertig – ansehen" usw. (SchrittStatus.tsx) statt eines Drehkreises; dazu die Marke „KI-Entwurf".
+ */
 export function PlatzhalterKnopf({
   reihe,
   s,
   setze,
-  speichernVorher
+  speichernVorher,
+  ansehen
 }: {
   reihe: Reihe
   s: Schritt
   setze: (patch: Partial<Schritt>) => void
   /** Die Reihe muss für den Hintergrund-Auftrag gespeichert sein */
   speichernVorher: () => Promise<Reihe | null>
+  /** „Fertig – ansehen" bei Schritten ohne Arbeitsblatt (z. B. Bearbeiten-Fenster öffnen) */
+  ansehen?: (s: Schritt) => void
 }): React.JSX.Element | null {
-  const [laeuft, setLaeuft] = useState(false)
+  const [startet, setStartet] = useState(false)
   const imHintergrund = useErzeugtGerade(reihe.id, s.id)
-  if (!s.platzhalter) return null
+  const status = <SchrittKiStatus reihe={reihe} s={s} setze={setze} ansehen={ansehen} />
+  const marke = <KiEntwurfMarke s={s} setze={setze} />
+  if (!s.platzhalter || imHintergrund)
+    return (
+      <>
+        {status}
+        {marke}
+      </>
+    )
   // Test aus der Reihe (06.10.2026): entsteht im Test-Programm – dorthin springen
   if (s.test) {
     const ziel = s.test
@@ -486,42 +504,36 @@ export function PlatzhalterKnopf({
   const art = s.inhalt.art
   const geht = art === 'arbeitsblatt' || direktErzeugbar(art)
   return (
-    <Tooltip label={s.platzhalter.beschreibung} multiline w={320}>
-      <Button
-        size="compact-xs"
-        variant="light"
-        color="grape"
-        leftSection={<IconSparkles size={13} />}
-        loading={laeuft || imHintergrund}
-        disabled={!geht}
-        onClick={async (e) => {
-          e.stopPropagation()
-          if (art === 'arbeitsblatt') {
-            const r = await speichernVorher()
-            if (!r) return
+    <>
+      {/* Nach Fehler oder Abbruch steht der Stand noch daneben */}
+      {status}
+      <Tooltip label={s.platzhalter.beschreibung} multiline w={320}>
+        <Button
+          size="compact-xs"
+          variant="light"
+          color="grape"
+          leftSection={<IconSparkles size={13} />}
+          loading={startet}
+          disabled={!geht}
+          onClick={async (e) => {
+            e.stopPropagation()
+            setStartet(true)
             try {
-              erzeugeBlattFuerPlatzhalter(r, s)
-              notifySuccess('Das Arbeitsblatt entsteht im Hintergrund – Fortschritt in der Auftragsleiste.')
+              const r = await speichernVorher()
+              if (!r) return
+              erzeugeFuerPlatzhalter(r, r.schritte.find((x) => x.id === s.id) ?? s)
             } catch (x) {
               notifyError(x)
+            } finally {
+              setStartet(false)
             }
-            return
-          }
-          setLaeuft(true)
-          try {
-            const inhalt = await erzeugeSchrittInhalt(reihe, s, ki)
-            setze({ inhalt, platzhalter: undefined })
-          } catch (x) {
-            notifyError(x, 'Nicht erstellt')
-          } finally {
-            setLaeuft(false)
-          }
-        }}
-        data-platzhalter-erstellen
-      >
-        Mit KI erstellen
-      </Button>
-    </Tooltip>
+          }}
+          data-platzhalter-erstellen
+        >
+          Mit KI erstellen
+        </Button>
+      </Tooltip>
+    </>
   )
 }
 

@@ -106,6 +106,17 @@ export type SchrittInhalt =
         loesung?: string
         merk?: { titel: string; text: string }[]
       }[]
+      /**
+       * Rolle des Blatts (08.10.2026, Plan G.2 „Jeder lernende Schritt ist ein vollwertiges Arbeitsblatt"): Aus einer
+       * Zwischenaufgabe, einem Abschlussprodukt, einer Selbsteinschätzung oder einer Einführung entstanden – das Blatt
+       * behält deren Rolle: `abschluss` mit Bewertungsraster (`raster`, Erwartungshorizont des Blatts), `reflexion` mit
+       * Ich-kann-Ampel und Lerntagebuch (`frage`), `einfuehrung` erklärt (Merkkasten + Beispiel) und übt an.
+       */
+      zweck?: BlattZweck
+      /** Reflexion: Frage fürs Lerntagebuch neben dem Blatt */
+      frage?: string
+      /** Abschluss: Bewertungsraster (Kriterien) */
+      raster?: string[]
     }
   | { art: 'rueckmeldung'; vorlage: unknown; runden: number }
   | {
@@ -192,6 +203,68 @@ export interface Schritt {
   begruendung?: string
   /** Test aus der Reihe (06.10.2026): Herkunft in der Ablage – Klassenarbeit, Lernzielkontrolle, Vokabeltest */
   test?: { modul: 'klassenarbeit' | 'lernzielkontrolle' | 'vokabeltest'; docId: string }
+  /**
+   * Marke „KI-Entwurf" (08.10.2026): Die KI hat den Inhalt erzeugt, die Lehrkraft hat ihn noch nicht geöffnet bzw. als
+   * „Geprüft" bestätigt. Beim Zuweisen nennt der Editor, wie viele Entwürfe die Reihe noch enthält (`entwuerfeIn`).
+   */
+  kiEntwurf?: boolean
+  /**
+   * Grundlage der KI (08.10.2026, „Was benutzt die KI?"): vor dem Erstellen abgewählte Eingaben
+   * (Kennungen aus `unterrichtsreihe/grundlage.ts`, z. B. 'kc', 'lernziele', 'minuten', 'davor', 'funktion'); fehlt = alles.
+   */
+  grundlageAus?: string[]
+  /** Vorgaben für die KI-Erstellung (08.10.2026, Expertenmodus): Anspruch und – nur Arbeitsblatt – Zahl der Niveaustufen */
+  kiVorgabe?: {
+    niveau?: 'grundlegend' | 'mittel' | 'anspruchsvoll'
+    stufen?: 1 | 2 | 3
+    /**
+     * Als vollwertiges Arbeitsblatt erstellen (08.10.2026, Plan G.2) – in gemischten Reihen wählbar für Zwischenaufgabe,
+     * Abschlussprodukt und Selbsteinschätzung; in digitalen Reihen immer (`blattZweckFuer`).
+     */
+    alsBlatt?: boolean
+  }
+  /**
+   * „Bitte ersetzen" (08.10.2026, Wechsel Planung → digital): aus einer Unterrichtsphase ohne Material entstanden – der
+   * Platzhalter muss noch zu einer Aufgabe am Gerät werden. Entfällt beim Bearbeiten bzw. Erstellen.
+   */
+  ersetzen?: boolean
+}
+
+/** Wie viele Schritte noch ungeprüfte KI-Entwürfe sind (Platzhalter zählen nicht – die sind noch leer) */
+export const entwuerfeIn = (r: Pick<Reihe, 'schritte'>): number => r.schritte.filter((s) => s.kiEntwurf && !s.platzhalter).length
+
+/**
+ * Name eines in der Reihe erzeugten Materials in der Bibliothek (08.10.2026): „<Reihe> – <Schritt>" – so ist es in
+ * „Meine Arbeitsblätter" wiederzufinden. Fehlt eines, steht das andere allein; doppelte Namen nur einmal.
+ */
+export function materialName(reiheTitel: string, schrittTitel: string): string {
+  const r = reiheTitel.trim()
+  const s = schrittTitel.trim()
+  if (!r) return s || 'Arbeitsblatt'
+  if (!s || s.toLocaleLowerCase('de') === r.toLocaleLowerCase('de')) return r
+  return `${r} – ${s}`.slice(0, 200)
+}
+
+/** Ein mit einem Schritt verknüpftes Dokument der Ablage (Arbeitsblatt oder Test) */
+export interface ReiheMaterial {
+  schrittId: string
+  schrittTitel: string
+  art: 'arbeitsblatt' | 'test'
+  moduleId: string
+  docId: string
+  /** Anzeigename (Titel des Blatts bzw. des Schritts) */
+  titel: string
+}
+
+/** Alle verknüpften Arbeitsblätter und Tests der Reihe in der Reihenfolge der Schritte (08.10.2026, „Materialien der Reihe") */
+export function materialienDerReihe(r: Pick<Reihe, 'schritte'>): ReiheMaterial[] {
+  const liste: ReiheMaterial[] = []
+  for (const s of r.schritte) {
+    if (s.inhalt.art === 'arbeitsblatt' && s.inhalt.quelle)
+      liste.push({ schrittId: s.id, schrittTitel: s.titel, art: 'arbeitsblatt', moduleId: 'arbeitsblatt', docId: s.inhalt.quelle, titel: s.inhalt.titel || s.titel })
+    if (s.test) liste.push({ schrittId: s.id, schrittTitel: s.titel, art: 'test', moduleId: s.test.modul, docId: s.test.docId, titel: s.titel })
+  }
+  return liste
 }
 
 /** Wörtlich übernommener Buchabschnitt (Abschrift) oder Bildausschnitt aus dem Scan – immer mit Quelle */
@@ -205,6 +278,62 @@ export interface BuchUebernahme {
 
 export type StundenArt = 'einzel' | 'doppel'
 export const STUNDEN_MINUTEN: Record<StundenArt, number> = { einzel: 45, doppel: 90 }
+
+/**
+ * Reihenarten (08.10.2026, Plan „Unterrichtsreihe" E, abgestimmt):
+ *  - digital: Lernende bearbeiten alles am Gerät (PC, Tablet, Handy) mit KI-Feedback – keine Präsenzschritte;
+ *  - gemischt: Gerät und Unterrichtsphasen (wie bisher; Altbestand ohne Angabe);
+ *  - planung: reine Planungsreihe für die Lehrkraft – je Stunde ein Stundenverlauf, kein Zuweisen, keine Schüleransicht.
+ */
+export type ReiheArt = 'digital' | 'gemischt' | 'planung'
+
+export const REIHEN_ARTEN: { id: ReiheArt; label: string; kurz: string; text: string }[] = [
+  {
+    id: 'digital',
+    label: 'Digital',
+    kurz: 'am Gerät',
+    text: 'Lernende bearbeiten alles selbstständig am PC, Tablet oder Handy – mit KI-Feedback. Keine Präsenzphasen.'
+  },
+  {
+    id: 'gemischt',
+    label: 'Gemischt',
+    kurz: 'Gerät + Unterricht',
+    text: 'Lernpfad am Gerät und Phasen im Unterricht (Gespräch, Experiment, Vortrag), die du abhakst.'
+  },
+  {
+    id: 'planung',
+    label: 'Planung',
+    kurz: 'nur für dich',
+    text: 'Deine Unterrichtsplanung: je Stunde ein Verlauf mit Phasen, Material und Hausaufgabe – als Word/PDF. Wird nicht zugewiesen.'
+  }
+]
+
+/** Art der Reihe (Altbestand und Unbekanntes = gemischt) */
+export const artVon = (r: Pick<Reihe, 'art'>): ReiheArt => (r.art === 'digital' || r.art === 'planung' ? r.art : 'gemischt')
+
+/** Eine Phase im Stundenverlauf einer Planungsreihe – Felder wie `VerlaufsPhase` (renderer/shared/stundenverlauf) */
+export interface ReihenPhase {
+  id: string
+  /** Einstieg, Erarbeitung, Sicherung, Transfer … */
+  phase: string
+  minuten: number
+  /** Geplantes Geschehen (Stichpunkte mit „ · " getrennt) */
+  geschehen: string
+  sozialform: string
+  medien: string
+  /** Verknüpfte Schritte/Materialien der Reihe (Kennungen) */
+  schritte?: string[]
+}
+
+/** Verlauf einer Stunde der Planungsreihe */
+export interface StundenPlanung {
+  /** Stundenziel in einem Satz */
+  ziel?: string
+  phasen: ReihenPhase[]
+  hausaufgabe?: string
+  /** Didaktischer Kommentar der KI bzw. der Lehrkraft */
+  hinweise?: string
+}
 
 export interface Reihe {
   id: string
@@ -231,6 +360,15 @@ export interface Reihe {
    * (fehlt/0 = keine nötig; mehr als vorhanden zählt nur bis zur vorhandenen Zahl)
    */
   optionalMindestens?: number
+  /** Hinweis der KI-Planung für die Lehrkraft (08.10.2026) – abrufbar über das Infosymbol am Kopf der Reihe */
+  planHinweis?: string
+  /** Reihenart (08.10.2026) – fehlt = 'gemischt' (`artVon`) */
+  art?: ReiheArt
+  /**
+   * Stundenverläufe der Planungsreihe (08.10.2026): Schlüssel = Index der Stunde in `stunden` als Text. Wandert beim
+   * Verschieben/Entfernen von Stunden mit (unterrichtsreihe/stundenRaster.ts).
+   */
+  verlauf?: Record<string, StundenPlanung>
 }
 
 /** Teile der Reihe: die angelegten, dazu die nur an Schritten genannten */
@@ -265,6 +403,31 @@ export interface SchrittStand {
   ueberarbeiten?: { text: string; zeit: number; bei: number }
   /** Gewählte Niveaustufe (Index der Variante), z. B. 0 = Basis */
   niveau?: number
+  /**
+   * KI-Vorschlag zur Bewertung eines Abschlussprodukts (08.10.2026, Plan E.6): Teilpunkte und Begründung je Kriterium
+   * des Rasters – NUR für die Lehrkraft (Lernende sehen erst die bestätigte Bewertung, `standFuerLernende`). In digitalen
+   * Reihen entscheidet er über „geschafft" (Einschätzungen wie beim KI-Bogen). `fehler`: Die KI konnte nicht prüfen.
+   */
+  kiVorschlag?: AbschlussVorschlag
+  /** Kurzer, freundlicher KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6) – keine Bewertung, keine Note */
+  impuls?: { text: string; zeit: number }
+}
+
+/** Ein Kriterium im KI-Vorschlag zum Abschlussprodukt */
+export interface VorschlagKriterium {
+  kriterium: string
+  punkte: number
+  max: number
+  einschaetzung: 'sicher' | 'teilweise' | 'noch nicht'
+  begruendung: string
+}
+
+export interface AbschlussVorschlag {
+  kriterien: VorschlagKriterium[]
+  /** Kurzer Gesamteindruck für die Lehrkraft */
+  gesamt?: string
+  zeit: number
+  fehler?: string
 }
 
 /** Frage einer/eines Lernenden an einen Schritt („Haftnotiz") und die Antwort der Lehrkraft */
@@ -322,9 +485,11 @@ const RANG: Record<string, number> = { 'noch nicht': 0, teilweise: 1, sicher: 2 
 export function einzelStatus(
   s: Schritt,
   st: SchrittStand | undefined,
-  ex: Extern | undefined
+  ex: Extern | undefined,
+  reiheArt: ReiheArt = 'gemischt'
 ): { status: Exclude<Status, 'gesperrt' | 'uebersprungen'>; wartet?: boolean } {
   if (st?.hand === 'geschafft') return { status: 'geschafft' }
+  const digital = reiheArt === 'digital'
   // Zur Überarbeitung zurückgeschickt: offen, bis neu eingereicht ist
   if (st?.ueberarbeiten) {
     const jetztEingereicht = ['arbeitsblatt', 'rueckmeldung', 'onlinetest', 'vokabeln'].includes(s.inhalt.art) ? (ex?.eingereicht ?? 0) : (st.eingereicht ?? 0)
@@ -344,13 +509,20 @@ export function einzelStatus(
     case 'diagnose':
       return st?.diagnose ? { status: 'geschafft' } : { status: 'offen' }
   }
+  // Selbsteinschätzung als Arbeitsblatt (08.10.2026): wie die Reflexion nie bewertet – Blatt eingereicht oder Ampel abgegeben
+  if (s.inhalt.art === 'arbeitsblatt' && s.inhalt.zweck === 'reflexion')
+    return eingereicht || st?.eingereicht ? { status: 'geschafft' } : { status: 'offen' }
   if (!eingereicht) return { status: 'offen' }
-  const e = s.erfolg
+  // Digitale Reihe (08.10.2026, Plan G.5): Die Lehrkraft greift nur bei Bedarf ein – ihre Bewertung gilt dann aber immer
+  if (digital && st?.bewertung) return { status: st.bewertung.geschafft ? 'geschafft' : 'nicht_geschafft' }
+  const e = wirksamerErfolg(s, reiheArt)
   if (e.art === 'abgabe') return { status: 'geschafft' }
-  if (e.art === 'lehrkraft' || s.inhalt.art === 'abschluss' || s.inhalt.art === 'sprechen') {
+  if (e.art === 'lehrkraft' || (!digital && (s.inhalt.art === 'abschluss' || s.inhalt.art === 'sprechen'))) {
     if (st?.bewertung) return { status: st.bewertung.geschafft ? 'geschafft' : 'nicht_geschafft' }
     return { status: 'eingereicht', wartet: true }
   }
+  // Abschlussprodukt (digital): Konnte die KI nicht prüfen, sieht es sich die Lehrkraft an
+  if (s.inhalt.art === 'abschluss' && st?.kiVorschlag?.fehler) return { status: 'eingereicht', wartet: true }
   const runden = verknuepft ? (ex?.runden ?? 1) : 2
   if (e.art === 'punkte') {
     const p = ex?.prozent
@@ -358,7 +530,11 @@ export function einzelStatus(
     return p >= e.prozent ? { status: 'geschafft' } : { status: eingereicht >= runden ? 'nicht_geschafft' : 'offen' }
   }
   // KI: alle Kriterien des letzten Bogens mindestens auf der Schwelle
-  const krit = verknuepft ? ex?.kriterien : st?.ki?.einschaetzungen
+  const krit = verknuepft
+    ? ex?.kriterien
+    : s.inhalt.art === 'abschluss'
+      ? st?.kiVorschlag?.kriterien.map((k) => k.einschaetzung)
+      : st?.ki?.einschaetzungen
   if (!krit) return { status: 'eingereicht' }
   const ok = krit.length > 0 && krit.every((k) => (RANG[k] ?? 0) >= RANG[e.schwelle])
   if (ok) return { status: 'geschafft' }
@@ -377,7 +553,8 @@ export function berechneWeg(r: Reihe, stand: Stand, extern: Record<string, Exter
     }
   let blockiert: string | null = null
   const wahlStand = new Map<string, number>()
-  const einzeln = new Map(r.schritte.map((s) => [s.id, einzelStatus(s, stand.schritte[s.id], extern[s.id])]))
+  const reiheArt = artVon(r)
+  const einzeln = new Map(r.schritte.map((s) => [s.id, einzelStatus(s, stand.schritte[s.id], extern[s.id], reiheArt)]))
 
   r.schritte.forEach((s, i) => {
     const st = stand.schritte[s.id]
@@ -474,7 +651,15 @@ export function diagnoseProzent(fragen: DiagnoseFrage[], antworten: Record<strin
 export function inhaltFuerLernende(i: SchrittInhalt): Record<string, unknown> {
   switch (i.art) {
     case 'arbeitsblatt':
-      return { art: i.art, titel: i.titel, varianten: (i.varianten ?? []).map((v) => v.label) }
+      return {
+        art: i.art,
+        titel: i.titel,
+        varianten: (i.varianten ?? []).map((v) => v.label),
+        // Rolle des Blatts (08.10.2026): Selbsteinschätzung mit Ampel und Tagebuch, Abschluss mit Raster
+        ...(i.zweck ? { zweck: i.zweck } : {}),
+        ...(i.zweck === 'reflexion' && i.frage ? { frage: i.frage } : {}),
+        ...(i.zweck === 'abschluss' && i.raster?.length ? { raster: i.raster } : {})
+      }
     case 'rueckmeldung':
     case 'onlinetest':
       return { art: i.art }
@@ -530,8 +715,19 @@ export function leererInhalt(art: SchrittArt): SchrittInhalt {
   }
 }
 
-/** Sinnvoller Erfolg je Art */
-export function standardErfolg(art: SchrittArt): Erfolg {
+/**
+ * Sinnvoller Erfolg je Art. Digitale Reihe (08.10.2026, Plan G.5): automatisch nach Ergebnis – KI-Einschätzung bzw.
+ * Punkte, keine Bestätigung durch die Lehrkraft (Sprechaufgabe: abgegeben genügt, die KI hört nicht zu).
+ */
+export function standardErfolg(art: SchrittArt, reiheArt: ReiheArt = 'gemischt'): Erfolg {
+  if (reiheArt === 'digital')
+    switch (art) {
+      case 'abschluss':
+      case 'aufgabe':
+        return { art: 'ki', schwelle: 'teilweise' }
+      case 'sprechen':
+        return { art: 'abgabe' }
+    }
   switch (art) {
     case 'arbeitsblatt':
     case 'rueckmeldung':
@@ -568,4 +764,88 @@ export function ampelAbweichungen(stand: Stand): number[] {
   return Object.keys(lk)
     .filter((k) => selbst[k] && ((selbst[k] === 'gruen' && lk[k] === 'rot') || (selbst[k] === 'rot' && lk[k] === 'gruen')))
     .map(Number)
+}
+
+// ---------------------------------------------------------------- Digitale Reihe: Blätter und Erfolg (08.10.2026)
+
+/** Rolle eines Arbeitsblatts in der Reihe (Plan G.2) – siehe `SchrittInhalt` „arbeitsblatt" */
+export type BlattZweck = 'aufgabe' | 'abschluss' | 'reflexion' | 'einfuehrung'
+
+/** Diese Schrittarten können als vollwertiges Arbeitsblatt entstehen; Lernkarten, Diagnose, Vokabeln, Test bleiben eigen */
+export const BLATT_FAEHIG: SchrittArt[] = ['aufgabe', 'abschluss', 'reflexion']
+
+/** Einführung/Erklärung am Titel bzw. Auftrag erkennen – das Blatt beginnt dann mit Erklärung und Beispiel */
+const EINFUEHRUNG = /einf(ü|ue)hr|erkl(ä|ae)r|einstieg|kennenlernen|grundlagen/i
+
+/**
+ * Soll dieser Platzhalter über die Arbeitsblatt-Pipeline entstehen – und in welcher Rolle? (Plan G.2)
+ * Digitale Reihe: immer für Zwischenaufgabe, Abschlussprodukt und Selbsteinschätzung; gemischte Reihe: nur auf Wunsch
+ * (`kiVorgabe.alsBlatt`); Planungsreihe nie. Liefert null, wenn der Schritt seine eigene Art behält.
+ */
+export function blattZweckFuer(
+  r: Pick<Reihe, 'art'>,
+  s: Pick<Schritt, 'inhalt' | 'titel' | 'platzhalter' | 'kiVorgabe'>
+): BlattZweck | null {
+  const art = artVon(r)
+  if (art === 'planung' || !BLATT_FAEHIG.includes(s.inhalt.art)) return null
+  if (art !== 'digital' && !s.kiVorgabe?.alsBlatt) return null
+  if (s.inhalt.art === 'abschluss') return 'abschluss'
+  if (s.inhalt.art === 'reflexion') return 'reflexion'
+  return EINFUEHRUNG.test(`${s.titel} ${s.platzhalter?.beschreibung ?? ''}`) ? 'einfuehrung' : 'aufgabe'
+}
+
+type BlattInhalt = Extract<SchrittInhalt, { art: 'arbeitsblatt' }>
+
+/**
+ * Inhalt des Schritts, nachdem das Blatt entstanden ist: Art „arbeitsblatt" mit der Rolle des bisherigen Schritts
+ * (Raster des Abschlusses, Tagebuchfrage der Reflexion bleiben), dazu der passende Erfolg.
+ */
+export function alsBlattSchritt(
+  alt: SchrittInhalt,
+  zweck: BlattZweck,
+  blatt: Partial<BlattInhalt>,
+  reiheArt: ReiheArt
+): { inhalt: BlattInhalt; erfolg: Erfolg } {
+  const leer = leererInhalt('arbeitsblatt') as BlattInhalt
+  const inhalt: BlattInhalt = {
+    ...leer,
+    ...blatt,
+    zweck,
+    ...(alt.art === 'reflexion' && alt.frage.trim() ? { frage: alt.frage } : {}),
+    ...(alt.art === 'abschluss' && alt.raster.length ? { raster: alt.raster } : {})
+  }
+  // Reflexion wird nie bewertet; sonst wie ein Arbeitsblatt – in gemischten Reihen bestätigt die Lehrkraft den Abschluss
+  const erfolg: Erfolg =
+    zweck === 'reflexion'
+      ? { art: 'abgabe' }
+      : zweck === 'abschluss' && reiheArt !== 'digital'
+        ? { art: 'lehrkraft' }
+        : { art: 'ki', schwelle: 'teilweise' }
+  return { inhalt, erfolg }
+}
+
+/**
+ * Erfolg, wie er gilt (Plan G.5): In digitalen Reihen ist keine Bestätigung durch die Lehrkraft nötig – „Lehrkraft
+ * bestätigt" wird dort zur KI-Einschätzung (Blatt, Schreibaufgabe, Zwischenaufgabe mit Feedback, Abschlussprodukt)
+ * bzw. zu „abgegeben genügt". Die Lehrkraft kann trotzdem jederzeit bewerten, zurückschicken oder freischalten.
+ */
+export function wirksamerErfolg(s: Pick<Schritt, 'erfolg' | 'inhalt'>, reiheArt: ReiheArt): Erfolg {
+  if (reiheArt !== 'digital' || s.erfolg.art !== 'lehrkraft') return s.erfolg
+  const i = s.inhalt
+  if (i.art === 'arbeitsblatt' || i.art === 'rueckmeldung' || i.art === 'abschluss' || (i.art === 'aufgabe' && i.feedback))
+    return { art: 'ki', schwelle: 'teilweise' }
+  return { art: 'abgabe' }
+}
+
+/** Was Lernende von ihrem Stand sehen: ohne den KI-Vorschlag zur Bewertung (nur für die Lehrkraft) */
+export function standFuerLernende(stand: Stand): Stand {
+  return {
+    ...stand,
+    schritte: Object.fromEntries(
+      Object.entries(stand.schritte).map(([k, v]) => {
+        const { kiVorschlag: _v, ...rest } = v
+        return [k, rest]
+      })
+    )
+  }
 }

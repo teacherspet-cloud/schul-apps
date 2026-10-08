@@ -1,6 +1,11 @@
 /**
  * Eine Unterrichtsreihe bauen: Titel, Fach, Oberthema (Kerncurriculum des Landes), übergeordnete
  * Lernziele, Schritte (hinzufügen, ordnen, bearbeiten) und zuweisen.
+ *
+ * Übersicht (08.10.2026, Plan „Unterrichtsreihe: Übersicht, KI-Status, Transparenz" B/C/G.1): Kopf nach der Planung
+ * eingeklappt (ReiheKopf.tsx), Standardmodus Stunde für Stunde (stundenAnsicht.ts) mit kompakten Schrittkarten
+ * (SchrittKarte.tsx, „Warum?", „Grundlage:"), Expertenmodus mit Schalter „Stunden | Teile"; „Als Schüler ansehen" öffnet
+ * die echte Schülerseite als Musterschüler (ReiheVorschau.tsx), der Ablauf-Simulator heißt im Expertenmodus „Ablauf testen".
  */
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useAlleLernenden } from '../lernen/LernendeWahl'
@@ -8,7 +13,6 @@ import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import {
   ActionIcon,
   Alert,
-  Badge,
   Button,
   Card,
   Checkbox,
@@ -27,22 +31,22 @@ import {
   Tooltip
 } from '@mantine/core'
 import {
+  IconAlertTriangle,
   IconArrowDown,
   IconArrowLeft,
   IconArrowUp,
-  IconCopy,
+  IconChevronUp,
   IconDeviceFloppy,
-  IconEye,
   IconFolderPlus,
-  IconGripVertical,
   IconMedal,
-  IconPencil,
+  IconPlayerPlay,
   IconPlus,
   IconSend,
   IconTrash
 } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
+  artVon,
   berechneWeg,
   leererInhalt,
   neueSchrittId,
@@ -52,6 +56,7 @@ import {
   teileVon,
   type Extern,
   type Reihe,
+  type ReiheArt,
   type Schritt,
   type SchrittArt,
   type Stand
@@ -65,24 +70,31 @@ import { LernzieleFeld, type KcAuszug } from './Lernziele'
 import { ichKannFormulieren, reihenLernziele } from './lernzieleKi'
 import { SchrittBearbeiten } from './SchrittBearbeiten'
 import { Zugang } from '../onlinetest/OnlinetestModule'
-import { DruckMenue, PlanenFenster, PlatzhalterKnopf, StundenLeiste } from './ReiheKi'
+import { DruckMenue, PlanenFenster, StundenLeiste } from './ReiheKi'
 import { horcheReihe } from './platzhalterAuftrag'
+import { AllePlatzhalterKnopf, ReiheMaterialien, ZuweisenHinweis } from './SchrittStatus'
 import { meldeOffeneReihe, usePlaene, usePlantGerade } from './planungAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
 import { IconBook, IconSparkles } from '@tabler/icons-react'
 import { ReiheAusSchulbuch, type BuchReihe } from './SchulbuchReiheFenster'
-import { TestHierKnopf } from './TestHierKnopf'
-import { fuegeEin } from './reiheTest'
+import { TestFenster } from './TestHierKnopf'
+import { fuegeEin, type TestZiel } from './reiheTest'
+import { useExperte } from '../../shared/settingsStore'
+import { SchrittKarte } from './SchrittKarte'
+import { ansichtGemerkt, kopfGemerkt, KopfZeile, merkeAnsicht, merkeKopf, PlanHinweis } from './ReiheKopf'
+import { ReiheAlsSchueler } from './ReiheVorschau'
+import { merkeKcAuszug } from './grundlage'
+import { ansichtFuer, stundenGruppen, stundenTitel } from './stundenAnsicht'
+import { ArtPlakette, ArtWahl } from './ReiheArt'
+import { PlanungExport, PlanungHinweis, PlanungOhneStunden, PlanungsStunde } from './StundenPlanung'
+import { fuerDigital, nichtAmGeraet, schritteAlsPhasen, wechsleArt } from './reihePlanung'
+import { horcheVerlauf } from './verlaufAuftrag'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
-const ROLLE: Record<Schritt['rolle'], { label: string; farbe: string }> = {
-  pflicht: { label: 'Pflicht', farbe: 'blue' },
-  wahl: { label: 'Wahl', farbe: 'grape' },
-  foerder: { label: 'Förderung', farbe: 'orange' },
-  forder: { label: '★ Forder', farbe: 'yellow' },
-  optional: { label: 'Optional', farbe: 'teal' }
-}
+/** Begründung der Planung auch am Schritt (08.10.2026, B5): Sie bleibt, wenn der Platzhalter beim Erstellen entfällt */
+const mitBegruendung = (schritte: Schritt[]): Schritt[] =>
+  schritte.map((s) => (s.platzhalter?.begruendung && !s.begruendung ? { ...s, begruendung: s.platzhalter.begruendung } : s))
 
 /** Alle Zeilen unter einem Knoten (Unterthemen, auch tiefer) */
 const zeilenVon = (k: KatalogKnoten): string[] => k.kinder.flatMap((c) => [c.wortlaut ?? c.name, ...zeilenVon(c).map((z) => `${c.name}: ${z}`)])
@@ -98,6 +110,9 @@ export function ReiheEditor({
   meldeGeaendert?: (geaendert: boolean) => void
 }): React.JSX.Element {
   const [r, setR] = useState<Reihe>(start)
+  // Jüngster Stand – für das sofortige Speichern übernommener KI-Ergebnisse (08.10.2026, horcheReihe)
+  const rAktuell = useRef(r)
+  rAktuell.current = r
   const [geaendert, setGeaendert] = useState(false)
   useEffect(() => {
     meldeGeaendert?.(geaendert)
@@ -109,6 +124,21 @@ export function ReiheEditor({
   const [kc, setKc] = useState<KatalogKnoten[]>([])
   const [planen, setPlanen] = useState(false)
   const [ausBuch, setAusBuch] = useState(false)
+  // Kopf (08.10.2026, B1): je Reihe gemerkt; sonst eine Reihe mit Schritten eingeklappt, eine neue, leere offen
+  const [kopfOffen, setKopfOffenRoh] = useState(() => kopfGemerkt(start.id) ?? !start.schritte.length)
+  const setKopfOffen = (offen: boolean): void => {
+    setKopfOffenRoh(offen)
+    merkeKopf(rAktuell.current.id, offen)
+  }
+  // Stunden | Teile (B3): Standardmodus Stunde für Stunde, Expertenmodus wählbar (gemerkt)
+  const experte = useExperte()
+  const [ansichtWahl, setAnsichtWahl] = useState(ansichtGemerkt)
+  // Reihenart (08.10.2026, Plan E): Planungsreihen zeigen je Stunde den Verlauf statt der Schritte der Lernenden
+  const art = artVon(r)
+  const planung = art === 'planung'
+  const ansicht = planung ? 'planung' : ansichtFuer(r, experte, ansichtWahl)
+  // „Test hier erstellen" aus dem Menü „⋯" eines Schritts (B6)
+  const [testHier, setTestHier] = useState<{ ziel: TestZiel; nach: string } | null>(null)
   const setze = (teil: Partial<Reihe>): void => {
     setR((x) => ({ ...x, ...teil }))
     setGeaendert(true)
@@ -130,6 +160,8 @@ export function ReiheEditor({
   const auszug: KcAuszug | null = gewaehlt
     ? { zeilen: [gewaehlt.wortlaut ?? gewaehlt.name, ...zeilenVon(gewaehlt)].slice(0, 60), quelle: `Kerncurriculum ${r.stateId} ${r.fachLabel}` }
     : null
+  // Auszug für die KI-Erstellung der Schritte bereitlegen (C1, grundlage.ts) – gleich hier, damit die Chips ihn sofort sehen
+  merkeKcAuszug(r, auszug)
 
   const speichern = async (stand: Reihe = r): Promise<Reihe | null> => {
     setLaeuft(true)
@@ -137,8 +169,9 @@ export function ReiheEditor({
       const a = await senden<{ id: string; geaendert: string }>('/server/reihen/speichern', { reihe: stand })
       const neu = { ...stand, id: a.id, geaendert: a.geaendert }
       setR(neu)
+      rAktuell.current = neu
       setGeaendert(false)
-      notifySuccess('Gespeichert.')
+      // Still speichern (08.10.2026): kein „Gespeichert." bei jedem Klick – Fehler meldet der catch-Zweig
       return neu
     } catch (e) {
       notifyError(e, 'Nicht gespeichert')
@@ -150,11 +183,59 @@ export function ReiheEditor({
   // Fertige Platzhalter aus dem Hintergrund übernehmen, solange die Reihe hier offen ist (05.10.2026)
   useEffect(() => {
     if (!r.id) return
-    return horcheReihe(r.id, (schrittId, patch) => {
-      setR((x) => ({ ...x, schritte: x.schritte.map((s) => (s.id === schrittId ? { ...s, ...patch } : s)) }))
-      setGeaendert(true)
-    })
+    // Verknüpfung gleich speichern (08.10.2026) – sonst ginge sie mit „nicht speichern" verloren
+    return horcheReihe(
+      r.id,
+      (schrittId, patch) => {
+        const x = rAktuell.current
+        const neu = { ...x, schritte: x.schritte.map((s) => (s.id === schrittId ? { ...s, ...patch } : s)) }
+        rAktuell.current = neu
+        setR(neu)
+        setGeaendert(true)
+      },
+      () => speichern(rAktuell.current)
+    )
   }, [r.id])
+  // Stundenverlauf-Vorschläge der KI (Planungsreihe, verlaufAuftrag.ts) ebenso übernehmen und gleich speichern
+  useEffect(() => {
+    if (!r.id) return
+    return horcheVerlauf(
+      r.id,
+      (stunde, p) => {
+        const x = rAktuell.current
+        const neu = { ...x, verlauf: { ...(x.verlauf ?? {}), [String(stunde)]: p } }
+        rAktuell.current = neu
+        setR(neu)
+        setGeaendert(true)
+      },
+      () => speichern(rAktuell.current)
+    )
+  }, [r.id])
+  /**
+   * Art wechseln (E5) – mit Umwandlung (reihePlanung.ts) und gleich gespeichert; lehnt der Server ab (zugewiesene Reihe
+   * → Planung), bleibt alles wie vorher.
+   */
+  const artWechseln = async (nach: ReiheArt): Promise<void> => {
+    const vorher = rAktuell.current
+    const warGeaendert = geaendert
+    const neu = wechsleArt(vorher, nach)
+    setR(neu)
+    rAktuell.current = neu
+    setGeaendert(true)
+    if (!neu.id || !neu.titel.trim()) return
+    if (!(await speichern(neu))) {
+      setR(vorher)
+      rAktuell.current = vorher
+      setGeaendert(warGeaendert)
+    }
+  }
+  /** Neue Schritte (KI-Plan, Schulbuch) passend zur Art: digital ohne „Im Unterricht", Planung als Phasen ihrer Stunde */
+  const nachArt = (alt: Schritt[], neu: Schritt[], stunden = r.stunden, verlaufVorher = r.verlauf): Pick<Reihe, 'schritte' | 'verlauf'> => {
+    if (art === 'digital') return { schritte: [...alt, ...fuerDigital(neu)], verlauf: r.verlauf }
+    if (!planung) return { schritte: [...alt, ...neu], verlauf: r.verlauf }
+    const { verlauf, aufgegangen } = schritteAlsPhasen({ stunden, verlauf: verlaufVorher }, neu)
+    return { schritte: [...alt, ...neu.filter((s) => !aufgegangen.includes(s.id))], verlauf }
+  }
   /*
    * KI-Planung im Hintergrund (08.10.2026, planungAuftrag.ts): Der fertige Plan liegt je Reihe bereit. Aus der
    * Auftragsleiste geöffnet (`zeigen`), erscheint gleich die Vorschau mit „Übernehmen"; sonst ein Hinweis über den Schritten.
@@ -176,7 +257,15 @@ export function ReiheEditor({
   const planUebernehmen = (plan: ReihenPlan, ersetzen: boolean): void => {
     const alteTeile = ersetzen ? [] : teileVon(r)
     const neueTeile = [...alteTeile, ...plan.teile.filter((t) => !alteTeile.includes(t))]
-    setzeSchritte([...(ersetzen ? [] : r.schritte), ...plan.schritte], neueTeile)
+    // Hinweis der Planung und Begründungen in der Reihe sichern (08.10.2026, B5) – der Platzhalter entfällt beim Erstellen
+    const n = nachArt(ersetzen ? [] : r.schritte, mitBegruendung(plan.schritte), r.stunden, ersetzen ? {} : r.verlauf)
+    setze({
+      schritte: ordneNachTeilen(n.schritte, neueTeile),
+      ...(n.verlauf ? { verlauf: n.verlauf } : {}),
+      teile: neueTeile,
+      ...(plan.hinweis.trim() ? { planHinweis: plan.hinweis.trim() } : {})
+    })
+    setKopfOffen(false)
     notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
   }
   /** Reihe aus Schulbuchseiten (06.10.2026): Stundenraster, ggf. Lernziele und Schritte übernehmen */
@@ -185,13 +274,17 @@ export function ReiheEditor({
     const neueTeile = [...alteTeile, ...b.teile.filter((t) => !alteTeile.includes(t))]
     // Beim Anhängen kommen die neuen Stunden hinter die vorhandenen
     const versatz = ersetzen ? 0 : r.stunden?.length ?? 0
-    const neu = b.schritte.map((x) => ({ ...x, stunde: (x.stunde ?? 0) + versatz }))
+    const neu = mitBegruendung(b.schritte).map((x) => ({ ...x, stunde: (x.stunde ?? 0) + versatz }))
+    const stunden = ersetzen ? b.stunden : [...(r.stunden ?? []), ...b.stunden]
+    const n = nachArt(ersetzen ? [] : r.schritte, neu, stunden, ersetzen ? {} : r.verlauf)
     setze({
-      stunden: ersetzen ? b.stunden : [...(r.stunden ?? []), ...b.stunden],
+      stunden,
       lernziele: r.lernziele.length ? r.lernziele : b.lernziele,
-      schritte: ordneNachTeilen([...(ersetzen ? [] : r.schritte), ...neu], neueTeile),
+      schritte: ordneNachTeilen(n.schritte, neueTeile),
+      ...(n.verlauf ? { verlauf: n.verlauf } : {}),
       teile: neueTeile
     })
+    setKopfOffen(false)
     notifySuccess(`${neu.length} Schritte aus dem Schulbuch übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
   }
   /** „Test hier erstellen" (06.10.2026): Platzhalter an der Stelle einfügen und gleich speichern */
@@ -260,22 +353,63 @@ export function ReiheEditor({
     setzeSchritte(r.schritte, [...teile, `Teil ${n}`])
   }
   const [neuIn, setNeuIn] = useState<string | undefined>(undefined)
-  const neuerSchritt = (art: SchrittArt, teil?: string): void => {
+  const neuerSchritt = (art: SchrittArt, teil?: string, stunde?: number): void => {
     setNeuIn(teil)
     setBearbeiten({
       id: neueSchrittId(),
       titel: '',
       lernziele: [],
       rolle: 'pflicht',
-      erfolg: standardErfolg(art),
+      erfolg: standardErfolg(art, artVon(r)),
       inhalt: leererInhalt(art),
-      ...(teil ? { abschnitt: teil } : {})
+      ...(teil ? { abschnitt: teil } : {}),
+      ...(stunde !== undefined ? { stunde } : {})
     })
   }
   const [gezogen, setGezogen] = useState<string | null>(null)
   const [ueber, setUeber] = useState<string | null>(null)
   const nummer = new Map(r.schritte.map((x, k) => [x.id, k + 1]))
+  const speichernVorher = async (): Promise<Reihe | null> => (geaendert || !r.id ? await speichern() : r)
+  /** Was jede Schrittkarte kann – in beiden Ansichten gleich */
+  const karte = (s: Schritt) => ({
+    reihe: r,
+    s,
+    nummer: nummer.get(s.id) ?? 0,
+    teile,
+    setze: (p: Partial<Schritt>) => schrittAendern(s.id, p),
+    bearbeiten: () => setBearbeiten(s),
+    verdoppeln: () => {
+      const i = r.schritte.findIndex((x) => x.id === s.id)
+      setzeSchritte([...r.schritte.slice(0, i + 1), { ...structuredClone(s), id: neueSchrittId(), titel: `${s.titel} (Kopie)` }, ...r.schritte.slice(i + 1)])
+    },
+    entfernen: () => setzeSchritte(r.schritte.filter((x) => x.id !== s.id)),
+    inTeil: (t: string | undefined) => verschiebeNach(s.id, t, null),
+    speichernVorher,
+    testHier: (ziel: TestZiel) => setTestHier({ ziel, nach: s.id }),
+    ansehen: (x: Schritt) => setBearbeiten(x)
+  })
+  const halteZeile = (s: Schritt): React.ReactNode =>
+    s.halt && (
+      <Text size="xs" c="orange.7">
+        ⏸ Haltepunkt: {s.halt.art === 'freigabe' ? 'nach gemeinsamer Besprechung' : `ab ${new Date(s.halt.ab).toLocaleDateString('de-DE')}`}
+      </Text>
+    )
   const anzahlOptional = r.schritte.filter((x) => x.rolle === 'optional' && x.inhalt.art !== 'hefter').length
+  const nichtAmGeraetZahl = r.schritte.filter((x) => nichtAmGeraet(r, x)).length
+  const ohneStunde = (s: Schritt): boolean => s.stunde === undefined || s.stunde < 0 || s.stunde >= (r.stunden?.length ?? 0)
+
+  // Neue Reihe (E1): zuerst die Art wählen – drei Karten; gilt für alle Wege, die über `neueReihe` anlegen
+  if (!r.id && !r.art && !r.schritte.length)
+    return (
+      <Stack data-reihe-editor>
+        <Group>
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck}>
+            Alle Reihen
+          </Button>
+        </Group>
+        <ArtWahl waehle={(a) => setR((x) => ({ ...x, art: a }))} />
+      </Stack>
+    )
 
   return (
     <OptionenBereich>
@@ -295,25 +429,53 @@ export function ReiheEditor({
             >
               Speichern{geaendert ? ' *' : ''}
             </Button>
+            {planung && <PlanungExport reihe={r} />}
             {r.schritte.length > 0 && <DruckMenue reihe={r} />}
-            <Button variant="default" leftSection={<IconEye size={16} />} disabled={!r.schritte.length} onClick={() => setVorschau(true)} data-schuelervorschau>
-              Als Schüler ansehen
-            </Button>
-            <Button
-              leftSection={<IconSend size={16} />}
-              disabled={!r.titel.trim() || !r.schritte.length}
-              onClick={async () => {
-                const neu = geaendert || !r.id ? await speichern() : r
-                if (neu) setZuweisen(true)
-              }}
-              data-reihe-zuweisen
-            >
-              Zuweisen
-            </Button>
+            <ReiheMaterialien reihe={r} />
+            {planung ? (
+              // Planungsreihe (E4): nur für die Lehrkraft – kein Zuweisen, keine Schüleransicht
+              <PlanungHinweis />
+            ) : (
+              <>
+                {/* Ablauf-Simulator (03.10.2026) – seit 08.10.2026 nur im Expertenmodus, die echte Schülerseite daneben */}
+                <NurExperte>
+                  <Button
+                    variant="default"
+                    leftSection={<IconPlayerPlay size={16} />}
+                    disabled={!r.schritte.length}
+                    onClick={() => setVorschau(true)}
+                    data-ablauf-testen
+                  >
+                    Ablauf testen
+                  </Button>
+                </NurExperte>
+                <ReiheAlsSchueler reihe={r} speichernVorher={speichernVorher} platzhalter={r.schritte.filter((x) => x.platzhalter).length} />
+                <Button
+                  leftSection={<IconSend size={16} />}
+                  disabled={!r.titel.trim() || !r.schritte.length}
+                  onClick={async () => {
+                    const neu = geaendert || !r.id ? await speichern() : r
+                    if (neu) setZuweisen(true)
+                  }}
+                  data-reihe-zuweisen
+                >
+                  Zuweisen
+                </Button>
+              </>
+            )}
           </Group>
         </Group>
-        <Card withBorder>
+        {!kopfOffen ? (
+          <KopfZeile reihe={r} aufklappen={() => setKopfOffen(true)} plakette={<ArtPlakette reihe={r} wechseln={(a) => void artWechseln(a)} />} />
+        ) : (
+        <Card withBorder data-reihe-kopf-offen>
           <Stack gap="sm">
+            <Group gap="xs">
+              <Text size="sm" c="dimmed">
+                Art der Reihe:
+              </Text>
+              <ArtPlakette reihe={r} wechseln={(a) => void artWechseln(a)} />
+            </Group>
             <Group grow align="start">
               <TextInput label="Titel der Reihe" value={r.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-reihe-titel />
               <HaeufigSelect
@@ -353,12 +515,42 @@ export function ReiheEditor({
               ichKann={(z) => ichKannFormulieren(r, z, ki)}
             />
             <StundenLeiste reihe={r} setze={setze} />
+            {(r.planHinweis?.trim() || r.schritte.length > 0) && (
+              <Group justify="flex-end" gap="xs">
+                {r.planHinweis?.trim() && <PlanHinweis text={r.planHinweis} />}
+                {r.schritte.length > 0 && (
+                  <Button size="xs" variant="subtle" color="gray" leftSection={<IconChevronUp size={14} />} onClick={() => setKopfOffen(false)} data-reihe-kopf-zu>
+                    Einklappen
+                  </Button>
+                )}
+              </Group>
+            )}
           </Stack>
         </Card>
+        )}
 
         <Group justify="space-between">
-          <Text fw={700}>Schritte</Text>
+          <Group gap="sm">
+            <Text fw={700}>{planung ? 'Stunden' : 'Schritte'}</Text>
+            {experte && !planung && (r.stunden?.length ?? 0) > 0 && (
+              <SegmentedControl
+                size="xs"
+                value={ansicht}
+                onChange={(v) => {
+                  const a = v as 'stunden' | 'teile'
+                  setAnsichtWahl(a)
+                  merkeAnsicht(a)
+                }}
+                data={[
+                  { value: 'stunden', label: 'Stunden' },
+                  { value: 'teile', label: 'Teile' }
+                ]}
+                data-reihe-ansicht
+              />
+            )}
+          </Group>
           <Group gap="xs">
+            <AllePlatzhalterKnopf reihe={r} speichernVorher={speichernVorher} />
             <Button variant="light" color="grape" leftSection={<IconBook size={16} />} onClick={() => setAusBuch(true)} data-reihe-aus-buch-knopf>
               Aus Schulbuch
             </Button>
@@ -372,12 +564,20 @@ export function ReiheEditor({
             >
               {plantGerade ? 'Plant im Hintergrund …' : 'Mit KI planen'}
             </Button>
-            <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
-              Teil hinzufügen
-            </Button>
-            <SchrittMenue neu={(art) => neuerSchritt(art)} />
+            {ansicht === 'teile' && (
+              <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
+                Teil hinzufügen
+              </Button>
+            )}
+            <SchrittMenue neu={(a) => neuerSchritt(a)} reiheArt={art} />
           </Group>
         </Group>
+        {nichtAmGeraetZahl > 0 && (
+          <Alert variant="light" color="orange" icon={<IconAlertTriangle size={16} />} data-nicht-am-geraet-hinweis>
+            {nichtAmGeraetZahl === 1 ? 'Ein Schritt „Im Unterricht“ geht' : `${nichtAmGeraetZahl} Schritte „Im Unterricht“ gehen`} in einer digitalen Reihe nicht am
+            Gerät – bitte durch eine Aufgabe ersetzen (markiert mit „nicht am Gerät“) oder die Art der Reihe auf „Gemischt“ ändern.
+          </Alert>
+        )}
         {planBereit && !planen && (
           <Alert variant="light" color="grape" data-plan-bereit>
             <Group justify="space-between" wrap="nowrap">
@@ -395,14 +595,99 @@ export function ReiheEditor({
             </Group>
           </Alert>
         )}
-        {r.schritte.length === 0 && teile.length === 0 && (
+        {!planung && r.schritte.length === 0 && teile.length === 0 && (
           <Text c="dimmed" size="sm">
             Noch keine Schritte. Am schnellsten: „Aus Schulbuch“ – Seiten der Einheit hochladen, die KI plant daraus. Oder von Hand, zum Beispiel: Teil 1
             „Grundlagen“ mit Eingangsdiagnose → Arbeitsblatt → Lernkarten, Teil 2 „Anwenden“ mit Zwischenaufgabe → Test → Selbsteinschätzung. Schritte lassen
             sich mit der Maus in einen anderen Teil ziehen.
           </Text>
         )}
-        {[undefined, ...teile].map((teil) => {
+        {ansicht === 'planung' && (
+          <Stack gap="sm" data-planung-ansicht>
+            {(r.stunden?.length ?? 0) === 0 && <PlanungOhneStunden leiste={<StundenLeiste reihe={r} setze={setze} />} />}
+            {(r.stunden ?? []).map((_, i) => (
+              <PlanungsStunde
+                key={i}
+                reihe={r}
+                stunde={i}
+                setze={setze}
+                speichernVorher={speichernVorher}
+                materialNeu={<SchrittMenue neu={(a) => neuerSchritt(a, undefined, i)} reiheArt={art} klein label="Material hinzufügen" />}
+                material={
+                  <Stack gap={6}>
+                    {r.schritte
+                      .filter((s) => s.stunde === i)
+                      .map((s) => (
+                        <SchrittKarte key={s.id} {...karte(s)} teileAnsicht={false} />
+                      ))}
+                  </Stack>
+                }
+              />
+            ))}
+            {r.schritte.some(ohneStunde) && (
+              <Paper withBorder radius="md" p="sm" data-planung-ohne-stunde>
+                <Text fw={700} mb={6}>
+                  Material ohne Stunde
+                </Text>
+                <Stack gap={6}>
+                  {r.schritte.filter(ohneStunde).map((s) => (
+                    <SchrittKarte key={s.id} {...karte(s)} teileAnsicht={false} />
+                  ))}
+                </Stack>
+              </Paper>
+            )}
+          </Stack>
+        )}
+        {ansicht === 'stunden' && (
+          <Stack gap="sm" data-stunden-ansicht>
+            {stundenGruppen(r).map((g) => (
+              <Paper
+                key={g.stunde ?? 'ohne'}
+                withBorder
+                radius="md"
+                p="sm"
+                bg="var(--mantine-color-default-hover)"
+                data-stunde-gruppe={g.stunde ?? ''}
+                data-ueberlang={g.ueberlang || undefined}
+              >
+                <Group justify="space-between" mb={6} wrap="nowrap">
+                  <Text fw={700}>{stundenTitel(g)}</Text>
+                  {experte && g.stunde !== null && (
+                    <Group gap={4} wrap="nowrap" data-stunde-summe>
+                      {g.ueberlang && <IconAlertTriangle size={14} color="var(--mantine-color-red-6)" />}
+                      <Text size="xs" c={g.ueberlang ? 'red' : 'dimmed'}>
+                        {g.summe} von {g.laenge} min verplant{g.ueberlang ? ' – mehr, als die Stunde hat' : ''}
+                      </Text>
+                    </Group>
+                  )}
+                </Group>
+                <Stack gap={6}>
+                  {g.zeilen.length === 0 && (
+                    <Text size="xs" c="dimmed" ta="center" py={4}>
+                      Noch nichts in dieser Stunde – Schritte über „⋯ → In Stunde …" hierher verschieben.
+                    </Text>
+                  )}
+                  {g.zeilen.map(({ schritt: s, teil, teilWechsel }) => (
+                    <Stack key={s.id} gap={4}>
+                      {teilWechsel && (
+                        <Group gap={4} mt={2} data-teil-ueberschrift={teil}>
+                          <IconMedal size={13} color="var(--mantine-color-yellow-6)" />
+                          <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                            {teil}
+                          </Text>
+                        </Group>
+                      )}
+                      {halteZeile(s)}
+                      <SchrittKarte {...karte(s)} teileAnsicht={false} />
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+        {ansicht === 'teile' &&
+          [undefined, ...teile].map((teil) => {
           const schritte = r.schritte.filter((x) => (teil ? x.abschnitt === teil : !x.abschnitt || !teile.includes(x.abschnitt)))
           if (!teil && !schritte.length) return null
           const zielKennung = `teil:${teil ?? ''}`
@@ -437,7 +722,8 @@ export function ReiheEditor({
                   hoch={() => teilVerschieben(teil, -1)}
                   runter={() => teilVerschieben(teil, 1)}
                   loeschen={() => teilLoeschen(teil)}
-                  neu={(art) => neuerSchritt(art, teil)}
+                  neu={(a) => neuerSchritt(a, teil)}
+                  reiheArt={art}
                 />
               )}
               <Stack gap={6} mt={teil ? 'xs' : 0}>
@@ -446,161 +732,52 @@ export function ReiheEditor({
                     Noch leer – Schritt hinzufügen oder hierher ziehen.
                   </Text>
                 )}
-                {schritte.map((s) => {
-                  const art = SCHRITT_ARTEN.find((a) => a.id === s.inhalt.art)
-                  const imTeil = schritte.indexOf(s)
-                  return (
-                    <Stack key={s.id} gap={4}>
-                      {s.halt && (
-                        <Text size="xs" c="orange.7">
-                          ⏸ Haltepunkt: {s.halt.art === 'freigabe' ? 'nach gemeinsamer Besprechung' : `ab ${new Date(s.halt.ab).toLocaleDateString('de-DE')}`}
-                        </Text>
-                      )}
-                      <Paper
-                        withBorder
-                        p="sm"
-                        radius="md"
-                        data-schritt={s.id}
-                        draggable
-                        onDragStart={(e) => {
+                {schritte.map((s, imTeil) => (
+                  <Stack key={s.id} gap={4}>
+                    {halteZeile(s)}
+                    <SchrittKarte
+                      {...karte(s)}
+                      teileAnsicht
+                      hoch={imTeil > 0 ? () => verschiebe(s.id, -1) : undefined}
+                      runter={imTeil < schritte.length - 1 ? () => verschiebe(s.id, 1) : undefined}
+                      rahmen={{
+                        draggable: true,
+                        onDragStart: (e) => {
                           e.dataTransfer.effectAllowed = 'move'
                           e.dataTransfer.setData('text/plain', s.id)
                           setGezogen(s.id)
-                        }}
-                        onDragEnd={() => {
+                        },
+                        onDragEnd: () => {
                           setGezogen(null)
                           setUeber(null)
-                        }}
-                        onDragOver={(e) => {
+                        },
+                        onDragOver: (e) => {
                           if (!gezogen || gezogen === s.id) return
                           e.preventDefault()
                           e.stopPropagation()
                           setUeber(s.id)
-                        }}
-                        onDrop={(e) => {
+                        },
+                        onDrop: (e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           if (gezogen) verschiebeNach(gezogen, s.abschnitt && teile.includes(s.abschnitt) ? s.abschnitt : undefined, s.id)
                           setGezogen(null)
                           setUeber(null)
-                        }}
-                        style={{
+                        },
+                        style: {
                           cursor: 'grab',
                           opacity: gezogen === s.id ? 0.4 : 1,
                           borderTop: ueber === s.id ? '3px solid var(--mantine-color-blue-5)' : undefined
-                        }}
-                      >
-                        <Group justify="space-between" wrap="nowrap">
-                          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                            <IconGripVertical size={16} color="var(--mantine-color-dimmed)" />
-                            <Badge variant="filled" color="gray" circle>
-                              {nummer.get(s.id)}
-                            </Badge>
-                            <div style={{ minWidth: 0 }}>
-                              <Group gap={6}>
-                                <Text fw={600} truncate>
-                                  {s.titel || '(ohne Titel)'}
-                                </Text>
-                                <Badge size="xs" variant="light">
-                                  {art?.label}
-                                </Badge>
-                                {s.rolle === 'pflicht' || s.rolle === 'optional' ? (
-                                  <Tooltip label={s.rolle === 'pflicht' ? 'Klick: optional machen' : 'Klick: Pflicht machen'}>
-                                    <Badge
-                                      size="xs"
-                                      variant="light"
-                                      color={ROLLE[s.rolle].farbe}
-                                      style={{ cursor: 'pointer' }}
-                                      onClick={() => schrittAendern(s.id, { rolle: s.rolle === 'pflicht' ? 'optional' : 'pflicht' })}
-                                      data-rolle-umschalten={s.rolle}
-                                    >
-                                      {ROLLE[s.rolle].label}
-                                    </Badge>
-                                  </Tooltip>
-                                ) : (
-                                  <Badge size="xs" variant="light" color={ROLLE[s.rolle].farbe}>
-                                    {ROLLE[s.rolle].label}
-                                    {s.rolle === 'wahl' && s.wahlGruppe ? ` ${s.wahlGruppe} (${s.wahlMindestens ?? 1})` : ''}
-                                  </Badge>
-                                )}
-                                {s.stunde !== undefined && (r.stunden?.length ?? 0) > 0 && (
-                                  <Badge size="xs" variant="outline" color="gray">
-                                    Std. {s.stunde + 1}
-                                    {s.minuten ? ` · ${s.minuten} min` : ''}
-                                  </Badge>
-                                )}
-                                {s.platzhalter && (
-                                  <Badge size="xs" variant="light" color="orange" data-platzhalter>
-                                    Platzhalter
-                                  </Badge>
-                                )}
-                                <PlatzhalterKnopf
-                                  reihe={r}
-                                  s={s}
-                                  setze={(p) => schrittAendern(s.id, p)}
-                                  speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
-                                />
-                              </Group>
-                              <Text size="xs" c="dimmed" truncate>
-                                {s.platzhalter
-                                  ? s.platzhalter.beschreibung
-                                  : s.lernziele.length
-                                  ? s.lernziele.map((l) => l.ichKann || l.text).join(' · ')
-                                  : 'ohne Lernziele'}
-                              </Text>
-                            </div>
-                          </Group>
-                          <Group gap={2} wrap="nowrap">
-                            <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, -1)} disabled={imTeil === 0} aria-label="nach oben">
-                              <IconArrowUp size={16} />
-                            </ActionIcon>
-                            <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, 1)} disabled={imTeil === schritte.length - 1} aria-label="nach unten">
-                              <IconArrowDown size={16} />
-                            </ActionIcon>
-                            {!s.platzhalter && <DruckMenue schritt={s} />}
-                            <Tooltip label="Bearbeiten">
-                              <ActionIcon variant="subtle" onClick={() => setBearbeiten(s)} aria-label="bearbeiten" data-schritt-bearbeiten>
-                                <IconPencil size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Verdoppeln">
-                              <ActionIcon
-                                variant="subtle"
-                                onClick={() => {
-                                  const i = r.schritte.findIndex((x) => x.id === s.id)
-                                  setzeSchritte([
-                                    ...r.schritte.slice(0, i + 1),
-                                    { ...structuredClone(s), id: neueSchrittId(), titel: `${s.titel} (Kopie)` },
-                                    ...r.schritte.slice(i + 1)
-                                  ])
-                                }}
-                                aria-label="verdoppeln"
-                              >
-                                <IconCopy size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Entfernen">
-                              <ActionIcon
-                                variant="subtle"
-                                color="red"
-                                onClick={() => setzeSchritte(r.schritte.filter((x) => x.id !== s.id))}
-                                aria-label="entfernen"
-                              >
-                                <IconTrash size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                          </Group>
-                        </Group>
-                      </Paper>
-                      {!s.test && <TestHierKnopf reihe={r} nach={s.id} einfuegen={testEinfuegen} />}
-                    </Stack>
-                  )
-                })}
+                        }
+                      }}
+                    />
+                  </Stack>
+                ))}
               </Stack>
             </Paper>
           )
         })}
-        {teile.length > 0 && (
+        {teile.length > 0 && !planung && (
           <Text size="xs" c="dimmed">
             Abzeichen gibt es für jeden geschafften Teil: {teile.join(', ')}.
           </Text>
@@ -631,13 +808,18 @@ export function ReiheEditor({
             speichern={(s) => {
               const da = r.schritte.some((x) => x.id === s.id)
               setzeSchritte(
-                da ? r.schritte.map((x) => (x.id === s.id ? s : x)) : [...r.schritte, { ...s, ...(neuIn && !s.abschnitt ? { abschnitt: neuIn } : {}) }]
+                // Bearbeitet und übernommen = geprüft: Marke „KI-Entwurf" entfällt (08.10.2026)
+                // „bitte ersetzen" (aus der Planung) entfällt ebenso
+                da
+                  ? r.schritte.map((x) => (x.id === s.id ? { ...s, kiEntwurf: undefined, ersetzen: undefined } : x))
+                  : [...r.schritte, { ...s, ...(neuIn && !s.abschnitt ? { abschnitt: neuIn } : {}) }]
               )
               setBearbeiten(null)
             }}
           />
         )}
-        {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
+        {zuweisen && r.id && !planung && <Zuweisen reiheId={r.id} reihe={r} schliessen={() => setZuweisen(false)} />}
+        {testHier && <TestFenster reihe={r} nach={testHier.nach} ziel={testHier.ziel} einfuegen={testEinfuegen} schliessen={() => setTestHier(null)} />}
         {planen && (
           <PlanenFenster
             // Kommt der Plan, während das Fenster offen ist, gleich die Vorschau zeigen
@@ -666,7 +848,7 @@ export function ReiheEditor({
   )
 }
 
-function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => void }): React.JSX.Element {
+function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reihe; schliessen: () => void }): React.JSX.Element {
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'gaeste'>('gruppe')
   // Gäste per QR-Code (05.10.2026): zusätzlich zu Lerngruppe/Einzelnen oder allein
   const [mitGaesten, setMitGaesten] = useState(false)
@@ -717,6 +899,8 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
           Die Lernenden finden die Reihe auf ihrer Startseite unter „Unterrichtsreihen“. Arbeitsblätter, Tests und Aufgaben der Reihe werden dabei für sie
           freigegeben.
         </Text>
+        {/* Noch ungeprüfte KI-Entwürfe (08.10.2026) – zuweisen bleibt möglich */}
+        <ZuweisenHinweis reihe={reihe} />
         <SegmentedControl
           value={art}
           onChange={(v) => {
@@ -814,16 +998,27 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
 }
 
 /** Menü „Schritt hinzufügen" (oben und in jedem Teil) */
-function SchrittMenue({ neu, klein }: { neu: (art: SchrittArt) => void; klein?: boolean }): React.JSX.Element {
+function SchrittMenue({
+  neu,
+  klein,
+  reiheArt = 'gemischt',
+  label = 'Schritt hinzufügen'
+}: {
+  neu: (art: SchrittArt) => void
+  klein?: boolean
+  /** Digital: kein „Im Unterricht" (nicht am Gerät); Planung: das steht als Phase im Verlauf (08.10.2026) */
+  reiheArt?: ReiheArt
+  label?: string
+}): React.JSX.Element {
   return (
     <Menu position="bottom-end" width={360}>
       <Menu.Target>
         <Button size={klein ? 'xs' : 'sm'} variant={klein ? 'subtle' : 'filled'} leftSection={<IconPlus size={klein ? 14 : 16} />} data-schritt-neu>
-          Schritt hinzufügen
+          {label}
         </Button>
       </Menu.Target>
       <Menu.Dropdown>
-        {SCHRITT_ARTEN.map((a) => (
+        {SCHRITT_ARTEN.filter((a) => reiheArt === 'gemischt' || a.id !== 'praesenz').map((a) => (
           <Menu.Item key={a.id} onClick={() => neu(a.id)} data-schritt-art={a.id}>
             <Text size="sm" fw={600}>
               {a.label}
@@ -849,6 +1044,7 @@ function TeilKopf(p: {
   runter: () => void
   loeschen: () => void
   neu: (art: SchrittArt) => void
+  reiheArt?: ReiheArt
 }): React.JSX.Element {
   const [text, setText] = useState(p.name)
   useEffect(() => setText(p.name), [p.name])
@@ -869,7 +1065,7 @@ function TeilKopf(p: {
         />
       </Group>
       <Group gap={2} wrap="nowrap">
-        <SchrittMenue neu={p.neu} klein />
+        <SchrittMenue neu={p.neu} klein reiheArt={p.reiheArt} />
         <ActionIcon variant="subtle" onClick={p.hoch} disabled={p.erster} aria-label="Teil nach oben">
           <IconArrowUp size={16} />
         </ActionIcon>
@@ -887,7 +1083,8 @@ function TeilKopf(p: {
 }
 
 /**
- * „Als Schüler ansehen" (03.10.2026, Idee aus LearningView): der Weg, wie ihn Lernende sehen – mit
+ * „Ablauf testen" (03.10.2026 als „Als Schüler ansehen", Idee aus LearningView; seit 08.10.2026 nur im Expertenmodus –
+ * die echte Schülerseite öffnet ReiheVorschau.tsx): der Weg, wie ihn Lernende sehen – mit
  * simulierten Ergebnissen, um Freischaltung, Haltepunkte, Wahl- und Förderschritte zu prüfen.
  * Nichts wird gespeichert.
  */
@@ -906,7 +1103,7 @@ function Vorschau({ reihe, schliessen }: { reihe: Reihe; schliessen: () => void 
       })
   }
   return (
-    <Modal opened onClose={schliessen} title={`Vorschau: ${reihe.titel}`} size="lg">
+    <Modal opened onClose={schliessen} title={`Ablauf testen: ${reihe.titel}`} size="lg">
       <Stack gap="xs" data-vorschau>
         <Text size="sm" c="dimmed">
           So sieht der Weg für Lernende aus. Mit den Knöpfen simulierst du Ergebnisse – gespeichert wird nichts.

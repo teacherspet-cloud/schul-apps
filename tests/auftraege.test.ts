@@ -22,7 +22,7 @@ const offen = new Map<string, { ok: (v: unknown) => void; weg: (e: Error) => voi
 const abgebrochen: string[] = []
 // Bilder: Wie die Bild-KI von OpenAI überhören sie den Abbruch und kommen später trotzdem
 const offeneBilder: ((url: string) => void)[] = []
-let platz: ((p: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number }) => void) | null = null
+let platz: ((p: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number; platz?: number }) => void) | null = null
 ;(globalThis as unknown as { window: unknown }).window = {
   api: {
     ai: {
@@ -338,6 +338,47 @@ describe('Hintergrund-Aufträge', () => {
     expect(auftrag()?.status).toBe('laufend')
     expect(auftrag()?.wartegrund).toBeUndefined()
     brichAb(auftrag()!.id)
+  })
+
+  it('nennt seinen Platz in der Warteschlange und kennzeichnet seine Anfragen mit seiner Kennung (08.10.2026)', async () => {
+    void starteAuftrag({
+      moduleId: 'unterrichtsreihe',
+      docId: 'r-platz',
+      titel: 'Igel',
+      art: 'Probe',
+      eingabe: {},
+      arbeit: (_e, k) => k.ai(REQ),
+      ablegen: async () => undefined
+    })
+    await tick()
+    const anfrage = [...offen.keys()].at(-1)!
+    // „<auftrag>~<anfrage>": Der Hauptprozess bedient im Wechsel je Auftrag (kiPlaetze.ts)
+    expect(anfrage.startsWith(`${auftrag()!.id}~`)).toBe(true)
+    platz!({ id: anfrage, zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0, platz: 2 })
+    expect(auftrag()?.status).toBe('wartend')
+    expect(auftrag()?.platz).toBe(2)
+    platz!({ id: anfrage, zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0, platz: 1 })
+    expect(auftrag()?.platz).toBe(1)
+    platz!({ id: anfrage, zustand: 'laufend' })
+    expect(auftrag()?.status).toBe('laufend')
+    expect(auftrag()?.platz).toBeUndefined()
+    brichAb(auftrag()!.id)
+  })
+
+  it('merkt sich, wohin „Öffnen" führt, wenn das Ablegen ein eigenes Dokument anlegt', async () => {
+    const lauf = starteAuftrag({
+      moduleId: 'unterrichtsreihe',
+      docId: 'r-ziel',
+      titel: 'Blatt',
+      art: 'Probe',
+      eingabe: {},
+      arbeit: (_e, k) => k.ai(REQ),
+      ablegen: async () => ({ moduleId: 'arbeitsblatt', docId: 'ws-neu' })
+    })
+    await antworte({ ok: true })
+    await lauf
+    expect(auftrag()?.status).toBe('fertig')
+    expect(auftrag()?.ziel).toEqual({ moduleId: 'arbeitsblatt', docId: 'ws-neu' })
   })
 
   it('nennt den Grund passend zu Zahl und Art der abgebrochenen Anfragen', () => {
