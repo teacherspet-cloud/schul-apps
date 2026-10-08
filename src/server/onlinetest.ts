@@ -46,11 +46,11 @@ import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/s
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER, fachSchreibweise } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
-import { alleNutzer, datenbank, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
 import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { iservBereit } from './anmeldung'
-import { registerVergessen } from './namensschutz'
+import { mitNamensliste, registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
 
 const SCHEMA = `
@@ -153,8 +153,17 @@ const alsGruppe = (z: Record<string, unknown>): Lerngruppe => ({
   mitglieder: json_(String(z.mitglieder ?? '[]'), [] as string[])
 })
 
+/**
+ * Haken für Änderungen an Lerngruppen (08.10.2026): vokabeln.ts trägt hier `klassenKurseSichern` ein (umgekehrt
+ * importiert vokabeln.ts dieses Modul) – neue Klassen mit Fremdsprache bekommen gleich ihren Kurs in „Sprachenlernen".
+ */
+export const lerngruppenHaken: { geaendert?: (lehrkraftId: string) => void } = {}
+
 export function lerngruppenVon(lehrkraftId: string): Lerngruppe[] {
-  return (db().prepare('SELECT * FROM lerngruppen WHERE lehrkraft_id = ? ORDER BY name').all(lehrkraftId) as Record<string, unknown>[]).map(alsGruppe)
+  // Namen sind verschlüsselt (08.10.2026) – nach dem Entschlüsseln sortieren
+  return (db().prepare('SELECT * FROM lerngruppen WHERE lehrkraft_id = ?').all(lehrkraftId) as Record<string, unknown>[])
+    .map(alsGruppe)
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
 export function lerngruppe(id: string): Lerngruppe | null {
@@ -600,6 +609,7 @@ type Fall = KiFall & { teilnahme: string; einheit: string; feld: string; art: 'k
  */
 async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): Promise<{ anfragen: number; bewertet: number }> {
   const alle = teilnahmenVon(test.id, true).filter((t) => t.abgabe)
+  const teilnehmerNamen = alle.map((t) => nutzerNachId(t.schueler_id)?.name ?? '').filter(Boolean)
   let anfragen = 0
   let bewertet = 0
   for (let v = 0; v < test.fassungen.length; v++) {
@@ -678,15 +688,23 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
       // In Paketen zu höchstens 40 Antworten
       for (let i = 0; i < faelle.length; i += 40) {
         const paket = faelle.slice(i, i + 40)
-        const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
-          aufruf('ai:structured', [
-            kiAnfrage(
-              test.einstellungen.zielsprache,
-              test.einstellungen.niveau,
-              paket,
-              test.einstellungen.art === 'Vokabeltest' || !test.einstellungen.art ? undefined : { art: test.einstellungen.art, fach: test.einstellungen.fach }
-            )
-          ])
+        /*
+         * Namen der Teilnehmenden (auch Gäste mit nur einem Vornamen) werden vor der KI ersetzt (08.10.2026) – auch einzeln
+         * und auch, wenn sie zugleich Wörter sind; ob in einer Antwort die Person oder das Wort gemeint ist („rose" als
+         * Vokabel), entscheidet der Server lokal (personOderWort.ts) mit Frage und Erwartung als Material.
+         */
+        const material = paket.map((f) => `${f.frage}\n${f.erwartung}`).join('\n')
+        const antwort = await mitNamensliste({ namen: teilnehmerNamen, sprache: test.einstellungen.zielsprache || test.einstellungen.fach, material }, () =>
+          imNutzer(alsNutzer(lehrkraft), () =>
+            aufruf('ai:structured', [
+              kiAnfrage(
+                test.einstellungen.zielsprache,
+                test.einstellungen.niveau,
+                paket,
+                test.einstellungen.art === 'Vokabeltest' || !test.einstellungen.art ? undefined : { art: test.einstellungen.art, fach: test.einstellungen.fach }
+              )
+            ])
+          )
         )
         anfragen++
         bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
@@ -765,7 +783,7 @@ async function kiLauf(testId: string): Promise<void> {
     s.fehler = undefined
   } catch (e) {
     s.fehler = e instanceof Error ? e.message : String(e)
-    protokolliereServer('onlinetest', `KI-Auswertung fehlgeschlagen: ${s.fehler.slice(0, 200)}`, lehrkraft.id)
+    protokolliereServer('onlinetest', `KI-Auswertung fehlgeschlagen: ${fehlerKurz(e)}`, lehrkraft.id)
   } finally {
     s.laeuft = false
     if (s.erneut) {
@@ -1137,7 +1155,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       if (!t || t.schueler_id !== ich.id || t.geheim !== String(k0.geheim ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
       if (!t.abgabe && t.beginn > 0) {
         const liste = [...vorfaelleVon(t), { art: 'verlassen' as const, zeit: Date.now() }].slice(-MAX_VORFAELLE)
-        db().prepare('UPDATE teilnahmen SET vorfaelle = ?, verlassen = 1 WHERE id = ? AND abgabe IS NULL').run(JSON.stringify(liste), t.id)
+        db().prepare('UPDATE teilnahmen SET vorfaelle = ?, verlassen = ? WHERE id = ? AND abgabe IS NULL').run(JSON.stringify(liste), 1, t.id)
       }
       return (json(res, 200, { ok: true }), true)
     }
@@ -1229,6 +1247,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
             JSON.stringify(mitglieder),
             new Date().toISOString()
           )
+        lerngruppenHaken.geaendert?.(ich.id)
         return (json(res, 200, { id }), true)
       }
       if (req.method === 'POST' && teile[0] === 'aendern') {
@@ -1250,6 +1269,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
             JSON.stringify(mitglieder),
             g.id
           )
+        lerngruppenHaken.geaendert?.(ich.id)
         return (json(res, 200, { ok: true }), true)
       }
       if (req.method === 'POST' && teile[0] === 'loeschen') {
@@ -1670,12 +1690,15 @@ export function fachHinzufuegen(lehrkraftId: string, gruppeId: string, fach: str
   if (gleich) return gleich.id
   if (!g.fach.trim()) {
     db().prepare('UPDATE lerngruppen SET fach = ? WHERE id = ?').run(f, g.id)
+    lerngruppenHaken.geaendert?.(lehrkraftId)
     return g.id
   }
   const id = neueId()
   db()
     .prepare('INSERT INTO lerngruppen (id, lehrkraft_id, name, fach, iserv_gruppe, mitglieder, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(id, lehrkraftId, g.name, f, g.iserv_gruppe, JSON.stringify(g.mitglieder), new Date().toISOString())
+  // Neues Fach (z. B. Englisch) → Kurs in „Sprachenlernen" (08.10.2026)
+  lerngruppenHaken.geaendert?.(lehrkraftId)
   return id
 }
 

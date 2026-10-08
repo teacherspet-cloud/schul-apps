@@ -18,25 +18,40 @@ export function galleryColumns(count: number, role: ImageRole = 'illustration'):
   return count <= 4 ? count : count <= 6 ? 3 : 4
 }
 
-export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element {
+export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element | null {
   const { mode, actions } = useWs()
   const edit = mode === 'edit'
   // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
   const schreiben = isEditMode(mode)
   const set = useSetter(block)
-  const items = block.items ?? []
+  /*
+   * Einzelbilder ohne Bild (08.10.2026): Auf dem Schülerblatt kein Kasten mit dem Suchauftrag mehr – nur die
+   * gefundenen Bilder (Nummern bleiben, damit „Bild 3" in der Aufgabe stimmt). Ohne jedes Bild fehlt die Reihe ganz.
+   * Im Editor „Bild fehlt" im Rahmen; ein Klick darauf öffnet die Bildwahl.
+   */
+  const alle = block.items ?? []
+  const items = schreiben ? alle : alle.filter((it) => it.image)
+  if (!items.length) return null
   return (
     <figure className={`ws-block ws-image ws-gallery ws-gallery-${block.role}`}>
-      <div className="ws-gallery-grid" style={{ gridTemplateColumns: `repeat(${galleryColumns(items.length, block.role)}, 1fr)` }}>
-        {items.map((it, k) => (
+      <div className="ws-gallery-grid" style={{ gridTemplateColumns: `repeat(${galleryColumns(alle.length, block.role)}, 1fr)` }}>
+        {items.map((it) => {
+          const k = alle.indexOf(it)
+          return (
           <div className="ws-gallery-item" key={it.id}>
             <div
               className={`ws-gallery-frame ${edit ? 'ws-gallery-pick' : ''}`}
               onClick={edit ? () => actions?.pickImage?.(block.id, it.id) : undefined}
               title={edit ? 'Bild wählen' : undefined}
             >
-              {it.image ? <img src={it.image.dataUrl} alt={it.description} /> : <div className="ws-image-placeholder">{it.description}</div>}
-              {items.length > 1 && <span className="ws-gallery-number">{k + 1}</span>}
+              {it.image ? (
+                <img src={it.image.dataUrl} alt={it.description} />
+              ) : (
+                <div className="ws-image-placeholder ws-bild-fehlt-rahmen" title={edit ? 'Bild suchen' : undefined}>
+                  <strong>Bild fehlt</strong> {it.description}
+                </div>
+              )}
+              {alle.length > 1 && <span className="ws-gallery-number">{k + 1}</span>}
             </div>
             {(it.caption || edit) && (
               <div className="ws-gallery-caption">
@@ -52,7 +67,8 @@ export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
       {(block.caption || edit) && (
         <figcaption>

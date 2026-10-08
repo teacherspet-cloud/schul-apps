@@ -54,6 +54,9 @@ import { useMediaQuery } from '@mantine/hooks'
 import type { SchrittStand, Stand, Status, Weg } from '@shared/reihe'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
+import { WeiterKnopf } from './ReiheWeiter'
+import { naechsterSchritt, schrittErledigt } from '@shared/reiheWeiter'
+import type { DiagnoseErgebnis } from '@shared/diagnoseAuswertung'
 
 interface SchrittSicht {
   id: string
@@ -73,6 +76,8 @@ interface ReiheDaten {
   id: string
   titel: string
   oberthema: string
+  /** Leitfrage der Reihe (08.10.2026, Reihenmuster) */
+  leitfrage?: string
   fach: string
   /** Reihenart (08.10.2026): digital = alles am Gerät, geschafft nach Ergebnis */
   art?: 'digital' | 'gemischt' | 'planung'
@@ -188,6 +193,11 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
           {d.fach} · {d.oberthema}
         </Text>
         <Title order={3}>{d.titel}</Title>
+        {d.leitfrage && (
+          <Text fs="italic" mt={4} data-reihe-leitfrage>
+            Leitfrage: {d.leitfrage}
+          </Text>
+        )}
         <Group mt="sm" gap="xs" align="center">
           <Progress value={d.weg.fortschritt * 100} style={{ flex: 1 }} size="lg" color={d.weg.fertig ? 'green' : 'blue'} data-fortschritt />
           <Text fw={700}>{Math.round(d.weg.fortschritt * 100)} %</Text>
@@ -261,6 +271,13 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
           )}
         </Group>
       </Card>
+
+      {/* Weiter mit dem nächsten offenen Schritt (08.10.2026) – deutlich oben, statt ihn in der Liste zu suchen */}
+      {!d.weg.fertig && naechsterSchritt(d.schritte, d.weg.schritte) && (
+        <Paper withBorder p="sm" radius="lg" style={{ borderColor: 'var(--mantine-color-blue-5)' }} data-weiter-mit>
+          <WeiterKnopf d={d} zurueck={false} praefix="Weiter mit" />
+        </Paper>
+      )}
 
       {d.schritte.map((s, i) => {
         const l = lage.get(s.id)!
@@ -417,7 +434,13 @@ function SchrittSeite({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () =
           {st.bewertung.text || (st.bewertung.geschafft ? 'Deine Lehrkraft hat den Schritt bestätigt.' : 'Sieh dir die Aufgabe noch einmal an.')}
         </Alert>
       )}
-      {l.status === 'geschafft' && !st.bewertung && <Alert color="green">Geschafft – weiter geht es auf dem Weg.</Alert>}
+      {l.status === 'geschafft' && !st.bewertung && (
+        <Alert color="green" data-schritt-geschafft>
+          Geschafft – weiter geht es auf dem Weg.
+        </Alert>
+      )}
+      {/* Erledigt (08.10.2026): gleich zum nächsten Schritt – auch nach Lernkarten, Diagnose, Abgabe … */}
+      {schrittErledigt(l) && <WeiterKnopf d={d} aktuell={s.id} />}
       {s.inhalt && l.status !== 'gesperrt' && <Inhalt d={d} s={s} st={st} status={l.status} neu={neu} />}
       {l.status !== 'gesperrt' && <Fragen d={d} s={s} neu={neu} />}
     </Stack>
@@ -928,21 +951,27 @@ function Diagnose({
     // weiter unten das Formular
   } else if (st.diagnose && ab)
     return (
-      <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
-        {Date.now() >= ab ? (
-          <Button mt="xs" variant="light" onClick={() => setNochmal(true)} data-diagnose-nochmal>
-            Noch einmal versuchen
-          </Button>
-        ) : (
-          `Noch einmal möglich ab ${new Date(ab).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`
-        )}
-      </Alert>
+      <Stack>
+        <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
+          {Date.now() >= ab ? (
+            <Button mt="xs" variant="light" onClick={() => setNochmal(true)} data-diagnose-nochmal>
+              Noch einmal versuchen
+            </Button>
+          ) : (
+            `Noch einmal möglich ab ${new Date(ab).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`
+          )}
+        </Alert>
+        <DiagnoseErgebnisse fragen={fragen} ergebnis={st.diagnose.ergebnis} />
+      </Stack>
     )
   else if (st.diagnose)
     return (
-      <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
-        Danke! Auf deinem Weg siehst du jetzt, was du schon kannst und was als Nächstes dran ist.
-      </Alert>
+      <Stack>
+        <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
+          Danke! Auf deinem Weg siehst du jetzt, was du schon kannst und was als Nächstes dran ist.
+        </Alert>
+        <DiagnoseErgebnisse fragen={fragen} ergebnis={st.diagnose.ergebnis} />
+      </Stack>
     )
   return (
     <Stack data-diagnose>
@@ -985,6 +1014,44 @@ function Diagnose({
       >
         Auswerten
       </Button>
+    </Stack>
+  )
+}
+
+/** Je Frage ✓/✗ mit der richtigen Antwort und ggf. dem kurzen Hinweis der KI (08.10.2026, shared/diagnoseAuswertung.ts) */
+function DiagnoseErgebnisse({ fragen, ergebnis }: { fragen: { frage: string }[]; ergebnis?: DiagnoseErgebnis[] }): React.JSX.Element | null {
+  if (!ergebnis?.length) return null
+  return (
+    <Stack gap="xs" data-diagnose-ergebnis>
+      {ergebnis.map((e, n) => (
+        <Card key={n} withBorder padding="sm" style={{ borderLeft: `4px solid var(--mantine-color-${e.richtig ? 'green' : 'red'}-6)` }} data-diagnose-frage={e.richtig ? 'richtig' : 'falsch'}>
+          <Group gap="xs" wrap="nowrap" align="start">
+            <ThemeIcon size={24} radius="xl" color={e.richtig ? 'green' : 'red'} style={{ flexShrink: 0 }} aria-label={e.richtig ? 'richtig' : 'falsch'}>
+              <Text fw={800} size="sm" c="white">
+                {e.richtig ? '✓' : '✗'}
+              </Text>
+            </ThemeIcon>
+            <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+              <Text size="sm" fw={600} style={{ overflowWrap: 'anywhere' }}>
+                {n + 1}. {fragen[n]?.frage ?? ''}
+              </Text>
+              <Text size="sm" style={{ overflowWrap: 'anywhere' }}>
+                Deine Antwort: {e.antwort || '–'}
+              </Text>
+              {!e.richtig && e.loesung && (
+                <Text size="sm" c="green.8" style={{ overflowWrap: 'anywhere' }} data-diagnose-loesung>
+                  Richtig: {e.loesung}
+                </Text>
+              )}
+              {e.hinweis && (
+                <Text size="xs" c="dimmed">
+                  {e.hinweis}
+                </Text>
+              )}
+            </Stack>
+          </Group>
+        </Card>
+      ))}
     </Stack>
   )
 }

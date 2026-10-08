@@ -26,6 +26,7 @@ import { buildWorksheetHtml } from './render/printHtml'
 import { useArbeitsblatt } from './store'
 import { messeSeiten } from './render/seitenMessen'
 import { taskNumbersFor } from './render/SheetPages'
+import { aufgabenSchluessel } from './blattSchluessel'
 
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
 export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
@@ -40,13 +41,16 @@ export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
     if (b.type !== 'task') return []
     const nr = nummern.get(b.id) ?? 0
     const teile = b.parts.map((p, i) => `${String.fromCharCode(97 + i)}) ${plainText(p.instruction)}`)
+    // Lösungsschlüssel für die automatische Prüfung beim Einreichen (08.10.2026)
+    const schluessel = aufgabenSchluessel(b)
     return [
       {
         nr,
         anweisung: [plainText(b.instruction), ...teile].join(' '),
         erwartung: describeBlock(b),
         ...(b.freiwillig ? { freiwillig: true } : {}),
-        ...(karten.get(nr) ? { hilfekarten: karten.get(nr) } : {})
+        ...(karten.get(nr) ? { hilfekarten: karten.get(nr) } : {}),
+        ...(schluessel ? { schluessel } : {})
       }
     ]
   })

@@ -20,6 +20,7 @@ import {
   abschnitteAus,
   leiter,
   quelleAusTitel,
+  quelleUnits,
   reiheVon,
   SCHWELLE,
   EINGEUEBT_AB,
@@ -150,7 +151,10 @@ async function wegeFuer(ich: NutzerInfo): Promise<Weg[]> {
     const zugewiesen = new Set(
       liste
         .filter((x) => x.buch.id === buch.id)
-        .flatMap((x) => abschnitte.filter((a) => a.unit === x.q.unit && x.q.abschnitte.includes(a.section)).map((a) => a.key))
+        // Mehrere Units je Kurs (08.10.2026): jede Unit mit ihren Abschnitten
+        .flatMap((x) =>
+          quelleUnits(x.q).flatMap((u) => abschnitte.filter((a) => a.unit === u.unit && u.abschnitte.includes(a.section)).map((a) => a.key))
+        )
     )
     const ws = wegStand(ich.id, key)
     const fachVon = (v: Vokabel): number => Math.max(ws.woerter[v.id]?.fach ?? 0, termFach.get(normal(v.term)) ?? 0)

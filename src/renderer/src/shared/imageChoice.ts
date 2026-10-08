@@ -100,7 +100,12 @@ async function searchHits(queries: string[], source: OnlineImageSource, services
   return merged
 }
 
-export async function gatherCandidates(need: ImageNeed, services: ImageServices, perKind = 3): Promise<ImageCandidate[]> {
+/**
+ * `fotoQuelle` (08.10.2026): Woher Fotos kommen – Standard Wikimedia Commons. Der Archiv-Durchgang für Geschichte
+ * und Politik (arbeitsblatt/generation/worksheetImages.ts) sucht einmal über Openverse (Museen, Bibliotheken,
+ * Flickr Commons).
+ */
+export async function gatherCandidates(need: ImageNeed, services: ImageServices, perKind = 3, fotoQuelle: OnlineImageSource = 'wikimedia'): Promise<ImageCandidate[]> {
   const jobs: (() => Promise<ImageCandidate>)[] = []
 
   if (need.kinds.includes('pictogram')) {
@@ -162,7 +167,7 @@ export async function gatherCandidates(need: ImageNeed, services: ImageServices,
   }
   // Reihenfolge wie in need.kinds (die wichtigste Bildart zuerst)
   for (const kind of need.kinds) {
-    if (kind === 'photo') await online('photo', 'wikimedia', need.queries, perKind + 1)
+    if (kind === 'photo') await online('photo', fotoQuelle, need.queries, perKind + 1)
     if (kind === 'clipart') await online('clipart', 'clipart', need.queries, perKind)
   }
 

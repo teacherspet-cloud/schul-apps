@@ -500,6 +500,8 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         bis: ausFeld(bis, '23:59:00'),
         gaeste: art === 'code' || qr,
         ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
+        // Mehrere Abschnitte/Units (08.10.2026): je Abschnitt ein Teil im Kasten „Freigegebene Abschnitte"
+        ...(auswahl.teile ? { teile: auswahl.teile } : {}),
         ...(verben ? { verben } : {})
       })
       notifySuccess(
@@ -785,7 +787,14 @@ function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void })
     try {
       const mit = await mitBildern(auswahl)
       const verben = await verbenDerListe(mit)
-      const r = await senden<{ neu: number }>(`/server/vokabeln/${id}/woerter`, { woerter: mit.woerter, titel: auswahl.titel, ...(verben ? { verben } : {}) })
+      // Herkunft und Abschnitte mitschicken (08.10.2026): weitere Units zählen für Grammatik, Vokabelweg und Abzeichen
+      const r = await senden<{ neu: number }>(`/server/vokabeln/${id}/woerter`, {
+        woerter: mit.woerter,
+        titel: auswahl.titel,
+        ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
+        ...(auswahl.teile ? { teile: auswahl.teile } : {}),
+        ...(verben ? { verben } : {})
+      })
       notifySuccess(r.neu ? `${r.neu} Vokabeln hinzugefügt – sie kommen als neue Wörter in den Kasten.` : 'Alle diese Vokabeln waren schon dabei.')
       schliessen()
     } catch (e) {
@@ -1664,6 +1673,7 @@ function Lernstand({
   const [ziel, setZiel] = useState<number | string>('')
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
   useEffect(laden, [laden])
+  const [problemOffen, setProblemOffen] = useGemerkt('vok-problemwoerter-offen', false)
   if (!d) return <Loader size="sm" />
   const aendern = (was: string, daten: Record<string, unknown>): void =>
     void senden(`/server/vokabeln/${id}/${was}`, daten).then(laden, (e: unknown) => notifyError(e))
@@ -1794,6 +1804,8 @@ function Lernstand({
           </Button>
         )}
       </Group>
+      {/* Grammatik direkt unter „Vokabeln hinzufügen“ (08.10.2026, Wunsch der Lehrkraft) */}
+      <KursGrammatik vokId={id} hinzufuegen={() => setGrammatik(true)} geoeffnet={grammatikOffen} oeffnen={setGrammatikOffen} stand={grammatikStand} />
       {grammatik && (
         <GrammatikDazu
           vokId={id}
@@ -1938,49 +1950,61 @@ function Lernstand({
       </SimpleGrid>
 
       <Card withBorder display={mitWoertern ? undefined : 'none'}>
-        <Group gap="xs" mb="xs">
-          <IconBooks size={18} />
-          <Text fw={700}>Problemwörter der Lerngruppe</Text>
-        </Group>
-        {d.problem.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            Noch keine – sie erscheinen, sobald genug geübt ist.
-          </Text>
-        ) : (
-          <Table striped data-karten>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Wort</Table.Th>
-                <Table.Th>Fehlerquote</Table.Th>
-                <Table.Th>Typische Falschantworten</Table.Th>
-                <Table.Th style={{ width: 40 }} />
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {d.problem.map((p) => (
-                <Table.Tr key={p.id} data-problemwort={p.id}>
-                  <Table.Td>
-                    <b>{p.term}</b> – {p.translation}
-                  </Table.Td>
-                  <Table.Td>{Math.round(p.quote * 100)} %</Table.Td>
-                  <Table.Td>{p.typisch.join(' · ') || '–'}</Table.Td>
-                  <Table.Td>
-                    <Tooltip label="Aus der Liste nehmen – kommt wieder, wenn neue Fehler dazukommen">
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => aendern('problem-aus', { id: p.id })}
-                        aria-label={`${p.term} aus der Liste nehmen`}
-                        data-problem-aus={p.id}
-                      >
-                        <IconX size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Table.Td>
+        <KastenKopf
+          titel={
+            <Group gap="xs" component="span">
+              <IconBooks size={18} />
+              <span>Problemwörter der Lerngruppe{d.problem.length ? ` (${d.problem.length})` : ''}</span>
+            </Group>
+          }
+          offen={problemOffen}
+          umschalten={() => setProblemOffen(!problemOffen)}
+          data-problemwoerter-kopf
+        />
+        {/* Auf- und zuklappbar, Vorgabe zu (08.10.2026, Wunsch der Lehrkraft) */}
+        {problemOffen && (
+          <div style={{ marginTop: 8 }}>
+          {d.problem.length === 0 ? (
+            <Text size="sm" c="dimmed">
+              Noch keine – sie erscheinen, sobald genug geübt ist.
+            </Text>
+          ) : (
+            <Table striped data-karten>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Wort</Table.Th>
+                  <Table.Th>Fehlerquote</Table.Th>
+                  <Table.Th>Typische Falschantworten</Table.Th>
+                  <Table.Th style={{ width: 40 }} />
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {d.problem.map((p) => (
+                  <Table.Tr key={p.id} data-problemwort={p.id}>
+                    <Table.Td>
+                      <b>{p.term}</b> – {p.translation}
+                    </Table.Td>
+                    <Table.Td>{Math.round(p.quote * 100)} %</Table.Td>
+                    <Table.Td>{p.typisch.join(' · ') || '–'}</Table.Td>
+                    <Table.Td>
+                      <Tooltip label="Aus der Liste nehmen – kommt wieder, wenn neue Fehler dazukommen">
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => aendern('problem-aus', { id: p.id })}
+                          aria-label={`${p.term} aus der Liste nehmen`}
+                          data-problem-aus={p.id}
+                        >
+                          <IconX size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+          </div>
         )}
       </Card>
 
@@ -1990,7 +2014,6 @@ function Lernstand({
         entfernen={setEntfernen}
         kurs={{ id, fach: d.fach, sprache: d.sprache ?? '', lerngruppe: d.lerngruppe, woerter: d.woerter, quelle: d.quelle, lerngruppeId: d.lerngruppeId }}
       />
-      <KursGrammatik vokId={id} hinzufuegen={() => setGrammatik(true)} geoeffnet={grammatikOffen} oeffnen={setGrammatikOffen} stand={grammatikStand} />
       <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">
         {entfernen && (
           <Stack gap="sm">

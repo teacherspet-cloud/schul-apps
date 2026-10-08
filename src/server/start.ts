@@ -21,11 +21,12 @@ import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
 import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
+import { kiAblagenAufraeumen } from './kiAblage'
 import { registriereKanaele, type Handle } from '../main/kanaele'
 import { setzeGeheimRueckfall } from '../main/services/storage/settings'
 import { setzeRolleQuelle } from '../main/services/rolle'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
-import { abgelaufeneSitzungenEntfernen, datenbank, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
+import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
 import { hauptschluessel, passwortHash } from './geheim'
 import { ADMIN_BENUTZER } from './anmeldung'
 import { serverUmgebung } from './umgebung'
@@ -94,6 +95,19 @@ async function main(): Promise<void> {
 
   // Personenbezogenes verschlüsselt (feldschutz.ts, shims/fs.ts): Altdateien der Ablagen einmal umschreiben
   const umgeschrieben = ablageVerschluesseln()
+  // Reste der KI-Programme (Protokolle, Verläufe, Arbeitsordner) – beim Start ohne Schonfrist, danach alle 10 Minuten
+  try {
+    kiAblagenAufraeumen(DATEN, Date.now(), 0)
+  } catch {
+    /* beim nächsten Durchgang */
+  }
+  setInterval(() => {
+    try {
+      kiAblagenAufraeumen(DATEN)
+    } catch {
+      /* beim nächsten Durchgang */
+    }
+  }, 10 * 60 * 1000).unref()
   if (umgeschrieben) console.log(`${umgeschrieben} Dateien der Ablagen verschlüsselt.`)
 
   const hosts = (env.SCHULAPPS_HOSTS || new URL(adresse).host)
@@ -169,7 +183,10 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => void ende())
   process.on('SIGINT', () => void ende())
   // Ein Fehler außerhalb einer Anfrage soll den Server nicht beenden – laut melden und weiter
-  process.on('unhandledRejection', (e) => console.error('Unbehandelt:', e))
+  // Nur Art, gekürzte Meldung und Aufrufstelle – keine Inhalte (Meldungen zitieren sonst Anfragen, 08.10.2026)
+  process.on('unhandledRejection', (e) =>
+    console.error('Unbehandelt:', fehlerKurz(e), e instanceof Error ? (e.stack ?? '').split('\n').filter((z) => /^\s+at /.test(z)).slice(0, 6).join('\n') : '')
+  )
 }
 
 void main().catch((e: unknown) => {

@@ -72,7 +72,11 @@ const aufgabeSchema = (latein: boolean, extra = false): Record<string, unknown> 
     ...(extra ? EXTRA_FELDER : {})
   })
 
-const paketSchema = (latein: boolean, extra = false): Record<string, unknown> =>
+/**
+ * Mehrere Themen in einer Freigabe (08.10.2026, abgestimmt): Jede Regelkarte nennt ihr Thema – beim Freigeben wird daraus
+ * ein Training je Thema (server/grammatikTeilen.ts).
+ */
+const paketSchema = (latein: boolean, extra = false, themen: string[] = []): Record<string, unknown> =>
   O({
     regeln: A(
       O({
@@ -80,7 +84,8 @@ const paketSchema = (latein: boolean, extra = false): Record<string, unknown> =>
         titel: S('kurzer Titel der Regel'),
         erklaerung: S('2–4 Sätze auf Deutsch, altersgerecht'),
         beispiele: A(S(), '2–3 Beispielsätze in der Zielsprache'),
-        ...(extra ? { stolperfallen: A(S(), 'Förderaufgaben: 2–3 typische Stolperfallen (aus den Fehlern), je ein kurzer Satz auf Deutsch; sonst leer') } : {})
+        ...(extra ? { stolperfallen: A(S(), 'Förderaufgaben: 2–3 typische Stolperfallen (aus den Fehlern), je ein kurzer Satz auf Deutsch; sonst leer') } : {}),
+        ...(themen.length > 1 ? { thema: { type: 'string', enum: themen, description: 'das Thema, zu dem die Regel gehört (genau wie in der Liste)' } } : {})
       })
     ),
     aufgaben: A(aufgabeSchema(latein, extra))
@@ -140,6 +145,16 @@ function extraAuftrag(e: NonNullable<GrammatikAuftrag['extra']>): { system: stri
     user: `Sicher beherrschte Regel(n):\n${regeln}\n\nBekannte Grammatik (darf vorkommen): ${e.bekannt.join('; ') || 'nur die Regel(n) oben'}`
   }
 }
+
+/** Themen eines Auftrags (mehrere stehen mit „ · " getrennt im Thema) */
+export const themenVon = (thema: string): string[] => [
+  ...new Set(
+    thema
+      .split(' · ')
+      .map((t) => t.trim())
+      .filter(Boolean)
+  )
+]
 
 const istLatein = (a: GrammatikAuftrag): boolean => a.sprache === 'la' || /latein/i.test(a.fach)
 
@@ -201,14 +216,16 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
 Zielsprache: ${a.sprache}`
       : `${
           a.thema.includes(' · ')
-            ? `Themen (gemischt üben, Aufgaben gleichmäßig verteilen; Regelkarten zu jedem Thema): ${a.thema.split(' · ').join('; ')}`
+            ? `Themen (Aufgaben gleichmäßig verteilen; Regelkarten zu jedem Thema, jede Regel gehört zu GENAU EINEM Thema und nennt es in „thema"; jede Aufgabe übt nur die Regel ihrer regelId): ${a.thema
+                .split(' · ')
+                .join('; ')}`
             : `Thema: ${a.thema}`
         }\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
           a.teilformen
             ? `\n\n${a.teilformen}\nVerteile die Aufgaben auf die Teilformen zum Bilden; Teilformen „nur erkennen" nur in Auswahl- und Fehler-Aufgaben.`
             : ''
         }`,
-    schema: paketSchema(latein, Boolean(extra))
+    schema: paketSchema(latein, Boolean(extra), extra ? [] : themenVon(a.thema))
   })
   let paket = paketBereinigt(roh, a.thema)
   melde(`Die KI prüft ${paket.aufgaben.length} Aufgaben …`)

@@ -9,10 +9,15 @@
  * Klassen": ältere Lerngruppen hießen „englisch" – gewählt, bevor es den Fächerkatalog gab). Nur, was der Katalog kennt
  * (shared/faecher.ts `fachSchreibweise`); eigene Fächer bleiben. Die Fach-Spalten sind nicht verschlüsselt
  * (feldschutz.ts); geschrieben wird trotzdem über den geschützten Zugang, den `datenbank()` übergibt.
+ *
+ * grammatik-je-thema-2026-10-08: Kurs-Grammatik mit mehreren Themen in ein Training je Thema teilen (abgestimmt mit der
+ * Lehrkraft; grammatikTeilen.ts). Die erste Gruppe behält die Kennung, der Lernstand zieht je Aufgabe mit um.
  */
 import type { DatabaseSync } from 'node:sqlite'
 import { fachSchreibweise } from '../shared/faecher'
 import { protokoll } from './diagnose'
+import { grammatikThemenTeilen } from './grammatikTeilen'
+import { codePruefwertAusAlt } from './feldschutz'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
 export const ZEIT_GRENZE: Record<string, number> = { blitz: 30, richtiggehoert: 30, formenblitz: 30, verbblitz: 30, richtigfalsch: 30 }
@@ -47,7 +52,8 @@ export function faecherVereinheitlichen(d: DatabaseSync): number {
   }
   // Onlinetests führen das Fach in den Einstellungen (JSON)
   if (tabelleDa(d, 'onlinetests')) {
-    for (const z of d.prepare("SELECT rowid AS r, einstellungen FROM onlinetests WHERE einstellungen LIKE '%\"fach\"%'").all() as { r: number; einstellungen: string }[]) {
+    // Einstellungen sind verschlüsselt (08.10.2026) – kein LIKE in SQL, sondern nach dem Entschlüsseln prüfen
+    for (const z of d.prepare('SELECT rowid AS r, einstellungen FROM onlinetests').all() as { r: number; einstellungen: string }[]) {
       let e: { fach?: unknown }
       try {
         e = JSON.parse(z.einstellungen) as typeof e
@@ -85,10 +91,53 @@ function rekordeZeitBereinigen(d: DatabaseSync): string {
   return `${entfernt} unnatürlich hohe Bestwerte zurückgesetzt`
 }
 
+/**
+ * Prüfwerte der Gäste-Codes (vok_gaeste.wieder/anmelde, gram_gaeste.wieder) von ungesalzenem SHA-256 auf HMAC mit dem
+ * Hauptschlüssel umstellen (08.10.2026, feldschutz.ts `codePruefwertAusAlt`). Der Code selbst wird nicht gebraucht.
+ */
+export function codePruefwerteUmstellen(d: DatabaseSync): number {
+  let n = 0
+  for (const [tabelle, spalten] of [
+    ['vok_gaeste', ['wieder', 'anmelde']],
+    ['gram_gaeste', ['wieder']]
+  ] as const) {
+    if (!tabelleDa(d, tabelle)) continue
+    for (const spalte of spalten) {
+      if (!spalteDa(d, tabelle, spalte)) continue
+      for (const z of d.prepare(`SELECT rowid AS r, ${spalte} AS w FROM ${tabelle}`).all() as { r: number; w: string }[]) {
+        const neu = codePruefwertAusAlt(String(z.w ?? ''))
+        if (neu === z.w) continue
+        d.prepare(`UPDATE ${tabelle} SET ${spalte} = ? WHERE rowid = ?`).run(neu, z.r)
+        n++
+      }
+    }
+  }
+  return n
+}
+
+/**
+ * Klartext-Reste nach dem Verschlüsseln entfernen (08.10.2026): Alte Fassungen der Zeilen liegen sonst noch in freien
+ * Seiten der Datenbank und im WAL. Einmal den WAL zurückschreiben und leeren, dann VACUUM (baut die Datei neu; mit
+ * secure_delete, datenbank.ts). Läuft beim Start, also ohne offene Transaktion.
+ */
+export function klartextResteEntfernen(d: DatabaseSync): string {
+  d.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  d.exec('VACUUM')
+  d.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  return 'Datenbank neu geschrieben (VACUUM), WAL geleert'
+}
+
 /** Einmalige Aufgaben in fester Reihenfolge – jede liefert den Satz fürs Protokoll */
 const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   ['rekorde-zeit-2026-10-08', rekordeZeitBereinigen],
-  ['faecher-schreibweise-2026-10-08', (d) => `${faecherVereinheitlichen(d)} Fachnamen in die Schreibweise des Katalogs gebracht`]
+  ['faecher-schreibweise-2026-10-08', (d) => `${faecherVereinheitlichen(d)} Fachnamen in die Schreibweise des Katalogs gebracht`],
+  [
+    'grammatik-je-thema-2026-10-08',
+    (d) => `${grammatikThemenTeilen(d, (z) => protokoll('langsam', `WARTUNG grammatik-je-thema-2026-10-08: ${z}`))} Grammatiktrainings je Thema geteilt`
+  ],
+  ['codes-hmac-2026-10-08', (d) => `${codePruefwerteUmstellen(d)} Code-Prüfwerte auf HMAC umgestellt`],
+  // Zuletzt: nach allen Umstellungen die Klartext-Reste entfernen
+  ['klartext-reste-2026-10-08', klartextResteEntfernen]
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

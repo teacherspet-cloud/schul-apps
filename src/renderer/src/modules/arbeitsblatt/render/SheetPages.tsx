@@ -9,8 +9,8 @@ import type { Sheet, TextBlock, Worksheet, WorksheetMeta, WsBlock } from '../mod
 import { BlockView, SeitenFussnoten } from './BlockView'
 import { subjectById } from '../model/subjects'
 import { contentInsets, PageFrame, PageInfo } from './PageFrame'
-import { MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem } from './paginate'
-import { WsContext, WsContextValue, WsMode, isKeyMode } from './WsContext'
+import { bindeKurzeTabellen, MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem, tabelleZusammenhalten } from './paginate'
+import { WsContext, WsContextValue, WsMode, isEditMode, isKeyMode } from './WsContext'
 import { DEFAULT_CITATION_STYLE, formatCitation } from '../../../shared/citation'
 import type { CitationStyle } from '@shared/types'
 import { canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
@@ -24,7 +24,7 @@ import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
 import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
-import { isMaterial, loeseMaterialverweise, materialNummern, verschluesseleBaustein } from '../didactics/integrity'
+import { isMaterial, loeseMaterialverweise, materialNummern, mitSeitenHinweisen, seitenJeBaustein, verschluesseleBaustein } from '../didactics/integrity'
 import { ueberlaufUnten } from './seitenUeberlauf'
 import { anmerkungenJeAbsatz, anmerkungenImStueck, anmerkungsArt, anmerkungenVon, type Anmerkung } from '../didactics/anmerkungen'
 import { aufAbsaetze, zeilenBaender, zeilenEinheiten, zeilenSchnitte, type AbsatzMessung, type Streifen, type ZeilenStelle } from './zeilenTeilung'
@@ -341,9 +341,14 @@ export function SheetPages({
   nurSeite?: number
 }): React.JSX.Element {
   // Dargestellt wird die Fassung mit aufgelösten Materialverweisen (siehe `zurAnzeige`)
-  const sheet = zurAnzeige(gespeichert)
+  const angezeigt = zurAnzeige(gespeichert)
   const ownPhrasePage = phraseSheetModus(ws.meta) === 'blatt'
-  const pages = plans && plans.length ? plans : fallbackPlan(sheet, ownPhrasePage)
+  const pages = plans && plans.length ? plans : fallbackPlan(angezeigt, ownPhrasePage)
+  /*
+   * Aufgabe weit weg vom Material (08.10.2026): „M1 (S. 1)", wenn das Material zwei oder mehr Seiten davor steht
+   * (didactics/integrity.ts). Nicht im Editor – dort würde der Hinweis beim Bearbeiten mitgespeichert.
+   */
+  const sheet = plans?.length && !isEditMode(context.mode) ? mitSeitenHinweisen(angezeigt, seitenJeBaustein(plans)) : angezeigt
   const byId = new Map(sheet.blocks.map((b) => [b.id, b]))
   const sides = new Map(
     blockLayout(sheet.blocks, ownPhrasePage)
@@ -1119,7 +1124,9 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
           block?.type === 'text' && unitEls.length
             ? textZeilen(block, unitEls, !block.illustration && !wrap.querySelector('.ws-side-image'), fontPx)
             : undefined
-        const splittable = Boolean(block && TEILBAR.has(block.type)) && (zeilen ? zeilen.units.length : unitEls.length) > 1
+        // Kurze Tabellen (≤ 8 Zeilen oder ≤ 1/3 Seite) wandern geschlossen (08.10.2026, shared/render/paginate.ts)
+        const kurzeTabelle = block?.type === 'table' && tabelleZusammenhalten(unitEls.length, height, otherHeight)
+        const splittable = Boolean(block && TEILBAR.has(block.type)) && !kurzeTabelle && (zeilen ? zeilen.units.length : unitEls.length) > 1
         if (splittable) {
           const units = zeilen?.units ?? einheitenHoehen(unitEls)
           const unitSum = units.reduce((a, b) => a + b, 0)
@@ -1155,7 +1162,21 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
            * in der Einheit davor – auf der neuen Seite steht sie trotzdem: also immer anrechnen.
            */
           // Zeilen-Einheiten eines Texts binden nichts und wiederholen nichts
-          const unitGlue = zeilen ? [] : unitEls.map((u) => u.hasAttribute('data-bindet'))
+          const gebunden = zeilen ? [] : unitEls.map((u) => u.hasAttribute('data-bindet'))
+          /*
+           * Innere Tabellen (Ausfülltabelle, Richtig/Falsch …) als Zeilen-Einheiten: kurze bleiben zusammen (08.10.2026).
+           * Eine Tabelle = aufeinanderfolgende <tr>-Einheiten derselben <table>.
+           */
+          const innere: { von: number; bis: number }[] = []
+          if (!zeilen && block?.type !== 'table')
+            unitEls.forEach((u, k) => {
+              const t = u.tagName === 'TR' ? u.closest('table') : null
+              if (!t) return
+              const letzte = innere[innere.length - 1]
+              if (letzte && letzte.bis === k && unitEls[k - 1]?.closest('table') === t) letzte.bis = k + 1
+              else innere.push({ von: k, bis: k + 1 })
+            })
+          const unitGlue = innere.length ? bindeKurzeTabellen(units, gebunden, innere, otherHeight) : gebunden
           const unitRepeat = (zeilen ? [] : unitEls).map((u) => {
             if (block?.type === 'table' || u.tagName !== 'TR') return 0
             const kopf = u.closest('table')?.tHead

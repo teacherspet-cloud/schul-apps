@@ -61,7 +61,9 @@ export function datenbank(datei = join(DATEN, 'schulapps.db')): DatabaseSync {
   if (db) return db
   ordner()
   const roh = new DatabaseSync(datei)
-  roh.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
+  // secure_delete (08.10.2026): Gelöschte oder überschriebene Inhalte (z. B. der Klartext vor dem Verschlüsseln) werden
+  // mit Nullen überschrieben, statt als freie Seiten in der Datei liegen zu bleiben
+  roh.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA secure_delete = ON;')
   roh.exec(SCHEMA)
   ergaenze(roh)
   // Personenbezogenes nur verschlüsselt (feldschutz.ts): alle vorhandenen Tabellen gleich beim Start umschreiben
@@ -335,6 +337,20 @@ export function setzeServerGeheimnis(schluessel: string, wert: string): void {
 }
 
 // ---------------------------------------------------------------- Prüfprotokoll
+
+/**
+ * Fehler kurz und ohne Inhalte fürs Protokoll (08.10.2026): Meldungen zitieren oft Titel, Antworten oder Anfragekörper.
+ * Behalten wird die Art des Fehlers und der Anfang der Meldung ohne zitierten Text und ohne Zahlenkolonnen.
+ */
+export function fehlerKurz(e: unknown): string {
+  const art = e instanceof Error ? e.name : 'Fehler'
+  if (art === 'SyntaxError') return art
+  const meldung = (e instanceof Error ? e.message : String(e))
+    .replace(/\s+/g, ' ')
+    .replace(/„[^“”"]*[“”"]|"[^"]*"|'[^']*'|«[^»]*»|`[^`]*`/g, '…')
+    .slice(0, 80)
+  return `${art}: ${meldung}`
+}
 
 /** Ein Eintrag OHNE Klarnamen und ohne Inhalte – nur, was geschah */
 export function protokolliereServer(art: string, text: string, nutzerId?: string): void {

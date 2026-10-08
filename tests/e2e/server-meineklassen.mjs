@@ -197,9 +197,10 @@ try {
   const reiter = (await p.locator('[data-klasse-detail] [role="tab"]').allInnerTexts()).map((r) => r.trim())
   pruefe(
     /^Unterrichtsreihen & Blätter/.test(reiter[0]) &&
-      /^Vokabeln & Grammatik/.test(reiter[1]) &&
-      /^Tests & Noten/.test(reiter[2]) &&
-      /^Lernende/.test(reiter[3]),
+      /^Vokabeln/.test(reiter[1]) &&
+      /^Grammatik/.test(reiter[2]) &&
+      /^Tests & Noten/.test(reiter[3]) &&
+      /^Lernende/.test(reiter[4]),
     `Reiter-Reihenfolge (${reiter.join(' | ')})`
   )
   // Reihen & Blätter: Standard offen + Frist zuerst; Pfeile sortieren, Rechtsklick filtert
@@ -231,7 +232,10 @@ try {
   pruefe(arten.join(',') === 'pdf,word(aus),drucken,iserv(aus)', `PDF, Word (ohne Original aus), Drucken, IServ (im Browser aus): ${arten.join(', ')}`)
   await p.screenshot({ path: join(out, '3-reihen-blaetter.png'), fullPage: true })
   await p.keyboard.press('Escape')
-  await p.getByRole('tab', { name: /^Vokabeln & Grammatik/ }).click()
+  // Getrennte Reiter (08.10.2026): Grammatik eigener Reiter
+  await p.getByRole('tab', { name: /^Grammatik/ }).click()
+  pruefe(await da(p.locator('[data-grammatik-reiter], [data-keine-grammatik]').first()), 'Reiter „Grammatik“ zeigt die Grammatik der Klasse')
+  await p.getByRole('tab', { name: /^Vokabeln/ }).click()
   pruefe(await da(p.locator('[data-kurs="Weather"] [data-material="Kurs"]')), 'Kurs als eine Karte')
   pruefe((await p.locator('[data-kurs="Weather"] [data-kurs-stand]').count()) === 1, 'Kurs-Karte: Balken sicher / kennengelernt / neu')
   pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/heute aktiv \d+\/\d+/)), 'Kurs-Karte: „heute aktiv n/m“')
@@ -264,7 +268,10 @@ try {
   // Geschichte: kein Reiter „Vokabeln & Grammatik"
   await p.locator('[data-fach-leiste] [data-fach="Geschichte"]').click()
   await p.locator(`[data-klasse-detail="${K5} – Geschichte"]`).waitFor({ timeout: 10000 })
-  pruefe((await p.getByRole('tab', { name: /^Vokabeln & Grammatik/ }).count()) === 0, 'Geschichte: ohne „Vokabeln & Grammatik“')
+  pruefe(
+    (await p.getByRole('tab', { name: /^Vokabeln/ }).count()) === 0 && (await p.getByRole('tab', { name: /^Grammatik/ }).count()) === 0,
+    'Geschichte: ohne Reiter „Vokabeln“ und „Grammatik“'
+  )
   await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
   await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
 

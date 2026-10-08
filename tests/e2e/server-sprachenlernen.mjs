@@ -274,6 +274,14 @@ try {
 
   // ---------- Lehrwerk-Stand einer Lerngruppe (Meine Klassen)
   const g = await post('/server/lerngruppen/anlegen', { name: '5x', fach: 'Englisch', iservGruppe: 'klasse:5x' })
+  // Kurs für die Klasse (08.10.2026): automatisch, leer, Überschrift ohne Jahr; Lernende sehen ihn noch nicht
+  const kurs5x = (await get('/server/vokabeln')).zuweisungen.filter((z) => z.lerngruppe === '5x')
+  pruefe(
+    kurs5x.length === 1 && kurs5x[0].woerter === 0 && kurs5x[0].ueberschrift === '5x - Englisch',
+    `Klasse 5x mit Englisch hat automatisch einen leeren Kurs (${kurs5x.map((z) => z.ueberschrift).join(', ')})`
+  )
+  pruefe((await get('/server/vokabeln')).zuweisungen.filter((z) => z.lerngruppe === '5x').length === 1, 'Kein zweiter Kurs beim erneuten Öffnen')
+  if (kurs5x[0]) kurse.push(kurs5x[0].id)
   const ls0 = await get(`/server/grammatik/lehrwerkstand?gruppe=${g.id}`)
   await post('/server/grammatik/lehrwerkstand', { gruppe: g.id, buch: 'Green Line 2', unit: Object.keys(ls0.baende)[1] ? ls0.baende['Green Line 2'][1] : '' })
   const ls1 = await get(`/server/grammatik/lehrwerkstand?gruppe=${g.id}`)

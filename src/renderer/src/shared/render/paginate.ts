@@ -336,6 +336,38 @@ export function paginate(
   return pages
 }
 
+/*
+ * KURZE TABELLEN BLEIBEN ZUSAMMEN (08.10.2026, Befund „Vom Krieg zur Krise", Geschichte Kl. 9): Eine Tabelle mit
+ * drei Zeilen stand mit Kopf und einer Zeile unten auf Seite 1 und mit dem Rest oben auf Seite 2. Kurz heißt:
+ * höchstens 8 Zeilen ODER höchstens ein Drittel der Seite – sie wandert dann geschlossen. Längere Tabellen
+ * dürfen geteilt werden; jedes Folgestück wiederholt die Kopfzeile (render/baustein/tabelle.tsx, Answers.tsx,
+ * gemessen in `continuedHead` bzw. `unitRepeat`). Größer als eine Seite wird immer geteilt.
+ */
+export const TABELLE_ZUSAMMEN_ZEILEN = 8
+export const TABELLE_ZUSAMMEN_ANTEIL = 1 / 3
+
+/** Bleibt eine Tabelle mit `zeilen` Zeilen und der Höhe `hoehe` (px) beim Umbruch zusammen? */
+export function tabelleZusammenhalten(zeilen: number, hoehe: number, seitenhoehe: number): boolean {
+  if (hoehe > seitenhoehe) return false
+  return zeilen <= TABELLE_ZUSAMMEN_ZEILEN || hoehe <= seitenhoehe * TABELLE_ZUSAMMEN_ANTEIL
+}
+
+/**
+ * Tabellen INNERHALB eines teilbaren Bausteins (Ausfülltabelle, Richtig/Falsch): Die Zeilen-Einheiten
+ * [von, bis) einer kurzen Tabelle werden aneinander gebunden – samt der Einheit davor, in deren Messung die
+ * Kopfzeile steckt (die Tabelle beginnt so nie allein mit ihrem Kopf am Seitenende). Liefert die neue Bindung.
+ */
+export function bindeKurzeTabellen(units: readonly number[], glue: readonly boolean[], tabellen: readonly { von: number; bis: number }[], seitenhoehe: number): boolean[] {
+  const aus = Array.from({ length: units.length }, (_, k) => Boolean(glue[k]))
+  for (const { von, bis } of tabellen) {
+    const zeilen = bis - von
+    const hoehe = sum(units.slice(von, bis) as number[])
+    if (zeilen < 2 || !tabelleZusammenhalten(zeilen, hoehe, seitenhoehe)) continue
+    for (let k = Math.max(0, von - 1); k < bis - 1; k++) aus[k] = true
+  }
+  return aus
+}
+
 function sum(values: number[]): number {
   return values.reduce((a, b) => a + b, 0)
 }

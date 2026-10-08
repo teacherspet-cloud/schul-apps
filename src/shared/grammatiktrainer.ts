@@ -41,6 +41,8 @@ export interface GrammatikRegel {
   beispiele: string[]
   /** Förderaufgaben (08.10.2026): typische Stolperfallen, aus den Fehlern des Kindes */
   stolperfallen?: string[]
+  /** Thema (Katalog-Bezeichnung), zu dem die Regel gehört – bei mehreren Themen je Freigabe ein Training je Thema (08.10.2026) */
+  thema?: string
 }
 
 export interface GrammatikAufgabe {
@@ -131,7 +133,8 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
         titel: text(y.titel, 120),
         erklaerung: text(y.erklaerung, 900),
         beispiele: liste(y.beispiele, 6, 240),
-        ...(liste(y.stolperfallen, 5, 240).length ? { stolperfallen: liste(y.stolperfallen, 5, 240) } : {})
+        ...(liste(y.stolperfallen, 5, 240).length ? { stolperfallen: liste(y.stolperfallen, 5, 240) } : {}),
+        ...(text(y.thema, 160) ? { thema: text(y.thema, 160) } : {})
       }
     })
     .filter((x) => x.titel && x.erklaerung)

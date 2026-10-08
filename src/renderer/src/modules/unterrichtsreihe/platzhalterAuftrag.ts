@@ -97,7 +97,11 @@ export function schrittAendernUeberall(reiheId: string, schrittId: string, patch
       return
     }
     const { reihe } = await holen<{ reihe: Reihe }>(`/server/reihen/${reiheId}`)
-    await senden('/server/reihen/speichern', { reihe: { ...reihe, schritte: reihe.schritte.map((x) => (x.id === schrittId ? { ...x, ...patch } : x)) } })
+    // `auftrag`: frisch geladen und nur dieser Schritt geändert – ohne Prüfung auf einen neueren Stand (reiheSpeichern.ts)
+    await senden('/server/reihen/speichern', {
+      reihe: { ...reihe, schritte: reihe.schritte.map((x) => (x.id === schrittId ? { ...x, ...patch } : x)) },
+      auftrag: true
+    })
   })
 }
 
@@ -209,7 +213,8 @@ export function blattMeta(r: Reihe, s: Schritt, zweck: BlattZweck | null = blatt
   // Funktion, Anspruch – ohne die vor dem Erstellen abgewählten Chips
   const g = grundlageEingabe(r, s, kcAuszugFuer(r))
   const basis = defaultMeta(r.stateId, r.schoolTypeId, schulform)
-  const stufe = g.niveau ? { anspruch: g.niveau, sprache: g.niveau } : undefined
+  // Niveau der Reihe bzw. des Schritts (08.10.2026, grundlage.ts `schrittNiveau`): Anspruch und Sprache getrennt
+  const stufe = g.niveau || g.sprache ? { anspruch: g.niveau ?? 'mittel', sprache: g.sprache ?? g.niveau ?? 'mittel' } : undefined
   const rolle = blattRollenVorgaben(r, s, zweck)
   const selbst = artVon(r) === 'digital' || zweck !== null
   return {
@@ -229,6 +234,8 @@ export function blattMeta(r: Reihe, s: Schritt, zweck: BlattZweck | null = blatt
       : {}),
     // Umfang nach geplanter Zeit: bis 25 Minuten eine Seite
     pages: (s.minuten ?? 30) <= 25 ? 1 : 2,
+    // Korrekturrand an allen Schreiblinien (08.10.2026): Blätter der Reihe bekommen KI-Feedback am Rand
+    correctionMargin: true,
     // Selbstständig am Gerät (Plan G.6): Hilfekarten, Lernhilfen und Lösungen immer, Erklärung mit Beispiel vorn
     ...(selbst ? { helpCards: true, lernhilfen: true, answerKey: true } : {}),
     ...(zweck === 'einfuehrung' ? { sheetType: 'erarbeitung' as const } : zweck === 'reflexion' ? { sheetType: 'wiederholung' as const } : {})
@@ -334,6 +341,10 @@ export function erzeugeBlattFuerPlatzhalter(r: Reihe, s: Schritt, zweck: BlattZw
         kiEntwurf: true,
         ...(s.lernziele.length ? {} : { lernziele: b.lernziele })
       }
+      // „Schrittweise freischalten" schlägt die KI beim Gliedern vor (08.10.2026) – mit Grund, im Schritt änderbar
+      const o = ws.outline
+      if (patch.inhalt?.art === 'arbeitsblatt' && typeof o?.schrittweise === 'boolean')
+        patch.inhalt = { ...patch.inhalt, schrittweise: o.schrittweise, ...(o.schrittweiseGrund ? { schrittweiseGrund: o.schrittweiseGrund } : {}) }
       // Im offenen Editor übernommen und gleich gespeichert, sonst in der gespeicherten Reihe ergänzt
       await schrittAendernUeberall(reiheId, s.id, patch)
       notifySuccess(`Arbeitsblatt „${name}" erstellt, mit dem Schritt verknüpft und unter „Meine Arbeitsblätter" abgelegt.`)

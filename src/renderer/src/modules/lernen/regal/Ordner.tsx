@@ -9,15 +9,18 @@
  */
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
 import { IconAbc, IconArrowLeft, IconBook2, IconFileText } from '@tabler/icons-react'
+import { SegmentedControl } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
+import VokabelTrainer from '../VokabelTrainer'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { VokabelwegKarten } from '../VokabelLeiter'
-import { beschriftung, fachName, type Register } from './beschriftung'
+import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
+import { istOffen, ladeOffen, nachJahrgaengen, speichereOffen } from './grammatikJahrgaenge'
 import { deckelBereit, nimmUebergang, ordnerZu } from './ordnerAnimation'
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
-import { useRegal, type FachOrdner, type Mappe, type Merkkasten } from './regalDaten'
+import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
 
 const CSS = `
 .og-ordner { display: grid; grid-template-columns: 46px 1fr auto; min-height: 70vh; border-radius: 10px; overflow: visible; position: relative;
@@ -40,6 +43,17 @@ const CSS = `
 .og-lasche svg { transform: rotate(90deg); }
 .og-karte { display: block; text-decoration: none; color: inherit; border-radius: 10px; padding: 10px 12px; background: var(--og-karte);
   box-shadow: 0 1px 0 rgba(0,0,0,.06), inset 4px 0 0 var(--og-akzent); }
+.og-suche { width: 100%; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 2px solid var(--og-akzent);
+  padding: 6px 4px 6px 28px; outline: none; border-radius: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 4px center; }
+.og-suche:focus-visible { border-bottom-width: 3px; }
+.og-suche::placeholder { color: inherit; opacity: .55; }
+.og-jahr { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; color: inherit; font: inherit;
+  font-weight: 800; font-size: 1.05rem; padding: 4px 2px; cursor: pointer; text-align: left; }
+.og-jahr:disabled { cursor: default; }
+.og-jahr:focus-visible { outline: 2px solid var(--og-akzent); outline-offset: 2px; border-radius: 6px; }
+.og-jahr-zahl { font-size: .75rem; font-weight: 700; opacity: .6; }
 .og-karte:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12), inset 4px 0 0 var(--og-akzent); }
 @keyframes og-auf { from { opacity: 0; transform: perspective(1400px) rotateY(-8deg) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes og-blatt { from { opacity: 0; transform: perspective(1200px) rotateY(-14deg); } to { opacity: 1; transform: none; } }
@@ -145,7 +159,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
             <Text fw={800} size="lg" mb="sm" style={{ color: dunkel ? '#e9ecef' : f.register[aktiv].bg }}>
               {s[aktiv]}
             </Text>
-            {aktiv === 'vok' && <Kurse o={o} grammatik={false} />}
+            {aktiv === 'vok' && <VokabelRegister o={o} />}
             {aktiv === 'gram' && <Kurse o={o} grammatik />}
             {aktiv === 'mat' && <Materialien o={o} />}
           </div>
@@ -192,37 +206,130 @@ export function zuTun(o: FachOrdner, r: Register): number {
 /** Zurück: Gäste auf die Startseite, Konten in ihren Lernraum (dort steht das Regal) */
 const zurueckZiel = (): string => (!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
 
-function Kurse({ o, grammatik }: { o: FachOrdner; grammatik: boolean }): React.JSX.Element {
-  const liste = grammatik ? o.grammatik : o.vokabeln
+/**
+ * Register Vocabulary (08.10.2026, Wunsch der Lehrkraft): der Kurs gleich hier – Karteikasten, Tagesrunde, Spiele –
+ * statt einer Karte, die erst eine eigene Seite öffnet. Mehrere Kurse im Fach: Umschalter oben (gemerkt je Fach).
+ */
+function VokabelRegister({ o }: { o: FachOrdner }): React.JSX.Element {
   const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
+  const schluessel = `sa-ordner-kurs-${o.fach}`
+  const [wahl, setWahl] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem(schluessel) ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const kurs = o.vokabeln.find((v) => v.id === wahl) ?? o.vokabeln[0]
+  const waehle = (id: string): void => {
+    setWahl(id)
+    try {
+      sessionStorage.setItem(schluessel, id)
+    } catch {
+      /* egal */
+    }
+  }
+  return (
+    <Stack gap="sm">
+      {konto && <VokabelwegKarten fach={o.fach} />}
+      {o.vokabeln.length > 1 && (
+        <SegmentedControl
+          value={kurs?.id ?? ''}
+          onChange={waehle}
+          data={o.vokabeln.map((v) => ({ value: v.id, label: v.titel }))}
+          fullWidth
+          data-ordner-kurswahl
+        />
+      )}
+      {kurs && (
+        <div data-ordner-kurs-inhalt={kurs.id}>
+          <VokabelTrainer key={kurs.id} id={kurs.id} eingebettet />
+        </div>
+      )}
+    </Stack>
+  )
+}
+
+function Kurse({ o, grammatik }: { o: FachOrdner; grammatik: boolean }): React.JSX.Element {
+  const [suche, setSuche] = useState('')
+  const alle = grammatik ? o.grammatik : o.vokabeln
+  // Suche im Grammatikhefter (08.10.2026, Wunsch der Lehrkraft): filtert die Einträge nach dem Titel
+  const s = suche.trim().toLocaleLowerCase('de')
+  const liste = s ? alle.filter((v) => v.titel.toLocaleLowerCase('de').includes(s)) : alle
+  const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
+  // Grammatik nach Schuljahren (08.10.2026, abgestimmt): neuestes Jahr oben und offen, Auf/Zu je Gerät gemerkt
+  const [gemerkt, setGemerkt] = useState<Record<string, boolean>>(() => ladeOffen(o.fach))
+  const gruppen = grammatik ? nachJahrgaengen(liste) : []
+  const mitJahren = gruppen.some((g) => g.jahrgang !== null)
+  const karte = (v: KursKurz): React.JSX.Element => (
+    <a key={v.id} className="og-karte" href={`${grammatik ? '/s/g/' : '/s/v/'}${v.id}`} data-ordner-kurs={grammatik ? 'grammatik' : 'vokabeln'}>
+      <Group justify="space-between" wrap="nowrap">
+        <div style={{ minWidth: 0 }}>
+          <Text fw={700}>{v.titel}</Text>
+          {grammatik && v.uebersicht.unbearbeitet !== undefined && <GrammatikStand u={v.uebersicht} />}
+          {!grammatik && v.uebersicht.heuteOffen !== undefined && (
+            <Text size="sm" fw={600} c={v.uebersicht.heuteOffen ? 'orange' : 'teal'} data-heute-offen={v.uebersicht.heuteOffen}>
+              {v.uebersicht.heuteOffen
+                ? `Heute noch ${v.uebersicht.heuteOffen} ${v.uebersicht.heuteOffen === 1 ? 'Wort' : 'Wörter'} üben – dann sind die Spiele frei`
+                : '✓ Für heute geschafft'}
+            </Text>
+          )}
+          {!grammatik && (
+            <Text size="sm" c="dimmed">
+              {`${v.uebersicht.gesamt - v.uebersicht.neu} von ${v.uebersicht.gesamt} kennengelernt · ${v.uebersicht.sicher} sicher`}
+            </Text>
+          )}
+        </div>
+        <Badge variant="filled" radius="xl" style={{ flex: 'none', background: 'var(--og-akzent)' }} autoContrast>
+          Üben
+        </Badge>
+      </Group>
+    </a>
+  )
   return (
     <Stack gap="xs">
       {!grammatik && konto && <VokabelwegKarten fach={o.fach} />}
-      {liste.map((v) => (
-        <a key={v.id} className="og-karte" href={`${grammatik ? '/s/g/' : '/s/v/'}${v.id}`} data-ordner-kurs={grammatik ? 'grammatik' : 'vokabeln'}>
-          <Group justify="space-between" wrap="nowrap">
-            <div style={{ minWidth: 0 }}>
-              <Text fw={700}>{v.titel}</Text>
-              {grammatik && v.uebersicht.unbearbeitet !== undefined && <GrammatikStand u={v.uebersicht} />}
-              {!grammatik && v.uebersicht.heuteOffen !== undefined && (
-                <Text size="sm" fw={600} c={v.uebersicht.heuteOffen ? 'orange' : 'teal'} data-heute-offen={v.uebersicht.heuteOffen}>
-                  {v.uebersicht.heuteOffen
-                    ? `Heute noch ${v.uebersicht.heuteOffen} ${v.uebersicht.heuteOffen === 1 ? 'Wort' : 'Wörter'} üben – dann sind die Spiele frei`
-                    : '✓ Für heute geschafft'}
-                </Text>
-              )}
-              {!grammatik && (
-                <Text size="sm" c="dimmed">
-                  {`${v.uebersicht.gesamt - v.uebersicht.neu} von ${v.uebersicht.gesamt} kennengelernt · ${v.uebersicht.sicher} sicher`}
-                </Text>
-              )}
-            </div>
-            <Badge variant="filled" radius="xl" style={{ flex: 'none', background: 'var(--og-akzent)' }} autoContrast>
-              Üben
-            </Badge>
-          </Group>
-        </a>
-      ))}
+      {grammatik && alle.length > 1 && (
+        <input
+          type="search"
+          className="og-suche"
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          placeholder="Im Ordner suchen …"
+          aria-label="Grammatik im Ordner durchsuchen"
+          data-ordner-suche
+        />
+      )}
+      {grammatik && s && liste.length === 0 && (
+        <Text size="sm" c="dimmed">
+          Nichts gefunden zu „{suche.trim()}“.
+        </Text>
+      )}
+      {!mitJahren
+        ? liste.map(karte)
+        : gruppen.map((g, i) => {
+            const k = String(g.jahrgang ?? 'ohne')
+            const offen = istOffen(gruppen, i, gemerkt, Boolean(s))
+            const umschalten = (): void => {
+              const neu = { ...gemerkt, [k]: !offen }
+              setGemerkt(neu)
+              speichereOffen(o.fach, neu)
+            }
+            return (
+              <div key={k} data-ordner-jahrgang={k} data-offen={offen}>
+                <button type="button" className="og-jahr" aria-expanded={offen} onClick={umschalten} disabled={Boolean(s)}>
+                  <span aria-hidden>{offen ? '▾' : '▸'}</span>
+                  {g.jahrgang === null ? 'Weitere' : jahrgangName(o.fach, g.jahrgang)}
+                  <span className="og-jahr-zahl">{g.eintraege.length}</span>
+                </button>
+                {offen && (
+                  <Stack gap="xs" mt={6}>
+                    {g.eintraege.map(karte)}
+                  </Stack>
+                )}
+              </div>
+            )
+          })}
     </Stack>
   )
 }

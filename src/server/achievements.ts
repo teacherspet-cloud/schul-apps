@@ -18,7 +18,7 @@ import { grammatikFuerAchievements } from './grammatik'
 import { gespielteSpiele } from './rekordbuch'
 import { achDatenLesen, achDatenSchreiben, rundeAbschliessen, tageVereinen, type AchDaten, type Erreicht } from './achievementsDaten'
 import { ACH_GRUPPEN, berechneAchievements, type Achievement, type AchEingabe } from '../shared/achievements'
-import { abschnitteAus, quelleAusTitel, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
+import { abschnitteAus, quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
 import { istSicher, kernform, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 
 const normal = (t: string): string => kernform(t).toLowerCase()
@@ -57,7 +57,7 @@ async function wortschatz(ich: NutzerInfo): Promise<{ woerter: AchEingabe['woert
     const buch = await buchFuer(q.lehrwerk, z.lehrkraft_id).catch(() => null)
     if (!buch) continue
     const e = buecher.get(buch.id) ?? { buch, units: new Set<string>() }
-    e.units.add(q.unit)
+    for (const u of quelleUnits(q)) e.units.add(u.unit)
     buecher.set(buch.id, e)
   }
   // Vokabelweg: Lehrwerkswörter über die geladenen Bände auf ihr Wort abbilden, sonst nach Kennung

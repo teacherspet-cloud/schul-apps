@@ -18,6 +18,8 @@
  *  - KEINE Ranglisten, kein Vergleich mit anderen.
  */
 
+import type { DiagnoseErgebnis } from './diagnoseAuswertung'
+
 export type SchrittArt =
   | 'arbeitsblatt'
   | 'rueckmeldung'
@@ -42,7 +44,7 @@ export const SCHRITT_ARTEN: { id: SchrittArt; label: string; text: string }[] = 
   { id: 'onlinetest', label: 'Test (Onlinetest)', text: 'Vokabeltest als Onlinetest im eigenen Tempo, Ergebnis sofort.' },
   { id: 'rueckmeldung', label: 'Schreibaufgabe mit Feedback', text: 'Aufgabe aus der Rückmeldungs-App: schreiben, Feedback, überarbeiten.' },
   { id: 'aufgabe', label: 'Zwischenaufgabe', text: 'Kurzer Auftrag mit Antwortfeld oder Foto, auch zu einem Lese-/Hörtext oder Video mit Kontrollfragen.' },
-  { id: 'lernkarten', label: 'Lernkarten', text: 'Begriffe oder Vokabeln wiederholen, bis alle sitzen.' },
+  { id: 'lernkarten', label: 'Lernkarten', text: 'Begriffe oder Vokabeln sichern und wiederholen, bis alle sitzen – nach der Erarbeitung, nicht als Einstieg.' },
   { id: 'reflexion', label: 'Selbsteinschätzung', text: 'Ich-kann-Ampel zu den Lernzielen, dazu eine Frage fürs Lerntagebuch.' },
   { id: 'diagnose', label: 'Eingangsdiagnose', text: 'Kurzer Vortest – wer es schon kann, überspringt die gewählten Schritte.' },
   { id: 'praesenz', label: 'Im Unterricht', text: 'Etwas im Unterricht (Experiment, Vortrag …) – die Lehrkraft hakt ab.' },
@@ -84,6 +86,8 @@ export type SchrittInhalt =
       stift: boolean
       /** Aufgaben schrittweise freischalten / Merkkästen erst am Ende (05.10.2026, shared/blattFreigabe.ts) */
       schrittweise?: boolean
+      /** Warum (nicht) schrittweise – Vorschlag der KI beim Erzeugen für die Reihe (08.10.2026), im Schritt-Editor sichtbar */
+      schrittweiseGrund?: string
       merkAmEnde?: boolean
       /** Lösungsblatt – sehen die Lernenden erst nach dem ersten Einreichen (03.10.2026) */
       loesung?: string
@@ -369,7 +373,35 @@ export interface Reihe {
    * Verschieben/Entfernen von Stunden mit (unterrichtsreihe/stundenRaster.ts).
    */
   verlauf?: Record<string, StundenPlanung>
+  /**
+   * Niveau der Reihe (08.10.2026, wie beim Arbeitsblatt – didactics/schwierigkeit.ts): Anspruch und Sprache relativ zum
+   * Jahrgang („mittel" = jahrgangsgemäß) und Zahl der Niveaustufen. Vorgabe für die KI-Planung und für alle Schritte; die
+   * Vorgabe eines Schritts (`kiVorgabe`) gilt nur im Expertenmodus vorrangig.
+   */
+  niveau?: ReiheNiveau
+  /**
+   * Leitfrage der Reihe (08.10.2026, Entscheidung der Lehrkraft: sichtbar): schlägt die KI-Planung vor, die Lehrkraft
+   * ändert sie im Kopf der Reihe; Lernende sehen sie oben in der Reihe. Der letzte Schritt nimmt sie ausdrücklich auf
+   * (Gegencheck in unterrichtsreihe/reihenmusterPruefung.ts).
+   */
+  leitfrage?: string
+  /**
+   * Reihentyp aus dem fachtypischen Reihenmuster (08.10.2026, shared/reihenmuster.ts) – Kennung; fehlt = die KI wählt.
+   * Die Lehrkraft wählt ihn im Fenster „Mit KI planen", die KI meldet den gewählten im Plan zurück.
+   */
+  reihentyp?: string
 }
+
+/** Stufe relativ zum Jahrgang – gleiche Bedeutung wie `Schwierigkeit` im Arbeitsblatt */
+export type ReiheStufe = 'grundlegend' | 'mittel' | 'anspruchsvoll'
+
+export interface ReiheNiveau {
+  anspruch: ReiheStufe
+  sprache: ReiheStufe
+  stufen: 1 | 2 | 3
+}
+
+export const NIVEAU_STANDARD: ReiheNiveau = { anspruch: 'mittel', sprache: 'mittel', stufen: 1 }
 
 /** Teile der Reihe: die angelegten, dazu die nur an Schritten genannten */
 export const teileVon = (r: Pick<Reihe, 'teile' | 'schritte'>): string[] => [
@@ -393,7 +425,8 @@ export interface SchrittStand {
   ampel?: Record<string, 'gruen' | 'gelb' | 'rot'>
   tagebuch?: string
   gewusst?: boolean
-  diagnose?: { prozent: number; zeit: number }
+  /** Ergebnis je Frage mit richtiger Antwort (08.10.2026, shared/diagnoseAuswertung.ts) */
+  diagnose?: { prozent: number; zeit: number; ergebnis?: DiagnoseErgebnis[] }
   praesenz?: boolean
   zeit?: number
   /**

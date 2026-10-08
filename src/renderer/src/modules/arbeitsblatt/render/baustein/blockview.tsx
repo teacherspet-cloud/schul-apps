@@ -61,6 +61,36 @@ export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedIt
   )
 }
 
+/**
+ * Hinweis „Bild fehlt" im Editor (08.10.2026): nur für die Lehrkraft, ohne Höhe im Satz. Die Beschreibung bleibt
+ * bearbeitbar (sie ist die Suchgrundlage), „Bild suchen" öffnet die Bildwahl.
+ */
+export function BildFehlt({
+  beschreibung,
+  onChange,
+  onSuchen
+}: {
+  beschreibung: string
+  onChange?: (v: string) => void
+  onSuchen?: () => void
+}): React.JSX.Element {
+  return (
+    <div className="ws-bild-fehlt-anker" data-bild-fehlt>
+      <div className="ws-bild-fehlt">
+        <strong>Bild fehlt</strong>
+        <span className="ws-bild-fehlt-text">
+          <Feld value={beschreibung} editable={Boolean(onChange)} onChange={(v) => onChange?.(v)} placeholder="Was das Bild zeigen soll" />
+        </span>
+        {onSuchen && (
+          <button type="button" className="ws-bild-fehlt-knopf" onClick={onSuchen}>
+            Bild suchen
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** Einheiten [von, bis) des gesetzten Stücks; ohne Aufteilung alle */
 const stueck = (placed: PlacedItem | undefined, anzahl: number): [number, number] => [placed?.from ?? 0, placed?.to ?? anzahl]
 
@@ -179,6 +209,20 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
 
     case 'image': {
       if (block.items?.length) return <GalleryView block={block} />
+      /*
+       * OHNE BILD (08.10.2026, Befund „Vom Krieg zur Krise", Geschichte Kl. 9): Auf dem Schülerblatt stand ein
+       * gestrichelter Kasten mit dem Suchauftrag der KI („Bild wählen: Foto eines …"). Schülerblatt, Druck, Lösung
+       * und Messung zeigen jetzt NICHTS. Im Editor steht ein Hinweis „Bild fehlt" mit Knopf „Bild suchen" – ohne
+       * Höhe im Satz (er liegt über dem Folgenden), damit Editor und Druck gleich umbrechen.
+       */
+      if (!block.image)
+        return schreiben ? (
+          <BildFehlt
+            beschreibung={block.description}
+            onChange={set((d, v) => ((d as typeof block).description = v))}
+            onSuchen={ctx.actions?.pickImage ? () => ctx.actions?.pickImage?.(block.id) : undefined}
+          />
+        ) : null
       const picture = block.image ? (
         <>
           <img src={block.image.dataUrl} alt={block.description} />
@@ -190,13 +234,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             </span>
           )}
         </>
-      ) : (
-        <div className="ws-image-placeholder">
-          {isEditMode(mode) || mode === 'measure' ? 'Bild wählen: ' : ''}
-          {/* Die Beschreibung steht auf dem Blatt – also auch hier bearbeitbar (30.09.2026) */}
-          <Feld value={block.description} editable={schreiben} onChange={set((d, v) => ((d as typeof block).description = v))} />
-        </div>
-      )
+      ) : null
       return (
         <figure className="ws-block ws-image" style={{ width: `${block.widthPercent}%` }}>
           {block.labels?.length ? (
@@ -368,6 +406,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       const linien = block.kind === 'lines' ? Math.max(1, Math.round(block.heightMm / LINIE_MM)) : 1
       const [von, bis] = stueck(placed, linien)
       const hoehe = (k: number): number => (k < linien - 1 ? LINIE_MM : Math.max(1, block.heightMm - (linien - 1) * LINIE_MM))
+      // Korrekturrand auch an den Linien eines Schreibraums (08.10.2026) – bis dahin nur an den Schreiblinien der Aufgaben
+      const rand = block.kind === 'lines' && ctx.correctionMargin ? ' ws-lines-rand' : ''
       return (
         <div className={`ws-block ws-workspace ${placed?.continued ? 'ws-continued' : ''}`}>
           {von > 0 && <FortsetzungsHinweis bezeichnung={block.label} />}
@@ -377,7 +417,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             </div>
           )}
           {linien < 2 ? (
-            <div className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${block.heightMm}mm` }} />
+            <div className={`ws-workspace-area ws-workspace-${block.kind}${rand}`} style={{ height: `${block.heightMm}mm` }} />
           ) : (
             Array.from({ length: bis - von }, (_, k) => (
               <div
@@ -385,7 +425,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                 data-unit
                 // Mindestens zwei Linien je Stück – siehe `linieGebunden`
                 {...(linieGebunden(von + k, linien) ? { 'data-bindet': '' } : {})}
-                className={`ws-workspace-area ws-workspace-${block.kind}`}
+                className={`ws-workspace-area ws-workspace-${block.kind}${rand}`}
                 style={{ height: `${hoehe(von + k)}mm` }}
               />
             ))

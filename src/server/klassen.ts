@@ -168,7 +168,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     vorschlaege.push({
       art: 'vokabeln',
       titel: `Wackelige Wörter – ${klassenTitel(g)}`,
-      text: `Ein kurzes Vokabeltraining mit den ${vok.wackelig.length} Wörtern, die der Klasse am häufigsten danebengehen.`,
+      text: `Ein kurzes Vokabeltraining mit den ${vok.wackelig.length} Wörtern, die gerade am meisten wackeln (höchstens 20: zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern zuletzt danebengingen).`,
       sprache: vok.wackelig[0].sprache,
       fach: vok.wackelig[0].fach,
       woerter: vok.wackelig.map(({ term, translation, example }) => ({ term, translation, ...(example ? { example } : {}) }))

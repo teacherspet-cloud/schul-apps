@@ -13,13 +13,13 @@
  *  bekommt Zugang zur Reihe UND zu allen verknüpften Blättern, Aufgaben und Vokabeln (auch später ergänzten).
  */
 import { randomBytes } from 'node:crypto'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { imNutzer } from './kontext'
 import { pdfOhneSkripte } from './druck'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
 import { iservBereit } from './anmeldung'
-import { registerVergessen } from './namensschutz'
+import { mitNamensliste, registerVergessen } from './namensschutz'
 import { gastEntfernen } from './gaeste'
 import { blattFassung, blattFassungen, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { blattFreigabe, blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
@@ -29,7 +29,6 @@ import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/ty
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
 import {
   berechneWeg,
-  diagnoseProzent,
   inhaltFuerLernende,
   type Extern,
   type Reihe,
@@ -54,6 +53,8 @@ import {
   type AbschlussEingabe
 } from '../shared/reiheKiFeedback'
 import type { StructuredRequest } from '../shared/types'
+import { diagnoseAbschliessen, diagnoseAnfrage, diagnoseVorpruefen, type DiagnoseErgebnis } from '../shared/diagnoseAuswertung'
+import { aenderungenSeit, istVeraltet, OHNE_TITEL, sofortVeroeffentlichen, type Veroeffentlichung } from '../shared/reiheSpeichern'
 import type { BlattAufgabe } from '../shared/blattFreigabe'
 import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type VorschauZustand } from './vorschau'
 
@@ -115,6 +116,13 @@ const db = () => {
     } catch {
       /* schon da */
     }
+    // Veröffentlichter Stand für Lernende (08.10.2026): Speichern ändert bei zugewiesenen Reihen nur den Entwurf
+    for (const spalte of ['veroeffentlicht TEXT', 'veroeffentlicht_am TEXT'])
+      try {
+        d.exec(`ALTER TABLE reihen ADD COLUMN ${spalte}`)
+      } catch {
+        /* schon da */
+      }
     bereit = true
   }
   return d
@@ -194,12 +202,42 @@ export const REIHEN_VORSCHAU_KLASSE = 'Unterrichtsreihe'
 /**
  * Reihe aus der Datenbank. Platzhalter der KI-Planung (05.10.2026) sind noch leer – für Lernende,
  * Fortschritt und Auswertung gibt es sie nicht; nur der Editor (`roh`) sieht sie.
+ *
+ * Veröffentlichter Stand (08.10.2026): Lernende, Fortschritt und Auswertung lesen den veröffentlichten Stand
+ * (`veroeffentlicht`); der Editor (`roh`) den Entwurf. Ohne Veröffentlichung (Altbestand) gilt der Entwurf.
  */
 const reiheVon = (id: string, roh = false): (Reihe & { lehrkraftId: string }) | null => {
-  const z = db().prepare('SELECT * FROM reihen WHERE id = ?').get(id) as { daten: string; lehrkraft_id: string } | undefined
+  const z = db().prepare('SELECT * FROM reihen WHERE id = ?').get(id) as
+    | { daten: string; lehrkraft_id: string; veroeffentlicht?: string | null }
+    | undefined
   if (!z) return null
-  const r = { ...json_(z.daten, {} as Reihe), id, lehrkraftId: z.lehrkraft_id }
+  const r = { ...json_(roh ? z.daten : (z.veroeffentlicht ?? z.daten), {} as Reihe), id, lehrkraftId: z.lehrkraft_id }
   return roh ? r : { ...r, schritte: (r.schritte ?? []).filter((s) => !s.platzhalter) }
+}
+
+/** Zuweisungen einer Reihe (ohne Musterschüler-Vorschau) */
+const zahlZuweisungen = (reiheId: string): number =>
+  (db().prepare('SELECT COUNT(*) AS n FROM reihen_zuweisungen WHERE reihe_id = ? AND COALESCE(vorschau, 0) = 0').get(reiheId) as { n: number }).n
+
+/** Stand der Veröffentlichung für den Editor: Zuweisungen und Änderungen, die Lernende noch nicht sehen */
+function veroeffentlichungVon(reiheId: string): Veroeffentlichung {
+  const z = db().prepare('SELECT daten, veroeffentlicht, veroeffentlicht_am FROM reihen WHERE id = ?').get(reiheId) as
+    | { daten: string; veroeffentlicht: string | null; veroeffentlicht_am: string | null }
+    | undefined
+  if (!z) return { zugewiesen: 0, offen: 0 }
+  const zugewiesen = zahlZuweisungen(reiheId)
+  const offen = zugewiesen && z.veroeffentlicht ? aenderungenSeit(json_(z.veroeffentlicht, null as Reihe | null), json_(z.daten, {} as Reihe)) : 0
+  return { zugewiesen, offen, ...(z.veroeffentlicht_am ? { am: z.veroeffentlicht_am } : {}) }
+}
+
+/** Entwurf veröffentlichen: Lernende sehen ab jetzt diesen Stand; neue Schritte werden in allen offenen Zuweisungen verknüpft */
+function veroeffentliche(reiheId: string): void {
+  const jetzt = new Date().toISOString()
+  db().prepare('UPDATE reihen SET veroeffentlicht = daten, veroeffentlicht_am = ? WHERE id = ?').run(jetzt, reiheId)
+  const r = reiheVon(reiheId)
+  if (!r) return
+  for (const z of db().prepare("SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND status = 'offen'").all(reiheId) as unknown as ZuweisungZeile[])
+    verknuepfe(z, r)
 }
 const zuweisung = (id: string): ZuweisungZeile | null =>
   (db().prepare('SELECT * FROM reihen_zuweisungen WHERE id = ?').get(id) as ZuweisungZeile | undefined) ?? null
@@ -378,7 +416,7 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
       else continue
       neu = true
     } catch (e) {
-      protokolliereServer('reihe', `Schritt „${s.titel}" nicht verknüpft: ${e instanceof Error ? e.message : String(e)}`, z.lehrkraft_id)
+      protokolliereServer('reihe', `Schritt ${s.id} nicht verknüpft: ${fehlerKurz(e)}`, z.lehrkraft_id)
     }
   }
   if (neu) {
@@ -452,10 +490,13 @@ function fotosVon(st: SchrittStand): string[] {
 }
 
 /** KI-Aufruf im Namen der Lehrkraft der Zuweisung (ihr Zugang und Kontingent; der Namensfilter liegt zentral um `aufruf`) */
-async function alsLehrkraft(z: ZuweisungZeile, aufruf: Aufruf, anfrage: StructuredRequest): Promise<unknown> {
+async function alsLehrkraft(z: ZuweisungZeile, aufruf: Aufruf, anfrage: StructuredRequest, kontext: { sprache?: string; material?: string } = {}): Promise<unknown> {
   const lk = nutzerNachId(z.lehrkraft_id)
   if (!lk) throw new Error('Die Lehrkraft gibt es nicht mehr.')
-  return imNutzer(alsNutzer(lk), () => aufruf('ai:structured', [anfrage]))
+  // Namensliste der Zuweisung (08.10.2026): Lernende werden auch einzeln und als Vornamen ersetzt; „Material“ ist nur
+  // der Aufgabentext, nie die Antwort des Kindes (personOderWort.ts)
+  const namen = [...new Set(lernendeVon(z).map((n) => n.name).filter(Boolean))]
+  return mitNamensliste({ namen, ...kontext }, () => imNutzer(alsNutzer(lk), () => aufruf('ai:structured', [anfrage])))
 }
 
 /**
@@ -484,7 +525,13 @@ async function abschlussVorschlagErzeugen(r: Reihe, z: ZuweisungZeile, s: Schrit
   if (!text.trim() && !bilder.length) v = { kriterien: [], zeit: Date.now(), fehler: 'Nur Dateien, die die KI nicht ansehen kann – bitte selbst ansehen.' }
   else
     try {
-      v = abschlussVorschlagAus(await alsLehrkraft(z, aufruf, abschlussVorschlagAnfrage(eingabe)), eingabe)
+      v = abschlussVorschlagAus(
+        await alsLehrkraft(z, aufruf, abschlussVorschlagAnfrage(eingabe), {
+          sprache: r.fachLabel,
+          material: [eingabe.anweisung ?? '', JSON.stringify(eingabe.raster ?? ''), ...eingabe.lernziele].join(' ')
+        }),
+        eingabe
+      )
     } catch (e) {
       v = { kriterien: [], zeit: Date.now(), fehler: e instanceof Error ? e.message : String(e) }
     }
@@ -518,7 +565,8 @@ async function reflexionImpulsErzeugen(r: Reihe, z: ZuweisungZeile, s: Schritt, 
       ampel,
       fach: r.fachLabel,
       jahrgang: r.grade
-    })
+    }),
+    { sprache: r.fachLabel, material: [tagebuchFrage(s), ...ampel.map((a) => a.ziel)].join(' ') }
   )
   return reflexionImpulsAus(roh)
 }
@@ -757,6 +805,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             id: z.id,
             titel: r.titel,
             oberthema: r.oberthema,
+            // Leitfrage der Reihe (08.10.2026, Reihenmuster) – oben in der Reihe
+            ...(r.leitfrage?.trim() ? { leitfrage: r.leitfrage.trim() } : {}),
             fach: r.fachLabel,
             // Digital: alles am Gerät, geschafft nach Ergebnis (08.10.2026)
             art: artVon(r),
@@ -931,9 +981,40 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             true
           )
         st.antworten = antworten()
-        st.diagnose = { prozent: diagnoseProzent(s.inhalt.fragen, st.antworten), zeit: Date.now() }
-        standSpeichern(z.id, ich.id, stand)
-        return (json(res, 200, { prozent: st.diagnose.prozent, bestanden: st.diagnose.prozent >= s.inhalt.schwelle }), true)
+        /*
+         * Je Frage ✓/✗ mit der richtigen Antwort (08.10.2026, shared/diagnoseAuswertung.ts): Auswahl und wortgleiche
+         * Antworten ohne KI, abweichende freie Antworten prüft die KI kurz (Zugang der Lehrkraft, ohne Namen)
+         */
+        const fragen = s.inhalt.fragen
+        const vor = diagnoseVorpruefen(fragen, st.antworten)
+        const fertig = (kiRoh?: unknown): { prozent: number; bestanden: boolean; ergebnis: DiagnoseErgebnis[] } => {
+          const aus = diagnoseAbschliessen(fragen, st.antworten ?? {}, vor, kiRoh)
+          // Wiederholbare Diagnose (08.10.2026): nur ✓/✗ und Hinweis, keine richtige Antwort – sonst ließe sie sich beim
+          // nächsten Versuch einfach abschreiben
+          if (warten) aus.ergebnis = aus.ergebnis.map((e) => ({ ...e, loesung: '' }))
+          st.diagnose = { prozent: aus.prozent, zeit: Date.now(), ergebnis: aus.ergebnis }
+          standSpeichern(z.id, ich.id, stand)
+          return { prozent: aus.prozent, bestanden: aus.prozent >= (s.inhalt as { schwelle: number }).schwelle, ergebnis: aus.ergebnis }
+        }
+        if (!vor.offen.length) return (json(res, 200, fertig()), true)
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+        const puls = setInterval(() => res.write(' '), PULS_MS)
+        res.on('close', () => clearInterval(puls))
+        try {
+          const ohneNamen = Object.fromEntries(Object.entries(st.antworten).map(([x, y]) => [x, ohneEigenenNamen(y, ich.name)]))
+          const roh = await alsLehrkraft(z, aufruf, diagnoseAnfrage(fragen, ohneNamen, vor.offen, { fach: r.fachLabel, jahrgang: r.grade }), {
+            sprache: r.fachLabel,
+            material: fragen.map((f) => `${f.frage} ${(f.optionen ?? []).join(' ')} ${f.richtig ?? ''}`).join(' ')
+          })
+          protokolliereServer('reihe', 'Diagnose: freie Antworten geprüft', ich.id)
+          res.end(JSON.stringify(fertig(roh)))
+        } catch {
+          // Ohne KI: nicht wortgleiche freie Antworten zählen als falsch – die Diagnose ist trotzdem ausgewertet
+          res.end(JSON.stringify(fertig()))
+        } finally {
+          clearInterval(puls)
+        }
+        return true
       }
       if (aktion === 'abgeben') {
         // Selbsteinschätzung – auch neben einem Arbeitsblatt in dieser Rolle (08.10.2026, Plan G.2)
@@ -1058,7 +1139,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
               .all(x.id) as unknown as ZuweisungZeile[]
             return {
               id: x.id,
-              titel: r.titel,
+              // Entwurf ohne Titel (automatisch gespeichert, 08.10.2026)
+              titel: r.titel?.trim() || OHNE_TITEL,
               fach: r.fachLabel,
               fachId: r.fachId,
               oberthema: r.oberthema,
@@ -1137,12 +1219,22 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
     if (req.method === 'POST' && teile[0] === 'speichern') {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const r = k0.reihe as Reihe | undefined
-      if (!r?.titel?.trim() || !Array.isArray(r.schritte)) return (json(res, 400, { fehler: 'Die Reihe braucht einen Titel.' }), true)
+      // Entwürfe ohne Titel (automatisches Speichern, 08.10.2026) heißen in Listen „Neue Reihe"
+      if (!r || typeof r.titel !== 'string' || !Array.isArray(r.schritte)) return (json(res, 400, { fehler: 'Die Reihe ist unvollständig.' }), true)
       const roh = JSON.stringify(r)
       if (roh.length > 40 * 1024 * 1024) return (json(res, 413, { fehler: 'Die Reihe ist zu groß.' }), true)
       const jetzt = new Date().toISOString()
       const alt = r.id ? reiheVon(r.id, true) : null
       if (alt && alt.lehrkraftId !== ich.id) return (json(res, 403, { fehler: 'Diese Reihe gehört einer anderen Lehrkraft.' }), true)
+      /*
+       * Kein älterer Stand über einen neueren (08.10.2026): Der Editor schickt mit, auf welchem Stand er aufbaut. Ist der
+       * gespeicherte neuer (zweites Fenster, Ergebnis eines Auftrags), lehnt der Server ab – der Editor führt zusammen.
+       * Aufträge (`auftrag`) ändern nur ihren Schritt im frisch geladenen Stand und dürfen immer.
+       */
+      if (alt && istVeraltet(alt.geaendert, typeof k0.basis === 'string' ? k0.basis : undefined, k0.auftrag === true)) {
+        const { lehrkraftId: _l, ...aktuell } = alt
+        return (json(res, 409, { fehler: 'Die Reihe wurde inzwischen an anderer Stelle geändert.', konflikt: true, reihe: aktuell }), true)
+      }
       const id = alt ? alt.id : neueId()
       /*
        * Reihenart (08.10.2026, Plan E): Unbekanntes fällt weg (= gemischt). Eine zugewiesene Reihe kann keine Planungsreihe
@@ -1155,15 +1247,24 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       }
       const { art: _art, ...ohneArt } = r
       const neu = { ...ohneArt, ...(art ? { art } : {}), id, geaendert: jetzt }
-      if (alt) db().prepare('UPDATE reihen SET titel = ?, daten = ?, geaendert = ? WHERE id = ?').run(r.titel.slice(0, 200), JSON.stringify(neu), jetzt, id)
+      const titel = (r.titel.trim() || OHNE_TITEL).slice(0, 200)
+      /*
+       * Veröffentlichen (08.10.2026): Speichern ändert bei zugewiesenen Reihen nur den Entwurf – das automatische Speichern
+       * schiebt nichts zu den Lernenden. Erst „Für Lernende aktualisieren" (`veroeffentlichen`) zeigt den neuen Stand und
+       * verknüpft neue Schritte. Nicht zugewiesene Reihen sind sofort veröffentlicht (sieht niemand außer dem Musterschüler).
+       */
+      const zugewiesen = alt ? zahlZuweisungen(id) : 0
+      if (alt && zugewiesen) {
+        // Altbestand ohne veröffentlichten Stand: der bisherige Stand ist der, den die Lernenden kennen
+        db().prepare('UPDATE reihen SET veroeffentlicht = COALESCE(veroeffentlicht, daten) WHERE id = ?').run(id)
+      }
+      if (alt) db().prepare('UPDATE reihen SET titel = ?, daten = ?, geaendert = ? WHERE id = ?').run(titel, JSON.stringify(neu), jetzt, id)
       else
         db()
           .prepare('INSERT INTO reihen (id, lehrkraft_id, titel, daten, erstellt, geaendert) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(id, ich.id, r.titel.slice(0, 200), JSON.stringify(neu), jetzt, jetzt)
-      // Neue Schritte auch in bestehenden Zuweisungen bereitstellen
-      for (const z of db().prepare("SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND status = 'offen'").all(id) as unknown as ZuweisungZeile[])
-        verknuepfe(z, { ...neu, schritte: neu.schritte.filter((s) => !s.platzhalter) })
-      return (json(res, 200, { id, geaendert: jetzt }), true)
+          .run(id, ich.id, titel, JSON.stringify(neu), jetzt, jetzt)
+      if (sofortVeroeffentlichen(zugewiesen, k0.veroeffentlichen === true)) veroeffentliche(id)
+      return (json(res, 200, { id, geaendert: jetzt, veroeffentlichung: veroeffentlichungVon(id) }), true)
     }
     if (teile[0] === 'z' && teile[1]) {
       const z = zuweisung(teile[1])
@@ -1306,7 +1407,16 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
     if (!r || r.lehrkraftId !== ich.id) return (json(res, 404, { fehler: 'Unbekannte Reihe.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
       const { lehrkraftId: _l, ...rein } = r
-      return (json(res, 200, { reihe: rein }), true)
+      return (json(res, 200, { reihe: rein, veroeffentlichung: veroeffentlichungVon(r.id) }), true)
+    }
+    // Stand der Veröffentlichung (08.10.2026): „n Änderungen noch nicht bei den Lernenden"
+    if (req.method === 'GET' && teile[1] === 'veroeffentlichung') return (json(res, 200, veroeffentlichungVon(r.id)), true)
+    // „Für Lernende aktualisieren": der gespeicherte Entwurf wird der Stand der Lernenden
+    if (req.method === 'POST' && teile[1] === 'veroeffentlichen') {
+      if (r.art === 'planung') return (json(res, 400, { fehler: 'Eine Planungsreihe wird nicht veröffentlicht.' }), true)
+      veroeffentliche(r.id)
+      protokolliereServer('reihe', 'Änderungen der Reihe für Lernende veröffentlicht', ich.id)
+      return (json(res, 200, veroeffentlichungVon(r.id)), true)
     }
     if (req.method === 'POST' && teile[1] === 'zuweisen') {
       // Planungsreihe (08.10.2026, Plan E4): nur für die Lehrkraft – wird nicht zugewiesen
@@ -1324,12 +1434,16 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         return (json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder Gäste per QR-Code wählen.' }), true)
       const id = neueId()
       const code = mitGaesten ? neuerCode() : null
+      // Erste Zuweisung (08.10.2026): Was die Lehrkraft jetzt zuweist, ist der veröffentlichte Stand
+      const ersteZuweisung = zahlZuweisungen(r.id) === 0
       db()
         .prepare(
           'INSERT INTO reihen_zuweisungen (id, reihe_id, lehrkraft_id, lerngruppe_id, schueler, halte_frei, verknuepft, status, erstellt, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .run(id, r.id, ich.id, g?.id ?? '', JSON.stringify(einzelne), '[]', '{}', 'offen', new Date().toISOString(), code)
-      verknuepfe(zuweisung(id)!, r)
+      if (ersteZuweisung) veroeffentliche(r.id)
+      // Weitere Zuweisungen bekommen den veröffentlichten Stand – wie alle anderen Lernenden der Reihe
+      verknuepfe(zuweisung(id)!, reiheVon(r.id) ?? r)
       protokolliereServer('reihe', 'Unterrichtsreihe zugewiesen', ich.id)
       return (json(res, 200, { id, ...(code ? { code, link: reiheLink(code) } : {}) }), true)
     }

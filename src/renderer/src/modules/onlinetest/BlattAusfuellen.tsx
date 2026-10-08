@@ -42,6 +42,8 @@ import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug
 import type { FormArt } from '@shared/blattObjekte'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
+import { markeGilt, markenAusVerlauf, pruefRunden, type AbgabeFeedback, type FeldMarke } from '@shared/blattPruefung'
+import { ReiheWeiterNachBlatt } from './ReiheWeiter'
 import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL } from '@shared/blattAuswertung'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
@@ -72,6 +74,10 @@ interface Feld {
   anker?: number
   /** Index des (ersten) Elements in doc.querySelectorAll(FELDER) – die Druckfassung schreibt dort hinein */
   el?: number
+  /** Stelle im Lösungsschlüssel (shared/blattPruefung.ts) – für die automatische Prüfung beim Einreichen */
+  bezug?: string
+  /** Zweites Feld an derselben Stelle (Kästchen in der Richtig/Falsch-Zelle) – zählt nicht, Nummern bleiben stabil */
+  doppelt?: boolean
 }
 
 interface Seite {
@@ -135,6 +141,10 @@ type AufgabenFb = {
   fehlt?: string
   schritt?: string
   markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string }[]
+  /** Beim Einreichen entstanden (08.10.2026): Nummer der Einreichung, automatisch geprüft, ✓/✗ je Feld */
+  abgabe?: number
+  auto?: AbgabeFeedback['auto']
+  marken?: Record<string, FeldMarke>
 }
 
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
@@ -301,32 +311,93 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
   }
   const index = new Map<Element, number>()
   doc.querySelectorAll(FELDER).forEach((el, i) => index.set(el, i))
+  /*
+   * Stelle im Lösungsschlüssel (08.10.2026, shared/blattPruefung.ts): Teilaufgabe aus der letzten Marke „a)" bzw. „3."
+   * (Fragenreihe) vor dem Feld, darin Möglichkeit, Aussage, Lücke oder Zeile – in Lesereihenfolge gezählt.
+   */
+  let teil = -1
+  const zaehler = new Map<string, number>()
+  const zaehle = (n: number, art: string): number => {
+    const k = `${n}|${teil}|${art}`
+    const v = zaehler.get(k) ?? 0
+    zaehler.set(k, v + 1)
+    return v
+  }
+  const tfZeilen = new Map<Element, number>()
+  const text = (el: Element | null | undefined): string => ((el as HTMLElement | null)?.innerText ?? '').replace(/\s+/g, ' ').trim()
   doc.querySelectorAll('.ws-page').forEach((p, i) => {
     const r = p.getBoundingClientRect()
     seiten.push({ x: r.left, y: r.top, w: r.width, h: r.height, andocken: andockstellen(p, r) })
     // Aufgaben auch ohne Felder zählen (Nummern wie auf dem Blatt)
-    const elemente = [...p.querySelectorAll('.ws-task, ' + FELDER)]
+    const elemente = [...p.querySelectorAll('.ws-task, .ws-part-letter, .ws-mc-num, ' + FELDER)]
     for (const el of elemente) {
       if (el.classList.contains('ws-task')) {
+        if (!gesehen.has(el) && !el.classList.contains('ws-continued')) teil = -1
         nummerVon(el, i)
         continue
       }
       // Gelöstes Beispiel, Kopf (Name/Datum) und Fuß: nichts auszufüllen
       if (el.closest('.ws-example, .ws-header, .ws-footer')) continue
+      if (el.matches('.ws-part-letter, .ws-mc-num')) {
+        const m = el.matches('.ws-part-letter') ? /^([a-z])\)/.exec(text(el)) : /^(\d{1,2})\./.exec(text(el))
+        if (m) teil = el.matches('.ws-part-letter') ? m[1].charCodeAt(0) - 97 : Number(m[1]) - 1
+        continue
+      }
       const b = el.getBoundingClientRect()
       if (b.width < 6 || b.height < 4) continue
       const n = nummerVon(el.closest('.ws-task'), i)
+      // Zuordnen und Ordnen: Buchstabe bzw. Nummer eintragen, nicht ankreuzen (08.10.2026)
+      const zuordnen = el.matches('.ws-box') && Boolean(el.closest('.ws-match-box'))
+      const ordnen = el.matches('.ws-box') && Boolean(el.closest('.ws-order-row'))
       const art: BlattFeldArt = el.matches('.ws-gap')
         ? 'luecke'
-        : el.matches('.ws-check, .ws-tf-cell') || (el.matches('.ws-box') && b.width < 40 && b.height < 40)
-          ? 'kreuz'
-          : el.matches('.ws-space, .ws-workspace, .ws-cell-empty')
-            ? 'flaeche'
-            : el.matches('.ws-box')
-              ? 'text'
-              : 'zeilen'
+        : zuordnen || ordnen
+          ? 'text'
+          : el.matches('.ws-check, .ws-tf-cell') || (el.matches('.ws-box') && b.width < 40 && b.height < 40)
+            ? 'kreuz'
+            : el.matches('.ws-space, .ws-workspace, .ws-cell-empty')
+              ? 'flaeche'
+              : el.matches('.ws-box')
+                ? 'text'
+                : 'zeilen'
       const zeile = el.closest('li, tr, .ws-mc-option, .ws-tf-row, p') as HTMLElement | null
       const li = el.getAttribute('data-li')
+      let bezug: string | undefined
+      let beschriftung = art === 'kreuz' && zeile ? zeile.innerText.trim() : ''
+      const option = el.matches('.ws-check') ? el.closest('.ws-mc-option') : null
+      const tfZelle = el.matches('.ws-check') ? el.closest('.ws-tf-cell') : null
+      if (n > 0 && el.matches('.ws-gap') && el.closest('.ws-gaptext')) bezug = `${teil}.luecke.${zaehle(n, 'luecke')}`
+      else if (n > 0 && zuordnen) {
+        bezug = `${teil}.zuordnen.${zaehle(n, 'zuordnen')}`
+        beschriftung = text(el.closest('tr')?.querySelector('.ws-match-left'))
+      } else if (n > 0 && ordnen) {
+        bezug = `${teil}.ordnen.${zaehle(n, 'ordnen')}`
+        beschriftung = text(el.closest('.ws-order-row'))
+      } else if (n > 0 && option) {
+        const buchstabe = /^([a-z])\)/.exec(text(option.querySelector('.ws-mc-letter')))
+        const k = buchstabe ? buchstabe[1].charCodeAt(0) - 97 : [...(option.parentElement?.children ?? [])].filter((c) => c.matches('.ws-mc-option')).indexOf(option)
+        bezug = `${teil}.mc.${k}`
+        // Kästchen-Text für die KI (08.10.2026): Frage der Fragenreihe bzw. Teilaufgabe und die Möglichkeit wie auf dem Blatt
+        const frage = text(option.closest('td')?.querySelector('.ws-mc-question'))
+        beschriftung = [frage || (teil >= 0 ? `Teilaufgabe ${String.fromCharCode(97 + teil)}` : ''), text(option)].filter(Boolean).join(': ')
+      } else if (n > 0 && tfZelle) {
+        const tr = tfZelle.closest('tr')!
+        let r = tfZeilen.get(tr)
+        if (r === undefined) {
+          r = zaehle(n, 'rf')
+          tfZeilen.set(tr, r)
+        }
+        const sp = [...tr.querySelectorAll('.ws-tf-cell')].indexOf(tfZelle)
+        bezug = `${teil}.rf.${r}.${sp}`
+        const kopf = text(tr.closest('table')?.querySelectorAll('thead th')[sp + 1])
+        beschriftung = `${text(tr.querySelector('td'))} → ${kopf || (sp === 0 ? 'richtig' : 'falsch')}`
+      } else if (el.matches('.ws-cell-empty')) {
+        // Ausfülltabelle (auch aus leeren Materialtabellen, generation/antworttabellen.ts): Zeilenvorgabe und Spaltenkopf
+        const tr = el.closest('tr')
+        const c = tr ? [...tr.children].indexOf(el) : -1
+        const kopf = c >= 0 ? text(el.closest('table')?.querySelectorAll('thead th')[c]) : ''
+        beschriftung = [text(tr?.querySelector('td:not(.ws-cell-empty)')), kopf].filter(Boolean).join(' – ')
+      }
       roh.push({
         ...(li !== null ? { anker: Number(li) } : {}),
         el: index.get(el),
@@ -337,7 +408,10 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
         y: b.top,
         w: b.width,
         h: b.height,
-        ...(art === 'kreuz' && zeile ? { text: zeile.innerText.trim().slice(0, 160) } : {})
+        ...(beschriftung ? { text: beschriftung.slice(0, 160) } : {}),
+        ...(bezug ? { bezug } : {}),
+        // Richtig/Falsch: das Kästchen in der Zelle ist das Feld – die Zelle darum nicht noch einmal
+        ...(el.matches('.ws-tf-cell') && el.querySelector('.ws-check:not(.ws-check-demo)') ? { doppelt: true } : {})
       })
     }
   })
@@ -370,13 +444,15 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
     felder.push({ ...f, id: '', ...(f.art === 'zeilen' ? { zeilen: 1, abstand: f.h } : {}) })
   }
   felder.forEach((f, i) => (f.id = `f${i}`))
+  // Doppelte erst nach dem Nummerieren entfernen – die Nummern gespeicherter Antworten bleiben gleich
+  const ohneDoppelte = felder.filter((f) => !f.doppelt)
   // Hilfekarten je Aufgabe (06.10.2026): am ?-Symbol statt auf der Schlussseite
   const hilfen = hilfekartenAus(doc)
   for (const a of aufgaben) {
     const h = hilfen.get(a.nr)
     if (h) a.hilfe = h
   }
-  return { felder, seiten, aufgaben }
+  return { felder: ohneDoppelte, seiten, aufgaben }
 }
 
 export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Element {
@@ -562,8 +638,19 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     const zuordnung = JSON.stringify(Object.fromEntries(gemessen.felder.filter((f) => f.nr > 0).map((f) => [f.id, f.nr])))
     setAntworten((a) => (a[ZUORDNUNG_SCHLUESSEL] === zuordnung ? a : { ...a, [ZUORDNUNG_SCHLUESSEL]: zuordnung }))
   }, [gemessen, lehrkraft])
-  const felderAlsDaten = (): { id: string; nr: number; art: string; seite: number }[] =>
-    (gemessen?.felder ?? []).map((f) => ({ id: f.id, nr: f.nr, art: f.art, seite: f.seite }))
+  // Mit Kästchen-Text und Stelle im Lösungsschlüssel (08.10.2026) – für die KI und die automatische Prüfung
+  const felderAlsDaten = (): { id: string; nr: number; art: string; seite: number; text?: string; bezug?: string }[] =>
+    (gemessen?.felder ?? []).map((f) => ({
+      id: f.id,
+      nr: f.nr,
+      art: f.art,
+      seite: f.seite,
+      ...(f.text ? { text: f.text } : {}),
+      ...(f.bezug ? { bezug: f.bezug } : {})
+    }))
+  // ✓/✗ der letzten Einreichung je Feld (08.10.2026) – gelten, solange das Feld unverändert ist
+  const marken = useMemo(() => markenAusVerlauf(aufgabenFb), [aufgabenFb])
+  const [pruefHinweis, setPruefHinweis] = useState('')
 
   const [pruefFehler, setPruefFehler] = useState<Record<string, string>>({})
   /** Materialtexte mit Zeilennummern für die KI (Zeilenangaben prüfbar) */
@@ -608,7 +695,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     setLaeuft('abgabe')
     setMeldung('')
     try {
-      const r = await senden<{ ok: boolean; bogen?: FeedbackBogen; nr: number; fehler?: string }>('/s/api/blatt/abgeben', {
+      const r = await senden<{
+        ok: boolean
+        bogen?: FeedbackBogen
+        nr: number
+        fehler?: string
+        aufgabenFeedback?: Record<string, AufgabenFb>
+        pruefFehler?: string
+      }>('/s/api/blatt/abgeben', {
         id: d.id,
         ...materialAngabe(),
         antworten,
@@ -617,6 +711,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       })
       setGenutzt((g) => g + 1)
       setFassungen((f) => [...f, { nr: r.nr, zeit: new Date().toISOString(), bogen: r.bogen, fehler: r.fehler }])
+      // Alles auf einmal (08.10.2026): ✓/✗ an Kästchen und Lücken, Ampel und Hinweis an jeder Aufgabe
+      const neu = r.aufgabenFeedback ?? {}
+      if (Object.keys(neu).length) setAufgabenFb((x) => ({ ...x, ...Object.fromEntries(Object.entries(neu).map(([nr, e]) => [nr, [...(x[nr] ?? []), e]])) }))
+      setPruefHinweis(r.pruefFehler ? `Die Hinweise zu den offenen Aufgaben konnten nicht erstellt werden: ${r.pruefFehler}` : '')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
       setMeldung(e instanceof Error ? e.message : String(e))
@@ -700,6 +798,17 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     }
   }
   const lehrkraftSicht = Boolean(lehrkraft)
+  // Aus einer Unterrichtsreihe geöffnet (`?reihe=`): Rückweg und „Weiter" dorthin
+  const reiheId = useMemo(() => {
+    if (lehrkraft) return null
+    const r = new URLSearchParams(window.location.search).get('reihe')
+    return r && /^[a-f0-9]{8,32}$/.test(r) ? r : null
+  }, [lehrkraft])
+  // Ergebnis der letzten Einreichung je Aufgabe (Ampel und Hinweis) – als Übersicht über dem Blatt
+  const abgabeErgebnis = Object.entries(aufgabenFb)
+    .map(([nr, l]) => ({ nr: Number(nr), e: l?.at(-1) }))
+    .filter((x): x is { nr: number; e: AufgabenFb } => Boolean(x.e?.abgabe) && x.e!.abgabe === genutzt)
+    .sort((a, b) => a.nr - b.nr)
   /*
    * Schrittweise Freischaltung und Merkkästen am Ende (05.10.2026, shared/blattFreigabe.ts): Gesperrte
    * Aufgaben stehen unsichtbar im Blatt (die Seiten behalten ihre Maße), mit einem Hinweis darüber;
@@ -719,7 +828,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei)
   const aufgaben = alleAufgaben.filter((a) => a.nr <= bis)
   const felderSichtbar = (gemessen?.felder ?? []).filter((f) => f.nr <= bis)
-  const ampeln = d.einstellungen.aufgabenFeedback
+  // Ampel auch ohne „prüfen lassen", sobald es Hinweise vom Einreichen gibt (08.10.2026)
+  const ampeln =
+    d.einstellungen.aufgabenFeedback || Object.values(aufgabenFb).some((l) => l?.length)
     ? Object.fromEntries(alleAufgaben.map((a) => [a.nr, ampelVon(aufgabenFb[String(a.nr)], frei.includes(a.nr))]))
     : null
   useEffect(() => {
@@ -733,6 +844,11 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       {lehrkraft ? (
         <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck}>
           Zur Übersicht
+        </Button>
+      ) : reiheId ? (
+        // Blatt einer Unterrichtsreihe (08.10.2026): zurück zur Reihe statt zur Liste der Arbeitsblätter
+        <Button variant="light" component="a" href={`/s/r/${reiheId}`} w="fit-content" leftSection={<IconArrowLeft size={16} />} data-zur-reihe>
+          Zur Unterrichtsreihe
         </Button>
       ) : (
         <Button variant="subtle" component="a" href="/s/blaetter" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
@@ -830,6 +946,34 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           )}
         </Card>
       )}
+      {abgabeErgebnis.length > 0 && (
+        <Card withBorder padding="md" data-abgabe-ergebnis>
+          <Title order={5} mb={4}>
+            Deine Aufgaben nach dem Einreichen
+          </Title>
+          <Text size="xs" c="dimmed" mb="xs">
+            ✓ und ✗ stehen an deinen Kästchen und Lücken, die Hinweise auch direkt an jeder Aufgabe.
+          </Text>
+          <Stack gap={6}>
+            {abgabeErgebnis.map(({ nr, e }) => (
+              <Group key={nr} gap="xs" wrap="nowrap" align="start" data-abgabe-aufgabe={nr} data-einschaetzung={e.einschaetzung}>
+                <Badge
+                  variant="filled"
+                  color={e.einschaetzung === 'sicher' ? 'green' : e.einschaetzung === 'teilweise' ? 'yellow' : 'red'}
+                  style={{ flexShrink: 0 }}
+                >
+                  Aufgabe {nr}
+                </Badge>
+                <Text size="sm" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                  {e.text}
+                </Text>
+              </Group>
+            ))}
+          </Stack>
+        </Card>
+      )}
+      {pruefHinweis && <Alert color="orange">{pruefHinweis}</Alert>}
+      {reiheId && genutzt > 0 && <ReiheWeiterNachBlatt zid={reiheId} blattId={d.id} stand={genutzt} />}
       {fassungen.at(-1)?.fehler && (
         <Alert color="orange">Das Feedback konnte nicht erstellt werden: {fassungen.at(-1)!.fehler}. Deine Lehrkraft sieht dein Blatt trotzdem.</Alert>
       )}
@@ -899,6 +1043,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                   setTinte((t) => ({ ...t, [String(s)]: url }))
                 }}
                 pruefen={offen && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
+                marken={marken}
                 pruefFehler={pruefFehler}
                 laeuft={laeuft}
                 fb={aufgabenFb}
@@ -927,6 +1072,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           setze={setze}
           gesperrt={!offen}
           pruefen={offen && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
+          marken={marken}
           laeuft={laeuft}
           fb={aufgabenFb}
           runden={d.einstellungen.aufgabenRunden}
@@ -980,7 +1126,12 @@ function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.El
   // Gegliedert seit 03.10.2026: gelungen / noch offen / nächster Schritt; ältere Antworten als Text
   if (!l.gelungen && !l.fehlt && !l.schritt)
     return (
-      <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback>
+      <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback {...(l.abgabe ? { 'data-abgabe-feedback': l.einschaetzung } : {})}>
+        {l.abgabe ? (
+          <Text size="xs" fw={700} c="dimmed">
+            Nach dem Einreichen{l.auto ? ` · ${l.auto.richtig} von ${l.auto.gesamt} richtig` : ''}
+          </Text>
+        ) : null}
         <Text size="sm">{l.text}</Text>
       </Alert>
     )
@@ -1033,6 +1184,8 @@ function Ebene(p: {
   tinte: Record<string, string>
   setTinte: (seite: number, url: string) => void
   pruefen?: (nr: number) => Promise<void>
+  /** ✓/✗ der letzten Einreichung je Feld (08.10.2026) */
+  marken?: Record<string, FeldMarke>
   pruefFehler: Record<string, string>
   laeuft: string | null
   fb: BlattDaten['aufgabenFeedback']
@@ -1046,6 +1199,8 @@ function Ebene(p: {
   hilfeOeffnen?: (a: AufgabeInfo) => void
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
+  // Feedback-Knopf an der Aufgabe: zum Prüfen lassen oder um vorhandenes Feedback zu lesen
+  const knopfDa = (nr: number): boolean => Boolean(p.pruefen) || Boolean(p.fb[String(nr)]?.length)
   const schreibt = p.werkzeug !== 'tastatur'
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
@@ -1195,6 +1350,15 @@ function Ebene(p: {
           />
         ]
       })}
+      {/* ✓/✗ nach dem Einreichen (08.10.2026): an jedem automatisch geprüften Kästchen und Feld */}
+      {p.felder.map((f) => {
+        const m = p.marken?.[f.id]
+        if (!markeGilt(m, p.antworten[f.id])) return null
+        const g = 16
+        // Kästchen: links daneben (rechts steht der Text der Möglichkeit), Lücken und Felder: rechts am Ende
+        const x = f.art === 'kreuz' ? f.x - g - 2 : f.x + f.w - g / 2
+        return <PruefZeichen key={`pm-${f.id}`} marke={m.m} stil={{ position: 'absolute', left: Math.max(0, x), top: f.y + f.h / 2 - g / 2, zIndex: 18 }} feld={f.id} />
+      })}
       <Rand
         eintraege={p.anmerkungen
           .filter((a) => lagen[a.nr] !== undefined && vergeben.has(a.nr))
@@ -1268,12 +1432,14 @@ function Ebene(p: {
       {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}
       {p.ampeln &&
         p.aufgaben.map((a) => (
-          <AmpelZeichen key={`ampel-${a.nr}`} stand={p.ampeln![a.nr] ?? 'rot'} x={Math.max(0, a.x - (p.pruefen ? 34 : 4) - 16)} y={a.y - 1} nr={a.nr} />
+          <AmpelZeichen key={`ampel-${a.nr}`} stand={p.ampeln![a.nr] ?? 'rot'} x={Math.max(0, a.x - (knopfDa(a.nr) ? 34 : 4) - 16)} y={a.y - 1} nr={a.nr} />
         ))}
-      {p.pruefen &&
-        p.aufgaben.map((a) => {
+      {/* Feedback bleibt sichtbar, auch nach der letzten Runde (08.10.2026) – „prüfen lassen" nur, solange es geht */}
+      {p.aufgaben
+        .filter((a) => knopfDa(a.nr))
+        .map((a) => {
           const liste = p.fb[String(a.nr)]
-          const rest = p.runden - (liste?.length ?? 0)
+          const rest = p.pruefen ? p.runden - pruefRunden(liste) : 0
           return (
             <div key={a.nr} style={{ position: 'absolute', left: Math.max(2, a.x - 34), top: a.y - 2, zIndex: 20 }} data-fb-fenster>
               <Tooltip label={rest > 0 ? `Feedback zu Aufgabe ${a.nr} (noch ${rest}×)` : 'Feedback ansehen'}>
@@ -1299,15 +1465,15 @@ function Ebene(p: {
                         {p.pruefFehler[String(a.nr)]}
                       </Alert>
                     )}
-                    {rest > 0 ? (
+                    {rest > 0 && p.pruefen ? (
                       <Button size="xs" loading={p.laeuft === `a${a.nr}`} onClick={() => void p.pruefen!(a.nr)} data-aufgabe-pruefen-los>
                         {liste?.length ? 'Noch einmal prüfen lassen' : `Aufgabe ${a.nr} prüfen lassen`}
                       </Button>
-                    ) : (
+                    ) : p.pruefen ? (
                       <Text size="xs" c="dimmed">
                         Für diese Aufgabe gibt es kein weiteres Feedback mehr.
                       </Text>
-                    )}
+                    ) : null}
                   </Stack>
                 </Paper>
               )}
@@ -1466,6 +1632,8 @@ function Liste(p: {
   setze: (f: string, w: string) => void
   gesperrt: boolean
   pruefen?: (nr: number) => Promise<void>
+  /** ✓/✗ der letzten Einreichung je Feld (08.10.2026) */
+  marken?: Record<string, FeldMarke>
   laeuft: string | null
   fb: BlattDaten['aufgabenFeedback']
   runden: number
@@ -1488,7 +1656,11 @@ function Liste(p: {
       )}
       {gruppen.map((g) => {
         const liste = p.fb[String(g.nr)]
-        const rest = p.runden - (liste?.length ?? 0)
+        const rest = p.runden - pruefRunden(liste)
+        const zeichen = (id: string): React.ReactNode => {
+          const m = p.marken?.[id]
+          return markeGilt(m, p.antworten[id]) ? <PruefZeichen marke={m.m} feld={id} stil={{ display: 'inline-flex', marginLeft: 6, verticalAlign: 'middle' }} /> : null
+        }
         return (
           <Card key={g.nr} withBorder padding="md">
             <Group justify="space-between" mb={6} wrap="nowrap" align="start">
@@ -1545,7 +1717,12 @@ function Liste(p: {
                   f.art === 'kreuz' ? (
                     <Checkbox
                       key={f.id}
-                      label={f.text || `Kästchen ${i + 1}`}
+                      label={
+                        <>
+                          {f.text || `Kästchen ${i + 1}`}
+                          {zeichen(f.id)}
+                        </>
+                      }
                       checked={Boolean(p.antworten[f.id])}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.checked ? 'x' : '')}
@@ -1569,8 +1746,8 @@ function Liste(p: {
                     <Textarea
                       key={f.id}
                       autosize
-                      minRows={3}
-                      label={`${i + 1}`}
+                      minRows={f.text ? 2 : 3}
+                      label={f.text ? `${i + 1}. ${f.text}` : `${i + 1}`}
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.value)}
@@ -1582,7 +1759,12 @@ function Liste(p: {
                   ) : (
                     <TextInput
                       key={f.id}
-                      label={`${f.art === 'luecke' ? 'Lücke' : 'Feld'} ${i + 1}`}
+                      label={
+                        <>
+                          {f.art === 'luecke' ? `Lücke ${i + 1}` : f.text ? `${f.text} – Buchstabe/Nummer` : `Feld ${i + 1}`}
+                          {zeichen(f.id)}
+                        </>
+                      }
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
                       onChange={(e) => p.setze(f.id, e.currentTarget.value)}
@@ -1605,6 +1787,41 @@ function Liste(p: {
         )
       })}
     </Stack>
+  )
+}
+
+const MARKE_TEXT: Record<FeldMarke['m'], string> = { r: 'richtig', f: 'falsch', fehlt: 'Hier wäre richtig gewesen' }
+
+/** ✓ (grün), ✗ (rot) bzw. Hinweis auf das Fehlende (orange) an einem geprüften Feld (08.10.2026) */
+function PruefZeichen({ marke, stil, feld }: { marke: FeldMarke['m']; stil?: React.CSSProperties; feld: string }): React.JSX.Element {
+  const farbe = marke === 'r' ? '#2f9e44' : marke === 'f' ? '#e03131' : '#f08c00'
+  return (
+    <span
+      role="img"
+      aria-label={MARKE_TEXT[marke]}
+      title={MARKE_TEXT[marke]}
+      data-pruef-marke={marke}
+      data-pruef-feld={feld}
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        background: marke === 'fehlt' ? '#fff' : farbe,
+        border: `2px solid ${farbe}`,
+        color: marke === 'fehlt' ? farbe : '#fff',
+        fontSize: 11,
+        fontWeight: 800,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+        ...stil
+      }}
+    >
+      {marke === 'r' ? '✓' : marke === 'f' ? '✗' : '!'}
+    </span>
   )
 }
 

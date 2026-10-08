@@ -517,6 +517,47 @@
   color: #777;
   font-size: 0.85em;
 }
+/*
+ * „Bild fehlt" im Editor (08.10.2026): nur für die Lehrkraft und ohne Höhe im Satz – Druck und Schülerblatt
+ * zeigen an dieser Stelle nichts, beide brechen also gleich um. Der Hinweis liegt über dem Folgenden.
+ */
+.ws-bild-fehlt-anker {
+  position: relative;
+  height: 0;
+}
+.ws-bild-fehlt {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2mm;
+  padding: 1.5mm 3mm;
+  border: 0.4mm dashed #c92a2a;
+  border-radius: 2mm;
+  background: #fff5f5;
+  color: #a51d1d;
+  font-size: 0.8em;
+}
+.ws-bild-fehlt-text {
+  flex: 1 1 40mm;
+  color: #555;
+}
+.ws-bild-fehlt-knopf {
+  font: inherit;
+  padding: 0.5mm 3mm;
+  border: 0.3mm solid #a51d1d;
+  border-radius: 1.5mm;
+  background: #fff;
+  color: #a51d1d;
+  cursor: pointer;
+}
+.ws-bild-fehlt-rahmen strong {
+  color: #a51d1d;
+}
 .ws-image figcaption {
   font-size: 0.8em;
   color: #333;
@@ -1164,6 +1205,11 @@
   border-radius: 0;
   background-image: linear-gradient(to bottom, transparent calc(var(--ws-linie, 8.5mm) - 0.25mm), #666 calc(var(--ws-linie, 8.5mm) - 0.25mm));
   background-size: 100% var(--ws-linie, 8.5mm);
+}
+/* Korrekturrand am Schreibraum (08.10.2026): Linien enden vor dem Streifen, die senkrechte Linie zeichnet `.ws-lines-rand::after` */
+.ws-workspace-lines.ws-lines-rand {
+  background-size: calc(100% - 45mm - var(--rand-abstand, 3mm)) var(--ws-linie, 8.5mm);
+  background-repeat: repeat-y;
 }
 .ws-workspace-grid {
   background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm), linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);

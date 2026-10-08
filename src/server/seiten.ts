@@ -45,6 +45,8 @@ a.zu:hover, a.zu:focus-visible { background: var(--rand); color: var(--text); }
 `
 
 /*
+ * Tab/Enter im Feld „Benutzername“ führt ausdrücklich ins Passwortfeld (08.10.2026, Befund der Lehrkraft auf iPad,
+ * Online-Exe und PC-Browser – vermutlich fangen Vorschlagslisten gespeicherter Anmeldungen den Tab-Druck ab).
  * Anmeldefenster (08.10.2026): öffnet als Dialog (Esc schließt, Klick daneben schließt, Fokus ins
  * Feld „Benutzername“, beim Schließen zurück auf den Knopf). Ohne showModal (sehr alte Browser)
  * bleibt der #Anker-Weg. Fester Text, damit der Hash in der CSP stimmt.
@@ -55,6 +57,7 @@ a.addEventListener('click',function(e){e.preventDefault();auf()})
 d.addEventListener('click',function(e){if(e.target===d)d.close()})
 var z=d.querySelectorAll('[data-schliessen]');for(var i=0;i<z.length;i++)z[i].addEventListener('click',function(e){e.preventDefault();d.close()})
 d.addEventListener('close',function(){a.focus()})
+var bn=document.getElementById('benutzer'),pw=document.getElementById('passwort');if(bn&&pw)bn.addEventListener('keydown',function(e){if((e.key==='Tab'&&!e.shiftKey)||e.key==='Enter'){e.preventDefault();pw.focus()}})
 if(d.classList.contains('offen')||location.hash==='#anmelden-fenster')auf()})()`
 
 /** CSP der Anmeldeseite: keine Skripte außer dem kleinen Fensterskript (per Hash freigegeben) */

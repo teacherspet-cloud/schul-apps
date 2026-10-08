@@ -69,11 +69,38 @@ export function abschnitteAus(buch: Buch): Abschnitt[] {
   )
 }
 
-/** Herkunft einer Zuweisung aus dem Lehrwerk */
+/** Eine Unit mit ihren gewählten Abschnitten */
+export interface QuelleUnit {
+  unit: string
+  abschnitte: string[]
+}
+
+/**
+ * Herkunft einer Zuweisung aus dem Lehrwerk. Mehrere Units (08.10.2026): `units` in Buchreihenfolge; `unit` ist dann die
+ * höchste davon und `abschnitte` alle Abschnitte hintereinander (für ältere Leser).
+ */
 export interface Quelle {
   lehrwerk: string
   unit: string
   abschnitte: string[]
+  units?: QuelleUnit[]
+}
+
+/** Units einer Herkunft – neue mit `units`, ältere mit einer Unit */
+export function quelleUnits(q: Partial<Quelle> | null | undefined): QuelleUnit[] {
+  if (!q) return []
+  if (Array.isArray(q.units) && q.units.length)
+    return q.units.filter((u) => u && typeof u.unit === 'string' && u.unit).map((u) => ({ unit: u.unit, abschnitte: Array.isArray(u.abschnitte) ? u.abschnitte : [] }))
+  return typeof q.unit === 'string' && q.unit ? [{ unit: q.unit, abschnitte: Array.isArray(q.abschnitte) ? q.abschnitte : [] }] : []
+}
+
+/** Kurztext der Herkunft: „green-line-1 · Unit 1: Station 1, Station 2 · Unit 2: Station 1" */
+export function quelleText(q: Partial<Quelle> | null | undefined): string {
+  if (!q) return ''
+  const units = quelleUnits(q)
+  if (units.length <= 1)
+    return [q.lehrwerk, units[0]?.unit, units[0]?.abschnitte.length ? units[0].abschnitte.join(', ') : ''].filter(Boolean).join(' · ')
+  return [q.lehrwerk, ...units.map((u) => (u.abschnitte.length ? `${u.unit}: ${u.abschnitte.join(', ')}` : u.unit))].filter(Boolean).join(' · ')
 }
 
 /**

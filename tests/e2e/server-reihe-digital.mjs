@@ -5,6 +5,8 @@
 //    geschafft; Selbsteinschätzung mit KI-Impuls; Abschlussprodukt mit KI-Vorschlag (nur die Lehrkraft sieht Punkte),
 //    geschafft ohne Lehrkraft; Materialien und „Meine Abgaben"; Hefter als Seite mit PDF; nichts ragt seitlich über;
 //  - Lehrkraft: KI-Vorschlag im Handlungsbedarf und in der Detailansicht, übernehmen und bestätigen.
+//  - Einreichen (08.10.2026): ✓/✗ an Ankreuzen und Lücke ohne KI, Hinweis je offener Aufgabe aus EINER Anfrage
+//    („blatt_abgabe_aufgaben", Attrappe), „Weiter: <nächster Schritt>" führt zum nächsten offenen Schritt.
 // Vorher: Server lokal mit KI-Attrappe (SCHULAPPS_KI_ATTRAPPE; Grundantworten „rueckmeldung_bogen", „blatt_aufgabe_feedback"
 // wie für server-reihe.mjs). Der Test trägt seine übrigen Antworten selbst ein und stellt die Datei danach wieder her.
 // Eigene Konten, am Ende samt Daten gelöscht. Vorlage für Fach/Thema: jüngstes echtes Arbeitsblatt (nur gelesen).
@@ -67,6 +69,7 @@ const baustein = (patch) => ({
   ...patch
 })
 const IMPULS = 'Du hast genau benannt, was schwer war. Welche Ursache könntest du morgen noch einmal mit einem Beispiel erklären?'
+const HINWEIS = 'Eine Ursache passt schon – nenne noch eine zweite aus dem Merkkasten.'
 attrappe.protokoll = protokoll
 attrappe.antworten = {
   ...attrappe.antworten,
@@ -77,7 +80,9 @@ attrappe.antworten = {
     teacherNote: '',
     items: [
       { type: 'text', purpose: 'Merkkasten mit Beispiel', afb: '', operator: '', socialForm: 'EA', stars: 0, answerKind: 'none' },
-      { type: 'task', purpose: 'Informationen entnehmen', afb: 'I', operator: 'nennen', socialForm: 'EA', stars: 0, answerKind: 'lines' }
+      { type: 'task', purpose: 'Informationen entnehmen', afb: 'I', operator: 'nennen', socialForm: 'EA', stars: 0, answerKind: 'lines' },
+      { type: 'task', purpose: 'Ursache erkennen', afb: 'I', operator: 'ankreuzen', socialForm: 'EA', stars: 0, answerKind: 'multipleChoice' },
+      { type: 'task', purpose: 'Fachbegriff einsetzen', afb: 'I', operator: 'ergänzen', socialForm: 'EA', stars: 0, answerKind: 'gapText' }
     ]
   },
   worksheet: {
@@ -90,10 +95,29 @@ attrappe.antworten = {
         afb: 'I',
         solution: 'zwei Ursachen',
         answer: { ...leer, kind: 'lines', lines: 3 }
+      }),
+      // Feste Lösungen (08.10.2026): beim Einreichen ohne KI geprüft
+      baustein({
+        outlineIndex: 2,
+        instruction: '**Kreuze an:** Was ist die Ursache für den nassen Boden?',
+        operator: 'ankreuzen',
+        afb: 'I',
+        solution: 'Regen',
+        answer: { ...leer, kind: 'multipleChoice', options: ['Regen', 'Sonne', 'Schnee'], correct: [0] }
+      }),
+      baustein({
+        outlineIndex: 3,
+        instruction: '**Ergänze** die Lücke.',
+        operator: 'ergänzen',
+        afb: 'I',
+        solution: 'nass',
+        answer: { ...leer, kind: 'gapText', gapText: 'Durch den Regen wird der Boden [[nass]].' }
       })
     ]
   },
   worksheet_review: { problems: [] },
+  // Einreichen: Hinweis je offener Aufgabe (Aufgabe 1 – Ankreuzen und Lücke prüft der Server selbst)
+  blatt_abgabe_aufgaben: { aufgaben: [{ nr: 1, einschaetzung: 'teilweise', hinweis: HINWEIS }] },
   reihe_reflexion_impuls: { impuls: IMPULS },
   reihe_abschluss_vorschlag: {
     kriterien: [
@@ -257,6 +281,14 @@ try {
       'KI-Feedback zu einer Aufgabe am Handy'
     )
   } else pruefe(false, 'Knopf „Feedback zu Aufgabe" am Handy sichtbar')
+  // Ankreuzen (falsch: „Sonne") und Lücke (richtig: „nass") – prüft der Server beim Einreichen ohne KI
+  await s.locator('[data-blatt-liste] label', { hasText: 'Sonne' }).first().click()
+  await s
+    .locator('[data-blatt-liste] .mantine-Card-root', { hasText: 'Aufgabe 3' })
+    .locator('input[data-listen-feld]:not([type=checkbox])')
+    .first()
+    .fill('nass')
+  await s.waitForTimeout(500)
   await s.locator('[data-blatt-einreichen]').click()
   pruefe(
     await s
@@ -269,7 +301,56 @@ try {
     'Nach dem Einreichen: KI-Bogen am Handy'
   )
   await s.screenshot({ path: join(out, '3-handy-blatt.png'), fullPage: true })
+  // Alles auf einmal: ✓/✗ an den Feldern, Hinweis an der offenen Aufgabe, Übersicht je Aufgabe
+  pruefe((await s.locator('[data-blatt-liste] [data-pruef-marke="f"]').count()) === 1, 'Falsches Kreuz mit ✗ markiert (ohne KI)')
+  pruefe((await s.locator('[data-blatt-liste] [data-pruef-marke="r"]').count()) === 1, 'Richtige Lücke mit ✓ markiert (ohne KI)')
+  const offeneHinweis = await s
+    .locator('[data-blatt-liste] .mantine-Card-root', { hasText: 'Aufgabe 1' })
+    .locator('[data-abgabe-feedback]')
+    .innerText()
+    .catch(() => '')
+  pruefe(offeneHinweis.includes('zweite aus dem Merkkasten'), 'Hinweis der KI direkt an der offenen Aufgabe')
+  pruefe(
+    (await s.locator('[data-abgabe-ergebnis] [data-abgabe-aufgabe="2"][data-einschaetzung="noch nicht"]').count()) === 1 &&
+      (await s.locator('[data-abgabe-ergebnis] [data-abgabe-aufgabe="3"][data-einschaetzung="sicher"]').count()) === 1,
+    'Übersicht nach dem Einreichen: Ankreuzen „noch nicht", Lücke „sicher"'
+  )
+  const abgabeAnfragen = anfragen().filter((a) => a.schemaName === 'blatt_abgabe_aufgaben')
+  pruefe(
+    abgabeAnfragen.length === 1 &&
+      abgabeAnfragen[0].user.includes('AUFGABE 1') &&
+      !abgabeAnfragen[0].user.includes('AUFGABE 2') &&
+      !abgabeAnfragen[0].user.includes('AUFGABE 3') &&
+      !/Nele|Probe/.test(abgabeAnfragen[0].user),
+    'Eine KI-Anfrage nur für die offene Aufgabe, ohne Namen'
+  )
+  pruefe(
+    anfragen().some((a) => a.schemaName === 'rueckmeldung_bogen' && /angekreuzt: .*Sonne/.test(a.user ?? '')),
+    'Bogen-Anfrage nennt die angekreuzte Möglichkeit statt „Kästchen n"'
+  )
+  // Weiter zum nächsten offenen Schritt (Hefter zählt nicht – die Selbsteinschätzung ist dran)
+  const weiter = s.locator('[data-reihe-weiter-karte] [data-reihe-weiter]')
+  pruefe(
+    await weiter
+      .waitFor({ timeout: 20000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    '„Weiter: …" nach dem Einreichen'
+  )
+  pruefe((await s.locator('[data-reihe-weiter-karte] [data-schritt-geschafft]').count()) === 1, 'Schritt als „Geschafft" gekennzeichnet')
+  pruefe((await ueberstand(s)) <= 1, `Blatt nach dem Einreichen: nichts ragt seitlich über (${await ueberstand(s)} px)`)
+  await weiter.click()
+  pruefe(
+    await s.waitForURL(`**/s/r/${zid}/sr`, { timeout: 15000 }).then(
+      () => true,
+      () => false
+    ),
+    `„Weiter" führt zum nächsten Schritt (${s.url()})`
+  )
   st = await status()
+  pruefe((await s.locator('[data-weiter-mit] [data-reihe-weiter="sr"]').count()) === 1, 'Weg: „Weiter mit: Wie sicher bist du?" oben')
   pruefe(st[0] === 'geschafft', `Blatt automatisch geschafft – ohne Lehrkraft (${st.join(', ')})`)
 
   // Hefter als Seite mit PDF

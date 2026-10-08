@@ -55,6 +55,7 @@ import {
   taskContext
 } from './prompts'
 import { FLAT_BLOCK, OUTLINE_SCHEMA, REVIEW_SCHEMA, WORKSHEET_SCHEMA } from './schemas'
+import { tabellenZumAusfuellen } from './antworttabellen'
 import { antwortRaumAnwenden, antwortRaumUebersicht, schreibRegelFuerMeta, schreibraumRichtwerte, type AntwortRaumVorschlag } from '../didactics/schreibraum'
 import { seitenPlanAus, seitenPlanRegeln } from '../didactics/seiten'
 import { linkListeningTasks, scriptForSheet, wantsListening, writeListeningScripts } from './listening'
@@ -106,7 +107,7 @@ export async function generateOutline(
        */
       [
         'Gib für jede Aufgabe Anforderungsbereich (afb), Operator und Sozialform an und halte die Soll-Verteilung der Anforderungsbereiche ein.',
-        'Beginne mit den Lernzielen und stelle Material (Texte, Kästen, Bilder) vor die zugehörigen Aufgaben.',
+        'Beginne mit den Lernzielen und stelle Material (Texte, Kästen, Bilder) vor die zugehörigen Aufgaben. Jede Aufgabe steht direkt hinter dem Material, auf das sie sich bezieht (dieselbe Seite bzw. Doppelseite); eine Aufgabe, die nur ein frühes Material braucht, steht direkt hinter diesem – ans Ende gehören nur Aufgaben, die mehrere Materialien zusammenführen.',
         istUebungsklausur(meta) ? 'Dies ist eine Übungsklausur: KEINE Selbsteinschätzung.' : 'Ende mit einer Selbsteinschätzung.',
         phraseSheetModus(meta) !== 'aus'
           ? 'Die Lehrkraft hat ein Hilfsblatt mit nützlichen Ausdrücken verlangt: Setze dafür einen Gliederungspunkt vom Typ „phrases" ans ENDE.'
@@ -737,7 +738,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     const mit = ws.originalMaterial ? setzeMaterialEin(mitVersuch, ws.originalMaterial, meta, newId) : mitVersuch
     // Gespeichert werden KENNUNGEN: Schreibt die KI trotzdem „M2", wird daraus die Kennung des Materials, das jetzt M2 ist.
     // Erst jetzt, wo alle Materialien an ihrem Platz stehen – auch der eingesetzte Ausgangstext. Die Nummern entstehen beim Darstellen.
-    return { ...mit, blocks: verschluesseleMaterialverweise(mit.blocks) }
+    // Leere Tabellen sind Antwortbereiche, kein Material (08.10.2026): Ausfülltabelle der Aufgabe – im Druck und digital ausfüllbar
+    return tabellenZumAusfuellen({ ...mit, blocks: verschluesseleMaterialverweise(mit.blocks) }).sheet
   }
 
   /*

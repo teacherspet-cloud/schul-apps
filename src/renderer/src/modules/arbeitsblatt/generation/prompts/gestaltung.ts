@@ -5,6 +5,7 @@ import { operatorenAuswahl } from '@shared/operatoren/zugriff'
 import { imageDesignRules } from '../../didactics/imageDesign'
 import { wantedTasks } from './grundregeln'
 import { schreibRegelFuerMeta, schreibraumRichtwerte } from '../../didactics/schreibraum'
+import { wortspeicherRegel } from '../../didactics/language'
 
 // ---------- Bilder, Lernpsychologie, Fachmethoden ----------
 
@@ -77,14 +78,15 @@ export function learningDesignRules(meta: WorksheetMeta): string {
 }
 
 /**
- * Sprachliche Hilfen (sprachsensibler Fachunterricht nach Leisen, Wortspeicher mit Artikel,
+ * Sprachliche Hilfen (sprachsensibler Fachunterricht nach Leisen, Wortspeicher – in Sprachfächern mit Artikel,
  * Satzanfänge zum Operator, Textsortengerüste, gestufter Abbau der Hilfen).
  */
 export function scaffoldRules(meta: WorksheetMeta): string {
   return [
     'SPRACHLICHE HILFEN:',
     '- Fachwörter bei der ersten Nennung in einem kurzen Satz erklären und für denselben Sachverhalt durchgehend dasselbe Wort verwenden (keine Synonyme).',
-    '- Wortspeicher mit Artikel und Pluralform; wo es passt, Alltagssprache und Fachsprache nebeneinanderstellen.',
+    // Artikel und Plural nur in Sprachfächern und im sprachsensiblen/DaZ-Modus (08.10.2026, didactics/language.ts)
+    wortspeicherRegel(meta),
     '- Zu Schreib- und Sprechaufgaben drei bis fünf Satzanfänge anbieten, die zum Operator passen (erklären: „Das liegt daran, dass …"; begründen: „Dafür spricht, dass …"; vergleichen: „Beide … haben gemeinsam, dass …").',
     '- Jeder Wortspeicher und jede Satzanfang-Hilfe (scaffold oder phrases) gehört zu EINER Aufgabe: Der Baustein steht DIREKT hinter dieser Aufgabe (oder direkt davor), der Titel oder der Hinweistext (phrases: body) nennt sie („Wortspeicher zu Aufgabe 2", „Für Aufgabe 2: …"). Eine Hilfe ohne erkennbaren Aufgabenbezug gehört nicht aufs Blatt.',
     '- Für Textsorten ein Gerüst vorgeben: Versuchsprotokoll (Frage, Vermutung, Material, Durchführung, Beobachtung, Ergebnis), Quelleninterpretation (Einordnung, Inhalt, Deutung, Bewertung), Erörterung (These, Argument, Beleg, Beispiel, Schluss).',
@@ -140,6 +142,8 @@ export function operatorRules(meta: WorksheetMeta, foreignLanguage?: string): st
     `- Jede Aufgabe beginnt mit genau einem Operator aus ${landNamen.length ? 'diesen Listen' : 'dieser Liste'}; keine Umschreibungen wie „Beschäftige dich mit".`,
     '- Die Listen nennen die Operatoren im Infinitiv. In der Aufgabe steht der korrekt konjugierte Imperativ in der Satzstellung der Sprache: trennbare Verben mit der Vorsilbe am Satzende („Fassen Sie … zusammen", „Ordne … ein"), nie „Zusammenfassen Sie …"; in Fremdsprachen der Imperativ der Zielsprache („Summarise …", „Résumez …", „Resuma …", „Riassumete …", „Обобщите …").',
     '- Jede Aufgabe nennt das Material ausdrücklich (z. B. „anhand von M1", „mithilfe der Tabelle").',
+    // Abstand Aufgabe–Material (08.10.2026, didactics/integrity.ts `aufgabenNaheAmMaterial`)
+    '- NÄHE ZUM MATERIAL: Eine Aufgabe steht auf derselben Seite bzw. Doppelseite wie das Material, auf das sie sich bezieht – direkt hinter dem Material und den Aufgaben dazu. Eine (Schluss-)Aufgabe, die sich NUR auf ein frühes Material bezieht, steht direkt hinter diesem Material, nicht am Blattende hinter späterem Material. Ans Ende gehören nur Aufgaben, die mehrere Materialien oder die bisherigen Ergebnisse zusammenführen.',
     '- MATERIALNUMMERN VERGIBT DIE APP: Sie nummeriert Texte, Bilder, Tabellen und Raster in der Reihenfolge der Bausteine als M1, M2, M3 … Schreibe selbst KEINE Nummer in den Titel.',
     '- VERWEISE NUR ÜBER KENNUNGEN: Jeder Materialbaustein bekommt in „ref" eine Kurzkennung (z. B. "zeitleiste", "karte", "tabelle"); Aufgaben, Hilfen und Tabellenköpfe verweisen mit M{zeitleiste}, M{karte} – NIE mit einer selbst gezählten Nummer wie „M2". Die App ersetzt M{…} durch die richtige Nummer. Ein von der App eingesetzter Ausgangstext heißt M{quelle}.',
     '- Ein Einstiegsimpuls („Erinnere dich: …", eine Leitfrage) ist KEIN Material: nicht als Baustein „text", sondern als infoBox (variant „wissen") oder als erste Aufgabe.',

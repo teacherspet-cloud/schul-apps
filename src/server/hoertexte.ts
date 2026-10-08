@@ -15,7 +15,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
-import { datenbank, protokolliereServer } from './datenbank'
+import { datenbank, fehlerKurz, protokolliereServer } from './datenbank'
 import { nutzerOrdner } from './pfade'
 import { json, type Anfrage } from './http'
 
@@ -160,7 +160,7 @@ export function mitFreigabe(ergebnis: unknown, nutzerId: string, adresse: string
     const kennung = freigabeFuer(nutzerId, datei, titel)
     return { ...ergebnis, freigabe: `${adresse.replace(/\/$/, '')}/h/${kennung}` }
   } catch (e) {
-    protokolliereServer('hoertext', `Freigabe nicht angelegt: ${e instanceof Error ? e.message : String(e)}`, nutzerId)
+    protokolliereServer('hoertext', `Freigabe nicht angelegt: ${fehlerKurz(e)}`, nutzerId)
     return ergebnis
   }
 }

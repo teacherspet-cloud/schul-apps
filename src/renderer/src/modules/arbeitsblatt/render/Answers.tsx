@@ -565,7 +565,8 @@ export function AnswerView({ answer, onChange }: { answer: Answer; onChange?: (f
       return null
     case 'lines':
       return (
-        <div className="ws-lines">
+        // Korrekturrand an allen Schreiblinien (08.10.2026)
+        <div className={`ws-lines ${ctx.correctionMargin ? 'ws-lines-rand' : ''}`}>
           {Array.from({ length: Math.max(0, answer.count) }, (_, i) => (
             <div key={i} className="ws-line" />
           ))}

@@ -67,3 +67,61 @@ describe('Namen zerlegen', () => {
     expect(personAus('Mustermann, Max')).toEqual({ vorname: 'Max', nachname: 'Mustermann', benutzer: undefined })
   })
 })
+
+/*
+ * Klassenliste der Anfrage (08.10.2026): Namen der Lernenden auch einzeln und auch, wenn sie Wörter sind – ob die
+ * Person gemeint ist, entscheidet personOderWort.ts lokal; die Antwort der KI bekommt die Klarnamen zurück.
+ */
+describe('Klassenliste: Person oder Wort, Ersetzen und Wiederherstellen', () => {
+  const klasse = (namen: string[], sprache?: string, material?: string) =>
+    musterFuer(
+      namen.map((n) => ({ ...personAus(n)!, streng: true })),
+      { sprache, material }
+    )
+
+  it('Gast „Rose": im Satz über die Person ersetzt, die Blume bleibt – Rundweg mit Wiederherstellen', () => {
+    const m = klasse(['Rose', 'Ben', 'Mia'], 'de')
+    const { req: r, z } = schuetzeAnfrage(req('Ich habe mit Rose gelernt. Die Rose blüht. Ben und Mia lachen.'), m)
+    expect(r.user).toBe('Ich habe mit [Person-1] gelernt. Die Rose blüht. [Person-2] und [Person-3] lachen.')
+    const antwort = stelleWiederHer({ feedback: '[Person-1] hat mit [Person-2] gut gearbeitet.' }, z)
+    expect(antwort.feedback).toBe('Rose hat mit Ben gut gearbeitet.')
+  })
+
+  it('Vokabeltest: „rose" als Vokabel bleibt (Material), die Mitschülerin wird ersetzt', () => {
+    const m = klasse(['Rose Klein'], 'en', 'Translate: die Rose → rose')
+    const { req: r } = schuetzeAnfrage(req('Antwort A1: rose\nAntwort A2: I like Rose Klein'), m)
+    expect(r.user).toBe('Antwort A1: rose\nAntwort A2: I like [Person-1]')
+  })
+
+  it('Otto, Sankt Martin, Mark: Wörter bleiben, Personen nicht', () => {
+    const m = klasse(['Otto Berg', 'Martin Fuchs', 'Mark Weber'], 'de')
+    const { req: r } = schuetzeAnfrage(
+      req('Der Ottomotor ist alt. Zu Sankt Martin gab es Laternen. Das kostete 5 Mark. Otto sagt, Martin hat recht, und Mark fragt.'),
+      m
+    )
+    expect(r.user).toContain('Der Ottomotor ist alt.')
+    expect(r.user).toContain('Sankt Martin')
+    expect(r.user).toContain('5 Mark')
+    expect(r.user).not.toMatch(/Otto sagt|Martin hat|Mark fragt/)
+  })
+
+  it('Russisch mit Fallformen und kurze Namen', () => {
+    const m = klasse(['Мартин', 'Роза', 'Ян'], 'ru')
+    const { req: r } = schuetzeAnfrage(req('Я гуляю с Мартином и Розой. Красная роза. Ян говорит.'), m)
+    expect(r.user).not.toMatch(/Мартин|Розой|Ян говорит/)
+    expect(r.user).toContain('Красная роза')
+  })
+
+  it('Nachprüfung zählt nur Vorkommen, die eine Person meinen (kein Sperren wegen der Blume)', () => {
+    const m = klasse(['Rose'], 'de')
+    expect(() => schuetzeText('Die Rose blüht.', m)).not.toThrow()
+    expect(schuetzeText('Die Rose blüht.', m).text).toBe('Die Rose blüht.')
+  })
+
+  it('Hörtext: eine Person der Klassenliste sperrt, die Blume nicht', () => {
+    const m = klasse(['Rose'], 'de')
+    const tts = (text: string) => ({ turns: [{ speaker: 'A', text }] }) as never
+    expect(() => pruefeHoertext(tts('Die Rose blüht im Garten.'), m)).not.toThrow()
+    expect(() => pruefeHoertext(tts('Hallo Rose, wie geht es dir?'), m)).toThrow()
+  })
+})

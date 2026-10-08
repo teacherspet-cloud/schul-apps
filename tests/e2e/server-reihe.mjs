@@ -232,6 +232,12 @@ try {
   pruefe(await s.getByText('Ich kann das Wetter auf Englisch beschreiben.').isVisible(), 'Lernziele der Reihe sichtbar')
   await s.screenshot({ path: join(out, '3-weg-anfang.png'), fullPage: true })
   // Diagnose: nicht bestanden → Lernkarten werden nicht übersprungen
+  // Vor dem Abschicken: keine Diagnose-Lösungen, kein Ergebnis (Lösung „sonnig" erst danach)
+  const vorDiagnose = JSON.stringify(await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json())
+  pruefe(
+    !vorDiagnose.includes('"richtig"') && !vorDiagnose.includes('sonnig') && !vorDiagnose.includes('"ergebnis"') && !vorDiagnose.includes('"loesung"'),
+    'Vor dem Abschicken: keine Diagnose-Lösungen bei den Lernenden'
+  )
   await s.locator('[data-station]').first().click()
   await s.locator('[data-diagnose] input').first().fill('sonnig')
   await s.locator('[data-diagnose-abgeben]').click()
@@ -305,6 +311,8 @@ try {
   await p.locator('button', { hasText: 'Aktualisieren' }).click()
   await p.locator('[data-bedarf-ansehen]').first().waitFor({ timeout: 10000 })
   await p.locator('[data-bedarf-ansehen]').first().click()
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: join(out, '4b-bedarf-ansehen.png') })
   pruefe(
     await p
       .locator('.mantine-Modal-body img')
@@ -333,8 +341,15 @@ try {
   await p.waitForTimeout(800)
   await p.screenshot({ path: join(out, '6-uebersicht-fertig.png'), fullPage: true })
   // Keine Lösungen bei den Lernenden
-  const roh = JSON.stringify(await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json())
-  pruefe(!roh.includes('Three sentences, weather words') && !roh.includes('"richtig"'), 'Lernende bekommen keine Erwartungen und keine Diagnose-Lösungen')
+  // Nach dem Abschicken darf der eigene Diagnose-Stand ✓/✗ mit Lösung zeigen (stand.schritte.sd.diagnose.ergebnis) –
+  // die Inhalte der Schritte aber nie Erwartungen oder Lösungsschlüssel
+  const rohDaten = await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json()
+  const roh = JSON.stringify(rohDaten)
+  const inhalte = JSON.stringify({ ...rohDaten, stand: null })
+  pruefe(
+    !roh.includes('Three sentences, weather words') && !/"(richtig|erwartung|schluessel)"/.test(inhalte),
+    'Lernende bekommen keine Erwartungen und keine Diagnose-Lösungen'
+  )
   // Zuweisen an eine einzelne Schülerin ohne Lerngruppe (03.10.2026)
   const einzeln = await (
     await lk.request.post(`${A}/server/reihen/${gesp.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: '', schueler: [mia.benutzer] } })
@@ -349,6 +364,32 @@ try {
     zEinzeln.lernende?.length === 1 && zEinzeln.zuweisung.lerngruppe === 'Einzelne Lernende',
     `Übersicht: 1 Lernende, „Einzelne Lernende" (${zEinzeln.lernende?.length})`
   )
+  // ---------- Entwurf und Veröffentlichung (08.10.2026): Speichern schiebt nichts zu den Lernenden
+  const lkRoh = async () => await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()
+  const vorher = await lkRoh()
+  const entwurf = { ...vorher.reihe, titel: `${vorher.reihe.titel} (überarbeitet)` }
+  const sp1 = await (
+    await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: entwurf, basis: vorher.reihe.geaendert } })
+  ).json()
+  const miaTitel = async () => (await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json()).titel
+  pruefe((await miaTitel()) === vorher.reihe.titel, 'Gespeicherter Entwurf ist noch nicht bei den Lernenden')
+  pruefe(sp1.veroeffentlichung?.offen >= 1 && sp1.veroeffentlichung?.zugewiesen >= 1, `„Änderungen noch nicht bei den Lernenden" (${sp1.veroeffentlichung?.offen})`)
+  // Älterer Stand über neueren: 409 mit dem aktuellen Stand
+  const alt = await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: vorher.reihe, basis: vorher.reihe.geaendert } })
+  const altJson = await alt.json()
+  pruefe(alt.status() === 409 && altJson.reihe?.titel === entwurf.titel, `Veralteter Stand abgelehnt (${alt.status()})`)
+  // Auftrag darf immer (frisch geladen, ein Schritt geändert)
+  const auftrag = await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: { ...altJson.reihe }, auftrag: true } })
+  pruefe(auftrag.status() === 200, 'Ablage eines Auftrags ohne Prüfung')
+  const v = await (await lk.request.post(`${A}/server/reihen/${gesp.id}/veroeffentlichen`, { headers: KOPF, data: {} })).json()
+  pruefe(v.offen === 0 && (await miaTitel()) === entwurf.titel, '„Für Lernende aktualisieren“ zeigt den neuen Stand')
+  // Entwurf ohne Titel wird angenommen und heißt in der Liste „Neue Reihe"
+  const ohne = await (
+    await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: { ...basis, id: '', titel: '', art: 'digital' } } })
+  ).json()
+  const reihenListe = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen
+  pruefe(reihenListe.some((x) => x.id === ohne.id && x.titel === 'Neue Reihe'), 'Entwurf ohne Titel als „Neue Reihe“ gespeichert')
+  if (ohne.id) await lk.request.post(`${A}/server/reihen/${ohne.id}/loeschen`, { headers: KOPF, data: {} })
   await lk.request.post(`${A}/server/reihen/${gesp.id}/loeschen`, { headers: KOPF, data: {} })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 8).join(' | ')}`)

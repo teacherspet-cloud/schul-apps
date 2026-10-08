@@ -114,6 +114,7 @@ export function convertOutline(data: any): Outline {
     minutes: Number(data?.minutes) || 45,
     teacherNote: text(data?.teacherNote),
     ...(text(data?.ueberthema).trim() ? { ueberthema: text(data?.ueberthema).trim().slice(0, 80) } : {}),
+    ...(typeof data?.schrittweise === 'boolean' ? { schrittweise: data.schrittweise, schrittweiseGrund: text(data?.schrittweiseGrund).trim().slice(0, 240) } : {}),
     items: (Array.isArray(data?.items) ? data.items : []).map((it: any): OutlineItem => ({
       id: newId(),
       type: pick<WsBlockType>(it.type, BLOCK_TYPES, 'task'),
@@ -346,15 +347,17 @@ export function convertBlock(
         socialForm: pick<SocialForm>(b.socialForm, SOCIAL_FORMS, 'EA'),
         minutes: Number(b.minutes) || 0,
         points: punkteOf(b.points),
-        solution: text(b.solution),
+        solution: mcLoesung(answer, text(b.solution)),
         answer,
         parts: (Array.isArray(b.parts) ? b.parts : [])
           .filter((p: any) => text(p?.instruction))
           .map((p: any) => ({
             id: newId(rng),
             instruction: satzbau(text(p.instruction)),
-            answer: convertAnswer(p.answer, rng),
-            solution: text(p.solution),
+            ...((): { answer: ReturnType<typeof convertAnswer>; solution: string } => {
+              const antwort = convertAnswer(p.answer, rng)
+              return { answer: antwort, solution: mcLoesung(antwort, text(p.solution)) }
+            })(),
             ...(stufeAus(p.stufe) ? { stufe: stufeAus(p.stufe) } : {}),
             ...(stufeAus(p.stufe) && text(p.stufeGrund) ? { stufeGrund: text(p.stufeGrund) } : {})
           })),
@@ -469,4 +472,14 @@ export function convertBlock(
       // Platzhalter: Die App setzt das Protokoll aus dem ausgearbeiteten Versuch ein (setzeVersuchEin)
       return { ...base, type, title: text(b.title) || 'Versuchsprotokoll', art: 'versuch', stufe: 'offen', stil: 'praesens', abschnitte: [] }
   }
+}
+
+/**
+ * Musterlösung bei Multiple Choice (08.10.2026): Die Optionen werden gemischt, Buchstaben in der Lösung der KI
+ * („a) Regen“) stimmen danach nicht mehr – die Lösung wird aus den gemischten Optionen neu geschrieben.
+ */
+function mcLoesung(antwort: unknown, loesung: string): string {
+  const a = antwort as { kind?: string; options?: string[]; correct?: number[] } | undefined
+  if (a?.kind !== 'multipleChoice' || !a.options?.length || !a.correct?.length) return loesung
+  return a.correct.map((c) => `${String.fromCharCode(97 + c)}) ${a.options![c]}`).join(', ')
 }

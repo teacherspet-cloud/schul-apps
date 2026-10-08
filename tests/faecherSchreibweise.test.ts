@@ -77,7 +77,13 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
     wartungAusfuehren(d)
     expect(faecher(d, 'lerngruppen').g1).toBe('Englisch')
     const erledigt = (d.prepare('SELECT name FROM wartung ORDER BY name').all() as { name: string }[]).map((z) => z.name)
-    expect(erledigt).toEqual(['faecher-schreibweise-2026-10-08', 'rekorde-zeit-2026-10-08'])
+    expect(erledigt).toEqual([
+      'codes-hmac-2026-10-08',
+      'faecher-schreibweise-2026-10-08',
+      'grammatik-je-thema-2026-10-08',
+      'klartext-reste-2026-10-08',
+      'rekorde-zeit-2026-10-08'
+    ])
     // Danach Eingetragenes bleibt beim nächsten Start, wie es ist (die Wartung ist erledigt)
     d.prepare("UPDATE lerngruppen SET fach = 'englisch' WHERE id = 'g1'").run()
     wartungAusfuehren(d)

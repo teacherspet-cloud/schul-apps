@@ -325,7 +325,7 @@ function StationFenster({
   )
 }
 
-export default function VokabelTrainer({ id }: { id: string }): React.JSX.Element {
+export default function VokabelTrainer({ id, eingebettet = false }: { id: string; eingebettet?: boolean }): React.JSX.Element {
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
@@ -364,6 +364,7 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
           aktualisieren={(r) => setD({ ...d, ...r })}
           vorher={vorher}
           oeffneStation={d.weg ? setStation : undefined}
+          eingebettet={eingebettet}
         />
       )}
       {/* Abschnitt des Vokabelwegs angetippt (08.10.2026): seine Wörter im Fenster, danach zurück zum Pfad */}
@@ -407,9 +408,12 @@ function Kasten({
   starten,
   aktualisieren,
   vorher,
-  oeffneStation
+  oeffneStation,
+  eingebettet = false
 }: {
   d: Liste
+  /** Im Fachordner (Register Vocabulary) gezeigt: ohne eigenen Rückweg (08.10.2026) */
+  eingebettet?: boolean
   starten: (w: Vokabel[], freiwillig?: boolean) => void
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
   /** Stand vor der letzten Runde (für den Aufstieg) */
@@ -494,9 +498,11 @@ function Kasten({
   return (
     <Stack className="vt" data-vokabel-kasten gap="lg">
       <style>{CSS}</style>
-      <Button variant="subtle" color={farbe.a} component="a" href={zurueck.href} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} data-zurueck-lernen>
-        {zurueck.text}
-      </Button>
+      {!eingebettet && (
+        <Button variant="subtle" color={farbe.a} component="a" href={zurueck.href} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} data-zurueck-lernen>
+          {zurueck.text}
+        </Button>
+      )}
       {!spielt && (
         <>
           <div className="vt-kopf">

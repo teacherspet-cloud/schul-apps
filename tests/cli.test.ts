@@ -78,6 +78,16 @@ describe('Abo-Zugang: schlanke Codex-Aufrufe', () => {
   })
 })
 
+describe('Codex legt nichts dauerhaft ab (08.10.2026)', () => {
+  it('kein Verlauf, keine Erinnerungen – Schlüssel an Codex 0.154.0 mit --strict-config geprüft', async () => {
+    const a = (await import('../src/main/services/ai/cli')).codexLeanArgs().join(' ')
+    expect(a).toContain('--disable memories')
+    expect(a).toContain('-c history.persistence="none"')
+    expect(a).toContain('-c memories.generate_memories=false')
+    expect(a).toContain('-c memories.use_memories=false')
+  })
+})
+
 describe('Werkzeuge von Codex', () => {
   const args = async (opts?: { webSearch?: boolean; keepImageGeneration?: boolean }): Promise<string> =>
     (await import('../src/main/services/ai/cli')).codexLeanArgs(opts).join(' ')

@@ -11,6 +11,7 @@
  * Schlüssel „für alle" an; Nutzer ohne eigenen Schlüssel arbeiten dann damit. ChatGPT-/Claude-Abos
  * sind NICHT teilbar (Nutzungsbedingungen) – jede Lehrkraft meldet ihr eigenes an.
  */
+import { leseDiagnose } from './diagnose'
 import { freemem, loadavg, totalmem } from 'node:os'
 import { rmSync, statfsSync } from 'node:fs'
 import type { SecretName } from '@shared/types'
@@ -108,6 +109,11 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
       return (json(res, 200, { freigaben: alleFreigaben().map((f) => ({ ...f, benutzer: namen.get(f.nutzer_id) ?? '' })) }), true)
     }
     if (was === 'protokoll') return (json(res, 200, { eintraege: leseServerProtokoll(Number(url.searchParams.get('anzahl')) || 300) }), true)
+    // Diagnose-Protokolle (zeilenweise verschlüsselt, diagnose.ts) entschlüsselt lesen – 08.10.2026
+    if (was === 'diagnose') {
+      const datei = url.searchParams.get('datei') === 'browser' ? 'browser' : 'langsam'
+      return (json(res, 200, { zeilen: leseDiagnose(datei, Math.min(5000, Number(url.searchParams.get('anzahl')) || 500)) }), true)
+    }
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
   }
 
@@ -278,7 +284,7 @@ function bekannteKlassen(): string[] {
   const namen = new Map<string, string>()
   for (const n of alleNutzer()) for (const g of n.gruppen) if (g.id.startsWith('klasse:')) namen.set(g.id, g.name)
   try {
-    const zeilen = datenbank().prepare('SELECT DISTINCT name FROM lerngruppen').all() as { name: string }[]
+    const zeilen = datenbank().prepare('SELECT name FROM lerngruppen').all() as { name: string }[]
     for (const z of zeilen) if (z.name.trim()) namen.set(klassenGruppe(z.name).id, namen.get(klassenGruppe(z.name).id) ?? z.name.trim())
   } catch {
     // Tabelle fehlt (noch keine Lerngruppe) – nur die Konten

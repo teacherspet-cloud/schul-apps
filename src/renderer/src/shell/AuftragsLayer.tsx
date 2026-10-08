@@ -29,6 +29,8 @@ import {
   useAuftraege,
   useSekundentakt,
   versucheErneut,
+  wartetKurz,
+  wartetVorStart,
   type Auftrag
 } from '../shared/auftraege'
 import { sichereAlles } from '../shared/autosave'
@@ -140,7 +142,7 @@ export default function AuftragsLayer(): React.JSX.Element | null {
 
   const fertig = auftraege.filter((a) => a.status === 'fertig').length
   const fehler = auftraege.filter((a) => a.status === 'fehler').length
-  const wartend = laufend.filter((a) => a.status === 'wartend').length
+  const wartend = laufend.filter(wartetVorStart).length
   const gesamt = laufend.length ? laufend.reduce((s, a) => s + a.anteil, 0) / laufend.length : 1
   const teile = [
     laufend.length - wartend > 0 ? `${laufend.length - wartend} ${laufend.length - wartend === 1 ? 'läuft' : 'laufen'}` : '',
@@ -250,15 +252,21 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
               <Text size="xs" c="dimmed" truncate="end">
                 {modul?.name ?? a.moduleId} · {a.art}
               </Text>
+              {/* Ruhiger Stand (08.10.2026): Grau und „Wartet …" nur, bevor die erste Anfrage gearbeitet hat */}
               {laeuft(a) &&
-                (a.anteil > 0 || a.status === 'wartend' ? (
-                  <Progress value={a.anteil * 100} size="sm" animated={a.status === 'laufend'} color={a.status === 'wartend' ? 'gray' : undefined} />
+                (a.anteil > 0 || wartetVorStart(a) ? (
+                  <Progress value={a.anteil * 100} size="sm" animated={!wartetVorStart(a)} color={wartetVorStart(a) ? 'gray' : undefined} />
                 ) : (
                   <Loader size="xs" type="dots" />
                 ))}
               <Text size="xs" c={a.status === 'fehler' ? 'red' : undefined} lineClamp={3}>
-                {a.status === 'wartend' ? (a.wartegrund ?? (a.platz ? `Wartet auf freien Platz – Platz ${a.platz}` : 'Wartet auf freien Platz …')) : a.meldung}
+                {wartetVorStart(a) ? (a.wartegrund ?? (a.platz ? `Wartet auf freien Platz – Platz ${a.platz}` : 'Wartet auf freien Platz …')) : a.meldung}
               </Text>
+              {wartetKurz(a) && (
+                <Text size="xs" c="dimmed" data-wartet-kurz>
+                  {a.wartegrund ?? 'wartet kurz auf freien Platz'}
+                </Text>
+              )}
               {/* Verbindung zum PC weg (iPad-App, Browser, 30.09.2026): Der Auftrag ist nicht verloren – das soll hier stehen */}
               {laeuft(a) && a.verbindung && (
                 <Text size="xs" c="orange" data-verbindung={a.verbindung}>

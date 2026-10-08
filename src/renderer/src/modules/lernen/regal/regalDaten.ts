@@ -14,6 +14,9 @@ export interface KursKurz {
   titel: string
   fach: string
   uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number }
+  /** Grammatik (08.10.2026): Jahrgang und Stelle im Lehrwerk – das Register gliedert nach Schuljahren */
+  jahrgang?: number | null
+  stelle?: number | null
 }
 export interface BlattEintrag {
   id: string
@@ -88,8 +91,27 @@ export interface FachOrdner {
 
 const leer = <T>(): Promise<T[]> => Promise.resolve([])
 
+/** Je Konto, damit auf geteilten Geräten nie fremde Ordner aufblitzen */
+const CACHE = `sa-regal-daten-${typeof window !== 'undefined' ? window.__schulappsServer?.benutzer ?? window.__schulappsServer?.name ?? '' : ''}`
+
 export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void } {
-  const [ordner, setOrdner] = useState<FachOrdner[] | null>(null)
+  // Zuletzt geladene Ordner sofort zeigen (08.10.2026): Der Ordner klappt ohne Warten auf, im Hintergrund wird aufgefrischt
+  const [ordner, setOrdnerRoh] = useState<FachOrdner[] | null>(() => {
+    try {
+      const roh = sessionStorage.getItem(CACHE)
+      return roh ? (JSON.parse(roh) as FachOrdner[]) : null
+    } catch {
+      return null
+    }
+  })
+  const setOrdner = (o: FachOrdner[]): void => {
+    setOrdnerRoh(o)
+    try {
+      sessionStorage.setItem(CACHE, JSON.stringify(o))
+    } catch {
+      /* voll oder privat: dann ohne Zwischenspeicher */
+    }
+  }
   const laden = useCallback(() => {
     const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
     void Promise.all([

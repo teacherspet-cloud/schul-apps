@@ -136,7 +136,7 @@ try {
   pruefe((await s.evaluate(() => document.documentElement.style.background)) === '', 'Vorab-Hintergrund nach dem Aufbau entfernt')
   pruefe(await da(s.locator('[data-vokabel-start]', { hasText: '10 Wörter' })), '„Jetzt üben · 10 Wörter"')
   const seite = await s.locator('body').innerText()
-  pruefe(seite.includes(`${new Date().getFullYear()} - Englisch`) && !seite.includes('Unit 1 Wörter'), 'Lernende sehen die Überschrift, nicht den Quellentitel')
+  pruefe(seite.includes('Englisch') && !seite.includes(`${new Date().getFullYear()} - Englisch`) && !seite.includes('Unit 1 Wörter'), 'Lernende sehen die Überschrift (ohne Jahr), nicht den Quellentitel')
   pruefe(await da(s.locator('[data-vokabel-rest]', { hasText: '25' })), 'Hinweis: heute noch 25 bis zu den Spielen')
   pruefe((await s.locator('[data-spielwahl]').count()) === 0, 'Spiele noch nicht frei')
   await s.locator('[data-wert="sicher"]').click()
@@ -327,10 +327,10 @@ try {
   pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Zugeklappt bleibt nach dem Neuladen')
   await p.locator('[data-lernende-kopf]').click()
 
-  // ---------- Übersicht: Überschrift (Standard „Jahr - Lerngruppe - Fach", umbenennbar), Symbol per Rechtsklick
+  // ---------- Übersicht: Überschrift (Standard „Lerngruppe - Fach" ohne Jahr, umbenennbar), Symbol per Rechtsklick
   const kurz = async () => (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((z) => z.id === vid)
   const k1 = await kurz()
-  pruefe(k1.ueberschrift === `${new Date().getFullYear()} - Englisch` && k1.titel === 'Unit 1 Wörter', `Standard-Überschrift (${k1.ueberschrift})`)
+  pruefe(k1.ueberschrift === 'Englisch' && k1.titel === 'Unit 1 Wörter', `Standard-Überschrift (${k1.ueberschrift})`)
   pruefe(k1.faecher?.length === 7 && k1.faecher.reduce((a, b) => a + b, 0) > 0, `Fächerverteilung für das Symbol (${k1.faecher})`)
   await p.reload()
   await p.waitForTimeout(1500)

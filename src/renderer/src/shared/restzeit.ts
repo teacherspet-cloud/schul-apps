@@ -313,3 +313,27 @@ export function glaetteZiel(bisher: number | undefined, ziel: number): number {
   if (bisher === undefined) return ziel
   return Math.round(bisher + 0.4 * (ziel - bisher))
 }
+
+/** Höchstens so oft (ms) folgt die Anzeige kleinen Änderungen der Schätzung */
+export const REST_TAKT_MS = 10_000
+/** Ab dieser Abweichung (Anteil der bisher angezeigten Restzeit) folgt sie sofort */
+export const REST_SCHWELLE = 0.15
+
+/**
+ * Ruhige Restzeit (08.10.2026, Befund der Lehrkraft: „noch etwa 2 Min." sprang bei jedem Zeichenpaket hin und her): Eine
+ * neue Schätzung ändert das angezeigte Ziel nur, wenn sie um mehr als 15 % von der angezeigten Restzeit abweicht oder
+ * die letzte Änderung mindestens 10 Sekunden her ist – dann geglättet (`glaetteZiel`). Dazwischen läuft der Zähler
+ * einfach weiter. Liefert das neue Ziel und den Zeitpunkt seiner letzten Änderung.
+ */
+export function ruhigesZiel(
+  bisher: { ziel: number; seit: number } | undefined,
+  ziel: number,
+  nun: number
+): { ziel: number; seit: number } {
+  if (!bisher) return { ziel, seit: nun }
+  const restAlt = Math.max(1000, bisher.ziel - nun)
+  const restNeu = ziel - nun
+  const deutlich = Math.abs(restNeu - restAlt) > REST_SCHWELLE * restAlt
+  if (!deutlich && nun - bisher.seit < REST_TAKT_MS) return bisher
+  return { ziel: glaetteZiel(bisher.ziel, ziel), seit: nun }
+}

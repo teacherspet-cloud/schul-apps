@@ -21,38 +21,48 @@
  * werden für Sortierung und Zuordnung gebraucht und nennen keine Person.
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import { entschluessle, hauptschluessel, verschluessle } from './geheim'
 
 /** Tabelle → sensible Spalten */
 export const SENSIBEL: Record<string, string[]> = {
   nutzer: ['name', 'gruppen', 'benutzer_v', 'iserv_sub'],
-  lerngruppen: ['mitglieder'],
-  teilnahmen: ['antworten', 'bewertung', 'vorfaelle'],
+  // Klassen-/Kursnamen und IServ-Gruppe seit 08.10.2026 ebenfalls (Wunsch der Lehrkraft: alles verschlüsselt)
+  lerngruppen: ['name', 'iserv_gruppe', 'mitglieder'],
+  // Grund und Verlassen der Seite sind Angaben zur Person (Aufsicht), 08.10.2026
+  teilnahmen: ['antworten', 'bewertung', 'vorfaelle', 'grund', 'verlassen'],
   onlinetest_tinte: ['png', 'text'],
-  feedback_freigaben: ['schueler'],
+  // Material der Lehrkraft (in den Ablagen ohnehin verschlüsselt) und Kopfangaben/Hinweise, 08.10.2026
+  onlinetests: ['titel', 'fassungen', 'einstellungen'],
+  feedback_freigaben: ['schueler', 'titel', 'vorlage'],
   feedback_abgaben: ['fassungen'],
-  blatt_freigaben: ['schueler', 'auswertung'],
-  blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback', 'hilfen'],
-  // Grammatik-Lern-App (06.10.2026)
-  gram_zuweisungen: ['schueler'],
+  blatt_freigaben: ['schueler', 'auswertung', 'titel', 'thema', 'html', 'aufgaben', 'loesung', 'merk', 'einstellungen'],
+  blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback', 'hilfen', 'freigeschaltet'],
+  // Grammatik-Lern-App (06.10.2026); `art` verrät Förder-/Forderaufgaben einzelner Lernender (08.10.2026)
+  gram_zuweisungen: ['schueler', 'titel', 'thema', 'paket', 'info', 'art', 'problem_aus'],
   gram_stand: ['daten'],
   fach_kopien: ['titel'],
-  reihen_zuweisungen: ['schueler'],
+  reihen: ['titel', 'daten', 'veroeffentlicht'],
+  // Verknüpfungen und freigegebene Haltepunkte: nur Kennungen – trotzdem verschlüsselt (im Zweifel verschlüsseln, 08.10.2026)
+  reihen_zuweisungen: ['schueler', 'halte_frei', 'verknuepft'],
   reihen_stand: ['daten'],
   reihen_dateien: ['daten', 'name'],
-  vok_zuweisungen: ['schueler'],
+  vok_zuweisungen: ['schueler', 'titel', 'woerter', 'quelle', 'verben', 'teile', 'ueberschrift', 'problem_aus'],
   vok_stand: ['daten'],
   vok_laufbahn: ['daten'],
-  // Persönlicher Zugangscode der Gäste – für die Lehrkraft lesbar (08.10.2026), sonst nur als Prüfwert
+  // Persönlicher Zugangscode der Gäste – für die Lehrkraft lesbar (08.10.2026), sonst nur als Prüfwert (codePruefwert)
   vok_gaeste: ['code_v'],
   // Rekordbuch der Lernenden (08.10.2026)
   rekord_buch: ['daten'],
   // Achievements der Lernenden (08.10.2026)
   achievements: ['daten'],
-  tafel_freigaben: ['schueler'],
+  tafel_freigaben: ['schueler', 'titel', 'thema', 'bilder'],
+  hoertext_freigaben: ['titel'],
   // Schüler-Startseite (06.10.2026): Wochen-Schnappschuss und Lerntipp je Person (lernstand.ts)
-  lern_wochen: ['daten']
+  lern_wochen: ['daten'],
+  // Darstellung der Lernenden (Leseschrift, Vorlesen, Zeilenabstand …) und Prüfprotokoll, 08.10.2026
+  nutzer_darstellung: ['daten'],
+  protokoll: ['text']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 
@@ -81,19 +91,54 @@ function blobVon(b: Uint8Array): Uint8Array {
   return Buffer.concat([d.update(buf.subarray(32)), d.final()])
 }
 
+/** Zahlen in sensiblen Spalten (z. B. teilnahmen.verlassen) kommen beim Lesen wieder als Zahl zurück */
+const ZAHL = '\u0001z:'
+
 /** Einen Wert für eine sensible Spalte verschlüsseln (schon Verschlüsseltes bleibt) */
 export function zu(wert: unknown): unknown {
   if (wert === null || wert === undefined) return wert
   if (wert instanceof Uint8Array) return Buffer.from(wert.subarray(0, 4)).equals(BLOB_KOPF) ? wert : blobZu(wert)
+  if (typeof wert === 'number' || typeof wert === 'bigint') return verschluessle(`${ZAHL}${String(wert)}`)
   if (typeof wert !== 'string') return wert
   return wert.startsWith('v1:') ? wert : verschluessle(wert)
 }
 
 /** Einen gelesenen Wert entschlüsseln (Klartext aus alten Zeilen bleibt, wie er ist) */
 export function von(wert: unknown): unknown {
-  if (typeof wert === 'string' && wert.startsWith('v1:')) return entschluessle(wert)
-  if (wert instanceof Uint8Array) return blobVon(wert)
+  if (typeof wert === 'string' && wert.startsWith('v1:')) {
+    let klar: string
+    try {
+      klar = entschluessle(wert)
+    } catch {
+      // Klartext, der zufällig mit „v1:" beginnt (z. B. ein Titel) – unverändert lassen
+      return wert
+    }
+    return klar.startsWith(ZAHL) ? Number(klar.slice(ZAHL.length)) : klar
+  }
+  if (wert instanceof Uint8Array) {
+    try {
+      return blobVon(wert)
+    } catch {
+      return wert
+    }
+  }
   return wert
+}
+
+/**
+ * Prüfwert für Zugangscodes der Gäste (08.10.2026, Befund der Prüfung: ungesalzenes SHA-256 eines 6–8-stelligen Codes
+ * ist offline in Minuten durchprobiert). HMAC mit dem Hauptschlüssel über den bisherigen SHA-256 – so lassen sich
+ * vorhandene Prüfwerte ohne den Code umstellen (`codePruefwertAusAlt`, wartung.ts) und alle Zeilen haben eine Form.
+ */
+export function codePruefwert(code: string): string {
+  return codePruefwertAusAlt(createHash('sha256').update(code.toUpperCase().replace(/[^A-Z0-9]/g, '')).digest('hex'))
+}
+
+/** Einen alten SHA-256-Prüfwert (64 Hexzeichen) in die neue Form bringen; alles andere bleibt */
+export function codePruefwertAusAlt(alt: string): string {
+  if (!/^[0-9a-f]{64}$/.test(alt)) return alt
+  const k = createHmac('sha256', hauptschluessel()).update('code-pruefwert').digest()
+  return `h2:${createHmac('sha256', k).update(alt).digest('hex')}`
 }
 
 function zeileVon<T>(z: T): T {
@@ -189,6 +234,61 @@ export function planFuer(sql: string): Plan | null {
   return null
 }
 
+/** Feste Werte im SQL-Text (Zahl, 'Text', NULL) – stammen aus dem Code, nie von Personen */
+const istLiteral = (w: string): boolean => /^(?:'(?:[^']|'')*'|NULL|-?\d+(?:\.\d+)?)$/i.test(w.trim())
+
+/**
+ * Schreibt die Anweisung eine sensible Spalte so, dass sie NICHT verschlüsselt würde? (08.10.2026: „fail closed" –
+ * ein unbekanntes Muster ist ein Fehler, kein stiller Klartext.) Erlaubt sind für sensible Spalten: Platzhalter `?`,
+ * feste Werte, eine andere sensible Spalte derselben Tabelle (Kopie des Chiffrats), `excluded.<sensibel>` und
+ * COALESCE aus solchen. Liefert die Beanstandung oder null.
+ */
+export function schreibFehler(sql: string): string | null {
+  const s = sql.replace(/\s+/g, ' ').trim()
+  const kopf = /^(?:INSERT(?: OR \w+)?|REPLACE) INTO (\w+)|^UPDATE (?:OR \w+ )?(\w+) SET /i.exec(s)
+  if (!kopf) return null
+  const tabelle = (kopf[1] ?? kopf[2]).toLowerCase()
+  const sens = SENSIBEL[tabelle]
+  if (!sens) return null
+  const sensibel = (x: string): boolean => sens.includes(x.toLowerCase())
+  const wertOk = (w: string): boolean => {
+    const t = w.trim()
+    if (t === '?' || istLiteral(t)) return true
+    const ex = /^(?:excluded\.)?(\w+)$/i.exec(t)
+    if (ex) return sensibel(ex[1])
+    const co = /^COALESCE\((.*)\)$/i.exec(t)
+    return Boolean(co) && teile(co![1]).every(wertOk)
+  }
+  const zuweisungenOk = (liste: string): string | null => {
+    for (const zuw of teile(liste)) {
+      const m = /^(\w+) = (.+)$/s.exec(zuw.trim())
+      if (!m) return `unbekannte Zuweisung „${zuw.trim().slice(0, 60)}"`
+      if (sensibel(m[1]) && !wertOk(m[2])) return `${tabelle}.${m[1]} = ${m[2].slice(0, 40)}`
+    }
+    return null
+  }
+  if (kopf[1]) {
+    const ins = /^(?:INSERT(?: OR \w+)?|REPLACE) INTO (\w+) \(([^)]*)\) VALUES \(/i.exec(s)
+    if (!ins) return `${tabelle}: INSERT ohne Spaltenliste und VALUES`
+    const spalten = ins[2].split(',').map((x) => x.trim().toLowerCase())
+    let tiefe = 1
+    let ende = ins[0].length
+    for (; ende < s.length && tiefe > 0; ende++) {
+      if (s[ende] === '(') tiefe++
+      else if (s[ende] === ')') tiefe--
+    }
+    const werte = teile(s.slice(ins[0].length, ende - 1))
+    if (werte.length !== spalten.length) return `${tabelle}: ${spalten.length} Spalten, ${werte.length} Werte`
+    for (let i = 0; i < spalten.length; i++) if (sensibel(spalten[i]) && !(werte[i] === '?' || istLiteral(werte[i]))) return `${tabelle}.${spalten[i]} = ${werte[i]}`
+    const rest = s.slice(ende).trim()
+    if (rest.startsWith(',')) return `${tabelle}: mehrere VALUES-Zeilen`
+    const upd = /DO UPDATE SET (.*?)(?: WHERE .*)?$/i.exec(rest)
+    return upd ? zuweisungenOk(upd[1]) : null
+  }
+  const upd = /^UPDATE (?:OR \w+ )?\w+ SET (.*?)(?: WHERE .*)?$/i.exec(s)
+  return upd ? zuweisungenOk(upd[1]) : `${tabelle}: unbekannte UPDATE-Form`
+}
+
 function werteFuer(plan: Plan | null, werte: unknown[]): unknown[] {
   if (!plan) return werte
   return werte.map((w, i) => (plan.art[i] === 'zu' ? zu(w) : plan.art[i] === 'kennung' && typeof w === 'string' && !istKennung(w) ? kennung(w) : w))
@@ -235,6 +335,8 @@ export function geschuetzt(d: DatabaseSync): DatabaseSync {
   const tabellenIn = (sql: string): string[] => Object.keys(SENSIBEL).filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(sql))
   const umhuellt = (sql: string): StatementSync => {
     for (const t of tabellenIn(sql)) migriere(d, t)
+    const fehler = schreibFehler(sql)
+    if (fehler) throw new Error(`Feldschutz: Diese Anweisung würde Personenbezogenes unverschlüsselt schreiben (${fehler}).`)
     const st = prepare(sql)
     const plan = planFuer(sql)
     return new Proxy(st, {

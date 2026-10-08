@@ -6,7 +6,7 @@ import { aktuelleKi, stempleKi } from '@shared/kiKennzeichnung'
 import type { Netzfund } from '../../../main/services/ai/provider'
 import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPhase } from './aiProgress'
 import { istGeloescht, sichereAlles } from './autosave'
-import { glaetteZiel, kiKennung, merkeAnfrage, merkeAuftrag, schaetzeRest } from './restzeit'
+import { kiKennung, merkeAnfrage, merkeAuftrag, ruhigesZiel, schaetzeRest } from './restzeit'
 import { useAppSettings } from './settingsStore'
 import { useZwischenstaende, zwischenstandsMelder } from './zwischenstand'
 
@@ -85,6 +85,11 @@ export interface Auftrag {
   wartegrund?: string
   /** Wartend: Platz in der Warteschlange des Hauptprozesses (1 = als Nächster dran; 08.10.2026) */
   platz?: number
+  /**
+   * Mindestens eine Anfrage hat schon gearbeitet (08.10.2026). Danach ist kurzes Warten auf einen Platz zwischen zwei
+   * Anfragen kein neuer Zustand mehr: Anzeigen bleiben bei „Entsteht …" und nennen das Warten nur leise (`wartetKurz`).
+   */
+  gestartet?: boolean
   /** Fertig: wohin „Öffnen" führt, wenn nicht ins Dokument `docId` (z. B. das neue Arbeitsblatt eines Reihen-Schritts) */
   ziel?: AuftragsZiel
   /** Geschätzter Zeitpunkt des Endes (ms seit 1970) – fehlt, solange keine belastbare Zahl vorliegt */
@@ -218,6 +223,8 @@ interface Laufzeit {
   erneut?: () => void
   /** Wartet gerade sichtbar (`k.pausiere`) – mit diesem Grund */
   pause?: string
+  /** Eine Anfrage hat schon gearbeitet (Meldung „laufend" des Hauptprozesses oder fertig) */
+  gestartet?: boolean
 }
 
 const laufzeit = new Map<string, Laufzeit>()
@@ -226,6 +233,8 @@ const laufzeit = new Map<string, Laufzeit>()
  * Plätze, die dabei noch abgebrochene Anfragen halten (davon Bilder).
  */
 const wartendeAnfragen = new Map<string, { abgebrochen: number; bilder: number; platz?: number }>()
+/** Anfragen, die der Hauptprozess als „laufend" gemeldet hat (08.10.2026) – bis dahin ist ihr Zustand unbekannt */
+const angelaufen = new Set<string>()
 let zaehler = 0
 
 /**
@@ -266,7 +275,12 @@ function horchePlatz(): void {
   if (platzAbo || typeof window === 'undefined' || !window.api?.ai.onPlatz) return
   platzAbo = window.api.ai.onPlatz(({ id, zustand, abgebrochen, abgebrocheneBilder, platz }) => {
     if (zustand === 'wartend') wartendeAnfragen.set(id, { abgebrochen: abgebrochen ?? 0, bilder: abgebrocheneBilder ?? 0, platz })
-    else wartendeAnfragen.delete(id)
+    else {
+      wartendeAnfragen.delete(id)
+      // Die Anfrage arbeitet: ihr Auftrag hat begonnen
+      if (anfrageWarten.has(id)) angelaufen.add(id)
+      for (const lz of laufzeit.values()) if (lz.anfragen.has(id)) lz.gestartet = true
+    }
     if (anfrageWarten.has(id)) merkeWartezustand(id, zustand === 'wartend')
     for (const fn of platzHoerer) fn()
     for (const [auftragId, lz] of laufzeit) if (lz.anfragen.has(id)) aendere(auftragId, (a) => ({ ...a, ...lage(lz, a) }))
@@ -411,18 +425,34 @@ export function nimmUnterbrocheneAuf(): number {
   return fortgesetzt
 }
 
-/** Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend". */
-function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund' | 'platz'> {
-  if (!laeuft(a)) return { status: a.status, wartegrund: undefined, platz: undefined }
-  if (lz.pause) return { status: 'wartend', wartegrund: lz.pause, platz: undefined }
+/**
+ * Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend".
+ *
+ * Kein Aufblitzen (08.10.2026): Eine neue Anfrage ist kurz weder als wartend noch als laufend gemeldet. Wartete der
+ * Auftrag, bleibt er so lange „wartend", statt für einen Augenblick „laufend" zu zeigen.
+ */
+function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund' | 'platz' | 'gestartet'> {
+  const gestartet = lz.gestartet || a.gestartet ? true : undefined
+  if (!laeuft(a)) return { status: a.status, wartegrund: undefined, platz: undefined, gestartet }
+  if (lz.pause) return { status: 'wartend', wartegrund: lz.pause, platz: undefined, gestartet }
   const ids = [...lz.anfragen]
   const wartet = ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id))
-  if (!wartet) return { status: 'laufend', wartegrund: undefined, platz: undefined }
+  if (!wartet) {
+    const unbekannt = Boolean(platzAbo) && ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id) || !angelaufen.has(id))
+    if (unbekannt && a.status === 'wartend') return { status: 'wartend', wartegrund: a.wartegrund, platz: a.platz, gestartet }
+    return { status: 'laufend', wartegrund: undefined, platz: undefined, gestartet }
+  }
   const lagen = ids.map((id) => wartendeAnfragen.get(id)!)
   // Der vorderste Platz seiner Anfragen – mit ihm geht es weiter
   const plaetze = lagen.map((l) => l.platz).filter((p): p is number => typeof p === 'number' && p > 0)
-  return { status: 'wartend', wartegrund: warteGrund(lagen), platz: plaetze.length ? Math.min(...plaetze) : undefined }
+  return { status: 'wartend', wartegrund: warteGrund(lagen), platz: plaetze.length ? Math.min(...plaetze) : undefined, gestartet }
 }
+
+/** Wartet, bevor überhaupt eine Anfrage gearbeitet hat – „Wartet – Platz n" */
+export const wartetVorStart = (a: Pick<Auftrag, 'status' | 'gestartet'>): boolean => a.status === 'wartend' && !a.gestartet
+
+/** Hat schon gearbeitet und wartet gerade zwischen zwei Anfragen auf einen Platz – bleibt „Entsteht …", leiser Hinweis */
+export const wartetKurz = (a: Pick<Auftrag, 'status' | 'gestartet'>): boolean => a.status === 'wartend' && Boolean(a.gestartet)
 
 /**
  * Hält ein ABGEBROCHENER Auftrag noch einen Platz, sagt die Leiste das – leise, aber ehrlich.
@@ -547,7 +577,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
   /** Arbeitszeit einer Anfrage: seit ihrem Start, ohne ihre Wartezeit auf einen Platz */
   const arbeitszeit = (anfrageId: string, l: { start: number }, nun: number): number => Math.max(0, nun - l.start - gewartetVon(anfrageId, nun))
 
-  let restBis: number | undefined
+  // Ruhige Restzeit (08.10.2026, restzeit.ts `ruhigesZiel`): Ziel und Zeitpunkt seiner letzten Änderung
+  let restStand: { ziel: number; seit: number } | undefined
   const restzeit = (): Pick<Auftrag, 'restBis' | 'restLage'> => {
     const nun = Date.now()
     pruefeWarten(nun)
@@ -561,15 +592,15 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       ki: (art) => kiFuer(art)
     })
     if (laenger) {
-      restBis = undefined
+      restStand = undefined
       return { restBis: undefined, restLage: 'laenger' }
     }
     if (sekunden === null) {
-      restBis = undefined
+      restStand = undefined
       return { restBis: undefined, restLage: undefined }
     }
-    restBis = glaetteZiel(restBis, nun + sekunden * 1000)
-    return { restBis, restLage: undefined }
+    restStand = ruhigesZiel(restStand, nun + sekunden * 1000, nun)
+    return { restBis: restStand.ziel, restLage: undefined }
   }
 
   const aktualisiere = (meldung?: string): void => {
@@ -608,6 +639,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     } finally {
       const lauf = buch.laufend.get(anfrageId)
       buch.laufend.delete(anfrageId)
+      if (ok) lz.gestartet = true
+      angelaufen.delete(anfrageId)
       if (ok && lauf) {
         buch.erledigt[art] = (buch.erledigt[art] ?? 0) + 1
         merkeAnfrage(art, lauf.ki, { ms: arbeitszeit(anfrageId, lauf, Date.now()), chars: tracker.stand(anfrageId).chars })

@@ -19,9 +19,18 @@ export interface VokabelAuswahl {
   sprache: string
   fach: string
   woerter: Vokabel[]
-  /** Herkunft aus dem Lehrwerk – für den Vokabelweg der Lernenden (03.10.2026) */
-  quelle?: { lehrwerk: string; unit: string; abschnitte: string[] }
+  /**
+   * Herkunft aus dem Lehrwerk – für den Vokabelweg der Lernenden (03.10.2026). Mehrere Units (08.10.2026): `units` in
+   * Buchreihenfolge, `unit` = die höchste, `abschnitte` = alle hintereinander.
+   */
+  quelle?: { lehrwerk: string; unit: string; abschnitte: string[]; units?: { unit: string; abschnitte: string[] }[] }
+  /** Je gewähltem Abschnitt ein Teil {titel, anzahl} in Wortreihenfolge (Kasten „Freigegebene Abschnitte") */
+  teile?: { titel: string; anzahl: number }[]
 }
+
+/** Kennung eines Abschnitts in der Mehrfachauswahl: Unit und Abschnitt (Abschnittsnamen wiederholen sich je Unit) */
+const TRENNER = '\u0001'
+const abschnittKey = (unit: string, abschnitt: string): string => `${unit}${TRENNER}${abschnitt}`
 
 const FACH_ZU: Record<string, string> = {
   en: 'Englisch',
@@ -78,7 +87,8 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
   const [reihe, setReihe] = useState<string | null>(null)
   const [bandId, setBandId] = useState<string | null>(null)
   const [buch, setBuch] = useState<Textbook | null>(null)
-  const [unit, setUnit] = useState<string | null>(null)
+  // Mehrere Units (08.10.2026, abgestimmt): Abschnitte je Unit, nicht vorausgewählt – die Lehrkraft wählt sie aktiv
+  const [units, setUnits] = useState<string[]>([])
   const [abschnitte, setAbschnitte] = useState<string[]>([])
   const [listen, setListen] = useState<
     { id: string; name: string; language?: string; source?: string; entries: { term: string; translation: string; pos?: string; note?: string }[] }[]
@@ -110,7 +120,7 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
   const mehrereAusgaben = new Set(baende.map((b) => b.ausgabe ?? '')).size > 1
   const bandWaehlen = (id: string | null): void => {
     setBandId(id)
-    setUnit(null)
+    setUnits([])
     setAbschnitte([])
     if (!id) return setBuch(null)
     setLaeuft(true)
@@ -119,17 +129,26 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
       .then(setBuch, (e: unknown) => notifyError(e))
       .finally(() => setLaeuft(false))
   }
-  const units = buch?.units ?? []
-  const sections = useMemo(() => units.find((u) => u.name === unit)?.sections ?? [], [units, unit])
+  const buchUnits = useMemo(() => buch?.units ?? [], [buch])
+  // Gewählte Units in Buchreihenfolge, je mit ihren gewählten Abschnitten (ebenfalls in Buchreihenfolge)
+  const gewaehlt = useMemo(
+    () =>
+      buchUnits
+        .filter((u) => units.includes(u.name))
+        .map((u) => ({ unit: u.name, sections: u.sections.filter((s) => abschnitte.includes(abschnittKey(u.name, s.name))) }))
+        .filter((u) => u.sections.length),
+    [buchUnits, units, abschnitte]
+  )
 
   // Auswahl melden
   useEffect(() => {
     if (art === 'buch') {
-      if (!buch || !unit || !abschnitte.length) return wahl(null)
-      const woerter: Vokabel[] = sections
-        .filter((s) => abschnitte.includes(s.name))
-        .flatMap((s, si) =>
-          s.entries
+      if (!buch || !gewaehlt.length) return wahl(null)
+      const teile: { titel: string; anzahl: number }[] = []
+      const woerter: Vokabel[] = gewaehlt
+        .flatMap((u) => u.sections.map((s) => ({ unit: u.unit, s })))
+        .flatMap(({ unit, s }, si) => {
+          const liste = s.entries
             .filter((e) => !e.explained && e.term && e.translation)
             .map((e, i) => ({
               id: `b${si}-${i}`,
@@ -140,13 +159,28 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
               ...(e.pos ? { pos: e.pos } : {}),
               ...(e.note ? { note: e.note } : {})
             }))
-        )
+          if (liste.length) teile.push({ titel: gewaehlt.length > 1 ? `${unit} · ${s.name}` : s.name, anzahl: liste.length })
+          return liste
+        })
+      const quelleUnits = gewaehlt.map((u) => ({ unit: u.unit, abschnitte: u.sections.map((s) => s.name) }))
       wahl({
-        titel: [buch.name, unit, abschnitte.join(', ')].join(' - '),
+        titel:
+          quelleUnits.length === 1
+            ? [buch.name, quelleUnits[0].unit, quelleUnits[0].abschnitte.join(', ')].join(' - ')
+            : [buch.name, ...quelleUnits.map((u) => `${u.unit}: ${u.abschnitte.join(', ')}`)].join(' - '),
         sprache: buch.language,
         fach: FACH_ZU[buch.language] ?? buch.language,
         woerter,
-        quelle: { lehrwerk: buch.id, unit, abschnitte }
+        quelle:
+          quelleUnits.length === 1
+            ? { lehrwerk: buch.id, unit: quelleUnits[0].unit, abschnitte: quelleUnits[0].abschnitte }
+            : {
+                lehrwerk: buch.id,
+                units: quelleUnits,
+                unit: quelleUnits[quelleUnits.length - 1].unit,
+                abschnitte: quelleUnits.flatMap((u) => u.abschnitte)
+              },
+        ...(teile.length > 1 ? { teile } : {})
       })
     } else {
       const l = listen.find((x) => x.id === liste)
@@ -161,7 +195,7 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [art, buch, unit, abschnitte, liste, sections])
+  }, [art, buch, gewaehlt, liste])
 
   return (
     <Stack gap="xs" data-vokabel-quelle>
@@ -214,24 +248,33 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
               data-vokabel-band
             />
           </Group>
-          <Group grow align="end">
-            <Select
-              label="Unit"
-              data={units.map((u) => u.name)}
-              value={unit}
-              onChange={(u) => (setUnit(u), setAbschnitte([]))}
-              disabled={!buch}
-              data-vokabel-unit
-            />
-          </Group>
+          <MultiSelect
+            label="Units"
+            data={[...new Set(buchUnits.map((u) => u.name))]}
+            value={units}
+            onChange={(neu) => {
+              setUnits(neu)
+              // Abschnitte abgewählter Units fallen weg; neue Units kommen ohne Vorauswahl dazu
+              setAbschnitte((a) => a.filter((k) => neu.includes(k.split(TRENNER)[0])))
+            }}
+            disabled={!buch}
+            placeholder={units.length ? undefined : 'eine oder mehrere Units'}
+            data-vokabel-unit
+          />
           {laeuft && <Loader size="sm" />}
-          {unit && (
+          {units.length > 0 && (
             <MultiSelect
               label="Abschnitte"
-              data={sections.map((s) => ({ value: s.name, label: `${s.name} (${s.entries.length})` }))}
+              data={buchUnits
+                .filter((u) => units.includes(u.name))
+                .map((u) => ({
+                  group: u.name,
+                  items: u.sections.map((s) => ({ value: abschnittKey(u.name, s.name), label: `${u.name} · ${s.name} (${s.entries.length})` }))
+                }))}
               value={abschnitte}
               onChange={setAbschnitte}
-              placeholder="z. B. Station 1"
+              placeholder={abschnitte.length ? undefined : 'z. B. Station 1'}
+              error={abschnitte.length ? undefined : 'Abschnitte auswählen'}
               data-vokabel-abschnitte
             />
           )}

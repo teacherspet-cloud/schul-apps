@@ -10,7 +10,7 @@
 // Vorlage: jüngstes echtes Arbeitsblatt mit mind. drei Aufgaben (nur gelesen).
 // Aufruf: node tests/e2e/server-reihe-ki.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { expertenmodus } from './warten.mjs'
 
@@ -71,9 +71,22 @@ const baustein = (patch) => ({
   ...patch
 })
 const schritt = (o) => ({ rolle: 'pflicht', minuten: 20, lernziele: [0], begruendung: 'passt hier', beschreibung: '', material: '', ...o })
+// Anfragen mitschreiben (08.10.2026): Planungsanfrage prüfen
+const protokoll = join(out, 'ki-protokoll.jsonl')
+writeFileSync(protokoll, '')
+attrappe.protokoll = protokoll
+const anfragen = () =>
+  (existsSync(protokoll) ? readFileSync(protokoll, 'utf8') : '')
+    .split('\n')
+    .filter(Boolean)
+    .map((z) => JSON.parse(z))
 attrappe.antworten = {
   ...attrappe.antworten,
   reihe_planung: {
+    // 08.10.2026 (Reihenmuster): Leitfrage und Reihentyp im Plan; der letzte Schritt nimmt die Leitfrage auf (sonst Nachfrage
+    // „reihe_planung_reihenmuster"); ein Reihentyp, den das Fach nicht kennt, fällt in der App weg
+    leitfrage: 'Was wissen wir schon – und was noch nicht?',
+    reihentyp: 'leitfrage-urteil',
     hinweis: 'Im Plenum die Ergebnisse sichern.',
     teile: [
       {
@@ -90,7 +103,7 @@ attrappe.antworten = {
           })
         ]
       },
-      { name: 'Sicherung', schritte: [schritt({ titel: 'Neues Übungsblatt', art: 'arbeitsblatt', stunde: 2, beschreibung: 'Übung mit Anwendung' })] }
+      { name: 'Sicherung', schritte: [schritt({ titel: 'Neues Übungsblatt', art: 'arbeitsblatt', stunde: 2, beschreibung: 'Übung mit Anwendung und Auswertung, zurück zur Leitfrage' })] }
     ]
   },
   reihe_schritt_aufgabe: {
@@ -230,6 +243,17 @@ try {
   pruefe((await p.locator('[data-reihe-titel]').inputValue()) === 'KI-Reihe Probe', 'Öffnen führt in die geplante Reihe mit Plan-Vorschau')
   await p.screenshot({ path: join(out, '1-plan.png'), fullPage: true })
   pruefe(await p.getByText('vorhandenes Material').first().isVisible(), 'Plan: vorhandenes Material eingesetzt')
+  // Vorschau Stunde für Stunde (08.10.2026), keine leere Stunde – die Attrappe belegt beide
+  pruefe((await p.locator('[data-plan-stunde]').count()) === 2 && (await p.locator('[data-plan-stunde-leer]').count()) === 0, 'Plan-Vorschau Stunde für Stunde, jede Stunde belegt')
+  const planAnfrage = anfragen().find((a) => a.schemaName === 'reihe_planung')
+  pruefe(
+    Boolean(planAnfrage) && planAnfrage.user.includes('eine Doppelstunde zählt als EINE Stunde') && planAnfrage.user.includes('LERNGRUPPENPROFIL'),
+    'Planungsanfrage: Stunde = Termin, Lerngruppen-Profil'
+  )
+  pruefe(!anfragen().some((a) => a.schemaName === 'reihe_planung_verteilung'), 'Keine Nachfrage zur Verteilung, wenn alle Stunden belegt sind')
+  // Reihenmuster (08.10.2026): Muster in der Anfrage (Fächer mit Muster), kein Gegencheck nötig, Leitfrage in der Vorschau
+  pruefe(!anfragen().some((a) => a.schemaName === 'reihe_planung_reihenmuster'), 'Keine Nachfrage zum Reihenmuster, wenn der Plan die Regeln einhält')
+  pruefe(await p.locator('[data-plan-leitfrage]').isVisible(), 'Plan-Vorschau zeigt die Leitfrage')
   await p.locator('[data-plan-uebernehmen]').click()
   await p.waitForTimeout(500)
   pruefe((await p.locator('[data-plan-bereit]').count()) === 0, 'Nach dem Übernehmen kein bereitliegender Plan mehr')
@@ -237,6 +261,7 @@ try {
   const kopf = (await p.locator('[data-reihe-kopf-zeile]').textContent().catch(() => '')) ?? ''
   pruefe(kopf.includes('2 Stunden') && kopf.includes('1 Lernziel'), `Kopf nach dem Übernehmen eingeklappt („${kopf.trim()}")`)
   pruefe((await p.locator('[data-plan-hinweis]').count()) === 1, 'Hinweis der KI-Planung am Kopf abrufbar')
+  pruefe((await p.locator('[data-reihe-kopf-leitfrage]').count()) === 1, 'Leitfrage übernommen und im eingeklappten Kopf sichtbar')
   pruefe((await p.locator('[data-stunde-gruppe]').count()) === 2, 'Stundenansicht: zwei Stunden mit ihren Schritten')
   pruefe((await p.locator('[data-schritt]').first().locator('[data-grundlage-chip]').count()) >= 2, 'Grundlage-Chips am Platzhalter')
   pruefe((await p.locator('[data-test-hier]').count()) === 0, '„Test hier erstellen" nicht mehr dauerhaft unter jedem Schritt')

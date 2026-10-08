@@ -464,7 +464,9 @@ function Inhalt({
             <Checkbox
               mt="lg"
               label="Aufgaben schrittweise freischalten"
-              title="Die nächste Aufgabe erscheint erst, wenn die vorige mindestens teilweise treffend gelöst ist; Ampel neben jeder Aufgabe"
+              // Vorschlag der KI mit Grund (08.10.2026, platzhalterAuftrag.ts) – änderbar; der Grund steht im Hinweis und darunter
+              title={`Die nächste Aufgabe erscheint erst, wenn die vorige mindestens teilweise treffend gelöst ist; Ampel neben jeder Aufgabe${i.schrittweiseGrund ? ` – Vorschlag der KI: ${i.schrittweiseGrund}` : ''}`}
+              description={i.schrittweiseGrund ? `Vorschlag der KI: ${i.schrittweiseGrund}` : undefined}
               checked={Boolean(i.schrittweise)}
               onChange={(e) => setzeInhalt({ schrittweise: e.currentTarget.checked })}
               data-schritt-schrittweise

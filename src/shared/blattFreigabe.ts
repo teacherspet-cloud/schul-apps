@@ -11,6 +11,7 @@
  */
 import type { StructuredRequest } from './types'
 import type { AbschriftBefund } from './abschrift'
+import type { AufgabenSchluessel } from './blattPruefung'
 
 export interface BlattAufgabe {
   nr: number
@@ -22,6 +23,11 @@ export interface BlattAufgabe {
   freiwillig?: boolean
   /** Zahl der Hilfekarten zu dieser Aufgabe (06.10.2026) – digital über das ?-Symbol */
   hilfekarten?: number
+  /**
+   * Lösungsschlüssel für die automatische Prüfung nach dem Einreichen (08.10.2026, shared/blattPruefung.ts):
+   * Ankreuzen, Richtig/Falsch, Lücken, Zuordnen, Ordnen – bleibt wie die Erwartung auf dem Server
+   */
+  schluessel?: AufgabenSchluessel
 }
 
 export type BlattFeldArt = 'text' | 'zeilen' | 'luecke' | 'flaeche' | 'kreuz'
@@ -33,6 +39,10 @@ export interface BlattFeld {
   art: BlattFeldArt | string
   /** Seite (0-basiert) */
   seite: number
+  /** Kästchen (08.10.2026): Text der Möglichkeit bzw. Aussage mit Spalte – für die KI statt „Kästchen 3" */
+  text?: string
+  /** Stelle im Lösungsschlüssel (shared/blattPruefung.ts, z. B. „0.mc.2"), gemessen auf dem Gerät */
+  bezug?: string
 }
 
 /** Antworten je Aufgabe als Text: „Aufgabe 2 (Anweisung): 1) … 2) …" – leere Felder fallen weg */
@@ -41,11 +51,20 @@ export function blattAbgabeText(aufgaben: BlattAufgabe[], felder: BlattFeld[], a
   const teile: string[] = []
   for (const nr of nummern) {
     const eigene = felder.filter((f) => f.nr === nr)
+    /*
+     * Kästchen (08.10.2026, Befund: „Kästchen 7: angekreuzt" zählte alle Felder der Aufgabe mit – die KI konnte das keiner
+     * Möglichkeit zuordnen): mit dem Text der Möglichkeit wie auf dem Blatt („b) Paris"), sonst nur unter den Kästchen gezählt
+     */
+    let kaestchen = 0
     const eintraege = eigene
       .map((f, i) => {
         const w = (antworten[f.id] ?? '').trim()
+        if (f.art === 'kreuz') kaestchen++
         if (!w) return ''
-        return f.art === 'kreuz' ? `Kästchen ${i + 1}: angekreuzt` : `${i + 1}) ${w}`
+        // Mit Beschriftung (Tabellenzelle, Zuordnung), damit die KI weiß, wohin der Eintrag gehört
+        if (f.art !== 'kreuz') return `${i + 1}) ${f.text ? `${f.text.replace(/\s+/g, ' ').trim()}: ` : ''}${w}`
+        const text = (f.text ?? '').replace(/\s+/g, ' ').trim()
+        return text ? `angekreuzt: ${text}` : `Kästchen ${kaestchen}: angekreuzt`
       })
       .filter(Boolean)
     if (!eintraege.length) continue

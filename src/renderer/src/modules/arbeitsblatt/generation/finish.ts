@@ -5,11 +5,48 @@ import { generateBoard } from './board'
 import type { AiCall, Progress } from './generate'
 import { allBlocks, checkMediaSources, completeOriginalSources, SourceServices } from './originalSources'
 import { completeWorksheetImages, WorksheetImageDeps } from './worksheetImages'
+import { entferneFehlendeBilder } from './bildFehlt'
+import { aufgabenNaheAmMaterial, seitenJeBaustein } from '../didactics/integrity'
+import type { PagePlan } from '../render/paginate'
+
+/** Gemessene Seitenaufteilung je Blatt (Schülerfassung) */
+export type Messen = (ws: Worksheet) => Promise<(sheetId: string) => PagePlan[] | undefined>
 
 export interface FinishDeps {
   ai: AiCall
   images: WorksheetImageDeps
   sources: SourceServices
+  /**
+   * Seitenaufteilung messen (08.10.2026) – für „Aufgabe nah am Material". Fehlt der Wert, misst die App im Browser
+   * selbst (render/seitenMessen.tsx); ohne Browser (Tests) entfällt der Schritt. `null` = nicht messen.
+   */
+  messen?: Messen | null
+}
+
+/** Standard: dieselbe Messung wie im Editor, außerhalb des Bildschirms */
+const browserMessen: Messen | undefined =
+  typeof document === 'undefined'
+    ? undefined
+    : async (ws) => {
+        const [{ messeSeiten }, { layoutKey }] = await Promise.all([import('../render/seitenMessen'), import('../render/SheetPages')])
+        const l = await messeSeiten(ws, null, '', 15000)
+        return (id) => l.get(layoutKey(id, false))
+      }
+
+/**
+ * Aufgaben hinter ihr Material rücken, wenn es nach dem Umbruch zwei oder mehr Seiten davor steht und die
+ * Reihenfolge es erlaubt (didactics/integrity.ts). Was nicht umgestellt werden kann, nennt beim Darstellen die Seite.
+ */
+export function aufgabenZumMaterial(ws: Worksheet, plaene: (sheetId: string) => PagePlan[] | undefined): string[] {
+  const hinweise: string[] = []
+  ws.sheets = ws.sheets.map((s) => {
+    const p = plaene(s.id)
+    if (!p?.length) return s
+    const { sheet, umgestellt } = aufgabenNaheAmMaterial(s, seitenJeBaustein(p))
+    for (const h of umgestellt) hinweise.push(ws.sheets.length > 1 ? `${s.label}: ${h}` : h)
+    return sheet
+  })
+  return hinweise
 }
 
 /*
@@ -77,6 +114,34 @@ export async function finishWorksheet(
     }
   } catch (e) {
     addNote(result, `Bilder konnten nicht automatisch gewählt werden: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  /*
+   * Was jetzt noch kein Bild hat, verlässt das Blatt (08.10.2026): Auf dem Schülerblatt stand sonst der Suchauftrag
+   * der KI, und Aufgaben verwiesen auf leeres Material. Aufgaben werden ohne KI angepasst (generation/bildFehlt.ts).
+   * Nicht bei „Platzhalter" – dort will die Lehrkraft die Bilder selbst wählen.
+   */
+  if ((result.meta.imageSource ?? 'auto') !== 'placeholder') {
+    const fehlt = entferneFehlendeBilder(result)
+    if (fehlt.entfernt) {
+      addNote(
+        result,
+        `Bild fehlt: ${fehlt.entfernt} Bild(er) ließen sich weder finden noch erzeugen und wurden vom Blatt genommen${fehlt.angepasst + fehlt.gestrichen ? ` – ${fehlt.angepasst} Aufgabe(n) angepasst, ${fehlt.gestrichen} entfallen` : ''}. Im Editor lässt sich jederzeit ein Bild einfügen.`
+      )
+      for (const h of fehlt.hinweise) addNote(result, h)
+      zwischenstand?.(result, 'Fehlende Bilder entfernt')
+    }
+  }
+
+  // Aufgabe nah am Material (08.10.2026): nach der gemessenen Seitenaufteilung, wo es die Reihenfolge erlaubt
+  const messen = deps.messen === undefined ? browserMessen : deps.messen
+  if (messen) {
+    try {
+      onProgress?.('Seitenumbruch wird geprüft …', 0, 1)
+      for (const h of aufgabenZumMaterial(result, await messen(result))) addNote(result, `Aufgabe nah am Material: ${h}`)
+    } catch {
+      /* ohne Messung bleibt die Reihenfolge; die Seitenhinweise setzt die Darstellung */
+    }
   }
 
   // Illustrationen (26.09.2026): nach Regeln gesetzt, Sprechblasen von der KI – nur bei jüngeren Jahrgängen

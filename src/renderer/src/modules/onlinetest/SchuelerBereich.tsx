@@ -140,8 +140,31 @@ interface Ergebnis {
   bewertung?: Bewertung
 }
 
+/**
+ * Beim Abmelden alles Personenbezogene dieses Kontos aus dem Gerät nehmen (08.10.2026, geteilte iPads): gesicherte
+ * Testantworten, freigeschaltete Vokabelwege, gemerkte Zustände (schulapps-…, sa-…) und die Darstellung (enthält z. B.
+ * Leseschrift – sie kommt für Konten nach der Anmeldung vom Server zurück). Die Gerätekennung bleibt.
+ */
+function personenbezogenesVergessen(): void {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k === 'schulapps-netz-geraet' || k === 'onlinetest-namen-verdeckt') continue
+      if (/^(onlinetest-|vokabelweg-frei-|schulapps-|sa-|schul-apps-blattzoom)/.test(k)) localStorage.removeItem(k)
+    }
+  } catch {
+    /* Speicher gesperrt – nichts zu tun */
+  }
+}
+
 async function abmelden(ziel = '/anmelden?ziel=/s/'): Promise<void> {
   await fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } }).catch(() => undefined)
+  // Zwischengespeicherte Daten dieses Kontos (Regal, gewählter Kurs) nicht für das nächste Kind stehen lassen (08.10.2026)
+  try {
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith('sa-')) sessionStorage.removeItem(k)
+  } catch {
+    /* egal */
+  }
+  personenbezogenesVergessen()
   window.location.assign(ziel)
 }
 
@@ -324,7 +347,8 @@ export default function SchuelerBereich(): React.JSX.Element {
             ))}
         </Group>
       </Group>
-      {ausReihe && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
+      {/* Blätter der Reihe haben den Rückweg selbst (BlattAusfuellen, 08.10.2026) */}
+      {ausReihe && !blatt && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
         <Button variant="light" component="a" href={`/s/r/${ausReihe}`} mb="sm" leftSection={<IconArrowLeft size={16} />} data-zur-reihe>
           Zur Unterrichtsreihe
         </Button>
@@ -1363,7 +1387,15 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       .then((d) => {
         setT(d)
         versatz.current = d.jetzt - Date.now()
-        if (d.abgegeben) return setPhase('abgegeben')
+        if (d.abgegeben) {
+          // Abgegeben: die Sicherung der Antworten im Browser wird nicht mehr gebraucht (08.10.2026)
+          try {
+            localStorage.removeItem(`onlinetest-${d.id}`)
+          } catch {
+            /* egal */
+          }
+          return setPhase('abgegeben')
+        }
         if (d.wartet) return setPhase('warten')
         // Nach einem Neuladen: Antworten vom Server, sonst aus dem Browser (falls neuer)
         let lokal: Antworten = {}

@@ -81,7 +81,7 @@ import { TestFenster } from './TestHierKnopf'
 import { fuegeEin, type TestZiel } from './reiheTest'
 import { useExperte } from '../../shared/settingsStore'
 import { SchrittKarte } from './SchrittKarte'
-import { ansichtGemerkt, kopfGemerkt, KopfZeile, merkeAnsicht, merkeKopf, PlanHinweis } from './ReiheKopf'
+import { ansichtGemerkt, kopfGemerkt, KopfZeile, LeitfrageFeld, merkeAnsicht, merkeKopf, PlanHinweis } from './ReiheKopf'
 import { ReiheAlsSchueler } from './ReiheVorschau'
 import { merkeKcAuszug } from './grundlage'
 import { ansichtFuer, stundenGruppen, stundenTitel } from './stundenAnsicht'
@@ -89,6 +89,19 @@ import { ArtPlakette, ArtWahl } from './ReiheArt'
 import { PlanungExport, PlanungHinweis, PlanungOhneStunden, PlanungsStunde } from './StundenPlanung'
 import { fuerDigital, nichtAmGeraet, schritteAlsPhasen, wechsleArt } from './reihePlanung'
 import { horcheVerlauf } from './verlaufAuftrag'
+import { useVerzoegertesSichern } from '../../shared/useAutosave'
+import { ServerFehler } from '../onlinetest/serverApi'
+import { fuehreZusammen, type Veroeffentlichung } from '@shared/reiheSpeichern'
+import { planAufRaster } from './planAbdeckung'
+import { NiveauWahl } from './ReiheNiveau'
+import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
+
+/**
+ * Lohnt sich das automatische Speichern? (08.10.2026) Gespeicherte Reihen immer; neue erst, wenn mehr als die Art gewählt
+ * ist – sonst füllte jedes Öffnen von „Neue Reihe" die Liste.
+ */
+export const reiheSpeicherbar = (x: Reihe): boolean =>
+  Boolean(x.id) || Boolean(x.art && (x.titel.trim() || x.schritte.length || x.lernziele.length || x.oberthema.trim() || x.stunden?.length))
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -163,22 +176,102 @@ export function ReiheEditor({
   // Auszug für die KI-Erstellung der Schritte bereitlegen (C1, grundlage.ts) – gleich hier, damit die Chips ihn sofort sehen
   merkeKcAuszug(r, auszug)
 
-  const speichern = async (stand: Reihe = r): Promise<Reihe | null> => {
+  /*
+   * Speichern (08.10.2026, automatisch und von Hand):
+   *  - Alle Läufe nacheinander (`kette`) – zwei gleichzeitige Läufe einer neuen Reihe hätten sonst zwei Reihen angelegt.
+   *  - Nach dem Speichern kommen nur Kennung und Zeitstempel in den JETZIGEN Stand. Vorher ersetzte der gespeicherte Stand
+   *    alles, was während des Speicherns getippt wurde (Befund: Eingaben verschwanden).
+   *  - Der Server lehnt ab, wenn sein Stand neuer ist als der, auf dem der Editor aufbaut (409, reiheSpeichern.ts). Dann
+   *    führt der Editor beide Stände zusammen (`fuehreZusammen` mit der letzten Basis) und speichert erneut.
+   */
+  const basis = useRef<Reihe | null>(start.id ? start : null)
+  const geaendertRef = useRef(geaendert)
+  geaendertRef.current = geaendert
+  const [veroeff, setVeroeff] = useState<Veroeffentlichung | null>(null)
+  const kette = useRef<Promise<unknown>>(Promise.resolve())
+  const speichernJetzt = async (stand: Reihe, versuch = 0): Promise<Reihe | null> => {
+    const jetzt0 = rAktuell.current
+    // Kennung und Basis des letzten eigenen Speicherns (ein wartender Lauf kennt sie sonst noch nicht)
+    const senden_ = { ...stand, id: stand.id || jetzt0.id, geaendert: jetzt0.geaendert ?? stand.geaendert }
     setLaeuft(true)
     try {
-      const a = await senden<{ id: string; geaendert: string }>('/server/reihen/speichern', { reihe: stand })
-      const neu = { ...stand, id: a.id, geaendert: a.geaendert }
-      setR(neu)
+      const a = await senden<{ id: string; geaendert: string; veroeffentlichung?: Veroeffentlichung }>('/server/reihen/speichern', {
+        reihe: senden_,
+        basis: senden_.geaendert ?? ''
+      })
+      const gespeichert = { ...senden_, id: a.id, geaendert: a.geaendert }
+      basis.current = gespeichert
+      if (a.veroeffentlichung) setVeroeff(a.veroeffentlichung)
+      const jetzt = rAktuell.current
+      const neu = { ...jetzt, id: a.id, geaendert: a.geaendert }
       rAktuell.current = neu
-      setGeaendert(false)
+      setR(neu)
+      // Nur „gespeichert", wenn seitdem nichts dazukam – sonst plant das automatische Speichern den nächsten Lauf
+      if (jetzt === stand || jetzt === jetzt0) setGeaendert(false)
       // Still speichern (08.10.2026): kein „Gespeichert." bei jedem Klick – Fehler meldet der catch-Zweig
-      return neu
+      return gespeichert
     } catch (e) {
+      const server = e instanceof ServerFehler && e.status === 409 ? (e.daten as { reihe?: Reihe } | undefined)?.reihe : undefined
+      if (server && versuch < 2) {
+        const zusammen = fuehreZusammen(rAktuell.current, basis.current, server)
+        basis.current = server
+        rAktuell.current = zusammen
+        setR(zusammen)
+        setGeaendert(true)
+        return speichernJetzt(zusammen, versuch + 1)
+      }
       notifyError(e, 'Nicht gespeichert')
       return null
     } finally {
       setLaeuft(false)
     }
+  }
+  const speichern = (stand?: Reihe): Promise<Reihe | null> => {
+    const lauf = kette.current.catch(() => undefined).then(() => speichernJetzt(stand ?? rAktuell.current))
+    kette.current = lauf
+    return lauf
+  }
+  // Automatisch speichern (08.10.2026): 1,5 s nach der letzten Änderung; Programmwechsel und Schließen sichern sofort (autosave.ts)
+  const sicherung = useVerzoegertesSichern(async () => {
+    if (!geaendertRef.current || !reiheSpeicherbar(rAktuell.current)) return
+    await speichern()
+  })
+  useEffect(() => {
+    if (geaendert && reiheSpeicherbar(r)) sicherung.plane(1500)
+  }, [r, geaendert, sicherung])
+  // Stand der Veröffentlichung (zugewiesene Reihen): „n Änderungen noch nicht bei den Lernenden"
+  useEffect(() => {
+    if (!r.id) return
+    let aktiv = true
+    void holen<Veroeffentlichung>(`/server/reihen/${r.id}/veroeffentlichung`).then(
+      (v) => aktiv && setVeroeff(v),
+      () => undefined
+    )
+    return () => {
+      aktiv = false
+    }
+  }, [r.id])
+  const [veroeffLaeuft, setVeroeffLaeuft] = useState(false)
+  /** „Für Lernende aktualisieren": erst speichern, dann den gespeicherten Stand veröffentlichen */
+  const veroeffentlichen = async (): Promise<void> => {
+    setVeroeffLaeuft(true)
+    try {
+      await sicherung.sofort()
+      const x = geaendertRef.current || !rAktuell.current.id ? await speichern() : rAktuell.current
+      if (!x?.id) return
+      setVeroeff(await senden<Veroeffentlichung>(`/server/reihen/${x.id}/veroeffentlichen`))
+      notifySuccess('Die Lernenden sehen jetzt den neuen Stand der Reihe.')
+    } catch (e) {
+      notifyError(e, 'Nicht veröffentlicht')
+    } finally {
+      setVeroeffLaeuft(false)
+    }
+  }
+  /** „Alle Reihen": Anstehendes zuerst speichern */
+  const zurueckGesichert = async (): Promise<void> => {
+    await sicherung.sofort()
+    await kette.current.catch(() => undefined)
+    zurueck()
   }
   // Fertige Platzhalter aus dem Hintergrund übernehmen, solange die Reihe hier offen ist (05.10.2026)
   useEffect(() => {
@@ -258,12 +351,18 @@ export function ReiheEditor({
     const alteTeile = ersetzen ? [] : teileVon(r)
     const neueTeile = [...alteTeile, ...plan.teile.filter((t) => !alteTeile.includes(t))]
     // Hinweis der Planung und Begründungen in der Reihe sichern (08.10.2026, B5) – der Platzhalter entfällt beim Erstellen
-    const n = nachArt(ersetzen ? [] : r.schritte, mitBegruendung(plan.schritte), r.stunden, ersetzen ? {} : r.verlauf)
+    // Stunden wie geplant (08.10.2026): auf das Raster, für das die KI geplant hat – auch wenn es sich seitdem geändert hat
+    const raster = planAufRaster(r.stunden, plan.stunden, mitBegruendung(plan.schritte), ersetzen)
+    const n = nachArt(ersetzen ? [] : r.schritte, raster.schritte, raster.stunden, ersetzen ? {} : r.verlauf)
     setze({
+      stunden: raster.stunden,
       schritte: ordneNachTeilen(n.schritte, neueTeile),
       ...(n.verlauf ? { verlauf: n.verlauf } : {}),
       teile: neueTeile,
-      ...(plan.hinweis.trim() ? { planHinweis: plan.hinweis.trim() } : {})
+      ...(plan.hinweis.trim() ? { planHinweis: plan.hinweis.trim() } : {}),
+      // Reihenmuster (08.10.2026): Leitfrage der KI nur, wo die Lehrkraft keine hat (oder beim Ersetzen); Reihentyp wie geplant
+      ...(plan.leitfrage && (ersetzen || !r.leitfrage?.trim()) ? { leitfrage: plan.leitfrage } : {}),
+      ...(plan.reihentyp ? { reihentyp: plan.reihentyp } : {})
     })
     setKopfOffen(false)
     notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
@@ -403,7 +502,7 @@ export function ReiheEditor({
     return (
       <Stack data-reihe-editor>
         <Group>
-          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck}>
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => void zurueckGesichert()} data-alle-reihen>
             Alle Reihen
           </Button>
         </Group>
@@ -415,7 +514,7 @@ export function ReiheEditor({
     <OptionenBereich>
       <Stack data-reihe-editor>
         <Group justify="space-between">
-          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck}>
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => void zurueckGesichert()} data-alle-reihen>
             Alle Reihen
           </Button>
           <Group gap="xs">
@@ -423,11 +522,13 @@ export function ReiheEditor({
               variant="light"
               leftSection={<IconDeviceFloppy size={16} />}
               loading={laeuft}
-              disabled={!r.titel.trim()}
+              disabled={!reiheSpeicherbar(r)}
               onClick={() => void speichern()}
               data-reihe-speichern
+              data-gespeichert={!geaendert || undefined}
             >
-              Speichern{geaendert ? ' *' : ''}
+              {/* Automatisch gespeichert (08.10.2026) – der Knopf sichert sofort */}
+              {geaendert ? 'Speichern *' : 'Gespeichert'}
             </Button>
             {planung && <PlanungExport reihe={r} />}
             {r.schritte.length > 0 && <DruckMenue reihe={r} />}
@@ -506,6 +607,8 @@ export function ReiheEditor({
               clearable
               data-reihe-oberthema
             />
+            {/* Leitfrage (08.10.2026, Reihenmuster): sehen die Lernenden oben in der Reihe */}
+            <LeitfrageFeld wert={r.leitfrage ?? ''} setze={(leitfrage) => setze({ leitfrage })} />
             <LernzieleFeld
               titel="Lernziele der Reihe (sehen die Lernenden oben in der Reihe)"
               ziele={r.lernziele}
@@ -515,6 +618,8 @@ export function ReiheEditor({
               ichKann={(z) => ichKannFormulieren(r, z, ki)}
             />
             <StundenLeiste reihe={r} setze={setze} />
+            {/* Niveau der Reihe (08.10.2026): Vorgabe für Planung und alle Schritte */}
+            {!planung && <NiveauWahl niveau={r.niveau} setze={(n) => setze({ niveau: n })} />}
             {(r.planHinweis?.trim() || r.schritte.length > 0) && (
               <Group justify="flex-end" gap="xs">
                 {r.planHinweis?.trim() && <PlanHinweis text={r.planHinweis} />}
@@ -576,6 +681,20 @@ export function ReiheEditor({
           <Alert variant="light" color="orange" icon={<IconAlertTriangle size={16} />} data-nicht-am-geraet-hinweis>
             {nichtAmGeraetZahl === 1 ? 'Ein Schritt „Im Unterricht“ geht' : `${nichtAmGeraetZahl} Schritte „Im Unterricht“ gehen`} in einer digitalen Reihe nicht am
             Gerät – bitte durch eine Aufgabe ersetzen (markiert mit „nicht am Gerät“) oder die Art der Reihe auf „Gemischt“ ändern.
+          </Alert>
+        )}
+        {/* Zugewiesene Reihe (08.10.2026): Speichern ändert nur den Entwurf – erst „Für Lernende aktualisieren" zeigt ihn */}
+        {!planung && veroeff && veroeff.zugewiesen > 0 && veroeff.offen > 0 && (
+          <Alert variant="light" color="blue" icon={<IconRefresh size={16} />} data-unveroeffentlicht={veroeff.offen}>
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="sm">
+                {veroeff.offen === 1 ? '1 Änderung ist' : `${veroeff.offen} Änderungen sind`} noch nicht bei den Lernenden – sie sehen den Stand
+                {veroeff.am ? ` vom ${new Date(veroeff.am).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}` : ' der Zuweisung'}.
+              </Text>
+              <Button size="xs" loading={veroeffLaeuft} onClick={() => void veroeffentlichen()} data-fuer-lernende-aktualisieren>
+                Für Lernende aktualisieren
+              </Button>
+            </Group>
           </Alert>
         )}
         {planBereit && !planen && (
@@ -649,6 +768,20 @@ export function ReiheEditor({
                 bg="var(--mantine-color-default-hover)"
                 data-stunde-gruppe={g.stunde ?? ''}
                 data-ueberlang={g.ueberlang || undefined}
+                // Schritte in eine Stunde ziehen (08.10.2026) – auch in eine leere
+                onDragOver={(e) => {
+                  if (!gezogen) return
+                  e.preventDefault()
+                  setUeber(`stunde:${g.stunde ?? ''}`)
+                }}
+                onDragLeave={() => setUeber((u) => (u === `stunde:${g.stunde ?? ''}` ? null : u))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (gezogen) schrittAendern(gezogen, { stunde: g.stunde ?? undefined })
+                  setGezogen(null)
+                  setUeber(null)
+                }}
+                style={{ outline: ueber === `stunde:${g.stunde ?? ''}` ? '2px dashed var(--mantine-color-blue-5)' : undefined }}
               >
                 <Group justify="space-between" mb={6} wrap="nowrap">
                   <Text fw={700}>{stundenTitel(g)}</Text>
@@ -662,10 +795,16 @@ export function ReiheEditor({
                   )}
                 </Group>
                 <Stack gap={6}>
-                  {g.zeilen.length === 0 && (
-                    <Text size="xs" c="dimmed" ta="center" py={4}>
-                      Noch nichts in dieser Stunde – Schritte über „⋯ → In Stunde …" hierher verschieben.
-                    </Text>
+                  {g.zeilen.length === 0 && g.stunde !== null && (
+                    // Leere Stunde (08.10.2026): gleich etwas anlegen oder hierher holen – oder eine Karte hineinziehen
+                    <Group justify="center" gap="xs" py={4} data-stunde-leer>
+                      <SchrittMenue neu={(a) => neuerSchritt(a, undefined, g.stunde!)} reiheArt={art} klein label="Schritt hier anlegen" />
+                      <SchrittHolen
+                        schritte={r.schritte.filter((x) => x.stunde !== g.stunde)}
+                        nummer={nummer}
+                        holen={(id) => schrittAendern(id, { stunde: g.stunde! })}
+                      />
+                    </Group>
                   )}
                   {g.zeilen.map(({ schritt: s, teil, teilWechsel }) => (
                     <Stack key={s.id} gap={4}>
@@ -678,7 +817,23 @@ export function ReiheEditor({
                         </Group>
                       )}
                       {halteZeile(s)}
-                      <SchrittKarte {...karte(s)} teileAnsicht={false} />
+                      <SchrittKarte
+                        {...karte(s)}
+                        teileAnsicht={false}
+                        rahmen={{
+                          draggable: true,
+                          onDragStart: (e) => {
+                            e.dataTransfer.effectAllowed = 'move'
+                            e.dataTransfer.setData('text/plain', s.id)
+                            setGezogen(s.id)
+                          },
+                          onDragEnd: () => {
+                            setGezogen(null)
+                            setUeber(null)
+                          },
+                          style: { cursor: 'grab', opacity: gezogen === s.id ? 0.4 : 1 }
+                        }}
+                      />
                     </Stack>
                   ))}
                 </Stack>
@@ -829,6 +984,8 @@ export function ReiheEditor({
             schliessen={() => setPlanen(false)}
             uebernehmen={planUebernehmen}
             setzeStunden={setze}
+            setzeNiveau={(niveau) => setze({ niveau })}
+            setzeReihentyp={(reihentyp) => setze({ reihentyp })}
             speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
             ergebnis={planBereit}
           />
@@ -1025,6 +1182,41 @@ function SchrittMenue({
             </Text>
             <Text size="xs" c="dimmed">
               {a.text}
+            </Text>
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  )
+}
+
+/** „Schritt hierher verschieben" (08.10.2026): Auswahl unter den Schritten anderer Stunden für eine leere Stunde */
+function SchrittHolen({
+  schritte,
+  nummer,
+  holen
+}: {
+  schritte: Schritt[]
+  nummer: Map<string, number>
+  holen: (id: string) => void
+}): React.JSX.Element | null {
+  if (!schritte.length) return null
+  return (
+    <Menu position="bottom" width={340} withinPortal>
+      <Menu.Target>
+        <Button size="xs" variant="subtle" leftSection={<IconArrowsMove size={14} />} data-schritt-holen>
+          Schritt hierher verschieben
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown mah={360} style={{ overflowY: 'auto' }}>
+        {schritte.map((x) => (
+          <Menu.Item key={x.id} onClick={() => holen(x.id)} data-schritt-holen-wahl={x.id}>
+            <Text size="sm" truncate>
+              {nummer.get(x.id) ?? ''}. {x.titel || '(ohne Titel)'}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {x.stunde !== undefined ? `jetzt in Stunde ${x.stunde + 1}` : 'ohne Stunde'}
+              {x.minuten ? ` · ${x.minuten} min` : ''}
             </Text>
           </Menu.Item>
         ))}

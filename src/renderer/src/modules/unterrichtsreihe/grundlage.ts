@@ -14,6 +14,7 @@
  */
 import type { Reihe, Schritt } from '@shared/reihe'
 import type { KcAuszug } from './Lernziele'
+import { useAppSettings } from '../../shared/settingsStore'
 
 export type GrundlageArt = 'lerngruppe' | 'kc' | 'lernziele' | 'buch' | 'minuten' | 'davor' | 'funktion' | 'niveau'
 
@@ -65,7 +66,40 @@ export interface GrundlageEingabe {
   davor: string[]
   buch?: string
   niveau?: NonNullable<Schritt['kiVorgabe']>['niveau']
+  /** Sprache relativ zum Jahrgang (Niveau der Reihe, 08.10.2026) – fehlt = wie `niveau` */
+  sprache?: NonNullable<Schritt['kiVorgabe']>['niveau']
   stufen?: NonNullable<Schritt['kiVorgabe']>['stufen']
+}
+
+/** Expertenmodus? (ohne geladene Einstellungen: ja – wie `useExperte`) */
+export function istExperte(): boolean {
+  try {
+    return useAppSettings.getState().settings.oberflaeche !== 'standard'
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Niveau eines Schritts (08.10.2026): Vorgabe ist das Niveau der Reihe (`Reihe.niveau`, wie beim Arbeitsblatt: Anspruch,
+ * Sprache, Niveaustufen); die eigene Vorgabe des Schritts (`kiVorgabe`) gilt nur im Expertenmodus vorrangig. „mittel" bei
+ * einem Niveau bleibt ohne Angabe (jahrgangsgemäß).
+ */
+export function schrittNiveau(
+  r: Pick<Reihe, 'niveau'>,
+  s: Pick<Schritt, 'kiVorgabe'>,
+  experte = istExperte()
+): Pick<GrundlageEingabe, 'niveau' | 'sprache' | 'stufen'> {
+  const eigen = experte ? s.kiVorgabe : undefined
+  const anspruch = eigen?.niveau ?? r.niveau?.anspruch
+  const sprache = eigen?.niveau && !r.niveau ? eigen.niveau : (r.niveau?.sprache ?? eigen?.niveau)
+  const stufen = eigen?.stufen ?? r.niveau?.stufen
+  const mittel = anspruch === 'mittel' && (sprache ?? 'mittel') === 'mittel'
+  return {
+    ...(anspruch && !mittel ? { niveau: anspruch } : {}),
+    ...(sprache && !mittel ? { sprache } : {}),
+    ...(stufen && stufen > 1 ? { stufen } : {})
+  }
 }
 
 const istAus = (s: Pick<Schritt, 'grundlageAus'>, id: GrundlageArt): boolean => (s.grundlageAus ?? []).includes(id)
@@ -98,8 +132,7 @@ export function grundlageEingabe(r: Reihe, s: Schritt, kc: KcAuszug | null): Gru
     ...(funktion && !istAus(s, 'funktion') ? { funktion } : {}),
     davor: istAus(s, 'davor') ? [] : davor,
     ...(s.platzhalter?.buch?.trim() ? { buch: s.platzhalter.buch.trim() } : {}),
-    ...(s.kiVorgabe?.niveau ? { niveau: s.kiVorgabe.niveau } : {}),
-    ...(s.kiVorgabe?.stufen && s.kiVorgabe.stufen > 1 ? { stufen: s.kiVorgabe.stufen } : {})
+    ...schrittNiveau(r, s)
   }
 }
 
@@ -112,6 +145,7 @@ export function grundlageZeilen(e: GrundlageEingabe): string[] {
     e.minuten ? `BEARBEITUNGSZEIT: etwa ${e.minuten} Minuten – den Umfang danach bemessen.` : '',
     e.funktion ? `DIDAKTISCHE FUNKTION AN DIESER STELLE: ${e.funktion}` : '',
     e.niveau ? `ANSPRUCH: ${e.niveau} (gemessen am Jahrgang; „mittel" = jahrgangsgemäß)` : '',
+    e.sprache && e.sprache !== e.niveau ? `SPRACHE: ${e.sprache} (Satzlänge, Lesbarkeit, Fachsprache – gemessen am Jahrgang)` : '',
     e.davor.length ? `DAVOR IN DER REIHE: ${e.davor.join('; ')}` : ''
   ].filter(Boolean)
 }
@@ -210,14 +244,16 @@ export function grundlageChips(r: Reihe, s: Schritt, kc: KcAuszug | null): Grund
   const funktion = funktionVon(s)
   if (funktion)
     chips.push({ id: 'funktion', label: 'Didaktische Funktion', titel: 'Didaktische Funktion an dieser Stelle', zeilen: [funktion], abwaehlbar: true, aus: istAus(s, 'funktion') })
-  if (s.kiVorgabe?.niveau || (s.kiVorgabe?.stufen ?? 1) > 1)
+  const nv = schrittNiveau(r, s)
+  if (nv.niveau || (nv.stufen ?? 1) > 1)
     chips.push({
       id: 'niveau',
-      label: [s.kiVorgabe?.niveau, (s.kiVorgabe?.stufen ?? 1) > 1 ? `${s.kiVorgabe!.stufen} Niveaustufen` : ''].filter(Boolean).join(' · '),
+      label: [nv.niveau, (nv.stufen ?? 1) > 1 ? `${nv.stufen} Niveaustufen` : ''].filter(Boolean).join(' · '),
       titel: 'Anspruch',
       zeilen: [
-        s.kiVorgabe?.niveau ? `Anspruch: ${s.kiVorgabe.niveau} (gemessen am Jahrgang)` : '',
-        (s.kiVorgabe?.stufen ?? 1) > 1 ? `${s.kiVorgabe!.stufen} Niveaustufen (nur Arbeitsblatt)` : ''
+        nv.niveau ? `Anspruch: ${nv.niveau} (gemessen am Jahrgang)` : '',
+        nv.sprache && nv.sprache !== nv.niveau ? `Sprache: ${nv.sprache}` : '',
+        (nv.stufen ?? 1) > 1 ? `${nv.stufen} Niveaustufen (nur Arbeitsblatt)` : ''
       ].filter(Boolean),
       abwaehlbar: false,
       aus: false

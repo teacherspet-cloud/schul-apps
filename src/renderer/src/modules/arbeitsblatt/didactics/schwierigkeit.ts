@@ -116,7 +116,7 @@ export function stufenRegeln(stufe: Stufe, profile?: LearnerProfile): string[] {
   if (stufe.anspruch === 'grundlegend') {
     out.push(
       'ANSPRUCH grundlegend: Denkprozess Reproduktion und naher Transfer (Bekanntes in bekannter Form anwenden); jede Aufgabe verknüpft höchstens zwei Wissenseinheiten; geschlossene oder halboffene Formate; jede Aufgabe ist in vorgegebene Teilschritte zerlegt; enger Bezug zur Lebenswelt, konkrete oder bildliche Darstellung.',
-      'HILFEN sichtbar auf dem Blatt: ein gelöstes Beispiel vor der ersten Übungsaufgabe, Wortspeicher und Satzanfänge zu jeder Schreibaufgabe; dazu gestufte Hilfekarten (1. Aufgabe in eigenen Worten, 2. Denkanstoß, 3. Fachwissen, 4. Lösungsbeispiel).'
+      'HILFEN sichtbar auf dem Blatt: ein gelöstes Beispiel vor der ersten Übungsaufgabe, Wortspeicher (in der Form aus SPRACHLICHE HILFEN) und Satzanfänge zu jeder Schreibaufgabe; dazu gestufte Hilfekarten (1. Aufgabe in eigenen Worten, 2. Denkanstoß, 3. Fachwissen, 4. Lösungsbeispiel).'
     )
   } else if (stufe.anspruch === 'anspruchsvoll') {
     out.push(

@@ -18,6 +18,7 @@ import {
   Modal,
   Paper,
   SegmentedControl,
+  Select,
   Stack,
   Text,
   Textarea,
@@ -34,6 +35,10 @@ import { starteReihenPlanung, usePlaene, usePlantGerade, type PlanErgebnis } fro
 import { erzeugeFuerPlatzhalter, useErzeugtGerade } from './platzhalterAuftrag'
 import { KiEntwurfMarke, SchrittKiStatus } from './SchrittStatus'
 import { reiheAusgeben, schrittAusgeben, type DruckArt } from './reiheDruck'
+import type { ReiheNiveau } from '@shared/reihe'
+import { NiveauWahl } from './ReiheNiveau'
+import { pruefeAbdeckung } from './planAbdeckung'
+import { reihenmusterFuer, reihentypVon } from '@shared/reihenmuster'
 
 const stundenName = (a: StundenArt): string => (a === 'doppel' ? 'Doppelstunde' : 'Einzelstunde')
 
@@ -203,6 +208,8 @@ export function PlanenFenster({
   schliessen,
   uebernehmen,
   setzeStunden,
+  setzeNiveau,
+  setzeReihentyp,
   speichernVorher,
   ergebnis
 }: {
@@ -212,6 +219,10 @@ export function PlanenFenster({
   uebernehmen: (plan: ReihenPlan, ersetzen: boolean) => void
   /** Stundenraster der Reihe ändern (derselbe Stand wie im Editor) */
   setzeStunden: (p: StundenPatch) => void
+  /** Niveau der Reihe ändern (08.10.2026) – Vorgabe für die Planung und alle Schritte */
+  setzeNiveau?: (n: ReiheNiveau) => void
+  /** Reihentyp aus dem Fachmuster (08.10.2026) – undefined = die KI wählt */
+  setzeReihentyp?: (t: string | undefined) => void
   /** Die Reihe muss für den Hintergrund-Auftrag gespeichert sein (liefert den gespeicherten Stand) */
   speichernVorher: () => Promise<Reihe | null>
   /** Fertiger Plan aus dem Hintergrund – Vorschau statt Formular */
@@ -231,6 +242,8 @@ export function PlanenFenster({
   useEffect(() => {
     void materialKandidaten({ fachId, grade }).then(setMaterial, () => setMaterial([]))
   }, [fachId, grade])
+  // Fachtypisches Reihenmuster (08.10.2026): Reihentypen des Fachs zur Wahl
+  const muster = reihenmusterFuer(reihe.fachId)
   const ohneStunden = !(reihe.stunden?.length ?? 0)
   const ohneTitel = !reihe.titel.trim()
   /** Speichern, Auftrag starten, Fenster zu – die Lehrkraft arbeitet weiter */
@@ -276,6 +289,27 @@ export function PlanenFenster({
             <Card withBorder p="sm" data-planen-stunden>
               <StundenLeiste reihe={reihe} setze={setzeStunden} liste />
             </Card>
+            {/* Niveau wie beim Arbeitsblatt (08.10.2026): Anspruch, Sprache, Niveaustufen – gilt für alle Schritte */}
+            {setzeNiveau && (
+              <Card withBorder p="sm" data-planen-niveau>
+                <NiveauWahl niveau={reihe.niveau} setze={setzeNiveau} hinweis />
+              </Card>
+            )}
+            {/* Reihentyp (08.10.2026): die KI wählt, die Lehrkraft kann ihn festlegen */}
+            {muster && setzeReihentyp && (
+              <Select
+                label="Reihentyp"
+                description={`Fachtypische Muster für ${muster.name} – die Phasen sind Leitlinien, keine starre Reihenfolge.`}
+                data={[
+                  { value: '', label: 'automatisch (KI wählt)' },
+                  ...muster.reihentypen.map((t) => ({ value: t.id, label: t.label }))
+                ]}
+                value={reihentypVon(muster, reihe.reihentyp)?.id ?? ''}
+                onChange={(v) => setzeReihentyp(v || undefined)}
+                allowDeselect={false}
+                data-planen-reihentyp
+              />
+            )}
             <Text size="xs" c="dimmed">
               {material === null ? (
                 <>
@@ -354,24 +388,27 @@ export function PlanenFenster({
                 {plan.hinweis}
               </Alert>
             )}
+            {/* Reihenmuster (08.10.2026): gewählter Reihentyp und Leitfrage */}
+            {(plan.leitfrage || plan.reihentyp) && (
+              <Stack gap={2} data-plan-muster>
+                {plan.reihentyp && (
+                  <Text size="sm" data-plan-reihentyp>
+                    <b>Reihentyp:</b> {reihentypVon(muster, plan.reihentyp)?.label ?? plan.reihentyp}
+                  </Text>
+                )}
+                {plan.leitfrage && (
+                  <Text size="sm" data-plan-leitfrage>
+                    <b>Leitfrage:</b> {plan.leitfrage}
+                  </Text>
+                )}
+              </Stack>
+            )}
             <Text size="sm" c="dimmed">
               {plan.schritte.length} Schritte in {plan.teile.length} Teilen · {plan.materialEingesetzt} eigene Materialien eingesetzt ·{' '}
               {plan.schritte.filter((x) => x.platzhalter).length} Platzhalter
             </Text>
-            {plan.teile.map((t) => (
-              <Card key={t} withBorder p="sm">
-                <Text fw={700} mb={4}>
-                  {t}
-                </Text>
-                <Stack gap={4}>
-                  {plan.schritte
-                    .filter((x) => x.abschnitt === t)
-                    .map((x) => (
-                      <PlanZeile key={x.id} s={x} />
-                    ))}
-                </Stack>
-              </Card>
-            ))}
+            {/* Stunde für Stunde (08.10.2026): so sieht man gleich, ob jede Stunde etwas bekommt und die Zeit passt */}
+            <PlanNachStunden plan={plan} stunden={plan.stunden ?? reihe.stunden ?? []} />
             <Group justify="space-between">
               {reihe.schritte.length > 0 ? (
                 <SegmentedControl
@@ -409,14 +446,75 @@ export function PlanenFenster({
   )
 }
 
-function PlanZeile({ s }: { s: Schritt }): React.JSX.Element {
+/** Vorschau des Plans je Stunde: Länge, verplante Minuten der Pflichtschritte, Teil als kleine Marke */
+function PlanNachStunden({ plan, stunden }: { plan: ReihenPlan; stunden: StundenArt[] }): React.JSX.Element {
+  const a = pruefeAbdeckung(plan.schritte, stunden)
+  const ohne = plan.schritte.filter((x) => x.stunde === undefined || x.stunde < 0 || x.stunde >= stunden.length)
+  return (
+    <Stack gap="xs" data-plan-stunden>
+      {plan.verteilung === 'fest' && (
+        <Alert variant="light" color="orange" p="xs">
+          <Text size="xs">Die KI hat nicht alle Stunden belegt – die App hat die Schritte der Reihe nach auf die Stunden verteilt. Bitte prüfen.</Text>
+        </Alert>
+      )}
+      {stunden.map((art, i) => {
+        const schritte = plan.schritte.filter((x) => x.stunde === i)
+        const laenge = STUNDEN_MINUTEN[art]
+        const zuViel = a.ueberlang.includes(i)
+        return (
+          <Card key={i} withBorder p="sm" data-plan-stunde={i}>
+            <Group justify="space-between" mb={4} wrap="nowrap">
+              <Text fw={700}>
+                Stunde {i + 1} · {stundenName(art)} · {laenge} min
+              </Text>
+              <Text size="xs" c={zuViel ? 'red' : 'dimmed'}>
+                {a.summen[i]} von {laenge} min verplant
+              </Text>
+            </Group>
+            <Stack gap={4}>
+              {schritte.length ? (
+                schritte.map((x) => <PlanZeile key={x.id} s={x} teil />)
+              ) : (
+                <Text size="xs" c="orange" data-plan-stunde-leer>
+                  Noch nichts in dieser Stunde.
+                </Text>
+              )}
+            </Stack>
+          </Card>
+        )
+      })}
+      {ohne.length > 0 && (
+        <Card withBorder p="sm">
+          <Text fw={700} mb={4}>
+            Ohne Stunde
+          </Text>
+          <Stack gap={4}>
+            {ohne.map((x) => (
+              <PlanZeile key={x.id} s={x} teil />
+            ))}
+          </Stack>
+        </Card>
+      )}
+    </Stack>
+  )
+}
+
+function PlanZeile({ s, teil }: { s: Schritt; teil?: boolean }): React.JSX.Element {
   const art = SCHRITT_ARTEN.find((a) => a.id === s.inhalt.art)?.label
   return (
     <div>
       <Group gap={6}>
-        <Badge size="xs" variant="outline">
-          Std. {(s.stunde ?? 0) + 1}
-        </Badge>
+        {teil ? (
+          s.abschnitt ? (
+            <Badge size="xs" variant="outline" color="gray" style={{ textTransform: 'none' }}>
+              {s.abschnitt}
+            </Badge>
+          ) : null
+        ) : (
+          <Badge size="xs" variant="outline">
+            Std. {(s.stunde ?? 0) + 1}
+          </Badge>
+        )}
         <Text size="sm" fw={600}>
           {s.titel}
         </Text>

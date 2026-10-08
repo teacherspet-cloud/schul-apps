@@ -6,6 +6,7 @@
  * Datenbank (alle Konten der Schule) und aus den Einstellungen des Nutzers (Briefkopf); die
  * Muster werden eine Minute zwischengespeichert.
  */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { StructuredRequest, TtsRequest } from '@shared/types'
 import { getSettings } from '../main/services/storage/settings'
 import { alleNutzer, protokolliereServer } from './datenbank'
@@ -31,7 +32,21 @@ export const registerVergessen = (): void => {
   schule = null
 }
 
-/** Muster für den angemeldeten Nutzer: Schule + eigene Namen aus den Einstellungen */
+/**
+ * Klassenliste einer KI-Anfrage (08.10.2026): Namen der Lernenden, um die es geht (auch Gäste mit nur einem Vornamen),
+ * dazu Sprache und Material (Aufgaben, Erwartungen, Vokabeln) für die Entscheidung Person/Wort (personOderWort.ts).
+ */
+export interface Namensliste {
+  namen: string[]
+  sprache?: string
+  material?: string
+}
+const liste = new AsyncLocalStorage<Namensliste>()
+
+/** `fn` mit dieser Klassenliste ausführen – alle KI-Aufrufe darin ersetzen deren Namen auch einzeln */
+export const mitNamensliste = <T>(l: Namensliste, fn: () => T): T => liste.run(l, fn)
+
+/** Muster für den angemeldeten Nutzer: Schule + eigene Namen aus den Einstellungen (+ Klassenliste der Anfrage) */
 export function namensMuster(zusatz: Person[] = []): Muster[] {
   const eigene: Person[] = []
   try {
@@ -41,7 +56,12 @@ export function namensMuster(zusatz: Person[] = []): Muster[] {
   } catch {
     // ohne Einstellungen nur die Schule
   }
-  return musterFuer([...personenDerSchule(), ...eigene, ...zusatz])
+  const l = liste.getStore()
+  const klasse = (l?.namen ?? [])
+    .map((n) => personAus(n))
+    .filter((p): p is Person => Boolean(p))
+    .map((p) => ({ ...p, streng: true }))
+  return musterFuer([...personenDerSchule(), ...eigene, ...zusatz, ...klasse], { sprache: l?.sprache, material: l?.material })
 }
 
 /** Den Aufruf der Kanäle mit dem Namensschutz umhüllen */

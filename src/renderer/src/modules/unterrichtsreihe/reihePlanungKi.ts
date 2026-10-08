@@ -25,13 +25,19 @@ import {
   type Reihe,
   type Schritt,
   type SchrittArt,
-  type SchrittInhalt
+  type SchrittInhalt,
+  type StundenArt
 } from '@shared/reihe'
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { describeBlock } from '../arbeitsblatt/generation/describe'
 import { blattAlsSchritt, blattAlsSchrittGemessen } from './schrittAusBlatt'
 import { grundlageEingabe, grundlageZeilen, kcAuszugFuer } from './grundlage'
 import type { KcAuszug } from './Lernziele'
+import { istAbbruch } from '@shared/abbruch'
+import { abdeckungText, pruefeAbdeckung, verteileAufStunden } from './planAbdeckung'
+import { landName, planungsDidaktik, reihenmusterZeilen, schulformName } from './planungDidaktik'
+import { reihenmusterFuer } from '@shared/reihenmuster'
+import { behebeReihenmuster, gegencheckText, musterNachfrage, pruefeReihenmuster, type MusterKontext } from './reihenmusterPruefung'
 
 type Ki = <T>(req: StructuredRequest) => Promise<T>
 
@@ -92,7 +98,7 @@ export async function materialKandidaten(r: Pick<Reihe, 'fachId' | 'grade'>, max
 const ARTEN_TEXT: Record<string, string> = {
   arbeitsblatt: 'Arbeitsblatt (Erarbeitung/Übung mit Aufgaben, KI-Feedback je Aufgabe)',
   aufgabe: 'Zwischenaufgabe (kurzer Auftrag mit Antwortfeld/Foto, auch zu einem Text/Video mit Kontrollfragen)',
-  lernkarten: 'Lernkarten (Begriffe wiederholen)',
+  lernkarten: 'Lernkarten (Begriffe SICHERN – nur nachdem die Begriffe erarbeitet wurden, nie als Einstieg)',
   diagnose: 'Eingangsdiagnose (kurzer Vortest am Anfang eines Teils)',
   reflexion: 'Selbsteinschätzung (Ich-kann-Ampel + Lerntagebuchfrage, am Ende eines Teils)',
   hefter: 'Wissensspeicher (Merkkasten/Sicherung)',
@@ -101,9 +107,12 @@ const ARTEN_TEXT: Record<string, string> = {
   praesenz: 'Im Unterricht (Experiment, Gruppenarbeit, Vortrag – Lehrkraft hakt ab)'
 }
 
-const planSchema = (arten: SchrittArt[]): Record<string, unknown> => ({
+/** Schema des Plans – seit 08.10.2026 mit Leitfrage und Reihentyp (Kennungen des Fachmusters, sonst freier Text) */
+const planSchema = (arten: SchrittArt[], typen: string[] = []): Record<string, unknown> => ({
   type: 'object',
   properties: {
+    leitfrage: { type: 'string', description: 'Leitfrage der Reihe als Frage, für Lernende verständlich' },
+    reihentyp: typen.length ? { type: 'string', enum: typen } : { type: 'string' },
     teile: {
       type: 'array',
       items: {
@@ -118,7 +127,10 @@ const planSchema = (arten: SchrittArt[]): Record<string, unknown> => ({
                 titel: { type: 'string' },
                 art: { type: 'string', enum: arten },
                 rolle: { type: 'string', enum: ['pflicht', 'optional', 'foerder', 'forder'] },
-                stunde: { type: 'integer' },
+                stunde: {
+                  type: 'integer',
+                  description: 'Nummer der Stunde ab 1. Stunde = Termin: eine Doppelstunde zählt als EINE Stunde mit 90 min.'
+                },
                 minuten: { type: 'integer' },
                 beschreibung: { type: 'string' },
                 lernziele: { type: 'array', items: { type: 'integer' } },
@@ -136,11 +148,18 @@ const planSchema = (arten: SchrittArt[]): Record<string, unknown> => ({
     },
     hinweis: { type: 'string' }
   },
-  required: ['teile', 'hinweis'],
+  required: ['leitfrage', 'reihentyp', 'teile', 'hinweis'],
   additionalProperties: false
 })
 
-interface PlanRoh {
+/** Reihentypen des Fachmusters als Kennungen (leer: Fach ohne Muster) */
+const typenVon = (r: Pick<Reihe, 'fachId'>): string[] => reihenmusterFuer(r.fachId)?.reihentypen.map((t) => t.id) ?? []
+
+export interface PlanRoh {
+  /** Leitfrage der Reihe (08.10.2026) */
+  leitfrage?: string
+  /** Kennung des gewählten Reihentyps aus dem Fachmuster (08.10.2026) */
+  reihentyp?: string
   teile: {
     name: string
     schritte: {
@@ -164,27 +183,42 @@ export interface ReihenPlan {
   hinweis: string
   /** Wie viele vorhandene Materialien eingeplant wurden */
   materialEingesetzt: number
+  /**
+   * Stundenraster, für das geplant wurde (08.10.2026) – `stunde` der Schritte zählt darin. Beim Übernehmen legt
+   * `planAufRaster` (planAbdeckung.ts) den Plan auf das inzwischen vielleicht geänderte Raster der Reihe.
+   */
+  stunden?: StundenArt[]
+  /** Wie die Stunden verteilt wurden: von der KI, nach einer Nachfrage an die KI oder fest von der App */
+  verteilung?: 'ki' | 'nachgefragt' | 'fest'
+  /** Leitfrage der Reihe (08.10.2026) – vorgeschlagen von der KI bzw. die der Lehrkraft */
+  leitfrage?: string
+  /** Gewählter Reihentyp (Kennung aus shared/reihenmuster.ts) */
+  reihentyp?: string
+  /** Gegencheck Reihenmuster (reihenmusterPruefung.ts): Nachfrage an die KI, fest behoben, offen */
+  gegencheck?: { nachgefragt: boolean; behoben: string[]; offen: string[] }
 }
 
 /** Stundenraster als Text: „1. Einzelstunde (45 min), 2. Doppelstunde (90 min) …" */
 export const stundenText = (stunden: Reihe['stunden'] = []): string =>
   stunden.map((a, i) => `${i + 1}. ${a === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'} (${STUNDEN_MINUTEN[a]} min)`).join(', ')
 
-/** Die KI plant Teile und Schritte der Reihe – vorhandenes Material eingesetzt, Rest als Platzhalter */
-export async function planeReihe(
+/**
+ * Anfrage der Planung (auch für Tests und die Vorschau). Seit 08.10.2026 mit Land und Schulform ausgeschrieben, dem
+ * Lerngruppen-Profil, den Operatoren des Landes, den Regeln der Altersstufe und dem Niveau der Reihe (planungsDidaktik.ts)
+ * sowie der Zählung „Stunde = Termin".
+ */
+export function planAnfrage(
   r: Reihe,
   kc: { auszug: string[]; quelle: string },
-  materialien: MaterialKandidat[],
-  ki: Ki,
+  materialien: Pick<MaterialKandidat, 'id' | 'titel' | 'thema' | 'jahrgang' | 'details'>[],
   wunsch = '',
-  /** Schulbuchseiten als Grundlage (Phase 6b): Text aus `schulbuchText` – verweisen/übernehmen */
   schulbuch = ''
-): Promise<ReihenPlan> {
+): { system: string; user: string } {
   const stunden = r.stunden ?? []
   const arten = kiArtenFuer(r)
   const digital = artVon(r) === 'digital'
-  const d = await ki<PlanRoh>({
-    system: `Du planst als erfahrene Lehrkraft eine realistische Unterrichtsreihe (${r.fachLabel}, Klasse ${r.grade}, Schulform ${r.schoolTypeId}, Bundesland ${r.stateId}), die die Lernenden Schritt für Schritt in einem digitalen Lernpfad bearbeiten.`,
+  return {
+    system: `Du planst als erfahrene Lehrkraft eine realistische Unterrichtsreihe (${r.fachLabel}, Klasse ${r.grade}, Schulform ${schulformName(r)}, Bundesland ${landName(r) || r.stateId}), die die Lernenden Schritt für Schritt in einem digitalen Lernpfad bearbeiten.`,
     user: [
       `OBERTHEMA: ${r.oberthema || r.titel}`,
       r.titel ? `TITEL DER REIHE: ${r.titel}` : '',
@@ -194,7 +228,9 @@ export async function planeReihe(
       r.lernziele.length
         ? `LERNZIELE DER REIHE (Nummern für "lernziele"):\n${r.lernziele.map((l, i) => `${i}: ${l.text}`).join('\n')}`
         : 'Noch keine Lernziele – leite sie aus dem Kerncurriculum ab; "lernziele" bleibt dann leer.',
-      `STUNDEN (nummeriert ab 1): ${stundenText(stunden)}`,
+      `STUNDEN (nummeriert ab 1; Stunde = Termin – eine Doppelstunde zählt als EINE Stunde mit 90 min): ${stundenText(stunden)}`,
+      ...planungsDidaktik(r),
+      ...reihenmusterZeilen(r),
       materialien.length
         ? `VORHANDENE MATERIALIEN DER LEHRKRAFT (Kennung in "material" eintragen, wenn eingesetzt):\n${materialien
             .map((m) => `[${m.id}] „${m.titel}" – Thema: ${m.thema}, Jahrgang ${m.jahrgang}\n${m.details}`)
@@ -208,7 +244,12 @@ export async function planeReihe(
       ...arten.map((a) => `- ${a}: ${ARTEN_TEXT[a]}`),
       'REGELN:',
       '- Gliedere in 2 bis 5 sinnvolle Teile (z. B. Einstieg/Grundlagen, Erarbeitung, Vertiefung/Anwendung, Sicherung/Abschluss) mit kurzen Namen.',
-      '- Verteile die Schritte auf GENAU die angegebenen Stunden ("stunde" = Nummer ab 1). "minuten" ist die realistische Bearbeitungszeit; die Summe je Stunde passt in deren Länge (Einstieg, Besprechung und Sicherung im Plenum mitbedenken – etwa ein Viertel der Zeit).',
+      `- STUNDEN: "stunde" ist die Nummer des Termins ab 1 (1 bis ${Math.max(1, stunden.length)}); eine Doppelstunde ist EINE Stunde mit 90 min, nicht zwei. JEDE Stunde bekommt mindestens einen Schritt. "minuten" ist die realistische Bearbeitungszeit; die Summe der Pflichtschritte je Stunde passt in deren Länge (Einstieg, Besprechung und Sicherung im Plenum mitbedenken – etwa ein Viertel der Zeit).`,
+      r.leitfrage?.trim()
+        ? `- LEITFRAGE: Die Lehrkraft hat sie festgelegt: „${r.leitfrage.trim()}" – übernimm sie wörtlich in "leitfrage".`
+        : '- LEITFRAGE: Formuliere in "leitfrage" EINE Leitfrage der Reihe (echte Frage, für Lernende verständlich, problemorientiert), die die ganze Reihe trägt.',
+      '- RÜCKBEZUG: Der LETZTE Schritt der Reihe nimmt die Leitfrage ausdrücklich auf und lässt sie begründet beantworten – nenne in seiner "beschreibung" das Wort „Leitfrage".',
+      '- EINSTIEG: Der erste Schritt der Reihe ist ein problemorientierter Einstieg – ein Impuls (Bild, Quelle, Fallbeispiel oder Leitfrage), der neugierig macht und die Leitfrage der Reihe aufwirft, umgesetzt als kurze Zwischenaufgabe ("aufgabe") oder kurzes Arbeitsblatt. Eine Eingangsdiagnose darf direkt danach stehen. Lernkarten nie als Einstieg.',
       '- Fortschreitend vom Einfachen zum Komplexen; jeder Schritt baut auf den vorigen auf; Anforderungsbereiche I bis III kommen vor.',
       digital
         ? '- DIGITALE REIHE: Die Lernenden bearbeiten ALLES selbstständig am Gerät (PC, Tablet, Handy) – keine Präsenzphasen. Jeder Schritt erklärt sich selbst (Einführung, Beispiel, Hilfen); Abwechslung über die Schrittarten.'
@@ -217,15 +258,111 @@ export async function planeReihe(
       '- Je Teil höchstens ein Förderschritt ("foerder") und höchstens ein freiwilliger Forderschritt ("forder"); Vertiefungen und Differenzierung, die nicht alle brauchen, als "optional" (blockiert den Weg nie); alles andere "pflicht".',
       '- VORHANDENES MATERIAL: nur einsetzen, wenn es didaktisch und pädagogisch passt (Jahrgang, Niveau, Lernziele, Anforderung) – an der Stelle der Reihe, an die es inhaltlich gehört. Dann art "arbeitsblatt", "material" = Kennung, "begruendung" = warum es passt und warum an dieser Stelle (ein Satz). Ungeeignetes weglassen. Jedes Material höchstens einmal.',
       '- Alle anderen Schritte sind PLATZHALTER: "material" leer; "beschreibung" sagt so genau, dass daraus später allein Material entstehen kann: Gegenstand, Ziel, Aufgabenformate/Operatoren, Anforderung, ggf. Materialart (Quelle, Grafik, Text …). "begruendung": didaktische Funktion an dieser Stelle (ein Satz).',
+      '- Lernkarten und Wissensspeicher erst NACH einer Erarbeitung, nie als erster Schritt.',
       '- Titel kurz und für Lernende verständlich (keine Nummern).',
       '- "hinweis": zwei bis drei Sätze für die Lehrkraft zur Planung (z. B. was im Plenum geschehen sollte, welche Materialien fehlen).'
     ]
       .filter(Boolean)
-      .join('\n'),
-    schemaName: 'reihe_planung',
-    schema: planSchema(arten)
-  })
+      .join('\n')
+  }
+}
+
+/** Schritte des Rohplans mit Stunde ab 0 – für die Prüfung der Abdeckung */
+export const rohSchritte = (d: PlanRoh): Pick<Schritt, 'stunde' | 'minuten' | 'rolle'>[] =>
+  (d?.teile ?? []).flatMap((t) =>
+    (t.schritte ?? []).map((x) => ({
+      stunde: Math.round(Number(x.stunde) || 0) - 1,
+      minuten: Number(x.minuten) > 0 ? Math.round(Number(x.minuten)) : undefined,
+      rolle: x.rolle === 'foerder' || x.rolle === 'forder' || x.rolle === 'optional' ? x.rolle : 'pflicht'
+    }))
+  )
+
+/** Nachfrage, wenn Stunden leer oder überfüllt sind: derselbe Plan, neu auf die Stunden verteilt */
+export function verteilungsNachfrage(d: PlanRoh, befund: string, stunden: Reihe['stunden'] = []): string {
+  return [
+    'Dein Plan für die Unterrichtsreihe verteilt die Schritte noch nicht richtig auf die Stunden.',
+    `BEFUND: ${befund}`,
+    `STUNDEN (nummeriert ab 1; Stunde = Termin – eine Doppelstunde zählt als EINE Stunde mit 90 min): ${stundenText(stunden)}`,
+    'AUFTRAG: Gib den VOLLSTÄNDIGEN Plan im selben Format zurück. Behalte Teile, Schritte und ihre Inhalte bei; verteile "stunde" und "minuten" so, dass JEDE Stunde mindestens einen Schritt hat und die Summe der Pflichtschritte je Stunde etwa drei Viertel ihrer Länge nicht übersteigt. Wo nötig, teile einen langen Schritt in zwei oder ergänze einen kurzen Übungs- oder Sicherungsschritt.',
+    `BISHERIGER PLAN:\n${JSON.stringify(d)}`
+  ].join('\n')
+}
+
+/** Die KI plant Teile und Schritte der Reihe – vorhandenes Material eingesetzt, Rest als Platzhalter */
+export async function planeReihe(
+  r: Reihe,
+  kc: { auszug: string[]; quelle: string },
+  materialien: MaterialKandidat[],
+  ki: Ki,
+  wunsch = '',
+  /** Schulbuchseiten als Grundlage (Phase 6b): Text aus `schulbuchText` – verweisen/übernehmen */
+  schulbuch = '',
+  /** Zwischenstand für die Auftragsleiste */
+  melde?: (meldung: string) => void
+): Promise<ReihenPlan> {
+  const stunden = r.stunden ?? []
+  const arten = kiArtenFuer(r)
+  const typen = typenVon(r)
+  const schema = planSchema(arten, typen)
+  const anfrage = planAnfrage(r, kc, materialien, wunsch, schulbuch)
+  let d = festeVorgaben(await ki<PlanRoh>({ ...anfrage, schemaName: 'reihe_planung', schema }), r, typen)
+  /*
+   * Gegencheck Reihenmuster (08.10.2026, reihenmusterPruefung.ts): Verstöße gegen die harten Regeln → EINE Nachfrage an die
+   * KI im selben Auftrag; was danach noch verstößt, behebt die App fest, wo das geht. Steht im Hinweis der Planung.
+   */
+  const kontext: MusterKontext = { fachId: r.fachId, art: r.art, leitfrage: r.leitfrage }
+  let nachgefragt = false
+  const verstoesse = pruefeReihenmuster(d, kontext)
+  if (verstoesse.length) {
+    melde?.('Die KI korrigiert den Plan nach dem Reihenmuster des Fachs …')
+    try {
+      const neu = await ki<PlanRoh>({ system: anfrage.system, user: musterNachfrage(d, verstoesse, r.fachId), schemaName: 'reihe_planung_reihenmuster', schema })
+      if (neu?.teile?.some((t) => t.schritte?.length)) {
+        d = festeVorgaben({ ...neu, hinweis: neu.hinweis?.trim() || d.hinweis, leitfrage: neu.leitfrage?.trim() || d.leitfrage }, r, typen)
+        nachgefragt = true
+      }
+    } catch (e) {
+      if (istAbbruch(e)) throw e
+      // Nachfrage gescheitert – dann fest beheben
+    }
+  }
+  let fest = behebeReihenmuster(d, kontext)
+  const behoben = [...fest.behoben]
+  d = fest.plan
+  /*
+   * Jede Stunde belegt, keine überfüllt (08.10.2026): sonst EINE Nachfrage an die KI im selben Auftrag; hilft auch die
+   * nicht, verteilt die App fest (`verteileAufStunden`).
+   */
+  let verteilung: ReihenPlan['verteilung'] = 'ki'
+  let abdeckung = pruefeAbdeckung(rohSchritte(d), stunden)
+  if (!abdeckung.ok && stunden.length) {
+    melde?.('Die KI verteilt die Schritte neu auf die Stunden …')
+    try {
+      const neu = await ki<PlanRoh>({
+        system: anfrage.system,
+        user: verteilungsNachfrage(d, abdeckungText(abdeckung, stunden), stunden),
+        schemaName: 'reihe_planung_verteilung',
+        schema
+      })
+      if (neu?.teile?.some((t) => t.schritte?.length)) {
+        d = festeVorgaben({ ...neu, hinweis: neu.hinweis?.trim() || d.hinweis, leitfrage: neu.leitfrage?.trim() || d.leitfrage }, r, typen)
+        // Die neue Verteilung darf die Regeln des Reihenmusters nicht wieder brechen
+        fest = behebeReihenmuster(d, kontext)
+        behoben.push(...fest.behoben.filter((b) => !behoben.includes(b)))
+        d = fest.plan
+        verteilung = 'nachgefragt'
+        abdeckung = pruefeAbdeckung(rohSchritte(d), stunden)
+      }
+    } catch (e) {
+      if (istAbbruch(e)) throw e
+      // Nachfrage gescheitert – dann fest verteilen
+    }
+  }
   const plan = planUebernehmen(d, r, materialien)
+  if (!abdeckung.ok && stunden.length) {
+    plan.schritte = verteileAufStunden(plan.schritte, stunden)
+    verteilung = 'fest'
+  }
   // Eingesetzte Materialien mit gemessenen Seiten (wie im Editor) – nicht der ungeprüfte Druckweg
   for (const s of plan.schritte) {
     const i = s.inhalt
@@ -235,7 +372,20 @@ export async function planeReihe(
     const b = await blattAlsSchrittGemessen(m.id, m.ws, m.name).catch(() => null)
     if (b) s.inhalt = { ...i, ...b.inhalt }
   }
-  return plan
+  const gegencheck = { nachgefragt, behoben, offen: fest.offen }
+  const g = gegencheckText(gegencheck)
+  return { ...plan, hinweis: [plan.hinweis, g].filter(Boolean).join(' '), stunden: [...stunden], verteilung, gegencheck }
+}
+
+/**
+ * Vorgaben der Lehrkraft gelten vor der Antwort der KI (08.10.2026): ihre Leitfrage, ihr Reihentyp; ein Reihentyp, den
+ * das Fachmuster nicht kennt, fällt weg (Fächer ohne Muster: keiner).
+ */
+export function festeVorgaben(d: PlanRoh, r: Pick<Reihe, 'leitfrage' | 'reihentyp'>, typen: string[]): PlanRoh {
+  const leitfrage = r.leitfrage?.trim() || String(d?.leitfrage ?? '').trim() || undefined
+  const gewuenscht = r.reihentyp && typen.includes(r.reihentyp) ? r.reihentyp : undefined
+  const reihentyp = gewuenscht ?? (d?.reihentyp && typen.includes(d.reihentyp) ? d.reihentyp : undefined)
+  return { ...d, leitfrage, reihentyp }
 }
 
 /** KI-Plan in Schritte der Reihe übersetzen (geprüft: Stunden, Lernziele, Material, Arten) */
@@ -292,7 +442,15 @@ export function planUebernehmen(
       })
     }
   }
-  return { teile, schritte, hinweis: String(d?.hinweis ?? '').trim(), materialEingesetzt: benutzt.size }
+  const leitfrage = String(d?.leitfrage ?? '').trim()
+  return {
+    teile,
+    schritte,
+    hinweis: String(d?.hinweis ?? '').trim(),
+    materialEingesetzt: benutzt.size,
+    ...(leitfrage ? { leitfrage } : {}),
+    ...(d?.reihentyp ? { reihentyp: d.reihentyp } : {})
+  }
 }
 
 // ---------------------------------------------------------------- Platzhalter füllen (außer Arbeitsblatt)
@@ -402,9 +560,11 @@ export function schrittAnfrage(r: Reihe, schritt: Schritt, kc: KcAuszug | null =
   if (!vorgabe) return null
   const g = grundlageEingabe(r, schritt, kc)
   return {
-    system: `Du erstellst einen Schritt eines digitalen Lernpfads (${r.fachLabel}, Klasse ${r.grade}, Schulform ${r.schoolTypeId}, Bundesland ${r.stateId}). Die Lernenden bearbeiten ihn selbstständig; sprich sie mit „du" an. Fachlich korrekt, altersgerecht, ohne Personennamen realer Personen aus dem Umfeld der Schule.`,
+    system: `Du erstellst einen Schritt eines digitalen Lernpfads (${r.fachLabel}, Klasse ${r.grade}, Schulform ${schulformName(r)}, Bundesland ${landName(r) || r.stateId}). Die Lernenden bearbeiten ihn selbstständig; sprich sie mit „du" an. Fachlich korrekt, altersgerecht, ohne Personennamen realer Personen aus dem Umfeld der Schule.`,
     user: [
       `REIHE: ${r.titel} (Oberthema: ${r.oberthema})`,
+      // Leitfrage der Reihe (08.10.2026): Schritte arbeiten auf sie hin
+      r.leitfrage?.trim() ? `LEITFRAGE DER REIHE: ${r.leitfrage.trim()}` : '',
       `SCHRITT: ${schritt.titel} – ${ARTEN_TEXT[art] ?? art}`,
       schritt.platzhalter?.beschreibung ? `WAS ENTSTEHEN SOLL: ${schritt.platzhalter.beschreibung}` : '',
       g.schrittZiele.length ? `LERNZIELE: ${g.schrittZiele.join('; ')}` : '',

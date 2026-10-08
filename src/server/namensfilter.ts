@@ -22,11 +22,18 @@
  * (shared/pseudonymisierung.ts). Namen in BILDERN (Fotos von Arbeiten) kann der Filter nicht sehen.
  */
 import type { StructuredRequest, TtsRequest } from '@shared/types'
+import { personOderWort, spracheAus, type WortKontext } from './personOderWort'
 
 export interface Person {
   vorname: string
   nachname: string
   benutzer?: string
+  /**
+   * Aus der Klassenliste der Anfrage (08.10.2026): Vor- und Nachname werden auch EINZELN erkannt – auch kurze und solche,
+   * die zugleich Wörter sind (Rose, Otto, Mark, Mia). Ob die Person oder das Wort gemeint ist, entscheidet
+   * `personOderWort` je Vorkommen (lokal, ohne KI); im Zweifel die Person.
+   */
+  streng?: boolean
 }
 
 /** Nachnamen, die zugleich gewöhnliche Wörter sind – allein stehend NICHT ersetzt */
@@ -54,12 +61,36 @@ export interface Muster {
   /** Platzhalter-Gruppe: gleiche Person → gleicher Platzhalter */
   person: number
   re: RegExp
+  /** Nur ersetzen, wenn an dieser Stelle die Person gemeint ist (Namen der Klassenliste, die auch Wörter sind) */
+  pruefe?: (text: string, index: number) => boolean
 }
 
-/** Erkennungsmuster für eine Liste von Personen (längste zuerst) */
-export function musterFuer(personen: Person[]): Muster[] {
-  const out: { person: number; quelle: string; laenge: number }[] = []
+/** Sprachen, in denen Namen dekliniert werden (Роза → Розой): Muster über den Stamm */
+const FLEKTIEREND = new Set(['ru', 'pl', 'cs', 'tr'])
+
+/**
+ * Erkennungsmuster für eine Liste von Personen (längste zuerst). `kontext` (Sprache, Material der Anfrage) gilt für
+ * die Entscheidung Person/Wort bei Personen der Klassenliste (`streng`).
+ */
+export function musterFuer(personen: Person[], kontext: WortKontext = {}): Muster[] {
+  const out: { person: number; quelle: string; laenge: number; pruefe?: (text: string, index: number) => boolean }[] = []
+  const liste = personen.filter((p) => p.streng).map((p) => `${p.vorname} ${p.nachname}`.trim())
+  const flektierend = FLEKTIEREND.has(spracheAus(kontext.sprache) ?? '')
   personen.forEach((p, i) => {
+    if (p.streng) {
+      for (const teil of new Set([p.vorname.trim(), p.nachname.trim()])) {
+        if (teil.length < 2 || /\s/.test(teil)) continue
+        const kyrillisch = /[Ѐ-ӿ]/.test(teil)
+        const stamm = (flektierend || kyrillisch) && /[аяоеыиaeoy]$/i.test(teil) && teil.length > 3 ? teil.slice(0, -1) : teil
+        out.push({
+          person: i,
+          // mit Endungen (Roses, Martins, Мартином) – ob Name oder Zusammensetzung (Rosenstrauch), entscheidet `pruefe`
+          quelle: `${esc(stamm)}\\p{L}*`,
+          laenge: teil.length,
+          pruefe: (text, index) => personOderWort(text, index, teil, { ...kontext, namen: liste }).person
+        })
+      }
+    }
     const vn = p.vorname.trim()
     const nn = p.nachname.trim()
     const varianten: string[] = []
@@ -68,14 +99,15 @@ export function musterFuer(personen: Person[]): Muster[] {
     }
     if (nn && nn.length >= 3) {
       varianten.push(`(?:Herrn?|Frau|Hr\\.|Fr\\.|Mr\\.?|Mrs\\.?|Ms\\.?|Monsieur|Madame|Señora?)\\s+${esc(nn)}`)
-      if (!GEWOEHNLICHE_WOERTER.has(nn.toLowerCase()) && nn.length >= 4) varianten.push(esc(nn))
+      // Klassenliste: der Nachname allein läuft oben über die Prüfung Person/Wort
+      if (!p.streng && !GEWOEHNLICHE_WOERTER.has(nn.toLowerCase()) && nn.length >= 4) varianten.push(esc(nn))
     }
     if (p.benutzer && p.benutzer.length >= 4) varianten.push(esc(p.benutzer))
     for (const v of varianten) out.push({ person: i, quelle: v, laenge: v.length })
   })
   return out
     .sort((a, b) => b.laenge - a.laenge)
-    .map((m) => ({ person: m.person, re: new RegExp(`${VOR}${m.quelle}${NACH}`, 'giu') }))
+    .map((m) => ({ person: m.person, re: new RegExp(`${VOR}${m.quelle}${NACH}`, 'giu'), ...(m.pruefe ? { pruefe: m.pruefe } : {}) }))
 }
 
 /** Aus einem Anzeigenamen Vor- und Nachname („Max Mustermann", „Mustermann, Max") */
@@ -101,7 +133,9 @@ export interface Ersetzung {
 export function ersetzeIn(text: string, muster: Muster[], z: Ersetzung, nummer: Map<number, string>): string {
   let out = text
   for (const m of muster) {
-    out = out.replace(m.re, (treffer) => {
+    out = out.replace(m.re, (treffer: string, ...rest: unknown[]) => {
+      // Das Wort statt der Person (Rose im Beet, St. Martin): unverändert lassen
+      if (m.pruefe && !m.pruefe(rest[rest.length - 1] as string, rest[rest.length - 2] as number)) return treffer
       let platz = nummer.get(m.person)
       if (!platz) {
         platz = `[Person-${nummer.size + 1}]`
@@ -115,18 +149,15 @@ export function ersetzeIn(text: string, muster: Muster[], z: Ersetzung, nummer: 
   return out
 }
 
-export const enthaeltNamen = (text: string, muster: Muster[]): boolean =>
-  muster.some((m) => {
-    m.re.lastIndex = 0
-    const ja = m.re.test(text)
-    m.re.lastIndex = 0
-    return ja
-  })
+/** Vorkommen eines Musters, die eine Person meinen */
+const treffer = (text: string, m: Muster): RegExpMatchArray[] => [...text.matchAll(m.re)].filter((t) => !m.pruefe || m.pruefe(text, t.index ?? 0))
+
+export const enthaeltNamen = (text: string, muster: Muster[]): boolean => muster.some((m) => treffer(text, m).length > 0)
 
 /** Welche Namen (für die Meldung an die Lehrkraft – sie sieht ihre eigenen Daten) */
 export function gefundeneNamen(text: string, muster: Muster[]): string[] {
   const out = new Set<string>()
-  for (const m of muster) for (const t of text.matchAll(m.re)) out.add(t[0])
+  for (const m of muster) for (const t of treffer(text, m)) out.add(t[0])
   return [...out]
 }
 

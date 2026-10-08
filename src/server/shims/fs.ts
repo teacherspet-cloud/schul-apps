@@ -2,7 +2,7 @@
  * Dateien der Nutzer verschlüsselt ablegen (02.10.2026, siehe feldschutz.ts).
  *
  * Im Server-Bündel bekommen die Bausteine aus src/main und src/server dieses Modul statt `fs`
- * (vite.server.config.ts). Alles, was unter <DATEN>/nutzer und <DATEN>/fach geschrieben wird –
+ * (vite.server.config.ts). Alles, was unter <DATEN>/nutzer, <DATEN>/fach und <DATEN>/system geschrieben wird –
  * Einstellungen, Material, Rückmeldungen mit Schülertexten und Namen –, landet mit AES-256-GCM
  * verschlüsselt auf der Platte; beim Lesen wird es wieder entschlüsselt. Ausgenommen sind
  * Audio und Video (werden gestreamt, enthalten keine Namen). Unverschlüsselte Altdateien werden
@@ -20,7 +20,8 @@ export * from 'node:fs'
 
 const KOPF = Buffer.from('SAENC1\n')
 const OHNE = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.mp4', '.mov'])
-const BEREICHE = () => [join(DATEN, 'nutzer') + sep, join(DATEN, 'fach') + sep]
+// <DATEN>/system (08.10.2026): Ablage ohne angemeldeten Nutzer (Einstellungen, protokoll.log, verbrauch.json)
+const BEREICHE = () => [join(DATEN, 'nutzer') + sep, join(DATEN, 'fach') + sep, join(DATEN, 'system') + sep]
 
 const pfadVon = (p: echt.PathOrFileDescriptor): string | null =>
   typeof p === 'string' ? resolve(p) : p instanceof URL ? resolve(p.pathname) : Buffer.isBuffer(p) ? resolve(p.toString()) : null
@@ -32,6 +33,8 @@ export function geschuetzteDatei(p: echt.PathOrFileDescriptor): boolean {
   // Anmeldedaten der KI-Programme (<DATEN>/nutzer/<id>/ki/…) lesen Codex und Claude selbst
   const nutzer = join(DATEN, 'nutzer') + sep
   if (pfad.startsWith(nutzer) && pfad.slice(nutzer.length).split(sep)[1] === 'ki') return false
+  // … ebenso ohne angemeldeten Nutzer (<DATEN>/system/ki, serverKiOrdner außerhalb einer Anfrage)
+  if (pfad.startsWith(join(DATEN, 'system', 'ki') + sep)) return false
   return BEREICHE().some((b) => pfad.startsWith(b))
 }
 

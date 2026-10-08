@@ -3,9 +3,10 @@
  * Oberthema · 6 Lernziele · 8 Stunden ✎" statt 600–900 px Formular vor dem ersten Schritt. Klick klappt auf; der
  * Zustand ist je Reihe gemerkt (localStorage – fehlt er, ist eine Reihe mit Schritten eingeklappt, eine leere offen).
  * Der Hinweis der KI-Planung (`Reihe.planHinweis`) steht hinter dem Infosymbol.
+ * Leitfrage (08.10.2026, Reihenmuster): eine Zeile im aufgeklappten Kopf (`LeitfrageFeld`), eingeklappt unter der Kopfzeile.
  */
-import { ActionIcon, Group, Paper, Popover, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconInfoCircle, IconPencil } from '@tabler/icons-react'
+import { ActionIcon, Group, Paper, Popover, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core'
+import { IconHelpHexagon, IconInfoCircle, IconPencil } from '@tabler/icons-react'
 import type { Reihe } from '@shared/reihe'
 
 const KOPF_SCHLUESSEL = 'schulapps.reihe.kopf.'
@@ -74,24 +75,51 @@ export function KopfZeile({
 }): React.JSX.Element {
   return (
     <Paper withBorder radius="md" px="sm" py={6} data-reihe-kopf-zeile>
-      <Group justify="space-between" wrap="nowrap" gap="xs">
-        {plakette}
-        <Tooltip label="Aufklappen: Titel, Oberthema, Lernziele, Stunden bearbeiten" openDelay={400}>
-          <UnstyledButton onClick={aufklappen} style={{ minWidth: 0, flex: 1 }} aria-label="Kopf der Reihe aufklappen" data-reihe-kopf-auf>
-            <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
-              <Text fw={700} truncate style={{ flexShrink: 0, maxWidth: '40%' }}>
-                {reihe.titel || '(ohne Titel)'}
+      <Stack gap={2}>
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          {plakette}
+          <Tooltip label="Aufklappen: Titel, Oberthema, Lernziele, Stunden bearbeiten" openDelay={400}>
+            <UnstyledButton onClick={aufklappen} style={{ minWidth: 0, flex: 1 }} aria-label="Kopf der Reihe aufklappen" data-reihe-kopf-auf>
+              <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
+                <Text fw={700} truncate style={{ flexShrink: 0, maxWidth: '40%' }}>
+                  {reihe.titel || '(ohne Titel)'}
+                </Text>
+                <Text size="sm" c="dimmed" truncate>
+                  {kopfText(reihe).join(' · ')}
+                </Text>
+                <IconPencil size={15} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+              </Group>
+            </UnstyledButton>
+          </Tooltip>
+          {reihe.planHinweis?.trim() && <PlanHinweis text={reihe.planHinweis} />}
+        </Group>
+        {reihe.leitfrage?.trim() && (
+          <UnstyledButton onClick={aufklappen} style={{ minWidth: 0 }} aria-label="Leitfrage bearbeiten" data-reihe-kopf-leitfrage>
+            <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+              <IconHelpHexagon size={15} color="var(--mantine-color-grape-6)" style={{ flexShrink: 0 }} />
+              <Text size="sm" fs="italic" truncate>
+                Leitfrage: {reihe.leitfrage.trim()}
               </Text>
-              <Text size="sm" c="dimmed" truncate>
-                {kopfText(reihe).join(' · ')}
-              </Text>
-              <IconPencil size={15} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
             </Group>
           </UnstyledButton>
-        </Tooltip>
-        {reihe.planHinweis?.trim() && <PlanHinweis text={reihe.planHinweis} />}
-      </Group>
+        )}
+      </Stack>
     </Paper>
+  )
+}
+
+/** Leitfrage der Reihe – eine Zeile; die KI-Planung schlägt sie vor, Lernende sehen sie oben in der Reihe */
+export function LeitfrageFeld({ wert, setze }: { wert: string; setze: (leitfrage: string) => void }): React.JSX.Element {
+  return (
+    <TextInput
+      label="Leitfrage der Reihe"
+      description="Sehen die Lernenden oben in der Reihe; der letzte Schritt beantwortet sie. Leer lassen: Die KI-Planung schlägt eine vor."
+      placeholder="z. B. Warum wurde aus einem Attentat ein Weltkrieg?"
+      leftSection={<IconHelpHexagon size={16} />}
+      value={wert}
+      onChange={(e) => setze(e.currentTarget.value)}
+      data-reihe-leitfrage
+    />
   )
 }
 

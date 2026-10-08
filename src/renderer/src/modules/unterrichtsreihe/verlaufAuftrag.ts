@@ -115,7 +115,8 @@ function legeVerlaufAb(reiheId: string, stunde: number, p: StundenPlanung): Prom
       return
     }
     const { reihe } = await holen<{ reihe: Reihe }>(`/server/reihen/${reiheId}`)
-    await senden('/server/reihen/speichern', { reihe: { ...reihe, verlauf: { ...(reihe.verlauf ?? {}), [String(stunde)]: p } } })
+    // `auftrag`: frisch geladen, nur der Verlauf dieser Stunde geändert (reiheSpeichern.ts)
+    await senden('/server/reihen/speichern', { reihe: { ...reihe, verlauf: { ...(reihe.verlauf ?? {}), [String(stunde)]: p } }, auftrag: true })
   })
 }
 

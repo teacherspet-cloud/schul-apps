@@ -76,7 +76,7 @@ export function ProtokollView({ block, placed }: { block: ProtocolBlock; placed?
         }
         default:
           return a.zeilen ? (
-            <div className="ws-lines">
+            <div className={`ws-lines ${ctx.correctionMargin ? 'ws-lines-rand' : ''}`}>
               {Array.from({ length: a.zeilen }, (_, k) => (
                 <div key={k} className="ws-line" />
               ))}

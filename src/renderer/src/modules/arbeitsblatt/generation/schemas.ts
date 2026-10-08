@@ -58,6 +58,11 @@ export const OUTLINE_SCHEMA = obj({
   ueberthema: str(
     'Unterrichtseinheit (Überthema), unter der dieses Blatt im Lehrplan steht: GENAU der Wortlaut eines vorhandenen Themenbereichs des Fachs, wenn einer passt; sonst ein kurzer, lehrplannaher Name (2–5 Wörter)'
   ),
+  // Digitale Bearbeitung (08.10.2026): Aufgaben nacheinander freischalten? Entscheidet die KI je Blatt, die Lehrkraft kann es ändern
+  schrittweise: bool(
+    'true, wenn die Aufgaben aufeinander aufbauen und am selben Material nacheinander bearbeitet werden (z. B. nennen → erklären → beurteilen; die nächste setzt das Ergebnis der vorigen voraus) – dann schaltet die App sie digital nacheinander frei. false bei unabhängigen Aufgaben, Stationen, Wahl- oder Zusatzaufgaben.'
+  ),
+  schrittweiseGrund: str('Ein kurzer Satz für die Lehrkraft, warum schrittweise bzw. nicht (z. B. „Aufgaben 1–3 bauen an M1 aufeinander auf")'),
   items: arr(
     obj({
       type: enumOf(BLOCK_TYPES),

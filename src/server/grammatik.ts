@@ -9,7 +9,8 @@
  * Der Lernstand je Person liegt verschlüsselt (feldschutz.ts: gram_stand.daten, gram_zuweisungen.schueler). Lernende lösen
  * keine KI-Anfragen aus – der Aufgabenpool entsteht einmal beim Freigeben.
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { codePruefwert } from './feldschutz'
 import {
   GRAMMATIK_SPIELE,
   grammatikRekord,
@@ -41,6 +42,11 @@ import {
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen } from './rekordbuch'
+import { themenTeilung } from './grammatikTeilen'
+import { buchFuer } from './vokabelweg'
+import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
+import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
+import { jahrgangAus } from '../shared/lernstand'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 
 const SCHEMA = `
@@ -182,11 +188,14 @@ export const lehrwerkStandVon = (lerngruppeId: string): { buch: string; unit: st
 export function hoechsteUnit(quellen: string[]): { buch: string; unit: string } | null {
   let best: { buch: string; unit: string; rang: number } | null = null
   for (const roh of quellen) {
-    const q = json_(roh, {} as { lehrwerk?: string; unit?: string })
+    const q = json_(roh, {} as Partial<Quelle>)
     const buch = q.lehrwerk ? grammatikBand(q.lehrwerk) : undefined
-    if (!buch || !q.unit) continue
-    const rang = Object.keys(LEHRWERK_GRAMMATIK).indexOf(buch) * 100 + Object.keys(LEHRWERK_GRAMMATIK[buch]).indexOf(q.unit)
-    if (!best || rang > best.rang) best = { buch, unit: q.unit, rang }
+    if (!buch) continue
+    // Mehrere Units je Kurs (08.10.2026): jede zählt, die höchste gewinnt
+    for (const { unit } of quelleUnits(q)) {
+      const rang = Object.keys(LEHRWERK_GRAMMATIK).indexOf(buch) * 100 + Object.keys(LEHRWERK_GRAMMATIK[buch]).indexOf(unit)
+      if (!best || rang > best.rang) best = { buch, unit, rang }
+    }
   }
   return best ? { buch: best.buch, unit: best.unit } : null
 }
@@ -269,10 +278,8 @@ function neuerCode(n = 6): string {
     if (!db().prepare('SELECT 1 FROM gram_zuweisungen WHERE code = ?').get(c)) return c
   }
 }
-const hashVon = (s: string): string =>
-  createHash('sha256')
-    .update(s.toUpperCase().replace(/[^A-Z0-9]/g, ''))
-    .digest('hex')
+// Prüfwert des persönlichen Codes: HMAC mit dem Hauptschlüssel statt ungesalzenem SHA-256 (08.10.2026, feldschutz.ts)
+const hashVon = codePruefwert
 const nachCode = (code: string): Zeile | null =>
   code ? (db().prepare("SELECT * FROM gram_zuweisungen WHERE code = ? AND code != ''").get(code.toUpperCase()) as Zeile | undefined) ?? null : null
 const gaesteVon = (zid: string): NutzerInfo[] =>
@@ -366,7 +373,7 @@ export function grammatikFuer(ich: NutzerInfo): {
   uebersicht: ReturnType<typeof uebersicht> & { unbearbeitet: number }
 }[] {
   return (
-    (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
+    (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC, rowid").all() as unknown as Zeile[])
       .filter((z) => istOffen(z) && istFuer(z, ich))
       .map((z) => {
         const kk = karten(paketVon(z))
@@ -389,11 +396,42 @@ export function grammatikFuer(ich: NutzerInfo): {
 }
 
 /**
+ * Jahrgang und Stelle im Lehrwerk einer Grammatik für den Ordner der Lernenden (08.10.2026, abgestimmt; Reihenfolge der
+ * Quellen in shared/grammatikJahrgang.ts): Lehrwerk-Band der Freigabe, Lehrwerk des Kurses, Klasse beim Freigeben,
+ * Lerngruppe, sonst die heutige Klasse zurückgerechnet.
+ */
+export async function jahrgangDerGrammatik(z: Zeile, ich: NutzerInfo): Promise<{ jahrgang: number | null; stelle: number | null }> {
+  const info = infoVon(z)
+  const v = vokVon(z)
+  const q = json_(v?.quelle, {} as { lehrwerk?: string; unit?: string })
+  const buch = q.lehrwerk ? await buchFuer(q.lehrwerk, z.lehrkraft_id).catch(() => null) : null
+  const band = info.lehrwerk?.buch ? grammatikBand(info.lehrwerk.buch) ?? info.lehrwerk.buch : undefined
+  const gruppe = z.lerngruppe_id || v?.lerngruppe_id || ''
+  const jahrgang = jahrgangDerFreigabe({
+    sprache: z.sprache || v?.sprache || '',
+    grammatikBand: band,
+    buchJahrgang: (buch as { grade?: number } | null)?.grade ?? null,
+    buchBand: buch ? buch.band || buch.name : undefined,
+    freigabeKlasse: info.jahrgang ?? null,
+    gruppenKlasse: gruppe ? jahrgangAus(lerngruppe(gruppe)?.name) : null,
+    heutigeKlasse: klasseFuer({ lerngruppe_id: '' }, ich),
+    erstellt: Date.parse(z.erstellt) || undefined
+  })
+  const stelle = info.lehrwerk?.unit
+    ? unitStelle(info.lehrwerk.unit, band && LEHRWERK_GRAMMATIK[band] ? Object.keys(LEHRWERK_GRAMMATIK[band]) : undefined)
+    : unitStelle(q.unit, buch?.units.map((u) => u.name))
+  return { jahrgang, stelle }
+}
+
+/**
  * Sprachenlernen (08.10.2026): Grammatiktrainings ohne Kurs werden einmalig zu Kursen ohne Vokabeln – mit ihren
  * Empfängern, Gästen, Code und Zeitraum. Danach hängt die Grammatik über `vok_id` am Kurs.
  */
 export function grammatikKurseAnlegen(lehrkraftId: string): void {
-  const ohne = db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = '' AND art = ''").all(lehrkraftId) as unknown as Zeile[]
+  // `art` ist verschlüsselt (08.10.2026) – nach dem Entschlüsseln filtern
+  const ohne = (db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = ''").all(lehrkraftId) as unknown as Zeile[]).filter(
+    (z) => !z.art
+  )
   for (const z of ohne) {
     const vid = vokabelnZuweisen({
       lehrkraftId,
@@ -530,7 +568,7 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
 kursHaken.profil = grammatikProfil
 kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
-kursHaken.grammatikZahl = (vokId) => (db().prepare("SELECT COUNT(*) AS n FROM gram_zuweisungen WHERE vok_id = ? AND art = ''").get(vokId) as { n: number }).n
+kursHaken.grammatikZahl = (vokId) => (db().prepare('SELECT art FROM gram_zuweisungen WHERE vok_id = ?').all(vokId) as { art: string }[]).filter((z) => !z.art).length
 
 /** Vorschaukonto („Als Schüler ansehen", vorschau.ts): Beispielstand je offenem Training – `stand` bekommt die Kennungen der Aufgaben */
 export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => { aufgaben: Record<string, WortStand>; tage: string[] }): void {
@@ -574,13 +612,13 @@ export function grammatikDerGruppe(
   try {
     zs = db()
       .prepare(
-        'SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND (lerngruppe_id = ? OR (vok_id != \'\' AND vok_id IN (SELECT id FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ?))) ORDER BY erstellt DESC'
+        'SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND (lerngruppe_id = ? OR (vok_id != \'\' AND vok_id IN (SELECT id FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ?))) ORDER BY erstellt DESC, rowid'
       )
       .all(lehrkraftId, lerngruppeId, lehrkraftId, lerngruppeId) as unknown as Zeile[]
   } catch {
     // Ohne Vokabeltabelle (noch nie ein Kurs): nur die Lerngruppe selbst
     zs = db()
-      .prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC')
+      .prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC, rowid')
       .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
   }
   const jePerson: Record<string, { sicher: number; gesamt: number }> = {}
@@ -645,6 +683,56 @@ export function grammatikDerGruppe(
     }
   })
   return { trainings, jePerson }
+}
+
+/**
+ * Grammatik anlegen (Freigabe). Kurs-Grammatik mit mehreren Themen wird je Thema ein eigenes Training (08.10.2026,
+ * abgestimmt; grammatikTeilen.ts) – gleiche Empfänger und Einstellungen, eigener Code je Training. Extras bleiben eins.
+ * Ergebnis: die Kennungen in Themen-Reihenfolge.
+ */
+export function grammatikAnlegen(f: {
+  lehrkraftId: string
+  lerngruppeId: string
+  schueler: string[]
+  titel: string
+  fach: string
+  sprache: string
+  paket: GrammatikPaket
+  code: boolean
+  bis: number | null
+  vokId: string
+  art: string
+  info: GrammatikInfo
+}): string[] {
+  const gruppen = f.art
+    ? [{ titel: f.titel, paket: f.paket, info: f.info as unknown as Record<string, unknown> }]
+    : themenTeilung(f.paket, f.info as unknown as Record<string, unknown>, f.titel).gruppen
+  const erstellt = new Date().toISOString()
+  return gruppen.map((gr) => {
+    const id = randomBytes(8).toString('hex')
+    db()
+      .prepare(
+        "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id, art, info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
+      )
+      .run(
+        id,
+        f.lehrkraftId,
+        f.lerngruppeId,
+        JSON.stringify(f.schueler),
+        gr.titel.slice(0, 160),
+        f.fach.slice(0, 40),
+        f.sprache.slice(0, 8),
+        gr.paket.thema.slice(0, 160),
+        JSON.stringify(gr.paket),
+        erstellt,
+        f.code ? neuerCode() : '',
+        f.bis,
+        f.vokId,
+        f.art,
+        JSON.stringify(infoBereinigt(gr.info))
+      )
+    return id
+  })
 }
 
 export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
@@ -712,7 +800,16 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
 
     // ---------------------------------------------------------------- Lernende
     if (schueler) {
-      if (req.method === 'GET' && url.pathname === '/s/api/grammatik') return json(res, 200, { listen: grammatikFuer(ich) }), true
+      if (req.method === 'GET' && url.pathname === '/s/api/grammatik') {
+        // Jahrgang und Lehrwerk-Stelle je Training (08.10.2026): der Ordner gliedert danach
+        const listen = await Promise.all(
+          grammatikFuer(ich).map(async (l) => {
+            const z = zeile(l.id)
+            return { ...l, ...(z ? await jahrgangDerGrammatik(z, ich).catch(() => ({ jahrgang: null, stelle: null })) : {}) }
+          })
+        )
+        return json(res, 200, { listen }), true
+      }
       const k0 = req.method === 'POST' ? ((await k.koerper()) as Record<string, unknown>) : {}
       const id = req.method === 'GET' ? String(url.searchParams.get('id') ?? '') : String(k0.id ?? '')
       const z = zeile(id)
@@ -796,7 +893,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         ? 'Per QR-Code'
         : 'Einzelne Lernende'
     if (req.method === 'GET' && teile.length === 0) {
-      const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Zeile[]
+      const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC, rowid').all(ich.id) as unknown as Zeile[]
       return (
         json(res, 200, {
           zuweisungen: liste.map((z) => {
@@ -902,33 +999,30 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const paket = paketBereinigt(k0.paket, String(k0.thema ?? ''))
       if (paket.aufgaben.length < (art ? 4 : 8))
         return json(res, 400, { fehler: `Der Aufgabenpool ist zu klein (mindestens ${art ? 4 : 8} brauchbare Aufgaben).` }), true
-      const id = randomBytes(8).toString('hex')
-      db()
-        .prepare(
-          "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id, art, info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
-        )
-        .run(
-          id,
-          ich.id,
-          art ? '' : g?.id ?? '',
-          JSON.stringify(einzelne),
-          String(k0.titel ?? paket.thema ?? 'Grammatik').slice(0, 160),
-          String(k0.fach ?? '').slice(0, 40),
-          String(k0.sprache ?? '').slice(0, 8),
-          paket.thema.slice(0, 160),
-          JSON.stringify(paket),
-          new Date().toISOString(),
-          mitGaesten && !art ? neuerCode() : '',
-          typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null,
-          vok?.id ?? '',
-          art,
-          JSON.stringify(infoBereinigt(k0.info))
-        )
+      const ids = grammatikAnlegen({
+        lehrkraftId: ich.id,
+        lerngruppeId: art ? '' : g?.id ?? '',
+        schueler: einzelne,
+        titel: String(k0.titel ?? paket.thema ?? 'Grammatik'),
+        fach: String(k0.fach ?? ''),
+        sprache: String(k0.sprache ?? ''),
+        paket,
+        code: mitGaesten && !art,
+        bis: typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null,
+        vokId: vok?.id ?? '',
+        art,
+        info: infoBereinigt(k0.info)
+      })
+      const id = ids[0]
       // Gäste unter den Empfängern einer Extra-Freigabe
       for (const n of extraFuer.filter((x) => x.quelle === 'gast'))
         db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(id, n.id, '')
-      protokolliereServer('grammatik', art ? `Extra-Aufgaben (${art}) freigegeben` : 'Grammatiktraining freigegeben', ich.id)
-      return json(res, 200, { id, aufgaben: paket.aufgaben.length }), true
+      protokolliereServer(
+        'grammatik',
+        art ? `Extra-Aufgaben (${art}) freigegeben` : ids.length > 1 ? `Grammatik freigegeben – ${ids.length} Trainings (je Thema eines)` : 'Grammatiktraining freigegeben',
+        ich.id
+      )
+      return json(res, 200, { id, ids, aufgaben: paket.aufgaben.length }), true
     }
     const z = teile[0] ? zeile(teile[0]) : null
     if (!z || z.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannt.' }), true

@@ -655,7 +655,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
     }
   }
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
-  const aktiverReiter = reiter === 'vokabeln' && !d.sprachfach ? 'reihen' : reiter
+  const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
   return (
     <Stack data-klasse-detail={d.titel}>
       {/* ---------- Handlungsbedarf */}
@@ -753,7 +753,9 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
       <Tabs value={aktiverReiter} onChange={(v) => v && setze({ reiter: v })} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="reihen">Unterrichtsreihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
-          {d.sprachfach && <Tabs.Tab value="vokabeln">Vokabeln & Grammatik ({d.vokabeln.length + d.grammatik.length})</Tabs.Tab>}
+          {/* Vokabeln und Grammatik getrennt (08.10.2026, Wunsch der Lehrkraft) */}
+          {d.sprachfach && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.length})</Tabs.Tab>}
+          {d.sprachfach && <Tabs.Tab value="grammatik">Grammatik ({d.grammatik.length})</Tabs.Tab>}
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
         </Tabs.List>
@@ -779,7 +781,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
                 </Text>
                 <LehrwerkStand gruppeId={id} />
               </Group>
-              <KursKarten d={d} ort={ort} />
+              <KursKarten d={d} ort={ort} ohneGrammatik />
               {d.wackelig.length > 0 && (
                 <Card withBorder padding="sm" radius="md">
                   <Text fw={700} size="sm" mb={6}>
@@ -794,6 +796,19 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
                   </Group>
                 </Card>
               )}
+            </Stack>
+          </Tabs.Panel>
+        )}
+        {d.sprachfach && (
+          <Tabs.Panel value="grammatik" pt="sm">
+            <Stack gap="xs">
+              <Group justify="space-between" gap="xs">
+                <Text fw={700} size="sm">
+                  Grammatik in Sprachenlernen
+                </Text>
+                <LehrwerkStand gruppeId={id} />
+              </Group>
+              <GrammatikReiter d={d} ort={ort} />
             </Stack>
           </Tabs.Panel>
         )}
@@ -971,10 +986,53 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
  * für einzelne stehen zugeklappt in der Karte; ein Klick auf die Karte öffnet den Kurs in Sprachenlernen. Was zu keinem
  * Kurs gehört (ältere eigenständige Grammatik-Trainings), liegt zugeklappt unter „Weitere".
  */
-function KursKarten({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.Element {
+/** Reiter „Grammatik“ (08.10.2026): je Kurs die Grammatiktrainings, Extra-Aufgaben zugeklappt, nicht verbundene unter „Weitere“ */
+function GrammatikReiter({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.Element {
   const kurse = [...d.vokabeln].sort((a, b) => (a.status === b.status ? ms(b.erstellt) - ms(a.erstellt) : a.status === 'offen' ? -1 : 1))
   const kursIds = new Set(kurse.map((k) => k.id))
   const weitere = d.grammatik.filter((g) => !g.vokId || !kursIds.has(g.vokId))
+  if (!d.grammatik.length)
+    return (
+      <Text c="dimmed" size="sm" data-keine-grammatik>
+        Noch keine Grammatik für diese Lerngruppe – im Kurs in Sprachenlernen „Grammatik hinzufügen“.
+      </Text>
+    )
+  return (
+    <Stack gap="sm" data-grammatik-reiter>
+      {kurse.map((v) => {
+        const gram = d.grammatik.filter((g) => g.vokId === v.id)
+        if (!gram.length) return null
+        const normal = gram.filter((g) => !g.extra)
+        const extras = gram.filter((g) => g.extra)
+        return (
+          <Stack key={v.id} gap={4} data-grammatik-kurs={v.titel}>
+            <Text size="xs" c="dimmed" fw={600}>
+              {v.titel}
+            </Text>
+            <MaterialListe eintraege={grammatikEintraege(normal, ort)} leer="Nur Extra-Aufgaben in diesem Kurs." />
+            {extras.length > 0 && (
+              <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras">
+                {extras.map((g) => (
+                  <KursZeile key={g.id} g={g} />
+                ))}
+              </Aufklapp>
+            )}
+          </Stack>
+        )
+      })}
+      {weitere.length > 0 && (
+        <Aufklapp titel={`Weitere (${weitere.length})`} kennung="weitere" rahmen>
+          <MaterialListe eintraege={grammatikEintraege(weitere, ort)} leer="" />
+        </Aufklapp>
+      )}
+    </Stack>
+  )
+}
+
+function KursKarten({ d, ort, ohneGrammatik = false }: { d: KlasseDetail; ort: Ort; ohneGrammatik?: boolean }): React.JSX.Element {
+  const kurse = [...d.vokabeln].sort((a, b) => (a.status === b.status ? ms(b.erstellt) - ms(a.erstellt) : a.status === 'offen' ? -1 : 1))
+  const kursIds = new Set(kurse.map((k) => k.id))
+  const weitere = ohneGrammatik ? [] : d.grammatik.filter((g) => !g.vokId || !kursIds.has(g.vokId))
   if (!kurse.length && !weitere.length)
     return (
       <Text c="dimmed" size="sm" data-keine-kurse>
@@ -1024,14 +1082,14 @@ function KursKarten({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.Elemen
                       </Progress.Root>
                     </Tooltip>
                   )}
-                  {normal.length > 0 && (
+                  {!ohneGrammatik && normal.length > 0 && (
                     <Aufklapp titel={`Grammatik (${normal.length})`} kennung="grammatik">
                       {normal.map((g) => (
                         <KursZeile key={g.id} g={g} />
                       ))}
                     </Aufklapp>
                   )}
-                  {extras.length > 0 && (
+                  {!ohneGrammatik && extras.length > 0 && (
                     <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras">
                       {extras.map((g) => (
                         <KursZeile key={g.id} g={g} />

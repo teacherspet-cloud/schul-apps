@@ -1414,6 +1414,13 @@ export interface Outline {
    * Themenbereich zu (shared/themenVorschlag.ts).
    */
   ueberthema?: string
+  /**
+   * Digitale Bearbeitung (08.10.2026): Aufgaben nacheinander freischalten – von der KI vorgeschlagen, wenn die
+   * Aufgaben am selben Material aufeinander aufbauen (nennen → erklären → beurteilen), nicht bei Stationen oder
+   * Wahlaufgaben. Die Unterrichtsreihe übernimmt beides in den Schritt (`inhalt.schrittweise`), die Lehrkraft ändert es.
+   */
+  schrittweise?: boolean
+  schrittweiseGrund?: string
   items: OutlineItem[]
 }
 

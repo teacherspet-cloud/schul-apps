@@ -56,7 +56,8 @@ try {
   const g = await (
     await lk.request.post(`${A}/server/grammatik/freigeben`, {
       headers: KOPF,
-      data: { titel: 'Simple past', fach: 'Englisch', sprache: 'en', thema: 'Simple past', paket: PAKET, vokId: en }
+      // Klasse beim Freigeben (08.10.2026): Grammatik-Register nach Schuljahren – „Year 5"
+      data: { titel: 'Simple past', fach: 'Englisch', sprache: 'en', thema: 'Simple past', paket: PAKET, vokId: en, info: { themen: [], teilformen: [], jahrgang: 5 } }
     })
   ).json()
   pruefe(Boolean(en && fr && ben?.zugang && g.id), `Englisch (mit Grammatik) und Französisch freigegeben, Ben eingetragen (${JSON.stringify(g).slice(0, 200)})`)
@@ -114,10 +115,19 @@ try {
   await p.screenshot({ path: join(out, '2-ordner-vok.png') })
   await p.locator('[data-lasche="gram"]').click()
   pruefe(await da(p.locator('[data-ordner-kurs="grammatik"]')), 'Register Grammar zeigt das Grammatiktraining')
+  pruefe(
+    (await p.locator('[data-ordner-jahrgang="5"][data-offen="true"]').textContent().catch(() => ''))?.includes('Year 5'),
+    'Grammar nach Schuljahren: „Year 5" (neuestes Jahr) aufgeklappt'
+  )
   await p.screenshot({ path: join(out, '3-ordner-gram.png') })
+  // Register Vocabulary zeigt den Kurs direkt (08.10.2026): Karteikasten ohne eigenen Rückweg
   await p.locator('[data-lasche="vok"]').click()
-  await p.locator('[data-ordner-kurs="vokabeln"]').click()
-  await p.locator('[data-vokabel-kasten]').waitFor()
+  pruefe(await da(p.locator('[data-ordner-kurs-inhalt] [data-vokabel-kasten]')), 'Vocabulary zeigt den Karteikasten direkt im Ordner')
+  pruefe((await p.locator('[data-ordner-kurs-inhalt] [data-zurueck-lernen]').count()) === 0, 'Eingebettet ohne eigenen Zurück-Knopf')
+  // Grammatik öffnet weiter als eigene Seite mit Rückweg in den Ordner
+  await p.locator('[data-lasche="gram"]').click()
+  await p.locator('[data-ordner-kurs="grammatik"]').click()
+  await p.locator('[data-grammatik-kasten]').waitFor()
   const zurueck = p.locator('[data-zurueck-lernen]')
   pruefe((await zurueck.innerText()).includes('In den Ordner'), 'Training: „In den Ordner“ als Rückweg')
   await zurueck.click()

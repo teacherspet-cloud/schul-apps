@@ -20,6 +20,7 @@ import { ReiheEditor } from './ReiheEditor'
 import { useDokumentOeffner, useZielZeiger } from '../../shared/navigation'
 import { reiheAusPlanSchluessel, usePlaene } from './planungAuftrag'
 import { Uebersicht } from './Uebersicht'
+import { sichereAlles } from '../../shared/autosave'
 
 interface ReiheKurz {
   id: string
@@ -92,11 +93,12 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
     if (!neuGewuenscht) return
     const vorgabe = useReihenZiel.getState().vorgabe
     useReihenZiel.getState().setzeNeu(false)
-    // Wie „Neue Reihe" in der Liste – nur nichts Ungespeichertes stillschweigend verwerfen
-    if (editorGeaendert.current && !window.confirm('Die geöffnete Reihe hat ungespeicherte Änderungen. Trotzdem eine neue Reihe beginnen?')) return
-    editorGeaendert.current = false
-    setNeuZaehler((n) => n + 1)
-    setAnsicht({ art: 'editor', reihe: neueReihe(vorgabe) })
+    // Wie „Neue Reihe" in der Liste – die offene Reihe wird vorher gespeichert (automatisches Speichern, 08.10.2026)
+    void sichereAlles().then(() => {
+      editorGeaendert.current = false
+      setNeuZaehler((n) => n + 1)
+      setAnsicht({ art: 'editor', reihe: neueReihe(vorgabe) })
+    })
   }, [neuGewuenscht])
   /*
    * Aus der Auftragsleiste (08.10.2026, KI-Planung und Platzhalter im Hintergrund): Ein Auftrag gehört zu einer Reihe
@@ -108,8 +110,8 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
   useDokumentOeffner('unterrichtsreihe', async (id) => {
     const jetzt = ansichtRef.current
     if (jetzt.art === 'editor' && jetzt.reihe.id === id) return
-    if (jetzt.art === 'editor' && editorGeaendert.current && !window.confirm('Die geöffnete Reihe hat ungespeicherte Änderungen. Trotzdem die andere Reihe öffnen?'))
-      return
+    // Die offene Reihe zuerst speichern (automatisches Speichern, 08.10.2026) – statt Rückfrage
+    if (jetzt.art === 'editor') await sichereAlles()
     const d = await holen<{ reihe: Reihe }>(`/server/reihen/${id}`)
     editorGeaendert.current = false
     setAnsicht({ art: 'editor', reihe: d.reihe })

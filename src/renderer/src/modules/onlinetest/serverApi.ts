@@ -3,7 +3,11 @@
  * Lerngruppen, Verwaltung. Sitzung per Cookie; die Kopfzeile schützt vor untergeschobenen
  * Formularen (src/server/http.ts). Abgelaufene Sitzung → zurück zur Anmeldung.
  */
-export class ServerFehler extends Error {}
+/** Fehler des Servers – mit Statuscode und Antwort (z. B. 409 mit dem neueren Stand einer Reihe, 08.10.2026) */
+export class ServerFehler extends Error {
+  status?: number
+  daten?: unknown
+}
 
 async function antwort<T>(r: Response): Promise<T> {
   if (r.status === 401) {
@@ -18,7 +22,12 @@ async function antwort<T>(r: Response): Promise<T> {
     throw new ServerFehler(`Der Server hat unerwartet geantwortet (${r.status}).`)
   }
   const d = daten as { fehler?: string; ok?: boolean }
-  if (!r.ok || d.fehler) throw new ServerFehler(d.fehler || `Fehler ${r.status}`)
+  if (!r.ok || d.fehler) {
+    const f = new ServerFehler(d.fehler || `Fehler ${r.status}`)
+    f.status = r.status
+    f.daten = daten
+    throw f
+  }
   return daten as T
 }
 

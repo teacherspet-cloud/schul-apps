@@ -10,6 +10,7 @@
  */
 import type { Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { DURING_ANSWER_KINDS, duringPolicy } from './videoTasks'
+import { verweiseUmschreiben } from './aufgabenVerweise'
 
 export interface IntegrityFinding {
   /** Baustein, der nachgebessert werden muss */
@@ -358,6 +359,184 @@ export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks)
     }
   }
   return findings
+}
+
+// ---------- Abstand zwischen Aufgabe und Material (08.10.2026) ----------
+/*
+ * Befund der Lehrkraft (Reihe „Vom Krieg zur Krise", Geschichte Kl. 9): Die letzte Aufgabe auf Seite 3 verwies
+ * auf M1 auf Seite 1 – die Lernenden blätterten hin und her. Regel: Eine Aufgabe steht auf derselben Seite oder
+ * Doppelseite wie das Material, auf das sie sich bezieht. Liegt es nach dem Umbruch ZWEI oder mehr Seiten davor,
+ * rückt die App die Aufgabe (samt ihren Hilfen und Schreibflächen) hinter das Material, wenn die Reihenfolge es
+ * erlaubt (`aufgabenNaheAmMaterial`); sonst nennt die Aufgabe die Seite: „M1 (S. 1)" (`mitSeitenHinweisen`).
+ */
+
+/** Seiten (0-basiert) eines Bausteins: erste und letzte, auf der ein Stück von ihm steht */
+export interface BausteinSeiten {
+  erste: number
+  letzte: number
+}
+
+/** Seiten je Baustein aus einer Seitenaufteilung */
+export function seitenJeBaustein(plaene: readonly { items: readonly { id: string }[] }[]): Map<string, BausteinSeiten> {
+  const map = new Map<string, BausteinSeiten>()
+  plaene.forEach((p, seite) => {
+    for (const it of p.items) {
+      const da = map.get(it.id)
+      if (da) da.letzte = seite
+      else map.set(it.id, { erste: seite, letzte: seite })
+    }
+  })
+  return map
+}
+
+/** Ab so vielen Seiten Abstand gilt das Material als „zu weit weg" */
+export const MATERIAL_ABSTAND_SEITEN = 2
+
+export interface FernesMaterial {
+  aufgabeId: string
+  materialId: string
+  /** Nummer, wie das Blatt sie zeigt („M1") */
+  nummer: string
+  /** Letzte Seite des Materials (0-basiert) */
+  seite: number
+}
+
+/** Material-Bausteine, auf die eine Aufgabe verweist (gespeichert „M{karte}" oder sichtbar „M2") */
+function verwieseneMaterialien(task: WsBlock, blocks: WsBlock[], nummern: Map<string, string>): WsBlock[] {
+  if (task.type !== 'task') return []
+  const texte = [task.instruction ?? '', task.brief?.situation ?? '', ...task.parts.map((p) => p.instruction ?? '')].join('\n')
+  const nachNummer = new Map([...nummern].map(([id, nr]) => [nr, id]))
+  const ids = new Set<string>()
+  for (const m of texte.matchAll(MATERIAL_VERWEIS)) {
+    const b = blocks.find((x) => isMaterial(x) && refOf(x) === m[1])
+    if (b) ids.add(b.id)
+  }
+  for (const m of texte.matchAll(MATERIAL_NUMMER)) {
+    const id = nachNummer.get(`M${m[1]}`)
+    if (id) ids.add(id)
+  }
+  return blocks.filter((b) => ids.has(b.id))
+}
+
+/** Verweise auf Material, das zwei oder mehr Seiten vor der Aufgabe endet */
+export function fernesMaterial(blocks: WsBlock[], seiten: Map<string, BausteinSeiten>, dokument: WsBlock[] = blocks): FernesMaterial[] {
+  const nummern = materialNummern(dokument)
+  const aus: FernesMaterial[] = []
+  for (const task of blocks) {
+    if (task.type !== 'task') continue
+    const t = seiten.get(task.id)
+    if (!t) continue
+    for (const m of verwieseneMaterialien(task, dokument, nummern)) {
+      const s = seiten.get(m.id)
+      if (!s || t.erste - s.letzte < MATERIAL_ABSTAND_SEITEN) continue
+      aus.push({ aufgabeId: task.id, materialId: m.id, nummer: nummern.get(m.id) ?? '', seite: s.letzte })
+    }
+  }
+  return aus
+}
+
+/** Prüfung nach dem Umbruch: Aufgaben, deren Material zwei oder mehr Seiten davor steht */
+export function checkMaterialAbstand(sheet: Sheet, seiten: Map<string, BausteinSeiten>): IntegrityFinding[] {
+  return fernesMaterial(sheet.blocks, seiten).map((f) => ({
+    blockId: f.aufgabeId,
+    severity: 'mittel' as const,
+    message: `Das Material ${f.nummer} steht auf Seite ${f.seite + 1}, die Aufgabe ${seiten.get(f.aufgabeId)!.erste - f.seite} Seiten später – die Aufgabe direkt hinter das Material rücken oder die Seite nennen.`
+  }))
+}
+
+/**
+ * ANZEIGE: „M1" → „M1 (S. 1)" in Aufgaben, deren Material zwei oder mehr Seiten davor steht. Nur für Druck,
+ * Schülerblatt und Lösung – im Editor nicht, sonst würde der Hinweis beim Bearbeiten mitgespeichert.
+ * `sheet` ist die Anzeigefassung (Nummern aufgelöst, siehe `loeseMaterialverweise`).
+ */
+export function mitSeitenHinweisen(sheet: Sheet, seiten: Map<string, BausteinSeiten>): Sheet {
+  const fern = fernesMaterial(sheet.blocks, seiten)
+  if (!fern.length) return sheet
+  const je = new Map<string, FernesMaterial[]>()
+  for (const f of fern) if (f.nummer) je.set(f.aufgabeId, [...(je.get(f.aufgabeId) ?? []), f])
+  const setze = (text: string, f: FernesMaterial): { text: string; gesetzt: boolean } => {
+    const muster = new RegExp(String.raw`\b${f.nummer}\b(?!\s*\(S\.)`)
+    if (!muster.test(text)) return { text, gesetzt: false }
+    return { text: text.replace(muster, `${f.nummer} (S. ${f.seite + 1})`), gesetzt: true }
+  }
+  return {
+    ...sheet,
+    blocks: sheet.blocks.map((b) => {
+      const liste = b.type === 'task' ? je.get(b.id) : undefined
+      if (!liste || b.type !== 'task') return b
+      let instruction = b.instruction
+      const parts = b.parts.map((p) => ({ ...p }))
+      for (const f of liste) {
+        const r = setze(instruction, f)
+        instruction = r.text
+        if (r.gesetzt) continue
+        for (const p of parts) {
+          const q = setze(p.instruction, f)
+          p.instruction = q.text
+          if (q.gesetzt) break
+        }
+      }
+      return { ...b, instruction, parts }
+    })
+  }
+}
+
+/** Wörter, an denen eine Aufgabe erkennbar auf Vorheriges aufbaut – sie bleibt an ihrem Platz */
+const BAUT_AUF = /\b(Ergebnis(?:se|sen)?|bisherig\w*|insgesamt|zusammenfass\w*|Erkenntnis(?:se|sen)?|vorherig\w*|alle(?:n)? Materialien|Aufgaben? \d)/i
+/** Was zu einer Aufgabe gehört und mit ihr wandert */
+const BEGLEITER = new Set<WsBlock['type']>(['scaffold', 'phrases', 'workspace'])
+
+/**
+ * Rückt Aufgaben hinter ihr Material, wenn es nach dem Umbruch zwei oder mehr Seiten davor steht und die
+ * Reihenfolge es erlaubt: nicht bei Aufgaben, die auf andere Aufgaben oder Ergebnisse aufbauen, nicht bei Hör-,
+ * Film- und Beobachtungsaufgaben, nicht bei frei platzierten Bausteinen und nicht bei Blättern mit erzwungenen
+ * Umbrüchen (Übungsklausur: Aufgaben vorn, Material danach). Die Aufgabe kommt hinter das Material und die
+ * Aufgaben, die direkt darauf folgen; Verweise „Aufgabe 4" werden umgezählt. Liefert die Hinweise für die Lehrkraft.
+ */
+export function aufgabenNaheAmMaterial(sheet: Sheet, seiten: Map<string, BausteinSeiten>): { sheet: Sheet; umgestellt: string[] } {
+  const fern = fernesMaterial(sheet.blocks, seiten)
+  if (!fern.length || sheet.blocks.some((b) => b.pageBreakBefore)) return { sheet, umgestellt: [] }
+  const nummern = materialNummern(sheet.blocks)
+  const vorher = new Map<string, number>()
+  let n = 0
+  for (const b of sheet.blocks) if (b.type === 'task') vorher.set(b.id, ++n)
+  let blocks = [...sheet.blocks]
+  const umgestellt: string[] = []
+  for (const aufgabeId of [...new Set(fern.map((f) => f.aufgabeId))]) {
+    const i = blocks.findIndex((b) => b.id === aufgabeId)
+    const task = blocks[i]
+    if (!task || task.type !== 'task' || task.free || task.audioId || task.videoId || task.viewingPhase || task.observerGroup) continue
+    const text = [task.instruction, task.brief?.situation ?? '', ...task.parts.map((p) => p.instruction)].join('\n')
+    if (BAUT_AUF.test(text)) continue
+    const materialien = verwieseneMaterialien(task, blocks, nummern).map((m) => blocks.indexOf(m))
+    if (!materialien.length || Math.max(...materialien) > i) continue
+    const m = Math.max(...materialien)
+    // Gruppe: die Aufgabe, eine Hilfe direkt davor (wenn sie ihr gehört) und ihre Begleiter danach
+    let von = i
+    const nr = vorher.get(task.id)
+    while (von - 1 > m && blocks[von - 1].type === 'scaffold' && !blocks[von - 1].free && JSON.stringify(blocks[von - 1]).includes(`Aufgabe ${nr}`)) von--
+    let bis = i + 1
+    while (bis < blocks.length && BEGLEITER.has(blocks[bis].type) && !blocks[bis].free) bis++
+    // Einfügestelle: hinter dem Material und den Aufgaben (mit Begleitern), die direkt darauf folgen
+    let k = m + 1
+    while (k < von && (blocks[k].type === 'task' || BEGLEITER.has(blocks[k].type))) k++
+    if (k >= von) continue
+    // Nur, wenn es den Abstand wirklich verkürzt
+    const davor = seiten.get(blocks[k - 1].id)
+    const mat = seiten.get(blocks[m].id)
+    if (!davor || !mat || davor.letzte - mat.letzte >= MATERIAL_ABSTAND_SEITEN) continue
+    const gruppe = blocks.slice(von, bis)
+    const materialNr = nummern.get(blocks[m].id)
+    blocks = [...blocks.slice(0, k), ...gruppe, ...blocks.slice(k, von), ...blocks.slice(bis)]
+    umgestellt.push(`Aufgabe ${nr} steht jetzt direkt hinter ${materialNr ?? 'ihrem Material'} – das Material lag ${seiten.get(task.id)!.erste - mat.letzte} Seiten davor.`)
+  }
+  if (!umgestellt.length) return { sheet, umgestellt }
+  // Verweise „Aufgabe 4" auf die neue Zählung
+  const neu = new Map<number, number | null>()
+  let k = 0
+  for (const b of blocks) if (b.type === 'task') neu.set(vorher.get(b.id)!, ++k)
+  if ([...neu].some(([a, b]) => a !== b)) blocks = blocks.map((b) => wandleTexte(b, (s) => verweiseUmschreiben(s, neu)) as WsBlock)
+  return { sheet: { ...sheet, blocks }, umgestellt }
 }
 
 /**

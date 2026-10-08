@@ -1,5 +1,6 @@
 import type { CefrLevel } from '@shared/types'
 import { CEFR_DESCRIPTORS } from '../../../shared/cefr'
+import { SPRACHFAECHER } from '@shared/faecher'
 
 /** Sprachniveau für Fächer, die keine Fremdsprache sind. */
 export type LanguageMode = 'standard' | 'sensitive' | 'simple' | 'easyOriented' | 'dazA1' | 'dazA2' | 'dazB1'
@@ -13,6 +14,29 @@ export const LANGUAGE_MODES: { value: LanguageMode; label: string; description: 
   { value: 'dazA2', label: 'DaZ – Niveau A2', description: 'Kurze Hauptsätze mit Satzmustern.' },
   { value: 'dazB1', label: 'DaZ – Niveau B1', description: 'Einfache Sprache mit Formulierungshilfen.' }
 ]
+
+/**
+ * Form des Wortspeichers (08.10.2026, Befund „Vom Krieg zur Krise", Geschichte Kl. 9): Der Wortspeicher
+ * mit Artikel und Pluralform („der Vertrag, die Verträge") ist eine Hilfe für das Sprachenlernen –
+ * in Fremdsprachen, DaZ und im sprachsensiblen bzw. DaZ-Modus. In deutschsprachigen Sachfächern
+ * brauchen die Lernenden die Bedeutung der Fachbegriffe, nicht ihre Grammatik: dort „Fachbegriffe mit
+ * kurzer Erklärung".
+ */
+export type WortspeicherArt = 'grammatisch' | 'fachbegriffe'
+
+export function wortspeicherArt(meta: { subjectId: string; languageMode?: LanguageMode }): WortspeicherArt {
+  if (SPRACHFAECHER.includes(meta.subjectId)) return 'grammatisch'
+  const m = meta.languageMode
+  if (m === 'sensitive' || m === 'dazA1' || m === 'dazA2' || m === 'dazB1') return 'grammatisch'
+  return 'fachbegriffe'
+}
+
+/** Die Regel zum Wortspeicher für den Auftrag – je nach `wortspeicherArt` */
+export function wortspeicherRegel(meta: { subjectId: string; languageMode?: LanguageMode }): string {
+  return wortspeicherArt(meta) === 'grammatisch'
+    ? '- Wortspeicher mit Artikel und Pluralform; wo es passt, Alltagssprache und Fachsprache nebeneinanderstellen.'
+    : '- Wortspeicher als „Fachbegriffe mit kurzer Erklärung": je Eintrag der Fachbegriff und eine knappe Erklärung (höchstens ein kurzer Satz, z. B. „Reparationen – Zahlungen eines Kriegsverlierers an die Sieger"). KEINE Listen mit Artikel und Pluralform – die Lernenden sprechen Deutsch, sie brauchen die Bedeutung, nicht die Grammatik.'
+}
 
 /** Erhöht die Mindestschriftgröße und den Zeilenabstand (Leichte/Einfache Sprache, DaZ-Anfänger). */
 export function needsLargeType(mode: LanguageMode): boolean {

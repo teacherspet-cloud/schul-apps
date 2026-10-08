@@ -12,7 +12,7 @@ const jetzt = Date.parse('2026-10-08T12:00:00Z')
 const tagVor = (n: number): string => new Date(jetzt - n * TAG).toISOString().slice(0, 10)
 const kurs = (o: Partial<Parameters<typeof vokabelBedarf>[0][number]> = {}): Parameters<typeof vokabelBedarf>[0][number] => ({
   id: 'k1',
-  titel: '2026 - 5b - Englisch',
+  titel: '5b - Englisch',
   fach: 'Englisch',
   testTermin: null,
   sicherSchnitt: 0.1,

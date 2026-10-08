@@ -606,7 +606,7 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
   const freigeben = async (): Promise<void> => {
     setLaeuft(true)
     try {
-      await senden('/server/grammatik/freigeben', {
+      const r = await senden<{ ids?: string[] }>('/server/grammatik/freigeben', {
         titel: e.titel,
         fach: e.fach,
         sprache: e.sprache,
@@ -622,7 +622,11 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
       })
       speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
       notifySuccess(
-        extra ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.` : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`
+        extra
+          ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.`
+          : (r?.ids?.length ?? 1) > 1
+          ? `„${e.titel}" ist freigegeben – als ${r!.ids!.length} Trainings, eines je Thema. Die Lernenden finden sie in ihrer Lern-App.`
+          : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`
       )
       fertig()
     } catch (er) {

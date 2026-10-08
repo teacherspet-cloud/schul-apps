@@ -81,8 +81,11 @@ export function resolveShim(cmdPath: string, provider: AiProviderId): string | n
  */
 export const aufServer = (): boolean => process.env.SCHULAPPS_SERVER === '1'
 
-/** Anmeldeordner des Nutzers auf dem Server (nur für ihn lesbar) */
-export function serverKiOrdner(teil: 'codex' | 'claude' | 'home'): string {
+/**
+ * Anmeldeordner des Nutzers auf dem Server (nur für ihn lesbar). `tmp` (08.10.2026): Arbeitsordner der KI-Aufrufe
+ * (Schema, Anweisungen, Bilder von Schülerarbeiten) – je Lehrkraft statt im gemeinsamen /tmp, nach jedem Aufruf gelöscht.
+ */
+export function serverKiOrdner(teil: 'codex' | 'claude' | 'home' | 'tmp'): string {
   const dir = join(app.getPath('userData'), 'ki', teil)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 })
   return dir
@@ -186,7 +189,14 @@ function run(
 ): Promise<RunResult> {
   return new Promise((resolvePromise, reject) => {
     if (opts.signal?.aborted) return reject(new AbbruchFehler())
-    const child = spawn(exe, args, { cwd: opts.cwd, env: cliEnv(), windowsHide: true })
+    const umgebung = cliEnv()
+    /*
+     * Server (08.10.2026): Codex legt seine SQLite-Dateien (Protokolle logs_2, Zustand state_5, Erinnerungen memories_1 …)
+     * sonst dauerhaft in CODEX_HOME ab – mit Teilen der Anfragen. Umgeleitet in den Arbeitsordner, der nach dem Aufruf
+     * gelöscht wird. CODEX_SQLITE_HOME ist an Codex 0.154.0 nachgeprüft (die Dateien landen dort).
+     */
+    if (aufServer()) umgebung.CODEX_SQLITE_HOME = join(opts.cwd, '.codex-zustand')
+    const child = spawn(exe, args, { cwd: opts.cwd, env: umgebung, windowsHide: true })
     // Abbruch durch die Lehrkraft: Programm samt Unterprozessen beenden
     const beiAbbruch = (): void => {
       clearTimeout(timer)
@@ -226,7 +236,7 @@ function run(
 }
 
 /** Wurzel der Arbeitsordner – je Anfrage entsteht darunter ein eigener. */
-const workRoot = (): string => join(app.getPath('temp'), 'schul-apps-ki')
+const workRoot = (): string => (aufServer() ? serverKiOrdner('tmp') : join(app.getPath('temp'), 'schul-apps-ki'))
 
 /**
  * Arbeitsordner aufräumen, die kein Lauf mehr braucht.
@@ -573,6 +583,14 @@ export function codexLeanArgs(opts: { keepImageGeneration?: boolean; webSearch?:
     'include_apps_instructions'
   ]
   const args = [...disabled.flatMap((f) => ['--disable', f]), ...off.flatMap((k) => ['-c', `${k}=false`])]
+  /*
+   * Nichts dauerhaft ablegen (08.10.2026, Datenschutz auf dem Server): kein Verlauf, keine „Erinnerungen" aus früheren
+   * Anfragen. Alle Schlüssel an Codex 0.154.0 mit --strict-config nachgeprüft (history.persistence kennt „save-all" und
+   * „none"; memories ist ein Feature und hat generate_memories/use_memories). --ephemeral setzen die Aufrufe selbst.
+   */
+  args.push('--disable', 'memories', '-c', 'history.persistence="none"', '-c', 'memories.generate_memories=false', '-c', 'memories.use_memories=false')
+  // Textprotokolle (log_dir) auf dem Server in den Arbeitsordner – er wird nach dem Aufruf gelöscht
+  if (aufServer() && opts.cwd) args.push('-c', `log_dir="${join(opts.cwd, '.codex-log').replace(/\\/g, '/')}"`)
   /*
    * Websuche einschalten.
    *

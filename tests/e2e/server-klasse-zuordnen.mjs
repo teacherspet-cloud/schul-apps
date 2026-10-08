@@ -43,7 +43,7 @@ try {
   const post = async (pfad, data) => (await lk.request.post(`${A}/server/${pfad}`, { headers: KOPF, data })).json()
   const get = async (pfad) => (await lk.request.get(`${A}/server/${pfad}`, { headers: KOPF })).json()
 
-  // ---------- Klasse 5b (Meine Klassen) und ein Kurs „2026 - 5b - Englisch" mit eingetragenen Lernenden
+  // ---------- Klasse 5b (Meine Klassen) und ein Kurs „5b - Englisch" mit eingetragenen Lernenden
   gid = (await post('lerngruppen/anlegen', { name: '5b', fach: 'Englisch' })).id
   pruefe(Boolean(gid), 'Lerngruppe 5b angelegt')
   const vid = (await post('vokabeln/freigeben', { lerngruppeId: gid, titel: 'Unit 1', sprache: 'en', fach: 'Englisch', woerter: WOERTER, gaeste: true })).id

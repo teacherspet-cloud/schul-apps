@@ -1,6 +1,7 @@
 // Bilder für Arbeitsblätter aller Fächer: freie Bilder aus dem Internet (Wikimedia Commons, Cliparts),
 // von der KI auf fachliche Eignung geprüft; sonst KI-Bild (nie bei Originalquellen).
-import { AiCall, chooseImages, gatherCandidates, ImageNeed, ImageServices } from '../../../shared/imageChoice'
+import { AiCall, chooseImages, Choice, gatherCandidates, ImageNeed, ImageServices } from '../../../shared/imageChoice'
+import { bildzugriff } from '../didactics/bildarbeit'
 import { runLimited } from '../../../shared/async'
 import { GREEN_SCREEN_PROMPT } from '../../../shared/images'
 import type { ImageBlock, ImageItem, WorksheetMeta, WsBlock } from '../model/types'
@@ -279,6 +280,48 @@ async function completeTargets(
         pending.delete(rep)
       }
     }
+    /*
+     * ARCHIV-DURCHGANG (08.10.2026, Befund „Vom Krieg zur Krise", Geschichte Kl. 9): Blieb ein Bild ohne Treffer,
+     * stand auf dem Schülerblatt der Suchauftrag. Für Fächer, die mit historischen Bildquellen arbeiten, sucht die
+     * App deshalb EINMAL in freien Archiven (Openverse: Museen, Bibliotheken, Flickr Commons) – mit derselben
+     * Prüfung und der Mindestanforderung „Kernmotiv". Was danach fehlt, nimmt `entferneFehlendeBilder` vom Blatt.
+     */
+    const archivRunde = archivSuche(meta) ? gathered.filter(({ rep }) => pending.has(rep)) : []
+    if (archivRunde.length) {
+      onProgress?.('Kein Bild gefunden – die App sucht einmal in freien Archiven (Museen, Bibliotheken) …', 0, reps.length)
+      const gesammelt = await Promise.all(
+        archivRunde.map(async ({ rep, need }) => ({
+          rep,
+          need: { ...need, kinds: ['photo'] as ImageNeed['kinds'] },
+          candidates: await gatherCandidates({ ...need, kinds: ['photo'] }, deps.services, 3, 'openverse').catch(() => [])
+        }))
+      )
+      const mitFunden = gesammelt.filter((g) => g.candidates.length)
+      const archiv = mitFunden.length
+        ? await chooseImages(
+            mitFunden.map(({ rep, need, candidates }) => ({
+              need: rep.original ? need : { ...need, subject: `${need.subject} – ${mindestanforderung(rep)}` },
+              candidates
+            })),
+            worksheetImageRules(meta),
+            deps.ai
+          ).catch(() => new Map<string, Choice>())
+        : new Map<string, Choice>()
+      for (const { rep, need } of mitFunden) {
+        const c = archiv.get(need.id)
+        if (!c?.candidate) continue
+        const dataUrl = await c.candidate.load().catch(() => null)
+        if (!dataUrl) continue
+        const source = c.candidate.source === 'ai' ? 'ai' : c.candidate.source
+        apply(rep, (b) => {
+          b.image = { dataUrl, source, credit: c.candidate!.credit, ...(c.candidate!.citation ? { citation: c.candidate!.citation } : {}) }
+          b.autoPicked = true
+          warn(b, `Bild: aus einem freien Archiv gewählt („${c.candidate!.title.slice(0, 60)}“, ${c.reason}) – bitte prüfen.`)
+        })
+        stats.web++
+        pending.delete(rep)
+      }
+    }
     for (const { rep, need } of gathered) {
       if (pending.has(rep) && rep.original) {
         apply(rep, (b) =>
@@ -356,6 +399,12 @@ async function completeTargets(
   )
   for (const b of images) if (b.image && b.autoPicked) blindeBeschriftung(b)
   return stats
+}
+
+/** Fächer, die mit historischen Bildquellen arbeiten (Geschichte; Politik, Werte und Normen): einmal im Archiv nachsuchen */
+export const archivSuche = (meta: Pick<WorksheetMeta, 'subjectId'>): boolean => {
+  const art = bildzugriff(meta)
+  return art === 'quelle' || art === 'karikatur'
 }
 
 /**

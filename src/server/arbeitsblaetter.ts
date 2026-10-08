@@ -40,7 +40,7 @@ import { gastEntfernen } from './gaeste'
 import { auswerten, mitarbeitAnfrage, mitarbeitAus, type AuswertungsKontext, type MitarbeitVorschlag, type PersonRoh } from './blattAuswertung'
 import type { Strenge } from '../shared/blattAuswertung'
 import { iservBereit } from './anmeldung'
-import { registerVergessen } from './namensschutz'
+import { mitNamensliste, registerVergessen } from './namensschutz'
 import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { PULS_MS } from '../main/services/lanServer'
 import { pdfOhneSkripte, seitenMitTinte } from './druck'
@@ -61,6 +61,18 @@ import {
   type BlattFeld
 } from '../shared/blattFreigabe'
 import { eingabenAus, PLAUS_SCHLUESSEL, zuordnungAus, ZUORDNUNG_SCHLUESSEL } from '../shared/blattAuswertung'
+import {
+  abgabeAufgabenAnfrage,
+  abgabeAufgabenAus,
+  autoHinweis,
+  autoPruefen,
+  bezugAus,
+  einschaetzungAus,
+  pruefRunden,
+  schluesselBereinigt,
+  type AbgabeEintrag,
+  type AbgabeFeedback
+} from '../shared/blattPruefung'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS blatt_freigaben (
@@ -190,6 +202,17 @@ const abgabeVon = (fid: string, sid: string): Abgabe | null =>
   (db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid) as Abgabe | undefined) ?? null
 
 /** Gehört das Blatt dieser Person? (Lerngruppe, ggf. nur Ausgewählte, oder per Code beigetreten) */
+/**
+ * Namen für den Namensfilter vor der KI (08.10.2026): das Kind selbst und die Lerngruppe der Freigabe. Ob ein Name, der
+ * zugleich ein Wort ist („Rose“), die Person meint, entscheidet der Server lokal (personOderWort.ts) – „Material“ ist nur
+ * der Aufgaben-/Materialtext, nie die Antwort des Kindes.
+ */
+function namenFuerKi(z: Zeile, ich: NutzerInfo): string[] {
+  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+  const namen = new Set<string>([ich.name, ...(g ? mitgliederVon(g).map((n) => n.name) : [])].filter(Boolean))
+  return [...namen]
+}
+
 export function blattIstFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (db().prepare('SELECT 1 FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
@@ -258,7 +281,121 @@ const bereinigeFelder = (roh: unknown): BlattFeld[] =>
     .slice(0, 1000)
     .map((x) => x as Record<string, unknown>)
     .filter((x) => /^f\d{1,3}$/.test(String(x.id)))
-    .map((x) => ({ id: String(x.id), nr: Number(x.nr) || 0, art: String(x.art ?? 'text').slice(0, 12), seite: Number(x.seite) || 0 }))
+    .map((x) => ({
+      id: String(x.id),
+      nr: Number(x.nr) || 0,
+      art: String(x.art ?? 'text').slice(0, 12),
+      seite: Number(x.seite) || 0,
+      // Text der Möglichkeit und Stelle im Lösungsschlüssel (08.10.2026)
+      ...(typeof x.text === 'string' && x.text.trim() ? { text: x.text.slice(0, 200) } : {}),
+      ...(bezugAus(x.bezug) ? { bezug: String(x.bezug) } : {})
+    }))
+
+/**
+ * Prüfung beim Einreichen (08.10.2026, shared/blattPruefung.ts): Ankreuzen, Richtig/Falsch, Lücken, Zuordnen, Ordnen
+ * ohne KI; offene Aufgaben in EINER KI-Anfrage (Zugang der Lehrkraft, ohne Namen). Die Einträge landen im
+ * Feedback-Verlauf der Aufgaben (Ampel, Hinweis an der Aufgabe) – zählen aber nicht als „prüfen lassen".
+ * Wirft nie: Ohne KI bleiben die automatisch geprüften Aufgaben.
+ */
+async function pruefungBeimEinreichen(p: {
+  z: Zeile
+  e: BlattEinstellungen
+  aufgaben: BlattAufgabe[]
+  felder: BlattFeld[]
+  antworten: Record<string, string>
+  ich: NutzerInfo
+  abgabe: number
+  letzteRunde: boolean
+  bilder: string[]
+  material: string
+  aufruf: Aufruf
+}): Promise<{ eintraege: Record<string, AbgabeFeedback>; fehler?: string }> {
+  const zeit = Date.now()
+  const eintraege: Record<string, AbgabeFeedback> = {}
+  let fehler: string | undefined
+  try {
+    const auto = autoPruefen(p.aufgaben, p.felder, p.antworten, { letzteRunde: p.letzteRunde })
+    const objekte = blattExtra(p.antworten).objekte
+    const offen: AbgabeEintrag[] = []
+    const teilweise: Record<string, Pick<AbgabeFeedback, 'auto' | 'marken'>> = {}
+    for (const a of p.aufgaben) {
+      if (!a.nr) continue
+      const eigene = p.felder.filter((f) => f.nr === a.nr)
+      const marken = Object.fromEntries(eigene.filter((f) => auto.marken[f.id]).map((f) => [f.id, auto.marken[f.id]]))
+      const mitMarken = Object.keys(marken).length ? { marken } : {}
+      const au = auto.aufgaben[String(a.nr)]
+      if (au?.nurAuto) {
+        eintraege[String(a.nr)] = {
+          einschaetzung: einschaetzungAus(au.richtig, au.gesamt),
+          text: autoHinweis(au.richtig, au.gesamt, p.letzteRunde),
+          zeit,
+          abgabe: p.abgabe,
+          auto: { richtig: au.richtig, gesamt: au.gesamt },
+          ...mitMarken
+        }
+        continue
+      }
+      const leer = !eigene.some((f) => (p.antworten[f.id] ?? '').trim())
+      // Zeichenaufgabe ohne Felder (Zeitleiste, Diagramm): zählt, wenn etwas gezeichnet bzw. eingetragen ist
+      const gezeichnet = !eigene.length && (p.bilder.length > 0 || objekte.length > 0)
+      if (leer && !gezeichnet) {
+        if (!a.freiwillig) eintraege[String(a.nr)] = { einschaetzung: 'noch nicht', text: 'Hier hast du noch nichts eingetragen.', zeit, abgabe: p.abgabe }
+        continue
+      }
+      const text = ohneNamen({
+        id: 'a',
+        kuerzel: 'S1',
+        name: p.ich.name,
+        dateiname: '',
+        text: [blattAbgabeText([a], eigene, p.antworten), eigene.length ? '' : objekteText(objekte)].filter(Boolean).join('\n'),
+        bilder: []
+      }).text
+      offen.push({ aufgabe: a, antwort: text })
+      if (au) teilweise[String(a.nr)] = { auto: { richtig: au.richtig, gesamt: au.gesamt }, ...mitMarken }
+    }
+    const lehrkraft = nutzerNachId(p.z.lehrkraft_id)
+    if (offen.length && lehrkraft && (p.e.feedback || p.e.aufgabenFeedback)) {
+      try {
+        const roh = await mitNamensliste(
+          { namen: namenFuerKi(p.z, p.ich), sprache: p.e.sprache, material: [p.material, ...offen.map((o) => `${o.aufgabe.anweisung ?? ''} ${o.aufgabe.erwartung ?? ''}`)].join(' ') },
+          () => imNutzer(alsNutzer(lehrkraft), () => p.aufruf('ai:structured', [abgabeAufgabenAnfrage(offen, { sprache: p.e.sprache, material: p.material, bilder: p.bilder })]))
+        )
+        const urteile = abgabeAufgabenAus(
+          roh,
+          offen.map((o) => o.aufgabe.nr)
+        )
+        for (const o of offen) {
+          const u = urteile[String(o.aufgabe.nr)]
+          if (u) eintraege[String(o.aufgabe.nr)] = { einschaetzung: u.einschaetzung, text: u.hinweis, zeit, abgabe: p.abgabe, ...teilweise[String(o.aufgabe.nr)] }
+        }
+        protokolliereServer('arbeitsblatt', 'Feedback je Aufgabe beim Einreichen', p.ich.id)
+      } catch (err) {
+        fehler = err instanceof Error ? err.message : String(err)
+      }
+    }
+    // Ohne KI-Urteil: die geprüften Kästchen und Lücken einer gemischten Aufgabe bleiben sichtbar
+    for (const [nr, t] of Object.entries(teilweise))
+      if (!eintraege[nr] && t.auto) {
+        const e0 = einschaetzungAus(t.auto.richtig, t.auto.gesamt)
+        eintraege[nr] = {
+          einschaetzung: e0 === 'sicher' ? 'teilweise' : e0,
+          text: `${autoHinweis(t.auto.richtig, t.auto.gesamt, p.letzteRunde)} Zu deinem Text kam noch kein Hinweis.`,
+          zeit,
+          abgabe: p.abgabe,
+          ...t
+        }
+      }
+    if (Object.keys(eintraege).length) {
+      // Frisch lesen: Der Bogen läuft parallel, „prüfen lassen“ kann dazwischenkommen
+      const verlauf = json_(abgabeVon(p.z.id, p.ich.id)?.aufgaben_feedback ?? '{}', {} as Record<string, unknown[]>)
+      for (const [nr, x] of Object.entries(eintraege)) verlauf[nr] = [...(verlauf[nr] ?? []), x].slice(-20)
+      db().prepare('UPDATE blatt_abgaben SET aufgaben_feedback = ? WHERE freigabe_id = ? AND schueler_id = ?').run(JSON.stringify(verlauf), p.z.id, p.ich.id)
+    }
+  } catch (err) {
+    fehler ??= err instanceof Error ? err.message : String(err)
+  }
+  return { eintraege, ...(fehler ? { fehler } : {}) }
+}
 
 /** Für Lernende: Übersicht eines Blattes */
 function kurz(z: Zeile, ich: NutzerInfo) {
@@ -469,7 +606,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             )
         )
           return (json(res, 403, { fehler: 'Diese Aufgabe ist noch nicht freigeschaltet.' }), true)
-        if (liste.length >= e.aufgabenRunden)
+        // Die Einträge vom Einreichen (08.10.2026) zählen nicht als „prüfen lassen"
+        if (pruefRunden(liste) >= e.aufgabenRunden)
           return (json(res, 409, { fehler: `Zu dieser Aufgabe gab es schon ${e.aufgabenRunden}× Feedback. Reiche das Blatt ein, wenn du fertig bist.` }), true)
         // Bereich der Aufgabe (Zeitleiste & Co. ohne Schreibfelder): ihre Seite und die Objekte darin zählen mit
         const b0 = (k0.bereich ?? {}) as { seite?: unknown; von?: unknown; bis?: unknown }
@@ -518,15 +656,16 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             ...(material ? { material } : {}),
             ...(befund ? { abschrift: befund } : {})
           }
-          const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
-            aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)])
+          const antwort = await mitNamensliste(
+            { namen: namenFuerKi(z, ich), sprache: e.sprache, material: `${material} ${aufgabe.anweisung ?? ''} ${aufgabe.erwartung ?? ''}` },
+            () => imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)]))
           )
           const roh = aufgabenFeedbackAus(antwort)
           const fb = befund ? { ...roh, einschaetzung: deckeln(roh.einschaetzung, befund) } : roh
           bisher[String(nr)] = [...liste, { ...fb, zeit: Date.now() }]
           speichern(antworten, k0.tinte ? tinte : null, { aufgaben_feedback: JSON.stringify(bisher) })
           protokolliereServer('arbeitsblatt', 'Feedback zu einer Aufgabe', ich.id)
-          return (json(res, 200, { ...fb, rest: e.aufgabenRunden - liste.length - 1 }), true)
+          return (json(res, 200, { ...fb, rest: e.aufgabenRunden - pruefRunden(liste) - 1 }), true)
         } catch (err) {
           return (json(res, 503, { fehler: err instanceof Error ? err.message : String(err) }), true)
         }
@@ -543,13 +682,40 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
         const puls = setInterval(() => res.write(' '), PULS_MS)
         res.on('close', () => clearInterval(puls))
+        const material = typeof k0.material === 'string' ? k0.material.slice(0, 24000) : ''
         try {
           // Stift-Einträge über dem Blatt als Seitenbilder (sonst sieht die KI nur Striche ohne Zusammenhang)
           // Zeichnungen gehen mit, auch wenn der Stift nicht freigegeben war (Zeichenaufgaben, 05.10.2026)
           const bilder = e.stift || Object.keys(tinte).length ? await seitenMitTinte(z.html, tinte, blattExtra(antworten)).catch(() => [] as string[]) : []
-          const material = typeof k0.material === 'string' ? k0.material.slice(0, 24000) : ''
+          /*
+           * Alles auf einmal (08.10.2026, Entscheidung der Lehrkraft): feste Lösungen sofort geprüft (✓/✗), offene Aufgaben
+           * mit Ampel und kurzem Hinweis (eine KI-Anfrage) – parallel zum Bogen, gespeichert im Feedback-Verlauf je Aufgabe
+           */
+          const pruefung = pruefungBeimEinreichen({
+            z,
+            e,
+            aufgaben,
+            felder,
+            antworten,
+            ich,
+            abgabe: genutzt + 1,
+            letzteRunde: genutzt + 1 >= e.runden + extraVon(z.id, ich.id),
+            bilder: Object.keys(tinte).length ? bilder : [],
+            material,
+            aufruf
+          })
           const r = await blattFassung(z.rueckmeldung_id, nutzerNachId(ich.id)!, text, bilder, e.feedback, aufruf, material)
-          res.end(JSON.stringify({ ok: !r.fehler, fehler: r.fehler, bogen: r.bogen, nr: r.nr }))
+          const pr = await pruefung
+          res.end(
+            JSON.stringify({
+              ok: !r.fehler,
+              fehler: r.fehler,
+              bogen: r.bogen,
+              nr: r.nr,
+              aufgabenFeedback: pr.eintraege,
+              ...(pr.fehler ? { pruefFehler: pr.fehler } : {})
+            })
+          )
         } catch (err) {
           res.end(JSON.stringify({ ok: false, fehler: err instanceof Error ? err.message : String(err) }))
         } finally {
@@ -612,7 +778,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           anweisung: String(y.anweisung ?? '').slice(0, 4000),
           erwartung: String(y.erwartung ?? '').slice(0, 8000),
           ...(y.freiwillig === true ? { freiwillig: true } : {}),
-          ...(Number(y.hilfekarten) > 0 ? { hilfekarten: Math.min(20, Math.round(Number(y.hilfekarten))) } : {})
+          ...(Number(y.hilfekarten) > 0 ? { hilfekarten: Math.min(20, Math.round(Number(y.hilfekarten))) } : {}),
+          // Lösungsschlüssel für die automatische Prüfung beim Einreichen (08.10.2026)
+          ...(schluesselBereinigt(y.schluessel) ? { schluessel: schluesselBereinigt(y.schluessel) } : {})
         }
       })
       const vorlage = k0.rueckmeldung as Rueckmeldung | undefined

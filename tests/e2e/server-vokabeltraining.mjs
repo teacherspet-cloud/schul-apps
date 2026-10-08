@@ -47,6 +47,15 @@ try {
   const gruppe = await (
     await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
   ).json()
+  // Kurs für die Klasse (08.10.2026): eine Lerngruppe mit Englisch bekommt automatisch einen leeren Kurs „<Klasse> - Englisch"
+  const kurseDerKlasse = async () =>
+    (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.filter((z) => z.lerngruppe === KLASSE)
+  const auto = await kurseDerKlasse()
+  pruefe(
+    auto.length === 1 && auto[0].woerter === 0 && auto[0].ueberschrift === `${KLASSE} - Englisch` && auto[0].fach === 'Englisch',
+    `Klasse mit Englisch hat automatisch einen leeren Kurs (${auto.map((z) => `${z.ueberschrift}/${z.woerter}`).join(', ')})`
+  )
+  pruefe((await kurseDerKlasse()).length === 1, 'Erneutes Öffnen legt keinen zweiten Kurs an')
 
   // ---------- Vokabeltraining nur per QR-Code, mit Lernzeitraum
   const bis = Date.now() + 30 * 864e5
@@ -99,9 +108,41 @@ try {
     .first()
     .click()
   pruefe(await da(p.locator('[data-vokabel-unit]')), 'Danach die Unit')
+  // Mehrere Units (08.10.2026): zwei Units wählen – Abschnitte sind NICHT vorausgewählt, Hinweis, „Freigeben" gesperrt
+  await p.locator('[data-vokabel-unit]').click()
+  const unitNamen = (await p.getByRole('option').allInnerTexts()).map((x) => x.trim()).filter(Boolean)
+  pruefe(unitNamen.length >= 2, `Mindestens zwei Units im Band (${unitNamen.slice(0, 3).join(', ')})`)
+  await p.getByRole('option', { name: unitNamen[0], exact: true }).click()
+  await p.getByRole('option', { name: unitNamen[1], exact: true }).click()
+  await p.keyboard.press('Escape')
+  pruefe(await da(p.getByText('Abschnitte auswählen')), 'Hinweis „Abschnitte auswählen" – keine Vorauswahl')
+  pruefe(await p.locator('[data-vokabeln-los]').isDisabled(), '„Freigeben" gesperrt, solange kein Abschnitt gewählt ist')
+  await p.locator('[data-vokabel-abschnitte]').click()
+  await p.getByRole('option').filter({ hasText: `${unitNamen[0]} · ` }).first().click()
+  await p.getByRole('option').filter({ hasText: `${unitNamen[1]} · ` }).first().click()
+  await p.keyboard.press('Escape')
+  await p.locator('[data-vokabel-gruppe]').click()
+  await p.getByRole('option', { name: KLASSE, exact: true }).click()
   await p.screenshot({ path: join(out, '1b-lehrwerk.png') })
-  await p.keyboard.press('Escape')
-  await p.keyboard.press('Escape')
+  pruefe(await p.locator('[data-vokabeln-los]').isEnabled(), '„Freigeben" mit Abschnitten aus zwei Units möglich')
+  await p.locator('[data-vokabeln-los]').click()
+  await p.waitForTimeout(3000)
+  // Der leere Kurs der Klasse wird gefüllt – kein zweiter Kurs daneben
+  const kurseNachher = await kurseDerKlasse()
+  pruefe(kurseNachher.length === 1 && kurseNachher[0].id === auto[0].id && kurseNachher[0].woerter > 0, `Der leere Kurs der Klasse wird gefüllt (${kurseNachher.length} Kurs/e)`)
+  const mitWoertern = kurseNachher.filter((z) => z.woerter > 0)
+  const zweiUnits = mitWoertern.length === 1 ? await (await lk.request.get(`${A}/server/vokabeln/${mitWoertern[0].id}`, { headers: KOPF })).json() : null
+  pruefe(
+    Boolean(zweiUnits) &&
+      zweiUnits.quelle?.units?.length === 2 &&
+      zweiUnits.quelle.units.map((u) => u.unit).join('|') === `${unitNamen[0]}|${unitNamen[1]}` &&
+      zweiUnits.teile?.length === 2 &&
+      zweiUnits.teile[0].titel.startsWith(unitNamen[0]) &&
+      zweiUnits.teile[1].titel.startsWith(unitNamen[1]) &&
+      zweiUnits.woerter.length === zweiUnits.teile[0].anzahl + zweiUnits.teile[1].anzahl,
+    `Ein Kurs mit den Wörtern beider Units in Buchreihenfolge (${zweiUnits?.teile?.map((t) => `${t.titel}: ${t.anzahl}`).join(', ')})`
+  )
+  if (await p.getByRole('dialog').count()) await p.keyboard.press('Escape')
 
   // ---------- Gast am Handy: Name → persönlicher Code → Trainer
   const g1 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })

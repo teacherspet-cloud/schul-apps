@@ -2,7 +2,8 @@
  * KI-Stand und Materialien an den Schritten einer Reihe (08.10.2026, Plan „Unterrichtsreihe: Übersicht, KI-Status …",
  * Abschnitte A und D). Eigenständige Bausteine – der Editor setzt sie an seine Schrittkarten und in seinen Kopf:
  *
- * - `SchrittKiStatus`: Plakette statt Drehkreis – „Wartet – Platz 2", „Entsteht: … · 1:20 · noch etwa 2 Min.",
+ * - `SchrittKiStatus`: Plakette statt Drehkreis – „Wartet – Platz 2" (nur vor der ersten Anfrage), „Entsteht: … · 1:20 ·
+ *   noch etwa 2 Min." (danach ohne Wechsel, kurzes Warten nur als leiser Zusatz),
  *   „Fertig – ansehen", „Fehler: … · Erneut versuchen", „Abgebrochen" (Befund: „Mit KI erstellen" startete scheinbar
  *   verzögert mit einem rätselhaften Kreisel – meist wartete der Auftrag nur auf einen freien KI-Platz);
  * - `KiEntwurfMarke`: dezente Marke „KI-Entwurf" mit „Geprüft";
@@ -26,7 +27,7 @@ import {
   IconSparkles
 } from '@tabler/icons-react'
 import { entwuerfeIn, materialienDerReihe, SCHRITT_ARTEN, type Reihe, type ReiheMaterial, type Schritt } from '@shared/reihe'
-import { brichAb, dauerLabel, laeuft, useSekundentakt, versucheErneut, type Auftrag } from '../../shared/auftraege'
+import { brichAb, dauerLabel, laeuft, useSekundentakt, versucheErneut, wartetKurz, wartetVorStart, type Auftrag } from '../../shared/auftraege'
 import { dauerWorte, restAnzeige, schaetzeGesamtdauer } from '../../shared/restzeit'
 import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigation'
 import { notifyError } from '../../shared/util'
@@ -46,10 +47,14 @@ export async function oeffneAusReihe(moduleId: string, docId: string): Promise<v
   await dokumentOeffnenWennBereit(moduleId, docId)
 }
 
-/** Text der Plakette für einen Auftrag (auch für Tests und andere Anzeigen) */
+/**
+ * Text der Plakette für einen Auftrag (auch für Tests und andere Anzeigen). Ruhiger Stand (08.10.2026): „Wartet – Platz n"
+ * nur, bevor die erste Anfrage gearbeitet hat; danach bleibt es bei „Entsteht: …" – kurzes Warten zwischen zwei Anfragen
+ * nennt `wartetHinweis` leise daneben, ohne Farb- oder Symbolwechsel.
+ */
 export function statusText(a: Auftrag, jetzt: number): string {
-  if (a.status === 'wartend') return a.wartegrund ?? (a.platz ? `Wartet – Platz ${a.platz}` : 'Wartet auf freien Platz')
-  if (a.status === 'laufend') {
+  if (wartetVorStart(a)) return a.wartegrund ?? (a.platz ? `Wartet – Platz ${a.platz}` : 'Wartet auf freien Platz')
+  if (a.status === 'laufend' || a.status === 'wartend') {
     const rest = restAnzeige(a, jetzt)
     return [`Entsteht: ${a.meldung.replace(/\s*…$/, '')}`, dauerLabel(jetzt - a.start), rest].filter(Boolean).join(' · ')
   }
@@ -57,6 +62,9 @@ export function statusText(a: Auftrag, jetzt: number): string {
   if (a.status === 'fehler') return `Fehler: ${a.fehler ?? a.meldung}`
   return 'Abgebrochen'
 }
+
+/** Leiser Zusatz, solange ein schon begonnener Auftrag auf einen Platz wartet (sonst leer) */
+export const wartetHinweis = (a: Auftrag): string => (wartetKurz(a) ? (a.wartegrund ?? 'wartet kurz auf freien Platz') : '')
 
 /**
  * Plakette mit dem Stand der KI-Erstellung dieses Schritts. Zeigt nichts, solange es für den Schritt keinen Auftrag in
@@ -79,19 +87,27 @@ export function SchrittKiStatus({
   if (!a) return null
   const text = statusText(a, jetzt)
   const stopp = (e: React.MouseEvent): void => e.stopPropagation()
-  if (laeuft(a))
+  if (laeuft(a)) {
+    // Gezeigter Stand: „wartend" nur vor der ersten Anfrage – danach bleibt die Plakette ruhig bei „Entsteht"
+    const vorStart = wartetVorStart(a)
+    const hinweis = wartetHinweis(a)
     return (
-      <Group gap={4} wrap="nowrap" onClick={stopp} data-ki-status={a.status} data-ki-platz={a.platz ?? ''}>
+      <Group gap={4} wrap="nowrap" onClick={stopp} data-ki-status={vorStart ? 'wartend' : 'laufend'} data-ki-platz={vorStart ? (a.platz ?? '') : ''}>
         <Badge
           size="sm"
           variant="light"
-          color={a.status === 'wartend' ? 'gray' : 'grape'}
-          leftSection={a.status === 'wartend' ? <IconClock size={12} /> : <Loader size={10} color="grape" />}
+          color={vorStart ? 'gray' : 'grape'}
+          leftSection={vorStart ? <IconClock size={12} /> : <Loader size={10} color="grape" />}
           style={{ textTransform: 'none', maxWidth: 420 }}
           title={text}
         >
           {text}
         </Badge>
+        {hinweis && (
+          <Text size="xs" c="dimmed" data-ki-wartet-kurz>
+            {hinweis}
+          </Text>
+        )}
         <Tooltip label="Abbrechen">
           <ActionIcon size="sm" variant="subtle" color="gray" aria-label="KI-Erstellung abbrechen" onClick={() => brichAb(a.id)} data-ki-abbrechen>
             <IconPlayerStop size={13} />
@@ -99,6 +115,7 @@ export function SchrittKiStatus({
         </Tooltip>
       </Group>
     )
+  }
   if (a.status === 'fertig')
     return (
       <Badge
