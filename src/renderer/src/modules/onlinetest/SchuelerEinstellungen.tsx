@@ -57,7 +57,8 @@ export { useDarstellung, type Darstellung }
 
 const mitKonto = (): boolean => {
   const ich = window.__schulappsServer
-  return Boolean(ich?.angemeldet && ich.quelle !== 'gast')
+  // Seit 08.10.2026 auch Gäste – sie melden sich mit ihrem persönlichen Code an mehreren Geräten an
+  return Boolean(ich?.angemeldet)
 }
 
 const dunkelImSystem = (): boolean => window.matchMedia?.('(prefers-color-scheme: dark)').matches === true

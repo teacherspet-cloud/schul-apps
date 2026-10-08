@@ -20,7 +20,7 @@ export async function medienRoute(k: Anfrage): Promise<boolean> {
     const sprache = String(url.searchParams.get('sprache') ?? '')
     const woerter = url.searchParams.getAll('w').slice(0, 600)
     // Bevorzugte Fassung der Aussprache (Einstellungen der Lernenden, 07.10.2026) – die andere als Rückfall
-    const lage = url.searchParams.get('lage') === 'm' ? 'm' : 'w'
+    const lage = url.searchParams.get('lage') === 'w' ? 'w' : 'm'
     // Bildstufe nach Klasse der Lernenden (07.10.2026; die Seite kennt sie aus der Lerngruppe)
     const s = url.searchParams.get('stufe')
     const stufe = istStufe(s) ? s : 's2'

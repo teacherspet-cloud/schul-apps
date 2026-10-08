@@ -82,7 +82,7 @@ interface Entwurf {
   fach: string
   sprache: string
   thema: string
-  empfaenger: { lerngruppeId: string; schueler: string[]; gaeste: boolean; bis: number | null; gruppe: string }
+  empfaenger: { lerngruppeId: string; schueler: string[]; gaeste: boolean; bis: number | null; gruppe: string; vokId?: string }
   paket: GrammatikPaket
 }
 
@@ -254,10 +254,18 @@ export function GrammatiktrainingModule({ active }: { active: boolean }): React.
   )
 }
 
-function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Element {
+/** Vorbelegung aus einem Vokabeltraining (08.10.2026): Empfänger = dessen Lernende, Fach und Unit wie dort */
+export interface GrammatikVorgabe {
+  vokId: string
+  titel: string
+  sprache?: string
+  lehrwerk?: { buch?: string; unit?: string }
+}
+
+export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vorgabe?: GrammatikVorgabe }): React.JSX.Element {
   const faecher = useSprachFaecher()
   const { settings } = useAppSettings()
-  const [fachId, setFachId] = useState<string | null>(faecher[0]?.id ?? null)
+  const [fachId, setFachId] = useState<string | null>((vorgabe?.sprache && faecher.find((f) => f.sprache === vorgabe.sprache)?.id) || (faecher[0]?.id ?? null))
   const [jahrgang, setJahrgang] = useState<number>(6)
   const [themenIds, setThemenIds] = useState<string[]>([])
   const [eigenes, setEigenes] = useState('')
@@ -268,7 +276,17 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
    */
   const [wortArt, setWortArt] = useState<'frei' | 'grund' | 'liste'>('frei')
   const [wortListe, setWortListe] = useState<VokabelAuswahl | null>(null)
-  const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code'>('gruppe')
+  const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code' | 'vok'>(vorgabe ? 'vok' : 'gruppe')
+  // Lernende eines Vokabeltrainings – fest verbunden (08.10.2026)
+  const [vokId, setVokId] = useState<string | null>(vorgabe?.vokId ?? null)
+  const [vokListe, setVokListe] = useState<{ id: string; titel: string; lerngruppe: string }[]>(vorgabe ? [{ id: vorgabe.vokId, titel: vorgabe.titel, lerngruppe: '' }] : [])
+  useEffect(() => {
+    if (art !== 'vok' || vokListe.length > 1) return
+    void holen<{ zuweisungen: { id: string; titel: string; lerngruppe: string; status: string }[] }>('/server/vokabeln').then(
+      (r) => setVokListe(r.zuweisungen.filter((z) => z.status === 'offen')),
+      () => undefined
+    )
+  }, [art]) // eslint-disable-line react-hooks/exhaustive-deps
   // Unregelmäßige Verben statt Grammatikthema (07.10.2026) – ohne KI aus der Verbliste
   const [modus, setModus] = useState<'thema' | 'verben'>('thema')
   const [verbWahl, setVerbWahl] = useState<{ verben: VerbEintrag[]; titel: string }>({ verben: [], titel: '' })
@@ -289,10 +307,17 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   // Teilformen des Themas (Recherche 06.10.2026): keine gewählt = alle, die zur Klasse passen
   const [teilWahl, setTeilWahl] = useState<string[]>([])
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
-  const gruppenName = art === 'gruppe' ? gruppen.find((g) => g.id === gruppe)?.name ?? '' : art === 'einzeln' ? `${einzelne.length} Lernende` : 'QR-Code'
+  const gruppenName =
+    art === 'gruppe'
+      ? (gruppen.find((g) => g.id === gruppe)?.name ?? '')
+      : art === 'einzeln'
+        ? `${einzelne.length} Lernende`
+        : art === 'vok'
+          ? `wie Vokabeltraining „${vokListe.find((v) => v.id === vokId)?.titel ?? ''}“`
+          : 'QR-Code'
   const verbSprache = fach && istVerbSprache(fach.sprache) ? fach.sprache : null
   const mitVerben = modus === 'verben' && verbSprache
-  const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : true
+  const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : art === 'vok' ? Boolean(vokId) : true
   const bereit = Boolean(fach && (mitVerben ? verbWahl.verben.length >= 4 : thema) && empfaengerDa)
   const erstellen = (): void => {
     if (!fach || !bereit) return
@@ -301,7 +326,8 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
       schueler: art === 'einzeln' ? einzelne : [],
       gaeste: art === 'code' || qr,
       bis: ausFeld(bis, '23:59:00'),
-      gruppe: gruppenName
+      gruppe: gruppenName,
+      ...(art === 'vok' && vokId ? { vokId } : {})
     }
     if (mitVerben) {
       // Ohne KI: je Verb eine Karte, dazu die Karten der Verbspiele – als Entwurf zum Ansehen wie bei Themen
@@ -407,6 +433,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
               <GrammatikAuswahl
                 key={fachId}
                 unitSofort
+                lehrwerk={vorgabe?.lehrwerk}
                 query={query}
                 wahl={{ themen: themenIds, teilformen: teilWahl }}
                 onChange={(w) => (setThemenIds(w.themen), setTeilWahl(w.teilformen))}
@@ -465,10 +492,22 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             data={[
               { value: 'gruppe', label: 'Lerngruppe' },
               { value: 'einzeln', label: 'Einzelne Lernende' },
+              { value: 'vok', label: 'Wie Vokabeltraining' },
               { value: 'code', label: 'Nur per QR-Code' }
             ]}
+            data-grammatik-empfaenger
           />
-          {art === 'gruppe' ? (
+          {art === 'vok' ? (
+            <Select
+              label="Vokabeltraining"
+              description="Gilt fest für dessen Lernende – auch für alle, die später dort eingetragen werden oder beitreten."
+              data={vokListe.map((v) => ({ value: v.id, label: v.lerngruppe ? `${v.titel} (${v.lerngruppe})` : v.titel }))}
+              value={vokId}
+              onChange={setVokId}
+              placeholder="wählen …"
+              data-grammatik-vok
+            />
+          ) : art === 'gruppe' ? (
             <Select
               label="Lerngruppe"
               data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
@@ -527,7 +566,8 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
         lerngruppeId: e.empfaenger.lerngruppeId,
         schueler: e.empfaenger.schueler,
         gaeste: e.empfaenger.gaeste,
-        bis: e.empfaenger.bis
+        bis: e.empfaenger.bis,
+        ...(e.empfaenger.vokId ? { vokId: e.empfaenger.vokId } : {})
       })
       speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
       notifySuccess(`„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`)

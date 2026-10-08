@@ -226,14 +226,14 @@ export default function SchuelerBereich(): React.JSX.Element {
             ? aufgabe || fbCode
               ? ' · Rückmeldung'
               : blatt || blattCode
-                ? ' · Arbeitsblatt'
-                : vokabeln || vokCode
-                  ? ' · Vokabeltraining'
-                  : grammatik || gramCode
-                    ? ' · Grammatiktraining'
-                    : code
-                      ? ' · Onlinetest'
-                      : ''
+              ? ' · Arbeitsblatt'
+              : vokabeln || vokCode
+              ? ' · Vokabeltraining'
+              : grammatik || gramCode
+              ? ' · Grammatiktraining'
+              : code
+              ? ' · Onlinetest'
+              : ''
             : ''}
         </Text>
         <Group gap={4} style={mitTabs ? { display: 'none' } : undefined}>
@@ -418,38 +418,38 @@ function Startseite(): React.JSX.Element {
         farbe: 'teal'
       }
     : offeneReihen[0]
-      ? {
-          titel: offeneReihen[0].titel,
-          text: `Unterrichtsreihe – ${Math.round(offeneReihen[0].fortschritt * 100)} % geschafft. Weiter geht's!`,
-          href: `/s/r/${offeneReihen[0].id}`,
-          knopf: 'Weitermachen',
-          farbe: 'indigo'
-        }
-      : faelligeVok[0]
-        ? {
-            titel: faelligeVok[0].titel,
-            text: `${faelligeVok[0].uebersicht.faellig} Vokabeln sind heute dran – ein paar Minuten genügen.`,
-            href: `/s/v/${faelligeVok[0].id}`,
-            knopf: 'Vokabeln üben',
-            farbe: 'grape'
-          }
-        : offeneBlaetter[0]
-          ? {
-              titel: offeneBlaetter[0].titel,
-              text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
-              href: `/s/b/${offeneBlaetter[0].id}`,
-              knopf: offeneBlaetter[0].begonnen ? 'Weiter ausfüllen' : 'Öffnen',
-              farbe: 'blue'
-            }
-          : offeneAufgaben[0]
-            ? {
-                titel: offeneAufgaben[0].titel,
-                text: 'Eine Aufgabe mit Feedback ist offen.',
-                href: `/s/a/${offeneAufgaben[0].id}`,
-                knopf: 'Öffnen',
-                farbe: 'green'
-              }
-            : null
+    ? {
+        titel: offeneReihen[0].titel,
+        text: `Unterrichtsreihe – ${Math.round(offeneReihen[0].fortschritt * 100)} % geschafft. Weiter geht's!`,
+        href: `/s/r/${offeneReihen[0].id}`,
+        knopf: 'Weitermachen',
+        farbe: 'indigo'
+      }
+    : faelligeVok[0]
+    ? {
+        titel: faelligeVok[0].titel,
+        text: `${faelligeVok[0].uebersicht.faellig} Vokabeln sind heute dran – ein paar Minuten genügen.`,
+        href: `/s/v/${faelligeVok[0].id}`,
+        knopf: 'Vokabeln üben',
+        farbe: 'grape'
+      }
+    : offeneBlaetter[0]
+    ? {
+        titel: offeneBlaetter[0].titel,
+        text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
+        href: `/s/b/${offeneBlaetter[0].id}`,
+        knopf: offeneBlaetter[0].begonnen ? 'Weiter ausfüllen' : 'Öffnen',
+        farbe: 'blue'
+      }
+    : offeneAufgaben[0]
+    ? {
+        titel: offeneAufgaben[0].titel,
+        text: 'Eine Aufgabe mit Feedback ist offen.',
+        href: `/s/a/${offeneAufgaben[0].id}`,
+        knopf: 'Öffnen',
+        farbe: 'green'
+      }
+    : null
   return (
     <Stack data-startseite gap="lg">
       <style>{STARTSEITE_CSS}</style>
@@ -462,12 +462,7 @@ function Startseite(): React.JSX.Element {
         </Alert>
       )}
       <Begruessung vorname={vorname} stand={stand} naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null} />
-      {stand && (
-        <TippKarte
-          stand={stand}
-          gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)}
-        />
-      )}
+      {stand && <TippKarte stand={stand} gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)} />}
 
       {naechstes && (
         <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
@@ -524,8 +519,8 @@ function Startseite(): React.JSX.Element {
             tests === null
               ? '…'
               : offeneTests.length
-                ? `${offeneTests.length} offene${offeneTests.length === 1 ? 'r' : ''} Test${offeneTests.length === 1 ? '' : 's'}`
-                : 'Code eingeben oder QR-Code scannen'
+              ? `${offeneTests.length} offene${offeneTests.length === 1 ? 'r' : ''} Test${offeneTests.length === 1 ? '' : 's'}`
+              : 'Code eingeben oder QR-Code scannen'
           }
         />
         {Boolean(reihen?.length) && (
@@ -557,8 +552,8 @@ function Startseite(): React.JSX.Element {
             blaetter === null
               ? '…'
               : blaetter.length
-                ? `${offeneBlaetter.length} offen · ${blaetter.length - offeneBlaetter.length} erledigt`
-                : 'Noch keine Arbeitsblätter'
+              ? `${offeneBlaetter.length} offen · ${blaetter.length - offeneBlaetter.length} erledigt`
+              : 'Noch keine Arbeitsblätter'
           }
         />
         <Kachel
@@ -572,8 +567,8 @@ function Startseite(): React.JSX.Element {
             aufgaben === null
               ? '…'
               : aufgaben.length
-                ? `${offeneAufgaben.length} offen · ${aufgaben.length - offeneAufgaben.length} erledigt`
-                : 'Noch keine Aufgaben mit Feedback'
+              ? `${offeneAufgaben.length} offen · ${aufgaben.length - offeneAufgaben.length} erledigt`
+              : 'Noch keine Aufgaben mit Feedback'
           }
         />
         <Kachel
@@ -586,8 +581,8 @@ function Startseite(): React.JSX.Element {
             ergebnisse === null
               ? '…'
               : ergebnisse.length
-                ? `${ergebnisse.length} Test${ergebnisse.length === 1 ? '' : 's'} – zuletzt ${ergebnisse[0].titel}`
-                : 'Noch keine Ergebnisse'
+              ? `${ergebnisse.length} Test${ergebnisse.length === 1 ? '' : 's'} – zuletzt ${ergebnisse[0].titel}`
+              : 'Noch keine Ergebnisse'
           }
         />
       </SimpleGrid>
@@ -773,6 +768,11 @@ function BlaetterSeite(): React.JSX.Element {
 
 /** Ein Code kann zu einem Test oder zu einer Aufgabe mit Feedback gehören (Etappe 4) */
 async function oeffneCode(code: string): Promise<void> {
+  // Persönlicher Anmeldecode vom Zettel der Lehrkraft (8 Zeichen, 08.10.2026): meldet an und öffnet die Vokabeln
+  if (code.length === 8) {
+    const a = await senden<{ id: string; anzahl: number }>('/s/api/vokabeln/anmelden', { code }).catch(() => null)
+    if (a) return window.location.assign(a.id ? `/s/v/${a.id}` : '/s/')
+  }
   const aufgabe = await holen<{ id: string }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
   if (aufgabe?.id) return window.location.assign(`/s/f/${code}`)
   const blatt = await holen<{ id: string }>(`/s/api/blatt/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
@@ -912,7 +912,14 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
  */
 function GastStart(): React.JSX.Element {
   const [vok, setVok] = useState<
-    { id: string; titel: string; fach: string; uebersicht: { gesamt: number; sicher: number; faellig: number }; g?: boolean }[] | null
+    | {
+        id: string
+        titel: string
+        fach: string
+        uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number }
+        g?: boolean
+      }[]
+    | null
   >(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   useEffect(() => {
@@ -963,11 +970,27 @@ function GastStart(): React.JSX.Element {
                 {v.g ? 'Grammatiktraining' : 'Vokabeltraining'} · {v.fach}
               </Text>
               <Text fw={700}>{v.titel}</Text>
+              {/* Motivierender Stand statt nur „0 von 127 sicher" (08.10.2026): heute noch etwas zu tun? */}
+              {v.uebersicht.heuteOffen !== undefined && (
+                <Text size="sm" fw={600} c={v.uebersicht.heuteOffen ? 'orange' : 'teal'} data-heute-offen={v.uebersicht.heuteOffen}>
+                  {v.uebersicht.heuteOffen
+                    ? `Heute noch ${v.uebersicht.heuteOffen} ${v.uebersicht.heuteOffen === 1 ? 'Wort' : 'Wörter'} üben${
+                        v.g ? '' : ' – dann sind die Spiele frei'
+                      }`
+                    : '✓ Für heute geschafft'}
+                </Text>
+              )}
               <Text size="sm" c="dimmed">
-                {v.uebersicht.sicher} von {v.uebersicht.gesamt} sicher{v.uebersicht.faellig ? ` · ${v.uebersicht.faellig} heute fällig` : ''}
+                {[
+                  v.uebersicht.heuteGeuebt ? `heute geübt: ${v.uebersicht.heuteGeuebt}` : '',
+                  `${v.uebersicht.gesamt - v.uebersicht.neu} von ${v.uebersicht.gesamt} kennengelernt`,
+                  `${v.uebersicht.sicher} sicher`
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
             </div>
-            <Button color={fachFarbeAus(v.fach, undefined) ?? 'orange'} radius="xl" component="span">
+            <Button color={fachFarbeAus(v.fach, undefined) ?? 'orange'} radius="xl" component="span" style={{ flex: 'none' }}>
               Üben
             </Button>
           </Group>
@@ -1034,7 +1057,7 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
         <Group align="end">
           <TextInput
             style={{ flex: 1 }}
-            label="Code (steht an der Tafel)"
+            label="Code (steht an der Tafel oder du hast ihn von deiner Lehrkraft erhalten)"
             description="für Test, Arbeitsblatt oder Vokabeln"
             value={code}
             onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
@@ -1559,10 +1582,10 @@ function ErgebnisAnsicht({
             {rueckblick
               ? `Abgegeben am ${datumText(rueckblick.datum)}`
               : grund === 'verlassen'
-                ? 'Du hast die Seite verlassen (anderer Tab, anderes Fenster oder andere App) – dein Test wurde deshalb automatisch abgegeben.'
-                : grund === 'zeit'
-                  ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
-                  : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
+              ? 'Du hast die Seite verlassen (anderer Tab, anderes Fenster oder andere App) – dein Test wurde deshalb automatisch abgegeben.'
+              : grund === 'zeit'
+              ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
+              : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
           </Text>
           {e && !e.frei && (
             <Text ta="center" size="sm" c="dimmed" data-ergebnis-wartet>

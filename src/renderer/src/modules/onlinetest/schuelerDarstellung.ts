@@ -19,6 +19,8 @@ export interface Darstellung {
   design: 'fach' | 'eigen'
   /** Dunkel als Vorgabe übernommen (05.10.2026) – fehlt sie, wird „automatisch" einmalig zu „dunkel" */
   dunkelVorgabe?: boolean
+  /** Töne an und männliche Aussprache als Vorgabe übernommen (08.10.2026) – fehlt sie, einmalig umgestellt */
+  vorgabe0810?: boolean
   // ---------- Lesen und Hören (06.10.2026)
   zeilen: 'normal' | 'weit' | 'sehrweit'
   kontrast: boolean
@@ -41,6 +43,8 @@ export interface Darstellung {
   /** Spiele mit Uhr (Blitzrunde, fallende Wörter …) */
   zeitdruck: boolean
   toene: boolean
+  /** Spielauswahl: Bereich → aufgeklappt (08.10.2026); fehlt ein Bereich, gilt die Vorgabe */
+  spielGruppen?: Record<string, boolean>
 }
 
 /** Nur auf dem Gerät – gehen nicht an den Server */
@@ -53,30 +57,41 @@ export const VORGABE: Darstellung = {
   ruhig: false,
   design: 'fach',
   dunkelVorgabe: true,
+  vorgabe0810: true,
   zeilen: 'normal',
   kontrast: false,
   leseschrift: false,
   vorlesen: false,
   tempo: 'normal',
   stimmen: {},
-  aussprache: 'w',
+  // Männliche Stimme als Standard (08.10.2026, Wunsch der Lehrkraft); fehlt die Aufnahme, kommt die weibliche
+  aussprache: 'm',
   wochenziel: 3,
   tipps: true,
   spiele: true,
   zeitdruck: true,
-  // Töne aus: im Klassenraum klingen sonst 30 Geräte zugleich
-  toene: false
+  // Töne für richtige Antworten an (08.10.2026, Wunsch der Lehrkraft) – abschaltbar in den Einstellungen
+  toene: true
 }
 const SPEICHER = 'schulapps-darstellung'
 
 /** Dunkel als Vorgabe (05.10.2026): ältere gespeicherte Darstellung mit „automatisch" einmalig auf „dunkel" */
-export const mitDunkelVorgabe = (d: Darstellung): Darstellung =>
-  d.dunkelVorgabe ? d : { ...d, modus: d.modus === 'auto' ? 'dunkel' : d.modus, dunkelVorgabe: true }
+export const mitDunkelVorgabe = (d0: Darstellung): Darstellung => {
+  const d = d0.dunkelVorgabe ? d0 : { ...d0, modus: d0.modus === 'auto' ? 'dunkel' : d0.modus, dunkelVorgabe: true }
+  // Neue Vorgaben vom 08.10.2026 einmalig für alle: Töne an, männliche Aussprache – danach gilt die eigene Wahl
+  return d.vorgabe0810 ? d : { ...d, toene: true, aussprache: 'm', vorgabe0810: true }
+}
 
 const ausSpeicher = (): Darstellung => {
   try {
     const roh = JSON.parse(localStorage.getItem(SPEICHER) ?? '{}') as Partial<Darstellung>
-    return mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, ...roh, ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true }) })
+    return mitDunkelVorgabe({
+      ...VORGABE,
+      dunkelVorgabe: false,
+      vorgabe0810: false,
+      ...roh,
+      ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true, vorgabe0810: true })
+    })
   } catch {
     return VORGABE
   }
@@ -104,7 +119,7 @@ export const fuerServer = (d: Darstellung): Partial<Darstellung> => {
 /** Vom Server geladen: Gerät-Angaben von hier behalten */
 export const vomServer = (server: Partial<Darstellung>): Darstellung => {
   const hier = useDarstellung.getState().d
-  return mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen })
+  return mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, vorgabe0810: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen })
 }
 
 // ---------------------------------------------------------------- Helfer, die die Einstellungen wirksam machen

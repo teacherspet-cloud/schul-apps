@@ -46,6 +46,8 @@ export interface WortStand {
   fehlerTexte: string[]
   /** Zuletzt geübt (ms) */
   zuletzt: number
+  /** Erster Kontakt (ms) – für die Tagesration neuer Wörter (08.10.2026); fehlt bei älteren Ständen */
+  erstmals?: number
 }
 
 export const TAG = 86_400_000
@@ -254,7 +256,15 @@ export function istSicher(st: WortStand): boolean {
  *  - Erkennen (Auswahl/Hören) bringt höchstens bis Fach 2 – weiter nur mit Schreiben
  */
 export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antwort: string, jetzt = Date.now(), testTermin?: number): WortStand {
-  const st: WortStand = { ...st0, frei: [...st0.frei], fehlerTexte: [...st0.fehlerTexte], versuche: st0.versuche + 1, zuletzt: jetzt }
+  const st: WortStand = {
+    ...st0,
+    frei: [...st0.frei],
+    fehlerTexte: [...st0.fehlerTexte],
+    versuche: st0.versuche + 1,
+    zuletzt: jetzt,
+    // Erster Kontakt: für die Tagesration neuer Wörter (08.10.2026)
+    ...(st0.versuche === 0 && !st0.erstmals ? { erstmals: jetzt } : {})
+  }
   const erkennen = ERKENNEN.includes(uebung)
   if (erkennen) {
     st.erkennenVersuche++
@@ -288,13 +298,57 @@ export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antw
   return st
 }
 
-/** Fällige Wörter einer Sitzung: zuerst Wiederholungen (älteste zuerst), dann höchstens `neu` neue */
-export function sitzungsWoerter(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), neu = 10, max = 25): Vokabel[] {
+/** Tag in Deutschland (JJJJ-MM-TT) – Grenze der Tagesration */
+export const tagVon = (ms: number): string => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' })
+
+/** Neue Wörter je Tag (08.10.2026, Wunsch der Lehrkraft: 127 freigegebene Vokabeln nicht alle am ersten Tag) */
+export const NEU_JE_TAG = 10
+
+/** Kleine, feste Streuzahl – mischt die neuen Wörter je Tag gleich (bleibt beim Neuladen stabil) */
+const streu = (s: string): number => {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+/** Wurde das Wort heute zum ersten Mal geübt? (Ältere Stände ohne `erstmals`: heute geübt und höchstens in Fach 1) */
+const heuteNeu = (st: WortStand, heute: string): boolean =>
+  st.erstmals ? tagVon(st.erstmals) === heute : st.versuche > 0 && st.fach <= 1 && tagVon(st.zuletzt) === heute
+
+/** Noch nie geübte Wörter in der Reihenfolge des Tages (zufällig, aber je Tag fest) */
+export function neueWoerter(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now()): Vokabel[] {
+  const heute = tagVon(jetzt)
+  return liste
+    .filter((v) => (staende[v.id]?.versuche ?? 0) === 0 && (staende[v.id]?.fach ?? 0) === 0)
+    .map((v) => [streu(`${heute}|${v.id}`), v] as const)
+    .sort((a, b) => a[0] - b[0])
+    .map(([, v]) => v)
+}
+
+/**
+ * Tagesration (08.10.2026, abgestimmt): fällige Wiederholungen (älteste zuerst; dazu kennengelernte, aber noch nicht
+ * gewusste), dann so viele neue Wörter, dass es heute höchstens `neu` neue sind – in zufälliger Reihenfolge. Ist die
+ * Ration geschafft, gibt es die Spiele; weitere neue Wörter nur freiwillig (`weitereNeue`). Am nächsten Tag die nächsten.
+ */
+export function sitzungsWoerter(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), neu = NEU_JE_TAG, max = 25): Vokabel[] {
   const st = (v: Vokabel): WortStand => staende[v.id] ?? neuerStand()
-  const faellig = liste.filter((v) => st(v).fach > 0 && st(v).faellig <= jetzt).sort((a, b) => st(a).faellig - st(b).faellig)
-  const neue = liste.filter((v) => st(v).fach === 0).slice(0, neu)
+  const heute = tagVon(jetzt)
+  const faellig = liste
+    // Neue und angefangene Wörter (Fach 0–1), heute schon geübt (auch nicht gewusst), kommen erst morgen wieder – sie
+    // wurden in der Runde selbst wiederholt; so endet die Tagesration. Ab Fach 2 bleibt „fast" heute noch fällig.
+    .filter((v) => (st(v).fach > 0 || st(v).versuche > 0) && st(v).faellig <= jetzt && !(st(v).fach <= 1 && st(v).zuletzt && tagVon(st(v).zuletzt) === heute))
+    .sort((a, b) => st(a).faellig - st(b).faellig)
+  const schonNeu = liste.filter((v) => heuteNeu(st(v), heute)).length
+  const neue = neueWoerter(liste, staende, jetzt).slice(0, Math.max(0, neu - schonNeu))
   return [...faellig, ...neue].slice(0, max)
 }
+
+/** Schrittgröße beim Üben: die Tagesration kommt in Zehnerschritten (der letzte Schritt ggf. kleiner) */
+export const SCHRITT = 10
+
+/** Freiwillig weiter (nach der Tagesration): die nächsten `n` neuen Wörter */
+export const weitereNeue = (liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), n = NEU_JE_TAG): Vokabel[] =>
+  neueWoerter(liste, staende, jetzt).slice(0, n)
 
 export interface Uebersicht {
   gesamt: number
@@ -306,9 +360,12 @@ export interface Uebersicht {
   erkennen: number
   /** Anzahl Wörter je Fach 0–6 */
   faecher: number[]
+  /** Heute schon geübte Wörter und was von der Tagesration noch offen ist (08.10.2026, Anzeige für Lernende) */
+  heuteGeuebt?: number
+  heuteOffen?: number
 }
 
-export function uebersicht(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now()): Uebersicht {
+export function uebersicht(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), tagesziel = NEU_JE_TAG): Uebersicht {
   const faecher = [0, 0, 0, 0, 0, 0, 0]
   let sicher = 0
   let faellig = 0
@@ -322,7 +379,20 @@ export function uebersicht(liste: Vokabel[], staende: Record<string, WortStand>,
     erk += s.erkannt
     erkV += s.erkennenVersuche
   }
-  return { gesamt: liste.length, neu: faecher[0], imAufbau: liste.length - faecher[0] - sicher, sicher, faellig, erkennen: erkV ? erk / erkV : 0, faecher }
+  const heute = tagVon(jetzt)
+  const heuteGeuebt = liste.filter((v) => (staende[v.id]?.zuletzt ?? 0) > 0 && tagVon(staende[v.id].zuletzt) === heute).length
+  const heuteOffen = sitzungsWoerter(liste, staende, jetzt, tagesziel, tagesziel + 25).length
+  return {
+    gesamt: liste.length,
+    neu: faecher[0],
+    imAufbau: liste.length - faecher[0] - sicher,
+    sicher,
+    faellig,
+    erkennen: erkV ? erk / erkV : 0,
+    faecher,
+    heuteGeuebt,
+    heuteOffen
+  }
 }
 
 /** Auswahl-Optionen: das richtige Wort und drei andere aus der Liste (nicht aus demselben Anfang) */

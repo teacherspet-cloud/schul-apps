@@ -35,7 +35,8 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
 import {
   IconArrowLeft,
@@ -47,6 +48,7 @@ import {
   IconMicrophone,
   IconPlayerPlay,
   IconShieldCheck,
+  IconPlus,
   IconStairsUp,
   IconVolume,
   IconX
@@ -64,7 +66,9 @@ import {
   ohneAngaben,
   STUFEN,
   satzMitLuecke,
+  SCHRITT,
   sitzungsWoerter,
+  weitereNeue,
   uebersicht,
   uebungFuer,
   varianten,
@@ -89,6 +93,10 @@ interface Liste {
   farbe?: string | null
   /** Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026) */
   klasse?: number | null
+  /** Spiele für heute freigeschaltet (Lehrkraft, 08.10.2026) */
+  spieleFrei?: boolean
+  /** Neue Vokabeln je Tag vor den Spielen (Lehrkraft, 08.10.2026) */
+  tagesziel?: number
   /** Unregelmäßige Verben der Liste (07.10.2026) – Stammformen-Nachfrage und Verbspiele */
   verben?: { sprache: VerbSprache; karten: VerbKarte[] } | null
   /** Vokabelweg (03.10.2026): die Freischalt-Leiter */
@@ -259,7 +267,7 @@ export function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fac
   const { d } = useDarstellung()
   const theme = useMantineTheme()
   const dunkel = useComputedColorScheme('light') === 'dark'
-  const akzent = d.design === 'eigen' ? (theme.colors[d.farbe]?.[7] ?? '#1971c2') : fachFarbe || fachFarbeAus(fach, undefined) || '#ea580c'
+  const akzent = d.design === 'eigen' ? theme.colors[d.farbe]?.[7] ?? '#1971c2' : fachFarbe || fachFarbeAus(fach, undefined) || '#ea580c'
   const farben = useMemo(() => vtFarben(akzent, dunkel), [akzent, dunkel])
   return (
     <VtFarbe.Provider value={farben}>
@@ -284,7 +292,11 @@ function Kasten({
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const u = uebersicht(d.woerter, d.staende)
-  const heute = sitzungsWoerter(d.woerter, d.staende)
+  // Tagesration nach dem Tagesziel der Lehrkraft (08.10.2026), geübt in Zehnerschritten
+  const ziel = d.tagesziel ?? 10
+  const heute = sitzungsWoerter(d.woerter, d.staende, Date.now(), ziel, ziel + 25)
+  const schritt = heute.slice(0, SCHRITT)
+  const weitere = heute.length ? [] : weitereNeue(d.woerter, d.staende)
   const max = Math.max(1, ...u.faecher)
   const tage = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const anteil = Math.round((u.sicher / Math.max(1, u.gesamt)) * 100)
@@ -302,7 +314,7 @@ function Kasten({
    */
   const fachDesVerbs = (k: VerbKarte): number => {
     const w = d.woerter.find((x) => verbSchluesselVonWort(x.term) === k.schluessel.toLowerCase())
-    return w ? (d.staende[w.id]?.fach ?? 0) : 0
+    return w ? d.staende[w.id]?.fach ?? 0 : 0
   }
   const bekannteVerben = useMemo(() => (d.verben?.karten ?? []).filter((k) => fachDesVerbs(k) >= 1), [d.verben, d.staende]) // eslint-disable-line react-hooks/exhaustive-deps
   const verbDaten = useVerbDaten(bekannteVerben, d.verben?.sprache, d.klasse, (k) => fachDesVerbs(k) >= 3)
@@ -316,12 +328,34 @@ function Kasten({
     const t = setTimeout(() => setOhneStimme(!besteStimme(STIMME[d.sprache])), 1500)
     return () => clearTimeout(t)
   }, [d.sprache])
-  const werte: { name: string; wert: string; farbe: string; symbol: React.ReactNode }[] = [
-    { name: 'sicher', wert: `${u.sicher} / ${u.gesamt}`, farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
-    { name: 'heute fällig', wert: String(heute.length), farbe: farbe.a, symbol: <IconFlame size={20} /> },
-    { name: 'im Aufbau', wert: String(u.imAufbau), farbe: '#f59e0b', symbol: <IconStairsUp size={20} /> },
+  // Antippen erklärt den Wert – wie bei den Fächern (08.10.2026: „ab wann gilt eine Vokabel als sicher?")
+  const werte: { name: string; wert: string; farbe: string; symbol: React.ReactNode; erklaerung: string }[] = [
+    {
+      name: 'sicher',
+      wert: `${u.sicher} / ${u.gesamt}`,
+      farbe: '#14b8a6',
+      symbol: <IconShieldCheck size={20} />,
+      erklaerung:
+        'Ein Wort gilt als sicher, wenn du es zweimal selbst richtig geschrieben hast – vom Deutschen in die Fremdsprache, ohne Auswahl – und zwischen den beiden Malen mindestens eine Woche liegt. Erkennen oder Auswählen allein zählt dafür noch nicht. Darum steht hier anfangs 0: Das erste Wort kann frühestens nach gut einer Woche sicher sein.'
+    },
+    {
+      name: 'heute fällig',
+      wert: String(heute.length),
+      farbe: farbe.a,
+      symbol: <IconFlame size={20} />,
+      erklaerung: 'So viele Wörter stehen heute an: Wiederholungen und neue Wörter, geübt in Zehnerschritten. Danach sind die Spiele frei.'
+    },
+    {
+      name: 'im Aufbau',
+      wert: String(u.imAufbau),
+      farbe: '#f59e0b',
+      symbol: <IconStairsUp size={20} />,
+      erklaerung: 'Wörter, die du schon kennengelernt hast, die aber noch nicht sicher sind. Sie kommen in wachsenden Abständen wieder.'
+    },
     {
       name: 'Test',
+      erklaerung:
+        'Der Termin des Vokabeltests, falls deine Lehrkraft einen eingetragen hat. Bis dahin plant der Kasten so, dass jedes Wort mehrmals geübt ist.',
       wert: tage !== null && tage >= 0 ? (tage === 0 ? 'heute' : `in ${tage} T.`) : '–',
       farbe: '#8b5cf6',
       symbol: <IconCalendarEvent size={20} />
@@ -417,36 +451,60 @@ function Kasten({
           </div>
           <div className="vt-werte">
             {werte.map((w) => (
-              <div key={w.name} className="vt-wert">
-                <div className="vt-wert-symbol" style={{ background: `${w.farbe}1f`, color: w.farbe }}>
-                  {w.symbol}
-                </div>
-                <div>
-                  <Text size="xs" c="dimmed">
-                    {w.name}
+              <Popover key={w.name} width={290} position="bottom" withArrow shadow="md">
+                <Popover.Target>
+                  <UnstyledButton className="vt-wert" style={{ textAlign: 'left' }} aria-label={`${w.name}: ${w.wert} – Erklärung`} data-wert={w.name}>
+                    <div className="vt-wert-symbol" style={{ background: `${w.farbe}1f`, color: w.farbe }}>
+                      {w.symbol}
+                    </div>
+                    <div>
+                      <Text size="xs" c="dimmed">
+                        {w.name}
+                      </Text>
+                      <Text fw={800} size="lg" lh={1.2} c="var(--vt-tinte)">
+                        {w.wert}
+                      </Text>
+                    </div>
+                  </UnstyledButton>
+                </Popover.Target>
+                <Popover.Dropdown>
+                  <Text size="sm" data-wert-erklaerung={w.name}>
+                    {w.erklaerung}
                   </Text>
-                  <Text fw={800} size="lg" lh={1.2} c="var(--vt-tinte)">
-                    {w.wert}
-                  </Text>
-                </div>
-              </div>
+                </Popover.Dropdown>
+              </Popover>
             ))}
           </div>
         </>
       )}
-      {heute.length ? (
-        <Button size="xl" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={22} />} onClick={() => starten(heute)} data-vokabel-start>
-          Jetzt üben · {heute.length} {heute.length === 1 ? 'Wort' : 'Wörter'}
+      {heute.length > 0 && !spielt && (
+        <Button size="xl" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={22} />} onClick={() => starten(schritt)} data-vokabel-start>
+          Jetzt üben · {schritt.length} {schritt.length === 1 ? 'Wort' : 'Wörter'}
         </Button>
-      ) : (
+      )}
+      {heute.length > schritt.length && !spielt && (
+        <Text size="sm" c="dimmed" ta="center" data-vokabel-rest>
+          Heute noch {heute.length} Wörter bis zu den Spielen – Schritt für Schritt je {SCHRITT}.
+        </Text>
+      )}
+      {/* Spiele nach der Tagesrunde – oder schon vorher, wenn die Lehrkraft sie für heute freigeschaltet hat (08.10.2026) */}
+      {(!heute.length || d.spieleFrei) && (
         <>
-          {!spielt && (
+          {!spielt && !heute.length && (
             <Alert color="teal" radius="lg" icon={<IconCheck />}>
-              Für heute ist alles erledigt. Der Kasten meldet sich, wenn die nächsten Wörter fällig sind.
+              Für heute ist alles erledigt. Der Kasten meldet sich, wenn die nächsten Wörter fällig sind
+              {weitere.length ? ' – morgen kommen die nächsten neuen Wörter dazu.' : '.'}
             </Alert>
+          )}
+          {/* Freiwillig weiter (08.10.2026): die nächsten 10 neuen Wörter – die Spiele bleiben frei */}
+          {!spielt && !heute.length && weitere.length > 0 && (
+            <Button size="md" radius="xl" variant="light" leftSection={<IconPlus size={18} />} onClick={() => starten(weitere)} data-weitere-neue>
+              Freiwillig: {weitere.length} weitere neue Vokabeln üben
+            </Button>
           )}
           {/* Spiele mit den gelernten Wörtern (03.10.2026, abgestimmt) */}
           <Spielwahl
+            vorDerRunde={heute.length > 0}
             woerter={d.woerter}
             staende={d.staende}
             sprache={d.sprache}
@@ -493,7 +551,7 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
   const [frage, setFrage] = useState(0)
   const v = warteschlange[0]
   const st = v
-    ? (staende[v.id] ?? ({ fach: 0, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche: 0, falsch: 0, fehlerTexte: [], zuletzt: 0 } as WortStand))
+    ? staende[v.id] ?? ({ fach: 0, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche: 0, falsch: 0, fehlerTexte: [], zuletzt: 0 } as WortStand)
     : null
   /*
    * Befund 03.10.2026: Nach einer Antwort änderte sich der Lernstand – und damit sofort die Übungsart
@@ -511,19 +569,24 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
     try {
       const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', { id: d.id, wortId: v.id, uebung, ...wert })
       setStaende((s) => ({ ...s, [v.id]: e.stand }))
-      setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
       if (e.urteil === 'richtig') ton('richtig')
+      // Lernkarte („Wusste ich" / „Noch nicht gewusst", 08.10.2026): gleich weiter, ohne Weiter-Knopf
+      if (uebung === 'karte') return weiterMit(e)
+      setErgebnis(e)
     } finally {
       setLaeuft(false)
     }
   }
   const weiter = (): void => {
-    if (!v || !ergebnis) return
+    if (ergebnis) weiterMit(ergebnis)
+  }
+  const weiterMit = (e: Ergebnis): void => {
+    if (!v) return
     const n = zaehler.wiederholt.get(v.id) ?? 0
     // Falsch/fast: in dieser Sitzung noch einmal (höchstens zweimal), nach ein paar anderen Wörtern
-    const nochmal = ergebnis.urteil !== 'richtig' && n < 2
+    const nochmal = e.urteil !== 'richtig' && n < 2
     const rest = warteschlange.slice(1)
     if (nochmal) {
       zaehler.wiederholt.set(v.id, n + 1)
@@ -713,7 +776,13 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
   const [zug, setZug] = useState(0)
   const start = useRef<number | null>(null)
   const [nachsprechen, setNachsprechen] = useState<string | null>(null)
-  useEffect(() => sprich(v.term, sprache), [v.term, sprache])
+  // Zufällig mal Deutsch, mal die Fremdsprache vorn (08.10.2026, Wunsch der Lehrkraft); je Karte fest
+  const [deutschVorn] = useState(() => Math.random() < 0.5)
+  // Vorlesen, sobald die fremdsprachige Seite zu sehen ist
+  const fremdSichtbar = deutschVorn ? um : !um
+  useEffect(() => {
+    if (fremdSichtbar) sprich(v.term, sprache)
+  }, [v.term, sprache, fremdSichtbar])
   const erkennung =
     (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike })
       .SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition
@@ -738,6 +807,50 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
     r.start()
     setNachsprechen('Ich höre zu …')
   }
+  const fremdSeite = (
+    <>
+      {v.bild && <img src={v.bild} alt="" style={{ width: 72, height: 72, marginBottom: 8 }} />}
+      <Text fw={800} size="1.8rem">
+        {v.term}
+      </Text>
+      {v.pos && (
+        <Text size="sm" c="dimmed">
+          {v.pos}
+        </Text>
+      )}
+      {v.example && (
+        <Text size="sm" mt="sm" fs="italic">
+          {v.example}
+          {hatSatzAufnahme(v.example) && (
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              ml={4}
+              aria-label="Beispielsatz anhören"
+              data-satz-anhoeren
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={(e) => (e.stopPropagation(), aufnahmeSpielen(v.example!))}
+            >
+              <IconVolume size={14} />
+            </ActionIcon>
+          )}
+        </Text>
+      )}
+    </>
+  )
+  const deutschSeite = (
+    <>
+      <Text fw={800} size="1.5rem">
+        {v.translation}
+      </Text>
+      {v.exampleTranslation && (
+        <Text size="xs" c="dimmed">
+          {v.exampleTranslation}
+        </Text>
+      )}
+    </>
+  )
   return (
     <Stack align="center" gap="md">
       <Text className="vt-frage">Neue Karte – tippe oder wische zum Umdrehen</Text>
@@ -754,46 +867,11 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
         data-lernkarte
       >
         <div className={`vt-karte ${um ? 'umgedreht' : ''}`} style={zug ? { transform: `rotateY(${(um ? 180 : 0) + zug}deg)` } : undefined}>
-          <div className="vt-seite">
-            {v.bild && <img src={v.bild} alt="" style={{ width: 72, height: 72, marginBottom: 8 }} />}
-            <Text fw={800} size="1.8rem">
-              {v.term}
-            </Text>
-            {v.pos && (
-              <Text size="sm" c="dimmed">
-                {v.pos}
-              </Text>
-            )}
+          {/* Fremdsprachige Seite mit Beispielsatz (08.10.2026), deutsche Seite mit der Übersetzung; Vorderseite zufällig */}
+          <div className="vt-seite" data-karte-vorn={deutschVorn ? 'deutsch' : 'fremd'}>
+            {deutschVorn ? deutschSeite : fremdSeite}
           </div>
-          <div className="vt-seite hinten">
-            <Text fw={800} size="1.5rem">
-              {v.translation}
-            </Text>
-            {v.example && (
-              <Text size="sm" mt="sm" fs="italic">
-                {v.example}
-                {hatSatzAufnahme(v.example) && (
-                  <ActionIcon
-                    size="sm"
-                    variant="subtle"
-                    ml={4}
-                    aria-label="Beispielsatz anhören"
-                    data-satz-anhoeren
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onPointerUp={(e) => e.stopPropagation()}
-                    onClick={(e) => (e.stopPropagation(), aufnahmeSpielen(v.example!))}
-                  >
-                    <IconVolume size={14} />
-                  </ActionIcon>
-                )}
-              </Text>
-            )}
-            {v.exampleTranslation && (
-              <Text size="xs" c="dimmed">
-                {v.exampleTranslation}
-              </Text>
-            )}
-          </div>
+          <div className="vt-seite hinten">{deutschVorn ? fremdSeite : deutschSeite}</div>
         </div>
       </div>
       <Group gap="xs">
@@ -1108,10 +1186,10 @@ function Schreiben({
         {uebung === 'diktat'
           ? 'Hör zu und schreib das Wort'
           : luecke
-            ? 'Ergänze den Satz'
-            : muster
-              ? 'Ergänze die fehlenden Buchstaben'
-              : 'Schreib das Wort in der Fremdsprache'}
+          ? 'Ergänze den Satz'
+          : muster
+          ? 'Ergänze die fehlenden Buchstaben'
+          : 'Schreib das Wort in der Fremdsprache'}
       </Text>
       {uebung === 'diktat' ? (
         <ActionIcon size={72} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">

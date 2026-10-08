@@ -64,15 +64,21 @@ try {
     await api(verwaltung, 'medien:bild-setzen', 'en', inf, { dataUrl: PNG, herkunft: 'ki', nachweis: 'Test' })
     for (const f of [inf, past, pp]) await api(verwaltung, 'medien:ton-setzen', 'en', inf, 'satz', { dataUrl: MP3, stimme: 'probe', text: f })
   }
-  const lehrer = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lou T' } })).json()
+  const lehrer = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lou T' } })
+  ).json()
   zuLoeschen.push(lehrer.id)
-  const liste = await (await verwaltung.request.post(`${A}/server/verwaltung/klassenliste`, { headers: KOPF, data: { klasse: KLASSE, namen: 'Ben Probe' } })).json()
+  const liste = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/klassenliste`, { headers: KOPF, data: { klasse: KLASSE, namen: 'Ben Probe' } })
+  ).json()
   const ben = liste.angelegt[0]
   for (const n of (await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json()).nutzer)
     if (n.benutzer === ben.benutzer) zuLoeschen.push(n.id)
   lk = await browser.newContext({ viewport: { width: 1400, height: 950 } })
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
-  const g = await (await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })).json()
+  const g = await (
+    await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
+  ).json()
   const vok = await (
     await lk.request.post(`${A}/server/vokabeln/freigeben`, {
       headers: KOPF,
@@ -81,17 +87,45 @@ try {
   ).json()
   const sm = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   await anmelden(sm, ben.benutzer, ben.passwort)
-  await sm.request.post(`${A}/auth/passwort`, { form: { neu: 'NeuesPasswort-99', neu2: 'NeuesPasswort-99', ziel: '/s/' }, headers: { origin: A }, maxRedirects: 0 })
+  await sm.request.post(`${A}/auth/passwort`, {
+    form: { neu: 'NeuesPasswort-99', neu2: 'NeuesPasswort-99', ziel: '/s/' },
+    headers: { origin: A },
+    maxRedirects: 0
+  })
   const l0 = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()
   pruefe(l0.verben?.karten?.length === 6, `Verben der Liste kommen bei den Lernenden an (${l0.verben?.karten?.length})`)
   // Tagesrunde „geschafft": alle als gewusst → Fach 1
-  for (const w of WOERTER) await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'karte', gewusst: true } })
+  for (const w of WOERTER)
+    await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'karte', gewusst: true } })
 
   const s = await sm.newPage()
   await s.goto(`${A}/s/v/${vok.id}`)
   pruefe(await da(s.locator('[data-spielwahl]')), 'Spielauswahl erscheint')
   await s.waitForTimeout(1500)
-  const neu = ['hoermemory', 'richtiggehoert', 'buchstaben', 'hoerbingo', 'bildmemory', 'wasfehlt', 'aufdecken', 'wortbild', 'verbtrio', 'formenblitz', 'bildverb', 'muster']
+  // Spielbereiche (08.10.2026) aufklappen – die Wahl bleibt am Konto gemerkt
+  const alleAuf = async () => {
+    const zu = s.locator('[data-spiel-gruppe]:not([data-offen]) [data-spiel-gruppe-kopf]')
+    for (let i = 0; i < 10 && (await zu.count()) > 0; i++) {
+      await zu.first().click()
+      await s.waitForTimeout(150)
+    }
+    await s.waitForTimeout(300)
+  }
+  await alleAuf()
+  const neu = [
+    'hoermemory',
+    'richtiggehoert',
+    'buchstaben',
+    'hoerbingo',
+    'bildmemory',
+    'wasfehlt',
+    'aufdecken',
+    'wortbild',
+    'verbtrio',
+    'formenblitz',
+    'bildverb',
+    'muster'
+  ]
   const da2 = []
   for (const id of neu) if (await s.locator(`[data-spiel-wahl="${id}"]`).count()) da2.push(id)
   pruefe(da2.length === neu.length, `alle 12 neuen Spiele angeboten (${da2.join(', ')})`)
@@ -104,6 +138,7 @@ try {
   let aktuell = ''
   const spiele = async (id, fn) => {
     aktuell = id
+    await alleAuf()
     await s.locator(`[data-spiel-wahl="${id}"]`).click()
     await fn()
     await s.screenshot({ path: join(out, `2-${id}.png`) })
@@ -162,7 +197,10 @@ try {
       const sichtbar = await s.locator('[data-kim-bild]:has(img)').evaluateAll((e) => e.map((x) => x.getAttribute('data-kim-bild')))
       const fehlt = alle.find((x) => !sichtbar.includes(x))
       const w = WOERTER.find((x) => x.id === fehlt)
-      await s.locator(`[data-option="${w.term}"], [data-option="${w.term.replace(/^to /, '')}"]`).first().click()
+      await s
+        .locator(`[data-option="${w.term}"], [data-option="${w.term.replace(/^to /, '')}"]`)
+        .first()
+        .click()
       await s.waitForTimeout(1300)
     }
   })
@@ -171,7 +209,10 @@ try {
     for (let i = 0; i < 6 && !(await s.locator('[data-spiel-ergebnis]').isVisible()); i++) {
       const id = await s.locator('[data-aufdecken-bild]').getAttribute('data-aufdecken-bild')
       const w = WOERTER.find((x) => x.id === id)
-      await s.locator(`[data-option="${w.term}"], [data-option="${w.term.replace(/^to /, '')}"]`).first().click()
+      await s
+        .locator(`[data-option="${w.term}"], [data-option="${w.term.replace(/^to /, '')}"]`)
+        .first()
+        .click()
       await s.waitForTimeout(1300)
     }
   })
@@ -214,7 +255,10 @@ try {
     }
   })
   const rek = (await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()).rekorde
-  pruefe(neu.every((id) => rek[id] !== undefined), `Rekorde aller neuen Spiele gespeichert (${Object.keys(rek).length})`)
+  pruefe(
+    neu.every((id) => rek[id] !== undefined),
+    `Rekorde aller neuen Spiele gespeichert (${Object.keys(rek).length})`
+  )
 
   // ---------- Stammformen-Nachfrage: „to take" in Fach 2 und heute fällig (Auswahl richtig → Fach 2; Akzentfehler → fast)
   const ant = (wortId, uebung, antwort) =>
@@ -227,31 +271,87 @@ try {
   await s.locator('[data-sitzung]').waitFor()
   let nachfrage = false
   for (let i = 0; i < 80 && !nachfrage; i++) {
-    if (await s.locator('[data-stammformen]').isVisible().catch(() => false)) {
+    if (
+      await s
+        .locator('[data-stammformen]')
+        .isVisible()
+        .catch(() => false)
+    ) {
       nachfrage = true
       break
     }
-    if (await s.locator('[data-sitzung-fertig]').isVisible().catch(() => false)) break
-    if (await s.locator('[data-weiter]').isVisible().catch(() => false)) {
+    if (
+      await s
+        .locator('[data-sitzung-fertig]')
+        .isVisible()
+        .catch(() => false)
+    )
+      break
+    if (
+      await s
+        .locator('[data-weiter]')
+        .isVisible()
+        .catch(() => false)
+    ) {
       await s.waitForTimeout(300)
-      if (await s.locator('[data-stammformen]').isVisible().catch(() => false)) {
+      if (
+        await s
+          .locator('[data-stammformen]')
+          .isVisible()
+          .catch(() => false)
+      ) {
         nachfrage = true
         break
       }
       await s.locator('[data-weiter]').click()
       continue
     }
-    if (await s.locator('[data-option="to take"]').isVisible().catch(() => false)) await s.locator('[data-option="to take"]').click()
-    else if (await s.locator('[data-option]').first().isVisible().catch(() => false)) await s.locator('[data-option]').first().click()
-    else if (await s.locator('[data-buchstabe]').first().isVisible().catch(() => false)) {
+    if (
+      await s
+        .locator('[data-option="to take"]')
+        .isVisible()
+        .catch(() => false)
+    )
+      await s.locator('[data-option="to take"]').click()
+    else if (
+      await s
+        .locator('[data-option]')
+        .first()
+        .isVisible()
+        .catch(() => false)
+    )
+      await s.locator('[data-option]').first().click()
+    else if (
+      await s
+        .locator('[data-buchstabe]')
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       while ((await s.locator('[data-buchstabe]:not([disabled])').count()) > 0) await s.locator('[data-buchstabe]:not([disabled])').first().click()
       await s.locator('[data-pruefen]').click()
-    } else if (await s.locator('[data-eingabe]').isVisible().catch(() => false)) {
+    } else if (
+      await s
+        .locator('[data-eingabe]')
+        .isVisible()
+        .catch(() => false)
+    ) {
       await s.locator('[data-eingabe]').fill('to take')
       await s.locator('[data-pruefen]').click()
-    } else if (await s.locator('[data-sitzung] .vt-buehne button:not([disabled])').first().isVisible().catch(() => false)) {
+    } else if (
+      await s
+        .locator('[data-sitzung] .vt-buehne button:not([disabled])')
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       // Auswahl ohne Kennzeichnung (Wort zur Bedeutung) bzw. Lernkarte
-      if (await s.locator('[data-lernkarte]').isVisible().catch(() => false)) {
+      if (
+        await s
+          .locator('[data-lernkarte]')
+          .isVisible()
+          .catch(() => false)
+      ) {
         await s.locator('[data-lernkarte]').click()
         await s.waitForTimeout(300)
         await s.locator('[data-karte-gewusst]').click()
@@ -261,7 +361,13 @@ try {
       const felder = s.locator('[data-sitzung] input:not([disabled])')
       const n = await felder.count()
       for (let k = 0; k < n; k++) await felder.nth(k).fill('a')
-      if (await s.locator('[data-pruefen]').isVisible().catch(() => false)) await s.locator('[data-pruefen]').click()
+      if (
+        await s
+          .locator('[data-pruefen]')
+          .isVisible()
+          .catch(() => false)
+      )
+        await s.locator('[data-pruefen]').click()
       else await s.keyboard.press('Enter')
     }
     await s.waitForTimeout(400)
@@ -311,9 +417,15 @@ try {
   pruefe(paket.verben?.length === paket.aufgaben.length, `Paket mit Verbkarten (${paket.verben?.length})`)
   // Alle Karten einmal richtig (API) – dann Spiele frei
   for (const a of paket.aufgaben)
-    await gg.request.post(`${A}/s/api/grammatik/antwort`, { headers: KOPF, data: { id: gid, aufgabeId: a.id, antwort: JSON.stringify([a.zeilen[0].loesungen]) } })
+    await gg.request.post(`${A}/s/api/grammatik/antwort`, {
+      headers: KOPF,
+      data: { id: gid, aufgabeId: a.id, antwort: JSON.stringify([a.zeilen[0].loesungen]) }
+    })
   await h.reload()
-  await h.locator('[data-vokabeln-los]').click().catch(() => undefined)
+  await h
+    .locator('[data-vokabeln-los]')
+    .click()
+    .catch(() => undefined)
   const vs = ['verbtrio', 'verbblitz', 'bildverb', 'muster']
   const vda = []
   for (const id of vs) if (await h.locator(`[data-grammatik-spiel="${id}"]`).count()) vda.push(id)
@@ -328,14 +440,21 @@ try {
   }
   pruefe(await da(h.locator('[data-spiel-ende]')), 'Stammformen-Trio im Grammatiktraining gelöst')
 } catch (e) {
-  pruefe(false, `Ablauf abgebrochen – ${String(e?.message ?? e).split('\n').slice(0, 3).join(' | ')}`)
+  pruefe(
+    false,
+    `Ablauf abgebrochen – ${String(e?.message ?? e)
+      .split('\n')
+      .slice(0, 3)
+      .join(' | ')}`
+  )
 } finally {
   if (gid && lk) await lk.request.delete(`${A}/server/grammatik/${gid}`, { headers: KOPF }).catch(() => undefined)
   for (const w of medienSchluessel) {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)
   }
-  for (const [inf, past, pp] of VERBEN) for (const f of [inf, past, pp]) await api(verwaltung, 'medien:ton-loeschen', 'en', inf, 'satz', f).catch(() => undefined)
+  for (const [inf, past, pp] of VERBEN)
+    for (const f of [inf, past, pp]) await api(verwaltung, 'medien:ton-loeschen', 'en', inf, 'satz', f).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   await browser.close()
 }

@@ -33,6 +33,8 @@ import { kernform, type Vokabel, type WortStand } from '../shared/vokabeltrainer
 import {
   abfrageAuswerten,
   standardVerben,
+  spieleHeuteFrei,
+  tageszielVon,
   db,
   fachfarbeDerLehrkraft,
   istOffen,
@@ -267,6 +269,9 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
           rekorde: ws.rekorde ?? {},
           ansehen: ws.ansehen ?? [],
           weg: leiterKurz(w),
+          // Spiele heute frei, wenn eine Freigabe dieses Wegs sie freigeschaltet hat (08.10.2026)
+          spieleFrei: w.zuweisungen.some((z) => istOffen(z) && spieleHeuteFrei(z)),
+          tagesziel: Math.max(0, ...w.zuweisungen.filter((z) => istOffen(z)).map((z) => tageszielVon(z))) || 10,
           // Unregelmäßige Verben (07.10.2026): aus den Freigaben dieses Wegs, sonst aus der Standardliste
           verben: verbenDesWegs(w, woerter)
         }),

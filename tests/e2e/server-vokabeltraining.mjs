@@ -71,7 +71,7 @@ try {
   await p.waitForTimeout(600)
   pruefe((await p.getByRole('tab', { name: 'Vokabeltraining' }).count()) === 0, 'Onlinetest ohne Reiter „Vokabeltraining"')
   await p.locator('.app-leiste [aria-label="Vokabeltraining"]').click()
-  pruefe(await da(p.locator('[data-vokabel-zuweisung]', { hasText: 'Weather words' })), 'App „Vokabeltraining" mit der Freigabe')
+  pruefe(await da(p.locator(`[data-vokabel-zuweisung="${vok.id}"]`)), 'App „Vokabeltraining" mit der Freigabe')
   await p.screenshot({ path: join(out, '1-app.png') })
   // Vokabeln wählen (06.10.2026): Fach (bei mehreren Fremdsprachen) → Lehrwerk → Band
   await p.locator('[data-vokabeln-freigeben]').click()
@@ -134,7 +134,8 @@ try {
     if (await h.locator('[data-sitzung-fertig]').isVisible()) break
     await h.waitForTimeout(250)
     if ((await h.locator('[data-urteil]').count()) > 0) sauber = false
-    if (await h.locator('[data-lernkarte]').isVisible()) {
+    const karte = await h.locator('[data-lernkarte]').isVisible()
+    if (karte) {
       arten.add('karte')
       await h.locator('[data-lernkarte]').click()
       // Erst „nicht gewusst" – so kommt das Wort in anderer Form wieder
@@ -168,7 +169,9 @@ try {
       await h.locator('[data-eingabe]').fill('cloud')
       await h.locator('[data-pruefen]').click()
     }
-    await h.locator('[data-weiter]').click({ timeout: 8000 })
+    // Lernkarte geht seit 08.10.2026 ohne Weiter-Knopf gleich weiter
+    if (karte) await h.waitForTimeout(400)
+    else await h.locator('[data-weiter]').click({ timeout: 8000 })
   }
   pruefe(sauber, `Jede Frage startet bedienbar ohne altes Ergebnis (${[...arten].join(', ')})`)
   pruefe(arten.size >= 2, `Mehrere Abfrageformate in der Runde (${[...arten].join(', ')})`)
@@ -210,7 +213,7 @@ try {
   pruefe(await da(h2.locator('[data-vokabel-kasten]')), 'Mit Name + persönlichem Code auf dem zweiten Gerät weiter')
 
   // Lehrkraft sieht den Gast im Lernstand, QR-Knopf
-  await p.locator('[data-vokabel-zuweisung]', { hasText: 'Weather words' }).click()
+  await p.locator(`[data-vokabel-zuweisung="${vok.id}"]`).click()
   pruefe(await da(p.locator('[data-lernstand]').getByText('Ben T.')), 'Gast im Lernstand der Lehrkraft')
   await p.locator('[data-vokabel-qr-zeigen]').click()
   pruefe(await da(p.getByRole('dialog').getByText(`/s/vt/${kurz.code}`)), 'QR-Code mit Code im Lernstand')

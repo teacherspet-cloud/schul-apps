@@ -25,6 +25,7 @@ import {
   Loader,
   Modal,
   MultiSelect,
+  NumberInput,
   Progress,
   SegmentedControl,
   Select,
@@ -35,9 +36,46 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
-import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, IconTrash, IconUser, IconUserMinus } from '@tabler/icons-react'
+import {
+  IconArrowLeft,
+  IconBooks,
+  IconCalendarEvent,
+  IconCards,
+  IconChevronDown,
+  IconPencil,
+  IconPlus,
+  IconPrinter,
+  IconQrcode,
+  IconSparkles,
+  IconTrash,
+  IconUser,
+  IconUserMinus,
+  IconUserPlus
+} from '@tabler/icons-react'
+import { LernendeEintragen, zettelAusgeben } from './LernendeEintragen'
+import { useAppSettings } from '../../shared/settingsStore'
+import { fachFarbe } from '../../shared/fachfarben'
+import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from './GrammatikTraining'
+import { lehrwerkeMitGrammatik } from '../arbeitsblatt/didactics/grammatikAuswahl'
+
+/**
+ * Grammatik zu einem Vokabeltraining (08.10.2026, abgestimmt): Empfänger fest = dessen Lernende; Band und Unit der
+ * Vokabelliste werden in der Grammatikauswahl vorgeschlagen, wenn der Band dort Unit-Grammatik hat.
+ */
+export function grammatikVorgabe(vokId: string, titel: string, sprache: string, quelle?: { lehrwerk?: string; unit?: string } | null): GrammatikVorgabe {
+  const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const fach = sprache === 'la' ? 'latein' : 'englisch'
+  const id = norm(quelle?.lehrwerk ?? '')
+  const buch = id
+    ? lehrwerkeMitGrammatik(fach)
+        .filter((b) => id.startsWith(norm(b)))
+        .sort((a, b) => b.length - a.length)[0]
+    : undefined
+  return { vokId, titel, sprache, ...(buch ? { lehrwerk: { buch, unit: quelle?.unit } } : {}) }
+}
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
 import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
@@ -72,6 +110,11 @@ export async function verbenDerListe(a: VokabelAuswahl): Promise<{ sprache: stri
 interface ZuweisungKurz {
   id: string
   titel: string
+  /** Überschrift der Lehrkraft bzw. Standard „2026 - 5b - Englisch" (08.10.2026) */
+  ueberschrift?: string
+  eigeneUeberschrift?: boolean
+  symbol?: 'verlauf' | 'farbe'
+  faecher?: number[]
   fach: string
   lerngruppe: string
   woerter: number
@@ -104,6 +147,63 @@ export function VokabeltrainingModule({ active }: { active: boolean }): React.JS
 export const FACH_NAMEN = STUFEN.map((x) => x.name)
 export const FACH_FARBEN = ['gray', 'red', 'orange', 'yellow', 'lime', 'green', 'teal']
 
+/**
+ * Symbol links in der Übersicht (08.10.2026, Wunsch der Lehrkraft): Verlauf der Fächer über alle Lernenden – von unten
+ * Neu (grau) bis Langzeitgedächtnis (türkis) – oder per Rechtsklick eine feste Farbe (Fachfarbe).
+ */
+export function LernstandSymbol({
+  faecher,
+  art,
+  fach,
+  umschalten
+}: {
+  faecher: number[]
+  art: 'verlauf' | 'farbe'
+  fach: string
+  umschalten: () => void
+}): React.JSX.Element {
+  useAppSettings((s) => s.settings.fachfarben)
+  const summe = faecher.reduce((a, b) => a + b, 0)
+  let bis = 0
+  const stopps = faecher.flatMap((n, i) => {
+    if (!n) return []
+    const von = bis
+    bis += (n / summe) * 100
+    const c = `var(--mantine-color-${FACH_FARBEN[i]}-6)`
+    return [`${c} ${von.toFixed(1)}%`, `${c} ${bis.toFixed(1)}%`]
+  })
+  const geuebt = summe ? Math.round(((summe - (faecher[0] ?? 0)) / summe) * 100) : 0
+  const hintergrund =
+    art === 'farbe' ? fachFarbe(fach) ?? 'var(--mantine-color-blue-6)' : summe ? `linear-gradient(to top, ${stopps.join(', ')})` : 'var(--mantine-color-gray-6)'
+  return (
+    <Tooltip
+      position="right"
+      label={art === 'farbe' ? 'Rechtsklick: Lernstand als Verlauf zeigen' : `Lernstand aller: ${geuebt} % geübt – Rechtsklick: feste Farbe`}
+    >
+      <div
+        onContextMenu={(e) => (e.preventDefault(), e.stopPropagation(), umschalten())}
+        data-lernstand-symbol={art}
+        style={{
+          width: 52,
+          height: 52,
+          flexShrink: 0,
+          borderRadius: 14,
+          background: hintergrund,
+          display: 'grid',
+          placeItems: 'center',
+          color: '#fff',
+          fontWeight: 800,
+          fontSize: 13,
+          textShadow: '0 1px 2px rgba(0,0,0,.6)',
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.15)'
+        }}
+      >
+        {art === 'farbe' ? <IconCards size={24} /> : `${geuebt}%`}
+      </div>
+    </Tooltip>
+  )
+}
+
 /** Balken der Fächerverteilung */
 export function Faecherbalken({ u, hoehe = 10 }: { u: Uebersicht; hoehe?: number }): React.JSX.Element {
   return (
@@ -128,6 +228,7 @@ export default function VokabelTraining(): React.JSX.Element {
   // openDocument('vokabeltraining', id) – z. B. aus „Meine Klassen" (06.10.2026)
   useDokumentOeffner('vokabeltraining', async (id) => setGewaehlt(id))
   const [suche, setSuche] = useState('')
+  const [umbenennen, setUmbenennen] = useState<{ id: string; text: string; standard: string } | null>(null)
   const laden = useCallback(
     () =>
       void holen<{ zuweisungen: ZuweisungKurz[] }>('/server/vokabeln').then(
@@ -139,7 +240,9 @@ export default function VokabelTraining(): React.JSX.Element {
   useEffect(laden, [laden])
   if (gewaehlt) return <Lernstand id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
   const q = suche.trim().toLowerCase()
-  const sichtbar = (liste ?? []).filter((z) => z.status === filter && (!q || `${z.titel} ${z.fach} ${z.lerngruppe}`.toLowerCase().includes(q)))
+  const sichtbar = (liste ?? []).filter(
+    (z) => z.status === filter && (!q || `${z.ueberschrift ?? ''} ${z.titel} ${z.fach} ${z.lerngruppe}`.toLowerCase().includes(q))
+  )
   return (
     <Stack data-vokabeltraining>
       {/* Gemeinsamer Kopf (Phase 6a): Filter in der zweiten Zeile */}
@@ -166,12 +269,43 @@ export default function VokabelTraining(): React.JSX.Element {
       {liste && sichtbar.length === 0 && <Text c="dimmed">{filter === 'offen' ? 'Gerade läuft kein Vokabeltraining.' : 'Nichts abgeschlossen.'}</Text>}
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         {sichtbar.map((z) => (
-          <Card key={z.id} withBorder style={{ cursor: 'pointer' }} onClick={() => setGewaehlt(z.id)} data-vokabel-zuweisung>
+          <Card key={z.id} withBorder style={{ cursor: 'pointer' }} onClick={() => setGewaehlt(z.id)} data-vokabel-zuweisung={z.id}>
             <Group justify="space-between" wrap="nowrap">
-              <div style={{ minWidth: 0 }}>
-                <Text fw={700} truncate>
-                  {z.titel}
-                </Text>
+              <LernstandSymbol
+                faecher={z.faecher ?? []}
+                art={z.symbol ?? 'verlauf'}
+                fach={z.fach}
+                umschalten={() =>
+                  void senden(`/server/vokabeln/${z.id}/symbol`, { art: z.symbol === 'farbe' ? 'verlauf' : 'farbe' }).then(laden, (e: unknown) =>
+                    notifyError(e)
+                  )
+                }
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Group gap={4} wrap="nowrap">
+                  <Text fw={700} truncate data-vokabel-ueberschrift>
+                    {z.ueberschrift || z.titel}
+                  </Text>
+                  <Tooltip label="Überschrift ändern">
+                    <ActionIcon
+                      variant="subtle"
+                      size="sm"
+                      color="gray"
+                      aria-label="Überschrift ändern"
+                      onClick={(e) => (
+                        e.stopPropagation(),
+                        setUmbenennen({
+                          id: z.id,
+                          text: z.eigeneUeberschrift ? z.ueberschrift ?? '' : '',
+                          standard: z.eigeneUeberschrift ? '' : z.ueberschrift ?? ''
+                        })
+                      )}
+                      data-vokabel-umbenennen
+                    >
+                      <IconPencil size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
                 <Text size="sm" c="dimmed">
                   {z.lerngruppe} · {z.woerter} Wörter · {z.lernende} Lernende{z.gaeste ? ` (davon ${z.gaeste} per QR-Code)` : ''}
                 </Text>
@@ -194,6 +328,35 @@ export default function VokabelTraining(): React.JSX.Element {
         ))}
       </SimpleGrid>
       {neu && <Freigeben schliessen={() => (setNeu(false), laden())} />}
+      <Modal opened={Boolean(umbenennen)} onClose={() => setUmbenennen(null)} title="Überschrift ändern">
+        {umbenennen && (
+          <Stack>
+            <TextInput
+              label="Überschrift"
+              description={
+                umbenennen.standard ? `Leer lassen für den Standard „${umbenennen.standard}“` : 'Leer lassen für den Standard „Jahr - Lerngruppe - Fach“'
+              }
+              value={umbenennen.text}
+              onChange={(e) => setUmbenennen({ ...umbenennen, text: e.currentTarget.value })}
+              data-autofocus
+              data-umbenennen-eingabe
+            />
+            <Group justify="flex-end">
+              <Button
+                onClick={() =>
+                  void senden(`/server/vokabeln/${umbenennen.id}/ueberschrift`, { text: umbenennen.text }).then(
+                    () => (setUmbenennen(null), laden()),
+                    (e: unknown) => notifyError(e)
+                  )
+                }
+                data-umbenennen-speichern
+              >
+                Speichern
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </Stack>
   )
 }
@@ -229,6 +392,9 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const [bis, setBis] = useState('')
   const [qr, setQr] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
+  // Passende Grammatik gleich mit freigeben (08.10.2026): nach den Vokabeln öffnet der Grammatik-Dialog, vorbelegt
+  const [mitGrammatik, setMitGrammatik] = useState(false)
+  const [grammatikDanach, setGrammatikDanach] = useState<GrammatikVorgabe | null>(null)
   const { gruppen } = useLerngruppen()
   useEffect(() => {
     if (auswahl) setTitel(auswahl.titel)
@@ -240,7 +406,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
     try {
       const mit = await mitBildern(auswahl)
       const verben = await verbenDerListe(mit)
-      await senden('/server/vokabeln/freigeben', {
+      const { id: neueId } = await senden<{ id: string }>('/server/vokabeln/freigeben', {
         titel: titel || auswahl.titel,
         sprache: mit.sprache,
         fach: mit.fach,
@@ -258,6 +424,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
           ? 'Freigegeben – QR-Code und Code stehen beim Training (Knopf „QR-Code").'
           : 'Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.'
       )
+      if (mitGrammatik && neueId) return setGrammatikDanach(grammatikVorgabe(neueId, titel || auswahl.titel, mit.sprache, auswahl.quelle))
       schliessen()
     } catch (e) {
       notifyError(e, 'Nicht freigegeben')
@@ -265,6 +432,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
       setLaeuft(false)
     }
   }
+  if (grammatikDanach) return <GrammatikFreigeben vorgabe={grammatikDanach} schliessen={schliessen} />
   return (
     <Modal opened onClose={schliessen} title="Vokabeln zum Lernen freigeben" size="lg">
       <Stack>
@@ -337,6 +505,15 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             onChange={(e) => setTermin(e.currentTarget.value)}
           />
         </Group>
+        {(auswahl?.sprache === 'en' || auswahl?.sprache === 'la' || auswahl?.sprache === 'fr' || auswahl?.sprache === 'es') && (
+          <Switch
+            label="Passende Grammatik gleich mit freigeben"
+            description="Danach öffnet sich die Grammatikauswahl – mit Band und Unit vorbelegt, für dieselben Lernenden."
+            checked={mitGrammatik}
+            onChange={(e) => setMitGrammatik(e.currentTarget.checked)}
+            data-vokabel-mit-grammatik
+          />
+        )}
         <Group justify="flex-end">
           <Button
             loading={laeuft}
@@ -359,13 +536,101 @@ interface Lernstanddaten {
   testTermin: number | null
   status: string
   bis: number | null
+  /** Spiele heute freigeschaltet / neue Vokabeln je Tag (08.10.2026) */
+  spieleFrei?: boolean
+  tagesziel?: number
+  adresse?: string
+  ueberschrift?: string
+  teile?: { titel: string; anzahl: number; zeit: number }[]
+  sprache?: string
+  quelle?: { lehrwerk?: string; unit?: string } | null
   code?: string
   link?: string
   lerngruppe: string
   woerter: { id: string; term: string; translation: string }[]
-  lernende: { id: string; name: string; gast?: boolean; perCode?: boolean; uebersicht: Uebersicht; tage7: number }[]
+  lernende: { id: string; name: string; gast?: boolean; perCode?: boolean; zugang?: string; uebersicht: Uebersicht; tage7: number }[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
+}
+
+/**
+ * Freigegebene Abschnitte (08.10.2026, Wunsch der Lehrkraft): nur in den Details, als zugeklappter Kasten – zu sehen ist
+ * die Wörterzahl, hervorgehoben, was in den letzten 2 Wochen dazukam; aufgeklappt die Abschnitte mit Datum.
+ */
+function VokabelAbschnitte({ teile, gesamt }: { teile: { titel: string; anzahl: number; zeit: number }[]; gesamt: number }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const neu = teile.filter((t) => t.zeit > Date.now() - 14 * 864e5 && t !== teile[0]).reduce((a, t) => a + t.anzahl, 0)
+  return (
+    <Card withBorder padding="sm" data-vokabel-abschnitte>
+      <UnstyledButton onClick={() => setOffen((x) => !x)} w="100%" aria-expanded={offen} data-vokabel-abschnitte-kopf>
+        <Group justify="space-between" wrap="nowrap">
+          <Group gap="xs">
+            <IconBooks size={18} />
+            <Text fw={700}>{gesamt} Wörter</Text>
+            {neu > 0 && (
+              <Badge color="green" variant="filled" data-vokabel-neu14>
+                +{neu} in den letzten 2 Wochen
+              </Badge>
+            )}
+          </Group>
+          <IconChevronDown size={18} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
+        </Group>
+      </UnstyledButton>
+      {offen && (
+        <Stack gap={4} mt="sm">
+          {teile.map((t, i) => (
+            <Group key={i} justify="space-between" wrap="nowrap" gap="xs">
+              <Text size="sm">{t.titel}</Text>
+              <Text size="xs" c={t.zeit > Date.now() - 14 * 864e5 && i > 0 ? 'green' : 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
+                {t.anzahl} Wörter · {t.zeit ? new Date(t.zeit).toLocaleDateString('de-DE') : ''}
+              </Text>
+            </Group>
+          ))}
+        </Stack>
+      )}
+    </Card>
+  )
+}
+
+/** Vokabeln nachträglich zu einer Freigabe hinzufügen (08.10.2026): Lernstand bleibt, Doppeltes wird übersprungen */
+function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
+  const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const los = async (): Promise<void> => {
+    if (!auswahl) return
+    setLaeuft(true)
+    try {
+      const mit = await mitBildern(auswahl)
+      const verben = await verbenDerListe(mit)
+      const r = await senden<{ neu: number }>(`/server/vokabeln/${id}/woerter`, { woerter: mit.woerter, titel: auswahl.titel, ...(verben ? { verben } : {}) })
+      notifySuccess(r.neu ? `${r.neu} Vokabeln hinzugefügt – sie kommen als neue Wörter in den Kasten.` : 'Alle diese Vokabeln waren schon dabei.')
+      schliessen()
+    } catch (e) {
+      notifyError(e, 'Nicht hinzugefügt')
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Modal opened onClose={schliessen} title="Vokabeln hinzufügen" size="lg">
+      <Stack>
+        <VokabelQuelle wahl={setAuswahl} />
+        {auswahl && (
+          <Text size="sm" c="dimmed">
+            {auswahl.woerter.length} Wörter gewählt – schon vorhandene werden übersprungen.
+          </Text>
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={schliessen}>
+            Abbrechen
+          </Button>
+          <Button onClick={() => void los()} loading={laeuft} disabled={!auswahl?.woerter.length} data-vokabel-hinzufuegen-los>
+            Hinzufügen
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
 }
 
 function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
@@ -374,6 +639,12 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
   const [qr, setQr] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
   const [entfernen, setEntfernen] = useState<Lernstanddaten['lernende'][number] | null>(null)
+  // Zugangscode eines Gastes ansehen (08.10.2026) und Vokabeln nachträglich hinzufügen
+  const [gast, setGast] = useState<Lernstanddaten['lernende'][number] | null>(null)
+  const [hinzu, setHinzu] = useState(false)
+  const [eintragen, setEintragen] = useState(false)
+  const [grammatik, setGrammatik] = useState(false)
+  const [ziel, setZiel] = useState<number | string>('')
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
   useEffect(laden, [laden])
   if (!d) return <Loader size="sm" />
@@ -381,6 +652,8 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
     void senden(`/server/vokabeln/${id}/${was}`, daten).then(laden, (e: unknown) => notifyError(e))
   const tageBisTest = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const lernende = [...d.lernende].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  // Zettel für alle Gäste mit lesbarem Code (eingetragene und solche mit neu erzeugtem Code)
+  const zettel = lernende.filter((l) => l.gast && l.zugang && l.zugang.length === 8).map((l) => ({ name: l.name, zugang: l.zugang! }))
   const anteilSicher = d.gesamt.gesamt ? d.gesamt.sicher / d.gesamt.gesamt : 0
   const anteilGeuebt = d.gesamt.gesamt ? (d.gesamt.gesamt - d.gesamt.neu) / d.gesamt.gesamt : 0
   return (
@@ -397,7 +670,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
       <Group justify="space-between" align="flex-start">
         <div>
           <Group gap="xs">
-            <Title order={3}>{d.titel}</Title>
+            <Title order={3}>{d.ueberschrift || d.titel}</Title>
             {d.status !== 'offen' && <Badge color="gray">abgeschlossen</Badge>}
           </Group>
           <Text c="dimmed" size="sm">
@@ -420,6 +693,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           </Tooltip>
         </Group>
       </Group>
+      <VokabelAbschnitte teile={d.teile ?? []} gesamt={d.woerter.length} />
       <Group gap="md" align="flex-end">
         <TextInput
           type="date"
@@ -438,6 +712,118 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           w={200}
         />
       </Group>
+      <Group gap="md" align="flex-end" data-vokabel-tag>
+        <NumberInput
+          label="Neue Vokabeln pro Tag"
+          description="vor den Spielen; geübt wird in 10er-Schritten"
+          min={1}
+          max={200}
+          w={230}
+          value={ziel === '' ? d.tagesziel ?? 10 : ziel}
+          onChange={setZiel}
+          onBlur={() => {
+            if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
+            setZiel('')
+          }}
+          data-vokabel-tagesziel
+        />
+        <Switch
+          label="Spiele heute schon freischalten"
+          description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
+          checked={Boolean(d.spieleFrei)}
+          onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
+          mb={4}
+          data-vokabel-spiele-frei
+        />
+        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setHinzu(true)} data-vokabel-hinzufuegen>
+          Vokabeln hinzufügen
+        </Button>
+        {/* Lernende eintragen + Zettel mit persönlichem Code (08.10.2026) */}
+        <Button variant="light" leftSection={<IconUserPlus size={16} />} onClick={() => setEintragen(true)} data-lernende-eintragen>
+          Lernende eintragen
+        </Button>
+        {/* Grammatik fest für dieselben Lernenden (08.10.2026) */}
+        <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setGrammatik(true)} data-vokabel-grammatik>
+          Grammatik dazu freigeben
+        </Button>
+        {zettel.length > 0 && (
+          <Button
+            variant="default"
+            leftSection={<IconPrinter size={16} />}
+            onClick={() => zettelAusgeben(d.titel, zettel, d.adresse || window.location.origin, false)}
+            data-zettel-alle
+          >
+            Zettel für alle ({zettel.length})
+          </Button>
+        )}
+      </Group>
+      {grammatik && <GrammatikFreigeben vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)} schliessen={() => setGrammatik(false)} />}
+      {eintragen && (
+        <LernendeEintragen
+          id={id}
+          titel={d.titel}
+          adresse={d.adresse || window.location.origin}
+          schonDa={lernende.map((l) => l.name)}
+          schliessen={() => (setEintragen(false), laden())}
+        />
+      )}
+      {hinzu && <Hinzufuegen id={id} schliessen={() => (setHinzu(false), laden())} />}
+      <Modal opened={Boolean(gast)} onClose={() => setGast(null)} title={gast ? `Zugang für ${gast.name}` : ''}>
+        {gast && (
+          <Stack gap="sm" data-gast-zugang>
+            <Text size="sm">
+              {gast.zugang?.length === 8
+                ? `${gast.name} meldet sich auf der Lernseite unter „Mit Code öffnen“ direkt mit dem persönlichen Code an.`
+                : `So kommt ${gast.name} an einem anderen Tag oder Gerät wieder hinein: Code des Trainings eingeben, „Schon dabei?“ wählen, dann Name und persönlicher Code.`}
+            </Text>
+            <SimpleGrid cols={2}>
+              <div>
+                <Text size="xs" c="dimmed">
+                  Code des Trainings
+                </Text>
+                <Title order={3} ff="monospace">
+                  {d.code ?? '–'}
+                </Title>
+              </div>
+              <div>
+                <Text size="xs" c="dimmed">
+                  Persönlicher Code
+                </Text>
+                <Title order={3} ff="monospace" data-gast-code>
+                  {gast.zugang || '–'}
+                </Title>
+              </div>
+            </SimpleGrid>
+            {!gast.zugang && (
+              <Text size="xs" c="dimmed">
+                Der Code wurde vor der Anzeige-Funktion vergeben und ist nicht lesbar gespeichert – ein neuer Code ersetzt ihn.
+              </Text>
+            )}
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                data-gast-code-neu
+                onClick={() =>
+                  void senden<{ zugang: string }>(`/server/vokabeln/${id}/gast-code`, { id: gast.id }).then(
+                    (r) => (setGast({ ...gast, zugang: r.zugang }), laden()),
+                    (e: unknown) => notifyError(e)
+                  )
+                }
+              >
+                Neuen Code erzeugen
+              </Button>
+              {gast.zugang?.length === 8 && (
+                <Button
+                  leftSection={<IconPrinter size={16} />}
+                  onClick={() => zettelAusgeben(d.titel, [{ name: gast.name, zugang: gast.zugang! }], d.adresse || window.location.origin, false)}
+                >
+                  Zettel drucken
+                </Button>
+              )}
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       {qr && d.code && d.link && (
         <Modal opened onClose={() => setQr(false)} title={d.titel} size="lg">
           <Zugang code={d.code} link={d.link} />
@@ -494,7 +880,9 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           <Title order={3}>{d.testTermin ? new Date(d.testTermin).toLocaleDateString('de-DE') : '–'}</Title>
           <Text size="xs" c="dimmed">
             {tageBisTest !== null && tageBisTest >= 0
-              ? `in ${tageBisTest} Tag${tageBisTest === 1 ? '' : 'en'} · Prognose: ${Math.round(anteilGeuebt * 100)} % der Wörter sind bis dahin mindestens geübt`
+              ? `in ${tageBisTest} Tag${tageBisTest === 1 ? '' : 'en'} · Prognose: ${Math.round(
+                  anteilGeuebt * 100
+                )} % der Wörter sind bis dahin mindestens geübt`
               : 'Ohne Termin plant der Kasten nach den festen Abständen.'}
           </Text>
         </Card>
@@ -552,7 +940,21 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
             {lernende.map((l) => (
               <Table.Tr key={l.id}>
                 <Table.Td>
-                  {l.name}
+                  {l.gast ? (
+                    <Text
+                      component="button"
+                      type="button"
+                      size="sm"
+                      td="underline"
+                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }}
+                      onClick={() => setGast(l)}
+                      data-gast-name={l.name}
+                    >
+                      {l.name}
+                    </Text>
+                  ) : (
+                    l.name
+                  )}
                   {l.gast && (
                     <Tooltip label="Per QR-Code dazugekommen">
                       <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />

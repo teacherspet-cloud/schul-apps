@@ -86,6 +86,20 @@ export const db = () => {
     if (!spalten.has('quelle')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN quelle TEXT NOT NULL DEFAULT ''")
     // Unregelmäßige Verben der Liste (07.10.2026): {sprache, karten} – für Stammformen-Übung und Verbspiele
     if (!spalten.has('verben')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN verben TEXT NOT NULL DEFAULT ''")
+    // Spiele für heute freigeschaltet (08.10.2026): Tag „JJJJ-MM-TT", leer = wie sonst erst nach der Tagesrunde
+    if (!spalten.has('spiele_frei')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN spiele_frei TEXT NOT NULL DEFAULT ''")
+    // Neue Vokabeln je Tag, bevor die Spiele frei werden (08.10.2026, Lehrkraft wählt; die Lernenden üben in 10er-Schritten)
+    if (!spalten.has('tagesziel')) d.exec('ALTER TABLE vok_zuweisungen ADD COLUMN tagesziel INTEGER NOT NULL DEFAULT 10')
+    // Übersicht (08.10.2026): eigene Überschrift der Lehrkraft und Symbol als Lernstand-Verlauf oder feste Farbe
+    if (!spalten.has('ueberschrift')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN ueberschrift TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('symbol')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN symbol TEXT NOT NULL DEFAULT ''")
+    // Freigegebene Abschnitte mit Zeitpunkt (08.10.2026): für den Kasten in den Details und „neu in 2 Wochen"
+    if (!spalten.has('teile')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN teile TEXT NOT NULL DEFAULT ''")
+    const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
+    if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
+    // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
+    if (!gSpalten.has('anmelde')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN anmelde TEXT NOT NULL DEFAULT ''")
+    d.exec('CREATE INDEX IF NOT EXISTS vok_gaeste_anmelde ON vok_gaeste(anmelde)')
     bereit = true
   }
   return d
@@ -119,7 +133,43 @@ export interface Zeile {
   quelle?: string
   /** Unregelmäßige Verben der Liste (JSON {sprache, karten}, 07.10.2026) */
   verben?: string
+  /** Spiele für diesen Tag freigeschaltet (JJJJ-MM-TT, 08.10.2026) */
+  spiele_frei?: string
+  /** Neue Vokabeln je Tag (08.10.2026) */
+  tagesziel?: number
+  /** Überschrift der Lehrkraft ('' = Standard „Jahr - Lerngruppe - Fach") und Symbol ('' = Verlauf, 'farbe') */
+  ueberschrift?: string
+  symbol?: string
+  /** JSON [{titel, anzahl, zeit}] – die freigegebenen Abschnitte; leer = nur der erste (Titel) */
+  teile?: string
 }
+
+export interface VokTeil {
+  titel: string
+  anzahl: number
+  zeit: number
+}
+/** Abschnitte eines Trainings; ältere Freigaben: einer mit dem Titel und allen Wörtern */
+export function teileVon(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstellt'>): VokTeil[] {
+  const t = json_(z.teile || '[]', [] as VokTeil[])
+  return t.length ? t : [{ titel: z.titel, anzahl: json_(z.woerter, [] as unknown[]).length, zeit: Date.parse(z.erstellt) || 0 }]
+}
+
+/** Standard-Überschrift (08.10.2026, Wunsch der Lehrkraft): „2026 - 5b - Englisch" */
+export function ueberschriftVon(z: Pick<Zeile, 'ueberschrift' | 'erstellt' | 'lerngruppe_id' | 'fach'>): string {
+  if (z.ueberschrift) return z.ueberschrift
+  const jahr = new Date(z.erstellt).getFullYear()
+  const gruppe = z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : ''
+  return [Number.isFinite(jahr) ? String(jahr) : '', gruppe, z.fach].filter(Boolean).join(' - ')
+}
+
+/** Tagesziel begrenzt (1–200, Vorgabe 10) */
+export const tageszielVon = (z: Pick<Zeile, 'tagesziel'>): number => Math.max(1, Math.min(200, Math.round(Number(z.tagesziel) || 10)))
+
+/** Heutiger Tag in Deutschland (JJJJ-MM-TT) – für die Freischaltung der Spiele */
+export const heuteTag = (jetzt = new Date()): string => jetzt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' })
+/** Hat die Lehrkraft die Spiele für heute freigeschaltet? */
+export const spieleHeuteFrei = (z: Pick<Zeile, 'spiele_frei'>, jetzt = new Date()): boolean => z.spiele_frei === heuteTag(jetzt)
 
 /** Offen = nicht beendet und Zeitraum nicht abgelaufen */
 export const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'offen' && !(z.bis && z.bis < Date.now())
@@ -130,6 +180,20 @@ function neuerCode(n = 6): string {
     const c = Array.from(randomBytes(n), (b) => CODE_ZEICHEN[b % CODE_ZEICHEN.length]).join('')
     if (n !== 6 || !db().prepare('SELECT 1 FROM vok_zuweisungen WHERE code = ?').get(c)) return c
   }
+}
+/** Persönlicher Anmeldecode: 8 Zeichen ohne Verwechsler, eindeutig über alle Trainings (08.10.2026) */
+const ANMELDE_ZEICHEN = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function anmeldeCode(): string {
+  for (;;) {
+    const c = Array.from(randomBytes(8), (b) => ANMELDE_ZEICHEN[b % ANMELDE_ZEICHEN.length]).join('')
+    if (!db().prepare('SELECT 1 FROM vok_gaeste WHERE anmelde = ?').get(hashVon(c))) return c
+  }
+}
+/** Neuen persönlichen Code für einen Gast setzen – gilt als Anmeldecode und für „Schon dabei?" (in allen seinen Trainings) */
+function gastCodeSetzen(nutzerId: string): string {
+  const c = anmeldeCode()
+  db().prepare('UPDATE vok_gaeste SET wieder = ?, code_v = ?, anmelde = ? WHERE nutzer_id = ?').run(hashVon(c), c, hashVon(c), nutzerId)
+  return c
 }
 const hashVon = (s: string): string =>
   createHash('sha256')
@@ -315,11 +379,12 @@ export function vokabelListenFuer(
     .filter((z) => istOffen(z) && vokIstFuer(z, ich))
     .map((z) => ({
       id: z.id,
-      titel: z.titel,
+      // Lernende sehen die Überschrift („2026 - 5b - Englisch"), nicht „Green Line 1 - Unit 1 - …" (08.10.2026)
+      titel: ueberschriftVon(z),
       fach: z.fach,
       sprache: z.sprache,
       testTermin: z.test_termin,
-      uebersicht: uebersicht(json_(z.woerter, [] as Vokabel[]), standVon(z.id, ich.id).woerter)
+      uebersicht: uebersicht(json_(z.woerter, [] as Vokabel[]), standVon(z.id, ich.id).woerter, Date.now(), tageszielVon(z))
     }))
 }
 
@@ -409,7 +474,22 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? ''))
       if (!z || !istOffen(z)) return (json(res, 404, { fehler: 'Dieses Vokabeltraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      return (json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && vokIstFuer(z, sitzung.nutzer)), bis: z.bis }), true)
+      return (json(res, 200, { id: z.id, titel: ueberschriftVon(z), gaeste: !iservBereit(), dabei: Boolean(sitzung && vokIstFuer(z, sitzung.nutzer)), bis: z.bis }), true)
+    }
+    // Anmelden mit persönlichem Code (08.10.2026, Zettel der Lehrkraft): öffnet alle Trainings dieses Kontos
+    if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/anmelden') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const roh = String(k0.code ?? '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+      const zeilen = roh.length === 8 ? (db().prepare('SELECT zuweisung_id, nutzer_id FROM vok_gaeste WHERE anmelde = ?').all(hashVon(roh)) as { zuweisung_id: string; nutzer_id: string }[]) : []
+      const offen = zeilen.map((g) => ({ g, z: zeile(g.zuweisung_id) })).filter((x): x is { g: (typeof zeilen)[number]; z: Zeile } => Boolean(x.z && istOffen(x.z)))
+      if (!offen.length) return (json(res, 404, { fehler: 'Diesen Code gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      const dauer = Math.max(...offen.map((x) => gastDauer(x.z)))
+      const neu = sitzungAnlegen(offen[0].g.nutzer_id, 'schueler', dauer)
+      setzeSitzungsCookie(res, neu.cookie, dauer, sicher)
+      protokolliereServer('vokabeln', 'Anmeldung mit persönlichem Code', offen[0].g.nutzer_id)
+      return (json(res, 200, { ok: true, id: offen.length === 1 ? offen[0].z.id : '', anzahl: offen.length }), true)
     }
     if (req.method === 'POST' && (url.pathname === '/s/api/vokabeln/gast' || url.pathname === '/s/api/vokabeln/wieder')) {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -451,7 +531,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       const wieder = neuerCode(6)
-      db().prepare('INSERT INTO vok_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(z.id, gast.id, hashVon(wieder))
+      db().prepare('INSERT INTO vok_gaeste (zuweisung_id, nutzer_id, wieder, code_v) VALUES (?, ?, ?, ?)').run(z.id, gast.id, hashVon(wieder), wieder)
       const neu = sitzungAnlegen(gast.id, 'schueler', gastDauer(z))
       setzeSitzungsCookie(res, neu.cookie, gastDauer(z), sicher)
       protokolliereServer('vokabeln', 'Beitritt mit Namen (ohne IServ)', gast.id)
@@ -473,13 +553,16 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return (
           json(res, 200, {
             id: z.id,
-            titel: z.titel,
+            titel: ueberschriftVon(z),
             sprache: z.sprache,
             fach: z.fach,
             testTermin: z.test_termin,
             woerter,
             staende: st.woerter,
             farbe: await fachfarbeDerLehrkraft(z),
+            // Spiele heute schon vor der Tagesrunde (Freischaltung der Lehrkraft, 08.10.2026)
+            spieleFrei: spieleHeuteFrei(z),
+            tagesziel: tageszielVon(z),
             // Unregelmäßige Verben der Liste (07.10.2026)
             verben: json_(z.verben, null as unknown) ?? standardVerben(woerter, z.sprache),
             // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
@@ -519,10 +602,16 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           zuweisungen: liste.map((z) => {
             const woerter = json_(z.woerter, [] as Vokabel[])
             const lernende = lernendeVon(z)
-            const sicher = lernende.map((n) => uebersicht(woerter, standVon(z.id, n.id).woerter).sicher)
+            const ue = lernende.map((n) => uebersicht(woerter, standVon(z.id, n.id).woerter))
+            const sicher = ue.map((u) => u.sicher)
             return {
               id: z.id,
               titel: z.titel,
+              ueberschrift: ueberschriftVon(z),
+              eigeneUeberschrift: Boolean(z.ueberschrift),
+              symbol: z.symbol === 'farbe' ? 'farbe' : 'verlauf',
+              // Wörter je Fach über alle Lernenden – für den Verlauf im Symbol
+              faecher: ue.reduce((s, u) => s.map((n, i) => n + (u.faecher[i] ?? 0)), [0, 0, 0, 0, 0, 0, 0]),
               fach: z.fach,
               lerngruppe: z.lerngruppe_id
                 ? (lerngruppe(z.lerngruppe_id)?.name ?? '')
@@ -583,9 +672,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const jetzt = Date.now()
       const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
       // Per Code/QR beigetreten – lässt sich wieder entfernen (05.10.2026)
-      const perCode = new Set(
-        (db().prepare('SELECT nutzer_id FROM vok_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
-      )
+      const gastZeilen = db().prepare('SELECT nutzer_id, code_v FROM vok_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string; code_v: string }[]
+      const perCode = new Set(gastZeilen.map((g) => g.nutzer_id))
+      // Persönlicher Zugangscode je Gast – die Lehrkraft sieht ihn per Klick auf den Namen (08.10.2026)
+      const codes = new Map(gastZeilen.map((g) => [g.nutzer_id, g.code_v]))
       const lernende = lernendeVon(z).map((n) => {
         const st = standVon(z.id, n.id)
         return {
@@ -593,6 +683,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           name: n.name || n.benutzer,
           gast: n.quelle === 'gast',
           perCode: perCode.has(n.id),
+          ...(n.quelle === 'gast' ? { zugang: codes.get(n.id) ?? '' } : {}),
           uebersicht: uebersicht(woerter, st.woerter, jetzt),
           tage7: st.tage.filter((t) => t >= vor7).length,
           stand: st.woerter
@@ -631,11 +722,20 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         json(res, 200, {
           id: z.id,
           titel: z.titel,
+          ueberschrift: ueberschriftVon(z),
           fach: z.fach,
           sprache: z.sprache,
           testTermin: z.test_termin,
           status: istOffen(z) ? 'offen' : 'beendet',
           bis: z.bis,
+          spieleFrei: spieleHeuteFrei(z),
+          tagesziel: tageszielVon(z),
+          // Freigegebene Abschnitte (08.10.2026)
+          teile: teileVon(z),
+          // Lehrwerk und Unit – für „Grammatik dazu freigeben" (08.10.2026)
+          quelle: json_(z.quelle ?? '', null as unknown),
+          // Adresse der Lernseite – für die Zettel (08.10.2026)
+          adresse: adresse.replace(/\/$/, ''),
           ...(z.code ? { code: z.code, link: link(z.code) } : {}),
           lerngruppe: z.lerngruppe_id
             ? (lerngruppe(z.lerngruppe_id)?.name ?? '')
@@ -661,6 +761,107 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .prepare('UPDATE vok_zuweisungen SET test_termin = ? WHERE id = ?')
           .run(typeof k0.testTermin === 'number' ? k0.testTermin : null, z.id)
         return (json(res, 200, { ok: true }), true)
+      }
+      // Spiele für heute freischalten bzw. wieder sperren (08.10.2026, Wunsch der Lehrkraft)
+      if (teile[1] === 'spiele') {
+        db()
+          .prepare('UPDATE vok_zuweisungen SET spiele_frei = ? WHERE id = ?')
+          .run(k0.frei === true ? heuteTag() : '', z.id)
+        protokolliereServer('vokabeln', k0.frei === true ? 'Spiele für heute freigeschaltet' : 'Spiele-Freischaltung aufgehoben', ich.id)
+        return (json(res, 200, { ok: true, spieleFrei: k0.frei === true }), true)
+      }
+      // Überschrift umbenennen ('' = Standard) und Symbol umschalten (08.10.2026)
+      if (teile[1] === 'ueberschrift') {
+        db().prepare('UPDATE vok_zuweisungen SET ueberschrift = ? WHERE id = ?').run(String(k0.text ?? '').trim().slice(0, 120), z.id)
+        return (json(res, 200, { ok: true }), true)
+      }
+      if (teile[1] === 'symbol') {
+        db().prepare('UPDATE vok_zuweisungen SET symbol = ? WHERE id = ?').run(k0.art === 'farbe' ? 'farbe' : '', z.id)
+        return (json(res, 200, { ok: true }), true)
+      }
+      // Neue Vokabeln je Tag (08.10.2026)
+      if (teile[1] === 'tagesziel') {
+        const n = tageszielVon({ tagesziel: Number(k0.tagesziel) })
+        db().prepare('UPDATE vok_zuweisungen SET tagesziel = ? WHERE id = ?').run(n, z.id)
+        return (json(res, 200, { ok: true, tagesziel: n }), true)
+      }
+      // Gast: neuen persönlichen Code erzeugen (ältere Gäste haben keinen lesbaren; 08.10.2026)
+      if (teile[1] === 'gast-code') {
+        const nid = String(k0.id ?? '')
+        const g = gaesteVon(z.id).find((n) => n.id === nid && n.quelle === 'gast')
+        if (!g) return (json(res, 404, { fehler: 'Diese Person ist kein Gast dieses Trainings.' }), true)
+        const wieder = gastCodeSetzen(nid)
+        protokolliereServer('vokabeln', 'Neuer persönlicher Code für einen Gast', ich.id)
+        return (json(res, 200, { ok: true, zugang: wieder }), true)
+      }
+      // Lernende eintragen (08.10.2026): Gastkonto „Vorname N." mit persönlichem Anmeldecode für den Zettel. Gibt es
+      // die Person schon in einem anderen Training dieser Lehrkraft, bekommt sie dasselbe Konto und denselben Code.
+      if (teile[1] === 'eintragen') {
+        const namen = (Array.isArray(k0.namen) ? (k0.namen as unknown[]) : []).slice(0, 200).map(gastName).filter((n): n is string => Boolean(n))
+        const hier = new Set(gaesteVon(z.id).map((n) => n.name.toLowerCase()))
+        if (hier.size + namen.length > 200) return (json(res, 400, { fehler: 'Höchstens 200 Lernende je Training.' }), true)
+        const andere = (
+          db()
+            .prepare(
+              "SELECT g.nutzer_id, g.wieder, g.code_v, g.anmelde FROM vok_gaeste g JOIN vok_zuweisungen z ON z.id = g.zuweisung_id WHERE z.lehrkraft_id = ? AND g.anmelde != ''"
+            )
+            .all(ich.id) as { nutzer_id: string; wieder: string; code_v: string; anmelde: string }[]
+        )
+          .map((g) => ({ ...g, n: nutzerNachId(g.nutzer_id) }))
+          .filter((g) => g.n?.quelle === 'gast')
+        const neu: { name: string; zugang: string }[] = []
+        for (const name of namen) {
+          if (hier.has(name.toLowerCase())) continue
+          hier.add(name.toLowerCase())
+          const schon = andere.find((g) => g.n!.name.toLowerCase() === name.toLowerCase())
+          if (schon) {
+            db()
+              .prepare('INSERT OR IGNORE INTO vok_gaeste (zuweisung_id, nutzer_id, wieder, code_v, anmelde) VALUES (?, ?, ?, ?, ?)')
+              .run(z.id, schon.nutzer_id, schon.wieder, schon.code_v, schon.anmelde)
+            neu.push({ name, zugang: schon.code_v })
+            continue
+          }
+          const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
+          const c = anmeldeCode()
+          db()
+            .prepare('INSERT INTO vok_gaeste (zuweisung_id, nutzer_id, wieder, code_v, anmelde) VALUES (?, ?, ?, ?, ?)')
+            .run(z.id, gast.id, hashVon(c), c, hashVon(c))
+          neu.push({ name, zugang: c })
+        }
+        if (neu.length) registerVergessen()
+        protokolliereServer('vokabeln', `${neu.length} Lernende eingetragen`, ich.id)
+        return (json(res, 200, { ok: true, eingetragen: neu }), true)
+      }
+      // Vokabeln nachträglich hinzufügen (08.10.2026): Lernstand bleibt, neue Wörter kommen als „neu" in den Kasten
+      if (teile[1] === 'woerter') {
+        const alt = json_(z.woerter, [] as Vokabel[])
+        const schluessel = (v: Vokabel): string => `${v.term.trim().toLowerCase()}|${v.translation.trim().toLowerCase()}`
+        const da = new Set(alt.map(schluessel))
+        const ids = new Set(alt.map((v) => v.id))
+        const neu: Vokabel[] = []
+        for (const v of bereinigeWoerter(k0.woerter)) {
+          if (!v.term.trim() || da.has(schluessel(v))) continue
+          da.add(schluessel(v))
+          let id = v.id
+          for (let i = alt.length + neu.length; ids.has(id); i++) id = `w${i}`
+          ids.add(id)
+          neu.push({ ...v, id })
+        }
+        if (alt.length + neu.length > 1500) return (json(res, 400, { fehler: 'Höchstens 1500 Vokabeln je Training.' }), true)
+        const verbenAlt = json_(z.verben, null as { sprache: string; karten: { id: string }[] } | null)
+        const verbenNeu = verbenBereinigt(k0.verben) ? (JSON.parse(verbenBereinigt(k0.verben)) as { sprache: string; karten: { id: string }[] }) : null
+        const verben =
+          verbenAlt && verbenNeu
+            ? { ...verbenAlt, karten: [...verbenAlt.karten, ...verbenNeu.karten.filter((k) => !verbenAlt.karten.some((a) => a.id === k.id))] }
+            : (verbenAlt ?? verbenNeu)
+        const teile = [
+          ...teileVon(z),
+          ...(neu.length ? [{ titel: String(k0.titel ?? 'Weitere Vokabeln').slice(0, 160), anzahl: neu.length, zeit: Date.now() }] : [])
+        ]
+        db()
+          .prepare('UPDATE vok_zuweisungen SET woerter = ?, verben = ?, teile = ? WHERE id = ?')
+          .run(JSON.stringify([...alt, ...neu]), verben ? JSON.stringify(verben) : (z.verben ?? ''), JSON.stringify(teile), z.id)
+        return (json(res, 200, { ok: true, neu: neu.length }), true)
       }
       if (teile[1] === 'zeitraum') {
         db()
@@ -689,7 +890,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // Gastkonten, die nur für dieses Training angelegt wurden, gehen mit
         const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
         db().prepare('DELETE FROM vok_zuweisungen WHERE id = ?').run(z.id)
-        for (const n of gaeste) nutzerLoeschen(n.id)
+        // Eingetragene Lernende in weiteren Trainings behalten ihr Konto (08.10.2026)
+        for (const n of gaeste) if (!db().prepare('SELECT 1 FROM vok_gaeste WHERE nutzer_id = ?').get(n.id)) nutzerLoeschen(n.id)
         return (json(res, 200, { ok: true }), true)
       }
     }

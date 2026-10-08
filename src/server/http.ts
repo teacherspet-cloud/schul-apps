@@ -521,7 +521,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
 
     // ---------- Darstellung der Lernenden (Modus, Schrift, Farbe) – folgt dem Konto auf jedes Gerät
-    if (url.pathname === '/s/api/darstellung' && sitzung && sitzung.nutzer.quelle !== 'gast') {
+    // Seit 08.10.2026 auch für Gäste (persönlicher Anmeldecode: sie lernen an mehreren Geräten)
+    if (url.pathname === '/s/api/darstellung' && sitzung) {
       const d = datenbank()
       d.exec('CREATE TABLE IF NOT EXISTS nutzer_darstellung (nutzer_id TEXT PRIMARY KEY REFERENCES nutzer(id) ON DELETE CASCADE, daten TEXT NOT NULL)')
       if (req.method === 'GET') {
@@ -545,12 +546,20 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           vorlesen: k0.vorlesen === true,
           tempo: wahl(k0.tempo, ['langsam', 'normal', 'schnell'], 'normal'),
           // Aufgenommene Aussprache: weibliche oder männliche Fassung (07.10.2026)
-          aussprache: wahl(k0.aussprache, ['w', 'm'], 'w'),
+          aussprache: wahl(k0.aussprache, ['w', 'm'], 'm'),
           wochenziel: Math.max(1, Math.min(7, Math.round(Number(k0.wochenziel) || 3))),
           tipps: k0.tipps !== false,
           spiele: k0.spiele !== false,
           zeitdruck: k0.zeitdruck !== false,
-          toene: k0.toene === true
+          toene: k0.toene !== false,
+          // Neue Vorgaben vom 08.10.2026 (Töne an, männliche Stimme) schon übernommen – sonst würden sie die eigene Wahl überschreiben
+          vorgabe0810: k0.vorgabe0810 === true,
+          // Spielauswahl: auf- und zugeklappte Bereiche (08.10.2026)
+          spielGruppen: Object.fromEntries(
+            Object.entries(typeof k0.spielGruppen === 'object' && k0.spielGruppen ? (k0.spielGruppen as Record<string, unknown>) : {})
+              .filter(([n, v]) => /^[a-z]{1,20}$/.test(n) && typeof v === 'boolean')
+              .slice(0, 20)
+          )
         }
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,

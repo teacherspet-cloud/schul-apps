@@ -3,7 +3,7 @@
  * den schon gelernten Wörtern, je Spiel der eigene Rekord – keine Ranglisten. Wörter, die im Spiel danebengingen,
  * landen auf „nochmal ansehen" und (seit 06.10.2026) wackelig im Kasten; Treffer befördern nichts.
  */
-import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import {
   IconArrowLeft,
   IconBolt,
@@ -16,6 +16,7 @@ import {
   IconMessage2,
   IconPhoto,
   IconPuzzle,
+  IconChevronDown,
   IconTrophy,
   IconTypography,
   IconX
@@ -33,7 +34,7 @@ import { BildAufdecken, BildMemory, BuchstabenPuzzle, HoerBingo, HoerMemory, Ric
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './SpieleVerben'
 import { kannSprechen } from '../VokabelTrainer'
 import { hatSatzAufnahme } from '../medienCache'
-import { ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
+import { fuerServer, ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 
 /** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
 export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell', 'richtiggehoert', 'aufdecken', 'formenblitz']
@@ -129,6 +130,38 @@ html.sa-ruhig [data-spiel] *, html.sa-ruhig [data-verbspiel] *, html.sa-ruhig .v
 @media (prefers-reduced-motion: reduce) { [data-spiel] *, [data-verbspiel] *, .vt-memory-innen { transition: none !important; animation: none !important; } }
 `
 
+/**
+ * Bereiche der Spielauswahl (08.10.2026, Wunsch der Lehrkraft: „durch die Masse sehr unübersichtlich"): nach der Art
+ * des Spielens statt nur Erkennen/Schreiben, auf- und zuklappbar; die Wahl der Lernenden hängt am Konto.
+ */
+const GRUPPEN: { id: string; name: string; text: string; offen: boolean; spiele: SpielId[] }[] = [
+  {
+    id: 'paare',
+    name: 'Paare finden',
+    text: 'Memory und Zuordnen – Wort, Bedeutung, Ton oder Bild',
+    offen: true,
+    spiele: ['memory', 'zuordnen', 'hoermemory', 'bildmemory']
+  },
+  {
+    id: 'schnell',
+    name: 'Schnell reagieren',
+    text: 'Gegen die Uhr oder die eigene Bestzeit',
+    offen: true,
+    spiele: ['blitz', 'duell', 'fallend', 'richtiggehoert']
+  },
+  {
+    id: 'hoeren',
+    name: 'Hören',
+    text: 'Hinhören, erkennen, aufschreiben',
+    offen: false,
+    spiele: ['hoeren', 'buchstaben', 'hoerbingo', 'satzhoeren', 'diktat']
+  },
+  { id: 'bilder', name: 'Bilder', text: 'Zum Bild das Wort – und umgekehrt', offen: false, spiele: ['bildwort', 'wortbild', 'wasfehlt', 'aufdecken'] },
+  { id: 'raetseln', name: 'Rätseln und schreiben', text: 'Buchstabe für Buchstabe', offen: false, spiele: ['wortraten', 'kreuzwort', 'suchsel'] },
+  { id: 'saetze', name: 'Sätze', text: 'Wörter im Zusammenhang', offen: false, spiele: ['satz', 'satzluecke'] },
+  { id: 'verben', name: 'Unregelmäßige Verben', text: 'Stammformen üben', offen: false, spiele: ['verbtrio', 'formenblitz', 'bildverb', 'muster'] }
+]
+
 export function Spielwahl({
   woerter,
   staende,
@@ -139,7 +172,8 @@ export function Spielwahl({
   aktualisieren,
   spielt,
   verben,
-  nurVerben
+  nurVerben,
+  vorDerRunde
 }: {
   woerter: Vokabel[]
   staende: Record<string, WortStand>
@@ -154,10 +188,12 @@ export function Spielwahl({
   verben?: VerbDaten
   /** Nur die Verbspiele (Grammatiktraining „Unregelmäßige Verben") */
   nurVerben?: boolean
+  /** Von der Lehrkraft für heute freigeschaltet, die Tagesrunde steht noch aus (08.10.2026) */
+  vorDerRunde?: boolean
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
-  const { d: wahl } = useDarstellung()
+  const { d: wahl, setze: setzeWahl } = useDarstellung()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
   const setSpiel = (s: SpielId | null): void => {
     setSpielRoh(s)
@@ -312,6 +348,91 @@ export function Spielwahl({
     )
   }
 
+  // Eine Karte je Spiel (null = ausgeblendet, weil Bilder, Ton oder Verben fehlen)
+  const karteFuer = (s: (typeof SPIELE)[number]): React.JSX.Element | null => {
+    // Ohne Verben keine Verbspiele; Verbspiele nach ihren Daten (07.10.2026)
+    if (VERBSPIELE.includes(s.id) && !verbZahl) return null
+    const gesperrtNeu =
+      s.id === 'hoermemory'
+        ? hoerbar < 6
+        : s.id === 'richtiggehoert' || s.id === 'buchstaben'
+        ? hoerbar < 4
+        : s.id === 'hoerbingo'
+        ? hoerbar < 9
+        : s.id === 'bildmemory' || s.id === 'wasfehlt'
+        ? mitBild < 6
+        : s.id === 'aufdecken' || s.id === 'wortbild'
+        ? mitBild < 4
+        : s.id === 'verbtrio' || s.id === 'muster'
+        ? verbZahl < 4 || (s.id === 'muster' && !verben?.mitMuster)
+        : s.id === 'formenblitz'
+        ? verbZahl < 4 || !(geraet || verben?.mitTon)
+        : s.id === 'bildverb'
+        ? verbBilder < 4
+        : s.id === 'diktat'
+        ? hoerbar < 4
+        : undefined
+    // Medienspiele erst zeigen, wenn es Bilder bzw. Ton gibt
+    if (gesperrtNeu) return null
+    const gesperrt =
+      gesperrtNeu === false
+        ? pool.length < 4 && !VERBSPIELE.includes(s.id)
+        : s.id === 'satzluecke'
+        ? mitSatzLuecke(woerter).length < 3
+        : s.id === 'satz'
+        ? mitSatz < 1
+        : s.id === 'bildwort'
+        ? mitBild < 4
+        : s.id === 'hoeren'
+        ? mitTon < 4 || woerter.length < 4
+        : s.id === 'satzhoeren'
+        ? mitSatzTon < 1
+        : pool.length < 4
+    // Spiele der Medienbank erst zeigen, wenn es Bilder bzw. Aufnahmen gibt
+    if (gesperrt && (s.id === 'bildwort' || s.id === 'hoeren' || s.id === 'satzhoeren')) return null
+    return (
+      <Card
+        key={s.id}
+        radius="lg"
+        withBorder
+        padding="md"
+        component="button"
+        type="button"
+        disabled={gesperrt}
+        onClick={() => !gesperrt && setSpiel(s.id)}
+        style={{ textAlign: 'left', cursor: gesperrt ? 'not-allowed' : 'pointer', opacity: gesperrt ? 0.5 : 1, width: '100%' }}
+        data-spiel-wahl={s.id}
+      >
+        <Group wrap="nowrap" align="flex-start">
+          {spielBild(s.id) ? (
+            <img src={spielBild(s.id)} alt="" width={56} height={56} style={{ flex: 'none', borderRadius: 14 }} data-spiel-bild={s.id} />
+          ) : (
+            <ThemeIcon size={44} radius="md" variant="light" color={FARBE[s.id]}>
+              {SYMBOL[s.id]}
+            </ThemeIcon>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <Text fw={700}>{s.name}</Text>
+            <Text size="xs" c="dimmed">
+              {gesperrt ? (s.id === 'satz' || s.id === 'satzluecke' ? 'Braucht Wörter mit Beispielsatz.' : 'Braucht mindestens vier Wörter.') : s.beschreibung}
+            </Text>
+            {rekorde[s.id] !== undefined && (
+              <Badge mt={6} size="sm" variant="light" color="yellow" leftSection={<IconTrophy size={10} />}>
+                Rekord: {rekorde[s.id]} {s.einheit}
+              </Badge>
+            )}
+          </div>
+        </Group>
+      </Card>
+    )
+  }
+  // Bereiche auf- und zuklappen – am Konto gemerkt, folgt auf jedes Gerät (08.10.2026)
+  const klappen = (id: string, offen: boolean): void => {
+    const neu = { ...wahl, spielGruppen: { ...(wahl.spielGruppen ?? {}), [id]: offen } }
+    setzeWahl(neu)
+    if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
+  }
+
   return (
     <Stack data-spielwahl>
       <style>{SPIELE_CSS}</style>
@@ -319,9 +440,9 @@ export function Spielwahl({
         <Title order={3} c="var(--vt-a-dunkel)">
           Spielen mit deinen Wörtern
         </Title>
-        <Text size="sm" c="dimmed">
-          Für heute ist alles geübt. Gespielt wird mit fälligen, wackeligen und ein paar sicheren Wörtern. Was im Spiel danebengeht, kommt im Karteikasten bald
-          wieder dran.
+        <Text size="sm" c="dimmed" data-spiele-freigeschaltet={vorDerRunde || undefined}>
+          {vorDerRunde ? 'Deine Lehrkraft hat die Spiele für heute freigeschaltet. ' : 'Für heute ist alles geübt. '}Gespielt wird mit fälligen, wackeligen und
+          ein paar sicheren Wörtern. Was im Spiel danebengeht, kommt im Karteikasten bald wieder dran.
         </Text>
       </div>
       {ansehen.length > 0 && (
@@ -341,96 +462,49 @@ export function Spielwahl({
           </Group>
         </Card>
       )}
-      {(['erkennen', 'schreiben'] as const).map((art) => (
-        <div key={art}>
-          <Text fw={700} size="sm" mb={6} c="var(--vt-a-dunkel)">
-            {art === 'erkennen' ? 'Erkennen' : 'Schreiben'}
-          </Text>
-          <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
-            {SPIELE.filter((s) => s.art === art && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && (!nurVerben || VERBSPIELE.includes(s.id))).map((s) => {
-              // Ohne Verben keine Verbspiele; Verbspiele nach ihren Daten (07.10.2026)
-              if (VERBSPIELE.includes(s.id) && !verbZahl) return null
-              const gesperrtNeu =
-                s.id === 'hoermemory'
-                  ? hoerbar < 6
-                  : s.id === 'richtiggehoert' || s.id === 'buchstaben'
-                  ? hoerbar < 4
-                  : s.id === 'hoerbingo'
-                  ? hoerbar < 9
-                  : s.id === 'bildmemory' || s.id === 'wasfehlt'
-                  ? mitBild < 6
-                  : s.id === 'aufdecken' || s.id === 'wortbild'
-                  ? mitBild < 4
-                  : s.id === 'verbtrio' || s.id === 'muster'
-                  ? verbZahl < 4 || (s.id === 'muster' && !verben?.mitMuster)
-                  : s.id === 'formenblitz'
-                  ? verbZahl < 4 || !(geraet || verben?.mitTon)
-                  : s.id === 'bildverb'
-                  ? verbBilder < 4
-                  : s.id === 'diktat'
-                  ? hoerbar < 4
-                  : undefined
-              // Medienspiele erst zeigen, wenn es Bilder bzw. Ton gibt
-              if (gesperrtNeu) return null
-              const gesperrt =
-                gesperrtNeu === false
-                  ? pool.length < 4 && !VERBSPIELE.includes(s.id)
-                  : s.id === 'satzluecke'
-                  ? mitSatzLuecke(woerter).length < 3
-                  : s.id === 'satz'
-                  ? mitSatz < 1
-                  : s.id === 'bildwort'
-                  ? mitBild < 4
-                  : s.id === 'hoeren'
-                  ? mitTon < 4 || woerter.length < 4
-                  : s.id === 'satzhoeren'
-                  ? mitSatzTon < 1
-                  : pool.length < 4
-              // Spiele der Medienbank erst zeigen, wenn es Bilder bzw. Aufnahmen gibt
-              if (gesperrt && (s.id === 'bildwort' || s.id === 'hoeren' || s.id === 'satzhoeren')) return null
-              return (
-                <Card
-                  key={s.id}
-                  radius="lg"
-                  withBorder
-                  padding="md"
-                  component="button"
-                  type="button"
-                  disabled={gesperrt}
-                  onClick={() => !gesperrt && setSpiel(s.id)}
-                  style={{ textAlign: 'left', cursor: gesperrt ? 'not-allowed' : 'pointer', opacity: gesperrt ? 0.5 : 1, width: '100%' }}
-                  data-spiel-wahl={s.id}
-                >
-                  <Group wrap="nowrap" align="flex-start">
-                    {spielBild(s.id) ? (
-                      <img src={spielBild(s.id)} alt="" width={56} height={56} style={{ flex: 'none', borderRadius: 14 }} data-spiel-bild={s.id} />
-                    ) : (
-                      <ThemeIcon size={44} radius="md" variant="light" color={FARBE[s.id]}>
-                        {SYMBOL[s.id]}
-                      </ThemeIcon>
-                    )}
-                    <div style={{ minWidth: 0 }}>
-                      <Text fw={700}>{s.name}</Text>
-                      <Text size="xs" c="dimmed">
-                        {gesperrt
-                          ? s.id === 'satz' || s.id === 'satzluecke'
-                            ? 'Braucht Wörter mit Beispielsatz.'
-                            : 'Braucht mindestens vier Wörter.'
-                          : s.beschreibung}
-                      </Text>
-                      {rekorde[s.id] !== undefined && (
-                        <Badge mt={6} size="sm" variant="light" color="yellow" leftSection={<IconTrophy size={10} />}>
-                          Rekord: {rekorde[s.id]} {s.einheit}
-                        </Badge>
-                      )}
-                    </div>
-                  </Group>
-                </Card>
-              )
-            })}
-          </SimpleGrid>
-        </div>
-      ))}
+      {GRUPPEN.map((g) => {
+        const karten = g.spiele
+          .map((id) => SPIELE.find((s) => s.id === id))
+          .filter(
+            (s): s is (typeof SPIELE)[number] => Boolean(s) && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s!.id)) && (!nurVerben || VERBSPIELE.includes(s!.id))
+          )
+          .map(karteFuer)
+          .filter(Boolean)
+        if (!karten.length) return null
+        const offen = nurVerben || (wahl.spielGruppen?.[g.id] ?? g.offen)
+        return (
+          <div key={g.id} data-spiel-gruppe={g.id} data-offen={offen || undefined}>
+            <UnstyledButton
+              onClick={() => klappen(g.id, !offen)}
+              aria-expanded={offen}
+              w="100%"
+              py={6}
+              style={{ borderBottom: '1px solid var(--vt-a-rand)' }}
+              data-spiel-gruppe-kopf={g.id}
+            >
+              <Group justify="space-between" wrap="nowrap">
+                <div>
+                  <Text fw={700} c="var(--vt-a-dunkel)">
+                    {g.name}{' '}
+                    <Text span size="sm" c="dimmed" fw={400}>
+                      · {karten.length}
+                    </Text>
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {g.text}
+                  </Text>
+                </div>
+                <IconChevronDown size={18} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
+              </Group>
+            </UnstyledButton>
+            {offen && (
+              <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm" mt="sm">
+                {karten}
+              </SimpleGrid>
+            )}
+          </div>
+        )
+      })}
     </Stack>
   )
 }

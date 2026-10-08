@@ -26,6 +26,7 @@ import { json, setzeSitzungsCookie, type Anfrage } from './http'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
+import { lernendeVon as vokLernende, vokIstFuer, zeile as vokZeile } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 
 const SCHEMA = `
@@ -63,6 +64,9 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Fest mit einem Vokabeltraining verbunden (08.10.2026, abgestimmt): gilt für genau dessen Lernende
+    const spalten = new Set((d.prepare('PRAGMA table_info(gram_zuweisungen)').all() as { name: string }[]).map((s) => s.name))
+    if (!spalten.has('vok_id')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN vok_id TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -92,7 +96,12 @@ interface Zeile {
   erstellt: string
   code: string
   bis: number | null
+  /** Verbundenes Vokabeltraining (08.10.2026) */
+  vok_id?: string
 }
+
+/** Das verbundene Vokabeltraining (falls es noch existiert) */
+const vokVon = (z: Zeile): ReturnType<typeof vokZeile> => (z.vok_id ? vokZeile(z.vok_id) : null)
 
 /** Lernstand einer Person: je Aufgabe wie ein Wort im Kasten, dazu Übungstage, Rekorde, „nochmal ansehen" */
 interface GramStand {
@@ -141,6 +150,10 @@ const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(12
 function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (ich.rolle !== 'schueler') return false
   if (db().prepare('SELECT 1 FROM gram_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
+  // Verbunden mit einem Vokabeltraining: wer dort lernt (auch eingetragene Gäste), hat auch diese Grammatik
+  const v = vokVon(z)
+  if (v && vokIstFuer(v, ich)) return true
+  if (z.vok_id) return false
   if (ich.quelle === 'gast') return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
@@ -157,6 +170,11 @@ function lernendeVon(z: Zeile): NutzerInfo[] {
     : g
       ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
       : []
+  const v = vokVon(z)
+  if (v) {
+    const ids = new Set<string>()
+    return [...vokLernende(v), ...gaesteVon(z.id)].filter((n) => !ids.has(n.id) && Boolean(ids.add(n.id)))
+  }
   const ids = new Set(feste.map((n) => n.id))
   return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
 }
@@ -399,7 +417,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
     const gruppeName = (z: Zeile): string =>
-      z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : z.code && !json_(z.schueler, [] as string[]).length ? 'Per QR-Code' : 'Einzelne Lernende'
+      vokVon(z)
+        ? `wie Vokabeltraining „${vokVon(z)!.titel}“`
+        : z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : z.code && !json_(z.schueler, [] as string[]).length ? 'Per QR-Code' : 'Einzelne Lernende'
     if (req.method === 'GET' && teile.length === 0) {
       const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Zeile[]
       return (
@@ -434,14 +454,17 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
       const mitGaesten = k0.gaeste === true
-      if (!g && !einzelne.length && !mitGaesten)
+      // Lernende eines eigenen Vokabeltrainings (08.10.2026)
+      const vok = k0.vokId ? vokZeile(String(k0.vokId)) : null
+      if (k0.vokId && (!vok || vok.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true)
+      if (!g && !einzelne.length && !mitGaesten && !vok)
         return (json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder den Zugang per QR-Code wählen.' }), true)
       const paket = paketBereinigt(k0.paket, String(k0.thema ?? ''))
       if (paket.aufgaben.length < 8) return (json(res, 400, { fehler: 'Der Aufgabenpool ist zu klein (mindestens 8 brauchbare Aufgaben).' }), true)
       const id = randomBytes(8).toString('hex')
       db()
         .prepare(
-          "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?)"
+          "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?)"
         )
         .run(
           id,
@@ -455,7 +478,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           JSON.stringify(paket),
           new Date().toISOString(),
           mitGaesten ? neuerCode() : '',
-          typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null
+          typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null,
+          vok?.id ?? ''
         )
       protokolliereServer('grammatik', 'Grammatiktraining freigegeben', ich.id)
       return (json(res, 200, { id, aufgaben: paket.aufgaben.length }), true)
