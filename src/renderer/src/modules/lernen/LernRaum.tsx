@@ -276,7 +276,7 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
 }
 
 /** Merkzettel: aus dem Kasten ziehen und umdrehen */
-function MerkKasten({ k, schliessen }: { k: Karteikasten; schliessen: () => void }): React.JSX.Element {
+export function MerkKasten({ k, schliessen }: { k: Karteikasten; schliessen: () => void }): React.JSX.Element {
   const karten = k.karten ?? []
   const [i, setI] = useState<number | null>(null)
   const [um, setUm] = useState(false)
@@ -332,7 +332,7 @@ function MerkKasten({ k, schliessen }: { k: Karteikasten; schliessen: () => void
 const ART: Record<MappenSeite['art'], string> = { blatt: 'Arbeitsblatt', tafel: 'Tafelbild', schreiben: 'Schreibaufgabe', test: 'Test', produkt: 'Lernprodukt' }
 
 /** Mappe: Seite für Seite umblättern (Wischen oder Pfeile) */
-function MappeAnsicht({ m, schliessen }: { m: { titel: string; seiten: MappenSeite[] }; schliessen: () => void }): React.JSX.Element {
+export function MappeAnsicht({ m, schliessen }: { m: { titel: string; seiten: MappenSeite[] }; schliessen: () => void }): React.JSX.Element {
   const [n, setN] = useState(0)
   const [richtung, setRichtung] = useState<'vor' | 'zurueck'>('vor')
   const [startX, setStartX] = useState<number | null>(null)

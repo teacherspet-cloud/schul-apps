@@ -16,13 +16,15 @@ import {
   Loader,
   Menu,
   Modal,
+  Paper,
   SegmentedControl,
   Stack,
   Text,
   Textarea,
   Tooltip
 } from '@mantine/core'
-import { IconArrowRight, IconBook, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowRight, IconArrowUp, IconBook, IconGripVertical, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { schritteInStunde, stundeAnhaengen, stundeEntfernen, stundeVerschieben, type StundenPatch } from './stundenRaster'
 import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigation'
 import { useEffect, useState } from 'react'
 import { SCHRITT_ARTEN, STUNDEN_MINUTEN, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
@@ -33,41 +35,153 @@ import { reiheAusgeben, schrittAusgeben, type DruckArt } from './reiheDruck'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
-/** Stundenraster: Einzel- und Doppelstunden in ihrer Reihenfolge */
-export function StundenLeiste({ stunden, setze }: { stunden: StundenArt[]; setze: (s: StundenArt[]) => void }): React.JSX.Element {
+const stundenName = (a: StundenArt): string => (a === 'doppel' ? 'Doppelstunde' : 'Einzelstunde')
+
+/**
+ * Stundenraster: Einzel- und Doppelstunden in ihrer Reihenfolge. `liste` (08.10.2026, im Fenster
+ * „Mit KI planen"): eine Zeile je Stunde mit Ziehgriff und Pfeilen (Pfeile auch fürs iPad, wo
+ * natives Ziehen nicht zuverlässig geht). Beide Formen ändern über `setze` denselben Stand der Reihe;
+ * die Schritte wandern beim Verschieben mit ihrer Stunde mit.
+ */
+export function StundenLeiste({
+  reihe,
+  setze,
+  liste
+}: {
+  reihe: Pick<Reihe, 'stunden' | 'schritte'>
+  setze: (p: StundenPatch) => void
+  liste?: boolean
+}): React.JSX.Element {
+  const stunden = reihe.stunden ?? []
   const minuten = stunden.reduce((n, a) => n + STUNDEN_MINUTEN[a], 0)
+  const [gezogen, setGezogen] = useState<number | null>(null)
+  const [ueber, setUeber] = useState<number | null>(null)
+  /** Leere Stunden gleich entfernen, belegte erst nach Rückfrage */
+  const entfernen = (i: number): void => {
+    const n = schritteInStunde(reihe, i)
+    if (
+      n &&
+      !window.confirm(
+        `In der ${i + 1}. Stunde ${n === 1 ? 'liegt ein Schritt' : `liegen ${n} Schritte`}. Stunde trotzdem entfernen? Die Schritte bleiben erhalten, nur ohne Stundenangabe.`
+      )
+    )
+      return
+    setze(stundeEntfernen(reihe, i))
+  }
+  const verschieben = (von: number, nach: number): void => setze(stundeVerschieben(reihe, von, nach))
+  const kopf = (
+    <Group justify="space-between">
+      <Text size="sm" fw={500}>
+        Stunden der Reihe
+      </Text>
+      <Text size="xs" c="dimmed">
+        {stunden.length
+          ? `${stunden.length} Termine · ${minuten} min (${Math.round(minuten / 45)} Unterrichtsstunden)`
+          : 'Noch keine – Grundlage für die KI-Planung'}
+      </Text>
+    </Group>
+  )
+  const neuKnoepfe = (
+    <>
+      <Button size="compact-sm" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setze(stundeAnhaengen(reihe, 'einzel'))} data-stunde-neu="einzel">
+        Einzelstunde
+      </Button>
+      <Button size="compact-sm" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setze(stundeAnhaengen(reihe, 'doppel'))} data-stunde-neu="doppel">
+        Doppelstunde
+      </Button>
+    </>
+  )
+  if (!liste)
+    return (
+      <Stack gap={6} data-stunden>
+        {kopf}
+        <Group gap={6}>
+          {stunden.map((a, i) => (
+            <Badge
+              key={i}
+              variant="light"
+              color={a === 'doppel' ? 'indigo' : 'cyan'}
+              size="lg"
+              rightSection={<CloseButton size="xs" aria-label="Stunde entfernen" onClick={() => entfernen(i)} />}
+              data-stunde={a}
+            >
+              {i + 1}. {stundenName(a)}
+            </Badge>
+          ))}
+          {neuKnoepfe}
+        </Group>
+      </Stack>
+    )
   return (
-    <Stack gap={6} data-stunden>
-      <Group justify="space-between">
-        <Text size="sm" fw={500}>
-          Stunden der Reihe
-        </Text>
-        <Text size="xs" c="dimmed">
-          {stunden.length
-            ? `${stunden.length} Termine · ${minuten} min (${Math.round(minuten / 45)} Unterrichtsstunden)`
-            : 'Noch keine – Grundlage für die KI-Planung'}
-        </Text>
-      </Group>
-      <Group gap={6}>
-        {stunden.map((a, i) => (
-          <Badge
+    <Stack gap={6} data-stunden data-stunden-liste>
+      {kopf}
+      {stunden.map((a, i) => {
+        const n = schritteInStunde(reihe, i)
+        return (
+          <Paper
             key={i}
-            variant="light"
-            color={a === 'doppel' ? 'indigo' : 'cyan'}
-            size="lg"
-            rightSection={<CloseButton size="xs" aria-label="Stunde entfernen" onClick={() => setze(stunden.filter((_, k) => k !== i))} />}
+            withBorder
+            px="xs"
+            py={4}
+            radius="md"
             data-stunde={a}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', String(i))
+              setGezogen(i)
+            }}
+            onDragEnd={() => {
+              setGezogen(null)
+              setUeber(null)
+            }}
+            onDragOver={(e) => {
+              if (gezogen === null || gezogen === i) return
+              e.preventDefault()
+              setUeber(i)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (gezogen !== null) verschieben(gezogen, i)
+              setGezogen(null)
+              setUeber(null)
+            }}
+            style={{
+              opacity: gezogen === i ? 0.4 : 1,
+              borderTop: ueber === i ? '3px solid var(--mantine-color-blue-5)' : undefined
+            }}
           >
-            {i + 1}. {a === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'}
-          </Badge>
-        ))}
-        <Button size="compact-sm" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setze([...stunden, 'einzel'])} data-stunde-neu="einzel">
-          Einzelstunde
-        </Button>
-        <Button size="compact-sm" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setze([...stunden, 'doppel'])} data-stunde-neu="doppel">
-          Doppelstunde
-        </Button>
-      </Group>
+            <Group justify="space-between" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap">
+                <IconGripVertical size={16} color="var(--mantine-color-dimmed)" style={{ cursor: 'grab' }} aria-label="ziehen" />
+                <Badge variant="light" color={a === 'doppel' ? 'indigo' : 'cyan'}>
+                  {i + 1}. {stundenName(a)}
+                </Badge>
+                <Text size="xs" c="dimmed">
+                  {STUNDEN_MINUTEN[a]} min{n ? ` · ${n} ${n === 1 ? 'Schritt' : 'Schritte'}` : ' · leer'}
+                </Text>
+              </Group>
+              <Group gap={2} wrap="nowrap">
+                <ActionIcon variant="subtle" size="lg" disabled={i === 0} onClick={() => verschieben(i, i - 1)} aria-label="Stunde nach oben" data-stunde-hoch>
+                  <IconArrowUp size={16} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  size="lg"
+                  disabled={i === stunden.length - 1}
+                  onClick={() => verschieben(i, i + 1)}
+                  aria-label="Stunde nach unten"
+                  data-stunde-runter
+                >
+                  <IconArrowDown size={16} />
+                </ActionIcon>
+                <CloseButton aria-label="Stunde entfernen" onClick={() => entfernen(i)} data-stunde-entfernen />
+              </Group>
+            </Group>
+          </Paper>
+        )
+      })}
+      <Group gap={6}>{neuKnoepfe}</Group>
     </Stack>
   )
 }
@@ -77,12 +191,15 @@ export function PlanenFenster({
   reihe,
   kc,
   schliessen,
-  uebernehmen
+  uebernehmen,
+  setzeStunden
 }: {
   reihe: Reihe
   kc: { auszug: string[]; quelle: string }
   schliessen: () => void
   uebernehmen: (plan: ReihenPlan, ersetzen: boolean) => void
+  /** Stundenraster der Reihe ändern (derselbe Stand wie im Editor) */
+  setzeStunden: (p: StundenPatch) => void
 }): React.JSX.Element {
   const [material, setMaterial] = useState<MaterialKandidat[] | null>(null)
   const [wunsch, setWunsch] = useState('')
@@ -92,9 +209,11 @@ export function PlanenFenster({
   const [buch, setBuch] = useState<{ text: string; titel: string; abschnitte: number }[]>([])
   const [liest, setLiest] = useState<string | null>(null)
   const [modus, setModus] = useState<'ersetzen' | 'anhaengen'>(reihe.schritte.length ? 'anhaengen' : 'ersetzen')
+  // Nur Fach und Jahrgang zählen – Änderungen am Stundenraster hier im Fenster laden nicht neu
+  const { fachId, grade } = reihe
   useEffect(() => {
-    void materialKandidaten(reihe).then(setMaterial, () => setMaterial([]))
-  }, [reihe])
+    void materialKandidaten({ fachId, grade }).then(setMaterial, () => setMaterial([]))
+  }, [fachId, grade])
   const ohneStunden = !(reihe.stunden?.length ?? 0)
   return (
     <Modal opened onClose={schliessen} title="Reihe mit KI planen" size="xl" data-planen-fenster>
@@ -107,9 +226,13 @@ export function PlanenFenster({
             </Text>
             {ohneStunden && (
               <Alert color="orange" variant="light">
-                Bitte zuerst Einzel- und Doppelstunden anlegen – die KI verteilt die Schritte auf genau diese Stunden.
+                Bitte zuerst Einzel- und Doppelstunden anlegen (hier gleich unten) – die KI verteilt die Schritte auf genau diese Stunden.
               </Alert>
             )}
+            {/* Stundenraster direkt im Fenster (08.10.2026): ändert dieselbe Reihe wie der Editor */}
+            <Card withBorder p="sm" data-planen-stunden>
+              <StundenLeiste reihe={reihe} setze={setzeStunden} liste />
+            </Card>
             <Text size="xs" c="dimmed">
               {material === null ? (
                 <>

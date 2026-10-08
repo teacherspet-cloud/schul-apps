@@ -453,6 +453,19 @@ export function SchuelerEinstellungen(): React.JSX.Element {
             data-design
           />
         </Zeile>
+        {/* Regal mit Fachordnern oder die bisherige Liste (08.10.2026) */}
+        <Zeile titel="Meine Materialien">
+          <SegmentedControl
+            fullWidth
+            value={d.materialien ?? 'regal'}
+            onChange={(v) => aendern({ materialien: v as NonNullable<Darstellung['materialien']> })}
+            data={[
+              { value: 'regal', label: 'Regal mit Ordnern' },
+              { value: 'liste', label: 'Liste' }
+            ]}
+            data-materialien
+          />
+        </Zeile>
         <Switch
           checked={d.ruhig}
           onChange={(e) => aendern({ ruhig: e.currentTarget.checked })}

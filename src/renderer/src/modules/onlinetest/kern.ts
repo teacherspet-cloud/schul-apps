@@ -16,6 +16,7 @@
  */
 import { anweisungFuer } from '../vokabeltest/model/blocks'
 import { mitOptionalem, teileVon } from '@shared/luecken'
+import { APOSTROPHE } from '@shared/apostroph'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
 export type FeldArt = 'text' | 'langtext' | 'auswahl' | 'wahr'
@@ -99,7 +100,7 @@ export type Antworten = Record<string, string>
 /** Ganze Punkte je Einheit: halbe Punkte gibt es im Onlinetest nicht (Entscheidung der Lehrkraft) */
 export const ganzePunkte = (p: number): number => Math.max(1, Math.round(Number.isFinite(p) ? p : 1))
 
-const ARTIKEL = /^(to|a|an|the|le|la|les|l'|l’|un|une|des|el|los|las|il|lo|gli|i|der|die|das|ein|eine|de|het)\s+/i
+const ARTIKEL = /^(to|a|an|the|le|la|les|l'|l’|l‘|lʼ|un|une|des|el|los|las|il|lo|gli|i|der|die|das|ein|eine|de|het)\s+/i
 
 /**
  * Normalisieren für den genauen Vergleich: Leerzeichen, typografische Zeichen, Schlusspunkt, Längenzeichen (Latein:
@@ -110,7 +111,8 @@ export function normalisiere(s: string): string {
     .normalize('NFD')
     .replace(/[̄̆]/g, '')
     .normalize('NFC')
-    .replace(/[‘’ʼ`´]/g, "'")
+    // Alle Apostroph-Zeichen wie im Vokabeltrainer (08.10.2026)
+    .replace(APOSTROPHE, "'")
     .replace(/[“”„«»]/g, '"')
     .replace(/[‐-―]/g, '-')
     .replace(/­/g, '')

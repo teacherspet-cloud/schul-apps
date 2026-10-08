@@ -21,10 +21,30 @@ export interface Zettel {
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (z) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[z]!))
 
+/** Öffentliche Adresse der Schul-Apps – kurz zum Abtippen, ohne https:// */
+export const OEFFENTLICHE_ADRESSE = 'www.meineschulapps.de'
+
+/**
+ * Adresse auf dem Zettel (08.10.2026, Wunsch der Lehrkraft): „www.meineschulapps.de" statt Server-Adresse
+ * mit „/s/" (z. B. „217.154.120.64:8443/s/"). Die Startseite zeigt ohne Anmeldung „Mit Code öffnen" ganz
+ * oben (server/seiten.ts) – der kurze Weg reicht. Nur ein Testserver im eigenen Netz (localhost, 192.168.…)
+ * behält seine eigene Adresse, sonst führte der Zettel dort ins Leere.
+ */
+export function zettelAdresse(adresse: string): string {
+  const basis = adresse.replace(/\/$/, '')
+  let host = ''
+  try {
+    host = new URL(basis).hostname
+  } catch {
+    host = ''
+  }
+  const lokal = host === 'localhost' || host === '[::1]' || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)
+  return lokal ? basis.replace(/^https?:\/\//, '') : OEFFENTLICHE_ADRESSE
+}
+
 /** Zettel zum Ausschneiden (10 je A4-Seite) */
 export function zettelHtml(titel: string, zettel: Zettel[], adresse: string): string {
-  const basis = adresse.replace(/\/$/, '')
-  const anzeige = `${basis.replace(/^https?:\/\//, '')}/s/`
+  const anzeige = zettelAdresse(adresse)
   const karten = zettel
     .filter((z) => z.zugang)
     .map(

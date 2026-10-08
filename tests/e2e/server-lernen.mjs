@@ -157,6 +157,8 @@ try {
   pruefe(Boolean(tafel.id), 'Tafelbild für die Lerngruppe freigegeben')
 
   // ---------- Lernraum: Tür → Zimmer → Karteikasten
+  // Bisherige Liste/Türen (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
+  await sm.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   await s.goto(`${A}/s/`)
   await s.locator('[data-kachel="lernen"]').click()
   await s.locator('[data-tuer]').first().waitFor({ timeout: 15000 })

@@ -11,10 +11,13 @@ import { ActionIcon, Badge, Button, Group, Progress, SimpleGrid, Stack, Text, Te
 import { IconBackspace, IconCheck, IconVolume, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { auswahlOptionen, bewerte, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { apostrophNormal, istApostroph } from '@shared/apostroph'
 import { spielform } from '@shared/vokabelSpiele'
 import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
+import { apostrophHinweis } from '../apostrophHinweis'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
+import LegeEingabe from '../handschrift/LegeEingabe'
 
 /** Ab diesem Fach wird geschrieben statt gewählt (abgestimmt 07.10.2026) */
 export const SCHREIBEN_AB_FACH = 3
@@ -33,7 +36,10 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (text.trim()) fertig(bewerte(text, v.term).urteil !== 'falsch')
+          if (!text.trim()) return
+          const gut = bewerte(text, v.term).urteil !== 'falsch'
+          if (gut) apostrophHinweis(text)
+          fertig(gut)
         }}
         style={{ width: '100%', maxWidth: 520 }}
       >
@@ -314,8 +320,9 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
   const fehler = useRef(new Set<string>())
   const v = reihe[i]
   const wort = v ? spielform(v.term) : ''
+  // Leerzeichen und Apostrophe sind keine Kacheln, sie stehen vorbelegt im Wort (08.10.2026)
   const kacheln = useMemo(() => {
-    const buchstaben = [...wort.replace(/\s/g, '')]
+    const buchstaben = [...wort].filter((c) => !/\s/.test(c) && !istApostroph(c))
     const ablenker = gemischt([...ABC].filter((b) => !buchstaben.includes(b))).slice(0, 2)
     return gemischt([...buchstaben, ...ablenker])
   }, [wort])
@@ -323,10 +330,18 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
     if (v) setTimeout(() => sprich(v.term, sprache), 250)
   }, [v]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!v) return <Text c="dimmed">Dafür gibt es noch zu wenige Wörter.</Text>
-  const ziel = wort.replace(/\s/g, '')
+  const ziel = [...wort].filter((c) => !/\s/.test(c) && !istApostroph(c)).join('')
   const gelegtText = gelegt.map((k) => kacheln[k]).join('')
+  // Felder je Zeichen: Buchstabe (Nummer der Kachel) oder vorbelegtes Apostroph/Leerzeichen
+  const felder: { fest?: string; nr?: number }[] = []
+  for (const c of wort) {
+    if (/\s/.test(c)) felder.push({ fest: ' ' })
+    else if (istApostroph(c)) felder.push({ fest: "'" })
+    else felder.push({ nr: felder.filter((f) => f.nr !== undefined).length })
+  }
   const pruefen = (): void => {
-    const ok = gelegtText.toLowerCase() === ziel.toLowerCase()
+    // Tolerant wie im Trainer: Groß-/Kleinschreibung und Apostroph-Zeichen egal (08.10.2026)
+    const ok = apostrophNormal(gelegtText).toLowerCase() === apostrophNormal(ziel).toLowerCase()
     setRueck(ok)
     if (ok) setGut((g) => g + 1)
     else fehler.current.add(v.id)
@@ -354,30 +369,46 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
         <IconVolume size={40} />
       </ActionIcon>
       <Group gap={4} mih={52} justify="center" data-gelegt>
-        {[...ziel].map((_, k) => (
-          <span key={k} className="vt-raten-feld">
-            {gelegt[k] !== undefined ? kacheln[gelegt[k]] : ''}
-          </span>
-        ))}
+        {felder.map((f, k) =>
+          f.fest !== undefined ? (
+            <span key={k} style={{ minWidth: f.fest === ' ' ? 14 : 10, fontSize: '1.6rem', fontWeight: 700, alignSelf: 'flex-end' }} data-fest>
+              {f.fest === ' ' ? '' : f.fest}
+            </span>
+          ) : (
+            <span key={k} className="vt-raten-feld">
+              {gelegt[f.nr!] !== undefined ? kacheln[gelegt[f.nr!]] : ''}
+            </span>
+          )
+        )}
       </Group>
       {rueck !== null && <Rueck gut={rueck} richtig={wort} />}
-      <Group gap={6} justify="center" maw={520}>
-        {kacheln.map((b, k) => (
-          <Button
-            key={k}
-            size="lg"
-            radius="md"
-            variant="default"
-            w={52}
-            px={0}
-            disabled={gelegt.includes(k) || rueck !== null || gelegt.length >= ziel.length}
-            onClick={() => setGelegt([...gelegt, k])}
-            data-kachel={b}
-          >
-            {b}
-          </Button>
-        ))}
-      </Group>
+      {/* Legen, tippen oder schreiben wie im Trainer (08.10.2026) */}
+      <LegeEingabe
+        kacheln={kacheln.map((b, k) => ({ b, i: k }))}
+        gelegt={gelegt}
+        setGelegt={setGelegt}
+        gesperrt={rueck !== null}
+        fertig={pruefen}
+        anzahl={ziel.length}
+      >
+        <Group gap={6} justify="center" maw={520}>
+          {kacheln.map((b, k) => (
+            <Button
+              key={k}
+              size="lg"
+              radius="md"
+              variant="default"
+              w={52}
+              px={0}
+              disabled={gelegt.includes(k) || rueck !== null || gelegt.length >= ziel.length}
+              onClick={() => setGelegt([...gelegt, k])}
+              data-kachel={b}
+            >
+              {b}
+            </Button>
+          ))}
+        </Group>
+      </LegeEingabe>
       <Group>
         <Button
           variant="subtle"

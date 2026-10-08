@@ -139,12 +139,25 @@ try {
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   pruefe(await da(p.locator(`[data-grammatik-zeile="${gram}"]`)), 'Grammatik-Tabelle im Kurs')
   const benProfil = p.locator('[data-grammatik-profil="Ben S."]')
-  pruefe(await da(benProfil.locator('[data-schwaechen]', { hasText: 'Simple past' })), 'Ben: Schwäche „Simple past"')
+  // Grammatik-Spalte kompakt (Plakette „1 Schwäche", Regeln im Attribut), Einzelheiten per Klick auf die Zeile
+  pruefe(await da(benProfil.locator('[data-schwaechen*="Simple past"]')), 'Ben: Schwäche „Simple past"')
   pruefe((await p.locator('[data-grammatik-profil="Tom K."] [data-schwaechen]').count()) === 0, 'Tom: keine Schwäche')
+  await p.locator('[data-lernende-aufklappen="Ben S."]').click()
+  pruefe(
+    await da(p.locator('[data-lernende-details="Ben S."] [data-details-schwaechen]', { hasText: 'Simple past' })),
+    'Ben: Einzelheiten zeigen die Schwäche'
+  )
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-regel-extra^="foerder:"]')), 'Ben: „Fördern" je Regel in den Einzelheiten')
+  pruefe(await p.locator('[data-fordern="Ben S."]').isDisabled(), 'Ben: „Fordern" ohne Stärken gesperrt')
   await p.screenshot({ path: join(out, '2-kurs.png'), fullPage: true })
+  // Grammatik-Übersicht (Lernende × Regeln): Bens schwache Regel rot
+  await p.locator('[data-lernende-ansicht]').getByText('Grammatik-Übersicht').click()
+  pruefe(await da(p.locator('[data-matrix-zelle^="Ben S.|"][data-stufe="rot"]')), 'Grammatik-Übersicht: Ben rot bei seiner Schwäche')
+  await p.screenshot({ path: join(out, '2b-matrix.png'), fullPage: true })
+  await p.locator('[data-lernende-ansicht]').getByText('Lernende', { exact: true }).click()
 
   // ---------- Fördern → KI (Attrappe) im Hintergrund → Entwurf in der Tabelle → prüfen → nur für Ben freischalten
-  await benProfil.locator('[data-foerdern]').click()
+  await p.locator('[data-foerdern="Ben S."]').click()
   pruefe(await da(p.locator('[data-grammatik-entwurf]'), 40000), 'Entwurf „Förderung" erscheint in der Grammatik-Tabelle')
   await p.locator('[data-grammatik-entwurf]').first().click()
   pruefe(await da(p.locator('[data-entwurf-fenster]')), 'Prüf-Fenster mit Aufgaben')
@@ -188,6 +201,8 @@ try {
   await p.keyboard.press('Escape')
 
   // ---------- Lernende: Startkarte, Seite nach Regeln, „Diese Regel üben", passende Spiele
+  // Bisherige Liste (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
+  await ben.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   const sb = await ben.newPage()
   await sb.goto(`${A}/s/`)
   pruefe(await da(sb.locator('[data-grammatik-offen]').first()), 'Startkarte: „Noch … Übungen nicht bearbeitet"')

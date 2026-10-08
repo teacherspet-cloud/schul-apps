@@ -12,7 +12,7 @@ import { hatInhalt, standardName, type Rueckmeldung } from './model/types'
 import Boegen from './steps/Boegen'
 import Einrichten from './steps/Einrichten'
 import { bibliothek, projektDatei, useRueckmeldung } from './store'
-import { horcheAufVorgabe, nimmRueckmeldungVorgabe } from './vorgabe'
+import { aeltereRueckmeldungZu, horcheAufVorgabe, nimmRueckmeldungVorgabe, rueckmeldungIdZu } from './vorgabe'
 
 /** Eine leere Rückmeldung mit den Voreinstellungen der Schule */
 export function leereRueckmeldung(): Rueckmeldung {
@@ -66,22 +66,34 @@ export default function RueckmeldungModule({ active }: { active: boolean }): Rea
   useEffect(() => {
     if (!dok) useRueckmeldung.getState().setDok(leereRueckmeldung())
   }, [dok])
-  // „Rückmeldung …" aus einem anderen Programm: neues Dokument mit diesem Material
+  /*
+   * „Rückmeldung …" aus einem anderen Programm (08.10.2026: je Material eine Rückmeldung): die
+   * vorhandene öffnen, sonst eine neue mit diesem Material anlegen und gleich sichern – so steht
+   * sie sofort in „Meine Rückmeldungen" und der nächste Klick findet sie.
+   */
   useEffect(() => {
     const uebernehmen = (): void => {
       const v = nimmRueckmeldungVorgabe()
       if (!v) return
-      void bibliothek
-        .neuSicher()
-        .then(() => ladeGrundlage(v.art, v.id))
-        .then(({ grundlage, fach }) => {
-          const r = leereRueckmeldung()
-          r.grundlage = grundlage
-          if (fach.id) Object.assign(r.meta, { subjectId: fach.id, subjectLabel: fach.label || subjectById(fach.id).label, grade: fach.grade || r.meta.grade })
-          useRueckmeldung.getState().setDok(r)
-          useRueckmeldung.getState().setStep(0)
-        })
-        .catch(notifyError)
+      void (async () => {
+        const vorhanden = await rueckmeldungIdZu(v.art, v.id)
+        if (vorhanden) return bibliothek.oeffnen(vorhanden)
+        await bibliothek.neuSicher()
+        const { grundlage, fach } = await ladeGrundlage(v.art, v.id)
+        const aeltere = await aeltereRueckmeldungZu(v.art, v.id, grundlage.titel)
+        if (aeltere) {
+          await bibliothek.oeffnen(aeltere)
+          // Neu sichern, damit die Quelle ins Verzeichnis kommt (rueckmeldungStats)
+          return bibliothek.speichern()
+        }
+        const r = leereRueckmeldung()
+        r.grundlage = grundlage
+        if (fach.id) Object.assign(r.meta, { subjectId: fach.id, subjectLabel: fach.label || subjectById(fach.id).label, grade: fach.grade || r.meta.grade })
+        useRueckmeldung.getState().setDok(r)
+        useRueckmeldung.getState().setStep(0)
+        // Gleiche Kennung wie das automatische Speichern – es überschreibt nur, legt nichts doppelt an
+        await bibliothek.speichern()
+      })().catch(notifyError)
     }
     uebernehmen()
     return horcheAufVorgabe(uebernehmen)

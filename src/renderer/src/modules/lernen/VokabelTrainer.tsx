@@ -15,6 +15,9 @@ import { besteStimme, stimmeVorhanden } from './stimme'
 import type { VerbSprache } from '@shared/verben'
 import { formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
 import { useVerbDaten } from './verbDaten'
+import { apostrophHinweis } from './apostrophHinweis'
+import LegeEingabe from './handschrift/LegeEingabe'
+import { rueckweg } from './regal/beschriftung'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
@@ -80,6 +83,9 @@ import {
   type WortStand
 } from '@shared/vokabeltrainer'
 import { holen, senden } from '../onlinetest/serverApi'
+
+/** Übungen mit getippter Antwort (Apostroph-Hinweis, 08.10.2026) */
+const SCHREIBEND: string[] = ['frei', 'diktat', 'luecke', 'luecken']
 
 interface Liste {
   id: string
@@ -373,11 +379,13 @@ function Kasten({
       symbol: <IconCalendarEvent size={20} />
     }
   ]
+  // Zurück in den Fachordner (Regal, 08.10.2026) bzw. wie bisher
+  const zurueck = rueckweg(d.fach, 'vok', gast, useDarstellung.getState().d.materialien !== 'liste')
   return (
     <Stack className="vt" data-vokabel-kasten gap="lg">
       <style>{CSS}</style>
-      <Button variant="subtle" color={farbe.a} component="a" href={gast ? '/s/' : '/s/lernen'} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
-        {gast ? 'Meine Materialien' : 'Lernraum'}
+      <Button variant="subtle" color={farbe.a} component="a" href={zurueck.href} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} data-zurueck-lernen>
+        {zurueck.text}
       </Button>
       {!spielt && (
         <>
@@ -609,6 +617,9 @@ function Sitzung({
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
       if (e.urteil === 'richtig') ton('richtig')
+      // Richtig, aber mit ’ statt ' getippt: Tastatur-Hinweis, höchstens einmal am Tag (08.10.2026) – nur bei
+      // geschriebenen Antworten, nicht bei Auswahl oder Kacheln (dort stammt das Zeichen aus der Lösung)
+      if (e.urteil === 'richtig' && wert.antwort && SCHREIBEND.includes(uebung)) apostrophHinweis(wert.antwort)
       // Lernkarte („Wusste ich" / „Noch nicht gewusst", 08.10.2026): gleich weiter, ohne Weiter-Knopf
       if (uebung === 'karte') return weiterMit(e)
       setErgebnis(e)
@@ -1170,21 +1181,24 @@ function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string)
           {wort || ' '}
         </Text>
       </div>
-      <Group gap={6} justify="center">
-        {kacheln.map((k) => (
-          <Button
-            key={k.i}
-            className="vt-kachel"
-            variant="light"
-            disabled={gelegt.includes(k.i) || gesperrt}
-            onClick={() => setGelegt([...gelegt, k.i])}
-            px="xs"
-            data-buchstabe
-          >
-            {k.b}
-          </Button>
-        ))}
-      </Group>
+      {/* Legen, tippen oder schreiben (08.10.2026) */}
+      <LegeEingabe kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} fertig={() => pruefen(wort)}>
+        <Group gap={6} justify="center">
+          {kacheln.map((k) => (
+            <Button
+              key={k.i}
+              className="vt-kachel"
+              variant="light"
+              disabled={gelegt.includes(k.i) || gesperrt}
+              onClick={() => setGelegt([...gelegt, k.i])}
+              px="xs"
+              data-buchstabe
+            >
+              {k.b}
+            </Button>
+          ))}
+        </Group>
+      </LegeEingabe>
       <Group>
         <Button variant="subtle" leftSection={<IconBackspace size={16} />} disabled={!gelegt.length || gesperrt} onClick={() => setGelegt(gelegt.slice(0, -1))}>
           Zurück

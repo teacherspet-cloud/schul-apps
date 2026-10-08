@@ -22,10 +22,23 @@ import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
 import { imNutzer } from './kontext'
 import { getSettings } from '../main/services/storage/settings'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
-import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import {
+  alleLernenden,
+  gastInLerngruppe,
+  gastName,
+  gehoertZu,
+  gleicheMengen,
+  lerngruppe,
+  lerngruppeErgaenzen,
+  lerngruppenVon,
+  mitgliederErgaenzen,
+  mitgliederVon,
+  type Lerngruppe
+} from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { bereinigeVerbKarten, verbenUnterWoertern, verbKarten, type VerbKarte } from '../shared/verbTraining'
 import { istVerbSprache, type VerbSprache } from '../shared/verben'
+import { verbenFrei } from '../shared/verbFreigabe'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
@@ -97,6 +110,10 @@ export const db = () => {
     if (!spalten.has('symbol')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN symbol TEXT NOT NULL DEFAULT ''")
     // Freigegebene Abschnitte mit Zeitpunkt (08.10.2026): für den Kasten in den Details und „neu in 2 Wochen"
     if (!spalten.has('teile')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN teile TEXT NOT NULL DEFAULT ''")
+    // Problemwörter, die die Lehrkraft aus der Liste genommen hat (08.10.2026): JSON {wortId: Fehlerzahl beim Entfernen}
+    // Verbspiele (08.10.2026): '' = automatisch ab bekannter Vergangenheit, 'an'/'aus' = Schalter der Lehrkraft
+    if (!spalten.has('verbspiele')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN verbspiele TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('problem_aus')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN problem_aus TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -137,6 +154,7 @@ export interface Zeile {
   verben?: string
   /** Spiele für diesen Tag freigeschaltet (JJJJ-MM-TT, 08.10.2026) */
   spiele_frei?: string
+  verbspiele?: string
   /** Neue Vokabeln je Tag (08.10.2026) */
   tagesziel?: number
   /** Überschrift der Lehrkraft ('' = Standard „Jahr - Lerngruppe - Fach") und Symbol ('' = Verlauf, 'farbe') */
@@ -144,6 +162,58 @@ export interface Zeile {
   symbol?: string
   /** JSON [{titel, anzahl, zeit}] – die freigegebenen Abschnitte; leer = nur der erste (Titel) */
   teile?: string
+  /** JSON {wortId: falsch beim Entfernen} – aus den Problemwörtern genommen, bis neue Fehler dazukommen (08.10.2026) */
+  problem_aus?: string
+}
+
+/**
+ * „Aus der Liste nehmen" (08.10.2026, Problemwörter/häufigste Fehler): ein Eintrag bleibt verborgen, solange seine
+ * Fehlerzahl nicht über die beim Entfernen gemerkte steigt. Gibt die sichtbaren Einträge und die noch gültige Merkliste
+ * zurück (überholte Einträge fallen heraus).
+ */
+export function ausgeblendetFiltern<T extends { id: string; falsch: number }>(
+  liste: T[],
+  gemerkt: Record<string, number>
+): { sichtbar: T[]; gueltig: Record<string, number> } {
+  const gueltig: Record<string, number> = {}
+  const sichtbar: T[] = []
+  for (const p of liste) {
+    const n = gemerkt[p.id]
+    if (typeof n === 'number' && p.falsch <= n) gueltig[p.id] = n
+    else sichtbar.push(p)
+  }
+  return { sichtbar, gueltig }
+}
+
+/** Problemwörter eines Trainings (ohne Grenze): ab 3 Versuchen mit Fehlern, höchste Fehlerquote zuerst */
+function problemWoerter(woerter: Vokabel[], staende: Record<string, WortStand>[]) {
+  return woerter
+    .map((v) => {
+      let versuche = 0
+      let falsch = 0
+      const texte = new Map<string, number>()
+      for (const st of staende) {
+        const s = st[v.id]
+        if (!s) continue
+        versuche += s.versuche
+        falsch += s.falsch
+        for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
+      }
+      return {
+        id: v.id,
+        term: v.term,
+        translation: v.translation,
+        versuche,
+        falsch,
+        quote: versuche ? falsch / versuche : 0,
+        typisch: [...texte.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([t]) => t)
+      }
+    })
+    .filter((p) => p.versuche >= 3 && p.falsch > 0)
+    .sort((a, b) => b.quote - a.quote)
 }
 
 export interface VokTeil {
@@ -188,6 +258,8 @@ export const kursHaken: {
   grammatikZahl?: (vokId: string) => number
   /** Stärken/Schwächen in Grammatik je Person (grammatik.ts `grammatikProfil`) */
   profil?: (n: NutzerInfo, sprache: string, lehrkraftId: string) => unknown
+  /** Bekannte Grammatik eines Kindes (grammatik.ts `bekannteGrammatikFuer`) – für die Freigabe der Verbspiele */
+  bekannt?: (n: NutzerInfo) => string[]
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -279,7 +351,8 @@ export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'> & { id?:
   if (ich.rolle !== 'schueler') return false
   // Gäste (QR-Code) und Lernende mit Konto, die per Code dazugekommen sind
   if (z.id && db().prepare('SELECT 1 FROM vok_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
-  if (ich.quelle === 'gast') return false
+  // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen")
+  if (ich.quelle === 'gast' && !gastInLerngruppe(z.lerngruppe_id, ich)) return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
   const g = lerngruppe(z.lerngruppe_id)
@@ -297,6 +370,35 @@ export function lernendeVon(z: Zeile): NutzerInfo[] {
     : []
   const ids = new Set(feste.map((n) => n.id))
   return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
+}
+
+// ---------------------------------------------------------------- Lernende einer Klasse zuordnen (08.10.2026)
+
+/** Wer aus dem Training in eine Lerngruppe kann: eingetragene Gäste (Anmeldecode) und Schülerkonten, nie Vorschaukonten */
+function zuordenbareLernende(z: Zeile): NutzerInfo[] {
+  return lernendeVon(z).filter((n) => n.rolle === 'schueler' && n.quelle !== 'vorschau')
+}
+
+/** Schon Mitglied? Gäste nur über den Eintrag, Konten auch über die IServ-Gruppe */
+const schonMitglied = (g: Lerngruppe, n: NutzerInfo): boolean => (n.quelle === 'gast' ? g.mitglieder.includes(n.benutzer) : gehoertZu(g, n))
+
+/**
+ * Darf das Training (bisher ohne Lerngruppe) mit `g` verbunden werden? Nur wenn danach – mit den zugeordneten
+ * Lernenden in `g` – genau dieselben Personen Zugang haben wie jetzt: keine weiteren Mitglieder bekommen das Training,
+ * niemand verliert es (Codes gelten über vok_gaeste ohnehin weiter).
+ */
+function verknuepfenOhneFolgen(z: Zeile, g: Lerngruppe, lernende: NutzerInfo[]): boolean {
+  if (z.lerngruppe_id) return false
+  const vorher = new Set(lernendeVon(z).map((n) => n.id))
+  const g2: Lerngruppe = { ...g, mitglieder: mitgliederErgaenzen(g.mitglieder, lernende.map((n) => n.benutzer)).mitglieder }
+  const nur = json_(z.schueler, [] as string[])
+  const nachher = new Set([
+    ...mitgliederVon(g2)
+      .filter((n) => !nur.length || nur.includes(n.benutzer))
+      .map((n) => n.id),
+    ...gaesteVon(z.id).map((n) => n.id)
+  ])
+  return gleicheMengen(vorher, nachher)
 }
 
 /** Wörter bereinigen (Bilder höchstens 200 KB, höchstens 400 Wörter) */
@@ -637,8 +739,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             // Spiele heute schon vor der Tagesrunde (Freischaltung der Lehrkraft, 08.10.2026)
             spieleFrei: spieleHeuteFrei(z),
             tagesziel: tageszielVon(z),
-            // Unregelmäßige Verben der Liste (07.10.2026)
-            verben: json_(z.verben, null as unknown) ?? standardVerben(woerter, z.sprache),
+            // Unregelmäßige Verben der Liste (07.10.2026) – erst ab bekannter Vergangenheit oder per Schalter (08.10.2026)
+            verben: verbenFrei(z.sprache, kursHaken.bekannt?.(ich) ?? [], z.verbspiele ?? '')
+              ? json_(z.verben, null as unknown) ?? standardVerben(woerter, z.sprache)
+              : null,
             // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
             klasse: klasseFuer(z, ich),
             rekorde: st.rekorde ?? {},
@@ -772,35 +876,12 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           stand: st.woerter
         }
       })
-      // Problemwörter: höchste Fehlerquote über die Lerngruppe, mit typischen Falschantworten
-      const problem = woerter
-        .map((v) => {
-          let versuche = 0
-          let falsch = 0
-          const texte = new Map<string, number>()
-          for (const l of lernende) {
-            const s = l.stand[v.id]
-            if (!s) continue
-            versuche += s.versuche
-            falsch += s.falsch
-            for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
-          }
-          return {
-            id: v.id,
-            term: v.term,
-            translation: v.translation,
-            versuche,
-            falsch,
-            quote: versuche ? falsch / versuche : 0,
-            typisch: [...texte.entries()]
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 3)
-              .map(([t]) => t)
-          }
-        })
-        .filter((p) => p.versuche >= 3 && p.falsch > 0)
-        .sort((a, b) => b.quote - a.quote)
-        .slice(0, 12)
+      // Problemwörter: höchste Fehlerquote über die Lerngruppe, mit typischen Falschantworten; aus der Liste
+      // genommene erst wieder bei neuen Fehlern (08.10.2026), die 12 erst nach dem Ausblenden
+      const problem = ausgeblendetFiltern(
+        problemWoerter(woerter, lernende.map((l) => l.stand)),
+        json_(z.problem_aus, {} as Record<string, number>)
+      ).sichtbar.slice(0, 12)
       return (
         json(res, 200, {
           id: z.id,
@@ -812,6 +893,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           status: istOffen(z) ? 'offen' : 'beendet',
           bis: z.bis,
           spieleFrei: spieleHeuteFrei(z),
+          verbspiele: z.verbspiele ?? '',
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026)
           teile: teileVon(z),
@@ -838,15 +920,69 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    // Lernende einer Klasse zuordnen (08.10.2026): Vorschau für den Dialog – je eigene Lerngruppe, wer schon dazugehört
+    if (req.method === 'GET' && teile[1] === 'klasse-zuordnen') {
+      const lernende = zuordenbareLernende(z)
+      return (
+        json(res, 200, {
+          lerngruppeId: z.lerngruppe_id,
+          lernende: lernende.map((n) => ({ id: n.id, name: n.name || n.benutzer, gast: n.quelle === 'gast' })),
+          gruppen: lerngruppenVon(ich.id).map((g) => ({
+            id: g.id,
+            name: g.name,
+            fach: g.fach,
+            schon: lernende.filter((n) => schonMitglied(g, n)).map((n) => n.id),
+            verknuepfbar: !z.lerngruppe_id && verknuepfenOhneFolgen(z, g, lernende)
+          }))
+        }),
+        true
+      )
+    }
     if (req.method === 'POST') {
       const k0 = (await k.koerper()) as Record<string, unknown>
+      // Lernende einer Klasse zuordnen (08.10.2026): Konten und Codes bleiben unverändert (vok_gaeste, Sitzungen, Namen) –
+      // die Lernenden stehen danach zusätzlich in der Lerngruppe und sehen deren Freigaben. Auf Wunsch wird das Training mit
+      // der Lerngruppe verbunden, aber nur, wenn das an den Zugängen nichts ändert.
+      if (teile[1] === 'klasse-zuordnen') {
+        const g = lerngruppe(String(k0.lerngruppeId ?? ''))
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true
+        const lernende = zuordenbareLernende(z)
+        if (!lernende.length) return json(res, 400, { fehler: 'In diesem Training sind noch keine Lernenden.' }), true
+        const verknuepfen = k0.verknuepfen === true && !z.lerngruppe_id
+        if (verknuepfen && !verknuepfenOhneFolgen(z, g, lernende))
+          return json(res, 409, { fehler: 'Die Lerngruppe hat weitere Mitglieder – mit ihr verbunden, bekämen sie das Training auch. Bitte ohne Verbinden zuordnen.' }), true
+        const dazu = lerngruppeErgaenzen(g, lernende.filter((n) => !schonMitglied(g, n)).map((n) => n.benutzer))
+        if (verknuepfen) db().prepare('UPDATE vok_zuweisungen SET lerngruppe_id = ? WHERE id = ?').run(g.id, z.id)
+        protokolliereServer('vokabeln', `${dazu.length} Lernende einer Lerngruppe zugeordnet${verknuepfen ? ' (Training verbunden)' : ''}`, ich.id)
+        return json(res, 200, { ok: true, dazu: dazu.length, schon: lernende.length - dazu.length, verknuepft: verknuepfen }), true
+      }
       if (teile[1] === 'termin') {
         db()
           .prepare('UPDATE vok_zuweisungen SET test_termin = ? WHERE id = ?')
           .run(typeof k0.testTermin === 'number' ? k0.testTermin : null, z.id)
         return json(res, 200, { ok: true }), true
       }
+      // Problemwort aus der Liste nehmen (08.10.2026): gemerkt wird die jetzige Fehlerzahl – steigt sie, kommt es wieder
+      if (teile[1] === 'problem-aus') {
+        const wid = String(k0.id ?? '')
+        const alle = problemWoerter(
+          json_(z.woerter, [] as Vokabel[]),
+          lernendeVon(z).map((n) => standVon(z.id, n.id).woerter)
+        )
+        const p = alle.find((x) => x.id === wid)
+        if (!p) return json(res, 404, { fehler: 'Dieses Wort steht nicht in der Liste.' }), true
+        const { gueltig } = ausgeblendetFiltern(alle, json_(z.problem_aus, {} as Record<string, number>))
+        gueltig[wid] = p.falsch
+        db().prepare('UPDATE vok_zuweisungen SET problem_aus = ? WHERE id = ?').run(JSON.stringify(gueltig), z.id)
+        return json(res, 200, { ok: true }), true
+      }
       // Spiele für heute freischalten bzw. wieder sperren (08.10.2026, Wunsch der Lehrkraft)
+      // Verbspiele: automatisch, immer oder nie (08.10.2026)
+      if (teile[1] === 'verbspiele') {
+        const w = k0.wert === 'an' || k0.wert === 'aus' ? k0.wert : ''
+        db().prepare('UPDATE vok_zuweisungen SET verbspiele = ? WHERE id = ?').run(w, z.id)
+        return json(res, 200, { ok: true, verbspiele: w }), true
+      }
       if (teile[1] === 'spiele') {
         db()
           .prepare('UPDATE vok_zuweisungen SET spiele_frei = ? WHERE id = ?')

@@ -222,8 +222,9 @@ try {
   const ad = await browser.newContext()
   const ap = await ad.newPage()
   await ap.goto(`${A}/anmelden?ziel=/s/`)
-  // Seit 08.10.2026 steht oben „Mit Code öffnen", die Anmeldung ist darunter zugeklappt
-  await ap.locator('details.anmelden > summary').click()
+  // Seit 08.10.2026 steht oben „Mit Code öffnen", Nutzername/Passwort in einem Fenster darunter
+  await ap.locator('[data-anmelden-oeffnen]').click()
+  pruefe(await ap.evaluate(() => document.activeElement?.id === 'benutzer'), 'Anmeldefenster: Fokus im Feld Benutzername')
   await ap.fill('#benutzer', admin.benutzer)
   await ap.fill('#passwort', admin.passwort)
   await ap.click('form[action=\"/auth/lokal\"] button[type=submit]')

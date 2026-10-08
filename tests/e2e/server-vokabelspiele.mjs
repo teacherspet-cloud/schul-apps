@@ -74,6 +74,10 @@ try {
   const s = await sm.newPage()
   await s.goto(`${A}/s/v/${vok.id}`)
   pruefe(await da(s.locator('[data-spielwahl]')), 'Tagesrunde geschafft: Spielauswahl erscheint')
+  // Bereiche sind seit 08.10.2026 aufklappbar: alle zugeklappten öffnen
+  const zu = s.locator('[data-spiel-gruppe]:not([data-offen]) [data-spiel-gruppe-kopf]')
+  for (let i = 0; i < 10 && (await zu.count()); i++) await zu.first().click()
+  await s.waitForTimeout(300)
   const spielzahl = await s.locator('[data-spiel-wahl]').count()
   pruefe(
     spielzahl >= 10 && (await s.locator('[data-spiel-wahl="duell"]').count()) === 1 && (await s.locator('[data-spiel-wahl="diktat"]').count()) === 1,

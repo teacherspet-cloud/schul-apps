@@ -15,6 +15,7 @@ import { varianten, type VerbSprache } from '@shared/verben'
 import { fehlformen, musterVon } from '../../../shared/verben/muster'
 import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
+import { apostrophHinweis } from '../apostrophHinweis'
 import { gemischt, useSekunden } from './SpieleErkennen'
 
 /** Was die Verbspiele brauchen */
@@ -291,7 +292,9 @@ export function BildVerb({ verben: d, ende }: VerbSpielProps): React.JSX.Element
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            weiter(d.spalten.every((s) => !k.formen[s.id] || formPasst(eingaben[s.id] ?? '', k.formen[s.id])))
+            const gut = d.spalten.every((s) => !k.formen[s.id] || formPasst(eingaben[s.id] ?? '', k.formen[s.id]))
+            if (gut) apostrophHinweis(Object.values(eingaben).join(' '))
+            weiter(gut)
           }}
           style={{ width: '100%', maxWidth: 520 }}
         >

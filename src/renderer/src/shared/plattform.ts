@@ -34,6 +34,16 @@ export const nurPcNetz = (): boolean => imNetz() && !aufServer()
 /** Die Exe „Schul-Apps Online" (src/client) – kann IServ-Ordner mit dem lokal gespeicherten Passwort */
 export const hatClient = (): boolean => typeof window !== 'undefined' && Boolean(window.__schulappsClient)
 
+/**
+ * Kann diese Oberfläche selbst auf einen gewählten Drucker drucken (08.10.2026)? In der App am PC und in
+ * einer Exe „Schul-Apps Online" mit Druck-Brücke; im Browser nicht – er kennt die Drucker nicht.
+ */
+export const druckerWaehlbar = (): boolean => {
+  if (typeof window === 'undefined') return false
+  if (imNetz()) return Boolean(window.__schulappsClient?.drucken && window.__schulappsClient?.drucker)
+  return !aufIos()
+}
+
 /** In der iPad-/iPhone-App? */
 export const aufIos = (): boolean => plattform() === 'ios'
 
@@ -52,6 +62,13 @@ declare global {
       iserv: ClientIserv
       /** Figuren der Exe ohne Server am selben PC */
       lokaleMaskottchen?: () => Promise<{ id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string; posen: Record<string, string> }[]>
+      /** Drucker des PCs (seit 08.10.2026 – ältere Exe ohne: dann Druck über den Browser-Weg) */
+      drucker?: () => Promise<{ name: string; displayName: string; isDefault: boolean }[]>
+      /** Mit Optionen direkt drucken, ohne: Druckdialog von Windows */
+      drucken?: (
+        html: string,
+        optionen?: { deviceName: string; copies: number; duplex: 'simplex' | 'longEdge' | 'shortEdge'; color: boolean; pages?: { from: number; to: number }[] }
+      ) => Promise<void>
     }
   }
 }

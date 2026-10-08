@@ -185,6 +185,8 @@ try {
   await h.screenshot({ path: join(out, '2c3-zuwachs.png'), fullPage: true })
   await h.screenshot({ path: join(out, '2c-runde.png'), fullPage: true })
   // Gast: „Meine Materialien" statt Test-Code-Seite
+  // Bisherige Liste/Türen (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
+  await g1.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   await h.goto(`${A}/s/`)
   pruefe(await da(h.locator('[data-gast-start] [data-gast-vokabeln]')), 'Gast-Startseite zeigt das Vokabeltraining')
   pruefe((await h.getByText('Schul-Apps · Onlinetest').count()) === 0, 'Kopfzeile nicht mehr „Onlinetest"')

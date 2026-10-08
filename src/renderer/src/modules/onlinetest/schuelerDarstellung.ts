@@ -45,6 +45,13 @@ export interface Darstellung {
   toene: boolean
   /** Spielauswahl: Bereich → aufgeklappt (08.10.2026); fehlt ein Bereich, gilt die Vorgabe */
   spielGruppen?: Record<string, boolean>
+  /** „Lege das Wort": mit Buchstaben legen, tippen oder mit Finger/Stift schreiben (08.10.2026) */
+  legen?: 'legen' | 'tippen' | 'schreiben'
+  // ---------- Meine Materialien (08.10.2026)
+  /** Regal mit Fachordnern oder die bisherige Liste */
+  materialien?: 'regal' | 'liste'
+  /** Eigene Reihenfolge der Ordner im Regal (Fachnamen); fehlt sie, gilt A–Z */
+  regal?: string[]
 }
 
 /** Nur auf dem Gerät – gehen nicht an den Server */

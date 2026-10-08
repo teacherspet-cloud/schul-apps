@@ -85,9 +85,21 @@ const ROLLE: Record<Schritt['rolle'], { label: string; farbe: string }> = {
 /** Alle Zeilen unter einem Knoten (Unterthemen, auch tiefer) */
 const zeilenVon = (k: KatalogKnoten): string[] => k.kinder.flatMap((c) => [c.wortlaut ?? c.name, ...zeilenVon(c).map((z) => `${c.name}: ${z}`)])
 
-export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => void }): React.JSX.Element {
+export function ReiheEditor({
+  start,
+  zurueck,
+  meldeGeaendert
+}: {
+  start: Reihe
+  zurueck: () => void
+  /** Ungespeicherte Änderungen nach außen melden (08.10.2026, „Reihen planen" aus Laufende Reihen) */
+  meldeGeaendert?: (geaendert: boolean) => void
+}): React.JSX.Element {
   const [r, setR] = useState<Reihe>(start)
   const [geaendert, setGeaendert] = useState(false)
+  useEffect(() => {
+    meldeGeaendert?.(geaendert)
+  }, [geaendert, meldeGeaendert])
   const [bearbeiten, setBearbeiten] = useState<Schritt | null>(null)
   const [zuweisen, setZuweisen] = useState(false)
   const [vorschau, setVorschau] = useState(false)
@@ -325,7 +337,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
               vorschlagen={() => reihenLernziele(r, { auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }, ki)}
               ichKann={(z) => ichKannFormulieren(r, z, ki)}
             />
-            <StundenLeiste stunden={r.stunden ?? []} setze={(stunden) => setze({ stunden })} />
+            <StundenLeiste reihe={r} setze={setze} />
           </Stack>
         </Card>
 
@@ -593,6 +605,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
             kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
             schliessen={() => setPlanen(false)}
             uebernehmen={planUebernehmen}
+            setzeStunden={setze}
           />
         )}
         {ausBuch && (

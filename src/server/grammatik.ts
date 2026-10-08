@@ -23,7 +23,7 @@ import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand }
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { json, setzeSitzungsCookie, type Anfrage } from './http'
-import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
 import {
@@ -36,7 +36,8 @@ import {
   vokabelnZuweisen,
   vokIstFuer,
   vokStatusSetzen,
-  zeile as vokZeile
+  zeile as vokZeile,
+  ausgeblendetFiltern
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen } from './rekordbuch'
@@ -90,6 +91,8 @@ const db = () => {
     // (Themen, Teilformen, Klasse, Lehrwerk) – für bekannte Grammatik und passende Spiele
     if (!spalten.has('art')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN art TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('info')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN info TEXT NOT NULL DEFAULT ''")
+    // „Am häufigsten falsch" – von der Lehrkraft aus der Liste genommen (08.10.2026): JSON {aufgabeId: Fehlerzahl beim Entfernen}
+    if (!spalten.has('problem_aus')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN problem_aus TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -125,6 +128,8 @@ interface Zeile {
   art?: string
   /** JSON GrammatikInfo */
   info?: string
+  /** JSON {aufgabeId: falsch beim Entfernen} – aus „Am häufigsten falsch" genommen (08.10.2026) */
+  problem_aus?: string
 }
 
 /** Angaben der Freigabe (08.10.2026) */
@@ -279,7 +284,8 @@ function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   // Verbunden mit einem Vokabeltraining: wer dort lernt (auch eingetragene Gäste), hat auch diese Grammatik
   const v = vokVon(z)
   if (v && vokIstFuer(v, ich)) return true
-  if (ich.quelle === 'gast') return false
+  // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
+  if (ich.quelle === 'gast' && !gastInLerngruppe(z.lerngruppe_id, ich)) return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
   const g = lerngruppe(z.lerngruppe_id)
@@ -311,6 +317,38 @@ function lernendeVon(z: Zeile): NutzerInfo[] {
 }
 
 const karten = (p: GrammatikPaket): Vokabel[] => alsKarten(p.aufgaben) as Vokabel[]
+
+/** „Am häufigsten falsch" eines Trainings (ohne Grenze): ab 3 Versuchen mit Fehlern, höchste Fehlerquote zuerst */
+function haeufigFalsch(p: GrammatikPaket, staende: Record<string, WortStand>[]) {
+  return p.aufgaben
+    .map((a) => {
+      let versuche = 0
+      let falsch = 0
+      const texte = new Map<string, number>()
+      for (const st of staende) {
+        const s = st[a.id]
+        if (!s) continue
+        versuche += s.versuche
+        falsch += s.falsch
+        for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
+      }
+      return {
+        id: a.id,
+        art: a.art,
+        satz: a.satz,
+        loesung: a.loesungen[0],
+        versuche,
+        falsch,
+        quote: versuche ? falsch / versuche : 0,
+        typisch: [...texte.entries()]
+          .sort((x, y) => y[1] - x[1])
+          .slice(0, 3)
+          .map(([t]) => t)
+      }
+    })
+    .filter((x) => x.versuche >= 3 && x.falsch > 0)
+    .sort((x, y) => y.quote - x.quote)
+}
 
 /** Für den Lernraum der Lernenden */
 export function grammatikFuer(ich: NutzerInfo): {
@@ -385,6 +423,8 @@ export interface GrammatikProfil {
   staerken: ProfilPunkt[]
   schwaechen: ProfilPunkt[]
   extra: { id: string; art: string; titel: string; bearbeitet: number; gesamt: number; status: string }[]
+  /** Alle geübten Regeln (ab 1 Versuch) – für die Grammatik-Übersicht der Lehrkraft und Fördern/Fordern je Regel (08.10.2026) */
+  regeln: ProfilPunkt[]
 }
 
 /** Schwellen (abgestimmt): Schwäche ab 5 Versuchen unter 60 % richtig; Stärke ab 5 Versuchen mit 85 % und Fach ≥ 3 */
@@ -456,10 +496,12 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
       .sort((a, b) => b.quote - a.quote)
       .slice(0, 3)
       .map(ohne),
-    extra
+    extra,
+    regeln: [...jeRegel.values()].filter((e) => e.versuche > 0).map(ohne)
   }
 }
 kursHaken.profil = grammatikProfil
+kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
 kursHaken.grammatikZahl = (vokId) => (db().prepare("SELECT COUNT(*) AS n FROM gram_zuweisungen WHERE vok_id = ? AND art = ''").get(vokId) as { n: number }).n
 
@@ -841,35 +883,11 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           stand: st.aufgaben
         }
       })
-      const problem = p.aufgaben
-        .map((a) => {
-          let versuche = 0
-          let falsch = 0
-          const texte = new Map<string, number>()
-          for (const l of lernende) {
-            const s = l.stand[a.id]
-            if (!s) continue
-            versuche += s.versuche
-            falsch += s.falsch
-            for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
-          }
-          return {
-            id: a.id,
-            art: a.art,
-            satz: a.satz,
-            loesung: a.loesungen[0],
-            versuche,
-            falsch,
-            quote: versuche ? falsch / versuche : 0,
-            typisch: [...texte.entries()]
-              .sort((x, y) => y[1] - x[1])
-              .slice(0, 3)
-              .map(([t]) => t)
-          }
-        })
-        .filter((x) => x.versuche >= 3 && x.falsch > 0)
-        .sort((x, y) => y.quote - x.quote)
-        .slice(0, 10)
+      // Aus der Liste genommene erst wieder bei neuen Fehlern (08.10.2026); die 10 erst nach dem Ausblenden
+      const problem = ausgeblendetFiltern(
+        haeufigFalsch(p, lernende.map((l) => l.stand)),
+        json_(z.problem_aus, {} as Record<string, number>)
+      ).sichtbar.slice(0, 10)
       return (
         json(res, 200, {
           id: z.id,
@@ -889,6 +907,20 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     }
     if (req.method === 'POST') {
       const k0 = (await k.koerper()) as Record<string, unknown>
+      // Aufgabe aus „Am häufigsten falsch" nehmen (08.10.2026): kommt wieder, wenn ihre Fehlerzahl steigt
+      if (teile[1] === 'problem-aus') {
+        const aid = String(k0.id ?? '')
+        const alle = haeufigFalsch(
+          paketVon(z),
+          lernendeVon(z).map((n) => standVon(z.id, n.id).aufgaben)
+        )
+        const pr = alle.find((x) => x.id === aid)
+        if (!pr) return json(res, 404, { fehler: 'Diese Aufgabe steht nicht in der Liste.' }), true
+        const { gueltig } = ausgeblendetFiltern(alle, json_(z.problem_aus, {} as Record<string, number>))
+        gueltig[aid] = pr.falsch
+        db().prepare('UPDATE gram_zuweisungen SET problem_aus = ? WHERE id = ?').run(JSON.stringify(gueltig), z.id)
+        return json(res, 200, { ok: true }), true
+      }
       if (teile[1] === 'status') {
         db()
           .prepare('UPDATE gram_zuweisungen SET status = ? WHERE id = ?')

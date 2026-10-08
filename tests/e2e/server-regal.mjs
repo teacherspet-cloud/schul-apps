@@ -1,0 +1,229 @@
+// Runde 08.10.2026 abends: Regal mit Fachordnern (Gäste), eigene Reihenfolge per Ziehen (am Konto gemerkt), A–Z,
+// Ordner aufschlagen mit Registern, Rückweg aus dem Training in den Ordner, Wahl „Liste" als Rückfall; Verbspiele erst
+// nach Freischaltung; „Lege das Wort" mit Tippen und Handschrift (Erkennung auf dem Gerät).
+// Vorher: Server lokal (KI-Attrappe). Es wird keine KI gebraucht.
+// Aufruf: node tests/e2e/server-regal.mjs <Ausgabeordner> [adresse] [admin] [passwort]
+import { chromium } from 'playwright-core'
+import { mkdirSync } from 'fs'
+import { join, resolve } from 'path'
+
+const out = resolve(process.argv[2] ?? 'test-results/server-regal')
+const A = process.argv[3] ?? 'http://localhost:18443'
+const admin = { benutzer: process.argv[4] ?? 't.kornahrens', passwort: process.argv[5] ?? 'test-notzugang-123' }
+mkdirSync(out, { recursive: true })
+const problems = []
+const pruefe = (ok, text) => {
+  if (!ok) problems.push(text)
+  console.log(`${ok ? '  ok  ' : '  !!  '} ${text}`)
+}
+const KOPF = { 'x-schulapps-token': 'server' }
+const da = (l, ms = 15000) =>
+  l.waitFor({ timeout: ms }).then(
+    () => true,
+    () => false
+  )
+const PAKET = {
+  thema: 'Simple past',
+  regeln: [{ id: 'r1', titel: 'Simple past', erklaerung: 'Vergangenes mit -ed.', beispiele: ['I played.'] }],
+  aufgaben: Array.from({ length: 8 }, (_, i) => ({
+    art: 'auswahl',
+    regelId: 'r1',
+    anweisung: 'Wähle die richtige Form.',
+    satz: `Yesterday I ___ (play ${i}).`,
+    optionen: ['played', 'play'],
+    loesungen: ['played']
+  }))
+}
+
+const browser = await chromium.launch({ channel: 'msedge' })
+const zuLoeschen = []
+const trainings = []
+const verwaltung = await browser.newContext()
+const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
+let lk
+try {
+  await anmelden(verwaltung, admin.benutzer, admin.passwort)
+  const lehrer = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Rita R' } })).json()
+  zuLoeschen.push(lehrer.id)
+  lk = await browser.newContext()
+  await anmelden(lk, lehrer.benutzer, lehrer.passwort)
+  const post = async (pfad, data) => (await lk.request.post(`${A}/server/vokabeln/${pfad}`, { headers: KOPF, data })).json()
+  const woerter = ['go', 'see', 'take', 'come', 'apple', 'tree'].map((t, i) => ({ id: `e${i}`, term: t, translation: `Wort ${i}` }))
+  const en = (await post('freigeben', { titel: 'Unit 1', sprache: 'en', fach: 'Englisch', woerter, gaeste: true })).id
+  const fr = (await post('freigeben', { titel: 'Unité 1', sprache: 'fr', fach: 'Französisch', woerter: [{ id: 'f1', term: 'le chat', translation: 'die Katze' }], gaeste: true })).id
+  trainings.push(en, fr)
+  const ben = (await post(`${en}/eintragen`, { namen: ['Ben S.'] })).eingetragen[0]
+  const g = await (
+    await lk.request.post(`${A}/server/grammatik/freigeben`, {
+      headers: KOPF,
+      data: { titel: 'Simple past', fach: 'Englisch', sprache: 'en', thema: 'Simple past', paket: PAKET, vokId: en }
+    })
+  ).json()
+  pruefe(Boolean(en && fr && ben?.zugang && g.id), `Englisch (mit Grammatik) und Französisch freigegeben, Ben eingetragen (${JSON.stringify(g).slice(0, 200)})`)
+
+  // ---------- Gast Ben: anmelden, in Französisch beitreten
+  const gc = await browser.newContext({ viewport: { width: 1100, height: 900 } })
+  await gc.request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: ben.zugang } })
+  // Ben auch in Französisch eintragen (gleicher Name bei derselben Lehrkraft = gleiches Konto)
+  await post(`${fr}/eintragen`, { namen: ['Ben S.'] })
+
+  // ---------- Verbspiele: ohne bekannte Vergangenheit keine Verben, nach Freischaltung schon
+  const liste = async () => (await (await gc.request.get(`${A}/s/api/vokabeln/liste?id=${en}`, { headers: KOPF })).json()).verben
+  pruefe((await liste()) === null, 'Ohne bekannte Vergangenheit: keine unregelmäßigen Verben für Ben')
+  await post(`${en}/verbspiele`, { wert: 'an' })
+  const v = await liste()
+  pruefe(Boolean(v?.karten?.length), `Nach „jetzt freischalten“: Verben da (${v?.karten?.length ?? 0})`)
+  await post(`${en}/verbspiele`, { wert: '' })
+
+  // ---------- Regal
+  const p = await gc.newPage()
+  p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
+  await p.goto(`${A}/s/`)
+  pruefe(await da(p.locator('[data-regal]')), 'Gast sieht das Regal')
+  const reihe = async () => p.locator('[data-regal-ordner]').evaluateAll((els) => els.map((e) => e.getAttribute('data-regal-ordner')))
+  await p.locator('[data-regal-ordner]').first().waitFor()
+  pruefe(JSON.stringify(await reihe()) === JSON.stringify(['Englisch', 'Französisch']), `A–Z: English vor Français (${await reihe()})`)
+  const rueckenText = await p.locator('[data-regal-ordner="Englisch"]').innerText()
+  pruefe(/English/.test(rueckenText) && /Vocabulary/.test(rueckenText) && /Grammar/.test(rueckenText), `Rücken in der Fremdsprache: ${rueckenText.replace(/\s+/g, ' ')}`)
+  await p.screenshot({ path: join(out, '1-regal-dunkel.png') })
+  // Ziehen: Français vor English
+  const quelle = await p.locator('[data-regal-ordner="Französisch"]').boundingBox()
+  const ziel = await p.locator('[data-regal-ordner="Englisch"]').boundingBox()
+  await p.mouse.move(quelle.x + quelle.width / 2, quelle.y + quelle.height / 2)
+  await p.mouse.down()
+  await p.mouse.move(quelle.x + quelle.width / 2 - 20, quelle.y + quelle.height / 2, { steps: 4 })
+  await p.mouse.move(ziel.x + 8, ziel.y + ziel.height / 2, { steps: 8 })
+  await p.mouse.up()
+  await p.waitForTimeout(600)
+  pruefe((await reihe())[0] === 'Französisch', `Nach dem Ziehen: Français vorn (${await reihe()})`)
+  pruefe(p.url().endsWith('/s/'), 'Ziehen öffnet keinen Ordner')
+  await p.reload()
+  await p.locator('[data-regal-ordner]').first().waitFor()
+  pruefe((await reihe())[0] === 'Französisch', 'Eigene Reihenfolge bleibt nach dem Neuladen (am Konto)')
+  await p.locator('[data-regal-az]').click()
+  await p.waitForTimeout(300)
+  pruefe((await reihe())[0] === 'Englisch', 'A–Z wiederhergestellt')
+
+  // ---------- Ordner aufschlagen
+  await p.locator('[data-regal-ordner="Englisch"]').click()
+  pruefe(await da(p.locator('[data-ordner-uebergang]'), 3000), 'Animation: Ordner wird herausgenommen')
+  await p.waitForURL(/\/s\/ordner\//)
+  pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Ordner Englisch aufgeschlagen')
+  await p.waitForTimeout(700)
+  pruefe((await p.locator('[data-lasche]').count()) === 2, 'Register: Vocabulary und Grammar (ohne Materialien)')
+  await p.screenshot({ path: join(out, '2-ordner-vok.png') })
+  await p.locator('[data-lasche="gram"]').click()
+  pruefe(await da(p.locator('[data-ordner-kurs="grammatik"]')), 'Register Grammar zeigt das Grammatiktraining')
+  await p.screenshot({ path: join(out, '3-ordner-gram.png') })
+  await p.locator('[data-lasche="vok"]').click()
+  await p.locator('[data-ordner-kurs="vokabeln"]').click()
+  await p.locator('[data-vokabel-kasten]').waitFor()
+  const zurueck = p.locator('[data-zurueck-lernen]')
+  pruefe((await zurueck.innerText()).includes('In den Ordner'), 'Training: „In den Ordner“ als Rückweg')
+  await zurueck.click()
+  pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Zurück im Ordner')
+
+  // ---------- Hell und Telefon
+  const darst = async (felder) => {
+    const alt = (await (await gc.request.get(`${A}/s/api/darstellung`, { headers: KOPF })).json()).darstellung ?? {}
+    await gc.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { ...alt, ...felder } })
+    await p.evaluate(() => localStorage.removeItem('schulapps-darstellung'))
+  }
+  await darst({ modus: 'hell' })
+  await p.goto(`${A}/s/`)
+  await p.locator('[data-regal-ordner]').first().waitFor()
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: join(out, '4-regal-hell.png') })
+  await p.setViewportSize({ width: 390, height: 844 })
+  await p.goto(`${A}/s/ordner/Englisch`)
+  await p.locator('[data-ordner="Englisch"]').waitFor()
+  await p.screenshot({ path: join(out, '5-ordner-telefon.png'), fullPage: true })
+  const breit = await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+  pruefe(breit, 'Telefon: kein seitliches Scrollen im Ordner')
+
+  // ---------- Rückfall: Liste
+  await darst({ materialien: 'liste' })
+  await p.goto(`${A}/s/`)
+  pruefe(await da(p.locator('[data-gast-start]')), 'Wahl „Liste“: bisherige Seite „Meine Materialien“')
+  await darst({ materialien: 'regal' })
+
+  // ---------- Lege das Wort: Tippen und Schreiben
+  const hw = (await post('freigeben', { titel: 'Handschrift', sprache: 'en', fach: 'Englisch', woerter: [{ id: 'h1', term: 'oil', translation: 'Öl' }], gaeste: true })).id
+  trainings.push(hw)
+  await post(`${hw}/eintragen`, { namen: ['Ben S.'] })
+  const t = await gc.newPage()
+  // Zufall fest: nach der Lernkarte kommt „Lege das Wort“
+  await t.addInitScript(() => {
+    Math.random = () => 0.9
+  })
+  await t.setViewportSize({ width: 900, height: 900 })
+  await t.goto(`${A}/s/v/${hw}`)
+  await t.locator('[data-vokabel-start]').click()
+  await t.locator('[data-sitzung]').waitFor()
+  for (let i = 0; i < 6 && !(await t.locator('[data-buchstabe]').count()); i++) {
+    await t.waitForTimeout(300)
+    if (await t.locator('[data-lernkarte]').isVisible()) {
+      await t.locator('[data-lernkarte]').click()
+      // „Nicht gewusst": Das Wort kommt in dieser Runde in anderer Form wieder
+      await t.locator('[data-karte-nicht]').click()
+    }
+  }
+  pruefe(await da(t.locator('[data-buchstabe]').first(), 5000), '„Lege das Wort“ erscheint')
+  // Tippen: getippte Buchstaben verbrauchen Plättchen, falsche werden abgewiesen
+  await t.locator('[data-lege-art]').getByText('Tippen').click()
+  await t.locator('[data-lege-tippen]').fill('ox')
+  pruefe((await t.locator('[data-lege-tippen]').inputValue()) === '', 'Tippen: „x“ ist kein Plättchen – abgewiesen')
+  await t.locator('[data-lege-tippen]').fill('oi')
+  pruefe((await t.locator('[data-buchstabe]:disabled').count()) === 2, 'Tippen: zwei Plättchen verbraucht')
+  await t.locator('[data-lege-tippen]').fill('')
+  // Schreiben: o, i, l mit der Maus zeichnen
+  await t.locator('[data-lege-art]').getByText('Schreiben').click()
+  const c = await t.locator('[data-lege-schreiben]').boundingBox()
+  const strich = async (punkte) => {
+    await t.mouse.move(c.x + punkte[0][0], c.y + punkte[0][1])
+    await t.mouse.down()
+    for (const [x, y] of punkte.slice(1)) await t.mouse.move(c.x + x, c.y + y)
+    await t.mouse.up()
+  }
+  await strich(Array.from({ length: 33 }, (_, k) => [120 + 32 * Math.cos((k / 32) * 2 * Math.PI), 105 + 38 * Math.sin((k / 32) * 2 * Math.PI)]))
+  await t.waitForTimeout(1100)
+  await strich([
+    [120, 80],
+    [120, 110],
+    [120, 150]
+  ])
+  await strich([
+    [120, 52],
+    [121, 53]
+  ])
+  await t.waitForTimeout(1100)
+  await strich([
+    [120, 25],
+    [120, 90],
+    [120, 160]
+  ])
+  await t.waitForTimeout(1100)
+  const gelegt = (await t.locator('[data-gelegt]').innerText()).replace(/\s/g, '')
+  await t.screenshot({ path: join(out, '6-handschrift.png') })
+  pruefe(gelegt === 'oil', `Handschrift erkannt: „${gelegt}“`)
+  await t.locator('[data-pruefen]').click()
+  pruefe(await da(t.locator('[data-urteil]'), 5000), 'Geprüft')
+} catch (e) {
+  pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
+  for (const [i, seite] of browser
+    .contexts()
+    .flatMap((c) => c.pages())
+    .entries())
+    await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
+} finally {
+  for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
+  pruefe(true, `Trainings, Gäste und Konten gelöscht (${zuLoeschen.length})`)
+  await browser.close()
+}
+if (problems.length) {
+  console.log(`\n${problems.length} Problem(e):`)
+  for (const x of problems) console.log(` - ${x}`)
+  process.exit(1)
+}
+console.log('\nAlles in Ordnung.')

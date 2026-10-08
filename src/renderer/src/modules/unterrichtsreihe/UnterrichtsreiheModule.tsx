@@ -10,7 +10,7 @@ import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { create } from 'zustand'
 import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconChartDots, IconDots, IconPlus, IconRoute, IconTrash } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Reihe } from '@shared/reihe'
 import { fachVon } from '@shared/faecher'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -47,8 +47,17 @@ function neueReihe(): Reihe {
   }
 }
 
-/** Sprungziel von außen (Laufende Reihen, Startseite): die Übersicht einer Zuweisung öffnen */
-export const useReihenZiel = create<{ zid: string | null; setze: (zid: string | null) => void }>((set) => ({ zid: null, setze: (zid) => set({ zid }) }))
+/**
+ * Sprungziel von außen (Laufende Reihen, Startseite): die Übersicht einer Zuweisung öffnen – oder
+ * (08.10.2026, „Reihen planen" in Laufende Reihen) gleich den Editor für eine neue Reihe. Als
+ * Zustand abgelegt, damit es greift, ob die App schon offen ist oder erst geladen wird.
+ */
+export const useReihenZiel = create<{
+  zid: string | null
+  neu: boolean
+  setze: (zid: string | null) => void
+  setzeNeu: (neu: boolean) => void
+}>((set) => ({ zid: null, neu: false, setze: (zid) => set({ zid }), setzeNeu: (neu) => set({ neu }) }))
 
 export default function UnterrichtsreiheModule(): React.JSX.Element {
   const [ansicht, setAnsicht] = useState<{ art: 'liste' } | { art: 'editor'; reihe: Reihe } | { art: 'uebersicht'; zid: string }>({ art: 'liste' })
@@ -58,6 +67,19 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
     setAnsicht({ art: 'uebersicht', zid: ziel })
     useReihenZiel.getState().setze(null)
   }, [ziel])
+  // Ungespeicherte Änderungen im offenen Editor (meldet der Editor selbst)
+  const editorGeaendert = useRef(false)
+  const neuGewuenscht = useReihenZiel((z) => z.neu)
+  const [neuZaehler, setNeuZaehler] = useState(0)
+  useEffect(() => {
+    if (!neuGewuenscht) return
+    useReihenZiel.getState().setzeNeu(false)
+    // Wie „Neue Reihe" in der Liste – nur nichts Ungespeichertes stillschweigend verwerfen
+    if (editorGeaendert.current && !window.confirm('Die geöffnete Reihe hat ungespeicherte Änderungen. Trotzdem eine neue Reihe beginnen?')) return
+    editorGeaendert.current = false
+    setNeuZaehler((n) => n + 1)
+    setAnsicht({ art: 'editor', reihe: neueReihe() })
+  }, [neuGewuenscht])
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
   const farbe = useProgrammFarbe()
   const laden = useCallback(
@@ -74,7 +96,18 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
   if (ansicht.art === 'editor')
     return (
       <Rahmen>
-        <ReiheEditor start={ansicht.reihe} zurueck={() => setAnsicht({ art: 'liste' })} />
+        <ReiheEditor
+          // Neue Reihe aus einer offenen heraus: frisch aufbauen statt alten Zustand behalten
+          key={ansicht.reihe.id || `neu-${neuZaehler}`}
+          start={ansicht.reihe}
+          zurueck={() => {
+            editorGeaendert.current = false
+            setAnsicht({ art: 'liste' })
+          }}
+          meldeGeaendert={(g) => {
+            editorGeaendert.current = g
+          }}
+        />
       </Rahmen>
     )
   if (ansicht.art === 'uebersicht')

@@ -10,6 +10,7 @@ import { auswahlOptionen, bewerte, satzMitLuecke, type Vokabel } from '@shared/v
 import { spielform } from '@shared/vokabelSpiele'
 import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
+import { apostrophHinweis } from '../apostrophHinweis'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
 
 const RUNDEN = 10
@@ -63,6 +64,8 @@ export function HoerenSchreiben({ woerter, sprache, ende }: SpielProps): React.J
     if (!v || rueck) return
     const u = bewerte(text, v.term)
     const gut = u.urteil === 'richtig'
+    // Richtig, aber mit typografischem Apostroph: Tastatur-Hinweis (08.10.2026)
+    if (gut) apostrophHinweis(text)
     if (gut) setTreffer((t) => t + 1)
     else fehler.current.add(v.id)
     setRueck({ gut, richtig: spielform(v.term) })
@@ -144,6 +147,8 @@ export function SatzLuecke({ woerter, ende }: SpielProps): React.JSX.Element {
       setText('')
       return
     }
+    // Getippt richtig, aber mit typografischem Apostroph: Tastatur-Hinweis (08.10.2026)
+    if (gut && !auswahl) apostrophHinweis(antwort)
     if (gut && !fehler.current.has(v.id)) setTreffer((t) => t + 1)
     if (!gut) fehler.current.add(v.id)
     setRueck({ gut, richtig: luecke.loesung })

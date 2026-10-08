@@ -65,12 +65,16 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     .map((n) => {
       const v = vok.jePerson[n.id]
       const gr = gram.jePerson[n.id]
-      const t = h.schueler.find((s) => s.benutzer === n.benutzer)
+      // Gäste (Anmeldecode, 08.10.2026) führt die Testhistorie ohne Benutzernamen, über ihren Namen
+      const gast = n.quelle === 'gast'
+      const t = h.schueler.find((s) => (gast ? !s.benutzer && s.name === n.name : s.benutzer === n.benutzer))
       const r = reihen.filter((x) => x.status === 'offen').flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
       return {
         id: n.id,
-        name: n.name,
-        benutzer: n.benutzer,
+        name: n.name || n.benutzer,
+        // Interne Kennung der Gäste („gast-…") ist kein IServ-Name – nicht anzeigen
+        benutzer: gast ? '' : n.benutzer,
+        gast,
         vokabelnSicher: v && v.gesamt ? v.sicher / v.gesamt : null,
         grammatikSicher: gr && gr.gesamt ? gr.sicher / gr.gesamt : null,
         zuletztGeuebt: v?.zuletzt ?? null,

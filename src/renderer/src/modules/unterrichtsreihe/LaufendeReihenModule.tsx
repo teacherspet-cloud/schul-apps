@@ -41,6 +41,12 @@ export const oeffneReihe = (zid: string): void => {
   openModule('unterrichtsreihe')
 }
 
+/** „Reihen planen" (08.10.2026): Unterrichtsreihe öffnen und dort gleich eine neue Reihe beginnen */
+export const planeNeueReihe = (): void => {
+  useReihenZiel.getState().setzeNeu(true)
+  openModule('unterrichtsreihe')
+}
+
 export function useLaufendeReihen(active = true): { reihen: LaufendeReihe[] | null; laden: () => void } {
   const [reihen, setReihen] = useState<LaufendeReihe[] | null>(null)
   const laden = useCallback(
@@ -157,7 +163,7 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
             ? `${reihen.length} Reihe${reihen.length > 1 ? 'n' : ''} in Arbeit – Fortschritt und Handlungsbedarf je Lerngruppe.`
             : 'Gerade läuft keine Reihe.'
         }
-        neu={{ label: 'Reihen planen', onClick: () => openModule('unterrichtsreihe'), kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
+        neu={{ label: 'Reihen planen', onClick: planeNeueReihe, kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
         suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Reihe, Thema, Lerngruppe …" />}
       />
       <Stack gap="lg">

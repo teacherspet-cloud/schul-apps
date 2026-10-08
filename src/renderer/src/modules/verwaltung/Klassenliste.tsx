@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
 import { senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
+import PrintPreview from '../../shared/components/PrintPreview'
 
 interface Konto {
   name: string
@@ -51,6 +52,7 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
   const [namen, setNamen] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const [ergebnis, setErgebnis] = useState<{ klasse: string; angelegt: Konto[] } | null>(null)
+  const [druckHtml, setDruckHtml] = useState<string | null>(null)
   const anlegen = async (): Promise<void> => {
     setLaeuft(true)
     try {
@@ -66,7 +68,9 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
   const drucken = (pdf: boolean): void => {
     if (!ergebnis) return
     const html = zugangskartenHtml(ergebnis.klasse, ergebnis.angelegt, window.location.origin)
-    void (pdf ? window.api.exporter.pdf(html, `Zugangskarten ${ergebnis.klasse}.pdf`) : window.api.exporter.print(html)).catch((e: unknown) => notifyError(e))
+    // Drucken über die Druckvorschau der App mit Druckerwahl (08.10.2026) statt gleich des Druckdialogs
+    if (!pdf) return setDruckHtml(html)
+    void window.api.exporter.pdf(html, `Zugangskarten ${ergebnis.klasse}.pdf`).catch((e: unknown) => notifyError(e))
   }
   const neu = ergebnis?.angelegt.filter((k) => !k.schonDa) ?? []
   return (
@@ -128,6 +132,7 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
           </Stack>
         )}
       </Stack>
+      {druckHtml && <PrintPreview html={druckHtml} title={`Zugangskarten ${ergebnis?.klasse ?? ''}`.trim()} onClose={() => setDruckHtml(null)} />}
     </Card>
   )
 }

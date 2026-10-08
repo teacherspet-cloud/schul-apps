@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('__schulappsClient', {
   name: 'Schul-Apps Online',
   /** Figuren der Exe ohne Server am selben PC (nur lesen) */
   lokaleMaskottchen: () => call('client:lokale-maskottchen'),
+  /** Drucker des PCs für die Druckvorschau (08.10.2026) */
+  drucker: () => call('client:drucker'),
+  /** Mit Optionen direkt auf den gewählten Drucker, ohne: Druckdialog von Windows */
+  drucken: (html: string, optionen?: unknown) => call('client:drucken', html, optionen),
   iserv: {
     status: () => call('client:iserv-status'),
     verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => call('client:iserv-verbinden', eingabe),

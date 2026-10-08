@@ -26,7 +26,7 @@ import type { Abgabe, Bogen, Rueckmeldung } from '../renderer/src/modules/rueckm
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, OHNE_VORSCHAU, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
-import { alleLernenden, gastName, gehoertZu, klasseVon, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
+import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, klasseVon, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
@@ -148,7 +148,8 @@ function gesamtVon(f: Freigabe): number {
 function istFuer(f: Freigabe, ich: NutzerInfo): boolean {
   // Per Code beigetreten (Gast oder Konto)?
   if (db().prepare('SELECT 1 FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(f.id, ich.id)) return true
-  if (ich.quelle === 'gast') return false
+  // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
+  if (ich.quelle === 'gast' && !gastInLerngruppe(f.lerngruppe_id, ich)) return false
   const nur = schuelerVon(f)
   // Ohne Lerngruppe (Unterrichtsreihe an Einzelne, 03.10.2026): nur die genannten Lernenden
   if (!f.lerngruppe_id) return ich.rolle === 'schueler' && nur.includes(ich.benutzer)
@@ -371,6 +372,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
                 id: f.id,
                 titel: f.titel,
                 offen: offen.includes(f),
+                // Fach für den Fachordner im Regal (08.10.2026)
+                fach: v.meta?.subjectLabel ?? '',
                 aufgabe: v.grundlage?.aufgaben ?? '',
                 runden: f.runden,
                 genutzt: fassungen.filter((x) => x.bogen).length,

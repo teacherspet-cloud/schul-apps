@@ -205,7 +205,8 @@ function lernendeVon(z: ZuweisungZeile): NutzerInfo[] {
   const g = lerngruppe(z.lerngruppe_id)
   if (!g) return dazu([])
   const nur = json_(z.schueler, [] as string[])
-  return dazu(mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer)))
+  // Eingetragene Gäste (Anmeldecode, 08.10.2026) stehen in der Lerngruppe, haben aber keine Reihen-Ansicht – sie zählen hier nicht
+  return dazu(mitgliederVon(g).filter((n) => n.quelle !== 'gast' && (!nur.length || nur.includes(n.benutzer))))
 }
 
 const standVon = (zid: string, sid: string): Stand => {
@@ -964,7 +965,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       const g = gid ? lerngruppe(gid) : null
       if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
       // Ohne Lerngruppe: einzelne Lernende aus allen eigenen Lerngruppen
-      const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
+      const erlaubt = new Set((g ? mitgliederVon(g).filter((n) => n.quelle !== 'gast') : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
       // Gäste per QR-Code (05.10.2026): auch ohne Lerngruppe; mit IServ melden sich alle dort an
       const mitGaesten = k0.gaeste === true

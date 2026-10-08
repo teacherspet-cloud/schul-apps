@@ -89,7 +89,10 @@ import {
 import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
+import Regal from '../lernen/regal/Regal'
+import Ordner from '../lernen/regal/Ordner'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
+import { useDarstellung } from './schuelerDarstellung'
 import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
@@ -157,6 +160,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   // Vokabelweg (03.10.2026): gemeinsamer Kasten einer Lehrwerksreihe
   const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
+  // Fachordner im Regal (08.10.2026)
+  const ordnerFach = /^\/s\/ordner\/([^/]+)\/?$/.exec(pfad)?.[1]
   const reiheM = /^\/s\/r\/([a-f0-9]{8,32})(?:\/([a-z0-9]{2,20}))?/.exec(pfad)
   // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
   const ausReihe = new URLSearchParams(window.location.search).get('reihe')
@@ -170,6 +175,8 @@ export default function SchuelerBereich(): React.JSX.Element {
    * Ausfüllen eines Blattes, beim Beitreten per Code und nicht für Gäste: dort zählt der Fokus.
    */
   const telefon = useSchuelerTelefon()
+  // Regal oder bisherige Liste (08.10.2026, Wahl der Lernenden in den Einstellungen)
+  const regalAn = useDarstellung((s) => s.d.materialien) !== 'liste'
   const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln)
   const mitTabs = telefon && !gast && !fokus
   const inhalt = code ? (
@@ -192,6 +199,14 @@ export default function SchuelerBereich(): React.JSX.Element {
     <VokabelTrainer id={`lb:${decodeURIComponent(vokWeg)}`} />
   ) : vokabeln ? (
     <VokabelTrainer id={vokabeln} />
+  ) : ordnerFach && ich?.angemeldet ? (
+    <Ordner fach={decodeURIComponent(ordnerFach)} />
+  ) : lernFach && !gast && regalAn ? (
+    lernFach[1] ? (
+      <Ordner fach={decodeURIComponent(lernFach[1])} />
+    ) : (
+      <Regal titel="Mein Lernraum" />
+    )
   ) : lernFach && !gast ? (
     <LernRaum fach={lernFach[1] ? decodeURIComponent(lernFach[1]) : undefined} />
   ) : reiheM && !gast ? (
@@ -205,8 +220,20 @@ export default function SchuelerBereich(): React.JSX.Element {
   ) : rueckblick && !gast ? (
     <ErgebnisRueckblick id={rueckblick} />
   ) : gast && ich?.angemeldet && !bereich ? (
-    // Gast mit Sitzung (QR-Code): eigene Übersicht statt der Test-Code-Seite (03.10.2026)
-    <GastStart />
+    // Gast mit Sitzung (QR-Code): eigene Übersicht statt der Test-Code-Seite (03.10.2026); seit 08.10.2026 als Regal
+    regalAn ? (
+      <Regal
+        titel="Meine Materialien"
+        unten={
+          <>
+            <Uebersicht ohneZurueck />
+            <GastAbmelden />
+          </>
+        }
+      />
+    ) : (
+      <GastStart />
+    )
   ) : gast || bereich === 'tests' ? (
     <Uebersicht />
   ) : bereich === 'ergebnisse' ? (
@@ -1060,15 +1087,21 @@ function GastStart(): React.JSX.Element {
       ))}
       {leer && <Text c="dimmed">Hier erscheint, was über einen Code geöffnet wurde.</Text>}
       <Uebersicht ohneZurueck />
-      <Card withBorder padding="md" radius="lg">
-        <Text size="sm" mb="xs">
-          Auf einem fremden oder geteilten Gerät: abmelden. Beim Vokabeltraining geht es danach mit Name und persönlichem Code weiter.
-        </Text>
-        <Button variant="default" leftSection={<IconLogout size={14} />} onClick={() => void abmelden('/s/')} data-gast-abmelden>
-          Abmelden
-        </Button>
-      </Card>
+      <GastAbmelden />
     </Stack>
+  )
+}
+
+function GastAbmelden(): React.JSX.Element {
+  return (
+    <Card withBorder padding="md" radius="lg">
+      <Text size="sm" mb="xs">
+        Auf einem fremden oder geteilten Gerät: abmelden. Beim Vokabeltraining geht es danach mit Name und persönlichem Code weiter.
+      </Text>
+      <Button variant="default" leftSection={<IconLogout size={14} />} onClick={() => void abmelden('/s/')} data-gast-abmelden>
+        Abmelden
+      </Button>
+    </Card>
   )
 }
 

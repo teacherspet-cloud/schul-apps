@@ -35,7 +35,7 @@ import {
 } from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
-import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { gastEntfernen } from './gaeste'
 import { auswerten, mitarbeitAnfrage, mitarbeitAus, type AuswertungsKontext, type MitarbeitVorschlag, type PersonRoh } from './blattAuswertung'
 import type { Strenge } from '../shared/blattAuswertung'
@@ -192,7 +192,8 @@ const abgabeVon = (fid: string, sid: string): Abgabe | null =>
 /** Gehört das Blatt dieser Person? (Lerngruppe, ggf. nur Ausgewählte, oder per Code beigetreten) */
 export function blattIstFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (db().prepare('SELECT 1 FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
-  if (ich.quelle === 'gast') return false
+  // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
+  if (ich.quelle === 'gast' && !gastInLerngruppe(z.lerngruppe_id, ich)) return false
   const nur = json_(z.schueler, [] as string[])
   // Ohne Lerngruppe (Unterrichtsreihe an Einzelne, 03.10.2026): nur die genannten Lernenden
   if (!z.lerngruppe_id) return ich.rolle === 'schueler' && nur.includes(ich.benutzer)
@@ -282,6 +283,9 @@ function kurz(z: Zeile, ich: NutzerInfo) {
     runden: e.runden,
     genutzt: a?.abgaben ?? 0,
     begonnen: Boolean(a && a.aktualisiert > 0),
+    // Fach und Thema für den Fachordner im Regal (08.10.2026); ohne eigene Angabe das Fach der Rückmeldungs-Vorlage
+    fach: (z as Zeile & { fach?: string }).fach || kontextVon(z).fach || '',
+    thema: (z as Zeile & { thema?: string }).thema ?? '',
     ...(stand ? { stand } : {})
   }
 }

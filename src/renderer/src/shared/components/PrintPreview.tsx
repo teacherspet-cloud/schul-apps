@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
 import { alleSeiten, neueNummern, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from '../export/seitenAuswahl'
 import { druckeImBrowser, imNetz } from '../netzZugang'
-import { aufIos } from '../plattform'
+import { aufIos, druckerWaehlbar } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 import { ZoomFlaeche } from '../touch/zoom'
 import { SeitenAuswahlFelder, SeitenHaken, umschalten } from './SeitenAuswahl'
@@ -74,6 +74,13 @@ function bereicheVon(seiten: number[]): { from: number; to: number }[] {
  * werden vor dem Umrechnen gewählt und neu gezählt („Seite 1 / 5" statt „Seite 1 / 9",
  * export/seitenAuswahl.ts). Dokumente ohne Marken (ohne Seitenzahlen) druckt der PC mit
  * Seitenbereichen; auf dem iPad und im Browser wählt dort der Druckdialog des Geräts.
+ *
+ * DRUCKERWAHL (08.10.2026, Meldung der Lehrkraft bei den Zugangszetteln): Der Drucker ließ sich erst im
+ * Dialog NACH „Drucken" wählen. Gewählt wird jetzt hier – in der App am PC und in der Exe „Schul-Apps
+ * Online" (Drucker des PCs über client/main.ts), vorbelegt mit dem zuletzt benutzten bzw. dem
+ * Standarddrucker (je Gerät gemerkt), gedruckt direkt dorthin. „Systemdialog …" öffnet weiter den Dialog
+ * von Windows. Ein reiner Browser kennt die Drucker nicht: Dort sagt die Vorschau, dass der Drucker im
+ * nächsten Fenster gewählt wird, und der Knopf heißt „Druckansicht öffnen …".
  */
 export default function PrintPreview({
   html,
@@ -104,6 +111,10 @@ export default function PrintPreview({
   const [printing, setPrinting] = useState(false)
   // iPad: Drucker, Exemplare, Duplex und Farbe wählt AirPrint selbst
   const ios = aufIos()
+  /** Drucker hier wählbar und direkt gedruckt (App am PC, Exe „Schul-Apps Online" mit Druck-Brücke) */
+  const direkt = druckerWaehlbar()
+  /** Reiner Browser: PDF im neuen Tab, Drucker im Druckdialog des Browsers */
+  const imBrowser = imNetz() && !direkt
 
   useEffect(() => {
     if (!html) return
@@ -173,7 +184,7 @@ export default function PrintPreview({
   const alleBlatt = blattAuswahl.length === pageCount
   const alleLoesung = loesungAuswahl.length === loesungSeiten
   // Ohne Marken lässt sich nur am PC (Seitenbereiche des Druckers) auswählen
-  const auswahlMoeglich = (blattMarkiert && (!loesung || loesungMarkiert)) || (!ios && !imNetz())
+  const auswahlMoeglich = (blattMarkiert && (!loesung || loesungMarkiert)) || direkt
   const gewaehlt = (seite: number): boolean => auswahl.includes(seite)
   // Neue Seitenzahlen der gewählten Seiten – zur Anzeige unter den Seitenbildern
   const nummern = useMemo(() => {
@@ -264,8 +275,8 @@ export default function PrintPreview({
   }
 
   const print = async (): Promise<void> => {
-    if (imNetz()) return druckeImNetz()
-    if (ios) return druckeAufIos()
+    if (imBrowser) return druckeImNetz()
+    if (ios || !direkt) return druckeAufIos()
     if (!html || !printer) return
     setPrinting(true)
     try {
@@ -334,7 +345,7 @@ export default function PrintPreview({
           display: 'block',
           background: '#fff',
           boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-          filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
+          filter: color === 'bw' && direkt ? 'grayscale(1)' : undefined,
           opacity: an ? 1 : 0.35
         }}
       />
@@ -417,6 +428,12 @@ export default function PrintPreview({
                   Drucker, Exemplare, Doppelseitig und Farbe stehen im Druckdialog von AirPrint.
                 </Text>
               )}
+              {imBrowser && (
+                <Text size="sm" c="dimmed" data-druckerwahl-hinweis>
+                  Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ zeigt das PDF, dort über das Drucksymbol drucken
+                  (dort auch Exemplare, Doppelseitig und Farbe).
+                </Text>
+              )}
               {bereit && gesamt > 1 && auswahlMoeglich && (
                 <SeitenAuswahlFelder
                   teile={teile}
@@ -432,21 +449,23 @@ export default function PrintPreview({
                   Einzelne Seiten lassen sich im Druckdialog des Geräts wählen.
                 </Text>
               )}
-              {!ios && (
+              {direkt && (
                 <Select
                   label="Drucker"
                   data={printers.map((p) => ({ value: p.name, label: p.displayName }))}
                   value={printer}
                   onChange={setPrinter}
                   placeholder={printers.length ? 'Drucker wählen' : 'Kein Drucker gefunden'}
+                  description={printers.length ? undefined : 'Über „Systemdialog …“ lässt sich trotzdem drucken.'}
                   allowDeselect={false}
                   searchable
+                  data-druckerwahl
                 />
               )}
-              {!ios && <ZahlFeld label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />}
+              {direkt && <ZahlFeld label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />}
               {loesung && (
                 <ZahlFeld
-                  label={ios ? `${loesung.titel} drucken (1 = ja, 0 = nein)` : `Exemplare ${loesung.titel}`}
+                  label={!direkt ? `${loesung.titel} drucken (1 = ja, 0 = nein)` : `Exemplare ${loesung.titel}`}
                   description="0 = nicht drucken"
                   min={0}
                   max={999}
@@ -454,7 +473,7 @@ export default function PrintPreview({
                   onChange={(v) => setLoesungExemplare(Math.max(0, Number(v) || 0))}
                 />
               )}
-              {!ios && (
+              {direkt && (
                 <>
                   <div>
                     <Text size="sm" fw={500} mb={4}>
@@ -488,7 +507,7 @@ export default function PrintPreview({
                   </div>
                 </>
               )}
-              {pages && !ios && (
+              {pages && direkt && (
                 <Text size="xs" c="dimmed" data-blattzahl>
                   {blattAuswahl.length} {blattAuswahl.length === 1 ? 'Seite' : 'Seiten'} × {copies} = {sheets * copies} {sheets * copies === 1 ? 'Blatt' : 'Blätter'}
                   {mitLoesung && loesungPages && `, dazu ${loesungBlaetter * loesungExemplare} für ${loesung!.titel}`}
@@ -503,18 +522,25 @@ export default function PrintPreview({
               leftSection={<IconPrinter size={16} />}
               onClick={() => void print()}
               loading={printing}
-              disabled={!bereit || (!printer && !imNetz() && !ios) || !auswahlGueltig || (!mitBlatt && !mitLoesung)}
+              disabled={!bereit || (!printer && direkt) || !auswahlGueltig || (!mitBlatt && !mitLoesung)}
             >
-              Drucken
+              {imBrowser ? 'Druckansicht öffnen …' : 'Drucken'}
             </Button>
             <Button className="pv-abbrechen" variant="default" onClick={onClose}>
               Abbrechen
             </Button>
           </div>
-          {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Drucken" über den Tab */}
-          {!imNetz() && !ios && (
-            <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html || (!mitBlatt && !mitLoesung)}>
-              Druckdialog von Windows öffnen
+          {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Druckansicht öffnen …" über den Tab */}
+          {direkt && (
+            <Button
+              className="pv-systemdialog"
+              variant="subtle"
+              size="xs"
+              title="Druckdialog von Windows öffnen – mit allen Einstellungen des Druckers"
+              onClick={() => void systemDialog()}
+              disabled={!html || (!mitBlatt && !mitLoesung)}
+            >
+              Systemdialog …
             </Button>
           )}
         </Stack>

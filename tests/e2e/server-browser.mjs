@@ -41,7 +41,8 @@ try {
   await page.goto(adresse)
   pruefe(page.url().includes('/anmelden'), `ohne Anmeldung → Anmeldeseite (${page.url()})`)
   await page.screenshot({ path: join(out, '1-anmelden.png') })
-  await page.evaluate(() => { document.querySelectorAll('details').forEach((d) => (d.open = true)) })
+  // Seit 08.10.2026 im Fenster „Mit Nutzername und Passwort anmelden"
+  await page.locator('[data-anmelden-oeffnen]').click()
   await page.fill('#benutzer', konto.benutzer)
   await page.fill('#passwort', konto.passwort)
   await page.click('form[action=\"/auth/lokal\"] button[type=submit]')

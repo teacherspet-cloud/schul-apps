@@ -185,9 +185,50 @@ export function alleLernenden(): NutzerInfo[] {
 /** Klasse eines Schülerkontos (aus der Klassenliste bzw. IServ), sonst leer */
 export const klasseVon = (n: Pick<NutzerInfo, 'gruppen'>): string => n.gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? n.gruppen[0]?.name ?? ''
 
+/**
+ * Mitglieder einer Lerngruppe. Gäste mit persönlichem Anmeldecode (Vokabeltraining „Lernende eintragen") zählen seit
+ * 08.10.2026 mit, wenn die Lehrkraft sie ausdrücklich eingetragen hat („Lernende einer Klasse zuordnen", vokabeln.ts) –
+ * QR-Gäste ohne Eintrag bleiben bei ihrer einen Freigabe.
+ */
 export function mitgliederVon(g: Lerngruppe): NutzerInfo[] {
-  return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && gehoertZu(g, n))
+  return alleNutzer().filter((n) => n.rolle === 'schueler' && (n.quelle === 'gast' ? g.mitglieder.includes(n.benutzer) : gehoertZu(g, n)))
 }
+
+/**
+ * Darf ein Gast eine Freigabe dieser Lerngruppe sehen? (08.10.2026) Nur wenn die Lehrkraft ihn in die Lerngruppe
+ * eingetragen hat. Für alle anderen (Konten, Gäste ohne Eintrag, keine Lerngruppe) false – die Prüfungen der
+ * Freigaben (vokIstFuer, blattIstFuer …) lassen Gäste nur in diesem Fall weiter.
+ */
+export function gastInLerngruppe(lerngruppeId: string | null | undefined, n: Pick<NutzerInfo, 'benutzer' | 'quelle'>): boolean {
+  if (n.quelle !== 'gast' || !lerngruppeId) return false
+  const g = lerngruppe(lerngruppeId)
+  return Boolean(g && g.mitglieder.includes(n.benutzer))
+}
+
+/** Neue Mitglieder ohne Doppelte anhängen (Reihenfolge der alten bleibt); liefert, wer neu dazukam */
+export function mitgliederErgaenzen(alt: string[], neu: string[]): { mitglieder: string[]; dazu: string[] } {
+  const da = new Set(alt)
+  const dazu: string[] = []
+  for (const b of neu.map((x) => x.trim().toLowerCase()).filter(Boolean))
+    if (!da.has(b)) {
+      da.add(b)
+      dazu.push(b)
+    }
+  return { mitglieder: [...alt, ...dazu], dazu }
+}
+
+/** Mitglieder einer Lerngruppe ergänzen (ohne Doppelte); liefert, wer neu dazukam */
+export function lerngruppeErgaenzen(g: Lerngruppe, benutzer: string[]): string[] {
+  const { mitglieder, dazu } = mitgliederErgaenzen(g.mitglieder, benutzer)
+  if (dazu.length) db().prepare('UPDATE lerngruppen SET mitglieder = ? WHERE id = ?').run(JSON.stringify(mitglieder), g.id)
+  return dazu
+}
+
+/** Eingetragene Gäste (Benutzer „gast-…") bleiben, wenn die Mitgliederliste neu gesetzt wird – sie stehen in keiner Eingabe */
+export const gaesteBehalten = (alt: string[], neu: string[]): string[] => mitgliederErgaenzen(neu, alt.filter((b) => b.startsWith('gast-'))).mitglieder
+
+/** Dieselben Einträge? (Zugänge vorher/nachher vergleichen) */
+export const gleicheMengen = <T>(a: Set<T>, b: Set<T>): boolean => a.size === b.size && [...a].every((x) => b.has(x))
 
 // ---------------------------------------------------------------- Tests
 
@@ -889,9 +930,10 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           x.abgabe
         ])
       )
-      // Offene Tests der eigenen Lerngruppen (Gäste: nur der eigene Test)
+      // Offene Tests der eigenen Lerngruppen (Gäste: nur der eigene Test – und seit 08.10.2026 die Tests der Lerngruppen,
+      // in die die Lehrkraft sie eingetragen hat)
       const tests = (db().prepare("SELECT * FROM onlinetests WHERE status != 'beendet'").all() as unknown as TestZeile[]).map(alsTest).filter((t) => {
-        if (gast) return meine.has(t.id)
+        if (gast) return meine.has(t.id) || (!t.einstellungen.reihe && gastInLerngruppe(t.lerngruppe_id, ich))
         if (t.einstellungen.reihe) return false
         const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
         return g && gehoertZu(g, ich)
@@ -902,6 +944,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
             code: t.code,
             titel: t.titel,
             zeitMin: t.einstellungen.zeitMin,
+            // Fach für den Fachordner im Regal (08.10.2026)
+            fach: t.einstellungen.fach ?? '',
             abgegeben: Boolean(meine.get(t.id)),
             wartend: t.status === 'wartend'
           }))
@@ -978,8 +1022,9 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       let t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, ich.id) as TeilnahmeZeile | undefined
       if (!t) {
         if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
-        // Gast eines anderen Tests: die Seite fragt neu nach dem Namen (SchuelerBereich, 03.10.2026)
-        if (gast) return (json(res, 403, { fehler: 'Dieser Name gehört zu einem anderen Test.' }), true)
+        // Gast eines anderen Tests: die Seite fragt neu nach dem Namen (SchuelerBereich, 03.10.2026) – außer er ist in die
+        // Lerngruppe des Tests eingetragen (08.10.2026)
+        if (gast && !gastInLerngruppe(test.lerngruppe_id, ich)) return (json(res, 403, { fehler: 'Dieser Name gehört zu einem anderen Test.' }), true)
         t = teilnahmeAnlegen(test, ich.id)
       } else if (!t.abgabe && t.beginn === 0 && test.status === 'offen') {
         // Gestartet, während dieses Gerät gewartet hat (Sicherheitsnetz zu „starten")
@@ -1187,7 +1232,10 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         const g = lerngruppe(String(k0.id ?? ''))
         if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
         const mitglieder = Array.isArray(k0.mitglieder)
-          ? (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x))
+          ? gaesteBehalten(
+              g.mitglieder,
+              (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x))
+            )
           : g.mitglieder
         db()
           .prepare('UPDATE lerngruppen SET name = ?, fach = ?, iserv_gruppe = ?, mitglieder = ? WHERE id = ?')

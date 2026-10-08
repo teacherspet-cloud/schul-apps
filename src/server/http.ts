@@ -49,7 +49,7 @@ import {
 import { auftragsRegister, buendel, oeffneStrom, sitzungVergessen } from './ereignisse'
 import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
-import { anmeldeSeite, passwortSeite } from './seiten'
+import { ANMELDE_CSP, anmeldeSeite, passwortSeite } from './seiten'
 
 export type Aufruf = (kanal: string, args: unknown[]) => Promise<unknown>
 
@@ -422,7 +422,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       res.writeHead(200, {
         'content-type': TYPEN['.html'],
         'cache-control': 'no-store',
-        'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
+        // Anmeldefenster (08.10.2026): nur das kleine Fensterskript per Hash erlaubt
+        'content-security-policy': ANMELDE_CSP
       })
       return void res.end(
         anmeldeSeite({
@@ -430,7 +431,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           notzugang: notzugangAn(),
           fehler: url.searchParams.get('fehler') ?? '',
           ziel: url.searchParams.get('ziel') ?? '/',
-          benutzer: url.searchParams.get('benutzer') ?? ''
+          benutzer: url.searchParams.get('benutzer') ?? '',
+          konto: url.searchParams.get('konto') === '1'
         })
       )
     }
@@ -483,7 +485,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         res.writeHead(303, { location: nutzer.passwortWechseln ? `/passwort?ziel=${encodeURIComponent(weiter)}` : weiter })
       } catch (e) {
         res.writeHead(303, {
-          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(
+          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&konto=1&ziel=${encodeURIComponent(
             ziel
           )}`
         })
@@ -616,7 +618,13 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             Object.entries(typeof k0.spielGruppen === 'object' && k0.spielGruppen ? (k0.spielGruppen as Record<string, unknown>) : {})
               .filter(([n, v]) => /^[a-z]{1,20}$/.test(n) && typeof v === 'boolean')
               .slice(0, 20)
-          )
+          ),
+          // „Lege das Wort": legen, tippen oder schreiben; Meine Materialien als Regal oder Liste, eigene Ordnerreihenfolge (08.10.2026)
+          legen: wahl(k0.legen, ['legen', 'tippen', 'schreiben'], 'legen'),
+          materialien: wahl(k0.materialien, ['regal', 'liste'], 'regal'),
+          regal: (Array.isArray(k0.regal) ? k0.regal : [])
+            .filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 60)
+            .slice(0, 40)
         }
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,

@@ -454,6 +454,22 @@ export function netzZugangEinrichten(): void {
   api.exporter.print = async (html) => {
     await druckeImBrowser([html])
   }
+  /*
+   * Drucker (08.10.2026): Der Browser kennt die Drucker des Geräts nicht – die Liste des Servers bzw. des
+   * PCs mit dem Netzzugang wäre die falsche. Die Exe „Schul-Apps Online" kennt sie und druckt direkt
+   * (client/main.ts); ältere Exe ohne diese Brücke drucken wie der Browser.
+   */
+  api.exporter.printers = async () => []
+  const druckBruecke = client?.drucken && client.drucker ? { drucken: client.drucken, drucker: client.drucker } : null
+  if (druckBruecke) {
+    api.exporter.printers = () => druckBruecke.drucker()
+    api.exporter.print = async (html, options) => {
+      // Silbentrennung wie bei der Vorschau (apiShape `vorbereitet`)
+      const { htmlMitTrennung } = await import('./silbentrennung')
+      const fertig = await htmlMitTrennung(html).catch(() => html)
+      await druckBruecke.drucken(fertig, options)
+    }
+  }
 
   window.api = api
 }

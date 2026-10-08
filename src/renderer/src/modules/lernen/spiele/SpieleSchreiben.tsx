@@ -10,6 +10,7 @@ import { buildCrossword } from '../../vokabeltest/generation/crossword'
 import { createRng, randomSeed } from '../../vokabeltest/model/random'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
 import { useVtFarbe } from '../vtFarben'
+import { apostrophHinweis } from '../apostrophHinweis'
 
 // ---------------------------------------------------------------- Wortraten
 
@@ -64,6 +65,7 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
     if (!t || fertig || verloren) return
     if ([...t].length === 1) return raten(t)
     if (t === klein || kernform(t) === kernform(klein)) {
+      apostrophHinweis(eingabe)
       setGeraten([...new Set([...geraten, ...[...klein].filter(istBuchstabe)])])
       setDaneben(false)
     } else {
@@ -414,7 +416,9 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
       liste.current = [...liste.current, { key: zaehler.current, id: w.id, y: 0, x: 0.08 + Math.random() * 0.6, tempo: 1 / (fallzeit * 20) }]
       setFallen(liste.current)
     }
-    if (!zaehler.current) neu()
+    // Steht kein Wort mehr da (alle getroffen oder alle gefallen), kommt das nächste sofort (08.10.2026);
+    // fallen noch andere, bleibt der Takt. Treffer und verlorene Leben starten diesen Effekt neu.
+    if (!zaehler.current || !liste.current.length) neu()
     const t = setInterval(neu, abstand)
     return () => clearInterval(t)
   }, [geschafft, leben, klasse])
@@ -428,6 +432,7 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
     setText(wert)
     const treffer = liste.current.find((f) => bewerte(wert, v(f.id).term).urteil === 'richtig')
     if (!treffer) return
+    apostrophHinweis(wert)
     liste.current = liste.current.filter((f) => f.key !== treffer.key)
     setFallen(liste.current)
     setGeschafft((g) => g + 1)
@@ -468,6 +473,30 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
 
 // ---------------------------------------------------------------- Buchstabensalat (Suchsel)
 
+/**
+ * Gerade Linie im Gitter von Zelle `von` Richtung `nach` (08.10.2026): rastet auf die nächstliegende der acht Richtungen
+ * ein (waagerecht, senkrecht, diagonal) und endet am Rand.
+ */
+export function suchselLinie(groesse: number, von: number, nach: number): number[] {
+  const r0 = Math.floor(von / groesse)
+  const c0 = von % groesse
+  const dr = Math.floor(nach / groesse) - r0
+  const dc = (nach % groesse) - c0
+  if (!dr && !dc) return [von]
+  const achtel = Math.round(Math.atan2(dr, dc) / (Math.PI / 4))
+  const sr = Math.round(Math.sin((achtel * Math.PI) / 4))
+  const sc = Math.round(Math.cos((achtel * Math.PI) / 4))
+  const laenge = sr && sc ? Math.max(Math.abs(dr), Math.abs(dc)) : sr ? Math.abs(dr) : Math.abs(dc)
+  const aus = [von]
+  for (let k = 1; k <= laenge; k++) {
+    const r = r0 + sr * k
+    const c = c0 + sc * k
+    if (r < 0 || c < 0 || r >= groesse || c >= groesse) break
+    aus.push(r * groesse + c)
+  }
+  return aus
+}
+
 export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
   const gitter = useMemo(
@@ -486,15 +515,15 @@ export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
   const sek = useSekunden(gefunden.length < gitter.woerter.length)
   const v = (id: string) => woerter.find((w) => w.id === id)!
   const markiert = new Set(gitter.woerter.filter((w) => gefunden.includes(w.id)).flatMap(suchselZellen))
-  const tippen = (n: number): void => {
-    if (start === null) return setStart(n)
+  // Wort von Zelle a bis Zelle b prüfen (in beide Richtungen)
+  const pruefen = (a: number, b: number): void => {
     const treffer = gitter.woerter.find((w) => {
       const z = suchselZellen(w)
-      return !gefunden.includes(w.id) && ((z[0] === start && z[z.length - 1] === n) || (z[0] === n && z[z.length - 1] === start))
+      return !gefunden.includes(w.id) && ((z[0] === a && z[z.length - 1] === b) || (z[0] === b && z[z.length - 1] === a))
     })
     setStart(null)
     if (!treffer) {
-      setDaneben([start, n])
+      setDaneben([a, b])
       setTimeout(() => setDaneben([]), 500)
       return
     }
@@ -502,23 +531,93 @@ export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
     setGefunden(g)
     if (g.length === gitter.woerter.length) setTimeout(() => ende(sek, []), 600)
   }
+  const tippen = (n: number): void => {
+    if (start === null) return setStart(n)
+    pruefen(start, n)
+  }
+  /*
+   * Ziehen (08.10.2026, Wunsch der Lehrkraft): mit Maus, Finger oder Stift vom ersten zum letzten Buchstaben; die Auswahl
+   * rastet auf eine gerade Linie ein (waagerecht, senkrecht, diagonal). Antippen ohne Ziehen = Tippen wie bisher (erst
+   * erster, dann letzter Buchstabe). Maus und Finger laufen nur über Zeigerereignisse, der Klick zählt nur von der Tastatur.
+   */
+  const [zug, setZug] = useState<number[]>([])
+  const ziehen = useRef<{ von: number; bis: number; zeiger: number } | null>(null)
+  const zelleBei = (x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-such]')
+    const n = el ? Number(el.getAttribute('data-such')) : NaN
+    return Number.isInteger(n) ? n : null
+  }
+  const runter = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const n = zelleBei(e.clientX, e.clientY)
+    if (n === null) return
+    e.preventDefault()
+    ziehen.current = { von: n, bis: n, zeiger: e.pointerId }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // ohne Einfangen geht es auch
+    }
+    setZug([n])
+  }
+  const bewegen = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const z = ziehen.current
+    if (!z || z.zeiger !== e.pointerId) return
+    const n = zelleBei(e.clientX, e.clientY)
+    if (n === null) return
+    const pfad = suchselLinie(gitter.groesse, z.von, n)
+    if (pfad[pfad.length - 1] === z.bis) return
+    z.bis = pfad[pfad.length - 1]
+    setZug(pfad)
+  }
+  const hoch = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const z = ziehen.current
+    if (!z || z.zeiger !== e.pointerId) return
+    ziehen.current = null
+    setZug([])
+    if (z.bis === z.von) tippen(z.von)
+    else pruefen(z.von, z.bis)
+  }
+  const abbrechen = (): void => {
+    ziehen.current = null
+    setZug([])
+  }
   return (
     <Stack data-spiel="suchsel" align="center">
       <Group justify="space-between" w="100%">
         <Text c="dimmed" size="sm">
-          Tippe den ersten und den letzten Buchstaben eines Wortes.
+          Ziehe über ein Wort – oder tippe den ersten und den letzten Buchstaben.
         </Text>
         <Badge color={farbe.a} variant="light" size="lg">
           {sek} s · {gefunden.length}/{gitter.woerter.length}
         </Badge>
       </Group>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gitter.groesse}, minmax(26px, 34px))`, gap: 3, maxWidth: '100%' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${gitter.groesse}, minmax(26px, 34px))`,
+          gap: 3,
+          maxWidth: '100%',
+          // Auf dem Gitter ziehen statt blättern/zoomen (iPad): muss schon vor dem Berühren gelten
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none'
+        }}
+        onPointerDown={runter}
+        onPointerMove={bewegen}
+        onPointerUp={hoch}
+        onPointerCancel={abbrechen}
+        data-suchsel-gitter
+      >
         {gitter.zellen.map((c, n) => (
           <button
             key={n}
             type="button"
-            onClick={() => tippen(n)}
-            className={`vt-such ${markiert.has(n) ? 'gefunden' : ''} ${start === n ? 'start' : ''} ${daneben.includes(n) ? 'daneben' : ''}`}
+            // Nur Tastatur (Enter/Leertaste: detail 0) – Maus, Finger und Stift laufen über die Zeigerereignisse
+            onClick={(e) => {
+              if (e.detail === 0) tippen(n)
+            }}
+            className={`vt-such ${markiert.has(n) ? 'gefunden' : ''} ${start === n || zug.includes(n) ? 'start' : ''} ${daneben.includes(n) ? 'daneben' : ''}`}
             data-such={n}
           >
             {c}

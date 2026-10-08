@@ -57,10 +57,14 @@ import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten
 import { SPIELE_CSS } from './spiele/Spiele'
 import { useVerbDaten } from './verbDaten'
 import { useVtFarbe } from './vtFarben'
+import { apostrophHinweis } from './apostrophHinweis'
 import { fuerServer, ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
+import { rueckweg } from './regal/beschriftung'
 
 /** Spiele mit ablaufender Uhr – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (Einstellungen der Lernenden, 06.10.2026) */
 const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle', 'richtigfalsch']
+/** Aufgabenarten mit getippter Antwort – nur dort der Apostroph-Hinweis (08.10.2026) */
+const GETIPPT: readonly string[] = ['luecke', 'umformen', 'fehler']
 /** Neue Spiele (08.10.2026) – laufen im Rahmen der Verbspiele */
 const NEUE_SPIELE: readonly GrammatikSpielId[] = ['richtigfalsch', 'formenmemory', 'tabellenpuzzle', 'signalwort']
 
@@ -276,13 +280,14 @@ function Kasten({
   const spiele = GRAMMATIK_SPIELE.filter(
     (s) => (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length) && spielPasst(s.id)
   )
+  const zurueck = rueckweg(d.fach, 'gram', gast, useDarstellung.getState().d.materialien !== 'liste')
   return (
     <Stack className="vt vt-rein" data-grammatik-kasten>
       <style>{CSS}</style>
       {/* Zurück wie beim Vokabeltraining (08.10.2026): Gäste zu „Meine Materialien", sonst in den Lernraum */}
       <Button
         component="a"
-        href={gast ? '/s/' : '/s/lernen'}
+        href={zurueck.href}
         variant="subtle"
         color={farbe.a}
         leftSection={<IconArrowLeft size={16} />}
@@ -290,7 +295,7 @@ function Kasten({
         w="fit-content"
         data-zurueck-lernen
       >
-        {gast ? 'Meine Materialien' : 'Lernraum'}
+        {zurueck.text}
       </Button>
       <div>
         <Text c="dimmed" size="sm">
@@ -584,6 +589,8 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       if (e.urteil === 'richtig') ton('richtig')
+      // Getippt richtig, aber mit typografischem Apostroph (don’t): Tastatur-Hinweis (08.10.2026)
+      if (e.urteil === 'richtig' && !selbst && GETIPPT.includes(a.art)) apostrophHinweis(antwort)
       setNetz('')
     } catch (e) {
       // Verbindung trotz Wiederholung weg (08.10.2026): sagen statt scheinbar hängen – nochmal tippen geht
@@ -1062,7 +1069,9 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
             antworten={(x, w) => {
               const a = runde as GrammatikAufgabe
               const okWort = a.art !== 'fehler' || (w !== undefined && normiert(w) === normiert(a.fehlerWort ?? ''))
-              naechste(okWort && a.loesungen.some((l) => normiert(l) === normiert(x)), a.id)
+              const ok = okWort && a.loesungen.some((l) => normiert(l) === normiert(x))
+              if (ok && GETIPPT.includes(a.art)) apostrophHinweis(x)
+              naechste(ok, a.id)
             }}
           />
         )}

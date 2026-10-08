@@ -7,7 +7,8 @@
  *  - Ein Fenster mit der Oberfläche vom Server. Die Sitzung (Cookie) liegt in einer dauerhaften
  *    Partition – nach dem Neustart ist man noch angemeldet. Abmelden: Knopf in der Leiste.
  *  - Anmeldung über IServ läuft im selben Fenster (gywem.de), danach zurück zum Server.
- *  - Downloads (Word, PDF) mit dem Speichern-Dialog von Windows; Drucken öffnet das PDF.
+ *  - Downloads (Word, PDF) mit dem Speichern-Dialog von Windows; Drucken mit Druckerwahl in der
+ *    Druckvorschau der App (seit 08.10.2026, `druckKanaele`), sonst öffnet es das PDF.
  *  - IServ-Ordner: Der Server darf das IServ-Passwort nie bekommen. Deshalb spricht DIESE Exe
  *    IServ per WebDAV direkt an – mit dem Passwort verschlüsselt auf dem PC (Windows-DPAPI).
  *    Die Oberfläche ruft das über `window.__schulappsClient.iserv` auf (preload.ts).
@@ -30,6 +31,7 @@ import {
 import type { DavAbruf } from '../main/services/iserv/webdav'
 import type { AblageZiel } from '@shared/types'
 import { getSettings, setSettings } from '../main/services/storage/settings'
+import { printHtml, type PrintOptions } from '../main/services/export/pdf'
 
 // Eigene Domain seit 05.10.2026 (das Schulnetz sperrt die IP-Adresse); https://217.154.120.64:8443 geht weiter
 const STANDARD_SERVER = 'https://www.meineschulapps.de'
@@ -103,6 +105,64 @@ function iservKanaele(): void {
     if (e && typeof standardZiel === 'string' && standardZiel) setSettings({ iserv: { ...e, ziel: standardZiel } })
     return iservAblegen(geraet, name, daten, ziel)
   })
+}
+
+// ---------- Drucken mit Druckerwahl (08.10.2026)
+
+/**
+ * Meldung der Lehrkraft: In der Druckvorschau ließ sich kein Drucker wählen – erst nach „Drucken" kam
+ * der Druckdialog. Im Browser geht das nicht anders (er kennt die Drucker nicht), DIESE Exe aber
+ * schon: Drucker des PCs zur Auswahl und direkt drucken wie in der Standalone-Exe
+ * (main/services/export/pdf.ts). Ohne Optionen: Druckdialog von Windows („Systemdialog …").
+ */
+function druckKanaele(): void {
+  const nurVomServer = (e: Electron.IpcMainInvokeEvent): void => {
+    if (!e.senderFrame?.url.startsWith(serverAdresse())) throw new Error('Nicht erlaubt.')
+  }
+  const antwort = async <R>(fn: () => Promise<R>): Promise<{ ok: boolean; value?: R; error?: string }> => {
+    try {
+      return { ok: true, value: await fn() }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+  void ipcMain.handle('client:drucker', (e) =>
+    antwort(async () => {
+      nurVomServer(e)
+      return (await e.sender.getPrintersAsync()).map((p) => ({
+        name: p.name,
+        displayName: p.displayName || p.name,
+        isDefault: Boolean((p as { isDefault?: boolean }).isDefault)
+      }))
+    })
+  )
+  void ipcMain.handle('client:drucken', (e, html: unknown, optionen: unknown) =>
+    antwort(async () => {
+      nurVomServer(e)
+      if (typeof html !== 'string') throw new Error('Kein Druckinhalt.')
+      return printHtml(html, druckOptionen(optionen))
+    })
+  )
+}
+
+/** Optionen aus der Oberfläche prüfen – ohne gültigen Drucker: Druckdialog von Windows */
+function druckOptionen(o: unknown): PrintOptions | undefined {
+  if (!o || typeof o !== 'object') return undefined
+  const x = o as Record<string, unknown>
+  if (typeof x.deviceName !== 'string' || !x.deviceName) return undefined
+  const zahl = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null)
+  const pages = Array.isArray(x.pages)
+    ? x.pages
+        .map((r) => ({ from: zahl((r as { from?: unknown })?.from), to: zahl((r as { to?: unknown })?.to) }))
+        .filter((r): r is { from: number; to: number } => r.from !== null && r.to !== null && r.from >= 1 && r.to >= r.from)
+    : undefined
+  return {
+    deviceName: x.deviceName,
+    copies: Math.min(999, Math.max(1, zahl(x.copies) ?? 1)),
+    duplex: x.duplex === 'longEdge' || x.duplex === 'shortEdge' ? x.duplex : 'simplex',
+    color: x.color === true,
+    pages: pages?.length ? pages : undefined
+  }
 }
 
 // ---------- Figuren (Maskottchen) der Exe ohne Server am selben PC (02.10.2026)
@@ -252,6 +312,7 @@ else {
       item.setSaveDialogOptions({ title: 'Speichern', defaultPath: join(app.getPath('documents'), item.getFilename()) })
     })
     iservKanaele()
+    druckKanaele()
     fenster()
   })
   app.on('window-all-closed', () => app.quit())

@@ -16,8 +16,8 @@ import { randomBytes } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
 import { alleLernenden, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
-import { blaetterFuerLernen } from './arbeitsblaetter'
-import { vokabelListenFuer } from './vokabeln'
+import { blaetterFuerLernen, blattIstFuer } from './arbeitsblaetter'
+import { fachfarbeDerLehrkraft, vokabelListenFuer, zeile as vokZeile } from './vokabeln'
 import { reihenFuerLernen } from './reihen'
 import { fachVon, FAECHER } from '../shared/faecher'
 
@@ -206,15 +206,50 @@ export function lernRaeume(ich: NutzerInfo): FachRaum[] {
   return [...raeume.values()].sort((a, b) => a.fach.localeCompare(b.fach, 'de'))
 }
 
+/**
+ * Fachfarben für das Regal (08.10.2026): je Fach die Farbe der Lehrkraft, die dort zuletzt etwas freigegeben hat –
+ * sonst der Vorschlag. Schlüssel ist der einheitliche Fachname wie in den Lernräumen.
+ */
+export async function regalFarben(ich: NutzerInfo): Promise<Record<string, string>> {
+  const quellen: { fach: string; lehrkraft_id: string; erstellt: string }[] = []
+  for (const v of sicher(() => vokabelListenFuer(ich))) {
+    const z = vokZeile(v.id)
+    if (z) quellen.push({ fach: z.fach, lehrkraft_id: z.lehrkraft_id, erstellt: z.erstellt })
+  }
+  for (const g of sicher(() => grammatikFuer(ich))) {
+    const z = db().prepare('SELECT lehrkraft_id, erstellt FROM gram_zuweisungen WHERE id = ?').get(g.id) as { lehrkraft_id: string; erstellt: string } | undefined
+    if (z) quellen.push({ fach: g.fach, ...z })
+  }
+  for (const z of sicher(
+    () =>
+      (db().prepare("SELECT * FROM blatt_freigaben WHERE reihe = ''").all() as unknown as Parameters<typeof blattIstFuer>[0][]).filter((x) => blattIstFuer(x, ich)) as unknown as {
+        fach: string
+        lehrkraft_id: string
+        erstellt: string
+      }[]
+  ))
+    if (z.fach) quellen.push({ fach: z.fach, lehrkraft_id: z.lehrkraft_id, erstellt: z.erstellt })
+  quellen.sort((a, b) => String(b.erstellt).localeCompare(String(a.erstellt)))
+  const farben: Record<string, string> = {}
+  for (const q of quellen) {
+    const n = fachName(q.fach)
+    if (farben[n]) continue
+    const f = await fachfarbeDerLehrkraft({ fach: q.fach, lehrkraft_id: q.lehrkraft_id } as Parameters<typeof fachfarbeDerLehrkraft>[0]).catch(() => null)
+    if (f) farben[n] = f
+  }
+  return farben
+}
+
 export function lernenRoute(): (k: Anfrage) => Promise<boolean> {
   return async (k) => {
     const { url, req, res, sitzung } = k
-    const schueler = url.pathname === '/s/api/lernen' || url.pathname === '/s/api/tafel'
+    const schueler = url.pathname === '/s/api/lernen' || url.pathname === '/s/api/tafel' || url.pathname === '/s/api/regal/farben'
     const lehrer = url.pathname === '/server/tafeln/freigeben'
     if (!schueler && !lehrer) return false
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const ich = sitzung.nutzer
     if (req.method === 'GET' && url.pathname === '/s/api/lernen') return (json(res, 200, { raeume: lernRaeume(ich) }), true)
+    if (req.method === 'GET' && url.pathname === '/s/api/regal/farben') return (json(res, 200, { farben: await regalFarben(ich) }), true)
     if (req.method === 'GET' && url.pathname === '/s/api/tafel') {
       const z = db()
         .prepare('SELECT * FROM tafel_freigaben WHERE id = ?')
@@ -229,7 +264,8 @@ export function lernenRoute(): (k: Anfrage) => Promise<boolean> {
     const gid = String(k0.lerngruppeId ?? '')
     const g = gid ? lerngruppe(gid) : null
     if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
-    const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
+    // Tafelbilder nur für Konten (Lernraum) – eingetragene Gäste der Lerngruppe (08.10.2026) nicht einzeln wählbar
+    const erlaubt = new Set((g ? mitgliederVon(g).filter((n) => n.quelle !== 'gast') : alleLernenden()).map((n) => n.benutzer))
     const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
     if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
     const bilder = (Array.isArray(k0.bilder) ? k0.bilder : [])

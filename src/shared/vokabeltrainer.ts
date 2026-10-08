@@ -14,6 +14,8 @@
  *    Auswahl → Buchstaben → frei → Lückensatz.
  */
 
+import { apostrophNormal, istApostroph } from './apostroph'
+
 export interface Vokabel {
   id: string
   term: string
@@ -153,7 +155,8 @@ export function ohneAngaben(t: string): string {
 
 /** „to go" → „go", „the dog" → „dog", „(to) play" → „play" */
 export function kernform(t: string): string {
-  return ohneAngaben(t)
+  // Apostroph vorher vereinheitlichen: „l’ école" verliert den Artikel wie „l' école" (08.10.2026)
+  return apostrophNormal(ohneAngaben(t))
     .replace(/\([^)]*\)/g, ' ')
     .replace(/^\s*(to|the|a|an|le|la|les|l'|un|une|el|los|las|il|lo|gli|der|die|das)\s+/i, '')
     .replace(/\s+/g, ' ')
@@ -181,9 +184,9 @@ export function varianten(loesung: string): string[] {
 
 const ohneAkzente = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 const normal = (s: string): string =>
-  s
+  // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
+  apostrophNormal(s)
     .toLowerCase()
-    .replace(/[’`´]/g, "'")
     .replace(/[.!?]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -507,6 +510,11 @@ export function mitLeerzeichen(term: string, gelegt: string): string {
   let aus = ''
   let i = 0
   for (const c of kern) {
+    // Apostrophe sind wie Leerzeichen keine Kacheln, sondern vorbelegt – auch am Wortende („dogs'", 08.10.2026)
+    if (istApostroph(c)) {
+      aus += c
+      continue
+    }
     if (i >= gelegt.length) break
     if (c === ' ') aus += ' '
     else aus += gelegt[i++]
@@ -518,6 +526,6 @@ export function buchstaben(term: string, zufall: () => number = Math.random): st
   const kern = kernform(varianten(term)[0] ?? term)
   return kern
     .split('')
-    .filter((c) => c !== ' ')
+    .filter((c) => c !== ' ' && !istApostroph(c))
     .sort(() => zufall() - 0.5)
 }

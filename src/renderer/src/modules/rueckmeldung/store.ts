@@ -11,7 +11,9 @@ export const rueckmeldungStats = (r: Rueckmeldung): Record<string, unknown> => (
   grade: r.meta.grade,
   thema: r.grundlage.titel,
   abgaben: r.abgaben.length,
-  fertig: r.abgaben.filter((a) => a.bogen).length
+  fertig: r.abgaben.filter((a) => a.bogen).length,
+  // Aus welchem Material (08.10.2026): „Rückmeldung …" im Editor findet so die vorhandene (vorgabe.ts)
+  ...(r.grundlage.art !== 'frei' && r.grundlage.docId ? { quelleArt: r.grundlage.art, quelleId: r.grundlage.docId } : {})
 })
 
 export const bibliothek = erzeugeBibliothek({

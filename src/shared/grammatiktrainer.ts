@@ -13,6 +13,7 @@
 import { abstand, type Urteil } from './vokabeltrainer'
 import { bereinigeVerbKarten, type VerbKarte } from './verbTraining'
 import { istVerbSprache, type VerbSprache } from './verben'
+import { APOSTROPHE } from './apostroph'
 
 export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau' | 'bestimmen' | 'mehrfach' | 'tabelle' | 'uebersetzen'
 
@@ -253,7 +254,8 @@ export const ohneLaengen = (s: string): string =>
 export function normiert(s: string): string {
   return ohneLaengen(s)
     .normalize('NFC')
-    .replace(/[’‘`´]/g, "'")
+    // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
+    .replace(APOSTROPHE, "'")
     .replace(/[“”„]/g, '"')
     .replace(/\s+/g, ' ')
     .replace(/\s*([.,!?;:])\s*$/g, '')

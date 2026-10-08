@@ -10,6 +10,7 @@
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -33,9 +34,10 @@ import {
   TextInput,
   Textarea,
   Title,
+  Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconArrowLeft, IconPlus, IconQrcode, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconQrcode, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { type GrammatikPaket } from '@shared/grammatiktrainer'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
@@ -781,21 +783,35 @@ export function Lernstand({ id, zurueck, imFenster }: { id: string; zurueck: () 
           </Text>
           <Stack gap={4}>
             {d.problem.map((p) => (
-              <Text key={p.id} size="sm">
-                <Badge size="xs" variant="light" mr={6}>
-                  {Math.round(p.quote * 100)} %
-                </Badge>
-                {p.satz}{' '}
-                <Text span c="teal">
-                  → {p.loesung}
-                </Text>
-                {p.typisch.length > 0 && (
-                  <Text span c="dimmed">
-                    {' '}
-                    · oft: {p.typisch.join(', ')}
+              <Group key={p.id} gap="xs" wrap="nowrap" justify="space-between" data-problem-aufgabe={p.id}>
+                <Text size="sm">
+                  <Badge size="xs" variant="light" mr={6}>
+                    {Math.round(p.quote * 100)} %
+                  </Badge>
+                  {p.satz}{' '}
+                  <Text span c="teal">
+                    → {p.loesung}
                   </Text>
-                )}
-              </Text>
+                  {p.typisch.length > 0 && (
+                    <Text span c="dimmed">
+                      {' '}
+                      · oft: {p.typisch.join(', ')}
+                    </Text>
+                  )}
+                </Text>
+                {/* Aus der Liste nehmen (08.10.2026): kommt wieder, wenn die Aufgabe neue Fehler bekommt */}
+                <Tooltip label="Aus der Liste nehmen – kommt wieder, wenn neue Fehler dazukommen">
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    onClick={() => void senden(`/server/grammatik/${id}/problem-aus`, { id: p.id }).then(laden, (e: unknown) => notifyError(e))}
+                    aria-label="Aus der Liste nehmen"
+                    data-problem-aus={p.id}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
             ))}
           </Stack>
         </Card>

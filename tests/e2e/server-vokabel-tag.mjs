@@ -222,6 +222,8 @@ try {
   )
 
   // ---------- Startseite: motivierender Stand und ob heute noch etwas zu tun ist
+  // Bisherige Liste/Türen (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
+  await ctx.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   await s.goto(`${A}/s/`)
   pruefe(await da(s.locator('[data-heute-offen="15"]', { hasText: 'Heute noch 15 Wörter' })), '„Heute noch 15 Wörter üben" auf der Startseite')
   pruefe(await da(s.getByText(/heute geübt: 10 · 10 von 32 kennengelernt · 0 sicher/)), '„heute geübt: 10 · 10 von 32 kennengelernt · 0 sicher"')

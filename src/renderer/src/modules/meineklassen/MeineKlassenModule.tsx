@@ -108,6 +108,8 @@ interface KlasseDetail {
     id: string
     name: string
     benutzer: string
+    /** Gast mit persönlichem Anmeldecode (Vokabeltraining), der Klasse zugeordnet (08.10.2026) */
+    gast?: boolean
     vokabelnSicher: number | null
     grammatikSicher?: number | null
     zuletztGeuebt: string | null
@@ -1051,7 +1053,14 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
       <Table.Tbody>
         {zeilen.map((l) => (
           <Table.Tr key={l.id}>
-            <Table.Td fw={600}>{l.name}</Table.Td>
+            <Table.Td fw={600}>
+              {l.name}
+              {l.gast && (
+                <Badge size="xs" variant="light" color="gray" ml={6} data-mit-anmeldecode title="Meldet sich mit dem persönlichen Code vom Zettel an">
+                  mit Anmeldecode
+                </Badge>
+              )}
+            </Table.Td>
             {zeigtVokabeln && (
               <Table.Td>
                 <Anteil x={l.vokabelnSicher} />

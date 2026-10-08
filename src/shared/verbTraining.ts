@@ -8,6 +8,7 @@
  */
 import { grundformVon, varianten, VERB_SPALTEN, type VerbEintrag, type VerbSprache } from './verben'
 import type { GrammatikAufgabe } from './grammatiktrainer'
+import { APOSTROPHE } from './apostroph'
 
 export interface VerbKarte {
   id: string
@@ -116,7 +117,8 @@ const norm = (s: string): string =>
     .normalize('NFD')
     .replace(/[̄̆]/g, '')
     .normalize('NFC')
-    .replace(/[’‘`´]/g, "'")
+    // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
+    .replace(APOSTROPHE, "'")
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
