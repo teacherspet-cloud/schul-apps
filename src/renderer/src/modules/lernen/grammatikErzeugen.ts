@@ -45,9 +45,15 @@ const LATEIN_FELDER = {
   )
 }
 
-const aufgabeSchema = (latein: boolean): Record<string, unknown> =>
+/** Felder der Extra-Aufgaben (Förder/Forder, 08.10.2026) */
+const EXTRA_FELDER = {
+  stufe: { type: 'integer', enum: [1, 2, 3], description: 'Förderaufgaben: 1 erkennen, 2 gelenkt bilden, 3 selbst bilden; Forderaufgaben: 3' },
+  tipp: S('kleine Hilfe vor der Antwort auf Deutsch – verrät die Lösung NICHT')
+}
+
+const aufgabeSchema = (latein: boolean, extra = false): Record<string, unknown> =>
   O({
-    art: { type: 'string', enum: latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
+    art: { type: 'string', enum: latein ? ARTEN_LATEIN : extra ? [...ARTEN_ALLGEMEIN, 'uebersetzen'] : ARTEN_ALLGEMEIN },
     regelId: S('Kennung der Regelkarte, zu der die Aufgabe gehört'),
     anweisung: S('kurze Arbeitsanweisung auf Deutsch, z. B. „Setze die richtige Form ein."'),
     satz: S(
@@ -62,20 +68,22 @@ const aufgabeSchema = (latein: boolean): Record<string, unknown> =>
     fehlerWort: S('fehler: das falsche Wort GENAU wie im Satz; sonst leer'),
     teile: A(S(), 'satzbau: die Wörter bzw. Satzteile in RICHTIGER Reihenfolge (4–9 Teile); sonst leer'),
     erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form'),
-    ...(latein ? LATEIN_FELDER : {})
+    ...(latein ? LATEIN_FELDER : {}),
+    ...(extra ? EXTRA_FELDER : {})
   })
 
-const paketSchema = (latein: boolean): Record<string, unknown> =>
+const paketSchema = (latein: boolean, extra = false): Record<string, unknown> =>
   O({
     regeln: A(
       O({
         id: S('r1, r2 …'),
         titel: S('kurzer Titel der Regel'),
         erklaerung: S('2–4 Sätze auf Deutsch, altersgerecht'),
-        beispiele: A(S(), '2–3 Beispielsätze in der Zielsprache')
+        beispiele: A(S(), '2–3 Beispielsätze in der Zielsprache'),
+        ...(extra ? { stolperfallen: A(S(), 'Förderaufgaben: 2–3 typische Stolperfallen (aus den Fehlern), je ein kurzer Satz auf Deutsch; sonst leer') } : {})
       })
     ),
-    aufgaben: A(aufgabeSchema(latein))
+    aufgaben: A(aufgabeSchema(latein, extra))
   })
 
 export interface GrammatikAuftrag {
@@ -92,6 +100,45 @@ export interface GrammatikAuftrag {
   woerter?: string[]
   /** Woher der Wortschatz stammt (für den Prompt), z. B. „Pontes, bis Lektion 12" */
   wortQuelle?: string
+  /**
+   * Förder-/Forderaufgaben für ein Kind (08.10.2026, abgestimmt). Ohne Namen: nur die Regeln, die falschen Antworten
+   * mit der richtigen Lösung und die bekannte Grammatik.
+   */
+  extra?: {
+    art: 'foerder' | 'forder'
+    regeln: { titel: string; erklaerung: string; beispiele: string[] }[]
+    fehler: { antwort: string; richtig: string }[]
+    bekannt: string[]
+  }
+}
+
+/** Auftragstext der Extra-Aufgaben */
+function extraAuftrag(e: NonNullable<GrammatikAuftrag['extra']>): { system: string; user: string } {
+  const regeln = e.regeln.map((r) => `- ${r.titel}: ${r.erklaerung}${r.beispiele.length ? ` (z. B. ${r.beispiele.slice(0, 2).join('; ')})` : ''}`).join('\n')
+  if (e.art === 'foerder')
+    return {
+      system: [
+        'Du erstellst FÖRDERAUFGABEN für ein einzelnes Kind, das mit einer Grammatikregel noch Schwierigkeiten hat.',
+        'Regelkarte: GENAU EINE vereinfachte Regelkarte (kurze Sätze, ein Merksatz, 2–3 sehr einfache Beispiele) und „stolperfallen": 2–3 typische Fehler, wie sie in den Antworten des Kindes vorkommen – jeweils was falsch ist und wie es richtig geht.',
+        'Aufgaben: genau 10 in drei Stufen, vom Leichten zum Schweren:',
+        '- stufe 1 (3 Aufgaben): erkennen – Auswahl und Fehler finden;',
+        '- stufe 2 (4 Aufgaben): gelenkt bilden – Lücke mit Grundform in „vorgabe";',
+        '- stufe 3 (3 Aufgaben): selbst bilden – Umformen und Satzbau.',
+        'Jede Aufgabe hat einen „tipp" (Denkanstoß auf Deutsch, verrät die Lösung nicht) und eine kurze „erklaerung". Die typischen Fehler des Kindes gezielt aufgreifen. Einfacher Wortschatz.'
+      ].join('\n'),
+      user: `Regel(n), mit denen das Kind Schwierigkeiten hat:\n${regeln}\n\nFalsche Antworten des Kindes (→ richtig):\n${
+        e.fehler.map((f) => `„${f.antwort}" → „${f.richtig}"`).join('\n') || '(keine Texte gespeichert)'
+      }`
+    }
+  return {
+    system: [
+      'Du erstellst FORDERAUFGABEN für ein einzelnes Kind, das eine Grammatikregel schon sicher kann.',
+      'Regelkarte: GENAU EINE kurze Karte „Weiterdenken" (worauf es bei schwierigeren Fällen ankommt), 2 Beispiele; stolperfallen leer.',
+      'Aufgaben: genau 8 anspruchsvollere Aufgaben (stufe 3), Transfer und Mischung: die sichere Regel gemischt mit anderer BEKANNTER Grammatik, Übersetzen (Deutsch → Zielsprache: satz = deutscher Satz, loesungen = alle richtigen Übersetzungen), Fehler finden in längeren Sätzen, Umformungen mit mehreren Schritten.',
+      'NUR Grammatik aus der Liste „bekannt" verwenden – nichts, was noch nicht behandelt wurde. „tipp" darf leer bleiben.'
+    ].join('\n'),
+    user: `Sicher beherrschte Regel(n):\n${regeln}\n\nBekannte Grammatik (darf vorkommen): ${e.bekannt.join('; ') || 'nur die Regel(n) oben'}`
+  }
 }
 
 const istLatein = (a: GrammatikAuftrag): boolean => a.sprache === 'la' || /latein/i.test(a.fach)
@@ -120,14 +167,19 @@ export const LATEIN_REGELN = [
 
 export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
   const latein = istLatein(a)
-  melde('Die KI schreibt Regelkarten und Aufgaben …')
+  const extra = a.extra ? extraAuftrag(a.extra) : null
+  melde(extra ? 'Die KI schreibt die Extra-Aufgaben …' : 'Die KI schreibt Regelkarten und Aufgaben …')
   const roh = await ai<{ regeln: unknown[]; aufgaben: unknown[] }>({
     schemaName: 'grammatik_pool',
     system: [
       `Du erstellst einen Aufgabenpool für eine Grammatik-Lern-App (${a.fach}, Klasse ${a.jahrgang}${a.niveau ? `, Niveau ${a.niveau}` : ''}).`,
       'Die Lernenden üben selbstständig im Karteikasten-Prinzip; jede Aufgabe muss für sich allein verständlich und EINDEUTIG lösbar sein.',
-      'Regelkarten: 2–4 kurze Regeln zum Thema (bei mehreren Themen je Thema 1–3, zusammen höchstens 8), Erklärung auf Deutsch, altersgerecht, mit 2–3 Beispielen in der Zielsprache.',
-      latein
+      extra
+        ? extra.system
+        : 'Regelkarten: 2–4 kurze Regeln zum Thema (bei mehreren Themen je Thema 1–3, zusammen höchstens 8), Erklärung auf Deutsch, altersgerecht, mit 2–3 Beispielen in der Zielsprache.',
+      extra
+        ? ''
+        : latein
         ? 'Aufgaben: genau 40, gemischt – etwa 10 Bestimmen, 4 Mehrfachauswahl, 4 Tabelle, 8 Umformen (davon 3 KNG-Kongruenz), 6 Lücke, 4 Übersetzen, 4 Auswahl. Alle Regeln abdecken, vom Leichten zum Schweren.'
         : 'Aufgaben: genau 40, gemischt – etwa 12 Lücke, 8 Auswahl, 8 Umformen, 6 Fehler finden, 6 Satzbau. Alle Regeln abdecken, vom Leichten zum Schweren.',
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
@@ -144,16 +196,19 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
     ]
       .filter(Boolean)
       .join('\n'),
-    user: `${
-      a.thema.includes(' · ')
-        ? `Themen (gemischt üben, Aufgaben gleichmäßig verteilen; Regelkarten zu jedem Thema): ${a.thema.split(' · ').join('; ')}`
-        : `Thema: ${a.thema}`
-    }\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
-      a.teilformen
-        ? `\n\n${a.teilformen}\nVerteile die Aufgaben auf die Teilformen zum Bilden; Teilformen „nur erkennen" nur in Auswahl- und Fehler-Aufgaben.`
-        : ''
-    }`,
-    schema: paketSchema(latein)
+    user: extra
+      ? `${extra.user}
+Zielsprache: ${a.sprache}`
+      : `${
+          a.thema.includes(' · ')
+            ? `Themen (gemischt üben, Aufgaben gleichmäßig verteilen; Regelkarten zu jedem Thema): ${a.thema.split(' · ').join('; ')}`
+            : `Thema: ${a.thema}`
+        }\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
+          a.teilformen
+            ? `\n\n${a.teilformen}\nVerteile die Aufgaben auf die Teilformen zum Bilden; Teilformen „nur erkennen" nur in Auswahl- und Fehler-Aufgaben.`
+            : ''
+        }`,
+    schema: paketSchema(latein, Boolean(extra))
   })
   let paket = paketBereinigt(roh, a.thema)
   melde(`Die KI prüft ${paket.aufgaben.length} Aufgaben …`)
@@ -229,7 +284,9 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
               ...(x.art === 'fehler' && u.fehlerWort ? { fehlerWort: u.fehlerWort } : {}),
               ...(x.art === 'mehrfach' && u.optionen?.length ? { optionen: u.optionen } : {}),
               // Nur übernehmen, wenn jede Lesart je Merkmal einen Wert hat (Praxislauf 07.10.2026: „1. Sg." zusammengezogen)
-              ...(x.art === 'bestimmen' && u.lesarten?.length && u.lesarten.every((l) => l.length === (x.merkmale?.length ?? 0)) ? { lesarten: u.lesarten } : {}),
+              ...(x.art === 'bestimmen' && u.lesarten?.length && u.lesarten.every((l) => l.length === (x.merkmale?.length ?? 0))
+                ? { lesarten: u.lesarten }
+                : {}),
               ...(x.art === 'tabelle' && u.zellen?.length && x.zeilen
                 ? { zeilen: x.zeilen.map((z, j) => ({ ...z, loesungen: u.zellen![j]?.length === z.loesungen.length ? u.zellen![j] : z.loesungen })) }
                 : {})

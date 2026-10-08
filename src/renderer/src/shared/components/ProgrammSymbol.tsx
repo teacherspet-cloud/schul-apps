@@ -50,6 +50,7 @@ export type ProgrammSymbolForm =
   | 'laufendereihen'
   | 'vokabeltraining'
   | 'grammatiktraining'
+  | 'sprachenlernen'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -221,6 +222,15 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
       { d: 'M3 16.5H16V19.5H3Z', art: 'akzent' }
     ],
     vorn: [{ d: 'M20 3V9M20 3.5H23L22 5L23 6.5H20', art: 'strich', breite: 1.5 }]
+  },
+  // Sprachenlernen (08.10.2026): Karteikasten, vorne eine Sprechblase (Vokabeln und Grammatik in einer App)
+  sprachenlernen: {
+    hinten: [
+      { d: 'M3 10H17V20H3Z', art: 'strich' },
+      { d: 'M5 6H15V10H5Z', art: 'akzent' },
+      { d: 'M7 14H13', art: 'strich', breite: 1.5 }
+    ],
+    vorn: [{ d: 'M14 12H23V18H19L16.5 20.5V18H14Z', art: 'strich', breite: 1.5 }]
   },
   // Vokabeltraining (03.10.2026): Karteikasten mit Karten, vorne ein Haken
   vokabeltraining: {

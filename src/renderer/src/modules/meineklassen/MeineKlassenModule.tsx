@@ -24,6 +24,7 @@ import {
   Modal,
   Popover,
   Progress,
+  Select,
   SimpleGrid,
   Stack,
   Table,
@@ -464,6 +465,52 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
   )
 }
 
+/**
+ * Lehrwerk-Stand der Lerngruppe (08.10.2026, abgestimmt): bestimmt, welche Grammatik als bekannt gilt (passende Spiele,
+ * Forderaufgaben). Ohne Eintrag gilt die höchste Unit aus den Vokabeltrainings der Lernenden.
+ */
+function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | null {
+  const [d, setD] = useState<{ stand: { buch: string; unit: string } | null; baende: Record<string, string[]> } | null>(null)
+  const laden = useCallback(
+    () => void holen<typeof d>(`/server/grammatik/lehrwerkstand?gruppe=${encodeURIComponent(gruppeId)}`).then(setD, () => setD(null)),
+    [gruppeId]
+  )
+  useEffect(laden, [laden])
+  if (!d) return null
+  const setzen = (buch: string | null, unit: string | null): void =>
+    void senden('/server/grammatik/lehrwerkstand', { gruppe: gruppeId, buch: buch ?? '', unit: unit ?? '' }).then(laden, (e: unknown) => notifyError(e))
+  const buch = d.stand?.buch ?? null
+  return (
+    <Card withBorder padding="sm" radius="md" data-lehrwerk-stand>
+      <Text fw={700} size="sm">
+        Lehrwerk-Stand (Grammatik)
+      </Text>
+      <Text size="xs" c="dimmed" mb={6}>
+        Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Leer: automatisch aus den Vokabeln der Lernenden.
+      </Text>
+      <Group grow>
+        <Select
+          label="Band"
+          data={Object.keys(d.baende)}
+          value={buch}
+          onChange={(b) => (b ? setzen(b, d.baende[b][0] ?? '') : setzen(null, null))}
+          clearable
+          placeholder="automatisch"
+          data-lehrwerk-band
+        />
+        <Select
+          label="Unit"
+          data={buch ? d.baende[buch] ?? [] : []}
+          value={d.stand?.unit ?? null}
+          onChange={(u) => buch && u && setzen(buch, u)}
+          disabled={!buch}
+          data-lehrwerk-unit
+        />
+      </Group>
+    </Card>
+  )
+}
+
 function FachAnsicht({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
@@ -602,6 +649,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           <Tabs.Panel value="vokabeln" pt="sm">
             <Stack gap="xs">
               <MaterialListe eintraege={vokabelEintraege(d, ort)} leer="Noch kein Vokabel- oder Grammatiktraining in dieser Lerngruppe." />
+              <LehrwerkStand gruppeId={id} />
               {d.wackelig.length > 0 && (
                 <Card withBorder padding="sm" radius="md">
                   <Text fw={700} size="sm" mb={6}>
@@ -811,11 +859,11 @@ function vokabelEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
         ]}
         wert={v.sicherSchnitt}
         wertText={`${prozent(v.sicherSchnitt)} sicher`}
-        oeffnen={() => oeffneMitRueckweg('vokabeltraining', v.id)}
+        oeffnen={() => oeffneMitRueckweg('sprachenlernen', v.id)}
         aktionen={
           <>
             <AblegenKnopf quelle={vokabelQuelle(v.id, v.titel)} {...ort} programm="vokabelliste" klein />
-            {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('vokabeltraining', v.id))}
+            {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('sprachenlernen', v.id))}
           </>
         }
         details={

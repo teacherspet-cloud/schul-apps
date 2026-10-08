@@ -26,8 +26,19 @@ import { json, setzeSitzungsCookie, type Anfrage } from './http'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
-import { lernendeVon as vokLernende, ueberschriftVon, vokIstFuer, zeile as vokZeile } from './vokabeln'
+import {
+  kursGastAufnehmen,
+  kursHaken,
+  lernendeVon as vokLernende,
+  ueberschriftVon,
+  vokabelListenFuer,
+  vokabelnZuweisen,
+  vokIstFuer,
+  vokStatusSetzen,
+  zeile as vokZeile
+} from './vokabeln'
 import { registerVergessen } from './namensschutz'
+import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -52,6 +63,12 @@ CREATE TABLE IF NOT EXISTS gram_stand (
   aktualisiert INTEGER NOT NULL,
   PRIMARY KEY (zuweisung_id, schueler_id)
 );
+CREATE TABLE IF NOT EXISTS lehrwerk_stand (
+  lerngruppe_id TEXT PRIMARY KEY,
+  lehrkraft_id TEXT NOT NULL,
+  buch TEXT NOT NULL,
+  unit TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gram_gaeste (
   zuweisung_id TEXT NOT NULL REFERENCES gram_zuweisungen(id) ON DELETE CASCADE,
   nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
@@ -67,6 +84,10 @@ const db = () => {
     // Fest mit einem Vokabeltraining verbunden (08.10.2026, abgestimmt): gilt für genau dessen Lernende
     const spalten = new Set((d.prepare('PRAGMA table_info(gram_zuweisungen)').all() as { name: string }[]).map((s) => s.name))
     if (!spalten.has('vok_id')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN vok_id TEXT NOT NULL DEFAULT ''")
+    // Sprachenlernen (08.10.2026): Art ('' normal, 'foerder'/'forder' = Extra für einzelne) und Angaben der Freigabe
+    // (Themen, Teilformen, Klasse, Lehrwerk) – für bekannte Grammatik und passende Spiele
+    if (!spalten.has('art')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN art TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('info')) d.exec("ALTER TABLE gram_zuweisungen ADD COLUMN info TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -98,6 +119,107 @@ interface Zeile {
   bis: number | null
   /** Verbundenes Vokabeltraining (08.10.2026) */
   vok_id?: string
+  /** '' = Grammatik des Kurses; 'foerder'/'forder' = Extra für einzelne Lernende (08.10.2026) */
+  art?: string
+  /** JSON GrammatikInfo */
+  info?: string
+}
+
+/** Angaben der Freigabe (08.10.2026) */
+export interface GrammatikInfo {
+  themen: string[]
+  teilformen: string[]
+  jahrgang?: number
+  lehrwerk?: { buch?: string; unit?: string }
+  /** Extra: die Regeln, für die sie gedacht sind */
+  fuerRegeln?: string[]
+}
+export function infoBereinigt(roh: unknown): GrammatikInfo {
+  const r = (roh ?? {}) as Record<string, unknown>
+  const liste = (x: unknown, n: number): string[] =>
+    Array.isArray(x)
+      ? x
+          .map(String)
+          .filter((s) => s.length <= 120)
+          .slice(0, n)
+      : []
+  const lw = (r.lehrwerk ?? {}) as Record<string, unknown>
+  return {
+    themen: liste(r.themen, 40),
+    teilformen: liste(r.teilformen, 120),
+    ...(Number.isFinite(Number(r.jahrgang)) && Number(r.jahrgang) >= 1 && Number(r.jahrgang) <= 13 ? { jahrgang: Math.round(Number(r.jahrgang)) } : {}),
+    ...(typeof lw.buch === 'string' && lw.buch
+      ? { lehrwerk: { buch: lw.buch.slice(0, 80), ...(typeof lw.unit === 'string' ? { unit: lw.unit.slice(0, 80) } : {}) } }
+      : {}),
+    ...(liste(r.fuerRegeln, 6).length ? { fuerRegeln: liste(r.fuerRegeln, 6) } : {})
+  }
+}
+const infoVon = (z: Zeile): GrammatikInfo => infoBereinigt(json_(z.info, {}))
+const istExtra = (z: Pick<Zeile, 'art'>): boolean => z.art === 'foerder' || z.art === 'forder'
+
+// ---------------------------------------------------------------- Bekannte Grammatik (08.10.2026, abgestimmt)
+
+const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+/** Band der Grammatikliste zu einer Lehrwerk-Kennung oder einem Namen („green-line-1-nds" → „Green Line 1") */
+export function grammatikBand(lehrwerk: string): string | undefined {
+  const n = norm(lehrwerk)
+  return Object.keys(LEHRWERK_GRAMMATIK)
+    .filter((b) => n.startsWith(norm(b)))
+    .sort((a, b) => b.length - a.length)[0]
+}
+/** Lehrwerk-Stand einer Lerngruppe, von der Lehrkraft in „Meine Klassen" gesetzt */
+export const lehrwerkStandVon = (lerngruppeId: string): { buch: string; unit: string } | null =>
+  (db().prepare('SELECT buch, unit FROM lehrwerk_stand WHERE lerngruppe_id = ?').get(lerngruppeId) as { buch: string; unit: string } | undefined) ?? null
+
+/** Katalog-Kennungen bis zu einer Unit (alles aus früheren Bänden und Units, dazu die Unit selbst) */
+export function bisUnit(buch: string, unit: string): string[] {
+  const baende = Object.keys(LEHRWERK_GRAMMATIK)
+  const i = baende.indexOf(buch)
+  if (i < 0) return []
+  const kapitel = Object.keys(LEHRWERK_GRAMMATIK[buch])
+  const fruehere = baende.slice(0, i).map((b) => ({ buch: b, kapitel: Object.keys(LEHRWERK_GRAMMATIK[b]) }))
+  const { bekannt, neu } = bekannteGrammatik(kapitel, buch, unit, undefined, fruehere)
+  return [...bekannt, ...neu].flatMap((p) => p.t)
+}
+
+/**
+ * Was ein Kind an Grammatik kennt: Lehrwerk-Stand (Lerngruppe, sonst die höchste Unit seiner Vokabeltrainings) plus die
+ * Themen freigegebener Grammatik. Ohne fein erfasstes Lehrwerk (z. B. Latein) bleibt nur das Freigegebene.
+ * Ergebnis: Themen- und Teilform-Kennungen, Themen auch ohne Teilform („en.verb.past_simple").
+ */
+export function bekannteGrammatikFuer(ich: NutzerInfo): string[] {
+  const kennungen = new Set<string>()
+  const plus = (t: string): void => {
+    kennungen.add(t)
+    kennungen.add(t.split('/')[0])
+  }
+  // 1. Lehrwerk-Stand: von Hand gesetzt (Lerngruppe), sonst aus den Vokabeln
+  const stand: { buch: string; unit: string }[] = []
+  const gruppen = (db().prepare('SELECT lerngruppe_id FROM lehrwerk_stand').all() as { lerngruppe_id: string }[])
+    .map((g) => lerngruppe(g.lerngruppe_id))
+    .filter((g): g is NonNullable<typeof g> => Boolean(g && gehoertZu(g, ich)))
+  for (const g of gruppen) {
+    const s = lehrwerkStandVon(g.id)
+    if (s) stand.push(s)
+  }
+  if (!stand.length) {
+    let best: { buch: string; unit: string; rang: number } | null = null
+    for (const v of vokabelListenFuer(ich)) {
+      const q = json_(vokZeile(v.id)?.quelle ?? '', {} as { lehrwerk?: string; unit?: string })
+      const buch = q.lehrwerk ? grammatikBand(q.lehrwerk) : undefined
+      if (!buch || !q.unit) continue
+      const rang = Object.keys(LEHRWERK_GRAMMATIK).indexOf(buch) * 100 + Object.keys(LEHRWERK_GRAMMATIK[buch]).indexOf(q.unit)
+      if (!best || rang > best.rang) best = { buch, unit: q.unit, rang }
+    }
+    if (best) stand.push(best)
+  }
+  for (const s of stand) for (const t of bisUnit(s.buch, s.unit)) plus(t)
+  // 2. Freigegebene Grammatik
+  for (const z of (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[]).filter((z) => istFuer(z, ich))) {
+    const i = infoVon(z)
+    for (const t of [...i.themen, ...i.teilformen]) plus(t)
+  }
+  return [...kennungen].sort()
 }
 
 /** Das verbundene Vokabeltraining (falls es noch existiert) */
@@ -139,7 +261,7 @@ const hashVon = (s: string): string =>
     .update(s.toUpperCase().replace(/[^A-Z0-9]/g, ''))
     .digest('hex')
 const nachCode = (code: string): Zeile | null =>
-  code ? ((db().prepare("SELECT * FROM gram_zuweisungen WHERE code = ? AND code != ''").get(code.toUpperCase()) as Zeile | undefined) ?? null) : null
+  code ? (db().prepare("SELECT * FROM gram_zuweisungen WHERE code = ? AND code != ''").get(code.toUpperCase()) as Zeile | undefined) ?? null : null
 const gaesteVon = (zid: string): NutzerInfo[] =>
   (db().prepare('SELECT nutzer_id FROM gram_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
     .map((g) => nutzerNachId(g.nutzer_id))
@@ -150,6 +272,8 @@ const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(12
 function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (ich.rolle !== 'schueler') return false
   if (db().prepare('SELECT 1 FROM gram_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
+  // Extra (Förder/Forder, 08.10.2026): nur für die gewählten Lernenden, nicht für den ganzen Kurs
+  if (istExtra(z)) return ich.quelle !== 'gast' && json_(z.schueler, [] as string[]).includes(ich.benutzer)
   // Verbunden mit einem Vokabeltraining: wer dort lernt (auch eingetragene Gäste), hat auch diese Grammatik
   const v = vokVon(z)
   if (v && vokIstFuer(v, ich)) return true
@@ -163,12 +287,17 @@ function istFuer(z: Zeile, ich: NutzerInfo): boolean {
 
 function lernendeVon(z: Zeile): NutzerInfo[] {
   const nur = json_(z.schueler, [] as string[])
+  if (istExtra(z)) {
+    const feste = alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.includes(n.benutzer))
+    const ids = new Set(feste.map((n) => n.id))
+    return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
+  }
   const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
   const feste = !z.lerngruppe_id
     ? alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.includes(n.benutzer))
     : g
-      ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
-      : []
+    ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
+    : []
   const v = vokVon(z)
   if (v) {
     // Lernende des verbundenen Vokabeltrainings – zusätzlich zu den bisherigen Empfängern
@@ -182,11 +311,155 @@ function lernendeVon(z: Zeile): NutzerInfo[] {
 const karten = (p: GrammatikPaket): Vokabel[] => alsKarten(p.aufgaben) as Vokabel[]
 
 /** Für den Lernraum der Lernenden */
-export function grammatikFuer(ich: NutzerInfo): { id: string; titel: string; fach: string; uebersicht: ReturnType<typeof uebersicht> }[] {
-  return (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
-    .filter((z) => istOffen(z) && istFuer(z, ich))
-    .map((z) => ({ id: z.id, titel: z.titel, fach: z.fach, uebersicht: uebersicht(karten(paketVon(z)), standVon(z.id, ich.id).aufgaben) }))
+export function grammatikFuer(ich: NutzerInfo): {
+  id: string
+  titel: string
+  fach: string
+  extra: boolean
+  uebersicht: ReturnType<typeof uebersicht> & { unbearbeitet: number }
+}[] {
+  return (
+    (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
+      .filter((z) => istOffen(z) && istFuer(z, ich))
+      .map((z) => {
+        const kk = karten(paketVon(z))
+        const st = standVon(z.id, ich.id).aufgaben
+        return {
+          id: z.id,
+          // Extra heißt bei den Lernenden „Extra für dich: …" – ohne Etikett Förder/Forder (abgestimmt)
+          titel: istExtra(z) ? `Extra für dich: ${z.thema || z.titel}` : z.titel,
+          fach: z.fach,
+          extra: istExtra(z),
+          // Startkarte (08.10.2026): „Noch 23 von 40 Übungen nicht bearbeitet"
+          uebersicht: { ...uebersicht(kk, st), unbearbeitet: kk.filter((k) => !st[k.id]?.versuche).length }
+        }
+      })
+      // Extra zuerst
+      .sort((a, b) => Number(b.extra) - Number(a.extra))
+  )
 }
+
+/**
+ * Sprachenlernen (08.10.2026): Grammatiktrainings ohne Kurs werden einmalig zu Kursen ohne Vokabeln – mit ihren
+ * Empfängern, Gästen, Code und Zeitraum. Danach hängt die Grammatik über `vok_id` am Kurs.
+ */
+export function grammatikKurseAnlegen(lehrkraftId: string): void {
+  const ohne = db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = '' AND art = ''").all(lehrkraftId) as unknown as Zeile[]
+  for (const z of ohne) {
+    const vid = vokabelnZuweisen({
+      lehrkraftId,
+      lerngruppeId: z.lerngruppe_id,
+      schueler: json_(z.schueler, [] as string[]),
+      titel: z.titel,
+      sprache: z.sprache,
+      fach: z.fach,
+      woerter: [],
+      leer: true,
+      gaeste: Boolean(z.code),
+      bis: z.bis
+    })
+    for (const g of db().prepare('SELECT nutzer_id, wieder FROM gram_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string; wieder: string }[])
+      kursGastAufnehmen(vid, g.nutzer_id, g.wieder)
+    db().prepare('UPDATE gram_zuweisungen SET vok_id = ? WHERE id = ?').run(vid, z.id)
+    if (!istOffen(z)) vokStatusSetzen(vid, 'beendet')
+  }
+}
+// ---------------------------------------------------------------- Stärken und Schwächen (08.10.2026, abgestimmt)
+
+export interface ProfilPunkt {
+  /** Regel (über Pakete hinweg nach Titel zusammengefasst) */
+  titel: string
+  erklaerung: string
+  beispiele: string[]
+  versuche: number
+  /** Anteil richtig (0–1) */
+  quote: number
+  /** Letzte falsche Antworten mit der richtigen Lösung – Grundlage der Förderaufgaben (ohne Namen) */
+  fehler: { antwort: string; richtig: string }[]
+  /** Themen der Freigaben, aus denen die Regel stammt */
+  themen: string[]
+}
+export interface GrammatikProfil {
+  staerken: ProfilPunkt[]
+  schwaechen: ProfilPunkt[]
+  extra: { id: string; art: string; titel: string; bearbeitet: number; gesamt: number; status: string }[]
+}
+
+/** Schwellen (abgestimmt): Schwäche ab 5 Versuchen unter 60 % richtig; Stärke ab 5 Versuchen mit 85 % und Fach ≥ 3 */
+export const SCHWAECHE_UNTER = 0.6
+export const STAERKE_AB = 0.85
+export const MIN_VERSUCHE = 5
+
+/**
+ * Stärken und Schwächen einer Person in Grammatik einer Sprache – ohne KI aus den Antworten: je Regel aller
+ * Grammatik dieser Lehrkraft, die die Person hat (Extra-Aufgaben eingeschlossen).
+ */
+export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: string): GrammatikProfil {
+  const zs = (db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ?').all(lehrkraftId, sprache) as unknown as Zeile[]).filter(
+    (z) => istFuer(z, n)
+  )
+  const jeRegel = new Map<string, ProfilPunkt & { fachSumme: number; geuebt: number }>()
+  const extra: GrammatikProfil['extra'] = []
+  for (const z of zs) {
+    const p = paketVon(z)
+    const st = standVon(z.id, n.id).aufgaben
+    if (istExtra(z))
+      extra.push({
+        id: z.id,
+        art: z.art ?? '',
+        titel: z.thema || z.titel,
+        bearbeitet: p.aufgaben.filter((a) => st[a.id]?.versuche).length,
+        gesamt: p.aufgaben.length,
+        status: istOffen(z) ? 'offen' : 'beendet'
+      })
+    for (const r of p.regeln) {
+      const schluessel = norm(r.titel)
+      const e = jeRegel.get(schluessel) ?? {
+        titel: r.titel,
+        erklaerung: r.erklaerung,
+        beispiele: r.beispiele,
+        versuche: 0,
+        quote: 0,
+        fehler: [],
+        themen: [],
+        fachSumme: 0,
+        geuebt: 0
+      }
+      let richtig = e.quote * e.versuche
+      for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
+        const s = st[a.id]
+        if (!s?.versuche) continue
+        e.versuche += s.versuche
+        richtig += s.versuche - s.falsch
+        e.fachSumme += s.fach
+        e.geuebt++
+        for (const t of s.fehlerTexte ?? []) e.fehler.push({ antwort: t, richtig: a.loesungen[0] ?? '' })
+      }
+      e.quote = e.versuche ? richtig / e.versuche : 0
+      if (!e.themen.includes(z.thema)) e.themen.push(z.thema)
+      e.fehler = e.fehler.slice(-6)
+      jeRegel.set(schluessel, e)
+    }
+  }
+  const alle = [...jeRegel.values()].filter((e) => e.versuche >= MIN_VERSUCHE)
+  const ohne = ({ fachSumme: _f, geuebt: _g, ...rest }: ProfilPunkt & { fachSumme: number; geuebt: number }): ProfilPunkt => rest
+  return {
+    schwaechen: alle
+      .filter((e) => e.quote < SCHWAECHE_UNTER)
+      .sort((a, b) => a.quote - b.quote)
+      .slice(0, 3)
+      .map(ohne),
+    staerken: alle
+      .filter((e) => e.quote >= STAERKE_AB && e.geuebt && e.fachSumme / e.geuebt >= 3)
+      .sort((a, b) => b.quote - a.quote)
+      .slice(0, 3)
+      .map(ohne),
+    extra
+  }
+}
+kursHaken.profil = grammatikProfil
+kursHaken.vorListe = grammatikKurseAnlegen
+kursHaken.grammatikZahl = (vokId) => (db().prepare("SELECT COUNT(*) AS n FROM gram_zuweisungen WHERE vok_id = ? AND art = ''").get(vokId) as { n: number }).n
 
 /** Vorschaukonto („Als Schüler ansehen", vorschau.ts): Beispielstand je offenem Training – `stand` bekommt die Kennungen der Aufgaben */
 export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => { aufgaben: Record<string, WortStand>; tage: string[] }): void {
@@ -292,27 +565,27 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     const schueler = url.pathname === '/s/api/grammatik' || url.pathname.startsWith('/s/api/grammatik/')
     const lehrer = url.pathname === '/server/grammatik' || url.pathname.startsWith('/server/grammatik/')
     if (!schueler && !lehrer) return false
-    if (req.method === 'POST' && typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+    if (req.method === 'POST' && typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nur aus der App.' }), true
     const sicher = Boolean((req.socket as { encrypted?: boolean }).encrypted)
 
     // ---------------------------------------------------------------- Zugang per Code
     if (req.method === 'GET' && url.pathname === '/s/api/grammatik/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? ''))
-      if (!z || !istOffen(z)) return (json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      return (json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis }), true)
+      if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
+      return json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis }), true
     }
     if (req.method === 'POST' && (url.pathname === '/s/api/grammatik/gast' || url.pathname === '/s/api/grammatik/wieder')) {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const z = nachCode(String(k0.code ?? ''))
-      if (!z || !istOffen(z)) return (json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      if (sitzung && istFuer(z, sitzung.nutzer)) return (json(res, 200, { ok: true, id: z.id }), true)
+      if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
+      if (sitzung && istFuer(z, sitzung.nutzer)) return json(res, 200, { ok: true, id: z.id }), true
       if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
         db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(z.id, sitzung.nutzer.id, '')
-        return (json(res, 200, { ok: true, id: z.id }), true)
+        return json(res, 200, { ok: true, id: z.id }), true
       }
-      if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
+      if (iservBereit()) return json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true
       const name = gastName(k0.name)
-      if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
+      if (!name) return json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true
       const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
       const gleich = gaeste.find((n) => n.name.toLowerCase() === name.toLowerCase())
       if (url.pathname === '/s/api/grammatik/wieder') {
@@ -322,10 +595,10 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           : undefined
         const ist = hashVon(String(k0.wieder ?? ''))
         if (!gleich || !soll || soll.length !== ist.length || !timingSafeEqual(Buffer.from(soll), Buffer.from(ist)))
-          return (json(res, 403, { fehler: 'Name und persönlicher Code passen nicht zusammen.' }), true)
+          return json(res, 403, { fehler: 'Name und persönlicher Code passen nicht zusammen.' }), true
         const neu = sitzungAnlegen(gleich.id, 'schueler', gastDauer(z))
         setzeSitzungsCookie(res, neu.cookie, gastDauer(z), sicher)
-        return (json(res, 200, { ok: true, id: z.id }), true)
+        return json(res, 200, { ok: true, id: z.id }), true
       }
       if (gleich)
         return (
@@ -334,7 +607,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           }),
           true
         )
-      if (gaeste.length >= 120) return (json(res, 429, { fehler: 'Für dieses Training sind schon zu viele Gäste angemeldet.' }), true)
+      if (gaeste.length >= 120) return json(res, 429, { fehler: 'Für dieses Training sind schon zu viele Gäste angemeldet.' }), true
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       const wieder = neuerCode(6)
@@ -342,19 +615,19 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const neu = sitzungAnlegen(gast.id, 'schueler', gastDauer(z))
       setzeSitzungsCookie(res, neu.cookie, gastDauer(z), sicher)
       protokolliereServer('grammatik', 'Beitritt mit Namen (ohne IServ)', gast.id)
-      return (json(res, 200, { ok: true, id: z.id, wieder }), true)
+      return json(res, 200, { ok: true, id: z.id, wieder }), true
     }
 
-    if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
+    if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
     const ich = sitzung.nutzer
 
     // ---------------------------------------------------------------- Lernende
     if (schueler) {
-      if (req.method === 'GET' && url.pathname === '/s/api/grammatik') return (json(res, 200, { listen: grammatikFuer(ich) }), true)
+      if (req.method === 'GET' && url.pathname === '/s/api/grammatik') return json(res, 200, { listen: grammatikFuer(ich) }), true
       const k0 = req.method === 'POST' ? ((await k.koerper()) as Record<string, unknown>) : {}
       const id = req.method === 'GET' ? String(url.searchParams.get('id') ?? '') : String(k0.id ?? '')
       const z = zeile(id)
-      if (!z || !istFuer(z, ich)) return (json(res, 404, { fehler: 'Dieses Grammatiktraining ist nicht für dich freigegeben.' }), true)
+      if (!z || !istFuer(z, ich)) return json(res, 404, { fehler: 'Dieses Grammatiktraining ist nicht für dich freigegeben.' }), true
       const p = paketVon(z)
       const st = standVon(z.id, ich.id)
       if (req.method === 'GET' && url.pathname === '/s/api/grammatik/liste')
@@ -367,14 +640,18 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             paket: p,
             staende: st.aufgaben,
             rekorde: st.rekorde ?? {},
-            ansehen: st.ansehen ?? []
+            ansehen: st.ansehen ?? [],
+            // Sprachenlernen (08.10.2026): Art (Extra), Angaben der Freigabe, bekannte Grammatik (für passende Spiele)
+            art: z.art ?? '',
+            info: infoVon(z),
+            bekannt: bekannteGrammatikFuer(ich)
           }),
           true
         )
       if (req.method === 'POST' && url.pathname === '/s/api/grammatik/antwort') {
-        if (!istOffen(z)) return (json(res, 409, { fehler: 'Dieses Training ist abgeschlossen.' }), true)
+        if (!istOffen(z)) return json(res, 409, { fehler: 'Dieses Training ist abgeschlossen.' }), true
         const a = p.aufgaben.find((x) => x.id === k0.aufgabeId)
-        if (!a) return (json(res, 400, { fehler: 'Unbekannte Aufgabe.' }), true)
+        if (!a) return json(res, 400, { fehler: 'Unbekannte Aufgabe.' }), true
         // Tabellen und Bestimmungen kommen als JSON – deshalb mehr Platz als für einen Satz
         const antwort = String(k0.antwort ?? '').slice(0, 4000)
         const selbst = k0.selbst === 'richtig' || k0.selbst === 'fast' || k0.selbst === 'falsch' ? k0.selbst : undefined
@@ -392,13 +669,13 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const heute = new Date(jetzt).toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
         standSpeichern(z.id, ich.id, st)
-        return (json(res, 200, { urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', stand: neu, sicher: istSicher(neu) }), true)
+        return json(res, 200, { urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', stand: neu, sicher: istSicher(neu) }), true
       }
       if (req.method === 'POST' && url.pathname === '/s/api/grammatik/spiel') {
         const spiel = String(k0.spiel ?? '') as GrammatikSpielId
         const wert = Number(k0.wert)
         if (!GRAMMATIK_SPIELE.some((x) => x.id === spiel) || !Number.isFinite(wert) || wert < 0 || wert > 100000)
-          return (json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true)
+          return json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true
         const rekord = grammatikRekord(spiel, wert, st.rekorde?.[spiel])
         if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
         // Fehler wie bei den Vokabelspielen: wackelig, gleich wieder dran; sichere ein Fach zurück
@@ -408,18 +685,22 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const heute = new Date().toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
         standSpeichern(z.id, ich.id, st)
-        return (json(res, 200, { rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true)
+        return json(res, 200, { rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true
       }
-      return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      return json(res, 404, { fehler: 'Unbekannt.' }), true
     }
 
     // ---------------------------------------------------------------- Lehrkraft
-    if (ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
+    if (ich.rolle === 'schueler') return json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
     const gruppeName = (z: Zeile): string =>
       vokVon(z)
         ? `${z.lerngruppe_id ? `${lerngruppe(z.lerngruppe_id)?.name ?? ''} + ` : ''}wie Vokabeltraining „${ueberschriftVon(vokVon(z)!)}“`
-        : z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : z.code && !json_(z.schueler, [] as string[]).length ? 'Per QR-Code' : 'Einzelne Lernende'
+        : z.lerngruppe_id
+        ? lerngruppe(z.lerngruppe_id)?.name ?? ''
+        : z.code && !json_(z.schueler, [] as string[]).length
+        ? 'Per QR-Code'
+        : 'Einzelne Lernende'
     if (req.method === 'GET' && teile.length === 0) {
       const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Zeile[]
       return (
@@ -436,6 +717,12 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               lerngruppe: gruppeName(z),
               vokId: z.vok_id ?? '',
               lerngruppeId: z.lerngruppe_id,
+              art: z.art ?? '',
+              ...(istExtra(z) ? { fuer: l.map((n) => ({ id: n.id, name: n.name || n.benutzer })) } : {}),
+              bearbeitetSchnitt:
+                l.length && kk.length
+                  ? l.reduce((s, n) => s + kk.filter((k) => standVon(z.id, n.id).aufgaben[k.id]?.versuche).length, 0) / l.length / kk.length
+                  : 0,
               aufgaben: kk.length,
               lernende: l.length,
               sicherSchnitt: l.length && kk.length ? sicherZahl.reduce((a, b) => a + b, 0) / l.length / kk.length : 0,
@@ -448,30 +735,70 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    // Lehrwerk-Stand einer Lerngruppe („Meine Klassen", 08.10.2026): leer = automatisch aus den Vokabeln
+    if (teile[0] === 'lehrwerkstand') {
+      if (req.method === 'GET') {
+        const gid = String(url.searchParams.get('gruppe') ?? '')
+        const g = lerngruppe(gid)
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true
+        return (
+          json(res, 200, { stand: lehrwerkStandVon(gid), baende: Object.fromEntries(Object.entries(LEHRWERK_GRAMMATIK).map(([b, k]) => [b, Object.keys(k)])) }),
+          true
+        )
+      }
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const gid = String(k0.gruppe ?? '')
+      const g = lerngruppe(gid)
+      if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true
+      const buch = String(k0.buch ?? '')
+      const unit = String(k0.unit ?? '')
+      if (!buch) db().prepare('DELETE FROM lehrwerk_stand WHERE lerngruppe_id = ?').run(gid)
+      else {
+        if (!LEHRWERK_GRAMMATIK[buch]?.[unit]) return json(res, 400, { fehler: 'Unbekannter Band oder unbekannte Unit.' }), true
+        db()
+          .prepare(
+            'INSERT INTO lehrwerk_stand (lerngruppe_id, lehrkraft_id, buch, unit) VALUES (?, ?, ?, ?) ON CONFLICT(lerngruppe_id) DO UPDATE SET buch = excluded.buch, unit = excluded.unit'
+          )
+          .run(gid, ich.id, buch, unit)
+      }
+      return json(res, 200, { ok: true }), true
+    }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const gid = String(k0.lerngruppeId ?? '')
       const g = gid ? lerngruppe(gid) : null
-      if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
+      if (gid && (!g || g.lehrkraft_id !== ich.id)) return json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true
       const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
       const mitGaesten = k0.gaeste === true
       // Lernende eines eigenen Vokabeltrainings (08.10.2026)
       const vok = k0.vokId ? vokZeile(String(k0.vokId)) : null
-      if (k0.vokId && (!vok || vok.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true)
+      if (k0.vokId && (!vok || vok.lehrkraft_id !== ich.id)) return json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true
       if (!g && !einzelne.length && !mitGaesten && !vok)
-        return (json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder den Zugang per QR-Code wählen.' }), true)
+        return json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder den Zugang per QR-Code wählen.' }), true
+      // Extra (Förder/Forder, 08.10.2026): nur für einzelne Lernende des Kurses (Nutzer-Kennungen)
+      const art = k0.art === 'foerder' || k0.art === 'forder' ? k0.art : ''
+      const extraFuer: NutzerInfo[] = []
+      if (art) {
+        if (!vok) return json(res, 400, { fehler: 'Extra-Aufgaben gehören zu einem Kurs.' }), true
+        const imKurs = new Map(vokLernende(vok).map((n) => [n.id, n]))
+        for (const nid of Array.isArray(k0.fuer) ? (k0.fuer as unknown[]).map(String) : []) if (imKurs.has(nid)) extraFuer.push(imKurs.get(nid)!)
+        if (!extraFuer.length) return json(res, 400, { fehler: 'Bitte mindestens eine Person aus dem Kurs wählen.' }), true
+        einzelne.length = 0
+        einzelne.push(...extraFuer.filter((n) => n.quelle !== 'gast').map((n) => n.benutzer))
+      }
       const paket = paketBereinigt(k0.paket, String(k0.thema ?? ''))
-      if (paket.aufgaben.length < 8) return (json(res, 400, { fehler: 'Der Aufgabenpool ist zu klein (mindestens 8 brauchbare Aufgaben).' }), true)
+      if (paket.aufgaben.length < (art ? 4 : 8))
+        return json(res, 400, { fehler: `Der Aufgabenpool ist zu klein (mindestens ${art ? 4 : 8} brauchbare Aufgaben).` }), true
       const id = randomBytes(8).toString('hex')
       db()
         .prepare(
-          "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?)"
+          "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id, art, info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
         )
         .run(
           id,
           ich.id,
-          g?.id ?? '',
+          art ? '' : g?.id ?? '',
           JSON.stringify(einzelne),
           String(k0.titel ?? paket.thema ?? 'Grammatik').slice(0, 160),
           String(k0.fach ?? '').slice(0, 40),
@@ -479,15 +806,20 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           paket.thema.slice(0, 160),
           JSON.stringify(paket),
           new Date().toISOString(),
-          mitGaesten ? neuerCode() : '',
+          mitGaesten && !art ? neuerCode() : '',
           typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null,
-          vok?.id ?? ''
+          vok?.id ?? '',
+          art,
+          JSON.stringify(infoBereinigt(k0.info))
         )
-      protokolliereServer('grammatik', 'Grammatiktraining freigegeben', ich.id)
-      return (json(res, 200, { id, aufgaben: paket.aufgaben.length }), true)
+      // Gäste unter den Empfängern einer Extra-Freigabe
+      for (const n of extraFuer.filter((x) => x.quelle === 'gast'))
+        db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(id, n.id, '')
+      protokolliereServer('grammatik', art ? `Extra-Aufgaben (${art}) freigegeben` : 'Grammatiktraining freigegeben', ich.id)
+      return json(res, 200, { id, aufgaben: paket.aufgaben.length }), true
     }
     const z = teile[0] ? zeile(teile[0]) : null
-    if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+    if (!z || z.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannt.' }), true
     if (req.method === 'GET' && teile.length === 1) {
       const p = paketVon(z)
       const kk = karten(p)
@@ -556,15 +888,26 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         db()
           .prepare('UPDATE gram_zuweisungen SET status = ? WHERE id = ?')
           .run(k0.status === 'beendet' ? 'beendet' : 'offen', z.id)
-        return (json(res, 200, { ok: true }), true)
+        return json(res, 200, { ok: true }), true
+      }
+      // Aufgaben und Regeln bearbeiten (08.10.2026, Grammatik-Fenster): Kennungen bleiben, der Lernstand gilt weiter
+      if (teile[1] === 'paket') {
+        const paket = paketBereinigt(k0.paket, z.thema)
+        if (paket.aufgaben.length < 3) return json(res, 400, { fehler: 'Es müssen mindestens 3 brauchbare Aufgaben bleiben.' }), true
+        db()
+          .prepare('UPDATE gram_zuweisungen SET paket = ?, titel = ?, thema = ? WHERE id = ?')
+          .run(JSON.stringify(paket), String(k0.titel ?? z.titel).slice(0, 160) || z.titel, paket.thema.slice(0, 160), z.id)
+        return json(res, 200, { ok: true, aufgaben: paket.aufgaben.length, paket }), true
       }
       // Mit einem Vokabeltraining verbinden bzw. lösen (08.10.2026: auch fertige Grammatiktrainings zuordnen)
       if (teile[1] === 'verbinden') {
         const vid = String(k0.vokId ?? '')
         const vok = vid ? vokZeile(vid) : null
-        if (vid && (!vok || vok.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true)
-        db().prepare('UPDATE gram_zuweisungen SET vok_id = ? WHERE id = ?').run(vok?.id ?? '', z.id)
-        return (json(res, 200, { ok: true }), true)
+        if (vid && (!vok || vok.lehrkraft_id !== ich.id)) return json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true
+        db()
+          .prepare('UPDATE gram_zuweisungen SET vok_id = ? WHERE id = ?')
+          .run(vok?.id ?? '', z.id)
+        return json(res, 200, { ok: true }), true
       }
       if (teile[1] === 'gast-entfernen') {
         const ok = gastEntfernen(
@@ -579,10 +922,11 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         db().prepare('DELETE FROM gram_zuweisungen WHERE id = ?').run(z.id)
         // Gäste, die noch in einem Vokabel- oder anderen Grammatiktraining sind, behalten ihr Konto (08.10.2026)
         for (const n of gaeste)
-          if (!db().prepare('SELECT 1 FROM gram_gaeste WHERE nutzer_id = ? UNION SELECT 1 FROM vok_gaeste WHERE nutzer_id = ?').get(n.id, n.id)) nutzerLoeschen(n.id)
-        return (json(res, 200, { ok: true }), true)
+          if (!db().prepare('SELECT 1 FROM gram_gaeste WHERE nutzer_id = ? UNION SELECT 1 FROM vok_gaeste WHERE nutzer_id = ?').get(n.id, n.id))
+            nutzerLoeschen(n.id)
+        return json(res, 200, { ok: true }), true
       }
     }
-    return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+    return json(res, 404, { fehler: 'Unbekannt.' }), true
   }
 }

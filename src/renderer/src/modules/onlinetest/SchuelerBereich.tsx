@@ -767,6 +767,29 @@ function BlaetterSeite(): React.JSX.Element {
 }
 
 /** Ein Code kann zu einem Test oder zu einer Aufgabe mit Feedback gehören (Etappe 4) */
+/**
+ * Stand einer Grammatik auf der Startkarte (08.10.2026, abgestimmt): „Noch 23 von 40 Übungen nicht bearbeitet",
+ * darunter „heute dran: 10 · 12 sicher"; alles bearbeitet: „✓ Alle Übungen bearbeitet – heute noch 4 Wiederholungen".
+ */
+export function GrammatikStand({ u }: { u: { gesamt: number; sicher: number; heuteOffen?: number; unbearbeitet?: number } }): React.JSX.Element {
+  const offen = u.unbearbeitet ?? 0
+  const heute = u.heuteOffen ?? 0
+  return (
+    <>
+      <Text size="sm" fw={600} c={offen ? 'orange' : heute ? 'grape' : 'teal'} data-grammatik-offen={offen}>
+        {offen
+          ? `Noch ${offen} von ${u.gesamt} Übungen nicht bearbeitet`
+          : heute
+          ? `✓ Alle Übungen bearbeitet – heute noch ${heute} ${heute === 1 ? 'Wiederholung' : 'Wiederholungen'}`
+          : '✓ Für heute geschafft'}
+      </Text>
+      <Text size="sm" c="dimmed">
+        {[offen && heute ? `heute dran: ${heute}` : '', `${u.sicher} sicher`].filter(Boolean).join(' · ')}
+      </Text>
+    </>
+  )
+}
+
 async function oeffneCode(code: string): Promise<void> {
   // Persönlicher Anmeldecode vom Zettel der Lehrkraft (8 Zeichen, 08.10.2026): meldet an und öffnet die Vokabeln
   if (code.length === 8) {
@@ -916,7 +939,7 @@ function GastStart(): React.JSX.Element {
         id: string
         titel: string
         fach: string
-        uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number }
+        uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number }
         g?: boolean
       }[]
     | null
@@ -970,8 +993,10 @@ function GastStart(): React.JSX.Element {
                 {v.g ? 'Grammatiktraining' : 'Vokabeltraining'} · {v.fach}
               </Text>
               <Text fw={700}>{v.titel}</Text>
+              {/* Grammatik (08.10.2026, abgestimmt): offene Übungen statt „Wörter" */}
+              {v.g && v.uebersicht.unbearbeitet !== undefined && <GrammatikStand u={v.uebersicht} />}
               {/* Motivierender Stand statt nur „0 von 127 sicher" (08.10.2026): heute noch etwas zu tun? */}
-              {v.uebersicht.heuteOffen !== undefined && (
+              {!v.g && v.uebersicht.heuteOffen !== undefined && (
                 <Text size="sm" fw={600} c={v.uebersicht.heuteOffen ? 'orange' : 'teal'} data-heute-offen={v.uebersicht.heuteOffen}>
                   {v.uebersicht.heuteOffen
                     ? `Heute noch ${v.uebersicht.heuteOffen} ${v.uebersicht.heuteOffen === 1 ? 'Wort' : 'Wörter'} üben${
@@ -980,15 +1005,17 @@ function GastStart(): React.JSX.Element {
                     : '✓ Für heute geschafft'}
                 </Text>
               )}
-              <Text size="sm" c="dimmed">
-                {[
-                  v.uebersicht.heuteGeuebt ? `heute geübt: ${v.uebersicht.heuteGeuebt}` : '',
-                  `${v.uebersicht.gesamt - v.uebersicht.neu} von ${v.uebersicht.gesamt} kennengelernt`,
-                  `${v.uebersicht.sicher} sicher`
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
+              {!v.g && (
+                <Text size="sm" c="dimmed">
+                  {[
+                    v.uebersicht.heuteGeuebt ? `heute geübt: ${v.uebersicht.heuteGeuebt}` : '',
+                    `${v.uebersicht.gesamt - v.uebersicht.neu} von ${v.uebersicht.gesamt} kennengelernt`,
+                    `${v.uebersicht.sicher} sicher`
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              )}
             </div>
             <Button color={fachFarbeAus(v.fach, undefined) ?? 'orange'} radius="xl" component="span" style={{ flex: 'none' }}>
               Üben

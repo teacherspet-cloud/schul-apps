@@ -52,6 +52,7 @@ const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
 const medienSchluessel = [...WOERTER.map((w) => w.term), ...VERBEN.map((v) => v[0])]
 let gid = ''
+let vKurs = ''
 let lk
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
@@ -389,30 +390,43 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
-  await p.locator('.app-leiste [aria-label="Grammatiktraining"]').click()
-  await p.locator('[data-grammatik-freigeben]').click()
+  // Seit 08.10.2026 im Kurs von „Sprachenlernen": Kurs nur mit Grammatik, Zugang per Code
+  vKurs = (
+    await (
+      await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+        headers: KOPF,
+        data: { titel: 'Verben-Kurs', sprache: 'en', fach: 'Englisch', woerter: [], nurGrammatik: true, gaeste: true }
+      })
+    ).json()
+  ).id
+  const vCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === vKurs)?.code
+  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await p.locator(`[data-vokabel-zuweisung="${vKurs}"]`).click()
+  await p.locator('[data-vokabel-grammatik]').click()
+  await p.locator('[data-grammatik-dazu-neu]').click()
   await p.locator('[data-grammatik-fach]').click()
   await p.getByRole('option', { name: 'Englisch', exact: true }).click()
   await p.locator('[data-grammatik-modus]').getByText('Unregelmäßige Verben').click()
   pruefe(await da(p.locator('[data-verb-freigabe]')), 'Freigabe: Verbauswahl erscheint')
   const anzahl = Number(await p.locator('[data-verb-anzahl]').getAttribute('data-verb-anzahl'))
   pruefe(anzahl >= 4, `Standardliste bis zum Lernjahr (${anzahl} Verben)`)
-  await p.getByText('Nur per QR-Code').click()
   await p.screenshot({ path: join(out, '3-verbfreigabe.png') })
   await p.locator('[data-grammatik-erstellen]').click()
   pruefe(await da(p.locator('[data-grammatik-entwurf]')), 'Entwurf sofort da (ohne KI)')
-  await p.locator('[data-entwurf-ansehen]').click()
+  await p.locator('[data-grammatik-entwurf]').click()
   await p.locator('[data-entwurf-freigeben]').click()
   await p.waitForTimeout(1500)
   const zw = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen.find((x) => /Unregelmäßige Verben/.test(x.titel))
   gid = zw?.id ?? ''
-  pruefe(Boolean(zw?.code), `Freigegeben mit Code (${zw?.code}, ${zw?.aufgaben} Karten)`)
+  pruefe(zw?.vokId === vKurs, `Freigegeben im Kurs (${zw?.aufgaben} Karten)`)
   const gg = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   const h = await gg.newPage()
-  await h.goto(`${A}/s/gt/${zw.code}`)
+  await h.goto(`${A}/s/vt/${vCode}`)
   await h.locator('[data-gastname]').fill('Ida V.')
   await h.getByRole('button', { name: 'Mitlernen' }).click()
   await h.locator('[data-vokabeln-los]').click()
+  await h.waitForTimeout(800)
+  await h.goto(`${A}/s/g/${gid}`)
   const paket = (await (await gg.request.get(`${A}/s/api/grammatik/liste?id=${gid}`)).json()).paket
   pruefe(paket.verben?.length === paket.aufgaben.length, `Paket mit Verbkarten (${paket.verben?.length})`)
   // Alle Karten einmal richtig (API) – dann Spiele frei
@@ -426,6 +440,16 @@ try {
     .locator('[data-vokabeln-los]')
     .click()
     .catch(() => undefined)
+  // Spiele stehen im aufklappbaren Bereich (08.10.2026)
+  await h.locator('[data-grammatik-kasten]').waitFor()
+  if (
+    !(await h
+      .locator('[data-grammatik-spiel]')
+      .first()
+      .isVisible()
+      .catch(() => false))
+  )
+    await h.locator('[data-grammatik-spiele-kopf]').click()
   const vs = ['verbtrio', 'verbblitz', 'bildverb', 'muster']
   const vda = []
   for (const id of vs) if (await h.locator(`[data-grammatik-spiel="${id}"]`).count()) vda.push(id)
@@ -449,6 +473,7 @@ try {
   )
 } finally {
   if (gid && lk) await lk.request.delete(`${A}/server/grammatik/${gid}`, { headers: KOPF }).catch(() => undefined)
+  if (vKurs && lk) await lk.request.post(`${A}/server/vokabeln/${vKurs}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
   for (const w of medienSchluessel) {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)

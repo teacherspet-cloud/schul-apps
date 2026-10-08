@@ -214,7 +214,7 @@ export function Schnellzugriff(): React.JSX.Element {
         titel="Termine & Vokabeltraining"
         symbol={<IconCalendarEvent size={18} />}
         farbe="orange"
-        alle={() => openModule('vokabeltraining')}
+        alle={() => openModule('sprachenlernen')}
         daten="termine"
       >
         {vok === null || reihen === null ? null : !termine.length && !halte.length ? <Leer text="Keine anstehenden Termine." /> : null}
@@ -225,7 +225,7 @@ export function Schnellzugriff(): React.JSX.Element {
               <Zeile
                 titel={v.titel}
                 unter={`${v.lerngruppe} · Test ${tage <= 0 ? 'heute' : tage === 1 ? 'morgen' : `in ${tage} Tagen`} (${new Date(v.testTermin!).toLocaleDateString('de-DE')})`}
-                onClick={() => openModule('vokabeltraining')}
+                onClick={() => openModule('sprachenlernen')}
               >
                 <Badge variant="light" color={v.sicherSchnitt >= 0.7 ? 'green' : v.sicherSchnitt >= 0.4 ? 'yellow' : 'red'}>
                   {Math.round(v.sicherSchnitt * 100)} % sicher

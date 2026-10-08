@@ -12,7 +12,7 @@ const ARTEN = {
   grammatik: { api: '/s/api/grammatik', ziel: '/s/g/', seite: '/s/gt/', name: 'Grammatiktraining' }
 }
 import { Alert, Button, Card, Center, Code, Group, Loader, Text, TextInput, Title } from '@mantine/core'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 
 interface Info {
@@ -21,6 +21,8 @@ interface Info {
   gaeste: boolean
   dabei: boolean
   bis: number | null
+  /** Kurs nur mit Grammatik (08.10.2026) */
+  nurGrammatik?: boolean
 }
 
 const NAME_OK = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u
@@ -37,7 +39,9 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
   const ich = window.__schulappsServer
   const mitKonto = Boolean(ich?.angemeldet && ich.quelle !== 'gast' && ich.rolle === 'schueler')
   const lehrkraft = Boolean(ich?.angemeldet && (ich.rolle === 'lehrkraft' || ich.rolle === 'admin'))
-  const ziel = (id: string): void => window.location.assign(`${A.ziel}${id}`)
+  // Kurs nur mit Grammatik (Sprachenlernen, 08.10.2026): nicht auf eine leere Vokabelseite, sondern zu „Meine Materialien"
+  const nurGrammatik = useRef(false)
+  const ziel = (id: string): void => window.location.assign(nurGrammatik.current ? '/s/' : `${A.ziel}${id}`)
 
   const beitreten = useCallback(
     async (daten: Record<string, string>, pfad = `${A.api}/gast`): Promise<void> => {
@@ -58,6 +62,7 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
   useEffect(() => {
     void holen<Info>(`${A.api}/zugang?code=${encodeURIComponent(code)}`).then(
       (d) => {
+        nurGrammatik.current = Boolean(d.nurGrammatik)
         if (d.dabei) return ziel(d.id)
         if (mitKonto) return void beitreten({})
         if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`${A.seite}${code}`)}`)

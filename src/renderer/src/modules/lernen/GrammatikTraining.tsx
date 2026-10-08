@@ -10,12 +10,12 @@
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
   Card,
   Center,
+  Checkbox,
   Container,
   Group,
   Loader,
@@ -33,12 +33,11 @@ import {
   TextInput,
   Textarea,
   Title,
-  Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconArrowLeft, IconPlus, IconQrcode, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
+import { IconArrowLeft, IconPlus, IconQrcode, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ART_NAME, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { type GrammatikPaket } from '@shared/grammatiktrainer'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { starteAuftrag } from '../../shared/auftraege'
@@ -51,11 +50,11 @@ import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { holen, senden } from '../onlinetest/serverApi'
 import { useAlleLernenden } from './LernendeWahl'
-import { lateinVorschau } from './LateinAufgaben'
 import { VerbFreigabe } from './VerbFreigabe'
 import { istVerbSprache, type VerbEintrag } from '@shared/verben'
 import { formSpalten, verbAufgaben, verbKarten } from '@shared/verbTraining'
 import { VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
+import { AufgabenEditor } from './kurs/AufgabenEditor'
 import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
 import { erzeugeGrammatikPaket, lateinLernjahr } from './grammatikErzeugen'
 import { ausFeld, useLerngruppen } from './VokabelTraining'
@@ -76,26 +75,39 @@ interface Zuweisung {
 }
 
 /** Fertig erzeugt, noch nicht freigegeben – auf diesem Gerät gemerkt */
-interface Entwurf {
+export interface Entwurf {
   schluessel: string
   titel: string
   fach: string
   sprache: string
   thema: string
-  empfaenger: { lerngruppeId: string; schueler: string[]; gaeste: boolean; bis: number | null; gruppe: string; vokId?: string }
+  empfaenger: {
+    lerngruppeId: string
+    schueler: string[]
+    gaeste: boolean
+    bis: number | null
+    gruppe: string
+    vokId?: string
+    /** Extra (Förder/Forder, 08.10.2026): für wen (Nutzer-Kennungen) und wer dieselbe Schwäche/Stärke hat */
+    art?: 'foerder' | 'forder'
+    fuer?: { id: string; name: string }[]
+    gleiche?: { id: string; name: string }[]
+  }
+  /** Angaben der Freigabe (Themen, Teilformen, Klasse, Lehrwerk – 08.10.2026) */
+  info?: { themen: string[]; teilformen: string[]; jahrgang?: number; lehrwerk?: { buch?: string; unit?: string }; fuerRegeln?: string[] }
   paket: GrammatikPaket
 }
 
 const ENTWUERFE = 'grammatik-entwuerfe'
 const EREIGNIS = 'grammatik-entwuerfe'
-const ladeEntwuerfe = (): Entwurf[] => {
+export const ladeEntwuerfe = (): Entwurf[] => {
   try {
     return JSON.parse(localStorage.getItem(ENTWUERFE) ?? '[]') as Entwurf[]
   } catch {
     return []
   }
 }
-const speichereEntwuerfe = (l: Entwurf[]): void => {
+export const speichereEntwuerfe = (l: Entwurf[]): void => {
   try {
     localStorage.setItem(ENTWUERFE, JSON.stringify(l))
   } catch {
@@ -103,7 +115,7 @@ const speichereEntwuerfe = (l: Entwurf[]): void => {
   }
   window.dispatchEvent(new Event(EREIGNIS))
 }
-function useEntwuerfe(): Entwurf[] {
+export function useEntwuerfe(): Entwurf[] {
   const [l, setL] = useState(ladeEntwuerfe)
   useEffect(() => {
     const neu = (): void => setL(ladeEntwuerfe())
@@ -279,7 +291,9 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code' | 'vok'>(vorgabe ? 'vok' : 'gruppe')
   // Lernende eines Vokabeltrainings – fest verbunden (08.10.2026)
   const [vokId, setVokId] = useState<string | null>(vorgabe?.vokId ?? null)
-  const [vokListe, setVokListe] = useState<{ id: string; titel: string; lerngruppe: string }[]>(vorgabe ? [{ id: vorgabe.vokId, titel: vorgabe.titel, lerngruppe: '' }] : [])
+  const [vokListe, setVokListe] = useState<{ id: string; titel: string; lerngruppe: string }[]>(
+    vorgabe ? [{ id: vorgabe.vokId, titel: vorgabe.titel, lerngruppe: '' }] : []
+  )
   useEffect(() => {
     if (art !== 'vok' || vokListe.length > 1) return
     void holen<{ zuweisungen: { id: string; titel: string; lerngruppe: string; status: string }[] }>('/server/vokabeln').then(
@@ -309,12 +323,12 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
   const gruppenName =
     art === 'gruppe'
-      ? (gruppen.find((g) => g.id === gruppe)?.name ?? '')
+      ? gruppen.find((g) => g.id === gruppe)?.name ?? ''
       : art === 'einzeln'
-        ? `${einzelne.length} Lernende`
-        : art === 'vok'
-          ? `wie Vokabeltraining „${vokListe.find((v) => v.id === vokId)?.titel ?? ''}“`
-          : 'QR-Code'
+      ? `${einzelne.length} Lernende`
+      : art === 'vok'
+      ? `wie Vokabeltraining „${vokListe.find((v) => v.id === vokId)?.titel ?? ''}“`
+      : 'QR-Code'
   const verbSprache = fach && istVerbSprache(fach.sprache) ? fach.sprache : null
   const mitVerben = modus === 'verben' && verbSprache
   const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : art === 'vok' ? Boolean(vokId) : true
@@ -340,7 +354,12 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
             id: 'verben',
             titel: 'Unregelmäßige Verben',
             erklaerung: `Unregelmäßige Verben bilden ihre Formen nicht nach der Regel – sie werden gelernt: ${spalten.map((s) => s.label).join(' – ')}.`,
-            beispiele: karten.slice(0, 3).map((k) => spalten.map((s) => k.formen[s.id]).filter(Boolean).join(' – '))
+            beispiele: karten.slice(0, 3).map((k) =>
+              spalten
+                .map((s) => k.formen[s.id])
+                .filter(Boolean)
+                .join(' – ')
+            )
           }
         ],
         aufgaben: verbAufgaben(karten, verbSprache),
@@ -349,14 +368,24 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       }
       speichereEntwuerfe([
         ...ladeEntwuerfe(),
-        { schluessel: `${Date.now()}`, titel: verbWahl.titel, fach: fach.label, sprache: fach.sprache, thema: verbWahl.titel, empfaenger, paket }
+        {
+          schluessel: `${Date.now()}`,
+          titel: verbWahl.titel,
+          fach: fach.label,
+          sprache: fach.sprache,
+          thema: verbWahl.titel,
+          empfaenger,
+          info: { themen: ['verben'], teilformen: [], jahrgang },
+          paket
+        }
       ])
       notifySuccess(`${karten.length} Verben stehen als Entwurf bereit – ansehen und freigeben.`)
       return schliessen()
     }
     const titel = `${thema}`
+    const info = { themen: themenIds, teilformen: teilWahl, jahrgang, ...(vorgabe?.lehrwerk?.buch ? { lehrwerk: vorgabe.lehrwerk } : {}) }
     void starteAuftrag({
-      moduleId: 'grammatiktraining',
+      moduleId: 'sprachenlernen',
       docId: `grammatik-${Date.now()}`,
       titel,
       art: 'Grammatiktraining',
@@ -378,8 +407,11 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       fehlerTitel: 'Aufgabenpool konnte nicht erstellt werden',
       arbeit: async (e, k) => erzeugeGrammatikPaket(e, k.ai, (t) => k.melde(t)),
       ablegen: async (paket) => {
-        speichereEntwuerfe([...ladeEntwuerfe(), { schluessel: `${Date.now()}`, titel, fach: fach.label, sprache: fach.sprache, thema, empfaenger, paket }])
-        notifySuccess(`Aufgabenpool „${titel}" ist fertig – in „Grammatiktraining" ansehen und freigeben.`)
+        speichereEntwuerfe([
+          ...ladeEntwuerfe(),
+          { schluessel: `${Date.now()}`, titel, fach: fach.label, sprache: fach.sprache, thema, empfaenger, info, paket }
+        ])
+        notifySuccess(`Aufgabenpool „${titel}" ist fertig – in „Sprachenlernen" beim Kurs ansehen und freigeben.`)
       },
       abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig – ansehen und freigeben`
     })
@@ -400,14 +432,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               onChange={(v) => (setFachId(v), setThemenIds([]), setTeilWahl([]))}
               data-grammatik-fach
             />
-            <NumberInput
-              label="Klasse"
-              min={1}
-              max={13}
-              value={jahrgang}
-              onChange={(v) => setJahrgang(Number(v) || 6)}
-              data-grammatik-jahrgang
-            />
+            <NumberInput label="Klasse" min={1} max={13} value={jahrgang} onChange={(v) => setJahrgang(Number(v) || 6)} data-grammatik-jahrgang />
           </Group>
           {verbSprache && (
             <SegmentedControl
@@ -486,54 +511,63 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
             onChange={(e) => setWunsch(e.currentTarget.value)}
             placeholder="z. B. Verneinung und Fragen, unregelmäßige Verben aus Unit 3"
           />
-          <SegmentedControl
-            value={art}
-            onChange={(v) => (setArt(v as typeof art), setEinzelne([]))}
-            data={[
-              { value: 'gruppe', label: 'Lerngruppe' },
-              { value: 'einzeln', label: 'Einzelne Lernende' },
-              { value: 'vok', label: 'Wie Vokabeltraining' },
-              { value: 'code', label: 'Nur per QR-Code' }
-            ]}
-            data-grammatik-empfaenger
-          />
-          {art === 'vok' ? (
-            <Select
-              label="Vokabeltraining"
-              description="Gilt fest für dessen Lernende – auch für alle, die später dort eingetragen werden oder beitreten."
-              data={vokListe.map((v) => ({ value: v.id, label: v.lerngruppe ? `${v.titel} (${v.lerngruppe})` : v.titel }))}
-              value={vokId}
-              onChange={setVokId}
-              placeholder="wählen …"
-              data-grammatik-vok
-            />
-          ) : art === 'gruppe' ? (
-            <Select
-              label="Lerngruppe"
-              data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
-              value={gruppe}
-              onChange={setGruppe}
-              placeholder="wählen …"
-              data-grammatik-gruppe
-            />
-          ) : art === 'einzeln' ? (
-            <MultiSelect
-              label="Lernende"
-              data={alleLernenden.daten}
-              value={einzelne}
-              onChange={setEinzelne}
-              searchable
-              clearable
-              placeholder="Namen suchen …"
-            />
-          ) : (
-            <Text size="sm" c="dimmed">
-              Wer den QR-Code scannt, übt mit – mit Konto direkt, sonst mit Vorname und Anfangsbuchstabe.
+          {/* Im Kurs (Sprachenlernen, 08.10.2026) gilt die Grammatik für dessen Lernende – keine Empfängerwahl */}
+          {vorgabe ? (
+            <Text size="sm" c="dimmed" data-grammatik-fuer-kurs>
+              Für die Lernenden des Kurses „{vorgabe.titel}“ – auch für alle, die später dazukommen.
             </Text>
+          ) : (
+            <>
+              <SegmentedControl
+                value={art}
+                onChange={(v) => (setArt(v as typeof art), setEinzelne([]))}
+                data={[
+                  { value: 'gruppe', label: 'Lerngruppe' },
+                  { value: 'einzeln', label: 'Einzelne Lernende' },
+                  { value: 'vok', label: 'Wie Vokabeltraining' },
+                  { value: 'code', label: 'Nur per QR-Code' }
+                ]}
+                data-grammatik-empfaenger
+              />
+              {art === 'vok' ? (
+                <Select
+                  label="Vokabeltraining"
+                  description="Gilt fest für dessen Lernende – auch für alle, die später dort eingetragen werden oder beitreten."
+                  data={vokListe.map((v) => ({ value: v.id, label: v.lerngruppe ? `${v.titel} (${v.lerngruppe})` : v.titel }))}
+                  value={vokId}
+                  onChange={setVokId}
+                  placeholder="wählen …"
+                  data-grammatik-vok
+                />
+              ) : art === 'gruppe' ? (
+                <Select
+                  label="Lerngruppe"
+                  data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+                  value={gruppe}
+                  onChange={setGruppe}
+                  placeholder="wählen …"
+                  data-grammatik-gruppe
+                />
+              ) : art === 'einzeln' ? (
+                <MultiSelect
+                  label="Lernende"
+                  data={alleLernenden.daten}
+                  value={einzelne}
+                  onChange={setEinzelne}
+                  searchable
+                  clearable
+                  placeholder="Namen suchen …"
+                />
+              ) : (
+                <Text size="sm" c="dimmed">
+                  Wer den QR-Code scannt, übt mit – mit Konto direkt, sonst mit Vorname und Anfangsbuchstabe.
+                </Text>
+              )}
+              <NurExperte geaendert={art !== 'code' && qr && 'zusätzlich per QR-Code'}>
+                {art !== 'code' && <Switch label="Zusätzlich per QR-Code / Code zugänglich" checked={qr} onChange={(e) => setQr(e.currentTarget.checked)} />}
+              </NurExperte>
+            </>
           )}
-          <NurExperte geaendert={art !== 'code' && qr && 'zusätzlich per QR-Code'}>
-            {art !== 'code' && <Switch label="Zusätzlich per QR-Code / Code zugänglich" checked={qr} onChange={(e) => setQr(e.currentTarget.checked)} />}
-          </NurExperte>
           <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} />
           <AlleOptionen />
           <Alert variant="light" icon={<IconSparkles size={16} />}>
@@ -551,9 +585,22 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   )
 }
 
-function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () => void; fertig: () => void }): React.JSX.Element {
-  const [aufgaben, setAufgaben] = useState(e.paket.aufgaben)
+/**
+ * Entwurf prüfen und freigeben (Sichtung). Seit 08.10.2026 mit dem AufgabenEditor (ändern statt nur streichen) und für
+ * Extra-Aufgaben (Förder/Forder) mit „Auch freischalten für …" (gleiche Schwäche bzw. Stärke).
+ */
+export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () => void; fertig: () => void }): React.JSX.Element {
+  const [paket, setPaket] = useState(e.paket)
+  const [auchFuer, setAuchFuer] = useState<string[]>([])
   const [laeuft, setLaeuft] = useState(false)
+  const extra = e.empfaenger.art
+  const minimum = extra ? 4 : 8
+  // Bearbeitungen am Entwurf gleich merken (auch ohne Freigeben)
+  const aendern = (p: GrammatikPaket): void => {
+    setPaket(p)
+    speichereEntwuerfe(ladeEntwuerfe().map((x) => (x.schluessel === e.schluessel ? { ...x, paket: p } : x)))
+  }
+  const fuer = [...(e.empfaenger.fuer ?? []), ...(e.empfaenger.gleiche ?? []).filter((g) => auchFuer.includes(g.id))]
   const freigeben = async (): Promise<void> => {
     setLaeuft(true)
     try {
@@ -562,15 +609,19 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
         fach: e.fach,
         sprache: e.sprache,
         thema: e.thema,
-        paket: { ...e.paket, aufgaben },
+        paket,
         lerngruppeId: e.empfaenger.lerngruppeId,
         schueler: e.empfaenger.schueler,
         gaeste: e.empfaenger.gaeste,
         bis: e.empfaenger.bis,
-        ...(e.empfaenger.vokId ? { vokId: e.empfaenger.vokId } : {})
+        ...(e.empfaenger.vokId ? { vokId: e.empfaenger.vokId } : {}),
+        ...(extra ? { art: extra, fuer: fuer.map((f) => f.id) } : {}),
+        ...(e.info ? { info: e.info } : {})
       })
       speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
-      notifySuccess(`„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`)
+      notifySuccess(
+        extra ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.` : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`
+      )
       fertig()
     } catch (er) {
       notifyError(er, 'Nicht freigegeben')
@@ -578,71 +629,57 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
       setLaeuft(false)
     }
   }
+  const verwerfen = (): void => {
+    speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
+    fertig()
+  }
   return (
-    <Modal opened onClose={schliessen} title={`${e.titel} – ansehen und freigeben`} size="xl">
-      <Stack>
+    <Modal
+      opened
+      onClose={schliessen}
+      title={extra ? `${e.titel} – prüfen und freischalten` : `${e.titel} – ansehen und freigeben`}
+      size="xl"
+      fullScreen={window.matchMedia?.('(max-width: 700px)').matches}
+    >
+      <Stack data-entwurf-fenster>
         <Text size="sm" c="dimmed">
-          Für {e.empfaenger.gruppe}. Unpassende Aufgaben mit × streichen; freigegeben wird, was hier steht.
+          {extra
+            ? `${extra === 'foerder' ? 'Förderaufgaben' : 'Forderaufgaben'} für ${(e.empfaenger.fuer ?? [])
+                .map((f) => f.name)
+                .join(', ')} – erscheinen dort als „Extra für dich“. Bitte prüfen; Unpassendes ändern oder streichen.`
+            : `Für ${e.empfaenger.gruppe}. Aufgaben prüfen, ändern oder streichen; freigegeben wird, was hier steht.`}
         </Text>
-        <Title order={5}>Regelkarten</Title>
-        <SimpleGrid cols={{ base: 1, md: 2 }}>
-          {e.paket.regeln.map((r) => (
-            <Card key={r.id} withBorder padding="sm" radius="md">
-              <Text fw={700} size="sm">
-                {r.titel}
-              </Text>
-              <Text size="sm">{r.erklaerung}</Text>
-              {r.beispiele.map((b) => (
-                <Text key={b} size="xs" c="dimmed" fs="italic">
-                  {b}
-                </Text>
+        <AufgabenEditor paket={paket} aendern={aendern} />
+        {extra && (e.empfaenger.gleiche?.length ?? 0) > 0 && (
+          <Card withBorder padding="sm" data-auch-fuer>
+            <Text size="sm" fw={600} mb={6}>
+              Auch freischalten für ({extra === 'foerder' ? 'gleiche Schwäche' : 'gleiche Stärke'}):
+            </Text>
+            <Group gap="md">
+              {e.empfaenger.gleiche!.map((g) => (
+                <Checkbox
+                  key={g.id}
+                  label={g.name}
+                  checked={auchFuer.includes(g.id)}
+                  onChange={(ev) => setAuchFuer(ev.currentTarget.checked ? [...auchFuer, g.id] : auchFuer.filter((x) => x !== g.id))}
+                  data-auch-fuer-person={g.name}
+                />
               ))}
-            </Card>
-          ))}
-        </SimpleGrid>
-        <Title order={5}>Aufgaben ({aufgaben.length})</Title>
-        <Table striped verticalSpacing={4} data-karten>
-          <Table.Tbody>
-            {aufgaben.map((a) => (
-              <Table.Tr key={a.id} data-entwurf-aufgabe>
-                <Table.Td w={90}>
-                  <Badge size="sm" variant="light">
-                    {ART_NAME[a.art]}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">
-                    {lateinVorschau(a)?.aufgabe ?? (a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz)}
-                    {a.vorgabe ? (
-                      <Text span c="dimmed">
-                        {' '}
-                        {a.vorgabe}
-                      </Text>
-                    ) : null}
-                  </Text>
-                  <Text size="xs" c="teal">
-                    → {lateinVorschau(a)?.loesung ?? a.loesungen.join(' | ')}
-                    {a.art === 'fehler' && a.fehlerWort ? ` (statt „${a.fehlerWort}")` : ''}
-                  </Text>
-                </Table.Td>
-                <Table.Td w={40}>
-                  <Tooltip label="Streichen">
-                    <ActionIcon variant="subtle" color="red" onClick={() => setAufgaben(aufgaben.filter((x) => x.id !== a.id))} aria-label="Aufgabe streichen">
-                      <IconX size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-        <Group justify="flex-end">
-          <Button variant="default" onClick={schliessen}>
-            Später
+            </Group>
+          </Card>
+        )}
+        <Group justify="space-between">
+          <Button variant="subtle" color="red" onClick={verwerfen} data-entwurf-verwerfen>
+            Verwerfen
           </Button>
-          <Button loading={laeuft} disabled={aufgaben.length < 8} onClick={() => void freigeben()} data-entwurf-freigeben>
-            Freigeben ({aufgaben.length} Aufgaben)
-          </Button>
+          <Group>
+            <Button variant="default" onClick={schliessen}>
+              Später
+            </Button>
+            <Button loading={laeuft} disabled={paket.aufgaben.length < minimum} onClick={() => void freigeben()} data-entwurf-freigeben>
+              {extra ? `Für ${fuer.length === 1 ? fuer[0].name : `${fuer.length} Lernende`} freischalten` : `Freigeben (${paket.aufgaben.length} Aufgaben)`}
+            </Button>
+          </Group>
         </Group>
       </Stack>
     </Modal>
@@ -663,7 +700,7 @@ interface Lernstanddaten {
   problem: { id: string; art: string; satz: string; loesung: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
 }
 
-function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+export function Lernstand({ id, zurueck, imFenster }: { id: string; zurueck: () => void; imFenster?: boolean }): React.JSX.Element {
   const rueck = useRueckweg('grammatiktraining', zurueck, 'Alle Grammatiktrainings')
   const [d, setD] = useState<Lernstanddaten | null>(null)
   const [loeschen, setLoeschen] = useState(false)
@@ -677,10 +714,12 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
     )
   return (
     <Stack data-grammatik-lernstand>
-      <Group justify="space-between">
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={rueck.los} data-zurueck={rueck.aus ? 'meineklassen' : undefined}>
-          {rueck.name}
-        </Button>
+      <Group justify={imFenster ? 'flex-end' : 'space-between'}>
+        {!imFenster && (
+          <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={rueck.los} data-zurueck={rueck.aus ? 'meineklassen' : undefined}>
+            {rueck.name}
+          </Button>
+        )}
         <Group gap="xs">
           <Button
             size="xs"
@@ -694,7 +733,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           </Button>
         </Group>
       </Group>
-      <Title order={3}>{d.titel}</Title>
+      {!imFenster && <Title order={3}>{d.titel}</Title>}
       <Text c="dimmed">
         {d.fach} · {d.lerngruppe} · {d.paket.aufgaben.length} Aufgaben, {d.paket.regeln.length} Regelkarten
       </Text>

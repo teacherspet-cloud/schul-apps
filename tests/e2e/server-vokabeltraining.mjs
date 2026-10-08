@@ -70,7 +70,7 @@ try {
   await p.locator('.app-leiste [aria-label="Onlinetest"]').click()
   await p.waitForTimeout(600)
   pruefe((await p.getByRole('tab', { name: 'Vokabeltraining' }).count()) === 0, 'Onlinetest ohne Reiter „Vokabeltraining"')
-  await p.locator('.app-leiste [aria-label="Vokabeltraining"]').click()
+  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   pruefe(await da(p.locator(`[data-vokabel-zuweisung="${vok.id}"]`)), 'App „Vokabeltraining" mit der Freigabe')
   await p.screenshot({ path: join(out, '1-app.png') })
   // Vokabeln wählen (06.10.2026): Fach (bei mehreren Fremdsprachen) → Lehrwerk → Band

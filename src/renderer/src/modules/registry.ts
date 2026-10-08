@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react'
 import MeineKlassenModule from './meineklassen/MeineKlassenModule'
-import { VokabeltrainingModule } from './lernen/VokabelTraining'
-import { GrammatiktrainingModule } from './lernen/GrammatikTraining'
+import { SprachenlernenModule } from './lernen/VokabelTraining'
 import VerwaltungLehrkraft from './verwaltung/DatenUndMaterial'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
 import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
@@ -158,30 +157,18 @@ export const modules: SchulModule[] = [
           faecher: 'alle' as const,
           component: FreigegebeneBlaetterModule
         },
-        // Vokabeltraining (03.10.2026): eigene App statt Reiter im Onlinetest – Lernen über Wochen
+        // Sprachenlernen (08.10.2026, abgestimmt): Vokabeltraining und Grammatiktraining in einer App – je Gruppe ein Kurs
         {
-          id: 'vokabeltraining',
-          name: 'Vokabeltraining',
+          id: 'sprachenlernen',
+          name: 'Sprachenlernen',
           description:
-            'Vokabeln über einen längeren Zeitraum im Karteikasten lernen lassen – Lerngruppe, Einzelne oder per QR-Code – mit Lernstand und Prognose.',
-          icon: programmSymbol('vokabeltraining', 'orange'),
+            'Vokabeln und Grammatik je Gruppe als Kurs üben lassen – Karteikasten, Spiele, Regelkarten; mit Lernstand, Stärken und Schwächen und Förder-/Forderaufgaben je Kind.',
+          icon: programmSymbol('sprachenlernen', 'orange'),
           color: 'orange',
-          illustration: illustration('vokabeltraining'),
-          leistenbild: leistenbild('vokabeltraining'),
+          illustration: illustration('sprachenlernen') ?? illustration('vokabeltraining'),
+          leistenbild: leistenbild('sprachenlernen') ?? leistenbild('vokabeltraining'),
           faecher: SPRACH_FAECHER,
-          component: VokabeltrainingModule
-        },
-        // Grammatiktraining (06.10.2026): Grundgerüst wie Vokabeltraining – Themen-Kasten mit Regelkarten, Spiele
-        {
-          id: 'grammatiktraining',
-          name: 'Grammatiktraining',
-          description: 'Grammatikthemen im Karteikasten üben lassen – Regelkarten, rund 40 geprüfte Aufgaben und Spiele, mit Lernstand je Person.',
-          icon: programmSymbol('grammatiktraining', 'grape'),
-          color: 'grape',
-          illustration: illustration('grammatiktraining'),
-          leistenbild: leistenbild('grammatiktraining'),
-          faecher: SPRACH_FAECHER,
-          component: GrammatiktrainingModule
+          component: SprachenlernenModule
         },
         // Unterrichtsreihe (Etappe 6, 02.10.2026): Lernpfad für Lernende mit Freischalten – alle Fächer
         {
@@ -297,7 +284,7 @@ export interface ModulGruppe {
   apps: string[]
 }
 export const MODUL_GRUPPEN: ModulGruppe[] = [
-  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'vokabeltraining', 'grammatiktraining'] },
+  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'sprachenlernen'] },
   { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
   { id: 'verwaltung', name: 'Verwaltung', apps: ['meineklassen', 'elternbrief', 'vokabelliste', 'verwaltung'] }

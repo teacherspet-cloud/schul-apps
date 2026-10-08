@@ -38,6 +38,8 @@ export interface GrammatikRegel {
   /** Kurze Erklärung auf Deutsch (2–4 Sätze) */
   erklaerung: string
   beispiele: string[]
+  /** Förderaufgaben (08.10.2026): typische Stolperfallen, aus den Fehlern des Kindes */
+  stolperfallen?: string[]
 }
 
 export interface GrammatikAufgabe {
@@ -60,6 +62,10 @@ export interface GrammatikAufgabe {
   teile?: string[]
   /** Warum (kurz, deutsch) – nach der Antwort gezeigt */
   erklaerung?: string
+  /** Förderaufgaben (08.10.2026): Stufe 1 erkennen, 2 gelenkt bilden, 3 selbst bilden */
+  stufe?: 1 | 2 | 3
+  /** Hilfe vor der Antwort (Tipp-Knopf) */
+  tipp?: string
   /** bestimmen: die Form (steht sie im `satz`, gilt nur die Lesart im Satz) */
   form?: string
   /** bestimmen: Merkmale in Reihenfolge, z. B. ["Kasus", "Numerus", "Genus"] */
@@ -123,19 +129,33 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
         id: /^[a-z0-9-]{1,30}$/i.test(String(y.id ?? '')) ? String(y.id) : `r${i + 1}`,
         titel: text(y.titel, 120),
         erklaerung: text(y.erklaerung, 900),
-        beispiele: liste(y.beispiele, 6, 240)
+        beispiele: liste(y.beispiele, 6, 240),
+        ...(liste(y.stolperfallen, 5, 240).length ? { stolperfallen: liste(y.stolperfallen, 5, 240) } : {})
       }
     })
     .filter((x) => x.titel && x.erklaerung)
   const regelIds = new Set(regeln.map((x) => x.id))
   const gesehen = new Set<string>()
   const aufgaben: GrammatikAufgabe[] = []
+  /*
+   * Kennungen bleiben erhalten (08.10.2026: Aufgaben bearbeiten und löschen) – sonst rutschten nach einer gelöschten
+   * Aufgabe alle späteren Kennungen nach und der Lernstand der Kinder hinge an falschen Aufgaben. Fehlt eine Kennung
+   * oder ist sie doppelt, gibt es die nächste freie „a<n>".
+   */
+  const vergeben = new Set<string>()
+  const kennung = (roh: unknown, i: number): string => {
+    const k = String(roh ?? '')
+    if (/^[a-z][a-z0-9-]{0,29}$/i.test(k) && !vergeben.has(k)) return k
+    let n = i + 1
+    while (vergeben.has(`a${n}`)) n++
+    return `a${n}`
+  }
   for (const [i, x] of (Array.isArray(r.aufgaben) ? r.aufgaben : []).slice(0, 120).entries()) {
     const y = (x ?? {}) as Record<string, unknown>
     const art = String(y.art ?? '') as AufgabenArt
     if (!ARTEN.includes(art)) continue
     const a: GrammatikAufgabe = {
-      id: `a${i + 1}`,
+      id: kennung(y.id, i),
       art,
       regelId: regelIds.has(String(y.regelId)) ? String(y.regelId) : regeln[0]?.id ?? '',
       anweisung: text(y.anweisung, 200),
@@ -145,7 +165,9 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
       ...(art === 'auswahl' ? { optionen: liste(y.optionen, 5, 120) } : {}),
       ...(art === 'fehler' && text(y.fehlerWort, 80) ? { fehlerWort: text(y.fehlerWort, 80) } : {}),
       ...(art === 'satzbau' ? { teile: liste(y.teile, 16, 80) } : {}),
-      ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {})
+      ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {}),
+      ...(y.stufe === 1 || y.stufe === 2 || y.stufe === 3 ? { stufe: y.stufe } : {}),
+      ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
     if (art === 'bestimmen') {
@@ -191,7 +213,8 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
       const offen = a.zeilen.flatMap((z) => z.loesungen.filter((l, j) => l && !z.vorgabe?.[j]))
       // Verbkarten (07.10.2026) haben eine Zeile mit mindestens einer offenen Form
       const minZeilen = a.regelId === 'verben' ? 1 : 2
-      if (!a.spalten.length || a.zeilen.length < minZeilen || a.zeilen.some((z) => z.loesungen.length !== a.spalten!.length) || offen.length < minZeilen) continue
+      if (!a.spalten.length || a.zeilen.length < minZeilen || a.zeilen.some((z) => z.loesungen.length !== a.spalten!.length) || offen.length < minZeilen)
+        continue
       a.loesungen = [offen.join(' | ')]
     }
     if (art === 'uebersetzen' && !a.satz) continue
@@ -204,6 +227,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     const schluessel = `${art}|${a.satz}|${a.form ?? ''}|${a.loesungen[0]}`.toLowerCase()
     if (gesehen.has(schluessel)) continue
     gesehen.add(schluessel)
+    vergeben.add(a.id)
     aufgaben.push(a)
     if (aufgaben.length >= 80) break
   }
@@ -377,7 +401,19 @@ export const alsKarten = (aufgaben: GrammatikAufgabe[]): { id: string; term: str
 
 // ---------------------------------------------------------------- Spiele
 
-export type GrammatikSpielId = 'fehlerjagd' | 'satzbaupuzzle' | 'formenblitz' | 'regelzuordnen' | 'verbtrio' | 'verbblitz' | 'bildverb' | 'muster'
+export type GrammatikSpielId =
+  | 'fehlerjagd'
+  | 'satzbaupuzzle'
+  | 'formenblitz'
+  | 'regelzuordnen'
+  | 'verbtrio'
+  | 'verbblitz'
+  | 'bildverb'
+  | 'muster'
+  | 'richtigfalsch'
+  | 'formenmemory'
+  | 'tabellenpuzzle'
+  | 'signalwort'
 
 export const GRAMMATIK_SPIELE: {
   id: GrammatikSpielId
@@ -388,46 +424,180 @@ export const GRAMMATIK_SPIELE: {
   braucht: AufgabenArt[]
   /** Verbspiel (07.10.2026): nur bei der Freigabe „Unregelmäßige Verben" */
   verben?: true
-}[] =
-  [
-    {
-      id: 'fehlerjagd',
-      name: 'Fehler finden',
-      einheit: 'richtig',
-      kleinerBesser: false,
-      beschreibung: 'Das falsche Wort antippen und verbessern.',
-      braucht: ['fehler']
-    },
-    {
-      id: 'satzbaupuzzle',
-      name: 'Satzbau-Puzzle',
-      einheit: 'Sätze',
-      kleinerBesser: false,
-      beschreibung: 'Die Wörter in die richtige Reihenfolge bringen.',
-      braucht: ['satzbau']
-    },
-    {
-      id: 'formenblitz',
-      name: 'Formen-Blitz',
-      einheit: 'richtig',
-      kleinerBesser: false,
-      beschreibung: '60 Sekunden – die richtige Form wählen.',
-      braucht: ['auswahl']
-    },
-    {
-      id: 'regelzuordnen',
-      name: 'Regel zuordnen',
-      einheit: 'richtig',
-      kleinerBesser: false,
-      beschreibung: 'Zum Beispielsatz die passende Regel finden.',
-      braucht: []
-    },
-    // Unregelmäßige Verben (07.10.2026, Plan-Modus mit der Lehrkraft)
-    { id: 'verbtrio', name: 'Stammformen-Trio', einheit: 'Züge', kleinerBesser: true, beschreibung: 'Die Formen eines Verbs zusammen aufdecken.', braucht: [], verben: true },
-    { id: 'verbblitz', name: 'Formen-Blitz', einheit: 'richtig', kleinerBesser: false, beschreibung: '60 Sekunden: Welche Form hast du gehört?', braucht: [], verben: true },
-    { id: 'bildverb', name: 'Bild-Verb', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Zum Bild die Formen des Verbs nennen.', braucht: [], verben: true },
-    { id: 'muster', name: 'Muster sortieren', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Verben nach ihrem Formenmuster ordnen.', braucht: [], verben: true }
-  ]
+}[] = [
+  {
+    id: 'fehlerjagd',
+    name: 'Fehler finden',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Das falsche Wort antippen und verbessern.',
+    braucht: ['fehler']
+  },
+  {
+    id: 'satzbaupuzzle',
+    name: 'Satzbau-Puzzle',
+    einheit: 'Sätze',
+    kleinerBesser: false,
+    beschreibung: 'Die Wörter in die richtige Reihenfolge bringen.',
+    braucht: ['satzbau']
+  },
+  {
+    id: 'formenblitz',
+    name: 'Formen-Blitz',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: '60 Sekunden – die richtige Form wählen.',
+    braucht: ['auswahl']
+  },
+  {
+    id: 'regelzuordnen',
+    name: 'Regel zuordnen',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Zum Beispielsatz die passende Regel finden.',
+    braucht: []
+  },
+  // Unregelmäßige Verben (07.10.2026, Plan-Modus mit der Lehrkraft)
+  {
+    id: 'verbtrio',
+    name: 'Stammformen-Trio',
+    einheit: 'Züge',
+    kleinerBesser: true,
+    beschreibung: 'Die Formen eines Verbs zusammen aufdecken.',
+    braucht: [],
+    verben: true
+  },
+  {
+    id: 'verbblitz',
+    name: 'Formen-Blitz',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: '60 Sekunden: Welche Form hast du gehört?',
+    braucht: [],
+    verben: true
+  },
+  {
+    id: 'bildverb',
+    name: 'Bild-Verb',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Zum Bild die Formen des Verbs nennen.',
+    braucht: [],
+    verben: true
+  },
+  {
+    id: 'muster',
+    name: 'Muster sortieren',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Verben nach ihrem Formenmuster ordnen.',
+    braucht: [],
+    verben: true
+  },
+  // Vier neue Spiele (08.10.2026, Plan-Modus mit der Lehrkraft) – nur, wenn die Grammatik dazu passt
+  {
+    id: 'richtigfalsch',
+    name: 'Richtig oder falsch?',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: '60 Sekunden: Stimmt der Satz grammatisch?',
+    braucht: ['auswahl', 'fehler', 'luecke']
+  },
+  {
+    id: 'formenmemory',
+    name: 'Formen-Memory',
+    einheit: 'Züge',
+    kleinerBesser: true,
+    beschreibung: 'Grundform und gebildete Form als Paar aufdecken.',
+    braucht: ['luecke', 'umformen', 'tabelle']
+  },
+  {
+    id: 'tabellenpuzzle',
+    name: 'Tabellen-Puzzle',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Die Formen in die richtigen Felder der Tabelle setzen.',
+    braucht: ['tabelle']
+  },
+  {
+    id: 'signalwort',
+    name: 'Signalwort-Sortierer',
+    einheit: 'richtig',
+    kleinerBesser: false,
+    beschreibung: 'Welche Zeitform verrät das Signalwort?',
+    braucht: []
+  }
+]
+
+/** Satz mit eingesetzter Lücke */
+const eingesetzt = (satz: string, wort: string): string => satz.replace('___', wort)
+
+/**
+ * Richtig oder falsch? – Sätze aus geübten Aufgaben: Auswahl (richtige bzw. falsche Option eingesetzt), Fehler finden
+ * (Satz mit Fehler bzw. verbessert), Lücke (richtig eingesetzt).
+ */
+export function richtigFalschSaetze(aufgaben: GrammatikAufgabe[], zufall: () => number = Math.random): { satz: string; stimmt: boolean; aufgabeId: string }[] {
+  const aus: { satz: string; stimmt: boolean; aufgabeId: string }[] = []
+  for (const a of aufgaben) {
+    if (a.art === 'auswahl' && a.satz.includes('___')) {
+      const falsch = (a.optionen ?? []).filter((o) => !a.loesungen.some((l) => normiert(l) === normiert(o)))
+      aus.push({ satz: eingesetzt(a.satz, a.loesungen[0]), stimmt: true, aufgabeId: a.id })
+      if (falsch.length) aus.push({ satz: eingesetzt(a.satz, falsch[Math.floor(zufall() * falsch.length)]), stimmt: false, aufgabeId: a.id })
+    } else if (a.art === 'fehler' && a.fehlerWort) {
+      aus.push({ satz: a.satz, stimmt: false, aufgabeId: a.id })
+      aus.push({ satz: a.satz.replace(a.fehlerWort, a.loesungen[0]), stimmt: true, aufgabeId: a.id })
+    } else if (a.art === 'luecke' && a.satz.includes('___')) aus.push({ satz: eingesetzt(a.satz, a.loesungen[0]), stimmt: true, aufgabeId: a.id })
+  }
+  return aus
+}
+
+/** Formen-Memory – Paare Grundform/Vorgabe ↔ gebildete Form aus Lücke (mit Grundform), Umformen (kurz) und Tabellen */
+export function memoryPaare(aufgaben: GrammatikAufgabe[]): { links: string; rechts: string; aufgabeId: string }[] {
+  const aus: { links: string; rechts: string; aufgabeId: string }[] = []
+  for (const a of aufgaben) {
+    if (a.art === 'luecke' && a.vorgabe && a.loesungen[0] && a.vorgabe.length <= 40)
+      aus.push({ links: a.vorgabe.replace(/^\(|\)$/g, ''), rechts: a.loesungen[0], aufgabeId: a.id })
+    else if (a.art === 'umformen' && a.satz.length <= 40 && (a.loesungen[0] ?? '').length <= 40)
+      aus.push({ links: `${a.satz}${a.vorgabe ? ` → ${a.vorgabe}` : ''}`, rechts: a.loesungen[0], aufgabeId: a.id })
+    else if (a.art === 'tabelle')
+      for (const z of a.zeilen ?? [])
+        z.loesungen.forEach((l, j) => {
+          if (l && !z.vorgabe?.[j]) aus.push({ links: `${z.name} ${a.spalten?.[j] ?? ''}`.trim(), rechts: l, aufgabeId: a.id })
+        })
+  }
+  // Gleiche Formen nur einmal (sonst gäbe es zwei passende Karten)
+  const gesehen = new Set<string>()
+  return aus.filter((p) => {
+    const k = normiert(p.rechts)
+    if (gesehen.has(k) || gesehen.has(`l:${normiert(p.links)}`)) return false
+    gesehen.add(k)
+    gesehen.add(`l:${normiert(p.links)}`)
+    return true
+  })
+}
+
+/**
+ * Passt das Spiel? (08.10.2026, abgestimmt: unpassende Spiele werden ausgeblendet.) `geuebt` = schon eingeführte
+ * Aufgaben (Fach > 0), `bekannteZeitformen` = Anzahl bekannter Zeitformen (Signalwort-Sortierer).
+ */
+export function grammatikSpielPasst(id: GrammatikSpielId, geuebt: GrammatikAufgabe[], regeln: number, bekannteZeitformen: number): boolean {
+  switch (id) {
+    case 'regelzuordnen':
+      return regeln >= 2
+    case 'richtigfalsch':
+      return richtigFalschSaetze(geuebt).length >= 6
+    case 'formenmemory':
+      return memoryPaare(geuebt).length >= 4
+    case 'tabellenpuzzle':
+      return geuebt.some((a) => a.art === 'tabelle')
+    case 'signalwort':
+      return bekannteZeitformen >= 2
+    default: {
+      const s = GRAMMATIK_SPIELE.find((x) => x.id === id)
+      return Boolean(s && !s.verben && geuebt.filter((a) => s.braucht.includes(a.art)).length >= 3)
+    }
+  }
+}
 
 export const grammatikRekord = (spiel: GrammatikSpielId, wert: number, bisher: number | undefined): boolean =>
   bisher === undefined || (GRAMMATIK_SPIELE.find((s) => s.id === spiel)?.kleinerBesser ? wert < bisher : wert > bisher)

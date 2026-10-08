@@ -10,7 +10,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
-import { openDocument, useDokumentOeffner, useRueckweg } from '../../shared/navigation'
+import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../shared/components/SortierTabelle'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
@@ -57,6 +57,7 @@ import {
   IconUserPlus
 } from '@tabler/icons-react'
 import { LernendeEintragen, ZettelDruck, type Zettel } from './LernendeEintragen'
+import { extraStarten, KursGrammatik, type ProfilPunkt } from './kurs/KursGrammatik'
 import { useAppSettings } from '../../shared/settingsStore'
 import { fachFarbe } from '../../shared/fachfarben'
 import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from './GrammatikTraining'
@@ -135,7 +136,8 @@ const alsFeld = (ms: number | null): string => (ms ? new Date(ms - new Date(ms).
 export const ausFeld = (v: string, uhr: string): number | null => (v ? new Date(`${v}T${uhr}`).getTime() : null)
 
 /** Die App „Vokabeltraining" (Gruppe Unterricht) */
-export function VokabeltrainingModule({ active }: { active: boolean }): React.JSX.Element | null {
+/** Sprachenlernen (08.10.2026): Vokabel- und Grammatik-App in einem – je Gruppe ein Kurs */
+export function SprachenlernenModule({ active }: { active: boolean }): React.JSX.Element | null {
   if (!active) return null
   return (
     <Container size="xl" py="md">
@@ -226,8 +228,23 @@ export default function VokabelTraining(): React.JSX.Element {
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
   const [filter, setFilter] = useState<'offen' | 'beendet'>('offen')
-  // openDocument('vokabeltraining', id) – z. B. aus „Meine Klassen" (06.10.2026)
-  useDokumentOeffner('vokabeltraining', async (id) => setGewaehlt(id))
+  const [grammatikOffen, setGrammatikOffen] = useState<string | null>(null)
+  // openDocument('sprachenlernen', id) – Kurs; „g:<id>" = Grammatik (öffnet den Kurs und darin das Grammatik-Fenster)
+  useDokumentOeffner('sprachenlernen', async (id) => {
+    if (!id.startsWith('g:')) return setGewaehlt(id)
+    const gid = id.slice(2)
+    const g = (await holen<{ zuweisungen: { id: string; vokId?: string }[] }>('/server/grammatik')).zuweisungen.find((x) => x.id === gid)
+    if (!g?.vokId) {
+      // Noch ohne Kurs: die Liste legt ihn an (Überführung) – dann erneut nachsehen
+      await holen('/server/vokabeln')
+      const g2 = (await holen<{ zuweisungen: { id: string; vokId?: string }[] }>('/server/grammatik')).zuweisungen.find((x) => x.id === gid)
+      if (!g2?.vokId) return
+      setGrammatikOffen(gid)
+      return setGewaehlt(g2.vokId)
+    }
+    setGrammatikOffen(gid)
+    setGewaehlt(g.vokId)
+  })
   const [suche, setSuche] = useState('')
   const [umbenennen, setUmbenennen] = useState<{ id: string; text: string; standard: string } | null>(null)
   const laden = useCallback(
@@ -239,7 +256,15 @@ export default function VokabelTraining(): React.JSX.Element {
     []
   )
   useEffect(laden, [laden])
-  if (gewaehlt) return <Lernstand id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
+  if (gewaehlt)
+    return (
+      <Lernstand
+        id={gewaehlt}
+        zurueck={() => (setGewaehlt(null), setGrammatikOffen(null), laden())}
+        grammatikOffen={grammatikOffen}
+        setGrammatikOffen={setGrammatikOffen}
+      />
+    )
   const q = suche.trim().toLowerCase()
   const sichtbar = (liste ?? []).filter(
     (z) => z.status === filter && (!q || `${z.ueberschrift ?? ''} ${z.titel} ${z.fach} ${z.lerngruppe}`.toLowerCase().includes(q))
@@ -248,11 +273,11 @@ export default function VokabelTraining(): React.JSX.Element {
     <Stack data-vokabeltraining>
       {/* Gemeinsamer Kopf (Phase 6a): Filter in der zweiten Zeile */}
       <AppKopf
-        beschreibung="Vokabeln über einen längeren Zeitraum zum Lernen freigeben – für eine Lerngruppe, einzelne Lernende oder per QR-Code. Geübt wird im Karteikasten der Lern-App; hier steht der Lernstand."
+        beschreibung="Vokabeln und Grammatik je Gruppe als Kurs – für eine Lerngruppe, einzelne Lernende oder per Code. Geübt wird in der Lern-App; hier stehen Lernstand, Stärken und Schwächen."
         suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Titel, Fach, Lerngruppe …" />}
         hauptknopf={
           <Button leftSection={<IconPlus size={16} />} radius="md" color={farbe} onClick={() => setNeu(true)} data-vokabeln-freigeben>
-            Vokabeln freigeben
+            Neuer Kurs
           </Button>
         }
         links={
@@ -383,6 +408,15 @@ export function useLerngruppen(): { gruppen: { id: string; name: string }[]; all
   return { gruppen, alle }
 }
 
+/** Sprachen eines Kurses nur mit Grammatik */
+const KURS_SPRACHEN = [
+  { value: 'en', label: 'Englisch' },
+  { value: 'fr', label: 'Französisch' },
+  { value: 'es', label: 'Spanisch' },
+  { value: 'la', label: 'Latein' },
+  { value: 'de', label: 'Deutsch' }
+]
+
 function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Element {
   const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
   const [titel, setTitel] = useState('')
@@ -396,12 +430,40 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   // Passende Grammatik gleich mit freigeben (08.10.2026): nach den Vokabeln öffnet der Grammatik-Dialog, vorbelegt
   const [mitGrammatik, setMitGrammatik] = useState(false)
   const [grammatikDanach, setGrammatikDanach] = useState<GrammatikVorgabe | null>(null)
+  // Kurs nur mit Grammatik (Sprachenlernen, 08.10.2026): Sprache wählen, Vokabeln später
+  const [nurGrammatik, setNurGrammatik] = useState(false)
+  const [sprache, setSprache] = useState<string | null>('en')
   const { gruppen } = useLerngruppen()
   useEffect(() => {
     if (auswahl) setTitel(auswahl.titel)
   }, [auswahl])
   const alleLernenden = useAlleLernenden()
   const los = async (): Promise<void> => {
+    if (nurGrammatik) {
+      if (!sprache) return
+      setLaeuft(true)
+      try {
+        const name = KURS_SPRACHEN.find((s) => s.value === sprache)!.label
+        const { id: neueId } = await senden<{ id: string }>('/server/vokabeln/freigeben', {
+          titel: titel || name,
+          sprache,
+          fach: name,
+          woerter: [],
+          nurGrammatik: true,
+          lerngruppeId: art === 'gruppe' ? gruppe : '',
+          schueler: art === 'einzeln' ? einzelne : [],
+          bis: ausFeld(bis, '23:59:00'),
+          gaeste: art === 'code' || qr
+        })
+        notifySuccess('Kurs angelegt – jetzt die Grammatik wählen.')
+        return setGrammatikDanach({ vokId: neueId, titel: titel || name, sprache })
+      } catch (e) {
+        notifyError(e, 'Kurs nicht angelegt')
+      } finally {
+        setLaeuft(false)
+      }
+      return
+    }
     if (!auswahl) return
     setLaeuft(true)
     try {
@@ -435,9 +497,19 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   }
   if (grammatikDanach) return <GrammatikFreigeben vorgabe={grammatikDanach} schliessen={schliessen} />
   return (
-    <Modal opened onClose={schliessen} title="Vokabeln zum Lernen freigeben" size="lg">
+    <Modal opened onClose={schliessen} title="Neuer Kurs" size="lg">
       <Stack>
-        <VokabelQuelle wahl={setAuswahl} />
+        <Switch
+          label="Nur Grammatik (Vokabeln lassen sich später hinzufügen)"
+          checked={nurGrammatik}
+          onChange={(e) => setNurGrammatik(e.currentTarget.checked)}
+          data-nur-grammatik
+        />
+        {nurGrammatik ? (
+          <Select label="Sprache" data={KURS_SPRACHEN} value={sprache} onChange={setSprache} allowDeselect={false} data-kurs-sprache />
+        ) : (
+          <VokabelQuelle wahl={setAuswahl} />
+        )}
         {auswahl && (
           <Text size="sm" c="dimmed">
             {auswahl.woerter.length} Wörter, davon {auswahl.woerter.filter((w) => w.example).length} mit Beispielsatz.
@@ -506,7 +578,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             onChange={(e) => setTermin(e.currentTarget.value)}
           />
         </Group>
-        {(auswahl?.sprache === 'en' || auswahl?.sprache === 'la' || auswahl?.sprache === 'fr' || auswahl?.sprache === 'es') && (
+        {!nurGrammatik && (auswahl?.sprache === 'en' || auswahl?.sprache === 'la' || auswahl?.sprache === 'fr' || auswahl?.sprache === 'es') && (
           <Switch
             label="Passende Grammatik gleich mit freigeben"
             description="Danach öffnet sich die Grammatikauswahl – mit Band und Unit vorbelegt, für dieselben Lernenden."
@@ -518,11 +590,11 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         <Group justify="flex-end">
           <Button
             loading={laeuft}
-            disabled={!auswahl?.woerter.length || (art === 'gruppe' ? !gruppe : art === 'einzeln' ? !einzelne.length : false)}
+            disabled={(nurGrammatik ? !sprache : !auswahl?.woerter.length) || (art === 'gruppe' ? !gruppe : art === 'einzeln' ? !einzelne.length : false)}
             onClick={() => void los()}
             data-vokabeln-los
           >
-            Freigeben
+            {nurGrammatik ? 'Kurs anlegen und Grammatik wählen' : 'Freigeben'}
           </Button>
         </Group>
       </Stack>
@@ -560,6 +632,12 @@ interface Lernstanddaten {
     /** In 7 Tagen neu gelernt / wiederholt (08.10.2026) */
     neu7?: number
     wiederholt7?: number
+    /** Stärken/Schwächen in Grammatik und Extra-Aufgaben (Sprachenlernen, 08.10.2026) */
+    grammatik?: {
+      staerken: ProfilPunkt[]
+      schwaechen: ProfilPunkt[]
+      extra: { id: string; art: string; titel: string; bearbeitet: number; gesamt: number; status: string }[]
+    }
   }[]
   lerngruppeId?: string
   gesamt: Uebersicht
@@ -761,6 +839,57 @@ function KastenKopf({
   )
 }
 
+/** Zelle „Grammatik": Schwächen mit „Fördern", Stärken mit „Fordern", laufende Extra-Aufgaben */
+function GrammatikZelle({ l, foerdern, fordern }: { l: Lernende; foerdern: () => void; fordern: () => void }): React.JSX.Element {
+  const g = l.grammatik
+  if (!g || (!g.schwaechen.length && !g.staerken.length && !g.extra.length))
+    return (
+      <Text size="xs" c="dimmed">
+        noch zu wenig geübt
+      </Text>
+    )
+  const prozent = (p: ProfilPunkt): string => `${Math.round(p.quote * 100)} %`
+  return (
+    <Stack gap={4}>
+      {g.schwaechen.length > 0 && (
+        <Group gap={6} wrap="nowrap" justify="space-between">
+          <Text size="xs" data-schwaechen>
+            <Text span c="orange" fw={700}>
+              Schwächen:
+            </Text>{' '}
+            {g.schwaechen.map((p) => `${p.titel} (${prozent(p)})`).join(' · ')}
+          </Text>
+          <Button size="compact-xs" variant="light" color="orange" onClick={foerdern} data-foerdern={l.name}>
+            Fördern
+          </Button>
+        </Group>
+      )}
+      {g.staerken.length > 0 && (
+        <Group gap={6} wrap="nowrap" justify="space-between">
+          <Text size="xs" data-staerken>
+            <Text span c="teal" fw={700}>
+              Stärken:
+            </Text>{' '}
+            {g.staerken.map((p) => p.titel).join(' · ')}
+          </Text>
+          <Button size="compact-xs" variant="light" color="teal" onClick={fordern} data-fordern={l.name}>
+            Fordern
+          </Button>
+        </Group>
+      )}
+      {g.extra.length > 0 && (
+        <Group gap={4}>
+          {g.extra.map((x) => (
+            <Badge key={x.id} size="xs" variant="light" color={x.bearbeitet >= x.gesamt ? 'teal' : 'gray'} tt="none" data-extra-stand={x.id}>
+              {x.art === 'foerder' ? 'Förderung' : 'Forderung'} {x.bearbeitet >= x.gesamt ? 'geschafft' : `läuft ${x.bearbeitet}/${x.gesamt}`}
+            </Badge>
+          ))}
+        </Group>
+      )}
+    </Stack>
+  )
+}
+
 /**
  * Je Lernende/r (08.10.2026, Wunsch der Lehrkraft): auf- und zuklappbar, Namen ausblendbar (etwa am Beamer),
  * sortier- und filterbar; statt der Übungstage die in 7 Tagen neu gelernten und wiederholten Vokabeln.
@@ -768,12 +897,44 @@ function KastenKopf({
 function LernendeTabelle({
   lernende,
   gastZeigen,
-  entfernen
+  entfernen,
+  kurs
 }: {
   lernende: Lernende[]
   gastZeigen: (l: Lernende) => void
   entfernen: (l: Lernende) => void
+  kurs: { id: string; fach: string; sprache: string; lerngruppe: string; woerter: { term: string; translation: string }[] }
 }): React.JSX.Element {
+  /*
+   * Förder-/Forderaufgaben (08.10.2026, abgestimmt): für das eine Kind; wer dieselbe Schwäche bzw. Stärke hat, wird im
+   * Prüf-Fenster angeboten. Bekannte Grammatik = die Grammatik dieses Kurses und die Regeln aus den Profilen.
+   */
+  const extra = async (l: Lernende, art: 'foerder' | 'forder'): Promise<void> => {
+    const punkte = (art === 'foerder' ? l.grammatik?.schwaechen : l.grammatik?.staerken) ?? []
+    if (!punkte.length) return
+    const titel = new Set(punkte.map((p) => p.titel))
+    const gleiche = lernende
+      .filter((x) => x.id !== l.id && ((art === 'foerder' ? x.grammatik?.schwaechen : x.grammatik?.staerken) ?? []).some((p) => titel.has(p.titel)))
+      .map((x) => ({ id: x.id, name: x.name }))
+    const kursGrammatik = await holen<{ zuweisungen: { vokId?: string; thema: string; art?: string }[] }>('/server/grammatik')
+      .then((r) => r.zuweisungen.filter((g) => g.vokId === kurs.id && !g.art).map((g) => g.thema))
+      .catch(() => [] as string[])
+    const bekannt = [
+      ...new Set([...kursGrammatik, ...lernende.flatMap((x) => [...(x.grammatik?.staerken ?? []), ...(x.grammatik?.schwaechen ?? [])].map((p) => p.titel))])
+    ]
+    extraStarten({
+      art,
+      vokId: kurs.id,
+      fach: kurs.fach,
+      sprache: kurs.sprache,
+      jahrgang: Number(/\d{1,2}/.exec(kurs.lerngruppe)?.[0] ?? 6) || 6,
+      fuer: { id: l.id, name: l.name },
+      punkte,
+      gleiche,
+      bekannt,
+      woerter: kurs.woerter.map((w) => `${w.term} – ${w.translation}`)
+    })
+  }
   const [offen, setOffen] = useGemerkt('vok-lernende-offen', true)
   const [ohneNamen, setOhneNamen] = useGemerkt('vok-lernende-ohne-namen', false)
   // Ersatzname je Person bleibt beim Sortieren gleich (Reihenfolge nach Namen)
@@ -790,6 +951,15 @@ function LernendeTabelle({
     },
     { id: 'sicher', label: 'sicher', wert: (l) => l.uebersicht.sicher, absteigend: true },
     { id: 'faellig', label: 'fällig', wert: (l) => l.uebersicht.faellig, absteigend: true },
+    {
+      id: 'grammatik',
+      label: 'Grammatik',
+      wert: (l) => (l.grammatik?.schwaechen.length ?? 0) * 10 + (l.grammatik?.staerken.length ?? 0),
+      filter: 'auswahl',
+      filterWert: (l) => (l.grammatik?.schwaechen.length ? 'mit Schwächen' : l.grammatik?.staerken.length ? 'nur Stärken' : 'ohne Befund'),
+      absteigend: true,
+      breite: '26%'
+    },
     {
       id: 'woche',
       label: 'geübt (7 Tage)',
@@ -857,6 +1027,9 @@ function LernendeTabelle({
                     {l.uebersicht.sicher}/{l.uebersicht.gesamt}
                   </Table.Td>
                   <Table.Td>{l.uebersicht.faellig}</Table.Td>
+                  <Table.Td data-grammatik-profil={anzeige(l)}>
+                    <GrammatikZelle l={l} foerdern={() => void extra(l, 'foerder')} fordern={() => void extra(l, 'forder')} />
+                  </Table.Td>
                   <Table.Td data-woche={`${l.neu7 ?? 0}/${l.wiederholt7 ?? 0}`}>
                     {(l.neu7 ?? 0) + (l.wiederholt7 ?? 0) ? (
                       <Text size="sm">
@@ -898,109 +1071,19 @@ function LernendeTabelle({
   )
 }
 
-interface GrammatikKurz {
+function Lernstand({
+  id,
+  zurueck,
+  grammatikOffen = null,
+  setGrammatikOffen = () => undefined
+}: {
   id: string
-  titel: string
-  thema: string
-  lerngruppe: string
-  lerngruppeId?: string
-  vokId?: string
-  aufgaben: number
-  lernende: number
-  sicherSchnitt: number
-  status: string
-  erstellt: string
-}
-
-/**
- * Grammatik der Gruppe (08.10.2026): verbundene Grammatiktrainings und solche für dieselbe Lerngruppe – filter- und
- * sortierbar; ein Klick öffnet das Grammatiktraining.
- */
-function GrammatikDerGruppe({ vokId, lerngruppeId }: { vokId: string; lerngruppeId: string }): React.JSX.Element | null {
-  const [offen, setOffen] = useGemerkt('vok-grammatik-offen', true)
-  const [liste, setListe] = useState<GrammatikKurz[] | null>(null)
-  useEffect(
-    () =>
-      void holen<{ zuweisungen: GrammatikKurz[] }>('/server/grammatik').then(
-        (r) => setListe(r.zuweisungen.filter((g) => g.vokId === vokId || (lerngruppeId && g.lerngruppeId === lerngruppeId))),
-        () => setListe([])
-      ),
-    [vokId, lerngruppeId]
-  )
-  const spalten: Spalte<GrammatikKurz>[] = [
-    { id: 'titel', label: 'Grammatik', wert: (g) => g.titel.toLowerCase(), filterWert: (g) => `${g.titel} ${g.thema}`, filter: 'text' },
-    {
-      id: 'weg',
-      label: 'Für',
-      wert: (g) => (g.vokId === vokId ? 'verbunden' : 'gleiche Lerngruppe'),
-      filter: 'auswahl'
-    },
-    { id: 'aufgaben', label: 'Aufgaben', wert: (g) => g.aufgaben, absteigend: true },
-    { id: 'sicher', label: 'Ø sicher', wert: (g) => g.sicherSchnitt, absteigend: true },
-    { id: 'status', label: 'Status', wert: (g) => (g.status === 'offen' ? 'läuft' : 'abgeschlossen'), filter: 'auswahl' },
-    { id: 'datum', label: 'Freigegeben', wert: (g) => g.erstellt, absteigend: true }
-  ]
-  const t = useSortierTabelle(liste ?? [], spalten, { spalte: 'datum', ab: true })
-  return (
-    <Card withBorder data-grammatik-gruppe>
-      <KastenKopf
-        titel={`Grammatik der Gruppe${liste ? ` (${liste.length})` : ''}`}
-        offen={offen}
-        umschalten={() => setOffen(!offen)}
-        data-grammatik-gruppe-kopf
-      />
-      {offen &&
-        (!liste ? (
-          <Loader size="sm" mt="xs" />
-        ) : liste.length === 0 ? (
-          <Text size="sm" c="dimmed" mt="xs">
-            Noch keine Grammatik für diese Gruppe – mit „Grammatik dazu freigeben“ verbinden oder neu erstellen.
-          </Text>
-        ) : (
-          <>
-            <AktiveFilter spalten={spalten} tabelle={t} />
-            <Table data-karten mt="xs" highlightOnHover data-grammatik-gruppe-tabelle>
-              <Table.Thead>
-                <Table.Tr>
-                  {spalten.map((sp) => (
-                    <SortKopf key={sp.id} spalte={sp} tabelle={t} />
-                  ))}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {t.sichtbar.map((g) => (
-                  <Table.Tr key={g.id} style={{ cursor: 'pointer' }} onClick={() => void openDocument('grammatiktraining', g.id)} data-grammatik-zeile={g.id}>
-                    <Table.Td>
-                      <Text size="sm" fw={600}>
-                        {g.titel}
-                      </Text>
-                      {g.thema && g.thema !== g.titel && (
-                        <Text size="xs" c="dimmed">
-                          {g.thema}
-                        </Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge variant="light" color={g.vokId === vokId ? 'grape' : 'gray'} tt="none">
-                        {g.vokId === vokId ? 'verbunden' : 'gleiche Lerngruppe'}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{g.aufgaben}</Table.Td>
-                    <Table.Td>{Math.round(g.sicherSchnitt * 100)} %</Table.Td>
-                    <Table.Td>{g.status === 'offen' ? 'läuft' : 'abgeschlossen'}</Table.Td>
-                    <Table.Td>{new Date(g.erstellt).toLocaleDateString('de-DE')}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </>
-        ))}
-    </Card>
-  )
-}
-
-function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
-  const rueck = useRueckweg('vokabeltraining', zurueck, 'Alle Freigaben')
+  zurueck: () => void
+  grammatikOffen?: string | null
+  setGrammatikOffen?: (id: string | null) => void
+}): React.JSX.Element {
+  const rueck = useRueckweg('sprachenlernen', zurueck, 'Alle Kurse')
+  const [grammatikStand, setGrammatikStand] = useState(0)
   const [d, setD] = useState<Lernstanddaten | null>(null)
   const [qr, setQr] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
@@ -1019,6 +1102,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
     void senden(`/server/vokabeln/${id}/${was}`, daten).then(laden, (e: unknown) => notifyError(e))
   const tageBisTest = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const lernende = [...d.lernende].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  const mitWoertern = d.woerter.length > 0
   // Zettel für alle Gäste mit lesbarem Code (eingetragene und solche mit neu erzeugtem Code)
   const zettel = lernende.filter((l) => l.gast && l.zugang && l.zugang.length === 8).map((l) => ({ name: l.name, zugang: l.zugang! }))
   const anteilSicher = d.gesamt.gesamt ? d.gesamt.sicher / d.gesamt.gesamt : 0
@@ -1060,7 +1144,8 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           </Tooltip>
         </Group>
       </Group>
-      <VokabelAbschnitte teile={d.teile ?? []} gesamt={d.woerter.length} />
+      {/* Kurs nur mit Grammatik (08.10.2026): Vokabelteile erst, wenn Vokabeln dazukommen */}
+      {mitWoertern && <VokabelAbschnitte teile={d.teile ?? []} gesamt={d.woerter.length} />}
       <Group gap="md" align="flex-end">
         <TextInput
           type="date"
@@ -1080,28 +1165,32 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         />
       </Group>
       <Group gap="md" align="flex-end" data-vokabel-tag>
-        <NumberInput
-          label="Neue Vokabeln pro Tag"
-          description="vor den Spielen; geübt wird in 10er-Schritten"
-          min={1}
-          max={200}
-          w={230}
-          value={ziel === '' ? d.tagesziel ?? 10 : ziel}
-          onChange={setZiel}
-          onBlur={() => {
-            if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
-            setZiel('')
-          }}
-          data-vokabel-tagesziel
-        />
-        <Switch
-          label="Spiele heute schon freischalten"
-          description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
-          checked={Boolean(d.spieleFrei)}
-          onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
-          mb={4}
-          data-vokabel-spiele-frei
-        />
+        {mitWoertern && (
+          <NumberInput
+            label="Neue Vokabeln pro Tag"
+            description="vor den Spielen; geübt wird in 10er-Schritten"
+            min={1}
+            max={200}
+            w={230}
+            value={ziel === '' ? d.tagesziel ?? 10 : ziel}
+            onChange={setZiel}
+            onBlur={() => {
+              if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
+              setZiel('')
+            }}
+            data-vokabel-tagesziel
+          />
+        )}
+        {mitWoertern && (
+          <Switch
+            label="Spiele heute schon freischalten"
+            description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
+            checked={Boolean(d.spieleFrei)}
+            onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
+            mb={4}
+            data-vokabel-spiele-frei
+          />
+        )}
         <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setHinzu(true)} data-vokabel-hinzufuegen>
           Vokabeln hinzufügen
         </Button>
@@ -1109,17 +1198,19 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         <Button variant="light" leftSection={<IconUserPlus size={16} />} onClick={() => setEintragen(true)} data-lernende-eintragen>
           Lernende eintragen
         </Button>
-        {/* Grammatik fest für dieselben Lernenden (08.10.2026) */}
-        <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setGrammatik(true)} data-vokabel-grammatik>
-          Grammatik dazu freigeben
-        </Button>
         {zettel.length > 0 && (
           <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => setZettelDruck(zettel)} data-zettel-alle>
             Zettel für alle ({zettel.length})
           </Button>
         )}
       </Group>
-      {grammatik && <GrammatikDazu vokId={id} vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)} schliessen={() => setGrammatik(false)} />}
+      {grammatik && (
+        <GrammatikDazu
+          vokId={id}
+          vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)}
+          schliessen={() => (setGrammatik(false), setGrammatikStand((n) => n + 1))}
+        />
+      )}
       {zettelDruck && (
         <ZettelDruck
           titel={d.ueberschrift || d.titel}
@@ -1255,7 +1346,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         </Card>
       </SimpleGrid>
 
-      <Card withBorder>
+      <Card withBorder display={mitWoertern ? undefined : 'none'}>
         <Group gap="xs" mb="xs">
           <IconBooks size={18} />
           <Text fw={700}>Problemwörter der Lerngruppe</Text>
@@ -1288,8 +1379,13 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         )}
       </Card>
 
-      <LernendeTabelle lernende={lernende} gastZeigen={setGast} entfernen={setEntfernen} />
-      <GrammatikDerGruppe vokId={id} lerngruppeId={d.lerngruppeId ?? ''} />
+      <LernendeTabelle
+        lernende={lernende}
+        gastZeigen={setGast}
+        entfernen={setEntfernen}
+        kurs={{ id, fach: d.fach, sprache: d.sprache ?? '', lerngruppe: d.lerngruppe, woerter: d.woerter }}
+      />
+      <KursGrammatik vokId={id} hinzufuegen={() => setGrammatik(true)} geoeffnet={grammatikOffen} oeffnen={setGrammatikOffen} stand={grammatikStand} />
       <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">
         {entfernen && (
           <Stack gap="sm">

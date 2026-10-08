@@ -4,8 +4,36 @@
  * danach Spiele (Fehler finden, Satzbau-Puzzle, Formen-Blitz, Regel zuordnen) mit eigenem Rekord.
  * Regeln in shared/grammatiktrainer.ts, Server in server/grammatik.ts. Keine KI-Anfragen.
  */
-import { Alert, Badge, Button, Card, Center, Group, Loader, Paper, Progress, SimpleGrid, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
-import { IconArrowLeft, IconBook2, IconCheck, IconFlame, IconPlayerPlay, IconShieldCheck, IconStairsUp, IconTrophy, IconX } from '@tabler/icons-react'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Center,
+  Group,
+  Loader,
+  Paper,
+  Popover,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
+import {
+  IconArrowLeft,
+  IconBook2,
+  IconCheck,
+  IconChevronDown,
+  IconFlame,
+  IconPlayerPlay,
+  IconShieldCheck,
+  IconStairsUp,
+  IconTrophy,
+  IconX
+} from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ART_NAME,
@@ -17,8 +45,10 @@ import {
   type GrammatikPaket,
   type GrammatikSpielId
 } from '@shared/grammatiktrainer'
-import { alsKarten } from '@shared/grammatiktrainer'
-import { sitzungsWoerter, STUFEN, uebersicht, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { alsKarten, grammatikSpielPasst } from '@shared/grammatiktrainer'
+import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
+import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from './spiele/SpieleGrammatik'
+import { sitzungsWoerter, STUFEN, tagVon, uebersicht, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
@@ -26,10 +56,12 @@ import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten
 import { SPIELE_CSS } from './spiele/Spiele'
 import { useVerbDaten } from './verbDaten'
 import { useVtFarbe } from './vtFarben'
-import { ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
+import { fuerServer, ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
 
 /** Spiele mit ablaufender Uhr – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (Einstellungen der Lernenden, 06.10.2026) */
-const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle']
+const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle', 'richtigfalsch']
+/** Neue Spiele (08.10.2026) – laufen im Rahmen der Verbspiele */
+const NEUE_SPIELE: readonly GrammatikSpielId[] = ['richtigfalsch', 'formenmemory', 'tabellenpuzzle', 'signalwort']
 
 interface Daten {
   id: string
@@ -40,6 +72,9 @@ interface Daten {
   staende: Record<string, WortStand>
   rekorde: Record<string, number>
   ansehen: string[]
+  /** Sprachenlernen (08.10.2026): '' oder 'foerder'/'forder' (Extra für dich), bekannte Grammatik (passende Spiele) */
+  art?: string
+  bekannt?: string[]
 }
 interface Ergebnis {
   urteil: Urteil
@@ -106,10 +141,25 @@ function Kasten({
   const farbe = useVtFarbe()
   const karten = useMemo(() => alsKarten(d.paket.aufgaben) as Vokabel[], [d.paket.aufgaben])
   const u = uebersicht(karten, d.staende)
-  const heute = sitzungsWoerter(karten, d.staende)
-  const [regeln, setRegeln] = useState(false)
+  /*
+   * Heute dran (08.10.2026): fällige Wiederholungen, dann unbearbeitete Übungen in der Reihenfolge der Regeln (bei
+   * Förderaufgaben nach Stufen) – je Tag höchstens 10 neue.
+   */
+  const heute = useMemo(() => {
+    const faellig = sitzungsWoerter(karten, d.staende, Date.now(), 0)
+    const heuteTag = tagVon(Date.now())
+    const schonNeu = d.paket.aufgaben.filter((a) => d.staende[a.id]?.erstmals && tagVon(d.staende[a.id].erstmals!) === heuteTag).length
+    const regelIndex = new Map(d.paket.regeln.map((r, i) => [r.id, i]))
+    const neue = d.paket.aufgaben
+      .filter((a) => !d.staende[a.id]?.versuche)
+      .sort((a, b) => (a.stufe ?? 0) - (b.stufe ?? 0) || (regelIndex.get(a.regelId) ?? 0) - (regelIndex.get(b.regelId) ?? 0))
+      .slice(0, Math.max(0, 10 - schonNeu))
+    const nachId = new Map(karten.map((k) => [k.id, k]))
+    return [...faellig, ...neue.map((a) => nachId.get(a.id)!)].filter(Boolean)
+  }, [karten, d.staende, d.paket])
+  const [offeneRegel, setOffeneRegel] = useState<string | null>(null)
   const [spiel, setSpiel] = useState<GrammatikSpielId | null>(null)
-  const { d: wahl } = useDarstellung()
+  const { d: wahl, setze: setzeWahl } = useDarstellung()
   const ich = window.__schulappsServer
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
   const nachId = new Map(d.paket.aufgaben.map((a) => [a.id, a]))
@@ -129,6 +179,38 @@ function Kasten({
     [d.paket.verben, d.staende, verbAufgabe]
   )
   const verbDaten = useVerbDaten(bekannteVerben, d.paket.verbSprache, null, (k) => (d.staende[verbAufgabe.get(k.id) ?? '']?.fach ?? 0) >= 3)
+  // Zeitformen, die das Kind kennt (Lehrwerk-Stand + freigegebene Grammatik) – für den Signalwort-Sortierer
+  const zeitformen = useMemo(() => (d.sprache === 'en' ? bekannteZeitformen(d.bekannt ?? []) : []), [d.sprache, d.bekannt])
+  /** Passt das Spiel zur Grammatik? Unpassende werden ausgeblendet (08.10.2026, abgestimmt) */
+  const spielPasst = (id: GrammatikSpielId): boolean => {
+    const s = GRAMMATIK_SPIELE.find((x) => x.id === id)!
+    if (s.verben)
+      return (
+        Boolean(verbDaten) &&
+        (id === 'bildverb'
+          ? verbDaten!.karten.filter((k) => verbDaten!.bild(k)).length >= 4
+          : id === 'verbblitz'
+          ? verbDaten!.karten.length >= 4 && verbDaten!.mitTon
+          : id === 'muster'
+          ? verbDaten!.mitMuster
+          : verbDaten!.karten.length >= 4)
+      )
+    return grammatikSpielPasst(id, bekannt.aufgaben, d.paket.regeln.length, zeitformen.length)
+  }
+  if (spiel && NEUE_SPIELE.includes(spiel))
+    return (
+      <VerbSpielLauf
+        d={d}
+        spiel={spiel}
+        aufgaben={bekannt.aufgaben}
+        zeitformen={zeitformen}
+        aufgabeVon={(id) => id}
+        fertig={(r) => {
+          setSpiel(null)
+          if (r) aktualisieren(r)
+        }}
+      />
+    )
   if (spiel && GRAMMATIK_SPIELE.find((s) => s.id === spiel)?.verben && verbDaten)
     return (
       <VerbSpielLauf
@@ -153,12 +235,44 @@ function Kasten({
         }}
       />
     )
+  // ---------------------------------------------------------------- Ansicht nach Regeln (08.10.2026, abgestimmt)
+  const jetzt = Date.now()
+  const bearbeitet = d.paket.aufgaben.filter((a) => d.staende[a.id]?.versuche).length
+  const erklaerungen: Record<string, string> = {
+    bearbeitet: 'So viele Übungen hast du schon mindestens einmal gemacht. Unbearbeitete kommen bei „Weiter üben" zuerst nach den fälligen dran.',
+    sicher:
+      'Eine Übung ist sicher, wenn du sie zweimal selbst richtig gelöst hast – mit mindestens einer Woche Abstand dazwischen. Das klappt erst nach gut einer Woche.',
+    'heute dran': 'Wiederholungen, die heute fällig sind, und die nächsten neuen Übungen. Danach sind die Spiele frei.'
+  }
   const werte = [
-    { name: 'sicher', wert: `${u.sicher} / ${u.gesamt}`, farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
-    { name: 'heute dran', wert: String(heute.length), farbe: farbe.a, symbol: <IconFlame size={20} /> },
-    { name: 'im Aufbau', wert: String(u.imAufbau), farbe: '#f59e0b', symbol: <IconStairsUp size={20} /> }
+    { name: 'bearbeitet', wert: `${bearbeitet} / ${d.paket.aufgaben.length}`, farbe: farbe.a, symbol: <IconStairsUp size={20} /> },
+    { name: 'sicher', wert: String(u.sicher), farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
+    { name: 'heute dran', wert: String(heute.length), farbe: '#f59e0b', symbol: <IconFlame size={20} /> }
   ]
-  const max = Math.max(1, ...u.faecher)
+  /** Übungen einer Regel: unbearbeitete, dann fällige, dann wackelige (Fach 1–2), höchstens 10 */
+  const regelAufgaben = (rid: string): GrammatikAufgabe[] => {
+    const l = d.paket.aufgaben.filter((a) => a.regelId === rid)
+    const st = (a: GrammatikAufgabe): WortStand | undefined => d.staende[a.id]
+    const rang = (a: GrammatikAufgabe): number => (!st(a)?.versuche ? 0 : (st(a)!.faellig ?? 0) <= jetzt ? 1 : (st(a)!.fach ?? 0) <= 2 ? 2 : 3)
+    return [...l].sort((a, b) => rang(a) - rang(b) || (a.stufe ?? 0) - (b.stufe ?? 0)).slice(0, 10)
+  }
+  const arten = Object.entries(d.paket.aufgaben.reduce<Record<string, number>>((m, a) => ((m[a.art] = (m[a.art] ?? 0) + 1), m), {})) as [
+    keyof typeof ART_NAME,
+    number
+  ][]
+  const stufen = [1, 2, 3].map((s) => {
+    const l = d.paket.aufgaben.filter((a) => a.stufe === s)
+    return { s, gesamt: l.length, fertig: l.filter((a) => d.staende[a.id]?.versuche).length }
+  })
+  const spieleOffen = wahl.spielGruppen?.grammatik ?? false
+  const spieleKlappen = (): void => {
+    const neu = { ...wahl, spielGruppen: { ...(wahl.spielGruppen ?? {}), grammatik: !spieleOffen } }
+    setzeWahl(neu)
+    if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
+  }
+  const spiele = GRAMMATIK_SPIELE.filter(
+    (s) => (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length) && spielPasst(s.id)
+  )
   return (
     <Stack className="vt vt-rein" data-grammatik-kasten>
       <style>{CSS}</style>
@@ -177,106 +291,152 @@ function Kasten({
       </Button>
       <div>
         <Text c="dimmed" size="sm">
-          Grammatik · {d.fach}
+          {d.art ? 'Extra für dich' : 'Grammatik'} · {d.fach}
         </Text>
-        <Title order={2}>{d.titel}</Title>
+        <Title order={2}>{d.art ? d.paket.thema || d.titel : d.titel}</Title>
       </div>
       <SimpleGrid cols={3}>
         {werte.map((w) => (
-          <Paper key={w.name} withBorder radius="lg" p="sm" style={{ borderColor: w.farbe }}>
-            <Group gap={6} c={w.farbe}>
-              {w.symbol}
-              <Text size="xs" fw={700} tt="uppercase">
-                {w.name}
+          <Popover key={w.name} width={280} position="bottom" withArrow shadow="md">
+            <Popover.Target>
+              <UnstyledButton aria-label={`${w.name}: ${w.wert} – Erklärung`} data-wert={w.name}>
+                <Paper withBorder radius="lg" p="sm" style={{ borderColor: w.farbe }}>
+                  <Group gap={6} c={w.farbe} wrap="nowrap">
+                    {w.symbol}
+                    <Text size="xs" fw={700} tt="uppercase">
+                      {w.name}
+                    </Text>
+                  </Group>
+                  <Text fz={24} fw={800}>
+                    {w.wert}
+                  </Text>
+                </Paper>
+              </UnstyledButton>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Text size="sm" data-wert-erklaerung={w.name}>
+                {erklaerungen[w.name]}
               </Text>
-            </Group>
-            <Text fz={24} fw={800}>
-              {w.wert}
-            </Text>
-          </Paper>
+            </Popover.Dropdown>
+          </Popover>
         ))}
       </SimpleGrid>
-      <Group gap={4} align="flex-end" h={70} aria-label="Fächer im Kasten">
-        {u.faecher.map((n, i) => (
-          <Stack key={i} gap={2} align="center" style={{ flex: 1 }}>
-            <Text size="xs">{n}</Text>
-            <div
-              style={{
-                width: '100%',
-                height: `${Math.max(4, (n / max) * 44)}px`,
-                borderRadius: 6,
-                background: i >= 5 ? '#14b8a6' : farbe.a,
-                opacity: 0.35 + i * 0.1
-              }}
-            />
-            <Text size="10px" c="dimmed">
-              {STUFEN[i].kurz}
-            </Text>
-          </Stack>
-        ))}
-      </Group>
+      {/* Förderaufgaben: Stufen erkennen → gelenkt bilden → selbst bilden */}
+      {stufen.some((s) => s.gesamt) && (
+        <Group gap="xs" data-stufen>
+          {stufen
+            .filter((s) => s.gesamt)
+            .map((s) => (
+              <Badge key={s.s} size="lg" variant={s.fertig >= s.gesamt ? 'filled' : 'light'} color={s.fertig >= s.gesamt ? 'teal' : farbe.a} tt="none">
+                Stufe {s.s}: {['erkennen', 'gelenkt bilden', 'selbst bilden'][s.s - 1]} {s.fertig >= s.gesamt ? '✓' : `${s.fertig}/${s.gesamt}`}
+              </Badge>
+            ))}
+        </Group>
+      )}
       {heute.length > 0 ? (
         <Button size="lg" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={18} />} onClick={() => starten(tagesAufgaben)} data-grammatik-start>
-          Heute üben ({heute.length})
+          Weiter üben · {heute.length} {heute.length === 1 ? 'Übung' : 'Übungen'}
         </Button>
       ) : (
         <Alert color="teal" icon={<IconCheck size={16} />} data-grammatik-geschafft>
-          Für heute ist alles geübt. Jetzt noch ein Spiel?
+          {bearbeitet < d.paket.aufgaben.length
+            ? 'Für heute ist alles geübt – morgen geht es weiter.'
+            : 'Alle Übungen bearbeitet und für heute alles wiederholt.'}
+          {wahl.spiele && spiele.length ? ' Jetzt noch ein Spiel?' : ''}
         </Alert>
       )}
-      <Button variant="light" color={farbe.a} leftSection={<IconBook2 size={16} />} onClick={() => setRegeln((r) => !r)} data-regelkarten>
-        {regeln ? 'Regelkarten schließen' : `Regelkarten (${d.paket.regeln.length})`}
-      </Button>
-      {regeln && (
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          {d.paket.regeln.map((r) => (
-            <RegelKarte key={r.id} r={r} />
-          ))}
-        </SimpleGrid>
-      )}
-      {wahl.spiele && (
-        <Title order={4} mt="sm">
-          Spiele
-        </Title>
-      )}
-      {wahl.spiele && heute.length > 0 && (
-        <Text size="sm" c="dimmed">
-          Die Spiele gibt es nach der Übung für heute.
-        </Text>
-      )}
-      <SimpleGrid cols={{ base: 2, sm: 4 }}>
-        {GRAMMATIK_SPIELE.filter(
-          (s) => wahl.spiele && (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length)
-        ).map((s) => {
-          const genug = s.verben
-            ? Boolean(verbDaten) &&
-              (s.id === 'bildverb'
-                ? verbDaten!.karten.filter((k) => verbDaten!.bild(k)).length >= 4
-                : s.id === 'verbblitz'
-                ? verbDaten!.karten.length >= 4 && verbDaten!.mitTon
-                : s.id === 'muster'
-                ? verbDaten!.mitMuster
-                : verbDaten!.karten.length >= 4)
-            : s.id === 'regelzuordnen'
-            ? d.paket.regeln.length >= 2
-            : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
+      <Title order={4} mt="xs">
+        Regeln
+      </Title>
+      <Stack gap="xs" data-regeln>
+        {d.paket.regeln.map((r, i) => {
+          const l = d.paket.aufgaben.filter((a) => a.regelId === r.id)
+          if (!l.length) return null
+          const ru = uebersicht(alsKarten(l) as Vokabel[], d.staende)
+          const fertig = l.filter((a) => d.staende[a.id]?.versuche).length
+          const offen = offeneRegel === r.id
           return (
-            <UnstyledButton key={s.id} disabled={heute.length > 0 || !genug} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
-              <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 || !genug ? 0.5 : 1, height: '100%' }}>
-                <Text fw={700}>{s.name}</Text>
-                <Text size="xs" c="dimmed">
-                  {s.beschreibung}
-                </Text>
-                {d.rekorde[s.id] !== undefined && (
-                  <Badge mt={6} leftSection={<IconTrophy size={12} />} variant="light" color="yellow">
-                    {d.rekorde[s.id]} {s.einheit}
-                  </Badge>
-                )}
-              </Card>
-            </UnstyledButton>
+            <Card key={r.id} withBorder radius="lg" padding="sm" data-regel={r.id}>
+              <UnstyledButton onClick={() => setOffeneRegel(offen ? null : r.id)} w="100%" aria-expanded={offen} data-regel-kopf={r.id}>
+                <Group justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={700}>
+                      {d.paket.regeln.length > 1 ? `${i + 1} ` : ''}
+                      {r.titel}
+                    </Text>
+                    <Progress.Root size={8} radius="xl" mt={6}>
+                      <Progress.Section value={(ru.sicher / l.length) * 100} color="teal" />
+                      <Progress.Section value={((fertig - ru.sicher) / l.length) * 100} color={farbe.a} />
+                    </Progress.Root>
+                  </div>
+                  <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-regel-stand={`${fertig}/${l.length}`}>
+                    {fertig}/{l.length}
+                  </Text>
+                  <IconChevronDown size={16} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flex: 'none' }} />
+                </Group>
+              </UnstyledButton>
+              {offen && (
+                <Stack gap="xs" mt="sm">
+                  <RegelKarte r={r} />
+                  <Button
+                    variant="light"
+                    color={farbe.a}
+                    leftSection={<IconPlayerPlay size={16} />}
+                    onClick={() => starten(regelAufgaben(r.id))}
+                    data-regel-ueben={r.id}
+                  >
+                    Diese Regel üben
+                  </Button>
+                </Stack>
+              )}
+            </Card>
           )
         })}
-      </SimpleGrid>
+      </Stack>
+      <Text size="sm" c="dimmed" data-uebungsarten>
+        Übungsarten: {arten.map(([a, n]) => `${ART_NAME[a]} ${n}`).join(' · ')}
+      </Text>
+      {wahl.spiele && spiele.length > 0 && (
+        <Card withBorder radius="lg" padding="sm" data-grammatik-spiele>
+          <UnstyledButton onClick={spieleKlappen} w="100%" aria-expanded={spieleOffen} data-grammatik-spiele-kopf>
+            <Group justify="space-between">
+              <Text fw={700}>
+                Spiele{' '}
+                <Text span size="sm" c="dimmed" fw={400}>
+                  · {spiele.length}
+                </Text>
+              </Text>
+              <IconChevronDown size={16} style={{ transform: spieleOffen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
+            </Group>
+          </UnstyledButton>
+          {spieleOffen && (
+            <>
+              {heute.length > 0 && (
+                <Text size="sm" c="dimmed" mt="xs">
+                  Die Spiele gibt es nach der Übung für heute.
+                </Text>
+              )}
+              <SimpleGrid cols={{ base: 2, sm: 4 }} mt="xs">
+                {spiele.map((s) => (
+                  <UnstyledButton key={s.id} disabled={heute.length > 0} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
+                    <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 ? 0.5 : 1, height: '100%' }}>
+                      <Text fw={700}>{s.name}</Text>
+                      <Text size="xs" c="dimmed">
+                        {s.beschreibung}
+                      </Text>
+                      {d.rekorde[s.id] !== undefined && (
+                        <Badge mt={6} leftSection={<IconTrophy size={12} />} variant="light" color="yellow">
+                          {d.rekorde[s.id]} {s.einheit}
+                        </Badge>
+                      )}
+                    </Card>
+                  </UnstyledButton>
+                ))}
+              </SimpleGrid>
+            </>
+          )}
+        </Card>
+      )}
     </Stack>
   )
 }
@@ -286,12 +446,17 @@ function VerbSpielLauf({
   d,
   spiel,
   daten,
+  aufgaben = [],
+  zeitformen = [],
   aufgabeVon,
   fertig
 }: {
   d: Daten
   spiel: GrammatikSpielId
-  daten: VerbDaten
+  daten?: VerbDaten
+  /** Neue Grammatikspiele (08.10.2026): geübte Aufgaben bzw. bekannte Zeitformen */
+  aufgaben?: GrammatikAufgabe[]
+  zeitformen?: Zeitform[]
   aufgabeVon: (verbId: string) => string
   fertig: (r?: Partial<Daten>) => void
 }): React.JSX.Element {
@@ -338,7 +503,15 @@ function VerbSpielLauf({
         <Text fw={800}>{info.name}</Text>
       </Group>
       <div className="vt-buehne">
-        {spiel === 'verbtrio' ? (
+        {spiel === 'richtigfalsch' ? (
+          <RichtigFalsch aufgaben={aufgaben} ende={abschliessen} />
+        ) : spiel === 'formenmemory' ? (
+          <FormenMemory aufgaben={aufgaben} ende={abschliessen} />
+        ) : spiel === 'tabellenpuzzle' ? (
+          <TabellenPuzzle aufgaben={aufgaben} ende={abschliessen} />
+        ) : spiel === 'signalwort' ? (
+          <SignalwortSortierer zeitformen={zeitformen} ende={abschliessen} />
+        ) : !daten ? null : spiel === 'verbtrio' ? (
           <StammformenTrio verben={daten} ende={abschliessen} />
         ) : spiel === 'verbblitz' ? (
           <FormenBlitz verben={daten} ende={abschliessen} />
@@ -364,6 +537,18 @@ function RegelKarte({ r }: { r: GrammatikPaket['regeln'][number] }): React.JSX.E
           → {b}
         </Text>
       ))}
+      {(r.stolperfallen?.length ?? 0) > 0 && (
+        <>
+          <Text size="sm" fw={700} mt="sm">
+            Stolperfallen
+          </Text>
+          {r.stolperfallen!.map((x) => (
+            <Text key={x} size="sm" mt={2}>
+              ⚠ {x}
+            </Text>
+          ))}
+        </>
+      )}
     </Card>
   )
 }
@@ -377,6 +562,8 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const [laeuft, setLaeuft] = useState(false)
   const [frage, setFrage] = useState(0)
   const [regel, setRegel] = useState(false)
+  // Tipp vor der Antwort (Förderaufgaben, 08.10.2026) – gilt für die aktuelle Frage
+  const [tippFuer, setTippFuer] = useState<string | null>(null)
   const a = schlange[0]
   const antworten = async (antwort: string, wort?: string, selbst?: Urteil): Promise<void> => {
     if (!a || laeuft || ergebnis) return
@@ -455,7 +642,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
             {ART_NAME[a.art]}
           </Badge>
           <Badge variant="outline" color={farbe.a} size="lg" radius="sm" tt="none">
-            {STUFEN[Math.min(6, st?.fach ?? 0)].name}
+            {a.stufe ? `Stufe ${a.stufe}` : STUFEN[Math.min(6, st?.fach ?? 0)].name}
           </Badge>
         </Group>
       </Group>
@@ -463,6 +650,18 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
         <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
       </div>
+      {a.tipp && !ergebnis && (
+        <Stack gap={4}>
+          <Button variant="light" size="xs" color="yellow" w="fit-content" onClick={() => setTippFuer(`${a.id}-${frage}`)} data-tipp-zeigen>
+            Tipp
+          </Button>
+          {tippFuer === `${a.id}-${frage}` && (
+            <Alert color="yellow" variant="light" data-tipp-text>
+              {a.tipp}
+            </Alert>
+          )}
+        </Stack>
+      )}
       {r && (
         <Button
           variant="subtle"

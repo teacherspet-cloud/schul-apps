@@ -56,6 +56,15 @@ interface NavigationState {
 type Oeffner = (docId: string) => Promise<void>
 
 const oeffner = new Map<string, Oeffner>()
+
+/**
+ * Zusammengelegte Programme (08.10.2026: Vokabel- und Grammatiktraining → Sprachenlernen). Alte Kennungen aus Links,
+ * Server-Zielen („Meine Klassen", Handlungsbedarf) und Aufträgen führen weiter dorthin; eine Grammatik öffnet den Kurs
+ * mit ihrem Fenster („g:<id>").
+ */
+export const ALIAS: Record<string, string> = { vokabeltraining: 'sprachenlernen', grammatiktraining: 'sprachenlernen' }
+export const modulVon = (id: string): string => ALIAS[id] ?? id
+const dokumentVon = (moduleId: string, docId: string): string => (moduleId === 'grammatiktraining' ? `g:${docId}` : docId)
 const anleger = new Map<string, () => Promise<string>>()
 const druck = new Map<string, () => void>()
 
@@ -65,8 +74,9 @@ export const useNavigation = create<NavigationState>((set, get) => ({
   themenZiel: { n: 0 },
   laufpunkte: {},
   rueckweg: null,
-  setRueckweg: (r) => set({ rueckweg: r }),
-  openModule: (id) => {
+  setRueckweg: (r) => set({ rueckweg: r ? { ...r, fuer: modulVon(r.fuer) } : r }),
+  openModule: (id0) => {
+    const id = modulVon(id0)
     // Rückweg verfällt, sobald man anderswohin wechselt
     const r = get().rueckweg
     if (r && id !== r.fuer) set({ rueckweg: null })
@@ -84,7 +94,9 @@ export const useNavigation = create<NavigationState>((set, get) => ({
     set({ active: 'settings', settingsTab: tab })
   },
   setSettingsTab: (tab) => set({ settingsTab: tab }),
-  openDocument: async (moduleId, docId) => {
+  openDocument: async (moduleId0, docId0) => {
+    const moduleId = modulVon(moduleId0)
+    const docId = dokumentVon(moduleId0, docId0)
     await sichereAlles()
     get().openModule(moduleId)
     const oeffnen = oeffner.get(moduleId)
@@ -109,7 +121,7 @@ export const useNavigation = create<NavigationState>((set, get) => ({
 useAuftraege.subscribe((s, prev) => {
   if (s.auftraege === prev.auftraege) return
   const punkte: Record<string, boolean> = {}
-  for (const a of s.auftraege) if (laeuft(a)) punkte[a.moduleId] = true
+  for (const a of s.auftraege) if (laeuft(a)) punkte[modulVon(a.moduleId)] = true
   const bisher = useNavigation.getState().laufpunkte
   const gleich = Object.keys(punkte).length === Object.keys(bisher).filter((k) => bisher[k]).length && Object.keys(punkte).every((k) => bisher[k])
   if (!gleich) useNavigation.setState({ laufpunkte: punkte })
@@ -120,7 +132,7 @@ useAuftraege.subscribe((s, prev) => {
  * seinen Öffner erst beim ersten Zeichnen an – bis dahin kurz warten (höchstens ~5 s).
  */
 export async function dokumentOeffnenWennBereit(moduleId: string, docId: string): Promise<void> {
-  for (let i = 0; i < 40 && !oeffner.has(moduleId); i++) await new Promise((r) => setTimeout(r, 125))
+  for (let i = 0; i < 40 && !oeffner.has(modulVon(moduleId)); i++) await new Promise((r) => setTimeout(r, 125))
   await useNavigation.getState().openDocument(moduleId, docId)
 }
 

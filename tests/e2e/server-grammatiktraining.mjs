@@ -1,5 +1,6 @@
-// Grammatik-Lern-App (06.10.2026): Lehrkraft gibt ein Thema frei (KI-Attrappe erzeugt den Pool im Hintergrund,
-// Prüfschritt streicht eine Aufgabe), sichtet den Entwurf, streicht eine Aufgabe, gibt per QR-Code frei.
+// Grammatik-Lern-App (06.10.2026; seit 08.10.2026 im Kurs von „Sprachenlernen"): Lehrkraft erstellt im Kurs eine
+// Grammatik (KI-Attrappe erzeugt den Pool im Hintergrund, Prüfschritt streicht eine Aufgabe), sichtet den Entwurf in der
+// Grammatik-Tabelle des Kurses, streicht eine Aufgabe, gibt frei; Gäste kommen über den Code des Kurses.
 // Gast am Handy: Name → persönlicher Code → Kasten mit Regelkarten → Tagesration mit allen Aufgabenarten → Spiel.
 // Lehrkraft sieht Lernstand. Vorher: Server lokal mit KI-Attrappe (Schemas grammatik_pool / grammatik_pruefung).
 // Aufruf: node tests/e2e/server-grammatiktraining.mjs <Ausgabeordner> [adresse] [admin] [passwort]
@@ -34,6 +35,7 @@ const zuLoeschen = []
 const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
 let zid = ''
+let kurs = ''
 let lk
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
@@ -51,9 +53,21 @@ try {
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
   await expertenmodus(p)
-  await p.locator('.app-leiste [aria-label="Grammatiktraining"]').click()
-  pruefe(await da(p.locator('[data-grammatiktraining]')), 'App „Grammatiktraining" in der Leiste')
-  await p.locator('[data-grammatik-freigeben]').click()
+  // Kurs nur mit Grammatik, Zugang per Code (Sprachenlernen, 08.10.2026)
+  kurs = (
+    await (
+      await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+        headers: KOPF,
+        data: { titel: 'Grammatik-Kurs', sprache: 'en', fach: 'Englisch', woerter: [], nurGrammatik: true, gaeste: true }
+      })
+    ).json()
+  ).id
+  const kursCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === kurs)?.code
+  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  pruefe(await da(p.locator('[data-kurs-grammatik]')), 'Kurs mit Grammatik-Tabelle')
+  await p.locator('[data-vokabel-grammatik]').click()
+  await p.locator('[data-grammatik-dazu-neu]').click()
   await p.locator('[data-grammatik-fach]').click()
   await p.getByRole('option', { name: 'Englisch', exact: true }).click()
   // Themenauswahl wie im Arbeitsblatt (GrammatikAuswahl, 06.10.2026): Liste links, Teilformen rechts
@@ -70,41 +84,50 @@ try {
   await p.getByRole('option', { name: 'Green Line 2', exact: true }).click()
   await p.locator('[data-grammatik-thema] [data-lehrwerk-unit]').click()
   await p.getByRole('option').first().click()
-  pruefe(await da(p.locator('[data-grammatik-thema] [data-unit-hinweis]')), `Unit-Grammatik vorgeschlagen: ${await p.locator('[data-grammatik-thema] [data-unit-hinweis]').innerText().catch(() => '–')}`)
+  pruefe(
+    await da(p.locator('[data-grammatik-thema] [data-unit-hinweis]')),
+    `Unit-Grammatik vorgeschlagen: ${await p
+      .locator('[data-grammatik-thema] [data-unit-hinweis]')
+      .innerText()
+      .catch(() => '–')}`
+  )
   pruefe(/vorgeschlagen|keine/.test(await p.locator('[data-grammatik-thema] [data-unit-hinweis]').innerText()), 'Hinweis nennt die Vorschläge der Unit')
   const mitUnit = await p.locator('[data-grammatik-thema] [data-auswahl-chip]').count()
   pruefe(mitUnit > zwei, `Unit-Themen kommen zur eigenen Wahl dazu (${zwei} → ${mitUnit})`)
   await p.locator('[data-grammatik-eigenes-schalter]').click({ force: true })
   await p.locator('[data-grammatik-eigenes]').fill('Simple past – Test')
-  await p.getByText('Nur per QR-Code').click()
+  pruefe(await da(p.locator('[data-grammatik-fuer-kurs]')), 'Im Kurs keine Empfängerwahl – gilt für die Lernenden des Kurses')
   await p.screenshot({ path: join(out, '1-freigeben.png') })
   await p.locator('[data-grammatik-erstellen]').click()
-  pruefe(await da(p.locator('[data-grammatik-entwurf]'), 40000), 'Entwurf erscheint nach der Erzeugung im Hintergrund')
-  await p.locator('[data-entwurf-ansehen]').click()
+  pruefe(await da(p.locator('[data-grammatik-entwurf]'), 40000), 'Entwurf erscheint in der Grammatik-Tabelle des Kurses')
+  await p.locator('[data-grammatik-entwurf]').click()
   const anzahl = await p.locator('[data-entwurf-aufgabe]').count()
   pruefe(anzahl === 29, `Pool geprüft: eine Aufgabe vom Prüfschritt gestrichen (${anzahl} von 30)`)
   await p.screenshot({ path: join(out, '2-entwurf.png') })
   await p.locator('[data-entwurf-aufgabe]').first().getByRole('button', { name: 'Aufgabe streichen' }).click()
   pruefe((await p.locator('[data-entwurf-aufgabe]').count()) === 28, 'Lehrkraft streicht eine Aufgabe')
   await p.locator('[data-entwurf-freigeben]').click()
-  pruefe(await da(p.locator('[data-grammatik-zuweisung="Simple past – Test"]')), 'Freigegeben und in der Liste')
-  pruefe((await p.locator('[data-grammatik-entwurf]').count()) === 0, 'Entwurf danach weg')
+  await p.waitForTimeout(1500)
   const liste = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen
   const z = liste.find((x) => x.titel === 'Simple past – Test')
   zid = z?.id ?? ''
-  pruefe(Boolean(z?.code && z.link?.includes('/s/gt/')) && z.aufgaben === 28, `Code und Link (${z?.code}), 28 Aufgaben`)
+  pruefe(await da(p.locator(`[data-grammatik-zeile="${zid}"]`)), 'Freigegeben und in der Grammatik-Tabelle')
+  pruefe((await p.locator('[data-grammatik-entwurf]').count()) === 0, 'Entwurf danach weg')
+  pruefe(z?.vokId === kurs && z.aufgaben === 28, `Am Kurs, 28 Aufgaben (${z?.aufgaben})`)
 
   // ---------- Gast am Handy
   const g = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   const h = await g.newPage()
-  await h.goto(`${A}/s/gt/${z.code}`)
+  await h.goto(`${A}/s/vt/${kursCode}`)
   await h.locator('[data-gastname]').fill('Mia R.')
   await h.getByRole('button', { name: 'Mitlernen' }).click()
   pruefe(await da(h.locator('[data-wieder-code]')), 'Gast bekommt einen persönlichen Code')
   await h.locator('[data-vokabeln-los]').click()
-  pruefe(await da(h.locator('[data-grammatik-kasten]')), 'Gast sieht den Grammatik-Kasten')
-  await h.locator('[data-regelkarten]').click()
-  pruefe((await h.locator('[data-regelkarte]').count()) === 2, 'Zwei Regelkarten')
+  await h.waitForURL(`${A}/s/`, { timeout: 10000 }).catch(() => undefined)
+  pruefe(h.url() === `${A}/s/`, `Kurs ohne Vokabeln: weiter zu „Meine Materialien" (${h.url()})`)
+  await h.goto(`${A}/s/g/${zid}`)
+  pruefe(await da(h.locator('[data-grammatik-kasten]')), 'Gast sieht die Grammatik')
+  pruefe((await h.locator('[data-regel]').count()) === 2, 'Zwei Regeln')
   await h.screenshot({ path: join(out, '3-kasten.png'), fullPage: true })
   const paket = (await (await g.request.get(`${A}/s/api/grammatik/liste?id=${zid}`)).json()).paket
   const nachSatz = (t) => paket.aufgaben.find((a) => a.satz && t.includes(a.satz.split('___')[0].trim()))
@@ -120,7 +143,7 @@ try {
     if (art === 'luecke') {
       const a = paket.aufgaben.find((x) => x.art === 'luecke' && text.includes(x.satz.split('(').pop()))
       // Einmal absichtlich falsch: dann Regelkarte und Lösung
-      await h.locator('[data-luecke-eingabe]').fill(falsch ? (a?.loesungen[0] ?? 'x') : 'goed')
+      await h.locator('[data-luecke-eingabe]').fill(falsch ? a?.loesungen[0] ?? 'x' : 'goed')
       await h.locator('[data-pruefen]').click()
       if (!falsch) {
         falsch = true
@@ -167,6 +190,15 @@ try {
       })
   await h.goto(`${A}/s/g/${zid}`)
   pruefe(await da(h.locator('[data-grammatik-geschafft]')), 'Ration leer: „Für heute ist alles geübt"')
+  // Spiele stehen im aufklappbaren Bereich (08.10.2026)
+  if (
+    !(await h
+      .locator('[data-grammatik-spiel]')
+      .first()
+      .isVisible()
+      .catch(() => false))
+  )
+    await h.locator('[data-grammatik-spiele-kopf]').click()
   // Spiel „Formen-Blitz" (60 s) – zwei Runden spielen, dann abwarten wäre zu lang: Regel zuordnen statt dessen ganz
   await h.locator('[data-grammatik-spiel="regelzuordnen"]').click()
   pruefe(await da(h.locator('[data-spiel="regelzuordnen"]')), 'Spiel „Regel zuordnen" startet')
@@ -189,9 +221,11 @@ try {
   // ---------- Lehrkraft: Lernstand
   await p.reload()
   await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Grammatiktraining"]').click()
-  await p.locator('[data-grammatik-zuweisung="Simple past – Test"]').getByText('Simple past – Test').click()
-  pruefe(await da(p.locator('[data-grammatik-lernstand]').getByText('Mia R.')), 'Lernstand zeigt den Gast')
+  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await p.locator(`[data-grammatik-zeile="${zid}"]`).click()
+  await p.locator('[data-reiter-lernstand]').click()
+  pruefe(await da(p.locator('[data-grammatik-lernstand]').getByText('Mia R.')), 'Lernstand im Grammatik-Fenster zeigt den Gast')
   await p.screenshot({ path: join(out, '8-lernstand.png'), fullPage: true })
   // Lernraum-Eintrag (Gaststart) zeigt das Grammatiktraining
   await h.goto(`${A}/s/`)
@@ -201,6 +235,7 @@ try {
   console.log(e)
 } finally {
   if (zid && lk) await lk.request.post(`${A}/server/grammatik/${zid}/loeschen`, { headers: KOPF, data: {} }).catch(() => null)
+  if (kurs && lk) await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: {} }).catch(() => null)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => null)
   await browser.close()
 }
