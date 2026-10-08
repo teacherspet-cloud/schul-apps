@@ -9,6 +9,9 @@ import { IconFileImport, IconPrinter, IconUsersPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { htmlAlsZeilen, kurzNamen, namenAusText } from '@shared/namenListe'
 import { senden } from '../onlinetest/serverApi'
+import PrintPreview from '../../shared/components/PrintPreview'
+// Symbol eingebettet (08.10.2026): als Internetadresse kam es im Druckfenster nicht an – nur ein leeres Bildsymbol
+import webSymbol from '../../assets/web-symbol.png?inline'
 import { notifyError, notifySuccess } from '../../shared/util'
 
 export interface Zettel {
@@ -25,7 +28,7 @@ export function zettelHtml(titel: string, zettel: Zettel[], adresse: string): st
   const karten = zettel
     .filter((z) => z.zugang)
     .map(
-      (z) => `<div class="zettel"><div class="kopf"><img src="${esc(basis)}/web-app/apple-touch-icon.png" alt=""><div><div class="titel">Vokabeltraining</div>
+      (z) => `<div class="zettel"><div class="kopf"><img src="${webSymbol}" alt=""><div><div class="titel">Vokabeltraining</div>
 <div class="name">${esc(z.name)}</div></div></div>
 <div class="zeile"><span class="feld">Adresse</span><span class="wert">${esc(anzeige)}</span></div>
 <div class="zeile"><span class="feld">Dein Code</span><span class="wert code">${esc(z.zugang)}</span></div>
@@ -47,10 +50,27 @@ ol { margin: 2mm 0 0; padding-left: 4.5mm; font-size: 8pt; color: #333; } li { m
 </style></head><body><div class="raster">${karten}</div></body></html>`
 }
 
-/** Zettel drucken oder als PDF sichern */
-export function zettelAusgeben(titel: string, zettel: Zettel[], adresse: string, pdf: boolean): void {
-  const html = zettelHtml(titel, zettel, adresse)
-  void (pdf ? window.api.exporter.pdf(html, `Zugangszettel ${titel}.pdf`) : window.api.exporter.print(html)).catch((e: unknown) => notifyError(e))
+/** Zettel als PDF sichern */
+export function zettelAlsPdf(titel: string, zettel: Zettel[], adresse: string): void {
+  void window.api.exporter.pdf(zettelHtml(titel, zettel, adresse), `Zugangszettel ${titel}.pdf`).catch((e: unknown) => notifyError(e))
+}
+
+/**
+ * Zettel drucken – mit der Druckvorschau der App wie bei Arbeitsblättern (08.10.2026: der Windows-Druckdialog direkt
+ * meldete „Diese App unterstützt keine Seitenansicht").
+ */
+export function ZettelDruck({
+  titel,
+  zettel,
+  adresse,
+  schliessen
+}: {
+  titel: string
+  zettel: Zettel[]
+  adresse: string
+  schliessen: () => void
+}): React.JSX.Element {
+  return <PrintPreview html={zettelHtml(titel, zettel, adresse)} title={`Zugangszettel ${titel}`} onClose={schliessen} />
 }
 
 /** Text einer Klassenliste aus PDF, Word, CSV, Excel oder Text */
@@ -83,6 +103,7 @@ export function LernendeEintragen({
   const [laeuft, setLaeuft] = useState(false)
   const [hinweis, setHinweis] = useState('')
   const [fertig, setFertig] = useState<Zettel[] | null>(null)
+  const [druck, setDruck] = useState(false)
   const ausDatei = async (f: File | null): Promise<void> => {
     if (!f) return
     try {
@@ -133,16 +154,17 @@ export function LernendeEintragen({
             </Alert>
           )}
           <Group>
-            <Button leftSection={<IconPrinter size={16} />} disabled={!fertig.length} onClick={() => zettelAusgeben(titel, fertig, adresse, false)}>
+            <Button leftSection={<IconPrinter size={16} />} disabled={!fertig.length} onClick={() => setDruck(true)}>
               Zettel drucken
             </Button>
-            <Button variant="light" disabled={!fertig.length} onClick={() => zettelAusgeben(titel, fertig, adresse, true)} data-zettel-pdf>
+            <Button variant="light" disabled={!fertig.length} onClick={() => zettelAlsPdf(titel, fertig, adresse)} data-zettel-pdf>
               Als PDF speichern
             </Button>
             <Button variant="default" onClick={schliessen}>
               Fertig
             </Button>
           </Group>
+          {druck && <ZettelDruck titel={titel} zettel={fertig} adresse={adresse} schliessen={() => setDruck(false)} />}
         </Stack>
       ) : (
         <Stack>

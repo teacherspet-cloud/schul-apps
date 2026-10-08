@@ -26,7 +26,7 @@ import { json, setzeSitzungsCookie, type Anfrage } from './http'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
-import { lernendeVon as vokLernende, vokIstFuer, zeile as vokZeile } from './vokabeln'
+import { lernendeVon as vokLernende, ueberschriftVon, vokIstFuer, zeile as vokZeile } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 
 const SCHEMA = `
@@ -153,7 +153,6 @@ function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   // Verbunden mit einem Vokabeltraining: wer dort lernt (auch eingetragene Gäste), hat auch diese Grammatik
   const v = vokVon(z)
   if (v && vokIstFuer(v, ich)) return true
-  if (z.vok_id) return false
   if (ich.quelle === 'gast') return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
@@ -172,8 +171,9 @@ function lernendeVon(z: Zeile): NutzerInfo[] {
       : []
   const v = vokVon(z)
   if (v) {
+    // Lernende des verbundenen Vokabeltrainings – zusätzlich zu den bisherigen Empfängern
     const ids = new Set<string>()
-    return [...vokLernende(v), ...gaesteVon(z.id)].filter((n) => !ids.has(n.id) && Boolean(ids.add(n.id)))
+    return [...vokLernende(v), ...feste, ...gaesteVon(z.id)].filter((n) => !ids.has(n.id) && Boolean(ids.add(n.id)))
   }
   const ids = new Set(feste.map((n) => n.id))
   return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
@@ -418,7 +418,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
     const gruppeName = (z: Zeile): string =>
       vokVon(z)
-        ? `wie Vokabeltraining „${vokVon(z)!.titel}“`
+        ? `${z.lerngruppe_id ? `${lerngruppe(z.lerngruppe_id)?.name ?? ''} + ` : ''}wie Vokabeltraining „${ueberschriftVon(vokVon(z)!)}“`
         : z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : z.code && !json_(z.schueler, [] as string[]).length ? 'Per QR-Code' : 'Einzelne Lernende'
     if (req.method === 'GET' && teile.length === 0) {
       const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Zeile[]
@@ -434,6 +434,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               fach: z.fach,
               thema: z.thema,
               lerngruppe: gruppeName(z),
+              vokId: z.vok_id ?? '',
               aufgaben: kk.length,
               lernende: l.length,
               sicherSchnitt: l.length && kk.length ? sicherZahl.reduce((a, b) => a + b, 0) / l.length / kk.length : 0,
@@ -556,6 +557,14 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .run(k0.status === 'beendet' ? 'beendet' : 'offen', z.id)
         return (json(res, 200, { ok: true }), true)
       }
+      // Mit einem Vokabeltraining verbinden bzw. lösen (08.10.2026: auch fertige Grammatiktrainings zuordnen)
+      if (teile[1] === 'verbinden') {
+        const vid = String(k0.vokId ?? '')
+        const vok = vid ? vokZeile(vid) : null
+        if (vid && (!vok || vok.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte ein eigenes Vokabeltraining wählen.' }), true)
+        db().prepare('UPDATE gram_zuweisungen SET vok_id = ? WHERE id = ?').run(vok?.id ?? '', z.id)
+        return (json(res, 200, { ok: true }), true)
+      }
       if (teile[1] === 'gast-entfernen') {
         const ok = gastEntfernen(
           { tabelle: 'gram_gaeste', spalte: 'zuweisung_id', freigabeId: z.id, stand: [{ tabelle: 'gram_stand', spalte: 'zuweisung_id' }] },
@@ -567,7 +576,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       if (teile[1] === 'loeschen') {
         const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
         db().prepare('DELETE FROM gram_zuweisungen WHERE id = ?').run(z.id)
-        for (const n of gaeste) nutzerLoeschen(n.id)
+        // Gäste, die noch in einem Vokabel- oder anderen Grammatiktraining sind, behalten ihr Konto (08.10.2026)
+        for (const n of gaeste)
+          if (!db().prepare('SELECT 1 FROM gram_gaeste WHERE nutzer_id = ? UNION SELECT 1 FROM vok_gaeste WHERE nutzer_id = ?').get(n.id, n.id)) nutzerLoeschen(n.id)
         return (json(res, 200, { ok: true }), true)
       }
     }

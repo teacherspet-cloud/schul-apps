@@ -91,8 +91,20 @@ try {
   await p.screenshot({ path: join(out, '1-eintragen.png') })
   await p.locator('[data-namen-eintragen]').click()
   pruefe(await da(p.locator('[data-eingetragen]')), 'Eingetragen, Zettel-Knöpfe da')
+  // Zettel mit der Druckvorschau der App (nicht der Windows-Dialog), Symbol eingebettet
+  await p.getByRole('button', { name: 'Zettel drucken' }).click()
+  await p.waitForTimeout(3000)
+  await p.screenshot({ path: join(out, '2b-zettel-vorschau.png') })
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(500)
   await p.screenshot({ path: join(out, '2-eingetragen.png') })
-  await p.getByRole('button', { name: 'Fertig' }).click()
+  if (
+    await p
+      .getByRole('button', { name: 'Fertig' })
+      .isVisible()
+      .catch(() => false)
+  )
+    await p.getByRole('button', { name: 'Fertig' }).click()
   const st2 = await (await lk.request.get(`${A}/server/vokabeln/${vid}`, { headers: KOPF })).json()
   const gaeste = st2.lernende.filter((l) => l.gast)
   pruefe(
@@ -117,6 +129,10 @@ try {
   await s.getByRole('button', { name: 'Öffnen', exact: true }).click()
   await s.waitForURL(`**/s/v/${vid}`, { timeout: 15000 }).catch(() => undefined)
   pruefe(s.url().endsWith(`/s/v/${vid}`), `Code vom Zettel öffnet das Training (${s.url()})`)
+  // Vorab-Hintergrund (kein weißer Blitz): Skript da, nach dem Aufbau wieder entfernt
+  pruefe((await ctx.request.get(`${A}/server/vorab.js`)).status() === 200, 'Vorab-Skript wird ausgeliefert')
+  await s.waitForTimeout(500)
+  pruefe((await s.evaluate(() => document.documentElement.style.background)) === '', 'Vorab-Hintergrund nach dem Aufbau entfernt')
   pruefe(await da(s.locator('[data-vokabel-start]', { hasText: '10 Wörter' })), '„Jetzt üben · 10 Wörter"')
   const seite = await s.locator('body').innerText()
   pruefe(seite.includes(`${new Date().getFullYear()} - Englisch`) && !seite.includes('Unit 1 Wörter'), 'Lernende sehen die Überschrift, nicht den Quellentitel')
@@ -253,6 +269,30 @@ try {
   pruefe(an.id === vid && gramDora.some((x) => x.id === g.id), 'Später Eingetragene haben die Grammatik automatisch')
   const gl = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen?.find((x) => x.id === g.id)
   pruefe(Boolean(gl?.lerngruppe?.includes('Vokabeltraining')), `Grammatik zeigt die Verbindung (${gl?.lerngruppe})`)
+  // Fertiges Grammatiktraining nachträglich verbinden (Dialog „Grammatik dazu freigeben")
+  const g2 = await (
+    await lk.request.post(`${A}/server/grammatik/freigeben`, {
+      headers: KOPF,
+      data: { titel: 'Past progressive', fach: 'Englisch', sprache: 'en', thema: 'Past progressive', paket: PAKET, gaeste: true }
+    })
+  ).json()
+  await p
+    .locator('[data-zurueck], button:has-text("Alle Freigaben")')
+    .first()
+    .click()
+    .catch(() => undefined)
+  await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await p.locator('[data-vokabel-grammatik]').click()
+  pruefe(await da(p.locator('[data-grammatik-verbunden]')), 'Dialog zeigt die schon verbundene Grammatik')
+  await p.locator('[data-grammatik-dazu-wahl]').click()
+  await p.getByRole('option', { name: /Past progressive/ }).click()
+  await p.screenshot({ path: join(out, '9-grammatik-dazu.png') })
+  await p.locator('[data-grammatik-dazu-verbinden]').click()
+  await p.waitForTimeout(1000)
+  const gl2 = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen?.find((x) => x.id === g2.id)
+  const gramBen = (await (await ctx.request.get(`${A}/s/api/grammatik`, { headers: KOPF })).json()).listen ?? []
+  pruefe(gl2?.vokId === vid && gramBen.some((x) => x.id === g2.id), 'Fertiges Grammatiktraining verbunden – Ben sieht es')
+  await p.keyboard.press('Escape')
 
   // ---------- Übersicht: Überschrift (Standard „Jahr - Lerngruppe - Fach", umbenennbar), Symbol per Rechtsklick
   const kurz = async () => (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((z) => z.id === vid)

@@ -235,6 +235,19 @@ var sa=Element.prototype.setAttribute;Element.prototype.setAttribute=function(n,
 if(d&&d.set)Object.defineProperty(K.prototype,'src',{configurable:true,enumerable:d.enumerable,get:d.get,set:function(w){d.set.call(this,typeof w==='string'?mitVs(w):w)}})});
 if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){return sb(mitVs(u),d)}}})();`
 
+/**
+ * Hintergrund, bevor die App steht (08.10.2026, Befund der Lehrkraft: nach der Tür-Animation kurz ein weißer
+ * Bildschirm). Läuft als erstes Skript im Kopf (Inline-Skripte verbietet die CSP der Seite): Hintergrund nach der
+ * Darstellung der Lernenden (dunkel/hell), bis die App in #root etwas zeigt.
+ */
+const VORAB_JS = `(function(){try{var d=document.documentElement,m='dunkel';try{var s=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');if(s.modus)m=s.modus}catch(e){}
+var dunkel=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+d.style.background=dunkel?'#1f1f1f':'#ffffff';d.style.colorScheme=dunkel?'dark':'light';
+var fertig=function(){d.style.background='';d.style.colorScheme=''};
+var warte=function(){var r=document.getElementById('root');if(!r)return;if(r.childElementCount)return requestAnimationFrame(function(){requestAnimationFrame(fertig)});
+new MutationObserver(function(_,o){if(r.childElementCount){o.disconnect();requestAnimationFrame(function(){requestAnimationFrame(fertig)})}}).observe(r,{childList:true})};
+document.addEventListener('DOMContentLoaded',warte);setTimeout(fertig,10000)}catch(e){}})();`
+
 /** Die Seite der Programme mit dem Skript, das den angemeldeten Nutzer bekannt macht */
 const seitenZwischenspeicher = new Map<boolean, { mtime: number; html: string }>()
 function programmSeite(fuerSchueler = false): string {
@@ -260,6 +273,8 @@ function programmSeite(fuerSchueler = false): string {
       '<link rel="icon" href="/favicon.ico" sizes="any" />',
       '<link rel="icon" type="image/png" sizes="192x192" href="/web-app/icon-192.png" />',
       '<link rel="apple-touch-icon" href="/web-app/apple-touch-icon.png" />',
+      // Lernende: Hintergrund schon vor der App (kein weißer Blitz nach der Tür-Animation, 08.10.2026)
+      ...(fuerSchueler ? ['<script src="/server/vorab.js"></script>'] : []),
       '<script src="/server/ich.js"></script>'
     ].join('\n    ')
   )
@@ -355,6 +370,11 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     if (req.method === 'GET' && (url.pathname === '/manifest.webmanifest' || url.pathname === '/s/manifest.webmanifest')) {
       res.writeHead(200, { 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-cache' })
       return void res.end(webManifest(url.pathname.startsWith('/s/')))
+    }
+
+    if (req.method === 'GET' && url.pathname === '/server/vorab.js') {
+      res.writeHead(200, { 'content-type': TYPEN['.js'], 'cache-control': 'public, max-age=3600' })
+      return void res.end(VORAB_JS)
     }
 
     // ---------- Symbole für Browser-Reiter und Home-Bildschirm (ohne Anmeldung – auch die Anmeldeseite zeigt sie)

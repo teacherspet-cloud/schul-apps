@@ -17,6 +17,14 @@ describe('Namen aus Klassenlisten', () => {
       { vorname: 'Lea Marie', nachname: 'Yilmaz' }
     ])
   })
+  it('liest schon gekürzte Listen ohne Kopfzeile („Vorname | A." und „Vorname A.")', () => {
+    expect(namenAusText('Yara\tA.\nJonas\tB.\nMia K.')).toEqual([
+      { vorname: 'Yara', nachname: 'A.' },
+      { vorname: 'Jonas', nachname: 'B.' },
+      { vorname: 'Mia', nachname: 'K.' }
+    ])
+    expect(kurzNamen(namenAusText('Yara\tA.\nJonas\tBe.'))).toEqual(['Yara A.', 'Jonas Be.'])
+  })
   it('liest Word-Tabellen', () => {
     const html = '<table><tr><th>Name</th><th>Vorname</th></tr><tr><td>Müller</td><td>Anna</td></tr></table>'
     expect(namenAusText(htmlAlsZeilen(html))).toEqual([{ vorname: 'Anna', nachname: 'Müller' }])

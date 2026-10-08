@@ -11,7 +11,9 @@ export interface Person {
   nachname: string
 }
 
-const NAMENSTEIL = /^\p{L}[\p{L}'’-]*$/u
+// Auch Anfangsbuchstaben mit Punkt („A.", „Mü.") – Listen, die schon gekürzt sind (Befund 08.10.2026: 5b.xlsx)
+const NAMENSTEIL = /^\p{L}[\p{L}'’-]*\.?$/u
+const INITIAL = /^\p{L}{1,3}\.$/u
 const KEIN_NAME = /\b(klasse|schuljahr|lehrer|lehrkraft|seite|datum|summe|gesamt|anzahl|schule|stand)\b/i
 const KOPF_VOR = /^(vorname|vornamen|rufname|first ?name)$/i
 const KOPF_NACH = /^(nachname|familienname|name|last ?name|surname)$/i
@@ -84,8 +86,11 @@ export function namenAusText(text: string): Person[] {
     }
     // Ohne Kopfzeile: Nummernspalte weg, dann zwei Namensspalten (Nachname | Vorname) oder eine Zelle
     const inhalt = c.filter((x) => x && !/^\d{1,3}[.)]?$/.test(x))
-    if (inhalt.length >= 2 && istTeil(inhalt[0]) && istTeil(inhalt[1]) && !inhalt[0].includes(' ') && !KEIN_NAME.test(z)) {
-      ergebnis.push({ vorname: inhalt[1], nachname: inhalt[0] })
+    if (inhalt.length >= 2 && istTeil(inhalt[0]) && istTeil(inhalt[1]) && !KEIN_NAME.test(z)) {
+      // Ein gekürzter Nachname („A.") zeigt, welche Spalte der Vorname ist; sonst üblich „Nachname | Vorname"
+      if (INITIAL.test(inhalt[1]) && !INITIAL.test(inhalt[0])) ergebnis.push({ vorname: inhalt[0], nachname: inhalt[1] })
+      else if (!inhalt[0].includes(' ')) ergebnis.push({ vorname: inhalt[1], nachname: inhalt[0] })
+      else continue
       continue
     }
     const p = inhalt.length === 1 ? ausZelle(inhalt[0]) : null
@@ -101,11 +106,16 @@ export function kurzNamen(personen: Person[], schonDa: string[] = []): string[] 
   const vergeben = new Set(schonDa.map((n) => n.toLowerCase()))
   const aus: string[] = []
   const sauber = personen
-    .map((p) => ({ v: p.vorname.split(/\s+/)[0].split('-').map(gross).join('-'), n: p.nachname.replace(/[^\p{L}]/gu, '') }))
+    .map((p) => ({
+      v: p.vorname.split(/\s+/)[0].split('-').map(gross).join('-'),
+      n: p.nachname.replace(/[^\p{L}]/gu, ''),
+      // Schon gekürzt („Be.") – so übernehmen, nicht weiter kürzen
+      gekuerzt: INITIAL.test(p.nachname.trim())
+    }))
     .filter((p) => p.v && p.n)
   for (const p of sauber) {
     let name = ''
-    for (let k = 1; k <= 3; k++) {
+    for (let k = p.gekuerzt ? Math.min(3, p.n.length) : 1; k <= 3; k++) {
       const versuch = `${p.v} ${gross(p.n.slice(0, k))}.`
       // Gleich lautende Kurzform bei anderer Person: länger machen; dieselbe Person doppelt: überspringen
       const andere = sauber.some((q) => q !== p && q.v === p.v && q.n.slice(0, k).toLowerCase() === p.n.slice(0, k).toLowerCase() && q.n !== p.n)

@@ -37,7 +37,8 @@ export function mitTuer(ziel: string, farbe = '#ea580c'): void {
   buehne.innerHTML = '<div class="sa-tuer-rahmen"><div class="sa-tuer-licht"></div><div class="sa-tuer-blatt"><span class="sa-tuer-griff"></span></div></div>'
   document.head.appendChild(stil)
   document.body.appendChild(buehne)
-  setTimeout(() => window.location.assign(ziel), 760)
+  // Schon während die Tür aufschwingt laden (08.10.2026): Der Browser zeigt die Tür, bis die neue Seite da ist
+  setTimeout(() => window.location.assign(ziel), 420)
   // Zurück im Browser (Seite aus dem Zwischenspeicher): Tür wieder entfernen
   window.addEventListener(
     'pageshow',

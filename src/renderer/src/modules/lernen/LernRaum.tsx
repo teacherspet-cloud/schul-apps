@@ -151,7 +151,7 @@ export default function LernRaum({ fach }: { fach?: string }): React.JSX.Element
                 aria-label={`Tür: ${r.fach}`}
                 onClick={() => {
                   setOffen(r.fach)
-                  setTimeout(() => window.location.assign(`/s/lernen/${encodeURIComponent(r.fach)}`), 750)
+                  setTimeout(() => window.location.assign(`/s/lernen/${encodeURIComponent(r.fach)}`), 420)
                 }}
                 data-tuer={r.fach}
               >

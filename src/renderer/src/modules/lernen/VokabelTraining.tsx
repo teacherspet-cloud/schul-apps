@@ -55,7 +55,7 @@ import {
   IconUserMinus,
   IconUserPlus
 } from '@tabler/icons-react'
-import { LernendeEintragen, zettelAusgeben } from './LernendeEintragen'
+import { LernendeEintragen, ZettelDruck, type Zettel } from './LernendeEintragen'
 import { useAppSettings } from '../../shared/settingsStore'
 import { fachFarbe } from '../../shared/fachfarben'
 import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from './GrammatikTraining'
@@ -592,6 +592,74 @@ function VokabelAbschnitte({ teile, gesamt }: { teile: { titel: string; anzahl: 
   )
 }
 
+/**
+ * Grammatik zu einem Vokabeltraining (08.10.2026): ein fertiges Grammatiktraining verbinden (seine bisherigen
+ * Empfänger behalten den Zugang) oder ein neues erstellen; verbundene lassen sich wieder lösen.
+ */
+function GrammatikDazu({ vokId, vorgabe, schliessen }: { vokId: string; vorgabe: GrammatikVorgabe; schliessen: () => void }): React.JSX.Element {
+  const [liste, setListe] = useState<{ id: string; titel: string; lerngruppe: string; status: string; vokId?: string }[] | null>(null)
+  const [wahl, setWahl] = useState<string | null>(null)
+  const [neu, setNeu] = useState(false)
+  const laden = useCallback(
+    () =>
+      void holen<{ zuweisungen: { id: string; titel: string; lerngruppe: string; status: string; vokId?: string }[] }>('/server/grammatik').then(
+        (r) => setListe(r.zuweisungen),
+        (e: unknown) => notifyError(e)
+      ),
+    []
+  )
+  useEffect(laden, [laden])
+  const verbinden = (gid: string, mit: boolean): void =>
+    void senden(`/server/grammatik/${gid}/verbinden`, { vokId: mit ? vokId : '' }).then(
+      () => (notifySuccess(mit ? 'Verbunden – die Lernenden des Vokabeltrainings üben diese Grammatik mit.' : 'Verbindung gelöst.'), setWahl(null), laden()),
+      (e: unknown) => notifyError(e)
+    )
+  if (neu) return <GrammatikFreigeben vorgabe={vorgabe} schliessen={schliessen} />
+  const verbunden = (liste ?? []).filter((g) => g.vokId === vokId)
+  const andere = (liste ?? []).filter((g) => g.vokId !== vokId && g.status === 'offen')
+  return (
+    <Modal opened onClose={schliessen} title="Grammatik zu diesem Vokabeltraining" size="lg">
+      <Stack data-grammatik-dazu>
+        {!liste && <Loader size="sm" />}
+        {verbunden.length > 0 && (
+          <div>
+            <Text fw={700} size="sm" mb={4}>
+              Schon verbunden
+            </Text>
+            {verbunden.map((g) => (
+              <Group key={g.id} justify="space-between" wrap="nowrap" data-grammatik-verbunden={g.id}>
+                <Text size="sm">{g.titel}</Text>
+                <Button size="compact-sm" variant="subtle" color="red" onClick={() => verbinden(g.id, false)}>
+                  Lösen
+                </Button>
+              </Group>
+            ))}
+          </div>
+        )}
+        <Select
+          label="Fertiges Grammatiktraining verbinden"
+          description="Seine bisherigen Lernenden behalten den Zugang; die Lernenden dieses Vokabeltrainings kommen dazu – auch alle, die später eingetragen werden."
+          data={andere.map((g) => ({ value: g.id, label: g.lerngruppe ? `${g.titel} (${g.lerngruppe})` : g.titel }))}
+          value={wahl}
+          onChange={setWahl}
+          placeholder={liste && !andere.length ? 'Kein weiteres laufendes Grammatiktraining' : 'wählen …'}
+          disabled={!andere.length}
+          searchable
+          data-grammatik-dazu-wahl
+        />
+        <Group justify="space-between">
+          <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setNeu(true)} data-grammatik-dazu-neu>
+            Neues Grammatiktraining erstellen
+          </Button>
+          <Button disabled={!wahl} onClick={() => wahl && verbinden(wahl, true)} data-grammatik-dazu-verbinden>
+            Verbinden
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
 /** Vokabeln nachträglich zu einer Freigabe hinzufügen (08.10.2026): Lernstand bleibt, Doppeltes wird übersprungen */
 function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
   const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
@@ -644,6 +712,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
   const [hinzu, setHinzu] = useState(false)
   const [eintragen, setEintragen] = useState(false)
   const [grammatik, setGrammatik] = useState(false)
+  const [zettelDruck, setZettelDruck] = useState<Zettel[] | null>(null)
   const [ziel, setZiel] = useState<number | string>('')
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
   useEffect(laden, [laden])
@@ -747,21 +816,24 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           Grammatik dazu freigeben
         </Button>
         {zettel.length > 0 && (
-          <Button
-            variant="default"
-            leftSection={<IconPrinter size={16} />}
-            onClick={() => zettelAusgeben(d.titel, zettel, d.adresse || window.location.origin, false)}
-            data-zettel-alle
-          >
+          <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => setZettelDruck(zettel)} data-zettel-alle>
             Zettel für alle ({zettel.length})
           </Button>
         )}
       </Group>
-      {grammatik && <GrammatikFreigeben vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)} schliessen={() => setGrammatik(false)} />}
+      {grammatik && <GrammatikDazu vokId={id} vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)} schliessen={() => setGrammatik(false)} />}
+      {zettelDruck && (
+        <ZettelDruck
+          titel={d.ueberschrift || d.titel}
+          zettel={zettelDruck}
+          adresse={d.adresse || window.location.origin}
+          schliessen={() => setZettelDruck(null)}
+        />
+      )}
       {eintragen && (
         <LernendeEintragen
           id={id}
-          titel={d.titel}
+          titel={d.ueberschrift || d.titel}
           adresse={d.adresse || window.location.origin}
           schonDa={lernende.map((l) => l.name)}
           schliessen={() => (setEintragen(false), laden())}
@@ -813,10 +885,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
                 Neuen Code erzeugen
               </Button>
               {gast.zugang?.length === 8 && (
-                <Button
-                  leftSection={<IconPrinter size={16} />}
-                  onClick={() => zettelAusgeben(d.titel, [{ name: gast.name, zugang: gast.zugang! }], d.adresse || window.location.origin, false)}
-                >
+                <Button leftSection={<IconPrinter size={16} />} onClick={() => setZettelDruck([{ name: gast.name, zugang: gast.zugang! }])}>
                   Zettel drucken
                 </Button>
               )}
