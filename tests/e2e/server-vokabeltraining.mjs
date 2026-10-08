@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vokabeltraining')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -261,6 +261,7 @@ try {
 
   // Lehrkraft sieht den Gast im Lernstand, QR-Knopf
   await p.locator(`[data-vokabel-zuweisung="${vok.id}"]`).click()
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator('[data-lernstand]').getByText('Ben T.')), 'Gast im Lernstand der Lehrkraft')
   await p.locator('[data-vokabel-qr-zeigen]').click()
   pruefe(await da(p.getByRole('dialog').getByText(`/s/vt/${kurz.code}`)), 'QR-Code mit Code im Lernstand')

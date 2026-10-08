@@ -93,3 +93,22 @@ export async function weitereOptionen(page) {
   await kopf.click()
   await page.waitForTimeout(500)
 }
+
+/**
+ * Kursseite im Sprachenlernen (08.10.2026): die Kästen „Vokabeln" und „Grammatik" sind von sich aus zugeklappt, die
+ * Grammatik nach Schuljahren (nur das neueste offen). Aufklappen, was zu ist – die Knöpfe „Vokabeln hinzufügen" und
+ * „Grammatik hinzufügen" stehen im Kopf und brauchen das nicht.
+ */
+export async function kursKaestenAuf(page) {
+  for (const s of ['[data-vokabel-kasten-kopf]', '[data-kurs-grammatik-kopf]']) {
+    const k = page.locator(s).first()
+    try {
+      await k.waitFor({ state: 'visible', timeout: 15000 })
+    } catch {
+      continue
+    }
+    if ((await k.getAttribute('aria-expanded')) === 'false') await k.click()
+  }
+  await page.waitForTimeout(300)
+  for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
+}

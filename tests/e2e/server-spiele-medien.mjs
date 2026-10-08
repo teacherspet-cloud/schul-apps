@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-spiele-medien')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -86,6 +87,8 @@ try {
       data: { lerngruppeId: g.id, titel: 'Medien', sprache: 'en', fach: 'Englisch', woerter: WOERTER, verben: { sprache: 'en', karten: KARTEN } }
     })
   ).json()
+  // Verbspiele erst ab bekannter Vergangenheit (08.10.2026) – für den Test freischalten
+  await lk.request.post(`${A}/server/vokabeln/${vok.id}/verbspiele`, { headers: KOPF, data: { wert: 'an' } })
   const sm = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   await anmelden(sm, ben.benutzer, ben.passwort)
   await sm.request.post(`${A}/auth/passwort`, {
@@ -412,6 +415,9 @@ try {
   pruefe(anzahl >= 4, `Standardliste bis zum Lernjahr (${anzahl} Verben)`)
   await p.screenshot({ path: join(out, '3-verbfreigabe.png') })
   await p.locator('[data-grammatik-erstellen]').click()
+  // Grammatik-Kasten ist zugeklappt (08.10.2026)
+  await p.waitForTimeout(800)
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator('[data-grammatik-entwurf]')), 'Entwurf sofort da (ohne KI)')
   await p.locator('[data-grammatik-entwurf]').click()
   await p.locator('[data-entwurf-freigeben]').click()

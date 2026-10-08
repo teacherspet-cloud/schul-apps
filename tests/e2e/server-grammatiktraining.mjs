@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-grammatiktraining')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -65,6 +65,7 @@ try {
   const kursCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === kurs)?.code
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator('[data-kurs-grammatik]')), 'Kurs mit Grammatik-Tabelle')
   await p.locator('[data-vokabel-grammatik]').click()
   await p.locator('[data-grammatik-dazu-neu]').click()
@@ -111,6 +112,7 @@ try {
   const liste = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen
   const z = liste.find((x) => x.titel === 'Simple past – Test')
   zid = z?.id ?? ''
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator(`[data-grammatik-zeile="${zid}"]`)), 'Freigegeben und in der Grammatik-Tabelle')
   pruefe((await p.locator('[data-grammatik-entwurf]').count()) === 0, 'Entwurf danach weg')
   pruefe(z?.vokId === kurs && z.aufgaben === 28, `Am Kurs, 28 Aufgaben (${z?.aufgaben})`)
@@ -223,6 +225,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator(`[data-grammatik-zeile="${zid}"]`).click()
   await p.locator('[data-reiter-lernstand]').click()
   pruefe(await da(p.locator('[data-grammatik-lernstand]').getByText('Mia R.')), 'Lernstand im Grammatik-Fenster zeigt den Gast')

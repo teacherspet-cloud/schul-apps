@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vokabel-tag')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -77,6 +77,7 @@ try {
   await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await kursKaestenAuf(p)
   // Abschnitte nur in den Details, zugeklappt: Wörterzahl, neu Hinzugekommenes hervorgehoben
   pruefe(await da(p.locator('[data-vokabel-neu14]', { hasText: '+2' })), 'Kasten „32 Wörter" mit „+2 in den letzten 2 Wochen"')
   pruefe(!(await p.locator('[data-vokabel-abschnitte]').getByText('Unit 1 Wörter').isVisible()), 'Abschnitte zugeklappt')
@@ -285,6 +286,7 @@ try {
     .click()
     .catch(() => undefined)
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator('[data-vokabel-grammatik]').click()
   pruefe(await da(p.locator('[data-grammatik-verbunden]')), 'Dialog zeigt die schon verbundene Grammatik')
   await p.locator('[data-grammatik-dazu-wahl]').click()
@@ -303,6 +305,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator('[data-woche="10/0"]')), 'Ben: „10 neu · 0 wiederholt" in 7 Tagen')
   await p.locator('[data-sortieren="woche"]').click()
   pruefe((await p.locator('[data-lernende-tabelle] tbody tr').first().innerText()).includes('Ben S.'), 'Sortiert nach „geübt (7 Tage)": Ben oben')
@@ -323,6 +326,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator('[data-lernende-kasten]').waitFor()
   pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Zugeklappt bleibt nach dem Neuladen')
   await p.locator('[data-lernende-kopf]').click()

@@ -48,6 +48,7 @@ import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
+import { gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -124,7 +125,8 @@ interface Zeile {
   sprache: string
   thema: string
   paket: string
-  status: 'offen' | 'beendet'
+  /** 'entfernt' (08.10.2026): aus dem Kurs genommen – für Lernende unsichtbar, der Lernstand bleibt für ein Wiederherstellen */
+  status: 'offen' | 'beendet' | 'entfernt'
   erstellt: string
   code: string
   bis: number | null
@@ -492,9 +494,9 @@ export const MIN_VERSUCHE = 5
  * Grammatik dieser Lehrkraft, die die Person hat (Extra-Aufgaben eingeschlossen).
  */
 export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: string): GrammatikProfil {
-  const zs = (db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ?').all(lehrkraftId, sprache) as unknown as Zeile[]).filter(
-    (z) => istFuer(z, n)
-  )
+  const zs = (
+    db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND status != 'entfernt'").all(lehrkraftId, sprache) as unknown as Zeile[]
+  ).filter((z) => istFuer(z, n))
   const jeRegel = new Map<string, ProfilPunkt & { fachSumme: number; geuebt: number }>()
   const extra: GrammatikProfil['extra'] = []
   for (const z of zs) {
@@ -568,7 +570,8 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
 kursHaken.profil = grammatikProfil
 kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
-kursHaken.grammatikZahl = (vokId) => (db().prepare('SELECT art FROM gram_zuweisungen WHERE vok_id = ?').all(vokId) as { art: string }[]).filter((z) => !z.art).length
+kursHaken.grammatikZahl = (vokId) =>
+  (db().prepare("SELECT art FROM gram_zuweisungen WHERE vok_id = ? AND status != 'entfernt'").all(vokId) as { art: string }[]).filter((z) => !z.art).length
 
 /** Vorschaukonto („Als Schüler ansehen", vorschau.ts): Beispielstand je offenem Training – `stand` bekommt die Kennungen der Aufgaben */
 export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => { aufgaben: Record<string, WortStand>; tage: string[] }): void {
@@ -623,6 +626,8 @@ export function grammatikDerGruppe(
   }
   const jePerson: Record<string, { sicher: number; gesamt: number }> = {}
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
+  // Entfernte Grammatik (08.10.2026) zählt in „Meine Klassen" nicht
+  zs = zs.filter((z) => z.status !== 'entfernt')
   const trainings = zs.map((z) => {
     const offen = istOffen(z)
     const p = paketVon(z)
@@ -708,7 +713,40 @@ export function grammatikAnlegen(f: {
     ? [{ titel: f.titel, paket: f.paket, info: f.info as unknown as Record<string, unknown> }]
     : themenTeilung(f.paket, f.info as unknown as Record<string, unknown>, f.titel).gruppen
   const erstellt = new Date().toISOString()
+  // Entfernte Kurs-Grammatik mit gleichem Thema (08.10.2026): wiederherstellen statt neu anlegen – Kennungen und Lernstand bleiben
+  const entfernte = f.art
+    ? []
+    : (
+        db()
+          .prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND status = 'entfernt' AND vok_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC")
+          .all(f.lehrkraftId, f.vokId, f.lerngruppeId) as unknown as Zeile[]
+      ).filter((z) => !istExtra(z))
   return gruppen.map((gr) => {
+    const info = infoBereinigt(gr.info)
+    const alt = entfernte.find((z) => gleichesThema({ titel: z.titel, themen: infoVon(z).themen }, { titel: gr.titel, themen: info.themen }))
+    if (alt) {
+      entfernte.splice(entfernte.indexOf(alt), 1)
+      const { paket } = paketeZusammen(paketVon(alt), gr.paket)
+      const ai = infoVon(alt)
+      const zusammen: GrammatikInfo = {
+        ...ai,
+        themen: [...new Set([...ai.themen, ...info.themen])],
+        teilformen: [...new Set([...ai.teilformen, ...info.teilformen])],
+        ...(info.jahrgang ? { jahrgang: info.jahrgang } : {}),
+        ...(info.lehrwerk ? { lehrwerk: info.lehrwerk } : {})
+      }
+      db()
+        .prepare("UPDATE gram_zuweisungen SET status = 'offen', paket = ?, schueler = ?, bis = ?, info = ?, code = ? WHERE id = ?")
+        .run(
+          JSON.stringify(paket),
+          JSON.stringify([...new Set([...json_(alt.schueler, [] as string[]), ...f.schueler])]),
+          f.bis,
+          JSON.stringify(infoBereinigt(zusammen)),
+          alt.code || (f.code ? neuerCode() : ''),
+          alt.id
+        )
+      return alt.id
+    }
     const id = randomBytes(8).toString('hex')
     db()
       .prepare(
@@ -729,7 +767,7 @@ export function grammatikAnlegen(f: {
         f.bis,
         f.vokId,
         f.art,
-        JSON.stringify(infoBereinigt(gr.info))
+        JSON.stringify(info)
       )
     return id
   })
@@ -894,9 +932,11 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         : 'Einzelne Lernende'
     if (req.method === 'GET' && teile.length === 0) {
       const liste = db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? ORDER BY erstellt DESC, rowid').all(ich.id) as unknown as Zeile[]
+      // Jahrgang und Lehrwerk-Stelle je Training (08.10.2026): die Kursseite gliedert die Grammatik nach Schuljahren
+      const jahre = await Promise.all(liste.map((z) => jahrgangDerGrammatik(z, ich).catch(() => ({ jahrgang: null, stelle: null }))))
       return (
         json(res, 200, {
-          zuweisungen: liste.map((z) => {
+          zuweisungen: liste.map((z, i) => {
             const kk = karten(paketVon(z))
             const l = lernendeVon(z)
             const sicherZahl = l.map((n) => uebersicht(kk, standVon(z.id, n.id).aufgaben).sicher)
@@ -917,8 +957,12 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               aufgaben: kk.length,
               lernende: l.length,
               sicherSchnitt: l.length && kk.length ? sicherZahl.reduce((a, b) => a + b, 0) / l.length / kk.length : 0,
-              status: istOffen(z) ? 'offen' : 'beendet',
+              status: z.status === 'entfernt' ? 'entfernt' : istOffen(z) ? 'offen' : 'beendet',
+              // Regeltitel für die Suche auf der Kursseite (08.10.2026)
+              regeln: paketVon(z).regeln.map((r) => r.titel),
               erstellt: z.erstellt,
+              jahrgang: jahre[i].jahrgang,
+              stelle: jahre[i].stelle,
               ...(z.code ? { code: z.code, link: link(z.code) } : {})
             }
           })
@@ -1080,6 +1124,14 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         db().prepare('UPDATE gram_zuweisungen SET problem_aus = ? WHERE id = ?').run(JSON.stringify(gueltig), z.id)
         return json(res, 200, { ok: true }), true
       }
+      // Aus dem Kurs entfernen bzw. wiederherstellen (08.10.2026): der Lernstand bleibt, Lernende sehen es nicht mehr
+      if (teile[1] === 'entfernen' || teile[1] === 'wiederherstellen') {
+        db()
+          .prepare('UPDATE gram_zuweisungen SET status = ? WHERE id = ?')
+          .run(teile[1] === 'entfernen' ? 'entfernt' : 'offen', z.id)
+        protokolliereServer('grammatik', teile[1] === 'entfernen' ? 'Grammatik aus dem Kurs entfernt' : 'Grammatik wiederhergestellt', ich.id)
+        return json(res, 200, { ok: true }), true
+      }
       if (teile[1] === 'status') {
         db()
           .prepare('UPDATE gram_zuweisungen SET status = ? WHERE id = ?')
@@ -1142,7 +1194,7 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
   const tage = new Set<string>()
   for (const { zuweisung_id } of db().prepare('SELECT zuweisung_id FROM gram_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string }[]) {
     const z = zeile(zuweisung_id)
-    if (!z || !istFuer(z, ich)) continue
+    if (!z || z.status === 'entfernt' || !istFuer(z, ich)) continue
     const p = paketVon(z)
     const st = standVon(z.id, ich.id)
     for (const t of st.tage ?? []) tage.add(t)

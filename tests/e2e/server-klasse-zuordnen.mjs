@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-klasse-zuordnen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -72,6 +72,7 @@ try {
   await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator('[data-klasse-zuordnen-knopf]').click()
   pruefe(await da(p.locator('[data-klasse-zuordnen]')), 'Dialog „Lernende einer Klasse zuordnen" offen')
   // Vorauswahl: die Lerngruppe des Kurses

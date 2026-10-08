@@ -49,6 +49,7 @@ import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen, woerterEintragen } from './rekordbuch'
 import { achievementAntwort } from './achievementsDaten'
+import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen, type EntfernterTeil } from '../shared/kursEntfernen'
 import {
   bewerte,
   istSicher,
@@ -119,6 +120,8 @@ export const db = () => {
     // Verbspiele (08.10.2026): '' = automatisch ab bekannter Vergangenheit, 'an'/'aus' = Schalter der Lehrkraft
     if (!spalten.has('verbspiele')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN verbspiele TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('problem_aus')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN problem_aus TEXT NOT NULL DEFAULT ''")
+    // Entfernte Abschnitte (08.10.2026): JSON [{teil, woerter, zeit}] – Wörter samt Kennungen, der Lernstand bleibt in vok_stand
+    if (!spalten.has('entfernt')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN entfernt TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -169,6 +172,8 @@ export interface Zeile {
   teile?: string
   /** JSON {wortId: falsch beim Entfernen} – aus den Problemwörtern genommen, bis neue Fehler dazukommen (08.10.2026) */
   problem_aus?: string
+  /** JSON EntfernterTeil[] – entfernte Abschnitte mit ihren Wörtern (08.10.2026, shared/kursEntfernen.ts) */
+  entfernt?: string
 }
 
 /**
@@ -230,6 +235,20 @@ export interface VokTeil {
 export function teileVon(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstellt'>): VokTeil[] {
   const t = json_(z.teile || '[]', [] as VokTeil[])
   return t.length ? t : [{ titel: z.titel, anzahl: json_(z.woerter, [] as unknown[]).length, zeit: Date.parse(z.erstellt) || 0 }]
+}
+
+/** Entfernte Abschnitte eines Kurses (08.10.2026) */
+export const entferntVon = (z: Pick<Zeile, 'entfernt'>): EntfernterTeil[] => json_(z.entfernt || '[]', [] as EntfernterTeil[])
+
+/** Lernstand zu Wörtern löschen („Endgültig löschen", 08.10.2026, Datenschutz) – bei allen, die je geübt haben */
+export function lernstandLoeschen(zid: string, wortIds: string[]): void {
+  if (!wortIds.length) return
+  for (const r of db().prepare('SELECT schueler_id FROM vok_stand WHERE zuweisung_id = ?').all(zid) as { schueler_id: string }[]) {
+    const st = standVon(zid, r.schueler_id)
+    let anders = false
+    for (const id of wortIds) if (id in st.woerter) (delete st.woerter[id], (anders = true))
+    if (anders) standSpeichern(zid, r.schueler_id, st)
+  }
 }
 
 /**
@@ -1042,7 +1061,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           tage7: st.tage.filter((t) => t >= vor7).length,
           // In 7 Tagen neu gelernt bzw. wiederholt (08.10.2026, statt nur der Übungstage); ältere Stände ohne
           // „erstmals": höchstens zwei Abfragen gelten als neu
-          ...sieben(st.woerter, jetzt),
+          // Nur die Wörter des Kurses – entfernte Abschnitte zählen nicht (08.10.2026)
+          ...sieben(nurAktuell(st.woerter, woerter), jetzt),
           // Sprachenlernen (08.10.2026): Stärken/Schwächen in Grammatik und laufende Extra-Aufgaben
           grammatik: kursHaken.profil?.(n, z.sprache, z.lehrkraft_id),
           stand: st.woerter
@@ -1068,7 +1088,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           verbspiele: z.verbspiele ?? '',
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026)
-          teile: teileVon(z),
+          teile: woerter.length ? teileVon(z) : [],
+          // Entfernte Abschnitte (08.10.2026): Lernstand gespeichert, kommt beim erneuten Hinzufügen zurück
+          entfernt: entferntVon(z).map((e) => ({ teil: e.teil, anzahl: e.woerter.length, zeit: e.zeit })),
           lerngruppeId: z.lerngruppe_id,
           // Lehrwerk und Unit – für „Grammatik dazu freigeben" (08.10.2026)
           quelle: json_(z.quelle ?? '', null as unknown),
@@ -1241,8 +1263,11 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const alt = json_(z.woerter, [] as Vokabel[])
         const schluessel = (v: Vokabel): string => `${v.term.trim().toLowerCase()}|${v.translation.trim().toLowerCase()}`
         const da = new Set(alt.map(schluessel))
-        const ids = new Set(alt.map((v) => v.id))
+        // Kennungen entfernter Wörter bleiben reserviert – neue Wörter erben nie fremden Lernstand (08.10.2026)
+        const entferntVorher = entferntVon(z)
+        const ids = new Set([...alt.map((v) => v.id), ...entfernteKennungen(entferntVorher)])
         const neu: Vokabel[] = []
+        const neuTeil: (string | undefined)[] = []
         // Mehrere Abschnitte/Units auf einmal (08.10.2026): je Abschnitt ein Teil, gezählt nach dem Überspringen von Doppeltem
         const rohe = (Array.isArray(k0.woerter) ? (k0.woerter as unknown[]) : []).slice(0, 400)
         const teilGrenzen = (Array.isArray(k0.teile) ? (k0.teile as unknown[]) : []).slice(0, 60).map((t) => {
@@ -1264,8 +1289,15 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           for (let n = alt.length + neu.length; ids.has(id); n++) id = `w${n}`
           ids.add(id)
           neu.push({ ...v, id })
+          neuTeil.push(teilePassen ? teilGrenzen[teilIndex(i)].titel : String(k0.titel ?? '') || undefined)
           if (teilePassen) neuJeTeil[teilIndex(i)]++
         }
+        // Früher entfernte Wörter bekommen ihre alte Kennung zurück – der Lernstand gilt weiter (08.10.2026)
+        const wieder = kennungenWiederverwenden(
+          neu.map((wort, i) => ({ wort, teil: neuTeil[i] })),
+          entferntVorher
+        )
+        neu.splice(0, neu.length, ...wieder.woerter)
         if (alt.length + neu.length > 1500) return json(res, 400, { fehler: 'Höchstens 1500 Vokabeln je Training.' }), true
         const verbenAlt = json_(z.verben, null as { sprache: string; karten: { id: string }[] } | null)
         const verbenNeu = verbenBereinigt(k0.verben) ? (JSON.parse(verbenBereinigt(k0.verben)) as { sprache: string; karten: { id: string }[] }) : null
@@ -1286,9 +1318,47 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // Herkunft fortschreiben (08.10.2026): weitere Units zählen für „bekannte Grammatik", Vokabelweg und Abzeichen
         const quelle = neu.length ? quelleZusammen(z.quelle ?? '', quelleBereinigt(k0.quelle)) : z.quelle ?? ''
         db()
-          .prepare('UPDATE vok_zuweisungen SET woerter = ?, verben = ?, teile = ?, quelle = ? WHERE id = ?')
-          .run(JSON.stringify([...alt, ...neu]), verben ? JSON.stringify(verben) : z.verben ?? '', JSON.stringify(teile), quelle, z.id)
-        return json(res, 200, { ok: true, neu: neu.length }), true
+          .prepare('UPDATE vok_zuweisungen SET woerter = ?, verben = ?, teile = ?, quelle = ?, entfernt = ? WHERE id = ?')
+          .run(
+            JSON.stringify([...alt, ...neu]),
+            verben ? JSON.stringify(verben) : z.verben ?? '',
+            JSON.stringify(teile),
+            quelle,
+            wieder.entfernt.length ? JSON.stringify(wieder.entfernt) : '',
+            z.id
+          )
+        return json(res, 200, { ok: true, neu: neu.length, wieder: wieder.wieder }), true
+      }
+      /*
+       * Abschnitt entfernen (08.10.2026, abgestimmt): die Wörter verlassen die Wortliste, der Lernstand bleibt – kommt der
+       * Abschnitt wieder dazu, gilt er weiter. „Endgültig löschen" (auch für schon entfernte) löscht den Lernstand mit.
+       */
+      if (teile[1] === 'abschnitt-entfernen' || teile[1] === 'abschnitt-loeschen') {
+        const endgueltig = teile[1] === 'abschnitt-loeschen'
+        const woerter = json_(z.woerter, [] as Vokabel[])
+        let entfernt = entferntVon(z)
+        let weg: Vokabel[] = []
+        if (endgueltig && typeof k0.entfernt === 'number') {
+          // schon entfernter Abschnitt
+          const e = entfernt[k0.entfernt]
+          if (!e || (typeof k0.titel === 'string' && e.teil !== k0.titel)) return json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht (mehr).' }), true
+          weg = e.woerter
+          entfernt = entfernt.filter((_, i) => i !== k0.entfernt)
+          db().prepare('UPDATE vok_zuweisungen SET entfernt = ? WHERE id = ?').run(entfernt.length ? JSON.stringify(entfernt) : '', z.id)
+        } else {
+          const tl = woerter.length ? teileVon(z) : []
+          const i = Math.round(Number(k0.index))
+          if (!tl[i] || (typeof k0.titel === 'string' && tl[i].titel !== k0.titel)) return json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht (mehr).' }), true
+          const r = teilEntfernen(woerter, tl, i, Date.now())!
+          weg = r.entfernt.woerter
+          if (!endgueltig) entfernt = [...entfernt, r.entfernt]
+          db()
+            .prepare('UPDATE vok_zuweisungen SET woerter = ?, teile = ?, entfernt = ? WHERE id = ?')
+            .run(JSON.stringify(r.woerter), r.teile.length ? JSON.stringify(r.teile) : '', entfernt.length ? JSON.stringify(entfernt) : '', z.id)
+        }
+        if (endgueltig) lernstandLoeschen(z.id, weg.map((v) => v.id))
+        protokolliereServer('vokabeln', `Abschnitt ${endgueltig ? 'endgültig gelöscht' : 'entfernt'} (${weg.length} Wörter)`, ich.id)
+        return json(res, 200, { ok: true, woerter: weg.length }), true
       }
       if (teile[1] === 'zeitraum') {
         db()

@@ -159,7 +159,8 @@ export function GrammatiktrainingModule({ active }: { active: boolean }): React.
   const farbe = useProgrammFarbe()
   const laden = useCallback(() => {
     void holen<{ zuweisungen: Zuweisung[] }>('/server/grammatik').then(
-      (d) => setListe(d.zuweisungen),
+      // Aus dem Kurs entfernte Grammatik (08.10.2026) nur auf der Kursseite unter „Entfernt"
+      (d) => setListe(d.zuweisungen.filter((z) => z.status !== 'entfernt')),
       () => setListe([])
     )
   }, [])

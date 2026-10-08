@@ -218,10 +218,12 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
         (testInTagen !== null && testInTagen >= 0 ? `, Vokabeltest in ${testInTagen} Tagen` : '')
     )
   }
-  for (const z of sicher(() => db().prepare('SELECT daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { daten: string }[], [])) {
+  for (const z of sicher(() => db().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[], [])) {
     const st = json_(z.daten, { woerter: {}, tage: [] } as { woerter: Record<string, WortStand>; tage: string[] })
     for (const t of st.tage ?? []) tage.add(t)
-    for (const s of Object.values(st.woerter ?? {})) zaehle(s)
+    // Nur Wörter, die noch im Kurs stehen – entfernte Abschnitte zählen nicht (08.10.2026)
+    const aktuell = new Set(sicher(() => json_(vokZeile(z.zuweisung_id)?.woerter, [] as { id: string }[]).map((v) => v.id), [] as string[]))
+    for (const [id, s] of Object.entries(st.woerter ?? {})) if (aktuell.has(id)) zaehle(s)
   }
 
   // Grammatik
@@ -245,7 +247,14 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
     gramDaten.push({ id: g.id, titel: g.titel, faellig: heuteDran(g.uebersicht), href: `/s/g/${g.id}` })
     prompt.push(`Grammatiktraining „${g.titel}" (${g.fach}): ${g.uebersicht.sicher} von ${g.uebersicht.gesamt} Aufgaben sicher, ${heuteDran(g.uebersicht)} heute dran`)
   }
-  for (const z of sicher(() => db().prepare('SELECT daten FROM gram_stand WHERE schueler_id = ?').all(ich.id) as { daten: string }[], [])) {
+  // Entfernte Grammatik (08.10.2026) zählt nicht – ihr Lernstand bleibt nur für ein erneutes Hinzufügen gespeichert
+  for (const z of sicher(
+    () =>
+      db()
+        .prepare("SELECT s.daten AS daten FROM gram_stand s JOIN gram_zuweisungen g ON g.id = s.zuweisung_id WHERE s.schueler_id = ? AND g.status != 'entfernt'")
+        .all(ich.id) as { daten: string }[],
+    []
+  )) {
     const st = json_(z.daten, { aufgaben: {}, tage: [] } as { aufgaben: Record<string, WortStand>; tage: string[] })
     for (const t of st.tage ?? []) tage.add(t)
     for (const s of Object.values(st.aufgaben ?? {})) zaehle(s)

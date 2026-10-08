@@ -47,7 +47,8 @@ export const SENSIBEL: Record<string, string[]> = {
   reihen_zuweisungen: ['schueler', 'halte_frei', 'verknuepft'],
   reihen_stand: ['daten'],
   reihen_dateien: ['daten', 'name'],
-  vok_zuweisungen: ['schueler', 'titel', 'woerter', 'quelle', 'verben', 'teile', 'ueberschrift', 'problem_aus'],
+  // entfernt: entfernte Abschnitte samt Wörtern (08.10.2026)
+  vok_zuweisungen: ['schueler', 'titel', 'woerter', 'quelle', 'verben', 'teile', 'ueberschrift', 'problem_aus', 'entfernt'],
   vok_stand: ['daten'],
   vok_laufbahn: ['daten'],
   // Persönlicher Zugangscode der Gäste – für die Lehrkraft lesbar (08.10.2026), sonst nur als Prüfwert (codePruefwert)

@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-sprachenlernen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -137,6 +137,7 @@ try {
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await kursKaestenAuf(p)
   pruefe(await da(p.locator(`[data-grammatik-zeile="${gram}"]`)), 'Grammatik-Tabelle im Kurs')
   // Reiter „Lernende" nur mit Vokabeln (08.10.2026): keine Grammatik-Spalte, kein Fördern/Fordern
   pruefe((await p.locator('[data-lernende-tabelle] [data-foerdern]').count()) === 0, 'Reiter „Lernende" ohne Fördern/Fordern')
@@ -192,6 +193,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
   pruefe(await da(p.locator('[data-grammatik-profil="Ben S."] [data-extra-stand]')), 'Ben: Plakette „Förderung läuft"')
 

@@ -24,6 +24,7 @@ import {
   Container,
   Group,
   Loader,
+  Menu,
   Modal,
   MultiSelect,
   NumberInput,
@@ -64,6 +65,8 @@ import {
 import { LernendeEintragen, ZettelDruck, type Zettel } from './LernendeEintragen'
 import { KlasseZuordnen } from './KlasseZuordnen'
 import { extraStarten, KursGrammatik, type ProfilPunkt } from './kurs/KursGrammatik'
+import { KastenKopf, useGemerkt, useGemerktText } from './kurs/Kasten'
+import { vokabelKurzinfo } from './kurs/kursAnsicht'
 import { useAppSettings } from '../../shared/settingsStore'
 import { fachFarbe } from '../../shared/fachfarben'
 import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from './GrammatikTraining'
@@ -639,6 +642,8 @@ interface Lernstanddaten {
   adresse?: string
   ueberschrift?: string
   teile?: { titel: string; anzahl: number; zeit: number }[]
+  /** Entfernte Abschnitte (08.10.2026): Lernstand gespeichert */
+  entfernt?: { teil: string; anzahl: number; zeit: number }[]
   sprache?: string
   quelle?: { lehrwerk?: string; unit?: string } | null
   code?: string
@@ -672,11 +677,37 @@ interface Lernstanddaten {
 
 /**
  * Freigegebene Abschnitte (08.10.2026, Wunsch der Lehrkraft): nur in den Details, als zugeklappter Kasten – zu sehen ist
- * die Wörterzahl, hervorgehoben, was in den letzten 2 Wochen dazukam; aufgeklappt die Abschnitte mit Datum.
+ * die Wörterzahl, hervorgehoben, was in den letzten 2 Wochen dazukam; aufgeklappt die Abschnitte mit Datum. Je Abschnitt
+ * „Entfernen" (Lernstand bleibt, kommt beim erneuten Hinzufügen zurück) und „Endgültig löschen" (mit Lernstand);
+ * entfernte Abschnitte stehen darunter (08.10.2026, abgestimmt).
  */
-function VokabelAbschnitte({ teile, gesamt }: { teile: { titel: string; anzahl: number; zeit: number }[]; gesamt: number }): React.JSX.Element {
+type AbschnittFrage = { was: 'entfernen' | 'loeschen'; titel: string; index?: number; entfernt?: number }
+function VokabelAbschnitte({
+  teile,
+  gesamt,
+  entfernt,
+  ausfuehren
+}: {
+  teile: { titel: string; anzahl: number; zeit: number }[]
+  gesamt: number
+  entfernt: { teil: string; anzahl: number; zeit: number }[]
+  ausfuehren: (f: AbschnittFrage) => Promise<void>
+}): React.JSX.Element {
   const [offen, setOffen] = useState(false)
+  const [entferntOffen, setEntferntOffen] = useState(false)
+  const [frage, setFrage] = useState<AbschnittFrage | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
   const neu = teile.filter((t) => t.zeit > Date.now() - 14 * 864e5 && t !== teile[0]).reduce((a, t) => a + t.anzahl, 0)
+  const los = async (): Promise<void> => {
+    if (!frage) return
+    setLaeuft(true)
+    try {
+      await ausfuehren(frage)
+      setFrage(null)
+    } finally {
+      setLaeuft(false)
+    }
+  }
   return (
     <Card withBorder padding="sm" data-vokabel-abschnitte>
       <UnstyledButton onClick={() => setOffen((x) => !x)} w="100%" aria-expanded={offen} data-vokabel-abschnitte-kopf>
@@ -689,6 +720,11 @@ function VokabelAbschnitte({ teile, gesamt }: { teile: { titel: string; anzahl: 
                 +{neu} in den letzten 2 Wochen
               </Badge>
             )}
+            {entfernt.length > 0 && (
+              <Badge color="gray" variant="light" tt="none">
+                {entfernt.length} entfernt
+              </Badge>
+            )}
           </Group>
           <IconChevronDown size={18} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
         </Group>
@@ -696,15 +732,83 @@ function VokabelAbschnitte({ teile, gesamt }: { teile: { titel: string; anzahl: 
       {offen && (
         <Stack gap={4} mt="sm">
           {teile.map((t, i) => (
-            <Group key={i} justify="space-between" wrap="nowrap" gap="xs">
+            <Group key={i} justify="space-between" wrap="nowrap" gap="xs" data-vokabel-abschnitt={t.titel}>
               <Text size="sm">{t.titel}</Text>
-              <Text size="xs" c={t.zeit > Date.now() - 14 * 864e5 && i > 0 ? 'green' : 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
-                {t.anzahl} Wörter · {t.zeit ? new Date(t.zeit).toLocaleDateString('de-DE') : ''}
-              </Text>
+              <Group gap={4} wrap="nowrap">
+                <Text size="xs" c={t.zeit > Date.now() - 14 * 864e5 && i > 0 ? 'green' : 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
+                  {t.anzahl} Wörter · {t.zeit ? new Date(t.zeit).toLocaleDateString('de-DE') : ''}
+                </Text>
+                <Menu position="bottom-end" withinPortal>
+                  <Menu.Target>
+                    <ActionIcon size="sm" variant="subtle" color="gray" aria-label={`${t.titel}: entfernen`} data-vokabel-abschnitt-aktionen={i}>
+                      <IconX size={14} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item onClick={() => setFrage({ was: 'entfernen', titel: t.titel, index: i })} data-vokabel-abschnitt-entfernen>
+                      Entfernen
+                    </Menu.Item>
+                    <Menu.Item color="red" onClick={() => setFrage({ was: 'loeschen', titel: t.titel, index: i })} data-vokabel-abschnitt-loeschen>
+                      Endgültig löschen …
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
             </Group>
           ))}
+          {entfernt.length > 0 && (
+            <div data-vokabel-entfernt>
+              <UnstyledButton onClick={() => setEntferntOffen(!entferntOffen)} aria-expanded={entferntOffen} data-vokabel-entfernt-kopf>
+                <Group gap={4}>
+                  <IconChevronDown size={14} style={{ transform: entferntOffen ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
+                  <Text size="sm" c="dimmed">
+                    Entfernt ({entfernt.length})
+                  </Text>
+                </Group>
+              </UnstyledButton>
+              {entferntOffen && (
+                <Stack gap={4} mt={4} pl="md">
+                  <Text size="xs" c="dimmed">
+                    Wieder aufnehmen über „Vokabeln hinzufügen“ – der Lernstand gilt dann weiter.
+                  </Text>
+                  {entfernt.map((e, i) => (
+                    <Group key={i} justify="space-between" wrap="nowrap" gap="xs" data-vokabel-entfernt-zeile={e.teil}>
+                      <Text size="sm" c="dimmed">
+                        {e.teil} · {e.anzahl} Wörter · entfernt am {new Date(e.zeit).toLocaleDateString('de-DE')}
+                      </Text>
+                      <Button size="compact-xs" variant="subtle" color="red" onClick={() => setFrage({ was: 'loeschen', titel: e.teil, entfernt: i })} data-vokabel-entfernt-loeschen={i}>
+                        Endgültig löschen
+                      </Button>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </div>
+          )}
         </Stack>
       )}
+      <Modal opened={Boolean(frage)} onClose={() => setFrage(null)} title={frage?.was === 'loeschen' ? 'Abschnitt endgültig löschen?' : 'Abschnitt entfernen?'}>
+        {frage && (
+          <Stack gap="sm">
+            <Text size="sm" fw={600}>
+              {frage.titel}
+            </Text>
+            <Text size="sm">
+              {frage.was === 'loeschen'
+                ? 'Die Wörter und der Lernstand aller Lernenden zu diesen Wörtern werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.'
+                : 'Abschnitt entfernen? Der Lernstand bleibt gespeichert und gilt wieder, wenn du den Abschnitt erneut hinzufügst.'}
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setFrage(null)}>
+                Abbrechen
+              </Button>
+              <Button color="red" loading={laeuft} onClick={() => void los()} data-vokabel-abschnitt-bestaetigen={frage.was}>
+                {frage.was === 'loeschen' ? 'Endgültig löschen' : 'Entfernen'}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </Card>
   )
 }
@@ -788,14 +892,20 @@ function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void })
       const mit = await mitBildern(auswahl)
       const verben = await verbenDerListe(mit)
       // Herkunft und Abschnitte mitschicken (08.10.2026): weitere Units zählen für Grammatik, Vokabelweg und Abzeichen
-      const r = await senden<{ neu: number }>(`/server/vokabeln/${id}/woerter`, {
+      const r = await senden<{ neu: number; wieder?: number }>(`/server/vokabeln/${id}/woerter`, {
         woerter: mit.woerter,
         titel: auswahl.titel,
         ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
         ...(auswahl.teile ? { teile: auswahl.teile } : {}),
         ...(verben ? { verben } : {})
       })
-      notifySuccess(r.neu ? `${r.neu} Vokabeln hinzugefügt – sie kommen als neue Wörter in den Kasten.` : 'Alle diese Vokabeln waren schon dabei.')
+      notifySuccess(
+        !r.neu
+          ? 'Alle diese Vokabeln waren schon dabei.'
+          : r.wieder
+          ? `${r.neu} Vokabeln hinzugefügt – ${r.wieder} davon waren schon einmal im Kurs, ihr Lernstand gilt weiter.`
+          : `${r.neu} Vokabeln hinzugefügt – sie kommen als neue Wörter in den Kasten.`
+      )
       schliessen()
     } catch (e) {
       notifyError(e, 'Nicht hinzugefügt')
@@ -826,70 +936,6 @@ function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void })
 }
 
 type Lernende = Lernstanddaten['lernende'][number]
-
-/** Aufgeklappt-Zustand eines Kastens, auf diesem Gerät gemerkt */
-function useGemerkt(schluessel: string, vorgabe: boolean): [boolean, (v: boolean) => void] {
-  const [wert, setWert] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem(`schulapps-${schluessel}`)
-      return v === null ? vorgabe : v === '1'
-    } catch {
-      return vorgabe
-    }
-  })
-  const setzen = (v: boolean): void => {
-    setWert(v)
-    try {
-      localStorage.setItem(`schulapps-${schluessel}`, v ? '1' : '0')
-    } catch {
-      /* ohne Speicher nur für jetzt */
-    }
-  }
-  return [wert, setzen]
-}
-/** Wie useGemerkt, aber mit Text (gewählte Ansicht) */
-function useGemerktText(schluessel: string, vorgabe: string): [string, (v: string) => void] {
-  const [wert, setWert] = useState<string>(() => {
-    try {
-      return localStorage.getItem(`schulapps-${schluessel}`) ?? vorgabe
-    } catch {
-      return vorgabe
-    }
-  })
-  const setzen = (v: string): void => {
-    setWert(v)
-    try {
-      localStorage.setItem(`schulapps-${schluessel}`, v)
-    } catch {
-      /* ohne Speicher nur für jetzt */
-    }
-  }
-  return [wert, setzen]
-}
-
-/** Kopf eines auf- und zuklappbaren Kastens */
-function KastenKopf({
-  titel,
-  offen,
-  umschalten,
-  rechts,
-  ...rest
-}: { titel: React.ReactNode; offen: boolean; umschalten: () => void; rechts?: React.ReactNode } & Record<
-  `data-${string}`,
-  string | boolean
->): React.JSX.Element {
-  return (
-    <Group justify="space-between" wrap="nowrap">
-      <UnstyledButton onClick={umschalten} aria-expanded={offen} style={{ flex: 1 }} {...rest}>
-        <Group gap="xs" wrap="nowrap">
-          <IconChevronDown size={18} style={{ transform: offen ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
-          <Text fw={700}>{titel}</Text>
-        </Group>
-      </UnstyledButton>
-      {rechts}
-    </Group>
-  )
-}
 
 /** Schwellen wie im Server (grammatik.ts): Schwäche unter 60 %, Stärke ab 85 %, Befund erst ab 5 Versuchen */
 type Stufe = 'rot' | 'gelb' | 'gruen' | 'grau'
@@ -1407,7 +1453,7 @@ function GrammatikMatrix({
 /**
  * Je Lernende/r (08.10.2026, Wunsch der Lehrkraft): auf- und zuklappbar, Namen ausblendbar (etwa am Beamer),
  * sortier- und filterbar; statt der Übungstage die in 7 Tagen neu gelernten und wiederholten Vokabeln. Reiter
- * „Lernende" nur mit den Vokabeln; „Grammatik" mit Details je Person und Fördern/Fordern (abgestimmt 08.10.2026);
+ * „Vokabeln" (bis 08.10.2026 „Lernende"); „Grammatik" mit Details je Person und Fördern/Fordern (abgestimmt 08.10.2026);
  * „Übersicht" = Lernende × Regeln.
  */
 function LernendeTabelle({
@@ -1447,8 +1493,8 @@ function LernendeTabelle({
       return ((art === 'foerder' ? x.grammatik?.schwaechen : x.grammatik?.staerken) ?? []).some((p) => titel.has(p.titel))
     }
     const gleiche = lernende.filter((x) => x.id !== l.id && passt(x)).map((x) => ({ id: x.id, name: x.name }))
-    const kursGrammatik = await holen<{ zuweisungen: { vokId?: string; thema: string; art?: string }[] }>('/server/grammatik')
-      .then((r) => r.zuweisungen.filter((g) => g.vokId === kurs.id && !g.art).map((g) => g.thema))
+    const kursGrammatik = await holen<{ zuweisungen: { vokId?: string; thema: string; art?: string; status?: string }[] }>('/server/grammatik')
+      .then((r) => r.zuweisungen.filter((g) => g.vokId === kurs.id && !g.art && g.status !== 'entfernt').map((g) => g.thema))
       .catch(() => [] as string[])
     const bekannt = [...new Set([...kursGrammatik, ...lernende.flatMap((x) => regelnVon(x).map((p) => p.titel))])]
     extraStarten({
@@ -1530,7 +1576,7 @@ function LernendeTabelle({
             value={ansicht === 'matrix' || ansicht === 'grammatik' ? ansicht : 'liste'}
             onChange={setAnsicht}
             data={[
-              { value: 'liste', label: 'Lernende' },
+              { value: 'liste', label: 'Vokabeln' },
               { value: 'grammatik', label: 'Grammatik' },
               { value: 'matrix', label: 'Übersicht' }
             ]}
@@ -1674,6 +1720,7 @@ function Lernstand({
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
   useEffect(laden, [laden])
   const [problemOffen, setProblemOffen] = useGemerkt('vok-problemwoerter-offen', false)
+  const [vokOffen, setVokOffen] = useGemerkt('vok-kasten-vokabeln', false)
   if (!d) return <Loader size="sm" />
   const aendern = (was: string, daten: Record<string, unknown>): void =>
     void senden(`/server/vokabeln/${id}/${was}`, daten).then(laden, (e: unknown) => notifyError(e))
@@ -1682,6 +1729,19 @@ function Lernstand({
   const mitWoertern = d.woerter.length > 0
   // Zettel für alle Gäste mit lesbarem Code (eingetragene und solche mit neu erzeugtem Code)
   const zettel = lernende.filter((l) => l.gast && l.zugang && l.zugang.length === 8).map((l) => ({ name: l.name, zugang: l.zugang! }))
+  // Abschnitt entfernen bzw. endgültig löschen (08.10.2026)
+  const abschnitt = async (f: { was: 'entfernen' | 'loeschen'; titel: string; index?: number; entfernt?: number }): Promise<void> => {
+    try {
+      await senden(`/server/vokabeln/${id}/${f.was === 'loeschen' ? 'abschnitt-loeschen' : 'abschnitt-entfernen'}`, {
+        titel: f.titel,
+        ...(typeof f.entfernt === 'number' ? { entfernt: f.entfernt } : { index: f.index })
+      })
+      notifySuccess(f.was === 'loeschen' ? `„${f.titel}“ endgültig gelöscht.` : `„${f.titel}“ entfernt – der Lernstand bleibt gespeichert.`)
+      laden()
+    } catch (e) {
+      notifyError(e)
+    }
+  }
   const anteilSicher = d.gesamt.gesamt ? d.gesamt.sicher / d.gesamt.gesamt : 0
   const anteilGeuebt = d.gesamt.gesamt ? (d.gesamt.gesamt - d.gesamt.neu) / d.gesamt.gesamt : 0
   return (
@@ -1721,74 +1781,8 @@ function Lernstand({
           </Tooltip>
         </Group>
       </Group>
-      {/* Kurs nur mit Grammatik (08.10.2026): Vokabelteile erst, wenn Vokabeln dazukommen */}
-      {mitWoertern && <VokabelAbschnitte teile={d.teile ?? []} gesamt={d.woerter.length} />}
-      <Group gap="md" align="flex-end">
-        <TextInput
-          type="date"
-          label="Lernzeitraum bis"
-          leftSection={<IconCalendarEvent size={14} />}
-          value={alsFeld(d.bis)}
-          onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
-          w={200}
-          data-vokabel-bis-aendern
-        />
-        <TextInput
-          type="date"
-          label="Testtermin"
-          value={alsFeld(d.testTermin)}
-          onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
-          w={200}
-        />
-      </Group>
-      <Group gap="md" align="flex-end" data-vokabel-tag>
-        {mitWoertern && (
-          <NumberInput
-            label="Neue Vokabeln pro Tag"
-            description="vor den Spielen; geübt wird in 10er-Schritten"
-            min={1}
-            max={200}
-            w={230}
-            value={ziel === '' ? d.tagesziel ?? 10 : ziel}
-            onChange={setZiel}
-            onBlur={() => {
-              if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
-              setZiel('')
-            }}
-            data-vokabel-tagesziel
-          />
-        )}
-        {mitWoertern && (
-          <Switch
-            label="Spiele heute schon freischalten"
-            description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
-            checked={Boolean(d.spieleFrei)}
-            onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
-            mb={4}
-            data-vokabel-spiele-frei
-          />
-        )}
-        {mitWoertern && (
-          <Select
-            label="Unregelmäßige Verben (Spiele und Stammformen)"
-            description="Automatisch: erst wenn die Vergangenheit laut Lehrwerk-Stand oder freigegebener Grammatik dran war"
-            data={[
-              { value: '', label: 'automatisch' },
-              { value: 'an', label: 'jetzt freischalten' },
-              { value: 'aus', label: 'ausblenden' }
-            ]}
-            value={d.verbspiele ?? ''}
-            onChange={(w) => aendern('verbspiele', { wert: w ?? '' })}
-            allowDeselect={false}
-            maw={420}
-            mb={4}
-            data-vokabel-verbspiele
-          />
-        )}
-        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setHinzu(true)} data-vokabel-hinzufuegen>
-          Vokabeln hinzufügen
-        </Button>
-        {/* Lernende eintragen + Zettel mit persönlichem Code (08.10.2026) */}
+      {/* Lernende direkt unter dem Titel (08.10.2026, abgestimmt): eintragen, einer Klasse zuordnen, Zettel drucken */}
+      <Group gap="xs" data-lernende-knoepfe>
         <Button variant="light" leftSection={<IconUserPlus size={16} />} onClick={() => setEintragen(true)} data-lernende-eintragen>
           Lernende eintragen
         </Button>
@@ -1804,8 +1798,112 @@ function Lernstand({
           </Button>
         )}
       </Group>
-      {/* Grammatik direkt unter „Vokabeln hinzufügen“ (08.10.2026, Wunsch der Lehrkraft) */}
-      <KursGrammatik vokId={id} hinzufuegen={() => setGrammatik(true)} geoeffnet={grammatikOffen} oeffnen={setGrammatikOffen} stand={grammatikStand} />
+      {/*
+       * Kasten „Vokabeln" (08.10.2026, abgestimmt): Vorgabe zugeklappt, im Kopf eine Kurzinfo; „Vokabeln hinzufügen"
+       * steht im Kopf und ist auch zugeklappt erreichbar.
+       */}
+      <Card withBorder data-vokabel-kasten>
+        <KastenKopf
+          titel={
+            <Group gap="xs" component="span" wrap="wrap">
+              <IconBooks size={18} />
+              <span>Vokabeln</span>
+              {!vokOffen && (
+                <Text component="span" size="sm" c="dimmed" fw={400} data-vokabel-kurzinfo>
+                  {vokabelKurzinfo({ anzahl: d.woerter.length, tagesziel: d.tagesziel, bis: d.bis, testTermin: d.testTermin })}
+                </Text>
+              )}
+            </Group>
+          }
+          offen={vokOffen}
+          umschalten={() => setVokOffen(!vokOffen)}
+          data-vokabel-kasten-kopf
+          rechts={
+            <Button variant="light" size="xs" leftSection={<IconPlus size={14} />} onClick={() => setHinzu(true)} data-vokabel-hinzufuegen>
+              Vokabeln hinzufügen
+            </Button>
+          }
+        />
+        {vokOffen && !mitWoertern && (
+          <Stack gap="sm" mt="sm">
+            <Text size="sm" c="dimmed" data-vokabel-ohne>
+              Dieser Kurs hat bisher nur Grammatik. Mit „Vokabeln hinzufügen“ kommen Wörter dazu – dann gibt es hier Tagesziel, Spiele und Lernzeitraum.
+            </Text>
+            {(d.entfernt ?? []).length > 0 && <VokabelAbschnitte teile={[]} gesamt={0} entfernt={d.entfernt ?? []} ausfuehren={abschnitt} />}
+          </Stack>
+        )}
+        {vokOffen && mitWoertern && (
+          <Stack gap="sm" mt="sm">
+            <VokabelAbschnitte teile={d.teile ?? []} gesamt={d.woerter.length} entfernt={d.entfernt ?? []} ausfuehren={abschnitt} />
+            <Group gap="md" align="flex-end">
+              <TextInput
+                type="date"
+                label="Lernzeitraum bis"
+                leftSection={<IconCalendarEvent size={14} />}
+                value={alsFeld(d.bis)}
+                onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
+                w={200}
+                data-vokabel-bis-aendern
+              />
+              <TextInput
+                type="date"
+                label="Testtermin"
+                value={alsFeld(d.testTermin)}
+                onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
+                w={200}
+              />
+            </Group>
+            <Group gap="md" align="flex-end" data-vokabel-tag>
+              <NumberInput
+                label="Neue Vokabeln pro Tag"
+                description="vor den Spielen; geübt wird in 10er-Schritten"
+                min={1}
+                max={200}
+                w={230}
+                value={ziel === '' ? d.tagesziel ?? 10 : ziel}
+                onChange={setZiel}
+                onBlur={() => {
+                  if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
+                  setZiel('')
+                }}
+                data-vokabel-tagesziel
+              />
+              <Switch
+                label="Spiele heute schon freischalten"
+                description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
+                checked={Boolean(d.spieleFrei)}
+                onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
+                mb={4}
+                data-vokabel-spiele-frei
+              />
+              <Select
+                label="Unregelmäßige Verben (Spiele und Stammformen)"
+                description="Automatisch: erst wenn die Vergangenheit laut Lehrwerk-Stand oder freigegebener Grammatik dran war"
+                data={[
+                  { value: '', label: 'automatisch' },
+                  { value: 'an', label: 'jetzt freischalten' },
+                  { value: 'aus', label: 'ausblenden' }
+                ]}
+                value={d.verbspiele ?? ''}
+                onChange={(w) => aendern('verbspiele', { wert: w ?? '' })}
+                allowDeselect={false}
+                maw={420}
+                mb={4}
+                data-vokabel-verbspiele
+              />
+            </Group>
+          </Stack>
+        )}
+      </Card>
+      {/* Grammatik unter den Vokabeln, zugeklappt und nach Schuljahren (08.10.2026, Wunsch der Lehrkraft) */}
+      <KursGrammatik
+        vokId={id}
+        fach={d.fach}
+        hinzufuegen={() => setGrammatik(true)}
+        geoeffnet={grammatikOffen}
+        oeffnen={setGrammatikOffen}
+        stand={grammatikStand}
+      />
       {grammatik && (
         <GrammatikDazu
           vokId={id}
