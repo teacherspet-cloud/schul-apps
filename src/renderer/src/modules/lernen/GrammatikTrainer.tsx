@@ -162,11 +162,19 @@ function Kasten({
   return (
     <Stack className="vt vt-rein" data-grammatik-kasten>
       <style>{CSS}</style>
-      {!gast && (
-        <Button component="a" href="/s/lernen" variant="subtle" color={farbe.a} leftSection={<IconArrowLeft size={16} />} px={4} w="fit-content">
-          Lernraum
-        </Button>
-      )}
+      {/* Zurück wie beim Vokabeltraining (08.10.2026): Gäste zu „Meine Materialien", sonst in den Lernraum */}
+      <Button
+        component="a"
+        href={gast ? '/s/' : '/s/lernen'}
+        variant="subtle"
+        color={farbe.a}
+        leftSection={<IconArrowLeft size={16} />}
+        px={4}
+        w="fit-content"
+        data-zurueck-lernen
+      >
+        {gast ? 'Meine Materialien' : 'Lernraum'}
+      </Button>
       <div>
         <Text c="dimmed" size="sm">
           Grammatik · {d.fach}
@@ -245,13 +253,13 @@ function Kasten({
               (s.id === 'bildverb'
                 ? verbDaten!.karten.filter((k) => verbDaten!.bild(k)).length >= 4
                 : s.id === 'verbblitz'
-                  ? verbDaten!.karten.length >= 4 && verbDaten!.mitTon
-                  : s.id === 'muster'
-                    ? verbDaten!.mitMuster
-                    : verbDaten!.karten.length >= 4)
+                ? verbDaten!.karten.length >= 4 && verbDaten!.mitTon
+                : s.id === 'muster'
+                ? verbDaten!.mitMuster
+                : verbDaten!.karten.length >= 4)
             : s.id === 'regelzuordnen'
-              ? d.paket.regeln.length >= 2
-              : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
+            ? d.paket.regeln.length >= 2
+            : bekannt.aufgaben.filter((a) => s.braucht.includes(a.art)).length >= 3
           return (
             <UnstyledButton key={s.id} disabled={heute.length > 0 || !genug} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
               <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 || !genug ? 0.5 : 1, height: '100%' }}>

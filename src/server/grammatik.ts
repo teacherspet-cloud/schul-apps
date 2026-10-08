@@ -435,6 +435,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               thema: z.thema,
               lerngruppe: gruppeName(z),
               vokId: z.vok_id ?? '',
+              lerngruppeId: z.lerngruppe_id,
               aufgaben: kk.length,
               lernende: l.length,
               sicherSchnitt: l.length && kk.length ? sicherZahl.reduce((a, b) => a + b, 0) / l.length / kk.length : 0,

@@ -163,6 +163,20 @@ export function ueberschriftVon(z: Pick<Zeile, 'ueberschrift' | 'erstellt' | 'le
   return [Number.isFinite(jahr) ? String(jahr) : '', gruppe, z.fach].filter(Boolean).join(' - ')
 }
 
+/** Wörter, die in den letzten 7 Tagen neu gelernt bzw. wiederholt wurden */
+function sieben(staende: Record<string, WortStand>, jetzt: number): { neu7: number; wiederholt7: number } {
+  const grenze = jetzt - 7 * TAG
+  let neu7 = 0
+  let wiederholt7 = 0
+  for (const st of Object.values(staende)) {
+    if (!st.versuche || (st.zuletzt ?? 0) < grenze) continue
+    const neu = st.erstmals ? st.erstmals >= grenze : st.versuche <= 2
+    if (neu) neu7++
+    else wiederholt7++
+  }
+  return { neu7, wiederholt7 }
+}
+
 /** Tagesziel begrenzt (1–200, Vorgabe 10) */
 export const tageszielVon = (z: Pick<Zeile, 'tagesziel'>): number => Math.max(1, Math.min(200, Math.round(Number(z.tagesziel) || 10)))
 
@@ -686,6 +700,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           ...(n.quelle === 'gast' ? { zugang: codes.get(n.id) ?? '' } : {}),
           uebersicht: uebersicht(woerter, st.woerter, jetzt),
           tage7: st.tage.filter((t) => t >= vor7).length,
+          // In 7 Tagen neu gelernt bzw. wiederholt (08.10.2026, statt nur der Übungstage); ältere Stände ohne
+          // „erstmals": höchstens zwei Abfragen gelten als neu
+          ...sieben(st.woerter, jetzt),
           stand: st.woerter
         }
       })
@@ -732,6 +749,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026)
           teile: teileVon(z),
+          lerngruppeId: z.lerngruppe_id,
           // Lehrwerk und Unit – für „Grammatik dazu freigeben" (08.10.2026)
           quelle: json_(z.quelle ?? '', null as unknown),
           // Adresse der Lernseite – für die Zettel (08.10.2026)

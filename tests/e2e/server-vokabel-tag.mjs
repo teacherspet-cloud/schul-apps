@@ -69,6 +69,7 @@ try {
 
   // ---------- Lehrkraft: Lernende eintragen aus einer CSV-Datei, Zettel, Gast-Code ansehen
   const p = await lk.newPage()
+  p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
   await p.goto(A)
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
@@ -293,6 +294,36 @@ try {
   const gramBen = (await (await ctx.request.get(`${A}/s/api/grammatik`, { headers: KOPF })).json()).listen ?? []
   pruefe(gl2?.vokId === vid && gramBen.some((x) => x.id === g2.id), 'Fertiges Grammatiktraining verbunden – Ben sieht es')
   await p.keyboard.press('Escape')
+
+  // ---------- Details: Je Lernende/r (neu/wiederholt, sortieren, filtern, Namen ausblenden) und Grammatik der Gruppe
+  console.log('  URL vor dem Neuladen:', p.url())
+  await p.reload()
+  await p.waitForTimeout(1500)
+  await p.locator('.app-leiste [aria-label="Vokabeltraining"]').click()
+  await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  pruefe(await da(p.locator('[data-woche="10/0"]')), 'Ben: „10 neu · 0 wiederholt" in 7 Tagen')
+  await p.locator('[data-sortieren="woche"]').click()
+  pruefe((await p.locator('[data-lernende-tabelle] tbody tr').first().innerText()).includes('Ben S.'), 'Sortiert nach „geübt (7 Tage)": Ben oben')
+  await p.locator('[data-filtern="woche"]').click()
+  await p.locator('[data-filter-wahl="woche"]').click()
+  await p.getByRole('option', { name: 'hat geübt' }).click()
+  await p.waitForTimeout(300)
+  pruefe((await p.locator('[data-lernende-tabelle] tbody tr').count()) === 1, 'Filter „hat geübt": nur Ben')
+  await p.keyboard.press('Escape')
+  await p.locator('[data-namen-ausblenden]').click()
+  pruefe((await p.locator('[data-lernende-name]').first().innerText()).startsWith('Lernende/r'), 'Namen ausgeblendet')
+  pruefe((await p.locator('[data-grammatik-zeile]').count()) === 2, 'Grammatik der Gruppe: beide verbundenen Trainings')
+  await p.screenshot({ path: join(out, '10-details-tabellen.png'), fullPage: true })
+  await p.locator('[data-namen-ausblenden]').click()
+  await p.locator('[data-lernende-kopf]').click()
+  pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Je Lernende/r zugeklappt')
+  await p.reload()
+  await p.waitForTimeout(1500)
+  await p.locator('.app-leiste [aria-label="Vokabeltraining"]').click()
+  await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
+  await p.locator('[data-lernende-kasten]').waitFor()
+  pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Zugeklappt bleibt nach dem Neuladen')
+  await p.locator('[data-lernende-kopf]').click()
 
   // ---------- Übersicht: Überschrift (Standard „Jahr - Lerngruppe - Fach", umbenennbar), Symbol per Rechtsklick
   const kurz = async () => (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((z) => z.id === vid)

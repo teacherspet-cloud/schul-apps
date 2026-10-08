@@ -10,7 +10,8 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
-import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
+import { openDocument, useDokumentOeffner, useRueckweg } from '../../shared/navigation'
+import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../shared/components/SortierTabelle'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { useAlleLernenden } from './LernendeWahl'
@@ -548,7 +549,19 @@ interface Lernstanddaten {
   link?: string
   lerngruppe: string
   woerter: { id: string; term: string; translation: string }[]
-  lernende: { id: string; name: string; gast?: boolean; perCode?: boolean; zugang?: string; uebersicht: Uebersicht; tage7: number }[]
+  lernende: {
+    id: string
+    name: string
+    gast?: boolean
+    perCode?: boolean
+    zugang?: string
+    uebersicht: Uebersicht
+    tage7: number
+    /** In 7 Tagen neu gelernt / wiederholt (08.10.2026) */
+    neu7?: number
+    wiederholt7?: number
+  }[]
+  lerngruppeId?: string
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
 }
@@ -698,6 +711,291 @@ function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void })
         </Group>
       </Stack>
     </Modal>
+  )
+}
+
+type Lernende = Lernstanddaten['lernende'][number]
+
+/** Aufgeklappt-Zustand eines Kastens, auf diesem Gerät gemerkt */
+function useGemerkt(schluessel: string, vorgabe: boolean): [boolean, (v: boolean) => void] {
+  const [wert, setWert] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(`schulapps-${schluessel}`)
+      return v === null ? vorgabe : v === '1'
+    } catch {
+      return vorgabe
+    }
+  })
+  const setzen = (v: boolean): void => {
+    setWert(v)
+    try {
+      localStorage.setItem(`schulapps-${schluessel}`, v ? '1' : '0')
+    } catch {
+      /* ohne Speicher nur für jetzt */
+    }
+  }
+  return [wert, setzen]
+}
+
+/** Kopf eines auf- und zuklappbaren Kastens */
+function KastenKopf({
+  titel,
+  offen,
+  umschalten,
+  rechts,
+  ...rest
+}: { titel: React.ReactNode; offen: boolean; umschalten: () => void; rechts?: React.ReactNode } & Record<
+  `data-${string}`,
+  string | boolean
+>): React.JSX.Element {
+  return (
+    <Group justify="space-between" wrap="nowrap">
+      <UnstyledButton onClick={umschalten} aria-expanded={offen} style={{ flex: 1 }} {...rest}>
+        <Group gap="xs" wrap="nowrap">
+          <IconChevronDown size={18} style={{ transform: offen ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
+          <Text fw={700}>{titel}</Text>
+        </Group>
+      </UnstyledButton>
+      {rechts}
+    </Group>
+  )
+}
+
+/**
+ * Je Lernende/r (08.10.2026, Wunsch der Lehrkraft): auf- und zuklappbar, Namen ausblendbar (etwa am Beamer),
+ * sortier- und filterbar; statt der Übungstage die in 7 Tagen neu gelernten und wiederholten Vokabeln.
+ */
+function LernendeTabelle({
+  lernende,
+  gastZeigen,
+  entfernen
+}: {
+  lernende: Lernende[]
+  gastZeigen: (l: Lernende) => void
+  entfernen: (l: Lernende) => void
+}): React.JSX.Element {
+  const [offen, setOffen] = useGemerkt('vok-lernende-offen', true)
+  const [ohneNamen, setOhneNamen] = useGemerkt('vok-lernende-ohne-namen', false)
+  // Ersatzname je Person bleibt beim Sortieren gleich (Reihenfolge nach Namen)
+  const nummer = new Map([...lernende].sort((a, b) => a.name.localeCompare(b.name, 'de')).map((l, i) => [l.id, i + 1]))
+  const anzeige = (l: Lernende): string => (ohneNamen ? `Lernende/r ${nummer.get(l.id)}` : l.name)
+  const spalten: Spalte<Lernende>[] = [
+    { id: 'name', label: 'Name', wert: (l) => anzeige(l).toLowerCase(), filterWert: anzeige, filter: 'text' },
+    {
+      id: 'kasten',
+      label: 'Karteikasten',
+      wert: (l) => (l.uebersicht.gesamt ? (l.uebersicht.gesamt - l.uebersicht.neu) / l.uebersicht.gesamt : 0),
+      absteigend: true,
+      breite: '34%'
+    },
+    { id: 'sicher', label: 'sicher', wert: (l) => l.uebersicht.sicher, absteigend: true },
+    { id: 'faellig', label: 'fällig', wert: (l) => l.uebersicht.faellig, absteigend: true },
+    {
+      id: 'woche',
+      label: 'geübt (7 Tage)',
+      wert: (l) => (l.neu7 ?? 0) + (l.wiederholt7 ?? 0),
+      filter: 'auswahl',
+      filterWert: (l) => ((l.neu7 ?? 0) + (l.wiederholt7 ?? 0) > 0 ? 'hat geübt' : 'noch nicht geübt'),
+      absteigend: true
+    }
+  ]
+  const t = useSortierTabelle(lernende, spalten, { spalte: 'name', ab: false })
+  return (
+    <Card withBorder data-lernende-kasten>
+      <KastenKopf
+        titel={`Je Lernende/r (${lernende.length})`}
+        offen={offen}
+        umschalten={() => setOffen(!offen)}
+        data-lernende-kopf
+        rechts={
+          offen && (
+            <Switch size="xs" label="Namen ausblenden" checked={ohneNamen} onChange={(e) => setOhneNamen(e.currentTarget.checked)} data-namen-ausblenden />
+          )
+        }
+      />
+      {offen && (
+        <>
+          <AktiveFilter spalten={spalten} tabelle={t} />
+          <Table data-karten mt="xs" data-lernende-tabelle>
+            <Table.Thead>
+              <Table.Tr>
+                {spalten.map((sp) => (
+                  <SortKopf key={sp.id} spalte={sp} tabelle={t} />
+                ))}
+                <Table.Th />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {t.sichtbar.map((l) => (
+                <Table.Tr key={l.id}>
+                  <Table.Td data-lernende-name>
+                    {l.gast && !ohneNamen ? (
+                      <Text
+                        component="button"
+                        type="button"
+                        size="sm"
+                        td="underline"
+                        style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }}
+                        onClick={() => gastZeigen(l)}
+                        data-gast-name={l.name}
+                      >
+                        {l.name}
+                      </Text>
+                    ) : (
+                      anzeige(l)
+                    )}
+                    {l.gast && (
+                      <Tooltip label="Gast (per Code oder QR-Code)">
+                        <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />
+                      </Tooltip>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Faecherbalken u={l.uebersicht} />
+                  </Table.Td>
+                  <Table.Td>
+                    {l.uebersicht.sicher}/{l.uebersicht.gesamt}
+                  </Table.Td>
+                  <Table.Td>{l.uebersicht.faellig}</Table.Td>
+                  <Table.Td data-woche={`${l.neu7 ?? 0}/${l.wiederholt7 ?? 0}`}>
+                    {(l.neu7 ?? 0) + (l.wiederholt7 ?? 0) ? (
+                      <Text size="sm">
+                        <b>{l.neu7 ?? 0}</b> neu · <b>{l.wiederholt7 ?? 0}</b> wiederholt
+                      </Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        noch nicht
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {l.perCode && (
+                      <Tooltip label="Aus dieser Freigabe entfernen">
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => entfernen(l)}
+                          aria-label={`${anzeige(l)} entfernen`}
+                          data-gast-entfernen={l.name}
+                        >
+                          <IconUserMinus size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+          <Text size="xs" c="dimmed" mt="xs">
+            Stufen: Neu (grau) → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im Langzeitgedächtnis (türkis). „Sicher“ = zweimal frei richtig
+            geschrieben im Abstand von mindestens einer Woche. „geübt (7 Tage)“: Vokabeln, die in den letzten 7 Tagen zum ersten Mal geübt bzw. wiederholt
+            wurden.
+          </Text>
+        </>
+      )}
+    </Card>
+  )
+}
+
+interface GrammatikKurz {
+  id: string
+  titel: string
+  thema: string
+  lerngruppe: string
+  lerngruppeId?: string
+  vokId?: string
+  aufgaben: number
+  lernende: number
+  sicherSchnitt: number
+  status: string
+  erstellt: string
+}
+
+/**
+ * Grammatik der Gruppe (08.10.2026): verbundene Grammatiktrainings und solche für dieselbe Lerngruppe – filter- und
+ * sortierbar; ein Klick öffnet das Grammatiktraining.
+ */
+function GrammatikDerGruppe({ vokId, lerngruppeId }: { vokId: string; lerngruppeId: string }): React.JSX.Element | null {
+  const [offen, setOffen] = useGemerkt('vok-grammatik-offen', true)
+  const [liste, setListe] = useState<GrammatikKurz[] | null>(null)
+  useEffect(
+    () =>
+      void holen<{ zuweisungen: GrammatikKurz[] }>('/server/grammatik').then(
+        (r) => setListe(r.zuweisungen.filter((g) => g.vokId === vokId || (lerngruppeId && g.lerngruppeId === lerngruppeId))),
+        () => setListe([])
+      ),
+    [vokId, lerngruppeId]
+  )
+  const spalten: Spalte<GrammatikKurz>[] = [
+    { id: 'titel', label: 'Grammatik', wert: (g) => g.titel.toLowerCase(), filterWert: (g) => `${g.titel} ${g.thema}`, filter: 'text' },
+    {
+      id: 'weg',
+      label: 'Für',
+      wert: (g) => (g.vokId === vokId ? 'verbunden' : 'gleiche Lerngruppe'),
+      filter: 'auswahl'
+    },
+    { id: 'aufgaben', label: 'Aufgaben', wert: (g) => g.aufgaben, absteigend: true },
+    { id: 'sicher', label: 'Ø sicher', wert: (g) => g.sicherSchnitt, absteigend: true },
+    { id: 'status', label: 'Status', wert: (g) => (g.status === 'offen' ? 'läuft' : 'abgeschlossen'), filter: 'auswahl' },
+    { id: 'datum', label: 'Freigegeben', wert: (g) => g.erstellt, absteigend: true }
+  ]
+  const t = useSortierTabelle(liste ?? [], spalten, { spalte: 'datum', ab: true })
+  return (
+    <Card withBorder data-grammatik-gruppe>
+      <KastenKopf
+        titel={`Grammatik der Gruppe${liste ? ` (${liste.length})` : ''}`}
+        offen={offen}
+        umschalten={() => setOffen(!offen)}
+        data-grammatik-gruppe-kopf
+      />
+      {offen &&
+        (!liste ? (
+          <Loader size="sm" mt="xs" />
+        ) : liste.length === 0 ? (
+          <Text size="sm" c="dimmed" mt="xs">
+            Noch keine Grammatik für diese Gruppe – mit „Grammatik dazu freigeben“ verbinden oder neu erstellen.
+          </Text>
+        ) : (
+          <>
+            <AktiveFilter spalten={spalten} tabelle={t} />
+            <Table data-karten mt="xs" highlightOnHover data-grammatik-gruppe-tabelle>
+              <Table.Thead>
+                <Table.Tr>
+                  {spalten.map((sp) => (
+                    <SortKopf key={sp.id} spalte={sp} tabelle={t} />
+                  ))}
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {t.sichtbar.map((g) => (
+                  <Table.Tr key={g.id} style={{ cursor: 'pointer' }} onClick={() => void openDocument('grammatiktraining', g.id)} data-grammatik-zeile={g.id}>
+                    <Table.Td>
+                      <Text size="sm" fw={600}>
+                        {g.titel}
+                      </Text>
+                      {g.thema && g.thema !== g.titel && (
+                        <Text size="xs" c="dimmed">
+                          {g.thema}
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" color={g.vokId === vokId ? 'grape' : 'gray'} tt="none">
+                        {g.vokId === vokId ? 'verbunden' : 'gleiche Lerngruppe'}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>{g.aufgaben}</Table.Td>
+                    <Table.Td>{Math.round(g.sicherSchnitt * 100)} %</Table.Td>
+                    <Table.Td>{g.status === 'offen' ? 'läuft' : 'abgeschlossen'}</Table.Td>
+                    <Table.Td>{new Date(g.erstellt).toLocaleDateString('de-DE')}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </>
+        ))}
+    </Card>
   )
 }
 
@@ -990,72 +1288,8 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         )}
       </Card>
 
-      <Card withBorder>
-        <Text fw={700} mb="xs">
-          Je Lernende/r
-        </Text>
-        <Table data-karten>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th style={{ width: '40%' }}>Karteikasten</Table.Th>
-              <Table.Th>sicher</Table.Th>
-              <Table.Th>fällig</Table.Th>
-              <Table.Th>geübt (7 Tage)</Table.Th>
-              <Table.Th />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {lernende.map((l) => (
-              <Table.Tr key={l.id}>
-                <Table.Td>
-                  {l.gast ? (
-                    <Text
-                      component="button"
-                      type="button"
-                      size="sm"
-                      td="underline"
-                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }}
-                      onClick={() => setGast(l)}
-                      data-gast-name={l.name}
-                    >
-                      {l.name}
-                    </Text>
-                  ) : (
-                    l.name
-                  )}
-                  {l.gast && (
-                    <Tooltip label="Per QR-Code dazugekommen">
-                      <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />
-                    </Tooltip>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Faecherbalken u={l.uebersicht} />
-                </Table.Td>
-                <Table.Td>
-                  {l.uebersicht.sicher}/{l.uebersicht.gesamt}
-                </Table.Td>
-                <Table.Td>{l.uebersicht.faellig}</Table.Td>
-                <Table.Td>{l.tage7 ? `an ${l.tage7} Tag${l.tage7 === 1 ? '' : 'en'}` : <Text c="dimmed">noch nicht</Text>}</Table.Td>
-                <Table.Td>
-                  {l.perCode && (
-                    <Tooltip label="Aus dieser Freigabe entfernen">
-                      <ActionIcon variant="subtle" color="red" onClick={() => setEntfernen(l)} aria-label={`${l.name} entfernen`} data-gast-entfernen={l.name}>
-                        <IconUserMinus size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-        <Text size="xs" c="dimmed" mt="xs">
-          Stufen: Neu (grau) → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im Langzeitgedächtnis (türkis). „Sicher“ = zweimal frei richtig
-          geschrieben im Abstand von mindestens einer Woche. Keine Rangliste – sortiert nach Namen.
-        </Text>
-      </Card>
+      <LernendeTabelle lernende={lernende} gastZeigen={setGast} entfernen={setEntfernen} />
+      <GrammatikDerGruppe vokId={id} lerngruppeId={d.lerngruppeId ?? ''} />
       <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">
         {entfernen && (
           <Stack gap="sm">
