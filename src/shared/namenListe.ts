@@ -128,3 +128,26 @@ export function kurzNamen(personen: Person[], schonDa: string[] = []): string[] 
   }
   return aus
 }
+
+/**
+ * Nach Nachnamen sortieren (08.10.2026, Wunsch der Lehrkraft: Lernendenlisten nach Vor- ODER Nachnamen). Nachname =
+ * letztes Wort des Namens – bei Gästen „Ben S." also der Anfangsbuchstabe „S."; „Müller, Anna" (Komma) gilt als
+ * „Nachname, Vorname". Der Schlüssel ist „Nachname Vorname", damit Gleiche nach dem Vornamen folgen.
+ */
+export function nachnameSchluessel(name: string): string {
+  const s = name.trim().replace(/\s+/g, ' ')
+  const komma = s.indexOf(',')
+  if (komma > 0) return `${s.slice(0, komma).trim()} ${s.slice(komma + 1).trim()}`.trim()
+  const teile = s.split(' ')
+  if (teile.length < 2) return s
+  return `${teile[teile.length - 1]} ${teile.slice(0, -1).join(' ')}`
+}
+
+export type NamenFolge = 'vorname' | 'nachname'
+
+/** Zwei Namen vergleichen – nach Vor- oder Nachnamen, Zahlen natürlich („Lernende/r 2" vor „Lernende/r 10") */
+export const namenVergleich = (a: string, b: string, folge: NamenFolge = 'vorname'): number =>
+  (folge === 'nachname' ? nachnameSchluessel(a) : a).localeCompare(folge === 'nachname' ? nachnameSchluessel(b) : b, 'de', {
+    sensitivity: 'base',
+    numeric: true
+  })

@@ -7,13 +7,14 @@
  * Erreichtes wird nie wieder entzogen (Server: server/achievements.ts speichert den Zeitpunkt).
  */
 
-export type AchGruppe = 'dranbleiben' | 'lehrwerk' | 'wortschatz' | 'grammatik' | 'spiele' | 'besonderes'
+export type AchGruppe = 'dranbleiben' | 'lehrwerk' | 'wortschatz' | 'grammatik' | 'spiele' | 'zusammen' | 'besonderes'
 export const ACH_GRUPPEN: { id: AchGruppe; name: string }[] = [
   { id: 'dranbleiben', name: 'Dranbleiben' },
   { id: 'lehrwerk', name: 'Lehrwerk' },
   { id: 'wortschatz', name: 'Wortschatz' },
   { id: 'grammatik', name: 'Grammatik' },
   { id: 'spiele', name: 'Spiele' },
+  { id: 'zusammen', name: 'Zusammen' },
   { id: 'besonderes', name: 'Besonderes' }
 ]
 
@@ -43,8 +44,49 @@ export interface AchZaehler {
   handschrift: number
   /** Übungstage mit mindestens 10 Antworten im Kasten und keinem Fehler */
   fehlerfreieTage: number
+  // Zusammen spielen (08.10.2026, Plan F; Beschreib-Raten zählt nicht)
+  /** Kooperative Runden zu Ende gespielt */
+  koopRunden: number
+  /** Team-Ziel geschafft */
+  teamZiele: number
+  fluchtraumFehlerfrei: number
+  satzbaustelleFehlerfrei: number
+  /** Versus-Spiele zu Ende gespielt */
+  versusSpiele: number
+  /** Siege im Versus (immer mit Handicap nach Können) */
+  faireSiege: number
+  comebackSiege: number
+  /** Auf „unmöglich" das Team-Ziel bzw. einen Sieg geschafft */
+  unmoeglich: number
+  /** Bitmaske der ausprobierten Spielarten (shared/mehrspieler/typen.ts SPIELART_BIT) */
+  spielarten: number
 }
-export const LEERE_ZAEHLER: AchZaehler = { rekordeGebrochen: 0, blitzFehlerfrei: 0, verbformen: 0, diktate: 0, handschrift: 0, fehlerfreieTage: 0 }
+export const LEERE_ZAEHLER: AchZaehler = {
+  rekordeGebrochen: 0,
+  blitzFehlerfrei: 0,
+  verbformen: 0,
+  diktate: 0,
+  handschrift: 0,
+  fehlerfreieTage: 0,
+  koopRunden: 0,
+  teamZiele: 0,
+  fluchtraumFehlerfrei: 0,
+  satzbaustelleFehlerfrei: 0,
+  versusSpiele: 0,
+  faireSiege: 0,
+  comebackSiege: 0,
+  unmoeglich: 0,
+  spielarten: 0
+}
+
+/** Anzahl gesetzter Bits (ausprobierte Spielarten) */
+export const bitZahl = (n: number): number => {
+  let c = 0
+  for (let x = n >>> 0; x; x >>>= 1) c += x & 1
+  return c
+}
+/** Die acht Kernspiele ohne Beschreib-Raten = die ersten sieben Bits */
+export const KERNSPIELE_BITS = 0b1111111
 
 export interface AchEingabe {
   /** Übungstage als ISO-Datum (UTC, wie im Kasten) */
@@ -275,7 +317,51 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
   )
   neu('blitz-fehlerfrei', 'spiele', null, 'Fehlerfreie Blitzrunde', 'Eine Blitzrunde mit mindestens 10 richtigen und keinem Fehler.', z.blitzFehlerfrei >= 1)
 
-  // 6. Besonderes
+  // 6. Zusammen (Mehrspieler, 08.10.2026)
+  neu('zusammen-erste', 'zusammen', 'bronze', 'Erste Teamrunde', 'Zum ersten Mal gemeinsam mit anderen gespielt.', z.koopRunden >= 1)
+  stufen(
+    'teamziel',
+    'zusammen',
+    z.teamZiele,
+    [
+      [1, 'bronze'],
+      [10, 'silber'],
+      [25, 'gold']
+    ],
+    (n) => (n === 1 ? 'Team-Ziel geschafft' : `${n} Team-Ziele geschafft`),
+    (n) => (n === 1 ? 'Gemeinsam das Ziel einer Teamrunde erreicht.' : `${n}-mal gemeinsam das Ziel einer Teamrunde erreicht.`)
+  )
+  neu('fluchtraum-fehlerfrei', 'zusammen', 'silber', 'Ausbruch ohne Fehlversuch', 'Aus dem Fluchtraum entkommen – jeder Code saß beim ersten Mal.', z.fluchtraumFehlerfrei >= 1)
+  neu('satzbaustelle-fehlerfrei', 'zusammen', 'silber', 'Saubere Baustelle', 'Alle Sätze der Satzbaustelle ohne einen Fehler gebaut.', z.satzbaustelleFehlerfrei >= 1)
+  stufen(
+    'versus',
+    'zusammen',
+    z.versusSpiele,
+    [
+      [5, 'bronze'],
+      [25, 'silber'],
+      [50, 'gold']
+    ],
+    (n) => `${n} Versus-Spiele`,
+    (n) => `${n} Versus-Spiele zu Ende gespielt – gewonnen oder nicht.`
+  )
+  stufen(
+    'fair',
+    'zusammen',
+    z.faireSiege,
+    [
+      [1, 'bronze'],
+      [10, 'silber']
+    ],
+    (n) => (n === 1 ? 'Fairer Sieg' : `${n} faire Siege`),
+    (n) => (n === 1 ? 'Ein Versus-Spiel gewonnen – mit Fragen passend zu deinem Können.' : `${n} Versus-Spiele gewonnen – mit Fragen passend zu deinem Können.`)
+  )
+  neu('comeback-sieg', 'zusammen', 'silber', 'Comeback-Sieg', 'Deutlich zurückgelegen und trotzdem gewonnen.', z.comebackSiege >= 1)
+  neu('unmoeglich', 'zusammen', 'gold', '„Unmöglich“ geschafft', 'Auf der Stufe „unmöglich“ das Ziel erreicht.', z.unmoeglich >= 1)
+  neu('alle-spielarten', 'zusammen', 'gold', 'Alle Kernspiele ausprobiert', 'Jedes der Kernspiele zum gemeinsamen Spielen einmal gespielt.', (z.spielarten & KERNSPIELE_BITS) === KERNSPIELE_BITS)
+  neu('viele-spielarten', 'zusammen', 'gold', '15 Zusammen-Spiele ausprobiert', '15 verschiedene Spiele mit anderen gespielt.', bitZahl(z.spielarten) >= 15)
+
+  // 7. Besonderes
   stufen(
     'diktat',
     'besonderes',

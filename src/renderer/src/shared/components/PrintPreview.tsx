@@ -10,6 +10,7 @@ import { druckeImBrowser, imNetz } from '../netzZugang'
 import { aufIos, druckerWaehlbar } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 import { ZoomFlaeche } from '../touch/zoom'
+import { mobilerBrowser } from '../export/druckSeite'
 import { SeitenAuswahlFelder, SeitenHaken, umschalten } from './SeitenAuswahl'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -115,6 +116,8 @@ export default function PrintPreview({
   const direkt = druckerWaehlbar()
   /** Reiner Browser: PDF im neuen Tab, Drucker im Druckdialog des Browsers */
   const imBrowser = imNetz() && !direkt
+  /** Tablet/Telefon im Browser: Druckseite mit Druckdialog statt PDF-Tab (export/druckSeite.ts, 08.10.2026) */
+  const mobil = imBrowser && mobilerBrowser()
 
   useEffect(() => {
     if (!html) return
@@ -242,7 +245,11 @@ export default function PrintPreview({
       const wie = await druckeImBrowser(teileZumDruck, `${title ?? 'Druck'}.pdf`)
       const was = loesung && mitLoesung ? (mitBlatt ? `Blatt und ${loesung.titel}` : loesung.titel) : 'Blatt'
       notifySuccess(
-        wie === 'tab' ? `Druckansicht im neuen Tab geöffnet (${was}).` : `Der Browser hat den neuen Tab blockiert – das PDF (${was}) wurde heruntergeladen.`
+        wie === 'druck'
+          ? `Druckansicht im neuen Tab geöffnet (${was}) – dort öffnet sich der Druckdialog, sonst „Drucken …“ bzw. das Drucksymbol nutzen.`
+          : wie === 'tab'
+            ? `Druckansicht im neuen Tab geöffnet (${was}).`
+            : `Der Browser hat den neuen Tab blockiert – das PDF (${was}) wurde heruntergeladen.`
       )
       onClose()
     } catch (e) {
@@ -430,8 +437,9 @@ export default function PrintPreview({
               )}
               {imBrowser && (
                 <Text size="sm" c="dimmed" data-druckerwahl-hinweis>
-                  Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ zeigt das PDF, dort über das Drucksymbol drucken
-                  (dort auch Exemplare, Doppelseitig und Farbe).
+                  {mobil
+                    ? 'Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ öffnet die Seiten in einem neuen Tab und dort den Druckdialog des Geräts (auf dem iPad AirPrint, mit Exemplaren und Doppelseitig). Dort steht auch „Als PDF sichern“.'
+                    : 'Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ zeigt das PDF in einem neuen Tab und öffnet gleich den Druckdialog des Browsers (Drucker, Exemplare, Doppelseitig, Farbe). Falls nicht, dort über das Drucksymbol drucken.'}
                 </Text>
               )}
               {bereit && gesamt > 1 && auswahlMoeglich && (

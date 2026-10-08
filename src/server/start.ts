@@ -46,6 +46,7 @@ import { blaetterRoute } from './arbeitsblaetter'
 import { reihenRoute } from './reihen'
 import { vokabelRoute } from './vokabeln'
 import { lernenRoute } from './lernen'
+import { spielRoute } from './spiel'
 import { aktuellerNutzer } from './kontext'
 import { DATEN, OBERFLAECHE } from './pfade'
 
@@ -152,6 +153,8 @@ async function main(): Promise<void> {
       rekordbuchRoute(),
       // Achievements der Lernenden (08.10.2026)
       achievementsRoute(),
+      // Zusammen spielen: Kooperativ und Versus (08.10.2026)
+      spielRoute(),
       lernenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
       lernstandRoute(aufruf),

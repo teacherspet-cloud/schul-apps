@@ -101,7 +101,7 @@ describe('Katalog', () => {
     const ids = erreicht(
       eingabe({
         spiele: 10,
-        zaehler: { rekordeGebrochen: 10, blitzFehlerfrei: 1, verbformen: 260, diktate: 50, handschrift: 100, fehlerfreieTage: 1 }
+        zaehler: { ...LEERE_ZAEHLER, rekordeGebrochen: 10, blitzFehlerfrei: 1, verbformen: 260, diktate: 50, handschrift: 100, fehlerfreieTage: 1 }
       })
     )
     for (const id of ['rekord-1', 'rekord-10', 'spiele-10', 'blitz-fehlerfrei', 'stammformen-250', 'diktat-50', 'hand-100', 'fehlerfrei-1'])

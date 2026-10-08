@@ -22,6 +22,7 @@ import {
   Container,
   Group,
   Loader,
+  Menu,
   Modal,
   Popover,
   Progress,
@@ -44,6 +45,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconChevronRight,
+  IconCircleMinus,
   IconClipboardCheck,
   IconExternalLink,
   IconFileText,
@@ -71,6 +73,8 @@ import { blattFuerKlasse, useFertigeBlaetter, type FertigesBlatt } from './klass
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
+import { NamenFolgeKnopf, useNamenFolge } from '../../shared/components/SortierTabelle'
+import { namenVergleich } from '@shared/namenListe'
 import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from './MaterialListe'
 import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
@@ -489,14 +493,63 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
   const { gruppe, setze } = useSicht()
   const farbe = useProgrammFarbe()
   const aktiv = k.faecher.find((f) => f.id === gruppe) ?? k.faecher[0]
+  // Rechtsklick auf ein Fach (08.10.2026, Wunsch der Lehrkraft): „Fach in der Klasse abwählen"
+  const [menue, setMenue] = useState<{ f: FachKurz; x: number; y: number } | null>(null)
+  const [abwahl, setAbwahl] = useState<FachKurz | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const klasse = /^\d/.test(k.name) ? `Klasse ${k.name}` : k.name
+  const abwaehlen = async (f: FachKurz): Promise<void> => {
+    setLaeuft(true)
+    try {
+      const r = await senden<{ art: 'ausgeblendet' | 'entfernt' }>(`/server/klassen/${f.id}/abwaehlen`, {})
+      notifySuccess(
+        r.art === 'ausgeblendet'
+          ? `${fachSchreibweise(f.fach)} ist in ${klasse} abgewählt. Freigegebenes Material bleibt für die Lernenden; „+ Fach hinzufügen" holt das Fach zurück.`
+          : `${fachSchreibweise(f.fach)} ist in ${klasse} abgewählt.`
+      )
+      setAbwahl(null)
+      setze({ gruppe: null })
+      neu()
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setLaeuft(false)
+    }
+  }
   return (
     <Stack data-klasse-ansicht={k.name}>
+      <Menu opened={Boolean(menue)} onChange={(o) => !o && setMenue(null)} position="bottom-start" withinPortal>
+        <Menu.Target>
+          <div style={{ position: 'fixed', left: menue?.x ?? 0, top: menue?.y ?? 0, width: 1, height: 1, pointerEvents: 'none' }} />
+        </Menu.Target>
+        <Menu.Dropdown data-fach-menue>
+          <Menu.Item color="red" leftSection={<IconCircleMinus size={16} />} onClick={() => (menue && setAbwahl(menue.f), setMenue(null))} data-fach-abwaehlen>
+            {menue ? `${fachSchreibweise(menue.f.fach)} in ${klasse} abwählen` : ''}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      <Modal opened={Boolean(abwahl)} onClose={() => setAbwahl(null)} title={abwahl ? `${fachSchreibweise(abwahl.fach)} in ${klasse} abwählen?` : ''} centered>
+        <Stack>
+          <Text size="sm">
+            Das Fach steht dann nicht mehr bei {klasse} in „Meine Klassen". Bereits freigegebenes Material (Kurse, Tests, Arbeitsblätter, Reihen) bleibt für
+            die Lernenden erhalten. Über „+ Fach hinzufügen" lässt sich das Fach jederzeit zurückholen.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setAbwahl(null)}>
+              Abbrechen
+            </Button>
+            <Button color="red" loading={laeuft} onClick={() => abwahl && void abwaehlen(abwahl)} data-fach-abwahl-ok>
+              Abwählen
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
       <Group justify="space-between">
         <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={zurueck}>
           Alle Klassen
         </Button>
       </Group>
-      <Title order={2}>{/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}</Title>
+      <Title order={2}>{klasse}</Title>
 
       {/* ---------- Fach-Leiste über dem Handlungsbedarf, rechts daneben „Als Schüler ansehen" (ganze Klasse) */}
       <Group justify="space-between" align="flex-start" gap="xs">
@@ -510,6 +563,10 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
                     value={f.id}
                     rightSection={f.bedarf > 0 ? <BedarfZahl n={f.bedarf} size="xs" /> : undefined}
                     onClick={() => f.bedarf > 0 && zeigeHandlungsbedarf(f.id)}
+                    onContextMenu={(e: React.MouseEvent) => {
+                      e.preventDefault()
+                      setMenue({ f, x: e.clientX, y: e.clientY })
+                    }}
                     aria-label={f.bedarf > 0 ? `${fachSchreibweise(f.fach)}, ${bedarfText(f.bedarf)}` : undefined}
                     data-fach={f.fach}
                   >
@@ -1311,7 +1368,9 @@ function Anteil({ x }: { x: number | null | undefined }): React.JSX.Element {
 }
 
 function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
-  const zeilen = useMemo(() => d.lernende, [d])
+  // Vor- oder Nachname (08.10.2026, Wunsch der Lehrkraft)
+  const [folge, setFolge] = useNamenFolge()
+  const zeilen = useMemo(() => [...d.lernende].sort((a, b) => namenVergleich(a.name, b.name, folge)), [d, folge])
   if (!zeilen.length) return <Text c="dimmed">Noch keine Lernenden in dieser Lerngruppe.</Text>
   const zeigtVokabeln = zeilen.some((l) => l.vokabelnSicher !== null)
   const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
@@ -1320,7 +1379,12 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
     <Table striped highlightOnHover data-lernende-tabelle data-karten>
       <Table.Thead>
         <Table.Tr>
-          <Table.Th>Name</Table.Th>
+          <Table.Th>
+            <Group gap={4} wrap="nowrap">
+              Name
+              <NamenFolgeKnopf folge={folge} setFolge={setFolge} />
+            </Group>
+          </Table.Th>
           {zeigtVokabeln && <Table.Th>Vokabeln sicher</Table.Th>}
           {zeigtVokabeln && <Table.Th>zuletzt geübt</Table.Th>}
           {zeigtGrammatik && <Table.Th>Grammatik sicher</Table.Th>}

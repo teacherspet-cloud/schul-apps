@@ -25,7 +25,8 @@ const CSS = `
   background: linear-gradient(90deg, color-mix(in srgb, var(--rg-f) 78%, #000) 0, var(--rg-f) 18%, var(--rg-f) 82%, color-mix(in srgb, var(--rg-f) 70%, #000) 100%);
   color: var(--rg-t); box-shadow: 2px 0 0 rgba(0,0,0,.18), 0 4px 8px rgba(0,0,0,.2); transition: transform .18s ease, box-shadow .18s ease;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
-.rg-ordner:hover, .rg-ordner:focus-visible { transform: translateY(-6px); box-shadow: 2px 0 0 rgba(0,0,0,.18), 0 10px 16px rgba(0,0,0,.28); }
+@media (hover: hover) { .rg-ordner:hover { transform: translateY(-6px); box-shadow: 2px 0 0 rgba(0,0,0,.18), 0 10px 16px rgba(0,0,0,.28); } }
+.rg-ordner:focus-visible { transform: translateY(-6px); box-shadow: 2px 0 0 rgba(0,0,0,.18), 0 10px 16px rgba(0,0,0,.28); }
 .rg-ordner:focus-visible { outline: 3px solid var(--mantine-color-blue-5); outline-offset: 2px; }
 .rg-ordner.gezogen { transform: translateY(-14px) scale(1.06); box-shadow: 0 18px 28px rgba(0,0,0,.35); z-index: 2; cursor: grabbing; }
 .rg-ordner.ziel::before { content: ''; position: absolute; left: -5px; top: 10%; bottom: 10%; width: 3px; border-radius: 2px; background: var(--mantine-color-blue-5); }
@@ -60,7 +61,8 @@ export const registerVon = (o: FachOrdner): ('vok' | 'gram' | 'mat')[] =>
 
 export const ordnerLink = (fach: string): string => `/s/ordner/${encodeURIComponent(fach)}`
 
-export default function Regal({ titel, unten }: { titel: string; unten?: React.ReactNode }): React.JSX.Element {
+/** `kompakt` (08.10.2026): für „Mein Lernraum" auf der Startseite – ohne Überschrift und Hinweiszeile */
+export default function Regal({ titel, unten, kompakt }: { titel: string; unten?: React.ReactNode; kompakt?: boolean }): React.JSX.Element {
   const { ordner } = useRegal()
   const wahl = useDarstellung((s) => s.d)
   const setze = useDarstellung((s) => s.setze)
@@ -179,20 +181,24 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
   for (let i = 0; reihe && i < reihe.length; i += jeBoden) boeden.push(reihe.slice(i, i + jeBoden))
   const holz = dunkel ? '#4a3b2e' : '#b98b5b'
   return (
-    <Stack data-regal>
+    <Stack data-regal data-regal-kompakt={kompakt || undefined} gap={kompakt ? 'xs' : undefined}>
       <style>{CSS}</style>
-      <div>
-        <Title order={3}>{titel}</Title>
-        {window.__schulappsServer?.name && (
-          <Text c="dimmed" size="sm">
-            Angemeldet als {window.__schulappsServer.name}
-          </Text>
-        )}
-      </div>
+      {!kompakt && (
+        <div>
+          <Title order={3}>{titel}</Title>
+          {window.__schulappsServer?.name && (
+            <Text c="dimmed" size="sm">
+              Angemeldet als {window.__schulappsServer.name}
+            </Text>
+          )}
+        </div>
+      )}
       {!reihe ? (
         <Loader />
       ) : !reihe.length ? (
-        <Text c="dimmed">Hier erscheinen deine Fachordner, sobald etwas für dich freigegeben ist oder du es über einen Code öffnest.</Text>
+        <Text c="dimmed" size={kompakt ? 'sm' : undefined}>
+          Hier erscheinen deine Fachordner, sobald etwas für dich freigegeben ist oder du es über einen Code öffnest.
+        </Text>
       ) : (
         <>
           <div
@@ -249,6 +255,7 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
               </div>
             ))}
           </div>
+          {!kompakt && (
           <Group justify="space-between" gap="xs">
             <Text size="xs" c="dimmed">
               Ordner verschieben: mit der Maus ziehen, am Tablet lange drücken und ziehen.
@@ -259,6 +266,7 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
               </Button>
             )}
           </Group>
+          )}
         </>
       )}
       {unten}

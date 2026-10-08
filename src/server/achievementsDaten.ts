@@ -7,6 +7,7 @@
  */
 import { datenbank, type NutzerInfo } from './datenbank'
 import { LEERE_ZAEHLER, type AchGruppe, type AchZaehler, type Medaille } from '../shared/achievements'
+import { SPIELART_BIT, type MehrArt, type MehrspielId } from '../shared/mehrspieler/typen'
 
 let bereit = false
 const db = () => {
@@ -129,5 +130,39 @@ export function achievementSpiel(n: NutzerInfo, schluessel: string, wert: number
     achDatenSchreiben(n.id, d)
   } catch {
     // wie oben
+  }
+}
+
+/**
+ * Ein Mehrspieler-Spiel ist zu Ende (08.10.2026, server/spiel.ts; nie für Beschreib-Raten): Teamrunden, Team-Ziele,
+ * fehlerfreie Fluchträume/Baustellen, Versus-Spiele und Siege, Comeback, „unmöglich“, ausprobierte Spielarten.
+ */
+export function achievementZusammen(
+  n: NutzerInfo,
+  e: { spiel: MehrspielId; art: MehrArt; teamZiel: boolean; gewonnen: boolean; comeback: boolean; fehlerfrei: boolean; unmoeglich: boolean },
+  jetzt = Date.now()
+): void {
+  if (!zaehlt(n) || e.spiel === 'beschreiben') return
+  try {
+    const d = achDatenLesen(n.id)
+    const heute = isoTag(jetzt)
+    if (!d.tage.includes(heute)) d.tage = tageVereinen(d.tage, [heute])
+    const z = d.zaehler
+    z.spielarten = (z.spielarten ?? 0) | (SPIELART_BIT[e.spiel] ?? 0)
+    if (e.art === 'koop') {
+      z.koopRunden++
+      if (e.teamZiel) z.teamZiele++
+      if (e.spiel === 'fluchtraum' && e.teamZiel && e.fehlerfrei) z.fluchtraumFehlerfrei++
+      if (e.spiel === 'satzbaustelle' && e.fehlerfrei) z.satzbaustelleFehlerfrei++
+      if (e.unmoeglich && e.teamZiel) z.unmoeglich++
+    } else {
+      z.versusSpiele++
+      if (e.gewonnen) z.faireSiege++
+      if (e.gewonnen && e.comeback) z.comebackSiege++
+      if (e.unmoeglich && e.gewonnen) z.unmoeglich++
+    }
+    achDatenSchreiben(n.id, d)
+  } catch {
+    // Achievements dürfen das Spielen nie stören
   }
 }

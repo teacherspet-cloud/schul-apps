@@ -56,6 +56,7 @@ import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './spiele/SpieleVerben'
 import { SPIELE_CSS } from './spiele/Spiele'
+import ZusammenSpielen from './mehrspieler/ZusammenSpielen'
 import { useVerbDaten } from './verbDaten'
 import { useVtFarbe } from './vtFarben'
 import { apostrophHinweis } from './apostrophHinweis'
@@ -563,6 +564,12 @@ function Kasten({
                   </UnstyledButton>
                 ))}
               </SimpleGrid>
+              {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) */}
+              {!d.paket.verben?.length && (
+                <Stack gap="xs" mt="sm">
+                  <ZusammenSpielen bereich="gram" kurs={d.id} sprache={d.sprache} />
+                </Stack>
+              )}
             </>
           )}
         </Card>

@@ -5,7 +5,8 @@ import { datenbank, datenbankFuerTests, nutzerAnlegen, type NutzerInfo } from '.
 import { lerngruppenVon } from '../src/server/onlinetest'
 import { standSpeichern, standVon, vokabelListenFuer, vokabelnZuweisen, vokabelRoute } from '../src/server/vokabeln'
 import { grammatikAnlegen, grammatikFuer, grammatikRoute } from '../src/server/grammatik'
-import { gleichesThema, kennungenWiederverwenden, paketeZusammen, teilEntfernen, woerterJeTeil } from '../src/shared/kursEntfernen'
+import { aufgabenAnhaengen, gleichesThema, kennungenWiederverwenden, paketeZusammen, teilEntfernen, woerterJeTeil } from '../src/shared/kursEntfernen'
+import { paketBereinigt } from '../src/shared/grammatiktrainer'
 import type { Anfrage } from '../src/server/http'
 import type { GrammatikAufgabe, GrammatikPaket } from '../src/shared/grammatiktrainer'
 
@@ -76,6 +77,26 @@ describe('Grammatik (rein)', () => {
     expect(new Set(p.aufgaben.map((a) => a.id)).size).toBe(15)
     expect(p.regeln).toHaveLength(1)
     expect(p.aufgaben.every((a) => a.regelId === 'r1')).toBe(true)
+  })
+  // „+ Aufgaben" (08.10.2026): frische Kennungen, nie die einer gelöschten Aufgabe; Doppeltes fällt weg
+  it('hängt Aufgaben an: alte Kennungen bleiben, neue bekommen frische Kennungen', () => {
+    const alt = paket(6)
+    alt.aufgaben.splice(2, 1) // a3 gelöscht – ihr Lernstand liegt evtl. noch beim Kind
+    const neu = paket(4, 4) // a1…a4 mit Satz 5…8 – Satz 5/6 gibt es schon
+    const { paket: p, dazu } = aufgabenAnhaengen(alt, neu, 'm1')
+    expect(dazu).toBe(2)
+    expect(p.aufgaben.slice(0, 5)).toEqual(alt.aufgaben)
+    const neue = p.aufgaben.slice(5)
+    expect(neue.map((a) => a.satz)).toEqual(['Satz 7 ___', 'Satz 8 ___'])
+    expect(neue.every((a) => a.id.startsWith('m1-'))).toBe(true)
+    expect(neue.some((a) => a.id === 'a3')).toBe(false)
+    expect(new Set(p.aufgaben.map((a) => a.id)).size).toBe(p.aufgaben.length)
+    // Die Bereinigung behält alle Kennungen
+    expect(paketBereinigt(p, 'Simple past').aufgaben.map((a) => a.id)).toEqual(p.aufgaben.map((a) => a.id))
+  })
+  it('anhängen mit ungültigem Präfix fällt auf „n" zurück und ordnet Regeln über den Titel zu', () => {
+    const { paket: p } = aufgabenAnhaengen(paket(2), paket(1, 9, { id: 'r7', titel: 'simple past' }), '1-ungültig')
+    expect(p.aufgaben[2]).toMatchObject({ id: 'n-1', regelId: 'r1' })
   })
 })
 
@@ -237,6 +258,27 @@ describe('Grammatik entfernen und wieder hinzufügen', () => {
     expect(p.aufgaben.slice(0, 8).map((a) => a.id)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8'])
     expect(p.aufgaben).toHaveLength(14)
     expect(Object.keys(gramStand(gid) ?? {})).toEqual(['a1', 'a2'])
+  })
+  it('„+ Aufgaben": die Route hängt an, Kennungen und Lernstand bleiben; die Liste nennt die Themen', async () => {
+    const zid = anlegen(paket(8, 100), ['en.tense.future'], 'Future')[0]
+    datenbank()
+      .prepare('INSERT INTO gram_stand (zuweisung_id, schueler_id, daten, aktualisiert) VALUES (?, ?, ?, ?)')
+      .run(zid, mia.id, JSON.stringify({ aufgaben: { a1: wortStand }, tage: [] }), Date.now())
+    const neu = { aufgaben: [aufgabe('a1', 'r1', 'Neu 1 ___'), aufgabe('a2', 'r1', 'Neu 2 ___'), aufgabe('a3', 'r1', 'Satz 101 ___')] }
+    const r = await gram('POST', `/server/grammatik/${zid}/anhaengen`, { paket: neu })
+    expect(r.code).toBe(200)
+    expect(r.d).toMatchObject({ dazu: 2, aufgaben: 10 })
+    const z = datenbank().prepare('SELECT paket FROM gram_zuweisungen WHERE id = ?').get(zid) as { paket: string }
+    const p = JSON.parse(z.paket) as GrammatikPaket
+    expect(p.aufgaben.slice(0, 8).map((a) => a.id)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8'])
+    expect(p.aufgaben.slice(8).every((a) => /^m[a-z0-9]+-\d+$/.test(a.id))).toBe(true)
+    expect(Object.keys(gramStand(zid) ?? {})).toEqual(['a1'])
+    // Nur Doppeltes: abgelehnt
+    expect((await gram('POST', `/server/grammatik/${zid}/anhaengen`, { paket: { aufgaben: [aufgabe('x', 'r1', 'Neu 1 ___')] } })).code).toBe(400)
+    const l = (await gram('GET', '/server/grammatik')).d.zuweisungen as { id: string; themen: string[] }[]
+    expect(l.find((x) => x.id === zid)?.themen).toEqual(['en.tense.future'])
+    const d = (await gram('GET', `/server/grammatik/${zid}`)).d
+    expect(d).toMatchObject({ sprache: 'en', info: { jahrgang: 6 } })
   })
   it('wiederherstellen und endgültig löschen (mit Lernstand)', async () => {
     await gram('POST', `/server/grammatik/${gid}/entfernen`)

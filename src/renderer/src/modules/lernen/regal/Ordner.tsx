@@ -17,7 +17,7 @@ import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { VokabelwegKarten } from '../VokabelLeiter'
 import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
 import { istOffen, ladeOffen, nachJahrgaengen, speichereOffen } from './grammatikJahrgaenge'
-import { deckelBereit, nimmUebergang, ordnerZu } from './ordnerAnimation'
+import { deckelBereit, herkunft, nimmUebergang, ordnerZu } from './ordnerAnimation'
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
@@ -87,7 +87,13 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   const [uebergang] = useState(nimmUebergang)
   const aufklappen = useRef<((ziel: HTMLElement | null) => void) | null>(null)
   const ordnerEl = useRef<HTMLDivElement>(null)
-  if (uebergang && !aufklappen.current) aufklappen.current = deckelBereit(uebergang)
+  // Nur EINMAL einen Deckel auflegen (08.10.2026, Befund am Tablet): Nach dem Aufklappen ist `aufklappen` wieder leer –
+  // ohne eigene Marke legte das nächste Zeichnen einen zweiten, geschlossenen Deckel auf, der bis zu 6 s liegen blieb
+  const aufgelegt = useRef(false)
+  if (uebergang && !aufgelegt.current) {
+    aufgelegt.current = true
+    aufklappen.current = deckelBereit(uebergang)
+  }
   useEffect(() => {
     if (!ordner || !aufklappen.current) return
     const los = aufklappen.current
@@ -204,7 +210,7 @@ export function zuTun(o: FachOrdner, r: Register): number {
 }
 
 /** Zurück: Gäste auf die Startseite, Konten in ihren Lernraum (dort steht das Regal) */
-const zurueckZiel = (): string => (!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
+const zurueckZiel = (): string => herkunft(!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
 
 /**
  * Register Vocabulary (08.10.2026, Wunsch der Lehrkraft): der Kurs gleich hier – Karteikasten, Tagesrunde, Spiele –

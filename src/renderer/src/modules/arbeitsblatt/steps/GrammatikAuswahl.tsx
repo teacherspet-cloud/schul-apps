@@ -6,6 +6,7 @@ import {
   Checkbox,
   CloseButton,
   Group,
+  MultiSelect,
   Paper,
   ScrollArea,
   Select,
@@ -78,6 +79,7 @@ export default function GrammatikAuswahl({
   einzeln = false,
   teilformenWaehlbar = true,
   unitSofort = false,
+  kurs = false,
   beschreibung
 }: {
   query: GrammarQuery
@@ -95,6 +97,12 @@ export default function GrammatikAuswahl({
    * werden die Vorschläge der vorigen ersetzt; von Hand Gewähltes bleibt.
    */
   unitSofort?: boolean
+  /**
+   * Grammatik eines Kurses freigeben (Sprachenlernen, 08.10.2026, Wunsch der Lehrkraft): „Abschnitt(e)" statt „bis
+   * Kapitel" – mehrere Units wählbar, ihre Grammatik steht darunter zum An- und Abhaken; ohne die Zusammenfassung der
+   * Auswahl (Chips) oben – angehakt ist, was in der Liste angehakt ist.
+   */
+  kurs?: boolean
   beschreibung?: string
 }): React.JSX.Element {
   const fach = query.subjectId
@@ -128,17 +136,29 @@ export default function GrammatikAuswahl({
   useEffect(() => {
     if (lehrwerk?.buch && baende.includes(lehrwerk.buch)) {
       setBuch(lehrwerk.buch)
-      if (lehrwerk.unit && grammatikKapitel(lehrwerk.buch).includes(lehrwerk.unit)) setUnit(lehrwerk.unit)
+      if (lehrwerk.unit && grammatikKapitel(lehrwerk.buch).includes(lehrwerk.unit)) {
+        setUnit(lehrwerk.unit)
+        if (kurs) setUnits((u) => (u.length ? u : [lehrwerk.unit!]))
+      }
     }
   }, [lehrwerk?.buch, lehrwerk?.unit, baende])
   const [mitFrueheren, setMitFrueheren] = useState(false)
   const [unitModus, setUnitModus] = useState<'bis' | 'nur' | null>(null)
+  // Kurs: mehrere Abschnitte (Units) zugleich
+  const [units, setUnits] = useState<string[]>(() => (kurs && startUnit && kapitel.includes(startUnit) ? [startUnit] : []))
   const [unitHinweis, setUnitHinweis] = useState('')
   const frueher = buch ? fruehereBaende(buch) : []
   const herkunft = useMemo(() => (buch ? herkunftKarte(fach, buch, frueher) : new Map<string, string>()), [fach, buch, frueher.join('|')])
   const eintraege = useMemo(
-    () => (buch && unit && unitModus ? unitEintraege(fach, buch, unit, unitModus, unitModus === 'bis' && mitFrueheren ? frueher : []) : []),
-    [fach, buch, unit, unitModus, mitFrueheren, frueher.join('|')]
+    () =>
+      kurs
+        ? buch
+          ? units.flatMap((u) => unitEintraege(fach, buch, u, 'nur', []))
+          : []
+        : buch && unit && unitModus
+          ? unitEintraege(fach, buch, unit, unitModus, unitModus === 'bis' && mitFrueheren ? frueher : [])
+          : [],
+    [kurs, units.join('|'), fach, buch, unit, unitModus, mitFrueheren, frueher.join('|')] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const fachThemen = useMemo(() => GRAMMAR_TOPICS.filter((t) => t.subject === fach), [fach])
@@ -222,6 +242,8 @@ export default function GrammatikAuswahl({
 
   // ---------- Was die Liste zeigt
   const suchAktiv = suche.trim().length > 0
+  // Welche Unit-Ansicht gilt: im Kurs die gewählten Abschnitte (eine Suche geht vor), sonst die Schnellknöpfe
+  const unitAnsicht: 'bis' | 'nur' | null = kurs ? (units.length && !suchAktiv ? 'nur' : null) : unitModus
   let liste: GrammarTopic[]
   // Unit-Ansicht: Themen der Units (sicher und vorgeschlagen), sonst Katalog
   const unitIds = new Map<string, { kapitel: string; sicher: boolean; phrase: string }>()
@@ -231,22 +253,22 @@ export default function GrammatikAuswahl({
       if (!alt || (!alt.sicher && e.sicher))
         unitIds.set(id, { kapitel: mitFrueheren && e.band !== buch ? `${e.band}, ${e.kapitel}` : e.kapitel, sicher: e.sicher, phrase: e.phrase })
     }
-  if (unitModus && eintraege.length) liste = [...unitIds.keys()].map(nachId).filter((t): t is GrammarTopic => Boolean(t))
+  if (unitAnsicht && eintraege.length) liste = [...unitIds.keys()].map(nachId).filter((t): t is GrammarTopic => Boolean(t))
   else if (suchAktiv) liste = sucheThemen(fachThemen, suche)
   else liste = alle ? fachThemen : passend
   if (stufe) liste = liste.filter((t) => inStufe(t, Number(stufe), query))
   if (niveauFilter) liste = liste.filter((t) => aufNiveau(t, niveauFilter))
   const vorBereich = liste
-  if (bereich && !unitModus) liste = liste.filter((t) => oberBereich(t.area) === bereich)
+  if (bereich && !unitAnsicht) liste = liste.filter((t) => oberBereich(t.area) === bereich)
   // Bei der Suche: Passendes vor Unpassendem
-  if (suchAktiv && !unitModus) liste = [...liste.filter((t) => passendIds.has(t.id)), ...liste.filter((t) => !passendIds.has(t.id))]
+  if (suchAktiv && !unitAnsicht) liste = [...liste.filter((t) => passendIds.has(t.id)), ...liste.filter((t) => !passendIds.has(t.id))]
 
   const gruppen = new Map<string, GrammarTopic[]>()
   for (const t of liste) {
-    const g = unitModus && eintraege.length ? unitIds.get(t.id)?.kapitel ?? '' : suchAktiv ? 'Treffer' : t.area
+    const g = unitAnsicht && eintraege.length ? unitIds.get(t.id)?.kapitel ?? '' : suchAktiv ? 'Treffer' : t.area
     gruppen.set(g, [...(gruppen.get(g) ?? []), t])
   }
-  if (!unitModus && !suchAktiv) for (const l of gruppen.values()) l.sort((a, b) => a.from - b.from || a.label.localeCompare(b.label))
+  if (!unitAnsicht && !suchAktiv) for (const l of gruppen.values()) l.sort((a, b) => a.from - b.from || a.label.localeCompare(b.label))
   const nichtZugeordnet = eintraege.filter((e) => !e.ids.length)
 
   const kacheln = useMemo(() => {
@@ -288,46 +310,75 @@ export default function GrammatikAuswahl({
               onChange={(v) => {
                 setBuch(v)
                 setUnit(null)
+                setUnits([])
                 setUnitModus(null)
                 setUnitHinweis('')
               }}
               w={150}
               data-lehrwerk-buch
             />
-            <Select
-              size="xs"
-              label="bis Kapitel"
-              placeholder="Unit"
-              data={kapitel}
-              value={unit}
-              disabled={!buch}
-              onChange={(v) => {
-                setUnit(v)
-                setUnitModus(null)
-                setUnitHinweis('')
-                if (buch && v) merkeLehrwerk(buch, v)
-              }}
-              w={150}
-              data-lehrwerk-unit
-            />
-            <Button size="xs" variant={unitModus === 'bis' ? 'filled' : 'light'} disabled={!unit} onClick={() => unitWahl('bis')} data-unit-bis>
-              Alles bis {unit ?? 'Unit …'}
-            </Button>
-            <Button size="xs" variant={unitModus === 'nur' ? 'filled' : 'light'} disabled={!unit} onClick={() => unitWahl('nur')} data-unit-nur>
-              Nur {unit ?? 'Unit …'}
-            </Button>
+            {kurs ? (
+              <MultiSelect
+                size="xs"
+                label="Abschnitt(e)"
+                placeholder={units.length ? '' : 'Units wählen'}
+                data={kapitel}
+                value={units}
+                disabled={!buch}
+                onChange={(v) => {
+                  const neu = [...v].sort((a, b) => kapitel.indexOf(a) - kapitel.indexOf(b))
+                  setUnits(neu)
+                  setSuche('')
+                  setBereich(null)
+                  if (buch && neu.length) merkeLehrwerk(buch, neu[neu.length - 1])
+                }}
+                clearable
+                miw={220}
+                style={{ flex: 1 }}
+                data-lehrwerk-unit
+                data-lehrwerk-abschnitte
+              />
+            ) : (
+              <Select
+                size="xs"
+                label="bis Kapitel"
+                placeholder="Unit"
+                data={kapitel}
+                value={unit}
+                disabled={!buch}
+                onChange={(v) => {
+                  setUnit(v)
+                  setUnitModus(null)
+                  setUnitHinweis('')
+                  if (buch && v) merkeLehrwerk(buch, v)
+                }}
+                w={150}
+                data-lehrwerk-unit
+              />
+            )}
+            {!kurs && (
+              <>
+                <Button size="xs" variant={unitModus === 'bis' ? 'filled' : 'light'} disabled={!unit} onClick={() => unitWahl('bis')} data-unit-bis>
+                  Alles bis {unit ?? 'Unit …'}
+                </Button>
+                <Button size="xs" variant={unitModus === 'nur' ? 'filled' : 'light'} disabled={!unit} onClick={() => unitWahl('nur')} data-unit-nur>
+                  Nur {unit ?? 'Unit …'}
+                </Button>
+              </>
+            )}
             <Button
               size="xs"
-              variant={!unitModus ? 'filled' : 'subtle'}
+              variant={!unitAnsicht ? 'filled' : 'subtle'}
               onClick={() => {
                 setUnitModus(null)
+                setUnits([])
                 setUnitHinweis('')
               }}
               data-unit-alle
             >
               Alle anzeigen
             </Button>
-            {frueher.length > 0 && (
+            {!kurs && frueher.length > 0 && (
               <Switch size="xs" label={`mit ${frueher.join(', ')}`} checked={mitFrueheren} onChange={(e) => setMitFrueheren(e.currentTarget.checked)} mb={4} />
             )}
           </Group>
@@ -380,8 +431,8 @@ export default function GrammatikAuswahl({
         )}
       </Group>
 
-      {/* Auswahl immer sichtbar */}
-      <Group gap={6} wrap="wrap" data-auswahl-chips>
+      {/* Auswahl immer sichtbar – im Kurs nicht: dort zählt allein das Häkchen in der Liste (08.10.2026) */}
+      <Group gap={6} wrap="wrap" data-auswahl-chips display={kurs ? 'none' : undefined}>
         <Text size="xs" fw={600} data-auswahl-zaehler>
           {gewaehlt.length
             ? `${gewaehlt.length} ${gewaehlt.length === 1 ? 'Thema' : 'Themen'}${voll ? `, ${teilSumme} Teilform${teilSumme === 1 ? '' : 'en'}` : ''}`
@@ -430,7 +481,7 @@ export default function GrammatikAuswahl({
         </Stack>
       )}
 
-      {!suchAktiv && !unitModus && kacheln.length > 1 && (
+      {!suchAktiv && !unitAnsicht && kacheln.length > 1 && (
         <SimpleGrid cols={{ base: 2, xs: 3, md: schmal ? 3 : 5 }} spacing={6} data-bereich-kacheln>
           {kacheln.map(([b, n]) => (
             <UnstyledButton

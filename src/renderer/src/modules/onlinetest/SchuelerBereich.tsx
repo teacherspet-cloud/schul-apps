@@ -10,6 +10,7 @@
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
  *  /s/vt/<CODE>   Vokabeltraining per QR-Code (VokabelBeitritt.tsx) → /s/v/<ID>, auch für Gäste über Wochen
  *  /s/gt/<CODE>   Grammatiktraining per QR-Code (06.10.2026) → /s/g/<ID> (GrammatikTrainer.tsx)
+ *  /s/sp/<CODE>   Zusammen spielen (08.10.2026): Lobby und Spiel einer Mehrspieler-Runde (lernen/mehrspieler)
  *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
  *  /s/reihen, /s/r/<ZID>[/<SID>]  Unterrichtsreihen (ReiheAnsicht.tsx)
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
@@ -98,6 +99,7 @@ import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
+import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
 import { holen, senden } from './serverApi'
 import { Begruessung, Lernstand, MeinLernraum, TippKarte, type NeuesMaterial } from './SchuelerStart'
 import type { LernstandAntwort } from '@shared/lernstand'
@@ -181,6 +183,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const grammatik = /^\/s\/g\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const gramCode = /^\/s\/gt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  // Zusammen spielen (08.10.2026): Einladungscode aus sechs Ziffern
+  const spielCode = /^\/s\/sp\/(\d{6})\/?$/.exec(pfad)?.[1]
   // Vokabelweg (03.10.2026): gemeinsamer Kasten einer Lehrwerksreihe
   const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
@@ -201,7 +205,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const telefon = useSchuelerTelefon()
   // Regal oder bisherige Liste (08.10.2026, Wahl der Lernenden in den Einstellungen)
   const regalAn = useDarstellung((s) => s.d.materialien) !== 'liste'
-  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln)
+  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln || spielCode)
   const mitTabs = telefon && !gast && !fokus
   // Kopfzeile: Startseite erkennen; Gäste sehen, wo sie sind (vorher „Schul-Apps · Vokabeltraining")
   const aufStart = pfad === '/s/' || pfad === '/s'
@@ -214,6 +218,8 @@ export default function SchuelerBereich(): React.JSX.Element {
       ? 'Vokabeltraining'
       : grammatik || gramCode
       ? 'Grammatiktraining'
+      : spielCode
+      ? 'Zusammen spielen'
       : code
       ? 'Onlinetest'
       : ''
@@ -230,6 +236,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <VokabelBeitritt code={vokCode.toUpperCase()} />
   ) : gramCode ? (
     <VokabelBeitritt code={gramCode.toUpperCase()} art="grammatik" />
+  ) : spielCode && ich?.angemeldet ? (
+    <MehrspielerSeite code={spielCode} />
   ) : grammatik ? (
     <GrammatikTrainer id={grammatik} />
   ) : blatt ? (
@@ -896,6 +904,11 @@ export function GrammatikStand({ u }: { u: { gesamt: number; sicher: number; heu
 }
 
 async function oeffneCode(code: string): Promise<void> {
+  // Einladungscode einer Spielrunde (sechs Ziffern, 08.10.2026)
+  if (/^\d{6}$/.test(code.trim())) {
+    const spiel = await holen<{ code: string }>(`/s/api/spiel/zugang?code=${code.trim()}`).catch(() => null)
+    if (spiel?.code) return window.location.assign(`/s/sp/${spiel.code}`)
+  }
   // Persönlicher Anmeldecode vom Zettel der Lehrkraft (8 Zeichen, 08.10.2026): meldet an und öffnet die Vokabeln
   if (code.length === 8) {
     const a = await senden<{ id: string; anzahl: number }>('/s/api/vokabeln/anmelden', { code }).catch(() => null)

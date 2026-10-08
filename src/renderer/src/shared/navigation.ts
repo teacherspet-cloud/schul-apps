@@ -99,6 +99,12 @@ export const useNavigation = create<NavigationState>((set, get) => ({
     const docId = dokumentVon(moduleId0, docId0)
     await sichereAlles()
     get().openModule(moduleId)
+    /*
+     * Programm noch nie geöffnet (08.10.2026, Befund aus „Meine Klassen" → Handlungsbedarf → Sprachenlernen): Es meldet
+     * seinen Öffner erst beim ersten Zeichnen an – kurz warten (höchstens ~5 s), sonst landete man nur auf der Startseite
+     * des Programms statt im Kurs.
+     */
+    for (let i = 0; i < 40 && !oeffner.has(moduleId); i++) await new Promise((r) => setTimeout(r, 125))
     const oeffnen = oeffner.get(moduleId)
     if (!oeffnen) return
     try {

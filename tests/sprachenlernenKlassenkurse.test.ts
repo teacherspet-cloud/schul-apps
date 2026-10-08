@@ -235,7 +235,8 @@ describe('Kurse für die eigenen Klassen', () => {
     expect(d.quelle.unit).toBe('Unit 2')
     expect(d.ueberschrift).toBe('6b - Englisch')
     const sicht = vokabelListenFuer(anna)
-    expect(sicht.map((v) => [v.id, v.titel])).toEqual([[leer, '6b - Englisch']])
+    // Lernende sehen die Klasse nie im Titel (08.10.2026): nur „Englisch"
+    expect(sicht.map((v) => [v.id, v.titel])).toEqual([[leer, 'Englisch']])
     // Ein zweiter neuer Kurs (der Klassenkurs ist nicht mehr leer) entsteht daneben
     const r2 = await rufe(lk, 'POST', '/server/vokabeln/freigeben', { lerngruppeId: g.en6b, titel: 'Extra', sprache: 'en', fach: 'Englisch', woerter: [{ id: 'x', term: 'tree', translation: 'Baum' }] })
     expect(r2.d.id).not.toBe(leer)

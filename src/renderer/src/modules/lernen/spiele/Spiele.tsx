@@ -35,6 +35,7 @@ import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten
 import { kannSprechen } from '../VokabelTrainer'
 import { hatSatzAufnahme } from '../medienCache'
 import { fuerServer, ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
+import ZusammenSpielen from '../mehrspieler/ZusammenSpielen'
 
 /** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
 export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell', 'richtiggehoert', 'aufdecken', 'formenblitz']
@@ -533,6 +534,8 @@ export function Spielwahl({
           </div>
         )
       })}
+      {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) – nicht im Vokabelweg und nicht bei den reinen Verbspielen */}
+      {!nurVerben && !listeId.startsWith('lb:') && <ZusammenSpielen bereich="vok" kurs={listeId} sprache={sprache} />}
     </Stack>
   )
 }

@@ -148,24 +148,29 @@ try {
   pruefe(await da(benProfil.locator('[data-foerdern="Ben S."][data-empfohlen]')), 'Ben: „Fördern" hervorgehoben')
   pruefe((await p.locator('[data-grammatik-profil="Tom K."] [data-schwaechen]').count()) === 0, 'Tom: keine Schwäche')
   pruefe(await p.locator('[data-fordern="Ben S."]').isDisabled(), 'Ben: „Fordern" ohne Stärken gesperrt')
-  // Details: großes Fenster mit Zahlen als Filter, Bereichen und Fördern je Regel
+  // Reiter „Übersicht" (Lernende × Regeln) entfällt – seine Angaben stehen in den Details (08.10.2026)
+  pruefe((await p.locator('[data-lernende-ansicht]').getByText('Übersicht', { exact: true }).count()) === 0, 'Kein Reiter „Übersicht" mehr')
+  // Details: Kompetenzprofil (Kacheln je Bereich), „Braucht Aufmerksamkeit", „Alle Formen" zugeklappt
   await p.locator('[data-grammatik-details="Ben S."]').click()
   pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-details-filter="schwaeche"]', { hasText: 'Schwäche 1' })), 'Details: „Schwäche 1"')
   pruefe(
-    await da(p.locator('[data-lernende-details="Ben S."] [data-ampel="schwaeche"]', { hasText: 'Simple past' })),
-    'Details: Bereich mit der Schwäche aufgeklappt, Regel rot'
+    await da(p.locator('[data-lernende-details="Ben S."] [data-kompetenzprofil] [data-profil-kachel][data-kachel-ampel="schwaeche"]').first()),
+    'Kompetenzprofil: rote Kachel für Bens Schwäche'
   )
-  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-regel-extra^="foerder:"]')), 'Ben: „Fördern" je Regel in den Details')
+  pruefe(
+    await da(p.locator('[data-lernende-details="Ben S."] [data-aufmerksamkeit] [data-ampel="schwaeche"]', { hasText: 'Simple past' })),
+    'Braucht Aufmerksamkeit: die Schwäche mit Fehlern, Regel rot'
+  )
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-aufmerksamkeit] [data-regel-extra^="foerder:"]').first()), 'Ben: „Fördern" je Form in den Details')
+  pruefe((await p.locator('[data-lernende-details="Ben S."] [data-alle-formen] [data-regel-zeile]').count()) === 0, '„Alle Formen" ist zugeklappt')
+  // Klick auf die Kachel öffnet „Alle Formen" mit der Zeile der Form
+  await p.locator('[data-lernende-details="Ben S."] [data-profil-kachel][data-kachel-ampel="schwaeche"]').first().click()
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-alle-formen] [data-regel-zeile][data-ampel="schwaeche"]').first()), 'Kachel öffnet die Zeile der Form')
   await p.locator('[data-details-ansicht]').getByText('nach Lehrwerk-Units').click()
   pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-details-gruppe]').first()), 'Details nach Lehrwerk-Units')
   await p.locator('[data-details-ansicht]').getByText('nach Bereichen').click()
   await p.screenshot({ path: join(out, '2-kurs.png'), fullPage: true })
   await p.keyboard.press('Escape')
-  // Übersicht (Lernende × Regeln): Bens schwache Regel rot
-  await p.locator('[data-lernende-ansicht]').getByText('Übersicht', { exact: true }).click()
-  pruefe(await da(p.locator('[data-matrix-zelle^="Ben S.|"][data-stufe="rot"]')), 'Übersicht: Ben rot bei seiner Schwäche')
-  await p.screenshot({ path: join(out, '2b-matrix.png'), fullPage: true })
-  await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
 
   // ---------- Fördern → KI (Attrappe) im Hintergrund → Entwurf in der Tabelle → prüfen → nur für Ben freischalten
   await p.locator('[data-foerdern="Ben S."]').click()

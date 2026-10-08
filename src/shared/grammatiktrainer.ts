@@ -120,8 +120,11 @@ const liste = (x: unknown, n = 12, m = 200): string[] =>
 /**
  * Paket der KI (oder vom Server gespeichert) bereinigen und unbrauchbare Aufgaben aussortieren: ohne Lösung, Lücke ohne
  * „___", Auswahl ohne die Lösung unter den Möglichkeiten, Fehler-Aufgabe, deren Fehlerwort nicht im Satz steht,
- * Satzbau mit weniger als drei Teilen. Höchstens 80 Aufgaben, 12 Regeln.
+ * Satzbau mit weniger als drei Teilen. Höchstens 120 Aufgaben (seit 08.10.2026: „+ Aufgaben" hängt an), 12 Regeln.
  */
+/** Höchstzahl der Aufgaben eines Pakets */
+export const GRAMMATIK_HOECHSTENS = 120
+
 export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
   const r = (roh ?? {}) as Record<string, unknown>
   const regeln: GrammatikRegel[] = (Array.isArray(r.regeln) ? r.regeln : [])
@@ -154,7 +157,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     while (vergeben.has(`a${n}`)) n++
     return `a${n}`
   }
-  for (const [i, x] of (Array.isArray(r.aufgaben) ? r.aufgaben : []).slice(0, 120).entries()) {
+  for (const [i, x] of (Array.isArray(r.aufgaben) ? r.aufgaben : []).slice(0, 160).entries()) {
     const y = (x ?? {}) as Record<string, unknown>
     const art = String(y.art ?? '') as AufgabenArt
     if (!ARTEN.includes(art)) continue
@@ -233,7 +236,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     gesehen.add(schluessel)
     vergeben.add(a.id)
     aufgaben.push(a)
-    if (aufgaben.length >= 80) break
+    if (aufgaben.length >= GRAMMATIK_HOECHSTENS) break
   }
   // Verben (07.10.2026): Karten bereinigt übernehmen
   const verbSprache = istVerbSprache(String(r.verbSprache ?? '')) ? (String(r.verbSprache) as VerbSprache) : undefined

@@ -16,9 +16,9 @@ import { fachAusName, SPRACHFAECHER } from '../shared/faecher'
 import { blaetterDerGruppe } from './arbeitsblaetter'
 import { serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
-import { fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
+import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
-import { vokabelnDerGruppe } from './vokabeln'
+import { leerenKursLoeschen, vokabelnDerGruppe } from './vokabeln'
 import { grammatikDerGruppe } from './grammatik'
 
 const TAG = 86_400_000
@@ -223,6 +223,15 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
 
     if (req.method === 'POST') {
       if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      // Fach abwählen (08.10.2026): mit Material nur ausblenden, sonst entfernen (leere Kurse gehen mit)
+      if (teile.length === 2 && teile[1] === 'abwaehlen') {
+        const g = lerngruppe(teile[0])
+        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        const d = detail(g, ich.id)
+        const material = d.tests.length + d.vokabeln.filter((v) => v.woerter > 0).length + d.grammatik.length + d.reihen.length + d.blaetter.length
+        if (!material) for (const v of d.vokabeln) leerenKursLoeschen(v.id, ich.id)
+        return (json(res, 200, { art: fachAbwaehlen(ich.id, g.id, material > 0), material }), true)
+      }
       if (teile.length !== 2 || teile[1] !== 'fach') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       try {
@@ -262,6 +271,8 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         const kl = klassen.get(s) ?? { schluessel: s, name: g.name.trim(), gruppen: [], lernende: new Set<string>(), bedarf: 0, vorschlaege: 0, faecher: [] }
         klassen.set(s, kl)
         kl.gruppen.push(g.id)
+        // Abgewähltes Fach (08.10.2026): nicht in der Fach-Leiste, die Klasse bleibt
+        if (g.ausgeblendet) continue
         const d = detail(g, ich.id)
         for (const l of d.lernende) kl.lernende.add(l.id)
         kl.bedarf += d.bedarf.length

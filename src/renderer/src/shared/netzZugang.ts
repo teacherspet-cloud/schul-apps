@@ -233,8 +233,12 @@ export const horche = (kanal: string, cb: (wert: unknown) => void): (() => void)
  *    Opfer. Jetzt entsteht EIN PDF: Blatt, dann Lösungen ab einer neuen Seite.
  *
  * Wird der Tab trotzdem blockiert, wird das PDF heruntergeladen – verloren geht nichts.
+ *
+ * iPad, iPhone und Android (08.10.2026): Dort lässt sich ein PDF im Tab nicht drucken, nur sichern. Der Tab
+ * bekommt stattdessen eine Druckseite mit den Seitenbildern, öffnet den Druckdialog des Geräts (AirPrint mit
+ * Druckerwahl) und bietet „Als PDF sichern" an (export/druckSeite.ts). Ergebnis dann 'druck'.
  */
-export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'): Promise<'tab' | 'datei'> {
+export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'): Promise<'tab' | 'druck' | 'datei'> {
   // VOR dem ersten `await`: So zählt das Öffnen noch als Folge des Klicks
   const tab = window.open('', '_blank')
   try {
@@ -247,8 +251,24 @@ export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'):
     for (const html of teile) pdfs.push(await window.api.exporter.preview(html))
     const bytes = pdfs.length === 1 ? pdfs[0] : await vereinePdfs(pdfs)
     const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).slice().buffer], { type: 'application/pdf' }))
-    setTimeout(() => URL.revokeObjectURL(url), 120_000)
+    const { mobilerBrowser, zeigeDruckSeite } = await import('./export/druckSeite')
+    const mobil = mobilerBrowser()
+    // Auf der Druckseite bleibt „Als PDF sichern" länger stehen als ein PDF-Tab braucht
+    setTimeout(() => URL.revokeObjectURL(url), mobil ? 30 * 60_000 : 120_000)
+    if (tab && !tab.closed && mobil) {
+      try {
+        await zeigeDruckSeite(tab, bytes, dateiname.replace(/\.pdf$/i, ''), url, dateiname)
+        return 'druck'
+      } catch {
+        // Seitenbilder gingen nicht (z. B. Speicher) – dann wie bisher das PDF im Tab
+        if (!tab.closed) tab.location.href = url
+        return 'tab'
+      }
+    }
     if (tab && !tab.closed) {
+      // PC-Browser (08.10.2026): PDF im Tab in einem Rahmen zeigen und gleich den Druckdialog des Browsers öffnen
+      // (Druckerwahl); klappt das nicht, bleibt die PDF-Ansicht mit ihrem eigenen Druckknopf stehen
+      if (pdfImRahmenDrucken(tab, url, dateiname)) return 'druck'
       tab.location.href = url
       return 'tab'
     }
@@ -260,6 +280,36 @@ export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'):
   } catch (e) {
     tab?.close()
     throw e
+  }
+}
+
+/** Schreibt eine Seite mit dem PDF im Rahmen in den Tab und ruft dessen Druckdialog auf; false, wenn das nicht geht */
+function pdfImRahmenDrucken(tab: Window, url: string, dateiname: string): boolean {
+  try {
+    const d = tab.document
+    d.open()
+    d.write(
+      `<!doctype html><html><head><meta charset="utf-8"><title>${dateiname.replace(/[<&]/g, '')}</title>` +
+        '<style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%}</style></head>' +
+        `<body><iframe id="pdf" src="${url}"></iframe></body></html>`
+    )
+    d.close()
+    const rahmen = d.getElementById('pdf') as HTMLIFrameElement | null
+    if (!rahmen) return false
+    rahmen.addEventListener('load', () => {
+      // Kurz warten, bis die PDF-Ansicht des Browsers bereit ist
+      setTimeout(() => {
+        try {
+          rahmen.contentWindow?.focus()
+          rahmen.contentWindow?.print()
+        } catch {
+          // Druckknopf der PDF-Ansicht bleibt
+        }
+      }, 400)
+    })
+    return true
+  } catch {
+    return false
   }
 }
 

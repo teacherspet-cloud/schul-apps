@@ -34,6 +34,8 @@ import type { Reihe, SchrittLage, Stand, Status, Weg } from '@shared/reihe'
 import { vorschlagSumme } from '@shared/reiheKiFeedback'
 import { notifyError } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
+import { NamenFolgeKnopf, useNamenFolge } from '../../shared/components/SortierTabelle'
+import { namenVergleich } from '@shared/namenListe'
 
 interface Daten {
   reihe: Reihe
@@ -55,6 +57,8 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
   const [d, setD] = useState<Daten | null>(null)
   const [detail, setDetail] = useState<{ schueler: string; schritt: string } | null>(null)
   const [qr, setQr] = useState(false)
+  // Vor- oder Nachname (08.10.2026, Wunsch der Lehrkraft)
+  const [folge, setFolge] = useNamenFolge()
   const laden = useCallback(() => {
     void holen<Daten>(`/server/reihen/z/${zid}`).then(setD, (e: unknown) => notifyError(e))
   }, [zid])
@@ -70,7 +74,7 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
         <Loader size="sm" />
       </Group>
     )
-  const lernende = [...d.lernende].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  const lernende = [...d.lernende].sort((a, b) => namenVergleich(a.name, b.name, folge))
   const csv = (): void => {
     const kopf = [
       'Name',
@@ -185,7 +189,12 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
         <Table withTableBorder withColumnBorders striped stickyHeader data-raster>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Name</Table.Th>
+              <Table.Th>
+                <Group gap={4} wrap="nowrap">
+                  Name
+                  <NamenFolgeKnopf folge={folge} setFolge={setFolge} />
+                </Group>
+              </Table.Th>
               {d.reihe.schritte.map((s, i) => (
                 <Table.Th key={s.id} style={{ minWidth: 44, textAlign: 'center' }}>
                   <Tooltip label={`${s.titel}${s.rolle === 'optional' ? ' (optional)' : ''}${s.halt ? ' (nach Haltepunkt)' : ''}`}>

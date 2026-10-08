@@ -5,7 +5,62 @@
  */
 import { ActionIcon, Badge, Button, Group, Popover, Select, Table, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconArrowDown, IconArrowsSort, IconArrowUp, IconFilter, IconX } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { namenVergleich, type NamenFolge } from '@shared/namenListe'
+
+/*
+ * Vor- oder Nachname (08.10.2026, Wunsch der Lehrkraft): Namensspalten sortieren wahlweise nach dem Vornamen oder nach
+ * dem Nachnamen (letztes Wort, bei Gästen „Ben S." der Anfangsbuchstabe). Die Wahl gilt für alle Lernendenlisten und
+ * bleibt auf diesem Gerät gemerkt.
+ */
+const FOLGE_SCHLUESSEL = 'schulapps-namen-folge'
+const FOLGE_EREIGNIS = 'schulapps-namen-folge'
+const liesFolge = (): NamenFolge => {
+  try {
+    return localStorage.getItem(FOLGE_SCHLUESSEL) === 'nachname' ? 'nachname' : 'vorname'
+  } catch {
+    return 'vorname'
+  }
+}
+
+/** Gemerkte Namensfolge (Vorname/Nachname) – über alle Tabellen gleich */
+export function useNamenFolge(): [NamenFolge, (f: NamenFolge) => void] {
+  const [folge, setFolgeZustand] = useState<NamenFolge>(liesFolge)
+  useEffect(() => {
+    const neu = (): void => setFolgeZustand(liesFolge())
+    window.addEventListener(FOLGE_EREIGNIS, neu)
+    return () => window.removeEventListener(FOLGE_EREIGNIS, neu)
+  }, [])
+  const setFolge = useCallback((f: NamenFolge): void => {
+    setFolgeZustand(f)
+    try {
+      localStorage.setItem(FOLGE_SCHLUESSEL, f)
+    } catch {
+      /* ohne Speicher nur für jetzt */
+    }
+    window.dispatchEvent(new Event(FOLGE_EREIGNIS))
+  }, [])
+  return [folge, setFolge]
+}
+
+/** Kleiner Umschalter „Vorname / Nachname" neben einer Namens-Überschrift */
+export function NamenFolgeKnopf({ folge, setFolge, onClick }: { folge: NamenFolge; setFolge: (f: NamenFolge) => void; onClick?: () => void }): React.JSX.Element {
+  return (
+    <Tooltip label={folge === 'nachname' ? 'sortiert nach Nachnamen – umschalten auf Vornamen' : 'sortiert nach Vornamen – umschalten auf Nachnamen'}>
+      <Button
+        size="compact-xs"
+        variant="subtle"
+        color="gray"
+        fw={500}
+        onClick={() => (setFolge(folge === 'nachname' ? 'vorname' : 'nachname'), onClick?.())}
+        aria-label={folge === 'nachname' ? 'nach Vornamen sortieren' : 'nach Nachnamen sortieren'}
+        data-namen-folge={folge}
+      >
+        {folge === 'nachname' ? 'Nachname' : 'Vorname'}
+      </Button>
+    </Tooltip>
+  )
+}
 
 export interface Spalte<T> {
   id: string
@@ -18,6 +73,8 @@ export interface Spalte<T> {
   /** Zuerst absteigend sortieren (Zahlen wie „sicher") */
   absteigend?: boolean
   breite?: string | number
+  /** Namensspalte: sortiert nach Vor- oder Nachnamen (Umschalter im Kopf) */
+  namen?: boolean
 }
 
 type Sort = { spalte: string; ab: boolean }
@@ -26,6 +83,7 @@ type Sort = { spalte: string; ab: boolean }
 export function useSortierTabelle<T>(zeilen: T[], spalten: Spalte<T>[], start: Sort) {
   const [sort, setSort] = useState<Sort>(start)
   const [filter, setFilter] = useState<Record<string, string | undefined>>({})
+  const [folge, setFolge] = useNamenFolge()
   const sichtbar = useMemo(() => {
     const fw = (s: Spalte<T>, t: T): string => String(s.filterWert ? s.filterWert(t) : s.wert(t))
     const gefiltert = zeilen.filter((t) =>
@@ -40,20 +98,25 @@ export function useSortierTabelle<T>(zeilen: T[], spalten: Spalte<T>[], start: S
     return [...gefiltert].sort((a, b) => {
       const x = sp.wert(a)
       const y = sp.wert(b)
-      const v = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')
+      const v =
+        typeof x === 'number' && typeof y === 'number'
+          ? x - y
+          : sp.namen
+            ? namenVergleich(String(x), String(y), folge)
+            : String(x).localeCompare(String(y), 'de')
       return sort.ab ? -v : v
     })
-  }, [zeilen, spalten, sort, filter])
+  }, [zeilen, spalten, sort, filter, folge])
   const auswahl = (s: Spalte<T>): { value: string; label: string }[] =>
     [...new Set(zeilen.map((t) => String(s.filterWert ? s.filterWert(t) : s.wert(t))).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'de'))
       .map((v) => ({ value: v, label: v }))
-  return { sichtbar, sort, setSort, filter, setFilter, auswahl }
+  return { sichtbar, sort, setSort, filter, setFilter, auswahl, folge, setFolge }
 }
 
 /** Kopfzelle mit Sortierpfeil und Filtertrichter */
 export function SortKopf<T>({ spalte, tabelle }: { spalte: Spalte<T>; tabelle: ReturnType<typeof useSortierTabelle<T>> }): React.JSX.Element {
-  const { sort, setSort, filter, setFilter, auswahl } = tabelle
+  const { sort, setSort, filter, setFilter, auswahl, folge, setFolge } = tabelle
   const aktiv = sort.spalte === spalte.id
   const gefiltert = Boolean(filter[spalte.id])
   return (
@@ -74,6 +137,7 @@ export function SortKopf<T>({ spalte, tabelle }: { spalte: Spalte<T>; tabelle: R
             {aktiv ? sort.ab ? <IconArrowDown size={14} /> : <IconArrowUp size={14} /> : <IconArrowsSort size={14} />}
           </ActionIcon>
         </Tooltip>
+        {spalte.namen && <NamenFolgeKnopf folge={folge} setFolge={setFolge} onClick={() => !aktiv && setSort({ spalte: spalte.id, ab: false })} />}
         {spalte.filter && (
           <Popover position="bottom-start" shadow="md" withArrow>
             <Popover.Target>

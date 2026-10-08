@@ -10,6 +10,7 @@ import { json, type Anfrage } from './http'
 import { SPIELE } from '../shared/vokabelSpiele'
 import { GRAMMATIK_SPIELE } from '../shared/grammatiktrainer'
 import { achievementSpiel } from './achievementsDaten'
+import { mehrspielInfo } from '../shared/mehrspieler/typen'
 
 let bereit = false
 const db = () => {
@@ -58,6 +59,8 @@ const schreiben = (nutzerId: string, jahr: string, j: Jahr): void => {
 /** Kleiner ist besser? (Züge, Sekunden) – aus den Spiellisten */
 const kleinerBesser = (schluessel: string): boolean => {
   const [art, id] = schluessel.split(':')
+  // Zusammen spielen (08.10.2026): „koop:<spiel>“ bzw. „versus:<spiel>“
+  if (art === 'koop' || art === 'versus') return Boolean(mehrspielInfo(id)?.kleinerBesser)
   return Boolean(art === 'gram' ? GRAMMATIK_SPIELE.find((s) => s.id === id)?.kleinerBesser : SPIELE.find((s) => s.id === id)?.kleinerBesser)
 }
 
@@ -106,6 +109,10 @@ export function gespielteSpiele(nutzerId: string): Set<string> {
 /** Name und Einheit eines Spiels für die Anzeige */
 const spielInfo = (schluessel: string): { name: string; einheit: string; bereich: string } => {
   const [art, id] = schluessel.split(':')
+  if (art === 'koop' || art === 'versus') {
+    const m = mehrspielInfo(id)
+    return { name: m?.name ?? id, einheit: m?.einheit ?? '', bereich: 'Zusammen' }
+  }
   const s = art === 'gram' ? GRAMMATIK_SPIELE.find((x) => x.id === id) : SPIELE.find((x) => x.id === id)
   return { name: s?.name ?? id, einheit: s?.einheit ?? '', bereich: art === 'gram' ? 'Grammatik' : 'Vokabeln' }
 }

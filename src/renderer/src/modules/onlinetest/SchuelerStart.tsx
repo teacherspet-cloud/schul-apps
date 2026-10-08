@@ -13,6 +13,7 @@
  *  - „Mein Lernraum" (08.10.2026, Befund der Lehrkraft: die wachsende Liste der Themenbereiche unter „Mein Stand" war
  *    zu lang): Link zum Regal und die fünf neuesten Materialien, jedes mit einem Tipp direkt geöffnet.
  */
+import Regal from '../lernen/regal/Regal'
 import { Badge, Button, Group, Paper, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip } from '@mantine/core'
 import {
   IconArrowRight,
@@ -393,6 +394,10 @@ export function MeinLernraum({ neueste }: { neueste: NeuesMaterial[] | null }): 
         </Title>
         <IconArrowRight size={18} />
       </a>
+      {/* Die Fachordner direkt hier (08.10.2026, Wunsch der Lehrkraft) – ein Klick schlägt den Ordner auf */}
+      <div data-lernraum-regal style={{ marginBottom: 12 }}>
+        <Regal titel="Mein Lernraum" kompakt />
+      </div>
       {neueste === null ? (
         <Text size="sm" c="dimmed">
           …

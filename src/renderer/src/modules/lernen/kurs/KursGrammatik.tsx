@@ -4,16 +4,35 @@
  * freigegeben). Ein Klick öffnet das große Grammatik-Fenster: Aufgaben bearbeiten bzw. Lernstand und Einstellungen.
  * Dazu der Start der Förder-/Forderaufgaben (KI im Hintergrund, Ergebnis als Entwurf zum Prüfen).
  */
-import { ActionIcon, Badge, Button, Card, Group, Loader, Menu, Modal, Stack, Table, Tabs, Text, TextInput, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconDots, IconPlus, IconSearch, IconTrash, IconX } from '@tabler/icons-react'
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  NumberInput,
+  SegmentedControl,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  Textarea,
+  TextInput,
+  UnstyledButton
+} from '@mantine/core'
+import { IconChevronDown, IconDots, IconPencil, IconPlus, IconSearch, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
-import { paketBereinigt, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
 import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { starteAuftrag } from '../../../shared/auftraege'
 import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../../shared/components/SortierTabelle'
 import { EntwurfAnsehen, ladeEntwuerfe, Lernstand, speichereEntwuerfe, useEntwuerfe, type Entwurf } from '../GrammatikTraining'
-import { erzeugeGrammatikPaket } from '../grammatikErzeugen'
+import { erzeugeGrammatikPaket, erzeugeMehrAufgaben, mehrAnzahl, waehlbareArten, type MehrAufgabenAuftrag } from '../grammatikErzeugen'
 import { AufgabenEditor } from './AufgabenEditor'
 import { KastenKopf, useGemerkt } from './Kasten'
 import { nachJahrGruppiert, passtSuche } from './kursAnsicht'
@@ -39,7 +58,12 @@ export interface GrammatikZeile {
   stelle?: number | null
   /** Regeltitel – für die Suche */
   regeln?: string[]
+  /** Katalog-Themen der Freigabe (Dialog „Grammatik hinzufügen") */
+  themen?: string[]
 }
+
+/** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
+export const GRAMMATIK_GEAENDERT = 'kurs-grammatik-geaendert'
 
 /** Zeile der Tabelle: freigegeben oder Entwurf */
 type Zeile = { art: 'frei'; g: GrammatikZeile } | { art: 'entwurf'; e: Entwurf }
@@ -48,7 +72,7 @@ const ART_TEXT = (art: string | undefined, fuer?: { name: string }[]): string =>
   art === 'foerder' || art === 'forder' ? `Extra für ${(fuer ?? []).map((f) => f.name).join(', ')}` : 'ganzer Kurs'
 
 /** Grammatik-Fenster: Aufgaben bearbeiten | Lernstand und Einstellungen */
-export function GrammatikFenster({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
+export function GrammatikFenster({ id, schliessen, nurAufgaben }: { id: string; schliessen: () => void; nurAufgaben?: boolean }): React.JSX.Element {
   const [d, setD] = useState<{ titel: string; paket: GrammatikPaket } | null>(null)
   const [paket, setPaket] = useState<GrammatikPaket | null>(null)
   const [laeuft, setLaeuft] = useState(false)
@@ -77,6 +101,36 @@ export function GrammatikFenster({ id, schliessen }: { id: string; schliessen: (
       setLaeuft(false)
     }
   }
+  const editor = !paket ? (
+    <Loader size="sm" />
+  ) : (
+    <Stack>
+      <AufgabenEditor paket={paket} aendern={setPaket} />
+      <Group justify="flex-end" pos="sticky" bottom={0} py="xs" bg="var(--mantine-color-body)">
+        <Button variant="default" disabled={!geaendert} onClick={() => setPaket(d!.paket)}>
+          Verwerfen
+        </Button>
+        <Button loading={laeuft} disabled={!geaendert} onClick={() => void speichern()} data-grammatik-speichern>
+          Änderungen speichern
+        </Button>
+      </Group>
+    </Stack>
+  )
+  // „Bearbeiten" in der Aufgaben-Spalte (08.10.2026): nur die Aufgaben – ändern oder löschen, die übrigen behalten ihre Kennung
+  if (nurAufgaben)
+    return (
+      <Modal
+        opened
+        onClose={schliessen}
+        title={`${d?.titel ?? 'Grammatik'} – Aufgaben bearbeiten`}
+        size="xl"
+        fullScreen={window.matchMedia?.('(max-width: 700px)').matches}
+      >
+        <div data-grammatik-fenster data-aufgaben-bearbeiten-fenster>
+          {editor}
+        </div>
+      </Modal>
+    )
   return (
     <Modal opened onClose={schliessen} title={d?.titel ?? 'Grammatik'} size="xl" fullScreen={window.matchMedia?.('(max-width: 700px)').matches}>
       <Tabs defaultValue="aufgaben" data-grammatik-fenster>
@@ -86,27 +140,133 @@ export function GrammatikFenster({ id, schliessen }: { id: string; schliessen: (
             Lernstand und Einstellungen
           </Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="aufgaben">
-          {!paket ? (
-            <Loader size="sm" />
-          ) : (
-            <Stack>
-              <AufgabenEditor paket={paket} aendern={setPaket} />
-              <Group justify="flex-end" pos="sticky" bottom={0} py="xs" bg="var(--mantine-color-body)">
-                <Button variant="default" disabled={!geaendert} onClick={() => setPaket(d!.paket)}>
-                  Verwerfen
-                </Button>
-                <Button loading={laeuft} disabled={!geaendert} onClick={() => void speichern()} data-grammatik-speichern>
-                  Änderungen speichern
-                </Button>
-              </Group>
-            </Stack>
-          )}
-        </Tabs.Panel>
+        <Tabs.Panel value="aufgaben">{editor}</Tabs.Panel>
         <Tabs.Panel value="lernstand">
           <Lernstand id={id} zurueck={schliessen} imFenster />
         </Tabs.Panel>
       </Tabs>
+    </Modal>
+  )
+}
+
+/**
+ * „+ Aufgaben" (08.10.2026, Wunsch der Lehrkraft): weitere Aufgaben zu einer freigegebenen Grammatik erstellen lassen –
+ * Anzahl 4–20, Aufgabenarten, Schwierigkeit und Wünsche. Die KI arbeitet im Hintergrund; die neuen Aufgaben werden
+ * angehängt, die bisherigen behalten ihre Kennungen (der Lernstand bleibt).
+ */
+export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schliessen: () => void }): React.JSX.Element {
+  const [d, setD] = useState<{ titel: string; fach: string; sprache?: string; thema: string; info?: { jahrgang?: number }; paket: GrammatikPaket } | null>(null)
+  const [anzahl, setAnzahl] = useState(10)
+  const [arten, setArten] = useState<AufgabenArt[] | null>(null)
+  const [schwierigkeit, setSchwierigkeit] = useState<MehrAufgabenAuftrag['schwierigkeit']>('mittel')
+  const [wunsch, setWunsch] = useState('')
+  useEffect(
+    () =>
+      void holen<NonNullable<typeof d>>(`/server/grammatik/${g.id}`).then(
+        (r) => setD(r),
+        (e: unknown) => (notifyError(e), schliessen())
+      ),
+    [g.id] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const moeglich = d ? waehlbareArten(d.sprache ?? '', d.fach) : []
+  // Vorauswahl: die Arten, die schon im Paket vorkommen (sonst alle)
+  const vorhanden = d ? moeglich.filter((a) => d.paket.aufgaben.some((x) => x.art === a)) : []
+  const gewaehlt = arten ?? (vorhanden.length ? vorhanden : moeglich)
+  const starten = (): void => {
+    if (!d || !gewaehlt.length) return
+    const eingabe: MehrAufgabenAuftrag = {
+      thema: d.thema || d.titel,
+      fach: d.fach,
+      sprache: d.sprache ?? '',
+      jahrgang: d.info?.jahrgang ?? g.jahrgang ?? 6,
+      anzahl: mehrAnzahl(anzahl),
+      arten: gewaehlt,
+      schwierigkeit,
+      wunsch: wunsch.trim() || undefined,
+      regeln: d.paket.regeln.map((r) => ({ id: r.id, titel: r.titel, erklaerung: r.erklaerung, beispiele: r.beispiele })),
+      vorhanden: d.paket.aufgaben.map((a) => (a.satz || a.form || (a.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean)
+    }
+    const titel = d.titel
+    void starteAuftrag({
+      moduleId: 'sprachenlernen',
+      docId: `mehr-${g.id}-${Date.now()}`,
+      titel: `${titel}: ${eingabe.anzahl} weitere Aufgaben`,
+      art: 'Weitere Grammatikaufgaben',
+      eingabe,
+      sperrt: false,
+      fehlerTitel: 'Weitere Aufgaben konnten nicht erstellt werden',
+      arbeit: async (e, h) => erzeugeMehrAufgaben(e, h.ai, (x) => h.melde(x)),
+      ablegen: async (paket) => {
+        const r = await senden<{ dazu: number; aufgaben: number }>(`/server/grammatik/${g.id}/anhaengen`, { paket })
+        window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT))
+        notifySuccess(`„${titel}": ${r.dazu} neue Aufgaben angehängt – jetzt ${r.aufgaben}. Die Lernenden üben sie gleich mit.`)
+      },
+      abschluss: (p) => `${p.aufgaben.length} Aufgaben angehängt`
+    })
+    notifySuccess('Die KI erstellt die weiteren Aufgaben im Hintergrund – sie werden danach automatisch angehängt.')
+    schliessen()
+  }
+  return (
+    <Modal opened onClose={schliessen} title={`Weitere Aufgaben – ${g.titel}`} size="lg">
+      {!d ? (
+        <Loader size="sm" />
+      ) : (
+        <Stack data-mehr-aufgaben-fenster>
+          <Text size="sm" c="dimmed">
+            Bisher {d.paket.aufgaben.length} Aufgaben zu {d.paket.regeln.length} {d.paket.regeln.length === 1 ? 'Regel' : 'Regeln'}. Die neuen kommen dazu; der
+            Lernstand der Lernenden bleibt.
+          </Text>
+          <NumberInput
+            label="Anzahl"
+            min={4}
+            max={20}
+            value={anzahl}
+            onChange={(v) => setAnzahl(Number(v) || 4)}
+            clampBehavior="strict"
+            w={140}
+            data-mehr-anzahl
+          />
+          <Checkbox.Group label="Aufgabenarten" value={gewaehlt} onChange={(v) => setArten(v as AufgabenArt[])} data-mehr-arten>
+            <Group gap="md" mt={4}>
+              {moeglich.map((a) => (
+                <Checkbox key={a} value={a} label={ART_NAME[a]} data-mehr-art={a} />
+              ))}
+            </Group>
+          </Checkbox.Group>
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              Schwierigkeit
+            </Text>
+            <SegmentedControl
+              value={schwierigkeit}
+              onChange={(v) => setSchwierigkeit(v as typeof schwierigkeit)}
+              data={[
+                { value: 'grundlegend', label: 'grundlegend' },
+                { value: 'mittel', label: 'mittel' },
+                { value: 'anspruchsvoll', label: 'anspruchsvoll' }
+              ]}
+              data-mehr-schwierigkeit
+            />
+          </Stack>
+          <Textarea
+            label="Wünsche (optional)"
+            autosize
+            minRows={2}
+            value={wunsch}
+            onChange={(e) => setWunsch(e.currentTarget.value)}
+            placeholder="z. B. mehr Fragen und Verneinungen, Wortschatz aus Unit 3"
+            data-mehr-wunsch
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={schliessen}>
+              Abbrechen
+            </Button>
+            <Button leftSection={<IconSparkles size={16} />} disabled={!gewaehlt.length} onClick={starten} data-mehr-starten>
+              {mehrAnzahl(anzahl)} Aufgaben erstellen
+            </Button>
+          </Group>
+        </Stack>
+      )}
     </Modal>
   )
 }
@@ -153,6 +313,8 @@ export function KursGrammatik({
   const [suche, setSuche] = useState('')
   const [jahre, setJahre] = useState<Record<string, boolean>>(() => ladeJahre(vokId))
   const [frage, setFrage] = useState<{ was: 'entfernen' | 'loeschen'; g: GrammatikZeile } | null>(null)
+  const [mehr, setMehr] = useState<GrammatikZeile | null>(null)
+  const [bearbeiten, setBearbeiten] = useState<string | null>(null)
   const entwuerfe = useEntwuerfe().filter((e) => e.empfaenger.vokId === vokId)
   const laden = useCallback(
     () =>
@@ -163,6 +325,10 @@ export function KursGrammatik({
     [vokId]
   )
   useEffect(laden, [laden, stand])
+  useEffect(() => {
+    window.addEventListener(GRAMMATIK_GEAENDERT, laden)
+    return () => window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
+  }, [laden])
   const aktive = (liste ?? []).filter((g) => g.status !== 'entfernt')
   const entfernte = (liste ?? []).filter((g) => g.status === 'entfernt')
   const zeilen: Zeile[] = [...entwuerfe.map((e) => ({ art: 'entwurf' as const, e })), ...aktive.map((g) => ({ art: 'frei' as const, g }))]
@@ -183,17 +349,12 @@ export function KursGrammatik({
     },
     { id: 'aufgaben', label: 'Aufgaben', wert: (z) => (z.art === 'frei' ? z.g.aufgaben : z.e.paket.aufgaben.length), absteigend: true },
     { id: 'bearbeitet', label: 'bearbeitet Ø', wert: (z) => (z.art === 'frei' ? z.g.bearbeitetSchnitt ?? 0 : -1), absteigend: true },
-    { id: 'sicher', label: 'sicher Ø', wert: (z) => (z.art === 'frei' ? z.g.sicherSchnitt : -1), absteigend: true },
-    {
-      id: 'status',
-      label: 'Status',
-      wert: (z) => (z.art === 'entwurf' ? 'Entwurf' : z.g.status === 'offen' ? 'läuft' : 'abgeschlossen'),
-      filter: 'auswahl'
-    }
+    { id: 'sicher', label: 'sicher Ø', wert: (z) => (z.art === 'frei' ? z.g.sicherSchnitt : -1), absteigend: true }
   ]
-  const t = useSortierTabelle(zeilen, spalten, { spalte: 'status', ab: true })
+  // Spalte „Status" entfällt (08.10.2026, Wunsch der Lehrkraft): Entwürfe stehen oben, „abgeschlossen" als Plakette am Titel
+  const t = useSortierTabelle(zeilen, spalten, { spalte: 'titel', ab: false })
   const sucht = suche.trim().length > 0
-  const gefunden = t.sichtbar.filter((z) =>
+  const gefunden = [...t.sichtbar.filter((z) => z.art === 'entwurf'), ...t.sichtbar.filter((z) => z.art !== 'entwurf')].filter((z) =>
     passtSuche(z.art === 'frei' ? [z.g.titel, z.g.thema, ...(z.g.regeln ?? [])] : [z.e.titel, z.e.thema, ...z.e.paket.regeln.map((r) => r.titel)], suche)
   )
   const gruppen = nachJahrGruppiert(gefunden, (z) => (z.art === 'frei' ? z.g.jahrgang : z.e.info?.jahrgang))
@@ -327,14 +488,16 @@ export function KursGrammatik({
                               </Text>
                             </Table.Td>
                             <Table.Td>{ART_TEXT(z.e.empfaenger.art, z.e.empfaenger.fuer)}</Table.Td>
-                            <Table.Td>{z.e.paket.aufgaben.length}</Table.Td>
-                            <Table.Td>–</Table.Td>
-                            <Table.Td>–</Table.Td>
                             <Table.Td>
-                              <Badge color="yellow" variant="light" tt="none">
-                                Entwurf – prüfen
-                              </Badge>
+                              <Group gap="xs" wrap="nowrap">
+                                <Text size="sm">{z.e.paket.aufgaben.length}</Text>
+                                <Badge color="yellow" variant="light" tt="none">
+                                  Entwurf – prüfen
+                                </Badge>
+                              </Group>
                             </Table.Td>
+                            <Table.Td>–</Table.Td>
+                            <Table.Td>–</Table.Td>
                             <Table.Td />
                           </Table.Tr>
                         ) : (
@@ -342,6 +505,11 @@ export function KursGrammatik({
                             <Table.Td>
                               <Text size="sm" fw={600}>
                                 {z.g.titel}
+                                {z.g.status === 'beendet' && (
+                                  <Badge ml={6} size="xs" variant="light" color="gray" tt="none" data-grammatik-abgeschlossen>
+                                    abgeschlossen
+                                  </Badge>
+                                )}
                               </Text>
                               {z.g.thema && z.g.thema !== z.g.titel && (
                                 <Text size="xs" c="dimmed">
@@ -354,10 +522,34 @@ export function KursGrammatik({
                                 {ART_TEXT(z.g.art, z.g.fuer)}
                               </Badge>
                             </Table.Td>
-                            <Table.Td>{z.g.aufgaben}</Table.Td>
+                            <Table.Td onClick={halt} style={{ cursor: 'default' }}>
+                              <Group gap={6} wrap="nowrap" data-grammatik-aufgaben={z.g.id}>
+                                <Text size="sm" fw={600} miw={22}>
+                                  {z.g.aufgaben}
+                                </Text>
+                                <Button
+                                  size="compact-xs"
+                                  variant="light"
+                                  color="grape"
+                                  leftSection={<IconPlus size={12} />}
+                                  onClick={() => setMehr(z.g)}
+                                  data-grammatik-mehr={z.g.id}
+                                >
+                                  Aufgaben
+                                </Button>
+                                <Button
+                                  size="compact-xs"
+                                  variant="default"
+                                  leftSection={<IconPencil size={12} />}
+                                  onClick={() => setBearbeiten(z.g.id)}
+                                  data-grammatik-bearbeiten={z.g.id}
+                                >
+                                  Bearbeiten
+                                </Button>
+                              </Group>
+                            </Table.Td>
                             <Table.Td>{Math.round((z.g.bearbeitetSchnitt ?? 0) * 100)} %</Table.Td>
                             <Table.Td>{Math.round(z.g.sicherSchnitt * 100)} %</Table.Td>
-                            <Table.Td>{z.g.status === 'offen' ? 'läuft' : 'abgeschlossen'}</Table.Td>
                             <Table.Td onClick={halt}>
                               <Menu position="bottom-end" withinPortal>
                                 <Menu.Target>
@@ -443,6 +635,8 @@ export function KursGrammatik({
         )}
       </Modal>
       {geoeffnet && <GrammatikFenster id={geoeffnet} schliessen={() => (oeffnen(null), laden())} />}
+      {bearbeiten && <GrammatikFenster id={bearbeiten} nurAufgaben schliessen={() => (setBearbeiten(null), laden())} />}
+      {mehr && <MehrAufgabenFenster g={mehr} schliessen={() => setMehr(null)} />}
       {entwurf && <EntwurfAnsehen e={entwurf} schliessen={() => setEntwurf(null)} fertig={() => (setEntwurf(null), laden())} />}
     </Card>
   )

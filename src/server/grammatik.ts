@@ -9,6 +9,7 @@
  * Der Lernstand je Person liegt verschlüsselt (feldschutz.ts: gram_stand.daten, gram_zuweisungen.schueler). Lernende lösen
  * keine KI-Anfragen aus – der Aufgabenpool entsteht einmal beim Freigeben.
  */
+import { ohneKlasse } from '../shared/ohneKlasse'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
 import {
@@ -48,7 +49,7 @@ import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
-import { gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
+import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -383,7 +384,7 @@ export function grammatikFuer(ich: NutzerInfo): {
         return {
           id: z.id,
           // Extra heißt bei den Lernenden „Extra für dich: …" – ohne Etikett Förder/Forder (abgestimmt)
-          titel: istExtra(z) ? `Extra für dich: ${z.thema || z.titel}` : z.titel,
+          titel: istExtra(z) ? `Extra für dich: ${z.thema || z.titel}` : ohneKlasse(z.titel),
           fach: z.fach,
           extra: istExtra(z),
           // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
@@ -787,7 +788,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && url.pathname === '/s/api/grammatik/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? ''))
       if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
-      return json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis }), true
+      return json(res, 200, { id: z.id, titel: ohneKlasse(z.titel), gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis }), true
     }
     if (req.method === 'POST' && (url.pathname === '/s/api/grammatik/gast' || url.pathname === '/s/api/grammatik/wieder')) {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -858,7 +859,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return (
           json(res, 200, {
             id: z.id,
-            titel: z.titel,
+            titel: ohneKlasse(z.titel),
             fach: z.fach,
             sprache: z.sprache,
             paket: p,
@@ -960,6 +961,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               status: z.status === 'entfernt' ? 'entfernt' : istOffen(z) ? 'offen' : 'beendet',
               // Regeltitel für die Suche auf der Kursseite (08.10.2026)
               regeln: paketVon(z).regeln.map((r) => r.titel),
+              // Katalog-Themen der Freigabe (08.10.2026): im Dialog „Grammatik hinzufügen" vorab angehakt
+              themen: infoVon(z).themen,
               erstellt: z.erstellt,
               jahrgang: jahre[i].jahrgang,
               stelle: jahre[i].stelle,
@@ -1096,6 +1099,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           id: z.id,
           titel: z.titel,
           fach: z.fach,
+          // Sprache und Angaben der Freigabe für „+ Aufgaben" (08.10.2026)
+          sprache: z.sprache,
+          info: infoVon(z),
           thema: z.thema,
           status: istOffen(z) ? 'offen' : 'beendet',
           bis: z.bis,
@@ -1146,6 +1152,23 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .prepare('UPDATE gram_zuweisungen SET paket = ?, titel = ?, thema = ? WHERE id = ?')
           .run(JSON.stringify(paket), String(k0.titel ?? z.titel).slice(0, 160) || z.titel, paket.thema.slice(0, 160), z.id)
         return json(res, 200, { ok: true, aufgaben: paket.aufgaben.length, paket }), true
+      }
+      /*
+       * Weitere Aufgaben anhängen (08.10.2026, „+ Aufgaben" in der Grammatik des Kurses): die KI-Aufgaben kommen geprüft
+       * und bereinigt; die bisherigen behalten ihre Kennungen, die neuen bekommen frische (Lernstand bleibt richtig).
+       */
+      if (teile[1] === 'anhaengen') {
+        const alt = paketVon(z)
+        const neu = paketBereinigt({ ...(k0.paket as Record<string, unknown>), regeln: (k0.paket as { regeln?: unknown })?.regeln ?? alt.regeln }, z.thema)
+        if (!neu.aufgaben.length) return json(res, 400, { fehler: 'Keine brauchbaren neuen Aufgaben.' }), true
+        const { paket: zusammen } = aufgabenAnhaengen(alt, neu, `m${Date.now().toString(36)}`)
+        const paket = paketBereinigt(zusammen, z.thema)
+        const dazu = paket.aufgaben.length - alt.aufgaben.length
+        if (dazu <= 0)
+          return json(res, 400, { fehler: 'Keine neuen Aufgaben übernommen – alle waren schon da, oder die Höchstzahl ist erreicht.' }), true
+        db().prepare('UPDATE gram_zuweisungen SET paket = ? WHERE id = ?').run(JSON.stringify(paket), z.id)
+        protokolliereServer('grammatik', `${dazu} Aufgaben angehängt`, ich.id)
+        return json(res, 200, { ok: true, dazu, aufgaben: paket.aufgaben.length }), true
       }
       // Mit einem Vokabeltraining verbinden bzw. lösen (08.10.2026: auch fertige Grammatiktrainings zuordnen)
       if (teile[1] === 'verbinden') {
@@ -1230,4 +1253,41 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
     extrasGeschafft,
     tage: [...tage]
   }
+}
+
+/**
+ * Zugriff für die Mehrspieler-Spiele (08.10.2026, server/spiel.ts): Zugang, Paket, Lernstand und Angaben der Freigaben –
+ * ohne die Zeilen-Struktur nach außen zu geben.
+ */
+export const grammatikFuerSpiel = {
+  zeile: (id: string) => zeile(id),
+  offen: (id: string): boolean => {
+    const z = zeile(id)
+    return Boolean(z && istOffen(z))
+  },
+  istFuer: (id: string, ich: NutzerInfo): boolean => {
+    const z = zeile(id)
+    return Boolean(z && istOffen(z) && istFuer(z, ich))
+  },
+  paket: (id: string): GrammatikPaket | null => {
+    const z = zeile(id)
+    return z ? paketVon(z) : null
+  },
+  info: (id: string): GrammatikInfo | null => {
+    const z = zeile(id)
+    return z ? infoVon(z) : null
+  },
+  kopf: (id: string): { id: string; titel: string; thema: string; sprache: string; vokId: string; lerngruppe: string } | null => {
+    const z = zeile(id)
+    return z ? { id: z.id, titel: z.titel, thema: z.thema, sprache: z.sprache, vokId: z.vok_id ?? '', lerngruppe: z.lerngruppe_id } : null
+  },
+  stand: (id: string, sid: string): { aufgaben: Record<string, WortStand>; tage: string[]; ansehen?: string[] } => standVon(id, sid),
+  speichern: (id: string, sid: string, s: { aufgaben: Record<string, WortStand>; tage: string[]; ansehen?: string[] }): void =>
+    standSpeichern(id, sid, s as GramStand),
+  /** Offene Freigaben (ohne Extras), z. B. derselben Sprache – für die Formen in der Lobby und dieselbe Katalogform */
+  alle: (sprache: string): string[] =>
+    (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[])
+      .filter((z) => istOffen(z) && !istExtra(z) && (!sprache || z.sprache === sprache))
+      .map((z) => z.id),
+  bekannt: (ich: NutzerInfo): string[] => bekannteGrammatikFuer(ich)
 }

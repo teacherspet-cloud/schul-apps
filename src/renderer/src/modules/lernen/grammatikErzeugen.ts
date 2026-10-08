@@ -12,7 +12,7 @@
  * prima). Die Formen bildet weiter die KI – die Prüfung schaut deshalb gezielt auf Formen und Lesarten.
  */
 import type { StructuredRequest } from '@shared/types'
-import { paketBereinigt, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
 
 type Ai = <T>(req: StructuredRequest) => Promise<T>
 
@@ -227,7 +227,13 @@ Zielsprache: ${a.sprache}`
         }`,
     schema: paketSchema(latein, Boolean(extra), extra ? [] : themenVon(a.thema))
   })
-  let paket = paketBereinigt(roh, a.thema)
+  return gepruefterPool(paketBereinigt(roh, a.thema), a, ai, melde)
+}
+
+/** 2. Schritt: Eine zweite Anfrage prüft jede Aufgabe (korrigiert Lösungen bzw. streicht) – auch für „+ Aufgaben" */
+async function gepruefterPool(start: GrammatikPaket, a: GrammatikAuftrag, ai: Ai, melde: (t: string) => void): Promise<GrammatikPaket> {
+  const latein = istLatein(a)
+  let paket = start
   melde(`Die KI prüft ${paket.aufgaben.length} Aufgaben …`)
   // 2. Prüfung: Korrekturen bzw. Streichungen je Aufgabe
   try {
@@ -318,3 +324,87 @@ Zielsprache: ${a.sprache}`
   }
   return paket
 }
+
+/** Auftrag „+ Aufgaben" (08.10.2026): weitere Aufgaben zu einer freigegebenen Grammatik */
+export interface MehrAufgabenAuftrag {
+  thema: string
+  fach: string
+  sprache: string
+  jahrgang: number
+  /** 4–20 */
+  anzahl: number
+  /** gewünschte Aufgabenarten (leer = gemischt wie bisher) */
+  arten: AufgabenArt[]
+  schwierigkeit: 'grundlegend' | 'mittel' | 'anspruchsvoll'
+  wunsch?: string
+  /** Die Regelkarten der Grammatik – die neuen Aufgaben hängen an ihren Kennungen */
+  regeln: { id: string; titel: string; erklaerung: string; beispiele: string[] }[]
+  /** Vorhandene Sätze (gekürzt) – damit nichts doppelt kommt */
+  vorhanden: string[]
+}
+
+const SCHWIERIGKEIT_TEXT: Record<MehrAufgabenAuftrag['schwierigkeit'], string> = {
+  grundlegend: 'grundlegend – kurze Sätze, einfacher Wortschatz, die Regel in ihrer Grundform',
+  mittel: 'mittel – wie im Unterricht üblich, gemischte Fälle',
+  anspruchsvoll: 'anspruchsvoll – längere Sätze, Ausnahmen und Sonderfälle, Transfer'
+}
+
+/** Anzahl der Aufgaben im Auftrag „+ Aufgaben" auf 4–20 begrenzen */
+export const mehrAnzahl = (n: number): number => Math.max(4, Math.min(20, Math.round(Number.isFinite(n) ? n : 10)))
+
+/**
+ * Weitere Aufgaben zu einer freigegebenen Grammatik (08.10.2026, Wunsch der Lehrkraft: „+ Aufgaben" je Grammatik):
+ * Anzahl, Aufgabenarten, Schwierigkeit und Wünsche; nur Aufgaben, keine neuen Regelkarten – jede Aufgabe nennt die
+ * Kennung einer vorhandenen Regel. Danach dieselbe Prüfung wie beim Pool. Keine Namen, keine Daten der Lernenden.
+ */
+export async function erzeugeMehrAufgaben(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
+  const auftrag: GrammatikAuftrag = { thema: a.thema, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang }
+  const latein = istLatein(auftrag)
+  const erlaubt = latein ? ARTEN_LATEIN : [...ARTEN_ALLGEMEIN, 'uebersetzen']
+  const arten = a.arten.filter((x) => erlaubt.includes(x))
+  const anzahl = mehrAnzahl(a.anzahl)
+  melde(`Die KI schreibt ${anzahl} weitere Aufgaben …`)
+  const schema = O({
+    aufgaben: A(
+      O({
+        ...((aufgabeSchema(latein) as { properties: Record<string, Record<string, unknown>> }).properties),
+        art: { type: 'string', enum: arten.length ? arten : latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
+        regelId: { type: 'string', enum: a.regeln.map((r) => r.id) }
+      })
+    )
+  })
+  const roh = await ai<{ aufgaben: unknown[] }>({
+    schemaName: 'grammatik_mehr',
+    system: [
+      `Du ergänzt einen Aufgabenpool für eine Grammatik-Lern-App (${a.fach}, Klasse ${a.jahrgang}). Die Regelkarten stehen schon fest.`,
+      'Jede Aufgabe muss für sich allein verständlich und EINDEUTIG lösbar sein; „regelId" nennt die Regelkarte, die sie übt.',
+      `Aufgaben: genau ${anzahl}${arten.length ? `, nur diese Arten: ${arten.map((x) => ART_NAME[x as AufgabenArt] ?? x).join(', ')} (möglichst gleichmäßig)` : ', gemischt'}. Alle Regeln abdecken.`,
+      `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel}.`,
+      'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
+      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an.',
+      'Fehler finden: genau EIN Grammatikfehler, „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
+      'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
+      'Übersetzen: satz = deutscher Satz, loesungen = alle richtigen Übersetzungen in die Zielsprache.',
+      'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
+      'Keine Sätze, die schon im Pool stehen (Liste unten).',
+      latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    user: [
+      `Thema: ${a.thema}`,
+      `Zielsprache: ${a.sprache}`,
+      a.wunsch?.trim() ? `Wunsch der Lehrkraft: ${a.wunsch.trim().slice(0, 600)}` : '',
+      '',
+      'Regelkarten:',
+      ...a.regeln.map((r) => `- ${r.id}: ${r.titel} – ${r.erklaerung}${r.beispiele.length ? ` (z. B. ${r.beispiele.slice(0, 2).join('; ')})` : ''}`),
+      ...(a.vorhanden.length ? ['', 'Schon im Pool (nicht wiederholen):', ...a.vorhanden.slice(0, 80)] : [])
+    ].join('\n'),
+    schema
+  })
+  return gepruefterPool(paketBereinigt({ thema: a.thema, regeln: a.regeln, aufgaben: roh.aufgaben }, a.thema), auftrag, ai, melde)
+}
+
+/** Aufgabenarten, die die KI für diese Sprache schreibt (Auswahl im Fenster „+ Aufgaben") */
+export const waehlbareArten = (sprache: string, fach: string): AufgabenArt[] =>
+  (istLatein({ thema: '', fach, sprache, jahrgang: 0 }) ? ARTEN_LATEIN : [...ARTEN_ALLGEMEIN, 'uebersetzen']) as AufgabenArt[]

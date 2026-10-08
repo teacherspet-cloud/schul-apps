@@ -176,6 +176,14 @@ try {
   pruefe(await da(p.locator('[data-fach-leiste] [data-fach="Französisch"]')), 'Fach hinzugefügt: Reiter „Französisch“')
   pruefe(await da(p.locator('[data-handlungsbedarf]')), 'Danach Handlungsbedarf und Reiter des Fachs')
   await p.screenshot({ path: join(out, '2b-fach-neu.png') })
+  // Rechtsklick auf das Fach (08.10.2026): „Französisch in Klasse … abwählen" – ohne Material verschwindet es
+  await p.locator('[data-fach-leiste] [data-fach="Französisch"]').click({ button: 'right' })
+  pruefe(await da(p.locator('[data-fach-abwaehlen]'), 5000), 'Rechtsklick auf ein Fach: „… abwählen“')
+  pruefe(/Französisch in Klasse .* abwählen/.test(await p.locator('[data-fach-abwaehlen]').innerText()), 'Menüpunkt nennt Fach und Klasse')
+  await p.locator('[data-fach-abwaehlen]').click()
+  await p.locator('[data-fach-abwahl-ok]').click()
+  pruefe(await da(p.locator('[data-ohne-fach]')), 'Fach abgewählt: Klasse wieder ohne Fach')
+  pruefe((await p.locator('[data-fach-leiste] [data-fach]').count()) === 0, 'Kein Fach-Reiter mehr')
   await p.getByRole('button', { name: 'Alle Klassen' }).click()
 
   // Klasse mit zwei Fächern
@@ -274,6 +282,16 @@ try {
   )
   await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
   await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
+
+  // Handlungsbedarf → Sprachenlernen öffnet direkt den Kurs der Klasse (08.10.2026, Befund der Lehrkraft)
+  const vokEintrag = p.locator('[data-handlungsbedarf] [data-bedarf="inaktiv"], [data-handlungsbedarf] [data-bedarf="foerdern"], [data-handlungsbedarf] [data-bedarf="termin"]').first()
+  if (await vokEintrag.count()) {
+    await vokEintrag.click()
+    pruefe(await da(p.locator('[data-lernende-tabelle]'), 10000), 'Handlungsbedarf öffnet in Sprachenlernen direkt den Kurs der Klasse')
+    await p.screenshot({ path: join(out, '4b-kurs-aus-bedarf.png') })
+    await p.locator('[data-zurueck="meineklassen"]').click()
+    await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
+  } else pruefe(false, 'Vokabel-Eintrag im Handlungsbedarf fehlt')
 
   // Rückweg: Blatt öffnen → „Meine Klassen" führt zurück in dieselbe Klasse
   await p.getByRole('tab', { name: /^Unterrichtsreihen/ }).click()

@@ -23,6 +23,17 @@ const CSS = `
 
 const SCHLUESSEL = 'sa-ordner-uebergang'
 const ZURUECK = 'sa-ordner-zurueck'
+const VON = 'sa-ordner-von'
+
+/** Woher der Ordner kam (08.10.2026: Regal auch auf der Startseite) – Zuklappen führt dorthin zurück */
+export function herkunft(rueckfall: string): string {
+  try {
+    const v = sessionStorage.getItem(VON)
+    return v && v.startsWith('/s') ? v : rueckfall
+  } catch {
+    return rueckfall
+  }
+}
 
 export interface Rechteck {
   x: number
@@ -68,6 +79,11 @@ function mitte(): Rechteck {
  */
 export function mitOrdner(ziel: string, farbe: string, quelle: HTMLElement | null, text: string): void {
   if (gestartet) return
+  try {
+    sessionStorage.setItem(VON, window.location.pathname)
+  } catch {
+    /* dann zurück zum Rückfall */
+  }
   if (ruhig() || !quelle) return void window.location.assign(ziel)
   gestartet = true
   const r = quelle.getBoundingClientRect()

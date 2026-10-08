@@ -406,7 +406,6 @@ try {
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vKurs}"]`).click()
   await p.locator('[data-vokabel-grammatik]').click()
-  await p.locator('[data-grammatik-dazu-neu]').click()
   await p.locator('[data-grammatik-fach]').click()
   await p.getByRole('option', { name: 'Englisch', exact: true }).click()
   await p.locator('[data-grammatik-modus]').getByText('Unregelmäßige Verben').click()

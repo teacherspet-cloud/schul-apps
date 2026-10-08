@@ -116,6 +116,9 @@ const db = () => {
     // Aufsicht (06.10.2026): Vorfälle je Teilnahme (Seite verlassen, Fenster daneben, Übersetzen …), verschlüsselt
     const sp = new Set((d.prepare('PRAGMA table_info(teilnahmen)').all() as { name: string }[]).map((x) => x.name))
     if (!sp.has('vorfaelle')) d.exec("ALTER TABLE teilnahmen ADD COLUMN vorfaelle TEXT NOT NULL DEFAULT '[]'")
+    // Fach in „Meine Klassen" abgewählt, aber mit freigegebenem Material (08.10.2026): ausgeblendet statt gelöscht
+    const lg = new Set((d.prepare('PRAGMA table_info(lerngruppen)').all() as { name: string }[]).map((x) => x.name))
+    if (!lg.has('ausgeblendet')) d.exec('ALTER TABLE lerngruppen ADD COLUMN ausgeblendet INTEGER NOT NULL DEFAULT 0')
     bereit = true
   }
   return d
@@ -144,6 +147,8 @@ export interface Lerngruppe {
   iserv_gruppe: string
   mitglieder: string[]
   erstellt: string
+  /** In „Meine Klassen" abgewählt (08.10.2026) – Material bleibt für die Lernenden, „+ Fach hinzufügen" holt es zurück */
+  ausgeblendet?: number
 }
 
 const alsGruppe = (z: Record<string, unknown>): Lerngruppe => ({
@@ -1687,7 +1692,13 @@ export function fachHinzufuegen(lehrkraftId: string, gruppeId: string, fach: str
   if (!f) throw new Error('Bitte ein Fach wählen.')
   const name = g.name.trim().toLowerCase()
   const gleich = lerngruppenVon(lehrkraftId).find((x) => x.name.trim().toLowerCase() === name && x.fach.trim().toLowerCase() === f.toLowerCase())
-  if (gleich) return gleich.id
+  if (gleich) {
+    if (gleich.ausgeblendet) {
+      db().prepare('UPDATE lerngruppen SET ausgeblendet = 0 WHERE id = ?').run(gleich.id)
+      lerngruppenHaken.geaendert?.(lehrkraftId)
+    }
+    return gleich.id
+  }
   if (!g.fach.trim()) {
     db().prepare('UPDATE lerngruppen SET fach = ? WHERE id = ?').run(f, g.id)
     lerngruppenHaken.geaendert?.(lehrkraftId)
@@ -1700,6 +1711,25 @@ export function fachHinzufuegen(lehrkraftId: string, gruppeId: string, fach: str
   // Neues Fach (z. B. Englisch) → Kurs in „Sprachenlernen" (08.10.2026)
   lerngruppenHaken.geaendert?.(lehrkraftId)
   return id
+}
+
+/**
+ * Fach in einer Klasse abwählen („Meine Klassen", Rechtsklick, 08.10.2026). Mit freigegebenem Material nur ausblenden –
+ * die Lernenden behalten es. Ohne Material: weitere Fächer der Klasse → diese Lerngruppe löschen, sonst bleibt die Klasse
+ * ohne Fach stehen.
+ */
+export function fachAbwaehlen(lehrkraftId: string, gruppeId: string, mitMaterial: boolean): 'ausgeblendet' | 'entfernt' {
+  const g = lerngruppe(gruppeId)
+  if (!g || g.lehrkraft_id !== lehrkraftId) throw new Error('Diese Lerngruppe gibt es nicht.')
+  if (mitMaterial) db().prepare('UPDATE lerngruppen SET ausgeblendet = 1 WHERE id = ?').run(g.id)
+  else {
+    const name = g.name.trim().toLowerCase()
+    const weitere = lerngruppenVon(lehrkraftId).some((x) => x.id !== g.id && x.name.trim().toLowerCase() === name)
+    if (weitere) db().prepare('DELETE FROM lerngruppen WHERE id = ? AND lehrkraft_id = ?').run(g.id, lehrkraftId)
+    else db().prepare("UPDATE lerngruppen SET fach = '', ausgeblendet = 0 WHERE id = ?").run(g.id)
+  }
+  lerngruppenHaken.geaendert?.(lehrkraftId)
+  return mitMaterial ? 'ausgeblendet' : 'entfernt'
 }
 
 export type { Nutzer }

@@ -273,7 +273,8 @@ try {
   pruefe(an.id === vid && gramDora.some((x) => x.id === g.id), 'Später Eingetragene haben die Grammatik automatisch')
   const gl = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen?.find((x) => x.id === g.id)
   pruefe(Boolean(gl?.lerngruppe?.includes('Vokabeltraining')), `Grammatik zeigt die Verbindung (${gl?.lerngruppe})`)
-  // Fertiges Grammatiktraining nachträglich verbinden (Dialog „Grammatik dazu freigeben")
+  // Fertiges Grammatiktraining nachträglich verbinden – seit 08.10.2026 ohne eigenen Dialog („Grammatik hinzufügen"
+  // öffnet gleich die Freigabe); die Server-Route bleibt
   const g2 = await (
     await lk.request.post(`${A}/server/grammatik/freigeben`, {
       headers: KOPF,
@@ -287,13 +288,11 @@ try {
     .catch(() => undefined)
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursKaestenAuf(p)
+  await lk.request.post(`${A}/server/grammatik/${g2.id}/verbinden`, { headers: KOPF, data: { vokId: vid } })
   await p.locator('[data-vokabel-grammatik]').click()
-  pruefe(await da(p.locator('[data-grammatik-verbunden]')), 'Dialog zeigt die schon verbundene Grammatik')
-  await p.locator('[data-grammatik-dazu-wahl]').click()
-  await p.getByRole('option', { name: /Past progressive/ }).click()
+  pruefe(await da(p.locator('[data-grammatik-fach]')), '„Grammatik hinzufügen" öffnet gleich „Grammatik zum Üben freigeben"')
+  pruefe((await p.locator('[data-grammatik-verbunden]').count()) === 0, 'Keine Liste „Schon verbunden" mit „Lösen" mehr')
   await p.screenshot({ path: join(out, '9-grammatik-dazu.png') })
-  await p.locator('[data-grammatik-dazu-verbinden]').click()
-  await p.waitForTimeout(1000)
   const gl2 = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen?.find((x) => x.id === g2.id)
   const gramBen = (await (await ctx.request.get(`${A}/s/api/grammatik`, { headers: KOPF })).json()).listen ?? []
   pruefe(gl2?.vokId === vid && gramBen.some((x) => x.id === g2.id), 'Fertiges Grammatiktraining verbunden – Ben sieht es')

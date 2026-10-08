@@ -18,6 +18,7 @@
 import { istRekord, nachSpielfehler, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
+import { ohneKlasse } from '../shared/ohneKlasse'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
 import { imNutzer } from './kontext'
@@ -122,6 +123,8 @@ export const db = () => {
     if (!spalten.has('problem_aus')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN problem_aus TEXT NOT NULL DEFAULT ''")
     // Entfernte Abschnitte (08.10.2026): JSON [{teil, woerter, zeit}] – Wörter samt Kennungen, der Lernstand bleibt in vok_stand
     if (!spalten.has('entfernt')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN entfernt TEXT NOT NULL DEFAULT ''")
+    // Zusammen spielen (08.10.2026): 'aus' = Kooperativ/Versus für diesen Kurs (samt Grammatik) abgeschaltet
+    if (!spalten.has('zusammen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN zusammen TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -163,6 +166,8 @@ export interface Zeile {
   /** Spiele für diesen Tag freigeschaltet (JJJJ-MM-TT, 08.10.2026) */
   spiele_frei?: string
   verbspiele?: string
+  /** 'aus' = Zusammen spielen abgeschaltet (08.10.2026) */
+  zusammen?: string
   /** Neue Vokabeln je Tag (08.10.2026) */
   tagesziel?: number
   /** Überschrift der Lehrkraft ('' = Standard „Lerngruppe - Fach", seit 08.10.2026 ohne Jahr) und Symbol ('' = Verlauf, 'farbe') */
@@ -261,6 +266,9 @@ export function ueberschriftVon(z: Pick<Zeile, 'ueberschrift' | 'lerngruppe_id' 
   const gruppe = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id)?.name ?? '' : ''
   return [gruppe, z.fach].filter(Boolean).join(' - ') || z.titel || ''
 }
+
+/** Lernende sehen nie die Klasse im Titel (08.10.2026): „Englisch" statt „10b - Englisch" */
+export const titelFuerLernende = (z: Parameters<typeof ueberschriftVon>[0]): string => ohneKlasse(ueberschriftVon(z))
 
 /** Wörter, die in den letzten 7 Tagen neu gelernt bzw. wiederholt wurden */
 function sieben(staende: Record<string, WortStand>, jetzt: number): { neu7: number; wiederholt7: number } {
@@ -626,6 +634,13 @@ export function klassenKurseSichern(lehrkraftId: string): number {
   if (neu) protokolliereServer('vokabeln', `${neu} Kurs(e) für eigene Klassen angelegt`, lehrkraftId)
   return neu
 }
+/** Leeren Kurs (ohne Wörter) löschen – z. B. wenn das Fach in der Klasse abgewählt wird (08.10.2026) */
+export function leerenKursLoeschen(id: string, lehrkraftId: string): void {
+  const z = zeile(id)
+  if (!z || z.lehrkraft_id !== lehrkraftId || json_(z.woerter, [] as unknown[]).length) return
+  db().prepare('DELETE FROM vok_zuweisungen WHERE id = ?').run(id)
+}
+
 /**
  * Neuer Kurs für eine Lerngruppe, die schon einen leeren Kurs derselben Sprache hat (ohne Wörter, ohne Grammatik, offen,
  * für die ganze Gruppe; 08.10.2026): Inhalt und Einstellungen des neuen gehen in den leeren (seine Überschrift, eingetragene
@@ -700,8 +715,8 @@ export function vokabelListenFuer(
       .filter((z) => istOffen(z) && vokIstFuer(z, ich) && json_(z.woerter, [] as unknown[]).length > 0)
       .map((z) => ({
         id: z.id,
-        // Lernende sehen die Überschrift („5b - Englisch"), nicht „Green Line 1 - Unit 1 - …" (08.10.2026)
-        titel: ueberschriftVon(z),
+        // Lernende sehen die Überschrift ohne Klasse („Englisch" statt „5b - Englisch"), nicht „Green Line 1 - Unit 1 - …" (08.10.2026)
+        titel: titelFuerLernende(z),
         fach: z.fach,
         sprache: z.sprache,
         testTermin: z.test_termin,
@@ -818,7 +833,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         json(res, 200, {
           id: z.id,
           nurGrammatik: json_(z.woerter, [] as unknown[]).length === 0,
-          titel: ueberschriftVon(z),
+          titel: titelFuerLernende(z),
           gaeste: !iservBereit(),
           dabei: Boolean(sitzung && vokIstFuer(z, sitzung.nutzer)),
           bis: z.bis
@@ -911,7 +926,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return (
           json(res, 200, {
             id: z.id,
-            titel: ueberschriftVon(z),
+            titel: titelFuerLernende(z),
             sprache: z.sprache,
             fach: z.fach,
             testTermin: z.test_termin,
@@ -1086,6 +1101,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           bis: z.bis,
           spieleFrei: spieleHeuteFrei(z),
           verbspiele: z.verbspiele ?? '',
+          zusammen: z.zusammen !== 'aus',
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026)
           teile: woerter.length ? teileVon(z) : [],
@@ -1172,6 +1188,11 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       }
       // Spiele für heute freischalten bzw. wieder sperren (08.10.2026, Wunsch der Lehrkraft)
       // Verbspiele: automatisch, immer oder nie (08.10.2026)
+      if (teile[1] === 'zusammen') {
+        const w = k0.an === false ? 'aus' : ''
+        db().prepare('UPDATE vok_zuweisungen SET zusammen = ? WHERE id = ?').run(w, z.id)
+        return json(res, 200, { ok: true, zusammen: w !== 'aus' }), true
+      }
       if (teile[1] === 'verbspiele') {
         const w = k0.wert === 'an' || k0.wert === 'aus' ? k0.wert : ''
         db().prepare('UPDATE vok_zuweisungen SET verbspiele = ? WHERE id = ?').run(w, z.id)

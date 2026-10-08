@@ -148,3 +148,25 @@ export function paketeZusammen(alt: GrammatikPaket, neu: GrammatikPaket): { pake
   const verbSprache = alt.verbSprache ?? neu.verbSprache
   return { paket: { ...alt, regeln, aufgaben, ...(verben ? { verben } : {}), ...(verbSprache ? { verbSprache } : {}) }, dazu }
 }
+
+/**
+ * Weitere Aufgaben an eine freigegebene Grammatik anhängen (08.10.2026, Wunsch der Lehrkraft: „+ Aufgaben"). Die
+ * bisherigen Aufgaben behalten Kennung und Reihenfolge (der Lernstand hängt daran); die neuen bekommen FRISCHE Kennungen
+ * mit eigenem Präfix – nie die einer früher gelöschten Aufgabe, deren Lernstand sonst an der neuen hinge. Doppeltes
+ * (gleicher Satz, gleiche Lösung) fällt weg; Regeln werden wie bei `paketeZusammen` über den Titel zugeordnet.
+ */
+export function aufgabenAnhaengen(alt: GrammatikPaket, neu: GrammatikPaket, praefix: string): { paket: GrammatikPaket; dazu: number } {
+  const p = /^[a-z][a-z0-9]{0,15}$/i.test(praefix) ? praefix : 'n'
+  const ids = new Set(alt.aufgaben.map((a) => a.id))
+  let n = 1
+  const umbenannt: GrammatikPaket = {
+    ...neu,
+    aufgaben: neu.aufgaben.map((a) => {
+      while (ids.has(`${p}-${n}`)) n++
+      const id = `${p}-${n}`
+      ids.add(id)
+      return { ...a, id }
+    })
+  }
+  return paketeZusammen(alt, umbenannt)
+}
