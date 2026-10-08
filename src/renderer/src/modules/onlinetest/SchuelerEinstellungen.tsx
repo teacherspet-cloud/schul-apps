@@ -129,9 +129,38 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
  * (Ausnahmen, abgelehnte Zusagen) als kurzer Bericht an den Server (Diagnose, ohne Namen; höchstens 5 je Seite).
  */
 function VerbindungsHinweis(): React.JSX.Element | null {
-  const [gestoert, setGestoert] = useState(false)
+  // null = kein Hinweis; sonst „wird erneut versucht" oder „keine Verbindung" (endgültig gescheitert)
+  const [gestoert, setGestoert] = useState<null | 'versuch' | 'aus'>(null)
   useEffect(() => {
-    const an = (e: Event): void => setGestoert(Boolean((e as CustomEvent<{ gestoert: boolean }>).detail?.gestoert))
+    /*
+     * Nicht aufblitzen (08.10.2026): serverApi.ts meldet erst nach 3 s Störung; einmal sichtbar, bleibt der Hinweis
+     * mindestens 4 Sekunden stehen – sonst wirkt er wie ein kurz aufflackernder Fehler.
+     */
+    let seit = 0
+    let uhr: ReturnType<typeof setTimeout> | undefined
+    const an = (e: Event): void => {
+      const d = (e as CustomEvent<{ gestoert: boolean; ausgefallen?: boolean }>).detail
+      clearTimeout(uhr)
+      if (d?.gestoert) {
+        seit = seit || Date.now()
+        setGestoert(d.ausgefallen ? 'aus' : 'versuch')
+        // Endgültig gescheitert: nach 8 s ausblenden (die Seite selbst sagt, was nicht geklappt hat)
+        if (d.ausgefallen)
+          uhr = setTimeout(() => {
+            seit = 0
+            setGestoert(null)
+          }, 8000)
+        return
+      }
+      if (!seit) return setGestoert(null)
+      uhr = setTimeout(
+        () => {
+          seit = 0
+          setGestoert(null)
+        },
+        Math.max(0, 4000 - (Date.now() - seit))
+      )
+    }
     window.addEventListener('schulapps-verbindung', an)
     let gemeldet = 0
     const berichten = (art: string, meldung: string, ort: string): void => {
@@ -160,6 +189,7 @@ function VerbindungsHinweis(): React.JSX.Element | null {
     }
     document.addEventListener('pointerdown', markierungWeg, true)
     return () => {
+      clearTimeout(uhr)
       window.removeEventListener('schulapps-verbindung', an)
       window.removeEventListener('error', fehler)
       window.removeEventListener('unhandledrejection', zusage)
@@ -181,12 +211,14 @@ function VerbindungsHinweis(): React.JSX.Element | null {
         color: '#222',
         padding: '6px 14px',
         borderRadius: 999,
+        maxWidth: 'calc(100vw - 32px)',
+        textAlign: 'center',
         fontSize: 14,
         fontWeight: 600,
         boxShadow: '0 4px 14px rgba(0,0,0,.25)'
       }}
     >
-      Verbindung unterbrochen – es wird erneut versucht …
+      {gestoert === 'aus' ? 'Keine Verbindung zum Server – bitte gleich noch einmal versuchen.' : 'Verbindung unterbrochen – es wird erneut versucht …'}
     </div>
   )
 }

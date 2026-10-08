@@ -6,7 +6,7 @@
 //  - Jahrgang aus der Klasse (7… → Stufe 7–10, 3… → 1–4 mit Maskottchen und Sternen, Q1… → 11–13 mit Kurzstatistik)
 //  - Begrüßung „neu" → nach Übung „erfolgreich, wenig aktiv" → mit Wochenziel 1 „erfolgreich und fleißig"
 //  - genau ein Tipp mit Knopf („Jetzt 10 Vokabeln abfragen"), danach Wochenrückblick der KI (Attrappe), „Gelesen" → fester Tipp
-//  - Lernstand: „Mein Stand" mit Stufenbalken, „Mein Fortschritt" mit Wochenleiste
+//  - Lernstand: „Mein Lernraum" mit den neuesten Materialien, „Mein Fortschritt" mit Wochenleiste
 //  - Einstellungen: Kacheln, „Gespeichert", Vorlesen-Knopf, Kontrast, lesefreundliche Schrift (nur Gerät), Lerntipps aus,
 //    Spiele aus / ohne Zeitdruck wirken im Vokabeltraining
 //  - zum Schluss alle Konten samt Daten gelöscht
@@ -92,7 +92,9 @@ try {
   pruefe(/Mia!/.test(await p.locator('[data-gruss]').innerText()), 'Begrüßung mit Vornamen')
   pruefe((await p.locator('[data-maskottchen]').count()) === 0, 'Kl. 7–10 ohne Maskottchen')
   pruefe((await p.locator('[data-tipp]').count()) === 1, 'Nur ein Tipp')
-  pruefe(await da(p.locator('[data-stand-bereich="vokabeln"]')), 'Mein Stand: Vokabelliste mit Stufenbalken')
+  // „Mein Lernraum" statt „Mein Stand" (08.10.2026): Link zum Lernraum und die neuesten Materialien
+  pruefe(await da(p.locator('[data-mein-lernraum] [data-neues-material="vokabeln"]')), 'Mein Lernraum: Vokabeltraining unter den neuesten Materialien')
+  pruefe((await p.locator('[data-stand-bereich]').count()) === 0, 'Keine Liste der Themenbereiche mehr')
   pruefe(await da(p.locator('[data-wochenleiste]')), 'Mein Fortschritt: Wochenleiste')
   const kacheln = await p.locator('[data-kachel]').evaluateAll((k) => k.map((x) => x.getAttribute('data-kachel')))
   pruefe(['tests', 'ergebnisse', 'aufgaben', 'blaetter', 'lernen'].every((k) => kacheln.includes(k)), `Kacheln bleiben (${kacheln.join(', ')})`)
@@ -171,7 +173,7 @@ try {
   pruefe((await g.p.locator('[data-begruessung]').getAttribute('data-stufe')) === 'grund', 'Klasse 3… → Stufe 1–4')
   pruefe(await da(g.p.locator('[data-maskottchen]')), 'Kl. 1–4: Maskottchen')
   pruefe(await da(g.p.locator('[data-wochen-sterne]')), 'Kl. 1–4: Sterne für die Übungstage')
-  pruefe(await da(g.p.locator('[data-sterne]')), 'Kl. 1–4: Stand als Sterne statt Zahlen')
+  pruefe(await da(g.p.locator('[data-mein-lernraum] [data-neues-material]')), 'Kl. 1–4: Mein Lernraum mit den neuesten Materialien')
   pruefe(!/\d+ von \d+ sicher/.test(await g.p.locator('[data-mein-stand]').innerText()), 'Kl. 1–4: keine Zahlen im Stand')
   await g.p.screenshot({ path: join(out, '5-kl3.png'), fullPage: true })
 

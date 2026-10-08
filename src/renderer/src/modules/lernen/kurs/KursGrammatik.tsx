@@ -244,6 +244,11 @@ export interface ProfilPunkt {
   quote: number
   fehler: { antwort: string; richtig: string }[]
   themen: string[]
+  /** Katalog-Kennungen, zuletzt geübt (ms), mittleres Fach, Band/Unit der Freigabe (08.10.2026, Details je Lernende/r) */
+  kennungen?: string[]
+  zuletzt?: number
+  fach?: number
+  lehrwerk?: { buch: string; unit: string }
 }
 
 /**

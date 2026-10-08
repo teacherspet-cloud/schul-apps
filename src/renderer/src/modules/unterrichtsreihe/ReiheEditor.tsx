@@ -7,6 +7,7 @@ import { useAlleLernenden } from '../lernen/LernendeWahl'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Card,
@@ -66,6 +67,7 @@ import { SchrittBearbeiten } from './SchrittBearbeiten'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { DruckMenue, PlanenFenster, PlatzhalterKnopf, StundenLeiste } from './ReiheKi'
 import { horcheReihe } from './platzhalterAuftrag'
+import { meldeOffeneReihe, usePlaene, usePlantGerade } from './planungAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
 import { IconBook, IconSparkles } from '@tabler/icons-react'
 import { ReiheAusSchulbuch, type BuchReihe } from './SchulbuchReiheFenster'
@@ -153,6 +155,19 @@ export function ReiheEditor({
       setGeaendert(true)
     })
   }, [r.id])
+  /*
+   * KI-Planung im Hintergrund (08.10.2026, planungAuftrag.ts): Der fertige Plan liegt je Reihe bereit. Aus der
+   * Auftragsleiste geöffnet (`zeigen`), erscheint gleich die Vorschau mit „Übernehmen"; sonst ein Hinweis über den Schritten.
+   */
+  useEffect(() => meldeOffeneReihe(r.id || null), [r.id])
+  const planBereit = usePlaene((st) => (r.id ? st.plaene[r.id] : undefined))
+  const plantGerade = usePlantGerade(r.id || undefined)
+  const zeigePlan = usePlaene((st) => st.zeigen)
+  useEffect(() => {
+    if (!r.id || zeigePlan !== r.id) return
+    usePlaene.getState().setzeZeigen(null)
+    if (planBereit) setPlanen(true)
+  }, [zeigePlan, r.id, planBereit])
   const schrittAendern = (id: string, patch: Partial<Schritt>): void => {
     setR((x) => ({ ...x, schritte: x.schritte.map((s) => (s.id === id ? { ...s, ...patch } : s)) }))
     setGeaendert(true)
@@ -347,8 +362,15 @@ export function ReiheEditor({
             <Button variant="light" color="grape" leftSection={<IconBook size={16} />} onClick={() => setAusBuch(true)} data-reihe-aus-buch-knopf>
               Aus Schulbuch
             </Button>
-            <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setPlanen(true)} data-reihe-planen>
-              Mit KI planen
+            <Button
+              variant="light"
+              color="grape"
+              leftSection={<IconSparkles size={16} />}
+              onClick={() => setPlanen(true)}
+              data-reihe-planen
+              data-plant={plantGerade || undefined}
+            >
+              {plantGerade ? 'Plant im Hintergrund …' : 'Mit KI planen'}
             </Button>
             <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
               Teil hinzufügen
@@ -356,6 +378,23 @@ export function ReiheEditor({
             <SchrittMenue neu={(art) => neuerSchritt(art)} />
           </Group>
         </Group>
+        {planBereit && !planen && (
+          <Alert variant="light" color="grape" data-plan-bereit>
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="sm">
+                Der KI-Plan ist fertig: {planBereit.plan.schritte.length} Schritte in {planBereit.plan.teile.length} Teilen – ansehen und übernehmen.
+              </Text>
+              <Group gap="xs" wrap="nowrap">
+                <Button size="xs" variant="subtle" color="gray" onClick={() => r.id && usePlaene.getState().verwerfe(r.id)} data-plan-verwerfen>
+                  Verwerfen
+                </Button>
+                <Button size="xs" color="grape" onClick={() => setPlanen(true)} data-plan-ansehen>
+                  Ansehen
+                </Button>
+              </Group>
+            </Group>
+          </Alert>
+        )}
         {r.schritte.length === 0 && teile.length === 0 && (
           <Text c="dimmed" size="sm">
             Noch keine Schritte. Am schnellsten: „Aus Schulbuch“ – Seiten der Einheit hochladen, die KI plant daraus. Oder von Hand, zum Beispiel: Teil 1
@@ -601,11 +640,15 @@ export function ReiheEditor({
         {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
         {planen && (
           <PlanenFenster
+            // Kommt der Plan, während das Fenster offen ist, gleich die Vorschau zeigen
+            key={planBereit?.fertig ?? 'formular'}
             reihe={r}
             kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
             schliessen={() => setPlanen(false)}
             uebernehmen={planUebernehmen}
             setzeStunden={setze}
+            speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
+            ergebnis={planBereit}
           />
         )}
         {ausBuch && (

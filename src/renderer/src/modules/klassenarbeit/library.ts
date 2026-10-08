@@ -33,10 +33,21 @@ export function defaultExamName(exam: Exam): string {
 }
 
 /**
- * Lohnt sich das Sichern? Schon als Entwurf, sobald ein Thema oder ein Aufbau dasteht – nicht
- * erst mit geplanten Teilen. Ein leeres Formular soll die Übersicht aber nicht füllen.
+ * Lohnt sich das Sichern? Schon als Entwurf, sobald ein Titel, ein Thema oder Inhalt in einem Teil
+ * dasteht – nicht erst nach dem Erzeugen. Ein leeres Formular soll die Übersicht aber nicht füllen.
+ *
+ * Ein Aufbau allein zählt nicht mehr (08.10.2026): Im Standardmodus füllt der Rahmenschritt den
+ * Aufbau beim Öffnen selbst (FrameStep, `fuelleAufbau`). Jede frisch geöffnete oder nach dem
+ * Löschen neu angelegte Arbeit landete so als leere „Klassenarbeit Englisch“ in der Bibliothek.
  */
-export const lohntSicherung = (exam: Exam | null): boolean => Boolean(exam && (exam.parts.length || exam.meta.topic.trim() || exam.meta.title.trim()))
+export const lohntSicherung = (exam: Exam | null): boolean =>
+  Boolean(
+    exam &&
+      (exam.meta.topic.trim() ||
+        exam.meta.title.trim() ||
+        examHasContent(exam) ||
+        exam.parts.some((p) => p.notes?.trim() || p.sprechDaten))
+  )
 
 /*
  * Speichern, Öffnen, Ablegen, Neu, automatisch Speichern: gemeinsames Gerüst mit den anderen

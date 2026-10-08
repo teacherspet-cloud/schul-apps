@@ -48,6 +48,8 @@ export const SENSIBEL: Record<string, string[]> = {
   vok_gaeste: ['code_v'],
   // Rekordbuch der Lernenden (08.10.2026)
   rekord_buch: ['daten'],
+  // Achievements der Lernenden (08.10.2026)
+  achievements: ['daten'],
   tafel_freigaben: ['schueler'],
   // Schüler-Startseite (06.10.2026): Wochen-Schnappschuss und Lerntipp je Person (lernstand.ts)
   lern_wochen: ['daten']
@@ -133,19 +135,34 @@ const zaehle = (s: string): number => (s.replace(/'[^']*'/g, '').match(/\?/g) ??
 
 export function planFuer(sql: string): Plan | null {
   const s = sql.replace(/\s+/g, ' ').trim()
-  const ins = /^INSERT (?:OR \w+ )?INTO (\w+) \(([^)]*)\) VALUES \((.*)\)(.*)$/i.exec(s)
+  const ins = /^INSERT (?:OR \w+ )?INTO (\w+) \(([^)]*)\) VALUES \(/i.exec(s)
   if (ins) {
     const tabelle = ins[1].toLowerCase()
     const sens = SENSIBEL[tabelle]
     if (!sens && tabelle !== 'nutzer') return null
     const spalten = ins[2].split(',').map((x) => x.trim().toLowerCase())
-    const werte = teile(ins[3])
+    // VALUES-Liste bis zur passenden Klammer lesen (08.10.2026: Die gierige Suche bis zur letzten Klammer schloss bei
+    // „ON CONFLICT(a)" den letzten Wert aus – rekord_buch.daten blieb so unverschlüsselt)
+    const ab = ins[0].length
+    let tiefe = 1
+    let ende = ab
+    for (; ende < s.length && tiefe > 0; ende++) {
+      if (s[ende] === '(') tiefe++
+      else if (s[ende] === ')') tiefe--
+    }
+    const werte = teile(s.slice(ab, ende - 1))
+    const rest = s.slice(ende)
     const art: Plan['art'] = []
     werte.forEach((w, i) => {
       const n = zaehle(w)
       for (let k = 0; k < n; k++)
         art.push(w === '?' && tabelle === 'nutzer' && spalten[i] === 'benutzer' ? 'kennung' : w === '?' && sens?.includes(spalten[i]) ? 'zu' : null)
     })
+    // Platzhalter danach (z. B. „DO UPDATE SET daten = ?"): sensible Spalten ebenfalls verschlüsseln
+    for (const zuw of rest.split(/,| SET | WHERE /i)) {
+      const m = /(\w+) = \?/.exec(zuw)
+      for (let k = 0; k < zaehle(zuw); k++) art.push(m && sens?.includes(m[1].toLowerCase()) ? 'zu' : null)
+    }
     return { tabelle, art }
   }
   const upd = /^UPDATE (\w+) SET (.*?)( WHERE .*)?$/i.exec(s)

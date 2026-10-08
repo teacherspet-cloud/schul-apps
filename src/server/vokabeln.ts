@@ -44,6 +44,7 @@ import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen, woerterEintragen } from './rekordbuch'
+import { achievementAntwort } from './achievementsDaten'
 import {
   bewerte,
   istSicher,
@@ -515,7 +516,7 @@ export function vokabelStand(zid: string, sid: string): { eingereicht: number; r
 /** Kurzfassung für die Lernenden (auch für die Lern-App) */
 export function vokabelListenFuer(
   ich: NutzerInfo
-): { id: string; titel: string; fach: string; sprache: string; testTermin: number | null; uebersicht: ReturnType<typeof uebersicht> }[] {
+): { id: string; titel: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht> }[] {
   return (
     (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
       // Kurse nur mit Grammatik (08.10.2026) sind kein Vokabeltraining – ihre Grammatik kommt über grammatikFuer
@@ -527,6 +528,8 @@ export function vokabelListenFuer(
         fach: z.fach,
         sprache: z.sprache,
         testTermin: z.test_termin,
+        // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026: die neuesten Materialien)
+        erstellt: z.erstellt,
         uebersicht: uebersicht(json_(z.woerter, [] as Vokabel[]), standVon(z.id, ich.id).woerter, Date.now(), tageszielVon(z))
       }))
   )
@@ -580,6 +583,8 @@ export function abfrageAuswerten(
   // Rekordbuch: neu gelernt (erster Kontakt) und sicher geworden – je Schuljahr
   if (buch)
     woerterEintragen(buch.ich, { gelernt: !alt?.versuche ? 1 : 0, sicher: istSicher(neu) && !(alt && istSicher(alt)) ? 1 : 0 }, buch.klasse, jetzt)
+  // Achievements (08.10.2026): Tagesrunde, Diktate, „Lege das Wort" von Hand (`eingabe` schickt der Trainer mit)
+  if (buch) achievementAntwort(buch.ich, { uebung, urteil: ergebnis.urteil, eingabe: k0.eingabe }, jetzt)
   // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
   if (ergebnis.urteil === 'richtig' && stand.ansehen?.includes(v.id)) stand.ansehen = stand.ansehen.filter((x) => x !== v.id)
   const heute = new Date(jetzt).toISOString().slice(0, 10)
@@ -607,7 +612,7 @@ export function spielEintragen(
   const heute = new Date().toISOString().slice(0, 10)
   if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
   // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres über alle Trainings
-  if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt)
+  if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt, fehler.length)
   return { rekord }
 }
 
@@ -1158,14 +1163,22 @@ export function vokabelnDerGruppe(
     lernende: number
     aktiv7: number
     probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
+    /** Kurs-Karte in „Meine Klassen" (08.10.2026): Anteile aller Wörter aller Lernenden – sicher, im Aufbau (kennengelernt), neu */
+    anteil: { sicher: number; aufbau: number; neu: number }
+    /** Lernende, die heute geübt haben */
+    heuteAktiv: number
+    /** Erster Übungstag eines Lernenden in diesem Kurs (JJJJ-MM-TT) – wie lange schon geübt wird */
+    ersterTag: string | null
+    /** Wörter, die seit mindestens 14 Tagen freigegeben sind („sicher" braucht zwei Treffer im Abstand einer Woche) */
+    reifeWoerter: number
   }[]
-  jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }>
+  jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
   wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string }[]
 } {
   const zs = db()
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
-  const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }> = {}
+  const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }> = {}
   const woerterFehler = new Map<string, { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string }>()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
   const trainings = zs.map((z) => {
@@ -1175,15 +1188,37 @@ export function vokabelnDerGruppe(
     let aktiv7 = 0
     const jeWort = new Map<string, { v: Vokabel; versuche: number; falsch: number; texte: Map<string, number> }>()
     const lernende = lernendeVon(z)
+    // Reife Wörter (08.10.2026): die Abschnitte stehen in Freigabe-Reihenfolge hintereinander in der Wortliste
+    const reifGrenze = jetzt - 14 * TAG
+    const reifeWoerter = Math.min(
+      woerter.length,
+      teileVon(z)
+        .filter((t) => t.zeit && t.zeit <= reifGrenze)
+        .reduce((a, t) => a + t.anzahl, 0)
+    )
+    const reif = woerter.slice(0, reifeWoerter)
+    const heute = new Date(jetzt).toISOString().slice(0, 10)
+    let heuteAktiv = 0
+    let ersterTag: string | null = null
+    const summe = { sicher: 0, aufbau: 0, neu: 0 }
     for (const n of lernende) {
       const st = standVon(z.id, n.id)
       const u = uebersicht(woerter, st.woerter, jetzt)
       anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
+      summe.sicher += u.sicher
+      summe.aufbau += u.imAufbau
+      summe.neu += u.neu
       if (st.tage.some((t) => t >= vor7)) aktiv7++
+      if (st.tage.includes(heute)) heuteAktiv++
+      for (const t of st.tage) if (!ersterTag || t < ersterTag) ersterTag = t
       if (offen) {
-        const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null })
+        const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null, reifSicher: 0, reifGesamt: 0 })
         p.sicher += u.sicher
         p.gesamt += u.gesamt
+        if (reif.length) {
+          p.reifSicher += reif.filter((v) => st.woerter[v.id] && istSicher(st.woerter[v.id])).length
+          p.reifGesamt += reif.length
+        }
         const letzter = st.tage[st.tage.length - 1] ?? null
         if (letzter && (!p.zuletzt || letzter > p.zuletzt)) p.zuletzt = letzter
       }
@@ -1218,6 +1253,13 @@ export function vokabelnDerGruppe(
       quelle: [q.lehrwerk, q.unit, q.abschnitte?.length ? q.abschnitte.join(', ') : ''].filter(Boolean).join(' · '),
       lernende: lernende.length,
       aktiv7,
+      anteil: (() => {
+        const ges = summe.sicher + summe.aufbau + summe.neu
+        return ges ? { sicher: summe.sicher / ges, aufbau: summe.aufbau / ges, neu: summe.neu / ges } : { sicher: 0, aufbau: 0, neu: 1 }
+      })(),
+      heuteAktiv,
+      ersterTag,
+      reifeWoerter,
       probleme: [...jeWort.values()]
         .filter((e) => e.versuche >= 3 && e.falsch > 0)
         .sort((a, b) => b.falsch / b.versuche - a.falsch / a.versuche)

@@ -946,6 +946,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
             zeitMin: t.einstellungen.zeitMin,
             // Fach für den Fachordner im Regal (08.10.2026)
             fach: t.einstellungen.fach ?? '',
+            // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
+            erstellt: t.erstellt,
             abgegeben: Boolean(meine.get(t.id)),
             wartend: t.status === 'wartend'
           }))

@@ -227,7 +227,8 @@ try {
   await p.locator('[data-reiter-lernstand]').click()
   pruefe(await da(p.locator('[data-grammatik-lernstand]').getByText('Mia R.')), 'Lernstand im Grammatik-Fenster zeigt den Gast')
   await p.screenshot({ path: join(out, '8-lernstand.png'), fullPage: true })
-  // Lernraum-Eintrag (Gaststart) zeigt das Grammatiktraining
+  // Lernraum-Eintrag (Gaststart) zeigt das Grammatiktraining – bisherige Liste (Rückfall zum Regal, 08.10.2026)
+  await h.context().request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   await h.goto(`${A}/s/`)
   pruefe(await da(h.locator('[data-gast-vokabeln="grammatik"]')), 'Gast-Startseite listet das Grammatiktraining')
 } catch (e) {

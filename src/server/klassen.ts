@@ -50,6 +50,53 @@ interface Bedarf {
   ziel?: { modul: string; id?: string }
 }
 
+/**
+ * Vokabeln im Handlungsbedarf (08.10.2026, Befund der Lehrkraft: frisch gestartete Klassen wurden mit „Vokabeln unter
+ * 30 % sicher" überflutet). „Sicher" braucht zwei Treffer im Abstand einer Woche – deshalb:
+ *  - „unter 30 % sicher" zählt nur Wörter, die seit mindestens 14 Tagen freigegeben sind, und erst, wenn im Kurs seit
+ *    mindestens 14 Tagen geübt wird;
+ *  - vorher das frühe Zeichen: wer seit 7 Tagen nicht geübt hat;
+ *  - höchstens EIN Vokabel-Eintrag je Klasse (mehrere Kurse zusammengefasst, nächster Testtermin vorne). Ein Klick
+ *    öffnet den Kurs: den mit dem Termin, sonst den jüngsten offenen Kurs im Fach der Lerngruppe.
+ */
+export function vokabelBedarf(
+  offene: { id: string; titel: string; fach: string; testTermin: number | null; sicherSchnitt: number; ersterTag: string | null; reifeWoerter: number }[],
+  jePerson: Record<string, { reifSicher: number; reifGesamt: number; zuletzt: string | null }>,
+  lernende: { id: string; name: string }[],
+  fach: string,
+  jetzt = Date.now()
+): Bedarf | null {
+  if (!offene.length) return null
+  const kurs = offene.find((t) => t.fach === fach) ?? offene[0]
+  const termin = offene
+    .filter((t) => t.testTermin && t.testTermin > jetzt && t.testTermin - jetzt < 8 * TAG)
+    .sort((a, b) => (a.testTermin ?? 0) - (b.testTermin ?? 0))[0]
+  const tag14 = new Date(jetzt - 14 * TAG).toISOString().slice(0, 10)
+  const lange = offene.some((t) => t.ersterTag && t.ersterTag <= tag14 && t.reifeWoerter > 0)
+  const schwach = lange
+    ? lernende.filter((l) => {
+        const p = jePerson[l.id]
+        return p && p.reifGesamt > 0 && p.reifSicher / p.reifGesamt < 0.3
+      })
+    : []
+  const grenze = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
+  const inaktiv = lernende.filter((l) => jePerson[l.id] && (!jePerson[l.id].zuletzt || jePerson[l.id].zuletzt! < grenze))
+  const teile: string[] = []
+  if (termin)
+    teile.push(
+      `Vokabeltest „${termin.titel}" am ${new Date(termin.testTermin!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} – Klasse im Schnitt ${Math.round(termin.sicherSchnitt * 100)} % sicher`
+    )
+  if (schwach.length) teile.push(`Vokabeln unter 30 % sicher (Wörter seit mind. 14 Tagen): ${schwach.map((l) => l.name).join(', ')}`)
+  if (inaktiv.length)
+    teile.push(`${inaktiv.length} ${inaktiv.length === 1 ? 'Lernende/r hat' : 'Lernende haben'} in den letzten 7 Tagen nicht geübt: ${inaktiv.map((l) => l.name).join(', ')}`)
+  if (!teile.length) return null
+  return {
+    art: schwach.length ? 'foerdern' : termin ? 'termin' : 'inaktiv',
+    text: teile.join(' · '),
+    ziel: { modul: 'vokabeltraining', id: (termin ?? kurs).id }
+  }
+}
+
 function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
@@ -96,20 +143,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
         ziel: { modul: 'onlinetest', id: t.id }
       })
   if (offeneVok.length) {
-    const schwach = lernende.filter((l) => l.vokabelnSicher !== null && l.vokabelnSicher < 0.3)
-    if (schwach.length)
-      bedarf.push({ art: 'foerdern', text: `Vokabeln unter 30 % sicher: ${schwach.map((l) => l.name).join(', ')}`, ziel: { modul: 'vokabeltraining' } })
-    const grenze = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
-    const inaktiv = lernende.filter((l) => l.vokabelnSicher !== null && (!l.zuletztGeuebt || l.zuletztGeuebt < grenze))
-    if (inaktiv.length)
-      bedarf.push({ art: 'inaktiv', text: `Seit einer Woche nicht geübt: ${inaktiv.map((l) => l.name).join(', ')}`, ziel: { modul: 'vokabeltraining' } })
-    for (const t of offeneVok)
-      if (t.testTermin && t.testTermin > jetzt && t.testTermin - jetzt < 8 * TAG)
-        bedarf.push({
-          art: 'termin',
-          text: `Vokabeltest „${t.titel}" am ${new Date(t.testTermin).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} – Klasse im Schnitt ${Math.round(t.sicherSchnitt * 100)} % sicher`,
-          ziel: { modul: 'vokabeltraining', id: t.id }
-        })
+    const v = vokabelBedarf(offeneVok, vok.jePerson, lernende, g.fach, jetzt)
+    if (v) bedarf.push(v)
   }
   for (const r of reihen) for (const b of r.bedarf.slice(0, 3)) bedarf.push({ art: 'reihe', text: `${r.titel}: ${b}`, ziel: { modul: 'laufendereihen' } })
   for (const b of blaetter) {

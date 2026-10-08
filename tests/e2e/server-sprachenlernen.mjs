@@ -138,23 +138,33 @@ try {
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   pruefe(await da(p.locator(`[data-grammatik-zeile="${gram}"]`)), 'Grammatik-Tabelle im Kurs')
+  // Reiter „Lernende" nur mit Vokabeln (08.10.2026): keine Grammatik-Spalte, kein Fördern/Fordern
+  pruefe((await p.locator('[data-lernende-tabelle] [data-foerdern]').count()) === 0, 'Reiter „Lernende" ohne Fördern/Fordern')
+  // Reiter „Grammatik": Name | Details | Fördern | Fordern, Empfehlung mit Grund („1 Schwäche")
+  await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
   const benProfil = p.locator('[data-grammatik-profil="Ben S."]')
-  // Grammatik-Spalte kompakt (Plakette „1 Schwäche", Regeln im Attribut), Einzelheiten per Klick auf die Zeile
-  pruefe(await da(benProfil.locator('[data-schwaechen*="Simple past"]')), 'Ben: Schwäche „Simple past"')
+  pruefe(await da(benProfil.locator('[data-schwaechen*="Simple past"]')), 'Ben: Schwäche „Simple past" als Hinweis unter „Fördern"')
+  pruefe(await da(benProfil.locator('[data-foerdern="Ben S."][data-empfohlen]')), 'Ben: „Fördern" hervorgehoben')
   pruefe((await p.locator('[data-grammatik-profil="Tom K."] [data-schwaechen]').count()) === 0, 'Tom: keine Schwäche')
-  await p.locator('[data-lernende-aufklappen="Ben S."]').click()
-  pruefe(
-    await da(p.locator('[data-lernende-details="Ben S."] [data-details-schwaechen]', { hasText: 'Simple past' })),
-    'Ben: Einzelheiten zeigen die Schwäche'
-  )
-  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-regel-extra^="foerder:"]')), 'Ben: „Fördern" je Regel in den Einzelheiten')
   pruefe(await p.locator('[data-fordern="Ben S."]').isDisabled(), 'Ben: „Fordern" ohne Stärken gesperrt')
+  // Details: großes Fenster mit Zahlen als Filter, Bereichen und Fördern je Regel
+  await p.locator('[data-grammatik-details="Ben S."]').click()
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-details-filter="schwaeche"]', { hasText: 'Schwäche 1' })), 'Details: „Schwäche 1"')
+  pruefe(
+    await da(p.locator('[data-lernende-details="Ben S."] [data-ampel="schwaeche"]', { hasText: 'Simple past' })),
+    'Details: Bereich mit der Schwäche aufgeklappt, Regel rot'
+  )
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-regel-extra^="foerder:"]')), 'Ben: „Fördern" je Regel in den Details')
+  await p.locator('[data-details-ansicht]').getByText('nach Lehrwerk-Units').click()
+  pruefe(await da(p.locator('[data-lernende-details="Ben S."] [data-details-gruppe]').first()), 'Details nach Lehrwerk-Units')
+  await p.locator('[data-details-ansicht]').getByText('nach Bereichen').click()
   await p.screenshot({ path: join(out, '2-kurs.png'), fullPage: true })
-  // Grammatik-Übersicht (Lernende × Regeln): Bens schwache Regel rot
-  await p.locator('[data-lernende-ansicht]').getByText('Grammatik-Übersicht').click()
-  pruefe(await da(p.locator('[data-matrix-zelle^="Ben S.|"][data-stufe="rot"]')), 'Grammatik-Übersicht: Ben rot bei seiner Schwäche')
+  await p.keyboard.press('Escape')
+  // Übersicht (Lernende × Regeln): Bens schwache Regel rot
+  await p.locator('[data-lernende-ansicht]').getByText('Übersicht', { exact: true }).click()
+  pruefe(await da(p.locator('[data-matrix-zelle^="Ben S.|"][data-stufe="rot"]')), 'Übersicht: Ben rot bei seiner Schwäche')
   await p.screenshot({ path: join(out, '2b-matrix.png'), fullPage: true })
-  await p.locator('[data-lernende-ansicht]').getByText('Lernende', { exact: true }).click()
+  await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
 
   // ---------- Fördern → KI (Attrappe) im Hintergrund → Entwurf in der Tabelle → prüfen → nur für Ben freischalten
   await p.locator('[data-foerdern="Ben S."]').click()
@@ -182,6 +192,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
+  await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
   pruefe(await da(p.locator('[data-grammatik-profil="Ben S."] [data-extra-stand]')), 'Ben: Plakette „Förderung läuft"')
 
   // ---------- Grammatik-Fenster: Aufgabe bearbeiten → Lernende sehen die Änderung
@@ -213,6 +224,8 @@ try {
   await sb.screenshot({ path: join(out, '5-startseite.png'), fullPage: true })
   await sb.goto(`${A}/s/g/${gram}`)
   pruefe(await da(sb.locator('[data-regel="r1"]')), 'Seite nach Regeln')
+  pruefe(await da(sb.locator('[data-gerade-dran] [data-regel="r2"]')), 'Unbearbeitete Regel unter „Gerade dran"')
+  pruefe(await da(sb.locator('[data-gerade-dran] [data-extra-link]')), '„Extra für dich" unter „Gerade dran"')
   pruefe(await da(sb.locator('[data-uebungsarten]', { hasText: 'Auswahl 8' })), 'Übungsarten-Zeile')
   pruefe(await da(sb.locator('[data-grammatik-start]', { hasText: 'Übungen' })), '„Weiter üben · N Übungen"')
   await sb.locator('[data-regel-kopf="r2"]').click()

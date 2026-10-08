@@ -64,4 +64,10 @@ describe('Feldschutz', () => {
     expect(planFuer('SELECT passwort_hash FROM nutzer WHERE benutzer = ?')?.art).toEqual(['kennung'])
     expect(planFuer('SELECT * FROM onlinetests WHERE id = ?')).toBeNull()
   })
+
+  it('INSERT … ON CONFLICT: auch der letzte Wert wird verschlüsselt (08.10.2026)', () => {
+    expect(planFuer('INSERT INTO rekord_buch (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten')?.art).toEqual([null, 'zu'])
+    expect(planFuer('INSERT INTO achievements (nutzer_id, daten) VALUES (?, ?) ON CONFLICT (nutzer_id) DO UPDATE SET daten = ?')?.art).toEqual([null, 'zu', 'zu'])
+    expect(planFuer('INSERT INTO blatt_abgaben (a, antworten) VALUES (?, ?) ON CONFLICT(a, b) DO NOTHING')?.art).toEqual([null, 'zu'])
+  })
 })

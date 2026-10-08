@@ -374,6 +374,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
                 offen: offen.includes(f),
                 // Fach für den Fachordner im Regal (08.10.2026)
                 fach: v.meta?.subjectLabel ?? '',
+                // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
+                erstellt: f.erstellt,
                 aufgabe: v.grundlage?.aufgaben ?? '',
                 runden: f.runden,
                 genutzt: fassungen.filter((x) => x.bogen).length,

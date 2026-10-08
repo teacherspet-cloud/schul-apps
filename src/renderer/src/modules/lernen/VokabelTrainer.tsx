@@ -11,6 +11,8 @@ import { useAuffrischen } from '../../shared/auffrischen'
 import { aufnahmeSpielen, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
 import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
+import type { Stufe } from '@shared/vokabelLaufbahn'
+import { useMediaQuery } from '@mantine/hooks'
 import { besteStimme, stimmeVorhanden } from './stimme'
 import type { VerbSprache } from '@shared/verben'
 import { formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
@@ -32,6 +34,7 @@ import {
   Center,
   Group,
   Loader,
+  Modal,
   Popover,
   Progress,
   SimpleGrid,
@@ -109,6 +112,8 @@ interface Liste {
   verben?: { sprache: VerbSprache; karten: VerbKarte[] } | null
   /** Vokabelweg (03.10.2026): die Freischalt-Leiter */
   weg?: WegKurz
+  /** Nur ein Abschnitt des Vokabelwegs (08.10.2026, Fenster aus dem Pfad) – geht bei jeder Antwort mit */
+  abschnitt?: string
 }
 
 const STIMME: Record<string, string> = {
@@ -226,6 +231,100 @@ export const CSS = `
 @media (prefers-reduced-motion: reduce) { .vt-karte, .vt-fach-fuellung { transition: none } .vt-rein, .vt-fach.zuwachs, .vt-fach-plus, .vt-aufstieg { animation: none } }
 `
 
+/** Medienbank: Aussprache und Beispielbilder (05.10.2026) – ein fehlendes Bild kommt aus der Medienbank */
+async function mitMedien(liste: Liste): Promise<Liste> {
+  const m = await medienLaden(
+    liste.sprache,
+    liste.woerter.map((w) => w.term),
+    liste.klasse
+  )
+  return { ...liste, woerter: liste.woerter.map((w) => (w.bild || !m[w.term]?.bild?.url ? w : { ...w, bild: m[w.term]!.bild!.url })) }
+}
+
+/**
+ * Wörter für eine Runde im Abschnitts-Fenster (08.10.2026): neue zuerst als Lernkarte und danach noch einmal
+ * abgefragt, dazu angefangene (unter Fach 2) – je höchstens ein Zehnerschritt. Ist der Abschnitt schon eingeübt,
+ * die am längsten nicht geübten zur Wiederholung.
+ */
+export function abschnittsRunde(woerter: Vokabel[], staende: Record<string, WortStand>): Vokabel[] {
+  const neu = woerter.filter((v) => !staende[v.id] || (staende[v.id].fach === 0 && staende[v.id].versuche === 0)).slice(0, SCHRITT)
+  const aufbau = woerter.filter((v) => staende[v.id] && !neu.includes(v) && staende[v.id].fach < 2).slice(0, SCHRITT)
+  if (neu.length || aufbau.length) return [...neu, ...aufbau, ...neu]
+  return [...woerter].sort((a, b) => (staende[a.id]?.zuletzt ?? 0) - (staende[b.id]?.zuletzt ?? 0)).slice(0, SCHRITT)
+}
+
+/**
+ * Fenster eines Abschnitts (08.10.2026, abgestimmt): genau dessen Wörter lernen und abfragen – dieselbe Runde wie
+ * im Kasten, derselbe Lernstand (der Server schränkt nur die Wortauswahl ein). Am Telefon bildschirmfüllend.
+ */
+function StationFenster({
+  id,
+  stufe,
+  fach,
+  farbe,
+  schliessen
+}: {
+  id: string
+  stufe: Stufe
+  fach: string
+  farbe?: string | null
+  schliessen: () => void
+}): React.JSX.Element {
+  const klein = useMediaQuery('(max-width: 640px)')
+  const [d, setD] = useState<Liste | null | undefined>(undefined)
+  const [fehler, setFehler] = useState('')
+  const [runde, setRunde] = useState<Vokabel[] | null>(null)
+  useEffect(() => {
+    void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}&abschnitt=${encodeURIComponent(stufe.key)}`).then(
+      async (liste) => {
+        const mit = await mitMedien(liste)
+        setD(mit)
+        setRunde(abschnittsRunde(mit.woerter, mit.staende))
+      },
+      (e: unknown) => {
+        setFehler(e instanceof Error ? e.message : String(e))
+        setD(null)
+      }
+    )
+  }, [id, stufe.key])
+  return (
+    <Modal
+      opened
+      onClose={schliessen}
+      fullScreen={klein}
+      size="xl"
+      radius={klein ? 0 : 'lg'}
+      title={
+        <Text fw={800}>
+          {stufe.unit} · {stufe.section}
+        </Text>
+      }
+      closeButtonProps={{ 'aria-label': 'Zurück zum Vokabelweg' }}
+    >
+      <div data-vw-fenster={stufe.key}>
+      <TrainerFarben fach={fach} fachFarbe={farbe}>
+        {d === undefined ? (
+          <Center py="xl">
+            <Loader />
+          </Center>
+        ) : !d ? (
+          <Alert color="orange">{fehler || 'Diesen Abschnitt gibt es nicht.'}</Alert>
+        ) : !runde?.length ? (
+          <Stack align="center" py="lg">
+            <Text c="dimmed">In diesem Abschnitt gibt es keine Wörter zum Üben.</Text>
+            <Button radius="xl" onClick={schliessen}>
+              Zurück zum Vokabelweg
+            </Button>
+          </Stack>
+        ) : (
+          <Sitzung d={d} woerter={runde} fertig={schliessen} fertigText="Zurück zum Vokabelweg" />
+        )}
+      </TrainerFarben>
+      </div>
+    </Modal>
+  )
+}
+
 export default function VokabelTrainer({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
@@ -233,17 +332,11 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
   // Freiwillig weiter üben (08.10.2026): Antworten rücken nur eingeschränkt vor (shared/vokabeltrainer nachFreiwillig)
   const [freiwillig, setFreiwillig] = useState(false)
   const [vorher, setVorher] = useState<Record<string, WortStand> | null>(null)
+  // Angetippter Abschnitt des Vokabelwegs (08.10.2026)
+  const [station, setStation] = useState<Stufe | null>(null)
   const laden = useCallback(() => {
     void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}`).then(
-      async (liste) => {
-        // Medienbank: Aussprache und Beispielbilder (05.10.2026) – ein fehlendes Bild kommt aus der Medienbank
-        const m = await medienLaden(
-          liste.sprache,
-          liste.woerter.map((w) => w.term),
-          liste.klasse
-        )
-        setD({ ...liste, woerter: liste.woerter.map((w) => (w.bild || !m[w.term]?.bild?.url ? w : { ...w, bild: m[w.term]!.bild!.url })) })
-      },
+      async (liste) => setD(await mitMedien(liste)),
       (e: unknown) => {
         setFehler(e instanceof Error ? e.message : String(e))
         setD(null)
@@ -270,6 +363,20 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
           starten={(w, frei) => (setVorher(null), setFreiwillig(Boolean(frei)), setSitzung(w))}
           aktualisieren={(r) => setD({ ...d, ...r })}
           vorher={vorher}
+          oeffneStation={d.weg ? setStation : undefined}
+        />
+      )}
+      {/* Abschnitt des Vokabelwegs angetippt (08.10.2026): seine Wörter im Fenster, danach zurück zum Pfad */}
+      {station && (
+        <StationFenster
+          id={id}
+          stufe={station}
+          fach={d.fach}
+          farbe={d.farbe}
+          schliessen={() => {
+            setStation(null)
+            laden()
+          }}
         />
       )}
     </TrainerFarben>
@@ -299,13 +406,16 @@ function Kasten({
   d,
   starten,
   aktualisieren,
-  vorher
+  vorher,
+  oeffneStation
 }: {
   d: Liste
   starten: (w: Vokabel[], freiwillig?: boolean) => void
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
   /** Stand vor der letzten Runde (für den Aufstieg) */
   vorher?: Record<string, WortStand> | null
+  /** Vokabelweg: freien Abschnitt im Fenster üben (08.10.2026) */
+  oeffneStation?: (s: Stufe) => void
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const u = uebersicht(d.woerter, d.staende)
@@ -420,7 +530,7 @@ function Kasten({
               </div>
             </div>
           </div>
-          {d.weg && <VokabelLeiter weg={d.weg} />}
+          {d.weg && <VokabelLeiter weg={d.weg} oeffne={oeffneStation} />}
           <div>
             <Text size="sm" fw={700} mb={6} c="var(--vt-a-dunkel)">
               Dein Karteikasten
@@ -578,12 +688,15 @@ function Sitzung({
   d,
   woerter,
   fertig,
-  freiwillig = false
+  freiwillig = false,
+  fertigText = 'Zurück zum Kasten'
 }: {
   d: Liste
   woerter: Vokabel[]
   fertig: (st: Record<string, WortStand>) => void
   freiwillig?: boolean
+  /** Knopf nach der Runde (Abschnitts-Fenster: „Zurück zum Vokabelweg", 08.10.2026) */
+  fertigText?: string
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const [warteschlange, setWarteschlange] = useState<Vokabel[]>(woerter)
@@ -612,7 +725,16 @@ function Sitzung({
     if (!v || laeuft) return
     setLaeuft(true)
     try {
-      const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', { id: d.id, wortId: v.id, uebung, ...wert, ...(freiwillig ? { freiwillig: true } : {}) })
+      const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', {
+        id: d.id,
+        wortId: v.id,
+        uebung,
+        ...wert,
+        ...(freiwillig ? { freiwillig: true } : {}),
+        ...(d.abschnitt ? { abschnitt: d.abschnitt } : {}),
+        // Eingabeart von „Lege das Wort" (legen/tippen/schreiben) für die Achievements (08.10.2026)
+        ...(uebung === 'buchstaben' ? { eingabe: useDarstellung.getState().d.legen ?? 'legen' } : {})
+      })
       setStaende((s) => ({ ...s, [v.id]: e.stand }))
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
@@ -694,8 +816,8 @@ function Sitzung({
             </Group>
           </Stack>
         )}
-        <Button size="lg" radius="xl" className="vt-los" onClick={() => fertig(staende)}>
-          Zurück zum Kasten
+        <Button size="lg" radius="xl" className="vt-los" onClick={() => fertig(staende)} data-sitzung-zurueck>
+          {fertigText}
         </Button>
       </Stack>
     )

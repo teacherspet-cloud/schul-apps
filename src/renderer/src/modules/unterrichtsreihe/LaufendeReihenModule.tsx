@@ -13,7 +13,7 @@ import { holen } from '../onlinetest/serverApi'
 import { openModule } from '../../shared/navigation'
 import { fachFarbe as fachFarbeRoh } from '../../shared/fachfarben'
 import { useAppSettings } from '../../shared/settingsStore'
-import { Eingang, useReihenZiel } from './UnterrichtsreiheModule'
+import { Eingang, useReihenZiel, type ReihenVorgabe } from './UnterrichtsreiheModule'
 
 const fachFarbe = (f: string): string => fachFarbeRoh(f) ?? '#4c6ef5'
 
@@ -42,8 +42,8 @@ export const oeffneReihe = (zid: string): void => {
 }
 
 /** „Reihen planen" (08.10.2026): Unterrichtsreihe öffnen und dort gleich eine neue Reihe beginnen */
-export const planeNeueReihe = (): void => {
-  useReihenZiel.getState().setzeNeu(true)
+export const planeNeueReihe = (vorgabe?: ReihenVorgabe): void => {
+  useReihenZiel.getState().setzeNeu(true, vorgabe ?? null)
   openModule('unterrichtsreihe')
 }
 
@@ -163,7 +163,7 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
             ? `${reihen.length} Reihe${reihen.length > 1 ? 'n' : ''} in Arbeit – Fortschritt und Handlungsbedarf je Lerngruppe.`
             : 'Gerade läuft keine Reihe.'
         }
-        neu={{ label: 'Reihen planen', onClick: planeNeueReihe, kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
+        neu={{ label: 'Reihen planen', onClick: () => planeNeueReihe(), kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
         suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Reihe, Thema, Lerngruppe …" />}
       />
       <Stack gap="lg">

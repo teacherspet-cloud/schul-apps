@@ -54,3 +54,19 @@ export function nimmThemaVorgabe(moduleId: string): ThemaVorgabe | null {
   themen.delete(moduleId)
   return v
 }
+
+/**
+ * Jahrgang für ein neues Material vorgeben (08.10.2026, „Arbeitsblatt erstellen" in Meine Klassen): Jahrgang der
+ * Klasse („7b" → 7). Wie Fach und Thema genau einmal abgeholt.
+ */
+const jahrgaenge = new Map<string, number>()
+
+export function setzeJahrgangVorgabe(moduleId: string, grade: number): void {
+  if (Number.isInteger(grade) && grade >= 1 && grade <= 13) jahrgaenge.set(moduleId, grade)
+}
+
+export function nimmJahrgangVorgabe(moduleId: string): number | null {
+  const g = jahrgaenge.get(moduleId) ?? null
+  jahrgaenge.delete(moduleId)
+  return g
+}

@@ -9,6 +9,7 @@ import { datenbank, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
 import { SPIELE } from '../shared/vokabelSpiele'
 import { GRAMMATIK_SPIELE } from '../shared/grammatiktrainer'
+import { achievementSpiel } from './achievementsDaten'
 
 let bereit = false
 const db = () => {
@@ -60,8 +61,11 @@ const kleinerBesser = (schluessel: string): boolean => {
   return Boolean(art === 'gram' ? GRAMMATIK_SPIELE.find((s) => s.id === id)?.kleinerBesser : SPIELE.find((s) => s.id === id)?.kleinerBesser)
 }
 
-/** Spielergebnis eintragen; true = neuer Rekord des Schuljahres. `schluessel` = „vok:blitz" bzw. „gram:formenblitz" */
-export function rekordEintragen(n: NutzerInfo, schluessel: string, wert: number, klasse: number | null, jetzt = Date.now()): boolean {
+/**
+ * Spielergebnis eintragen; true = neuer Rekord des Schuljahres. `schluessel` = „vok:blitz" bzw. „gram:formenblitz".
+ * `fehler` (falsche Antworten im Spiel, wenn bekannt) zählt für die Achievements (08.10.2026).
+ */
+export function rekordEintragen(n: NutzerInfo, schluessel: string, wert: number, klasse: number | null, jetzt = Date.now(), fehler?: number): boolean {
   if (n.rolle !== 'schueler' || n.quelle === 'vorschau' || !Number.isFinite(wert)) return false
   const jahr = schuljahrVon(jetzt)
   const j = lesen(n.id, jahr)
@@ -70,6 +74,8 @@ export function rekordEintragen(n: NutzerInfo, schluessel: string, wert: number,
   const besser = !bisher || (kleinerBesser(schluessel) ? wert < bisher.wert : wert > bisher.wert)
   if (besser) j.rekorde[schluessel] = { wert, datum: jetzt }
   schreiben(n.id, jahr, j)
+  // Achievements: „Rekord gebrochen" nur, wenn es schon einen Rekord gab; dazu Spielarten, Blitzrunde, Verbformen
+  achievementSpiel(n, schluessel, wert, besser && Boolean(bisher), fehler, jetzt)
   return besser
 }
 
@@ -82,6 +88,19 @@ export function woerterEintragen(n: NutzerInfo, art: { gelernt?: number; sicher?
   j.gelernt += art.gelernt ?? 0
   j.sicher += art.sicher ?? 0
   schreiben(n.id, jahr, j)
+}
+
+/** Achievements (08.10.2026): alle Spiele, die die Person je gespielt hat (über alle Schuljahre) */
+export function gespielteSpiele(nutzerId: string): Set<string> {
+  const aus = new Set<string>()
+  for (const z of db().prepare('SELECT daten FROM rekord_buch WHERE nutzer_id = ?').all(nutzerId) as { daten: string }[]) {
+    try {
+      for (const k of Object.keys((JSON.parse(z.daten) as Jahr).rekorde ?? {})) aus.add(k)
+    } catch {
+      // beschädigter Eintrag: überspringen
+    }
+  }
+  return aus
 }
 
 /** Name und Einheit eines Spiels für die Anzeige */

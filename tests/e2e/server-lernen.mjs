@@ -156,15 +156,18 @@ try {
   ).json()
   pruefe(Boolean(tafel.id), 'Tafelbild für die Lerngruppe freigegeben')
 
-  // ---------- Lernraum: Tür → Zimmer → Karteikasten
-  // Bisherige Liste/Türen (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
+  // ---------- Lernraum: Fach → Zimmer → Karteikasten
+  // Bisherige Liste (Rückfall zum Regal, 08.10.2026; die Türen sind entfallen) – das Regal prüft server-regal.mjs
   await sm.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
   await s.goto(`${A}/s/`)
+  // „Mein Lernraum" auf der Startseite: Link zum Lernraum und die neuesten Materialien
+  pruefe(await s.locator('[data-mein-lernraum] [data-neues-material]').first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'Mein Lernraum: neueste Materialien')
   await s.locator('[data-kachel="lernen"]').click()
-  await s.locator('[data-tuer]').first().waitFor({ timeout: 15000 })
-  pruefe((await s.locator('[data-tuer]').count()) >= 1, 'Lernraum: Tür für das Fach')
-  await s.screenshot({ path: join(out, '3-tueren.png'), fullPage: true })
-  await s.locator('[data-tuer]').first().click()
+  await s.locator('[data-fach-karte]').first().waitFor({ timeout: 15000 })
+  pruefe((await s.locator('[data-fach-karte]').count()) >= 1, 'Lernraum: Karte für das Fach')
+  pruefe((await s.locator('[data-tuer], .lr-tuer').count()) === 0, 'Lernraum ohne Türen')
+  await s.screenshot({ path: join(out, '3-faecher.png'), fullPage: true })
+  await s.locator('[data-fach-karte]').first().click()
   await s.locator('[data-zimmer]').waitFor({ timeout: 15000 })
   pruefe((await s.locator('[data-karteikasten]').count()) >= 1, 'Zimmer: Karteikasten mit den Vokabeln')
   pruefe((await s.locator('[data-mappe]').count()) >= 1, 'Zimmer: Mappe mit dem Tafelbild')

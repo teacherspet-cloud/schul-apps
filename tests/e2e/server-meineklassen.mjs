@@ -126,6 +126,15 @@ try {
     d.bedarf.some((b) => b.art === 'inaktiv' || b.art === 'foerdern'),
     `Handlungsbedarf erkannt (${d.bedarf.map((b) => b.art).join(', ')})`
   )
+  // 08.10.2026: höchstens EIN Vokabel-Eintrag je Klasse, junger Kurs ohne „unter 30 % sicher", Ziel ist der Kurs
+  const vokBedarf = d.bedarf.filter((b) => b.ziel?.modul === 'vokabeltraining')
+  pruefe(vokBedarf.length === 1, `Ein Vokabel-Eintrag im Handlungsbedarf (${vokBedarf.length})`)
+  pruefe(!vokBedarf.some((b) => /unter 30/.test(b.text)), 'Junger Kurs: kein „unter 30 % sicher“')
+  pruefe(vokBedarf[0]?.ziel?.id === vok.id, `Klick öffnet den Kurs der Klasse (${vokBedarf[0]?.ziel?.id})`)
+  pruefe(
+    d.vokabeln[0]?.anteil && typeof d.vokabeln[0]?.heuteAktiv === 'number',
+    `Kurs-Karte: Anteile und „heute aktiv“ (${JSON.stringify(d.vokabeln[0]?.anteil)}, ${d.vokabeln[0]?.heuteAktiv})`
+  )
   pruefe(
     d.vorschlaege.some((v) => v.art === 'vokabeln'),
     'Vorschlag: Vokabeltraining „Wackelige Wörter“'
@@ -217,11 +226,25 @@ try {
   await p.screenshot({ path: join(out, '3-reihen-blaetter.png'), fullPage: true })
   await p.keyboard.press('Escape')
   await p.getByRole('tab', { name: /^Vokabeln & Grammatik/ }).click()
-  pruefe(await da(p.locator('[data-material-titel="Weather"]')), 'Vokabeltraining mit Details')
-  pruefe((await p.locator('[data-material-titel="Weather"] [data-ampel]').count()) === 1, 'Vokabel-Balken in Ampelfarbe')
+  pruefe(await da(p.locator('[data-kurs="Weather"] [data-material="Kurs"]')), 'Kurs als eine Karte')
+  pruefe((await p.locator('[data-kurs="Weather"] [data-kurs-stand]').count()) === 1, 'Kurs-Karte: Balken sicher / kennengelernt / neu')
+  pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/heute aktiv \d+\/\d+/)), 'Kurs-Karte: „heute aktiv n/m“')
+  // Lehrwerk-Stand: kleiner Knopf in der Kopfzeile, Auswahl im Pop-up, zurück zu „automatisch"
+  await p.locator('[data-lehrwerk-knopf]').click()
+  pruefe(await da(p.locator('[data-lehrwerk-stand]')), 'Lehrwerk-Stand im Pop-up')
+  await p.locator('[data-lehrwerk-band]').click()
+  await p.getByRole('option').first().click()
+  await p.waitForTimeout(600)
+  pruefe((await p.locator('[data-lehrwerk-knopf][data-automatisch]').count()) === 0, 'Band gewählt: nicht mehr automatisch')
+  await p.locator('[data-lehrwerk-automatisch]').click()
+  await p.waitForTimeout(600)
+  pruefe((await p.locator('[data-lehrwerk-knopf][data-automatisch]').count()) === 1, '„Automatisch (aus den Vokabeln)“ löscht die Wahl')
+  const standNachher = await (await lk.request.get(`${A}/server/grammatik/lehrwerkstand?gruppe=${gEn.id}`, { headers: KOPF })).json()
+  pruefe(standNachher.stand === null, 'Server: Eintrag gelöscht')
+  await p.keyboard.press('Escape')
   await p.screenshot({ path: join(out, '4-vokabeln.png'), fullPage: true })
   // Ablegen ▾ → Als PDF speichern (im Browser: Download)
-  await p.locator('[data-material-titel="Weather"] [data-ablegen]').click()
+  await p.locator('[data-kurs="Weather"] [data-ablegen]').click()
   const [laden] = await Promise.all([
     p.waitForEvent('download', { timeout: 30000 }).catch(() => null),
     p.locator('[data-ablegen-menue] [data-ablegen-art="pdf"]').click()
@@ -241,6 +264,8 @@ try {
 
   // Rückweg: Blatt öffnen → „Meine Klassen" führt zurück in dieselbe Klasse
   await p.getByRole('tab', { name: /^Unterrichtsreihen/ }).click()
+  pruefe(await da(p.locator('[data-reihe-erstellen]')), 'Knopf „Unterrichtsreihe erstellen“')
+  pruefe(await da(p.locator('[data-arbeitsblatt-erstellen]')), 'Knopf „Arbeitsblatt erstellen“')
   await p.locator('[data-material-titel="Mit Frist"] [data-material-oeffnen]').click()
   pruefe(await da(p.locator('[data-zurueck="meineklassen"]')), 'Im geöffneten Blatt heißt der Zurück-Knopf „Meine Klassen“')
   await p.locator('[data-zurueck="meineklassen"]').click()

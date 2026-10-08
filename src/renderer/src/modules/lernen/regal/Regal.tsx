@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { fuerServer, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 import { senden } from '../../onlinetest/serverApi'
 import { beschriftung } from './beschriftung'
-import { mitOrdner } from './ordnerAnimation'
+import { mitOrdner, nimmZurueck } from './ordnerAnimation'
 import { ordnerFarben, REGAL_DUNKEL, REGAL_HELL } from './ordnerFarben'
 import { sortiert, useRegal, type FachOrdner } from './regalDaten'
 
@@ -37,8 +37,10 @@ const CSS = `
 .rg-loch { position: absolute; left: 50%; bottom: 14px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: rgba(0,0,0,.38);
   box-shadow: inset 0 3px 5px rgba(0,0,0,.55), 0 0 0 3px rgba(255,255,255,.18); }
 .rg-zahl { position: absolute; top: -8px; right: -6px; }
+.rg-ordner.zurueck { animation: rg-zurueck .45s cubic-bezier(.3,.7,.2,1); }
+@keyframes rg-zurueck { from { transform: translateY(-16px) scale(1.08); box-shadow: 0 18px 28px rgba(0,0,0,.35); } to { transform: none; } }
 @media (max-width: 480px) { .rg-ordner { width: 54px; height: 190px; } .rg-boden { min-height: 200px; gap: 5px; padding: 0 4px; } .rg-name { font-size: .95rem; } }
-@media (prefers-reduced-motion: reduce) { .rg-ordner { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .rg-ordner { transition: none; } .rg-ordner.zurueck { animation: none; } }
 `
 
 /** Was heute im Ordner wartet – als kleine Zahl am Rücken */
@@ -65,6 +67,8 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
   const dunkel = useComputedColorScheme('light') === 'dark'
   const name = (f: string): string => beschriftung(f).fach
   const [eigene, setEigene] = useState<string[] | null>(null)
+  // Aus dem Ordner zurück: dieser Rücken gleitet an seinen Platz
+  const [zurueck] = useState(nimmZurueck)
   const reihe = useMemo(() => (ordner ? sortiert(ordner, eigene ?? wahl.regal, name) : null), [ordner, eigene, wahl.regal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Böden nach Breite: so viele Ordner nebeneinander, wie hineinpassen
@@ -211,7 +215,7 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
                       <button
                         key={o.fach}
                         type="button"
-                        className={`rg-ordner ${gezogen === o.fach ? 'gezogen' : ''}`}
+                        className={`rg-ordner ${gezogen === o.fach ? 'gezogen' : ''} ${zurueck === o.fach ? 'zurueck' : ''}`}
                         style={{ ['--rg-f' as string]: f.ruecken.bg, ['--rg-t' as string]: f.ruecken.text }}
                         onPointerDown={start(o.fach)}
                         onContextMenu={(e) => e.preventDefault()}
@@ -221,7 +225,7 @@ export default function Regal({ titel, unten }: { titel: string; unten?: React.R
                             nachZug.current = false
                             return
                           }
-                          mitOrdner(ordnerLink(o.fach), f.ruecken.bg, e.currentTarget)
+                          mitOrdner(ordnerLink(o.fach), f.ruecken.bg, e.currentTarget, s.fach)
                         }}
                         aria-label={`Ordner ${s.fach}${s.fach !== o.fach ? ` (${o.fach})` : ''} öffnen${zahl ? `, ${zahl} offen` : ''}. Umschalt und Pfeiltaste verschiebt.`}
                         title={s.fach !== o.fach ? `${s.fach} · ${o.fach}` : s.fach}

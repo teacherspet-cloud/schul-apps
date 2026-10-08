@@ -47,6 +47,8 @@ export interface Darstellung {
   spielGruppen?: Record<string, boolean>
   /** „Lege das Wort": mit Buchstaben legen, tippen oder mit Finger/Stift schreiben (08.10.2026) */
   legen?: 'legen' | 'tippen' | 'schreiben'
+  /** „Dein Vokabelweg" im Karteikasten aufgeklappt (08.10.2026); fehlt es, ist er zugeklappt */
+  vokabelwegOffen?: boolean
   // ---------- Meine Materialien (08.10.2026)
   /** Regal mit Fachordnern oder die bisherige Liste */
   materialien?: 'regal' | 'liste'

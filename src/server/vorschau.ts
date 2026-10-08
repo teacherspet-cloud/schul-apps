@@ -290,15 +290,31 @@ function fensterSeite(schluessel: string, klasse: string, zustand: string): stri
   try { var gemerkt = localStorage.getItem('sa-vorschau-geraet'); if (gemerkt) geraet(gemerkt) } catch (e) {}
   document.querySelectorAll('.geraete button').forEach(function (b) { b.addEventListener('click', function () { geraet(b.getAttribute('data-geraet')) }) });
   // Eigenes Fenster schließen; ohne eigenes Fenster (iPad-App) zurück zur App
-  document.getElementById('schliessen').addEventListener('click', function () { if (window.opener || history.length <= 1) window.close(); if (!window.closed) location.assign('/') });
-  document.getElementById('zuruecksetzen').addEventListener('click', function () {
-    var zustand = document.getElementById('zustand').value;
-    meldung.textContent = 'Wird zurückgesetzt …';
-    fetch('/server/vorschau/zuruecksetzen', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ schluessel: schluessel, zustand: zustand }), cache: 'no-store' })
+  // Beim Schließen den gemerkten Schlüssel vergessen – sonst liefe ein späterer Schülerbereich in diesem Reiter als Vorschau
+  document.getElementById('schliessen').addEventListener('click', function () { try { sessionStorage.removeItem('sa-vorschau') } catch (e) {} if (window.opener || history.length <= 1) window.close(); if (!window.closed) location.assign('/') });
+  /*
+   * Lernstand wechseln wirkt sofort (08.10.2026, Befund der Lehrkraft: die Auswahl „fleißig" änderte nichts – erst der
+   * Knopf „Zurücksetzen" setzte den Stand neu auf). Auswahl = Stand neu erzeugen und Ansicht neu laden; der Knopf setzt
+   * den gewählten Stand erneut auf (z. B. nach eigenen Übungen in der Vorschau).
+   */
+  var auswahl = document.getElementById('zustand'), laufend = 0;
+  var anwenden = function (text, fertig) {
+    var nr = ++laufend;
+    auswahl.disabled = true;
+    meldung.textContent = text;
+    fetch('/server/vorschau/zuruecksetzen', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ schluessel: schluessel, zustand: auswahl.value }), cache: 'no-store' })
       .then(function (r) { return r.json().then(function (d) { if (!r.ok || d.fehler) throw new Error(d.fehler || ('Fehler ' + r.status)); return d }) })
-      .then(function () { meldung.textContent = 'Zurückgesetzt.'; ansicht.src = '/s/?vs=' + encodeURIComponent(schluessel); setTimeout(function () { meldung.textContent = '' }, 2500) })
-      .catch(function (e) { meldung.textContent = e.message })
-  });
+      .then(function () {
+        if (nr !== laufend) return;
+        meldung.textContent = fertig;
+        ansicht.src = '/s/?vs=' + encodeURIComponent(schluessel) + '&t=' + Date.now();
+        setTimeout(function () { if (nr === laufend) meldung.textContent = '' }, 2500)
+      })
+      .catch(function (e) { if (nr === laufend) meldung.textContent = e.message })
+      .then(function () { if (nr === laufend) auswahl.disabled = false })
+  };
+  auswahl.addEventListener('change', function () { anwenden('Lernstand wird gesetzt …', 'Lernstand übernommen.') });
+  document.getElementById('zuruecksetzen').addEventListener('click', function () { anwenden('Wird zurückgesetzt …', 'Zurückgesetzt.') });
 })();
 </script>
 </body></html>`

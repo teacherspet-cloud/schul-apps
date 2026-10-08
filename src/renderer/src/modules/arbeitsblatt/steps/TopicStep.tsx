@@ -7,7 +7,7 @@ import { sehtextQuelle } from '../didactics/sehtext'
 import VersuchKarte from './VersuchKarte'
 import { versuchAuftrag } from '../auftraege'
 import { hatProtokolle } from '../didactics/protokoll'
-import { nimmFachVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
+import { nimmFachVorgabe, nimmJahrgangVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
 import { pruefeHochladen } from '../../../shared/datenschutz'
 import {
   Alert,
@@ -172,6 +172,8 @@ export default function TopicStep(): React.JSX.Element {
           const vorgabe = nimmFachVorgabe('arbeitsblatt')
           // „Übungsblatt dazu erstellen" aus der Rückmeldung gibt zusätzlich Thema und Jahrgang vor
           const thema = nimmThemaVorgabe('arbeitsblatt')
+          // „Arbeitsblatt erstellen" in Meine Klassen gibt den Jahrgang der Klasse vor (08.10.2026)
+          const jahrgang = nimmJahrgangVorgabe('arbeitsblatt')
           const fachId = vorgabe && subjectById(vorgabe).id === vorgabe ? vorgabe : last.subjectId
           const subject = fachId ? subjectById(fachId) : null
           const ws: Worksheet = {
@@ -180,6 +182,7 @@ export default function TopicStep(): React.JSX.Element {
               ...defaultMeta(stateId, schoolTypeId, typeName),
               ...(subject ? { subjectId: subject.id, subjectLabel: subject.label } : {}),
               ...(last.grade ? { grade: last.grade } : {}),
+              ...(jahrgang ? { grade: jahrgang } : {}),
               ...(thema
                 ? {
                     topic: thema.topic,

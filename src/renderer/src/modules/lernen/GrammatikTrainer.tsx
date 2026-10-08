@@ -30,6 +30,7 @@ import {
   IconChevronDown,
   IconFlame,
   IconPlayerPlay,
+  IconSearch,
   IconShieldCheck,
   IconStairsUp,
   IconTrophy,
@@ -60,6 +61,32 @@ import { useVtFarbe } from './vtFarben'
 import { apostrophHinweis } from './apostrophHinweis'
 import { fuerServer, ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
 import { rueckweg } from './regal/beschriftung'
+import { BEREICHE, bereichVonRegel, type BereichId } from '@shared/grammatikBereiche'
+
+/** Offene Bereiche der Regel-Seite, je Training auf diesem Gerät gemerkt (08.10.2026) */
+function useOffeneBereiche(id: string): [Set<string>, (b: string) => void] {
+  const schluessel = `schulapps-gram-bereiche-${id}`
+  const [offen, setOffen] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(schluessel) ?? '[]') as string[])
+    } catch {
+      return new Set()
+    }
+  })
+  const umschalten = (b: string): void =>
+    setOffen((alt) => {
+      const neu = new Set(alt)
+      if (neu.has(b)) neu.delete(b)
+      else neu.add(b)
+      try {
+        localStorage.setItem(schluessel, JSON.stringify([...neu]))
+      } catch {
+        /* ohne Speicher nur für jetzt */
+      }
+      return neu
+    })
+  return [offen, umschalten]
+}
 
 /** Spiele mit ablaufender Uhr – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (Einstellungen der Lernenden, 06.10.2026) */
 const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle', 'richtigfalsch']
@@ -80,6 +107,9 @@ interface Daten {
   /** Sprachenlernen (08.10.2026): '' oder 'foerder'/'forder' (Extra für dich), bekannte Grammatik (passende Spiele) */
   art?: string
   bekannt?: string[]
+  /** Angaben der Freigabe (Katalog-Kennungen → Bereiche) und Freigabedatum („Gerade dran"), 08.10.2026 */
+  info?: { themen?: string[]; teilformen?: string[] }
+  erstellt?: string
 }
 interface Ergebnis {
   urteil: Urteil
@@ -165,6 +195,22 @@ function Kasten({
     return [...faellig, ...neue.map((a) => nachId.get(a.id)!)].filter(Boolean)
   }, [karten, d.staende, d.paket])
   const [offeneRegel, setOffeneRegel] = useState<string | null>(null)
+  const [offeneBereiche, bereichKlappen] = useOffeneBereiche(d.id)
+  const [suche, setSuche] = useState('')
+  // „Extra für dich" aus anderen Freigaben (nur auf der normalen Grammatik-Seite)
+  const [extras, setExtras] = useState<{ id: string; titel: string; fach: string; uebersicht: { unbearbeitet: number; gesamt: number } }[]>([])
+  useEffect(() => {
+    if (d.art) return
+    let aus = false
+    void holen<{ listen: { id: string; titel: string; fach: string; extra: boolean; uebersicht: { unbearbeitet: number; gesamt: number } }[] }>(
+      '/s/api/grammatik'
+    )
+      .then((r) => !aus && setExtras((r.listen ?? []).filter((x) => x.extra && x.id !== d.id && x.fach.toLowerCase() === d.fach.toLowerCase())))
+      .catch(() => undefined)
+    return () => {
+      aus = true
+    }
+  }, [d.id, d.art, d.fach])
   const [spiel, setSpiel] = useState<GrammatikSpielId | null>(null)
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const ich = window.__schulappsServer
@@ -281,6 +327,61 @@ function Kasten({
     (s) => (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length) && spielPasst(s.id)
   )
   const zurueck = rueckweg(d.fach, 'gram', gast, useDarstellung.getState().d.materialien !== 'liste')
+  /*
+   * Viele Regeln (08.10.2026, abgestimmt): oben „Gerade dran" (in den letzten 14 Tagen freigegeben, Regeln mit noch
+   * unbearbeiteten Übungen, „Extra für dich"), darunter die übrigen Regeln nach Bereichen – zugeklappt, je Gerät gemerkt.
+   * Jede Regel steht genau einmal auf der Seite. Ab 16 Regeln gibt es eine Suche.
+   */
+  const kennungen = [...(d.info?.themen ?? []), ...(d.info?.teilformen ?? [])]
+  const neuFreigegeben = Boolean(d.erstellt && jetzt - Date.parse(d.erstellt) < 14 * 864e5)
+  const regelInfos = d.paket.regeln.flatMap((r, i) => {
+    const l = d.paket.aufgaben.filter((a) => a.regelId === r.id)
+    if (!l.length) return []
+    const ru = uebersicht(alsKarten(l) as Vokabel[], d.staende)
+    const fertig = l.filter((a) => d.staende[a.id]?.versuche).length
+    return [{ r, i, l, ru, fertig, sicher: ru.sicher >= l.length, dran: neuFreigegeben || fertig < l.length, bereich: bereichVonRegel(r.titel, kennungen) }]
+  })
+  type RegelInfo = (typeof regelInfos)[number]
+  const geradeDran = regelInfos.filter((x) => x.dran)
+  const bereiche = BEREICHE.map((b) => ({ ...b, regeln: regelInfos.filter((x) => !x.dran && x.bereich === b.id) })).filter((b) => b.regeln.length) as {
+    id: BereichId
+    name: string
+    regeln: RegelInfo[]
+  }[]
+  const gefunden = regelInfos.filter((x) => x.r.titel.toLowerCase().includes(suche.trim().toLowerCase()))
+  const regelKarte = ({ r, i, l, ru, fertig }: RegelInfo): React.JSX.Element => {
+    const offen = offeneRegel === r.id
+    return (
+      <Card key={r.id} withBorder radius="lg" padding="sm" data-regel={r.id}>
+        <UnstyledButton onClick={() => setOffeneRegel(offen ? null : r.id)} w="100%" aria-expanded={offen} data-regel-kopf={r.id}>
+          <Group justify="space-between" wrap="nowrap">
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <Text fw={700}>
+                {d.paket.regeln.length > 1 ? `${i + 1} ` : ''}
+                {r.titel}
+              </Text>
+              <Progress.Root size={8} radius="xl" mt={6}>
+                <Progress.Section value={(ru.sicher / l.length) * 100} color="teal" />
+                <Progress.Section value={((fertig - ru.sicher) / l.length) * 100} color={farbe.a} />
+              </Progress.Root>
+            </div>
+            <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-regel-stand={`${fertig}/${l.length}`}>
+              {fertig}/{l.length}
+            </Text>
+            <IconChevronDown size={16} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flex: 'none' }} />
+          </Group>
+        </UnstyledButton>
+        {offen && (
+          <Stack gap="xs" mt="sm">
+            <RegelKarte r={r} />
+            <Button variant="light" color={farbe.a} leftSection={<IconPlayerPlay size={16} />} onClick={() => starten(regelAufgaben(r.id))} data-regel-ueben={r.id}>
+              Diese Regel üben
+            </Button>
+          </Stack>
+        )}
+      </Card>
+    )
+  }
   return (
     <Stack className="vt vt-rein" data-grammatik-kasten>
       <style>{CSS}</style>
@@ -356,50 +457,71 @@ function Kasten({
       <Title order={4} mt="xs">
         Regeln
       </Title>
+      {regelInfos.length > 15 && (
+        <TextInput
+          placeholder="Regel suchen"
+          leftSection={<IconSearch size={16} />}
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          aria-label="Regel suchen"
+          data-regel-suche
+        />
+      )}
       <Stack gap="xs" data-regeln>
-        {d.paket.regeln.map((r, i) => {
-          const l = d.paket.aufgaben.filter((a) => a.regelId === r.id)
-          if (!l.length) return null
-          const ru = uebersicht(alsKarten(l) as Vokabel[], d.staende)
-          const fertig = l.filter((a) => d.staende[a.id]?.versuche).length
-          const offen = offeneRegel === r.id
-          return (
-            <Card key={r.id} withBorder radius="lg" padding="sm" data-regel={r.id}>
-              <UnstyledButton onClick={() => setOffeneRegel(offen ? null : r.id)} w="100%" aria-expanded={offen} data-regel-kopf={r.id}>
-                <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <Text fw={700}>
-                      {d.paket.regeln.length > 1 ? `${i + 1} ` : ''}
-                      {r.titel}
-                    </Text>
-                    <Progress.Root size={8} radius="xl" mt={6}>
-                      <Progress.Section value={(ru.sicher / l.length) * 100} color="teal" />
-                      <Progress.Section value={((fertig - ru.sicher) / l.length) * 100} color={farbe.a} />
-                    </Progress.Root>
-                  </div>
-                  <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-regel-stand={`${fertig}/${l.length}`}>
-                    {fertig}/{l.length}
-                  </Text>
-                  <IconChevronDown size={16} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flex: 'none' }} />
-                </Group>
-              </UnstyledButton>
-              {offen && (
-                <Stack gap="xs" mt="sm">
-                  <RegelKarte r={r} />
-                  <Button
-                    variant="light"
-                    color={farbe.a}
-                    leftSection={<IconPlayerPlay size={16} />}
-                    onClick={() => starten(regelAufgaben(r.id))}
-                    data-regel-ueben={r.id}
-                  >
-                    Diese Regel üben
-                  </Button>
-                </Stack>
-              )}
-            </Card>
+        {suche.trim() ? (
+          gefunden.length ? (
+            gefunden.map(regelKarte)
+          ) : (
+            <Text size="sm" c="dimmed">
+              Keine Regel gefunden.
+            </Text>
           )
-        })}
+        ) : (
+          <>
+            {(geradeDran.length > 0 || extras.length > 0) && (
+              <Stack gap="xs" data-gerade-dran>
+                <Text size="sm" fw={700} c={farbe.a}>
+                  Gerade dran
+                </Text>
+                {extras.map((x) => (
+                  <Card key={x.id} component="a" href={`/s/g/${x.id}`} withBorder radius="lg" padding="sm" data-extra-link={x.id}>
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text fw={700}>{x.titel}</Text>
+                      <Badge variant="light" color={farbe.a} tt="none">
+                        {x.uebersicht.unbearbeitet ? `noch ${x.uebersicht.unbearbeitet} von ${x.uebersicht.gesamt}` : 'alles bearbeitet'}
+                      </Badge>
+                    </Group>
+                  </Card>
+                ))}
+                {geradeDran.map(regelKarte)}
+              </Stack>
+            )}
+            {bereiche.map((b) => {
+              const auf = offeneBereiche.has(b.id)
+              const sicher = b.regeln.filter((x) => x.sicher).length
+              return (
+                <Card key={b.id} withBorder radius="lg" padding="sm" data-regel-bereich={b.id}>
+                  <UnstyledButton onClick={() => bereichKlappen(b.id)} w="100%" aria-expanded={auf} data-regel-bereich-kopf={b.id}>
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text fw={700}>{b.name}</Text>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }} data-bereich-sicher={`${sicher}/${b.regeln.length}`}>
+                          {sicher} von {b.regeln.length} sicher
+                        </Text>
+                        <IconChevronDown size={16} style={{ transform: auf ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flex: 'none' }} />
+                      </Group>
+                    </Group>
+                  </UnstyledButton>
+                  {auf && (
+                    <Stack gap="xs" mt="sm">
+                      {b.regeln.map(regelKarte)}
+                    </Stack>
+                  )}
+                </Card>
+              )
+            })}
+          </>
+        )}
       </Stack>
       <Text size="sm" c="dimmed" data-uebungsarten>
         Übungsarten: {arten.map(([a, n]) => `${ART_NAME[a]} ${n}`).join(' · ')}

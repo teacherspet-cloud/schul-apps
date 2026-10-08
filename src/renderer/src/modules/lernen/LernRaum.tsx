@@ -1,16 +1,15 @@
 /**
- * Lernraum der Lernenden (03.10.2026, /s/lernen; Server: src/server/lernen.ts) – Wunsch der Lehrkraft:
- * „Für jedes Fach eine Tür, die sich animiert öffnet, dahinter Mappen und Karteikästen für verschiedene
- * Themenbereiche … professionell aussehen."
+ * Lernraum der Lernenden (03.10.2026, /s/lernen; Server: src/server/lernen.ts) – seit 08.10.2026 nur noch die
+ * „Liste" (Wahl in den Einstellungen); sonst zeigt /s/lernen das Regal mit den Fachordnern (lernen/regal).
  *
- *  - Türen je Fach (Fachfarbe, Namensschild), öffnen sich in 3D.
- *  - Dahinter ein Regal: Karteikästen (Vokabeln → Trainer; Merkzettel → Karten herausnehmen und
- *    umdrehen) und Mappen je Themenbereich (umblättern: Arbeitsblätter mit Feedback, Tafelbilder,
- *    Schreibaufgaben, Tests, Lernprodukte).
+ *  - Je Fach eine Karte in der Fachfarbe (die Türen mit Aufschwing-Animation sind entfallen, Befund der Lehrkraft
+ *    08.10.2026: veraltet).
+ *  - Im Fach: Karteikästen (Vokabeln → Trainer; Merkzettel → Karten herausnehmen und umdrehen) und Mappen je
+ *    Themenbereich (umblättern: Arbeitsblätter mit Feedback, Tafelbilder, Schreibaufgaben, Tests, Lernprodukte).
  */
 import { useAuffrischen } from '../../shared/auffrischen'
-import { mitTuer } from './tuer'
 import { VokabelwegKarten } from './VokabelLeiter'
+import { lesbarAuf } from './vtFarben'
 import { ActionIcon, Alert, Badge, Button, Center, Group, Loader, Modal, Stack, Text, Title } from '@mantine/core'
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconExternalLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -51,22 +50,12 @@ function farbeVon(fach: string): string {
 }
 
 const CSS = `
-.lr-flur { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px; padding: 22px; border-radius: 24px;
-  background: linear-gradient(180deg, #f1f3f5 0%, #e9ecef 70%, #dee2e6 70.5%, #ced4da 100%); }
-.lr-rahmen { position: relative; aspect-ratio: 0.58; perspective: 900px; border-radius: 10px 10px 4px 4px; background: #2b2f36; padding: 7px 7px 0;
-  box-shadow: 0 14px 26px rgba(0,0,0,0.25); cursor: pointer; border: none; }
-.lr-innen { position: absolute; inset: 7px 7px 0; border-radius: 6px 6px 0 0; background: radial-gradient(circle at 50% 35%, #fff9db, #ffe8a3 60%, #f0c96a);
-  display: flex; align-items: center; justify-content: center; }
-.lr-tuer { position: absolute; inset: 7px 7px 0; border-radius: 6px 6px 0 0; transform-origin: left center; transition: transform .8s cubic-bezier(.3,.7,.2,1), box-shadow .8s;
-  box-shadow: inset 0 0 0 3px rgba(255,255,255,0.08), inset 0 -40px 60px rgba(0,0,0,0.15); display: flex; flex-direction: column; align-items: center; padding-top: 18%; }
-.lr-tuer::before, .lr-tuer::after { content: ''; position: absolute; left: 14%; right: 14%; border-radius: 6px; border: 2px solid rgba(255,255,255,0.18); }
-.lr-tuer::before { top: 30%; height: 26%; } .lr-tuer::after { top: 62%; height: 28%; }
-.lr-rahmen:hover .lr-tuer { transform: rotateY(-14deg); box-shadow: 10px 0 18px rgba(0,0,0,0.25); }
-.lr-rahmen.offen .lr-tuer { transform: rotateY(-102deg); box-shadow: 18px 0 30px rgba(0,0,0,0.35); }
-.lr-schild { position: relative; z-index: 1; background: #fff; color: #212529; font-weight: 800; padding: 4px 10px; border-radius: 6px; font-size: .85rem;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25); max-width: 88%; text-align: center; }
-.lr-griff { position: absolute; right: 12%; top: 54%; width: 10px; height: 26px; border-radius: 6px; background: linear-gradient(180deg, #f1f3f5, #adb5bd); box-shadow: 0 2px 3px rgba(0,0,0,0.4); }
-.lr-zahl { position: relative; z-index: 1; margin-top: 8px; color: #fff; font-size: .75rem; opacity: .9; }
+.lr-faecher { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.lr-fach { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 16px; text-decoration: none; min-height: 96px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.15); transition: transform .18s ease; }
+.lr-fach:hover, .lr-fach:focus-visible { transform: translateY(-3px); }
+.lr-fach-name { font-weight: 800; font-size: 1.05rem; }
+.lr-fach-zahl { font-size: .8rem; opacity: .9; }
 .lr-regal { position: relative; padding: 18px 18px 0; border-radius: 18px; background: linear-gradient(180deg, #fbf6ee, #f3e7d3); }
 .lr-brett { height: 14px; margin: 0 -18px 22px; background: linear-gradient(180deg, #c8a77a, #a7845a); box-shadow: 0 6px 10px rgba(0,0,0,0.18); border-radius: 3px; }
 .lr-reihe { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; min-height: 120px; }
@@ -102,12 +91,11 @@ const CSS = `
 .lr-merk > div.hinten { transform: rotateY(180deg); background: linear-gradient(160deg, #fff9db, #fff3bf); white-space: pre-wrap; }
 @keyframes lr-ziehen { from { transform: translateY(40px) scale(.9); opacity: 0 } to { transform: none; opacity: 1 } }
 .lr-gezogen { animation: lr-ziehen .45s cubic-bezier(.3,.7,.2,1); }
-@media (prefers-reduced-motion: reduce) { .lr-tuer, .lr-merk { transition: none } .lr-vor, .lr-zurueck, .lr-gezogen { animation: none } }
+@media (prefers-reduced-motion: reduce) { .lr-fach, .lr-merk { transition: none } .lr-vor, .lr-zurueck, .lr-gezogen { animation: none } }
 `
 
 export default function LernRaum({ fach }: { fach?: string }): React.JSX.Element {
   const [raeume, setRaeume] = useState<Raum[] | null>(null)
-  const [offen, setOffen] = useState<string | null>(null)
   const laden = useCallback(
     () =>
       void holen<{ raeume: Raum[] }>('/s/api/lernen').then(
@@ -137,49 +125,37 @@ export default function LernRaum({ fach }: { fach?: string }): React.JSX.Element
       <div>
         <Title order={3}>Dein Lernraum</Title>
         <Text c="dimmed" size="sm">
-          Hinter jeder Tür: deine Karteikästen und Mappen in diesem Fach.
+          Deine Karteikästen und Mappen – nach Fach geordnet.
         </Text>
       </div>
       {raeume.length === 0 ? (
         <Alert>
-          Noch ist nichts da. Sobald deine Lehrkraft Vokabeln, Arbeitsblätter oder Tafelbilder freigibt oder du etwas bearbeitest, füllen sich die Räume.
+          Noch ist nichts da. Sobald deine Lehrkraft Vokabeln, Arbeitsblätter oder Tafelbilder freigibt oder du etwas bearbeitest, füllt sich der Lernraum.
         </Alert>
       ) : (
-        <div className="lr-flur">
+        <div className="lr-faecher">
           {raeume.map((r) => {
             const farbe = farbeVon(r.fach)
             const faellig = r.karteikaesten.reduce((n, k) => n + (k.uebersicht?.faellig ?? 0), 0)
             return (
-              <button
+              <a
                 key={r.fach}
-                type="button"
-                className={`lr-rahmen ${offen === r.fach ? 'offen' : ''}`}
-                aria-label={`Tür: ${r.fach}`}
-                onClick={() => {
-                  setOffen(r.fach)
-                  setTimeout(() => window.location.assign(`/s/lernen/${encodeURIComponent(r.fach)}`), 420)
-                }}
-                data-tuer={r.fach}
+                href={`/s/lernen/${encodeURIComponent(r.fach)}`}
+                className="lr-fach"
+                style={{ background: `linear-gradient(150deg, ${farbe}, ${farbe}cc)`, color: lesbarAuf(farbe) }}
+                data-fach-karte={r.fach}
               >
-                <div className="lr-innen">
-                  <Text fw={800} c="dark">
-                    {r.fach}
-                  </Text>
-                </div>
-                <div className="lr-tuer" style={{ background: `linear-gradient(160deg, ${farbe}, ${farbe}cc)` }}>
-                  <span className="lr-schild">{r.fach}</span>
-                  <span className="lr-zahl">
-                    {r.karteikaesten.length} {r.karteikaesten.length === 1 ? 'Kasten' : 'Kästen'} · {r.mappen.length}{' '}
-                    {r.mappen.length === 1 ? 'Mappe' : 'Mappen'}
-                  </span>
-                  {faellig > 0 && (
-                    <Badge color="red" variant="filled" mt={6} style={{ position: 'relative', zIndex: 1 }}>
-                      {faellig} fällig
-                    </Badge>
-                  )}
-                  <span className="lr-griff" />
-                </div>
-              </button>
+                <span className="lr-fach-name">{r.fach}</span>
+                <span className="lr-fach-zahl">
+                  {r.karteikaesten.length} {r.karteikaesten.length === 1 ? 'Kasten' : 'Kästen'} · {r.mappen.length}{' '}
+                  {r.mappen.length === 1 ? 'Mappe' : 'Mappen'}
+                </span>
+                {faellig > 0 && (
+                  <Badge color="red" variant="filled" w="fit-content">
+                    {faellig} fällig
+                  </Badge>
+                )}
+              </a>
             )
           })}
         </div>
@@ -196,7 +172,7 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
     <Stack data-zimmer={raum.fach}>
       <style>{CSS}</style>
       <Button variant="subtle" component="a" href="/s/lernen" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
-        Alle Türen
+        Alle Fächer
       </Button>
       <Title order={3}>{raum.fach}</Title>
       <VokabelwegKarten fach={raum.fach} />
@@ -216,7 +192,11 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
               type="button"
               className="lr-kasten"
               onClick={() =>
-                k.art === 'vokabeln' && k.id ? mitTuer(`/s/v/${k.id}`, farbe) : k.art === 'grammatik' && k.id ? mitTuer(`/s/g/${k.id}`, farbe) : setKasten(k)
+                k.art === 'vokabeln' && k.id
+                  ? window.location.assign(`/s/v/${k.id}`)
+                  : k.art === 'grammatik' && k.id
+                    ? window.location.assign(`/s/g/${k.id}`)
+                    : setKasten(k)
               }
               aria-label={`Karteikasten: ${k.titel}`}
               data-karteikasten={k.art}

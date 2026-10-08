@@ -9,20 +9,23 @@
  *    Leistung allein. Wochenserie statt Tagesserie, kein Verlustbildschirm, Animation unter 2 s und
  *    abschaltbar (Ruhige Darstellung, prefers-reduced-motion). Keine freischaltbaren Looks.
  *  - Genau ein Lerntipp mit ausführbarem Knopf (einmal je Woche als Wochenrückblick der KI, sonst fest).
- *  - Lernstand: „Mein Stand" (was sitzt – Stufen neu / in Arbeit / sicher statt Rot) und getrennt
- *    „Mein Fortschritt" (gegenüber früher). Keine Vergleiche, keine Ranglisten; Kl. 1–4 Symbole statt Zahlen.
+ *  - Lernstand: „Mein Fortschritt" (gegenüber früher). Keine Vergleiche, keine Ranglisten; Kl. 1–4 Symbole statt Zahlen.
+ *  - „Mein Lernraum" (08.10.2026, Befund der Lehrkraft: die wachsende Liste der Themenbereiche unter „Mein Stand" war
+ *    zu lang): Link zum Regal und die fünf neuesten Materialien, jedes mit einem Tipp direkt geöffnet.
  */
-import { Badge, Button, Group, Paper, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip } from '@mantine/core'
+import { Badge, Button, Group, Paper, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip } from '@mantine/core'
 import {
   IconArrowRight,
   IconBook,
+  IconBooks,
   IconBulb,
   IconCalendarCheck,
   IconCheck,
+  IconClipboardCheck,
   IconFileText,
   IconFlame,
   IconLanguage,
-  IconRoute,
+  IconMessageCircle,
   IconSparkles,
   IconStar,
   IconStarFilled,
@@ -30,6 +33,7 @@ import {
 } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import type { LernstandAntwort, Strategie, Stufe, Zustand } from '@shared/lernstand'
+import { fachAusName } from '@shared/faecher'
 import { VorleseKnopf } from './SchuelerEinstellungen'
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -91,7 +95,7 @@ function begruessung(z: Zustand, s: Stufe, a: LernstandAntwort): string {
       return s === 'grund'
         ? 'Das ist dein Lernort. Los geht’s!'
         : s === 'unter'
-          ? 'Hier siehst du, was ansteht – und wie weit du schon bist.'
+          ? ''
           : s === 'ober'
             ? 'Überblick: Unten steht, was für dich freigeschaltet ist.'
             : 'Hier findest du alles, was für dich freigeschaltet ist. Wähl einen Startpunkt.'
@@ -210,12 +214,15 @@ export function Begruessung({
             {gruss}
             {vorname ? `, ${vorname}` : ''}!
           </Title>
-          <Group gap={6} wrap="nowrap" align="flex-start">
-            <Text className="sl-unter" data-begruessung-text>
-              {text}
-            </Text>
-            {stand && <VorleseKnopf text={`${gruss}${vorname ? `, ${vorname}` : ''}! ${text}`} farbe="gray" />}
-          </Group>
+          {/* Ohne Text (Kl. 5–6, neu: der Satz „Hier siehst du, was ansteht …" ist entfallen, 08.10.2026) keine leere Zeile */}
+          {text && (
+            <Group gap={6} wrap="nowrap" align="flex-start">
+              <Text className="sl-unter" data-begruessung-text>
+                {text}
+              </Text>
+              {stand && <VorleseKnopf text={`${gruss}${vorname ? `, ${vorname}` : ''}! ${text}`} farbe="gray" />}
+            </Group>
+          )}
           {stand && <Auszeichnungen a={stand} />}
           {(knopf || (z === 'neu' && s === 'mittel')) && (
             <Group gap="xs" mt="sm">
@@ -354,119 +361,89 @@ export function TippKarte({ stand, gelesen }: { stand: LernstandAntwort; gelesen
   )
 }
 
-const BEREICH_SYMBOL = { vokabeln: <IconLanguage size={18} />, grammatik: <IconBook size={18} />, blaetter: <IconFileText size={18} /> }
-/** Stufenfarben: von warm (neu) nach kühl (sicher) – wie im Karteikasten, kein Rot */
-const STUFE_FARBE = { neu: '#cbd5e1', arbeit: '#fbbf24', sicher: '#14b8a6' }
+/** Ein Material für „Mein Lernraum" auf der Startseite (SchuelerBereich.tsx stellt die Liste zusammen) */
+export interface NeuesMaterial {
+  art: 'vokabeln' | 'grammatik' | 'blatt' | 'test' | 'aufgabe'
+  titel: string
+  fach?: string
+  href: string
+  /** Freigabe (ms) */
+  erstellt: number
+}
 
-/** Stufenbalken neu / in Arbeit / sicher */
-function StufenBalken({ neu, arbeit, sicher }: { neu: number; arbeit: number; sicher: number }): React.JSX.Element {
-  const ges = Math.max(1, neu + arbeit + sicher)
+const MATERIAL_ART: Record<NeuesMaterial['art'], { name: string; symbol: React.ReactNode }> = {
+  vokabeln: { name: 'Vokabeltraining', symbol: <IconLanguage size={18} /> },
+  grammatik: { name: 'Grammatik', symbol: <IconBook size={18} /> },
+  blatt: { name: 'Arbeitsblatt', symbol: <IconFileText size={18} /> },
+  test: { name: 'Onlinetest', symbol: <IconClipboardCheck size={18} /> },
+  aufgabe: { name: 'Aufgabe mit Feedback', symbol: <IconMessageCircle size={18} /> }
+}
+
+/** „Mein Lernraum": Link zum Regal und die fünf neuesten Materialien (null = lädt noch) */
+export function MeinLernraum({ neueste }: { neueste: NeuesMaterial[] | null }): React.JSX.Element {
   return (
-    <Progress.Root size={12} radius="xl" aria-hidden>
-      <Progress.Section value={(sicher / ges) * 100} color={STUFE_FARBE.sicher} />
-      <Progress.Section value={(arbeit / ges) * 100} color={STUFE_FARBE.arbeit} />
-      <Progress.Section value={(neu / ges) * 100} color={STUFE_FARBE.neu} />
-    </Progress.Root>
+    // Stil aus START_CSS (die Begrüßung steht immer darüber)
+    <Paper withBorder radius="xl" p="lg" className="sl-karte" data-mein-stand data-mein-lernraum>
+      <a href="/s/lernen" className="sl-lernraum-link" data-kachel="lernen">
+        <ThemeIcon variant="light" radius="md" color="teal">
+          <IconBooks size={18} />
+        </ThemeIcon>
+        <Title order={4} style={{ flex: 1 }}>
+          Mein Lernraum
+        </Title>
+        <IconArrowRight size={18} />
+      </a>
+      {neueste === null ? (
+        <Text size="sm" c="dimmed">
+          …
+        </Text>
+      ) : neueste.length === 0 ? (
+        <Text size="sm" c="dimmed">
+          Sobald deine Lehrkraft etwas freischaltet, steht es hier.
+        </Text>
+      ) : (
+        <Stack gap={4}>
+          <Text size="xs" c="dimmed">
+            Neu für dich
+          </Text>
+          {neueste.map((m) => {
+            const fach = m.fach ? (fachAusName(m.fach)?.label ?? m.fach) : ''
+            return (
+              <a key={`${m.art}-${m.href}`} href={m.href} className="sl-zeile" data-neues-material={m.art}>
+                <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
+                  <span className="sl-zeile-symbol">{MATERIAL_ART[m.art].symbol}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={600} size="sm" truncate>
+                      {m.titel}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate>
+                      {MATERIAL_ART[m.art].name}
+                      {fach ? ` · ${fach}` : ''}
+                      {m.erstellt ? ` · ${new Date(m.erstellt).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })}` : ''}
+                    </Text>
+                  </div>
+                </Group>
+              </a>
+            )
+          })}
+        </Stack>
+      )}
+    </Paper>
   )
 }
 
-/** Sterne statt Zahl (Kl. 1–4): Anteil sicher → 0–5 Sterne */
-function Sterne({ anteil }: { anteil: number }): React.JSX.Element {
-  const n = Math.round(Math.max(0, Math.min(1, anteil)) * 5)
-  return (
-    <Group gap={2} data-sterne={n}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={`sl-stern klein${i < n ? ' an' : ''}`}>
-          {i < n ? <IconStarFilled size={16} /> : <IconStar size={16} />}
-        </span>
-      ))}
-    </Group>
-  )
-}
-
-/** Lernstand: links „Mein Stand", rechts „Mein Fortschritt" – getrennt, ohne Vergleich */
-export function Lernstand({
-  stand,
-  reihen
-}: {
-  stand: LernstandAntwort
-  reihen: { id: string; titel: string; fortschritt: number; fertig: boolean }[]
-}): React.JSX.Element {
+/**
+ * Lernstand: links „Mein Lernraum" (Link zum Regal und die fünf neuesten Materialien), rechts „Mein Fortschritt" –
+ * getrennt, ohne Vergleich. `neueste` = null, solange die Listen noch laden.
+ */
+export function Lernstand({ stand, neueste }: { stand: LernstandAntwort; neueste: NeuesMaterial[] | null }): React.JSX.Element {
   const symbole = stand.stufe === 'grund'
   const tage = useMemo(() => new Set(stand.tage), [stand.tage])
   const woche = dieseWoche()
   const heute = new Date().toISOString().slice(0, 10)
-  const hatStand = stand.bereiche.length > 0 || reihen.length > 0
-  const offeneReihen = reihen.filter((r) => !r.fertig).slice(0, 3)
   return (
     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" data-lernstand>
-      <Paper withBorder radius="xl" p="lg" className="sl-karte" data-mein-stand>
-        <Group gap="xs" mb="sm">
-          <ThemeIcon variant="light" radius="md" color="teal">
-            <IconCheck size={18} />
-          </ThemeIcon>
-          <Title order={4}>{symbole ? 'Das kannst du schon' : 'Mein Stand'}</Title>
-        </Group>
-        {!hatStand && (
-          <Text size="sm" c="dimmed">
-            Sobald deine Lehrkraft etwas freischaltet, siehst du hier, was schon sitzt.
-          </Text>
-        )}
-        <Stack gap="sm">
-          {stand.bereiche.slice(0, 6).map((b) => {
-            const blatt = b.art === 'blaetter'
-            return (
-              <a key={`${b.art}-${b.href}`} href={b.href} className="sl-zeile" data-stand-bereich={b.art}>
-                <Group justify="space-between" wrap="nowrap" mb={4} gap="xs">
-                  <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
-                    <span className="sl-zeile-symbol">{BEREICH_SYMBOL[b.art]}</span>
-                    <Text fw={600} size="sm" truncate>
-                      {b.titel}
-                    </Text>
-                  </Group>
-                  {symbole ? (
-                    <Sterne anteil={b.gesamt ? b.sicher / b.gesamt : 0} />
-                  ) : (
-                    <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                      {blatt ? `${b.sicher} von ${b.gesamt} bearbeitet` : `${b.sicher} von ${b.gesamt} sicher`}
-                    </Text>
-                  )}
-                </Group>
-                <StufenBalken neu={b.neu} arbeit={b.inArbeit} sicher={b.sicher} />
-              </a>
-            )
-          })}
-          {offeneReihen.map((r) => (
-            <a key={r.id} href={`/s/r/${r.id}`} className="sl-zeile" data-stand-bereich="reihe">
-              <Group justify="space-between" wrap="nowrap" mb={4} gap="xs">
-                <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
-                  <span className="sl-zeile-symbol">
-                    <IconRoute size={18} />
-                  </span>
-                  <Text fw={600} size="sm" truncate>
-                    {r.titel}
-                  </Text>
-                </Group>
-                {symbole ? (
-                  <Sterne anteil={r.fortschritt} />
-                ) : (
-                  <Text size="xs" c="dimmed">
-                    {Math.round(r.fortschritt * 100)} % des Wegs
-                  </Text>
-                )}
-              </Group>
-              <Progress value={r.fortschritt * 100} color="indigo" size={12} radius="xl" />
-            </a>
-          ))}
-        </Stack>
-        {hatStand && (
-          <Group gap="md" mt="sm" className="sl-legende">
-            <Legende farbe={STUFE_FARBE.sicher} text={symbole ? 'sitzt' : 'sicher'} />
-            <Legende farbe={STUFE_FARBE.arbeit} text={symbole ? 'üben wir' : 'in Arbeit'} />
-            <Legende farbe={STUFE_FARBE.neu} text="neu" />
-          </Group>
-        )}
-      </Paper>
+      <MeinLernraum neueste={neueste} />
 
       <Paper withBorder radius="xl" p="lg" className="sl-karte" data-mein-fortschritt>
         <Group gap="xs" mb="sm">
@@ -531,25 +508,9 @@ export function Lernstand({
               Einiges ist wieder wackelig geworden – das ist normal. Eine Wiederholungsrunde holt es zurück.
             </Text>
           )}
-          {stand.zahlen.sicherNeu === null && stand.fleiss.tage14 === 0 && (
-            <Text size="sm" c="dimmed">
-              Sobald du übst, siehst du hier, wie du vorankommst – nur im Vergleich mit dir selbst.
-            </Text>
-          )}
         </Stack>
       </Paper>
     </SimpleGrid>
-  )
-}
-
-function Legende({ farbe, text }: { farbe: string; text: string }): React.JSX.Element {
-  return (
-    <Group gap={4} wrap="nowrap">
-      <span style={{ width: 10, height: 10, borderRadius: 3, background: farbe, display: 'inline-block' }} />
-      <Text size="xs" c="dimmed">
-        {text}
-      </Text>
-    </Group>
   )
 }
 
@@ -591,6 +552,8 @@ const START_CSS = `
 .sl-zeile { display: block; text-decoration: none; color: inherit; padding: 6px 8px; margin: 0 -8px; border-radius: 12px; transition: background .15s; }
 .sl-zeile:hover, .sl-zeile:focus-visible { background: var(--mantine-color-default-hover); }
 .sl-zeile-symbol { display: inline-flex; color: var(--mantine-color-dimmed); }
+.sl-lernraum-link { display: flex; align-items: center; gap: 8px; margin: 0 -8px 8px; padding: 6px 8px; border-radius: 12px; text-decoration: none; color: inherit; }
+.sl-lernraum-link:hover, .sl-lernraum-link:focus-visible { background: var(--mantine-color-default-hover); }
 .sl-woche { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .sl-tag { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .sl-punkt { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--mantine-color-default-border); color: #fff; }

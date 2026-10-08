@@ -1,4 +1,5 @@
-// Unterrichtsreihe mit KI planen (05.10.2026): Stunden, Planen (Attrappe „reihe_planung"), vorhandenes Material
+// Unterrichtsreihe mit KI planen (05.10.2026): Stunden, Planen (Attrappe „reihe_planung") als Hintergrund-Auftrag (08.10.2026:
+// Fenster schließt, Reihe gespeichert, Ergebnis über die Auftragsleiste in derselben Reihe), vorhandenes Material
 // eingesetzt, Platzhalter direkt erzeugt („reihe_schritt_aufgabe"), Auswahl je Schritt (KI-Vorschlag „reihe_auswahl",
 // übernehmen) – Lernende sehen keine Platzhalter, ausgeblendete Aufgaben fehlen, freiwillige sind markiert.
 // Vorher: Server lokal mit KI-Attrappe. Der Test trägt seine Antworten selbst in die Attrappe ein und stellt sie danach wieder her.
@@ -154,11 +155,31 @@ try {
   await p.locator('[data-planen-los]').waitFor()
   await p.waitForFunction(() => !document.querySelector('[data-planen-los]')?.hasAttribute('disabled'), null, { timeout: 20000 })
   await p.locator('[data-planen-los]').click()
-  await p.locator('[data-plan-uebernehmen]').waitFor({ timeout: 30000 })
+  // Hintergrund-Auftrag (08.10.2026): Das Fenster schließt sich, die Reihe ist vorher gespeichert, die Planung läuft in der Auftragsleiste
+  await p.locator('[data-planen-los]').waitFor({ state: 'detached', timeout: 15000 })
+  pruefe(true, 'Planen: Fenster geschlossen, Planung im Hintergrund')
+  const vorPlan = (await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()).reihe
+  pruefe((vorPlan.stunden ?? []).length === 2, `Reihe vor der Planung gespeichert (${(vorPlan.stunden ?? []).length} Stunden am Server)`)
+  // Weiterarbeiten: zur Liste der Reihen wechseln – das Ergebnis muss trotzdem in DIESER Reihe ankommen
+  await p.getByRole('button', { name: 'Alle Reihen' }).click()
+  await p.locator('[data-reihen-liste]').waitFor({ timeout: 15000 })
+  // Auftragsleiste aufklappen (eingeklappt ist sie eine Pille) und den fertigen Auftrag öffnen
+  await p.locator('.auftrags-pille, .auftrags-liste').first().waitFor({ timeout: 15000 })
+  if (await p.locator('.auftrags-pille').isVisible().catch(() => false)) await p.locator('.auftrags-pille').click()
+  const zeile = p.locator('.auftrags-zeile').filter({ hasText: 'KI-Reihe Probe' }).filter({ hasText: 'Reihe mit KI planen' })
+  await zeile.and(p.locator('[data-status="fertig"]')).waitFor({ timeout: 60000 })
+  pruefe(true, 'Planung als fertiger Auftrag in der Leiste')
+  await p.screenshot({ path: join(out, '1-auftrag.png') })
+  await zeile.getByRole('button', { name: 'Öffnen', exact: true }).click()
+  await p.locator('[data-reihe-editor]').waitFor({ timeout: 15000 })
+  await p.locator('[data-plan-uebernehmen]').waitFor({ timeout: 15000 })
+  pruefe((await p.locator('[data-reihe-titel]').inputValue()) === 'KI-Reihe Probe', 'Öffnen führt in die geplante Reihe mit Plan-Vorschau')
   await p.screenshot({ path: join(out, '1-plan.png'), fullPage: true })
   pruefe(await p.getByText('vorhandenes Material').first().isVisible(), 'Plan: vorhandenes Material eingesetzt')
   await p.locator('[data-plan-uebernehmen]').click()
   await p.waitForTimeout(500)
+  pruefe((await p.locator('[data-plan-bereit]').count()) === 0, 'Nach dem Übernehmen kein bereitliegender Plan mehr')
+  pruefe((await p.locator('[data-stunde]').count()) === 2, 'Stunden aus der gespeicherten Reihe erhalten')
   pruefe((await p.locator('[data-schritt]').count()) === 3, `Drei Schritte übernommen (${await p.locator('[data-schritt]').count()})`)
   pruefe((await p.locator('[data-platzhalter]').count()) === 2, 'Zwei Platzhalter markiert')
   // Platzhalter Zwischenaufgabe direkt erzeugen

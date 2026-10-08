@@ -66,7 +66,7 @@ const ldb = () => {
   }
   return d
 }
-const wegStand = (sid: string, reihe: string): VokStand => {
+export const wegStand = (sid: string, reihe: string): VokStand => {
   const z = ldb().prepare('SELECT daten FROM vok_laufbahn WHERE schueler_id = ? AND reihe = ?').get(sid, reihe) as { daten: string } | undefined
   return json_(z?.daten, { woerter: {}, tage: [] } as VokStand)
 }
@@ -80,7 +80,7 @@ function wegSpeichern(sid: string, reihe: string, s: VokStand): void {
 
 // Lehrwerke: im Kontext der Lehrkraft gelesen (auch ihre importierten), kurz zwischengespeichert
 const buchCache = new Map<string, { buch: Buch; zeit: number }>()
-async function buchFuer(id: string, lehrkraftId: string): Promise<Buch | null> {
+export async function buchFuer(id: string, lehrkraftId: string): Promise<Buch | null> {
   const c = buchCache.get(id)
   if (c && Date.now() - c.zeit < 10 * 60_000) return c.buch
   const lk = nutzerNachId(lehrkraftId)
@@ -90,7 +90,7 @@ async function buchFuer(id: string, lehrkraftId: string): Promise<Buch | null> {
   return buch
 }
 let namenCache: { liste: { id: string; name: string }[]; zeit: number } | null = null
-async function buchNamen(lehrkraftId: string): Promise<{ id: string; name: string }[]> {
+export async function buchNamen(lehrkraftId: string): Promise<{ id: string; name: string }[]> {
   if (namenCache && Date.now() - namenCache.zeit < 10 * 60_000) return namenCache.liste
   const lk = nutzerNachId(lehrkraftId)
   const liste = lk ? ((await imNutzer(alsNutzer(lk), async () => listTextbooks()).catch(() => [])) as { id: string; name: string }[]) : []
@@ -192,7 +192,12 @@ function verbenDesWegs(w: Weg, woerter: Vokabel[]): { sprache: string; karten: V
   return karten.size ? { sprache, karten: [...karten.values()] } : null
 }
 
-function kastenVon(w: Weg, ich: NutzerInfo): { woerter: Vokabel[]; staende: Record<string, WortStand>; ws: VokStand } {
+/**
+ * Der gemeinsame Kasten eines Weges. Mit `abschnitt` (08.10.2026, Abschnitt im Vokabelweg angetippt): nur die
+ * Wörter dieses (freien) Abschnitts – mit denselben Kennungen wie im ganzen Kasten (ein Wort, das auch in einer
+ * Zuweisung steht, bleibt die Zuweisungs-Karte), damit der Lernstand derselbe bleibt.
+ */
+function kastenVon(w: Weg, ich: NutzerInfo, abschnitt?: string): { woerter: Vokabel[]; staende: Record<string, WortStand>; ws: VokStand } {
   const ws = wegStand(ich.id, w.key)
   const woerter: Vokabel[] = []
   const staende: Record<string, WortStand> = {}
@@ -218,7 +223,13 @@ function kastenVon(w: Weg, ich: NutzerInfo): { woerter: Vokabel[]; staende: Reco
   const aktuell = w.stufen.find((s) => s.aktuell)?.key
   for (const a of w.abschnitte) {
     if (!frei.has(a.key)) continue
-    for (const v of a.woerter) if (a.key === aktuell || ws.woerter[v.id]) dazu(v, ws.woerter[v.id])
+    for (const v of a.woerter) if (a.key === aktuell || a.key === abschnitt || ws.woerter[v.id]) dazu(v, ws.woerter[v.id])
+  }
+  if (abschnitt) {
+    const a = w.abschnitte.find((x) => x.key === abschnitt)
+    const terme = new Set((a && frei.has(a.key) ? a.woerter : []).map((v) => normal(v.term)))
+    const nur = woerter.filter((v) => terme.has(normal(v.term)))
+    return { woerter: nur, staende: Object.fromEntries(nur.filter((v) => staende[v.id]).map((v) => [v.id, staende[v.id]])), ws }
   }
   return { woerter, staende, ws }
 }
@@ -255,7 +266,11 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
 
     const w = wege.find((x) => `lb:${x.key}` === id)
     if (!w) return (json(res, 404, { fehler: 'Diesen Vokabelweg gibt es nicht.' }), true)
-    const { woerter, staende, ws } = kastenVon(w, ich)
+    // Ein Abschnitt des Wegs (08.10.2026): ?abschnitt=… bzw. {abschnitt} – nur gesperrte gibt es nicht
+    const abschnitt = String((req.method === 'GET' ? url.searchParams.get('abschnitt') : ((await k.koerper()) as Record<string, unknown>).abschnitt) ?? '')
+    if (abschnitt && !w.stufen.some((s) => s.key === abschnitt && s.frei))
+      return (json(res, 403, { fehler: 'Dieser Abschnitt ist noch nicht freigeschaltet.' }), true)
+    const { woerter, staende, ws } = kastenVon(w, ich, abschnitt || undefined)
     if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste')
       return (
         json(res, 200, {
@@ -270,6 +285,7 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
           rekorde: ws.rekorde ?? {},
           ansehen: ws.ansehen ?? [],
           weg: leiterKurz(w),
+          ...(abschnitt ? { abschnitt } : {}),
           // Spiele heute frei, wenn eine Freigabe dieses Wegs sie freigeschaltet hat (08.10.2026)
           spieleFrei: w.zuweisungen.some((z) => istOffen(z) && spieleHeuteFrei(z)),
           tagesziel: Math.max(0, ...w.zuweisungen.filter((z) => istOffen(z)).map((z) => tageszielVon(z))) || 10,

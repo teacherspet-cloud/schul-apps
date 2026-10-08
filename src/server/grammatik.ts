@@ -178,6 +178,19 @@ export function grammatikBand(lehrwerk: string): string | undefined {
 export const lehrwerkStandVon = (lerngruppeId: string): { buch: string; unit: string } | null =>
   (db().prepare('SELECT buch, unit FROM lehrwerk_stand WHERE lerngruppe_id = ?').get(lerngruppeId) as { buch: string; unit: string } | undefined) ?? null
 
+/** Höchste Unit der Grammatikliste aus den Quellen von Vokabeltrainings (JSON mit lehrwerk und unit) – der automatische Stand */
+export function hoechsteUnit(quellen: string[]): { buch: string; unit: string } | null {
+  let best: { buch: string; unit: string; rang: number } | null = null
+  for (const roh of quellen) {
+    const q = json_(roh, {} as { lehrwerk?: string; unit?: string })
+    const buch = q.lehrwerk ? grammatikBand(q.lehrwerk) : undefined
+    if (!buch || !q.unit) continue
+    const rang = Object.keys(LEHRWERK_GRAMMATIK).indexOf(buch) * 100 + Object.keys(LEHRWERK_GRAMMATIK[buch]).indexOf(q.unit)
+    if (!best || rang > best.rang) best = { buch, unit: q.unit, rang }
+  }
+  return best ? { buch: best.buch, unit: best.unit } : null
+}
+
 /** Katalog-Kennungen bis zu einer Unit (alles aus früheren Bänden und Units, dazu die Unit selbst) */
 export function bisUnit(buch: string, unit: string): string[] {
   const baende = Object.keys(LEHRWERK_GRAMMATIK)
@@ -210,14 +223,7 @@ export function bekannteGrammatikFuer(ich: NutzerInfo): string[] {
     if (s) stand.push(s)
   }
   if (!stand.length) {
-    let best: { buch: string; unit: string; rang: number } | null = null
-    for (const v of vokabelListenFuer(ich)) {
-      const q = json_(vokZeile(v.id)?.quelle ?? '', {} as { lehrwerk?: string; unit?: string })
-      const buch = q.lehrwerk ? grammatikBand(q.lehrwerk) : undefined
-      if (!buch || !q.unit) continue
-      const rang = Object.keys(LEHRWERK_GRAMMATIK).indexOf(buch) * 100 + Object.keys(LEHRWERK_GRAMMATIK[buch]).indexOf(q.unit)
-      if (!best || rang > best.rang) best = { buch, unit: q.unit, rang }
-    }
+    const best = hoechsteUnit(vokabelListenFuer(ich).map((v) => vokZeile(v.id)?.quelle ?? ''))
     if (best) stand.push(best)
   }
   for (const s of stand) for (const t of bisUnit(s.buch, s.unit)) plus(t)
@@ -356,6 +362,7 @@ export function grammatikFuer(ich: NutzerInfo): {
   titel: string
   fach: string
   extra: boolean
+  erstellt: string
   uebersicht: ReturnType<typeof uebersicht> & { unbearbeitet: number }
 }[] {
   return (
@@ -370,6 +377,8 @@ export function grammatikFuer(ich: NutzerInfo): {
           titel: istExtra(z) ? `Extra für dich: ${z.thema || z.titel}` : z.titel,
           fach: z.fach,
           extra: istExtra(z),
+          // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
+          erstellt: z.erstellt,
           // Startkarte (08.10.2026): „Noch 23 von 40 Übungen nicht bearbeitet"
           uebersicht: { ...uebersicht(kk, st), unbearbeitet: kk.filter((k) => !st[k.id]?.versuche).length }
         }
@@ -418,6 +427,14 @@ export interface ProfilPunkt {
   fehler: { antwort: string; richtig: string }[]
   /** Themen der Freigaben, aus denen die Regel stammt */
   themen: string[]
+  /** Katalog-Kennungen der Freigaben („en.verb.past_simple", Teilformen mit „/") – für die Bereiche (08.10.2026) */
+  kennungen?: string[]
+  /** Zuletzt geübt (ms) – „seit 3 Wochen nicht geübt" (08.10.2026) */
+  zuletzt?: number
+  /** Mittleres Fach der geübten Aufgaben – „sicher" ab 85 % mit Fach ≥ 3 (08.10.2026) */
+  fach?: number
+  /** Band und Unit der Freigabe, falls angegeben – Lehrwerk-Stelle (08.10.2026) */
+  lehrwerk?: { buch: string; unit: string }
 }
 export interface GrammatikProfil {
   staerken: ProfilPunkt[]
@@ -464,6 +481,8 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
         quote: 0,
         fehler: [],
         themen: [],
+        kennungen: [],
+        zuletzt: 0,
         fachSumme: 0,
         geuebt: 0
       }
@@ -475,16 +494,24 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
         richtig += s.versuche - s.falsch
         e.fachSumme += s.fach
         e.geuebt++
+        e.zuletzt = Math.max(e.zuletzt ?? 0, s.zuletzt ?? 0)
         for (const t of s.fehlerTexte ?? []) e.fehler.push({ antwort: t, richtig: a.loesungen[0] ?? '' })
       }
       e.quote = e.versuche ? richtig / e.versuche : 0
       if (!e.themen.includes(z.thema)) e.themen.push(z.thema)
+      // Bereiche und Lehrwerk-Stelle (08.10.2026): Kennungen und Band/Unit aus den Angaben der Freigabe
+      const info = infoVon(z)
+      for (const k of [...info.themen, ...info.teilformen]) if (!e.kennungen!.includes(k)) e.kennungen!.push(k)
+      if (!e.lehrwerk && info.lehrwerk?.buch && info.lehrwerk.unit) e.lehrwerk = { buch: info.lehrwerk.buch, unit: info.lehrwerk.unit }
       e.fehler = e.fehler.slice(-6)
       jeRegel.set(schluessel, e)
     }
   }
   const alle = [...jeRegel.values()].filter((e) => e.versuche >= MIN_VERSUCHE)
-  const ohne = ({ fachSumme: _f, geuebt: _g, ...rest }: ProfilPunkt & { fachSumme: number; geuebt: number }): ProfilPunkt => rest
+  const ohne = ({ fachSumme, geuebt, ...rest }: ProfilPunkt & { fachSumme: number; geuebt: number }): ProfilPunkt => ({
+    ...rest,
+    fach: geuebt ? Math.round((fachSumme / geuebt) * 10) / 10 : 0
+  })
   return {
     schwaechen: alle
       .filter((e) => e.quote < SCHWAECHE_UNTER)
@@ -535,12 +562,27 @@ export function grammatikDerGruppe(
     lernende: number
     aktiv7: number
     probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
+    /** Kurs (Vokabeltraining), zu dem die Grammatik gehört – '' = eigenständig (08.10.2026) */
+    vokId: string
+    /** Extra-Aufgabe für einzelne (Förder-/Forderaufgabe) */
+    extra: boolean
   }[]
   jePerson: Record<string, { sicher: number; gesamt: number }>
 } {
-  const zs = db()
-    .prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC')
-    .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  // Auch Grammatik, die nur über den Kurs der Lerngruppe läuft (vok_id, z. B. Extras für einzelne; 08.10.2026)
+  let zs: Zeile[]
+  try {
+    zs = db()
+      .prepare(
+        'SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND (lerngruppe_id = ? OR (vok_id != \'\' AND vok_id IN (SELECT id FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ?))) ORDER BY erstellt DESC'
+      )
+      .all(lehrkraftId, lerngruppeId, lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  } catch {
+    // Ohne Vokabeltabelle (noch nie ein Kurs): nur die Lerngruppe selbst
+    zs = db()
+      .prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC')
+      .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  }
   const jePerson: Record<string, { sicher: number; gesamt: number }> = {}
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
   const trainings = zs.map((z) => {
@@ -562,7 +604,8 @@ export function grammatikDerGruppe(
         for (const t of s.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
         jeAufgabe.set(id, j)
       }
-      if (offen) {
+      // Extras (einzelne Lernende) zählen nicht in den Grammatik-Stand der Person
+      if (offen && !istExtra(z)) {
         const q = (jePerson[n.id] ??= { sicher: 0, gesamt: 0 })
         q.sicher += u.sicher
         q.gesamt += u.gesamt
@@ -581,6 +624,8 @@ export function grammatikDerGruppe(
       regeln: p.regeln.length,
       lernende: lernende.length,
       aktiv7,
+      vokId: z.vok_id ?? '',
+      extra: istExtra(z),
       probleme: p.aufgaben
         .map((a) => ({ a, j: jeAufgabe.get(a.id) }))
         .filter((x): x is { a: (typeof p.aufgaben)[number]; j: { versuche: number; falsch: number; texte: Map<string, number> } } =>
@@ -688,6 +733,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             // Sprachenlernen (08.10.2026): Art (Extra), Angaben der Freigabe, bekannte Grammatik (für passende Spiele)
             art: z.art ?? '',
             info: infoVon(z),
+            // „Gerade dran" (08.10.2026): in den letzten 14 Tagen freigegeben
+            erstellt: z.erstellt,
             bekannt: bekannteGrammatikFuer(ich)
           }),
           true
@@ -788,8 +835,25 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const gid = String(url.searchParams.get('gruppe') ?? '')
         const g = lerngruppe(gid)
         if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true
+        // Was „automatisch" gerade ergibt (08.10.2026): höchste Unit der offenen Vokabeltrainings dieser Lerngruppe
+        let automatisch: { buch: string; unit: string } | null = null
+        try {
+          automatisch = hoechsteUnit(
+            (
+              db().prepare("SELECT quelle FROM vok_zuweisungen WHERE lerngruppe_id = ? AND lehrkraft_id = ? AND status = 'offen'").all(gid, ich.id) as {
+                quelle: string
+              }[]
+            ).map((z) => z.quelle)
+          )
+        } catch {
+          // Noch keine Vokabeltrainings (Tabelle fehlt): kein automatischer Stand
+        }
         return (
-          json(res, 200, { stand: lehrwerkStandVon(gid), baende: Object.fromEntries(Object.entries(LEHRWERK_GRAMMATIK).map(([b, k]) => [b, Object.keys(k)])) }),
+          json(res, 200, {
+            stand: lehrwerkStandVon(gid),
+            automatisch,
+            baende: Object.fromEntries(Object.entries(LEHRWERK_GRAMMATIK).map(([b, k]) => [b, Object.keys(k)]))
+          }),
           true
         )
       }
@@ -799,7 +863,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true
       const buch = String(k0.buch ?? '')
       const unit = String(k0.unit ?? '')
-      if (!buch) db().prepare('DELETE FROM lehrwerk_stand WHERE lerngruppe_id = ?').run(gid)
+      // Band oder Unit geleert („Automatisch"): Eintrag löschen – dann gilt wieder der Stand aus den Vokabeln
+      if (!buch || !unit) db().prepare('DELETE FROM lehrwerk_stand WHERE lerngruppe_id = ?').run(gid)
       else {
         if (!LEHRWERK_GRAMMATIK[buch]?.[unit]) return json(res, 400, { fehler: 'Unbekannter Band oder unbekannte Unit.' }), true
         db()
@@ -965,5 +1030,58 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       }
     }
     return json(res, 404, { fehler: 'Unbekannt.' }), true
+  }
+}
+
+/**
+ * Achievements der Lernenden (08.10.2026): Regeln über alle eigenen Grammatik-Pakete (nach Titel zusammengefasst wie im
+ * Profil). Sicher = mindestens drei (bei kleinen Regeln alle) Aufgaben sicher; Schwäche/Stärke mit den Schwellen des
+ * Profils. Dazu, wie viele „Extra für dich" ganz bearbeitet sind. Nur Pakete, in denen die Person schon geübt hat.
+ */
+export function grammatikFuerAchievements(ich: NutzerInfo): {
+  regeln: { schluessel: string; sicher: boolean; schwaeche: boolean; staerke: boolean }[]
+  extrasGeschafft: number
+  tage: string[]
+} {
+  const jeRegel = new Map<string, { n: number; sicher: number; versuche: number; richtig: number; fachSumme: number; geuebt: number }>()
+  let extrasGeschafft = 0
+  const tage = new Set<string>()
+  for (const { zuweisung_id } of db().prepare('SELECT zuweisung_id FROM gram_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string }[]) {
+    const z = zeile(zuweisung_id)
+    if (!z || !istFuer(z, ich)) continue
+    const p = paketVon(z)
+    const st = standVon(z.id, ich.id)
+    for (const t of st.tage ?? []) tage.add(t)
+    if (istExtra(z) && p.aufgaben.length && p.aufgaben.every((a) => st.aufgaben[a.id]?.versuche)) extrasGeschafft++
+    for (const r of p.regeln) {
+      const k = norm(r.titel)
+      const e = jeRegel.get(k) ?? { n: 0, sicher: 0, versuche: 0, richtig: 0, fachSumme: 0, geuebt: 0 }
+      for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
+        e.n++
+        const s = st.aufgaben[a.id]
+        if (!s?.versuche) continue
+        if (istSicher(s)) e.sicher++
+        e.versuche += s.versuche
+        e.richtig += s.versuche - s.falsch
+        e.fachSumme += s.fach
+        e.geuebt++
+      }
+      jeRegel.set(k, e)
+    }
+  }
+  return {
+    regeln: [...jeRegel.entries()]
+      .filter(([, e]) => e.geuebt > 0)
+      .map(([schluessel, e]) => {
+        const quote = e.versuche ? e.richtig / e.versuche : 0
+        return {
+          schluessel,
+          sicher: e.sicher >= Math.min(3, e.n),
+          schwaeche: e.versuche >= MIN_VERSUCHE && quote < SCHWAECHE_UNTER,
+          staerke: e.versuche >= MIN_VERSUCHE && quote >= STAERKE_AB && e.fachSumme / e.geuebt >= 3
+        }
+      }),
+    extrasGeschafft,
+    tage: [...tage]
   }
 }

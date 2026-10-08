@@ -1,6 +1,7 @@
 /**
  * Untere Leiste im Schülerbereich auf dem Telefon (07.10.2026, abgestimmt mit der Lehrkraft nach Recherche:
- * Duolingo/Anton – große Symbol-Ziele unten im Daumenbereich): Start · Lernen · Aufgaben · Erfolge · Ich.
+ * Duolingo/Anton – große Symbol-Ziele unten im Daumenbereich): Start · Lernen · Aufgaben · Ergebnisse · Ich.
+ * („Ergebnisse" hieß bis 08.10.2026 „Erfolge" mit Pokal – gemeint sind die Ergebnisse der Onlinetests, Seite „Meine Ergebnisse".)
  *
  *  - „Aufgaben" öffnet ein Blatt von unten mit Tests, Arbeitsblättern, Aufgaben mit Feedback und Unterrichtsreihen,
  *    jeweils mit der Zahl der offenen; die Zahl aller offenen steht am Ziel.
@@ -12,7 +13,7 @@
 import { RekordKnopf } from './Rekorde'
 import { Badge, Button, Drawer, Group, Indicator, Stack, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconBook2, IconChecklist, IconHome, IconLogout, IconSettings, IconTrophy, IconUser } from '@tabler/icons-react'
+import { IconBook2, IconChecklist, IconClipboardCheck, IconHome, IconLogout, IconSettings, IconUser } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { holen } from './serverApi'
 import { ModusKnopf } from './SchuelerEinstellungen'
@@ -91,7 +92,7 @@ export default function SchuelerTabs({ abmelden }: { abmelden: () => void }): Re
             <IconChecklist size={24} />
           </Indicator>
         )}
-        {ziel('Erfolge', <IconTrophy size={24} />, aktiv(/^\/s\/ergebnisse/), '/s/ergebnisse')}
+        {ziel('Ergebnisse', <IconClipboardCheck size={24} />, aktiv(/^\/s\/(ergebnisse|e\/)/), '/s/ergebnisse')}
         {ziel('Ich', <IconUser size={24} />, aktiv(/^\/s\/einstellungen/), () => setBlatt('ich'))}
       </nav>
       <Drawer

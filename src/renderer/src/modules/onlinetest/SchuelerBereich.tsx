@@ -27,10 +27,10 @@ import { RekordKnopf } from './Rekorde'
 import { useAuffrischen } from '../../shared/auffrischen'
 import { useAufsicht, useZeitraum, vorfallSender } from './aufsicht'
 import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
-import { tuerKlick } from '../lernen/tuer'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import VokabelBeitritt from '../lernen/VokabelBeitritt'
 import {
+  ActionIcon,
   Alert,
   Anchor,
   Badge,
@@ -60,6 +60,7 @@ import {
   IconArrowRight,
   IconCheck,
   IconClock,
+  IconHome,
   IconHourglass,
   IconLogout,
   IconPlayerPlay,
@@ -98,7 +99,7 @@ import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import { holen, senden } from './serverApi'
-import { Begruessung, Lernstand, TippKarte } from './SchuelerStart'
+import { Begruessung, Lernstand, MeinLernraum, TippKarte, type NeuesMaterial } from './SchuelerStart'
 import type { LernstandAntwort } from '@shared/lernstand'
 
 interface Beitritt {
@@ -179,6 +180,21 @@ export default function SchuelerBereich(): React.JSX.Element {
   const regalAn = useDarstellung((s) => s.d.materialien) !== 'liste'
   const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln)
   const mitTabs = telefon && !gast && !fokus
+  // Kopfzeile: Startseite erkennen; Gäste sehen, wo sie sind (vorher „Schul-Apps · Vokabeltraining")
+  const aufStart = pfad === '/s/' || pfad === '/s'
+  const kopfTitel = gast
+    ? aufgabe || fbCode
+      ? 'Rückmeldung'
+      : blatt || blattCode
+      ? 'Arbeitsblatt'
+      : vokabeln || vokCode
+      ? 'Vokabeltraining'
+      : grammatik || gramCode
+      ? 'Grammatiktraining'
+      : code
+      ? 'Onlinetest'
+      : ''
+    : ''
   const inhalt = code ? (
     <TestAblauf code={code.toUpperCase()} />
   ) : fbCode ? (
@@ -248,37 +264,64 @@ export default function SchuelerBereich(): React.JSX.Element {
   return (
     // Arbeitsblätter breiter (06.10.2026): Querseiten passen so ohne starkes Verkleinern; am Tablet ohnehin volle Breite
     <Container size={blatt || reiheM ? 'lg' : 'sm'} py="md" px="md" style={{ minHeight: '100vh' }}>
-      <Group justify="space-between" mb="md">
-        <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
-          Schul-Apps
-          {gast
-            ? aufgabe || fbCode
-              ? ' · Rückmeldung'
-              : blatt || blattCode
-              ? ' · Arbeitsblatt'
-              : vokabeln || vokCode
-              ? ' · Vokabeltraining'
-              : grammatik || gramCode
-              ? ' · Grammatiktraining'
-              : code
-              ? ' · Onlinetest'
-              : ''
-            : ''}
-        </Text>
-        <Group gap={4} style={mitTabs ? { display: 'none' } : undefined}>
+      {/*
+       * Kopfzeile (08.10.2026, Befund der Lehrkraft: zurück zur Startseite ging nur über den Schriftzug „Schul-Apps" oben
+       * links – das fand niemand): ein deutlicher Knopf „Start" mit Haus, daneben der Seitentitel. Auf der Startseite
+       * selbst steht nur der Name; im laufenden Onlinetest gibt es keinen Knopf (dort zählt jedes Verlassen).
+       * Auf dem Telefon Symbole statt Wörter, damit alles in eine Zeile passt.
+       */}
+      <Group justify="space-between" mb="md" wrap="nowrap" gap="xs" data-schueler-kopf>
+        <Group gap={8} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+          {aufStart ? (
+            <Text fw={700} size="lg">
+              Schul-Apps
+            </Text>
+          ) : (
+            !code && (
+              <Button
+                component="a"
+                href="/s/"
+                variant="light"
+                radius="xl"
+                size="compact-md"
+                leftSection={<IconHome size={18} />}
+                style={{ flex: 'none' }}
+                data-start-knopf
+              >
+                Start
+              </Button>
+            )
+          )}
+          {kopfTitel && (
+            <Text fw={700} truncate data-kopf-titel>
+              {kopfTitel}
+            </Text>
+          )}
+        </Group>
+        <Group gap={4} wrap="nowrap" style={mitTabs ? { display: 'none' } : { flex: 'none' }}>
           <ModusKnopf />
           {/* Meine Rekorde (08.10.2026): links von „Einstellungen" */}
-          {(!gast || ich?.angemeldet) && <RekordKnopf />}
-          {(!gast || ich?.angemeldet) && (
-            <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
-              Einstellungen
-            </Button>
-          )}
-          {!gast && (
-            <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
-              Abmelden
-            </Button>
-          )}
+          {(!gast || ich?.angemeldet) && <RekordKnopf nurSymbol={telefon} />}
+          {(!gast || ich?.angemeldet) &&
+            (telefon ? (
+              <ActionIcon variant="subtle" size="lg" component="a" href="/s/einstellungen" aria-label="Einstellungen" data-einstellungen-knopf>
+                <IconSettings size={18} />
+              </ActionIcon>
+            ) : (
+              <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
+                Einstellungen
+              </Button>
+            ))}
+          {!gast &&
+            (telefon ? (
+              <ActionIcon variant="subtle" size="lg" onClick={() => void abmelden()} aria-label="Abmelden">
+                <IconLogout size={18} />
+              </ActionIcon>
+            ) : (
+              <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
+                Abmelden
+              </Button>
+            ))}
         </Group>
       </Group>
       {ausReihe && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
@@ -389,19 +432,23 @@ function Kachel(props: {
  */
 function Startseite(): React.JSX.Element {
   const ich = window.__schulappsServer
-  const [tests, setTests] = useState<{ code: string; titel: string; abgegeben: boolean; wartend: boolean }[] | null>(null)
+  const [tests, setTests] = useState<{ code: string; titel: string; abgegeben: boolean; wartend: boolean; fach?: string; erstellt?: string }[] | null>(null)
   const [ergebnisse, setErgebnisse] = useState<FruehereErgebnis[] | null>(null)
   const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   const [reihen, setReihen] = useState<{ id: string; titel: string; fortschritt: number; fertig: boolean }[] | null>(null)
-  const [vok, setVok] = useState<{ id: string; titel: string; uebersicht: { faellig: number; sicher: number; gesamt: number } }[] | null>(null)
+  const [vok, setVok] = useState<
+    { id: string; titel: string; fach?: string; erstellt?: string; uebersicht: { faellig: number; sicher: number; gesamt: number } }[] | null
+  >(null)
+  const [gram, setGram] = useState<{ id: string; titel: string; fach?: string; erstellt?: string }[] | null>(null)
   // Lernstand, Begrüßung und Lerntipp (06.10.2026, SchuelerStart.tsx / server/lernstand.ts)
   const [stand, setStand] = useState<LernstandAntwort | null>(null)
+  const [standFehlt, setStandFehlt] = useState(false)
   const standLaden = useCallback(
     () =>
       void holen<LernstandAntwort>('/s/api/lernstand').then(
-        (d) => setStand(d),
-        () => undefined
+        (d) => (setStand(d), setStandFehlt(false)),
+        () => setStandFehlt(true)
       ),
     []
   )
@@ -411,6 +458,10 @@ function Startseite(): React.JSX.Element {
     void holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
       (d) => setVok(d.listen ?? []),
       () => setVok([])
+    )
+    void holen<{ listen: NonNullable<typeof gram> }>('/s/api/grammatik').then(
+      (d) => setGram(d.listen ?? []),
+      () => setGram([])
     )
     void holen<{ tests: NonNullable<typeof tests> }>('/s/api/tests').then(
       (d) => setTests(d.tests ?? []),
@@ -440,7 +491,23 @@ function Startseite(): React.JSX.Element {
   const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
   const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
   const faelligeVok = vok?.filter((v) => v.uebersicht.faellig > 0) ?? []
-  const faelligGesamt = faelligeVok.reduce((n, v) => n + v.uebersicht.faellig, 0)
+  /*
+   * „Mein Lernraum" (08.10.2026, Befund der Lehrkraft): statt der wachsenden Themenbereiche die fünf neuesten
+   * Materialien jeder Art, jedes direkt zu öffnen. Erst wenn alle Listen da sind – sonst springt die Reihenfolge.
+   */
+  const neueste = useMemo((): NeuesMaterial[] | null => {
+    if (!vok || !gram || !tests || !blaetter || !aufgaben) return null
+    const zeit = (iso?: string): number => (iso ? Date.parse(iso) || 0 : 0)
+    return [
+      ...vok.map((v): NeuesMaterial => ({ art: 'vokabeln', titel: v.titel, fach: v.fach, href: `/s/v/${v.id}`, erstellt: zeit(v.erstellt) })),
+      ...gram.map((g): NeuesMaterial => ({ art: 'grammatik', titel: g.titel, fach: g.fach, href: `/s/g/${g.id}`, erstellt: zeit(g.erstellt) })),
+      ...blaetter.map((b): NeuesMaterial => ({ art: 'blatt', titel: b.titel, fach: b.fach, href: `/s/b/${b.id}`, erstellt: zeit(b.erstellt) })),
+      ...tests.map((t): NeuesMaterial => ({ art: 'test', titel: t.titel, fach: t.fach, href: `/s/t/${t.code}`, erstellt: zeit(t.erstellt) })),
+      ...aufgaben.map((a): NeuesMaterial => ({ art: 'aufgabe', titel: a.titel, fach: a.fach, href: `/s/a/${a.id}`, erstellt: zeit(a.erstellt) }))
+    ]
+      .sort((a, b) => b.erstellt - a.erstellt)
+      .slice(0, 5)
+  }, [vok, gram, tests, blaetter, aufgaben])
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
   // Das Wichtigste zuerst: ein laufender Test, dann die Reihe, dann Blätter und Aufgaben
   const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string } | null = offeneTests[0]
@@ -524,23 +591,8 @@ function Startseite(): React.JSX.Element {
         </Paper>
       )}
 
-      {stand && <Lernstand stand={stand} reihen={reihen ?? []} />}
+      {stand ? <Lernstand stand={stand} neueste={neueste} /> : standFehlt && <MeinLernraum neueste={neueste} />}
 
-      <a href="/s/lernen" className="sa-lernraum" data-kachel="lernen">
-        <div className="sa-tueren" aria-hidden>
-          <span style={{ background: 'linear-gradient(160deg,#4c6ef5,#364fc7)' }} />
-          <span style={{ background: 'linear-gradient(160deg,#12b886,#087f5b)' }} />
-          <span style={{ background: 'linear-gradient(160deg,#f76707,#d9480f)' }} />
-        </div>
-        <div style={{ position: 'relative' }}>
-          <Text fw={800} size="xl" c="white">
-            Mein Lernraum
-          </Text>
-          <Text size="sm" c="white" style={{ opacity: 0.9 }}>
-            Karteikästen und Mappen für jedes Fach{faelligGesamt ? ` · ${faelligGesamt} Vokabeln fällig` : ''}
-          </Text>
-        </div>
-      </a>
       <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md">
         <Kachel
           href="/s/tests"
@@ -640,14 +692,6 @@ html.sa-ruhig .sa-puls { animation: none; }
 .sa-kachel:hover, .sa-kachel:focus-visible { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.12); }
 .sa-kachel img { transition: transform .25s ease; }
 .sa-kachel:hover img { transform: rotate(-6deg) scale(1.06); }
-.sa-lernraum { position: relative; display: flex; align-items: center; gap: 18px; padding: 18px 22px; border-radius: 22px; text-decoration: none; overflow: hidden;
-  background: linear-gradient(120deg, #343a40 0%, #495057 100%); box-shadow: 0 10px 24px rgba(0,0,0,0.18); transition: transform .18s ease; }
-.sa-lernraum:hover { transform: translateY(-3px); }
-.sa-tueren { display: flex; gap: 8px; perspective: 400px; }
-.sa-tueren span { width: 30px; height: 50px; border-radius: 4px 4px 1px 1px; transform-origin: left center; transition: transform .5s ease; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.15); }
-.sa-lernraum:hover .sa-tueren span:nth-child(1) { transform: rotateY(-35deg); }
-.sa-lernraum:hover .sa-tueren span:nth-child(2) { transform: rotateY(-25deg); transition-delay: .05s; }
-.sa-lernraum:hover .sa-tueren span:nth-child(3) { transform: rotateY(-15deg); transition-delay: .1s; }
 .sa-blase { position: absolute; right: -30px; bottom: -40px; width: 140px; height: 140px; border-radius: 50%; opacity: 0.18; }
 @media (prefers-reduced-motion: reduce) { .sa-puls { animation: none } .sa-kachel, .sa-kachel img { transition: none } }
 `
@@ -740,6 +784,9 @@ interface BlattKurz {
   runden: number
   genutzt: number
   begonnen: boolean
+  fach?: string
+  /** Freigabe (ISO) – für „Mein Lernraum" auf der Startseite */
+  erstellt?: string
   /** Ampeln der Aufgaben (mit Feedback je Aufgabe, 05.10.2026) */
   stand?: { gruen: number; gelb: number; aufgaben: number }
 }
@@ -1020,7 +1067,6 @@ function GastStart(): React.JSX.Element {
           radius="lg"
           component="a"
           href={`${v.g ? '/s/g/' : '/s/v/'}${v.id}`}
-          onClick={tuerKlick(`${v.g ? '/s/g/' : '/s/v/'}${v.id}`, fachFarbeAus(v.fach, undefined) ?? undefined)}
           style={{ textDecoration: 'none', borderLeft: `4px solid ${fachFarbeAus(v.fach, undefined) ?? '#ea580c'}` }}
           data-gast-vokabeln={v.g ? 'grammatik' : ''}
         >
@@ -1068,7 +1114,6 @@ function GastStart(): React.JSX.Element {
           radius="lg"
           component="a"
           href={`/s/b/${b.id}`}
-          onClick={tuerKlick(`/s/b/${b.id}`, '#228be6')}
           style={{ textDecoration: 'none', borderLeft: '4px solid #228be6' }}
           data-gast-blatt
         >
@@ -2045,6 +2090,9 @@ interface AufgabeMitFeedback {
   fassungen: { nr: number; text: string; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
   /** false: abgeschlossen (nur noch nachlesen) */
   offen?: boolean
+  fach?: string
+  /** Freigabe (ISO) – für „Mein Lernraum" auf der Startseite */
+  erstellt?: string
 }
 
 function AufgabenListe({ leer }: { leer: string }): React.JSX.Element | null {

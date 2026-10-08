@@ -249,6 +249,25 @@ var warte=function(){var r=document.getElementById('root');if(!r)return;if(r.chi
 new MutationObserver(function(_,o){if(r.childElementCount){o.disconnect();requestAnimationFrame(function(){requestAnimationFrame(fertig)})}}).observe(r,{childList:true})};
 document.addEventListener('DOMContentLoaded',warte);setTimeout(fertig,10000)}catch(e){}})();`
 
+/*
+ * Wohin nach der Anmeldung (03.10.2026, Befund der Lehrkraft: nach dem Abmelden auf der Schülerseite landete der Admin
+ * wieder auf der Schüler-Startseite). Lernende nur in ihren Bereich.
+ *
+ * Lehrkraft-Ansicht als Vorgabe (08.10.2026, Befund der Lehrkraft: nach der Anmeldung landete sie im Schülerbereich).
+ * Ursache: Nur fünf Seiten des Schülerbereichs wurden auf „/" umgebogen – jede andere (/s/lernen, /s/einstellungen,
+ * /s/ordner/…, /s/v/…, die Rückkehr nach einer abgelaufenen Sitzung mit „ziel=<aktuelle Seite>") blieb Ziel. Jetzt
+ * führt jedes Ziel im Schülerbereich Lehrkräfte in die App; nur ausdrückliche Code-Links (QR: Test, Blatt, Aufgabe,
+ * Reihe, Vokabel-/Grammatiktraining) bleiben – die öffnet eine Lehrkraft bewusst.
+ */
+export const zielNachAnmeldung = (rolle: string, z: string): string =>
+  rolle === 'schueler'
+    ? z.startsWith('/s/')
+      ? z
+      : '/s/'
+    : (z === '/s' || z.startsWith('/s/')) && !/^\/s\/(?:[tfw]|vt|gt|rq)\/[A-Za-z0-9]{4,12}\/?$/.test(z)
+    ? '/'
+    : z
+
 /** Die Seite der Programme mit dem Skript, das den angemeldeten Nutzer bekannt macht */
 const seitenZwischenspeicher = new Map<boolean, { mtime: number; html: string }>()
 function programmSeite(fuerSchueler = false): string {
@@ -446,14 +465,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         return void res.end()
       }
     }
-    /*
-     * Wohin nach der Anmeldung (03.10.2026, Befund der Lehrkraft: nach dem Abmelden auf der
-     * Schülerseite landete der Admin wieder auf der Schüler-Startseite – „/s/" stand als Ziel in der
-     * Anmeldeseite). Lernende nur in ihren Bereich; Lehrkräfte von der Schüler-Startseite zurück zur
-     * App, Links zu einem bestimmten Test (/s/t/…) bleiben.
-     */
-    const zielFuer = (rolle: string, z: string): string =>
-      rolle === 'schueler' ? (z.startsWith('/s/') ? z : '/s/') : /^\/s\/?$|^\/s\/(tests|ergebnisse|aufgaben|blaetter|reihen)\/?$/.test(z) ? '/' : z
+    const zielFuer = zielNachAnmeldung
     if (req.method === 'GET' && url.pathname === '/auth/rueckruf') {
       try {
         const fehlerVonIserv = url.searchParams.get('error')
@@ -541,7 +553,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       if (fehler) return void res.writeHead(303, { location: `/passwort?fehler=${encodeURIComponent(fehler)}&ziel=${encodeURIComponent(ziel)}` }).end()
       nutzerAendern(sitzung.nutzer.id, { passwortHash: passwortHash(neu), passwortWechseln: false })
       protokolliereServer('anmeldung', 'Eigenes Passwort gesetzt', sitzung.nutzer.id)
-      return void res.writeHead(303, { location: sitzung.nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel }).end()
+      return void res.writeHead(303, { location: zielFuer(sitzung.nutzer.rolle, ziel) }).end()
     }
     // ---------- Passwort ändern aus den Einstellungen (Lehrkraft, Admin, Lernende; 03.10.2026)
     if (req.method === 'POST' && url.pathname === '/konto/passwort') {
@@ -621,6 +633,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           ),
           // „Lege das Wort": legen, tippen oder schreiben; Meine Materialien als Regal oder Liste, eigene Ordnerreihenfolge (08.10.2026)
           legen: wahl(k0.legen, ['legen', 'tippen', 'schreiben'], 'legen'),
+          // „Dein Vokabelweg" auf- oder zugeklappt (08.10.2026)
+          vokabelwegOffen: k0.vokabelwegOffen === true,
           materialien: wahl(k0.materialien, ['regal', 'liste'], 'regal'),
           regal: (Array.isArray(k0.regal) ? k0.regal : [])
             .filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 60)
@@ -776,6 +790,21 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       // Schülerinnen und Schüler sehen nur ihren Bereich
       if (istSchueler && !url.pathname.startsWith('/assets/') && !url.pathname.startsWith('/s/')) {
         res.writeHead(302, { location: '/s/' })
+        return void res.end()
+      }
+      /*
+       * Lehrkräfte auf der Schüler-Startseite (08.10.2026): als Hauptseite geöffnet (gemerkte Seite, Web-App vom
+       * Home-Bildschirm, Rückweg „/s/") gleich zur Lehrkraft-Ansicht. Nicht im Vorschaufenster (läuft im iframe bzw. mit
+       * Vorschau-Schlüssel) und nicht mit einem Code aus „Mit Code öffnen" (/s/?code=…).
+       */
+      if (
+        !istSchueler &&
+        !inVorschau &&
+        (url.pathname === '/s/' || url.pathname === '/s') &&
+        !url.searchParams.has('code') &&
+        req.headers['sec-fetch-dest'] === 'document'
+      ) {
+        res.writeHead(302, { location: '/', 'cache-control': 'no-store' })
         return void res.end()
       }
       return statisch(res, decodeURIComponent(url.pathname))

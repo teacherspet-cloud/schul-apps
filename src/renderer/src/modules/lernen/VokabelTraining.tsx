@@ -68,6 +68,20 @@ import { useAppSettings } from '../../shared/settingsStore'
 import { fachFarbe } from '../../shared/fachfarben'
 import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from './GrammatikTraining'
 import { lehrwerkeMitGrammatik } from '../arbeitsblatt/didactics/grammatikAuswahl'
+import { LEHRWERK_GRAMMATIK } from '../../shared/lehrwerkGrammatik'
+import {
+  AMPEL_NAME,
+  ampelVon,
+  bandVon,
+  BEREICHE,
+  bereichName,
+  bereichVonRegel,
+  empfehlung,
+  langeNichtGeuebt,
+  lehrwerkStelle,
+  stellenRang,
+  type Ampel
+} from '@shared/grammatikBereiche'
 
 /**
  * Grammatik zu einem Vokabeltraining (08.10.2026, abgestimmt): Empfänger fest = dessen Lernende; Band und Unit der
@@ -85,7 +99,7 @@ export function grammatikVorgabe(vokId: string, titel: string, sprache: string, 
   return { vokId, titel, sprache, ...(buch ? { lehrwerk: { buch, unit: quelle?.unit } } : {}) }
 }
 import { Zugang } from '../onlinetest/OnlinetestModule'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -824,6 +838,25 @@ function useGemerkt(schluessel: string, vorgabe: boolean): [boolean, (v: boolean
   }
   return [wert, setzen]
 }
+/** Wie useGemerkt, aber mit Text (gewählte Ansicht) */
+function useGemerktText(schluessel: string, vorgabe: string): [string, (v: string) => void] {
+  const [wert, setWert] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`schulapps-${schluessel}`) ?? vorgabe
+    } catch {
+      return vorgabe
+    }
+  })
+  const setzen = (v: string): void => {
+    setWert(v)
+    try {
+      localStorage.setItem(`schulapps-${schluessel}`, v)
+    } catch {
+      /* ohne Speicher nur für jetzt */
+    }
+  }
+  return [wert, setzen]
+}
 
 /** Kopf eines auf- und zuklappbaren Kastens */
 function KastenKopf({
@@ -858,32 +891,16 @@ const prozent = (p: { quote: number }): string => `${Math.round(p.quote * 100)} 
 const regelnVon = (l: Lernende): ProfilPunkt[] => l.grammatik?.regeln ?? [...(l.grammatik?.schwaechen ?? []), ...(l.grammatik?.staerken ?? [])]
 const regelVon = (l: Lernende, titel: string): ProfilPunkt | undefined => regelnVon(l).find((p) => p.titel === titel)
 
-/** Zelle „Grammatik" (08.10.2026, kompakt): Zahl der Schwächen/Stärken und laufende Extra-Aufgaben als Plaketten */
-function GrammatikZelle({ l }: { l: Lernende }): React.JSX.Element {
-  const g = l.grammatik
-  if (!g || (!g.schwaechen.length && !g.staerken.length && !g.extra.length))
-    return (
-      <Text size="xs" c="dimmed">
-        noch zu wenig geübt
-      </Text>
-    )
+const AMPEL_FARBE: Record<Ampel, string> = { sicher: 'teal', aufbau: 'yellow', schwaeche: 'red', wenig: 'gray' }
+const datum = (ms?: number): string => (ms ? new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '–')
+
+/** Laufende Extra-Aufgaben einer Person als kleine Plaketten (08.10.2026) */
+function ExtraPlaketten({ l }: { l: Lernende }): React.JSX.Element | null {
+  const extra = l.grammatik?.extra ?? []
+  if (!extra.length) return null
   return (
     <Group gap={4}>
-      {g.schwaechen.length > 0 && (
-        <Tooltip label={g.schwaechen.map((p) => `${p.titel} (${prozent(p)})`).join(' · ')} multiline maw={320}>
-          <Badge size="sm" variant="light" color="orange" tt="none" data-schwaechen={g.schwaechen.map((p) => p.titel).join(' · ')}>
-            {g.schwaechen.length} {g.schwaechen.length === 1 ? 'Schwäche' : 'Schwächen'}
-          </Badge>
-        </Tooltip>
-      )}
-      {g.staerken.length > 0 && (
-        <Tooltip label={g.staerken.map((p) => `${p.titel} (${prozent(p)})`).join(' · ')} multiline maw={320}>
-          <Badge size="sm" variant="light" color="teal" tt="none" data-staerken={g.staerken.map((p) => p.titel).join(' · ')}>
-            {g.staerken.length} {g.staerken.length === 1 ? 'Stärke' : 'Stärken'}
-          </Badge>
-        </Tooltip>
-      )}
-      {g.extra.map((x) => (
+      {extra.map((x) => (
         <Tooltip key={x.id} label={x.titel}>
           <Badge size="sm" variant="outline" color={x.bearbeitet >= x.gesamt ? 'teal' : 'gray'} tt="none" data-extra-stand={x.id}>
             {x.art === 'foerder' ? 'Förderung' : 'Forderung'} {x.bearbeitet >= x.gesamt ? 'geschafft' : `${x.bearbeitet}/${x.gesamt}`}
@@ -894,113 +911,360 @@ function GrammatikZelle({ l }: { l: Lernende }): React.JSX.Element {
   )
 }
 
-/** Aufgeklappte Zeile (08.10.2026): Schwächen mit typischen Fehlern, Stärken, Extra-Aufgaben – Fördern/Fordern je Regel */
-function LernendeDetails({
+/** Wo im Lehrwerk eine Regel eingeführt wurde: Band/Unit der Freigabe, sonst aus den Kennungen und dem Band des Kurses */
+function stelleVon(p: ProfilPunkt, band: string | undefined): { text: string; rang: number } | null {
+  if (p.lehrwerk && LEHRWERK_GRAMMATIK[p.lehrwerk.buch]?.[p.lehrwerk.unit]) {
+    const rang = stellenRang(p.lehrwerk.buch, p.lehrwerk.unit, LEHRWERK_GRAMMATIK)
+    if (rang !== null) return { text: `${p.lehrwerk.buch} · ${p.lehrwerk.unit}`, rang }
+  }
+  const s = lehrwerkStelle(p.kennungen ?? [], band ?? (p.lehrwerk ? bandVon(p.lehrwerk.buch, LEHRWERK_GRAMMATIK) : undefined), LEHRWERK_GRAMMATIK)
+  return s ? { text: `${s.buch} · ${s.unit}`, rang: s.rang } : null
+}
+
+type DetailFilter = Ampel | 'alt' | null
+
+/**
+ * Details je Lernende/r (08.10.2026, abgestimmt): großes Fenster für viele Grammatikregeln über die Jahre. Oben die
+ * Zahlen als Filter, darunter nach Bereichen (Schwächen zuerst und aufgeklappt, alles Sichere zugeklappt) oder
+ * chronologisch nach Lehrwerk-Units; je Regel Ampel, Anteil richtig, Versuche, zuletzt geübt, Unit, typische Fehler und
+ * Fördern/Fordern genau für diese Regel.
+ */
+function GrammatikDetails({
   l,
-  spalten,
-  starten
+  name,
+  band,
+  starten,
+  schliessen
 }: {
   l: Lernende
-  spalten: number
+  name: string
+  band: string | undefined
   starten: (art: 'foerder' | 'forder', regel: string) => void
+  schliessen: () => void
 }): React.JSX.Element {
-  const g = l.grammatik
-  const punkt = (p: ProfilPunkt, art: 'foerder' | 'forder'): React.JSX.Element => (
-    <Group key={p.titel} justify="space-between" wrap="nowrap" align="flex-start" gap="xs">
-      <div>
-        <Text size="sm">
-          <b>{p.titel}</b>{' '}
-          <Text span size="xs" c="dimmed">
-            {prozent(p)} richtig · {p.versuche} Versuche
+  const [filter, setFilter] = useState<DetailFilter>(null)
+  const [ansicht, setAnsicht] = useGemerktText('vok-details-ansicht', 'bereiche')
+  const [umgeschaltet, setUmgeschaltet] = useState<Record<string, boolean>>({})
+  const jetzt = Date.now()
+  const regeln = regelnVon(l).map((p) => ({ p, a: ampelVon(p), b: bereichVonRegel(p.titel, p.kennungen ?? []), s: stelleVon(p, band) }))
+  const zahl = (f: Exclude<DetailFilter, null>): number => regeln.filter((r) => (f === 'alt' ? langeNichtGeuebt(r.p.zuletzt, jetzt) : r.a === f)).length
+  const passt = (r: (typeof regeln)[number]): boolean => !filter || (filter === 'alt' ? langeNichtGeuebt(r.p.zuletzt, jetzt) : r.a === filter)
+  const chips: { f: Exclude<DetailFilter, null>; text: string; farbe: string }[] = [
+    { f: 'sicher', text: 'Sicher', farbe: 'teal' },
+    { f: 'aufbau', text: 'im Aufbau', farbe: 'yellow' },
+    { f: 'schwaeche', text: 'Schwäche', farbe: 'red' },
+    { f: 'alt', text: 'seit 3 Wochen nicht geübt', farbe: 'gray' },
+    ...(zahl('wenig') ? [{ f: 'wenig' as const, text: 'zu wenig geübt', farbe: 'gray' }] : [])
+  ]
+  // Gruppen: Bereiche (Schwächen zuerst, sonst feste Reihenfolge) oder Lehrwerk-Units (chronologisch, ohne Stelle zuletzt)
+  const gruppen = new Map<string, { titel: string; rang: number; zeilen: typeof regeln }>()
+  for (const r of regeln) {
+    const schluessel = ansicht === 'units' ? (r.s?.text ?? '') : r.b
+    const g = gruppen.get(schluessel) ?? {
+      titel: ansicht === 'units' ? (r.s?.text ?? 'ohne Lehrwerk-Stelle') : bereichName(r.b),
+      rang: ansicht === 'units' ? (r.s?.rang ?? Number.MAX_SAFE_INTEGER) : BEREICHE.findIndex((x) => x.id === r.b),
+      zeilen: []
+    }
+    g.zeilen.push(r)
+    gruppen.set(schluessel, g)
+  }
+  const liste = [...gruppen.entries()]
+    .map(([k, g]) => ({ k, ...g, schwach: g.zeilen.some((r) => r.a === 'schwaeche'), alleSicher: g.zeilen.every((r) => r.a === 'sicher') }))
+    .sort((x, y) => (ansicht === 'units' ? 0 : Number(y.schwach) - Number(x.schwach)) || x.rang - y.rang)
+  const istOffen = (g: (typeof liste)[number]): boolean => (filter ? true : (umgeschaltet[g.k] ?? !g.alleSicher))
+  const regelZeile = (r: (typeof regeln)[number]): React.JSX.Element => {
+    const { p, a } = r
+    return (
+      <Table.Tr key={p.titel} data-regel-zeile={p.titel} data-ampel={a}>
+        <Table.Td style={{ width: 22 }}>
+          <Tooltip label={AMPEL_NAME[a]}>
+            <div style={{ width: 12, height: 12, borderRadius: 6, background: `var(--mantine-color-${AMPEL_FARBE[a]}-6)` }} />
+          </Tooltip>
+        </Table.Td>
+        <Table.Td>
+          <Text size="sm" fw={600}>
+            {p.titel}
           </Text>
-        </Text>
-        {art === 'foerder' && p.fehler.length > 0 && (
-          <Text size="xs" c="dimmed">
-            Typische Fehler:{' '}
-            {p.fehler.slice(-3).map((f, i) => (
-              <span key={i}>
-                {i > 0 && ' · '}
-                <Text span size="xs" c="red" td="line-through">
-                  {f.antwort || '(leer)'}
-                </Text>{' '}
-                →{' '}
-                <Text span size="xs" c="teal" fw={600}>
-                  {f.richtig}
-                </Text>
-              </span>
-            ))}
+          {p.fehler.length > 0 && (
+            <Text size="xs" c="dimmed" data-regel-fehler>
+              {p.fehler.slice(-3).map((f, i) => (
+                <span key={i}>
+                  {i > 0 && ' · '}
+                  <Text span size="xs" c="red" td="line-through">
+                    {f.antwort || '(leer)'}
+                  </Text>{' '}
+                  →{' '}
+                  <Text span size="xs" c="teal" fw={600}>
+                    {f.richtig}
+                  </Text>
+                </span>
+              ))}
+            </Text>
+          )}
+        </Table.Td>
+        <Table.Td>{prozent(p)}</Table.Td>
+        <Table.Td>{p.versuche}</Table.Td>
+        <Table.Td>
+          <Text size="sm" c={langeNichtGeuebt(p.zuletzt, jetzt) ? 'orange' : undefined}>
+            {datum(p.zuletzt)}
           </Text>
+        </Table.Td>
+        {ansicht !== 'units' && (
+          <Table.Td>
+            <Text size="xs" c="dimmed">
+              {r.s?.text ?? '–'}
+            </Text>
+          </Table.Td>
         )}
-      </div>
+        <Table.Td>
+          <Group gap={4} wrap="nowrap" justify="flex-end">
+            <Button
+              size="compact-xs"
+              variant={a === 'schwaeche' ? 'filled' : 'light'}
+              color="orange"
+              disabled={a !== 'schwaeche' && a !== 'aufbau'}
+              onClick={() => (starten('foerder', p.titel), schliessen())}
+              data-regel-extra={`foerder:${p.titel}`}
+            >
+              Fördern
+            </Button>
+            <Button
+              size="compact-xs"
+              variant={a === 'sicher' ? 'filled' : 'light'}
+              color="teal"
+              disabled={a !== 'sicher'}
+              onClick={() => (starten('forder', p.titel), schliessen())}
+              data-regel-extra={`forder:${p.titel}`}
+            >
+              Fordern
+            </Button>
+          </Group>
+        </Table.Td>
+      </Table.Tr>
+    )
+  }
+  return (
+    <Stack gap="sm" data-lernende-details={l.name}>
+      {!regeln.length ? (
+        <Text size="sm" c="dimmed">
+          Noch keine Grammatik geübt – ein Befund erscheint ab 5 Versuchen je Regel.
+        </Text>
+      ) : (
+        <>
+          <Group justify="space-between" gap="xs">
+            <Group gap={6} data-details-zahlen>
+              {chips.map((c) => (
+                <Button
+                  key={c.f}
+                  size="compact-sm"
+                  radius="xl"
+                  variant={filter === c.f ? 'filled' : 'light'}
+                  color={c.farbe}
+                  onClick={() => setFilter(filter === c.f ? null : c.f)}
+                  aria-pressed={filter === c.f}
+                  data-details-filter={c.f}
+                >
+                  {c.text} {zahl(c.f)}
+                </Button>
+              ))}
+            </Group>
+            <SegmentedControl
+              size="xs"
+              value={ansicht}
+              onChange={setAnsicht}
+              data={[
+                { value: 'bereiche', label: 'nach Bereichen' },
+                { value: 'units', label: 'nach Lehrwerk-Units' }
+              ]}
+              data-details-ansicht
+            />
+          </Group>
+          {ansicht === 'units' && !band && (
+            <Text size="xs" c="dimmed">
+              Kein Lehrwerk mit Grammatikliste am Kurs – nur Freigaben mit Band und Unit haben eine Stelle.
+            </Text>
+          )}
+          {liste.map((g) => {
+            const zeilen = g.zeilen.filter(passt)
+            if (filter && !zeilen.length) return null
+            const n = (a: Ampel): number => g.zeilen.filter((r) => r.a === a).length
+            const offen = istOffen(g)
+            return (
+              <Card key={g.k} withBorder padding="sm" data-details-gruppe={g.titel}>
+                <UnstyledButton
+                  onClick={() => setUmgeschaltet({ ...umgeschaltet, [g.k]: !offen })}
+                  aria-expanded={offen}
+                  disabled={Boolean(filter)}
+                  data-details-gruppe-kopf={g.titel}
+                >
+                  <Group justify="space-between" wrap="nowrap" gap="sm">
+                    <Group gap="xs" wrap="nowrap">
+                      <IconChevronDown size={16} style={{ transform: offen ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
+                      <Text fw={700}>{g.titel}</Text>
+                    </Group>
+                    <Group gap="sm" wrap="nowrap">
+                      <Progress.Root size={10} w={140} radius="xl">
+                        {(['sicher', 'aufbau', 'schwaeche', 'wenig'] as const).map((a) => (
+                          <Progress.Section key={a} value={(n(a) / g.zeilen.length) * 100} color={AMPEL_FARBE[a]} />
+                        ))}
+                      </Progress.Root>
+                      <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }} data-gruppe-sicher={`${n('sicher')}/${g.zeilen.length}`}>
+                        {n('sicher')} von {g.zeilen.length} sicher
+                      </Text>
+                    </Group>
+                  </Group>
+                </UnstyledButton>
+                {offen && (
+                  <Table.ScrollContainer minWidth={640} mt="xs">
+                    <Table verticalSpacing={4}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th />
+                          <Table.Th>Regel · typische Fehler</Table.Th>
+                          <Table.Th>richtig</Table.Th>
+                          <Table.Th>Versuche</Table.Th>
+                          <Table.Th>zuletzt</Table.Th>
+                          {ansicht !== 'units' && <Table.Th>Lehrwerk</Table.Th>}
+                          <Table.Th />
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>{zeilen.map(regelZeile)}</Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                )}
+              </Card>
+            )
+          })}
+        </>
+      )}
+      {(l.grammatik?.extra.length ?? 0) > 0 && (
+        <div>
+          <Text size="xs" fw={700} mb={4}>
+            Extra-Aufgaben von {name}
+          </Text>
+          <ExtraPlaketten l={l} />
+        </div>
+      )}
+    </Stack>
+  )
+}
+
+/** Befund einer Person für Filter und Hinweis */
+const befundVon = (l: Lernende): string => {
+  const e = empfehlung(regelnVon(l))
+  return e.art === 'foerder' ? 'braucht Förderung' : e.art === 'forder' ? 'braucht Forderung' : regelnVon(l).length ? 'im Aufbau' : 'zu wenig geübt'
+}
+
+/**
+ * Reiter „Grammatik" (08.10.2026, abgestimmt): Name | Details | Fördern | Fordern. Empfohlen wird mit Grund – mindestens
+ * eine Schwäche: Fördern hervorgehoben („2 Schwächen", Vorrang auch bei Stärken), sonst mindestens eine Stärke: Fordern
+ * („3 Stärken, keine Schwäche"), sonst beide gedämpft („erst mehr üben").
+ */
+function GrammatikTabelle({
+  lernende,
+  anzeige,
+  extra,
+  details
+}: {
+  lernende: Lernende[]
+  anzeige: (l: Lernende) => string
+  extra: (l: Lernende, art: 'foerder' | 'forder') => void
+  details: (l: Lernende) => void
+}): React.JSX.Element {
+  const spalten: Spalte<Lernende>[] = [
+    { id: 'name', label: 'Name', wert: (l) => anzeige(l).toLowerCase(), filterWert: anzeige, filter: 'text' },
+    { id: 'details', label: 'Details', wert: (l) => regelnVon(l).length, filter: 'auswahl', filterWert: befundVon, absteigend: true },
+    { id: 'foerdern', label: 'Fördern', wert: (l) => empfehlung(regelnVon(l)).schwaechen, absteigend: true },
+    { id: 'fordern', label: 'Fordern', wert: (l) => empfehlung(regelnVon(l)).staerken, absteigend: true }
+  ]
+  const t = useSortierTabelle(lernende, spalten, { spalte: 'name', ab: false })
+  const knopf = (l: Lernende, art: 'foerder' | 'forder'): React.JSX.Element => {
+    const e = empfehlung(regelnVon(l))
+    const punkte = (art === 'foerder' ? l.grammatik?.schwaechen : l.grammatik?.staerken) ?? []
+    const empfohlen = e.art === art
+    const titel = regelnVon(l)
+      .filter((p) => ampelVon(p) === (art === 'foerder' ? 'schwaeche' : 'sicher'))
+      .map((p) => p.titel)
+    const b = (
       <Button
-        size="compact-xs"
-        variant="light"
+        size="compact-sm"
+        variant={empfohlen ? 'filled' : 'light'}
         color={art === 'foerder' ? 'orange' : 'teal'}
-        onClick={() => starten(art, p.titel)}
-        data-regel-extra={`${art}:${p.titel}`}
-        style={{ flexShrink: 0 }}
+        disabled={!punkte.length}
+        onClick={() => extra(l, art)}
+        data-foerdern={art === 'foerder' ? l.name : undefined}
+        data-fordern={art === 'forder' ? l.name : undefined}
+        data-empfohlen={empfohlen || undefined}
       >
         {art === 'foerder' ? 'Fördern' : 'Fordern'}
       </Button>
-    </Group>
-  )
-  return (
-    <Table.Tr data-lernende-details={l.name}>
-      <Table.Td colSpan={spalten} style={{ background: 'var(--mantine-color-default-hover)' }}>
-        {!g || (!g.schwaechen.length && !g.staerken.length && !g.extra.length) ? (
-          <Text size="sm" c="dimmed">
-            Noch zu wenig Grammatik geübt – ein Befund erscheint ab 5 Versuchen je Regel.
-          </Text>
+    )
+    return (
+      <Stack gap={2} align="flex-start">
+        {punkte.length ? (
+          b
         ) : (
-          <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
-            <Stack gap={6} data-details-schwaechen>
-              <Text size="xs" fw={700} c="orange">
-                Schwächen
-              </Text>
-              {g.schwaechen.length ? (
-                g.schwaechen.map((p) => punkt(p, 'foerder'))
-              ) : (
-                <Text size="xs" c="dimmed">
-                  keine
-                </Text>
-              )}
-            </Stack>
-            <Stack gap={6} data-details-staerken>
-              <Text size="xs" fw={700} c="teal">
-                Stärken
-              </Text>
-              {g.staerken.length ? (
-                g.staerken.map((p) => punkt(p, 'forder'))
-              ) : (
-                <Text size="xs" c="dimmed">
-                  keine
-                </Text>
-              )}
-            </Stack>
-            <Stack gap={6}>
-              <Text size="xs" fw={700}>
-                Extra-Aufgaben
-              </Text>
-              {g.extra.length ? (
-                g.extra.map((x) => (
-                  <Text key={x.id} size="sm">
-                    {x.art === 'foerder' ? 'Förderung' : 'Forderung'}: {x.titel}{' '}
-                    <Text span size="xs" c={x.bearbeitet >= x.gesamt ? 'teal' : 'dimmed'}>
-                      {x.bearbeitet >= x.gesamt ? 'geschafft' : `${x.bearbeitet} von ${x.gesamt} bearbeitet`}
-                      {x.status !== 'offen' ? ' · beendet' : ''}
-                    </Text>
-                  </Text>
-                ))
-              ) : (
-                <Text size="xs" c="dimmed">
-                  keine
-                </Text>
-              )}
-            </Stack>
-          </SimpleGrid>
+          <Tooltip
+            label={
+              e.art === null
+                ? 'Noch kein Befund – ab 5 Versuchen je Regel'
+                : art === 'foerder'
+                  ? 'Keine Schwäche (unter 60 % richtig)'
+                  : 'Keine Stärke (ab 85 % richtig und gefestigt)'
+            }
+          >
+            <span>{b}</span>
+          </Tooltip>
         )}
-      </Table.Td>
-    </Table.Tr>
+        {empfohlen && (
+          <Text
+            size="xs"
+            c={art === 'foerder' ? 'orange' : 'teal'}
+            fw={600}
+            data-schwaechen={art === 'foerder' ? titel.join(' · ') : undefined}
+            data-staerken={art === 'forder' ? titel.join(' · ') : undefined}
+          >
+            {e.text}
+          </Text>
+        )}
+        {e.art === null && art === 'foerder' && (
+          <Text size="xs" c="dimmed" data-befund-offen>
+            {e.text}
+          </Text>
+        )}
+      </Stack>
+    )
+  }
+  return (
+    <>
+      <AktiveFilter spalten={spalten} tabelle={t} />
+      <Table mt="xs" verticalSpacing="xs" data-grammatik-tabelle>
+        <Table.Thead>
+          <Table.Tr>
+            {spalten.map((sp) => (
+              <SortKopf key={sp.id} spalte={sp} tabelle={t} />
+            ))}
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {t.sichtbar.map((l) => (
+            <Table.Tr key={l.id} data-grammatik-profil={anzeige(l)}>
+              <Table.Td>{anzeige(l)}</Table.Td>
+              <Table.Td>
+                <Group gap="xs">
+                  <Button size="compact-sm" variant="default" onClick={() => details(l)} data-grammatik-details={l.name}>
+                    Details
+                  </Button>
+                  <ExtraPlaketten l={l} />
+                </Group>
+              </Table.Td>
+              <Table.Td>{knopf(l, 'foerder')}</Table.Td>
+              <Table.Td>{knopf(l, 'forder')}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </>
   )
 }
 
@@ -1133,8 +1397,9 @@ function GrammatikMatrix({
 
 /**
  * Je Lernende/r (08.10.2026, Wunsch der Lehrkraft): auf- und zuklappbar, Namen ausblendbar (etwa am Beamer),
- * sortier- und filterbar; statt der Übungstage die in 7 Tagen neu gelernten und wiederholten Vokabeln. Grammatik
- * kompakt, Fördern/Fordern in eigener Spalte, Einzelheiten per Klick auf die Zeile; daneben die Grammatik-Übersicht.
+ * sortier- und filterbar; statt der Übungstage die in 7 Tagen neu gelernten und wiederholten Vokabeln. Reiter
+ * „Lernende" nur mit den Vokabeln; „Grammatik" mit Details je Person und Fördern/Fordern (abgestimmt 08.10.2026);
+ * „Übersicht" = Lernende × Regeln.
  */
 function LernendeTabelle({
   lernende,
@@ -1145,12 +1410,20 @@ function LernendeTabelle({
   lernende: Lernende[]
   gastZeigen: (l: Lernende) => void
   entfernen: (l: Lernende) => void
-  kurs: { id: string; fach: string; sprache: string; lerngruppe: string; woerter: { term: string; translation: string }[] }
+  kurs: {
+    id: string
+    fach: string
+    sprache: string
+    lerngruppe: string
+    woerter: { term: string; translation: string }[]
+    quelle?: { lehrwerk?: string; unit?: string } | null
+    lerngruppeId?: string
+  }
 }): React.JSX.Element {
   /*
    * Förder-/Forderaufgaben (08.10.2026, abgestimmt): für das eine Kind; wer dieselbe Schwäche bzw. Stärke hat, wird im
    * Prüf-Fenster angeboten. Bekannte Grammatik = die Grammatik dieses Kurses und die Regeln aus den Profilen. Mit `regel`
-   * nur diese eine Regel (aus den Einzelheiten oder der Grammatik-Übersicht).
+   * nur diese eine Regel (aus den Details oder der Übersicht).
    */
   const extra = async (l: Lernende, art: 'foerder' | 'forder', regel?: string): Promise<void> => {
     const einzeln = regel ? regelVon(l, regel) : undefined
@@ -1184,15 +1457,23 @@ function LernendeTabelle({
   }
   const [offen, setOffen] = useGemerkt('vok-lernende-offen', true)
   const [ohneNamen, setOhneNamen] = useGemerkt('vok-lernende-ohne-namen', false)
-  const [matrix, setMatrix] = useGemerkt('vok-lernende-matrix', false)
-  const [auf, setAuf] = useState<Set<string>>(new Set())
-  const umklappen = (id: string): void =>
-    setAuf((s) => {
-      const n = new Set(s)
-      if (n.has(id)) n.delete(id)
-      else n.add(id)
-      return n
-    })
+  const [ansicht, setAnsicht] = useGemerktText('vok-lernende-ansicht', 'liste')
+  const [detailsFuer, setDetailsFuer] = useState<string | null>(null)
+  // Band des Kurses für die Units-Ansicht: aus der Vokabelquelle, sonst der Lehrwerk-Stand der Lerngruppe („Meine Klassen")
+  const bandQuelle = kurs.quelle?.lehrwerk ? bandVon(kurs.quelle.lehrwerk, LEHRWERK_GRAMMATIK) : undefined
+  const [bandStand, setBandStand] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (bandQuelle || !kurs.lerngruppeId || detailsFuer === null) return
+    let aus = false
+    void holen<{ stand: { buch: string } | null; automatisch: { buch: string } | null }>(
+      `/server/grammatik/lehrwerkstand?gruppe=${encodeURIComponent(kurs.lerngruppeId)}`
+    )
+      .then((r) => !aus && setBandStand(r.stand?.buch ?? r.automatisch?.buch))
+      .catch(() => undefined)
+    return () => {
+      aus = true
+    }
+  }, [bandQuelle, kurs.lerngruppeId, detailsFuer])
   // Ersatzname je Person bleibt beim Sortieren gleich (Reihenfolge nach Namen)
   const nummer = new Map([...lernende].sort((a, b) => a.name.localeCompare(b.name, 'de')).map((l, i) => [l.id, i + 1]))
   const anzeige = (l: Lernende): string => (ohneNamen ? `Lernende/r ${nummer.get(l.id)}` : l.name)
@@ -1203,18 +1484,10 @@ function LernendeTabelle({
       label: 'Karteikasten',
       wert: (l) => (l.uebersicht.gesamt ? (l.uebersicht.gesamt - l.uebersicht.neu) / l.uebersicht.gesamt : 0),
       absteigend: true,
-      breite: '28%'
+      breite: '32%'
     },
     { id: 'sicher', label: 'sicher', wert: (l) => l.uebersicht.sicher, absteigend: true },
     { id: 'faellig', label: 'fällig', wert: (l) => l.uebersicht.faellig, absteigend: true },
-    {
-      id: 'grammatik',
-      label: 'Grammatik',
-      wert: (l) => (l.grammatik?.schwaechen.length ?? 0) * 10 + (l.grammatik?.staerken.length ?? 0),
-      filter: 'auswahl',
-      filterWert: (l) => (l.grammatik?.schwaechen.length ? 'mit Schwächen' : l.grammatik?.staerken.length ? 'nur Stärken' : 'ohne Befund'),
-      absteigend: true
-    },
     {
       id: 'woche',
       label: 'geübt (7 Tage)',
@@ -1225,9 +1498,8 @@ function LernendeTabelle({
     }
   ]
   const t = useSortierTabelle(lernende, spalten, { spalte: 'name', ab: false })
-  // Pfeil + Datenspalten + Aktionen
-  const spaltenZahl = spalten.length + 2
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
+  const detailsPerson = lernende.find((l) => l.id === detailsFuer)
   return (
     <Card withBorder data-lernende-kasten>
       <KastenKopf
@@ -1246,145 +1518,121 @@ function LernendeTabelle({
           <SegmentedControl
             mt="xs"
             size="xs"
-            value={matrix ? 'matrix' : 'liste'}
-            onChange={(v) => setMatrix(v === 'matrix')}
+            value={ansicht === 'matrix' || ansicht === 'grammatik' ? ansicht : 'liste'}
+            onChange={setAnsicht}
             data={[
               { value: 'liste', label: 'Lernende' },
-              { value: 'matrix', label: 'Grammatik-Übersicht' }
+              { value: 'grammatik', label: 'Grammatik' },
+              { value: 'matrix', label: 'Übersicht' }
             ]}
             data-lernende-ansicht
           />
-          {matrix ? (
+          {ansicht === 'matrix' ? (
             <GrammatikMatrix lernende={lernende} anzeige={anzeige} starten={(l, art, regel) => void extra(l, art, regel)} />
+          ) : ansicht === 'grammatik' ? (
+            <GrammatikTabelle lernende={lernende} anzeige={anzeige} extra={(l, art) => void extra(l, art)} details={(l) => setDetailsFuer(l.id)} />
           ) : (
             <>
               <AktiveFilter spalten={spalten} tabelle={t} />
               <Table data-karten mt="xs" data-lernende-tabelle>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th style={{ width: 28 }} />
                     {spalten.map((sp) => (
                       <SortKopf key={sp.id} spalte={sp} tabelle={t} />
                     ))}
-                    <Table.Th style={{ width: 196 }} />
+                    <Table.Th style={{ width: 40 }} />
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {t.sichtbar.map((l) => {
-                    const istAuf = auf.has(l.id)
-                    return (
-                      <Fragment key={l.id}>
-                        <Table.Tr onClick={() => umklappen(l.id)} style={{ cursor: 'pointer' }} data-lernende-zeile={l.name}>
-                          <Table.Td>
+                  {t.sichtbar.map((l) => (
+                    <Table.Tr key={l.id} data-lernende-zeile={l.name}>
+                      <Table.Td data-lernende-name>
+                        {l.gast && !ohneNamen ? (
+                          <Text
+                            component="button"
+                            type="button"
+                            size="sm"
+                            td="underline"
+                            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }}
+                            onClick={(e: React.MouseEvent) => (halt(e), gastZeigen(l))}
+                            data-gast-name={l.name}
+                          >
+                            {l.name}
+                          </Text>
+                        ) : (
+                          anzeige(l)
+                        )}
+                        {l.gast && (
+                          <Tooltip label="Gast (per Code oder QR-Code)">
+                            <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />
+                          </Tooltip>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Faecherbalken u={l.uebersicht} />
+                      </Table.Td>
+                      <Table.Td>
+                        {l.uebersicht.sicher}/{l.uebersicht.gesamt}
+                      </Table.Td>
+                      <Table.Td>{l.uebersicht.faellig}</Table.Td>
+                      <Table.Td data-woche={`${l.neu7 ?? 0}/${l.wiederholt7 ?? 0}`}>
+                        {(l.neu7 ?? 0) + (l.wiederholt7 ?? 0) ? (
+                          <Text size="sm">
+                            <b>{l.neu7 ?? 0}</b> neu · <b>{l.wiederholt7 ?? 0}</b> wiederholt
+                          </Text>
+                        ) : (
+                          <Text size="sm" c="dimmed">
+                            noch nicht
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {l.perCode && (
+                          <Tooltip label="Aus dieser Freigabe entfernen">
                             <ActionIcon
-                              size="sm"
                               variant="subtle"
-                              color="gray"
-                              aria-expanded={istAuf}
-                              aria-label={istAuf ? 'Einzelheiten zuklappen' : 'Einzelheiten aufklappen'}
-                              data-lernende-aufklappen={l.name}
+                              color="red"
+                              onClick={() => entfernen(l)}
+                              aria-label={`${anzeige(l)} entfernen`}
+                              data-gast-entfernen={l.name}
                             >
-                              <IconChevronDown size={16} style={{ transform: istAuf ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
+                              <IconUserMinus size={16} />
                             </ActionIcon>
-                          </Table.Td>
-                          <Table.Td data-lernende-name>
-                            {l.gast && !ohneNamen ? (
-                              <Text
-                                component="button"
-                                type="button"
-                                size="sm"
-                                td="underline"
-                                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit' }}
-                                onClick={(e: React.MouseEvent) => (halt(e), gastZeigen(l))}
-                                data-gast-name={l.name}
-                              >
-                                {l.name}
-                              </Text>
-                            ) : (
-                              anzeige(l)
-                            )}
-                            {l.gast && (
-                              <Tooltip label="Gast (per Code oder QR-Code)">
-                                <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />
-                              </Tooltip>
-                            )}
-                          </Table.Td>
-                          <Table.Td>
-                            <Faecherbalken u={l.uebersicht} />
-                          </Table.Td>
-                          <Table.Td>
-                            {l.uebersicht.sicher}/{l.uebersicht.gesamt}
-                          </Table.Td>
-                          <Table.Td>{l.uebersicht.faellig}</Table.Td>
-                          <Table.Td data-grammatik-profil={anzeige(l)}>
-                            <GrammatikZelle l={l} />
-                          </Table.Td>
-                          <Table.Td data-woche={`${l.neu7 ?? 0}/${l.wiederholt7 ?? 0}`}>
-                            {(l.neu7 ?? 0) + (l.wiederholt7 ?? 0) ? (
-                              <Text size="sm">
-                                <b>{l.neu7 ?? 0}</b> neu · <b>{l.wiederholt7 ?? 0}</b> wiederholt
-                              </Text>
-                            ) : (
-                              <Text size="sm" c="dimmed">
-                                noch nicht
-                              </Text>
-                            )}
-                          </Table.Td>
-                          <Table.Td onClick={halt} style={{ cursor: 'default' }}>
-                            <Group gap={4} wrap="nowrap" justify="flex-end">
-                              <Button
-                                size="compact-xs"
-                                variant="light"
-                                color="orange"
-                                disabled={!l.grammatik?.schwaechen.length}
-                                onClick={() => void extra(l, 'foerder')}
-                                data-foerdern={l.name}
-                              >
-                                Fördern
-                              </Button>
-                              <Button
-                                size="compact-xs"
-                                variant="light"
-                                color="teal"
-                                disabled={!l.grammatik?.staerken.length}
-                                onClick={() => void extra(l, 'forder')}
-                                data-fordern={l.name}
-                              >
-                                Fordern
-                              </Button>
-                              {l.perCode ? (
-                                <Tooltip label="Aus dieser Freigabe entfernen">
-                                  <ActionIcon
-                                    variant="subtle"
-                                    color="red"
-                                    onClick={() => entfernen(l)}
-                                    aria-label={`${anzeige(l)} entfernen`}
-                                    data-gast-entfernen={l.name}
-                                  >
-                                    <IconUserMinus size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                              ) : (
-                                <span style={{ width: 28, flexShrink: 0 }} />
-                              )}
-                            </Group>
-                          </Table.Td>
-                        </Table.Tr>
-                        {istAuf && <LernendeDetails l={l} spalten={spaltenZahl} starten={(art, regel) => void extra(l, art, regel)} />}
-                      </Fragment>
-                    )
-                  })}
+                          </Tooltip>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
                 </Table.Tbody>
               </Table>
             </>
           )}
           <Text size="xs" c="dimmed" mt="xs">
-            {matrix
+            {ansicht === 'matrix'
               ? 'Anteil richtig je Grammatikregel. Klick auf eine rote oder gelbe Zelle lässt Förderaufgaben zu genau dieser Regel erstellen, auf eine grüne Forderaufgaben – als Entwurf zum Prüfen in der Grammatik des Kurses.'
-              : 'Stufen: Neu (grau) → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im Langzeitgedächtnis (türkis). „Sicher“ = zweimal frei richtig geschrieben im Abstand von mindestens einer Woche. „geübt (7 Tage)“: Vokabeln, die in den letzten 7 Tagen zum ersten Mal geübt bzw. wiederholt wurden. Klick auf eine Zeile zeigt Stärken, Schwächen und typische Fehler.'}
+              : ansicht === 'grammatik'
+                ? 'Empfohlen ist Fördern, sobald es eine Schwäche gibt (unter 60 % richtig ab 5 Versuchen), sonst Fordern bei Stärken (ab 85 % richtig und gefestigt). „Details" zeigt alle Regeln nach Bereichen oder Lehrwerk-Units – mit Fördern/Fordern je Regel.'
+                : 'Stufen: Neu (grau) → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im Langzeitgedächtnis (türkis). „Sicher“ = zweimal frei richtig geschrieben im Abstand von mindestens einer Woche. „geübt (7 Tage)“: Vokabeln, die in den letzten 7 Tagen zum ersten Mal geübt bzw. wiederholt wurden.'}
           </Text>
         </>
       )}
+      <Modal
+        opened={Boolean(detailsPerson)}
+        onClose={() => setDetailsFuer(null)}
+        title={detailsPerson ? `Grammatik – ${anzeige(detailsPerson)}` : ''}
+        size="80rem"
+        fullScreen={typeof window !== 'undefined' && window.innerWidth < 700}
+      >
+        {detailsPerson && (
+          <GrammatikDetails
+            l={detailsPerson}
+            name={anzeige(detailsPerson)}
+            band={bandQuelle ?? bandStand}
+            starten={(art, regel) => void extra(detailsPerson, art, regel)}
+            schliessen={() => setDetailsFuer(null)}
+          />
+        )}
+      </Modal>
     </Card>
   )
 }
@@ -1740,7 +1988,7 @@ function Lernstand({
         lernende={lernende}
         gastZeigen={setGast}
         entfernen={setEntfernen}
-        kurs={{ id, fach: d.fach, sprache: d.sprache ?? '', lerngruppe: d.lerngruppe, woerter: d.woerter }}
+        kurs={{ id, fach: d.fach, sprache: d.sprache ?? '', lerngruppe: d.lerngruppe, woerter: d.woerter, quelle: d.quelle, lerngruppeId: d.lerngruppeId }}
       />
       <KursGrammatik vokId={id} hinzufuegen={() => setGrammatik(true)} geoeffnet={grammatikOffen} oeffnen={setGrammatikOffen} stand={grammatikStand} />
       <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">

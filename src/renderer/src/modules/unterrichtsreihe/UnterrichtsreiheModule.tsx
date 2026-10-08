@@ -17,6 +17,8 @@ import { useAppSettings } from '../../shared/settingsStore'
 import { notifyError } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { ReiheEditor } from './ReiheEditor'
+import { useDokumentOeffner, useZielZeiger } from '../../shared/navigation'
+import { reiheAusPlanSchluessel, usePlaene } from './planungAuftrag'
 import { Uebersicht } from './Uebersicht'
 
 interface ReiheKurz {
@@ -30,17 +32,24 @@ interface ReiheKurz {
   zuweisungen: { id: string; lerngruppe: string; schueler: number; status: string }[]
 }
 
-function neueReihe(): Reihe {
+/** Vorgabe für eine neue Reihe (08.10.2026, „Unterrichtsreihe erstellen" in Meine Klassen): Fach und Jahrgang der Klasse */
+export interface ReihenVorgabe {
+  fachId?: string
+  grade?: number
+  titel?: string
+}
+
+function neueReihe(vorgabe?: ReihenVorgabe | null): Reihe {
   const { settings } = useAppSettings.getState()
-  const fachId = settings.eigeneFaecher?.[0] ?? 'englisch'
+  const fachId = vorgabe?.fachId || (settings.eigeneFaecher?.[0] ?? 'englisch')
   return {
     id: '',
-    titel: '',
+    titel: vorgabe?.titel ?? '',
     fachId,
     fachLabel: fachVon(fachId)?.label ?? fachId,
     stateId: settings.defaults.stateId,
     schoolTypeId: settings.defaults.schoolTypeId,
-    grade: 7,
+    grade: vorgabe?.grade && vorgabe.grade >= 1 && vorgabe.grade <= 13 ? vorgabe.grade : 7,
     oberthema: '',
     lernziele: [],
     schritte: []
@@ -55,9 +64,17 @@ function neueReihe(): Reihe {
 export const useReihenZiel = create<{
   zid: string | null
   neu: boolean
+  /** Fach/Jahrgang für die neue Reihe (Meine Klassen) */
+  vorgabe: ReihenVorgabe | null
   setze: (zid: string | null) => void
-  setzeNeu: (neu: boolean) => void
-}>((set) => ({ zid: null, neu: false, setze: (zid) => set({ zid }), setzeNeu: (neu) => set({ neu }) }))
+  setzeNeu: (neu: boolean, vorgabe?: ReihenVorgabe | null) => void
+}>((set) => ({
+  zid: null,
+  neu: false,
+  vorgabe: null,
+  setze: (zid) => set({ zid }),
+  setzeNeu: (neu, vorgabe = null) => set(neu ? { neu, vorgabe } : { neu })
+}))
 
 export default function UnterrichtsreiheModule(): React.JSX.Element {
   const [ansicht, setAnsicht] = useState<{ art: 'liste' } | { art: 'editor'; reihe: Reihe } | { art: 'uebersicht'; zid: string }>({ art: 'liste' })
@@ -73,13 +90,34 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
   const [neuZaehler, setNeuZaehler] = useState(0)
   useEffect(() => {
     if (!neuGewuenscht) return
+    const vorgabe = useReihenZiel.getState().vorgabe
     useReihenZiel.getState().setzeNeu(false)
     // Wie „Neue Reihe" in der Liste – nur nichts Ungespeichertes stillschweigend verwerfen
     if (editorGeaendert.current && !window.confirm('Die geöffnete Reihe hat ungespeicherte Änderungen. Trotzdem eine neue Reihe beginnen?')) return
     editorGeaendert.current = false
     setNeuZaehler((n) => n + 1)
-    setAnsicht({ art: 'editor', reihe: neueReihe() })
+    setAnsicht({ art: 'editor', reihe: neueReihe(vorgabe) })
   }, [neuGewuenscht])
+  /*
+   * Aus der Auftragsleiste (08.10.2026, KI-Planung und Platzhalter im Hintergrund): Ein Auftrag gehört zu einer Reihe
+   * (`docId`) – „Öffnen" lädt genau diese Reihe in den Editor, auch wenn inzwischen eine andere offen ist (nach
+   * Rückfrage, falls die offene ungespeicherte Änderungen hat). Eine fertige Planung zeigt danach ihre Vorschau.
+   */
+  const ansichtRef = useRef(ansicht)
+  ansichtRef.current = ansicht
+  useDokumentOeffner('unterrichtsreihe', async (id) => {
+    const jetzt = ansichtRef.current
+    if (jetzt.art === 'editor' && jetzt.reihe.id === id) return
+    if (jetzt.art === 'editor' && editorGeaendert.current && !window.confirm('Die geöffnete Reihe hat ungespeicherte Änderungen. Trotzdem die andere Reihe öffnen?'))
+      return
+    const d = await holen<{ reihe: Reihe }>(`/server/reihen/${id}`)
+    editorGeaendert.current = false
+    setAnsicht({ art: 'editor', reihe: d.reihe })
+  })
+  useZielZeiger('unterrichtsreihe', (z) => {
+    const reiheId = reiheAusPlanSchluessel(z.baustein)
+    if (reiheId) usePlaene.getState().setzeZeigen(reiheId)
+  })
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
   const farbe = useProgrammFarbe()
   const laden = useCallback(

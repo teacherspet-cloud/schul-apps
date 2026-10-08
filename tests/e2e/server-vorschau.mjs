@@ -121,7 +121,8 @@ try {
   const zustand = await f.locator('[data-begruessung]').getAttribute('data-begruessung')
   pruefe(zustand === 'erfolgreich_fleissig', `Lernstand „erfolgreich“ → Begrüßung ${zustand}`)
   console.log(`        „${(await f.locator('[data-begruessung-text]').innerText().catch(() => '')).trim()}“`)
-  pruefe(await da(f.locator('[data-stand-bereich="vokabeln"]').filter({ hasText: 'Weather' })), 'Startseite zeigt das Vokabeltraining der Klasse (Englisch)')
+  const neueste = await f.locator('[data-neues-material]').allInnerTexts().catch(() => [])
+  pruefe(await da(f.locator('[data-neues-material="vokabeln"]').filter({ hasText: 'Englisch' }), 5000), `Startseite zeigt das Vokabeltraining der Klasse (Englisch) – ${neueste.map((t) => t.split(String.fromCharCode(10))[0]).join(' | ')}`)
   await fenster.screenshot({ path: join(out, '2-vorschau-tablet.png') })
 
   // Im Fenster: Aufrufe laufen als Musterschüler (fetch mit Schlüssel) – Blatt aus Geschichte sichtbar, abgeben
@@ -200,7 +201,17 @@ try {
   pruefe(Math.round(breite) === 390, `Handy: Ansicht 390 px breit (${Math.round(breite)})`)
   await fenster.screenshot({ path: join(out, '3-vorschau-handy.png') })
   await fenster.locator('.geraete button[data-geraet="pc"]').click()
+  // Lernstand wirkt schon mit der Auswahl (08.10.2026) – ohne Knopf
+  await fenster.locator('[data-vorschau-zustand]').selectOption('fleissig')
+  await fenster.waitForTimeout(1500)
+  await fenster.waitForFunction(() => !document.querySelector('[data-vorschau-zustand]').disabled, null, { timeout: 15000 }).catch(() => undefined)
+  pruefe(
+    await da(fenster.frameLocator('#ansicht').locator('[data-begruessung]:not([data-begruessung="neu"])'), 20000),
+    'Auswahl „fleißig“ ohne Knopf: Begrüßung nicht mehr für Neue'
+  )
   await fenster.locator('[data-vorschau-zustand]').selectOption('neu')
+  await fenster.waitForTimeout(1500)
+  pruefe(await da(fenster.frameLocator('#ansicht').locator('[data-begruessung="neu"]'), 20000), 'Auswahl „neu“ ohne Knopf: Begrüßung für Neue')
   await fenster.locator('[data-vorschau-zuruecksetzen]').click()
   await fenster.waitForTimeout(1500)
   pruefe(await da(f.locator('[data-begruessung="neu"]'), 20000), 'Zurückgesetzt auf „neu“: Begrüßung für Neue')

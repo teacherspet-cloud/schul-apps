@@ -15,6 +15,7 @@
  */
 import { grammatikRoute } from './grammatik'
 import { rekordbuchRoute } from './rekordbuch'
+import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
@@ -135,6 +136,8 @@ async function main(): Promise<void> {
       grammatikRoute(adresse),
       // Rekordbuch der Lernenden (08.10.2026)
       rekordbuchRoute(),
+      // Achievements der Lernenden (08.10.2026)
+      achievementsRoute(),
       lernenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
       lernstandRoute(aufruf),

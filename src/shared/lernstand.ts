@@ -310,7 +310,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
         strategie: d.stufe === 'grund' || d.stufe === 'unter' ? 'abruf' : 'selbsterklaerung',
         text: nachStufe(d.stufe, {
           grund: `In „${g.titel}" warten Aufgaben auf dich. Mach eine kleine Runde – fünf Minuten reichen.`,
-          unter: `In „${g.titel}" sind Aufgaben fällig. Sag dir bei jeder kurz, welche Regel passt – dann sitzt sie besser.`,
+          unter: `In „${g.titel}" sind Aufgaben fällig. Sag dir bei jeder Aufgabe kurz, welche Regel passt – dann sitzt sie besser.`,
           mittel: `„${g.titel}": Aufgaben sind fällig. Erklär dir bei jeder Antwort in einem Satz, warum sie stimmt – das festigt die Regel.`,
           ober: `„${g.titel}": fällige Aufgaben. Begründe jede Antwort kurz für dich selbst, bevor du weitergehst.`
         }),

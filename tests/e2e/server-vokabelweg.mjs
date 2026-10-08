@@ -76,8 +76,9 @@ try {
 
   // Leiter im Browser, erster Besuch (merkt sich den Stand)
   const s = await sm.newPage()
-  await s.goto(`${A}/s/lernen`)
-  pruefe(await da(s.locator('[data-vokabelweg-karte]')), 'Lernraum zeigt den Vokabelweg')
+  // Seit dem Regal (08.10.2026) steht der Vokabelweg im Fachordner, Register Vocabulary
+  await s.goto(`${A}/s/ordner/Englisch?r=vok`)
+  pruefe(await da(s.locator('[data-vokabelweg-karte]')), 'Fachordner zeigt den Vokabelweg')
   await s.locator('[data-vokabelweg-karte]').first().click()
   pruefe(await da(s.locator('[data-vokabelweg]')), 'Freischalt-Leiste im Kasten')
   pruefe(
@@ -119,6 +120,59 @@ try {
   await s.goto(`${A}/s/vw/${encodeURIComponent(w.key)}`)
   pruefe(await da(s.locator('[data-vw-neu]')), 'Neu freigeschaltet wird gefeiert')
   await s.screenshot({ path: join(out, '2-freigeschaltet.png'), fullPage: true })
+
+  // Zuklappbar (08.10.2026): zugeklappt als Vorgabe, aufgeklappt bleibt nach dem Neuladen (am Konto gemerkt)
+  pruefe((await s.locator('[data-vokabelweg][data-vw-offen]').count()) === 0, 'Vokabelweg zugeklappt als Vorgabe')
+  await s.locator('[data-vw-klappen]').click()
+  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]'), 5000), 'Vokabelweg aufgeklappt')
+  await s.waitForTimeout(800)
+  const darst = await (await sm.request.get(`${A}/s/api/darstellung`, { headers: KOPF })).json()
+  pruefe(darst.darstellung?.vokabelwegOffen === true, 'Aufgeklappt am Konto gespeichert')
+  await s.reload()
+  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]')), 'Nach dem Neuladen weiter aufgeklappt')
+  pruefe((await s.locator('button[data-vw-stufe="zu"]').count()) === 0, 'Gesperrte Abschnitte nicht anklickbar')
+
+  // Abschnitt antippen (08.10.2026): Fenster mit genau seinen Wörtern, Lernkarte, Antwort zählt im selben Kasten
+  const k1 = w.stufen[1].key
+  await s.locator(`button[data-vw-key="${k1}"]`).click()
+  pruefe(await da(s.locator(`[data-vw-fenster="${k1}"]`)), `Fenster für ${a1.unit} · ${a1.section}`)
+  const karte = s.locator('[data-vw-fenster] [data-lernkarte]')
+  pruefe(await da(karte), 'Lernkarte im Fenster')
+  await s.screenshot({ path: join(out, '3-abschnitt-fenster.png') })
+  const nurAbschnitt = await (
+    await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}&abschnitt=${encodeURIComponent(k1)}`, { headers: KOPF })
+  ).json()
+  pruefe(
+    nurAbschnitt.woerter.length > 0 && nurAbschnitt.woerter.length <= a1.entries.length && nurAbschnitt.abschnitt === k1,
+    `Server liefert nur die Wörter des Abschnitts (${nurAbschnitt.woerter.length} von ${a1.entries.length})`
+  )
+  const gesperrt = w.stufen.find((x) => !x.frei)
+  if (gesperrt) {
+    const r403 = await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}&abschnitt=${encodeURIComponent(gesperrt.key)}`, { headers: KOPF })
+    pruefe(r403.status() === 403, 'Gesperrter Abschnitt wird nicht ausgeliefert')
+  }
+  const vorAntwort = Object.keys(nurAbschnitt.staende).length
+  await karte.click()
+  await s.locator('[data-vw-fenster] [data-karte-gewusst]').click()
+  await s.waitForTimeout(800)
+  const nachAntwort = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}`, { headers: KOPF })).json()
+  pruefe(
+    nurAbschnitt.woerter.filter((v) => nachAntwort.staende[v.id]).length > vorAntwort,
+    'Antwort im Fenster zählt im gemeinsamen Kasten'
+  )
+  await s.locator('.mantine-Modal-close').click()
+  pruefe(
+    await s
+      .locator('[data-vw-fenster]')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Fenster geschlossen'
+  )
+  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]')), 'Zurück auf dem Vokabelweg')
+  await s.screenshot({ path: join(out, '4-zurueck.png'), fullPage: true })
   await lk.request.post(`${A}/server/vokabeln/${zu.id}/loeschen`, { headers: KOPF, data: {} })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)

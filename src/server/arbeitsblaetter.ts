@@ -286,6 +286,8 @@ function kurz(z: Zeile, ich: NutzerInfo) {
     // Fach und Thema für den Fachordner im Regal (08.10.2026); ohne eigene Angabe das Fach der Rückmeldungs-Vorlage
     fach: (z as Zeile & { fach?: string }).fach || kontextVon(z).fach || '',
     thema: (z as Zeile & { thema?: string }).thema ?? '',
+    // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
+    erstellt: z.erstellt,
     ...(stand ? { stand } : {})
   }
 }

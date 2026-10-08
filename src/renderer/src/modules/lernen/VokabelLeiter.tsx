@@ -3,13 +3,17 @@
  * spielerisch als Freischalten anzeigt"). Ein Pfad durch die Abschnitte des Bandes: gelernt (Haken),
  * aktuell (Ring mit Fortschritt zur 80-%-Schwelle), frei, gesperrt (Schloss). Darüber, wie viele Wörter
  * bis zum nächsten Abschnitt fehlen; ein neu freigeschalteter Abschnitt wird gefeiert.
+ *
+ * 08.10.2026 (abgestimmt): zuklappbar, zugeklappt als Vorgabe, der letzte Zustand am Konto gemerkt
+ * (Darstellung.vokabelwegOffen). Ein freier Abschnitt lässt sich antippen – der Trainer öffnet dann ein Fenster
+ * mit genau dessen Wörtern (`oeffne`); gesperrte bleiben ohne Klick, ein Hinweis sagt warum.
  */
-import { Group, Progress, Stack, Text } from '@mantine/core'
-import { holen } from '../onlinetest/serverApi'
-import { tuerKlick } from './tuer'
+import { Collapse, Group, Progress, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { holen, senden } from '../onlinetest/serverApi'
+import { fuerServer, useDarstellung } from '../onlinetest/schuelerDarstellung'
 import { lesbarAuf } from './vtFarben'
-import { IconCheck, IconConfetti, IconLock, IconMapPin } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { IconCheck, IconChevronDown, IconConfetti, IconLock, IconMapPin } from '@tabler/icons-react'
+import { forwardRef, useEffect, useMemo, useState } from 'react'
 import { fehlenBis, type Stufe } from '@shared/vokabelLaufbahn'
 
 export interface WegKurz {
@@ -37,6 +41,10 @@ export const LEITER_CSS = `
 .vw-knoten.gelernt { border-color: var(--vt-a); background: var(--vt-a); color: var(--vt-auf-akzent); }
 .vw-knoten.aktuell { border-color: transparent; color: var(--vt-a-dunkel); box-shadow: 0 0 0 4px var(--vt-a-rand); animation: vw-puls 2.2s ease-in-out infinite; }
 .vw-knoten.zu { background: var(--vt-a-hell); opacity: .75; }
+button.vw-knoten { cursor: pointer; font-family: inherit; padding: 0; }
+button.vw-knoten:hover, button.vw-knoten:focus-visible { transform: scale(1.08); outline: none; box-shadow: 0 0 0 4px var(--vt-a-rand); }
+.vw-pfeil { transition: transform .2s; color: var(--vt-a-dunkel); flex: none; }
+.vw-pfeil.offen { transform: rotate(180deg); }
 .vw-name { font-size: .66rem; color: var(--vt-leise); text-align: center; margin-top: 4px; width: 68px; margin-left: -11px; line-height: 1.15; }
 @keyframes vw-puls { 0%, 100% { box-shadow: 0 0 0 4px var(--vt-a-rand) } 50% { box-shadow: 0 0 0 8px var(--vt-a-hell2) } }
 .vw-fest { display: flex; gap: 10px; align-items: center; border-radius: 14px; padding: 10px 12px; background: var(--vt-gut-bg); color: var(--vt-gut-text); font-weight: 700; animation: vt-rein .5s ease-out; }
@@ -45,8 +53,16 @@ export const LEITER_CSS = `
 
 const kurz = (s: string): string => s.replace(/^Station\s*/i, 'St. ').replace(/^Unit\s*/i, 'U ')
 
-export function VokabelLeiter({ weg }: { weg: WegKurz }): React.JSX.Element {
+export function VokabelLeiter({ weg, oeffne }: { weg: WegKurz; oeffne?: (s: Stufe) => void }): React.JSX.Element {
   const stufen = weg.stufen
+  // Auf- und zuklappen (08.10.2026): am Konto gemerkt, folgt auf jedes Gerät; Gäste merken es nur auf dem Gerät
+  const { d: wahl, setze: setzeWahl } = useDarstellung()
+  const offen = wahl.vokabelwegOffen === true
+  const klappen = (): void => {
+    const neu = { ...wahl, vokabelwegOffen: !offen }
+    setzeWahl(neu)
+    if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
+  }
   const gelernt = stufen.filter((s) => s.gelernt).length
   const aktuellIndex = stufen.findIndex((s) => s.aktuell)
   const aktuell = aktuellIndex >= 0 ? stufen[aktuellIndex] : null
@@ -73,28 +89,52 @@ export function VokabelLeiter({ weg }: { weg: WegKurz }): React.JSX.Element {
     })
     return m
   }, [stufen])
-  // Den aktuellen Abschnitt ins Bild rollen
+  // Den aktuellen Abschnitt ins Bild rollen (nur im Pfad, nicht die ganze Seite – erst wenn aufgeklappt)
   useEffect(() => {
-    document.querySelector('[data-vw-aktuell]')?.scrollIntoView({ block: 'nearest', inline: 'center' })
-  }, [aktuellIndex])
+    if (!offen) return
+    const t = setTimeout(() => {
+      const k = document.querySelector<HTMLElement>('[data-vw-aktuell]')
+      const pfad = k?.closest<HTMLElement>('.vw-pfad')
+      if (k && pfad) pfad.scrollLeft = Math.max(0, k.getBoundingClientRect().left - pfad.getBoundingClientRect().left + pfad.scrollLeft - pfad.clientWidth / 2)
+    }, 220)
+    return () => clearTimeout(t)
+  }, [aktuellIndex, offen])
+  // Warum ein Abschnitt gesperrt ist: der davor muss erst zu 80 % eingeübt sein
+  const gesperrtWeil = (i: number): string => {
+    const davor = stufen[i - 1]
+    return davor
+      ? `Noch gesperrt – frei wird es, wenn ${davor.unit} · ${davor.section} zu ${Math.round(weg.schwelle * 100)} % eingeübt ist (Fach 2).`
+      : 'Noch gesperrt.'
+  }
   return (
-    <div className="vw" data-vokabelweg={weg.key}>
+    <div className="vw" data-vokabelweg={weg.key} data-vw-offen={offen || undefined}>
       <style>{LEITER_CSS}</style>
-      <Group justify="space-between" mb={6} wrap="nowrap">
-        <div>
-          <Text fw={800} c="var(--vt-a-dunkel)">
-            Dein Vokabelweg · {weg.band}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {gelernt} von {stufen.length} Abschnitten gelernt · freigeschaltet wird ab {Math.round(weg.schwelle * 100)} % der Wörter in Fach 2
-          </Text>
-        </div>
-      </Group>
+      <UnstyledButton onClick={klappen} aria-expanded={offen} w="100%" data-vw-klappen>
+        <Group justify="space-between" wrap="nowrap">
+          <div>
+            <Text fw={800} c="var(--vt-a-dunkel)">
+              Dein Vokabelweg · {weg.band}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {gelernt} von {stufen.length} Abschnitten gelernt
+              {aktuell && !offen ? ` · gerade dran: ${aktuell.unit} · ${aktuell.section} (${Math.round(aktuell.anteil * 100)} %)` : ''}
+              {offen ? ` · freigeschaltet wird ab ${Math.round(weg.schwelle * 100)} % der Wörter in Fach 2` : ''}
+            </Text>
+          </div>
+          <IconChevronDown size={20} className={`vw-pfeil ${offen ? 'offen' : ''}`} aria-hidden />
+        </Group>
+      </UnstyledButton>
       {neu.length > 0 && (
         <div className="vw-fest" data-vw-neu>
           <IconConfetti size={22} />
           <span>Freigeschaltet: {neu.map((s) => `${s.unit} · ${s.section}`).join(', ')}!</span>
         </div>
+      )}
+      <Collapse expanded={offen}>
+      {oeffne && (
+        <Text size="xs" c="dimmed" mt={8}>
+          Tippe einen freien Abschnitt an, um genau seine Wörter zu lernen.
+        </Text>
       )}
       {aktuell && (
         <div style={{ margin: '10px 0 4px' }} data-vw-fortschritt>
@@ -132,11 +172,25 @@ export function VokabelLeiter({ weg }: { weg: WegKurz }): React.JSX.Element {
                   <div key={s.key} style={{ display: 'flex', alignItems: 'flex-start' }}>
                     {i > 0 && <div className={`vw-linie ${s.frei ? 'an' : ''}`} style={{ marginTop: 21 }} />}
                     <div>
-                      <div
+                      <Tooltip
+                        label={
+                          s.frei
+                            ? `${s.unit} · ${s.section}: ${Math.round(s.anteil * 100)} % eingeübt${oeffne ? ' – antippen zum Lernen' : ''}`
+                            : gesperrtWeil(i)
+                        }
+                        multiline
+                        w={240}
+                        withArrow
+                        events={{ hover: true, focus: true, touch: true }}
+                      >
+                      <Knoten
+                        klickbar={Boolean(oeffne && s.frei)}
+                        onClick={() => oeffne?.(s)}
                         className={`vw-knoten ${klasse}`}
                         style={ring}
-                        title={`${s.unit} · ${s.section}: ${Math.round(s.anteil * 100)} %${s.frei ? '' : ' – noch gesperrt'}`}
+                        aria-label={`${s.unit} · ${s.section}${s.frei ? '' : ' (gesperrt)'}`}
                         data-vw-stufe={klasse}
+                        data-vw-key={s.key}
                         {...(s.aktuell ? { 'data-vw-aktuell': '' } : {})}
                       >
                         {s.aktuell ? (
@@ -150,7 +204,8 @@ export function VokabelLeiter({ weg }: { weg: WegKurz }): React.JSX.Element {
                         ) : (
                           <IconLock size={16} />
                         )}
-                      </div>
+                      </Knoten>
+                      </Tooltip>
                       <div className="vw-name">{s.section}</div>
                     </div>
                   </div>
@@ -160,9 +215,27 @@ export function VokabelLeiter({ weg }: { weg: WegKurz }): React.JSX.Element {
           </div>
         ))}
       </div>
+      </Collapse>
     </div>
   )
 }
+
+/** Ein Punkt des Pfads: frei und mit Fenster ein Knopf, sonst nur ein Kreis (gesperrt: kein Klick, nur der Hinweis) */
+const Knoten = forwardRef<HTMLElement, { klickbar: boolean; children: React.ReactNode } & React.HTMLAttributes<HTMLElement>>(
+  function Knoten({ klickbar, children, onClick, ...rest }, ref) {
+    if (klickbar)
+      return (
+        <button type="button" ref={ref as React.Ref<HTMLButtonElement>} onClick={onClick} {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
+          {children}
+        </button>
+      )
+    return (
+      <div ref={ref as React.Ref<HTMLDivElement>} tabIndex={0} {...(rest as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    )
+  }
+)
 
 /** Einstieg in den Vokabelweg (Lernraum, Fachzimmer): je Lehrwerksreihe eine Karte mit Fortschritt */
 export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element | null {
@@ -187,7 +260,6 @@ export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element
           <a
             key={w.key}
             href={`/s/vw/${encodeURIComponent(w.key)}`}
-            onClick={tuerKlick(`/s/vw/${encodeURIComponent(w.key)}`, farbe)}
             style={{
               textDecoration: 'none',
               color: 'inherit',

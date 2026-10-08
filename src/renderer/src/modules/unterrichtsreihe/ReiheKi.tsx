@@ -29,7 +29,8 @@ import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigatio
 import { useEffect, useState } from 'react'
 import { SCHRITT_ARTEN, STUNDEN_MINUTEN, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { direktErzeugbar, erzeugeSchrittInhalt, materialKandidaten, planeReihe, type MaterialKandidat, type ReihenPlan } from './reihePlanungKi'
+import { direktErzeugbar, erzeugeSchrittInhalt, materialKandidaten, type MaterialKandidat, type ReihenPlan } from './reihePlanungKi'
+import { starteReihenPlanung, usePlaene, usePlantGerade, type PlanErgebnis } from './planungAuftrag'
 import { erzeugeBlattFuerPlatzhalter, useErzeugtGerade } from './platzhalterAuftrag'
 import { reiheAusgeben, schrittAusgeben, type DruckArt } from './reiheDruck'
 
@@ -186,13 +187,21 @@ export function StundenLeiste({
   )
 }
 
-/** Planungsfenster: Materialien sichten, planen lassen, Vorschau, übernehmen */
+/**
+ * Planungsfenster: Materialien sichten, planen lassen, Vorschau, übernehmen.
+ *
+ * Hintergrund-Auftrag (08.10.2026, planungAuftrag.ts): „Planen" speichert die Reihe, startet die Planung in der
+ * Auftragsleiste und schließt das Fenster. Der fertige Plan kommt über `ergebnis` zurück (Auftrag öffnen bzw. Hinweis
+ * im Editor) – dann zeigt das Fenster gleich die Vorschau mit „Übernehmen".
+ */
 export function PlanenFenster({
   reihe,
   kc,
   schliessen,
   uebernehmen,
-  setzeStunden
+  setzeStunden,
+  speichernVorher,
+  ergebnis
 }: {
   reihe: Reihe
   kc: { auszug: string[]; quelle: string }
@@ -200,13 +209,18 @@ export function PlanenFenster({
   uebernehmen: (plan: ReihenPlan, ersetzen: boolean) => void
   /** Stundenraster der Reihe ändern (derselbe Stand wie im Editor) */
   setzeStunden: (p: StundenPatch) => void
+  /** Die Reihe muss für den Hintergrund-Auftrag gespeichert sein (liefert den gespeicherten Stand) */
+  speichernVorher: () => Promise<Reihe | null>
+  /** Fertiger Plan aus dem Hintergrund – Vorschau statt Formular */
+  ergebnis?: PlanErgebnis
 }): React.JSX.Element {
   const [material, setMaterial] = useState<MaterialKandidat[] | null>(null)
-  const [wunsch, setWunsch] = useState('')
-  const [laeuft, setLaeuft] = useState(false)
-  const [plan, setPlan] = useState<ReihenPlan | null>(null)
+  const [wunsch, setWunsch] = useState(ergebnis?.eingaben.wunsch ?? '')
+  const [startet, setStartet] = useState(false)
+  const [plan, setPlan] = useState<ReihenPlan | null>(ergebnis?.plan ?? null)
+  const plantSchon = usePlantGerade(reihe.id || undefined)
   // Schulbuchseiten als Grundlage (Phase 6b)
-  const [buch, setBuch] = useState<{ text: string; titel: string; abschnitte: number }[]>([])
+  const [buch, setBuch] = useState<{ text: string; titel: string; abschnitte: number }[]>(ergebnis?.eingaben.buch ?? [])
   const [liest, setLiest] = useState<string | null>(null)
   const [modus, setModus] = useState<'ersetzen' | 'anhaengen'>(reihe.schritte.length ? 'anhaengen' : 'ersetzen')
   // Nur Fach und Jahrgang zählen – Änderungen am Stundenraster hier im Fenster laden nicht neu
@@ -215,6 +229,22 @@ export function PlanenFenster({
     void materialKandidaten({ fachId, grade }).then(setMaterial, () => setMaterial([]))
   }, [fachId, grade])
   const ohneStunden = !(reihe.stunden?.length ?? 0)
+  const ohneTitel = !reihe.titel.trim()
+  /** Speichern, Auftrag starten, Fenster zu – die Lehrkraft arbeitet weiter */
+  const planenImHintergrund = async (): Promise<void> => {
+    setStartet(true)
+    try {
+      const gespeichert = await speichernVorher()
+      if (!gespeichert?.id) return
+      starteReihenPlanung({ reihe: gespeichert, kc, material: material ?? [], eingaben: { wunsch, buch } })
+      notifySuccess('Die Reihe wird im Hintergrund geplant – Fortschritt in der Auftragsleiste. Du kannst weiterarbeiten.')
+      schliessen()
+    } catch (e) {
+      notifyError(e, 'Keine Planung')
+    } finally {
+      setStartet(false)
+    }
+  }
   return (
     <Modal opened onClose={schliessen} title="Reihe mit KI planen" size="xl" data-planen-fenster>
       <Stack>
@@ -227,6 +257,16 @@ export function PlanenFenster({
             {ohneStunden && (
               <Alert color="orange" variant="light">
                 Bitte zuerst Einzel- und Doppelstunden anlegen (hier gleich unten) – die KI verteilt die Schritte auf genau diese Stunden.
+              </Alert>
+            )}
+            {ohneTitel && (
+              <Alert color="orange" variant="light">
+                Bitte zuerst einen Titel der Reihe eintragen – die Reihe wird vor der Planung gespeichert.
+              </Alert>
+            )}
+            {plantSchon && (
+              <Alert color="blue" variant="light" data-plant-schon>
+                Für diese Reihe läuft schon eine Planung – Fortschritt in der Auftragsleiste unten rechts.
               </Alert>
             )}
             {/* Stundenraster direkt im Fenster (08.10.2026): ändert dieselbe Reihe wie der Editor */}
@@ -288,21 +328,15 @@ export function PlanenFenster({
               value={wunsch}
               onChange={(e) => setWunsch(e.currentTarget.value)}
             />
-            <Group justify="flex-end">
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="xs" c="dimmed">
+                Die Planung läuft im Hintergrund: Das Fenster schließt sich, der fertige Plan erscheint in der Auftragsleiste.
+              </Text>
               <Button
                 leftSection={<IconSparkles size={16} />}
-                loading={laeuft}
-                disabled={ohneStunden || material === null}
-                onClick={async () => {
-                  setLaeuft(true)
-                  try {
-                    setPlan(await planeReihe(reihe, kc, material ?? [], ki, wunsch, buch.map((b) => b.text).join('\n\n')))
-                  } catch (e) {
-                    notifyError(e, 'Keine Planung')
-                  } finally {
-                    setLaeuft(false)
-                  }
-                }}
+                loading={startet}
+                disabled={ohneStunden || ohneTitel || plantSchon || material === null}
+                onClick={() => void planenImHintergrund()}
                 data-planen-los
               >
                 Planen
@@ -355,6 +389,8 @@ export function PlanenFenster({
                 <Button
                   onClick={() => {
                     uebernehmen(plan, modus === 'ersetzen')
+                    // Übernommen: der bereitliegende Plan dieser Reihe ist erledigt
+                    if (reihe.id) usePlaene.getState().verwerfe(reihe.id)
                     schliessen()
                   }}
                   data-plan-uebernehmen

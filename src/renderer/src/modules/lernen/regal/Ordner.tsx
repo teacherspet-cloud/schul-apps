@@ -9,12 +9,12 @@
  */
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
 import { IconAbc, IconArrowLeft, IconBook2, IconFileText } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { VokabelwegKarten } from '../VokabelLeiter'
 import { beschriftung, fachName, type Register } from './beschriftung'
-import { ordnerZu } from './ordnerAnimation'
+import { deckelBereit, nimmUebergang, ordnerZu } from './ordnerAnimation'
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type Mappe, type Merkkasten } from './regalDaten'
@@ -30,6 +30,9 @@ const CSS = `
   background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--og-linie) 31px 32px); position: relative; }
 .og-papier::before { content: ''; position: absolute; left: 14px; top: 0; bottom: 0; width: 2px; background: rgba(220, 80, 80, .35); }
 .og-seite { animation: og-blatt .35s ease-out; transform-origin: left center; }
+.og-ordner.mit-deckel { animation: none; }
+.og-zahl { writing-mode: horizontal-tb; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; font-size: .7rem; font-weight: 800;
+  background: #e03131; color: #fff; display: inline-grid; place-items: center; }
 .og-laschen { display: flex; flex-direction: column; gap: 6px; padding-top: 26px; }
 .og-lasche { writing-mode: vertical-rl; border: 0; cursor: pointer; padding: 14px 7px; border-radius: 0 10px 10px 0; font-weight: 700; font-size: .9rem;
   display: flex; align-items: center; gap: 6px; box-shadow: 2px 2px 4px rgba(0,0,0,.18); transition: transform .15s ease; margin-left: -4px; }
@@ -66,6 +69,18 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   const o = ordner?.find((x) => x.fach === fachName(fach))
   const vorgabe = new URLSearchParams(window.location.search).get('r') as Register | null
   const [wahl, setWahl] = useState<Register | null>(vorgabe)
+  // Aus dem Regal geöffnet: Deckel liegt schon über der Seite und klappt auf, sobald der Ordner steht (08.10.2026)
+  const [uebergang] = useState(nimmUebergang)
+  const aufklappen = useRef<((ziel: HTMLElement | null) => void) | null>(null)
+  const ordnerEl = useRef<HTMLDivElement>(null)
+  if (uebergang && !aufklappen.current) aufklappen.current = deckelBereit(uebergang)
+  useEffect(() => {
+    if (!ordner || !aufklappen.current) return
+    const los = aufklappen.current
+    aufklappen.current = null
+    // Ein Bild warten, damit der Ordner gezeichnet ist
+    requestAnimationFrame(() => los(ordnerEl.current))
+  }, [ordner])
   if (!ordner) return <Loader />
   const s = beschriftung(fach)
   if (!o)
@@ -97,7 +112,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
           onClick={(e: React.MouseEvent) => {
             if (e.ctrlKey || e.metaKey || e.button !== 0) return
             e.preventDefault()
-            ordnerZu(zurueckZiel(), f.ruecken.bg)
+            ordnerZu(zurueckZiel(), f.ruecken.bg, ordnerEl.current, s.fach, o.fach)
           }}
           leftSection={<IconArrowLeft size={16} />}
           px={4}
@@ -110,7 +125,8 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
         </Text>
       </Group>
       <div
-        className="og-ordner"
+        ref={ordnerEl}
+        className={`og-ordner ${uebergang ? 'mit-deckel' : ''}`}
         style={{
           ['--og-f' as string]: f.ruecken.bg,
           ['--og-papier' as string]: dunkel ? '#26282c' : '#fdfcf7',
@@ -148,11 +164,27 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
             >
               {SYMBOL[r]}
               {s[r]}
+              {zuTun(o, r) > 0 && (
+                <span className="og-zahl" title="Hier ist etwas zu tun" data-lasche-offen={zuTun(o, r)}>
+                  {zuTun(o, r)}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
     </Stack>
+  )
+}
+
+/** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
+export function zuTun(o: FachOrdner, r: Register): number {
+  if (r === 'vok') return o.vokabeln.filter((v) => (v.uebersicht.heuteOffen ?? 0) > 0 || v.uebersicht.faellig > 0).length
+  if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
+  return (
+    o.blaetter.filter((b) => b.offen && b.genutzt < b.runden && !b.begonnen).length +
+    o.tests.filter((t) => !t.abgegeben).length +
+    o.aufgaben.filter((a) => a.offen !== false && !a.fassungen.length).length
   )
 }
 

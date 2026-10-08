@@ -18,6 +18,7 @@ import {
   Button,
   Card,
   Center,
+  Collapse,
   Container,
   Group,
   Loader,
@@ -41,12 +42,14 @@ import {
   IconBook2,
   IconCalendarEvent,
   IconCheck,
+  IconChevronDown,
   IconChevronRight,
   IconClipboardCheck,
   IconExternalLink,
   IconFileText,
   IconLanguage,
   IconLock,
+  IconPencil,
   IconPlus,
   IconRoute,
   IconSparkles,
@@ -56,10 +59,12 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
-import { FAECHER } from '@shared/faecher'
+import { FAECHER, fachAusName } from '@shared/faecher'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
-import { openDocument, openModule, useNavigation } from '../../shared/navigation'
+import { neuAnlegen, openDocument, openModule, useNavigation } from '../../shared/navigation'
+import { setzeFachVorgabe, setzeJahrgangVorgabe } from '../../shared/fachVorgabe'
+import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, type FertigesBlatt } from './klassenMaterial'
@@ -152,6 +157,9 @@ interface KlasseDetail {
     lernende: number
     aktiv7: number
     probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
+    /** Kurs-Karte (08.10.2026): Anteile sicher / kennengelernt / neu über alle Lernenden */
+    anteil?: { sicher: number; aufbau: number; neu: number }
+    heuteAktiv?: number
   }[]
   grammatik: {
     id: string
@@ -166,6 +174,9 @@ interface KlasseDetail {
     lernende: number
     aktiv7: number
     probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
+    /** Kurs, zu dem die Grammatik gehört ('' = eigenständig) und ob es eine Extra-Aufgabe für einzelne ist (08.10.2026) */
+    vokId?: string
+    extra?: boolean
   }[]
   wackelig: { term: string; translation: string; quote: number }[]
   reihen: {
@@ -224,6 +235,35 @@ function oeffneMitRueckweg(modul: string, id?: string): void {
   useNavigation.getState().setRueckweg({ fuer: modul, nach: 'meineklassen', name: 'Meine Klassen' })
   if (id) void openDocument(modul, id)
   else openModule(modul)
+}
+
+/** Jahrgang aus dem Klassennamen („7b" → 7, „10" → 10; „Q1" → keiner) */
+export const jahrgangAusKlasse = (name: string): number | undefined => {
+  const n = Number(/^\s*(\d{1,2})(?!\d)/.exec(name)?.[1])
+  return Number.isInteger(n) && n >= 1 && n <= 13 ? n : undefined
+}
+
+/**
+ * Neu für diese Klasse (08.10.2026, Wunsch der Lehrkraft): Unterrichtsreihe bzw. Arbeitsblatt mit Fach und Jahrgang der
+ * Klasse beginnen. Die Lerngruppe wählt man wie gewohnt beim Zuweisen bzw. Freigeben.
+ */
+function reiheFuerKlasse(d: Pick<KlasseDetail, 'name' | 'fach'>): void {
+  useNavigation.getState().setRueckweg({ fuer: 'unterrichtsreihe', nach: 'meineklassen', name: 'Meine Klassen' })
+  useReihenZiel.getState().setzeNeu(true, { fachId: fachAusName(d.fach)?.id, grade: jahrgangAusKlasse(d.name) })
+  openModule('unterrichtsreihe')
+}
+
+async function blattNeuFuerKlasse(d: Pick<KlasseDetail, 'name' | 'fach'>): Promise<void> {
+  const fachId = fachAusName(d.fach)?.id
+  const jahrgang = jahrgangAusKlasse(d.name)
+  if (fachId) setzeFachVorgabe('arbeitsblatt', fachId)
+  if (jahrgang) setzeJahrgangVorgabe('arbeitsblatt', jahrgang)
+  useNavigation.getState().setRueckweg({ fuer: 'arbeitsblatt', nach: 'meineklassen', name: 'Meine Klassen' })
+  try {
+    if (!(await neuAnlegen('arbeitsblatt'))) openModule('arbeitsblatt')
+  } catch (e) {
+    notifyError(e)
+  }
 }
 
 const BEDARF_SYMBOL: Record<Bedarf['art'], React.ReactNode> = {
@@ -470,9 +510,18 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
 /**
  * Lehrwerk-Stand der Lerngruppe (08.10.2026, abgestimmt): bestimmt, welche Grammatik als bekannt gilt (passende Spiele,
  * Forderaufgaben). Ohne Eintrag gilt die höchste Unit aus den Vokabeltrainings der Lernenden.
+ *
+ * Klein (08.10.2026, Wunsch der Lehrkraft): ein Knopf in der Kopfzeile von „Vokabeln & Grammatik" („Lehrwerk: Green
+ * Line 1 · Unit 2 (automatisch)"), die Auswahl im Pop-up. Zurück zu „automatisch": beide Felder leerbar und ein eigener
+ * Knopf – der Server löscht dann den Eintrag (vorher ließ sich ein gewählter Stand nicht mehr abwählen).
  */
 function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | null {
-  const [d, setD] = useState<{ stand: { buch: string; unit: string } | null; baende: Record<string, string[]> } | null>(null)
+  const [d, setD] = useState<{
+    stand: { buch: string; unit: string } | null
+    automatisch?: { buch: string; unit: string } | null
+    baende: Record<string, string[]>
+  } | null>(null)
+  const [offen, setOffen] = useState(false)
   const laden = useCallback(
     () => void holen<typeof d>(`/server/grammatik/lehrwerkstand?gruppe=${encodeURIComponent(gruppeId)}`).then(setD, () => setD(null)),
     [gruppeId]
@@ -482,37 +531,68 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
   const setzen = (buch: string | null, unit: string | null): void =>
     void senden('/server/grammatik/lehrwerkstand', { gruppe: gruppeId, buch: buch ?? '', unit: unit ?? '' }).then(laden, (e: unknown) => notifyError(e))
   const buch = d.stand?.buch ?? null
+  const auto = d.automatisch ?? null
+  const gilt = d.stand ?? auto
+  const knopfText = gilt ? `Lehrwerk: ${gilt.buch} · ${gilt.unit}${d.stand ? '' : ' (automatisch)'}` : 'Lehrwerk festlegen'
   return (
-    <Card withBorder padding="sm" radius="md" data-lehrwerk-stand>
-      <Text fw={700} size="sm">
-        Lehrwerk-Stand (Grammatik)
-      </Text>
-      <Text size="xs" c="dimmed" mb={6}>
-        Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Leer: automatisch aus den Vokabeln der Lernenden.
-      </Text>
-      <Group grow>
-        <Select
-          label="Band"
-          data={Object.keys(d.baende)}
-          value={buch}
-          onChange={(b) => (b ? setzen(b, d.baende[b][0] ?? '') : setzen(null, null))}
-          clearable
-          placeholder="automatisch"
-          data-lehrwerk-band
-        />
-        <Select
-          label="Unit"
-          data={buch ? d.baende[buch] ?? [] : []}
-          value={d.stand?.unit ?? null}
-          onChange={(u) => buch && u && setzen(buch, u)}
-          disabled={!buch}
-          data-lehrwerk-unit
-        />
-      </Group>
-    </Card>
+    <Popover opened={offen} onChange={setOffen} position="bottom-end" withinPortal shadow="md" trapFocus>
+      <Popover.Target>
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          rightSection={<IconPencil size={14} />}
+          onClick={() => setOffen((o) => !o)}
+          data-lehrwerk-knopf
+          data-automatisch={d.stand ? undefined : ''}
+        >
+          {knopfText}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown maw={360}>
+        <Stack gap="xs" data-lehrwerk-stand>
+          <Text fw={700} size="sm">
+            Lehrwerk-Stand (Grammatik)
+          </Text>
+          <Text size="xs" c="dimmed">
+            Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Automatisch: höchste Unit aus den Vokabeln der
+            Klasse – {auto ? `zurzeit ${auto.buch} · ${auto.unit}` : 'zurzeit noch keine (keine Vokabeln mit Lehrwerk und Unit)'}.
+          </Text>
+          <Select
+            label="Band"
+            data={Object.keys(d.baende)}
+            value={buch}
+            onChange={(b) => (b ? setzen(b, d.baende[b][0] ?? '') : setzen(null, null))}
+            clearable
+            placeholder={auto ? `automatisch (${auto.buch})` : 'automatisch'}
+            comboboxProps={{ withinPortal: false }}
+            data-lehrwerk-band
+          />
+          <Select
+            label="Unit"
+            data={buch ? d.baende[buch] ?? [] : []}
+            value={d.stand?.unit ?? null}
+            onChange={(u) => (buch && u ? setzen(buch, u) : setzen(null, null))}
+            clearable
+            placeholder={auto && !buch ? `automatisch (${auto.unit})` : 'automatisch'}
+            disabled={!buch}
+            comboboxProps={{ withinPortal: false }}
+            data-lehrwerk-unit
+          />
+          <Button
+            size="xs"
+            variant={d.stand ? 'light' : 'subtle'}
+            disabled={!d.stand}
+            leftSection={d.stand ? undefined : <IconCheck size={14} />}
+            onClick={() => setzen(null, null)}
+            data-lehrwerk-automatisch
+          >
+            {d.stand ? 'Automatisch (aus den Vokabeln)' : 'Automatisch (aus den Vokabeln) ist gewählt'}
+          </Button>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   )
 }
-
 function FachAnsicht({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
@@ -645,13 +725,28 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="reihen" pt="sm">
+          {/* Neu für diese Klasse (08.10.2026): Reihe bzw. Blatt mit Fach und Jahrgang der Klasse beginnen */}
+          <Group gap="xs" mb="sm" data-klasse-neu>
+            <Button size="xs" variant="light" leftSection={<IconRoute size={14} />} onClick={() => reiheFuerKlasse(d)} data-reihe-erstellen>
+              Unterrichtsreihe erstellen
+            </Button>
+            <Button size="xs" variant="light" leftSection={<IconFileText size={14} />} onClick={() => void blattNeuFuerKlasse(d)} data-arbeitsblatt-erstellen>
+              Arbeitsblatt erstellen
+            </Button>
+          </Group>
           <MaterialListe eintraege={reihenEintraege(d, ort)} leer="Noch keine Unterrichtsreihen oder Blätter in dieser Lerngruppe." />
         </Tabs.Panel>
         {d.sprachfach && (
           <Tabs.Panel value="vokabeln" pt="sm">
             <Stack gap="xs">
-              <MaterialListe eintraege={vokabelEintraege(d, ort)} leer="Noch kein Vokabel- oder Grammatiktraining in dieser Lerngruppe." />
-              <LehrwerkStand gruppeId={id} />
+              {/* Kopfzeile: Kurse links, Lehrwerk-Stand als kleiner Knopf rechts (08.10.2026) */}
+              <Group justify="space-between" gap="xs">
+                <Text fw={700} size="sm">
+                  Kurse in Sprachenlernen
+                </Text>
+                <LehrwerkStand gruppeId={id} />
+              </Group>
+              <KursKarten d={d} ort={ort} />
               {d.wackelig.length > 0 && (
                 <Card withBorder padding="sm" radius="md">
                   <Text fw={700} size="sm" mb={6}>
@@ -837,56 +932,150 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
   return [...reihen, ...blaetter]
 }
 
-function vokabelEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
-  const vok: Eintrag[] = d.vokabeln.map((v) => ({
-    key: `v${v.id}`,
-    art: 'Vokabeln',
-    titel: v.titel,
-    status: v.status,
-    datum: ms(v.erstellt),
-    frist: v.bis ?? v.testTermin,
-    wert: v.sicherSchnitt,
-    inhalt: (
-      <MaterialKarte
-        symbol={<IconLanguage size={16} />}
-        titel={v.titel}
-        art="Vokabeln"
-        status={v.status}
-        angaben={[
-          `seit ${tag(v.erstellt)}`,
-          v.bis ? `bis ${tag(v.bis)}` : 'ohne Ende',
-          v.testTermin ? `Test ${tag(v.testTermin)}` : '',
-          `${v.woerter} Wörter`,
-          `${v.aktiv7} von ${v.lernende} aktiv (7 Tage)`
-        ]}
-        wert={v.sicherSchnitt}
-        wertText={`${prozent(v.sicherSchnitt)} sicher`}
-        oeffnen={() => oeffneMitRueckweg('sprachenlernen', v.id)}
-        aktionen={
-          <>
-            <AblegenKnopf quelle={vokabelQuelle(v.id, v.titel)} {...ort} programm="vokabelliste" klein />
-            {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('sprachenlernen', v.id))}
-          </>
-        }
-        details={
-          <>
-            {v.quelle && <DetailZeile name="Lehrwerk">{v.quelle}</DetailZeile>}
-            <DetailZeile name="Umfang">
-              {v.woerter} Wörter für {v.lernende} Lernende
-            </DetailZeile>
-            {v.probleme.length > 0 && (
-              <DetailZeile name="Schwierigste Wörter">
-                {v.probleme
-                  .map((p) => `${p.term} – ${p.translation} (${prozent(p.quote)} falsch${p.typisch.length ? `, oft „${p.typisch.join('“, „')}“` : ''})`)
-                  .join('; ')}
-              </DetailZeile>
-            )}
-          </>
-        }
-      />
+/**
+ * Kurse statt Einzelliste (08.10.2026, Wunsch der Lehrkraft): EINE Karte je Kurs der Klasse – Titel, Vokabelstand
+ * (sicher / kennengelernt / neu), „heute aktiv", Zahl der Grammatik-Trainings und Extras. Grammatik und Extra-Aufgaben
+ * für einzelne stehen zugeklappt in der Karte; ein Klick auf die Karte öffnet den Kurs in Sprachenlernen. Was zu keinem
+ * Kurs gehört (ältere eigenständige Grammatik-Trainings), liegt zugeklappt unter „Weitere".
+ */
+function KursKarten({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.Element {
+  const kurse = [...d.vokabeln].sort((a, b) => (a.status === b.status ? ms(b.erstellt) - ms(a.erstellt) : a.status === 'offen' ? -1 : 1))
+  const kursIds = new Set(kurse.map((k) => k.id))
+  const weitere = d.grammatik.filter((g) => !g.vokId || !kursIds.has(g.vokId))
+  if (!kurse.length && !weitere.length)
+    return (
+      <Text c="dimmed" size="sm" data-keine-kurse>
+        Noch kein Kurs in dieser Lerngruppe – in Sprachenlernen einen Kurs für die Klasse freigeben.
+      </Text>
     )
-  }))
-  const gram: Eintrag[] = d.grammatik.map((g) => ({
+  return (
+    <Stack gap="xs" data-kurse>
+      {kurse.map((v) => {
+        const gram = d.grammatik.filter((g) => g.vokId === v.id)
+        const normal = gram.filter((g) => !g.extra)
+        const extras = gram.filter((g) => g.extra)
+        const laufendeExtras = extras.filter((g) => g.status === 'offen').length
+        const a = v.anteil
+        return (
+          <div key={v.id} data-kurs={v.titel}>
+            <MaterialKarte
+              symbol={<IconLanguage size={16} />}
+              titel={v.titel}
+              art="Kurs"
+              status={v.status}
+              angaben={[
+                v.woerter ? `${v.woerter} Wörter` : 'nur Grammatik',
+                v.heuteAktiv != null ? `heute aktiv ${v.heuteAktiv}/${v.lernende}` : `${v.aktiv7} von ${v.lernende} aktiv (7 Tage)`,
+                `${normal.length} Grammatik`,
+                extras.length ? `${laufendeExtras} von ${extras.length} Extras laufen` : '',
+                v.testTermin ? `Test ${tag(v.testTermin)}` : '',
+                v.bis ? `bis ${tag(v.bis)}` : ''
+              ]}
+              wert={null}
+              wertText={v.woerter ? `${prozent(v.sicherSchnitt)} sicher` : undefined}
+              oeffnen={() => oeffneMitRueckweg('sprachenlernen', v.id)}
+              aktionen={
+                <>
+                  <AblegenKnopf quelle={vokabelQuelle(v.id, v.titel)} {...ort} programm="vokabelliste" klein />
+                  {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('sprachenlernen', v.id))}
+                </>
+              }
+              zusatz={
+                <>
+                  {v.woerter > 0 && a && (
+                    <Tooltip label={`sicher ${prozent(a.sicher)} · kennengelernt ${prozent(a.aufbau)} · neu ${prozent(a.neu)}`}>
+                      <Progress.Root mt={6} size="md" radius="xl" data-kurs-stand>
+                        <Progress.Section value={a.sicher * 100} color="green" />
+                        <Progress.Section value={a.aufbau * 100} color="yellow" />
+                        <Progress.Section value={a.neu * 100} color="gray.4" />
+                      </Progress.Root>
+                    </Tooltip>
+                  )}
+                  {normal.length > 0 && (
+                    <Aufklapp titel={`Grammatik (${normal.length})`} kennung="grammatik">
+                      {normal.map((g) => (
+                        <KursZeile key={g.id} g={g} />
+                      ))}
+                    </Aufklapp>
+                  )}
+                  {extras.length > 0 && (
+                    <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras">
+                      {extras.map((g) => (
+                        <KursZeile key={g.id} g={g} />
+                      ))}
+                    </Aufklapp>
+                  )}
+                </>
+              }
+              details={
+                v.quelle || v.probleme.length ? (
+                  <>
+                    {v.quelle && <DetailZeile name="Lehrwerk">{v.quelle}</DetailZeile>}
+                    {v.probleme.length > 0 && (
+                      <DetailZeile name="Schwierigste Wörter">
+                        {v.probleme
+                          .map((p) => `${p.term} – ${p.translation} (${prozent(p.quote)} falsch${p.typisch.length ? `, oft „${p.typisch.join('“, „')}“` : ''})`)
+                          .join('; ')}
+                      </DetailZeile>
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
+          </div>
+        )
+      })}
+      {weitere.length > 0 && (
+        <Aufklapp titel={`Weitere (${weitere.length})`} kennung="weitere" rahmen>
+          <MaterialListe eintraege={grammatikEintraege(weitere, ort)} leer="" />
+        </Aufklapp>
+      )}
+    </Stack>
+  )
+}
+
+/** Zugeklappte Gruppe in einer Kurs-Karte */
+function Aufklapp({ titel, kennung, rahmen, children }: { titel: string; kennung: string; rahmen?: boolean; children: React.ReactNode }): React.JSX.Element {
+  const [auf, setAuf] = useState(false)
+  return (
+    <div data-aufklapp={kennung}>
+      <UnstyledButton mt={6} onClick={() => setAuf((x) => !x)} aria-expanded={auf} data-aufklapp-knopf={kennung}>
+        <Group gap={2}>
+          {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          <Text size={rahmen ? 'sm' : 'xs'} c="dimmed" fw={rahmen ? 600 : undefined}>
+            {titel}
+          </Text>
+        </Group>
+      </UnstyledButton>
+      <Collapse expanded={auf}>
+        <Stack gap={4} mt={4} pl={rahmen ? 0 : 'md'}>
+          {children}
+        </Stack>
+      </Collapse>
+    </div>
+  )
+}
+
+/** Eine Grammatik bzw. Extra-Aufgabe in der Kurs-Karte: Titel, Stand, Klick öffnet sie */
+function KursZeile({ g }: { g: KlasseDetail['grammatik'][number] }): React.JSX.Element {
+  return (
+    <UnstyledButton onClick={() => oeffneMitRueckweg('grammatiktraining', g.id)} data-kurs-grammatik={g.titel}>
+      <Group gap={6} wrap="nowrap">
+        <IconBook2 size={14} />
+        <Text size="xs" truncate style={{ flex: 1 }}>
+          {g.titel}
+          {g.status === 'beendet' ? ' (beendet)' : ''}
+        </Text>
+        <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+          {prozent(g.sicherSchnitt)} sicher · {g.lernende} Lernende
+        </Text>
+      </Group>
+    </UnstyledButton>
+  )
+}
+
+function grammatikEintraege(liste: KlasseDetail['grammatik'], ort: Ort): Eintrag[] {
+  return liste.map((g) => ({
     key: `g${g.id}`,
     art: 'Grammatik',
     titel: g.titel,
@@ -933,7 +1122,6 @@ function vokabelEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
       />
     )
   }))
-  return [...vok, ...gram]
 }
 
 function testEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
