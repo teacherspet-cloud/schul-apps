@@ -81,6 +81,17 @@ try {
     baende.join('|') === 'Green Line 1|Green Line 2|Green Line 3|Green Line 4|Green Line 5|Green Line 6|Green Line Transition',
     `Aufgeklappt: die Bände in Reihenfolge (${baende.length})`
   )
+  // Cover je Band (09.10.2026): Verlagsbild oder – ohne Netz – Ersatzkachel; nie beides, nie keins
+  const cover = await sichtbar(page.locator('[data-band]')).evaluateAll((els) =>
+    els.map((e) => {
+      const img = e.querySelector('img[data-cover]')
+      return img ? `${img.getAttribute('alt')}|${img.getAttribute('referrerpolicy')}|${img.getAttribute('loading')}` : e.querySelector('[data-cover-ersatz]') ? 'ersatz' : ''
+    })
+  )
+  pruefe(
+    cover.every((c) => c === 'ersatz' || /^Cover Green Line .+\|no-referrer\|lazy$/.test(c)) && cover.length === 7,
+    `Jeder Band mit Cover oder Ersatzkachel (${cover.join(', ')})`
+  )
   await sortiere('Klassenstufe')
   pruefe((await sichtbar(page.locator('[data-reihen-flach]')).count()) === 1 && (await karten().count()) === 0, '„Klassenstufe": flache Liste')
   pruefe((await sichtbar(page.locator('[data-reihen-kennzeichen]')).count()) === 7, '… jeder Band mit Reihen-Kennzeichen')

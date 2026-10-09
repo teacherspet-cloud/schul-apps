@@ -18,7 +18,7 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import { FachPunkt } from '../../shared/components/FachFarbe'
-import { IconBook2, IconBooks, IconChevronRight, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
+import { IconBooks, IconChevronRight, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
 import { notifyError } from '../../shared/util'
@@ -53,6 +53,7 @@ import {
   type FilterWahl,
   type ReihenSortierung
 } from '@shared/lehrwerkReihe'
+import { bandFarbe, bandKuerzel, coverAusgabe } from '@shared/lehrwerkCover'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -246,6 +247,7 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
           buecher={[...matching, ...others]}
           andere={others}
           languageLabel={languageLabel}
+          land={choice.stateId}
           reihen={reihen}
           offen={offeneReihen}
           onOffen={setOffeneReihen}
@@ -491,6 +493,7 @@ function Schulbuecher({
   buecher,
   andere,
   languageLabel,
+  land,
   reihen,
   offen,
   onOffen,
@@ -500,6 +503,8 @@ function Schulbuecher({
   /** Bände, die nicht zur gewählten Lerngruppe passen (Kennzeichen „andere Lerngruppe") */
   andere: TextbookMeta[]
   languageLabel: string
+  /** Bundesland der Lerngruppe – wählt die Ausgabe des Covers (09.10.2026) */
+  land: string
   reihen: ReihenFilter
   offen: string[]
   onOffen: (o: string[]) => void
@@ -509,34 +514,36 @@ function Schulbuecher({
   const band = (b: TextbookMeta, mitReihe: boolean): React.JSX.Element => (
     <Card key={b.id} withBorder padding="sm" data-band={b.name}>
       <Group justify="space-between" wrap="nowrap">
-        <div style={{ minWidth: 0 }}>
-          <Group gap="xs">
-            <IconBook2 size={16} />
-            <Text fw={600} truncate>
-              {b.name}
+        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+          <BandCover band={b} land={land} />
+          <div style={{ minWidth: 0 }}>
+            <Group gap="xs">
+              <Text fw={600} truncate>
+                {b.name}
+              </Text>
+              <Badge variant="light">{b.entryCount} Vokabeln</Badge>
+              {b.grade ? <Badge variant="outline">Klasse {b.grade}</Badge> : null}
+              {mitReihe && (
+                <Badge variant="light" color="gray" tt="none" data-reihen-kennzeichen>
+                  {reiheTitel(b)}
+                </Badge>
+              )}
+              {!b.builtIn && (
+                <Badge variant="light" color="teal">
+                  eigene Fassung
+                </Badge>
+              )}
+              {andere.includes(b) && (
+                <Badge variant="outline" color="gray">
+                  andere Lerngruppe
+                </Badge>
+              )}
+            </Group>
+            <Text size="xs" c="dimmed">
+              {b.units.length} Units{b.band ? ` · Band ${b.band}` : ''}
             </Text>
-            <Badge variant="light">{b.entryCount} Vokabeln</Badge>
-            {b.grade ? <Badge variant="outline">Klasse {b.grade}</Badge> : null}
-            {mitReihe && (
-              <Badge variant="light" color="gray" tt="none" data-reihen-kennzeichen>
-                {reiheTitel(b)}
-              </Badge>
-            )}
-            {!b.builtIn && (
-              <Badge variant="light" color="teal">
-                eigene Fassung
-              </Badge>
-            )}
-            {andere.includes(b) && (
-              <Badge variant="outline" color="gray">
-                andere Lerngruppe
-              </Badge>
-            )}
-          </Group>
-          <Text size="xs" c="dimmed">
-            {b.units.length} Units{b.band ? ` · Band ${b.band}` : ''}
-          </Text>
-        </div>
+          </div>
+        </Group>
         <Button size="xs" onClick={() => onBearbeiten(b.id)}>
           Vokabeln bearbeiten
         </Button>
@@ -606,5 +613,49 @@ function Schulbuecher({
         </Stack>
       )}
     </>
+  )
+}
+
+/**
+ * Cover eines Bands (09.10.2026): klein links neben dem Band, direkt vom Verlag geladen (nichts wird gespeichert – Wunsch
+ * der Lehrkraft, Urheberrecht). Ausgabe nach Bundesland, Regeln in src/shared/lehrwerkCover.ts. Ohne bekanntes Cover,
+ * ohne Netz oder bei geänderter Adresse: Kachel in der Bandfarbe mit der Bandnummer.
+ */
+function BandCover({ band, land }: { band: TextbookMeta; land: string }): React.JSX.Element {
+  const cover = coverAusgabe(band, land)
+  const [fehler, setFehler] = useState<string | null>(null)
+  const masse: React.CSSProperties = { width: 48, height: 64, borderRadius: 4, flexShrink: 0 }
+  if (cover && fehler !== cover.url)
+    return (
+      <img
+        src={cover.url}
+        alt={`Cover ${band.name}`}
+        title={`${cover.reihe} ${cover.band} · ${cover.ausgabe} (Klett)`}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        draggable={false}
+        data-cover={cover.isbn}
+        onError={() => setFehler(cover.url)}
+        style={{ ...masse, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+      />
+    )
+  const farbe = bandFarbe(band)
+  return (
+    <div
+      aria-hidden
+      data-cover-ersatz
+      style={{
+        ...masse,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `var(--mantine-color-${farbe}-6)`,
+        color: 'white',
+        fontWeight: 700,
+        fontSize: 20
+      }}
+    >
+      {bandKuerzel(band)}
+    </div>
   )
 }

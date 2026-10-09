@@ -302,7 +302,7 @@ export function Spielwahl({
       <Stack data-spiel-laeuft={spiel}>
         <style>{SPIELE_CSS}</style>
         <Group justify="space-between">
-          <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} px={4} onClick={() => setSpiel(null)}>
+          <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} px={4} onClick={() => setSpiel(null)} data-eigenes-beenden>
             Beenden
           </Button>
           <Text fw={800}>{spielName('vok', spiel, sprache, info(spiel).name)}</Text>

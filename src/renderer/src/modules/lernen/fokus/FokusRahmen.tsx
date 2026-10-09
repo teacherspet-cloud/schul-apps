@@ -43,6 +43,8 @@ html.sa-fokus-aktiv :has(.sa-fokus[data-fokus="an"]) { transform: none !importan
   background: var(--mantine-color-body); color: var(--mantine-color-text); outline: none;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
   animation: sa-fokus-ein .18s ease-out; }
+/* Im Vollbild nur ein „Beenden" (09.10.2026): das eigene der Übung weicht dem der Leiste */
+.sa-fokus[data-fokus="an"] [data-eigenes-beenden] { visibility: hidden; }
 .sa-fokus[data-fokus="an"] > .sa-fokus-leiste { flex: none; display: flex; justify-content: flex-end; gap: 6px; padding: 8px 16px 6px; }
 .sa-fokus[data-fokus="an"] > .sa-fokus-inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; padding: 0 max(16px, calc((100% - 860px) / 2)) max(16px, env(safe-area-inset-bottom)); }

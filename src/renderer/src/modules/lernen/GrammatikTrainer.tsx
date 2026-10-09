@@ -681,7 +681,7 @@ function VerbSpielLauf({
       <style>{CSS}</style>
       <style>{SPIELE_CSS}</style>
       <Group justify="space-between">
-        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4}>
+        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4} data-eigenes-beenden>
           Beenden
         </Button>
         <Text fw={800}>{spielName('gram', spiel, d.sprache, info.name)}</Text>
@@ -831,7 +831,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
     <Stack className="vt" data-sitzung>
       <style>{CSS}</style>
       <Group justify="space-between">
-        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4}>
+        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
           Beenden
         </Button>
         <Group gap={6}>

@@ -162,7 +162,8 @@ try {
   await s.waitForTimeout(300)
   // Echtes Vollbild vom Browser verlassen: Fokusansicht bleibt, „×" und „Ganzer Bildschirm" sichtbar
   await s.evaluate(() => document.exitFullscreen())
-  await s.waitForTimeout(400)
+  // Länger als die Esc-Sperre nach dem Verlassen des Vollbilds (400 ms) warten – sonst Wettlauf
+  await s.waitForTimeout(800)
   l = await lage(s)
   pruefe(l.fokus === 'vokabelrunde' && !l.vollbild && (await s.locator('[data-fokus-ganz]').isVisible()), 'Browser verlässt das Vollbild: Fokusansicht bleibt (mit „Ganzer Bildschirm")')
   // Esc außerhalb des echten Vollbilds beendet die Übung

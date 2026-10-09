@@ -909,7 +909,7 @@ function Sitzung({
     <Stack className="vt" data-sitzung>
       <style>{CSS}</style>
       <Group justify="space-between">
-        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4}>
+        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
           Beenden
         </Button>
         <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
