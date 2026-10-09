@@ -19,7 +19,7 @@ import AuftragsHinweis from '../components/AuftragsHinweis'
 import { useZwischenstaende, type Zwischenstand } from '../zwischenstand'
 import UndoRedoButtons from '../components/UndoRedoButtons'
 import RueckwegKnopf from '../components/RueckwegKnopf'
-import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../navigation'
+import { useDokumentOeffner, useNeuAnleger, useUebersichtZeiger, useZielZeiger } from '../navigation'
 import { useUndoKeys } from '../useUndoKeys'
 import { notifyError } from '../util'
 import type { Bibliothek } from './bibliothek'
@@ -136,6 +136,13 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
       .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
+  // Erstes Öffnen in der Sitzung über die Leiste (09.10.2026, shared/sitzung.ts): die Bibliothek, wenn es Dokumente gibt
+  useUebersichtZeiger(p.modulId, () =>
+    void p
+      .liste()
+      .then((list) => list.length > 0 && setLibrary(true))
+      .catch(() => undefined)
+  )
 
   if (library) {
     const { BibliotheksSeite } = p

@@ -21,6 +21,7 @@ import { createContext, useContext, useState } from 'react'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import type { ProgrammIcon } from './ProgrammSymbol'
 import { useAppSettings, useExperte } from '../settingsStore'
+import { offenLesen, offenMerken } from '../sitzung'
 
 /** Name, Beschreibung, Farbe und Bild des Programms aus der Registry (App.tsx) */
 export const ProgrammInfo = createContext<{ name: string; description: string; color: string; icon?: ProgrammIcon; bild?: string } | null>(null)
@@ -81,23 +82,13 @@ export function AppKopf({
   const Symbol = info?.icon
   /*
    * Ein- und ausblendbar (06.10.2026, Wunsch der Lehrkraft): eingeklappt bleibt nur eine schmale Leiste mit Name und
-   * Pfeil – mehr Platz für Blatt und Editor. Gemerkt je Programm (nur in diesem Browser).
+   * Pfeil – mehr Platz für Blatt und Editor. Gemerkt je Programm für die Sitzung (shared/sitzung.ts, 09.10.2026).
    */
   const merkName = `schulapps-kopf-zu:${name}`
-  const [zu, setZu] = useState(() => {
-    try {
-      return localStorage.getItem(merkName) === '1'
-    } catch {
-      return false
-    }
-  })
+  const [zu, setZu] = useState(() => offenLesen<boolean>(merkName) === true)
   const umschalten = (): void => {
     setZu(!zu)
-    try {
-      localStorage.setItem(merkName, zu ? '0' : '1')
-    } catch {
-      // ohne Browserspeicher: nur für diese Sitzung
-    }
+    offenMerken(merkName, !zu)
   }
   /*
    * Telefon (07.10.2026, Recherche Material 3 / Apple HIG): EINE Zeile – Bild, Titel, ⋮. Suche, Zusätze, „Meine …" und

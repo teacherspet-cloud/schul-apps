@@ -8,6 +8,7 @@ import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPh
 import { istGeloescht, sichereAlles } from './autosave'
 import { kiKennung, merkeAnfrage, merkeAuftrag, ruhigesZiel, schaetzeRest } from './restzeit'
 import { useAppSettings } from './settingsStore'
+import { offenLesen, offenMerken } from './sitzung'
 import { useZwischenstaende, zwischenstandsMelder } from './zwischenstand'
 
 /**
@@ -117,25 +118,15 @@ interface AuftraegeState {
 }
 
 const OFFEN_KEY = 'schul-apps-auftraege-offen'
-/** Standard: eingeklappt – die Liste läge sonst über den Knöpfen unten rechts im Formular */
-const leseOffen = (): boolean => {
-  try {
-    return localStorage.getItem(OFFEN_KEY) === '1'
-  } catch {
-    return false
-  }
-}
+/** Standard: eingeklappt – die Liste läge sonst über den Knöpfen unten rechts im Formular. Offen gilt je Sitzung (shared/sitzung.ts, 09.10.2026). */
+const leseOffen = (): boolean => offenLesen<boolean>(OFFEN_KEY) === true
 
 export const useAuftraege = create<AuftraegeState>((set) => ({
   auftraege: [],
   offen: leseOffen(),
   neu: 0,
   setzeOffen: (offen) => {
-    try {
-      localStorage.setItem(OFFEN_KEY, offen ? '1' : '0')
-    } catch {
-      // ohne lokalen Speicher gilt die Wahl nur für diese Sitzung
-    }
+    offenMerken(OFFEN_KEY, offen)
     set({ offen })
   },
   entferne: (id) => {

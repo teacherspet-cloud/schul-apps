@@ -77,6 +77,7 @@ export default function EinfacheBibliothek({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Fach, Thema, Klasse"
+          reihe={bib.reihe}
         >
           <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={props.onOpenFile}>
             Datei öffnen …
@@ -86,7 +87,7 @@ export default function EinfacheBibliothek({
           </Button>
         </BibliothekKopf>
         {bib.eintraege && treffer.length === 0 && (
-          <BibliothekLeer leer={alle.length === 0} text="Noch nichts gespeichert – es wird automatisch gesichert, sobald etwas eingetragen ist." />
+          <BibliothekLeer ausgeblendet={bib.reihe.anzahl} leer={alle.length === 0} text="Noch nichts gespeichert – es wird automatisch gesichert, sobald etwas eingetragen ist." />
         )}
         {suche ? (
           <Stack gap="xs">{treffer.map(zeile)}</Stack>

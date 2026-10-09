@@ -30,8 +30,15 @@ export function touchAktiv(): boolean {
   return document.documentElement.hasAttribute('data-touch')
 }
 
+/*
+ * Android und andere Tablets (09.10.2026, Befund: Kopfknöpfe der Lernenden 34 statt 44 Punkte): Manche Geräte melden
+ * als Hauptzeiger keinen „groben" Zeiger (Stift, angedockte Maus), haben aber kein Überfahren und einen Finger als
+ * weiteren Zeiger – auch dann gelten die Fingergrößen. PCs mit Touchbildschirm melden „hover: hover" und bleiben außen vor.
+ */
+const FINGER_OHNE_HOVER = '(hover: none) and (any-pointer: coarse)'
+
 function ermitteln(): boolean {
-  return aufIos() || Boolean(medien(GROB)?.matches)
+  return aufIos() || Boolean(medien(GROB)?.matches) || Boolean(medien(FINGER_OHNE_HOVER)?.matches)
 }
 
 const hoerer = new Set<() => void>()
@@ -73,6 +80,7 @@ export function touchModusEinrichten(): void {
   installiert = true
   setzen()
   medien(GROB)?.addEventListener('change', setzen)
+  medien(FINGER_OHNE_HOVER)?.addEventListener('change', setzen)
   if (touchAktiv()) viewportSetzen()
   // Übersichtstabellen als Kartenliste am Telefon (07.10.2026)
   if (document.body) kartenTabellenEinrichten()

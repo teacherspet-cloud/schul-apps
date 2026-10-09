@@ -11,7 +11,7 @@
  */
 import { app } from 'electron'
 import { randomBytes } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import {
   MEDIEN_DATEI,
@@ -245,20 +245,40 @@ export function bildLoeschen(sprache: string, wort: string, stufe: Bildstufe = '
  * beider Fassungen, für die `weg` true sagt, wird gelöscht – Datei und Eintrag. Danach spricht wie ohne Aufnahme die
  * Stimme des Geräts. Bilder bleiben. Ohne Medienbank (kein index.json) geschieht nichts und es wird nichts angelegt.
  */
-export function toeneAussortieren(weg_: (ton: MedienTon, art: TonArt, sprache: string) => boolean): { woerter: number; saetze: number; dateien: number } {
+export function toeneAussortieren(
+  weg_: (ton: MedienTon, art: TonArt, sprache: string, eintrag: { wort: string; saetze: string[] }) => boolean,
+  /**
+   * Sicherung zuerst (09.10.2026, Wartung verbform-ton): Name eines Unterordners der Medienbank. Vor der ersten
+   * Löschung kommt index.json dorthin, die betroffenen Dateien werden dorthin VERSCHOBEN statt gelöscht.
+   */
+  sicherung?: string
+): { woerter: number; saetze: number; dateien: number } {
   const zahl = { woerter: 0, saetze: 0, dateien: 0 }
   if (!existsSync(join(wurzelPfad(), 'index.json'))) return zahl
   const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
+  const sich = sicherung && /^[a-z0-9-]{3,80}$/.test(sicherung) ? join(wurzelPfad(), sicherung) : null
+  if (sicherung && !sich) throw new Error('Ungültiger Name der Sicherung.')
+  const sichern = (): void => {
+    if (!sich || existsSync(join(sich, 'index.json'))) return
+    mkdirSync(sich, { recursive: true })
+    copyFileSync(indexDatei(), join(sich, 'index.json'))
+  }
   const loeschen = (t: MedienTon): void => {
-    if (t.datei && MEDIEN_DATEI.test(t.datei) && existsSync(join(wurzelPfad(), 'dateien', t.datei))) zahl.dateien++
+    sichern()
+    const pfad = t.datei && MEDIEN_DATEI.test(t.datei) ? join(wurzelPfad(), 'dateien', t.datei) : null
+    if (pfad && existsSync(pfad)) {
+      zahl.dateien++
+      if (sich) return renameSync(pfad, join(sich, t.datei))
+    }
     weg(t.datei)
   }
   for (const [schluessel, e0] of Object.entries(i)) {
     const sp = schluessel.split(':')[0] ?? ''
     const e: MedienEintrag = { ...e0 }
+    const eintrag = { wort: schluessel.slice(sp.length + 1), saetze: [...Object.keys(e0.saetze ?? {}), ...Object.keys(e0.saetzeM ?? {})] }
     for (const feld of ['ton', 'tonM'] as const) {
       const t = e[feld]
-      if (t && weg_(t, 'wort', sp)) {
+      if (t && weg_(t, 'wort', sp, eintrag)) {
         loeschen(t)
         delete e[feld]
         zahl.woerter++
@@ -269,7 +289,7 @@ export function toeneAussortieren(weg_: (ton: MedienTon, art: TonArt, sprache: s
       if (!s) continue
       const rest: Record<string, MedienTon> = {}
       for (const [k, t] of Object.entries(s))
-        if (weg_(t, 'satz', sp)) {
+        if (weg_(t, 'satz', sp, eintrag)) {
           loeschen(t)
           zahl.saetze++
         } else rest[k] = t

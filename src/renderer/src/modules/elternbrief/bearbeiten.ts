@@ -10,7 +10,8 @@
 import type { StructuredRequest } from '@shared/types'
 import { arr, obj, str } from '../../shared/aiSchema'
 import type { Familiensprache } from '../../shared/familiensprachen'
-import { BRIEF_SCHEMA, festeAngaben, TOENE, type BriefText, type Elternbrief } from './model'
+import { BRIEF_SCHEMA, festeAngaben, FETT_REGEL, TOENE, type BriefText, type Elternbrief } from './model'
+import { bereinigeFett } from './hervorhebung'
 
 // ---------- Teile eines Briefes ----------
 
@@ -132,7 +133,7 @@ export const AKTIONEN: { value: Aktion; label: string; auftrag: string }[] = [
 ]
 
 const FEST_REGEL =
-  'FESTE ANGABEN: Datumsangaben, Uhrzeiten, Beträge, Fristen, Orte und Platzhalter in eckigen Klammern bleiben inhaltlich gleich und in derselben Schreibweise (12.12.2026 bleibt 12.12.2026, 8:00 Uhr bleibt 8:00 Uhr, 5 € bleibt 5 €). Umformuliert wird nur der Satz drumherum. Nichts dazuerfinden.'
+  'FESTE ANGABEN: Datumsangaben, Uhrzeiten, Beträge, Fristen, Orte und Platzhalter in eckigen Klammern bleiben inhaltlich gleich und in derselben Schreibweise (12.12.2026 bleibt 12.12.2026, 8:00 Uhr bleibt 8:00 Uhr, 5 € bleibt 5 €). Umformuliert wird nur der Satz drumherum. Nichts dazuerfinden. Fettmarkierungen **…** um wichtige Angaben bleiben erhalten.'
 
 const TEIL_SCHEMA = obj({ text: str('Der neu formulierte Teil') })
 
@@ -177,7 +178,7 @@ export function teilAnfrage(b: Elternbrief, schluessel: string, aktion: Aktion |
 }
 
 export function teilAus(daten: unknown): string {
-  const text = String((daten as { text?: unknown } | null)?.text ?? '').trim()
+  const text = bereinigeFett(String((daten as { text?: unknown } | null)?.text ?? '')).trim()
   if (!text) throw new Error('Die KI hat keinen Text geliefert.')
   return text
 }
@@ -202,6 +203,7 @@ export function neuAnfrage(b: Elternbrief, o: Neuformulierung): StructuredReques
       o.kuerzer ? '- Deutlich kürzer: nur das Nötige, 2–3 Absätze.' : '',
       o.hinweis.trim() ? `HINWEIS DER LEHRKRAFT (umsetzen): ${o.hinweis.trim()}` : '',
       FEST_REGEL,
+      FETT_REGEL,
       '- KEINE Namen von Kindern oder Eltern; der Rücklaufzettel bleibt erhalten (gleiche Angaben).',
       b.meta.ruecklauf ? '' : '- Ohne Rücklaufzettel: ruecklaufTitel leer, ruecklaufZeilen leer.',
       ...festeAngaben(b.meta),
@@ -231,7 +233,7 @@ export function teileUebersetzungsAnfrage(teile: Teil[], sprache: Familiensprach
   return {
     system: `Du übersetzt Teile von Elternbriefen deutscher Schulen in die Familiensprache der Eltern: ${sprache.name} (${sprache.eigen}). Genau, vollständig, in einfacher, höflicher Alltagssprache.`,
     user: [
-      `Übersetze jeden Teil ins ${sprache.name}. Den Schlüssel unverändert zurückgeben. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Zahlen von Datum, Uhrzeit und Betrag unverändert; Wörter wie „Uhr" oder „bis" werden mitübersetzt.`,
+      `Übersetze jeden Teil ins ${sprache.name}. Den Schlüssel unverändert zurückgeben. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Zahlen von Datum, Uhrzeit und Betrag unverändert; Wörter wie „Uhr" oder „bis" werden mitübersetzt. Fettmarkierungen **…** bleiben um dieselben Angaben stehen.`,
       JSON.stringify(teile)
     ].join('\n\n'),
     schemaName: 'elternbrief_teile',
@@ -242,7 +244,7 @@ export function teileUebersetzungsAnfrage(teile: Teil[], sprache: Familiensprach
 export function teileUebersetzungAus(daten: unknown, erwartet: Teil[]): Teil[] {
   const liste = (daten as { teile?: unknown } | null)?.teile
   const raus = (Array.isArray(liste) ? liste : [])
-    .map((x) => ({ schluessel: String((x as Teil)?.schluessel ?? ''), text: String((x as Teil)?.text ?? '').trim() }))
+    .map((x) => ({ schluessel: String((x as Teil)?.schluessel ?? ''), text: bereinigeFett(String((x as Teil)?.text ?? '')).trim() }))
     .filter((x) => x.text && erwartet.some((e) => e.schluessel === x.schluessel))
   if (raus.length !== erwartet.length) throw new Error('Die Übersetzung ist unvollständig.')
   return raus

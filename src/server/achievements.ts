@@ -121,7 +121,13 @@ function wochenzielVon(nutzerId: string): number {
   return Number.isFinite(z) && z >= 1 && z <= 7 ? Math.round(z) : 3
 }
 
+/** Wer gespeichert wird: Lernende ohne Vorschaukonten */
 const zaehlt = (n: NutzerInfo): boolean => n.rolle === 'schueler' && n.quelle !== 'vorschau'
+/**
+ * Wer die Liste sieht: alle Lernenden, auch die Musterschüler-Vorschau (09.10.2026: dort stand „0 von 0") – die
+ * Vorschau wird nur berechnet, nicht gespeichert, und meldet nichts als neu (sonst käme der Glückwunsch bei jedem Öffnen).
+ */
+const siehtListe = (n: NutzerInfo): boolean => n.rolle === 'schueler'
 
 /** Laufende Auswertung je Person – gleichzeitige Anfragen teilen sie */
 const laufend = new Map<string, Promise<{ d: AchDaten; katalog: Achievement[] }>>()
@@ -182,13 +188,13 @@ export function achievementsRoute(): (k: Anfrage) => Promise<boolean> {
     if (req.method !== 'GET') return json(res, 405, { fehler: 'Nur lesen.' }), true
     if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
     const ich = sitzung.nutzer
-    if (!zaehlt(ich))
+    if (!siehtListe(ich) || (!zaehlt(ich) && url.pathname.endsWith('/neu')))
       return (
         json(res, 200, url.pathname.endsWith('/neu') ? { neu: [] } : { alle: [], erreicht: [], verborgen: 0, gruppen: ACH_GRUPPEN, neu: [], lernende: 0, platz: null }),
         true
       )
     const { d, katalog } = await achievementsAuswerten(ich)
-    const offen = [...d.offen]
+    const offen = zaehlt(ich) ? [...d.offen] : []
     alsGemeldet(ich, offen)
     if (url.pathname.endsWith('/neu')) return json(res, 200, { neu: eintraege(d, offen) }), true
     const reihenfolge = ACH_GRUPPEN.map((g) => g.id)

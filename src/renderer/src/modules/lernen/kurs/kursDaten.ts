@@ -3,6 +3,7 @@
  * in Sprachenlernen und „Meine Klassen"): Antwort von GET /server/vokabeln/<id> und kleine Datums-Helfer.
  */
 import type { Uebersicht } from '@shared/vokabeltrainer'
+import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import type { ProfilPunkt } from './KursGrammatik'
 
 /** Reiter der Kursseite */
@@ -54,6 +55,11 @@ export interface Lernstanddaten {
     }
   }[]
   lerngruppeId?: string
+  /** Kurs einer festen Klasse (09.10.2026): nicht beenden/löschen, kein Lernzeitraum-Ende */
+  klassenKurs?: boolean
+  /** Übersicht je Abschnitt – nur bei Kursen ohne Lerngruppe (09.10.2026) */
+  abschnitte?: AbschnittStatistik[]
+  lernendeNamen?: string[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
 }

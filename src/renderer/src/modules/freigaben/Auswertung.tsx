@@ -15,6 +15,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { farbeFuer, type MitarbeitNote, type Strenge } from '@shared/blattAuswertung'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { starteAuftrag } from '../../shared/auftraege'
+
+const MITARBEIT_FERTIG = 'blatt-mitarbeit-fertig'
 
 type AmpelStand = 'rot' | 'gelb' | 'gruen'
 
@@ -207,14 +210,38 @@ export function AuswertungLeiste({
   const [strenge, setStrenge] = useState<Strenge>(daten.strenge)
   const [laeuft, setLaeuft] = useState(false)
   const [hilfen, setHilfen] = useState(false)
+  /*
+   * Als Auftrag in der Auftragsleiste (09.10.2026, Wunsch der Lehrkraft): Die KI-Einschätzung läuft im Hintergrund weiter,
+   * auch wenn man die Auswertung verlässt; fertig landet sie hier (Ereignis) bzw. beim nächsten Öffnen vom Server.
+   */
+  useEffect(() => {
+    const fertig = (e: Event): void => {
+      const d = (e as CustomEvent<{ id: string; r: Pick<AuswertungDaten, 'strenge' | 'mitarbeit'> & { erstellt: number } }>).detail
+      if (d?.id === id) setDaten({ ...daten, ...d.r })
+    }
+    window.addEventListener(MITARBEIT_FERTIG, fertig)
+    return () => window.removeEventListener(MITARBEIT_FERTIG, fertig)
+  }, [id, daten, setDaten])
   const einschaetzen = async (s: Strenge): Promise<void> => {
     setLaeuft(true)
     try {
-      const r = await senden<{ strenge: Strenge; mitarbeit: AuswertungDaten['mitarbeit']; erstellt: number }>(`/server/blaetter/${id}/mitarbeit`, {
-        strenge: s
+      await starteAuftrag({
+        moduleId: 'freigaben',
+        docId: id,
+        titel: `Mitarbeit: ${titel}`,
+        art: 'Mitarbeit einschätzen',
+        eingabe: { strenge: s },
+        sperrt: false,
+        schluessel: `mitarbeit:${id}`,
+        fehlerTitel: 'Keine Einschätzung',
+        arbeit: async (e) =>
+          senden<{ strenge: Strenge; mitarbeit: AuswertungDaten['mitarbeit']; erstellt: number }>(`/server/blaetter/${id}/mitarbeit`, { strenge: e.strenge }),
+        ablegen: async (r) => {
+          window.dispatchEvent(new CustomEvent(MITARBEIT_FERTIG, { detail: { id, r } }))
+          notifySuccess(`Vorschläge zu Mitarbeit und Hilfen für „${titel}" erstellt.`)
+        },
+        abschluss: () => 'Mitarbeit eingeschätzt'
       })
-      setDaten({ ...daten, ...r })
-      notifySuccess('Vorschläge zu Mitarbeit und Hilfen erstellt.')
     } catch (e) {
       notifyError(e, 'Keine Einschätzung')
     } finally {

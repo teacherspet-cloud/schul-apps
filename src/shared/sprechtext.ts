@@ -56,6 +56,7 @@ const REGELN: Record<string, SprachRegeln> = {
       'sth.': 'something',
       '°C': 'degrees Celsius',
       '°F': 'degrees Fahrenheit',
+      'km/h': 'kilometres per hour',
       km: 'kilometres',
       cm: 'centimetres',
       ml: 'millilitres',
@@ -83,6 +84,7 @@ const REGELN: Record<string, SprachRegeln> = {
       'jmd.': 'jemand',
       'etw.': 'etwas',
       '°C': 'Grad Celsius',
+      'km/h': 'Kilometer pro Stunde',
       km: 'Kilometer',
       cm: 'Zentimeter',
       ml: 'Milliliter',
@@ -103,6 +105,7 @@ const REGELN: Record<string, SprachRegeln> = {
       Mme: 'Madame',
       Mlle: 'Mademoiselle',
       '°C': 'degrés Celsius',
+      'km/h': 'kilomètres-heure',
       km: 'kilomètres'
     },
     alsWort: ['OTAN', 'UNESCO', 'SIDA', 'OVNI', 'SMIC', 'ONG', 'NASA'],
@@ -121,6 +124,7 @@ const REGELN: Record<string, SprachRegeln> = {
       'Ud.': 'usted',
       'Uds.': 'ustedes',
       '°C': 'grados Celsius',
+      'km/h': 'kilómetros por hora',
       km: 'kilómetros'
     },
     alsWort: ['OTAN', 'ONU', 'SIDA', 'OVNI', 'UNESCO', 'RENFE', 'NASA'],
@@ -186,6 +190,126 @@ function ausserhalbKlammern(text: string, fn: (teil: string) => string): string 
     .join('')
 }
 
+/*
+ * Varianten und Formenreihen (09.10.2026, Wunsch der Lehrkraft: „was / were" soll als „was … were" mit kurzer Pause
+ * klingen, nie „slash"). Recherche und Liste der betroffenen Verben: recherche/aussprache-unregelmaessige-verben.md.
+ *
+ * Die Pause steht anbieterneutral als Auslassungspunkte im Sprechtext (so wird er auch mit der Aufnahme gespeichert):
+ * eleven_v3 (Dialoge) und OpenAI (gpt-4o-mini-tts) machen daraus eine Pause; für eleven_multilingual_v2 setzt der
+ * Hauptprozess bei kurzen Einzeltexten eine echte Pausenmarke `<break time="0.4s" />` ein (`mitPausenMarken`), die
+ * Gerätestimme bekommt ein Komma (`fuerGeraetestimme`). Der angezeigte Text bleibt immer, wie er ist.
+ */
+
+/** Pause zwischen gleichwertigen Varianten („was / were", „burnt or burned") */
+export const VARIANTEN_PAUSE = ' … '
+/** Pause zwischen den Formen einer Reihe („be – was – been") */
+export const FORMEN_PAUSE = '. '
+
+/** „stato/a", „cansado/a", „Schüler/-innen": nur die Grundform sprechen */
+const ENDUNG_NACH_STRICH = /([\p{L}\p{M}]{2,})\/-?(?:a|e|i|o|s|as|es|os|is|ne|in|innen)(?![\p{L}\p{M}\d])/gu
+/** Adressen bleiben unberührt */
+const ADRESSE = /(\S*(?:\/\/|www\.)\S*)/
+/** Schrägstrich zwischen Wörtern (nicht „1/2", nicht „km/h") */
+const STRICH_ZWISCHEN_WOERTERN = /([\p{L}\p{M}.)\]'’])[ \t]*\/[ \t]*(?=[\p{L}\p{M}]{2}|[(\['’])/gu
+
+/** Schrägstriche zwischen Wörtern als kurze Pause: „was/were" → „was … were", „il/elle" → „il … elle" */
+export function ohneSchraegstrich(text: string): string {
+  return String(text ?? '')
+    .split(ADRESSE)
+    .map((teil, i) => (i % 2 ? teil : teil.replace(ENDUNG_NACH_STRICH, '$1').replace(STRICH_ZWISCHEN_WOERTERN, `$1${VARIANTEN_PAUSE}`)))
+    .join('')
+}
+
+/** Für eleven_multilingual_v2 (kurze Einzeltexte): Auslassungspunkte zwischen Wörtern als echte Pause von 0,4 s */
+export const mitPausenMarken = (text: string, sekunden = 0.4): string =>
+  String(text ?? '').replace(/\s*…\s*(?=\S)/g, (m, i: number) => (i === 0 ? m : ` <break time="${sekunden}s" /> `))
+
+/** Für die Stimme des Geräts: Pause als Komma (manche Gerätestimmen lesen „…" vor oder überspringen es) */
+export const fuerGeraetestimme = (text: string): string =>
+  String(text ?? '')
+    .replace(/\s*…\s*(?=\S)/g, ', ')
+    .replace(/\s*…\s*$/, '')
+
+/** Angaben, die nie gesprochen werden: „(AE)", „[BE]", „(infml)", „(irr.)" */
+const ANGABE_IN_KLAMMERN =
+  /\s*\((?:AE|BE|AmE|BrE|US|UK|Am\.?|Br\.?|am\.|brit\.|amerik\.|infml\.?|fml\.?|informal|formal|irr\.?|unregelm\.?|selten|veraltet|old|lit\.?|liter\.?|ugs\.?|fam\.?|pop\.?|vulg\.?)\)/giu
+/** Allein stehende Marker britisch/amerikanisch („gotten AE") */
+const MARKER_ALLEIN = /(?<![\p{L}\d])(?:AE|BE|AmE|BrE)(?![\p{L}\d])/gu
+/** Angehängte Endungen in Klammern: „allé(e)", „assis(e)", „venu(e)s", „cansado(a)" */
+const ENDUNG_IN_KLAMMERN = /([\p{L}\p{M}])\((?:e|s|es|x|a|o|as|os|ne|le|n|in|innen)\)/giu
+/** Französisch: Partizip nach „être" in der weiblichen Form, wie sie früher aus „allé(e)" entstand („je suis allée") */
+const FR_WEIBLICH_NACH_ETRE = /(^|[^\p{L}])((?:je|tu|il|on|nous|vous|ils)\s+(?:(?:me|m'|te|t'|se|s'|nous|vous)\s*)?(?:suis|es|est|sommes|êtes|sont)\s+[\p{L}\p{M}]*[\p{L}\p{M}])e(s?)(?![\p{L}\p{M}])/gu
+
+/**
+ * Englische Homographen (09.10.2026): gleiche Schreibung, andere Aussprache je nach Form. Nur in Verbformen und nur in
+ * der genannten Spalte (`inf` bzw. `past`/`pp`) – nie im freien Text. Die Ersatzschreibung klingt bei jeder Stimme
+ * (ElevenLabs, OpenAI, Gerät) richtig; Lautschrift-Marken versteht eleven_multilingual_v2 nicht.
+ */
+export const VERB_HOMOGRAPHE: { wort: string; spalten: ('inf' | 'past' | 'pp')[]; gesprochen: string; laut: string }[] = [
+  { wort: 'read', spalten: ['past', 'pp'], gesprochen: 'red', laut: '/rɛd/ (nicht /riːd/)' },
+  { wort: 'lead', spalten: ['inf'], gesprochen: 'leed', laut: '/liːd/ (nicht /lɛd/ wie das Metall)' },
+  { wort: 'wind', spalten: ['inf'], gesprochen: 'wined', laut: '/waɪnd/ (nicht /wɪnd/ wie der Wind)' },
+  { wort: 'wound', spalten: ['past', 'pp'], gesprochen: 'wownd', laut: '/waʊnd/ (nicht /wuːnd/ wie die Wunde)' },
+  { wort: 'tear', spalten: ['inf'], gesprochen: 'tare', laut: '/teə/ (nicht /tɪə/ wie die Träne)' },
+  { wort: 'sow', spalten: ['inf'], gesprochen: 'so', laut: '/səʊ/ (nicht /saʊ/ wie die Sau)' },
+  { wort: 'dove', spalten: ['past'], gesprochen: 'dohv', laut: '/dəʊv/ (AE, nicht /dʌv/ wie die Taube)' },
+  { wort: 'bow', spalten: ['inf'], gesprochen: 'bough', laut: '/baʊ/ (sich verbeugen, nicht /bəʊ/ wie der Bogen)' }
+]
+
+/**
+ * Sprechtext einer Zelle der Liste unregelmäßiger Verben (09.10.2026). `spalte`: Kennung aus VERB_SPALTEN (`inf`,
+ * `past`, `pp` …) – steuert die Homographen. Nimmt auch den alten Sprechtext („was, were") an.
+ *  - Angaben fallen weg: „[AE]", „(AE)", „(infml)", „gotten AE" → „gotten"
+ *  - Endungen fallen weg: „allé(e)" → „allé", „sono stato/a" → „sono stato" (die Grundform genügt)
+ *  - Klammer vorn wird mitgesprochen: „(to) be" → „to be", „(s')asseoir" → „s'asseoir"
+ *  - Varianten mit kurzer Pause: „was/were", „learnt or learned", „burnt, burned", „learnt (learned)" → „… … …"
+ *  - Reihen mit Pause statt Strich: „be – was – been" → „be. was. been"
+ *  - Platzhalter wie im freien Text („sb" → „somebody")
+ */
+export function verbFormSprechtext(zelle: string, sprache = 'en', spalte = ''): string {
+  const sp = String(sprache ?? '').toLowerCase().split(/[-_]/)[0]
+  let t = String(zelle ?? '')
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!t || /^[-–—]+$/.test(t)) return ''
+  t = t
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(ANGABE_IN_KLAMMERN, ' ')
+    .replace(MARKER_ALLEIN, ' ')
+    .replace(ENDUNG_IN_KLAMMERN, '$1')
+    .replace(ENDUNG_IN_KLAMMERN, '$1')
+  // Endung nach Schrägstrich; im alten Sprechtext stand dort ein Komma („sono stato, a")
+  t = t.replace(ENDUNG_NACH_STRICH, '$1').replace(/([\p{L}\p{M}]{2,}), (?:a|as)(?=$|[,;/])/gu, '$1')
+  if (sp === 'fr') t = t.replace(FR_WEIBLICH_NACH_ETRE, (m, vor: string, kern: string, s: string) => (/\b(?:elle|elles)\b/.test(m) ? m : `${vor}${kern}${s}`))
+  // Klammer vorn: mitsprechen; Klammer mitten/hinten: Variante („learnt (learned)")
+  t = t.replace(/^\(([^)]*)\)\s*/, (_m, x: string) => `${x.trim()}${/['’]$/.test(x.trim()) ? '' : ' '}`)
+  t = t.replace(/\s*\(([^)]*)\)/g, (_m, x: string) => (x.trim() ? `${VARIANTEN_PAUSE}${x.trim()} ` : ' '))
+  t = t
+    .replace(/\s+[–—-]\s+/g, FORMEN_PAUSE)
+    .replace(/\s*\/\s*/g, VARIANTEN_PAUSE)
+    .replace(/\s*[,;]\s*/g, VARIANTEN_PAUSE)
+    .replace(/\s+(?:or|ou|o|oder|или)\s+/giu, VARIANTEN_PAUSE)
+  if (sp === 'en' && spalte)
+    for (const h of VERB_HOMOGRAPHE)
+      if ((h.spalten as string[]).includes(spalte)) t = t.replace(new RegExp(`(?<![\\p{L}'’])${h.wort}(?![\\p{L}'’])`, 'giu'), h.gesprochen)
+  t = sprechText(t, sp || 'en')
+  return t
+    .replace(/\s*…\s*/g, VARIANTEN_PAUSE)
+    .replace(/(?:\s*…\s*){2,}/g, VARIANTEN_PAUSE)
+    .replace(/^\s*…\s*|\s*…\s*$/g, '')
+    .replace(/\s*\.\s*(?=\.|$)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Sprechtext einer ganzen Zeile („be – was/were – been"): die Formen nacheinander mit Pause, ohne leere Formen */
+export const verbReiheSprechtext = (formen: { spalte: string; zelle: string }[], sprache = 'en'): string =>
+  formen
+    .map((f) => verbFormSprechtext(f.zelle, sprache, f.spalte))
+    .filter(Boolean)
+    .join(FORMEN_PAUSE)
+
 /**
  * Freien Text für die Sprachausgabe vorbereiten (Beispielsätze, Hörtexte, Wörter ohne Tabelleneintrag).
  * `nurKuerzel`: Initialwörter NICHT buchstabieren (das übernimmt dann das Aussprache-Wörterbuch).
@@ -195,7 +319,7 @@ export function sprechText(text: string, sprache = 'en', nurKuerzel = false): st
   // Längere Kürzel zuerst („Mrs" vor „Mr", „z. B." vor „B.")
   const kuerzel = Object.keys(r.kuerzel).sort((a, b) => b.length - a.length)
   const muster = kuerzel.length ? new RegExp(`(^|[^\\p{L}\\d°])(${kuerzel.map(escape).join('|')})(?![\\p{L}\\d])`, 'gu') : null
-  return ausserhalbKlammern(text, (teil) => {
+  const vorbereitet = ausserhalbKlammern(text, (teil) => {
     let t = muster ? teil.replace(muster, (_m, vor: string, k: string) => `${vor}${r.kuerzel[k]}`) : teil
     // „No. 5" → „number 5" – nur vor einer Zahl (sonst ist „No." das Wort „nein")
     if (r === REGELN.en) t = t.replace(/(?<![\p{L}])No\.\s?(?=\d)/gu, 'number ')
@@ -208,6 +332,8 @@ export function sprechText(text: string, sprache = 'en', nurKuerzel = false): st
       })
     return t
   })
+  // Nie „slash" (09.10.2026): „was/were" → „was … were" – auch in Klammern („be (was/were, been)")
+  return ohneSchraegstrich(vorbereitet)
 }
 
 /**
@@ -218,7 +344,7 @@ export function sprechTextFuerWort(v: { term: string; aussprache?: string }, spr
   const eigen = String(v.aussprache ?? '').trim()
   if (eigen) return eigen
   const tab = abkEintrag(v.term)
-  if (tab) return tab.aussprache
+  if (tab) return ohneSchraegstrich(tab.aussprache)
   const abk = abkuerzungAus(v.term)
   if (abk) {
     const kurz = kurzGesprochen(abk.kurz, sprache)

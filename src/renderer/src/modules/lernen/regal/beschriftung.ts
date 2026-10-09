@@ -8,41 +8,43 @@ import { fachAusName, FAECHER, type Fach } from '@shared/faecher'
 /** Fach aus Kennung, Name oder Sprachkürzel („en") */
 const fachFinden = (f: string): Fach | undefined => fachAusName(f) ?? FAECHER.find((x) => x.sprache === f.trim().toLowerCase())
 
-/** Register des Fachordners; „wort" = Wortliste (09.10.2026) */
-export type Register = 'vok' | 'wort' | 'gram' | 'mat'
+/** Register des Fachordners; „wort" = Meine Bücher (bis 09.10.2026 „Wortliste"), „abc" = alphabetische Liste (09.10.2026) */
+export type Register = 'vok' | 'wort' | 'abc' | 'gram' | 'mat'
 
 interface Sprachbeschriftung {
   fach: string
   vok: string
-  /** Wortliste (09.10.2026): alle freigegebenen Wörter des Fachs */
+  /** Meine Bücher (09.10.2026, vorher „Wortliste"): Bücherbord mit den Wörtern der Bände */
   wort: string
+  /** Alphabetische Liste aller Wörter aus „Meine Bücher" (09.10.2026) */
+  abc: string
   gram: string
   mat: string
   /** Wort vor der Klassenstufe im Grammatik-Register (08.10.2026): „Year 6", „Classe 6" – deutsche Zählung */
   jahrgang?: string
 }
 
-const DEUTSCH: Omit<Sprachbeschriftung, 'fach'> = { vok: 'Vokabeln', wort: 'Wortliste', gram: 'Grammatik', mat: 'Materialien' }
+const DEUTSCH: Omit<Sprachbeschriftung, 'fach'> = { vok: 'Vokabeln', wort: 'Meine Bücher', abc: 'Alphabetisch', gram: 'Grammatik', mat: 'Materialien' }
 
 const SPRACHEN: Record<string, Sprachbeschriftung> = {
-  en: { fach: 'English', vok: 'Vocabulary', wort: 'Word list', gram: 'Grammar', mat: 'Materials', jahrgang: 'Year' },
-  fr: { fach: 'Français', vok: 'Vocabulaire', wort: 'Lexique', gram: 'Grammaire', mat: 'Documents', jahrgang: 'Classe' },
-  es: { fach: 'Español', vok: 'Vocabulario', wort: 'Léxico', gram: 'Gramática', mat: 'Materiales', jahrgang: 'Curso' },
-  it: { fach: 'Italiano', vok: 'Vocabolario', wort: 'Lessico', gram: 'Grammatica', mat: 'Materiali', jahrgang: 'Classe' },
-  la: { fach: 'Latina', vok: 'Vocabula', wort: 'Index verborum', gram: 'Grammatica', mat: 'Materia', jahrgang: 'Classis' },
-  ru: { fach: 'Русский язык', vok: 'Лексика', wort: 'Словарь', gram: 'Грамматика', mat: 'Материалы', jahrgang: 'Класс' },
-  nl: { fach: 'Nederlands', vok: 'Woordenschat', wort: 'Woordenlijst', gram: 'Grammatica', mat: 'Materialen' },
-  pl: { fach: 'Język polski', vok: 'Słownictwo', wort: 'Słowniczek', gram: 'Gramatyka', mat: 'Materiały' },
-  cs: { fach: 'Český jazyk', vok: 'Slovní zásoba', wort: 'Slovníček', gram: 'Gramatika', mat: 'Materiály' },
-  pt: { fach: 'Português', vok: 'Vocabulário', wort: 'Glossário', gram: 'Gramática', mat: 'Materiais' },
-  tr: { fach: 'Türkçe', vok: 'Kelimeler', wort: 'Sözlük', gram: 'Dilbilgisi', mat: 'Materyaller' },
-  da: { fach: 'Dansk', vok: 'Ordforråd', wort: 'Ordliste', gram: 'Grammatik', mat: 'Materialer' },
+  en: { fach: 'English', vok: 'Vocabulary', wort: 'My Books', abc: 'Alphabetical list', gram: 'Grammar', mat: 'Materials', jahrgang: 'Year' },
+  fr: { fach: 'Français', vok: 'Vocabulaire', wort: 'Mes livres', abc: 'Liste alphabétique', gram: 'Grammaire', mat: 'Documents', jahrgang: 'Classe' },
+  es: { fach: 'Español', vok: 'Vocabulario', wort: 'Mis libros', abc: 'Lista alfabética', gram: 'Gramática', mat: 'Materiales', jahrgang: 'Curso' },
+  it: { fach: 'Italiano', vok: 'Vocabolario', wort: 'I miei libri', abc: 'Elenco alfabetico', gram: 'Grammatica', mat: 'Materiali', jahrgang: 'Classe' },
+  la: { fach: 'Latina', vok: 'Vocabula', wort: 'Libri mei', abc: 'Index alphabeticus', gram: 'Grammatica', mat: 'Materia', jahrgang: 'Classis' },
+  ru: { fach: 'Русский язык', vok: 'Лексика', wort: 'Мои книги', abc: 'Алфавитный список', gram: 'Грамматика', mat: 'Материалы', jahrgang: 'Класс' },
+  nl: { fach: 'Nederlands', vok: 'Woordenschat', wort: 'Mijn boeken', abc: 'Alfabetische lijst', gram: 'Grammatica', mat: 'Materialen' },
+  pl: { fach: 'Język polski', vok: 'Słownictwo', wort: 'Moje książki', abc: 'Lista alfabetyczna', gram: 'Gramatyka', mat: 'Materiały' },
+  cs: { fach: 'Český jazyk', vok: 'Slovní zásoba', wort: 'Moje knihy', abc: 'Abecední seznam', gram: 'Gramatika', mat: 'Materiály' },
+  pt: { fach: 'Português', vok: 'Vocabulário', wort: 'Os meus livros', abc: 'Lista alfabética', gram: 'Gramática', mat: 'Materiais' },
+  tr: { fach: 'Türkçe', vok: 'Kelimeler', wort: 'Kitaplarım', abc: 'Alfabetik liste', gram: 'Dilbilgisi', mat: 'Materyaller' },
+  da: { fach: 'Dansk', vok: 'Ordforråd', wort: 'Mine bøger', abc: 'Alfabetisk liste', gram: 'Grammatik', mat: 'Materialer' },
   // Weitere Sprachen (09.10.2026): auch Altgriechisch, Neugriechisch, Chinesisch, Japanisch und Arabisch in der Fremdsprache
-  grc: { fach: 'Ἑλληνική', vok: 'Λέξεις', wort: 'Λεξικόν', gram: 'Γραμματική', mat: 'Ὕλη' },
-  el: { fach: 'Ελληνικά', vok: 'Λεξιλόγιο', wort: 'Γλωσσάρι', gram: 'Γραμματική', mat: 'Υλικό', jahrgang: 'Τάξη' },
-  zh: { fach: '中文', vok: '词汇', wort: '生词表', gram: '语法', mat: '材料' },
-  ja: { fach: '日本語', vok: '語彙', wort: '単語リスト', gram: '文法', mat: '教材' },
-  ar: { fach: 'العربية', vok: 'المفردات', wort: 'قائمة الكلمات', gram: 'القواعد', mat: 'المواد' }
+  grc: { fach: 'Ἑλληνική', vok: 'Λέξεις', wort: 'Τὰ βιβλία μου', abc: 'Ἀλφαβητικὸς κατάλογος', gram: 'Γραμματική', mat: 'Ὕλη' },
+  el: { fach: 'Ελληνικά', vok: 'Λεξιλόγιο', wort: 'Τα βιβλία μου', abc: 'Αλφαβητική λίστα', gram: 'Γραμματική', mat: 'Υλικό', jahrgang: 'Τάξη' },
+  zh: { fach: '中文', vok: '词汇', wort: '我的书', abc: '按字母顺序', gram: '语法', mat: '材料' },
+  ja: { fach: '日本語', vok: '語彙', wort: '私の本', abc: '索引', gram: '文法', mat: '教材' },
+  ar: { fach: 'العربية', vok: 'المفردات', wort: 'كتبي', abc: 'قائمة أبجدية', gram: 'القواعد', mat: 'المواد' }
 }
 
 /** Sprache eines Fachs (lebende Sprache oder Latein) */

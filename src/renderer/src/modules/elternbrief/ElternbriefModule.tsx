@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { useAppSettings } from '../../shared/settingsStore'
-import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { hatText, standardName, type Elternbrief } from './model'
+import BriefBibliothek from './steps/Bibliothek'
 import Brief from './steps/Brief'
 import Inhalt from './steps/Inhalt'
 import { bibliothek, projektDatei, useElternbrief } from './store'
@@ -27,24 +27,9 @@ export function leererBrief(): Elternbrief {
   }
 }
 
-/** Bibliotheksseite (stabil außerhalb des Programms) */
+/** Bibliotheksseite (stabil außerhalb des Programms) – Schuljahr → Klasse → Briefe (09.10.2026, steps/Bibliothek.tsx) */
 function ElternbriefBibliothek(props: BibliotheksSeiteProps): React.JSX.Element {
-  return (
-    <EinfacheBibliothek
-      props={props}
-      api={window.api.elternbriefe}
-      moduleId="elternbrief"
-      titel="Meine Elternbriefe"
-      einzahl="Ein Elternbrief"
-      mehrzahl="Elternbriefe"
-      neuText="Neuer Elternbrief"
-      offeneId={() => useElternbrief.getState().docId}
-      umbenannt={(m) => useElternbrief.getState().markSaved(m.id, m.updatedAt, m.name)}
-      geloescht={() => useElternbrief.getState().forgetSaved()}
-      oeffnen={bibliothek.oeffnen}
-      info={(m) => [String(m.thema ?? ''), Number(m.sprachen) ? `${m.sprachen} Übersetzungen` : '']}
-    />
-  )
+  return <BriefBibliothek props={props} />
 }
 
 /** Programm „Elternbrief" (Großprogramm 0.4, F7; Strg+7) */

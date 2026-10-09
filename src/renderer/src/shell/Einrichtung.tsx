@@ -1,5 +1,6 @@
-import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
+import { Button, Group, Modal, Progress, Stack, Stepper, Text, Title } from '@mantine/core'
 import { aufServer, serverIch } from '../shared/plattform'
+import { schuleFest } from '@shared/schulFest'
 import { IconFolder, IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
@@ -10,6 +11,9 @@ import { AiCard, AppearanceCard, HoertextCard, ImageAiCard, SchoolCard } from '.
 import AblageCard from './AblageCard'
 import IservCard from './IservCard'
 import SicherungEinlesen from './SicherungEinlesen'
+import MehrText from '../shared/components/MehrText'
+import { useTelefon } from '../shared/touch/touchModus'
+import { SchuldatenAngebot, useSchulVorbelegung } from './SchuldatenAngebot'
 
 /**
  * Der Einrichtungsassistent nach dem ersten Start oder nach dem Zurücksetzen.
@@ -46,6 +50,7 @@ export default function Einrichtung(): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
   const [schritt, setSchritt] = useState(0)
   const [geprueft, setGeprueft] = useState(false)
+  const telefon = useTelefon()
   // IServ-Schritt vorn: beim Öffnen festgelegt – er bleibt stehen, auch wenn IServ währenddessen verbunden wird
   const iservAmAnfang = useRef<boolean | null>(null)
 
@@ -86,7 +91,11 @@ export default function Einrichtung(): React.JSX.Element | null {
     if (offen && !settings.oberflaeche) void update({ oberflaeche: 'standard' })
   }, [offen])
 
-  if (!offen) return null
+  // Server (09.10.2026): leere Schulfelder aus der Schul-Einrichtung der Verwaltung vorbelegen
+  const vorbelegt = useSchulVorbelegung(offen)
+
+  // Bereits eingerichtet, aber ohne Schuldaten: einmaliges Angebot, sie aus der Verwaltung zu übernehmen
+  if (!offen) return <SchuldatenAngebot />
 
   /** Schließen – auf dem Server zugleich „eingerichtet" merken (der Assistent kommt nicht wieder) */
   function schliessen(): void {
@@ -125,7 +134,17 @@ export default function Einrichtung(): React.JSX.Element | null {
       icon: <IconSchool size={18} />,
       hinweis:
         'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die nicht zur eigenen Schule passen müssen. Die unterrichteten Fächer stehen später in jeder Fachauswahl oben; Programme, die zu keinem davon passen, werden ausgeblendet.',
-      inhalt: <SchoolCard settings={settings} update={update} />
+      inhalt: (
+        <>
+          {/* IServ-Konten: Schule fest aus der Verwaltung (09.10.2026) – die Karte zeigt sie nur an */}
+          {vorbelegt && !schuleFest(serverIch()) && (
+            <Text size="sm" c="teal" mb="sm" data-schule-vorbelegt>
+              Aus der Schul-Einrichtung der Verwaltung vorausgefüllt – alle Angaben lassen sich hier ändern.
+            </Text>
+          )}
+          <SchoolCard settings={settings} update={update} />
+        </>
+      )
     },
     {
       label: 'KI-Zugang',
@@ -184,17 +203,31 @@ export default function Einrichtung(): React.JSX.Element | null {
 
   return (
     <Modal opened onClose={schliessen} title="Willkommen bei Schul-Apps" size="xl" closeOnClickOutside={false}>
-      <Stack gap="lg">
+      <Stack gap={telefon ? 'sm' : 'lg'}>
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" c="dimmed">
-            {ZAHLWORT[schritte.length] ?? schritte.length} kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen
-            nachholen.
+            {telefon
+              ? 'Jeder Schritt lässt sich überspringen.'
+              : `${ZAHLWORT[schritte.length] ?? schritte.length} kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen nachholen.`}
           </Text>
           {/* Nach einem Zurücksetzen der naheliegende Weg zurück (Wunsch vom 25.09.2026) */}
           <SicherungEinlesen variant="subtle" />
         </Group>
 
-        <Stepper active={schritt} onStepClick={setSchritt} size="sm">
+        {/*
+          Telefon (09.10.2026, Befund: fünf Schrittkreise brachen in zwei Zeilen um): „Schritt 2 von 5 · KI-Zugang"
+          mit Fortschrittsbalken statt der Kreise.
+        */}
+        {telefon && (
+          <div data-einrichtung-schritt={schritt + 1}>
+            <Text size="sm" fw={600} mb={6}>
+              Schritt {schritt + 1} von {schritte.length} · {aktuell.label}
+            </Text>
+            <Progress value={((schritt + 1) / schritte.length) * 100} size="sm" radius="xl" aria-hidden />
+          </div>
+        )}
+        {/* Am Telefon unsichtbar, aber da: Das Wischen zwischen den Schritten (gesten.ts) tippt die Schritte an */}
+        <Stepper active={schritt} onStepClick={setSchritt} size="sm" className={telefon ? 'nur-vorlesen' : undefined}>
           {schritte.map((s) => (
             <Stepper.Step key={s.label} label={s.label} description={s.beschreibung} icon={s.icon} />
           ))}
@@ -204,17 +237,33 @@ export default function Einrichtung(): React.JSX.Element | null {
           <Title order={5} mb={4}>
             {aktuell.beschreibung}
           </Title>
-          <Text size="sm" c="dimmed" mb="md">
-            {aktuell.hinweis}
-          </Text>
-          {aktuell.inhalt}
+          {/* Am Telefon nur der erste Satz, der Rest nach „Mehr" – sonst stehen die Felder erst nach einer Bildschirmhöhe Text */}
+          {telefon ? (
+            <MehrText key={schritt} text={aktuell.hinweis} size="sm" mb="md" />
+          ) : (
+            <Text size="sm" c="dimmed" mb="md">
+              {aktuell.hinweis}
+            </Text>
+          )}
+          <div className={telefon ? 'einrichtung-telefon' : undefined}>{aktuell.inhalt}</div>
         </div>
 
-        <Group justify="space-between">
-          <Button variant="subtle" onClick={schliessen}>
+        {/*
+          Am Telefon bleibt die Knopfzeile unten am Blatt stehen (touch.css `dialog-fuss`) – in EINER Zeile: „Später
+          einrichten" steht dann darüber im Inhalt (das Kreuz oben schließt ebenso)
+        */}
+        {telefon && (
+          <Button variant="subtle" onClick={schliessen} style={{ alignSelf: 'center' }}>
             Später einrichten
           </Button>
-          <Group>
+        )}
+        <Group justify="space-between" className="dialog-fuss" data-eine-zeile={telefon || undefined}>
+          {!telefon && (
+            <Button variant="subtle" onClick={schliessen}>
+              Später einrichten
+            </Button>
+          )}
+          <Group gap={telefon ? 'xs' : undefined} style={telefon ? { flex: 1 } : undefined}>
             {schritt > 0 && (
               <Button variant="default" onClick={() => setSchritt((n) => n - 1)}>
                 Zurück

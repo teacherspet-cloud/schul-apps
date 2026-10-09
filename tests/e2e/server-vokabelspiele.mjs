@@ -273,7 +273,7 @@ try {
   await gp.goto(`${A}/s/`)
   pruefe(await da(gp.locator('[data-modus-knopf]')), 'Hell/Dunkel-Schalter auch ohne Konto')
   await gc.close()
-  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 
   // Kasten unverändert, Rekorde gespeichert
   const nachher = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()
@@ -290,7 +290,7 @@ try {
     ['memory', 'zuordnen', 'satz', 'wortraten', 'suchsel'].every((k) => nachher.rekorde[k] !== undefined),
     `Rekorde gespeichert (${Object.keys(nachher.rekorde).join(', ')})`
   )
-  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

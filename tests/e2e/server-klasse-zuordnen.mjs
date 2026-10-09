@@ -131,7 +131,7 @@ try {
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
   // Kurse löschen (nimmt die Gastkonten mit), Lerngruppe, dann die Lehrkraft
-  for (const id of kurse) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  for (const id of kurse) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   if (gid && lk) await lk.request.post(`${A}/server/lerngruppen/loeschen`, { headers: KOPF, data: { id: gid } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Kurse, Gäste, Lerngruppe und Konten gelöscht (${zuLoeschen.length})`)

@@ -1,6 +1,7 @@
 /**
- * Verwaltung für Admins auf dem Schul-Apps-Server (02.10.2026); seit 03.10.2026 mit dem Reiter
- * „Daten und Material" (Fachschaft, Themenbereiche, Sicherung), den Lehrkräfte als ganze App sehen.
+ * Verwaltung für Admins auf dem Schul-Apps-Server (02.10.2026). Der Reiter „Daten und Material"
+ * (03.10.–09.10.2026) entfällt: Fachschaft-Freigaben stehen in der Bibliothek jeder App, Themenbereiche
+ * und Sicherung unter Einstellungen › Material; Lehrkräfte sehen die App nicht mehr.
  *
  * Wunsch der Lehrkraft: „Für Admins soll eine Verwaltungs-App erstellt werden, in der die
  * wichtigsten Daten der Haupt- und Unter-Apps verwaltet werden können. Als Admin soll man
@@ -25,6 +26,7 @@ import {
   Group,
   Loader,
   Modal,
+  NumberInput,
   PasswordInput,
   Select,
   SimpleGrid,
@@ -36,13 +38,17 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
-import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconTrash, IconUserPlus } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { nutzerSuchen, QUELLEN_TEXT, SUCHE_MAX, SUCHE_MIN } from '@shared/nutzerSuche'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlassenlisteKarte } from './Klassenliste'
+import { KiZugaenge } from './KiZugaenge'
+import { SchuleEinrichten } from './SchuleEinrichten'
+import { SchulFachfarben } from './SchulFachfarben'
 import { serverIch } from '../../shared/plattform'
-import { DatenUndMaterial } from './DatenUndMaterial'
+import { ServerReiter } from './ServerReiter'
 import MaskottchenSettings from '../../shell/MaskottchenSettings'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useZielZeiger } from '../../shared/navigation'
@@ -65,7 +71,7 @@ interface Uebersicht {
   /** Bekannte Klassen (Schülerkonten und Lerngruppen) für die Zuordnung */
   klassen?: string[]
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
-  iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean }
+  iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean; abgleichSchwelle?: number }
   notzugang: boolean
   ablage?: { muster: string; standard: string }
   server: {
@@ -78,19 +84,10 @@ interface Uebersicht {
   }
 }
 
-const NAMEN: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic (Claude)',
-  google: 'Google (Gemini)',
-  elevenlabs: 'ElevenLabs (Hörtexte)',
-  pixabay: 'Pixabay (Bilder)'
-}
-const mb = (b: number): string => `${Math.round(b / 1024 / 1024)} MB`
-const gb = (b: number): string => `${(b / 1024 / 1024 / 1024).toFixed(1).replace('.', ',')} GB`
-
 export default function VerwaltungModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [d, setD] = useState<Uebersicht | null>(null)
-  const [reiter, setReiter] = useState<string | null>('daten')
+  // „Daten und Material" entfällt (09.10.2026, Entscheidung des Admins) – erster Reiter ist jetzt „Nutzer"
+  const [reiter, setReiter] = useState<string | null>('nutzer')
   const settings = useAppSettings((s) => s.settings)
   const update = useAppSettings((s) => s.update)
   // „Öffnen" eines Maskottchen-Auftrags führt in den Reiter Maskottchen
@@ -117,8 +114,9 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           }
           links={
             <Tabs.List style={{ borderBottom: 0 }}>
-              <Tabs.Tab value="daten">Daten und Material</Tabs.Tab>
               <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
+              {/* Schul-Einrichtung des Servers (09.10.2026) */}
+              <Tabs.Tab value="schule">Schule</Tabs.Tab>
               <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
               <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
               {/* „Hörtexte" entfernt (07.10.2026, Wunsch der Lehrkraft): eine lange, unübersichtliche Liste aller QR-Freigaben */}
@@ -131,14 +129,19 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           <Loader />
         ) : (
           <>
-            <Tabs.Panel value="daten">
-              <DatenUndMaterial />
-            </Tabs.Panel>
             <Tabs.Panel value="nutzer">
               <Nutzer d={d} neu={laden} />
             </Tabs.Panel>
+            <Tabs.Panel value="schule">
+              <Stack gap="lg">
+                <SchuleEinrichten />
+                {/* Fachfarben gelten für die ganze Schule (09.10.2026, SchulFachfarben.tsx) */}
+                <SchulFachfarben />
+              </Stack>
+            </Tabs.Panel>
             <Tabs.Panel value="ki">
-              <Schluessel d={d} neu={laden} />
+              {/* Aufklappbare Anbieterkarten, OpenAI-kompatible Anbieter und KI-Nutzung (09.10.2026, KiZugaenge.tsx) */}
+              <KiZugaenge schluessel={d.schluessel} neu={laden} />
             </Tabs.Panel>
             <Tabs.Panel value="iserv">
               <Iserv d={d} neu={laden} />
@@ -147,7 +150,8 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
               <MaskottchenSettings settings={settings} update={(p) => void update(p)} schule />
             </Tabs.Panel>
             <Tabs.Panel value="server">
-              <Server d={d} />
+              {/* Neu gestaltet (09.10.2026): Ampel, Verlauf, Nutzung, Platz, Sicherungen, Fehler (ServerReiter.tsx) */}
+              <ServerReiter sichtbar={reiter === 'server'} zuKi={() => setReiter('ki')} />
             </Tabs.Panel>
           </>
         )}
@@ -187,7 +191,14 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   const ich = serverIch()?.benutzer
   // Gäste aus Onlinetests (ohne IServ) nur als Zahl – sonst würde die Liste mit jedem Test länger
   const gaeste = d.nutzer.filter((n) => n.quelle === 'gast').length
-  const konten = d.nutzer.filter((n) => n.quelle !== 'gast')
+  /*
+   * Suche statt Liste aller Konten (09.10.2026, Wunsch des Admins): Bei einer ganzen Schule wurde die Liste unübersichtlich.
+   * Treffer ab 2 Zeichen nach Name, Benutzername, Rolle, Anmeldeart und Klasse, höchstens 50.
+   */
+  const [suche, setSuche] = useState('')
+  const ohneGaeste = useMemo(() => d.nutzer.filter((n) => n.quelle !== 'gast'), [d.nutzer])
+  const { treffer: konten, gesamt } = useMemo(() => nutzerSuchen(ohneGaeste, suche), [ohneGaeste, suche])
+  const zuKurz = suche.trim().length < SUCHE_MIN
   const anlegen = async (): Promise<void> => {
     try {
       const r = await senden<{ benutzer: string; passwort: string }>('/server/verwaltung/nutzer-anlegen', neuerNutzer)
@@ -303,6 +314,31 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           Testkonten melden sich mit Benutzername und Passwort an (Anmeldeseite › Testkonto). Löschen entfernt das Konto mit allen Daten.
         </Text>
       </Card>
+      <IservAbgleich d={d} neu={neu} />
+      <Card withBorder data-nutzer-suche>
+        <TextInput
+          label="Nutzer suchen"
+          description={`Name, Benutzername, Rolle, Anmeldeart oder Klasse – ab ${SUCHE_MIN} Zeichen. ${ohneGaeste.length} Konten insgesamt.`}
+          placeholder="z. B. mustermann, 7a, Lehrkraft, IServ"
+          leftSection={<IconSearch size={16} />}
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          data-feld="suche"
+        />
+        {!zuKurz && (
+          <Text size="xs" c="dimmed" mt={6} data-suche-anzahl>
+            {gesamt === 0
+              ? 'Keine Treffer.'
+              : gesamt > konten.length
+                ? `${gesamt} Treffer, die ersten ${SUCHE_MAX} werden gezeigt – Suche genauer fassen.`
+                : `${gesamt} Treffer`}
+          </Text>
+        )}
+      </Card>
+      {!zuKurz && konten.length > 0 && (
       <Table striped highlightOnHover data-karten>
         <Table.Thead>
           <Table.Tr>
@@ -349,7 +385,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
               </Table.Td>
               <Table.Td>
                 <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : n.quelle === 'lokal' ? 'teal' : 'orange'}>
-                  {n.quelle === 'iserv' ? 'IServ' : n.quelle === 'test' ? 'Testkonto' : n.quelle === 'lokal' ? 'Passwort' : 'Notzugang'}
+                  {QUELLEN_TEXT[n.quelle] ?? 'Notzugang'}
                 </Badge>
                 {n.passwortWechseln && (
                   <Text size="xs" c="dimmed">
@@ -373,11 +409,14 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
                         </ActionIcon>
                       </Tooltip>
                     )}
-                    <Tooltip label="Löschen">
-                      <ActionIcon variant="subtle" color="red" onClick={() => loeschen(n)}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
+                    {/* IServ-Konten nicht einzeln löschen (09.10.2026): Sie kämen bei der nächsten Anmeldung wieder; Abgänge entfernt „Mit IServ abgleichen" */}
+                    {n.quelle !== 'iserv' && (
+                      <Tooltip label="Löschen">
+                        <ActionIcon variant="subtle" color="red" onClick={() => loeschen(n)}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                   </Group>
                 )}
               </Table.Td>
@@ -385,6 +424,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           ))}
         </Table.Tbody>
       </Table>
+      )}
       {gaeste > 0 && (
         <Text size="xs" c="dimmed">
           Dazu {gaeste} Gast{gaeste === 1 ? '' : 'e'} aus Onlinetests (Beitritt mit Namen, ohne IServ) – sie haben nur Zugang zu ihrem Test.
@@ -419,65 +459,153 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   )
 }
 
-function Schluessel({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
-  const [werte, setWerte] = useState<Record<string, string>>({})
-  const speichern = (name: string, patch: object): void =>
-    void senden('/server/verwaltung/schluessel', { name, ...patch }).then(
-      () => {
-        notifySuccess('Gespeichert.')
-        setWerte((w) => ({ ...w, [name]: '' }))
-        neu()
-      },
-      (e: unknown) => notifyError(e)
-    )
+interface AbgleichErgebnis {
+  geprueft: number
+  iservAnzahl: number
+  entfernen: { id: string; benutzer: string; name: string; rolle: string; zuletzt: string | null }[]
+  /** Gastkonten mit IServ-Anmeldung (Code/QR + IServ) */
+  verknuepft?: number
+  /** Gastkonten, deren IServ-Person fehlt: nur die Verknüpfung wird gelöst */
+  loesen?: { id: string; benutzer: string; name: string; rolle: string; zuletzt: string | null }[]
+  abbruch?: string
+  schwelle: number
+  kennung: string
+}
+
+/**
+ * „Mit IServ abgleichen" (09.10.2026): IServ-Konten, die es in IServ nicht mehr gibt, entfernen. Zwei Schritte – „Prüfen"
+ * zeigt nur die Liste, „Entfernen" erst nach Rückfrage; der Server prüft dabei erneut und sichert vorher die Datenbank.
+ */
+function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
+  const [schwelle, setSchwelle] = useState<number>(d.iserv.abgleichSchwelle ?? 20)
+  const [laeuft, setLaeuft] = useState(false)
+  const [ergebnis, setErgebnis] = useState<AbgleichErgebnis | null>(null)
+  const [fehler, setFehler] = useState('')
+  const bereit = Boolean(d.iserv.clientId && d.iserv.geheimnis)
+  const pruefen = async (): Promise<void> => {
+    setLaeuft(true)
+    setFehler('')
+    setErgebnis(null)
+    try {
+      setErgebnis(await senden<AbgleichErgebnis>('/server/verwaltung/iserv-abgleich-pruefen', { schwelle }))
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  const entfernen = async (): Promise<void> => {
+    if (!ergebnis?.kennung) return
+    const n = ergebnis.entfernen.length
+    const l = ergebnis.loesen?.length ?? 0
+    const frage = [
+      n ? `${n} Konto${n === 1 ? '' : 'en'} samt ALLER Daten (Material, Ergebnisse, Einstellungen) endgültig entfernen?` : '',
+      l ? `Bei ${l} Gastkonto${l === 1 ? '' : 'en'} die IServ-Anmeldung lösen (Konto und Code bleiben)?` : ''
+    ]
+      .filter(Boolean)
+      .join(' ')
+    if (!window.confirm(`${frage} Vorher wird die Datenbank gesichert.`)) return
+    setLaeuft(true)
+    try {
+      const r = await senden<{ entfernt: number; geloest?: number; sicherung: string }>('/server/verwaltung/iserv-abgleich-entfernen', { kennung: ergebnis.kennung, bestaetigt: true })
+      notifySuccess(
+        `${r.entfernt} Konto${r.entfernt === 1 ? '' : 'en'} entfernt${r.geloest ? `, ${r.geloest} Verknüpfung${r.geloest === 1 ? '' : 'en'} gelöst` : ''}.${r.sicherung ? ` Sicherung: ${r.sicherung}` : ''}`
+      )
+      setErgebnis(null)
+      neu()
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+      setErgebnis(null)
+    } finally {
+      setLaeuft(false)
+    }
+  }
   return (
-    <Stack>
-      <Alert variant="light">
-        Freigegebene API-Schlüssel nutzen alle Lehrkräfte, die keinen eigenen hinterlegt haben – die Kosten trägt das Konto des Schlüssels. Schlüssel liegen
-        verschlüsselt auf dem Server und werden nie wieder angezeigt. ChatGPT-/Claude-Abos sind nicht teilbar (Nutzungsbedingungen): Jede Lehrkraft meldet ihr
-        eigenes in den Einstellungen an.
-      </Alert>
-      <SimpleGrid cols={{ base: 1, md: 2 }}>
-        {d.schluessel.map((s) => (
-          <Card key={s.name} withBorder>
-            <Group justify="space-between" mb="xs">
-              <Text fw={700}>{NAMEN[s.name] ?? s.name}</Text>
-              {s.hinterlegt ? <Badge color="green">hinterlegt {s.hinterlegt}</Badge> : <Badge color="gray">kein Schlüssel</Badge>}
-            </Group>
-            <Group align="end">
-              <PasswordInput
-                style={{ flex: 1 }}
-                leftSection={<IconKey size={14} />}
-                placeholder={s.hinterlegt ? 'neuen Schlüssel eintragen' : 'Schlüssel eintragen'}
-                value={werte[s.name] ?? ''}
-                onChange={(e) => setWerte((w) => ({ ...w, [s.name]: e.currentTarget.value }))}
-              />
-              <Button disabled={!(werte[s.name] ?? '').trim()} onClick={() => speichern(s.name, { wert: werte[s.name] })}>
-                Speichern
+    <Card withBorder data-iserv-abgleich>
+      <Text fw={600} mb={4}>
+        Mit IServ abgleichen
+      </Text>
+      <Text size="xs" c="dimmed" mb="xs">
+        Konten mit IServ-Anmeldung, die es in IServ nicht mehr gibt, aus Schul-Apps entfernen. „Prüfen“ zeigt zuerst die Liste, entfernt wird erst nach
+        Bestätigung. Admins, das eigene Konto und Konten ohne IServ bleiben immer.
+      </Text>
+      {!bereit ? (
+        <Text size="sm" c="dimmed">
+          Erst die IServ-Anbindung einrichten (Reiter „IServ-Anbindung“).
+        </Text>
+      ) : (
+        <Group align="end">
+          <NumberInput
+            label="Abbrechen ab (%)"
+            description="Würden mehr IServ-Konten entfernt, passiert nichts"
+            min={1}
+            max={100}
+            w={220}
+            value={schwelle}
+            onChange={(v) => setSchwelle(typeof v === 'number' ? v : Number(v) || 20)}
+            data-abgleich-schwelle
+          />
+          <Button variant="light" leftSection={<IconSearch size={16} />} loading={laeuft && !ergebnis} onClick={() => void pruefen()} data-abgleich-pruefen>
+            Prüfen
+          </Button>
+        </Group>
+      )}
+      {fehler && (
+        <Alert color="red" mt="sm" data-abgleich-fehler>
+          {fehler}
+        </Alert>
+      )}
+      {ergebnis && (
+        <Stack gap="xs" mt="sm" data-abgleich-ergebnis>
+          <Text size="sm">
+            {ergebnis.geprueft} IServ-Konten in Schul-Apps geprüft, IServ kennt {ergebnis.iservAnzahl} Konten.{' '}
+            {ergebnis.entfernen.length ? `${ergebnis.entfernen.length} fehlen in IServ:` : 'Alle sind noch in IServ vorhanden.'}
+          </Text>
+          {(ergebnis.loesen?.length ?? 0) > 0 && (
+            <Text size="sm" data-abgleich-loesen>
+              Dazu {ergebnis.loesen!.length} von {ergebnis.verknuepft ?? 0} Gastkonten mit IServ-Anmeldung, deren Person in IServ fehlt – dort wird nur die
+              Verknüpfung gelöst, Konto und Code bleiben: {ergebnis.loesen!.map((n) => n.name).join(', ')}
+            </Text>
+          )}
+          {ergebnis.abbruch && <Alert color="orange">{ergebnis.abbruch}</Alert>}
+          {ergebnis.entfernen.length > 0 && (
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Konto</Table.Th>
+                  <Table.Th>Rolle</Table.Th>
+                  <Table.Th>Zuletzt angemeldet</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {ergebnis.entfernen.map((n) => (
+                  <Table.Tr key={n.id}>
+                    <Table.Td>
+                      <Text fw={600}>{n.name}</Text>
+                      <Text size="xs" c="dimmed">
+                        {n.benutzer}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{n.rolle === 'schueler' ? 'Schüler/in' : n.rolle === 'lehrkraft' ? 'Lehrkraft' : n.rolle}</Table.Td>
+                    <Table.Td>{n.zuletzt ? new Date(n.zuletzt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+          {ergebnis.kennung && (
+            <Group>
+              <Button color="red" leftSection={<IconUsersMinus size={16} />} loading={laeuft} onClick={() => void entfernen()} data-abgleich-entfernen>
+                Entfernen ({ergebnis.entfernen.length + (ergebnis.loesen?.length ?? 0)})
+              </Button>
+              <Button variant="subtle" onClick={() => setErgebnis(null)}>
+                Abbrechen
               </Button>
             </Group>
-            <Group justify="space-between" mt="sm">
-              <Switch
-                label="Für alle Lehrkräfte freigeben"
-                checked={s.fuerAlle}
-                disabled={!s.hinterlegt}
-                onChange={(e) => speichern(s.name, { fuerAlle: e.currentTarget.checked })}
-              />
-              {s.hinterlegt && (
-                <Button
-                  size="xs"
-                  variant="subtle"
-                  color="red"
-                  onClick={() => window.confirm('Schlüssel entfernen?') && speichern(s.name, { wert: '', fuerAlle: false })}
-                >
-                  Entfernen
-                </Button>
-              )}
-            </Group>
-          </Card>
-        ))}
-      </SimpleGrid>
-    </Stack>
+          )}
+        </Stack>
+      )}
+    </Card>
   )
 }
 
@@ -528,29 +656,6 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
         onChange={(e) => void senden('/server/verwaltung/notzugang', { an: e.currentTarget.checked }).then(neu, (er: unknown) => notifyError(er))}
       />
     </Stack>
-  )
-}
-
-function Server({ d }: { d: Uebersicht }): React.JSX.Element {
-  const s = d.server
-  return (
-    <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
-      {[
-        ['Fassung', s.fassung || '–'],
-        ['Arbeitsspeicher', `${mb(s.speicher.gesamt - s.speicher.frei)} von ${mb(s.speicher.gesamt)} belegt (Schul-Apps: ${mb(s.speicher.prozess)})`],
-        ['Platte', s.platte ? `${gb(s.platte.frei)} frei von ${gb(s.platte.gesamt)}` : '–'],
-        ['Last (1/5/15 min)', s.last.map((x) => x.toFixed(2)).join(' / ')],
-        ['Offene Verbindungen', String(s.stroeme)],
-        ['Läuft seit', `${Math.round(s.laufzeit / 3600)} h`]
-      ].map(([k, v]) => (
-        <Card key={k} withBorder>
-          <Text size="xs" c="dimmed">
-            {k}
-          </Text>
-          <Text fw={600}>{v}</Text>
-        </Card>
-      ))}
-    </SimpleGrid>
   )
 }
 

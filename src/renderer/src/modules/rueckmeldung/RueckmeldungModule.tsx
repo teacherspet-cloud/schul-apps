@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
+import type { SavedDokumentMeta } from '@shared/apiShape'
 import { STANDARD_ANREDE } from './render/texte'
 import { useAppSettings } from '../../shared/settingsStore'
-import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
+import { ProgrammSymbol } from '../../shared/components/ProgrammSymbol'
+import ThemenDokumentBibliothek from '../../shared/testmodul/ThemenDokumentBibliothek'
 import { RueckmeldungVorschau } from './steps/RueckmeldungVorschau'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { notifyError } from '../../shared/util'
@@ -36,10 +38,21 @@ export function leereRueckmeldung(): Rueckmeldung {
   }
 }
 
-/** Bibliotheksseite (stabil außerhalb des Programms, sonst entstünde sie bei jedem Zeichnen neu) */
+/** Vorschau der Karte: der Anfang der Aufgabe (lädt erst, wenn die Karte sichtbar ist) */
+const aufgabenVorschau = (id: string) => async () => {
+  const r = (await window.api.rueckmeldungen.get(id)).payload as Rueckmeldung
+  const t = (r.grundlage?.aufgaben || r.grundlage?.titel || '').trim()
+  return t ? { text: t.slice(0, 400) } : null
+}
+
+/** Quelle als Themenbereich-Vorgabe: das Material, aus dem die Rückmeldung stammt */
+const quelle = (m: SavedDokumentMeta): { moduleId: string; id: string } | null =>
+  typeof m.quelleArt === 'string' && typeof m.quelleId === 'string' ? { moduleId: m.quelleArt, id: m.quelleId } : null
+
+/** Bibliotheksseite (stabil außerhalb des Programms, sonst entstünde sie bei jedem Zeichnen neu); Fach → Themenbereich seit 09.10.2026 */
 function RueckmeldungBibliothek(props: BibliotheksSeiteProps): React.JSX.Element {
   return (
-    <EinfacheBibliothek
+    <ThemenDokumentBibliothek
       props={props}
       api={window.api.rueckmeldungen}
       moduleId="rueckmeldung"
@@ -51,6 +64,13 @@ function RueckmeldungBibliothek(props: BibliotheksSeiteProps): React.JSX.Element
       umbenannt={(m) => useRueckmeldung.getState().markSaved(m.id, m.updatedAt, m.name)}
       geloescht={() => useRueckmeldung.getState().forgetSaved()}
       oeffnen={bibliothek.oeffnen}
+      imOffenen={(id, name) => {
+        const s = useRueckmeldung.getState()
+        if (s.docId === id && s.dok) s.update((d) => void (name === null ? delete d.meta.themenbereich : (d.meta.themenbereich = name)))
+      }}
+      symbol={<ProgrammSymbol form="rueckmeldung" farbe="green" size={40} />}
+      vorschau={(m) => aufgabenVorschau(m.id)}
+      quelleBereich={quelle}
       info={(m) => [String(m.thema ?? ''), `${m.abgaben ?? 0} Abgaben`, `${m.fertig ?? 0} Bögen`]}
     />
   )

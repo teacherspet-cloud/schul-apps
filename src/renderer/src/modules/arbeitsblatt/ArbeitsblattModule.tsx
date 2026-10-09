@@ -20,7 +20,7 @@ import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings, useExperte } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
-import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger, useUebersichtZeiger, useZielZeiger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import { MaterialVorschau, ZwischenstandsBlatt } from './render/BlattVorschau'
@@ -71,6 +71,14 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
       .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
+  // Erstes Öffnen in der Sitzung über die Leiste (09.10.2026, shared/sitzung.ts): die Bibliothek, wenn es Blätter gibt
+  useUebersichtZeiger('arbeitsblatt', () => {
+    setArea('create')
+    void window.api.sheets
+      .list()
+      .then((list) => list.length > 0 && setLibrary(true))
+      .catch(() => undefined)
+  })
 
   const openFile = async (): Promise<void> => {
     try {

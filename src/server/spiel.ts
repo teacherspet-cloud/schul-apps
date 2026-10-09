@@ -35,7 +35,7 @@ import {
   db as vokDb
 } from './vokabeln'
 import { buchFuer, buchNamen, wegStand } from './vokabelweg'
-import { lehrwerkStandVon } from './grammatik'
+import { lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
 import { quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
 import { grammatikFuerSpiel as G } from './grammatik'
 import { rekordEintragen } from './rekordbuch'
@@ -62,7 +62,7 @@ const RUF: TextSchluessel[] = ['ruf0', 'ruf1', 'ruf2', 'ruf3', 'ruf4']
 const schwierigkeitenIn = (sprache: string, jahrgang: number | null): typeof SCHWIERIGKEITEN =>
   SCHWIERIGKEITEN.map((x) => ({ id: x.id, name: spielText(sprache, jahrgang, S_NAME[x.id][0]), text: spielText(sprache, jahrgang, S_NAME[x.id][1]) }))
 const kurzrufeIn = (sprache: string, jahrgang: number | null): string[] => KURZRUFE.map((_, i) => spielText(sprache, jahrgang, RUF[i] ?? 'ruf0'))
-import { gramItems, lehrwerkBisStand, leererInhalt, synonymeAus, verbFormenAus, vokItems, zeitSaetzeAus } from '../shared/mehrspieler/inhalt'
+import { gramItems, lehrwerkBisStand, lehrwerkFruehereUndFrei, leererInhalt, synonymeAus, verbFormenAus, vokItems, zeitSaetzeAus } from '../shared/mehrspieler/inhalt'
 import { bandEinzeln, bandGemeinsam } from '../shared/mehrspieler/schwierigkeit'
 import { aufraeumen, beitreten, einstellen, entfernen, lobbyNeu, startPruefen, verbindung, verlassen, type Lobby } from '../shared/mehrspieler/lobby'
 import { aktive, type Basis, type Block } from '../shared/mehrspieler/kern'
@@ -342,8 +342,8 @@ function neuerCode(): string {
 
 /**
  * Reiseplaner (09.10.2026, Lehrkraft): Wörter aus ALLEN Units und Bänden des Lehrwerks der Klasse bis zu ihrem Stand –
- * auch solche, die nicht im Kurs stehen. Stand: die höchste Unit aus den Kursen der Lerngruppe (Herkunft) bzw. der von
- * der Lehrkraft gesetzte Lehrwerk-Stand, wenn er weiter ist. Dazu, was alle Mitspielenden im Vokabelweg schon
+ * auch solche, die nicht im Kurs stehen. Seit 09.10.2026: frühere Bände ganz, vom erkannten Band der Klasse das
+ * Freigegebene; ein von der Lehrkraft gesetzter Lehrwerk-Stand gilt bis zu seiner Unit. Dazu, was alle Mitspielenden im Vokabelweg schon
  * kennengelernt haben (zuerst gewählt).
  */
 async function reiseWoerter(kurs: string, leute: NutzerInfo[]): Promise<{ alle: string[]; gemeinsam: string[] } | undefined> {
@@ -351,9 +351,12 @@ async function reiseWoerter(kurs: string, leute: NutzerInfo[]): Promise<{ alle: 
   if (!z) return undefined
   const zeilen = (
     z.lerngruppe_id
-      ? (vokDb().prepare('SELECT quelle, titel, lehrkraft_id FROM vok_zuweisungen WHERE lerngruppe_id = ?').all(z.lerngruppe_id) as { quelle: string; titel: string; lehrkraft_id: string }[])
-      : [{ quelle: z.quelle ?? '', titel: z.titel, lehrkraft_id: z.lehrkraft_id }]
-  ).slice(0, 200)
+      ? (vokDb().prepare("SELECT * FROM vok_zuweisungen WHERE lerngruppe_id = ? AND status = 'offen'").all(z.lerngruppe_id) as unknown as NonNullable<ReturnType<typeof vokZeile>>[])
+      : [z]
+  )
+    .slice(0, 200)
+    // Nur Freigegebenes (geplante Abschnitte zählen noch nicht)
+    .map((x) => kursFuerLernende(x))
   const namen = await buchNamen(z.lehrkraft_id)
   // Herkunft je Kurs → (Buch, Unit-Index); dieselbe Reihe wie der Kurs selbst
   const eigeneQ = json_(z.quelle, null as Quelle | null) ?? quelleAusTitel(z.titel, namen)
@@ -377,17 +380,40 @@ async function reiseWoerter(kurs: string, leute: NutzerInfo[]): Promise<{ alle: 
     if (!buch || ui < 0) return
     if (!stand || nummer(buch) > nummer(stand.buch) || (buch.id === stand.buch.id && ui > stand.ui)) stand = { buch, ui }
   }
+  const frei: { buch: string; unit: string; abschnitte: string[] }[] = []
   for (const zz of zeilen) {
     const q = json_(zz.quelle, null as Quelle | null) ?? quelleAusTitel(zz.titel, namen)
-    if (q) for (const u of quelleUnits(q)) nimm(buecher.find((b) => b.id === q.lehrwerk), u.unit)
+    if (q)
+      for (const u of quelleUnits(q)) {
+        nimm(buecher.find((b) => b.id === q.lehrwerk), u.unit)
+        frei.push({ buch: q.lehrwerk, unit: u.unit, abschnitte: u.abschnitte })
+      }
   }
   // Von Hand gesetzter Stand („Green Line 2", „Unit 3")
   const hand = z.lerngruppe_id ? lehrwerkStandVon(z.lerngruppe_id) : null
   const flach = (t: string): string => t.toLowerCase().replace(/[^a-z0-9]/g, '')
   if (hand) nimm(buecher.find((b) => flach(b.name).startsWith(flach(hand.buch))), hand.unit)
-  if (!stand) return undefined
-  const s0 = stand as { buch: Buch; ui: number }
-  const woerter = lehrwerkBisStand(buecher, { buch: s0.buch.id, unit: s0.buch.units[s0.ui].name })
+  /*
+   * „Frühere Bände + Freigegebenes" (09.10.2026, abgestimmt – wie die bekannte Grammatik): Von Hand gesetzter Stand gilt
+   * bis zu seiner Unit; sonst der erkannte Band der Klasse (Jahrgang, Schulform, Land) bzw. ohne Lerngruppe der höchste
+   * Band der Kurse – frühere Bände ganz, vom aktuellen nur die freigegebenen Units und Abschnitte.
+   */
+  let woerter: { id: string; term: string }[]
+  if (hand && stand) {
+    const s0 = stand as { buch: Buch; ui: number }
+    woerter = lehrwerkBisStand(buecher, { buch: s0.buch.id, unit: s0.buch.units[s0.ui].name })
+  } else {
+    const auto = z.lerngruppe_id ? lehrwerkAutomatisch(z.lerngruppe_id) : null
+    const autoBuch = auto ? buecher.find((b) => flach(b.name) === flach(auto.buch)) : undefined
+    const aktuell = autoBuch ?? (stand as { buch: Buch; ui: number } | null)?.buch
+    if (!aktuell) return undefined
+    // Freigegebenes auch aus Abschnitten älterer Freigaben (die Herkunft eines Kurses nennt nur den letzten Band)
+    for (const f of auto?.freigegeben ?? []) {
+      const b = buecher.find((x) => flach(x.name) === flach(f.buch))
+      if (b) frei.push({ buch: b.id, unit: f.unit, abschnitte: f.abschnitte })
+    }
+    woerter = lehrwerkFruehereUndFrei(buecher, aktuell.id, frei)
+  }
   // Von allen kennengelernt (Fach ≥ 1 im Vokabelweg)
   const staende = leute.map((n) => wegStand(n.id, reihe).woerter)
   const gemeinsam = leute.length ? woerter.filter((w) => staende.every((st) => (st[w.id]?.fach ?? 0) >= 1)).map((w) => w.term) : []

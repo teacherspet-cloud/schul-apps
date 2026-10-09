@@ -156,6 +156,8 @@ body {
 
 .app-leiste .leiste-umschalter-zeile {
   display: flex;
+  /* Schmale Leiste am iPad (09.10.2026): zwei 44er-Knöpfe passen nicht nebeneinander – untereinander statt 7 Punkte über den Rand */
+  flex-wrap: wrap;
   justify-content: center;
   gap: 2px;
   margin-bottom: 6px;
@@ -987,6 +989,89 @@ img.home-illustration {
   align-items: center;
 }
 
+/*
+ * Dichte Leiste (09.10.2026, Befund am Notebook 1366 × 768: die Leiste rollte). shell/leistenDichte.ts setzt
+ * `data-dichte`, solange die Programmliste sonst überläuft: Stufe 1 rückt zusammen, Stufe 2 (nur mit Maus) stellt
+ * in der schmalen Leiste je Gruppe zwei Kacheln nebeneinander und macht die Zeilen der breiten Leiste flach.
+ */
+.app-leiste[data-dichte] .leiste-liste {
+  margin-top: 8px !important;
+}
+.app-leiste[data-dichte] .leiste-gruppe + .leiste-gruppe {
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.app-leiste[data-dichte] .leiste-kopf-schmal {
+  height: 22px;
+  margin-bottom: 2px;
+}
+.app-leiste[data-dichte] .leiste-kopf-breit {
+  height: 24px;
+  margin-bottom: 2px;
+}
+.app-leiste[data-dichte] .leiste-gruppe-apps {
+  padding-top: 3px;
+}
+.app-leiste[data-dichte] .nav-icon {
+  margin-bottom: 3px !important;
+}
+html:not([data-touch]) .app-leiste[data-dichte] .nav-icon:not(.nav-breit) {
+  --ai-size: 44px !important;
+}
+html:not([data-touch]) .app-leiste[data-dichte] .nav-icon:not(.nav-breit) .nav-bild {
+  width: 32px;
+  height: 32px;
+}
+html:not([data-touch]) .app-leiste[data-dichte] .nav-breit {
+  height: 38px !important;
+}
+.app-leiste[data-dichte] .leiste-umschalter-zeile {
+  margin-bottom: 2px;
+}
+.app-leiste[data-dichte] .modus-schalter {
+  margin-bottom: 4px;
+}
+/* Stufe 2 */
+html:not([data-touch]) .app-leiste[data-dichte='2'] .nav-icon:not(.nav-breit) {
+  --ai-size: 38px !important;
+  margin-bottom: 2px !important;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2'] .nav-icon:not(.nav-breit) .nav-bild {
+  width: 28px;
+  height: 28px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2']:not([data-breit='true']) .leiste-gruppe-apps {
+  display: grid;
+  grid-template-columns: repeat(2, 32px);
+  gap: 2px;
+  justify-content: center;
+  padding: 3px 0 3px 3px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2']:not([data-breit='true']) .leiste-gruppe-apps .nav-icon {
+  --ai-size: 32px !important;
+  margin: 0 !important;
+  border-radius: 8px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2']:not([data-breit='true']) .leiste-gruppe-apps .nav-bild {
+  width: 26px;
+  height: 26px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2'] .nav-breit {
+  height: 28px !important;
+  margin-bottom: 1px !important;
+  font-size: 13px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2'] .nav-breit .nav-bild {
+  width: 20px;
+  height: 20px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-kopf-breit {
+  height: 22px;
+}
+html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
+  --ai-size: 30px !important;
+}
+
 /* Gemeinsamer Programmkopf (Phase 6a, 05.10.2026 – shared/components/AppKopf.tsx) */
 .app-kopf {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -1093,4 +1178,51 @@ img.home-illustration {
 }
 .klassen-bedarf:hover {
   background: var(--mantine-color-default-hover);
+}
+
+/* Bibliothek der Elternbriefe (09.10.2026): kleine Vorschau der ersten Seite (A4), Papier bleibt auch dunkel weiß */
+.eb-vorschau {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-dimmed);
+  background: var(--mantine-color-default-hover);
+}
+.eb-vorschau[data-eb-vorschau='bild'] {
+  background: #fff;
+}
+.eb-vorschau iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.eb-schuljahr-kopf {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+.eb-schuljahr-kopf:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+/* Unsichtbar, aber im Aufbau (Vorlesen, Wischgesten) – z. B. die Schrittkreise der Einrichtung am Telefon (09.10.2026) */
+.nur-vorlesen {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  margin: -1px !important;
+  padding: 0 !important;
 }

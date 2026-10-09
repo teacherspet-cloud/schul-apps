@@ -155,9 +155,9 @@ describe('Verbrauch', () => {
   it('zählt je Monat, Anbieter und Modell zusammen', () => {
     setzeVerbrauchsDatei(join(wurzel, 'verbrauch.json'))
     const sept = new Date(2026, 8, 27)
-    merkeVerbrauch('anthropic', 'claude-x', { anfragen: 1, eingabe: 100, ausgabe: 50 }, sept)
-    merkeVerbrauch('anthropic', 'claude-x', { anfragen: 1, wiederholungen: 1, eingabe: 10, ausgabe: Number.NaN }, sept)
-    merkeVerbrauch('elevenlabs', '', { ttsZeichen: 300 }, new Date(2026, 9, 1))
+    merkeVerbrauch('anthropic', 'claude-x', { anfragen: 1, eingabe: 100, ausgabe: 50 }, undefined, sept)
+    merkeVerbrauch('anthropic', 'claude-x', { anfragen: 1, wiederholungen: 1, eingabe: 10, ausgabe: Number.NaN }, undefined, sept)
+    merkeVerbrauch('elevenlabs', '', { ttsZeichen: 300 }, undefined, new Date(2026, 9, 1))
     const v = leseVerbrauch()
     expect(monat(sept)).toBe('2026-09')
     expect(v['2026-09']['anthropic · claude-x']).toEqual({ anfragen: 2, wiederholungen: 1, eingabe: 110, ausgabe: 50, bilder: 0, ttsZeichen: 0 })

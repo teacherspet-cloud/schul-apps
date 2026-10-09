@@ -111,7 +111,7 @@ try {
   // Fremde Personen lassen sich so nicht entfernen
   const fremd = await lk.request.post(`${A}/server/vokabeln/${vk.id}/gast-entfernen`, { headers: KOPF, data: { id: lehrer.id } })
   pruefe(fremd.status() === 404, 'Wer nicht per Code beigetreten ist, lässt sich so nicht entfernen')
-  await lk.request.post(`${A}/server/vokabeln/${vk.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${vk.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

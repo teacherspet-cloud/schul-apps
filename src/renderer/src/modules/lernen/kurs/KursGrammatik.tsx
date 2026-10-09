@@ -37,10 +37,13 @@ import { bekanntNachStand } from '@shared/zeitformSperre'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { AufgabenEditor } from './AufgabenEditor'
 import { KastenKopf, useGemerkt } from './Kasten'
-import { nachJahrGruppiert, passtSuche } from './kursAnsicht'
-import { istOffen } from '../regal/grammatikJahrgaenge'
+import { nachLehrwerkGruppiert, passtSuche, type KursGruppe } from './kursAnsicht'
+import { stelleImLehrwerk } from '@shared/lehrwerkBand'
+import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
+import { BandCover } from '../../../shared/components/BandCover'
 import { jahrgangName } from '../regal/beschriftung'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
+import { offenLesen, offenMerken } from '../../../shared/sitzung'
 
 /** Land und Schulform aus den Einstellungen – Maßstab für das Niveau der Grammatikaufgaben (09.10.2026, grammatikNiveau.ts) */
 const niveauOrt = (): { land?: string; schulform?: string } => {
@@ -69,6 +72,9 @@ export interface GrammatikZeile {
   regeln?: string[]
   /** Katalog-Themen der Freigabe (Dialog „Grammatik hinzufügen") */
   themen?: string[]
+  /** Band und Unit (09.10.2026, Server: lehrwerkDerGrammatik) – Gliederung nach Lehrwerk */
+  buch?: string
+  unit?: string
 }
 
 /** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
@@ -293,15 +299,9 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
   )
 }
 
-/** Offene Jahre je Kurs, auf diesem Gerät gemerkt */
+/** Offene Jahre je Kurs, gemerkt für die Sitzung (shared/sitzung.ts, 09.10.2026) */
 const JAHRE_SCHLUESSEL = (vokId: string): string => `schulapps-vok-grammatik-jahre-${vokId}`
-function ladeJahre(vokId: string): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(JAHRE_SCHLUESSEL(vokId)) ?? '{}') as Record<string, boolean>
-  } catch {
-    return {}
-  }
-}
+const ladeJahre = (vokId: string): Record<string, boolean> => offenLesen<Record<string, boolean>>(JAHRE_SCHLUESSEL(vokId)) ?? {}
 
 /**
  * Die Grammatik des Kurses (08.10.2026, abgestimmt): zugeklappter Kasten, „Grammatik hinzufügen" im Kopf (auch
@@ -316,7 +316,8 @@ export function KursGrammatik({
   geoeffnet,
   oeffnen,
   stand,
-  immerOffen = false
+  immerOffen = false,
+  eingebettet = false
 }: {
   vokId: string
   /** Fach des Kurses – für die Jahrgangs-Überschriften in der Fremdsprache („Year 6") */
@@ -330,11 +331,13 @@ export function KursGrammatik({
   stand: number
   /** Im Reiter „Grammatik" der Kursseite (09.10.2026): ohne Auf- und Zuklappen */
   immerOffen?: boolean
+  /** In „Meine Klassen" (09.10.2026, Wunsch der Lehrkraft): zuklappbar, zu Beginn offen */
+  eingebettet?: boolean
 }): React.JSX.Element {
   const [liste, setListe] = useState<GrammatikZeile[] | null>(null)
   const [entwurf, setEntwurf] = useState<Entwurf | null>(null)
-  const [offenGemerkt, setOffen] = useGemerkt('vok-kasten-grammatik', false)
-  const offen = immerOffen || offenGemerkt
+  const [offenGemerkt, setOffen] = useGemerkt(eingebettet ? 'mk-grammatik-liste-offen' : 'vok-kasten-grammatik', eingebettet)
+  const offen = (immerOffen && !eingebettet) || offenGemerkt
   const [entferntOffen, setEntferntOffen] = useState(false)
   const [suche, setSuche] = useState('')
   const [jahre, setJahre] = useState<Record<string, boolean>>(() => ladeJahre(vokId))
@@ -383,18 +386,41 @@ export function KursGrammatik({
   const gefunden = [...t.sichtbar.filter((z) => z.art === 'entwurf'), ...t.sichtbar.filter((z) => z.art !== 'entwurf')].filter((z) =>
     passtSuche(z.art === 'frei' ? [z.g.titel, z.g.thema, ...(z.g.regeln ?? [])] : [z.e.titel, z.e.thema, ...z.e.paket.regeln.map((r) => r.titel)], suche)
   )
-  const gruppen = nachJahrGruppiert(gefunden, (z) => (z.art === 'frei' ? z.g.jahrgang : z.e.info?.jahrgang))
+  /*
+   * Gliederung (09.10.2026, Wunsch der Lehrkraft): nach Band und Unit, wo das Lehrwerk bekannt ist (Freigabe bzw. Katalog),
+   * neuester Band oben; sonst nach Schuljahr. Die Suche geht über alle Gruppen und öffnet die passenden.
+   */
+  const gruppen = nachLehrwerkGruppiert(
+    gefunden,
+    (z) =>
+      z.art === 'frei'
+        ? z.g.buch
+          ? { buch: z.g.buch, unit: z.g.unit }
+          : null
+        : z.e.info?.lehrwerk?.buch
+        ? { buch: z.e.info.lehrwerk.buch, unit: z.e.info.lehrwerk.unit }
+        : stelleImLehrwerk(z.e.info?.themen ?? [], z.e.info?.teilformen ?? []),
+    (z) => (z.art === 'frei' ? z.g.jahrgang : z.e.info?.jahrgang),
+    (buch) => Object.keys(LEHRWERK_GRAMMATIK[buch] ?? {})
+  )
+  const gruppeOffen = (g: KursGruppe<Zeile>, i: number): boolean =>
+    sucht || (g.schluessel in jahre ? jahre[g.schluessel] : i === 0 || g.eintraege.some((z) => z.art === 'entwurf'))
   const jahrUmschalten = (i: number): void => {
-    const k = String(gruppen[i].jahrgang ?? 'ohne')
-    const jetzt = istOffen(gruppen, i, jahre, false) || (!(k in jahre) && gruppen[i].eintraege.some((z) => z.art === 'entwurf'))
+    const k = gruppen[i].schluessel
+    const jetzt = gruppeOffen(gruppen[i], i)
     const neu = { ...jahre, [k]: !jetzt }
     setJahre(neu)
-    try {
-      localStorage.setItem(JAHRE_SCHLUESSEL(vokId), JSON.stringify(neu))
-    } catch {
-      /* ohne Speicher nur für jetzt */
-    }
+    offenMerken(JAHRE_SCHLUESSEL(vokId), neu)
   }
+  const gruppenTitel = (g: KursGruppe<Zeile>): React.ReactNode =>
+    g.buch ? (
+      <Group gap={8} wrap="nowrap">
+        <BandCover band={{ name: g.buch }} breite={22} />
+        <span>{[g.buch, g.unit].filter(Boolean).join(' · ')}</span>
+      </Group>
+    ) : (
+      jahrTitel(g.jahrgang)
+    )
   const jahrTitel = (j: number | null): React.ReactNode => {
     if (j === null) return 'Ohne Schuljahr'
     const name = jahrgangName(fach, j)
@@ -427,7 +453,7 @@ export function KursGrammatik({
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
   return (
     <Card withBorder data-kurs-grammatik>
-      {immerOffen ? (
+      {immerOffen && !eingebettet ? (
         <Group justify="space-between" wrap="nowrap">
           <Text fw={700}>Grammatik ({zeilen.length})</Text>
           <Button size="xs" variant="light" color="grape" leftSection={<IconPlus size={14} />} onClick={hinzufuegen} data-vokabel-grammatik>
@@ -488,21 +514,21 @@ export function KursGrammatik({
                   )}
                   {gruppen.flatMap((gr, i) => {
                     // Jahre mit Entwürfen (zum Prüfen) sind von sich aus offen
-                    const auf =
-                      istOffen(gruppen, i, jahre, sucht) || (!(String(gr.jahrgang ?? 'ohne') in jahre) && gr.eintraege.some((z) => z.art === 'entwurf'))
+                    const auf = gruppeOffen(gr, i)
                     const kopf = (
                       <Table.Tr
-                        key={`jahr-${gr.jahrgang ?? 'ohne'}`}
+                        key={gr.schluessel}
                         style={{ cursor: sucht ? undefined : 'pointer', background: 'var(--mantine-color-default-hover)' }}
                         onClick={() => !sucht && jahrUmschalten(i)}
                         aria-expanded={auf}
-                        data-grammatik-jahr={gr.jahrgang ?? 'ohne'}
+                        data-grammatik-jahr={gr.buch ? undefined : gr.jahrgang ?? 'ohne'}
+                        data-grammatik-band={gr.buch ? [gr.buch, gr.unit].filter(Boolean).join(' · ') : undefined}
                       >
                         <Table.Td colSpan={spalten.length + 1}>
                           <Group gap="xs" wrap="nowrap">
                             <IconChevronDown size={16} style={{ transform: auf ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
-                            <Text fw={700} size="sm">
-                              {jahrTitel(gr.jahrgang)}
+                            <Text fw={700} size="sm" component="div">
+                              {gruppenTitel(gr)}
                             </Text>
                             <Badge size="sm" variant="light" color="gray">
                               {gr.eintraege.length}

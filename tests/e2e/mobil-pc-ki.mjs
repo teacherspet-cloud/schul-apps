@@ -26,7 +26,7 @@ import { createServer as tcpServer, connect as tcpVerbinden } from 'net'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { kartenAuf, warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/mobil-pc-ki')
 mkdirSync(out, { recursive: true })
@@ -129,6 +129,7 @@ try {
   await page.evaluate(() => window.api.settings.set({ schoolName: 'PC-KI-Probe' }))
   await page.getByRole('button', { name: /Einstellungen/ }).filter({ visible: true }).first().click()
   await page.getByRole('tab', { name: 'KI-Zugang' }).click()
+  await kartenAuf(page, 'ki-text')
   await page.getByText('Abo über den PC (WLAN)').first().click()
   await page.getByLabel('Adresse des PCs').first().fill(`127.0.0.1:${lan.port}`)
   await page.getByLabel('PIN').first().fill(pin)
@@ -188,7 +189,11 @@ try {
   // Ab jetzt über den Vermittler
   await page.evaluate((p) => window.api.settings.set({ pcKi: { adresse: `127.0.0.1:${p}` } }), vermittlerPort)
   const sichtbar = (l) => l.filter({ visible: true }).first()
-  await page.keyboard.press('Control+7')
+  // Elternbriefe über die Leiste (Strg+7 ist seit der Leisten-Ordnung Tafelbilder); erstes Öffnen in der Sitzung zeigt
+  // die Übersicht (09.10.2026, shared/sitzung.ts) – von dort ein neuer Brief
+  await sichtbar(page.locator('[aria-label="Elternbriefe"]')).click()
+  const neuerBrief = sichtbar(page.getByRole('button', { name: 'Neuer Elternbrief' }))
+  if (await neuerBrief.waitFor({ timeout: 8000 }).then(() => true, () => false)) await neuerBrief.click()
   await sichtbar(page.locator('[data-eb-stichpunkte]')).waitFor({ timeout: 15000 })
   await sichtbar(page.locator('[data-eb-stichpunkte]')).fill('Wandertag am 12.10., Treffpunkt 8:00 Schulhof, Wildpark, 5 €')
   await page.waitForTimeout(600)
@@ -304,6 +309,7 @@ try {
   await page.evaluate(() => window.api.settings.set({ pcKi: { tailscaleAdresse: 'http://home-pc.tailae2351.ts.net:8420' } }))
   await page.getByRole('button', { name: /Einstellungen/ }).filter({ visible: true }).first().click()
   await page.getByRole('tab', { name: 'KI-Zugang' }).click()
+  await kartenAuf(page, 'ki-text')
   const feld = page.getByLabel('Adresse des PCs').first()
   await feld.fill('100.101.181.79:8420')
   const warnung = await page.getByText(/Tailscale-IP-Adressen \(100\.x\) lässt iOS nicht zu/).first().isVisible().catch(() => false)

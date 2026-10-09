@@ -7,6 +7,8 @@
 // - Ist er gesperrt, steht daneben der Grund („Thema fehlt").
 // - Selten Geändertes steht eingeklappt unter „Weitere Optionen"; auf/zu wird je Programm
 //   gemerkt, und die eingeklappte Überschrift nennt, was vom Standard abweicht.
+// - Seit 09.10.2026 (shared/sitzung.ts): auf/zu gilt nur für die Sitzung – nach einem Neustart der Exe ist
+//   „Weitere Optionen" wieder eingeklappt, und das Programm zeigt beim ersten Öffnen seine Übersicht.
 //
 // Es wird nichts erzeugt: Die Knöpfe werden nur auf Sichtbarkeit und Sperre geprüft.
 import { _electron as electron } from 'playwright-core'
@@ -200,7 +202,19 @@ const zurueck = await imBild(page, 'Zurück zur Vokabelliste')
 pruefe(zurueck.da && zurueck.sichtbar, 'Vokabeltest: „Zurück zur Vokabelliste“ steht in derselben Leiste')
 await page.screenshot({ path: join(out, 'paket6-vokabeltest-formular.png') })
 
-// ---------- Gemerkt über einen Neustart ----------
+// ---------- Neustart = neue Sitzung: wieder eingeklappt (09.10.2026) ----------
+// Innerhalb der Sitzung bleibt es offen – auch nach dem Neuladen des Fensters
+await page.reload()
+await warteAufOberflaeche(page)
+await page.click('[aria-label="Arbeitsblatt"]')
+await page.waitForTimeout(1500)
+{
+  const neuAb = page.getByRole('button', { name: 'Neues Arbeitsblatt' }).filter({ visible: true })
+  if (await neuAb.count()) await neuAb.first().click()
+  await page.waitForSelector('text=Thema & Lerngruppe')
+  await page.waitForTimeout(600)
+  pruefe((await weitereKopf(page).getAttribute('aria-expanded')) === 'true', 'Arbeitsblatt: „Weitere Optionen“ bleibt nach dem Neuladen offen (gleiche Sitzung)')
+}
 await app.close()
 ;({ app, page } = await starte())
 await page.click('[aria-label="Arbeitsblatt"]')
@@ -210,7 +224,7 @@ const neu = page.getByRole('button', { name: 'Neues Arbeitsblatt' }).filter({ vi
 if (await neu.count()) await neu.first().click()
 await page.waitForSelector('text=Thema & Lerngruppe')
 await page.waitForTimeout(600)
-pruefe((await weitereKopf(page).getAttribute('aria-expanded')) === 'true', 'Arbeitsblatt: „Weitere Optionen“ ist nach dem Neustart weiter offen (gemerkt)')
+pruefe((await weitereKopf(page).getAttribute('aria-expanded')) === 'false', 'Arbeitsblatt: „Weitere Optionen“ ist nach dem Neustart wieder eingeklappt (neue Sitzung)')
 await app.close()
 rmSync(userData, { recursive: true, force: true })
 

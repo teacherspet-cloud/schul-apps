@@ -363,6 +363,22 @@ function besterKatalogIndex(m: ThemenMaterial, katalog: KatalogMitWoertern): num
 }
 
 /**
+ * Das passendste belegte Thema für EIN Material – ohne Themenbereiche, Mindestgruppe und
+ * Anlegen (09.10.2026, ThemenBibliothek: Tafelbilder, Rückmeldungen, freigegebene Blätter).
+ * Dieselbe Regel wie die Automatik (`besterKatalogIndex`); null = nichts sicher Passendes.
+ */
+const katalogCache = new WeakMap<KatalogThema[], KatalogMitWoertern>()
+export function passendesKatalogThema(m: ThemenMaterial, katalog: KatalogThema[]): KatalogThema | null {
+  let w = katalogCache.get(katalog)
+  if (!w) {
+    w = katalogWoerter(katalog)
+    katalogCache.set(katalog, w)
+  }
+  const i = besterKatalogIndex(m, w)
+  return i >= 0 ? katalog[i] : null
+}
+
+/**
  * Die AUTOMATIK (Paket 12, Wunsch der Lehrkraft vom 26.09.2026): „vorhandene und neue
  * Materialien werden automatisch in die Hierarchie einsortiert – von Hand Zugeordnetes bleibt".
  *

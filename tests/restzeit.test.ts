@@ -194,3 +194,13 @@ describe('Schätzung der Restzeit', () => {
     expect(glaetteZiel(5000, 10000)).toBe(7000)
   })
 })
+
+describe('Wartende Aufträge ohne Restzeit (09.10.2026)', () => {
+  it('vor dem Start keine Restzeit, danach schon', async () => {
+    const { restAnzeige } = await import('../src/renderer/src/shared/restzeit')
+    const jetzt = Date.now()
+    expect(restAnzeige({ status: 'wartend', restBis: jetzt + 7000 }, jetzt)).toBe('')
+    expect(restAnzeige({ status: 'wartend', gestartet: true, restBis: jetzt + 60_000 }, jetzt)).not.toBe('')
+    expect(restAnzeige({ status: 'laeuft', restBis: jetzt + 60_000 }, jetzt)).not.toBe('')
+  })
+})

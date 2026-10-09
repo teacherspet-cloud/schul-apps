@@ -332,7 +332,7 @@ try {
   await p.screenshot({ path: join(out, '8-vorschau.png'), fullPage: true })
 
   await lk.request.post(`${A}/server/reihen/${gesp.id}/loeschen`, { headers: KOPF, data: {} })
-  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 8).join(' | ')}`)
   for (const [i, seite] of browser

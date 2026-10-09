@@ -170,7 +170,7 @@ try {
     .entries())
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
-  if (lk && kurs) await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  if (lk && kurs) await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   await browser.close()
 }

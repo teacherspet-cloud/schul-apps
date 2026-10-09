@@ -58,9 +58,12 @@ const fachname = (label: string): string => label.replace(/\s*…$/, "");
 export default function FachfarbenSettings({
   settings,
   update,
+  eingebettet = false,
 }: {
   settings: AppSettings;
   update: (patch: DeepPartial<AppSettings>) => void;
+  /** Ohne eigene Karte und Überschrift – in der Verwaltung (Fachfarben der Schule, 09.10.2026) */
+  eingebettet?: boolean;
 }): React.JSX.Element {
   const eigene = settings.fachfarben ?? {};
   // Dazu die Sprachen, die es nur im Vokabeltest gibt (Niederländisch, Russisch)
@@ -70,11 +73,8 @@ export default function FachfarbenSettings({
     farbe: fachFarbeAus(s.id, eigene)!,
   }));
 
-  return (
-    <Card withBorder padding="lg" className="fachfarben-karte">
-      <Title order={4} mb={4}>
-        Fachfarben
-      </Title>
+  const inhalt = (
+    <>
       <MehrText
         size="sm"
         text="Jedes Fach färbt seine Materialien in einer eigenen Farbe: Kopf, Überschriften, Rahmen, Farbband und Seitenleiste. Die Designvorlage bestimmt weiter Aufbau und Schrift. An jedem Material lässt sich stattdessen die Farbe der Vorlage wählen. Die Vorschläge stammen aus einer Palette, die auch auf Schwarz-Weiß-Kopien lesbar bleibt."
@@ -106,6 +106,15 @@ export default function FachfarbenSettings({
           />
         ))}
       </SimpleGrid>
+    </>
+  );
+  if (eingebettet) return <div className="fachfarben-karte">{inhalt}</div>;
+  return (
+    <Card withBorder padding="lg" className="fachfarben-karte">
+      <Title order={4} mb={4}>
+        Fachfarben
+      </Title>
+      {inhalt}
     </Card>
   );
 }

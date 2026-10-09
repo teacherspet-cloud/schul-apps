@@ -11,11 +11,14 @@
  */
 import { istSicher, type Vokabel, type WortStand } from './vokabeltrainer'
 import { quelleUnits, type Quelle } from './vokabelLaufbahn'
+import { bandRang } from './lehrwerkBand'
 
 export interface KursTeil {
   titel: string
   anzahl: number
   zeit: number
+  /** Lehrwerk-Kennung, aus der der Abschnitt kam (seit 09.10.2026 beim Hinzufügen gemerkt – Sortierung nach Band) */
+  lehrwerk?: string
 }
 
 export interface AbschnittEinordnung {
@@ -91,6 +94,36 @@ export function buchAusKennung(kennung: string): string {
   return w.map((x) => (/^\d+$/.test(x) ? x : x[0].toUpperCase() + x.slice(1))).join(' ')
 }
 
+/**
+ * Band je Abschnitt (09.10.2026, Sortierung nach Band): aus dem Titel („Green Line 6 - Unit 1 - …"), sonst aus der beim
+ * Hinzufügen gemerkten Lehrwerk-Kennung, sonst – nur mit erkannter Unit – vom Abschnitt davor (gleiche Freigabe) bzw. aus
+ * dem Kurstitel oder der Herkunft des Kurses. Ohne jeden Hinweis bleibt `buch` leer („Weitere Vokabeln").
+ */
+export function mitBaenden(
+  teile: Pick<KursTeil, 'titel' | 'lehrwerk'>[],
+  einordnung: AbschnittEinordnung[],
+  quelle: Partial<Quelle> | null | undefined,
+  titel = ''
+): AbschnittEinordnung[] {
+  const kopf = titel.split(' - ').map((x) => x.trim())
+  let letzte = istBuchTitel(kopf) ? kopf[0] : ''
+  const rueckfall = quelle?.lehrwerk ? buchAusKennung(quelle.lehrwerk) : ''
+  return einordnung.map((e, i) => {
+    const kennung = teile[i]?.lehrwerk
+    // Ganze Unit in einem Teil („Green Line 1 - Unit 3", ältere Freigaben): Band und Unit aus dem Titel
+    const zwei = (teile[i]?.titel ?? '').split(' - ').map((x) => x.trim())
+    const bandTitel = zwei.length === 2 && zwei[1] && [rueckfall, kennung ? buchAusKennung(kennung) : ''].some((b) => b && norm(b) === norm(zwei[0]))
+    if (!e.buch && bandTitel) {
+      letzte = zwei[0]
+      return { ...e, buch: zwei[0], unit: e.unit || zwei[1] }
+    }
+    // Ohne Unit (eigene Liste wie „Weather") kein geerbter Band
+    const buch = e.buch || (kennung ? buchAusKennung(kennung) : '') || (e.unit ? letzte || rueckfall : '')
+    if (buch) letzte = buch
+    return buch ? { ...e, buch } : e
+  })
+}
+
 /** Vergleichsform: ohne Akzente („Découvertes" = „decouvertes"), nur Buchstaben und Ziffern */
 const norm = (s: string): string =>
   s
@@ -136,6 +169,8 @@ export function kursName(fach: string, baende: string[], titel = ''): string {
 export interface AbschnittStatistik {
   /** Stelle in `teile` (für „Abschnitt entfernen" u. ä.) */
   index: number
+  /** Band („Green Line 6"), falls bekannt (`mitBaenden`, 09.10.2026) */
+  buch?: string
   unit: string
   name: string
   woerter: number
@@ -209,6 +244,7 @@ export function abschnittStatistik(
     const nachId = new Map(liste.map((v) => [v.id, v]))
     return {
       index: i,
+      ...(einordnung[i]?.buch ? { buch: einordnung[i].buch } : {}),
       unit: einordnung[i]?.unit ?? '',
       name: einordnung[i]?.name || t.titel,
       woerter: liste.length,
@@ -234,4 +270,19 @@ export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'>>(z
   return [...gruppen.entries()]
     .map(([unit, l]) => ({ unit, zeilen: l, neueste: Math.max(0, ...l.map((x) => x.zeit)) }))
     .sort((a, b) => b.neueste - a.neueste)
+}
+
+/**
+ * Gruppen nach Band (09.10.2026, Wunsch der Lehrkraft): neuester Band oben, ältester unten, nur Bände mit Inhalt; ohne
+ * Band („Weitere Vokabeln") ganz unten. Im Band die Units wie bei `nachUnits` (neueste Freigabe zuerst).
+ */
+export function nachBaenden<T extends Pick<AbschnittStatistik, 'unit' | 'zeit' | 'buch'>>(
+  zeilen: T[]
+): { buch: string; units: { unit: string; zeilen: T[]; neueste: number }[]; neueste: number }[] {
+  const baende = new Map<string, T[]>()
+  for (const z of zeilen) baende.set(z.buch ?? '', [...(baende.get(z.buch ?? '') ?? []), z])
+  return [...baende.entries()]
+    // Gleichzeitig freigegebene Units: die spätere im Buch zuerst
+    .map(([buch, l]) => ({ buch, units: nachUnits(l).sort((a, b) => b.neueste - a.neueste || bandRang(b.unit) - bandRang(a.unit)), neueste: Math.max(0, ...l.map((x) => x.zeit)) }))
+    .sort((a, b) => Number(!a.buch) - Number(!b.buch) || bandRang(b.buch) - bandRang(a.buch) || b.neueste - a.neueste)
 }

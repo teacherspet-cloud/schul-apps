@@ -249,7 +249,7 @@ try {
   await s.waitForTimeout(1500)
   pruefe((await s.locator('img[src^="/medien/"]').count()) >= 0, 'Trainer geladen')
   await s.screenshot({ path: join(out, '5-trainer.png') })
-  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

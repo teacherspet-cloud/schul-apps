@@ -8,6 +8,11 @@
  * (Lücken je Land in resources/schulen/README.md), und manche Schule nennt sich im Kopf ihrer
  * Blätter kürzer als amtlich.
  *
+ * Anschrift und Telefon (09.10.2026): Die Wahl einer Schule füllt NUR leere Felder des Briefkopfs
+ * (shared/schulVerzeichnisDaten.ts); weicht ein gefülltes Feld vom Verzeichnis ab, bietet ein Hinweis
+ * „Daten aus dem Schulverzeichnis übernehmen" an. Dasselbe Suchfeld (`SchulSuchfeld`) nutzt die
+ * Verwaltung beim Einrichten der Schule.
+ *
  * Vorgabe-Logo: Liegt für die gewählte Schule eines bei (bisher nur das Gymnasium Wesermünde),
  * wird es gesetzt, wenn noch kein Logo da ist – sonst nach kurzer Rückfrage. Ein eigenes Logo
  * wird nie ungefragt ersetzt.
@@ -16,6 +21,7 @@ import { Anchor, Badge, Button, CloseButton, Combobox, Group, List, Loader, Moda
 import { IconSchool } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { appSchulform, type SchulQuelle, type SchulTreffer } from '@shared/schulsuche'
+import { VERZEICHNIS_FELDNAME, verzeichnisAbgleich, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
 import type { AppSettings, CefrTable, DeepPartial } from '@shared/types'
 import { useAppSettings } from '../shared/settingsStore'
 import { notifyError, notifySuccess } from '../shared/util'
@@ -44,19 +50,31 @@ interface Props {
   disabled?: boolean
 }
 
-export default function SchulnameFeld({ settings, update, table, disabled }: Props): React.JSX.Element {
-  const [text, setText] = useState(settings.schoolName)
+interface SuchfeldProps {
+  value: string
+  onChange: (text: string) => void
+  onWaehle: (t: SchulTreffer) => void
+  /** Beim Verlassen des Feldes (eigener Wortlaut) */
+  onBlur?: () => void
+  /** Land und Schulform der Einstellungen – passende Treffer zuerst */
+  land?: string
+  schulform?: string
+  label: string
+  description?: string
+  placeholder?: string
+  disabled?: boolean
+  required?: boolean
+  /** Wert für das Attribut data-schulsuche (Oberflächentests) */
+  kennung?: string
+}
+
+/** Textfeld mit Vorschlägen aus dem Schulverzeichnis (Einstellungen, Assistent, Verwaltung) */
+export function SchulSuchfeld(p: SuchfeldProps): React.JSX.Element {
   const [treffer, setTreffer] = useState<SchulTreffer[]>([])
   const [sucht, setSucht] = useState(false)
-  const [gewaehlt, setGewaehlt] = useState<SchulTreffer | null>(null)
-  const [logoFrage, setLogoFrage] = useState<{ schule: string; png: string } | null>(null)
-  const [quellenOffen, setQuellenOffen] = useState(false)
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() })
   const lauf = useRef(0)
-  const { stateId, schoolTypeId } = settings.defaults
-
-  // Von außen geändert (Sicherung eingelesen, zweites Fenster): Feld nachziehen
-  useEffect(() => setText(settings.schoolName), [settings.schoolName])
+  const text = p.value
 
   useEffect(() => {
     const q = text.trim()
@@ -69,33 +87,131 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
     // Kurz warten: Bei schnellem Tippen nicht für jeden Buchstaben suchen
     const t = setTimeout(() => {
       window.api.schulen
-        .suche(q, { land: stateId, schulform: schoolTypeId })
+        .suche(q, { land: p.land, schulform: p.schulform })
         .then((r) => nr === lauf.current && setTreffer(r))
         .catch(() => nr === lauf.current && setTreffer([]))
         .finally(() => nr === lauf.current && setSucht(false))
     }, 120)
     return () => clearTimeout(t)
-  }, [text, stateId, schoolTypeId, combobox.dropdownOpened])
+  }, [text, p.land, p.schulform, combobox.dropdownOpened])
+
+  return (
+    <Combobox
+      store={combobox}
+      onOptionSubmit={(id) => {
+        const t = treffer.find((x) => x.id === id)
+        combobox.closeDropdown()
+        if (t) p.onWaehle(t)
+      }}
+      withinPortal
+    >
+      <Combobox.Target>
+        <TextInput
+          label={p.label}
+          description={p.description}
+          placeholder={p.placeholder}
+          required={p.required}
+          value={text}
+          disabled={p.disabled}
+          rightSection={sucht ? <Loader size={14} /> : null}
+          data-schulsuche={p.kennung ?? ''}
+          onChange={(e) => {
+            p.onChange(e.currentTarget.value)
+            combobox.openDropdown()
+            combobox.updateSelectedOptionIndex()
+          }}
+          onFocus={() => combobox.openDropdown()}
+          onClick={() => combobox.openDropdown()}
+          onBlur={() => {
+            combobox.closeDropdown()
+            p.onBlur?.()
+          }}
+        />
+      </Combobox.Target>
+      <Combobox.Dropdown hidden={text.trim().length < 2 || (!treffer.length && sucht)}>
+        <Combobox.Options mah={340} style={{ overflowY: 'auto' }} aria-label="Gefundene Schulen">
+          {treffer.length ? (
+            treffer.map((t) => (
+              <Combobox.Option value={t.id} key={t.id}>
+                <Group gap={8} wrap="nowrap" justify="space-between">
+                  <div style={{ minWidth: 0 }}>
+                    <Text size="sm" fw={500} truncate>
+                      {t.name}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate>
+                      {[[t.plz, t.ort].filter(Boolean).join(' '), t.land, formenText(t)].filter(Boolean).join(' · ')}
+                    </Text>
+                  </div>
+                  {t.logo && (
+                    <Badge size="xs" variant="light" leftSection={<IconSchool size={10} />}>
+                      Logo
+                    </Badge>
+                  )}
+                </Group>
+              </Combobox.Option>
+            ))
+          ) : (
+            <Combobox.Empty>Keine Schule gefunden – der Name bleibt so, wie er eingetippt ist.</Combobox.Empty>
+          )}
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
+  )
+}
+
+/** Hinweis: Das Verzeichnis führt andere Angaben als die eingetragenen – Übernahme nur auf Klick */
+export function VerzeichnisAbweichung({
+  abweichend,
+  uebernehmen,
+  schliessen
+}: {
+  abweichend: Abweichung[]
+  uebernehmen: () => void
+  schliessen: () => void
+}): React.JSX.Element {
+  return (
+    <Paper withBorder p="xs" radius="sm" data-verzeichnis-abweichung>
+      <Group gap="xs" justify="space-between" wrap="nowrap" align="flex-start">
+        <Text size="xs">
+          Im Schulverzeichnis steht anderes:{' '}
+          {abweichend.map((a, i) => (
+            <span key={a.feld}>
+              {i > 0 && ' · '}
+              {VERZEICHNIS_FELDNAME[a.feld]} <b>{a.verzeichnis}</b> (eingetragen: {a.bisher})
+            </span>
+          ))}
+        </Text>
+        <Group gap={4} wrap="nowrap">
+          <Button size="compact-xs" variant="light" onClick={uebernehmen} data-verzeichnis-uebernehmen>
+            Daten aus dem Schulverzeichnis übernehmen
+          </Button>
+          <CloseButton size="sm" aria-label="Hinweis schließen" onClick={schliessen} />
+        </Group>
+      </Group>
+    </Paper>
+  )
+}
+
+export default function SchulnameFeld({ settings, update, table, disabled }: Props): React.JSX.Element {
+  const [text, setText] = useState(settings.schoolName)
+  const [gewaehlt, setGewaehlt] = useState<SchulTreffer | null>(null)
+  const [abweichung, setAbweichung] = useState<{ treffer: SchulTreffer; felder: Abweichung[] } | null>(null)
+  const [logoFrage, setLogoFrage] = useState<{ schule: string; png: string } | null>(null)
+  const [quellenOffen, setQuellenOffen] = useState(false)
+  const { stateId, schoolTypeId } = settings.defaults
+
+  // Von außen geändert (Sicherung eingelesen, zweites Fenster): Feld nachziehen
+  useEffect(() => setText(settings.schoolName), [settings.schoolName])
 
   const waehle = async (t: SchulTreffer): Promise<void> => {
     setText(t.name)
-    combobox.closeDropdown()
-    // Anschrift für den Briefkopf der Elternbriefe (29.09.2026). Andere Schule: Anschrift ganz aus dem
-    // Verzeichnis (Fehlendes bleibt leer). Dieselbe Schule erneut gewählt: nur Leeres ergänzen.
+    // Anschrift für den Briefkopf der Elternbriefe (29.09.2026; 09.10.2026: nur leere Felder füllen, Abweichungen
+    // als Angebot – shared/schulVerzeichnisDaten.ts)
     const { settings: aktuell } = useAppSettings.getState()
     const bisher = aktuell.briefkopf ?? {}
-    const gleich = aktuell.schoolName.trim() === t.name
-    const wert = (neu: string, alt?: string): string => (gleich ? alt || neu : neu)
-    await update({
-      schoolName: t.name,
-      briefkopf: {
-        ...bisher,
-        strasse: wert(t.strasse, bisher.strasse),
-        plz: wert(t.plz, bisher.plz),
-        ort: wert(t.ort, bisher.ort),
-        telefon: wert(t.telefon, bisher.telefon)
-      }
-    })
+    const { gefuellt, abweichend } = verzeichnisAbgleich(bisher, t)
+    await update({ schoolName: t.name, briefkopf: { ...bisher, ...gefuellt } })
+    setAbweichung(abweichend.length ? { treffer: t, felder: abweichend } : null)
     setGewaehlt(t)
     setLogoFrage(null)
     if (!t.logo) return
@@ -127,58 +243,37 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
 
   return (
     <Stack gap={6}>
-      <Combobox store={combobox} onOptionSubmit={(id) => void waehle(treffer.find((t) => t.id === id)!)} withinPortal>
-        <Combobox.Target>
-          <TextInput
-            label="Schulname (erscheint im Kopf von Tests und Arbeitsblättern)"
-            description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder – eigener Wortlaut bleibt möglich."
-            placeholder="Namen oder Ort der Schule eingeben"
-            value={text}
-            disabled={disabled}
-            rightSection={sucht ? <Loader size={14} /> : null}
-            data-schulsuche
-            onChange={(e) => {
-              setText(e.currentTarget.value)
-              setGewaehlt(null)
-              combobox.openDropdown()
-              combobox.updateSelectedOptionIndex()
-            }}
-            onFocus={() => combobox.openDropdown()}
-            onClick={() => combobox.openDropdown()}
-            onBlur={() => {
-              combobox.closeDropdown()
-              if (text !== settings.schoolName) void update({ schoolName: text })
-            }}
-          />
-        </Combobox.Target>
-        <Combobox.Dropdown hidden={text.trim().length < 2 || (!treffer.length && sucht)}>
-          <Combobox.Options mah={340} style={{ overflowY: 'auto' }} aria-label="Gefundene Schulen">
-            {treffer.length ? (
-              treffer.map((t) => (
-                <Combobox.Option value={t.id} key={t.id}>
-                  <Group gap={8} wrap="nowrap" justify="space-between">
-                    <div style={{ minWidth: 0 }}>
-                      <Text size="sm" fw={500} truncate>
-                        {t.name}
-                      </Text>
-                      <Text size="xs" c="dimmed" truncate>
-                        {[[t.plz, t.ort].filter(Boolean).join(' '), t.land, formenText(t)].filter(Boolean).join(' · ')}
-                      </Text>
-                    </div>
-                    {t.logo && (
-                      <Badge size="xs" variant="light" leftSection={<IconSchool size={10} />}>
-                        Logo
-                      </Badge>
-                    )}
-                  </Group>
-                </Combobox.Option>
-              ))
-            ) : (
-              <Combobox.Empty>Keine Schule gefunden – der Name bleibt so, wie er eingetippt ist.</Combobox.Empty>
-            )}
-          </Combobox.Options>
-        </Combobox.Dropdown>
-      </Combobox>
+      <SchulSuchfeld
+        value={text}
+        onChange={(x) => {
+          setText(x)
+          setGewaehlt(null)
+        }}
+        onWaehle={(t) => void waehle(t)}
+        onBlur={() => {
+          if (text !== settings.schoolName) void update({ schoolName: text })
+        }}
+        land={stateId}
+        schulform={schoolTypeId}
+        label="Schulname (erscheint im Kopf von Tests und Arbeitsblättern)"
+        description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder – eigener Wortlaut bleibt möglich. Die Wahl ergänzt leere Felder der Anschrift."
+        placeholder="Namen oder Ort der Schule eingeben"
+        disabled={disabled}
+      />
+
+      {abweichung && (
+        <VerzeichnisAbweichung
+          abweichend={abweichung.felder}
+          uebernehmen={() => {
+            const bisher = useAppSettings.getState().settings.briefkopf ?? {}
+            void Promise.resolve(update({ briefkopf: { ...bisher, ...verzeichnisUebernehmen(abweichung.treffer) } }))
+              .then(() => notifySuccess('Anschrift und Telefon aus dem Schulverzeichnis übernommen.'))
+              .catch(notifyError)
+            setAbweichung(null)
+          }}
+          schliessen={() => setAbweichung(null)}
+        />
+      )}
 
       {gewaehlt && abweichend && (
         <Paper withBorder p="xs" radius="sm" data-schule-uebernehmen>

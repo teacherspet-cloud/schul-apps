@@ -23,6 +23,7 @@ import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
+import { VERBFORM_TON } from './wartungVerbformTon'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
 export const ZEIT_GRENZE: Record<string, number> = { blitz: 30, richtiggehoert: 30, formenblitz: 30, verbblitz: 30, richtigfalsch: 30 }
@@ -152,7 +153,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Zusammengefasste Vokabel-Abschnitte je Lehrwerk-Abschnitt teilen (09.10.2026, wartungAbschnitteTeilen.ts)
   ABSCHNITTE_TEILEN,
   // Aufnahmen mit Abkürzungen löschen (09.10.2026, von der Lehrkraft bestätigt; wartungAbkuerzungTon.ts)
-  ABKUERZUNG_TON
+  ABKUERZUNG_TON,
+  // Aufnahmen mit „slash" und alter Verbform-Aussprache entfernen, vorher gesichert (09.10.2026; wartungVerbformTon.ts)
+  VERBFORM_TON
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

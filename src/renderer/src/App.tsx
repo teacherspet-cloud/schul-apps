@@ -22,7 +22,7 @@ import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { useMaskottchen } from './shared/maskottchenStore'
-import { modules, MODUL_GRUPPEN, gruppenBild } from './modules/registry'
+import { modules, LEISTE_OBEN, MODUL_GRUPPEN, gruppenBild } from './modules/registry'
 import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
 import Themenuebersicht from './shell/Themenuebersicht'
@@ -33,12 +33,15 @@ import AuftragsLayer from './shell/AuftragsLayer'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
-import { dokumentOeffnenWennBereit, druckeAktives, openModule, openSettings, useNavigation } from './shared/navigation'
+import { dokumentOeffnenWennBereit, druckeAktives, oeffneProgramm, openModule, openSettings, useNavigation } from './shared/navigation'
 import { faecherAusIservUebernehmen } from './shared/iservAbgleich'
 import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesDokument, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
+import { useLeistenDichte } from './shell/leistenDichte'
 import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
+import { useFachschaftNeu } from './shared/components/Fachordner'
+import { useOffenGemerkt } from './shared/sitzung'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
 const LEISTE_KEY = 'schul-apps-leiste-breit'
@@ -76,26 +79,15 @@ export default function App(): React.JSX.Element {
   // Wohin die App zeigt, steht im Navigations-Store – so können auch Hinweise und die Startseite dorthin führen
   const active = useNavigation((s) => s.active)
   const laufpunkte = useNavigation((s) => s.laufpunkte)
+  // Noch nicht angesehene Freigaben der Fachschaft je App (09.10.2026) – Zahl am Symbol in der Leiste
+  const fachschaftNeu = useFachschaftNeu()
   const current = modules.find((m) => m.id === active)
   // Nur die Programme zu den eigenen Fächern (Paket 12) – geladen bleiben trotzdem alle
   const sichtbar = useSichtbareProgramme()
-  // Zugeklappte Gruppen der Leiste (je Gerät; beim ersten Start alle offen)
-  const [zuGruppen, setZuGruppen] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('leiste-gruppen-zu') ?? '[]') as string[]
-    } catch {
-      return []
-    }
-  })
-  const gruppeUmschalten = (id: string, offen: boolean): void => {
-    const neu = offen ? [...new Set([...zuGruppen, id])] : zuGruppen.filter((x) => x !== id)
-    setZuGruppen(neu)
-    try {
-      localStorage.setItem('leiste-gruppen-zu', JSON.stringify(neu))
-    } catch {
-      // ohne Speicher nur für diese Sitzung
-    }
-  }
+  // Zugeklappte Gruppen der Leiste – je Sitzung (shared/sitzung.ts, 09.10.2026); zu Beginn einer Sitzung alle offen
+  const [zuGruppen, setZuGruppen] = useOffenGemerkt<string[]>('leiste-gruppen-zu', [])
+  const gruppeUmschalten = (id: string, offen: boolean): void =>
+    setZuGruppen(offen ? [...new Set([...zuGruppen, id])] : zuGruppen.filter((x) => x !== id))
   // Der Tastenhorcher (unten) bleibt stehen; die aktuelle Liste liest er hier
   const sichtbarRef = useRef(sichtbar)
   sichtbarRef.current = sichtbar
@@ -130,6 +122,8 @@ export default function App(): React.JSX.Element {
   // Ein Programm im eigenen Fenster (?einzeln=<id>, 02.10.2026): nur dieses Programm, ohne Leiste
   const einzeln = einzelnesProgramm()
   const ohneLeiste = Boolean(einzeln) || telefon || (touch && leisteAus)
+  // Leiste dichter, solange sie sonst rollen müsste (09.10.2026, Notebook 1366 × 768) – shell/leistenDichte.ts
+  const dichte = useLeistenDichte(`${breit}|${zuGruppen.join(',')}|${sichtbar.map((m) => m.id).join(',')}|${active}|${ohneLeiste}`, touch)
   const leisteAusblenden = (aus: boolean): void => {
     setLeisteAus(aus)
     try {
@@ -140,12 +134,14 @@ export default function App(): React.JSX.Element {
   }
   const schubladeAuf = useCallback(() => setSchublade(true), [])
   useRandWischen(ohneLeiste, schubladeAuf)
-  const navDaten: NavigationsDaten = { programme: sichtbar, active, laufpunkte, oeffnen: openModule }
+  const navDaten: NavigationsDaten = { programme: sichtbar, active, laufpunkte, oeffnen: oeffneProgramm }
   useEffect(() => {
     if (!einzeln) return
     const m = modules.find((x) => x.id === einzeln)
     if (!m) return
-    openModule(m.id)
+    // Mit Dokument gleich dorthin, sonst die Übersicht der App
+    if (einzelnesDokument()) openModule(m.id)
+    else oeffneProgramm(m.id)
     document.title = `${m.name} – Schul-Apps`
     // Mit Dokument (z. B. ein Onlinetest aus der Liste): gleich öffnen
     const dok = einzelnesDokument()
@@ -185,7 +181,7 @@ export default function App(): React.JSX.Element {
         const ziel = n === 0 ? 'home' : sichtbarRef.current[n - 1]?.id
         if (!ziel) return
         e.preventDefault()
-        openModule(ziel)
+        oeffneProgramm(ziel)
         return
       }
       if (e.code === 'KeyP' && druckeAktives()) e.preventDefault()
@@ -260,7 +256,7 @@ export default function App(): React.JSX.Element {
   return (
     <AppShell navbar={ohneLeiste ? undefined : { width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
       {!ohneLeiste && (
-        <AppShell.Navbar p={10} className="app-leiste" data-breit={breit}>
+        <AppShell.Navbar p={10} className="app-leiste" data-breit={breit} data-dichte={dichte || undefined}>
           <AppShell.Section>
             <NavIcon label="Startseite" breit={breit} active={active === 'home' || active === 'themen'} onClick={() => openModule('home')}>
               <IconHome size={22} />
@@ -277,6 +273,22 @@ export default function App(): React.JSX.Element {
               Leistungsüberprüfungen, Verwaltung. Ein Klick auf die Gruppe klappt ihre Apps auf oder zu;
               die Leiste merkt sich das. Die Gruppe der offenen App bleibt immer aufgeklappt.
             */}
+            {/* Ganz oben ohne Gruppe (09.10.2026): Meine Klassen */}
+            {LEISTE_OBEN.flatMap((id) => sichtbar.filter((m) => m.id === id)).map((m) => (
+              <NavIcon
+                key={m.id}
+                label={m.name}
+                breit={breit}
+                active={active === m.id}
+                badge={laufpunkte[m.id]}
+                neu={fachschaftNeu[m.id]}
+                bild={m.leistenbild}
+                onClick={() => oeffneProgramm(m.id)}
+                fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
+              >
+                <m.icon size={22} />
+              </NavIcon>
+            ))}
             {MODUL_GRUPPEN.map((g) => {
               // In der Reihenfolge der Gruppe (wie abgestimmt), nicht der Registrierung
               const apps = g.apps.flatMap((id) => sichtbar.filter((m) => m.id === id))
@@ -293,7 +305,7 @@ export default function App(): React.JSX.Element {
                     offen={offen}
                     anzahl={apps.length}
                     active={hatAktive && !offen}
-                    badge={!offen && apps.some((m) => laufpunkte[m.id])}
+                    badge={!offen && apps.some((m) => laufpunkte[m.id] || fachschaftNeu[m.id])}
                     onClick={() => gruppeUmschalten(g.id, offen)}
                   >
                     <Symbol size={16} />
@@ -307,8 +319,9 @@ export default function App(): React.JSX.Element {
                           breit={breit}
                           active={active === m.id}
                           badge={laufpunkte[m.id]}
+                          neu={fachschaftNeu[m.id]}
                           bild={m.leistenbild}
-                          onClick={() => openModule(m.id)}
+                          onClick={() => oeffneProgramm(m.id)}
                           fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
                         >
                           <m.icon size={22} />
@@ -321,7 +334,7 @@ export default function App(): React.JSX.Element {
             })}
             {/* Apps ohne Gruppe (falls es künftig welche gibt) */}
             {sichtbar
-              .filter((m) => !MODUL_GRUPPEN.some((g) => g.apps.includes(m.id)))
+              .filter((m) => !MODUL_GRUPPEN.some((g) => g.apps.includes(m.id)) && !LEISTE_OBEN.includes(m.id))
               .map((m) => (
                 <NavIcon
                   key={m.id}
@@ -329,8 +342,9 @@ export default function App(): React.JSX.Element {
                   breit={breit}
                   active={active === m.id}
                   badge={laufpunkte[m.id]}
+                  neu={fachschaftNeu[m.id]}
                   bild={m.leistenbild}
-                  onClick={() => openModule(m.id)}
+                  onClick={() => oeffneProgramm(m.id)}
                   fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
                 >
                   <m.icon size={22} />
@@ -345,7 +359,7 @@ export default function App(): React.JSX.Element {
             {(!schmalerBildschirm || touch) && (
               <div className="leiste-umschalter-zeile">
                 {!schmalerBildschirm && (
-                  <Tooltip label={breit ? 'Namen einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
+                  <Tooltip label={breit ? 'Namen einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow disabled={touch}>
                     <ActionIcon
                       variant="subtle"
                       className="leiste-umschalter"
@@ -360,7 +374,7 @@ export default function App(): React.JSX.Element {
                 )}
                 {/* Mit dem Finger (iPad): die Leiste ganz ausblenden – dann mehr Platz für das Blatt */}
                 {touch && (
-                  <Tooltip label="Seitenleiste ganz ausblenden" position="right" withArrow>
+                  <Tooltip label="Seitenleiste ganz ausblenden" position="right" withArrow disabled>
                     <ActionIcon
                       variant="subtle"
                       className="leiste-umschalter"
@@ -469,6 +483,8 @@ function NavIcon(props: {
   active: boolean
   breit: boolean
   badge?: boolean
+  /** Zahl neuer Freigaben der Fachschaft für diese App (09.10.2026) */
+  neu?: number
   bild?: string
   onClick: () => void
   /**
@@ -501,6 +517,8 @@ function GruppenKopf(props: {
   children: React.ReactNode
 }): React.JSX.Element {
   const Pfeil = props.offen ? IconChevronDown : IconChevronRight
+  // Am iPad blieb der Tooltip nach dem Antippen stehen (09.10.2026) – mit dem Finger ohne Tooltips
+  const touch = useTouch()
   const symbol = props.bild ? <img src={props.bild} className="leiste-kopf-bild" alt="" draggable={false} /> : props.children
   const knopf = (
     <UnstyledButton
@@ -523,7 +541,7 @@ function GruppenKopf(props: {
   return props.breit ? (
     knopf
   ) : (
-    <Tooltip label={`${props.label} – ${props.offen ? 'zuklappen' : `aufklappen (${props.anzahl})`}`} position="right" withArrow>
+    <Tooltip label={`${props.label} – ${props.offen ? 'zuklappen' : `aufklappen (${props.anzahl})`}`} position="right" withArrow disabled={touch}>
       {knopf}
     </Tooltip>
   )
@@ -534,22 +552,37 @@ function NavKnopf(props: {
   active: boolean
   breit: boolean
   badge?: boolean
+  /** Zahl neuer Freigaben der Fachschaft für diese App (09.10.2026) */
+  neu?: number
   bild?: string
   onClick: () => void
   fenster?: () => void
   children: React.ReactNode
 }): React.JSX.Element {
   const doppel = props.fenster ? { onDoubleClick: props.fenster, 'data-doppelklick-fenster': '' } : {}
+  // Mit dem Finger keine Tooltips (09.10.2026): am iPad blieb „Meine Klassen / Doppelklick: eigenes Fenster" nach dem Antippen offen
+  const touch = useTouch()
   // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
   const variant = props.active ? 'filled' : props.bild ? 'subtle' : 'light'
   const color = props.active ? undefined : 'gray'
   const symbol = (
     <Indicator disabled={!props.badge} size={10} offset={props.bild ? 2 : 4} processing color="orange" position="top-end">
-      {props.bild ? (
-        <img src={props.bild} className="nav-bild" width={props.breit ? 30 : 40} height={props.breit ? 30 : 40} alt="" draggable={false} />
-      ) : (
-        props.children
-      )}
+      <Indicator
+        disabled={!props.neu}
+        label={props.neu}
+        size={16}
+        offset={props.bild ? 2 : 4}
+        color="orange"
+        position="bottom-end"
+        title={props.neu ? `${props.neu} neu von der Fachschaft` : undefined}
+        data-fachschaft-neu={props.neu || undefined}
+      >
+        {props.bild ? (
+          <img src={props.bild} className="nav-bild" width={props.breit ? 30 : 40} height={props.breit ? 30 : 40} alt="" draggable={false} />
+        ) : (
+          props.children
+        )}
+      </Indicator>
     </Indicator>
   )
   if (props.breit)
@@ -589,6 +622,7 @@ function NavKnopf(props: {
       }
       position="right"
       withArrow
+      disabled={touch}
     >
       <ActionIcon
         onClick={props.onClick}

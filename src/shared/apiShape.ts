@@ -249,10 +249,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
       hoertexteAufraeumen: () => call<{ dateien: string[]; bytes: number }>('wartung:hoertexteAufraeumen')
     },
     verbrauch: {
-      get: () =>
-        call<
-          Record<string, Record<string, { anfragen: number; wiederholungen: number; eingabe: number; ausgabe: number; bilder: number; ttsZeichen: number }>>
-        >('verbrauch:get')
+      /** Monate, Tage und Limits (09.10.2026, shared/verbrauch.ts) */
+      get: () => call<import('./verbrauch').VerbrauchsDaten>('verbrauch:get'),
+      /** ElevenLabs-Kontingent in Zeichen; null ohne Schlüssel oder Auskunft */
+      kontingent: () => call<{ verbraucht: number; grenze: number; erneuert: string | null; tarif: string } | null>('verbrauch:kontingent')
     },
     /** Briefkopf (29.09.2026): Zertifikat für die digitale Signatur wählen – im Netzzugang gesperrt */
     briefkopf: {

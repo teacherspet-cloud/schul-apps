@@ -109,10 +109,26 @@ export async function kursReiter(page, reiter) {
 /** Zugeklappte Schuljahre der Grammatik-Tabelle aufklappen */
 export async function grammatikJahreAuf(page) {
   await page.locator('[data-kurs-grammatik]').first().waitFor({ timeout: 15000 }).catch(() => undefined)
-  for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
+  for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"], [data-grammatik-band][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
 }
 
 /** Früherer Name: Kursseite geöffnet, Reiter „Grammatik" (Vorgabe) bzw. der angegebene */
 export async function kursKaestenAuf(page, reiter = 'grammatik') {
   await kursReiter(page, reiter)
+}
+
+/**
+ * Einstellungen › KI-Zugang und › Bilder und Hörtexte (09.10.2026): Die Karten sind eingeklappt (Kopf mit Statuszeile,
+ * Inhalt erst nach dem Aufklappen). `kartenAuf` klappt alle sichtbaren zu Karten auf – oder nur die mit der Kennung
+ * `id` (data-klappkarte: ki-text, ki-bild, verbrauch, bildsuche, hoertexte, vokabel-stimmen).
+ */
+export async function kartenAuf(page, id) {
+  const zu = () =>
+    page.locator(id ? `[data-klappkarte="${id}"][data-offen="false"] [data-klappkopf]` : '[data-klappkarte][data-offen="false"] [data-klappkopf]').filter({ visible: true })
+  await page.locator('[data-klappkarte]').first().waitFor({ timeout: 5000 }).catch(() => undefined)
+  for (let i = 0; i < 20 && (await zu().count()); i++) {
+    await zu().first().click().catch(() => undefined)
+    await page.waitForTimeout(150)
+  }
+  await page.waitForTimeout(200)
 }

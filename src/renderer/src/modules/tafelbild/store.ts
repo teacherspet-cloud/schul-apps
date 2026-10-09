@@ -20,7 +20,10 @@ export const bibliothek = erzeugeBibliothek({
     stateId: t.meta.stateId,
     schoolTypeId: t.meta.schoolTypeId,
     hatTafel: hatTafel(t),
-    formate: t.meta.formate.map((f) => formatInfo(f).kurz).join(', ')
+    formate: t.meta.formate.map((f) => formatInfo(f).kurz).join(', '),
+    // Themen-Bibliothek (09.10.2026): Überthema und von Hand gewählter Themenbereich
+    ueberthema: t.meta.ueberthema ?? '',
+    ...(t.meta.themenbereich ? { themenbereich: t.meta.themenbereich } : {})
   }),
   standardName,
   lohntSicherung,

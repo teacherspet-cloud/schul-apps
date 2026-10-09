@@ -28,6 +28,9 @@ export function cleanupWorkDirs(): number {
   return 0
 }
 
+/** Die iPad-App ist nie der Server (models.ts fragt das für KI-kompatible Anbieter ab, 09.10.2026) */
+export const aufServer = (): boolean => false
+
 export function findCli(): string | null {
   return null
 }

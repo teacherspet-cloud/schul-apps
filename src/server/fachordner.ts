@@ -52,10 +52,14 @@ function lies(fach: string): FachEintrag[] {
 
 const schreib = (fach: string, liste: FachEintrag[]): void => writeAtomic(indexDatei(fach), JSON.stringify(liste, null, 2))
 
+/** Gehört der Pfad zum Fachordner? */
+export const fachordnerPfad = (pfad: string): boolean => pfad === '/server/fach' || pfad.startsWith('/server/fach/')
+
 export function fachordnerRoute(): (k: Anfrage) => Promise<boolean> {
   return async (k) => {
     const { url, req, res, sitzung } = k
-    if (!url.pathname.startsWith('/server/fach')) return false
+    // Nur /server/fach und /server/fach/… – nicht /server/fachfarben, /server/fachschaft (09.10.2026: fing GET /server/fachfarben mit 405 ab)
+    if (!fachordnerPfad(url.pathname)) return false
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const n = sitzung.nutzer
     if (n.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)

@@ -169,9 +169,9 @@ try {
   // Leiste: vier Gruppen, aufklappbar
   const gruppen = await p.locator('.app-leiste [data-gruppe]').evaluateAll((e) => e.map((x) => x.getAttribute('data-gruppe')))
   pruefe(gruppen.join(',') === 'unterricht,planung,pruefung,verwaltung', `Gruppen in der Leiste: ${gruppen.join(', ')}`)
-  await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Leistungsüberprüfungen"]').first().click()
+  await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Tests"]').first().click()
   pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"]').count()) === 0, 'Gruppe zugeklappt: Apps verborgen')
-  await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Leistungsüberprüfungen"]').first().click()
+  await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Tests"]').first().click()
   pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"]').count()) === 1, 'Gruppe aufgeklappt: Apps wieder da')
   // Laufende Reihen → Übersicht der Reihe
   await p.locator('.app-leiste [aria-label="Laufende Reihen"]').click()

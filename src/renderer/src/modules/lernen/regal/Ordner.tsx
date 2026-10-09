@@ -13,20 +13,20 @@
  */
 import { kursReiterNamen } from '@shared/ohneKlasse'
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
-import { IconAbc, IconArrowLeft, IconBook2, IconFileText, IconListSearch } from '@tabler/icons-react'
+import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconFileText, IconSortAscendingLetters } from '@tabler/icons-react'
 import { SegmentedControl } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
 import VokabelTrainer from '../VokabelTrainer'
 import GrammatikTrainer from '../GrammatikTrainer'
 import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
-import Wortliste from './Wortliste'
+import { Alphabetisch, MeineBuecher } from './Wortliste'
 import { BlaetternRahmen, useOrdnerBlaettern } from './blaettern'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { VokabelwegKarten } from '../VokabelLeiter'
 import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
 import { istOffen, ladeOffen, nachJahrgaengen, speichereOffen } from './grammatikJahrgaenge'
-import { deckelBereit, herkunft, nimmUebergang, ordnerZu } from './ordnerAnimation'
+import { herkunft, ordnerUebergangLaeuft, ordnerZu } from './ordnerAnimation'
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
@@ -77,6 +77,13 @@ const CSS = `
   .og-lasche[aria-selected="true"] { transform: translateY(-4px); }
   .og-lasche svg { transform: none; }
 }
+/* Mit dem Finger (09.10.2026): Laschen mindestens 44 Punkte; am Telefon nur die offene mit Symbol, damit mehr Laschen ohne Rollen zu sehen sind */
+html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
+@media (max-width: 560px) {
+  .og-laschen { padding-left: 22px; gap: 3px; scroll-snap-type: x proximity; }
+  .og-lasche { padding: 6px 9px; scroll-snap-align: start; }
+  .og-lasche:not([aria-selected="true"]) svg { display: none; }
+}
 .og-zurueck-leiste { margin: -6px 0 10px -6px; }
 @media (prefers-reduced-motion: reduce) { .og-ordner, .og-seite { animation: none; } .og-lasche { transition: none; } }
 html.sa-ruhig .og-ordner, html.sa-ruhig .og-seite { animation: none; }
@@ -84,7 +91,8 @@ html.sa-ruhig .og-ordner, html.sa-ruhig .og-seite { animation: none; }
 
 const SYMBOL: Record<Register, React.ReactNode> = {
   vok: <IconAbc size={16} />,
-  wort: <IconListSearch size={16} />,
+  wort: <IconBooks size={16} />,
+  abc: <IconSortAscendingLetters size={16} />,
   gram: <IconBook2 size={16} />,
   mat: <IconFileText size={16} />
 }
@@ -98,24 +106,10 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   // Geöffnete Unterseite des Ordners selbst (Grammatiktraining, Arbeitsblatt); tiefere Ebenen gehören den Bausteinen
   const [seite, setSeite] = useState<Seite | null>(null)
   const papierEl = useRef<HTMLDivElement>(null)
-  // Aus dem Regal geöffnet: Deckel liegt schon über der Seite und klappt auf, sobald der Ordner steht (08.10.2026)
-  const [uebergang] = useState(nimmUebergang)
-  const aufklappen = useRef<((ziel: HTMLElement | null) => void) | null>(null)
+  // Aus dem Regal geöffnet (09.10.2026, ohne Neuladen): Der Deckel liegt schon über der Seite, misst den gezeichneten
+  // Ordner und klappt auf (ordnerAnimation.ts) – der Ordner selbst blendet sich dann nicht noch einmal ein
+  const [uebergang] = useState(ordnerUebergangLaeuft)
   const ordnerEl = useRef<HTMLDivElement>(null)
-  // Nur EINMAL einen Deckel auflegen (08.10.2026, Befund am Tablet): Nach dem Aufklappen ist `aufklappen` wieder leer –
-  // ohne eigene Marke legte das nächste Zeichnen einen zweiten, geschlossenen Deckel auf, der bis zu 6 s liegen blieb
-  const aufgelegt = useRef(false)
-  if (uebergang && !aufgelegt.current) {
-    aufgelegt.current = true
-    aufklappen.current = deckelBereit(uebergang)
-  }
-  useEffect(() => {
-    if (!ordner || !aufklappen.current) return
-    const los = aufklappen.current
-    aufklappen.current = null
-    // Ein Bild warten, damit der Ordner gezeichnet ist
-    requestAnimationFrame(() => los(ordnerEl.current))
-  }, [ordner])
   if (!ordner) return <Loader />
   const s = beschriftung(fach)
   if (!o)
@@ -129,7 +123,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
       </Stack>
     )
   const f = ordnerFarben(o.farbe, dunkel)
-  // Wortliste (09.10.2026): eigenes Register gleich nach den Vokabeln – nur im Ordner, der Rücken im Regal bleibt
+  // Meine Bücher und Alphabetisch (09.10.2026): eigene Register gleich nach den Vokabeln – nur im Ordner, der Rücken im Regal bleibt
   const register = mitWortliste(registerVon(o))
   const aktiv: Register = wahl && register.includes(wahl) ? wahl : register[0] ?? 'mat'
   const zeigen = (r: Register): void => {
@@ -199,7 +193,8 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                   {/* Geplante Freischaltungen (09.10.2026): nur Titel und Datum */}
                   {tiefe === 0 && <Demnaechst fach={o.fach} register={aktiv} vorhanden={register} />}
                   {aktiv === 'vok' && <VokabelRegister o={o} oben={tiefe === 0} />}
-                  {aktiv === 'wort' && <Wortliste o={o} />}
+                  {aktiv === 'wort' && <MeineBuecher o={o} />}
+                  {aktiv === 'abc' && <Alphabetisch o={o} />}
                   {aktiv === 'gram' &&
                     (seite?.art === 'gram' ? (
                       <div data-ordner-unterseite="grammatik">
@@ -249,12 +244,12 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   )
 }
 
-/** Register mit Wortliste: gleich hinter „Vokabeln" (die Wortliste gibt es, sobald es Vokabeln gibt) */
-export const mitWortliste = (r: Register[]): Register[] => r.flatMap((x) => (x === 'vok' ? (['vok', 'wort'] as Register[]) : [x]))
+/** Register „Meine Bücher" und „Alphabetisch": gleich hinter „Vokabeln" (es gibt sie, sobald es Vokabeln gibt) */
+export const mitWortliste = (r: Register[]): Register[] => r.flatMap((x) => (x === 'vok' ? (['vok', 'wort', 'abc'] as Register[]) : [x]))
 
 /** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
 export function zuTun(o: FachOrdner, r: Register): number {
-  if (r === 'wort') return 0
+  if (r === 'wort' || r === 'abc') return 0
   if (r === 'vok') return o.vokabeln.filter((v) => (v.uebersicht.heuteOffen ?? 0) > 0 || v.uebersicht.faellig > 0).length
   if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
   return (

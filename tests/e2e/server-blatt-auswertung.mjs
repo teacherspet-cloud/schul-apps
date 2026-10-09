@@ -143,6 +143,10 @@ try {
   // Mitarbeit einschätzen (streng), Hilfestellungen
   await p.locator('[data-strenge]').getByText('Streng').click()
   await p.locator('[data-mitarbeit-einschaetzen]').click()
+  // Läuft als Auftrag in der Auftragsleiste (09.10.2026) – die Leiste ist anfangs eingeklappt (je Sitzung): aufklappen
+  await p.locator('.auftrags-pille').click({ timeout: 10000 })
+  pruefe(await da(p.locator('[data-auftrag]').filter({ hasText: 'Mitarbeit' }).first(), 10000), 'Einschätzung erscheint als Auftrag in der Warteschlange')
+  await p.getByRole('button', { name: 'Aufträge einklappen' }).click().catch(() => undefined)
   pruefe(
     await da(p.locator(`[data-auswertung-knopf="${mia.name ?? 'Mia Probe'}"]`, { hasText: 'Mitarbeit +' }), 30000),
     'Mitarbeitsvorschlag steht auf dem Knopf'

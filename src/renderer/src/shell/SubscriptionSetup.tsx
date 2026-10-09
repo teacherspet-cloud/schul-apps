@@ -2,7 +2,7 @@ import { Alert, Anchor, Badge, Button, Checkbox, Collapse, Group, Image, Loader,
 import { aufServer } from '../shared/plattform'
 import { IconAlertTriangle, IconCheck, IconDownload, IconExternalLink, IconLogin, IconPhoto, IconRefresh } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
-import { AiProviderId, AppSettings, DeepPartial, ModelOption, SUBSCRIPTIONS, SubscriptionStatus } from '@shared/types'
+import { AiProviderId, AppSettings, DeepPartial, aboInfo, ModelOption, SubscriptionStatus } from '@shared/types'
 import { notifyError, notifySuccess } from '../shared/util'
 
 type Update = (patch: DeepPartial<AppSettings>) => Promise<void>
@@ -15,7 +15,7 @@ type Phase =
 const MB = 1024 * 1024
 
 /** Hinweise, welche Modelle das Abo-Kontingent schonen */
-const MODEL_HINTS: Record<AiProviderId, string> = {
+const MODEL_HINTS: Partial<Record<AiProviderId, string>> = {
   openai:
     'Für Vokabeltests und Arbeitsblätter reicht meist GPT-5.6-Luna – es verbraucht das Kontingent am wenigsten. GPT-6-Astra ist am stärksten, aber sehr schnell aufgebraucht.',
   anthropic: 'Haiku ist schnell und schont das Kontingent; Sonnet ist ausgewogen; Opus ist am stärksten und verbraucht am meisten.',
@@ -38,7 +38,8 @@ export default function SubscriptionSetup({
   /** Für Texte (Modellwahl, Test-Anfrage) oder Bilder (Testbild) */
   purpose?: 'text' | 'image'
 }): React.JSX.Element {
-  const info = SUBSCRIPTIONS[provider]
+  // Nur für Kernanbieter eingeblendet (SettingsPage) – OpenAI-kompatible haben kein Abo
+  const info = aboInfo(provider)!
   const { ai } = settings
   const accepted = ai.subscriptionAccepted[provider]
   const savedPath = ai.cliPaths[provider]

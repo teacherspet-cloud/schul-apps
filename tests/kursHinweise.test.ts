@@ -41,6 +41,8 @@ describe('kursHinweise', () => {
     const h = kursHinweise({ ...basis, testTermin: jetzt + 2 * TAG, entwuerfe: 1, foerderNamen: ['Mia R.'] }, jetzt)
     expect(h.map((x) => x.art)).toEqual(['entwurf', 'termin', 'schwach', 'foerdern', 'inaktiv'])
     expect(h[0].reiter).toBe('grammatik')
+    // Grammatik-Schwäche führt in den Reiter „Grammatik" (09.10.2026), nicht zur Vokabeltabelle
+    expect(h.find((x) => x.art === 'foerdern')!.reiter).toBe('grammatik')
     expect(h.find((x) => x.art === 'schwach')!.text).toContain('Ben S.')
     expect(h.find((x) => x.art === 'inaktiv')!.text).toContain('Mia R.')
   })

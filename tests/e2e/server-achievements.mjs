@@ -75,6 +75,26 @@ try {
   const b = await api(ben)
   pruefe(b.platz?.platz === 2 && b.platz?.von === 5 && b.platz?.tage === 0, `Ben (kein Übungstag) teilt sich Platz 2 (${b.platz?.platz} von ${b.platz?.von})`)
 
+  // Musterschüler-Vorschau (09.10.2026, Befund der Lehrkraft: „0 von 0 Achievements geschafft"): voller Katalog mit
+  // Fortschritt, aber nichts gespeichert, nichts als neu gemeldet, und die Klasse sieht keinen zusätzlichen Lernenden
+  const vs = (await (await lk.request.post(`${A}/server/klassen/${g.id}/vorschau`, { headers: KOPF, data: { zustand: 'erfolgreich' } })).json()).schluessel
+  const vKopf = { ...KOPF, 'x-schulapps-vorschau': vs }
+  const v = await (await lk.request.get(`${A}/s/api/achievements`, { headers: vKopf })).json()
+  pruefe(Boolean(vs) && Array.isArray(v.alle) && v.alle.length === a.alle.length, `Vorschau: alle Achievements (${v.alle?.length} von ${a.alle?.length})`)
+  pruefe(v.alle?.every((x) => typeof x.ist === 'number' && typeof x.ziel === 'number'), `Vorschau: jedes mit Fortschritt (${v.alle?.filter((x) => x.ist > 0).length} begonnen, ${v.erreicht?.length} erreicht)`)
+  const vNeu = await (await lk.request.get(`${A}/s/api/achievements/neu`, { headers: vKopf })).json()
+  pruefe(Array.isArray(vNeu.neu) && vNeu.neu.length === 0 && Array.isArray(v.neu) && v.neu.length === 0, 'Vorschau: kein Glückwunsch bei jedem Öffnen (nichts als neu)')
+  const b2 = await api(ben)
+  pruefe(b2.platz?.von === 5, `Vorschau zählt in der Klasse nicht mit (Ben: von ${b2.platz?.von})`)
+
+  // Gast mit persönlichem Code (Lernende eintragen): ebenfalls der volle Katalog
+  const ein = await (await lk.request.post(`${A}/server/vokabeln/${kurs}/eintragen`, { headers: KOPF, data: { namen: ['Gina G.'] } })).json()
+  const gastCode = ein.neu?.[0]?.zugang ?? ein.eingetragen?.[0]?.zugang
+  const gast = await browser.newContext()
+  const anm = await gast.request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: gastCode } })
+  const ga = anm.ok() ? await api(gast) : {}
+  pruefe(anm.ok() && Array.isArray(ga.alle) && ga.alle.length === a.alle.length, `Gast: alle Achievements (${ga.alle?.length}; Anmeldung ${anm.status()})`)
+
   // Oberfläche: Fenster „Achievements"
   const p = await mia.newPage()
   p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
@@ -87,10 +107,19 @@ try {
   pruefe((await p.locator('[data-achievement="comeback"]').count()) === 0 && (await da(p.locator('[data-achievements-verborgen="3"]'))), 'Geheime nur als Zahl')
   pruefe((await p.locator('[data-achievement-anteil]').count()) === 0, 'Kein Schulanteil unter 10 Lernenden')
   await p.screenshot({ path: join(out, '1-achievements.png'), fullPage: true })
+
+  // Oberfläche der Vorschau: Seite mit dem Vorschau-Schlüssel (wie das Fenster „Als Schüler ansehen")
+  const vp = await lk.newPage()
+  vp.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
+  await vp.goto(`${A}/s/?vs=${encodeURIComponent(vs)}`)
+  await vp.locator('[data-rekorde-knopf]').first().click()
+  const zahl = vp.locator('[data-achievements-zahl]')
+  pruefe((await da(zahl)) && !(await zahl.getAttribute('data-achievements-zahl')).endsWith('/0'), `Vorschau-Fenster: ${await zahl.innerText().catch(() => '–')}`)
+  await vp.screenshot({ path: join(out, '2-vorschau-achievements.png'), fullPage: true })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${String(e?.message ?? e).split('\n').slice(0, 4).join(' | ')}`)
 } finally {
-  for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Trainings und Konten gelöscht (${zuLoeschen.length})`)
   await browser.close()

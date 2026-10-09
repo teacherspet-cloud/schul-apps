@@ -11,7 +11,7 @@ import { Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, ThemeIco
 import { IconAlertCircle, IconCalendarEvent, IconChalkboard, IconDeviceLaptop, IconShare, IconFlag, IconPlayerPlay } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { holen } from '../modules/onlinetest/serverApi'
-import { openDocument, openModule } from '../shared/navigation'
+import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte, useLaufendeReihen } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe, useFreigaben } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
@@ -57,15 +57,16 @@ function Bereich(p: {
 }): React.JSX.Element {
   return (
     <Card withBorder radius="lg" padding="md" data-schnellzugriff={p.daten}>
-      <Group justify="space-between" mb="sm">
-        <Group gap="xs">
+      {/* Telefon (09.10.2026): „Alle" rutschte bei langen Titeln in eine eigene Zeile – der Titel bricht jetzt selbst um */}
+      <Group justify="space-between" mb="sm" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
           <ThemeIcon variant="light" color={p.farbe} radius="md">
             {p.symbol}
           </ThemeIcon>
           <Text fw={700}>{p.titel}</Text>
         </Group>
         {p.alle && (
-          <Button size="compact-xs" variant="subtle" onClick={p.alle}>
+          <Button size="compact-xs" variant="subtle" onClick={p.alle} miw={44} style={{ flex: 'none' }}>
             Alle
           </Button>
         )}
@@ -114,7 +115,7 @@ export function Schnellzugriff(): React.JSX.Element {
 
   return (
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb={40} data-schnellzugriff-raster>
-      <Bereich titel="Laufende Unterrichtsreihen" symbol={<IconChalkboard size={18} />} farbe="violet" alle={() => openModule('laufendereihen')} daten="reihen">
+      <Bereich titel="Laufende Unterrichtsreihen" symbol={<IconChalkboard size={18} />} farbe="violet" alle={() => oeffneProgramm('laufendereihen')} daten="reihen">
         {bedarf > 0 && (
           <Button
             variant="light"
@@ -139,7 +140,7 @@ export function Schnellzugriff(): React.JSX.Element {
         )}
       </Bereich>
 
-      <Bereich titel="Onlinetests" symbol={<IconDeviceLaptop size={18} />} farbe="teal" alle={() => openModule('onlinetest')} daten="tests">
+      <Bereich titel="Onlinetests" symbol={<IconDeviceLaptop size={18} />} farbe="teal" alle={() => oeffneProgramm('onlinetest')} daten="tests">
         {tests === null ? null : !geplant.length && !laufend.length && !zuPruefen.length ? <Leer text="Kein Test geplant oder offen." /> : null}
         {laufend.map((t) => (
           <Zeile
@@ -172,7 +173,7 @@ export function Schnellzugriff(): React.JSX.Element {
         ))}
       </Bereich>
 
-      <Bereich titel="Freigaben & Rückmeldungen" symbol={<IconShare size={18} />} farbe="blue" alle={() => openModule('freigaben')} daten="freigaben">
+      <Bereich titel="Freigaben & Rückmeldungen" symbol={<IconShare size={18} />} farbe="blue" alle={() => oeffneProgramm('freigaben')} daten="freigaben">
         {blaetter === null || rueck === null ? null : !blattOffen.length && !rueckOffen.length ? <Leer text="Nichts freigegeben." /> : null}
         {blattOffen.slice(0, 5).map((b) => (
           <Zeile
@@ -214,7 +215,7 @@ export function Schnellzugriff(): React.JSX.Element {
         titel="Termine & Vokabeltraining"
         symbol={<IconCalendarEvent size={18} />}
         farbe="orange"
-        alle={() => openModule('sprachenlernen')}
+        alle={() => oeffneProgramm('sprachenlernen')}
         daten="termine"
       >
         {vok === null || reihen === null ? null : !termine.length && !halte.length ? <Leer text="Keine anstehenden Termine." /> : null}
@@ -265,7 +266,8 @@ function Zeile(p: { titel: string; unter: string; onClick: () => void; children?
             {p.unter}
           </Text>
         </div>
-        {p.children}
+        {/* Abzeichen („Arbeitsblatt") nicht kürzen – der Titel daneben wird gekürzt (09.10.2026, „ARBEITS…" am Telefon) */}
+        {p.children && <div style={{ flex: 'none' }}>{p.children}</div>}
       </Group>
       {p.unten && <div style={{ marginTop: 6 }}>{p.unten}</div>}
     </Card>

@@ -103,6 +103,7 @@ export default function TestLibrary({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Form, Fach, Klasse"
+          reihe={bib.reihe}
         >
           <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
             Datei öffnen …
@@ -113,7 +114,7 @@ export default function TestLibrary({
         </BibliothekKopf>
 
         {bib.eintraege && treffer.length === 0 && (
-          <BibliothekLeer leer={tests.length === 0} text="Noch kein Grammatiktest gespeichert. Neue Tests werden automatisch gesichert." />
+          <BibliothekLeer ausgeblendet={bib.reihe.anzahl} leer={tests.length === 0} text="Noch kein Grammatiktest gespeichert. Neue Tests werden automatisch gesichert." />
         )}
 
         {suche ? (

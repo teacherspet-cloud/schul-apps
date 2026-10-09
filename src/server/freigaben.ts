@@ -36,6 +36,7 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'ai:login-code',
   'ai:login-cancel',
   'verbrauch:get',
+  'verbrauch:kontingent',
   // Eigenes Material löschen – die eigene Ablage, nicht die eines anderen
   ...MATERIAL.map((m) => `${m}:delete`),
   'nachteilsausgleiche:list',
@@ -73,7 +74,8 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
 export function beschneideEinstellungen(patch: unknown): unknown {
   if (!patch || typeof patch !== 'object') return patch
   // IServ-Angaben (Schule, Benutzer, Ziel – nie ein Passwort) bleiben: die Exe „Schul-Apps Online“ braucht sie
-  const { lan: _l, sicherung: _s, pcKi: _p, ...rest } = patch as Record<string, unknown>
+  // Fachfarben legt am Server die Verwaltung fest (09.10.2026, fachfarben.ts)
+  const { lan: _l, sicherung: _s, pcKi: _p, fachfarben: _f, ...rest } = patch as Record<string, unknown>
   if (rest.briefkopf && typeof rest.briefkopf === 'object') {
     // Zertifikat (Datei) und Signieren gehören an den eigenen Rechner
     const { zertifikat: _z, signieren: _si, ...kopf } = rest.briefkopf as Record<string, unknown>

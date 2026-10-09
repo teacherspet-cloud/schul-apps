@@ -334,7 +334,8 @@ export function TippKarte({ stand, gelesen }: { stand: LernstandAntwort; gelesen
             <Text size="xs" tt="uppercase" fw={800} c={ki ? 'grape' : 'yellow.8'}>
               {ki ? 'Dein Wochenrückblick' : 'Dein Tipp'}
             </Text>
-            <Badge size="xs" variant="light" color="gray">
+            {/* 12 statt 9 Punkte Schrift (09.10.2026, Befund: „Sich selbst erklären" kaum lesbar) */}
+            <Badge size="sm" fz={12} variant="light" color="gray">
               {STRATEGIE_NAME[t.strategie]}
             </Badge>
           </Group>
@@ -519,18 +520,25 @@ export function Lernstand({ stand, neueste }: { stand: LernstandAntwort; neueste
   )
 }
 
+/*
+ * Kopfband in der gewählten Farbe (09.10.2026, Farbkonzept „Helle, ruhige Flächen + Akzentfarbe"): Vorher hatte jede
+ * Altersstufe eigene, feste Farben – Kl. 7–10 ein fast schwarzes Band, auch im hellen Modus. Jetzt trägt das Band die
+ * Akzentfarbe (Stufen 6–9, weiße Schrift ≥ 4,5 : 1, tests/schuelerFarben.test.ts); die Stufen unterscheiden sich nur
+ * im Verlauf. Oberstufe: ruhige Karte mit Farbstreifen.
+ */
 const START_CSS = `
 .sl-kopf { position: relative; overflow: hidden; border-radius: 24px; padding: 24px 22px 24px; color: #fff;
-  background: linear-gradient(135deg, #4c6ef5 0%, #7048e8 45%, #15aabf 100%); box-shadow: 0 10px 30px rgba(76,110,245,0.25);
+  background: linear-gradient(135deg, var(--mantine-primary-color-6) 0%, var(--mantine-primary-color-8) 100%);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--mantine-primary-color-6) 22%, transparent);
   animation: sl-rein .45s ease-out both; }
-.sl-kopf.sl-grund { background: linear-gradient(135deg, #ff922b 0%, #f06595 50%, #845ef7 100%); box-shadow: 0 10px 30px rgba(240,101,149,0.28); }
-.sl-kopf.sl-unter { background: linear-gradient(135deg, #12b886 0%, #228be6 55%, #7048e8 100%); }
-.sl-kopf.sl-mittel { background: radial-gradient(120% 140% at 0% 0%, #1e293b 0%, #0b1020 60%, #05070f 100%); border: 1px solid rgba(124,140,255,0.25);
-  box-shadow: 0 0 0 1px rgba(124,140,255,0.08), 0 12px 30px rgba(0,0,0,0.35); }
-.sl-kopf.sl-mittel.sl-cool { box-shadow: 0 0 22px rgba(92,124,250,0.35), 0 12px 30px rgba(0,0,0,0.35); animation: sl-rein .45s ease-out both, sl-leuchten 1.6s ease-out 1; }
+.sl-kopf.sl-grund { background: linear-gradient(135deg, var(--mantine-primary-color-6) 0%, var(--mantine-primary-color-7) 60%, var(--mantine-primary-color-8) 100%); }
+.sl-kopf.sl-unter { background: linear-gradient(120deg, var(--mantine-primary-color-6) 0%, var(--mantine-primary-color-8) 100%); }
+.sl-kopf.sl-mittel { background: linear-gradient(135deg, var(--mantine-primary-color-7) 0%, var(--mantine-primary-color-9) 100%); }
+.sl-kopf.sl-mittel.sl-cool { animation: sl-rein .45s ease-out both, sl-leuchten 1.6s ease-out 1; }
 .sl-kopf.sl-mittel::before { content: ''; position: absolute; inset: -40% -10% auto auto; width: 60%; height: 120%;
-  background: radial-gradient(closest-side, rgba(92,124,250,0.28), transparent); pointer-events: none; }
-.sl-kopf.sl-ober { background: var(--mantine-color-body); color: var(--mantine-color-text); border: 1px solid var(--mantine-color-default-border); box-shadow: none; }
+  background: radial-gradient(closest-side, rgba(255,255,255,0.10), transparent); pointer-events: none; }
+.sl-kopf.sl-ober { background: var(--mantine-color-body); color: var(--mantine-color-text); border: 1px solid var(--mantine-color-default-border);
+  border-top: 6px solid var(--mantine-primary-color-filled); box-shadow: none; }
 .sl-kopf.sl-ober .sl-gruss { color: var(--mantine-color-text); }
 .sl-kopf.sl-ober .sl-zahl { background: var(--mantine-color-default-hover); }
 .sl-gruss { color: inherit; position: relative; font-size: clamp(1.5rem, 5vw, 2.1rem); }
@@ -543,8 +551,7 @@ const START_CSS = `
 .sl-regen span { position: absolute; top: -24px; color: #ffe066; font-size: 20px; animation: sl-fallen 1.7s ease-in 1 both; text-shadow: 0 0 6px rgba(255,224,102,0.7); }
 .sl-abzeichen { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700;
   background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); }
-.sl-mittel .sl-abzeichen { background: rgba(92,124,250,0.12); border-color: rgba(124,140,255,0.45); color: #c5d0ff; }
-.sl-mittel .sl-abzeichen.sl-sicher { border-color: rgba(56,217,169,0.5); color: #a6f4dc; background: rgba(56,217,169,0.1); }
+.sl-mittel .sl-abzeichen.sl-sicher { border-color: rgba(255,255,255,0.6); }
 .sl-zahl { border-radius: 12px; padding: 8px 10px; background: rgba(255,255,255,0.12); }
 .sl-stern { color: rgba(255,255,255,0.55); display: inline-flex; }
 .sl-stern.an { color: #ffe066; filter: drop-shadow(0 0 3px rgba(255,224,102,0.6)); }
@@ -562,12 +569,12 @@ const START_CSS = `
 .sl-woche { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .sl-tag { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .sl-punkt { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--mantine-color-default-border); color: #fff; }
-.sl-tag.an .sl-punkt { border: 0; background: linear-gradient(135deg, #20c997, #12b886); box-shadow: 0 3px 8px rgba(18,184,134,0.3); }
+.sl-tag.an .sl-punkt { border: 0; background: var(--mantine-primary-color-filled); box-shadow: 0 3px 8px color-mix(in srgb, var(--mantine-primary-color-6) 30%, transparent); }
 .sl-tag.heute .sl-punkt { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 2px; }
 @keyframes sl-rein { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
 @keyframes sl-hops { 0% { transform: translateY(0) } 35% { transform: translateY(-10px) } 65% { transform: translateY(0) } 80% { transform: translateY(-3px) } 100% { transform: none } }
 @keyframes sl-fallen { 0% { transform: translateY(0) rotate(0); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(220px) rotate(200deg); opacity: 0 } }
-@keyframes sl-leuchten { 0% { box-shadow: 0 0 0 rgba(92,124,250,0) } 50% { box-shadow: 0 0 34px rgba(92,124,250,0.55) } 100% { box-shadow: 0 0 22px rgba(92,124,250,0.35) } }
+@keyframes sl-leuchten { 0% { box-shadow: 0 0 0 transparent } 50% { box-shadow: 0 0 30px color-mix(in srgb, var(--mantine-primary-color-6) 50%, transparent) } 100% { box-shadow: 0 10px 26px color-mix(in srgb, var(--mantine-primary-color-6) 22%, transparent) } }
 html.sa-ruhig .sl-kopf, html.sa-ruhig .sl-figur, html.sa-ruhig .sl-eule-jubelt, html.sa-ruhig .sl-tipp-symbol, html.sa-ruhig .sl-zeile { animation: none !important; transition: none; }
 html.sa-ruhig .sl-regen { display: none; }
 @media (prefers-reduced-motion: reduce) {

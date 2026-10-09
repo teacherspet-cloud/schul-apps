@@ -9,8 +9,8 @@ import { dirname, join, normalize, sep } from 'path'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { createGunzip } from 'zlib'
-import { AiProviderId, SetupEvent, SUBSCRIPTIONS } from '@shared/types'
-import { aufServer, cliEnv, findCli, managedCliPath, MANAGED_DIR } from './cli'
+import { AiProviderId, SetupEvent } from '@shared/types'
+import { abo, aufServer, cliEnv, findCli, managedCliPath, MANAGED_DIR } from './cli'
 import { textSammler } from './textstrom'
 
 type Emit = (event: SetupEvent) => void
@@ -231,8 +231,8 @@ export async function installCli(provider: AiProviderId, emit: Emit): Promise<st
     else if (provider === 'anthropic') await installClaude(emit)
     else await installAgy(emit)
     const path = findCli(provider)
-    if (!path) throw new Error(`${SUBSCRIPTIONS[provider].program} konnte nicht eingerichtet werden.`)
-    emit({ provider, type: 'installed', message: `${SUBSCRIPTIONS[provider].program} ist eingerichtet.` })
+    if (!path) throw new Error(`${abo(provider).program} konnte nicht eingerichtet werden.`)
+    emit({ provider, type: 'installed', message: `${abo(provider).program} ist eingerichtet.` })
     return path
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -281,7 +281,7 @@ function workDir(): string {
 export function startLogin(provider: AiProviderId, emit: Emit, isLoggedIn: () => Promise<boolean>): void {
   cancelLogin(provider)
   const exe = findCli(provider)
-  if (!exe) throw new Error(`${SUBSCRIPTIONS[provider].program} ist noch nicht eingerichtet.`)
+  if (!exe) throw new Error(`${abo(provider).program} ist noch nicht eingerichtet.`)
   const cwd = workDir()
 
   if (provider === 'google') {

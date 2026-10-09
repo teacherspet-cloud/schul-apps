@@ -2,7 +2,7 @@ import { ActionIcon, Button, Drawer, Indicator, Stack, Text } from '@mantine/cor
 import ModusSchalter from '../../shell/ModusSchalter'
 import { IconApps, IconChalkboard, IconDots, IconFolders, IconHome, IconLayoutSidebarLeftExpand, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { MODUL_GRUPPEN, type SchulModule } from '../../modules/registry'
+import { LEISTE_OBEN, MODUL_GRUPPEN, type SchulModule } from '../../modules/registry'
 
 /**
  * Navigation mit dem Finger (30.09.2026, recherche/mobile-bedienung-2026-09-30.md).
@@ -208,8 +208,11 @@ export function MobilTabs({
   const nach = (ids: string[]): Programm[] => ids.flatMap((id) => daten.programme.filter((p) => p.id === id))
   const unterricht = nach(UNTERRICHT_APPS)
   const erstellen = ERSTELLEN_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))
-  const gruppiert = MODUL_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))
-  const uebrige = daten.programme.filter((p) => !MODUL_GRUPPEN.some((g) => g.apps.includes(p.id)))
+  // „Meine Klassen" zuerst (09.10.2026, wie in der Leiste)
+  const gruppiert = [{ id: 'klassen', name: 'Klassen', programme: nach(LEISTE_OBEN) }, ...MODUL_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))].filter(
+    (g) => g.programme.length
+  )
+  const uebrige = daten.programme.filter((p) => !MODUL_GRUPPEN.some((g) => g.apps.includes(p.id)) && !LEISTE_OBEN.includes(p.id))
   const alle = uebrige.length ? [...gruppiert, { id: 'weitere', name: 'Weitere', programme: uebrige }] : gruppiert
   const laeuft = (liste: Programm[]): boolean => liste.some((p) => daten.laufpunkte[p.id])
   const inUnterricht = unterricht.some((p) => p.id === daten.active)

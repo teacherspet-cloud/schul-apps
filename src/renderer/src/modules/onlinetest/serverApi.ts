@@ -21,9 +21,14 @@ async function antwort<T>(r: Response): Promise<T> {
   } catch {
     throw new ServerFehler(`Der Server hat unerwartet geantwortet (${r.status}).`)
   }
-  const d = daten as { fehler?: string; ok?: boolean }
-  if (!r.ok || d.fehler) {
-    const f = new ServerFehler(d.fehler || `Fehler ${r.status}`)
+  const d = daten as { fehler?: unknown; ok?: boolean }
+  /*
+   * Nur ein TEXT unter „fehler" ist eine Fehlermeldung (09.10.2026, Befund: Verwaltung › Server lud nie – seine Antwort
+   * hat einen Abschnitt „fehler" mit der Fehlerübersicht, der als Fehler galt und als „[object Object]" erschien).
+   */
+  const meldung = typeof d.fehler === 'string' ? d.fehler : ''
+  if (!r.ok || meldung) {
+    const f = new ServerFehler(meldung || `Fehler ${r.status}`)
     f.status = r.status
     f.daten = daten
     throw f

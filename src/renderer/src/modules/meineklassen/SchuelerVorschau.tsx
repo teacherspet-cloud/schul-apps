@@ -23,7 +23,11 @@ const WAHL = [
   { wert: 'behalten', text: 'Stand von zuletzt behalten' }
 ] as const
 
-export function AlsSchuelerAnsehen({ gruppe, klasse }: { gruppe: string; klasse: string }): React.JSX.Element {
+/**
+ * `kursId` (09.10.2026, Sprachenlernen): Vorschau eines Kurses – das Fenster landet gleich auf dem Kurs (/s/v/<Kurs>).
+ * Kurs einer Klasse: Musterschüler der Klasse; spontane Gruppe (ohne Lerngruppe): Musterschüler tritt dem Kurs wie ein Gast bei.
+ */
+export function AlsSchuelerAnsehen({ gruppe, klasse, kursId }: { gruppe?: string; klasse: string; kursId?: string }): React.JSX.Element {
   const farbe = useProgrammFarbe()
   const [offen, setOffen] = useState(false)
   const [wahl, setWahl] = useState<string>('neu')
@@ -36,7 +40,8 @@ export function AlsSchuelerAnsehen({ gruppe, klasse }: { gruppe: string; klasse:
     const fenster = !aufIos() && typeof window.open === 'function' ? window.open('', name, merkmale) : null
     setLaeuft(true)
     try {
-      const r = await senden<{ adresse: string }>(`/server/klassen/${encodeURIComponent(gruppe)}/vorschau`, wahl === 'behalten' ? {} : { zustand: wahl })
+      const pfad = kursId ? `/server/vorschau/kurs/${encodeURIComponent(kursId)}` : `/server/klassen/${encodeURIComponent(gruppe ?? '')}/vorschau`
+      const r = await senden<{ adresse: string }>(pfad, wahl === 'behalten' ? {} : { zustand: wahl })
       const ziel = new URL(r.adresse, window.location.origin).href
       setOffen(false)
       if (fenster && !fenster.closed) {
@@ -68,8 +73,9 @@ export function AlsSchuelerAnsehen({ gruppe, klasse }: { gruppe: string; klasse:
             </Stack>
           </Radio.Group>
           <Text size="xs" c="dimmed">
-            Der Musterschüler sieht alle Freigaben der Klasse {klasse} und kann alles bearbeiten und abgeben – er zählt in keiner Auswertung, Liste oder
-            Note.
+            {kursId && !gruppe
+              ? `Der Musterschüler tritt dem Kurs „${klasse}“ wie ein Gast bei und kann alles üben – er zählt in keiner Auswertung, Liste oder Note.`
+              : `Der Musterschüler sieht alle Freigaben der Klasse ${klasse} und kann alles bearbeiten und abgeben – er zählt in keiner Auswertung, Liste oder Note.`}
           </Text>
           <Button color={farbe} loading={laeuft} onClick={() => void oeffnen()} data-vorschau-oeffnen>
             Vorschau öffnen

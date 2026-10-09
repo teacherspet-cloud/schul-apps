@@ -266,6 +266,8 @@ export interface TafelbildMeta {
   /** Weitere Wünsche an die KI */
   wuensche: string
   ueberthema?: string
+  /** Themenbereich, von Hand gewählt in „Meine Tafelbilder" (09.10.2026, ThemenBibliothek) – fehlt = automatisch */
+  themenbereich?: string
   ki?: KiHerkunft
   kiVermerk?: KiVermerk
 }

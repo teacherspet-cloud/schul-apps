@@ -13,7 +13,7 @@ import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
-import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger, useUebersichtZeiger } from '../../shared/navigation'
 import RueckwegKnopf from '../../shared/components/RueckwegKnopf'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
@@ -49,6 +49,13 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
       .then((list) => !vonAussen.current && !hasContent() && setLibraryOpen(list.length > 0))
       .catch(() => setLibraryOpen(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Erstes Öffnen in der Sitzung über die Leiste (09.10.2026, shared/sitzung.ts): die Bibliothek, wenn es Tests gibt
+  useUebersichtZeiger('vokabeltest', () =>
+    void window.api.tests
+      .list()
+      .then((list) => list.length > 0 && setLibraryOpen(true))
+      .catch(() => undefined)
+  )
 
   // Beim Öffnen einer .vokabeltest-Datei per Doppelklick direkt laden
   useEffect(() => {

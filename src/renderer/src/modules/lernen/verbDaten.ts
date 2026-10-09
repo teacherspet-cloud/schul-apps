@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { satzSchluessel } from '@shared/medienbank'
-import { formSpalten, sprechtext, type VerbKarte } from '@shared/verbTraining'
+import { formSchluessel, formSpalten, type VerbKarte } from '@shared/verbTraining'
 import type { VerbSprache } from '@shared/verben'
 import { medienErgaenzen, medium } from './medienCache'
 import { kannSprechen } from './VokabelTrainer'
@@ -28,7 +28,8 @@ export function useVerbDaten(
   }, [schluessel, sprache, klasse]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!karten?.length || !sprache) return undefined
   void geladen
-  const aufnahme = (k: VerbKarte): boolean => Object.values(k.formen).some((f) => Boolean(medium(k.schluessel)?.saetze?.[satzSchluessel(sprechtext(f))]?.url))
+  const aufnahme = (k: VerbKarte): boolean =>
+    Object.entries(k.formen).some(([spalte, f]) => Boolean(medium(k.schluessel)?.saetze?.[satzSchluessel(formSchluessel(f, sprache, spalte))]?.url))
   return {
     karten,
     spalten: formSpalten(sprache),

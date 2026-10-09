@@ -1,4 +1,6 @@
-// Runde 08.10.2026 abends: Regal mit Fachordnern (Gäste), Wortliste als Register (09.10.2026), eigene Reihenfolge per Ziehen (am Konto gemerkt), A–Z,
+// Runde 08.10.2026 abends: Regal mit Fachordnern (Gäste), Register „My Books" (Bücherbord: frühere Bände ganz, aktueller Band mit
+// freigegebenen Abschnitten, „Weitere Wörter"; Cover schlägt auf) und „Alphabetical list" (A–Z-Leiste, Fundstellen, Fenster-Zeichnen) (09.10.2026),
+// eigene Reihenfolge per Ziehen (am Konto gemerkt), A–Z,
 // Ordner aufschlagen mit Registern, Blättern im Ordner (Unterseiten, Zurück/Vorwärts, Neuladen; 09.10.2026), Wahl „Liste" als Rückfall; Verbspiele erst
 // nach Freischaltung; „Lege das Wort" mit Tippen und Handschrift (Erkennung auf dem Gerät).
 // Vorher: Server lokal (KI-Attrappe). Es wird keine KI gebraucht.
@@ -48,7 +50,7 @@ try {
   lk = await browser.newContext()
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
   const post = async (pfad, data) => (await lk.request.post(`${A}/server/vokabeln/${pfad}`, { headers: KOPF, data })).json()
-  const woerter = ['go', 'see', 'take', 'come', 'apple', 'tree'].map((t, i) => ({ id: `e${i}`, term: t, translation: `Wort ${i}` }))
+  const woerter = ['go', 'see', 'take', 'come', 'quokka', 'kumquat'].map((t, i) => ({ id: `e${i}`, term: t, translation: `Wort ${i}` }))
   const en = (await post('freigeben', { titel: 'Unit 1', sprache: 'en', fach: 'Englisch', woerter, gaeste: true })).id
   const fr = (await post('freigeben', { titel: 'Unité 1', sprache: 'fr', fach: 'Französisch', woerter: [{ id: 'f1', term: 'le chat', translation: 'die Katze' }], gaeste: true })).id
   trainings.push(en, fr)
@@ -75,6 +77,22 @@ try {
   const v = await liste()
   pruefe(Boolean(v?.karten?.length), `Nach „jetzt freischalten“: Verben da (${v?.karten?.length ?? 0})`)
   await post(`${en}/verbspiele`, { wert: '' })
+  // Kurs aus dem Lehrwerk (09.10.2026, „My Books"): Green Line 3, Unit 1 – Check-in und Station 1 freigegeben
+  const gl = (
+    await post('freigeben', {
+      titel: 'Green Line 3 - Unit 1 - Check-in, Station 1',
+      sprache: 'en',
+      fach: 'Englisch',
+      woerter: [
+        { id: 'g1', term: 'to attend', translation: 'teilnehmen, besuchen' },
+        { id: 'g2', term: 'comfort zone', translation: 'Komfortzone' }
+      ],
+      quelle: { lehrwerk: 'green-line-3', unit: 'Unit 1', abschnitte: ['Check-in', 'Station 1'] },
+      gaeste: true
+    })
+  ).id
+  trainings.push(gl)
+  await post(`${gl}/eintragen`, { namen: ['Ben S.'] })
 
   // ---------- Regal
   const p = await gc.newPage()
@@ -112,8 +130,8 @@ try {
   pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Ordner Englisch aufgeschlagen')
   await p.waitForTimeout(700)
   pruefe(
-    JSON.stringify(await p.locator('[data-lasche]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lasche')))) === '["vok","wort","gram"]',
-    'Register: Vocabulary, Word list und Grammar (ohne Materialien)'
+    JSON.stringify(await p.locator('[data-lasche]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lasche')))) === '["vok","wort","abc","gram"]',
+    'Register: Vocabulary, My Books, Alphabetical list und Grammar (ohne Materialien)'
   )
   await p.screenshot({ path: join(out, '2-ordner-vok.png') })
   await p.locator('[data-lasche="gram"]').click()
@@ -123,23 +141,87 @@ try {
     'Grammar nach Schuljahren: „Year 5" (neuestes Jahr) aufgeklappt'
   )
   await p.screenshot({ path: join(out, '3-ordner-gram.png') })
-  // Wortliste (09.10.2026): eigenes Register mit allen freigegebenen Wörtern, Suche in beiden Sprachen
+  // My Books (09.10.2026): Bücherbord – Green Line 1 und 2 ganz, Green Line 3 nur mit den freigegebenen Abschnitten,
+  // dazu „Weitere Wörter" (Liste ohne Lehrwerk); keine Gruppen „Vokabelweg …"
   await p.locator('[data-lasche="wort"]').click()
-  pruefe((await p.locator('[data-lasche="wort"]').innerText()).includes('Word list'), 'Lasche „Word list" in der Fremdsprache')
-  pruefe(await da(p.locator('[data-wortliste-wort]').first()), 'Wortliste zeigt die Wörter')
-  pruefe((await p.locator('[data-wortliste-wort]').count()) === 6, `Alle 6 freigegebenen Wörter (${await p.locator('[data-wortliste-wort]').count()})`)
-  pruefe((await p.locator('[data-wort-status="neu"]').count()) >= 6, 'Stand je Wort: alle noch „neu"')
+  pruefe((await p.locator('[data-lasche="wort"]').innerText()).includes('My Books'), 'Lasche „My Books" in der Fremdsprache')
+  pruefe(await da(p.locator('[data-buecherbord]')), 'My Books zeigt das Bücherbord')
+  const buecher = await p.locator('[data-buch]').evaluateAll((els) => els.map((e) => e.getAttribute('data-buch')))
+  pruefe(JSON.stringify(buecher) === '["green-line-1","green-line-2","green-line-3","__weitere"]', `Bord: GL 1, GL 2, GL 3 und Weitere Wörter (${buecher})`)
+  pruefe((await p.locator('[data-buch-aktuell]').getAttribute('data-buch')) === 'green-line-3', 'Green Line 3 ist der aktuelle Band')
+  pruefe((await p.locator('[data-buch] [data-cover], [data-buch] [data-cover-ersatz], [data-buch] .mb-ersatz').count()) === 4, 'Je Buch ein Cover (oder Ersatzkachel)')
+  pruefe((await p.getByText('Vokabelweg').count()) === 0, 'Keine Gruppen „Vokabelweg …" mehr')
+  pruefe(
+    (await p.locator('[data-buch="__weitere"]').textContent()).includes('More words') && (await p.locator('[data-buch-aktuell]').textContent()).includes('so far'),
+    'Bord-Texte in der Fremdsprache („More words", „so far")'
+  )
+  await p.screenshot({ path: join(out, '2b-meine-buecher.png') })
   const anzahl = async () => Number(await p.locator('[data-wortliste-anzahl]').getAttribute('data-wortliste-anzahl'))
-  await p.locator('[data-wortliste-suche]').fill('WORT 2')
+  // Suche über alle Bücher
+  await p.locator('[data-wortliste-suche]').fill('KOMFORTZONE')
+  await p.waitForTimeout(250)
+  pruefe(
+    (await anzahl()) >= 1 && (await p.locator('[data-wortliste-gruppe^="Green Line 3"] [data-wortliste-wort="comfort zone"]').isVisible()),
+    `Suche in allen Büchern (groß/klein egal): „comfort zone" aus GL 3 (${await anzahl()} Treffer)`
+  )
+  await p.locator('[data-wortliste-suche]').fill('überrascht')
+  await p.waitForTimeout(250)
+  pruefe((await anzahl()) >= 2, `Suche auf Deutsch findet „surprised" in GL 1 und GL 2 (${await anzahl()})`)
+  await p.locator('[data-wortliste-suche]').fill('xyzq')
   await p.waitForTimeout(200)
-  pruefe((await anzahl()) === 1 && (await p.locator('[data-wortliste-wort="take"]').isVisible()), 'Suche auf Deutsch (groß/klein egal): „take"')
-  await p.locator('[data-wortliste-suche]').fill('appl')
-  await p.waitForTimeout(200)
-  pruefe((await anzahl()) === 1 && (await p.locator('[data-wortliste-wort="apple"]').isVisible()), 'Suche in der Fremdsprache: „apple"')
-  await p.locator('[data-wortliste-suche]').fill('xyz')
-  await p.waitForTimeout(200)
-  pruefe((await anzahl()) === 0 && (await p.getByText('Nichts gefunden').isVisible()), 'Ohne Treffer: „Nichts gefunden"')
-  await p.screenshot({ path: join(out, '2b-wortliste.png') })
+  // Texte in der Fremdsprache (09.10.2026): „Nothing found", „More words", „so far"
+  pruefe((await anzahl()) === 0 && (await p.getByText('Nothing found').isVisible()), 'Ohne Treffer: „Nothing found" (in der Fremdsprache)')
+  await p.locator('[data-wortliste-suche]').fill('')
+  // Buch aufschlagen: Cover wächst und schlägt auf, darunter Units/Abschnitte
+  await p.locator('[data-buch="green-line-3"]').click()
+  pruefe(await da(p.locator('[data-buch-aufschlagen]'), 1500), 'Cover schlägt auf')
+  await p.waitForTimeout(400)
+  await p.screenshot({ path: join(out, '2c-buch-aufschlagen.png') })
+  await p.locator('[data-buch-aufschlagen]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined)
+  const gruppen = await p.locator('[data-wortliste-gruppe]').evaluateAll((els) => els.map((e) => e.getAttribute('data-wortliste-gruppe')))
+  pruefe(
+    (await da(p.locator('[data-buch-offen="green-line-3"]'))) && JSON.stringify(gruppen) === '["Unit 1 · Check-in","Unit 1 · Station 1"]',
+    `GL 3 nur mit den freigegebenen Abschnitten (${gruppen})`
+  )
+  pruefe((await p.locator('[data-wort-status="neu"]').count()) >= 10 && /\?r=wort&buch=green-line-3/.test(p.url()), `Wörter mit Stand, Adresse nennt das Buch (${p.url()})`)
+  await p.screenshot({ path: join(out, '2d-buch-gl3.png') })
+  await p.locator('[data-ordner-zurueck]').click()
+  pruefe(await da(p.locator('[data-buecherbord]')), 'Zurück blättert zum Bord')
+  await p.locator('[data-buch="green-line-1"]').click()
+  await p.locator('[data-buch-offen="green-line-1"]').waitFor()
+  pruefe((await p.locator('[data-wortliste-gruppe]').count()) > 10, `GL 1 vollständig (${await p.locator('[data-wortliste-gruppe]').count()} Abschnitte)`)
+  await p.goBack()
+  await p.locator('[data-buecherbord]').waitFor()
+  await p.locator('[data-buch="__weitere"]').click()
+  pruefe(await da(p.locator('[data-wortliste-wort="quokka"]')), 'Weitere Wörter: die Liste ohne Lehrwerk')
+  pruefe((await p.locator('[data-wortliste-wort]').count()) === 6, `Alle 6 Wörter der Liste (${await p.locator('[data-wortliste-wort]').count()})`)
+  await p.locator('[data-ordner-zurueck]').click()
+  // Alphabetical list (09.10.2026)
+  await p.locator('[data-lasche="abc"]').click()
+  pruefe((await p.locator('[data-lasche="abc"]').innerText()).includes('Alphabetical list'), 'Lasche „Alphabetical list"')
+  pruefe(await da(p.locator('[data-abc-leiste]')), 'Sprungleiste A–Z')
+  const gesamt = await anzahl()
+  const gezeichnet = Number(await p.locator('[data-abc-liste]').getAttribute('data-abc-gezeichnet'))
+  pruefe(gesamt > 2000 && gezeichnet < 300, `Alle Wörter (${gesamt}), gezeichnet nur der sichtbare Ausschnitt (${gezeichnet})`)
+  const erste = await p.locator('[data-abc-wort]').evaluateAll((els) => els.slice(0, 40).map((e) => e.getAttribute('data-abc-wort')))
+  pruefe(erste.length > 10, `Liste beginnt alphabetisch (${erste.slice(0, 6).join(', ')} …)`)
+  const buchstaben = await p.locator('[data-abc-sprung]').evaluateAll((els) => els.map((e) => e.getAttribute('data-abc-sprung')))
+  pruefe(buchstaben.includes('A') && buchstaben.includes('S') && new Set(buchstaben).size === buchstaben.length, `Leiste mit den vorhandenen Buchstaben (${buchstaben.join('')})`)
+  await p.locator('[data-abc-sprung="S"]').click()
+  await p.waitForTimeout(900)
+  const kopfS = await p.locator('[data-abc-kopf="S"]').boundingBox()
+  const leisteBox = await p.locator('[data-abc-leiste]').boundingBox()
+  pruefe(Boolean(kopfS && leisteBox && kopfS.y >= leisteBox.y + leisteBox.height - 4 && kopfS.y < 300), `Sprung zu „S": Überschrift oben unter der Leiste (${Math.round(kopfS?.y ?? -1)})`)
+  pruefe((await p.locator('[data-abc-sprung="S"]').getAttribute('aria-current')) === 'true', 'Leiste zeigt den aktuellen Buchstaben')
+  await p.screenshot({ path: join(out, '2e-alphabetisch-s.png') })
+  await p.locator('[data-wortliste-suche]').fill('surprised')
+  await p.waitForTimeout(300)
+  const quellen = await p.locator('[data-abc-wort="surprised"] [data-abc-quelle]').evaluateAll((els) => els.map((e) => e.getAttribute('data-abc-quelle')))
+  pruefe(quellen.includes('GL 1 · U1') && quellen.includes('GL 2 · U1') && (await p.locator('[data-abc-wort="surprised"]').count()) === 1, `Gleiches Wort einmal mit allen Fundstellen (${quellen})`)
+  await p.locator('[data-wortliste-suche]').fill('attend')
+  await p.waitForTimeout(300)
+  pruefe((await p.locator('[data-abc-wort="to attend"]').count()) === 1, '„to attend" unter A (ohne „to ")')
+  await p.screenshot({ path: join(out, '2f-alphabetisch-suche.png') })
   await p.locator('[data-wortliste-suche]').fill('')
   // Register Vocabulary zeigt den Kurs direkt (08.10.2026): Karteikasten ohne eigenen Rückweg
   await p.locator('[data-lasche="vok"]').click()
@@ -218,10 +300,22 @@ try {
   const breit = await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
   pruefe(breit, 'Telefon: kein seitliches Scrollen im Ordner')
   await p.goto(`${A}/s/ordner/Englisch?r=wort`)
-  await p.locator('[data-wortliste-wort]').first().waitFor()
+  await p.locator('[data-buch]').first().waitFor()
   await p.waitForTimeout(800)
-  await p.screenshot({ path: join(out, '5b-wortliste-telefon.png'), fullPage: true })
-  pruefe(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Telefon: Wortliste ohne seitliches Scrollen')
+  await p.screenshot({ path: join(out, '5b-meine-buecher-telefon.png'), fullPage: true })
+  pruefe(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Telefon: My Books ohne seitliches Scrollen')
+  await p.locator('[data-buch="green-line-2"]').click()
+  await p.locator('[data-buch-offen="green-line-2"]').waitFor()
+  await p.waitForTimeout(1100)
+  await p.screenshot({ path: join(out, '5c-buch-telefon.png') })
+  pruefe(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Telefon: Buch ohne seitliches Scrollen')
+  await p.goto(`${A}/s/ordner/Englisch?r=abc`)
+  await p.locator('[data-abc-leiste]').waitFor()
+  await p.locator('[data-abc-sprung="M"]').click()
+  await p.waitForTimeout(900)
+  await p.screenshot({ path: join(out, '5d-alphabetisch-telefon.png') })
+  pruefe(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Telefon: Alphabetical list ohne seitliches Scrollen')
+  pruefe(await p.locator('[data-abc-kopf="M"]').isVisible(), 'Telefon: Sprung zu „M"')
 
   // ---------- Rückfall: Liste
   await darst({ materialien: 'liste' })
@@ -298,7 +392,7 @@ try {
     .entries())
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
-  for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Trainings, Gäste und Konten gelöscht (${zuLoeschen.length})`)
   await browser.close()

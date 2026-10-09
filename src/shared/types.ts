@@ -1,4 +1,6 @@
 // Typen, die Main-Prozess, Preload und Oberfläche gemeinsam nutzen.
+import { KOMPATIBLE_ANBIETER, KOMPATIBEL_IDS, type KompatibelEinstellung, type KompatibelId } from './kiAnbieter'
+export type { KompatibelId, KompatibelEinstellung } from './kiAnbieter'
 
 export const CEFR_SCALE = ['Pre-A1', 'A1', 'A1+', 'A2', 'A2+', 'B1', 'B1+', 'B2', 'B2+', 'C1', 'C2'] as const
 export type CefrLevel = (typeof CEFR_SCALE)[number]
@@ -13,7 +15,12 @@ export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K]
 }
 
-export type AiProviderId = 'openai' | 'anthropic' | 'google'
+/** Anbieter mit eigenem Programmpaket und Abo-Zugang (Codex, Claude Code, Antigravity) */
+export type KernAnbieterId = 'openai' | 'anthropic' | 'google'
+/** Seit 09.10.2026 auch Anbieter über die OpenAI-kompatible Schnittstelle (shared/kiAnbieter.ts) */
+export type AiProviderId = KernAnbieterId | KompatibelId
+export const KERN_ANBIETER: KernAnbieterId[] = ['openai', 'anthropic', 'google']
+export const istKernAnbieter = (id: string): id is KernAnbieterId => KERN_ANBIETER.includes(id as KernAnbieterId)
 export type ImageProviderId = 'openai' | 'google' | 'anthropic' | 'none'
 export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs' | 'iserv'
 export type ModelKind = 'text' | 'image'
@@ -24,6 +31,12 @@ export interface AiProviderInfo {
   keyUrl: string
   keyPlaceholder: string
   supportsImages: boolean
+  /** Über die OpenAI-kompatible Schnittstelle (09.10.2026): Adresse + Schlüssel + Modell */
+  kompatibel?: boolean
+  /** Ohne Schlüssel (lokal) */
+  ohneSchluessel?: boolean
+  /** Nur am PC (lokale Modelle) */
+  nurPc?: boolean
 }
 
 export const AI_PROVIDERS: AiProviderInfo[] = [
@@ -47,14 +60,29 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     keyUrl: 'aistudio.google.com',
     keyPlaceholder: 'AIza…',
     supportsImages: true
-  }
+  },
+  // Weitere Anbieter über die OpenAI-kompatible Schnittstelle (09.10.2026) – Bilder vorerst nicht
+  ...KOMPATIBLE_ANBIETER.map((a) => ({
+    id: a.id,
+    label: a.label,
+    keyUrl: a.keyUrl,
+    keyPlaceholder: a.keyPlaceholder,
+    supportsImages: false,
+    kompatibel: true,
+    ...(a.ohneSchluessel ? { ohneSchluessel: true } : {}),
+    ...(a.nurPc ? { nurPc: true } : {})
+  }))
 ]
+
+/** Ein Wert je Anbieter (Vorgaben der Einstellungen) */
+const jeAnbieter = <T>(kern: Record<KernAnbieterId, T>, kompatibel: (id: KompatibelId) => T): Record<AiProviderId, T> =>
+  ({ ...kern, ...Object.fromEntries(KOMPATIBEL_IDS.map((id) => [id, kompatibel(id)])) }) as Record<AiProviderId, T>
 
 /** Zugang zur KI: bezahlter API-Schlüssel oder privates Abo über das Kommandozeilenprogramm des Anbieters. */
 export type AiAccess = 'api' | 'subscription'
 
 export interface SubscriptionInfo {
-  provider: AiProviderId
+  provider: KernAnbieterId
   /** Name des Abos, z. B. „ChatGPT Plus/Pro" */
   plan: string
   /** Name des Kommandozeilenprogramms */
@@ -73,7 +101,8 @@ export interface SubscriptionInfo {
   experimental?: boolean
 }
 
-export const SUBSCRIPTIONS: Record<AiProviderId, SubscriptionInfo> = {
+/** Nur die Kernanbieter haben ein Abo – Zugriff mit einer beliebigen Kennung über `aboInfo` */
+export const SUBSCRIPTIONS: Record<KernAnbieterId, SubscriptionInfo> = {
   openai: {
     provider: 'openai',
     plan: 'ChatGPT Plus/Pro',
@@ -114,6 +143,9 @@ export const SUBSCRIPTIONS: Record<AiProviderId, SubscriptionInfo> = {
     experimental: true
   }
 }
+
+/** Abo-Angaben eines Anbieters – undefined bei Anbietern ohne Abo (OpenAI-kompatibel) */
+export const aboInfo = (id: AiProviderId): SubscriptionInfo | undefined => (istKernAnbieter(id) ? SUBSCRIPTIONS[id] : undefined)
 
 /** Fortschritt bei Einrichtung und Anmeldung (vom Hauptprozess an die Oberfläche) */
 export interface SetupEvent {
@@ -186,6 +218,8 @@ export interface AppSettings {
     cliPaths: Record<AiProviderId, string>
     /** Sparmodus: weniger KI-Anfragen (auto = nur beim Abo-Zugang) */
     economy: 'auto' | 'on' | 'off'
+    /** OpenAI-kompatible Anbieter (09.10.2026): Adresse und Azure-Version je Anbieter */
+    kompatibel?: Partial<Record<KompatibelId, KompatibelEinstellung>>
     /**
      * Blindprobe für Ankreuzfragen zu Texten (01.10.2026): eine zweite Anfrage beantwortet die
      * Fragen ohne den Text; Lösbares wird neu gefasst. Fehlt der Wert, ist sie an.
@@ -291,7 +325,27 @@ export interface AppSettings {
    * Schulwahl aus dem Schulverzeichnis und bleiben änderbar; `zertifikat` = Pfad einer .pfx/.p12-Datei
    * zum digitalen Signieren der Brief-PDFs (das Passwort wird nie gespeichert).
    */
-  briefkopf?: { lehrkraft?: string; strasse?: string; plz?: string; ort?: string; telefon?: string; zertifikat?: string; signieren?: boolean }
+  briefkopf?: {
+    lehrkraft?: string
+    /** Funktion unter dem Namen im Elternbrief, z. B. „Klassenleitung 6b" (09.10.2026) */
+    funktion?: string
+    strasse?: string
+    plz?: string
+    ort?: string
+    telefon?: string
+    /** E-Mail der Schule im Absender (09.10.2026, aus der Schul-Einrichtung des Servers übernehmbar) */
+    email?: string
+    zertifikat?: string
+    signieren?: boolean
+  }
+  /**
+   * Server (09.10.2026, shared/schulEinrichtung.ts): Bundesland/Schulform selbst gewählt. Ohne eigene Wahl gelten
+   * die der Schule aus der Verwaltung („Schule & Daten" › Schule) – sie werden festgeschrieben, sobald die Lehrkraft
+   * eigene Schulangaben macht.
+   */
+  schulwahlEigen?: boolean
+  /** Angebot „Schuldaten aus der Verwaltung übernehmen?" beantwortet (09.10.2026) – kommt danach nicht wieder */
+  schuldatenAngebot?: 'uebernommen' | 'abgelehnt'
   /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
   sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**
@@ -525,19 +579,15 @@ export interface TtsResult {
 export const DEFAULT_SETTINGS: AppSettings = {
   ai: {
     textProvider: 'openai',
-    textModels: {
-      openai: 'gpt-5.5',
-      anthropic: 'claude-opus-5',
-      google: 'gemini-2.5-pro'
-    },
+    textModels: jeAnbieter({ openai: 'gpt-5.5', anthropic: 'claude-opus-5', google: 'gemini-2.5-pro' }, (id) => KOMPATIBLE_ANBIETER.find((a) => a.id === id)?.modelle[0] ?? ''),
     imageProvider: 'openai',
     imageModels: { openai: 'gpt-image-2', google: 'imagen-4.0-generate-001' },
     imageAccess: { openai: 'api', google: 'api', anthropic: 'api' },
     autoLatest: true,
-    access: { openai: 'api', anthropic: 'api', google: 'api' },
-    subscriptionModels: { openai: '', anthropic: '', google: '' },
-    subscriptionAccepted: { openai: false, anthropic: false, google: false },
-    cliPaths: { openai: '', anthropic: '', google: '' },
+    access: jeAnbieter<AiAccess>({ openai: 'api', anthropic: 'api', google: 'api' }, () => 'api'),
+    subscriptionModels: jeAnbieter({ openai: '', anthropic: '', google: '' }, () => ''),
+    subscriptionAccepted: jeAnbieter({ openai: false, anthropic: false, google: false }, () => false),
+    cliPaths: jeAnbieter({ openai: '', anthropic: '', google: '' }, () => ''),
     economy: 'auto'
   },
   // Dunkel als Vorgabe (05.10.2026, Wunsch der Lehrkraft)
@@ -961,6 +1011,8 @@ export interface Textbook {
   reihe?: string
   ausgabe?: string
   band?: string
+  /** Platzhalter (09.10.2026): Band ist angelegt, der Wortschatz folgt noch */
+  platzhalter?: boolean
   units: TextbookUnit[]
   /** mitgeliefert (nur lesen) oder von der Lehrkraft importiert */
   builtIn?: boolean
@@ -998,6 +1050,8 @@ export interface TextbookMeta {
   reihe?: string
   ausgabe?: string
   band?: string
+  /** Platzhalter-Band ohne Wortschatz (09.10.2026) */
+  platzhalter?: boolean
   units: { name: string; sections: TextbookSectionMeta[] }[]
   entryCount: number
 }

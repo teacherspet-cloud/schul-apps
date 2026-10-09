@@ -8,7 +8,7 @@ import { AppKopf } from '../../shared/components/AppKopf'
 import {
   Badge,
   Button,
-  Card,
+  Chip,
   Center,
   Container,
   Group,
@@ -24,7 +24,7 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import { IconArrowLeft, IconEye, IconQrcode, IconSearch, IconTrash, IconUserMinus, IconUsersGroup } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { Ausfuellen, type BlattDaten } from '../onlinetest/BlattAusfuellen'
@@ -34,6 +34,13 @@ import { abgabeTeile, FortschrittsBalken } from '../../shared/components/Fortsch
 import { AuswertungKnopf, AuswertungLeiste, AuswertungModal, useAuswertung, type PersonA } from './Auswertung'
 import type { Ampel } from '@shared/blattFreigabe'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
+import { ThemenBibliothek } from '../../shared/components/ThemenBibliothek'
+import { ProgrammSymbol } from '../../shared/components/ProgrammSymbol'
+import type { ThemenEintrag } from '../../shared/themenBibliothek'
+import { ladeThemen, themenbereichVon, useThemen } from '../../shared/themenbereiche'
+import { fachIdVon } from '../../shared/fachfarben'
+import { obersterBereich, type ThemenDaten } from '@shared/themen'
+import type { SavedWorksheetMeta } from '@shared/types'
 
 export interface Freigabe {
   id: string
@@ -50,6 +57,50 @@ export interface Freigabe {
   begonnen: number
   /** Für wie viele Personen (Fortschrittsbalken, 05.10.2026) */
   gesamt?: number
+  /** Thema des Blattes und von Hand gewählter Themenbereich (09.10.2026, ThemenBibliothek) */
+  thema?: string
+  themenbereich?: string
+  /** Mit `quelle.docId` = das Arbeitsblatt, aus dem die Freigabe stammt */
+  einstellungen?: { quelle?: { docId?: string } }
+}
+
+/** Eine Freigabe als Eintrag der Themen-Bibliothek */
+export type FreigabeEintrag = ThemenEintrag & { f: Freigabe; bild?: string }
+
+const ALLE = '__alle__'
+
+/**
+ * Freigaben → Einträge der Themen-Bibliothek (09.10.2026). Klasse, Überthema, Vorschaubild und
+ * Themenbereich kommen vom Arbeitsblatt, aus dem die Freigabe stammt; ohne Blatt die Klasse aus
+ * dem Namen der Lerngruppe („9b" → 9).
+ */
+export function freigabeEintraege(liste: Freigabe[], blaetter: SavedWorksheetMeta[], themen: ThemenDaten): FreigabeEintrag[] {
+  const nachId = new Map(blaetter.map((b) => [b.id, b]))
+  return liste.map((f) => {
+    const docId = f.einstellungen?.quelle?.docId
+    const b = docId ? nachId.get(docId) : undefined
+    const bereich = docId ? themenbereichVon('arbeitsblatt', docId, themen) : null
+    const ausGruppe = Number(/^\s*(\d{1,2})(?!\d)/.exec(f.lerngruppe)?.[1] ?? 0)
+    const grade = b?.grade || (ausGruppe >= 1 && ausGruppe <= 13 ? ausGruppe : undefined)
+    const fach = f.fach || b?.subjectLabel || ''
+    return {
+      id: f.id,
+      titel: f.titel,
+      fach,
+      fachId: b?.subjectId || fachIdVon(fach) || '',
+      ...(grade ? { grade } : {}),
+      thema: f.thema || b?.topic || '',
+      ueberthema: b?.ueberthema ?? '',
+      updatedAt: f.erstellt,
+      themenbereich: f.themenbereich ?? '',
+      bereichVorgabe: bereich ? (obersterBereich(themen, bereich.id)?.name ?? bereich.name) : '',
+      suchtext: f.lerngruppe || 'Gäste',
+      ...(b?.stateId ? { land: b.stateId } : {}),
+      ...(b?.schoolTypeId ? { schulform: b.schoolTypeId } : {}),
+      ...(b?.thumb ? { bild: b.thumb } : {}),
+      f
+    }
+  })
 }
 
 interface Detail {
@@ -117,6 +168,23 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
   const { liste, laden } = useFreigaben(active)
   const [filter, setFilter] = useState<'offen' | 'beendet' | 'alle'>('offen')
   const [suche, setSuche] = useState('')
+  const [lerngruppe, setLerngruppe] = useState<string | null>(null)
+  // Die Arbeitsblätter hinter den Freigaben: Klasse, Überthema, Vorschaubild und ihr Themenbereich (09.10.2026)
+  const [blaetter, setBlaetter] = useState<SavedWorksheetMeta[]>([])
+  const themen = useThemen((s) => s.daten)
+  useEffect(() => {
+    if (!active) return
+    void ladeThemen().catch(() => undefined)
+    window.api.sheets
+      .list()
+      .then(setBlaetter)
+      .catch(() => undefined)
+  }, [active])
+  const eintraege = useMemo(
+    () => (liste ? freigabeEintraege(liste.filter((f) => filter === 'alle' || f.status === filter), blaetter, themen) : null),
+    [liste, filter, blaetter, themen]
+  )
+  const lerngruppeFilter = useCallback((e: FreigabeEintrag) => lerngruppe === null || e.f.lerngruppe === lerngruppe, [lerngruppe])
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [leeren, setLeeren] = useState(false)
   const [loescht, setLoescht] = useState(false)
@@ -138,9 +206,8 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
         <Loader />
       </Center>
     )
-  const q = suche.trim().toLowerCase()
-  const sichtbar = liste.filter((f) => (filter === 'alle' || f.status === filter) && (!q || `${f.titel} ${f.lerngruppe} ${f.fach}`.toLowerCase().includes(q)))
-  // Nach Lerngruppe geordnet (03.10.2026, Wunsch der Lehrkraft); Gäste per QR am Ende, innerhalb neueste zuerst
+  const sichtbar = liste.filter((f) => filter === 'alle' || f.status === filter)
+  // Lerngruppen als Filter (09.10.2026; bis dahin die Gliederung der Liste); Gäste per QR am Ende
   const gruppen = [...new Set(sichtbar.map((f) => f.lerngruppe))].sort((x, y) => (!x ? 1 : !y ? -1 : x.localeCompare(y, 'de', { numeric: true })))
   const abgeschlossen = liste.filter((f) => f.status !== 'offen').length
   const allesLeeren = async (): Promise<void> => {
@@ -184,7 +251,7 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
             )}
             <TextInput
               leftSection={<IconSearch size={14} />}
-              placeholder="Titel, Lerngruppe, Fach …"
+              placeholder="Titel, Thema, Lerngruppe, Fach …"
               value={suche}
               onChange={(e) => setSuche(e.currentTarget.value)}
               w={260}
@@ -207,73 +274,84 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
           </Button>
         </Group>
       </Modal>
-      {!sichtbar.length && <Text c="dimmed">Keine Freigaben{filter === 'offen' ? ' laufen gerade' : ''}.</Text>}
-      <Stack gap="lg">
-        {gruppen.map((g) => {
-          const eigene = sichtbar.filter((f) => f.lerngruppe === g)
-          return (
-            <div key={g || '-'} data-freigabe-gruppe={g || 'gaeste'}>
-              <Group gap={6} mb={6}>
-                <IconUsersGroup size={18} color="var(--mantine-color-blue-6)" />
-                <Text fw={700}>{g || 'Gäste per QR-Code'}</Text>
-                <Badge variant="light" color="gray" size="sm">
-                  {eigene.length}
-                </Badge>
-              </Group>
-              <Stack gap="xs">
-                {eigene.map((f) => (
-                  <Card key={f.id} withBorder padding="sm" radius="md" data-freigabe={f.id}>
-                    <Group justify="space-between" wrap="nowrap">
-                      <div style={{ minWidth: 0 }}>
-                        <Group gap={6}>
-                          {/* Titel öffnet das Blatt (06.10.2026) – vorher nur markierbarer Text */}
-                          <Text
-                            fw={700}
-                            truncate
-                            component="button"
-                            type="button"
-                            onClick={() => setGewaehlt(f.id)}
-                            className="freigabe-titel"
-                            title="Blatt öffnen"
-                            data-freigabe-titel
-                          >
-                            {f.titel}
-                          </Text>
-                          {f.status !== 'offen' && (
-                            <Badge size="xs" color="gray">
-                              abgeschlossen
-                            </Badge>
-                          )}
-                        </Group>
-                        <Text size="xs" c="dimmed">
-                          {[f.fach, new Date(f.erstellt).toLocaleDateString('de-DE'), f.code && f.lerngruppe ? 'auch per QR' : ''].filter(Boolean).join(' · ')}
-                        </Text>
-                      </div>
-                      <Group gap="xs" wrap="nowrap">
-                        {f.gesamt ? (
-                          <div style={{ width: 220 }}>
-                            <FortschrittsBalken gesamt={f.gesamt} teile={abgabeTeile(f.gesamt, f.begonnen, f.abgaben)} />
-                          </div>
-                        ) : (
-                          <>
-                            <Badge variant="light">{f.begonnen} begonnen</Badge>
-                            <Badge variant="light" color="green">
-                              {f.abgaben} eingereicht
-                            </Badge>
-                          </>
-                        )}
-                        <Button size="xs" onClick={() => setGewaehlt(f.id)} data-freigabe-oeffnen>
-                          Öffnen
-                        </Button>
-                      </Group>
-                    </Group>
-                  </Card>
+      {/* Fach → Themenbereich (09.10.2026, Entscheidung der Lehrkraft); die Lerngruppe als Filter und an jeder Karte */}
+      <ThemenBibliothek<FreigabeEintrag>
+        speicherSchluessel="freigaben"
+        eintraege={eintraege}
+        suche={suche}
+        symbol={<ProgrammSymbol form="arbeitsblatt" farbe="indigo" size={40} />}
+        oeffnen={(e) => setGewaehlt(e.f.id)}
+        themenbereichSetzen={async (e, name) => {
+          await senden(`/server/blaetter/${e.f.id}/themenbereich`, { themenbereich: name ?? '' })
+          laden()
+        }}
+        vorschau={(e) => (e.bild ? () => Promise.resolve({ bild: e.bild! }) : undefined)}
+        datum={(e) => e.f.erstellt}
+        info={(e) => ['freigegeben', e.f.code && e.f.lerngruppe ? 'auch per QR' : ''].filter(Boolean)}
+        leerText={`Keine Freigaben${filter === 'offen' ? ' laufen gerade' : ''}.`}
+        filter={lerngruppeFilter}
+        attribute={(e) => ({ 'data-freigabe': e.f.id })}
+        leiste={
+          gruppen.length > 1 ? (
+            <Chip.Group multiple={false} value={lerngruppe ?? ALLE} onChange={(v) => setLerngruppe(v === ALLE ? null : v)}>
+              <Group gap={6} data-freigabe-lerngruppen>
+                <Chip value={ALLE} size="xs" variant="light">
+                  Alle Lerngruppen
+                </Chip>
+                {gruppen.map((g) => (
+                  <Chip
+                    key={g || '-'}
+                    value={g}
+                    size="xs"
+                    variant="light"
+                    wrapperProps={{ 'data-freigabe-lerngruppe': g || 'gaeste' }}
+                  >
+                    {g || 'Gäste per QR-Code'} ({sichtbar.filter((f) => f.lerngruppe === g).length})
+                  </Chip>
                 ))}
-              </Stack>
-            </div>
-          )
-        })}
-      </Stack>
+              </Group>
+            </Chip.Group>
+          ) : undefined
+        }
+        kennzeichen={(e) => (
+          <>
+            <Badge
+              size="xs"
+              variant="light"
+              color="blue"
+              leftSection={<IconUsersGroup size={11} />}
+              style={{ textTransform: 'none' }}
+              data-freigabe-gruppe={e.f.lerngruppe || 'gaeste'}
+            >
+              {e.f.lerngruppe || 'Gäste per QR-Code'}
+            </Badge>
+            {e.f.status !== 'offen' && (
+              <Badge size="xs" color="gray">
+                abgeschlossen
+              </Badge>
+            )}
+          </>
+        )}
+        aktionen={(e) => (
+          <>
+            {e.f.gesamt ? (
+              <div style={{ width: '100%', maxWidth: 220 }}>
+                <FortschrittsBalken gesamt={e.f.gesamt} teile={abgabeTeile(e.f.gesamt, e.f.begonnen, e.f.abgaben)} />
+              </div>
+            ) : (
+              <>
+                <Badge variant="light">{e.f.begonnen} begonnen</Badge>
+                <Badge variant="light" color="green">
+                  {e.f.abgaben} eingereicht
+                </Badge>
+              </>
+            )}
+            <Button size="xs" onClick={() => setGewaehlt(e.f.id)} data-freigabe-oeffnen>
+              Öffnen
+            </Button>
+          </>
+        )}
+      />
     </Container>
   )
 }

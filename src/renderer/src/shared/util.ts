@@ -5,10 +5,25 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
 }
 
+/**
+ * Lesbarer Text zu einem Fehler (09.10.2026, Befund: „[object Object]" in einer Meldung): Error → message; ein
+ * schlichtes Objekt mit „message"/„fehler"/„error" als Text → dieser Text; sonst ein allgemeiner Satz statt „[object Object]".
+ */
+export function fehlerText(e: unknown): string {
+  if (e instanceof Error) return e.message || 'Unbekannter Fehler.'
+  if (typeof e === 'string') return e || 'Unbekannter Fehler.'
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>
+    for (const k of ['message', 'fehler', 'error']) if (typeof o[k] === 'string' && o[k]) return o[k] as string
+    return 'Unbekannter Fehler – Einzelheiten stehen im Protokoll.'
+  }
+  return e === undefined || e === null ? 'Unbekannter Fehler.' : String(e)
+}
+
 export function notifyError(e: unknown, title = 'Fehler'): void {
   // Ein abgebrochener Auftrag ist gewollt, kein Fehler – kein roter Hinweis (siehe shared/auftraege.ts)
   if (istAbbruch(e)) return
-  notifications.show({ color: 'red', title, message: e instanceof Error ? e.message : String(e), autoClose: 10000 })
+  notifications.show({ color: 'red', title, message: fehlerText(e), autoClose: 10000 })
 }
 
 export function notifySuccess(message: string, title?: string): void {

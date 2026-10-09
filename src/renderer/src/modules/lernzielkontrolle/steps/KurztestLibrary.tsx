@@ -110,6 +110,7 @@ export default function KurztestLibrary({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Thema, Fach, Klasse, Bundesland"
+          reihe={bib.reihe}
         >
           <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
             Datei öffnen …
@@ -121,6 +122,7 @@ export default function KurztestLibrary({
 
         {bib.eintraege && treffer.length === 0 && (
           <BibliothekLeer
+            ausgeblendet={bib.reihe.anzahl}
             leer={tests.length === 0}
             text="Noch nichts gespeichert. Sobald ein Thema eingetragen ist, wird die Kontrolle automatisch gesichert."
           />

@@ -110,7 +110,7 @@ async function lauf(name, typ, optionen) {
     pruefe(/IServ › Eigene Dateien › Unterricht › Schulmaterial/.test(zielText), `${name}: Ziel gewählt (${zielText})`)
     await page.screenshot({ path: join(out, `${name}-2-ordner.png`) })
 
-    // ---------- 3. Speichern auf IServ
+    // ---------- 3. Speichern auf IServ (seit 05.10.2026 mit der Materialart als unterster Ebene, shared/schulmaterial.ts)
     const pdf = [0x25, 0x50, 0x44, 0x46, 0x2d, 0x00, 0xff, 0x80]
     const ziel = { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] }
     const speichern = () => page.evaluate(([b, z]) => window.api.files.save('Vokabeltest.pdf', [], new Uint8Array(b), z), [pdf, ziel])
@@ -121,15 +121,18 @@ async function lauf(name, typ, optionen) {
     await page.screenshot({ path: join(out, `${name}-3-ortwahl.png`) })
     await page.locator('button[data-ort="iserv"]').click()
     const p1 = await laeuft
-    pruefe(p1 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltest.pdf', `${name}: auf IServ gespeichert (${p1})`)
-    const datei = fake.baum.get('/Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltest.pdf')
+    pruefe(p1 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest.pdf', `${name}: auf IServ gespeichert (${p1})`)
+    const datei = fake.baum.get('/Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest.pdf')
     pruefe(Boolean(datei) && JSON.stringify([...datei.daten]) === JSON.stringify(pdf), `${name}: Bytes unverändert angekommen`)
     pruefe(datei?.typ === 'application/pdf', `${name}: Inhaltstyp PDF`)
 
+    // Gibt es den Namen schon, fragt die App (05.10.2026): überschreiben oder als neue Version – hier neue Version
+    const neueVersion = () => page.getByRole('button', { name: /Als neue Version/ }).click({ timeout: 10000 })
     laeuft = speichern()
     await page.locator('button[data-ort="iserv"]').click({ timeout: 10000 })
+    await neueVersion()
     const p2 = await laeuft
-    pruefe(p2 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltest (2).pdf', `${name}: kein Überschreiben auf IServ (${p2})`)
+    pruefe(p2 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest (2).pdf', `${name}: kein Überschreiben auf IServ (${p2})`)
 
     // ---------- 4. Abbrechen, aufs iPad, merken
     laeuft = speichern()
@@ -138,14 +141,17 @@ async function lauf(name, typ, optionen) {
     laeuft = speichern()
     await page.locator('button[data-ort="geraet"]').click({ timeout: 10000 })
     const p3 = await laeuft
-    pruefe(p3 === '/documents/Schulmaterial/Englisch/Unit 1/Vokabeltest.pdf', `${name}: „Auf dem iPad" wie bisher (${p3})`)
+    pruefe(p3 === '/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest.pdf', `${name}: „Auf dem iPad" wie bisher (${p3})`)
     laeuft = speichern()
     await page.locator('[data-ausgabe-ort] input[type="checkbox"]').check({ timeout: 10000 })
     await page.locator('button[data-ort="iserv"]').click()
+    await neueVersion()
     await laeuft
     await page.waitForTimeout(500)
-    const p4 = await speichern()
-    pruefe(p4 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltest (4).pdf', `${name}: gemerkte Auswahl ohne Rückfrage (${p4})`)
+    const laeuft4 = speichern()
+    await neueVersion()
+    const p4 = await laeuft4
+    pruefe(p4 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest (4).pdf', `${name}: gemerkte Auswahl ohne Rückfrage (${p4})`)
 
     // ---------- 5. Datei von IServ öffnen
     const csv = [...new TextEncoder().encode('house;Haus')]

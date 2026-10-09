@@ -37,7 +37,8 @@ import {
   type Zeile
 } from './vokabeln'
 import type { Vokabel } from '../shared/vokabeltrainer'
-import { grammatikDerGruppe, hoechsteUnit, lehrwerkStandVon } from './grammatik'
+import { grammatikDerGruppe, grammatikFoerder, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
+import { kursBedarf, kursHinweise, type HinweisReiter, type KursBedarf, type KursHinweisArt } from '../shared/kursHinweise'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import type { VorwahlDaten } from '../shared/lehrwerkVorwahl'
 import type { NutzerInfo } from './datenbank'
@@ -88,6 +89,14 @@ export interface Bedarf {
   /** Stabile Kennung des Eintrags (Art + Ziel), zum Ausblenden */
   schluessel: string
   merkmal: Merkmal
+  /**
+   * Eintrag aus dem Handlungsbedarf eines Sprachkurses (09.10.2026, shared/kursHinweise.ts): Kurs, Art des Hinweises,
+   * Reiter (Grammatik → „Grammatik") und Betroffene – die Kursseite zeigt genau diese Einträge ihres Kurses.
+   */
+  kurs?: string
+  hinweis?: KursHinweisArt
+  reiter?: HinweisReiter
+  ids?: string[]
 }
 
 /** Kurzer Prüfwert eines Textes */
@@ -174,6 +183,8 @@ export function bedarfEinblenden(lehrkraftId: string, gruppeId: string, schluess
  *  - vorher das frühe Zeichen: wer seit 7 Tagen nicht geübt hat;
  *  - höchstens EIN Vokabel-Eintrag je Klasse (mehrere Kurse zusammengefasst, nächster Testtermin vorne). Ein Klick
  *    öffnet den Kurs: den mit dem Termin, sonst den jüngsten offenen Kurs im Fach der Lerngruppe.
+ *
+ * Seit 09.10.2026 nicht mehr im Handlungsbedarf: dort stehen die Hinweise der Kursseite (`kursBedarfDerGruppe`).
  */
 export function vokabelBedarf(
   offene: { id: string; titel: string; fach: string; testTermin: number | null; sicherSchnitt: number; ersterTag: string | null; reifeWoerter: number }[],
@@ -215,6 +226,33 @@ export function vokabelBedarf(
     schluessel: 'vokabeln',
     merkmal: { art, termin: termin?.testTermin ?? null, ids: [...schwach.map((l) => `s:${l.id}`), ...inaktiv.map((l) => `i:${l.id}`)] }
   }
+}
+
+/**
+ * Handlungsbedarf der laufenden Sprachkurse einer Lerngruppe (09.10.2026, Befund der Lehrkraft: „Meine Klassen" zeigte
+ * andere Einträge als die Kursseite): je Kurs `kursHinweise` aus shared/kursHinweise.ts – mit dem Grammatik-Profil der
+ * Lernenden (Fördern). Hat die Klasse mehrere Kurse mit Hinweisen, steht der Kursname vorne. Entwürfe liegen nur im
+ * Gerät der Lehrkraft – die zählt der Client dazu.
+ */
+export function kursBedarfDerGruppe(
+  daten: ReturnType<typeof vokabelnDerGruppe>['hinweisDaten'],
+  kurse: { id: string; kursName?: string; titel: string }[],
+  lehrkraftId: string,
+  jetzt = Date.now(),
+  /** Kennungen mit Grammatik-Schwäche (grammatik.ts `grammatikFoerder`: wie das Profil, aber gesammelt und schnell) */
+  foerderVon: (nutzer: NutzerInfo[], sprache: string) => Set<string> = (nutzer, s) => grammatikFoerder(nutzer, s, lehrkraftId)
+): KursBedarf[] {
+  const jeKurs = kurse
+    .filter((k) => daten[k.id])
+    .map((k) => {
+      const d = daten[k.id]
+      const schwach = foerderVon(d.nutzer, d.sprache)
+      const foerder = d.nutzer.filter((n) => schwach.has(n.id)).map((n) => ({ id: n.id, name: n.name || n.benutzer }))
+      return { k, hinweise: kursHinweise({ ...d.eingabe, foerder }, jetzt) }
+    })
+    .filter((x) => x.hinweise.length)
+  const mitName = jeKurs.length > 1
+  return jeKurs.flatMap(({ k, hinweise }) => kursBedarf({ id: k.id, name: mitName ? k.kursName || k.titel : undefined }, hinweise))
 }
 
 /**
@@ -300,8 +338,11 @@ export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
   let stand: { buch: string; unit: string } | null = null
   if (g) {
     stand = lehrwerkStandVon(g.id)
-    if (!stand)
-      stand = hoechsteUnit(alle.filter((k) => k.lerngruppe_id === g.id && k.status === 'offen').map((k) => k.quelle ?? ''))
+    // Automatisch (09.10.2026): Band nach Jahrgang, Schulform und Land – ohne Unit (Vorwahl der Units dann aus dem Kurs)
+    if (!stand) {
+      const auto = lehrwerkAutomatisch(g.id)
+      stand = auto ? { buch: auto.buch, unit: '' } : null
+    }
   }
   return {
     sprache: z.sprache,
@@ -368,10 +409,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
         schluessel: `test:${t.id}`,
         merkmal: { art: 'entscheiden', zahl: t.offen }
       })
-  if (offeneVok.length) {
-    const v = vokabelBedarf(offeneVok, vok.jePerson, lernende, g.fach, jetzt)
-    if (v) bedarf.push(v)
-  }
+  // Sprachkurse der Klasse (09.10.2026): dieselben Hinweise wie auf der Kursseite (shared/kursHinweise.ts) – je Kurs
+  bedarf.push(...kursBedarfDerGruppe(vok.hinweisDaten, offeneVok, lehrkraftId, jetzt))
   for (const r of reihen)
     for (const [i, b] of r.bedarf.slice(0, 3).entries())
       bedarf.push({

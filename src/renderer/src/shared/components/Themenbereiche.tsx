@@ -44,6 +44,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
+import { useReiheZuordnung } from "../reiheZuordnung";
 import type { Themenbereich } from "@shared/themen";
 import {
   automatikAn,
@@ -93,6 +94,7 @@ import {
 } from "../themenVorschlag";
 import { useConfirmKeys } from "../useConfirmKeys";
 import { notifyError } from "../util";
+import { offenLesen, offenMerken } from "../sitzung";
 import { VerschiebenKontext } from "./Bibliothek";
 import { FachOrdnerSymbol, FachPunkt } from "./FachFarbe";
 
@@ -158,7 +160,7 @@ const SORTIERUNG_KEY = "schul-apps-themen-sortierung";
 const UMFANG_KEY = "schul-apps-themen-umfang";
 const VORSCHLAG_AUS_KEY = "schul-apps-themen-vorschlag-aus";
 
-/** Was aufgeklappt ist: `fach:<Kennung>` und `bereich:<Kennung>`. Standard: alles zu (Wunsch der Lehrkraft). */
+/** Was aufgeklappt ist: `fach:<Kennung>` und `bereich:<Kennung>`. Standard: alles zu (Wunsch der Lehrkraft). Gilt je Sitzung (shared/sitzung.ts, 09.10.2026). */
 const OFFEN_KEY = "schul-apps-themen-offen";
 const MIME_BEREICH = "application/x-schulapps-bereich";
 
@@ -169,18 +171,18 @@ interface OffenState {
 }
 /** Gemeinsam für alle Bibliotheken und die übergreifende Seite: Was hier aufgeklappt wird, ist es dort auch */
 const useOffen = create<OffenState>((set, get) => ({
-  offen: lies<string[]>(OFFEN_KEY, []),
+  offen: offenLesen<string[]>(OFFEN_KEY) ?? [],
   umschalten: (k) => {
     const neu = get().offen.includes(k)
       ? get().offen.filter((x) => x !== k)
       : [...get().offen, k];
-    merke(OFFEN_KEY, neu);
+    offenMerken(OFFEN_KEY, neu);
     set({ offen: neu });
   },
   oeffne: (ks) => {
     const neu = [...new Set([...get().offen, ...ks])];
     if (neu.length === get().offen.length) return;
-    merke(OFFEN_KEY, neu);
+    offenMerken(OFFEN_KEY, neu);
     set({ offen: neu });
   },
 }));
@@ -306,13 +308,23 @@ export function ThemenAnsicht({
     };
   }, [eigene]);
 
-  // Eigene Einträge aus der Bibliothek (aktuell), die übrigen aus der geladenen Gesamtliste
+  // Material aus Unterrichtsreihen (09.10.2026): auch in „alle Materialien" und der Themenübersicht zunächst ausgeblendet
+  const reiheZuordnung = useReiheZuordnung((z) => z.zuordnung);
+  const reiheEinblenden = useReiheZuordnung((z) => z.einblenden);
+  useEffect(() => {
+    void useReiheZuordnung.getState().laden();
+  }, []);
+  // Eigene Einträge aus der Bibliothek (aktuell, dort schon gefiltert), die übrigen aus der geladenen Gesamtliste
   const alle = useMemo(
     () => [
       ...eigene,
-      ...(geladen ?? []).filter((m) => m.moduleId !== moduleId),
+      ...(geladen ?? []).filter(
+        (m) =>
+          m.moduleId !== moduleId &&
+          (reiheEinblenden || !reiheZuordnung.has(m.id))
+      ),
     ],
-    [eigene, geladen, moduleId]
+    [eigene, geladen, moduleId, reiheZuordnung, reiheEinblenden]
   );
   const zuordnung = (m: Material): string | null =>
     daten.zuordnungen[schluesselVon(m)]?.bereichId ?? null;
@@ -1002,7 +1014,9 @@ export function ThemenAnsicht({
         const oben = kinder(fachId, null).filter(zeigen);
         const ohne = sortiert(inBereich(null, fachId), reihenKey(null, fachId));
         // Nur ein Fach zu sehen (Sprung, Filter): dann gleich offen – ein einzelner zugeklappter Kopf wäre ein Klick zu viel
-        const auf = istOffen(`fach:${fachId}`) || gezeigteFaecher.length === 1;
+        // Ließ sich so aber nie zuklappen (09.10.2026, Befund der Lehrkraft): ein ausdrückliches Zuklappen merkt `zu:fach:`
+        const einziges = gezeigteFaecher.length === 1;
+        const auf = istOffen(`fach:${fachId}`) || (einziges && !istOffen(`zu:fach:${fachId}`));
         const zahl = sichtbar.filter((m) => fachVon(m) === fachId).length;
         return (
           <Box
@@ -1020,7 +1034,11 @@ export function ThemenAnsicht({
               {...ablageZiel(`fach:${fachId}`, null)}
             >
               <UnstyledButton
-                onClick={() => umschalten(`fach:${fachId}`)}
+                onClick={() =>
+                  einziges && !istOffen(`fach:${fachId}`)
+                    ? umschalten(`zu:fach:${fachId}`)
+                    : umschalten(`fach:${fachId}`)
+                }
                 aria-expanded={auf}
                 aria-label={`${fachAnzeige(fachId)} ${
                   auf ? "zuklappen" : "aufklappen"
@@ -1035,7 +1053,8 @@ export function ThemenAnsicht({
                   />
                   <FachPunkt fach={fachId} groesse={12} />
                   <Title order={4}>{fachAnzeige(fachId)}</Title>
-                  <Text size="xs" c="dimmed">
+                  {/* Nicht umbrechen (09.10.2026): „7 / Materialien" lief am Telefon unter den Knopf daneben */}
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                     {oben.length
                       ? `${
                           oben.length === 1
@@ -1655,11 +1674,13 @@ function FachMenue({
   const { menue, weiter } = useMenueFokus();
   return (
     <Group gap={4} wrap="nowrap">
+      {/* Am Telefon nur das Symbol (touch.css `.fach-neu-bereich`, 09.10.2026) */}
       <Button
         size="compact-sm"
         variant="subtle"
         leftSection={<IconFolderPlus size={14} />}
         onClick={onNeu}
+        className="fach-neu-bereich"
       >
         Themenbereich
       </Button>

@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { writeAtomic } from './atomar'
 import { join } from 'path'
 import { AppSettings, DEFAULT_SETTINGS, DeepPartial, SecretName, SavedVocabList } from '@shared/types'
+import { mitSchulRueckfall, vorSchulAenderung, type SchulEinrichtung } from '@shared/schulEinrichtung'
+import { mitFesterSchule, ohneSchulangaben } from '@shared/schulFest'
+import { mitSchulFachfarben, ohneFachfarben } from '@shared/schulFachfarben'
 
 function dataDir(): string {
   const dir = app.getPath('userData')
@@ -47,6 +50,17 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
       subscriptionModels: { ...base.ai.subscriptionModels, ...(ai.subscriptionModels as object) },
       subscriptionAccepted: { ...base.ai.subscriptionAccepted, ...(ai.subscriptionAccepted as object) },
       cliPaths: { ...base.ai.cliPaths, ...(ai.cliPaths as object) },
+      // OpenAI-kompatible Anbieter (09.10.2026): je Anbieter zusammenführen – die Adresse des einen löscht die übrigen nicht
+      ...(base.ai.kompatibel || ai.kompatibel
+        ? {
+            kompatibel: Object.fromEntries(
+              [...new Set([...Object.keys(base.ai.kompatibel ?? {}), ...Object.keys((ai.kompatibel as object) ?? {})])].map((id) => [
+                id,
+                { ...(base.ai.kompatibel as Record<string, object> | undefined)?.[id], ...(ai.kompatibel as Record<string, object> | undefined)?.[id] }
+              ])
+            )
+          }
+        : {}),
       economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy,
       // Blindprobe für Ankreuzfragen (01.10.2026): fehlt der Wert, ist sie an
       ...((v) => (typeof v === 'boolean' ? { mcBlindprobe: v } : {}))(ai.mcBlindprobe ?? base.ai.mcBlindprobe)
@@ -92,14 +106,80 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
   }
 }
 
+/**
+ * Server (09.10.2026, src/server/schule.ts): die Schul-Einrichtung aus der Verwaltung. Ohne eigene Wahl der Lehrkraft
+ * gelten deren Bundesland und Schulform (shared/schulEinrichtung.ts). Am PC und auf dem iPad nie gesetzt.
+ */
+let schulRueckfall: (() => SchulEinrichtung | null) | null = null
+export const setzeSchulRueckfall = (fn: (() => SchulEinrichtung | null) | null): void => {
+  schulRueckfall = fn
+}
+const schuleDesServers = (): SchulEinrichtung | null => {
+  try {
+    return schulRueckfall?.() ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Server (09.10.2026): Fachfarben der Schule (src/server/fachfarben.ts, shared/schulFachfarben.ts) – gelten für alle
+ * und ersetzen die eigenen; Lehrkräfte ändern sie dort nicht. Am PC und auf dem iPad nie gesetzt.
+ */
+let fachfarbenQuelle: (() => Record<string, string> | null) | null = null
+export const setzeFachfarbenQuelle = (fn: (() => Record<string, string> | null) | null): void => {
+  fachfarbenQuelle = fn
+}
+const schulFachfarben = (): Record<string, string> | null => {
+  try {
+    return fachfarbenQuelle?.() ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Server (09.10.2026, shared/schulFest.ts): Gehört das angemeldete Konto fest zur Schule des Servers (IServ)? Dann
+ * kommen Schulname, Bundesland, Schulform und Anschrift immer aus der Schul-Einrichtung.
+ */
+let schuleFestQuelle: (() => boolean) | null = null
+export const setzeSchuleFest = (fn: (() => boolean) | null): void => {
+  schuleFestQuelle = fn
+}
+const schuleFest = (): boolean => {
+  try {
+    return Boolean(schuleFestQuelle?.())
+  } catch {
+    return false
+  }
+}
+
+/** Gespeicherte Einstellungen ohne Rückfall */
+const gespeicherteEinstellungen = (): AppSettings => mergeSettings(DEFAULT_SETTINGS, readJson('settings.json', {}))
+
+/** Eigene, gespeicherte Fachfarben (ohne die der Schule) – für die einmalige Übernahme am Server */
+export const eigeneFachfarben = (): Record<string, string> => gespeicherteEinstellungen().fachfarben ?? {}
+
+/** Was gilt: gespeicherte Einstellungen mit Rückfall bzw. fester Schule und den Fachfarben der Schule */
+function wirksam(s: AppSettings, schule: SchulEinrichtung | null): AppSettings {
+  const mitSchule = schuleFest() ? mitFesterSchule(s, schule) : mitSchulRueckfall(s, schule)
+  return mitSchulFachfarben(mitSchule, schulFachfarben())
+}
+
 export function getSettings(): AppSettings {
-  return mergeSettings(DEFAULT_SETTINGS, readJson('settings.json', {}))
+  return wirksam(gespeicherteEinstellungen(), schuleDesServers())
 }
 
 export function setSettings(patch: DeepPartial<AppSettings>): AppSettings {
-  const next = mergeSettings(getSettings(), patch as DeepPartial<AppSettings> & { ai?: Record<string, unknown> })
+  const schule = schuleDesServers()
+  // Am Server: Fachfarben legt die Verwaltung fest, die Schule der IServ-Konten ebenso (09.10.2026)
+  if (fachfarbenQuelle) patch = ohneFachfarben(patch)
+  if (schuleFest()) patch = ohneSchulangaben(patch, schule)
+  // Gespeichert wird ohne Rückfall – außer die Lehrkraft macht erstmals eigene Schulangaben: dann bleibt, was sie sah
+  const basis = vorSchulAenderung(gespeicherteEinstellungen(), patch, schule)
+  const next = mergeSettings(basis, patch as DeepPartial<AppSettings> & { ai?: Record<string, unknown> })
   writeJson('settings.json', next)
-  return next
+  return wirksam(next, schule)
 }
 
 // ---------- Geheimnisse (verschlüsselt über Windows DPAPI) ----------
@@ -126,6 +206,14 @@ export function setSecret(name: SecretName, value: string): void {
 let geheimRueckfall: ((name: SecretName) => string | undefined) | null = null
 export const setzeGeheimRueckfall = (fn: ((name: SecretName) => string | undefined) | null): void => {
   geheimRueckfall = fn
+}
+
+/**
+ * Hat der Nutzer SELBST einen Schlüssel hinterlegt (ohne den freigegebenen der Schule)? Für die
+ * KI-Nutzungsübersicht des Servers (09.10.2026): Gezählt wird nur, was über Schlüssel der Schule läuft.
+ */
+export function hatEigenesGeheimnis(name: SecretName): boolean {
+  return Boolean(readJson<SecretStore>('secrets.json', {})[name])
 }
 
 export function getSecret(name: SecretName): string | undefined {

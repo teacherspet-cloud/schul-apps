@@ -51,7 +51,9 @@ const AUSNAHMEN: Record<string, string> = {
   'lehrwerk_stand.unit': 'Stelle im Lehrwerk',
   'vorschau_konten.klasse': 'Klassenstufe des erfundenen Musterschülers',
   'vorschau_konten.anzeige': 'Anzeigename des erfundenen Musterschülers (keine echte Person)',
-  'wartung.name': 'Name einer Wartungsaufgabe'
+  'wartung.name': 'Name einer Wartungsaufgabe',
+  // Verwaltung › Server (09.10.2026): server_messwerte (Last, Speicher) und server_tage sind reine Zahlen ohne Person
+  'server_tage.wert': 'Tageszahl (Anfragen, Fehler, Zahl aktiver Konten) – nur Zahlen, keine Kennungen'
 }
 
 interface Spalte {

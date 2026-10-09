@@ -27,6 +27,8 @@ export interface Vokabel {
   example?: string
   /** Unregelmäßige Verben (07.10.2026): die gesprochenen Formen (infinitive, simple past, past participle) */
   formen?: string[]
+  /** … und was die Stimme bei jeder Form sagt (Schlüssel = Eintrag aus `formen`; 09.10.2026: Pause statt „slash") */
+  formenGesprochen?: Record<string, string>
   /** … und der Hinweis bzw. das Beispiel der Zeile */
   hinweis?: string
   /** Eigene Aussprache der Lehrkraft („Aussprache als …", 09.10.2026) – nur für den Ton */

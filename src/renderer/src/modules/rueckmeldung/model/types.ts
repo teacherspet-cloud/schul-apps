@@ -249,6 +249,8 @@ export interface RueckmeldungMeta {
   bilingual?: BilingualVorgaben
   /** Worauf die Lehrkraft achten will (Kriterien, Schwerpunkt) */
   schwerpunkt: string
+  /** Themenbereich, von Hand gewählt in „Meine Rückmeldungen" (09.10.2026, ThemenBibliothek) – fehlt = automatisch */
+  themenbereich?: string
   /** Aus hineingezogenem Material erkannte Lerngruppe (29.09.2026) – Hinweis neben den Feldern */
   erkannt?: string
   /**

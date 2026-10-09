@@ -179,7 +179,7 @@ try {
     const r403 = await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}&abschnitt=${encodeURIComponent(gesperrt.key)}`, { headers: KOPF })
     pruefe(r403.status() === 403, 'Gesperrter Abschnitt wird nicht ausgeliefert')
   }
-  await lk.request.post(`${A}/server/vokabeln/${zu.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${zu.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

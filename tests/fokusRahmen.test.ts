@@ -10,10 +10,11 @@ describe('Vollbild beim Lernen', () => {
     expect(fokusVorgabe(false)).toBe(false)
   })
 
-  it('Einstellung: Vorgabe an, wird mitgespeichert und vom Server übernommen (Feld in der Freigabeliste von http.ts)', () => {
+  it('Einstellung: Vorgabe an, wird mitgespeichert und vom Server übernommen (Feld in der Freigabeliste des Servers)', () => {
     const quelle = readFileSync('src/renderer/src/modules/onlinetest/schuelerDarstellung.ts', 'utf8')
     expect(quelle).toMatch(/vollbild: true\s*\n\}/)
-    const server = readFileSync('src/server/http.ts', 'utf8')
+    // Freigabeliste seit 09.10.2026 in darstellungFelder.ts (aus http.ts herausgelöst)
+    const server = readFileSync('src/server/darstellungFelder.ts', 'utf8')
     expect(server).toMatch(/vollbild: k0\.vollbild !== false/)
   })
 

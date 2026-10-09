@@ -28,3 +28,15 @@ contextBridge.exposeInMainWorld(
     }
   })
 )
+
+/*
+ * Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): Kennung dieses Programmstarts – vor dem ersten
+ * Zeichnen bekannt, damit gemerkte Auf/Zu-Zustände gleich richtig gelesen werden.
+ */
+let sitzung = ''
+try {
+  sitzung = String(ipcRenderer.sendSync('sitzung:kennung') ?? '')
+} catch {
+  sitzung = ''
+}
+contextBridge.exposeInMainWorld('__schulappsSitzung', sitzung)

@@ -12,6 +12,7 @@ import type { StructuredRequest } from '@shared/types'
 import type { KiHerkunft, KiVermerk } from '@shared/kiKennzeichnung'
 import { arr, obj, str } from '../../shared/aiSchema'
 import type { Familiensprache } from '../../shared/familiensprachen'
+import { bereinigeFett, fristKurz, ohneFett } from './hervorhebung'
 
 export const ANLAESSE = [
   'Elternabend',
@@ -64,6 +65,8 @@ export interface Elternbrief {
     termin?: { datum?: string; uhrzeit?: string }
     /** Rückgabe des Rücklaufzettels bis (JJJJ-MM-TT) */
     rueckgabeBis?: string
+    /** Anlass für die Bibliothek (09.10.2026, bibliothekInfo.ts) – im Menü gewählt; fehlt er, wird er erkannt */
+    anlassArt?: string
     subjectLabel?: string
     ki?: KiHerkunft
     kiVermerk?: KiVermerk
@@ -85,11 +88,18 @@ export const standardName = (b: Elternbrief): string => b.meta.title.trim() || b
 export const BRIEF_SCHEMA = obj({
   betreff: str('Betreffzeile, knapp'),
   anrede: str('Anrede („Liebe Eltern und Erziehungsberechtigte der Klasse 7b,")'),
-  absaetze: arr(str('Ein Absatz des Briefes')),
+  absaetze: arr(str('Ein Absatz des Briefes – das Wichtigste (Datum, Uhrzeit, Ort, Kosten, Mitzubringendes, Frist) in **…** fett')),
   gruss: str('Grußformel ohne Namen („Mit freundlichen Grüßen")'),
   ruecklaufTitel: str('Überschrift des Rücklaufzettels – leer, wenn keiner gewünscht ist'),
   ruecklaufZeilen: arr(str('Eine Zeile des Rücklaufzettels, z. B. „☐ Mein Kind nimmt teil." oder „Unterschrift: ____"'))
 })
+
+/**
+ * Fettdruck (09.10.2026, hervorhebung.ts): Die KI markiert das Wichtigste mit **…** – nur fett, sparsam. Dieselbe
+ * Regel gilt beim Neu-Formulieren (bearbeiten.ts).
+ */
+export const FETT_REGEL =
+  '- FETTDRUCK: Markiere das Wichtigste mit **…** (nur so, keine andere Formatierung, kein HTML): Datum, Uhrzeit, Treff- und Zeitpunkte mit Ort, Eintritt/Kosten, was mitzubringen ist, die Rückgabefrist und andere Schlüsselangaben. Höchstens 6–8 fette Stellen im ganzen Brief, jeweils nur die Angabe selbst (z. B. „am **Freitag, 17.10.2026**, um **8:00 Uhr** am **Haupteingang**"), nie ganze Sätze. Betreff, Anrede und Gruß ohne **.'
 
 const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
 
@@ -126,8 +136,12 @@ export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest 
       m.ruecklauf
         ? '- Mit Rücklaufzettel: Überschrift und Zeilen zum Ankreuzen bzw. Ausfüllen (Name des Kindes, Unterschrift eines Erziehungsberechtigten, Datum).'
         : '- Ohne Rücklaufzettel: ruecklaufTitel leer, ruecklaufZeilen leer.',
+      FETT_REGEL,
       fest.length
         ? '- FESTE ANGABEN (unten): Datum, Uhrzeit und Frist stehen im Brief GENAU in dieser Schreibweise (z. B. „Freitag, 12.12.2026"); kein Platzhalter dafür. Die Rückgabefrist steht im Brief und auf dem Rücklaufzettel.'
+        : '',
+      m.ruecklauf && datumLang(m.rueckgabeBis)
+        ? `- Die Rückgabefrist ist fett und steht auf dem Rücklaufzettel als eigene Zeile: „Bitte bis **${fristKurz(m.rueckgabeBis)}** zurückgeben."`
         : '',
       ...(fest.length ? ['FESTE ANGABEN:', ...fest] : []),
       'STICHPUNKTE DER LEHRKRAFT:',
@@ -143,15 +157,16 @@ export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest 
 export function briefAus(daten: unknown, mitRuecklauf: boolean): BriefText {
   const d = (daten ?? {}) as Record<string, unknown>
   const text = (x: unknown): string => String(x ?? '').trim()
-  const absaetze = (Array.isArray(d.absaetze) ? d.absaetze : []).map(text).filter(Boolean)
+  // Nur Fettdruck (**…**) ist erlaubt; Betreff, Anrede, Gruß und Überschrift ganz ohne (hervorhebung.ts)
+  const absaetze = (Array.isArray(d.absaetze) ? d.absaetze : []).map((x) => bereinigeFett(text(x)).trim()).filter(Boolean)
   if (!absaetze.length) throw new Error('Die KI hat keinen Brief geliefert.')
-  const zeilen = (Array.isArray(d.ruecklaufZeilen) ? d.ruecklaufZeilen : []).map(text).filter(Boolean)
+  const zeilen = (Array.isArray(d.ruecklaufZeilen) ? d.ruecklaufZeilen : []).map((x) => bereinigeFett(text(x)).trim()).filter(Boolean)
   return {
-    betreff: text(d.betreff),
-    anrede: text(d.anrede),
+    betreff: ohneFett(text(d.betreff)),
+    anrede: ohneFett(text(d.anrede)),
     absaetze,
-    gruss: text(d.gruss) || 'Mit freundlichen Grüßen',
-    ...(mitRuecklauf && zeilen.length ? { ruecklauf: { titel: text(d.ruecklaufTitel) || 'Rückmeldung', zeilen } } : {})
+    gruss: ohneFett(text(d.gruss)) || 'Mit freundlichen Grüßen',
+    ...(mitRuecklauf && zeilen.length ? { ruecklauf: { titel: ohneFett(text(d.ruecklaufTitel)) || 'Rückmeldung', zeilen } } : {})
   }
 }
 
@@ -169,7 +184,7 @@ export function uebersetzungsAnfrage(t: BriefText, sprache: Familiensprache): St
   return {
     system: `Du übersetzt Elternbriefe deutscher Schulen in die Familiensprache der Eltern: ${sprache.name} (${sprache.eigen}). Genau, vollständig, in einfacher, höflicher Alltagssprache; Begriffe des deutschen Schulsystems (Klassenarbeit, Elternabend, Zeugnis) übersetzt und beim ersten Vorkommen kurz erklärt, das deutsche Wort in Klammern dahinter.`,
     user: [
-      `Übersetze diesen Elternbrief ins ${sprache.name}. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Zahlen von Datum, Uhrzeit und Betrag unverändert; Wörter wie „Uhr" oder „bis" werden mitübersetzt.`,
+      `Übersetze diesen Elternbrief ins ${sprache.name}. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Zahlen von Datum, Uhrzeit und Betrag unverändert; Wörter wie „Uhr" oder „bis" werden mitübersetzt. Fettmarkierungen **…** bleiben um dieselben Angaben stehen.`,
       JSON.stringify({
         betreff: t.betreff,
         anrede: t.anrede,

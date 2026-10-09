@@ -97,6 +97,10 @@ html[data-touch] .mantine-PillsInput-field,
 html[data-touch] .mantine-TagsInput-inputField {
   font-size: max(16px, var(--_input-fz, var(--input-fz, var(--mantine-font-size-md))));
 }
+/* Hinweise unter Feldern mindestens 12 px (09.10.2026): bei size="xs" waren es 10 px (z. B. „Webseite oder YouTube-Video …") */
+html[data-touch] :is([class*='mantine-'][class*='-description'], [class*='mantine-'][class*='-error']):not(.mantine-Alert-root *) {
+  font-size: max(12px, var(--input-description-size, 12px));
+}
 /* Auf dem Blatt stehen die Felder in Blattschrift – dort bleibt die Größe des Blattes */
 html[data-touch] :is(input:not([type='checkbox'], [type='radio'], [type='range']), textarea, select):not(:is(.ws-page, .vt-page, .rm-buehne) *) {
   font-size: max(16px, 1em);
@@ -730,7 +734,8 @@ html[data-tastatur] .mobil-tabs {
   }
 
   /* Eine Spalte statt zwei – außer bei kleinen Kennzahl-Rastern, die ausdrücklich zweispaltig bleiben (data-zweispaltig, 07.10.2026) */
-  html[data-touch] .mantine-SimpleGrid-root:not([data-zweispaltig]) {
+  /* Spiele behalten ihr eigenes Raster (09.10.2026): Memory, Zuordnen (Wörter links, Übersetzungen rechts) … standen sonst in einer Spalte */
+  html[data-touch] .mantine-SimpleGrid-root:not([data-zweispaltig]):not(:is([data-spiel], [data-spiel-laeuft], [data-verbspiel]) *) {
     grid-template-columns: minmax(0, 1fr) !important;
   }
   html[data-touch] .mantine-SimpleGrid-root[data-zweispaltig] {
@@ -794,7 +799,9 @@ html[data-touch]:has(.mobil-tabs) .app-kopf-fab {
   bottom: calc(62px + 14px + env(safe-area-inset-bottom, 0px));
 }
 html[data-tastatur] .app-kopf-fab,
-html[data-touch]:has(.editor-leiste) .app-kopf-fab {
+html[data-touch]:has(.editor-leiste) .app-kopf-fab,
+html[data-touch]:has(.formular-fuss) .app-kopf-fab {
+  /* Formulare (09.10.2026): Der runde Knopf lag auf dem Hauptknopf der Fußleiste („Test erstellen", „Weiter …") */
   /* Im Editor verdeckte der Knopf die Zoom-Leiste – „Neu …" braucht es dort nicht */
   display: none;
 }
@@ -823,6 +830,87 @@ html[data-touch]:has(.editor-leiste) .app-kopf-fab {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /*
+   * Fußleiste der Formulare flach (09.10.2026, Befund Telefon: sie nahm ein Fünftel der Höhe ein): Sperrgrund klein
+   * neben dem Hauptknopf statt in eigener Zeile darüber, weniger Innenabstand.
+   */
+  html[data-touch] .formular-fuss {
+    padding: 4px 12px;
+  }
+  /* Fachordner: „Themenbereich" nur als Symbol – sonst lief die Materialzahl unter den Knopf */
+  html[data-touch] .fach-neu-bereich .mantine-Button-label {
+    /* unsichtbar, aber vorlesbar – der Knopf heißt weiter „Themenbereich" */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  html[data-touch] .fach-neu-bereich .mantine-Button-section {
+    margin: 0;
+  }
+  html[data-touch] .fach-neu-bereich {
+    min-width: 44px;
+    justify-content: center;
+  }
+  /* Einrichtung am Telefon: der lange Erklärtext der Karte entfällt – der Schritt erklärt sich schon darüber (mit „Mehr") */
+  html[data-touch] .einrichtung-telefon .karten-erklaerung {
+    display: none;
+  }
+  /* Feldpaare, die nebeneinander gekürzt würden („1. Fremdspr"), am Telefon untereinander */
+  html[data-touch] .feld-paar-telefon {
+    flex-wrap: wrap !important;
+  }
+  html[data-touch] .feld-paar-telefon > * {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+  }
+  html[data-touch] .formular-fuss-innen > .mantine-Group-root:last-child {
+    --group-wrap: nowrap !important;
+    flex: 1 1 auto;
+  }
+  html[data-touch] .formular-fuss-innen > .mantine-Group-root:first-child:empty {
+    display: none;
+  }
+  html[data-touch] .formular-fuss-grund {
+    flex: 1 1 0;
+    font-size: 12px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    white-space: normal;
+  }
+  html[data-touch] .formular-fuss-grund svg {
+    display: none;
+  }
+  html[data-touch] .formular-fuss .mantine-Button-root {
+    flex: none;
+  }
+
+  /*
+   * Lange Dialoge mit Hauptknopf (09.10.2026, Befund: „Freigeben" stand nach 1.400 Punkten am Ende): Die Knopfzeile
+   * mit `dialog-fuss` bleibt unten am Blatt stehen, der Inhalt rollt darüber.
+   */
+  html[data-touch] .mantine-Modal-root .dialog-fuss {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin-inline: calc(-1 * var(--mb-padding, 16px));
+    padding: 8px var(--mb-padding, 16px) calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--app-surface, var(--mantine-color-body));
+    border-top: 1px solid var(--app-border, var(--mantine-color-default-border));
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  }
+  html[data-touch] .mantine-Modal-root .dialog-fuss .mantine-Button-root {
+    flex: 1 1 auto;
+    padding-inline: 10px;
+  }
+  html[data-touch] .mantine-Modal-root .dialog-fuss[data-eine-zeile],
+  html[data-touch] .mantine-Modal-root .dialog-fuss[data-eine-zeile] .mantine-Group-root {
+    --group-wrap: nowrap !important;
   }
 }
 /* Schülerbereich: Ziele sind Verweise */

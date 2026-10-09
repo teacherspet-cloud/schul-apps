@@ -85,6 +85,8 @@ export interface ServerIch {
   vorschau?: boolean
   /** öffentliche Adresse des Servers (QR-Codes) */
   adresse: string
+  /** Kennung der Anmeldesitzung (abgeleitet, 09.10.2026) – neue Anmeldung = neue Sitzung (shared/sitzung.ts) */
+  sitzung?: string
 }
 
 export const serverIch = (): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)

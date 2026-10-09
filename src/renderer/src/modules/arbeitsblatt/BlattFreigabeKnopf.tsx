@@ -388,7 +388,8 @@ export function BlattFreigabeDialog({
         />
         {aufgabenZahl === 0 && <Alert color="orange">Dieses Blatt hat keine Aufgaben zum Ausfüllen.</Alert>}
         <FreigabePlanen wert={plan} aendern={setPlan} />
-        <Group justify="flex-end">
+        {/* Am Telefon bleibt der Knopf unten am Blatt stehen (touch.css `dialog-fuss`, 09.10.2026) */}
+        <Group justify="flex-end" className="dialog-fuss">
           <Button loading={laeuft} disabled={(!gruppe && !gaeste) || !aufgabenZahl || !titel.trim()} onClick={() => void freigeben()} data-blatt-freigeben>
             {planKnopf(plan, 'Freigeben')}
           </Button>

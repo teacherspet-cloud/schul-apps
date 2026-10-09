@@ -268,7 +268,8 @@ export default function SetupStep(): React.JSX.Element {
                       schoolTypeName={meta.schoolTypeName}
                       onChange={patchGruppe}
                     />
-                    <Group grow>
+                    {/* Am Telefon untereinander (09.10.2026): „1. Fremdsprache" war nebeneinander auf „1. Fremdspr" gekürzt */}
+                    <Group grow align="flex-start" className="feld-paar-telefon">
                       <NurExperte>
                         {subjectById(meta.subjectId).foreignLanguage && (
                           <Select

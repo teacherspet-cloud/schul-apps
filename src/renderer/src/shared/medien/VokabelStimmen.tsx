@@ -20,12 +20,14 @@
  */
 import { ActionIcon, Badge, Button, Card, Group, Loader, Modal, Select, Stack, Text, Title, Tooltip } from '@mantine/core'
 import { IconPlayerPlay, IconPlayerStop, IconSearch } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { BibliotheksStimme, TtsVoice } from '@shared/types'
 import { STIMMLAGE_NAME, STIMMLAGEN, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { passtZurLage, stimmeEignung } from '../voiceFilter'
 import { notifyError, notifySuccess } from '../util'
 import { useMedienAdmin } from './MedienUi'
+import { KlappKarte } from '../components/KlappKarte'
+import { stimmenStatus } from '@shared/einstellungsStatus'
 
 const SPRACHEN: { code: string; name: string }[] = [
   { code: 'de', name: 'Deutsch' },
@@ -56,7 +58,25 @@ function auswahl(nutzbar: TtsVoice[], sprache: string, lage: Stimmlage): { group
   ].filter((g) => g.items.length)
 }
 
-export function VokabelStimmenCard(): React.JSX.Element {
+/**
+ * Karte „Aussprache der Vokabeln". `klappbar` (Einstellungen, 09.10.2026): eingeklappt mit Statuszeile („4 Stimmen für
+ * 2 Sprachen"); die Stimmen des Kontos werden erst beim Aufklappen abgefragt.
+ */
+export function VokabelStimmenCard({ klappbar = false }: { klappbar?: boolean }): React.JSX.Element {
+  const [wahl, setWahl] = useState<Record<string, Stimmen> | null>(null)
+  useEffect(() => {
+    if (klappbar) void window.api.medien.stimmen().then(setWahl, () => setWahl({}))
+  }, [klappbar])
+  if (!klappbar) return <VokabelStimmenInhalt />
+  return (
+    <KlappKarte id="vokabel-stimmen" titel="Aussprache der Vokabeln" status={stimmenStatus(wahl)} rahmen={{ 'data-vokabel-stimmen': true }}>
+      <VokabelStimmenInhalt rahmen={false} onWahl={setWahl} />
+    </KlappKarte>
+  )
+}
+
+function VokabelStimmenInhalt({ rahmen = true, onWahl }: { rahmen?: boolean; onWahl?: (w: Record<string, Stimmen>) => void }): React.JSX.Element {
+  const Rahmen = rahmen ? KartenRahmen : Fragment
   const admin = useMedienAdmin()
   const [stimmen, setStimmen] = useState<TtsVoice[] | null>(null)
   const [wahl, setWahl] = useState<Record<string, Stimmen>>({})
@@ -75,7 +95,13 @@ export function VokabelStimmenCard(): React.JSX.Element {
     ladeStimmen()
   }, [])
   const setzen = (sprache: string, lage: Stimmlage, stimme: string): void =>
-    void window.api.medien.stimmeSetzen(sprache, stimme, lage).then(setWahl, (e: unknown) => notifyError(e))
+    void window.api.medien.stimmeSetzen(sprache, stimme, lage).then(
+      (w) => {
+        setWahl(w)
+        onWahl?.(w)
+      },
+      (e: unknown) => notifyError(e)
+    )
   // Hörprobe: welche Zeile gerade lädt bzw. spielt (Sprache + Fassung oder Bibliotheksstimme)
   const [probe, setProbe] = useState<{ schluessel: string; laedt: boolean } | null>(null)
   const ton = useRef<HTMLAudioElement | null>(null)
@@ -99,10 +125,12 @@ export function VokabelStimmenCard(): React.JSX.Element {
   // Nur Stimmen, die mit diesem Schlüssel und Tarif sprechen dürfen
   const nutzbar = (stimmen ?? []).filter((v) => v.usable !== false)
   return (
-    <Card withBorder padding="lg" data-vokabel-stimmen>
-      <Title order={4} mb={4}>
-        Aussprache der Vokabeln
-      </Title>
+    <Rahmen>
+      {rahmen && (
+        <Title order={4} mb={4}>
+          Aussprache der Vokabeln
+        </Title>
+      )}
       <Text size="xs" c="dimmed" mb="sm">
         Je Sprache eine weibliche und eine männliche Stimme für die Aussprache von Wörtern und Beispielsätzen in den Vokabellisten. Erzeugt wird jede Fassung,
         für die eine Stimme gewählt ist; die Lernenden wählen in ihren Einstellungen, welche sie hören (fehlt sie, die andere).
@@ -212,11 +240,19 @@ export function VokabelStimmenCard(): React.JSX.Element {
           }}
         />
       )}
-    </Card>
+    </Rahmen>
   )
 }
 
 /** Stimmen der ElevenLabs-Bibliothek zu Sprache und Geschlecht – übernehmen setzt sie zugleich als Standardstimme */
+function KartenRahmen({ children }: { children?: React.ReactNode }): React.JSX.Element {
+  return (
+    <Card withBorder padding="lg" data-vokabel-stimmen>
+      {children}
+    </Card>
+  )
+}
+
 function BibliothekDialog({
   sprache,
   lage,

@@ -10,6 +10,11 @@ export const rueckmeldungStats = (r: Rueckmeldung): Record<string, unknown> => (
   subjectLabel: r.meta.subjectLabel,
   grade: r.meta.grade,
   thema: r.grundlage.titel,
+  // Themen-Bibliothek (09.10.2026): Fachkennung, Land und Schulform für den Lehrplankatalog, Themenbereich von Hand
+  subjectId: r.meta.subjectId,
+  stateId: r.meta.stateId,
+  schoolTypeId: r.meta.schoolTypeId,
+  ...(r.meta.themenbereich ? { themenbereich: r.meta.themenbereich } : {}),
   abgaben: r.abgaben.length,
   fertig: r.abgaben.filter((a) => a.bogen).length,
   // Aus welchem Material (08.10.2026): „Rückmeldung …" im Editor findet so die vorhandene (vorgabe.ts)

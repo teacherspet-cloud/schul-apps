@@ -8,7 +8,7 @@ import { MEHRSPIELE, type MehrspielId, type Schwierigkeit, type SpielInhalt } fr
 import { SPIELE } from '../src/shared/vokabelSpiele'
 import { GRAMMATIK_SPIELE } from '../src/shared/grammatiktrainer'
 import { REGELN, angebotFuer } from '../src/shared/mehrspieler/regeln'
-import { lehrwerkBisStand, leererInhalt, synonymeAus, vokItems } from '../src/shared/mehrspieler/inhalt'
+import { lehrwerkBisStand, lehrwerkFruehereUndFrei, leererInhalt, synonymeAus, vokItems } from '../src/shared/mehrspieler/inhalt'
 import { bekannteWoerter, reiseRunde } from '../src/shared/mehrspieler/spiele/reiseplaner'
 import { lexikonFuer } from '../src/shared/mehrspieler/reiseLexikon'
 import type { Buch } from '../src/shared/vokabelLaufbahn'
@@ -189,6 +189,18 @@ describe('Reiseplaner: Lehrwerkswörter bis zum Stand der Klasse', () => {
     // Unbekannte Unit oder unbekanntes Buch: nichts
     expect(lehrwerkBisStand(buecher, { buch: 'green-line-2', unit: 'Unit 99' })).toEqual([])
     expect(lehrwerkBisStand(buecher, { buch: 'nix', unit: 'Unit 1' })).toEqual([])
+  })
+  it('„Frühere Bände + Freigegebenes" (09.10.2026): Band 1 ganz, aus Band 2 nur die freigegebenen Abschnitte', () => {
+    const u = buecher[1].units[1]
+    const w = lehrwerkFruehereUndFrei(buecher, 'green-line-2', [{ buch: 'green-line-2', unit: u.name, abschnitte: [u.sections[0].name] }])
+    const band1 = buecher[0].units.reduce((n, x) => n + x.sections.reduce((m, sec) => m + sec.entries.length, 0), 0)
+    expect(w.length).toBe(band1 + u.sections[0].entries.length)
+    expect(w.filter((x) => x.id.startsWith('b:green-line-2:')).every((x) => x.id.startsWith('b:green-line-2:1:0:'))).toBe(true)
+    expect(w.some((x) => x.id.startsWith('b:green-line-3:'))).toBe(false)
+    // Ohne Freigaben: nur frühere Bände; ganze Unit ohne Abschnittsangabe
+    expect(lehrwerkFruehereUndFrei(buecher, 'green-line-2', []).length).toBe(band1)
+    const ganz = lehrwerkFruehereUndFrei(buecher, 'green-line-2', [{ buch: 'green-line-2', unit: u.name, abschnitte: [] }])
+    expect(ganz.length).toBe(band1 + u.sections.reduce((m, sec) => m + sec.entries.length, 0))
   })
   it('Vorrang: von allen gekannte Wörter vor Lehrwerkswörtern vor dem Grundwortschatz', () => {
     const i = inhalt()

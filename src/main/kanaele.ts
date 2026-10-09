@@ -52,7 +52,8 @@ import { pdfMitSeiten } from '@shared/seitenPdf'
 import { freierDateiname } from '@shared/dateiname'
 import { vorhandenFehler, type BeiVorhanden } from '@shared/vorhanden'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
-import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
+import { createProvider, createTextProvider, getModelList, hatApiZugang, healModelSelection, kompatibelModell, refreshProvider } from './services/ai/models'
+import { istKompatibel } from '@shared/kiAnbieter'
 import { mitPdfMetadaten } from './services/export/pdfMetadaten'
 import { htmlToPdfWithExtras, MEASURE_SCRIPT, type Gemessen, type Messen } from './services/export/fillablePdf'
 import { fetchAsDataUrl, getOpenMojiSvg, searchOnline, searchOpenMoji } from './services/images/images'
@@ -61,7 +62,7 @@ import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/mat
 import { ablehnungAufheben, leseAblehnungen, quelleAblehnen } from './services/storage/quellenAblehnungen'
 import { ladeVideo } from './services/sources/video'
 import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePose } from './services/storage/maskottchen'
-import { audioPath, bibliothekSuchen, bibliothekUebernehmen, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
+import { audioPath, bibliothekSuchen, bibliothekUebernehmen, elevenlabsKontingent, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { importiereAudio } from './services/audio/importAudio'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
 import { deleteVerbList, getVerbList, listVerbLists, saveVerbList } from './services/storage/verbListen'
@@ -99,7 +100,8 @@ import { leseZertifikat, signierePdf } from './services/export/pdfSignatur'
 import type { PaketArt } from './services/paket/paket'
 import { leseProtokoll, protokolliere } from './services/protokoll'
 import { mitWiederholung } from './services/ai/wiederholung'
-import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
+import { merkeLimit, merkeVerbrauch, verbrauchsDaten } from './services/ai/verbrauch'
+import { artVonSchema, istLimit } from '@shared/kiArten'
 import type { LanStatus } from './services/lanServer'
 import type { WindowsFreigabe, WindowsFreigabeStatus } from './services/netz/windowsFreigabe'
 import type { SicherungsEintrag } from './services/storage/autoSicherung'
@@ -279,11 +281,12 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'], additionalProperties: false }
   }
   handle('ai:test', async (provider: AiProviderId) => {
-    const models = await refreshProvider(provider)
+    // OpenAI-kompatible (09.10.2026): Nicht jeder Endpunkt listet Modelle (Azure-Bereitstellungen, manche Hoster) – dann zählt nur die Probeanfrage
+    const models = istKompatibel(provider) ? await refreshProvider(provider).catch(() => [] as unknown[]) : await refreshProvider(provider)
     await updateModelsInBackground()
     // Die Modellliste funktioniert auch ohne Guthaben – deshalb eine winzige echte Anfrage mit dem gewählten Modell
     const { ai } = getSettings()
-    await createProvider(provider).structured(PING, ai.textModels[provider])
+    await createProvider(provider).structured(PING, istKompatibel(provider) ? kompatibelModell(provider, ai) : ai.textModels[provider])
     return models.length
   })
   handle('ai:subscription-status', (provider: AiProviderId) => subscriptionStatus(provider))
@@ -340,7 +343,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
       : undefined
     const anbieter = req.provider ?? getSettings().ai.textProvider
     const modell = req.model || model
-    merkeVerbrauch(anbieter, modell, { anfragen: 1 })
+    // Auftragsart für den Verbrauch je Programm (09.10.2026)
+    const auftragsArt = artVonSchema(req.schemaName)
+    merkeVerbrauch(anbieter, modell, { anfragen: 1 }, auftragsArt)
     // Einmal wiederholen bei kaputter, abgeschnittener oder leerer Antwort und Serverfehlern (27.09.2026)
     return kiPlaetze.platz(id, (signal) =>
       mitWiederholung(
@@ -349,10 +354,15 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
         ({ art, meldung }) => {
           if (signal.aborted) return
           protokolliere('warnung', 'ki', `${req.schemaName ?? 'Anfrage'}: Wiederholung (${art}) – ${meldung}`)
-          merkeVerbrauch(anbieter, modell, { anfragen: 1, wiederholungen: 1 })
+          merkeVerbrauch(anbieter, modell, { anfragen: 1, wiederholungen: 1 }, auftragsArt)
         }
       )
-    )
+    ).catch((e: unknown) => {
+      // Erreichte Limits für den Verbrauch merken (09.10.2026) – Abbrüche nicht
+      const meldung = e instanceof Error ? e.message : String(e)
+      if (!istAbbruch(e) && istLimit(meldung)) merkeLimit(anbieter, meldung, auftragsArt)
+      throw e
+    })
   })
   handle('ai:cancel', (id: string) => {
     kiPlaetze.abbrechen(id)
@@ -376,10 +386,17 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     }
   })
   handle('ai:image', (prompt: string, id?: string) => {
-    merkeVerbrauch(getSettings().ai.imageProvider, '', { bilder: 1 })
-    return kiPlaetze.platz(id, (signal) => generateImage(prompt, signal), 'bild')
+    const anbieter = getSettings().ai.imageProvider
+    merkeVerbrauch(anbieter, '', { bilder: 1 }, 'bild')
+    return kiPlaetze.platz(id, (signal) => generateImage(prompt, signal), 'bild').catch((e: unknown) => {
+      const meldung = e instanceof Error ? e.message : String(e)
+      if (!istAbbruch(e) && istLimit(meldung)) merkeLimit(anbieter, meldung, 'bild')
+      throw e
+    })
   })
-  handle('verbrauch:get', () => leseVerbrauch())
+  handle('verbrauch:get', () => verbrauchsDaten())
+  // ElevenLabs-Kontingent (Zeichen) für den Ring im Verbrauch (09.10.2026) – null ohne Schlüssel oder Auskunft
+  handle('verbrauch:kontingent', () => elevenlabsKontingent())
 
   handle('cefr:get', () => getCefrTable())
 
@@ -713,7 +730,7 @@ function aiStatus(): AiStatus {
     textAccess: ai.access[ai.textProvider],
     // Mit der Attrappe der Oberflächentests (nie im Betrieb) gilt die KI als eingerichtet
     hasTextKey:
-      attrappeAktiv() || (ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionAccepted[ai.textProvider] : Boolean(getSecret(ai.textProvider))),
+      attrappeAktiv() || (ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionAccepted[ai.textProvider] : hatApiZugang(ai.textProvider)),
     imageProvider: ai.imageProvider,
     imageModel,
     imageAccess,
@@ -730,8 +747,8 @@ function aiStatus(): AiStatus {
  * ein stärkeres Modell anbieten (Hörtexte), zeigen daraus ihre Auswahl.
  */
 function textOptions(ai: AppSettings['ai']): AiStatus['textOptions'] {
-  return AI_PROVIDERS.filter((p) => (ai.access[p.id] === 'subscription' ? ai.subscriptionAccepted[p.id] : Boolean(getSecret(p.id)))).map((p) => {
-    const model = ai.access[p.id] === 'subscription' ? ai.subscriptionModels[p.id] : ai.textModels[p.id]
+  return AI_PROVIDERS.filter((p) => (ai.access[p.id] === 'subscription' ? ai.subscriptionAccepted[p.id] : hatApiZugang(p.id))).map((p) => {
+    const model = istKompatibel(p.id) ? kompatibelModell(p.id, ai) : ai.access[p.id] === 'subscription' ? ai.subscriptionModels[p.id] : ai.textModels[p.id]
     return { provider: p.id, model, label: `${p.label}${model ? ` · ${model}` : ''}` }
   })
 }
@@ -763,7 +780,7 @@ async function generateImage(prompt: string, signal?: AbortSignal): Promise<stri
       if (w.provider === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt, signal)
       const provider = createProvider(w.provider)
       if (!provider.generateImage) throw new Error('Dieser Anbieter kann keine Bilder erzeugen.')
-      return provider.generateImage(prompt, ai.imageModels[w.provider], signal)
+      return provider.generateImage(prompt, ai.imageModels[w.provider as 'openai' | 'google'], signal)
     },
     istAbbruch
   )
@@ -776,7 +793,7 @@ async function generateImage(prompt: string, signal?: AbortSignal): Promise<stri
         .join(' | ')
         .slice(0, 400)}`
     )
-    merkeVerbrauch(genutzt.provider, '', { bilder: 1 })
+    merkeVerbrauch(genutzt.provider, '', { bilder: 1 }, 'bild')
   }
   return bild
 }

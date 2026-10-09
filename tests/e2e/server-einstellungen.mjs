@@ -1,4 +1,7 @@
 // Einstellungen (03.10.2026): Lernende ändern Darstellung und Passwort, Lehrkraft ändert ihr Passwort.
+// 09.10.2026: Farbkonzept „Helle, ruhige Flächen + Akzentfarbe" (10 Farben mit Vorschau hell/dunkel, getönter Grund,
+// weiße Karten, Kopfband in der Farbe, hell/dunkel wirklich überall) und „Konto" nur für Konten mit eigenem Passwort
+// (nicht für Gäste mit Code und die Musterschüler-Vorschau; IServ verwaltet es selbst).
 // Vorher: Server lokal (KI wird nicht gebraucht), IServ NICHT eingerichtet.
 // Aufruf: node tests/e2e/server-einstellungen.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -74,6 +77,70 @@ try {
   await s.waitForTimeout(1200)
   await s.screenshot({ path: join(out, '3-start-dunkel.png'), fullPage: true })
 
+  // ---------- Farbkonzept (09.10.2026)
+  await s.goto(`${A}/s/einstellungen`)
+  pruefe((await s.locator('[data-farbe]').count()) === 10, `Zehn Farben zur Wahl (${await s.locator('[data-farbe]').count()})`)
+  for (const w of ['lavendel', 'koralle', 'salbei', 'ozean']) pruefe((await s.locator(`[data-farbe="${w}"]`).count()) === 1, `Neue Farbe ${w}`)
+  const farben = async () =>
+    s.evaluate(() => {
+      const css = (sel, prop) => {
+        const el = document.querySelector(sel)
+        return el ? getComputedStyle(el)[prop] : ''
+      }
+      return {
+        schema: document.documentElement.getAttribute('data-mantine-color-scheme'),
+        grund: getComputedStyle(document.body).backgroundColor,
+        karte: css('[data-bereich="aussehen"]', 'backgroundColor'),
+        knopf: css('[data-vorschau] button', 'backgroundColor'),
+        kopf: css('.sl-kopf', 'backgroundImage')
+      }
+    })
+  const hell = (rgb) => {
+    const [r, g, b] = (rgb.match(/\d+/g) ?? []).map(Number)
+    return (r + g + b) / 3
+  }
+  const bilder = []
+  for (const [farbe, name] of [
+    ['teal', 'tuerkis'],
+    ['koralle', 'koralle'],
+    ['lavendel', 'lavendel']
+  ]) {
+    await s.goto(`${A}/s/einstellungen`)
+    await s.locator(`[data-farbe="${farbe}"]`).click()
+    for (const modus of ['Hell', 'Dunkel']) {
+      await s.goto(`${A}/s/einstellungen`)
+      await s.locator('[data-modus]').getByText(modus, { exact: true }).click()
+      await s.waitForTimeout(400)
+      const f = await farben()
+      if (modus === 'Hell')
+        pruefe(
+          f.schema === 'light' && hell(f.grund) > 225 && hell(f.grund) < 255 && f.karte === 'rgb(255, 255, 255)' && f.grund !== f.karte,
+          `${farbe} hell: getönter heller Grund ${f.grund}, weiße Karten ${f.karte}, Knopf ${f.knopf}`
+        )
+      else pruefe(f.schema === 'dark' && hell(f.grund) < 45 && hell(f.karte) > hell(f.grund), `${farbe} dunkel: Grund ${f.grund}, Karten heller ${f.karte}`)
+      bilder.push(f.knopf)
+      await s.screenshot({ path: join(out, `farbe-${name}-${modus.toLowerCase()}-einstellungen.png`), fullPage: true })
+      await s.goto(`${A}/s/`)
+      await s.waitForTimeout(1200)
+      const st = await farben()
+      pruefe(modus !== 'Hell' || (hell(st.grund) > 225 && !/rgb\(\s*(5|11|30), /.test(st.kopf)), `${farbe} ${modus}: Startseite ohne dunklen Grund/dunkles Band (${st.grund})`)
+      await s.screenshot({ path: join(out, `farbe-${name}-${modus.toLowerCase()}-start.png`), fullPage: true })
+    }
+  }
+  pruefe(new Set(bilder).size === 3, `Knopffarbe folgt der Wahl (${[...new Set(bilder)].join(' | ')})`)
+  // „Wie das Gerät": hell bzw. dunkel nach dem System
+  await s.goto(`${A}/s/einstellungen`)
+  await s.locator('[data-modus]').getByText('Wie das Gerät').click()
+  await s.emulateMedia({ colorScheme: 'light' })
+  await s.waitForTimeout(300)
+  const sysHell = await farben()
+  await s.emulateMedia({ colorScheme: 'dark' })
+  await s.waitForTimeout(300)
+  const sysDunkel = await farben()
+  pruefe(sysHell.schema === 'light' && sysDunkel.schema === 'dark' && hell(sysHell.grund) > 225 && hell(sysDunkel.grund) < 45, `„Wie das Gerät" wechselt mit dem System (${sysHell.grund} / ${sysDunkel.grund})`)
+  await s.locator('[data-modus]').getByText('Dunkel', { exact: true }).click()
+  pruefe(await da(s.locator('[data-bereich="konto"]')), 'Konto mit eigenem Passwort: Bereich „Konto" da')
+
   // ---------- Mia: Passwort
   await s.goto(`${A}/s/einstellungen`)
   await s.locator('[data-pw-alt] input, input[data-pw-alt]').first().fill('falsch-falsch-1')
@@ -95,6 +162,38 @@ try {
   // ---------- Lehrkraft: Passwort in den Einstellungen
   const lk = await browser.newContext({ viewport: { width: 1400, height: 950 } })
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
+
+  // ---------- Kein „Konto" für Gäste mit Code und die Musterschüler-Vorschau (09.10.2026)
+  const kurs = (
+    await (
+      await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+        headers: KOPF,
+        data: { titel: 'Probe', sprache: 'en', fach: 'Englisch', woerter: [{ id: 'w1', term: 'dog', translation: 'Hund' }], schueler: [mia.benutzer] }
+      })
+    ).json()
+  ).id
+  try {
+    const ein = await (await lk.request.post(`${A}/server/vokabeln/${kurs}/eintragen`, { headers: KOPF, data: { namen: ['Gina G.'] } })).json()
+    const gast = await browser.newContext({ viewport: { width: 1024, height: 1000 } })
+    const anm = await gast.request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: ein.eingetragen?.[0]?.zugang } })
+    const gs = await gast.newPage()
+    await gs.goto(`${A}/s/einstellungen`)
+    const gDa = anm.ok() && (await da(gs.locator('[data-bereich="aussehen"]')))
+    await gs.screenshot({ path: join(out, '5-gast-einstellungen.png'), fullPage: true })
+    pruefe(gDa && (await gs.locator('[data-bereich="konto"], [data-bereich-kachel="konto"]').count()) === 0, `Gast mit Code: kein Bereich „Konto" (Anmeldung ${anm.status()}, Seite ${gDa})`)
+    const gpw = await gast.request.post(`${A}/konto/passwort`, { headers: KOPF, data: { alt: 'x', neu: 'y'.repeat(12), neu2: 'y'.repeat(12) } })
+    pruefe(gpw.status() >= 400, `Gast: Passwort ändern abgelehnt (${gpw.status()})`)
+    const gr = await (await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', mitglieder: [mia.benutzer] } })).json()
+    const vs = (await (await lk.request.post(`${A}/server/klassen/${gr.id}/vorschau`, { headers: KOPF, data: { zustand: 'neu' } })).json()).schluessel
+    const vp = await lk.newPage()
+    await vp.goto(`${A}/s/einstellungen?vs=${encodeURIComponent(vs)}`)
+    pruefe((await da(vp.locator('[data-bereich="aussehen"]'))) && (await vp.locator('[data-bereich="konto"], [data-bereich-kachel="konto"]').count()) === 0, 'Vorschau: kein Bereich „Konto"')
+    const vpw = await lk.request.post(`${A}/konto/passwort`, { headers: { ...KOPF, 'x-schulapps-vorschau': vs }, data: { alt: 'x', neu: 'y'.repeat(12), neu2: 'y'.repeat(12) } })
+    pruefe(vpw.status() === 400, `Vorschau: Passwort ändern abgelehnt (${vpw.status()})`)
+    await vp.close()
+  } finally {
+    await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
+  }
   await lk.request.post(`${A}/auth/passwort`, {
     form: { alt: lehrer.passwort, neu: 'LehrerPasswort-33', neu2: 'LehrerPasswort-33', ziel: '/' },
     headers: { origin: A },
@@ -120,6 +219,28 @@ try {
   // Ohne Kopfzeile kein Ändern (Schutz vor untergeschobenen Formularen)
   const ohne = await lk.request.post(`${A}/konto/passwort`, { data: { alt: 'LehrerPasswort-44', neu: 'x'.repeat(12), neu2: 'x'.repeat(12) } })
   pruefe(ohne.status() === 403, `Ohne Kopfzeile abgelehnt (${ohne.status()})`)
+
+  // ---------- Verwaltung (09.10.2026, Befunde der Oberflächenprüfung)
+  // Fachfarben der Schule: GET wurde vom Fachordner (/server/fach…) mit 405 abgefangen
+  const ff = await verwaltung.request.get(`${A}/server/fachfarben`, { headers: KOPF })
+  pruefe(ff.status() === 200 && typeof (await ff.json()).farben === 'object', `GET /server/fachfarben antwortet (${ff.status()})`)
+  pruefe((await verwaltung.request.get(`${A}/server/fach`, { headers: KOPF })).status() === 200, 'Fachordner /server/fach antwortet weiter')
+  // „Schule & Daten" › „Server": Ampel erscheint (die Antwort hat einen Abschnitt „fehler" – galt als Fehler, „[object Object]")
+  const v = await verwaltung.newPage()
+  await v.setViewportSize({ width: 1400, height: 950 })
+  await v.goto(A)
+  await v.waitForTimeout(2500)
+  const vSpaeter = v.getByRole('button', { name: 'Später einrichten' })
+  if (await vSpaeter.isVisible().catch(() => false)) await vSpaeter.click()
+  await expertenmodus(v)
+  await v.locator('.app-leiste [aria-label="Schule & Daten"]').first().click()
+  await v.getByRole('tab', { name: 'Server', exact: true }).click()
+  pruefe(await da(v.locator('[data-server-reiter] [data-server-ampel]').first(), 15000), 'Verwaltung › Server: Ampel erscheint')
+  await v.getByRole('tab', { name: 'Schule', exact: true }).click()
+  await v.waitForTimeout(1500)
+  const meldungen = (await v.locator('.mantine-Notification-root').allInnerTexts()).join(' | ')
+  pruefe(!/object Object|Nicht erlaubt/.test(meldungen), `Verwaltung: keine Fehlermeldung („${meldungen}")`)
+  await v.screenshot({ path: join(out, '5-verwaltung-schule.png') })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 8).join(' | ')}`)
   for (const [i, seite] of browser

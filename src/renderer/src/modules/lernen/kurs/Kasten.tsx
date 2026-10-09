@@ -1,13 +1,23 @@
 /**
- * Auf- und zuklappbare Kästen (aus VokabelTraining.tsx, 08.10.2026): Kopf mit Pfeil und Zustand je Gerät gemerkt.
+ * Auf- und zuklappbare Kästen (aus VokabelTraining.tsx, 08.10.2026): Kopf mit Pfeil und Zustand je Sitzung gemerkt.
  * `rechts` steht außerhalb des Klick-Bereichs – Knöpfe dort klappen den Kasten nicht um.
  */
 import { Group, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronDown } from '@tabler/icons-react'
 import { useState } from 'react'
+import { useOffenGemerkt } from '../../../shared/sitzung'
 
-/** Aufgeklappt-Zustand eines Kastens, auf diesem Gerät gemerkt */
+/**
+ * Aufgeklappt-Zustand eines Kastens – gemerkt für die Sitzung (shared/sitzung.ts, 09.10.2026): in einer neuen Sitzung
+ * steht er wieder wie vorgegeben.
+ */
 export function useGemerkt(schluessel: string, vorgabe: boolean): [boolean, (v: boolean) => void] {
+  const [wert, setzen] = useOffenGemerkt<boolean>(`schulapps-${schluessel}`, vorgabe)
+  return [wert, (v: boolean) => setzen(v)]
+}
+
+/** Ein Schalter (kein Auf/Zu, z. B. „ohne Namen") – dauerhaft auf diesem Gerät gemerkt */
+export function useGemerkterSchalter(schluessel: string, vorgabe: boolean): [boolean, (v: boolean) => void] {
   const [wert, setWert] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem(`schulapps-${schluessel}`)
@@ -26,7 +36,7 @@ export function useGemerkt(schluessel: string, vorgabe: boolean): [boolean, (v: 
   }
   return [wert, setzen]
 }
-/** Wie useGemerkt, aber mit Text (gewählte Ansicht) */
+/** Gewählte Ansicht (Text) – dauerhaft auf diesem Gerät gemerkt, kein Auf/Zu */
 export function useGemerktText(schluessel: string, vorgabe: string): [string, (v: string) => void] {
   const [wert, setWert] = useState<string>(() => {
     try {

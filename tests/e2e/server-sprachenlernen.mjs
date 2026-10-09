@@ -143,6 +143,31 @@ try {
   pruefe(await da(p.locator('[data-kurs-kopf] [data-kennzahl="aktiv"]')), 'Kopf: „aktiv diese Woche"')
   await p.locator('[data-kurs-kopf] [data-kennzahl="bedarf"]').click()
   pruefe(await da(p.locator('[data-kurs-bedarf]')), 'Klick auf „Handlungsbedarf" öffnet den Überblick')
+  // Units je Band (09.10.2026): neuester Band oben, Cover bzw. Kachel links
+  pruefe(await da(p.locator('[data-kurs-units] [data-band-gruppe="Green Line 1"]')), 'Überblick: Units unter „Green Line 1" (mit Cover)')
+  // Grammatik-Hinweise führen in den Reiter „Grammatik" (09.10.2026, Befund der Lehrkraft), nie zur Vokabeltabelle
+  pruefe(
+    (await p.locator('[data-kurs-bedarf] [data-kurs-hinweis="foerdern"]:not([data-ziel-reiter="grammatik"]), [data-kurs-bedarf] [data-kurs-hinweis="entwurf"]:not([data-ziel-reiter="grammatik"])').count()) === 0,
+    'Grammatik-Hinweise zielen auf den Reiter „Grammatik"'
+  )
+  const gramHinweis = p.locator('[data-kurs-bedarf] [data-ziel-reiter="grammatik"]').first()
+  if (await gramHinweis.count()) {
+    await gramHinweis.click()
+    pruefe(await da(p.locator('[data-kurs-reiter="grammatik"][data-active]')), 'Grammatik-Hinweis öffnet den Reiter „Grammatik"')
+    pruefe(await da(p.locator('[data-kurs-grammatik]')), 'Grammatik-Hinweis zeigt die Grammatik-Liste')
+    // Genau eine betroffene Person (09.10.2026, kursFokus.ts): deren Grammatik-Details öffnen sich gleich – wieder schließen
+    const details = p.getByRole('dialog', { name: /^Grammatik – / })
+    if (await details.waitFor({ timeout: 3000 }).then(() => true, () => false)) {
+      await p.keyboard.press('Escape')
+      await details.waitFor({ state: 'hidden', timeout: 5000 })
+    }
+  }
+  // Spontane Gruppe (QR-Code): „Kurs beenden" und „Kurs löschen" bleiben
+  await kursReiter(p, 'einstellungen')
+  pruefe(
+    (await p.locator('[data-kurs-einstellungen] [data-kurs-loeschen]').count()) === 1 && (await p.locator('[data-kurs-einstellungen] [data-vokabel-status]').count()) === 1,
+    'Spontane Gruppe: „Kurs beenden" und „Kurs löschen" vorhanden'
+  )
   await kursReiter(p, 'lernende')
   // Reiter „Lernende" nur mit Vokabeln (08.10.2026): keine Grammatik-Spalte, kein Fördern/Fordern
   pruefe((await p.locator('[data-lernende-tabelle] [data-foerdern]').count()) === 0, 'Reiter „Lernende" ohne Fördern/Fordern')
@@ -225,6 +250,26 @@ try {
   pruefe(Boolean(tomDaten.staende?.b1?.versuche), 'Lernstand der bearbeiteten Aufgabe bleibt erhalten')
   await p.keyboard.press('Escape')
 
+  // ---------- „Als Schüler ansehen" im Kurskopf (09.10.2026): spontane Gruppe → Fenster gleich auf dem Kurs
+  const alsSchueler = p.locator('[data-kurs-kopf] [data-als-schueler]')
+  pruefe(await da(alsSchueler), 'Kurskopf: Knopf „Als Schüler ansehen"')
+  await alsSchueler.click()
+  await p.locator('[data-vorschau-wahl="fleissig"]').click()
+  const [vorschauFenster] = await Promise.all([lk.waitForEvent('page', { timeout: 15000 }), p.locator('[data-vorschau-oeffnen]').click()])
+  await vorschauFenster.waitForURL(/\/vorschau\?vs=/, { timeout: 15000 })
+  const vorschauZiel = new URL(vorschauFenster.url()).searchParams.get('ziel')
+  pruefe(vorschauZiel === `/s/v/${kurs}`, `Vorschaufenster mit Ziel /s/v/<Kurs> (${vorschauZiel})`)
+  pruefe(await da(vorschauFenster.frameLocator('#ansicht').locator('[data-vokabel-kasten]'), 25000), 'Vorschau zeigt den Kurs (Vokabelkasten) als Musterschüler')
+  const rahmenIch = await vorschauFenster.frame({ url: /\/s\/v\// })?.evaluate(() => window.__schulappsServer)
+  pruefe(rahmenIch?.quelle === 'vorschau' && rahmenIch?.vorschau === true, `Im Fenster angemeldet als Musterschüler (${rahmenIch?.name})`)
+  await vorschauFenster.screenshot({ path: join(out, '4b-vorschau-kurs.png') })
+  await vorschauFenster.close()
+  const nachVorschau = await get(`/server/vokabeln/${kurs}`)
+  pruefe(
+    !nachVorschau.lernende.some((l) => l.name === 'Musterschüler') && nachVorschau.lernende.length === 2,
+    `Musterschüler nicht unter den Lernenden des Kurses (${nachVorschau.lernende.map((l) => l.name).join(', ')})`
+  )
+
   // ---------- Lernende: Startkarte, Seite nach Regeln, „Diese Regel üben", passende Spiele
   // Bisherige Liste (Rückfall zum Regal, 08.10.2026) – das Regal prüft server-regal.mjs
   await ben.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { materialien: 'liste' } })
@@ -297,6 +342,15 @@ try {
   pruefe((await get('/server/vokabeln')).zuweisungen.filter((z) => z.lerngruppe === '5x').length === 1, 'Kein zweiter Kurs beim erneuten Öffnen')
   if (kurs5x[0]) kurse.push(kurs5x[0].id)
   const ls0 = await get(`/server/grammatik/lehrwerkstand?gruppe=${g.id}`)
+  // Automatisch (09.10.2026): Reihe aus den Kursen der Lehrkraft, Band nach Klasse 5 → Green Line 1, ohne Unit
+  pruefe(ls0.automatisch?.buch === 'Green Line 1' && !ls0.automatisch?.unit, `Klasse 5x automatisch Green Line 1 ohne Unit (${JSON.stringify(ls0.automatisch)})`)
+  // Kurs einer festen Klasse (09.10.2026): weder beenden noch löschen
+  if (kurs5x[0]) {
+    const d5x = await get(`/server/vokabeln/${kurs5x[0].id}`)
+    pruefe(d5x.klassenKurs === true, 'Kurs der Klasse 5x gilt als Klassenkurs')
+    const ende = await lk.request.post(`${A}/server/vokabeln/${kurs5x[0].id}/status`, { headers: KOPF, data: { status: 'beendet' } })
+    pruefe(ende.status() === 400, `Klassenkurs lässt sich nicht beenden (${ende.status()})`)
+  }
   await post('/server/grammatik/lehrwerkstand', { gruppe: g.id, buch: 'Green Line 2', unit: Object.keys(ls0.baende)[1] ? ls0.baende['Green Line 2'][1] : '' })
   const ls1 = await get(`/server/grammatik/lehrwerkstand?gruppe=${g.id}`)
   pruefe(ls1.stand?.buch === 'Green Line 2', `Lehrwerk-Stand gesetzt (${JSON.stringify(ls1.stand)})`)
@@ -310,7 +364,7 @@ try {
     .entries())
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
-  for (const k of kurse) if (lk) await lk.request.post(`${A}/server/vokabeln/${k}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  for (const k of kurse) if (lk) await lk.request.post(`${A}/server/vokabeln/${k}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Kurse, Gäste und Konten gelöscht (${zuLoeschen.length})`)
   await browser.close()

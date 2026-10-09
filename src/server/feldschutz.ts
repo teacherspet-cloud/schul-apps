@@ -27,6 +27,8 @@ import { entschluessle, hauptschluessel, schluesselObjekt, verschluessle } from 
 /** Tabelle → sensible Spalten */
 export const SENSIBEL: Record<string, string[]> = {
   nutzer: ['name', 'gruppen', 'benutzer_v', 'iserv_sub'],
+  // IServ-Anmeldung eines Gastkontos (09.10.2026): Benutzername und Kennung verschlüsselt, gesucht wird über benutzer_k (HMAC)
+  konto_iserv: ['benutzer_v', 'iserv_sub'],
   // Klassen-/Kursnamen und IServ-Gruppe seit 08.10.2026 ebenfalls (Wunsch der Lehrkraft: alles verschlüsselt)
   lerngruppen: ['name', 'iserv_gruppe', 'mitglieder'],
   // Grund und Verlassen der Seite sind Angaben zur Person (Aufsicht), 08.10.2026
@@ -36,7 +38,7 @@ export const SENSIBEL: Record<string, string[]> = {
   onlinetests: ['titel', 'fassungen', 'einstellungen'],
   feedback_freigaben: ['schueler', 'titel', 'vorlage'],
   feedback_abgaben: ['fassungen'],
-  blatt_freigaben: ['schueler', 'auswertung', 'titel', 'thema', 'html', 'aufgaben', 'loesung', 'merk', 'einstellungen'],
+  blatt_freigaben: ['schueler', 'auswertung', 'titel', 'thema', 'html', 'aufgaben', 'loesung', 'merk', 'einstellungen', 'themenbereich'],
   blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback', 'hilfen', 'freigeschaltet'],
   // Grammatik-Lern-App (06.10.2026); `art` verrät Förder-/Forderaufgaben einzelner Lernender (08.10.2026)
   gram_zuweisungen: ['schueler', 'titel', 'thema', 'paket', 'info', 'art', 'problem_aus'],
@@ -65,7 +67,9 @@ export const SENSIBEL: Record<string, string[]> = {
   nutzer_darstellung: ['daten'],
   protokoll: ['text'],
   // Ausgeblendeter Handlungsbedarf (09.10.2026): Merkmale mit Kennungen Betroffener – im Zweifel verschlüsseln
-  klassen_ausgeblendet: ['merkmal']
+  klassen_ausgeblendet: ['merkmal'],
+  // KI-Nutzung der Lehrkräfte über Schlüssel der Schule (09.10.2026, kiNutzung.ts): nur Zahlen, trotzdem verschlüsselt
+  ki_nutzung: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

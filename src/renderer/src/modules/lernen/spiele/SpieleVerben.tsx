@@ -10,7 +10,7 @@
 import { ActionIcon, Badge, Button, Group, Progress, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconVolume } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { alsEintrag, formPasst, spaltenDerForm, sprechtext, type VerbKarte, type VerbSpalteKurz } from '@shared/verbTraining'
+import { alsEintrag, formenGesprochen, formGesprochen, formPasst, formSchluessel, spaltenDerForm, sprechtext, type VerbKarte, type VerbSpalteKurz } from '@shared/verbTraining'
 import { varianten, type VerbSprache } from '@shared/verben'
 import { fehlformen, musterVon } from '../../../shared/verben/muster'
 import { sprich } from '../VokabelTrainer'
@@ -47,15 +47,18 @@ const folge = (k: VerbKarte, spalten: VerbSpalteKurz[]): string =>
     .map((s) => erste(k.formen[s.id]))
     .filter(Boolean)
     .join(' – ')
-const sprichForm = (d: VerbDaten, form: string): void => sprich(sprechtext(form), d.tonSprache)
-const sprichAlle = (d: VerbDaten, k: VerbKarte): void =>
-  sprichForm(
-    d,
-    d.spalten
-      .map((s) => k.formen[s.id])
-      .filter(Boolean)
-      .join(', ')
+/** Eine Form vorsprechen – `spalte` entscheidet bei „read" über /riːd/ oder /rɛd/ (09.10.2026) */
+const sprichForm = (d: VerbDaten, form: string, spalte = ''): void =>
+  sprich(formSchluessel(form, d.sprache, spalte), d.tonSprache, formGesprochen(form, d.sprache, spalte))
+/** Alle Formen nacheinander, mit Pause statt Strich oder „slash" */
+const sprichAlle = (d: VerbDaten, k: VerbKarte): void => {
+  const da = d.spalten.filter((s) => k.formen[s.id])
+  sprich(
+    sprechtext(da.map((s) => k.formen[s.id]).join(', ')),
+    d.tonSprache,
+    formenGesprochen(Object.fromEntries(da.map((s) => [s.id, k.formen[s.id]])), d.sprache)
   )
+}
 
 /** Die Muster-Ids einer Liste (für „Muster sortieren") */
 export const musterDer = (karten: VerbKarte[], sprache: VerbSprache): Map<string, { id: string; label: string }> => {
@@ -86,7 +89,7 @@ export function StammformenTrio({ verben: d, ende }: VerbSpielProps): React.JSX.
   const [daneben, setDaneben] = useState(false)
   const tippen = (c: (typeof karten)[number]): void => {
     if (offen.includes(c.key) || gefunden.has(c.vid) || daneben) return
-    sprichForm(d, c.text)
+    sprichForm(d, c.text, c.spalte)
     const neu = [...offen, c.key]
     const auswahl = neu.map((x) => karten.find((y) => y.key === x)!)
     // Eine Karte eines anderen Verbs: daneben
@@ -144,10 +147,10 @@ export function FormenBlitz({ verben: d, ende }: VerbSpielProps): React.JSX.Elem
   const farbe = useVtFarbe()
   const sek = useSekunden()
   const DAUER = 60
-  const neu = (): { k: VerbKarte; form: string } => {
+  const neu = (): { k: VerbKarte; form: string; spalte: string } => {
     const k = gemischt(d.karten)[0]
     const s = gemischt(d.spalten.filter((x) => k.formen[x.id]))[0]
-    return { k, form: erste(k.formen[s.id]) }
+    return { k, form: erste(k.formen[s.id]), spalte: s.id }
   }
   const [runde, setRunde] = useState(neu)
   const [gut, setGut] = useState(0)
@@ -156,7 +159,7 @@ export function FormenBlitz({ verben: d, ende }: VerbSpielProps): React.JSX.Elem
   const fehler = useRef(new Set<string>())
   const fertig = useRef(false)
   useEffect(() => {
-    sprichForm(d, runde.form)
+    sprichForm(d, runde.form, runde.spalte)
   }, [runde]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (sek + abzug >= DAUER && !fertig.current) {
@@ -198,7 +201,7 @@ export function FormenBlitz({ verben: d, ende }: VerbSpielProps): React.JSX.Elem
         radius="xl"
         variant="light"
         color={farbe.a}
-        onClick={() => sprichForm(d, runde.form)}
+        onClick={() => sprichForm(d, runde.form, runde.spalte)}
         aria-label="Noch einmal anhören"
         data-blitz-form={runde.form}
       >

@@ -3,7 +3,7 @@ import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextI
 import { nurPcNetz } from '../plattform'
 import { FachschaftsListe, TeilenMenuePunkt } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
 import { kopieName, loescheDokument, passtZurSuche } from '../bibliothek'
 import { useMenueFokus } from '../menueFokus'
@@ -12,6 +12,8 @@ import { notifyError, notifySuccess, uid } from '../util'
 import WischZeile from '../touch/WischZeile'
 import { FachPunkt } from './FachFarbe'
 import { zuordnungKopieren, zuordnungVergessen } from '../themenbereiche'
+import { NurReiheHinweis, ReiheMarke, ReiheSchalter, useReiheZuordnung } from '../reiheZuordnung'
+import { ohneReiheMaterial, suchtrefferMitReihen, type ReiheVerweis } from '@shared/reiheMaterial'
 
 /**
  * „Verschieben nach …" im ⋯-Menü jedes Eintrags (Paket 10b). Die Themenansicht
@@ -64,6 +66,12 @@ export interface Bibliothek<M extends BibliotheksEintrag> {
   neuId: string | null
   /** Programm (modules/registry.ts) – für „Mit der Fachschaft teilen" (Server) */
   moduleId?: string
+  /**
+   * Material aus Unterrichtsreihen (09.10.2026, shared/reiheMaterial.ts): `eintraege` und `treffer` lassen es weg,
+   * solange es nicht eingeblendet ist. `anzahl` = wie viele Einträge zu Reihen gehören (für den Schalter im Kopf),
+   * `verweis` = Reihe eines Eintrags (Marke), `nurReiheTreffer` = die letzte Suche fand nur solches Material.
+   */
+  reihe: { anzahl: number; verweis: (id: string) => ReiheVerweis | undefined; nurReiheTreffer: () => boolean }
 }
 
 /**
@@ -84,7 +92,7 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     moduleId?: string
   }
 ): Bibliothek<M> {
-  const [eintraege, setEintraege] = useState<M[] | null>(null)
+  const [alleEintraege, setEintraege] = useState<M[] | null>(null)
   const [suche, setSuche] = useState('')
   const [umbenennen, setUmbenennen] = useState<{ id: string; name: string } | null>(null)
   const [loeschen, setLoeschen] = useState<M | null>(null)
@@ -95,6 +103,20 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   useEffect(() => {
     api.list().then(setEintraege).catch(notifyError)
   }, [api])
+
+  // Material aus Unterrichtsreihen (09.10.2026): Zuordnung bei jedem Öffnen der Bibliothek frisch holen
+  const zuordnung = useReiheZuordnung((z) => z.zuordnung)
+  const einblenden = useReiheZuordnung((z) => z.einblenden)
+  useEffect(() => {
+    void useReiheZuordnung.getState().laden()
+  }, [])
+  const offenJetzt = opts.offeneId()
+  const { sichtbar, ausReihen } = useMemo(
+    () => ohneReiheMaterial(alleEintraege ?? [], (e) => e.id, zuordnung, { einblenden, offen: offenJetzt }),
+    [alleEintraege, zuordnung, einblenden, offenJetzt]
+  )
+  const eintraege = alleEintraege ? sichtbar : null
+  const nurReihe = useRef(false)
 
   /** Gespeicherten Stand holen – vorher das offene Dokument sichern, damit nichts Älteres kopiert wird */
   const holen = async (id: string): Promise<{ name: string; stats: object; payload: unknown; thumb?: string }> => {
@@ -157,8 +179,20 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     }
   }
 
-  const treffer = (felder: (e: M) => (string | number | null | undefined)[]): M[] =>
-    (eintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
+  /*
+   * Mit Suche über ALLE Einträge: Material aus Reihen bleibt ausgeblendet – außer die Suche findet nur solches
+   * (dann mit Hinweis im Kopf, `nurReiheTreffer`). Ohne Suche die sichtbaren Einträge.
+   */
+  const treffer = (felder: (e: M) => (string | number | null | undefined)[]): M[] => {
+    if (!suche.trim()) {
+      nurReihe.current = false
+      return eintraege ?? []
+    }
+    const alle = (alleEintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
+    const { liste, nurReihe: nur } = suchtrefferMitReihen(alle, (e) => e.id, zuordnung, einblenden)
+    nurReihe.current = nur
+    return liste
+  }
 
   /** Liste neu holen (z. B. nach nachgetragenen Vorschaubildern) */
   const neuLaden = (): void =>
@@ -180,7 +214,8 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     kopieren,
     neuId,
     moduleId: opts.moduleId,
-    neuLaden
+    neuLaden,
+    reihe: { anzahl: ausReihen, verweis: (id) => zuordnung.get(id), nurReiheTreffer: () => nurReihe.current }
   }
 }
 
@@ -196,6 +231,7 @@ export function BibliothekKopf({
   suche,
   onSuche,
   suchHinweis,
+  reihe,
   children
 }: {
   titel: string
@@ -207,8 +243,11 @@ export function BibliothekKopf({
   onSuche: (s: string) => void
   /** Wonach sich suchen lässt, z. B. „Name, Thema, Fach, Klasse" */
   suchHinweis: string
+  /** Material aus Unterrichtsreihen (09.10.2026): `bib.reihe` – Schalter „einblenden (n)" und Suchhinweis */
+  reihe?: Bibliothek<BibliotheksEintrag>['reihe']
   children?: React.ReactNode
 }): React.JSX.Element {
+  const setEinblenden = useReiheZuordnung((z) => z.setEinblenden)
   // Gemeinsamer Kopf (Phase 6a): Titel „Meine …" links, Datei öffnen und „Neu" rechts, Suche in der zweiten Zeile
   return (
     <Stack gap="sm" mb="md">
@@ -238,6 +277,13 @@ export function BibliothekKopf({
         }
         links={<span />}
       />
+      {/* Material aus Unterrichtsreihen (09.10.2026): zunächst ausgeblendet, hier einblenden */}
+      {reihe && reihe.anzahl > 0 && (
+        <Group justify="flex-end" gap="sm" data-reihe-material-kopf>
+          {suche.trim() && reihe.nurReiheTreffer() && <NurReiheHinweis onEinblenden={() => setEinblenden(true)} />}
+          <ReiheSchalter anzahl={reihe.anzahl} />
+        </Group>
+      )}
       {/* Server: freigegebenes Material der Fachschaft für dieses Programm */}
       <FachschaftsListe />
     </Stack>
@@ -245,10 +291,24 @@ export function BibliothekKopf({
 }
 
 /** Hinweis bei leerer Bibliothek bzw. ohne Treffer */
-export function BibliothekLeer({ leer, text }: { leer: boolean; text: string }): React.JSX.Element {
+export function BibliothekLeer({
+  leer,
+  text,
+  ausgeblendet = 0
+}: {
+  leer: boolean
+  text: string
+  /** Ausgeblendetes Material aus Unterrichtsreihen (09.10.2026) – dann ist die Bibliothek nicht wirklich leer */
+  ausgeblendet?: number
+}): React.JSX.Element {
+  const einblenden = useReiheZuordnung((z) => z.einblenden)
   return (
     <Text c="dimmed" size="sm" ta="center" py="xl" data-bibliothek-leer>
-      {leer ? text : 'Nichts gefunden. Anderen Suchbegriff versuchen.'}
+      {!leer
+        ? 'Nichts gefunden. Anderen Suchbegriff versuchen.'
+        : ausgeblendet > 0 && !einblenden
+          ? 'Hier steht bisher nur Material aus Unterrichtsreihen – oben einblenden.'
+          : text}
     </Text>
   )
 }
@@ -437,6 +497,8 @@ export function EintragZeile<M extends BibliotheksEintrag>({
                 </Badge>
               )}
               {kennzeichen}
+              {/* Gehört zu einer Unterrichtsreihe (09.10.2026) */}
+              {bib.reihe.verweis(eintrag.id) && <ReiheMarke verweis={bib.reihe.verweis(eintrag.id)!} />}
             </Group>
             <Text size="xs" c="dimmed">
               {info}

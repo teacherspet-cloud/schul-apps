@@ -4,31 +4,27 @@
  *
  *  - In jeder Bibliothek: ⋯ › „Für Fachschaft freigeben" bzw. „Freigabe für Fachschaft zurücknehmen".
  *    Freigegeben wird das Original – die Fachschaft sieht immer den aktuellen Stand.
- *  - In jeder Bibliothek oben und auf der Startseite: „Von der Fachschaft" – Öffnen zeigt das
- *    Material; wer etwas ändert, bekommt eine eigene, namentlich benannte Kopie (der Server benennt
- *    sie beim ersten geänderten Speichern). Die Kopie sieht die Fachschaft erst, wenn man sie freigibt.
+ *  - In jeder Bibliothek oben: „Von der Fachschaft" – Öffnen zeigt das Material; wer etwas ändert,
+ *    bekommt eine eigene, namentlich benannte Kopie (der Server benennt sie beim ersten geänderten
+ *    Speichern). Die Kopie sieht die Fachschaft erst, wenn man sie freigibt.
+ *  - Seit 09.10.2026 (Entscheidung des Admins) gibt es die Sammelkarte unter „Schule & Daten ›
+ *    Daten und Material" nicht mehr: Alles steht in der Bibliothek der jeweiligen App – auch die
+ *    Kopien aus der ersten Fassung (Übernehmen/Entfernen) und die eigenen Freigaben. Noch nicht
+ *    angesehene Einträge zählen Leiste und Bibliothek (shared/fachschaftNeu.ts).
  *  - Sichtbar für alle, die das Fach unterrichten (eigene Fächer oder IServ-Gruppen).
  */
-import { ActionIcon, Badge, Button, Card, Collapse, Group, Loader, Menu, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconChevronRight, IconDownload, IconFolders, IconShare, IconShareOff, IconTrash } from '@tabler/icons-react'
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { holen, senden } from '../../modules/onlinetest/serverApi'
 import { aufServer, serverIch } from '../plattform'
 import { openDocument } from '../navigation'
 import { notifyError, notifySuccess } from '../util'
 import { AktuellesProgramm } from '../eigenesFenster'
+import { gesehenErgaenzen, gesehenLesen, gesehenSchreiben, neueJeProgramm, type FachschaftsEintrag } from '../fachschaftNeu'
 
 const FREIGEBBAR = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'elternbrief', 'tafelbild']
-const ARTNAME: Record<string, string> = {
-  arbeitsblatt: 'Arbeitsblatt',
-  vokabeltest: 'Vokabeltest',
-  klassenarbeit: 'Klassenarbeit',
-  lernzielkontrolle: 'Lernzielkontrolle',
-  grammatiktest: 'Grammatiktest',
-  elternbrief: 'Elternbrief',
-  tafelbild: 'Tafelbild'
-}
 
 export interface Freigabe {
   id: string
@@ -41,19 +37,64 @@ export interface Freigabe {
   datum: string
 }
 
-const useFachschaft = create<{ eintraege: Freigabe[] | null; faecher: { id: string; label: string }[]; laden: () => Promise<void> }>((set) => ({
+/** Kopie aus der ersten Fassung (Fachordner, /server/fach): zum Übernehmen in die eigene Ablage */
+interface AltEintrag {
+  id: string
+  art: string
+  titel: string
+  von: string
+  vonName: string
+  datum: string
+  /** Fach des Ordners (ergänzt beim Laden) */
+  fach: string
+}
+
+const konto = (): string => serverIch()?.benutzer ?? ''
+
+const useFachschaft = create<{
+  eintraege: Freigabe[] | null
+  faecher: { id: string; label: string }[]
+  alt: AltEintrag[]
+  gesehen: string[]
+  laden: () => Promise<void>
+  /** Die Einträge eines Programms als angesehen merken (Liste in der Bibliothek aufgeklappt) */
+  gesehenMarkieren: (art: string) => void
+}>((set, get) => ({
   eintraege: null,
   faecher: [],
+  alt: [],
+  gesehen: [],
   laden: async () => {
     if (!aufServer()) return
+    set({ gesehen: gesehenLesen(konto()) })
     try {
       const d = await holen<{ eintraege: Freigabe[]; faecher: { id: string; label: string }[] }>('/server/fachschaft')
       set({ eintraege: d.eintraege, faecher: d.faecher })
     } catch {
       set({ eintraege: [] })
     }
+    try {
+      const d = await holen<{ faecher: { id: string; eintraege: Omit<AltEintrag, 'fach'>[] }[] }>('/server/fach')
+      set({ alt: d.faecher.flatMap((f) => f.eintraege.map((e) => ({ ...e, fach: f.id }))) })
+    } catch {
+      set({ alt: [] })
+    }
+  },
+  gesehenMarkieren: (art) => {
+    const { eintraege, alt, gesehen } = get()
+    const ids = [...(eintraege ?? []).filter((e) => e.art === art && !e.eigen).map((e) => e.id), ...alt.filter((e) => e.art === art).map((e) => `alt:${e.id}`)]
+    const neu = gesehenErgaenzen(gesehen, ids)
+    if (neu.length === gesehen.length) return
+    gesehenSchreiben(konto(), neu)
+    set({ gesehen: neu })
   }
 }))
+
+/** Alle Einträge für die Zählung „neu" (Freigaben und Kopien der ersten Fassung) */
+const zaehlEintraege = (eintraege: Freigabe[] | null, alt: AltEintrag[]): FachschaftsEintrag[] => [
+  ...(eintraege ?? []).map((e) => ({ id: e.id, art: e.art, eigen: e.eigen })),
+  ...alt.map((e) => ({ id: `alt:${e.id}`, art: e.art, eigen: e.von === serverIch()?.benutzer }))
+]
 
 function useFreigaben(): Freigabe[] | null {
   const eintraege = useFachschaft((s) => s.eintraege)
@@ -61,6 +102,23 @@ function useFreigaben(): Freigabe[] | null {
     if (aufServer() && eintraege === null) void useFachschaft.getState().laden()
   }, [eintraege])
   return eintraege
+}
+
+/**
+ * Noch nicht angesehene Einträge der Fachschaft je Programm – für die Zahl an der App in der Leiste.
+ * Lädt beim ersten Aufruf und danach alle zehn Minuten neu (nur auf dem Server).
+ */
+export function useFachschaftNeu(): Record<string, number> {
+  const eintraege = useFachschaft((s) => s.eintraege)
+  const alt = useFachschaft((s) => s.alt)
+  const gesehen = useFachschaft((s) => s.gesehen)
+  useEffect(() => {
+    if (!aufServer()) return
+    if (useFachschaft.getState().eintraege === null) void useFachschaft.getState().laden()
+    const t = window.setInterval(() => void useFachschaft.getState().laden(), 10 * 60_000)
+    return () => window.clearInterval(t)
+  }, [])
+  return useMemo(() => (aufServer() ? neueJeProgramm(zaehlEintraege(eintraege, alt), gesehen) : {}), [eintraege, alt, gesehen])
 }
 
 /** Freigegebenes Material öffnen – der Server legt eine stille Arbeitskopie an */
@@ -118,7 +176,7 @@ export function TeilenDialog(): null {
   return null
 }
 
-function FreigabeZeile({ f, mitArt }: { f: Freigabe; mitArt?: boolean }): React.JSX.Element {
+function FreigabeZeile({ f }: { f: Freigabe }): React.JSX.Element {
   return (
     <Group justify="space-between" wrap="nowrap" data-freigabe={f.id}>
       <div style={{ minWidth: 0 }}>
@@ -126,11 +184,6 @@ function FreigabeZeile({ f, mitArt }: { f: Freigabe; mitArt?: boolean }): React.
           {f.titel}
         </Text>
         <Text size="xs" c="dimmed">
-          {mitArt && (
-            <Badge size="xs" variant="light" mr={6}>
-              {ARTNAME[f.art] ?? f.art}
-            </Badge>
-          )}
           {f.eigen ? 'eigenes Material' : f.vonName} · {new Date(f.datum).toLocaleDateString('de-DE')}
         </Text>
       </div>
@@ -141,23 +194,98 @@ function FreigabeZeile({ f, mitArt }: { f: Freigabe; mitArt?: boolean }): React.
   )
 }
 
-/** In jeder Bibliothek: freigegebenes Material anderer Lehrkräfte für dieses Programm */
+/** Kopie aus der ersten Fassung: übernehmen (eigene Kopie) oder aus dem Fachordner entfernen */
+function AltZeile({ e }: { e: AltEintrag }): React.JSX.Element {
+  const ich = serverIch()
+  return (
+    <Group justify="space-between" wrap="nowrap" data-fachordner-alt={e.id}>
+      <div style={{ minWidth: 0 }}>
+        <Text size="sm" truncate>
+          {e.titel}
+        </Text>
+        <Text size="xs" c="dimmed">
+          Kopie zum Übernehmen · {e.vonName || e.von} · {new Date(e.datum).toLocaleDateString('de-DE')}
+        </Text>
+      </div>
+      <Group gap={4} wrap="nowrap">
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconDownload size={14} />}
+          onClick={() =>
+            void senden('/server/fach/uebernehmen', { fach: e.fach, eintrag: e.id }).then(
+              () => notifySuccess(`„${e.titel}“ liegt jetzt in der eigenen Bibliothek.`),
+              (er: unknown) => notifyError(er)
+            )
+          }
+          data-fachordner-uebernehmen
+        >
+          Übernehmen
+        </Button>
+        {(e.von === ich?.benutzer || ich?.rolle === 'admin') && (
+          <ActionIcon
+            variant="subtle"
+            color="red"
+            aria-label="Aus dem Fachordner entfernen"
+            onClick={() =>
+              window.confirm('Aus dem Fachordner entfernen?') &&
+              void senden('/server/fach/loeschen', { fach: e.fach, eintrag: e.id }).then(
+                () => void useFachschaft.getState().laden(),
+                (er: unknown) => notifyError(er)
+              )
+            }
+          >
+            <IconTrash size={16} />
+          </ActionIcon>
+        )}
+      </Group>
+    </Group>
+  )
+}
+
+/**
+ * In jeder Bibliothek (BibliothekKopf): „Von der Fachschaft" für dieses Programm – Freigaben anderer
+ * Lehrkräfte (Öffnen), Kopien aus der ersten Fassung (Übernehmen/Entfernen) und die eigenen Freigaben.
+ * Die Zahl „neu" verschwindet, sobald die Liste einmal aufgeklappt war.
+ */
 export function FachschaftsListe(): React.JSX.Element | null {
   const programm = useContext(AktuellesProgramm)
   const eintraege = useFreigaben()
+  const alt = useFachschaft((s) => s.alt)
+  const gesehen = useFachschaft((s) => s.gesehen)
+  const faecher = useFachschaft((s) => s.faecher)
   const [offen, setOffen] = useState(false)
+  // Beim Öffnen der Bibliothek frisch laden – so erscheint Neues ohne Neustart
+  useEffect(() => {
+    if (aufServer() && programm) void useFachschaft.getState().laden()
+  }, [programm])
   if (!aufServer() || !programm) return null
   const fremd = (eintraege ?? []).filter((e) => e.art === programm && !e.eigen)
-  if (!fremd.length) return null
+  const eigene = (eintraege ?? []).filter((e) => e.art === programm && e.eigen)
+  const kopien = alt.filter((e) => e.art === programm)
+  if (!fremd.length && !eigene.length && !kopien.length) return null
+  const neu = neueJeProgramm(zaehlEintraege(eintraege, alt), gesehen)[programm] ?? 0
+  const fachName = (id: string): string => faecher.find((f) => f.id === id)?.label ?? id
+  const umschalten = (): void => {
+    if (!offen) useFachschaft.getState().gesehenMarkieren(programm)
+    setOffen(!offen)
+  }
+  // Mehrere Fächer: nach Fach getrennt (wie früher die Sammelkarte)
+  const fachIds = [...new Set([...fremd, ...kopien].map((e) => e.fach))]
   return (
     <Card withBorder padding="sm" data-fachschaftsliste>
-      <UnstyledButton onClick={() => setOffen(!offen)} style={{ width: '100%' }}>
+      <UnstyledButton onClick={umschalten} style={{ width: '100%' }} aria-expanded={offen}>
         <Group gap="xs">
           {offen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
           <IconFolders size={16} />
           <Text fw={600} size="sm">
-            Von der Fachschaft ({fremd.length})
+            Von der Fachschaft ({fremd.length + kopien.length})
           </Text>
+          {neu > 0 && (
+            <Badge size="sm" color="orange" variant="filled" data-fachschaft-neu={neu}>
+              {neu} neu
+            </Badge>
+          )}
           <Text size="xs" c="dimmed">
             Öffnen zeigt das Material; wer ändert, bekommt eine eigene Kopie.
           </Text>
@@ -165,116 +293,45 @@ export function FachschaftsListe(): React.JSX.Element | null {
       </UnstyledButton>
       <Collapse expanded={offen}>
         <Stack gap={6} mt="xs">
-          {fremd.map((f) => (
-            <FreigabeZeile key={f.id} f={f} />
+          {!fremd.length && !kopien.length && (
+            <Text size="sm" c="dimmed">
+              Von anderen Lehrkräften ist für diese App noch nichts freigegeben.
+            </Text>
+          )}
+          {fachIds.map((fach) => (
+            <Stack key={fach} gap={4}>
+              {fachIds.length > 1 && (
+                <Text fw={700} size="sm">
+                  {fachName(fach)}
+                </Text>
+              )}
+              {fremd
+                .filter((f) => f.fach === fach)
+                .map((f) => (
+                  <FreigabeZeile key={f.id} f={f} />
+                ))}
+              {kopien
+                .filter((e) => e.fach === fach)
+                .map((e) => (
+                  <AltZeile key={`alt-${e.id}`} e={e} />
+                ))}
+            </Stack>
           ))}
+          {eigene.length > 0 && (
+            <>
+              <Text fw={700} size="sm" mt={4}>
+                Eigene Freigaben
+              </Text>
+              {eigene.map((f) => (
+                <FreigabeZeile key={f.id} f={f} />
+              ))}
+            </>
+          )}
         </Stack>
       </Collapse>
     </Card>
   )
 }
 
-interface AltEintrag {
-  id: string
-  art: string
-  titel: string
-  von: string
-  vonName: string
-  datum: string
-}
-
-/** Karte auf der Startseite: Freigaben der Fachschaften (dazu Kopien aus der ersten Fassung) */
-export function FachordnerKarte(): React.JSX.Element | null {
-  const eintraege = useFreigaben()
-  const faecher = useFachschaft((s) => s.faecher)
-  const [alt, setAlt] = useState<{ id: string; label: string; eintraege: AltEintrag[] }[]>([])
-  const altLaden = useCallback(() => {
-    void holen<{ faecher: { id: string; label: string; eintraege: AltEintrag[] }[] }>('/server/fach').then(
-      (d) => setAlt(d.faecher.filter((f) => f.eintraege.length)),
-      () => setAlt([])
-    )
-  }, [])
-  useEffect(() => {
-    if (aufServer()) {
-      altLaden()
-      void useFachschaft.getState().laden()
-    }
-  }, [altLaden])
-  if (!aufServer()) return null
-  const ich = serverIch()
-  return (
-    <Card withBorder padding="lg" mb="lg" data-fachordner>
-      <Group gap="xs" mb="xs">
-        <IconFolders size={20} />
-        <Title order={4}>Fachschaft</Title>
-      </Group>
-      {!eintraege && <Loader size="sm" />}
-      {eintraege && !eintraege.length && !alt.length && (
-        <Text size="sm" c="dimmed">
-          Noch nichts freigegeben. In jeder Bibliothek: ⋯ › „Für Fachschaft freigeben“.
-        </Text>
-      )}
-      <Stack gap="md">
-        {faecher.map((fach) => (
-          <div key={fach.id}>
-            <Text fw={700} mb={4}>
-              {fach.label}
-            </Text>
-            <Stack gap={4}>
-              {(eintraege ?? [])
-                .filter((e) => e.fach === fach.id)
-                .map((f) => (
-                  <FreigabeZeile key={f.id} f={f} mitArt />
-                ))}
-            </Stack>
-          </div>
-        ))}
-        {alt.map((f) => (
-          <div key={`alt-${f.id}`}>
-            <Text fw={700} mb={4}>
-              {f.label} (Kopien zum Übernehmen)
-            </Text>
-            <Stack gap={4}>
-              {f.eintraege.map((e) => (
-                <Group key={e.id} justify="space-between" wrap="nowrap">
-                  <Text size="sm" truncate>
-                    {e.titel}
-                    <Text span size="xs" c="dimmed">
-                      {' '}
-                      · {e.vonName || e.von}
-                    </Text>
-                  </Text>
-                  <Group gap={4} wrap="nowrap">
-                    <Button
-                      size="xs"
-                      variant="light"
-                      leftSection={<IconDownload size={14} />}
-                      onClick={() =>
-                        void senden('/server/fach/uebernehmen', { fach: f.id, eintrag: e.id }).then(
-                          () => notifySuccess(`„${e.titel}“ liegt jetzt in der eigenen Bibliothek.`),
-                          (er: unknown) => notifyError(er)
-                        )
-                      }
-                    >
-                      Übernehmen
-                    </Button>
-                    {(e.von === ich?.benutzer || ich?.rolle === 'admin') && (
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        aria-label="Aus dem Fachordner entfernen"
-                        onClick={() => window.confirm('Aus dem Fachordner entfernen?') && void senden('/server/fach/loeschen', { fach: f.id, eintrag: e.id }).then(altLaden, (er: unknown) => notifyError(er))}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    )}
-                  </Group>
-                </Group>
-              ))}
-            </Stack>
-          </div>
-        ))}
-      </Stack>
-    </Card>
-  )
-}
+/** Andere Bezeichnung derselben Liste (Eingang der Fachschaft in jeder Bibliothek) */
+export const FachschaftEingang = FachschaftsListe

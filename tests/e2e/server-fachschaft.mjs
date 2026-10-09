@@ -133,18 +133,19 @@ try {
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
   await expertenmodus(p)
-  // Seit 03.10.2026 nicht mehr auf der Startseite, sondern in der App „Verwaltung" (Daten und Material)
-  await p.locator('.app-leiste .leiste-gruppe-apps [aria-label="Verwaltung"]').click()
+  // Seit 09.10.2026 (Entscheidung des Admins) kein Menü „Daten und Material" mehr: Lehrkräfte sehen „Schule & Daten" nicht,
+  // die Freigaben stehen in der Bibliothek der App – und die Leiste zählt, was noch nicht angesehen ist
+  pruefe((await p.locator('.app-leiste [aria-label="Schule & Daten"]').count()) === 0, 'Lehrkraft: keine App „Schule & Daten"')
   pruefe(
     await p
-      .locator('[data-fachordner] [data-freigabe]')
+      .locator('.app-leiste [aria-label="Vokabeltest"] [data-fachschaft-neu]')
       .first()
       .waitFor({ timeout: 10000 })
       .then(
         () => true,
         () => false
       ),
-    'Verwaltung: Karte „Fachschaft" mit der Freigabe'
+    'Leiste: Zahl „neu von der Fachschaft" am Vokabeltest'
   )
   await p.locator('.app-leiste [aria-label="Vokabeltest"]').click()
   await p
@@ -165,8 +166,12 @@ try {
   const eintrag = p.getByText('Weather Unit 1 – Kopie Ben Englisch').first()
   pruefe(await eintrag.isVisible(), 'Bens Kopie steht in seiner Bibliothek')
 
+  pruefe((await fl.locator('[data-fachschaft-neu]').count()) === 1, 'Bibliothek: Kennzeichen „neu" an „Von der Fachschaft"')
   // Öffnen über die Oberfläche, ansehen, zurück – ohne Änderung keine weitere Kopie
   await fl.getByRole('button').first().click()
+  await p.waitForTimeout(300)
+  pruefe((await fl.locator('[data-fachschaft-neu]').count()) === 0, 'aufgeklappt: „neu" verschwindet')
+  pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"] [data-fachschaft-neu]').count()) === 0, 'aufgeklappt: Zahl in der Leiste verschwindet')
   await fl.locator('[data-freigabe-oeffnen]').first().click()
   await p.waitForTimeout(4000)
   await p.screenshot({ path: join(out, '2-geoeffnet.png') })

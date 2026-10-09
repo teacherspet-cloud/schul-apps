@@ -54,11 +54,14 @@ import {
   ModelKind,
   ModelListResult,
   SecretName,
-  SUBSCRIPTIONS
+  SUBSCRIPTIONS,
+  aboInfo
 } from '@shared/types'
 import { useAppSettings } from '../shared/settingsStore'
 import { openSettings, SettingsTab, useNavigation } from '../shared/navigation'
 import SubscriptionSetup, { ImageTestRow } from './SubscriptionSetup'
+import { anbieterGruppen, KompatibelZugang } from './KompatibelZugang'
+import { istKompatibel, type KompatibelId } from '@shared/kiAnbieter'
 import { AppTheme, mix, THEMES } from '../shared/themes'
 import DropZone, { FILE_TYPES } from '../shared/components/DropZone'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../shared/util'
@@ -71,7 +74,15 @@ import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
 import WartungCard from './WartungCard'
 import SicherungenCard from './SicherungenCard'
+import { EigenesMaterialSichernCard, ThemenbereicheCard } from './EigenesMaterialCard'
 import VerbrauchCard from './VerbrauchCard'
+import { schuleFest } from '@shared/schulFest'
+import type { SchulEinrichtung } from '@shared/schulEinrichtung'
+import { ladeServerSchule } from '../shared/serverSchule'
+import { KlappKarte } from '../shared/components/KlappKarte'
+import { meldeKiStatus, useKiStatus, useSchluesselDa } from './kiStatus'
+import { verbrauchSichtbar } from '@shared/verbrauch'
+import { bildKiStatus, bildsucheStatus, hoertextStatus, textKiStatus } from '@shared/einstellungsStatus'
 import { imNetz } from '../shared/netzZugang'
 import { amPc, aufIos, aufServer, hatClient, nurPcNetz, serverIch } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
@@ -104,6 +115,9 @@ export default function SettingsPage(): React.JSX.Element {
   const gewuenscht = useNavigation((s) => s.settingsTab)
   const setTab = useNavigation((s) => s.setSettingsTab)
   const [passwortOffen, setPasswortOffen] = useState(false)
+  // Verbrauch nur, wenn mindestens ein KI-Zugang eingerichtet ist (09.10.2026)
+  const kiStand = useKiStatus()
+  const elevenlabsDa = useSchluesselDa('elevenlabs')
   // KI-Zugang, Netzwerk und Wartung gibt es nur am Rechner – vom Tablet aus gilt dann der erste Reiter
   const tab =
     (imNetz() && (['netzwerk', 'wartung'].includes(gewuenscht) || (nurPcNetz() && gewuenscht === 'ki'))) || (aufIos() && gewuenscht === 'netzwerk')
@@ -214,7 +228,23 @@ export default function SettingsPage(): React.JSX.Element {
               {aufIos() && <AblageCard settings={settings} update={update} />}
               {/* IServ per WebDAV: iPad (01.10.2026) und PC (02.10.2026) – nicht im Browser des Netzzugangs */}
               {(!imNetz() || hatClient()) && <IservCard settings={settings} update={update} />}
-              <FachfarbenSettings settings={settings} update={update} />
+              {/* Aus dem entfallenen Menü „Daten und Material" (09.10.2026) */}
+              <ThemenbereicheCard />
+              <EigenesMaterialSichernCard />
+              {/* Am Server legt die Verwaltung die Fachfarben für alle fest (09.10.2026); in der Exe bleiben es die eigenen */}
+              {aufServer() ? (
+                <Card withBorder padding="lg" data-fachfarben-schule>
+                  <Title order={4} mb={4}>
+                    Fachfarben
+                  </Title>
+                  <Text size="sm" c="dimmed">
+                    Die Fachfarben gelten für die ganze Schule und werden von der Schulverwaltung festgelegt („Schule & Daten“ › Schule). Sie färben alle
+                    Materialien, die Fachordner der Lernenden und „Meine Klassen“.
+                  </Text>
+                </Card>
+              ) : (
+                <FachfarbenSettings settings={settings} update={update} />
+              )}
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />
               <SchreibanteilSettings settings={settings} update={update} />
@@ -286,8 +316,9 @@ export default function SettingsPage(): React.JSX.Element {
           {!nurPcNetz() && (
             <Tabs.Panel value="ki">
               <Stack gap="md">
-                <AiCard settings={settings} update={update} />
-                <VerbrauchCard />
+                {/* Verbrauch oben, nur mit eingerichtetem Zugang; alle Karten eingeklappt (09.10.2026, Wunsch der Lehrkraft) */}
+                {verbrauchSichtbar(kiStand) && <VerbrauchCard elevenlabs={Boolean(elevenlabsDa)} />}
+                <AiCard settings={settings} update={update} klappbar />
               </Stack>
             </Tabs.Panel>
           )}
@@ -299,11 +330,8 @@ export default function SettingsPage(): React.JSX.Element {
                 bei Bildern und Hörtexten – und die Piktogramm-Werkstatt verwies auf sie. Am Tablet
                 nicht: Die Anmeldung beim Anbieter läuft auf dem Rechner.
               */}
-              {!nurPcNetz() && <ImageAiCard settings={settings} update={update} />}
-              <Card withBorder padding="lg">
-                <Title order={4} mb="md">
-                  Bildsuche
-                </Title>
+              {!nurPcNetz() && <ImageAiCard settings={settings} update={update} klappbar />}
+              <BildsucheKarte>
                 <SecretField
                   name="pixabay"
                   label="Pixabay-API-Schlüssel (optional)"
@@ -313,11 +341,11 @@ export default function SettingsPage(): React.JSX.Element {
                 <Text size="xs" c="dimmed" mt="xs">
                   Die Openverse-Suche funktioniert ohne Schlüssel.
                 </Text>
-              </Card>
+              </BildsucheKarte>
 
-              <HoertextCard settings={settings} update={update} />
+              <HoertextCard settings={settings} update={update} klappbar />
               {/* Standardstimme je Sprache für die Vokabel-Aussprache (05.10.2026) */}
-              <VokabelStimmenCard />
+              <VokabelStimmenCard klappbar />
             </Stack>
           </Tabs.Panel>
 
@@ -532,8 +560,9 @@ function ModeLabel({ icon, text }: { icon: React.ReactNode; text: string }): Rea
 
 // ---------- KI ----------
 
-export function AiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+export function AiCard({ settings, update, klappbar = false }: { settings: AppSettings; update: Update; klappbar?: boolean }): React.JSX.Element {
   const { ai } = settings
+  const stand = useKiStatus()
   const textInfo = AI_PROVIDERS.find((p) => p.id === ai.textProvider)!
   const [reloadKey, setReloadKey] = useState(0)
   /*
@@ -543,13 +572,19 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
    */
   const ios = aufIos()
   const ueberPc = ios && Boolean(settings.pcKi?.texte)
-  const zugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
+  // Abo gibt es nur bei den Kernanbietern; OpenAI-kompatible immer über Schlüssel bzw. lokal (09.10.2026)
+  const kompatibel = istKompatibel(ai.textProvider)
+  const zugang: AiAccess = ios || kompatibel ? 'api' : ai.access[ai.textProvider]
 
   return (
-    <Card withBorder padding="lg">
-      <Title order={4} mb={4}>
-        Künstliche Intelligenz
-      </Title>
+    <KartenRahmen
+      klappbar={klappbar}
+      id="ki-text"
+      titel="Künstliche Intelligenz"
+      status={textKiStatus(stand, textInfo.label, ueberPc)}
+      ton={stand ? (stand.hasTextKey ? 'ok' : 'warnung') : 'neutral'}
+      rahmen={{ 'data-ki-karte': 'text' }}
+    >
       <Text size="sm" c="dimmed" mb="md">
         {ios
           ? 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (nutzungsabhängig bezahlt; er liegt verschlüsselt im Schlüsselbund dieses Geräts) oder über Schul-Apps am PC: Dann erzeugt der PC mit seinem Abo oder Schlüssel, das iPad schickt nur den Auftrag.'
@@ -567,13 +602,13 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
         {!ueberPc && (
           <Select
             label="KI für Aufgaben und Texterkennung"
-            data={AI_PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+            data={anbieterGruppen(AI_PROVIDERS, aufServer() || ios)}
             value={ai.textProvider}
             onChange={(v) => v && update({ ai: { textProvider: v as AiProviderId } })}
             allowDeselect={false}
           />
         )}
-        {!ios && (
+        {!ios && !kompatibel && (
           <SegmentedControl
             value={ai.access[ai.textProvider]}
             onChange={(v) => update({ ai: { access: { [ai.textProvider]: v as AiAccess } } })}
@@ -581,13 +616,32 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
               { value: 'api', label: 'API-Schlüssel' },
               {
                 value: 'subscription',
-                label: `Abo (${SUBSCRIPTIONS[ai.textProvider].plan})`
+                label: `Abo (${aboInfo(ai.textProvider)?.plan ?? ''})`
               }
             ]}
           />
         )}
         {ueberPc ? (
           <PcKiVerbindung settings={settings} update={update} />
+        ) : kompatibel ? (
+          // OpenAI-kompatible Anbieter (09.10.2026): Adresse, Schlüssel, Modell (auch von Hand)
+          <KompatibelZugang
+            key={`kompatibel-${ai.textProvider}`}
+            id={ai.textProvider as KompatibelId}
+            settings={settings}
+            update={update}
+            schluesselFeld={
+              <SecretField
+                key={`text-${ai.textProvider}`}
+                name={ai.textProvider}
+                label={`API-Schlüssel für ${textInfo.label}`}
+                placeholder={textInfo.keyPlaceholder}
+                description={textInfo.keyUrl ? `Erhältlich unter ${textInfo.keyUrl}` : undefined}
+                keyUrl={textInfo.keyUrl || undefined}
+                testable
+              />
+            }
+          />
         ) : zugang === 'subscription' ? (
           <SubscriptionSetup key={`sub-${ai.textProvider}`} provider={ai.textProvider} settings={settings} update={update} />
         ) : (
@@ -656,7 +710,56 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
           </>
         )}
       </Stack>
+    </KartenRahmen>
+  )
+}
+
+/**
+ * Rahmen der Karten im Reiter „KI-Zugang" und „Bilder und Hörtexte" (09.10.2026): in den Einstellungen einklappbar
+ * mit Statuszeile im Kopf (KlappKarte), im Einrichtungsassistenten wie bisher offen mit Überschrift.
+ */
+function KartenRahmen({
+  klappbar,
+  id,
+  titel,
+  status,
+  ton,
+  titelAbstand = 4,
+  rahmen,
+  children
+}: {
+  klappbar: boolean
+  id: string
+  titel: string
+  status: string
+  ton?: 'ok' | 'warnung' | 'neutral'
+  titelAbstand?: number | string
+  rahmen?: Record<string, string | boolean | undefined>
+  children: React.ReactNode
+}): React.JSX.Element {
+  if (klappbar)
+    return (
+      <KlappKarte id={id} titel={titel} status={status} ton={ton} rahmen={rahmen}>
+        {children}
+      </KlappKarte>
+    )
+  return (
+    <Card withBorder padding="lg" {...rahmen}>
+      <Title order={4} mb={titelAbstand}>
+        {titel}
+      </Title>
+      {children}
     </Card>
+  )
+}
+
+/** Bildsuche (Openverse, Pixabay) – eingeklappt mit Statuszeile (09.10.2026) */
+function BildsucheKarte({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const pixabay = useSchluesselDa('pixabay')
+  return (
+    <KlappKarte id="bildsuche" titel="Bildsuche" status={bildsucheStatus(pixabay)} rahmen={{ 'data-bildsuche': true }}>
+      {children}
+    </KlappKarte>
   )
 }
 
@@ -664,8 +767,9 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
  * KI für Bilder – eigene Karte im Reiter „Bilder und Hörtexte" (vorher im Reiter „KI-Zugang").
  * Die Einstellungen selbst sind unverändert: Anbieter, Zugang per Schlüssel oder Abo, Modell.
  */
-export function ImageAiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+export function ImageAiCard({ settings, update, klappbar = false }: { settings: AppSettings; update: Update; klappbar?: boolean }): React.JSX.Element {
   const { ai } = settings
+  const stand = useKiStatus()
   const imageProvider = ai.imageProvider === 'none' ? null : ai.imageProvider
   // iPad: API-Schlüssel oder über den PC (siehe AiCard)
   const ios = aufIos()
@@ -674,11 +778,16 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
   const textZugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
   const [reloadKey, setReloadKey] = useState(0)
 
+  const bildLabel = imageProvider ? (AI_PROVIDERS.find((p) => p.id === imageProvider)?.label ?? imageProvider) : null
   return (
-    <Card withBorder padding="lg">
-      <Title order={4} mb={4}>
-        Bilder mit KI
-      </Title>
+    <KartenRahmen
+      klappbar={klappbar}
+      id="ki-bild"
+      titel="Bilder mit KI"
+      status={bildKiStatus(stand, bildLabel, ueberPc)}
+      ton={!imageProvider || !stand ? 'neutral' : stand.hasImageKey ? 'ok' : 'warnung'}
+      rahmen={{ 'data-ki-karte': 'bild' }}
+    >
       <Text size="sm" c="dimmed" mb="md">
         Erzeugt auf Wunsch Bilder für Arbeitsblätter und gestaltet Piktogramme neu. Der Zugang lässt sich getrennt von der KI für Texte wählen.
       </Text>
@@ -770,7 +879,7 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
           </>
         )}
       </Stack>
-    </Card>
+    </KartenRahmen>
   )
 }
 
@@ -782,14 +891,21 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
  * iPad-App geht es auch über den PC: Dann vertont Schul-Apps am PC mit seinen Schlüsseln, und
  * die fertige Hördatei landet auf dem iPad.
  */
-export function HoertextCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+export function HoertextCard({ settings, update, klappbar = false }: { settings: AppSettings; update: Update; klappbar?: boolean }): React.JSX.Element {
   const ios = aufIos()
   const ueberPc = ios && Boolean(settings.pcKi?.hoertexte)
+  const elevenlabs = useSchluesselDa('elevenlabs')
+  const openai = useSchluesselDa('openai')
   return (
-    <Card withBorder padding="lg">
-      <Title order={4} mb="md">
-        Hörtexte
-      </Title>
+    <KartenRahmen
+      klappbar={klappbar}
+      id="hoertexte"
+      titel="Hörtexte"
+      titelAbstand="md"
+      status={hoertextStatus(elevenlabs, openai, ueberPc)}
+      ton={elevenlabs || openai || ueberPc ? 'ok' : 'neutral'}
+      rahmen={{ 'data-ki-karte': 'hoertexte' }}
+    >
       <Stack gap="sm">
         {ios && <PcKiWahl settings={settings} update={update} gruppe="hoertexte" lokal="Eigener Schlüssel" />}
         {ueberPc ? (
@@ -815,7 +931,7 @@ export function HoertextCard({ settings, update }: { settings: AppSettings; upda
           </div>
         )}
       </Stack>
-    </Card>
+    </KartenRahmen>
   )
 }
 
@@ -969,6 +1085,7 @@ function SecretField({
             setVerified(false)
             writeVerified(name, false)
             notifySuccess('Schlüssel gespeichert.')
+            meldeKiStatus()
             onSaved?.()
           } catch (e) {
             notifyError(e)
@@ -1041,6 +1158,7 @@ function SecretField({
             setStored(false)
             setVerified(false)
             writeVerified(name, false)
+            meldeKiStatus()
           }}
         >
           Entfernen
@@ -1062,13 +1180,21 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
 
   const { stateId, schoolTypeId } = settings.defaults
   const state = table?.states.find((s) => s.id === stateId)
+  // IServ-Konten am Server: Schule fest aus der Verwaltung, keine eigene Schulwahl (09.10.2026, shared/schulFest.ts)
+  const fest = schuleFest(serverIch())
+  const [serverSchule, setServerSchule] = useState<SchulEinrichtung | null>(null)
+  useEffect(() => {
+    if (fest) void ladeServerSchule().then((d) => setServerSchule(d?.schule ?? null))
+  }, [fest])
+  const festeFormen = (serverSchule?.schulformen ?? []).map((id) => ({ value: id, label: state?.schoolTypes.find((t) => t.id === id)?.name ?? id }))
 
   return (
     <Card withBorder padding="lg">
       <Title order={4} mb={4}>
         Schule
       </Title>
-      <Text size="sm" c="dimmed" mb="md">
+      {/* Im Einrichtungsassistenten am Telefon ausgeblendet (touch.css `.karten-erklaerung`, 09.10.2026) */}
+      <Text size="sm" c="dimmed" mb="md" className="karten-erklaerung">
         Bundesland und Schulform gelten für alle Programme. Dort werden sie nicht mehr abgefragt, sondern stehen nur noch als Zeile da – wer für eine andere
         Lerngruppe etwas erstellt, klappt sie mit „ändern" auf. Das Sprachniveau wird weiterhin im Programm gewählt.
       </Text>
@@ -1079,39 +1205,59 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
           checked={settings.showSchool !== false}
           onChange={(e) => update({ showSchool: e.currentTarget.checked })}
         />
-        {/* Mit Schulsuche im Verzeichnis der Länder (Paket 13) – auch im Einrichtungsassistenten */}
-        <SchulnameFeld settings={settings} update={update} table={table} disabled={settings.showSchool === false} />
+        {fest ? (
+          <Text size="sm" data-schule-fest>
+            Schule: <b>{settings.schoolName || serverSchule?.name || '–'}</b> (von der Schulverwaltung festgelegt)
+            {state ? ` · ${state.name}` : ''}
+          </Text>
+        ) : (
+          /* Mit Schulsuche im Verzeichnis der Länder (Paket 13) – auch im Einrichtungsassistenten */
+          <SchulnameFeld settings={settings} update={update} table={table} disabled={settings.showSchool === false} />
+        )}
         <LogoField />
-        {!imNetz() && <BriefkopfFelder settings={settings} update={update} />}
-        <Group grow>
-          <HaeufigSelect
-            art="bundesland"
-            label="Bundesland"
-            data={(table?.states ?? []).map((s) => ({
-              value: s.id,
-              label: s.name
-            }))}
-            value={stateId}
-            onChange={(v) => {
-              if (!v) return
-              const firstType = table?.states.find((s) => s.id === v)?.schoolTypes[0]?.id ?? ''
-              update({ defaults: { stateId: v, schoolTypeId: firstType } })
-            }}
-            allowDeselect={false}
-            maxDropdownHeight={400}
-          />
-          <HaeufigSelect
-            art="schulform"
-            label="Schulform"
-            data={(state?.schoolTypes ?? []).map((s) => ({
-              value: s.id,
-              label: s.name
-            }))}
-            value={schoolTypeId}
-            onChange={(v) => v && update({ defaults: { schoolTypeId: v } })}
-            allowDeselect={false}
-          />
-        </Group>
+        {!imNetz() && <BriefkopfFelder settings={settings} update={update} schuleFest={fest} />}
+        {fest ? (
+          // Mehrere Schulformen an der Schule: Wahl nur unter diesen
+          festeFormen.length > 1 && (
+            <Select
+              label="Schulform"
+              data={festeFormen}
+              value={schoolTypeId}
+              onChange={(v) => v && update({ defaults: { schoolTypeId: v } })}
+              allowDeselect={false}
+            />
+          )
+        ) : (
+          <Group grow>
+            <HaeufigSelect
+              art="bundesland"
+              label="Bundesland"
+              data={(table?.states ?? []).map((s) => ({
+                value: s.id,
+                label: s.name
+              }))}
+              value={stateId}
+              onChange={(v) => {
+                if (!v) return
+                const firstType = table?.states.find((s) => s.id === v)?.schoolTypes[0]?.id ?? ''
+                update({ defaults: { stateId: v, schoolTypeId: firstType } })
+              }}
+              allowDeselect={false}
+              maxDropdownHeight={400}
+            />
+            <HaeufigSelect
+              art="schulform"
+              label="Schulform"
+              data={(state?.schoolTypes ?? []).map((s) => ({
+                value: s.id,
+                label: s.name
+              }))}
+              value={schoolTypeId}
+              onChange={(v) => v && update({ defaults: { schoolTypeId: v } })}
+              allowDeselect={false}
+            />
+          </Group>
+        )}
         {/* Eigene Fächer (Paket 12) – hier, damit sie auch im Einrichtungsassistenten gefragt werden */}
         <EigeneFaecherFeld settings={settings} update={update} />
         {schoolTypeId !== 'grundschule' && (

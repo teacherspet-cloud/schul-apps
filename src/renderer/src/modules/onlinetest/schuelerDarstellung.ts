@@ -9,11 +9,14 @@
  * Tempo und Stimme der Aussprache, Töne.
  */
 import { create } from 'zustand'
+import type { SchuelerFarbe } from '@shared/schuelerFarben'
+import { sitzungsKennung } from '../../shared/sitzung'
 
 export interface Darstellung {
   modus: 'hell' | 'dunkel' | 'auto'
   schrift: 'normal' | 'gross' | 'sehrgross'
-  farbe: 'blue' | 'teal' | 'grape' | 'orange' | 'pink' | 'green'
+  /** Akzentfarbe (shared/schuelerFarben.ts; Lavendel, Koralle, Salbei, Ozean seit 09.10.2026) */
+  farbe: SchuelerFarbe
   ruhig: boolean
   /** Lernbereiche (Vokabeltraining): Farbe des Fachs wie im Kopfband der Arbeitsblätter, oder die eigene Farbe */
   design: 'fach' | 'eigen'
@@ -49,6 +52,11 @@ export interface Darstellung {
   legen?: 'legen' | 'tippen' | 'schreiben'
   /** „Dein Vokabelweg" im Karteikasten aufgeklappt (08.10.2026); fehlt es, ist er zugeklappt */
   vokabelwegOffen?: boolean
+  /**
+   * Sitzung, in der `spielGruppen` und `vokabelwegOffen` gesetzt wurden (09.10.2026, shared/sitzung.ts): Auf/Zu gilt nur
+   * für die Anmeldung – nach einer neuen Anmeldung stehen die Bereiche wieder wie vorgegeben.
+   */
+  offenSitzung?: string
   /** Vollbild beim Lernen (09.10.2026): Übungen, Spiele, Arbeitsblätter füllen den Bildschirm; fehlt es, gilt an */
   vollbild?: boolean
   // ---------- Meine Materialien (08.10.2026)
@@ -56,6 +64,8 @@ export interface Darstellung {
   materialien?: 'regal' | 'liste'
   /** Eigene Reihenfolge der Ordner im Regal (Fachnamen); fehlt sie, gilt A–Z */
   regal?: string[]
+  /** Willkommens-Assistent gesehen oder übersprungen (09.10.2026) – am Konto, nicht je Gerät (willkommenLogik.ts) */
+  willkommenErledigt?: boolean
 }
 
 /** Nur auf dem Gerät – gehen nicht an den Server */
@@ -95,16 +105,23 @@ export const mitDunkelVorgabe = (d0: Darstellung): Darstellung => {
   return d.vorgabe0810 ? d : { ...d, toene: true, aussprache: 'm', vorgabe0810: true }
 }
 
+/** Auf/Zu aus einer anderen Sitzung verwerfen (dann gilt die Vorgabe) und die aktuelle Sitzung vermerken */
+export function offenNurInSitzung(d: Darstellung, sitzung: string): Darstellung {
+  if (d.offenSitzung === sitzung) return d
+  const { spielGruppen: _g, vokabelwegOffen: _v, ...rest } = d
+  return { ...rest, offenSitzung: sitzung }
+}
+
 const ausSpeicher = (): Darstellung => {
   try {
     const roh = JSON.parse(localStorage.getItem(SPEICHER) ?? '{}') as Partial<Darstellung>
-    return mitDunkelVorgabe({
+    return offenNurInSitzung(mitDunkelVorgabe({
       ...VORGABE,
       dunkelVorgabe: false,
       vorgabe0810: false,
       ...roh,
       ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true, vorgabe0810: true })
-    })
+    }), sitzungsKennung())
   } catch {
     return VORGABE
   }
@@ -112,7 +129,8 @@ const ausSpeicher = (): Darstellung => {
 
 export const useDarstellung = create<{ d: Darstellung; setze: (d: Darstellung) => void }>((set) => ({
   d: ausSpeicher(),
-  setze: (d) => {
+  setze: (d0) => {
+    const d = offenNurInSitzung(d0, sitzungsKennung())
     try {
       localStorage.setItem(SPEICHER, JSON.stringify(d))
     } catch {
@@ -132,7 +150,10 @@ export const fuerServer = (d: Darstellung): Partial<Darstellung> => {
 /** Vom Server geladen: Gerät-Angaben von hier behalten */
 export const vomServer = (server: Partial<Darstellung>): Darstellung => {
   const hier = useDarstellung.getState().d
-  return mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, vorgabe0810: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen })
+  return offenNurInSitzung(
+    mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, vorgabe0810: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen }),
+    sitzungsKennung()
+  )
 }
 
 // ---------------------------------------------------------------- Helfer, die die Einstellungen wirksam machen

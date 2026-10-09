@@ -14,7 +14,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { kartenAuf, warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/hauptapp')
 mkdirSync(out, { recursive: true })
@@ -104,6 +104,8 @@ pruefe((await page.getByRole('tab', { name: 'KI-Zugang' }).getAttribute('aria-se
 pruefe((await page.getByLabel('KI für Bilder').count()) === 0, 'Die Bild-KI steht nicht mehr unter KI-Zugang')
 await page.getByRole('tab', { name: 'Bilder und Hörtexte' }).click()
 await page.waitForTimeout(300)
+// Karten sind seit 09.10.2026 eingeklappt
+await kartenAuf(page)
 pruefe((await page.getByLabel('KI für Bilder').count()) > 0, 'Die Bild-KI steht unter „Bilder und Hörtexte"')
 // Über die Leiste kommt man beim ersten Reiter an
 await page.click('[aria-label="Startseite"]')
@@ -242,6 +244,10 @@ await page.keyboard.press('Control+p')
 await page.waitForTimeout(400)
 pruefe((await page.locator('.mantine-Modal-title', { hasText: 'Drucken' }).count()) === 0, 'Strg+P auf der Startseite tut nichts')
 await page.keyboard.press('Control+2')
+// Erstes Öffnen in der Sitzung zeigt die Übersicht (09.10.2026, shared/sitzung.ts) – von dort den Test öffnen
+const oeffnenKnopf = page.getByRole('button', { name: 'Öffnen', exact: true }).filter({ visible: true })
+await Promise.race([oeffnenKnopf.first().waitFor({ timeout: 15000 }), page.locator('.editor-sheet .vt-page').first().waitFor({ timeout: 15000 })]).catch(() => undefined)
+if (await oeffnenKnopf.count()) await oeffnenKnopf.first().click()
 await page.waitForSelector('.editor-sheet .vt-page', { timeout: 15000 })
 await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
 await page.keyboard.press('Control+p')

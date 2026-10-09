@@ -336,21 +336,3 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
     return (json(res, 200, { ...r.ergebnis, stand: r.neu, sicher: false }), true)
   }
 }
-
-/**
- * Wortliste im Fachordner (09.10.2026, server/wortliste.ts): die freien Abschnitte der Vokabelwege eines Fachs mit
- * dem eigenen Stand – nur für Konten (Gäste haben keinen Vokabelweg), nur die Wege der Person selbst.
- */
-export async function wegAbschnitteFuer(
-  ich: NutzerInfo,
-  fachPasst: (fach: string) => boolean
-): Promise<{ key: string; name: string; sprache: string; abschnitte: Abschnitt[]; staende: Record<string, WortStand> }[]> {
-  if (ich.rolle !== 'schueler' || ich.quelle === 'gast') return []
-  const wege = await wegeFuer(ich)
-  return wege
-    .filter((w) => fachPasst(w.fach))
-    .map((w) => {
-      const frei = new Set(w.stufen.filter((s) => s.frei).map((s) => s.key))
-      return { key: w.key, name: w.name, sprache: w.sprache, abschnitte: w.abschnitte.filter((a) => frei.has(a.key)), staende: wegStand(ich.id, w.key).woerter }
-    })
-}

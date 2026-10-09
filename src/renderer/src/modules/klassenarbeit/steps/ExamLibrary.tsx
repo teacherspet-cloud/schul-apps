@@ -97,6 +97,7 @@ export default function ExamLibrary({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Thema, Fach, Klasse"
+          reihe={bib.reihe}
         >
           <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
             Datei öffnen …
@@ -108,6 +109,7 @@ export default function ExamLibrary({
 
         {bib.eintraege && treffer.length === 0 && (
           <BibliothekLeer
+            ausgeblendet={bib.reihe.anzahl}
             leer={exams.length === 0}
             text="Noch keine Klassenarbeit gespeichert. Neue Arbeiten werden ab dem ersten Schritt automatisch gesichert."
           />

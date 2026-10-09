@@ -29,7 +29,7 @@ export interface VorwahlDaten {
   /** Lehrwerk (Kennung) und Units des Kurses */
   kursLehrwerk: string | null
   kursUnits: { unit: string; abschnitte: string[] }[]
-  /** Lehrwerk-Stand der Lerngruppe (Grammatik-Band, z. B. „Green Line 1", und Unit) – gesetzt oder automatisch */
+  /** Lehrwerk-Stand der Lerngruppe (Grammatik-Band, z. B. „Green Line 1", und Unit) – gesetzt oder automatisch (seit 09.10.2026 nur der Band, Unit leer) */
   stand: { buch: string; unit: string } | null
   /** Lehrwerke der Kurse derselben Klasse (gleichnamige Lerngruppen), jüngste zuerst */
   klassenLehrwerke: string[]

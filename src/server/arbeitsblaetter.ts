@@ -130,6 +130,8 @@ const db = () => {
     if (!sp2.has('freigeschaltet')) d.exec("ALTER TABLE blatt_abgaben ADD COLUMN freigeschaltet TEXT NOT NULL DEFAULT '[]'")
     // Geöffnete Hilfekarten je Aufgabe (06.10.2026; verschlüsselt, feldschutz.ts)
     if (!sp2.has('hilfen')) d.exec("ALTER TABLE blatt_abgaben ADD COLUMN hilfen TEXT NOT NULL DEFAULT '{}'")
+    // Themenbereich, von Hand gewählt in „Freigegebene Blätter" (09.10.2026, ThemenBibliothek; verschlüsselt, feldschutz.ts)
+    if (!spalten.has('themenbereich')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN themenbereich TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -758,6 +760,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             // Geplante Freischaltung (09.10.2026): Uhr „geplant ab …" in der Liste
             geplantAb: geplantAb('blatt', z.id),
             fach: (z as Zeile & { fach?: string }).fach ?? '',
+            // Themen-Bibliothek (09.10.2026): Thema und von Hand gewählter Themenbereich
+            thema: (z as Zeile & { thema?: string }).thema ?? '',
+            themenbereich: (z as Zeile & { themenbereich?: string }).themenbereich ?? '',
             // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite)
             zuletzt:
               (db().prepare(`SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { t: number | null }).t ?? 0,
@@ -973,6 +978,13 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         }),
         true
       )
+    }
+    // Themenbereich der Freigabe (09.10.2026, „Themenbereich ändern …" bzw. Ziehen in „Freigegebene Blätter"); leer = automatisch
+    if (req.method === 'POST' && teile[1] === 'themenbereich') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const name = typeof k0.themenbereich === 'string' ? k0.themenbereich.trim().slice(0, 160) : ''
+      db().prepare('UPDATE blatt_freigaben SET themenbereich = ? WHERE id = ?').run(name, z.id)
+      return (json(res, 200, { ok: true }), true)
     }
     if (req.method === 'POST' && teile[1] === 'status') {
       const k0 = (await k.koerper()) as Record<string, unknown>

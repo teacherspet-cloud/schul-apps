@@ -322,7 +322,8 @@ export default function SettingsStep(): React.JSX.Element {
                               />
                             </Group>
                           </SchulAngabe>
-                          <Group grow>
+                          {/* Am Telefon untereinander (09.10.2026): „1. Fremdsprache" war nebeneinander auf „1. Fremdspr" gekürzt */}
+                          <Group grow align="flex-start" className="feld-paar-telefon">
                             <NurExperte>
                               <Select
                                 label="Fremdsprache"

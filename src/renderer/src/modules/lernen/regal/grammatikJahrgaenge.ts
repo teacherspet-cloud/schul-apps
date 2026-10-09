@@ -1,8 +1,9 @@
 /**
  * Grammatik-Register nach Schuljahren (08.10.2026, abgestimmt mit der Lehrkraft): Gruppen je Jahrgang (vom Server,
  * shared/grammatikJahrgang.ts), das neueste Jahr oben, nur Jahre mit Inhalt; im Jahr nach Stelle im Lehrwerk (Unit),
- * dann Titel. Ohne bekannten Jahrgang ganz unten. Auf- und Zuklappen merkt sich das Gerät (je Fach).
+ * dann Titel. Ohne bekannten Jahrgang ganz unten. Auf- und Zuklappen gilt je Sitzung (je Fach).
  */
+import { offenLesen, offenMerken } from '../../../shared/sitzung'
 
 export interface JahrgangsGruppe<T> {
   /** null = ohne bekannten Jahrgang */
@@ -36,17 +37,10 @@ export function istOffen(gruppen: JahrgangsGruppe<unknown>[], i: number, gemerkt
 
 const SCHLUESSEL = (fach: string): string => `sa-ordner-jahrgaenge-${fach}`
 
+/** Gemerkt für die Sitzung (shared/sitzung.ts, 09.10.2026): nach einer neuen Anmeldung wieder nur das neueste Jahr offen */
 export function ladeOffen(fach: string): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(SCHLUESSEL(fach)) ?? '{}') as Record<string, boolean>
-  } catch {
-    return {}
-  }
+  return offenLesen<Record<string, boolean>>(SCHLUESSEL(fach)) ?? {}
 }
 export function speichereOffen(fach: string, offen: Record<string, boolean>): void {
-  try {
-    localStorage.setItem(SCHLUESSEL(fach), JSON.stringify(offen))
-  } catch {
-    /* privat oder voll: dann nur bis zum Neuladen */
-  }
+  offenMerken(SCHLUESSEL(fach), offen)
 }

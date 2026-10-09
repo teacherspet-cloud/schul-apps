@@ -20,6 +20,7 @@ import type { Rolle } from './kontext'
 import { nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, passwortHashVon, protokolliereServer, serverGeheimnis, serverWert, type NutzerInfo } from './datenbank'
 import { passwortPruefen } from './geheim'
 import { registerVergessen } from './namensschutz'
+import { gastFuerIserv, gastSuchen, verknuepfen, vorschlaegeAnlegen } from './kontoVerknuepfung'
 
 export const ADMIN_BENUTZER = 't.kornahrens'
 
@@ -84,9 +85,18 @@ export function rolleAus(benutzer: string, claims: Record<string, unknown>): Rol
   return null
 }
 
+/** UUID des IServ-Kontos aus den Angaben (iserv:uuid bzw. uuid, sonst sub) – leer, wenn keine geliefert wurde */
+export function iservKennungAus(claims: Record<string, unknown>): string {
+  for (const k of ['iserv:uuid', 'uuid', 'sub']) {
+    const v = claims[k]
+    if (typeof v === 'string' && v.trim() && v.length <= 200) return v.trim().toLowerCase()
+  }
+  return ''
+}
+
 // ---------------------------------------------------------------- OpenID Connect
 
-interface Discovery {
+export interface Discovery {
   issuer: string
   authorization_endpoint: string
   token_endpoint: string
@@ -98,7 +108,8 @@ interface Discovery {
 
 let discovery: { fuer: string; d: Discovery; zeit: number } | null = null
 
-async function entdecken(aussteller: string, abruf: typeof fetch = fetch): Promise<Discovery> {
+/** Discovery-Dokument des IServ (6 Stunden gemerkt) – auch für den Abgleich der Konten (iservAbgleich.ts) */
+export async function entdecken(aussteller: string, abruf: typeof fetch = fetch): Promise<Discovery> {
   if (discovery && discovery.fuer === aussteller && Date.now() - discovery.zeit < 6 * 36e5) return discovery.d
   const r = await abruf(`${aussteller.replace(/\/$/, '')}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(15_000) })
   if (!r.ok) throw new Error(`IServ antwortet nicht wie erwartet (${r.status}).`)
@@ -153,7 +164,7 @@ export async function iservAnmeldeAdresse(
   const e = iservEinstellung()
   const stufen = scopeStufen(e.scopes)
   const nr = Math.min(Math.max(0, stufe), stufen.length - 1)
-  if (!iservBereit()) throw new Error('Die Anmeldung über IServ ist noch nicht eingerichtet (Verwaltung › IServ-Anbindung).')
+  if (!iservBereit()) throw new Error('Die Anmeldung über IServ ist noch nicht eingerichtet (Schule & Daten › IServ-Anbindung).')
   const d = await entdecken(e.aussteller, abruf)
   const state = b64url(randomBytes(24))
   const verifier = b64url(randomBytes(48))
@@ -257,14 +268,47 @@ export async function iservRueckruf(
   }
   const name = String(claims.name ?? [claims.given_name, claims.family_name].filter(Boolean).join(' ') ?? benutzer).trim() || benutzer
   const gruppen = gruppenAus(claims)
+  const kennung = iservKennungAus(claims)
+  /*
+   * Gastkonto mit Code/QR (09.10.2026, kontoVerknuepfung.ts): Ist diese IServ-Person schon mit einem Gastkonto verbunden,
+   * geht es in genau dieses Konto – Name, Gruppen und Code des Gastes bleiben unverändert.
+   */
+  const gast = rolle === 'schueler' ? gastFuerIserv({ benutzer, sub: kennung }) : null
+  if (gast) {
+    if (gast.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')
+    protokolliereServer('anmeldung', 'Anmeldung über IServ (Gastkonto)', gast.id)
+    guteStufe = v.stufe
+    return { nutzer: gast, ziel: v.ziel }
+  }
   let nutzer = nutzerNachBenutzer(benutzer)
+  // Erste Anmeldung einer Schülerin/eines Schülers: bisheriges Gastkonto der Klasse eindeutig gefunden → verbinden, ohne Rückfrage
+  let vorschlaege: string[] = []
+  if (!nutzer && rolle === 'schueler') {
+    const z = gastSuchen(claims, benutzer, gruppen)
+    if (z.eindeutig && !z.eindeutig.gesperrt) {
+      verknuepfen(z.eindeutig.id, { benutzer, sub: kennung })
+      protokolliereServer('anmeldung', 'Erste Anmeldung über IServ mit bisherigem Gastkonto verbunden', z.eindeutig.id)
+      guteStufe = v.stufe
+      return { nutzer: z.eindeutig, ziel: v.ziel }
+    }
+    vorschlaege = z.vorschlaege.map((n) => n.id)
+  }
   if (nutzer) {
     // Ein Admin bleibt Admin, auch wenn IServ nur „Lehrer" meldet; gesperrt bleibt gesperrt
     // Von der Verwaltung zugeordnete Klasse („klasse:…") bleibt erhalten, IServ liefert sie nicht
     const zugeordnet = nutzer.gruppen.filter((g) => g.id.startsWith('klasse:') && !gruppen.some((x) => x.id === g.id))
     nutzerAendern(nutzer.id, { name, gruppen: [...gruppen, ...zugeordnet], rolle: nutzer.rolle === 'admin' ? 'admin' : rolle, quelle: nutzer.quelle === 'test' ? 'test' : 'iserv' })
     nutzer = nutzerNachBenutzer(benutzer)!
-  } else nutzer = nutzerAnlegen({ benutzer, name, rolle, quelle: 'iserv', gruppen })
+  } else {
+    nutzer = nutzerAnlegen({ benutzer, name, rolle, quelle: 'iserv', gruppen })
+    // Mehrdeutig oder ohne Klassenangabe: die Lehrkraft entscheidet (Meine Klassen › Lernende)
+    if (vorschlaege.length) {
+      vorschlaegeAnlegen(nutzer.id, vorschlaege)
+      protokolliereServer('anmeldung', `Erste Anmeldung über IServ: ${vorschlaege.length} mögliche Gastkonten zum Zusammenführen vorgeschlagen`, nutzer.id)
+    }
+  }
+  // Feste Kennung des IServ-Kontos (09.10.2026) für „Mit IServ abgleichen": übersteht Umbenennungen des Benutzernamens
+  if (kennung && nutzer.quelle === 'iserv') nutzerAendern(nutzer.id, { iservSub: kennung })
   // Neue oder geänderte Namen sofort im Namensschutz (namensschutz.ts)
   registerVergessen()
   if (nutzer.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')

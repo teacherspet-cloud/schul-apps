@@ -27,12 +27,16 @@ import {
   type Neuformulierung
 } from './bearbeiten'
 import { briefAnfrage, briefAus, uebersetzungAus, uebersetzungsAnfrage, type BriefText, type Elternbrief, type Uebersetzung } from './model'
+import { briefNachbereiten } from './hervorhebung'
 import { bibliothek } from './store'
 
 /** Die bisherige deutsche Fassung vorn in die Liste (höchstens 10) */
 function mitFassung(b: Elternbrief, anlass: string): Elternbrief['fassungen'] {
   return b.text ? [{ am: new Date().toISOString(), anlass, text: structuredClone(b.text) }, ...(b.fassungen ?? [])].slice(0, 10) : b.fassungen
 }
+
+/** Rückgabefrist, wenn ein Rücklaufzettel gewünscht ist */
+const frist = (b: Elternbrief): string | undefined => (b.meta.ruecklauf ? b.meta.rueckgabeBis : undefined)
 
 export function briefSchreiben(b: Elternbrief, docId: string): void {
   void starteAuftrag({
@@ -48,7 +52,8 @@ export function briefSchreiben(b: Elternbrief, docId: string): void {
     fehlerTitel: 'Der Elternbrief konnte nicht geschrieben werden',
     arbeit: async (eb, k) => {
       k.melde('Die KI formuliert den Brief …')
-      return briefAus(await k.ai<unknown>(briefAnfrage(eb, useAppSettings.getState().settings.schoolName)), eb.meta.ruecklauf)
+      // Fettdruck nachprüfen, Frist fett und auf dem Rücklaufzettel (09.10.2026, hervorhebung.ts)
+      return briefNachbereiten(briefAus(await k.ai<unknown>(briefAnfrage(eb, useAppSettings.getState().settings.schoolName)), eb.meta.ruecklauf), frist(eb))
     },
     abschluss: () => 'Der Brief ist fertig.',
     // Ein neuer deutscher Text macht die Übersetzungen ungültig – sie werden verworfen; der alte bleibt als Fassung
@@ -202,13 +207,16 @@ export function briefNeuFormulieren(b: Elternbrief, docId: string, o: Neuformuli
       const alt = eb.text!
       const vorher = festeWerte(alt)
       k.melde('Die KI formuliert den Brief neu …')
-      let neu = briefAus(await k.ai<unknown>(neuAnfrage(eb, o)), eb.meta.ruecklauf)
+      let neu = briefNachbereiten(briefAus(await k.ai<unknown>(neuAnfrage(eb, o)), eb.meta.ruecklauf), frist(eb))
       let verloren = verloreneAngaben(vorher, neu)
       // Fehlt eine feste Angabe, einmal mit ausdrücklicher Liste nachfragen
       if (verloren.length) {
         k.melde('Feste Angaben fehlten – die KI formuliert noch einmal …')
         const nachdruck = `Diese Angaben MÜSSEN unverändert vorkommen: ${verloren.join(', ')}`
-        neu = briefAus(await k.ai<unknown>(neuAnfrage(eb, { ...o, hinweis: [o.hinweis, nachdruck].filter(Boolean).join(' – ') })), eb.meta.ruecklauf)
+        neu = briefNachbereiten(
+          briefAus(await k.ai<unknown>(neuAnfrage(eb, { ...o, hinweis: [o.hinweis, nachdruck].filter(Boolean).join(' – ') })), eb.meta.ruecklauf),
+          frist(eb)
+        )
         verloren = verloreneAngaben(vorher, neu)
       }
       const geaendert = gleicherAufbau(alt, neu) ? geaenderteTeile(alt, neu) : teileVon(neu).map((t) => t.schluessel)

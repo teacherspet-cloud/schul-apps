@@ -329,7 +329,7 @@ export const LEHRWERK_GRAMMATIK: Record<string, Band> = {
 }
 
 /** Reihenfolge der Abschnitte innerhalb einer Unit (wie in den Lehrwerksdateien) */
-const ABSCHNITT_FOLGE = ['Check-in', 'Introduction', 'Station 1', 'Station 2', 'Station 3', 'Story', 'Unit task', 'Check-out']
+export const ABSCHNITT_FOLGE = ['Check-in', 'Introduction', 'Station 1', 'Station 2', 'Station 3', 'Story', 'Unit task', 'Check-out']
 
 /** Kurztext eines Kapitels aus der Liste („Artikel, to be …") – für Vorwissen und Planung */
 export function grammatikText(buch: string, kapitel: string): string | undefined {

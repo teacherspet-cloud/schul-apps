@@ -21,6 +21,7 @@
 //     der Art „touch"), Präsentation öffnen und Schritt für Schritt aufdecken. Seit dem Zoom: Der
 //     Finger rollt und zoomt, verschoben wird erst mit „Mit dem Finger zeichnen" (sonst mit dem Stift).
 import { chromium, webkit } from 'playwright-core'
+import { kartenAuf } from './warten.mjs'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { extname, join, resolve } from 'path'
@@ -198,6 +199,7 @@ async function lauf(name, browserTyp, startOpt) {
     if (await kiReiter.count()) {
       await kiReiter.click()
       await page.waitForTimeout(500)
+      await kartenAuf(page, 'ki-text')
       pruefe((await page.getByText(/^Abo \(/).count()) === 0, `${name}: keine Abo-Wahl beim KI-Zugang`)
       pruefe((await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: Wahl „Abo über den PC" beim KI-Zugang`)
       pruefe((await page.getByText(/API-Schlüssel für/).count()) > 0, `${name}: Feld für den API-Schlüssel da`)
@@ -258,17 +260,17 @@ async function lauf(name, browserTyp, startOpt) {
     const tests = await page.evaluate(() => window.api.tests.list())
     pruefe(tests.length > 0, `${name}: Test in der Bibliothek (${tests.length})`)
 
-    // ---------- 7. Ablage unter Schulmaterial
+    // ---------- 7. Ablage unter Schulmaterial (seit 05.10.2026 mit der Materialart als unterster Ebene, shared/schulmaterial.ts)
     const sichern = (name, ziel) => page.evaluate(([n, z]) => window.api.files.save(n, [], 'Inhalt', z), [name, ziel])
     const englisch = { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] }
     const p1 = await sichern('Probe.txt', englisch)
-    pruefe(p1 === '/documents/Schulmaterial/Englisch/Unit 1/Probe.txt', `${name}: Ablage nach Fach und Themenbereich (${p1})`)
+    pruefe(p1 === '/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Probe.txt', `${name}: Ablage nach Fach und Themenbereich (${p1})`)
     const p2 = await sichern('Probe.txt', englisch)
-    pruefe(p2 === '/documents/Schulmaterial/Englisch/Unit 1/Probe (2).txt', `${name}: kein Überschreiben (${p2})`)
+    pruefe(p2 === '/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Probe (2).txt', `${name}: kein Überschreiben (${p2})`)
     const p3 = await sichern('Brief: 7/8.txt', { programm: 'elternbrief' })
     pruefe(p3 === '/documents/Schulmaterial/Allgemein/Elternbriefe/Brief- 7-8.txt', `${name}: ohne Fach unter Allgemein, Name bereinigt (${p3})`)
     const p4 = await sichern('Blatt.txt', { programm: 'arbeitsblatt', fach: 'Biologie' })
-    pruefe(p4 === '/documents/Schulmaterial/Biologie/Blatt.txt', `${name}: ohne Themenbereich im Fachordner (${p4})`)
+    pruefe(p4 === '/documents/Schulmaterial/Biologie/Arbeitsblätter/Blatt.txt', `${name}: ohne Themenbereich im Fachordner (${p4})`)
     // Über die Oberfläche: Word-Ausgabe des Vokabeltests
     await sichtbar(page.getByRole('button', { name: 'Word', exact: true })).click()
     await sichtbar(page.getByRole('button', { name: 'Speichern …' })).click()
@@ -286,7 +288,7 @@ async function lauf(name, browserTyp, startOpt) {
     await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
     await page.waitForTimeout(800)
     const p5 = await sichern('Probe.txt', englisch)
-    pruefe(p5 === '/documents/Schulmaterial/Englisch/Unit 1/Probe (3).txt', `${name}: auch nach dem Neuladen kein Überschreiben (${p5})`)
+    pruefe(p5 === '/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Probe (3).txt', `${name}: auch nach dem Neuladen kein Überschreiben (${p5})`)
 
     // ---------- 8. Tafelbilder: erzeugen, mit dem Finger verschieben, präsentieren
     await sichtbar(page.locator('[aria-label="Tafelbilder"]')).click()
@@ -365,11 +367,20 @@ async function assistent(name, browserTyp, startOpt) {
     )
     pruefe(da, `${name}: Einrichtungsassistent erscheint auf dem iPad`)
     if (!da) return
-    pruefe(await page.getByText('Sechs kurze Schritte').isVisible(), `${name}: Einleitung nennt sechs Schritte`)
+    // IServ steht seit 02.10.2026 als erster Schritt vorn (Einrichtung.tsx) – dann sind es sieben
+    const mitIserv = (await page.locator('.mantine-Stepper-stepLabel', { hasText: 'IServ' }).count()) > 0
+    pruefe(
+      await page.getByText(mitIserv ? 'Sieben kurze Schritte' : 'Sechs kurze Schritte').isVisible(),
+      `${name}: Einleitung nennt ${mitIserv ? 'sieben' : 'sechs'} Schritte`
+    )
     for (const s of ['Schule', 'KI-Zugang', 'Bilder-KI', 'Hörtexte', 'Ablage', 'Aussehen']) {
       pruefe((await page.locator('.mantine-Stepper-stepLabel', { hasText: s }).count()) > 0, `${name}: Schritt „${s}"`)
     }
     const weiter = page.getByRole('button', { name: 'Weiter', exact: true })
+    if (mitIserv) {
+      await weiter.click()
+      await page.waitForTimeout(400)
+    }
     await weiter.click()
     await page.waitForTimeout(400)
     pruefe((await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: KI-Schritt bietet „Abo über den PC"`)

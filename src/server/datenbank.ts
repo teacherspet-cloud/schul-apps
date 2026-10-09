@@ -12,7 +12,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { DATEN, ordner } from './pfade'
+import { DATEN, nutzerOrdner, ordner } from './pfade'
+import { rmSync } from 'node:fs'
 import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
 import { geschuetzt, migriere, nutzerSchreibzaehler, SENSIBEL } from './feldschutz'
@@ -47,6 +48,23 @@ CREATE INDEX IF NOT EXISTS sitzungen_nutzer ON sitzungen(nutzer_id);
 CREATE TABLE IF NOT EXISTS server_einstellungen (
   schluessel TEXT PRIMARY KEY,
   wert TEXT NOT NULL
+);
+-- Gastkonto (Code/QR) mit IServ-Anmeldung verknüpft (09.10.2026, kontoVerknuepfung.ts): ein Konto, zwei Wege hinein.
+-- benutzer_k = Suchschlüssel (HMAC) des IServ-Benutzernamens; Name und Kennung selbst verschlüsselt (feldschutz.ts)
+CREATE TABLE IF NOT EXISTS konto_iserv (
+  nutzer_id TEXT PRIMARY KEY REFERENCES nutzer(id) ON DELETE CASCADE,
+  benutzer_k TEXT NOT NULL UNIQUE,
+  benutzer_v TEXT NOT NULL DEFAULT '',
+  iserv_sub TEXT,
+  erstellt TEXT NOT NULL
+);
+-- Vorschläge „mit dem bisherigen Konto zusammenführen" für die Lehrkraft (Meine Klassen › Lernende)
+CREATE TABLE IF NOT EXISTS konto_vorschlaege (
+  iserv_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  gast_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'offen',
+  erstellt TEXT NOT NULL,
+  PRIMARY KEY (iserv_id, gast_id)
 );
 CREATE TABLE IF NOT EXISTS protokoll (
   nr INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,6 +260,8 @@ export function nutzerAendern(
     eingerichtet: boolean
     gruppen: { id: string; name: string }[]
     passwortWechseln: boolean
+    /** Feste Kennung des IServ-Kontos (UUID bzw. sub), verschlüsselt (feldschutz.ts) – 09.10.2026 */
+    iservSub: string | null
   }>
 ): void {
   const felder: string[] = []
@@ -254,14 +274,42 @@ export function nutzerAendern(
   if (patch.eingerichtet !== undefined) (felder.push('eingerichtet = ?'), werte.push(patch.eingerichtet ? 1 : 0))
   if (patch.gruppen !== undefined) (felder.push('gruppen = ?'), werte.push(JSON.stringify(patch.gruppen)))
   if (patch.passwortWechseln !== undefined) (felder.push('passwort_wechseln = ?'), werte.push(patch.passwortWechseln ? 1 : 0))
+  if (patch.iservSub !== undefined) (felder.push('iserv_sub = ?'), werte.push(patch.iservSub))
   if (!felder.length) return
   datenbank()
     .prepare(`UPDATE nutzer SET ${felder.join(', ')} WHERE id = ?`)
     .run(...werte, id)
 }
 
-export function nutzerLoeschen(id: string): void {
+/** Gespeicherte IServ-Kennungen (Nutzer-ID → UUID/sub) der IServ-Konten – nur für den Abgleich (iservAbgleich.ts) */
+export function iservKennungen(): Map<string, string> {
+  const zeilen = datenbank().prepare("SELECT id, iserv_sub FROM nutzer WHERE quelle = 'iserv'").all() as { id: string; iserv_sub: string | null }[]
+  return new Map(zeilen.filter((z) => typeof z.iserv_sub === 'string' && z.iserv_sub).map((z) => [z.id, String(z.iserv_sub).toLowerCase()]))
+}
+
+/** Gast mit IServ-Anmeldung (konto_iserv)? Der bleibt beim Aufräumen von Gästen bestehen – er ist ein Konto der Schule */
+export const istVerknuepfterGast = (id: string): boolean =>
+  Boolean(datenbank().prepare("SELECT 1 FROM konto_iserv k JOIN nutzer n ON n.id = k.nutzer_id WHERE k.nutzer_id = ? AND n.quelle = 'gast'").get(id))
+
+/**
+ * Konto löschen (Daten per Fremdschlüssel mit). Ein mit IServ verknüpfter Gast bleibt beim Aufräumen von Freigaben und
+ * Kursen stehen (09.10.2026) – nur `erzwingen` (Verwaltung, Zusammenführen) löscht ihn. Liefert, ob gelöscht wurde.
+ */
+export function nutzerLoeschen(id: string, erzwingen = false): boolean {
+  if (!erzwingen && istVerknuepfterGast(id)) return false
   datenbank().prepare('DELETE FROM nutzer WHERE id = ?').run(id)
+  return true
+}
+
+/** Ein Konto samt Sitzungen und ganzer Ablage entfernen – der eine Weg für „Löschen", „Mit IServ abgleichen" und Zusammenführen */
+export function kontoEntfernen(n: Pick<NutzerInfo, 'id'>): void {
+  sitzungenDesNutzersBeenden(n.id)
+  nutzerLoeschen(n.id, true)
+  try {
+    rmSync(nutzerOrdner(n.id), { recursive: true, force: true })
+  } catch {
+    // Ordner fehlte – nichts zu tun
+  }
 }
 
 export const nutzerGesehen = (id: string): void => void datenbank().prepare('UPDATE nutzer SET zuletzt = ? WHERE id = ?').run(jetzt(), id)

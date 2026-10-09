@@ -240,7 +240,7 @@ try {
   console.log(e)
 } finally {
   if (zid && lk) await lk.request.post(`${A}/server/grammatik/${zid}/loeschen`, { headers: KOPF, data: {} }).catch(() => null)
-  if (kurs && lk) await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: {} }).catch(() => null)
+  if (kurs && lk) await lk.request.post(`${A}/server/vokabeln/${kurs}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => null)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => null)
   await browser.close()
 }

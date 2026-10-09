@@ -18,6 +18,7 @@ import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
 import { klassenGaesteRoute } from './klassenGaeste'
+import { kontoVerknuepfungRoute } from './kontoVerknuepfungRoute'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
 import { wortlisteRoute } from './wortliste'
@@ -25,7 +26,10 @@ import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { kiAblagenAufraeumen } from './kiAblage'
 import { registriereKanaele, type Handle } from '../main/kanaele'
-import { setzeGeheimRueckfall } from '../main/services/storage/settings'
+import { getSettings, hatEigenesGeheimnis, setzeFachfarbenQuelle, setzeGeheimRueckfall, setzeSchuleFest, setzeSchulRueckfall } from '../main/services/storage/settings'
+import { fachfarbenRoute, leseSchulFachfarben, uebernimmFachfarbenEinmal } from './fachfarben'
+import { schuleFest } from '@shared/schulFest'
+import { leseSchule, schuleRoute } from './schule'
 import { setzeRolleQuelle } from '../main/services/rolle'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
@@ -34,7 +38,12 @@ import { ADMIN_BENUTZER } from './anmeldung'
 import { serverUmgebung } from './umgebung'
 import { starteServer } from './http'
 import { herzschlagStarten } from './ereignisse'
+import { messungenStarten, setzeKiNutzungQuelle, zaehlerSchreiben } from './serverZustand'
+import { kiNutzungJeTag, merkeKiNutzung, mitKiNutzung } from './kiNutzung'
+import { setzeEndpunktRueckfall } from '../main/services/ai/models'
+import type { SecretName } from '@shared/types'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
+import { kiZugaengeRoute, schulEndpunkt } from './kiZugaenge'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
@@ -70,6 +79,17 @@ async function main(): Promise<void> {
 
   // Vom Admin für alle freigegebene Schlüssel – nur, wenn der Nutzer keinen eigenen hat
   setzeGeheimRueckfall(freigegebenerSchluessel)
+  // OpenAI-kompatible Anbieter der Schule (09.10.2026): Adresse/Azure-Version aus „KI-Zugänge", solange die Lehrkraft keine eigene hat
+  setzeEndpunktRueckfall(schulEndpunkt)
+  // KI-Nutzung über Schlüssel der Schule für Verwaltung › Server (kiNutzung.ts)
+  setzeKiNutzungQuelle(kiNutzungJeTag)
+  // Schul-Einrichtung der Verwaltung: Bundesland/Schulform, solange die Lehrkraft keine eigenen gewählt hat (09.10.2026)
+  setzeSchulRueckfall(leseSchule)
+  // Fachfarben legt die Verwaltung für alle fest (09.10.2026, fachfarben.ts) – einmal die des Admins übernehmen
+  uebernimmFachfarbenEinmal()
+  setzeFachfarbenQuelle(leseSchulFachfarben)
+  // IServ-Konten gehören fest zur Schule des Servers (09.10.2026, shared/schulFest.ts)
+  setzeSchuleFest(() => schuleFest(aktuellerNutzer()))
   // Gemeinsame Lehrwerke und Medienbank: bearbeiten nur Admins (main/services/rolle.ts)
   setzeRolleQuelle(() => aktuellerNutzer()?.rolle)
 
@@ -87,7 +107,15 @@ async function main(): Promise<void> {
   }
   // Klarnamen nie an eine KI (namensfilter.ts) – EINE Stelle für alle KI- und Sprachausgabe-Aufrufe
   // Freigaben für die Fachschaft: Arbeitskopien bleiben aus der Bibliothek, bis sie geändert werden (fachschaft.ts)
-  const geschuetzt = mitFachschaft(mitNamensschutz(roh))
+  // Innen die Zählung der KI-Nutzung (09.10.2026, kiNutzung.ts): NUR Aufrufe über Schlüssel der Schule, nie private Zugänge
+  const gezaehlt = mitKiNutzung(roh, {
+    nutzer: () => aktuellerNutzer(),
+    einstellung: () => getSettings().ai,
+    eigenerSchluessel: (a) => hatEigenesGeheimnis(a as SecretName),
+    schulSchluessel: (a) => Boolean(freigegebenerSchluessel(a as SecretName)),
+    merke: merkeKiNutzung
+  })
+  const geschuetzt = mitFachschaft(mitNamensschutz(gezaehlt))
   setzeEntferner(roh)
   // Hörtexte: jede Aufnahme bekommt eine Adresse für den QR-Code (hoertexte.ts)
   const aufruf = async (kanal: string, args: unknown[]): Promise<unknown> => {
@@ -173,8 +201,16 @@ async function main(): Promise<void> {
       vorschauRoute(),
       // Gäste mit Anmeldecode in „Meine Klassen" › Lernende (09.10.2026, klassenGaeste.ts)
       klassenGaesteRoute(),
+      // Gastkonto ↔ IServ zusammenführen (09.10.2026, kontoVerknuepfungRoute.ts)
+      kontoVerknuepfungRoute(),
       klassenRoute(),
       fachordnerRoute(),
+      // Schul-Einrichtung (09.10.2026): lesen alle Lehrkräfte, ändern nur Admins
+      schuleRoute,
+      // Fachfarben der Schule: lesen alle Lehrkräfte, ändern nur Admins (09.10.2026)
+      fachfarbenRoute,
+      // KI-Zugänge der Schule: Adressen, Verbindungstest, Nutzungsübersicht (09.10.2026, kiZugaenge.ts)
+      kiZugaengeRoute,
       verwaltungsRoute
     ]
   })
@@ -182,6 +218,8 @@ async function main(): Promise<void> {
   protokolliereServer('start', `Server gestartet (${tls ? 'TLS' : 'ohne TLS'})`)
 
   herzschlagStarten()
+  // Messwerte für Verwaltung › Server (09.10.2026): alle 5 Minuten, 8 Tage aufgehoben
+  messungenStarten()
   const stuendlich = setInterval(() => {
     abgelaufeneSitzungenEntfernen()
     cleanupWorkDirs()
@@ -189,6 +227,7 @@ async function main(): Promise<void> {
   stuendlich.unref()
 
   const ende = async (): Promise<void> => {
+    zaehlerSchreiben()
     await druckBeenden()
     process.exit(0)
   }

@@ -167,7 +167,12 @@ try {
     )
     pruefe(quer.includes('Q') && quer.includes('H'), `Digitales Blatt mit Querseite (${quer})`)
   }
-  await s.evaluate((y) => window.scrollTo(0, window.scrollY + y - 450), a0.y)
+  // Vollbild beim Lernen (09.10.2026, FokusRahmen.tsx): dann rollt die Ebene der Übung, nicht das Fenster
+  await s.evaluate((y) => {
+    const ebene = document.querySelector('.sa-fokus[data-fokus="an"] > .sa-fokus-inhalt')
+    if (ebene) ebene.scrollBy(0, y - 450)
+    else window.scrollTo(0, window.scrollY + y - 450)
+  }, a0.y)
   await s.waitForTimeout(400)
   const ac = await achseSuchen()
   // Kästchen über der Achse
@@ -389,7 +394,8 @@ try {
   pruefe(alpha > 0 && alpha < 120, `Textmarker bleibt durchscheinend (höchste Deckkraft ${alpha}/255)`)
   // KI-Prüfung der Aufgabe mit der Zeitleiste (nur Kästchen, keine Schreibfelder)
   await s.locator('[data-werkzeug="text"]').click()
-  await s.mouse.click(ac.x + 260, ac.y - 130)
+  // Knapp über der Achse – sicher im Bereich der Aufgabe (im Vollbild ist das Blatt schmaler, die Aufgabenzeile liegt näher an der Achse)
+  await s.mouse.click(ac.x + 260, ac.y - 70)
   await s.locator('[data-kaestchen]').last().fill('Julikrise')
   await s.locator('[data-werkzeug="tastatur"]').click()
   const nr = await s.evaluate((y) => {
@@ -434,7 +440,7 @@ try {
   pruefe(fehler.length === 0 && (await s.getByText('Gelungen').count()) > 0, `KI-Prüfung der Zeitleisten-Aufgabe ${nr} liefert Feedback ${fehler.join(' ')}`)
   await s.screenshot({ path: join(out, '2-zeitleiste.png') })
   // Markierungen aus dem Feedback zur Zeitleiste dürfen nicht in einer anderen Aufgabe auftauchen
-  await s.keyboard.press('Escape')
+  // (kein Esc: im Vollbild beim Lernen beendet Esc die Übung, 09.10.2026 – Klick daneben genügt)
   await s.mouse.click(5, 400)
   const andere = s.locator('textarea[data-feld]').last()
   await andere.scrollIntoViewIfNeeded()

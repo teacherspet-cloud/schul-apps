@@ -8,13 +8,15 @@
  */
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { create } from 'zustand'
-import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import { Badge, Button, Card, Group, Loader, Menu, Modal, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconChartDots, IconDots, IconPlus, IconRoute, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Reihe } from '@shared/reihe'
 import { fachVon } from '@shared/faecher'
 import { useAppSettings } from '../../shared/settingsStore'
-import { notifyError } from '../../shared/util'
+import { notifyError, notifySuccess } from '../../shared/util'
+import { loeschFrage, loeschPlan, type MaterialVerweis } from '@shared/reiheMaterial'
+import { loescheReihe } from './reiheLoeschen'
 import { holen, senden } from '../onlinetest/serverApi'
 import { ReiheEditor } from './ReiheEditor'
 import { useDokumentOeffner, useZielZeiger } from '../../shared/navigation'
@@ -31,6 +33,8 @@ interface ReiheKurz {
   schritte: number
   geaendert: string
   zuweisungen: { id: string; lerngruppe: string; schueler: number; status: string }[]
+  /** Verknüpfte Dokumente der Ablage (09.10.2026, shared/reiheMaterial.ts) */
+  material?: MaterialVerweis[]
 }
 
 /** Vorgabe für eine neue Reihe (08.10.2026, „Unterrichtsreihe erstellen" in Meine Klassen): Fach und Jahrgang der Klasse */
@@ -121,6 +125,7 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
     if (reiheId) usePlaene.getState().setzeZeigen(reiheId)
   })
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
+  const [loeschen, setLoeschen] = useState<ReiheKurz | null>(null)
   const farbe = useProgrammFarbe()
   const laden = useCallback(
     () =>
@@ -209,10 +214,8 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
                     <Menu.Item
                       color="red"
                       leftSection={<IconTrash size={14} />}
-                      onClick={() => {
-                        if (window.confirm(`„${r.titel}“ löschen? Zuweisungen und Fortschritt der Lernenden gehen verloren.`))
-                          void senden(`/server/reihen/${r.id}/loeschen`).then(laden, (e: unknown) => notifyError(e))
-                      }}
+                      onClick={() => setLoeschen(r)}
+                      data-reihe-loeschen
                     >
                       Löschen
                     </Menu.Item>
@@ -246,7 +249,102 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
           ))}
         </SimpleGrid>
       </Stack>
+      {loeschen && liste && <ReiheLoeschenDialog reihe={loeschen} reihen={liste} schliessen={() => setLoeschen(null)} geloescht={laden} />}
     </Rahmen>
+  )
+}
+
+/**
+ * Löschen einer Reihe (09.10.2026, Wunsch der Lehrkraft): „Zugehöriges Material ebenfalls löschen? (n Dokumente)" –
+ * Reihe und Material, nur die Reihe (Material bleibt in den Bibliotheken, jetzt sichtbar) oder Abbrechen. Material,
+ * das auch eine andere Reihe nutzt, bleibt immer; Freigaben an Lernende bleiben samt Abgaben stehen.
+ */
+function ReiheLoeschenDialog({
+  reihe,
+  reihen,
+  schliessen,
+  geloescht
+}: {
+  reihe: ReiheKurz
+  reihen: ReiheKurz[]
+  schliessen: () => void
+  geloescht: () => void
+}): React.JSX.Element {
+  const [freigaben, setFreigaben] = useState<{ einstellungen?: { quelle?: { docId?: string } | null } }[]>([])
+  const [laeuft, setLaeuft] = useState(false)
+  useEffect(() => {
+    if (!reihe.material?.length) return
+    // Freigaben an Lernende aus diesem Material – nur zum Nennen; sie bleiben stehen
+    void holen<{ blaetter: { einstellungen?: { quelle?: { docId?: string } | null } }[] }>('/server/blaetter').then(
+      (d) => setFreigaben(d.blaetter ?? []),
+      () => undefined
+    )
+  }, [reihe])
+  const frage = loeschFrage(reihe.id, reihen, freigaben)
+  const zugewiesen = reihe.zuweisungen.length > 0
+  const los = async (mitMaterial: boolean): Promise<void> => {
+    setLaeuft(true)
+    try {
+      const material = mitMaterial ? loeschPlan(reihe.id, reihen).loeschen : []
+      const { fehlgeschlagen } = await loescheReihe(reihe.id, material)
+      if (fehlgeschlagen) notifyError(new Error(`${fehlgeschlagen} Dokument(e) ließen sich nicht löschen – sie stehen jetzt wieder in den Bibliotheken.`))
+      else
+        notifySuccess(
+          mitMaterial && material.length
+            ? `„${reihe.titel}“ und ${material.length === 1 ? 'ein Dokument' : `${material.length} Dokumente`} gelöscht.`
+            : frage.anzahl
+              ? `„${reihe.titel}“ gelöscht – das Material steht jetzt wieder in den Bibliotheken.`
+              : `„${reihe.titel}“ gelöscht.`
+        )
+      schliessen()
+      geloescht()
+    } catch (e) {
+      notifyError(e, 'Die Reihe ließ sich nicht löschen')
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Modal opened onClose={schliessen} title={`„${reihe.titel}“ löschen?`} centered size="lg" data-reihe-loeschen-dialog>
+      <Stack gap="sm">
+        {zugewiesen && <Text size="sm">Zuweisungen und Fortschritt der Lernenden in dieser Reihe gehen verloren.</Text>}
+        {frage.anzahl > 0 && (
+          <Text size="sm" fw={600} data-reihe-loeschen-anzahl={frage.anzahl}>
+            Zugehöriges Material ebenfalls löschen? ({frage.anzahl === 1 ? '1 Dokument' : `${frage.anzahl} Dokumente`})
+          </Text>
+        )}
+        {frage.freigegeben > 0 && (
+          <Text size="sm" c="dimmed">
+            {frage.freigegeben === 1 ? 'Ein Blatt daraus ist' : `${frage.freigegeben} Blätter daraus sind`} an Lernende freigegeben – die Freigaben
+            bleiben samt Abgaben unter „Freigegebene Blätter“ erhalten.
+          </Text>
+        )}
+        {frage.bleibt > 0 && (
+          <Text size="sm" c="dimmed">
+            {frage.bleibt === 1 ? 'Ein Dokument gehört' : `${frage.bleibt} Dokumente gehören`} auch zu einer anderen Reihe und
+            {frage.bleibt === 1 ? ' bleibt' : ' bleiben'} in jedem Fall erhalten.
+          </Text>
+        )}
+        <Stack gap="xs" mt="xs">
+          {frage.wahl.includes('mit-material') && (
+            <Button color="red" loading={laeuft} onClick={() => void los(true)} data-reihe-loeschen-mit-material>
+              Reihe und Material löschen
+            </Button>
+          )}
+          <Button
+            color="red"
+            variant={frage.anzahl ? 'light' : 'filled'}
+            loading={laeuft}
+            onClick={() => void los(false)}
+            data-reihe-loeschen-nur-reihe
+          >
+            {frage.anzahl ? 'Nur die Reihe löschen (Material bleibt in den Bibliotheken)' : 'Reihe löschen'}
+          </Button>
+          <Button variant="default" disabled={laeuft} onClick={schliessen} data-reihe-loeschen-abbrechen>
+            Abbrechen
+          </Button>
+        </Stack>
+      </Stack>
+    </Modal>
   )
 }
 

@@ -10,7 +10,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useUebersichtZeiger } from '../../shared/navigation'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { useAlleLernenden } from './LernendeWahl'
@@ -118,6 +118,12 @@ export default function VokabelTraining(): React.JSX.Element {
    * Kennungen der Hintergrund-Aufträge siehe kurs/auftragsZiel.ts (09.10.2026). Unbekanntes oder nicht Ladbares führt
    * still zur Übersicht – nie eine Fehlermeldung.
    */
+  // Erstes Öffnen in der Sitzung über die Leiste (09.10.2026, shared/sitzung.ts): die Kursübersicht
+  useUebersichtZeiger('sprachenlernen', () => {
+    setGewaehlt(null)
+    setGrammatikOffen(null)
+    setNeu(false)
+  })
   useDokumentOeffner('sprachenlernen', async (docId) => {
     const ziel = sprachenlernenZiel(docId)
     const zurUebersicht = (): void => (setGewaehlt(null), setGrammatikOffen(null))
@@ -366,11 +372,11 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
           nurGrammatik: true,
           lerngruppeId: art === 'gruppe' ? gruppe : '',
           schueler: art === 'einzeln' ? einzelne : [],
-          bis: ausFeld(bis, '23:59:00'),
+          bis: art === 'gruppe' ? null : ausFeld(bis, '23:59:00'),
           gaeste: art === 'code' || qr
         })
         notifySuccess('Kurs angelegt – jetzt die Grammatik wählen.')
-        return setGrammatikDanach({ vokId: neueId, titel: titel || name, sprache })
+        return setGrammatikDanach({ vokId: neueId, titel: titel || name, sprache, klassenKurs: art === 'gruppe' })
       } catch (e) {
         notifyError(e, 'Kurs nicht angelegt')
       } finally {
@@ -391,7 +397,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         lerngruppeId: art === 'gruppe' ? gruppe : '',
         schueler: art === 'einzeln' ? einzelne : [],
         testTermin: ausFeld(termin, '08:00:00'),
-        bis: ausFeld(bis, '23:59:00'),
+        bis: art === 'gruppe' ? null : ausFeld(bis, '23:59:00'),
         gaeste: art === 'code' || qr,
         ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
         // Mehrere Abschnitte/Units (08.10.2026): je Abschnitt ein Teil im Kasten „Freigegebene Abschnitte"
@@ -406,7 +412,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             ? 'Freigegeben – QR-Code und Code stehen beim Training (Knopf „QR-Code").'
             : 'Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.')
       )
-      if (mitGrammatik && neueId) return setGrammatikDanach(grammatikVorgabe(neueId, titel || auswahl.titel, mit.sprache, auswahl.quelle))
+      if (mitGrammatik && neueId) return setGrammatikDanach(grammatikVorgabe(neueId, titel || auswahl.titel, mit.sprache, auswahl.quelle, art === 'gruppe'))
       schliessen()
     } catch (e) {
       notifyError(e, 'Nicht freigegeben')
@@ -481,14 +487,17 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
           />
         )}
         <Group align="flex-start" grow>
-          <TextInput
-            type="date"
-            label="Lernzeitraum bis (optional)"
-            description="Danach ist das Training abgeschlossen; ohne Datum läuft es, bis es beendet wird."
-            value={bis}
-            onChange={(e) => setBis(e.currentTarget.value)}
-            data-vokabel-bis
-          />
+          {/* Feste Klasse (09.10.2026, abgestimmt): der Kurs läuft mit der Klasse weiter – kein Enddatum */}
+          {art !== 'gruppe' && (
+            <TextInput
+              type="date"
+              label="Lernzeitraum bis (optional)"
+              description="Danach ist das Training abgeschlossen; ohne Datum läuft es, bis es beendet wird."
+              value={bis}
+              onChange={(e) => setBis(e.currentTarget.value)}
+              data-vokabel-bis
+            />
+          )}
           <TextInput
             type="date"
             label="Testtermin (optional)"
@@ -510,7 +519,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             data-vokabel-mit-grammatik
           />
         )}
-        <Group justify="flex-end">
+        <Group justify="flex-end" className="dialog-fuss">
           <Button
             loading={laeuft}
             disabled={(nurGrammatik ? !sprache : !auswahl?.woerter.length) || (art === 'gruppe' ? !gruppe : art === 'einzeln' ? !einzelne.length : false)}

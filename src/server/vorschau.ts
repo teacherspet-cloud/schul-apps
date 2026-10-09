@@ -16,6 +16,13 @@
  *   POST /server/vorschau/zuruecksetzen      {schluessel, zustand}  Daten löschen, Lernstand neu erzeugen
  *   GET  /vorschau?vs=…[&ziel=/s/…]          Fenster: Streifen (Gerät, Lernstand, Zurücksetzen) + Ansicht
  *   POST /server/reihen/<id>/vorschau        {zustand}  → {schluessel, adresse}  (reihen.ts, 08.10.2026: Reihe als Musterschüler)
+ *   POST /server/vorschau/kurs/<kursId>      {zustand}  → {schluessel, adresse, klasse}  (09.10.2026: Sprachenlernen, s. u.)
+ *
+ * Ziel im Fenster (09.10.2026): `ziel` beim Öffnen einer Klasse (z. B. `/s/v/<Kurs>`) – nur Seiten des Schülerbereichs
+ * zu Inhalten DIESER Lehrkraft (`vorschauZielPruefen`). Kurse aus Sprachenlernen: Kurs einer Klasse → Vorschaukonto der
+ * Klasse; spontane Gruppe (ohne Lerngruppe, QR/Code) → Vorschaukonto „Sprachenlernen" der Lehrkraft, das dem Kurs wie
+ * ein Gast beitritt (vok_gaeste). Lernendenlisten, Statistik, Handlungsbedarf, Problemwörter und Codezettel lassen es aus
+ * (vokabeln.ts `gaesteVon`/`lernendeVon` filtern quelle 'vorschau'). Die Beitritte bleiben beim Zurücksetzen erhalten.
  *
  * Lernstand beim Öffnen wählbar (neu / fleißig, noch unsicher / erfolgreich / länger nicht da): Beispieldaten für
  * Vokabel- und Grammatikkästen, Übungstage und Wochen-Schnappschüsse, so dass die Zustandslogik (shared/lernstand.ts)
@@ -30,7 +37,7 @@ import { datenbank, nutzerAendern, nutzerAnlegen, nutzerLoeschen, nutzerNachId, 
 import { hauptschluessel } from './geheim'
 import { json, type Anfrage } from './http'
 import { lerngruppe, vorschauGruppe } from './onlinetest'
-import { standSpeichern as vokStandSpeichern, vokabelListenFuer, zeile as vokZeile } from './vokabeln'
+import { kursGastAufnehmen, standSpeichern as vokStandSpeichern, vokabelListenFuer, vokIstFuer, zeile as vokZeile } from './vokabeln'
 import { grammatikStandSetzen } from './grammatik'
 import { wocheSchreiben } from './lernstand'
 import { DATEN } from './pfade'
@@ -148,12 +155,16 @@ export function kontoZumSchluessel(schluessel: string, lehrkraft: Pick<NutzerInf
 
 // ---------------------------------------------------------------- Daten
 
-/** Alles des Kontos löschen: jede Tabelle mit schueler_id bzw. nutzer_id (Abgaben, Kästen, Wochen, Beitritte …) und die Ablage */
-export function datenLoeschen(id: string): void {
+/**
+ * Alles des Kontos löschen: jede Tabelle mit schueler_id bzw. nutzer_id (Abgaben, Kästen, Wochen, Beitritte …) und die Ablage.
+ * `kurseBehalten` (Zurücksetzen, 09.10.2026): Beitritte zu Kursen aus Sprachenlernen (vok_gaeste) bleiben – sonst
+ * verschwände der Kurs einer spontanen Gruppe nach „Zurücksetzen" aus der Vorschau.
+ */
+export function datenLoeschen(id: string, kurseBehalten = false): void {
   const d = db()
   const tabellen = (d.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((t) => t.name)
   for (const t of tabellen) {
-    if (!/^\w+$/.test(t) || ['nutzer', 'vorschau_konten', 'protokoll', 'sitzungen'].includes(t)) continue
+    if (!/^\w+$/.test(t) || ['nutzer', 'vorschau_konten', 'protokoll', 'sitzungen'].includes(t) || (kurseBehalten && t === 'vok_gaeste')) continue
     const spalten = new Set((d.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((s) => s.name))
     for (const s of ['schueler_id', 'nutzer_id']) if (spalten.has(s)) d.prepare(`DELETE FROM ${t} WHERE ${s} = ?`).run(id)
   }
@@ -187,7 +198,7 @@ function beispielStand(i: number, n: number, p: (typeof PLAN)[keyof typeof PLAN]
 
 /** Lernstand des Vorschaukontos neu aufsetzen: alles löschen, dann Beispieldaten für den Zustand (bei „neu" nichts) */
 export function vorschauAufsetzen(konto: NutzerInfo, zustand: VorschauZustand, jetzt = Date.now()): void {
-  datenLoeschen(konto.id)
+  datenLoeschen(konto.id, true)
   db().prepare('UPDATE vorschau_konten SET zustand = ? WHERE nutzer_id = ?').run(zustand, konto.id)
   if (zustand === 'neu') return
   const p = PLAN[zustand]
@@ -237,6 +248,35 @@ const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;',
 
 /** Startseite der Ansicht im Fenster (08.10.2026: z. B. gleich die Reihe `/s/r/<Zuweisung>`) – nur Seiten des Schülerbereichs */
 export const vorschauZiel = (wert: string | null): string => (wert && /^\/s\/[A-Za-z0-9/_-]*$/.test(wert) ? wert : '/s/')
+
+/** Seiten mit Kennung, die die Vorschau ansteuern darf: Kurs (Vokabeln), Grammatiktraining, Reihe – je Tabelle der Freigabe */
+const ZIEL_TABELLEN: Record<string, string> = { v: 'vok_zuweisungen', g: 'gram_zuweisungen', r: 'reihen_zuweisungen' }
+
+/**
+ * Ziel beim Öffnen prüfen (09.10.2026): leer → Startseite `/s/`; sonst nur `/s/` oder `/s/<v|g|r>/<Kennung>` einer
+ * Freigabe DIESER Lehrkraft. null = nicht erlaubt (fremd, unbekannt oder keine Schülerseite).
+ */
+export function vorschauZielPruefen(wert: unknown, lehrkraftId: string): string | null {
+  if (wert === undefined || wert === null || wert === '') return '/s/'
+  if (typeof wert !== 'string' || wert.length > 120) return null
+  if (wert === '/s/' || wert === '/s') return '/s/'
+  const m = /^\/s\/([vgr])\/([A-Za-z0-9_-]{1,64})$/.exec(wert)
+  if (!m) return null
+  const d = db()
+  const tabelle = ZIEL_TABELLEN[m[1]]
+  if (!d.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabelle)) return null
+  const z = d.prepare(`SELECT lehrkraft_id FROM ${tabelle} WHERE id = ?`).get(m[2]) as { lehrkraft_id: string } | undefined
+  return z && z.lehrkraft_id === lehrkraftId ? wert : null
+}
+
+/** Klassenname des Vorschaukontos für Kurse ohne Lerngruppe (spontane Gruppen per QR-Code/Code in Sprachenlernen) */
+export const KURS_VORSCHAU_KLASSE = 'Sprachenlernen'
+
+/** Sieht das Vorschaukonto den Kurs nicht (spontane Gruppe, Kurs nur für einzelne), tritt es ihm wie ein Gast bei */
+export function kursSichtbarMachen(konto: NutzerInfo, kursId: string): void {
+  const z = vokZeile(kursId)
+  if (z && !vokIstFuer(z, konto)) kursGastAufnehmen(kursId, konto.id, '')
+}
 
 function fensterSeite(schluessel: string, klasse: string, zustand: string, ziel = '/s/'): string {
   const titel = `Vorschau als Musterschüler ${klasse}`
@@ -335,7 +375,8 @@ export function vorschauRoute(): (k: Anfrage) => Promise<boolean> {
     const { url, req, res, sitzung } = k
     const p = url.pathname
     const oeffnen = /^\/server\/klassen\/[^/]+\/vorschau$/.test(p)
-    if (!oeffnen && p !== '/server/vorschau/zuruecksetzen' && p !== '/vorschau') return false
+    const kurs = /^\/server\/vorschau\/kurs\/([^/]+)$/.exec(p)
+    if (!oeffnen && !kurs && p !== '/server/vorschau/zuruecksetzen' && p !== '/vorschau') return false
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const ich = sitzung.nutzer
     if (ich.rolle !== 'lehrkraft' && ich.rolle !== 'admin') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
@@ -351,16 +392,35 @@ export function vorschauRoute(): (k: Anfrage) => Promise<boolean> {
     if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
     const k0 = (await k.koerper()) as Record<string, unknown>
 
-    if (oeffnen) {
-      const g = lerngruppe(decodeURIComponent(p.split('/')[3] ?? ''))
-      if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
-      const konto = vorschauKonto(ich.id, g.name)
+    if (oeffnen || kurs) {
+      let klasse: string
+      let ziel: string | null
+      if (kurs) {
+        // Kurs aus Sprachenlernen (09.10.2026): Kurs der Klasse → deren Vorschaukonto, spontane Gruppe → „Sprachenlernen"
+        const z = vokZeile(decodeURIComponent(kurs[1]))
+        if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diesen Kurs gibt es nicht.' }), true)
+        const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+        klasse = g && g.lehrkraft_id === ich.id ? g.name : KURS_VORSCHAU_KLASSE
+        ziel = `/s/v/${z.id}`
+      } else {
+        const g = lerngruppe(decodeURIComponent(p.split('/')[3] ?? ''))
+        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        klasse = g.name
+        // Gleich auf einer Seite landen (09.10.2026, z. B. `/s/v/<Kurs>`) – nur Inhalte dieser Lehrkraft
+        ziel = vorschauZielPruefen(k0.ziel, ich.id)
+        if (!ziel) return (json(res, 400, { fehler: 'Diese Seite lässt sich in der Vorschau nicht öffnen.' }), true)
+      }
+      const konto = vorschauKonto(ich.id, klasse)
+      // Kurs vor dem Aufsetzen sichtbar machen – dann bekommt auch er den Beispiel-Lernstand
+      const kursZiel = /^\/s\/v\/([^/]+)$/.exec(ziel)
+      if (kursZiel) kursSichtbarMachen(konto, kursZiel[1])
       // „behalten": weiter mit dem Stand von zuletzt (z. B. nach einer Abgabe)
       const zustand = zustandAus(k0.zustand)
       if (zustand) vorschauAufsetzen(konto, zustand)
       const schluessel = vorschauSchluessel(konto.id, ich.id)
-      protokolliereServer('vorschau', `Schülervorschau geöffnet (${zustand ?? 'Stand behalten'})`, ich.id)
-      return (json(res, 200, { schluessel, adresse: `/vorschau?vs=${encodeURIComponent(schluessel)}`, klasse: g.name.trim() }), true)
+      protokolliereServer('vorschau', `Schülervorschau geöffnet (${kurs ? 'Kurs, ' : ''}${zustand ?? 'Stand behalten'})`, ich.id)
+      const adresse = `/vorschau?vs=${encodeURIComponent(schluessel)}${ziel !== '/s/' ? `&ziel=${encodeURIComponent(ziel)}` : ''}`
+      return (json(res, 200, { schluessel, adresse, klasse: klasse.trim(), ziel }), true)
     }
     // Zurücksetzen aus dem Streifen des Fensters
     const konto = kontoZumSchluessel(String(k0.schluessel ?? ''), ich)

@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import { sichereAlles } from './autosave'
 import { laeuft, useAuftraege } from './auftraege'
 import { notifyError } from './util'
+import { alsGeoeffnetMerken, erstesOeffnen } from './sitzung'
 
 /**
  * Wohin die Hauptapp gerade zeigt – und wie man von überall dorthin kommt.
@@ -86,6 +87,8 @@ export const useNavigation = create<NavigationState>((set, get) => ({
      * ausgeht, soll nicht die letzten Sekunden Arbeit verlieren.
      */
     if (id !== get().active) void sichereAlles()
+    // Jeder Weg in eine App zählt als „geöffnet" – danach zeigt auch die Leiste den Stand, wie er ist (shared/sitzung.ts)
+    alsGeoeffnetMerken(id)
     // Über die Leiste kommt man in die Einstellungen immer beim ersten Reiter an (siehe SettingsPage)
     set(id === 'settings' ? { active: id, settingsTab: 'schule' } : { active: id })
   },
@@ -144,6 +147,40 @@ export async function dokumentOeffnenWennBereit(moduleId: string, docId: string)
 
 /** Kurzformen für Stellen außerhalb von React (und für Knöpfe, die nur auslösen) */
 export const openModule = (id: string): void => useNavigation.getState().openModule(id)
+
+/*
+ * ---------- Erstes Öffnen in der Sitzung (09.10.2026, Entscheidung der Lehrkraft) ----------
+ *
+ * Wer eine App über die Leiste (Programmliste, Tastenkürzel, „Alle …") zum ersten Mal in dieser Sitzung öffnet, sieht
+ * ihre Übersicht – nicht ein zuletzt offenes Dokument oder einen Unterschritt. Danach bleibt der Stand beim Wechseln
+ * erhalten. Gezielte Sprünge (`openDocument`, `neuAnlegen`, Auftragsleiste, Rückweg …) laufen über `openModule` und
+ * öffnen ihr Ziel; sie zählen als erstes Öffnen. Die App meldet an, wie sie zu ihrer Übersicht kommt
+ * (`useUebersichtZeiger`).
+ */
+const uebersicht = new Map<string, () => void>()
+
+/** Anmelden, wie eine App ihre Übersicht zeigt; liefert das Abmelden (auch für Tests ohne React) */
+export function uebersichtAnmelden(moduleId: string, zeigen: () => void): () => void {
+  uebersicht.set(moduleId, zeigen)
+  return () => {
+    if (uebersicht.get(moduleId) === zeigen) uebersicht.delete(moduleId)
+  }
+}
+
+/** Die App meldet an, wie sie ihre Übersicht (Bibliothek bzw. Startbild) zeigt */
+export function useUebersichtZeiger(moduleId: string, zeigen: () => void): void {
+  const aktuell = useRef(zeigen)
+  aktuell.current = zeigen
+  useEffect(() => uebersichtAnmelden(moduleId, () => aktuell.current()), [moduleId])
+}
+
+/** Öffnen über die Leiste: beim ersten Mal in der Sitzung mit der Übersicht der App */
+export function oeffneProgramm(id0: string): void {
+  const id = modulVon(id0)
+  const erstes = erstesOeffnen(id)
+  useNavigation.getState().openModule(id)
+  if (erstes) uebersicht.get(id)?.()
+}
 export const openSettings = (tab?: SettingsTab): void => useNavigation.getState().openSettings(tab)
 export const openDocument = (moduleId: string, docId: string): Promise<void> => useNavigation.getState().openDocument(moduleId, docId)
 export const openThemen = (fachId?: string, bereichId?: string): void => useNavigation.getState().openThemen(fachId, bereichId)

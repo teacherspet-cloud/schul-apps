@@ -24,7 +24,9 @@ import {
 import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
-import { json, setzeSitzungsCookie, type Anfrage } from './http'
+import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
+import { imNutzer } from './kontext'
+import { getSettings } from '../main/services/storage/settings'
 import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
@@ -39,7 +41,9 @@ import {
   vokIstFuer,
   vokStatusSetzen,
   zeile as vokZeile,
-  ausgeblendetFiltern
+  ausgeblendetFiltern,
+  sprachfaecherDerGruppe,
+  teileVon
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen } from './rekordbuch'
@@ -48,8 +52,12 @@ import { buchFuer } from './vokabelweg'
 import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
+import { ampelVon } from '../shared/grammatikBereiche'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
+import { abschnitteAusName, bandErkennen, bekanntNachBand, stelleImLehrwerk, type Erkennung, type FreigegebeneUnit, type SchulOrt } from '../shared/lehrwerkBand'
+import { abschnitteEinordnen, buchAusKennung, mitBaenden } from '../shared/kursAbschnitte'
+import { kursFuerLernende } from '../shared/freigabePlan'
 import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
 import { zugangPlan } from './planen'
 
@@ -216,9 +224,83 @@ export function bisUnit(buch: string, unit: string): string[] {
   return [...bekannt, ...neu].flatMap((p) => p.t)
 }
 
+/** Schulort der Lehrkraft (Einstellungen › Schule) für die Band-Erkennung – kurz zwischengespeichert */
+const ortCache = new Map<string, { ort: SchulOrt; zeit: number }>()
+export function schulOrtVon(lehrkraftId: string): SchulOrt {
+  const c = ortCache.get(lehrkraftId)
+  if (c && Date.now() - c.zeit < 60_000) return c.ort
+  let ort: SchulOrt = {}
+  try {
+    const lk = nutzerNachId(lehrkraftId)
+    const d = lk ? imNutzer(alsNutzer(lk), () => getSettings().defaults) : undefined
+    ort = { land: d?.stateId || undefined, schulform: d?.schoolTypeId || undefined }
+  } catch {
+    // Einstellungen nicht lesbar: ohne Ort (gilt als G9)
+  }
+  ortCache.set(lehrkraftId, { ort, zeit: Date.now() })
+  return ort
+}
+
+type VokKurs = NonNullable<ReturnType<typeof vokZeile>>
+
+/** Bände und freigegebene Units aus Vokabelkursen – nur Freigegebenes (geplante Abschnitte zählen noch nicht) */
+export function lehrwerkAusKursen(kurse: VokKurs[]): { baende: string[]; freigegeben: FreigegebeneUnit[] } {
+  const baende: string[] = []
+  const freigegeben: FreigegebeneUnit[] = []
+  for (const roh of kurse) {
+    const z = kursFuerLernende(roh)
+    const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
+    const teile = json_(z.woerter, [] as unknown[]).length ? teileVon(z) : []
+    for (const e of mitBaenden(teile, abschnitteEinordnen(teile, q), q, z.titel)) {
+      if (!e.buch) continue
+      baende.push(e.buch)
+      // Abschnittsname wie „Check-in, Station 1"; ein ganzer Titel („Green Line 1 - Unit 3") nennt keine – dann die Herkunft
+      if (e.unit && !e.name.includes(' - ')) freigegeben.push({ buch: e.buch, unit: e.unit, abschnitte: abschnitteAusName(e.name) })
+    }
+    if (q.lehrwerk) {
+      const buch = buchAusKennung(q.lehrwerk)
+      baende.push(buch)
+      for (const u of quelleUnits(q)) freigegeben.push({ buch, unit: u.unit, abschnitte: u.abschnitte })
+    }
+  }
+  return { baende, freigegeben }
+}
+
 /**
- * Was ein Kind an Grammatik kennt: Lehrwerk-Stand (Lerngruppe, sonst die höchste Unit seiner Vokabeltrainings) plus die
- * Themen freigegebener Grammatik. Ohne fein erfasstes Lehrwerk (z. B. Latein) bleibt nur das Freigegebene.
+ * Automatischer Lehrwerk-Stand einer Lerngruppe (09.10.2026, abgestimmt; Regeln in shared/lehrwerkBand.ts): Band nach
+ * Jahrgang, Schulform und Bundesland, Reihe aus den Vokabeln – ohne Unit. Ohne Jahrgang der höchste Band der Vokabeln.
+ */
+export function lehrwerkAutomatisch(gid: string): (Erkennung & { freigegeben: FreigegebeneUnit[] }) | null {
+  const g = lerngruppe(gid)
+  if (!g) return null
+  const sprache = sprachfaecherDerGruppe(g.fach)[0]?.sprache
+  let kurse: VokKurs[] = []
+  let ueblich: string[] = []
+  try {
+    kurse = (
+      db().prepare("SELECT * FROM vok_zuweisungen WHERE lerngruppe_id = ? AND lehrkraft_id = ? AND status = 'offen'").all(gid, g.lehrkraft_id) as unknown as VokKurs[]
+    ).filter((z) => !sprache || z.sprache === sprache)
+    ueblich = (
+      db()
+        .prepare("SELECT quelle FROM vok_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND quelle != '' ORDER BY erstellt DESC LIMIT 50")
+        .all(g.lehrkraft_id, sprache ?? 'en') as { quelle: string }[]
+    )
+      .map((z) => json_(z.quelle, {} as Partial<Quelle>).lehrwerk ?? '')
+      .filter(Boolean)
+      .map(buchAusKennung)
+  } catch {
+    // Noch keine Vokabeltrainings (Tabelle fehlt)
+  }
+  const { baende, freigegeben } = lehrwerkAusKursen(kurse)
+  const e = bandErkennen({ jahrgang: jahrgangAus(g.name), ort: schulOrtVon(g.lehrkraft_id), baende, ueblich })
+  return e ? { ...e, freigegeben } : null
+}
+
+/**
+ * Was ein Kind an Grammatik kennt (09.10.2026 neu abgestimmt: „Frühere Bände + Freigegebenes"): je Lerngruppe der von
+ * Hand gesetzte Lehrwerk-Stand (bis zu dieser Unit), sonst der automatisch erkannte Band – alle früheren Bände ganz, vom
+ * aktuellen das Freigegebene. Kurse ohne Lerngruppe (QR-Code): höchster Band ihrer Vokabeln, ebenso. Dazu die Themen
+ * freigegebener Grammatik. Ohne fein erfasstes Lehrwerk (z. B. Latein) bleibt nur das Freigegebene.
  * Ergebnis: Themen- und Teilform-Kennungen, Themen auch ohne Teilform („en.verb.past_simple").
  */
 export function bekannteGrammatikFuer(ich: NutzerInfo): string[] {
@@ -227,20 +309,28 @@ export function bekannteGrammatikFuer(ich: NutzerInfo): string[] {
     kennungen.add(t)
     kennungen.add(t.split('/')[0])
   }
-  // 1. Lehrwerk-Stand: von Hand gesetzt (Lerngruppe), sonst aus den Vokabeln
-  const stand: { buch: string; unit: string }[] = []
-  const gruppen = (db().prepare('SELECT lerngruppe_id FROM lehrwerk_stand').all() as { lerngruppe_id: string }[])
-    .map((g) => lerngruppe(g.lerngruppe_id))
-    .filter((g): g is NonNullable<typeof g> => Boolean(g && gehoertZu(g, ich)))
-  for (const g of gruppen) {
-    const s = lehrwerkStandVon(g.id)
-    if (s) stand.push(s)
+  // 1. Lehrwerk-Stand je Lerngruppe: von Hand gesetzt, sonst erkannt
+  const kurse = vokabelListenFuer(ich)
+    .map((v) => vokZeile(v.id))
+    .filter((z): z is VokKurs => Boolean(z))
+  const gruppen = new Set(kurse.map((z) => z.lerngruppe_id).filter(Boolean))
+  for (const r of db().prepare('SELECT lerngruppe_id FROM lehrwerk_stand').all() as { lerngruppe_id: string }[]) {
+    const g = lerngruppe(r.lerngruppe_id)
+    if (g && gehoertZu(g, ich)) gruppen.add(g.id)
   }
-  if (!stand.length) {
-    const best = hoechsteUnit(vokabelListenFuer(ich).map((v) => vokZeile(v.id)?.quelle ?? ''))
-    if (best) stand.push(best)
+  for (const gid of gruppen) {
+    const hand = lehrwerkStandVon(gid)
+    if (hand) for (const t of bisUnit(hand.buch, hand.unit)) plus(t)
+    else {
+      const auto = lehrwerkAutomatisch(gid)
+      if (auto) for (const t of bekanntNachBand(auto.buch, auto.freigegeben)) plus(t)
+    }
   }
-  for (const s of stand) for (const t of bisUnit(s.buch, s.unit)) plus(t)
+  for (const z of kurse.filter((k) => !k.lerngruppe_id)) {
+    const { baende, freigegeben } = lehrwerkAusKursen([z])
+    const e = bandErkennen({ jahrgang: null, baende })
+    if (e) for (const t of bekanntNachBand(e.buch, freigegeben)) plus(t)
+  }
   // 2. Freigegebene Grammatik
   for (const z of (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[]).filter((z) => istFuer(z, ich))) {
     const i = infoVon(z)
@@ -294,7 +384,8 @@ const gaesteVon = (zid: string): NutzerInfo[] =>
     .filter((n): n is NutzerInfo => Boolean(n && n.quelle !== 'vorschau'))
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 
-function istFuer(z: Zeile, ich: NutzerInfo): boolean {
+/** `kurse`: Merkliste der Kurse (Vokabeltrainings) für viele Prüfungen hintereinander – die Zeile samt Wortliste zu entschlüsseln kostet */
+function istFuer(z: Zeile, ich: NutzerInfo, kurse?: Map<string, ReturnType<typeof vokVon>>): boolean {
   if (ich.rolle !== 'schueler') return false
   // Geplante Freischaltung (09.10.2026, freigabePlan.ts): die Aufgaben dürfen schon fertig sein, die Lernenden sehen sie erst ab dann
   if (nochGeplant('gram', z.id)) return false
@@ -302,7 +393,7 @@ function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   // Extra (Förder/Forder, 08.10.2026): nur für die gewählten Lernenden, nicht für den ganzen Kurs
   if (istExtra(z)) return ich.quelle !== 'gast' && json_(z.schueler, [] as string[]).includes(ich.benutzer)
   // Verbunden mit einem Vokabeltraining: wer dort lernt (auch eingetragene Gäste), hat auch diese Grammatik
-  const v = vokVon(z)
+  const v = !kurse ? vokVon(z) : kurse.has(z.vok_id ?? '') ? kurse.get(z.vok_id ?? '')! : (kurse.set(z.vok_id ?? '', vokVon(z)), kurse.get(z.vok_id ?? '')!)
   if (v && vokIstFuer(v, ich)) return true
   // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
   if (ich.quelle === 'gast' && !gastInLerngruppe(z.lerngruppe_id, ich)) return false
@@ -428,6 +519,13 @@ export async function jahrgangDerGrammatik(z: Zeile, ich: NutzerInfo): Promise<{
     ? unitStelle(info.lehrwerk.unit, band && LEHRWERK_GRAMMATIK[band] ? Object.keys(LEHRWERK_GRAMMATIK[band]) : undefined)
     : unitStelle(q.unit, buch?.units.map((u) => u.name))
   return { jahrgang, stelle }
+}
+
+/** Band und Unit einer Grammatik: aus der Freigabe (Lehrwerk der Auswahl), sonst aus dem Katalog (erste Einführung) */
+export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string } {
+  const info = infoVon(z)
+  if (info.lehrwerk?.buch) return { buch: grammatikBand(info.lehrwerk.buch) ?? info.lehrwerk.buch, ...(info.lehrwerk.unit ? { unit: info.lehrwerk.unit } : {}) }
+  return stelleImLehrwerk(info.themen, info.teilformen) ?? {}
 }
 
 /**
@@ -573,6 +671,56 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
   }
 }
 kursHaken.profil = grammatikProfil
+
+/**
+ * Wer braucht Fördern? (09.10.2026, Handlungsbedarf der Klassenkurse) – dasselbe Ergebnis wie
+ * `empfehlung(grammatikProfil(n).regeln).art === 'foerder'`, aber für viele Lernende auf einmal und schnell genug für die
+ * Klassenübersicht (Messung mit 8 Klassen à 26: je Person ein Profil kostete ~650 ms je Aufruf von GET /server/klassen):
+ *  - die Zuweisungen der Lehrkraft in der Sprache EINMAL lesen (statt je Person), Pakete höchstens einmal entschlüsseln;
+ *  - welche Person überhaupt etwas geübt hat, steht in gram_stand (Kennungen unverschlüsselt) – EINE Abfrage ohne Daten;
+ *  - nur für diese Paare „ist für" prüfen und den Lernstand entschlüsseln. Schwäche = Regel mit Ampel „schwaeche".
+ */
+export function grammatikFoerder(nutzer: NutzerInfo[], sprache: string, lehrkraftId: string): Set<string> {
+  const aus = new Set<string>()
+  if (!nutzer.length) return aus
+  const zs = db()
+    .prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND status != 'entfernt'")
+    .all(lehrkraftId, sprache) as unknown as Zeile[]
+  if (!zs.length) return aus
+  const jeId = new Map(nutzer.map((n) => [n.id, n]))
+  const paare = new Map<string, Zeile[]>()
+  const nachZ = new Map(zs.map((z) => [z.id, z]))
+  const abfrage = db().prepare(`SELECT zuweisung_id, schueler_id FROM gram_stand WHERE zuweisung_id IN (${zs.map(() => '?').join(',')})`)
+  for (const r of abfrage.all(...zs.map((z) => z.id)) as { zuweisung_id: string; schueler_id: string }[]) {
+    if (!jeId.has(r.schueler_id)) continue
+    const z = nachZ.get(r.zuweisung_id)
+    if (z) paare.set(r.schueler_id, [...(paare.get(r.schueler_id) ?? []), z])
+  }
+  const pakete = new Map<string, GrammatikPaket>()
+  const paket = (z: Zeile): GrammatikPaket => pakete.get(z.id) ?? (pakete.set(z.id, paketVon(z)), pakete.get(z.id)!)
+  const kurse = new Map<string, ReturnType<typeof vokVon>>()
+  for (const [sid, liste] of paare) {
+    const n = jeId.get(sid)!
+    const jeRegel = new Map<string, { versuche: number; richtig: number }>()
+    for (const z of liste) {
+      if (!istFuer(z, n, kurse)) continue
+      const p = paket(z)
+      const st = standVon(z.id, n.id).aufgaben
+      for (const r of p.regeln) {
+        const e = jeRegel.get(norm(r.titel)) ?? { versuche: 0, richtig: 0 }
+        for (const a of p.aufgaben) {
+          const s = a.regelId === r.id ? st[a.id] : undefined
+          if (!s?.versuche) continue
+          e.versuche += s.versuche
+          e.richtig += s.versuche - s.falsch
+        }
+        jeRegel.set(norm(r.titel), e)
+      }
+    }
+    if ([...jeRegel.values()].some((e) => e.versuche > 0 && ampelVon({ versuche: e.versuche, quote: e.richtig / e.versuche }) === 'schwaeche')) aus.add(sid)
+  }
+  return aus
+}
 kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
 kursHaken.grammatikZahl = (vokId) =>
@@ -980,6 +1128,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               erstellt: z.erstellt,
               jahrgang: jahre[i].jahrgang,
               stelle: jahre[i].stelle,
+              // Band und Unit (09.10.2026): Kursseite gliedert die Grammatik nach Lehrwerk, sonst nach Schuljahr
+              ...lehrwerkDerGrammatik(z),
               ...(z.code ? { code: z.code, link: link(z.code) } : {})
             }
           })
@@ -993,19 +1143,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const gid = String(url.searchParams.get('gruppe') ?? '')
         const g = lerngruppe(gid)
         if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true
-        // Was „automatisch" gerade ergibt (08.10.2026): höchste Unit der offenen Vokabeltrainings dieser Lerngruppe
-        let automatisch: { buch: string; unit: string } | null = null
-        try {
-          automatisch = hoechsteUnit(
-            (
-              db().prepare("SELECT quelle FROM vok_zuweisungen WHERE lerngruppe_id = ? AND lehrkraft_id = ? AND status = 'offen'").all(gid, ich.id) as {
-                quelle: string
-              }[]
-            ).map((z) => z.quelle)
-          )
-        } catch {
-          // Noch keine Vokabeltrainings (Tabelle fehlt): kein automatischer Stand
-        }
+        // Was „automatisch" gerade ergibt (09.10.2026): Band nach Jahrgang, Schulform und Land – ohne Unit
+        const auto = lehrwerkAutomatisch(gid)
+        const automatisch = auto ? { buch: auto.buch, unit: '', grund: auto.grund } : null
         return (
           json(res, 200, {
             stand: lehrwerkStandVon(gid),

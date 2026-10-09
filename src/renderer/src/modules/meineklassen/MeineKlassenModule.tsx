@@ -88,8 +88,11 @@ import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klass
 import { AlsSchuelerAnsehen } from './SchuelerVorschau'
 import { FachKopf } from './FachKopf'
 import { KlassenKurs } from './KlassenKurs'
+import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
+import { IservVorschlaege } from './IservVorschlaege'
+import { kursEintragOeffnen, useEntwurfBedarf, type KursEintrag } from './kursBedarf'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
 import GeplantKarte from './GeplantKarte'
 import { geplantText } from '../../shared/components/FreigabePlanen'
@@ -121,7 +124,7 @@ type Bedarf = {
   ziel?: { modul: string; id?: string }
   /** Kennung zum Ausblenden (09.10.2026) */
   schluessel: string
-}
+} & Partial<Pick<KursEintrag, 'kurs' | 'hinweis' | 'reiter' | 'ids' | 'lokal'>>
 type Vorschlag =
   | { art: 'vokabeln'; titel: string; text: string; sprache: string; fach: string; woerter: { term: string; translation: string; example?: string }[] }
   | { art: 'blatt'; titel: string; text: string; testId: string; thema: string; schwerpunkte: string[]; testArt: string }
@@ -645,7 +648,8 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
 
 /**
  * Lehrwerk-Stand der Lerngruppe (08.10.2026, abgestimmt): bestimmt, welche Grammatik als bekannt gilt (passende Spiele,
- * Forderaufgaben). Ohne Eintrag gilt die höchste Unit aus den Vokabeltrainings der Lernenden.
+ * Forderaufgaben). Ohne Eintrag gilt seit 09.10.2026 der Band zu Klassenstufe, Schulform und Land (shared/lehrwerkBand.ts)
+ * – ohne Unit; bekannt sind dann alle früheren Bände und das Freigegebene des aktuellen.
  *
  * Klein (08.10.2026, Wunsch der Lehrkraft): ein Knopf in der Kopfzeile von „Vokabeln & Grammatik" („Lehrwerk: Green
  * Line 1 · Unit 2 (automatisch)"), die Auswahl im Pop-up. Zurück zu „automatisch": beide Felder leerbar und ein eigener
@@ -654,7 +658,7 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
 function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | null {
   const [d, setD] = useState<{
     stand: { buch: string; unit: string } | null
-    automatisch?: { buch: string; unit: string } | null
+    automatisch?: { buch: string; unit: string; grund?: 'jahrgang' | 'vokabeln' } | null
     baende: Record<string, string[]>
   } | null>(null)
   const [offen, setOffen] = useState(false)
@@ -668,8 +672,8 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
     void senden('/server/grammatik/lehrwerkstand', { gruppe: gruppeId, buch: buch ?? '', unit: unit ?? '' }).then(laden, (e: unknown) => notifyError(e))
   const buch = d.stand?.buch ?? null
   const auto = d.automatisch ?? null
-  const gilt = d.stand ?? auto
-  const knopfText = gilt ? `Lehrwerk: ${gilt.buch} · ${gilt.unit}${d.stand ? '' : ' (automatisch)'}` : 'Lehrwerk festlegen'
+  // Automatisch (09.10.2026, abgestimmt): nur der Band – „Lehrwerk: Green Line 6 (automatisch)", keine Unit
+  const knopfText = d.stand ? `Lehrwerk: ${d.stand.buch} · ${d.stand.unit}` : auto ? `Lehrwerk: ${auto.buch} (automatisch)` : 'Lehrwerk festlegen'
   return (
     <Popover opened={offen} onChange={setOffen} position="bottom-end" withinPortal shadow="md" trapFocus>
       <Popover.Target>
@@ -690,8 +694,11 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
             Lehrwerk-Stand (Grammatik)
           </Text>
           <Text size="xs" c="dimmed">
-            Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Automatisch: höchste Unit aus den Vokabeln der
-            Klasse – {auto ? `zurzeit ${auto.buch} · ${auto.unit}` : 'zurzeit noch keine (keine Vokabeln mit Lehrwerk und Unit)'}.
+            Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Automatisch: der Band zu Klassenstufe, Schulform und
+            Bundesland; bekannt sind alle früheren Bände und was aus diesem Band schon freigegeben ist.{' '}
+            <span data-lehrwerk-auto-text>
+              {auto ? `automatisch: ${auto.buch}` : 'Zurzeit keiner erkannt (noch keine Vokabeln aus einem Lehrwerk).'}
+            </span>
           </Text>
           <Select
             label="Band"
@@ -699,7 +706,7 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
             value={buch}
             onChange={(b) => (b ? setzen(b, d.baende[b][0] ?? '') : setzen(null, null))}
             clearable
-            placeholder={auto ? `automatisch (${auto.buch})` : 'automatisch'}
+            placeholder={auto ? `automatisch: ${auto.buch}` : 'automatisch'}
             comboboxProps={{ withinPortal: false }}
             data-lehrwerk-band
           />
@@ -709,7 +716,7 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
             value={d.stand?.unit ?? null}
             onChange={(u) => (buch && u ? setzen(buch, u) : setzen(null, null))}
             clearable
-            placeholder={auto && !buch ? `automatisch (${auto.unit})` : 'automatisch'}
+            placeholder={auto && !buch ? 'automatisch: frühere Bände + Freigegebenes' : 'automatisch'}
             disabled={!buch}
             comboboxProps={{ withinPortal: false }}
             data-lehrwerk-unit
@@ -722,7 +729,7 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
             onClick={() => setzen(null, null)}
             data-lehrwerk-automatisch
           >
-            {d.stand ? 'Automatisch (aus den Vokabeln)' : 'Automatisch (aus den Vokabeln) ist gewählt'}
+            {d.stand ? 'Automatisch (nach Klassenstufe)' : 'Automatisch (nach Klassenstufe) ist gewählt'}
           </Button>
         </Stack>
       </Popover.Dropdown>
@@ -761,22 +768,29 @@ function BedarfZeile({
   const titel = ausgeblendet ? 'Wieder einblenden' : 'Ausblenden – kommt wieder, sobald sich etwas ändert'
   return (
     <Group gap={6} wrap="nowrap" align="center" data-bedarf-zeile={b.schluessel}>
-      <Tooltip label={titel} withinPortal>
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          size="sm"
-          loading={laeuft}
-          onClick={() => void umschalten()}
-          aria-label={ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}
-          data-bedarf-ausblenden={ausgeblendet ? undefined : true}
-          data-bedarf-einblenden={ausgeblendet ? true : undefined}
-        >
-          {ausgeblendet ? <IconEye size={16} /> : <IconEyeOff size={16} />}
-        </ActionIcon>
-      </Tooltip>
+      {/* Entwürfe liegen nur in diesem Gerät (kursBedarf.ts) – nicht ausblendbar */}
+      {b.lokal ? (
+        <div style={{ width: 22, flexShrink: 0 }} />
+      ) : (
+        <Tooltip label={titel} withinPortal>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            loading={laeuft}
+            onClick={() => void umschalten()}
+            aria-label={ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}
+            data-bedarf-ausblenden={ausgeblendet ? undefined : true}
+            data-bedarf-einblenden={ausgeblendet ? true : undefined}
+          >
+            {ausgeblendet ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+          </ActionIcon>
+        </Tooltip>
+      )}
       <UnstyledButton
-        onClick={() => b.ziel && oeffnen(b.ziel.modul, b.ziel.id)}
+        // Kurs-Einträge (09.10.2026): in „Meine Klassen" bleiben – Reiter „Vokabeln"/„Grammatik" und Sprung an die Stelle
+        onClick={() => kursEintragOeffnen(b, (r) => useSicht.getState().setze({ reiter: r })) || (b.ziel && oeffnen(b.ziel.modul, b.ziel.id))}
+        data-ziel-reiter={b.reiter}
         className="klassen-bedarf"
         data-bedarf={b.art}
         style={{ flex: 1, opacity: ausgeblendet ? 0.7 : 1 }}
@@ -852,6 +866,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   }, [laden])
   const fertige = useFertigeBlaetter(id)
   const { logoDataUrl, settings } = useAppSettings()
+  // Grammatik-Entwürfe der Kurse (nur in diesem Gerät, 09.10.2026) – wie auf der Kursseite vorne im Handlungsbedarf
+  const entwurfBedarf = useEntwurfBedarf(d?.vokabeln ?? [])
   if (!d)
     return (
       <Center h="30vh">
@@ -885,31 +901,38 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     notifySuccess('Die KI erstellt das Arbeitsblatt im Hintergrund – fertig steht es hier unter „Passendes Material“ zum Freischalten.')
     setVorschau(null)
   }
+  // Kurs der Klasse (sonst der erste laufende mit Wörtern) – für den Lernstand oben
+  const sprachKurs = d.vokabeln.find((v) => v.id === d.klassenKurs) ?? d.vokabeln.find((v) => v.status === 'offen' && v.woerter > 0)
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
   const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
   return (
     <Stack data-klasse-detail={d.titel}>
       {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) */}
-      <FachKopf d={d} gehe={(r) => setze({ reiter: r })} />
+      <FachKopf d={{ ...d, bedarf: [...entwurfBedarf, ...d.bedarf] }} gehe={(r) => setze({ reiter: r })} />
       {/* ---------- Handlungsbedarf */}
       <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
         <Group gap={6} mb="xs">
           <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
           <Text fw={700}>Handlungsbedarf</Text>
         </Group>
-        {d.bedarf.length === 0 ? (
+        {d.bedarf.length + entwurfBedarf.length === 0 ? (
           <Text c="dimmed" size="sm">
             {d.bedarfAusgeblendet?.length ? 'Nichts weiter – der übrige Handlungsbedarf ist ausgeblendet.' : 'Nichts Dringendes – alle Abgaben geprüft, niemand hängt hinterher.'}
           </Text>
         ) : (
           <Stack gap={4}>
-            {d.bedarf.map((b) => (
+            {[...entwurfBedarf, ...d.bedarf].map((b) => (
               <BedarfZeile key={b.schluessel} b={b} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />
             ))}
           </Stack>
         )}
         {(d.bedarfAusgeblendet?.length ?? 0) > 0 && <AusgeblendeterBedarf liste={d.bedarfAusgeblendet!} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />}
       </Card>
+
+      {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units */}
+      {d.sprachfach && sprachKurs && sprachKurs.woerter > 0 && (
+        <SprachLernstand kursId={sprachKurs.id} abschnitte={sprachKurs.abschnitte} zuAbschnitten={() => setze({ reiter: 'vokabeln' })} />
+      )}
 
       {/* ---------- Geplante Freischaltungen (09.10.2026) */}
       <GeplantKarte gruppeId={d.id} neuLaden={laden} />
@@ -1042,6 +1065,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           />
         </Tabs.Panel>
         <Tabs.Panel value="lernende" pt="sm">
+          {/* Erste IServ-Anmeldung, mehrdeutig: mit dem bisherigen Gastkonto zusammenführen? (09.10.2026) */}
+          <IservVorschlaege gruppeId={d.id} geaendert={laden} />
           <LernendeTabelle d={d} neuLaden={laden} />
         </Tabs.Panel>
       </Tabs>

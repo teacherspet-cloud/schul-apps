@@ -315,6 +315,50 @@ export async function neuImBereich(moduleId: string, docId: string, bereich: The
   }
 }
 
+/** Programme, deren Materialien in den übergreifenden Themenbereichen stehen (shell/materialien.ts › ladeMaterialien) */
+export const ZENTRAL_GEORDNET: ReadonlySet<string> = new Set([
+  'vokabeltest',
+  'arbeitsblatt',
+  'lernzielkontrolle',
+  'grammatiktest',
+  'klassenarbeit',
+  'vokabelliste',
+  'tafelbild'
+])
+
+const gleicherName = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de') === b.trim().toLocaleLowerCase('de')
+
+/**
+ * Themenbereich von Hand in einer Themen-Bibliothek gewählt (09.10.2026, Befund aus der Tafelbild-Bibliothek): Der Name
+ * stand bisher nur im Dokument – Startseite und Themenübersicht (diese Zuordnungen) zeigten weiter den alten Bereich.
+ * Jetzt auch hier: der gleichnamige Bereich des Fachs (oberste Ebene zuerst; fehlt er, wird er angelegt), von Hand.
+ * Liegt das Material schon in diesem Bereich (oder einem seiner Unterbereiche), bleibt es dort. `null` = wieder
+ * automatisch: eine Zuordnung von Hand fällt weg.
+ */
+export async function themenbereichVonHand(moduleId: string, docId: string, fachId: string, name: string | null): Promise<void> {
+  if (!ZENTRAL_GEORDNET.has(moduleId)) return
+  const k = materialSchluessel(moduleId, docId)
+  const d = await ladeThemen()
+  const jetzt = d.zuordnungen[k]
+  const am = new Date().toISOString()
+  if (name === null) {
+    if (jetzt?.von === 'hand') setze(await window.api.themen.zuordnen({ [k]: null }))
+    return
+  }
+  const n = name.trim()
+  if (!n) return
+  const aktuell = jetzt?.bereichId ? d.bereiche.find((b) => b.id === jetzt.bereichId) : undefined
+  if (jetzt && aktuell && gleicherName(obersterBereich(d, aktuell.id)?.name ?? aktuell.name, n)) {
+    if (jetzt.von !== 'hand') setze(await window.api.themen.zuordnen({ [k]: { ...jetzt, von: 'hand', am } }))
+    return
+  }
+  if (!fachId) return
+  const passend = d.bereiche.filter((b) => b.fachId === fachId && gleicherName(b.name, n))
+  const ziel = passend.find((b) => !b.elternId) ?? passend[0] ?? (await bereichAnlegen(fachId, n))
+  if (!ziel) return
+  setze(await window.api.themen.zuordnen({ [k]: { bereichId: ziel.id, von: 'hand', am } }))
+}
+
 /**
  * Themenbereich eines Materials – der, in dem es direkt liegt (mit Unterbereichen der tiefste).
  * null = ohne Bereich. Liest den geladenen Stand; wer sicher gehen will, ruft vorher `ladeThemen()`.

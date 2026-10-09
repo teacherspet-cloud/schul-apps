@@ -12,9 +12,12 @@
  * sind NICHT teilbar (Nutzungsbedingungen) – jede Lehrkraft meldet ihr eigenes an.
  */
 import { leseDiagnose } from './diagnose'
+import { fehlerUebersicht, serverZustand } from './serverZustand'
+import { sicherungStarten, sicherungsStand } from './sicherungen'
 import { freemem, loadavg, totalmem } from 'node:os'
-import { rmSync, statfsSync } from 'node:fs'
+import { statfsSync } from 'node:fs'
 import type { SecretName } from '@shared/types'
+import { KOMPATIBEL_IDS, kompatibelVorgabe } from '@shared/kiAnbieter'
 import type { Anfrage } from './http'
 import { json } from './http'
 import {
@@ -22,7 +25,7 @@ import {
   leseServerProtokoll,
   nutzerAendern,
   nutzerAnlegen,
-  nutzerLoeschen,
+  kontoEntfernen,
   nutzerNachBenutzer,
   nutzerNachId,
   protokolliereServer,
@@ -35,16 +38,28 @@ import {
 } from './datenbank'
 import { passwortHash, zufallsPasswort } from './geheim'
 import { iservEinstellung, ISERV_STANDARD, type IservEinstellung } from './anmeldung'
-import { DATEN, nutzerOrdner } from './pfade'
+import { DATEN } from './pfade'
 import { offeneStroeme } from './ereignisse'
 import type { Rolle } from './kontext'
 import { benutzerFuer, klassenGruppe, nameAusZeile, startPasswort } from './klassenliste'
 import { registerVergessen } from './namensschutz'
 import { alleFreigaben, freigabeWiderrufen } from './hoertexte'
 import { ABLAGE_STANDARD, ablageMuster } from './klassen'
+import { AbgleichFehler, abgleichGeschuetzt, abgleichPruefen, abgleichSchwelle, pruefungEinloesen, pruefungMerken, sicherungVorAbgleich } from './iservAbgleich'
+import { basename } from 'node:path'
+import { verknuepfungLoesen } from './kontoVerknuepfung'
+import type { NutzerInfo } from './datenbank'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
-export const TEILBARE_SCHLUESSEL: SecretName[] = ['openai', 'anthropic', 'google', 'elevenlabs', 'pixabay']
+export const TEILBARE_SCHLUESSEL: SecretName[] = [
+  'openai',
+  'anthropic',
+  'google',
+  // OpenAI-kompatible Anbieter (09.10.2026, kiZugaenge.ts) – lokale Modelle gibt es auf dem Server nicht
+  ...KOMPATIBEL_IDS.filter((id) => !kompatibelVorgabe(id)?.nurPc),
+  'elevenlabs',
+  'pixabay'
+]
 
 /** Für main/services/storage/settings.ts `setzeGeheimRueckfall`: freigegebener Schlüssel oder nichts */
 export function freigegebenerSchluessel(name: SecretName): string | undefined {
@@ -88,7 +103,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
           // Bekannte Klassen für die Zuordnung von Schülerkonten (06.10.2026)
           klassen: bekannteKlassen(),
           schluessel: TEILBARE_SCHLUESSEL.map((name) => ({ name, hinterlegt: verdeckt(serverGeheimnis(`schluessel:${name}`)), fuerAlle: Boolean(freigaben[name]) })),
-          iserv: { ...iserv, geheimnis: Boolean(serverGeheimnis('iserv-client')) },
+          iserv: { ...iserv, geheimnis: Boolean(serverGeheimnis('iserv-client')), abgleichSchwelle: abgleichSchwelle() },
           notzugang: serverWert('notzugang', true),
           // Meine Klassen (06.10.2026): Ordnerstruktur für „In IServ ablegen"
           ablage: { muster: ablageMuster(), standard: ABLAGE_STANDARD },
@@ -108,6 +123,9 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
       const namen = new Map(alleNutzer().map((n) => [n.id, n.benutzer]))
       return (json(res, 200, { freigaben: alleFreigaben().map((f) => ({ ...f, benutzer: namen.get(f.nutzer_id) ?? '' })) }), true)
     }
+    // Reiter „Server" (09.10.2026): Ampel, Verlauf, Nutzung, Platz, Sicherungen, Fehler – Zeitraum 24h oder 7d
+    if (was === 'zustand') return (json(res, 200, serverZustand(DATEN, url.searchParams.get('zeitraum') === '7d' ? '7d' : '24h')), true)
+    if (was === 'fehler') return (json(res, 200, fehlerUebersicht()), true)
     if (was === 'protokoll') return (json(res, 200, { eintraege: leseServerProtokoll(Number(url.searchParams.get('anzahl')) || 300) }), true)
     // Diagnose-Protokolle (zeilenweise verschlüsselt, diagnose.ts) entschlüsselt lesen – 08.10.2026
     if (was === 'diagnose') {
@@ -202,17 +220,69 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     const n = nutzerNachId(String(k0.id ?? ''))
     if (!n) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (n.id === ich) return (json(res, 400, { fehler: 'Das eigene Konto lässt sich hier nicht löschen.' }), true)
-    sitzungenDesNutzersBeenden(n.id)
-    nutzerLoeschen(n.id)
+    // IServ-Konten nicht einzeln (09.10.2026): Sie kämen bei der nächsten Anmeldung leer wieder – entfernt werden sie über
+    // „Mit IServ abgleichen", sobald es sie in IServ nicht mehr gibt
+    if (n.quelle === 'iserv')
+      return (json(res, 400, { fehler: 'Konten aus IServ lassen sich nicht einzeln löschen. „Mit IServ abgleichen“ entfernt Konten, die es in IServ nicht mehr gibt; sperren geht jederzeit.' }), true)
     // Die ganze Ablage des Kontos geht mit
-    try {
-      rmSync(nutzerOrdner(n.id), { recursive: true, force: true })
-    } catch {
-      // Ordner fehlte – nichts zu tun
-    }
+    kontoEntfernen(n)
     registerVergessen()
     protokolliereServer('verwaltung', `Konto gelöscht (${n.quelle}, ${n.rolle})`, ich)
     return (json(res, 200, { ok: true }), true)
+  }
+  if (was === 'iserv-abgleich-pruefen') {
+    // Schritt 1 (09.10.2026): nur zeigen, wer entfernt würde – nichts wird gelöscht
+    const s = Number(k0.schwelle)
+    if (Number.isFinite(s) && s >= 1 && s <= 100) setzeServerWert('iserv-abgleich-schwelle', Math.round(s))
+    const schwelle = abgleichSchwelle()
+    try {
+      const plan = await abgleichPruefen(ich, undefined, schwelle)
+      const kennung = !plan.abbruch && (plan.entfernen.length || plan.loesen.length) ? pruefungMerken(ich, [...plan.entfernen, ...plan.loesen].map((x) => x.id)) : ''
+      protokolliereServer('verwaltung', `IServ-Abgleich geprüft (${plan.entfernen.length} von ${plan.geprueft} fehlen in IServ, ${plan.loesen.length} Verknüpfungen${plan.abbruch ? ', abgebrochen' : ''})`, ich)
+      return (json(res, 200, { ...plan, schwelle, kennung }), true)
+    } catch (e) {
+      protokolliereServer('verwaltung', 'IServ-Abgleich: Prüfen fehlgeschlagen', ich)
+      return (json(res, e instanceof AbgleichFehler ? 400 : 502, { fehler: e instanceof AbgleichFehler ? e.message : 'IServ war für den Abgleich nicht erreichbar.' }), true)
+    }
+  }
+  if (was === 'iserv-abgleich-entfernen') {
+    // Schritt 2: nur mit Bestätigung, nur wer beim Prüfen angezeigt wurde und laut erneuter Prüfung noch immer fehlt
+    if (k0.bestaetigt !== true) return (json(res, 400, { fehler: 'Das Entfernen braucht eine ausdrückliche Bestätigung.' }), true)
+    const gezeigt = pruefungEinloesen(String(k0.kennung ?? ''), ich)
+    if (!gezeigt) return (json(res, 409, { fehler: 'Die Prüfung ist abgelaufen. Bitte erneut prüfen.' }), true)
+    let ziele: NutzerInfo[]
+    let loesen: string[]
+    try {
+      const plan = await abgleichPruefen(ich)
+      if (plan.abbruch) return (json(res, 409, { fehler: plan.abbruch }), true)
+      ziele = plan.entfernen
+        .filter((x) => gezeigt.has(x.id))
+        .map((x) => nutzerNachId(x.id))
+        .filter((n): n is NutzerInfo => Boolean(n) && !abgleichGeschuetzt(n!, ich))
+      loesen = plan.loesen.filter((x) => gezeigt.has(x.id)).map((x) => x.id)
+    } catch (e) {
+      protokolliereServer('verwaltung', 'IServ-Abgleich: erneutes Prüfen fehlgeschlagen, nichts entfernt', ich)
+      return (json(res, e instanceof AbgleichFehler ? 400 : 502, { fehler: e instanceof AbgleichFehler ? e.message : 'IServ war für den Abgleich nicht erreichbar – nichts entfernt.' }), true)
+    }
+    if (!ziele.length && !loesen.length) return (json(res, 200, { entfernt: 0, geloest: 0, sicherung: '' }), true)
+    let sicherung = ''
+    try {
+      sicherung = basename(sicherungVorAbgleich(DATEN))
+    } catch (e) {
+      protokolliereServer('verwaltung', 'IServ-Abgleich: Sicherung fehlgeschlagen, nichts entfernt', ich)
+      return (json(res, 500, { fehler: e instanceof AbgleichFehler ? e.message : 'Die Sicherung vor dem Abgleich ist fehlgeschlagen – nichts entfernt.' }), true)
+    }
+    for (const n of ziele) kontoEntfernen(n)
+    // Gastkonten bleiben – nur die IServ-Anmeldung entfällt, Code/QR geht weiter
+    for (const id of loesen) verknuepfungLoesen(id)
+    registerVergessen()
+    // Nur Zahlen, keine Namen
+    protokolliereServer(
+      'verwaltung',
+      `IServ-Abgleich: ${ziele.length} Konten entfernt (${ziele.filter((n) => n.rolle === 'lehrkraft').length} Lehrkraft, ${ziele.filter((n) => n.rolle === 'schueler').length} Schüler), ${loesen.length} Verknüpfungen gelöst`,
+      ich
+    )
+    return (json(res, 200, { entfernt: ziele.length, geloest: loesen.length, sicherung }), true)
   }
   if (was === 'nutzer') {
     const n = nutzerNachId(String(k0.id ?? ''))
@@ -268,6 +338,11 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     setzeServerWert('iserv-ablage', muster || ABLAGE_STANDARD)
     protokolliereServer('verwaltung', 'IServ-Ablagestruktur geändert', ich)
     return (json(res, 200, { muster: muster || ABLAGE_STANDARD }), true)
+  }
+  if (was === 'sicherung') {
+    // „Sicherung jetzt anlegen" (09.10.2026): läuft im Hintergrund, Fortschritt über GET zustand
+    const r = sicherungStarten(DATEN, ich)
+    return (json(res, r.ok ? 200 : 409, r.ok ? { ok: true, stand: sicherungsStand() } : { fehler: r.fehler }), true)
   }
   if (was === 'notzugang') {
     setzeServerWert('notzugang', Boolean(k0.an))

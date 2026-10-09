@@ -365,7 +365,7 @@ try {
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
   // Training löschen (nimmt die Gastkonten mit), dann die Lehrkraft
-  if (vid && lk) await lk.request.post(`${A}/server/vokabeln/${vid}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  if (vid && lk) await lk.request.post(`${A}/server/vokabeln/${vid}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Training, Gäste und Konten gelöscht (${zuLoeschen.length})`)
   await browser.close()

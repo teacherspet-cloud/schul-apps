@@ -1,4 +1,5 @@
-import { AiProviderId, ModelKind, ModelOption } from '@shared/types'
+import { AiProviderId, KernAnbieterId, ModelKind, ModelOption } from '@shared/types'
+import { istKompatibel, KOMPATIBLE_ANBIETER, kompatibelVorgabe } from '@shared/kiAnbieter'
 import { RawModel } from './provider'
 
 /**
@@ -21,10 +22,14 @@ export function filterModels(provider: AiProviderId, kind: ModelKind, raw: RawMo
 
 /** Solange noch keine Liste vom Anbieter vorliegt (z. B. ohne Schlüssel). */
 export const BUILTIN_MODELS: Record<AiProviderId, Record<ModelKind, string[]>> = {
-  openai: { text: ['gpt-5.5', 'gpt-5.4-mini'], image: ['gpt-image-2'] },
-  anthropic: { text: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'], image: [] },
-  google: { text: ['gemini-2.5-pro', 'gemini-2.5-flash'], image: ['imagen-4.0-generate-001'] }
-}
+  ...({
+    openai: { text: ['gpt-5.5', 'gpt-5.4-mini'], image: ['gpt-image-2'] },
+    anthropic: { text: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'], image: [] },
+    google: { text: ['gemini-2.5-pro', 'gemini-2.5-flash'], image: ['imagen-4.0-generate-001'] }
+  } satisfies Record<KernAnbieterId, Record<ModelKind, string[]>>),
+  // OpenAI-kompatible Anbieter (09.10.2026): Modelle aus den Voreinstellungen, Bilder vorerst nicht
+  ...(Object.fromEntries(KOMPATIBLE_ANBIETER.map((a) => [a.id, { text: a.modelle, image: [] }])) as Record<string, Record<ModelKind, string[]>>)
+} as unknown as Record<AiProviderId, Record<ModelKind, string[]>>
 
 export function builtinOptions(provider: AiProviderId, kind: ModelKind): ModelOption[] {
   return BUILTIN_MODELS[provider][kind].map((id, i) => ({ id, label: id, recommended: i === 0 }))
@@ -40,6 +45,11 @@ const DATED = /-\d{4}-?\d{2}-?\d{2}$|-\d{8}$|-\d{3}$/
 
 function accepts(provider: AiProviderId, kind: ModelKind, m: RawModel): boolean {
   const id = m.id.toLowerCase()
+  if (istKompatibel(provider)) {
+    // Was der Endpunkt meldet, ohne offensichtliche Nicht-Textmodelle; Bilder über diesen Weg vorerst nicht
+    if (kind === 'image') return false
+    return !/(embed|whisper|tts|transcri|audio|rerank|moderation|guard|flux|dall-e|imagen|stable-diffusion|sdxl|ocr)/.test(id)
+  }
   if (provider === 'openai') {
     if (kind === 'image') return /^(gpt-image-\d+(\.\d+)?(-mini)?|dall-e-3)$/.test(id)
     if (!/^(gpt-(4o|4\.1|[5-9])|o[1-9])/.test(id)) return false
@@ -70,6 +80,10 @@ function compareNewest(a: RawModel, b: RawModel): number {
 }
 
 function pickRecommended(provider: AiProviderId, kind: ModelKind, sorted: RawModel[]): RawModel | undefined {
+  if (istKompatibel(provider)) {
+    const vorgabe = kompatibelVorgabe(provider)?.modelle ?? []
+    return vorgabe.map((v) => sorted.find((m) => m.id === v)).find(Boolean) ?? sorted[0]
+  }
   const byVersion = (list: RawModel[]): RawModel | undefined => [...list].sort((a, b) => modelVersion(b.id) - modelVersion(a.id) || compareNewest(a, b))[0]
   if (provider === 'openai') {
     if (kind === 'image') return byVersion(sorted.filter((m) => /^gpt-image-[\d.]+$/.test(m.id))) ?? sorted[0]

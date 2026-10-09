@@ -310,7 +310,18 @@ export default function BookEditor({
         <Text size="sm" fw={500} mb={4}>
           Unit
         </Text>
-        <Chip.Group value={unit} onChange={(v) => typeof v === 'string' && void wechsle(() => setUnit(v))}>
+        <Chip.Group
+          value={unit}
+          onChange={(v) =>
+            typeof v === 'string' &&
+            void wechsle(() => {
+              setUnit(v)
+              // Neue Unit beginnt mit ihrem ersten Abschnitt (09.10.2026): ein gleichnamiger Abschnitt („Wortschatz") der
+              // vorigen Unit bzw. des vorigen Bandes blieb sonst markiert
+              setSection(book.units.find((u) => u.name === v)?.sections[0]?.name ?? '')
+            })
+          }
+        >
           <Group gap={6}>
             {book.units.map((u) => (
               <Chip key={u.name} value={u.name} size="xs">

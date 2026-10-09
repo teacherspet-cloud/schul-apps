@@ -134,7 +134,16 @@ function Zeichenflaeche({ offen, schliessen, fertig }: { offen: boolean; schlies
   )
 }
 
-export default function BriefkopfFelder({ settings, update }: { settings: AppSettings; update: (p: Partial<AppSettings>) => void }): React.JSX.Element {
+export default function BriefkopfFelder({
+  settings,
+  update,
+  schuleFest = false
+}: {
+  settings: AppSettings
+  update: (p: Partial<AppSettings>) => void
+  /** IServ-Konto am Server (09.10.2026, shared/schulFest.ts): Anschrift der Schule nur anzeigen, nicht ändern */
+  schuleFest?: boolean
+}): React.JSX.Element {
   const kopf: Briefkopf = settings.briefkopf ?? {}
   const [werte, setWerte] = useState<Briefkopf>(kopf)
   const [unterschrift, setUnterschrift] = useState<string | null>(null)
@@ -180,13 +189,26 @@ export default function BriefkopfFelder({ settings, update }: { settings: AppSet
           Absender oben links im Brief. Anschrift und Telefon kommen bei der Wahl der Schule aus dem Schulverzeichnis, soweit es sie führt.
         </Text>
       </div>
-      {feld('lehrkraft', 'Name der Lehrkraft', 'z. B. Frau Müller')}
-      {feld('strasse', 'Straße und Hausnummer')}
-      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-        {feld('plz', 'PLZ')}
-        {feld('ort', 'Ort')}
-        {feld('telefon', 'Telefon der Schule')}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        {feld('lehrkraft', 'Name der Lehrkraft', 'z. B. Frau Müller')}
+        {feld('funktion', 'Funktion unter dem Namen (optional)', 'z. B. Klassenleitung 6b')}
       </SimpleGrid>
+      {schuleFest ? (
+        <Text size="sm" c="dimmed" data-briefkopf-fest>
+          Anschrift der Schule: {[kopf.strasse, [kopf.plz, kopf.ort].filter(Boolean).join(' '), kopf.telefon, kopf.email].filter(Boolean).join(' · ') || '–'} (von der
+          Schulverwaltung festgelegt)
+        </Text>
+      ) : (
+        <>
+          {feld('strasse', 'Straße und Hausnummer')}
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            {feld('plz', 'PLZ')}
+            {feld('ort', 'Ort')}
+            {feld('telefon', 'Telefon der Schule')}
+            {feld('email', 'E-Mail der Schule')}
+          </SimpleGrid>
+        </>
+      )}
 
       <div>
         <Text size="sm" fw={500}>

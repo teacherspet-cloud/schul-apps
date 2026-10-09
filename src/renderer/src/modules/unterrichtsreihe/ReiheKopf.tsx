@@ -1,13 +1,15 @@
 /**
  * Kopf der Reihe eingeklappt (08.10.2026, Plan „Übersicht" B1): nach der Planung eine Zeile „Titel · Fach · Jg. 7 ·
  * Oberthema · 6 Lernziele · 8 Stunden ✎" statt 600–900 px Formular vor dem ersten Schritt. Klick klappt auf; der
- * Zustand ist je Reihe gemerkt (localStorage – fehlt er, ist eine Reihe mit Schritten eingeklappt, eine leere offen).
+ * Zustand ist je Reihe gemerkt – für die Sitzung (shared/sitzung.ts, 09.10.2026); fehlt er, ist eine Reihe mit Schritten
+ * eingeklappt, eine leere offen.
  * Der Hinweis der KI-Planung (`Reihe.planHinweis`) steht hinter dem Infosymbol.
  * Leitfrage (08.10.2026, Reihenmuster): eine Zeile im aufgeklappten Kopf (`LeitfrageFeld`), eingeklappt unter der Kopfzeile.
  */
 import { ActionIcon, Group, Paper, Popover, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconHelpHexagon, IconInfoCircle, IconPencil } from '@tabler/icons-react'
 import type { Reihe } from '@shared/reihe'
+import { offenLesen, offenMerken } from '../../shared/sitzung'
 
 const KOPF_SCHLUESSEL = 'schulapps.reihe.kopf.'
 const ANSICHT_SCHLUESSEL = 'schulapps.reihe.ansicht'
@@ -15,21 +17,13 @@ const ANSICHT_SCHLUESSEL = 'schulapps.reihe.ansicht'
 /** Gemerkter Zustand des Kopfs dieser Reihe (null = nichts gemerkt) */
 export function kopfGemerkt(id: string): boolean | null {
   if (!id) return null
-  try {
-    const w = localStorage.getItem(KOPF_SCHLUESSEL + id)
-    return w === 'offen' ? true : w === 'zu' ? false : null
-  } catch {
-    return null
-  }
+  const w = offenLesen<string>(KOPF_SCHLUESSEL + id)
+  return w === 'offen' ? true : w === 'zu' ? false : null
 }
 
 export function merkeKopf(id: string, offen: boolean): void {
   if (!id) return
-  try {
-    localStorage.setItem(KOPF_SCHLUESSEL + id, offen ? 'offen' : 'zu')
-  } catch {
-    /* ohne Speicher eben nicht gemerkt */
-  }
+  offenMerken(KOPF_SCHLUESSEL + id, offen ? 'offen' : 'zu')
 }
 
 /** Gemerkte Ansicht des Expertenmodus („Stunden | Teile") */

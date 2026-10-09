@@ -1,0 +1,13 @@
+{
+  "id": "decouvertes-2020-5",
+  "name": "Découvertes 5",
+  "language": "fr",
+  "grade": 10,
+  "publisher": "Klett",
+  "reihe": "Découvertes",
+  "ausgabe": "ab 2020",
+  "band": "5",
+  "schoolTypeId": "gymnasium",
+  "platzhalter": true,
+  "units": []
+}

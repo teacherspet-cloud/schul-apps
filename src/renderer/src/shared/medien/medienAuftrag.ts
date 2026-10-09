@@ -194,7 +194,9 @@ async function eines(
       const texte = einzeln
         ? [...new Set((art === 'formen' ? v.formen ?? [] : [v.hinweis ?? '']).map((t) => t.trim()).filter(Boolean))]
         : fehlendeTexte(art, v, sicht, l)
-      for (const t of texte) await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', t, stimmen[l]!, l, gesprochenFuer('satz', t, v, sp)))
+      // Verbformen: Sprechtext der Zelle (Varianten mit Pause, „read" der Vergangenheit /rɛd/ – 09.10.2026)
+      const gesprochen = (t: string): string => (art === 'formen' && v.formenGesprochen?.[t]) || gesprochenFuer('satz', t, v, sp)
+      for (const t of texte) await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', t, stimmen[l]!, l, gesprochen(t)))
     }
     return true
   }

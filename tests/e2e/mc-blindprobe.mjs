@@ -13,7 +13,7 @@ import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { kartenAuf, warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/mc-blindprobe')
 mkdirSync(out, { recursive: true })
@@ -76,7 +76,8 @@ try {
   await hinweis.waitFor({ state: 'detached', timeout: 30000 }).catch(() => undefined)
   pruefe(!(await hinweis.isVisible().catch(() => false)), 'Nach der Blindprobe ist der Hinweis weg')
   await page.waitForTimeout(800)
-  const blatt = await page.locator('.ws-editor-pages').first().innerText()
+  // Silbentrennung im Blatt: weiche Trennstriche vor dem Vergleich entfernen
+  const blatt = (await page.locator('.ws-editor-pages:visible').first().innerText()).replace(/­/g, '')
   pruefe(blatt.includes('What do the fishermen order?'), 'Die ohne Text lösbare Frage ist neu gefasst')
   pruefe(!blatt.includes('capital of France'), 'Die alte Frage steht nicht mehr auf dem Blatt')
   pruefe(blatt.includes('When does the café close?'), 'Die nicht lösbare Frage bleibt')
@@ -97,7 +98,7 @@ try {
   // Rückgängig: die alte Frage kommt zurück (ein Schritt)
   await page.locator('[aria-label="Rückgängig"]').filter({ visible: true }).first().click()
   await page.waitForTimeout(800)
-  const zurueck = await page.locator('.ws-editor-pages').first().innerText()
+  const zurueck = (await page.locator('.ws-editor-pages:visible').first().innerText()).replace(/­/g, '')
   pruefe(zurueck.includes('capital of France'), 'Rückgängig holt die alte Frage zurück')
 
   // Schalter in den Einstellungen
@@ -106,6 +107,7 @@ try {
   const reiter = page.getByRole('tab', { name: /KI/ }).first()
   if (await reiter.count()) await reiter.click().catch(() => undefined)
   await page.waitForTimeout(500)
+  await kartenAuf(page, 'ki-text')
   const schalter = page.getByTestId('einstellung-mc-blindprobe')
   pruefe((await schalter.count()) > 0, 'Einstellungen: Schalter „Blindprobe für Ankreuzfragen zu Texten"')
   if (await schalter.count()) {

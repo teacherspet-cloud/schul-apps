@@ -9,6 +9,7 @@
 import { grundformVon, varianten, VERB_SPALTEN, type VerbEintrag, type VerbSprache } from './verben'
 import type { GrammatikAufgabe } from './grammatiktrainer'
 import { APOSTROPHE } from './apostroph'
+import { verbFormSprechtext, verbReiheSprechtext } from './sprechtext'
 
 export interface VerbKarte {
   id: string
@@ -47,13 +48,42 @@ export const verbSchluesselVonWort = (term: string): string =>
     .trim()
     .toLowerCase()
 
-/** So wird eine Zelle gesprochen: „burnt/burned" → „burnt, burned", Klammern ohne Klammerzeichen */
+/**
+ * Schlüssel einer Form in der Medienbank (und Text im Hinweis des Knopfs): „burnt/burned" → „burnt, burned", Klammern
+ * ohne Klammerzeichen. Bleibt seit 07.10.2026 unverändert, damit vorhandene Aufnahmen gefunden werden. Was die Stimme
+ * wirklich sagt, steht in `formGesprochen` (09.10.2026).
+ */
 export const sprechtext = (s: string): string =>
   s
     .replace(/\s*\/\s*/g, ', ')
     .replace(/[()]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+/**
+ * Formen, die im Infinitiv und in der Vergangenheit gleich geschrieben, aber anders gesprochen werden („read" /riːd/ –
+ * „read" /rɛd/). Ihre Vergangenheitsform bekommt einen eigenen Schlüssel, sonst teilten sich beide eine Aufnahme.
+ */
+const GLEICHE_SCHREIBUNG = ['read']
+const VERGANGENHEIT = ['past', 'pp']
+
+/** Schlüssel einer Form je Spalte (09.10.2026): wie `sprechtext`, nur „read" der Vergangenheit eigen */
+export function formSchluessel(zelle: string, sprache: string, spalte: string): string {
+  const s = sprechtext(zelle)
+  const eigen =
+    sprache === 'en' && VERGANGENHEIT.includes(spalte) && varianten(zelle).some((v) => GLEICHE_SCHREIBUNG.includes(v.toLowerCase()))
+  return eigen ? `${s} (Vergangenheit)` : s
+}
+
+/** Was die Stimme bei einer Form sagt (09.10.2026, shared/sprechtext.ts): Varianten mit Pause, „read" der Vergangenheit /rɛd/ */
+export const formGesprochen = (zelle: string, sprache: string, spalte: string): string => verbFormSprechtext(zelle, sprache, spalte)
+
+/** Alle Formen einer Karte nacheinander gesprochen („be. was … were. been") */
+export const formenGesprochen = (formen: Record<string, string>, sprache: string): string =>
+  verbReiheSprechtext(
+    Object.entries(formen).map(([spalte, zelle]) => ({ spalte, zelle })),
+    sprache
+  )
 
 /** Karten aus den Einträgen einer Verbliste (nur Verben mit mindestens zwei Formen) */
 export function verbKarten(eintraege: VerbEintrag[], sprache: VerbSprache): VerbKarte[] {

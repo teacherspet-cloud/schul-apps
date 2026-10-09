@@ -9,9 +9,10 @@ import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../..
 import { useExperte } from '../../../shared/settingsStore'
 import { holen } from '../../onlinetest/serverApi'
 import { extraStarten, type ProfilPunkt } from './KursGrammatik'
-import { KastenKopf, useGemerkt, useGemerktText } from './Kasten'
+import { KastenKopf, useGemerkt, useGemerkterSchalter, useGemerktText } from './Kasten'
 import { Faecherbalken } from './LernstandVerlauf'
 import type { Lernende } from './kursDaten'
+import { fokusFuer, useKursFokus } from './kursFokus'
 import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import {
   AMPEL_NAME,
@@ -34,6 +35,24 @@ const stufeVon = (r: { versuche: number; quote: number } | undefined): Stufe | n
   !r ? null : r.versuche < 5 ? 'grau' : r.quote < 0.6 ? 'rot' : r.quote < 0.85 ? 'gelb' : 'gruen'
 const prozent = (p: { quote: number }): string => `${Math.round(p.quote * 100)} %`
 /** Alle geübten Regeln einer Person (ältere Server ohne `regeln`: nur Stärken und Schwächen) */
+/** Kurzzeile im zugeklappten Kopf (09.10.2026): wie viele üben, wie sicher bzw. wer Förderung oder Forderung braucht */
+export function zusammenfassung(lernende: Lernende[], bereich: 'liste' | 'grammatik'): string {
+  const n = lernende.length
+  const kopf = `${n} ${n === 1 ? 'Lernende/r' : 'Lernende'}`
+  if (bereich === 'grammatik') {
+    const arten = lernende.map((l) => empfehlung(regelnVon(l)).art)
+    const foerder = arten.filter((a) => a === 'foerder').length
+    const forder = arten.filter((a) => a === 'forder').length
+    return [kopf, foerder ? `${foerder} zum Fördern` : '', forder ? `${forder} zum Fordern` : '', !foerder && !forder ? 'keine Auffälligkeiten' : '']
+      .filter(Boolean)
+      .join(' · ')
+  }
+  const geuebt = lernende.filter((l) => (l.neu7 ?? 0) + (l.wiederholt7 ?? 0) > 0).length
+  const gesamt = lernende.reduce((s, l) => s + l.uebersicht.gesamt, 0)
+  const sicher = lernende.reduce((s, l) => s + l.uebersicht.sicher, 0)
+  return [kopf, `${geuebt} in den letzten 7 Tagen geübt`, gesamt ? `${Math.round((sicher / gesamt) * 100)} % der Wörter sicher` : ''].filter(Boolean).join(' · ')
+}
+
 export const regelnVon = (l: Lernende): ProfilPunkt[] => l.grammatik?.regeln ?? [...(l.grammatik?.schwaechen ?? []), ...(l.grammatik?.staerken ?? [])]
 const regelVon = (l: Lernende, titel: string): ProfilPunkt | undefined => regelnVon(l).find((p) => p.titel === titel)
 
@@ -642,9 +661,11 @@ export function LernendeTabelle({
     })
   }
   const [offenGemerkt, setOffen] = useGemerkt('vok-lernende-offen', true)
-  const offen = immerOffen || offenGemerkt
+  // Eingebettet je Bereich („Meine Klassen", 09.10.2026, Wunsch der Lehrkraft): zuklappbar, zu Beginn zu
+  const [offenBereich, setOffenBereich] = useGemerkt(`kurs-je-lernende-${nurAnsicht ?? ''}-offen`, false)
+  const offen = nurAnsicht ? offenBereich : immerOffen || offenGemerkt
   const experte = useExperte()
-  const [ohneNamen, setOhneNamen] = useGemerkt('vok-lernende-ohne-namen', false)
+  const [ohneNamen, setOhneNamen] = useGemerkterSchalter('vok-lernende-ohne-namen', false)
   const [ansichtGemerkt, setAnsicht] = useGemerktText('vok-lernende-ansicht', 'liste')
   const ansicht = nurAnsicht ?? ansichtGemerkt
   const [detailsFuer, setDetailsFuer] = useState<string | null>(null)
@@ -690,24 +711,58 @@ export function LernendeTabelle({
   const t = useSortierTabelle(lernende, spalten, { spalte: 'name', ab: false })
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
   const detailsPerson = lernende.find((l) => l.id === detailsFuer)
+  /*
+   * Sprung aus dem Handlungsbedarf (09.10.2026, kursFokus.ts): passende Ansicht (Grammatik bzw. Vokabeln), aufklappen;
+   * bei genau einer betroffenen Person in der Grammatik gleich deren Details. Jeder Fokus nur einmal.
+   */
+  const fokus = useKursFokus((s) => s.fokus)
+  useEffect(() => {
+    if (!fokusFuer(fokus, kurs.id)) return
+    const soll = fokus.reiter === 'grammatik' ? 'grammatik' : 'liste'
+    if (nurAnsicht && nurAnsicht !== soll) return
+    // Nur einmal umsetzen – ein später aufgebauter Reiter greift ihn nicht noch einmal auf
+    useKursFokus.getState().erledige(fokus.zeit)
+    if (nurAnsicht) setOffenBereich(true)
+    else {
+      setAnsicht(soll)
+      if (!immerOffen) setOffen(true)
+    }
+    const person = fokus.ids?.length === 1 ? fokus.ids[0] : null
+    if (soll === 'grammatik' && person && lernende.some((l) => l.id === person)) setDetailsFuer(person)
+  }, [fokus, kurs.id, nurAnsicht, immerOffen, lernende, setOffenBereich, setAnsicht, setOffen])
   return (
     <Card withBorder data-lernende-kasten>
-      {immerOffen ? (
-        <Group justify="space-between" gap="xs">
-          {nurAnsicht ? (
-            <Text fw={700}>{nurAnsicht === 'grammatik' ? 'Grammatik je Lernende/r' : 'Karteikasten je Lernende/r'}</Text>
-          ) : (
-            <SegmentedControl
-              size="xs"
-              value={ansicht === 'grammatik' ? ansicht : 'liste'}
-              onChange={setAnsicht}
-              data={[
-                { value: 'liste', label: 'Vokabeln' },
-                { value: 'grammatik', label: 'Grammatik' }
-              ]}
-              data-lernende-ansicht
-            />
+      {nurAnsicht ? (
+        <>
+          <KastenKopf
+            titel={nurAnsicht === 'grammatik' ? 'Grammatik je Lernende/r' : 'Karteikasten je Lernende/r'}
+            offen={offen}
+            umschalten={() => setOffenBereich(!offen)}
+            data-je-lernende-kopf={nurAnsicht}
+            rechts={
+              offen && (
+                <Switch size="xs" label="Namen ausblenden" checked={ohneNamen} onChange={(e) => setOhneNamen(e.currentTarget.checked)} data-namen-ausblenden />
+              )
+            }
+          />
+          {!offen && (
+            <Text size="xs" c="dimmed" ml={26} data-je-lernende-kurz>
+              {zusammenfassung(lernende, nurAnsicht)}
+            </Text>
           )}
+        </>
+      ) : immerOffen ? (
+        <Group justify="space-between" gap="xs">
+          <SegmentedControl
+            size="xs"
+            value={ansicht === 'grammatik' ? ansicht : 'liste'}
+            onChange={setAnsicht}
+            data={[
+              { value: 'liste', label: 'Vokabeln' },
+              { value: 'grammatik', label: 'Grammatik' }
+            ]}
+            data-lernende-ansicht
+          />
           <Switch size="xs" label="Namen ausblenden" checked={ohneNamen} onChange={(e) => setOhneNamen(e.currentTarget.checked)} data-namen-ausblenden />
         </Group>
       ) : (

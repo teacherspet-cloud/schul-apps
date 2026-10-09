@@ -9,6 +9,7 @@
  */
 import { istSicher, type Vokabel, type WortStand } from './vokabeltrainer'
 import type { AbschnittEinordnung, KursTeil } from './kursAbschnitte'
+import type { MeinBuch } from './meineBuecher'
 
 export type WortStatus = 'neu' | 'aufbau' | 'sicher'
 
@@ -37,7 +38,10 @@ export interface Wortliste {
   fach: string
   /** Sprachkürzel für die Aussprache ('' = unbekannt) */
   sprache: string
+  /** Seit „Meine Bücher" (09.10.2026): Wörter, die in keinem Band auf dem Bord stehen („Weitere Wörter") */
   gruppen: WortlisteGruppe[]
+  /** Bücherbord (09.10.2026, shared/meineBuecher.ts): frühere Bände vollständig, der aktuelle mit freigegebenen Abschnitten */
+  buecher?: MeinBuch[]
 }
 
 /** Eigener Stand eines Wortes: neu (noch nicht kennengelernt), sicher (zweimal frei gewusst im Abstand einer Woche oder Langzeit), sonst im Aufbau */

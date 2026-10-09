@@ -50,6 +50,8 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconClock,
+  IconEye,
+  IconEyeOff,
   IconLayoutDashboard,
   IconPlus,
   IconPrinter,
@@ -62,7 +64,8 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { nachUnits, type AbschnittStatistik } from '@shared/kursAbschnitte'
+import { nachBaenden, type AbschnittStatistik } from '@shared/kursAbschnitte'
+import { BandGruppe } from '../../../shared/components/BandCover'
 import { empfehlung } from '@shared/grammatikBereiche'
 import { useRueckweg } from '../../../shared/navigation'
 import { useExperte } from '../../../shared/settingsStore'
@@ -76,6 +79,7 @@ import { Freigeben as GrammatikFreigeben, useEntwuerfe } from '../GrammatikTrain
 import { LernendeEintragen, ZettelDruck, type Zettel } from '../LernendeEintragen'
 import { KlasseZuordnen } from '../KlasseZuordnen'
 import { VokabelAbschnitte as AbschnittUebersicht } from '../../meineklassen/VokabelAbschnitte'
+import { AlsSchuelerAnsehen } from '../../meineklassen/SchuelerVorschau'
 import { KursGrammatik } from './KursGrammatik'
 import { KastenKopf, useGemerkt } from './Kasten'
 import { AbschnitteVerwalten, type AbschnittFrage } from './AbschnitteVerwalten'
@@ -83,67 +87,161 @@ import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
 import { alsFeld, ausFeld, type KursReiter, type Lernende, type Lernstanddaten } from './kursDaten'
-import { geplanteAbschnitte, kursHinweise, kursKennzahlen, type KursHinweis } from './kursHinweise'
+import { entwurfHinweis, geplanteAbschnitte, HINWEIS_FARBE, kursHinweise, kursKennzahlen, type KursBedarf, type KursHinweis } from './kursHinweise'
+import { zumHinweis } from './kursFokus'
 
 const prozent = (x: number | null | undefined): string => (x == null ? '–' : `${Math.round(x * 100)} %`)
 const kurzTag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
 
-/** Abschnitts-Übersicht (Statistik je Abschnitt) – von „Meine Klassen" mitgegeben oder über die Lerngruppe geladen */
-function useAbschnittStatistik(
-  kursId: string,
-  lerngruppeId: string | undefined,
-  vorgabe: { abschnitte: AbschnittStatistik[]; namen: string[] } | undefined,
-  stand: number
-): { abschnitte: AbschnittStatistik[]; namen: string[] } | null {
-  const [geladen, setGeladen] = useState<{ abschnitte: AbschnittStatistik[]; namen: string[] } | null>(null)
+/** Eintrag des Handlungsbedarfs einer Klasse, wie ihn GET /server/klassen/<id> liefert (ohne Merkmal) */
+type KlassenEintrag = Omit<KursBedarf, 'merkmal'>
+
+interface KlassenDetail {
+  statistik: { abschnitte: AbschnittStatistik[]; namen: string[] } | null
+  /** null = lädt noch; 'fehler' = Lerngruppe nicht erreichbar (dann rechnet die Kursseite selbst) */
+  bedarf: { sichtbar: KlassenEintrag[]; ausgeblendet: KlassenEintrag[] } | null | 'fehler'
+}
+
+/**
+ * Lerngruppe des Kurses aus „Meine Klassen" (GET /server/klassen/<id>): Abschnitts-Übersicht und – seit 09.10.2026 –
+ * der Handlungsbedarf dieses Kurses, genau wie „Meine Klassen" ihn zeigt (eine Quelle, Ausgeblendetes inklusive).
+ */
+function useKlassenDetail(kursId: string, lerngruppeId: string | undefined, noetig: boolean, stand: number): KlassenDetail {
+  const [geladen, setGeladen] = useState<KlassenDetail>({ statistik: null, bedarf: null })
   useEffect(() => {
-    if (vorgabe || !lerngruppeId) return
+    if (!noetig || !lerngruppeId) return
     let aus = false
-    void holen<{ vokabeln: { id: string; abschnitte?: AbschnittStatistik[]; lernendeNamen?: string[] }[] }>(`/server/klassen/${encodeURIComponent(lerngruppeId)}`)
+    void holen<{
+      vokabeln: { id: string; abschnitte?: AbschnittStatistik[]; lernendeNamen?: string[] }[]
+      bedarf: Partial<KlassenEintrag>[]
+      bedarfAusgeblendet?: Partial<KlassenEintrag>[]
+    }>(`/server/klassen/${encodeURIComponent(lerngruppeId)}`)
       .then((r) => {
+        if (aus) return
         const v = r.vokabeln.find((x) => x.id === kursId)
-        if (!aus && v?.abschnitte) setGeladen({ abschnitte: v.abschnitte, namen: v.lernendeNamen ?? [] })
+        const meine = (l: Partial<KlassenEintrag>[] | undefined): KlassenEintrag[] => (l ?? []).filter((b): b is KlassenEintrag => b.kurs === kursId)
+        setGeladen({
+          statistik: v?.abschnitte ? { abschnitte: v.abschnitte, namen: v.lernendeNamen ?? [] } : null,
+          bedarf: { sichtbar: meine(r.bedarf), ausgeblendet: meine(r.bedarfAusgeblendet) }
+        })
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!aus) setGeladen({ statistik: null, bedarf: 'fehler' })
+      })
     return () => {
       aus = true
     }
-  }, [kursId, lerngruppeId, vorgabe, stand])
-  return vorgabe ?? geladen
+  }, [kursId, lerngruppeId, noetig, stand])
+  return geladen
 }
 
-/** Hinweise des Kurses als Liste – Klick führt in den passenden Reiter */
-function HinweisListe({ hinweise, gehe }: { hinweise: KursHinweis[]; gehe: (r: KursReiter) => void }): React.JSX.Element {
-  if (!hinweise.length)
-    return (
-      <Text size="sm" c="dimmed" data-kurs-bedarf-leer>
-        Nichts Dringendes – alle üben, kein Test steht kurz bevor.
-      </Text>
-    )
+/** Ein Eintrag der Liste: Hinweis (eigene Rechnung, Entwürfe) oder Eintrag der Klasse (mit Ausblenden) */
+interface HinweisZeile {
+  text: string
+  art: KursHinweis['art']
+  reiter: KursReiter
+  ids?: string[]
+  /** Nur Einträge der Klasse lassen sich ausblenden */
+  schluessel?: string
+}
+
+/** Kurs-Hinweis bzw. Eintrag der Klasse → Zeile der Liste */
+const alsZeile = (h: KursHinweis | KlassenEintrag): HinweisZeile =>
+  'hinweis' in h
+    ? { text: h.text, art: h.hinweis, reiter: h.reiter, ids: h.ids, schluessel: h.schluessel }
+    : { text: h.text, art: h.art, reiter: h.reiter, ids: h.ids }
+
+/** Hinweise des Kurses als Liste – Klick führt in den passenden Reiter (Grammatik → „Grammatik") */
+function HinweisListe({
+  hinweise,
+  gehe,
+  ausblenden,
+  ausgeblendet = [],
+  laedt = false
+}: {
+  hinweise: HinweisZeile[]
+  gehe: (h: HinweisZeile) => void
+  ausblenden?: (h: HinweisZeile, wieder: boolean) => void
+  ausgeblendet?: HinweisZeile[]
+  laedt?: boolean
+}): React.JSX.Element {
+  const [zeigeAus, setZeigeAus] = useState(false)
+  const zeile = (h: HinweisZeile, aus: boolean): React.JSX.Element => (
+    <Group key={h.schluessel ?? h.art} gap={6} wrap="nowrap" align="center" data-kurs-bedarf-zeile={h.schluessel ?? h.art}>
+      {ausblenden && h.schluessel && (
+        <Tooltip label={aus ? 'Wieder einblenden' : 'Ausblenden – kommt wieder, sobald sich etwas ändert (auch in „Meine Klassen“)'} withinPortal>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => ausblenden(h, aus)}
+            aria-label={aus ? 'Wieder einblenden' : 'Ausblenden'}
+            data-kurs-bedarf-ausblenden={aus ? undefined : true}
+            data-kurs-bedarf-einblenden={aus ? true : undefined}
+          >
+            {aus ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+          </ActionIcon>
+        </Tooltip>
+      )}
+      <UnstyledButton
+        onClick={() => gehe(h)}
+        className="klassen-bedarf"
+        data-kurs-hinweis={h.art}
+        data-ziel-reiter={h.reiter}
+        style={{ flex: 1, opacity: aus ? 0.7 : 1 }}
+      >
+        <Group gap="xs" wrap="nowrap">
+          <ThemeIcon size="sm" variant="light" color={HINWEIS_FARBE[h.art]}>
+            <IconAlertTriangle size={14} />
+          </ThemeIcon>
+          <Text size="sm" style={{ flex: 1 }}>
+            {h.text}
+          </Text>
+          <IconChevronRight size={14} />
+        </Group>
+      </UnstyledButton>
+    </Group>
+  )
   return (
     <Stack gap={4}>
-      {hinweise.map((h, i) => (
-        <UnstyledButton key={i} onClick={() => gehe(h.reiter)} className="klassen-bedarf" data-kurs-hinweis={h.art}>
-          <Group gap="xs" wrap="nowrap">
-            <ThemeIcon size="sm" variant="light" color={h.farbe}>
-              <IconAlertTriangle size={14} />
-            </ThemeIcon>
-            <Text size="sm" style={{ flex: 1 }}>
-              {h.text}
-            </Text>
-            <IconChevronRight size={14} />
-          </Group>
-        </UnstyledButton>
-      ))}
+      {laedt ? (
+        <Loader size="xs" />
+      ) : !hinweise.length ? (
+        <Text size="sm" c="dimmed" data-kurs-bedarf-leer>
+          {ausgeblendet.length ? 'Nichts weiter – der übrige Handlungsbedarf ist ausgeblendet.' : 'Nichts Dringendes – alle üben, kein Test steht kurz bevor.'}
+        </Text>
+      ) : (
+        hinweise.map((h) => zeile(h, false))
+      )}
+      {ausgeblendet.length > 0 && (
+        <div data-kurs-bedarf-ausgeblendet={ausgeblendet.length}>
+          <UnstyledButton onClick={() => setZeigeAus((o) => !o)} aria-expanded={zeigeAus} data-kurs-bedarf-ausgeblendet-knopf>
+            <Group gap={4}>
+              {zeigeAus ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+              <Text size="xs" c="dimmed">
+                Ausgeblendet ({ausgeblendet.length})
+              </Text>
+            </Group>
+          </UnstyledButton>
+          <Collapse expanded={zeigeAus}>
+            <Stack gap={4} mt={4}>
+              {ausgeblendet.map((h) => zeile(h, true))}
+            </Stack>
+          </Collapse>
+        </div>
+      )}
     </Stack>
   )
 }
 
-/** Units kompakt: neueste offen (Abschnitte mit Balken), ältere zugeklappt mit „% sicher" */
-function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] }): React.JSX.Element {
-  const gruppen = useMemo(() => nachUnits(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
+/**
+ * Units kompakt: je Band (neuester oben, mit Cover – 09.10.2026), darin die Units; die neueste Unit des neuesten Bands
+ * offen (Abschnitte mit Balken), ältere zugeklappt mit „% sicher". Auch in „Meine Klassen" (Lernstand der Klasse).
+ */
+export function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] }): React.JSX.Element {
+  const baende = useMemo(() => nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
   const [umgeschaltet, setUmgeschaltet] = useState<Set<string>>(new Set())
-  if (!gruppen.length)
+  if (!baende.length)
     return (
       <Text size="sm" c="dimmed">
         Noch kein Abschnitt freigeschaltet.
@@ -158,55 +256,71 @@ function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] }): Rea
       </Progress.Root>
     </Tooltip>
   )
+  const schluessel = (buch: string, unit: string): string => `${buch}|${unit}`
+  const erste = schluessel(baende[0].buch, baende[0].units[0]?.unit ?? '')
+  const mittel = (zeilen: AbschnittStatistik[], k: 'sicher' | 'aufbau' | 'neu'): number => {
+    const woerter = zeilen.reduce((s, z) => s + z.woerter, 0) || 1
+    return zeilen.reduce((s, z) => s + z[k] * z.woerter, 0) / woerter
+  }
   return (
-    <Stack gap={6} data-kurs-units>
-      {gruppen.map((g, i) => {
-        const auf = (i === 0) !== umgeschaltet.has(g.unit)
-        const woerter = g.zeilen.reduce((s, z) => s + z.woerter, 0) || 1
-        const mittel = (k: 'sicher' | 'aufbau' | 'neu'): number => g.zeilen.reduce((s, z) => s + z[k] * z.woerter, 0) / woerter
-        return (
-          <div key={g.unit || 'ohne'} data-kurs-unit={g.unit || 'Weitere Vokabeln'} data-offen={auf || undefined}>
-            <UnstyledButton
-              w="100%"
-              aria-expanded={auf}
-              onClick={() =>
-                setUmgeschaltet((s) => {
-                  const n = new Set(s)
-                  if (n.has(g.unit)) n.delete(g.unit)
-                  else n.add(g.unit)
-                  return n
-                })
-              }
-            >
-              <Group gap="xs" wrap="nowrap">
-                {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                <Text size="sm" fw={600} w={150} truncate style={{ flexShrink: 0 }}>
-                  {g.unit || 'Weitere Vokabeln'}
-                </Text>
-                {balken(mittel('sicher'), mittel('aufbau'), mittel('neu'))}
-                <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
-                  {prozent(mittel('sicher'))} sicher
-                </Text>
-              </Group>
-            </UnstyledButton>
-            <Collapse expanded={auf}>
-              <Stack gap={3} mt={4} pl={22}>
-                {g.zeilen.map((a) => (
-                  <Group key={a.index} gap="xs" wrap="nowrap">
-                    <Text size="xs" w={128} truncate style={{ flexShrink: 0 }}>
-                      {a.name}
-                    </Text>
-                    {balken(a.sicher, a.aufbau, a.neu)}
-                    <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
-                      {prozent(a.sicher)}
-                    </Text>
-                  </Group>
-                ))}
-              </Stack>
-            </Collapse>
-          </div>
-        )
-      })}
+    <Stack gap={8} data-kurs-units>
+      {baende.map((b) => (
+        <BandGruppe
+          key={b.buch || 'ohne'}
+          buch={b.buch}
+          ohneBand="Weitere Vokabeln"
+          zusatz={`${prozent(mittel(b.units.flatMap((u) => u.zeilen), 'sicher'))} sicher`}
+        >
+          <Stack gap={4}>
+            {b.units.map((g) => {
+              const k = schluessel(b.buch, g.unit)
+              const auf = (k === erste) !== umgeschaltet.has(k)
+              return (
+                <div key={k} data-kurs-unit={g.unit || 'Weitere Vokabeln'} data-offen={auf || undefined}>
+                  <UnstyledButton
+                    w="100%"
+                    aria-expanded={auf}
+                    onClick={() =>
+                      setUmgeschaltet((s) => {
+                        const n = new Set(s)
+                        if (n.has(k)) n.delete(k)
+                        else n.add(k)
+                        return n
+                      })
+                    }
+                  >
+                    <Group gap="xs" wrap="nowrap">
+                      {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                      <Text size="sm" fw={600} w={120} truncate style={{ flexShrink: 0 }}>
+                        {g.unit || 'Weitere Vokabeln'}
+                      </Text>
+                      {balken(mittel(g.zeilen, 'sicher'), mittel(g.zeilen, 'aufbau'), mittel(g.zeilen, 'neu'))}
+                      <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
+                        {prozent(mittel(g.zeilen, 'sicher'))} sicher
+                      </Text>
+                    </Group>
+                  </UnstyledButton>
+                  <Collapse expanded={auf}>
+                    <Stack gap={3} mt={4} pl={22}>
+                      {g.zeilen.map((a) => (
+                        <Group key={a.index} gap="xs" wrap="nowrap">
+                          <Text size="xs" w={98} truncate style={{ flexShrink: 0 }}>
+                            {a.name}
+                          </Text>
+                          {balken(a.sicher, a.aufbau, a.neu)}
+                          <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
+                            {prozent(a.sicher)}
+                          </Text>
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Collapse>
+                </div>
+              )
+            })}
+          </Stack>
+        </BandGruppe>
+      ))}
       <Group gap="md" mt={2}>
         {[
           ['teal', 'sicher'],
@@ -223,6 +337,23 @@ function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] }): Rea
       </Group>
     </Stack>
   )
+}
+
+/** Kurzzeile der Abschnitte im zugeklappten Kopf (09.10.2026): Umfang, Stand, neuester Abschnitt */
+export function abschnitteKurz(abschnitte: AbschnittStatistik[]): string {
+  const frei = abschnitte.filter((a) => a.zeit <= Date.now())
+  const woerter = frei.reduce((s, a) => s + a.woerter, 0)
+  const sicher = woerter ? frei.reduce((s, a) => s + a.sicher * a.woerter, 0) / woerter : 0
+  const neuester = [...frei].sort((a, b) => b.zeit - a.zeit)[0]
+  const baende = new Set(frei.map((a) => a.buch ?? '').filter(Boolean))
+  return [
+    `${frei.length} ${frei.length === 1 ? 'Abschnitt' : 'Abschnitte'}${baende.size > 1 ? ` aus ${baende.size} Bänden` : ''}`,
+    `${woerter} Wörter`,
+    `${prozent(sicher)} sicher`,
+    neuester ? `zuletzt: ${[neuester.buch, neuester.unit, neuester.name].filter(Boolean).join(' · ')}` : ''
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 export interface KursSeiteProps {
@@ -285,7 +416,13 @@ export function KursSeite({
   )
   useEffect(laden, [laden])
   const neuLaden = (): void => (laden(), geaendert?.())
-  const statistik = useAbschnittStatistik(id, d?.lerngruppeId, abschnitteVorgabe, stand)
+  const [bedarfStand, setBedarfStand] = useState(0)
+  const vorgabe = abschnitteVorgabe ?? (d?.abschnitte ? { abschnitte: d.abschnitte, namen: d.lernendeNamen ?? [] } : undefined)
+  // Lerngruppe laden: für die Abschnitts-Übersicht (falls nicht mitgegeben) und den Handlungsbedarf im Überblick
+  const klassenDetail = useKlassenDetail(id, d?.lerngruppeId || undefined, !vorgabe || !(eingebettet && nurReiter), stand + bedarfStand)
+  const statistik = vorgabe ?? klassenDetail.statistik
+  // Zuklappbar (09.10.2026, Wunsch der Lehrkraft): in „Meine Klassen" zu Beginn zu, in Sprachenlernen offen
+  const [abschnitteOffen, setAbschnitteOffen] = useGemerkt(eingebettet ? 'mk-abschnitte-offen' : 'kurs-abschnitte-offen', !eingebettet)
   const entwuerfe = useEntwuerfe().filter((e) => e.empfaenger.vokId === id).length
   if (!d)
     return (
@@ -310,10 +447,32 @@ export function KursSeite({
       notifyError(e)
     }
   }
-  const foerderNamen = lernende.filter((l) => empfehlung(regelnVon(l)).art === 'foerder').map((l) => l.name)
-  const eingabe = { ...d, woerter: d.woerter.length, lernende, entwuerfe, foerderNamen }
+  const foerder = lernende.filter((l) => empfehlung(regelnVon(l)).art === 'foerder').map((l) => ({ id: l.id, name: l.name }))
+  const eingabe = { ...d, woerter: d.woerter.length, lernende, entwuerfe, foerder }
   const z = kursKennzahlen(eingabe)
-  const hinweise = kursHinweise(eingabe)
+  /*
+   * Handlungsbedarf (09.10.2026, eine Quelle): Kurse einer Lerngruppe zeigen die Einträge, die auch „Meine Klassen" zeigt
+   * (Server, shared/kursHinweise.ts; Ausgeblendetes bleibt ausgeblendet) plus die Entwürfe dieses Geräts. Spontane
+   * Gruppen (ohne Lerngruppe) oder eine nicht erreichbare Lerngruppe rechnen hier selbst.
+   */
+  const klassenBedarf = d.lerngruppeId && klassenDetail.bedarf !== 'fehler' ? klassenDetail.bedarf : undefined
+  const entwurf = entwurfHinweis(entwuerfe)
+  const hinweise: HinweisZeile[] =
+    klassenBedarf === undefined
+      ? kursHinweise(eingabe).map(alsZeile)
+      : [...(entwurf ? [alsZeile(entwurf)] : []), ...(klassenBedarf?.sichtbar ?? []).map(alsZeile)]
+  const ausgeblendeteHinweise = (klassenBedarf ? klassenBedarf.ausgeblendet : []).map(alsZeile)
+  const zumZiel = (h: HinweisZeile): void => {
+    setReiter(h.reiter)
+    zumHinweis({ kurs: id, hinweis: h.art, reiter: h.reiter, ids: h.ids })
+  }
+  const ausblenden = (h: HinweisZeile, wieder: boolean): void => {
+    if (!d.lerngruppeId || !h.schluessel) return
+    void senden(`/server/klassen/${encodeURIComponent(d.lerngruppeId)}/${wieder ? 'bedarf-einblenden' : 'bedarf-ausblenden'}`, { schluessel: h.schluessel }).then(
+      () => setBedarfStand((n) => n + 1),
+      (e: unknown) => notifyError(e)
+    )
+  }
   const geplant = geplanteAbschnitte(d.teile)
   const titel = d.ueberschrift || d.titel
 
@@ -349,7 +508,13 @@ export function KursSeite({
             <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
             <Text fw={700}>Handlungsbedarf</Text>
           </Group>
-          <HinweisListe hinweise={hinweise} gehe={setReiter} />
+          <HinweisListe
+            hinweise={hinweise}
+            gehe={zumZiel}
+            ausblenden={klassenBedarf ? ausblenden : undefined}
+            ausgeblendet={ausgeblendeteHinweise}
+            laedt={klassenBedarf === null}
+          />
         </Card>
         {mitWoertern && (
           <Card withBorder radius="md" padding="md" data-kurs-lernstand>
@@ -432,10 +597,19 @@ export function KursSeite({
       )}
       {mitWoertern && statistik && statistik.abschnitte.length > 0 && (
         <Card withBorder radius="md" padding="sm" data-kurs-abschnitte>
-          <Text fw={700} mb={4}>
-            Abschnitte und Stand der Lernenden
-          </Text>
-          <AbschnittUebersicht abschnitte={statistik.abschnitte} namen={statistik.namen} />
+          <KastenKopf
+            titel="Abschnitte und Stand der Lernenden"
+            offen={abschnitteOffen}
+            umschalten={() => setAbschnitteOffen(!abschnitteOffen)}
+            data-kurs-abschnitte-kopf
+          />
+          {abschnitteOffen ? (
+            <AbschnittUebersicht abschnitte={statistik.abschnitte} namen={statistik.namen} />
+          ) : (
+            <Text size="xs" c="dimmed" ml={26} data-kurs-abschnitte-kurz>
+              {abschnitteKurz(statistik.abschnitte)}
+            </Text>
+          )}
         </Card>
       )}
       {(mitWoertern || (d.entfernt ?? []).length > 0) && (
@@ -458,8 +632,10 @@ export function KursSeite({
         oeffnen={setGrammatikOffen}
         stand={grammatikStand}
         immerOffen
+        eingebettet={eingebettet}
       />
-      {eingebettet && lernende.length > 0 && (
+      {/* Grammatik je Lernende/r auch in Sprachenlernen (09.10.2026): Ziel der Grammatik-Hinweise im Handlungsbedarf */}
+      {lernende.length > 0 && (
         <LernendeTabelle lernende={lernende} gastZeigen={setGast} entfernen={setEntfernen} kurs={kursInfo(d, id)} nurAnsicht="grammatik" immerOffen />
       )}
     </Stack>
@@ -510,7 +686,7 @@ export function KursSeite({
     <>
       {grammatik && (
         <GrammatikFreigeben
-          vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle)}
+          vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle, Boolean(d.klassenKurs))}
           schliessen={() => (setGrammatik(false), setGrammatikStand((n) => n + 1), geaendert?.())}
         />
       )}
@@ -670,10 +846,16 @@ export function KursSeite({
         }
         untertitel={!eingebettet ? [d.lerngruppe, d.fach].filter(Boolean).join(' · ') : undefined}
         rechts={
-          !eingebettet && d.code && d.link ? (
-            <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
-              QR-Code
-            </Button>
+          !eingebettet ? (
+            <Group gap="xs">
+              {/* „Als Schüler ansehen" (09.10.2026, wie in „Meine Klassen"): Fenster gleich auf diesem Kurs */}
+              <AlsSchuelerAnsehen kursId={id} gruppe={d.lerngruppeId || undefined} klasse={d.lerngruppeId && d.lerngruppe ? d.lerngruppe : titel} />
+              {d.code && d.link && (
+                <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
+                  QR-Code
+                </Button>
+              )}
+            </Group>
           ) : undefined
         }
         zahlen={zahlen}
@@ -839,16 +1021,19 @@ function Einstellungen({
             Zeitraum und Test
           </Text>
           <Group gap="md" align="flex-start">
-            <TextInput
-              type="date"
-              label="Lernzeitraum bis"
-              description="Danach ist der Kurs abgeschlossen."
-              leftSection={<IconCalendarEvent size={14} />}
-              value={alsFeld(d.bis)}
-              onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
-              w={220}
-              data-vokabel-bis-aendern
-            />
+            {/* Feste Klasse (09.10.2026, abgestimmt): kein Enddatum – ein schon gesetztes lässt sich noch löschen */}
+            {(!d.klassenKurs || d.bis) && (
+              <TextInput
+                type="date"
+                label="Lernzeitraum bis"
+                description={d.klassenKurs ? 'Kurs der Klasse: Datum löschen, dann läuft er weiter.' : 'Danach ist der Kurs abgeschlossen.'}
+                leftSection={<IconCalendarEvent size={14} />}
+                value={alsFeld(d.bis)}
+                onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
+                w={220}
+                data-vokabel-bis-aendern
+              />
+            )}
             <TextInput
               type="date"
               label="Testtermin"
@@ -947,19 +1132,27 @@ function Einstellungen({
             </Stack>
           </Card>
         </NurExperte>
-        <Card withBorder radius="md" padding="md" data-kurs-verwalten>
-          <Text fw={700} mb="sm">
-            Kurs
-          </Text>
-          <Group gap="xs">
-            <Button variant="default" onClick={beenden} data-vokabel-status>
-              {d.status === 'offen' ? 'Kurs beenden' : 'Wieder öffnen'}
-            </Button>
-            <Button variant="subtle" color="red" leftSection={<IconTrash size={16} />} onClick={loeschen} data-kurs-loeschen>
-              Kurs löschen …
-            </Button>
-          </Group>
-        </Card>
+        {/*
+          Beenden/Löschen nur für spontane Gruppen (09.10.2026, abgestimmt): Der Kurs einer festen Klasse läuft über die
+          Schuljahre; ein (früher) beendeter lässt sich wieder öffnen.
+        */}
+        {(!d.klassenKurs || d.status !== 'offen') && (
+          <Card withBorder radius="md" padding="md" data-kurs-verwalten>
+            <Text fw={700} mb="sm">
+              Kurs
+            </Text>
+            <Group gap="xs">
+              <Button variant="default" onClick={beenden} data-vokabel-status>
+                {d.status === 'offen' ? 'Kurs beenden' : 'Wieder öffnen'}
+              </Button>
+              {!d.klassenKurs && (
+                <Button variant="subtle" color="red" leftSection={<IconTrash size={16} />} onClick={loeschen} data-kurs-loeschen>
+                  Kurs löschen …
+                </Button>
+              )}
+            </Group>
+          </Card>
+        )}
         <AlleOptionen />
       </Stack>
     </OptionenBereich>

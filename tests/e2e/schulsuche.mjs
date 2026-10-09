@@ -44,6 +44,9 @@ try {
   const assistent = page.locator('.mantine-Modal-content', { hasText: 'Willkommen bei Schul-Apps' })
   await page.waitForTimeout(1500)
   pruefe((await assistent.count()) > 0, 'Einrichtungsassistent ist da')
+  // Am PC steht IServ als erster Schritt vorn (seit „IServ first in the setup") – zum Schritt „Schule" wechseln
+  if (!(await feld().count())) await assistent.locator('.mantine-Stepper-step', { hasText: 'Schule' }).first().click()
+  await page.waitForTimeout(400)
   pruefe((await feld().count()) === 1, 'Der Assistent zeigt das Feld mit Schulsuche')
   pruefe(Boolean(await page.evaluate(() => window.api.branding.getLogo())) === false, 'Anfangs ist kein Logo gesetzt')
   await feld().click()
@@ -87,6 +90,17 @@ try {
   pruefe(einst.schoolName === 'Gymnasium Wesermünde', `Schulname gesetzt („${einst.schoolName}")`)
   pruefe((await page.evaluate(() => window.api.branding.getLogo())) === vorgabeLogo, 'Das Vorgabe-Logo ist ohne Rückfrage gesetzt (vorher keins)')
   pruefe((await sichtbar(page.locator('[data-schule-uebernehmen]')).count()) === 0, 'NI/Gymnasium stimmen – kein Übernahme-Hinweis')
+  // Anschrift (09.10.2026): Die Hamburger Schule hat die leeren Felder gefüllt; die zweite Wahl überschreibt sie
+  // nicht still, sondern bietet „Daten aus dem Schulverzeichnis übernehmen" an
+  pruefe(Boolean(einst.briefkopf?.plz) && einst.briefkopf.plz !== '27570', `Anschrift der ersten Wahl bleibt (PLZ ${einst.briefkopf?.plz})`)
+  const abweichung = sichtbar(page.locator('[data-verzeichnis-abweichung]'))
+  pruefe((await abweichung.count()) === 1 && /27570/.test(await abweichung.innerText()), 'Abweichende Anschrift wird zur Übernahme angeboten')
+  if (await abweichung.count()) {
+    await abweichung.locator('[data-verzeichnis-uebernehmen]').click()
+    await page.waitForTimeout(700)
+    const nach = await page.evaluate(() => window.api.settings.get())
+    pruefe(nach.briefkopf?.plz === '27570' && nach.briefkopf?.ort === 'Bremerhaven', 'Nach dem Klick: Anschrift aus dem Verzeichnis')
+  }
   await page.screenshot({ path: join(shots, 'paket13-schulsuche-wesermuende.png') })
   await assistent.getByRole('button', { name: 'Später einrichten' }).click()
   await page.waitForTimeout(800)

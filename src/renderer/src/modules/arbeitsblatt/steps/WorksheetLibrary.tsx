@@ -3,6 +3,7 @@ import { FachPunkt } from '../../../shared/components/FachFarbe'
 import { IconChalkboard, IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef } from 'react'
 import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
+import { ReiheMarke } from '../../../shared/reiheZuordnung'
 import { nurListe } from '../../../shell/materialien'
 import type { SavedWorksheetMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
@@ -95,6 +96,7 @@ export default function WorksheetLibrary({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Thema, Fach, Klasse"
+          reihe={bib.reihe}
         >
           <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
             Datei öffnen …
@@ -106,6 +108,7 @@ export default function WorksheetLibrary({
 
         {bib.eintraege && (suche ? treffer.length === 0 : sheets.length === 0) && (
           <BibliothekLeer
+            ausgeblendet={bib.reihe.anzahl}
             leer={sheets.length === 0}
             text="Noch keine Arbeitsblätter gespeichert. Neue Blätter werden ab dem ersten Schritt automatisch gesichert."
           />
@@ -209,6 +212,8 @@ function BlattKarte({
                 Tafelbild
               </Badge>
             )}
+            {/* Gehört zu einer Unterrichtsreihe (09.10.2026) */}
+            {bib.reihe.verweis(s.id) && <ReiheMarke verweis={bib.reihe.verweis(s.id)!} size="xs" />}
           </Group>
         </Oeffnen>
         <EintragMenue

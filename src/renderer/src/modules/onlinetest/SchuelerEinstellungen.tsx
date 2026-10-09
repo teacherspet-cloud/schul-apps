@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  type CSSVariablesResolver,
+  type MantineColorsTuple,
   ActionIcon,
   Badge,
   Button,
-  ColorSwatch,
   Group,
   MantineProvider,
   NativeSelect,
   Paper,
+  Progress,
   SegmentedControl,
   SimpleGrid,
   Stack,
@@ -27,12 +29,14 @@ import {
   IconMoon,
   IconPalette,
   IconPlayerStop,
+  IconSparkles,
   IconSun,
   IconTarget,
   IconUserCircle,
   IconVolume
 } from '@tabler/icons-react'
 import { holen, senden } from './serverApi'
+import { farbSatz, SCHUELER_FARBEN, type FarbSatz } from '@shared/schuelerFarben'
 import { PasswortAendern } from '../../shared/PasswortAendern'
 import {
   fuerServer,
@@ -45,6 +49,7 @@ import {
   vorlesenText,
   type Darstellung
 } from './schuelerDarstellung'
+import { useWillkommen, willkommenAnsehen } from './willkommenLogik'
 
 /**
  * Einstellungen der Lernenden (03.10.2026; neu gegliedert 06.10.2026 nach der Recherche
@@ -80,7 +85,10 @@ html.sa-leseschrift h1, html.sa-leseschrift h2, html.sa-leseschrift h3, html.sa-
   font-family: Verdana, Tahoma, 'Segoe UI', Arial, sans-serif !important; letter-spacing: 0.02em; word-spacing: 0.12em; }
 html.sa-kontrast[data-mantine-color-scheme='light'] { --mantine-color-dimmed: #1f2328; --mantine-color-text: #000; --mantine-color-default-border: #555; }
 html.sa-kontrast[data-mantine-color-scheme='dark'] { --mantine-color-dimmed: #e9ecef; --mantine-color-text: #fff; --mantine-color-default-border: #adb5bd;
-  --mantine-color-body: #000; }
+  --mantine-color-body: #000; --sa-grund: #000; }
+html.sa-kontrast[data-mantine-color-scheme='light'] { --sa-grund: #fff; }
+/* Seitengrund leicht getönt, Karten (--mantine-color-body) weiß bzw. eine Stufe heller (09.10.2026) */
+html:root, html:root body { background: var(--sa-grund, var(--mantine-color-body)); }
 html.sa-kontrast .mantine-Paper-root, html.sa-kontrast .mantine-Card-root { border-color: var(--mantine-color-default-border) !important; }
 html.sa-kontrast a:focus-visible, html.sa-kontrast button:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
 .sa-vorlese-leiste { position: fixed; right: 16px; bottom: 16px; z-index: 300; }
@@ -93,7 +101,11 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
   useEffect(() => {
     if (mitKonto())
       void holen<{ darstellung: Partial<Darstellung> | null }>('/s/api/darstellung').then(
-        (r) => r.darstellung && setze(vomServer(r.darstellung)),
+        (r) => {
+          if (r.darstellung) setze(vomServer(r.darstellung))
+          // Willkommens-Assistent (09.10.2026): erst jetzt ist klar, ob dieses Konto ihn schon gesehen hat
+          useWillkommen.setState({ geladen: true, erledigt: r.darstellung?.willkommenErledigt === true })
+        },
         () => undefined
       )
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -113,14 +125,43 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
     html.classList.toggle('sa-leseschrift', d.leseschrift)
   }, [d.schrift, d.ruhig, d.zeilen, d.kontrast, d.leseschrift])
   const schema = d.modus === 'auto' ? (systemDunkel ? 'dark' : 'light') : d.modus === 'dunkel' ? 'dark' : 'light'
+  const { theme, variablen } = useMemo(() => schuelerTheme(d.farbe), [d.farbe])
   return (
-    <MantineProvider theme={{ primaryColor: d.farbe, autoContrast: true }} forceColorScheme={schema}>
+    <MantineProvider theme={theme} cssVariablesResolver={variablen} forceColorScheme={schema}>
       <style>{LESEN_CSS}</style>
       {children}
       {d.vorlesen && <VorleseLeiste />}
       <VerbindungsHinweis />
     </MantineProvider>
   )
+}
+
+/**
+ * Farbkonzept „Helle, ruhige Flächen + Akzentfarbe" (09.10.2026, Entscheidung der Lehrkraft): Die gewählte Farbe
+ * liegt als eigene Reihe „akzent" vor (Knöpfe, Fortschritt, Kopfband, Fokusrahmen) – Mantines Farben wie „blue"
+ * bleiben, wie sie sind (Fachordner der Lehrkraft u. Ä.). Seitengrund leicht getönt (--sa-grund), Karten weiß
+ * bzw. im Dunkeln eine Stufe heller (--mantine-color-body). Die vier neuen Farben gibt es auch unter ihrem Namen.
+ */
+function schuelerTheme(farbe: string): { theme: Parameters<typeof MantineProvider>[0]['theme']; variablen: CSSVariablesResolver } {
+  const s = farbSatz(farbe)
+  const colors: Record<string, MantineColorsTuple> = { akzent: s.reihe }
+  for (const f of SCHUELER_FARBEN.slice(6)) colors[f.wert] = farbSatz(f.wert).reihe
+  return {
+    theme: { primaryColor: 'akzent', primaryShade: { light: 6, dark: 6 }, autoContrast: true, colors },
+    // Auch die Flächen-Variablen der Lehrkraft-App (app.css: Kartenrand, Grund) – sonst fehlen sie hier und z. B.
+    // Kartenränder fielen auf Schwarz zurück
+    variablen: () => {
+      const v = (x: FarbSatz['hell']): Record<string, string> => ({
+        '--mantine-color-body': x.karte,
+        '--sa-grund': x.grund,
+        '--app-bg': x.grund,
+        '--app-surface': x.karte,
+        '--app-border': x.rand,
+        '--app-card-border': x.rand
+      })
+      return { variables: {}, light: v(s.hell), dark: v(s.dunkel) }
+    }
+  }
 }
 
 /**
@@ -305,14 +346,14 @@ export function VorleseKnopf({ text, farbe }: { text: string; farbe?: string }):
   )
 }
 
-const FARBEN: { wert: Darstellung['farbe']; name: string }[] = [
-  { wert: 'blue', name: 'Blau' },
-  { wert: 'teal', name: 'Türkis' },
-  { wert: 'green', name: 'Grün' },
-  { wert: 'grape', name: 'Lila' },
-  { wert: 'pink', name: 'Pink' },
-  { wert: 'orange', name: 'Orange' }
-]
+/**
+ * Konto mit eigenem Passwort auf dem Server (09.10.2026, Wunsch der Lehrkraft): Wer über IServ kommt, verwaltet das
+ * Passwort dort; Gäste (QR/Code) und die Musterschüler-Vorschau haben keins – für sie kein Bereich „Konto".
+ */
+const mitPasswort = (): boolean => {
+  const ich = window.__schulappsServer
+  return Boolean(ich?.angemeldet && !ich.vorschau && (ich.quelle === 'lokal' || ich.quelle === 'test' || ich.quelle === 'notzugang'))
+}
 
 /**
  * Schneller Wechsel Hell/Dunkel in der Kopfzeile (03.10.2026, Wunsch der Lehrkraft: „auch Schüler in den
@@ -376,6 +417,7 @@ export function SchuelerEinstellungen(): React.JSX.Element {
   const [gespeichert, setGespeichert] = useState<'' | 'konto' | 'geraet' | 'fehler'>('')
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null)
   const konto = mitKonto()
+  const passwort = mitPasswort()
   const melde = (art: 'konto' | 'geraet' | 'fehler'): void => {
     setGespeichert(art)
     if (zeit.current) clearTimeout(zeit.current)
@@ -410,8 +452,12 @@ export function SchuelerEinstellungen(): React.JSX.Element {
           Alles wirkt sofort.
         </Text>
       </Group>
+      {/* Willkommens-Assistent noch einmal (09.10.2026) – auch in der Musterschüler-Vorschau der einzige Weg dorthin */}
+      <Button variant="light" w="fit-content" leftSection={<IconSparkles size={16} />} onClick={willkommenAnsehen} data-willkommen-ansehen>
+        Willkommens-Tour erneut ansehen
+      </Button>
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
-        {BEREICHE.filter((b) => b.id !== 'konto' || konto).map((b) => (
+        {BEREICHE.filter((b) => b.id !== 'konto' || passwort).map((b) => (
           <UnstyledButton key={b.id} className="se-kachel" onClick={() => hin(b.id)} data-bereich-kachel={b.id}>
             <ThemeIcon size={46} radius="md" color={b.farbe} variant="light">
               {b.symbol}
@@ -440,25 +486,13 @@ export function SchuelerEinstellungen(): React.JSX.Element {
             data-modus
           />
         </Zeile>
-        <Zeile titel="Farbe">
-          <Group gap="sm">
-            {FARBEN.map((f) => (
-              <ColorSwatch
-                key={f.wert}
-                component="button"
-                type="button"
-                color={`var(--mantine-color-${f.wert}-6)`}
-                size={36}
-                onClick={() => aendern({ farbe: f.wert })}
-                aria-label={f.name}
-                title={f.name}
-                style={{ cursor: 'pointer', outline: d.farbe === f.wert ? '3px solid var(--mantine-color-text)' : undefined, outlineOffset: 2 }}
-                data-farbe={f.wert}
-              >
-                {d.farbe === f.wert && <IconCheck size={18} color="white" />}
-              </ColorSwatch>
+        <Zeile titel="Farbe" text="Für Knöpfe, Fortschritt und das Kopfband – die Flächen bleiben hell bzw. dunkel und ruhig.">
+          {/* Je Farbe eine kleine Vorschau hell und dunkel (09.10.2026) */}
+          <SimpleGrid cols={{ base: 2, xs: 3, sm: 5 }} spacing="xs" role="radiogroup" aria-label="Farbe">
+            {SCHUELER_FARBEN.map((f) => (
+              <FarbKachel key={f.wert} wert={f.wert} name={f.name} an={d.farbe === f.wert} waehlen={() => aendern({ farbe: f.wert })} />
             ))}
-          </Group>
+          </SimpleGrid>
         </Zeile>
         <Zeile titel="Schriftgröße">
           <SegmentedControl
@@ -634,7 +668,7 @@ export function SchuelerEinstellungen(): React.JSX.Element {
         />
       </Bereich>
 
-      {konto && (
+      {passwort && (
         <Bereich id="konto">
           <PasswortAendern />
         </Bereich>
@@ -662,11 +696,19 @@ export function SchuelerEinstellungen(): React.JSX.Element {
   )
 }
 
-const EINST_CSS = `
+export const EINST_CSS = `
 .se-kachel { display: block; padding: 14px; border-radius: 16px; border: 1px solid var(--mantine-color-default-border); background: var(--mantine-color-body);
   transition: transform .15s ease, box-shadow .15s ease; text-align: left; }
 .se-kachel:hover, .se-kachel:focus-visible { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.10); }
 .se-bereich { scroll-margin-top: 16px; }
+.se-farbe { display: block; padding: 4px; border-radius: 12px; border: 2px solid transparent; }
+.se-farbe[data-an] { border-color: var(--mantine-primary-color-filled); }
+.se-farbe:focus-visible { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 2px; }
+.se-farbe-bild { display: grid; grid-template-columns: 1fr 1fr; border-radius: 8px; overflow: hidden; border: 1px solid var(--mantine-color-default-border); }
+.se-farbe-halb { padding: 0 0 6px; }
+.se-farbe-band { height: 8px; }
+.se-farbe-karte { margin: 6px 6px 0; height: 26px; border-radius: 5px; border: 1px solid; display: flex; align-items: center; padding: 0 5px; }
+.se-farbe-knopf { display: block; width: 60%; height: 9px; border-radius: 9px; }
 .se-gespeichert { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 310; animation: se-rein .2s ease-out; }
 @keyframes se-rein { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translate(-50%, 0) } }
 html.sa-ruhig .se-gespeichert, html.sa-ruhig .se-kachel { animation: none; transition: none; }
@@ -704,11 +746,37 @@ function Zeile({ titel, text, children }: { titel: string; text?: string; childr
   )
 }
 
+/** Farbwahl: kleine Seite hell und dunkel – Grund, weiße bzw. dunkle Karte, Knopf in der Farbe */
+export function FarbKachel({ wert, name, an, waehlen }: { wert: string; name: string; an: boolean; waehlen: () => void }): React.JSX.Element {
+  const s = farbSatz(wert)
+  const halb = (grund: string, karte: string, linie: string): React.JSX.Element => (
+    <div className="se-farbe-halb" style={{ background: grund }}>
+      <div className="se-farbe-band" style={{ background: s.reihe[6] }} />
+      <div className="se-farbe-karte" style={{ background: karte, borderColor: linie }}>
+        <span className="se-farbe-knopf" style={{ background: s.knopf }} />
+      </div>
+    </div>
+  )
+  return (
+    <UnstyledButton className="se-farbe" onClick={waehlen} role="radio" aria-checked={an} aria-label={name} title={name} data-farbe={wert} data-an={an || undefined}>
+      <div className="se-farbe-bild">
+        {halb(s.hell.grund, s.hell.karte, '#dee2e6')}
+        {halb(s.dunkel.grund, s.dunkel.karte, '#3a3b40')}
+      </div>
+      <Group gap={4} justify="center" wrap="nowrap" mt={4}>
+        {an && <IconCheck size={14} />}
+        <Text size="xs" fw={an ? 700 : 500}>
+          {name}
+        </Text>
+      </Group>
+    </UnstyledButton>
+  )
+}
+
 /** Live-Vorschau: ein Stück Startseite in der gewählten Darstellung */
 function Vorschau(): React.JSX.Element {
-  const { d } = useDarstellung()
   return (
-    <Paper radius="md" p="md" withBorder data-vorschau style={{ background: `var(--mantine-color-${d.farbe}-light)` }}>
+    <Paper radius="md" p="md" withBorder data-vorschau style={{ background: 'var(--sa-grund)' }}>
       <Text size="xs" tt="uppercase" fw={700} c="dimmed" mb={4}>
         Vorschau
       </Text>
@@ -723,6 +791,7 @@ function Vorschau(): React.JSX.Element {
           Knopf
         </Button>
       </Group>
+      <Progress value={60} mt="sm" size="sm" radius="xl" aria-label="Fortschritt (Beispiel)" />
     </Paper>
   )
 }

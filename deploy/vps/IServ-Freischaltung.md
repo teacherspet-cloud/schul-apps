@@ -40,3 +40,20 @@ ein. Das Geheimnis wird dort verschlüsselt gespeichert und nie wieder angezeigt
 - **Andere Konten** werden abgewiesen.
 - **Klarnamen** bleiben auf dem Server. Sie gehen nie an eine KI; dort ersetzt Schul-Apps Namen
   durch Platzhalter.
+
+## 4. Abgleich der Konten (optional, seit 09.10.2026)
+
+Schul-Apps kann Konten entfernen, die es in IServ nicht mehr gibt (Abgänge, gelöschte Konten):
+*Schul-Apps › Verwaltung › Nutzer › Mit IServ abgleichen*. Dafür liest der Server die Benutzerliste
+über die **IDM-API** von IServ (`/iserv/idm/api/v1/users`, nur lesend). Dazu bei der Anwendung
+„Schul-Apps“ unter *Verwaltung › System › Single-Sign-On* zusätzlich freischalten:
+
+| Feld | Eintrag |
+|---|---|
+| Scopes | zusätzlich `iserv:idm:api-read` (nur lesen; **nicht** `iserv:idm:api-write`) |
+| Grant-Typ | zusätzlich **Client Credentials** (Zugang der App ohne angemeldete Person) |
+
+Übermittelt werden dabei nur Kennung (UUID) und Benutzername der Konten; Schul-Apps speichert die
+Liste nicht. Entfernt wird nur nach Prüfung und Bestätigung durch den Admin; vorher sichert der
+Server seine Datenbank. Ohne diese Freischaltung funktioniert alles andere unverändert – der Abgleich
+meldet dann nur, welcher Scope fehlt.

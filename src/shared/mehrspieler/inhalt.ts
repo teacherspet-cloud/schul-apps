@@ -257,3 +257,34 @@ export function lehrwerkBisStand(buecher: Buch[], stand: { buch: string; unit: s
   }
   return aus
 }
+
+/**
+ * Lehrwerkswörter nach „Frühere Bände + Freigegebenes" (09.10.2026, abgestimmt – wie die bekannte Grammatik): alle Bände
+ * derselben Reihe VOR dem aktuellen ganz, vom aktuellen (und späteren) nur die freigegebenen Units und Abschnitte
+ * (`abschnitte` leer = die ganze Unit). Kennungen wie im Vokabelweg.
+ */
+export function lehrwerkFruehereUndFrei(
+  buecher: Buch[],
+  aktuellId: string,
+  frei: { buch: string; unit: string; abschnitte: string[] }[]
+): { id: string; term: string }[] {
+  const aktuell = buecher.find((b) => b.id === aktuellId)
+  if (!aktuell) return []
+  const reihe = reiheVon(aktuell)
+  const nummer = (b: Buch): number => {
+    const n = parseFloat(String(b.band ?? '').replace(/[^0-9.]/g, ''))
+    return Number.isFinite(n) ? n : 99
+  }
+  const aus: { id: string; term: string }[] = []
+  const da = new Set<string>()
+  for (const b of buecher.filter((x) => reiheVon(x) === reihe)) {
+    const frueher = b.id !== aktuell.id && nummer(b) < nummer(aktuell)
+    const freiHier = frei.filter((f) => f.buch === b.id)
+    if (!frueher && !freiHier.length) continue
+    for (const a of abschnitteAus(b)) {
+      const dabei = frueher || freiHier.some((f) => f.unit === a.unit && (!f.abschnitte.length || f.abschnitte.includes(a.section)))
+      if (dabei) for (const w of a.woerter) if (!da.has(w.id)) (da.add(w.id), aus.push({ id: w.id, term: w.term }))
+    }
+  }
+  return aus
+}

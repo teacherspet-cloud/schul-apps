@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useAppSettings } from '../../shared/settingsStore'
 import { nimmFachVorgabe } from '../../shared/fachVorgabe'
-import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
+import { ProgrammSymbol } from '../../shared/components/ProgrammSymbol'
+import ThemenDokumentBibliothek from '../../shared/testmodul/ThemenDokumentBibliothek'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { subjectById } from '../arbeitsblatt/model/subjects'
 import './auftrag'
-import { hatTafel, leeresTafelbild, standardName, type Tafelbild } from './model'
+import { hatTafel, leeresTafelbild, normalisiere, standardName, type Tafelbild } from './model'
+import { tafelSvg } from './svg'
 import { TafelVorschau } from './editor/TafelVorschau'
 import Bearbeiten from './steps/Bearbeiten'
 import Einrichten from './steps/Einrichten'
@@ -23,9 +25,17 @@ export function neuesTafelbild(): Tafelbild {
   })
 }
 
+/** Kleines Bild der ersten Tafel für die Karte (lädt erst, wenn die Karte sichtbar ist) */
+const tafelVorschau = (id: string) => async () => {
+  const t = normalisiere((await window.api.tafelbilder.get(id)).payload as Tafelbild)
+  const tafel = t.tafeln[0]
+  return tafel && hatTafel(t) ? { svg: tafelSvg(tafel, { ohneTextur: true }) } : null
+}
+
+/** Meine Tafelbilder: Fach → Themenbereich mit kleinen Tafelbildern (09.10.2026, ThemenBibliothek) */
 function TafelbildBibliothek(props: BibliotheksSeiteProps): React.JSX.Element {
   return (
-    <EinfacheBibliothek
+    <ThemenDokumentBibliothek
       props={props}
       api={window.api.tafelbilder}
       moduleId="tafelbild"
@@ -37,6 +47,12 @@ function TafelbildBibliothek(props: BibliotheksSeiteProps): React.JSX.Element {
       umbenannt={(m) => useTafelbild.getState().markSaved(m.id, m.updatedAt, m.name)}
       geloescht={() => useTafelbild.getState().forgetSaved()}
       oeffnen={bibliothek.oeffnen}
+      imOffenen={(id, name) => {
+        const s = useTafelbild.getState()
+        if (s.docId === id && s.dok) s.update((d) => void (name === null ? delete d.meta.themenbereich : (d.meta.themenbereich = name)))
+      }}
+      symbol={<ProgrammSymbol form="tafelbild" farbe="lime" size={40} />}
+      vorschau={(m) => (m.hatTafel ? tafelVorschau(m.id) : undefined)}
       info={(m) => [String(m.thema ?? ''), String(m.formate ?? '')]}
     />
   )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nachJahrGruppiert, passtSuche, tagMonat, vokabelKurzinfo } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
+import { nachJahrGruppiert, nachLehrwerkGruppiert, passtSuche, tagMonat, vokabelKurzinfo } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
 
 /*
  * Kursseite im Sprachenlernen (08.10.2026, abgestimmt): Kurzinfo im zugeklappten Kasten „Vokabeln", Grammatik nach
@@ -35,5 +35,46 @@ describe('Grammatik nach Schuljahren', () => {
     expect(passtSuche(['Simple past', 'Vergangenheit', undefined], '')).toBe(true)
     expect(passtSuche(['Simple past', 'Regelmäßige Verben'], 'PAST verben')).toBe(true)
     expect(passtSuche(['Simple past'], 'present')).toBe(false)
+  })
+})
+
+describe('Grammatik nach Lehrwerk gliedern (09.10.2026)', () => {
+  type G = { id: string; buch?: string; unit?: string; jahr?: number | null }
+  const folge = (buch: string): string[] => (buch.startsWith('Green Line') ? ['Welcome back', 'Unit 1', 'Unit 2', 'Trailer 1', 'Unit 3'] : [])
+  const gruppen = (z: G[]) =>
+    nachLehrwerkGruppiert(
+      z,
+      (x) => (x.buch ? { buch: x.buch, unit: x.unit } : null),
+      (x) => x.jahr,
+      folge
+    )
+  it('neuester Band oben, darin die spätere Unit oben; ohne Lehrwerk nach Schuljahr darunter', () => {
+    const g = gruppen([
+      { id: 'a', buch: 'Green Line 5', unit: 'Unit 3' },
+      { id: 'b', buch: 'Green Line 6', unit: 'Unit 1' },
+      { id: 'c', buch: 'Green Line 6', unit: 'Unit 2' },
+      { id: 'd', jahr: 9 },
+      { id: 'e', jahr: null },
+      { id: 'f', jahr: 10 },
+      { id: 'g', buch: 'Green Line 6' },
+      { id: 'h', buch: 'Green Line 6', unit: 'Trailer 1' }
+    ])
+    expect(g.map((x) => x.schluessel)).toEqual([
+      'b:Green Line 6|Trailer 1',
+      'b:Green Line 6|Unit 2',
+      'b:Green Line 6|Unit 1',
+      'b:Green Line 6|',
+      'b:Green Line 5|Unit 3',
+      'j:10',
+      'j:9',
+      'j:ohne'
+    ])
+  })
+  it('Reihenfolge innerhalb einer Gruppe bleibt', () => {
+    const g = gruppen([
+      { id: '2', buch: 'Green Line 1', unit: 'Unit 1' },
+      { id: '1', buch: 'Green Line 1', unit: 'Unit 1' }
+    ])
+    expect(g[0].eintraege.map((x) => x.id)).toEqual(['2', '1'])
   })
 })

@@ -11,7 +11,7 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { writeAtomic } from '../storage/atomar'
-import { merkeVerbrauch } from '../ai/verbrauch'
+import { merkeLimit, merkeVerbrauch } from '../ai/verbrauch'
 import { join, resolve, sep } from 'path'
 import type { BibliotheksStimme, TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
@@ -20,7 +20,7 @@ import { abrufe } from '../images/politeFetch'
 import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi, sprichOpenAiTeile } from './openaiTts'
 import { vertoneHoertext, zeitenAusAusrichtung, zeitenAusDialog, type Synthese, type SyntheseTeil, type Vorlage } from '@shared/vertonung'
 import { attrappeStimmen, attrappeSynthese } from '../ai/attrappe'
-import { ausspracheRegeln, fingerabdruck, plsLexikon, sprechText, type AusspracheRegel } from '@shared/sprechtext'
+import { ausspracheRegeln, fingerabdruck, mitPausenMarken, plsLexikon, sprechText, type AusspracheRegel } from '@shared/sprechtext'
 
 // Basis ohne Fassungsnummer: Die Stimmenliste braucht v2 (nur dort gibt es `sharing`),
 // alles andere v1. Jeder Pfad nennt seine Fassung deshalb selbst.
@@ -80,6 +80,31 @@ function audioDir(): string {
   return dir
 }
 
+/**
+ * Kontingent des ElevenLabs-Kontos (09.10.2026, Einstellungen › KI-Zugang › Verbrauch): verbrauchte und erlaubte
+ * Zeichen im laufenden Abrechnungszeitraum (GET /v1/user/subscription – kostet nichts). null ohne Schlüssel, in der
+ * Attrappe der Oberflächentests oder wenn der Schlüssel die Auskunft nicht darf.
+ */
+export async function elevenlabsKontingent(): Promise<{ verbraucht: number; grenze: number; erneuert: string | null; tarif: string } | null> {
+  if (attrappeStimmen() || attrappeSynthese()) return null
+  const k = getSecret('elevenlabs')
+  if (!k || keyProblem(k)) return null
+  try {
+    const res = await requestRoh('/v1/user/subscription')
+    if (!res.ok) return null
+    const j = (await res.json()) as { character_count?: number; character_limit?: number; next_character_count_reset_unix?: number; tier?: string }
+    if (typeof j.character_count !== 'number' || typeof j.character_limit !== 'number' || j.character_limit <= 0) return null
+    return {
+      verbraucht: j.character_count,
+      grenze: j.character_limit,
+      erneuert: j.next_character_count_reset_unix ? new Date(j.next_character_count_reset_unix * 1000).toISOString() : null,
+      tarif: String(j.tier ?? '')
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Anfrage ohne Fehlerprüfung – für Endpunkte mit Rückfall (Zeitmarken, 01.10.2026) */
 function requestRoh(path: string, init: RequestInit = {}): Promise<Response> {
   return abrufe(`${API}${path}`, {
@@ -107,6 +132,8 @@ async function pruefeAntwort(res: Response): Promise<Response> {
        */
       const nach = Number(res.headers.get('retry-after'))
       const warte = Number.isFinite(nach) && nach > 0 ? ` – erneut versuchen in ${Math.ceil(nach)} s` : ''
+      // Für den Verbrauch in den Einstellungen (09.10.2026)
+      merkeLimit('elevenlabs', `429 ${message}`, 'hoertext')
       throw new Error(`Das ElevenLabs-Kontingent ist erschöpft oder es laufen zu viele Anfragen gleichzeitig (429)${warte}.${message ? ` (${message})` : ''}`)
     }
     throw new Error(message || `ElevenLabs meldet einen Fehler (${res.status}). ${body.slice(0, 200)}`)
@@ -604,11 +631,18 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   const sprache = req.languageCode || 'en'
   const regeln = attrappe || ueberOpenAi ? [] : ausspracheRegeln(roh.map((t) => t.text), sprache)
   const woerterbuch = regeln.length ? await woerterbuchFuer(regeln, sprache).catch(() => null) : null
-  const turns = roh.map((t) => ({ ...t, text: sprechText(t.text, sprache, Boolean(woerterbuch)) }))
+  const vorbereitet = roh.map((t) => ({ ...t, text: sprechText(t.text, sprache, Boolean(woerterbuch)) }))
+  /*
+   * Pausen (09.10.2026, „was / were" → „was … were"): eleven_multilingual_v2 versteht `<break time="0.4s" />` – nur bei
+   * kurzen Einzeltexten (Aussprache der Medienbank), damit die Zeitmarken langer Hörtexte stimmen. eleven_v3 (Dialog)
+   * kennt keine Pausenmarke, OpenAI auch nicht: dort bleiben die Auslassungspunkte, die beide als Pause sprechen.
+   */
+  const kurzSolo = !attrappe && !ueberOpenAi && !dialog && vorbereitet.length === 1 && vorbereitet[0].text.length <= 300 && !req.vorher
+  const turns = kurzSolo ? [{ ...vorbereitet[0], text: mitPausenMarken(vorbereitet[0].text) }] : vorbereitet
   const synth = attrappe ?? (ueberOpenAi ? openAiSynthese(req) : dialog ? dialogSynthese(req, woerterbuch) : soloSynthese(req, woerterbuch))
   const { vorlage, fehlt } = ladeVorlage(req.vorher)
   const erg = await vertoneHoertext(turns, { settings: req.settings, sprache: req.languageCode }, synth, vorlage, fehlt)
-  if (!attrappe) merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', synth.modell, { ttsZeichen: erg.zeichen })
+  if (!attrappe) merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', synth.modell, { ttsZeichen: erg.zeichen }, 'hoertext')
   const mp3 = Buffer.from(erg.mp3.buffer, erg.mp3.byteOffset, erg.mp3.byteLength)
   const fileName = `${req.id}.mp3`
   writeAtomic(join(audioDir(), fileName), mp3)

@@ -1,0 +1,13 @@
+{
+  "id": "decouvertes-serie-jaune-4",
+  "name": "Découvertes Série jaune 4",
+  "language": "fr",
+  "grade": 9,
+  "publisher": "Klett",
+  "reihe": "Découvertes Série jaune",
+  "ausgabe": "ab 2012",
+  "band": "4",
+  "schoolTypeId": "gymnasium",
+  "platzhalter": true,
+  "units": []
+}

@@ -49,6 +49,7 @@ import { ReiheWeiterNachBlatt } from './ReiheWeiter'
 import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL } from '@shared/blattAuswertung'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
+import { useTouch } from '../../shared/touch/touchModus'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
@@ -1224,6 +1225,9 @@ function Ebene(p: {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   // Feedback-Knopf an der Aufgabe: zum Prüfen lassen oder um vorhandenes Feedback zu lesen
   const knopfDa = (nr: number): boolean => Boolean(p.pruefen) || Boolean(p.fb[String(nr)]?.length)
+  // Mit dem Finger ist der Knopf 44 statt 28 Punkte breit – Knopf und Ampel rücken entsprechend weiter nach links,
+  // sonst lagen sie am iPad auf der Aufgabennummer (09.10.2026)
+  const knopfBreite = useTouch() ? 44 : 28
   const schreibt = p.werkzeug !== 'tastatur'
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
@@ -1455,7 +1459,7 @@ function Ebene(p: {
       {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}
       {p.ampeln &&
         p.aufgaben.map((a) => (
-          <AmpelZeichen key={`ampel-${a.nr}`} stand={p.ampeln![a.nr] ?? 'rot'} x={Math.max(0, a.x - (knopfDa(a.nr) ? 34 : 4) - 16)} y={a.y - 1} nr={a.nr} />
+          <AmpelZeichen key={`ampel-${a.nr}`} stand={p.ampeln![a.nr] ?? 'rot'} x={Math.max(0, a.x - (knopfDa(a.nr) ? knopfBreite + 8 : 4) - 16)} y={a.y - 1} nr={a.nr} />
         ))}
       {/* Feedback bleibt sichtbar, auch nach der letzten Runde (08.10.2026) – „prüfen lassen" nur, solange es geht */}
       {p.aufgaben
@@ -1464,7 +1468,7 @@ function Ebene(p: {
           const liste = p.fb[String(a.nr)]
           const rest = p.pruefen ? p.runden - pruefRunden(liste) : 0
           return (
-            <div key={a.nr} style={{ position: 'absolute', left: Math.max(2, a.x - 34), top: a.y - 2, zIndex: 20 }} data-fb-fenster>
+            <div key={a.nr} style={{ position: 'absolute', left: Math.max(2, a.x - knopfBreite - 6), top: a.y - 2, zIndex: 20 }} data-fb-fenster>
               <Tooltip label={rest > 0 ? `Feedback zu Aufgabe ${a.nr} (noch ${rest}×)` : 'Feedback ansehen'}>
                 <ActionIcon
                   size="md"
@@ -1480,7 +1484,7 @@ function Ebene(p: {
                 </ActionIcon>
               </Tooltip>
               {offenesFb === a.nr && (
-                <Paper withBorder shadow="md" p="xs" w={300} style={{ position: 'absolute', left: 36, top: 0 }}>
+                <Paper withBorder shadow="md" p="xs" w={300} style={{ position: 'absolute', left: knopfBreite + 8, top: 0 }}>
                   <Stack gap={6}>
                     <AufgabenFeedbackText liste={liste} />
                     {p.pruefFehler[String(a.nr)] && (

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
+import { randomUUID } from 'crypto'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { cleanupWorkDirs } from './services/ai/cli'
 import { oeffnePaket, paketAusArgumenten } from './services/paket/wege'
@@ -68,6 +69,16 @@ function merkeFensterStand(win: BrowserWindow): void {
 /** Adresse der eigenen Oberfläche (Entwicklung: Vite, sonst die Datei im Paket) */
 const eigeneSeite = (): string =>
   is.dev && process.env['ELECTRON_RENDERER_URL'] ? process.env['ELECTRON_RENDERER_URL'] : pathToFileURL(join(__dirname, '../renderer/index.html')).href
+
+/*
+ * Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): Jeder Programmstart ist eine neue Sitzung – die Apps
+ * zeigen beim ersten Öffnen ihre Übersicht, eingeklappte Kästen stehen wieder eingeklappt. Alle Fenster dieses Starts
+ * (auch „In eigenem Fenster") teilen die Kennung; der Preload holt sie einmal synchron.
+ */
+const SITZUNG = randomUUID()
+ipcMain.on('sitzung:kennung', (e) => {
+  e.returnValue = SITZUNG
+})
 
 /**
  * Regeln für jedes Fenster: Links ins Netz im Browser; ein Programm im eigenen Fenster

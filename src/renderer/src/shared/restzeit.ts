@@ -296,7 +296,9 @@ export function schaetzeRest(lage: RestzeitLage, verlauf: DauerVerlauf = leseVer
  * Anzeige aus dem gemerkten Zielzeitpunkt des Auftrags: Der Zähler läuft zwischen zwei
  * Schätzungen von selbst weiter, statt auf dem letzten Wert zu stehen.
  */
-export function restAnzeige(a: { restBis?: number; restLage?: 'laenger' }, jetzt: number): string {
+export function restAnzeige(a: { restBis?: number; restLage?: 'laenger'; status?: string; gestartet?: boolean | number }, jetzt: number): string {
+  // Noch nicht begonnen (wartet auf freien Platz, 09.10.2026): keine Restzeit – sie begann sonst immer wieder von vorn
+  if (a.status === 'wartend' && !a.gestartet) return ''
   if (a.restLage === 'laenger') return 'dauert länger als sonst'
   if (a.restBis === undefined) return ''
   const s = Math.round((a.restBis - jetzt) / 1000)

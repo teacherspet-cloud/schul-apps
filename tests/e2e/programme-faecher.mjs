@@ -47,18 +47,18 @@ try {
       JSON.stringify([
         'Unterricht',
         'Rückmeldung',
-        'Unterrichtsplanung',
+        'Planung',
         'Arbeitsblatt',
         'Tafelbilder',
-        'Leistungsüberprüfungen',
+        'Tests',
         'Vokabeltest',
         'Grammatiktest',
         'Lernzielkontrolle',
         'Klassenarbeiten',
-        'Verwaltung',
+        'Organisation',
         'Elternbriefe',
-        'Vokabellisten',
-        'Verwaltung'
+        'Vokabellisten'
+        // „Schule & Daten" gibt es seit 09.10.2026 nur noch für Admins auf dem Server
       ]),
     `Reihenfolge der Leiste (${(await leiste()).join(', ')})`
   )
@@ -103,15 +103,14 @@ try {
       JSON.stringify([
         'Unterricht',
         'Rückmeldung',
-        'Unterrichtsplanung',
+        'Planung',
         'Arbeitsblatt',
         'Tafelbilder',
-        'Leistungsüberprüfungen',
+        'Tests',
         'Lernzielkontrolle',
         'Klassenarbeiten',
-        'Verwaltung',
-        'Elternbriefe',
-        'Verwaltung'
+        'Organisation',
+        'Elternbriefe'
       ]),
     `Geschichte + Mathematik: nur passende Programme in der Leiste (${(await leiste()).join(', ')})`
   )

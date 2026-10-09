@@ -69,27 +69,18 @@ import { rueckweg } from './regal/beschriftung'
 import { useBlaettern } from './regal/blaettern'
 import { FokusRahmen } from './fokus/FokusRahmen'
 import { BEREICHE, bereichVonRegel, type BereichId } from '@shared/grammatikBereiche'
+import { offenLesen, offenMerken } from '../../shared/sitzung'
 
-/** Offene Bereiche der Regel-Seite, je Training auf diesem Gerät gemerkt (08.10.2026) */
+/** Offene Bereiche der Regel-Seite, je Training gemerkt (08.10.2026) – für die Sitzung (shared/sitzung.ts, 09.10.2026) */
 function useOffeneBereiche(id: string): [Set<string>, (b: string) => void] {
   const schluessel = `schulapps-gram-bereiche-${id}`
-  const [offen, setOffen] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem(schluessel) ?? '[]') as string[])
-    } catch {
-      return new Set()
-    }
-  })
+  const [offen, setOffen] = useState<Set<string>>(() => new Set(offenLesen<string[]>(schluessel) ?? []))
   const umschalten = (b: string): void =>
     setOffen((alt) => {
       const neu = new Set(alt)
       if (neu.has(b)) neu.delete(b)
       else neu.add(b)
-      try {
-        localStorage.setItem(schluessel, JSON.stringify([...neu]))
-      } catch {
-        /* ohne Speicher nur für jetzt */
-      }
+      offenMerken(schluessel, [...neu])
       return neu
     })
   return [offen, umschalten]

@@ -295,6 +295,9 @@ try {
   pruefe(await da(p.locator('[data-fach-kopf="sprache"] [data-kennzahl="sicher"]')), 'Kopf der Fachansicht: „Wörter sicher"')
   pruefe(/\d+\/\d+/.test(await p.locator('[data-fach-kopf] [data-kennzahl="aktiv"]').innerText()), 'Kopf: „aktiv diese Woche n/m"')
   pruefe(await da(p.locator('[data-fach-kopf] [data-kennzahl="tests"]')), 'Kopf: „Tests Ø"')
+  // Lernstand der Sprachklasse wie im Überblick der Kursseite (09.10.2026): Karteikasten-Säulen und Units je Band
+  pruefe(await da(p.locator('[data-sprach-lernstand] [data-stufen-diagramm]')), 'Sprachklasse: „Lernstand im Karteikasten"')
+  pruefe(await da(p.locator('[data-sprach-lernstand] [data-kurs-units] [data-band-gruppe]').first()), 'Sprachklasse: „Units" je Band (mit Cover/Kachel)')
   // Bedarfszahl am Fach (08.10.2026): oranges Abzeichen mit Warnzeichen, Erklärung als Bezeichnung des Reiters
   const mitBedarf = p.locator('[data-fach-leiste] [data-fach]:has([data-bedarf-zahl])').first()
   if (await mitBedarf.count()) {
@@ -345,7 +348,11 @@ try {
   // Dieselbe Kursseite wie in Sprachenlernen, eingebettet (09.10.2026): kein Wechsel, keine zweite Reiterleiste
   pruefe(await da(p.locator('[data-klassen-kurs] [data-kurs-grammatik]')), 'Reiter „Grammatik“ zeigt die Grammatik-Tabelle des Kurses')
   pruefe((await p.locator('[data-kurs-reiterleiste]').count()) === 0, 'Eingebettet ohne zweite Reiterleiste')
-  pruefe(await da(p.locator('[data-klassen-kurs] [data-grammatik-tabelle]')), 'Darunter Fördern/Fordern je Lernende/r')
+  // „Grammatik je Lernende/r" zugeklappt mit Kurzzeile (09.10.2026), aufklappbar
+  pruefe(await da(p.locator('[data-klassen-kurs] [data-je-lernende-kurz]')), '„Grammatik je Lernende/r" zu Beginn zugeklappt (Kurzzeile)')
+  await p.locator('[data-klassen-kurs] [data-je-lernende-kopf="grammatik"]').click()
+  pruefe(await da(p.locator('[data-klassen-kurs] [data-grammatik-tabelle]')), 'Aufgeklappt: Fördern/Fordern je Lernende/r')
+  pruefe(await da(p.locator('[data-klassen-kurs] [data-kurs-grammatik-kopf]')), 'Grammatik-Liste zuklappbar (Kopf)')
   await grammatikJahreAuf(p)
   // „+ Aufgaben" je Grammatik (09.10.2026): öffnet das Fenster wie in Sprachenlernen
   await p.locator(`[data-grammatik-mehr="${gram.id}"]`).click()
@@ -355,6 +362,9 @@ try {
   await p.locator('[data-klassen-kurs] [data-vokabel-grammatik]').click()
   pruefe(await da(p.locator('[data-grammatik-fuer-kurs]')), '„Grammatik hinzufügen“ öffnet „Grammatik zum Üben freigeben“ für den Kurs')
   pruefe(/Weather/.test(await p.locator('[data-grammatik-fuer-kurs]').innerText().catch(() => '')), 'Für die Lernenden des Kurses „Weather“')
+  // Feste Klasse (09.10.2026): „Planen …" wie bei Vokabeln, kein „Übungszeitraum bis"
+  pruefe(await da(p.locator('.mantine-Modal-content [data-plan-modus]')), 'Grammatik hinzufügen: „Jetzt freischalten / Planen …"')
+  pruefe((await p.locator('[data-grammatik-bis]').count()) === 0, 'Feste Klasse: kein „Übungszeitraum bis"')
   await p.keyboard.press('Escape')
   await p.waitForTimeout(400)
   await p.getByRole('tab', { name: /^Vokabeln/ }).click()
@@ -369,6 +379,11 @@ try {
   await p.getByRole('button', { name: 'Abbrechen' }).click()
   await p.waitForTimeout(400)
   pruefe(await da(p.locator('[data-kurs="Weather"][data-klassen-kurs] [data-vokabel-kasten]')), 'Kursseite (Vokabeln) eingebettet')
+  // „Abschnitte und Stand der Lernenden" und „Karteikasten je Lernende/r" zu Beginn zugeklappt (09.10.2026)
+  pruefe(/Abschnitt/.test(await p.locator('[data-kurs="Weather"] [data-kurs-abschnitte-kurz]').innerText().catch(() => '')), 'Abschnitte zugeklappt mit Kurzzeile')
+  pruefe(/Lernende/.test(await p.locator('[data-kurs="Weather"] [data-je-lernende-kurz]').innerText().catch(() => '')), '„Karteikasten je Lernende/r" zugeklappt mit Kurzzeile')
+  await p.locator('[data-kurs="Weather"] [data-kurs-abschnitte-kopf]').click()
+  pruefe(await da(p.locator('[data-kurs="Weather"] [data-vok-abschnitte] [data-band-gruppe]').first()), 'Abschnitte je Band (Cover links)')
   pruefe((await p.locator('[data-kurs="Weather"] [data-abschnitt-stand]').count()) >= 1, 'Abschnitte: Balken sicher / im Aufbau / neu')
   // Name nach Kurs und Übersicht je Abschnitt (09.10.2026): neueste Unit offen, Klick zeigt Wörter und Ampeln je Person
   pruefe(
@@ -390,6 +405,11 @@ try {
   )
   await p.screenshot({ path: join(out, '3c-abschnitte.png'), fullPage: true })
   // Lehrwerk-Stand: kleiner Knopf in der Kopfzeile, Auswahl im Pop-up, zurück zu „automatisch"
+  // Automatisch (09.10.2026): nur der Band nach Klassenstufe – keine Unit
+  const lwText = await p.locator('[data-lehrwerk-knopf]').innerText()
+  pruefe(/Green Line 1 \(automatisch\)/.test(lwText) && !/Unit/.test(lwText), `Lehrwerk automatisch ohne Unit (${lwText})`)
+  const stand10 = await (await lk.request.get(`${A}/server/grammatik/lehrwerkstand?gruppe=${g10.id}`, { headers: KOPF })).json()
+  pruefe(stand10.automatisch?.buch === 'Green Line 6' && !stand10.automatisch?.unit, `Klasse 10 (Gymnasium) → Green Line 6 ohne Unit (${JSON.stringify(stand10.automatisch)})`)
   await p.locator('[data-lehrwerk-knopf]').click()
   pruefe(await da(p.locator('[data-lehrwerk-stand]')), 'Lehrwerk-Stand im Pop-up')
   await p.locator('[data-lehrwerk-band]').click()
@@ -398,11 +418,22 @@ try {
   pruefe((await p.locator('[data-lehrwerk-knopf][data-automatisch]').count()) === 0, 'Band gewählt: nicht mehr automatisch')
   await p.locator('[data-lehrwerk-automatisch]').click()
   await p.waitForTimeout(600)
-  pruefe((await p.locator('[data-lehrwerk-knopf][data-automatisch]').count()) === 1, '„Automatisch (aus den Vokabeln)“ löscht die Wahl')
+  pruefe((await p.locator('[data-lehrwerk-knopf][data-automatisch]').count()) === 1, '„Automatisch (nach Klassenstufe)“ löscht die Wahl')
   const standNachher = await (await lk.request.get(`${A}/server/grammatik/lehrwerkstand?gruppe=${gEn.id}`, { headers: KOPF })).json()
   pruefe(standNachher.stand === null, 'Server: Eintrag gelöscht')
   await p.keyboard.press('Escape')
   await p.screenshot({ path: join(out, '4-vokabeln.png'), fullPage: true })
+  // Kurs der festen Klasse (09.10.2026): weder beenden noch löschen, kein Lernzeitraum-Ende
+  await p.locator('[data-kurs="Weather"] [data-kurs-einstellungen-knopf]').click()
+  pruefe(await da(p.locator('[data-kurs-einstellungen]')), 'Kurseinstellungen offen')
+  pruefe(
+    (await p.locator('[data-kurs-loeschen], [data-vokabel-status], [data-vokabel-bis-aendern]').count()) === 0,
+    'Feste Klasse: ohne „Kurs beenden/löschen" und „Lernzeitraum bis"'
+  )
+  const loeschVersuch = await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: {} })
+  pruefe(loeschVersuch.status() === 400, `Server lehnt das Löschen des Klassenkurses ab (${loeschVersuch.status()})`)
+  await p.locator('.mantine-Modal-close').first().click()
+  await p.waitForTimeout(400)
   // Ablegen ▾ → Als PDF speichern (im Browser: Download)
   await p.locator('[data-kurs="Weather"] [data-ablegen]').click()
   const [laden] = await Promise.all([
@@ -429,15 +460,21 @@ try {
   await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
   await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
 
-  // Handlungsbedarf → Sprachenlernen öffnet direkt den Kurs der Klasse (08.10.2026, Befund der Lehrkraft)
-  const vokEintrag = p.locator('[data-handlungsbedarf] [data-bedarf="inaktiv"], [data-handlungsbedarf] [data-bedarf="foerdern"], [data-handlungsbedarf] [data-bedarf="termin"]').first()
+  // Handlungsbedarf der Kurse (09.10.2026, eine Quelle mit der Kursseite): Klick bleibt in „Meine Klassen" – Vokabel-
+  // Hinweise im Reiter „Vokabeln", Grammatik-Hinweise im Reiter „Grammatik"
+  const vokEintrag = p.locator('[data-handlungsbedarf] [data-ziel-reiter="vokabeln"], [data-handlungsbedarf] [data-ziel-reiter="lernende"]').first()
   if (await vokEintrag.count()) {
     await vokEintrag.click()
-    pruefe(await da(p.locator('[data-kurs-seite] [data-kurs-bedarf]'), 10000), 'Handlungsbedarf öffnet in Sprachenlernen direkt den Kurs der Klasse (Überblick)')
+    pruefe(await da(p.locator(`[data-klasse-detail="${K5} – Englisch"] [data-kurs-seite][data-eingebettet]`), 10000), 'Vokabel-Hinweis öffnet den Kurs eingebettet in „Meine Klassen" (Reiter „Vokabeln")')
+    pruefe(await da(p.locator('[role="tab"][aria-selected="true"]', { hasText: /^Vokabeln/ })), 'Reiter „Vokabeln" gewählt')
     await p.screenshot({ path: join(out, '4b-kurs-aus-bedarf.png') })
-    await p.locator('[data-zurueck="meineklassen"]').click()
-    await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
   } else pruefe(false, 'Vokabel-Eintrag im Handlungsbedarf fehlt')
+  const gramEintrag = p.locator('[data-handlungsbedarf] [data-ziel-reiter="grammatik"]').first()
+  if (await gramEintrag.count()) {
+    await gramEintrag.click()
+    pruefe(await da(p.locator('[role="tab"][aria-selected="true"]', { hasText: /^Grammatik/ })), 'Grammatik-Hinweis öffnet den Reiter „Grammatik"')
+    pruefe(await da(p.locator('[data-kurs-seite] [data-kurs-grammatik]'), 10000), 'Grammatik-Hinweis zeigt die Grammatik-Liste')
+  }
 
   // Rückweg: Blatt öffnen → „Meine Klassen" führt zurück in dieselbe Klasse
   await p.getByRole('tab', { name: /^Unterrichtsreihen/ }).click()
@@ -479,7 +516,7 @@ try {
   pruefe(faelligVorher === 0 && faelligNachher === 5, `Wörter bei Mia wieder fällig (vorher ${faelligVorher}, nachher ${faelligNachher} von 5)`)
   const vt = await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()
   pruefe((vt.zuweisungen ?? []).length === kurseVorher && !(vt.zuweisungen ?? []).some((z) => /Wackelige Wörter/.test(z.titel)), 'Kein zweiter Kurs „Wackelige Wörter“')
-  for (const z of vt.zuweisungen ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: {} })
+  for (const z of vt.zuweisungen ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 
   // ---------- Verwaltung: Ablagestruktur ändern und zurücksetzen
   const neuMuster = await (

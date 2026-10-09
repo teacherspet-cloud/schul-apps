@@ -1,0 +1,137 @@
+/* Themen-Bibliothek (09.10.2026, ThemenBibliothek.tsx) – helles und dunkles Design über die Mantine-Farben */
+.tbib-kopf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 6px;
+  min-height: 40px;
+}
+.tbib-kopf:hover {
+  background: var(--mantine-color-default-hover);
+}
+.tbib-bereich {
+  border-radius: 8px;
+  padding: 2px 4px 6px;
+  transition: background 120ms, outline-color 120ms;
+  outline: 2px dashed transparent;
+}
+.tbib-bereich[data-ziel='ja'] {
+  outline-color: var(--mantine-color-blue-5);
+  background: var(--mantine-color-blue-0);
+}
+.tbib-karte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  background: var(--mantine-color-body);
+  overflow: hidden;
+}
+.tbib-karte[data-neu='ja'] {
+  border-color: var(--mantine-color-teal-5);
+}
+.tbib-karte:focus-within,
+.tbib-karte:hover {
+  border-color: var(--mantine-color-blue-4);
+}
+.tbib-bild {
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  background: var(--mantine-color-gray-0);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  color: var(--mantine-color-dimmed);
+  overflow: hidden;
+  cursor: pointer;
+}
+.tbib-bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.tbib-bild-text {
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--mantine-color-text);
+  opacity: 0.75;
+  align-self: start;
+  justify-self: start;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  white-space: pre-line;
+}
+.tbib-titel {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.tbib-menue {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--mantine-color-body);
+  border-radius: 6px;
+}
+.tbib-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  background: var(--mantine-color-body);
+  min-height: 44px;
+}
+.tbib-zeile[data-neu='ja'] {
+  border-color: var(--mantine-color-teal-5);
+}
+.tbib-zeile-bild {
+  width: 56px;
+  flex: 0 0 56px;
+  aspect-ratio: 16 / 10;
+  border-radius: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+}
+.tbib-zuletzt {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .tbib-zuletzt {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(180px, 46%);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+  }
+  .tbib-zuletzt > * {
+    scroll-snap-align: start;
+  }
+}
+.tbib-auswahl {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+[data-mantine-color-scheme='dark'] .tbib-bereich[data-ziel='ja'] {
+  background: rgba(34, 139, 230, 0.12);
+}
+[data-mantine-color-scheme='dark'] .tbib-bild {
+  background: var(--mantine-color-dark-6);
+}

@@ -2,6 +2,7 @@ import { Card, Collapse, Group, Text, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useState } from 'react'
 import { AlleOptionenKopf, useNotausgang, useVerborgeneAbweichungen } from './NurExperte'
+import { offenLesen, offenMerken } from '../sitzung'
 
 /**
  * Einklappbarer Bereich „Weitere Optionen" für selten Geändertes.
@@ -70,19 +71,11 @@ export default function WeitereOptionen({
 
 const schluessel = (modul: string): string => `schul-apps-weitere-optionen-${modul}`
 
-/** Standard: eingeklappt – so steht der Hauptteil des Formulars ohne Scrollen da */
+/** Standard: eingeklappt – so steht der Hauptteil des Formulars ohne Scrollen da. Offen gilt je Sitzung (shared/sitzung.ts, 09.10.2026). */
 export function weitereOptionenOffen(modul: string): boolean {
-  try {
-    return localStorage.getItem(schluessel(modul)) === '1'
-  } catch {
-    return false
-  }
+  return offenLesen<boolean>(schluessel(modul)) === true
 }
 
 export function merkeWeitereOptionen(modul: string, offen: boolean): void {
-  try {
-    localStorage.setItem(schluessel(modul), offen ? '1' : '0')
-  } catch {
-    // ohne lokalen Speicher gilt die Wahl nur bis zum Neustart
-  }
+  offenMerken(schluessel(modul), offen)
 }

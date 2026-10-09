@@ -30,7 +30,8 @@ import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, safeFileName } from '../../../shared/util'
 import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { briefNeuFormulieren, briefUebersetzen, teileNachuebersetzen, teilUeberarbeiten } from '../auftrag'
-import { briefDocx, briefHtml, type Briefkopf } from '../ausgabe'
+import { briefDocx, briefHtml, kopfMitSchule, type Briefkopf } from '../ausgabe'
+import { ladeServerSchule, type ServerSchule } from '../../../shared/serverSchule'
 import { AKTIONEN, geaenderteTeile, gleicherAufbau, pruefeBrief, teilLesen, type Aktion } from '../bearbeiten'
 import { DEUTSCHER_VERMERK, TOENE, type BriefText } from '../model'
 import { useElternbrief } from '../store'
@@ -100,6 +101,8 @@ export default function Brief(): React.JSX.Element | null {
   const [passwortFrage, setPasswortFrage] = useState(false)
   const [passwort, setPasswort] = useState('')
   const [unterschrift, setUnterschrift] = useState<string | null>(null)
+  // Server (09.10.2026): Schule der Verwaltung als Rückfall für leere Briefkopf-Felder
+  const [serverSchule, setServerSchule] = useState<ServerSchule | null>(null)
   // Wert eines deutschen Feldes beim Betreten – beim Verlassen entscheidet er, ob nachübersetzt wird
   const beimBetreten = useRef<Record<string, string>>({})
   const settings = useAppSettings((s) => s.settings)
@@ -109,20 +112,25 @@ export default function Brief(): React.JSX.Element | null {
       .getUnterschrift()
       .then(setUnterschrift)
       .catch(() => setUnterschrift(null))
+    void ladeServerSchule().then(setServerSchule)
   }, [])
   if (!b?.text) return null
   const bk = settings.briefkopf ?? {}
   const zeigeSchule = settings.showSchool !== false
-  const kopf: Briefkopf = {
+  const eigenerKopf: Briefkopf = {
     schule: zeigeSchule ? settings.schoolName : '',
     logo: zeigeSchule ? logo : null,
     lehrkraft: bk.lehrkraft,
+    funktion: bk.funktion,
     strasse: zeigeSchule ? bk.strasse : '',
     plz: zeigeSchule ? bk.plz : '',
     ort: bk.ort,
     telefon: zeigeSchule ? bk.telefon : '',
+    email: zeigeSchule ? bk.email : '',
     unterschrift
   }
+  // Ohne eigene Angaben gelten die der Schule (Verwaltung) – nicht, wenn die Schule ausgeblendet ist
+  const kopf = zeigeSchule ? kopfMitSchule(eigenerKopf, serverSchule?.schule, serverSchule?.logo) : eigenerKopf
   const name = safeFileName(b.meta.title || b.text.betreff || 'Elternbrief')
   const signieren = Boolean(bk.zertifikat && bk.signieren)
   const ton = neu.ton || b.meta.ton
@@ -368,6 +376,10 @@ export default function Brief(): React.JSX.Element | null {
             Übersetzungen nachgezogen.
           </Text>
         </Card>
+        <Text size="xs" c="dimmed" mb="xs" data-eb-fett-hinweis>
+          Text zwischen **zwei Sternchen** erscheint im Brief fett; die Rückgabefrist zusätzlich unterstrichen. Der Brief wird nach DIN 5008 (Form B)
+          gesetzt.
+        </Text>
         <Tabs defaultValue="de" keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="de">Deutsch</Tabs.Tab>

@@ -40,6 +40,12 @@ import { FachOrdnerSymbol, FachPunkt } from "../shared/components/FachFarbe";
 import { abgleichen, ladeThemen, useThemen } from "../shared/themenbereiche";
 import { nachfahrenVon, pfadVon, type Themenbereich } from "@shared/themen";
 import SchulpaketKnoepfe from "./Schulpaket";
+import {
+  NurReiheHinweis,
+  ReiheMarke,
+  useReiheZuordnung,
+} from "../shared/reiheZuordnung";
+import { suchtrefferMitReihen, type ReiheMitMaterial } from "@shared/reiheMaterial";
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8;
@@ -104,13 +110,37 @@ export default function Home(): React.JSX.Element {
     };
   }, []);
 
+  /*
+   * Material aus Unterrichtsreihen (09.10.2026, shared/reiheMaterial.ts): in „Zuletzt bearbeitet" zunächst ausgeblendet,
+   * in der Suche nur, wenn sie ausschließlich solches findet (dann mit Hinweis)
+   */
+  const reiheZuordnung = useReiheZuordnung((z) => z.zuordnung);
+  const reiheEinblenden = useReiheZuordnung((z) => z.einblenden);
+  const reihenListe = useReiheZuordnung((z) => z.reihen);
+  useEffect(() => {
+    void useReiheZuordnung.getState().laden();
+  }, []);
   const zuletzt = useMemo(
-    () => neueste(materialien ?? [], ZULETZT_ANZAHL),
-    [materialien]
+    () =>
+      neueste(
+        // Startseite (09.10.2026, Wunsch der Lehrkraft): immer nur die Reihe als Ganzes – ihr Material nie, auch nicht eingeblendet
+        [
+          ...(materialien ?? []).filter((m) => !reiheZuordnung.has(m.id)),
+          ...reihenListe.map(reiheAlsMaterial),
+        ],
+        ZULETZT_ANZAHL
+      ),
+    [materialien, reiheZuordnung, reihenListe]
   );
-  const treffer = useMemo(
-    () => suche(materialien ?? [], suchtext),
-    [materialien, suchtext]
+  const { liste: treffer, nurReihe } = useMemo(
+    () =>
+      suchtrefferMitReihen(
+        suche(materialien ?? [], suchtext),
+        (m) => m.id,
+        reiheZuordnung,
+        reiheEinblenden
+      ),
+    [materialien, suchtext, reiheZuordnung, reiheEinblenden]
   );
   const suchtAktiv = suchtext.trim().length > 0;
   const themen = useThemen((s) => s.daten);
@@ -162,6 +192,35 @@ export default function Home(): React.JSX.Element {
           Organisatorisches schnell erstellen.
         </Text>
       </Stack>
+
+      {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer erscheinen unten unter „Suchergebnis" */}
+      {(materialien?.length ?? 0) > 0 && (
+      <TextInput
+        aria-label="Materialien durchsuchen"
+        placeholder="Alle Materialien durchsuchen (Name, Thema, Fach)"
+        leftSection={<IconSearch size={16} />}
+        rightSection={
+          suchtAktiv ? (
+            <CloseButton
+              size="sm"
+              aria-label="Suche leeren"
+              onClick={() => setSuchtext("")}
+            />
+          ) : null
+        }
+        value={suchtext}
+        onChange={(e) => setSuchtext(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          // Enter öffnet den ersten Treffer, Escape leert die Suche
+          if (e.key === "Enter" && treffer[0])
+            void openDocument(treffer[0].moduleId, treffer[0].id);
+          if (e.key === "Escape") setSuchtext("");
+        }}
+        size="md"
+        mb="lg"
+        data-home-suche
+      />
+      )}
 
       {(ohneKi || sicherungFaellig) && (
         <Stack gap="sm" mb="xl">
@@ -250,30 +309,6 @@ export default function Home(): React.JSX.Element {
             <Title order={3}>
               {suchtAktiv ? "Suchergebnis" : "Zuletzt bearbeitet"}
             </Title>
-            <TextInput
-              aria-label="Materialien durchsuchen"
-              placeholder="Alle Materialien durchsuchen (Name, Thema, Fach)"
-              leftSection={<IconSearch size={16} />}
-              rightSection={
-                suchtAktiv ? (
-                  <CloseButton
-                    size="sm"
-                    aria-label="Suche leeren"
-                    onClick={() => setSuchtext("")}
-                  />
-                ) : null
-              }
-              value={suchtext}
-              onChange={(e) => setSuchtext(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                // Enter öffnet den ersten Treffer, Escape leert die Suche
-                if (e.key === "Enter" && treffer[0])
-                  void openDocument(treffer[0].moduleId, treffer[0].id);
-                if (e.key === "Escape") setSuchtext("");
-              }}
-              w={380}
-              maw="100%"
-            />
           </Group>
           {suchtAktiv && bereichTreffer.length > 0 && (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
@@ -297,6 +332,11 @@ export default function Home(): React.JSX.Element {
             )
           ) : (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {suchtAktiv && nurReihe && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <NurReiheHinweis />
+                </div>
+              )}
               {(suchtAktiv ? treffer.slice(0, 40) : zuletzt).map((m) => (
                 <MaterialZeile key={`${m.moduleId}-${m.id}`} material={m} />
               ))}
@@ -316,12 +356,34 @@ export default function Home(): React.JSX.Element {
 }
 
 /** Ein Eintrag in „Zuletzt bearbeitet" bzw. im Suchergebnis; ein Klick öffnet das Dokument. */
+/** Eine Unterrichtsreihe als Eintrag in „Zuletzt bearbeitet" (09.10.2026) – öffnet die Reihe */
+function reiheAlsMaterial(r: ReiheMitMaterial): Material {
+  const schritte = r.schritte ?? 0;
+  return {
+    moduleId: "unterrichtsreihe",
+    id: r.id,
+    name: r.titel,
+    detail: [r.fach, r.oberthema, `${schritte} ${schritte === 1 ? "Schritt" : "Schritte"}`]
+      .filter(Boolean)
+      .join(" · "),
+    // SQLite-Zeit („JJJJ-MM-TT hh:mm:ss", UTC) als ISO, damit Sortierung und „vor …" stimmen
+    updatedAt: r.geaendert ? `${r.geaendert.replace(" ", "T")}${/[zZ]|[+-]\d\d:?\d\d$/.test(r.geaendert) ? "" : "Z"}` : "",
+    entwurf: false,
+    suchtext: `${r.titel} ${r.fach ?? ""} ${r.oberthema ?? ""}`.toLowerCase(),
+    fach: r.fachId || r.fach,
+    fachId: r.fachId ?? "",
+    thema: r.oberthema ?? "",
+  };
+}
+
 function MaterialZeile({
   material: m,
 }: {
   material: Material;
 }): React.JSX.Element {
   const modul = modules.find((x) => x.id === m.moduleId);
+  // Gehört zu einer Unterrichtsreihe (09.10.2026) – nur sichtbar, wenn eingeblendet bzw. als einziger Suchtreffer
+  const reihe = useReiheZuordnung((z) => z.zuordnung.get(m.id));
   return (
     <UnstyledButton
       className="home-material"
@@ -368,6 +430,7 @@ function MaterialZeile({
                 Entwurf
               </Badge>
             )}
+            {reihe && <ReiheMarke verweis={reihe} size="xs" />}
           </Group>
           <Text size="xs" c="dimmed" truncate>
             {zeileMitModul(modul?.name, m.detail, wann(m.updatedAt))}

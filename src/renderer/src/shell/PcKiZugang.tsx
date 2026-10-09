@@ -1,7 +1,7 @@
 import { Alert, Badge, Button, Group, List, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
 import { IconAlertTriangle, IconCheck, IconDeviceDesktop, IconPlugConnected } from '@tabler/icons-react'
 import { useState } from 'react'
-import { AI_PROVIDERS, SUBSCRIPTIONS, type AppSettings, type DeepPartial, type PcKiEinstellungen, type PcKiTest } from '@shared/types'
+import { AI_PROVIDERS, aboInfo, type AppSettings, type DeepPartial, type PcKiEinstellungen, type PcKiTest } from '@shared/types'
 import { notifyError } from '../shared/util'
 import { ersetzeTailscaleIp, zeigtAufTailscaleIp } from '../shared/pcAdresse'
 
@@ -166,7 +166,7 @@ export function PcKiVerbindung({ settings, update }: { settings: AppSettings; up
 function TestErgebnis({ ergebnis }: { ergebnis: PcKiTest }): React.JSX.Element {
   const { status, abo } = ergebnis
   const anbieter = AI_PROVIDERS.find((p) => p.id === status.textProvider)?.label ?? status.textProvider
-  const weg = status.textAccess === 'subscription' ? `Abo (${SUBSCRIPTIONS[status.textProvider].plan})` : 'API-Schlüssel'
+  const weg = status.textAccess === 'subscription' ? `Abo (${aboInfo(status.textProvider)?.plan ?? ''})` : 'API-Schlüssel'
   const aboAbgemeldet = status.textAccess === 'subscription' && abo?.loggedIn === false
   return (
     <Alert color={status.hasTextKey && !aboAbgemeldet ? 'teal' : 'yellow'} icon={<IconCheck size={16} />} title="Verbindung zum PC steht">

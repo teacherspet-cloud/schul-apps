@@ -18,7 +18,14 @@ import { ladeVerbPool, verbenAusVokabeln } from '../../../shared/verben/quellen'
  * Grammatik zu einem Vokabeltraining (08.10.2026, abgestimmt): Empfänger fest = dessen Lernende; Band und Unit der
  * Vokabelliste werden in der Grammatikauswahl vorgeschlagen, wenn der Band dort Unit-Grammatik hat.
  */
-export function grammatikVorgabe(vokId: string, titel: string, sprache: string, quelle?: { lehrwerk?: string; unit?: string } | null): GrammatikVorgabe {
+export function grammatikVorgabe(
+  vokId: string,
+  titel: string,
+  sprache: string,
+  quelle?: { lehrwerk?: string; unit?: string } | null,
+  /** Kurs einer festen Klasse (09.10.2026): ohne „Übungszeitraum bis" */
+  klassenKurs?: boolean
+): GrammatikVorgabe {
   const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
   const fach = sprache === 'la' ? 'latein' : 'englisch'
   const id = norm(quelle?.lehrwerk ?? '')
@@ -27,7 +34,7 @@ export function grammatikVorgabe(vokId: string, titel: string, sprache: string, 
         .filter((b) => id.startsWith(norm(b)))
         .sort((a, b) => b.length - a.length)[0]
     : undefined
-  return { vokId, titel, sprache, ...(buch ? { lehrwerk: { buch, unit: quelle?.unit } } : {}) }
+  return { vokId, titel, sprache, ...(buch ? { lehrwerk: { buch, unit: quelle?.unit } } : {}), ...(klassenKurs !== undefined ? { klassenKurs } : {}) }
 }
 
 /**
@@ -102,7 +109,7 @@ export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => 
           </Text>
         )}
         <FreigabePlanen wert={plan} aendern={setPlan} abschnitte={auswahl?.teile?.map((t) => t.titel) ?? (auswahl ? [auswahl.titel] : undefined)} mitTest />
-        <Group justify="flex-end">
+        <Group justify="flex-end" className="dialog-fuss">
           <Button variant="default" onClick={schliessen}>
             Abbrechen
           </Button>

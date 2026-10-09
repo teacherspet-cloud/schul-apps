@@ -94,6 +94,7 @@ export function toMeta(b: Textbook): TextbookMeta {
     reihe: b.reihe,
     ausgabe: b.ausgabe,
     band: b.band,
+    platzhalter: b.platzhalter,
     units: b.units.map((u) => ({
       name: u.name,
       sections: u.sections.map((s) => {

@@ -20,10 +20,9 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
 import { ohneKlasse, ohneKlassenname } from '../shared/ohneKlasse'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
-import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
-import { imNutzer } from './kontext'
-import { getSettings } from '../main/services/storage/settings'
+import { json, setzeSitzungsCookie, type Anfrage } from './http'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
+import { leseSchulFachfarben } from './fachfarben'
 import {
   alleLernenden,
   gastInLerngruppe,
@@ -45,7 +44,7 @@ import { verbenFrei } from '../shared/verbFreigabe'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
-import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, type AbschnittStatistik } from '../shared/kursAbschnitte'
+import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, type AbschnittStatistik } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -57,6 +56,7 @@ import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
 import { abschnitteBeimSpeichern } from './wartungAbschnitteTeilen'
 import { abkuerzungAus } from '../shared/abkuerzung'
+import type { KursHinweisEingabe } from '../shared/kursHinweise'
 import {
   bewerte,
   bewerteAbkuerzung,
@@ -243,6 +243,8 @@ export interface VokTeil {
   titel: string
   anzahl: number
   zeit: number
+  /** Lehrwerk-Kennung des Abschnitts (seit 09.10.2026) */
+  lehrwerk?: string
 }
 /** Abschnitte eines Trainings; ältere Freigaben: einer mit dem Titel und allen Wörtern */
 export function teileVon(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstellt'>): VokTeil[] {
@@ -583,6 +585,9 @@ export function vokabelnZuweisen(e: {
     const r = abschnitteBeimSpeichern(teile ?? [{ titel: e.titel.slice(0, 160), anzahl: woerter.length, zeit: jetzt }], woerter, quelle, e.lehrkraftId)
     if (r) ((woerter = r.woerter), (teile = r.teile))
   }
+  // Band je Abschnitt merken (09.10.2026, Sortierung nach Band)
+  const lehrwerk = quelle ? json_(quelle, {} as Partial<Quelle>).lehrwerk : undefined
+  if (teile && lehrwerk) teile = teile.map((t) => ({ ...t, lehrwerk }))
   db()
     .prepare(
       "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle, verben, teile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
@@ -652,6 +657,13 @@ export function klassenKurseSichern(lehrkraftId: string): number {
   if (neu) protokolliereServer('vokabeln', `${neu} Kurs(e) für eigene Klassen angelegt`, lehrkraftId)
   return neu
 }
+/**
+ * Kurs einer festen Klasse (09.10.2026, abgestimmt): mit einer (noch vorhandenen) Lerngruppe verbunden. Solche Kurse
+ * lassen sich weder beenden noch löschen (Sprachenlernen › Einstellungen zeigt die Knöpfe nur für spontane Gruppen);
+ * `klassenkurs: true` im Aufruf erlaubt es ausdrücklich (Aufräumen in Tests).
+ */
+export const istKlassenKurs = (z: Pick<Zeile, 'lerngruppe_id'>): boolean => Boolean(z.lerngruppe_id && lerngruppe(z.lerngruppe_id))
+
 /** Leeren Kurs (ohne Wörter) löschen – z. B. wenn das Fach in der Klasse abgewählt wird (08.10.2026) */
 export function leerenKursLoeschen(id: string, lehrkraftId: string): void {
   const z = zeile(id)
@@ -750,13 +762,12 @@ export function vokabelListenFuer(
 }
 
 /**
- * Fachfarbe des Kopfbands, wie die Lehrkraft sie eingestellt hat (sonst der Vorschlag des Fachs) –
- * das Vokabeltraining der Lernenden sieht aus wie ihre Arbeitsblätter (03.10.2026)
+ * Fachfarbe des Kopfbands – das Vokabeltraining der Lernenden sieht aus wie ihre Arbeitsblätter (03.10.2026).
+ * Seit 09.10.2026 die Farbe der SCHULE (Verwaltung, fachfarben.ts), sonst der Vorschlag des Fachs – nicht mehr die
+ * eigene der Lehrkraft. Der Name bleibt, damit die Aufrufer (Regal, Vokabelweg, Listen) unverändert bleiben.
  */
 export async function fachfarbeDerLehrkraft(z: Zeile): Promise<string | null> {
-  const lk = nutzerNachId(z.lehrkraft_id)
-  const eigene = lk ? await imNutzer(alsNutzer(lk), async () => getSettings().fachfarben).catch(() => undefined) : undefined
-  return fachFarbeAus(z.fach, eigene)
+  return fachFarbeAus(z.fach, leseSchulFachfarben())
 }
 
 /**
@@ -1157,6 +1168,20 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           // Entfernte Abschnitte (08.10.2026): Lernstand gespeichert, kommt beim erneuten Hinzufügen zurück
           entfernt: entferntVon(z).map((e) => ({ teil: e.teil, anzahl: e.woerter.length, zeit: e.zeit })),
           lerngruppeId: z.lerngruppe_id,
+          // Kurs einer festen Klasse (09.10.2026): kein „Kurs beenden/löschen", kein Lernzeitraum-Ende
+          klassenKurs: istKlassenKurs(z),
+          // Übersicht je Abschnitt auch ohne Lerngruppe (09.10.2026: Units je Band im Überblick) – mit Lerngruppe kommt sie
+          // aus „Meine Klassen" (/server/klassen/<id>)
+          ...(!z.lerngruppe_id && woerter.length
+            ? (() => {
+                const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
+                const tl = teileVon(z)
+                return {
+                  abschnitte: abschnittStatistik(tl, woerter, lernende.map((l) => l.stand), mitBaenden(tl, abschnitteEinordnen(tl, q), q, z.titel), jetzt),
+                  lernendeNamen: lernende.map((l) => l.name)
+                }
+              })()
+            : {}),
           // Lehrwerk und Unit – für „Grammatik dazu freigeben" (08.10.2026)
           quelle: json_(z.quelle ?? '', null as unknown),
           // Adresse der Lernseite – für die Zettel (08.10.2026)
@@ -1386,6 +1411,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           const r = abschnitteBeimSpeichern(neueTeile, neu, quelleBereinigt(k0.quelle), ich.id)
           if (r) (neu.splice(0, neu.length, ...r.woerter), (neueTeile = r.teile))
         }
+        // Band je Abschnitt merken (09.10.2026): Sortierung nach Band, auch wenn der Titel nur „Station 1" heißt
+        const neuLehrwerk = json_(quelleBereinigt(k0.quelle) || '{}', {} as Partial<Quelle>).lehrwerk
+        if (neuLehrwerk) neueTeile = neueTeile.map((t) => ({ ...t, lehrwerk: neuLehrwerk }))
         const teile = [
           // Leerer Kurs (z. B. automatisch für eine Klasse angelegt): sein „Titel-Teil" ohne Wörter fällt weg
           ...(alt.length ? teileVon(z) : []),
@@ -1446,6 +1474,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       }
       if (teile[1] === 'status') {
         const auf = k0.status !== 'beendet'
+        // Kurs einer festen Klasse (09.10.2026, abgestimmt): läuft über die Schuljahre – nicht beenden
+        if (!auf && istKlassenKurs(z) && k0.klassenkurs !== true)
+          return json(res, 400, { fehler: 'Der Kurs einer festen Klasse lässt sich nicht beenden – er läuft mit der Klasse weiter.' }), true
         db()
           .prepare('UPDATE vok_zuweisungen SET status = ? WHERE id = ?')
           .run(auf ? 'offen' : 'beendet', z.id)
@@ -1462,6 +1493,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return ok ? (json(res, 200, { ok: true }), true) : (json(res, 404, { fehler: 'Diese Person ist nicht per Code beigetreten.' }), true)
       }
       if (teile[1] === 'loeschen') {
+        // Kurs einer festen Klasse (09.10.2026, abgestimmt): nicht löschen – nur spontane Gruppen (QR-Code, Code)
+        if (istKlassenKurs(z) && k0.klassenkurs !== true)
+          return json(res, 400, { fehler: 'Der Kurs einer festen Klasse lässt sich nicht löschen – Abschnitte und Grammatik lassen sich einzeln entfernen.' }), true
         // Gastkonten, die nur für dieses Training angelegt wurden, gehen mit
         const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
         db().prepare('DELETE FROM vok_zuweisungen WHERE id = ?').run(z.id)
@@ -1523,6 +1557,11 @@ export function vokabelnDerGruppe(
   jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
   /** `kurs` und `id`: wo das Wort steht (erster offener Kurs) – „Im Kurs wiederholen" in „Meine Klassen" (09.10.2026) */
   wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string; betroffen: number; kurs: string; id: string }[]
+  /**
+   * Handlungsbedarf je laufendem Kurs (09.10.2026): Eingabe für shared/kursHinweise.ts – dieselben Zahlen wie GET
+   * /server/vokabeln/<id> (nur freigeschaltete Wörter); `nutzer` für das Grammatik-Profil (Fördern). Nur serverintern.
+   */
+  hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[] }>
 } {
   const zs = db()
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
@@ -1535,6 +1574,7 @@ export function vokabelnDerGruppe(
     { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
   >()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
+  const hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[] }> = {}
   const trainings = zs.map((zVoll) => {
     // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026); die Abschnitts-Übersicht zeigt auch geplante
     const z = kursFuerLernende(zVoll, jetzt)
@@ -1558,10 +1598,12 @@ export function vokabelnDerGruppe(
     let ersterTag: string | null = null
     const summe = { sicher: 0, aufbau: 0, neu: 0 }
     const staende: Record<string, WortStand>[] = []
+    const hinweisLernende: KursHinweisEingabe['lernende'] = []
     for (const n of lernende) {
       const st = standVon(z.id, n.id)
       staende.push(st.woerter)
       const u = uebersicht(woerter, st.woerter, jetzt)
+      hinweisLernende.push({ id: n.id, name: n.name || n.benutzer, tage7: st.tage.filter((t) => t >= vor7).length, uebersicht: { gesamt: u.gesamt, sicher: u.sicher } })
       anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
       summe.sicher += u.sicher
       summe.aufbau += u.imAufbau
@@ -1607,6 +1649,21 @@ export function vokabelnDerGruppe(
     const teile = woerter.length ? teileVon(z) : []
     const einordnung = abschnitteEinordnen(teile, q)
     const baende = baendeVon(z.titel, einordnung, q)
+    if (offen) {
+      const wVoll = json_(zVoll.woerter, [] as Vokabel[])
+      hinweisDaten[z.id] = {
+        eingabe: {
+          status: 'offen',
+          testTermin: z.test_termin ?? null,
+          woerter: woerter.length,
+          teile: wVoll.length ? teileVon(zVoll) : [],
+          gesamt: { gesamt: hinweisLernende.reduce((a, l) => a + l.uebersicht.gesamt, 0), sicher: hinweisLernende.reduce((a, l) => a + l.uebersicht.sicher, 0) },
+          lernende: hinweisLernende
+        },
+        sprache: z.sprache,
+        nutzer: lernende
+      }
+    }
     return {
       id: z.id,
       titel: z.titel,
@@ -1617,7 +1674,7 @@ export function vokabelnDerGruppe(
             abschnitte: (() => {
               const wVoll = json_(zVoll.woerter, [] as Vokabel[])
               const tVoll = wVoll.length ? teileVon(zVoll) : []
-              return abschnittStatistik(tVoll, wVoll, staende, abschnitteEinordnen(tVoll, q), jetzt)
+              return abschnittStatistik(tVoll, wVoll, staende, mitBaenden(tVoll, abschnitteEinordnen(tVoll, q), q, z.titel), jetzt)
             })(),
             lernendeNamen: lernende.map((n) => n.name || n.benutzer)
           }
@@ -1674,5 +1731,5 @@ export function vokabelnDerGruppe(
       kurs: e.kurs,
       id: e.v.id
     }))
-  return { trainings, jePerson, wackelig }
+  return { trainings, jePerson, wackelig, hinweisDaten }
 }

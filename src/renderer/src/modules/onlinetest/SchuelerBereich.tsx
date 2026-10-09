@@ -25,6 +25,7 @@
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
 import { RekordKnopf } from './Rekorde'
+import { usePfad } from './schuelerNavigation'
 import { useAuffrischen } from '../../shared/auffrischen'
 import { useAufsicht, useZeitraum, vorfallSender } from './aufsicht'
 import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
@@ -97,6 +98,7 @@ import { FreischaltungHinweis } from '../lernen/regal/planHinweise'
 import Ordner from '../lernen/regal/Ordner'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { useDarstellung } from './schuelerDarstellung'
+import Willkommen from './Willkommen'
 import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
@@ -175,7 +177,8 @@ async function abmelden(ziel = '/anmelden?ziel=/s/'): Promise<void> {
 }
 
 export default function SchuelerBereich(): React.JSX.Element {
-  const pfad = window.location.pathname
+  // Seitenwechsel ohne Neuladen (09.10.2026, schuelerNavigation.ts): Ordner aufschlagen/zuklappen ohne leere Seite
+  const pfad = usePfad()
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
@@ -365,7 +368,9 @@ export default function SchuelerBereich(): React.JSX.Element {
           Zur Unterrichtsreihe
         </Button>
       )}
-      <div data-vorlese-bereich>{inhalt}</div>
+      <div data-vorlese-bereich key={pfad}>
+        {inhalt}
+      </div>
       {mitTabs && (
         <>
           {/* Platz für die Leiste unten */}
@@ -373,6 +378,8 @@ export default function SchuelerBereich(): React.JSX.Element {
           <SchuelerTabs abmelden={() => void abmelden()} />
         </>
       )}
+      {/* Willkommens-Assistent (09.10.2026): einmal je Konto, sonst über die Einstellungen */}
+      <Willkommen pfad={pfad} />
     </Container>
   )
 }

@@ -1,7 +1,6 @@
 import type { ComponentType } from 'react'
 import MeineKlassenModule from './meineklassen/MeineKlassenModule'
 import { SprachenlernenModule } from './lernen/VokabelTraining'
-import VerwaltungLehrkraft from './verwaltung/DatenUndMaterial'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
 import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
 import { programmSymbol, type ProgrammIcon } from '../shared/components/ProgrammSymbol'
@@ -255,19 +254,27 @@ export const modules: SchulModule[] = [
     faecher: PROGRAMM_FAECHER.vokabelliste,
     component: VokabellisteModule
   },
-  // Verwaltung (03.10.2026 zusammengelegt mit der Datenverwaltung): für alle – Admins sehen zusätzlich
-  // Nutzer, KI-Zugänge, IServ, Hörtexte und Server
-  {
-    id: 'verwaltung',
-    name: 'Verwaltung',
-    description: 'Freigaben der Fachschaften, Themenbereiche und Sicherung – für Admins dazu Nutzer, KI-Schlüssel, IServ-Anbindung und Server.',
-    icon: programmSymbol('verwaltung', 'gray'),
-    color: 'gray',
-    illustration: illustration('verwaltung'),
-    leistenbild: leistenbild('verwaltung'),
-    faecher: 'alle' as const,
-    component: aufServer() && serverIch()?.rolle === 'admin' ? VerwaltungModule : VerwaltungLehrkraft
-  }
+  /*
+   * Schule & Daten – nur für Admins auf dem Server (09.10.2026, Entscheidung des Admins): Nutzer, KI-Zugänge, IServ,
+   * Maskottchen, Server. Das Menü „Daten und Material" (bis dahin für Lehrkräfte die ganze App) entfällt: Freigaben der
+   * Fachschaft stehen in der Bibliothek jeder App, Themenbereiche und Sicherung unter Einstellungen › Material.
+   */
+  ...(aufServer() && serverIch()?.rolle === 'admin'
+    ? [
+        {
+          id: 'verwaltung',
+          // Umbenannt (09.10.2026, Wunsch der Lehrkraft): deutlicher, was hier verwaltet wird
+          name: 'Schule & Daten',
+          description: 'Nutzer, KI-Schlüssel, IServ-Anbindung, Maskottchen der Schule und Server.',
+          icon: programmSymbol('verwaltung', 'gray'),
+          color: 'gray',
+          illustration: illustration('verwaltung'),
+          leistenbild: leistenbild('verwaltung'),
+          faecher: 'alle' as const,
+          component: VerwaltungModule
+        }
+      ]
+    : [])
 ]
 
 /**
@@ -283,9 +290,11 @@ export interface ModulGruppe {
   name: string
   apps: string[]
 }
+/** Ganz oben in der Leiste, ohne Gruppe (09.10.2026, Wunsch der Lehrkraft): „Meine Klassen" über „Unterricht" */
+export const LEISTE_OBEN = ['meineklassen']
 export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'sprachenlernen'] },
-  { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
-  { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Verwaltung', apps: ['meineklassen', 'elternbrief', 'vokabelliste', 'verwaltung'] }
+  { id: 'planung', name: 'Planung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
+  { id: 'pruefung', name: 'Tests', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
+  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
 ]

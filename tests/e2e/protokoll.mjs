@@ -12,7 +12,7 @@ import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { kartenAuf, warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/protokoll')
 mkdirSync(out, { recursive: true })
@@ -74,7 +74,18 @@ const kiTab = page.getByRole('tab', { name: /^KI/ })
 if (await kiTab.count()) {
   await kiTab.first().click()
   await page.waitForTimeout(800)
-  pruefe((await page.getByText('Verbrauch', { exact: true }).filter({ visible: true }).count()) === 1, 'Die Karte „Verbrauch" steht im Reiter KI')
+  // Seit 09.10.2026: oben im Reiter und nur mit eingerichtetem KI-Zugang (Text, Bild oder Vertonung)
+  const st = await page.evaluate(() => window.api.ai.status())
+  const soll = Boolean(st.hasTextKey || st.hasImageKey || st.hasTts)
+  const verbrauch = await page.locator('[data-klappkarte="verbrauch"]').filter({ visible: true }).count()
+  pruefe(verbrauch === (soll ? 1 : 0), soll ? 'Die Karte „Verbrauch" steht im Reiter KI' : 'Ohne KI-Zugang keine Karte „Verbrauch"')
+  if (soll) {
+    const erste = await page.locator('[data-klappkarte]').filter({ visible: true }).first().getAttribute('data-klappkarte')
+    pruefe(erste === 'verbrauch', `„Verbrauch" steht oben (${erste})`)
+    await kartenAuf(page, 'verbrauch')
+    pruefe((await page.getByText('Diese Woche', { exact: true }).filter({ visible: true }).count()) === 1, 'Aufgeklappt: Kennzahlen des Verbrauchs')
+  }
+  pruefe((await page.locator('[data-klappkarte="ki-text"][data-offen="false"]').count()) === 1, 'Die Karte „Künstliche Intelligenz" ist eingeklappt')
   await page.screenshot({ path: join(out, 'verbrauch.png'), fullPage: true })
 } else pruefe(false, 'Reiter „KI" gefunden')
 

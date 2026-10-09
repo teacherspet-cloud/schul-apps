@@ -11,7 +11,8 @@ import { ActionIcon, Alert, Badge, Button, Group, Text, Tooltip } from '@mantine
 import { IconMessage2, IconPhotoSearch, IconSparkles, IconVolume } from '@tabler/icons-react'
 import { useState } from 'react'
 import { saetzeVon, satzSchluessel, sprachKurz, STIMMLAGE_NAME, type MedienSicht, type Stimmlage } from '@shared/medienbank'
-import { VERB_SPALTEN, type VerbEintrag, type VerbSprache } from '@shared/verben'
+import { istLeerform, VERB_SPALTEN, type VerbEintrag, type VerbSprache } from '@shared/verben'
+import { sprechText } from '@shared/sprechtext'
 import { notifyError } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
 import { tonErzeugen, type Vokabel } from '../medien/medienbank'
@@ -20,11 +21,17 @@ import { spiele, useStandardstimmen } from '../medien/MedienUi'
 
 /** Schlüssel in der Medienbank und gesprochener Text – gemeinsam mit den Lernenden (shared/verbTraining.ts, 07.10.2026) */
 export { medienSchluesselVerb as verbSchluessel, sprechtext } from '@shared/verbTraining'
-import { medienSchluesselVerb as verbSchluessel, sprechtext } from '@shared/verbTraining'
+import { formGesprochen, formSchluessel, medienSchluesselVerb as verbSchluessel } from '@shared/verbTraining'
 
-/** Die gesprochenen Formen einer Zeile (ohne die deutsche Bedeutung) */
-export function sprechFormen(e: VerbEintrag, sprache: VerbSprache): { label: string; text: string }[] {
-  return VERB_SPALTEN[sprache].filter((s) => !s.deutsch && e.formen[s.id]?.trim()).map((s) => ({ label: s.label, text: sprechtext(e.formen[s.id]) }))
+/**
+ * Die Formen einer Zeile (ohne die deutsche Bedeutung und ohne „—"): `text` = Schlüssel der Aufnahme (wie bisher),
+ * `gesprochen` = was die Stimme sagt (09.10.2026: Varianten mit Pause statt „slash", „read" der Vergangenheit /rɛd/)
+ */
+export function sprechFormen(e: VerbEintrag, sprache: VerbSprache): { label: string; text: string; gesprochen: string }[] {
+  return VERB_SPALTEN[sprache]
+    .filter((s) => !s.deutsch && !istLeerform(e.formen[s.id]))
+    .map((s) => ({ label: s.label, text: formSchluessel(e.formen[s.id], sprache, s.id), gesprochen: formGesprochen(e.formen[s.id], sprache, s.id) }))
+    .filter((f) => f.text && f.gesprochen)
 }
 
 /** Eine Zeile als „Vokabel" für Medienbank und Aufträge */
@@ -34,6 +41,7 @@ export function alsVokabel(e: VerbEintrag, sprache: VerbSprache): Vokabel {
     term: verbSchluessel(e, sprache),
     translation: (de && e.formen[de.id]) || '',
     formen: sprechFormen(e, sprache).map((f) => f.text),
+    formenGesprochen: Object.fromEntries(sprechFormen(e, sprache).map((f) => [f.text, f.gesprochen])),
     ...(e.hinweis?.trim() ? { hinweis: e.hinweis.trim() } : {})
   }
 }
@@ -43,6 +51,7 @@ function TextTon({
   sprache,
   wort,
   text,
+  gesprochen,
   label,
   sicht,
   lage,
@@ -53,6 +62,8 @@ function TextTon({
   sprache: string
   wort: string
   text: string
+  /** Was die Stimme sagt (09.10.2026) – fehlt = der Text */
+  gesprochen?: string
   label: string
   sicht?: MedienSicht
   lage: Stimmlage
@@ -88,7 +99,7 @@ function TextTon({
         data-verb-ton-erzeugen={lage}
         onClick={() => {
           setLaeuft(true)
-          void tonErzeugen(sprachKurz(sprache), wort, 'satz', text, stimme, lage)
+          void tonErzeugen(sprachKurz(sprache), wort, 'satz', text, stimme, lage, gesprochen)
             .then(() => medienGeaendert(sprache))
             .catch((e: unknown) => notifyError(e, 'Keine Aussprache'))
             .finally(() => setLaeuft(false))
@@ -134,6 +145,7 @@ export function FormenTonZelle({
               sprache={sprache}
               wort={wort}
               text={f.text}
+              gesprochen={f.gesprochen}
               label={f.label}
               sicht={sicht}
               lage={l}
@@ -178,6 +190,7 @@ export function HinweisTonZelle({
             sprache={sprache}
             wort={wort}
             text={text}
+            gesprochen={sprechText(text, sprachKurz(sprache))}
             label="Hinweis"
             sicht={sicht}
             lage={l}

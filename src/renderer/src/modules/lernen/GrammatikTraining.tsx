@@ -96,6 +96,8 @@ export interface Entwurf {
     bis: number | null
     gruppe: string
     vokId?: string
+    /** „Planen …" schon beim Anlegen gewählt (09.10.2026) – die Sichtung übernimmt es */
+    plan?: PlanWahl
     /** Extra (Förder/Forder, 08.10.2026): für wen (Nutzer-Kennungen) und wer dieselbe Schwäche/Stärke hat */
     art?: 'foerder' | 'forder'
     fuer?: { id: string; name: string }[]
@@ -281,6 +283,8 @@ export interface GrammatikVorgabe {
   titel: string
   sprache?: string
   lehrwerk?: { buch?: string; unit?: string }
+  /** Kurs einer festen Klasse (09.10.2026): kein „Übungszeitraum bis" */
+  klassenKurs?: boolean
 }
 
 export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vorgabe?: GrammatikVorgabe }): React.JSX.Element {
@@ -317,6 +321,8 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [qr, setQr] = useState(false)
   const [bis, setBis] = useState('')
+  // „Planen …" (09.10.2026, wie bei Vokabeln): gilt beim Freigeben nach der Sichtung
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const { gruppen } = useLerngruppen()
   const alleLernenden = useAlleLernenden()
   const fach = faecher.find((f) => f.id === fachId)
@@ -400,6 +406,12 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       : 'QR-Code'
   const verbSprache = fach && istVerbSprache(fach.sprache) ? fach.sprache : null
   const mitVerben = modus === 'verben' && verbSprache
+  /*
+   * Feste Klasse (09.10.2026, abgestimmt): Lerngruppe oder Kurs einer Klasse – kein „Übungszeitraum bis" (der Kurs läuft
+   * mit der Klasse weiter); spontane Gruppen (QR-Code, einzelne Lernende) behalten das Enddatum.
+   */
+  const festeKlasse =
+    art === 'gruppe' || (art === 'vok' && (vorgabe?.vokId === vokId && vorgabe?.klassenKurs !== undefined ? vorgabe.klassenKurs : Boolean(vokListe.find((v) => v.id === vokId)?.lerngruppe)))
   const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : art === 'vok' ? Boolean(vokId) : true
   const kursAbgleich = abgleich && !mitVerben ? abgleich : null
   const aenderungen = kursAbgleich ? kursAbgleich.erzeugen.length + kursAbgleich.wiederherstellen.length : 0
@@ -412,9 +424,10 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       lerngruppeId: art === 'gruppe' ? gruppe! : '',
       schueler: art === 'einzeln' ? einzelne : [],
       gaeste: art === 'code' || qr,
-      bis: ausFeld(bis, '23:59:00'),
+      bis: festeKlasse ? null : ausFeld(bis, '23:59:00'),
       gruppe: gruppenName,
-      ...(art === 'vok' && vokId ? { vokId } : {})
+      ...(art === 'vok' && vokId ? { vokId } : {}),
+      ...(plan.modus === 'planen' ? { plan } : {})
     }
     if (mitVerben) {
       // Ohne KI: je Verb eine Karte, dazu die Karten der Verbspiele – als Entwurf zum Ansehen wie bei Themen
@@ -684,13 +697,21 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               </NurExperte>
             </>
           )}
-          <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} />
+          {!festeKlasse && (
+            <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} data-grammatik-bis />
+          )}
+          {!mitVerben && (
+            <Text size="xs" c="dimmed" mb={-6}>
+              Die KI erstellt die Aufgaben gleich; „Planen …“ legt fest, ab wann die Lernenden sie nach der Sichtung sehen.
+            </Text>
+          )}
+          <FreigabePlanen wert={plan} aendern={setPlan} />
           <AlleOptionen />
           <Alert variant="light" icon={<IconSparkles size={16} />}>
             Die KI erstellt mit dem eigenen KI-Zugang Regelkarten und rund 40 Aufgaben und prüft sie. Das dauert ein bis zwei Minuten im Hintergrund; danach
             wird der Pool hier angesehen und erst dann freigegeben.
           </Alert>
-          <Group justify="flex-end">
+          <Group justify="flex-end" className="dialog-fuss">
             {kursAbgleich && (
               <Text size="sm" c="dimmed" data-grammatik-abgleich>
                 {!bestehend
@@ -724,7 +745,7 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
   const [auchFuer, setAuchFuer] = useState<string[]>([])
   const [laeuft, setLaeuft] = useState(false)
   // „Planen …" (09.10.2026): die Aufgaben sind fertig, die Lernenden sehen sie erst ab dem Zeitpunkt
-  const [plan, setPlan] = useState<PlanWahl>(planStart)
+  const [plan, setPlan] = useState<PlanWahl>(() => e.empfaenger.plan ?? planStart())
   const extra = e.empfaenger.art
   const minimum = extra ? 4 : 8
   // Bearbeitungen am Entwurf gleich merken (auch ohne Freigeben)
@@ -808,7 +829,7 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
           </Card>
         )}
         <FreigabePlanen wert={plan} aendern={setPlan} />
-        <Group justify="space-between">
+        <Group justify="space-between" className="dialog-fuss">
           <Button variant="subtle" color="red" onClick={verwerfen} data-entwurf-verwerfen>
             Verwerfen
           </Button>

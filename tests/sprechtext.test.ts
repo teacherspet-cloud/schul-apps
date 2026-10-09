@@ -25,7 +25,8 @@ describe('Sprechtext für Abkürzungen', () => {
 
   it('Kürzel und Platzhalter je Sprache ausgeschrieben', () => {
     expect(sprechText('e.g. a cat', 'en')).toBe('for example a cat')
-    expect(sprechText('to point at sb/sth', 'en')).toBe('to point at somebody/something')
+    // Schrägstrich als Pause (09.10.2026, nie „slash")
+    expect(sprechText('to point at sb/sth', 'en')).toBe('to point at somebody … something')
     expect(sprechText("to be in sb's shoes", 'en')).toBe("to be in somebody's shoes")
     expect(sprechText('Mrs Smith and Mr Brown', 'en')).toBe('Missus Smith and Mister Brown')
     expect(sprechText('jmdm. etw. schulden, z. B. Geld', 'de')).toBe('jemandem etwas schulden, zum Beispiel Geld')

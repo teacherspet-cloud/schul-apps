@@ -42,6 +42,8 @@ export function ordnerFarben(farbe: string, dunkel: boolean): OrdnerFarben {
       vok: ruecken,
       // Wortliste (09.10.2026): zwischen Vokabeln und Grammatik
       wort: flaecheMitSchrift(mische(basis, '#ffffff', 0.18)),
+      // Alphabetische Liste (09.10.2026): gleich hinter „Meine Bücher"
+      abc: flaecheMitSchrift(mische(basis, '#ffffff', 0.27)),
       gram: flaecheMitSchrift(mische(basis, '#ffffff', 0.35)),
       mat: flaecheMitSchrift(mische(basis, '#000000', 0.35))
     }

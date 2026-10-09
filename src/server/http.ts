@@ -14,10 +14,14 @@
  *    nie freigegeben wird) – Schutz gegen untergeschobene Formulare.
  *  - Schülerinnen und Schüler erreichen nur ihren Bereich (/s/…), nie die Programme.
  */
+import { fruehGrund } from '../shared/schuelerFarben'
+import { darstellungPruefen } from './darstellungFelder'
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { berichtErlaubt, protokoll } from './diagnose'
+import { anfrageGemessen, kontoAktiv } from './serverZustand'
 import { createSecureContext, type SecureContext } from 'node:tls'
+import { createHash } from 'node:crypto'
 import { createReadStream, existsSync, readFileSync, statSync, watchFile } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
 import { AUFTRAGS_KANAELE, AuftragsFehler, gueltigeAuftragsId, gueltigesGeraet, kennungDesAuftrags, MAX_WARTEN_MS } from '../main/services/lanAuftraege'
@@ -166,6 +170,9 @@ const TYPEN: Record<string, string> = {
 }
 
 /** Ein Nutzer als Kontext (für imNutzer) */
+/** Sitzung für die Oberfläche (09.10.2026): Fingerabdruck der Sitzungskennung – verschieden je Anmeldung, nicht umkehrbar */
+export const sitzungsAnzeige = (kennung: string): string => createHash('sha256').update(`oberflaeche:${kennung}`).digest('hex').slice(0, 16)
+
 export const alsNutzer = (n: NutzerInfo, kennung?: string): Nutzer => ({
   id: n.id,
   benutzer: n.benutzer,
@@ -242,9 +249,9 @@ if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.s
  * Bildschirm). Läuft als erstes Skript im Kopf (Inline-Skripte verbietet die CSP der Seite): Hintergrund nach der
  * Darstellung der Lernenden (dunkel/hell), bis die App in #root etwas zeigt.
  */
-const VORAB_JS = `(function(){try{var d=document.documentElement,m='dunkel';try{var s=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');if(s.modus)m=s.modus}catch(e){}
+const VORAB_JS = `(function(){try{var d=document.documentElement,m='dunkel',g=${JSON.stringify(fruehGrund().blue)};try{var s=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');if(s.modus)m=s.modus;g=${JSON.stringify(fruehGrund())}[s.farbe]||g}catch(e){}
 var dunkel=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
-d.style.background=dunkel?'#1f1f1f':'#ffffff';d.style.colorScheme=dunkel?'dark':'light';
+d.style.background=dunkel?g[1]:g[0];d.style.colorScheme=dunkel?'dark':'light';
 var fertig=function(){d.style.background='';d.style.colorScheme=''};
 var warte=function(){var r=document.getElementById('root');if(!r)return;if(r.childElementCount)return requestAnimationFrame(function(){requestAnimationFrame(fertig)});
 new MutationObserver(function(_,o){if(r.childElementCount){o.disconnect();requestAnimationFrame(function(){requestAnimationFrame(fertig)})}}).observe(r,{childList:true})};
@@ -346,7 +353,10 @@ function gemessen(req: IncomingMessage, res: ServerResponse, arbeit: () => Promi
   const pfad = String(req.url ?? '').split('?')[0]
   res.on('finish', () => {
     const ms = Date.now() - ab
-    if (ms > 1000 && !/^\/(ereignisse|auftrag\/)/.test(pfad)) protokoll('langsam', `${ms} ms ${req.method} ${pfad} ${res.statusCode}`)
+    if (/^\/(ereignisse|auftrag\/)/.test(pfad)) return
+    if (ms > 1000) protokoll('langsam', `${ms} ms ${req.method} ${pfad} ${res.statusCode}`)
+    // Tageszahlen für Verwaltung › Server (09.10.2026): nur Zähler im Speicher
+    anfrageGemessen(ms, res.statusCode)
   })
   arbeit().catch((e: unknown) => {
     protokoll('langsam', `FEHLER ${req.method} ${pfad}: ${e instanceof Error ? e.message : String(e)}`)
@@ -409,6 +419,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     // Kein Zugriff auf fremdes Material: Beitritt per Code (QR) gibt es in der Vorschau nicht
     if (inVorschau && req.method === 'POST' && /^\/s\/api\/(?:gast|(?:blatt|aufgabe|reihe|vokabeln|grammatik)\/(?:gast|wieder))$/.test(url.pathname))
       return json(res, 403, { fehler: 'In der Vorschau gibt es nur das Material dieser Klasse.' })
+    // Aktive Konten je Tag (nur gezählt, Verwaltung › Server, 09.10.2026)
+    if (sitzung) kontoAktiv(sitzung.nutzer)
     let koerperCache: Promise<unknown> | null = null
     const k: Anfrage = {
       req,
@@ -592,6 +604,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       if (!sitzung || sitzung.nutzer.quelle === 'gast') return json(res, 401, { fehler: 'Bitte zuerst anmelden.' })
       if (sitzung.nutzer.quelle === 'vorschau') return json(res, 400, { fehler: 'In der Vorschau gibt es kein Passwort.' })
       if (sitzung.nutzer.quelle === 'iserv') return json(res, 400, { fehler: 'Dein Passwort verwaltest du in IServ.' })
+      // Nur Konten mit eigenem Passwort auf dem Server (09.10.2026: der Bereich „Konto" fehlt den anderen ohnehin)
+      if (!sitzung.nutzer.hatPasswort) return json(res, 400, { fehler: 'Für dieses Konto gibt es hier kein Passwort.' })
       const sperre = `pw:${sitzung.nutzer.id}`
       if (gesperrtWegenVersuchen(sperre)) return json(res, 429, { fehler: 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.' })
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -633,46 +647,15 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       }
       if (req.method === 'POST' && mitKopf) {
         const k0 = (await k.koerper()) as Record<string, unknown>
-        const wahl = (wert: unknown, erlaubt: string[], vorgabe: string): string => (erlaubt.includes(String(wert)) ? String(wert) : vorgabe)
-        const darstellung = {
-          modus: wahl(k0.modus, ['hell', 'dunkel', 'auto'], 'auto'),
-          schrift: wahl(k0.schrift, ['normal', 'gross', 'sehrgross'], 'normal'),
-          farbe: wahl(k0.farbe, ['blue', 'teal', 'grape', 'orange', 'pink', 'green'], 'blue'),
-          ruhig: k0.ruhig === true,
-          // Vokabeltraining: Fachfarbe oder eigene Farbe (03.10.2026)
-          design: wahl(k0.design, ['fach', 'eigen'], 'fach'),
-          // Lesen und Hören, Lernen (06.10.2026). Die lesefreundliche Schrift und die Stimme bleiben nur auf dem Gerät
-          // (keine Angaben, die nach Diagnose aussehen, auf dem Server; Stimmen gibt es je Gerät).
-          zeilen: wahl(k0.zeilen, ['normal', 'weit', 'sehrweit'], 'normal'),
-          kontrast: k0.kontrast === true,
-          vorlesen: k0.vorlesen === true,
-          tempo: wahl(k0.tempo, ['langsam', 'normal', 'schnell'], 'normal'),
-          // Aufgenommene Aussprache: weibliche oder männliche Fassung (07.10.2026)
-          aussprache: wahl(k0.aussprache, ['w', 'm'], 'm'),
-          wochenziel: Math.max(1, Math.min(7, Math.round(Number(k0.wochenziel) || 3))),
-          tipps: k0.tipps !== false,
-          spiele: k0.spiele !== false,
-          zeitdruck: k0.zeitdruck !== false,
-          toene: k0.toene !== false,
-          // Neue Vorgaben vom 08.10.2026 (Töne an, männliche Stimme) schon übernommen – sonst würden sie die eigene Wahl überschreiben
-          vorgabe0810: k0.vorgabe0810 === true,
-          // Spielauswahl: auf- und zugeklappte Bereiche (08.10.2026)
-          spielGruppen: Object.fromEntries(
-            Object.entries(typeof k0.spielGruppen === 'object' && k0.spielGruppen ? (k0.spielGruppen as Record<string, unknown>) : {})
-              .filter(([n, v]) => /^[a-z]{1,20}$/.test(n) && typeof v === 'boolean')
-              .slice(0, 20)
-          ),
-          // „Lege das Wort": legen, tippen oder schreiben; Meine Materialien als Regal oder Liste, eigene Ordnerreihenfolge (08.10.2026)
-          legen: wahl(k0.legen, ['legen', 'tippen', 'schreiben'], 'legen'),
-          // „Dein Vokabelweg" auf- oder zugeklappt (08.10.2026)
-          vokabelwegOffen: k0.vokabelwegOffen === true,
-          // Vollbild beim Lernen (09.10.2026): an, solange die Lernenden es nicht ausschalten
-          vollbild: k0.vollbild !== false,
-          materialien: wahl(k0.materialien, ['regal', 'liste'], 'regal'),
-          regal: (Array.isArray(k0.regal) ? k0.regal : [])
-            .filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 60)
-            .slice(0, 40)
+        // Erlaubte Felder in darstellungFelder.ts (09.10.2026); „willkommenErledigt" bleibt, einmal gesetzt, erhalten
+        const vorher = d.prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(sitzung.nutzer.id) as { daten: string } | undefined
+        let alt: Record<string, unknown> | null = null
+        try {
+          alt = vorher ? (JSON.parse(vorher.daten) as Record<string, unknown>) : null
+        } catch {
+          alt = null
         }
+        const darstellung = darstellungPruefen(k0, alt)
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,
           JSON.stringify(darstellung)
@@ -700,6 +683,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             quelle: sitzung.nutzer.quelle,
             eingerichtet: sitzung.nutzer.eingerichtet,
             adresse: opts.adresse,
+            // Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): neue Anmeldung = Übersichten und
+            // eingeklappte Kästen wie vorgegeben. Nur ein Fingerabdruck der Kennung, nicht die Kennung selbst.
+            sitzung: sitzungsAnzeige(sitzung.kennung),
             ...(inVorschau ? { vorschau: true } : {})
           }
         : { angemeldet: false, adresse: opts.adresse }
@@ -712,7 +698,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         "(function(){try{if(location.pathname.indexOf('/s/')!==0)return;var d=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');" +
         // Dunkel als Vorgabe (05.10.2026): ohne gespeicherte Wahl bzw. ältere „automatisch" → dunkel
         "var m=d.modus||'dunkel';if(m==='auto'&&!d.dunkelVorgabe)m='dunkel';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
-        "var s=document.createElement('style');s.id='sa-frueh';s.textContent=dk?':where(html,body){background:#242424;color-scheme:dark}':':where(html,body){background:#fff}';" +
+        // Seitengrund leicht in der gewählten Farbe getönt (09.10.2026, shared/schuelerFarben.ts)
+        `var g=${JSON.stringify(fruehGrund())}[d.farbe]||${JSON.stringify(fruehGrund().blue)};` +
+        "var s=document.createElement('style');s.id='sa-frueh';s.textContent=dk?':where(html,body){background:'+g[1]+';color-scheme:dark}':':where(html,body){background:'+g[0]+'}';" +
         'document.head.appendChild(s)}catch(e){}})();'
       return void res.end(
         `window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};${frueh}` +

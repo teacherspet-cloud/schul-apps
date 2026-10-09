@@ -219,7 +219,8 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
   const modul = modules.find((m) => m.id === a.moduleId)
   const Symbol = modul?.icon
   const vergangen = (a.ende ?? jetzt) - a.start
-  const rest = laeuft(a) ? restAnzeige(a, jetzt) : ''
+  // Wartet noch auf den Start (09.10.2026, Befund der Lehrkraft): keine Restzeit – „noch etwa 7 Sekunden“ begann sonst ständig von vorn
+  const rest = laeuft(a) && !wartetVorStart(a) ? restAnzeige(a, jetzt) : ''
   /*
    * Zum Auftrag (01.10.2026, Wunsch der Lehrkraft): Ein Klick auf den Auftrag führt in sein
    * Programm, sein Dokument und seinen Schritt – während er läuft (dort steht der Hinweis auf den

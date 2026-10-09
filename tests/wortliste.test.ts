@@ -130,12 +130,17 @@ describe('Wortliste: Suche (alle Sprachen)', () => {
 })
 
 describe('Wortliste: Register im Ordner', () => {
-  it('heißt in der Fremdsprache, sonst „Wortliste"', () => {
-    expect(beschriftung('Englisch').wort).toBe('Word list')
-    expect(beschriftung('Französisch').wort).toBe('Lexique')
-    expect(beschriftung('Spanisch').wort).toBe('Léxico')
-    expect(beschriftung('Latein').wort).toBe('Index verborum')
-    expect(beschriftung('Russisch').wort).toBe('Словарь')
-    expect(beschriftung('Geschichte').wort).toBe('Wortliste')
+  it('„Meine Bücher" und „Alphabetisch" heißen in der Fremdsprache, sonst deutsch (09.10.2026)', () => {
+    expect(beschriftung('Englisch').wort).toBe('My Books')
+    expect(beschriftung('Englisch').abc).toBe('Alphabetical list')
+    expect(beschriftung('Französisch').wort).toBe('Mes livres')
+    expect(beschriftung('Französisch').abc).toBe('Liste alphabétique')
+    expect(beschriftung('Spanisch').wort).toBe('Mis libros')
+    expect(beschriftung('Spanisch').abc).toBe('Lista alfabética')
+    expect(beschriftung('Latein').wort).toBe('Libri mei')
+    expect(beschriftung('Latein').abc).toBe('Index alphabeticus')
+    expect(beschriftung('Russisch').wort).toBe('Мои книги')
+    expect(beschriftung('Geschichte').wort).toBe('Meine Bücher')
+    expect(beschriftung('Geschichte').abc).toBe('Alphabetisch')
   })
 })

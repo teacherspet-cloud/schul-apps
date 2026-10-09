@@ -1,0 +1,20 @@
+# Weiche auf Port 443/80 (neuer Server, 09.10.2026) – siehe nginx.conf
+name: schul-weiche
+services:
+  weiche:
+    image: nginx:1.27-alpine
+    container_name: schul-weiche
+    restart: unless-stopped
+    network_mode: host
+    # Erneuerte Zertifikate (certbot-Hook) alle 6 Stunden übernehmen
+    command: ['/bin/sh', '-c', "(while sleep 21600; do nginx -s reload; done) & exec nginx -g 'daemon off;'"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/www/acme:/acme:ro
+      - /var/lib/docker/volumes/schul-apps-daten/_data/tls:/schulapps-tls:ro
+    mem_limit: 96m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '2'

@@ -327,7 +327,11 @@ try {
   pruefe(/Vokabeltraining/.test((await h.locator('[data-kopf-titel]').innerText().catch(() => '')) ?? ''), 'Kopfzeile: Seitentitel „Vokabeltraining"')
   await h.screenshot({ path: join(out, '2e-kopf.png') })
   const ichJs = await (await g1.request.get(`${A}/server/ich.js`)).text()
-  pruefe(ichJs.includes('schulapps-darstellung') && ichJs.includes('#242424'), 'Dunkler Hintergrund wird vor dem Programm gesetzt')
+  // Seitengrund seit 09.10.2026 in der gewählten Farbe getönt (shared/schuelerFarben.ts) statt fest #242424
+  pruefe(
+    ichJs.includes('schulapps-darstellung') && ichJs.includes('color-scheme:dark') && /"blue":\["#[0-9a-f]{6}","#[0-9a-f]{6}"\]/i.test(ichJs),
+    'Dunkler Hintergrund wird vor dem Programm gesetzt'
+  )
   const cookie = (await g1.cookies()).find((c) => c.name === 'sa_sitzung')
   pruefe(Boolean(cookie && cookie.expires * 1000 > Date.now() + 20 * 864e5), 'Gast bleibt über Wochen angemeldet (bis zum Ende des Zeitraums)')
 
@@ -359,11 +363,11 @@ try {
   pruefe(zu.status() === 404, 'Nach Ablauf des Zeitraums kein Zugang mehr')
   // Löschen nimmt die Gastkonten mit
   const vorher = (await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json()).nutzer.length
-  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: {} })
+  await lk.request.post(`${A}/server/vokabeln/${vok.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
   const nachher = (await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json()).nutzer.length
   pruefe(nachher === vorher - 1, `Löschen entfernt das Gastkonto (${vorher} → ${nachher})`)
 
-  // ---------- Freigegebene Blätter: nach Lerngruppe, Liste leeren
+  // ---------- Freigegebene Blätter: Fach → Themenbereich, Lerngruppe an jeder Karte und als Filter (09.10.2026), Liste leeren
   const frei = async (lerngruppeId, titel) =>
     (
       await lk.request.post(`${A}/server/blaetter/freigeben`, {
@@ -375,8 +379,14 @@ try {
   const b2 = await frei('', 'Blatt B')
   pruefe(Boolean(b1.id && b2.id), `Zwei Blätter freigegeben (${b1.fehler ?? ''}${b2.fehler ?? ''})`)
   await p.locator('.app-leiste [aria-label="Freigegebene Blätter"]').click()
-  pruefe(await da(p.locator(`[data-freigabe-gruppe="${KLASSE}"]`)), 'Gruppiert nach Lerngruppe')
-  pruefe(await da(p.locator('[data-freigabe-gruppe="gaeste"]')), 'Eigene Gruppe „Gäste per QR-Code"')
+  pruefe(await da(p.locator('[data-themen-bibliothek="freigaben"] [data-themen-fach]')), 'Freigaben nach Fach und Themenbereich gegliedert')
+  pruefe(await da(p.locator(`[data-freigabe] [data-freigabe-gruppe="${KLASSE}"]`)), 'Lerngruppe an der Karte')
+  pruefe(await da(p.locator('[data-freigabe] [data-freigabe-gruppe="gaeste"]')), '„Gäste per QR-Code" an der Karte')
+  // Filter nach Lerngruppe: nur noch Blatt A
+  await p.locator(`[data-freigabe-lerngruppe="${KLASSE}"]`).click()
+  await p.waitForTimeout(300)
+  pruefe((await p.locator('[data-freigabe] [data-freigabe-gruppe="gaeste"]').count()) === 0, 'Filter nach Lerngruppe blendet die Gäste-Blätter aus')
+  await p.getByText('Alle Lerngruppen', { exact: true }).click()
   await p.screenshot({ path: join(out, '4-freigaben.png') })
   // Teacher am Handy: QR-Link des Blatts zeigt das Namensfeld
   const lkHandy = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, storageState: await lk.storageState() })
@@ -399,10 +409,12 @@ try {
   const rest = (await (await lk.request.get(`${A}/server/blaetter`, { headers: KOPF })).json()).blaetter
   pruefe(rest.length === 0, `Liste geleert (${rest.length} übrig)`)
 
-  // ---------- Verwaltung für Lehrkräfte: Daten und Material
-  await p.locator('.app-leiste .leiste-gruppe-apps [aria-label="Verwaltung"]').click()
-  pruefe(await da(p.locator('[data-datenverwaltung]')), 'Verwaltung (Daten und Material) für Lehrkräfte')
-  await p.screenshot({ path: join(out, '6-verwaltung.png') })
+  // ---------- Seit 09.10.2026 kein „Schule & Daten" für Lehrkräfte; Themenbereiche stehen unter Einstellungen › Material
+  pruefe((await p.locator('.app-leiste [aria-label="Schule & Daten"]').count()) === 0, 'Lehrkraft: keine App „Schule & Daten"')
+  await p.locator('.app-leiste [aria-label="Einstellungen"]').click()
+  await p.getByRole('tab', { name: 'Material' }).click()
+  pruefe(await da(p.locator('[data-einstellungen-themen]')), 'Einstellungen › Material: Themenbereiche')
+  await p.screenshot({ path: join(out, '6-einstellungen-material.png') })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

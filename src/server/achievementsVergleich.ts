@@ -110,7 +110,8 @@ export function klassenPlatz(ich: NutzerInfo, jetzt = Date.now()): { platz: numb
     let { gruppen, lernende } = gruppenUndLernende(jetzt)
     let k = hauptKlasse(ich, gruppen, lernende)
     // Neue Klasse oder neu eingetragen (09.10.2026): Zwischenspeicher kennt die Person noch nicht – einmal frisch laden
-    if (!k || !k.mitglieder.some((n) => n.id === ich.id)) {
+    // Vorschaukonten stehen nie in der Liste (alleNutzer) – für sie nicht jedes Mal neu laden
+    if (ich.quelle !== 'vorschau' && (!k || !k.mitglieder.some((n) => n.id === ich.id))) {
       gruppenStand = null
       ;({ gruppen, lernende } = gruppenUndLernende(jetzt))
       k = hauptKlasse(ich, gruppen, lernende)

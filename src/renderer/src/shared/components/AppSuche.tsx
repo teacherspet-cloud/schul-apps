@@ -14,6 +14,8 @@ import { useContext, useMemo, useState } from 'react'
 import { ladeMaterialien, suche, type Material } from '../../shell/materialien'
 import { AktuellesProgramm } from '../eigenesFenster'
 import { openDocument } from '../navigation'
+import { ReiheMarke, useReiheZuordnung } from '../reiheZuordnung'
+import { suchtrefferMitReihen } from '@shared/reiheMaterial'
 
 const BREITE = 240
 
@@ -52,12 +54,26 @@ export function DokumentSuche({ platzhalter, alle }: { platzhalter?: string; all
   const [eingabe, setEingabe] = useState('')
   const [liste, setListe] = useState<Material[] | null>(null)
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() })
-  // `alle` (Verwaltung „Daten und Material"): alle Materialien, geöffnet in ihrer App
+  // `alle` (Kopf von „Schule & Daten"): alle Materialien, geöffnet in ihrer App
   const eigene = useMemo(() => (liste ?? []).filter((m) => alle || m.moduleId === programm), [liste, programm, alle])
-  const treffer = useMemo(() => (eingabe.trim() ? suche(eigene, eingabe) : eigene).slice(0, 8), [eigene, eingabe])
+  /*
+   * Material aus Unterrichtsreihen (09.10.2026, shared/reiheMaterial.ts): ohne Eingabe ausgeblendet (sofern nicht
+   * eingeblendet), mit Eingabe nur, wenn die Suche ausschließlich solches findet – dann mit Hinweis
+   */
+  const reiheZuordnung = useReiheZuordnung((z) => z.zuordnung)
+  const reiheEinblenden = useReiheZuordnung((z) => z.einblenden)
+  const { liste: gefunden, nurReihe } = useMemo(
+    () =>
+      eingabe.trim()
+        ? suchtrefferMitReihen(suche(eigene, eingabe), (m) => m.id, reiheZuordnung, reiheEinblenden)
+        : { liste: eigene.filter((m) => reiheEinblenden || !reiheZuordnung.has(m.id)), nurReihe: false },
+    [eigene, eingabe, reiheZuordnung, reiheEinblenden]
+  )
+  const treffer = gefunden.slice(0, 8)
   if (!programm && !alle) return null
   const laden = (): void => {
     if (liste) return
+    void useReiheZuordnung.getState().laden()
     void ladeMaterialien()
       .then(setListe)
       .catch(() => setListe([]))
@@ -104,13 +120,20 @@ export function DokumentSuche({ platzhalter, alle }: { platzhalter?: string; all
           ) : treffer.length === 0 ? (
             <Combobox.Empty>{eigene.length ? 'Nichts gefunden.' : 'Noch nichts gespeichert.'}</Combobox.Empty>
           ) : (
-            treffer.map((m) => (
+            <>
+              {nurReihe && (
+                <Combobox.Empty data-nur-reihe-treffer>Nur Treffer aus Unterrichtsreihen – sonst ausgeblendet.</Combobox.Empty>
+              )}
+              {treffer.map((m) => (
               <Combobox.Option value={`${m.moduleId}::${m.id}`} key={`${m.moduleId}::${m.id}`} data-suchtreffer={m.id}>
                 <Group justify="space-between" wrap="nowrap" gap="xs">
                   <div style={{ minWidth: 0 }}>
-                    <Text size="sm" fw={600} truncate>
-                      {m.name || 'Ohne Titel'}
-                    </Text>
+                    <Group gap={6} wrap="nowrap">
+                      <Text size="sm" fw={600} truncate>
+                        {m.name || 'Ohne Titel'}
+                      </Text>
+                      {reiheZuordnung.get(m.id) && <ReiheMarke verweis={reiheZuordnung.get(m.id)!} size="xs" />}
+                    </Group>
                     {m.detail && (
                       <Text size="xs" c="dimmed" truncate>
                         {m.detail}
@@ -122,7 +145,8 @@ export function DokumentSuche({ platzhalter, alle }: { platzhalter?: string; all
                   </Text>
                 </Group>
               </Combobox.Option>
-            ))
+              ))}
+            </>
           )}
         </Combobox.Options>
       </Combobox.Dropdown>

@@ -5,7 +5,14 @@ import { randomUUID } from 'crypto'
 import { app } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { delimiter, dirname, join, resolve } from 'path'
-import { AiProviderId, ModelOption, StructuredRequest, SubscriptionStatus, SUBSCRIPTIONS } from '@shared/types'
+import { aboInfo, AiProviderId, KernAnbieterId, ModelOption, StructuredRequest, SubscriptionInfo, SubscriptionStatus } from '@shared/types'
+
+/** Abo-Angaben; nur die Kernanbieter haben ein Kommandozeilenprogramm (09.10.2026) */
+export function abo(provider: AiProviderId): SubscriptionInfo {
+  const s = aboInfo(provider)
+  if (!s) throw new Error('Für diesen Anbieter gibt es keinen Abo-Zugang – bitte einen API-Schlüssel verwenden.')
+  return s
+}
 import { getSettings } from '../storage/settings'
 import { AiProvider, ChunkListener, Netzfund, RawModel, splitDataUrl } from './provider'
 import { generateSvgImage } from './svg'
@@ -20,7 +27,7 @@ const appData = env.APPDATA ?? join(home, 'AppData', 'Roaming')
 const localAppData = env.LOCALAPPDATA ?? join(home, 'AppData', 'Local')
 
 /** Übliche Installationsorte zusätzlich zum Suchpfad (die App wird oft nicht aus einer Konsole gestartet). */
-const EXTRA_DIRS: Record<AiProviderId, string[]> = {
+const EXTRA_DIRS: Record<KernAnbieterId, string[]> = {
   openai: [join(appData, 'npm'), join(localAppData, 'Programs', 'codex'), join(home, '.codex', 'bin')],
   anthropic: [join(home, '.local', 'bin'), join(appData, 'npm')],
   google: [join(localAppData, 'agy', 'bin'), join(home, '.local', 'bin')]
@@ -94,7 +101,7 @@ export function serverKiOrdner(teil: 'codex' | 'claude' | 'home' | 'tmp'): strin
 export function findCli(provider: AiProviderId): string | null {
   if (aufServer()) {
     if (provider === 'google') return null
-    const pfad = (provider === 'openai' ? env.SCHULAPPS_CLI_OPENAI : env.SCHULAPPS_CLI_ANTHROPIC) || `/usr/local/bin/${SUBSCRIPTIONS[provider].command}`
+    const pfad = (provider === 'openai' ? env.SCHULAPPS_CLI_OPENAI : env.SCHULAPPS_CLI_ANTHROPIC) || `/usr/local/bin/${abo(provider).command}`
     return isFile(pfad) ? pfad : null
   }
   const custom = getSettings().ai.cliPaths[provider]?.trim()
@@ -103,8 +110,8 @@ export function findCli(provider: AiProviderId): string | null {
     return isFile(custom) ? custom : null
   }
   if (isFile(managedCliPath(provider))) return managedCliPath(provider)
-  const name = SUBSCRIPTIONS[provider].command
-  const dirs = [...(env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean), ...EXTRA_DIRS[provider]]
+  const name = abo(provider).command
+  const dirs = [...(env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean), ...(EXTRA_DIRS[provider as KernAnbieterId] ?? [])]
   for (const dir of dirs) {
     const exe = join(dir, `${name}.exe`)
     if (isFile(exe)) return exe
@@ -348,7 +355,7 @@ function lastLines(text: string, n = 4): string {
 }
 
 function notFound(provider: AiProviderId): Error {
-  const s = SUBSCRIPTIONS[provider]
+  const s = abo(provider)
   return new Error(`${s.program} ist noch nicht eingerichtet. Bitte in den Einstellungen unter „Künstliche Intelligenz" auf „Einrichten" klicken.`)
 }
 

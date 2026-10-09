@@ -51,11 +51,27 @@ describe('Reihe und Band aus dem Namen', () => {
 
   it('die mitgelieferten Green-Line-Bände tragen Reihe, Ausgabe und Band', () => {
     const dir = join(__dirname, '..', 'resources', 'lehrwerke')
-    for (const f of readdirSync(dir)) {
+    for (const f of readdirSync(dir).filter((x) => x.startsWith('green-line'))) {
       const b = JSON.parse(readFileSync(join(dir, f), 'utf8'))
       expect(b).toMatchObject({ reihe: 'Green Line', ausgabe: 'ab 2021', publisher: 'Klett', edition: 'Niedersachsen' })
       expect(`${b.reihe} ${b.band}`).toBe(b.name)
     }
+  })
+
+  it('Platzhalter-Bände (09.10.2026): ¡Apúntate! 2016/2024, Découvertes Série jaune und Découvertes ab 2020, Reihe + Band im Namen, ohne Wortschatz', () => {
+    const dir = join(__dirname, '..', 'resources', 'lehrwerke')
+    const platz = readdirSync(dir)
+      .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
+      .filter((b) => b.platzhalter)
+    expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2016')).toHaveLength(5)
+    expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2024')).toHaveLength(5)
+    expect(platz.filter((b) => b.reihe === 'Découvertes Série jaune')).toHaveLength(5)
+    expect(platz.filter((b) => b.reihe === 'Découvertes' && b.ausgabe === 'ab 2020')).toHaveLength(5)
+    for (const b of platz) {
+      expect(`${b.reihe} ${b.band}`).toBe(b.name)
+      expect(b.units).toEqual([])
+    }
+    expect(new Set(platz.map((b) => b.id)).size).toBe(platz.length)
   })
 
   it('CSV-Import mit Spalten „Lehrwerk" und „Band": Reihe und Band kommen daraus', () => {

@@ -55,6 +55,7 @@ import {
 import type { StructuredRequest } from '../shared/types'
 import { diagnoseAbschliessen, diagnoseAnfrage, diagnoseVorpruefen, type DiagnoseErgebnis } from '../shared/diagnoseAuswertung'
 import { aenderungenSeit, istVeraltet, OHNE_TITEL, sofortVeroeffentlichen, type Veroeffentlichung } from '../shared/reiheSpeichern'
+import { materialVerweise } from '../shared/reiheMaterial'
 import type { BlattAufgabe } from '../shared/blattFreigabe'
 import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type VorschauZustand } from './vorschau'
 import { geplantAb, nachFreigabe, nochGeplant, planVon, planVorbei } from './freigabePlan'
@@ -1153,6 +1154,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
               fachId: r.fachId,
               oberthema: r.oberthema,
               schritte: r.schritte?.length ?? 0,
+              // Verknüpfte Dokumente der Ablage (09.10.2026, shared/reiheMaterial.ts): in den Bibliotheken zunächst ausgeblendet
+              material: materialVerweise({ schritte: r.schritte ?? [] }),
               geaendert: x.geaendert,
               zuweisungen: zw.map((z) => ({
                 id: z.id,

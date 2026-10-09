@@ -121,6 +121,7 @@ export default function TestLibrary({
           suche={bib.suche}
           onSuche={bib.setSuche}
           suchHinweis="Name, Fach, Klasse"
+          reihe={bib.reihe}
         >
           <Button
             variant="default"
@@ -157,7 +158,7 @@ export default function TestLibrary({
         </BibliothekKopf>
 
         {bib.eintraege && treffer.length === 0 && (
-          <BibliothekLeer leer={tests.length === 0} text="Noch keine Vokabeltests gespeichert. Gesichert wird automatisch ab der ersten Vokabel." />
+          <BibliothekLeer ausgeblendet={bib.reihe.anzahl} leer={tests.length === 0} text="Noch keine Vokabeltests gespeichert. Gesichert wird automatisch ab der ersten Vokabel." />
         )}
 
         {suche ? (

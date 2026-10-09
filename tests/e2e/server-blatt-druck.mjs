@@ -119,13 +119,15 @@ try {
     'Der Erste Weltkrieg veraenderte sich nicht durch ein einzelnes Ereignis. 1914 scheiterte der deutsche Vormarsch an der Marne. Im Westen begann ein Stellungskrieg. Befestigte Linien erschwerten die Bewegung. Bei Verdun fuehrte dies zu extremen Verlusten. 1917 veraenderten die Februarrevolution und der Kriegseintritt der USA die Kraefteverhaeltnisse. 1918 brach die deutsche Widerstandskraft bei Amiens.'
   await s.keyboard.type(TEXT, { delay: 1 })
   await s.waitForTimeout(1200)
+  // Im Verhältnis zur Blattbreite (09.10.2026: im Vollbild beim Lernen ist das Blatt breiter als früher)
   const breite = await t.evaluate((x) => x.getBoundingClientRect().width)
-  pruefe(breite < 560, `Schreiblinien schmaler (Korrekturrand), Feldbreite ${Math.round(breite)} px`)
+  const blattBreite = await s.locator('iframe').first().evaluate((x) => x.getBoundingClientRect().width)
+  pruefe(breite / blattBreite < 0.7, `Schreiblinien schmaler (Korrekturrand), Feldbreite ${Math.round(breite)} von ${Math.round(blattBreite)} px`)
   // Feedback zu Aufgabe 1 (Attrappe: Markierungen mit Korrekturzeichen)
   await s.locator('[data-aufgabe-pruefen="1"]').click()
   await s.locator('[data-aufgabe-pruefen-los]').click()
   await s.waitForTimeout(3000)
-  await s.keyboard.press('Escape')
+  // kein Esc: im Vollbild beim Lernen beendet Esc die Übung (09.10.2026) – Klick daneben genügt
   await s.mouse.click(5, 300)
   const rand = s.locator('[data-rand-kommentar]')
   pruefe(await da(rand.first()), `Randkommentare im Korrekturrand (${await rand.count()})`)

@@ -15,7 +15,7 @@ import type { Stufe } from '@shared/vokabelLaufbahn'
 import { useMediaQuery } from '@mantine/hooks'
 import { besteStimme, stimmeVorhanden } from './stimme'
 import type { VerbSprache } from '@shared/verben'
-import { formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
+import { formenGesprochen, formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
 import { useVerbDaten } from './verbDaten'
 import { apostrophHinweis } from './apostrophHinweis'
 import LegeEingabe, { gelegtText, nurBuchstaben } from './handschrift/LegeEingabe'
@@ -68,7 +68,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { falschschreibungen } from '@shared/vokabelFehler'
 import { abkuerzungAus } from '@shared/abkuerzung'
-import { sprechTextFuerWort } from '@shared/sprechtext'
+import { fuerGeraetestimme, sprechTextFuerWort } from '@shared/sprechtext'
 import {
   abrufUebungFuer,
   auswahlFsOptionen,
@@ -169,7 +169,8 @@ export const kannSprechen = (sprache: string): boolean => {
   }
 }
 
-export function sprich(text: string, sprache: string): void {
+/** `gesprochen` (09.10.2026): fertiger Sprechtext für die Gerätestimme (Verbformen: Pause statt „slash", „read" /rɛd/) */
+export function sprich(text: string, sprache: string, gesprochen?: string): void {
   if (aufnahmeSpielen(text)) return
   try {
     if (!('speechSynthesis' in window) || !STIMME[sprache]) return
@@ -179,7 +180,10 @@ export function sprich(text: string, sprache: string): void {
     const stimme = besteStimme(STIMME[sprache])
     if (!stimme) return
     // Abkürzungen gesprochen statt gelesen (09.10.2026): „YA (= young adults)" → „Y. A., young adults", „sb" → „somebody"
-    const u = new SpeechSynthesisUtterance(ohneAngaben(sprechTextFuerWort({ term: text }, sprache)).replace(/\([^)]*\)/g, ''))
+    // Varianten („was/were") mit Pause statt „slash" (09.10.2026) – für die Gerätestimme als Komma
+    const u = new SpeechSynthesisUtterance(
+      fuerGeraetestimme(gesprochen?.trim() || ohneAngaben(sprechTextFuerWort({ term: text }, sprache)).replace(/\([^)]*\)/g, ''))
+    )
     u.voice = stimme
     u.lang = stimme.lang
     // Sprechtempo aus den Einstellungen der Lernenden (06.10.2026)
@@ -205,7 +209,7 @@ export const CSS = `
   background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 6px, rgba(255,255,255,0.45) 6px 7px); }
 .vt-fach-zahl { position: relative; font-weight: 800; font-size: 1.2rem; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 8px; padding: 0 7px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 .vt-fach-name { position: relative; font-size: .68rem; font-weight: 700; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 6px; padding: 1px 5px; margin-top: 3px;
-  max-width: calc(100% - 6px); text-align: center; line-height: 1.15; hyphens: manual; overflow-wrap: anywhere; }
+  max-width: calc(100% - 4px); text-align: center; line-height: 1.15; hyphens: manual; overflow-wrap: normal; }
 .vt-fach-wieder { position: relative; font-size: .6rem; color: var(--vt-leise); background: var(--vt-flaeche); border-radius: 6px; padding: 0 4px; margin-top: 2px; white-space: nowrap; }
 .vt-fach-plus { position: absolute; top: 6px; right: 6px; z-index: 2; font-size: .7rem; font-weight: 800; border-radius: 999px; padding: 1px 6px;
   background: var(--vt-gut-bg); color: var(--vt-gut-text); border: 1px solid var(--vt-gut-rand); animation: vt-plus 1.2s ease-out; }
@@ -216,6 +220,13 @@ export const CSS = `
   border: 1px solid var(--vt-gut-rand); font-weight: 600; font-size: .85rem; animation: vt-steigen .7s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes vt-steigen { from { transform: translateY(18px); opacity: 0 } to { transform: none; opacity: 1 } }
 @media (max-width: 560px) { .vt-kasten { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Telefon (09.10.2026): „Gefestig t" brach mitten im Wort – schmaler Rand, etwas kleinere Schrift, Trennung nur an den weichen Trennstellen */
+@media (max-width: 560px) {
+  .vt-kasten { gap: 5px; padding: 10px 8px 14px; }
+  .vt-fach-name { font-size: .64rem; padding: 1px 3px; letter-spacing: -0.01em; }
+  .vt-los { font-size: 1rem !important; padding-inline: 18px !important; }
+  .vt-los .mantine-Button-label { white-space: normal; text-align: center; line-height: 1.2; }
+}
 .vt-werte { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .vt-wert { border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: var(--vt-flaeche); border: 1px solid var(--vt-linie); box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
 .vt-wert-symbol { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
@@ -447,7 +458,7 @@ export function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fac
   const { d } = useDarstellung()
   const theme = useMantineTheme()
   const dunkel = useComputedColorScheme('light') === 'dark'
-  const akzent = d.design === 'eigen' ? theme.colors[d.farbe]?.[7] ?? '#1971c2' : fachFarbe || fachFarbeAus(fach, undefined) || '#ea580c'
+  const akzent = d.design === 'eigen' ? (theme.colors.akzent ?? theme.colors[d.farbe])?.[7] ?? '#1971c2' : fachFarbe || fachFarbeAus(fach, undefined) || '#ea580c'
   const farben = useMemo(() => vtFarben(akzent, dunkel), [akzent, dunkel])
   return (
     <VtFarbe.Provider value={farben}>
@@ -986,7 +997,11 @@ function StammformenNachfrage({ karte, sprache, tonSprache }: { karte: VerbKarte
         onSubmit={(e) => {
           e.preventDefault()
           setGeprueft(true)
-          sprich(sprechtext(spalten.map((s) => karte.formen[s.id]).join(', ')), tonSprache)
+          sprich(
+            sprechtext(spalten.map((s) => karte.formen[s.id]).join(', ')),
+            tonSprache,
+            formenGesprochen(Object.fromEntries(spalten.map((s) => [s.id, karte.formen[s.id]])), sprache)
+          )
         }}
       >
         <Group gap="xs" align="flex-end" wrap="wrap">

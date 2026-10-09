@@ -1129,7 +1129,7 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
           )}
         </NurExperte>
         <FreigabePlanen wert={plan} aendern={setPlan} mitEnde endeText="Danach lässt sich die Reihe nur noch ansehen – keine neuen Abgaben." />
-        <Group justify="flex-end">
+        <Group justify="flex-end" className="dialog-fuss">
           <Button
             loading={laeuft}
             disabled={art === 'gaeste' ? false : art === 'gruppe' ? !gruppe : !einzelne.length}

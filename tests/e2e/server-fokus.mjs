@@ -314,7 +314,7 @@ try {
     .entries())
     await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
-  if (lk && vokId) await lk.request.post(`${A}/server/vokabeln/${vokId}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  if (lk && vokId) await lk.request.post(`${A}/server/vokabeln/${vokId}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   if (lk && blattId) await lk.request.post(`${A}/server/blaetter/${blattId}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Training, Blatt und Konten gelöscht (${zuLoeschen.length})`)

@@ -106,7 +106,7 @@ try {
   await s.goto(`${A}/s/v/${vok.id}`)
   pruefe(await da(s.locator('[data-spielwahl]')), 'Spielauswahl erscheint')
   await s.waitForTimeout(1500)
-  // Spielbereiche (08.10.2026) aufklappen – die Wahl bleibt am Konto gemerkt
+  // Spielbereiche (08.10.2026) aufklappen – die Wahl bleibt am Konto gemerkt (seit 09.10.2026 nur für diese Anmeldung)
   const alleAuf = async () => {
     const zu = s.locator('[data-spiel-gruppe]:not([data-offen]) [data-spiel-gruppe-kopf]')
     for (let i = 0; i < 10 && (await zu.count()) > 0; i++) {
@@ -485,7 +485,7 @@ try {
   )
 } finally {
   if (gid && lk) await lk.request.delete(`${A}/server/grammatik/${gid}`, { headers: KOPF }).catch(() => undefined)
-  if (vKurs && lk) await lk.request.post(`${A}/server/vokabeln/${vKurs}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
+  if (vKurs && lk) await lk.request.post(`${A}/server/vokabeln/${vKurs}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const w of medienSchluessel) {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)

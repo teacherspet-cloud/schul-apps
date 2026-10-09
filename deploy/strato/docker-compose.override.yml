@@ -1,0 +1,21 @@
+# Neuer eigener Server bei Strato (87.106.217.186, 09.10.2026) – nur Schul-Apps, ohne Gywem Aviation.
+# Diese Datei bleibt bei Updates bestehen (das Paket bringt nur docker-compose.yml mit).
+# Von außen nur über die Weiche (/opt/schul-weiche, nginx auf 80/443); 8443 lauscht nur lokal.
+services:
+  schul-apps:
+    ports: !override
+      - '127.0.0.1:8443:8443'
+    environment:
+      SCHULAPPS_ADRESSE: https://www.meineschulapps.de
+      SCHULAPPS_WEICHE: '1'
+      SCHULAPPS_HOSTS: www.meineschulapps.de,meineschulapps.de,127.0.0.1:8443
+      # Ein Zertifikat für alles (das IP-Zertifikat des alten Servers entfällt)
+      SCHULAPPS_TLS_CERT: /daten/tls/domain.crt
+      SCHULAPPS_TLS_KEY: /daten/tls/domain.key
+      SCHULAPPS_TLS_DOMAIN_NAMEN: www.meineschulapps.de,meineschulapps.de
+      SCHULAPPS_TLS_DOMAIN_CERT: /daten/tls/domain.crt
+      SCHULAPPS_TLS_DOMAIN_KEY: /daten/tls/domain.key
+    # Eigener Server: mehr Luft als auf dem geteilten (900 MB führten zu Abstürzen)
+    mem_limit: 2g
+    memswap_limit: 3g
+    cpus: 1.8

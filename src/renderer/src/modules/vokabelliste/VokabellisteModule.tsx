@@ -53,7 +53,8 @@ import {
   type FilterWahl,
   type ReihenSortierung
 } from '@shared/lehrwerkReihe'
-import { bandFarbe, bandKuerzel, coverAusgabe } from '@shared/lehrwerkCover'
+// Cover je Band: gemeinsame Komponente (09.10.2026, auch Kursseite und „Meine Klassen")
+import { BandCover } from '../../shared/components/BandCover'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -143,6 +144,8 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
       <ScrollArea h="100%">
         <Container size="lg" py="lg">
           <BookEditor
+            // Anderer Band = frischer Editor (09.10.2026): keine Unit-/Abschnittswahl vom vorigen Band
+            key={openBook}
             bookId={openBook}
             aktiv={active}
             start={buchStart}
@@ -540,7 +543,7 @@ function Schulbuecher({
               )}
             </Group>
             <Text size="xs" c="dimmed">
-              {b.units.length} Units{b.band ? ` · Band ${b.band}` : ''}
+              {b.platzhalter && !b.units.length ? 'Platzhalter – Wortschatz folgt' : `${b.units.length} Units`}{b.band ? ` · Band ${b.band}` : ''}
             </Text>
           </div>
         </Group>
@@ -613,49 +616,5 @@ function Schulbuecher({
         </Stack>
       )}
     </>
-  )
-}
-
-/**
- * Cover eines Bands (09.10.2026): klein links neben dem Band, direkt vom Verlag geladen (nichts wird gespeichert – Wunsch
- * der Lehrkraft, Urheberrecht). Ausgabe nach Bundesland, Regeln in src/shared/lehrwerkCover.ts. Ohne bekanntes Cover,
- * ohne Netz oder bei geänderter Adresse: Kachel in der Bandfarbe mit der Bandnummer.
- */
-function BandCover({ band, land }: { band: TextbookMeta; land: string }): React.JSX.Element {
-  const cover = coverAusgabe(band, land)
-  const [fehler, setFehler] = useState<string | null>(null)
-  const masse: React.CSSProperties = { width: 48, height: 64, borderRadius: 4, flexShrink: 0 }
-  if (cover && fehler !== cover.url)
-    return (
-      <img
-        src={cover.url}
-        alt={`Cover ${band.name}`}
-        title={`${cover.reihe} ${cover.band} · ${cover.ausgabe} (Klett)`}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        draggable={false}
-        data-cover={cover.isbn}
-        onError={() => setFehler(cover.url)}
-        style={{ ...masse, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
-      />
-    )
-  const farbe = bandFarbe(band)
-  return (
-    <div
-      aria-hidden
-      data-cover-ersatz
-      style={{
-        ...masse,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: `var(--mantine-color-${farbe}-6)`,
-        color: 'white',
-        fontWeight: 700,
-        fontSize: 20
-      }}
-    >
-      {bandKuerzel(band)}
-    </div>
   )
 }
