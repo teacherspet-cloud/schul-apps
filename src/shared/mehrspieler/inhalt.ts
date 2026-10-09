@@ -4,12 +4,13 @@
  * Aufgabentexte), unregelmäßige Verben der Liste, Sätze mit Zeitform. Reine Funktionen für Server und Tests.
  */
 import { kernform, ohneAngaben, satzMitLuecke, varianten, type Vokabel } from '../vokabeltrainer'
+import { abkuerzungAus, abkVoll } from '../abkuerzung'
+import { spielform } from '../vokabelSpiele'
 import { normiert, type GrammatikAufgabe } from '../grammatiktrainer'
 import { ZEITFORMEN_EN } from '../signalwoerter'
 import type { SpielInhalt, SpielItem, VerbFormen, ZeitSatz } from './typen'
 import { abschnitteAus, reiheVon, type Buch } from '../vokabelLaufbahn'
 
-const spielform = (t: string): string => ohneAngaben(varianten(t)[0] ?? t)
 const woerterVon = (s: string): string[] => s.split(/\s+/).filter(Boolean)
 
 /** Wort ohne Satzzeichen (Apostroph und Bindestrich bleiben) – so werden angetippte Wörter verglichen */
@@ -45,6 +46,12 @@ export function lueckeImSatz(satz: string, term: string): { vor: string; nach: s
   return satzMitLuecke(satz, term)
 }
 
+/** Abkürzung: Abkürzung allein, Langform allein und der ganze Eintrag; sonst die Varianten */
+const abkAlternativen = (term: string, sonst: string[]): string[] => {
+  const e = abkuerzungAus(term)
+  return e ? [e.kurz, e.lang, abkVoll(e)] : sonst
+}
+
 /** Die Lücke steht an Wortgrenzen (nicht mitten in einem längeren Wort) */
 const luekeAnWortgrenze = (l: { vor: string; nach: string }): boolean => !/\p{L}$/u.test(l.vor) && !/^\p{L}/u.test(l.nach)
 
@@ -62,7 +69,8 @@ export function vokItems(woerter: Vokabel[]): SpielItem[] {
       frage: translation,
       zusatz: 'Wie heißt das Wort?',
       loesung: term,
-      alternativen: varianten(w.term).filter((v) => v !== term),
+      // Abkürzungen (09.10.2026): Abkürzung, Langform und ganzer Eintrag zählen
+      alternativen: abkAlternativen(w.term, varianten(w.term)).filter((v) => v !== term),
       ablenker: [],
       vok: {
         term,

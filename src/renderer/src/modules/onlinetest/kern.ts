@@ -17,6 +17,7 @@
 import { anweisungFuer } from '../vokabeltest/model/blocks'
 import { mitOptionalem, teileVon } from '@shared/luecken'
 import { APOSTROPHE } from '@shared/apostroph'
+import { abkuerzungAus, abkVergleich, auchRichtigAus, platzhalterNormal } from '@shared/abkuerzung'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
 export type FeldArt = 'text' | 'langtext' | 'auswahl' | 'wahr'
@@ -146,8 +147,20 @@ export type Vergleich = 'richtig' | 'falsch' | 'nurGross' | 'leer'
 export function vergleiche(antwort: string, werte: string[], artikelFrei = false): Vergleich {
   const a = normalisiere(antwort)
   if (!a) return 'leer'
-  const soll = werte.flatMap(alternativen)
-  const ohne = (x: string): string => (artikelFrei ? x.replace(ARTIKEL, '') : x)
+  /*
+   * Abkürzungen (09.10.2026): Ist die Lösung ein Eintrag wie „YA = young adults", zählen die Abkürzung, die Langform
+   * (ohne Rücksicht auf Groß-/Kleinschreibung) und beides zusammen; nur abweichende Schreibung der Abkürzung („ya")
+   * markiert die Lehrkraft wie sonst. Dazu weitere richtige Antworten aus der Tabelle des Lehrwerks.
+   */
+  for (const w of werte) {
+    const e = abkuerzungAus(w)
+    const v = e ? abkVergleich(a, e, normalisiere) : null
+    if (v === 'genau') return 'richtig'
+    if (v === 'schreibweise') return 'nurGross'
+  }
+  const soll = [...werte, ...werte.flatMap(auchRichtigAus)].flatMap(alternativen)
+  // Platzhalter: „sb"/„somebody", „etw."/„etwas" gleich (09.10.2026)
+  const ohne = (x: string): string => platzhalterNormal(artikelFrei ? x.replace(ARTIKEL, '') : x)
   if (soll.some((s) => ohne(s) === ohne(a))) return 'richtig'
   // Nur Groß-/Kleinschreibung falsch: als falsch werten, aber für die Lehrkraft markieren
   if (soll.some((s) => ohne(s).toLowerCase() === ohne(a).toLowerCase())) return 'nurGross'

@@ -18,6 +18,7 @@ const NICHT_SICHERN: Record<string, string> = {
   sicherungen: 'die Sicherungen selbst',
   'protokoll.log': 'Fehlerprotokoll dieses Rechners',
   'verbrauch.json': 'Verbrauchszählung dieses Rechners',
+  'aussprache-woerterbuecher.json': 'Kennungen der Aussprache-Wörterbücher bei ElevenLabs (09.10.2026) – entstehen beim Vertonen von selbst neu',
   ki: 'Server (02.10.2026): Anmeldung der KI-Programme je Nutzer – Zugangsdaten, gehören nie in eine Sicherung'
 }
 

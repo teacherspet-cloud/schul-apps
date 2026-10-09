@@ -39,6 +39,11 @@ export interface MedienTon {
   stimme: string
   /** Gesprochener Text – ändert sich das Wort/der Satz, passt der Ton nicht mehr */
   text: string
+  /**
+   * Tatsächlich an die Sprach-KI geschickter Text, wenn er vom Wort abweicht (09.10.2026: Abkürzungen „YA" → „Y. A.",
+   * eigene Aussprache der Lehrkraft). Ändert er sich, wird die Aufnahme neu erzeugt. Fehlt = wie `text`.
+   */
+  gesprochen?: string
   zeit: number
 }
 

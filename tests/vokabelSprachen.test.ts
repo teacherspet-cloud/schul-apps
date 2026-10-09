@@ -152,7 +152,8 @@ describe('Überschriften, Anweisungen und Kopf in der Zielsprache', () => {
   it('jede Aufgabe, die es in der Sprache gibt, hat feste Texte – nicht englisch', () => {
     for (const c of MODERN) {
       for (const def of TASK_TYPE_LIST) {
-        if (def.id === 'freeText' || def.id === 'irregularVerbs' || NUR_LATEIN.includes(def.id) || !passtZurSprache(def.id, c)) continue
+        // Abkürzungen (09.10.2026) setzen Überschrift und Anweisung im Erzeuger selbst (taskTypes.ts ABK_TITEL/ABK_ANWEISUNG)
+        if (def.id === 'freeText' || def.id === 'irregularVerbs' || def.id === 'abbreviations' || NUR_LATEIN.includes(def.id) || !passtZurSprache(def.id, c)) continue
         const t = aufgabenText(def.id, c)
         expect(t, `${c}: ${def.id}`).toBeDefined()
         expect(t!.title, `${c}: ${def.id}`).not.toBe(def.defaultTitle)

@@ -67,6 +67,8 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { falschschreibungen } from '@shared/vokabelFehler'
+import { abkuerzungAus } from '@shared/abkuerzung'
+import { sprechTextFuerWort } from '@shared/sprechtext'
 import {
   abrufUebungFuer,
   auswahlFsOptionen,
@@ -98,7 +100,7 @@ import {
 import { holen, senden } from '../onlinetest/serverApi'
 
 /** Übungen mit getippter Antwort (Apostroph-Hinweis, 08.10.2026) */
-const SCHREIBEND: string[] = ['frei', 'diktat', 'luecke', 'luecken']
+const SCHREIBEND: string[] = ['frei', 'diktat', 'luecke', 'luecken', 'abkLang', 'abkKurz']
 
 interface Liste {
   id: string
@@ -176,7 +178,8 @@ export function sprich(text: string, sprache: string): void {
     // Gezielt die beste Stimme der Sprache (stimme.ts) – ohne passende Stimme lieber nichts als falsch
     const stimme = besteStimme(STIMME[sprache])
     if (!stimme) return
-    const u = new SpeechSynthesisUtterance(ohneAngaben(text).replace(/\([^)]*\)/g, ''))
+    // Abkürzungen gesprochen statt gelesen (09.10.2026): „YA (= young adults)" → „Y. A., young adults", „sb" → „somebody"
+    const u = new SpeechSynthesisUtterance(ohneAngaben(sprechTextFuerWort({ term: text }, sprache)).replace(/\([^)]*\)/g, ''))
     u.voice = stimme
     u.lang = stimme.lang
     // Sprechtempo aus den Einstellungen der Lernenden (06.10.2026)
@@ -1458,11 +1461,17 @@ function Buchstaben({
   gesperrt: boolean
   schwer?: boolean
 }): React.JSX.Element {
-  const kacheln = useMemo(() => buchstaben(v.term).map((b, i) => ({ b, i })), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  /*
+   * Abkürzungen (09.10.2026): gelegt wird die Langform („young adults"); in der leichten Stufe steht die Abkürzung als
+   * Hilfe dabei, in der schweren nicht.
+   */
+  const abk = useMemo(() => abkuerzungAus(v.term), [v.term])
+  const ziel = abk ? abk.lang : v.term
+  const kacheln = useMemo(() => buchstaben(ziel).map((b, i) => ({ b, i })), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [gelegt, setGelegt] = useState<number[]>([])
   const text = gelegtText(gelegt, kacheln)
   // Leicht: Leerzeichen stehen von selbst an ihrer Stelle („bring about", 06.10.2026); schwer: wie selbst gesetzt
-  const wort = schwer ? mitApostrophen(v.term, text) : mitLeerzeichen(v.term, text)
+  const wort = schwer ? mitApostrophen(ziel, text) : mitLeerzeichen(ziel, text)
   const alleGelegt = nurBuchstaben(gelegt).length === kacheln.length
   return (
     <Stack align="center">
@@ -1470,6 +1479,11 @@ function Buchstaben({
       <Text fw={800} size="1.6rem" c="var(--vt-tinte)">
         {v.translation}
       </Text>
+      {abk && !schwer && (
+        <Text size="sm" c="dimmed" data-abk-hilfe>
+          Abkürzung: {abk.kurz}
+        </Text>
+      )}
       <div className="vt-gelegt" data-gelegt data-lege-schwer={schwer || undefined}>
         <Text size="1.6rem" fw={700} style={{ letterSpacing: 3, whiteSpace: 'pre' }} c="var(--vt-a-dunkel)">
           {wort || ' '}
@@ -1483,7 +1497,7 @@ function Buchstaben({
         gesperrt={gesperrt}
         fertig={() => pruefen(wort)}
         leerzeichen={schwer}
-        anzeige={(g) => (schwer ? mitApostrophen(v.term, gelegtText(g, kacheln)) : mitLeerzeichenVoraus(v.term, gelegtText(g, kacheln)))}
+        anzeige={(g) => (schwer ? mitApostrophen(ziel, gelegtText(g, kacheln)) : mitLeerzeichenVoraus(ziel, gelegtText(g, kacheln)))}
       >
         <Group gap={6} justify="center">
           {kacheln.map((k) => (
@@ -1533,7 +1547,10 @@ function Schreiben({
   const [text, setText] = useState('')
   const feld = useRef<HTMLInputElement>(null)
   const luecke = uebung === 'luecke' && v.example ? satzMitLuecke(v.example, v.term) : null
-  const muster = useMemo(() => (uebung === 'luecken' ? lueckenMuster(v.term) : ''), [v.id, uebung]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Abkürzungen (09.10.2026): Lückenmuster aus der Langform; „Abkürzung schreiben/auflösen" zeigt die andere Seite
+  const abk = useMemo(() => abkuerzungAus(v.term), [v.term])
+  const abkUebung = (uebung === 'abkLang' || uebung === 'abkKurz') && abk ? uebung : null
+  const muster = useMemo(() => (uebung === 'luecken' ? lueckenMuster(abk ? abk.lang : v.term) : ''), [v.id, uebung]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (uebung === 'diktat') sprich(v.term, sprache)
     feld.current?.focus()
@@ -1550,6 +1567,10 @@ function Schreiben({
       <Text className="vt-frage">
         {uebung === 'diktat'
           ? 'Hör zu und schreib das Wort'
+          : abkUebung === 'abkLang'
+          ? 'Wofür steht die Abkürzung? Schreib die Langform'
+          : abkUebung === 'abkKurz'
+          ? 'Wie lautet die Abkürzung?'
           : luecke
           ? 'Ergänze den Satz'
           : muster
@@ -1560,6 +1581,15 @@ function Schreiben({
         <ActionIcon size={72} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
           <IconVolume size={36} />
         </ActionIcon>
+      ) : abkUebung && abk ? (
+        <Stack gap={4} align="center" data-abk-uebung={abkUebung}>
+          <Text fw={800} size="2rem" c="var(--vt-a-dunkel)">
+            {abkUebung === 'abkLang' ? abk.kurz : abk.lang}
+          </Text>
+          <Text size="md" c="dimmed">
+            {v.translation}
+          </Text>
+        </Stack>
       ) : muster ? (
         <Stack gap={4} align="center">
           <Text fw={800} size="2rem" c="var(--vt-a-dunkel)" style={{ letterSpacing: 6, fontFamily: 'ui-monospace, monospace' }} data-luecken-muster>
@@ -1605,7 +1635,7 @@ function Schreiben({
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={muster ? 'ganzes Wort' : '…'}
+          placeholder={muster ? 'ganzes Wort' : abkUebung === 'abkLang' ? 'Langform' : abkUebung === 'abkKurz' ? 'Abkürzung' : '…'}
           data-eingabe
         />
         {AKZENTE[sprache] && (

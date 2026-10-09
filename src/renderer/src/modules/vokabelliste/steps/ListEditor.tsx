@@ -276,7 +276,7 @@ export default function ListEditor({
           />
         </Group>
         {medienAdmin && (
-          <MedienLeiste sprache={language} vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation }))} daten={medien.daten} ziel={medienZiel} />
+          <MedienLeiste sprache={language} vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, aussprache: r.aussprache }))} daten={medien.daten} ziel={medienZiel} />
         )}
         <VokabelTabelle
           zeilen={rows}

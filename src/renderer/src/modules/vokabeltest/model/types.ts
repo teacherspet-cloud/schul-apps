@@ -36,6 +36,10 @@ export interface VocabEntry {
    * sie in der dritten Spalte (`pos`) oder in Klammern hinter dem Wort. Siehe `didactics/schrift.ts`.
    */
   lesung?: string
+  /** Sprechtext für die Sprachausgabe statt des Wortes (09.10.2026, „Aussprache als …" – nur für den Ton) */
+  aussprache?: string
+  /** Weitere richtige Antworten („auch richtig", 09.10.2026) */
+  auchRichtig?: string[]
 }
 
 /** Wortarten, für die es im Lateinischen eine eigene Nennform gibt. */
@@ -83,6 +87,8 @@ export type TaskTypeId =
   | 'arabicRoots'
   // Unregelmäßige Verben aus der Verbliste des Lehrwerks (30.09.2026, shared/verben)
   | 'irregularVerbs'
+  // Abkürzungen auflösen bzw. bilden (09.10.2026, shared/abkuerzung.ts) – ohne KI aus der Liste
+  | 'abbreviations'
 
 // ---------- Blöcke (eine Aufgabe im Test) ----------
 

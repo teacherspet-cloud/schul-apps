@@ -212,7 +212,7 @@ export function VerbMedienLeiste({
   const lagen = lagenVon(stimmen ?? undefined)
   const laufend = useLaufendeSchluessel(ziel.docId)
   const stufe = ziel.stufe ?? 's2'
-  const offen = (art: MedienArt): Vokabel[] => offeneVokabeln(art, vokabeln, daten, lagen.length ? lagen : ['w'], stufe)
+  const offen = (art: MedienArt): Vokabel[] => offeneVokabeln(art, vokabeln, daten, lagen.length ? lagen : ['w'], stufe, sprachKurz(sprache))
   const ohneStimme = stimmen !== null && !lagen.length
   const knopf = (art: MedienArt, label: string, icon: React.ReactNode, braucheStimme = false): React.JSX.Element => {
     const liste = offen(art)

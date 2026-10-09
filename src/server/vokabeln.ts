@@ -56,8 +56,11 @@ import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen
 import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
 import { abschnitteBeimSpeichern } from './wartungAbschnitteTeilen'
+import { abkuerzungAus } from '../shared/abkuerzung'
 import {
   bewerte,
+  bewerteAbkuerzung,
+  bewerteMitAuchRichtig,
   istSicher,
   nachAbfrage,
   nachFreiwillig,
@@ -455,6 +458,11 @@ function bereinigeWoerter(roh: unknown): Vokabel[] {
         ...(y.exampleTranslation ? { exampleTranslation: t('exampleTranslation', 600) } : {}),
         ...(y.pos ? { pos: t('pos', 60) } : {}),
         ...(y.note ? { note: t('note', 200) } : {}),
+        // Abkürzungen (09.10.2026): eigene Aussprache und weitere richtige Antworten der Lehrkraft
+        ...(typeof y.aussprache === 'string' && y.aussprache.trim() ? { aussprache: t('aussprache', 200) } : {}),
+        ...(Array.isArray(y.auchRichtig) && y.auchRichtig.length
+          ? { auchRichtig: y.auchRichtig.map((a) => String(a ?? '').slice(0, 200)).filter((a) => a.trim()).slice(0, 10) }
+          : {}),
         ...(bild ? { bild } : {})
       }
     })
@@ -772,7 +780,9 @@ export function abfrageAuswerten(
       ? { urteil: k0.gewusst === true ? 'richtig' : 'falsch', richtig: v.term }
       : uebung === 'paar'
       ? { urteil: (antwort === 'stimmt') === paarStimmt ? 'richtig' : 'falsch', richtig: `${v.term} – ${v.translation}` }
-      : bewerte(antwort, loesungFuer(v, uebung), uebung === 'auswahlFs')
+      : uebung === 'abkLang' || uebung === 'abkKurz'
+      ? abkErgebnis(antwort, v, uebung)
+      : bewerteMitAuchRichtig(antwort, loesungFuer(v, uebung), loesungFuer(v, uebung) === v.term ? v.auchRichtig : undefined, uebung === 'auswahlFs')
   const jetzt = Date.now()
   const alt = stand.woerter[v.id]
   // Freiwillig weiter üben (08.10.2026): rückt nur vor, wenn fällig und heute noch nicht vorgerückt; Fehler ohne Zurückstufen
@@ -820,6 +830,16 @@ export function spielEintragen(
   // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres über alle Trainings
   if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt, fehler.length)
   return { rekord }
+}
+
+/** „Abkürzung schreiben" bzw. „auflösen" (09.10.2026) – ohne Abkürzung im Eintrag wie freies Schreiben */
+function abkErgebnis(antwort: string, v: Vokabel, uebung: Uebung): { urteil: Urteil; hinweis?: string; richtig: string } {
+  const e = abkuerzungAus(v.term)
+  if (!e) return bewerteMitAuchRichtig(antwort, v.term, v.auchRichtig)
+  const r = bewerteAbkuerzung(antwort, e, uebung === 'abkKurz' ? 'kurz' : 'lang')
+  if (r.urteil === 'richtig' || uebung === 'abkKurz') return r
+  const auch = bewerteMitAuchRichtig(antwort, e.lang, v.auchRichtig)
+  return auch.urteil === 'falsch' ? r : { ...auch, richtig: r.richtig }
 }
 
 /** Was eine Übung als Lösung erwartet */

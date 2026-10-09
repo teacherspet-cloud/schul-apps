@@ -15,6 +15,7 @@
  */
 
 import { apostrophNormal, istApostroph } from './apostroph'
+import { abkuerzungAus, abkUeben, abkVoll, antwortTeile, auchRichtigAus, kurzPasst, platzhalterNormal, type Abkuerzung } from './abkuerzung'
 
 export interface Vokabel {
   id: string
@@ -28,6 +29,10 @@ export interface Vokabel {
   note?: string
   /** Bild (OpenMoji als data:-URL) für konkrete Wörter */
   bild?: string
+  /** Sprechtext für die Sprachausgabe statt des Wortes (09.10.2026, von der Lehrkraft gesetzt – nur für den Ton) */
+  aussprache?: string
+  /** Weitere richtige Antworten, von der Lehrkraft eingetragen („auch richtig", 09.10.2026) */
+  auchRichtig?: string[]
 }
 
 /** Stand eines Wortes für eine Person */
@@ -102,14 +107,46 @@ export type Urteil = 'richtig' | 'fast' | 'falsch'
  * Schreibweise der Fremdsprache wählen – mit typischen Falschschreibungen als Distraktoren),
  * `paar` (stimmt das Paar Fremdwort – Übersetzung?), `luecken` (Wort mit fehlenden Buchstaben).
  */
-export type Uebung = 'karte' | 'auswahl' | 'hoeren' | 'buchstaben' | 'frei' | 'diktat' | 'luecke' | 'auswahlFs' | 'paar' | 'luecken'
-export const UEBUNGEN: Uebung[] = ['karte', 'auswahl', 'hoeren', 'buchstaben', 'frei', 'diktat', 'luecke', 'auswahlFs', 'paar', 'luecken']
+export type Uebung =
+  | 'karte'
+  | 'auswahl'
+  | 'hoeren'
+  | 'buchstaben'
+  | 'frei'
+  | 'diktat'
+  | 'luecke'
+  | 'auswahlFs'
+  | 'paar'
+  | 'luecken'
+  /** Abkürzungen (09.10.2026): „YA" → Langform schreiben bzw. „young adults" → Abkürzung schreiben */
+  | 'abkLang'
+  | 'abkKurz'
+export const UEBUNGEN: Uebung[] = ['karte', 'auswahl', 'hoeren', 'buchstaben', 'frei', 'diktat', 'luecke', 'auswahlFs', 'paar', 'luecken', 'abkLang', 'abkKurz']
 /** Erkennen (nicht selbst schreiben): bringt höchstens bis Fach 2 */
 export const ERKENNEN: Uebung[] = ['auswahl', 'hoeren', 'auswahlFs', 'paar']
 
+/**
+ * Abkürzungs-Übung für Einträge wie „YA = young adults" (09.10.2026, Wunsch der Lehrkraft) – nur für solche Wörter und
+ * erst nach der Lernkarte: etwa jede vierte Abfrage. Bis Fach 1 die Abkürzung schreiben (Langform steht da), danach
+ * meist die Abkürzung auflösen. Zählt wie die anderen Schreibübungen (rückt vor, aber nicht für „sicher").
+ */
+export function abkUebungFuer(st: WortStand, v: Vokabel, zufall: number): Uebung | null {
+  if (!abkuerzungAus(v.term) || (st.fach === 0 && st.versuche === 0)) return null
+  // Eigener Zufallswert: die Verteilung der übrigen Übungen bleibt, wie sie war
+  if (zufall < 0.75) return null
+  // Was die Tabelle des Lehrwerks erlaubt („GCSE": nur auflösen, „°C": nur auflösen)
+  const ueben = abkUeben(v.term)
+  if (ueben === 'keine') return null
+  if (ueben === 'aufloesen') return 'abkLang'
+  if (ueben === 'kuerzen' || st.fach <= 1) return 'abkKurz'
+  return zufall < 0.8 ? 'abkKurz' : 'abkLang'
+}
+
 /** Welche Übung als Nächstes für dieses Wort (je nach Fach) – Erstkontakt mit Karte, dann steigend */
-export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): Uebung {
+export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random()): Uebung {
   if (st.fach === 0 && st.versuche === 0) return 'karte'
+  const abk = abkUebungFuer(st, v, zufall2)
+  if (abk) return abk
   // Fach 0–1: erkennen in mehreren Formen, dazu Buchstaben legen
   if (st.fach <= 1) return zufall < 0.28 ? 'auswahl' : zufall < 0.46 ? 'paar' : zufall < 0.7 ? 'auswahlFs' : 'buchstaben'
   // Fach 2: Schreibweise festigen
@@ -126,11 +163,13 @@ export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): U
  * Neue Wörter bleiben beim ersten Kontakt Lernkarte; Fach 0–1 legt Buchstaben, Fach 2 schreibt (auch mit Lücken),
  * ab Fach 3 wie gewohnt (frei, Lückensatz, Diktat).
  */
-export function abrufUebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): Uebung {
+export function abrufUebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random()): Uebung {
   if (st.fach === 0 && st.versuche === 0) return 'karte'
+  const abk = abkUebungFuer(st, v, zufall2)
+  if (abk) return abk
   if (st.fach <= 1) return 'buchstaben'
   if (st.fach === 2) return zufall < 0.35 ? 'luecken' : 'frei'
-  return uebungFuer(st, v, zufall)
+  return uebungFuer(st, v, zufall, 0)
 }
 
 /**
@@ -143,12 +182,29 @@ export const leerzeichenSelbst = (st: Pick<WortStand, 'fach'> | null | undefined
 
 /** Kommt das Wort (oder sein Kern ohne „to"/Artikel) im Satz vor? */
 export function enthaeltWort(satz: string, term: string): boolean {
+  if (abkuerzungAus(term)) return satzMitLuecke(satz, term) !== null
   const kern = kernform(varianten(term)[0] ?? term)
   return kern.length >= 2 && satz.toLowerCase().includes(kern.toLowerCase())
 }
 
+/**
+ * Abkürzung im Satz (09.10.2026): erst die Langform („young adults", wie sonst ab Wortanfang), dann die Abkürzung selbst –
+ * genau so geschrieben und als ganzes Wort, damit „YA" nicht in „player" gefunden wird.
+ */
+function abkImSatz(satz: string, e: Abkuerzung): { vor: string; nach: string; loesung: string } | null {
+  const lang = satzMitLuecke(satz, e.lang)
+  if (lang) return lang
+  const k = e.kurz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = new RegExp(`(^|[^\\p{L}\\d])(${k})(?![\\p{L}\\d])`, 'u').exec(satz)
+  if (!m) return null
+  const i = m.index + m[1].length
+  return { vor: satz.slice(0, i), nach: satz.slice(i + m[2].length), loesung: m[2] }
+}
+
 /** Satz mit Lücke an der Stelle des Wortes */
 export function satzMitLuecke(satz: string, term: string): { vor: string; nach: string; loesung: string } | null {
+  const abk = abkuerzungAus(term)
+  if (abk) return abkImSatz(satz, abk)
   const kern = kernform(varianten(term)[0] ?? term)
   const i = satz.toLowerCase().indexOf(kern.toLowerCase())
   if (i < 0) return null
@@ -216,7 +272,8 @@ export function varianten(loesung: string): string[] {
 const ohneAkzente = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 const normal = (s: string): string =>
   // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
-  apostrophNormal(ohneAuslassung(s))
+  // Platzhalter wie „sb"/„somebody", „etw."/„etwas" zählen gleich (09.10.2026)
+  platzhalterNormal(apostrophNormal(ohneAuslassung(s)))
     .toLowerCase()
     .replace(/[.!?]+$/g, '')
     .replace(/\s+/g, ' ')
@@ -238,13 +295,79 @@ export function abstand(a: string, b: string): number {
   return z[b.length]
 }
 
+type Bewertung = { urteil: Urteil; hinweis?: string; richtig: string }
+
+/**
+ * Abkürzungs-Eintrag (09.10.2026, Wunsch der Lehrkraft): Richtig ist die Abkürzung allein („YA"), die Langform allein
+ * („young adults", wie sonst ohne Groß-/Kleinschreibung und mit Tippfehler-Toleranz) oder beides in einer üblichen
+ * Schreibweise („YA = young adults", „YA (young adults)", „young adults (YA)"). Abweichende Groß-/Kleinschreibung der
+ * Abkürzung („ya") zählt, die Rückmeldung nennt aber die richtige. Die Lösung zeigt immer den ganzen Eintrag.
+ * `ziel`: nur die Abkürzung bzw. nur die Langform verlangen (Übungen „Abkürzung schreiben"/„auflösen") – der ganze
+ * Eintrag zählt dann auch.
+ */
+export function bewerteAbkuerzung(antwort: string, e: Abkuerzung, ziel: 'beide' | 'kurz' | 'lang' = 'beide', strikt = false): Bewertung {
+  const richtig = abkVoll(e)
+  const a = String(antwort ?? '').trim()
+  if (!a) return { urteil: 'falsch', richtig }
+  const schreibweise: Bewertung = { urteil: 'richtig', hinweis: `Achte auf die Schreibweise der Abkürzung: „${e.kurz}“.`, richtig }
+  const langUrteil = (x: string): Bewertung => bewerte(x, e.lang, strikt)
+  // Beides genannt
+  const teile = antwortTeile(a)
+  if (teile)
+    for (const [x, y] of [teile, [teile[1], teile[0]]]) {
+      const k = kurzPasst(x, e.kurz)
+      const l = langUrteil(y)
+      if (k && l.urteil !== 'falsch') return l.urteil === 'fast' ? { ...l, richtig } : k === 'genau' ? { urteil: 'richtig', richtig } : schreibweise
+    }
+  if (ziel !== 'lang') {
+    const k = kurzPasst(a, e.kurz)
+    if (k === 'genau') return { urteil: 'richtig', richtig }
+    if (k) return strikt ? { urteil: 'falsch', richtig } : schreibweise
+  }
+  if (ziel !== 'kurz') {
+    const l = langUrteil(a)
+    if (l.urteil !== 'falsch') return { ...l, richtig }
+  } else if (langUrteil(a).urteil === 'richtig') return { urteil: 'falsch', hinweis: `Gefragt ist die Abkürzung: „${e.kurz}“.`, richtig }
+  return { urteil: 'falsch', richtig }
+}
+
 /**
  * Antwort bewerten (tolerant mit Hinweis):
  *  - genau (ohne Groß-/Kleinschreibung, Satzzeichen am Ende, „to"/Artikel optional) → richtig
  *  - nur Akzent fehlt → fast („Akzent fehlt: é")
  *  - ein Tippfehler bei Wörtern ab 5 Buchstaben → fast
+ *  - Einträge mit Abkürzung („YA = young adults"): siehe bewerteAbkuerzung
  */
-export function bewerte(antwort: string, loesung: string, strikt = false): { urteil: Urteil; hinweis?: string; richtig: string } {
+export function bewerte(antwort: string, loesung: string, strikt = false): Bewertung {
+  const r = bewerteGrund(antwort, loesung, strikt)
+  if (r.urteil === 'richtig') return r
+  // Weitere richtige Antworten aus der Abkürzungs-Tabelle („PC" → „personal computer", „Mr" → „Mr.")
+  for (const alt of auchRichtigAus(loesung)) {
+    const x = bewerteGrund(antwort, alt, strikt)
+    if (x.urteil === 'richtig' || (x.urteil === 'fast' && r.urteil === 'falsch')) return { ...x, richtig: r.richtig }
+  }
+  return r
+}
+
+/** Antwort gegen weitere, von der Lehrkraft eingetragene richtige Antworten („auch richtig") prüfen */
+export function bewerteMitAuchRichtig(antwort: string, loesung: string, auch: string[] | undefined, strikt = false): Bewertung {
+  const r = bewerte(antwort, loesung, strikt)
+  if (r.urteil === 'richtig') return r
+  for (const alt of auch ?? []) {
+    if (!String(alt ?? '').trim()) continue
+    const x = bewerte(antwort, alt, strikt)
+    if (x.urteil === 'richtig' || (x.urteil === 'fast' && r.urteil === 'falsch')) return { ...x, richtig: r.richtig }
+  }
+  return r
+}
+
+function bewerteGrund(antwort: string, loesung: string, strikt: boolean): Bewertung {
+  const abk = abkuerzungAus(loesung)
+  if (abk) {
+    // Genau der ganze Eintrag (auch bei Auswahl unter Falschschreibungen) – sonst die Regeln der Abkürzung
+    if (normal(antwort) === normal(loesung)) return { urteil: 'richtig', richtig: abkVoll(abk) }
+    return bewerteAbkuerzung(antwort, abk, 'beide', strikt)
+  }
   const a = normal(antwort)
   const alle = varianten(loesung)
   const richtig = alle[0] ?? loesung

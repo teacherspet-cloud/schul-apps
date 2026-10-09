@@ -499,7 +499,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
       bildLoeschen: (sprache: string, wort: string, stufe: Bildstufe = 's2') => call<void>('medien:bild-loeschen', sprache, wort, stufe),
       /** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken */
       ohneBild: (sprache: string, wort: string, stufe: Bildstufe) => call<void>('medien:ohne-bild', sprache, wort, stufe),
-      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }, lage: Stimmlage = 'w') =>
+      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string; gesprochen?: string }, lage: Stimmlage = 'w') =>
         call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
       tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w') =>
         call<void>('medien:ton-loeschen', sprache, wort, art, satz, lage),

@@ -404,7 +404,7 @@ export default function BookEditor({
         {admin && medienZiel && (
           <MedienLeiste
             sprache={book.language}
-            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example }))}
+            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example, aussprache: r.aussprache }))}
             daten={medien.daten}
             ziel={medienZiel}
             mehr={
@@ -427,7 +427,8 @@ export default function BookEditor({
                 vokabeln: (u.name === unit && s.name === section ? rows : s.entries).map((e) => ({
                   term: e.term,
                   translation: e.translation,
-                  example: e.example
+                  example: e.example,
+                  aussprache: e.aussprache
                 })),
                 ziel: { ...zielBuch(book.id, book.name, u.name, s.name, book.grade), stufe: zielMitStufe.stufe }
               }))

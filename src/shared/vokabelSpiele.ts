@@ -7,6 +7,7 @@
  * Hier die reinen Regeln (ohne Oberfläche), damit Server und Tests sie teilen.
  */
 import { ohneAngaben, varianten, type Vokabel, type WortStand } from './vokabeltrainer'
+import { abkSpiel, abkuerzungAus } from './abkuerzung'
 
 export type SpielId =
   | 'memory'
@@ -134,8 +135,14 @@ export const SPIELE: SpielInfo[] = [
 /** Verbspiele: nur, wenn die Liste unregelmäßige Verben hat (07.10.2026) */
 export const VERBSPIELE: readonly SpielId[] = ['verbtrio', 'formenblitz', 'bildverb', 'muster']
 
-/** Schreibweise eines Wortes im Spiel: erste Variante, ohne Angaben */
-export const spielform = (term: string): string => ohneAngaben(varianten(term)[0] ?? term)
+/**
+ * Schreibweise eines Wortes im Spiel: erste Variante, ohne Angaben. Abkürzungen (09.10.2026) überall gleich als
+ * „YA (young adults)" – getippte Antworten zählen mit Abkürzung oder Langform (bewerte).
+ */
+export const spielform = (term: string): string => {
+  const abk = abkuerzungAus(term)
+  return abk ? abkSpiel(abk) : ohneAngaben(varianten(term)[0] ?? term)
+}
 
 /**
  * Wörter für die Spiele (06.10.2026, abgestimmt): nur schon kennengelernte (ab Fach 1 – neue erst nach der Einführung
@@ -190,7 +197,8 @@ export const istRekord = (spiel: SpielId, wert: number, bisher: number | undefin
 
 /** Nur Buchstaben, groß – für Gitter (Kreuzwort, Suchsel) */
 export const gitterform = (term: string): string =>
-  spielform(term)
+  // Abkürzungen: die Langform ins Gitter („YOUNGADULTS" statt „YA")
+  (abkuerzungAus(term)?.lang ?? spielform(term))
     .replace(/^(to|a|an|the|le|la|les|l'|un|une|el|los|las|il|lo|der|die|das)\s+/i, '')
     .toLocaleUpperCase()
     .replace(/[^\p{L}]/gu, '')

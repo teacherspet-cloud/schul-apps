@@ -159,10 +159,13 @@ export function TonZelle({
   art,
   admin,
   erzeugen,
-  lage
+  lage,
+  gesprochen
 }: {
-  ton?: { datei: string; url?: string; text: string }
+  ton?: { datei: string; url?: string; text: string; gesprochen?: string }
   text: string
+  /** Erwarteter Sprechtext (Abkürzungen, eigene Aussprache, 09.10.2026) – weicht die Aufnahme ab, ist sie veraltet */
+  gesprochen?: string
   art: TonArt
   admin: boolean
   erzeugen: () => Promise<void>
@@ -172,7 +175,7 @@ export function TonZelle({
   const [laeuft, setLaeuft] = useState(false)
   if (!text.trim()) return null
   if (art === 'satz' && !istGanzerSatz(text)) return null
-  const veraltet = ton && ton.text.trim() !== text.trim()
+  const veraltet = ton && (ton.text.trim() !== text.trim() || (gesprochen !== undefined && (ton.gesprochen ?? ton.text).trim() !== gesprochen.trim()))
   const fassung = lage ? ` (${STIMMLAGE_NAME[lage]})` : ''
   const marke = (knopf: React.JSX.Element): React.JSX.Element =>
     lage ? (
@@ -414,9 +417,9 @@ export function MedienLeiste({
   const woerter = vokabeln.filter((v) => v.term.trim())
   const stufe = ziel.stufe ?? stufeVon(ziel.klasse)
   const setzeStufe = useStufenWahl((x) => x.setze)
-  const ohneBild = offeneVokabeln('bilder', woerter, daten, ['w'], stufe)
-  const ohneTon = offeneVokabeln('aussprache', woerter, daten, lagen.length ? lagen : ['w'])
-  const ohneSatz = offeneVokabeln('satz', woerter, daten, lagen.length ? lagen : ['w'])
+  const ohneBild = offeneVokabeln('bilder', woerter, daten, ['w'], stufe, sp)
+  const ohneTon = offeneVokabeln('aussprache', woerter, daten, lagen.length ? lagen : ['w'], stufe, sp)
+  const ohneSatz = offeneVokabeln('satz', woerter, daten, lagen.length ? lagen : ['w'], stufe, sp)
   const ohneStimme = stimmen !== null && !lagen.length
   const start = (art: MedienArt, liste: Vokabel[]): void => void starteMedienAuftrag({ art, sprache: sp, vokabeln: liste, ziel })
   const knopf = (art: MedienArt, label: string, liste: Vokabel[], icon: React.ReactNode, kennung: string, braucheStimme = false): React.JSX.Element => {

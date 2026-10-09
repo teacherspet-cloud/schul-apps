@@ -792,6 +792,10 @@ export interface SavedVocabList {
     note?: string
     grey?: boolean
     inBox?: boolean
+    /** Sprechtext für die Sprachausgabe (09.10.2026, „Aussprache als …") */
+    aussprache?: string
+    /** Weitere richtige Antworten („auch richtig", 09.10.2026) */
+    auchRichtig?: string[]
     /**
      * Veraltet: Bis Paket 7 schrieb der Vokabeltest seine Abfrage-Wahl mit in die Liste.
      * Beim Laden wird es ignoriert (vokabeltest/model/vocab.ts `ausListe`), neu gespeichert
@@ -917,6 +921,10 @@ export interface TextbookEntry {
   /** Beispielsatz aus dem Buch */
   example?: string
   exampleTranslation?: string
+  /** Sprechtext für die Sprachausgabe statt des Wortes (09.10.2026, „Aussprache als …") */
+  aussprache?: string
+  /** Weitere richtige Antworten („auch richtig", 09.10.2026) */
+  auchRichtig?: string[]
 }
 
 export interface TextbookSection {

@@ -17,6 +17,18 @@ import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonVo
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
 import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
+import { sprechText, sprechTextFuerWort } from '@shared/sprechtext'
+
+/**
+ * Sprechtext (09.10.2026): Abkürzungen gesprochen statt gelesen („YA (= young adults)" → „Y. A., young adults",
+ * „sb" → „somebody"), eigene Aussprache der Lehrkraft zuerst. Wörter ohne Abkürzung bleiben, wie sie sind.
+ */
+export const gesprochenFuer = (art: 'wort' | 'satz', text: string, v: Pick<Vokabel, 'term' | 'aussprache'>, sprache: string): string =>
+  art === 'wort' ? sprechTextFuerWort(v, sprache) : sprechText(text, sprache)
+
+/** Passt die Aufnahme noch zum Wort und zu seinem Sprechtext? (Ältere Aufnahmen ohne `gesprochen`: Text = Sprechtext) */
+export const tonPasst = (ton: { text: string; gesprochen?: string } | undefined, text: string, gesprochen: string): boolean =>
+  Boolean(ton) && ton!.text.trim() === text.trim() && (ton!.gesprochen ?? ton!.text).trim() === gesprochen.trim()
 
 export const MEDIEN_MODUL = 'vokabelliste'
 
@@ -135,12 +147,9 @@ export interface MedienErgebnis {
 }
 
 /** Fehlt diesem Wort die Aussprache in dieser Fassung? */
-const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage): boolean => {
+const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage, sprache: string): boolean => {
   if (art === 'formen' || art === 'hinweis') return fehlendeTexte(art, v, sicht, lage).length > 0
-  if (art === 'aussprache') {
-    const t = tonVon(sicht, lage)
-    return !t || t.text.trim() !== v.term.trim()
-  }
+  if (art === 'aussprache') return !tonPasst(tonVon(sicht, lage), v.term, gesprochenFuer('wort', v.term, v, sprachKurz(sprache)))
   return istGanzerSatz(v.example) && !saetzeVon(sicht, lage)?.[satzSchluessel(v.example!)]
 }
 
@@ -153,13 +162,15 @@ export function offeneVokabeln(
   vokabeln: Vokabel[],
   daten: Record<string, MedienSicht>,
   lagen: Stimmlage[] = ['w'],
-  stufe: Bildstufe = 's2'
+  stufe: Bildstufe = 's2',
+  /** Sprache der Wörter – für den Sprechtext von Abkürzungen (09.10.2026) */
+  sprache = 'en'
 ): Vokabel[] {
   const woerter = vokabeln.filter((v) => v.term.trim())
   // Bildstufen (07.10.2026): offen ist, was in DIESER Stufe kein Bild hat – außer die KI sah dafür kein eindeutiges
   if (art === 'bilder' || art === 'bildKi')
     return woerter.filter((v) => !daten[v.term]?.bildStufenDa?.includes(stufe) && !daten[v.term]?.ohneBild?.includes(stufe))
-  return woerter.filter((v) => lagen.some((l) => tonFehlt(art, v, daten[v.term], l)))
+  return woerter.filter((v) => lagen.some((l) => tonFehlt(art, v, daten[v.term], l, sprache)))
 }
 
 /** Fassungen, für die eine Standardstimme eingestellt ist */
@@ -183,17 +194,19 @@ async function eines(
       const texte = einzeln
         ? [...new Set((art === 'formen' ? v.formen ?? [] : [v.hinweis ?? '']).map((t) => t.trim()).filter(Boolean))]
         : fehlendeTexte(art, v, sicht, l)
-      for (const t of texte) await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', t, stimmen[l]!, l))
+      for (const t of texte) await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', t, stimmen[l]!, l, gesprochenFuer('satz', t, v, sp)))
     }
     return true
   }
   if (art === 'aussprache' || art === 'satz') {
     // Je Fassung mit eingestellter Stimme – nur die fehlende, außer bei einzelnem Neu-Erzeugen
     for (const l of lagen) {
-      if (!einzeln && !tonFehlt(art, v, sicht, l)) continue
+      if (!einzeln && !tonFehlt(art, v, sicht, l, sp)) continue
       const stimme = stimmen[l]!
       await beimDienst(k, 'sprache', () =>
-        art === 'aussprache' ? tonErzeugen(sp, v.term, 'wort', v.term, stimme, l) : tonErzeugen(sp, v.term, 'satz', v.example ?? '', stimme, l)
+        art === 'aussprache'
+          ? tonErzeugen(sp, v.term, 'wort', v.term, stimme, l, gesprochenFuer('wort', v.term, v, sp))
+          : tonErzeugen(sp, v.term, 'satz', v.example ?? '', stimme, l, gesprochenFuer('satz', v.example ?? '', v, sp))
       )
     }
     return true
@@ -260,7 +273,7 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
           sp,
           liste.map((v) => v.term)
         )
-        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe }))
+        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe }), sp)
         const erg: MedienErgebnis = { erledigt: 0, leer: 0, fehler: 0, gesamt: liste.length }
         let ersterFehler: unknown = null
         for (const [i, v] of liste.entries()) {

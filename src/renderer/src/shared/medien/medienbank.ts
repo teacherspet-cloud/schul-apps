@@ -29,6 +29,8 @@ export interface Vokabel {
   formen?: string[]
   /** … und der Hinweis bzw. das Beispiel der Zeile */
   hinweis?: string
+  /** Eigene Aussprache der Lehrkraft („Aussprache als …", 09.10.2026) – nur für den Ton */
+  aussprache?: string
 }
 
 /** Wie die Abläufe die KI erreichen – im Auftrag über dessen Kontext, sonst direkt */
@@ -285,12 +287,25 @@ export async function bildErzeugen(sprache: string, v: Vokabel, lernende?: Lerne
   await window.api.medien.bildSetzen(sprache, v.term, { dataUrl: await verkleinern(d), herkunft: 'ki', nachweis: 'KI-generiert' }, stufeDer(lernende))
 }
 
-/** Aussprache erzeugen – `lage`: weibliche oder männliche Fassung (07.10.2026) */
-export async function tonErzeugen(sprache: string, wort: string, art: TonArt, text: string, stimme: string, lage: Stimmlage = 'w'): Promise<void> {
+/**
+ * Aussprache erzeugen – `lage`: weibliche oder männliche Fassung (07.10.2026). `gesprochen` (09.10.2026): der Text, den
+ * die Sprach-KI wirklich spricht (Abkürzungen ausgeschrieben bzw. buchstabiert, eigene Aussprache) – fehlt = `text`.
+ * Er wird mit der Aufnahme gespeichert; ändert er sich, gilt die Aufnahme als veraltet.
+ */
+export async function tonErzeugen(
+  sprache: string,
+  wort: string,
+  art: TonArt,
+  text: string,
+  stimme: string,
+  lage: Stimmlage = 'w',
+  gesprochen?: string
+): Promise<void> {
   const id = `vok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-  const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text }], languageCode: sprache })
+  const sprech = gesprochen?.trim() || text
+  const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache })
   if (!r?.dataUrl) throw new Error('Die Sprach-KI hat keine Aufnahme geliefert.')
-  await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text }, lage)
+  await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text, ...(sprech !== text ? { gesprochen: sprech } : {}) }, lage)
 }
 
 let laeuft: HTMLAudioElement | null = null

@@ -22,6 +22,7 @@ import { NAMEN_KORRIGIEREN } from './wartungGastname'
 import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
+import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
 export const ZEIT_GRENZE: Record<string, number> = { blitz: 30, richtiggehoert: 30, formenblitz: 30, verbblitz: 30, richtigfalsch: 30 }
@@ -149,7 +150,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Grammatik der 10. Klassen der Lehrkraft löschen – von ihr am 09.10.2026 ausdrücklich bestätigt (wartungGrammatik10.ts)
   GRAMMATIK_KLASSE10,
   // Zusammengefasste Vokabel-Abschnitte je Lehrwerk-Abschnitt teilen (09.10.2026, wartungAbschnitteTeilen.ts)
-  ABSCHNITTE_TEILEN
+  ABSCHNITTE_TEILEN,
+  // Aufnahmen mit Abkürzungen löschen (09.10.2026, von der Lehrkraft bestätigt; wartungAbkuerzungTon.ts)
+  ABKUERZUNG_TON
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

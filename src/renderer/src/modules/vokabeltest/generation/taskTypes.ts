@@ -16,6 +16,7 @@ import { aufgabenText, FESTE_ANWEISUNG, mindmapAnweisung, synonymTexte, zuordnun
 import { baueVerbBlock } from './verbAufgabe'
 import { LUECKEN_REGELN, ohneDoppelte, optionalesInLoesung, teileVon } from '@shared/luecken'
 import { ersatzWoerter, wortartenVon, wortartVon } from './wortart'
+import { abkuerzungAus, abkUeben } from '@shared/abkuerzung'
 
 export interface GenContext {
   settings: TestSettings
@@ -1374,6 +1375,88 @@ ${vocabLines(vocab)}`,
     }
   }
 ]
+
+/** Anweisung der Abkürzungs-Aufgabe in der Testsprache (Englisch als Rückfall) */
+const ABK_ANWEISUNG: Record<string, string> = {
+  en: 'Write the full form or the abbreviation.',
+  fr: "Écris la forme complète ou l'abréviation.",
+  es: 'Escribe la forma completa o la abreviatura.',
+  it: "Scrivi la forma completa o l'abbreviazione.",
+  de: 'Schreib die vollständige Form oder die Abkürzung.',
+  nl: 'Schrijf de volledige vorm of de afkorting.',
+  ru: 'Напиши полную форму или сокращение.',
+  pl: 'Napisz pełną formę lub skrót.',
+  cs: 'Napiš celý tvar nebo zkratku.',
+  pt: 'Escreve a forma completa ou a abreviatura.',
+  tr: 'Tam halini ya da kısaltmayı yaz.',
+  zh: '写出全称或缩写。',
+  ja: '正式な形または略語を書きなさい。',
+  ar: 'اكتب الصيغة الكاملة أو الاختصار.',
+  da: 'Skriv den fulde form eller forkortelsen.',
+  el: 'Γράψε την πλήρη μορφή ή τη συντομογραφία.'
+}
+const ABK_TITEL: Record<string, string> = {
+  en: 'Abbreviations',
+  fr: 'Abréviations',
+  es: 'Abreviaturas',
+  it: 'Abbreviazioni',
+  de: 'Abkürzungen',
+  nl: 'Afkortingen',
+  ru: 'Сокращения',
+  pl: 'Skróty',
+  cs: 'Zkratky',
+  pt: 'Abreviaturas',
+  tr: 'Kısaltmalar',
+  zh: '缩写',
+  ja: '略語',
+  ar: 'الاختصارات',
+  da: 'Forkortelser',
+  el: 'Συντομογραφίες'
+}
+
+/**
+ * Abkürzungen (09.10.2026, Wunsch der Lehrkraft): ohne KI aus Einträgen wie „YA = young adults". Je Wort eine Zeile
+ * „YA = ____" (Langform schreiben) oder „____ = young adults" (Abkürzung schreiben) – abwechselnd, soweit die Tabelle
+ * des Lehrwerks beide Richtungen erlaubt. Die Lösung zeigt so immer den ganzen Eintrag; im Onlinetest zählt bei der
+ * Langform auch die Abkürzung samt Langform (onlinetest/kern.ts `vergleiche`).
+ */
+defs.push({
+  id: 'abbreviations',
+  label: 'Abkürzungen auflösen',
+  description: 'Nur für Einträge mit Abkürzung (z. B. „YA = young adults"): Langform zur Abkürzung schreiben oder umgekehrt – ohne KI.',
+  kind: 'gap',
+  minLevel: 'Pre-A1',
+  usesVocab: true,
+  defaultPoints: 1,
+  defaultTitle: 'Abbreviations',
+  defaultInstruction: ABK_ANWEISUNG.en,
+  accepts: (v) => abkUeben(v.term) !== 'keine',
+  build(vocab, data, ctx) {
+    const sprache = ctx.settings.targetLanguage
+    const b = base(this, data, ctx)
+    const items: GapItem[] = vocab.flatMap((v, i) => {
+      const e = abkuerzungAus(v.term)
+      if (!e) return []
+      const ueben = abkUeben(v.term)
+      const kurzFragen = ueben === 'kuerzen' || (ueben === 'beide' && i % 2 === 1)
+      return [
+        kurzFragen
+          ? { id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: '', after: ` = ${e.lang}` }], answer: e.kurz }
+          : { id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: `${e.kurz} = `, after: '' }], answer: e.lang }
+      ]
+    })
+    return {
+      ...b,
+      title: ABK_TITEL[sprache] ?? b.title,
+      instruction: ABK_ANWEISUNG[sprache] ?? b.instruction,
+      kind: 'gap',
+      items,
+      wordBank: false,
+      firstLetterHint: false,
+      extraBankWords: []
+    }
+  }
+})
 
 export const TASK_TYPES = Object.fromEntries(defs.map((d) => [d.id, d])) as Record<TaskTypeId, TaskTypeDef>
 export const TASK_TYPE_LIST = defs

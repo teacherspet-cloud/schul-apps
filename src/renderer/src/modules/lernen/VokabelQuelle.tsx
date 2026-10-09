@@ -97,7 +97,7 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
   const [units, setUnits] = useState<string[]>([])
   const [abschnitte, setAbschnitte] = useState<string[]>([])
   const [listen, setListen] = useState<
-    { id: string; name: string; language?: string; source?: string; entries: { term: string; translation: string; pos?: string; note?: string }[] }[]
+    { id: string; name: string; language?: string; source?: string; entries: { term: string; translation: string; pos?: string; note?: string; aussprache?: string; auchRichtig?: string[] }[] }[]
   >([])
   const [liste, setListe] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
@@ -186,7 +186,10 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
               ...(e.example ? { example: e.example } : {}),
               ...(e.exampleTranslation ? { exampleTranslation: e.exampleTranslation } : {}),
               ...(e.pos ? { pos: e.pos } : {}),
-              ...(e.note ? { note: e.note } : {})
+              ...(e.note ? { note: e.note } : {}),
+              // Abkürzungen (09.10.2026): eigene Aussprache und weitere richtige Antworten
+              ...(e.aussprache ? { aussprache: e.aussprache } : {}),
+              ...(e.auchRichtig?.length ? { auchRichtig: e.auchRichtig } : {})
             }))
           if (liste.length) teile.push({ titel: gewaehlt.length > 1 ? `${unit} · ${s.name}` : s.name, anzahl: liste.length })
           return liste
@@ -220,7 +223,10 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
         fach: FACH_ZU[l.language ?? 'en'] ?? '',
         woerter: l.entries
           .filter((e) => e.term && e.translation)
-          .map((e, i) => ({ id: `l${i}`, term: e.term, translation: e.translation, ...(e.pos ? { pos: e.pos } : {}), ...(e.note ? { note: e.note } : {}) }))
+          .map((e, i) => ({ id: `l${i}`, term: e.term, translation: e.translation, ...(e.pos ? { pos: e.pos } : {}), ...(e.note ? { note: e.note } : {}),
+            ...(e.aussprache ? { aussprache: e.aussprache } : {}),
+            ...(e.auchRichtig?.length ? { auchRichtig: e.auchRichtig } : {})
+          }))
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

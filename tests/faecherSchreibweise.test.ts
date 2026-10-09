@@ -78,6 +78,7 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
     expect(faecher(d, 'lerngruppen').g1).toBe('Englisch')
     const erledigt = (d.prepare('SELECT name FROM wartung ORDER BY name').all() as { name: string }[]).map((z) => z.name)
     expect(erledigt).toEqual([
+      'abkuerzung-ton-2026-10-09',
       'abschnitte-teilen-2026-10-09',
       'codes-hmac-2026-10-08',
       'faecher-schreibweise-2026-10-08',

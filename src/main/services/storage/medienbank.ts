@@ -35,8 +35,10 @@ import {
   type TonArt
 } from '@shared/medienbank'
 
+const wurzelPfad = (): string =>
+  process.env.SCHULAPPS_SERVER ? resolve(process.env.SCHULAPPS_DATEN || './server-daten', 'medienbank') : join(app.getPath('userData'), 'medienbank')
 const wurzel = (): string => {
-  const w = process.env.SCHULAPPS_SERVER ? resolve(process.env.SCHULAPPS_DATEN || './server-daten', 'medienbank') : join(app.getPath('userData'), 'medienbank')
+  const w = wurzelPfad()
   const d = join(w, 'dateien')
   if (!existsSync(d)) mkdirSync(d, { recursive: true })
   return w
@@ -238,13 +240,75 @@ export function bildLoeschen(sprache: string, wort: string, stufe: Bildstufe = '
   })
 }
 
+/**
+ * Aufnahmen aussortieren (09.10.2026, einmalige Wartung server/wartungAbkuerzungTon.ts): Jede Wort- und Satz-Aufnahme
+ * beider Fassungen, für die `weg` true sagt, wird gelöscht – Datei und Eintrag. Danach spricht wie ohne Aufnahme die
+ * Stimme des Geräts. Bilder bleiben. Ohne Medienbank (kein index.json) geschieht nichts und es wird nichts angelegt.
+ */
+export function toeneAussortieren(weg_: (ton: MedienTon, art: TonArt, sprache: string) => boolean): { woerter: number; saetze: number; dateien: number } {
+  const zahl = { woerter: 0, saetze: 0, dateien: 0 }
+  if (!existsSync(join(wurzelPfad(), 'index.json'))) return zahl
+  const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
+  const loeschen = (t: MedienTon): void => {
+    if (t.datei && MEDIEN_DATEI.test(t.datei) && existsSync(join(wurzelPfad(), 'dateien', t.datei))) zahl.dateien++
+    weg(t.datei)
+  }
+  for (const [schluessel, e0] of Object.entries(i)) {
+    const sp = schluessel.split(':')[0] ?? ''
+    const e: MedienEintrag = { ...e0 }
+    for (const feld of ['ton', 'tonM'] as const) {
+      const t = e[feld]
+      if (t && weg_(t, 'wort', sp)) {
+        loeschen(t)
+        delete e[feld]
+        zahl.woerter++
+      }
+    }
+    for (const feld of ['saetze', 'saetzeM'] as const) {
+      const s = e[feld]
+      if (!s) continue
+      const rest: Record<string, MedienTon> = {}
+      for (const [k, t] of Object.entries(s))
+        if (weg_(t, 'satz', sp)) {
+          loeschen(t)
+          zahl.saetze++
+        } else rest[k] = t
+      if (Object.keys(rest).length) e[feld] = rest
+      else delete e[feld]
+    }
+    const leer =
+      !e.bild && !Object.keys(e.bildStufen ?? {}).length && !e.ohneBild?.length && !e.ton && !e.tonM && !Object.keys(e.saetze ?? {}).length && !Object.keys(e.saetzeM ?? {}).length
+    if (leer) delete i[schluessel]
+    else i[schluessel] = e
+  }
+  if (zahl.woerter || zahl.saetze) {
+    schreibe(indexDatei(), i)
+    zwischen = null
+  }
+  return zahl
+}
+
 /** `lage`: Fassung (weiblich = die bisherigen Felder) */
-export function tonSetzen(sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }, lage: Stimmlage = 'w'): MedienTon {
+export function tonSetzen(
+  sprache: string,
+  wort: string,
+  art: TonArt,
+  t: { dataUrl: string; stimme: string; text: string; gesprochen?: string },
+  lage: Stimmlage = 'w'
+): MedienTon {
   const { bytes, endung } = ausDataUrl(t.dataUrl)
   if (endung !== 'mp3') throw new Error('Kein MP3.')
   const datei = neueDatei('mp3')
   writeFileSync(medienDateiPfad(datei), bytes)
-  const ton: MedienTon = { datei, stimme: String(t.stimme ?? '').slice(0, 120), text: String(t.text ?? '').slice(0, 600), zeit: Date.now() }
+  const gesprochen = typeof t.gesprochen === 'string' ? t.gesprochen.slice(0, 600) : ''
+  const ton: MedienTon = {
+    datei,
+    stimme: String(t.stimme ?? '').slice(0, 120),
+    text: String(t.text ?? '').slice(0, 600),
+    // Abweichender Sprechtext (Abkürzungen, eigene Aussprache, 09.10.2026)
+    ...(gesprochen && gesprochen !== t.text ? { gesprochen } : {}),
+    zeit: Date.now()
+  }
   const tonFeld = lage === 'm' ? 'tonM' : 'ton'
   const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(medienSchluessel(sprache, wort), (e) => {

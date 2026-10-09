@@ -1,9 +1,10 @@
 import { saetzeVon, satzSchluessel, sprachKurz, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
-import { lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
-import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
+import { gesprochenFuer, lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
+import { abkuerzungAus, abkVoll } from '@shared/abkuerzung'
+import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Stack, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { newId } from '../model/random'
 import SonderzeichenLeiste from '../../../shared/components/SonderzeichenLeiste'
 import { sprachAttribute } from '../../../shared/sprachSchrift'
@@ -40,6 +41,10 @@ export interface TabellenZeile {
   inBox?: boolean
   /** Wird im Test abgefragt (fehlt = ja) – nur mit `abfragen` */
   include?: boolean
+  /** Sprechtext für die Sprachausgabe statt des Wortes („Aussprache als …", 09.10.2026) */
+  aussprache?: string
+  /** Weitere richtige Antworten („auch richtig", 09.10.2026) */
+  auchRichtig?: string[]
 }
 
 type Feld = 'term' | 'translation' | 'pos' | 'example' | 'note'
@@ -143,7 +148,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
       await starteMedienAuftrag({
         art: art === 'wort' ? 'aussprache' : 'satz',
         sprache: medienSprache,
-        vokabeln: [{ term: wort, translation: zeile?.translation ?? '', example: art === 'satz' ? text : zeile?.example }],
+        vokabeln: [{ term: wort, translation: zeile?.translation ?? '', example: art === 'satz' ? text : zeile?.example, aussprache: zeile?.aussprache }],
         ziel: zielRef.current,
         lagen: [lage],
         einzeln: true
@@ -348,6 +353,14 @@ const Zeile = memo(function Zeile({
   const lagen: Stimmlage[] = lagenText ? (lagenText.split(',') as Stimmlage[]) : ['w']
   const zwei = lagen.length > 1
   const name = v.term.trim() || `Zeile ${nr}`
+  /*
+   * „Aussprache als …" und „auch richtig" (09.10.2026, Abkürzungen): zwei kleine Felder unter dem Wort – sichtbar, sobald
+   * etwas eingetragen ist, sonst über das ⋯-Menü. Erkennt die App eine Abkürzung, steht sie als Hinweis darunter.
+   */
+  const [zusatzOffen, setZusatzOffen] = useState(false)
+  const zusatz = zusatzOffen || Boolean(v.aussprache) || Boolean(v.auchRichtig?.length)
+  const abk = useMemo(() => abkuerzungAus(v.term), [v.term])
+  const sprechtext = medienAn ? gesprochenFuer('wort', v.term, v, sprache ?? 'en') : undefined
   const abgefragt = v.include !== false
   // Wort, Beispiel und Nennform/Lesung in der Schrift der Sprache; Deutsch und Hinweis bleiben, wie sie sind
   const zielsprachig = (f: Feld): boolean => f === 'term' || f === 'example' || f === 'pos'
@@ -427,7 +440,48 @@ const Zeile = memo(function Zeile({
               </Badge>
             </Tooltip>
           )}
+          {abk && (
+            <Tooltip label={`Abkürzung erkannt: ${abkVoll(abk)} – Lernende dürfen die Abkürzung, die Langform oder beides schreiben`}>
+              <Badge size="xs" variant="light" color="blue" tt="none" style={{ flexShrink: 0 }} data-abkuerzung>
+                Abk.
+              </Badge>
+            </Tooltip>
+          )}
         </Group>
+        {zusatz && (
+          <Stack gap={2} mt={2} data-zusatzfelder>
+            <TextInput
+              size="xs"
+              variant="filled"
+              label="Aussprache als"
+              placeholder="z. B. Y. A., young adults"
+              aria-label={`Aussprache als – Zeile ${nr}`}
+              value={v.aussprache ?? ''}
+              readOnly={nurLesen}
+              data-zeile={v.id}
+              data-feld="aussprache"
+              onChange={(e) => aendern(v.id, { aussprache: e.currentTarget.value }, `zeile:${v.id}:aussprache`)}
+            />
+            <TextInput
+              size="xs"
+              variant="filled"
+              label="Auch richtig (mit ; trennen)"
+              placeholder="z. B. telly; telebox"
+              aria-label={`Auch richtig – Zeile ${nr}`}
+              value={(v.auchRichtig ?? []).join('; ')}
+              readOnly={nurLesen}
+              data-zeile={v.id}
+              data-feld="auchRichtig"
+              onChange={(e) =>
+                aendern(
+                  v.id,
+                  { auchRichtig: e.currentTarget.value.split(';').map((x, i, alle) => (i < alle.length - 1 ? x.trim() : x.trimStart())) },
+                  `zeile:${v.id}:auchRichtig`
+                )
+              }
+            />
+          </Stack>
+        )}
       </Table.Td>
       <Table.Td>{sprache === 'de' ? feld('translation', 'Bedeutung', 'einfache Erklärung') : feld('translation', 'Deutsch', 'erkunden')}</Table.Td>
       <Table.Td>{feld('pos', 'Wortart')}</Table.Td>
@@ -464,6 +518,7 @@ const Zeile = memo(function Zeile({
                   art="wort"
                   lage={zwei ? l : undefined}
                   admin={medienAdmin}
+                  gesprochen={sprechtext}
                   erzeugen={() => tonFuer(v.term, 'wort', v.term, l)}
                 />
               ))}
@@ -507,6 +562,11 @@ const Zeile = memo(function Zeile({
                 <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => neueZeile(v.id)}>
                   Zeile darunter einfügen
                 </Menu.Item>
+                {!zusatz && (
+                  <Menu.Item onClick={() => setZusatzOffen(true)} data-zusatz-oeffnen>
+                    Aussprache / weitere richtige Antworten …
+                  </Menu.Item>
+                )}
               </Menu.Dropdown>
             </Menu>
             <Tooltip label={mitVerlauf ? 'Zeile löschen (Strg+Z holt sie zurück)' : 'Zeile löschen'}>

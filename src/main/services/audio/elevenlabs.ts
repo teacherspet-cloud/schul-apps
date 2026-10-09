@@ -20,6 +20,7 @@ import { abrufe } from '../images/politeFetch'
 import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi, sprichOpenAiTeile } from './openaiTts'
 import { vertoneHoertext, zeitenAusAusrichtung, zeitenAusDialog, type Synthese, type SyntheseTeil, type Vorlage } from '@shared/vertonung'
 import { attrappeStimmen, attrappeSynthese } from '../ai/attrappe'
+import { ausspracheRegeln, fingerabdruck, plsLexikon, sprechText, type AusspracheRegel } from '@shared/sprechtext'
 
 // Basis ohne Fassungsnummer: Die Stimmenliste braucht v2 (nur dort gibt es `sharing`),
 // alles andere v1. Jeder Pfad nennt seine Fassung deshalb selbst.
@@ -355,6 +356,48 @@ export async function previewVoice(voiceId: string): Promise<string> {
   return `data:audio/mpeg;base64,${buf.toString('base64')}`
 }
 
+/** Verweis auf ein Aussprache-Wörterbuch von ElevenLabs (höchstens drei je Auftrag) */
+type WoerterbuchVerweis = { pronunciation_dictionary_id: string; version_id: string }
+const mitWoerterbuch = (w: WoerterbuchVerweis | null): { pronunciation_dictionary_locators?: WoerterbuchVerweis[] } =>
+  w ? { pronunciation_dictionary_locators: [w] } : {}
+
+const woerterbuchDatei = (): string => join(app.getPath('userData'), 'aussprache-woerterbuecher.json')
+
+/**
+ * Aussprache-Wörterbuch für Abkürzungen (09.10.2026, shared/sprechtext.ts): Die Initialwörter eines Hörtexts („YA",
+ * „BBC") gehen als PLS-Lexikon mit Alias-Regeln („YA" → „Y. A.") an ElevenLabs. Angelegt wird es nur, wenn die Lehrkraft
+ * vertont – und nur einmal je Regelsatz: Kennung und Fassung merkt sich die App (Schlüssel = Fingerabdruck des
+ * Lexikons). Alias-Regeln versteht jedes Modell. Klappt das Anlegen nicht, kommt null zurück und der Text wird
+ * stattdessen vorbereitet (buchstabiert).
+ */
+export async function woerterbuchFuer(regeln: AusspracheRegel[], sprache: string): Promise<WoerterbuchVerweis | null> {
+  if (!regeln.length) return null
+  const pls = plsLexikon(regeln, sprache)
+  const schluessel = fingerabdruck(pls)
+  let gemerkt: Record<string, WoerterbuchVerweis> = {}
+  try {
+    if (existsSync(woerterbuchDatei())) gemerkt = JSON.parse(readFileSync(woerterbuchDatei(), 'utf8')) as Record<string, WoerterbuchVerweis>
+  } catch {
+    gemerkt = {}
+  }
+  if (gemerkt[schluessel]?.pronunciation_dictionary_id) return gemerkt[schluessel]
+  const form = new FormData()
+  form.append('name', `Schul-Apps Abkürzungen ${sprache} ${schluessel}`)
+  form.append('description', 'Aussprache von Abkürzungen (Schul-Apps, automatisch angelegt)')
+  form.append('file', new Blob([pls], { type: 'application/pls+xml' }), `abkuerzungen-${schluessel}.pls`)
+  // Ohne „content-type": den Rand des Formulars setzt fetch selbst
+  const res = await pruefeAntwort(await abrufe(`${API}/v1/pronunciation-dictionaries/add-from-file`, { method: 'POST', headers: { 'xi-api-key': key() }, body: form }))
+  const d = (await res.json()) as { id?: string; version_id?: string }
+  if (!d.id || !d.version_id) return null
+  const verweis = { pronunciation_dictionary_id: d.id, version_id: d.version_id }
+  try {
+    writeAtomic(woerterbuchDatei(), JSON.stringify({ ...gemerkt, [schluessel]: verweis }, null, 1))
+  } catch {
+    // Nicht gemerkt: beim nächsten Mal wird es neu angelegt
+  }
+  return verweis
+}
+
 /** Die Klangregler in die Schreibweise der Schnittstelle bringen. */
 function settingsBody(s?: TtsSettings): Record<string, number | boolean> {
   const v = clampTtsSettings(s)
@@ -373,7 +416,8 @@ async function ttsStueck(
   voiceId: string,
   text: string,
   settings: TtsSettings | undefined,
-  kontext: { previous_text?: string; next_text?: string; previous_request_ids?: string[] }
+  kontext: { previous_text?: string; next_text?: string; previous_request_ids?: string[] },
+  woerterbuch: WoerterbuchVerweis | null = null
 ): Promise<{ buf: Buffer; id: string }> {
   const res = await request(`/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
     method: 'POST',
@@ -382,7 +426,8 @@ async function ttsStueck(
       model_id: TTS_MODEL,
       // eleven_multilingual_v2 erkennt die Sprache selbst; language_code wird dort nicht unterstützt
       voice_settings: settingsBody(settings),
-      ...kontext
+      ...kontext,
+      ...mitWoerterbuch(woerterbuch)
     })
   })
   return { buf: Buffer.from(await res.arrayBuffer()), id: res.headers.get('request-id') ?? '' }
@@ -428,7 +473,7 @@ async function mitZeitmarken(path: string, body: string): Promise<{ daten: MitZe
  * Audio-Tags fliegen hier raus: eleven_multilingual_v2 versteht sie nicht und würde sie
  * vorlesen.
  */
-function soloSynthese(req: TtsRequest): Synthese {
+function soloSynthese(req: TtsRequest, woerterbuch: WoerterbuchVerweis | null = null): Synthese {
   return {
     modell: TTS_MODEL,
     async vertone(zeilen, kontext) {
@@ -444,7 +489,7 @@ function soloSynthese(req: TtsRequest): Synthese {
         const r = await mitZeitmarken(
           `/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`,
           // eleven_multilingual_v2 erkennt die Sprache selbst; language_code wird dort nicht unterstützt
-          JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: settingsBody(req.settings), ...rand })
+          JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: settingsBody(req.settings), ...rand, ...mitWoerterbuch(woerterbuch) })
         )
         if (r)
           return [{ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: zeilen.length, zeiten: zeitenAusAusrichtung(r.daten.alignment, texte) }]
@@ -455,7 +500,7 @@ function soloSynthese(req: TtsRequest): Synthese {
         const { buf, id } = await ttsStueck(voiceId, stuecke[i], req.settings, {
           ...(i > 0 ? { previous_text: stuecke[i - 1], previous_request_ids: ids.slice(-3) } : rand.previous_text ? { previous_text: rand.previous_text } : {}),
           ...(i + 1 < stuecke.length ? { next_text: stuecke[i + 1] } : rand.next_text ? { next_text: rand.next_text } : {})
-        })
+        }, woerterbuch)
         parts.push(buf)
         if (id) ids.push(id)
       }
@@ -479,7 +524,7 @@ function soloSynthese(req: TtsRequest): Synthese {
  * Seit 01.10.2026 über `…/with-timestamps`: `voice_segments` nennt Beginn und Ende jeder
  * Zeile – daraus entstehen die Zeitmarken und die Schnittstellen für spätere Teil-Vertonungen.
  */
-function dialogSynthese(req: TtsRequest): Synthese {
+function dialogSynthese(req: TtsRequest, woerterbuch: WoerterbuchVerweis | null = null): Synthese {
   return {
     modell: DIALOG_MODEL,
     async vertone(zeilen) {
@@ -489,7 +534,8 @@ function dialogSynthese(req: TtsRequest): Synthese {
           model_id: DIALOG_MODEL,
           inputs: block.map((z) => ({ text: z.text, voice_id: z.voiceId })),
           settings: settingsBody(req.settings),
-          ...(req.languageCode ? { language_code: req.languageCode } : {})
+          ...(req.languageCode ? { language_code: req.languageCode } : {}),
+          ...mitWoerterbuch(woerterbuch)
         })
         const r = await mitZeitmarken('/v1/text-to-dialogue/with-timestamps?output_format=mp3_44100_128', body)
         if (r) {
@@ -543,15 +589,23 @@ function ladeVorlage(vorher: TtsRequest['vorher']): { vorlage: Vorlage | null; f
  * Liegt eine frühere Aufnahme mit Segmenten vor, werden nur geänderte Zeilen neu vertont.
  */
 export async function speak(req: TtsRequest): Promise<TtsResult> {
-  const turns = req.turns.filter((t) => t.text.trim())
-  if (!turns.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
-  const stimmen = new Set(turns.map((t) => t.voiceId))
+  const roh = req.turns.filter((t) => t.text.trim())
+  if (!roh.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
+  const stimmen = new Set(roh.map((t) => t.voiceId))
   const dialog = stimmen.size > 1
   // OpenAI-Stimme gewählt (Großprogramm 0.4, F6): der ganze Hörtext über OpenAI
-  const ueberOpenAi = turns.some((t) => istOpenAiStimme(t.voiceId))
+  const ueberOpenAi = roh.some((t) => istOpenAiStimme(t.voiceId))
   // Oberflächentests (nie im Betrieb): Stille mit bekannter Länge statt eines Dienstes
   const attrappe = attrappeSynthese()
-  const synth = attrappe ?? (ueberOpenAi ? openAiSynthese(req) : dialog ? dialogSynthese(req) : soloSynthese(req))
+  /*
+   * Abkürzungen (09.10.2026, shared/sprechtext.ts): Initialwörter über ein Aussprache-Wörterbuch (nur ElevenLabs), sonst
+   * buchstabiert in den Text; Kürzel mit Punkt und Platzhalter („e.g.", „sb") immer ausgeschrieben.
+   */
+  const sprache = req.languageCode || 'en'
+  const regeln = attrappe || ueberOpenAi ? [] : ausspracheRegeln(roh.map((t) => t.text), sprache)
+  const woerterbuch = regeln.length ? await woerterbuchFuer(regeln, sprache).catch(() => null) : null
+  const turns = roh.map((t) => ({ ...t, text: sprechText(t.text, sprache, Boolean(woerterbuch)) }))
+  const synth = attrappe ?? (ueberOpenAi ? openAiSynthese(req) : dialog ? dialogSynthese(req, woerterbuch) : soloSynthese(req, woerterbuch))
   const { vorlage, fehlt } = ladeVorlage(req.vorher)
   const erg = await vertoneHoertext(turns, { settings: req.settings, sprache: req.languageCode }, synth, vorlage, fehlt)
   if (!attrappe) merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', synth.modell, { ttsZeichen: erg.zeichen })

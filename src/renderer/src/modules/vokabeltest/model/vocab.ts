@@ -82,6 +82,9 @@ export function alsListenEintrag(v: Omit<VocabEntry, 'id'> | ListenEintrag): Lis
     ...(v.pos?.trim() ? { pos: v.pos.trim() } : {}),
     ...(v.note?.trim() ? { note: v.note.trim() } : {}),
     ...(v.grey ? { grey: true } : {}),
-    ...(v.inBox ? { inBox: true } : {})
+    ...(v.inBox ? { inBox: true } : {}),
+    // Abkürzungen (09.10.2026): eigene Aussprache und weitere richtige Antworten der Lehrkraft
+    ...(v.aussprache?.trim() ? { aussprache: v.aussprache.trim() } : {}),
+    ...(v.auchRichtig?.some((a) => a.trim()) ? { auchRichtig: v.auchRichtig.map((a) => a.trim()).filter(Boolean) } : {})
   }
 }

@@ -262,7 +262,10 @@ describe('Alle Aufgabentypen', () => {
    * Wortvorrat der Prüfung reichte dann für keinen von beiden.
    */
   const typesFuer = (sprache: string): TaskTypeId[] =>
-    TASK_TYPE_LIST.map((d) => d.id).filter((t): t is TaskTypeId => t !== 'pictureLabel' && t !== 'freeText' && passtZurSprache(t, sprache))
+    // „Abkürzungen auflösen" (09.10.2026) braucht Einträge mit Abkürzung – eigene Tests in abkuerzungVokabeltest.test.ts
+    TASK_TYPE_LIST.map((d) => d.id).filter(
+      (t): t is TaskTypeId => t !== 'pictureLabel' && t !== 'freeText' && t !== 'abbreviations' && passtZurSprache(t, sprache)
+    )
   const types = typesFuer('en')
 
   it('erzeugen gültige Blöcke ohne Prüfhinweise und lassen sich exportieren', async () => {

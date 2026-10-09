@@ -107,9 +107,19 @@ export function hauptKlasse(ich: NutzerInfo, gruppen: Lerngruppe[], lernende: Nu
 /** Eigener Platz in der Klasse nach Übungstagen der letzten 4 Wochen – oder null */
 export function klassenPlatz(ich: NutzerInfo, jetzt = Date.now()): { platz: number; von: number; tage: number } | null {
   try {
-    const { gruppen, lernende } = gruppenUndLernende(jetzt)
-    const k = hauptKlasse(ich, gruppen, lernende)
+    let { gruppen, lernende } = gruppenUndLernende(jetzt)
+    let k = hauptKlasse(ich, gruppen, lernende)
+    // Neue Klasse oder neu eingetragen (09.10.2026): Zwischenspeicher kennt die Person noch nicht – einmal frisch laden
+    if (!k || !k.mitglieder.some((n) => n.id === ich.id)) {
+      gruppenStand = null
+      ;({ gruppen, lernende } = gruppenUndLernende(jetzt))
+      k = hauptKlasse(ich, gruppen, lernende)
+      if (k) klassen.delete(k.g.id)
+    }
     if (!k) return null
+    // Mitgliederzahl geändert: Klassenwerte neu berechnen
+    const alt = klassen.get(k.g.id)
+    if (alt && alt.werte.size !== k.mitglieder.length) klassen.delete(k.g.id)
     let c = klassen.get(k.g.id)
     if (!c || jetzt - c.t >= FRISCH_MS) {
       c = { t: jetzt, werte: new Map(k.mitglieder.map((n) => [n.id, tageImZeitraum(uebungsTage(n.id), jetzt)])) }
