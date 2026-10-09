@@ -41,6 +41,7 @@ import {
   fehlversuch,
   gesperrtWegenVersuchen,
   iservAnmeldeAdresse,
+  iservNaechsteStufe,
   iservBereit,
   iservRueckruf,
   notzugangAn,
@@ -472,6 +473,17 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     if (req.method === 'GET' && url.pathname === '/auth/rueckruf') {
       try {
         const fehlerVonIserv = url.searchParams.get('error')
+        // IServ gibt nicht alle Berechtigungen frei (09.10.2026): mit weniger noch einmal versuchen
+        if (fehlerVonIserv === 'invalid_scope') {
+          const weiter = await iservNaechsteStufe(rueckruf, url.searchParams.get('state') ?? '')
+          if (weiter) {
+            res.writeHead(302, { location: weiter, 'cache-control': 'no-store' })
+            return void res.end()
+          }
+          throw new AnmeldeFehler(
+            'IServ gibt die nötigen Angaben nicht frei. Bitte in IServ (Verwaltung › Single-Sign-On › OAuth/OpenID Connect) beim Client für Schul-Apps die Scopes „openid", „profile" und „email" (am besten auch „roles" und „groups") erlauben.'
+          )
+        }
         if (fehlerVonIserv)
           throw new AnmeldeFehler(fehlerVonIserv === 'access_denied' ? 'Die Anmeldung bei IServ wurde abgebrochen.' : `IServ: ${fehlerVonIserv}`)
         const { nutzer, ziel } = await iservRueckruf(rueckruf, url.searchParams.get('state') ?? '', url.searchParams.get('code') ?? '')

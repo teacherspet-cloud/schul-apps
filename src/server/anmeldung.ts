@@ -113,7 +113,24 @@ interface Vorgang {
   nonce: string
   ziel: string
   zeit: number
+  /** Stufe der Berechtigungen (scopeStufen) – für den Rückfall bei „invalid_scope" */
+  stufe: number
 }
+
+/**
+ * Rückfall bei „invalid_scope" (09.10.2026, Befund am VPS): IServ kennt alle Scopes, gibt im Client aber nicht immer
+ * alle frei. Dann der Reihe nach weniger anfragen; Rollen erkennt die App notfalls am Benutzernamen (LEHRKRAFT_MUSTER),
+ * Klassen über die eingetragenen Lernenden.
+ */
+export function scopeStufen(eingestellt: string): string[] {
+  const stufen = [eingestellt, 'openid profile email iserv:roles iserv:groups', 'openid profile email roles groups', 'openid profile email', 'openid profile']
+  const norm = stufen.map((x) => x.trim().replace(/\s+/g, ' '))
+  const erlaubt = new Set(norm[0].split(' '))
+  // Nur weniger als eingestellt anfragen, nie mehr
+  return norm.filter((x, i, a) => x && a.indexOf(x) === i && (i === 0 || x.split(' ').every((t) => erlaubt.has(t))))
+}
+/** Zuletzt erfolgreiche Stufe – die nächste Anmeldung beginnt gleich dort */
+let guteStufe = 0
 
 /** Laufende Anmeldungen (state → PKCE) – nur 10 Minuten gültig, nur im Speicher */
 const vorgaenge = new Map<string, Vorgang>()
@@ -124,20 +141,27 @@ function aufraeumen(): void {
 }
 
 /** Weiterleitung zu IServ; `ziel` = Pfad nach der Anmeldung (nur eigene Pfade) */
-export async function iservAnmeldeAdresse(rueckruf: string, ziel: string, abruf?: typeof fetch): Promise<{ adresse: string; state: string }> {
+export async function iservAnmeldeAdresse(
+  rueckruf: string,
+  ziel: string,
+  abruf?: typeof fetch,
+  stufe = guteStufe
+): Promise<{ adresse: string; state: string }> {
   aufraeumen()
   const e = iservEinstellung()
+  const stufen = scopeStufen(e.scopes)
+  const nr = Math.min(Math.max(0, stufe), stufen.length - 1)
   if (!iservBereit()) throw new Error('Die Anmeldung über IServ ist noch nicht eingerichtet (Verwaltung › IServ-Anbindung).')
   const d = await entdecken(e.aussteller, abruf)
   const state = b64url(randomBytes(24))
   const verifier = b64url(randomBytes(48))
   const nonce = b64url(randomBytes(16))
-  vorgaenge.set(state, { verifier, nonce, ziel: /^\/[a-zA-Z0-9/_-]*$/.test(ziel) ? ziel : '/', zeit: Date.now() })
+  vorgaenge.set(state, { verifier, nonce, ziel: /^\/[a-zA-Z0-9/_-]*$/.test(ziel) ? ziel : '/', zeit: Date.now(), stufe: nr })
   const q = new URLSearchParams({
     response_type: 'code',
     client_id: e.clientId,
     redirect_uri: rueckruf,
-    scope: e.scopes,
+    scope: stufen[nr],
     state,
     nonce,
     code_challenge: b64url(createHash('sha256').update(verifier).digest()),
@@ -157,6 +181,16 @@ function jwtInhalt(jwt: string): Record<string, unknown> {
 }
 
 export class AnmeldeFehler extends Error {}
+
+/** „invalid_scope" von IServ: mit weniger Berechtigungen neu anfragen – null, wenn keine Stufe mehr übrig ist */
+export async function iservNaechsteStufe(rueckruf: string, state: string, abruf?: typeof fetch): Promise<string | null> {
+  const v = vorgaenge.get(state)
+  vorgaenge.delete(state)
+  if (!v || Date.now() - v.zeit > 10 * 60_000) return null
+  const stufen = scopeStufen(iservEinstellung().scopes)
+  if (v.stufe + 1 >= stufen.length) return null
+  return (await iservAnmeldeAdresse(rueckruf, v.ziel, abruf, v.stufe + 1)).adresse
+}
 
 /**
  * Rückkehr von IServ: Code einlösen, Angaben lesen, Nutzer anlegen bzw. aktualisieren.
@@ -218,6 +252,7 @@ export async function iservRueckruf(
   registerVergessen()
   if (nutzer.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')
   protokolliereServer('anmeldung', `Anmeldung über IServ (${nutzer.rolle})`, nutzer.id)
+  guteStufe = v.stufe
   return { nutzer, ziel: v.ziel }
 }
 
