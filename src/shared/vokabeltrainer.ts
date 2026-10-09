@@ -381,8 +381,25 @@ export function freiwilligeWoerter(liste: Vokabel[], staende: Record<string, Wor
     .map((x) => x.v)
 }
 
+let TAG_FORMAT: Intl.DateTimeFormat | null = null
+const TAG_JE_STUNDE = new Map<number, string>()
 /** Tag in Deutschland (JJJJ-MM-TT) – Grenze der Tagesration */
-export const tagVon = (ms: number): string => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' })
+export const tagVon = (ms: number): string => {
+  /*
+   * Leistung (09.10.2026): toLocaleDateString mit Zeitzone baut bei jedem Aufruf einen Formatierer – in „Meine Klassen"
+   * (je Lernende und Wort mehrfach) kostete das über 20 s. Ein Formatierer für alle, dazu ein Merkzettel je Stunde
+   * (Tagesgrenzen in Deutschland liegen immer auf vollen UTC-Stunden).
+   */
+  const stunde = Math.floor(ms / 3_600_000)
+  const da = TAG_JE_STUNDE.get(stunde)
+  if (da !== undefined) return da
+  if (!Number.isFinite(ms)) return new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' })
+  TAG_FORMAT ??= new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' })
+  const tag = TAG_FORMAT.format(ms)
+  if (TAG_JE_STUNDE.size > 5000) TAG_JE_STUNDE.clear()
+  TAG_JE_STUNDE.set(stunde, tag)
+  return tag
+}
 
 /** Neue Wörter je Tag (08.10.2026, Wunsch der Lehrkraft: 127 freigegebene Vokabeln nicht alle am ersten Tag) */
 export const NEU_JE_TAG = 10

@@ -95,20 +95,24 @@ export async function weitereOptionen(page) {
 }
 
 /**
- * Kursseite im Sprachenlernen (08.10.2026): die Kästen „Vokabeln" und „Grammatik" sind von sich aus zugeklappt, die
- * Grammatik nach Schuljahren (nur das neueste offen). Aufklappen, was zu ist – die Knöpfe „Vokabeln hinzufügen" und
- * „Grammatik hinzufügen" stehen im Kopf und brauchen das nicht.
+ * Kursseite (09.10.2026, „Kopf + Reiter"): Überblick · Vokabeln · Grammatik · Lernende · Einstellungen. `kursReiter`
+ * wählt einen Reiter (wartet, bis die Seite steht); im Reiter „Grammatik" werden zugeklappte Schuljahre geöffnet.
  */
-export async function kursKaestenAuf(page) {
-  for (const s of ['[data-vokabel-kasten-kopf]', '[data-kurs-grammatik-kopf]']) {
-    const k = page.locator(s).first()
-    try {
-      await k.waitFor({ state: 'visible', timeout: 15000 })
-    } catch {
-      continue
-    }
-    if ((await k.getAttribute('aria-expanded')) === 'false') await k.click()
-  }
+export async function kursReiter(page, reiter) {
+  const r = page.locator(`[data-kurs-reiter="${reiter}"]`).first()
+  await r.waitFor({ state: 'visible', timeout: 15000 })
+  if ((await r.getAttribute('aria-selected')) !== 'true') await r.click()
   await page.waitForTimeout(300)
+  if (reiter === 'grammatik') await grammatikJahreAuf(page)
+}
+
+/** Zugeklappte Schuljahre der Grammatik-Tabelle aufklappen */
+export async function grammatikJahreAuf(page) {
+  await page.locator('[data-kurs-grammatik]').first().waitFor({ timeout: 15000 }).catch(() => undefined)
   for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
+}
+
+/** Früherer Name: Kursseite geöffnet, Reiter „Grammatik" (Vorgabe) bzw. der angegebene */
+export async function kursKaestenAuf(page, reiter = 'grammatik') {
+  await kursReiter(page, reiter)
 }

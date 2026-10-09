@@ -11,6 +11,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { nachUnits, REIF_TAGE, SCHWACH_UNTER, type AbschnittStatistik } from '@shared/kursAbschnitte'
 import { ampel } from './MaterialListe'
 import { GeplantMarke } from '../../shared/components/FreigabePlanen'
+import { useExperte } from '../../shared/settingsStore'
 
 const prozent = (x: number): string => `${Math.round(x * 100)} %`
 const tag = (x: number): string => (x ? new Date(x).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '–')
@@ -50,6 +51,7 @@ function PersonenAmpeln({ a, namen }: { a: AbschnittStatistik; namen: string[] }
 }
 
 export function VokabelAbschnitte({ abschnitte, namen }: { abschnitte: AbschnittStatistik[]; namen: string[] }): React.JSX.Element | null {
+  const experte = useExperte()
   const [suche, setSuche] = useState('')
   /** Zu- bzw. aufgeklappte Units (Abweichung vom Standard: neueste offen) */
   const [umgeschaltet, setUmgeschaltet] = useState<Set<string>>(new Set())
@@ -168,9 +170,12 @@ export function VokabelAbschnitte({ abschnitte, namen }: { abschnitte: Abschnitt
                               <Stack gap={6} py={4}>
                                 <Text size="xs">
                                   <b>Schwierigste Wörter:</b>{' '}
+                                  {/* Fehlerquoten nur im Expertenmodus (09.10.2026) */}
                                   {a.probleme.length
-                                    ? a.probleme.map((p) => `${p.term} – ${p.translation} (${prozent(p.quote)} falsch)`).join('; ')
-                                    : 'noch keine (erst ab drei Versuchen gezählt)'}
+                                    ? a.probleme.map((p) => `${p.term} – ${p.translation}${experte ? ` (${prozent(p.quote)} falsch)` : ''}`).join('; ')
+                                    : experte
+                                      ? 'noch keine (erst ab drei Versuchen gezählt)'
+                                      : 'noch keine'}
                                 </Text>
                                 {namen.length > 0 ? (
                                   <PersonenAmpeln a={a} namen={namen} />

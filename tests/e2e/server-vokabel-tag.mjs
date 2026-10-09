@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, kursReiter } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vokabel-tag')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -77,12 +77,13 @@ try {
   await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
-  await kursKaestenAuf(p)
+  await kursKaestenAuf(p, 'vokabeln')
   // Abschnitte nur in den Details, zugeklappt: Wörterzahl, neu Hinzugekommenes hervorgehoben
   pruefe(await da(p.locator('[data-vokabel-neu14]', { hasText: '+2' })), 'Kasten „32 Wörter" mit „+2 in den letzten 2 Wochen"')
   pruefe(!(await p.locator('[data-vokabel-abschnitte]').getByText('Unit 1 Wörter').isVisible()), 'Abschnitte zugeklappt')
   await p.locator('[data-vokabel-abschnitte-kopf]').click()
   pruefe(await da(p.locator('[data-vokabel-abschnitte]').getByText('Unit 1 Wörter')), 'Aufgeklappt: die Abschnitte')
+  await kursReiter(p, 'lernende')
   await p.locator('[data-lernende-eintragen]').click()
   const [wahl] = await Promise.all([p.waitForEvent('filechooser'), p.locator('[data-namen-datei]').click()])
   await wahl.setFiles({ name: 'klasse.csv', mimeType: 'text/csv', buffer: Buffer.from('Nr;Nachname;Vorname\n1;Müller;Anna\n2;Schmidt;Ben\n3;Müller;Anton\n') })
@@ -119,7 +120,8 @@ try {
   pruefe(await da(p.locator('[data-gast-code]', { hasText: benCode })), 'Klick auf den Namen zeigt den Code')
   await p.screenshot({ path: join(out, '3-gast-code.png') })
   await p.keyboard.press('Escape')
-  // Spiele-Schalter und Tagesziel in den Details
+  // Spiele-Schalter und Tagesziel im Reiter „Einstellungen"
+  await kursReiter(p, 'einstellungen')
   pruefe(await da(p.locator('[data-vokabel-tagesziel]')), 'Feld „Neue Vokabeln pro Tag"')
   await p.screenshot({ path: join(out, '4-details.png'), fullPage: true })
 
@@ -287,7 +289,7 @@ try {
     .click()
     .catch(() => undefined)
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
-  await kursKaestenAuf(p)
+  await kursKaestenAuf(p, 'grammatik')
   await lk.request.post(`${A}/server/grammatik/${g2.id}/verbinden`, { headers: KOPF, data: { vokId: vid } })
   await p.locator('[data-vokabel-grammatik]').click()
   pruefe(await da(p.locator('[data-grammatik-fach]')), '„Grammatik hinzufügen" öffnet gleich „Grammatik zum Üben freigeben"')
@@ -304,7 +306,7 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
-  await kursKaestenAuf(p)
+  await kursKaestenAuf(p, 'lernende')
   pruefe(await da(p.locator('[data-woche="10/0"]')), 'Ben: „10 neu · 0 wiederholt" in 7 Tagen')
   await p.locator('[data-sortieren="woche"]').click()
   pruefe((await p.locator('[data-lernende-tabelle] tbody tr').first().innerText()).includes('Ben S.'), 'Sortiert nach „geübt (7 Tage)": Ben oben')
@@ -316,19 +318,17 @@ try {
   await p.keyboard.press('Escape')
   await p.locator('[data-namen-ausblenden]').click()
   pruefe((await p.locator('[data-lernende-name]').first().innerText()).startsWith('Lernende/r'), 'Namen ausgeblendet')
-  pruefe((await p.locator('[data-grammatik-zeile]').count()) === 2, 'Grammatik der Gruppe: beide verbundenen Trainings')
   await p.screenshot({ path: join(out, '10-details-tabellen.png'), fullPage: true })
   await p.locator('[data-namen-ausblenden]').click()
-  await p.locator('[data-lernende-kopf]').click()
-  pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Je Lernende/r zugeklappt')
-  await p.reload()
-  await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
-  await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
-  await kursKaestenAuf(p)
-  await p.locator('[data-lernende-kasten]').waitFor()
-  pruefe((await p.locator('[data-lernende-tabelle]').count()) === 0, 'Zugeklappt bleibt nach dem Neuladen')
-  await p.locator('[data-lernende-kopf]').click()
+  // Reiter statt Kästen (09.10.2026): die Tabelle steht im Reiter „Lernende" immer offen, die Grammatik im eigenen Reiter
+  pruefe((await p.locator('[data-lernende-kopf]').count()) === 0, 'Reiter „Lernende" ohne Auf- und Zuklappen')
+  await kursReiter(p, 'grammatik')
+  pruefe((await p.locator('[data-grammatik-zeile]').count()) === 2, 'Grammatik der Gruppe: beide verbundenen Trainings')
+  // Überblick: Lernstand als Säulen je Stufe, Kopf mit Kennzahlen
+  await kursReiter(p, 'ueberblick')
+  pruefe(await da(p.locator('[data-stufen-diagramm] [data-stufe-saeule="1"]')), 'Überblick: Lernstand als Säulen je Stufe')
+  pruefe(/\d+\/\d+/.test(await p.locator('[data-kurs-kopf] [data-kennzahl="aktiv"]').innerText()), 'Kopf: „aktiv diese Woche n/m"')
+  await p.screenshot({ path: join(out, '10b-ueberblick.png'), fullPage: true })
 
   // ---------- Übersicht: Überschrift (Standard „Lerngruppe - Fach" ohne Jahr, umbenennbar), Symbol per Rechtsklick
   const kurz = async () => (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((z) => z.id === vid)

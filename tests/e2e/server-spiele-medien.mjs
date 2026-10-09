@@ -411,6 +411,7 @@ try {
   const vCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === vKurs)?.code
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vKurs}"]`).click()
+  await kursKaestenAuf(p)
   await p.locator('[data-vokabel-grammatik]').click()
   await p.locator('[data-grammatik-fach]').click()
   await p.getByRole('option', { name: 'Englisch', exact: true }).click()

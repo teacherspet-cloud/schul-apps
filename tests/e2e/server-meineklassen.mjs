@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, grammatikJahreAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-meineklassen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -164,6 +164,23 @@ try {
   pruefe(vokBedarf.length === 1, `Ein Vokabel-Eintrag im Handlungsbedarf (${vokBedarf.length})`)
   pruefe(!vokBedarf.some((b) => /unter 30/.test(b.text)), 'Junger Kurs: kein „unter 30 % sicher“')
   pruefe(vokBedarf[0]?.ziel?.id === vok.id, `Klick öffnet den Kurs der Klasse (${vokBedarf[0]?.ziel?.id})`)
+  // 09.10.2026: Handlungsbedarf ausblenden – zählt nicht mehr in der Übersicht, „Wieder einblenden" holt ihn zurück
+  {
+    const zahl = async () =>
+      (await (await lk.request.get(`${A}/server/klassen`, { headers: KOPF })).json()).klassen.flatMap((k) => k.faecher).find((f) => f.id === gEn.id)?.bedarf
+    const vorher = await zahl()
+    const schluessel = vokBedarf[0]?.schluessel
+    pruefe(typeof schluessel === 'string' && !d.bedarf.some((b) => /[A-Z][a-z]+ Probe/.test(b.schluessel ?? '')), `Eintrag mit Schlüssel ohne Namen (${schluessel})`)
+    await lk.request.post(`${A}/server/klassen/${gEn.id}/bedarf-ausblenden`, { headers: KOPF, data: { schluessel } })
+    const d2 = await (await lk.request.get(`${A}/server/klassen/${gEn.id}`, { headers: KOPF })).json()
+    pruefe(
+      !d2.bedarf.some((b) => b.schluessel === schluessel) && d2.bedarfAusgeblendet?.some((b) => b.schluessel === schluessel),
+      'Ausgeblendeter Eintrag steht unter „Ausgeblendet"'
+    )
+    pruefe((await zahl()) === vorher - 1, `Bedarfszahl ohne Ausgeblendetes (${vorher} → ${await zahl()})`)
+    await lk.request.post(`${A}/server/klassen/${gEn.id}/bedarf-einblenden`, { headers: KOPF, data: { schluessel } })
+    pruefe((await zahl()) === vorher, 'Wieder eingeblendet zählt wieder')
+  }
   pruefe(
     d.vokabeln[0]?.anteil && typeof d.vokabeln[0]?.heuteAktiv === 'number',
     `Kurs-Karte: Anteile und „heute aktiv“ (${JSON.stringify(d.vokabeln[0]?.anteil)}, ${d.vokabeln[0]?.heuteAktiv})`
@@ -260,6 +277,24 @@ try {
   const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
   const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
   pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
+  // Ausblenden ganz links am Eintrag, darunter „Ausgeblendet (n)" zum Wiederherstellen (09.10.2026)
+  {
+    const zeile = p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').first()
+    const knopf = zeile.locator('[data-bedarf-ausblenden]')
+    const links = (await knopf.boundingBox())?.x ?? 1e9
+    const eintrag = (await zeile.locator('.klassen-bedarf').boundingBox())?.x ?? 0
+    pruefe(links < eintrag, 'Auge „Ausblenden" steht links vom Eintrag')
+    await knopf.click()
+    pruefe(await da(p.locator('[data-bedarf-ausgeblendet="1"]')), '„Ausgeblendet (1)" erscheint')
+    await p.locator('[data-bedarf-ausgeblendet-knopf]').click()
+    await p.locator('[data-bedarf-einblenden]').first().click()
+    await p.locator('[data-bedarf-ausgeblendet]').waitFor({ state: 'detached', timeout: 10000 }).catch(() => undefined)
+    pruefe((await p.locator('[data-bedarf-ausgeblendet]').count()) === 0, 'Wieder eingeblendet – „Ausgeblendet" verschwindet')
+  }
+  // Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter"): im Sprachfach mit „Wörter sicher" und „aktiv diese Woche"
+  pruefe(await da(p.locator('[data-fach-kopf="sprache"] [data-kennzahl="sicher"]')), 'Kopf der Fachansicht: „Wörter sicher"')
+  pruefe(/\d+\/\d+/.test(await p.locator('[data-fach-kopf] [data-kennzahl="aktiv"]').innerText()), 'Kopf: „aktiv diese Woche n/m"')
+  pruefe(await da(p.locator('[data-fach-kopf] [data-kennzahl="tests"]')), 'Kopf: „Tests Ø"')
   // Bedarfszahl am Fach (08.10.2026): oranges Abzeichen mit Warnzeichen, Erklärung als Bezeichnung des Reiters
   const mitBedarf = p.locator('[data-fach-leiste] [data-fach]:has([data-bedarf-zahl])').first()
   if (await mitBedarf.count()) {
@@ -307,20 +342,24 @@ try {
   await p.keyboard.press('Escape')
   // Getrennte Reiter (08.10.2026): Grammatik eigener Reiter
   await p.getByRole('tab', { name: /^Grammatik/ }).click()
-  pruefe(await da(p.locator('[data-grammatik-reiter], [data-keine-grammatik]').first()), 'Reiter „Grammatik“ zeigt die Grammatik der Klasse')
+  // Dieselbe Kursseite wie in Sprachenlernen, eingebettet (09.10.2026): kein Wechsel, keine zweite Reiterleiste
+  pruefe(await da(p.locator('[data-klassen-kurs] [data-kurs-grammatik]')), 'Reiter „Grammatik“ zeigt die Grammatik-Tabelle des Kurses')
+  pruefe((await p.locator('[data-kurs-reiterleiste]').count()) === 0, 'Eingebettet ohne zweite Reiterleiste')
+  pruefe(await da(p.locator('[data-klassen-kurs] [data-grammatik-tabelle]')), 'Darunter Fördern/Fordern je Lernende/r')
+  await grammatikJahreAuf(p)
   // „+ Aufgaben" je Grammatik (09.10.2026): öffnet das Fenster wie in Sprachenlernen
-  await p.locator('[data-mk-mehr-aufgaben="Simple past"]').click()
+  await p.locator(`[data-grammatik-mehr="${gram.id}"]`).click()
   pruefe(await da(p.locator('[data-mehr-aufgaben-fenster]')), '„+ Aufgaben“ öffnet „Weitere Aufgaben“')
   await p.getByRole('button', { name: 'Abbrechen' }).click()
   // „Grammatik hinzufügen" (09.10.2026): derselbe Dialog wie im Kurs, für den Kurs der Klasse
-  await p.locator('[data-mk-grammatik-hinzufuegen]').click()
+  await p.locator('[data-klassen-kurs] [data-vokabel-grammatik]').click()
   pruefe(await da(p.locator('[data-grammatik-fuer-kurs]')), '„Grammatik hinzufügen“ öffnet „Grammatik zum Üben freigeben“ für den Kurs')
   pruefe(/Weather/.test(await p.locator('[data-grammatik-fuer-kurs]').innerText().catch(() => '')), 'Für die Lernenden des Kurses „Weather“')
   await p.keyboard.press('Escape')
   await p.waitForTimeout(400)
   await p.getByRole('tab', { name: /^Vokabeln/ }).click()
   // „Vokabeln hinzufügen" (09.10.2026): derselbe Dialog wie im Kurs
-  await p.locator('[data-mk-vokabeln-hinzufuegen]').click()
+  await p.locator('[data-klassen-kurs] [data-vokabel-hinzufuegen]').click()
   pruefe(await da(p.locator('[data-vokabel-hinzufuegen-los]')), '„Vokabeln hinzufügen“ öffnet den Dialog des Kurses')
   // Vorwahl: übliche Reihe der Lehrkraft (Green Line), Band nach Jahrgang der Klasse 5 → Green Line 1
   await p.waitForTimeout(1500)
@@ -329,15 +368,14 @@ try {
   pruefe(reiheWahl === 'Green Line' && /^Green Line 1\b/.test(band), `Lehrwerk vorgewählt (${reiheWahl} · ${band})`)
   await p.getByRole('button', { name: 'Abbrechen' }).click()
   await p.waitForTimeout(400)
-  pruefe(await da(p.locator('[data-kurs="Weather"] [data-material="Kurs"]')), 'Kurs als eine Karte')
-  pruefe((await p.locator('[data-kurs="Weather"] [data-kurs-stand]').count()) === 1, 'Kurs-Karte: Balken sicher / kennengelernt / neu')
-  pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/heute aktiv \d+\/\d+/)), 'Kurs-Karte: „heute aktiv n/m“')
+  pruefe(await da(p.locator('[data-kurs="Weather"][data-klassen-kurs] [data-vokabel-kasten]')), 'Kursseite (Vokabeln) eingebettet')
+  pruefe((await p.locator('[data-kurs="Weather"] [data-abschnitt-stand]').count()) >= 1, 'Abschnitte: Balken sicher / im Aufbau / neu')
   // Name nach Kurs und Übersicht je Abschnitt (09.10.2026): neueste Unit offen, Klick zeigt Wörter und Ampeln je Person
   pruefe(
-    (await p.locator('[data-kurs="Weather"] [data-material-titel]').getAttribute('data-material-titel')) === 'Vokabeln Englisch · Green Line 1',
-    'Kurs-Karte heißt „Vokabeln Englisch · Green Line 1“'
+    (await p.locator('[data-kurs="Weather"]').getAttribute('data-kurs-name')) === 'Vokabeln Englisch · Green Line 1',
+    'Kurs heißt „Vokabeln Englisch · Green Line 1“'
   )
-  pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/3 Abschnitte/)), 'Kurzzeile: Zahl der Abschnitte')
+  pruefe(await da(p.locator('[data-kurs="Weather"] [data-vokabel-kurzinfo]', { hasText: /3 Abschnitten/ })), 'Kurzzeile: Zahl der Abschnitte')
   pruefe(
     (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Unit 1"][data-offen]').count()) === 1 &&
       (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Weitere Vokabeln"][data-offen]').count()) === 0,
@@ -384,6 +422,10 @@ try {
     (await p.getByRole('tab', { name: /^Vokabeln/ }).count()) === 0 && (await p.getByRole('tab', { name: /^Grammatik/ }).count()) === 0,
     'Geschichte: ohne Reiter „Vokabeln“ und „Grammatik“'
   )
+  // Derselbe Kopf für jedes Fach – ohne Sprach-Kennzahlen
+  pruefe(await da(p.locator('[data-fach-kopf="fach"] [data-kennzahl="tests"]')), 'Geschichte: Kopf mit „Tests Ø"')
+  pruefe((await p.locator('[data-fach-kopf] [data-kennzahl="sicher"]').count()) === 0, 'Geschichte: ohne „Wörter sicher"')
+  await p.screenshot({ path: join(out, '4c-geschichte-kopf.png') })
   await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
   await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
 
@@ -391,7 +433,7 @@ try {
   const vokEintrag = p.locator('[data-handlungsbedarf] [data-bedarf="inaktiv"], [data-handlungsbedarf] [data-bedarf="foerdern"], [data-handlungsbedarf] [data-bedarf="termin"]').first()
   if (await vokEintrag.count()) {
     await vokEintrag.click()
-    pruefe(await da(p.locator('[data-lernende-tabelle]'), 10000), 'Handlungsbedarf öffnet in Sprachenlernen direkt den Kurs der Klasse')
+    pruefe(await da(p.locator('[data-kurs-seite] [data-kurs-bedarf]'), 10000), 'Handlungsbedarf öffnet in Sprachenlernen direkt den Kurs der Klasse (Überblick)')
     await p.screenshot({ path: join(out, '4b-kurs-aus-bedarf.png') })
     await p.locator('[data-zurueck="meineklassen"]').click()
     await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })

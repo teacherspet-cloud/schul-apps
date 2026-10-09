@@ -315,7 +315,8 @@ export function KursGrammatik({
   hinzufuegen,
   geoeffnet,
   oeffnen,
-  stand
+  stand,
+  immerOffen = false
 }: {
   vokId: string
   /** Fach des Kurses – für die Jahrgangs-Überschriften in der Fremdsprache („Year 6") */
@@ -327,10 +328,13 @@ export function KursGrammatik({
   oeffnen: (id: string | null) => void
   /** Zähler zum Neuladen (nach Freigaben) */
   stand: number
+  /** Im Reiter „Grammatik" der Kursseite (09.10.2026): ohne Auf- und Zuklappen */
+  immerOffen?: boolean
 }): React.JSX.Element {
   const [liste, setListe] = useState<GrammatikZeile[] | null>(null)
   const [entwurf, setEntwurf] = useState<Entwurf | null>(null)
-  const [offen, setOffen] = useGemerkt('vok-kasten-grammatik', false)
+  const [offenGemerkt, setOffen] = useGemerkt('vok-kasten-grammatik', false)
+  const offen = immerOffen || offenGemerkt
   const [entferntOffen, setEntferntOffen] = useState(false)
   const [suche, setSuche] = useState('')
   const [jahre, setJahre] = useState<Record<string, boolean>>(() => ladeJahre(vokId))
@@ -423,17 +427,26 @@ export function KursGrammatik({
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
   return (
     <Card withBorder data-kurs-grammatik>
-      <KastenKopf
-        titel={`Grammatik (${zeilen.length})`}
-        offen={offen}
-        umschalten={() => setOffen(!offen)}
-        data-kurs-grammatik-kopf
-        rechts={
+      {immerOffen ? (
+        <Group justify="space-between" wrap="nowrap">
+          <Text fw={700}>Grammatik ({zeilen.length})</Text>
           <Button size="xs" variant="light" color="grape" leftSection={<IconPlus size={14} />} onClick={hinzufuegen} data-vokabel-grammatik>
             Grammatik hinzufügen
           </Button>
-        }
-      />
+        </Group>
+      ) : (
+        <KastenKopf
+          titel={`Grammatik (${zeilen.length})`}
+          offen={offen}
+          umschalten={() => setOffen(!offen)}
+          data-kurs-grammatik-kopf
+          rechts={
+            <Button size="xs" variant="light" color="grape" leftSection={<IconPlus size={14} />} onClick={hinzufuegen} data-vokabel-grammatik>
+              Grammatik hinzufügen
+            </Button>
+          }
+        />
+      )}
       {offen && (
         <Stack gap="xs" mt="sm">
           {!liste ? (

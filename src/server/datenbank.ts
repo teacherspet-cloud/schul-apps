@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { DATEN, ordner } from './pfade'
 import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
-import { geschuetzt, migriere, SENSIBEL } from './feldschutz'
+import { geschuetzt, migriere, nutzerSchreibzaehler, SENSIBEL } from './feldschutz'
 import { wartungAusfuehren } from './wartung'
 
 let db: DatabaseSync | null = null
@@ -167,11 +167,24 @@ export const passwortHashVon = (benutzer: string): string | null =>
  * Listen, Auswertungen, Lerngruppen oder im Namensschutz. `mitVorschau` nur für vorschau.ts selbst.
  */
 export function alleNutzer(mitVorschau = false): NutzerInfo[] {
-  // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
-  return (datenbank().prepare(mitVorschau ? 'SELECT * FROM nutzer' : "SELECT * FROM nutzer WHERE quelle != 'vorschau'").all() as unknown as NutzerZeile[])
-    .map(alsInfo)
-    .sort((a, b) => a.rolle.localeCompare(b.rolle) || a.benutzer.localeCompare(b.benutzer))
+  /*
+   * Gemerkt (09.10.2026, Leistung): „Meine Klassen" fragte je Lerngruppe, Kurs und Test erneut alle Konten ab und
+   * entschlüsselte sie jedes Mal. Neu gerechnet wird nach jedem Schreiben in `nutzer` (feldschutz.ts zählt mit), sonst
+   * spätestens nach 30 s. Jede Antwort bekommt eigene Objekte – Aufrufer dürfen sie verändern.
+   */
+  const d = datenbank()
+  const m = nutzerMerk[mitVorschau ? 1 : 0]
+  let liste = m && m.d === d && m.stand === nutzerSchreibzaehler.stand && Date.now() - m.zeit < 30_000 ? m.liste : null
+  if (!liste) {
+    // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
+    liste = (d.prepare(mitVorschau ? 'SELECT * FROM nutzer' : "SELECT * FROM nutzer WHERE quelle != 'vorschau'").all() as unknown as NutzerZeile[])
+      .map(alsInfo)
+      .sort((a, b) => a.rolle.localeCompare(b.rolle) || a.benutzer.localeCompare(b.benutzer))
+    nutzerMerk[mitVorschau ? 1 : 0] = { d, stand: nutzerSchreibzaehler.stand, zeit: Date.now(), liste }
+  }
+  return liste.map((n) => ({ ...n, gruppen: n.gruppen.map((g) => ({ ...g })) }))
 }
+const nutzerMerk: ({ d: DatabaseSync; stand: number; zeit: number; liste: NutzerInfo[] } | undefined)[] = []
 
 /** SQL-Bedingung für Auswertungen, z. B. `schueler_id ${OHNE_VORSCHAU}`: Abgaben der Vorschaukonten zählen nie */
 export const OHNE_VORSCHAU = "NOT IN (SELECT id FROM nutzer WHERE quelle = 'vorschau')"

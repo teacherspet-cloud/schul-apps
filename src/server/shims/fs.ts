@@ -13,7 +13,7 @@
 import * as echt from 'node:fs'
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { extname, join, resolve, sep } from 'node:path'
-import { hauptschluessel } from '../geheim'
+import { schluesselObjekt } from '../geheim'
 import { DATEN } from '../pfade'
 
 export * from 'node:fs'
@@ -42,7 +42,7 @@ export const istVerschluesselt = (b: Buffer): boolean => b.length >= KOPF.length
 
 export function dateiZu(klar: Buffer): Buffer {
   const iv = randomBytes(12)
-  const c = createCipheriv('aes-256-gcm', hauptschluessel(), iv)
+  const c = createCipheriv('aes-256-gcm', schluesselObjekt(), iv)
   const daten = Buffer.concat([c.update(klar), c.final()])
   return Buffer.concat([KOPF, iv, c.getAuthTag(), daten])
 }
@@ -50,7 +50,7 @@ export function dateiZu(klar: Buffer): Buffer {
 export function dateiVon(roh: Buffer): Buffer {
   if (!istVerschluesselt(roh)) return roh
   const o = KOPF.length
-  const d = createDecipheriv('aes-256-gcm', hauptschluessel(), roh.subarray(o, o + 12))
+  const d = createDecipheriv('aes-256-gcm', schluesselObjekt(), roh.subarray(o, o + 12))
   d.setAuthTag(roh.subarray(o + 12, o + 28))
   return Buffer.concat([d.update(roh.subarray(o + 28)), d.final()])
 }

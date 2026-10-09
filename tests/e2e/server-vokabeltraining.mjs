@@ -346,7 +346,7 @@ try {
 
   // Lehrkraft sieht den Gast im Lernstand, QR-Knopf
   await p.locator(`[data-vokabel-zuweisung="${vok.id}"]`).click()
-  await kursKaestenAuf(p)
+  await kursKaestenAuf(p, 'lernende')
   pruefe(await da(p.locator('[data-lernstand]').getByText('Ben T.')), 'Gast im Lernstand der Lehrkraft')
   await p.locator('[data-vokabel-qr-zeigen]').click()
   pruefe(await da(p.getByRole('dialog').getByText(`/s/vt/${kurz.code}`)), 'QR-Code mit Code im Lernstand')

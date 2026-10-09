@@ -72,7 +72,7 @@ try {
   await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
-  await kursKaestenAuf(p)
+  await kursKaestenAuf(p, 'lernende')
   await p.locator('[data-klasse-zuordnen-knopf]').click()
   pruefe(await da(p.locator('[data-klasse-zuordnen]')), 'Dialog „Lernende einer Klasse zuordnen" offen')
   // Vorauswahl: die Lerngruppe des Kurses

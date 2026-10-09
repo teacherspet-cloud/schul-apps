@@ -950,7 +950,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           zuweisungen: liste.map((z, i) => {
             const kk = karten(paketVon(z))
             const l = lernendeVon(z)
-            const sicherZahl = l.map((n) => uebersicht(kk, standVon(z.id, n.id).aufgaben).sicher)
+            // Je Person EINMAL lesen (09.10.2026, Leistung: vorher je Aufgabe neu entschlüsselt)
+            const staende = l.map((n) => standVon(z.id, n.id).aufgaben)
+            const sicherZahl = staende.map((st) => uebersicht(kk, st).sicher)
             return {
               id: z.id,
               titel: z.titel,
@@ -965,7 +967,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               ...(istExtra(z) ? { fuer: l.map((n) => ({ id: n.id, name: n.name || n.benutzer })) } : {}),
               bearbeitetSchnitt:
                 l.length && kk.length
-                  ? l.reduce((s, n) => s + kk.filter((k) => standVon(z.id, n.id).aufgaben[k.id]?.versuche).length, 0) / l.length / kk.length
+                  ? staende.reduce((s, st) => s + kk.filter((k) => st[k.id]?.versuche).length, 0) / l.length / kk.length
                   : 0,
               aufgaben: kk.length,
               lernende: l.length,

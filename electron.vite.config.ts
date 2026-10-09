@@ -18,6 +18,9 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react()]
+    plugins: [react()],
+    // Oberfläche verkleinern (09.10.2026, Befund Ladezeiten): electron-vite lässt den Renderer sonst unverkleinert –
+    // 20 MB statt ~8 MB, über die Leitung (Brotli) etwa 3,4 statt ~2 MB
+    build: { minify: 'esbuild' }
   }
 })

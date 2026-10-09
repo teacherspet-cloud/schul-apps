@@ -55,6 +55,7 @@ import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen
 // Freischaltungen planen (09.10.2026): Lernende sehen nur freie Abschnitte
 import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
+import { abschnitteBeimSpeichern } from './wartungAbschnitteTeilen'
 import {
   bewerte,
   istSicher,
@@ -564,8 +565,16 @@ export function vokabelnZuweisen(e: {
   teile?: unknown
 }): string {
   const id = randomBytes(8).toString('hex')
-  const woerter = bereinigeWoerter(e.woerter)
+  let woerter = bereinigeWoerter(e.woerter)
   if (!woerter.length && !e.leer) throw new Error('Die Liste hat keine Vokabeln.')
+  const quelle = quelleBereinigt(e.quelle)
+  const jetzt = Date.now()
+  let teile = teileBereinigt(e.teile, woerter.length, jetzt)
+  // Zusammengefasster Abschnitt (älterer Stand der App, 09.10.2026): je Lehrwerk-Abschnitt ein Teil
+  if (quelle && woerter.length > 1 && (!teile || teile.length < 2)) {
+    const r = abschnitteBeimSpeichern(teile ?? [{ titel: e.titel.slice(0, 160), anzahl: woerter.length, zeit: jetzt }], woerter, quelle, e.lehrkraftId)
+    if (r) ((woerter = r.woerter), (teile = r.teile))
+  }
   db()
     .prepare(
       "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle, verben, teile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
@@ -584,12 +593,9 @@ export function vokabelnZuweisen(e: {
       new Date().toISOString(),
       e.gaeste ? neuerCode() : '',
       e.bis ?? null,
-      quelleBereinigt(e.quelle),
+      quelle,
       verbenBereinigt(e.verben ?? standardVerben(woerter, e.sprache)),
-      (() => {
-        const t = teileBereinigt(e.teile, woerter.length, Date.now())
-        return t && t.length > 1 ? JSON.stringify(t) : ''
-      })()
+      teile && teile.length > 1 ? JSON.stringify(teile) : ''
     )
   return id
 }
@@ -1350,14 +1356,20 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             ? { ...verbenAlt, karten: [...verbenAlt.karten, ...verbenNeu.karten.filter((k) => !verbenAlt.karten.some((a) => a.id === k.id))] }
             : verbenAlt ?? verbenNeu
         const jetzt = Date.now()
+        let neueTeile: VokTeil[] = !neu.length
+          ? []
+          : teilePassen
+          ? teilGrenzen.map((t, j) => ({ titel: t.titel, anzahl: neuJeTeil[j], zeit: jetzt })).filter((t) => t.anzahl > 0)
+          : [{ titel: String(k0.titel ?? 'Weitere Vokabeln').slice(0, 160), anzahl: neu.length, zeit: jetzt }]
+        // Mehrere Lehrwerk-Abschnitte in einem Teil (älterer Stand der App, 09.10.2026): je Abschnitt ein Teil
+        if (!teilePassen && neu.length > 1) {
+          const r = abschnitteBeimSpeichern(neueTeile, neu, quelleBereinigt(k0.quelle), ich.id)
+          if (r) (neu.splice(0, neu.length, ...r.woerter), (neueTeile = r.teile))
+        }
         const teile = [
           // Leerer Kurs (z. B. automatisch für eine Klasse angelegt): sein „Titel-Teil" ohne Wörter fällt weg
           ...(alt.length ? teileVon(z) : []),
-          ...(!neu.length
-            ? []
-            : teilePassen
-            ? teilGrenzen.map((t, j) => ({ titel: t.titel, anzahl: neuJeTeil[j], zeit: jetzt })).filter((t) => t.anzahl > 0)
-            : [{ titel: String(k0.titel ?? 'Weitere Vokabeln').slice(0, 160), anzahl: neu.length, zeit: jetzt }])
+          ...neueTeile
         ]
         // Herkunft fortschreiben (08.10.2026): weitere Units zählen für „bekannte Grammatik", Vokabelweg und Abzeichen
         const quelle = neu.length ? quelleZusammen(z.quelle ?? '', quelleBereinigt(k0.quelle)) : z.quelle ?? ''

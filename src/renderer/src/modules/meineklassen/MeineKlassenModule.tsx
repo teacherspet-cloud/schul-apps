@@ -52,8 +52,9 @@ import {
   IconCircleMinus,
   IconClipboardCheck,
   IconExternalLink,
+  IconEye,
+  IconEyeOff,
   IconFileText,
-  IconLanguage,
   IconLock,
   IconPencil,
   IconPlus,
@@ -75,8 +76,6 @@ import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, vokabelBlattFuerKlasse, type FertigesBlatt } from './klassenMaterial'
-import { grammatikVorgabe, Hinzufuegen as VokabelnHinzufuegen } from '../lernen/VokabelTraining'
-import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from '../lernen/GrammatikTraining'
 import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -87,7 +86,8 @@ import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from '
 import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
 import { AlsSchuelerAnsehen } from './SchuelerVorschau'
-import { VokabelAbschnitte } from './VokabelAbschnitte'
+import { FachKopf } from './FachKopf'
+import { KlassenKurs } from './KlassenKurs'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
@@ -115,7 +115,13 @@ interface KlasseKurz {
   faecher: FachKurz[]
 }
 
-type Bedarf = { art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'; text: string; ziel?: { modul: string; id?: string } }
+type Bedarf = {
+  art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'
+  text: string
+  ziel?: { modul: string; id?: string }
+  /** Kennung zum Ausblenden (09.10.2026) */
+  schluessel: string
+}
 type Vorschlag =
   | { art: 'vokabeln'; titel: string; text: string; sprache: string; fach: string; woerter: { term: string; translation: string; example?: string }[] }
   | { art: 'blatt'; titel: string; text: string; testId: string; thema: string; schwerpunkte: string[]; testArt: string }
@@ -241,6 +247,8 @@ interface KlasseDetail {
     geplantAb?: number | null
   }[]
   bedarf: Bedarf[]
+  /** Ausgeblendeter Handlungsbedarf (09.10.2026) – kommt wieder, wenn sich die Lage ändert */
+  bedarfAusgeblendet?: Bedarf[]
   vorschlaege: Vorschlag[]
 }
 
@@ -629,7 +637,7 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
           </Center>
         </Card>
       ) : (
-        <FachAnsicht key={aktiv.id} id={aktiv.id} />
+        <FachAnsicht key={aktiv.id} id={aktiv.id} bedarfGeaendert={neu} />
       )}
     </Stack>
   )
@@ -721,20 +729,122 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
     </Popover>
   )
 }
-function FachAnsicht({ id }: { id: string }): React.JSX.Element {
+/**
+ * Ein Eintrag im Handlungsbedarf (09.10.2026): ganz links „Ausblenden" (Auge), dann der Eintrag selbst (Klick öffnet das
+ * Ziel). Ausgeblendet bleibt er, solange die Lage gleich bleibt; ändert sie sich, kommt er wieder (server/klassen.ts).
+ */
+function BedarfZeile({
+  b,
+  gruppeId,
+  oeffnen,
+  geaendert,
+  ausgeblendet = false
+}: {
+  b: Bedarf
+  gruppeId: string
+  oeffnen: (modul: string, id?: string) => void
+  geaendert: () => void
+  ausgeblendet?: boolean
+}): React.JSX.Element {
+  const [laeuft, setLaeuft] = useState(false)
+  const umschalten = async (): Promise<void> => {
+    setLaeuft(true)
+    try {
+      await senden(`/server/klassen/${gruppeId}/${ausgeblendet ? 'bedarf-einblenden' : 'bedarf-ausblenden'}`, { schluessel: b.schluessel })
+      geaendert()
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  const titel = ausgeblendet ? 'Wieder einblenden' : 'Ausblenden – kommt wieder, sobald sich etwas ändert'
+  return (
+    <Group gap={6} wrap="nowrap" align="center" data-bedarf-zeile={b.schluessel}>
+      <Tooltip label={titel} withinPortal>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="sm"
+          loading={laeuft}
+          onClick={() => void umschalten()}
+          aria-label={ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}
+          data-bedarf-ausblenden={ausgeblendet ? undefined : true}
+          data-bedarf-einblenden={ausgeblendet ? true : undefined}
+        >
+          {ausgeblendet ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+        </ActionIcon>
+      </Tooltip>
+      <UnstyledButton
+        onClick={() => b.ziel && oeffnen(b.ziel.modul, b.ziel.id)}
+        className="klassen-bedarf"
+        data-bedarf={b.art}
+        style={{ flex: 1, opacity: ausgeblendet ? 0.7 : 1 }}
+      >
+        <Group gap="xs" wrap="nowrap">
+          <ThemeIcon size="sm" variant="light" color={BEDARF_FARBE[b.art]}>
+            {BEDARF_SYMBOL[b.art]}
+          </ThemeIcon>
+          <Text size="sm" style={{ flex: 1 }}>
+            {b.text}
+          </Text>
+          {b.ziel && <IconChevronRight size={14} />}
+        </Group>
+      </UnstyledButton>
+    </Group>
+  )
+}
+
+/** „Ausgeblendet (n)" unter dem Handlungsbedarf – aufklappbar, je Eintrag „Wieder einblenden" */
+function AusgeblendeterBedarf({
+  liste,
+  gruppeId,
+  oeffnen,
+  geaendert
+}: {
+  liste: Bedarf[]
+  gruppeId: string
+  oeffnen: (modul: string, id?: string) => void
+  geaendert: () => void
+}): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  return (
+    <div style={{ marginTop: 8 }} data-bedarf-ausgeblendet={liste.length}>
+      <UnstyledButton onClick={() => setOffen((o) => !o)} aria-expanded={offen} data-bedarf-ausgeblendet-knopf>
+        <Group gap={4}>
+          {offen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          <Text size="xs" c="dimmed">
+            Ausgeblendet ({liste.length})
+          </Text>
+        </Group>
+      </UnstyledButton>
+      <Collapse expanded={offen}>
+        <Stack gap={4} mt={4}>
+          {liste.map((b) => (
+            <BedarfZeile key={b.schluessel} b={b} gruppeId={gruppeId} oeffnen={oeffnen} geaendert={geaendert} ausgeblendet />
+          ))}
+        </Stack>
+      </Collapse>
+    </div>
+  )
+}
+
+function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: () => void }): React.JSX.Element {
   const experte = useExperte()
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
-  // „Vokabeln/Grammatik hinzufügen" für den Kurs der Klasse (09.10.2026)
-  const [vokHinzu, setVokHinzu] = useState(false)
-  const [gramVorgabe, setGramVorgabe] = useState<GrammatikVorgabe | null>(null)
   const [wiederholt, setWiederholt] = useState(false)
   const { reiter, setze } = useSicht()
   const laden = useCallback(() => {
     void holen<KlasseDetail>(`/server/klassen/${id}`).then(setD, (e: unknown) => notifyError(e))
   }, [id])
   useEffect(laden, [laden])
+  // Ausgeblendet/eingeblendet (09.10.2026): Fach neu laden und die Zahlen in Fach-Leiste und Übersicht
+  const bedarfNeu = useCallback(() => {
+    laden()
+    bedarfGeaendert?.()
+  }, [laden, bedarfGeaendert])
   // „+ Aufgaben" fertig, Grammatik zurückgeholt … → neu laden
   useEffect(() => {
     window.addEventListener(GRAMMATIK_GEAENDERT, laden)
@@ -775,19 +885,12 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
     notifySuccess('Die KI erstellt das Arbeitsblatt im Hintergrund – fertig steht es hier unter „Passendes Material“ zum Freischalten.')
     setVorschau(null)
   }
-  const grammatikHinzufuegen = async (): Promise<void> => {
-    if (!d.klassenKurs) return
-    try {
-      const k = await holen<{ titel: string; sprache?: string; quelle?: { lehrwerk?: string; unit?: string } | null }>(`/server/vokabeln/${d.klassenKurs}`)
-      setGramVorgabe(grammatikVorgabe(d.klassenKurs, k.titel, k.sprache ?? '', k.quelle))
-    } catch (e) {
-      notifyError(e)
-    }
-  }
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
   const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
   return (
     <Stack data-klasse-detail={d.titel}>
+      {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) */}
+      <FachKopf d={d} gehe={(r) => setze({ reiter: r })} />
       {/* ---------- Handlungsbedarf */}
       <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
         <Group gap={6} mb="xs">
@@ -796,25 +899,16 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
         </Group>
         {d.bedarf.length === 0 ? (
           <Text c="dimmed" size="sm">
-            Nichts Dringendes – alle Abgaben geprüft, niemand hängt hinterher.
+            {d.bedarfAusgeblendet?.length ? 'Nichts weiter – der übrige Handlungsbedarf ist ausgeblendet.' : 'Nichts Dringendes – alle Abgaben geprüft, niemand hängt hinterher.'}
           </Text>
         ) : (
           <Stack gap={4}>
-            {d.bedarf.map((b, i) => (
-              <UnstyledButton key={i} onClick={() => b.ziel && oeffneMitRueckweg(b.ziel.modul, b.ziel.id)} className="klassen-bedarf" data-bedarf={b.art}>
-                <Group gap="xs" wrap="nowrap">
-                  <ThemeIcon size="sm" variant="light" color={BEDARF_FARBE[b.art]}>
-                    {BEDARF_SYMBOL[b.art]}
-                  </ThemeIcon>
-                  <Text size="sm" style={{ flex: 1 }}>
-                    {b.text}
-                  </Text>
-                  {b.ziel && <IconChevronRight size={14} />}
-                </Group>
-              </UnstyledButton>
+            {d.bedarf.map((b) => (
+              <BedarfZeile key={b.schluessel} b={b} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />
             ))}
           </Stack>
         )}
+        {(d.bedarfAusgeblendet?.length ?? 0) > 0 && <AusgeblendeterBedarf liste={d.bedarfAusgeblendet!} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />}
       </Card>
 
       {/* ---------- Geplante Freischaltungen (09.10.2026) */}
@@ -907,21 +1001,12 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
         {d.sprachfach && (
           <Tabs.Panel value="vokabeln" pt="sm">
             <Stack gap="xs">
-              {/* Kopfzeile: Kurse links, Lehrwerk-Stand als kleiner Knopf rechts (08.10.2026) */}
-              <Group justify="space-between" gap="xs">
-                <Group gap="xs">
-                  <Text fw={700} size="sm">
-                    Kurse in Sprachenlernen
-                  </Text>
-                  {d.klassenKurs && (
-                    <Button size="compact-sm" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setVokHinzu(true)} data-mk-vokabeln-hinzufuegen>
-                      Vokabeln hinzufügen
-                    </Button>
-                  )}
-                </Group>
-                <LehrwerkStand gruppeId={id} />
-              </Group>
-              <KursKarten d={d} ort={ort} ohneGrammatik />
+              {/* Dieselbe Kursseite wie in Sprachenlernen, eingebettet (09.10.2026); Lehrwerk-Stand rechts in der Kopfzeile */}
+              <KlassenKurs kurse={d.vokabeln} klassenKurs={d.klassenKurs} bereich="vokabeln"
+                rechts={<LehrwerkStand gruppeId={id} />}
+                aktionen={(k) => <AblegenKnopf quelle={vokabelQuelle(k.id, k.titel)} {...ort} programm="vokabelliste" klein />}
+                geaendert={laden}
+              />
               {/* „Am häufigsten daneben" nur im Expertenmodus (09.10.2026, Wunsch der Lehrkraft) */}
               {d.wackelig.length > 0 && experte && (
                 <Card withBorder padding="sm" radius="md" data-haeufig-daneben>
@@ -943,26 +1028,9 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
         {d.sprachfach && (
           <Tabs.Panel value="grammatik" pt="sm">
             <Stack gap="xs">
-              <Group justify="space-between" gap="xs">
-                <Group gap="xs">
-                  <Text fw={700} size="sm">
-                    Grammatik in Sprachenlernen
-                  </Text>
-                  {d.klassenKurs && (
-                    <Button
-                      size="compact-sm"
-                      variant="light"
-                      leftSection={<IconPlus size={14} />}
-                      onClick={() => void grammatikHinzufuegen()}
-                      data-mk-grammatik-hinzufuegen
-                    >
-                      Grammatik hinzufügen
-                    </Button>
-                  )}
-                </Group>
-                <LehrwerkStand gruppeId={id} />
-              </Group>
-              <GrammatikReiter d={d} ort={ort} />
+              <KlassenKurs kurse={d.vokabeln} klassenKurs={d.klassenKurs} bereich="grammatik" rechts={<LehrwerkStand gruppeId={id} />} geaendert={laden} />
+              {/* Grammatik ohne Kurs (ältere eigenständige Trainings) */}
+              <GrammatikReiter d={d} ort={ort} nurWeitere />
             </Stack>
           </Tabs.Panel>
         )}
@@ -1010,8 +1078,6 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           </Stack>
         </Modal>
       )}
-      {vokHinzu && d.klassenKurs && <VokabelnHinzufuegen id={d.klassenKurs} schliessen={() => (setVokHinzu(false), laden())} />}
-      {gramVorgabe && <GrammatikFreigeben vorgabe={gramVorgabe} schliessen={() => (setGramVorgabe(null), laden())} />}
       {freigabe && (
         <BlattFreigabeDialog
           ws={freigabe.ws}
@@ -1149,10 +1215,17 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
  * Kurs gehört (ältere eigenständige Grammatik-Trainings), liegt zugeklappt unter „Weitere".
  */
 /** Reiter „Grammatik“ (08.10.2026): je Kurs die Grammatiktrainings, Extra-Aufgaben zugeklappt, nicht verbundene unter „Weitere“ */
-function GrammatikReiter({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.Element {
+function GrammatikReiter({ d, ort, nurWeitere = false }: { d: KlasseDetail; ort: Ort; nurWeitere?: boolean }): React.JSX.Element | null {
   const kurse = [...d.vokabeln].sort((a, b) => (a.status === b.status ? ms(b.erstellt) - ms(a.erstellt) : a.status === 'offen' ? -1 : 1))
   const kursIds = new Set(kurse.map((k) => k.id))
   const weitere = d.grammatik.filter((g) => !g.vokId || !kursIds.has(g.vokId))
+  // Eingebettete Kursseite (09.10.2026): hier nur noch, was zu keinem Kurs gehört
+  if (nurWeitere)
+    return weitere.length ? (
+      <Aufklapp titel={`Grammatik ohne Kurs (${weitere.length})`} kennung="weitere" rahmen>
+        <MaterialListe eintraege={grammatikEintraege(weitere, ort)} leer="" />
+      </Aufklapp>
+    ) : null
   if (!d.grammatik.length)
     return (
       <Text c="dimmed" size="sm" data-keine-grammatik>
@@ -1180,105 +1253,6 @@ function GrammatikReiter({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.E
               </Aufklapp>
             )}
           </Stack>
-        )
-      })}
-      {weitere.length > 0 && (
-        <Aufklapp titel={`Weitere (${weitere.length})`} kennung="weitere" rahmen>
-          <MaterialListe eintraege={grammatikEintraege(weitere, ort)} leer="" />
-        </Aufklapp>
-      )}
-    </Stack>
-  )
-}
-
-function KursKarten({ d, ort, ohneGrammatik = false }: { d: KlasseDetail; ort: Ort; ohneGrammatik?: boolean }): React.JSX.Element {
-  const kurse = [...d.vokabeln].sort((a, b) => (a.status === b.status ? ms(b.erstellt) - ms(a.erstellt) : a.status === 'offen' ? -1 : 1))
-  const kursIds = new Set(kurse.map((k) => k.id))
-  const weitere = ohneGrammatik ? [] : d.grammatik.filter((g) => !g.vokId || !kursIds.has(g.vokId))
-  if (!kurse.length && !weitere.length)
-    return (
-      <Text c="dimmed" size="sm" data-keine-kurse>
-        Noch kein Kurs in dieser Lerngruppe – in Sprachenlernen einen Kurs für die Klasse freigeben.
-      </Text>
-    )
-  return (
-    <Stack gap="xs" data-kurse>
-      {kurse.map((v) => {
-        const gram = d.grammatik.filter((g) => g.vokId === v.id)
-        const normal = gram.filter((g) => !g.extra)
-        const extras = gram.filter((g) => g.extra)
-        const laufendeExtras = extras.filter((g) => g.status === 'offen').length
-        const a = v.anteil
-        return (
-          <div key={v.id} data-kurs={v.titel} data-kurs-name={v.kursName ?? v.titel}>
-            <MaterialKarte
-              symbol={<IconLanguage size={16} />}
-              // Name nach Kurs statt nach den ersten Abschnitten (09.10.2026)
-              titel={v.kursName ?? v.titel}
-              art="Kurs"
-              status={v.status}
-              angaben={[
-                (v.abschnitte?.length ?? 0) > 1 ? `${v.abschnitte!.length} Abschnitte` : '',
-                v.woerter ? `${v.woerter} Wörter` : 'nur Grammatik',
-                v.heuteAktiv != null ? `heute aktiv ${v.heuteAktiv}/${v.lernende}` : `${v.aktiv7} von ${v.lernende} aktiv (7 Tage)`,
-                `${normal.length} Grammatik`,
-                extras.length ? `${laufendeExtras} von ${extras.length} Extras laufen` : '',
-                v.testTermin ? `Test ${tag(v.testTermin)}` : '',
-                v.bis ? `bis ${tag(v.bis)}` : ''
-              ]}
-              wert={null}
-              wertText={v.woerter ? `Klasse ${prozent(v.sicherSchnitt)} sicher` : undefined}
-              oeffnen={() => oeffneMitRueckweg('sprachenlernen', v.id)}
-              aktionen={
-                <>
-                  <AblegenKnopf quelle={vokabelQuelle(v.id, v.titel)} {...ort} programm="vokabelliste" klein />
-                  {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('sprachenlernen', v.id))}
-                </>
-              }
-              zusatz={
-                <>
-                  {v.woerter > 0 && a && (
-                    <Tooltip label={`sicher ${prozent(a.sicher)} · kennengelernt ${prozent(a.aufbau)} · neu ${prozent(a.neu)}`}>
-                      <Progress.Root mt={6} size="md" radius="xl" data-kurs-stand>
-                        <Progress.Section value={a.sicher * 100} color="green" />
-                        <Progress.Section value={a.aufbau * 100} color="yellow" />
-                        <Progress.Section value={a.neu * 100} color="gray.4" />
-                      </Progress.Root>
-                    </Tooltip>
-                  )}
-                  {v.woerter > 0 && v.abschnitte && <VokabelAbschnitte abschnitte={v.abschnitte} namen={v.lernendeNamen ?? []} />}
-                  {!ohneGrammatik && normal.length > 0 && (
-                    <Aufklapp titel={`Grammatik (${normal.length})`} kennung="grammatik">
-                      {normal.map((g) => (
-                        <KursZeile key={g.id} g={g} />
-                      ))}
-                    </Aufklapp>
-                  )}
-                  {!ohneGrammatik && extras.length > 0 && (
-                    <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras">
-                      {extras.map((g) => (
-                        <KursZeile key={g.id} g={g} />
-                      ))}
-                    </Aufklapp>
-                  )}
-                </>
-              }
-              details={
-                v.quelle || v.probleme.length ? (
-                  <>
-                    {v.quelle && <DetailZeile name="Lehrwerk">{v.quelle}</DetailZeile>}
-                    {v.probleme.length > 0 && (
-                      <DetailZeile name="Schwierigste Wörter">
-                        {v.probleme
-                          .map((p) => `${p.term} – ${p.translation} (${prozent(p.quote)} falsch${p.typisch.length ? `, oft „${p.typisch.join('“, „')}“` : ''})`)
-                          .join('; ')}
-                      </DetailZeile>
-                    )}
-                  </>
-                ) : undefined
-              }
-            />
-          </div>
         )
       })}
       {weitere.length > 0 && (

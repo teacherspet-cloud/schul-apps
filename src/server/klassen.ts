@@ -16,7 +16,8 @@
  */
 import { fachAusName, SPRACHFAECHER } from '../shared/faecher'
 import { blaetterDerGruppe } from './arbeitsblaetter'
-import { serverWert } from './datenbank'
+import { createHash } from 'node:crypto'
+import { datenbank, serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
 import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
@@ -63,11 +64,106 @@ export const istSprachfach = (fach: string): boolean => {
   return Boolean(f && SPRACHFAECHER.includes(f.id))
 }
 
-interface Bedarf {
+/**
+ * Merkmal eines Handlungsbedarf-Eintrags (09.10.2026, „Ausblenden"): woran sich erkennen lässt, ob die Lage gleich
+ * geblieben ist. Nur Kennungen, Zahlen und ein Prüfwert des Textes – keine Namen (gespeichert trotzdem verschlüsselt).
+ */
+export interface Merkmal {
+  art: string
+  /** Betroffene (Lernenden-Kennungen, ggf. mit Vorsilbe je Grund) */
+  ids?: string[]
+  /** Anzahl (offene Antworten, fehlende Abgaben …) */
+  zahl?: number
+  /** Termin (Testtermin, Frist) */
+  termin?: number | null
+  /** Prüfwert des Textes (wenn es keine besseren Merkmale gibt) */
+  text?: string
+}
+
+export interface Bedarf {
   art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'
   text: string
   /** Wohin der Klick führt */
   ziel?: { modul: string; id?: string }
+  /** Stabile Kennung des Eintrags (Art + Ziel), zum Ausblenden */
+  schluessel: string
+  merkmal: Merkmal
+}
+
+/** Kurzer Prüfwert eines Textes */
+export const pruefwert = (t: string): string => createHash('sha256').update(t).digest('hex').slice(0, 16)
+
+/**
+ * Ausgeblendeter Eintrag wieder sichtbar? (09.10.2026, Wunsch der Lehrkraft): Er bleibt verborgen, solange die Lage
+ * gleich bleibt oder besser wird; er kommt wieder bei anderer Art, neuem Termin, neuen Betroffenen, höherer Zahl oder
+ * (ohne solche Merkmale) anderem Text.
+ */
+export function bedarfWiederSichtbar(alt: Merkmal, neu: Merkmal): boolean {
+  if (alt.art !== neu.art) return true
+  if ((neu.termin ?? null) !== null && neu.termin !== (alt.termin ?? null)) return true
+  const vorher = new Set(alt.ids ?? [])
+  if ((neu.ids ?? []).some((id) => !vorher.has(id))) return true
+  if (typeof neu.zahl === 'number' && neu.zahl > (alt.zahl ?? 0)) return true
+  if (neu.text !== undefined && neu.text !== alt.text) return true
+  return false
+}
+
+/** Einträge nach den gemerkten Merkmalen aufteilen; `veraltet` = gemerkte Schlüssel, die nicht mehr gelten */
+export function bedarfAufteilen(
+  liste: Bedarf[],
+  gemerkt: Map<string, Merkmal>
+): { sichtbar: Bedarf[]; ausgeblendet: Bedarf[]; veraltet: string[] } {
+  const sichtbar: Bedarf[] = []
+  const ausgeblendet: Bedarf[] = []
+  const gueltig = new Set<string>()
+  for (const b of liste) {
+    const m = gemerkt.get(b.schluessel)
+    if (m && !bedarfWiederSichtbar(m, b.merkmal)) {
+      ausgeblendet.push(b)
+      gueltig.add(b.schluessel)
+    } else sichtbar.push(b)
+  }
+  return { sichtbar, ausgeblendet, veraltet: [...gemerkt.keys()].filter((k) => !gueltig.has(k)) }
+}
+
+// ---------------------------------------------------------------- Ausgeblendeter Handlungsbedarf (je Lehrkraft und Lerngruppe)
+
+let ausBereit = false
+const ausDb = () => {
+  const d = datenbank()
+  if (!ausBereit) {
+    d.exec(`CREATE TABLE IF NOT EXISTS klassen_ausgeblendet (
+  lehrkraft_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  gruppe_id TEXT NOT NULL,
+  schluessel TEXT NOT NULL,
+  merkmal TEXT NOT NULL,
+  zeit INTEGER NOT NULL,
+  PRIMARY KEY (lehrkraft_id, gruppe_id, schluessel)
+)`)
+    ausBereit = true
+  }
+  return d
+}
+export function ausgeblendetVon(lehrkraftId: string, gruppeId: string): Map<string, Merkmal> {
+  const m = new Map<string, Merkmal>()
+  for (const z of ausDb().prepare('SELECT schluessel, merkmal FROM klassen_ausgeblendet WHERE lehrkraft_id = ? AND gruppe_id = ?').all(lehrkraftId, gruppeId) as {
+    schluessel: string
+    merkmal: string
+  }[])
+    m.set(z.schluessel, json_(z.merkmal, { art: '' } as Merkmal))
+  return m
+}
+export function bedarfAusblenden(lehrkraftId: string, gruppeId: string, schluessel: string, merkmal: Merkmal): void {
+  ausDb()
+    .prepare(
+      'INSERT INTO klassen_ausgeblendet (lehrkraft_id, gruppe_id, schluessel, merkmal, zeit) VALUES (?, ?, ?, ?, ?) ON CONFLICT (lehrkraft_id, gruppe_id, schluessel) DO UPDATE SET merkmal = excluded.merkmal, zeit = excluded.zeit'
+    )
+    .run(lehrkraftId, gruppeId, schluessel, JSON.stringify(merkmal), Date.now())
+}
+export function bedarfEinblenden(lehrkraftId: string, gruppeId: string, schluessel: string[]): void {
+  if (!schluessel.length) return
+  const weg = ausDb().prepare('DELETE FROM klassen_ausgeblendet WHERE lehrkraft_id = ? AND gruppe_id = ? AND schluessel = ?')
+  for (const k of schluessel) weg.run(lehrkraftId, gruppeId, k)
 }
 
 /**
@@ -110,10 +206,14 @@ export function vokabelBedarf(
   if (inaktiv.length)
     teile.push(`${inaktiv.length} ${inaktiv.length === 1 ? 'Lernende/r hat' : 'Lernende haben'} in den letzten 7 Tagen nicht geübt: ${inaktiv.map((l) => l.name).join(', ')}`)
   if (!teile.length) return null
+  const art = schwach.length ? 'foerdern' : termin ? 'termin' : 'inaktiv'
   return {
-    art: schwach.length ? 'foerdern' : termin ? 'termin' : 'inaktiv',
+    art,
     text: teile.join(' · '),
-    ziel: { modul: 'vokabeltraining', id: (termin ?? kurs).id }
+    ziel: { modul: 'vokabeltraining', id: (termin ?? kurs).id },
+    // Ein Vokabel-Eintrag je Klasse
+    schluessel: 'vokabeln',
+    merkmal: { art, termin: termin?.testTermin ?? null, ids: [...schwach.map((l) => `s:${l.id}`), ...inaktiv.map((l) => `i:${l.id}`)] }
   }
 }
 
@@ -214,12 +314,16 @@ export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
   }
 }
 
-function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
+/**
+ * Eine Lerngruppe im Detail. `leicht` (09.10.2026, Leistung): für die Übersicht aller Klassen ohne die Übersicht je
+ * Abschnitt und ohne Test-Einzelheiten – Zahlen, Handlungsbedarf und Vorschläge bleiben gleich.
+ */
+function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht = false) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
-  const testDetails = testDetailsDerGruppe(g)
+  const testDetails = leicht ? ({} as ReturnType<typeof testDetailsDerGruppe>) : testDetailsDerGruppe(g)
   // Mit Übersicht je Abschnitt (Reiter „Vokabeln", 09.10.2026)
-  const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt, true)
+  const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt, !leicht)
   const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt)
   const reihen = reihenDerGruppe(lehrkraftId, g.id)
   const blaetter = blaetterDerGruppe(lehrkraftId, g.id)
@@ -260,23 +364,41 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
       bedarf.push({
         art: 'entscheiden',
         text: `„${t.titel}": ${t.offen} Antwort${t.offen === 1 ? '' : 'en'} zu prüfen`,
-        ziel: { modul: 'onlinetest', id: t.id }
+        ziel: { modul: 'onlinetest', id: t.id },
+        schluessel: `test:${t.id}`,
+        merkmal: { art: 'entscheiden', zahl: t.offen }
       })
   if (offeneVok.length) {
     const v = vokabelBedarf(offeneVok, vok.jePerson, lernende, g.fach, jetzt)
     if (v) bedarf.push(v)
   }
-  for (const r of reihen) for (const b of r.bedarf.slice(0, 3)) bedarf.push({ art: 'reihe', text: `${r.titel}: ${b}`, ziel: { modul: 'laufendereihen' } })
+  for (const r of reihen)
+    for (const [i, b] of r.bedarf.slice(0, 3).entries())
+      bedarf.push({
+        art: 'reihe',
+        text: `${r.titel}: ${b}`,
+        ziel: { modul: 'laufendereihen' },
+        schluessel: `reihe:${r.zid}:${i}`,
+        merkmal: { art: 'reihe', text: pruefwert(`${r.titel}: ${b}`) }
+      })
   for (const b of blaetter) {
     // Geplant (09.10.2026): noch bei niemandem – kein Handlungsbedarf
     if (b.status !== 'offen' || b.geplantAb) continue
     if (b.gesamt && b.eingereicht < b.gesamt && b.begonnen < b.gesamt / 2)
-      bedarf.push({ art: 'blatt', text: `Blatt „${b.titel}": erst ${b.begonnen} von ${b.gesamt} haben begonnen`, ziel: { modul: 'freigaben', id: b.id } })
+      bedarf.push({
+        art: 'blatt',
+        text: `Blatt „${b.titel}": erst ${b.begonnen} von ${b.gesamt} haben begonnen`,
+        ziel: { modul: 'freigaben', id: b.id },
+        schluessel: `blatt:${b.id}:begonnen`,
+        merkmal: { art: 'blatt', zahl: b.gesamt - b.begonnen, termin: b.bis ?? null }
+      })
     else if (b.bis && b.bis < jetzt && b.eingereicht < b.gesamt)
       bedarf.push({
         art: 'blatt',
         text: `Blatt „${b.titel}": Frist vorbei, ${b.gesamt - b.eingereicht} noch nicht eingereicht`,
-        ziel: { modul: 'freigaben', id: b.id }
+        ziel: { modul: 'freigaben', id: b.id },
+        schluessel: `blatt:${b.id}:frist`,
+        merkmal: { art: 'blatt', zahl: b.gesamt - b.eingereicht, termin: b.bis }
       })
   }
 
@@ -328,7 +450,14 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     wackelig: vok.wackelig,
     reihen: reihen.map(({ lernende: l, bedarf: _b, ...rest }) => ({ ...rest, lernende: l.length })),
     blaetter: blaetter.map(({ eingereichtVon: _e, ...rest }) => rest),
-    bedarf,
+    // Ausgeblendetes (09.10.2026) zählt nicht mit; überholte Merkmale fallen weg
+    ...(() => {
+      const gemerkt = ausgeblendetVon(lehrkraftId, g.id)
+      const { sichtbar, ausgeblendet, veraltet } = bedarfAufteilen(bedarf, gemerkt)
+      if (veraltet.length) bedarfEinblenden(lehrkraftId, g.id, veraltet)
+      const ohneMerkmal = ({ merkmal: _m, ...b }: Bedarf) => b
+      return { bedarf: sichtbar.map(ohneMerkmal), bedarfAusgeblendet: ausgeblendet.map(ohneMerkmal), bedarfAlle: bedarf }
+    })(),
     vorschlaege
   }
 }
@@ -358,6 +487,18 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         const material = d.tests.length + d.vokabeln.filter((v) => v.woerter > 0).length + d.grammatik.length + d.reihen.length + d.blaetter.length
         if (!material) for (const v of d.vokabeln) leerenKursLoeschen(v.id, ich.id)
         return (json(res, 200, { art: fachAbwaehlen(ich.id, g.id, material > 0), material }), true)
+      }
+      // Handlungsbedarf ausblenden / wieder einblenden (09.10.2026): {schluessel}
+      if (teile.length === 2 && (teile[1] === 'bedarf-ausblenden' || teile[1] === 'bedarf-einblenden')) {
+        const g = lerngruppe(teile[0])
+        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        const schluessel = String(k0.schluessel ?? '').slice(0, 200)
+        if (teile[1] === 'bedarf-einblenden') return (bedarfEinblenden(ich.id, g.id, [schluessel]), json(res, 200, { ok: true }), true)
+        const b = detail(g, ich.id).bedarfAlle.find((x) => x.schluessel === schluessel)
+        if (!b) return (json(res, 404, { fehler: 'Diesen Eintrag gibt es nicht mehr.' }), true)
+        bedarfAusblenden(ich.id, g.id, b.schluessel, b.merkmal)
+        return (json(res, 200, { ok: true }), true)
       }
       if (teile.length !== 2 || teile[1] !== 'fach') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -400,7 +541,7 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         kl.gruppen.push(g.id)
         // Abgewähltes Fach (08.10.2026): nicht in der Fach-Leiste, die Klasse bleibt
         if (g.ausgeblendet) continue
-        const d = detail(g, ich.id)
+        const d = detail(g, ich.id, Date.now(), true)
         for (const l of d.lernende) kl.lernende.add(l.id)
         kl.bedarf += d.bedarf.length
         kl.vorschlaege += d.vorschlaege.length
@@ -438,6 +579,7 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
     // Kurs der Klasse (09.10.2026) – fehlt er (z. B. gelöscht), wie bei neuen Lerngruppen gleich anlegen
     let klassenKurs = istSprachfach(g.fach) ? klassenKursVon(g, ich.id) : null
     if (istSprachfach(g.fach) && !klassenKurs && klassenKurseSichern(ich.id)) klassenKurs = klassenKursVon(g, ich.id)
-    return (json(res, 200, { ...detail(g, ich.id), ablageMuster: ablageMuster(), klassenKurs }), true)
+    const { bedarfAlle: _alle, ...d } = detail(g, ich.id)
+    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs }), true)
   }
 }

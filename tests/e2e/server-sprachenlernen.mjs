@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, kursReiter } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-sprachenlernen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -139,6 +139,11 @@ try {
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursKaestenAuf(p)
   pruefe(await da(p.locator(`[data-grammatik-zeile="${gram}"]`)), 'Grammatik-Tabelle im Kurs')
+  // Kopf + Reiter (09.10.2026): Kennzahlen im Kopf, Überblick mit Handlungsbedarf
+  pruefe(await da(p.locator('[data-kurs-kopf] [data-kennzahl="aktiv"]')), 'Kopf: „aktiv diese Woche"')
+  await p.locator('[data-kurs-kopf] [data-kennzahl="bedarf"]').click()
+  pruefe(await da(p.locator('[data-kurs-bedarf]')), 'Klick auf „Handlungsbedarf" öffnet den Überblick')
+  await kursReiter(p, 'lernende')
   // Reiter „Lernende" nur mit Vokabeln (08.10.2026): keine Grammatik-Spalte, kein Fördern/Fordern
   pruefe((await p.locator('[data-lernende-tabelle] [data-foerdern]').count()) === 0, 'Reiter „Lernende" ohne Fördern/Fordern')
   // Reiter „Grammatik": Name | Details | Fördern | Fordern, Empfehlung mit Grund („1 Schwäche")
@@ -174,6 +179,7 @@ try {
 
   // ---------- Fördern → KI (Attrappe) im Hintergrund → Entwurf in der Tabelle → prüfen → nur für Ben freischalten
   await p.locator('[data-foerdern="Ben S."]').click()
+  await kursReiter(p, 'grammatik')
   pruefe(await da(p.locator('[data-grammatik-entwurf]'), 40000), 'Entwurf „Förderung" erscheint in der Grammatik-Tabelle')
   await p.locator('[data-grammatik-entwurf]').first().click()
   pruefe(await da(p.locator('[data-entwurf-fenster]')), 'Prüf-Fenster mit Aufgaben')
@@ -198,9 +204,10 @@ try {
   await p.waitForTimeout(1500)
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
-  await kursKaestenAuf(p)
+  await kursReiter(p, 'lernende')
   await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()
   pruefe(await da(p.locator('[data-grammatik-profil="Ben S."] [data-extra-stand]')), 'Ben: Plakette „Förderung läuft"')
+  await kursReiter(p, 'grammatik')
 
   // ---------- Grammatik-Fenster: Aufgabe bearbeiten → Lernende sehen die Änderung
   await p.locator(`[data-grammatik-zeile="${gram}"]`).click()

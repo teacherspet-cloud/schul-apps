@@ -22,7 +22,7 @@
  */
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
-import { entschluessle, hauptschluessel, verschluessle } from './geheim'
+import { entschluessle, hauptschluessel, schluesselObjekt, verschluessle } from './geheim'
 
 /** Tabelle → sensible Spalten */
 export const SENSIBEL: Record<string, string[]> = {
@@ -63,7 +63,9 @@ export const SENSIBEL: Record<string, string[]> = {
   lern_wochen: ['daten'],
   // Darstellung der Lernenden (Leseschrift, Vorlesen, Zeilenabstand …) und Prüfprotokoll, 08.10.2026
   nutzer_darstellung: ['daten'],
-  protokoll: ['text']
+  protokoll: ['text'],
+  // Ausgeblendeter Handlungsbedarf (09.10.2026): Merkmale mit Kennungen Betroffener – im Zweifel verschlüsseln
+  klassen_ausgeblendet: ['merkmal']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 
@@ -79,7 +81,7 @@ const istKennung = (s: unknown): boolean => typeof s === 'string' && s.startsWit
 
 function blobZu(b: Uint8Array): Buffer {
   const iv = randomBytes(12)
-  const c = createCipheriv('aes-256-gcm', hauptschluessel(), iv)
+  const c = createCipheriv('aes-256-gcm', schluesselObjekt(), iv)
   const daten = Buffer.concat([c.update(b), c.final()])
   return Buffer.concat([BLOB_KOPF, iv, c.getAuthTag(), daten])
 }
@@ -87,7 +89,7 @@ function blobZu(b: Uint8Array): Buffer {
 function blobVon(b: Uint8Array): Uint8Array {
   const buf = Buffer.from(b)
   if (buf.length < 32 || !buf.subarray(0, 4).equals(BLOB_KOPF)) return b
-  const d = createDecipheriv('aes-256-gcm', hauptschluessel(), buf.subarray(4, 16))
+  const d = createDecipheriv('aes-256-gcm', schluesselObjekt(), buf.subarray(4, 16))
   d.setAuthTag(buf.subarray(16, 32))
   return Buffer.concat([d.update(buf.subarray(32)), d.final()])
 }
@@ -330,25 +332,50 @@ export function migriere(d: DatabaseSync, tabelle: string): void {
   }
 }
 
+/**
+ * Zähler der Schreibzugriffe auf `nutzer` (09.10.2026, Leistung): datenbank.ts merkt sich `alleNutzer()` (Entschlüsseln
+ * aller Konten) und rechnet neu, sobald sich der Zähler ändert.
+ */
+export const nutzerSchreibzaehler = { stand: 0 }
+const SCHREIBT_NUTZER = /^\s*(?:INSERT|UPDATE|DELETE|REPLACE)\b[\s\S]*?\bnutzer\b/i
+
 /** Den Datenbankzugang umhüllen: Schreiben verschlüsselt, Lesen entschlüsselt */
 export function geschuetzt(d: DatabaseSync): DatabaseSync {
   const prepare = d.prepare.bind(d)
-  const tabellenIn = (sql: string): string[] => Object.keys(SENSIBEL).filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(sql))
+  const muster = Object.keys(SENSIBEL).map((t) => [t, new RegExp(`\\b${t}\\b`, 'i')] as const)
+  const tabellenIn = (sql: string): string[] => muster.filter(([, m]) => m.test(sql)).map(([t]) => t)
+  /*
+   * Vorbereitete Anweisungen je SQL-Text wiederverwenden (09.10.2026, Leistung): Prüfen, Planen und Vorbereiten kosteten
+   * bei jedem Aufruf (z. B. je Lernende/r ein Lernstand). Nach Schemaänderungen bereitet SQLite selbst neu vor.
+   */
+  const fertig = new Map<string, StatementSync>()
   const umhuellt = (sql: string): StatementSync => {
+    const da = fertig.get(sql)
+    if (da) return da
     for (const t of tabellenIn(sql)) migriere(d, t)
     const fehler = schreibFehler(sql)
     if (fehler) throw new Error(`Feldschutz: Diese Anweisung würde Personenbezogenes unverschlüsselt schreiben (${fehler}).`)
     const st = prepare(sql)
     const plan = planFuer(sql)
-    return new Proxy(st, {
+    // „zuletzt gesehen" (stündlich je Sitzung) zählt nicht – höchstens 30 s alt in der gemerkten Liste
+    const nutzerSchreiben = SCHREIBT_NUTZER.test(sql) && !/^\s*UPDATE nutzer SET zuletzt = \? WHERE id = \?\s*$/i.test(sql)
+    const p = new Proxy(st, {
       get(ziel, name, empf) {
-        if (name === 'run') return (...w: unknown[]) => ziel.run(...(werteFuer(plan, w) as never[]))
+        if (name === 'run')
+          return (...w: unknown[]) => {
+            const r = ziel.run(...(werteFuer(plan, w) as never[]))
+            if (nutzerSchreiben) nutzerSchreibzaehler.stand++
+            return r
+          }
         if (name === 'get') return (...w: unknown[]) => zeileVon(ziel.get(...(werteFuer(plan, w) as never[])))
         if (name === 'all') return (...w: unknown[]) => ziel.all(...(werteFuer(plan, w) as never[])).map((z) => zeileVon(z))
         const v = Reflect.get(ziel, name, empf) as unknown
         return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(ziel) : v
       }
     })
+    if (fertig.size > 500) fertig.clear()
+    fertig.set(sql, p)
+    return p
   }
   return new Proxy(d, {
     get(ziel, name, empf) {

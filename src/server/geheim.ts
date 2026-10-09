@@ -8,11 +8,23 @@
  *
  * Format: „v1:" + Base64(IV 12 Byte | Tag 16 Byte | Chiffrat).
  */
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createSecretKey, randomBytes, scryptSync, timingSafeEqual, type KeyObject } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCHLUESSEL_DATEI } from './pfade'
 
 let schluessel: Buffer | null = null
+let schluesselObj: { roh: Buffer; obj: KeyObject } | null = null
+
+/**
+ * Der Hauptschlüssel als KeyObject (09.10.2026, Leistung): createCipheriv/createDecipheriv mit einem Buffer bereiten den
+ * Schlüssel bei JEDEM Aufruf neu vor – beim Entschlüsseln vieler Zeilen (Lernstände, Nutzer) war das etwa achtmal so
+ * teuer wie die Entschlüsselung selbst. Das Objekt entsteht einmal je Schlüssel.
+ */
+export function schluesselObjekt(): KeyObject {
+  const k = hauptschluessel()
+  if (schluesselObj?.roh !== k) schluesselObj = { roh: k, obj: createSecretKey(k) }
+  return schluesselObj.obj
+}
 
 /** Den Hauptschlüssel laden bzw. beim ersten Start anlegen */
 export function hauptschluessel(datei = SCHLUESSEL_DATEI): Buffer {
@@ -37,7 +49,7 @@ export const setzeSchluesselFuerTests = (k: Buffer | null): void => {
 
 export function verschluessle(text: string): string {
   const iv = randomBytes(12)
-  const c = createCipheriv('aes-256-gcm', hauptschluessel(), iv)
+  const c = createCipheriv('aes-256-gcm', schluesselObjekt(), iv)
   const daten = Buffer.concat([c.update(text, 'utf8'), c.final()])
   return `v1:${Buffer.concat([iv, c.getAuthTag(), daten]).toString('base64')}`
 }
@@ -45,7 +57,7 @@ export function verschluessle(text: string): string {
 export function entschluessle(wert: string): string {
   if (!wert.startsWith('v1:')) throw new Error('Unbekanntes Format.')
   const roh = Buffer.from(wert.slice(3), 'base64')
-  const d = createDecipheriv('aes-256-gcm', hauptschluessel(), roh.subarray(0, 12))
+  const d = createDecipheriv('aes-256-gcm', schluesselObjekt(), roh.subarray(0, 12))
   d.setAuthTag(roh.subarray(12, 28))
   return Buffer.concat([d.update(roh.subarray(28)), d.final()]).toString('utf8')
 }
