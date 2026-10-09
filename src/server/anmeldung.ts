@@ -92,6 +92,8 @@ interface Discovery {
   token_endpoint: string
   userinfo_endpoint: string
   end_session_endpoint?: string
+  /** z. B. ['client_secret_post'] (IServ) oder ['client_secret_basic'] */
+  token_endpoint_auth_methods_supported?: string[]
 }
 
 let discovery: { fuer: string; d: Discovery; zeit: number } | null = null
@@ -208,16 +210,31 @@ export async function iservRueckruf(
   const e = iservEinstellung()
   const d = await entdecken(e.aussteller, abruf)
   const geheimnis = serverGeheimnis('iserv-client')
+  /*
+   * Client-Geheimnis so, wie IServ es annimmt (09.10.2026, Befund „400"): IServ unterstützt laut Discovery nur
+   * „client_secret_post" – das Geheimnis gehört dann ins Formular, nicht in den Basic-Kopf. Andere Anbieter: Basic.
+   */
+  const verfahren = d.token_endpoint_auth_methods_supported ?? []
+  const imFormular = verfahren.includes('client_secret_post') && !verfahren.includes('client_secret_basic')
+  const formular = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: rueckruf, code_verifier: v.verifier, client_id: e.clientId })
+  if (imFormular) formular.set('client_secret', geheimnis)
   const token = await abruf(d.token_endpoint, {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
-      authorization: `Basic ${Buffer.from(`${encodeURIComponent(e.clientId)}:${encodeURIComponent(geheimnis)}`).toString('base64')}`
+      accept: 'application/json',
+      ...(imFormular ? {} : { authorization: `Basic ${Buffer.from(`${encodeURIComponent(e.clientId)}:${encodeURIComponent(geheimnis)}`).toString('base64')}` })
     },
-    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: rueckruf, code_verifier: v.verifier, client_id: e.clientId }),
+    body: formular,
     signal: AbortSignal.timeout(20_000)
   })
-  if (!token.ok) throw new AnmeldeFehler(`IServ hat die Anmeldung nicht bestätigt (${token.status}).`)
+  if (!token.ok) {
+    // Fehlercode von IServ mitnennen (z. B. invalid_client, invalid_grant) – enthält keine Geheimnisse
+    const f = (await token.json().catch(() => ({}))) as { error?: unknown; error_description?: unknown }
+    const grund = [f.error, f.error_description].filter((x): x is string => typeof x === 'string' && x.length < 200).join(': ')
+    protokolliereServer('anmeldung', `IServ-Token abgelehnt (${token.status}${grund ? `, ${grund}` : ''})`)
+    throw new AnmeldeFehler(`IServ hat die Anmeldung nicht bestätigt (${token.status}${grund ? ` – ${grund}` : ''}).`)
+  }
   const t = (await token.json()) as { access_token?: string; id_token?: string }
   if (!t.access_token) throw new AnmeldeFehler('IServ hat keinen Zugang geliefert.')
   const idt = t.id_token ? jwtInhalt(t.id_token) : {}
