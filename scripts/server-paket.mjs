@@ -8,7 +8,8 @@
 // Geheimnisse sind NIE im Paket: Hauptschlüssel (geheim/) und Notzugang-Passwort (notzugang.env)
 // entstehen auf dem VPS.
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { brotliCompressSync, constants as zlibKonstanten } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -32,6 +33,19 @@ lauf(npx, ['vite', 'build', '-c', 'vite.server.config.ts'], { SCHULAPPS_SERVER_O
 console.log('3/3 Paket schnüren …')
 for (const datei of ['Dockerfile', 'docker-compose.yml', 'package.json', 'schul-apps-zertifikat.sh', 'IServ-Freischaltung.md']) cpSync(join(wurzel, 'deploy', 'vps', datei), join(bau, datei))
 cpSync(join(wurzel, 'out', 'renderer'), join(bau, 'oberflaeche'), { recursive: true })
+// Bündel vorab packen (09.10.2026): Der Server liefert „.br" nur noch aus – Packen im Container sprengte den Speicher
+{
+  const assets = join(bau, 'oberflaeche', 'assets')
+  let n = 0
+  for (const name of existsSync(assets) ? readdirSync(assets) : []) {
+    const datei = join(assets, name)
+    if (!/\.(m?js|css|json|svg|txt|wasm)$/.test(name) || statSync(datei).size < 1024) continue
+    const roh = readFileSync(datei)
+    writeFileSync(`${datei}.br`, brotliCompressSync(roh, { params: { [zlibKonstanten.BROTLI_PARAM_QUALITY]: 11, [zlibKonstanten.BROTLI_PARAM_SIZE_HINT]: roh.length } }))
+    n++
+  }
+  console.log(`${n} Dateien vorab gepackt (Brotli)`)
+}
 // Ressourcen ohne die Einzel-SVGs von OpenMoji (die App liest den Index) – wie electron-builder.yml
 cpSync(join(wurzel, 'resources'), join(bau, 'resources'), {
   recursive: true,

@@ -305,14 +305,30 @@ function programmSeite(fuerSchueler = false): string {
   return html
 }
 
-function statisch(res: ServerResponse, pfad: string): void {
+/*
+ * Komprimierte Bündel (09.10.2026, Befund „Lehrermenüs laden lange"): Das Hauptbündel der Oberfläche hat rund 20 MB und
+ * ging ungepackt über die Leitung. scripts/server-paket.mjs legt neben jede Textdatei eine mit Brotli gepackte „.br";
+ * die wird nur gestreamt (Packen im Container brauchte zu viel Speicher und ließ den Server abstürzen).
+ */
+function statisch(res: ServerResponse, pfad: string, annahme = ''): void {
   const ziel = normalize(join(OBERFLAECHE, pfad))
   if (!ziel.startsWith(OBERFLAECHE + sep)) return void res.writeHead(403).end('verboten')
   if (!existsSync(ziel) || !statSync(ziel).isFile() || ziel.endsWith('index.html')) {
     res.writeHead(200, { 'content-type': TYPEN['.html'], 'cache-control': 'no-store' })
     return void res.end(programmSeite(pfad.startsWith('/s/')))
   }
-  res.writeHead(200, { 'content-type': TYPEN[extname(ziel)] ?? 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable' })
+  const typ = TYPEN[extname(ziel)] ?? 'application/octet-stream'
+  if (/\bbr\b/.test(annahme) && existsSync(`${ziel}.br`)) {
+    res.writeHead(200, {
+      'content-type': typ,
+      'content-encoding': 'br',
+      'content-length': statSync(`${ziel}.br`).size,
+      vary: 'accept-encoding',
+      'cache-control': 'public, max-age=31536000, immutable'
+    })
+    return void createReadStream(`${ziel}.br`).pipe(res)
+  }
+  res.writeHead(200, { 'content-type': typ, vary: 'accept-encoding', 'cache-control': 'public, max-age=31536000, immutable' })
   createReadStream(ziel).pipe(res)
 }
 
@@ -435,7 +451,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
 
     // ---------- Symbole für Browser-Reiter und Home-Bildschirm (ohne Anmeldung – auch die Anmeldeseite zeigt sie)
-    if (req.method === 'GET' && (url.pathname === '/favicon.ico' || /^\/web-app\/[\w-]+\.png$/.test(url.pathname))) return void statisch(res, url.pathname)
+    if (req.method === 'GET' && (url.pathname === '/favicon.ico' || /^\/web-app\/[\w-]+\.png$/.test(url.pathname))) return void statisch(res, url.pathname, String(req.headers['accept-encoding'] ?? ''))
 
     // ---------- Anmeldung
     if (req.method === 'GET' && url.pathname === '/anmelden') {
@@ -712,11 +728,11 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       if (req.method === 'GET' && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/ereignisse')) {
         const datei = url.pathname !== '/' && existsSync(join(OBERFLAECHE, url.pathname)) && !url.pathname.endsWith('.html')
         // Bündel (js/css) dürfen ohne Anmeldung kommen – die Anmeldeseite braucht sie nicht, schadet aber nicht
-        if (datei) return statisch(res, decodeURIComponent(url.pathname))
+        if (datei) return statisch(res, decodeURIComponent(url.pathname), String(req.headers['accept-encoding'] ?? ''))
         // Onlinetest per QR-Code: Solange IServ nicht freigeschaltet ist, reicht der Name (SchuelerBereich, src/server/onlinetest.ts)
         // Grammatiktraining (gt) und Unterrichtsreihe (rq) per QR-Code ebenso
         if ((/^\/s\/(?:[tfw]|vt|gt|rq)\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit())
-          return statisch(res, '/s/')
+          return statisch(res, '/s/', String(req.headers['accept-encoding'] ?? ''))
         res.writeHead(302, {
           location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`,
           'cache-control': 'no-store'
@@ -824,7 +840,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         res.writeHead(302, { location: '/', 'cache-control': 'no-store' })
         return void res.end()
       }
-      return statisch(res, decodeURIComponent(url.pathname))
+      return statisch(res, decodeURIComponent(url.pathname), String(req.headers['accept-encoding'] ?? ''))
     }
     res.writeHead(405).end('nicht erlaubt')
   }
