@@ -9,6 +9,8 @@
  *   GET  /server/klassen               Übersicht: Klassen mit ihren Fächern
  *   GET  /server/klassen/<id>          eine Lerngruppe (Klasse + Fach) im Detail
  *   POST /server/klassen/<id>/fach     {fach} → Fach hinzufügen, liefert {id}
+ *   POST /server/klassen/<id>/wackelig-wiederholen   wackelige Wörter im Kurs wieder fällig machen (09.10.2026)
+ *   GET  /server/klassen/vorwahl?kurs=<id>            Lehrwerk-Vorwahl für „Vokabeln/Grammatik hinzufügen" (09.10.2026)
  *
  * Nur für Lehrkräfte; nur die eigenen Lerngruppen. Namen der Lernenden gehen nur an die Lehrkraft selbst.
  */
@@ -18,8 +20,26 @@ import { serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
 import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
-import { leerenKursLoeschen, vokabelnDerGruppe } from './vokabeln'
-import { grammatikDerGruppe } from './grammatik'
+import {
+  db as vokDb,
+  json_,
+  klasseFuer,
+  klassenKurseSichern,
+  leerenKursLoeschen,
+  lernendeVon,
+  sprachfaecherDerGruppe,
+  standSpeichern,
+  standVon,
+  ueberschriftVon,
+  vokabelnDerGruppe,
+  zeile,
+  type Zeile
+} from './vokabeln'
+import type { Vokabel } from '../shared/vokabeltrainer'
+import { grammatikDerGruppe, hoechsteUnit, lehrwerkStandVon } from './grammatik'
+import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
+import type { VorwahlDaten } from '../shared/lehrwerkVorwahl'
+import type { NutzerInfo } from './datenbank'
 
 const TAG = 86_400_000
 
@@ -97,6 +117,103 @@ export function vokabelBedarf(
   }
 }
 
+/**
+ * Kurs der Klasse in Sprachenlernen (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" in „Meine Klassen"
+ * wirken auf denselben Kurs wie in Sprachenlernen – den Kurs dieser Lerngruppe in ihrer Sprache (klassenKurseSichern,
+ * auch an einer gleichnamigen Lerngruppe). Vorrang: eigene Lerngruppe, offen, für die ganze Gruppe, ältester zuerst.
+ */
+export function klassenKursVon(g: Lerngruppe, lehrkraftId: string): string | null {
+  const sprachen = sprachfaecherDerGruppe(g.fach).map((s) => s.sprache)
+  if (!sprachen.length) return null
+  const name = g.name.trim().toLowerCase()
+  const geschwister = new Set(lerngruppenVon(lehrkraftId).filter((x) => x.name.trim().toLowerCase() === name).map((x) => x.id))
+  geschwister.add(g.id)
+  const kurse = (
+    vokDb()
+      .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND reihe = '' AND lerngruppe_id != '' ORDER BY erstellt ASC")
+      .all(lehrkraftId) as unknown as Zeile[]
+  ).filter((k) => geschwister.has(k.lerngruppe_id ?? '') && sprachen.includes(k.sprache))
+  const rang = (k: Zeile): number =>
+    (k.lerngruppe_id === g.id ? 0 : 4) + (k.status === 'offen' ? 0 : 2) + (json_(k.schueler, [] as string[]).length ? 1 : 0)
+  return [...kurse].sort((a, b) => rang(a) - rang(b))[0]?.id ?? null
+}
+
+/**
+ * „Wackelige Wörter" im Kurs wiederholen (09.10.2026, Wunsch der Lehrkraft – statt eines zweiten Kurses): Die Wörter
+ * stehen schon in den Kursen der Klasse. Wer ein Wort schon gesehen hat (Versuche > 0) und darin wackelt (Fehler oder
+ * Fach 1–2), bekommt es jetzt fällig – es kommt in der nächsten Tagesrunde. Kein Fachwechsel, kein neuer Kurs.
+ */
+export function wackeligWiederholen(
+  g: Lerngruppe,
+  lehrkraftId: string,
+  jetzt = Date.now()
+): { woerter: number; lernende: number; kurse: string[] } {
+  const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt)
+  const schluessel = new Set(vok.wackelig.map((w) => `${w.sprache}|${w.term}`))
+  const woerter = new Set<string>()
+  const lernende = new Set<string>()
+  const kurse = new Set<string>()
+  for (const t of vok.trainings) {
+    if (t.status !== 'offen') continue
+    const z = zeile(t.id)
+    if (!z || z.lehrkraft_id !== lehrkraftId) continue
+    const liste = json_(z.woerter, [] as Vokabel[]).filter((v) => schluessel.has(`${z.sprache}|${v.term}`))
+    if (!liste.length) continue
+    for (const n of lernendeVon(z)) {
+      const st = standVon(z.id, n.id)
+      let anders = false
+      for (const v of liste) {
+        const w = st.woerter[v.id]
+        if (!w || !w.versuche || !(w.falsch > 0 || w.fach <= 2)) continue
+        if (w.faellig > jetzt) {
+          w.faellig = jetzt
+          anders = true
+        }
+        woerter.add(`${z.sprache}|${v.term}`)
+        lernende.add(n.id)
+        kurse.add(ueberschriftVon(z))
+      }
+      if (anders) standSpeichern(z.id, n.id, st)
+    }
+  }
+  return { woerter: woerter.size, lernende: lernende.size, kurse: [...kurse] }
+}
+
+/**
+ * Lehrwerk-Vorwahl (09.10.2026, Wunsch der Lehrkraft; Auswahl in shared/lehrwerkVorwahl.ts): was Kurs, Lerngruppe, die
+ * übrigen Kurse der Klasse und die Lehrkraft insgesamt an Lehrwerken nutzen.
+ */
+export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
+  const q = json_(z.quelle, {} as Partial<Quelle>)
+  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+  const alle = vokDb()
+    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND reihe = '' ORDER BY erstellt DESC")
+    .all(ich.id) as unknown as Zeile[]
+  const lehrwerk = (k: Zeile): string => json_(k.quelle, {} as Partial<Quelle>).lehrwerk ?? ''
+  const name = g?.name.trim().toLowerCase() ?? ''
+  const klasse = new Set(name ? lerngruppenVon(ich.id).filter((x) => x.name.trim().toLowerCase() === name).map((x) => x.id) : [])
+  const klassenLehrwerke = [
+    ...new Set(alle.filter((k) => k.id !== z.id && k.sprache === z.sprache && klasse.has(k.lerngruppe_id)).map(lehrwerk).filter(Boolean))
+  ]
+  const zahl = new Map<string, number>()
+  for (const k of alle) if (k.sprache === z.sprache && lehrwerk(k)) zahl.set(lehrwerk(k), (zahl.get(lehrwerk(k)) ?? 0) + 1)
+  let stand: { buch: string; unit: string } | null = null
+  if (g) {
+    stand = lehrwerkStandVon(g.id)
+    if (!stand)
+      stand = hoechsteUnit(alle.filter((k) => k.lerngruppe_id === g.id && k.status === 'offen').map((k) => k.quelle ?? ''))
+  }
+  return {
+    sprache: z.sprache,
+    jahrgang: klasseFuer(z, ich),
+    kursLehrwerk: q.lehrwerk || null,
+    kursUnits: quelleUnits(q),
+    stand,
+    klassenLehrwerke,
+    ueblicheLehrwerke: [...zahl.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
+  }
+}
+
 function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
@@ -168,7 +285,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     vorschlaege.push({
       art: 'vokabeln',
       titel: `Wackelige Wörter – ${klassenTitel(g)}`,
-      text: `Ein kurzes Vokabeltraining mit den ${vok.wackelig.length} Wörtern, die gerade am meisten wackeln (höchstens 20: zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern zuletzt danebengingen).`,
+      text: `Die ${vok.wackelig.length} Wörter, die gerade am meisten wackeln (höchstens 20: zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern zuletzt danebengingen) – im Kurs gleich wiederholen lassen oder als kurzes Arbeitsblatt.`,
       sprache: vok.wackelig[0].sprache,
       fach: vok.wackelig[0].fach,
       woerter: vok.wackelig.map(({ term, translation, example }) => ({ term, translation, ...(example ? { example } : {}) }))
@@ -223,6 +340,12 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
 
     if (req.method === 'POST') {
       if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      // Wackelige Wörter im Kurs wiederholen (09.10.2026)
+      if (teile.length === 2 && teile[1] === 'wackelig-wiederholen') {
+        const g = lerngruppe(teile[0])
+        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        return (json(res, 200, wackeligWiederholen(g, ich.id)), true)
+      }
       // Fach abwählen (08.10.2026): mit Material nur ausblenden, sonst entfernen (leere Kurse gehen mit)
       if (teile.length === 2 && teile[1] === 'abwaehlen') {
         const g = lerngruppe(teile[0])
@@ -301,8 +424,16 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    if (teile[0] === 'vorwahl') {
+      const z = zeile(String(url.searchParams.get('kurs') ?? ''))
+      if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diesen Kurs gibt es nicht.' }), true)
+      return (json(res, 200, vorwahlDaten(z, sitzung.nutzer)), true)
+    }
     const g = lerngruppe(teile[0])
     if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
-    return (json(res, 200, { ...detail(g, ich.id), ablageMuster: ablageMuster() }), true)
+    // Kurs der Klasse (09.10.2026) – fehlt er (z. B. gelöscht), wie bei neuen Lerngruppen gleich anlegen
+    let klassenKurs = istSprachfach(g.fach) ? klassenKursVon(g, ich.id) : null
+    if (istSprachfach(g.fach) && !klassenKurs && klassenKurseSichern(ich.id)) klassenKurs = klassenKursVon(g, ich.id)
+    return (json(res, 200, { ...detail(g, ich.id), ablageMuster: ablageMuster(), klassenKurs }), true)
   }
 }

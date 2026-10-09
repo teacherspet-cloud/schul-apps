@@ -131,6 +131,9 @@ export interface Stufe {
   gelernt: boolean
   /** Der Abschnitt, an dem gerade gelernt wird (erster freier, noch nicht gelernter) */
   aktuell: boolean
+  /** Fortschrittspfad (09.10.2026, vom Server ergänzt): Wörter ab Fach 1 (einmal kennengelernt) bzw. ab Fach 2 */
+  kennengelernt?: number
+  fach2plus?: number
 }
 
 /**
@@ -177,3 +180,67 @@ export const fehlenBis = (s: Pick<Stufe, 'woerter' | 'anteil'>): number => Math.
 /** Schlüssel einer Lehrwerksreihe über die Bände hinweg (Green Line 1–6 derselben Ausgabe) */
 export const reiheVon = (b: Pick<Buch, 'reihe' | 'edition' | 'language' | 'name'>): string =>
   `${b.reihe || b.name.replace(/\s*\d+\s*$/, '')}|${b.edition ?? ''}|${b.language}`.toLowerCase().replace(/[^a-z0-9|]+/g, '-')
+
+/*
+ * Fortschrittspfad „Mein Vokabelweg" (09.10.2026, Entscheidung der Lehrkraft): statt eines zweiten Karteikastens ein
+ * Pfad je Unit mit einem Wegpunkt je Abschnitt – nur zum Ansehen, geübt wird im Kurs. Zwei Stufen:
+ *  - „gelernt": alle Wörter des Abschnitts einmal kennengelernt (Fach ≥ 1) → halber Stern,
+ *  - „abgeschlossen": 80 % der Wörter mindestens in Fach 2 (dieselbe Regel wie das Freischalten) → Stern und Fähnchen.
+ * Dazwischen füllt sich das Wegstück: zur Hälfte über das Kennenlernen, zur anderen Hälfte über den Weg zur Schwelle.
+ */
+export type WegStufe = 'offen' | 'gelernt' | 'abgeschlossen'
+
+export interface StationZahlen {
+  gesamt: number
+  kennengelernt: number
+  fach2plus: number
+}
+
+export function stationStand(z: StationZahlen): { stufe: WegStufe; fuellung: number } {
+  const gesamt = Math.max(0, z.gesamt)
+  if (!gesamt) return { stufe: 'offen', fuellung: 0 }
+  const kennen = Math.min(1, Math.max(0, z.kennengelernt) / gesamt)
+  const sicher = Math.min(1, Math.max(0, z.fach2plus) / gesamt)
+  if (sicher >= SCHWELLE) return { stufe: 'abgeschlossen', fuellung: 1 }
+  // Ab Fach 2 ist ein Wort auch kennengelernt – das Kennenlernen zählt mindestens so weit
+  const fuellung = 0.5 * Math.max(kennen, sicher) + 0.5 * Math.min(1, sicher / SCHWELLE)
+  return { stufe: kennen >= 1 ? 'gelernt' : 'offen', fuellung: Math.min(0.99, fuellung) }
+}
+
+/** Zahlen eines Wegpunkts; ältere Antworten ohne die Felder: aus dem Anteil ab Fach 2 geschätzt */
+export const stationZahlen = (s: Stufe): StationZahlen => {
+  const fach2plus = s.fach2plus ?? Math.round(s.anteil * s.woerter)
+  return { gesamt: s.woerter, kennengelernt: Math.max(s.kennengelernt ?? 0, fach2plus), fach2plus }
+}
+
+export type UnitLage = 'fertig' | 'aktuell' | 'davor' | 'spaeter'
+
+export interface WegUnit {
+  unit: string
+  stufen: { s: Stufe; i: number; stufe: WegStufe; fuellung: number }[]
+  /** fertig = alle Abschnitte abgeschlossen (zusammengeklappt), aktuell = hier steht die Figur, spaeter = gedimmt */
+  lage: UnitLage
+}
+
+/**
+ * Units in Buchreihenfolge mit Lage, dazu der Wegpunkt der Figur: der aktuelle Abschnitt (erster freier, noch nicht
+ * abgeschlossener); ist alles Freie abgeschlossen, der letzte freie Abschnitt.
+ */
+export function wegUnits(stufen: Stufe[]): { units: WegUnit[]; figur: number } {
+  let figur = stufen.findIndex((s) => s.aktuell)
+  if (figur < 0) figur = stufen.reduce((m, s, i) => (s.frei ? i : m), stufen.length ? 0 : -1)
+  const units: WegUnit[] = []
+  stufen.forEach((s, i) => {
+    const st = stationStand(stationZahlen(s))
+    const letzte = units[units.length - 1]
+    const eintrag = { s, i, ...st }
+    if (letzte && letzte.unit === s.unit) letzte.stufen.push(eintrag)
+    else units.push({ unit: s.unit, stufen: [eintrag], lage: 'davor' })
+  })
+  const figurUnit = units.findIndex((u) => u.stufen.some((x) => x.i === figur))
+  units.forEach((u, ui) => {
+    const fertig = u.stufen.every((x) => x.stufe === 'abgeschlossen')
+    u.lage = ui === figurUnit ? 'aktuell' : fertig ? 'fertig' : ui > figurUnit ? 'spaeter' : 'davor'
+  })
+  return { units, figur }
+}

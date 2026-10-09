@@ -98,6 +98,7 @@ import { useDarstellung } from './schuelerDarstellung'
 import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
+import VokabelwegSeite from '../lernen/VokabelwegPfad'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
 import { holen, senden } from './serverApi'
@@ -185,7 +186,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const gramCode = /^\/s\/gt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   // Zusammen spielen (08.10.2026): Einladungscode aus sechs Ziffern
   const spielCode = /^\/s\/sp\/(\d{6})\/?$/.exec(pfad)?.[1]
-  // Vokabelweg (03.10.2026): gemeinsamer Kasten einer Lehrwerksreihe
+  // Vokabelweg (03.10.2026) einer Lehrwerksreihe – seit 09.10.2026 der Fortschrittspfad (geübt wird im Kurs)
   const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
   // Fachordner im Regal (08.10.2026)
@@ -243,7 +244,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
   ) : vokWeg && !gast ? (
-    <VokabelTrainer id={`lb:${decodeURIComponent(vokWeg)}`} />
+    <VokabelwegSeite wegKey={decodeURIComponent(vokWeg)} />
   ) : vokabeln ? (
     <VokabelTrainer id={vokabeln} />
   ) : ordnerFach && ich?.angemeldet ? (

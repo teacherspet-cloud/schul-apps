@@ -16,3 +16,15 @@ describe('ohneKlasse', () => {
     expect(ohneKlasse('10b - ')).toBe('10b - ')
   })
 })
+
+describe('Reiter-Namen für mehrere Kurse', () => {
+  it('gleiche Titel: eigener Kursname, sonst Nummer', async () => {
+    const { kursReiterNamen, ohneKlassenname } = await import('../src/shared/ohneKlasse')
+    expect(ohneKlassenname('Wackelige Wörter – 6b - Englisch', '6b')).toBe('Wackelige Wörter – Englisch')
+    expect(ohneKlassenname('6b Englisch', '6b')).toBe('6b Englisch')
+    expect(ohneKlassenname('Englisch', '6b')).toBe('Englisch')
+    expect(kursReiterNamen([{ titel: 'Englisch', name: 'Englisch' }, { titel: 'Englisch', name: 'Wackelige Wörter – Englisch' }])).toEqual(['Englisch', 'Wackelige Wörter – Englisch'])
+    expect(kursReiterNamen([{ titel: 'Englisch' }, { titel: 'Englisch' }])).toEqual(['Englisch (1)', 'Englisch (2)'])
+    expect(kursReiterNamen([{ titel: 'Englisch' }, { titel: 'Französisch' }])).toEqual(['Englisch', 'Französisch'])
+  })
+})

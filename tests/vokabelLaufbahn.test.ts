@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abschnitteAus, fehlenBis, leiter, quelleAusTitel, reiheVon, type Buch } from '../src/shared/vokabelLaufbahn'
+import { abschnitteAus, fehlenBis, leiter, quelleAusTitel, reiheVon, stationStand, wegUnits, type Buch } from '../src/shared/vokabelLaufbahn'
 
 const buch: Buch = {
   id: 'green-line-2',
@@ -62,5 +62,51 @@ describe('Vokabelweg (03.10.2026)', () => {
     })
     expect(quelleAusTitel('Weather words', [{ id: 'green-line-2', name: 'Green Line 2' }])).toBeNull()
     expect(reiheVon(buch)).toBe(reiheVon({ ...buch, name: 'Green Line 3' }))
+  })
+})
+
+describe('Fortschrittspfad „Mein Vokabelweg" (09.10.2026)', () => {
+  const ab = abschnitteAus(buch)
+  it('Stufen: offen → gelernt (alle einmal kennengelernt) → abgeschlossen (80 % ab Fach 2)', () => {
+    expect(stationStand({ gesamt: 15, kennengelernt: 0, fach2plus: 0 })).toEqual({ stufe: 'offen', fuellung: 0 })
+    expect(stationStand({ gesamt: 15, kennengelernt: 12, fach2plus: 9 }).stufe).toBe('offen')
+    expect(stationStand({ gesamt: 15, kennengelernt: 15, fach2plus: 3 }).stufe).toBe('gelernt')
+    expect(stationStand({ gesamt: 15, kennengelernt: 15, fach2plus: 12 })).toEqual({ stufe: 'abgeschlossen', fuellung: 1 })
+    // Abgeschlossen auch ohne jedes Wort kennengelernt – dieselbe Regel wie das Freischalten
+    expect(stationStand({ gesamt: 10, kennengelernt: 8, fach2plus: 8 }).stufe).toBe('abgeschlossen')
+    expect(stationStand({ gesamt: 10, kennengelernt: 10, fach2plus: 7 }).stufe).toBe('gelernt')
+    expect(stationStand({ gesamt: 0, kennengelernt: 0, fach2plus: 0 }).stufe).toBe('offen')
+  })
+  it('das Wegstück füllt sich anteilig und wächst mit jedem Schritt', () => {
+    const f = (k: number, s: number): number => stationStand({ gesamt: 10, kennengelernt: k, fach2plus: s }).fuellung
+    expect(f(5, 0)).toBeCloseTo(0.25)
+    expect(f(10, 0)).toBeCloseTo(0.5)
+    expect(f(10, 4)).toBeCloseTo(0.75)
+    expect(f(10, 7)).toBeLessThan(1)
+    expect(f(3, 0)).toBeLessThan(f(6, 0))
+    expect(f(10, 2)).toBeLessThan(f(10, 5))
+  })
+  it('Units: abgeschlossene zusammengeklappt, die Figur am aktuellen Abschnitt, spätere gedimmt', () => {
+    const anteile: Record<string, number> = { [ab[0].key]: 1, [ab[1].key]: 0.9, [ab[2].key]: 0.8 }
+    const st = leiter(ab, new Set([ab[0].key]), (k) => anteile[k] ?? 0).map((s) => ({
+      ...s,
+      kennengelernt: s.key === ab[3].key ? 5 : Math.round((anteile[s.key] ?? 0) * s.woerter),
+      fach2plus: Math.round((anteile[s.key] ?? 0) * s.woerter)
+    }))
+    const { units, figur } = wegUnits(st)
+    expect(units.map((u) => [u.unit, u.lage])).toEqual([
+      ['Unit 1', 'fertig'],
+      ['Unit 2', 'aktuell']
+    ])
+    expect(figur).toBe(3)
+    expect(units[1].stufen.map((x) => x.stufe)).toEqual(['gelernt', 'offen'])
+  })
+  it('spätere Units gedimmt; ist alles Freie abgeschlossen, steht die Figur am letzten freien Abschnitt', () => {
+    const a = wegUnits(leiter(ab, new Set(), () => 0))
+    expect(a.figur).toBe(0)
+    expect(a.units.map((u) => u.lage)).toEqual(['aktuell', 'spaeter'])
+    const b = wegUnits(leiter(ab, new Set(), () => 1))
+    expect(b.figur).toBe(4)
+    expect(b.units.map((u) => u.lage)).toEqual(['fertig', 'aktuell'])
   })
 })

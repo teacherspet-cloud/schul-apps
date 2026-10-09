@@ -61,6 +61,7 @@ import {
 import { LernendeEintragen, ZettelDruck, type Zettel } from './LernendeEintragen'
 import { KlasseZuordnen } from './KlasseZuordnen'
 import { extraStarten, KursGrammatik, type ProfilPunkt } from './kurs/KursGrammatik'
+import { sprachenlernenZiel } from './kurs/auftragsZiel'
 import { KastenKopf, useGemerkt, useGemerktText } from './kurs/Kasten'
 import { vokabelKurzinfo } from './kurs/kursAnsicht'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -154,6 +155,17 @@ const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE')
 /** Datumsfeld (JJJJ-MM-TT) ↔ Zeitpunkt: Termine morgens, Zeitraum-Ende am Abend */
 const alsFeld = (ms: number | null): string => (ms ? new Date(ms - new Date(ms).getTimezoneOffset() * 6e4).toISOString().slice(0, 10) : '')
 export const ausFeld = (v: string, uhr: string): number | null => (v ? new Date(`${v}T${uhr}`).getTime() : null)
+
+/** Nach dem Öffnen eines Kurses die Grammatik ins Bild holen – den Entwurf, sonst den Kasten (wartet kurz aufs Laden) */
+function zeigeKursGrammatik(): void {
+  const bis = Date.now() + 5000
+  const versuch = (): void => {
+    const el = document.querySelector<HTMLElement>('[data-grammatik-entwurf]') ?? document.querySelector<HTMLElement>('[data-kurs-grammatik]')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    else if (Date.now() < bis) window.setTimeout(versuch, 100)
+  }
+  window.setTimeout(versuch, 50)
+}
 
 /** Die App „Vokabeltraining" (Gruppe Unterricht) */
 /** Sprachenlernen (08.10.2026): Vokabel- und Grammatik-App in einem – je Gruppe ein Kurs */
@@ -249,21 +261,50 @@ export default function VokabelTraining(): React.JSX.Element {
   const [neu, setNeu] = useState(false)
   const [filter, setFilter] = useState<'offen' | 'beendet'>('offen')
   const [grammatikOffen, setGrammatikOffen] = useState<string | null>(null)
-  // openDocument('sprachenlernen', id) – Kurs; „g:<id>" = Grammatik (öffnet den Kurs und darin das Grammatik-Fenster)
-  useDokumentOeffner('sprachenlernen', async (id) => {
-    if (!id.startsWith('g:')) return setGewaehlt(id)
-    const gid = id.slice(2)
-    const g = (await holen<{ zuweisungen: { id: string; vokId?: string }[] }>('/server/grammatik')).zuweisungen.find((x) => x.id === gid)
-    if (!g?.vokId) {
-      // Noch ohne Kurs: die Liste legt ihn an (Überführung) – dann erneut nachsehen
-      await holen('/server/vokabeln')
-      const g2 = (await holen<{ zuweisungen: { id: string; vokId?: string }[] }>('/server/grammatik')).zuweisungen.find((x) => x.id === gid)
-      if (!g2?.vokId) return
+  // Neu öffnen erzwingen (gleicher Kurs, aber z. B. jetzt mit aufgeklappter Grammatik)
+  const [oeffnung, setOeffnung] = useState(0)
+  /*
+   * openDocument('sprachenlernen', id) – Kurs; „g:<id>" = Grammatik (öffnet den Kurs und darin das Grammatik-Fenster);
+   * Kennungen der Hintergrund-Aufträge siehe kurs/auftragsZiel.ts (09.10.2026). Unbekanntes oder nicht Ladbares führt
+   * still zur Übersicht – nie eine Fehlermeldung.
+   */
+  useDokumentOeffner('sprachenlernen', async (docId) => {
+    const ziel = sprachenlernenZiel(docId)
+    const zurUebersicht = (): void => (setGewaehlt(null), setGrammatikOffen(null))
+    try {
+      if (ziel.art === 'uebersicht') return zurUebersicht()
+      if (ziel.art === 'kurs' || ziel.art === 'kursGrammatik') {
+        const id = ziel.art === 'kurs' ? ziel.id : ziel.vokId
+        const kurse = (await holen<{ zuweisungen: { id: string }[] }>('/server/vokabeln')).zuweisungen
+        if (!kurse.some((k) => k.id === id)) return zurUebersicht()
+        if (ziel.art === 'kursGrammatik') {
+          // Die Grammatik des Kurses aufgeklappt zeigen – dort steht der Entwurf
+          try {
+            localStorage.setItem('schulapps-vok-kasten-grammatik', '1')
+          } catch {
+            /* ohne Speicher: Kurs trotzdem öffnen */
+          }
+          setOeffnung((n) => n + 1)
+          zeigeKursGrammatik()
+        }
+        setGrammatikOffen(null)
+        return setGewaehlt(id)
+      }
+      const gid = ziel.gid
+      const finde = async (): Promise<string | undefined> =>
+        (await holen<{ zuweisungen: { id: string; vokId?: string }[] }>('/server/grammatik')).zuweisungen.find((x) => x.id === gid)?.vokId
+      let vokId = await finde()
+      if (!vokId) {
+        // Noch ohne Kurs: die Liste legt ihn an (Überführung) – dann erneut nachsehen
+        await holen('/server/vokabeln')
+        vokId = await finde()
+      }
+      if (!vokId) return zurUebersicht()
       setGrammatikOffen(gid)
-      return setGewaehlt(g2.vokId)
+      setGewaehlt(vokId)
+    } catch {
+      zurUebersicht()
     }
-    setGrammatikOffen(gid)
-    setGewaehlt(g.vokId)
   })
   const [suche, setSuche] = useState('')
   const [umbenennen, setUmbenennen] = useState<{ id: string; text: string; standard: string } | null>(null)
@@ -279,6 +320,7 @@ export default function VokabelTraining(): React.JSX.Element {
   if (gewaehlt)
     return (
       <Lernstand
+        key={`${gewaehlt}-${oeffnung}`}
         id={gewaehlt}
         zurueck={() => (setGewaehlt(null), setGrammatikOffen(null), laden())}
         grammatikOffen={grammatikOffen}
@@ -812,8 +854,11 @@ function VokabelAbschnitte({
   )
 }
 
-/** Vokabeln nachträglich zu einer Freigabe hinzufügen (08.10.2026): Lernstand bleibt, Doppeltes wird übersprungen */
-function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
+/**
+ * Vokabeln nachträglich zu einer Freigabe hinzufügen (08.10.2026): Lernstand bleibt, Doppeltes wird übersprungen.
+ * Auch aus „Meine Klassen" (09.10.2026) – derselbe Dialog für denselben Kurs der Klasse.
+ */
+export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
   const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const los = async (): Promise<void> => {
@@ -847,7 +892,7 @@ function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void })
   return (
     <Modal opened onClose={schliessen} title="Vokabeln hinzufügen" size="lg">
       <Stack>
-        <VokabelQuelle wahl={setAuswahl} />
+        <VokabelQuelle wahl={setAuswahl} kurs={id} />
         {auswahl && (
           <Text size="sm" c="dimmed">
             {auswahl.woerter.length} Wörter gewählt – schon vorhandene werden übersprungen.

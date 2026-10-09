@@ -1,13 +1,11 @@
 /**
- * „Grammatik hinzufügen" im Kurs (08.10.2026, Wunsch der Lehrkraft): Der Dialog „Grammatik zum Üben freigeben" zeigt die
- * schon freigegebenen Formen angehakt. Beim Speichern gilt:
+ * „Grammatik hinzufügen" im Kurs (08.10.2026, Wunsch der Lehrkraft). Seit 09.10.2026 (Wunsch der Lehrkraft) steht schon
+ * freigegebene Grammatik NICHT mehr zur Wahl – sie steht in der Grammatik-Tabelle des Kurses (dort „+ Aufgaben" und
+ * Entfernen). Der Dialog fügt also nur hinzu:
  *  - neu angehakt (noch nie im Kurs) → Aufgaben erstellen lassen (KI, wie bisher),
- *  - schon freigegeben und angehakt → nichts (keine neuen Aufgaben),
- *  - schon freigegeben und abgehakt → sanft entfernen (Status „entfernt", Lernstand bleibt),
- *  - entfernt und wieder angehakt → wiederherstellen, ohne neue Aufgaben.
- * Ein Training mit mehreren Themen wird erst entfernt, wenn keines seiner Themen mehr angehakt ist. Trainings ohne
- * Katalog-Thema (eigenes Thema, Verben) und Extra-Aufgaben fasst der Dialog nicht an. Entwürfe (KI fertig, noch nicht
- * freigegeben) gelten als vorhanden – für sie entstehen keine zweiten Aufgaben.
+ *  - früher entfernt und wieder angehakt → wiederherstellen, ohne neue Aufgaben (Lernstand gilt weiter).
+ * Entfernt wird hier nichts mehr. Entwürfe (KI fertig, noch nicht freigegeben) gelten als vorhanden – für sie entstehen
+ * keine zweiten Aufgaben.
  */
 export interface BestehendeGrammatik {
   id: string
@@ -18,25 +16,28 @@ export interface BestehendeGrammatik {
 export interface FreigabeAbgleich {
   /** Themen, für die die KI Aufgaben erstellt */
   erzeugen: string[]
-  /** Trainings, die sanft entfernt werden */
-  entfernen: string[]
   /** Entfernte Trainings, die zurückkommen */
   wiederherstellen: string[]
 }
 
-/** Vorab angehakt: die Themen der freigegebenen (auch abgeschlossenen) Trainings und der Entwürfe */
-export const vorabGewaehlt = (bestehend: BestehendeGrammatik[]): string[] => [
+/** Nicht zur Wahl: Themen der freigegebenen (auch abgeschlossenen) Trainings und der Entwürfe – nicht Entferntes */
+export const schonImKurs = (bestehend: BestehendeGrammatik[]): string[] => [
   ...new Set(bestehend.filter((b) => b.status !== 'entfernt').flatMap((b) => b.themen))
 ]
 
 export function freigabeAbgleich(gewaehlt: string[], bestehend: BestehendeGrammatik[]): FreigabeAbgleich {
-  const an = new Set(gewaehlt)
+  const aktiv = new Set(schonImKurs(bestehend))
+  const an = new Set(gewaehlt.filter((t) => !aktiv.has(t)))
   const vorhanden = new Set(bestehend.flatMap((b) => b.themen))
   return {
-    erzeugen: [...new Set(gewaehlt)].filter((t) => !vorhanden.has(t)),
-    entfernen: bestehend
-      .filter((b) => (b.status === 'offen' || b.status === 'beendet') && b.themen.length > 0 && !b.themen.some((t) => an.has(t)))
-      .map((b) => b.id),
+    erzeugen: [...an].filter((t) => !vorhanden.has(t)),
     wiederherstellen: bestehend.filter((b) => b.status === 'entfernt' && b.themen.some((t) => an.has(t))).map((b) => b.id)
   }
+}
+
+/** Zusammenfassung unter der Auswahl: „2 neu (KI erstellt Aufgaben) · 1 zurückholen" */
+export function abgleichText(a: FreigabeAbgleich): string {
+  return [a.erzeugen.length ? `${a.erzeugen.length} neu (KI erstellt Aufgaben)` : '', a.wiederherstellen.length ? `${a.wiederherstellen.length} zurückholen` : '']
+    .filter(Boolean)
+    .join(' · ')
 }

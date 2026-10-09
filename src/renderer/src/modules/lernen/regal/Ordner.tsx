@@ -7,6 +7,7 @@
  *    (Ergebnisse, Tafelbilder, Lernprodukte) und Merkzettel; Arbeitsblätter aus Unterrichtsreihen je Reihe (08.10.2026)
  * Registerwechsel blättert um; ruhige Darstellung ohne Bewegung.
  */
+import { kursReiterNamen } from '@shared/ohneKlasse'
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
 import { IconAbc, IconArrowLeft, IconBook2, IconFileText } from '@tabler/icons-react'
 import { SegmentedControl } from '@mantine/core'
@@ -242,7 +243,7 @@ function VokabelRegister({ o }: { o: FachOrdner }): React.JSX.Element {
         <SegmentedControl
           value={kurs?.id ?? ''}
           onChange={waehle}
-          data={o.vokabeln.map((v) => ({ value: v.id, label: v.titel }))}
+          data={kursReiterNamen(o.vokabeln).map((label, i) => ({ value: o.vokabeln[i].id, label }))}
           fullWidth
           data-ordner-kurswahl
         />

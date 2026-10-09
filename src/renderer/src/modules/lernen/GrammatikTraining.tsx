@@ -60,7 +60,10 @@ import { AufgabenEditor } from './kurs/AufgabenEditor'
 import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
 import { erzeugeGrammatikPaket, lateinLernjahr } from './grammatikErzeugen'
 import { ausFeld, useLerngruppen } from './VokabelTraining'
-import { freigabeAbgleich, vorabGewaehlt, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
+import { kursGrammatikDocId } from './kurs/auftragsZiel'
+import { grammatikUnits, normName, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
+import { grammatikKapitel, lehrwerkeMitGrammatik } from '../arbeitsblatt/didactics/grammatikAuswahl'
+import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
 
 interface Zuweisung {
   id: string
@@ -325,8 +328,9 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   // Teilformen des Themas (Recherche 06.10.2026): keine gewählt = alle, die zur Klasse passen
   const [teilWahl, setTeilWahl] = useState<string[]>([])
   /*
-   * Im Kurs (08.10.2026, Wunsch der Lehrkraft): Schon freigegebene Grammatik steht angehakt da; Speichern erstellt nur für
-   * neu Angehaktes Aufgaben, Abgehaktes wird sanft entfernt (Lernstand bleibt), wieder Angehaktes kommt zurück.
+   * Im Kurs (08.10.2026, Wunsch der Lehrkraft): Speichern erstellt nur für neu Angehaktes Aufgaben, früher Entferntes
+   * kommt zurück. Schon freigegebene Grammatik steht seit 09.10.2026 nicht mehr zur Wahl (Grammatik-Tabelle des Kurses:
+   * „+ Aufgaben", Entfernen) – der Dialog entfernt nichts mehr.
    */
   const [bestehend, setBestehend] = useState<BestehendeGrammatik[] | null>(vorgabe ? null : [])
   useEffect(() => {
@@ -342,12 +346,44 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
             .map((e) => ({ id: e.schluessel, themen: e.info?.themen ?? [], status: 'entwurf' as const }))
         ]
         setBestehend(liste)
-        // Schon Gewähltes bleibt (falls die Lehrkraft schneller war als die Liste)
-        setThemenIds((t) => [...new Set([...vorabGewaehlt(liste), ...t])])
+        // Schon Freigegebenes ist nicht mehr wählbar – falls die Lehrkraft schneller war als die Liste
+        const aktiv = new Set(schonImKurs(liste))
+        setThemenIds((t) => t.filter((id) => !aktiv.has(id)))
       },
       (e: unknown) => (notifyError(e), setBestehend([]))
     )
   }, [vorgabe?.vokId]) // eslint-disable-line react-hooks/exhaustive-deps
+  /*
+   * Lehrwerk vorwählen (09.10.2026, Wunsch der Lehrkraft): Band der Klasse und die Units bis zu ihrem Stand
+   * (shared/lehrwerkVorwahl.ts). undefined = lädt noch; null = nichts Passendes (dann wie bisher die Vorgabe des Kurses).
+   */
+  const [kursLehrwerk, setKursLehrwerk] = useState<{ buch?: string; unit?: string; units?: string[] } | null | undefined>(vorgabe ? undefined : null)
+  useEffect(() => {
+    if (!vorgabe) return
+    let aktiv = true
+    void (async () => {
+      try {
+        const [d, buecher] = await Promise.all([
+          holen<VorwahlDaten>(`/server/klassen/vorwahl?kurs=${encodeURIComponent(vorgabe.vokId)}`),
+          window.api.textbooks.list()
+        ])
+        const fachKennung = d.sprache === 'la' ? 'latein' : 'englisch'
+        const buch = vorwahlBuch(d, buecher, { land: settings.defaults?.stateId, schulform: settings.defaults?.schoolTypeId })
+        const band = buch
+          ? lehrwerkeMitGrammatik(fachKennung)
+              .filter((b) => normName(buch.id).startsWith(normName(b)) || normName(buch.name) === normName(b))
+              .sort((a, b) => b.length - a.length)[0]
+          : undefined
+        if (aktiv) setKursLehrwerk(band ? { buch: band, units: grammatikUnits(grammatikKapitel(band), band, d) } : null)
+      } catch {
+        if (aktiv) setKursLehrwerk(null)
+      }
+    })()
+    return () => {
+      aktiv = false
+    }
+  }, [vorgabe?.vokId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lehrwerkVorwahl = kursLehrwerk ?? vorgabe?.lehrwerk
   const abgleich = vorgabe && !eigenesAn ? freigabeAbgleich(themenIds, bestehend ?? []) : null
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
   const gruppenName =
@@ -362,7 +398,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   const mitVerben = modus === 'verben' && verbSprache
   const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : art === 'vok' ? Boolean(vokId) : true
   const kursAbgleich = abgleich && !mitVerben ? abgleich : null
-  const aenderungen = kursAbgleich ? kursAbgleich.erzeugen.length + kursAbgleich.entfernen.length + kursAbgleich.wiederherstellen.length : 0
+  const aenderungen = kursAbgleich ? kursAbgleich.erzeugen.length + kursAbgleich.wiederherstellen.length : 0
   const bereit = Boolean(
     fach && (mitVerben ? verbWahl.verben.length >= 4 : kursAbgleich ? bestehend && aenderungen > 0 : thema) && empfaengerDa
   )
@@ -415,27 +451,17 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       notifySuccess(`${karten.length} Verben stehen als Entwurf bereit – ansehen und freigeben.`)
       return schliessen()
     }
-    // Kurs: Abgehaktes entfernen, wieder Angehaktes zurückholen – neue Aufgaben nur für neu Angehaktes
+    // Kurs: früher Entferntes zurückholen – neue Aufgaben nur für neu Angehaktes
     let neueThemen = gewaehlteThemen
     // Eigenes Thema: keine Katalog-Themen mitschicken (im Kurs stehen dort die schon freigegebenen)
     let neueIds = eigenesAn ? [] : themenIds
     let neueTeile = eigenesAn ? [] : teilWahl
     if (kursAbgleich) {
-      const aktionen = [
-        ...kursAbgleich.entfernen.map((id) => senden(`/server/grammatik/${id}/entfernen`, {})),
-        ...kursAbgleich.wiederherstellen.map((id) => senden(`/server/grammatik/${id}/wiederherstellen`, {}))
-      ]
+      const aktionen = kursAbgleich.wiederherstellen.map((id) => senden(`/server/grammatik/${id}/wiederherstellen`, {}))
       if (aktionen.length)
         void Promise.all(aktionen).then(
           () => {
-            notifySuccess(
-              [
-                kursAbgleich.entfernen.length ? `${kursAbgleich.entfernen.length} entfernt (Lernstand bleibt)` : '',
-                kursAbgleich.wiederherstellen.length ? `${kursAbgleich.wiederherstellen.length} wieder im Kurs` : ''
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            )
+            notifySuccess(`${aktionen.length} wieder im Kurs – der Lernstand gilt weiter.`)
             window.dispatchEvent(new Event('kurs-grammatik-geaendert'))
           },
           (e: unknown) => notifyError(e, 'Nicht alles gespeichert')
@@ -449,7 +475,8 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
     const info = { themen: neueIds, teilformen: neueTeile, jahrgang, ...(vorgabe?.lehrwerk?.buch ? { lehrwerk: vorgabe.lehrwerk } : {}) }
     void starteAuftrag({
       moduleId: 'sprachenlernen',
-      docId: `grammatik-${Date.now()}`,
+      // „Öffnen" im Auftrag führt zum Kurs und seiner Grammatik (kurs/auftragsZiel.ts)
+      docId: kursGrammatikDocId(vorgabe?.vokId ?? (art === 'vok' && vokId ? vokId : undefined)),
       titel,
       art: 'Grammatiktraining',
       eingabe: {
@@ -492,8 +519,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               allowDeselect={false}
               data={faecher.map((f) => ({ value: f.id, label: f.label }))}
               value={fachId}
-              // Im Kurs bleibt das Freigegebene angehakt – sonst würde ein Fachwechsel es beim Speichern entfernen
-              onChange={(v) => v !== fachId && (setFachId(v), setThemenIds(vorgabe ? vorabGewaehlt(bestehend ?? []) : []), setTeilWahl([]))}
+              onChange={(v) => v !== fachId && (setFachId(v), setThemenIds([]), setTeilWahl([]))}
               data-grammatik-fach
             />
             <NumberInput label="Klasse" min={1} max={13} value={jahrgang} onChange={(v) => setJahrgang(Number(v) || 6)} data-grammatik-jahrgang />
@@ -517,19 +543,21 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               wahl={(verben, titel) => setVerbWahl({ verben, titel })}
             />
           )}
-          {fachId && !eigenesAn && !mitVerben && (
+          {fachId && !eigenesAn && !mitVerben && vorgabe && (kursLehrwerk === undefined || !bestehend) && <Loader size="sm" />}
+          {fachId && !eigenesAn && !mitVerben && !(vorgabe && (kursLehrwerk === undefined || !bestehend)) && (
             <div data-grammatik-thema>
               <GrammatikAuswahl
-                key={fachId}
+                key={`${fachId}-${lehrwerkVorwahl?.buch ?? ''}`}
                 unitSofort={!vorgabe}
                 kurs={Boolean(vorgabe)}
-                lehrwerk={vorgabe?.lehrwerk}
+                ausblenden={vorgabe ? schonImKurs(bestehend ?? []) : undefined}
+                lehrwerk={lehrwerkVorwahl}
                 query={query}
                 wahl={{ themen: themenIds, teilformen: teilWahl }}
                 onChange={(w) => (setThemenIds(w.themen), setTeilWahl(w.teilformen))}
                 beschreibung={
                   vorgabe
-                    ? 'Angehakt = im Kurs freigegeben. Neu Angehaktes bekommt Aufgaben von der KI; Abgehaktes wird entfernt (der Lernstand bleibt).'
+                    ? 'Schon freigegebene Grammatik steht nicht mehr zur Wahl – sie steht in der Grammatik-Tabelle des Kurses (dort „+ Aufgaben"). Neu Angehaktes bekommt Aufgaben von der KI; früher Entferntes kommt mit seinem Lernstand zurück.'
                     : 'Ein oder mehrere Themen wählen – mit Band und Unit schlägt die App die Grammatik der Unit vor. Ohne Teilform-Auswahl übt die KI alle, die zur Klasse passen.'
                 }
               />
@@ -649,14 +677,8 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                 {!bestehend
                   ? 'Lade die Grammatik des Kurses …'
                   : aenderungen
-                    ? [
-                        kursAbgleich.erzeugen.length ? `${kursAbgleich.erzeugen.length} neu (KI erstellt Aufgaben)` : '',
-                        kursAbgleich.entfernen.length ? `${kursAbgleich.entfernen.length} entfernen` : '',
-                        kursAbgleich.wiederherstellen.length ? `${kursAbgleich.wiederherstellen.length} zurückholen` : ''
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')
-                    : 'Keine Änderung'}
+                    ? abgleichText(kursAbgleich)
+                    : 'Noch nichts gewählt'}
               </Text>
             )}
             <Button
@@ -665,7 +687,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               onClick={erstellen}
               data-grammatik-erstellen
             >
-              {kursAbgleich ? (kursAbgleich.erzeugen.length ? 'Speichern und Aufgaben erstellen' : 'Speichern') : 'Aufgaben erstellen'}
+              {kursAbgleich ? (kursAbgleich.erzeugen.length ? 'Hinzufügen und Aufgaben erstellen' : 'Hinzufügen') : 'Aufgaben erstellen'}
             </Button>
           </Group>
         </Stack>

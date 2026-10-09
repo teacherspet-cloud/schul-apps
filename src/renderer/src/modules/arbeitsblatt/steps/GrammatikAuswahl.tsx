@@ -80,13 +80,14 @@ export default function GrammatikAuswahl({
   teilformenWaehlbar = true,
   unitSofort = false,
   kurs = false,
+  ausblenden,
   beschreibung
 }: {
   query: GrammarQuery
   wahl: GrammatikWahl
   onChange: (w: GrammatikWahl) => void
-  /** Lehrwerk der Lerngruppe (knownVocab), sonst wählbar */
-  lehrwerk?: { buch?: string; unit?: string }
+  /** Lehrwerk der Lerngruppe (knownVocab), sonst wählbar; im Kurs auch die vorgewählten Units (09.10.2026: bis zum Stand der Klasse) */
+  lehrwerk?: { buch?: string; unit?: string; units?: string[] }
   /** Nur ein Thema (Grammatiktraining, Klassenarbeit) */
   einzeln?: boolean
   /** false = Teilformen nur zur Orientierung zeigen (Klassenarbeit speichert nur den Themennamen) */
@@ -103,6 +104,11 @@ export default function GrammatikAuswahl({
    * Auswahl (Chips) oben – angehakt ist, was in der Liste angehakt ist.
    */
   kurs?: boolean
+  /**
+   * Nicht zur Wahl stellen (09.10.2026, Wunsch der Lehrkraft): im Kurs schon freigegebene Grammatik – sie steht in der
+   * Grammatik-Tabelle des Kurses, weitere Aufgaben gibt es dort über „+ Aufgaben".
+   */
+  ausblenden?: string[]
   beschreibung?: string
 }): React.JSX.Element {
   const fach = query.subjectId
@@ -145,7 +151,12 @@ export default function GrammatikAuswahl({
   const [mitFrueheren, setMitFrueheren] = useState(false)
   const [unitModus, setUnitModus] = useState<'bis' | 'nur' | null>(null)
   // Kurs: mehrere Abschnitte (Units) zugleich
-  const [units, setUnits] = useState<string[]>(() => (kurs && startUnit && kapitel.includes(startUnit) ? [startUnit] : []))
+  const [units, setUnits] = useState<string[]>(() => {
+    if (!kurs) return []
+    const vor = buch && lehrwerk?.buch === buch ? (lehrwerk.units ?? []).filter((u) => kapitel.includes(u)) : []
+    if (vor.length) return vor
+    return startUnit && kapitel.includes(startUnit) ? [startUnit] : []
+  })
   const [unitHinweis, setUnitHinweis] = useState('')
   const frueher = buch ? fruehereBaende(buch) : []
   const herkunft = useMemo(() => (buch ? herkunftKarte(fach, buch, frueher) : new Map<string, string>()), [fach, buch, frueher.join('|')])
@@ -262,6 +273,8 @@ export default function GrammatikAuswahl({
   if (bereich && !unitAnsicht) liste = liste.filter((t) => oberBereich(t.area) === bereich)
   // Bei der Suche: Passendes vor Unpassendem
   if (suchAktiv && !unitAnsicht) liste = [...liste.filter((t) => passendIds.has(t.id)), ...liste.filter((t) => !passendIds.has(t.id))]
+  const verborgen = new Set(ausblenden ?? [])
+  if (verborgen.size) liste = liste.filter((t) => !verborgen.has(t.id))
 
   const gruppen = new Map<string, GrammarTopic[]>()
   for (const t of liste) {
@@ -288,8 +301,8 @@ export default function GrammatikAuswahl({
   }, [fachThemen, sequence])
   const niveaus = useMemo(() => CEFR_SCALE.filter((c) => fachThemen.some((t) => einfuehrungsNiveau(t.level) === c)) as string[], [fachThemen])
 
-  const favoriten = (gemerkt.favoriten[fach] ?? []).map(nachId).filter((t): t is GrammarTopic => Boolean(t))
-  const zuletzt = (gemerkt.zuletzt[fach] ?? []).map(nachId).filter((t): t is GrammarTopic => Boolean(t))
+  const favoriten = (gemerkt.favoriten[fach] ?? []).map(nachId).filter((t): t is GrammarTopic => Boolean(t) && !verborgen.has(t!.id))
+  const zuletzt = (gemerkt.zuletzt[fach] ?? []).map(nachId).filter((t): t is GrammarTopic => Boolean(t) && !verborgen.has(t!.id))
   const gewaehlt = themen.map(nachId).filter((t): t is GrammarTopic => Boolean(t))
   const zaehler = (t: GrammarTopic) => teilZaehler(t, query, teilformen)
   const teilSumme = gewaehlt.reduce((s, t) => s + zaehler(t).gewaehlt, 0)

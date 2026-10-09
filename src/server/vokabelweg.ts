@@ -172,7 +172,11 @@ async function wegeFuer(ich: NutzerInfo): Promise<Weg[]> {
       sprache,
       buch,
       abschnitte,
-      stufen: leiter(abschnitte, zugewiesen, anteil),
+      // Fortschrittspfad (09.10.2026): je Abschnitt kennengelernt (Fach ≥ 1) und ab Fach 2 – gesamt ist `woerter`
+      stufen: leiter(abschnitte, zugewiesen, anteil).map((st) => {
+        const wl = abschnitte.find((x) => x.key === st.key)?.woerter ?? []
+        return { ...st, kennengelernt: wl.filter((v) => fachVon(v) >= 1).length, fach2plus: wl.filter((v) => fachVon(v) >= EINGEUEBT_AB).length }
+      }),
       zuweisungen: zuw,
       farbe: await fachfarbeDerLehrkraft(juengste)
     })

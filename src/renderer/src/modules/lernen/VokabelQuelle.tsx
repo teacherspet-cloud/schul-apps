@@ -8,7 +8,9 @@ import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { eigeneWerte } from '../../shared/haeufig'
 import { Group, Loader, MultiSelect, SegmentedControl, Select, Stack, Text } from '@mantine/core'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { naechsterAbschnitt, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
+import { holen } from '../onlinetest/serverApi'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import type { Vokabel } from '@shared/vokabeltrainer'
 import { kernform } from '@shared/vokabeltrainer'
@@ -75,7 +77,11 @@ export async function mitBildern(a: VokabelAuswahl): Promise<VokabelAuswahl> {
   return { ...a, woerter }
 }
 
-export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => void }): React.JSX.Element {
+/**
+ * `kurs` (09.10.2026, Wunsch der Lehrkraft): Vokabeln für einen bestehenden Kurs – Lehrwerk und Band der Klasse sind
+ * vorgewählt, dazu der nächste Abschnitt nach dem höchsten schon im Kurs (shared/lehrwerkVorwahl.ts). Alles änderbar.
+ */
+export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null) => void; kurs?: string }): React.JSX.Element {
   const [art, setArt] = useState<'buch' | 'liste'>('buch')
   const [buecher, setBuecher] = useState<TextbookMeta[]>([])
   /*
@@ -102,6 +108,13 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
     )
     void window.api.library.list().then(setListen, () => setListen([]))
   }, [])
+  const [vorwahl, setVorwahl] = useState<VorwahlDaten | null>(null)
+  const vorgewaehlt = useRef(false)
+  useEffect(() => {
+    if (!kurs) return
+    void holen<VorwahlDaten>(`/server/klassen/vorwahl?kurs=${encodeURIComponent(kurs)}`).then(setVorwahl, () => setVorwahl(null))
+  }, [kurs])
+  const schule = useAppSettings((x) => x.settings.defaults)
   // Fremdsprachen der Lehrkraft, für die es Lehrwerke gibt (ohne Angabe: alle mit Lehrwerk)
   const vorhanden = [...new Set(buecher.map((b) => b.language))]
   // Seit 07.10.2026 alle Sprachen wählbar – die eigenen stehen im Fachfeld oben (im Standardmodus nur sie, weitere per Eintippen)
@@ -129,6 +142,22 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
       .then(setBuch, (e: unknown) => notifyError(e))
       .finally(() => setLaeuft(false))
   }
+  // Vorwahl einmal anwenden, sobald Lehrwerke und Kursdaten da sind
+  useEffect(() => {
+    if (vorgewaehlt.current || !vorwahl || !buecher.length) return
+    vorgewaehlt.current = true
+    const b = vorwahlBuch(vorwahl, buecher, { land: schule?.stateId, schulform: schule?.schoolTypeId })
+    if (!b) return
+    setSprache(b.language)
+    setReihe(reiheVon(b))
+    bandWaehlen(b.id)
+    const naechster = b.id === vorwahl.kursLehrwerk ? naechsterAbschnitt(b, vorwahl.kursUnits) : null
+    if (naechster) {
+      setUnits([naechster.unit])
+      setAbschnitte([abschnittKey(naechster.unit, naechster.abschnitt)])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vorwahl, buecher])
   const buchUnits = useMemo(() => buch?.units ?? [], [buch])
   // Gewählte Units in Buchreihenfolge, je mit ihren gewählten Abschnitten (ebenfalls in Buchreihenfolge)
   const gewaehlt = useMemo(

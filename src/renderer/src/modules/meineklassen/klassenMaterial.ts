@@ -113,7 +113,7 @@ export function klassenBlattMeta(
   const land = settings.defaults?.stateId ?? 'NI'
   const form = settings.defaults?.schoolTypeId ?? 'gymnasium'
   const schulform = SCHULFORMEN[land]?.find((f) => f.id === form)?.name ?? ''
-  const fach = SUBJECTS.find((s) => s.label.toLowerCase() === k.fach.toLowerCase()) ?? SUBJECTS.find((s) => s.id === 'englisch') ?? SUBJECTS[0]
+  const fach = blattFach(k.fach)
   return {
     ...defaultMeta(land, form, schulform),
     subjectId: fach.id,
@@ -130,24 +130,58 @@ export function klassenBlattMeta(
   }
 }
 
-/** Übungsblatt im Hintergrund erzeugen; fertig → in der Klasse unter „Passendes Material" */
-export function blattFuerKlasse(
-  k: { id: string; name: string; fach: string; titel: string },
-  v: { thema: string; schwerpunkte: string[]; testArt: string; titel: string; testId: string }
-): void {
-  const meta = klassenBlattMeta(k, v)
+/** Fach des Arbeitsblatts aus dem Fachnamen (Englisch …), sonst Englisch */
+const blattFach = (name: string): (typeof SUBJECTS)[number] =>
+  SUBJECTS.find((s) => s.label.toLowerCase() === name.trim().toLowerCase()) ?? SUBJECTS.find((s) => s.id === 'englisch') ?? SUBJECTS[0]
+
+/**
+ * „Wackelige Wörter" als kurzes Arbeitsblatt (09.10.2026, Wunsch der Lehrkraft): höchstens zwei Seiten mit genau diesen
+ * Wörtern – Zuordnen, Lückensätze (mit den Beispielsätzen) und Übersetzen im Zusammenhang; Fach = Sprache des Kurses,
+ * Jahrgang der Klasse. Beim Freischalten geht das Fach mit (meta.subjectLabel) – so liegt es im passenden Fach-Ordner
+ * der Lernenden unter „Materialien".
+ */
+export function vokabelBlattMeta(
+  k: { name: string; fach: string; titel: string },
+  v: { fach: string; woerter: { term: string; translation: string; example?: string }[] }
+): WorksheetMeta {
+  const { settings } = useAppSettings.getState()
+  const land = settings.defaults?.stateId ?? 'NI'
+  const form = settings.defaults?.schoolTypeId ?? 'gymnasium'
+  const schulform = SCHULFORMEN[land]?.find((f) => f.id === form)?.name ?? ''
+  const fach = blattFach(v.fach || k.fach)
+  const liste = v.woerter.map((w) => `- ${w.term} – ${w.translation}${w.example ? ` (Beispiel: ${w.example})` : ''}`)
+  return {
+    ...defaultMeta(land, form, schulform),
+    subjectId: fach.id,
+    subjectLabel: fach.label,
+    grade: jahrgangAus(k.name),
+    title: 'Vokabelübung: wackelige Wörter',
+    topic: `Kurze Vokabelübung mit ${v.woerter.length} Wörtern, die in der Klasse gerade wackeln (${k.titel})`,
+    learningGoals: [
+      `Kurzes Übungsblatt (höchstens zwei Seiten) mit GENAU diesen ${v.woerter.length} Wörtern – keine weiteren Vokabeln abfragen:`,
+      ...liste,
+      'Aufgaben, aufsteigend: 1. Zuordnen (Wort – Bedeutung), 2. Lückensätze mit den Beispielsätzen bzw. ähnlichen Sätzen (Wortspeicher mit genau diesen Wörtern),',
+      '3. Übersetzen im Zusammenhang (kurze Sätze, in denen die Wörter vorkommen). Kurz und klar, ohne lange Einleitung, mit Lösungen.'
+    ].join('\n'),
+    priorKnowledge: 'Die Wörter wurden im Vokabeltraining der Klasse schon geübt, sitzen aber bei vielen noch nicht.',
+    pages: 2
+  }
+}
+
+/** Gemeinsamer Hintergrundauftrag: Blatt planen, ausformulieren, fertigstellen; fertig → „Passendes Material" */
+function klassenBlattAuftrag(k: { id: string; titel: string }, meta: WorksheetMeta, schluessel: string, art: string): void {
   void starteAuftrag({
     moduleId: 'meineklassen',
     docId: k.id,
     titel: meta.title,
-    art: `Übungsblatt für ${k.titel}`,
+    art: `${art} für ${k.titel}`,
     eingabe: meta,
     sperrt: false,
-    schluessel: `meineklassen:${k.id}:${v.testId}`,
-    fehlerTitel: 'Übungsblatt konnte nicht erstellt werden',
+    schluessel,
+    fehlerTitel: `${art} konnte nicht erstellt werden`,
     arbeit: async (m, ctx) => {
       const profile = profileFromMeta(m)
-      ctx.melde('Die KI plant das Übungsblatt …')
+      ctx.melde(`Die KI plant das ${art} …`)
       const ws: Worksheet = { version: 1, meta: m, design: presetDesigns()[0], outline: null, sheets: [], sources: [], createdAt: new Date().toISOString() }
       ws.outline = await generateOutline(m, profile, [], ctx.ai)
       const result = await generateWorksheet(ws, profile, {
@@ -168,8 +202,26 @@ export function blattFuerKlasse(
       const { logoDataUrl, settings } = useAppSettings.getState()
       const docId = await speichereNeuesArbeitsblatt(ws, logoDataUrl ?? null, settings.schoolName ?? '')
       schreiben(k.id, [...lesen(k.id).filter((x) => x.docId !== docId), { docId, titel: ws.meta.title || meta.title }])
-      notifySuccess(`Übungsblatt für ${k.titel} ist fertig – in „Meine Klassen" ansehen und freischalten.`)
+      notifySuccess(`${art} für ${k.titel} ist fertig – in „Meine Klassen" ansehen und freischalten.`)
+      // „Öffnen" im fertigen Auftrag: das Blatt im Editor (während er läuft: die Klasse, docId = Lerngruppe)
+      return { moduleId: 'arbeitsblatt', docId }
     },
-    abschluss: () => `Übungsblatt für ${k.titel} fertig`
+    abschluss: () => `${art} für ${k.titel} fertig`
   })
+}
+
+/** Übungsblatt im Hintergrund erzeugen; fertig → in der Klasse unter „Passendes Material" */
+export function blattFuerKlasse(
+  k: { id: string; name: string; fach: string; titel: string },
+  v: { thema: string; schwerpunkte: string[]; testArt: string; titel: string; testId: string }
+): void {
+  klassenBlattAuftrag(k, klassenBlattMeta(k, v), `meineklassen:${k.id}:${v.testId}`, 'Übungsblatt')
+}
+
+/** Kurzes Vokabel-Arbeitsblatt zu den wackeligen Wörtern im Hintergrund erzeugen (09.10.2026) */
+export function vokabelBlattFuerKlasse(
+  k: { id: string; name: string; fach: string; titel: string },
+  v: { fach: string; woerter: { term: string; translation: string; example?: string }[] }
+): void {
+  klassenBlattAuftrag(k, vokabelBlattMeta(k, v), `meineklassen:${k.id}:wackelig`, 'Vokabelblatt')
 }

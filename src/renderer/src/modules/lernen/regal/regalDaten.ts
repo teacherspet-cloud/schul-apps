@@ -12,6 +12,8 @@ import { fachName } from './beschriftung'
 export interface KursKurz {
   id: string
   titel: string
+  /** Eigener Kursname ohne Klasse – unterscheidet mehrere Kurse eines Fachs (09.10.2026) */
+  name?: string
   fach: string
   uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number }
   /** Grammatik (08.10.2026): Jahrgang und Stelle im Lehrwerk – das Register gliedert nach Schuljahren */

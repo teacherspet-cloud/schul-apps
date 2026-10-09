@@ -8,8 +8,11 @@
  *    Vokabeln & Grammatik (nur Sprachfächer), Tests & Noten, Lernende.
  *  - Materialien: sortier- und filterbar (MaterialListe.tsx), mit Details und „Ablegen ▾" (PDF, Word, Drucken, IServ in der
  *    Ablagestruktur der Verwaltung, klassenAblage.ts). Was von hier geöffnet wird, führt mit „Zurück" wieder hierher.
- *  - Vorschläge: „Wackelige Wörter" als Vokabeltraining (Vorschau → „Jetzt freischalten"); „Übungsblatt zu den Fehlern
- *    des letzten Tests" entsteht im Hintergrund (KI-Zugang der Lehrkraft) und erscheint fertig zum Ansehen und Freischalten.
+ *  - Vorschläge: „Wackelige Wörter" (09.10.2026) im Kurs der Klasse wiederholen lassen (wieder fällig, kein zweiter Kurs)
+ *    oder als kurzes Arbeitsblatt; „Übungsblatt zu den Fehlern des letzten Tests" entsteht im Hintergrund (KI-Zugang der
+ *    Lehrkraft) und erscheint fertig zum Ansehen und Freischalten.
+ *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
+ *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
 import {
   ActionIcon,
@@ -53,6 +56,7 @@ import {
   IconLock,
   IconPencil,
   IconPlus,
+  IconRepeat,
   IconRoute,
   IconSparkles,
   IconUserExclamation,
@@ -64,12 +68,15 @@ import { create } from 'zustand'
 import { FAECHER, fachAusName, fachSchreibweise } from '@shared/faecher'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
-import { neuAnlegen, openDocument, openModule, useNavigation } from '../../shared/navigation'
+import { neuAnlegen, openDocument, openModule, useDokumentOeffner, useNavigation } from '../../shared/navigation'
 import { setzeFachVorgabe, setzeJahrgangVorgabe } from '../../shared/fachVorgabe'
 import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
-import { blattFuerKlasse, useFertigeBlaetter, type FertigesBlatt } from './klassenMaterial'
+import { blattFuerKlasse, useFertigeBlaetter, vokabelBlattFuerKlasse, type FertigesBlatt } from './klassenMaterial'
+import { grammatikVorgabe, Hinzufuegen as VokabelnHinzufuegen } from '../lernen/VokabelTraining'
+import { Freigeben as GrammatikFreigeben, type GrammatikVorgabe } from '../lernen/GrammatikTraining'
+import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
@@ -182,7 +189,9 @@ interface KlasseDetail {
     vokId?: string
     extra?: boolean
   }[]
-  wackelig: { term: string; translation: string; quote: number }[]
+  wackelig: { term: string; translation: string; quote: number; kurs?: string; id?: string }[]
+  /** Kurs der Klasse in Sprachenlernen (09.10.2026) – Ziel von „Vokabeln/Grammatik hinzufügen" */
+  klassenKurs?: string | null
   reihen: {
     zid: string
     titel: string
@@ -337,6 +346,20 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
   useEffect(() => {
     if (active) laden()
   }, [active, laden])
+  /*
+   * „Öffnen" eines Auftrags aus „Meine Klassen" (09.10.2026): docId = Lerngruppe → diese Klasse mit dem Fach. Unbekanntes
+   * führt still zur Übersicht.
+   */
+  useDokumentOeffner('meineklassen', async (gruppeId) => {
+    try {
+      const d = await holen<{ klassen: KlasseKurz[] }>('/server/klassen')
+      setKlassen(d.klassen)
+      const k = d.klassen.find((x) => x.faecher.some((f) => f.id === gruppeId) || x.gruppen.includes(gruppeId))
+      setze(k ? { klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null } : { klasse: null, gruppe: null })
+    } catch {
+      setze({ klasse: null, gruppe: null })
+    }
+  })
   if (!active) return null
   const q = suche.trim().toLowerCase()
   const sichtbar = (klassen ?? []).filter((k) => !q || `${k.name} ${k.faecher.map((f) => f.fach).join(' ')}`.toLowerCase().includes(q))
@@ -687,11 +710,20 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
+  // „Vokabeln/Grammatik hinzufügen" für den Kurs der Klasse (09.10.2026)
+  const [vokHinzu, setVokHinzu] = useState(false)
+  const [gramVorgabe, setGramVorgabe] = useState<GrammatikVorgabe | null>(null)
+  const [wiederholt, setWiederholt] = useState(false)
   const { reiter, setze } = useSicht()
   const laden = useCallback(() => {
     void holen<KlasseDetail>(`/server/klassen/${id}`).then(setD, (e: unknown) => notifyError(e))
   }, [id])
   useEffect(laden, [laden])
+  // „+ Aufgaben" fertig, Grammatik zurückgeholt … → neu laden
+  useEffect(() => {
+    window.addEventListener(GRAMMATIK_GEAENDERT, laden)
+    return () => window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
+  }, [laden])
   const fertige = useFertigeBlaetter(id)
   const { logoDataUrl, settings } = useAppSettings()
   if (!d)
@@ -701,12 +733,37 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
       </Center>
     )
   const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster }
-  const vokabelnFreischalten = async (v: Extract<Vorschlag, { art: 'vokabeln' }>): Promise<void> => {
+  /*
+   * „Wackelige Wörter" (09.10.2026, Wunsch der Lehrkraft): kein neuer Kurs mehr (er erschien als zweiter Kurs im Ordner der
+   * Lernenden) – die Wörter stehen schon im Kurs der Klasse und werden dort wieder fällig; oder ein kurzes Arbeitsblatt.
+   */
+  const imKursWiederholen = async (): Promise<void> => {
+    setWiederholt(true)
     try {
-      await senden('/server/vokabeln/freigeben', { lerngruppeId: d.id, titel: v.titel, sprache: v.sprache, fach: v.fach, woerter: v.woerter })
-      notifySuccess(`„${v.titel}" ist für ${d.titel} freigeschaltet.`)
+      const r = await senden<{ woerter: number; lernende: number; kurse: string[] }>(`/server/klassen/${d.id}/wackelig-wiederholen`, {})
+      notifySuccess(
+        r.woerter
+          ? `${r.woerter} wackelige ${r.woerter === 1 ? 'Wort ist' : 'Wörter sind'} für ${r.lernende} Lernende wieder dran – im Kurs ${r.kurse.map((k) => `„${k}“`).join(', ')}.`
+          : 'Gerade wackelt bei niemandem eines dieser Wörter – nichts zu wiederholen.'
+      )
       setVorschau(null)
       laden()
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setWiederholt(false)
+    }
+  }
+  const alsArbeitsblatt = (v: Extract<Vorschlag, { art: 'vokabeln' }>): void => {
+    vokabelBlattFuerKlasse(d, v)
+    notifySuccess('Die KI erstellt das Arbeitsblatt im Hintergrund – fertig steht es hier unter „Passendes Material“ zum Freischalten.')
+    setVorschau(null)
+  }
+  const grammatikHinzufuegen = async (): Promise<void> => {
+    if (!d.klassenKurs) return
+    try {
+      const k = await holen<{ titel: string; sprache?: string; quelle?: { lehrwerk?: string; unit?: string } | null }>(`/server/vokabeln/${d.klassenKurs}`)
+      setGramVorgabe(grammatikVorgabe(d.klassenKurs, k.titel, k.sprache ?? '', k.quelle))
     } catch (e) {
       notifyError(e)
     }
@@ -791,7 +848,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
                 )}
                 {v.art === 'vokabeln' ? (
                   <Button size="xs" onClick={() => setVorschau(v)} data-vorschlag-ansehen>
-                    Ansehen und freischalten
+                    Ansehen und wiederholen lassen
                   </Button>
                 ) : (
                   <Tooltip label="Entsteht im Hintergrund mit dem eigenen KI-Zugang; ist es fertig, erscheint es hier zum Freischalten">
@@ -833,9 +890,16 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
             <Stack gap="xs">
               {/* Kopfzeile: Kurse links, Lehrwerk-Stand als kleiner Knopf rechts (08.10.2026) */}
               <Group justify="space-between" gap="xs">
-                <Text fw={700} size="sm">
-                  Kurse in Sprachenlernen
-                </Text>
+                <Group gap="xs">
+                  <Text fw={700} size="sm">
+                    Kurse in Sprachenlernen
+                  </Text>
+                  {d.klassenKurs && (
+                    <Button size="compact-sm" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setVokHinzu(true)} data-mk-vokabeln-hinzufuegen>
+                      Vokabeln hinzufügen
+                    </Button>
+                  )}
+                </Group>
                 <LehrwerkStand gruppeId={id} />
               </Group>
               <KursKarten d={d} ort={ort} ohneGrammatik />
@@ -860,9 +924,22 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           <Tabs.Panel value="grammatik" pt="sm">
             <Stack gap="xs">
               <Group justify="space-between" gap="xs">
-                <Text fw={700} size="sm">
-                  Grammatik in Sprachenlernen
-                </Text>
+                <Group gap="xs">
+                  <Text fw={700} size="sm">
+                    Grammatik in Sprachenlernen
+                  </Text>
+                  {d.klassenKurs && (
+                    <Button
+                      size="compact-sm"
+                      variant="light"
+                      leftSection={<IconPlus size={14} />}
+                      onClick={() => void grammatikHinzufuegen()}
+                      data-mk-grammatik-hinzufuegen
+                    >
+                      Grammatik hinzufügen
+                    </Button>
+                  )}
+                </Group>
                 <LehrwerkStand gruppeId={id} />
               </Group>
               <GrammatikReiter d={d} ort={ort} />
@@ -885,7 +962,9 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
         <Modal opened onClose={() => setVorschau(null)} title={vorschau.titel} size="lg">
           <Stack>
             <Text size="sm" c="dimmed">
-              {vorschau.woerter.length} Wörter für {d.titel} – als Vokabeltraining im Karteikasten der Lern-App.
+              {vorschau.woerter.length} Wörter für {d.titel}. Sie stehen schon im Kurs der Klasse: „Im Kurs wiederholen“ macht sie bei allen, die
+              darin wackeln, in der nächsten Tagesrunde wieder fällig – ohne neuen Kurs. Oder die KI erstellt daraus ein kurzes Arbeitsblatt
+              (höchstens zwei Seiten), das danach hier zum Freischalten bereitsteht.
             </Text>
             <Table withRowBorders={false} verticalSpacing={2}>
               <Table.Tbody>
@@ -901,13 +980,18 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
               <Button variant="default" onClick={() => setVorschau(null)}>
                 Abbrechen
               </Button>
-              <Button leftSection={<IconLock size={14} />} onClick={() => void vokabelnFreischalten(vorschau)} data-vokabeln-freischalten>
-                Jetzt freischalten
+              <Button variant="light" leftSection={<IconFileText size={14} />} onClick={() => alsArbeitsblatt(vorschau)} data-wackelig-blatt>
+                Als kurzes Arbeitsblatt
+              </Button>
+              <Button leftSection={<IconRepeat size={14} />} loading={wiederholt} onClick={() => void imKursWiederholen()} data-wackelig-wiederholen>
+                Im Kurs wiederholen
               </Button>
             </Group>
           </Stack>
         </Modal>
       )}
+      {vokHinzu && d.klassenKurs && <VokabelnHinzufuegen id={d.klassenKurs} schliessen={() => (setVokHinzu(false), laden())} />}
+      {gramVorgabe && <GrammatikFreigeben vorgabe={gramVorgabe} schliessen={() => (setGramVorgabe(null), laden())} />}
       {freigabe && (
         <BlattFreigabeDialog
           ws={freigabe.ws}
@@ -1051,7 +1135,7 @@ function GrammatikReiter({ d, ort }: { d: KlasseDetail; ort: Ort }): React.JSX.E
   if (!d.grammatik.length)
     return (
       <Text c="dimmed" size="sm" data-keine-grammatik>
-        Noch keine Grammatik für diese Lerngruppe – im Kurs in Sprachenlernen „Grammatik hinzufügen“.
+        Noch keine Grammatik für diese Lerngruppe – oben „Grammatik hinzufügen“.
       </Text>
     )
   return (
@@ -1222,6 +1306,26 @@ function KursZeile({ g }: { g: KlasseDetail['grammatik'][number] }): React.JSX.E
   )
 }
 
+/** „+ Aufgaben" (09.10.2026, Wunsch der Lehrkraft): wie in der Grammatik-Tabelle des Kurses – KI im Hintergrund, angehängt */
+function MehrAufgabenKnopf({ g }: { g: KlasseDetail['grammatik'][number] }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  return (
+    <>
+      <Tooltip label="Weitere Aufgaben zu dieser Grammatik erstellen lassen">
+        <Button size="compact-xs" variant="subtle" leftSection={<IconPlus size={12} />} onClick={() => setOffen(true)} data-mk-mehr-aufgaben={g.titel}>
+          Aufgaben
+        </Button>
+      </Tooltip>
+      {offen && (
+        <MehrAufgabenFenster
+          g={{ id: g.id, titel: g.titel, thema: g.thema, aufgaben: g.aufgaben, lernende: g.lernende, sicherSchnitt: g.sicherSchnitt, status: g.status, erstellt: g.erstellt }}
+          schliessen={() => setOffen(false)}
+        />
+      )}
+    </>
+  )
+}
+
 function grammatikEintraege(liste: KlasseDetail['grammatik'], ort: Ort): Eintrag[] {
   return liste.map((g) => ({
     key: `g${g.id}`,
@@ -1248,6 +1352,7 @@ function grammatikEintraege(liste: KlasseDetail['grammatik'], ort: Ort): Eintrag
         oeffnen={() => oeffneMitRueckweg('grammatiktraining', g.id)}
         aktionen={
           <>
+            {g.status === 'offen' && <MehrAufgabenKnopf g={g} />}
             <AblegenKnopf quelle={grammatikQuelle(g.id, g.titel)} {...ort} programm="grammatiktest" klein />
             {oeffnenKnopf(g.titel, () => oeffneMitRueckweg('grammatiktraining', g.id))}
           </>

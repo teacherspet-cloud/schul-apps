@@ -18,7 +18,7 @@
 import { istRekord, nachSpielfehler, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
-import { ohneKlasse } from '../shared/ohneKlasse'
+import { ohneKlasse, ohneKlassenname } from '../shared/ohneKlasse'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
 import { imNutzer } from './kontext'
@@ -708,7 +708,7 @@ export function vokabelStand(zid: string, sid: string): { eingereicht: number; r
 /** Kurzfassung für die Lernenden (auch für die Lern-App) */
 export function vokabelListenFuer(
   ich: NutzerInfo
-): { id: string; titel: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht> }[] {
+): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht> }[] {
   return (
     (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
       // Kurse nur mit Grammatik (08.10.2026) sind kein Vokabeltraining – ihre Grammatik kommt über grammatikFuer
@@ -717,6 +717,8 @@ export function vokabelListenFuer(
         id: z.id,
         // Lernende sehen die Überschrift ohne Klasse („Englisch" statt „5b - Englisch"), nicht „Green Line 1 - Unit 1 - …" (08.10.2026)
         titel: titelFuerLernende(z),
+        // Eigener Kursname ohne Klasse (09.10.2026): unterscheidet mehrere Kurse eines Fachs im Ordner
+        name: ohneKlassenname(z.titel, z.lerngruppe_id ? lerngruppe(z.lerngruppe_id)?.name ?? '' : ''),
         fach: z.fach,
         sprache: z.sprache,
         testTermin: z.test_termin,
@@ -1454,7 +1456,8 @@ export function vokabelnDerGruppe(
     reifeWoerter: number
   }[]
   jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
-  wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string; betroffen: number }[]
+  /** `kurs` und `id`: wo das Wort steht (erster offener Kurs) – „Im Kurs wiederholen" in „Meine Klassen" (09.10.2026) */
+  wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string; betroffen: number; kurs: string; id: string }[]
 } {
   const zs = db()
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
@@ -1464,7 +1467,7 @@ export function vokabelnDerGruppe(
   // Rang: Test in den nächsten 14 Tagen → bei wie vielen Kindern wackelig → wie oft falsch → Fehlerquote; höchstens 20
   const woerterFehler = new Map<
     string,
-    { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean }
+    { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
   >()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
   const trainings = zs.map((z) => {
@@ -1519,7 +1522,7 @@ export function vokabelnDerGruppe(
         jeWort.set(v.id, j)
         if (!offen) continue
         const k = `${z.sprache}|${v.term}`
-        const e = woerterFehler.get(k) ?? { v, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach, betroffen: 0, testBald: false }
+        const e = woerterFehler.get(k) ?? { v, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach, betroffen: 0, testBald: false, kurs: z.id }
         const aktuellWackelig = w.fach >= 1 && w.fach <= 2 && w.falsch > 0 && jetzt - (w.zuletzt || 0) < 14 * TAG
         if (aktuellWackelig) {
           e.betroffen++
@@ -1582,7 +1585,9 @@ export function vokabelnDerGruppe(
       quote: e.falsch / e.versuche,
       sprache: e.sprache,
       fach: e.fach,
-      betroffen: e.betroffen
+      betroffen: e.betroffen,
+      kurs: e.kurs,
+      id: e.v.id
     }))
   return { trainings, jePerson, wackelig }
 }

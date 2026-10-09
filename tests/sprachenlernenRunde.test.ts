@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { nachnameSchluessel, namenVergleich } from '../src/shared/namenListe'
-import { freigabeAbgleich, vorabGewaehlt, type BestehendeGrammatik } from '../src/renderer/src/modules/lernen/kurs/freigabeAbgleich'
+import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from '../src/renderer/src/modules/lernen/kurs/freigabeAbgleich'
 import { mehrAnzahl } from '../src/renderer/src/modules/lernen/grammatikErzeugen'
 
 /* Sprachenlernen, Runde 08.10.2026: Nachnamen-Sortierung, Abgleich im Dialog „Grammatik hinzufügen", „+ Aufgaben" */
@@ -33,21 +33,21 @@ describe('Grammatik hinzufügen: Abgleich mit dem Kurs', () => {
     { id: 'g5', themen: [], status: 'offen' },
     { id: 'e1', themen: ['going-to'], status: 'entwurf' }
   ]
-  it('vorab angehakt: freigegeben (auch abgeschlossen) und Entwürfe, nicht Entferntes', () => {
-    expect(vorabGewaehlt(bestehend).sort()).toEqual(['future', 'going-to', 'past', 'perfect', 'will'])
+  // 09.10.2026: schon Freigegebenes steht nicht mehr zur Wahl, der Dialog entfernt nichts
+  it('nicht zur Wahl: freigegeben (auch abgeschlossen) und Entwürfe, nicht Entferntes', () => {
+    expect(schonImKurs(bestehend).sort()).toEqual(['future', 'going-to', 'past', 'perfect', 'will'])
   })
-  it('unverändert gespeichert: nichts zu tun', () => {
-    expect(freigabeAbgleich(vorabGewaehlt(bestehend), bestehend)).toEqual({ erzeugen: [], entfernen: [], wiederherstellen: [] })
+  it('nichts gewählt: nichts zu tun', () => {
+    expect(freigabeAbgleich([], bestehend)).toEqual({ erzeugen: [], wiederherstellen: [] })
   })
-  it('neu angehakt → Aufgaben; schon Freigegebenes → keine neuen; abgehakt → entfernen; wieder angehakt → zurück', () => {
+  it('neu angehakt → Aufgaben; früher entfernt → zurück; schon Freigegebenes wird nie doppelt erzeugt', () => {
     const r = freigabeAbgleich(['past', 'will', 'plural', 'adverbs', 'adverbs', 'going-to'], bestehend)
-    expect(r.erzeugen).toEqual(['adverbs'])
-    // g2 bleibt (ein Thema noch angehakt), g4 abgehakt; Entwurf und Training ohne Thema bleiben unberührt
-    expect(r.entfernen).toEqual(['g4'])
-    expect(r.wiederherstellen).toEqual(['g3'])
+    expect(r).toEqual({ erzeugen: ['adverbs'], wiederherstellen: ['g3'] })
+    expect(abgleichText(r)).toBe('1 neu (KI erstellt Aufgaben) · 1 zurückholen')
   })
-  it('alles abgehakt: entfernt jedes Training mit Thema, nie Entwürfe', () => {
-    expect(freigabeAbgleich([], bestehend)).toEqual({ erzeugen: [], entfernen: ['g1', 'g2', 'g4'], wiederherstellen: [] })
+  it('Thema in einem entfernten UND einem aktiven Training: nicht zurückholen (steht schon im Kurs)', () => {
+    const b2: BestehendeGrammatik[] = [...bestehend, { id: 'g6', themen: ['past'], status: 'entfernt' }]
+    expect(freigabeAbgleich(['past'], b2)).toEqual({ erzeugen: [], wiederherstellen: [] })
   })
 })
 

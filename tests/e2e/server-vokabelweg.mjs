@@ -1,4 +1,5 @@
 // Vokabelweg (03.10.2026, abgestimmt): Lehrwerk-Leiter, Freischalten ab 80 % in Fach 2, gemeinsamer Kasten.
+// Seit 09.10.2026 zeigt die Seite einen Fortschrittspfad (halber Stern, Stern + Fähnchen, Figur) – nur zum Ansehen.
 // Vorher: Server lokal (KI-Attrappe), IServ NICHT eingerichtet. Es wird keine KI gebraucht.
 // Aufruf: node tests/e2e/server-vokabelweg.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -74,17 +75,26 @@ try {
   pruefe(Boolean(w) && w.band === 'Green Line 2', `Vokabelweg Green Line 2 (${w?.stufen?.length} Abschnitte)`)
   pruefe(w.stufen[0].frei && w.stufen[0].grund === 'zugewiesen' && !w.stufen[1].frei, 'Zugewiesener Abschnitt frei, der nächste gesperrt')
 
-  // Leiter im Browser, erster Besuch (merkt sich den Stand)
+  pruefe(
+    w.stufen[0].woerter === a0.entries.length && w.stufen[0].kennengelernt === 0 && w.stufen[0].fach2plus === 0,
+    'Zahlen je Abschnitt (gesamt, kennengelernt, ab Fach 2)'
+  )
+
+  // Fortschrittspfad im Browser (09.10.2026), erster Besuch (merkt sich den Stand)
   const s = await sm.newPage()
   // Seit dem Regal (08.10.2026) steht der Vokabelweg im Fachordner, Register Vocabulary
   await s.goto(`${A}/s/ordner/Englisch?r=vok`)
   pruefe(await da(s.locator('[data-vokabelweg-karte]')), 'Fachordner zeigt den Vokabelweg')
   await s.locator('[data-vokabelweg-karte]').first().click()
-  pruefe(await da(s.locator('[data-vokabelweg]')), 'Freischalt-Leiste im Kasten')
+  pruefe(await da(s.locator('[data-vokabelweg]')), 'Fortschrittspfad geöffnet')
   pruefe(
-    (await s.locator('[data-vw-stufe="zu"]').count()) >= 1 && (await s.locator('[data-vw-aktuell]').count()) === 1,
-    'Gesperrte Abschnitte und aktueller Abschnitt'
+    (await s.locator('[data-vp-stufe="gesperrt"]').count()) >= 1 && (await s.locator('[data-vp-hier]').count()) === 1,
+    'Gesperrte Wegpunkte und ein aktueller Wegpunkt'
   )
+  pruefe((await s.locator('[data-vp-figur]').count()) === 1, 'Figur steht am aktuellen Wegpunkt')
+  pruefe((await s.locator('[data-vp-lage="spaeter"]').count()) >= 1, 'Spätere Units gedimmt')
+  // Nur ansehen: kein Karteikasten, keine Lernkarte
+  pruefe((await s.locator('[data-vokabel-kasten], [data-lernkarte]').count()) === 0, 'Kein Karteikasten auf dem Vokabelweg')
   await s.screenshot({ path: join(out, '1-weg.png'), fullPage: true })
 
   // Lernen: jedes Wort einmal als Karte gewusst (Fach 1), dann frei geschrieben (Fach 2)
@@ -98,6 +108,10 @@ try {
   }
   w = await weg()
   pruefe(w.stufen[0].gelernt && w.stufen[1].frei && w.stufen[1].grund === 'gelernt', `Gelernt → ${a1.unit} · ${a1.section} freigeschaltet`)
+  pruefe(
+    w.stufen[0].kennengelernt === a0.entries.length && w.stufen[0].fach2plus === a0.entries.length,
+    'Zahlen des gelernten Abschnitts: alle kennengelernt, alle ab Fach 2'
+  )
   const kasten2 = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}`, { headers: KOPF })).json()
   pruefe(
     kasten2.woerter.some((v) => v.id.startsWith('b:')),
@@ -116,29 +130,43 @@ try {
     'Übung im Weg zählt in der zugewiesenen Liste mit'
   )
 
-  // Zweiter Besuch: Feier für den neu freigeschalteten Abschnitt
+  // Zweiter Besuch: Feier für den neu abgeschlossenen Abschnitt, Stern und Fähnchen, Figur weitergezogen
   await s.goto(`${A}/s/vw/${encodeURIComponent(w.key)}`)
-  pruefe(await da(s.locator('[data-vw-neu]')), 'Neu freigeschaltet wird gefeiert')
-  await s.screenshot({ path: join(out, '2-freigeschaltet.png'), fullPage: true })
+  pruefe(await da(s.locator('[data-vw-neu]')), 'Neu abgeschlossen wird gefeiert')
+  pruefe(
+    (await s.locator(`[data-vp-punkt="${w.stufen[0].key}"][data-vp-stufe="abgeschlossen"] .vp-fahne`).count()) === 1,
+    'Abgeschlossener Abschnitt mit Stern und Fähnchen'
+  )
+  const hier = await s.locator('[data-vp-hier]').getAttribute('data-vp-punkt')
+  pruefe(hier === w.stufen.find((x) => x.aktuell)?.key, 'Figur steht am neuen aktuellen Abschnitt')
+  await s.screenshot({ path: join(out, '2-abgeschlossen.png'), fullPage: true })
 
-  // Zuklappbar (08.10.2026): zugeklappt als Vorgabe, aufgeklappt bleibt nach dem Neuladen (am Konto gemerkt)
-  pruefe((await s.locator('[data-vokabelweg][data-vw-offen]').count()) === 0, 'Vokabelweg zugeklappt als Vorgabe')
-  await s.locator('[data-vw-klappen]').click()
-  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]'), 5000), 'Vokabelweg aufgeklappt')
-  await s.waitForTimeout(800)
-  const darst = await (await sm.request.get(`${A}/s/api/darstellung`, { headers: KOPF })).json()
-  pruefe(darst.darstellung?.vokabelwegOffen === true, 'Aufgeklappt am Konto gespeichert')
-  await s.reload()
-  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]')), 'Nach dem Neuladen weiter aufgeklappt')
-  pruefe((await s.locator('button[data-vw-stufe="zu"]').count()) === 0, 'Gesperrte Abschnitte nicht anklickbar')
+  // Antippen zeigt nur eine Auskunft – kein Fenster zum Üben
+  const k0 = w.stufen[0].key
+  await s.locator(`[data-vp-punkt="${k0}"]`).click()
+  const auskunft = s.locator(`[data-vp-auskunft="${k0}"]`)
+  pruefe(await da(auskunft, 5000), 'Auskunft zum Wegpunkt')
+  const text = (await auskunft.textContent()) ?? ''
+  pruefe(
+    text.includes(`${a0.entries.length} von ${a0.entries.length} kennengelernt`) && text.includes('sicher genug'),
+    `Auskunft nennt den Stand (${text.slice(0, 80)})`
+  )
+  pruefe((await s.locator('[data-vw-fenster], [data-lernkarte]').count()) === 0, 'Kein Üben vom Vokabelweg aus')
+  await s.screenshot({ path: join(out, '3-auskunft.png') })
 
-  // Abschnitt antippen (08.10.2026): Fenster mit genau seinen Wörtern, Lernkarte, Antwort zählt im selben Kasten
+  // Telefon: der Pfad läuft senkrecht
+  const tel = await sm.newPage()
+  await tel.setViewportSize({ width: 390, height: 844 })
+  await tel.goto(`${A}/s/vw/${encodeURIComponent(w.key)}`)
+  pruefe(await da(tel.locator('.vp-pfad').first()), 'Vokabelweg auf dem Telefon')
+  pruefe(
+    (await tel.locator('.vp-pfad').first().evaluate((e) => getComputedStyle(e).flexDirection)) === 'column',
+    'Auf dem Telefon senkrecht'
+  )
+  await tel.screenshot({ path: join(out, '4-telefon.png'), fullPage: true })
+
+  // Die Datenwege des gemeinsamen Kastens bleiben (Abschnitt einzeln, gesperrte nicht)
   const k1 = w.stufen[1].key
-  await s.locator(`button[data-vw-key="${k1}"]`).click()
-  pruefe(await da(s.locator(`[data-vw-fenster="${k1}"]`)), `Fenster für ${a1.unit} · ${a1.section}`)
-  const karte = s.locator('[data-vw-fenster] [data-lernkarte]')
-  pruefe(await da(karte), 'Lernkarte im Fenster')
-  await s.screenshot({ path: join(out, '3-abschnitt-fenster.png') })
   const nurAbschnitt = await (
     await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}&abschnitt=${encodeURIComponent(k1)}`, { headers: KOPF })
   ).json()
@@ -151,28 +179,6 @@ try {
     const r403 = await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}&abschnitt=${encodeURIComponent(gesperrt.key)}`, { headers: KOPF })
     pruefe(r403.status() === 403, 'Gesperrter Abschnitt wird nicht ausgeliefert')
   }
-  const vorAntwort = Object.keys(nurAbschnitt.staende).length
-  await karte.click()
-  await s.locator('[data-vw-fenster] [data-karte-gewusst]').click()
-  await s.waitForTimeout(800)
-  const nachAntwort = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${encodeURIComponent(key)}`, { headers: KOPF })).json()
-  pruefe(
-    nurAbschnitt.woerter.filter((v) => nachAntwort.staende[v.id]).length > vorAntwort,
-    'Antwort im Fenster zählt im gemeinsamen Kasten'
-  )
-  await s.locator('.mantine-Modal-close').click()
-  pruefe(
-    await s
-      .locator('[data-vw-fenster]')
-      .waitFor({ state: 'detached', timeout: 5000 })
-      .then(
-        () => true,
-        () => false
-      ),
-    'Fenster geschlossen'
-  )
-  pruefe(await da(s.locator('[data-vokabelweg][data-vw-offen]')), 'Zurück auf dem Vokabelweg')
-  await s.screenshot({ path: join(out, '4-zurueck.png'), fullPage: true })
   await lk.request.post(`${A}/server/vokabeln/${zu.id}/loeschen`, { headers: KOPF, data: {} })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)

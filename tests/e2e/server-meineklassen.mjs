@@ -1,5 +1,6 @@
 // „Meine Klassen" (06.10.2026, abgestimmt): Lerngruppen als „5b – Englisch" alphabetisch, Lernstand, Handlungsbedarf,
-// Vorschlag „Wackelige Wörter" ansehen und freischalten. Ohne KI (das Übungsblatt wird nur angeboten, nicht erzeugt).
+// Vorschlag „Wackelige Wörter" ansehen und im Kurs wiederholen lassen (09.10.2026: kein zweiter Kurs mehr), „Vokabeln/Grammatik
+// hinzufügen" und „+ Aufgaben" in den Reitern, Leiste bleibt im Leerlauf ruhig. Ohne KI (Blätter werden nur angeboten, nicht erzeugt).
 // Vorher: Server lokal, IServ NICHT eingerichtet.
 // Aufruf: node tests/e2e/server-meineklassen.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -33,6 +34,19 @@ const WOERTER = ['weather', 'sunny', 'cloud', 'rain', 'wind', 'snow', 'storm'].m
   term: t,
   translation: ['Wetter', 'sonnig', 'Wolke', 'Regen', 'Wind', 'Schnee', 'Sturm'][i]
 }))
+const PAKET = {
+  thema: 'Simple past',
+  regeln: [{ id: 'r1', titel: 'Simple past', erklaerung: 'Vergangenes.', beispiele: ['I played.'] }],
+  aufgaben: Array.from({ length: 11 }, (_, i) => ({
+    id: `a${i + 1}`,
+    art: 'auswahl',
+    regelId: 'r1',
+    anweisung: 'Wähle die richtige Form.',
+    satz: `Yesterday I ___ football with friend number ${i}.`,
+    optionen: ['played', 'play', 'plays'],
+    loesungen: ['played']
+  }))
+}
 const da = (l, ms = 15000) =>
   l.waitFor({ timeout: ms }).then(
     () => true,
@@ -62,8 +76,19 @@ try {
   const gGe = await neu(K5, 'Geschichte')
   const gEn = await neu(K5, 'Englisch')
   const gOhne = await neu(K7, '')
-  void g10
   void gOhne
+  // Übliche Reihe der Lehrkraft (09.10.2026, Lehrwerk-Vorwahl): Klasse 10 lernt mit Green Line 6
+  await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+    headers: KOPF,
+    data: {
+      lerngruppeId: g10.id,
+      titel: 'Green Line 6 - Unit 1',
+      sprache: 'en',
+      fach: 'Englisch',
+      woerter: WOERTER.slice(0, 2),
+      quelle: { lehrwerk: 'green-line-6', unit: 'Unit 1', abschnitte: ['Station 1'] }
+    }
+  })
   const vok = await (
     await lk.request.post(`${A}/server/vokabeln/freigeben`, {
       headers: KOPF,
@@ -102,6 +127,14 @@ try {
   for (const w of WOERTER.slice(0, 5))
     for (let i = 0; i < 3; i++)
       await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'frei', antwort: 'xyz' } })
+  // Grammatik im Kurs der Klasse (für „+ Aufgaben" im Reiter Grammatik)
+  const gram = await (
+    await lk.request.post(`${A}/server/grammatik/freigeben`, {
+      headers: KOPF,
+      data: { titel: 'Simple past', fach: 'Englisch', sprache: 'en', thema: 'Simple past', paket: PAKET, vokId: vok.id }
+    })
+  ).json()
+  pruefe(Boolean(gram.id), `Grammatik im Kurs freigegeben (${gram.id ?? gram.fehler})`)
 
   // ---------- Schnittstelle: eine Karte je Klasse, Fächer darunter
   const uebersicht = await (await lk.request.get(`${A}/server/klassen`, { headers: KOPF })).json()
@@ -137,8 +170,11 @@ try {
   )
   pruefe(
     d.vorschlaege.some((v) => v.art === 'vokabeln'),
-    'Vorschlag: Vokabeltraining „Wackelige Wörter“'
+    'Vorschlag: „Wackelige Wörter“'
   )
+  // 09.10.2026: Kurs der Klasse (Ziel von „Vokabeln/Grammatik hinzufügen"), Wackeliges mit Kurs und Wort
+  pruefe(d.klassenKurs === vok.id, `Kurs der Klasse ist der Kurs „Weather“ (${d.klassenKurs})`)
+  pruefe(d.wackelig.every((w) => w.kurs === vok.id && WOERTER.some((x) => x.id === w.id)), 'Wackelige Wörter tragen Kurs und Wort')
   const dGe = await (await lk.request.get(`${A}/server/klassen/${gGe.id}`, { headers: KOPF })).json()
   pruefe(dGe.sprachfach === false, 'Geschichte ist kein Sprachfach')
 
@@ -243,7 +279,27 @@ try {
   // Getrennte Reiter (08.10.2026): Grammatik eigener Reiter
   await p.getByRole('tab', { name: /^Grammatik/ }).click()
   pruefe(await da(p.locator('[data-grammatik-reiter], [data-keine-grammatik]').first()), 'Reiter „Grammatik“ zeigt die Grammatik der Klasse')
+  // „+ Aufgaben" je Grammatik (09.10.2026): öffnet das Fenster wie in Sprachenlernen
+  await p.locator('[data-mk-mehr-aufgaben="Simple past"]').click()
+  pruefe(await da(p.locator('[data-mehr-aufgaben-fenster]')), '„+ Aufgaben“ öffnet „Weitere Aufgaben“')
+  await p.getByRole('button', { name: 'Abbrechen' }).click()
+  // „Grammatik hinzufügen" (09.10.2026): derselbe Dialog wie im Kurs, für den Kurs der Klasse
+  await p.locator('[data-mk-grammatik-hinzufuegen]').click()
+  pruefe(await da(p.locator('[data-grammatik-fuer-kurs]')), '„Grammatik hinzufügen“ öffnet „Grammatik zum Üben freigeben“ für den Kurs')
+  pruefe(/Weather/.test(await p.locator('[data-grammatik-fuer-kurs]').innerText().catch(() => '')), 'Für die Lernenden des Kurses „Weather“')
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(400)
   await p.getByRole('tab', { name: /^Vokabeln/ }).click()
+  // „Vokabeln hinzufügen" (09.10.2026): derselbe Dialog wie im Kurs
+  await p.locator('[data-mk-vokabeln-hinzufuegen]').click()
+  pruefe(await da(p.locator('[data-vokabel-hinzufuegen-los]')), '„Vokabeln hinzufügen“ öffnet den Dialog des Kurses')
+  // Vorwahl: übliche Reihe der Lehrkraft (Green Line), Band nach Jahrgang der Klasse 5 → Green Line 1
+  await p.waitForTimeout(1500)
+  const band = await p.locator('[data-vokabel-band]').inputValue().catch(() => '')
+  const reiheWahl = await p.locator('[data-vokabel-buch]').inputValue().catch(() => '')
+  pruefe(reiheWahl === 'Green Line' && /^Green Line 1\b/.test(band), `Lehrwerk vorgewählt (${reiheWahl} · ${band})`)
+  await p.getByRole('button', { name: 'Abbrechen' }).click()
+  await p.waitForTimeout(400)
   pruefe(await da(p.locator('[data-kurs="Weather"] [data-material="Kurs"]')), 'Kurs als eine Karte')
   pruefe((await p.locator('[data-kurs="Weather"] [data-kurs-stand]').count()) === 1, 'Kurs-Karte: Balken sicher / kennengelernt / neu')
   pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/heute aktiv \d+\/\d+/)), 'Kurs-Karte: „heute aktiv n/m“')
@@ -302,13 +358,38 @@ try {
   await p.locator('[data-zurueck="meineklassen"]').click()
   pruefe(await da(p.locator(`[data-klasse-detail="${K5} – Englisch"]`)), 'Zurück in derselben Klasse und demselben Fach')
 
+  // Leiste im Leerlauf (09.10.2026, Befund der Lehrkraft: Einträge der Gruppe „Verwaltung" blinkten): 20 s keine Änderung
+  await p.evaluate(() => {
+    window.__leiste = 0
+    new MutationObserver((l) => (window.__leiste += l.length)).observe(document.querySelector('.app-leiste'), {
+      subtree: true,
+      attributes: true,
+      childList: true,
+      characterData: true
+    })
+  })
+  await p.waitForTimeout(20000)
+  const leiste = await p.evaluate(() => window.__leiste)
+  pruefe(leiste === 0, `Leiste bleibt im Leerlauf ruhig (${leiste} Änderungen in 20 s)`)
+
+  // „Wackelige Wörter" (09.10.2026): kein neuer Kurs – im Kurs wieder fällig. Vorher richtig geübt → erst morgen dran
+  for (const w of WOERTER.slice(0, 5))
+    await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'frei', antwort: w.term } })
+  const faellig = async () => {
+    const l = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()
+    return WOERTER.slice(0, 5).filter((w) => (l.staende?.[w.id]?.faellig ?? Infinity) <= Date.now()).length
+  }
+  const faelligVorher = await faellig()
+  const kurseVorher = ((await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen ?? []).length
   await p.locator('[data-vorschlag="vokabeln"] [data-vorschlag-ansehen]').click()
-  await p.locator('[data-vokabeln-freischalten]').click()
-  pruefe(await da(p.getByText(/ist für .* freigeschaltet/), 8000), 'Vorschlag nach Sichtung freigeschaltet')
+  pruefe(await da(p.locator('[data-wackelig-blatt]')), 'Vorschau bietet „Als kurzes Arbeitsblatt“')
+  await p.locator('[data-wackelig-wiederholen]').click()
+  pruefe(await da(p.getByText(/wieder dran – im Kurs „/), 8000), 'Meldung: wackelige Wörter sind im Kurs wieder dran')
+  const faelligNachher = await faellig()
+  pruefe(faelligVorher === 0 && faelligNachher === 5, `Wörter bei Mia wieder fällig (vorher ${faelligVorher}, nachher ${faelligNachher} von 5)`)
   const vt = await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()
-  const neuVt = (vt.zuweisungen ?? vt.liste ?? []).find((z) => /Wackelige Wörter/.test(z.titel))
-  pruefe(Boolean(neuVt), `Neues Vokabeltraining „${neuVt?.titel}“ für die Klasse`)
-  for (const z of vt.zuweisungen ?? vt.liste ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: {} })
+  pruefe((vt.zuweisungen ?? []).length === kurseVorher && !(vt.zuweisungen ?? []).some((z) => /Wackelige Wörter/.test(z.titel)), 'Kein zweiter Kurs „Wackelige Wörter“')
+  for (const z of vt.zuweisungen ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: {} })
 
   // ---------- Verwaltung: Ablagestruktur ändern und zurücksetzen
   const neuMuster = await (

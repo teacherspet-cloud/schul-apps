@@ -38,6 +38,7 @@ import { KastenKopf, useGemerkt } from './Kasten'
 import { nachJahrGruppiert, passtSuche } from './kursAnsicht'
 import { istOffen } from '../regal/grammatikJahrgaenge'
 import { jahrgangName } from '../regal/beschriftung'
+import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
 
 export interface GrammatikZeile {
   id: string
@@ -189,7 +190,8 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
     const titel = d.titel
     void starteAuftrag({
       moduleId: 'sprachenlernen',
-      docId: `mehr-${g.id}-${Date.now()}`,
+      // „Öffnen" im Auftrag: Kurs mit dem Fenster dieser Grammatik (auftragsZiel.ts)
+      docId: mehrAufgabenDocId(g.id),
       titel: `${titel}: ${eingabe.anzahl} weitere Aufgaben`,
       art: 'Weitere Grammatikaufgaben',
       eingabe,
@@ -678,7 +680,7 @@ export function extraStarten(k: {
   const titel = `${k.art === 'foerder' ? 'Förderung' : 'Forderung'}: ${thema}`
   void starteAuftrag({
     moduleId: 'sprachenlernen',
-    docId: `extra-${Date.now()}`,
+    docId: extraDocId(k.vokId, k.fuer.id),
     titel: `${titel} (${k.fuer.name})`,
     art: k.art === 'foerder' ? 'Förderaufgaben' : 'Forderaufgaben',
     eingabe: {
