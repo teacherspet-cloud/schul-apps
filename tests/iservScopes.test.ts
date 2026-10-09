@@ -49,3 +49,18 @@ describe('IServ: Client-Geheimnis im Formular (client_secret_post, 09.10.2026)',
     expect(form.get('client_id')).toBe('cid')
   })
 })
+
+describe('Namensschutz: buchstabierte Abkürzungen sind keine Initialen (09.10.2026)', () => {
+  it('„T. T. S." im Hörtext sperrt nicht wegen Gästen „Tom T." / „Tara S.", der volle Name schon', async () => {
+    const { musterFuer, gefundeneNamen } = await import('../src/server/namensfilter')
+    const m = musterFuer([
+      { vorname: 'Tom', nachname: 'T.', streng: true },
+      { vorname: 'Tara', nachname: 'S.', streng: true },
+      { vorname: 'Max', nachname: 'Mustermann' }
+    ], { sprache: 'en' })
+    expect(gefundeneNamen('T. T. S. students wear school uniform.', m)).toEqual([])
+    expect(gefundeneNamen('How long are lessons at T. T. S.?', m)).toEqual([])
+    expect(gefundeneNamen('Tom T. is late.', m)).toContain('Tom T.')
+    expect(gefundeneNamen('M. Mustermann was here.', m)).toContain('M. Mustermann')
+  })
+})

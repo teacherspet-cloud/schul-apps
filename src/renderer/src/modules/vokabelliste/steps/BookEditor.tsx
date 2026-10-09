@@ -405,7 +405,7 @@ export default function BookEditor({
           <MedienLeiste
             sprache={book.language}
             vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example, aussprache: r.aussprache }))}
-            daten={medien.daten}
+            daten={medien.daten} bereit={medien.bereit}
             ziel={medienZiel}
             mehr={
               <Button size="xs" variant="light" leftSection={<IconStack2 size={14} />} onClick={() => setAbschnitteOffen(true)} data-medien-mehrere>

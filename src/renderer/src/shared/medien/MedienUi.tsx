@@ -75,12 +75,32 @@ export function useMedienZiel(ziel: MedienZiel): MedienZiel & { stufe: Bildstufe
 }
 
 /** Einträge der Medienbank für die Wörter einer Tabelle – Bilder in der Bildstufe `stufe` */
-export function useMedienbank(sprache: string | undefined, woerter: string[], stufe?: Bildstufe): { daten: Record<string, MedienSicht>; laden: () => void } {
+export function useMedienbank(
+  sprache: string | undefined,
+  woerter: string[],
+  stufe?: Bildstufe
+): { daten: Record<string, MedienSicht>; laden: () => void; bereit: boolean } {
   const [daten, setDaten] = useState<Record<string, MedienSicht>>({})
   const schluessel = woerter.filter(Boolean).join('\u0001')
+  // Für welche Wörter die Daten gelten (09.10.2026): bis sie da sind, zählen die Knöpfe nicht „alles offen" (kein Aufblinken)
+  const auftrag = `${sprache ?? ''}|${stufe ?? ''}|${schluessel}`
+  const [geladenFuer, setGeladenFuer] = useState('')
   const laden = useCallback(() => {
-    if (!sprache || !schluessel) return setDaten({})
-    void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001'), stufe).then(setDaten, () => setDaten({}))
+    const fuer = `${sprache ?? ''}|${stufe ?? ''}|${schluessel}`
+    if (!sprache || !schluessel) {
+      setDaten({})
+      return setGeladenFuer(fuer)
+    }
+    void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001'), stufe).then(
+      (d) => {
+        setDaten(d)
+        setGeladenFuer(fuer)
+      },
+      () => {
+        setDaten({})
+        setGeladenFuer(fuer)
+      }
+    )
   }, [sprache, schluessel, stufe])
   useEffect(() => laden(), [laden])
   // Medienaufträge im Hintergrund melden jedes erledigte Wort – kurz gesammelt neu laden
@@ -97,7 +117,7 @@ export function useMedienbank(sprache: string | undefined, woerter: string[], st
       weg()
     }
   }, [sprache, laden])
-  return { daten, laden }
+  return { daten, laden, bereit: geladenFuer === auftrag }
 }
 
 export const spiele = (q: { datei?: string; url?: string } | undefined): void => {
@@ -401,13 +421,16 @@ export function MedienLeiste({
   vokabeln,
   daten,
   ziel,
-  mehr
+  mehr,
+  bereit = true
 }: {
   sprache: string
   vokabeln: Vokabel[]
   daten: Record<string, MedienSicht>
   ziel: MedienZiel
   mehr?: React.ReactNode
+  /** Medienbank-Daten für diese Wörter geladen? Vorher Knöpfe gesperrt ohne Zahl (09.10.2026) */
+  bereit?: boolean
 }): React.JSX.Element {
   const stimmen = useStandardstimmen(sprache)
   const lagen = lagenVon(stimmen ?? undefined)
@@ -429,11 +452,11 @@ export function MedienLeiste({
         size="xs"
         leftSection={icon}
         loading={laeuft}
-        disabled={laeuft || !liste.length || (braucheStimme && ohneStimme)}
+        disabled={!bereit || laeuft || !liste.length || (braucheStimme && ohneStimme)}
         onClick={() => start(art, liste)}
         {...{ [kennung]: true }}
       >
-        {label} ({liste.length})
+        {label} ({bereit ? liste.length : '…'})
       </Button>
     )
   }

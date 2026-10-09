@@ -79,7 +79,8 @@ export function musterFuer(personen: Person[], kontext: WortKontext = {}): Muste
   personen.forEach((p, i) => {
     if (p.streng) {
       for (const teil of new Set([p.vorname.trim(), p.nachname.trim()])) {
-        if (teil.length < 2 || /\s/.test(teil)) continue
+        // Eine Initiale allein („S.") ist kein Name – sonst träfe sie jedes buchstabierte Kürzel (09.10.2026)
+        if (teil.length < 2 || /\s/.test(teil) || /^\p{L}\.?$/u.test(teil)) continue
         const kyrillisch = /[Ѐ-ӿ]/.test(teil)
         const stamm = (flektierend || kyrillisch) && /[аяоеыиaeoy]$/i.test(teil) && teil.length > 3 ? teil.slice(0, -1) : teil
         out.push({
@@ -94,10 +95,14 @@ export function musterFuer(personen: Person[], kontext: WortKontext = {}): Muste
     const vn = p.vorname.trim()
     const nn = p.nachname.trim()
     const varianten: string[] = []
+    // Nachname nur als Initiale („Tom T.", Gäste): kein Muster „Initiale + Nachname" – „T. T." träfe sonst buchstabierte
+    // Abkürzungen im Hörtext („TTS" → „T. T. S.", 09.10.2026)
+    const nurInitiale = /^\p{L}\.?$/u.test(nn)
     if (vn && nn) {
-      varianten.push(`${esc(vn)}\\s+${esc(nn)}`, `${esc(nn)},\\s*${esc(vn)}`, `${esc(vn[0])}\\.\\s*${esc(nn)}`)
+      varianten.push(`${esc(vn)}\\s+${esc(nn)}`, `${esc(nn)},\\s*${esc(vn)}`)
+      if (!nurInitiale) varianten.push(`${esc(vn[0])}\\.\\s*${esc(nn)}`)
     }
-    if (nn && nn.length >= 3) {
+    if (nn && nn.length >= 3 && !nurInitiale) {
       varianten.push(`(?:Herrn?|Frau|Hr\\.|Fr\\.|Mr\\.?|Mrs\\.?|Ms\\.?|Monsieur|Madame|Señora?)\\s+${esc(nn)}`)
       // Klassenliste: der Nachname allein läuft oben über die Prüfung Person/Wort
       if (!p.streng && !GEWOEHNLICHE_WOERTER.has(nn.toLowerCase()) && nn.length >= 4) varianten.push(esc(nn))
