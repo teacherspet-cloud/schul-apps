@@ -14,6 +14,7 @@
  *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
+import { useExperte } from '../../shared/settingsStore'
 import {
   ActionIcon,
   Alert,
@@ -86,6 +87,12 @@ import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from '
 import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
 import { AlsSchuelerAnsehen } from './SchuelerVorschau'
+import { VokabelAbschnitte } from './VokabelAbschnitte'
+import type { AbschnittStatistik } from '@shared/kursAbschnitte'
+import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
+// Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
+import GeplantKarte from './GeplantKarte'
+import { geplantText } from '../../shared/components/FreigabePlanen'
 
 interface FachKurz {
   id: string
@@ -171,6 +178,12 @@ interface KlasseDetail {
     /** Kurs-Karte (08.10.2026): Anteile sicher / kennengelernt / neu über alle Lernenden */
     anteil?: { sicher: number; aufbau: number; neu: number }
     heuteAktiv?: number
+    /** Name nach Kurs (09.10.2026): „Vokabeln Englisch · Green Line 1–2" */
+    kursName?: string
+    baende?: string
+    /** Übersicht je Abschnitt (shared/kursAbschnitte.ts) und die Namen in der Reihenfolge von `jeLernende` */
+    abschnitte?: AbschnittStatistik[]
+    lernendeNamen?: string[]
   }[]
   grammatik: {
     id: string
@@ -204,6 +217,7 @@ interface KlasseDetail {
     schritte: number
     nichtBegonnen: string[]
     lernziele: { text: string; erreicht: number }[]
+    geplantAb?: number | null
   }[]
   blaetter: {
     id: string
@@ -224,6 +238,7 @@ interface KlasseDetail {
     ergebnis: number | null
     schwierigste: { nr: number; anweisung: string; rot: number } | null
     quelle: { docId: string } | null
+    geplantAb?: number | null
   }[]
   bedarf: Bedarf[]
   vorschlaege: Vorschlag[]
@@ -707,6 +722,7 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
   )
 }
 function FachAnsicht({ id }: { id: string }): React.JSX.Element {
+  const experte = useExperte()
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
@@ -800,6 +816,9 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           </Stack>
         )}
       </Card>
+
+      {/* ---------- Geplante Freischaltungen (09.10.2026) */}
+      <GeplantKarte gruppeId={d.id} neuLaden={laden} />
 
       {/* ---------- Vorschläge für Material */}
       {(d.vorschlaege.length > 0 || fertige.length > 0) && (
@@ -903,8 +922,9 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
                 <LehrwerkStand gruppeId={id} />
               </Group>
               <KursKarten d={d} ort={ort} ohneGrammatik />
-              {d.wackelig.length > 0 && (
-                <Card withBorder padding="sm" radius="md">
+              {/* „Am häufigsten daneben" nur im Expertenmodus (09.10.2026, Wunsch der Lehrkraft) */}
+              {d.wackelig.length > 0 && experte && (
+                <Card withBorder padding="sm" radius="md" data-haeufig-daneben>
                   <Text fw={700} size="sm" mb={6}>
                     Am häufigsten daneben (alle laufenden Trainings)
                   </Text>
@@ -954,7 +974,7 @@ function FachAnsicht({ id }: { id: string }): React.JSX.Element {
           />
         </Tabs.Panel>
         <Tabs.Panel value="lernende" pt="sm">
-          <LernendeTabelle d={d} />
+          <LernendeTabelle d={d} neuLaden={laden} />
         </Tabs.Panel>
       </Tabs>
 
@@ -1038,7 +1058,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
         titel={r.titel}
         art="Reihe"
         status={r.status}
-        angaben={[`seit ${tag(r.erstellt)}`, r.oberthema, `${r.schritte} Schritte`, `${r.fertig} von ${r.lernende} fertig`]}
+        angaben={[geplantText(r.geplantAb), `seit ${tag(r.erstellt)}`, r.oberthema, `${r.schritte} Schritte`, `${r.fertig} von ${r.lernende} fertig`]}
         wert={r.schnitt}
         wertText={`Ø ${prozent(r.schnitt)}`}
         oeffnen={() => oeffneMitRueckweg('laufendereihen')}
@@ -1083,7 +1103,8 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
           art="Blatt"
           status={b.status}
           angaben={[
-            `freigegeben ${tag(b.erstellt)}`,
+            geplantText(b.geplantAb),
+            !b.geplantAb && `freigegeben ${tag(b.erstellt)}`,
             b.bis ? `bis ${tag(b.bis)}${b.bis < Date.now() && b.status === 'offen' ? ' (vorbei)' : ''}` : 'ohne Frist',
             b.thema,
             `${b.eingereicht} von ${b.gesamt} eingereicht`,
@@ -1189,13 +1210,15 @@ function KursKarten({ d, ort, ohneGrammatik = false }: { d: KlasseDetail; ort: O
         const laufendeExtras = extras.filter((g) => g.status === 'offen').length
         const a = v.anteil
         return (
-          <div key={v.id} data-kurs={v.titel}>
+          <div key={v.id} data-kurs={v.titel} data-kurs-name={v.kursName ?? v.titel}>
             <MaterialKarte
               symbol={<IconLanguage size={16} />}
-              titel={v.titel}
+              // Name nach Kurs statt nach den ersten Abschnitten (09.10.2026)
+              titel={v.kursName ?? v.titel}
               art="Kurs"
               status={v.status}
               angaben={[
+                (v.abschnitte?.length ?? 0) > 1 ? `${v.abschnitte!.length} Abschnitte` : '',
                 v.woerter ? `${v.woerter} Wörter` : 'nur Grammatik',
                 v.heuteAktiv != null ? `heute aktiv ${v.heuteAktiv}/${v.lernende}` : `${v.aktiv7} von ${v.lernende} aktiv (7 Tage)`,
                 `${normal.length} Grammatik`,
@@ -1204,7 +1227,7 @@ function KursKarten({ d, ort, ohneGrammatik = false }: { d: KlasseDetail; ort: O
                 v.bis ? `bis ${tag(v.bis)}` : ''
               ]}
               wert={null}
-              wertText={v.woerter ? `${prozent(v.sicherSchnitt)} sicher` : undefined}
+              wertText={v.woerter ? `Klasse ${prozent(v.sicherSchnitt)} sicher` : undefined}
               oeffnen={() => oeffneMitRueckweg('sprachenlernen', v.id)}
               aktionen={
                 <>
@@ -1223,6 +1246,7 @@ function KursKarten({ d, ort, ohneGrammatik = false }: { d: KlasseDetail; ort: O
                       </Progress.Root>
                     </Tooltip>
                   )}
+                  {v.woerter > 0 && v.abschnitte && <VokabelAbschnitte abschnitte={v.abschnitte} namen={v.lernendeNamen ?? []} />}
                   {!ohneGrammatik && normal.length > 0 && (
                     <Aufklapp titel={`Grammatik (${normal.length})`} kennung="grammatik">
                       {normal.map((g) => (
@@ -1472,64 +1496,96 @@ function Anteil({ x }: { x: number | null | undefined }): React.JSX.Element {
   )
 }
 
-function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
+function LernendeTabelle({ d, neuLaden }: { d: KlasseDetail; neuLaden: () => void }): React.JSX.Element {
   // Vor- oder Nachname (08.10.2026, Wunsch der Lehrkraft)
   const [folge, setFolge] = useNamenFolge()
   const zeilen = useMemo(() => [...d.lernende].sort((a, b) => namenVergleich(a.name, b.name, folge)), [d, folge])
+  // Lernende mit Anmeldecode (09.10.2026, LernendeCodes.tsx): Codezettel für alle, Klick auf den Namen öffnet den Zugang
+  const { gaeste, laden: gaesteLaden } = useGaesteMitCode(d.id, zeilen.some((l) => l.gast))
+  const [gastOffen, setGastOffen] = useState<GastMitCode | null>(null)
   if (!zeilen.length) return <Text c="dimmed">Noch keine Lernenden in dieser Lerngruppe.</Text>
   const zeigtVokabeln = zeilen.some((l) => l.vokabelnSicher !== null)
   const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
   const zeigtGrammatik = zeilen.some((l) => l.grammatikSicher != null)
   return (
-    <Table striped highlightOnHover data-lernende-tabelle data-karten>
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>
-            <Group gap={4} wrap="nowrap">
-              Name
-              <NamenFolgeKnopf folge={folge} setFolge={setFolge} />
-            </Group>
-          </Table.Th>
-          {zeigtVokabeln && <Table.Th>Vokabeln sicher</Table.Th>}
-          {zeigtVokabeln && <Table.Th>zuletzt geübt</Table.Th>}
-          {zeigtGrammatik && <Table.Th>Grammatik sicher</Table.Th>}
-          <Table.Th>Testschnitt</Table.Th>
-          {zeigtReihen && <Table.Th>Reihen</Table.Th>}
-          <Table.Th>Blätter eingereicht</Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {zeilen.map((l) => (
-          <Table.Tr key={l.id}>
-            <Table.Td fw={600}>
-              {l.name}
-              {l.gast && (
-                <Badge size="xs" variant="light" color="gray" ml={6} data-mit-anmeldecode title="Meldet sich mit dem persönlichen Code vom Zettel an">
-                  mit Anmeldecode
-                </Badge>
-              )}
-            </Table.Td>
-            {zeigtVokabeln && (
-              <Table.Td>
-                <Anteil x={l.vokabelnSicher} />
-              </Table.Td>
-            )}
-            {zeigtVokabeln && <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>}
-            {zeigtGrammatik && (
-              <Table.Td>
-                <Anteil x={l.grammatikSicher} />
-              </Table.Td>
-            )}
-            <Table.Td>{l.tests ? note(l.testSchnitt) : '–'}</Table.Td>
-            {zeigtReihen && (
-              <Table.Td>
-                <Anteil x={l.reihenFortschritt} />
-              </Table.Td>
-            )}
-            <Table.Td>{l.blaetterEingereicht}</Table.Td>
+    <Stack gap="xs">
+      {gaeste.some((g) => g.zugang.length === 8) && (
+        <Group justify="flex-end" data-lernende-codezettel>
+          <CodezettelKnopf titel={d.titel || d.name} gaeste={gaeste} />
+        </Group>
+      )}
+      {gastOffen && (
+        <GastFenster
+          gruppeId={d.id}
+          titel={d.titel || d.name}
+          gast={gastOffen}
+          schliessen={() => setGastOffen(null)}
+          geaendert={() => (gaesteLaden(), neuLaden())}
+        />
+      )}
+      <Table striped highlightOnHover data-lernende-tabelle data-karten>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>
+              <Group gap={4} wrap="nowrap">
+                Name
+                <NamenFolgeKnopf folge={folge} setFolge={setFolge} />
+              </Group>
+            </Table.Th>
+            {zeigtVokabeln && <Table.Th>Vokabeln sicher</Table.Th>}
+            {zeigtVokabeln && <Table.Th>zuletzt geübt</Table.Th>}
+            {zeigtGrammatik && <Table.Th>Grammatik sicher</Table.Th>}
+            <Table.Th>Testschnitt</Table.Th>
+            {zeigtReihen && <Table.Th>Reihen</Table.Th>}
+            <Table.Th>Blätter eingereicht</Table.Th>
           </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
+        </Table.Thead>
+        <Table.Tbody>
+          {zeilen.map((l) => (
+            <Table.Tr key={l.id}>
+              <Table.Td fw={600}>
+                {l.gast ? (
+                  <UnstyledButton
+                    fw={600}
+                    td="underline"
+                    style={{ textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}
+                    title="Code, Zettel und Name"
+                    onClick={() => setGastOffen(gaeste.find((g) => g.id === l.id) ?? { id: l.id, name: l.name, zugang: '' })}
+                    data-gast-name={l.name}
+                  >
+                    {l.name}
+                  </UnstyledButton>
+                ) : (
+                  l.name
+                )}
+                {l.gast && (
+                  <Badge size="xs" variant="light" color="gray" ml={6} data-mit-anmeldecode title="Meldet sich mit dem persönlichen Code vom Zettel an">
+                    mit Anmeldecode
+                  </Badge>
+                )}
+              </Table.Td>
+              {zeigtVokabeln && (
+                <Table.Td>
+                  <Anteil x={l.vokabelnSicher} />
+                </Table.Td>
+              )}
+              {zeigtVokabeln && <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>}
+              {zeigtGrammatik && (
+                <Table.Td>
+                  <Anteil x={l.grammatikSicher} />
+                </Table.Td>
+              )}
+              <Table.Td>{l.tests ? note(l.testSchnitt) : '–'}</Table.Td>
+              {zeigtReihen && (
+                <Table.Td>
+                  <Anteil x={l.reihenFortschritt} />
+                </Table.Td>
+              )}
+              <Table.Td>{l.blaetterEingereicht}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Stack>
   )
 }

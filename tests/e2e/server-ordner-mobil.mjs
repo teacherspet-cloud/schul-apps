@@ -78,6 +78,8 @@ try {
       const ctx = await browser.newContext({ ...g.geraet })
       await ctx.addInitScript(AUFZEICHNEN)
       await anmelden(ctx, kind.benutzer, kind.passwort)
+      // Hier geht es ums Blättern im Ordner: „Vollbild beim Lernen" aus (eigener Test: server-fokus.mjs, 09.10.2026)
+      await ctx.request.post(`${A}/s/api/darstellung`, { headers: KOPF, data: { modus: 'dunkel', vorgabe0810: true, vollbild: false } })
       const p = await ctx.newPage()
       p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
       await p.goto(`${A}/s/`)
@@ -118,6 +120,51 @@ try {
       const breitO = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       pruefe(breitO <= 1, `${g.name}: Ordnerseite ragt nicht seitlich heraus (${breitO}px)`)
       await p.screenshot({ path: join(out, `${g.name}-4-offen.png`) })
+
+      // Blättern im Ordner (09.10.2026): Vokabelrunde als nächste Seite, Wischen blättert zurück und wieder vor
+      const tiefe = async () => Number(await p.locator('[data-ordner-tiefe]').getAttribute('data-ordner-tiefe'))
+      const ruhe = () => p.locator('[data-ordner-umblaettern]').first().waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined)
+      await p.locator('[data-ordner-kurs-inhalt] [data-vokabel-start]').tap()
+      const umgeblaettert = await da(p.locator('[data-ordner-umblaettern]').first(), 1500)
+      await p.waitForTimeout(250)
+      await p.screenshot({ path: join(out, `${g.name}-4b-umblaettern.png`) }).catch(() => undefined)
+      await ruhe()
+      pruefe(umgeblaettert && (await da(p.locator('[data-ordner] [data-sitzung]'))) && (await tiefe()) === 1, `${g.name}: Vokabelrunde als nächste Seite im Ordner (umgeblättert)`)
+      const breitU = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      pruefe(breitU <= 1, `${g.name}: nach dem Umblättern ragt nichts seitlich heraus (${breitU}px)`)
+      // Wischen über die Zurück-Leiste (in der Übung selbst gehören die Gesten der Aufgabe)
+      const wische = (richtung) =>
+        p.evaluate((r) => {
+          const el = document.querySelector('.og-zurueck-leiste')
+          if (!el || typeof Touch !== 'function') return false
+          const b = el.getBoundingClientRect()
+          const y = b.top + b.height / 2
+          const [x0, x1] = r > 0 ? [b.left + 20, b.left + 220] : [b.left + 220, b.left + 20]
+          const t = (x) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y, pageX: x, pageY: y })
+          el.dispatchEvent(new TouchEvent('touchstart', { touches: [t(x0)], changedTouches: [t(x0)], bubbles: true }))
+          el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [t(x1)], bubbles: true }))
+          return true
+        }, richtung).catch(() => false)
+      if (await wische(1)) {
+        await p.waitForTimeout(300)
+        await ruhe()
+        pruefe((await da(p.locator('[data-ordner-kurs-inhalt] [data-vokabel-kasten]'))) && (await tiefe()) === 0, `${g.name}: Wischen nach rechts blättert zurück`)
+        // Wieder vor: Wischen nach links (auf der Registerseite gibt es keine Zurück-Leiste – dort auf dem Blatt)
+        await p.evaluate(() => {
+          const el = document.querySelector('[data-ordner-tiefe]')
+          const b = el.getBoundingClientRect()
+          const y = b.top + 40
+          const t = (x) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y, pageX: x, pageY: y })
+          el.dispatchEvent(new TouchEvent('touchstart', { touches: [t(b.right - 20)], changedTouches: [t(b.right - 20)], bubbles: true }))
+          el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [t(b.right - 220)], bubbles: true }))
+        })
+        await p.waitForTimeout(300)
+        await ruhe()
+        pruefe((await tiefe()) === 1 && (await da(p.locator('[data-ordner] [data-sitzung]'))), `${g.name}: Wischen nach links blättert wieder vor`)
+      } else console.log(`   (${g.name}: ohne Touch-Ereignisse in dieser Engine – Wischen nicht geprüft)`)
+      await p.locator('[data-ordner-zurueck]').tap()
+      await ruhe()
+      pruefe((await da(p.locator('[data-ordner-kurs-inhalt] [data-vokabel-kasten]'))) && (await tiefe()) === 0, `${g.name}: Zurück-Knopf blättert zurück`)
 
       // Zuklappen
       await p.locator('[data-ins-regal]').tap()

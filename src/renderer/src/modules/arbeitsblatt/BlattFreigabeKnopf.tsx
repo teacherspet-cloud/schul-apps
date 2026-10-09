@@ -27,6 +27,7 @@ import { useArbeitsblatt } from './store'
 import { messeSeiten } from './render/seitenMessen'
 import { taskNumbersFor } from './render/SheetPages'
 import { aufgabenSchluessel } from './blattSchluessel'
+import FreigabePlanen, { GeplantMarke, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
 export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
@@ -118,6 +119,8 @@ interface Freigegeben {
   link?: string
   abgaben: number
   begonnen: number
+  /** Geplante Freischaltung (09.10.2026) */
+  geplantAb?: number | null
 }
 
 export default function BlattFreigabeKnopf(props: {
@@ -173,6 +176,10 @@ export function BlattFreigabeDialog({
   const quelleId = docId ?? eigeneId
   // Frist (optional) für „Meine Klassen" (06.10.2026)
   const [bis, setBis] = useState('')
+  // „Planen …" (09.10.2026)
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
+  // Harte Frist (09.10.2026): nur mit Haken, Vorgabe aus
+  const [fristHart, setFristHart] = useState(false)
   const [titel, setTitel] = useState(ws.meta.title || ws.meta.topic || 'Arbeitsblatt')
   const [blatt, setBlatt] = useState(ws.sheets[0]?.id ?? '')
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
@@ -250,11 +257,13 @@ export function BlattFreigabeDialog({
           stift,
           ...(schrittweise ? { schrittweise: true } : {}),
           ...(merkAmEnde ? { merkAmEnde: true } : {}),
-          ...(bis ? { bis: new Date(`${bis}T23:59:00`).getTime() } : {}),
+          ...(bis ? { bis: new Date(`${bis}T23:59:00`).getTime(), ...(fristHart ? { fristHart: true } : {}) } : {}),
           ...(quelleId ? { quelle: { docId: quelleId, sheetId: sheet.id } } : {})
-        }
+        },
+        ...planKoerper(plan)
       })
-      notifySuccess('Freigegeben – die Lernenden finden das Blatt im Schülerbereich unter „Arbeitsblätter“.')
+      planGeaendert()
+      notifySuccess(planMeldung(plan, 'Arbeitsblatt') || 'Freigegeben – die Lernenden finden das Blatt im Schülerbereich unter „Arbeitsblätter“.')
       if (r.code && r.link) setQr({ titel, code: r.code, link: r.link })
       laden()
       freigegeben?.()
@@ -339,6 +348,15 @@ export function BlattFreigabeDialog({
           maw={260}
           data-blatt-frist
         />
+        {bis && (
+          <Checkbox
+            label="Nach der Frist nur noch ansehen"
+            description="Ohne Haken bleibt die Frist eine Erinnerung – die Lernenden können weiter abgeben."
+            checked={fristHart}
+            onChange={(e) => setFristHart(e.currentTarget.checked)}
+            data-blatt-frist-hart
+          />
+        )}
         <Checkbox
           label="Korrekturrand"
           description="Rand neben den Schreiblinien – auf Ausdrucken leer für Korrekturen; digital stehen dort die KI-Kommentare. Das Original bleibt unverändert."
@@ -369,9 +387,10 @@ export function BlattFreigabeDialog({
           data-blatt-loesung
         />
         {aufgabenZahl === 0 && <Alert color="orange">Dieses Blatt hat keine Aufgaben zum Ausfüllen.</Alert>}
+        <FreigabePlanen wert={plan} aendern={setPlan} />
         <Group justify="flex-end">
           <Button loading={laeuft} disabled={(!gruppe && !gaeste) || !aufgabenZahl || !titel.trim()} onClick={() => void freigeben()} data-blatt-freigeben>
-            Freigeben
+            {planKnopf(plan, 'Freigeben')}
           </Button>
         </Group>
         {!ohneListe && liste.length > 0 && (
@@ -383,7 +402,7 @@ export function BlattFreigabeDialog({
               <Group key={f.id} justify="space-between" wrap="nowrap">
                 <div>
                   <Text size="sm" fw={600}>
-                    {f.titel}{' '}
+                    {f.titel} <GeplantMarke ab={f.geplantAb} />{' '}
                     {f.status !== 'offen' && (
                       <Badge size="xs" color="gray">
                         beendet

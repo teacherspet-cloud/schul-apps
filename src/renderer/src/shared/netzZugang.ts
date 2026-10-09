@@ -222,95 +222,30 @@ export const horche = (kanal: string, cb: (wert: unknown) => void): (() => void)
 /*
  * ---------- Drucken im Browser ----------
  *
- * Drucken heißt hier: das fertige PDF in einem neuen Tab öffnen und dort drucken. Der
- * Druckdialog des Rechners wäre der falsche – gedruckt werden soll dort, wo das Gerät steht.
+ * Gedruckt wird dort, wo das Gerät steht – nicht mit dem Druckdialog des Rechners mit der App.
  *
- * Zwei Fallen (Nachtrag zu Paket 4):
- *  - Ein neuer Tab darf nur als DIREKTE Folge eines Klicks aufgehen. Die erste Fassung öffnete
- *    ihn erst, nachdem das PDF erzeugt war – Sekunden später. Safari und strenge Popup-Blocker
- *    verwerfen das. Deshalb geht der Tab sofort auf (noch leer) und bekommt das PDF, sobald es da ist.
- *  - „Lösungen separat drucken" öffnete ZWEI Tabs; der zweite fällt dem Blocker sicher zum
- *    Opfer. Jetzt entsteht EIN PDF: Blatt, dann Lösungen ab einer neuen Seite.
- *
- * Wird der Tab trotzdem blockiert, wird das PDF heruntergeladen – verloren geht nichts.
- *
- * iPad, iPhone und Android (08.10.2026): Dort lässt sich ein PDF im Tab nicht drucken, nur sichern. Der Tab
- * bekommt stattdessen eine Druckseite mit den Seitenbildern, öffnet den Druckdialog des Geräts (AirPrint mit
- * Druckerwahl) und bietet „Als PDF sichern" an (export/druckSeite.ts). Ergebnis dann 'druck'.
+ * Bis 08.10.2026 öffnete das Drucken einen NEUEN TAB mit dem PDF (bzw. einer Druckseite mit Seitenbildern). Am iPad
+ * (Opera) und an einem Schul-PC blockierte das der Popup-Blocker (09.10.2026, Befund der Lehrkraft). Jetzt bleibt alles
+ * im aktuellen Dokument (export/druckImDokument.ts): Seitenbilder in einem unsichtbaren Druckbereich, dann
+ * window.print() direkt aus dem Klick. Blatt und Lösungen bleiben EIN Auftrag (ein PDF, Lösungen ab neuer Seite).
  */
-export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'): Promise<'tab' | 'druck' | 'datei'> {
-  // VOR dem ersten `await`: So zählt das Öffnen noch als Folge des Klicks
-  const tab = window.open('', '_blank')
-  try {
-    tab?.document.write('<p style="font-family:sans-serif;padding:2em">Druckansicht wird erstellt …</p>')
-  } catch {
-    // nur ein Hinweis im leeren Tab
-  }
-  try {
-    const pdfs: Uint8Array[] = []
-    for (const html of teile) pdfs.push(await window.api.exporter.preview(html))
-    const bytes = pdfs.length === 1 ? pdfs[0] : await vereinePdfs(pdfs)
-    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).slice().buffer], { type: 'application/pdf' }))
-    const { mobilerBrowser, zeigeDruckSeite } = await import('./export/druckSeite')
-    const mobil = mobilerBrowser()
-    // Auf der Druckseite bleibt „Als PDF sichern" länger stehen als ein PDF-Tab braucht
-    setTimeout(() => URL.revokeObjectURL(url), mobil ? 30 * 60_000 : 120_000)
-    if (tab && !tab.closed && mobil) {
-      try {
-        await zeigeDruckSeite(tab, bytes, dateiname.replace(/\.pdf$/i, ''), url, dateiname)
-        return 'druck'
-      } catch {
-        // Seitenbilder gingen nicht (z. B. Speicher) – dann wie bisher das PDF im Tab
-        if (!tab.closed) tab.location.href = url
-        return 'tab'
-      }
-    }
-    if (tab && !tab.closed) {
-      // PC-Browser (08.10.2026): PDF im Tab in einem Rahmen zeigen und gleich den Druckdialog des Browsers öffnen
-      // (Druckerwahl); klappt das nicht, bleibt die PDF-Ansicht mit ihrem eigenen Druckknopf stehen
-      if (pdfImRahmenDrucken(tab, url, dateiname)) return 'druck'
-      tab.location.href = url
-      return 'tab'
-    }
-    const a = document.createElement('a')
-    a.href = url
-    a.download = dateiname
-    a.click()
-    return 'datei'
-  } catch (e) {
-    tab?.close()
-    throw e
-  }
+
+/** Ein PDF aus einem oder mehreren Druck-HTML (z. B. Blatt und Lösungen) */
+export async function druckPdf(teile: string[]): Promise<Uint8Array> {
+  const pdfs: Uint8Array[] = []
+  for (const html of teile) pdfs.push(await window.api.exporter.preview(html))
+  return pdfs.length === 1 ? pdfs[0] : vereinePdfs(pdfs)
 }
 
-/** Schreibt eine Seite mit dem PDF im Rahmen in den Tab und ruft dessen Druckdialog auf; false, wenn das nicht geht */
-function pdfImRahmenDrucken(tab: Window, url: string, dateiname: string): boolean {
-  try {
-    const d = tab.document
-    d.open()
-    d.write(
-      `<!doctype html><html><head><meta charset="utf-8"><title>${dateiname.replace(/[<&]/g, '')}</title>` +
-        '<style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%}</style></head>' +
-        `<body><iframe id="pdf" src="${url}"></iframe></body></html>`
-    )
-    d.close()
-    const rahmen = d.getElementById('pdf') as HTMLIFrameElement | null
-    if (!rahmen) return false
-    rahmen.addEventListener('load', () => {
-      // Kurz warten, bis die PDF-Ansicht des Browsers bereit ist
-      setTimeout(() => {
-        try {
-          rahmen.contentWindow?.focus()
-          rahmen.contentWindow?.print()
-        } catch {
-          // Druckknopf der PDF-Ansicht bleibt
-        }
-      }, 400)
-    })
-    return true
-  } catch {
-    return false
-  }
+/**
+ * Drucken ohne die Druckvorschau der App (window.api.exporter.print im Browser): bereitet vor und zeigt dann ein
+ * kleines Fenster im Dokument mit „Drucken …" – kein neuer Tab. Die Druckvorschau (PrintPreview.tsx) bereitet selbst
+ * vor und druckt direkt aus ihrem Knopf.
+ */
+export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'): Promise<'druck'> {
+  const { druckeMitKnopf } = await import('./export/druckImDokument')
+  await druckeMitKnopf(druckPdf(teile), dateiname)
+  return 'druck'
 }
 
 /** Mehrere PDFs zu einem – jedes beginnt auf einer neuen Seite. */
@@ -500,7 +435,7 @@ export function netzZugangEinrichten(): void {
    * fragt gar nicht erst danach; kommt der Aufruf doch einmal an, heißt die Antwort „abgebrochen".
    */
   api.files.chooseFolder = async () => null
-  // Drucken: PDF im neuen Tab des Geräts (siehe `druckeImBrowser`)
+  // Drucken: im aktuellen Dokument mit dem Druckdialog des Geräts (siehe `druckeImBrowser`)
   api.exporter.print = async (html) => {
     await druckeImBrowser([html])
   }

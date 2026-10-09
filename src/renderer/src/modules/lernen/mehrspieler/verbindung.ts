@@ -23,6 +23,9 @@ export interface SpielSicht {
   spieler: { id: string; name: string; verbunden: boolean; host: boolean }[]
   schwierigkeit: Schwierigkeit
   schwierigkeiten: { id: Schwierigkeit; name: string; text: string }[]
+  /** Zielsprache und Klasse des Kurses – Beschriftungen der Spielseite in der Zielsprache (09.10.2026) */
+  sprache?: string
+  jahrgang?: number | null
   form?: string
   formen: { id: string; name: string; waehlbar: boolean; hinweis?: string }[]
   spiele: Angebot[]

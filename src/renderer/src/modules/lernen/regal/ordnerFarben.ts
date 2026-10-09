@@ -40,6 +40,8 @@ export function ordnerFarben(farbe: string, dunkel: boolean): OrdnerFarben {
     ruecken,
     register: {
       vok: ruecken,
+      // Wortliste (09.10.2026): zwischen Vokabeln und Grammatik
+      wort: flaecheMitSchrift(mische(basis, '#ffffff', 0.18)),
       gram: flaecheMitSchrift(mische(basis, '#ffffff', 0.35)),
       mat: flaecheMitSchrift(mische(basis, '#000000', 0.35))
     }

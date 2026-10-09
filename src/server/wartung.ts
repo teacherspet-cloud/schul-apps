@@ -18,6 +18,9 @@ import { fachSchreibweise } from '../shared/faecher'
 import { protokoll } from './diagnose'
 import { grammatikThemenTeilen } from './grammatikTeilen'
 import { codePruefwertAusAlt } from './feldschutz'
+import { NAMEN_KORRIGIEREN } from './wartungGastname'
+import { THERE_WAS_KLASSE5 } from './wartungThereWas'
+import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
 export const ZEIT_GRENZE: Record<string, number> = { blitz: 30, richtiggehoert: 30, formenblitz: 30, verbblitz: 30, richtigfalsch: 30 }
@@ -137,7 +140,13 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   ],
   ['codes-hmac-2026-10-08', (d) => `${codePruefwerteUmstellen(d)} Code-Prüfwerte auf HMAC umgestellt`],
   // Zuletzt: nach allen Umstellungen die Klartext-Reste entfernen
-  ['klartext-reste-2026-10-08', klartextResteEntfernen]
+  ['klartext-reste-2026-10-08', klartextResteEntfernen],
+  // Namen einzelner Lernender korrigieren (09.10.2026, 5b und 10b; wartungGastname.ts)
+  NAMEN_KORRIGIEREN,
+  // „There was/were" aus „There is / There are" in Klasse 5 entfernen (09.10.2026, wartungThereWas.ts)
+  THERE_WAS_KLASSE5,
+  // Grammatik der 10. Klassen der Lehrkraft löschen – von ihr am 09.10.2026 ausdrücklich bestätigt (wartungGrammatik10.ts)
+  GRAMMATIK_KLASSE10
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

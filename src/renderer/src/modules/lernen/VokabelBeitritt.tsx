@@ -14,6 +14,8 @@ const ARTEN = {
 import { Alert, Button, Card, Center, Code, Group, Loader, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
+import { CodeUnbekannt } from '../onlinetest/CodeUnbekannt'
+import { FreischaltungHinweis } from './regal/planHinweise'
 
 interface Info {
   id: string
@@ -23,6 +25,8 @@ interface Info {
   bis: number | null
   /** Kurs nur mit Grammatik (08.10.2026) */
   nurGrammatik?: boolean
+  /** Geplante Freischaltung (09.10.2026): noch nichts frei – ab dann */
+  geplantAb?: number
 }
 
 const NAME_OK = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u
@@ -41,7 +45,14 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
   const lehrkraft = Boolean(ich?.angemeldet && (ich.rolle === 'lehrkraft' || ich.rolle === 'admin'))
   // Kurs nur mit Grammatik (Sprachenlernen, 08.10.2026): nicht auf eine leere Vokabelseite, sondern zu „Meine Materialien"
   const nurGrammatik = useRef(false)
-  const ziel = (id: string): void => window.location.assign(nurGrammatik.current ? '/s/' : `${A.ziel}${id}`)
+  // Vor einer geplanten Freischaltung (09.10.2026): beitreten ja, dann den Zeitpunkt nennen statt einer leeren Seite
+  const geplant = useRef<number | null>(null)
+  const [wartet, setWartet] = useState<{ ab: number; titel: string } | null>(null)
+  const titelRef = useRef('')
+  const ziel = (id: string): void => {
+    if (geplant.current && geplant.current > Date.now()) return setWartet({ ab: geplant.current, titel: titelRef.current })
+    window.location.assign(nurGrammatik.current ? '/s/' : `${A.ziel}${id}`)
+  }
 
   const beitreten = useCallback(
     async (daten: Record<string, string>, pfad = `${A.api}/gast`): Promise<void> => {
@@ -63,6 +74,8 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
     void holen<Info>(`${A.api}/zugang?code=${encodeURIComponent(code)}`).then(
       (d) => {
         nurGrammatik.current = Boolean(d.nurGrammatik)
+        geplant.current = d.geplantAb ?? null
+        titelRef.current = d.titel
         if (d.dabei) return ziel(d.id)
         if (mitKonto) return void beitreten({})
         if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`${A.seite}${code}`)}`)
@@ -72,7 +85,9 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
     )
   }, [code, mitKonto, beitreten])
 
-  if (info === null) return <Alert color="orange">Dieses {A.name} gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
+  // Unbekannter Code (09.10.2026): dieselbe Meldung wie auf den anderen Code-Seiten
+  if (info === null) return <CodeUnbekannt />
+  if (wartet && !persoenlich) return <FreischaltungHinweis ab={wartet.ab} titel={wartet.titel} art={A.name} />
   if (persoenlich)
     return (
       <Card withBorder padding="lg" data-persoenlicher-code>
@@ -85,7 +100,7 @@ export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { co
             {persoenlich.wieder}
           </Code>
         </Center>
-        <Button fullWidth size="lg" onClick={() => ziel(persoenlich.id)} data-vokabeln-los>
+        <Button fullWidth size="lg" onClick={() => (ziel(persoenlich.id), setPersoenlich(null))} data-vokabeln-los>
           Aufgeschrieben – los geht's
         </Button>
       </Card>

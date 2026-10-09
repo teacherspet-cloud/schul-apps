@@ -11,8 +11,20 @@
  * Umformen/Kongruenz, Übersetzen, Präpositionen) und Regeln aus der Recherche (KC Niedersachsen 2017, Pontes/Campus/
  * prima). Die Formen bildet weiter die KI – die Prüfung schaut deshalb gezielt auf Formen und Lesarten.
  */
-import type { StructuredRequest } from '@shared/types'
+import { CEFR_SCALE, type CefrLevel, type CefrTable, type StructuredRequest } from '@shared/types'
+import {
+  bekanntNachLernjahr,
+  katalogFormenRegel,
+  lateinNiveauRegel,
+  niveauBefund,
+  niveauMischung,
+  niveauRegel,
+  verschoben,
+  zielNiveau,
+  type Schwierigkeit
+} from './grammatikNiveau'
 import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache, type SperrbareZeitform } from '@shared/zeitformSperre'
 
 type Ai = <T>(req: StructuredRequest) => Promise<T>
 
@@ -106,6 +118,18 @@ export interface GrammatikAuftrag {
   /** Woher der Wortschatz stammt (für den Prompt), z. B. „Pontes, bis Lektion 12" */
   wortQuelle?: string
   /**
+   * Bekannte Grammatik der Lerngruppe (Katalogkennungen aus Lehrwerk-Stand und Freigegebenem, 09.10.2026). Fehlt sie,
+   * gilt der Jahrgang (shared/zeitformSperre.ts `bekanntNachStand`).
+   */
+  bekannt?: string[]
+  /** Katalogkennungen der Themen dieses Auftrags (ihre Zeitformen sind erlaubt) */
+  themenIds?: string[]
+  /** Bundesland und Schulform (09.10.2026) – Maßstab für das Niveau (grammatikNiveau.ts) */
+  land?: string
+  schulform?: string
+  /** GER-Niveau der Lerngruppe, falls schon bekannt (sonst GER-Tabelle bzw. Faustregel) */
+  ger?: CefrLevel
+  /**
    * Förder-/Forderaufgaben für ein Kind (08.10.2026, abgestimmt). Ohne Namen: nur die Regeln, die falschen Antworten
    * mit der richtigen Lösung und die bekannte Grammatik.
    */
@@ -161,6 +185,116 @@ const istLatein = (a: GrammatikAuftrag): boolean => a.sprache === 'la' || /latei
 /** Lernjahr im Fach Latein (ab Klasse 6 als 2. Fremdsprache die Regel in Niedersachsen; Klasse 5 = 1. Lernjahr) */
 export const lateinLernjahr = (jahrgang: number): number => Math.max(1, Math.min(6, jahrgang - 5))
 
+type SperrAngaben = Pick<GrammatikAuftrag, 'thema' | 'fach' | 'sprache' | 'jahrgang' | 'bekannt' | 'themenIds' | 'land'> & { extra?: { bekannt: string[] } }
+
+/**
+ * Gesperrte Zeitformen eines Auftrags (09.10.2026, Befund „There is / There are" in Klasse 5 mit „There was/were";
+ * Nachtrag: alle Fremdsprachen). Englisch: bekannt = Angabe des Auftrags (Förder/Forder: die bekannte Grammatik des
+ * Kindes), sonst der Jahrgang. Übrige Sprachen: dazu immer der Katalog nach Lernjahr (Latein auch der Lehrwerk-Stand,
+ * den der Aufrufer über `bekanntNachStand` mitgibt).
+ */
+export function zeitformSperre(a: SperrAngaben): SperrbareZeitform[] {
+  const sprache = sperrSprache(a.sprache, a.fach)
+  if (!sprache) return []
+  const eigene = [...(a.bekannt ?? []), ...(a.extra?.bekannt ?? [])]
+  const bekannt =
+    sprache === 'en' ? (eigene.length ? eigene : bekanntNachStand(undefined, a.jahrgang)) : [...eigene, ...bekanntNachLernjahr(a)]
+  return sperreFuer({ bekannt, themen: a.themenIds, thema: a.thema, sprache })
+}
+
+/** Regel für den Auftrag: die strikte Zeitform-Regel – für Sprachen ohne erfasste Prüfung die Regel aus dem Katalog */
+export function zeitformRegel(a: SperrAngaben, gesperrt: SperrbareZeitform[]): string {
+  if (sperrSprache(a.sprache, a.fach)) return sperrRegel(gesperrt)
+  return katalogFormenRegel(a, a.themenIds)
+}
+
+/** Was Zeitform-Prüfung und Niveau-Gegenprobe gefunden haben – für die Meldung am Ende des Auftrags */
+const gestrichen = new WeakMap<GrammatikPaket, { entfernt: number; zeitformen: string[]; niveau?: string }>()
+
+/**
+ * Zusatz für die Abschlussmeldung: „(3 Aufgaben mit noch unbekannter Zeitform entfernt …)" und ggf. „Niveau: wirkt für
+ * B1+ zu leicht …" – leer, wenn nichts auffiel.
+ */
+export function erzeugungsHinweis(p: GrammatikPaket): string {
+  const g = gestrichen.get(p)
+  if (!g) return ''
+  const teile = [
+    g.entfernt
+      ? `${g.entfernt} ${g.entfernt === 1 ? 'Aufgabe' : 'Aufgaben'} mit noch unbekannter Zeitform entfernt${g.zeitformen.length ? `: ${g.zeitformen.join(', ')}` : ''}`
+      : '',
+    g.niveau ? `Niveau: ${g.niveau}` : ''
+  ].filter(Boolean)
+  return teile.length ? ` (${teile.join('; ')})` : ''
+}
+
+/** Niveau-Gegenprobe (grammatikNiveau.ts `niveauBefund`): Fällt der Pool deutlich zu leicht aus, sagt es die Meldung */
+export function mitNiveauBefund(p: GrammatikPaket, ziel: CefrLevel | null): GrammatikPaket {
+  if (!ziel) return p
+  const b = niveauBefund(p.aufgaben, ziel)
+  if (b.zuLeicht) gestrichen.set(p, { ...(gestrichen.get(p) ?? { entfernt: 0, zeitformen: [] }), niveau: b.hinweis })
+  return p
+}
+
+/** GER-Niveau des Auftrags: Angabe, sonst GER-Tabelle der Länder (falls erreichbar), sonst Faustregel */
+export async function niveauDesAuftrags(a: {
+  fach: string
+  sprache: string
+  jahrgang: number
+  land?: string
+  schulform?: string
+  ger?: CefrLevel
+}): Promise<CefrLevel> {
+  if (a.ger && CEFR_SCALE.includes(a.ger)) return a.ger
+  let table: CefrTable | null = null
+  try {
+    const api = (globalThis as { window?: { api?: { cefr?: { get: () => Promise<CefrTable> } } } }).window?.api
+    if (api?.cefr) table = await api.cefr.get()
+  } catch {
+    // ohne Tabelle: Faustregel
+  }
+  return zielNiveau(a, table).ger
+}
+
+/**
+ * Nach der Prüfung: Aufgaben mit gesperrten Zeitformen streichen. Fehlen dadurch Aufgaben, schreibt die KI einmal
+ * entsprechend viele nach (gleiche Regelkarten, dieselbe Sperre) – deren Treffer fallen ebenfalls weg.
+ */
+export async function mitZeitformSperre(
+  paket: GrammatikPaket,
+  gesperrt: SperrbareZeitform[],
+  ziel: number,
+  nachschreiben: (anzahl: number, p: GrammatikPaket) => Promise<GrammatikPaket>,
+  melde: (t: string) => void = () => undefined
+): Promise<GrammatikPaket> {
+  if (!gesperrt.length) return paket
+  const erst = ohneGesperrteZeitformen(paket, gesperrt)
+  let ergebnis: GrammatikPaket = { ...paket, regeln: erst.regeln, aufgaben: erst.aufgaben }
+  let entfernt = erst.entfernt
+  const zeitformen = new Set(erst.zeitformen)
+  const fehlend = Math.min(erst.entfernt, ziel - erst.aufgaben.length)
+  if (fehlend > 0) {
+    melde(`${erst.entfernt} Aufgaben mit unbekannter Zeitform entfernt – die KI schreibt ${fehlend} neue …`)
+    try {
+      const neu = await nachschreiben(fehlend, ergebnis)
+      const zweit = ohneGesperrteZeitformen(neu, gesperrt)
+      entfernt += zweit.entfernt
+      for (const z of zweit.zeitformen) zeitformen.add(z)
+      ergebnis = paketBereinigt(
+        {
+          ...ergebnis,
+          // Neue Aufgaben ohne Kennung – paketBereinigt vergibt freie, die vorhandenen behalten ihre
+          aufgaben: [...ergebnis.aufgaben, ...zweit.aufgaben.slice(0, fehlend).map((x) => ({ ...x, id: '' }))]
+        },
+        paket.thema
+      )
+    } catch {
+      // Nachschreiben fehlgeschlagen: der bereinigte Pool bleibt
+    }
+  }
+  gestrichen.set(ergebnis, { entfernt, zeitformen: [...zeitformen] })
+  return ergebnis
+}
+
 /**
  * Latein-Regeln für die KI (Recherche 07.10.2026). Abkürzungen wie in den Schulbüchern; Längenzeichen in Formen und
  * Lösungen (die Eingaben der Lernenden werden ohne Längen geprüft); typische Mehrdeutigkeiten gezielt.
@@ -183,6 +317,10 @@ export const LATEIN_REGELN = [
 export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
   const latein = istLatein(a)
   const extra = a.extra ? extraAuftrag(a.extra) : null
+  const gesperrt = zeitformSperre(a)
+  // Niveau (09.10.2026): Förderaufgaben eine Teilstufe darunter, Forderaufgaben darüber, sonst der Wunsch der Lehrkraft
+  const ger = await niveauDesAuftrags(a)
+  const stufe: Schwierigkeit | string | undefined = a.extra ? (a.extra.art === 'foerder' ? 'grundlegend' : 'anspruchsvoll') : a.niveau
   melde(extra ? 'Die KI schreibt die Extra-Aufgaben …' : 'Die KI schreibt Regelkarten und Aufgaben …')
   const roh = await ai<{ regeln: unknown[]; aufgaben: unknown[] }>({
     schemaName: 'grammatik_pool',
@@ -196,13 +334,15 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
         ? ''
         : latein
         ? 'Aufgaben: genau 40, gemischt – etwa 10 Bestimmen, 4 Mehrfachauswahl, 4 Tabelle, 8 Umformen (davon 3 KNG-Kongruenz), 6 Lücke, 4 Übersetzen, 4 Auswahl. Alle Regeln abdecken, vom Leichten zum Schweren.'
-        : 'Aufgaben: genau 40, gemischt – etwa 12 Lücke, 8 Auswahl, 8 Umformen, 6 Fehler finden, 6 Satzbau. Alle Regeln abdecken, vom Leichten zum Schweren.',
+        : `Aufgaben: genau 40, gemischt – ${niveauMischung(ger, stufe)}. Alle Regeln abdecken, innerhalb des Niveaus vom Leichteren zum Schwereren.`,
+      latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, stufe) : niveauRegel(a, ger, stufe),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
       'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an (z. B. Kurz- und Langform).',
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
       latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : '',
+      zeitformRegel(a, gesperrt),
       a.woerter?.length
         ? `WORTSCHATZ${
             a.wortQuelle ? ` (${a.wortQuelle})` : ''
@@ -227,11 +367,53 @@ Zielsprache: ${a.sprache}`
         }`,
     schema: paketSchema(latein, Boolean(extra), extra ? [] : themenVon(a.thema))
   })
-  return gepruefterPool(paketBereinigt(roh, a.thema), a, ai, melde)
+  const geprueft = await gepruefterPool(paketBereinigt(roh, a.thema), a, ai, melde, gesperrt, latein ? undefined : verschoben(ger, stufe))
+  const ziel = a.extra ? (a.extra.art === 'foerder' ? 10 : 8) : 40
+  const fertig = await mitZeitformSperre(
+    geprueft,
+    gesperrt,
+    ziel,
+    async (anzahl, p) => {
+      const neu = await mehrAufgabenRoh(
+        {
+          thema: a.thema,
+          fach: a.fach,
+          sprache: a.sprache,
+          jahrgang: a.jahrgang,
+          anzahl,
+          arten: [],
+          schwierigkeit: a.extra?.art === 'forder' ? 'anspruchsvoll' : a.extra ? 'grundlegend' : 'mittel',
+          regeln: p.regeln,
+          vorhanden: vorhandeneSaetze(p),
+          land: a.land,
+          schulform: a.schulform,
+          ger
+        },
+        ai,
+        melde,
+        gesperrt
+      )
+      // Förderaufgaben: die nachgeschriebenen zählen zur gelenkten Stufe
+      return a.extra ? { ...neu, aufgaben: neu.aufgaben.map((x) => ({ ...x, stufe: x.stufe ?? (a.extra?.art === 'forder' ? 3 : 2) })) } : neu
+    },
+    melde
+  )
+  return mitNiveauBefund(fertig, latein ? null : verschoben(ger, stufe))
 }
 
+/** Vorhandene Sätze (gekürzt) – damit beim Nachschreiben nichts doppelt kommt */
+const vorhandeneSaetze = (p: GrammatikPaket): string[] =>
+  p.aufgaben.map((x) => (x.satz || x.form || (x.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean)
+
 /** 2. Schritt: Eine zweite Anfrage prüft jede Aufgabe (korrigiert Lösungen bzw. streicht) – auch für „+ Aufgaben" */
-async function gepruefterPool(start: GrammatikPaket, a: GrammatikAuftrag, ai: Ai, melde: (t: string) => void): Promise<GrammatikPaket> {
+async function gepruefterPool(
+  start: GrammatikPaket,
+  a: GrammatikAuftrag,
+  ai: Ai,
+  melde: (t: string) => void,
+  gesperrt: SperrbareZeitform[] = [],
+  ger?: CefrLevel
+): Promise<GrammatikPaket> {
   const latein = istLatein(a)
   let paket = start
   melde(`Die KI prüft ${paket.aufgaben.length} Aufgaben …`)
@@ -255,6 +437,12 @@ async function gepruefterPool(start: GrammatikPaket, a: GrammatikAuftrag, ai: Ai
         'Für jede Aufgabe: Ist sie eindeutig lösbar? Stimmt die Lösung? Fehlen gültige Varianten (z. B. Kurzform)? Bei „Fehler finden": genau ein Fehler, fehlerWort exakt im Satz?',
         'ok = false, wenn die Aufgabe mehrdeutig oder falsch ist und sich nicht durch die Lösungen reparieren lässt.',
         'loesungen/optionen/fehlerWort: die korrigierte Fassung (oder unverändert); grund: kurz, deutsch.',
+        gesperrt.length
+          ? `ok = false auch, wenn Satz, Lösung oder Möglichkeiten eine Zeitform brauchen, die die Lerngruppe noch nicht kennt: ${gesperrt
+              .map((z) => z.name)
+              .join('; ')}.`
+          : '',
+        ger ? `ok = false auch für Aufgaben, die für GER-Niveau ${ger} trivial sind (ohne die Regel lösbar, Ablenker offensichtlich falsch).` : '',
         latein
           ? 'LATEIN: Prüfe JEDE lateinische Form auf Richtigkeit (Endung, Stamm, Längen). Bestimmen: Sind ALLE Lesarten genannt (bei Einzelformen) bzw. genau die im Satz passende? lesarten = vollständige, korrigierte Liste – je Lesart GENAU ein Wert pro Merkmal, in der Reihenfolge und Schreibweise der Merkmale (z. B. ["1.", "Sg.", "Präs.", "Ind.", "Akt."], nicht "1. Sg."). Tabelle: Formen in [eckigen Klammern] sind vorgegeben, die übrigen füllen die Lernenden aus – das ist eine gültige Aufgabe; zellen = NUR die korrigierten Formen je Zeile (ohne Zeilennamen), eine Zelle je Spalte. Übersetzen: alle gleichwertigen deutschen Fassungen. Umformen/Lücke/Auswahl mit mehreren möglichen Lösungen, die nicht alle genannt sind, oder mit unklarem Ziel: ok = false.'
           : ''
@@ -341,6 +529,14 @@ export interface MehrAufgabenAuftrag {
   regeln: { id: string; titel: string; erklaerung: string; beispiele: string[] }[]
   /** Vorhandene Sätze (gekürzt) – damit nichts doppelt kommt */
   vorhanden: string[]
+  /** Bekannte Grammatik der Lerngruppe (Katalogkennungen; 09.10.2026) – fehlt sie, gilt der Jahrgang */
+  bekannt?: string[]
+  /** Katalogkennungen der Themen dieser Grammatik */
+  themenIds?: string[]
+  /** Bundesland, Schulform, GER-Niveau (09.10.2026) – „schwierigkeit" gilt relativ zu diesem Maßstab */
+  land?: string
+  schulform?: string
+  ger?: CefrLevel
 }
 
 const SCHWIERIGKEIT_TEXT: Record<MehrAufgabenAuftrag['schwierigkeit'], string> = {
@@ -357,12 +553,29 @@ export const mehrAnzahl = (n: number): number => Math.max(4, Math.min(20, Math.r
  * Anzahl, Aufgabenarten, Schwierigkeit und Wünsche; nur Aufgaben, keine neuen Regelkarten – jede Aufgabe nennt die
  * Kennung einer vorhandenen Regel. Danach dieselbe Prüfung wie beim Pool. Keine Namen, keine Daten der Lernenden.
  */
-export async function erzeugeMehrAufgaben(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
+export async function erzeugeMehrAufgaben(a0: MehrAufgabenAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
+  const gesperrt = zeitformSperre(a0)
+  const ger = await niveauDesAuftrags(a0)
+  const a = { ...a0, ger }
+  const p = await mehrAufgabenRoh(a, ai, melde, gesperrt)
+  const fertig = await mitZeitformSperre(
+    p,
+    gesperrt,
+    mehrAnzahl(a.anzahl),
+    (fehlend, q) => mehrAufgabenRoh({ ...a, anzahl: fehlend, vorhanden: [...a.vorhanden, ...vorhandeneSaetze(q)] }, ai, melde, gesperrt),
+    melde
+  )
+  return mitNiveauBefund(fertig, istLatein({ ...a, thema: '' }) ? null : verschoben(ger, a.schwierigkeit))
+}
+
+/** „+ Aufgaben" ohne Nachprüfung der Zeitformen – auch zum Nachschreiben gestrichener Aufgaben */
+async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string) => void, gesperrt: SperrbareZeitform[]): Promise<GrammatikPaket> {
   const auftrag: GrammatikAuftrag = { thema: a.thema, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang }
   const latein = istLatein(auftrag)
   const erlaubt = latein ? ARTEN_LATEIN : [...ARTEN_ALLGEMEIN, 'uebersetzen']
   const arten = a.arten.filter((x) => erlaubt.includes(x))
   const anzahl = mehrAnzahl(a.anzahl)
+  const ger = await niveauDesAuftrags(a)
   melde(`Die KI schreibt ${anzahl} weitere Aufgaben …`)
   const schema = O({
     aufgaben: A(
@@ -379,7 +592,8 @@ export async function erzeugeMehrAufgaben(a: MehrAufgabenAuftrag, ai: Ai, melde:
       `Du ergänzt einen Aufgabenpool für eine Grammatik-Lern-App (${a.fach}, Klasse ${a.jahrgang}). Die Regelkarten stehen schon fest.`,
       'Jede Aufgabe muss für sich allein verständlich und EINDEUTIG lösbar sein; „regelId" nennt die Regelkarte, die sie übt.',
       `Aufgaben: genau ${anzahl}${arten.length ? `, nur diese Arten: ${arten.map((x) => ART_NAME[x as AufgabenArt] ?? x).join(', ')} (möglichst gleichmäßig)` : ', gemischt'}. Alle Regeln abdecken.`,
-      `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel}.`,
+      `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel} – relativ zum Niveau der Lerngruppe.`,
+      latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, a.schwierigkeit) : niveauRegel(a, ger, a.schwierigkeit),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
       'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an.',
       'Fehler finden: genau EIN Grammatikfehler, „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
@@ -387,7 +601,8 @@ export async function erzeugeMehrAufgaben(a: MehrAufgabenAuftrag, ai: Ai, melde:
       'Übersetzen: satz = deutscher Satz, loesungen = alle richtigen Übersetzungen in die Zielsprache.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
       'Keine Sätze, die schon im Pool stehen (Liste unten).',
-      latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : ''
+      latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : '',
+      zeitformRegel(a, gesperrt)
     ]
       .filter(Boolean)
       .join('\n'),
@@ -402,7 +617,14 @@ export async function erzeugeMehrAufgaben(a: MehrAufgabenAuftrag, ai: Ai, melde:
     ].join('\n'),
     schema
   })
-  return gepruefterPool(paketBereinigt({ thema: a.thema, regeln: a.regeln, aufgaben: roh.aufgaben }, a.thema), auftrag, ai, melde)
+  return gepruefterPool(
+    paketBereinigt({ thema: a.thema, regeln: a.regeln, aufgaben: roh.aufgaben }, a.thema),
+    auftrag,
+    ai,
+    melde,
+    gesperrt,
+    latein ? undefined : verschoben(ger, a.schwierigkeit)
+  )
 }
 
 /** Aufgabenarten, die die KI für diese Sprache schreibt (Auswahl im Fenster „+ Aufgaben") */

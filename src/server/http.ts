@@ -451,7 +451,10 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           fehler: url.searchParams.get('fehler') ?? '',
           ziel: url.searchParams.get('ziel') ?? '/',
           benutzer: url.searchParams.get('benutzer') ?? '',
-          konto: url.searchParams.get('konto') === '1'
+          konto: url.searchParams.get('konto') === '1',
+          // Unbekannter Code vom Feld „Mit Code öffnen" (09.10.2026, SchuelerBereich.tsx)
+          code: url.searchParams.get('code') ?? '',
+          codeUnbekannt: url.searchParams.get('unbekannt') === '1'
         })
       )
     }
@@ -635,6 +638,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           legen: wahl(k0.legen, ['legen', 'tippen', 'schreiben'], 'legen'),
           // „Dein Vokabelweg" auf- oder zugeklappt (08.10.2026)
           vokabelwegOffen: k0.vokabelwegOffen === true,
+          // Vollbild beim Lernen (09.10.2026): an, solange die Lernenden es nicht ausschalten
+          vollbild: k0.vollbild !== false,
           materialien: wahl(k0.materialien, ['regal', 'liste'], 'regal'),
           regal: (Array.isArray(k0.regal) ? k0.regal : [])
             .filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 60)

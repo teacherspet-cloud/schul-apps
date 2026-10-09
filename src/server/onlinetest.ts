@@ -909,7 +909,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
       const k0 = await koerperRoh(k)
       const test = testNachCode(String(k0.code ?? ''))
-      if (!test) return (json(res, 404, { fehler: 'Diesen Test gibt es nicht. Bitte den Code prüfen.' }), true)
+      if (!test) return (json(res, 404, { fehler: 'Diesen Code kennen wir nicht – bitte genau prüfen.' }), true)
       if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
       if (test.einstellungen.gaeste === false)
         return (json(res, 403, { fehler: 'Diesen Test schreibst du mit deinem Schülerkonto – bitte anmelden.', anmelden: true }), true)
@@ -940,7 +940,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
     // Vor dem Beitritt: Darf man mit Namen hinein oder nur mit Konto? (ohne Anmeldung abfragbar)
     if (req.method === 'GET' && was === 'zugang') {
       const test = testNachCode(String(url.searchParams.get('code') ?? ''))
-      return (json(res, 200, { gaeste: !test || test.einstellungen.gaeste !== false }), true)
+      // bekannt (09.10.2026): Unbekannter Code → die Seite meldet das, statt nach dem Namen zu fragen
+      return (json(res, 200, { gaeste: !test || test.einstellungen.gaeste !== false, bekannt: Boolean(test) }), true)
     }
 
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
@@ -1035,7 +1036,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       if (!mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
       const k0 = await koerperRoh(k)
       const test = testNachCode(String(k0.code ?? ''))
-      if (!test) return (json(res, 404, { fehler: 'Diesen Test gibt es nicht. Bitte den Code prüfen.' }), true)
+      if (!test) return (json(res, 404, { fehler: 'Diesen Code kennen wir nicht – bitte genau prüfen.' }), true)
       if (test.lerngruppe_id && !gast) {
         const g = lerngruppe(test.lerngruppe_id)
         if (g && !gehoertZu(g, ich) && ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Dieser Test ist für eine andere Lerngruppe.' }), true)
@@ -1568,16 +1569,18 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
 export function historie(g: Lerngruppe) {
   const namen = new Map(alleNutzer().map((n) => [n.id, n]))
   const tests = (db().prepare('SELECT * FROM onlinetests WHERE lerngruppe_id = ? ORDER BY erstellt').all(g.id) as unknown as TestZeile[]).map(alsTest)
-  const jeSchueler = new Map<string, { name: string; benutzer: string; noten: number[]; prozente: number[] }>()
+  // ids (09.10.2026): alle Konten der Person – „Meine Klassen" ordnet über die Kennung zu, der Name ist nur Rückfall
+  const jeSchueler = new Map<string, { name: string; benutzer: string; ids: Set<string>; noten: number[]; prozente: number[] }>()
   const liste = tests.map((t) => {
     abgelaufeneAbschliessen(t)
     const ts = teilnahmenVon(t.id).filter((x) => x.abgabe)
     const ergebnisse = ts.map((x) => ueberblick(t, x, namen))
     const verteilung = [1, 2, 3, 4, 5, 6].map((n) => ergebnisse.filter((e) => e.note === n).length)
-    for (const e of ergebnisse) {
+    for (const [i, e] of ergebnisse.entries()) {
       if (e.note == null) continue
       // Gäste (ohne IServ) über ihren Namen in der Lerngruppe
-      const s = jeSchueler.get(e.schluessel) ?? { name: e.name, benutzer: e.benutzer, noten: [], prozente: [] }
+      const s = jeSchueler.get(e.schluessel) ?? { name: e.name, benutzer: e.benutzer, ids: new Set<string>(), noten: [], prozente: [] }
+      s.ids.add(ts[i].schueler_id)
       s.noten.push(e.note)
       s.prozente.push(e.max ? (e.punkte / e.max) * 100 : 0)
       jeSchueler.set(e.schluessel, s)
@@ -1603,6 +1606,7 @@ export function historie(g: Lerngruppe) {
       .map((s) => ({
         name: s.name,
         benutzer: s.benutzer,
+        ids: [...s.ids],
         tests: s.noten.length,
         durchschnitt: Math.round((s.noten.reduce((a, b) => a + b, 0) / s.noten.length) * 100) / 100,
         prozent: Math.round(s.prozente.reduce((a, b) => a + b, 0) / s.prozente.length)

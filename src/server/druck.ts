@@ -5,7 +5,7 @@
  * aus dem CSS. EIN Browser für alle, Aufträge nacheinander – der VPS hat wenig Arbeitsspeicher
  * (Proof of Concept). Nach 5 Minuten ohne Auftrag wird der Browser beendet.
  *
- * Drucken heißt im Browser: PDF im neuen Tab (renderer/shared/netzZugang.ts `druckeImBrowser`).
+ * Drucken heißt im Browser: Seitenbilder des PDFs im aktuellen Dokument drucken, ohne neuen Tab (renderer/shared/export/druckImDokument.ts).
  */
 import { digitalisieren, zusatzLinien } from '../shared/blattDigital'
 import { objekteSvg, type BlattObjekt } from '../shared/blattObjekte'

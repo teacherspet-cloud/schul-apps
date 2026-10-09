@@ -2,9 +2,13 @@
  * Achievements der Lernenden (08.10.2026, mit der Lehrkraft abgestimmt) – reine Berechnung, ohne Datenbank.
  *
  * Für Vokabeln und Grammatik der Sprachen-Lern-App: rund 40 feste Achievements in sechs Gruppen, viele in Stufen
- * (Bronze/Silber/Gold), dazu je Unit und je Lehrwerksband aus den eigenen Kursen. Die Lernenden sehen nur, was sie
- * erreicht haben, und wie viele noch zu entdecken sind – nie welche. Keine Rangliste, kein Vergleich mit anderen.
- * Erreichtes wird nie wieder entzogen (Server: server/achievements.ts speichert den Zeitpunkt).
+ * (Bronze/Silber/Gold), dazu je Unit und je Lehrwerksband aus den eigenen Kursen. Erreichtes wird nie wieder entzogen
+ * (Server: server/achievements.ts speichert den Zeitpunkt).
+ *
+ * Seit 09.10.2026 (Wunsch der Lehrkraft): Die Lernenden sehen ALLE Achievements, auch die noch nicht erreichten, mit
+ * Fortschritt (`ist`/`ziel`, etwa 23/50) – nur die geheimen Überraschungen (`geheim`) bleiben verborgen, bis sie
+ * erreicht sind. Vergleich nur über Zahlen: Anteil der Lernenden der Schule und der eigene Platz in der Klasse
+ * (shared/achievementsVergleich.ts) – nie Namen oder Werte anderer.
  */
 
 export type AchGruppe = 'dranbleiben' | 'lehrwerk' | 'wortschatz' | 'grammatik' | 'spiele' | 'zusammen' | 'besonderes'
@@ -28,6 +32,11 @@ export interface Achievement {
   text: string
   medaille: Medaille
   erreicht: boolean
+  /** Fortschritt (09.10.2026): aktueller Wert und Ziel – bei Einmaligem 0/1 bzw. 1/1 */
+  ist: number
+  ziel: number
+  /** Überraschung: erst sichtbar, wenn erreicht (09.10.2026) */
+  geheim?: boolean
 }
 
 /** Zähler, die im Moment des Geschehens mitgeschrieben werden (server/achievementsDaten.ts) */
@@ -148,13 +157,16 @@ export function wochenMitZiel(tage: string[], ziel: number): number {
   return [...jeWoche.values()].filter((x) => x >= z).length
 }
 
-const anteil = (teil: number, ganz: number): number => (ganz > 0 ? (teil / ganz) * 100 : 0)
+/** Wie viele von `ganz` für `prozent` % nötig sind (dasselbe wie „Anteil ≥ prozent“) */
+const noetig = (ganz: number, prozent: number): number => Math.max(1, Math.ceil((ganz * prozent) / 100 - 1e-9))
 
 /** Der ganze Katalog für diese Eingabe – erreicht oder nicht */
 export function berechneAchievements(e: AchEingabe): Achievement[] {
   const aus: Achievement[] = []
-  const neu = (id: string, gruppe: AchGruppe, medaille: Medaille, titel: string, text: string, erreicht: boolean): void => {
-    aus.push({ id, gruppe, titel, text, medaille, erreicht })
+  /** `wert`: Zahl mit Ziel `ziel`, oder Ja/Nein (dann 1/1 bzw. 0/1) */
+  const neu = (id: string, gruppe: AchGruppe, medaille: Medaille, titel: string, text: string, wert: number | boolean, ziel = 1, geheim = false): void => {
+    const ist = typeof wert === 'boolean' ? (wert ? 1 : 0) : Math.max(0, Math.floor(wert))
+    aus.push({ id, gruppe, titel, text, medaille, erreicht: ist >= ziel, ist: Math.min(ist, ziel), ziel, ...(geheim ? { geheim: true } : {}) })
   }
   const stufen = (
     basis: string,
@@ -164,7 +176,7 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     titel: (n: number) => string,
     text: (n: number) => string
   ): void => {
-    for (const [n, m] of werte) neu(`${basis}-${n}`, gruppe, m, titel(n), text(n), ist >= n)
+    for (const [n, m] of werte) neu(`${basis}-${n}`, gruppe, m, titel(n), text(n), ist, n)
   }
   const z = { ...LEERE_ZAEHLER, ...e.zaehler }
 
@@ -196,13 +208,13 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => (n === 1 ? 'Wochenziel geschafft' : `Wochenziel in ${n} Wochen`),
     (n) => (n === 1 ? 'Eine Woche lang so oft geübt, wie du es dir vorgenommen hast.' : `In ${n} Wochen dein Wochenziel erreicht.`)
   )
-  neu('comeback', 'dranbleiben', null, 'Comeback', 'Nach mindestens zwei Wochen Pause wieder eingestiegen.', hatComeback(e.tage))
+  // Geheim (09.10.2026): eine Überraschung, kein Ziel zum Hinarbeiten
+  neu('comeback', 'dranbleiben', null, 'Comeback', 'Nach mindestens zwei Wochen Pause wieder eingestiegen.', hatComeback(e.tage), 1, true)
 
   // 2. Lehrwerk: je Unit (sicher) und je Band (kennengelernt)
   for (const b of e.lehrwerk) {
     for (const u of b.units) {
       if (!u.gesamt) continue
-      const p = anteil(u.sicher, u.gesamt)
       for (const [s, m] of [
         [50, 'bronze'],
         [80, 'silber'],
@@ -214,11 +226,11 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
           m,
           `${u.unit} (${b.name}) zu ${s} % sicher`,
           `${s === 100 ? 'Alle' : `${s} %`} der Wörter aus ${u.unit} sitzen sicher.`,
-          p >= s
+          u.sicher,
+          noetig(u.gesamt, s)
         )
     }
     if (!b.gesamt) continue
-    const p = anteil(b.gelernt, b.gesamt)
     for (const [s, m] of [
       [25, 'bronze'],
       [50, 'silber'],
@@ -231,7 +243,8 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
         m,
         `${b.name}: ${s} % kennengelernt`,
         `${s === 100 ? 'Alle' : `${s} %`} der Wörter aus ${b.name} hast du schon kennengelernt.`,
-        p >= s
+        b.gelernt,
+        noetig(b.gesamt, s)
       )
   }
 
@@ -250,7 +263,7 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => `${n} Wörter sicher`,
     (n) => `${n} Wörter sitzen sicher – auch nach einer Woche noch gewusst.`
   )
-  neu('langzeit-100', 'wortschatz', 'gold', '100 Wörter im Langzeit-Fach', '100 Wörter haben es bis ins oberste Fach geschafft.', e.woerter.langzeit >= 100)
+  neu('langzeit-100', 'wortschatz', 'gold', '100 Wörter im Langzeit-Fach', '100 Wörter haben es bis ins oberste Fach geschafft.', e.woerter.langzeit, 100)
   stufen(
     'fehlerfrei',
     'wortschatz',
@@ -266,7 +279,7 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
 
   // 4. Grammatik
   const sichereRegeln = e.regeln.filter((r) => r.sicher).length
-  neu('regel-1', 'grammatik', 'bronze', 'Erste sichere Regel', 'Die erste Grammatikregel sitzt sicher.', sichereRegeln >= 1)
+  neu('regel-1', 'grammatik', 'bronze', 'Erste sichere Regel', 'Die erste Grammatikregel sitzt sicher.', sichereRegeln)
   stufen(
     'regeln',
     'grammatik',
@@ -288,7 +301,7 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     'Eine Regel, die dir schwerfiel, sitzt jetzt.',
     e.regeln.some((r) => war.has(r.schluessel) && !r.schwaeche && (r.staerke || r.sicher))
   )
-  neu('extra', 'grammatik', null, '„Extra für dich" geschafft', 'Alle Aufgaben eines Extras für dich bearbeitet.', e.extrasGeschafft >= 1)
+  neu('extra', 'grammatik', null, '„Extra für dich" geschafft', 'Alle Aufgaben eines Extras für dich bearbeitet.', e.extrasGeschafft)
 
   // 5. Spiele
   stufen(
@@ -315,10 +328,10 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => `${n} Spiele ausprobiert`,
     (n) => `${n} verschiedene Spiele gespielt.`
   )
-  neu('blitz-fehlerfrei', 'spiele', null, 'Fehlerfreie Blitzrunde', 'Eine Blitzrunde mit mindestens 10 richtigen und keinem Fehler.', z.blitzFehlerfrei >= 1)
+  neu('blitz-fehlerfrei', 'spiele', null, 'Fehlerfreie Blitzrunde', 'Eine Blitzrunde mit mindestens 10 richtigen und keinem Fehler.', z.blitzFehlerfrei)
 
   // 6. Zusammen (Mehrspieler, 08.10.2026)
-  neu('zusammen-erste', 'zusammen', 'bronze', 'Erste Teamrunde', 'Zum ersten Mal gemeinsam mit anderen gespielt.', z.koopRunden >= 1)
+  neu('zusammen-erste', 'zusammen', 'bronze', 'Erste Teamrunde', 'Zum ersten Mal gemeinsam mit anderen gespielt.', z.koopRunden)
   stufen(
     'teamziel',
     'zusammen',
@@ -331,8 +344,8 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => (n === 1 ? 'Team-Ziel geschafft' : `${n} Team-Ziele geschafft`),
     (n) => (n === 1 ? 'Gemeinsam das Ziel einer Teamrunde erreicht.' : `${n}-mal gemeinsam das Ziel einer Teamrunde erreicht.`)
   )
-  neu('fluchtraum-fehlerfrei', 'zusammen', 'silber', 'Ausbruch ohne Fehlversuch', 'Aus dem Fluchtraum entkommen – jeder Code saß beim ersten Mal.', z.fluchtraumFehlerfrei >= 1)
-  neu('satzbaustelle-fehlerfrei', 'zusammen', 'silber', 'Saubere Baustelle', 'Alle Sätze der Satzbaustelle ohne einen Fehler gebaut.', z.satzbaustelleFehlerfrei >= 1)
+  neu('fluchtraum-fehlerfrei', 'zusammen', 'silber', 'Ausbruch ohne Fehlversuch', 'Aus dem Fluchtraum entkommen – jeder Code saß beim ersten Mal.', z.fluchtraumFehlerfrei)
+  neu('satzbaustelle-fehlerfrei', 'zusammen', 'silber', 'Saubere Baustelle', 'Alle Sätze der Satzbaustelle ohne einen Fehler gebaut.', z.satzbaustelleFehlerfrei)
   stufen(
     'versus',
     'zusammen',
@@ -356,10 +369,10 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => (n === 1 ? 'Fairer Sieg' : `${n} faire Siege`),
     (n) => (n === 1 ? 'Ein Versus-Spiel gewonnen – mit Fragen passend zu deinem Können.' : `${n} Versus-Spiele gewonnen – mit Fragen passend zu deinem Können.`)
   )
-  neu('comeback-sieg', 'zusammen', 'silber', 'Comeback-Sieg', 'Deutlich zurückgelegen und trotzdem gewonnen.', z.comebackSiege >= 1)
-  neu('unmoeglich', 'zusammen', 'gold', '„Unmöglich“ geschafft', 'Auf der Stufe „unmöglich“ das Ziel erreicht.', z.unmoeglich >= 1)
-  neu('alle-spielarten', 'zusammen', 'gold', 'Alle Kernspiele ausprobiert', 'Jedes der Kernspiele zum gemeinsamen Spielen einmal gespielt.', (z.spielarten & KERNSPIELE_BITS) === KERNSPIELE_BITS)
-  neu('viele-spielarten', 'zusammen', 'gold', '15 Zusammen-Spiele ausprobiert', '15 verschiedene Spiele mit anderen gespielt.', bitZahl(z.spielarten) >= 15)
+  neu('comeback-sieg', 'zusammen', 'silber', 'Comeback-Sieg', 'Deutlich zurückgelegen und trotzdem gewonnen.', z.comebackSiege, 1, true)
+  neu('unmoeglich', 'zusammen', 'gold', '„Unmöglich“ geschafft', 'Auf der Stufe „unmöglich“ das Ziel erreicht.', z.unmoeglich, 1, true)
+  neu('alle-spielarten', 'zusammen', 'gold', 'Alle Kernspiele ausprobiert', 'Jedes der Kernspiele zum gemeinsamen Spielen einmal gespielt.', bitZahl(z.spielarten & KERNSPIELE_BITS), bitZahl(KERNSPIELE_BITS))
+  neu('viele-spielarten', 'zusammen', 'gold', '15 Zusammen-Spiele ausprobiert', '15 verschiedene Spiele mit anderen gespielt.', bitZahl(z.spielarten), 15)
 
   // 7. Besonderes
   stufen(
@@ -399,4 +412,73 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
     (n) => `${n} Verbformen in den Verbspielen richtig.`
   )
   return aus
+}
+
+/** Ein Eintrag, wie ihn die Lernenden sehen (09.10.2026) */
+export interface AchSicht {
+  id: string
+  gruppe: AchGruppe
+  titel: string
+  text: string
+  medaille: Medaille
+  erreicht: boolean
+  /** Zeitpunkt des Erreichens, sonst null */
+  am: number | null
+  ist: number
+  ziel: number
+  /** Anteil der Lernenden der Schule in Prozent, die es haben – null, wenn zu wenige im Vergleich sind */
+  anteil: number | null
+}
+
+/** Gespeichert Erreichtes (server/achievementsDaten.ts Erreicht) – nur, was die Sicht braucht */
+interface Gespeichert {
+  am: number
+  titel: string
+  text: string
+  gruppe: AchGruppe
+  medaille: Medaille
+}
+
+/**
+ * Was die Lernenden sehen (09.10.2026): den ganzen Katalog mit Fortschritt, Erreichtes nie entzogen (auch wenn es im
+ * Katalog nicht mehr vorkommt, etwa nach einem entfernten Kurs) – geheime erst, wenn erreicht. `anteile` = Prozent je
+ * Achievement aus dem Schulvergleich oder null (zu wenige Lernende); ohne Eintrag dort hat es noch niemand.
+ */
+export function achievementSicht(
+  katalog: Achievement[],
+  gespeichert: Record<string, Gespeichert>,
+  anteile: Record<string, number> | null
+): { liste: AchSicht[]; verborgen: number } {
+  const liste: AchSicht[] = []
+  let verborgen = 0
+  const gesehen = new Set<string>()
+  const anteil = (id: string): number | null => (anteile ? anteile[id] ?? 0 : null)
+  for (const a of katalog) {
+    if (gesehen.has(a.id)) continue
+    gesehen.add(a.id)
+    const g = gespeichert[a.id]
+    if (a.geheim && !g) {
+      verborgen++
+      continue
+    }
+    liste.push({
+      id: a.id,
+      gruppe: a.gruppe,
+      titel: g?.titel ?? a.titel,
+      text: g?.text ?? a.text,
+      medaille: a.medaille,
+      erreicht: Boolean(g),
+      am: g?.am ?? null,
+      ist: g ? a.ziel : Math.min(a.ist, a.ziel),
+      ziel: a.ziel,
+      anteil: anteil(a.id)
+    })
+  }
+  for (const [id, g] of Object.entries(gespeichert))
+    if (!gesehen.has(id)) liste.push({ id, gruppe: g.gruppe, titel: g.titel, text: g.text, medaille: g.medaille, erreicht: true, am: g.am, ist: 1, ziel: 1, anteil: anteil(id) })
+  const reihenfolge = ACH_GRUPPEN.map((x) => x.id)
+  // Stabil nach Gruppen – innerhalb der Gruppe in der Reihenfolge des Katalogs (Stufen aufsteigend)
+  const index = new Map(liste.map((x, i) => [x.id, i]))
+  liste.sort((a, b) => reihenfolge.indexOf(a.gruppe) - reihenfolge.indexOf(b.gruppe) || index.get(a.id)! - index.get(b.id)!)
+  return { liste, verborgen }
 }

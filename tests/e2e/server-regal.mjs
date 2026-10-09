@@ -1,5 +1,5 @@
-// Runde 08.10.2026 abends: Regal mit Fachordnern (Gäste), eigene Reihenfolge per Ziehen (am Konto gemerkt), A–Z,
-// Ordner aufschlagen mit Registern, Rückweg aus dem Training in den Ordner, Wahl „Liste" als Rückfall; Verbspiele erst
+// Runde 08.10.2026 abends: Regal mit Fachordnern (Gäste), Wortliste als Register (09.10.2026), eigene Reihenfolge per Ziehen (am Konto gemerkt), A–Z,
+// Ordner aufschlagen mit Registern, Blättern im Ordner (Unterseiten, Zurück/Vorwärts, Neuladen; 09.10.2026), Wahl „Liste" als Rückfall; Verbspiele erst
 // nach Freischaltung; „Lege das Wort" mit Tippen und Handschrift (Erkennung auf dem Gerät).
 // Vorher: Server lokal (KI-Attrappe). Es wird keine KI gebraucht.
 // Aufruf: node tests/e2e/server-regal.mjs <Ausgabeordner> [adresse] [admin] [passwort]
@@ -111,7 +111,10 @@ try {
   await p.waitForURL(/\/s\/ordner\//)
   pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Ordner Englisch aufgeschlagen')
   await p.waitForTimeout(700)
-  pruefe((await p.locator('[data-lasche]').count()) === 2, 'Register: Vocabulary und Grammar (ohne Materialien)')
+  pruefe(
+    JSON.stringify(await p.locator('[data-lasche]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lasche')))) === '["vok","wort","gram"]',
+    'Register: Vocabulary, Word list und Grammar (ohne Materialien)'
+  )
   await p.screenshot({ path: join(out, '2-ordner-vok.png') })
   await p.locator('[data-lasche="gram"]').click()
   pruefe(await da(p.locator('[data-ordner-kurs="grammatik"]')), 'Register Grammar zeigt das Grammatiktraining')
@@ -120,18 +123,82 @@ try {
     'Grammar nach Schuljahren: „Year 5" (neuestes Jahr) aufgeklappt'
   )
   await p.screenshot({ path: join(out, '3-ordner-gram.png') })
+  // Wortliste (09.10.2026): eigenes Register mit allen freigegebenen Wörtern, Suche in beiden Sprachen
+  await p.locator('[data-lasche="wort"]').click()
+  pruefe((await p.locator('[data-lasche="wort"]').innerText()).includes('Word list'), 'Lasche „Word list" in der Fremdsprache')
+  pruefe(await da(p.locator('[data-wortliste-wort]').first()), 'Wortliste zeigt die Wörter')
+  pruefe((await p.locator('[data-wortliste-wort]').count()) === 6, `Alle 6 freigegebenen Wörter (${await p.locator('[data-wortliste-wort]').count()})`)
+  pruefe((await p.locator('[data-wort-status="neu"]').count()) >= 6, 'Stand je Wort: alle noch „neu"')
+  const anzahl = async () => Number(await p.locator('[data-wortliste-anzahl]').getAttribute('data-wortliste-anzahl'))
+  await p.locator('[data-wortliste-suche]').fill('WORT 2')
+  await p.waitForTimeout(200)
+  pruefe((await anzahl()) === 1 && (await p.locator('[data-wortliste-wort="take"]').isVisible()), 'Suche auf Deutsch (groß/klein egal): „take"')
+  await p.locator('[data-wortliste-suche]').fill('appl')
+  await p.waitForTimeout(200)
+  pruefe((await anzahl()) === 1 && (await p.locator('[data-wortliste-wort="apple"]').isVisible()), 'Suche in der Fremdsprache: „apple"')
+  await p.locator('[data-wortliste-suche]').fill('xyz')
+  await p.waitForTimeout(200)
+  pruefe((await anzahl()) === 0 && (await p.getByText('Nichts gefunden').isVisible()), 'Ohne Treffer: „Nichts gefunden"')
+  await p.screenshot({ path: join(out, '2b-wortliste.png') })
+  await p.locator('[data-wortliste-suche]').fill('')
   // Register Vocabulary zeigt den Kurs direkt (08.10.2026): Karteikasten ohne eigenen Rückweg
   await p.locator('[data-lasche="vok"]').click()
   pruefe(await da(p.locator('[data-ordner-kurs-inhalt] [data-vokabel-kasten]')), 'Vocabulary zeigt den Karteikasten direkt im Ordner')
   pruefe((await p.locator('[data-ordner-kurs-inhalt] [data-zurueck-lernen]').count()) === 0, 'Eingebettet ohne eigenen Zurück-Knopf')
-  // Grammatik öffnet weiter als eigene Seite mit Rückweg in den Ordner
+  // Blättern im Ordner (09.10.2026): Grammatikform → Training → Übung als nächste Seiten IM Ordner, mit Umblättern;
+  // Zurück (Knopf, Browser) blättert zurück, Vorwärts wieder vor, Neuladen bleibt auf der Ebene
+  const umblaettern = async () => {
+    // „attached": Beim Start einer Übung im Vollbild (09.10.2026) liegt das Umblättern unsichtbar unter der Übung
+    const sah = await p
+      .locator('[data-ordner-umblaettern]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 1500 })
+      .then(
+        () => true,
+        () => false
+      )
+    await p.locator('[data-ordner-umblaettern]').first().waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined)
+    return sah
+  }
+  const tiefe = async () => Number(await p.locator('[data-ordner-tiefe]').getAttribute('data-ordner-tiefe'))
+  await p.locator('[data-lasche="gram"]').click()
+  await p.locator('[data-ordner-kurs="grammatik"]').click()
+  pruefe(await umblaettern(), 'Grammatikform öffnen: die Seite schlägt um')
+  pruefe(await da(p.locator('[data-ordner="Englisch"] [data-ordner-unterseite="grammatik"] [data-grammatik-kasten]')), 'Grammatiktraining IM Ordner (nicht als eigene Seite)')
+  pruefe(/\/s\/ordner\/Englisch\?r=gram&g=[a-f0-9]+/.test(p.url()) && (await tiefe()) === 1, `Adresse nennt die Ebene (${p.url()})`)
+  pruefe((await p.locator('[data-zurueck-lernen]').count()) === 0 && (await p.locator('[data-ordner-zurueck]').isVisible()), 'Im Ordner: „Zurück“ des Ordners statt eigenem Rückweg')
+  await p.screenshot({ path: join(out, '3b-ordner-grammatik.png') })
+  // Übung als weitere Seite
+  await p.locator('[data-grammatik-start]').click()
+  pruefe((await umblaettern()) && (await da(p.locator('[data-ordner] [data-sitzung]'))) && (await tiefe()) === 2, 'Übung: noch eine Seite weiter (Ebene 2)')
+  // Vollbild beim Lernen (09.10.2026): die Übung verdeckt den Ordner – „× Beenden" blättert zurück wie „Zurück"
+  await p.locator((await p.locator('[data-fokus-beenden]').isVisible()) ? '[data-fokus-beenden]' : '[data-ordner-zurueck]').click()
+  pruefe((await umblaettern()) && (await da(p.locator('[data-grammatik-kasten]'))) && (await tiefe()) === 1, 'Zurück-Knopf blättert zurück zum Training')
+  // Zurück des Browsers: zur Grammatikliste; Vorwärts: wieder ins Training
+  await p.goBack()
+  pruefe((await umblaettern()) && (await da(p.locator('[data-ordner-kurs="grammatik"]'))) && (await tiefe()) === 0, 'Zurück des Browsers blättert zur Liste')
+  pruefe(/\?r=gram$/.test(p.url()), `Adresse wieder auf dem Register (${p.url()})`)
+  await p.goForward()
+  pruefe((await umblaettern()) && (await da(p.locator('[data-grammatik-kasten]'))) && (await tiefe()) === 1, 'Vorwärts des Browsers blättert wieder vor')
+  // Neuladen: bleibt im Training, darunter liegt die Liste
+  await p.reload()
+  pruefe((await da(p.locator('[data-ordner-unterseite="grammatik"] [data-grammatik-kasten]'))) && (await tiefe()) === 1, 'Neuladen: Training im Ordner bleibt offen')
+  await p.locator('[data-ordner-zurueck]').click()
+  pruefe((await da(p.locator('[data-ordner-kurs="grammatik"]'))) && (await tiefe()) === 0, 'Nach dem Neuladen: Zurück führt zur Liste')
+  // Registerwechsel mit offener Seite: alles zu, dann das andere Register
+  await p.locator('[data-ordner-kurs="grammatik"]').click()
+  await umblaettern()
+  await p.locator('[data-lasche="vok"]').click()
+  pruefe((await da(p.locator('[data-ordner-register="vok"]'))) && (await tiefe()) === 0 && /\?r=vok$/.test(p.url()), `Registerwechsel schließt offene Seiten (${p.url()})`)
+  // Ruhige Darstellung: kein Umblättern
+  await p.emulateMedia({ reducedMotion: 'reduce' })
   await p.locator('[data-lasche="gram"]').click()
   await p.locator('[data-ordner-kurs="grammatik"]').click()
   await p.locator('[data-grammatik-kasten]').waitFor()
-  const zurueck = p.locator('[data-zurueck-lernen]')
-  pruefe((await zurueck.innerText()).includes('In den Ordner'), 'Training: „In den Ordner“ als Rückweg')
-  await zurueck.click()
-  pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Zurück im Ordner')
+  pruefe((await p.locator('[data-ordner-umblaettern]').count()) === 0, 'Reduzierte Bewegung: ohne Umblättern')
+  await p.emulateMedia({ reducedMotion: 'no-preference' })
+  await p.locator('[data-ordner-zurueck]').click()
+  pruefe(await da(p.locator('[data-ordner="Englisch"] [data-ordner-kurs="grammatik"]')), 'Zurück im Ordner')
 
   // ---------- Hell und Telefon
   const darst = async (felder) => {
@@ -150,6 +217,11 @@ try {
   await p.screenshot({ path: join(out, '5-ordner-telefon.png'), fullPage: true })
   const breit = await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
   pruefe(breit, 'Telefon: kein seitliches Scrollen im Ordner')
+  await p.goto(`${A}/s/ordner/Englisch?r=wort`)
+  await p.locator('[data-wortliste-wort]').first().waitFor()
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: join(out, '5b-wortliste-telefon.png'), fullPage: true })
+  pruefe(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Telefon: Wortliste ohne seitliches Scrollen')
 
   // ---------- Rückfall: Liste
   await darst({ materialien: 'liste' })

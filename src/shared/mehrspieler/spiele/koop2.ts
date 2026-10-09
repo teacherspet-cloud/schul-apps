@@ -11,7 +11,6 @@ import {
   fehlerMerken,
   frageAus,
   frageBlock,
-  gleicherText,
   gut,
   itemsZiehen,
   koopErgebnis,
@@ -21,7 +20,7 @@ import {
   naechste,
   rueckBlock,
   satzTeile,
-  zufall,
+  tx,
   type Basis,
   type Block,
   type Regeln
@@ -29,7 +28,7 @@ import {
 import type { Frage, SpielItem } from '../typen'
 
 const ids = (z: Basis): string[] => z.spieler.map((s) => s.id)
-const dranName = (z: Basis, id: string): Block => ({ typ: 'text', text: `${name(z, id)} ist dran.`, ton: 'leise' })
+const dranName = (z: Basis, id: string): Block => ({ typ: 'text', text: tx(z, 'istDran', name(z, id)), ton: 'leise' })
 
 // ---------------------------------------------------------------- Wortkette (Kl. 5–6)
 
@@ -46,7 +45,7 @@ function kettenFrage(z: Kette): void {
   const passend = z.inhalt.items.filter((i) => i.vok && !z.glieder.includes(i.vok.term) && (!buchstabe || i.vok.term[0]?.toLowerCase() === buchstabe))
   const item = passend.length ? eines(z, passend) : itemsZiehen(z, 1, { filter: (i) => Boolean(i.vok) && !z.glieder.includes(i.vok!.term) })[0] ?? eines(z, z.inhalt.items)
   z.frage = frageAus(z, item, 'abrufen', 4, false)
-  if (buchstabe && passend.length) z.frage.zusatz = `Fängt mit „${buchstabe}“ an.`
+  if (buchstabe && passend.length) z.frage.zusatz = tx(z, 'faengtMit', buchstabe)
 }
 export const wortkette: Regeln<Kette> = {
   id: 'wortkette',
@@ -61,25 +60,25 @@ export const wortkette: Regeln<Kette> = {
     if (antwortRichtig(z.frage, zug.wert)) {
       gut(z, wer)
       z.glieder.push(z.frage.loesung)
-      melde(z, wer, true, 'Neues Glied!')
+      melde(z, wer, true, tx(z, 'neuesGlied'))
     } else {
       z.brueche++
       fehlerMerken(z, wer, z.frage.itemId)
-      melde(z, wer, false, 'Die Kette hält trotzdem – weiter!', z.frage.loesung)
+      melde(z, wer, false, tx(z, 'ketteHaelt'), z.frage.loesung)
     }
     if (z.glieder.length >= z.ziel || z.brueche >= 5) return void (z.ende = true)
     z.dran = naechste(z, ids(z), z.dran)
     kettenFrage(z)
   },
   sicht(z, wer) {
-    const b: Block[] = [{ typ: 'reihe', titel: `Kette (${z.glieder.length} von ${z.ziel})`, teile: z.glieder }, ...rueckBlock(z)]
+    const b: Block[] = [{ typ: 'reihe', titel: tx(z, 'kette', z.glieder.length, z.ziel), teile: z.glieder }, ...rueckBlock(z)]
     if (z.ende || !z.frage) return b
     return [...b, ...(wer === z.spieler[z.dran].id ? [frageBlock(z.frage)] : [dranName(z, z.spieler[z.dran].id)])]
   },
   weg(z, wer) {
     if (z.spieler[z.dran].id === wer) z.dran = naechste(z, ids(z), z.dran)
   },
-  ergebnis: (z) => koopErgebnis(z, z.glieder.length >= z.ziel && z.brueche <= 2, z.glieder.length, `Eure Kette hat ${z.glieder.length} Glieder.`)
+  ergebnis: (z) => koopErgebnis(z, z.glieder.length >= z.ziel && z.brueche <= 2, z.glieder.length, tx(z, 'ketteErgebnis', z.glieder.length))
 }
 
 // ---------------------------------------------------------------- Team-Memory (Kl. 5–7)
@@ -123,17 +122,17 @@ export const teammemory: Regeln<Memory> = {
     if (z.karten[a].item === z.karten[b].item) {
       z.gefunden.push(a, b)
       gut(z, wer)
-      melde(z, wer, true, 'Paar gefunden!')
+      melde(z, wer, true, tx(z, 'paarGefunden'))
       if (z.gefunden.length >= z.karten.length) z.ende = true
       return
     }
-    melde(z, wer, false, 'Kein Paar.')
+    melde(z, wer, false, tx(z, 'keinPaar'))
     z.dran = naechste(z, ids(z), z.dran)
   },
   sicht(z, wer) {
     const sichtbar = new Set([...z.gefunden, ...z.offen, ...z.zuletzt])
-    const b: Block[] = [{ typ: 'text', text: `Züge: ${z.zuege} · Paare: ${z.gefunden.length / 2} von ${z.karten.length / 2}`, ton: 'info' }, ...rueckBlock(z)]
-    if (!z.ende) b.push(wer === z.spieler[z.dran].id ? { typ: 'text', text: 'Du bist dran: zwei Karten aufdecken.', ton: 'info' } : dranName(z, z.spieler[z.dran].id))
+    const b: Block[] = [{ typ: 'text', text: tx(z, 'memoryStand', z.zuege, z.gefunden.length / 2, z.karten.length / 2), ton: 'info' }, ...rueckBlock(z)]
+    if (!z.ende) b.push(wer === z.spieler[z.dran].id ? { typ: 'text', text: tx(z, 'memoryDran'), ton: 'info' } : dranName(z, z.spieler[z.dran].id))
     b.push({
       typ: 'kacheln',
       spalten: 4,
@@ -151,7 +150,7 @@ export const teammemory: Regeln<Memory> = {
       z.dran = naechste(z, ids(z), z.dran)
     }
   },
-  ergebnis: (z) => koopErgebnis(z, z.zuege <= Math.round((z.karten.length / 2) * 2), z.zuege, `Alle Paare in ${z.zuege} Zügen gefunden.`)
+  ergebnis: (z) => koopErgebnis(z, z.zuege <= Math.round((z.karten.length / 2) * 2), z.zuege, tx(z, 'memoryErgebnis', z.zuege))
 }
 
 // ---------------------------------------------------------------- Geteiltes Kreuzwort (Kl. 6–10)
@@ -194,7 +193,7 @@ export const kreuzwort: Regeln<Kreuz> = {
     if (antwortRichtig(f, text)) {
       w.geloest = true
       gut(z, wer)
-      melde(z, wer, true, `${w.wort} passt!`)
+      melde(z, wer, true, tx(z, 'wortPasst', w.wort))
       if (z.woerter.every((x) => x.geloest)) {
         z.ende = true
         z.dauer = Math.round((jetzt - z.start) / 1000)
@@ -202,14 +201,14 @@ export const kreuzwort: Regeln<Kreuz> = {
     } else {
       z.fehlerZahl++
       fehlerMerken(z, wer, w.item)
-      melde(z, wer, false, 'passt nicht.')
+      melde(z, wer, false, tx(z, 'passtNichtKlein'))
     }
   },
   sicht(z, wer) {
     const b: Block[] = [
       {
         typ: 'kacheln',
-        titel: 'Gemeinsames Rätsel',
+        titel: tx(z, 'gemeinsamesRaetsel'),
         kacheln: z.woerter.map((w, n) => ({
           id: String(n),
           text: `${n + 1}. ${w.geloest ? w.wort : w.wort.replace(/\p{L}/gu, '_ ').trim()}`,
@@ -221,7 +220,7 @@ export const kreuzwort: Regeln<Kreuz> = {
     ]
     if (z.ende) return b
     const meine = z.woerter.map((w, n) => ({ w, n })).filter((x) => x.w.besitzer === wer && !x.w.geloest)
-    if (!meine.length) return [...b, { typ: 'text', text: 'Deine Wörter sind gelöst – helft euch gegenseitig!', ton: 'gut' }]
+    if (!meine.length) return [...b, { typ: 'text', text: tx(z, 'woerterGeloest'), ton: 'gut' }]
     if (z.schwierigkeit === 'leicht')
       for (const { w, n } of meine.slice(0, 1)) b.push(frageBlock({ ...w.frage!, frage: `${n + 1}. ${w.hinweis}` }, `wort:${n}`))
     else b.push({ typ: 'eingaben', felder: meine.map(({ w, n }) => ({ id: String(n), titel: `${n + 1}. ${w.hinweis}` })), aktion: 'wort' })
@@ -234,82 +233,146 @@ export const kreuzwort: Regeln<Kreuz> = {
     })
   },
   ergebnis: (z) =>
-    koopErgebnis(z, z.fehlerZahl <= 3, z.dauer || null, `Rätsel gelöst mit ${z.fehlerZahl} Fehlversuchen.`, z.fehlerZahl === 0)
+    koopErgebnis(z, z.fehlerZahl <= 3, z.dauer || null, tx(z, 'kreuzErgebnis', z.fehlerZahl), z.fehlerZahl === 0)
 }
 
 // ---------------------------------------------------------------- Fehlerdetektive (Kl. 8–13)
 
+/**
+ * 09.10.2026 (Befund der Lehrkraft: zu viert waren nur zwei beschäftigt, Sätze ohne Fehler ließen das Spiel hängen):
+ * Je Runde bekommt JEDE Person einen eigenen Fehlersatz und sucht darin das falsche Wort; verbessert wird er von der
+ * nächsten Person – so findet jede ihren Fehler und verbessert zugleich den der Nachbarin. Die Fehlerstellen kennt
+ * nur der Server (`fehler.stellen`); falsch Getipptes wird als richtig markiert, das gefundene Wort als Fehler.
+ * „Überspringen" zeigt die Lösung und geht weiter – das Spiel kann nie hängen bleiben.
+ */
+interface Fall {
+  item: string
+  finder: string
+  gefunden: boolean
+  getippt: number[]
+  frage: Frage | null
+  fertig: boolean
+}
 interface Detektive extends Basis {
-  reihe: string[]
+  runden: number
   r: number
-  gefunden: string | null
-  verbessert: Frage | null
+  faelle: Fall[]
   fehlerZahl: number
+  gesamt: number
 }
+/** Korrektor eines Falls: die nächste anwesende Person nach der Finderin bzw. dem Finder */
+const korrektorVon = (z: Detektive, f: Fall): string => z.spieler[naechste(z, ids(z), z.spieler.findIndex((s) => s.id === f.finder))].id
 function detektivRunde(z: Detektive): void {
-  z.gefunden = null
-  z.verbessert = null
-  if (z.r >= z.reihe.length) z.ende = true
+  if (z.r >= z.runden) return void (z.ende = true)
+  const leute = aktive(z).map((s) => s.id)
+  const items = itemsZiehen(z, leute.length * 2, { filter: (i) => Boolean(i.fehler) })
+  const eindeutig = [...new Map(items.map((i) => [i.id, i])).values()]
+  z.faelle = leute.map((id, n) => ({ item: (eindeutig[n] ?? items[n % items.length]).id, finder: id, gefunden: false, getippt: [], frage: null, fertig: false }))
+  z.gesamt += z.faelle.length
 }
+function fallFertig(z: Detektive): void {
+  if (z.faelle.every((f) => f.fertig)) {
+    z.r++
+    detektivRunde(z)
+  }
+}
+const fehlerVon = (z: Detektive, f: Fall): NonNullable<SpielItem['fehler']> => z.inhalt.items.find((i) => i.id === f.item)!.fehler!
 export const fehlerdetektive: Regeln<Detektive> = {
   id: 'fehlerdetektive',
   passt: (i) => (i.items.filter((x) => x.fehler).length >= 3 ? null : 'Braucht mindestens drei Sätze mit Fehler.'),
   start(k) {
-    const z: Detektive = { ...basisNeu(k), reihe: [], r: 0, gefunden: null, verbessert: null, fehlerZahl: 0 }
-    z.reihe = [...new Set(itemsZiehen(z, 5, { filter: (i) => Boolean(i.fehler) }).map((i) => i.id))]
+    const b = basisNeu(k)
+    const z: Detektive = { ...b, runden: b.schwierigkeit === 'leicht' ? 2 : 3, r: 0, faelle: [], fehlerZahl: 0, gesamt: 0 }
+    detektivRunde(z)
     return z
   },
   zug(z, wer, zug) {
     if (z.ende) return
-    const item = z.inhalt.items.find((i) => i.id === z.reihe[z.r])!
-    const f = item.fehler!
-    if (zug.aktion === 'wort' && !z.gefunden) {
-      const wort = satzTeile(f.satz)[Number(zug.wert)]
-      if (!wort) return
-      if (gleicherText(wort.replace(/[^\p{L}\p{N}']/gu, ''), f.wort)) {
-        z.gefunden = wer
-        const loes = { ...item, loesung: f.korrektur, ablenker: [], frage: f.satz, zusatz: `Wie heißt „${f.wort}“ richtig?` }
-        z.verbessert = frageAus(z, loes, 'standard')
-        z.verbessert.optionen = z.tippen ? [] : mischen(z, [f.korrektur, ...ablenkerFuer(z, f.korrektur, [f.wort], (x) => x.fehler?.korrektur ?? x.vok?.term, 3)])
-        return melde(z, wer, true, `hat den Fehler gefunden: „${f.wort}“.`)
+    const [aktion, nr] = zug.aktion.split(':')
+    if (aktion === 'wort') {
+      const [fs, ws] = String(zug.wert ?? '').split(':')
+      const fall = z.faelle[Number(fs)]
+      if (!fall || fall.finder !== wer || fall.gefunden || fall.fertig) return
+      const f = fehlerVon(z, fall)
+      const i = Number(ws)
+      if (!Number.isInteger(i) || i < 0 || i >= satzTeile(f.satz).length || fall.getippt.includes(i)) return
+      if (f.stellen.includes(i)) {
+        fall.gefunden = true
+        const item = z.inhalt.items.find((x) => x.id === fall.item)!
+        const loes = { ...item, loesung: f.korrektur, alternativen: [], ablenker: [], frage: f.satz, zusatz: tx(z, 'wieRichtig', f.wort) }
+        fall.frage = frageAus(z, loes, 'standard')
+        if (!z.tippen) fall.frage.optionen = mischen(z, [f.korrektur, ...ablenkerFuer(z, f.korrektur, [f.wort], (x) => x.fehler?.korrektur ?? x.vok?.term, 3)])
+        return melde(z, wer, true, tx(z, 'fehlerGefunden', f.wort))
       }
+      fall.getippt.push(i)
       z.fehlerZahl++
-      fehlerMerken(z, wer, item.id)
-      return melde(z, wer, false, `„${wort}“ ist richtig.`)
+      fehlerMerken(z, wer, fall.item)
+      return melde(z, wer, false, tx(z, 'istRichtigWort', satzTeile(f.satz)[i]))
     }
-    if (zug.aktion === 'antwort' && z.gefunden && z.verbessert) {
-      // Verbessern darf die nächste Person nach der Finderin bzw. dem Finder (bei zwei Personen: die andere)
-      const verbesserer = z.spieler[naechste(z, ids(z), z.spieler.findIndex((s) => s.id === z.gefunden))].id
-      if (wer !== verbesserer) return
-      if (antwortRichtig(z.verbessert, zug.wert)) {
+    if (aktion === 'antwort') {
+      const fall = z.faelle[Number(nr)]
+      if (!fall || !fall.gefunden || fall.fertig || !fall.frage || korrektorVon(z, fall) !== wer) return
+      const f = fehlerVon(z, fall)
+      if (antwortRichtig(fall.frage, zug.wert)) {
         gut(z, wer)
-        melde(z, wer, true, 'Fall gelöst!', f.korrektur)
+        melde(z, wer, true, tx(z, 'fallGeloest'), f.korrektur)
       } else {
         z.fehlerZahl++
-        fehlerMerken(z, wer, item.id)
-        melde(z, wer, false, 'Nicht ganz.', f.korrektur)
+        fehlerMerken(z, wer, fall.item)
+        melde(z, wer, false, tx(z, 'nichtGanz'), `${f.wort} → ${f.korrektur}`)
       }
-      z.r++
-      detektivRunde(z)
+      fall.fertig = true
+      return fallFertig(z)
+    }
+    if (aktion === 'weiter') {
+      // Überspringen: die Person, die gerade an dem Fall ist, zeigt die Lösung und macht weiter
+      const fall = z.faelle[Number(zug.wert)]
+      if (!fall || fall.fertig) return
+      const dran = fall.gefunden ? korrektorVon(z, fall) : fall.finder
+      if (dran !== wer) return
+      const f = fehlerVon(z, fall)
+      z.fehlerZahl++
+      fall.fertig = true
+      melde(z, wer, false, tx(z, 'hatUebersprungen'), `${f.wort} → ${f.korrektur}`)
+      return fallFertig(z)
     }
   },
   sicht(z, wer) {
-    const b: Block[] = [{ typ: 'fortschritt', titel: `Fall ${Math.min(z.r + 1, z.reihe.length)} von ${z.reihe.length}`, wert: z.r, max: z.reihe.length }, ...rueckBlock(z)]
+    const b: Block[] = [{ typ: 'fortschritt', titel: tx(z, 'rundeVon', Math.min(z.r + 1, z.runden), z.runden), wert: z.r, max: z.runden }, ...rueckBlock(z)]
     if (z.ende) return b
-    const f = z.inhalt.items.find((i) => i.id === z.reihe[z.r])!.fehler!
-    b.push({
-      typ: 'kacheln',
-      titel: z.gefunden ? 'Der Satz' : 'Welches Wort ist falsch? Tippe es an.',
-      kacheln: satzTeile(f.satz).map((w, i) => ({ id: String(i), text: w })),
-      ...(z.gefunden ? {} : { aktion: 'wort' })
+    z.faelle.forEach((fall, n) => {
+      const f = fehlerVon(z, fall)
+      const korrektor = korrektorVon(z, fall)
+      const kacheln = (aktiv: boolean): Block => ({
+        typ: 'kacheln',
+        titel: fall.gefunden ? tx(z, 'satzRot') : tx(z, 'deinSatz'),
+        kacheln: satzTeile(f.satz).map((w, i) => ({
+          id: `${n}:${i}`,
+          text: w,
+          ...(fall.gefunden && f.stellen.includes(i) ? { status: 'schlecht' as const } : fall.getippt.includes(i) ? { status: 'gut' as const } : {})
+        })),
+        ...(aktiv ? { aktion: 'wort' } : {})
+      })
+      if (fall.finder === wer && !fall.fertig && !fall.gefunden) {
+        b.push(kacheln(true))
+        b.push({ typ: 'knoepfe', knoepfe: [{ text: tx(z, 'ueberspringenLoesung'), aktion: 'weiter', wert: String(n) }] })
+      } else if (korrektor === wer && fall.gefunden && !fall.fertig && fall.frage) {
+        b.push({ typ: 'text', text: tx(z, 'duVerbesserst', name(z, fall.finder)), ton: 'info' })
+        b.push(kacheln(false))
+        b.push(frageBlock(fall.frage, `antwort:${n}`))
+        b.push({ typ: 'knoepfe', knoepfe: [{ text: tx(z, 'ueberspringenLoesung'), aktion: 'weiter', wert: String(n) }] })
+      } else if (fall.finder === wer && fall.gefunden && !fall.fertig)
+        b.push({ typ: 'text', text: tx(z, 'verbessertDeinen', name(z, korrektor)), ton: 'leise' })
     })
-    if (z.gefunden && z.verbessert) {
-      const verbesserer = z.spieler[naechste(z, ids(z), z.spieler.findIndex((s) => s.id === z.gefunden))].id
-      b.push(wer === verbesserer ? frageBlock(z.verbessert) : { typ: 'text', text: `${name(z, verbesserer)} verbessert jetzt.`, ton: 'leise' })
-    }
+    const offen = z.faelle.filter((f) => !f.fertig).length
+    b.push({ typ: 'text', text: offen ? (offen === 1 ? tx(z, 'nochEinFall') : tx(z, 'nochFaelle', offen)) : tx(z, 'rundeFertig'), ton: 'leise' })
     return b
   },
-  ergebnis: (z) => koopErgebnis(z, z.fehlerZahl <= 2, z.fehlerZahl, `${z.reihe.length} Fälle bearbeitet, ${z.fehlerZahl} Fehltipps.`, z.fehlerZahl === 0)
+  weg(z, wer) {
+    // Fälle der Person, die gegangen ist: Finden übernimmt die nächste anwesende Person
+    for (const f of z.faelle) if (f.finder === wer && !f.fertig) f.finder = z.spieler[naechste(z, ids(z), z.spieler.findIndex((s) => s.id === wer))].id
+  },
+  ergebnis: (z) => koopErgebnis(z, z.fehlerZahl <= 2, z.fehlerZahl, tx(z, 'faelleErgebnis', z.gesamt, z.fehlerZahl), z.fehlerZahl === 0)
 }
 
 // ---------------------------------------------------------------- Dialog-Theater (Kl. 6–10)
@@ -346,7 +409,7 @@ export const dialog: Regeln<Dialog> = {
       melde(d, wer, true, item.vok!.beispiel ?? '')
     } else {
       fehlerMerken(d, wer, item.id)
-      melde(d, wer, false, 'Nicht ganz:', item.vok!.beispiel)
+      melde(d, wer, false, tx(d, 'nichtGanzDoppel'), item.vok!.beispiel)
     }
     d.gespielt.push(item.vok!.beispiel ?? '')
     d.z++
@@ -355,19 +418,19 @@ export const dialog: Regeln<Dialog> = {
   sicht(d, wer) {
     const meine = rolleVon(d, wer)
     const b: Block[] = [
-      { typ: 'text', text: `Deine Rolle: ${meine.map((r) => (r === 0 ? 'A' : 'B')).join(' und ')}`, ton: 'info' },
-      { typ: 'kacheln', titel: 'Bisher im Gespräch', kacheln: d.gespielt.map((t, i) => ({ id: String(i), text: `${i % 2 ? 'B' : 'A'}: ${t}` })) },
+      { typ: 'text', text: tx(d, 'deineRolle', meine.map((r) => (r === 0 ? 'A' : 'B')).join(' + ')), ton: 'info' },
+      { typ: 'kacheln', titel: tx(d, 'bisherGespraech'), kacheln: d.gespielt.map((t, i) => ({ id: String(i), text: `${i % 2 ? 'B' : 'A'}: ${t}` })) },
       ...rueckBlock(d)
     ]
     const zeile = d.zeilen[d.z]
     if (d.ende || !zeile) return b
-    if (meine.includes(zeile.rolle)) b.push(frageBlock({ ...zeile.frage, zusatz: `Rolle ${zeile.rolle ? 'B' : 'A'}: Welches Wort fehlt?` }))
-    else b.push({ typ: 'text', text: `Rolle ${zeile.rolle ? 'B' : 'A'} spricht: ${zeile.frage.frage}`, ton: 'leise' })
+    if (meine.includes(zeile.rolle)) b.push(frageBlock({ ...zeile.frage, zusatz: tx(d, 'rolleFehlt', zeile.rolle ? 'B' : 'A') }))
+    else b.push({ typ: 'text', text: tx(d, 'rolleSpricht', zeile.rolle ? 'B' : 'A', zeile.frage.frage), ton: 'leise' })
     return b
   },
   ergebnis: (d) => {
     const r = Object.values(d.richtig).reduce((a, b) => a + b, 0)
-    return koopErgebnis(d, r >= d.zeilen.length - 1, r, `${r} von ${d.zeilen.length} Zeilen richtig gespielt.`)
+    return koopErgebnis(d, r >= d.zeilen.length - 1, r, tx(d, 'dialogErgebnis', r, d.zeilen.length))
   }
 }
 /** Rolle(n) einer Person: Plätze abwechselnd A/B; wer allein in einer Rolle übrig ist, spielt beide */
@@ -418,126 +481,39 @@ export const hoerkette: Regeln<Hoer> = {
       gut(z, wer)
       gut(z, hoerer)
       z.glieder++
-      melde(z, wer, true, 'richtig verstanden!', i.vok!.term)
+      melde(z, wer, true, tx(z, 'richtigVerstanden'), i.vok!.term)
       return weiter()
     }
     z.raus.push(wer)
     fehlerMerken(z, wer, i.id)
     if (aktive(z).filter((s) => s.id !== hoerer).every((s) => z.raus.includes(s.id))) {
       fehlerMerken(z, hoerer, i.id)
-      melde(z, wer, false, 'Diesmal nicht.', i.vok!.term)
+      melde(z, wer, false, tx(z, 'diesmalNicht'), i.vok!.term)
       return weiter()
     }
-    melde(z, wer, false, 'war es nicht.')
+    melde(z, wer, false, tx(z, 'warEsNicht'))
   },
   sicht(z, wer) {
-    const b: Block[] = [{ typ: 'reihe', titel: `Kette: ${z.glieder} Glieder`, teile: Array.from({ length: z.glieder }, () => '●') }, ...rueckBlock(z)]
+    const b: Block[] = [{ typ: 'reihe', titel: tx(z, 'ketteGlieder', z.glieder), teile: Array.from({ length: z.glieder }, () => '●') }, ...rueckBlock(z)]
     if (z.ende) return b
     const i = z.inhalt.items.find((x) => x.id === z.reihe[z.r])!
     const hoerer = z.spieler[z.hoerer].id
     if (wer === hoerer)
       return [
         ...b,
-        { typ: 'text', text: 'Du hörst das Wort. Sprich es laut nach – die anderen tippen es an.', ton: 'info' },
+        { typ: 'text', text: tx(z, 'duHoerst'), ton: 'info' },
         { typ: 'vorlesen', text: i.vok!.term, sprache: z.inhalt.sprache }
       ]
     return [
       ...b,
-      { typ: 'text', text: `${name(z, hoerer)} spricht dir das Wort vor.`, ton: 'leise' },
-      { typ: 'frage', frage: 'Welches Wort hast du gehört?', optionen: z.optionen, aktion: 'antwort', gesperrt: z.raus.includes(wer) }
+      { typ: 'text', text: tx(z, 'sprichtVor', name(z, hoerer)), ton: 'leise' },
+      { typ: 'frage', frage: tx(z, 'welchesGehoert'), optionen: z.optionen, aktion: 'antwort', gesperrt: z.raus.includes(wer) }
     ]
   },
   weg(z, wer) {
     if (z.spieler[z.hoerer].id === wer) z.hoerer = naechste(z, ids(z), z.hoerer)
   },
-  ergebnis: (z) => koopErgebnis(z, z.glieder >= Math.ceil(z.reihe.length * 0.8), z.glieder, `${z.glieder} von ${z.reihe.length} Wörtern richtig weitergegeben.`)
+  ergebnis: (z) => koopErgebnis(z, z.glieder >= Math.ceil(z.reihe.length * 0.8), z.glieder, tx(z, 'hoerErgebnis', z.glieder, z.reihe.length))
 }
 
-// ---------------------------------------------------------------- Reiseplaner (Kl. 7–10)
-
-interface Reise extends Basis {
-  runden: { reisen: string[][]; ziel: number; hinweise: Record<string, string[]>; raus: number[] }[]
-  r: number
-  fehlerZahl: number
-}
-/** Vier Reisen aus je drei Kurswörtern; Hinweise (✓ dabei / ✗ nicht dabei, in der Fremdsprache) grenzen auf genau eine ein */
-export function reiseRunde(z: Basis, leute: string[]): Reise['runden'][number] {
-  const items = [...new Map(itemsZiehen(z, 12, { filter: (i) => Boolean(i.vok) }).map((i) => [i.id, i])).values()].slice(0, 6)
-  const reisen: string[][] = []
-  for (let v = 0; reisen.length < 4 && v < 50; v++) {
-    const r = mischen(z, items).slice(0, 3).map((i) => i.id).sort()
-    if (!reisen.some((x) => x.join() === r.join())) reisen.push(r)
-  }
-  const ziel = Math.floor(zufall(z) * reisen.length)
-  const aussagen: { text: string; passt: (r: string[]) => boolean }[] = items.map((i) => {
-    const drin = reisen[ziel].includes(i.id)
-    return { text: `${drin ? '✓' : '✗'} ${i.vok!.term}`, passt: (r: string[]) => r.includes(i.id) === drin }
-  })
-  // Gierig Aussagen wählen, bis nur noch die Zielreise passt
-  const gewaehlt: typeof aussagen = []
-  let uebrig = reisen.map((_, k) => k).filter((k) => k !== ziel)
-  for (const a of mischen(z, aussagen)) {
-    if (!uebrig.length && gewaehlt.length >= leute.length) break
-    const weg = uebrig.filter((k) => !a.passt(reisen[k]))
-    if (weg.length || gewaehlt.length < leute.length) {
-      gewaehlt.push(a)
-      uebrig = uebrig.filter((k) => a.passt(reisen[k]))
-    }
-  }
-  const hinweise: Record<string, string[]> = Object.fromEntries(leute.map((id) => [id, [] as string[]]))
-  gewaehlt.forEach((a, k) => hinweise[leute[k % leute.length]].push(a.text))
-  return { reisen, ziel, hinweise, raus: [] }
-}
-export const reiseplaner: Regeln<Reise> = {
-  id: 'reiseplaner',
-  passt: (i) => (i.items.filter((x) => x.vok).length >= 9 ? null : 'Braucht mindestens neun Wörter.'),
-  start(k) {
-    const z: Reise = { ...basisNeu(k), runden: [], r: 0, fehlerZahl: 0 }
-    for (let r = 0; r < 3; r++) z.runden.push(reiseRunde(z, ids(z)))
-    return z
-  },
-  zug(z, wer, zug) {
-    if (z.ende || zug.aktion !== 'reise') return
-    const runde = z.runden[z.r]
-    const k = Number(zug.wert)
-    if (!Number.isInteger(k) || k < 0 || k >= runde.reisen.length || runde.raus.includes(k)) return
-    if (k === runde.ziel) {
-      gut(z, wer)
-      melde(z, wer, true, 'Das ist eure Reise!')
-      z.r++
-      if (z.r >= z.runden.length) z.ende = true
-      return
-    }
-    runde.raus.push(k)
-    z.fehlerZahl++
-    for (const id of runde.reisen[k]) if (!runde.reisen[runde.ziel].includes(id)) fehlerMerken(z, wer, id)
-    melde(z, wer, false, 'Diese Reise passt nicht zu allen Hinweisen.')
-  },
-  sicht(z, wer) {
-    const b: Block[] = [{ typ: 'fortschritt', titel: `Reise ${Math.min(z.r + 1, z.runden.length)} von ${z.runden.length}`, wert: z.r, max: z.runden.length }, ...rueckBlock(z)]
-    if (z.ende) return b
-    const runde = z.runden[z.r]
-    b.push({ typ: 'kacheln', titel: 'Deine Hinweise (nur du siehst sie)', kacheln: (runde.hinweise[wer] ?? []).map((t, i) => ({ id: String(i), text: t })) })
-    b.push({
-      typ: 'kacheln',
-      titel: 'Welche Reise ist es? Besprecht euch!',
-      spalten: 2,
-      kacheln: runde.reisen.map((r, k) => ({
-        id: String(k),
-        text: r.map((id) => z.inhalt.items.find((i) => i.id === id)?.vok?.translation ?? '').join(' · '),
-        ...(runde.raus.includes(k) ? { status: 'aus' as const } : {})
-      })),
-      aktion: 'reise'
-    })
-    return b
-  },
-  weg(z, wer) {
-    const rest = aktive(z).map((s) => s.id)
-    for (const r of z.runden) {
-      const seine = r.hinweise[wer] ?? []
-      r.hinweise[wer] = []
-      seine.forEach((t, k) => rest.length && r.hinweise[rest[k % rest.length]].push(t))
-    }
-  },
-  ergebnis: (z) => koopErgebnis(z, z.fehlerZahl <= 1, z.fehlerZahl, `${z.runden.length} Reisen geplant, ${z.fehlerZahl} Fehlversuche.`, z.fehlerZahl === 0)
-}
+// Reiseplaner: neu gestaltet am 09.10.2026 in reiseplaner.ts

@@ -121,6 +121,26 @@ export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): U
   return 'frei'
 }
 
+/**
+ * „Abfrage ohne Hinschauen" (09.10.2026, Tipp auf der Startseite): nur selbst abrufen – keine Auswahl, kein Erkennen.
+ * Neue Wörter bleiben beim ersten Kontakt Lernkarte; Fach 0–1 legt Buchstaben, Fach 2 schreibt (auch mit Lücken),
+ * ab Fach 3 wie gewohnt (frei, Lückensatz, Diktat).
+ */
+export function abrufUebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): Uebung {
+  if (st.fach === 0 && st.versuche === 0) return 'karte'
+  if (st.fach <= 1) return 'buchstaben'
+  if (st.fach === 2) return zufall < 0.35 ? 'luecken' : 'frei'
+  return uebungFuer(st, v, zufall)
+}
+
+/**
+ * „Lege das Wort" in der schwersten Stufe (09.10.2026, Wunsch der Lehrkraft): Ab diesem Fach setzen die Lernenden die
+ * Leerzeichen selbst. Damit nichts verrät, ob das Wort getrennt geschrieben wird, gilt die Stufe für JEDES Wort –
+ * die Leertaste steht also auch bei „house" bereit, und es gibt keine Lücke oder Feldaufteilung.
+ */
+export const LEGE_LEERZEICHEN_AB = 2
+export const leerzeichenSelbst = (st: Pick<WortStand, 'fach'> | null | undefined): boolean => (st?.fach ?? 0) >= LEGE_LEERZEICHEN_AB
+
 /** Kommt das Wort (oder sein Kern ohne „to"/Artikel) im Satz vor? */
 export function enthaeltWort(satz: string, term: string): boolean {
   const kern = kernform(varianten(term)[0] ?? term)
@@ -153,10 +173,21 @@ export function ohneAngaben(t: string): string {
     .trim()
 }
 
+/**
+ * Auslassungspunkte („to look forward to ...", „… ago") gehören nicht zur Antwort (09.10.2026, Wunsch der Lehrkraft):
+ * Wer sie weglässt, antwortet richtig; wer sie mittippt, auch. Drei (oder mehr) Punkte und das Zeichen „…" fallen weg,
+ * einzelne Punkte wie in „sb." oder „etw." bleiben.
+ */
+export const ohneAuslassung = (t: string): string =>
+  String(t ?? '')
+    .replace(/\.{3,}|…/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
 /** „to go" → „go", „the dog" → „dog", „(to) play" → „play" */
 export function kernform(t: string): string {
   // Apostroph vorher vereinheitlichen: „l’ école" verliert den Artikel wie „l' école" (08.10.2026)
-  return apostrophNormal(ohneAngaben(t))
+  return apostrophNormal(ohneAuslassung(ohneAngaben(t)))
     .replace(/\([^)]*\)/g, ' ')
     .replace(/^\s*(to|the|a|an|le|la|les|l'|un|une|el|los|las|il|lo|gli|der|die|das)\s+/i, '')
     .replace(/\s+/g, ' ')
@@ -185,7 +216,7 @@ export function varianten(loesung: string): string[] {
 const ohneAkzente = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 const normal = (s: string): string =>
   // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
-  apostrophNormal(s)
+  apostrophNormal(ohneAuslassung(s))
     .toLowerCase()
     .replace(/[.!?]+$/g, '')
     .replace(/\s+/g, ' ')
@@ -522,10 +553,112 @@ export function mitLeerzeichen(term: string, gelegt: string): string {
   return aus + gelegt.slice(i)
 }
 
+/**
+ * Wie `mitLeerzeichen`, aber für das Tippfeld (09.10.2026): Ein Leerzeichen (bzw. Apostroph), das direkt nach den schon
+ * gelegten Buchstaben folgt, steht schon da – leicht, man muss es nicht tippen. Tippt man es doch, wird es nicht doppelt
+ * (getippte Leerzeichen verbrauchen nichts, das Feld zeigt immer diese Form).
+ */
+export function mitLeerzeichenVoraus(term: string, gelegt: string): string {
+  if (!gelegt) return mitLeerzeichen(term, gelegt)
+  const kern = kernform(varianten(term)[0] ?? term)
+  let aus = ''
+  let i = 0
+  for (const c of kern) {
+    if (c === ' ' || istApostroph(c)) {
+      aus += c
+      continue
+    }
+    // Erst am nächsten fehlenden Buchstaben aufhören – die Leerzeichen davor stehen schon
+    if (i >= gelegt.length) break
+    aus += gelegt[i++]
+  }
+  return aus + gelegt.slice(i)
+}
+
+/**
+ * Schwerste Stufe von „Lege das Wort" (09.10.2026): Die Lernenden setzen die Leerzeichen selbst (`gelegt` enthält sie,
+ * wie getippt). Nur Apostrophe stehen weiter von selbst an ihrer Stelle – direkt hinter dem Buchstaben, dem sie in der
+ * Lösung folgen („dogs'", „l'école"), sonst vor dem nächsten („'cause").
+ */
+export function mitApostrophen(term: string, gelegt: string): string {
+  const kern = kernform(varianten(term)[0] ?? term)
+  const vor: string[] = []
+  const nach: string[] = []
+  let n = 0
+  let puffer = ''
+  let letztesBuchstabe = false
+  for (const c of kern) {
+    if (istApostroph(c)) {
+      if (letztesBuchstabe) nach[n - 1] = (nach[n - 1] ?? '') + c
+      else puffer += c
+      continue
+    }
+    if (c === ' ') {
+      letztesBuchstabe = false
+      continue
+    }
+    vor[n] = puffer
+    puffer = ''
+    n++
+    letztesBuchstabe = true
+  }
+  let aus = ''
+  let i = 0
+  for (const c of gelegt) {
+    if (c === ' ') {
+      aus += c
+      continue
+    }
+    aus += (vor[i] ?? '') + c + (nach[i] ?? '')
+    i++
+  }
+  return aus
+}
+
 export function buchstaben(term: string, zufall: () => number = Math.random): string[] {
   const kern = kernform(varianten(term)[0] ?? term)
   return kern
     .split('')
     .filter((c) => c !== ' ' && !istApostroph(c))
     .sort(() => zufall() - 0.5)
+}
+
+/** Wackelig wie im Lernstand der Startseite: Fach 1–2, schon einmal falsch, in den letzten 14 Tagen geübt */
+export const istWackelig = (s: WortStand, jetzt = Date.now()): boolean => s.fach >= 1 && s.fach <= 2 && s.falsch > 0 && jetzt - (s.zuletzt || 0) < 14 * TAG
+
+/** Übungen, die ein Link direkt startet (`/s/v/<ID>?uebung=…`, Tipps der Startseite, 09.10.2026) */
+export type LinkUebung = 'runde' | 'abfragen' | 'wackelig'
+export const LINK_UEBUNGEN: readonly LinkUebung[] = ['runde', 'abfragen', 'wackelig']
+
+/**
+ * Welche Runde ein Link startet (09.10.2026, Befund der Lehrkraft: „Abfrage ohne Hinschauen starten" öffnete nur die
+ * Kursseite). `runde`: der nächste Zehnerschritt der Tagesration (sonst freiwillig weiter); `abfragen`: dasselbe, aber
+ * zuerst schon bekannte Wörter und nur selbst abrufen; `wackelig`: die wackeligen Wörter (freiwillig – ohne
+ * Zurückstufen). null = nichts zu üben, die Kursseite bleibt.
+ */
+export function linkRunde(
+  art: string | null,
+  liste: Vokabel[],
+  staende: Record<string, WortStand>,
+  jetzt = Date.now(),
+  tagesziel = NEU_JE_TAG
+): { woerter: Vokabel[]; abfragen: boolean; freiwillig: boolean } | null {
+  if (!art || !(LINK_UEBUNGEN as readonly string[]).includes(art)) return null
+  const heute = sitzungsWoerter(liste, staende, jetzt, tagesziel, tagesziel + 25)
+  const frei = (): Vokabel[] => freiwilligeWoerter(liste, staende, jetzt)
+  if (art === 'wackelig') {
+    const w = liste.filter((v) => staende[v.id] && istWackelig(staende[v.id], jetzt)).slice(0, SCHRITT)
+    if (w.length) return { woerter: w, abfragen: false, freiwillig: true }
+    art = 'runde'
+  }
+  if (art === 'abfragen') {
+    const bekannt = heute.filter((v) => (staende[v.id]?.versuche ?? 0) > 0)
+    const w = (bekannt.length ? bekannt : heute).slice(0, SCHRITT)
+    if (w.length) return { woerter: w, abfragen: true, freiwillig: false }
+    const f = frei()
+    return f.length ? { woerter: f, abfragen: true, freiwillig: true } : null
+  }
+  if (heute.length) return { woerter: heute.slice(0, SCHRITT), abfragen: false, freiwillig: false }
+  const f = frei()
+  return f.length ? { woerter: f, abfragen: false, freiwillig: true } : null
 }

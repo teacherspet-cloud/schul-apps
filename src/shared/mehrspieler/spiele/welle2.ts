@@ -1,6 +1,7 @@
 /** Regelmodule der Welle 2 (08.10.2026) – Bildergeschichte, Übersetzungs-Puzzle und Zeitstrahl liegen in ordnen.ts */
 import { bildergeschichte, uebersetzung, zeitstrahl } from './ordnen'
-import { dialog, fehlerdetektive, hoerkette, kreuzwort, reiseplaner, teammemory, wortkette } from './koop2'
+import { dialog, fehlerdetektive, hoerkette, kreuzwort, teammemory, wortkette } from './koop2'
+import { reiseplaner } from './reiseplaner'
 import { konjugation, kollokation, synonyme, umbau, woerterturm } from './rennen'
 import { auktion, buzzer, domino, galgen, schnapp, sniper, stadtland } from './versus2'
 

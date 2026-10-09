@@ -95,6 +95,7 @@ import { fuehreZusammen, type Veroeffentlichung } from '@shared/reiheSpeichern'
 import { planAufRaster } from './planAbdeckung'
 import { NiveauWahl } from './ReiheNiveau'
 import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
+import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 
 /**
  * Lohnt sich das automatische Speichern? (08.10.2026) Gespeicherte Reihen immer; neue erst, wenn mehr als die Art gewählt
@@ -1009,6 +1010,8 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'gaeste'>('gruppe')
   // Gäste per QR-Code (05.10.2026): zusätzlich zu Lerngruppe/Einzelnen oder allein
   const [mitGaesten, setMitGaesten] = useState(false)
+  // Planen mit optionalem Ende (09.10.2026)
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const [qr, setQr] = useState<{ code: string; link: string } | null>(null)
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
@@ -1125,6 +1128,7 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
             />
           )}
         </NurExperte>
+        <FreigabePlanen wert={plan} aendern={setPlan} mitEnde endeText="Danach lässt sich die Reihe nur noch ansehen – keine neuen Abgaben." />
         <Group justify="flex-end">
           <Button
             loading={laeuft}
@@ -1134,10 +1138,12 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
               void senden<{ id: string; code?: string; link?: string }>(`/server/reihen/${reiheId}/zuweisen`, {
                 lerngruppeId: art === 'gruppe' ? gruppe : '',
                 schueler: art === 'gaeste' ? [] : einzelne,
-                gaeste: gaesteAn
+                gaeste: gaesteAn,
+                ...planKoerper(plan, { mitEnde: true })
               })
                 .then((r) => {
-                  notifySuccess('Zugewiesen.')
+                  planGeaendert()
+                  notifySuccess(planMeldung(plan, 'Unterrichtsreihe') || 'Zugewiesen.')
                   if (r.code && r.link) setQr({ code: r.code, link: r.link })
                   else schliessen()
                 })
@@ -1146,7 +1152,7 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
             }}
             data-zuweisen-los
           >
-            Zuweisen
+            {planKnopf(plan, 'Zuweisen')}
           </Button>
         </Group>
       </Stack>

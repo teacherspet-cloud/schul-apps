@@ -218,7 +218,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
   const testDetails = testDetailsDerGruppe(g)
-  const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt)
+  // Mit Übersicht je Abschnitt (Reiter „Vokabeln", 09.10.2026)
+  const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt, true)
   const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt)
   const reihen = reihenDerGruppe(lehrkraftId, g.id)
   const blaetter = blaetterDerGruppe(lehrkraftId, g.id)
@@ -231,7 +232,9 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
       const gr = gram.jePerson[n.id]
       // Gäste (Anmeldecode, 08.10.2026) führt die Testhistorie ohne Benutzernamen, über ihren Namen
       const gast = n.quelle === 'gast'
-      const t = h.schueler.find((s) => (gast ? !s.benutzer && s.name === n.name : s.benutzer === n.benutzer))
+      // Zuerst über die Kennung (09.10.2026: nach dem Umbenennen bleiben die Ergebnisse dran), sonst wie bisher
+      const t =
+        h.schueler.find((s) => s.ids.includes(n.id)) ?? h.schueler.find((s) => (gast ? !s.benutzer && s.name === n.name : s.benutzer === n.benutzer))
       const r = reihen.filter((x) => x.status === 'offen').flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
       return {
         id: n.id,
@@ -265,7 +268,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   }
   for (const r of reihen) for (const b of r.bedarf.slice(0, 3)) bedarf.push({ art: 'reihe', text: `${r.titel}: ${b}`, ziel: { modul: 'laufendereihen' } })
   for (const b of blaetter) {
-    if (b.status !== 'offen') continue
+    // Geplant (09.10.2026): noch bei niemandem – kein Handlungsbedarf
+    if (b.status !== 'offen' || b.geplantAb) continue
     if (b.gesamt && b.eingereicht < b.gesamt && b.begonnen < b.gesamt / 2)
       bedarf.push({ art: 'blatt', text: `Blatt „${b.titel}": erst ${b.begonnen} von ${b.gesamt} haben begonnen`, ziel: { modul: 'freigaben', id: b.id } })
     else if (b.bis && b.bis < jetzt && b.eingereicht < b.gesamt)

@@ -50,6 +50,8 @@ import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
+import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
+import { zugangPlan } from './planen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -294,6 +296,8 @@ const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(12
 
 function istFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (ich.rolle !== 'schueler') return false
+  // Geplante Freischaltung (09.10.2026, freigabePlan.ts): die Aufgaben dürfen schon fertig sein, die Lernenden sehen sie erst ab dann
+  if (nochGeplant('gram', z.id)) return false
   if (db().prepare('SELECT 1 FROM gram_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   // Extra (Förder/Forder, 08.10.2026): nur für die gewählten Lernenden, nicht für den ganzen Kurs
   if (istExtra(z)) return ich.quelle !== 'gast' && json_(z.schueler, [] as string[]).includes(ich.benutzer)
@@ -608,6 +612,8 @@ export function grammatikDerGruppe(
     vokId: string
     /** Extra-Aufgabe für einzelne (Förder-/Forderaufgabe) */
     extra: boolean
+    /** Geplante Freischaltung (09.10.2026) */
+    geplantAb: number | null
   }[]
   jePerson: Record<string, { sicher: number; gesamt: number }>
 } {
@@ -635,6 +641,7 @@ export function grammatikDerGruppe(
     const k = karten(p)
     const lernende = lernendeVon(z)
     let aktiv7 = 0
+    const geplant = geplantAb('gram', z.id, jetzt)
     const jeAufgabe = new Map<string, { versuche: number; falsch: number; texte: Map<string, number> }>()
     const anteile = lernende.map((n) => {
       const st = standVon(z.id, n.id)
@@ -648,8 +655,8 @@ export function grammatikDerGruppe(
         for (const t of s.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
         jeAufgabe.set(id, j)
       }
-      // Extras (einzelne Lernende) zählen nicht in den Grammatik-Stand der Person
-      if (offen && !istExtra(z)) {
+      // Extras (einzelne Lernende) zählen nicht in den Grammatik-Stand der Person – Geplantes (09.10.2026) auch nicht
+      if (offen && !istExtra(z) && !geplant) {
         const q = (jePerson[n.id] ??= { sicher: 0, gesamt: 0 })
         q.sicher += u.sicher
         q.gesamt += u.gesamt
@@ -670,6 +677,8 @@ export function grammatikDerGruppe(
       aktiv7,
       vokId: z.vok_id ?? '',
       extra: istExtra(z),
+      // Geplante Freischaltung (09.10.2026): „geplant ab …"
+      geplantAb: geplant,
       probleme: p.aufgaben
         .map((a) => ({ a, j: jeAufgabe.get(a.id) }))
         .filter((x): x is { a: (typeof p.aufgaben)[number]; j: { versuche: number; falsch: number; texte: Map<string, number> } } =>
@@ -788,13 +797,14 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && url.pathname === '/s/api/grammatik/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? ''))
       if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
-      return json(res, 200, { id: z.id, titel: ohneKlasse(z.titel), gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis }), true
+      return json(res, 200, { id: z.id, titel: ohneKlasse(z.titel), gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis, ...zugangPlan('gram', z.id, sitzung?.nutzer) }), true
     }
     if (req.method === 'POST' && (url.pathname === '/s/api/grammatik/gast' || url.pathname === '/s/api/grammatik/wieder')) {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const z = nachCode(String(k0.code ?? ''))
       if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
-      if (sitzung && istFuer(z, sitzung.nutzer)) return json(res, 200, { ok: true, id: z.id }), true
+      // Schon dabei – auch vor einer geplanten Freischaltung (09.10.2026)
+      if (sitzung && (istFuer(z, sitzung.nutzer) || zugangPlan('gram', z.id, sitzung.nutzer).dabei)) return json(res, 200, { ok: true, id: z.id }), true
       if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
         db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(z.id, sitzung.nutzer.id, '')
         return json(res, 200, { ok: true, id: z.id }), true
@@ -949,6 +959,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               lerngruppe: gruppeName(z),
               vokId: z.vok_id ?? '',
               lerngruppeId: z.lerngruppe_id,
+              // Geplante Freischaltung (09.10.2026): Uhr „geplant ab …" auf der Kursseite
+              geplantAb: geplantAb('gram', z.id),
               art: z.art ?? '',
               ...(istExtra(z) ? { fuer: l.map((n) => ({ id: n.id, name: n.name || n.benutzer })) } : {}),
               bearbeitetSchnitt:
@@ -1046,6 +1058,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const paket = paketBereinigt(k0.paket, String(k0.thema ?? ''))
       if (paket.aufgaben.length < (art ? 4 : 8))
         return json(res, 400, { fehler: `Der Aufgabenpool ist zu klein (mindestens ${art ? 4 : 8} brauchbare Aufgaben).` }), true
+      // „Planen …" (09.10.2026): nur NEUE (oder zurückgeholte) Trainings werden geplant – Aufgaben, die an ein laufendes
+      // Training angehängt werden, verschwänden sonst samt dem Bisherigen
+      const schonSichtbar = new Set([...kennungenVon('gram_zuweisungen', ich.id)].filter((x) => zeile(x)?.status !== 'entfernt'))
       const ids = grammatikAnlegen({
         lehrkraftId: ich.id,
         lerngruppeId: art ? '' : g?.id ?? '',
@@ -1064,12 +1079,15 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       // Gäste unter den Empfängern einer Extra-Freigabe
       for (const n of extraFuer.filter((x) => x.quelle === 'gast'))
         db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(id, n.id, '')
+      const geplant = nachFreigabe('gram', ids.filter((x) => !schonSichtbar.has(x)), k0, ich.id, art ? '' : g?.id ?? vok?.lerngruppe_id ?? '')
       protokolliereServer(
         'grammatik',
-        art ? `Extra-Aufgaben (${art}) freigegeben` : ids.length > 1 ? `Grammatik freigegeben – ${ids.length} Trainings (je Thema eines)` : 'Grammatiktraining freigegeben',
+        geplant
+          ? 'Grammatik-Freigabe geplant'
+          : art ? `Extra-Aufgaben (${art}) freigegeben` : ids.length > 1 ? `Grammatik freigegeben – ${ids.length} Trainings (je Thema eines)` : 'Grammatiktraining freigegeben',
         ich.id
       )
-      return json(res, 200, { id, ids, aufgaben: paket.aufgaben.length }), true
+      return json(res, 200, { id, ids, aufgaben: paket.aufgaben.length, geplant }), true
     }
     const z = teile[0] ? zeile(teile[0]) : null
     if (!z || z.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannt.' }), true

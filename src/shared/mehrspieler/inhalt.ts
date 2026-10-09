@@ -7,9 +7,46 @@ import { kernform, ohneAngaben, satzMitLuecke, varianten, type Vokabel } from '.
 import { normiert, type GrammatikAufgabe } from '../grammatiktrainer'
 import { ZEITFORMEN_EN } from '../signalwoerter'
 import type { SpielInhalt, SpielItem, VerbFormen, ZeitSatz } from './typen'
+import { abschnitteAus, reiheVon, type Buch } from '../vokabelLaufbahn'
 
 const spielform = (t: string): string => ohneAngaben(varianten(t)[0] ?? t)
 const woerterVon = (s: string): string[] => s.split(/\s+/).filter(Boolean)
+
+/** Wort ohne Satzzeichen (Apostroph und Bindestrich bleiben) – so werden angetippte Wörter verglichen */
+export const wortKern = (t: string): string => normiert(t.replace(/[^\p{L}\p{N}'’-]/gu, ''))
+
+/**
+ * Stellen (Index in den Wörtern des Satzes), an denen `wort` steht – bei mehreren Wörtern alle Stellen der Folge.
+ * Leer = das Wort steht so nicht im Satz (dann taugt der Satz nicht als Fehlersatz).
+ */
+export function fehlerStellen(satz: string, wort: string): number[] {
+  const t = woerterVon(satz).map(wortKern)
+  const w = woerterVon(wort).map(wortKern).filter(Boolean)
+  if (!w.length) return []
+  const aus: number[] = []
+  for (let i = 0; i + w.length <= t.length; i++) if (w.every((x, j) => t[i + j] === x)) for (let j = 0; j < w.length; j++) aus.push(i + j)
+  return aus
+}
+
+/**
+ * Lücke für das Wort im Beispielsatz (09.10.2026): bevorzugt die Stelle, an der das Wort genau steht („go" in „This
+ * is a good day to go." ist das letzte Wort, nicht „good"); sonst eine gebeugte Form ab Wortanfang (satzMitLuecke).
+ */
+export function lueckeImSatz(satz: string, term: string): { vor: string; nach: string; loesung: string } | null {
+  const k = kernform(varianten(term)[0] ?? term).toLowerCase()
+  if (k) {
+    const klein = satz.toLowerCase()
+    for (let i = klein.indexOf(k); i >= 0; i = klein.indexOf(k, i + 1)) {
+      const vor = satz.slice(0, i)
+      const nach = satz.slice(i + k.length)
+      if (!/\p{L}$/u.test(vor) && !/^\p{L}/u.test(nach)) return { vor, nach, loesung: satz.slice(i, i + k.length) }
+    }
+  }
+  return satzMitLuecke(satz, term)
+}
+
+/** Die Lücke steht an Wortgrenzen (nicht mitten in einem längeren Wort) */
+const luekeAnWortgrenze = (l: { vor: string; nach: string }): boolean => !/\p{L}$/u.test(l.vor) && !/^\p{L}/u.test(l.nach)
 
 /** Vokabeln → Items (Richtung nach Schwierigkeit: wird beim Fragen gewählt; Vorgabe: Deutsch → Fremdsprache) */
 export function vokItems(woerter: Vokabel[]): SpielItem[] {
@@ -19,7 +56,7 @@ export function vokItems(woerter: Vokabel[]): SpielItem[] {
     const translation = ohneAngaben(w.translation)
     if (!term || !translation) continue
     const bsp = w.example && woerterVon(w.example).length >= 3 && woerterVon(w.example).length <= 14 ? w.example.trim() : undefined
-    const luecke = bsp ? satzMitLuecke(bsp, w.term) ?? undefined : undefined
+    const luecke = bsp ? lueckeImSatz(bsp, w.term) ?? undefined : undefined
     const item: SpielItem = {
       id: w.id,
       frage: translation,
@@ -45,15 +82,26 @@ export function vokItems(woerter: Vokabel[]): SpielItem[] {
     }
     aus.push(item)
   }
-  // Fehlersätze aus Beispielsätzen: das Wort durch ein anderes Kurswort ersetzt (für Fehlerdetektive und Fehler-Sniper)
-  const mitLuecke = aus.filter((i) => i.vok?.luecke && !/\s/.test(i.vok.luecke.loesung))
+  // Fehlersätze aus Beispielsätzen: das Wort durch ein anderes Kurswort ersetzt (für Fehlerdetektive und Fehler-Sniper).
+  // 09.10.2026 (Befund der Lehrkraft: Sätze ohne Fehler, Spiel hing): nur ganze Wörter ersetzen, nie durch eine
+  // gültige Form (dasselbe Wort, eine Variante, ein Synonym mit gleicher Übersetzung), und die Fehlerstelle merken.
+  const mitLuecke = aus.filter((i) => i.vok?.luecke && !/\s/.test(i.vok.luecke.loesung) && luekeAnWortgrenze(i.vok.luecke))
   mitLuecke.forEach((i, k) => {
-    const anderes = mitLuecke[(k + 1) % mitLuecke.length]
-    if (!anderes || anderes === i) return
     const l = i.vok!.luecke!
-    const falsch = kernform(anderes.vok!.term)
-    if (!falsch || /\s/.test(falsch) || normiert(falsch) === normiert(l.loesung)) return
-    i.fehler = { satz: `${l.vor}${falsch}${l.nach}`, wort: falsch, korrektur: l.loesung }
+    const gueltig = new Set([l.loesung, i.vok!.term, ...(i.alternativen ?? [])].map((x) => normiert(kernform(x))))
+    const bedeutung = normiert(kernform(i.vok!.translation))
+    for (let d = 1; d < mitLuecke.length; d++) {
+      const anderes = mitLuecke[(k + d) % mitLuecke.length]
+      const falsch = kernform(anderes.vok!.term)
+      if (!falsch || /\s/.test(falsch) || gueltig.has(normiert(falsch))) continue
+      if (normiert(kernform(anderes.vok!.translation)) === bedeutung) continue
+      const satz = `${l.vor}${falsch}${l.nach}`
+      const original = `${l.vor}${l.loesung}${l.nach}`
+      const stellen = fehlerStellen(satz, falsch)
+      if (normiert(satz) === normiert(original) || !stellen.length) continue
+      i.fehler = { satz, wort: falsch, korrektur: l.loesung, stellen }
+      break
+    }
   })
   return aus
 }
@@ -86,9 +134,13 @@ export function gramItems(aufgaben: GrammatikAufgabe[]): SpielItem[] {
         item.satzHinweis = [a.anweisung, a.vorgabe].filter(Boolean).join(' ')
       }
     } else if (a.art === 'fehler' && a.fehlerWort) {
-      item.fehler = { satz: a.satz, wort: a.fehlerWort, korrektur: loesung }
+      // Nur, wenn das falsche Wort wirklich im Satz steht und sich von der Verbesserung unterscheidet (09.10.2026)
+      const stellen = fehlerStellen(a.satz, a.fehlerWort)
+      if (stellen.length && !a.loesungen.some((l) => normiert(l) === normiert(a.fehlerWort!)))
+        item.fehler = { satz: a.satz, wort: a.fehlerWort, korrektur: loesung, stellen }
       item.frage = a.satz
-      item.zusatz = 'Wie heißt das falsche Wort richtig?'
+      // Fragezusatz in der Zielsprache setzt frageAus (kern.ts); ohne gültige Fehlerstelle die Anweisung der Aufgabe
+      item.zusatz = item.fehler ? undefined : a.anweisung || undefined
     } else if (a.art === 'umformen') {
       item.umformen = { satz: a.satz, vorgabe: a.vorgabe ?? a.anweisung, loesung }
       if (loesung.length > 60) item.frage = ''
@@ -171,3 +223,29 @@ export const leererInhalt = (bereich: SpielInhalt['bereich'], sprache: string): 
   zeitSaetze: [],
   synonyme: []
 })
+
+/**
+ * Lehrwerkswörter bis zum Stand der Klasse (09.10.2026, Reiseplaner): alle Bände derselben Reihe VOR dem aktuellen
+ * Band ganz, im aktuellen Band alle Units bis einschließlich der Stand-Unit – nie etwas danach. Kennungen wie im
+ * Vokabelweg („b:<band>:<u>:<s>:<i>"), damit der Stand der Kinder dazu passt.
+ */
+export function lehrwerkBisStand(buecher: Buch[], stand: { buch: string; unit: string }): { id: string; term: string }[] {
+  const aktuell = buecher.find((b) => b.id === stand.buch)
+  if (!aktuell) return []
+  const reihe = reiheVon(aktuell)
+  const nummer = (b: Buch): number => {
+    const n = parseFloat(String(b.band ?? '').replace(/[^0-9.]/g, ''))
+    return Number.isFinite(n) ? n : 99
+  }
+  const bis = aktuell.units.findIndex((u) => u.name === stand.unit)
+  if (bis < 0) return []
+  const aus: { id: string; term: string }[] = []
+  for (const b of buecher.filter((x) => reiheVon(x) === reihe && (x.id === aktuell.id || nummer(x) < nummer(aktuell)))) {
+    const letzte = b.id === aktuell.id ? bis : b.units.length - 1
+    for (const a of abschnitteAus(b)) {
+      const ui = Number(a.key.split(':').slice(-2)[0])
+      if (ui <= letzte) for (const w of a.woerter) aus.push({ id: w.id, term: w.term })
+    }
+  }
+  return aus
+}

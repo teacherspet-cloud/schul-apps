@@ -13,6 +13,7 @@ import { memoryPaare, normiert, richtigFalschSaetze, type GrammatikAufgabe } fro
 import { signalRunden, type Zeitform } from '@shared/signalwoerter'
 import { useVtFarbe } from '../vtFarben'
 import { gemischt } from './SpieleErkennen'
+import { useZuSchnell } from '../zuSchnell'
 import { ton } from '../../onlinetest/schuelerDarstellung'
 
 type Ende = (wert: number, fehler: string[]) => void
@@ -42,9 +43,23 @@ export function RichtigFalsch({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[]
     }
   }, [rest, i, saetze.length, punkte, ende])
   const s = saetze[i]
+  // Blind immer dieselbe Seite (09.10.2026): zählt nicht, schon gezählte Treffer der Folge werden zurückgenommen
+  const schnell = useZuSchnell<{ gut: boolean; id: string }>()
+  useEffect(() => schnell.frage(), [i, schnell.frage])
   const antworten = (stimmt: boolean): void => {
     if (!s || rueck) return
     const ok = stimmt === s.stimmt
+    const z = schnell.melden(stimmt ? 'stimmt' : 'falsch', { gut: ok, id: s.aufgabeId })
+    if (!z.werten) {
+      const treffer = z.zurueck.filter((x) => x.gut).length
+      if (treffer) setPunkte((p) => Math.max(0, p - treffer))
+      for (const x of z.zurueck) {
+        const k = x.gut ? -1 : fehler.current.lastIndexOf(x.id)
+        if (k >= 0) fehler.current.splice(k, 1)
+      }
+      setI((x) => x + 1)
+      return
+    }
     if (ok) {
       setPunkte((p) => p + 1)
       ton('richtig')
@@ -76,6 +91,7 @@ export function RichtigFalsch({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[]
           {s.stimmt ? 'Der Satz war richtig.' : 'Der Satz hatte einen Fehler.'}
         </Text>
       )}
+      {schnell.hinweis}
       <SimpleGrid cols={2}>
         <Button size="xl" radius="xl" color="teal" onClick={() => antworten(true)} data-rf="richtig">
           Stimmt

@@ -5,11 +5,19 @@
  */
 import { Alert, Badge, Button, Card, Group, Image, Progress, SimpleGrid, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { IconCheck, IconClock, IconVolume } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { spielText, type TextSchluessel } from '@shared/spielSprache'
 import type { Block, Kachel } from '@shared/mehrspieler/kern'
 import { kannSprechen, sprich } from '../VokabelTrainer'
 
 type Senden = (aktion: string, wert?: unknown) => void
+
+/** Beschriftungen der Bausteine in der Zielsprache des Kurses (09.10.2026); ohne Angabe Deutsch */
+const Sprache = createContext<{ sprache: string; jahrgang: number | null }>({ sprache: 'de', jahrgang: null })
+function useT(): (k: TextSchluessel, ...w: (string | number)[]) => string {
+  const { sprache, jahrgang } = useContext(Sprache)
+  return (k, ...w) => spielText(sprache, jahrgang, k, ...w)
+}
 
 const TON_FARBE: Record<string, string> = { gut: 'teal', schlecht: 'red', info: 'blue', warn: 'orange', leise: 'gray' }
 const KACHEL_FARBE: Record<string, string> = {
@@ -41,6 +49,7 @@ function Uhr({ bis, text }: { bis: number; text?: string }): React.JSX.Element {
 }
 
 function Vorlesen({ text, sprache }: { text: string; sprache: string }): React.JSX.Element {
+  const t = useT()
   const zuletzt = useRef('')
   useEffect(() => {
     if (zuletzt.current === text) return
@@ -49,12 +58,13 @@ function Vorlesen({ text, sprache }: { text: string; sprache: string }): React.J
   }, [text, sprache])
   return (
     <Button variant="light" leftSection={<IconVolume size={18} />} onClick={() => sprich(text, sprache)} data-mehr-vorlesen>
-      Nochmal hören
+      {t('uiNochmalHoeren')}
     </Button>
   )
 }
 
 function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Senden }): React.JSX.Element {
+  const t = useT()
   const [text, setText] = useState('')
   useEffect(() => setText(''), [b.frage])
   return (
@@ -80,7 +90,7 @@ function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Sen
             spellCheck={false}
             autoCapitalize="off"
             disabled={b.gesperrt}
-            placeholder="Antwort schreiben"
+            placeholder={t('uiAntwortSchreiben')}
             data-mehr-eingabe
           />
           <Button size="lg" disabled={b.gesperrt || !text.trim()} onClick={() => (senden(b.aktion, text), setText(''))} data-mehr-senden>
@@ -96,7 +106,7 @@ function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Sen
           ))}
           {!b.optionen.length && (
             <Text size="sm" c="dimmed">
-              Auf deinem Gerät ist gerade keine Antwort.
+              {t('uiKeineAntwort')}
             </Text>
           )}
         </SimpleGrid>
@@ -106,6 +116,7 @@ function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Sen
 }
 
 function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden: Senden }): React.JSX.Element {
+  const t = useT()
   const [wahl, setWahl] = useState<string[]>([])
   const mehr = Boolean(b.mehrfach && b.senden)
   const klick = (k: Kachel): void => {
@@ -165,45 +176,69 @@ function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden:
       </SimpleGrid>
       {mehr && (
         <Button disabled={!wahl.length} onClick={() => (senden(b.senden!, wahl), setWahl([]))} data-mehr-kacheln-senden>
-          Abschicken ({wahl.length})
+          {t('uiAbschickenN', wahl.length)}
         </Button>
       )}
     </Stack>
   )
 }
 
-function Code({ b, senden }: { b: Extract<Block, { typ: 'code' }>; senden: Senden }): React.JSX.Element {
-  const [code, setCode] = useState('')
+/** Codewort (Fluchtraum, 09.10.2026): freigeschaltete Buchstaben bzw. gefundene Buchstaben ohne Stelle, Wort eintippen */
+function Codewort({ b, senden }: { b: Extract<Block, { typ: 'codewort' }>; senden: Senden }): React.JSX.Element {
+  const [wort, setWort] = useState('')
+  const schicken = (): void => {
+    if (!wort.trim() || b.gesperrt) return
+    senden(b.aktion, wort.trim())
+    setWort('')
+  }
   return (
-    <Card withBorder radius="lg" padding="sm" data-mehr-code>
-      <Text fw={700} ta="center" size="xl" style={{ letterSpacing: 8 }}>
-        {(code + '·'.repeat(b.stellen)).slice(0, b.stellen)}
+    <Card withBorder radius="lg" padding="sm" data-mehr-codewort={b.felder.length}>
+      <Text size="sm" fw={600} ta="center">
+        {b.titel}
       </Text>
-      <SimpleGrid cols={5} spacing={6} mt="xs">
-        {'1234567890'.split('').map((z) => (
-          <Button key={z} variant="default" disabled={b.gesperrt || code.length >= b.stellen} onClick={() => setCode((c) => c + z)} data-mehr-ziffer={z}>
-            {z}
-          </Button>
+      <Group gap={6} justify="center" mt={6} wrap="wrap">
+        {b.felder.map((f, i) => (
+          <Card key={i} withBorder radius="md" padding={0} w={36} h={44} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} data-mehr-codefeld={f ?? ''}>
+            <Text fw={800} size="xl">
+              {f ?? '·'}
+            </Text>
+          </Card>
         ))}
-      </SimpleGrid>
-      <Group grow mt="xs">
-        <Button variant="subtle" onClick={() => setCode('')}>
-          Löschen
-        </Button>
-        <Button disabled={b.gesperrt || code.length !== b.stellen} onClick={() => (senden(b.aktion, code), setCode(''))} data-mehr-code-senden>
-          Schloss öffnen
+      </Group>
+      {b.buchstaben && b.buchstaben.length > 0 && (
+        <Group gap={6} justify="center" mt={8} data-mehr-codebuchstaben>
+          {b.buchstaben.map((c, i) => (
+            <Badge key={i} size="xl" variant="light" color="grape" tt="none">
+              {c}
+            </Badge>
+          ))}
+        </Group>
+      )}
+      <Group mt="xs" wrap="nowrap">
+        <TextInput
+          style={{ flex: 1 }}
+          size="md"
+          value={wort}
+          onChange={(e) => setWort(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === 'Enter' && schicken()}
+          placeholder={b.platzhalter}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          disabled={b.gesperrt}
+          data-mehr-codewort-eingabe
+        />
+        <Button size="md" disabled={b.gesperrt || !wort.trim()} onClick={schicken} data-mehr-codewort-senden>
+          {b.knopf}
         </Button>
       </Group>
-      {b.gesperrt && (
-        <Text size="xs" c="dimmed" ta="center" mt={4}>
-          Erst wenn alle ihre Ziffer haben.
-        </Text>
-      )}
     </Card>
   )
 }
 
 function Eingaben({ b, senden }: { b: Extract<Block, { typ: 'eingaben' }>; senden: Senden }): React.JSX.Element {
+  const t = useT()
   const [werte, setWerte] = useState<Record<string, string>>({})
   const schluessel = b.felder.map((f) => f.id).join()
   useEffect(() => setWerte({}), [schluessel])
@@ -227,128 +262,140 @@ function Eingaben({ b, senden }: { b: Extract<Block, { typ: 'eingaben' }>; sende
         />
       ))}
       <Button disabled={b.gesperrt} onClick={() => senden(b.aktion, werte)} data-mehr-eingaben-senden>
-        Abschicken
+        {t('uiAbschicken')}
       </Button>
     </Stack>
   )
 }
 
-export function Bloecke({ bloecke, senden }: { bloecke: Block[]; senden: Senden }): React.JSX.Element {
+export function Bloecke({
+  bloecke,
+  senden,
+  sprache = 'de',
+  jahrgang = null
+}: {
+  bloecke: Block[]
+  senden: Senden
+  sprache?: string
+  jahrgang?: number | null
+}): React.JSX.Element {
   return (
-    <Stack gap="sm" data-mehr-bloecke>
-      {bloecke.map((b, i) => {
-        switch (b.typ) {
-          case 'titel':
-            return (
-              <Text key={i} fw={800} size="lg">
-                {b.text}
-              </Text>
-            )
-          case 'text':
-            return b.ton && b.ton !== 'leise' ? (
-              <Alert key={i} color={TON_FARBE[b.ton]} radius="md" py={6} data-mehr-text={b.ton}>
-                <Text size={b.gross ? 'lg' : 'sm'} fw={b.gross ? 700 : 500}>
+    <Sprache.Provider value={{ sprache, jahrgang }}>
+      <Stack gap="sm" data-mehr-bloecke>
+        {bloecke.map((b, i) => {
+          switch (b.typ) {
+            case 'titel':
+              return (
+                <Text key={i} fw={800} size="lg">
                   {b.text}
                 </Text>
-              </Alert>
-            ) : (
-              <Text key={i} size={b.gross ? 'xl' : 'sm'} fw={b.gross ? 800 : 400} c={b.ton === 'leise' ? 'dimmed' : undefined} ta={b.gross ? 'center' : undefined} data-mehr-text={b.ton ?? ''}>
-                {b.text}
-              </Text>
-            )
-          case 'frage':
-            return <Frage key={i} b={b} senden={senden} />
-          case 'kacheln':
-            return <Kacheln key={i} b={b} senden={senden} />
-          case 'reihe':
-            return (
-              <div key={i} data-mehr-reihe>
-                {b.titel && (
-                  <Text size="sm" fw={700} mb={4}>
+              )
+            case 'text':
+              return b.ton && b.ton !== 'leise' ? (
+                <Alert key={i} color={TON_FARBE[b.ton]} radius="md" py={6} data-mehr-text={b.ton}>
+                  <Text size={b.gross ? 'lg' : 'sm'} fw={b.gross ? 700 : 500}>
+                    {b.text}
+                  </Text>
+                </Alert>
+              ) : (
+                <Text key={i} size={b.gross ? 'xl' : 'sm'} fw={b.gross ? 800 : 400} c={b.ton === 'leise' ? 'dimmed' : undefined} ta={b.gross ? 'center' : undefined} data-mehr-text={b.ton ?? ''}>
+                  {b.text}
+                </Text>
+              )
+            case 'frage':
+              return <Frage key={i} b={b} senden={senden} />
+            case 'kacheln':
+              return <Kacheln key={i} b={b} senden={senden} />
+            case 'reihe':
+              return (
+                <div key={i} data-mehr-reihe>
+                  {b.titel && (
+                    <Text size="sm" fw={700} mb={4}>
+                      {b.titel}
+                    </Text>
+                  )}
+                  <Group gap={6}>
+                    {b.teile.map((t, k) => (
+                      <Badge key={k} size="lg" radius="sm" variant="light" tt="none">
+                        {t}
+                      </Badge>
+                    ))}
+                    {Array.from({ length: b.leer ?? 0 }, (_, k) => (
+                      <Badge key={`l${k}`} size="lg" radius="sm" variant="outline" color="gray">
+                        …
+                      </Badge>
+                    ))}
+                  </Group>
+                </div>
+              )
+            case 'seil': {
+              const p = ((b.wert + b.ziel) / (2 * b.ziel)) * 100
+              return (
+                <div key={i} data-mehr-seil={b.wert}>
+                  <Group justify="space-between">
+                    <Text size="sm" fw={700}>
+                      {b.links}
+                    </Text>
+                    <Text size="sm" fw={700}>
+                      {b.rechts}
+                    </Text>
+                  </Group>
+                  <div style={{ position: 'relative', height: 28, borderRadius: 14, background: 'var(--mantine-color-gray-light)' }}>
+                    <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'var(--mantine-color-gray-5)' }} />
+                    <div style={{ position: 'absolute', left: `calc(${p}% - 14px)`, top: 0, width: 28, height: 28, borderRadius: 14, background: 'var(--mantine-color-orange-filled)', transition: 'left .3s' }} />
+                  </div>
+                </div>
+              )
+            }
+            case 'fortschritt':
+              return (
+                <div key={i}>
+                  <Text size="sm" fw={600}>
                     {b.titel}
                   </Text>
-                )}
-                <Group gap={6}>
-                  {b.teile.map((t, k) => (
-                    <Badge key={k} size="lg" radius="sm" variant="light" tt="none">
-                      {t}
-                    </Badge>
-                  ))}
-                  {Array.from({ length: b.leer ?? 0 }, (_, k) => (
-                    <Badge key={`l${k}`} size="lg" radius="sm" variant="outline" color="gray">
-                      …
-                    </Badge>
-                  ))}
-                </Group>
-              </div>
-            )
-          case 'seil': {
-            const p = ((b.wert + b.ziel) / (2 * b.ziel)) * 100
-            return (
-              <div key={i} data-mehr-seil={b.wert}>
-                <Group justify="space-between">
-                  <Text size="sm" fw={700}>
-                    {b.links}
-                  </Text>
-                  <Text size="sm" fw={700}>
-                    {b.rechts}
-                  </Text>
-                </Group>
-                <div style={{ position: 'relative', height: 28, borderRadius: 14, background: 'var(--mantine-color-gray-light)' }}>
-                  <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'var(--mantine-color-gray-5)' }} />
-                  <div style={{ position: 'absolute', left: `calc(${p}% - 14px)`, top: 0, width: 28, height: 28, borderRadius: 14, background: 'var(--mantine-color-orange-filled)', transition: 'left .3s' }} />
+                  <Progress value={(b.wert / Math.max(1, b.max)) * 100} color={TON_FARBE[b.ton ?? 'info']} radius="xl" size="lg" />
                 </div>
-              </div>
-            )
+              )
+            case 'punkte':
+              return (
+                <Group key={i} gap="xs" data-mehr-punkte>
+                  {b.eintraege.map((e, k) => (
+                    <Badge key={k} size="lg" variant={e.ich ? 'filled' : 'light'} tt="none">
+                      {e.name}: {e.wert}
+                    </Badge>
+                  ))}
+                </Group>
+              )
+            case 'uhr':
+              return <Uhr key={i} bis={b.bis} text={b.text} />
+            case 'codewort':
+              return <Codewort key={i} b={b} senden={senden} />
+            case 'vorlesen':
+              return <Vorlesen key={i} text={b.text} sprache={b.sprache} />
+            case 'knoepfe':
+              return (
+                <Group key={i} grow data-mehr-knoepfe>
+                  {b.knoepfe.map((k, n) => (
+                    <Button key={n} size="lg" color={k.farbe} variant={k.farbe ? 'filled' : 'default'} disabled={k.gesperrt} onClick={() => senden(k.aktion, k.wert)} data-mehr-knopf={k.aktion} styles={{ label: { whiteSpace: 'normal' } }} h="auto" mih={52}>
+                      {k.text}
+                    </Button>
+                  ))}
+                </Group>
+              )
+            case 'eingaben':
+              return <Eingaben key={i} b={b} senden={senden} />
+            case 'turm':
+              return (
+                <Stack key={i} gap={2} align="center" data-mehr-turm={b.hoehe} style={{ transform: b.wackeln ? `rotate(${b.wackeln % 2 ? 2 : -2}deg)` : undefined }}>
+                  {Array.from({ length: b.ziel }, (_, k) => b.ziel - 1 - k).map((k) => (
+                    <div key={k} style={{ width: 120, height: 14, borderRadius: 3, background: k < b.hoehe ? 'var(--mantine-color-orange-filled)' : 'var(--mantine-color-gray-light)' }} />
+                  ))}
+                </Stack>
+              )
           }
-          case 'fortschritt':
-            return (
-              <div key={i}>
-                <Text size="sm" fw={600}>
-                  {b.titel}
-                </Text>
-                <Progress value={(b.wert / Math.max(1, b.max)) * 100} color={TON_FARBE[b.ton ?? 'info']} radius="xl" size="lg" />
-              </div>
-            )
-          case 'punkte':
-            return (
-              <Group key={i} gap="xs" data-mehr-punkte>
-                {b.eintraege.map((e, k) => (
-                  <Badge key={k} size="lg" variant={e.ich ? 'filled' : 'light'} tt="none">
-                    {e.name}: {e.wert}
-                  </Badge>
-                ))}
-              </Group>
-            )
-          case 'uhr':
-            return <Uhr key={i} bis={b.bis} text={b.text} />
-          case 'code':
-            return <Code key={i} b={b} senden={senden} />
-          case 'vorlesen':
-            return <Vorlesen key={i} text={b.text} sprache={b.sprache} />
-          case 'knoepfe':
-            return (
-              <Group key={i} grow data-mehr-knoepfe>
-                {b.knoepfe.map((k, n) => (
-                  <Button key={n} size="lg" color={k.farbe} variant={k.farbe ? 'filled' : 'default'} disabled={k.gesperrt} onClick={() => senden(k.aktion, k.wert)} data-mehr-knopf={k.aktion} styles={{ label: { whiteSpace: 'normal' } }} h="auto" mih={52}>
-                    {k.text}
-                  </Button>
-                ))}
-              </Group>
-            )
-          case 'eingaben':
-            return <Eingaben key={i} b={b} senden={senden} />
-          case 'turm':
-            return (
-              <Stack key={i} gap={2} align="center" data-mehr-turm={b.hoehe} style={{ transform: b.wackeln ? `rotate(${b.wackeln % 2 ? 2 : -2}deg)` : undefined }}>
-                {Array.from({ length: b.ziel }, (_, k) => b.ziel - 1 - k).map((k) => (
-                  <div key={k} style={{ width: 120, height: 14, borderRadius: 3, background: k < b.hoehe ? 'var(--mantine-color-orange-filled)' : 'var(--mantine-color-gray-light)' }} />
-                ))}
-              </Stack>
-            )
-        }
-        return null
-      })}
-    </Stack>
+          return null
+        })}
+      </Stack>
+    </Sprache.Provider>
   )
 }

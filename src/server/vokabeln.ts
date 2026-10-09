@@ -45,12 +45,16 @@ import { verbenFrei } from '../shared/verbFreigabe'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
+import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, type AbschnittStatistik } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen, woerterEintragen } from './rekordbuch'
 import { achievementAntwort } from './achievementsDaten'
 import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen, type EntfernterTeil } from '../shared/kursEntfernen'
+// Freischaltungen planen (09.10.2026): Lernende sehen nur freie Abschnitte
+import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
+import { vokAbschnittePlanen } from './freigabePlan'
 import {
   bewerte,
   istSicher,
@@ -334,7 +338,7 @@ function anmeldeCode(): string {
   }
 }
 /** Neuen persönlichen Code für einen Gast setzen – gilt als Anmeldecode und für „Schon dabei?" (in allen seinen Trainings) */
-function gastCodeSetzen(nutzerId: string): string {
+export function gastCodeSetzen(nutzerId: string): string {
   const c = anmeldeCode()
   db().prepare('UPDATE vok_gaeste SET wieder = ?, code_v = ?, anmelde = ? WHERE nutzer_id = ?').run(hashVon(c), c, hashVon(c), nutzerId)
   return c
@@ -711,6 +715,8 @@ export function vokabelListenFuer(
 ): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht> }[] {
   return (
     (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
+      // Geplante Abschnitte (09.10.2026) gibt es für Lernende noch nicht – ein ganz geplanter Kurs erscheint nicht
+      .map((z) => kursFuerLernende(z))
       // Kurse nur mit Grammatik (08.10.2026) sind kein Vokabeltraining – ihre Grammatik kommt über grammatikFuer
       .filter((z) => istOffen(z) && vokIstFuer(z, ich) && json_(z.woerter, [] as unknown[]).length > 0)
       .map((z) => ({
@@ -838,7 +844,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           titel: titelFuerLernende(z),
           gaeste: !iservBereit(),
           dabei: Boolean(sitzung && vokIstFuer(z, sitzung.nutzer)),
-          bis: z.bis
+          bis: z.bis,
+          // Noch kein Abschnitt frei (09.10.2026): die Code-Seite nennt den Zeitpunkt
+          ...(ersteFreischaltung(z.teile) ? { geplantAb: ersteFreischaltung(z.teile) } : {})
         }),
         true
       )
@@ -922,7 +930,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const id = req.method === 'GET' ? String(url.searchParams.get('id') ?? '') : String(((await k.koerper()) as Record<string, unknown>).id ?? '')
       const z = zeile(id)
       if (!z || !vokIstFuer(z, ich)) return json(res, 404, { fehler: 'Diese Vokabeln sind nicht für dich freigegeben.' }), true
-      const woerter = json_(z.woerter, [] as Vokabel[])
+      // Nur freie Abschnitte (geplante Freischaltung, 09.10.2026)
+      const woerter = json_(kursFuerLernende(z).woerter, [] as Vokabel[])
       const st = standVon(z.id, ich.id)
       if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste')
         return (
@@ -940,7 +949,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             tagesziel: tageszielVon(z),
             // Unregelmäßige Verben der Liste (07.10.2026) – erst ab bekannter Vergangenheit oder per Schalter (08.10.2026)
             verben: verbenFrei(z.sprache, kursHaken.bekannt?.(ich) ?? [], z.verbspiele ?? '')
-              ? json_(z.verben, null as unknown) ?? standardVerben(woerter, z.sprache)
+              ? // Verben geplanter Abschnitte erst mit ihnen (09.10.2026)
+                json_(kursFuerLernende(z).verben, null as unknown) ?? standardVerben(woerter, z.sprache)
               : null,
             // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
             klasse: klasseFuer(z, ich),
@@ -987,13 +997,20 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           zuweisungen: liste.map((z) => {
             const woerter = json_(z.woerter, [] as Vokabel[])
             const lernende = lernendeVon(z)
-            const ue = lernende.map((n) => uebersicht(woerter, standVon(z.id, n.id).woerter))
+            // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026)
+            const frei = json_(kursFuerLernende(z).woerter, [] as Vokabel[])
+            const ue = lernende.map((n) => uebersicht(frei, standVon(z.id, n.id).woerter))
             const sicher = ue.map((u) => u.sicher)
             return {
               id: z.id,
               titel: z.titel,
               ueberschrift: ueberschriftVon(z),
               eigeneUeberschrift: Boolean(z.ueberschrift),
+              // Bände des Kurses (09.10.2026) statt der ersten Abschnitte im Titel: „Green Line 1–2"
+              baende: (() => {
+                const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
+                return baendeText(baendeVon(z.titel, abschnitteEinordnen(woerter.length ? teileVon(z) : [], q), q))
+              })(),
               symbol: z.symbol === 'farbe' ? 'farbe' : 'verlauf',
               // Wörter je Fach über alle Lernenden – für den Verlauf im Symbol
               faecher: ue.reduce((s, u) => s.map((n, i) => n + (u.faecher[i] ?? 0)), [0, 0, 0, 0, 0, 0, 0]),
@@ -1005,7 +1022,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
                 : 'Einzelne Lernende',
               woerter: woerter.length,
               lernende: lernende.length,
-              sicherSchnitt: lernende.length && woerter.length ? sicher.reduce((a, b) => a + b, 0) / lernende.length / woerter.length : 0,
+              sicherSchnitt: lernende.length && frei.length ? sicher.reduce((a, b) => a + b, 0) / lernende.length / frei.length : 0,
               testTermin: z.test_termin,
               status: istOffen(z) ? 'offen' : 'beendet',
               erstellt: z.erstellt,
@@ -1049,8 +1066,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         })
         // Leerer Kurs der Klasse (automatisch angelegt, 08.10.2026) wird gefüllt statt daneben einen zweiten anzulegen
         const ziel = g && !einzelne.length ? leerenKursFuellen(id, ich.id, g.id) : id
-        protokolliereServer('vokabeln', 'Vokabeln zum Lernen freigegeben', ich.id)
-        return json(res, 200, { id: ziel }), true
+        // „Planen …" / „nacheinander freischalten" (09.10.2026): Zeitpunkte je Abschnitt
+        const geplant = vokAbschnittePlanen(ziel, 0, k0)
+        protokolliereServer('vokabeln', geplant ? 'Vokabeln geplant freigegeben' : 'Vokabeln zum Lernen freigegeben', ich.id)
+        return json(res, 200, { id: ziel, geplant }), true
       } catch (e) {
         return json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true
       }
@@ -1060,6 +1079,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && teile.length === 1) {
       const woerter = json_(z.woerter, [] as Vokabel[])
       const jetzt = Date.now()
+      // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026) – die Wortliste zeigt alles, Geplantes markiert
+      const frei = json_(kursFuerLernende(z, jetzt).woerter, [] as Vokabel[])
       const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
       // Per Code/QR beigetreten – lässt sich wieder entfernen (05.10.2026)
       const gastZeilen = db().prepare('SELECT nutzer_id, code_v FROM vok_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string; code_v: string }[]
@@ -1074,7 +1095,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           gast: n.quelle === 'gast',
           perCode: perCode.has(n.id),
           ...(n.quelle === 'gast' ? { zugang: codes.get(n.id) ?? '' } : {}),
-          uebersicht: uebersicht(woerter, st.woerter, jetzt),
+          uebersicht: uebersicht(frei, st.woerter, jetzt),
           tage7: st.tage.filter((t) => t >= vor7).length,
           // In 7 Tagen neu gelernt bzw. wiederholt (08.10.2026, statt nur der Übungstage); ältere Stände ohne
           // „erstmals": höchstens zwei Abfragen gelten als neu
@@ -1088,7 +1109,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       // Problemwörter: höchste Fehlerquote über die Lerngruppe, mit typischen Falschantworten; aus der Liste
       // genommene erst wieder bei neuen Fehlern (08.10.2026), die 12 erst nach dem Ausblenden
       const problem = ausgeblendetFiltern(
-        problemWoerter(woerter, lernende.map((l) => l.stand)),
+        problemWoerter(frei, lernende.map((l) => l.stand)),
         json_(z.problem_aus, {} as Record<string, number>)
       ).sichtbar.slice(0, 12)
       return (
@@ -1123,7 +1144,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           woerter,
           lernende: lernende.map(({ stand: _s, ...rest }) => rest),
           gesamt: uebersicht(
-            woerter.flatMap((v) => lernende.map((l) => ({ ...v, id: `${l.id}:${v.id}` }))),
+            frei.flatMap((v) => lernende.map((l) => ({ ...v, id: `${l.id}:${v.id}` }))),
             Object.fromEntries(lernende.flatMap((l) => Object.entries(l.stand).map(([wid, s]) => [`${l.id}:${wid}`, s]))),
             jetzt
           ),
@@ -1350,7 +1371,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             wieder.entfernt.length ? JSON.stringify(wieder.entfernt) : '',
             z.id
           )
-        return json(res, 200, { ok: true, neu: neu.length, wieder: wieder.wieder }), true
+        // „Planen …" / „nacheinander freischalten" (09.10.2026): die neuen Abschnitte ab ihrer Stelle
+        const geplant = neu.length ? vokAbschnittePlanen(z.id, alt.length ? teileVon(z).length : 0, k0) : false
+        return json(res, 200, { ok: true, neu: neu.length, wieder: wieder.wieder, geplant }), true
       }
       /*
        * Abschnitt entfernen (08.10.2026, abgestimmt): die Wörter verlassen die Wortliste, der Lernstand bleibt – kommt der
@@ -1429,7 +1452,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
 export function vokabelnDerGruppe(
   lehrkraftId: string,
   lerngruppeId: string,
-  jetzt = Date.now()
+  jetzt = Date.now(),
+  /** Übersicht je Abschnitt mitrechnen (nur „Meine Klassen", 09.10.2026) */
+  mitAbschnitten = false
 ): {
   trainings: {
     id: string
@@ -1454,6 +1479,14 @@ export function vokabelnDerGruppe(
     ersterTag: string | null
     /** Wörter, die seit mindestens 14 Tagen freigegeben sind („sicher" braucht zwei Treffer im Abstand einer Woche) */
     reifeWoerter: number
+    /** Name nach Kurs (09.10.2026, shared/kursAbschnitte.ts): „Vokabeln Englisch · Green Line 1–2" */
+    kursName: string
+    /** Bände des Kurses („Green Line 1–2", leer ohne Lehrwerk) */
+    baende: string
+    /** Übersicht je Abschnitt (nur mit `mitAbschnitten`) */
+    abschnitte?: AbschnittStatistik[]
+    /** Namen der Lernenden in der Reihenfolge von `abschnitte[].jeLernende` */
+    lernendeNamen?: string[]
   }[]
   jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
   /** `kurs` und `id`: wo das Wort steht (erster offener Kurs) – „Im Kurs wiederholen" in „Meine Klassen" (09.10.2026) */
@@ -1470,7 +1503,9 @@ export function vokabelnDerGruppe(
     { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
   >()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
-  const trainings = zs.map((z) => {
+  const trainings = zs.map((zVoll) => {
+    // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026); die Abschnitts-Übersicht zeigt auch geplante
+    const z = kursFuerLernende(zVoll, jetzt)
     const offen = istOffen(z)
     const woerter = json_(z.woerter, [] as Vokabel[])
     const anteile: number[] = []
@@ -1490,8 +1525,10 @@ export function vokabelnDerGruppe(
     let heuteAktiv = 0
     let ersterTag: string | null = null
     const summe = { sicher: 0, aufbau: 0, neu: 0 }
+    const staende: Record<string, WortStand>[] = []
     for (const n of lernende) {
       const st = standVon(z.id, n.id)
+      staende.push(st.woerter)
       const u = uebersicht(woerter, st.woerter, jetzt)
       anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
       summe.sicher += u.sicher
@@ -1534,9 +1571,25 @@ export function vokabelnDerGruppe(
       }
     }
     const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
+    // Kurs nach Bänden benennen, Abschnitte je Unit (09.10.2026, shared/kursAbschnitte.ts)
+    const teile = woerter.length ? teileVon(z) : []
+    const einordnung = abschnitteEinordnen(teile, q)
+    const baende = baendeVon(z.titel, einordnung, q)
     return {
       id: z.id,
       titel: z.titel,
+      kursName: kursName(z.fach, baende, z.titel),
+      baende: baendeText(baende),
+      ...(mitAbschnitten
+        ? {
+            abschnitte: (() => {
+              const wVoll = json_(zVoll.woerter, [] as Vokabel[])
+              const tVoll = wVoll.length ? teileVon(zVoll) : []
+              return abschnittStatistik(tVoll, wVoll, staende, abschnitteEinordnen(tVoll, q), jetzt)
+            })(),
+            lernendeNamen: lernende.map((n) => n.name || n.benutzer)
+          }
+        : {}),
       sprache: z.sprache,
       fach: z.fach,
       testTermin: z.test_termin ?? null,

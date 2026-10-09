@@ -24,6 +24,7 @@ import {
 import { useCallback, useMemo, useState } from 'react'
 import type { Vokabel, WortStand } from '@shared/vokabeltrainer'
 import { istRekord, SPIELE, spielWoerter, VERBSPIELE, type SpielId } from '@shared/vokabelSpiele'
+import { einzelBeschreibung, spielName, spielText } from '@shared/spielSprache'
 import { senden } from '../../onlinetest/serverApi'
 import { useVtFarbe } from '../vtFarben'
 import { Blitzrunde, Memory, Satzpuzzle, Zuordnen } from './SpieleErkennen'
@@ -33,9 +34,11 @@ import { HoerenSchreiben, mitSatzLuecke, SatzLuecke, Wortduell } from './SpieleN
 import { BildAufdecken, BildMemory, BuchstabenPuzzle, HoerBingo, HoerMemory, RichtigGehoert, WasFehlt, WortBild } from './SpieleHoerenBild'
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './SpieleVerben'
 import { kannSprechen } from '../VokabelTrainer'
+import { useBlaettern } from '../regal/blaettern'
+import { FokusRahmen } from '../fokus/FokusRahmen'
 import { hatSatzAufnahme } from '../medienCache'
 import { fuerServer, ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
-import ZusammenSpielen from '../mehrspieler/ZusammenSpielen'
+import ZusammenSpielen, { EinladungsCode } from '../mehrspieler/ZusammenSpielen'
 
 /** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
 export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell', 'richtiggehoert', 'aufdecken', 'formenblitz']
@@ -239,10 +242,17 @@ export function Spielwahl({
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
-  const setSpiel = (s: SpielId | null): void => {
+  const zeigeSpiel = (s: SpielId | null): void => {
     setSpielRoh(s)
     spielt?.(Boolean(s))
-    if (s) window.scrollTo({ top: 0 })
+    if (s && !blatt) window.scrollTo({ top: 0 })
+  }
+  // Im Fachordner (09.10.2026, regal/blaettern.tsx): das Spiel als nächste Seite, Beenden/Ende blättert zurück
+  const blatt = useBlaettern()
+  const setSpiel = (s: SpielId | null): void => {
+    if (!blatt) return zeigeSpiel(s)
+    if (s) blatt.oeffne('spiel', () => zeigeSpiel(s), () => zeigeSpiel(null))
+    else blatt.zurueck(() => zeigeSpiel(null))
   }
   const [runde, setRunde] = useState(0)
   const [ergebnis, setErgebnis] = useState<{ spiel: SpielId; wert: number; rekord: boolean; fehler: number } | null>(null)
@@ -287,13 +297,15 @@ export function Spielwahl({
     // Hörspiele ohne Gerätestimme nur mit Wörtern, die eine Aufnahme haben
     const hoerWoerter = geraet ? woerter : woerter.filter(hatWortAufnahme)
     return (
+      // Vollbild beim Lernen (09.10.2026): das laufende Spiel füllt den Bildschirm; am Spielende zurück zur vorigen Ansicht
+      <FokusRahmen name="spiel" onEnde={() => setSpiel(null)}>
       <Stack data-spiel-laeuft={spiel}>
         <style>{SPIELE_CSS}</style>
         <Group justify="space-between">
           <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} px={4} onClick={() => setSpiel(null)}>
             Beenden
           </Button>
-          <Text fw={800}>{info(spiel).name}</Text>
+          <Text fw={800}>{spielName('vok', spiel, sprache, info(spiel).name)}</Text>
         </Group>
         <div className="vt-buehne" key={runde}>
           {spiel === 'memory' ? (
@@ -351,6 +363,7 @@ export function Spielwahl({
           )}
         </div>
       </Stack>
+      </FokusRahmen>
     )
   }
 
@@ -363,7 +376,7 @@ export function Spielwahl({
         </ThemeIcon>
         <Title order={3}>{ergebnis.rekord ? 'Neuer Rekord!' : 'Geschafft!'}</Title>
         <Text size="lg">
-          {i.name}: <b>{ergebnis.wert}</b> {i.einheit}
+          {spielName('vok', ergebnis.spiel, sprache, i.name)}: <b>{ergebnis.wert}</b> {i.einheit}
           {rekorde[ergebnis.spiel] !== undefined && !ergebnis.rekord ? ` · Rekord: ${rekorde[ergebnis.spiel]} ${i.einheit}` : ''}
         </Text>
         {ergebnis.fehler > 0 && (
@@ -456,9 +469,9 @@ export function Spielwahl({
             </ThemeIcon>
           )}
           <div style={{ minWidth: 0 }}>
-            <Text fw={700}>{s.name}</Text>
+            <Text fw={700}>{spielName('vok', s.id, sprache, s.name)}</Text>
             <Text size="xs" c="dimmed">
-              {gesperrt ? (s.id === 'satz' || s.id === 'satzluecke' ? 'Braucht Wörter mit Beispielsatz.' : 'Braucht mindestens vier Wörter.') : s.beschreibung}
+              {gesperrt ? spielText(sprache, null, s.id === 'satz' || s.id === 'satzluecke' ? 'brauchtBeispielsatz' : 'brauchtVier') : einzelBeschreibung('vok', s.id, s.beschreibung, sprache)}
             </Text>
             {rekorde[s.id] !== undefined && (
               <Badge mt={6} size="sm" variant="light" color="yellow" leftSection={<IconTrophy size={10} />}>
@@ -489,6 +502,8 @@ export function Spielwahl({
           ein paar sicheren Wörtern. Was im Spiel danebengeht, kommt im Karteikasten bald wieder dran.
         </Text>
       </div>
+      {/* Einladungscode für Kooperativ/Versus ganz oben (09.10.2026, Wunsch der Lehrkraft) */}
+      {!nurVerben && !listeId.startsWith('lb:') && <EinladungsCode sprache={sprache} />}
       {/* Nochmal ansehen (08.10.2026, Befund im Unterricht: lange Liste, schwer verständlich) – nur auf Nachfrage */}
       {ansehen.length > 0 && <NochmalAnsehen ids={ansehen} woerter={woerter} />}
       {GRUPPEN.map((g) => {
@@ -535,7 +550,7 @@ export function Spielwahl({
         )
       })}
       {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) – nicht im Vokabelweg und nicht bei den reinen Verbspielen */}
-      {!nurVerben && !listeId.startsWith('lb:') && <ZusammenSpielen bereich="vok" kurs={listeId} sprache={sprache} />}
+      {!nurVerben && !listeId.startsWith('lb:') && <ZusammenSpielen bereich="vok" kurs={listeId} sprache={sprache} mitCode={false} />}
     </Stack>
   )
 }

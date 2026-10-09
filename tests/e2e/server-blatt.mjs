@@ -115,6 +115,9 @@ try {
   // Stift: eine Linie auf Seite 1 (rot), Textmarker (03.10.2026: Farben)
   await s.locator('[data-werkzeug="stift"]').click()
   await s.locator('[data-farbe="#dc2626"]').click()
+  // Seite 1 oben ins Bild holen (09.10.2026): Nach dem Ausfüllen ist das Blatt gescrollt, feste Punkte trafen daneben
+  await s.locator('[data-tinte="0"]').evaluate((el) => el.scrollIntoView({ block: 'start' }))
+  await s.waitForTimeout(300)
   const c = await s.locator('[data-tinte="0"]').boundingBox()
   await s.mouse.move(c.x + 120, c.y + 300)
   await s.mouse.down()
@@ -127,7 +130,8 @@ try {
   await s.mouse.up()
   // Textkästchen, Verbindungslinie, Punkt mit Wert
   await s.locator('[data-werkzeug="text"]').click()
-  await s.mouse.click(c.x + 400, c.y + 500)
+  // Auf die Seite selbst klicken (09.10.2026): Nach dem Ausfüllen ist das Blatt gescrollt, feste Bildschirmpunkte trafen daneben
+  await s.locator('[data-tinte="0"]').click({ position: { x: 400, y: 500 }, force: true })
   await s.locator('[data-kaestchen]').first().fill('1914: Kriegsbeginn')
   await s.locator('[data-werkzeug="linie"]').click()
   // Unter dem Kästchen beginnen: ein Druck AUF ein Kästchen startet keine Linie (das Kästchen ist seit 06.10.2026 mit Griffen höher)

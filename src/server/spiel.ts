@@ -31,8 +31,12 @@ import {
   tageszielVon,
   titelFuerLernende,
   vokIstFuer,
-  zeile as vokZeile
+  zeile as vokZeile,
+  db as vokDb
 } from './vokabeln'
+import { buchFuer, buchNamen, wegStand } from './vokabelweg'
+import { lehrwerkStandVon } from './grammatik'
+import { quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
 import { grammatikFuerSpiel as G } from './grammatik'
 import { rekordEintragen } from './rekordbuch'
 import { achievementZusammen } from './achievementsDaten'
@@ -45,7 +49,20 @@ import { formSpalten, type VerbKarte } from '../shared/verbTraining'
 import { kurzNamen } from '../shared/namenListe'
 import { ohneKlasse } from '../shared/ohneKlasse'
 import { REGELN, angebotFuer, type Angebot } from '../shared/mehrspieler/regeln'
-import { gramItems, leererInhalt, synonymeAus, verbFormenAus, vokItems, zeitSaetzeAus } from '../shared/mehrspieler/inhalt'
+import { spielEinheit, spielName, spielText, type TextSchluessel } from '../shared/spielSprache'
+
+/** Schwierigkeiten und Kurzrufe in der Zielsprache des Kurses (09.10.2026, „Nur Fremdsprache") */
+const S_NAME: Record<string, [TextSchluessel, TextSchluessel]> = {
+  leicht: ['sLeicht', 'sLeichtText'],
+  mittel: ['sMittel', 'sMittelText'],
+  schwer: ['sSchwer', 'sSchwerText'],
+  unmoeglich: ['sUnmoeglich', 'sUnmoeglichText']
+}
+const RUF: TextSchluessel[] = ['ruf0', 'ruf1', 'ruf2', 'ruf3', 'ruf4']
+const schwierigkeitenIn = (sprache: string, jahrgang: number | null): typeof SCHWIERIGKEITEN =>
+  SCHWIERIGKEITEN.map((x) => ({ id: x.id, name: spielText(sprache, jahrgang, S_NAME[x.id][0]), text: spielText(sprache, jahrgang, S_NAME[x.id][1]) }))
+const kurzrufeIn = (sprache: string, jahrgang: number | null): string[] => KURZRUFE.map((_, i) => spielText(sprache, jahrgang, RUF[i] ?? 'ruf0'))
+import { gramItems, lehrwerkBisStand, leererInhalt, synonymeAus, verbFormenAus, vokItems, zeitSaetzeAus } from '../shared/mehrspieler/inhalt'
 import { bandEinzeln, bandGemeinsam } from '../shared/mehrspieler/schwierigkeit'
 import { aufraeumen, beitreten, einstellen, entfernen, lobbyNeu, startPruefen, verbindung, verlassen, type Lobby } from '../shared/mehrspieler/lobby'
 import { aktive, type Basis, type Block } from '../shared/mehrspieler/kern'
@@ -61,6 +78,13 @@ import {
   type SpielErgebnis,
   type SpielInhalt
 } from '../shared/mehrspieler/typen'
+import { kursFuerLernende } from '../shared/freigabePlan'
+
+/** Kurs, wie die Lernenden ihn sehen: ohne geplante Abschnitte (Freischaltungen planen, 09.10.2026) */
+const vokNurFrei = (id: string): ReturnType<typeof vokZeile> => {
+  const z = vokZeile(id)
+  return z ? kursFuerLernende(z) : null
+}
 
 const PULS_MS = 5000
 const ANWESEND_MS = 4000
@@ -81,6 +105,8 @@ interface Raum {
   angebot: Angebot[]
   formen: { id: string; name: string; waehlbar: boolean; hinweis?: string }[]
   abbruch?: string
+  /** Reiseplaner: Lehrwerkswörter bis zum Stand der Klasse (beim Start geladen) */
+  reise?: { alle: string[]; gemeinsam: string[] }
 }
 
 const raeume = new Map<string, Raum>()
@@ -110,7 +136,7 @@ function darf(bereich: Bereich, kurs: string, n: NutzerInfo): boolean {
 /** Spiele frei? Wie bei den Einzelspielen: nach der Tagesrunde bzw. wenn die Lehrkraft sie heute freigeschaltet hat */
 export function spieleFrei(bereich: Bereich, kurs: string, n: NutzerInfo, jetzt = Date.now()): boolean {
   if (bereich === 'vok') {
-    const z = vokZeile(kurs)
+    const z = vokNurFrei(kurs)
     if (!z) return false
     // Lehrkraft hat „Zusammen spielen" für den Kurs abgeschaltet (z. B. vor einem Test)
     if (z.zusammen === 'aus') return false
@@ -156,7 +182,7 @@ function inhaltFuer(
   leute: NutzerInfo[]
 ): { inhalt: SpielInhalt; band: { gemeinsam: Record<string, Band | null>; je: Record<string, Record<string, Band | null>> } } {
   if (bereich === 'vok') {
-    const z = vokZeile(kurs)!
+    const z = kursFuerLernende(vokZeile(kurs)!)
     const woerter = json_(z.woerter, [] as Vokabel[])
     const staende = leute.map((n) => vokStand(z.id, n.id).woerter)
     const gelernt = woerter.filter((w) => staende.some((st) => (st[w.id]?.fach ?? 0) >= 1))
@@ -243,7 +269,7 @@ function sichtFuer(r: Raum, wer: string, jetzt: number) {
     code: l.code,
     phase: l.phase,
     spiel: l.spiel,
-    spielName: info.name,
+    spielName: spielName('mehr', l.spiel, r.sprache, info.name),
     art: info.art,
     bereich: l.bereich,
     titel: r.titel,
@@ -253,12 +279,14 @@ function sichtFuer(r: Raum, wer: string, jetzt: number) {
     max: info.max,
     spieler: l.spieler.map((s) => ({ id: s.id, name: namen.get(s.id) ?? s.name, verbunden: s.verbunden, host: s.id === l.host })),
     schwierigkeit: l.schwierigkeit,
-    schwierigkeiten: SCHWIERIGKEITEN,
+    schwierigkeiten: schwierigkeitenIn(r.sprache, r.jahrgang),
+    sprache: r.sprache,
+    jahrgang: r.jahrgang,
     form: l.form ?? (l.bereich === 'gram' ? l.kurs : undefined),
     formen: l.phase === 'warten' ? r.formen : [],
     spiele: l.phase === 'warten' && l.host === wer ? r.angebot : [],
     rufe: r.rufe.filter((x) => jetzt - x.zeit < 8000),
-    kurzrufe: KURZRUFE,
+    kurzrufe: kurzrufeIn(r.sprache, r.jahrgang),
     ...(l.phase === 'spiel' && r.zustand ? { bloecke: REGELN[l.spiel].sicht(r.zustand, wer, jetzt) as Block[] } : {}),
     ...(r.ergebnis && l.phase === 'ende'
       ? {
@@ -267,7 +295,7 @@ function sichtFuer(r: Raum, wer: string, jetzt: number) {
             ...(r.ergebnis.teamZiel !== undefined ? { teamZiel: r.ergebnis.teamZiel } : {}),
             ...(r.ergebnis.unentschieden ? { unentschieden: true } : {}),
             sieger: (r.ergebnis.sieger ?? []).map((id) => namen.get(id) ?? r.zustand?.spieler.find((s) => s.id === id)?.name ?? ''),
-            einheit: info.einheit,
+            einheit: spielEinheit(info.einheit, r.sprache),
             // Eigene Leistung nur für mich; Platz nur, wenn er nicht der letzte ist (abgestimmt: kein öffentlicher letzter Platz)
             eigen: eigen
               ? {
@@ -312,11 +340,69 @@ function neuerCode(): string {
   }
 }
 
+/**
+ * Reiseplaner (09.10.2026, Lehrkraft): Wörter aus ALLEN Units und Bänden des Lehrwerks der Klasse bis zu ihrem Stand –
+ * auch solche, die nicht im Kurs stehen. Stand: die höchste Unit aus den Kursen der Lerngruppe (Herkunft) bzw. der von
+ * der Lehrkraft gesetzte Lehrwerk-Stand, wenn er weiter ist. Dazu, was alle Mitspielenden im Vokabelweg schon
+ * kennengelernt haben (zuerst gewählt).
+ */
+async function reiseWoerter(kurs: string, leute: NutzerInfo[]): Promise<{ alle: string[]; gemeinsam: string[] } | undefined> {
+  const z = vokZeile(kurs)
+  if (!z) return undefined
+  const zeilen = (
+    z.lerngruppe_id
+      ? (vokDb().prepare('SELECT quelle, titel, lehrkraft_id FROM vok_zuweisungen WHERE lerngruppe_id = ?').all(z.lerngruppe_id) as { quelle: string; titel: string; lehrkraft_id: string }[])
+      : [{ quelle: z.quelle ?? '', titel: z.titel, lehrkraft_id: z.lehrkraft_id }]
+  ).slice(0, 200)
+  const namen = await buchNamen(z.lehrkraft_id)
+  // Herkunft je Kurs → (Buch, Unit-Index); dieselbe Reihe wie der Kurs selbst
+  const eigeneQ = json_(z.quelle, null as Quelle | null) ?? quelleAusTitel(z.titel, namen)
+  if (!eigeneQ) return undefined
+  const eigenesBuch = await buchFuer(eigeneQ.lehrwerk, z.lehrkraft_id)
+  if (!eigenesBuch) return undefined
+  const reihe = reiheVon(eigenesBuch)
+  const buecher: Buch[] = []
+  for (const n of namen) {
+    const b = await buchFuer(n.id, z.lehrkraft_id)
+    if (b && reiheVon(b) === reihe) buecher.push(b)
+  }
+  if (!buecher.some((b) => b.id === eigenesBuch.id)) buecher.push(eigenesBuch)
+  const nummer = (b: Buch): number => {
+    const n = parseFloat(String(b.band ?? '').replace(/[^0-9.]/g, ''))
+    return Number.isFinite(n) ? n : 99
+  }
+  let stand: { buch: Buch; ui: number } | null = null
+  const nimm = (buch: Buch | undefined, unit: string): void => {
+    const ui = buch ? buch.units.findIndex((u) => u.name === unit) : -1
+    if (!buch || ui < 0) return
+    if (!stand || nummer(buch) > nummer(stand.buch) || (buch.id === stand.buch.id && ui > stand.ui)) stand = { buch, ui }
+  }
+  for (const zz of zeilen) {
+    const q = json_(zz.quelle, null as Quelle | null) ?? quelleAusTitel(zz.titel, namen)
+    if (q) for (const u of quelleUnits(q)) nimm(buecher.find((b) => b.id === q.lehrwerk), u.unit)
+  }
+  // Von Hand gesetzter Stand („Green Line 2", „Unit 3")
+  const hand = z.lerngruppe_id ? lehrwerkStandVon(z.lerngruppe_id) : null
+  const flach = (t: string): string => t.toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (hand) nimm(buecher.find((b) => flach(b.name).startsWith(flach(hand.buch))), hand.unit)
+  if (!stand) return undefined
+  const s0 = stand as { buch: Buch; ui: number }
+  const woerter = lehrwerkBisStand(buecher, { buch: s0.buch.id, unit: s0.buch.units[s0.ui].name })
+  // Von allen kennengelernt (Fach ≥ 1 im Vokabelweg)
+  const staende = leute.map((n) => wegStand(n.id, reihe).woerter)
+  const gemeinsam = leute.length ? woerter.filter((w) => staende.every((st) => (st[w.id]?.fach ?? 0) >= 1)).map((w) => w.term) : []
+  return { alle: woerter.map((w) => w.term), gemeinsam }
+}
+
 function spielStarten(r: Raum, jetzt: number): string | null {
   const l = r.lobby
   const leute = l.spieler.filter((s) => s.verbunden).map((s) => r.nutzer.get(s.id)!)
   const regeln = REGELN[l.spiel]
   const { inhalt, band } = inhaltFuer(l.bereich, l.kurs, l.form, leute)
+  if (l.spiel === 'reiseplaner' && r.reise) {
+    inhalt.lehrwerk = r.reise.alle
+    inhalt.lehrwerkGemeinsam = r.reise.gemeinsam
+  }
   const grund = regeln.passt(inhalt, true)
   if (grund) return grund
   const namen = kurzNamenVon(leute)
@@ -362,7 +448,7 @@ function eintragen(r: Raum, e: SpielErgebnis, jetzt: number): void {
     const n = r.nutzer.get(id)
     if (!n) continue
     if (l.bereich === 'vok') {
-      const z = vokZeile(l.kurs)
+      const z = vokNurFrei(l.kurs)
       if (!z) continue
       const st = vokStand(z.id, id)
       const woerter = new Set(json_(z.woerter, [] as Vokabel[]).map((w) => w.id))
@@ -467,7 +553,7 @@ export function spielRoute(): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && aktion === 'zugang') {
       const r = raeume.get(String(url.searchParams.get('code') ?? ''))
       if (!r) return json(res, 404, { fehler: 'Diese Spielrunde gibt es nicht (mehr).' }), true
-      return json(res, 200, { code: r.lobby.code, spiel: mehrspielInfo(r.lobby.spiel)?.name ?? '' }), true
+      return json(res, 200, { code: r.lobby.code, spiel: spielName('mehr', r.lobby.spiel, r.sprache, mehrspielInfo(r.lobby.spiel)?.name ?? '') }), true
     }
     if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
     const ich = sitzung.nutzer
@@ -589,6 +675,10 @@ export function spielRoute(): (k: Anfrage) => Promise<boolean> {
         fehler = startPruefen(l, ich.id)
         if (!fehler && r.formen.length && l.form && !r.formen.find((f) => f.id === l.form)?.waehlbar)
           fehler = { fehler: 'Diese Form hatten noch nicht alle – bitte eine andere wählen.', status: 409 }
+        if (!fehler && l.spiel === 'reiseplaner' && l.bereich === 'vok') {
+          const leute = l.spieler.filter((s) => s.verbunden).map((s) => r.nutzer.get(s.id)!).filter(Boolean)
+          r.reise = await reiseWoerter(l.kurs, leute).catch(() => undefined)
+        }
         if (!fehler) {
           const grund = spielStarten(r, jetzt)
           if (grund) fehler = { fehler: grund, status: 409 }
@@ -614,7 +704,7 @@ export function spielRoute(): (k: Anfrage) => Promise<boolean> {
         if (!Number.isInteger(i) || i < 0 || i >= KURZRUFE.length) return json(res, 400, { fehler: 'Unbekannter Ruf.' }), true
         if (jetzt - (r.rufZeit.get(ich.id) ?? 0) < RUF_ABSTAND_MS) return json(res, 200, { ok: true }), true
         r.rufZeit.set(ich.id, jetzt)
-        r.rufe = [...r.rufe.filter((x) => jetzt - x.zeit < 8000), { name: kurz(r, ich.id), text: KURZRUFE[i], zeit: jetzt }].slice(-5)
+        r.rufe = [...r.rufe.filter((x) => jetzt - x.zeit < 8000), { name: kurz(r, ich.id), text: kurzrufeIn(r.sprache, r.jahrgang)[i], zeit: jetzt }].slice(-5)
         break
       }
       case 'verlassen':

@@ -2,8 +2,10 @@
  * Tauziehen (Versus): zwei Seiten (1:1, 2:2; bei drei Personen gleicht ein Bot aus). Jede Person bekommt Fragen aus
  * ihrem EIGENEN Band (Handicap), jede richtige Antwort zieht das Seil nach Schwierigkeit gewichtet. Wer zurückliegt,
  * zieht etwas stärker (Aufholen). Ziel: Seil ganz auf die eigene Seite; nach drei Minuten gewinnt, wer vorn liegt.
+ * 09.10.2026 (Lehrkraft): ab „schwer" mehrteilige Aufgaben – zwei (unmöglich: drei, Klasse 5–6 höchstens zwei) Fragen
+ * hintereinander richtig, dann zieht die Summe; ein Fehler macht die Aufgabe ungültig.
  */
-import { antwortRichtig, basisNeu, fehlerMerken, frageBlock, gewicht, gut, melde, rueckBlock, teamName, teamsAus, versusErgebnis, zufall, type Block, type Regeln } from '../kern'
+import { antwortRichtig, basisNeu, fehlerMerken, frageBlock, gewicht, gut, melde, rueckBlock, teamName, teamsAus, tx, versusErgebnis, zufall, type Basis, type Block, type Regeln } from '../kern'
 import { frageItems, leereFragen, naechsteFrage, spaeterNochmal, type MitFragen } from './hilfen'
 
 const ZIEL = 12
@@ -17,7 +19,13 @@ interface Z extends MitFragen {
   tiefst: [number, number]
   botNaechster: number
   bis: number
+  /** Mehrteilige Aufgaben: Teile je Aufgabe, gelöste Teile und gesammelte Punkte je Person */
+  teile: number
+  stand: Record<string, { n: number; p: number }>
 }
+
+export const teileJeAufgabe = (z: Basis): number =>
+  z.schwierigkeit === 'unmoeglich' ? (z.jahrgang !== null && z.jahrgang <= 6 ? 2 : 3) : z.schwierigkeit === 'schwer' ? 2 : 1
 
 export const tauziehen: Regeln<Z> = {
   id: 'tauziehen',
@@ -26,7 +34,9 @@ export const tauziehen: Regeln<Z> = {
     const b = basisNeu(k)
     const teams = teamsAus(k.spieler)
     const bot = teams[0].length !== teams[1].length ? (teams[0].length < teams[1].length ? 0 : 1) : null
-    const z: Z = { ...b, ...leereFragen(b), teams, bot, seil: 0, tiefst: [0, 0], botNaechster: k.jetzt + BOT_TAKT[k.schwierigkeit], bis: k.jetzt + DAUER_MS }
+    const z: Z = { ...b, ...leereFragen(b), teams, bot, seil: 0, tiefst: [0, 0], botNaechster: k.jetzt + BOT_TAKT[k.schwierigkeit], bis: k.jetzt + DAUER_MS, teile: 1, stand: {} }
+    z.teile = teileJeAufgabe(z)
+    for (const s of k.spieler) z.stand[s.id] = { n: 0, p: 0 }
     for (const s of k.spieler) naechsteFrage(z, s.id)
     return z
   },
@@ -35,16 +45,24 @@ export const tauziehen: Regeln<Z> = {
     const f = z.fragen[wer]
     if (!f) return
     const seite = z.teams[0].includes(wer) ? 0 : 1
+    const st = (z.stand[wer] ??= { n: 0, p: 0 })
     if (antwortRichtig(f, zug.wert)) {
-      const hinten = seite === 0 ? z.seil <= -6 : z.seil >= 6
-      const p = gewicht(z, wer, f.itemId) + (hinten ? 1 : 0)
-      gut(z, wer, p)
-      ziehen(z, seite, p)
-      melde(z, wer, true, `zieht mit ${p}!`)
+      st.n++
+      st.p += gewicht(z, wer, f.itemId)
+      if (st.n < z.teile) melde(z, wer, true, tx(z, 'teilRichtig', st.n, z.teile))
+      else {
+        const hinten = seite === 0 ? z.seil <= -6 : z.seil >= 6
+        const p = st.p + (hinten ? 1 : 0)
+        z.stand[wer] = { n: 0, p: 0 }
+        gut(z, wer, p)
+        ziehen(z, seite, p)
+        melde(z, wer, true, tx(z, 'ziehtMit', p))
+      }
     } else {
+      z.stand[wer] = { n: 0, p: 0 }
       fehlerMerken(z, wer, f.itemId)
       spaeterNochmal(z, wer, f.itemId)
-      melde(z, wer, false, 'daneben.', f.loesung)
+      melde(z, wer, false, tx(z, 'daneben'), f.loesung)
     }
     naechsteFrage(z, wer)
   },
@@ -69,11 +87,14 @@ export const tauziehen: Regeln<Z> = {
     const rechts = teamName(z, z.teams[1]) + (z.bot === 1 ? ' & Bot' : '')
     const b: Block[] = [
       { typ: 'seil', wert: z.seil, ziel: ZIEL, links, rechts },
-      { typ: 'text', text: `Du ziehst nach ${seite === 0 ? 'links' : 'rechts'}.`, ton: 'leise' },
+      { typ: 'text', text: tx(z, seite === 0 ? 'duZiehstLinks' : 'duZiehstRechts'), ton: 'leise' },
       { typ: 'uhr', bis: z.bis },
       ...rueckBlock(z)
     ]
-    if (!z.ende && z.fragen[wer]) b.push(frageBlock(z.fragen[wer]!))
+    if (!z.ende && z.fragen[wer]) {
+      if (z.teile > 1) b.push({ typ: 'fortschritt', titel: tx(z, 'teilVon', (z.stand[wer]?.n ?? 0) + 1, z.teile), wert: z.stand[wer]?.n ?? 0, max: z.teile, ton: 'info' })
+      b.push(frageBlock(z.fragen[wer]!))
+    }
     return b
   },
   ergebnis(z) {
@@ -83,7 +104,7 @@ export const tauziehen: Regeln<Z> = {
       z,
       sieger,
       (id) => z.punkte[id] ?? 0,
-      sieger.length ? `Gewonnen hat: ${teamName(z, sieger)}` : z.seil === 0 && z.bot !== null ? 'Unentschieden!' : 'Unentschieden!',
+      sieger.length ? tx(z, 'gewonnenHat', teamName(z, sieger)) : tx(z, 'unentschieden'),
       { comeback, unentschieden: !sieger.length }
     )
   }

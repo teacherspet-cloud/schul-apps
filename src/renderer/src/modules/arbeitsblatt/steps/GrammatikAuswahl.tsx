@@ -485,10 +485,11 @@ export default function GrammatikAuswahl({
         )}
       </Group>
 
-      {(favoriten.length > 0 || zuletzt.length > 0) && !suchAktiv && (
+      {(favoriten.length > 0 || (zuletzt.length > 0 && !kurs)) && !suchAktiv && (
         <Stack gap={2}>
           {favoriten.length > 0 && <Schnellzeile titel="★ Favoriten" liste={favoriten} themen={themen} waehle={umschalten} />}
-          {zuletzt.length > 0 && (
+          {/* „Grammatik zum Üben freigeben" (09.10.2026, Wunsch der Lehrkraft): ohne „Zuletzt" */}
+          {zuletzt.length > 0 && !kurs && (
             <Schnellzeile titel="Zuletzt" liste={zuletzt.filter((t) => !favoriten.includes(t)).slice(0, 6)} themen={themen} waehle={umschalten} />
           )}
         </Stack>

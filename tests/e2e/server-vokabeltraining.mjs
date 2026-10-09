@@ -171,12 +171,47 @@ try {
   const arten = new Set()
   let sauber = true
   let buchstabenOk = true
+  let karteGeprueft = false
+  let tastaturGeprueft = false
   for (let i = 0; i < 40; i++) {
     if (await h.locator('[data-sitzung-fertig]').isVisible()) break
     await h.waitForTimeout(250)
     if ((await h.locator('[data-urteil]').count()) > 0) sauber = false
     const karte = await h.locator('[data-lernkarte]').isVisible()
-    if (karte) {
+    if (karte && !karteGeprueft) {
+      karteGeprueft = true
+      arten.add('karte')
+      const buehne = h.locator('[data-lernkarte]')
+      const deutschVorn = (await h.locator('[data-karte-vorn]').getAttribute('data-karte-vorn')) === 'deutsch'
+      // Aussprache verrät nichts (09.10.2026): bei deutscher Vorderseite kein Lautsprecher, erst nach dem Umdrehen
+      const tonVorher = await h.locator('[data-karte-anhoeren]').count()
+      pruefe(deutschVorn ? tonVorher === 0 : tonVorher === 1, `Lautsprecher nur auf der fremdsprachigen Seite (vorn ${deutschVorn ? 'deutsch' : 'fremd'}: ${tonVorher})`)
+      // Hängender Zug (Befund 09.10.2026 „Karteikarten frieren ein"): ziehen, dann vom Browser abgebrochen …
+      const b = await buehne.boundingBox()
+      const x = b.x + b.width / 2
+      await buehne.dispatchEvent('pointerdown', { pointerId: 41, pointerType: 'mouse', button: 0, isPrimary: true, clientX: x, clientY: b.y + 20 })
+      await buehne.dispatchEvent('pointermove', { pointerId: 41, pointerType: 'mouse', isPrimary: true, clientX: x + 80, clientY: b.y + 20 })
+      pruefe((await buehne.getAttribute('data-zieht')) !== null, 'Karte folgt dem Ziehen')
+      await buehne.dispatchEvent('pointercancel', { pointerId: 41, pointerType: 'mouse', isPrimary: true })
+      pruefe((await buehne.getAttribute('data-zieht')) === null, 'Abgebrochener Zug: Karte wieder in Ruhe')
+      // … oder neben der Karte losgelassen und das Fenster gewechselt
+      await buehne.dispatchEvent('pointerdown', { pointerId: 42, pointerType: 'mouse', button: 0, isPrimary: true, clientX: x, clientY: b.y + 20 })
+      await buehne.dispatchEvent('pointermove', { pointerId: 42, pointerType: 'mouse', isPrimary: true, clientX: x - 50, clientY: b.y + 20 })
+      await h.evaluate(() => window.dispatchEvent(new Event('blur')))
+      await h.waitForTimeout(100)
+      pruefe((await buehne.getAttribute('data-zieht')) === null, 'Fensterwechsel beendet den Zug')
+      await buehne.click()
+      pruefe((await h.locator('.vt-karte.umgedreht').count()) === 1, 'Danach dreht ein Klick die Karte normal um')
+      const tonNachher = await h.locator('[data-karte-anhoeren]').count()
+      pruefe(deutschVorn ? tonNachher === 1 : tonNachher === 0, 'Nach dem Umdrehen: Lautsprecher passend zur sichtbaren Seite')
+      // Antwort kommt nicht an: Meldung, Knöpfe wieder frei, nochmal tippen klappt
+      await h.route('**/s/api/vokabeln/antwort', (r) => r.abort())
+      await h.locator('[data-karte-gewusst]').click()
+      pruefe(await da(h.locator('[data-netz-fehler]'), 30000), 'Antwort ohne Verbindung: Meldung statt eingefrorener Karte')
+      pruefe(!(await h.locator('[data-karte-gewusst]').isDisabled()), 'Knöpfe der Lernkarte danach wieder frei')
+      await h.unroute('**/s/api/vokabeln/antwort')
+      await h.locator('[data-karte-gewusst]').click()
+    } else if (karte) {
       arten.add('karte')
       await h.locator('[data-lernkarte]').click()
       // Erst „nicht gewusst" – so kommt das Wort in anderer Form wieder
@@ -195,6 +230,17 @@ try {
       arten.add('auswahl')
       if (await h.locator('[data-option]').first().isDisabled()) sauber = false
       await h.locator('[data-option]').first().click()
+    } else if ((await h.locator('[data-buchstabe]').count()) > 0 && !tastaturGeprueft) {
+      // Tastatur wird erkannt (09.10.2026): einfach lostippen, ohne „Tippen" zu wählen; Enter prüft
+      tastaturGeprueft = true
+      arten.add('buchstaben')
+      const buehnenText = await h.locator('.vt-buehne').innerText()
+      const w = WOERTER.find((x) => buehnenText.includes(x.translation))
+      await h.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+      await h.keyboard.type(w.term.replace(/\s*\[.*\]/, ''))
+      pruefe(await da(h.locator('[data-lege-tippen]'), 3000), 'Lostippen schaltet „Lege das Wort" auf Tippen')
+      await h.keyboard.press('Enter')
+      pruefe((await h.locator('[data-urteil]').getAttribute('data-urteil', { timeout: 8000 })) === 'richtig', `Getippt und mit Enter geprüft: richtig (${w.term})`)
     } else if ((await h.locator('[data-buchstabe]').count()) > 0) {
       arten.add('buchstaben')
       const k = h.locator('[data-buchstabe]')
@@ -218,10 +264,49 @@ try {
   pruefe(arten.size >= 2, `Mehrere Abfrageformate in der Runde (${[...arten].join(', ')})`)
   pruefe(buchstabenOk, 'Buchstaben ohne „[pl]"-Angabe')
   pruefe(await da(h.locator('[data-aufstieg]'), 5000), 'Am Ende der Runde: aufgestiegene Wörter')
+  pruefe(karteGeprueft, 'Lernkarte geprüft (Ziehen, Ton, Verbindung)')
   await h.waitForTimeout(1200)
   await h.screenshot({ path: join(out, '2c2-aufstieg.png'), fullPage: true })
   await h.getByRole('button', { name: 'Zurück zum Kasten' }).click()
   pruefe(await da(h.locator('[data-fach-zuwachs]').first(), 5000), 'Kasten zeigt den Zuwachs je Fach')
+  // Tipp der Startseite „Abfrage ohne Hinschauen starten" (09.10.2026): Link öffnet die Abfrage selbst, nicht nur die Kursseite
+  const kastenUrl = h.url()
+  await h.goto(`${A}/s/v/${vok.id}?uebung=abfragen`)
+  pruefe(await da(h.locator('[data-sitzung]'), 10000), '„?uebung=abfragen" startet gleich die Abfrage')
+  pruefe(!h.url().includes('uebung='), 'Übungs-Hinweis verschwindet aus der Adresse')
+  pruefe(
+    (await h.locator('[data-option], [data-option-fs], [data-paar]').count()) === 0,
+    'Abfrage ohne Hinschauen: keine Auswahl, kein Erkennen'
+  )
+  // „Lösung zeigen" (09.10.2026): beim Schreiben/Legen die Lösung ansehen – zählt als falsch, dann „Weiter"
+  const falschGesamt = async () =>
+    Object.values((await (await g1.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()).staende ?? {}).reduce(
+      (n, st) => n + (st.falsch ?? 0),
+      0
+    )
+  for (let i = 0; i < 12 && !(await h.locator('[data-loesung-zeigen]').isVisible()); i++) {
+    if (await h.locator('[data-lernkarte]').isVisible()) {
+      await h.locator('[data-lernkarte]').click()
+      await h.locator('[data-karte-gewusst]').click()
+    } else if (await h.locator('[data-weiter]').isVisible()) await h.locator('[data-weiter]').click()
+    await h.waitForTimeout(400)
+  }
+  pruefe(await h.locator('[data-loesung-zeigen]').isVisible(), 'Schreiben/Legen: Knopf „Lösung zeigen" da')
+  const falschVorher = await falschGesamt()
+  // Mit der Tastatur erreichbar: fokussieren und mit Enter auslösen
+  await h.locator('[data-loesung-zeigen]').focus()
+  await h.keyboard.press('Enter')
+  pruefe((await h.locator('[data-urteil]').getAttribute('data-urteil', { timeout: 8000 })) === 'falsch', '„Lösung zeigen" zählt als nicht gewusst (falsch)')
+  pruefe(await h.getByText('Hier ist die Lösung').isVisible(), 'Rückmeldung nennt die Lösung')
+  await h.screenshot({ path: join(out, '2c4-loesung-zeigen.png'), fullPage: true })
+  pruefe((await falschGesamt()) === falschVorher + 1, `Im Kasten als Fehler gezählt (${falschVorher} → ${await falschGesamt()})`)
+  await h.locator('[data-weiter]').click()
+  pruefe(
+    (await da(h.locator('[data-sitzung-fertig]'), 3000)) || ((await h.locator('[data-urteil]').count()) === 0 && (await h.locator('[data-sitzung]').isVisible())),
+    '„Weiter" führt zur nächsten Frage'
+  )
+  await h.goto(kastenUrl)
+  await h.locator('[data-vokabel-kasten]').waitFor()
   await h.waitForTimeout(1300)
   await h.screenshot({ path: join(out, '2c3-zuwachs.png'), fullPage: true })
   await h.screenshot({ path: join(out, '2c-runde.png'), fullPage: true })

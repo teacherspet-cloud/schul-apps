@@ -76,6 +76,7 @@ import bildReihe from '../../assets/programme/unterrichtsreihe.webp'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { HandFeld, TastaturFeld } from './HandFeld'
 import { CodeScanner } from './CodeScanner'
+import { CODE_UNBEKANNT, CodeUnbekannt } from './CodeUnbekannt'
 import type { Erkennung } from './handschrift'
 import {
   antwortAlsText,
@@ -92,12 +93,14 @@ import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
 import Regal from '../lernen/regal/Regal'
+import { FreischaltungHinweis } from '../lernen/regal/planHinweise'
 import Ordner from '../lernen/regal/Ordner'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { useDarstellung } from './schuelerDarstellung'
 import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
+import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
 import VokabelwegSeite from '../lernen/VokabelwegPfad'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
@@ -904,28 +907,37 @@ export function GrammatikStand({ u }: { u: { gesamt: number; sicher: number; heu
   )
 }
 
-async function oeffneCode(code: string): Promise<void> {
+/**
+ * Einen eingegebenen oder gescannten Code öffnen. Antwort false: Den Code kennt der Server nicht (09.10.2026) – dann
+ * meldet die Code-Seite das, statt (wie vorher) auf die Test-Seite mit „Wie heißt du?" zu springen.
+ */
+async function oeffneCode(roh: string): Promise<boolean> {
+  const code = roh.trim().toUpperCase()
+  const geh = (ziel: string): boolean => (window.location.assign(ziel), true)
   // Einladungscode einer Spielrunde (sechs Ziffern, 08.10.2026)
-  if (/^\d{6}$/.test(code.trim())) {
-    const spiel = await holen<{ code: string }>(`/s/api/spiel/zugang?code=${code.trim()}`).catch(() => null)
-    if (spiel?.code) return window.location.assign(`/s/sp/${spiel.code}`)
+  if (/^\d{6}$/.test(code)) {
+    const spiel = await holen<{ code: string }>(`/s/api/spiel/zugang?code=${code}`).catch(() => null)
+    if (spiel?.code) return geh(`/s/sp/${spiel.code}`)
   }
   // Persönlicher Anmeldecode vom Zettel der Lehrkraft (8 Zeichen, 08.10.2026): meldet an und öffnet die Vokabeln
   if (code.length === 8) {
     const a = await senden<{ id: string; anzahl: number }>('/s/api/vokabeln/anmelden', { code }).catch(() => null)
-    if (a) return window.location.assign(a.id ? `/s/v/${a.id}` : '/s/')
+    if (a) return geh(a.id ? `/s/v/${a.id}` : '/s/')
   }
   const aufgabe = await holen<{ id: string }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  if (aufgabe?.id) return window.location.assign(`/s/f/${code}`)
+  if (aufgabe?.id) return geh(`/s/f/${code}`)
   const blatt = await holen<{ id: string }>(`/s/api/blatt/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  if (blatt?.id) return window.location.assign(`/s/w/${code}`)
+  if (blatt?.id) return geh(`/s/w/${code}`)
   const reihe = await holen<{ id: string }>(`/s/api/reihe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  if (reihe?.id) return window.location.assign(`/s/rq/${code}`)
+  if (reihe?.id) return geh(`/s/rq/${code}`)
   const vok = await holen<{ id: string }>(`/s/api/vokabeln/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  if (vok?.id) return window.location.assign(`/s/vt/${code}`)
+  if (vok?.id) return geh(`/s/vt/${code}`)
   const gram = await holen<{ id: string }>(`/s/api/grammatik/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  if (gram?.id) return window.location.assign(`/s/gt/${code}`)
-  window.location.assign(vok?.id ? `/s/vt/${code}` : `/s/t/${code}`)
+  if (gram?.id) return geh(`/s/gt/${code}`)
+  // Zuletzt der Onlinetest – nur, wenn es ihn gibt (ohne Antwort, z. B. Netz weg: trotzdem hin, die Seite meldet sich)
+  const test = await holen<{ bekannt?: boolean }>(`/s/api/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  if (test?.bekannt === false) return false
+  return geh(`/s/t/${code}`)
 }
 
 const BEITRITT = {
@@ -934,24 +946,21 @@ const BEITRITT = {
     gast: '/s/api/aufgabe/gast',
     ziel: (id: string) => `/s/a/${id}`,
     seite: (c: string) => `/s/f/${c}`,
-    art: 'Aufgabe mit Feedback',
-    fehlt: 'Diese Aufgabe'
+    art: 'Aufgabe mit Feedback'
   },
   blatt: {
     zugang: '/s/api/blatt/zugang',
     gast: '/s/api/blatt/gast',
     ziel: (id: string) => `/s/b/${id}`,
     seite: (c: string) => `/s/w/${c}`,
-    art: 'Arbeitsblatt',
-    fehlt: 'Dieses Arbeitsblatt'
+    art: 'Arbeitsblatt'
   },
   reihe: {
     zugang: '/s/api/reihe/zugang',
     gast: '/s/api/reihe/gast',
     ziel: (id: string) => `/s/r/${id}`,
     seite: (c: string) => `/s/rq/${c}`,
-    art: 'Unterrichtsreihe',
-    fehlt: 'Diese Unterrichtsreihe'
+    art: 'Unterrichtsreihe'
   }
 }
 
@@ -959,6 +968,16 @@ const BEITRITT = {
 function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): React.JSX.Element {
   const w = BEITRITT[art]
   const [info, setInfo] = useState<{ id: string; titel: string; gaeste: boolean; dabei: boolean } | null | undefined>(undefined)
+  // Geplante Freischaltung (09.10.2026): beitreten ja, dann den Zeitpunkt nennen
+  const geplant = useRef<{ ab: number; titel: string } | null>(null)
+  const [wartet, setWartet] = useState<{ ab: number; titel: string } | null>(null)
+  const hinein = useCallback(
+    (id: string): void => {
+      if (geplant.current && geplant.current.ab > Date.now()) return setWartet(geplant.current)
+      window.location.assign(w.ziel(id))
+    },
+    [w]
+  )
   const [name, setName] = useState('')
   const [fehler, setFehler] = useState('')
   const [laeuft, setLaeuft] = useState(false)
@@ -973,26 +992,29 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
       setFehler('')
       try {
         const r = await senden<{ id: string }>(w.gast, { code, ...(mitName ? { name: mitName } : {}) })
-        window.location.assign(w.ziel(r.id))
+        hinein(r.id)
+        setLaeuft(false)
       } catch (e) {
         setFehler(e instanceof Error ? e.message : String(e))
         setLaeuft(false)
       }
     },
-    [code, w]
+    [code, w, hinein]
   )
   useEffect(() => {
-    void holen<{ id: string; titel: string; gaeste: boolean; dabei: boolean }>(`${w.zugang}?code=${encodeURIComponent(code)}`).then(
+    void holen<{ id: string; titel: string; gaeste: boolean; dabei: boolean; geplantAb?: number }>(`${w.zugang}?code=${encodeURIComponent(code)}`).then(
       (d) => {
-        if (d.dabei) return window.location.assign(w.ziel(d.id))
+        geplant.current = d.geplantAb ? { ab: d.geplantAb, titel: d.titel } : null
+        if (d.dabei) return hinein(d.id)
         if (mitKonto) return void beitreten()
         if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(w.seite(code))}`)
         setInfo(d)
       },
       () => setInfo(null)
     )
-  }, [code, mitKonto, beitreten, w])
-  if (info === null) return <Alert color="orange">{w.fehlt} gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
+  }, [code, mitKonto, beitreten, w, hinein])
+  if (wartet) return <FreischaltungHinweis ab={wartet.ab} titel={wartet.titel} art={w.art} />
+  if (info === null) return <CodeUnbekannt />
   if (!info)
     return fehler ? (
       <Alert color="red">{fehler}</Alert>
@@ -1196,13 +1218,34 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
   const angemeldet = Boolean(window.__schulappsServer?.angemeldet)
   // Schon angemeldet (z. B. per Code vom Zettel): ein kleiner Knopf statt des großen Feldes (08.10.2026)
   const [codeOffen, setCodeOffen] = useState(!angemeldet)
+  // Unbekannter Code (09.10.2026): Meldung am Feld statt Namensabfrage auf der Test-Seite
+  const [unbekannt, setUnbekannt] = useState(false)
+  const [sucht, setSucht] = useState(false)
+  const oeffnen = useCallback(async (c: string): Promise<void> => {
+    if (c.length < 4) return
+    setSucht(true)
+    setUnbekannt(false)
+    const ok = await oeffneCode(c)
+    if (ok) return
+    setSucht(false)
+    setCode(c.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+    setCodeOffen(true)
+    setUnbekannt(true)
+  }, [])
   // Code von der Startseite (Anmeldeseite „Mit Code öffnen", ohne Skript: /s/?code=…) gleich öffnen
   useEffect(() => {
-    const roh = new URLSearchParams(window.location.search).get('code')
-    const c = (roh ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const such = new URLSearchParams(window.location.search)
+    const c = (such.get('code') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
     if (c.length >= 4) {
       window.history.replaceState(null, '', window.location.pathname)
-      void oeffneCode(c)
+      void oeffneCode(c).then((ok) => {
+        if (ok) return
+        // Von der Anmeldeseite: die Meldung dort am Codefeld zeigen (09.10.2026)
+        if (such.get('von') === 'anmelden') return window.location.replace(`/anmelden?unbekannt=1&code=${encodeURIComponent(c)}`)
+        setCode(c)
+        setCodeOffen(true)
+        setUnbekannt(true)
+      })
     }
   }, [])
   useEffect(() => {
@@ -1222,33 +1265,52 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
           <Button variant="subtle" size="sm" radius="xl" onClick={() => setScannen(true)} data-code-scannen>
             QR-Code scannen
           </Button>
-          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
+          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffnen(c)} />}
         </Group>
       ) : (
         <Card withBorder padding="lg">
           <Title order={4} mb="xs">
             Mit Code öffnen
           </Title>
-          <Group align="end">
-            <TextInput
-              style={{ flex: 1 }}
-              label="Code (steht an der Tafel oder du hast ihn von deiner Lehrkraft erhalten)"
-              description="für Test, Arbeitsblatt oder Vokabeln"
-              value={code}
-              onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              size="md"
-            />
-            <Button size="md" disabled={code.length < 4} onClick={() => void oeffneCode(code)}>
-              Öffnen
-            </Button>
-          </Group>
+          {/* Formular: Enter bestätigt (09.10.2026) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!sucht) void oeffnen(code)
+            }}
+          >
+            <Group align="end">
+              <TextInput
+                style={{ flex: 1 }}
+                label="Code (steht an der Tafel oder du hast ihn von deiner Lehrkraft erhalten)"
+                description="für Test, Arbeitsblatt oder Vokabeln"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+                  setUnbekannt(false)
+                }}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                size="md"
+                error={unbekannt ? CODE_UNBEKANNT : undefined}
+                data-code-feld
+              />
+              <Button type="submit" size="md" disabled={code.length < 4} loading={sucht} data-code-oeffnen>
+                Öffnen
+              </Button>
+            </Group>
+          </form>
+          {unbekannt && (
+            <Text size="sm" c="dimmed" mt={6} data-code-unbekannt>
+              Stimmt der Code, ist die Freigabe vielleicht schon beendet – dann bei der Lehrkraft nachfragen.
+            </Text>
+          )}
           <Button mt="sm" variant="light" fullWidth size="md" onClick={() => setScannen(true)} data-code-scannen>
             QR-Code scannen
           </Button>
-          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
+          {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffnen(c)} />}
         </Card>
       )}
       {aufAppleMobil() && !alsWebApp() && (
@@ -1299,9 +1361,12 @@ function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): R
   const gueltig = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u.test(name.trim().replace(/\s+/g, ' '))
   // Test nur mit Schülerkonto (Etappe 3): gleich zur Anmeldung, zurück zu diesem Test
   const zurAnmeldung = (): void => window.location.assign(`/anmelden?ziel=${encodeURIComponent(`/s/t/${code}`)}`)
+  // Unbekannter Code (09.10.2026): nicht nach dem Namen fragen, sondern das melden
+  const [unbekannt, setUnbekannt] = useState(false)
   useEffect(() => {
-    void holen<{ gaeste: boolean }>(`/s/api/zugang?code=${encodeURIComponent(code)}`)
+    void holen<{ gaeste: boolean; bekannt?: boolean }>(`/s/api/zugang?code=${encodeURIComponent(code)}`)
       .then((d) => {
+        if (d.bekannt === false) return setUnbekannt(true)
         if (d.gaeste === false) zurAnmeldung()
       })
       .catch(() => undefined)
@@ -1319,6 +1384,7 @@ function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): R
       setLaeuft(false)
     }
   }
+  if (unbekannt) return <CodeUnbekannt />
   return (
     <Card withBorder padding="lg">
       <Title order={3} mb={4}>
@@ -2310,6 +2376,14 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
     }
   }
   return (
+    // Vollbild beim Lernen (09.10.2026): solange die Aufgabe offen ist; schließt nicht von selbst (Feedback lesen)
+    <FokusRahmen
+      name="feedbackaufgabe"
+      aktiv={a.offen !== false}
+      // Der Text wird erst mit „Feedback anfordern" gespeichert – Esc soll ihn nicht versehentlich verwerfen
+      escNurAnsicht
+      onEnde={() => window.location.assign(window.__schulappsServer?.quelle !== 'gast' ? '/s/aufgaben' : '/s/')}
+    >
     <Stack>
       {window.__schulappsServer?.quelle !== 'gast' && (
         <Button variant="subtle" component="a" href="/s/aufgaben" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
@@ -2367,5 +2441,6 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
         </Card>
       )}
     </Stack>
+    </FokusRahmen>
   )
 }

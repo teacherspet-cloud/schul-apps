@@ -1,21 +1,32 @@
 import { Button, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
-import { IconEraser, IconKeyboard, IconPencil, IconPuzzle } from '@tabler/icons-react'
+import { IconEraser, IconKeyboard, IconPencil, IconPuzzle, IconSpace } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { fuerServer, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 import { senden } from '../../onlinetest/serverApi'
 import { erkenne, type Strich } from './erkennung'
+import { gelegtText, LEER, leerAnhaengen, nurBuchstaben, tippStand, zuordnen, type Kachel } from './legeLogik'
 
-export interface Kachel {
-  b: string
-  i: number
-}
+export { gelegtText, LEER, leerAnhaengen, nurBuchstaben, tippStand, zuordnen, type Kachel }
 
 type Art = 'legen' | 'tippen' | 'schreiben'
+
+/** Steht der Fokus in einem Eingabefeld? Sonst gehört die Taste der Legeaufgabe. */
+const imFeld = (t: EventTarget | null): boolean => {
+  const el = t as HTMLElement | null
+  return Boolean(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable))
+}
 
 /**
  * „Lege das Wort" mit drei Eingabearten (08.10.2026, abgestimmt mit der Lehrkraft): Plättchen antippen, auf der Tastatur
  * tippen oder mit Finger/Stift schreiben. Getippte und geschriebene Buchstaben verbrauchen sichtbar die Plättchen –
  * die Aufgabe bleibt dieselbe. Die Wahl folgt dem Konto (Darstellung `legen`).
+ *
+ * Seit 09.10.2026 (Wunsch der Lehrkraft):
+ *  - Tastatur wird erkannt: Wer beim Legen oder Schreiben einfach lostippt, ist ohne Klick auf „Tippen" im Tippmodus –
+ *    der erste Buchstabe zählt schon. Enter prüft, sobald alles liegt; die Rücktaste nimmt das Letzte zurück.
+ *  - `leerzeichen` (schwerste Stufe): Leerzeichen setzen die Lernenden selbst – mit der Leertaste oder dem Knopf
+ *    „Leerzeichen", der bei JEDEM Wort bereitsteht und so nichts verrät.
+ *  - `anzeige`: was das Tippfeld zeigt (im Trainer mit den Leerzeichen der Lösung, die schon dastehen).
  */
 export default function LegeEingabe({
   kacheln,
@@ -24,16 +35,22 @@ export default function LegeEingabe({
   gesperrt,
   fertig,
   anzahl,
+  leerzeichen = false,
+  anzeige,
   children
 }: {
   kacheln: Kachel[]
   gelegt: number[]
   setGelegt: (g: number[]) => void
   gesperrt: boolean
-  /** Enter im Tippfeld, wenn alle Plättchen liegen */
+  /** Enter (im Tippfeld oder ohne Fokus), wenn alle Plättchen liegen */
   fertig: () => void
   /** Wie viele Buchstaben das Wort hat (Spiel mit Ablenker-Plättchen); sonst alle Plättchen */
   anzahl?: number
+  /** Schwerste Stufe: Leerzeichen selbst setzen (09.10.2026) */
+  leerzeichen?: boolean
+  /** Text im Tippfeld zum Gelegten (sonst die Buchstaben hintereinander) */
+  anzeige?: (gelegt: number[]) => string
   /** Die Plättchen zum Antippen (bleiben in jeder Art sichtbar) */
   children: React.ReactNode
 }): React.JSX.Element {
@@ -41,11 +58,54 @@ export default function LegeEingabe({
   const wahl = useDarstellung((s) => s.d)
   const setze = useDarstellung((s) => s.setze)
   const art: Art = wahl.legen ?? 'legen'
+  const tippFeld = useRef<HTMLInputElement>(null)
   const umstellen = (a: Art): void => {
-    const neu = { ...wahl, legen: a }
+    const neu = { ...useDarstellung.getState().d, legen: a }
     setze(neu)
     if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
   }
+  const komplett = nurBuchstaben(gelegt).length >= voll
+  // Aktueller Stand für die Tastatur (der Horcher hängt einmal am Fenster)
+  const stand = useRef({ gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll })
+  stand.current = { gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll }
+  useEffect(() => {
+    const taste = (e: KeyboardEvent): void => {
+      const s = stand.current
+      if (s.gesperrt || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || imFeld(e.target)) return
+      if (e.key === 'Enter') {
+        if (!s.komplett) return
+        e.preventDefault()
+        s.fertig()
+        return
+      }
+      if (e.key === 'Backspace') {
+        if (!s.gelegt.length) return
+        e.preventDefault()
+        s.setGelegt(s.gelegt.slice(0, -1))
+        return
+      }
+      if (e.key.length !== 1) return
+      // Leertaste: nur in der schwersten Stufe ein Zeichen; sonst bedient sie wie gewohnt den Knopf im Fokus
+      if (e.key === ' ') {
+        if (!s.leerzeichen) return
+        e.preventDefault()
+        s.setGelegt(leerAnhaengen(s.gelegt))
+        return
+      }
+      if (!/[\p{L}\p{N}]/u.test(e.key)) return
+      e.preventDefault()
+      // Lostippen genügt: in den Tippmodus wechseln (am Konto gemerkt) – der Buchstabe zählt schon
+      if (s.art !== 'tippen') umstellen('tippen')
+      else tippFeld.current?.focus()
+      const r = zuordnen(
+        e.key,
+        s.kacheln.filter((k) => !s.gelegt.includes(k.i))
+      )
+      if (!r.fehlt && nurBuchstaben(s.gelegt).length < s.voll) s.setGelegt([...s.gelegt, ...r.gelegt])
+    }
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Stack align="center" gap="xs" w="100%">
       <SegmentedControl
@@ -60,7 +120,33 @@ export default function LegeEingabe({
         data-lege-art
       />
       {children}
-      {art === 'tippen' && <Tippen kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} fertig={fertig} voll={voll} />}
+      {leerzeichen && (
+        <Button
+          variant="default"
+          radius="md"
+          size="sm"
+          w={220}
+          leftSection={<IconSpace size={16} />}
+          disabled={gesperrt || !gelegt.length || gelegt[gelegt.length - 1] === LEER || komplett}
+          onClick={() => setGelegt(leerAnhaengen(gelegt))}
+          data-lege-leerzeichen
+        >
+          Leerzeichen
+        </Button>
+      )}
+      {art === 'tippen' && (
+        <Tippen
+          feld={tippFeld}
+          kacheln={kacheln}
+          gelegt={gelegt}
+          setGelegt={setGelegt}
+          gesperrt={gesperrt}
+          fertig={fertig}
+          voll={voll}
+          leerzeichen={leerzeichen}
+          anzeige={anzeige}
+        />
+      )}
       {art === 'schreiben' && <Schreiben kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} voll={voll} />}
     </Stack>
   )
@@ -75,52 +161,53 @@ function Mit({ icon, text }: { icon: React.ReactNode; text: string }): React.JSX
   )
 }
 
-/** Buchstaben eines Textes den freien Plättchen zuordnen (Groß/Klein egal); null, wenn einer fehlt */
-export function zuordnen(text: string, kacheln: Kachel[]): { gelegt: number[]; fehlt?: string } {
-  const frei = [...kacheln]
-  const gelegt: number[] = []
-  for (const z of [...text]) {
-    // Leerzeichen und Apostrophe stehen schon im Wort
-    if (/[\s'’‘ʼ´`′]/.test(z)) continue
-    const k = frei.findIndex((x) => x.b === z) >= 0 ? frei.findIndex((x) => x.b === z) : frei.findIndex((x) => x.b.toLowerCase() === z.toLowerCase())
-    if (k < 0) return { gelegt, fehlt: z }
-    gelegt.push(frei[k].i)
-    frei.splice(k, 1)
-  }
-  return { gelegt }
-}
-
 function Tippen({
+  feld,
   kacheln,
   gelegt,
   setGelegt,
   gesperrt,
   fertig,
-  voll
+  voll,
+  leerzeichen,
+  anzeige
 }: {
+  feld: React.RefObject<HTMLInputElement | null>
   kacheln: Kachel[]
   gelegt: number[]
   setGelegt: (g: number[]) => void
   gesperrt: boolean
   fertig: () => void
   voll: number
+  leerzeichen: boolean
+  anzeige?: (gelegt: number[]) => string
 }): React.JSX.Element {
   const [fehlt, setFehlt] = useState('')
-  const text = gelegt.map((i) => kacheln.find((k) => k.i === i)?.b ?? '').join('')
+  const text = anzeige ? anzeige(gelegt) : gelegtText(gelegt, kacheln)
+  // Fokus und Schreibmarke ans Ende – auch, wenn gerade erst per Tastatur in den Tippmodus gewechselt wurde
+  useEffect(() => {
+    const el = feld.current
+    if (!el || gesperrt) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Stack gap={2} align="center">
       <TextInput
+        ref={feld}
         value={text}
         onChange={(e) => {
-          const r = zuordnen(e.currentTarget.value, kacheln)
+          const r = tippStand({ text, gelegt }, e.currentTarget.value, kacheln, leerzeichen)
           setFehlt(r.fehlt ?? '')
-          if (!r.fehlt && r.gelegt.length <= voll) setGelegt(r.gelegt)
+          if (!r.fehlt && nurBuchstaben(r.gelegt).length <= voll) setGelegt(r.gelegt)
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && gelegt.length === voll) fertig()
+          if (e.key === 'Enter' && nurBuchstaben(gelegt).length === voll) {
+            e.preventDefault()
+            fertig()
+          }
         }}
         disabled={gesperrt}
-        autoFocus
         autoComplete="off"
         autoCapitalize="off"
         autoCorrect="off"
@@ -128,12 +215,16 @@ function Tippen({
         placeholder="Wort eintippen …"
         size="md"
         w={260}
-        styles={{ input: { textAlign: 'center', fontWeight: 700, letterSpacing: 2 } }}
+        styles={{ input: { textAlign: 'center', fontWeight: 700, letterSpacing: 2, whiteSpace: 'pre' } }}
         aria-label="Wort eintippen"
         data-lege-tippen
       />
       <Text size="xs" c={fehlt ? 'orange' : 'dimmed'} mih={18}>
-        {fehlt ? `„${fehlt}“ ist nicht mehr unter den Buchstaben.` : 'Jeder getippte Buchstabe nimmt ein Plättchen.'}
+        {fehlt
+          ? `„${fehlt}“ ist nicht mehr unter den Buchstaben.`
+          : leerzeichen
+          ? 'Jeder getippte Buchstabe nimmt ein Plättchen – Leerzeichen setzt du selbst.'
+          : 'Jeder getippte Buchstabe nimmt ein Plättchen.'}
       </Text>
     </Stack>
   )
@@ -214,7 +305,7 @@ function Schreiben({
     ctx.stroke()
   }
 
-  const fertigGelegt = gelegt.length >= voll
+  const fertigGelegt = nurBuchstaben(gelegt).length >= voll
   const zuletzt = gelegt.length ? kacheln.find((k) => k.i === gelegt[gelegt.length - 1]) : undefined
   return (
     <Stack gap={6} align="center">

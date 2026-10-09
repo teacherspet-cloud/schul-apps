@@ -67,6 +67,23 @@ export function achDatenSchreiben(nutzerId: string, d: AchDaten): void {
     .run(nutzerId, JSON.stringify(d))
 }
 
+/**
+ * Für den Schulvergleich (09.10.2026, achievementsVergleich.ts): je Person die Kennungen des Erreichten und die
+ * gesammelten Übungstage. Verlässt den Server nie als Einzelwert – nur als Anteil bzw. eigener Platz.
+ */
+export function alleAchievementDaten(): Map<string, { erreicht: string[]; tage: string[] }> {
+  const aus = new Map<string, { erreicht: string[]; tage: string[] }>()
+  for (const z of db().prepare('SELECT nutzer_id, daten FROM achievements').all() as { nutzer_id: string; daten: string }[]) {
+    try {
+      const d = JSON.parse(z.daten) as Partial<AchDaten>
+      aus.set(z.nutzer_id, { erreicht: Object.keys(d.erreicht ?? {}), tage: Array.isArray(d.tage) ? d.tage : [] })
+    } catch {
+      // beschädigter Eintrag: zählt wie keiner
+    }
+  }
+  return aus
+}
+
 const zaehlt = (n: NutzerInfo): boolean => n.rolle === 'schueler' && n.quelle !== 'vorschau'
 const isoTag = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
 

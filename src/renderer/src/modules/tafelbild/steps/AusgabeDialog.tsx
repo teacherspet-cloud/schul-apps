@@ -14,6 +14,7 @@ import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
 import { pdfHtml, pngFuer, pptxFuer, standardPdfWahl, type PdfWahl } from '../ausgabe'
 import { formatInfo } from '../formate'
 import { standardName, type Tafelbild } from '../model'
+import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../../shared/components/FreigabePlanen'
 
 export const PNG_FILTER = [{ name: 'PNG-Bild', extensions: ['png'] }]
 export const PPTX_FILTER = [{ name: 'PowerPoint', extensions: ['pptx'] }]
@@ -164,6 +165,8 @@ function TafelFreigabe({ t }: { t: Tafelbild }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
   const [wer, setWer] = useState<LernendeAuswahl | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  // „Planen …" (09.10.2026) – ein Tafelbild ist nur zum Ansehen, deshalb ohne Ende
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   if (!offen)
     return (
       <Button variant="subtle" leftSection={<IconUsersGroup size={16} />} onClick={() => setOffen(true)} w="fit-content" data-tb-freigeben>
@@ -176,6 +179,7 @@ function TafelFreigabe({ t }: { t: Tafelbild }): React.JSX.Element {
         Für Lernende freigeben
       </Text>
       <LernendeWahl wahl={setWer} />
+      <FreigabePlanen wert={plan} aendern={setPlan} />
       <Group>
         <Button
           loading={laeuft}
@@ -188,15 +192,22 @@ function TafelFreigabe({ t }: { t: Tafelbild }): React.JSX.Element {
               titel: t.inhalt?.titel || t.meta.title || 'Tafelbild',
               fach: t.meta.subjectLabel,
               thema: t.meta.thema,
-              bilder
+              bilder,
+              ...planKoerper(plan)
             })
-              .then(() => (notifySuccess('Freigegeben – das Tafelbild liegt jetzt in der Mappe der Lernenden.'), setOffen(false)))
+              .then(
+                () => (
+                  planGeaendert(),
+                  notifySuccess(planMeldung(plan, 'Tafelbild') || 'Freigegeben – das Tafelbild liegt jetzt in der Mappe der Lernenden.'),
+                  setOffen(false)
+                )
+              )
               .catch((e: unknown) => notifyError(e))
               .finally(() => setLaeuft(false))
           }}
           data-tb-freigeben-los
         >
-          Freigeben
+          {planKnopf(plan, 'Freigeben')}
         </Button>
         <Button variant="subtle" color="gray" onClick={() => setOffen(false)}>
           Abbrechen

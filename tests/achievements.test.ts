@@ -192,9 +192,13 @@ describe('Achievements am Server', () => {
     const alle = await rufe(ach, ida, 'GET', '/s/api/achievements')
     const erreicht = alle.d.erreicht as { id: string; titel: string; am: number }[]
     expect(erreicht.map((e) => e.id)).toEqual(expect.arrayContaining(['diktat-10', 'rekord-1', 'blitz-fehlerfrei']))
-    expect(alle.d.verborgen).toBeGreaterThan(30)
-    // Verborgene bleiben verborgen: nur Erreichtes kommt mit
     expect(erreicht.every((e) => e.am > 0 && e.titel)).toBe(true)
+    // Seit 09.10.2026: alle mit Fortschritt – nur die geheimen bleiben verborgen (als Zahl)
+    const sicht = alle.d.alle as { id: string; erreicht: boolean; ist: number; ziel: number }[]
+    expect(sicht.length).toBeGreaterThan(30)
+    expect(sicht.find((a) => a.id === 'diktat-50')).toMatchObject({ erreicht: false, ist: 10, ziel: 50 })
+    expect(sicht.some((a) => a.id === 'comeback' || a.id === 'unmoeglich')).toBe(false)
+    expect(alle.d.verborgen).toBe(3)
     // Gespeichert verschlüsselt (feldschutz.ts)
     const roh = datenbank().prepare('SELECT daten AS x FROM achievements WHERE nutzer_id = ?').get(ida.id) as { x: string }
     expect(String(roh.x).startsWith('v1:')).toBe(true)

@@ -33,6 +33,8 @@ import {
 } from '@mantine/core'
 import { IconArrowBackUp, IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useBlaettern } from '../lernen/regal/blaettern'
+import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
 import type { Andock, Vorgaben, VorgabeArt } from './blattWerkzeuge'
@@ -480,6 +482,9 @@ export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Eleme
  */
 export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zurueck: () => void } }): React.JSX.Element {
   const [antworten, setAntworten] = useState<Record<string, string>>(d.antworten)
+  // Im Fachordner geöffnet (09.10.2026): dessen „Zurück" blättert zurück – kein eigener Rückweg
+  const ordnerBlatt = useBlaettern()
+  const imOrdner = Boolean(ordnerBlatt)
   const [tinte, setTinte] = useState<Record<string, string>>(d.tinte)
   const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; hoehe: number } | null>(null)
   const [breite, setBreite] = useState(BREITE)
@@ -715,7 +720,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       const neu = r.aufgabenFeedback ?? {}
       if (Object.keys(neu).length) setAufgabenFb((x) => ({ ...x, ...Object.fromEntries(Object.entries(neu).map(([nr, e]) => [nr, [...(x[nr] ?? []), e]])) }))
       setPruefHinweis(r.pruefFehler ? `Die Hinweise zu den offenen Aufgaben konnten nicht erstellt werden: ${r.pruefFehler}` : '')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      seiteNachOben()
     } catch (e) {
       setMeldung(e instanceof Error ? e.message : String(e))
     } finally {
@@ -762,9 +767,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   }
   const pdf = async (art: 'speichern' | 'drucken' | 'teilen'): Promise<void> => {
     setPdfLaeuft(art)
-    // iPad/iPhone drucken ein verstecktes Fenster nicht zuverlässig: dort das PDF öffnen (Teilen › Drucken)
+    // iPad/iPhone drucken ein verstecktes Fenster nicht zuverlässig: dort das PDF vom Server als Seitenbilder im
+    // aktuellen Dokument drucken – ohne neuen Tab, den Popup-Blocker verwerfen (09.10.2026, export/druckImDokument.ts)
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    const fenster = art === 'drucken' && ios ? window.open('', '_blank') : null
     try {
       const html = await blattHtml()
       if (!html) throw new Error('Das Blatt ist noch nicht geladen.')
@@ -781,17 +786,19 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { fehler?: string }).fehler ?? 'Das PDF konnte nicht erstellt werden.')
       const blob = await r.blob()
       if (art === 'teilen') return void (await teilen(new File([blob], `${d.titel.replace(/[\/:*?"<>|]+/g, '-')}.pdf`, { type: 'application/pdf' })))
-      const url = URL.createObjectURL(blob)
-      if (fenster) fenster.location.href = url
-      else {
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${d.titel.replace(/[\\/:*?"<>|]+/g, '-')}.pdf`
-        a.click()
+      const dateiname = `${d.titel.replace(/[\\/:*?"<>|]+/g, '-')}.pdf`
+      if (art === 'drucken') {
+        const { druckeMitKnopf } = await import('../../shared/export/druckImDokument')
+        await druckeMitKnopf(blob.arrayBuffer().then((b) => new Uint8Array(b)), dateiname)
+        return
       }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = dateiname
+      a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (e) {
-      fenster?.close()
       setMeldung(e instanceof Error ? e.message : String(e))
     } finally {
       setPdfLaeuft(null)
@@ -840,6 +847,21 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   }, [gemessen, bis, merkZeigen])
 
   return (
+    /*
+     * Vollbild beim Lernen (09.10.2026): das Blatt füllt den Bildschirm – es schließt nicht von selbst (nach dem Einreichen
+     * wird das Feedback gelesen), nur mit „× Beenden"/Esc. Für die Lehrkraft (nur ansehen) nicht.
+     */
+    <FokusRahmen
+      name="arbeitsblatt"
+      breit
+      aktiv={!lehrkraft}
+      // Erst den letzten Stand sichern (sonst gingen die letzten 2 s Eingaben verloren), dann zurück
+      onEnde={() =>
+        void (offen ? sichern() : Promise.resolve()).finally(() =>
+          ordnerBlatt ? ordnerBlatt.zurueck() : window.location.assign(reiheId ? `/s/r/${reiheId}` : '/s/blaetter')
+        )
+      }
+    >
     <Stack data-blatt-ausfuellen>
       {lehrkraft ? (
         <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck}>
@@ -850,7 +872,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         <Button variant="light" component="a" href={`/s/r/${reiheId}`} w="fit-content" leftSection={<IconArrowLeft size={16} />} data-zur-reihe>
           Zur Unterrichtsreihe
         </Button>
-      ) : (
+      ) : imOrdner ? null : (
         <Button variant="subtle" component="a" href="/s/blaetter" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
           Arbeitsblätter
         </Button>
@@ -1083,7 +1105,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             // Nach dem Umschalten zur Aufgabe rollen (Lage im Blatt × Maßstab)
             setTimeout(() => {
               const r = rahmen.current?.getBoundingClientRect()
-              if (r) window.scrollTo({ top: window.scrollY + r.top + a.y * massstab - 80, behavior: 'smooth' })
+              if (r) seiteRollenUm(r.top + a.y * massstab - 80)
             }, 120)
           }}
         />
@@ -1113,6 +1135,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         </Paper>
       )}
     </Stack>
+    </FokusRahmen>
   )
 }
 

@@ -48,6 +48,9 @@ import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/ty
 import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { abschrift, abschriftZaehlt, blattText, deckeln } from '../shared/abschrift'
 import { fachAusName } from '../shared/faecher'
+import { geplantAb, nachFreigabe, nochGeplant, planVorbei } from './freigabePlan'
+import { istVorbei } from '../shared/freigabePlan'
+import { zugangPlan } from './planen'
 import { zeichenFuer } from '../renderer/src/shared/korrekturzeichen'
 import {
   ampelVon,
@@ -158,8 +161,10 @@ export interface BlattEinstellungen {
   schrittweise?: boolean
   /** Merkkästen erst nach vollständiger Bearbeitung zeigen (05.10.2026) */
   merkAmEnde?: boolean
-  /** Bearbeiten bis (ms) – Frist für „Meine Klassen" (06.10.2026) */
+  /** Bearbeiten bis (ms) – Frist für „Meine Klassen" (06.10.2026); allein nur eine Erinnerung */
   bis?: number
+  /** Nach der Frist nur noch ansehen (09.10.2026, Schalter beim Freigeben, Vorgabe aus) – sonst bleibt die Frist Erinnerung */
+  fristHart?: boolean
   /** Original in der Bibliothek der Lehrkraft (Word-Export aus „Meine Klassen") */
   quelle?: { docId: string; sheetId?: string }
 }
@@ -214,6 +219,8 @@ function namenFuerKi(z: Zeile, ich: NutzerInfo): string[] {
 }
 
 export function blattIstFuer(z: Zeile, ich: NutzerInfo): boolean {
+  // Geplante Freischaltung (09.10.2026, freigabePlan.ts): bis dahin für niemanden sichtbar
+  if (nochGeplant('blatt', z.id)) return false
   if (db().prepare('SELECT 1 FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
   if (ich.quelle === 'gast' && !gastInLerngruppe(z.lerngruppe_id, ich)) return false
@@ -398,6 +405,12 @@ async function pruefungBeimEinreichen(p: {
 }
 
 /** Für Lernende: Übersicht eines Blattes */
+/**
+ * Ende erreicht – nur noch ansehen (09.10.2026): bei harter Frist (Schalter „nach der Frist nur noch ansehen") oder mit
+ * dem Ende einer geplanten Freischaltung. Eine Frist allein (auch bei allen älteren Blättern) bleibt eine Erinnerung.
+ */
+const endeErreicht = (z: Zeile, e: BlattEinstellungen): boolean => (Boolean(e.fristHart) && istVorbei(e.bis)) || planVorbei('blatt', z.id)
+
 function kurz(z: Zeile, ich: NutzerInfo) {
   const e = einstellungenVon(z)
   const a = abgabeVon(z.id, ich.id)
@@ -415,7 +428,8 @@ function kurz(z: Zeile, ich: NutzerInfo) {
   return {
     id: z.id,
     titel: z.titel,
-    offen: z.status === 'offen',
+    // Nach der Frist (09.10.2026) nur noch ansehen
+    offen: z.status === 'offen' && !endeErreicht(z, e),
     feedback: e.feedback,
     runden: e.runden,
     genutzt: a?.abgaben ?? 0,
@@ -443,13 +457,14 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (req.method === 'GET' && url.pathname === '/s/api/blatt/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? '').toUpperCase())
       if (!z || z.status !== 'offen') return (json(res, 404, { fehler: 'Dieses Arbeitsblatt gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      return (json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && blattIstFuer(z, sitzung.nutzer)) }), true)
+      return (json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && blattIstFuer(z, sitzung.nutzer)), ...zugangPlan('blatt', z.id, sitzung?.nutzer) }), true)
     }
     if (req.method === 'POST' && url.pathname === '/s/api/blatt/gast') {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const z = nachCode(String(k0.code ?? '').toUpperCase())
       if (!z || z.status !== 'offen') return (json(res, 404, { fehler: 'Dieses Arbeitsblatt gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      if (sitzung && blattIstFuer(z, sitzung.nutzer)) return (json(res, 200, { ok: true, id: z.id }), true)
+      // Schon dabei – auch vor einer geplanten Freischaltung (09.10.2026), sonst entstünde ein zweiter Gast
+      if (sitzung && (blattIstFuer(z, sitzung.nutzer) || zugangPlan('blatt', z.id, sitzung.nutzer).dabei)) return (json(res, 200, { ok: true, id: z.id }), true)
       if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
         db().prepare('INSERT OR IGNORE INTO blatt_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)').run(z.id, sitzung.nutzer.id)
         return (json(res, 200, { ok: true, id: z.id }), true)
@@ -531,6 +546,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         return true
       }
       if (z.status !== 'offen') return (json(res, 409, { fehler: 'Dieses Arbeitsblatt ist abgeschlossen.' }), true)
+      // Frist vorbei (09.10.2026, „bis" der Freigabe): nur noch ansehen
+      if (endeErreicht(z, e)) return (json(res, 409, { fehler: 'Die Bearbeitungszeit ist vorbei – das Blatt lässt sich nur noch ansehen.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       const speichern = (
         antworten: Record<string, string>,
@@ -738,6 +755,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             titel: z.titel,
             status: z.status,
             erstellt: z.erstellt,
+            // Geplante Freischaltung (09.10.2026): Uhr „geplant ab …" in der Liste
+            geplantAb: geplantAb('blatt', z.id),
             fach: (z as Zeile & { fach?: string }).fach ?? '',
             // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite)
             zuletzt:
@@ -799,6 +818,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {}),
         // Meine Klassen (06.10.2026): Frist und Verweis aufs Original (Word-Export aus der Bibliothek)
         ...(typeof e0.bis === 'number' && e0.bis > 0 ? { bis: e0.bis } : {}),
+        // Harte Frist nur auf ausdrücklichen Wunsch (09.10.2026)
+        ...(e0.fristHart === true && typeof e0.bis === 'number' && e0.bis > 0 ? { fristHart: true } : {}),
         ...(e0.quelle && typeof (e0.quelle as { docId?: unknown }).docId === 'string'
           ? {
               quelle: {
@@ -844,8 +865,10 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       db()
         .prepare('UPDATE blatt_freigaben SET fach = ?, thema = ?, merk = ?, loesung = ? WHERE id = ?')
         .run(String(k0.fach ?? '').slice(0, 60), String(k0.thema ?? '').slice(0, 160), JSON.stringify(merkBereinigt(k0.merk)), loesungBereinigt(k0.loesung), id)
-      protokolliereServer('arbeitsblatt', 'Arbeitsblatt für Lernende freigegeben', ich.id)
-      return (json(res, 200, { id, ...(code ? { code, link: link(code) } : {}) }), true)
+      // „Planen …" (09.10.2026): sichtbar erst ab dem gewählten Zeitpunkt
+      const geplant = nachFreigabe('blatt', [id], k0, ich.id, g?.id ?? '')
+      protokolliereServer('arbeitsblatt', geplant ? 'Arbeitsblatt-Freigabe geplant' : 'Arbeitsblatt für Lernende freigegeben', ich.id)
+      return (json(res, 200, { id, ...(geplant ? { geplantAb: geplantAb('blatt', id) } : {}), ...(code ? { code, link: link(code) } : {}) }), true)
     }
     if (req.method === 'POST' && teile[0] === 'pdf') {
       const html = String(((await k.koerper()) as Record<string, unknown>).html ?? '')
@@ -1280,6 +1303,8 @@ export function blaetterDerGruppe(
   ergebnis: number | null
   schwierigste: { nr: number; anweisung: string; rot: number } | null
   quelle: { docId: string; sheetId?: string } | null
+  /** Geplante Freischaltung (09.10.2026): noch nicht bei den Lernenden */
+  geplantAb: number | null
 }[] {
   const zeilen = db()
     .prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
@@ -1318,6 +1343,7 @@ export function blaetterDerGruppe(
       id: z.id,
       titel: z.titel,
       status: z.status === 'offen' ? ('offen' as const) : ('beendet' as const),
+      geplantAb: geplantAb('blatt', z.id),
       erstellt: z.erstellt,
       bis: e.bis ?? null,
       fach: (z as Zeile & { fach?: string }).fach ?? '',

@@ -9,6 +9,7 @@
 import { bewerte } from '../vokabeltrainer'
 import { normiert } from '../grammatiktrainer'
 import { gewichtVon, ziehe } from './schwierigkeit'
+import { spielText, wortartVon, type TextSchluessel } from '../spielSprache'
 import type { Band, Frage, MehrspielId, Rueckmeldung, Schwierigkeit, SpielErgebnis, SpielInhalt, SpielItem } from './typen'
 
 // ---------------------------------------------------------------- Bausteine der Sicht
@@ -31,7 +32,11 @@ export type Block =
   | { typ: 'fortschritt'; titel: string; wert: number; max: number; ton?: Ton }
   | { typ: 'punkte'; eintraege: { name: string; wert: string; ich?: boolean }[] }
   | { typ: 'uhr'; bis: number; text?: string }
-  | { typ: 'code'; stellen: number; aktion: string; gesperrt?: boolean }
+  /**
+   * Codewort (Fluchtraum, 09.10.2026): Felder mit den freigeschalteten Buchstaben (null = noch verdeckt) bzw. – ab
+   * „schwer" – nur die gefundenen Buchstaben ohne Stelle (`buchstaben`); Beschriftungen in der Zielsprache.
+   */
+  | { typ: 'codewort'; felder: (string | null)[]; buchstaben?: string[]; aktion: string; titel: string; platzhalter: string; knopf: string; gesperrt?: boolean }
   | { typ: 'vorlesen'; text: string; sprache: string }
   | { typ: 'knoepfe'; knoepfe: { text: string; aktion: string; wert?: string; farbe?: string; gesperrt?: boolean }[] }
   | { typ: 'eingaben'; felder: { id: string; titel: string }[]; aktion: string; gesperrt?: boolean; werte?: Record<string, string> }
@@ -168,14 +173,66 @@ export type FragenArt = 'standard' | 'erkennen' | 'abrufen' | 'luecke'
 
 const gleich = (a: string, b: string): boolean => normiert(a) === normiert(b)
 
-/** Ablenker: eigene, dann Antworten anderer Items derselben Art – nie die Lösung */
-export function ablenkerFuer(z: Basis, loesung: string, eigene: string[], feld: (i: SpielItem) => string | undefined, n: number): string[] {
+/** Text in der Zielsprache des Kurses (09.10.2026): Klasse 5–6 einfache Sprache, ab Klasse 7 normal */
+export const tx = (z: Basis, schluessel: TextSchluessel, ...werte: (string | number)[]): string =>
+  spielText(z.inhalt.sprache, z.jahrgang, schluessel, ...werte)
+
+/** Ablenker-Stufe nach Klasse (09.10.2026): 0 zufällig (bis Klasse 6), 1 gleiche Wortart/Länge (7–8), 2 auch ähnliche Schreibung (ab 9) */
+export const ablenkerStufe = (z: Basis): 0 | 1 | 2 => (z.jahrgang === null || z.jahrgang <= 6 ? 0 : z.jahrgang <= 8 ? 1 : 2)
+
+/** Abstand zweier Wörter (Levenshtein, klein geschrieben) */
+export function abstand(a: string, b: string): number {
+  const x = [...a.toLowerCase()]
+  const y = [...b.toLowerCase()]
+  let vor = Array.from({ length: y.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= x.length; i++) {
+    const neu = [i]
+    for (let j = 1; j <= y.length; j++) neu[j] = Math.min(vor[j] + 1, neu[j - 1] + 1, vor[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
+    vor = neu
+  }
+  return vor[y.length]
+}
+
+/** Wie nah ist ein Ablenker an der Lösung? (höher = verwechselbarer) */
+function naehe(loesung: string, t: string, stufe: 1 | 2, posL?: string, posT?: string): number {
+  let p = 0
+  if (posL && posT && wortartVon(posL) && wortartVon(posL) === wortartVon(posT)) p += 2
+  if (Math.abs(t.length - loesung.length) <= 2) p += 1
+  if (t[0]?.toLowerCase() === loesung[0]?.toLowerCase()) p += 1
+  if (stufe === 2) {
+    const d = abstand(loesung, t)
+    if (d <= Math.max(2, Math.floor(loesung.length / 3))) p += 3
+    else if (d <= Math.ceil(loesung.length / 2)) p += 1
+  }
+  return p
+}
+
+/**
+ * Ablenker: eigene, dann Antworten anderer Items derselben Art – nie die Lösung. Ab Klasse 7 (Stufe 1/2) zuerst
+ * verwechselbare Ablenker (gleiche Wortart, ähnliche Länge, ab Klasse 9 ähnliche Schreibung).
+ */
+export function ablenkerFuer(
+  z: Basis,
+  loesung: string,
+  eigene: string[],
+  feld: (i: SpielItem) => string | undefined,
+  n: number,
+  opt: { stufe?: 0 | 1 | 2; pos?: string } = {}
+): string[] {
   const aus: string[] = []
   const dazu = (t: string | undefined): void => {
     if (t && !gleich(t, loesung) && !aus.some((a) => gleich(a, t))) aus.push(t)
   }
   for (const t of mischen(z, eigene)) dazu(t)
-  for (const i of mischen(z, z.inhalt.items)) {
+  const stufe = opt.stufe ?? 0
+  const kandidaten = mischen(z, z.inhalt.items)
+  if (stufe > 0)
+    kandidaten.sort((a, b) => {
+      const fa = feld(a) ?? ''
+      const fb = feld(b) ?? ''
+      return naehe(loesung, fb, stufe as 1 | 2, opt.pos, b.vok?.pos) - naehe(loesung, fa, stufe as 1 | 2, opt.pos, a.vok?.pos)
+    })
+  for (const i of kandidaten) {
     if (aus.length >= n) break
     dazu(feld(i))
   }
@@ -186,25 +243,26 @@ export function ablenkerFuer(z: Basis, loesung: string, eigene: string[], feld: 
 export function frageAus(z: Basis, item: SpielItem, art: FragenArt = 'standard', optionen = 4, tippen = z.tippen): Frage {
   const v = item.vok
   let frage = item.frage
-  let zusatz = item.zusatz
+  // Vokabel-Items: Fragezusatz in der Zielsprache (Grammatik behält die Anweisung der Aufgabe)
+  let zusatz = v ? tx(z, 'wieHeisst') : item.fehler && item.frage === item.fehler.satz ? tx(z, 'wieRichtig', item.fehler.wort) : item.zusatz
   let loesung = item.loesung
   let feld: (i: SpielItem) => string | undefined = (i) => i.loesung
   let eigene = item.ablenker
   if (v && art === 'erkennen') {
     frage = v.term
-    zusatz = 'Was bedeutet das?'
+    zusatz = tx(z, 'wasBedeutet')
     loesung = v.translation
     feld = (i) => i.vok?.translation
     eigene = []
   } else if (v && art === 'abrufen') {
     frage = v.translation
-    zusatz = 'Wie heißt das Wort?'
+    zusatz = tx(z, 'wieHeisst')
     loesung = v.term
     feld = (i) => i.vok?.term
     eigene = []
   } else if (v && art === 'luecke' && v.luecke) {
     frage = `${v.luecke.vor}___${v.luecke.nach}`
-    zusatz = 'Welches Wort fehlt?'
+    zusatz = tx(z, 'welchesFehlt')
     loesung = v.luecke.loesung
     feld = (i) => i.vok?.term
     eigene = []
@@ -244,7 +302,7 @@ export const frageBlock = (f: Frage, aktion = 'antwort', gesperrt = false, sprac
 
 // ---------------------------------------------------------------- Buchführung
 
-export const name = (z: Basis, id: string): string => z.spieler.find((s) => s.id === id)?.name ?? 'Jemand'
+export const name = (z: Basis, id: string): string => z.spieler.find((s) => s.id === id)?.name ?? tx(z, 'jemand')
 export const istDabei = (z: Basis, id: string): boolean => z.spieler.some((s) => s.id === id) && !z.weg.includes(id)
 export const aktive = (z: Basis): SpielerKurz[] => z.spieler.filter((s) => !z.weg.includes(s.id))
 
@@ -265,7 +323,7 @@ export function fehlerMerken(z: Basis, wer: string, itemId: string | undefined):
 export function rueckBlock(z: Basis): Block[] {
   const l = z.letzte
   if (!l) return []
-  const text = `${l.wer ? `${l.wer}: ` : ''}${l.text}${l.loesung && !l.richtig ? ` Richtig ist: ${l.loesung}` : ''}`
+  const text = `${l.wer ? `${l.wer}: ` : ''}${l.text}${l.loesung && !l.richtig ? ` ${tx(z, 'richtigIst', l.loesung)}` : ''}`
   return [{ typ: 'text', text, ton: l.richtig ? 'gut' : 'schlecht' }]
 }
 

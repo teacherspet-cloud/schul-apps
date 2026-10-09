@@ -59,6 +59,7 @@ export const istSchwierigkeit = (x: unknown): x is Schwierigkeit => typeof x ===
 
 export interface MehrspielInfo {
   id: MehrspielId
+  /** Deutscher Name (Lehrkraft, Tests); Lernende sehen den Namen der Zielsprache (spielSprache.ts, 09.10.2026) */
   name: string
   art: MehrArt
   min: number
@@ -119,7 +120,7 @@ export const MEHRSPIELE: MehrspielInfo[] = [
     min: 2,
     max: 4,
     bereiche: ['vok', 'gram'],
-    beschreibung: 'Jedes Schloss braucht eine Ziffer von allen. Löst eure Aufgaben und setzt den Code zusammen.',
+    beschreibung: 'Löst gemeinsam Aufgaben: Nach ein paar richtigen Antworten gibt es einen Buchstaben des Codeworts. Errätst ihr es, seid ihr frei!',
     einheit: 's',
     kleinerBesser: true,
     achievements: true
@@ -143,7 +144,7 @@ export const MEHRSPIELE: MehrspielInfo[] = [
     min: 2,
     max: 4,
     bereiche: ['vok', 'gram'],
-    beschreibung: 'Jede richtige Antwort zieht das Seil zu deiner Seite. Schwerere Fragen ziehen stärker.',
+    beschreibung: 'Jede richtige Antwort zieht das Seil zu deiner Seite. Schwerere Fragen ziehen stärker, ab „schwer“ mit mehrteiligen Aufgaben.',
     einheit: 'Punkte',
     kleinerBesser: false,
     achievements: true
@@ -179,7 +180,7 @@ export const MEHRSPIELE: MehrspielInfo[] = [
     min: 2,
     max: 4,
     bereiche: ['vok', 'gram'],
-    beschreibung: 'Richtig geantwortet? Dann darfst du schießen. Wer zuerst alle Schiffe findet, gewinnt.',
+    beschreibung: 'Ein paar richtige Antworten laden einen Schuss. Wer zuerst alle Schiffe findet, gewinnt.',
     einheit: 'Treffer',
     kleinerBesser: false,
     achievements: true
@@ -196,7 +197,7 @@ export const MEHRSPIELE: MehrspielInfo[] = [
   k('woerterturm', 'Wörterturm', 'koop', ['vok', 'gram'], [5, 6], 'Jede richtige Antwort ist ein Stein. Baut den Turm, bevor er wackelt!', 'Steine', false),
   k('hoerkette', 'Hör-Kette', 'koop', ['vok'], [5, 8], 'Eine Person hört das Wort und spricht es nach – die anderen tippen es an.', 'Glieder', false),
   k('zeitstrahl', 'Zeitstrahl', 'koop', ['gram'], [7, 11], 'Ordnet die Sätze auf dem Zeitstrahl und nennt die Zeitform.', 'Fehler', true),
-  k('reiseplaner', 'Reiseplaner', 'koop', ['vok'], [7, 10], 'Jede und jeder kennt einen Teil der Reise. Welche Reise ist es?', 'Fehler', true),
+  k('reiseplaner', 'Reiseplaner', 'koop', ['vok'], [5, 10], 'Alle sehen dieselben Reisen, jede und jeder hat eigene Hinweise. Nur alle Hinweise zusammen passen zu genau einer Reise.', 'Fehler', true),
   k('schnapp', 'Schnapp!', 'versus', ['vok'], [5, 6], 'Passen Wort und Bedeutung zusammen? Wer zuerst richtig schnappt, punktet.', 'Punkte', false),
   k('galgen', 'Galgen-Duell', 'versus', ['vok'], [5, 7], 'Errate deine Wörter Buchstabe für Buchstabe – wer schafft drei zuerst?', 'Wörter', false),
   k('buzzer', 'Team-Buzzer', 'versus', ['vok', 'gram'], [7, 10], 'Wer zuerst drückt, darf antworten. Daneben? Dann ist das andere Team dran.', 'Punkte', false),
@@ -253,7 +254,13 @@ export interface SpielItem {
     bild?: string
   }
   /** Satz mit genau einem falschen Wort (Grammatik „Fehler finden" bzw. aus Beispielsätzen) */
-  fehler?: { satz: string; wort: string; korrektur: string }
+  fehler?: {
+    satz: string
+    wort: string
+    korrektur: string
+    /** Wortstellen (Index in satzTeile(satz)), die den Fehler tragen – nur auf dem Server; nie leer (09.10.2026) */
+    stellen: number[]
+  }
   /** Umformen (Grammatik): Ausgangssatz, Vorgabe, Lösung */
   umformen?: { satz: string; vorgabe: string; loesung: string }
   /** Übersetzung: deutscher Satz und die Teile der Lösung */
@@ -308,6 +315,10 @@ export interface SpielInhalt {
   zeitSaetze: ZeitSatz[]
   /** Gruppen gleichbedeutender Wörter (gleiche Übersetzung oder „=" in der Notiz) */
   synonyme: { de: string; woerter: string[] }[]
+  /** Wörter des Lehrwerks der Klasse bis zum aktuellen Stand (alle Bände der Reihe davor) – Reiseplaner (09.10.2026) */
+  lehrwerk?: string[]
+  /** Davon: Wörter, die alle Mitspielenden im Vokabelweg schon kennengelernt haben (zuerst gewählt) */
+  lehrwerkGemeinsam?: string[]
 }
 
 export interface SpielErgebnis {

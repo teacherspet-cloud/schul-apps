@@ -3,6 +3,8 @@
  * Kasten mit Lernstand und Regelkarten → Tagesration (Lücke, Auswahl, Umformen, Fehler finden, Satzbau) →
  * danach Spiele (Fehler finden, Satzbau-Puzzle, Formen-Blitz, Regel zuordnen) mit eigenem Rekord.
  * Regeln in shared/grammatiktrainer.ts, Server in server/grammatik.ts. Keine KI-Anfragen.
+ * Im Fachordner (09.10.2026, regal/blaettern.tsx): Übungsrunde, Spiele und „Extra für dich" als nächste Seite im
+ * Ordner – mit Umblättern; „Zurück" blättert zurück. Der eigene Rückweg-Knopf entfällt dort (der Ordner hat einen).
  */
 import { useAuffrischen } from '../../shared/auffrischen'
 import {
@@ -48,6 +50,7 @@ import {
   type GrammatikSpielId
 } from '@shared/grammatiktrainer'
 import { alsKarten, grammatikSpielPasst } from '@shared/grammatiktrainer'
+import { einzelBeschreibung, spielName } from '@shared/spielSprache'
 import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
 import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from './spiele/SpieleGrammatik'
 import { sitzungsWoerter, STUFEN, tagVon, uebersicht, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
@@ -56,12 +59,15 @@ import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './spiele/SpieleVerben'
 import { SPIELE_CSS } from './spiele/Spiele'
-import ZusammenSpielen from './mehrspieler/ZusammenSpielen'
+import ZusammenSpielen, { EinladungsCode } from './mehrspieler/ZusammenSpielen'
 import { useVerbDaten } from './verbDaten'
 import { useVtFarbe } from './vtFarben'
 import { apostrophHinweis } from './apostrophHinweis'
+import LoesungZeigen from './LoesungZeigen'
 import { fuerServer, ton, useDarstellung } from '../onlinetest/schuelerDarstellung'
 import { rueckweg } from './regal/beschriftung'
+import { useBlaettern } from './regal/blaettern'
+import { FokusRahmen } from './fokus/FokusRahmen'
 import { BEREICHE, bereichVonRegel, type BereichId } from '@shared/grammatikBereiche'
 
 /** Offene Bereiche der Regel-Seite, je Training auf diesem Gerät gemerkt (08.10.2026) */
@@ -93,6 +99,8 @@ function useOffeneBereiche(id: string): [Set<string>, (b: string) => void] {
 const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle', 'richtigfalsch']
 /** Aufgabenarten mit getippter Antwort – nur dort der Apostroph-Hinweis (08.10.2026) */
 const GETIPPT: readonly string[] = ['luecke', 'umformen', 'fehler']
+/** „Lösung zeigen" (09.10.2026): alle Arten, in denen getippt wird – auch Übersetzen und Tabellen (Latein) */
+const MIT_LOESUNG_ZEIGEN: readonly string[] = [...GETIPPT, 'uebersetzen', 'tabelle']
 /** Neue Spiele (08.10.2026) – laufen im Rahmen der Verbspiele */
 const NEUE_SPIELE: readonly GrammatikSpielId[] = ['richtigfalsch', 'formenmemory', 'tabellenpuzzle', 'signalwort']
 
@@ -139,7 +147,8 @@ const teileGemischt = (teile: string[]): string[] => {
 export default function GrammatikTrainer({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<Daten | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
-  const [sitzung, setSitzung] = useState<GrammatikAufgabe[] | null>(null)
+  const [sitzung, setSitzungRoh] = useState<GrammatikAufgabe[] | null>(null)
+  const blatt = useBlaettern()
   const laden = useCallback(() => {
     void holen<Daten>(`/s/api/grammatik/liste?id=${encodeURIComponent(id)}`).then(setD, (e: unknown) => {
       setFehler(e instanceof Error ? e.message : String(e))
@@ -156,6 +165,12 @@ export default function GrammatikTrainer({ id }: { id: string }): React.JSX.Elem
       </Center>
     )
   if (!d) return <Alert color="orange">{fehler || 'Dieses Grammatiktraining gibt es nicht.'}</Alert>
+  // Im Ordner: Runde als nächste Seite; Zurück (auch mitten in der Runde) lädt den Stand neu
+  const setSitzung = (a: GrammatikAufgabe[] | null): void => {
+    if (!blatt) return setSitzungRoh(a)
+    if (a) blatt.oeffne('uebung', () => setSitzungRoh(a), () => (setSitzungRoh(null), laden()))
+    else blatt.zurueck(() => setSitzungRoh(null))
+  }
   return (
     <TrainerFarben fach={d.fach}>
       {sitzung ? (
@@ -212,7 +227,15 @@ function Kasten({
       aus = true
     }
   }, [d.id, d.art, d.fach])
-  const [spiel, setSpiel] = useState<GrammatikSpielId | null>(null)
+  const [spiel, setSpielRoh] = useState<GrammatikSpielId | null>(null)
+  // „Extra für dich" im Ordner: als nächste Seite statt eigener Seite
+  const [extra, setExtraRoh] = useState<string | null>(null)
+  const blatt = useBlaettern()
+  const setSpiel = (s: GrammatikSpielId | null): void => {
+    if (!blatt) return setSpielRoh(s)
+    if (s) blatt.oeffne('spiel', () => setSpielRoh(s), () => setSpielRoh(null))
+    else blatt.zurueck(() => setSpielRoh(null))
+  }
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const ich = window.__schulappsServer
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -251,6 +274,7 @@ function Kasten({
       )
     return grammatikSpielPasst(id, bekannt.aufgaben, d.paket.regeln.length, zeitformen.length)
   }
+  if (extra) return <GrammatikTrainer key={extra} id={extra} />
   if (spiel && NEUE_SPIELE.includes(spiel))
     return (
       <VerbSpielLauf
@@ -386,19 +410,21 @@ function Kasten({
   return (
     <Stack className="vt vt-rein" data-grammatik-kasten>
       <style>{CSS}</style>
-      {/* Zurück wie beim Vokabeltraining (08.10.2026): Gäste zu „Meine Materialien", sonst in den Lernraum */}
-      <Button
-        component="a"
-        href={zurueck.href}
-        variant="subtle"
-        color={farbe.a}
-        leftSection={<IconArrowLeft size={16} />}
-        px={4}
-        w="fit-content"
-        data-zurueck-lernen
-      >
-        {zurueck.text}
-      </Button>
+      {/* Zurück wie beim Vokabeltraining (08.10.2026): Gäste zu „Meine Materialien", sonst in den Lernraum; im Ordner blättert dessen Knopf */}
+      {!blatt && (
+        <Button
+          component="a"
+          href={zurueck.href}
+          variant="subtle"
+          color={farbe.a}
+          leftSection={<IconArrowLeft size={16} />}
+          px={4}
+          w="fit-content"
+          data-zurueck-lernen
+        >
+          {zurueck.text}
+        </Button>
+      )}
       <div>
         <Text c="dimmed" size="sm">
           {d.art ? 'Extra für dich' : 'Grammatik'} · {d.fach}
@@ -485,7 +511,20 @@ function Kasten({
                   Gerade dran
                 </Text>
                 {extras.map((x) => (
-                  <Card key={x.id} component="a" href={`/s/g/${x.id}`} withBorder radius="lg" padding="sm" data-extra-link={x.id}>
+                  <Card
+                    key={x.id}
+                    component="a"
+                    href={`/s/g/${x.id}`}
+                    onClick={(e: React.MouseEvent) => {
+                      if (!blatt || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+                      e.preventDefault()
+                      blatt.oeffne('extra', () => setExtraRoh(x.id), () => setExtraRoh(null))
+                    }}
+                    withBorder
+                    radius="lg"
+                    padding="sm"
+                    data-extra-link={x.id}
+                  >
                     <Group justify="space-between" wrap="nowrap">
                       <Text fw={700}>{x.titel}</Text>
                       <Badge variant="light" color={farbe.a} tt="none">
@@ -542,6 +581,12 @@ function Kasten({
           </UnstyledButton>
           {spieleOffen && (
             <>
+              {/* Einladungscode für Kooperativ/Versus oben im Spielbereich (09.10.2026) */}
+              {!d.paket.verben?.length && (
+                <div style={{ marginTop: 8 }}>
+                  <EinladungsCode sprache={d.sprache} />
+                </div>
+              )}
               {heute.length > 0 && (
                 <Text size="sm" c="dimmed" mt="xs">
                   Die Spiele gibt es nach der Übung für heute.
@@ -551,9 +596,9 @@ function Kasten({
                 {spiele.map((s) => (
                   <UnstyledButton key={s.id} disabled={heute.length > 0} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
                     <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 ? 0.5 : 1, height: '100%' }}>
-                      <Text fw={700}>{s.name}</Text>
+                      <Text fw={700}>{spielName('gram', s.id, d.sprache, s.name)}</Text>
                       <Text size="xs" c="dimmed">
-                        {s.beschreibung}
+                        {einzelBeschreibung('gram', s.id, s.beschreibung, d.sprache)}
                       </Text>
                       {d.rekorde[s.id] !== undefined && (
                         <Badge mt={6} leftSection={<IconTrophy size={12} />} variant="light" color="yellow">
@@ -567,7 +612,7 @@ function Kasten({
               {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) */}
               {!d.paket.verben?.length && (
                 <Stack gap="xs" mt="sm">
-                  <ZusammenSpielen bereich="gram" kurs={d.id} sprache={d.sprache} />
+                  <ZusammenSpielen bereich="gram" kurs={d.id} sprache={d.sprache} mitCode={false} />
                 </Stack>
               )}
             </>
@@ -630,6 +675,8 @@ function VerbSpielLauf({
       </Stack>
     )
   return (
+    // Vollbild beim Lernen (09.10.2026): das laufende Spiel füllt den Bildschirm, das Ergebnis zeigt die normale Ansicht
+    <FokusRahmen name="grammatikspiel" onEnde={() => fertig()}>
     <Stack className="vt" data-verbspiel={spiel}>
       <style>{CSS}</style>
       <style>{SPIELE_CSS}</style>
@@ -637,7 +684,7 @@ function VerbSpielLauf({
         <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4}>
           Beenden
         </Button>
-        <Text fw={800}>{info.name}</Text>
+        <Text fw={800}>{spielName('gram', spiel, d.sprache, info.name)}</Text>
       </Group>
       <div className="vt-buehne">
         {spiel === 'richtigfalsch' ? (
@@ -659,6 +706,7 @@ function VerbSpielLauf({
         )}
       </div>
     </Stack>
+    </FokusRahmen>
   )
 }
 
@@ -702,9 +750,12 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const [netz, setNetz] = useState('')
   // Tipp vor der Antwort (Förderaufgaben, 08.10.2026) – gilt für die aktuelle Frage
   const [tippFuer, setTippFuer] = useState<string | null>(null)
+  // „Lösung zeigen" (09.10.2026): leere Antwort = falsch; die Rückmeldung nennt nur die Lösung
+  const [aufgegeben, setAufgegeben] = useState(false)
   const a = schlange[0]
-  const antworten = async (antwort: string, wort?: string, selbst?: Urteil): Promise<void> => {
+  const antworten = async (antwort: string, wort?: string, selbst?: Urteil, zeigen = false): Promise<void> => {
     if (!a || laeuft || ergebnis) return
+    setAufgegeben(zeigen)
     setLaeuft(true)
     try {
       const e = await senden<Ergebnis>('/s/api/grammatik/antwort', {
@@ -775,6 +826,8 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const r = d.paket.regeln.find((x) => x.id === a.regelId)
   const st = staende[a.id]
   return (
+    // Vollbild beim Lernen (09.10.2026): die laufende Runde füllt den Bildschirm
+    <FokusRahmen name="grammatikrunde" onEnde={() => fertig(staende)}>
     <Stack className="vt" data-sitzung>
       <style>{CSS}</style>
       <Group justify="space-between">
@@ -799,6 +852,11 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
         <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
       </div>
+      {!ergebnis && MIT_LOESUNG_ZEIGEN.includes(a.art) && (
+        <Group justify="center">
+          <LoesungZeigen zeigen={() => void antworten('', undefined, undefined, true)} gesperrt={laeuft} />
+        </Group>
+      )}
       {a.tipp && !ergebnis && (
         <Stack gap={4}>
           <Button variant="light" size="xs" color="yellow" w="fit-content" onClick={() => setTippFuer(`${a.id}-${frage}`)} data-tipp-zeigen>
@@ -830,6 +888,8 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
           <Text fw={700}>
             {ergebnis.urteil === 'richtig'
               ? 'Richtig!'
+              : aufgegeben
+              ? 'Hier ist die Lösung – die Aufgabe kommt bald wieder.'
               : ergebnis.urteil === 'fast'
               ? a.art === 'bestimmen' || a.art === 'mehrfach' || a.art === 'tabelle'
                 ? 'Teilweise richtig.'
@@ -838,7 +898,11 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
                 : 'Fast – achte auf die Schreibweise.'
               : 'Leider falsch.'}
           </Text>
-          {ergebnis.urteil !== 'richtig' && <Text size="sm">Richtig: {ergebnis.richtig}</Text>}
+          {ergebnis.urteil !== 'richtig' && (
+            <Text size="sm" data-loesung-text>
+              {aufgegeben ? 'Lösung' : 'Richtig'}: {ergebnis.richtig}
+            </Text>
+          )}
           {ergebnis.erklaerung && <Text size="sm">{ergebnis.erklaerung}</Text>}
         </Alert>
       )}
@@ -848,6 +912,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
         </Button>
       )}
     </Stack>
+    </FokusRahmen>
   )
 }
 
@@ -1176,7 +1241,7 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
         <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4}>
           Abbrechen
         </Button>
-        <Title order={4}>{info.name}</Title>
+        <Title order={4}>{spielName('gram', spiel, d.sprache, info.name)}</Title>
         <Badge size="lg" variant="light" color={farbe.a}>
           {zeitSpiel ? `${Math.max(0, rest)} s · ` : `${nr + 1}/${runden.length} · `}
           {punkte}
@@ -1205,6 +1270,11 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
           />
         )}
       </div>
+      {urteil === null && spiel !== 'regelzuordnen' && runde && GETIPPT.includes((runde as GrammatikAufgabe).art) && (
+        <Group justify="center">
+          <LoesungZeigen zeigen={() => naechste(false, (runde as GrammatikAufgabe).id)} />
+        </Group>
+      )}
       {urteil === 'falsch' && spiel !== 'regelzuordnen' && <Text c="red">Richtig: {(runde as GrammatikAufgabe).loesungen[0]}</Text>}
     </Stack>
   )

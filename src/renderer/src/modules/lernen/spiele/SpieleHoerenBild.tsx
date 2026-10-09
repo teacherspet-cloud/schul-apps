@@ -10,7 +10,7 @@
 import { ActionIcon, Badge, Button, Group, Progress, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconBackspace, IconCheck, IconVolume, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { auswahlOptionen, bewerte, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { auswahlOptionen, bewerte, ohneAuslassung, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { apostrophNormal, istApostroph } from '@shared/apostroph'
 import { spielform } from '@shared/vokabelSpiele'
 import { sprich } from '../VokabelTrainer'
@@ -18,6 +18,8 @@ import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
 import LegeEingabe from '../handschrift/LegeEingabe'
+import { useZuSchnell } from '../zuSchnell'
+import LoesungZeigen from '../LoesungZeigen'
 
 /** Ab diesem Fach wird geschrieben statt gewählt (abgestimmt 07.10.2026) */
 export const SCHREIBEN_AB_FACH = 3
@@ -60,6 +62,10 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
           <Button size="lg" type="submit" disabled={!text.trim()}>
             OK
           </Button>
+        </Group>
+        {/* Nicht gewusst (09.10.2026): zählt als falsch, die Runde zeigt die Lösung */}
+        <Group justify="center" mt={4}>
+          <LoesungZeigen zeigen={() => fertig(false)} />
         </Group>
       </form>
     )
@@ -248,9 +254,20 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
       ende(gut, [...fehler.current])
     }
   }, [sek, abzug]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Blind immer dieselbe Seite (09.10.2026): zählt nicht, schon gezählte Treffer der Folge werden zurückgenommen
+  const schnell = useZuSchnell<{ gut: boolean; id: string }>()
+  useEffect(() => schnell.frage(), [runde, schnell.frage])
   const antwort = (passt: boolean): void => {
     if (rueck !== null || fertig.current) return
     const richtig = passt === (runde.v.id === runde.zeige.id)
+    const s = schnell.melden(passt ? 'passt' : 'passt nicht', { gut: richtig, id: runde.v.id })
+    if (!s.werten) {
+      const treffer = s.zurueck.filter((x) => x.gut).length
+      if (treffer) setGut((g) => Math.max(0, g - treffer))
+      for (const x of s.zurueck) if (!x.gut) fehler.current.delete(x.id)
+      setRunde(neueRunde())
+      return
+    }
     setRueck(richtig)
     if (richtig) setGut((g) => g + 1)
     else {
@@ -285,6 +302,7 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
           </Text>
         )}
       </div>
+      {schnell.hinweis}
       {rueck !== null ? (
         <Badge size="xl" color={rueck ? 'green' : 'red'} variant="light">
           {rueck ? 'Richtig!' : 'Daneben'}
@@ -319,7 +337,8 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
   const [gut, setGut] = useState(0)
   const fehler = useRef(new Set<string>())
   const v = reihe[i]
-  const wort = v ? spielform(v.term) : ''
+  // Auslassungspunkte („look forward to ...") sind keine Buchstaben zum Legen (09.10.2026)
+  const wort = v ? ohneAuslassung(spielform(v.term)) : ''
   // Leerzeichen und Apostrophe sind keine Kacheln, sie stehen vorbelegt im Wort (08.10.2026)
   const kacheln = useMemo(() => {
     const buchstaben = [...wort].filter((c) => !/\s/.test(c) && !istApostroph(c))
@@ -341,7 +360,11 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
   }
   const pruefen = (): void => {
     // Tolerant wie im Trainer: Groß-/Kleinschreibung und Apostroph-Zeichen egal (08.10.2026)
-    const ok = apostrophNormal(gelegtText).toLowerCase() === apostrophNormal(ziel).toLowerCase()
+    abschliessen(apostrophNormal(gelegtText).toLowerCase() === apostrophNormal(ziel).toLowerCase())
+  }
+  // „Lösung zeigen" (09.10.2026): zählt als falsch, die Lösung bleibt etwas länger stehen
+  const abschliessen = (ok: boolean, lange = false): void => {
+    if (rueck !== null) return
     setRueck(ok)
     if (ok) setGut((g) => g + 1)
     else fehler.current.add(v.id)
@@ -352,7 +375,7 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
         setGelegt([])
         setRueck(null)
       },
-      ok ? 800 : 1800
+      ok ? 800 : lange ? 3000 : 1800
     )
   }
   return (
@@ -422,6 +445,7 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
           Prüfen
         </Button>
       </Group>
+      <LoesungZeigen zeigen={() => abschliessen(false, true)} gesperrt={rueck !== null} />
     </Stack>
   )
 }

@@ -23,12 +23,14 @@ import {
   name,
   rueckBlock,
   standBlock,
+  tx,
   versusErgebnis,
   type Block,
   type Regeln
 } from '../kern'
 import type { Frage, MehrspielId, SpielInhalt } from '../typen'
 import { frageItems, leereFragen, naechsteFrage, spaeterNochmal, type MitFragen } from './hilfen'
+import { spielEinheit } from '../../spielSprache'
 
 export interface Rennen extends MitFragen {
   stand: Record<string, number>
@@ -82,12 +84,12 @@ export function rennenSpiel(cfg: RennenCfg): Regeln<Rennen> {
         gut(z, wer, p)
         if (cfg.koop) z.gemeinsam += p
         else z.stand[wer] += p
-        melde(z, wer, true, p > 1 ? `+${p}` : 'richtig!')
+        melde(z, wer, true, p > 1 ? `+${p}` : tx(z, 'richtigKlein'))
       } else {
         fehlerMerken(z, wer, f.itemId)
         spaeterNochmal(z, wer, f.itemId)
         cfg.falsch?.(z, wer)
-        melde(z, wer, false, 'daneben.', f.loesung)
+        melde(z, wer, false, tx(z, 'daneben'), f.loesung)
       }
       const bester = Math.max(...Object.values(z.stand))
       for (const id of Object.keys(z.stand)) z.rueckstand[id] = Math.max(z.rueckstand[id], bester - z.stand[id])
@@ -102,7 +104,7 @@ export function rennenSpiel(cfg: RennenCfg): Regeln<Rennen> {
     sicht(z, wer) {
       const ziel = cfg.ziel(z)
       const b: Block[] = cfg.koop
-        ? [{ typ: 'fortschritt', titel: `Gemeinsam: ${z.gemeinsam} von ${ziel} ${cfg.einheit}`, wert: z.gemeinsam, max: ziel, ton: 'gut' }]
+        ? [{ typ: 'fortschritt', titel: tx(z, 'gemeinsamVon', z.gemeinsam, ziel, spielEinheit(cfg.einheit, z.inhalt.sprache)), wert: z.gemeinsam, max: ziel, ton: 'gut' }]
         : [
             standBlock(
               z.spieler.map((s) => ({ name: s.name, wert: `${Math.min(z.stand[s.id], ziel)} / ${ziel}`, ...(s.id === wer ? { ich: true } : {}) }))
@@ -116,11 +118,11 @@ export function rennenSpiel(cfg: RennenCfg): Regeln<Rennen> {
     ergebnis(z) {
       if (cfg.koop) {
         const ok = z.gemeinsam >= cfg.ziel(z)
-        return koopErgebnis(z, ok, z.gemeinsam, ok ? `Geschafft: ${z.gemeinsam} ${cfg.einheit}!` : `${z.gemeinsam} von ${cfg.ziel(z)} ${cfg.einheit}.`)
+        return koopErgebnis(z, ok, z.gemeinsam, ok ? tx(z, 'geschafftEinheit', z.gemeinsam, spielEinheit(cfg.einheit, z.inhalt.sprache)) : tx(z, 'vonEinheit', z.gemeinsam, cfg.ziel(z), spielEinheit(cfg.einheit, z.inhalt.sprache)))
       }
       const bester = Math.max(...Object.values(z.stand))
       const sieger = Object.keys(z.stand).filter((id) => z.stand[id] === bester && bester > 0)
-      return versusErgebnis(z, sieger, (id) => z.stand[id], sieger.length ? `Gewonnen hat: ${sieger.map((id) => name(z, id)).join(' & ')}` : 'Unentschieden!', {
+      return versusErgebnis(z, sieger, (id) => z.stand[id], sieger.length ? tx(z, 'gewonnenHat', sieger.map((id) => name(z, id)).join(' & ')) : tx(z, 'unentschieden'), {
         comeback: sieger.some((id) => z.rueckstand[id] >= 3),
         unentschieden: sieger.length !== 1
       })
@@ -218,7 +220,7 @@ export const kollokation = rennenSpiel({
     return {
       itemId: i.id,
       frage: nachbarn(l.vor, l.nach),
-      zusatz: 'Welches Wort passt dazu?',
+      zusatz: tx(z, 'welchesPasstDazu'),
       optionen: z.tippen ? [] : mischen(z, [l.loesung, ...ablenker]),
       loesung: l.loesung,
       ...(z.tippen ? { tippen: true } : {})
@@ -245,7 +247,7 @@ export const synonyme = rennenSpiel({
     return {
       itemId: item?.id ?? a,
       frage: a,
-      zusatz: 'Welches Wort bedeutet dasselbe?',
+      zusatz: tx(z, 'welchesDasselbe'),
       optionen: z.tippen ? [] : mischen(z, [b, ...[...new Set(andere)].slice(0, 3)]),
       loesung: b,
       ...(z.tippen ? { tippen: true, alternativen: g.woerter.filter((w) => w !== a) } : {})

@@ -15,6 +15,7 @@ import { beschriftung } from './beschriftung'
 import { mitOrdner, nimmZurueck } from './ordnerAnimation'
 import { ordnerFarben, REGAL_DUNKEL, REGAL_HELL } from './ordnerFarben'
 import { sortiert, useRegal, type FachOrdner } from './regalDaten'
+import { Demnaechst, NeuFreigeschaltet } from './planHinweise'
 
 const CSS = `
 .rg-regal { border-radius: 14px; padding: 14px 12px 4px; background: var(--rg-holz-hinten); box-shadow: inset 0 0 0 6px var(--rg-holz), inset 0 10px 30px rgba(0,0,0,.18); }
@@ -183,6 +184,9 @@ export default function Regal({ titel, unten, kompakt }: { titel: string; unten?
   return (
     <Stack data-regal data-regal-kompakt={kompakt || undefined} gap={kompakt ? 'xs' : undefined}>
       <style>{CSS}</style>
+      {/* Freischaltungen planen (09.10.2026): einmal „Neu freigeschaltet", dazu „Demnächst" für Fächer ohne Ordner */}
+      <NeuFreigeschaltet />
+      {reihe && <Demnaechst ausser={reihe.map((o) => o.fach)} />}
       {!kompakt && (
         <div>
           <Title order={3}>{titel}</Title>

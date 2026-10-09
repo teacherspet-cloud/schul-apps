@@ -13,6 +13,7 @@ import { tauziehen } from './spiele/tauziehen'
 import { schiffe, staffel } from './spiele/staffel'
 import { bingo } from './spiele/bingo'
 import { WELLE2 } from './spiele/welle2'
+import { mehrBeschreibung, spielName } from '../spielSprache'
 
 export const REGELN: Record<MehrspielId, Regeln<Basis>> = {
   teammatch,
@@ -46,6 +47,19 @@ export function angebotFuer(inhalt: SpielInhalt, jahrgang: number | null, stimme
   return MEHRSPIELE.filter((s) => s.bereiche.includes(inhalt.bereich) && imJahrgang(s, jahrgang)).flatMap((s) => {
     const r = REGELN[s.id]
     const grund = r ? r.passt(inhalt, stimme) : 'Noch nicht verfügbar.'
-    return grund ? [] : [{ id: s.id, name: s.name, art: s.art, beschreibung: s.beschreibung, min: s.min, max: s.max, grund: null }]
+    // Name und Regel in der Zielsprache des Kurses (09.10.2026)
+    return grund
+      ? []
+      : [
+          {
+            id: s.id,
+            name: spielName('mehr', s.id, inhalt.sprache, s.name),
+            art: s.art,
+            beschreibung: mehrBeschreibung(s.id, s.beschreibung, inhalt.sprache, jahrgang),
+            min: s.min,
+            max: s.max,
+            grund: null
+          }
+        ]
   })
 }

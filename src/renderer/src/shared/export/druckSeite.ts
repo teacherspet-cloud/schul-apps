@@ -1,20 +1,17 @@
 /**
- * Drucken im Browser eines Tablets oder Telefons (08.10.2026).
+ * Seitenbilder zum Drucken im Browser (08.10.2026, seit 09.10.2026 ohne eigenen Tab).
  *
- * Meldung der Lehrkraft (iPad, Zugangszettel/Codekarten): Nach der Druckvorschau kam nur „Als PDF
- * sichern" – drucken ließ sich nicht, einen Drucker konnte man nicht wählen. Ursache: Im Browser öffnet
- * „Druckansicht öffnen …" das fertige PDF in einem neuen Tab (netzZugang.ts `druckeImBrowser`). Safari
- * auf iPad und iPhone zeigt ein PDF aus einem Blob aber nur zum Laden bzw. Sichern an, Chrome unter
- * Android lädt es gleich herunter – einen Druckknopf gibt es dort nicht.
+ * Meldung der Lehrkraft (iPad, Zugangszettel/Codekarten): Ein PDF aus einem Blob zeigt Safari auf iPad und iPhone nur
+ * zum Laden bzw. Sichern an, Chrome unter Android lädt es gleich herunter – einen Druckknopf gibt es dort nicht. Deshalb
+ * werden die Seiten des PDFs mit pdf.js zu Bildern (genau so, wie der Server sie gesetzt hat – Safari setzt das HTML
+ * beim Drucken anders) und über den Druckdialog des Geräts gedruckt (auf dem iPad AirPrint mit Druckerwahl, Exemplaren
+ * und Doppelseitig).
  *
- * Jetzt bekommt der neue Tab auf diesen Geräten eine DRUCKSEITE: die Seiten des PDFs als Bilder (mit
- * pdf.js gerendert, also genau so, wie der Server sie gesetzt hat – Safari setzt das HTML beim Drucken
- * anders), dazu „Drucken …" (window.print → Druckdialog des Geräts, auf dem iPad AirPrint mit Druckerwahl,
- * Exemplaren und Doppelseitig) und „Als PDF sichern" als Rückfall. Der Druckdialog öffnet sich gleich von
- * selbst, sobald die Seiten geladen sind; der Knopf bleibt für den zweiten Versuch.
+ * Bis 08.10.2026 kamen die Bilder in einen neuen Tab; den blockierte der Popup-Blocker (09.10.2026, iPad mit Opera,
+ * Schul-PC). Jetzt liegen sie in einem Druckbereich im aktuellen Dokument (druckImDokument.ts) – auf allen Geräten.
  *
- * Querformat-Seiten werden gedreht auf eine Hochformat-Seite gelegt – auf Papier ist das dasselbe, und die
- * Druckseite braucht so nur EIN Seitenformat (Safari kennt `@page size` je Seite nicht).
+ * Querformat-Seiten werden gedreht auf eine Hochformat-Seite gelegt – auf Papier ist das dasselbe, und der Druck
+ * braucht so nur EIN Seitenformat (Safari kennt `@page size` je Seite nicht).
  *
  * Die App am PC, die Exe „Schul-Apps Online" und die iPad-App drucken anders und sind nicht betroffen.
  */
@@ -68,66 +65,4 @@ export async function druckBilder(daten: Uint8Array): Promise<string[]> {
     await aufgabe.destroy()
   }
   return bilder
-}
-
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-
-/** Das HTML der Druckseite (ohne Skript – die Knöpfe verdrahtet `zeigeDruckSeite`) */
-export function druckSeiteHtml(bilder: string[], titel: string, pdfUrl: string, dateiname: string): string {
-  const seiten = bilder.map((src, i) => `<div class="seite"><img src="${src}" alt="Seite ${i + 1}"></div>`).join('')
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(titel)}</title><style>
-@page { size: A4 portrait; margin: 0; }
-html, body { margin: 0; background: #e9ecef; font-family: -apple-system, system-ui, "Segoe UI", sans-serif; color: #111; }
-.leiste { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: center; padding: 12px 16px; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.15); }
-.leiste button, .leiste a { font: 600 17px -apple-system, system-ui, sans-serif; padding: 11px 20px; border-radius: 10px; border: 0; cursor: pointer; text-decoration: none; touch-action: manipulation; }
-#drucken { background: #1c7ed6; color: #fff; }
-#pdf { background: #f1f3f5; color: #1c3d5a; }
-.hinweis { flex-basis: 100%; text-align: center; font-size: 13px; color: #555; }
-.seite { margin: 16px auto; width: min(800px, calc(100vw - 32px)); background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,.18); }
-.seite img { display: block; width: 100%; height: auto; }
-@media print {
-  .leiste { display: none; }
-  html, body { background: #fff; }
-  .seite { margin: 0 auto; width: 100%; box-shadow: none; break-inside: avoid; page-break-inside: avoid; break-after: page; page-break-after: always; }
-  .seite:last-child { break-after: auto; page-break-after: auto; }
-  .seite img { width: 100%; height: auto; max-height: 100vh; object-fit: contain; margin: 0 auto; }
-}
-</style></head><body>
-<div class="leiste"><button id="drucken" type="button">Drucken …</button><a id="pdf" href="${esc(pdfUrl)}" download="${esc(dateiname)}">Als PDF sichern</a>
-<div class="hinweis">Im Druckdialog lassen sich Drucker, Exemplare, Seiten und Doppelseitig wählen.</div></div>
-${seiten}
-</body></html>`
-}
-
-/**
- * Die Druckseite in den (schon offenen) Tab schreiben und den Druckdialog öffnen. `tab` ist ein
- * leerer Tab derselben Herkunft (window.open('') beim Klick), `pdfUrl` die Blob-Adresse des PDFs.
- */
-export async function zeigeDruckSeite(tab: Window, pdf: Uint8Array, titel: string, pdfUrl: string, dateiname: string): Promise<void> {
-  const bilder = await druckBilder(pdf)
-  const doc = tab.document
-  doc.open()
-  doc.write(druckSeiteHtml(bilder, titel, pdfUrl, dateiname))
-  doc.close()
-  const drucken = (): void => {
-    try {
-      tab.focus()
-      tab.print()
-    } catch {
-      // Knopf bleibt – dann eben von Hand
-    }
-  }
-  doc.getElementById('drucken')?.addEventListener('click', drucken)
-  // Erst drucken, wenn alle Seitenbilder da sind – sonst druckt Safari leere Seiten
-  await Promise.all(
-    Array.from(doc.images).map((b) =>
-      b.complete
-        ? Promise.resolve()
-        : new Promise<void>((r) => {
-            b.addEventListener('load', () => r())
-            b.addEventListener('error', () => r())
-          })
-    )
-  )
-  setTimeout(drucken, 300)
 }

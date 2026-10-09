@@ -6,13 +6,21 @@
  *  - Materialien / Materials …: Arbeitsblätter, Onlinetests, Rückmeldungen (Schreibaufgaben), dazu bei Konten Mappen
  *    (Ergebnisse, Tafelbilder, Lernprodukte) und Merkzettel; Arbeitsblätter aus Unterrichtsreihen je Reihe (08.10.2026)
  * Registerwechsel blättert um; ruhige Darstellung ohne Bewegung.
+ *
+ * Unterseiten im Ordner (09.10.2026, Wunsch der Lehrkraft, blaettern.tsx): Grammatikform → Training → Übung/Spiel,
+ * Vokabelrunde und Spiele, Arbeitsblätter öffnen sich als nächste Seite IM Ordner – die Seite schlägt nach links um,
+ * „Zurück" (Knopf, Browser, Wischen) blättert zurück. Die Adresse nennt die Ebene (?r=gram&g=<ID>, ?r=mat&b=<ID>).
  */
 import { kursReiterNamen } from '@shared/ohneKlasse'
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
-import { IconAbc, IconArrowLeft, IconBook2, IconFileText } from '@tabler/icons-react'
+import { IconAbc, IconArrowLeft, IconBook2, IconFileText, IconListSearch } from '@tabler/icons-react'
 import { SegmentedControl } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
 import VokabelTrainer from '../VokabelTrainer'
+import GrammatikTrainer from '../GrammatikTrainer'
+import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
+import Wortliste from './Wortliste'
+import { BlaetternRahmen, useOrdnerBlaettern } from './blaettern'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { VokabelwegKarten } from '../VokabelLeiter'
@@ -22,6 +30,7 @@ import { deckelBereit, herkunft, nimmUebergang, ordnerZu } from './ordnerAnimati
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
+import { Demnaechst, NeuFreigeschaltet } from './planHinweise'
 
 const CSS = `
 .og-ordner { display: grid; grid-template-columns: 46px 1fr auto; min-height: 70vh; border-radius: 10px; overflow: visible; position: relative;
@@ -63,17 +72,19 @@ const CSS = `
   .og-ringe { padding: 20px 0; } .og-ring { width: 22px; height: 12px; margin-right: -12px; border-width: 3px; }
   .og-papier { padding: 16px 12px 22px 22px; } .og-papier::before { left: 8px; }
   .og-ringe, .og-papier { grid-row: 2; }
-  .og-laschen { grid-column: 1 / -1; grid-row: 1; flex-direction: row; padding: 0 0 0 26px; gap: 4px; }
-  .og-lasche { writing-mode: horizontal-tb; border-radius: 10px 10px 0 0; padding: 7px 10px; margin: 0 0 -2px; font-size: .82rem; }
+  .og-laschen { grid-column: 1 / -1; grid-row: 1; flex-direction: row; padding: 4px 0 0 26px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .og-lasche { writing-mode: horizontal-tb; border-radius: 10px 10px 0 0; padding: 7px 10px; margin: 0 0 -2px; font-size: .82rem; white-space: nowrap; flex: none; }
   .og-lasche[aria-selected="true"] { transform: translateY(-4px); }
   .og-lasche svg { transform: none; }
 }
+.og-zurueck-leiste { margin: -6px 0 10px -6px; }
 @media (prefers-reduced-motion: reduce) { .og-ordner, .og-seite { animation: none; } .og-lasche { transition: none; } }
 html.sa-ruhig .og-ordner, html.sa-ruhig .og-seite { animation: none; }
 `
 
 const SYMBOL: Record<Register, React.ReactNode> = {
   vok: <IconAbc size={16} />,
+  wort: <IconListSearch size={16} />,
   gram: <IconBook2 size={16} />,
   mat: <IconFileText size={16} />
 }
@@ -84,6 +95,9 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   const o = ordner?.find((x) => x.fach === fachName(fach))
   const vorgabe = new URLSearchParams(window.location.search).get('r') as Register | null
   const [wahl, setWahl] = useState<Register | null>(vorgabe)
+  // Geöffnete Unterseite des Ordners selbst (Grammatiktraining, Arbeitsblatt); tiefere Ebenen gehören den Bausteinen
+  const [seite, setSeite] = useState<Seite | null>(null)
+  const papierEl = useRef<HTMLDivElement>(null)
   // Aus dem Regal geöffnet: Deckel liegt schon über der Seite und klappt auf, sobald der Ordner steht (08.10.2026)
   const [uebergang] = useState(nimmUebergang)
   const aufklappen = useRef<((ziel: HTMLElement | null) => void) | null>(null)
@@ -111,20 +125,23 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
           Ins Regal
         </Button>
         <Text c="dimmed">In diesem Ordner liegt (noch) nichts.</Text>
+        <Demnaechst fach={fachName(fach)} />
       </Stack>
     )
   const f = ordnerFarben(o.farbe, dunkel)
-  const register = registerVon(o)
+  // Wortliste (09.10.2026): eigenes Register gleich nach den Vokabeln – nur im Ordner, der Rücken im Regal bleibt
+  const register = mitWortliste(registerVon(o))
   const aktiv: Register = wahl && register.includes(wahl) ? wahl : register[0] ?? 'mat'
   const zeigen = (r: Register): void => {
     setWahl(r)
     // Register in der Adresse merken: „Zurück" aus einem Training landet wieder hier
-    window.history.replaceState(null, '', `${window.location.pathname}?r=${r}`)
+    window.history.replaceState({ ...(window.history.state ?? {}), ordnerTiefe: 0 }, '', `${window.location.pathname}?r=${r}`)
   }
   const akzent = f.register[aktiv].bg
   return (
     <Stack gap="sm" data-ordner={fach}>
       <style>{CSS}</style>
+      <NeuFreigeschaltet />
       <Group justify="space-between" wrap="nowrap">
         <Button
           variant="subtle"
@@ -157,49 +174,87 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
           ['--og-akzent' as string]: akzent
         }}
       >
-        <div className="og-ringe" aria-hidden>
-          <span className="og-ring" />
-          <span className="og-ring" />
-        </div>
-        <div className="og-papier">
-          <div key={aktiv} className="og-seite" role="tabpanel" data-ordner-register={aktiv}>
-            <Text fw={800} size="lg" mb="sm" style={{ color: dunkel ? '#e9ecef' : f.register[aktiv].bg }}>
-              {s[aktiv]}
-            </Text>
-            {aktiv === 'vok' && <VokabelRegister o={o} />}
-            {aktiv === 'gram' && <Kurse o={o} grammatik />}
-            {aktiv === 'mat' && <Materialien o={o} />}
-          </div>
-        </div>
-        <div className="og-laschen" role="tablist" aria-label="Register">
-          {register.map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="tab"
-              aria-selected={r === aktiv}
-              className="og-lasche"
-              style={{ background: f.register[r].bg, color: f.register[r].text }}
-              onClick={() => zeigen(r)}
-              data-lasche={r}
-            >
-              {SYMBOL[r]}
-              {s[r]}
-              {zuTun(o, r) > 0 && (
-                <span className="og-zahl" title="Hier ist etwas zu tun" data-lasche-offen={zuTun(o, r)}>
-                  {zuTun(o, r)}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <BlaetternRahmen papier={papierEl} buehne={ordnerEl}>
+          {({ tiefe, zurueck, alleZu, wischen }) => (
+            <>
+              <div className="og-ringe" aria-hidden>
+                <span className="og-ring" />
+                <span className="og-ring" />
+              </div>
+              <div className="og-papier" ref={papierEl} data-ordner-tiefe={tiefe} {...wischen}>
+                <Wiederherstellen setSeite={setSeite} register={aktiv} />
+                {tiefe > 0 && (
+                  <Group className="og-zurueck-leiste">
+                    <Button variant="subtle" size="compact-md" leftSection={<IconArrowLeft size={16} />} onClick={zurueck} data-ordner-zurueck>
+                      Zurück
+                    </Button>
+                  </Group>
+                )}
+                <div key={aktiv} className="og-seite" role="tabpanel" data-ordner-register={aktiv}>
+                  {tiefe === 0 && (
+                    <Text fw={800} size="lg" mb="sm" style={{ color: dunkel ? '#e9ecef' : f.register[aktiv].bg }}>
+                      {s[aktiv]}
+                    </Text>
+                  )}
+                  {/* Geplante Freischaltungen (09.10.2026): nur Titel und Datum */}
+                  {tiefe === 0 && <Demnaechst fach={o.fach} register={aktiv} vorhanden={register} />}
+                  {aktiv === 'vok' && <VokabelRegister o={o} oben={tiefe === 0} />}
+                  {aktiv === 'wort' && <Wortliste o={o} />}
+                  {aktiv === 'gram' &&
+                    (seite?.art === 'gram' ? (
+                      <div data-ordner-unterseite="grammatik">
+                        <GrammatikTrainer key={seite.id} id={seite.id} />
+                      </div>
+                    ) : (
+                      <Kurse o={o} grammatik setSeite={setSeite} />
+                    ))}
+                  {aktiv === 'mat' &&
+                    (seite?.art === 'blatt' ? (
+                      <div data-ordner-unterseite="blatt">
+                        <BlattAusfuellen key={seite.id} id={seite.id} />
+                      </div>
+                    ) : (
+                      <Materialien o={o} setSeite={setSeite} />
+                    ))}
+                </div>
+              </div>
+              <div className="og-laschen" role="tablist" aria-label="Register">
+                {register.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    role="tab"
+                    aria-selected={r === aktiv}
+                    className="og-lasche"
+                    style={{ background: f.register[r].bg, color: f.register[r].text }}
+                    // Offene Unterseiten zuklappen (Verlauf zurück), dann das Register zeigen
+                    onClick={() => alleZu(() => zeigen(r))}
+                    data-lasche={r}
+                  >
+                    {SYMBOL[r]}
+                    {s[r]}
+                    {zuTun(o, r) > 0 && (
+                      <span className="og-zahl" title="Hier ist etwas zu tun" data-lasche-offen={zuTun(o, r)}>
+                        {zuTun(o, r)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </BlaetternRahmen>
       </div>
     </Stack>
   )
 }
 
+/** Register mit Wortliste: gleich hinter „Vokabeln" (die Wortliste gibt es, sobald es Vokabeln gibt) */
+export const mitWortliste = (r: Register[]): Register[] => r.flatMap((x) => (x === 'vok' ? (['vok', 'wort'] as Register[]) : [x]))
+
 /** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
 export function zuTun(o: FachOrdner, r: Register): number {
+  if (r === 'wort') return 0
   if (r === 'vok') return o.vokabeln.filter((v) => (v.uebersicht.heuteOffen ?? 0) > 0 || v.uebersicht.faellig > 0).length
   if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
   return (
@@ -210,6 +265,48 @@ export function zuTun(o: FachOrdner, r: Register): number {
   )
 }
 
+/** Unterseite, die der Ordner selbst öffnet */
+type Seite = { art: 'gram' | 'blatt'; id: string }
+
+/** Adresse einer Unterseite: Register und Kennung („?r=gram&g=…") – so führen Neuladen und Verlauf dorthin */
+const seitenAdresse = (r: Register, x: Seite): string => `${window.location.pathname}?r=${r}&${x.art === 'gram' ? 'g' : 'b'}=${encodeURIComponent(x.id)}`
+
+/** Eine Unterseite öffnen (mit Umblättern) – außerhalb des Ordners bzw. mit Strg/Mittelklick wie ein Link */
+function useSeiteOeffnen(setSeite: (s: Seite | null) => void): (r: Register, x: Seite) => (e: React.MouseEvent) => void {
+  const b = useOrdnerBlaettern()
+  return (r, x) => (e) => {
+    if (!b || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    b.oeffne(
+      x.art,
+      () => setSeite(x),
+      () => setSeite(null),
+      seitenAdresse(r, x)
+    )
+  }
+}
+
+/**
+ * Beim Laden: Steht eine Unterseite in der Adresse (Neuladen, Lesezeichen), liegt darunter wieder die Registerseite –
+ * so führt „Zurück" zuerst dorthin. Ein Verlaufseintrag aus einer früheren Sitzung wird zur Registerseite.
+ */
+function Wiederherstellen({ setSeite, register }: { setSeite: (s: Seite | null) => void; register: Register }): null {
+  const b = useOrdnerBlaettern()
+  const erledigt = useRef(false)
+  useEffect(() => {
+    if (erledigt.current || !b) return
+    erledigt.current = true
+    const q = new URLSearchParams(window.location.search)
+    const g = q.get('g')
+    const bl = q.get('b')
+    const x: Seite | null = g && /^[a-f0-9]{8,32}$/.test(g) ? { art: 'gram', id: g } : bl && /^[a-f0-9]{8,32}$/.test(bl) ? { art: 'blatt', id: bl } : null
+    window.history.replaceState({ ...(window.history.state ?? {}), ordnerTiefe: 0 }, '', `${window.location.pathname}?r=${register}`)
+    if (x && ((x.art === 'gram' && register === 'gram') || (x.art === 'blatt' && register === 'mat')))
+      b.oeffne(x.art, () => setSeite(x), () => setSeite(null), seitenAdresse(register, x), true)
+  }, [b, register, setSeite])
+  return null
+}
+
 /** Zurück: Gäste auf die Startseite, Konten in ihren Lernraum (dort steht das Regal) */
 const zurueckZiel = (): string => herkunft(!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
 
@@ -217,7 +314,7 @@ const zurueckZiel = (): string => herkunft(!window.__schulappsServer?.angemeldet
  * Register Vocabulary (08.10.2026, Wunsch der Lehrkraft): der Kurs gleich hier – Karteikasten, Tagesrunde, Spiele –
  * statt einer Karte, die erst eine eigene Seite öffnet. Mehrere Kurse im Fach: Umschalter oben (gemerkt je Fach).
  */
-function VokabelRegister({ o }: { o: FachOrdner }): React.JSX.Element {
+function VokabelRegister({ o, oben }: { o: FachOrdner; oben: boolean }): React.JSX.Element {
   const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
   const schluessel = `sa-ordner-kurs-${o.fach}`
   const [wahl, setWahl] = useState<string>(() => {
@@ -238,8 +335,9 @@ function VokabelRegister({ o }: { o: FachOrdner }): React.JSX.Element {
   }
   return (
     <Stack gap="sm">
-      {konto && <VokabelwegKarten fach={o.fach} />}
-      {o.vokabeln.length > 1 && (
+      {/* Auf Unterseiten (Runde, Spiel) nur der Kurs – er bleibt dabei bestehen, damit nichts verloren geht */}
+      {konto && oben && <VokabelwegKarten fach={o.fach} />}
+      {o.vokabeln.length > 1 && oben && (
         <SegmentedControl
           value={kurs?.id ?? ''}
           onChange={waehle}
@@ -257,8 +355,9 @@ function VokabelRegister({ o }: { o: FachOrdner }): React.JSX.Element {
   )
 }
 
-function Kurse({ o, grammatik }: { o: FachOrdner; grammatik: boolean }): React.JSX.Element {
+function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; setSeite: (s: Seite | null) => void }): React.JSX.Element {
   const [suche, setSuche] = useState('')
+  const oeffnen = useSeiteOeffnen(setSeite)
   const alle = grammatik ? o.grammatik : o.vokabeln
   // Suche im Grammatikhefter (08.10.2026, Wunsch der Lehrkraft): filtert die Einträge nach dem Titel
   const s = suche.trim().toLocaleLowerCase('de')
@@ -269,7 +368,13 @@ function Kurse({ o, grammatik }: { o: FachOrdner; grammatik: boolean }): React.J
   const gruppen = grammatik ? nachJahrgaengen(liste) : []
   const mitJahren = gruppen.some((g) => g.jahrgang !== null)
   const karte = (v: KursKurz): React.JSX.Element => (
-    <a key={v.id} className="og-karte" href={`${grammatik ? '/s/g/' : '/s/v/'}${v.id}`} data-ordner-kurs={grammatik ? 'grammatik' : 'vokabeln'}>
+    <a
+      key={v.id}
+      className="og-karte"
+      href={`${grammatik ? '/s/g/' : '/s/v/'}${v.id}`}
+      onClick={grammatik ? oeffnen('gram', { art: 'gram', id: v.id }) : undefined}
+      data-ordner-kurs={grammatik ? 'grammatik' : 'vokabeln'}
+    >
       <Group justify="space-between" wrap="nowrap">
         <div style={{ minWidth: 0 }}>
           <Text fw={700}>{v.titel}</Text>
@@ -352,8 +457,9 @@ function Abschnitt({ titel, children }: { titel: string; children: React.ReactNo
   )
 }
 
-function Materialien({ o }: { o: FachOrdner }): React.JSX.Element {
+function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | null) => void }): React.JSX.Element {
   const [mappe, setMappe] = useState<Mappe | null>(null)
+  const oeffnen = useSeiteOeffnen(setSeite)
   const [merk, setMerk] = useState<Merkkasten | null>(null)
   const offeneTests = o.tests.filter((t) => !t.abgegeben)
   const fertigeTests = o.tests.filter((t) => t.abgegeben)
@@ -374,7 +480,7 @@ function Materialien({ o }: { o: FachOrdner }): React.JSX.Element {
       {o.blaetter.length > 0 && (
         <Abschnitt titel="Arbeitsblätter">
           {o.blaetter.map((b) => (
-            <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} data-ordner-blatt>
+            <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} onClick={oeffnen('mat', { art: 'blatt', id: b.id })} data-ordner-blatt>
               <Group justify="space-between" wrap="nowrap">
                 <div style={{ minWidth: 0 }}>
                   <Text fw={700}>{b.titel}</Text>

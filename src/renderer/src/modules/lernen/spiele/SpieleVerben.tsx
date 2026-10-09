@@ -16,6 +16,7 @@ import { fehlformen, musterVon } from '../../../shared/verben/muster'
 import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
+import LoesungZeigen from '../LoesungZeigen'
 import { gemischt, useSekunden } from './SpieleErkennen'
 
 /** Was die Verbspiele brauchen */
@@ -319,6 +320,10 @@ export function BildVerb({ verben: d, ende }: VerbSpielProps): React.JSX.Element
             <Button type="submit" data-pruefen>
               Prüfen
             </Button>
+            {/* Nicht gewusst (09.10.2026): zählt als falsch, die Formen werden gezeigt */}
+            <Group justify="center">
+              <LoesungZeigen zeigen={() => weiter(false)} />
+            </Group>
           </Stack>
         </form>
       ) : (

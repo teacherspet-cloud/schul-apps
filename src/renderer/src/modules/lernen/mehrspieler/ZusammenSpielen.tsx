@@ -11,14 +11,85 @@ import { fuerServer, useDarstellung } from '../../onlinetest/schuelerDarstellung
 import { kannSprechen } from '../VokabelTrainer'
 import type { Angebot } from '@shared/mehrspieler/regeln'
 import type { MehrArt } from '@shared/mehrspieler/typen'
+import { spielText, type TextSchluessel } from '@shared/spielSprache'
 
-const BEREICHE: { art: MehrArt; id: string; name: string; text: string }[] = [
-  { art: 'koop', id: 'koop', name: 'Kooperativ', text: 'Gemeinsam mit anderen aus deinem Kurs ein Ziel schaffen' },
-  { art: 'versus', id: 'versus', name: 'Versus', text: 'Gegeneinander – fair, mit Fragen passend zu eurem Können' }
+/** Bereiche – Name und Text in der Zielsprache des Kurses (09.10.2026, „Nur Fremdsprache") */
+const BEREICHE: { art: MehrArt; id: string; name: TextSchluessel; text: TextSchluessel }[] = [
+  { art: 'koop', id: 'koop', name: 'uiKooperativ', text: 'uiKoopText' },
+  { art: 'versus', id: 'versus', name: 'uiVersus', text: 'uiVersusText' }
 ]
 
-export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: 'vok' | 'gram'; kurs: string; sprache: string }): React.JSX.Element | null {
+/**
+ * Feld „Einladungscode" (09.10.2026, Wunsch der Lehrkraft: ganz oben im Spielbereich statt in den aufgeklappten
+ * Bereichen Kooperativ/Versus): sechs Ziffern, Enter oder „Beitreten" öffnet die Lobby. Nur für angemeldete Lernende.
+ */
+export function EinladungsCode({ sprache = 'de' }: { sprache?: string }): React.JSX.Element | null {
+  const t = (k: TextSchluessel): string => spielText(sprache, null, k)
+  const [code, setCode] = useState('')
+  const [fehler, setFehler] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+  if (!window.__schulappsServer?.angemeldet) return null
+  const beitreten = async (): Promise<void> => {
+    const c = code.replace(/\D/g, '')
+    if (c.length !== 6) return setFehler(t('uiCodeSechs'))
+    setLaeuft(true)
+    setFehler('')
+    try {
+      await holen(`/s/api/spiel/zugang?code=${c}`)
+      window.location.assign(`/s/sp/${c}`)
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+      setLaeuft(false)
+    }
+  }
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        void beitreten()
+      }}
+      data-mehr-einladung-feld
+    >
+      <Group gap="xs" wrap="nowrap" align="flex-end">
+        <TextInput
+          style={{ flex: 1 }}
+          label={t('uiCodeTitel')}
+          description={t('uiCodeBeschreibung')}
+          placeholder={t('uiZiffern')}
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={6}
+          value={code}
+          onChange={(e) => (setCode(e.currentTarget.value.replace(/\D/g, '')), setFehler(''))}
+          data-mehr-einladung
+        />
+        <Button type="submit" variant="light" disabled={code.length !== 6} loading={laeuft} data-mehr-beitreten>
+          {t('uiBeitreten')}
+        </Button>
+      </Group>
+      {fehler && (
+        <Alert color="red" radius="md" mt="xs" py={6}>
+          {fehler}
+        </Alert>
+      )}
+    </form>
+  )
+}
+
+export default function ZusammenSpielen({
+  bereich,
+  kurs,
+  sprache,
+  mitCode = true
+}: {
+  bereich: 'vok' | 'gram'
+  kurs: string
+  sprache: string
+  /** Feld „Einladungscode" in den Bereichen (aus, wenn es oben im Spielbereich steht – 09.10.2026) */
+  mitCode?: boolean
+}): React.JSX.Element | null {
   const { d: wahl, setze } = useDarstellung()
+  const t = (k: TextSchluessel, ...w: (string | number)[]): string => spielText(sprache, null, k, ...w)
   const [angebot, setAngebot] = useState<{ frei: boolean; spiele: Angebot[] } | null>(null)
   const [code, setCode] = useState('')
   const [fehler, setFehler] = useState('')
@@ -57,7 +128,7 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
   }
   const beitreten = async (): Promise<void> => {
     const c = code.replace(/\D/g, '')
-    if (c.length !== 6) return setFehler('Der Einladungscode hat sechs Ziffern.')
+    if (c.length !== 6) return setFehler(t('uiCodeSechs'))
     try {
       await holen(`/s/api/spiel/zugang?code=${c}`)
       window.location.assign(`/s/sp/${c}`)
@@ -78,13 +149,13 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
               <Group justify="space-between" wrap="nowrap">
                 <div>
                   <Text fw={700} c="var(--vt-a-dunkel)">
-                    {g.name}{' '}
+                    {t(g.name)}{' '}
                     <Text span size="sm" c="dimmed" fw={400}>
                       · {spiele.length}
                     </Text>
                   </Text>
                   <Text size="xs" c="dimmed">
-                    {g.text}
+                    {t(g.text)}
                   </Text>
                 </div>
                 <IconChevronDown size={18} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
@@ -92,11 +163,12 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
             </UnstyledButton>
             {offen && (
               <>
+                {mitCode && (
                 <Group mt="sm" gap="xs" wrap="nowrap" align="flex-end">
                   <TextInput
                     style={{ flex: 1 }}
-                    label="Einladungscode"
-                    placeholder="6 Ziffern"
+                    label={t('uiEinladungscode')}
+                    placeholder={t('uiZiffern')}
                     inputMode="numeric"
                     maxLength={6}
                     value={code}
@@ -105,9 +177,10 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
                     data-mehr-einladung
                   />
                   <Button variant="light" disabled={code.length !== 6} onClick={() => void beitreten()} data-mehr-beitreten>
-                    Beitreten
+                    {t('uiBeitreten')}
                   </Button>
                 </Group>
+                )}
                 {fehler && (
                   <Alert color="red" radius="md" mt="xs" py={6}>
                     {fehler}
@@ -115,7 +188,7 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
                 )}
                 {!angebot.frei && (
                   <Text size="sm" c="dimmed" mt="xs">
-                    Zusammen spielen gibt es nach der Übung für heute.
+                    {t('uiNachUebung')}
                   </Text>
                 )}
                 <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm" mt="sm">
@@ -142,7 +215,7 @@ export default function ZusammenSpielen({ bereich, kurs, sprache }: { bereich: '
                             {s.beschreibung}
                           </Text>
                           <Text size="xs" c="dimmed" mt={4}>
-                            {laeuft === s.id ? 'Runde wird eröffnet …' : `Spiel starten · ${s.min}–${s.max} Personen`}
+                            {laeuft === s.id ? t('uiWirdEroeffnet') : t('uiStartenPersonen', s.min, s.max)}
                           </Text>
                         </div>
                       </Group>

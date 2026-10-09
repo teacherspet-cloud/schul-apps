@@ -6,11 +6,11 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
 import { alleSeiten, neueNummern, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from '../export/seitenAuswahl'
-import { druckeImBrowser, imNetz } from '../netzZugang'
+import { imNetz, vereinePdfs } from '../netzZugang'
 import { aufIos, druckerWaehlbar } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 import { ZoomFlaeche } from '../touch/zoom'
-import { mobilerBrowser } from '../export/druckSeite'
+import { druckVorbereiten, type DruckVorlage } from '../export/druckImDokument'
 import { SeitenAuswahlFelder, SeitenHaken, umschalten } from './SeitenAuswahl'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -80,8 +80,13 @@ function bereicheVon(seiten: number[]): { from: number; to: number }[] {
  * Dialog NACH „Drucken" wählen. Gewählt wird jetzt hier – in der App am PC und in der Exe „Schul-Apps
  * Online" (Drucker des PCs über client/main.ts), vorbelegt mit dem zuletzt benutzten bzw. dem
  * Standarddrucker (je Gerät gemerkt), gedruckt direkt dorthin. „Systemdialog …" öffnet weiter den Dialog
- * von Windows. Ein reiner Browser kennt die Drucker nicht: Dort sagt die Vorschau, dass der Drucker im
- * nächsten Fenster gewählt wird, und der Knopf heißt „Druckansicht öffnen …".
+ * von Windows. Ein reiner Browser kennt die Drucker nicht: Dort wird der Drucker im Druckdialog des Geräts gewählt.
+ *
+ * IM BROWSER OHNE NEUEN TAB (09.10.2026, Befund der Lehrkraft: iPad mit Opera und ein Schul-PC blockierten den Tab mit
+ * dem PDF, gedruckt wurde nichts): Sobald die Seiten da sind, bereitet die Vorschau den Druck im Hintergrund vor
+ * (PDF der Auswahl → Seitenbilder in einem unsichtbaren Druckbereich, export/druckImDokument.ts). „Drucken …" ruft dann
+ * window.print() direkt im Klick auf – so lassen es auch Safari/WebKit auf dem iPad zu. Ändert sich die Auswahl, wird
+ * neu vorbereitet. „Als PDF sichern" lädt dieselbe Auswahl als PDF herunter.
  */
 export default function PrintPreview({
   html,
@@ -114,10 +119,14 @@ export default function PrintPreview({
   const ios = aufIos()
   /** Drucker hier wählbar und direkt gedruckt (App am PC, Exe „Schul-Apps Online" mit Druck-Brücke) */
   const direkt = druckerWaehlbar()
-  /** Reiner Browser: PDF im neuen Tab, Drucker im Druckdialog des Browsers */
+  /** Reiner Browser: Druck im aktuellen Dokument, Drucker im Druckdialog des Geräts (09.10.2026) */
   const imBrowser = imNetz() && !direkt
-  /** Tablet/Telefon im Browser: Druckseite mit Druckdialog statt PDF-Tab (export/druckSeite.ts, 08.10.2026) */
-  const mobil = imBrowser && mobilerBrowser()
+  /** Vorbereiteter Druck (nur im Browser) – gilt für die Auswahl mit diesem Schlüssel */
+  const [vorlage, setVorlage] = useState<{ schluessel: string; v: DruckVorlage } | null>(null)
+  const [vorbereitFehler, setVorbereitFehler] = useState<string | null>(null)
+  const vorlageRef = useRef<DruckVorlage | null>(null)
+  /** PDFs der Vorschau (Kopie – pdf.js übernimmt den Puffer), damit der Druck ohne zweite Anfrage auskommt */
+  const pdfZwischen = useRef(new Map<string, Uint8Array>())
 
   useEffect(() => {
     if (!html) return
@@ -128,15 +137,17 @@ export default function PrintPreview({
     setAuswahl([])
     setAuswahlGueltig(true)
     setError(null)
+    pdfZwischen.current.clear()
+    const merken = (quelle: string, data: Uint8Array): Uint8Array => (pdfZwischen.current.set(quelle, data.slice()), data)
     window.api.exporter
       .preview(html)
-      .then((data) => renderPages(data))
+      .then((data) => renderPages(merken(html, data)))
       .then((p) => !cancelled && setPages(p))
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
     if (loesung)
       window.api.exporter
         .preview(loesung.html)
-        .then((data) => renderPages(data))
+        .then((data) => renderPages(merken(loesung.html, data)))
         .then((p) => !cancelled && setLoesungPages(p))
         .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
     window.api.exporter
@@ -232,31 +243,45 @@ export default function PrintPreview({
   }, [bereit, gesamt])
 
   /*
-   * Im Browser (Tablet) gibt es keinen Drucker des Rechners: Blatt und – falls gewählt –
-   * Lösungen gehen als EIN PDF in EINEN neuen Tab (netzZugang.ts, `druckeImBrowser`). Zwei
-   * Druckaufträge hießen dort zwei Tabs, und den zweiten verwirft der Popup-Blocker.
-   * Muss ohne vorheriges `await` aufgerufen werden, sonst gilt der Tab nicht mehr als Folge des Klicks.
+   * Im Browser gibt es keinen Drucker des Rechners: Blatt und – falls gewählt – Lösungen werden EIN PDF, daraus
+   * Seitenbilder im Druckbereich des aktuellen Dokuments (export/druckImDokument.ts). Vorbereitet wird, sobald die
+   * Seiten da sind und nach jeder Änderung der Auswahl (kurz verzögert) – der Klick auf „Drucken …" muss den
+   * Druckdialog OHNE vorheriges `await` öffnen, sonst lässt Safari ihn nicht zu.
    */
-  const druckeImNetz = async (): Promise<void> => {
-    if (!html) return
-    setPrinting(true)
-    try {
-      const teileZumDruck = [blattHtml(), loesungHtml()].filter((t): t is string => Boolean(t))
-      const wie = await druckeImBrowser(teileZumDruck, `${title ?? 'Druck'}.pdf`)
-      const was = loesung && mitLoesung ? (mitBlatt ? `Blatt und ${loesung.titel}` : loesung.titel) : 'Blatt'
-      notifySuccess(
-        wie === 'druck'
-          ? `Druckansicht im neuen Tab geöffnet (${was}) – dort öffnet sich der Druckdialog, sonst „Drucken …“ bzw. das Drucksymbol nutzen.`
-          : wie === 'tab'
-            ? `Druckansicht im neuen Tab geöffnet (${was}).`
-            : `Der Browser hat den neuen Tab blockiert – das PDF (${was}) wurde heruntergeladen.`
-      )
-      onClose()
-    } catch (e) {
-      notifyError(e, 'Drucken fehlgeschlagen')
-    } finally {
-      setPrinting(false)
+  const druckTeile = useMemo(
+    () => (imBrowser && bereit && auswahlGueltig ? [blattHtml(), loesungHtml()].filter((t): t is string => Boolean(t)) : []),
+    [imBrowser, bereit, auswahlGueltig, html, loesung, auswahl.join(','), loesungExemplare, blattMarkiert, loesungMarkiert, pageCount, loesungSeiten] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const druckSchluessel = druckTeile.join('\u0001')
+  const druckBereit = Boolean(vorlage && druckSchluessel && vorlage.schluessel === druckSchluessel)
+  useEffect(() => {
+    if (!druckSchluessel || vorlage?.schluessel === druckSchluessel) return
+    let abgebrochen = false
+    setVorbereitFehler(null)
+    const t = setTimeout(() => {
+      void (async () => {
+        const pdfs = await Promise.all(druckTeile.map((teil) => pdfZwischen.current.get(teil)?.slice() ?? window.api.exporter.preview(teil)))
+        const bytes = pdfs.length === 1 ? pdfs[0] : await vereinePdfs(pdfs)
+        if (abgebrochen) return
+        const v = await druckVorbereiten(bytes, `${(title ?? 'Druck').replace(/[\\/:*?"<>|]+/g, '-')}.pdf`)
+        if (abgebrochen) return v.entfernen()
+        vorlageRef.current = v
+        setVorlage({ schluessel: druckSchluessel, v })
+      })().catch((e: unknown) => !abgebrochen && setVorbereitFehler(e instanceof Error ? e.message : String(e)))
+    }, 350)
+    return () => {
+      abgebrochen = true
+      clearTimeout(t)
     }
+  }, [druckSchluessel]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Schließen ohne Druck: Druckbereich weg (läuft ein Druck noch, räumt afterprint auf)
+  useEffect(() => () => vorlageRef.current?.entfernen(), [])
+
+  /** Druckdialog des Geräts – synchron im Klick (siehe oben) */
+  const druckeImNetz = (): void => {
+    if (!vorlage || !druckBereit) return
+    if (vorlage.v.drucken()) onClose()
+    else notifyError(new Error('Der Browser hat den Druckdialog nicht geöffnet – bitte „Als PDF sichern“ nutzen.'), 'Drucken fehlgeschlagen')
   }
 
   /** Blatt und Lösungen über den Druckdialog des Systems – iPad (AirPrint) und „Druckdialog von Windows" */
@@ -437,10 +462,14 @@ export default function PrintPreview({
               )}
               {imBrowser && (
                 <Text size="sm" c="dimmed" data-druckerwahl-hinweis>
-                  {mobil
-                    ? 'Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ öffnet die Seiten in einem neuen Tab und dort den Druckdialog des Geräts (auf dem iPad AirPrint, mit Exemplaren und Doppelseitig). Dort steht auch „Als PDF sichern“.'
-                    : 'Der Drucker wird im nächsten Fenster gewählt: „Druckansicht öffnen …“ zeigt das PDF in einem neuen Tab und öffnet gleich den Druckdialog des Browsers (Drucker, Exemplare, Doppelseitig, Farbe). Falls nicht, dort über das Drucksymbol drucken.'}
+                  „Drucken …“ öffnet den Druckdialog des Geräts – dort werden Drucker, Exemplare, Doppelseitig und Farbe gewählt (auf dem iPad über AirPrint).
+                  Es öffnet sich kein neuer Tab. „Als PDF sichern“ lädt dieselben Seiten als PDF herunter.
                 </Text>
+              )}
+              {imBrowser && vorbereitFehler && (
+                <Alert color="red" p="xs" data-druck-vorbereitung-fehler>
+                  Der Druck ließ sich nicht vorbereiten: {vorbereitFehler}
+                </Alert>
               )}
               {bereit && gesamt > 1 && auswahlMoeglich && (
                 <SeitenAuswahlFelder
@@ -528,17 +557,30 @@ export default function PrintPreview({
             <Button
               className="pv-drucken"
               leftSection={<IconPrinter size={16} />}
-              onClick={() => void print()}
-              loading={printing}
-              disabled={!bereit || (!printer && direkt) || !auswahlGueltig || (!mitBlatt && !mitLoesung)}
+              onClick={() => (imBrowser ? druckeImNetz() : void print())}
+              loading={printing || (imBrowser && bereit && !druckBereit && !vorbereitFehler && Boolean(druckSchluessel))}
+              disabled={!bereit || (!printer && direkt) || !auswahlGueltig || (!mitBlatt && !mitLoesung) || (imBrowser && !druckBereit)}
+              data-druck-bereit={imBrowser ? (druckBereit ? '1' : '0') : undefined}
             >
-              {imBrowser ? 'Druckansicht öffnen …' : 'Drucken'}
+              {imBrowser ? 'Drucken …' : 'Drucken'}
             </Button>
             <Button className="pv-abbrechen" variant="default" onClick={onClose}>
               Abbrechen
             </Button>
           </div>
-          {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Druckansicht öffnen …" über den Tab */}
+          {/* Im Browser: dieselbe Auswahl als PDF herunterladen (zweiter Weg, 09.10.2026) */}
+          {imBrowser && (
+            <Button
+              className="pv-systemdialog"
+              variant="subtle"
+              size="xs"
+              onClick={() => vorlage?.v.sichern()}
+              disabled={!druckBereit}
+              data-druck-pdf-sichern
+            >
+              Als PDF sichern
+            </Button>
+          )}
           {direkt && (
             <Button
               className="pv-systemdialog"

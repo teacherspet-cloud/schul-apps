@@ -17,8 +17,10 @@ import { grammatikRoute } from './grammatik'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
+import { klassenGaesteRoute } from './klassenGaeste'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
+import { wortlisteRoute } from './wortliste'
 import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { kiAblagenAufraeumen } from './kiAblage'
@@ -47,6 +49,7 @@ import { reihenRoute } from './reihen'
 import { vokabelRoute } from './vokabeln'
 import { lernenRoute } from './lernen'
 import { spielRoute } from './spiel'
+import { planenRoute } from './planen'
 import { aktuellerNutzer } from './kontext'
 import { DATEN, OBERFLAECHE } from './pfade'
 
@@ -147,6 +150,8 @@ async function main(): Promise<void> {
       // Vokabelweg vor den Listen: er übernimmt die Kennungen „lb:…"
       vokabelwegRoute(),
       vokabelRoute(adresse),
+      // Wortliste im Fachordner der Lernenden (09.10.2026)
+      wortlisteRoute(),
       // Grammatik-Lern-App (06.10.2026)
       grammatikRoute(adresse),
       // Rekordbuch der Lernenden (08.10.2026)
@@ -156,6 +161,8 @@ async function main(): Promise<void> {
       // Zusammen spielen: Kooperativ und Versus (08.10.2026)
       spielRoute(),
       lernenRoute(),
+      // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
+      planenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
       lernstandRoute(aufruf),
       schuelerRoute(aufruf),
@@ -164,6 +171,8 @@ async function main(): Promise<void> {
       // „Meine Klassen" (06.10.2026)
       // Musterschüler-Vorschau vor den Klassen (/server/klassen/<id>/vorschau)
       vorschauRoute(),
+      // Gäste mit Anmeldecode in „Meine Klassen" › Lernende (09.10.2026, klassenGaeste.ts)
+      klassenGaesteRoute(),
       klassenRoute(),
       fachordnerRoute(),
       verwaltungsRoute

@@ -58,12 +58,14 @@ import { formSpalten, verbAufgaben, verbKarten } from '@shared/verbTraining'
 import { VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
 import { AufgabenEditor } from './kurs/AufgabenEditor'
 import { grundwortschatzBis } from '@shared/lateinGrundwortschatz'
-import { erzeugeGrammatikPaket, lateinLernjahr } from './grammatikErzeugen'
+import { erzeugeGrammatikPaket, lateinLernjahr, erzeugungsHinweis } from './grammatikErzeugen'
+import { bekanntNachStand } from '@shared/zeitformSperre'
 import { ausFeld, useLerngruppen } from './VokabelTraining'
 import { kursGrammatikDocId } from './kurs/auftragsZiel'
 import { grammatikUnits, normName, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
 import { grammatikKapitel, lehrwerkeMitGrammatik } from '../arbeitsblatt/didactics/grammatikAuswahl'
 import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
+import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 
 interface Zuweisung {
   id: string
@@ -375,6 +377,8 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               .sort((a, b) => b.length - a.length)[0]
           : undefined
         if (aktiv) setKursLehrwerk(band ? { buch: band, units: grammatikUnits(grammatikKapitel(band), band, d) } : null)
+        // Klasse des Kurses vorbelegen (09.10.2026): die Zeitform-Sperre richtet sich ohne Lehrwerk-Stand nach ihr
+        if (aktiv && d.jahrgang && d.jahrgang >= 1 && d.jahrgang <= 13) setJahrgang(d.jahrgang)
       } catch {
         if (aktiv) setKursLehrwerk(null)
       }
@@ -491,7 +495,22 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
         ...(wortArt === 'liste' && wortListe?.woerter.length
           ? { woerter: wortListe.woerter.map((v) => `${v.term} – ${v.translation}`).slice(0, 300), wortQuelle: wortListe.titel }
           : {}),
-        teilformen: neueThemen.length ? teilformenAuftrag(neueThemen, query, neueTeile) || undefined : undefined
+        teilformen: neueThemen.length ? teilformenAuftrag(neueThemen, query, neueTeile) || undefined : undefined,
+        /*
+         * Bekannte Grammatik (09.10.2026, Befund „There was/were" in Klasse 5): Lehrwerk-Stand des Kurses (sonst der
+         * Jahrgang) und die im Kurs schon freigegebenen Themen – unbekannte Zeitformen sperrt grammatikErzeugen.ts.
+         */
+        bekannt: [
+          ...bekanntNachStand(
+            lehrwerkVorwahl?.buch ? { buch: lehrwerkVorwahl.buch, unit: kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit } : undefined,
+            jahrgang
+          ),
+          ...(bestehend ?? []).filter((b) => b.status !== 'entfernt').flatMap((b) => b.themen)
+        ],
+        themenIds: neueIds,
+        // Maßstab für das Niveau (09.10.2026): Land und Schulform aus den Einstellungen, Klasse oben
+        land: settings.defaults?.stateId || undefined,
+        schulform: settings.defaults?.schoolTypeId || undefined
       },
       sperrt: false,
       fehlerTitel: 'Aufgabenpool konnte nicht erstellt werden',
@@ -503,7 +522,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
         ])
         notifySuccess(`Aufgabenpool „${titel}" ist fertig – in „Sprachenlernen" beim Kurs ansehen und freigeben.`)
       },
-      abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig – ansehen und freigeben`
+      abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig${erzeugungsHinweis(p)} – ansehen und freigeben`
     })
     notifySuccess('Die KI erstellt den Aufgabenpool im Hintergrund – er erscheint hier zum Ansehen und Freigeben.')
     schliessen()
@@ -704,6 +723,8 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
   const [paket, setPaket] = useState(e.paket)
   const [auchFuer, setAuchFuer] = useState<string[]>([])
   const [laeuft, setLaeuft] = useState(false)
+  // „Planen …" (09.10.2026): die Aufgaben sind fertig, die Lernenden sehen sie erst ab dem Zeitpunkt
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const extra = e.empfaenger.art
   const minimum = extra ? 4 : 8
   // Bearbeitungen am Entwurf gleich merken (auch ohne Freigeben)
@@ -727,15 +748,18 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
         bis: e.empfaenger.bis,
         ...(e.empfaenger.vokId ? { vokId: e.empfaenger.vokId } : {}),
         ...(extra ? { art: extra, fuer: fuer.map((f) => f.id) } : {}),
-        ...(e.info ? { info: e.info } : {})
+        ...(e.info ? { info: e.info } : {}),
+        ...planKoerper(plan)
       })
       speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
+      planGeaendert()
       notifySuccess(
-        extra
+        planMeldung(plan, `„${e.titel}“`) ||
+        (extra
           ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.`
           : (r?.ids?.length ?? 1) > 1
           ? `„${e.titel}" ist freigegeben – als ${r!.ids!.length} Trainings, eines je Thema. Die Lernenden finden sie in ihrer Lern-App.`
-          : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`
+          : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`)
       )
       fertig()
     } catch (er) {
@@ -783,6 +807,7 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
             </Group>
           </Card>
         )}
+        <FreigabePlanen wert={plan} aendern={setPlan} />
         <Group justify="space-between">
           <Button variant="subtle" color="red" onClick={verwerfen} data-entwurf-verwerfen>
             Verwerfen
@@ -792,7 +817,11 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
               Später
             </Button>
             <Button loading={laeuft} disabled={paket.aufgaben.length < minimum} onClick={() => void freigeben()} data-entwurf-freigeben>
-              {extra ? `Für ${fuer.length === 1 ? fuer[0].name : `${fuer.length} Lernende`} freischalten` : `Freigeben (${paket.aufgaben.length} Aufgaben)`}
+              {plan.modus === 'planen'
+                ? `${planKnopf(plan, '')} (${paket.aufgaben.length} Aufgaben)`
+                : extra
+                  ? `Für ${fuer.length === 1 ? fuer[0].name : `${fuer.length} Lernende`} freischalten`
+                  : `Freigeben (${paket.aufgaben.length} Aufgaben)`}
             </Button>
           </Group>
         </Group>

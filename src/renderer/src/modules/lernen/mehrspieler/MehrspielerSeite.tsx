@@ -6,9 +6,17 @@
 import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconCrown, IconDoorExit, IconPlayerPlay, IconTrophy, IconUsers, IconWifiOff, IconX } from '@tabler/icons-react'
 import { Bloecke } from './Bloecke'
+import { FokusRahmen } from '../fokus/FokusRahmen'
 import { useSpielSicht, type SpielSicht } from './verbindung'
 import { ton } from '../../onlinetest/schuelerDarstellung'
 import { useEffect, useRef } from 'react'
+import { spielText, type TextSchluessel } from '@shared/spielSprache'
+
+/** Beschriftungen in der Zielsprache des Kurses (09.10.2026, „Nur Fremdsprache"; DaZ/ohne Angabe Deutsch) */
+const texter =
+  (s: SpielSicht) =>
+  (k: TextSchluessel, ...w: (string | number)[]): string =>
+    spielText(s.sprache ?? 'de', s.jahrgang ?? null, k, ...w)
 
 function Kurzrufe({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<string, unknown>) => Promise<void> }): React.JSX.Element {
   return (
@@ -34,25 +42,26 @@ function Kurzrufe({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record
 }
 
 function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<string, unknown>) => Promise<void> }): React.JSX.Element {
+  const t = texter(s)
   const genug = s.spieler.filter((p) => p.verbunden).length >= s.min
   const formOk = !s.formen.length || Boolean(s.formen.find((f) => f.id === s.form)?.waehlbar)
   return (
     <Stack data-mehr-lobby>
       <Card withBorder radius="lg" padding="md" ta="center">
         <Text size="sm" c="dimmed">
-          Einladungscode
+          {t('uiEinladungscode')}
         </Text>
         <Text fw={900} size="2.4rem" style={{ letterSpacing: 6 }} data-mehr-code-anzeige>
           {s.code}
         </Text>
         <Text size="sm" c="dimmed">
-          Die anderen geben ihn auf der Startseite bei „Mit Code öffnen“ oder in der Spielauswahl ein.
+          {t('uiCodeHinweis')}
         </Text>
       </Card>
       <div>
         <Group justify="space-between" mb={4}>
           <Text fw={700}>
-            <IconUsers size={16} style={{ verticalAlign: -2 }} /> Dabei ({s.spieler.length} von {s.max})
+            <IconUsers size={16} style={{ verticalAlign: -2 }} /> {t('uiDabei', s.spieler.length, s.max)}
           </Text>
         </Group>
         <Stack gap={4}>
@@ -62,7 +71,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
                 {p.host && <IconCrown size={16} color="var(--mantine-color-yellow-6)" />}
                 <Text fw={p.id === s.ich ? 700 : 400}>{p.name}</Text>
                 {!p.verbunden && (
-                  <Tooltip label="Verbindung unterbrochen – der Platz bleibt 60 Sekunden frei">
+                  <Tooltip label={t('uiGetrennt')}>
                     <span data-mehr-getrennt>
                       <IconWifiOff size={14} color="var(--mantine-color-orange-6)" />
                     </span>
@@ -70,7 +79,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
                 )}
               </Group>
               {s.host && p.id !== s.ich && (
-                <ActionIcon variant="subtle" color="red" aria-label={`${p.name} herausnehmen`} onClick={() => void senden('entfernen', { spieler: p.id })} data-mehr-entfernen>
+                <ActionIcon variant="subtle" color="red" aria-label={t('uiHerausnehmen', p.name)} onClick={() => void senden('entfernen', { spieler: p.id })} data-mehr-entfernen>
                   <IconX size={16} />
                 </ActionIcon>
               )}
@@ -83,7 +92,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
           {s.spiele.length > 1 && (
             <div>
               <Text fw={700} mb={4}>
-                Spiel
+                {t('uiSpiel')}
               </Text>
               <SimpleGrid cols={{ base: 2, xs: 3 }} spacing={6}>
                 {s.spiele
@@ -98,7 +107,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
           )}
           <div>
             <Text fw={700} mb={4}>
-              Schwierigkeit
+              {t('uiSchwierigkeit')}
             </Text>
             <SegmentedControl
               fullWidth
@@ -108,13 +117,13 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
               data-mehr-schwierigkeit
             />
             <Text size="xs" c="dimmed" mt={2}>
-              {s.schwierigkeiten.find((x) => x.id === s.schwierigkeit)?.text} – berechnet aus dem Lernstand von allen.
+              {t('uiBerechnet', s.schwierigkeiten.find((x) => x.id === s.schwierigkeit)?.text ?? '')}
             </Text>
           </div>
           {s.formen.length > 0 && (
             <div>
               <Text fw={700} mb={4}>
-                Grammatik
+                {t('uiGrammatik')}
               </Text>
               <Stack gap={4}>
                 {s.formen.map((f) => (
@@ -133,13 +142,12 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
             </div>
           )}
           <Button size="lg" radius="xl" leftSection={<IconPlayerPlay size={20} />} disabled={!genug || !formOk} onClick={() => void senden('start')} data-mehr-start>
-            {genug ? 'Spiel starten' : `Warte auf Mitspielende (mindestens ${s.min})`}
+            {genug ? t('uiStarten') : t('uiWarteMit', s.min)}
           </Button>
         </>
       ) : (
         <Alert color="blue" radius="md">
-          Gleich geht’s los – {s.spieler.find((p) => p.host)?.name ?? 'der Host'} wählt die Schwierigkeit und startet. Schwierigkeit:{' '}
-          {s.schwierigkeiten.find((x) => x.id === s.schwierigkeit)?.name}
+          {t('uiGleich', s.spieler.find((p) => p.host)?.name ?? t('uiDerHost'), s.schwierigkeiten.find((x) => x.id === s.schwierigkeit)?.name ?? '')}
         </Alert>
       )}
     </Stack>
@@ -148,6 +156,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
 
 function Ergebnis({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<string, unknown>) => Promise<void> }): React.JSX.Element {
   const e = s.ergebnis!
+  const t = texter(s)
   const ich = e.eigen
   const gewonnen = s.art === 'versus' ? Boolean(ich?.gewonnen) : Boolean(e.teamZiel)
   useEffect(() => {
@@ -163,31 +172,32 @@ function Ergebnis({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record
       <ThemeIcon size={72} radius="xl" color={gewonnen ? 'yellow' : 'blue'} variant={gewonnen ? 'filled' : 'light'}>
         <IconTrophy size={40} />
       </ThemeIcon>
-      <Title order={3}>{s.art === 'koop' ? (e.teamZiel ? 'Team-Ziel geschafft!' : 'Gut gespielt!') : e.unentschieden ? 'Unentschieden!' : `Gewonnen: ${e.sieger.join(' & ')}`}</Title>
+      <Title order={3}>{s.art === 'koop' ? (e.teamZiel ? t('uiTeamZiel') : t('uiGutGespielt')) : e.unentschieden ? t('unentschieden') : t('uiGewonnen', e.sieger.join(' & '))}</Title>
       <Text>{e.text}</Text>
       {ich && (
         <Card withBorder radius="lg" padding="sm" data-mehr-eigen>
           <Text size="sm" c="dimmed">
-            Nur für dich
+            {t('uiNurFuerDich')}
           </Text>
           <Text>
-            {ich.richtig} richtig{ich.wert !== null ? ` · ${ich.wert} ${e.einheit}` : ''}
-            {ich.platz ? ` · Platz ${ich.platz}` : ''}
+            {t('uiRichtigN', ich.richtig)}
+            {ich.wert !== null ? ` · ${ich.wert} ${e.einheit}` : ''}
+            {ich.platz ? ` · ${t('uiPlatz', ich.platz)}` : ''}
           </Text>
           {ich.fehler > 0 && (
             <Text size="sm" c="dimmed">
-              {ich.fehler} {ich.fehler === 1 ? 'Wort kommt' : 'Wörter kommen'} im Kasten bald wieder dran.
+              {ich.fehler === 1 ? t('uiEinWortWieder') : t('uiWoerterWieder', ich.fehler)}
             </Text>
           )}
         </Card>
       )}
       <Group>
         <Button variant="default" leftSection={<IconDoorExit size={16} />} onClick={() => void senden('verlassen').then(() => window.history.back())} data-mehr-verlassen>
-          Zurück
+          {t('uiZurueck')}
         </Button>
         {s.host && (
           <Button onClick={() => void senden('nochmal')} data-mehr-nochmal>
-            Nochmal
+            {t('uiNochmal')}
           </Button>
         )}
       </Group>
@@ -218,17 +228,19 @@ export default function MehrspielerSeite({ code }: { code: string }): React.JSX.
       </Center>
     )
   return (
+    // Vollbild beim Lernen (09.10.2026): nur das laufende Spiel (Warteraum und Ergebnis normal); Esc verlässt nur das Vollbild
+    <FokusRahmen name="mehrspieler" aktiv={s.phase === 'spiel'} onEnde={() => void senden('verlassen').then(() => window.history.back())} escNurAnsicht>
     <Stack data-mehr-seite={s.phase} data-mehr-spiel={s.spiel}>
       <Group justify="space-between" wrap="nowrap">
         <div style={{ minWidth: 0 }}>
           <Title order={3}>{s.spielName}</Title>
           <Text size="sm" c="dimmed" truncate>
-            {s.art === 'koop' ? 'Kooperativ' : 'Versus'} · {s.titel}
+            {s.art === 'koop' ? texter(s)('uiKooperativ') : texter(s)('uiVersus')} · {s.titel}
           </Text>
         </div>
         {s.phase !== 'ende' && (
           <Button variant="subtle" color="gray" size="xs" leftSection={<IconDoorExit size={14} />} onClick={() => void senden('verlassen').then(() => window.history.back())} data-mehr-verlassen>
-            Verlassen
+            {texter(s)('uiVerlassen')}
           </Button>
         )}
       </Group>
@@ -238,9 +250,10 @@ export default function MehrspielerSeite({ code }: { code: string }): React.JSX.
         </Alert>
       )}
       {s.phase === 'warten' && <Lobby s={s} senden={senden} />}
-      {s.phase === 'spiel' && s.bloecke && <Bloecke bloecke={s.bloecke} senden={(a, w) => void zug(a, w)} />}
+      {s.phase === 'spiel' && s.bloecke && <Bloecke bloecke={s.bloecke} senden={(a, w) => void zug(a, w)} sprache={s.sprache} jahrgang={s.jahrgang ?? null} />}
       {s.phase === 'ende' && s.ergebnis && <Ergebnis s={s} senden={senden} />}
       <Kurzrufe s={s} senden={senden} />
     </Stack>
+    </FokusRahmen>
   )
 }

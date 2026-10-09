@@ -28,6 +28,7 @@ import {
   fleissAus,
   jahrgangAus,
   leistungAus,
+  mitUebung,
   regelTipp,
   STIL,
   stufeVon,
@@ -368,7 +369,9 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
   }
   const aktionen: Gesammelt['aktionen'] = {}
   const vf = vokDaten.find((v) => v.faellig > 0) ?? vokDaten[0]
-  if (vf) aktionen.vokabeln = { text: vf.faellig ? `Jetzt ${Math.min(10, vf.faellig)} Vokabeln abfragen` : 'Vokabeln üben', href: vf.href }
+  // Knopf öffnet die Runde selbst, nicht nur die Kursseite (09.10.2026)
+  if (vf)
+    aktionen.vokabeln = { text: vf.faellig ? `Jetzt ${Math.min(10, vf.faellig)} Vokabeln abfragen` : 'Vokabeln üben', href: vf.faellig ? mitUebung(vf.href, 'runde') : vf.href }
   const gf = gramDaten.find((g) => g.faellig > 0) ?? gramDaten[0]
   if (gf) aktionen.grammatik = { text: 'Grammatik üben', href: gf.href }
   if (daten.blatt) aktionen.arbeitsblatt = { text: 'Arbeitsblatt öffnen', href: daten.blatt.href }

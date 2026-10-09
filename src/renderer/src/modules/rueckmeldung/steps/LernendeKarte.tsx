@@ -20,6 +20,7 @@ import { aufServer } from '../../../shared/plattform'
 import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
+import FreigabePlanen, { GeplantMarke, planBis, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../../shared/components/FreigabePlanen'
 
 interface FreigabeListe {
   id: string
@@ -32,11 +33,15 @@ interface FreigabeListe {
   schueler?: number
   code?: string
   link?: string
+  /** Geplante Freischaltung (09.10.2026) */
+  geplantAb?: number | null
 }
 
 export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: (fn: (d: Rueckmeldung) => void) => void }): React.JSX.Element | null {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [liste, setListe] = useState<FreigabeListe[]>([])
+  // „Planen …" und Ende (09.10.2026)
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [runden, setRunden] = useState(2)
   const [mitglieder, setMitglieder] = useState<{ benutzer: string; name: string }[]>([])
@@ -76,9 +81,12 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
         schueler: einzelne,
         gaeste,
         runden,
-        titel
+        titel,
+        ...(planBis(plan) ? { bis: planBis(plan) } : {}),
+        ...planKoerper(plan)
       })
-      notifySuccess('Freigegeben – die Lernenden finden die Aufgabe im Schülerbereich unter „Rückmeldung“.')
+      planGeaendert()
+      notifySuccess(planMeldung(plan, 'Schreibaufgabe') || 'Freigegeben – die Lernenden finden die Aufgabe im Schülerbereich unter „Rückmeldung“.')
       if (neu.code && neu.link) setQr({ titel: titel || 'Aufgabe', code: neu.code, link: neu.link })
       laden()
     } catch (e) {
@@ -136,6 +144,9 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
         Die Lernenden schreiben ihre Lösung im Schülerbereich und bekommen sofort Feedback – ohne Notenvorschlag. Danach können sie überarbeiten und erneut
         Feedback anfordern. Die Anfragen laufen über den KI-Zugang der Lehrkraft (Schlüssel oder Abo), ohne Namen.
       </Text>
+      <Stack mb="sm">
+        <FreigabePlanen wert={plan} aendern={setPlan} mitEnde endeText="Danach lässt sich die Aufgabe nur noch ansehen – keine neuen Fassungen." />
+      </Stack>
       <Group align="end" mb="md">
         <Select
           label="Lerngruppe"
@@ -155,7 +166,7 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           onClick={() => void freigeben()}
           data-feedback-freigeben
         >
-          Freigeben
+          {planKnopf(plan, 'Freigeben')}
         </Button>
       </Group>
       <NurExperte>
@@ -194,7 +205,7 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           <Group key={f.id} justify="space-between">
             <div>
               <Text size="sm" fw={600}>
-                {f.titel}
+                {f.titel} <GeplantMarke ab={f.geplantAb} />
               </Text>
               <Text size="xs" c="dimmed">
                 {[f.lerngruppe && (f.schueler ? `${f.lerngruppe} (${f.schueler} ausgewählt)` : f.lerngruppe), f.code && 'Gäste per QR']

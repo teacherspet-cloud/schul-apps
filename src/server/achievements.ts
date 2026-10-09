@@ -4,10 +4,11 @@
  *
  * Berechnet wird aus dem, was ohnehin da ist (Kästen der Vokabeln, Vokabelweg, Grammatik, Rekordbuch, Wochenziel),
  * und zwar beim Öffnen des Fensters und nach Antworten/Spielen (der Trainer fragt kurz danach nach Neuem für den
- * Glückwunsch). Lernende sehen nur Erreichtes und die Zahl der noch verborgenen – nie, welche. Keine Rangliste; die
- * Lehrkraft sieht die Achievements nicht.
+ * Glückwunsch). Die Lehrkraft sieht die Achievements nicht.
+ * Seit 09.10.2026: Lernende sehen alle Achievements mit Fortschritt (geheime erst, wenn erreicht), den Anteil der
+ * Lernenden der Schule und ihren eigenen Platz in der Klasse – nur Zahlen, keine Namen (achievementsVergleich.ts).
  *
- *  Lernende: GET /s/api/achievements      → { erreicht, verborgen, gruppen, neu }
+ *  Lernende: GET /s/api/achievements      → { alle, erreicht, verborgen, gruppen, neu, lernende, platz }
  *            GET /s/api/achievements/neu  → { neu } (noch nicht gemeldete, danach als gemeldet markiert)
  */
 import { datenbank, type NutzerInfo } from './datenbank'
@@ -17,7 +18,8 @@ import { buchFuer, buchNamen } from './vokabelweg'
 import { grammatikFuerAchievements } from './grammatik'
 import { gespielteSpiele } from './rekordbuch'
 import { achDatenLesen, achDatenSchreiben, rundeAbschliessen, tageVereinen, type AchDaten, type Erreicht } from './achievementsDaten'
-import { ACH_GRUPPEN, berechneAchievements, type Achievement, type AchEingabe } from '../shared/achievements'
+import { ACH_GRUPPEN, achievementSicht, berechneAchievements, type Achievement, type AchEingabe } from '../shared/achievements'
+import { klassenPlatz, schulAnteile } from './achievementsVergleich'
 import { abschnitteAus, quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
 import { istSicher, kernform, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 
@@ -181,7 +183,10 @@ export function achievementsRoute(): (k: Anfrage) => Promise<boolean> {
     if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
     const ich = sitzung.nutzer
     if (!zaehlt(ich))
-      return json(res, 200, url.pathname.endsWith('/neu') ? { neu: [] } : { erreicht: [], verborgen: 0, gruppen: ACH_GRUPPEN, neu: [] }), true
+      return (
+        json(res, 200, url.pathname.endsWith('/neu') ? { neu: [] } : { alle: [], erreicht: [], verborgen: 0, gruppen: ACH_GRUPPEN, neu: [], lernende: 0, platz: null }),
+        true
+      )
     const { d, katalog } = await achievementsAuswerten(ich)
     const offen = [...d.offen]
     alsGemeldet(ich, offen)
@@ -190,13 +195,19 @@ export function achievementsRoute(): (k: Anfrage) => Promise<boolean> {
     const erreicht = eintraege(d, Object.keys(d.erreicht)).sort(
       (a, b) => reihenfolge.indexOf(a.gruppe) - reihenfolge.indexOf(b.gruppe) || b.am - a.am || a.titel.localeCompare(b.titel, 'de')
     )
+    // Alle mit Fortschritt (09.10.2026); geheime nur als Zahl, bis sie erreicht sind
+    const schule = schulAnteile()
+    const { liste, verborgen } = achievementSicht(katalog, d.erreicht, schule.anteile)
     return (
       json(res, 200, {
+        alle: liste,
         erreicht,
-        // Nur die Zahl – welche, bleibt verborgen
-        verborgen: katalog.filter((a) => !d.erreicht[a.id]).length,
+        verborgen,
         gruppen: ACH_GRUPPEN,
-        neu: offen
+        neu: offen,
+        // Zahl der Lernenden im Schulvergleich nur, wenn Anteile gezeigt werden
+        lernende: schule.anteile ? schule.lernende : 0,
+        platz: klassenPlatz(ich)
       }),
       true
     )

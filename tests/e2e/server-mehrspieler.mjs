@@ -123,6 +123,9 @@ try {
   const ids = (angebot.spiele ?? []).map((s) => s.id)
   pruefe(angebot.frei === true && ids.includes('teammatch') && ids.includes('tauziehen'), `Angebot für Klasse 6: ${ids.join(', ')}`)
   pruefe(!ids.includes('kollokation') && !ids.includes('umbau'), 'Spiele außerhalb des Jahrgangsbands (Klasse 6 ± 1) ausgeblendet')
+  // 09.10.2026: Spielnamen nur in der Zielsprache des Kurses (Englisch)
+  const tm = (angebot.spiele ?? []).find((s) => s.id === 'teammatch')
+  pruefe(tm?.name === 'Team Match' && !/[äöüß]/.test(tm?.beschreibung ?? ''), `Spielname/Regel auf Englisch (${tm?.name}: ${tm?.beschreibung})`)
 
   // ---------- Team-Match im Browser: Mia eröffnet über die Spielauswahl
   const mia = await Mia.newPage()
@@ -143,9 +146,10 @@ try {
   pruefe(await da(ben.locator('[data-mehr-lobby]')), 'Ben: „Mit Code öffnen" erkennt den Spielcode → Lobby')
   const lea = await Lea.newPage()
   await lea.goto(`${A}/s/v/${vok.id}`)
-  await lea.locator('[data-spiel-gruppe-kopf="koop"]').click()
+  // Einladungscode ganz oben im Spielbereich, ohne Kooperativ aufzuklappen; Enter tritt bei (09.10.2026)
   await lea.locator('[data-mehr-einladung]').fill(code)
-  await lea.locator('[data-mehr-beitreten]').click()
+  pruefe((await lea.locator('[data-mehr-einladung]').count()) === 1, 'Ein Feld „Einladungscode" oben im Spielbereich')
+  await lea.locator('[data-mehr-einladung]').press('Enter')
   pruefe(await da(lea.locator('[data-mehr-lobby]')), 'Lea: Einladungscode in der Spielauswahl → Lobby')
   pruefe(await da(mia.locator('[data-mehr-spieler]').nth(2)), 'Host sieht drei Beigetretene')
   const namen = await mia.locator('[data-mehr-spieler]').evaluateAll((e) => e.map((x) => x.getAttribute('data-mehr-spieler')))
@@ -163,7 +167,7 @@ try {
   pruefe(wieder.status === 403, 'Entfernte Person kann nicht wieder beitreten')
 
   // Schwierigkeit „leicht" → Frage in der Fremdsprache, Möglichkeiten auf Deutsch
-  await mia.locator('[data-mehr-schwierigkeit]').getByText('Leicht').click()
+  await mia.locator('[data-mehr-schwierigkeit]').getByText('Easy').click()
   await mia.waitForTimeout(400)
   await mia.locator('[data-mehr-start]').click()
   pruefe(await da(mia.locator('[data-mehr-frage]')), 'Spiel startet bei allen')
@@ -181,7 +185,7 @@ try {
   }
   pruefe(einmalig, 'Die richtige Antwort lag jedes Mal auf genau einem Gerät')
   pruefe(await da(mia.locator('[data-mehr-ergebnis]')), 'Team-Match beendet: Ergebnis')
-  pruefe(await mia.getByText('Team-Ziel geschafft!').isVisible(), 'Team-Ziel geschafft (keine Fehler)')
+  pruefe(await mia.getByText('Team goal reached!', { exact: true }).isVisible(), 'Team-Ziel geschafft (keine Fehler, Anzeige auf Englisch)')
   await mia.screenshot({ path: join(out, '3-ergebnis.png') })
   const rekorde = await api(Mia).get('/s/api/rekorde')
   pruefe(JSON.stringify(rekorde).includes('koop:teammatch'), 'Rekordbuch: koop:teammatch eingetragen')

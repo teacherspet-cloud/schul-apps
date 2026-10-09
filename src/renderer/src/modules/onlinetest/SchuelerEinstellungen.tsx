@@ -338,7 +338,7 @@ export function ModusKnopf(): React.JSX.Element {
 const BEREICHE = [
   { id: 'aussehen', titel: 'Aussehen', text: 'Hell oder dunkel, Farbe, Schriftgröße', farbe: 'grape', symbol: <IconPalette size={26} /> },
   { id: 'lesen', titel: 'Lesen und Hören', text: 'Vorlesen, Zeilenabstand, Kontrast, Stimme', farbe: 'blue', symbol: <IconBook2 size={26} /> },
-  { id: 'lernen', titel: 'Lernen', text: 'Wochenziel, Lerntipps, Spiele, Töne', farbe: 'teal', symbol: <IconTarget size={26} /> },
+  { id: 'lernen', titel: 'Lernen', text: 'Wochenziel, Lerntipps, Spiele, Töne, Vollbild', farbe: 'teal', symbol: <IconTarget size={26} /> },
   { id: 'konto', titel: 'Konto', text: 'Passwort ändern', farbe: 'orange', symbol: <IconUserCircle size={26} /> }
 ] as const
 
@@ -623,6 +623,14 @@ export function SchuelerEinstellungen(): React.JSX.Element {
           label="Töne"
           description="Ein kurzer Klang bei richtigen Antworten und wenn eine Runde geschafft ist."
           data-toene
+        />
+        {/* Vollbild beim Lernen (09.10.2026): Vorgabe an; in jeder Übung auch nur für diese Übung abschaltbar */}
+        <Switch
+          checked={d.vollbild !== false}
+          onChange={(e) => aendern({ vollbild: e.currentTarget.checked })}
+          label="Vollbild beim Lernen"
+          description="Übungen, Spiele und Arbeitsblätter füllen den ganzen Bildschirm – ohne Kopfzeile und Leisten. In jeder Übung kannst du es mit „Vollbild aus“ auch nur für diese Übung abschalten."
+          data-vollbild
         />
       </Bereich>
 

@@ -30,6 +30,8 @@ import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, klasseVon, lerngr
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
+import { geplantAb, nachFreigabe, nochGeplant } from './freigabePlan'
+import { zugangPlan } from './planen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS feedback_freigaben (
@@ -146,6 +148,8 @@ function gesamtVon(f: Freigabe): number {
 
 /** Gehört die Aufgabe dieser Person? Lerngruppe (ggf. nur ausgewählte) oder als Gast beigetreten */
 function istFuer(f: Freigabe, ich: NutzerInfo): boolean {
+  // Geplante Freischaltung (09.10.2026, freigabePlan.ts)
+  if (nochGeplant('feedback', f.id)) return false
   // Per Code beigetreten (Gast oder Konto)?
   if (db().prepare('SELECT 1 FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(f.id, ich.id)) return true
   // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen“)
@@ -307,14 +311,15 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (req.method === 'GET' && url.pathname === '/s/api/aufgabe/zugang') {
       const f = freigabeNachCode(String(url.searchParams.get('code') ?? '').toUpperCase())
       if (!f || f.status !== 'offen') return (json(res, 404, { fehler: 'Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      return (json(res, 200, { id: f.id, titel: f.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(f, sitzung.nutzer)) }), true)
+      return (json(res, 200, { id: f.id, titel: f.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(f, sitzung.nutzer)), ...zugangPlan('feedback', f.id, sitzung?.nutzer) }), true)
     }
     if (req.method === 'POST' && url.pathname === '/s/api/aufgabe/gast') {
       if (!mitKopf0) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       const f = freigabeNachCode(String(k0.code ?? '').toUpperCase())
       if (!f || f.status !== 'offen') return (json(res, 404, { fehler: 'Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      if (sitzung && istFuer(f, sitzung.nutzer)) return (json(res, 200, { ok: true, id: f.id }), true)
+      // Schon dabei – auch vor einer geplanten Freischaltung (09.10.2026)
+      if (sitzung && (istFuer(f, sitzung.nutzer) || zugangPlan('feedback', f.id, sitzung.nutzer).dabei)) return (json(res, 200, { ok: true, id: f.id }), true)
       // Mit Schülerkonto per Code: ohne Namen dazu – die Abgabe steht dann unter dem Konto
       if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
         db().prepare('INSERT OR IGNORE INTO feedback_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)').run(f.id, sitzung.nutzer.id)
@@ -439,6 +444,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             ...(f.art ? { art: f.art } : {}),
             runden: f.runden,
             bis: f.bis,
+            // Geplante Freischaltung (09.10.2026)
+            geplantAb: geplantAb('feedback', f.id),
             lerngruppe: (f.lerngruppe_id ? lerngruppe(f.lerngruppe_id)?.name : '') ?? '',
             schueler: schuelerVon(f).length,
             ...(f.code ? { code: f.code, link: link(f.code) } : {}),
@@ -499,7 +506,9 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           mitGaesten ? neuerCode() : null
         )
       const neu = freigabe(id)!
-      return (json(res, 200, { id, ...(neu.code ? { code: neu.code, link: link(neu.code) } : {}) }), true)
+      // „Planen …" (09.10.2026): sichtbar erst ab dem Zeitpunkt; das Ende ist `bis` der Freigabe
+      const geplant = nachFreigabe('feedback', [id], { plan: { ...((k0.plan ?? {}) as object), bis: null } }, ich.id, g?.id ?? '')
+      return (json(res, 200, { id, ...(geplant ? { geplantAb: geplantAb('feedback', id) } : {}), ...(neu.code ? { code: neu.code, link: link(neu.code) } : {}) }), true)
     }
     const f = teile[0] ? freigabe(teile[0]) : null
     if (!f || f.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)

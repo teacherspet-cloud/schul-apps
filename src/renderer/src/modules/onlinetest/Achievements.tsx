@@ -1,15 +1,18 @@
 /**
  * Achievements der Lernenden (08.10.2026, mit der Lehrkraft abgestimmt): erster Reiter im Fenster „Achievements"
- * (Rekorde.tsx). Nur Erreichtes, nach den sechs Gruppen, mit Medaille und Datum – dazu „Noch N Achievements zu
- * entdecken" ohne Hinweis, welche. Keine Rangliste, kein Vergleich.
+ * (Rekorde.tsx), nach Gruppen, mit Medaille und Datum.
+ * Seit 09.10.2026 (Wunsch der Lehrkraft): alle Achievements, auch noch nicht erreichte, mit Fortschrittsbalken (23/50);
+ * geheime Überraschungen nur als Zahl, bis sie erreicht sind. Je Achievement „X % der Lernenden der Schule haben es"
+ * (ab 10 Lernenden) und oben der eigene Platz in der Klasse nach Übungstagen der letzten 4 Wochen (ab 5 Lernenden) –
+ * keine Namen, keine Plätze anderer.
  *
  * Glückwunsch: Nach Antworten und Spielen (Ereignis „schulapps-gesendet" aus serverApi.ts) fragt die Seite kurz danach
  * nach neu Erreichtem und zeigt eine kurze Meldung – mit etwas Konfetti, außer bei „ruhiger Darstellung"
  * (html.sa-ruhig) oder reduzierter Bewegung im System.
  */
-import { Badge, Card, Group, Loader, Stack, Text, ThemeIcon } from '@mantine/core'
+import { Badge, Card, Group, Loader, Progress, Stack, Text, ThemeIcon } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { IconAward, IconLock, IconStarFilled } from '@tabler/icons-react'
+import { IconAward, IconLock, IconStarFilled, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { abrufen } from './serverApi'
 
@@ -22,11 +25,27 @@ interface Eintrag {
   gruppe: string
   medaille: Medaille
 }
+/** Ein Achievement mit Fortschritt (09.10.2026, shared/achievements.ts AchSicht) */
+interface Sicht {
+  id: string
+  titel: string
+  text: string
+  gruppe: string
+  medaille: Medaille
+  erreicht: boolean
+  am: number | null
+  ist: number
+  ziel: number
+  anteil: number | null
+}
 interface Antwort {
+  alle?: Sicht[]
   erreicht: Eintrag[]
+  /** Geheime, noch nicht erreichte – nur die Zahl */
   verborgen: number
   gruppen: { id: string; name: string }[]
   neu: string[]
+  platz?: { platz: number; von: number; tage: number } | null
 }
 
 /** Medaillenfarben – in Hell und Dunkel gut zu sehen; Einmaliges ohne Stufe in Violett */
@@ -65,34 +84,51 @@ export function AchievementsInhalt(): React.JSX.Element {
       </Text>
     )
   const neu = new Set(d.neu)
+  // Ältere Antwort ohne `alle`: nur Erreichtes
+  const alle: Sicht[] = d.alle ?? d.erreicht.map((e) => ({ ...e, erreicht: true, ist: 1, ziel: 1, anteil: null }))
+  const geschafft = alle.filter((e) => e.erreicht).length
   return (
     <Stack gap="md" data-achievements>
-      <Group gap="xs" wrap="nowrap" data-achievements-verborgen>
-        <ThemeIcon variant="light" radius="xl" size="lg" color="gray">
-          <IconLock size={18} />
-        </ThemeIcon>
-        <Text size="sm" fw={600}>
-          {d.verborgen > 0
-            ? `Noch ${d.verborgen} ${d.verborgen === 1 ? 'Achievement' : 'Achievements'} zu entdecken`
-            : d.erreicht.length
-              ? 'Alles entdeckt, was es gerade zu entdecken gibt!'
-              : 'Übe mit Vokabeln und Grammatik – hier sammeln sich deine Achievements.'}
-        </Text>
-      </Group>
-      {d.erreicht.length === 0 && (
-        <Text size="sm" c="dimmed">
-          Noch keine Achievements – schon ein paar Tage Üben bringen die ersten.
-        </Text>
+      <Text size="sm" fw={600} data-achievements-zahl={`${geschafft}/${alle.length}`}>
+        {geschafft} von {alle.length} Achievements geschafft
+      </Text>
+      {/* Eigener Platz in der Klasse (09.10.2026): nur die eigene Zahl – keine Namen, keine Plätze anderer */}
+      {d.platz && (
+        <Card withBorder padding="xs" radius="md" data-achievements-platz={`${d.platz.platz}/${d.platz.von}`}>
+          <Group gap="sm" wrap="nowrap">
+            <ThemeIcon variant="light" radius="xl" size="lg" color="indigo">
+              <IconUsersGroup size={18} />
+            </ThemeIcon>
+            <Stack gap={0}>
+              <Text size="sm" fw={700}>
+                Du bist auf Platz {d.platz.platz} von {d.platz.von} in deiner Klasse
+              </Text>
+              <Text size="xs" c="dimmed">
+                nach Übungstagen der letzten 4 Wochen · du: {d.platz.tage} {d.platz.tage === 1 ? 'Tag' : 'Tage'}
+              </Text>
+            </Stack>
+          </Group>
+        </Card>
+      )}
+      {d.verborgen > 0 && (
+        <Group gap="xs" wrap="nowrap" data-achievements-verborgen={d.verborgen}>
+          <ThemeIcon variant="light" radius="xl" size="lg" color="gray">
+            <IconLock size={18} />
+          </ThemeIcon>
+          <Text size="sm" fw={600}>
+            Dazu {d.verborgen === 1 ? 'eine geheime Überraschung' : `${d.verborgen} geheime Überraschungen`} – welche, wird nicht verraten.
+          </Text>
+        </Group>
       )}
       {d.gruppen.map((g) => {
-        const liste = d.erreicht.filter((e) => e.gruppe === g.id)
+        const liste = alle.filter((e) => e.gruppe === g.id)
         if (!liste.length) return null
         return (
           <Stack key={g.id} gap={6} data-achievements-gruppe={g.id}>
             <Group gap={8}>
               <Text fw={800}>{g.name}</Text>
               <Badge size="sm" variant="light" color="gray" tt="none">
-                {liste.length}
+                {liste.filter((e) => e.erreicht).length}/{liste.length}
               </Badge>
             </Group>
             {liste.map((e) => (
@@ -103,12 +139,15 @@ export function AchievementsInhalt(): React.JSX.Element {
                 radius="md"
                 style={neu.has(e.id) ? { borderColor: FARBE[e.medaille ?? 'ohne'], borderWidth: 2 } : undefined}
                 data-achievement={e.id}
+                data-erreicht={e.erreicht}
               >
                 <Group gap="sm" wrap="nowrap" align="flex-start">
-                  <Medaille m={e.medaille} />
-                  <Stack gap={0} style={{ minWidth: 0, flex: 1 }}>
+                  <div style={e.erreicht ? undefined : { opacity: 0.35, filter: 'grayscale(1)' }}>
+                    <Medaille m={e.medaille} />
+                  </div>
+                  <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
                     <Group gap={6}>
-                      <Text fw={700} size="sm">
+                      <Text fw={700} size="sm" c={e.erreicht ? undefined : 'dimmed'}>
                         {e.titel}
                       </Text>
                       {neu.has(e.id) && (
@@ -120,9 +159,34 @@ export function AchievementsInhalt(): React.JSX.Element {
                     <Text size="xs" c="dimmed">
                       {e.text}
                     </Text>
-                    <Text size="xs" c="dimmed">
-                      {e.medaille ? `${STUFE[e.medaille]} · ` : ''}erreicht am {new Date(e.am).toLocaleDateString('de-DE')}
-                    </Text>
+                    {e.erreicht ? (
+                      <Text size="xs" c="dimmed">
+                        {e.medaille ? `${STUFE[e.medaille]} · ` : ''}erreicht{e.am ? ` am ${new Date(e.am).toLocaleDateString('de-DE')}` : ''}
+                      </Text>
+                    ) : e.ziel > 1 ? (
+                      <Group gap={8} wrap="nowrap" data-achievement-fortschritt={`${e.ist}/${e.ziel}`}>
+                        <Progress
+                          value={(e.ist / e.ziel) * 100}
+                          size="sm"
+                          radius="xl"
+                          color={FARBE[e.medaille ?? 'ohne']}
+                          style={{ flex: 1 }}
+                          aria-label={`Fortschritt ${e.ist} von ${e.ziel}`}
+                        />
+                        <Text size="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>
+                          {e.ist}/{e.ziel}
+                        </Text>
+                      </Group>
+                    ) : (
+                      <Text size="xs" c="dimmed" data-achievement-fortschritt="0/1">
+                        noch nicht erreicht
+                      </Text>
+                    )}
+                    {e.anteil !== null && (
+                      <Text size="xs" c="dimmed" data-achievement-anteil={e.anteil}>
+                        {e.anteil === 0 ? 'Noch niemand an der Schule hat es' : `${e.anteil} % der Lernenden der Schule haben es`}
+                      </Text>
+                    )}
                   </Stack>
                 </Group>
               </Card>

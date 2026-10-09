@@ -12,7 +12,10 @@ import { REGELN, angebotFuer, imJahrgang } from '../src/shared/mehrspieler/regel
 import { antwortRichtig, type Basis, type Block, type Zug } from '../src/shared/mehrspieler/kern'
 import { MEHRSPIELE, mehrspielInfo, type MehrspielId, type Schwierigkeit, type SpielInhalt } from '../src/shared/mehrspieler/typen'
 import { hinweiseFuer } from '../src/shared/mehrspieler/spiele/beschreiben'
-import { reiseRunde } from '../src/shared/mehrspieler/spiele/koop2'
+import { kartenText, pruefeRunde, reiseRunde, reisenZahl, stufeVon } from '../src/shared/mehrspieler/spiele/reiseplaner'
+import { lexikonFuer } from '../src/shared/mehrspieler/reiseLexikon'
+import { mehrBeschreibung, spielName, spielText, SPIELNAMEN_SCHLUESSEL } from '../src/shared/spielSprache'
+import { PAKETE } from '../src/shared/spielSprachen'
 import { slfGilt } from '../src/shared/mehrspieler/spiele/versus2'
 import { berechneAchievements, LEERE_ZAEHLER } from '../src/shared/achievements'
 
@@ -173,11 +176,8 @@ function loeser(id: MehrspielId, z: Z, wer: string): Zug | null {
       return k ? { aktion: 'legen', wert: k.id } : null
     }
     case 'fluchtraum': {
-      const s = z.schloesser[z.s]
-      if (!s.geloest[wer]) return { aktion: 'antwort', wert: s.aufgaben[wer].loesung }
-      if (Object.values(s.geloest).every(Boolean))
-        return { aktion: 'code', wert: z.spieler.filter((p) => p.id in s.ziffern).map((p) => s.ziffern[p.id]).join('') }
-      return null
+      if (z.aufgaben[wer]) return { aktion: 'antwort', wert: z.aufgaben[wer].loesung }
+      return z.frei >= z.reihenfolge.length ? { aktion: 'wort', wert: z.wort } : null
     }
     case 'beschreiben': {
       const erkl = z.spieler[z.erklaerer].id
@@ -219,15 +219,19 @@ function loeser(id: MehrspielId, z: Z, wer: string): Zug | null {
       if (n < 0) return null
       return z.schwierigkeit === 'leicht' ? { aktion: `wort:${n}`, wert: z.woerter[n].wort } : { aktion: 'wort', wert: { [n]: z.woerter[n].wort } }
     }
-    case 'fehlerdetektive':
+    case 'fehlerdetektive': {
+      const n = z.faelle.findIndex((f: any) => f.finder === wer && !f.gefunden && !f.fertig) // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (n >= 0) return { aktion: 'wort', wert: `${n}:${item(z, z.faelle[n].item).fehler!.stellen[0]}` }
+      const m = z.faelle.findIndex((f: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const i = z.spieler.findIndex((s) => s.id === f.finder)
+        return f.gefunden && !f.fertig && z.spieler[(i + 1) % z.spieler.length].id === wer
+      })
+      return m >= 0 ? { aktion: `antwort:${m}`, wert: z.faelle[m].frage.loesung } : null
+    }
     case 'sniper': {
       const f = item(z, z.reihe[z.r]).fehler!
-      const finder = id === 'sniper' ? z.finder : z.gefunden
-      if (!finder) return { aktion: 'wort', wert: String(f.satz.split(/\s+/).findIndex((w: string) => w.replace(/[^\p{L}\p{N}']/gu, '') === f.wort)) }
-      const loes = id === 'sniper' ? z.verbessern : z.verbessert
-      if (id === 'sniper') return finder === wer ? { aktion: 'antwort', wert: loes.loesung } : null
-      const i = z.spieler.findIndex((s) => s.id === finder)
-      return z.spieler[(i + 1) % z.spieler.length].id === wer ? { aktion: 'antwort', wert: loes.loesung } : null
+      if (!z.finder) return { aktion: 'wort', wert: String(f.stellen[0]) }
+      return z.finder === wer ? { aktion: 'antwort', wert: z.verbessern.loesung } : null
     }
     case 'dialog': {
       const zeile = z.zeilen[z.z]
@@ -237,6 +241,7 @@ function loeser(id: MehrspielId, z: Z, wer: string): Zug | null {
     case 'hoerkette':
       return z.spieler[z.hoerer].id === wer ? null : { aktion: 'antwort', wert: item(z, z.reihe[z.r]).vok!.term }
     case 'reiseplaner':
+      if (z.vorschlag) return z.vorschlag.ja.includes(wer) ? null : { aktion: 'zustimmen' }
       return { aktion: 'reise', wert: String(z.runden[z.r].ziel) }
     case 'schnapp':
       return z.abgestimmt.includes(wer) ? null : { aktion: z.karten[z.k].passt ? 'schnapp' : 'nicht' }
@@ -350,24 +355,67 @@ describe('Einzelne Regeln', () => {
     durchspielen('satzbaustelle', z)
     expect(REGELN.satzbaustelle.ergebnis(z).fehlerfrei).toBe(false)
   })
-  it('Fluchtraum: Ziffern sieht nur, wer gelöst hat; falscher Code ist ein Fehlversuch; Uhr nur außerhalb von „leicht"', () => {
+  it('Fluchtraum: Codewort statt Ziffern – Buchstaben als Belohnung, nie vorab in der Sicht', () => {
     const z = starte('fluchtraum', vokInhalt(), 2)
     const [a, b] = z.spieler.map((s) => s.id)
-    REGELN.fluchtraum.zug(z, a, { aktion: 'antwort', wert: z.schloesser[0].aufgaben[a].loesung }, 0)
-    const ziffer = String(z.schloesser[0].ziffern[a])
-    expect(JSON.stringify(REGELN.fluchtraum.sicht(z, a, 0))).toContain(`Deine Ziffer: ${ziffer}`)
-    expect(JSON.stringify(REGELN.fluchtraum.sicht(z, b, 0))).not.toContain('Deine Ziffer')
-    REGELN.fluchtraum.zug(z, b, { aktion: 'antwort', wert: z.schloesser[0].aufgaben[b].loesung }, 0)
-    REGELN.fluchtraum.zug(z, b, { aktion: 'code', wert: '0000' }, 0)
+    expect(z.noetig).toBe(3)
+    expect(z.inhalt.items.some((i) => i.vok?.term === z.wort)).toBe(false)
+    const wortIn = (s: Block[]): boolean => new RegExp(`\\b${z.wort}\\b`, 'i').test(JSON.stringify(s))
+    expect(wortIn(REGELN.fluchtraum.sicht(z, a, 0))).toBe(false)
+    // Zwei richtige Antworten reichen bei „mittel" noch nicht für einen Buchstaben, die dritte schon
+    REGELN.fluchtraum.zug(z, a, { aktion: 'antwort', wert: z.aufgaben[a].loesung }, 0)
+    REGELN.fluchtraum.zug(z, b, { aktion: 'antwort', wert: z.aufgaben[b].loesung }, 0)
+    expect(z.frei).toBe(0)
+    REGELN.fluchtraum.zug(z, a, { aktion: 'antwort', wert: z.aufgaben[a].loesung }, 0)
+    expect(z.frei).toBe(1)
+    const cw = REGELN.fluchtraum.sicht(z, b, 0).find((x) => x.typ === 'codewort') as Extract<Block, { typ: 'codewort' }>
+    expect(cw.felder.filter(Boolean)).toHaveLength(1)
+    expect(cw.felder).toHaveLength([...z.wort].length)
+    REGELN.fluchtraum.zug(z, b, { aktion: 'wort', wert: 'xyz' }, 0)
     expect(z.fehlversuche).toBe(1)
+    REGELN.fluchtraum.zug(z, b, { aktion: 'wort', wert: z.wort.toUpperCase() }, 60_000)
+    expect(z.entkommen).toBe(true)
     expect(starte('fluchtraum', vokInhalt(), 2, 'leicht').bis).toBeNull()
     expect(starte('fluchtraum', vokInhalt(), 2, 'schwer', 5).bis).toBeNull()
+  })
+  it('Fluchtraum: Antworten je Buchstabe nach Schwierigkeit, ab „schwer" ohne Stelle, schwerstes gemeinsames Wort', () => {
+    expect(['leicht', 'mittel', 'unmoeglich'].map((s) => starte('fluchtraum', vokInhalt(), 2, s as Schwierigkeit).noetig)).toEqual([2, 3, 4])
+    expect(starte('fluchtraum', vokInhalt(), 2, 'schwer').noetig).toBe(3)
+    expect(starte('fluchtraum', vokInhalt(), 4, 'schwer').noetig).toBe(4)
+    const z = starte('fluchtraum', vokInhalt(), 2, 'schwer')
+    z.frei = 2
+    const cw = REGELN.fluchtraum.sicht(z, 'a', 0).find((x) => x.typ === 'codewort') as Extract<Block, { typ: 'codewort' }>
+    expect(cw.felder.every((f) => f === null)).toBe(true)
+    expect(cw.buchstaben).toHaveLength(2)
+    // Ein Wort, das für beide „unmöglich" ist, wird Codewort
+    const inhalt = vokInhalt()
+    const spieler = ['a', 'b'].map((x) => ({ id: x, name: x }))
+    const gemeinsam: Record<string, Schwierigkeit | null> = Object.fromEntries(inhalt.items.map((i) => [i.id, 'leicht' as Schwierigkeit]))
+    gemeinsam.w8 = 'unmoeglich'
+    const zz = REGELN.fluchtraum.start({
+      spiel: 'fluchtraum',
+      spieler,
+      schwierigkeit: 'mittel',
+      jahrgang: 8,
+      inhalt,
+      band: { gemeinsam, je: { a: { ...gemeinsam }, b: { ...gemeinsam } } },
+      saat: 1,
+      jetzt: 0
+    }) as Z
+    expect(zz.wort).toBe('garden')
+  })
+  it('Fluchtraum: Hinweise in der Zielsprache nach Klasse (5–6 einfach, ab 9 Definition)', () => {
+    const klein = starte('fluchtraum', vokInhalt(), 2, 'mittel', 5)
+    const gross = starte('fluchtraum', vokInhalt(), 2, 'mittel', 10)
+    expect(klein.hinweise[0].text).toMatch(/^The word has \d+ letters\.$/)
+    expect(gross.hinweise.map((h: { text: string }) => h.text).join(' ')).toMatch(/Definition|This is how it is used/)
+    for (const z of [klein, gross]) for (const h of z.hinweise) expect(h.text.toLowerCase()).not.toMatch(new RegExp(`\\b${z.wort.toLowerCase()}\\b`))
   })
   it('Schiffe versenken: die gegnerische Flotte steht nie in der Sicht', () => {
     const z = starte('schiffe', vokInhalt(), 2)
     const a = z.spieler[0].id
     const sicht = REGELN.schiffe.sicht(z, a, 0) as Extract<Block, { typ: 'kacheln' }>[]
-    const gegner = sicht.find((x) => x.typ === 'kacheln' && x.titel?.startsWith('Feld von'))!
+    const gegner = sicht.filter((x) => x.typ === 'kacheln')[0]
     expect(gegner.kacheln.some((k) => k.status === 'schiff')).toBe(false)
   })
   it('Tauziehen: bei drei Personen gleicht ein Bot aus und zieht mit', () => {
@@ -397,20 +445,57 @@ describe('Einzelne Regeln', () => {
     REGELN.beschreiben.zug(z, rater, { aktion: 'antwort', wert: item(z, z.reihe[0]).vok!.term }, 0)
     expect(z.erklaerer).not.toBe(vorher)
   })
-  it('Reiseplaner: die Hinweise grenzen auf genau eine Reise ein', () => {
-    const z = starte('reiseplaner', vokInhalt(), 3)
-    for (let n = 0; n < 5; n++) {
-      const r = reiseRunde(z, ['a', 'b', 'c'])
-      const alle = Object.values(r.hinweise).flat()
-      const passt = r.reisen.filter((reise) =>
-        alle.every((h) => {
-          const term = h.slice(2)
-          const id = z.inhalt.items.find((i) => i.vok?.term === term)!.id
-          return h.startsWith('✓') ? reise.includes(id) : !reise.includes(id)
-        })
-      )
-      expect(passt).toEqual([r.reisen[r.ziel]])
+  it('Reiseplaner: viele Zufallsrunden – genau eine Reise passt, jede Person ist nötig, niemand löst allein', () => {
+    let saat = 1
+    const zf = (): number => {
+      saat = (saat * 16807) % 2147483647
+      return saat / 2147483647
     }
+    for (const sprache of SPRACHEN)
+      for (const schwierigkeit of ['leicht', 'mittel', 'schwer', 'unmoeglich'])
+        for (const jg of [5, 8, 10])
+          for (const n of [2, 3, 4])
+            for (let runde = 0; runde < 4; runde++) {
+              const spieler = ['a', 'b', 'c', 'd'].slice(0, n)
+              const r = reiseRunde({ lex: lexikonFuer(sprache), stufe: stufeVon(jg), schwierigkeit, runde, spieler, bekannt: new Map(), zufall: zf })
+              expect(r, `${sprache} ${schwierigkeit} Kl. ${jg} ${n} Pers. Runde ${runde}`).not.toBeNull()
+              const p = pruefeRunde(r!)
+              expect(p).toEqual({ eindeutig: true, alleNoetig: true, keinerAllein: true })
+              expect(r!.reisen.length).toBe(reisenZahl(schwierigkeit, runde, n))
+              for (const id of spieler) expect(r!.hinweise[id].length).toBeGreaterThanOrEqual(2)
+              const alle = Object.values(r!.hinweise).flat()
+              // Klassenregeln: 5–6 keine Verneinungen/Bedingungen, Bedingungen nur ab 9
+              if (jg === 5) expect(alle.some((h) => h.art === 'nicht' || h.art === 'wenn' || h.art === 'tageMin')).toBe(false)
+              if (jg === 8) expect(alle.some((h) => h.art === 'wenn')).toBe(false)
+            }
+  })
+  it('Reiseplaner: Symbole bis Klasse 8, nicht ab 9; Uhr nur ab „schwer" und nie in Klasse 5–6; Server-Sicht ohne Lösung', () => {
+    const lex = lexikonFuer('en')
+    const reise = { ziel: 'meer', verkehr: 'zug', akt: ['schwimmen'], preis: 200 }
+    expect(kartenText(lex, reise, 5)).toBe('🏖️ the sea · 🚆 train · 🏊 swimming · 💶 200 €')
+    expect(kartenText(lex, reise, 9)).toBe('the sea · train · swimming · 200 €')
+    expect(starte('reiseplaner', vokInhalt(), 2, 'mittel', 8).bis).toBeNull()
+    expect(starte('reiseplaner', vokInhalt(), 2, 'schwer', 8).bis).not.toBeNull()
+    expect(starte('reiseplaner', vokInhalt(), 2, 'unmoeglich', 6).bis).toBeNull()
+    const z = starte('reiseplaner', vokInhalt(), 3, 'mittel', 8)
+    const s = JSON.stringify(REGELN.reiseplaner.sicht(z, 'a', 0))
+    expect(s).not.toMatch(/"ziel":/)
+    // Eigene Hinweise sieht nur die Person selbst
+    const fremd = z.runden[0].hinweise.b[0].text
+    expect(s.includes(fremd) && !z.runden[0].hinweise.a.some((h: { text: string }) => h.text === fremd)).toBe(false)
+  })
+  it('Reiseplaner: Vorschlag + Mehrheit; falsche Wahl zeigt den ausschließenden Hinweis', () => {
+    const z = starte('reiseplaner', vokInhalt(), 3, 'mittel', 8)
+    const r = z.runden[0]
+    const falsch = r.reisen.findIndex((_: unknown, k: number) => k !== r.ziel)
+    REGELN.reiseplaner.zug(z, 'a', { aktion: 'reise', wert: String(falsch) }, 0)
+    expect(z.raus).toEqual([])
+    REGELN.reiseplaner.zug(z, 'b', { aktion: 'zustimmen' }, 0)
+    expect(z.raus).toEqual([falsch])
+    expect(z.letzte!.text).toMatch(new RegExp(`^Trip ${falsch + 1} does not fit: “.+” \\(Kind [ABC]\\.\\)$`))
+    REGELN.reiseplaner.zug(z, 'c', { aktion: 'reise', wert: String(r.ziel) }, 0)
+    REGELN.reiseplaner.zug(z, 'a', { aktion: 'zustimmen' }, 0)
+    expect(z.r).toBe(1)
   })
   it('Stadt-Land-Fluss: nur Kurswörter zählen, der Server prüft', () => {
     const z = starte('stadtland', vokInhalt(), 2)
@@ -432,6 +517,67 @@ describe('Einzelne Regeln', () => {
     REGELN.sniper.zug(z, a, { aktion: 'wort', wert: String(i) }, 8000)
     expect(z.finder).toBe(a)
   })
+  it('Fehlerdetektive zu viert: jede Person hat in jeder Runde etwas zu tun; Überspringen verhindert Hängen', () => {
+    const z = starte('fehlerdetektive', vokInhalt(), 4)
+    let runden = 0
+    while (!z.ende && runden < 10) {
+      const r = z.r
+      // Zu Beginn der Runde: jede Person hat einen eigenen Satz zum Antippen
+      for (const s of z.spieler) {
+        const bl = REGELN.fehlerdetektive.sicht(z, s.id, 0)
+        expect(bl.some((x) => x.typ === 'kacheln' && x.aktion === 'wort')).toBe(true)
+      }
+      // Alle finden ihren Fehler – dann hat jede Person einen Satz zu verbessern
+      for (const s of z.spieler) REGELN.fehlerdetektive.zug(z, s.id, loeser('fehlerdetektive', z, s.id)!, 0)
+      for (const s of z.spieler) expect(REGELN.fehlerdetektive.sicht(z, s.id, 0).some((x) => x.typ === 'frage')).toBe(true)
+      for (const s of z.spieler) REGELN.fehlerdetektive.zug(z, s.id, loeser('fehlerdetektive', z, s.id)!, 0)
+      expect(z.r).toBe(r + 1)
+      runden++
+    }
+    expect(z.ende).toBe(true)
+    // Überspringen: Runde endet auch ohne Lösung
+    const y = starte('fehlerdetektive', vokInhalt(), 3)
+    for (const s of y.spieler)
+      REGELN.fehlerdetektive.zug(y, s.id, { aktion: 'weiter', wert: String(y.faelle.findIndex((f: { finder: string }) => f.finder === s.id)) }, 0)
+    expect(y.r).toBe(1)
+  })
+  it('Fehlersätze: nie gleich dem Original, keine gültige Form, Fehlerstelle bekannt; mitten im Wort nie', () => {
+    const items = vokItems(WOERTER)
+    expect(items.filter((x) => x.fehler).length).toBeGreaterThan(3)
+    for (const i of items.filter((x) => x.fehler)) {
+      const f = i.fehler!
+      const original = `${i.vok!.luecke!.vor}${i.vok!.luecke!.loesung}${i.vok!.luecke!.nach}`
+      expect(f.satz).not.toBe(original)
+      expect(f.stellen.length).toBeGreaterThan(0)
+      expect(f.satz.split(/\s+/)[f.stellen[0]].toLowerCase()).toContain(f.wort.toLowerCase())
+      // Synonyme mit gleicher Übersetzung (big/large, street/road) machen keinen Fehlersatz
+      const anderes = items.find((x) => x.vok?.term === f.wort)!
+      expect(anderes.vok!.translation).not.toBe(i.vok!.translation)
+    }
+    // „go" steckt in „good" – ersetzt wird nur das ganze Wort „go"
+    const tricky = vokItems([
+      { id: 'x1', term: 'go', translation: 'gehen', example: 'This is a good day to go.' },
+      { id: 'x2', term: 'cat', translation: 'Katze', example: 'The cat sleeps on the sofa.' },
+      { id: 'x3', term: 'big', translation: 'groß', example: 'The house is very big indeed.' },
+      { id: 'x4', term: 'large', translation: 'groß', example: 'The park is very large indeed.' }
+    ])
+    expect(tricky.find((i) => i.id === 'x1')!.fehler?.satz).toMatch(/^This is a good day to \p{L}+\.$/u)
+    expect(tricky.find((i) => i.id === 'x3')!.fehler?.wort).not.toBe('large')
+    // Grammatik: falsches Wort nicht im Satz → kein Fehler-Item
+    const g = gramItems([{ id: 'q', art: 'fehler', regelId: 'r', anweisung: '', satz: 'He go home.', fehlerWort: 'goes', loesungen: ['goes'] }])
+    expect(g[0].fehler).toBeUndefined()
+  })
+  it('Fehler-Sniper: Überspringen, wenn alle drücken; Finder geht → nächster Satz', () => {
+    const z = starte('sniper', vokInhalt(), 2)
+    for (const s of z.spieler) REGELN.sniper.zug(z, s.id, { aktion: 'weiter' }, 0)
+    expect(z.r).toBe(1)
+    const f = item(z, z.reihe[1]).fehler!
+    REGELN.sniper.zug(z, 'a', { aktion: 'wort', wert: String(f.stellen[0]) }, 0)
+    expect(z.finder).toBe('a')
+    z.weg.push('a')
+    REGELN.sniper.weg!(z, 'a')
+    expect(z.r).toBe(2)
+  })
   it('Eingabeart und Zeitdruck nach Schwierigkeit und Klasse', () => {
     expect(starte('tauziehen', vokInhalt(), 2, 'schwer', 8).tippen).toBe(true)
     expect(starte('tauziehen', vokInhalt(), 2, 'schwer', 5).tippen).toBe(false)
@@ -441,6 +587,75 @@ describe('Einzelne Regeln', () => {
     const f = z.fragen[z.spieler[0].id]
     expect(f.optionen).toEqual([])
     expect(antwortRichtig(f, f.loesung.toUpperCase())).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------- Alle Fremdsprachen der App (09.10.2026)
+
+/** Alle Sprachen der Sprachfächer (faecher.ts) – Spielnamen, Regeln und Texte in der Zielsprache */
+const SPRACHEN = ['en', 'fr', 'es', 'it', 'la', 'ru', 'nl', 'pt', 'pl', 'cs', 'tr', 'da', 'el', 'grc', 'zh', 'ja', 'ar']
+/** Typische deutsche Wörter der Spieloberfläche – dürfen in keiner Sicht stehen (Inhalte sind frei von ihnen gewählt) */
+const DEUTSCH =
+  /(?<![\p{L}])(Runde d+ von|Spiel|warte|Warte|Wörter|Fehler|Punkte|dran|Deine|Dein|Frage|Hinweise?|Karte|Reise|Gewonnen hat|daneben|Schloss|Buchstaben?|Antwort|Lösung|nicht|richtig|Richtig|Tippe|tippe|Satz|Gemeinsam|gemeinsame|Unentschieden|Überspringen|Codewort|Teile|Team-Ziel|gefunden|Steine|Münzen|Wähle)(?![\p{L}])/u
+
+/** Inhalt ohne deutsche Oberflächenwörter (Übersetzungen der Wörter dürfen deutsch sein) */
+function neutralerInhalt(bereich: 'vok' | 'gram', sprache: string): SpielInhalt {
+  const i = bereich === 'vok' ? vokInhalt() : gramInhalt()
+  i.sprache = sprache
+  i.items = i.items.map((x) => ({
+    ...x,
+    ...(x.satzHinweis ? { satzHinweis: 'DE' } : {}),
+    ...(x.uebersetzung ? { uebersetzung: { ...x.uebersetzung, de: 'DE' } } : {}),
+    ...(bereich === 'gram' ? { zusatz: undefined, ...(x.umformen ? { umformen: { ...x.umformen, vorgabe: '(not)' } } : {}) } : {})
+  }))
+  return i
+}
+
+describe('Alle Sprachen: keine deutschen Reste in den Sichten', () => {
+  for (const sprache of SPRACHEN)
+    it(`${sprache}`, () => {
+      for (const [bereich, ids] of [
+        ['vok', VOK_SPIELE],
+        ['gram', GRAM_SPIELE]
+      ] as ['vok' | 'gram', MehrspielId[]][])
+        for (const id of ids)
+          for (const jg of [5, 8, 10]) {
+            const inhalt = neutralerInhalt(bereich, sprache)
+            if (REGELN[id].passt(inhalt, true)) continue
+            const z = starte(id, inhalt, 3, jg === 10 ? 'schwer' : 'mittel', jg)
+            const { sichten } = durchspielen(id, z)
+            const ergebnis = REGELN[id].ergebnis(z).text
+            for (const sicht of [...sichten, [{ typ: 'text', text: ergebnis }] as Block[]]) {
+              // Nur Sichtbares (Aktionen, Kennungen und Zustände sind interne Namen)
+              const t = JSON.stringify(sicht, (k, v) => (['aktion', 'senden', 'typ', 'id', 'status', 'ton', 'farbe', 'wert', 'sprache', 'bild'].includes(k) ? undefined : v))
+              const m = DEUTSCH.exec(t)
+              expect(m, `${sprache} ${id} Kl. ${jg}: „${m?.[0]}" in ${t.slice(Math.max(0, (m?.index ?? 0) - 80), (m?.index ?? 0) + 40)}`).toBeNull()
+            }
+          }
+    })
+})
+
+describe('Alle Sprachen: Namen, Regeln, Texte, Reiseplaner-Lexikon', () => {
+  it('jede Sprache hat eigene Spielnamen, Regeln und Texte (kein englischer Rückfall)', () => {
+    for (const sp of SPRACHEN.filter((x) => x !== 'en')) {
+      for (const k of SPIELNAMEN_SCHLUESSEL) {
+        const [art, id] = k.split(':') as ['mehr' | 'vok' | 'gram', string]
+        expect(spielName(art, id, sp), `${sp} ${k}`).toBeTruthy()
+      }
+      // Pakete: vollständig (Typ erzwingt alle Texte; hier die Namen und Beschreibungen)
+      const paket = PAKETE[sp]
+      if (paket) {
+        if (paket.namen) for (const k of SPIELNAMEN_SCHLUESSEL) expect(paket.namen[k], `${sp} ${k}`).toBeTruthy()
+        for (const s of MEHRSPIELE) expect(paket.beschreibung[s.id], `${sp} ${s.id}`).toBeTruthy()
+      }
+      // Die Lobby-Texte unterscheiden sich vom Englischen (Stichprobe)
+      expect(spielText(sp, 8, 'uiStarten'), sp).not.toBe(spielText('en', 8, 'uiStarten'))
+      expect(spielText(sp, 8, 'sLeicht'), sp).not.toBe('Easy')
+      expect(mehrBeschreibung('fluchtraum', 'X', sp, 8), sp).not.toBe(mehrBeschreibung('fluchtraum', 'X', 'en', 8))
+      // Reiseplaner: eigenes Lexikon
+      expect(lexikonFuer(sp), sp).not.toBe(lexikonFuer('en'))
+    }
+    expect(lexikonFuer('de').begriffe.ziel[0].karte).toBe('das Meer')
   })
 })
 

@@ -57,6 +57,8 @@ import { diagnoseAbschliessen, diagnoseAnfrage, diagnoseVorpruefen, type Diagnos
 import { aenderungenSeit, istVeraltet, OHNE_TITEL, sofortVeroeffentlichen, type Veroeffentlichung } from '../shared/reiheSpeichern'
 import type { BlattAufgabe } from '../shared/blattFreigabe'
 import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type VorschauZustand } from './vorschau'
+import { geplantAb, nachFreigabe, nochGeplant, planVon, planVorbei } from './freigabePlan'
+import { reiheMitPlanen, zugangPlan } from './planen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reihen (
@@ -244,6 +246,8 @@ const zuweisung = (id: string): ZuweisungZeile | null =>
 
 /** Gehört die Zuweisung dieser Person? (Lerngruppe, ggf. nur Ausgewählte, oder per Code beigetreten) */
 function istFuer(z: ZuweisungZeile, ich: NutzerInfo): boolean {
+  // Geplante Freischaltung (09.10.2026, freigabePlan.ts)
+  if (nochGeplant('reihe', z.id)) return false
   if (db().prepare('SELECT 1 FROM reihe_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   if (ich.quelle === 'gast') return false
   // Einzelnen Lernenden zugewiesen, ohne Lerngruppe (03.10.2026)
@@ -720,7 +724,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       const z = nachCode(String(url.searchParams.get('code') ?? '').toUpperCase())
       const r = z && z.status === 'offen' ? reiheVon(z.reihe_id) : null
       if (!z || !r) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      return (json(res, 200, { id: z.id, titel: r.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)) }), true)
+      return (json(res, 200, { id: z.id, titel: r.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), ...zugangPlan('reihe', z.id, sitzung?.nutzer) }), true)
     }
     if (req.method === 'POST' && url.pathname === '/s/api/reihe/gast') {
       if (!mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
@@ -728,7 +732,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       const z = nachCode(String(k0.code ?? '').toUpperCase())
       const r = z && z.status === 'offen' ? reiheVon(z.reihe_id) : null
       if (!z || !r) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
-      if (sitzung && istFuer(z, sitzung.nutzer)) return (json(res, 200, { ok: true, id: z.id }), true)
+      // Schon dabei – auch vor einer geplanten Freischaltung (09.10.2026)
+      if (sitzung && (istFuer(z, sitzung.nutzer) || zugangPlan('reihe', z.id, sitzung.nutzer).dabei)) return (json(res, 200, { ok: true, id: z.id }), true)
       if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
         db().prepare('INSERT OR IGNORE INTO reihe_gaeste (zuweisung_id, nutzer_id) VALUES (?, ?)').run(z.id, sitzung.nutzer.id)
         gaesteNachziehen(z, r, sitzung.nutzer.id)
@@ -792,6 +797,9 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       if (!z || !istFuer(z, ich)) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe ist nicht für dich freigegeben.' }), true)
       const r = reiheVon(z.reihe_id)
       if (!r) return (json(res, 404, { fehler: 'Die Reihe gibt es nicht mehr.' }), true)
+      // Ende der geplanten Freischaltung vorbei (09.10.2026): nur noch ansehen
+      if (req.method === 'POST' && planVorbei('reihe', z.id))
+        return (json(res, 409, { fehler: 'Die Bearbeitungszeit dieser Reihe ist vorbei – sie lässt sich nur noch ansehen.' }), true)
       verknuepfe(z, r)
       const stand = standVon(z.id, ich.id)
 
@@ -1444,8 +1452,12 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       if (ersteZuweisung) veroeffentliche(r.id)
       // Weitere Zuweisungen bekommen den veröffentlichten Stand – wie alle anderen Lernenden der Reihe
       verknuepfe(zuweisung(id)!, reiheVon(r.id) ?? r)
-      protokolliereServer('reihe', 'Unterrichtsreihe zugewiesen', ich.id)
-      return (json(res, 200, { id, ...(code ? { code, link: reiheLink(code) } : {}) }), true)
+      // „Planen …" (09.10.2026): die Reihe samt ihren verknüpften Schritten erst ab dem Zeitpunkt; „bis" = danach nur ansehen
+      const geplant = nachFreigabe('reihe', [id], k0, ich.id, g?.id ?? '')
+      const plan = planVon('reihe', id)
+      if (plan) reiheMitPlanen(id, plan.ab || null, plan.bis, ich.id, g?.id ?? '')
+      protokolliereServer('reihe', geplant ? 'Unterrichtsreihe geplant zugewiesen' : 'Unterrichtsreihe zugewiesen', ich.id)
+      return (json(res, 200, { id, geplant, ...(code ? { code, link: reiheLink(code) } : {}) }), true)
     }
     /*
      * „Als Schüler ansehen" (08.10.2026, Plan G.1): die echte Schülerseite als Musterschüler (server/vorschau.ts). Ist die
@@ -1634,6 +1646,8 @@ export function reihenDerGruppe(
   bedarf: string[]
   /** Runde 2 von „Meine Klassen" (06.10.2026) */
   status: 'offen' | 'beendet'
+  /** Geplante Freischaltung (09.10.2026) – bis dahin kein Handlungsbedarf */
+  geplantAb: number | null
   erstellt: string
   oberthema: string
   schritte: number
@@ -1662,8 +1676,10 @@ export function reihenDerGruppe(
         schnitt: f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0,
         fertig: lernende.filter((l) => l.weg.fertig).length,
         lernende: lernende.map((l) => ({ id: l.id, fortschritt: l.weg.fortschritt })),
-        bedarf: z.status === 'offen' ? bedarf.map((b) => b.text).slice(0, 8) : [],
+        bedarf: z.status === 'offen' && !nochGeplant('reihe', z.id) ? bedarf.map((b) => b.text).slice(0, 8) : [],
         status: z.status === 'offen' ? ('offen' as const) : ('beendet' as const),
+        // Geplante Freischaltung (09.10.2026)
+        geplantAb: geplantAb('reihe', z.id),
         erstellt: z.erstellt,
         oberthema: r.oberthema,
         schritte: r.schritte.length,

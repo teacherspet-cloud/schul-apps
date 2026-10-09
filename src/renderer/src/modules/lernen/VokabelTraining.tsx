@@ -105,6 +105,7 @@ import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { mitBildern, VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
+import FreigabePlanen, { GeplantMarke, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 import { istVerbSprache } from '@shared/verben'
 import { verbKarten, type VerbKarte } from '@shared/verbTraining'
 import { ladeVerbPool, verbenAusVokabeln } from '../../shared/verben/quellen'
@@ -136,6 +137,8 @@ interface ZuweisungKurz {
   /** Überschrift der Lehrkraft bzw. Standard „2026 - 5b - Englisch" (08.10.2026) */
   ueberschrift?: string
   eigeneUeberschrift?: boolean
+  /** Bände des Kurses (09.10.2026), z. B. „Green Line 1–2" – leer ohne Lehrwerk */
+  baende?: string
   symbol?: 'verlauf' | 'farbe'
   faecher?: number[]
   fach: string
@@ -372,7 +375,7 @@ export default function VokabelTraining(): React.JSX.Element {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <Group gap={4} wrap="nowrap">
                   <Text fw={700} truncate data-vokabel-ueberschrift>
-                    {z.ueberschrift || z.titel}
+                    {z.ueberschrift || (z.baende ? `Vokabeln · ${z.baende}` : z.titel)}
                   </Text>
                   <Tooltip label="Überschrift ändern">
                     <ActionIcon
@@ -395,7 +398,8 @@ export default function VokabelTraining(): React.JSX.Element {
                   </Tooltip>
                 </Group>
                 <Text size="sm" c="dimmed">
-                  {z.lerngruppe} · {z.woerter} Wörter · {z.lernende} Lernende{z.gaeste ? ` (davon ${z.gaeste} per QR-Code)` : ''}
+                  {z.lerngruppe}
+                  {z.baende ? ` · ${z.baende}` : ''} · {z.woerter} Wörter · {z.lernende} Lernende{z.gaeste ? ` (davon ${z.gaeste} per QR-Code)` : ''}
                 </Text>
                 <Text size="xs" c="dimmed">
                   {[z.bis ? `Lernzeitraum bis ${tag(z.bis)}` : 'ohne Enddatum', z.testTermin ? `Test am ${tag(z.testTermin)}` : ''].filter(Boolean).join(' · ')}
@@ -495,6 +499,8 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   // Kurs nur mit Grammatik (Sprachenlernen, 08.10.2026): Sprache wählen, Vokabeln später
   const [nurGrammatik, setNurGrammatik] = useState(false)
   const [sprache, setSprache] = useState<string | null>('en')
+  // „Planen …" (09.10.2026): Abschnitte zu einem Zeitpunkt oder nacheinander freischalten
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const { gruppen } = useLerngruppen()
   useEffect(() => {
     if (auswahl) setTitel(auswahl.titel)
@@ -544,12 +550,15 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
         // Mehrere Abschnitte/Units (08.10.2026): je Abschnitt ein Teil im Kasten „Freigegebene Abschnitte"
         ...(auswahl.teile ? { teile: auswahl.teile } : {}),
-        ...(verben ? { verben } : {})
+        ...(verben ? { verben } : {}),
+        ...planKoerper(plan, { abschnitte: auswahl.teile?.length ?? 1 })
       })
+      planGeaendert()
       notifySuccess(
-        art === 'code' || qr
-          ? 'Freigegeben – QR-Code und Code stehen beim Training (Knopf „QR-Code").'
-          : 'Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.'
+        planMeldung(plan, 'Vokabeln') ||
+          (art === 'code' || qr
+            ? 'Freigegeben – QR-Code und Code stehen beim Training (Knopf „QR-Code").'
+            : 'Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.')
       )
       if (mitGrammatik && neueId) return setGrammatikDanach(grammatikVorgabe(neueId, titel || auswahl.titel, mit.sprache, auswahl.quelle))
       schliessen()
@@ -640,8 +649,12 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             description="Bis dahin plant der Karteikasten so, dass jedes Wort vorher mehrmals verteilt geübt ist."
             value={termin}
             onChange={(e) => setTermin(e.currentTarget.value)}
+            disabled={plan.modus === 'planen' && plan.testKoppeln}
           />
         </Group>
+        {!nurGrammatik && (
+          <FreigabePlanen wert={plan} aendern={setPlan} abschnitte={auswahl?.teile?.map((t) => t.titel) ?? (auswahl ? [auswahl.titel] : undefined)} mitTest />
+        )}
         {!nurGrammatik && (auswahl?.sprache === 'en' || auswahl?.sprache === 'la' || auswahl?.sprache === 'fr' || auswahl?.sprache === 'es') && (
           <Switch
             label="Passende Grammatik gleich mit freigeben"
@@ -658,7 +671,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             onClick={() => void los()}
             data-vokabeln-los
           >
-            {nurGrammatik ? 'Kurs anlegen und Grammatik wählen' : 'Freigeben'}
+            {nurGrammatik ? 'Kurs anlegen und Grammatik wählen' : planKnopf(plan, 'Freigeben')}
           </Button>
         </Group>
       </Stack>
@@ -738,7 +751,8 @@ function VokabelAbschnitte({
   const [entferntOffen, setEntferntOffen] = useState(false)
   const [frage, setFrage] = useState<AbschnittFrage | null>(null)
   const [laeuft, setLaeuft] = useState(false)
-  const neu = teile.filter((t) => t.zeit > Date.now() - 14 * 864e5 && t !== teile[0]).reduce((a, t) => a + t.anzahl, 0)
+  // Geplante Abschnitte (09.10.2026: `zeit` = geplanter Zeitpunkt) zählen erst ab dann als neu
+  const neu = teile.filter((t) => t.zeit > Date.now() - 14 * 864e5 && t.zeit <= Date.now() && t !== teile[0]).reduce((a, t) => a + t.anzahl, 0)
   const los = async (): Promise<void> => {
     if (!frage) return
     setLaeuft(true)
@@ -776,6 +790,7 @@ function VokabelAbschnitte({
             <Group key={i} justify="space-between" wrap="nowrap" gap="xs" data-vokabel-abschnitt={t.titel}>
               <Text size="sm">{t.titel}</Text>
               <Group gap={4} wrap="nowrap">
+                <GeplantMarke ab={t.zeit} />
                 <Text size="xs" c={t.zeit > Date.now() - 14 * 864e5 && i > 0 ? 'green' : 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
                   {t.anzahl} Wörter · {t.zeit ? new Date(t.zeit).toLocaleDateString('de-DE') : ''}
                 </Text>
@@ -861,6 +876,8 @@ function VokabelAbschnitte({
 export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => void }): React.JSX.Element {
   const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  // „Planen …" / „nacheinander freischalten" (09.10.2026)
+  const [plan, setPlan] = useState<PlanWahl>(planStart)
   const los = async (): Promise<void> => {
     if (!auswahl) return
     setLaeuft(true)
@@ -873,10 +890,14 @@ export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => 
         titel: auswahl.titel,
         ...(auswahl.quelle ? { quelle: auswahl.quelle } : {}),
         ...(auswahl.teile ? { teile: auswahl.teile } : {}),
-        ...(verben ? { verben } : {})
+        ...(verben ? { verben } : {}),
+        ...planKoerper(plan, { abschnitte: auswahl.teile?.length ?? 1 })
       })
+      planGeaendert()
       notifySuccess(
-        !r.neu
+        r.neu && planMeldung(plan, `${r.neu} Vokabeln`)
+          ? planMeldung(plan, `${r.neu} Vokabeln`)
+          : !r.neu
           ? 'Alle diese Vokabeln waren schon dabei.'
           : r.wieder
           ? `${r.neu} Vokabeln hinzugefügt – ${r.wieder} davon waren schon einmal im Kurs, ihr Lernstand gilt weiter.`
@@ -898,12 +919,13 @@ export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => 
             {auswahl.woerter.length} Wörter gewählt – schon vorhandene werden übersprungen.
           </Text>
         )}
+        <FreigabePlanen wert={plan} aendern={setPlan} abschnitte={auswahl?.teile?.map((t) => t.titel) ?? (auswahl ? [auswahl.titel] : undefined)} mitTest />
         <Group justify="flex-end">
           <Button variant="default" onClick={schliessen}>
             Abbrechen
           </Button>
           <Button onClick={() => void los()} loading={laeuft} disabled={!auswahl?.woerter.length} data-vokabel-hinzufuegen-los>
-            Hinzufügen
+            {planKnopf(plan, 'Hinzufügen')}
           </Button>
         </Group>
       </Stack>

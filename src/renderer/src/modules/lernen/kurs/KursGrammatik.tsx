@@ -32,13 +32,21 @@ import { notifyError, notifySuccess } from '../../../shared/util'
 import { starteAuftrag } from '../../../shared/auftraege'
 import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../../shared/components/SortierTabelle'
 import { EntwurfAnsehen, ladeEntwuerfe, Lernstand, speichereEntwuerfe, useEntwuerfe, type Entwurf } from '../GrammatikTraining'
-import { erzeugeGrammatikPaket, erzeugeMehrAufgaben, mehrAnzahl, waehlbareArten, type MehrAufgabenAuftrag } from '../grammatikErzeugen'
+import { erzeugeGrammatikPaket, erzeugeMehrAufgaben, mehrAnzahl, waehlbareArten, erzeugungsHinweis, type MehrAufgabenAuftrag } from '../grammatikErzeugen'
+import { bekanntNachStand } from '@shared/zeitformSperre'
+import { useAppSettings } from '../../../shared/settingsStore'
 import { AufgabenEditor } from './AufgabenEditor'
 import { KastenKopf, useGemerkt } from './Kasten'
 import { nachJahrGruppiert, passtSuche } from './kursAnsicht'
 import { istOffen } from '../regal/grammatikJahrgaenge'
 import { jahrgangName } from '../regal/beschriftung'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
+
+/** Land und Schulform aus den Einstellungen – Maßstab für das Niveau der Grammatikaufgaben (09.10.2026, grammatikNiveau.ts) */
+const niveauOrt = (): { land?: string; schulform?: string } => {
+  const d = useAppSettings.getState().settings.defaults
+  return { land: d?.stateId || undefined, schulform: d?.schoolTypeId || undefined }
+}
 
 export interface GrammatikZeile {
   id: string
@@ -156,7 +164,14 @@ export function GrammatikFenster({ id, schliessen, nurAufgaben }: { id: string; 
  * angehängt, die bisherigen behalten ihre Kennungen (der Lernstand bleibt).
  */
 export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schliessen: () => void }): React.JSX.Element {
-  const [d, setD] = useState<{ titel: string; fach: string; sprache?: string; thema: string; info?: { jahrgang?: number }; paket: GrammatikPaket } | null>(null)
+  const [d, setD] = useState<{
+    titel: string
+    fach: string
+    sprache?: string
+    thema: string
+    info?: { jahrgang?: number; themen?: string[]; lehrwerk?: { buch?: string; unit?: string } }
+    paket: GrammatikPaket
+  } | null>(null)
   const [anzahl, setAnzahl] = useState(10)
   const [arten, setArten] = useState<AufgabenArt[] | null>(null)
   const [schwierigkeit, setSchwierigkeit] = useState<MehrAufgabenAuftrag['schwierigkeit']>('mittel')
@@ -185,7 +200,12 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
       schwierigkeit,
       wunsch: wunsch.trim() || undefined,
       regeln: d.paket.regeln.map((r) => ({ id: r.id, titel: r.titel, erklaerung: r.erklaerung, beispiele: r.beispiele })),
-      vorhanden: d.paket.aufgaben.map((a) => (a.satz || a.form || (a.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean)
+      vorhanden: d.paket.aufgaben.map((a) => (a.satz || a.form || (a.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean),
+      // Bekannte Grammatik (09.10.2026): Lehrwerk-Stand der Freigabe, sonst der Jahrgang – unbekannte Zeitformen gesperrt
+      bekannt: bekanntNachStand(d.info?.lehrwerk, d.info?.jahrgang ?? g.jahrgang ?? 6),
+      themenIds: d.info?.themen ?? [],
+      // Maßstab für das Niveau (09.10.2026): „Schwierigkeit" gilt relativ zu Land, Schulform und Klasse
+      ...niveauOrt()
     }
     const titel = d.titel
     void starteAuftrag({
@@ -203,7 +223,7 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
         window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT))
         notifySuccess(`„${titel}": ${r.dazu} neue Aufgaben angehängt – jetzt ${r.aufgaben}. Die Lernenden üben sie gleich mit.`)
       },
-      abschluss: (p) => `${p.aufgaben.length} Aufgaben angehängt`
+      abschluss: (p) => `${p.aufgaben.length} Aufgaben angehängt${erzeugungsHinweis(p)}`
     })
     notifySuccess('Die KI erstellt die weiteren Aufgaben im Hintergrund – sie werden danach automatisch angehängt.')
     schliessen()
@@ -688,6 +708,7 @@ export function extraStarten(k: {
       fach: k.fach,
       sprache: k.sprache,
       jahrgang: k.jahrgang,
+      ...niveauOrt(),
       ...(k.woerter.length ? { woerter: k.woerter.slice(0, 300), wortQuelle: 'Vokabeln des Kurses' } : {}),
       extra: {
         art: k.art,
@@ -730,7 +751,7 @@ export function extraStarten(k: {
       ])
       notifySuccess(`${titel} für ${k.fuer.name} ist fertig – in der Grammatik des Kurses prüfen und freischalten.`)
     },
-    abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig – prüfen und freischalten`
+    abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig${erzeugungsHinweis(p)} – prüfen und freischalten`
   })
   notifySuccess(
     `Die KI erstellt ${k.art === 'foerder' ? 'Förderaufgaben' : 'Forderaufgaben'} für ${k.fuer.name} – sie erscheinen gleich als Entwurf beim Kurs.`

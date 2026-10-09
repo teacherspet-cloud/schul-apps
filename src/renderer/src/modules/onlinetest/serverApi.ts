@@ -75,7 +75,7 @@ const melde = (): void => {
   }
 }
 
-export async function abrufen(pfad: string, init: RequestInit): Promise<Response> {
+export async function abrufen(pfad: string, init: RequestInit, zeitgrenze?: number): Promise<Response> {
   const senden = (init.method ?? 'GET').toUpperCase() !== 'GET'
   let uhrMelden: ReturnType<typeof setTimeout> | undefined
   let gemeldet = false
@@ -101,7 +101,7 @@ export async function abrufen(pfad: string, init: RequestInit): Promise<Response
   try {
     for (let versuch = 0; ; versuch++) {
       const ab = new AbortController()
-      const uhr = setTimeout(() => ab.abort(), senden ? ZEITGRENZE_SENDEN : ZEITGRENZE)
+      const uhr = setTimeout(() => ab.abort(), zeitgrenze ?? (senden ? ZEITGRENZE_SENDEN : ZEITGRENZE))
       try {
         const r = await fetch(pfad, { ...init, signal: ab.signal })
         const kurzWeg = r.status === 502 || r.status === 503 || (r.status === 504 && !senden)
@@ -145,13 +145,21 @@ export async function abrufen(pfad: string, init: RequestInit): Promise<Response
 export const holen = <T>(pfad: string): Promise<T> =>
   abrufen(pfad, { headers: { 'x-schulapps-token': 'server' }, cache: 'no-store' }).then((r) => antwort<T>(r))
 
-export const senden = <T>(pfad: string, koerper: unknown = {}): Promise<T> =>
-  abrufen(pfad, {
-    method: 'POST',
-    headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
-    body: JSON.stringify(koerper),
-    cache: 'no-store'
-  })
+/**
+ * `zeitgrenze` (09.10.2026): kurze Aufrufe wie eine Antwort im Vokabeltrainer warten nicht die 3 Minuten der
+ * Blatt-Abgabe – hing die Verbindung, war die Lernkarte so lange gesperrt (Befund: „Karteikarten frieren ein").
+ */
+export const senden = <T>(pfad: string, koerper: unknown = {}, zeitgrenze?: number): Promise<T> =>
+  abrufen(
+    pfad,
+    {
+      method: 'POST',
+      headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
+      body: JSON.stringify(koerper),
+      cache: 'no-store'
+    },
+    zeitgrenze
+  )
     .then((r) => antwort<T>(r))
     .then((d) => (gesendet(pfad), d))
 

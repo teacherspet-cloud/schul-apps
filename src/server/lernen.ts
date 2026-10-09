@@ -20,6 +20,7 @@ import { blaetterFuerLernen, blattIstFuer } from './arbeitsblaetter'
 import { fachfarbeDerLehrkraft, vokabelListenFuer, zeile as vokZeile } from './vokabeln'
 import { reihenFuerLernen } from './reihen'
 import { fachVon, FAECHER } from '../shared/faecher'
+import { nachFreigabe, nochGeplant } from './freigabePlan'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tafel_freigaben (
@@ -73,6 +74,8 @@ interface TafelZeile {
 
 function tafelIstFuer(z: TafelZeile, ich: NutzerInfo): boolean {
   if (ich.quelle === 'gast' || ich.rolle !== 'schueler') return false
+  // Geplante Freischaltung (09.10.2026, freigabePlan.ts)
+  if (nochGeplant('tafel', z.id)) return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
   const g = lerngruppe(z.lerngruppe_id)
@@ -289,7 +292,9 @@ export function lernenRoute(): (k: Anfrage) => Promise<boolean> {
         JSON.stringify(bilder),
         new Date().toISOString()
       )
-    protokolliereServer('lernen', 'Tafelbild für Lernende freigegeben', ich.id)
-    return (json(res, 200, { id }), true)
+    // „Planen …" (09.10.2026)
+    const geplant = nachFreigabe('tafel', [id], k0, ich.id, g?.id ?? '')
+    protokolliereServer('lernen', geplant ? 'Tafelbild-Freigabe geplant' : 'Tafelbild für Lernende freigegeben', ich.id)
+    return (json(res, 200, { id, geplant }), true)
   }
 }

@@ -57,6 +57,7 @@ import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 import { WeiterKnopf } from './ReiheWeiter'
 import { naechsterSchritt, schrittErledigt } from '@shared/reiheWeiter'
 import type { DiagnoseErgebnis } from '@shared/diagnoseAuswertung'
+import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
 
 interface SchrittSicht {
   id: string
@@ -402,10 +403,28 @@ function HilfeDialog({ d, schliessen, fertig }: { d: ReiheDaten; schliessen: () 
 
 // ---------------------------------------------------------------- ein Schritt
 
+/** Schritte mit Vollbild beim Lernen: Abgaben (bleiben offen) und Runden (enden mit dem Erledigen) */
+const FOKUS_ABGABE = ['aufgabe', 'abschluss', 'sprechen']
+const FOKUS_RUNDE = ['lernkarten', 'reflexion', 'diagnose']
+
 function SchrittSeite({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () => void }): React.JSX.Element {
   const l = d.weg.schritte.find((x) => x.id === s.id)!
   const st: SchrittStand = d.stand.schritte[s.id] ?? {}
+  /*
+   * Vollbild beim Lernen (09.10.2026): Schritte, in denen gearbeitet wird. Abgaben mit Feedback schließen nicht von selbst;
+   * Lernkarten, Selbsteinschätzung und Diagnose geben die normale Ansicht zurück, sobald sie erledigt sind.
+   */
+  const art = String(s.inhalt?.art ?? '')
+  const fokusAktiv =
+    l.status !== 'gesperrt' && (FOKUS_ABGABE.includes(art) || (FOKUS_RUNDE.includes(art) && !schrittErledigt(l)))
   return (
+    <FokusRahmen
+      name={`reihe-${art}`}
+      aktiv={fokusAktiv}
+      onEnde={() => window.location.assign(`/s/r/${d.id}`)}
+      // Abgaben: ungesendeter Text soll nicht durch Esc verloren gehen
+      escNurAnsicht={FOKUS_ABGABE.includes(art)}
+    >
     <Stack data-reihe-schritt={s.inhalt?.art}>
       <Button variant="subtle" component="a" href={`/s/r/${d.id}`} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
         {d.titel}
@@ -444,6 +463,7 @@ function SchrittSeite({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () =
       {s.inhalt && l.status !== 'gesperrt' && <Inhalt d={d} s={s} st={st} status={l.status} neu={neu} />}
       {l.status !== 'gesperrt' && <Fragen d={d} s={s} neu={neu} />}
     </Stack>
+    </FokusRahmen>
   )
 }
 

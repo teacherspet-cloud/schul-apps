@@ -47,11 +47,12 @@ describe('Freiwillig weiter üben', () => {
 
 describe('Fallende Wörter: Tempo nach Klasse', () => {
   it('Klasse 5 sehr langsam, wird mit Treffern schneller, nie unter das Minimum', () => {
-    expect(fallTempo(5, 0).fallzeit).toBe(18)
-    expect(fallTempo(5, 10).fallzeit).toBeLessThan(18)
-    expect(fallTempo(5, 200).fallzeit).toBe(7)
+    // 09.10.2026: Start deutlich langsamer (spiele/fallTempo.ts, weitere Fälle in fallendeWoerter.test.ts)
+    expect(fallTempo(5, 0).fallzeit).toBe(30)
+    expect(fallTempo(5, 10).fallzeit).toBeLessThan(30)
+    expect(fallTempo(5, 200).fallzeit).toBe(13)
     expect(fallTempo(11, 0).fallzeit).toBeLessThan(fallTempo(7, 0).fallzeit)
-    expect(fallTempo(null, 0).fallzeit).toBe(18)
+    expect(fallTempo(null, 0).fallzeit).toBe(28)
   })
 })
 

@@ -257,10 +257,15 @@ export default function SubscriptionSetup({
                       placeholder="Code hier einfügen"
                       value={code}
                       onChange={(e) => setCode(e.currentTarget.value)}
+                      // Enter bestätigt (09.10.2026)
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && code.trim()) (e.currentTarget.closest('.mantine-Group-root')?.querySelector('[data-code-bestaetigen]') as HTMLButtonElement | null)?.click()
+                      }}
                       autoFocus
                     />
                     <Button
                       disabled={!code.trim()}
+                      data-code-bestaetigen
                       onClick={async () => {
                         try {
                           await window.api.ai.loginCode(provider, code)

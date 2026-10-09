@@ -18,8 +18,13 @@ import type { VerbSprache } from '@shared/verben'
 import { formPasst, formSpalten, sprechtext, verbSchluesselVonWort, type VerbKarte } from '@shared/verbTraining'
 import { useVerbDaten } from './verbDaten'
 import { apostrophHinweis } from './apostrophHinweis'
-import LegeEingabe from './handschrift/LegeEingabe'
+import LegeEingabe, { gelegtText, nurBuchstaben } from './handschrift/LegeEingabe'
+import { fremdSeiteSichtbar, KEIN_ZUG, zugAbbrechen, zugBeenden, zugBeginnen, zugBewegen } from './kartenZug'
+import { useZuSchnell } from './zuSchnell'
+import LoesungZeigen from './LoesungZeigen'
 import { rueckweg } from './regal/beschriftung'
+import { useBlaettern } from './regal/blaettern'
+import { FokusRahmen } from './fokus/FokusRahmen'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
@@ -63,13 +68,18 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { falschschreibungen } from '@shared/vokabelFehler'
 import {
+  abrufUebungFuer,
   auswahlFsOptionen,
   auswahlOptionen,
   buchstaben,
+  leerzeichenSelbst,
+  mitApostrophen,
   mitLeerzeichen,
+  mitLeerzeichenVoraus,
   lueckenMuster,
   paarFuer,
   istSicher,
+  linkRunde,
   ohneAngaben,
   STUFEN,
   satzMitLuecke,
@@ -214,13 +224,16 @@ export const CSS = `
 .vt-option:hover { border-color: var(--vt-a) !important; transform: translateY(-1px); }
 .vt-option[data-zustand="richtig"] { background: var(--vt-gut-bg) !important; border-color: var(--vt-gut-rand) !important; color: var(--vt-gut-text) !important; }
 .vt-option[data-zustand="falsch"] { background: var(--vt-schlecht-bg) !important; border-color: var(--vt-schlecht-rand) !important; color: var(--vt-schlecht-text) !important; }
-.vt-karte-buehne { perspective: 1200px; width: 100%; max-width: 440px; height: 260px; margin: 0 auto; touch-action: pan-y; }
+.vt-karte-buehne { perspective: 1200px; width: 100%; max-width: 440px; height: 260px; margin: 0 auto; touch-action: pan-y;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; outline-offset: 4px; border-radius: 20px; }
+.vt-karte-buehne img { -webkit-user-drag: none; pointer-events: none; }
+.vt-karte-buehne:active .vt-karte { cursor: grabbing; }
 .vt-karte { position: relative; width: 100%; height: 100%; transition: transform .55s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; cursor: grab; }
 .vt-karte.umgedreht { transform: rotateY(180deg); }
-.vt-seite { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 20px; padding: 20px;
+.vt-seite { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(0deg) translateZ(1px); border-radius: 20px; padding: 20px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--vt-tinte);
   background: linear-gradient(160deg, var(--vt-flaeche), var(--vt-a-hell)); border: 1px solid var(--vt-a-rand); box-shadow: 0 14px 30px var(--vt-schatten); }
-.vt-seite.hinten { transform: rotateY(180deg); background: linear-gradient(160deg, var(--vt-flaeche), var(--vt-gut-bg)); border-color: var(--vt-gut-rand); }
+.vt-seite.hinten { transform: rotateY(180deg) translateZ(1px); background: linear-gradient(160deg, var(--vt-flaeche), var(--vt-gut-bg)); border-color: var(--vt-gut-rand); }
 .vt-seite::before { content: ''; position: absolute; left: 0; right: 0; top: 46px; border-top: 2px solid var(--vt-a-rand); }
 .vt-kachel { min-width: 42px; height: 46px; font-size: 1.2rem; font-weight: 700; border-radius: 12px !important; background: var(--vt-a-hell) !important; color: var(--vt-a-dunkel) !important;
   border: 2px solid var(--vt-a-rand) !important; box-shadow: 0 3px 0 var(--vt-a-zart); }
@@ -329,8 +342,11 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
+  const blatt = useBlaettern()
   // Freiwillig weiter üben (08.10.2026): Antworten rücken nur eingeschränkt vor (shared/vokabeltrainer nachFreiwillig)
   const [freiwillig, setFreiwillig] = useState(false)
+  // „Abfrage ohne Hinschauen" (Link aus einem Tipp der Startseite, 09.10.2026)
+  const [abfragen, setAbfragen] = useState(false)
   const [vorher, setVorher] = useState<Record<string, WortStand> | null>(null)
   // Angetippter Abschnitt des Vokabelwegs (08.10.2026)
   const [station, setStation] = useState<Stufe | null>(null)
@@ -344,6 +360,28 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
     )
   }, [id])
   useEffect(laden, [laden])
+  /*
+   * Direkt in eine Übung (09.10.2026, Befund der Lehrkraft: der Tipp „Abfrage ohne Hinschauen starten" öffnete nur die
+   * Kursseite): `?uebung=runde|abfragen|wackelig` startet sie einmal, sobald die Liste da ist (shared linkRunde) – und
+   * verschwindet aus der Adresse, damit „Zurück" und Neuladen wieder die Kursseite zeigen.
+   */
+  const linkGenutzt = useRef(false)
+  useEffect(() => {
+    if (!d || linkGenutzt.current) return
+    linkGenutzt.current = true
+    const q = new URLSearchParams(window.location.search)
+    const art = q.get('uebung')
+    if (!art) return
+    q.delete('uebung')
+    const rest = q.toString()
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`)
+    const r = linkRunde(art, d.woerter, d.staende, Date.now(), d.tagesziel ?? 10)
+    if (!r) return
+    setVorher(null)
+    setFreiwillig(r.freiwillig)
+    setAbfragen(r.abfragen)
+    setSitzung(r.woerter)
+  }, [d])
   // Neue Vokabeln ohne Neuladen (08.10.2026) – nicht mitten in einer Runde oder einem Spiel
   useAuffrischen(() => !document.querySelector('[data-spiel], [data-verbspiel], [data-sitzung]') && laden(), !sitzung)
   if (d === undefined)
@@ -356,11 +394,25 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
   return (
     <TrainerFarben fach={d.fach} fachFarbe={d.farbe}>
       {sitzung ? (
-        <Sitzung d={d} woerter={sitzung} freiwillig={freiwillig} fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), setSitzung(null))} />
+        <Sitzung
+          d={d}
+          woerter={sitzung}
+          freiwillig={freiwillig}
+          abfragen={abfragen}
+          // Im Fachordner (09.10.2026, regal/blaettern.tsx): zurückblättern statt nur ausblenden
+          fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), blatt ? blatt.zurueck(() => setSitzung(null)) : setSitzung(null))}
+        />
       ) : (
         <Kasten
           d={d}
-          starten={(w, frei) => (setVorher(null), setFreiwillig(Boolean(frei)), setSitzung(w))}
+          starten={(w, frei) => {
+            setVorher(null)
+            setFreiwillig(Boolean(frei))
+            setAbfragen(false)
+            // Im Fachordner: die Runde als nächste Seite; Zurück mitten in der Runde lädt den Stand neu
+            if (blatt) blatt.oeffne('uebung', () => setSitzung(w), () => (setSitzung(null), laden()))
+            else setSitzung(w)
+          }}
           aktualisieren={(r) => setD({ ...d, ...r })}
           vorher={vorher}
           oeffneStation={d.weg ? setStation : undefined}
@@ -690,17 +742,23 @@ interface Ergebnis {
   sicher: boolean
 }
 
+/** Zeitgrenze einer Antwort an den Server (09.10.2026): danach Meldung und nochmal tippen statt gesperrter Karte */
+const ANTWORT_ZEITGRENZE = 20000
+
 function Sitzung({
   d,
   woerter,
   fertig,
   freiwillig = false,
+  abfragen = false,
   fertigText = 'Zurück zum Kasten'
 }: {
   d: Liste
   woerter: Vokabel[]
   fertig: (st: Record<string, WortStand>) => void
   freiwillig?: boolean
+  /** „Abfrage ohne Hinschauen" (Tipp der Startseite, 09.10.2026): nur selbst abrufen, keine Auswahl */
+  abfragen?: boolean
   /** Knopf nach der Runde (Abschnitts-Fenster: „Zurück zum Vokabelweg", 08.10.2026) */
   fertigText?: string
 }): React.JSX.Element {
@@ -711,6 +769,8 @@ function Sitzung({
   const [zaehler, setZaehler] = useState({ richtig: 0, gesamt: 0, wiederholt: new Map<string, number>() })
   const [laeuft, setLaeuft] = useState(false)
   const [netz, setNetz] = useState('')
+  // „Lösung zeigen" (09.10.2026): leere Antwort = nicht gewusst (falsch im Kasten); die Rückmeldung nennt nur die Lösung
+  const [aufgegeben, setAufgegeben] = useState(false)
   // Zählt die gestellten Fragen: Die Übungsart gilt für eine Frage und wechselt erst mit „Weiter"
   const [frage, setFrage] = useState(0)
   const v = warteschlange[0]
@@ -722,13 +782,26 @@ function Sitzung({
    * desselben Worts (z. B. Lernkarte → Buchstaben legen). Die neue Übung stand schon gesperrt da, darunter
    * „Richtig". Deshalb wird die Übung nur beim Wechsel der Frage bestimmt.
    */
-  const uebung = useMemo<Uebung>(() => (v && st ? uebungFuer(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
+  const uebung = useMemo<Uebung>(() => (v && st ? (abfragen ? abrufUebungFuer : uebungFuer)(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
   const verbKarte = v ? d.verben?.karten.find((k) => k.schluessel.toLowerCase() === verbSchluesselVonWort(v.term)) : undefined
   // Fach VOR der Antwort (die Nachfrage gilt dem Stand des Wortes, nicht dem Ergebnis dieser Abfrage)
   const fachVorher = useMemo(() => st?.fach ?? 0, [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const antworten = async (wert: { antwort?: string; gewusst?: boolean; gezeigt?: string }): Promise<void> => {
-    if (!v || laeuft) return
+  /*
+   * Sperre gegen doppeltes Absenden als Ref (09.10.2026): Der Zustand `laeuft` kommt erst mit dem nächsten Zeichnen an –
+   * ein schneller Doppeltipp schickte die Antwort zweimal. Die Antwort hat eine kurze Zeitgrenze (ANTWORT_ZEITGRENZE):
+   * Vorher wartete sie wie eine Blatt-Abgabe bis zu 3 Minuten, so lange blieb die Lernkarte gesperrt („eingefroren").
+   */
+  const sendet = useRef(false)
+  // „Stimmt das?": blind immer dieselbe Seite zählt nicht (09.10.2026, shared/schnellKlick.ts)
+  const schnell = useZuSchnell()
+  useEffect(() => schnell.frage(), [v?.id, frage, schnell.frage]) // eslint-disable-line react-hooks/exhaustive-deps
+  const antworten = async (wert: { antwort?: string; gewusst?: boolean; gezeigt?: string; aufgegeben?: boolean }): Promise<void> => {
+    if (!v || sendet.current) return
+    // Nur aufeinanderfolgende „Stimmt das?"-Fragen bilden eine Folge
+    if (uebung !== 'paar') schnell.zuruecksetzen()
+    else if (!schnell.melden(wert.antwort ?? '').werten) return schnell.frage()
+    sendet.current = true
     setLaeuft(true)
     try {
       const e = await senden<Ergebnis>('/s/api/vokabeln/antwort', {
@@ -740,7 +813,7 @@ function Sitzung({
         ...(d.abschnitt ? { abschnitt: d.abschnitt } : {}),
         // Eingabeart von „Lege das Wort" (legen/tippen/schreiben) für die Achievements (08.10.2026)
         ...(uebung === 'buchstaben' ? { eingabe: useDarstellung.getState().d.legen ?? 'legen' } : {})
-      })
+      }, ANTWORT_ZEITGRENZE)
       setStaende((s) => ({ ...s, [v.id]: e.stand }))
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
       // Töne (Einstellungen › Lernen, 06.10.2026): nur bei „richtig“ – Fehler bleiben still
@@ -750,12 +823,14 @@ function Sitzung({
       if (e.urteil === 'richtig' && wert.antwort && SCHREIBEND.includes(uebung)) apostrophHinweis(wert.antwort)
       // Lernkarte („Wusste ich" / „Noch nicht gewusst", 08.10.2026): gleich weiter, ohne Weiter-Knopf
       if (uebung === 'karte') return weiterMit(e)
+      setAufgegeben(Boolean(wert.aufgegeben))
       setErgebnis(e)
       setNetz('')
     } catch (e) {
       // Verbindung trotz Wiederholung weg (08.10.2026): sagen statt scheinbar hängen – nochmal tippen geht
       setNetz(e instanceof Error ? e.message : String(e))
     } finally {
+      sendet.current = false
       setLaeuft(false)
     }
   }
@@ -829,6 +904,8 @@ function Sitzung({
     )
   const fortschritt = (zaehler.gesamt / Math.max(1, zaehler.gesamt + warteschlange.length)) * 100
   return (
+    // Vollbild beim Lernen (09.10.2026): die laufende Runde füllt den Bildschirm; „Geschafft!" zeigt wieder die normale Ansicht
+    <FokusRahmen name="vokabelrunde" onEnde={() => fertig(staende)}>
     <Stack className="vt" data-sitzung>
       <style>{CSS}</style>
       <Group justify="space-between">
@@ -840,6 +917,7 @@ function Sitzung({
         </Badge>
       </Group>
       <Progress value={fortschritt} radius="xl" size="lg" color={farbe.a} />
+      {schnell.hinweis}
       {netz && (
         <Alert color="orange" data-netz-fehler>
           {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.
@@ -862,12 +940,19 @@ function Sitzung({
         ) : uebung === 'paar' ? (
           <Paar v={v} liste={d.woerter} sprache={d.sprache} urteil={(a, gezeigt) => void antworten({ antwort: a, gezeigt })} ergebnis={ergebnis} />
         ) : uebung === 'buchstaben' ? (
-          <Buchstaben v={v} pruefen={(a) => void antworten({ antwort: a })} gesperrt={Boolean(ergebnis)} />
+          <Buchstaben v={v} schwer={leerzeichenSelbst({ fach: fachVorher })} pruefen={(a) => void antworten({ antwort: a })} zeigen={() => void antworten({ antwort: '', aufgegeben: true })} gesperrt={Boolean(ergebnis) || laeuft} />
         ) : (
-          <Schreiben v={v} uebung={uebung} sprache={d.sprache} pruefen={(a) => void antworten({ antwort: a })} gesperrt={Boolean(ergebnis)} />
+          <Schreiben
+            v={v}
+            uebung={uebung}
+            sprache={d.sprache}
+            pruefen={(a) => void antworten({ antwort: a })}
+            zeigen={() => void antworten({ antwort: '', aufgegeben: true })}
+            gesperrt={Boolean(ergebnis)}
+          />
         )}
       </div>
-      {ergebnis && uebung !== 'karte' && <Rueckmeldung e={ergebnis} v={v} sprache={d.sprache} />}
+      {ergebnis && uebung !== 'karte' && <Rueckmeldung e={ergebnis} v={v} sprache={d.sprache} aufgegeben={aufgegeben} />}
       {/* Unregelmäßige Verben (07.10.2026): ab Fach 2 nach der Antwort noch die Formen */}
       {ergebnis && verbKarte && fachVorher >= 2 && d.verben && (
         <StammformenNachfrage key={v.id} karte={verbKarte} sprache={d.verben.sprache} tonSprache={d.sprache} />
@@ -878,6 +963,7 @@ function Sitzung({
         </Button>
       )}
     </Stack>
+    </FokusRahmen>
   )
 }
 
@@ -933,18 +1019,26 @@ function StammformenNachfrage({ karte, sprache, tonSprache }: { karte: VerbKarte
   )
 }
 
-function Rueckmeldung({ e, v, sprache }: { e: Ergebnis; v: Vokabel; sprache: string }): React.JSX.Element {
+function Rueckmeldung({ e, v, sprache, aufgegeben = false }: { e: Ergebnis; v: Vokabel; sprache: string; aufgegeben?: boolean }): React.JSX.Element {
   const farbe = e.urteil === 'richtig' ? 'green' : e.urteil === 'fast' ? 'yellow' : 'red'
   useEffect(() => sprich(v.term, sprache), [v.term, sprache])
   return (
     <Alert color={farbe} variant="light" icon={e.urteil === 'falsch' ? <IconX /> : <IconCheck />} data-urteil={e.urteil} className="vt-rein">
       <Text fw={700}>
-        {e.urteil === 'richtig' ? (e.sicher ? 'Richtig – jetzt sitzt das Wort sicher!' : 'Richtig!') : e.urteil === 'fast' ? 'Fast!' : 'Noch nicht.'}
+        {e.urteil === 'richtig'
+          ? e.sicher
+            ? 'Richtig – jetzt sitzt das Wort sicher!'
+            : 'Richtig!'
+          : aufgegeben
+          ? 'Hier ist die Lösung – das Wort kommt bald wieder.'
+          : e.urteil === 'fast'
+          ? 'Fast!'
+          : 'Noch nicht.'}
       </Text>
       {e.hinweis && <Text size="sm">{e.hinweis}</Text>}
       {e.urteil !== 'richtig' && (
         <Text size="sm">
-          Richtig ist: <b>{e.richtig}</b>
+          {aufgegeben ? 'Lösung' : 'Richtig ist'}: <b>{e.richtig}</b>
         </Text>
       )}
       <Text size="sm" c="dimmed">
@@ -958,13 +1052,37 @@ function Rueckmeldung({ e, v, sprache }: { e: Ergebnis; v: Vokabel; sprache: str
 function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string; gewusst: (g: boolean) => void; gesperrt: boolean }): React.JSX.Element {
   const farbe = useVtFarbe()
   const [um, setUm] = useState(false)
+  // Ziehen/Wischen (kartenZug.ts): ein Zug je Zeiger, sicher beendet auch bei Abbruch, Fokus- oder Fensterwechsel
+  const zz = useRef(KEIN_ZUG)
   const [zug, setZug] = useState(0)
-  const start = useRef<number | null>(null)
+  const setZz = (z: typeof KEIN_ZUG): void => {
+    zz.current = z
+    setZug(z.zug)
+  }
+  useEffect(() => {
+    const ruhe = (): void => {
+      zz.current = zugAbbrechen(zz.current)
+      setZug(zz.current.zug)
+    }
+    const sichtbar = (): void => {
+      if (document.visibilityState !== 'visible') ruhe()
+    }
+    window.addEventListener('blur', ruhe)
+    document.addEventListener('visibilitychange', sichtbar)
+    return () => {
+      window.removeEventListener('blur', ruhe)
+      document.removeEventListener('visibilitychange', sichtbar)
+    }
+  }, [])
   const [nachsprechen, setNachsprechen] = useState<string | null>(null)
   // Zufällig mal Deutsch, mal die Fremdsprache vorn (08.10.2026, Wunsch der Lehrkraft); je Karte fest
   const [deutschVorn] = useState(() => Math.random() < 0.5)
-  // Vorlesen, sobald die fremdsprachige Seite zu sehen ist
-  const fremdSichtbar = deutschVorn ? um : !um
+  /*
+   * Vorlesen, sobald die fremdsprachige Seite zu sehen ist – und NUR dann (09.10.2026, Befund der Lehrkraft: bei der
+   * deutschen Vorderseite verriet der Lautsprecher-Knopf die Antwort). Knöpfe „Anhören", „Nachsprechen" und
+   * „Beispielsatz anhören" gibt es erst nach dem Umdrehen auf die fremdsprachige Seite.
+   */
+  const fremdSichtbar = fremdSeiteSichtbar(deutschVorn, um)
   useEffect(() => {
     if (fremdSichtbar) sprich(v.term, sprache)
   }, [v.term, sprache, fremdSichtbar])
@@ -1006,7 +1124,7 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
       {v.example && (
         <Text size="sm" mt="sm" fs="italic">
           {v.example}
-          {hatSatzAufnahme(v.example) && (
+          {hatSatzAufnahme(v.example) && fremdSichtbar && (
             <ActionIcon
               size="sm"
               variant="subtle"
@@ -1041,15 +1159,42 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
       <Text className="vt-frage">Neue Karte – tippe oder wische zum Umdrehen</Text>
       <div
         className="vt-karte-buehne"
-        onPointerDown={(e) => (start.current = e.clientX)}
-        onPointerMove={(e) => start.current !== null && setZug(Math.max(-60, Math.min(60, e.clientX - start.current)))}
+        role="button"
+        tabIndex={0}
+        aria-label={um ? 'Karte zurückdrehen' : 'Karte umdrehen'}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          // Den Zeiger festhalten: Auch losgelassen neben der Karte kommt das Loslassen hier an
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId)
+          } catch {
+            /* ohne Festhalten geht es auch */
+          }
+          setZz(zugBeginnen(zz.current, e.pointerId, e.clientX))
+        }}
+        onPointerMove={(e) => zz.current.zeiger !== null && setZz(zugBewegen(zz.current, e.pointerId, e.clientX))}
         onPointerUp={(e) => {
-          const dx = start.current === null ? 0 : e.clientX - start.current
-          start.current = null
-          setZug(0)
-          if (Math.abs(dx) > 40 || Math.abs(dx) < 6) setUm((x) => !x)
+          const r = zugBeenden(zz.current, e.pointerId)
+          setZz(r.zug)
+          if (r.umdrehen) setUm((x) => !x)
+          try {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+          } catch {
+            /* egal */
+          }
+        }}
+        onPointerCancel={(e) => setZz(zugAbbrechen(zz.current, e.pointerId))}
+        onLostPointerCapture={(e) => setZz(zugAbbrechen(zz.current, e.pointerId))}
+        onDragStart={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          // Tastatur: Leertaste dreht um (Enter gehört „Wusste ich", sobald die Rückseite zu sehen ist)
+          if (e.key === ' ' || (e.key === 'Enter' && !um)) {
+            e.preventDefault()
+            setUm((x) => !x)
+          }
         }}
         data-lernkarte
+        data-zieht={zug ? '' : undefined}
       >
         <div className={`vt-karte ${um ? 'umgedreht' : ''}`} style={zug ? { transform: `rotateY(${(um ? 180 : 0) + zug}deg)` } : undefined}>
           {/* Fremdsprachige Seite mit Beispielsatz (08.10.2026), deutsche Seite mit der Übersetzung; Vorderseite zufällig */}
@@ -1059,13 +1204,15 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
           <div className="vt-seite hinten">{deutschVorn ? fremdSeite : deutschSeite}</div>
         </div>
       </div>
-      <Group gap="xs">
-        <Tooltip label="Anhören">
-          <ActionIcon size="lg" variant="light" onClick={() => sprich(v.term, sprache)} aria-label="Anhören">
-            <IconVolume size={18} />
-          </ActionIcon>
-        </Tooltip>
-        {erkennung && STIMME[sprache] && (
+      <Group gap="xs" mih={34} data-karte-ton={fremdSichtbar ? 'fremd' : 'deutsch'}>
+        {fremdSichtbar && (
+          <Tooltip label="Anhören">
+            <ActionIcon size="lg" variant="light" onClick={() => sprich(v.term, sprache)} aria-label="Anhören" data-karte-anhoeren>
+              <IconVolume size={18} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+        {fremdSichtbar && erkennung && STIMME[sprache] && (
           <Tooltip label="Nachsprechen (die Aufnahme wird nicht gespeichert)">
             <ActionIcon size="lg" variant="light" onClick={sprechen} aria-label="Nachsprechen">
               <IconMicrophone size={18} />
@@ -1293,24 +1440,51 @@ function Paar({
   )
 }
 
-function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string) => void; gesperrt: boolean }): React.JSX.Element {
+/**
+ * Buchstaben legen. `schwer` (schwerste Stufe ab Fach 2, 09.10.2026): Leerzeichen setzen die Lernenden selbst – die
+ * Leerzeichen der Lösung stehen dann NICHT von selbst da, und weil die Leertaste bei jedem Wort bereitsteht, verrät
+ * nichts, ob das Wort getrennt geschrieben wird.
+ */
+function Buchstaben({
+  v,
+  pruefen,
+  zeigen,
+  gesperrt,
+  schwer = false
+}: {
+  v: Vokabel
+  pruefen: (a: string) => void
+  zeigen?: () => void
+  gesperrt: boolean
+  schwer?: boolean
+}): React.JSX.Element {
   const kacheln = useMemo(() => buchstaben(v.term).map((b, i) => ({ b, i })), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [gelegt, setGelegt] = useState<number[]>([])
-  // Leerzeichen stehen von selbst an ihrer Stelle („bring about", 06.10.2026)
-  const wort = mitLeerzeichen(v.term, gelegt.map((i) => kacheln.find((k) => k.i === i)!.b).join(''))
+  const text = gelegtText(gelegt, kacheln)
+  // Leicht: Leerzeichen stehen von selbst an ihrer Stelle („bring about", 06.10.2026); schwer: wie selbst gesetzt
+  const wort = schwer ? mitApostrophen(v.term, text) : mitLeerzeichen(v.term, text)
+  const alleGelegt = nurBuchstaben(gelegt).length === kacheln.length
   return (
     <Stack align="center">
       <Text className="vt-frage">Lege das Wort aus den Buchstaben</Text>
       <Text fw={800} size="1.6rem" c="var(--vt-tinte)">
         {v.translation}
       </Text>
-      <div className="vt-gelegt" data-gelegt>
-        <Text size="1.6rem" fw={700} style={{ letterSpacing: 3 }} c="var(--vt-a-dunkel)">
+      <div className="vt-gelegt" data-gelegt data-lege-schwer={schwer || undefined}>
+        <Text size="1.6rem" fw={700} style={{ letterSpacing: 3, whiteSpace: 'pre' }} c="var(--vt-a-dunkel)">
           {wort || ' '}
         </Text>
       </div>
-      {/* Legen, tippen oder schreiben (08.10.2026) */}
-      <LegeEingabe kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} fertig={() => pruefen(wort)}>
+      {/* Legen, tippen oder schreiben (08.10.2026); Tastatur wird erkannt (09.10.2026) */}
+      <LegeEingabe
+        kacheln={kacheln}
+        gelegt={gelegt}
+        setGelegt={setGelegt}
+        gesperrt={gesperrt}
+        fertig={() => pruefen(wort)}
+        leerzeichen={schwer}
+        anzeige={(g) => (schwer ? mitApostrophen(v.term, gelegtText(g, kacheln)) : mitLeerzeichenVoraus(v.term, gelegtText(g, kacheln)))}
+      >
         <Group gap={6} justify="center">
           {kacheln.map((k) => (
             <Button
@@ -1331,10 +1505,11 @@ function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string)
         <Button variant="subtle" leftSection={<IconBackspace size={16} />} disabled={!gelegt.length || gesperrt} onClick={() => setGelegt(gelegt.slice(0, -1))}>
           Zurück
         </Button>
-        <Button className="vt-los" radius="xl" disabled={gelegt.length !== kacheln.length || gesperrt} onClick={() => pruefen(wort)} data-pruefen>
+        <Button className="vt-los" radius="xl" disabled={!alleGelegt || gesperrt} onClick={() => pruefen(wort)} data-pruefen>
           Prüfen
         </Button>
       </Group>
+      {zeigen && <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} />}
     </Stack>
   )
 }
@@ -1344,12 +1519,14 @@ function Schreiben({
   uebung,
   sprache,
   pruefen,
+  zeigen,
   gesperrt
 }: {
   v: Vokabel
   uebung: Uebung
   sprache: string
   pruefen: (a: string) => void
+  zeigen?: () => void
   gesperrt: boolean
 }): React.JSX.Element {
   const farbe = useVtFarbe()
@@ -1443,6 +1620,11 @@ function Schreiben({
         <Button type="submit" fullWidth mt="sm" size="md" radius="xl" className="vt-los" disabled={gesperrt || !text.trim()} data-pruefen>
           Prüfen
         </Button>
+        {zeigen && (
+          <Group justify="center" mt={4}>
+            <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} />
+          </Group>
+        )}
       </form>
     </Stack>
   )

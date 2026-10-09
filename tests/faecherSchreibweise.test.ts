@@ -81,8 +81,11 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
       'codes-hmac-2026-10-08',
       'faecher-schreibweise-2026-10-08',
       'grammatik-je-thema-2026-10-08',
+      'grammatik-klasse10-loeschen-2026-10-09',
       'klartext-reste-2026-10-08',
-      'rekorde-zeit-2026-10-08'
+      'namen-korrigieren-2026-10-09',
+      'rekorde-zeit-2026-10-08',
+      'there-was-klasse5-2026-10-09'
     ])
     // Danach Eingetragenes bleibt beim nächsten Start, wie es ist (die Wartung ist erledigt)
     d.prepare("UPDATE lerngruppen SET fach = 'englisch' WHERE id = 'g1'").run()

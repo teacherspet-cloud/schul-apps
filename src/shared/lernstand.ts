@@ -222,6 +222,14 @@ export interface TippDaten {
   reihe?: { titel: string; href: string } | null
 }
 
+/**
+ * Knopf eines Tipps öffnet genau die Übung (09.10.2026, Befund der Lehrkraft: „Abfrage ohne Hinschauen starten" öffnete
+ * nur die Kursseite): Vokabel-Links bekommen `?uebung=…` (VokabelTrainer startet sie, shared/vokabeltrainer linkRunde).
+ * Andere Ziele bleiben, wie sie sind.
+ */
+export const mitUebung = (href: string, uebung: 'runde' | 'abfragen' | 'wackelig'): string =>
+  /^\/s\/v\/[^?#]+$/.test(href) ? `${href}?uebung=${uebung}` : href
+
 const nachStufe = (s: Stufe, t: { grund: string; unter: string; mittel: string; ober: string }): string =>
   s === 'grund' ? t.grund : s === 'unter' ? t.unter : s === 'ober' ? t.ober : t.mittel
 
@@ -242,7 +250,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
           mittel: `Der Vokabeltest ist in ${n} ${n === 1 ? 'Tag' : 'Tagen'}. Verteil die Wiederholung auf mehrere kurze Runden statt einer langen am Vorabend – das hält länger.`,
           ober: `Test in ${n} ${n === 1 ? 'Tag' : 'Tagen'}: Plane bis dahin zwei bis drei kurze Wiederholungen mit Abstand. Verteiltes Wiederholen schlägt Lernen am Stück.`
         }),
-        knopf: { text: 'Jetzt eine Runde üben', href: v.href }
+        knopf: { text: 'Jetzt eine Runde üben', href: mitUebung(v.href, 'runde') }
       }
     }
   },
@@ -262,7 +270,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
           mittel: `Du hast an ${d.fleiss.tage14} Tagen geübt. Mehr Wiederholen allein bringt hier weniger: Beantworte erst ohne Hinschauen und prüf danach. Bleibt etwas hängen, zeig es deiner Lehrkraft.`,
           ober: `Hohe Aktivität (${d.fleiss.tage14} Tage), die Treffer steigen noch nicht. Wechsle von Wiederlesen zu Abfragen ohne Vorlage. Hilft das nicht, sprich deine Lehrkraft an.`
         }),
-        knopf: { text: 'Abfrage ohne Hinschauen starten', href }
+        knopf: { text: 'Abfrage ohne Hinschauen starten', href: mitUebung(href, 'abfragen') }
       }
     }
   },
@@ -279,7 +287,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
           mittel: `${v.wackelig} Wörter waren zuletzt falsch. Schau dir an, was genau danebenging (Schreibung? Bedeutung?), und bau jedes in einen eigenen Satz ein.`,
           ober: `${v.wackelig} Einträge sind instabil. Lege dir ein kurzes Fehlerprotokoll an: Was war falsch, warum, wie lautet die Regel? Dann gezielt abfragen.`
         }),
-        knopf: { text: 'Wackelige Wörter üben', href: v.href }
+        knopf: { text: 'Wackelige Wörter üben', href: mitUebung(v.href, 'wackelig') }
       }
     }
   },
@@ -297,7 +305,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
           mittel: `${v.faellig} Vokabeln sind heute dran. Abfragen bringt mehr als Durchlesen – auch wenn es sich anstrengender anfühlt.`,
           ober: `${v.faellig} Vokabeln stehen heute an. Kurz abfragen sichert sie, bevor sie verblassen.`
         }),
-        knopf: { text: `Jetzt ${n} ${n === 1 ? 'Vokabel' : 'Vokabeln'} abfragen`, href: v.href }
+        knopf: { text: `Jetzt ${n} ${n === 1 ? 'Vokabel' : 'Vokabeln'} abfragen`, href: mitUebung(v.href, 'runde') }
       }
     }
   },

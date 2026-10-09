@@ -49,6 +49,8 @@ export interface Darstellung {
   legen?: 'legen' | 'tippen' | 'schreiben'
   /** „Dein Vokabelweg" im Karteikasten aufgeklappt (08.10.2026); fehlt es, ist er zugeklappt */
   vokabelwegOffen?: boolean
+  /** Vollbild beim Lernen (09.10.2026): Übungen, Spiele, Arbeitsblätter füllen den Bildschirm; fehlt es, gilt an */
+  vollbild?: boolean
   // ---------- Meine Materialien (08.10.2026)
   /** Regal mit Fachordnern oder die bisherige Liste */
   materialien?: 'regal' | 'liste'
@@ -80,7 +82,9 @@ export const VORGABE: Darstellung = {
   spiele: true,
   zeitdruck: true,
   // Töne für richtige Antworten an (08.10.2026, Wunsch der Lehrkraft) – abschaltbar in den Einstellungen
-  toene: true
+  toene: true,
+  // Vollbild beim Lernen an (09.10.2026, Entscheidung der Lehrkraft) – abschaltbar, die Lehrkraft erzwingt es nicht
+  vollbild: true
 }
 const SPEICHER = 'schulapps-darstellung'
 

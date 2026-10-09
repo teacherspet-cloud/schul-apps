@@ -182,6 +182,12 @@ try {
       await s.locator('[data-passt]').click()
       await s.waitForTimeout(700)
     }
+    // Blind immer „Passt", sobald die Frage da ist (09.10.2026): Hinweis, wird nicht gewertet
+    for (let i = 0; i < 6; i++) {
+      await s.getByText('Passt das Bild bzw. die Bedeutung').waitFor({ timeout: 5000 })
+      await s.locator('[data-passt]').click()
+    }
+    pruefe(await da(s.locator('[data-zu-schnell]'), 3000), 'Zu schnell geklickt: Hinweis „wird nicht gewertet"')
   })
   // Wort → Bild: richtiges Bild über die Wort-Id
   await spiele('wortbild', async () => {

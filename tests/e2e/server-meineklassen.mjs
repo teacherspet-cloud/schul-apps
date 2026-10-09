@@ -177,6 +177,35 @@ try {
   pruefe(d.wackelig.every((w) => w.kurs === vok.id && WOERTER.some((x) => x.id === w.id)), 'Wackelige Wörter tragen Kurs und Wort')
   const dGe = await (await lk.request.get(`${A}/server/klassen/${gGe.id}`, { headers: KOPF })).json()
   pruefe(dGe.sprachfach === false, 'Geschichte ist kein Sprachfach')
+  // 09.10.2026: Kurs nach Bänden benannt, Übersicht je Abschnitt – zwei Abschnitte aus Green Line 1 dazu
+  const neueWoerter = ['house', 'garden', 'kitchen', 'room'].map((t, i) => ({ id: `n${i}`, term: t, translation: ['Haus', 'Garten', 'Küche', 'Zimmer'][i] }))
+  await lk.request.post(`${A}/server/vokabeln/${vok.id}/woerter`, {
+    headers: KOPF,
+    data: {
+      woerter: neueWoerter,
+      teile: [
+        { titel: 'Station 1', anzahl: 2 },
+        { titel: 'Station 2', anzahl: 2 }
+      ],
+      quelle: { lehrwerk: 'green-line-1', unit: 'Unit 1', abschnitte: ['Station 1', 'Station 2'] }
+    }
+  })
+  const dAb = await (await lk.request.get(`${A}/server/klassen/${gEn.id}`, { headers: KOPF })).json()
+  const kAb = dAb.vokabeln.find((v) => v.id === vok.id)
+  pruefe(kAb?.kursName === 'Vokabeln Englisch · Green Line 1', `Kursname nach Band (${kAb?.kursName})`)
+  pruefe(
+    JSON.stringify((kAb?.abschnitte ?? []).map((a) => [a.unit, a.name, a.woerter])) ===
+      JSON.stringify([
+        ['', 'Weather', 7],
+        ['Unit 1', 'Station 1', 2],
+        ['Unit 1', 'Station 2', 2]
+      ]),
+    `Abschnitte je Unit (${JSON.stringify((kAb?.abschnitte ?? []).map((a) => a.name))})`
+  )
+  pruefe(
+    kAb?.lernendeNamen?.length === 2 && kAb.abschnitte[0].jeLernende.length === 2 && kAb.abschnitte[0].schwach === null && kAb.abschnitte[0].probleme.length >= 1,
+    'Abschnitt: je Person, „noch zu früh“, schwierigste Wörter'
+  )
 
   // ---------- Oberfläche
   const p = await lk.newPage()
@@ -303,6 +332,25 @@ try {
   pruefe(await da(p.locator('[data-kurs="Weather"] [data-material="Kurs"]')), 'Kurs als eine Karte')
   pruefe((await p.locator('[data-kurs="Weather"] [data-kurs-stand]').count()) === 1, 'Kurs-Karte: Balken sicher / kennengelernt / neu')
   pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/heute aktiv \d+\/\d+/)), 'Kurs-Karte: „heute aktiv n/m“')
+  // Name nach Kurs und Übersicht je Abschnitt (09.10.2026): neueste Unit offen, Klick zeigt Wörter und Ampeln je Person
+  pruefe(
+    (await p.locator('[data-kurs="Weather"] [data-material-titel]').getAttribute('data-material-titel')) === 'Vokabeln Englisch · Green Line 1',
+    'Kurs-Karte heißt „Vokabeln Englisch · Green Line 1“'
+  )
+  pruefe(await da(p.locator('[data-kurs="Weather"]').getByText(/3 Abschnitte/)), 'Kurzzeile: Zahl der Abschnitte')
+  pruefe(
+    (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Unit 1"][data-offen]').count()) === 1 &&
+      (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Weitere Vokabeln"][data-offen]').count()) === 0,
+    'Neueste Unit offen, ältere zugeklappt'
+  )
+  await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Weitere Vokabeln"] [data-abschnitt-gruppe-knopf]').click()
+  await p.locator('[data-kurs="Weather"] [data-abschnitt="Weather"]').click()
+  pruefe(await da(p.locator('[data-kurs="Weather"] [data-abschnitt-detail] [data-abschnitt-personen]')), 'Abschnitt-Details: Ampel je Person')
+  pruefe(
+    /Schwierigste Wörter:.*(weather|sunny|cloud|rain|wind)/.test(await p.locator('[data-kurs="Weather"] [data-abschnitt-detail]').innerText()),
+    'Abschnitt-Details: schwierigste Wörter'
+  )
+  await p.screenshot({ path: join(out, '3c-abschnitte.png'), fullPage: true })
   // Lehrwerk-Stand: kleiner Knopf in der Kopfzeile, Auswahl im Pop-up, zurück zu „automatisch"
   await p.locator('[data-lehrwerk-knopf]').click()
   pruefe(await da(p.locator('[data-lehrwerk-stand]')), 'Lehrwerk-Stand im Pop-up')

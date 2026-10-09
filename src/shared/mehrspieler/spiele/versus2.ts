@@ -23,6 +23,7 @@ import {
   standBlock,
   teamName,
   teamsAus,
+  tx,
   versusErgebnis,
   zufall,
   type Basis,
@@ -33,13 +34,14 @@ import { istFrageItem } from '../inhalt'
 import { kernform } from '../../vokabeltrainer'
 import type { Frage } from '../typen'
 import { artNach, frageItems } from './hilfen'
+import type { TextSchluessel } from '../../spielSprache'
 
 const ids = (z: Basis): string[] => z.spieler.map((s) => s.id)
 const besteNach = (z: Basis, wert: (id: string) => number): string[] => {
   const max = Math.max(...aktive(z).map((s) => wert(s.id)))
   return max > 0 ? aktive(z).filter((s) => wert(s.id) === max).map((s) => s.id) : []
 }
-const siegText = (z: Basis, sieger: string[]): string => (sieger.length ? `Gewonnen hat: ${sieger.map((id) => name(z, id)).join(' & ')}` : 'Unentschieden!')
+const siegText = (z: Basis, sieger: string[]): string => (sieger.length ? tx(z, 'gewonnenHat', sieger.map((id) => name(z, id)).join(' & ')) : tx(z, 'unentschieden'))
 
 // ---------------------------------------------------------------- Schnapp! (Kl. 5–6, ohne Uhr)
 
@@ -73,27 +75,27 @@ export const schnapp: Regeln<Schnapp> = {
     if (zug.aktion === 'schnapp') {
       if (karte.passt) {
         gut(z, wer, 1)
-        melde(z, wer, true, 'Schnapp!', `${item.vok!.term} = ${item.vok!.translation}`)
+        melde(z, wer, true, tx(z, 'schnapp'), `${item.vok!.term} = ${item.vok!.translation}`)
         return weiter()
       }
       z.punkte[wer] = Math.max(0, (z.punkte[wer] ?? 0) - 1)
       fehlerMerken(z, wer, item.id)
       z.abgestimmt.push(wer)
-      melde(z, wer, false, 'hat zu früh geschnappt.', `${item.vok!.term} = ${item.vok!.translation}`)
+      melde(z, wer, false, tx(z, 'zuFrueh'), `${item.vok!.term} = ${item.vok!.translation}`)
     } else {
       z.abgestimmt.push(wer)
       if (karte.passt) fehlerMerken(z, wer, item.id)
       else z.richtig[wer] = (z.richtig[wer] ?? 0) + 1
     }
     if (aktive(z).every((s) => z.abgestimmt.includes(s.id))) {
-      if (!karte.passt) melde(z, '', true, 'Richtig, das passte nicht.', `${item.vok!.term} = ${item.vok!.translation}`)
+      if (!karte.passt) melde(z, '', true, tx(z, 'passteNicht'), `${item.vok!.term} = ${item.vok!.translation}`)
       weiter()
     }
   },
   sicht(z, wer) {
     const b: Block[] = [
-      { typ: 'fortschritt', titel: `Karte ${Math.min(z.k + 1, z.karten.length)} von ${z.karten.length}`, wert: z.k, max: z.karten.length },
-      { typ: 'text', text: `Deine Punkte: ${z.punkte[wer] ?? 0}`, ton: 'info' },
+      { typ: 'fortschritt', titel: tx(z, 'karteVon', Math.min(z.k + 1, z.karten.length), z.karten.length), wert: z.k, max: z.karten.length },
+      { typ: 'text', text: tx(z, 'deinePunkte', z.punkte[wer] ?? 0), ton: 'info' },
       ...rueckBlock(z)
     ]
     if (z.ende) return b
@@ -103,8 +105,8 @@ export const schnapp: Regeln<Schnapp> = {
     b.push({
       typ: 'knoepfe',
       knoepfe: [
-        { text: 'Schnapp! Passt!', aktion: 'schnapp', farbe: 'green', gesperrt: z.abgestimmt.includes(wer) },
-        { text: 'Passt nicht', aktion: 'nicht', gesperrt: z.abgestimmt.includes(wer) }
+        { text: tx(z, 'schnappPasst'), aktion: 'schnapp', farbe: 'green', gesperrt: z.abgestimmt.includes(wer) },
+        { text: tx(z, 'passtNichtKnopf'), aktion: 'nicht', gesperrt: z.abgestimmt.includes(wer) }
       ]
     })
     return b
@@ -156,13 +158,13 @@ export const galgen: Regeln<Galgen> = {
     if (fertig) {
       z.geschafft[wer]++
       gut(z, wer, 1)
-      melde(z, wer, true, 'hat ein Wort geschafft!')
+      melde(z, wer, true, tx(z, 'wortGeschafft'))
       if (z.geschafft[wer] >= z.ziel) return void (z.ende = true)
       return galgenWort(z, wer)
     }
     if (z.falschZahl[wer] >= FEHLER_MAX) {
       fehlerMerken(z, wer, z.item[wer])
-      melde(z, wer, false, 'Neues Wort.', z.wort[wer])
+      melde(z, wer, false, tx(z, 'neuesWort'), z.wort[wer])
       galgenWort(z, wer)
     }
   },
@@ -176,9 +178,9 @@ export const galgen: Regeln<Galgen> = {
       ...rueckBlock(z)
     ]
     if (z.ende) return b
-    b.push({ typ: 'text', text: `Gesucht: ${item?.vok?.translation ?? ''}`, ton: 'info' })
+    b.push({ typ: 'text', text: tx(z, 'gesucht', item?.vok?.translation ?? ''), ton: 'info' })
     b.push({ typ: 'text', text: sichtbar, gross: true })
-    b.push({ typ: 'fortschritt', titel: `Fehler ${z.falschZahl[wer]} von ${FEHLER_MAX}`, wert: z.falschZahl[wer], max: FEHLER_MAX, ton: 'warn' })
+    b.push({ typ: 'fortschritt', titel: tx(z, 'fehlerVonMax', z.falschZahl[wer], FEHLER_MAX), wert: z.falschZahl[wer], max: FEHLER_MAX, ton: 'warn' })
     b.push({
       typ: 'kacheln',
       spalten: 7,
@@ -238,35 +240,35 @@ export const buzzer: Regeln<Buzzer> = {
       const p = gewicht(z, wer, z.frage.itemId)
       gut(z, wer, p)
       z.stand[teamVon(z, wer)] += p
-      melde(z, wer, true, `+${p} für das Team!`, z.frage.loesung)
+      melde(z, wer, true, tx(z, 'fuersTeam', p), z.frage.loesung)
       z.r++
       return buzzerRunde(z)
     }
     fehlerMerken(z, wer, z.frage.itemId)
     if (z.zweite === null) {
       z.zweite = teamVon(z, wer) === 0 ? 1 : 0
-      return melde(z, wer, false, 'daneben – jetzt darf das andere Team.')
+      return melde(z, wer, false, tx(z, 'danebenAnderes'))
     }
-    melde(z, wer, false, 'auch daneben.', z.frage.loesung)
+    melde(z, wer, false, tx(z, 'auchDaneben'), z.frage.loesung)
     z.r++
     buzzerRunde(z)
   },
   sicht(z, wer) {
     const b: Block[] = [
-      { typ: 'fortschritt', titel: `Frage ${Math.min(z.r + 1, z.reihe.length)} von ${z.reihe.length}`, wert: z.r, max: z.reihe.length },
+      { typ: 'fortschritt', titel: tx(z, 'frageVon', Math.min(z.r + 1, z.reihe.length), z.reihe.length), wert: z.r, max: z.reihe.length },
       standBlock([0, 1].map((t) => ({ name: teamName(z, z.teams[t]), wert: String(z.stand[t]), ...(teamVon(z, wer) === t ? { ich: true } : {}) }))),
       ...rueckBlock(z)
     ]
     if (z.ende || !z.frage) return b
     const darf = z.zweite === null ? wer === z.buzz : teamVon(z, wer) === z.zweite
-    if (!z.buzz) return [...b, { typ: 'text', text: z.frage.frage, gross: true }, { typ: 'knoepfe', knoepfe: [{ text: 'Buzzer!', aktion: 'buzz', farbe: 'red' }] }]
+    if (!z.buzz) return [...b, { typ: 'text', text: z.frage.frage, gross: true }, { typ: 'knoepfe', knoepfe: [{ text: tx(z, 'buzzer'), aktion: 'buzz', farbe: 'red' }] }]
     if (darf) return [...b, frageBlock(z.frage)]
-    return [...b, { typ: 'text', text: z.frage.frage, gross: true }, { typ: 'text', text: z.zweite === null ? `${name(z, z.buzz)} antwortet.` : 'Das andere Team antwortet.', ton: 'leise' }]
+    return [...b, { typ: 'text', text: z.frage.frage, gross: true }, { typ: 'text', text: z.zweite === null ? tx(z, 'antwortet', name(z, z.buzz)) : tx(z, 'anderesTeamAntwortet'), ton: 'leise' }]
   },
   ergebnis(z) {
     const t = z.stand[0] > z.stand[1] ? 0 : z.stand[1] > z.stand[0] ? 1 : null
     const sieger = t === null ? [] : z.teams[t]
-    return versusErgebnis(z, sieger, (id) => z.punkte[id] ?? 0, t === null ? 'Unentschieden!' : `Gewonnen hat: ${teamName(z, sieger)}`, { unentschieden: t === null })
+    return versusErgebnis(z, sieger, (id) => z.punkte[id] ?? 0, t === null ? tx(z, 'unentschieden') : tx(z, 'gewonnenHat', teamName(z, sieger)), { unentschieden: t === null })
   }
 }
 
@@ -310,25 +312,25 @@ export const auktion: Regeln<Auktion> = {
         fehlerMerken(z, id, a.item)
       }
     }
-    melde(z, '', a.stimmt, a.stimmt ? 'Die Aussage stimmte.' : 'Die Aussage stimmte nicht.', a.loesung)
+    melde(z, '', a.stimmt, a.stimmt ? tx(z, 'aussageStimmte') : tx(z, 'aussageStimmteNicht'), a.loesung)
     z.gebote = {}
     z.a++
     if (z.a >= z.aussagen.length) z.ende = true
   },
   sicht(z, wer) {
     const b: Block[] = [
-      { typ: 'fortschritt', titel: `Aussage ${Math.min(z.a + 1, z.aussagen.length)} von ${z.aussagen.length}`, wert: z.a, max: z.aussagen.length },
-      { typ: 'text', text: `Deine Münzen: ${z.muenzen[wer] ?? 0}`, ton: 'info' },
+      { typ: 'fortschritt', titel: tx(z, 'aussageVon', Math.min(z.a + 1, z.aussagen.length), z.aussagen.length), wert: z.a, max: z.aussagen.length },
+      { typ: 'text', text: tx(z, 'deineMuenzen', z.muenzen[wer] ?? 0), ton: 'info' },
       ...rueckBlock(z)
     ]
     if (z.ende) return b
     b.push({ typ: 'text', text: z.aussagen[z.a].text, gross: true })
-    if (z.gebote[wer]) return [...b, { typ: 'text', text: 'Gebot abgegeben – warte auf die anderen.', ton: 'leise' }]
+    if (z.gebote[wer]) return [...b, { typ: 'text', text: tx(z, 'gebotAb'), ton: 'leise' }]
     b.push({
       typ: 'knoepfe',
       knoepfe: [
-        ...EINSAETZE.map((e) => ({ text: `${e} auf „stimmt“`, aktion: 'gebot', wert: `ja:${e}`, farbe: 'green' })),
-        ...EINSAETZE.map((e) => ({ text: `${e} auf „stimmt nicht“`, aktion: 'gebot', wert: `nein:${e}`, farbe: 'red' }))
+        ...EINSAETZE.map((e) => ({ text: tx(z, 'aufStimmt', e), aktion: 'gebot', wert: `ja:${e}`, farbe: 'green' })),
+        ...EINSAETZE.map((e) => ({ text: tx(z, 'aufStimmtNicht', e), aktion: 'gebot', wert: `nein:${e}`, farbe: 'red' }))
       ]
     })
     return b
@@ -372,7 +374,7 @@ export const domino: Regeln<Domino> = {
     if (zug.aktion === 'passen') {
       if (hat) {
         fehlerMerken(z, wer, offenItem)
-        melde(z, wer, false, 'hatte den passenden Stein doch.')
+        melde(z, wer, false, tx(z, 'steinDoch'))
       }
       return weiter()
     }
@@ -381,14 +383,14 @@ export const domino: Regeln<Domino> = {
     if (!st) return
     if (st.k !== z.offen) {
       fehlerMerken(z, wer, z.kette[st.k])
-      melde(z, wer, false, 'Der Stein passt nicht.')
+      melde(z, wer, false, tx(z, 'steinPasstNicht'))
       return weiter()
     }
     st.gelegt = true
     z.offen++
     z.gelegt++
     gut(z, wer, 1)
-    melde(z, wer, true, 'legt an!')
+    melde(z, wer, true, tx(z, 'legtAn'))
     if (z.offen >= z.kette.length - 1 || !z.steine.some((s) => s.besitzer === wer && !s.gelegt)) z.ende = true
     else weiter()
   },
@@ -396,17 +398,17 @@ export const domino: Regeln<Domino> = {
     const it = (id: string) => z.inhalt.items.find((i) => i.id === id)!.vok!
     const b: Block[] = [...rueckBlock(z)]
     if (!z.ende) {
-      b.push({ typ: 'text', text: `Offen: ${it(z.kette[z.offen]).translation}`, gross: true, ton: 'info' })
-      b.push(wer === z.spieler[z.dran].id ? { typ: 'text', text: 'Du bist dran: lege den Stein mit dem passenden Wort – oder passe.', ton: 'info' } : { typ: 'text', text: `${name(z, z.spieler[z.dran].id)} ist dran.`, ton: 'leise' })
+      b.push({ typ: 'text', text: tx(z, 'offen', it(z.kette[z.offen]).translation), gross: true, ton: 'info' })
+      b.push(wer === z.spieler[z.dran].id ? { typ: 'text', text: tx(z, 'dominoDran'), ton: 'info' } : { typ: 'text', text: tx(z, 'istDran', name(z, z.spieler[z.dran].id)), ton: 'leise' })
     }
     const meine = z.steine.filter((s) => s.besitzer === wer && !s.gelegt)
     b.push({
       typ: 'kacheln',
-      titel: `Deine Steine (${meine.length})`,
+      titel: tx(z, 'deineSteine', meine.length),
       kacheln: meine.map((s) => ({ id: s.id, text: `${it(z.kette[s.k]).term} | ${it(z.kette[s.k + 1]).translation}` })),
       ...(wer === z.spieler[z.dran].id && !z.ende ? { aktion: 'stein' } : {})
     })
-    if (wer === z.spieler[z.dran].id && !z.ende) b.push({ typ: 'knoepfe', knoepfe: [{ text: 'Passen', aktion: 'passen' }] })
+    if (wer === z.spieler[z.dran].id && !z.ende) b.push({ typ: 'knoepfe', knoepfe: [{ text: tx(z, 'passen'), aktion: 'passen' }] })
     return b
   },
   weg(z, wer) {
@@ -445,6 +447,8 @@ const KATEGORIEN: Kategorie[] = [
   { id: 'verb', titel: 'Ein Verb' },
   { id: 'deutsch', titel: 'Die deutsche Bedeutung eines Kursworts (das Kurswort beginnt mit dem Buchstaben)' }
 ]
+/** Titel der Kategorien in der Zielsprache (09.10.2026) */
+const KATEGORIE_TEXT: Record<string, TextSchluessel> = { wort: 'slfWort', lang: 'slfLang', nomen: 'slfNomen', verb: 'slfVerb', deutsch: 'slfDeutsch' }
 const posArt = (pos: string | undefined): 'nomen' | 'verb' | null =>
   !pos ? null : /^\(?\s*(n|noun|nm|nf|nt|s|subst)\b/i.test(pos) ? 'nomen' : /^\(?\s*(v|verb|vt|vi)\b/i.test(pos) ? 'verb' : null
 /** Gilt die Antwort? Nur Wörter des Kurses (Fremdsprache bzw. bei „deutsch" die Bedeutung) */
@@ -474,7 +478,7 @@ function slfAuswerten(z: Slf): void {
       const a = z.antworten[s.id]?.[kat.id] ?? ''
       const id = slfGilt(z, kat.id, runde.buchstabe, a)
       if (id) gueltig.set(s.id, [id, kernform(a).toLowerCase()])
-      else if (a.trim()) zeilen.push(`${s.name}: „${a}“ zählt nicht`)
+      else if (a.trim()) zeilen.push(tx(z, 'zaehltNicht', s.name, a))
     }
     for (const [sid, [, norm]] of gueltig) {
       const doppelt = [...gueltig.entries()].some(([o, [, n]]) => o !== sid && n === norm)
@@ -483,7 +487,7 @@ function slfAuswerten(z: Slf): void {
     }
   }
   z.bewertung = zeilen
-  melde(z, '', true, `Runde ${z.r + 1} ausgewertet.`)
+  melde(z, '', true, tx(z, 'rundeAusgewertet', z.r + 1))
   z.r++
   z.antworten = {}
   z.fertig = []
@@ -525,19 +529,19 @@ export const stadtland: Regeln<Slf> = {
     return true
   },
   sicht(z, wer) {
-    const b: Block[] = [{ typ: 'text', text: `Deine Punkte: ${z.punkte[wer] ?? 0}`, ton: 'info' }, ...rueckBlock(z)]
+    const b: Block[] = [{ typ: 'text', text: tx(z, 'deinePunkte', z.punkte[wer] ?? 0), ton: 'info' }, ...rueckBlock(z)]
     if (z.bewertung.length) b.push({ typ: 'text', text: z.bewertung.join(' · '), ton: 'leise' })
     if (z.ende) return b
     const runde = z.runden[z.r]
-    b.push({ typ: 'text', text: `Runde ${z.r + 1}: Buchstabe ${runde.buchstabe.toUpperCase()}`, gross: true })
+    b.push({ typ: 'text', text: tx(z, 'rundeBuchstabe', z.r + 1, runde.buchstabe.toUpperCase()), gross: true })
     if (z.bis) b.push({ typ: 'uhr', bis: z.bis })
     b.push({
       typ: 'eingaben',
-      felder: runde.kategorien.map((c) => ({ id: c.id, titel: c.titel })),
+      felder: runde.kategorien.map((c) => ({ id: c.id, titel: tx(z, KATEGORIE_TEXT[c.id] ?? 'slfWort') })),
       aktion: 'antworten',
       gesperrt: z.fertig.includes(wer)
     })
-    if (z.fertig.includes(wer)) b.push({ typ: 'text', text: 'Abgegeben – warte auf die anderen.', ton: 'leise' })
+    if (z.fertig.includes(wer)) b.push({ typ: 'text', text: tx(z, 'abgegebenWarte'), ton: 'leise' })
     return b
   },
   ergebnis: (z) => {
@@ -556,45 +560,58 @@ interface Sniper extends Basis {
   versuche: Record<string, number>
   finder: string | null
   verbessern: Frage | null
+  /** Wer „Überspringen" gedrückt hat (alle Anwesenden → nächster Satz; 09.10.2026: nie hängen bleiben) */
+  skip: string[]
 }
 function sniperRunde(z: Sniper): void {
   z.finder = null
   z.verbessern = null
   z.versuche = {}
+  z.skip = []
   if (z.r >= z.reihe.length) z.ende = true
 }
 export const sniper: Regeln<Sniper> = {
   id: 'sniper',
   passt: (i) => (i.items.filter((x) => x.fehler).length >= 3 ? null : 'Braucht mindestens drei Sätze mit Fehler.'),
   start(k) {
-    const z: Sniper = { ...basisNeu(k), reihe: [], r: 0, sperre: {}, versuche: {}, finder: null, verbessern: null }
+    const z: Sniper = { ...basisNeu(k), reihe: [], r: 0, sperre: {}, versuche: {}, finder: null, verbessern: null, skip: [] }
     z.reihe = [...new Set(itemsZiehen(z, 6, { filter: (i) => Boolean(i.fehler) }).map((i) => i.id))]
     return z
   },
   zug(z, wer, zug, jetzt) {
-    if (z.ende || (z.sperre[wer] ?? 0) > jetzt) return
+    if (z.ende) return
     const item = z.inhalt.items.find((i) => i.id === z.reihe[z.r])!
     const f = item.fehler!
     const weiter = (): void => {
       z.r++
       sniperRunde(z)
     }
+    if (zug.aktion === 'weiter' && !z.finder) {
+      if (!z.skip.includes(wer)) z.skip.push(wer)
+      if (aktive(z).every((s) => z.skip.includes(s.id))) {
+        melde(z, '', false, tx(z, 'uebersprungen'), `${f.wort} → ${f.korrektur}`)
+        weiter()
+      }
+      return
+    }
+    if ((z.sperre[wer] ?? 0) > jetzt) return
     if (zug.aktion === 'wort' && !z.finder) {
-      const wort = satzTeile(f.satz)[Number(zug.wert)]
+      const i = Number(zug.wert)
+      const wort = satzTeile(f.satz)[i]
       if (!wort) return
-      if (gleicherText(wort.replace(/[^\p{L}\p{N}']/gu, ''), f.wort)) {
+      if (f.stellen.includes(i)) {
         z.finder = wer
-        z.verbessern = { itemId: item.id, frage: f.satz, zusatz: `Wie heißt „${f.wort}“ richtig?`, optionen: [], loesung: f.korrektur }
+        z.verbessern = { itemId: item.id, frage: f.satz, zusatz: tx(z, 'wieRichtig', f.wort), optionen: [], loesung: f.korrektur }
         if (z.tippen) z.verbessern.tippen = true
         else z.verbessern.optionen = mischen(z, [f.korrektur, ...ablenkerFuer(z, f.korrektur, [f.wort], (x) => x.fehler?.korrektur ?? x.vok?.term, 3)])
-        return melde(z, wer, true, 'hat den Fehler entdeckt!')
+        return melde(z, wer, true, tx(z, 'fehlerEntdeckt'))
       }
       z.sperre[wer] = jetzt + SPERRE_MS
       z.versuche[wer] = (z.versuche[wer] ?? 0) + 1
       fehlerMerken(z, wer, item.id)
-      melde(z, wer, false, 'daneben – 3 Sekunden Pause.')
+      melde(z, wer, false, tx(z, 'danebenPause'))
       if (aktive(z).every((s) => (z.versuche[s.id] ?? 0) >= 2)) {
-        melde(z, '', false, 'Niemand hat ihn gefunden.', `${f.wort} → ${f.korrektur}`)
+        melde(z, '', false, tx(z, 'niemandGefunden'), `${f.wort} → ${f.korrektur}`)
         weiter()
       }
       return
@@ -606,30 +623,45 @@ export const sniper: Regeln<Sniper> = {
         melde(z, wer, true, `+${p}!`, f.korrektur)
       } else {
         fehlerMerken(z, wer, item.id)
-        melde(z, wer, false, 'Verbesserung stimmt nicht.', f.korrektur)
+        melde(z, wer, false, tx(z, 'verbesserungFalsch'), f.korrektur)
       }
       weiter()
     }
   },
   sicht(z, wer, jetzt) {
     const b: Block[] = [
-      { typ: 'fortschritt', titel: `Satz ${Math.min(z.r + 1, z.reihe.length)} von ${z.reihe.length}`, wert: z.r, max: z.reihe.length },
-      { typ: 'text', text: `Deine Punkte: ${z.punkte[wer] ?? 0}`, ton: 'info' },
+      { typ: 'fortschritt', titel: tx(z, 'satzVon', Math.min(z.r + 1, z.reihe.length), z.reihe.length), wert: z.r, max: z.reihe.length },
+      { typ: 'text', text: tx(z, 'deinePunkte', z.punkte[wer] ?? 0), ton: 'info' },
       ...rueckBlock(z)
     ]
     if (z.ende) return b
     const f = z.inhalt.items.find((i) => i.id === z.reihe[z.r])!.fehler!
     const gesperrt = (z.sperre[wer] ?? 0) > jetzt
-    if (gesperrt) b.push({ typ: 'uhr', bis: z.sperre[wer], text: 'Pause' })
+    if (gesperrt) b.push({ typ: 'uhr', bis: z.sperre[wer], text: tx(z, 'pause') })
     b.push({
       typ: 'kacheln',
-      titel: z.finder ? 'Gefunden!' : 'Tippe das falsche Wort an!',
-      kacheln: satzTeile(f.satz).map((w, i) => ({ id: String(i), text: w })),
+      titel: z.finder ? tx(z, 'gefunden') : tx(z, 'tippeFalsches'),
+      kacheln: satzTeile(f.satz).map((w, i) => ({ id: String(i), text: w, ...(z.finder && f.stellen.includes(i) ? { status: 'schlecht' as const } : {}) })),
       ...(z.finder || gesperrt ? {} : { aktion: 'wort' })
     })
     if (z.finder === wer && z.verbessern) b.push(frageBlock(z.verbessern))
-    else if (z.finder) b.push({ typ: 'text', text: `${name(z, z.finder)} verbessert.`, ton: 'leise' })
+    else if (z.finder) b.push({ typ: 'text', text: tx(z, 'verbessert', name(z, z.finder)), ton: 'leise' })
+    else
+      b.push({
+        typ: 'knoepfe',
+        knoepfe: [{ text: z.skip.includes(wer) ? tx(z, 'warteAndere') : tx(z, 'findeNicht'), aktion: 'weiter', gesperrt: z.skip.includes(wer) }]
+      })
     return b
+  },
+  weg(z, wer) {
+    // Wer gerade verbessert, geht: Satz auflösen und weiter; sonst ggf. die fehlende Stimme zum Überspringen
+    if (z.ende) return
+    const f = z.inhalt.items.find((i) => i.id === z.reihe[z.r])?.fehler
+    if (z.finder === wer || (!z.finder && aktive(z).length && aktive(z).every((s) => z.skip.includes(s.id)))) {
+      if (f) melde(z, '', false, tx(z, 'naechsterSatz'), `${f.wort} → ${f.korrektur}`)
+      z.r++
+      sniperRunde(z)
+    }
   },
   ergebnis: (z) => {
     const sieger = besteNach(z, (id) => z.punkte[id] ?? 0)

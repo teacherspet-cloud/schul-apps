@@ -30,6 +30,7 @@ import {
   type Stufe
 } from '../shared/vokabelLaufbahn'
 import type { VerbKarte } from '../shared/verbTraining'
+import { kursFuerLernende } from '../shared/freigabePlan'
 import { kernform, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import {
   abfrageAuswerten,
@@ -122,7 +123,10 @@ const FACH_ZU: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es
 
 /** Alle Vokabelwege einer Person */
 async function wegeFuer(ich: NutzerInfo): Promise<Weg[]> {
-  const alle = (db().prepare('SELECT * FROM vok_zuweisungen ORDER BY erstellt ASC').all() as unknown as Zeile[]).filter((z) => vokIstFuer(z, ich))
+  const alle = (db().prepare('SELECT * FROM vok_zuweisungen ORDER BY erstellt ASC').all() as unknown as Zeile[])
+    .filter((z) => vokIstFuer(z, ich))
+    // Geplante Abschnitte (09.10.2026): weder Wörter noch Herkunft, bevor sie frei sind
+    .map((z) => kursFuerLernende(z))
   // Herkunft: gespeichert oder aus dem Titel
   const mitQuelle: { z: Zeile; q: Quelle; buch: Buch }[] = []
   for (const z of alle) {
@@ -331,4 +335,22 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
     wegSpeichern(ich.id, w.key, ws)
     return (json(res, 200, { ...r.ergebnis, stand: r.neu, sicher: false }), true)
   }
+}
+
+/**
+ * Wortliste im Fachordner (09.10.2026, server/wortliste.ts): die freien Abschnitte der Vokabelwege eines Fachs mit
+ * dem eigenen Stand – nur für Konten (Gäste haben keinen Vokabelweg), nur die Wege der Person selbst.
+ */
+export async function wegAbschnitteFuer(
+  ich: NutzerInfo,
+  fachPasst: (fach: string) => boolean
+): Promise<{ key: string; name: string; sprache: string; abschnitte: Abschnitt[]; staende: Record<string, WortStand> }[]> {
+  if (ich.rolle !== 'schueler' || ich.quelle === 'gast') return []
+  const wege = await wegeFuer(ich)
+  return wege
+    .filter((w) => fachPasst(w.fach))
+    .map((w) => {
+      const frei = new Set(w.stufen.filter((s) => s.frei).map((s) => s.key))
+      return { key: w.key, name: w.name, sprache: w.sprache, abschnitte: w.abschnitte.filter((a) => frei.has(a.key)), staende: wegStand(ich.id, w.key).woerter }
+    })
 }

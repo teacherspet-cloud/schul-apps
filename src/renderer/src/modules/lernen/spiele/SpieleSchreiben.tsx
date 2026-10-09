@@ -11,6 +11,8 @@ import { createRng, randomSeed } from '../../vokabeltest/model/random'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
 import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
+import LoesungZeigen from '../LoesungZeigen'
+import { fallTempo, naechsteStufe } from './fallTempo'
 
 // ---------------------------------------------------------------- Wortraten
 
@@ -179,6 +181,8 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
               </Button>
             ))}
           </Group>
+          {/* Nicht gewusst (09.10.2026): Wort aufdecken – zählt wie nicht erraten, weiter mit „Weiter" */}
+          <LoesungZeigen zeigen={() => setBlaetter(0)} />
         </Stack>
       )}
     </Stack>
@@ -354,27 +358,24 @@ interface Fallend {
   id: string
   y: number
   x: number
-  tempo: number
 }
 
 /**
- * Tempo nach Klasse (08.10.2026, Wunsch der Lehrkraft): jüngere Klassen beginnen sehr langsam, mit jedem Treffer wird es
- * etwas schneller (5 % kürzere Fallzeit), höhere Jahrgänge starten und enden schneller. Fallzeit in Sekunden.
+ * Tempo (09.10.2026, neu in spiele/fallTempo.ts): deutlich langsamerer Start nach Klasse, schneller mit Treffern,
+ * ruhiger nach Fehlern, Höchsttempo begrenzt. `fallTempo` bleibt hier erreichbar (Tests, ältere Aufrufe).
  */
-export function fallTempo(klasse: number | null | undefined, treffer: number): { fallzeit: number; abstand: number } {
-  const k = klasse ?? 6
-  const [start, schnellstens] = k <= 6 ? [18, 7] : k <= 8 ? [13, 5] : k <= 10 ? [10, 4] : [8, 3]
-  const fallzeit = Math.max(schnellstens, start * Math.pow(0.95, treffer))
-  // Neue Wörter etwa im Abstand einer halben Fallzeit – so stehen höchstens zwei bis drei Wörter gleichzeitig da
-  return { fallzeit, abstand: Math.max(1300, fallzeit * 500) }
-}
+export { fallTempo }
 
 export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
   const [fallen, setFallen] = useState<Fallend[]>([])
   const [leben, setLeben] = useState(3)
   const [geschafft, setGeschafft] = useState(0)
+  // Anpassendes Tempo: Stufe steigt mit Treffern, sinkt nach Fehlern (fallTempo.ts)
+  const [stufe, setStufe] = useState(0)
   const [text, setText] = useState('')
+  // „Lösung zeigen" (09.10.2026): das unterste Wort mit seiner Lösung, kurz eingeblendet
+  const [geloest, setGeloest] = useState<{ wort: string; loesung: string } | null>(null)
   const zaehler = useRef(0)
   const fehler = useRef(new Set<string>())
   const fertig = useRef(false)
@@ -384,6 +385,9 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
   const liste = useRef<Fallend[]>([])
   const woerterRef = useRef(woerter)
   woerterRef.current = woerter
+  // Fallgeschwindigkeit je Takt (50 ms) – gilt für alle Wörter auf dem Feld, auch nach einem Fehler sofort ruhiger
+  const tempo = useRef(1 / (fallTempo(klasse, 0).fallzeit * 20))
+  tempo.current = 1 / (fallTempo(klasse, stufe).fallzeit * 20)
   const v = (id: string) => woerter.find((w) => w.id === id)!
   useEffect(() => {
     feld.current?.focus()
@@ -392,7 +396,7 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
       let verloren = 0
       const weiter: Fallend[] = []
       for (const f of liste.current) {
-        const y = f.y + f.tempo
+        const y = f.y + tempo.current
         if (y >= 1) {
           fehler.current.add(f.id)
           verloren++
@@ -400,34 +404,42 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
       }
       liste.current = weiter
       setFallen(weiter)
-      if (verloren) setLeben((l) => l - verloren)
+      if (verloren) {
+        setLeben((l) => l - verloren)
+        setStufe((s) => naechsteStufe(s, 'fehler', klasse))
+      }
     }, 50)
     return () => clearInterval(schritt)
-  }, [])
-  // Neue Wörter im Takt des Tempos (nach Klasse, mit jedem Treffer schneller)
+  }, [klasse])
+  // Neue Wörter im Takt des Tempos (nach Klasse und Stufe)
   useEffect(() => {
     if (leben <= 0) return
-    const { fallzeit, abstand } = fallTempo(klasse, geschafft)
+    const { abstand } = fallTempo(klasse, stufe)
     const neu = (): void => {
       const l = woerterRef.current
       const w = l[Math.floor(Math.random() * l.length)]
       if (!w) return
       zaehler.current++
-      liste.current = [...liste.current, { key: zaehler.current, id: w.id, y: 0, x: 0.08 + Math.random() * 0.6, tempo: 1 / (fallzeit * 20) }]
+      liste.current = [...liste.current, { key: zaehler.current, id: w.id, y: 0, x: 0.08 + Math.random() * 0.6 }]
       setFallen(liste.current)
     }
     // Steht kein Wort mehr da (alle getroffen oder alle gefallen), kommt das nächste sofort (08.10.2026);
-    // fallen noch andere, bleibt der Takt. Treffer und verlorene Leben starten diesen Effekt neu.
+    // fallen noch andere, bleibt der Takt. Treffer, Fehler und verlorene Leben starten diesen Effekt neu.
     if (!zaehler.current || !liste.current.length) neu()
     const t = setInterval(neu, abstand)
     return () => clearInterval(t)
-  }, [geschafft, leben, klasse])
+  }, [stufe, geschafft, leben, klasse])
   useEffect(() => {
     if (leben <= 0 && !fertig.current) {
       fertig.current = true
       ende(geschafft, [...fehler.current])
     }
   }, [leben, geschafft, ende])
+  useEffect(() => {
+    if (!geloest) return
+    const t = setTimeout(() => setGeloest(null), 4000)
+    return () => clearTimeout(t)
+  }, [geloest])
   const eingeben = (wert: string): void => {
     setText(wert)
     const treffer = liste.current.find((f) => bewerte(wert, v(f.id).term).urteil === 'richtig')
@@ -436,10 +448,23 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
     liste.current = liste.current.filter((f) => f.key !== treffer.key)
     setFallen(liste.current)
     setGeschafft((g) => g + 1)
+    setStufe((s) => naechsteStufe(s, 'treffer', klasse))
     setText('')
   }
+  // Nicht gewusst: das unterste Wort verschwindet mit seiner Lösung – kein Leben weniger, zählt aber als Fehler
+  const zeigen = (): void => {
+    const unten = [...liste.current].sort((a, b) => b.y - a.y)[0]
+    if (!unten) return
+    const w = v(unten.id)
+    fehler.current.add(unten.id)
+    liste.current = liste.current.filter((f) => f.key !== unten.key)
+    setFallen(liste.current)
+    setGeloest({ wort: w.translation, loesung: spielform(w.term) })
+    setStufe((s) => naechsteStufe(s, 'fehler', klasse))
+    feld.current?.focus()
+  }
   return (
-    <Stack data-spiel="fallend">
+    <Stack data-spiel="fallend" data-fall-stufe={stufe}>
       <Group justify="space-between">
         <Badge color="red" variant="light" size="lg">
           {'♥'.repeat(Math.max(0, leben))}
@@ -455,6 +480,11 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
           </span>
         ))}
       </div>
+      {geloest && (
+        <Text ta="center" fw={700} c="red" aria-live="polite" data-fallend-loesung>
+          {geloest.wort} = {geloest.loesung}
+        </Text>
+      )}
       <TextInput
         ref={feld}
         size="lg"
@@ -467,6 +497,9 @@ export function FallendeWoerter({ woerter, ende, klasse }: SpielProps): React.JS
         spellCheck={false}
         data-fallend-eingabe
       />
+      <Group justify="center">
+        <LoesungZeigen zeigen={zeigen} gesperrt={!fallen.length} />
+      </Group>
     </Stack>
   )
 }

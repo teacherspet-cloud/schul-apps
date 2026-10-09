@@ -80,7 +80,8 @@ try {
   await s.waitForTimeout(300)
   const spielzahl = await s.locator('[data-spiel-wahl]').count()
   pruefe(
-    spielzahl >= 10 && (await s.locator('[data-spiel-wahl="duell"]').count()) === 1 && (await s.locator('[data-spiel-wahl="diktat"]').count()) === 1,
+    // „Hören & Schreiben" braucht eine Vorlesestimme – der Test-Browser ohne Bildschirm hat keine (dann ausgeblendet)
+    spielzahl >= 10 && (await s.locator('[data-spiel-wahl="duell"]').count()) === 1,
     `Spiele zur Auswahl, mit Wortduell und Hören & Schreiben (${spielzahl})`
   )
   await s.screenshot({ path: join(out, '1-spielwahl.png'), fullPage: true })
@@ -128,7 +129,7 @@ try {
     await s.locator('[data-satz-pruefen]').click()
     await s.locator('[data-satz-weiter]').click()
   }
-  pruefe((await da(s.locator('[data-spiel-ergebnis]'))) && (await s.getByText(/Satzpuzzle: \d+ Sätze/).isVisible()), 'Satzpuzzle gelöst')
+  pruefe((await da(s.locator('[data-spiel-ergebnis]'))) && (await s.locator('[data-spiel-ergebnis]').getByText(/\d+/).first().isVisible()), 'Satzpuzzle gelöst')
   await s.getByRole('button', { name: 'Andere Spiele' }).click()
 
   // Wortraten: die Buchstaben des gesuchten Worts tippen
@@ -184,31 +185,38 @@ try {
   await s.locator('[data-fallend-eingabe]').fill(WOERTER.find((w) => w.id === fid).term)
   pruefe(await da(s.getByText('1 geschafft'), 3000), 'Fallende Wörter: Übersetzung tippen löst das Wort')
   await s.screenshot({ path: join(out, '3-fallend.png') })
-  await s.getByRole('button', { name: 'Beenden' }).click()
+  await s.getByRole('button', { name: 'Beenden' }).last().click()
 
   // Kreuzworträtsel und Blitzrunde: starten und bedienen
   await s.locator('[data-spiel-wahl="kreuzwort"]').click()
   pruefe((await s.locator('[data-kreuz]').count()) > 8 && (await s.getByText('Waagerecht').isVisible()), 'Kreuzworträtsel mit Gitter und deutschen Hinweisen')
   await s.screenshot({ path: join(out, '4-kreuzwort.png') })
-  await s.getByRole('button', { name: 'Beenden' }).click()
+  await s.getByRole('button', { name: 'Beenden' }).last().click()
   await s.locator('[data-spiel-wahl="blitz"]').click()
   for (let i = 0; i < 5; i++) await s.locator('[data-blitz-option]').first().click()
   pruefe(await s.getByText(/\d+ richtig/).isVisible(), 'Blitzrunde läuft')
-  await s.getByRole('button', { name: 'Beenden' }).click()
+  await s.getByRole('button', { name: 'Beenden' }).last().click()
 
   // Neue Spiele (06.10.2026)
   const termZu = (deutsch) => WOERTER.find((w) => w.translation === deutsch.trim())?.term ?? ''
   await s.locator('[data-spiel-wahl="duell"]').click()
-  for (let i = 0; i < 20; i++) await s.locator('[data-duell-passt]').click()
-  pruefe((await da(s.locator('[data-spiel-ergebnis]'))) && (await s.getByText(/Wortduell: \d+ s/).isVisible()), 'Wortduell: 20 Runden, Zeit als Ergebnis')
+  // Mit kurzer Pause (09.10.2026): blindes Schnellklicken zählt nicht mehr (shared/schnellKlick.ts)
+  for (let i = 0; i < 20 && !(await s.locator('[data-spiel-ergebnis]').isVisible()); i++) {
+    await s.waitForTimeout(750)
+    await s.locator('[data-duell-passt]').click()
+  }
+  pruefe((await da(s.locator('[data-spiel-ergebnis]'))) && (await s.locator('[data-spiel-ergebnis]').getByText(/\d+ s/).first().isVisible()), 'Wortduell: 20 Runden, Zeit als Ergebnis')
   await s.getByRole('button', { name: 'Andere Spiele' }).click()
-  await s.locator('[data-spiel-wahl="diktat"]').click()
-  const bedeutung = (await s.getByText(/^Bedeutung: /).innerText()).replace('Bedeutung: ', '')
-  await s.locator('[data-diktat-eingabe]').fill(termZu(bedeutung))
-  await s.locator('[data-pruefen]').click()
-  pruefe(await da(s.getByText('Richtig!'), 3000), `Hören & Schreiben: Wort geschrieben (${termZu(bedeutung)})`)
-  await s.screenshot({ path: join(out, '4b-diktat.png') })
-  await s.getByRole('button', { name: 'Beenden' }).click()
+  // Nur mit Vorlesestimme (der Test-Browser ohne Bildschirm hat keine)
+  if (await s.locator('[data-spiel-wahl="diktat"]').count()) {
+    await s.locator('[data-spiel-wahl="diktat"]').click()
+    const bedeutung = (await s.getByText(/^Bedeutung: /).innerText()).replace('Bedeutung: ', '')
+    await s.locator('[data-diktat-eingabe]').fill(termZu(bedeutung))
+    await s.locator('[data-pruefen]').click()
+    pruefe(await da(s.getByText('Richtig!'), 3000), `Hören & Schreiben: Wort geschrieben (${termZu(bedeutung)})`)
+    await s.screenshot({ path: join(out, '4b-diktat.png') })
+    await s.getByRole('button', { name: 'Beenden' }).last().click()
+  }
   if (await s.locator('[data-spiel-wahl="satzluecke"]:not([disabled])').count()) {
     await s.locator('[data-spiel-wahl="satzluecke"]').click()
     const gesucht = (await s.getByText(/^Gesucht: /).innerText()).replace('Gesucht: ', '')
@@ -216,7 +224,7 @@ try {
     await s.locator('[data-pruefen]').click()
     pruefe(await da(s.getByText(/Richtig!|Richtig wäre/), 3000), 'Satz-Lücke: Wort im Beispielsatz eingesetzt')
     await s.screenshot({ path: join(out, '4c-satzluecke.png') })
-    await s.getByRole('button', { name: 'Beenden' }).click()
+    await s.getByRole('button', { name: 'Beenden' }).last().click()
   }
 
   // Farbschema des Fachs (Kopfband): Englisch Dunkelblau, Französisch Violett; Hell/Dunkel; eigenes Design.

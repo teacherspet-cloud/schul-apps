@@ -12,6 +12,8 @@ import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
+import { useZuSchnell } from '../zuSchnell'
+import LoesungZeigen from '../LoesungZeigen'
 
 const RUNDEN = 10
 
@@ -111,9 +113,18 @@ export function HoerenSchreiben({ woerter, sprache, ende }: SpielProps): React.J
           </Button>
         </Stack>
       ) : (
-        <Button radius="xl" onClick={pruefen} disabled={!text.trim()} data-pruefen>
-          Prüfen
-        </Button>
+        <Group>
+          <Button radius="xl" onClick={pruefen} disabled={!text.trim()} data-pruefen>
+            Prüfen
+          </Button>
+          {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler */}
+          <LoesungZeigen
+            zeigen={() => {
+              fehler.current.add(v.id)
+              setRueck({ gut: false, richtig: spielform(v.term) })
+            }}
+          />
+        </Group>
       )}
     </Stack>
   )
@@ -229,9 +240,18 @@ export function SatzLuecke({ woerter, ende }: SpielProps): React.JSX.Element {
       ) : (
         <>
           <Eingabe wert={text} setzen={setText} fertig={() => text.trim() && loesen(text)} platzhalter="Das fehlende Wort …" kennung="data-luecke-eingabe" />
-          <Button radius="xl" onClick={() => loesen(text)} disabled={!text.trim()} data-pruefen>
-            Prüfen
-          </Button>
+          <Group>
+            <Button radius="xl" onClick={() => loesen(text)} disabled={!text.trim()} data-pruefen>
+              Prüfen
+            </Button>
+            {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler */}
+            <LoesungZeigen
+              zeigen={() => {
+                fehler.current.add(v.id)
+                setRueck({ gut: false, richtig: luecke.loesung })
+              }}
+            />
+          </Group>
         </>
       )}
     </Stack>
@@ -269,10 +289,20 @@ export function Wortduell({ woerter, ende }: SpielProps): React.JSX.Element {
       ende(sekunden + strafe, [...fehler.current])
     }
   }, [fertig, sekunden, strafe, ende])
+  // Blind immer dieselbe Seite (09.10.2026): zählt nicht – die Runden kommen noch einmal
+  const schnell = useZuSchnell<{ gut: boolean; id: string }>()
+  useEffect(() => schnell.frage(), [i, schnell.frage])
   const antworten = (passt: boolean): void => {
     const r = runden[i]
     if (!r) return
     const gut = passt === r.passt
+    const s = schnell.melden(passt ? 'passt' : 'passt nicht', { gut, id: r.v.id })
+    if (!s.werten) {
+      for (const x of s.zurueck) if (!x.gut) fehler.current.delete(x.id)
+      if (s.zurueck.length) setI(Math.max(0, i - s.zurueck.length))
+      schnell.frage()
+      return
+    }
     if (!gut) {
       fehler.current.add(r.v.id)
       setStrafe((s) => s + STRAFE)
@@ -311,6 +341,7 @@ export function Wortduell({ woerter, ende }: SpielProps): React.JSX.Element {
           = {r.zeigt}
         </Text>
       </Stack>
+      {schnell.hinweis}
       <Group grow w="100%" maw={520}>
         <Button size="xl" radius="xl" color="teal" onClick={() => antworten(true)} disabled={fertig} data-duell-passt>
           ✓ passt

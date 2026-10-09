@@ -13,3 +13,4 @@ win-unpacked.tmp/
 out-client/
 
 .claude/settings.local.json
+server-daten/

@@ -65,7 +65,18 @@ export const ANMELDE_CSP = `default-src 'none'; img-src 'self'; style-src 'unsaf
   .update(FENSTER_JS)
   .digest('base64')}'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'`
 
-export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: string; ziel: string; benutzer?: string; konto?: boolean }): string {
+export function anmeldeSeite(o: {
+  iserv: boolean
+  notzugang: boolean
+  fehler: string
+  ziel: string
+  benutzer?: string
+  konto?: boolean
+  /** Unbekannter Code (09.10.2026): Meldung am Codefeld, eingegebener Code steht wieder darin */
+  code?: string
+  codeUnbekannt?: boolean
+}): string {
+  const code = (o.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
   const ziel = /^\/[a-zA-Z0-9/_-]*$/.test(o.ziel) ? o.ziel : '/'
   const fuerSchueler = ziel.startsWith('/s/')
   // Fehlgeschlagene Anmeldung mit Nutzername/Passwort (oder vorbelegter Name): Fenster gleich offen,
@@ -87,9 +98,11 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
   ${o.fehler && !kontoFehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
   <!-- Mit Code öffnen (08.10.2026, Befund im Unterricht): der übliche Weg der Lernenden, deshalb oben und groß -->
   <form method="get" action="/s/" class="code">
+    <input type="hidden" name="von" value="anmelden">
     <label for="code">Mit Code öffnen</label>
-    <input id="code" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" required
-      placeholder="z. B. AB12CD" style="text-transform:uppercase;font-size:1.3rem;letter-spacing:.08em">
+    ${o.codeUnbekannt ? '<div class="fehler" role="alert" data-code-unbekannt>Diesen Code kennen wir nicht – bitte genau prüfen.</div>' : ''}
+    <input id="code" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" required enterkeyhint="go"
+      placeholder="z. B. AB12CD" value="${esc(code)}"${o.codeUnbekannt ? ' autofocus aria-invalid="true"' : ''} style="text-transform:uppercase;font-size:1.3rem;letter-spacing:.08em">
     <button type="submit">Öffnen</button>
   </form>
   <!-- Anmeldung (08.10.2026): IServ wie bisher, Nutzername/Passwort in einem kleinen Fenster -->
