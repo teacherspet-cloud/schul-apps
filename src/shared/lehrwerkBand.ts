@@ -160,19 +160,45 @@ export const abschnitteAusName = (name: string): string[] =>
 /**
  * Stelle einer Grammatik im Lehrwerk aus dem Katalog (09.10.2026, Gliederung der Kurs-Grammatik nach Band und Unit):
  * das erste Kapitel der Grammatikliste (Buchreihenfolge), das eine der Teilformen bzw. eines der Themen einführt
- * (Wiederholungen zählen nicht; Trailer nur, wenn kein anderes Kapitel passt). Nichts gefunden → null (dann gliedert die Kursseite nach Schuljahr).
+ * (Wiederholungen zählen nicht; Trailer nur, wenn kein anderes Kapitel passt). Nichts gefunden → null (dann ordnet die
+ * Kursseite nach der Freigabezeit ein).
+ *
+ * Seit 10.10.2026 mit Station (Gliederung Band › Unit › Station wie bei den Vokabeln) und einem zweiten, groberen
+ * Durchgang (Befund der Lehrkraft in 5b: „bestimmter/unbestimmter Artikel", „Das Verb be", „Kurzantworten" standen
+ * unter „Year 5" statt unter Green Line 1 Unit 1 – ohne Treffer hier fiel die Kursseite auf das Schuljahr zurück):
+ * Teilformen unter `themen` zählen jetzt mit (vorher fielen sie ganz heraus), und passt keine Teilform genau – etwa
+ * eine andere Teilform desselben Themas („en.noun.articles/the" statt „…/a-an") –, zählt das Thema vor dem Schrägstrich.
+ * Freigaben ganz ohne Katalog-Themen (eigenes Thema, ältere Freigaben) ordnet die Kursseite nach der Freigabezeit in die
+ * Unit ein (kursAnsicht.ts `grammatikNachLehrwerk`), nicht mehr nach Schuljahr.
  */
-export function stelleImLehrwerk(themen: string[], teilformen: string[] = []): { buch: string; unit: string } | null {
-  const teile = new Set(teilformen)
+export function stelleImLehrwerk(themen: string[], teilformen: string[] = []): { buch: string; unit: string; station?: string } | null {
+  const teile = new Set([...teilformen, ...themen.filter((t) => t.includes('/'))])
   const ganze = new Set(themen.filter((t) => !t.includes('/')))
   if (!teile.size && !ganze.size) return null
-  // Erst ohne die optionalen Trailer (09.10.2026, abgestimmt), ein Trailer nur, wenn das Thema sonst nirgends vorkommt
-  for (const mitTrailer of [false, true])
-    for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK))
-      for (const [unit, stationen] of Object.entries(kapitel)) {
-        if (istOptional(unit) !== mitTrailer) continue
-        for (const punkte of Object.values(stationen))
-          for (const p of punkte) if (!p.w && p.t.some((t) => teile.has(t) || ganze.has(t.split('/')[0]))) return { buch, unit }
-      }
+  const themaVon = (t: string): string => t.split('/')[0]
+  const grob = new Set([...ganze, ...[...teile].map(themaVon)])
+  const passt: ((t: string) => boolean)[] = [(t) => teile.has(t) || ganze.has(themaVon(t)), (t) => grob.has(themaVon(t))]
+  for (const treffer of passt)
+    // Erst ohne die optionalen Trailer (09.10.2026, abgestimmt), ein Trailer nur, wenn das Thema sonst nirgends vorkommt
+    for (const mitTrailer of [false, true])
+      for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK))
+        for (const [unit, stationen] of Object.entries(kapitel)) {
+          if (istOptional(unit) !== mitTrailer) continue
+          for (const [station, punkte] of Object.entries(stationen))
+            for (const p of punkte) if (!p.w && p.t.some(treffer)) return station ? { buch, unit, station } : { buch, unit }
+        }
   return null
+}
+
+/** Station einer Grammatik in einer bekannten Unit (Freigabe nennt nur Band und Unit, 10.10.2026) – sonst undefined */
+export function stationInUnit(buch: string, unit: string, themen: string[], teilformen: string[] = []): string | undefined {
+  const band = grammatikBand(buch)
+  const stationen = band ? LEHRWERK_GRAMMATIK[band]?.[unit] : undefined
+  if (!stationen) return undefined
+  const themaVon = (t: string): string => t.split('/')[0]
+  const alle = new Set([...themen, ...teilformen])
+  const grob = new Set([...alle].map(themaVon))
+  for (const treffer of [(t: string) => alle.has(t) || alle.has(themaVon(t)), (t: string) => grob.has(themaVon(t))])
+    for (const [station, punkte] of Object.entries(stationen)) if (station && punkte.some((p) => p.t.some(treffer))) return station
+  return undefined
 }

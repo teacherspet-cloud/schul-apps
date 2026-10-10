@@ -56,7 +56,7 @@ import { jahrgangAus } from '../shared/lernstand'
 import { ampelVon } from '../shared/grammatikBereiche'
 import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
-import { abschnitteAusName, bandErkennen, bekanntNachBand, stelleImLehrwerk, type Erkennung, type FreigegebeneUnit, type SchulOrt } from '../shared/lehrwerkBand'
+import { abschnitteAusName, bandErkennen, bekanntNachBand, stationInUnit, stelleImLehrwerk, type Erkennung, type FreigegebeneUnit, type SchulOrt } from '../shared/lehrwerkBand'
 import { abschnitteEinordnen, buchAusKennung, mitBaenden } from '../shared/kursAbschnitte'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
@@ -536,10 +536,18 @@ export async function jahrgangDerGrammatik(z: Zeile, ich: NutzerInfo): Promise<{
   return { jahrgang, stelle }
 }
 
-/** Band und Unit einer Grammatik: aus der Freigabe (Lehrwerk der Auswahl), sonst aus dem Katalog (erste Einführung) */
-export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string } {
+/**
+ * Band, Unit und Station einer Grammatik: aus der Freigabe (Lehrwerk der Auswahl; die Station dann aus dem Katalog dieser
+ * Unit), sonst aus dem Katalog (erste Einführung). Station seit 10.10.2026 (Gliederung Band › Unit › Station).
+ */
+export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string; station?: string } {
   const info = infoVon(z)
-  if (info.lehrwerk?.buch) return { buch: grammatikBand(info.lehrwerk.buch) ?? info.lehrwerk.buch, ...(info.lehrwerk.unit ? { unit: info.lehrwerk.unit } : {}) }
+  if (info.lehrwerk?.buch) {
+    const buch = grammatikBand(info.lehrwerk.buch) ?? info.lehrwerk.buch
+    const unit = info.lehrwerk.unit
+    const station = unit ? stationInUnit(buch, unit, info.themen, info.teilformen) : undefined
+    return { buch, ...(unit ? { unit } : {}), ...(station ? { station } : {}) }
+  }
   return stelleImLehrwerk(info.themen, info.teilformen) ?? {}
 }
 

@@ -4,8 +4,9 @@
  *  - Übersicht (Runde 2): EINE Karte je Klasse („5b", „10b" – alphabetisch, Zahlen natürlich) mit ihren Fächern,
  *    Lernenden und Handlungsbedarf. Lerngruppen gleichen Namens sind die Fächer der Klasse (server/klassen.ts).
  *  - Klasse: oben die Fach-Leiste (Englisch | Geschichte | + Fach hinzufügen – ohne Fach nur „+ Fach hinzufügen"), darunter
- *    für das gewählte Fach Handlungsbedarf, Vorschläge für Material, dann die Reiter Unterrichtsreihen & Blätter,
- *    Vokabeln & Grammatik (nur Sprachfächer), Tests & Noten, Lernende.
+ *    für das gewählte Fach der Kopf mit Kennzahlen, Vorschläge für Material, dann die Reiter Unterrichtsreihen & Blätter,
+ *    Vokabeln & Grammatik (nur Sprachfächer), Tests & Noten, Lernende. Der Handlungsbedarf steht seit 10.10.2026 im
+ *    Pop-up hinter der Kachel „Handlungsbedarf" bzw. der Zahl am Fach (Handlungsbedarf.tsx).
  *  - Materialien: sortier- und filterbar (MaterialListe.tsx), mit Details und „Ablegen ▾" (PDF, Word, Drucken, IServ in der
  *    Ablagestruktur der Verwaltung, klassenAblage.ts). Was von hier geöffnet wird, führt mit „Zurück" wieder hierher.
  *  - Vorschläge: „Wackelige Wörter" (09.10.2026) im Kurs der Klasse wiederholen lassen (wieder fällig, kein zweiter Kurs)
@@ -37,7 +38,6 @@ import {
   Table,
   Tabs,
   Text,
-  ThemeIcon,
   Title,
   Tooltip,
   UnstyledButton
@@ -46,15 +46,12 @@ import {
   IconAlertTriangle,
   IconArrowLeft,
   IconBook2,
-  IconCalendarEvent,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconCircleMinus,
   IconClipboardCheck,
   IconExternalLink,
-  IconEye,
-  IconEyeOff,
   IconFileText,
   IconLock,
   IconPencil,
@@ -62,9 +59,7 @@ import {
   IconRepeat,
   IconRoute,
   IconSparkles,
-  IconUserExclamation,
-  IconUsers,
-  IconZzz
+  IconUsers
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DauerhaftMerken, useAufZu } from '../../shared/sitzung'
@@ -83,8 +78,6 @@ import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGra
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
-import { NamenFolgeKnopf, useNamenFolge } from '../../shared/components/SortierTabelle'
-import { namenVergleich } from '@shared/namenListe'
 import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from './MaterialListe'
 import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
@@ -93,11 +86,12 @@ import { FachKopf } from './FachKopf'
 import { KlassenKurs } from './KlassenKurs'
 import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
-import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
-import { LernendeAuszeichnung, type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
+import { type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
+import { LernendeTabelle } from './LernendeTabelle'
 import { IservVorschlaege } from './IservVorschlaege'
 import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
-import { kursEintragOeffnen, useEntwurfBedarf, type KursEintrag } from './kursBedarf'
+import { useEntwurfBedarf } from './kursBedarf'
+import { HandlungsbedarfFenster, useBedarfFenster, type Bedarf } from './Handlungsbedarf'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
 import GeplantKarte from './GeplantKarte'
 import { geplantText } from '../../shared/components/FreigabePlanen'
@@ -127,13 +121,6 @@ interface KlasseKurz {
   iserv?: IservAngabe | null
 }
 
-type Bedarf = {
-  art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'
-  text: string
-  ziel?: { modul: string; id?: string }
-  /** Kennung zum Ausblenden (09.10.2026) */
-  schluessel: string
-} & Partial<Pick<KursEintrag, 'kurs' | 'hinweis' | 'reiter' | 'ids' | 'lokal'>>
 type Vorschlag =
   | { art: 'vokabeln'; titel: string; text: string; sprache: string; fach: string; woerter: { term: string; translation: string; example?: string }[] }
   | { art: 'blatt'; titel: string; text: string; testId: string; thema: string; schwerpunkte: string[]; testArt: string }
@@ -320,16 +307,6 @@ async function blattNeuFuerKlasse(d: Pick<KlasseDetail, 'name' | 'fach'>): Promi
   }
 }
 
-const BEDARF_SYMBOL: Record<Bedarf['art'], React.ReactNode> = {
-  entscheiden: <IconClipboardCheck size={16} />,
-  foerdern: <IconUserExclamation size={16} />,
-  inaktiv: <IconZzz size={16} />,
-  termin: <IconCalendarEvent size={16} />,
-  reihe: <IconRoute size={16} />,
-  blatt: <IconFileText size={16} />
-}
-const BEDARF_FARBE: Record<Bedarf['art'], string> = { entscheiden: 'orange', foerdern: 'red', inaktiv: 'gray', termin: 'blue', reihe: 'violet', blatt: 'cyan' }
-
 /** „2 Punkte Handlungsbedarf" */
 const bedarfText = (n: number): string => `${n} ${n === 1 ? 'Punkt' : 'Punkte'} Handlungsbedarf`
 
@@ -337,15 +314,16 @@ const bedarfText = (n: number): string => `${n} ${n === 1 ? 'Punkt' : 'Punkte'} 
  * Zahl des Handlungsbedarfs (08.10.2026, Befund der Lehrkraft: die eingekreiste Zahl neben dem Fach war unklar):
  * kleines oranges Abzeichen mit Warnzeichen und Zahl, Erklärung beim Darüberfahren.
  */
-function BedarfZahl({ n, size = 'sm' }: { n: number; size?: 'xs' | 'sm' }): React.JSX.Element {
+function BedarfZahl({ n, size = 'sm', klick }: { n: number; size?: 'xs' | 'sm'; klick?: () => void }): React.JSX.Element {
   return (
-    <Tooltip label={bedarfText(n)} withinPortal>
+    <Tooltip label={klick ? `${bedarfText(n)} – ansehen` : bedarfText(n)} withinPortal>
       <Badge
         size={size}
+        onClick={klick}
+        style={{ flexShrink: 0, cursor: klick ? 'pointer' : undefined }}
         color="orange"
         variant="filled"
         leftSection={<IconAlertTriangle size={size === 'xs' ? 10 : 12} />}
-        style={{ flexShrink: 0 }}
         aria-label={bedarfText(n)}
         data-bedarf-zahl={n}
       >
@@ -353,25 +331,6 @@ function BedarfZahl({ n, size = 'sm' }: { n: number; size?: 'xs' | 'sm' }): Reac
       </Badge>
     </Tooltip>
   )
-}
-
-/**
- * Klick auf ein Fach mit Handlungsbedarf: den Abschnitt „Handlungsbedarf" dieses Fachs ins Bild holen, falls er nicht
- * zu sehen ist. Die Fachansicht lädt erst – deshalb kurz warten, bis der Abschnitt der gewählten Lerngruppe steht.
- */
-function zeigeHandlungsbedarf(gruppeId: string): void {
-  const bis = Date.now() + 4000
-  const versuch = (): void => {
-    const el = document.querySelector<HTMLElement>(`[data-handlungsbedarf][data-gruppe="${CSS.escape(gruppeId)}"]`)
-    if (!el) {
-      if (Date.now() < bis) window.setTimeout(versuch, 80)
-      return
-    }
-    const r = el.getBoundingClientRect()
-    const sichtbar = r.top >= 0 && r.bottom <= window.innerHeight
-    if (!sichtbar) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-  window.setTimeout(versuch, 0)
 }
 
 export default function MeineKlassenModule({ active }: { active: boolean }): React.JSX.Element | null {
@@ -677,8 +636,8 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
                   <Tabs.Tab
                     key={f.id}
                     value={f.id}
-                    rightSection={f.bedarf > 0 ? <BedarfZahl n={f.bedarf} size="xs" /> : undefined}
-                    onClick={() => f.bedarf > 0 && zeigeHandlungsbedarf(f.id)}
+                    // Zahl am Fach (10.10.2026): öffnet das Pop-up „Handlungsbedarf" dieses Fachs
+                    rightSection={f.bedarf > 0 ? <BedarfZahl n={f.bedarf} size="xs" klick={() => useBedarfFenster.getState().oeffne(f.id)} /> : undefined}
                     onContextMenu={(e: React.MouseEvent) => {
                       e.preventDefault()
                       setMenue({ f, x: e.clientX, y: e.clientY })
@@ -805,113 +764,6 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
     </Popover>
   )
 }
-/**
- * Ein Eintrag im Handlungsbedarf (09.10.2026): ganz links „Ausblenden" (Auge), dann der Eintrag selbst (Klick öffnet das
- * Ziel). Ausgeblendet bleibt er, solange die Lage gleich bleibt; ändert sie sich, kommt er wieder (server/klassen.ts).
- */
-function BedarfZeile({
-  b,
-  gruppeId,
-  oeffnen,
-  geaendert,
-  ausgeblendet = false
-}: {
-  b: Bedarf
-  gruppeId: string
-  oeffnen: (modul: string, id?: string) => void
-  geaendert: () => void
-  ausgeblendet?: boolean
-}): React.JSX.Element {
-  const [laeuft, setLaeuft] = useState(false)
-  const umschalten = async (): Promise<void> => {
-    setLaeuft(true)
-    try {
-      await senden(`/server/klassen/${gruppeId}/${ausgeblendet ? 'bedarf-einblenden' : 'bedarf-ausblenden'}`, { schluessel: b.schluessel })
-      geaendert()
-    } catch (e) {
-      notifyError(e)
-    } finally {
-      setLaeuft(false)
-    }
-  }
-  const titel = ausgeblendet ? 'Wieder einblenden' : 'Ausblenden – kommt wieder, sobald sich etwas ändert'
-  return (
-    <Group gap={6} wrap="nowrap" align="center" data-bedarf-zeile={b.schluessel}>
-      {/* Entwürfe liegen nur in diesem Gerät (kursBedarf.ts) – nicht ausblendbar */}
-      {b.lokal ? (
-        <div style={{ width: 22, flexShrink: 0 }} />
-      ) : (
-        <Tooltip label={titel} withinPortal>
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            size="sm"
-            loading={laeuft}
-            onClick={() => void umschalten()}
-            aria-label={ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}
-            data-bedarf-ausblenden={ausgeblendet ? undefined : true}
-            data-bedarf-einblenden={ausgeblendet ? true : undefined}
-          >
-            {ausgeblendet ? <IconEye size={16} /> : <IconEyeOff size={16} />}
-          </ActionIcon>
-        </Tooltip>
-      )}
-      <UnstyledButton
-        // Kurs-Einträge (09.10.2026): in „Meine Klassen" bleiben – Reiter „Vokabeln"/„Grammatik" und Sprung an die Stelle
-        onClick={() => kursEintragOeffnen(b, (r) => useSicht.getState().setze({ reiter: r })) || (b.ziel && oeffnen(b.ziel.modul, b.ziel.id))}
-        data-ziel-reiter={b.reiter}
-        className="klassen-bedarf"
-        data-bedarf={b.art}
-        style={{ flex: 1, opacity: ausgeblendet ? 0.7 : 1 }}
-      >
-        <Group gap="xs" wrap="nowrap">
-          <ThemeIcon size="sm" variant="light" color={BEDARF_FARBE[b.art]}>
-            {BEDARF_SYMBOL[b.art]}
-          </ThemeIcon>
-          <Text size="sm" style={{ flex: 1 }}>
-            {b.text}
-          </Text>
-          {b.ziel && <IconChevronRight size={14} />}
-        </Group>
-      </UnstyledButton>
-    </Group>
-  )
-}
-
-/** „Ausgeblendet (n)" unter dem Handlungsbedarf – aufklappbar, je Eintrag „Wieder einblenden" */
-function AusgeblendeterBedarf({
-  liste,
-  gruppeId,
-  oeffnen,
-  geaendert
-}: {
-  liste: Bedarf[]
-  gruppeId: string
-  oeffnen: (modul: string, id?: string) => void
-  geaendert: () => void
-}): React.JSX.Element {
-  const [offen, setOffen] = useAufZu('bedarf-ausgeblendet', false)
-  return (
-    <div style={{ marginTop: 8 }} data-bedarf-ausgeblendet={liste.length}>
-      <UnstyledButton onClick={() => setOffen((o) => !o)} aria-expanded={offen} data-bedarf-ausgeblendet-knopf>
-        <Group gap={4}>
-          {offen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-          <Text size="xs" c="dimmed">
-            Ausgeblendet ({liste.length})
-          </Text>
-        </Group>
-      </UnstyledButton>
-      <Collapse expanded={offen}>
-        <Stack gap={4} mt={4}>
-          {liste.map((b) => (
-            <BedarfZeile key={b.schluessel} b={b} gruppeId={gruppeId} oeffnen={oeffnen} geaendert={geaendert} ausgeblendet />
-          ))}
-        </Stack>
-      </Collapse>
-    </div>
-  )
-}
-
 function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: () => void }): React.JSX.Element {
   const experte = useExperte()
   const [d, setD] = useState<KlasseDetail | null>(null)
@@ -934,6 +786,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     return () => window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
   }, [laden])
   const fertige = useFertigeBlaetter(id)
+  const bedarfFenster = useBedarfFenster((s) => s.gruppe)
+  // Pop-up schließen, wenn das Fach verlassen wird (nicht, wenn es gerade für ein anderes Fach geöffnet wurde)
+  useEffect(() => () => void (useBedarfFenster.getState().gruppe === id && useBedarfFenster.getState().schliesse()), [id])
   const { logoDataUrl, settings } = useAppSettings()
   // Grammatik-Entwürfe der Kurse (nur in diesem Gerät, 09.10.2026) – wie auf der Kursseite vorne im Handlungsbedarf
   const entwurfBedarf = useEntwurfBedarf(d?.vokabeln ?? [])
@@ -975,6 +830,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
   const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
   const sichtbarerBedarf = [...entwurfBedarf, ...d.bedarf]
+  const wackeligVorschlag = d.vorschlaege.find((v): v is Extract<Vorschlag, { art: 'vokabeln' }> => v.art === 'vokabeln') ?? null
   const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
   const mitLernstand = Boolean(d.sprachfach && sprachKurs && sprachKurs.woerter > 0)
   return (
@@ -982,23 +838,6 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
       {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) – in Sprachklassen
            mit Lernstand klein neben Karteikasten und Units (10.10.2026, unten) */}
       {!mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
-      {/* ---------- Handlungsbedarf – nur wenn etwas Sichtbares ansteht (10.10.2026): ohne Bedarf, oder wenn alles
-           ausgeblendet ist, fällt der Kasten ganz weg; Ausgeblendetes kommt von selbst wieder, sobald sich etwas ändert */}
-      {sichtbarerBedarf.length > 0 && (
-        <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
-          <Group gap={6} mb="xs">
-            <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
-            <Text fw={700}>Handlungsbedarf</Text>
-          </Group>
-          <Stack gap={4}>
-            {sichtbarerBedarf.map((b) => (
-              <BedarfZeile key={b.schluessel} b={b} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />
-            ))}
-          </Stack>
-          {(d.bedarfAusgeblendet?.length ?? 0) > 0 && <AusgeblendeterBedarf liste={d.bedarfAusgeblendet!} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />}
-        </Card>
-      )}
-
       {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
            seit 10.10.2026 mit dem kompakten Kennzahlen-Kasten vorn in derselben Reihe */}
       {mitLernstand && sprachKurs && (
@@ -1007,6 +846,23 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           abschnitte={sprachKurs.abschnitte}
           zuAbschnitten={() => setze({ reiter: 'vokabeln' })}
           kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt />}
+        />
+      )}
+
+      {/* ---------- Handlungsbedarf als Pop-up (10.10.2026): öffnet die Kachel „Handlungsbedarf" bzw. die Zahl am Fach */}
+      {bedarfFenster === d.id && (
+        <HandlungsbedarfFenster
+          gruppeId={d.id}
+          titel={d.titel}
+          bedarf={sichtbarerBedarf}
+          ausgeblendet={d.bedarfAusgeblendet ?? []}
+          wackelig={wackeligVorschlag ? { woerter: wackeligVorschlag.woerter.length } : null}
+          oeffnen={oeffneMitRueckweg}
+          setzeReiter={(r) => setze({ reiter: r })}
+          geaendert={bedarfNeu}
+          wackeligAnsehen={() => wackeligVorschlag && setVorschau(wackeligVorschlag)}
+          wackeligWiederholen={() => void imKursWiederholen()}
+          wiederholtLaeuft={wiederholt}
         />
       )}
 
@@ -1146,7 +1002,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Tabs.Panel value="lernende" pt="sm">
           {/* Erste IServ-Anmeldung, mehrdeutig: mit dem bisherigen Gastkonto zusammenführen? (09.10.2026) */}
           <IservVorschlaege gruppeId={d.id} geaendert={laden} />
-          <LernendeTabelle d={d} neuLaden={laden} />
+          <LernendeTabelle gruppeId={d.id} titel={d.titel || d.name} lernende={d.lernende} neuLaden={laden} />
         </Tabs.Panel>
       </Tabs>
 
@@ -1565,116 +1421,5 @@ function Verteilung({ werte }: { werte: number[] }): React.JSX.Element {
         </Tooltip>
       ))}
     </Group>
-  )
-}
-
-function Anteil({ x }: { x: number | null | undefined }): React.JSX.Element {
-  if (x == null) return <>–</>
-  return (
-    <Group gap={6} wrap="nowrap">
-      <Progress value={x * 100} w={70} size="sm" color={ampel(x)} />
-      <Text size="xs">{prozent(x)}</Text>
-    </Group>
-  )
-}
-
-function LernendeTabelle({ d, neuLaden }: { d: KlasseDetail; neuLaden: () => void }): React.JSX.Element {
-  // Vor- oder Nachname (08.10.2026, Wunsch der Lehrkraft)
-  const [folge, setFolge] = useNamenFolge()
-  const zeilen = useMemo(() => [...d.lernende].sort((a, b) => namenVergleich(a.name, b.name, folge)), [d, folge])
-  // Lernende mit Anmeldecode (09.10.2026, LernendeCodes.tsx): Codezettel für alle, Klick auf den Namen öffnet den Zugang
-  const { gaeste, laden: gaesteLaden } = useGaesteMitCode(d.id, zeilen.some((l) => l.gast))
-  const [gastOffen, setGastOffen] = useState<GastMitCode | null>(null)
-  if (!zeilen.length) return <Text c="dimmed">Noch keine Lernenden in dieser Lerngruppe.</Text>
-  const zeigtVokabeln = zeilen.some((l) => l.vokabelnSicher !== null)
-  const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
-  const zeigtGrammatik = zeilen.some((l) => l.grammatikSicher != null)
-  const zeigtAuszeichnung = zeilen.some((l) => l.auszeichnung)
-  return (
-    <Stack gap="xs">
-      {gaeste.some((g) => g.zugang.length === 8) && (
-        <Group justify="flex-end" data-lernende-codezettel>
-          <CodezettelKnopf titel={d.titel || d.name} gaeste={gaeste} />
-        </Group>
-      )}
-      {gastOffen && (
-        <GastFenster
-          gruppeId={d.id}
-          titel={d.titel || d.name}
-          gast={gastOffen}
-          schliessen={() => setGastOffen(null)}
-          geaendert={() => (gaesteLaden(), neuLaden())}
-        />
-      )}
-      <Table striped highlightOnHover data-lernende-tabelle data-karten>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>
-              <Group gap={4} wrap="nowrap">
-                Name
-                <NamenFolgeKnopf folge={folge} setFolge={setFolge} />
-              </Group>
-            </Table.Th>
-            {zeigtVokabeln && <Table.Th>Vokabeln sicher</Table.Th>}
-            {zeigtVokabeln && <Table.Th>zuletzt geübt</Table.Th>}
-            {zeigtGrammatik && <Table.Th>Grammatik sicher</Table.Th>}
-            <Table.Th>Testschnitt</Table.Th>
-            {zeigtReihen && <Table.Th>Reihen</Table.Th>}
-            <Table.Th>Blätter eingereicht</Table.Th>
-            {zeigtAuszeichnung && <Table.Th title="Medaillen und Titel – als Gesprächsanlass, ohne Rangfolge">Medaillen & Titel</Table.Th>}
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {zeilen.map((l) => (
-            <Table.Tr key={l.id}>
-              <Table.Td fw={600}>
-                {l.gast ? (
-                  <UnstyledButton
-                    fw={600}
-                    td="underline"
-                    style={{ textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}
-                    title="Code, Zettel und Name"
-                    onClick={() => setGastOffen(gaeste.find((g) => g.id === l.id) ?? { id: l.id, name: l.name, zugang: '' })}
-                    data-gast-name={l.name}
-                  >
-                    {l.name}
-                  </UnstyledButton>
-                ) : (
-                  l.name
-                )}
-                {l.gast && (
-                  <Badge size="xs" variant="light" color="gray" ml={6} data-mit-anmeldecode title="Meldet sich mit dem persönlichen Code vom Zettel an">
-                    mit Anmeldecode
-                  </Badge>
-                )}
-              </Table.Td>
-              {zeigtVokabeln && (
-                <Table.Td>
-                  <Anteil x={l.vokabelnSicher} />
-                </Table.Td>
-              )}
-              {zeigtVokabeln && <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>}
-              {zeigtGrammatik && (
-                <Table.Td>
-                  <Anteil x={l.grammatikSicher} />
-                </Table.Td>
-              )}
-              <Table.Td>{l.tests ? note(l.testSchnitt) : '–'}</Table.Td>
-              {zeigtReihen && (
-                <Table.Td>
-                  <Anteil x={l.reihenFortschritt} />
-                </Table.Td>
-              )}
-              <Table.Td>{l.blaetterEingereicht}</Table.Td>
-              {zeigtAuszeichnung && (
-                <Table.Td>
-                  <LernendeAuszeichnung a={l.auszeichnung} />
-                </Table.Td>
-              )}
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-    </Stack>
   )
 }

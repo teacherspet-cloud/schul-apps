@@ -275,26 +275,29 @@ try {
   const faecher = await p.locator('[data-fach-leiste] [data-fach]').evaluateAll((e) => e.map((x) => x.getAttribute('data-fach')))
   pruefe(JSON.stringify(faecher) === JSON.stringify(['Englisch', 'Geschichte']), `Fach-Leiste (${faecher.join(' | ')})`)
   await p.locator('[data-fach-kopf]').waitFor({ timeout: 10000 })
-  const mitBedarfKasten = (await p.locator('[data-handlungsbedarf]').count()) > 0
-  if (mitBedarfKasten) {
-    const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
-    const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
-    pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
-  } else pruefe((await p.locator('[data-handlungsbedarf]').count()) === 0, 'Ohne Handlungsbedarf kein Kasten (10.10.2026)')
-  // Ausblenden ganz links am Eintrag, darunter „Ausgeblendet (n)" zum Wiederherstellen (09.10.2026) – nur mit mindestens
-  // zwei Einträgen (sonst verschwindet der Kasten samt „Ausgeblendet", 10.10.2026)
-  if ((await p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').count()) >= 2) {
-    const zeile = p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').first()
-    const knopf = zeile.locator('[data-bedarf-ausblenden]')
-    const links = (await knopf.boundingBox())?.x ?? 1e9
-    const eintrag = (await zeile.locator('.klassen-bedarf').boundingBox())?.x ?? 0
-    pruefe(links < eintrag, 'Auge „Ausblenden" steht links vom Eintrag')
-    await knopf.click()
-    pruefe(await da(p.locator('[data-bedarf-ausgeblendet="1"]')), '„Ausgeblendet (1)" erscheint')
-    await p.locator('[data-bedarf-ausgeblendet-knopf]').click()
-    await p.locator('[data-bedarf-einblenden]').first().click()
-    await p.locator('[data-bedarf-ausgeblendet]').waitFor({ state: 'detached', timeout: 10000 }).catch(() => undefined)
-    pruefe((await p.locator('[data-bedarf-ausgeblendet]').count()) === 0, 'Wieder eingeblendet – „Ausgeblendet" verschwindet')
+  // Handlungsbedarf als Pop-up (10.10.2026): kein eigener Kasten mehr – die Kachel „Handlungsbedarf" im Kopf (nur mit
+  // Inhalt) öffnet ein Fenster, nach Art gruppiert, je Eintrag „Ausblenden" links und ein Knopf mit dem nächsten Schritt
+  pruefe((await p.locator('[data-handlungsbedarf]').count()) === 0, 'Kein eigener Kasten „Handlungsbedarf" in der Klassenansicht')
+  const bedarfKachel = p.locator('[data-fach-kopf] [data-kennzahl="bedarf"]')
+  if (await bedarfKachel.count()) {
+    await bedarfKachel.click()
+    pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-gruppe]')), 'Kachel „Handlungsbedarf" öffnet das Pop-up mit Gruppen')
+    pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-aktion]').first()), 'Je Eintrag ein Knopf mit dem nächsten Schritt')
+    if ((await p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').count()) >= 1) {
+      const zeile = p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').first()
+      const knopf = zeile.locator('[data-bedarf-ausblenden]')
+      const links = (await knopf.boundingBox())?.x ?? 1e9
+      const eintrag = (await zeile.locator('.klassen-bedarf').boundingBox())?.x ?? 0
+      pruefe(links < eintrag, 'Auge „Ausblenden" steht links vom Eintrag')
+      await knopf.click()
+      pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-ausgeblendet="1"]')), '„Ausgeblendet (1)" erscheint im Pop-up')
+      await p.locator('[data-bedarf-ausgeblendet-knopf]').click()
+      await p.locator('[data-bedarf-einblenden]').first().click()
+      await p.locator('[data-bedarf-ausgeblendet]').waitFor({ state: 'detached', timeout: 10000 }).catch(() => undefined)
+      pruefe((await p.locator('[data-bedarf-ausgeblendet]').count()) === 0, 'Wieder eingeblendet – „Ausgeblendet" verschwindet')
+    }
+    await p.keyboard.press('Escape')
+    await p.locator('[data-handlungsbedarf]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
   }
   // Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter"): im Sprachfach mit „Wörter sicher" und „aktiv diese Woche"
   pruefe(await da(p.locator('[data-fach-kopf="sprache"] [data-kennzahl="sicher"]')), 'Kopf der Fachansicht: „Wörter sicher"')
@@ -470,6 +473,13 @@ try {
 
   // Handlungsbedarf der Kurse (09.10.2026, eine Quelle mit der Kursseite): Klick bleibt in „Meine Klassen" – Vokabel-
   // Hinweise im Reiter „Vokabeln", Grammatik-Hinweise im Reiter „Grammatik"
+  // Seit 10.10.2026 im Pop-up: erst die Kachel „Handlungsbedarf" öffnen
+  const bedarfAuf = async () => {
+    if (!(await p.locator('[data-handlungsbedarf]').count()) && (await p.locator('[data-fach-kopf] [data-kennzahl="bedarf"]').count()))
+      await p.locator('[data-fach-kopf] [data-kennzahl="bedarf"]').click()
+    await p.locator('[data-handlungsbedarf]').waitFor({ timeout: 5000 }).catch(() => undefined)
+  }
+  await bedarfAuf()
   const vokEintrag = p.locator('[data-handlungsbedarf] [data-ziel-reiter="vokabeln"], [data-handlungsbedarf] [data-ziel-reiter="lernende"]').first()
   if (await vokEintrag.count()) {
     await vokEintrag.click()
@@ -477,6 +487,7 @@ try {
     pruefe(await da(p.locator('[role="tab"][aria-selected="true"]', { hasText: /^Vokabeln/ })), 'Reiter „Vokabeln" gewählt')
     await p.screenshot({ path: join(out, '4b-kurs-aus-bedarf.png') })
   } else pruefe(false, 'Vokabel-Eintrag im Handlungsbedarf fehlt')
+  await bedarfAuf()
   const gramEintrag = p.locator('[data-handlungsbedarf] [data-ziel-reiter="grammatik"]').first()
   if (await gramEintrag.count()) {
     await gramEintrag.click()

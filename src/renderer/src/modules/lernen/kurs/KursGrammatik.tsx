@@ -37,11 +37,9 @@ import { bekanntNachStand } from '@shared/zeitformSperre'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { AufgabenEditor } from './AufgabenEditor'
 import { KastenKopf, useGemerkt } from './Kasten'
-import { nachLehrwerkGruppiert, passtSuche, type KursGruppe } from './kursAnsicht'
-import { stelleImLehrwerk } from '@shared/lehrwerkBand'
+import { bandGleich, grammatikNachLehrwerk, passtSuche, type KursAbschnittBezug } from './kursAnsicht'
 import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { BandCover } from '../../../shared/components/BandCover'
-import { jahrgangName } from '../regal/beschriftung'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
 import { useAufZu, useOffenGemerkt } from '../../../shared/sitzung'
 
@@ -75,6 +73,10 @@ export interface GrammatikZeile {
   /** Band und Unit (09.10.2026, Server: lehrwerkDerGrammatik) – Gliederung nach Lehrwerk */
   buch?: string
   unit?: string
+  /** Station im Lehrwerk (10.10.2026, Gliederung Band › Unit › Station) */
+  station?: string
+  /** Geplante Freischaltung (ms) – noch nicht bei den Lernenden */
+  geplantAb?: number | null
 }
 
 /** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
@@ -310,16 +312,16 @@ const JAHRE_SCHLUESSEL = (vokId: string): string => `schulapps-vok-grammatik-jah
  */
 export function KursGrammatik({
   vokId,
-  fach,
   hinzufuegen,
   geoeffnet,
   oeffnen,
   stand,
   immerOffen = false,
-  eingebettet = false
+  eingebettet = false,
+  abschnitte
 }: {
   vokId: string
-  /** Fach des Kurses – für die Jahrgangs-Überschriften in der Fremdsprache („Year 6") */
+  /** Fach des Kurses (bis 10.10.2026 für die Jahrgangs-Überschriften; die Gliederung folgt jetzt dem Lehrwerk) */
   fach: string
   /** Knopf „+ Grammatik hinzufügen" */
   hinzufuegen: () => void
@@ -332,6 +334,8 @@ export function KursGrammatik({
   immerOffen?: boolean
   /** In „Meine Klassen" (09.10.2026, Wunsch der Lehrkraft): zuklappbar, zu Beginn offen */
   eingebettet?: boolean
+  /** Abschnitte des Vokabelkurses (10.10.2026): Band › Unit › Station wie bei den Vokabeln, Einordnung nach Freigabezeit */
+  abschnitte?: KursAbschnittBezug[]
 }): React.JSX.Element {
   const [liste, setListe] = useState<GrammatikZeile[] | null>(null)
   const [entwurf, setEntwurf] = useState<Entwurf | null>(null)
@@ -387,53 +391,38 @@ export function KursGrammatik({
     passtSuche(z.art === 'frei' ? [z.g.titel, z.g.thema, ...(z.g.regeln ?? [])] : [z.e.titel, z.e.thema, ...z.e.paket.regeln.map((r) => r.titel)], suche)
   )
   /*
-   * Gliederung (09.10.2026, Wunsch der Lehrkraft): nach Band und Unit, wo das Lehrwerk bekannt ist (Freigabe bzw. Katalog),
-   * neuester Band oben; sonst nach Schuljahr. Die Suche geht über alle Gruppen und öffnet die passenden.
+   * Gliederung wie die Vokabeln (10.10.2026, Entscheidung der Lehrkraft): Band (mit Cover) › Unit › Station › Themen –
+   * nur Freigegebenes, Späteres oben (kursAnsicht.ts `grammatikNachLehrwerk`). Was sich keiner Stelle im Lehrwerk zuordnen
+   * lässt, steht unter der Unit, in der es freigegeben wurde. Entwürfe (zum Prüfen) stehen darüber, Geplantes darunter.
+   * Die Suche geht über alle Gruppen und öffnet die passenden.
    */
-  const gruppen = nachLehrwerkGruppiert(
-    gefunden,
-    (z) =>
-      z.art === 'frei'
-        ? z.g.buch
-          ? { buch: z.g.buch, unit: z.g.unit }
-          : null
-        : z.e.info?.lehrwerk?.buch
-        ? { buch: z.e.info.lehrwerk.buch, unit: z.e.info.lehrwerk.unit }
-        : stelleImLehrwerk(z.e.info?.themen ?? [], z.e.info?.teilformen ?? []),
-    (z) => (z.art === 'frei' ? z.g.jahrgang : z.e.info?.jahrgang),
-    (buch) => Object.keys(LEHRWERK_GRAMMATIK[buch] ?? {})
+  const jetzt = Date.now()
+  const entwurfZeilen = gefunden.filter((z): z is Extract<Zeile, { art: 'entwurf' }> => z.art === 'entwurf')
+  const freiZeilen = gefunden.filter((z): z is Extract<Zeile, { art: 'frei' }> => z.art === 'frei')
+  const geplantZeilen = freiZeilen.filter((z) => (z.g.geplantAb ?? 0) > jetzt)
+  const gliederung = grammatikNachLehrwerk(
+    freiZeilen.filter((z) => !((z.g.geplantAb ?? 0) > jetzt)),
+    (z) => (z.g.buch ? { buch: z.g.buch, unit: z.g.unit, station: z.g.station } : null),
+    (z) => Math.max(Date.parse(z.g.erstellt) || 0, z.g.geplantAb ?? 0),
+    (abschnitte ?? []).filter((x) => x.zeit <= jetzt),
+    (buch) => Object.keys(LEHRWERK_GRAMMATIK[Object.keys(LEHRWERK_GRAMMATIK).find((k) => bandGleich(k, buch)) ?? ''] ?? {})
   )
-  const gruppeOffen = (g: KursGruppe<Zeile>, i: number): boolean =>
-    sucht || (g.schluessel in jahre ? jahre[g.schluessel] : i === 0 || g.eintraege.some((z) => z.art === 'entwurf'))
-  const jahrUmschalten = (i: number): void => {
-    const k = gruppen[i].schluessel
-    const jetzt = gruppeOffen(gruppen[i], i)
-    const neu = { ...jahre, [k]: !jetzt }
-    setJahre(neu)
+  const ersteBand = gliederung.baende[0]
+  const vorgabeOffen = (k: string): boolean => k === ersteBand?.schluessel || k === ersteBand?.units[0]?.schluessel || k === 'ohne'
+  const istAuf = (k: string): boolean => sucht || (k in jahre ? jahre[k] : vorgabeOffen(k))
+  const umschalten = (k: string): void => {
+    if (sucht) return
+    setJahre({ ...jahre, [k]: !istAuf(k) })
   }
-  const gruppenTitel = (g: KursGruppe<Zeile>): React.ReactNode =>
-    g.buch ? (
-      <Group gap={8} wrap="nowrap">
-        <BandCover band={{ name: g.buch }} breite={22} />
-        <span>{[g.buch, g.unit].filter(Boolean).join(' · ')}</span>
-      </Group>
-    ) : (
-      jahrTitel(g.jahrgang)
-    )
-  const jahrTitel = (j: number | null): React.ReactNode => {
-    if (j === null) return 'Ohne Schuljahr'
-    const name = jahrgangName(fach, j)
-    return (
-      <>
-        {name}
-        {name !== `Klasse ${j}` && (
-          <Text component="span" size="xs" c="dimmed" fw={400} ml={6}>
-            (Klasse {j})
-          </Text>
-        )}
-      </>
-    )
-  }
+  const breite = spalten.length + 1
+  const pfeil = (auf: boolean): React.JSX.Element => (
+    <IconChevronDown size={16} style={{ transform: auf ? undefined : 'rotate(-90deg)', transition: 'transform .2s', flexShrink: 0 }} />
+  )
+  const anzahl = (n: number): React.JSX.Element => (
+    <Badge size="sm" variant="light" color="gray">
+      {n}
+    </Badge>
+  )
   const ausfuehren = (was: 'entfernen' | 'loeschen' | 'wiederherstellen', g: GrammatikZeile): void =>
     void senden(`/server/grammatik/${g.id}/${was}`, {}).then(
       () => (
@@ -450,6 +439,83 @@ export function KursGrammatik({
       (e: unknown) => notifyError(e)
     )
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
+  const entwurfZeile = (e: Entwurf): React.JSX.Element => (
+    <Table.Tr key={e.schluessel} style={{ cursor: 'pointer' }} onClick={() => setEntwurf(e)} data-grammatik-entwurf={e.titel}>
+      <Table.Td>
+        <Text size="sm" fw={600}>
+          {e.titel}
+        </Text>
+      </Table.Td>
+      <Table.Td>{ART_TEXT(e.empfaenger.art, e.empfaenger.fuer)}</Table.Td>
+      <Table.Td>
+        <Group gap="xs" wrap="nowrap">
+          <Text size="sm">{e.paket.aufgaben.length}</Text>
+          <Badge color="yellow" variant="light" tt="none">
+            Entwurf – prüfen
+          </Badge>
+        </Group>
+      </Table.Td>
+      <Table.Td>–</Table.Td>
+      <Table.Td>–</Table.Td>
+      <Table.Td />
+    </Table.Tr>
+  )
+  const freiZeile = (g: GrammatikZeile): React.JSX.Element => (
+    <Table.Tr key={g.id} style={{ cursor: 'pointer' }} onClick={() => oeffnen(g.id)} data-grammatik-zeile={g.id}>
+      <Table.Td className="grammatik-thema-zelle">
+        <Text size="sm" fw={600}>
+          {g.titel}
+          {g.status === 'beendet' && (
+            <Badge ml={6} size="xs" variant="light" color="gray" tt="none" data-grammatik-abgeschlossen>
+              abgeschlossen
+            </Badge>
+          )}
+        </Text>
+        {g.thema && g.thema !== g.titel && (
+          <Text size="xs" c="dimmed">
+            {g.thema}
+          </Text>
+        )}
+      </Table.Td>
+      <Table.Td>
+        <Badge variant="light" color={g.art ? 'teal' : 'grape'} tt="none">
+          {ART_TEXT(g.art, g.fuer)}
+        </Badge>
+      </Table.Td>
+      <Table.Td onClick={halt} style={{ cursor: 'default' }}>
+        <Group gap={6} wrap="nowrap" data-grammatik-aufgaben={g.id}>
+          <Text size="sm" fw={600} miw={22}>
+            {g.aufgaben}
+          </Text>
+          <Button size="compact-xs" variant="light" color="grape" leftSection={<IconPlus size={12} />} onClick={() => setMehr(g)} data-grammatik-mehr={g.id}>
+            Aufgaben
+          </Button>
+          <Button size="compact-xs" variant="default" leftSection={<IconPencil size={12} />} onClick={() => setBearbeiten(g.id)} data-grammatik-bearbeiten={g.id}>
+            Bearbeiten
+          </Button>
+        </Group>
+      </Table.Td>
+      <Table.Td>{Math.round((g.bearbeitetSchnitt ?? 0) * 100)} %</Table.Td>
+      <Table.Td>{Math.round(g.sicherSchnitt * 100)} %</Table.Td>
+      <Table.Td onClick={halt}>
+        <Menu position="bottom-end" withinPortal>
+          <Menu.Target>
+            <ActionIcon variant="subtle" color="gray" aria-label={`${g.titel}: weitere Aktionen`} data-grammatik-aktionen={g.id}>
+              <IconDots size={16} />
+            </ActionIcon>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item leftSection={<IconX size={14} />} onClick={() => setFrage({ was: 'entfernen', g })} data-grammatik-entfernen>
+              Entfernen
+            </Menu.Item>
+            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => setFrage({ was: 'loeschen', g })} data-grammatik-loeschen>
+              Endgültig löschen …
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
+      </Table.Td>
+    </Table.Tr>
+  )
   return (
     <Card withBorder data-kurs-grammatik>
       {immerOffen && !eingebettet ? (
@@ -502,141 +568,137 @@ export function KursGrammatik({
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {gruppen.length === 0 && (
+                  {gefunden.length === 0 && (
                     <Table.Tr>
-                      <Table.Td colSpan={spalten.length + 1}>
+                      <Table.Td colSpan={breite}>
                         <Text size="sm" c="dimmed">
                           Nichts gefunden.
                         </Text>
                       </Table.Td>
                     </Table.Tr>
                   )}
-                  {gruppen.flatMap((gr, i) => {
-                    // Jahre mit Entwürfen (zum Prüfen) sind von sich aus offen
-                    const auf = gruppeOffen(gr, i)
+                  {/* Entwürfe zum Prüfen – noch nicht freigegeben, deshalb über der Gliederung und immer offen */}
+                  {entwurfZeilen.length > 0 && (
+                    <Table.Tr key="entwuerfe" style={{ background: 'var(--mantine-color-yellow-light)' }} data-grammatik-entwuerfe={entwurfZeilen.length}>
+                      <Table.Td colSpan={breite}>
+                        <Group gap="xs" wrap="nowrap">
+                          <Text fw={700} size="sm">
+                            Entwürfe zum Prüfen
+                          </Text>
+                          {anzahl(entwurfZeilen.length)}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {entwurfZeilen.map((z) => entwurfZeile(z.e))}
+                  {gliederung.baende.flatMap((band) => {
+                    const bandAuf = istAuf(band.schluessel)
                     const kopf = (
                       <Table.Tr
-                        key={gr.schluessel}
+                        key={band.schluessel}
                         style={{ cursor: sucht ? undefined : 'pointer', background: 'var(--mantine-color-default-hover)' }}
-                        onClick={() => !sucht && jahrUmschalten(i)}
-                        aria-expanded={auf}
-                        data-grammatik-jahr={gr.buch ? undefined : gr.jahrgang ?? 'ohne'}
-                        data-grammatik-band={gr.buch ? [gr.buch, gr.unit].filter(Boolean).join(' · ') : undefined}
+                        onClick={() => umschalten(band.schluessel)}
+                        aria-expanded={bandAuf}
+                        data-grammatik-band={band.buch || 'Weitere Grammatik'}
                       >
-                        <Table.Td colSpan={spalten.length + 1}>
+                        <Table.Td colSpan={breite}>
                           <Group gap="xs" wrap="nowrap">
-                            <IconChevronDown size={16} style={{ transform: auf ? undefined : 'rotate(-90deg)', transition: 'transform .2s' }} />
-                            <Text fw={700} size="sm" component="div">
-                              {gruppenTitel(gr)}
+                            {pfeil(bandAuf)}
+                            {band.buch ? <BandCover band={{ name: band.buch }} breite={bandAuf ? 30 : 24} /> : null}
+                            <Text fw={700} size="sm">
+                              {band.buch || 'Weitere Grammatik'}
                             </Text>
-                            <Badge size="sm" variant="light" color="gray">
-                              {gr.eintraege.length}
-                            </Badge>
+                            {anzahl(band.anzahl)}
                           </Group>
                         </Table.Td>
                       </Table.Tr>
                     )
-                    if (!auf) return [kopf]
+                    if (!bandAuf) return [kopf]
                     return [
                       kopf,
-                      ...gr.eintraege.map((z) =>
-                        z.art === 'entwurf' ? (
-                          <Table.Tr key={z.e.schluessel} style={{ cursor: 'pointer' }} onClick={() => setEntwurf(z.e)} data-grammatik-entwurf={z.e.titel}>
-                            <Table.Td>
-                              <Text size="sm" fw={600}>
-                                {z.e.titel}
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>{ART_TEXT(z.e.empfaenger.art, z.e.empfaenger.fuer)}</Table.Td>
-                            <Table.Td>
+                      ...band.units.flatMap((u) => {
+                        const unitAuf = istAuf(u.schluessel)
+                        const unitKopf = (
+                          <Table.Tr
+                            key={u.schluessel}
+                            style={{ cursor: sucht ? undefined : 'pointer' }}
+                            onClick={() => umschalten(u.schluessel)}
+                            aria-expanded={unitAuf}
+                            data-grammatik-unit={u.unit || 'ohne Unit'}
+                          >
+                            <Table.Td colSpan={breite} style={{ paddingLeft: 28 }}>
                               <Group gap="xs" wrap="nowrap">
-                                <Text size="sm">{z.e.paket.aufgaben.length}</Text>
-                                <Badge color="yellow" variant="light" tt="none">
-                                  Entwurf – prüfen
-                                </Badge>
-                              </Group>
-                            </Table.Td>
-                            <Table.Td>–</Table.Td>
-                            <Table.Td>–</Table.Td>
-                            <Table.Td />
-                          </Table.Tr>
-                        ) : (
-                          <Table.Tr key={z.g.id} style={{ cursor: 'pointer' }} onClick={() => oeffnen(z.g.id)} data-grammatik-zeile={z.g.id}>
-                            <Table.Td>
-                              <Text size="sm" fw={600}>
-                                {z.g.titel}
-                                {z.g.status === 'beendet' && (
-                                  <Badge ml={6} size="xs" variant="light" color="gray" tt="none" data-grammatik-abgeschlossen>
-                                    abgeschlossen
-                                  </Badge>
-                                )}
-                              </Text>
-                              {z.g.thema && z.g.thema !== z.g.titel && (
-                                <Text size="xs" c="dimmed">
-                                  {z.g.thema}
+                                {pfeil(unitAuf)}
+                                <Text fw={600} size="sm">
+                                  {u.unit || 'Ohne Unit'}
                                 </Text>
-                              )}
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color={z.g.art ? 'teal' : 'grape'} tt="none">
-                                {ART_TEXT(z.g.art, z.g.fuer)}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td onClick={halt} style={{ cursor: 'default' }}>
-                              <Group gap={6} wrap="nowrap" data-grammatik-aufgaben={z.g.id}>
-                                <Text size="sm" fw={600} miw={22}>
-                                  {z.g.aufgaben}
-                                </Text>
-                                <Button
-                                  size="compact-xs"
-                                  variant="light"
-                                  color="grape"
-                                  leftSection={<IconPlus size={12} />}
-                                  onClick={() => setMehr(z.g)}
-                                  data-grammatik-mehr={z.g.id}
-                                >
-                                  Aufgaben
-                                </Button>
-                                <Button
-                                  size="compact-xs"
-                                  variant="default"
-                                  leftSection={<IconPencil size={12} />}
-                                  onClick={() => setBearbeiten(z.g.id)}
-                                  data-grammatik-bearbeiten={z.g.id}
-                                >
-                                  Bearbeiten
-                                </Button>
+                                {anzahl(u.anzahl)}
                               </Group>
-                            </Table.Td>
-                            <Table.Td>{Math.round((z.g.bearbeitetSchnitt ?? 0) * 100)} %</Table.Td>
-                            <Table.Td>{Math.round(z.g.sicherSchnitt * 100)} %</Table.Td>
-                            <Table.Td onClick={halt}>
-                              <Menu position="bottom-end" withinPortal>
-                                <Menu.Target>
-                                  <ActionIcon variant="subtle" color="gray" aria-label={`${z.g.titel}: weitere Aktionen`} data-grammatik-aktionen={z.g.id}>
-                                    <IconDots size={16} />
-                                  </ActionIcon>
-                                </Menu.Target>
-                                <Menu.Dropdown>
-                                  <Menu.Item leftSection={<IconX size={14} />} onClick={() => setFrage({ was: 'entfernen', g: z.g })} data-grammatik-entfernen>
-                                    Entfernen
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    color="red"
-                                    leftSection={<IconTrash size={14} />}
-                                    onClick={() => setFrage({ was: 'loeschen', g: z.g })}
-                                    data-grammatik-loeschen
-                                  >
-                                    Endgültig löschen …
-                                  </Menu.Item>
-                                </Menu.Dropdown>
-                              </Menu>
                             </Table.Td>
                           </Table.Tr>
                         )
-                      )
+                        if (!unitAuf) return [unitKopf]
+                        return [
+                          unitKopf,
+                          ...u.stationen.flatMap((st) => [
+                            ...(st.station || u.stationen.length > 1
+                              ? [
+                                  <Table.Tr key={`${u.schluessel}|${st.station}`} data-grammatik-station={st.station || 'Unit'}>
+                                    <Table.Td colSpan={breite} style={{ paddingLeft: 56, paddingTop: 4, paddingBottom: 2 }}>
+                                      <Text size="xs" c="dimmed" fw={700} tt="uppercase" style={{ letterSpacing: 0.4 }}>
+                                        {st.station || 'In dieser Unit freigegeben'}
+                                      </Text>
+                                    </Table.Td>
+                                  </Table.Tr>
+                                ]
+                              : []),
+                            ...st.eintraege.map((z) => freiZeile(z.g))
+                          ])
+                        ]
+                      })
                     ]
                   })}
+                  {gliederung.ohne.length > 0 && [
+                    <Table.Tr
+                      key="ohne"
+                      style={{ cursor: sucht ? undefined : 'pointer', background: 'var(--mantine-color-default-hover)' }}
+                      onClick={() => umschalten('ohne')}
+                      aria-expanded={istAuf('ohne')}
+                      data-grammatik-band="Weitere Grammatik"
+                    >
+                      <Table.Td colSpan={breite}>
+                        <Group gap="xs" wrap="nowrap">
+                          {pfeil(istAuf('ohne'))}
+                          <Text fw={700} size="sm">
+                            Weitere Grammatik
+                          </Text>
+                          {anzahl(gliederung.ohne.length)}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>,
+                    ...(istAuf('ohne') ? gliederung.ohne.map((z) => freiZeile(z.g)) : [])
+                  ]}
+                  {/* Geplant (Freigabe in der Zukunft) – noch nicht bei den Lernenden */}
+                  {geplantZeilen.length > 0 && [
+                    <Table.Tr
+                      key="geplant"
+                      style={{ cursor: sucht ? undefined : 'pointer' }}
+                      onClick={() => umschalten('geplant')}
+                      aria-expanded={istAuf('geplant')}
+                      data-grammatik-geplant={geplantZeilen.length}
+                    >
+                      <Table.Td colSpan={breite}>
+                        <Group gap="xs" wrap="nowrap">
+                          {pfeil(istAuf('geplant'))}
+                          <Text fw={700} size="sm" c="dimmed">
+                            Geplant
+                          </Text>
+                          {anzahl(geplantZeilen.length)}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>,
+                    ...(istAuf('geplant') ? geplantZeilen.map((z) => freiZeile(z.g)) : [])
+                  ]}
                 </Table.Tbody>
               </Table>
             </>

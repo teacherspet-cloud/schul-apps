@@ -1399,6 +1399,21 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
   background: var(--mantine-color-default-hover);
 }
 
+/* Meine Klassen › Lernende (10.10.2026): Namensspalte bleibt beim waagerechten Rollen stehen (hell und dunkel) */
+.mk-lernende :is(th, td):first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--mantine-color-body);
+  box-shadow: 1px 0 0 var(--mantine-color-default-border);
+}
+.mk-lernende tbody tr:hover td:first-child {
+  background: var(--mantine-color-default-hover);
+}
+.mk-lernende td {
+  vertical-align: middle;
+}
+
 /* Bibliothek der Elternbriefe (09.10.2026): kleine Vorschau der ersten Seite (A4), Papier bleibt auch dunkel weiß */
 .eb-vorschau {
   position: relative;

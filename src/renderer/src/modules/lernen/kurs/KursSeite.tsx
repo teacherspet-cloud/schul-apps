@@ -652,6 +652,11 @@ export function KursSeite({
         stand={grammatikStand}
         immerOffen
         eingebettet={eingebettet}
+        // Gliederung wie die Vokabeln (10.10.2026): Band › Unit › Station, Einordnung nach den freigegebenen Abschnitten
+        abschnitte={
+          statistik?.abschnitte ??
+          (d.teile ?? []).map((t) => ({ buch: t.buch, unit: t.unit ?? '', name: t.titel, zeit: t.zeit, unitRang: t.unitRang, abschnittRang: t.abschnittRang }))
+        }
       />
       {/* Grammatik je Lernende/r auch in Sprachenlernen (09.10.2026): Ziel der Grammatik-Hinweise im Handlungsbedarf */}
       {lernende.length > 0 && (

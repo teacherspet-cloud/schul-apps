@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { nachJahrGruppiert, nachLehrwerkGruppiert, passtSuche, tagMonat, vokabelKurzinfo } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
+import { bandGleich, grammatikNachLehrwerk, nachJahrGruppiert, nachLehrwerkGruppiert, passtSuche, tagMonat, vokabelKurzinfo } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
+import { stelleImLehrwerk } from '../src/shared/lehrwerkBand'
 
 /*
  * Kursseite im Sprachenlernen (08.10.2026, abgestimmt): Kurzinfo im zugeklappten Kasten „Vokabeln", Grammatik nach
@@ -76,5 +77,75 @@ describe('Grammatik nach Lehrwerk gliedern (09.10.2026)', () => {
       { id: '1', buch: 'Green Line 1', unit: 'Unit 1' }
     ])
     expect(g[0].eintraege.map((x) => x.id)).toEqual(['2', '1'])
+  })
+})
+
+/*
+ * Grammatik wie die Vokabeln (10.10.2026, Entscheidung der Lehrkraft): Band › Unit › Station, Späteres oben; was sich
+ * nicht zuordnen lässt, unter der Unit, in der es freigegeben wurde. Befund 5b: Artikel, be, Kurzantworten unter „Year 5".
+ */
+describe('Grammatik nach Lehrwerk (Band › Unit › Station)', () => {
+  type Z = { id: string; buch?: string; unit?: string; station?: string; zeit: number }
+  const abschnitte = [
+    { buch: 'Green Line 1', unit: 'Hello', name: 'Hello', zeit: 100, unitRang: 0 },
+    { buch: 'Green Line 1', unit: 'Unit 1', name: 'Check-in, Station 1', zeit: 200, unitRang: 1, abschnittRang: 1 },
+    { buch: 'Green Line 1', unit: 'Unit 1', name: 'Station 2', zeit: 300, unitRang: 1, abschnittRang: 2 },
+    { buch: 'Green Line 1', unit: 'Unit 2', name: 'Station 1', zeit: 500, unitRang: 3, abschnittRang: 1 }
+  ]
+  const gliedern = (z: Z[], ab = abschnitte) =>
+    grammatikNachLehrwerk(
+      z,
+      (x) => (x.buch ? { buch: x.buch, unit: x.unit, station: x.station } : null),
+      (x) => x.zeit,
+      ab
+    )
+  it('Band › Unit › Station, Späteres oben', () => {
+    const g = gliedern([
+      { id: 'a', buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1', zeit: 210 },
+      { id: 'b', buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 3', zeit: 220 },
+      { id: 'c', buch: 'Green Line 1', unit: 'Unit 2', station: 'Station 1', zeit: 510 }
+    ])
+    expect(g.ohne).toEqual([])
+    expect(g.baende.map((b) => b.buch)).toEqual(['Green Line 1'])
+    expect(g.baende[0].units.map((u) => u.unit)).toEqual(['Unit 2', 'Unit 1'])
+    expect(g.baende[0].units[1].stationen.map((s) => s.station)).toEqual(['Station 3', 'Station 1'])
+  })
+  it('ohne Stelle im Lehrwerk: unter der Unit, in der es freigegeben wurde (nicht nach Schuljahr)', () => {
+    const g = gliedern([
+      { id: 'artikel', zeit: 250 },
+      { id: 'be', zeit: 320 },
+      { id: 'vorher', zeit: 50 }
+    ])
+    expect(g.ohne).toEqual([])
+    const u1 = g.baende[0].units.find((u) => u.unit === 'Unit 1')!
+    expect(u1.stationen[0].station).toBe('')
+    expect(u1.stationen[0].eintraege.map((x) => x.id)).toEqual(['artikel', 'be'])
+    expect(g.baende[0].units.find((u) => u.unit === 'Hello')!.anzahl).toBe(1)
+  })
+  it('Wiederholung aus einem Band, den der Kurs nicht hat → Unit der Freigabe', () => {
+    const ab = [{ buch: 'Green Line 3', unit: 'Unit 1', name: 'Station 1', zeit: 100, unitRang: 1 }]
+    const g = gliedern([{ id: 'be', buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1', zeit: 150 }], ab)
+    expect(g.baende.map((b) => b.buch)).toEqual(['Green Line 3'])
+  })
+  it('Kurs ohne Lehrwerk: Katalogstelle, sonst „Weitere"', () => {
+    const g = gliedern([{ id: 'x', zeit: 1 }, { id: 'y', buch: 'Green Line 2', unit: 'Unit 1', zeit: 2 }], [])
+    expect(g.ohne.map((x) => x.id)).toEqual(['x'])
+    expect(g.baende[0].buch).toBe('Green Line 2')
+  })
+  it('neuester Band oben; Bandnamen wie bei den Vokabeln', () => {
+    const ab = [
+      { buch: 'Green Line 1', unit: 'Unit 4', name: 'Station 1', zeit: 100, unitRang: 5 },
+      { buch: 'Green Line 2', unit: 'Unit 1', name: 'Station 1', zeit: 200, unitRang: 2 }
+    ]
+    const g = gliedern([{ id: 'a', buch: 'Green Line 1', unit: 'Unit 4', zeit: 1 }, { id: 'b', buch: 'Green Line 2', unit: 'Unit 1', zeit: 2 }], ab)
+    expect(g.baende.map((b) => b.buch)).toEqual(['Green Line 2', 'Green Line 1'])
+    expect(bandGleich('Green Line 1', 'Green Line 10')).toBe(false)
+    expect(bandGleich('Green Line 1', 'green line 1 (Niedersachsen)')).toBe(true)
+  })
+  it('Katalog: Artikel, be und Kurzantworten gehören zu Green Line 1 Unit 1 – auch mit anderer Teilform', () => {
+    expect(stelleImLehrwerk(['en.noun.articles'])).toEqual({ buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1' })
+    expect(stelleImLehrwerk([], ['en.noun.articles/bestimmt'])).toEqual({ buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1' })
+    expect(stelleImLehrwerk(['en.syn.short_answers/be'])).toMatchObject({ buch: 'Green Line 1', unit: 'Unit 1' })
+    expect(stelleImLehrwerk([], ['en.verb.be_have/be-praesens'])).toMatchObject({ buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1' })
   })
 })

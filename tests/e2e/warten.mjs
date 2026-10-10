@@ -110,10 +110,12 @@ export async function kursReiter(page, reiter) {
   if (reiter === 'grammatik') await grammatikJahreAuf(page)
 }
 
-/** Zugeklappte Schuljahre der Grammatik-Tabelle aufklappen */
+/** Zugeklappte Gruppen der Grammatik-Tabelle aufklappen (Bände, Units, Geplantes) */
 export async function grammatikJahreAuf(page) {
   await page.locator('[data-kurs-grammatik]').first().waitFor({ timeout: 15000 }).catch(() => undefined)
   for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"], [data-grammatik-band][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
+  // Seit 10.10.2026 Band › Unit › Station: danach die zugeklappten Units und „Geplant"
+  for (const j of await page.locator('[data-grammatik-unit][aria-expanded="false"], [data-grammatik-geplant][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
 }
 
 /** Früherer Name: Kursseite geöffnet, Reiter „Grammatik" (Vorgabe) bzw. der angegebene */

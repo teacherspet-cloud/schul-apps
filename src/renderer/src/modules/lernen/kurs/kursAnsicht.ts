@@ -5,6 +5,7 @@
  */
 import type { JahrgangsGruppe } from '../regal/grammatikJahrgaenge'
 import { bandRang } from '@shared/lehrwerkBand'
+import { abschnittStelle } from '@shared/kursAbschnitte'
 
 /** „20.12." – Tag und Monat, zweistellig */
 export const tagMonat = (ms: number): string => {
@@ -94,4 +95,151 @@ export function nachLehrwerkGruppiert<T>(
     if (a.buch || b.buch) return a.buch ? -1 : 1
     return a.jahrgang === null ? 1 : b.jahrgang === null ? -1 : b.jahrgang - a.jahrgang
   })
+}
+
+/** Freigegebener Abschnitt des Vokabelkurses – Bezug für die Grammatik-Gliederung (shared/kursAbschnitte.ts) */
+export interface KursAbschnittBezug {
+  buch?: string
+  unit: string
+  name?: string
+  /** Freigegeben (ms) */
+  zeit: number
+  /** Stelle im Lehrwerk laut Gliederung (server/wartungAbschnitteTeilen.ts `lehrwerkGliederung`) */
+  unitRang?: number
+  abschnittRang?: number
+}
+
+export interface GrammatikStationGruppe<T> {
+  /** '' = in der Unit freigegeben, ohne bekannte Station */
+  station: string
+  eintraege: T[]
+}
+export interface GrammatikUnitGruppe<T> {
+  /** Schlüssel für „offen/zu" („u:Green Line 1|Unit 1") */
+  schluessel: string
+  unit: string
+  stationen: GrammatikStationGruppe<T>[]
+  anzahl: number
+}
+export interface GrammatikBandGruppe<T> {
+  /** Schlüssel für „offen/zu" („b:Green Line 1"); '' = ohne Band */
+  schluessel: string
+  buch: string
+  units: GrammatikUnitGruppe<T>[]
+  anzahl: number
+}
+
+const vergleich = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+/** „Green Line 1" = „Green Line 1 (Niedersachsen)", aber nicht = „Green Line 10" */
+export function bandGleich(a: string, b: string): boolean {
+  const x = vergleich(a)
+  const y = vergleich(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  const [kurz, lang] = x.length < y.length ? [x, y] : [y, x]
+  return lang.startsWith(kurz) && /\d$/.test(kurz) && !/\d/.test(lang[kurz.length])
+}
+
+/** Unit-Nummer im Namen („Unit 3" → 3) */
+const unitNummer = (unit: string): number | null => {
+  const m = /(\d+)\s*$/.exec(unit)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * Grammatik wie die Vokabeln gliedern (10.10.2026, Entscheidung der Lehrkraft): Band (mit Cover) › Unit › Station ›
+ * Grammatikthemen. Reihenfolge wie bei den Vokabeln auf der Seite der Lehrkraft: Späteres oben – neuester Band oben, im
+ * Band Unit 2 über Unit 1, in der Unit Station 3 über Station 1.
+ *
+ * Einordnung je Eintrag:
+ *  1. Stelle im Lehrwerk (Freigabe bzw. Katalog, `stelleVon`) – wenn der Kurs Bände hat, nur in einem dieser Bände
+ *     (eine Wiederholung aus Band 1 in einer Klasse mit Band 3 gehört zu Band 3). Namen von Band und Unit wie bei den
+ *     Vokabeln, damit beide Listen gleich heißen.
+ *  2. Sonst die Unit, in der sie freigegeben wurde: der zuletzt vor ihr freigegebene Vokabel-Abschnitt (vor allen
+ *     Abschnitten freigegeben: der erste). Ohne Station.
+ *  3. Kurs ohne Lehrwerk: Stelle aus dem Katalog, sonst `ohne` („Weitere Grammatik").
+ * Die Reihenfolge innerhalb einer Station bleibt wie übergeben (die Tabelle sortiert vorher).
+ */
+export function grammatikNachLehrwerk<T>(
+  zeilen: T[],
+  stelleVon: (t: T) => { buch?: string; unit?: string; station?: string } | null | undefined,
+  zeitVon: (t: T) => number,
+  abschnitte: KursAbschnittBezug[],
+  unitFolge: (buch: string) => string[] = () => []
+): { baende: GrammatikBandGruppe<T>[]; ohne: T[] } {
+  const frei = abschnitte.filter((a) => a.unit || a.buch).sort((a, b) => a.zeit - b.zeit)
+  const kursBaende = [...new Set(frei.map((a) => a.buch ?? '').filter(Boolean))]
+  const ohne: T[] = []
+  const plaetze: { z: T; buch: string; unit: string; station: string }[] = []
+  for (const z of zeilen) {
+    const s = stelleVon(z)
+    const imKurs = s?.buch ? kursBaende.find((b) => bandGleich(b, s.buch!)) : undefined
+    if (s?.buch && (imKurs || !frei.length || !kursBaende.length) && (s.unit || !frei.length)) {
+      const buch = imKurs ?? s.buch
+      const unit = s.unit ? frei.find((a) => bandGleich(a.buch ?? '', buch) && vergleich(a.unit) === vergleich(s.unit!))?.unit ?? s.unit : ''
+      plaetze.push({ z, buch, unit, station: s.station ?? '' })
+      continue
+    }
+    if (frei.length) {
+      const t = zeitVon(z)
+      const a = [...frei].reverse().find((x) => x.zeit <= t) ?? frei[0]
+      plaetze.push({ z, buch: a.buch ?? '', unit: a.unit, station: '' })
+      continue
+    }
+    ohne.push(z)
+  }
+  const baende = new Map<string, Map<string, Map<string, T[]>>>()
+  for (const p of plaetze) {
+    const b = baende.get(p.buch) ?? new Map<string, Map<string, T[]>>()
+    const u = b.get(p.unit) ?? new Map<string, T[]>()
+    u.set(p.station, [...(u.get(p.station) ?? []), p.z])
+    b.set(p.unit, u)
+    baende.set(p.buch, b)
+  }
+  // Unit-Rang im Band: Gliederung des Lehrwerks (wie die Vokabeln), Units ohne Gliederung über den Katalog dazwischen
+  const unitRaenge = (buch: string, units: string[]): Map<string, number> => {
+    const gliederung = new Map<string, number>()
+    for (const a of frei)
+      if (bandGleich(a.buch ?? '', buch) || (!buch && !a.buch)) if (a.unitRang !== undefined && !gliederung.has(vergleich(a.unit))) gliederung.set(vergleich(a.unit), a.unitRang)
+    const katalog = unitFolge(buch).map(vergleich)
+    const zuerst = new Map<string, number>()
+    frei.forEach((a, i) => !zuerst.has(vergleich(a.unit)) && (bandGleich(a.buch ?? '', buch) || (!buch && !a.buch)) && zuerst.set(vergleich(a.unit), i))
+    const rang = new Map<string, number>()
+    for (const u of units) {
+      const k = vergleich(u)
+      if (!u) rang.set(u, -Infinity)
+      else if (gliederung.has(k)) rang.set(u, gliederung.get(k)!)
+      else if (katalog.includes(k)) {
+        const ci = katalog.indexOf(k)
+        if (!gliederung.size) rang.set(u, ci)
+        else {
+          const davor = katalog.slice(0, ci).filter((x) => gliederung.has(x)).map((x) => gliederung.get(x)!)
+          rang.set(u, (davor.length ? Math.max(...davor) : -1) + 0.5)
+        }
+      } else if (unitNummer(u) !== null && !gliederung.size) rang.set(u, unitNummer(u)!)
+      else rang.set(u, zuerst.has(k) ? -1 + zuerst.get(k)! / 1000 : -1)
+    }
+    return rang
+  }
+  const stationRang = (s: string): number => (s ? (abschnittStelle(s) ?? -1) : -Infinity)
+  const ergebnis: GrammatikBandGruppe<T>[] = [...baende.entries()].map(([buch, units]) => {
+    const rang = unitRaenge(buch, [...units.keys()])
+    const ug: GrammatikUnitGruppe<T>[] = [...units.entries()]
+      .map(([unit, stationen]) => {
+        const sg = [...stationen.entries()]
+          .map(([station, eintraege]) => ({ station, eintraege }))
+          .sort((a, b) => stationRang(b.station) - stationRang(a.station) || a.station.localeCompare(b.station, 'de'))
+        return { schluessel: `u:${buch}|${unit}`, unit, stationen: sg, anzahl: sg.reduce((n, s) => n + s.eintraege.length, 0) }
+      })
+      .sort((a, b) => (rang.get(b.unit) ?? -1) - (rang.get(a.unit) ?? -1) || a.unit.localeCompare(b.unit, 'de'))
+    return { schluessel: `b:${buch}`, buch, units: ug, anzahl: ug.reduce((n, u) => n + u.anzahl, 0) }
+  })
+  ergebnis.sort((a, b) => Number(!a.buch) - Number(!b.buch) || bandRang(b.buch) - bandRang(a.buch) || a.buch.localeCompare(b.buch, 'de'))
+  return { baende: ergebnis, ohne }
 }

@@ -3,7 +3,8 @@
  * in Sprachenlernen): dieselbe ruhige Zeile mit Kennzahlen (shared/components/KennzahlenKopf.tsx) für JEDES Fach –
  * Lernende, Handlungsbedarf, Tests Ø, offene Blätter, laufende Reihen; in Sprachfächern dazu „Wörter sicher",
  * „aktiv diese Woche" und der nächste Vokabeltest. Klasse und Fach stehen schon in der Fach-Leiste darüber – deshalb
- * ohne eigenen Titel. Ein Klick auf eine Zahl führt in den passenden Reiter.
+ * ohne eigenen Titel. Ein Klick auf eine Zahl führt in den passenden Reiter; „Handlungsbedarf" öffnet seit 10.10.2026 das
+ * Pop-up mit den Einträgen nach Art (Handlungsbedarf.tsx) – der eigene Kasten darunter entfällt.
  *
  * Kompakt (10.10.2026, Wunsch der Lehrkraft): in Sprachklassen steht der Kasten klein neben „Lernstand im Karteikasten"
  * und „Units" und zeigt nur, was etwas sagt – „Wörter sicher" und „aktiv diese Woche" immer, alles andere nur mit Inhalt
@@ -16,6 +17,7 @@ import { SimpleGrid, Text, UnstyledButton } from '@mantine/core'
 import { FortschrittsRing } from '../../shared/components/diagramme'
 import { IconAlertTriangle } from '@tabler/icons-react'
 import { KennzahlenKopf, type Kennzahl } from '../../shared/components/KennzahlenKopf'
+import { useBedarfFenster } from './Handlungsbedarf'
 
 interface FachDaten {
   id: string
@@ -105,10 +107,8 @@ export function relevanteKennzahlen<T extends { id: string }>(zahlen: T[], k: Re
 
 export function FachKopf({ d, gehe, kompakt = false }: { d: FachDaten; gehe: (reiter: string) => void; kompakt?: boolean }): React.JSX.Element {
   const k = fachKennzahlen(d)
-  const zumBedarf = (): void => {
-    const el = document.querySelector<HTMLElement>(`[data-handlungsbedarf][data-gruppe="${CSS.escape(d.id)}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  // Handlungsbedarf als Pop-up (10.10.2026, Entscheidung der Lehrkraft) – nach Art gruppiert, mit nächstem Schritt
+  const zumBedarf = (): void => useBedarfFenster.getState().oeffne(d.id)
   const zahlen: Kennzahl[] = [
     ...(k.vokabeln
       ? [
@@ -136,7 +136,7 @@ export function FachKopf({ d, gehe, kompakt = false }: { d: FachDaten; gehe: (re
       wert: k.bedarf,
       farbe: k.bedarf ? 'orange' : undefined,
       symbol: k.bedarf ? <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" /> : undefined,
-      klick: zumBedarf
+      klick: k.bedarf ? zumBedarf : undefined
     }
   ]
   if (kompakt && k.vokabeln) {

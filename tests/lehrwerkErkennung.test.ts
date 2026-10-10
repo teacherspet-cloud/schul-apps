@@ -94,7 +94,8 @@ describe('Lehrwerk-Band einer Klasse', () => {
   it('Grammatik ohne Lehrwerk-Angabe ordnet der Katalog ein (erste Einführung)', () => {
     const z = { info: JSON.stringify({ themen: ['en.verb.future_present'], teilformen: [] }) } as unknown as Parameters<typeof lehrwerkDerGrammatik>[0]
     // Zukunft mit Präsensformen: zuerst im (optionalen) Trailer 1 von Band 4 – Trailer zählen nur, wenn sonst nichts passt
-    expect(lehrwerkDerGrammatik(z)).toEqual({ buch: 'Green Line 6', unit: 'Unit 1' })
+    // Seit 10.10.2026 mit Station (Gliederung Band › Unit › Station)
+    expect(lehrwerkDerGrammatik(z)).toEqual({ buch: 'Green Line 6', unit: 'Unit 1', station: 'Station 3' })
     const mitLw = { info: JSON.stringify({ themen: [], teilformen: [], lehrwerk: { buch: 'green-line-2', unit: 'Unit 3' } }) } as unknown as Parameters<typeof lehrwerkDerGrammatik>[0]
     expect(lehrwerkDerGrammatik(mitLw)).toEqual({ buch: 'Green Line 2', unit: 'Unit 3' })
   })
