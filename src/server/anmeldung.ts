@@ -17,7 +17,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto'
 import type { Rolle } from './kontext'
-import { nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, passwortHashVon, protokolliereServer, serverGeheimnis, serverWert, type NutzerInfo } from './datenbank'
+import { nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, nutzerNachId, passwortHashVon, protokolliereServer, serverGeheimnis, serverWert, type NutzerInfo } from './datenbank'
 import { passwortPruefen } from './geheim'
 import { registerVergessen } from './namensschutz'
 import { gastFuerIserv, gastSuchen, verknuepfen, vorschlaegeAnlegen } from './kontoVerknuepfung'
@@ -257,6 +257,31 @@ export async function iservRueckruf(
   const info = await abruf(d.userinfo_endpoint, { headers: { authorization: `Bearer ${t.access_token}` }, signal: AbortSignal.timeout(20_000) })
   if (!info.ok) throw new AnmeldeFehler(`IServ hat die Angaben nicht geliefert (${info.status}).`)
   const claims = { ...idt, ...((await info.json()) as Record<string, unknown>) }
+  const nutzer = iservAngabenUebernehmen(claims)
+  guteStufe = v.stufe
+  return { nutzer, ziel: v.ziel }
+}
+
+/**
+ * Nach der Anmeldung über IServ (10.10.2026): Klassen und Kurse aus den IServ-Gruppen erkennen und die Kurse der Lehrkraft
+ * als Lerngruppen anlegen (iservKursgruppen.ts). Von start.ts eingetragen – hier kein Import, sonst ein Ring über
+ * onlinetest.ts. Fehler dabei verhindern nie die Anmeldung.
+ */
+export const anmeldeHaken: { nachIserv?: (n: NutzerInfo, iservGruppen: { id: string; name: string }[]) => void } = {}
+const nachIserv = (n: NutzerInfo, gruppen: { id: string; name: string }[]): void => {
+  try {
+    anmeldeHaken.nachIserv?.(n, gruppen)
+  } catch {
+    // Erkennung der Kurse ist Zugabe – die Anmeldung gelingt trotzdem
+  }
+}
+
+/**
+ * Die Angaben von IServ übernehmen: Nutzer anlegen bzw. aktualisieren (Rolle, Name, Gruppen), Gastkonten verbinden.
+ * Getrennt vom OpenID-Ablauf, damit Browsertests eine IServ-Anmeldung mit nachgebauten Angaben durchspielen können
+ * (http.ts `/auth/iserv-test`, nur mit SCHULAPPS_ISERV_TESTANMELDUNG=1).
+ */
+export function iservAngabenUebernehmen(claims: Record<string, unknown>): NutzerInfo {
   const benutzer = String(claims.preferred_username ?? claims['iserv:account'] ?? claims.username ?? '')
     .trim()
     .toLowerCase()
@@ -277,8 +302,9 @@ export async function iservRueckruf(
   if (gast) {
     if (gast.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')
     protokolliereServer('anmeldung', 'Anmeldung über IServ (Gastkonto)', gast.id)
-    guteStufe = v.stufe
-    return { nutzer: gast, ziel: v.ziel }
+    // Gastkonten behalten ihre Gruppen – in IServ-Kursen werden sie als Mitglied eingetragen (iservKursgruppen.ts)
+    nachIserv(gast, gruppen)
+    return gast
   }
   let nutzer = nutzerNachBenutzer(benutzer)
   // Erste Anmeldung einer Schülerin/eines Schülers: bisheriges Gastkonto der Klasse eindeutig gefunden → verbinden, ohne Rückfrage
@@ -288,8 +314,8 @@ export async function iservRueckruf(
     if (z.eindeutig && !z.eindeutig.gesperrt) {
       verknuepfen(z.eindeutig.id, { benutzer, sub: kennung })
       protokolliereServer('anmeldung', 'Erste Anmeldung über IServ mit bisherigem Gastkonto verbunden', z.eindeutig.id)
-      guteStufe = v.stufe
-      return { nutzer: z.eindeutig, ziel: v.ziel }
+      nachIserv(z.eindeutig, gruppen)
+      return z.eindeutig
     }
     vorschlaege = z.vorschlaege.map((n) => n.id)
   }
@@ -313,9 +339,10 @@ export async function iservRueckruf(
   registerVergessen()
   if (nutzer.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')
   protokolliereServer('anmeldung', `Anmeldung über IServ (${nutzer.rolle})`, nutzer.id)
-  guteStufe = v.stufe
-  return { nutzer, ziel: v.ziel }
+  nachIserv(nutzer, gruppen)
+  return nutzerNachId(nutzer.id) ?? nutzer
 }
+
 
 /** Abmelden bei IServ (optional, nach dem eigenen Abmelden) */
 export async function iservAbmeldeAdresse(abruf?: typeof fetch): Promise<string | null> {

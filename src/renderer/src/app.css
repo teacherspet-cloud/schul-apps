@@ -1226,3 +1226,23 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
   margin: -1px !important;
   padding: 0 !important;
 }
+
+/* Startseite auf dem Smartphone (10.10.2026): Logo links, „Schul-Apps" und Schulname rechts daneben */
+.home-hero-handy {
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.home-hero-handy .mantine-Title-root {
+  font-size: 1.6rem;
+  line-height: 1.15;
+}
+.home-logo {
+  height: 56px;
+  width: auto;
+  max-width: 96px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.home-meineklassen {
+  width: 100%;
+}

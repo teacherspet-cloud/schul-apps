@@ -55,6 +55,8 @@ import { kalenderHaken } from './schulkalender'
 import { db as vokDb } from './vokabeln'
 import { DATEN } from './pfade'
 import { klassenGruppe } from './klassenliste'
+import { gruppeErkennen, kursNachfolgeRegeln, nameHochstufen } from '@shared/iservKurse'
+import { kursHaken, kursInfoVon, kursNachfolgeMerken } from './iservKursgruppen'
 
 export const MARKE = 'schuljahr-wechsel'
 const TAG = 864e5
@@ -86,6 +88,8 @@ export interface WechselEintrag {
   art: 'umbenannt' | 'abschluss' | 'wartet' | 'iserv' | 'unklar'
   /** IServ: Mitglieder (Kennungen) beim Wechsel */
   mitglieder?: string[]
+  /** Kurs aus IServ (10.10.2026, iservKursgruppen.ts): Name der IServ-Gruppe und Jahrgang beim Wechsel */
+  kurs?: { roh: string; jahrgang: number }
   kurse: KursVorher[]
   wechsler?: number
   wiederholer?: number
@@ -342,7 +346,27 @@ export function schuljahrWechseln(sj: number, o: { jetzt?: number; sichern?: () 
   for (const lk of lehrkraefteIds) {
     const abschluss = abschlussFuer(lk)
     const eintraege: WechselEintrag[] = []
+    // Kurse aus IServ (10.10.2026): Jahrgang aus der IServ-Gruppe, Nachfolge über die Mitglieder (wie Klassen mit IServ)
+    const kursLinks = kursInfoVon(lk)
     for (const g of lerngruppenVon(lk)) {
+      const link = kursLinks.get(g.id)
+      if (link && link.erkannt.art === 'kurs' && istIserv(g.iserv_gruppe) && g.iserv_gruppe === link.iservId) {
+        if (neuAngelegt(g)) continue
+        const kurse = kurseDerGruppe(g.id)
+        const alt = { name: g.name, iserv: g.iserv_gruppe }
+        const kurs = { roh: link.roh, jahrgang: link.erkannt.jahrgang }
+        if (kurs.jahrgang >= abschluss) {
+          kurseBeenden(kurse)
+          eintraege.push({ gruppeId: g.id, fach: g.fach, alt, art: 'abschluss', kurse, kurs })
+          zahlen.abschluss++
+          continue
+        }
+        const mitglieder = mitgliederVon(g).map((n) => n.id)
+        if (!mitglieder.length) continue
+        eintraege.push({ gruppeId: g.id, fach: g.fach, alt, art: 'wartet', mitglieder, kurse, kurs })
+        zahlen.wartet++
+        continue
+      }
       const h = klasseHochstufen(g.name, abschluss)
       if (!h || neuAngelegt(g)) continue
       const kurse = kurseDerGruppe(g.id)
@@ -398,14 +422,22 @@ export function nachsuchen(jetzt = Date.now()): { gefunden: number; uebernommen:
       if ((e.art !== 'wartet' && e.art !== 'unklar') || e.rueckgaengig) continue
       const g = lerngruppe(e.gruppeId)
       if (!g) continue
-      const f = nachfolgerFinden({ id: e.alt.iserv, name: e.alt.name, mitglieder: e.mitglieder ?? [] }, personen, abschluss)
+      const regeln = e.kurs ? kursNachfolgeRegeln(e.kurs.roh) : undefined
+      if (e.kurs && !regeln) continue
+      const f = nachfolgerFinden({ id: e.alt.iserv, name: e.kurs?.roh ?? e.alt.name, mitglieder: e.mitglieder ?? [] }, personen, abschluss, regeln ?? undefined)
       if (!f.gruppe || (f.art !== 'gleich' && f.art !== 'neu')) {
         if (f.art === 'unklar' && e.art !== 'unklar' && jetzt - w.zeit > (NACHSUCHE_TAGE - 1) * TAG) (e.art = 'unklar'), (geaendert = true)
         continue
       }
       const hoch = klasseHochstufen(e.alt.name, abschluss)
-      const name = hoch?.art === 'hoch' && klassenZusatz(nameAusIserv(f.gruppe.name)) === klassenZusatz(e.alt.name) ? hoch.neu : nameAusIserv(f.gruppe.name)
+      // Kurs: Jahrgang im Namen eins weiter (auch in einem eigenen Namen der Lehrkraft), Verknüpfung auf die neue Gruppe
+      const name = e.kurs
+        ? nameHochstufen(e.alt.name, e.kurs.jahrgang, e.kurs.jahrgang + 1)
+        : hoch?.art === 'hoch' && klassenZusatz(nameAusIserv(f.gruppe.name)) === klassenZusatz(e.alt.name)
+          ? hoch.neu
+          : nameAusIserv(f.gruppe.name)
       gruppeSetzen(g.id, name, f.gruppe.id)
+      if (e.kurs) kursNachfolgeMerken(lehrkraftId, g.id, f.gruppe, gruppeErkennen(f.gruppe.name))
       kurstitelUmbenennen(e.kurse, e.alt.name, name)
       e.neu = { name, iserv: f.gruppe.id }
       e.art = 'iserv'
@@ -537,6 +569,7 @@ export function rueckgaengig(lehrkraftId: string, jetzt = Date.now()): { ok: tru
       if (nurKlasse && e.alt.iserv !== nurKlasse) continue
       if (lerngruppe(e.gruppeId)) {
         if (e.neu) gruppeSetzen(e.gruppeId, e.alt.name, e.alt.iserv)
+        if (e.neu && e.kurs) kursNachfolgeMerken(lk, e.gruppeId, { id: e.alt.iserv, name: e.kurs.roh }, gruppeErkennen(e.kurs.roh))
         for (const k of e.kurse) {
           if (k.tabelle !== 'reihen_zuweisungen' && k.titel !== undefined) datenbank().prepare(`UPDATE ${k.tabelle} SET titel = ? WHERE id = ?`).run(k.titel, k.id)
           if (k.tabelle === 'vok_zuweisungen' && k.ueberschrift !== undefined) datenbank().prepare('UPDATE vok_zuweisungen SET ueberschrift = ? WHERE id = ?').run(k.ueberschrift, k.id)
@@ -645,4 +678,14 @@ export async function schuljahrRoute(k: Anfrage): Promise<boolean> {
 /** Beim Start: in den Zeitplaner des Schulkalenders einhängen */
 export function schuljahrWechselStarten(): void {
   kalenderHaken.pruefen = (heute) => schuljahrPruefen(heute)
+  kursHaken.wartend = wartendeKurse
+}
+
+/** Kursgruppen einer Lehrkraft, die auf ihre IServ-Nachfolgegruppe warten (iservKursgruppen.ts legt dafür keinen Zwilling an) */
+export function wartendeKurse(lehrkraftId: string, jetzt = Date.now()): { gruppeId: string; roh: string }[] {
+  const marke = serverWert<WechselMarke | null>(MARKE, null)
+  if (!marke || marke.eingerichtet) return []
+  const w = lies(lehrkraftId, marke.schuljahr)
+  if (!w || w.status !== 'aktiv' || jetzt - w.zeit > NACHSUCHE_TAGE * TAG) return []
+  return w.eintraege.filter((e) => e.kurs && (e.art === 'wartet' || e.art === 'unklar') && !e.rueckgaengig).map((e) => ({ gruppeId: e.gruppeId, roh: e.kurs!.roh }))
 }

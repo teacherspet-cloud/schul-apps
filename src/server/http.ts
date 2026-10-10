@@ -44,6 +44,7 @@ import {
   AnmeldeFehler,
   fehlversuch,
   gesperrtWegenVersuchen,
+  iservAngabenUebernehmen,
   iservAnmeldeAdresse,
   iservNaechsteStufe,
   iservBereit,
@@ -540,6 +541,22 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Die Anmeldung bei IServ ist fehlgeschlagen.')}`
         })
         return void res.end()
+      }
+    }
+    /*
+     * Browsertests (10.10.2026, Kurse aus IServ): eine IServ-Anmeldung mit nachgebauten Angaben (Rollen, Gruppen) – derselbe
+     * Weg wie nach dem echten Rückruf (anmeldung.ts `iservAngabenUebernehmen`). Nur mit SCHULAPPS_ISERV_TESTANMELDUNG=1
+     * (scripts/e2e-parallel.mjs), nie im Betrieb.
+     */
+    if (req.method === 'POST' && url.pathname === '/auth/iserv-test' && process.env.SCHULAPPS_ISERV_TESTANMELDUNG === '1') {
+      try {
+        const claims = JSON.parse(await leseKoerper(req, 64 * 1024)) as Record<string, unknown>
+        const nutzer = iservAngabenUebernehmen(claims)
+        const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
+        setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
+        return json(res, 200, { id: nutzer.id, benutzer: nutzer.benutzer, rolle: nutzer.rolle })
+      } catch (e) {
+        return json(res, 400, { fehler: e instanceof AnmeldeFehler ? e.message : 'Testanmeldung fehlgeschlagen.' })
       }
     }
     if (req.method === 'POST' && url.pathname === '/auth/lokal') {

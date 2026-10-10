@@ -11,6 +11,10 @@
  *   POST /server/klassen/<id>/fach     {fach} → Fach hinzufügen, liefert {id}
  *   POST /server/klassen/<id>/wackelig-wiederholen   wackelige Wörter im Kurs wieder fällig machen (09.10.2026)
  *   GET  /server/klassen/vorwahl?kurs=<id>            Lehrwerk-Vorwahl für „Vokabeln/Grammatik hinzufügen" (09.10.2026)
+ *   POST /server/klassen/<id>/iserv-ausblenden        aus IServ erkannten Kurs ausblenden („nicht meine Gruppe", 10.10.2026)
+ *   POST /server/klassen/iserv-einblenden  {id}       wieder einblenden
+ *   POST /server/klassen/<id>/umbenennen   {name}     Anzeigenamen ändern
+ *   POST /server/klassen/iserv-kuerzel     {kuerzel}  eigenes Kürzel für die Erkennung ('' = automatisch)
  *
  * Nur für Lehrkräfte; nur die eigenen Lerngruppen. Namen der Lernenden gehen nur an die Lehrkraft selbst.
  */
@@ -42,6 +46,8 @@ import { kursBedarf, kursHinweise, type HinweisReiter, type KursBedarf, type Kur
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import type { VorwahlDaten } from '../shared/lehrwerkVorwahl'
 import type { NutzerInfo } from './datenbank'
+import { ausgeblendeteKurse, erkanntVon, kuerzelSetzen, kursAusblenden, kursEinblenden, kursInfoVon, kursUmbenennen, verborgeneGruppen, type KursLink } from './iservKursgruppen'
+import { erkanntText } from '../shared/iservKurse'
 
 const TAG = 86_400_000
 
@@ -58,6 +64,10 @@ export const nachKlasse = (a: Pick<Lerngruppe, 'name' | 'fach'>, b: Pick<Lerngru
 
 /** Lerngruppen gleichen Namens bilden eine Klasse */
 export const klassenSchluessel = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ')
+
+/** Angaben „aus IServ erkannt" für die Oberfläche (ohne Mitglieder) */
+export const iservAngabe = (l: KursLink | undefined | null): { roh: string; text: string; art: KursLink['art'] } | null =>
+  l ? { roh: l.roh, text: erkanntText(l.erkannt), art: l.art } : null
 
 /** Fremdsprache (oder alte Sprache, DaZ): dann gibt es den Reiter „Vokabeln & Grammatik" */
 export const istSprachfach = (fach: string): boolean => {
@@ -539,6 +549,39 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         bedarfAusblenden(ich.id, g.id, b.schluessel, b.merkmal)
         return (json(res, 200, { ok: true }), true)
       }
+      // Kurse aus IServ korrigieren (10.10.2026)
+      if (teile.length === 2 && teile[1] === 'iserv-ausblenden') {
+        const g = lerngruppe(teile[0])
+        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        const d = detail(g, ich.id)
+        const material = d.tests.length + d.vokabeln.filter((v) => v.woerter > 0).length + d.grammatik.length + d.reihen.length + d.blaetter.length
+        const art = kursAusblenden(ich.id, g.id, material)
+        if (!art) return (json(res, 404, { fehler: 'Diese Lerngruppe ist nicht aus IServ erkannt.' }), true)
+        if (art === 'geloescht') for (const v of d.vokabeln) leerenKursLoeschen(v.id, ich.id)
+        return (json(res, 200, { art, material }), true)
+      }
+      if (teile.length === 1 && teile[0] === 'iserv-einblenden') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        if (!kursEinblenden(ich.id, String(k0.id ?? ''))) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+        return (json(res, 200, { ok: true }), true)
+      }
+      if (teile.length === 1 && teile[0] === 'iserv-kuerzel') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        try {
+          const p = kuerzelSetzen(ich.id, String(k0.kuerzel ?? ''))
+          return (json(res, 200, { kuerzel: p?.kuerzel ?? null, kuerzelEigen: p?.kuerzelEigen ?? '' }), true)
+        } catch (e) {
+          return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+        }
+      }
+      if (teile.length === 2 && teile[1] === 'umbenennen') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        try {
+          return (json(res, 200, { name: kursUmbenennen(ich.id, teile[0], String(k0.name ?? '')) }), true)
+        } catch (e) {
+          return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+        }
+      }
       if (teile.length !== 2 || teile[1] !== 'fach') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       try {
@@ -570,14 +613,22 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
             tests: number
             reihen: number
             blaetter: number
+            iserv: ReturnType<typeof iservAngabe>
           }[]
+          iserv: ReturnType<typeof iservAngabe>
         }
       >()
+      // Kurse aus IServ (10.10.2026): ausgeblendete fehlen, erkannte tragen „aus IServ erkannt"
+      const verborgen = verborgeneGruppen(ich.id)
+      const kursInfo = kursInfoVon(ich.id)
       for (const g of lerngruppenVon(ich.id).sort(nachKlasse)) {
+        if (verborgen.has(g.id)) continue
         const s = klassenSchluessel(g.name)
-        const kl = klassen.get(s) ?? { schluessel: s, name: g.name.trim(), gruppen: [], lernende: new Set<string>(), bedarf: 0, vorschlaege: 0, faecher: [] }
+        const kl = klassen.get(s) ?? { schluessel: s, name: g.name.trim(), gruppen: [], lernende: new Set<string>(), bedarf: 0, vorschlaege: 0, faecher: [], iserv: null }
         klassen.set(s, kl)
         kl.gruppen.push(g.id)
+        const iserv = iservAngabe(kursInfo.get(g.id))
+        if (iserv && !kl.iserv) kl.iserv = iserv
         // Abgewähltes Fach (08.10.2026): nicht in der Fach-Leiste, die Klasse bleibt
         if (g.ausgeblendet) continue
         const d = detail(g, ich.id, Date.now(), true)
@@ -596,14 +647,20 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
           testSchnitt: noten.length ? noten.reduce((a, b) => a + b, 0) / noten.length : null,
           tests: d.tests.length,
           reihen: d.reihen.filter((r) => r.status === 'offen').length,
-          blaetter: d.blaetter.filter((b) => b.status === 'offen').length
+          blaetter: d.blaetter.filter((b) => b.status === 'offen').length,
+          iserv
         })
       }
       return (
         json(res, 200, {
           klassen: [...klassen.values()]
             .sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
-            .map(({ lernende, ...rest }) => ({ ...rest, lernende: lernende.size }))
+            .map(({ lernende, ...rest }) => ({ ...rest, lernende: lernende.size })),
+          iservAusgeblendet: ausgeblendeteKurse(ich.id),
+          iservKuerzel: (() => {
+            const p = erkanntVon(ich.id)
+            return { kuerzel: p?.kuerzel ?? null, eigen: p?.kuerzelEigen ?? '', kurse: p?.kurse.length ?? 0 }
+          })()
         }),
         true
       )
@@ -619,6 +676,8 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
     let klassenKurs = istSprachfach(g.fach) ? klassenKursVon(g, ich.id) : null
     if (istSprachfach(g.fach) && !klassenKurs && klassenKurseSichern(ich.id)) klassenKurs = klassenKursVon(g, ich.id)
     const { bedarfAlle: _alle, ...d } = detail(g, ich.id)
-    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs }), true)
+    // Aus IServ erkannt (10.10.2026): Name der IServ-Gruppe = ihr Gruppenordner („Ablegen ▾" legt Kursmaterial dort ab)
+    const iserv = iservAngabe(kursInfoVon(ich.id).get(g.id))
+    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs, iserv }), true)
   }
 }

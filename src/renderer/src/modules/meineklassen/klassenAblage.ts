@@ -12,6 +12,7 @@
  */
 import { schuljahrText, schuljahrVon } from '@shared/schulkalender'
 import { pfadTeile } from '@shared/iserv'
+import { ordnerFuerKurs } from '@shared/iservKurse'
 import type { AblageZiel } from '@shared/types'
 import type { GrammatikPaket } from '@shared/grammatiktrainer'
 import { buildWorksheetDocx } from '../arbeitsblatt/export/docx'
@@ -52,6 +53,21 @@ export function iservPfadAus(muster: string, klasse: string, fach: string, jetzt
   )
 }
 
+/**
+ * Kurs aus IServ (10.10.2026): Material gehört in den Gruppenordner des Kurses („Gruppen/FR 7 Kon") statt in die
+ * Klassenstruktur. Der Ordner wird unter „Gruppen" gesucht (gleicher Name oder als derselbe Kurs erkannt,
+ * shared/iservKurse.ts); ohne Treffer der Name der IServ-Gruppe.
+ */
+export function kursOrdnerPfad(iservGruppe: string, ordner: string[] = []): string[] {
+  const sauber = (t: string): string => t.replace(/[\\/<>:"|?*]/g, '-').trim()
+  return ['Gruppen', sauber(ordnerFuerKurs(ordner, { roh: iservGruppe }) ?? iservGruppe)]
+}
+
+async function kursOrdner(iservGruppe: string): Promise<string[]> {
+  const ordner = (await window.api.iserv.ordner('Groups').catch(() => [] as { name: string }[])).map((e) => e.name)
+  return kursOrdnerPfad(iservGruppe, ordner)
+}
+
 export const dateiName = (t: string): string =>
   t
     .replace(/[\\/<>:"|?*]/g, '-')
@@ -62,7 +78,7 @@ export const dateiName = (t: string): string =>
 export async function ablegen(
   art: AblageArt,
   q: AblageQuelle,
-  ort: { klasse: string; fach: string; muster: string; programm: string }
+  ort: { klasse: string; fach: string; muster: string; programm: string; iservGruppe?: string }
 ): Promise<string | null> {
   const ziel: AblageZiel = { programm: ort.programm, fach: ort.fach }
   if (art === 'drucken') {
@@ -74,8 +90,10 @@ export async function ablegen(
     return window.api.files.save(`${q.name}.docx`, WORD_FILTER, await q.word(), ziel)
   }
   const html = await q.html()
-  if (art === 'iserv')
-    return window.api.exporter.pdf(html, `${q.name}.pdf`, undefined, { ...ziel, ort: 'iserv', iservPfad: iservPfadAus(ort.muster, ort.klasse, ort.fach) })
+  if (art === 'iserv') {
+    const iservPfad = ort.iservGruppe ? await kursOrdner(ort.iservGruppe) : iservPfadAus(ort.muster, ort.klasse, ort.fach)
+    return window.api.exporter.pdf(html, `${q.name}.pdf`, undefined, { ...ziel, ort: 'iserv', iservPfad })
+  }
   return window.api.exporter.pdf(html, `${q.name}.pdf`, undefined, ziel)
 }
 

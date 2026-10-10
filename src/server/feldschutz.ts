@@ -74,7 +74,10 @@ export const SENSIBEL: Record<string, string[]> = {
   push_wahl: ['daten'],
   push_geraete: ['daten'],
   // Schuljahreswechsel (10.10.2026, schuljahrWechsel.ts): alte/neue Klassennamen, Mitglieder, Lernstände für „Rückgängig"
-  schuljahr_wechsel: ['daten']
+  schuljahr_wechsel: ['daten'],
+  // Klassen und Kurse aus IServ (10.10.2026, iservKursgruppen.ts): Mitgliedschaften je Person und erkannte Kurse der Lehrkraft
+  iserv_erkannt: ['daten'],
+  iserv_kursgruppen: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

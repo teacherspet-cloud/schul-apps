@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { iservAnzeige } from '@shared/iserv'
 import { orteDiesesGeraets } from '../../shared/export/ausgabeOrt'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { ablegen, iservPfadAus, type AblageArt, type AblageQuelle } from './klassenAblage'
+import { ablegen, iservPfadAus, kursOrdnerPfad, type AblageArt, type AblageQuelle } from './klassenAblage'
 
 let iservStand: Promise<boolean> | null = null
 /** Ist IServ auf diesem Gerät verbunden und erreichbar? (einmal je Sitzung gefragt) */
@@ -31,7 +31,8 @@ export function AblegenKnopf({
   fach,
   muster,
   programm,
-  klein
+  klein,
+  iservGruppe
 }: {
   quelle: AblageQuelle
   klasse: string
@@ -39,14 +40,16 @@ export function AblegenKnopf({
   muster: string
   programm: string
   klein?: boolean
+  /** Kurs aus IServ (10.10.2026): Name der IServ-Gruppe – abgelegt wird in ihren Gruppenordner */
+  iservGruppe?: string
 }): React.JSX.Element {
   const iserv = useIservMoeglich()
   const [laeuft, setLaeuft] = useState<AblageArt | null>(null)
-  const ordner = iservAnzeige(iservPfadAus(muster, klasse, fach))
+  const ordner = iservAnzeige(iservGruppe ? kursOrdnerPfad(iservGruppe) : iservPfadAus(muster, klasse, fach))
   const los = async (art: AblageArt): Promise<void> => {
     setLaeuft(art)
     try {
-      const wo = await ablegen(art, quelle, { klasse, fach, muster, programm })
+      const wo = await ablegen(art, quelle, { klasse, fach, muster, programm, iservGruppe })
       if (art === 'iserv' && wo) notifySuccess(`In IServ abgelegt: ${ordner}`)
       else if (wo) notifySuccess('Gespeichert.')
     } catch (e) {

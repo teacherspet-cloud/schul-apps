@@ -45,6 +45,7 @@ import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/s
 import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER, fachSchreibweise } from '@shared/faecher'
+import { klasseAusGruppen } from '@shared/iservKurse'
 import { getSettings } from '../main/services/storage/settings'
 import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
@@ -198,8 +199,12 @@ export function alleLernenden(): NutzerInfo[] {
   return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && !n.gesperrt)
 }
 
-/** Klasse eines Schülerkontos (aus der Klassenliste bzw. IServ), sonst leer */
-export const klasseVon = (n: Pick<NutzerInfo, 'gruppen'>): string => n.gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? n.gruppen[0]?.name ?? ''
+/**
+ * Klasse eines Schülerkontos (aus der Klassenliste bzw. IServ), sonst leer. Seit 10.10.2026 die aus den IServ-Gruppen
+ * erkannte Klasse („Klasse 7b" → „7b", shared/iservKurse.ts) vor der ersten Gruppe – die kann ein Kurs sein („FR 7 Kon").
+ */
+export const klasseVon = (n: Pick<NutzerInfo, 'gruppen'>): string =>
+  n.gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? (klasseAusGruppen(n.gruppen) || n.gruppen[0]?.name) ?? ''
 
 /**
  * Mitglieder einer Lerngruppe. Gäste mit persönlichem Anmeldecode (Vokabeltraining „Lernende eintragen") zählen seit

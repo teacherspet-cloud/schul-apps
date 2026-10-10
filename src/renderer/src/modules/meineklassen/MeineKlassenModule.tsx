@@ -93,6 +93,7 @@ import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
 import { IservVorschlaege } from './IservVorschlaege'
+import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
 import { kursEintragOeffnen, useEntwurfBedarf, type KursEintrag } from './kursBedarf'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
 import GeplantKarte from './GeplantKarte'
@@ -108,6 +109,8 @@ interface FachKurz {
   tests: number
   reihen: number
   blaetter: number
+  /** Aus IServ erkannt (10.10.2026) */
+  iserv?: IservAngabe | null
 }
 interface KlasseKurz {
   schluessel: string
@@ -117,6 +120,8 @@ interface KlasseKurz {
   bedarf: number
   vorschlaege: number
   faecher: FachKurz[]
+  /** Aus IServ erkannter Kurs (10.10.2026) */
+  iserv?: IservAngabe | null
 }
 
 type Bedarf = {
@@ -137,6 +142,8 @@ interface KlasseDetail {
   titel: string
   sprachfach: boolean
   ablageMuster: string
+  /** Aus IServ erkannt: Name der IServ-Gruppe = ihr Gruppenordner (10.10.2026) */
+  iserv?: IservAngabe | null
   lernende: {
     id: string
     name: string
@@ -362,11 +369,12 @@ function zeigeHandlungsbedarf(gruppeId: string): void {
 
 export default function MeineKlassenModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [klassen, setKlassen] = useState<KlasseKurz[] | null>(null)
+  const [iservDaten, setIservDaten] = useState<IservUebersicht>({})
   const { klasse, setze } = useSicht()
   const [suche, setSuche] = useState('')
   const laden = useCallback(() => {
-    void holen<{ klassen: KlasseKurz[] }>('/server/klassen').then(
-      (d) => setKlassen(d.klassen),
+    void holen<{ klassen: KlasseKurz[] } & IservUebersicht>('/server/klassen').then(
+      (d) => (setKlassen(d.klassen), setIservDaten({ iservAusgeblendet: d.iservAusgeblendet, iservKuerzel: d.iservKuerzel })),
       (e: unknown) => (notifyError(e), setKlassen([]))
     )
   }, [])
@@ -405,7 +413,7 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
           <Loader />
         </Center>
       ) : klassen.length === 0 ? (
-        <Alert icon={<IconUsers size={18} />} title="Noch keine Lerngruppen">
+        <Alert icon={<IconUsers size={18} />} title="Noch keine Lerngruppen" data-klassen-leer>
           Lerngruppen entstehen in der App „Onlinetest“ unter „Lerngruppen“ (aus IServ oder von Hand). Danach stehen sie hier mit ihrem Lernstand.
         </Alert>
       ) : (
@@ -415,6 +423,7 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
           ))}
         </SimpleGrid>
       )}
+      {!klasse && klassen && <IservErkennung key={JSON.stringify(iservDaten.iservKuerzel ?? {})} d={iservDaten} geaendert={laden} />}
     </Container>
   )
 }
@@ -429,7 +438,7 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
       data-klasse={k.name}
     >
       <Group justify="space-between" wrap="nowrap" mb={8}>
-        <Text fw={800} size="lg">
+        <Text fw={800} size="lg" truncate>
           {/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}
         </Text>
         {k.bedarf > 0 ? (
@@ -440,10 +449,11 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
           </Badge>
         )}
       </Group>
-      <Group gap="lg" mb={8}>
+      <Group gap="lg" mb={8} align="center">
         <Kennzahl wert={String(k.lernende)} text="Lernende" />
         <Kennzahl wert={String(k.faecher.length)} text={k.faecher.length === 1 ? 'Fach' : 'Fächer'} />
         {k.vorschlaege > 0 && <Kennzahl wert={String(k.vorschlaege)} text={k.vorschlaege === 1 ? 'Vorschlag' : 'Vorschläge'} />}
+        {k.iserv && <IservAbzeichen a={k.iserv} />}
       </Group>
       <Stack gap={4} mih={44} justify="center">
         {k.faecher.length === 0 ? (
@@ -600,7 +610,22 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
           Alle Klassen
         </Button>
       </Group>
-      <Title order={2}>{klasse}</Title>
+      <Group gap="xs" align="center">
+        <Title order={2}>{klasse}</Title>
+        {k.iserv && <IservAbzeichen a={k.iserv} size="sm" />}
+        {(aktiv?.iserv ?? k.iserv) && (
+          <IservKursMenue
+            gruppeId={(aktiv?.iserv ? aktiv.id : k.faecher.find((f) => f.iserv)?.id) ?? k.gruppen[0]}
+            name={k.name}
+            geaendert={(weg, neuerName) => {
+              if (weg) return zurueck()
+              // Umbenannt: die Klasse heißt jetzt anders – Ansicht bleibt auf ihr
+              if (neuerName) setze({ klasse: neuerName.trim().toLowerCase().replace(/\s+/g, ' ') })
+              neu()
+            }}
+          />
+        )}
+      </Group>
 
       {/* ---------- Fach-Leiste über dem Handlungsbedarf, rechts daneben „Als Schüler ansehen" (ganze Klasse) */}
       <Group justify="space-between" align="flex-start" gap="xs">
@@ -876,7 +901,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Loader />
       </Center>
     )
-  const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster }
+  const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster, iservGruppe: d.iserv?.roh }
   /*
    * „Wackelige Wörter" (09.10.2026, Wunsch der Lehrkraft): kein neuer Kurs mehr (er erschien als zweiter Kurs im Ordner der
    * Lernenden) – die Wörter stehen schon im Kurs der Klasse und werden dort wieder fällig; oder ein kurzes Arbeitsblatt.

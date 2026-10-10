@@ -85,7 +85,9 @@ try {
         // Schulkalender (10.10.2026): Ferien/Feiertage aus der Datei statt aus dem Netz, Testuhr für den Schuljahreswechsel
         // (tests/e2e/server-schuljahr.mjs)
         SCHULAPPS_KALENDER_DATEI: join(wurzel, 'tests', 'fixtures', 'openholidays-ni.json'),
-        SCHULAPPS_KALENDER_TESTUHR: '1'
+        SCHULAPPS_KALENDER_TESTUHR: '1',
+        // IServ-Anmeldung mit nachgebauten Angaben (/auth/iserv-test, 10.10.2026)
+        SCHULAPPS_ISERV_TESTANMELDUNG: '1'
       },
       stdio: 'ignore'
     })

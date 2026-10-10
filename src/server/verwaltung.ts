@@ -45,6 +45,7 @@ import { benutzerFuer, klassenGruppe, nameAusZeile, startPasswort } from './klas
 import { registerVergessen } from './namensschutz'
 import { alleFreigaben, freigabeWiderrufen } from './hoertexte'
 import { ABLAGE_STANDARD, ablageMuster } from './klassen'
+import { alleKursgruppenSichern } from './iservKursgruppen'
 import { AbgleichFehler, abgleichGeschuetzt, abgleichPruefen, abgleichSchwelle, pruefungEinloesen, pruefungMerken, sicherungVorAbgleich } from './iservAbgleich'
 import { basename } from 'node:path'
 import { verknuepfungLoesen } from './kontoVerknuepfung'
@@ -237,6 +238,12 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     const schwelle = abgleichSchwelle()
     try {
       const plan = await abgleichPruefen(ich, undefined, schwelle)
+      // Kurse aus IServ (10.10.2026): beim Abgleich die Kursgruppen aller Lehrkräfte aus ihren gespeicherten Gruppen nachziehen
+      try {
+        alleKursgruppenSichern()
+      } catch {
+        /* Zugabe */
+      }
       const kennung = !plan.abbruch && (plan.entfernen.length || plan.loesen.length) ? pruefungMerken(ich, [...plan.entfernen, ...plan.loesen].map((x) => x.id)) : ''
       protokolliereServer('verwaltung', `IServ-Abgleich geprüft (${plan.entfernen.length} von ${plan.geprueft} fehlen in IServ, ${plan.loesen.length} Verknüpfungen${plan.abbruch ? ', abgebrochen' : ''})`, ich)
       return (json(res, 200, { ...plan, schwelle, kennung }), true)

@@ -200,6 +200,62 @@ try {
   pruefe(await da(p.locator('[data-freigaben]')), 'App „Freigegebene Blätter"')
   await p.screenshot({ path: join(out, '3-freigaben.png') })
   await lk.request.post(`${A}/server/reihen/${r.id}/loeschen`, { headers: KOPF, data: {} })
+
+  // ---------- Smartphone-Kopf (10.10.2026): Logo freigestellt links, „Schul-Apps" + Schulname rechts, „Meine Klassen"-Zeile
+  const vorher = await (await verwaltung.request.get(`${A}/server/schule`, { headers: KOPF })).json()
+  const logoSeite = await verwaltung.newPage()
+  await logoSeite.goto(`${A}/anmelden`)
+  // Testlogo: weißer Hintergrund, roter Kreis
+  const testLogo = await logoSeite.evaluate(() => {
+    const c = document.createElement('canvas')
+    c.width = 80
+    c.height = 80
+    const k = c.getContext('2d')
+    k.fillStyle = '#ffffff'
+    k.fillRect(0, 0, 80, 80)
+    k.fillStyle = '#c0392b'
+    k.beginPath()
+    k.arc(40, 40, 28, 0, Math.PI * 2)
+    k.fill()
+    return c.toDataURL('image/png')
+  })
+  await logoSeite.close()
+  if (!vorher.schule) await verwaltung.request.post(`${A}/server/schule`, { headers: KOPF, data: { name: 'Probe-Gymnasium', stateId: 'NI', schulformen: ['gymnasium'] } })
+  await verwaltung.request.post(`${A}/server/schule/logo`, { headers: KOPF, data: { logo: testLogo } })
+  const handy = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 })
+  await anmelden(handy, lehrer.benutzer, lehrer.passwort)
+  const h = await handy.newPage()
+  await h.goto(`${A}/`)
+  pruefe(await da(h.locator('[data-home-kopf="handy"]')), 'Smartphone: eigener Kopf der Startseite')
+  pruefe(!(await h.getByText('Material für den Unterricht und').isVisible().catch(() => false)), 'Smartphone: ohne Untertitel')
+  pruefe(await da(h.locator('[data-home-logo]')), 'Smartphone: Schullogo links im Kopf')
+  const ecke = await h.locator('[data-home-logo]').evaluate(
+    (img) =>
+      new Promise((ok) => {
+        const pruef = () => {
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth
+          c.height = img.naturalHeight
+          const k = c.getContext('2d')
+          k.drawImage(img, 0, 0)
+          ok([k.getImageData(1, 1, 1, 1).data[3], k.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data[3]])
+        }
+        img.complete ? pruef() : (img.onload = pruef)
+      })
+  )
+  pruefe(ecke[0] === 0 && ecke[1] === 255, `Smartphone: Logo-Hintergrund durchsichtig, Logo deckend (${ecke})`)
+  pruefe(await da(h.locator('[data-home-meineklassen]')), 'Smartphone: Zeile „Meine Klassen"')
+  const suche = h.locator('[data-home-suche]')
+  if (await suche.isVisible().catch(() => false)) {
+    const [mk, su] = [await h.locator('[data-home-meineklassen]').boundingBox(), await suche.boundingBox()]
+    pruefe(mk && su && mk.y < su.y, '„Meine Klassen" steht über der Materialsuche')
+  }
+  await h.screenshot({ path: join(out, '4-handy-kopf.png') })
+  await h.locator('[data-home-meineklassen]').click()
+  pruefe(await da(h.locator('[data-klassen-liste], [data-klassen-leer]').first(), 10000), 'Zeile öffnet „Meine Klassen"')
+  await handy.close()
+  await verwaltung.request.post(`${A}/server/schule/logo`, { headers: KOPF, data: { logo: null } })
+  if (vorher.schule) await verwaltung.request.post(`${A}/server/schule`, { headers: KOPF, data: vorher.schule })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

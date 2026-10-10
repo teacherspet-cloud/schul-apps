@@ -21,9 +21,14 @@ import {
   IconSearch,
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconUsersGroup } from "@tabler/icons-react";
+import { ladeServerSchule } from "../shared/serverSchule";
+import { logoFreigestellt } from "../shared/logoFreistellen";
 import { modules } from "../modules/registry";
 import { useAppSettings } from "../shared/settingsStore";
 import {
+  oeffneProgramm,
   openDocument,
   openSettings,
   openThemen,
@@ -85,6 +90,31 @@ function wann(iso: string): string {
  */
 export default function Home(): React.JSX.Element {
   const schoolName = useAppSettings((s) => s.settings.schoolName);
+  /*
+   * Smartphone (10.10.2026, Wunsch der Lehrkraft): im Kopf kein Untertitel, sondern links das Schullogo (freigestellt,
+   * ohne Hintergrund) und rechts daneben „Schul-Apps" und der Schulname; darunter eine Zeile „Meine Klassen"
+   */
+  const handy = useMediaQuery("(max-width: 700px)") ?? false;
+  const eigenesLogo = useAppSettings((s) => s.logoDataUrl);
+  const [serverLogo, setServerLogo] = useState<string | null>(null);
+  const [serverName, setServerName] = useState("");
+  useEffect(() => {
+    void ladeServerSchule().then((d) => {
+      setServerLogo(d?.logo ?? null);
+      setServerName(d?.schule?.name ?? "");
+    });
+  }, []);
+  const logoQuelle = serverLogo || eigenesLogo;
+  const [logo, setLogo] = useState<string | null>(null);
+  useEffect(() => {
+    if (!handy || !logoQuelle) return setLogo(null);
+    let weg = false;
+    void logoFreigestellt(logoQuelle).then((l) => !weg && setLogo(l));
+    return () => {
+      weg = true;
+    };
+  }, [handy, logoQuelle]);
+  const schulName = serverName || schoolName;
   const letzteSicherung = useAppSettings((s) => s.settings.letzteSicherung);
   const [materialien, setMaterialien] = useState<Material[] | null>(null);
   const [ohneKi, setOhneKi] = useState(false);
@@ -187,13 +217,48 @@ export default function Home(): React.JSX.Element {
 
   return (
     <Container size="lg" py={48} style={{ height: "100%", overflow: "auto" }}>
-      <Stack gap={4} className="home-hero">
-        <Title order={1}>Schul-Apps</Title>
-        <Text opacity={0.92}>
-          {schoolName ? `${schoolName} · ` : ""}Material für den Unterricht und
-          Organisatorisches schnell erstellen.
-        </Text>
-      </Stack>
+      {handy ? (
+        <Group gap="sm" wrap="nowrap" className="home-hero home-hero-handy" data-home-kopf="handy">
+          {logo && <img src={logo} alt="" className="home-logo" data-home-logo />}
+          <div style={{ minWidth: 0 }}>
+            <Title order={1}>Schul-Apps</Title>
+            {schulName && (
+              <Text opacity={0.92} size="sm" lineClamp={2}>
+                {schulName}
+              </Text>
+            )}
+          </div>
+        </Group>
+      ) : (
+        <Stack gap={4} className="home-hero">
+          <Title order={1}>Schul-Apps</Title>
+          <Text opacity={0.92}>
+            {schoolName ? `${schoolName} · ` : ""}Material für den Unterricht und
+            Organisatorisches schnell erstellen.
+          </Text>
+        </Stack>
+      )}
+
+      {/* Smartphone: „Meine Klassen" als eigene Zeile über der Materialsuche (10.10.2026) */}
+      {handy && aufServer() && modules.some((m) => m.id === "meineklassen") && (
+        <UnstyledButton
+          className="home-material home-meineklassen"
+          onClick={() => oeffneProgramm("meineklassen")}
+          data-home-meineklassen
+          mb="sm"
+        >
+          <Group gap="sm" wrap="nowrap">
+            {modules.find((m) => m.id === "meineklassen")?.leistenbild ? (
+              <img src={modules.find((m) => m.id === "meineklassen")?.leistenbild} width={36} height={36} alt="" />
+            ) : (
+              <ThemeIcon variant="light" size={36} radius="md">
+                <IconUsersGroup size={20} />
+              </ThemeIcon>
+            )}
+            <Text fw={600}>Meine Klassen</Text>
+          </Group>
+        </UnstyledButton>
+      )}
 
       {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer erscheinen unten unter „Suchergebnis" */}
       {(materialien?.length ?? 0) > 0 && (

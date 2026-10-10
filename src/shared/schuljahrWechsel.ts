@@ -114,27 +114,49 @@ export interface Nachfolge {
 }
 
 /**
- * Nachfolgegruppe einer IServ-Gruppe. `alt`: Kennung, Name und Mitglieder (Kennungen) beim Wechsel; `personen`: die
- * heutigen Gruppen derselben Personen (aus ihrer letzten IServ-Anmeldung). Nur Klassengruppen zählen: Namen, die mit
- * einem Jahrgang beginnen.
+ * Andere Gruppenart für die Nachfolge (10.10.2026, Kurse aus IServ, shared/iservKurse.ts `kursNachfolgeRegeln`): Jahrgang
+ * und Zusatz einer Gruppe nach ihren Regeln; nur Gruppen mit Jahrgang zählen.
  */
-export function nachfolgerFinden(alt: { id: string; name: string; mitglieder: string[] }, personen: PersonGruppen[], abschluss: number): Nachfolge {
+export interface NachfolgeRegeln {
+  alt: number
+  ziel: number
+  jahrgang: (name: string) => number | null
+  zusatz: (name: string) => string
+}
+
+/**
+ * Nachfolgegruppe einer IServ-Gruppe. `alt`: Kennung, Name und Mitglieder (Kennungen) beim Wechsel; `personen`: die
+ * heutigen Gruppen derselben Personen (aus ihrer letzten IServ-Anmeldung). Ohne `regeln` zählen nur Klassengruppen:
+ * Namen, die mit einem Jahrgang beginnen; mit `regeln` (Kurse) die Gruppen, denen die Regeln einen Jahrgang geben.
+ */
+export function nachfolgerFinden(
+  alt: { id: string; name: string; mitglieder: string[] },
+  personen: PersonGruppen[],
+  abschluss: number,
+  regeln?: NachfolgeRegeln
+): Nachfolge {
   const leer: Nachfolge = { art: 'unklar', anteil: 0, wechsler: [], wiederholer: [] }
-  const ziel = klasseHochstufen(alt.name, abschluss)
-  const altJahrgang = jahrgangAmAnfang(alt.name)
+  const jahrgangVon = regeln ? regeln.jahrgang : jahrgangAmAnfang
+  const zusatzVon = regeln ? regeln.zusatz : klassenZusatz
+  const ziel: Hochstufung | null = regeln
+    ? regeln.alt >= abschluss
+      ? { art: 'abschluss', jahrgang: regeln.alt }
+      : { art: 'hoch', neu: '', jahrgang: regeln.ziel }
+    : klasseHochstufen(alt.name, abschluss)
+  const altJahrgang = regeln ? regeln.alt : jahrgangAmAnfang(alt.name)
   if (!ziel || ziel.art !== 'hoch' || !altJahrgang) return leer
   const mitglieder = new Set(alt.mitglieder)
   const heute = personen.filter((p) => mitglieder.has(p.id))
   if (!heute.length) return { ...leer, art: 'warten' }
   const klassen = (p: PersonGruppen): { id: string; name: string; j: number }[] =>
     p.gruppen.flatMap((g) => {
-      const j = jahrgangAmAnfang(g.name)
+      const j = jahrgangVon(g.name)
       return j ? [{ ...g, j }] : []
     })
   // Schon umgestellt: hat eine Klassengruppe des neuen Jahrgangs oder steckt nicht mehr in der alten Gruppe
   const aktuell = heute.filter((p) => klassen(p).some((g) => g.j === ziel.jahrgang) || !p.gruppen.some((g) => g.id === alt.id))
   // Gleiche Kennung, neuer Name (IServ hat umbenannt)
-  const umbenannt = aktuell.flatMap((p) => p.gruppen.filter((g) => g.id === alt.id && jahrgangAmAnfang(g.name) === ziel.jahrgang))[0]
+  const umbenannt = aktuell.flatMap((p) => p.gruppen.filter((g) => g.id === alt.id && jahrgangVon(g.name) === ziel.jahrgang))[0]
   const noetig = Math.max(Math.min(2, mitglieder.size), Math.ceil(mitglieder.size * AKTUELL_ANTEIL))
   if (!umbenannt && aktuell.length < noetig) return { ...leer, art: 'warten' }
   const zaehler = new Map<string, { id: string; name: string; n: number }>()
@@ -145,13 +167,13 @@ export function nachfolgerFinden(alt: { id: string; name: string; mitglieder: st
         z.n++
         zaehler.set(g.id, z)
       }
-  const zusatz = klassenZusatz(alt.name)
-  const kandidaten = [...zaehler.values()].sort((a, b) => b.n - a.n || Number(klassenZusatz(b.name) === zusatz) - Number(klassenZusatz(a.name) === zusatz))
+  const zusatz = zusatzVon(alt.name)
+  const kandidaten = [...zaehler.values()].sort((a, b) => b.n - a.n || Number(zusatzVon(b.name) === zusatz) - Number(zusatzVon(a.name) === zusatz))
   const basis = Math.max(1, aktuell.length)
   let wahl: { id: string; name: string; n: number } | undefined
   if (umbenannt) wahl = zaehler.get(alt.id) ?? { ...umbenannt, n: 0 }
   else {
-    const gleicherBuchstabe = kandidaten.find((k) => klassenZusatz(k.name) === zusatz && k.n / basis >= NACHFOLGE_ANTEIL)
+    const gleicherBuchstabe = kandidaten.find((k) => zusatzVon(k.name) === zusatz && k.n / basis >= NACHFOLGE_ANTEIL)
     wahl = gleicherBuchstabe ?? kandidaten.find((k) => k.n / basis >= NACHFOLGE_ANTEIL)
   }
   if (!wahl) return { ...leer, art: 'unklar', anteil: (kandidaten[0]?.n ?? 0) / basis }
@@ -159,7 +181,7 @@ export function nachfolgerFinden(alt: { id: string; name: string; mitglieder: st
   const wechsler: Nachfolge['wechsler'] = []
   const wiederholer: Nachfolge['wiederholer'] = []
   for (const p of aktuell) {
-    if (p.gruppen.some((g) => g.id === gruppe.id && (g.id !== alt.id || jahrgangAmAnfang(g.name) === ziel.jahrgang))) continue
+    if (p.gruppen.some((g) => g.id === gruppe.id && (g.id !== alt.id || jahrgangVon(g.name) === ziel.jahrgang))) continue
     const k = klassen(p)
     const neu = k.find((g) => g.j === ziel.jahrgang)
     if (neu) {

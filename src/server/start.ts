@@ -38,7 +38,8 @@ import { setzeRolleQuelle } from '../main/services/rolle'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
 import { hauptschluessel, passwortHash } from './geheim'
-import { ADMIN_BENUTZER } from './anmeldung'
+import { ADMIN_BENUTZER, anmeldeHaken } from './anmeldung'
+import { alleKursgruppenSichern, iservKurseRoute, nachIservAnmeldung } from './iservKursgruppen'
 import { serverUmgebung } from './umgebung'
 import { starteServer } from './http'
 import { herzschlagStarten } from './ereignisse'
@@ -98,6 +99,8 @@ async function main(): Promise<void> {
   setzeSchuleFest(() => schuleFest(aktuellerNutzer()))
   // Gemeinsame Lehrwerke und Medienbank: bearbeiten nur Admins (main/services/rolle.ts)
   setzeRolleQuelle(() => aktuellerNutzer()?.rolle)
+  // Kurse aus IServ (10.10.2026, iservKursgruppen.ts): nach jeder Anmeldung über IServ erkennen und Kursgruppen sichern
+  anmeldeHaken.nachIserv = nachIservAnmeldung
 
   const port = Number(env.SCHULAPPS_PORT || 8443)
   const adresse = (env.SCHULAPPS_ADRESSE || `http://localhost:${port}`).replace(/\/$/, '')
@@ -175,6 +178,8 @@ async function main(): Promise<void> {
     // „Als Schüler ansehen“ (06.10.2026): Vorschau-Schlüssel nur mit der Sitzung der Lehrkraft
     vorschau: kontoZumSchluessel,
     routen: [
+      // Klasse und Kurse aus IServ für Lernende (10.10.2026, iservKursgruppen.ts) – vor den Routen, die /s/api/ ganz übernehmen
+      iservKurseRoute(),
       hoertextRoute,
       // Medienbank der Vokabeln für Lernende (05.10.2026)
       medienRoute,
@@ -239,6 +244,13 @@ async function main(): Promise<void> {
   setzeOrtQuelle(schulOrtVon)
   schuljahrWechselStarten()
   kalenderStarten()
+  // Kurse aus IServ (10.10.2026): beim Start einmal für alle Lehrkräfte (Gruppen aus ihrer letzten Anmeldung)
+  try {
+    const k = alleKursgruppenSichern()
+    if (k.angelegt || k.verknuepft) protokolliereServer('klassen', `Kurse aus IServ beim Start: ${k.angelegt} angelegt, ${k.verknuepft} verknüpft (${k.lehrkraefte} Lehrkräfte)`)
+  } catch {
+    /* beim nächsten Anmelden */
+  }
   const stuendlich = setInterval(() => {
     abgelaufeneSitzungenEntfernen()
     cleanupWorkDirs()
