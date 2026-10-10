@@ -166,12 +166,12 @@ describe('Abgleich planen (rein)', () => {
   it('bricht ab bei 0 Konten aus IServ und bei mehr als der Schwelle', () => {
     expect(ab.abgleichPlanen(nutzer, kennungen, [], 'id-ich.selbst', 20).abbruch).toMatch(/keine Konten/)
     const wenige = ab.abgleichPlanen(nutzer, kennungen, iserv.slice(0, 5), 'id-ich.selbst', 20)
-    expect(wenige.abbruch).toMatch(/mehr als 20 %/)
+    expect(wenige.abbruch).toMatch(/auffällig viele Konten/)
     // Genau an der Grenze geht es noch: 1 von 5 = 20 %
     const fuenf = [konto('a'), konto('b'), konto('c'), konto('d'), konto('e')]
     const vier = ['a', 'b', 'c', 'd'].map((b) => ({ uuid: '', benutzer: b }))
     expect(ab.abgleichPlanen(fuenf, new Map(), vier, 'x', 20).abbruch).toBeUndefined()
-    expect(ab.abgleichPlanen(fuenf, new Map(), vier.slice(0, 3), 'x', 20).abbruch).toMatch(/mehr als 20 %/)
+    expect(ab.abgleichPlanen(fuenf, new Map(), vier.slice(0, 3), 'x', 20).abbruch).toMatch(/auffällig viele Konten/)
   })
 })
 
@@ -230,9 +230,11 @@ describe('Verwaltung: Suche, Löschverbot und Abgleich in zwei Schritten', () =>
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('sucht ab 2 Zeichen nach Name, Benutzername, Rolle und Anmeldeart, höchstens 50 Treffer', () => {
+  it('sucht ab 3 Zeichen nach Name, Benutzername, Rolle und Anmeldeart, höchstens 50 Treffer', () => {
     const alle = db.alleNutzer().map((n) => ({ ...n, klasse: '' }))
     expect(nutzerSuchen(alle, 'w').gesamt).toBe(0)
+    expect(nutzerSuchen(alle, 'wa').gesamt).toBe(0)
+    expect(nutzerSuchen(alle, 'wan').treffer.map((n) => n.benutzer)).toEqual(['w.weg'])
     expect(nutzerSuchen(alle, 'wanda').treffer.map((n) => n.benutzer)).toEqual(['w.weg'])
     expect(nutzerSuchen(alle, 'Schüler').treffer.map((n) => n.benutzer).sort()).toEqual(['p.passwort', 's.schueler', 'v.verzogen'])
     expect(nutzerSuchen(alle, 'schueler passwort').treffer.map((n) => n.benutzer)).toEqual(['p.passwort'])
@@ -294,7 +296,7 @@ describe('Verwaltung: Suche, Löschverbot und Abgleich in zwei Schritten', () =>
     fake.konten.splice(3)
     const viel = await rufe('/server/verwaltung/iserv-abgleich-pruefen', {})
     expect(viel.code).toBe(200)
-    expect(String(viel.d.abbruch)).toMatch(/mehr als 20 %/)
+    expect(String(viel.d.abbruch)).toMatch(/auffällig viele Konten/)
     expect(viel.d.kennung).toBe('')
     // Höhere Schwelle (einstellbar): dann ginge es
     const erlaubt = await rufe('/server/verwaltung/iserv-abgleich-pruefen', { schwelle: 100 })

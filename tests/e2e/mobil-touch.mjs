@@ -255,6 +255,10 @@ async function befundeIpad(h) {
     )
     const schild = fig.locator('[data-griff="schild"][data-label-id="b"]').first()
     const sVorher = (await label('b')).schild?.y
+    // Telefon (10.10.2026): Seit der Kopfleiste des Rahmens ist das Fenster niedriger – das Schild läge sonst unter
+    // Bausteinleiste und Zoom-Knöpfen. Ein Mensch rollt es vorher ins Bild.
+    await schild.evaluate((e) => e.scrollIntoView({ block: 'center' }))
+    await page.waitForTimeout(300)
     await h.zug(await mitte(schild), 0, 40)
     const sNachher = (await label('b')).schild?.y
     pruefe(sNachher !== undefined && sNachher !== sVorher, `${name}: Schild der Beschriftung mit dem Finger gezogen (${sVorher} → ${sNachher})`)

@@ -24,9 +24,24 @@ html:root {
   /*
    * Mantine rückt Seitenleiste und Hauptbereich um eine (hier nicht vorhandene) Kopf- und
    * Fußleiste ab. Genau diese Abstände übernehmen jetzt Statusleiste und App-Wechsel-Balken.
+   * Seit dem Rahmen (10.10.2026) gibt es die Kopfleiste: Sie reicht farbig unter die Statusleiste, der Inhalt beginnt
+   * erst darunter – Kopfhöhe plus Statusleiste (ohne Kopfleiste, im eigenen Fenster, fehlt die Höhe und zählt 0).
    */
-  --app-shell-header-offset: var(--sicher-oben);
+  --app-shell-header-offset: calc(var(--app-shell-header-height, 0px) + var(--sicher-oben));
   --app-shell-footer-offset: var(--sicher-unten);
+}
+
+/* Kopfleiste des Rahmens (10.10.2026): Grund unter der Statusleiste, Inhalt darunter und neben den Aussparungen */
+html .mantine-AppShell-header {
+  height: calc(var(--app-shell-header-height, 0px) + var(--sicher-oben));
+  padding-top: var(--sicher-oben);
+  padding-inline-start: var(--sicher-links);
+  padding-inline-end: var(--sicher-rechts);
+}
+
+/* Runde Innenecke des Rahmens (app.css) an der eingerückten Seitenleiste */
+html .app-main[data-rahmen]::before {
+  left: calc(var(--app-shell-navbar-offset, 0px) + var(--sicher-links));
 }
 
 /* Seitenleiste neben der Kamera-Aussparung (iPhone quer) */

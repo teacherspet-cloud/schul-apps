@@ -72,6 +72,7 @@ import {
   type Zeile
 } from './vokabeln'
 import { buchFuer, buchNamen, wegSpeichern, wegStand } from './vokabelweg'
+import { klassenwechselPruefen } from './schuljahrWechsel'
 
 const FACH_ZU: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', ru: 'Russisch' }
 
@@ -183,6 +184,12 @@ const besser = (a: WortStatus | undefined, b: WortStatus): boolean => !a || RANG
 
 /** Alles, was die Ansichten einer Person je Sprache brauchen */
 export async function sprachAnalyse(ich: NutzerInfo, jetzt = Date.now()): Promise<SprachAnalyse[]> {
+  // Klassenwechsel/Wiederholung an der Person erkennen (10.10.2026, schuljahrWechsel.ts) – Fehler dort halten nichts auf
+  try {
+    klassenwechselPruefen(ich, { jetzt })
+  } catch (e) {
+    console.error('Klassenwechsel prüfen:', e)
+  }
   const kurse = await kurseVon(ich, jetzt)
   const schuljahr = schuljahrVon(jetzt)
   const nachSprache = new Map<string, Kurs[]>()

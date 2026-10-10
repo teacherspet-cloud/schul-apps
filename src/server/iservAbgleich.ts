@@ -225,7 +225,8 @@ export function abgleichPlanen(
   const betroffen = plan.entfernen.length + plan.loesen.length
   const grenze = (gesamt * schwelle) / 100
   if (betroffen > grenze)
-    plan.abbruch = `Es würden ${betroffen} von ${gesamt} IServ-Konten entfernt bzw. gelöst (mehr als ${schwelle} %). Das deutet eher auf einen Fehler der Liste als auf Abgänge hin – zur Sicherheit wird nichts entfernt.`
+    // Ohne Prozentzahl (10.10.2026, Wunsch der Lehrkraft): die Schwelle bleibt intern, die Meldung sagt nur, was zu tun ist
+    plan.abbruch = `Abgebrochen: Es wären auffällig viele Konten betroffen (${betroffen} von ${gesamt}). Das deutet auf einen Fehler bei der IServ-Verbindung hin – bitte die Einrichtung prüfen.`
   return plan
 }
 

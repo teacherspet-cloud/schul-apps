@@ -24,6 +24,19 @@
  *  5. Je Lehrkraft ein Hinweis in „Meine Klassen" (Zuordnung alt → neu) mit „Rückgängig" für 14 Tage: stellt Namen,
  *     IServ-Verknüpfung, Kurstitel und -status her und nimmt Übernahmen zurück. Bei Klassen aus der Klassenliste gilt
  *     das für die ganze Klasse (auch die Lerngruppen anderer Lehrkräfte mit derselben Klasse).
+ *  6. Wiederholer und Klassenwechsel (10.10.2026, Entscheidungen der Lehrkraft; mitnahme.ts): Der Fortschritt bleibt, die
+ *     Freigaben sind die der neuen Klasse (Einzel-Freigaben aus der bisherigen Klasse ruhen), später freigegebene Wörter
+ *     und Grammatik, die die Person schon kennt, zählen sofort. Ausgelöst
+ *     - beim Wechsel für IServ-Wiederholer (Schritt 4: wieder im alten Jahrgang) – immer;
+ *     - beim Wechsel für IServ-Wechsler – nur, wenn die neue Klasse hinterher ist (mindestens 5 in diesem Schuljahr
+ *       geübte Wörter, die sie noch nicht freigegeben hat);
+ *     - sonst (Klassenliste, eigene Mitgliederlisten, Wechsel mitten im Jahr) durch `klassenwechselPruefen`, wenn die Person
+ *       ihre Vokabeln öffnet: Sie hat in den letzten 120 Tagen in einem Klassenkurs geübt, den sie nicht mehr sieht (die
+ *       Lerngruppe beginnt mit einem Jahrgang), und sieht jetzt den Klassenkurs derselben Sprache in einer ANDEREN Klasse
+ *       (anderer Jahrgang oder Buchstabe), in dem sie noch nichts geübt hat. Niedrigerer Jahrgang = Wiederholer (immer
+ *       zurücksetzen), sonst Wechsel (zurücksetzen nur, wenn die neue Klasse hinterher ist). Je bisheriger Lerngruppe
+ *       einmal. Fällt das in die 14 Tage eines Schuljahreswechsels der bisherigen Lerngruppe, gilt dafür „Rückgängig".
+ *     Protokoll und Hinweis: „Wiederholer: n – Freigaben auf den Stand der Klasse gesetzt, Fortschritt behalten".
  *
  * Gespeichert in `schuljahr_wechsel` (Zeile je Lehrkraft und Schuljahr, Daten verschlüsselt; die Klassenliste in der
  * Zeile der Lehrkraft „*"). Das Protokoll nennt nur Zahlen. Erster Start mit Kalender: das laufende Schuljahr gilt als
@@ -41,7 +54,12 @@ import {
   standZusammenfuehren,
   titelUmbenennen,
   vergleichsSchluessel,
-  zuordnungUeber
+  zuordnungWoerter,
+  zuordnungUeber,
+  gleicheKlasse,
+  istHinterher,
+  jahrgangAmAnfang,
+  wechselGrund
 } from '@shared/schuljahrWechsel'
 import { ersterSchultag, letzterSchultag, schulkalender, schuljahrText, schuljahrVon, tagPlus, tagVon } from '@shared/schulkalender'
 import { schulformVon } from '@shared/schulformen'
@@ -52,7 +70,10 @@ import { json, type Anfrage } from './http'
 import { lerngruppe, lerngruppenHaken, lerngruppenVon, mitgliederVon, type Lerngruppe } from './onlinetest'
 import { leseSchule } from './schule'
 import { kalenderHaken } from './schulkalender'
-import { db as vokDb } from './vokabeln'
+import { db as vokDb, teileVon, vokIstFuer, zeile as vokZeile } from './vokabeln'
+import { kursFuerLernende } from '@shared/freigabePlan'
+import { mitnahmeVon, wechselEintragen, wechselZuruecknehmen, type Mitnahme } from './mitnahme'
+import type { NutzerInfo } from './datenbank'
 import { DATEN } from './pfade'
 import { klassenGruppe } from './klassenliste'
 import { gruppeErkennen, kursNachfolgeRegeln, nameHochstufen } from '@shared/iservKurse'
@@ -103,6 +124,12 @@ export interface Uebernahme {
   ziel: { id: string; name: string }
   erledigt: { art: 'vok' | 'gram'; von: string; nach: string; vorher: string | null }[]
   fertig?: boolean
+  /** Lerngruppe der neuen Klasse (beim Erkennen in `klassenwechselPruefen` schon bekannt) */
+  zielGruppe?: string
+  /** Wiederholer/Klassenwechsel (10.10.2026, mitnahme.ts): eingetragen; Stand davor für „Rückgängig" */
+  mitnahme?: { vorher: Mitnahme | null; ruhend: number; zurueckgesetzt: boolean }
+  /** Erst nach dem Wechsel an der Person erkannt (Klassenliste, eigene Liste, mitten im Jahr) */
+  erkannt?: boolean
 }
 
 export interface WechselDaten {
@@ -454,12 +481,20 @@ export function nachsuchen(jetzt = Date.now()): { gefunden: number; uebernommen:
         lehrkraftId
       )
     }
+    let zurueckgesetzt = 0
+    let ruhend = 0
     for (const u of w.uebernahmen) {
       if (u.fertig) continue
-      const n = uebernahmeVersuchen(u)
+      const schon = Boolean(u.mitnahme)
+      const n = uebernahmeVersuchen(u, jetzt)
       if (n) (uebernommen += n), (geaendert = true)
+      if (!schon && u.mitnahme) {
+        geaendert = true
+        if (u.mitnahme.zurueckgesetzt) (zurueckgesetzt++, (ruhend += u.mitnahme.ruhend))
+      }
       if (jetzt - w.zeit > (NACHSUCHE_TAGE - 1) * TAG) (u.fertig = true), (geaendert = true)
     }
+    if (zurueckgesetzt) protokolliereServer('schuljahr', wiederholerText(zurueckgesetzt, ruhend), lehrkraftId)
     if (geaendert) schreib(lehrkraftId, w)
   }
   return { gefunden, uebernommen }
@@ -471,16 +506,27 @@ interface VokZeile {
   woerter: string
   lerngruppe_id: string
   status: string
+  schueler?: string
 }
 
 const vokKurse = (gruppeId: string): VokZeile[] =>
   tabelleDa('vok_zuweisungen')
-    ? (datenbank().prepare('SELECT id, sprache, woerter, lerngruppe_id, status FROM vok_zuweisungen WHERE lerngruppe_id = ?').all(gruppeId) as unknown as VokZeile[])
+    ? (datenbank().prepare('SELECT id, sprache, woerter, lerngruppe_id, status, schueler FROM vok_zuweisungen WHERE lerngruppe_id = ?').all(gruppeId) as unknown as VokZeile[])
     : []
-const gramKurse = (gruppeId: string): { id: string; thema: string; paket: string; status: string }[] =>
+interface GramZeile {
+  id: string
+  thema: string
+  paket: string
+  status: string
+  art: string
+  schueler: string
+}
+const gramKurse = (gruppeId: string): GramZeile[] =>
   tabelleDa('gram_zuweisungen')
-    ? (datenbank().prepare('SELECT id, thema, paket, status FROM gram_zuweisungen WHERE lerngruppe_id = ?').all(gruppeId) as { id: string; thema: string; paket: string; status: string }[])
+    ? (datenbank().prepare('SELECT id, thema, paket, status, art, schueler FROM gram_zuweisungen WHERE lerngruppe_id = ?').all(gruppeId) as unknown as GramZeile[])
     : []
+/** Kurs bzw. Grammatik für die ganze Klasse (keine Einzel-Freigabe, kein Extra) */
+const fuerKlasse = (z: { schueler?: string; art?: string }): boolean => !json_(z.schueler, [] as string[]).length && z.art !== 'foerder' && z.art !== 'forder'
 const standRoh = (tabelle: 'vok_stand' | 'gram_stand', kurs: string, schueler: string): string | null =>
   (datenbank().prepare(`SELECT daten FROM ${tabelle} WHERE zuweisung_id = ? AND schueler_id = ?`).get(kurs, schueler) as { daten: string } | undefined)?.daten ?? null
 const standSchreiben = (tabelle: 'vok_stand' | 'gram_stand', kurs: string, schueler: string, daten: string | null): void => {
@@ -507,9 +553,54 @@ function zielGruppen(ziel: { id: string }, ohne: string): Lerngruppe[] {
     .filter((g): g is Lerngruppe => Boolean(g && g.id !== ohne && g.iserv_gruppe === ziel.id))
 }
 
-/** Lernstand einer Person aus den Kursen der alten Lerngruppe in die Kurse der neuen übernehmen; liefert die Zahl der Kurse */
-export function uebernahmeVersuchen(u: Uebernahme): number {
-  const ziele = zielGruppen(u.ziel, u.vonGruppe)
+/**
+ * Ist die neue Klasse hinterher? In DIESEM Schuljahr freigegebene Wörter der bisherigen Klassenkurse, die die Person geübt
+ * hat, gegen die (für Lernende schon freien) Wörter der Klassenkurse der neuen Lerngruppe(n) – je Sprache.
+ */
+function klasseHinterher(sid: string, von: string, ziele: Lerngruppe[], jetzt: number): boolean {
+  const sj = schuljahrVon(jetzt)
+  const geuebt: string[] = []
+  for (const k of vokKurse(von)) {
+    const z = vokZeile(k.id)
+    const roh = standRoh('vok_stand', k.id, sid)
+    if (!z || !roh) continue
+    const st = json_(roh, { woerter: {} } as { woerter: Record<string, { versuche?: number }> })
+    const woerter = json_(z.woerter, [] as Vokabel[])
+    const teile = teileVon(z)
+    let pos = 0
+    teile.forEach((t, i) => {
+      const stueck = i === teile.length - 1 ? woerter.slice(pos) : woerter.slice(pos, pos + Math.max(0, t.anzahl))
+      pos += stueck.length
+      if (schuljahrVon(t.zeit || Date.parse(z.erstellt) || jetzt) < sj) return
+      for (const v of stueck) if (st.woerter?.[v.id]?.versuche) geuebt.push(vergleichsSchluessel(z.sprache, v.term))
+    })
+  }
+  if (!geuebt.length) return false
+  const klasse = new Set<string>()
+  for (const g of ziele)
+    for (const k of vokKurse(g.id)) {
+      if (k.status !== 'offen' || !fuerKlasse(k)) continue
+      const z = vokZeile(k.id)
+      if (z) for (const v of json_(kursFuerLernende(z, jetzt).woerter, [] as Vokabel[])) klasse.add(vergleichsSchluessel(z.sprache, v.term))
+    }
+  return istHinterher(geuebt, klasse)
+}
+
+const wiederholerText = (n: number, ruhend: number): string =>
+  `Wiederholer: ${n} – Freigaben auf den Stand der Klasse gesetzt, Fortschritt behalten${ruhend ? ` (${ruhend} Einzel-Freigabe${ruhend === 1 ? ' ruht' : 'n ruhen'})` : ''}`
+
+/**
+ * Lernstand einer Person aus den Kursen der alten Lerngruppe in die Kurse der neuen übernehmen; liefert die Zahl der Kurse.
+ * Dazu (10.10.2026) die Mitnahme (mitnahme.ts): bei Wiederholern sofort, bei Wechslern, sobald die neue Klasse bekannt
+ * ist – zurückgesetzt werden die Freigaben bei Wiederholern immer, bei Wechslern, wenn die neue Klasse hinterher ist.
+ */
+export function uebernahmeVersuchen(u: Uebernahme, jetzt = Date.now()): number {
+  const ziele = u.zielGruppe ? [lerngruppe(u.zielGruppe)].filter((g): g is Lerngruppe => Boolean(g)) : zielGruppen(u.ziel, u.vonGruppe)
+  if (!u.mitnahme && (u.grund === 'wiederholung' || ziele.length)) {
+    const zurueck = u.grund === 'wiederholung' || klasseHinterher(u.schuelerId, u.vonGruppe, ziele, jetzt)
+    const r = wechselEintragen({ schuelerId: u.schuelerId, grund: u.grund, von: u.vonGruppe, nach: ziele[0]?.id ?? '', zuruecksetzen: zurueck, zeit: jetzt })
+    u.mitnahme = { vorher: r.vorher, ruhend: r.ruhend, zurueckgesetzt: zurueck }
+  }
   if (!ziele.length) return 0
   let n = 0
   const schon = new Set(u.erledigt.map((x) => `${x.art}:${x.von}`))
@@ -518,11 +609,12 @@ export function uebernahmeVersuchen(u: Uebernahme): number {
     if (schon.has(`vok:${von.id}`)) continue
     const altRoh = standRoh('vok_stand', von.id, u.schuelerId)
     if (!altRoh) continue
-    const nach = ziele.flatMap((g) => vokKurse(g.id)).find((k) => k.status === 'offen' && k.sprache === von.sprache)
+    // Nur in einen Kurs der ganzen Klasse (nicht in die Einzel-Freigabe eines anderen Kindes)
+    const nach = ziele.flatMap((g) => vokKurse(g.id)).find((k) => k.status === 'offen' && k.sprache === von.sprache && fuerKlasse(k))
     if (!nach) continue
     const woerterAlt = json_(von.woerter, [] as Vokabel[])
     const woerterNeu = json_(nach.woerter, [] as Vokabel[])
-    const zuordnung = zuordnungUeber(woerterAlt, woerterNeu, (w) => w.id, (w) => vergleichsSchluessel(w.term, w.translation))
+    const zuordnung = zuordnungWoerter(woerterAlt, woerterNeu)
     const alt = json_(altRoh, { woerter: {}, tage: [] } as { woerter: Record<string, never>; tage: string[] })
     const neuRoh = standRoh('vok_stand', nach.id, u.schuelerId)
     const neu = json_(neuRoh, { woerter: {}, tage: [] } as { woerter: Record<string, never>; tage: string[] } & Record<string, unknown>)
@@ -536,7 +628,7 @@ export function uebernahmeVersuchen(u: Uebernahme): number {
     if (schon.has(`gram:${von.id}`)) continue
     const altRoh = standRoh('gram_stand', von.id, u.schuelerId)
     if (!altRoh || !von.thema) continue
-    const nach = ziele.flatMap((g) => gramKurse(g.id)).find((k) => k.status === 'offen' && k.thema === von.thema)
+    const nach = ziele.flatMap((g) => gramKurse(g.id)).find((k) => k.status === 'offen' && k.thema === von.thema && fuerKlasse(k))
     if (!nach) continue
     const schl = (a: GrammatikPaket['aufgaben'][number]): string => vergleichsSchluessel(a.art, a.satz, a.vorgabe)
     const zuordnung = zuordnungUeber(json_(von.paket, { aufgaben: [] } as unknown as GrammatikPaket).aufgaben ?? [], json_(nach.paket, { aufgaben: [] } as unknown as GrammatikPaket).aufgaben ?? [], (a) => a.id, schl)
@@ -549,6 +641,117 @@ export function uebernahmeVersuchen(u: Uebernahme): number {
     n++
   }
   if (n) u.fertig = true
+  return n
+}
+
+// ---------------------------------------------------------------- Klassenwechsel an der Person erkennen (10.10.2026)
+
+/** So lange nach dem letzten Üben gilt ein bisheriger Klassenkurs als „eben noch die eigene Klasse" */
+export const WECHSEL_AKTIV_TAGE = 120
+const zuletztGeprueft = new Map<string, number>()
+/** Nur für Tests */
+export const klassenwechselZuruecksetzen = (): void => zuletztGeprueft.clear()
+
+/** Laufende Schuljahreswechsel (Nachsuche noch aktiv): Lerngruppen, die noch auf ihre IServ-Nachfolgegruppe warten */
+function wartendeGruppen(jetzt: number): Set<string> {
+  const marke = serverWert<WechselMarke | null>(MARKE, null)
+  if (!marke || marke.eingerichtet) return new Set()
+  return new Set(
+    alleDes(marke.schuljahr)
+      .filter((z) => z.lehrkraftId !== '*' && z.w.status === 'aktiv' && jetzt - z.w.zeit <= NACHSUCHE_TAGE * TAG)
+      .flatMap((z) => z.w.eintraege.filter((e) => (e.art === 'wartet' || e.art === 'unklar') && !e.rueckgaengig).map((e) => e.gruppeId))
+  )
+}
+
+/** Schuljahreswechsel, in dem die Lerngruppe vorkommt und „Rückgängig" noch geht */
+function laufenderWechselMit(gruppeId: string, jetzt: number): { lehrkraftId: string; w: WechselDaten } | null {
+  const marke = serverWert<WechselMarke | null>(MARKE, null)
+  if (!marke || marke.eingerichtet) return null
+  return (
+    alleDes(marke.schuljahr).find(
+      (z) => z.lehrkraftId !== '*' && z.w.status === 'aktiv' && jetzt <= z.w.bis && z.w.eintraege.some((e) => e.gruppeId === gruppeId && !e.rueckgaengig)
+    ) ?? null
+  )
+}
+
+interface KursKurz {
+  id: string
+  lerngruppe_id: string
+  schueler: string
+  sprache: string
+  status: string
+  bis: number | null
+}
+
+/**
+ * Wechsel der Klasse an der Person erkennen (Regeln oben, Schritt 6) – beim Öffnen der Vokabeln (sprachstand.ts), höchstens
+ * alle 10 Minuten je Person. Liefert die Zahl erkannter Wechsel.
+ */
+export function klassenwechselPruefen(ich: NutzerInfo, o: { jetzt?: number; sofort?: boolean } = {}): number {
+  const jetzt = o.jetzt ?? Date.now()
+  if (ich.rolle !== 'schueler' || ich.quelle === 'gast' || ich.quelle === 'vorschau') return 0
+  if (!o.sofort && jetzt - (zuletztGeprueft.get(ich.id) ?? -Infinity) < 10 * 60_000) return 0
+  zuletztGeprueft.set(ich.id, jetzt)
+  if (!tabelleDa('vok_zuweisungen') || !tabelleDa('vok_stand')) return 0
+  const schonVon = new Set((mitnahmeVon(ich.id)?.wechsel ?? []).map((w) => w.von))
+  const wartend = wartendeGruppen(jetzt)
+  const sprache = (z: { sprache: string }): string => (z.sprache || '').toLowerCase()
+  // Bisherige Klassen: Klassenkurs mit Lernstand, kürzlich geübt, aber nicht mehr sichtbar
+  const geuebtIn = new Set<string>()
+  const vorher = new Map<string, { g: Lerngruppe; j: number; sprachen: Set<string> }>()
+  for (const r of datenbank().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[]) {
+    const woerter = Object.values(json_(r.daten, { woerter: {} } as { woerter: Record<string, { versuche?: number; zuletzt?: number }> }).woerter ?? {})
+    const geuebt = woerter.filter((w) => w?.versuche)
+    if (!geuebt.length) continue
+    geuebtIn.add(r.zuweisung_id)
+    if (Math.max(...geuebt.map((w) => w.zuletzt ?? 0)) < jetzt - WECHSEL_AKTIV_TAGE * TAG) continue
+    const z = vokZeile(r.zuweisung_id)
+    if (!z || !z.lerngruppe_id || !fuerKlasse(z) || schonVon.has(z.lerngruppe_id) || wartend.has(z.lerngruppe_id)) continue
+    if (vokIstFuer(z, ich)) continue
+    const g = lerngruppe(z.lerngruppe_id)
+    const j = g ? jahrgangAmAnfang(g.name) : null
+    if (!g || j === null) continue
+    const e = vorher.get(g.id) ?? { g, j, sprachen: new Set<string>() }
+    e.sprachen.add(sprache(z))
+    vorher.set(g.id, e)
+  }
+  if (!vorher.size) return 0
+  // Klassenkurse, die die Person jetzt sieht
+  const sichtbar = (
+    datenbank().prepare("SELECT id, lerngruppe_id, schueler, sprache, status, bis FROM vok_zuweisungen WHERE status = 'offen' AND lerngruppe_id != ''").all() as unknown as KursKurz[]
+  ).filter((z) => fuerKlasse(z) && !(z.bis && z.bis < jetzt) && vokIstFuer(z, ich))
+  let n = 0
+  for (const f of vorher.values()) {
+    const kurse = sichtbar.filter((z) => z.lerngruppe_id !== f.g.id && f.sprachen.has(sprache(z)))
+    const neu = [...new Set(kurse.map((z) => z.lerngruppe_id))]
+      .map((id) => lerngruppe(id))
+      .filter((g): g is Lerngruppe => Boolean(g && jahrgangAmAnfang(g.name) !== null && !gleicheKlasse(g.name, f.g.name)))
+      // Neu in der Klasse: dort noch nichts geübt (sonst ist es eine zweite Gruppe neben der eigenen Klasse, etwa Förderkurs)
+      .filter((g) => !kurse.some((z) => z.lerngruppe_id === g.id && geuebtIn.has(z.id)))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    const c = neu[0]
+    if (!c) continue
+    const grund = wechselGrund(f.j, jahrgangAmAnfang(c.name))
+    const u: Uebernahme = { schuelerId: ich.id, vonGruppe: f.g.id, grund, ziel: { id: c.iserv_gruppe, name: c.name }, zielGruppe: c.id, erledigt: [], erkannt: true }
+    uebernahmeVersuchen(u, jetzt)
+    u.fertig = true
+    const lauf = laufenderWechselMit(f.g.id, jetzt)
+    if (lauf) {
+      lauf.w.uebernahmen.push(u)
+      const e = lauf.w.eintraege.find((x) => x.gruppeId === f.g.id)
+      if (e && grund === 'wiederholung') e.wiederholer = (e.wiederholer ?? 0) + 1
+      else if (e) e.wechsler = (e.wechsler ?? 0) + 1
+      schreib(lauf.lehrkraftId, lauf.w)
+    }
+    protokolliereServer(
+      'schuljahr',
+      `Klassenwechsel erkannt (${grund === 'wiederholung' ? 'Wiederholung' : 'Wechsel'}): ${
+        u.mitnahme?.zurueckgesetzt ? wiederholerText(1, u.mitnahme.ruhend).replace(/^Wiederholer: 1 – /, '') : 'Freigaben bleiben, Fortschritt behalten'
+      }`,
+      c.lehrkraft_id
+    )
+    n++
+  }
   return n
 }
 
@@ -582,6 +785,8 @@ export function rueckgaengig(lehrkraftId: string, jetzt = Date.now()): { ok: tru
     }
     if (!nurKlasse) {
       for (const u of x.uebernahmen) for (const r of u.erledigt.reverse()) standSchreiben(r.art === 'vok' ? 'vok_stand' : 'gram_stand', r.nach, u.schuelerId, r.vorher)
+      // Wiederholer/Klassenwechsel: ruhende Einzel-Freigaben wieder aktiv, Quellen fort (der Fortschritt bleibt ohnehin)
+      for (const u of [...x.uebernahmen].reverse()) if (u.mitnahme) wechselZuruecknehmen(u.schuelerId, u.mitnahme.vorher, u.vonGruppe)
       x.uebernahmen = x.uebernahmen.map((u) => ({ ...u, erledigt: [], fertig: true }))
       x.status = 'rueckgaengig'
     }
@@ -617,6 +822,10 @@ export interface WechselHinweis {
   rueckgaengigMoeglich: boolean
   eintraege: { alt: string; neu: string | null; fach: string; art: WechselEintrag['art']; wechsler: number; wiederholer: number; rueckgaengig: boolean }[]
   uebernommen: number
+  /** Wiederholer (und Wechsler in eine Klasse, die hinterher ist): Freigaben auf den Stand der Klasse gesetzt (10.10.2026) */
+  zurueckgesetzt: number
+  /** davon ruhende Einzel-Freigaben */
+  ruhend: number
 }
 
 export function hinweisFuer(lehrkraftId: string, jetzt = Date.now()): WechselHinweis | null {
@@ -640,7 +849,9 @@ export function hinweisFuer(lehrkraftId: string, jetzt = Date.now()): WechselHin
       wiederholer: e.wiederholer ?? 0,
       rueckgaengig: Boolean(e.rueckgaengig)
     })),
-    uebernommen: w.uebernahmen.reduce((a, u) => a + u.erledigt.length, 0)
+    uebernommen: w.uebernahmen.reduce((a, u) => a + u.erledigt.length, 0),
+    zurueckgesetzt: w.status === 'aktiv' ? w.uebernahmen.filter((u) => u.mitnahme?.zurueckgesetzt).length : 0,
+    ruhend: w.status === 'aktiv' ? w.uebernahmen.reduce((a, u) => a + (u.mitnahme?.zurueckgesetzt ? u.mitnahme.ruhend : 0), 0) : 0
   }
 }
 

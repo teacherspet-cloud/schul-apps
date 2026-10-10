@@ -10,6 +10,7 @@
  *
  *  Lehrkraft: GET /server/vokabeln · POST /server/vokabeln/freigeben · GET /server/vokabeln/<id>
  *             POST /server/vokabeln/<id>/termin|zeitraum|status|loeschen
+ *             POST /server/vokabeln/<id>/ruhend-aufheben {schueler}  ruhende Einzel-Freigabe wieder aufnehmen (10.10.2026)
  *  Lernende:  GET /s/api/vokabeln · GET /s/api/vokabeln/liste?id= · POST /s/api/vokabeln/antwort
  *  Gäste (eigene App „Vokabeltraining", 03.10.2026): per QR-Code/Code über einen längeren Zeitraum –
  *             GET /s/api/vokabeln/zugang?code= · POST /s/api/vokabeln/gast {code, name} → persönlicher
@@ -58,6 +59,7 @@ import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
 import { abschnitteBeimSpeichern, lehrwerkName } from './wartungAbschnitteTeilen'
 import { abkuerzungAus } from '../shared/abkuerzung'
+import { mitnahmeVon, ruhendAufheben, ruht, vokNachziehen } from './mitnahme'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
 import {
   bewerte,
@@ -411,7 +413,14 @@ export interface VokStand {
 export const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM vok_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
 export const standVon = (zid: string, sid: string): VokStand => {
   const z = db().prepare('SELECT daten FROM vok_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined
-  return json_(z?.daten, { woerter: {}, tage: [] } as VokStand)
+  const st = json_(z?.daten, { woerter: {}, tage: [] } as VokStand)
+  // Wiederholer/Klassenwechsel (10.10.2026, mitnahme.ts): Wörter, die die neue Klasse freigibt und die die Person schon
+  // kennt, zählen sofort – fehlende Einträge kommen aus den mitgebrachten Kursen
+  if (mitnahmeVon(sid)?.vok.length) {
+    const k = zeile(zid)
+    if (k && vokNachziehen(k, sid, st)) standSpeichern(zid, sid, st)
+  }
+  return st
 }
 export function standSpeichern(zid: string, sid: string, s: VokStand): void {
   db()
@@ -430,6 +439,8 @@ export function klasseFuer(z: Pick<Zeile, 'lerngruppe_id'>, ich: NutzerInfo): nu
 
 export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'> & { id?: string }, ich: NutzerInfo): boolean {
   if (ich.rolle !== 'schueler') return false
+  // Ruhende Einzel-Freigabe (Wiederholer/Klassenwechsel, 10.10.2026, mitnahme.ts): gilt die der neuen Klasse
+  if (z.id && ruht('vok', z.id, ich.id)) return false
   // Gäste (QR-Code) und Lernende mit Konto, die per Code dazugekommen sind
   if (z.id && db().prepare('SELECT 1 FROM vok_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   // Gäste nur, wenn die Lehrkraft sie in die Lerngruppe eingetragen hat (08.10.2026, „Lernende einer Klasse zuordnen")
@@ -450,7 +461,15 @@ export function lernendeVon(z: Zeile): NutzerInfo[] {
     ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
     : []
   const ids = new Set(feste.map((n) => n.id))
-  return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
+  // Für wen die Freigabe ruht (Wiederholer/Klassenwechsel, 10.10.2026), zählt hier nicht mit
+  return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))].filter((n) => !ruht('vok', z.id, n.id))
+}
+
+/** Lernende, für die die (Einzel-)Freigabe ruht (Wiederholer/Klassenwechsel, 10.10.2026, mitnahme.ts) */
+function ruhendeVon(z: Zeile): NutzerInfo[] {
+  const nur = json_(z.schueler, [] as string[])
+  if (!nur.length) return []
+  return alleNutzer().filter((n) => n.rolle === 'schueler' && nur.includes(n.benutzer) && ruht('vok', z.id, n.id))
 }
 
 // ---------------------------------------------------------------- Lernende einer Klasse zuordnen (08.10.2026)
@@ -1278,6 +1297,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             : 'Einzelne Lernende',
           woerter,
           lernende: lernende.map(({ stand: _s, ...rest }) => rest),
+          // Für wen die Einzel-Freigabe ruht (Wiederholer/Klassenwechsel, 10.10.2026) – mit „Wieder aufnehmen"
+          ruhend: ruhendeVon(z).map((n) => ({ id: n.id, name: n.name || n.benutzer })),
           gesamt: uebersicht(
             frei.flatMap((v) => lernende.map((l) => ({ ...v, id: `${l.id}:${v.id}` }))),
             Object.fromEntries(lernende.flatMap((l) => Object.entries(l.stand).map(([wid, s]) => [`${l.id}:${wid}`, s]))),
@@ -1329,6 +1350,13 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (verknuepfen) db().prepare('UPDATE vok_zuweisungen SET lerngruppe_id = ? WHERE id = ?').run(g.id, z.id)
         protokolliereServer('vokabeln', `${dazu.length} Lernende einer Lerngruppe zugeordnet${verknuepfen ? ' (Training verbunden)' : ''}`, ich.id)
         return json(res, 200, { ok: true, dazu: dazu.length, schon: lernende.length - dazu.length, verknuepft: verknuepfen }), true
+      }
+      // Ruhende Einzel-Freigabe für eine Person wieder aufnehmen (Wiederholer/Klassenwechsel, 10.10.2026, mitnahme.ts)
+      if (teile[1] === 'ruhend-aufheben') {
+        const sid = String(k0.schueler ?? '')
+        if (!ruhendAufheben(sid, 'vok', z.id)) return json(res, 404, { fehler: 'Diese Freigabe ruht für niemanden mit dieser Kennung.' }), true
+        protokolliereServer('vokabeln', 'Ruhende Einzel-Freigabe wieder aufgenommen', ich.id)
+        return json(res, 200, { ok: true }), true
       }
       if (teile[1] === 'termin') {
         db()
@@ -1680,7 +1708,7 @@ export function vokabelnDerGruppe(
    * Handlungsbedarf je laufendem Kurs (09.10.2026): Eingabe für shared/kursHinweise.ts – dieselben Zahlen wie GET
    * /server/vokabeln/<id> (nur freigeschaltete Wörter); `nutzer` für das Grammatik-Profil (Fördern). Nur serverintern.
    */
-  hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[] }>
+  hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[]; quelle?: string; einzeln?: boolean }>
 } {
   const zs = db()
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
@@ -1693,7 +1721,7 @@ export function vokabelnDerGruppe(
     { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
   >()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
-  const hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[] }> = {}
+  const hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[]; quelle?: string; einzeln?: boolean }> = {}
   const trainings = zs.map((zVoll) => {
     // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026); die Abschnitts-Übersicht zeigt auch geplante
     const z = kursFuerLernende(zVoll, jetzt)
@@ -1781,7 +1809,10 @@ export function vokabelnDerGruppe(
           lernende: hinweisLernende
         },
         sprache: z.sprache,
-        nutzer: lernende
+        nutzer: lernende,
+        // Startseite (10.10.2026): Herkunft für Band/Unit je Abschnitt, Einzelfreigabe (nur für ausgewählte Lernende)
+        quelle: z.quelle || '',
+        einzeln: json_(z.schueler, [] as unknown[]).length > 0
       }
     }
     return {

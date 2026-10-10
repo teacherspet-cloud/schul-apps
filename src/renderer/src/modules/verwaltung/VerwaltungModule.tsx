@@ -16,6 +16,7 @@ import { AppKopf } from '../../shared/components/AppKopf'
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Autocomplete,
   Badge,
   Button,
@@ -25,7 +26,6 @@ import {
   Group,
   Loader,
   Modal,
-  NumberInput,
   PasswordInput,
   Select,
   SimpleGrid,
@@ -39,6 +39,7 @@ import {
 } from '@mantine/core'
 import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDebouncedValue } from '@mantine/hooks'
 import { nutzerSuchen, QUELLEN_TEXT, SUCHE_MAX, SUCHE_MIN } from '@shared/nutzerSuche'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -130,10 +131,11 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
         ) : (
           <>
             <Tabs.Panel value="nutzer">
-              <Nutzer d={d} neu={laden} />
+              <Nutzer d={d} neu={laden} zuIserv={() => setReiter('iserv')} />
             </Tabs.Panel>
             <Tabs.Panel value="schule">
-              <Stack gap="lg">
+              {/* Gleiche Breite und Abstände wie die Kästen von SchuleEinrichten (10.10.2026): Fachfarben stand breiter daneben */}
+              <Stack maw={720}>
                 <SchuleEinrichten />
                 {/* Fachfarben gelten für die ganze Schule (09.10.2026, SchulFachfarben.tsx) */}
                 <SchulFachfarben />
@@ -184,7 +186,7 @@ function KlasseFeld({ wert, klassen, speichern }: { wert: string; klassen: strin
   )
 }
 
-function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
+function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: () => void }): React.JSX.Element {
   const [konto, setKonto] = useState<{ benutzer: string; passwort: string; titel?: string } | null>(null)
   const [rolle, setRolle] = useState<string>('lehrkraft')
   const [neuerNutzer, setNeuerNutzer] = useState({ benutzer: '', name: '', rolle: 'lehrkraft', passwort: '', klasse: '' })
@@ -193,12 +195,14 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   const gaeste = d.nutzer.filter((n) => n.quelle === 'gast').length
   /*
    * Suche statt Liste aller Konten (09.10.2026, Wunsch des Admins): Bei einer ganzen Schule wurde die Liste unübersichtlich.
-   * Treffer ab 2 Zeichen nach Name, Benutzername, Rolle, Anmeldeart und Klasse, höchstens 50.
+   * Treffer nach Name, Benutzername, Rolle, Anmeldeart und Klasse, höchstens 50.
+   * Seit 10.10.2026: Suchfeld ganz oben ohne Kasten, Treffer erscheinen von selbst ab 3 Zeichen (kurz nach dem Tippen).
    */
   const [suche, setSuche] = useState('')
+  const [frage] = useDebouncedValue(suche, 250)
   const ohneGaeste = useMemo(() => d.nutzer.filter((n) => n.quelle !== 'gast'), [d.nutzer])
-  const { treffer: konten, gesamt } = useMemo(() => nutzerSuchen(ohneGaeste, suche), [ohneGaeste, suche])
-  const zuKurz = suche.trim().length < SUCHE_MIN
+  const { treffer: konten, gesamt } = useMemo(() => nutzerSuchen(ohneGaeste, frage), [ohneGaeste, frage])
+  const zuKurz = frage.trim().length < SUCHE_MIN
   const anlegen = async (): Promise<void> => {
     try {
       const r = await senden<{ benutzer: string; passwort: string }>('/server/verwaltung/nutzer-anlegen', neuerNutzer)
@@ -231,6 +235,118 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   }
   return (
     <Stack>
+      {/* Nutzer suchen (10.10.2026): ganz oben, ohne Kasten – die Treffer stehen direkt darunter */}
+      <Stack gap={6} data-nutzer-suche>
+        <TextInput
+          placeholder={`Nutzer suchen – Name, Benutzername, Rolle, Anmeldeart oder Klasse (ab ${SUCHE_MIN} Zeichen)`}
+          aria-label="Nutzer suchen"
+          leftSection={<IconSearch size={16} />}
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          w="100%"
+          size="md"
+          data-feld="suche"
+        />
+        <Text size="xs" c="dimmed" data-suche-anzahl={zuKurz ? undefined : true}>
+          {zuKurz
+            ? `${ohneGaeste.length} Konten insgesamt`
+            : gesamt === 0
+              ? 'Keine Treffer.'
+              : gesamt > konten.length
+                ? `${gesamt} Treffer, die ersten ${SUCHE_MAX} werden gezeigt – Suche genauer fassen.`
+                : `${gesamt} Treffer`}
+        </Text>
+        {!zuKurz && konten.length > 0 && (
+        <Table striped highlightOnHover data-karten>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Konto</Table.Th>
+              <Table.Th>Rolle</Table.Th>
+              <Table.Th>Klasse</Table.Th>
+              <Table.Th>Anmeldung</Table.Th>
+              <Table.Th>Zuletzt</Table.Th>
+              <Table.Th />
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {konten.map((n) => (
+              <Table.Tr key={n.id} opacity={n.gesperrt ? 0.5 : 1}>
+                <Table.Td>
+                  <Text fw={600}>{n.name}</Text>
+                  <Text size="xs" c="dimmed">
+                    {n.benutzer}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Select
+                    size="xs"
+                    w={140}
+                    data={[
+                      { value: 'admin', label: 'Admin' },
+                      { value: 'lehrkraft', label: 'Lehrkraft' },
+                      { value: 'schueler', label: 'Schüler/in' }
+                    ]}
+                    value={n.rolle}
+                    disabled={n.benutzer === ich}
+                    onChange={(v) => v && aendern(n.id, { rolle: v })}
+                    allowDeselect={false}
+                  />
+                </Table.Td>
+                <Table.Td>
+                  {n.rolle === 'schueler' ? (
+                    <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendern(n.id, { klasse })} />
+                  ) : (
+                    <Text size="xs" c="dimmed">
+                      –
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : n.quelle === 'lokal' ? 'teal' : 'orange'}>
+                    {QUELLEN_TEXT[n.quelle] ?? 'Notzugang'}
+                  </Badge>
+                  {n.passwortWechseln && (
+                    <Text size="xs" c="dimmed">
+                      vorübergehendes Passwort
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td>{n.zuletzt ? new Date(n.zuletzt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
+                <Table.Td>
+                  {n.benutzer !== ich && (
+                    <Group gap={4} justify="flex-end">
+                      <Tooltip label={n.gesperrt ? 'Entsperren' : 'Sperren'}>
+                        <ActionIcon variant="subtle" onClick={() => aendern(n.id, { gesperrt: !n.gesperrt })}>
+                          {n.gesperrt ? <IconLockOpen size={16} /> : <IconLock size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                      {(n.quelle === 'lokal' || n.quelle === 'test') && (
+                        <Tooltip label="Neues vorübergehendes Passwort">
+                          <ActionIcon variant="subtle" onClick={() => zuruecksetzen(n)}>
+                            <IconKey size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      {/* IServ-Konten nicht einzeln löschen (09.10.2026): Sie kämen bei der nächsten Anmeldung wieder; Abgänge entfernt „Mit IServ abgleichen" */}
+                      {n.quelle !== 'iserv' && (
+                        <Tooltip label="Löschen">
+                          <ActionIcon variant="subtle" color="red" onClick={() => loeschen(n)}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Group>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+        )}
+      </Stack>
       {/* Kästen auf- und zuklappbar (10.10.2026, Wunsch der Lehrkraft), standardmäßig zu */}
       <KlappKarte id="nutzer-anlegen" titel="Neuen Nutzer anlegen" rahmen={{ 'data-nutzer-anlegen': true }}>
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
@@ -312,117 +428,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           Testkonten melden sich mit Benutzername und Passwort an (Anmeldeseite › Testkonto). Löschen entfernt das Konto mit allen Daten.
         </Text>
       </KlappKarte>
-      <IservAbgleich d={d} neu={neu} />
-      <KlappKarte id="nutzer-suche" titel="Nutzer suchen" status={`${ohneGaeste.length} Konten`} rahmen={{ 'data-nutzer-suche': true }}>
-        <TextInput
-          label="Nutzer suchen"
-          description={`Name, Benutzername, Rolle, Anmeldeart oder Klasse – ab ${SUCHE_MIN} Zeichen. ${ohneGaeste.length} Konten insgesamt.`}
-          placeholder="z. B. mustermann, 7a, Lehrkraft, IServ"
-          leftSection={<IconSearch size={16} />}
-          value={suche}
-          onChange={(e) => setSuche(e.currentTarget.value)}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          data-feld="suche"
-        />
-        {!zuKurz && (
-          <Text size="xs" c="dimmed" mt={6} data-suche-anzahl>
-            {gesamt === 0
-              ? 'Keine Treffer.'
-              : gesamt > konten.length
-                ? `${gesamt} Treffer, die ersten ${SUCHE_MAX} werden gezeigt – Suche genauer fassen.`
-                : `${gesamt} Treffer`}
-          </Text>
-        )}
-      </KlappKarte>
-      {!zuKurz && konten.length > 0 && (
-      <Table striped highlightOnHover data-karten>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Konto</Table.Th>
-            <Table.Th>Rolle</Table.Th>
-            <Table.Th>Klasse</Table.Th>
-            <Table.Th>Anmeldung</Table.Th>
-            <Table.Th>Zuletzt</Table.Th>
-            <Table.Th />
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {konten.map((n) => (
-            <Table.Tr key={n.id} opacity={n.gesperrt ? 0.5 : 1}>
-              <Table.Td>
-                <Text fw={600}>{n.name}</Text>
-                <Text size="xs" c="dimmed">
-                  {n.benutzer}
-                </Text>
-              </Table.Td>
-              <Table.Td>
-                <Select
-                  size="xs"
-                  w={140}
-                  data={[
-                    { value: 'admin', label: 'Admin' },
-                    { value: 'lehrkraft', label: 'Lehrkraft' },
-                    { value: 'schueler', label: 'Schüler/in' }
-                  ]}
-                  value={n.rolle}
-                  disabled={n.benutzer === ich}
-                  onChange={(v) => v && aendern(n.id, { rolle: v })}
-                  allowDeselect={false}
-                />
-              </Table.Td>
-              <Table.Td>
-                {n.rolle === 'schueler' ? (
-                  <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendern(n.id, { klasse })} />
-                ) : (
-                  <Text size="xs" c="dimmed">
-                    –
-                  </Text>
-                )}
-              </Table.Td>
-              <Table.Td>
-                <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : n.quelle === 'lokal' ? 'teal' : 'orange'}>
-                  {QUELLEN_TEXT[n.quelle] ?? 'Notzugang'}
-                </Badge>
-                {n.passwortWechseln && (
-                  <Text size="xs" c="dimmed">
-                    vorübergehendes Passwort
-                  </Text>
-                )}
-              </Table.Td>
-              <Table.Td>{n.zuletzt ? new Date(n.zuletzt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
-              <Table.Td>
-                {n.benutzer !== ich && (
-                  <Group gap={4} justify="flex-end">
-                    <Tooltip label={n.gesperrt ? 'Entsperren' : 'Sperren'}>
-                      <ActionIcon variant="subtle" onClick={() => aendern(n.id, { gesperrt: !n.gesperrt })}>
-                        {n.gesperrt ? <IconLockOpen size={16} /> : <IconLock size={16} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    {(n.quelle === 'lokal' || n.quelle === 'test') && (
-                      <Tooltip label="Neues vorübergehendes Passwort">
-                        <ActionIcon variant="subtle" onClick={() => zuruecksetzen(n)}>
-                          <IconKey size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                    {/* IServ-Konten nicht einzeln löschen (09.10.2026): Sie kämen bei der nächsten Anmeldung wieder; Abgänge entfernt „Mit IServ abgleichen" */}
-                    {n.quelle !== 'iserv' && (
-                      <Tooltip label="Löschen">
-                        <ActionIcon variant="subtle" color="red" onClick={() => loeschen(n)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </Group>
-                )}
-              </Table.Td>
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-      )}
+      <IservAbgleich d={d} neu={neu} zuIserv={zuIserv} />
       {gaeste > 0 && (
         <Text size="xs" c="dimmed">
           Dazu {gaeste} Gast{gaeste === 1 ? '' : 'e'} aus Onlinetests (Beitritt mit Namen, ohne IServ) – sie haben nur Zugang zu ihrem Test.
@@ -474,8 +480,8 @@ interface AbgleichErgebnis {
  * „Mit IServ abgleichen" (09.10.2026): IServ-Konten, die es in IServ nicht mehr gibt, entfernen. Zwei Schritte – „Prüfen"
  * zeigt nur die Liste, „Entfernen" erst nach Rückfrage; der Server prüft dabei erneut und sichert vorher die Datenbank.
  */
-function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
-  const [schwelle, setSchwelle] = useState<number>(d.iserv.abgleichSchwelle ?? 20)
+function IservAbgleich({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: () => void }): React.JSX.Element {
+  const schwelle = d.iserv.abgleichSchwelle ?? 20
   const [laeuft, setLaeuft] = useState(false)
   const [ergebnis, setErgebnis] = useState<AbgleichErgebnis | null>(null)
   const [fehler, setFehler] = useState('')
@@ -519,29 +525,27 @@ function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JS
     }
   }
   return (
-    <KlappKarte id="nutzer-iserv-abgleich" titel="Mit IServ abgleichen" rahmen={{ 'data-iserv-abgleich': true }}>
-      <Text size="xs" c="dimmed" mb="xs">
-        Konten mit IServ-Anmeldung, die es in IServ nicht mehr gibt, aus Schul-Apps entfernen. „Prüfen“ zeigt zuerst die Liste, entfernt wird erst nach
-        Bestätigung. Admins, das eigene Konto und Konten ohne IServ bleiben immer.
+    /* Kürzer und einfacher (10.10.2026, Wunsch der Lehrkraft): Was passiert, in einem Satz; Knöpfe sagen, was sie tun */
+    <KlappKarte id="nutzer-iserv-abgleich" titel="Konten mit IServ abgleichen" rahmen={{ 'data-iserv-abgleich': true }}>
+      <Text size="sm" data-abgleich-text>
+        Entfernt Konten, die es in IServ nicht mehr gibt (z. B. nach Schulwechsel). Erst wird eine Liste gezeigt, gelöscht wird nur nach Bestätigung.
+      </Text>
+      <Text size="xs" c="dimmed" mt={4} mb="sm">
+        Admins, das eigene Konto und Konten ohne IServ bleiben immer.
       </Text>
       {!bereit ? (
-        <Text size="sm" c="dimmed">
-          Erst die IServ-Anbindung einrichten (Reiter „IServ-Anbindung“).
+        <Text size="sm" c="dimmed" data-abgleich-ohne-iserv>
+          Dafür zuerst die{' '}
+          <Anchor component="button" type="button" size="sm" onClick={zuIserv}>
+            IServ-Anbindung einrichten
+          </Anchor>
+          .
         </Text>
       ) : (
-        <Group align="end">
-          <NumberInput
-            label="Abbrechen ab (%)"
-            description="Würden mehr IServ-Konten entfernt, passiert nichts"
-            min={1}
-            max={100}
-            w={220}
-            value={schwelle}
-            onChange={(v) => setSchwelle(typeof v === 'number' ? v : Number(v) || 20)}
-            data-abgleich-schwelle
-          />
+        // Keine Prozentzahl mehr in der Oberfläche (10.10.2026): die Sicherheitsgrenze gilt weiter, gemeldet wird nur ein Abbruch
+        <Group>
           <Button variant="light" leftSection={<IconSearch size={16} />} loading={laeuft && !ergebnis} onClick={() => void pruefen()} data-abgleich-pruefen>
-            Prüfen
+            Liste anzeigen
           </Button>
         </Group>
       )}
@@ -591,7 +595,7 @@ function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JS
           {ergebnis.kennung && (
             <Group>
               <Button color="red" leftSection={<IconUsersMinus size={16} />} loading={laeuft} onClick={() => void entfernen()} data-abgleich-entfernen>
-                Entfernen ({ergebnis.entfernen.length + (ergebnis.loesen?.length ?? 0)})
+                Diese Konten entfernen ({ergebnis.entfernen.length + (ergebnis.loesen?.length ?? 0)})
               </Button>
               <Button variant="subtle" onClick={() => setErgebnis(null)}>
                 Abbrechen

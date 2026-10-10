@@ -51,6 +51,7 @@ export function SchuleEinrichten(): React.JSX.Element {
   const [speichert, setSpeichert] = useState(false)
   const [logoLaedt, setLogoLaedt] = useState(false)
   const [fehler, setFehler] = useState('')
+  const [fehlerIn, setFehlerIn] = useState<'schule' | 'kontakt'>('schule')
   const [abweichung, setAbweichung] = useState<{ treffer: SchulTreffer; felder: Abweichung[] } | null>(null)
   const [logoFrage, setLogoFrage] = useState<{ schule: string; png: string } | null>(null)
 
@@ -111,7 +112,8 @@ export function SchuleEinrichten(): React.JSX.Element {
     }
   }
 
-  const speichern = async (): Promise<void> => {
+  const speichern = async (karte: 'schule' | 'kontakt'): Promise<void> => {
+    setFehlerIn(karte)
     const p = pruefeSchule(werte)
     if ('fehler' in p) return setFehler(p.fehler)
     setFehler('')
@@ -134,6 +136,25 @@ export function SchuleEinrichten(): React.JSX.Element {
 
   const schule = schulStatus(werte)
   const kontakt = kontaktStatus(werte)
+  /*
+   * Speichern im Kasten (10.10.2026, Wunsch der Lehrkraft): Der Knopf stand zwischen den Kästen und gehörte zu keinem.
+   * Jetzt steht „Speichern" unten in „Schule" und in „Anschrift und Kontakt" – beide sichern dieselben Angaben
+   * (der Server nimmt sie nur zusammen an); eine Fehlermeldung erscheint im Kasten, dessen Knopf gedrückt wurde.
+   */
+  const speicherZeile = (karte: 'schule' | 'kontakt'): React.JSX.Element => (
+    <Stack gap="xs" mt="md">
+      {fehler && fehlerIn === karte && (
+        <Alert color="red" variant="light" data-schule-fehler>
+          {fehler}
+        </Alert>
+      )}
+      <Group justify="flex-end">
+        <Button leftSection={<IconDeviceFloppy size={16} />} onClick={() => void speichern(karte)} loading={speichert} data-schule-speichern={karte}>
+          Speichern
+        </Button>
+      </Group>
+    </Stack>
+  )
 
   return (
     <Stack maw={720} data-schule-einrichten>
@@ -223,6 +244,7 @@ export function SchuleEinrichten(): React.JSX.Element {
             />
           </SimpleGrid>
         </Stack>
+        {speicherZeile('schule')}
       </KlappKarte>
       <KlappKarte id="verwaltung-kontakt" dauerhaft titel="Anschrift und Kontakt" status={kontakt || 'noch leer'} rahmen={{ 'data-schule-karte': 'kontakt' }}>
         <Text size="xs" c="dimmed" mb="sm">
@@ -237,17 +259,8 @@ export function SchuleEinrichten(): React.JSX.Element {
             {feld('email', 'E-Mail', 'z. B. sekretariat@schule.de')}
           </SimpleGrid>
         </Stack>
+        {speicherZeile('kontakt')}
       </KlappKarte>
-      {fehler && (
-        <Alert color="red" variant="light" data-schule-fehler>
-          {fehler}
-        </Alert>
-      )}
-      <Group justify="flex-end">
-        <Button leftSection={<IconDeviceFloppy size={16} />} onClick={() => void speichern()} loading={speichert} data-schule-speichern>
-          Schule und Kontakt speichern
-        </Button>
-      </Group>
       <KlappKarte
         id="verwaltung-logo"
         dauerhaft

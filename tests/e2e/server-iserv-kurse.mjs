@@ -112,7 +112,9 @@ try {
   const p = await seiteAuf(lk)
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
   pruefe(await da(p.locator('[data-klasse="Französisch 7 (Ktt)"] [data-iserv-erkannt="FR 7 Ktt"]')), 'Karte „Französisch 7 (Ktt)" mit „aus IServ erkannt"')
-  pruefe(await da(p.locator('[data-iserv-erkennung]')), 'Übersicht: Abschnitt „Aus IServ erkannt" mit Kürzel')
+  // Kürzel erkannt (10.10.2026): Erklärkasten „Aus IServ erkannt" entfällt
+  await p.waitForTimeout(800)
+  pruefe((await p.locator('[data-iserv-erkennung]').count()) === 0, 'Übersicht: ohne Erklärkasten, weil das Kürzel erkannt ist')
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
   await p.locator('[data-klasse="Englisch 13 eA (Ktt)"]').click()
   await p.locator('[data-iserv-menue]').click()

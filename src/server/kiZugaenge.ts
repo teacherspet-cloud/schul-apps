@@ -3,6 +3,9 @@
  * aus verwaltung.ts um:
  *
  *   GET  /server/verwaltung/ki-zugaenge   – Adressen/Vorgabemodelle der OpenAI-kompatiblen Anbieter + Nutzungsübersicht
+ *                                           (?zeitraum=woche|monat|schuljahr, 10.10.2026: Diagramme, Kosten, Budget, anonym je Lehrkraft)
+ *   POST /server/verwaltung/ki-preise     – Preise je 1 Mio. Eingabe-/Ausgabe-Token je Anbieter/Modell (Schätzung, 10.10.2026)
+ *   POST /server/verwaltung/ki-budget     – Monatsbudget der Schule in Token oder Euro (10.10.2026)
  *   POST /server/verwaltung/ki-endpunkt   – Adresse, Azure-Version, Vorgabemodell eines Anbieters speichern
  *   POST /server/verwaltung/ki-test       – Schlüssel der Schule mit einer winzigen Anfrage prüfen (nur auf Knopfdruck)
  *
@@ -19,12 +22,28 @@ import { istKompatibel, kompatibelVorgabe, type KompatibelEinstellung, type Komp
 import { AI_PROVIDERS, type AiProviderId, type StructuredRequest } from '@shared/types'
 import { protokolliereServer, serverGeheimnis, serverWert, setzeServerWert } from './datenbank'
 import { json, type Anfrage } from './http'
-import { kiNutzungUebersicht } from './kiNutzung'
+import { KI_ZEITRAEUME, kiNutzungDashboard, type KiZeitraum } from './kiNutzung'
+import { budgetBereinigen, preiseBereinigen, type KiBudget, type KiPreise } from '@shared/kiKosten'
+import { ersterSchultag, schuljahrVon } from '@shared/schulkalender'
 import { namensMuster } from './namensschutz'
 import { schuetzeAnfrage } from './namensfilter'
 import { TEILBARE_SCHLUESSEL } from './verwaltung'
 
 const ENDPUNKTE = 'ki-endpunkte'
+const PREISE = 'ki-preise'
+const BUDGET = 'ki-budget'
+
+/** Übersicht für die Verwaltung: Zeitraum, Preise und Budget aus den Servereinstellungen, Schuljahr aus dem Schulkalender */
+export function nutzungFuerVerwaltung(zeitraumRoh: string | null, jetzt = new Date()): ReturnType<typeof kiNutzungDashboard> {
+  const zeitraum = (KI_ZEITRAEUME as string[]).includes(zeitraumRoh ?? '') ? (zeitraumRoh as KiZeitraum) : 'monat'
+  let schuljahrBeginn: string | undefined
+  try {
+    schuljahrBeginn = ersterSchultag(schuljahrVon(jetzt)) ?? undefined
+  } catch {
+    schuljahrBeginn = undefined
+  }
+  return kiNutzungDashboard(zeitraum, { jetzt, preise: serverWert<KiPreise>(PREISE, {}), budget: serverWert<KiBudget | null>(BUDGET, null), schuljahrBeginn })
+}
 
 /** Adresse/Version/Vorgabemodell, die der Admin für einen OpenAI-kompatiblen Anbieter hinterlegt hat */
 export function schulEndpunkt(id: KompatibelId): KompatibelEinstellung | undefined {
@@ -60,18 +79,32 @@ function schulAnbieter(id: AiProviderId, schluessel: string): { provider: AiProv
 
 export async function kiZugaengeRoute(k: Anfrage): Promise<boolean> {
   const { url, req, res, sitzung } = k
-  const pfade = ['/server/verwaltung/ki-zugaenge', '/server/verwaltung/ki-endpunkt', '/server/verwaltung/ki-test']
+  const pfade = ['/server/verwaltung/ki-zugaenge', '/server/verwaltung/ki-endpunkt', '/server/verwaltung/ki-test', '/server/verwaltung/ki-preise', '/server/verwaltung/ki-budget']
   if (!pfade.includes(url.pathname)) return false
   if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
   if (sitzung.nutzer.rolle !== 'admin') return (json(res, 403, { fehler: 'Nur für die Verwaltung.' }), true)
 
   if (req.method === 'GET' && url.pathname === '/server/verwaltung/ki-zugaenge') {
-    return (json(res, 200, { endpunkte: serverWert<Record<string, KompatibelEinstellung>>(ENDPUNKTE, {}), nutzung: kiNutzungUebersicht() }), true)
+    return (json(res, 200, { endpunkte: serverWert<Record<string, KompatibelEinstellung>>(ENDPUNKTE, {}), nutzung: nutzungFuerVerwaltung(url.searchParams.get('zeitraum')) }), true)
   }
   if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
   if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
   const k0 = (await k.koerper()) as Record<string, unknown>
   const name = String(k0.name ?? '') as AiProviderId
+
+  // Preise (Schätzung) und Monatsbudget (10.10.2026)
+  if (url.pathname === '/server/verwaltung/ki-preise') {
+    const preise = preiseBereinigen(k0.preise)
+    setzeServerWert(PREISE, preise)
+    protokolliereServer('verwaltung', `KI-Preise geändert (${Object.keys(preise).length} Einträge)`, sitzung.nutzer.id)
+    return (json(res, 200, { ok: true, preise }), true)
+  }
+  if (url.pathname === '/server/verwaltung/ki-budget') {
+    const budget = budgetBereinigen(k0.budget)
+    setzeServerWert(BUDGET, budget)
+    protokolliereServer('verwaltung', budget ? `KI-Budget gesetzt (${budget.wert} ${budget.art === 'euro' ? '€' : 'Token'} je Monat)` : 'KI-Budget entfernt', sitzung.nutzer.id)
+    return (json(res, 200, { ok: true, budget }), true)
+  }
 
   if (url.pathname === '/server/verwaltung/ki-endpunkt') {
     if (!istKompatibel(name) || !TEILBARE_SCHLUESSEL.includes(name)) return (json(res, 400, { fehler: 'Unbekannter Anbieter.' }), true)

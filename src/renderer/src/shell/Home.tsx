@@ -25,11 +25,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useMediaQuery } from "@mantine/hooks";
 import { IconChevronDown, IconChevronRight, IconUsersGroup } from "@tabler/icons-react";
 import { useOffenGemerkt } from "../shared/sitzung";
-import { holen } from "../modules/onlinetest/serverApi";
 import { begrenzt, type StartKlasse, type StartseiteDaten } from "@shared/startseiteKurse";
+import { useKopfDaten } from "./kopfDaten";
 import { AnzahlWahl, useStartAnzahl } from "./StartAnzahl";
-import { ladeServerSchule } from "../shared/serverSchule";
-import { logoFreigestellt } from "../shared/logoFreistellen";
 import { modules } from "../modules/registry";
 import { useAppSettings } from "../shared/settingsStore";
 import {
@@ -93,32 +91,11 @@ function wann(iso: string): string {
  * vorn liegt) – damit ist die Liste immer auf dem Stand der Bibliotheken.
  */
 export default function Home(): React.JSX.Element {
-  const schoolName = useAppSettings((s) => s.settings.schoolName);
   /*
-   * Smartphone (10.10.2026, Wunsch der Lehrkraft): im Kopf kein Untertitel, sondern links das Schullogo (freigestellt,
-   * ohne Hintergrund) und rechts daneben „Schul-Apps" und der Schulname; darunter eine Zeile „Meine Klassen"
+   * Kopf (10.10.2026): Logo, „Schul-Apps", Schulname, Datum und Info-Chips stehen seit der Entscheidung der Lehrkraft im
+   * Rahmen über ALLEN Seiten (shell/RahmenKopf.tsx) – die Startseite hat keinen eigenen Kopf mehr.
    */
   const handy = useMediaQuery("(max-width: 700px)") ?? false;
-  const eigenesLogo = useAppSettings((s) => s.logoDataUrl);
-  const [serverLogo, setServerLogo] = useState<string | null>(null);
-  const [serverName, setServerName] = useState("");
-  useEffect(() => {
-    void ladeServerSchule().then((d) => {
-      setServerLogo(d?.logo ?? null);
-      setServerName(d?.schule?.name ?? "");
-    });
-  }, []);
-  const logoQuelle = serverLogo || eigenesLogo;
-  const [logo, setLogo] = useState<string | null>(null);
-  useEffect(() => {
-    if (!logoQuelle) return setLogo(null);
-    let weg = false;
-    void logoFreigestellt(logoQuelle).then((l) => !weg && setLogo(l));
-    return () => {
-      weg = true;
-    };
-  }, [logoQuelle]);
-  const schulName = serverName || schoolName;
   const letzteSicherung = useAppSettings((s) => s.settings.letzteSicherung);
   const [materialien, setMaterialien] = useState<Material[] | null>(null);
   const [ohneKi, setOhneKi] = useState(false);
@@ -276,26 +253,7 @@ export default function Home(): React.JSX.Element {
   );
 
   return (
-    <Container size="lg" py={48} style={{ height: "100%", overflow: "auto" }}>
-      {/* Kopf überall wie am Telefon (10.10.2026, Wunsch der Lehrkraft): Schullogo freigestellt links, „Schul-Apps" und
-          der Schulname rechts daneben – ohne Untertitel */}
-      <Group
-        gap={handy ? "sm" : "lg"}
-        wrap="nowrap"
-        className={handy ? "home-hero home-hero-handy" : "home-hero"}
-        data-home-kopf={handy ? "handy" : "gross"}
-      >
-        {logo && <img src={logo} alt="" className={handy ? "home-logo" : "home-logo home-logo-gross"} data-home-logo />}
-        <div style={{ minWidth: 0 }}>
-          <Title order={1}>Schul-Apps</Title>
-          {schulName && (
-            <Text opacity={0.92} size={handy ? "sm" : "md"} lineClamp={2}>
-              {schulName}
-            </Text>
-          )}
-        </div>
-      </Group>
-
+    <Container size="lg" py={handy ? 16 : 32} style={{ height: "100%", overflow: "auto" }}>
       {/* Smartphone: „Meine Klassen" über der Materialsuche (10.10.2026) – aufklappbar mit Klassen und Kursen */}
       {handy && aufServer() && modules.some((m) => m.id === "meineklassen") && <MeineKlassenKasten />}
 
@@ -555,17 +513,11 @@ function BereichZeile({
  */
 function MeineKlassenKasten(): React.JSX.Element {
   const [offen, setOffen] = useOffenGemerkt<boolean>("home-meineklassen-offen", false);
-  const [daten, setDaten] = useState<StartseiteDaten | null>(null);
+  // Daten aus dem gemeinsamen Speicher (shell/kopfDaten.ts, 10.10.2026) – dieselbe Anfrage wie Schnellzugriff und Kopf
+  const daten: StartseiteDaten | null = useKopfDaten((k) => k.start);
   const modul = modules.find((m) => m.id === "meineklassen");
   useEffect(() => {
-    let weg = false;
-    void holen<StartseiteDaten>("/server/startseite").then(
-      (d) => !weg && setDaten(d),
-      () => !weg && setDaten({ kurse: [], klassen: [] })
-    );
-    return () => {
-      weg = true;
-    };
+    void useKopfDaten.getState().laden();
   }, []);
   const klassen = daten?.klassen ?? null;
   const kursAnzahl = (klassen ?? []).reduce((s, k) => s + k.faecher.length, 0);

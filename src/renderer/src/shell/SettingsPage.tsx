@@ -62,7 +62,7 @@ import { openSettings, SettingsTab, useNavigation } from '../shared/navigation'
 import SubscriptionSetup, { ImageTestRow } from './SubscriptionSetup'
 import { anbieterGruppen, KompatibelZugang } from './KompatibelZugang'
 import { istKompatibel, type KompatibelId } from '@shared/kiAnbieter'
-import { AppTheme, mix, THEMES } from '../shared/themes'
+import { AppTheme, kopfVerlauf, mix, THEMES } from '../shared/themes'
 import DropZone, { FILE_TYPES } from '../shared/components/DropZone'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../shared/util'
 import { CITATION_STYLES } from '../shared/citation'
@@ -459,7 +459,9 @@ function ThemePreview({ theme: t, scheme }: { theme: AppTheme; scheme: 'light' |
   const p = scheme === 'dark' ? t.dark : t.light
   const radius = { xs: 2, sm: 4, md: 6, lg: 9, xl: 13 }[String(t.radius)] ?? 0
   const primary = t.primary[scheme === 'dark' ? t.primaryShade.dark : t.primaryShade.light]
-  const filledNav = t.nav === 'filled'
+  // Rahmen (10.10.2026): Leiste und Kopf in jedem Thema farbig – dunkles Ende des Kopfverlaufs
+  const filledNav = true
+  const kopf = kopfVerlauf(t, scheme)
   const card: React.CSSProperties = {
     background: t.cards === 'flat' ? mix(p.surface, p.bg, 0.3) : p.surface,
     borderRadius: radius,
@@ -472,7 +474,7 @@ function ThemePreview({ theme: t, scheme }: { theme: AppTheme; scheme: 'light' |
       <div
         style={{
           width: 22,
-          background: p.nav,
+          background: kopf.bis,
           borderRight: `1px solid ${filledNav ? 'transparent' : p.border}`,
           padding: '6px 4px'
         }}
@@ -501,7 +503,7 @@ function ThemePreview({ theme: t, scheme }: { theme: AppTheme; scheme: 'light' |
       >
         <div
           style={{
-            background: p.hero,
+            background: `linear-gradient(90deg, ${kopf.bis}, ${kopf.von})`,
             borderRadius: radius,
             color: '#fff',
             padding: '3px 7px',

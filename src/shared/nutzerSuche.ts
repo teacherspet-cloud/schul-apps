@@ -1,6 +1,6 @@
 /**
  * Suche in der Nutzerverwaltung (09.10.2026, Wunsch des Admins): statt der langen Liste aller Konten ein Suchfeld.
- * Gefunden wird nach Name, Benutzername, Rolle, Anmeldeart (Quelle) und Klasse; ab 2 Zeichen, höchstens `max` Treffer.
+ * Gefunden wird nach Name, Benutzername, Rolle, Anmeldeart (Quelle) und Klasse; ab 3 Zeichen, höchstens `max` Treffer.
  * Alle Wörter der Suche müssen vorkommen (Groß-/Kleinschreibung und Umlaute egal).
  */
 
@@ -32,7 +32,8 @@ function suchtext(k: SuchbaresKonto): string {
   return falte(`${k.name} ${k.benutzer} ${rolle} ${quelle} ${k.klasse ?? ''}`)
 }
 
-export const SUCHE_MIN = 2
+// Ab 3 Zeichen (10.10.2026, Wunsch des Admins): die Treffer erscheinen beim Tippen von selbst
+export const SUCHE_MIN = 3
 export const SUCHE_MAX = 50
 
 export function nutzerSuchen<T extends SuchbaresKonto>(konten: T[], frage: string, max = SUCHE_MAX): { treffer: T[]; gesamt: number } {

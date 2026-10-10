@@ -16,7 +16,7 @@ vi.mock('../src/main/services/storage/settings', async (original) => {
 
 const { setzeSchluesselFuerTests } = await import('../src/server/geheim')
 const { datenbankFuerTests, nutzerAnlegen } = await import('../src/server/datenbank')
-const { artVonSchema, kiNutzungJeTag, kiNutzungUebersicht, merkeKiNutzung, mitKiNutzung, zugangsArt, istLimit } = await import('../src/server/kiNutzung')
+const { artVonSchema, kiNutzungJeTag, kiNutzungDashboard, meldeTokens, merkeKiNutzung, mitKiNutzung, zugangsArt, istLimit } = await import('../src/server/kiNutzung')
 const { mitNamensschutz } = await import('../src/server/namensschutz')
 const { imNutzer } = await import('../src/server/kontext')
 const { KompatibelProvider } = await import('../src/main/services/ai/kompatibel')
@@ -134,18 +134,82 @@ describe('Datenbank und Übersicht', () => {
     expect(jeTag[2]).toEqual({ tag: '2026-10-09', auftraege: 2, anfragen: 3 })
     expect(jeTag[1]).toEqual({ tag: '2026-10-08', auftraege: 1, anfragen: 1 })
 
-    const u = kiNutzungUebersicht(heute)
+    const u = kiNutzungDashboard('monat', { jetzt: heute })
     expect(u.tage).toHaveLength(30)
-    expect(u.lehrkraefte.map((z) => z.name)).toEqual(['Ada Lehr', 'Bea Bergfeld'])
-    const ada = u.lehrkraefte[0]
-    expect(ada).toMatchObject({ anfragen7: 3, anfragen30: 3, auftraege30: 2, fehler: 1, limits: 1, arten: { arbeitsblatt: 2, grammatik: 1 }, anbieter: { mistral: 2, openai: 1 } })
-    expect(ada.verlauf.at(-1)).toBe(2)
-    expect(ada.verlauf.at(-2)).toBe(1)
-    expect(u.lehrkraefte[1]).toMatchObject({ anfragen7: 0, anfragen30: 1 })
+    expect(u.summe).toMatchObject({ anfragen: 4, auftraege: 3, fehler: 1, limits: 1, aktiveLehrkraefte: 2, euro: null })
+    // Anonym: nur „Lehrkraft A/B" nach Nutzung, ohne Namen, Benutzernamen und Kennungen
+    expect(u.lehrkraefte.map((z) => [z.bezeichnung, z.anfragen])).toEqual([
+      ['Lehrkraft A', 3],
+      ['Lehrkraft B', 1]
+    ])
+    expect(u.lehrkraefte[0].anteil).toBeCloseTo(0.75)
+    const roh = JSON.stringify(u)
+    for (const verboten of ['Ada', 'Bea', 'a.lehr', 'b.berg', lk, lk2, 'Ida', sus]) expect(roh).not.toContain(verboten)
+    expect(Object.keys(u.lehrkraefte[0]).sort()).toEqual(['anfragen', 'anteil', 'bezeichnung', 'euro', 'tokens'])
     expect(u.jeAnbieter.mistral).toEqual({ lehrkraefte: 2, anfragen: 3 })
     expect(u.jeAnbieter.openai).toEqual({ lehrkraefte: 1, anfragen: 1 })
-    expect(u.jeTag.at(-1)).toMatchObject({ summe: 2, arten: { arbeitsblatt: 2 } })
-    expect(JSON.stringify(u)).not.toContain('Ida')
+    expect(u.jeTagArt.at(-1)).toMatchObject({ arbeitsblatt: { a: 2 } })
+    expect(u.jeTagAnbieter.at(-2)).toMatchObject({ openai: { a: 1 } })
+    // Woche: nur Ada
+    const w = kiNutzungDashboard('woche', { jetzt: heute })
+    expect(w.lehrkraefte.map((z) => z.bezeichnung)).toEqual(['Lehrkraft A'])
+    expect(w.summe.anfragen).toBe(3)
+  })
+
+  it('Token, Kosten-Schätzung, Budget und feste Buchstaben', () => {
+    const jetzt = new Date('2026-11-20T10:00:00Z')
+    const tag = (d: string): Date => new Date(`${d}T10:00:00Z`)
+    const f = (nutzerId: string, eingabe: number, ausgabe: number, modell = 'mistral-large-latest'): Fall => ({
+      nutzerId,
+      art: 'arbeitsblatt',
+      anbieter: 'mistral',
+      ergebnis: 'ok',
+      neuerAuftrag: true,
+      eingabe,
+      ausgabe,
+      modell
+    })
+    merkeKiNutzung(f(lk, 1_000_000, 200_000), tag('2026-11-18'))
+    merkeKiNutzung(f(lk2, 3_000_000, 1_000_000), tag('2026-11-19'))
+    merkeKiNutzung({ ...f(lk2, 0, 0), art: 'bild' }, tag('2026-11-19'))
+    const preise = { mistral: { ein: 2, aus: 6 }, 'mistral|mistral-large-latest': { ein: 1, aus: 5 } }
+    const d = kiNutzungDashboard('woche', { jetzt, preise, budget: { art: 'euro', wert: 10 } })
+    expect(d.summe).toMatchObject({ anfragen: 3, eingabe: 4_000_000, ausgabe: 1_200_000, tokens: 5_200_000, ohneToken: 1 })
+    // Modellpreis geht vor: Ada 1 + 1 = 2 €, Bea 3 + 5 = 8 €
+    expect(d.summe.euro).toBeCloseTo(10)
+    expect(d.summe.euroUnvollstaendig).toBe(true)
+    expect(d.lehrkraefte.map((z) => [z.bezeichnung, z.tokens, Math.round(z.euro)])).toEqual([
+      ['Lehrkraft A', 4_000_000, 8],
+      ['Lehrkraft B', 1_200_000, 2]
+    ])
+    expect(d.budgetMonat).toMatchObject({ monat: '2026-11', ohnePreise: false, stufe: 'ueber' })
+    expect(d.budgetMonat!.anteil).toBeCloseTo(1)
+    expect(d.modelle).toContain('mistral|mistral-large-latest')
+    // Stabil: zweiter Abruf im selben Zeitraum gibt dieselben Buchstaben
+    expect(kiNutzungDashboard('woche', { jetzt, preise }).lehrkraefte).toEqual(kiNutzungDashboard('woche', { jetzt, preise }).lehrkraefte)
+    // Token-Budget: 5,2 Mio. von 6 Mio. = Warnung
+    expect(kiNutzungDashboard('woche', { jetzt, budget: { art: 'token', wert: 6_000_000 } }).budgetMonat).toMatchObject({ stufe: 'warnung', verbraucht: 5_200_000 })
+    // Euro-Budget ohne Preise: kein Stand
+    expect(kiNutzungDashboard('woche', { jetzt, budget: { art: 'euro', wert: 5 } }).budgetMonat).toMatchObject({ ohnePreise: true })
+    // Schuljahr: ab erstem Schultag (bzw. 1. August)
+    expect(kiNutzungDashboard('schuljahr', { jetzt, schuljahrBeginn: '2026-08-06' }).von).toBe('2026-08-06')
+    expect(kiNutzungDashboard('schuljahr', { jetzt }).von).toBe('2026-08-01')
+  })
+
+  it('Token eines gezählten Aufrufs landen beim Aufruf, private Aufrufe sammeln nichts', async () => {
+    const { u, faelle } = umgebung({ anbieter: 'mistral' })
+    await mitKiNutzung(async () => {
+      meldeTokens('mistral', 'mistral-small', { eingabe: 120, ausgabe: 30 })
+      await Promise.resolve()
+      meldeTokens('mistral', 'mistral-small', { eingabe: 10, ausgabe: 5 })
+      return { ok: true }
+    }, u)('ai:structured', [REQ])
+    expect(faelle[0]).toMatchObject({ eingabe: 130, ausgabe: 35, modell: 'mistral-small', ergebnis: 'ok' })
+    // Außerhalb eines gezählten Aufrufs: keine Wirkung, kein Fehler
+    expect(() => meldeTokens('openai', 'x', { eingabe: 1 })).not.toThrow()
+    const privat = umgebung({ eigener: true })
+    await mitKiNutzung(async () => (meldeTokens('openai', 'x', { eingabe: 5 }), { ok: true }), privat.u)('ai:structured', [REQ])
+    expect(privat.faelle).toEqual([])
   })
 
   it('Namensschutz bleibt vor dem neuen Zugang: Der Anbieter sieht keinen Klarnamen, die Lehrkraft schon', async () => {

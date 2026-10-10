@@ -130,7 +130,10 @@ export function IservErkennung({ d, geaendert }: { d: IservUebersicht; geaendert
   const aus = d.iservAusgeblendet ?? []
   const [kuerzel, setKuerzel] = useState(k?.eigen ?? '')
   const [laeuft, setLaeuft] = useState(false)
-  if (!k?.kurse && !aus.length) return null
+  // Kürzel erkannt oder eingetragen (10.10.2026, Wunsch der Lehrkraft): Kasten samt Erklärung entfällt – nur
+  // ausgeblendete Kurse bleiben zum Wiedereinblenden sichtbar
+  const kuerzelBekannt = Boolean(k?.eigen || k?.kuerzel)
+  if ((!k?.kurse || kuerzelBekannt) && !aus.length) return null
   const kuerzelSpeichern = async (): Promise<void> => {
     setLaeuft(true)
     try {
@@ -154,6 +157,8 @@ export function IservErkennung({ d, geaendert }: { d: IservUebersicht; geaendert
   return (
     <Card withBorder radius="md" mt="lg" data-iserv-erkennung>
       <Stack gap="xs">
+        {!kuerzelBekannt && (
+          <>
         <Group gap="xs">
           <IconUsersGroup size={18} />
           <Text fw={700}>Aus IServ erkannt</Text>
@@ -176,10 +181,12 @@ export function IservErkennung({ d, geaendert }: { d: IservUebersicht; geaendert
             Übernehmen
           </Button>
         </Group>
+          </>
+        )}
         {aus.length > 0 && (
           <Stack gap={4} data-iserv-ausgeblendet>
             <Text size="sm" fw={600}>
-              Ausgeblendet
+              {kuerzelBekannt ? 'Ausgeblendete IServ-Kurse' : 'Ausgeblendet'}
             </Text>
             {aus.map((a) => (
               <Group key={a.id} gap="xs" data-iserv-ausgeblendet-eintrag={a.roh}>

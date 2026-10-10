@@ -2,6 +2,7 @@
  * Hinweis zum Schuljahreswechsel in „Meine Klassen" (10.10.2026, src/server/schuljahrWechsel.ts): welche Lerngruppen
  * aufgerückt sind („5b → 6b"), welche als Abschlussjahrgang beendet wurden und welche IServ-Gruppen noch auf ihre
  * Nachfolgegruppe warten – mit „Rückgängig" (14 Tage) und „Ausblenden". Lernstände bleiben in jedem Fall erhalten.
+ * Wiederholer (10.10.2026): Freigaben auf den Stand der neuen Klasse gesetzt, Fortschritt behalten (server/mitnahme.ts).
  */
 import { Alert, Button, Group, List, Text } from '@mantine/core'
 import { IconSchool } from '@tabler/icons-react'
@@ -17,6 +18,9 @@ interface Hinweis {
   rueckgaengigMoeglich: boolean
   eintraege: { alt: string; neu: string | null; fach: string; art: 'umbenannt' | 'abschluss' | 'wartet' | 'iserv' | 'unklar'; wechsler: number; wiederholer: number; rueckgaengig: boolean }[]
   uebernommen: number
+  /** Wiederholer (10.10.2026): Freigaben auf den Stand der Klasse gesetzt; ruhende Einzel-Freigaben */
+  zurueckgesetzt?: number
+  ruhend?: number
 }
 
 const zeile = (e: Hinweis['eintraege'][number]): string => {
@@ -75,6 +79,12 @@ export function SchuljahrHinweis({ geaendert }: { geaendert: () => void }): Reac
       {h.uebernommen > 0 && (
         <Text size="xs" c="dimmed" mb={6}>
           Lernstand von Lernenden, die die Klasse gewechselt haben, in {h.uebernommen} Kurs{h.uebernommen === 1 ? '' : 'e'} der neuen Klasse übernommen.
+        </Text>
+      )}
+      {(h.zurueckgesetzt ?? 0) > 0 && (
+        <Text size="xs" c="dimmed" mb={6} data-schuljahr-wiederholer={h.zurueckgesetzt}>
+          Wiederholer: {h.zurueckgesetzt} – Freigaben auf den Stand der Klasse gesetzt, Fortschritt behalten
+          {(h.ruhend ?? 0) > 0 ? ` (${h.ruhend} Einzel-Freigabe${h.ruhend === 1 ? ' ruht' : 'n ruhen'}; „Rückgängig" stellt sie wieder her)` : ''}.
         </Text>
       )}
       <Group gap="xs">

@@ -110,6 +110,35 @@ export function lehrwerkName(kennung: string, lehrkraftId = ''): string {
   return name
 }
 
+/**
+ * Gliederung eines Lehrwerks (10.10.2026, Startseite „Abschnitt k von n"): nur Unit- und Abschnittsnamen in
+ * Buchreihenfolge – klein, deshalb 10 Minuten je Lehrkraft, Kennung und Band gemerkt (auch „unbekannt"). Ohne Kennung
+ * zuerst die Kennung aus dem Namen („Green Line 3" → green-line-3), sonst Suche nach dem Namen. Platzhalter-Lehrwerke
+ * ohne Units: null.
+ */
+const gliederungCache = new Map<string, { g: { name: string; abschnitte: string[] }[] | null; zeit: number }>()
+export function lehrwerkGliederung(kennung: string, bandName: string, lehrkraftId = ''): { name: string; abschnitte: string[] }[] | null {
+  const schluessel = `${lehrkraftId}|${kennung}|${bandName}`
+  const c = gliederungCache.get(schluessel)
+  if (c && Date.now() - c.zeit < 10 * 60_000) return c.g
+  const ausName = bandName
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  let buch: BuchFuerTeilen | null = null
+  try {
+    buch = buchSync(kennung || ausName, bandName, lehrkraftId)
+  } catch {
+    buch = null
+  }
+  const g = buch?.units.length ? buch.units.map((u) => ({ name: u.name, abschnitte: (u.sections ?? []).map((s) => s.name) })) : null
+  if (gliederungCache.size > 200) gliederungCache.clear()
+  gliederungCache.set(schluessel, { g, zeit: Date.now() })
+  return g
+}
+
 /** Alle Lehrwerke mit Units (gemeinsame, eigene Importe, mitgelieferte; je Kennung die erste Fassung) – für die Wartung */
 export function alleLehrwerke(lehrkraftId = ''): (BuchFuerTeilen & { reihe?: string; language?: string })[] {
   const aus = new Map<string, BuchFuerTeilen & { reihe?: string; language?: string }>()

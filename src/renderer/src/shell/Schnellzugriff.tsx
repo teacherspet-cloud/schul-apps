@@ -14,11 +14,10 @@
 import { Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconAlertCircle, IconCalendarEvent, IconChalkboard, IconDeviceLaptop, IconShare, IconFlag, IconPlayerPlay } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
-import { holen } from '../modules/onlinetest/serverApi'
+import { useEffect } from 'react'
 import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
-import { oeffneReihe, ReiheKarte, useLaufendeReihen } from '../modules/unterrichtsreihe/LaufendeReihenModule'
-import { oeffneFreigabe, useFreigaben } from '../modules/freigaben/FreigegebeneBlaetterModule'
+import { oeffneReihe, ReiheKarte } from '../modules/unterrichtsreihe/LaufendeReihenModule'
+import { oeffneFreigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
 import {
   begrenzt,
@@ -27,8 +26,7 @@ import {
   tagKurz,
   type DemnaechstEintrag,
   type StartAbzeichen,
-  type StartKurs,
-  type StartseiteDaten
+  type StartKurs
 } from '@shared/startseiteKurse'
 import { kursReiterDocId } from '../modules/lernen/kurs/auftragsZiel'
 import { zumHinweis } from '../modules/lernen/kurs/kursFokus'
@@ -36,28 +34,8 @@ import type { KursReiter } from '../modules/lernen/kurs/kursDaten'
 import { AnzahlWahl, useStartAnzahl } from './StartAnzahl'
 import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
+import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
 
-interface TestKurz {
-  id: string
-  titel: string
-  status: 'wartend' | 'offen' | 'beendet'
-  lerngruppe: string
-  teilnehmer: number
-  abgegeben: number
-  offen: number
-  zuEntscheiden: number
-  erstellt: string
-}
-interface RueckmeldungKurz {
-  id: string
-  titel: string
-  status: string
-  art?: string
-  lerngruppe: string
-  abgaben: number
-  /** Für wie viele Personen (Fortschrittsbalken) */
-  gesamt?: number
-}
 /** Am Smartphone: Anzahl je Karte wählbar (StartAnzahl.tsx); am PC feste Höchstzahl wie bisher */
 interface Begrenzung {
   karte: string
@@ -118,12 +96,12 @@ const Leer = ({ text }: { text: string }): React.JSX.Element => (
 
 const ampelFarbe = (x: number): string => (x >= 0.7 ? 'green' : x >= 0.4 ? 'yellow' : 'red')
 
+/**
+ * Daten seit 10.10.2026 aus dem gemeinsamen Speicher (shell/kopfDaten.ts) – derselbe, aus dem der Rahmen-Kopf seine
+ * Info-Chips zählt; beim Öffnen der Startseite frisch geladen, danach höchstens jede Minute.
+ */
 export function Schnellzugriff(): React.JSX.Element {
-  const { reihen } = useLaufendeReihen()
-  const { liste: blaetter } = useFreigaben()
-  const [tests, setTests] = useState<TestKurz[] | null>(null)
-  const [rueck, setRueck] = useState<RueckmeldungKurz[] | null>(null)
-  const [start, setStart] = useState<StartseiteDaten | null>(null)
+  const { reihen, blaetter, tests, rueck, start } = useKopfDaten()
   // Smartphone (10.10.2026): Anzahl je Karte wählbar, dauerhaft je Gerät
   const handy = useMediaQuery('(max-width: 700px)') ?? false
   const [nReihen, setNReihen] = useStartAnzahl('reihen')
@@ -137,19 +115,7 @@ export function Schnellzugriff(): React.JSX.Element {
   const karten = startKarten(ids)
   const vokabeln = karten.termine === 'voll'
   useEffect(() => {
-    void holen<{ tests: TestKurz[] }>('/server/onlinetest').then(
-      (d) => setTests(d.tests),
-      () => setTests([])
-    )
-    void holen<{ freigaben: RueckmeldungKurz[] }>('/server/feedback').then(
-      (d) => setRueck(d.freigaben),
-      () => setRueck([])
-    )
-    // Laufende Kurse mit ihrem einen Abzeichen und Testtermin (10.10.2026) – eine Anfrage für alle Kurse
-    void holen<StartseiteDaten>('/server/startseite').then(
-      (d) => setStart(d),
-      () => setStart({ kurse: [], klassen: [] })
-    )
+    void useKopfDaten.getState().laden(true)
   }, [])
 
   const bedarf = (reihen ?? []).reduce((s, r) => s + r.bedarf, 0)
@@ -356,6 +322,9 @@ export function Schnellzugriff(): React.JSX.Element {
 const ABZEICHEN_FARBE: Record<StartAbzeichen['art'], string> = { test: 'orange', inaktiv: 'red', problem: 'yellow', leer: 'gray', ok: 'green' }
 
 /** Eine Kurszeile (10.10.2026): „7b · Englisch", Balken mit „64 %", EIN Abzeichen – das Abzeichen führt in den passenden Reiter */
+/** Ein Teil der Kurszeile, der mit „…" kürzen darf (wie stark: flexShrink) */
+const KUERZEN = { flexGrow: 0, flexBasis: 'auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } as const
+
 function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
   const a = k.abzeichen
   const oeffnen = (): void => void openDocument('sprachenlernen', k.id)
@@ -369,15 +338,36 @@ function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
     <Card withBorder padding={8} radius="md" data-start-kurs={k.id} data-start-abzeichen={a.art}>
       <Group justify="space-between" wrap="nowrap" gap="xs">
         <UnstyledButton onClick={oeffnen} style={{ minWidth: 0, flex: 1 }} title={k.abschnitt}>
-          <Text size="sm" fw={600} truncate>
-            {kursKopf(k.gruppe, k.fach)}
-            {k.abschnitt && (
-              <Text span size="xs" c="dimmed" fw={400}>
-                {' '}
-                · {k.abschnitt}
+          {k.band !== undefined && k.einheit ? (
+            // Weitester Abschnitt (10.10.2026): eine Zeile; wird es eng, kürzt zuerst der Band, dann der Fortschritt – die
+            // Unit bleibt sichtbar
+            <Text size="sm" fw={600} style={{ display: 'flex', alignItems: 'baseline', whiteSpace: 'nowrap', minWidth: 0 }}>
+              <span style={{ ...KUERZEN, flexShrink: 0.001 }}>{kursKopf(k.gruppe, k.fach)}</span>
+              {k.band && (
+                <Text span size="xs" c="dimmed" fw={400} style={{ ...KUERZEN, flexShrink: 1000 }}>
+                  &nbsp;· {k.band}
+                </Text>
+              )}
+              <Text span size="xs" c="dimmed" fw={400} style={{ ...KUERZEN, flexShrink: 0.0001 }} data-start-unit>
+                &nbsp;· {k.einheit}
               </Text>
-            )}
-          </Text>
+              {k.fortschritt && (
+                <Text span size="xs" c="dimmed" fw={400} style={{ ...KUERZEN, flexShrink: 1 }}>
+                  &nbsp;{k.fortschritt}
+                </Text>
+              )}
+            </Text>
+          ) : (
+            <Text size="sm" fw={600} truncate>
+              {kursKopf(k.gruppe, k.fach)}
+              {k.abschnitt && (
+                <Text span size="xs" c="dimmed" fw={400}>
+                  {' '}
+                  · {k.abschnitt}
+                </Text>
+              )}
+            </Text>
+          )}
           {k.sicher !== null ? (
             <Group gap={6} wrap="nowrap" mt={4}>
               <Progress value={k.sicher * 100} size="xs" color={ampelFarbe(k.sicher)} style={{ flex: 1 }} aria-label="sicher" />

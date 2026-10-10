@@ -64,6 +64,8 @@ export interface Lernstanddaten {
   /** Übersicht je Abschnitt – nur bei Kursen ohne Lerngruppe (09.10.2026) */
   abschnitte?: AbschnittStatistik[]
   lernendeNamen?: string[]
+  /** Für wen die Einzel-Freigabe ruht (Wiederholer/Klassenwechsel, 10.10.2026, server/mitnahme.ts) */
+  ruhend?: { id: string; name: string }[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
   /** Kasten „Abschnitte & Wörter" (10.10.2026): Anteil der Lernenden, für die das Wort sicher ist */

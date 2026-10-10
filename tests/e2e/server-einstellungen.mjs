@@ -238,13 +238,46 @@ try {
   if (await vSpaeter.isVisible().catch(() => false)) await vSpaeter.click()
   await expertenmodus(v)
   await v.locator('.app-leiste [aria-label="Schule & Daten"]').first().click()
-  // Reiter „Nutzer" (10.10.2026): alle Kästen auf- und zuklappbar, standardmäßig zu
+  // Reiter „Nutzer" (10.10.2026): Suchfeld ganz oben ohne Kasten, darunter die Kästen – auf- und zuklappbar, standardmäßig zu
   await v.getByRole('tab', { name: 'Nutzer', exact: true }).click()
   await da(v.locator('[data-klappkarte="nutzer-anlegen"]'), 10000)
   const nutzerKaesten = await v.locator('[data-klappkarte^="nutzer-"]').evaluateAll((k) => k.map((x) => `${x.getAttribute('data-klappkarte')}=${x.getAttribute('data-offen')}`))
-  pruefe(nutzerKaesten.length >= 5 && nutzerKaesten.every((x) => x.endsWith('=false')), `Nutzer: Kästen zugeklappt (${nutzerKaesten.join(', ')})`)
+  pruefe(nutzerKaesten.length >= 4 && nutzerKaesten.every((x) => x.endsWith('=false')), `Nutzer: Kästen zugeklappt (${nutzerKaesten.join(', ')})`)
+  const suchfeld = v.locator('[data-nutzer-suche] [data-feld="suche"]')
+  const sucheLage = await suchfeld.evaluate((f) => {
+    const erster = document.querySelector('[data-klappkarte^="nutzer-"]')
+    return { inKasten: Boolean(f.closest('[data-klappkarte]')), oben: Boolean(erster && f.getBoundingClientRect().bottom <= erster.getBoundingClientRect().top), platzhalter: f.getAttribute('placeholder') ?? '' }
+  })
+  pruefe(
+    (await suchfeld.isVisible()) && !sucheLage.inKasten && sucheLage.oben && sucheLage.platzhalter.length > 0,
+    `Nutzer: Suchfeld sichtbar ganz oben, in keinem Kasten, mit Platzhalter (${JSON.stringify(sucheLage)})`
+  )
+  // Treffer erscheinen von selbst ab 3 Zeichen
+  await suchfeld.fill(admin.benutzer.slice(0, 2))
+  await v.waitForTimeout(600)
+  pruefe(!(await v.locator('[data-nutzer-suche] [data-suche-anzahl]').count()), 'Nutzer: 2 Zeichen – noch keine Treffer')
+  await suchfeld.fill(admin.benutzer.slice(0, 5))
+  pruefe(
+    await da(v.locator('[data-nutzer-suche] [data-suche-anzahl]'), 3000) && (await v.locator(`[data-nutzer-suche] table >> text=${admin.benutzer}`).count()) > 0,
+    'Nutzer: ab 3 Zeichen erscheinen die Treffer mit Anzahl darunter'
+  )
+  await v.screenshot({ path: join(out, '5c-nutzer-suche.png') })
+  await suchfeld.fill('')
   await v.locator('[data-klappkarte="nutzer-anlegen"] [data-klappkopf]').click()
   pruefe(await da(v.locator('[data-nutzer-anlegen] [data-feld="benutzer"]'), 5000), 'Nutzer: „Neuen Nutzer anlegen" klappt auf')
+  // „Konten mit IServ abgleichen" (10.10.2026): kurzer Satz, Knopf „Liste anzeigen" – ohne IServ ein Weg zur Anbindung
+  await v.locator('[data-klappkarte="nutzer-iserv-abgleich"] [data-klappkopf]').click()
+  const abgleich = v.locator('[data-iserv-abgleich]')
+  pruefe(
+    (await abgleich.locator('[data-klappkopf]').innerText()).includes('Konten mit IServ abgleichen') &&
+      (await da(abgleich.locator('[data-abgleich-text]'), 5000)) &&
+      (await abgleich.locator('[data-abgleich-text]').innerText()).includes('Erst wird eine Liste gezeigt'),
+    'Nutzer: Abgleich mit IServ in einem kurzen Satz erklärt'
+  )
+  if (await abgleich.locator('[data-abgleich-ohne-iserv]').count()) {
+    await abgleich.locator('[data-abgleich-ohne-iserv] button').click()
+    pruefe((await v.getByRole('tab', { name: 'IServ-Anbindung', exact: true }).getAttribute('aria-selected')) === 'true', 'Nutzer: Verweis führt zur IServ-Anbindung')
+  } else pruefe((await abgleich.locator('[data-abgleich-pruefen]').innerText()).includes('Liste anzeigen'), 'Nutzer: Knopf „Liste anzeigen"')
   await v.getByRole('tab', { name: 'Schule', exact: true }).click()
   await da(v.locator('[data-schule-einrichten]'), 10000)
   pruefe(!(await v.getByText('Die Schule, die diesen Server nutzt').count()), 'Schule: ohne Einleitungstext')

@@ -338,6 +338,47 @@ function solid(value: string): string {
   return value.match(/#[0-9a-f]{6}/i)?.[0] ?? value
 }
 
+/** Relative Leuchtdichte nach WCAG 2.x */
+function leuchtdichte(hex: string): number {
+  const k = (c: number): number => {
+    const x = c / 255
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+  }
+  const [r, g, b] = toRgb(hex)
+  return 0.2126 * k(r) + 0.7152 * k(g) + 0.0722 * k(b)
+}
+
+/** Kontrastverhältnis zweier Hex-Farben nach WCAG (1 … 21) */
+export function kontrast(a: string, b: string): number {
+  const [x, y] = [leuchtdichte(a), leuchtdichte(b)]
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+}
+
+/** Dunkelt eine Farbe in kleinen Schritten ab, bis weiße Schrift darauf mindestens `ziel` erreicht */
+function fuerWeisseSchrift(hex: string, ziel: number): string {
+  let c = hex
+  for (let t = 0.04; kontrast(c, '#ffffff') < ziel && t <= 1; t += 0.04) c = mix(hex, '#000000', t)
+  return c
+}
+
+/**
+ * Rahmen der App (10.10.2026, Entwurf A der Lehrkraft): ruhiger Verlauf in der Akzentfarbe des Themas aus der Farbreihe
+ * (Stufe 6 = `von`, Stufe 9 = `bis`). Weiße Schrift erreicht an jeder Stelle mindestens 4,8 : 1 (WCAG AA mit Reserve für
+ * das Punktmuster); im Dunkelmodus etwas dunkler und entsättigt (Richtung Hintergrund gemischt). Die Seitenleiste trägt
+ * `bis` – deutlich dunkler, damit auch die hellere Pille der aktiven App mit weißer Schrift AA erreicht.
+ */
+export function kopfVerlauf(t: Pick<AppTheme, 'primary' | 'dark'>, scheme: 'light' | 'dark'): { von: string; bis: string } {
+  const p = t.primary
+  const ziel = 4.8
+  if (scheme === 'light') {
+    const von = fuerWeisseSchrift(p[6], ziel)
+    return { von, bis: fuerWeisseSchrift(p[9], Math.max(ziel + 1.5, kontrast(von, '#ffffff') + 2)) }
+  }
+  const grund = solid(t.dark.bg).startsWith('#') ? solid(t.dark.bg) : '#1a1b1e'
+  const von = fuerWeisseSchrift(mix(p[7], grund, 0.3), ziel + 1)
+  return { von, bis: fuerWeisseSchrift(mix(p[9], grund, 0.55), kontrast(von, '#ffffff') + 3) }
+}
+
 const MANTINE_GRAY = ['#f8f9fa', '#f1f3f5', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#868e96', '#495057', '#343a40', '#212529']
 
 /**
@@ -386,9 +427,12 @@ export function buildMantineTheme(t: AppTheme): MantineThemeOverride {
 const HELLGRAU = '#c8cbd0'
 const arbeitsflaeche = (p: ThemePalette, scheme: 'light' | 'dark'): string => (scheme === 'light' && p.bg.startsWith('#') ? mix(p.bg, HELLGRAU, 0.38) : p.bg)
 
-function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<string, string> {
+function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark', t: AppTheme): Record<string, string> {
   const bg = arbeitsflaeche(p, scheme)
+  const kopf = kopfVerlauf(t, scheme)
   return {
+    '--app-kopf-von': kopf.von,
+    '--app-kopf-bis': kopf.bis,
     '--mantine-color-body': p.surface,
     '--mantine-color-text': p.text,
     '--mantine-color-dimmed': p.dimmed,
@@ -404,8 +448,12 @@ function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<str
      * in allen Themen etwa 1,9–2,5; im Dunkelmodus reicht der Rahmen des Themas (ca. 1,4–1,8).
      */
     '--app-card-border': scheme === 'light' ? mix(p.border, p.text, 0.3) : p.border,
-    '--app-nav-bg': p.nav,
-    '--app-nav-solid': solid(p.nav),
+    /*
+     * Rahmen (10.10.2026, Entscheidung der Lehrkraft): Die Leiste bildet mit der Kopfleiste ein Stück und trägt deren
+     * dunkles Ende – in jedem Thema farbig mit weißer Schrift (`p.nav` gilt nur noch für die Vorschau früherer Fassungen).
+     */
+    '--app-nav-bg': kopf.bis,
+    '--app-nav-solid': kopf.bis,
     '--app-hero': p.hero,
     '--editor-canvas': p.canvas,
     '--app-pattern-color': mix(bg, p.text, scheme === 'light' ? 0.09 : 0.12)
@@ -414,14 +462,15 @@ function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<str
 
 export const themeCssVariables: CSSVariablesResolver = (theme) => {
   const t = (theme.other as { appTheme: AppTheme }).appTheme
-  return { variables: {}, light: paletteVariables(t.light, 'light'), dark: paletteVariables(t.dark, 'dark') }
+  return { variables: {}, light: paletteVariables(t.light, 'light', t), dark: paletteVariables(t.dark, 'dark', t) }
 }
 
 /** Stil-Merkmale als Attribute am Wurzelelement, damit app.css Navigation, Karten und Muster umschalten kann. */
 export function applyThemeAttributes(t: AppTheme): void {
   const root = document.documentElement
   root.dataset.appTheme = t.id
-  root.dataset.appNav = t.nav
+  // Seit dem Rahmen (10.10.2026) ist die Leiste immer farbig – die Regeln für „filled" gelten für jedes Thema
+  root.dataset.appNav = 'filled'
   root.dataset.appCards = t.cards
   root.dataset.appPattern = t.pattern
 }

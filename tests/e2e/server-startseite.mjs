@@ -155,7 +155,15 @@ try {
           titel: 'Unit 3 words',
           sprache: 'en',
           fach: 'Englisch',
-          woerter: [{ id: 'w1', term: 'park', translation: 'Park' }],
+          woerter: [
+            { id: 'w1', term: 'park', translation: 'Park' },
+            { id: 'w2', term: 'hello', translation: 'hallo' }
+          ],
+          // Weitester Abschnitt (10.10.2026): „Hello" kommt zuletzt, Unit 2 ist im Buch weiter
+          teile: [
+            { titel: 'Green Line 1 - Unit 2 - Station 2', anzahl: 1 },
+            { titel: 'Green Line 1 - Hello - Check-in', anzahl: 1 }
+          ],
           testTermin: Date.now() + 3 * 864e5
         }
       })
@@ -208,6 +216,11 @@ try {
   const zeileEn = termineP.locator(`[data-start-kurs="${kursMitTermin}"]`)
   pruefe(await da(zeileEn), 'Kurszeile des Kurses mit Testtermin')
   pruefe((await zeileEn.innerText()).includes(`${KLASSE} · Englisch`), `Kurszeile „${KLASSE} · Englisch"`)
+  // Weitester Abschnitt in Buchreihenfolge mit Fortschritt aus dem Lehrwerk (10.10.2026); Platzhalter-Lehrwerk ohne Fortschritt
+  const abschnittEn = (await zeileEn.innerText()).replace(/\s+/g, ' ')
+  pruefe(abschnittEn.includes('Green Line 1 · Unit 2 (Abschnitt 3 von 7)'), `Kurszeile: weitester Abschnitt „Green Line 1 · Unit 2 (Abschnitt 3 von 7)" (${abschnittEn})`)
+  const abschnittFr = (await termineP.locator(`[data-start-kurs="${kursOhneTermin}"]`).innerText()).replace(/\s+/g, ' ')
+  pruefe(abschnittFr.includes('Découvertes 2 · Unité 1') && !abschnittFr.includes('Abschnitt'), `Kurszeile Platzhalter-Lehrwerk ohne Fortschritt (${abschnittFr})`)
   pruefe(/\d+ %/.test(await zeileEn.innerText()), 'Kurszeile mit „n %" (sicher)')
   const badgeEn = (await zeileEn.locator('[data-start-badge]').allInnerTexts()).map((x) => x.trim())
   pruefe(badgeEn.length === 1 && /^Test (heute|morgen|Mo|Di|Mi|Do|Fr|Sa|So)$/.test(badgeEn[0]), `Genau ein Abzeichen „Test …" (${badgeEn.join(' | ')})`)
@@ -217,11 +230,47 @@ try {
   const termineText = await termineP.innerText()
   pruefe(!/heute geübt/.test(termineText) && (await termineP.locator('[data-start-hinweis], [data-start-grammatik]').count()) === 0, 'Keine Zeile „heute geübt", keine Hinweis-/Grammatikzeilen')
   const bald = (await termineP.locator('[data-start-demnaechst]').allInnerTexts()).map((x) => x.replace(/\s+/g, ' ').trim())
-  pruefe(bald.some((x) => new RegExp(`^(Mo|Di|Mi|Do|Fr|Sa|So) \\d\\d\\.\\d\\d\\. Vokabeltest ${KLASSE}`).test(x)), `Demnächst: Vokabeltest mit Datum (${bald.join(' | ')})`)
+  pruefe(bald.some((x) => new RegExp(`^(Mo|Di|Mi|Do|Fr|Sa|So) \\d\\d\\.\\d\\d\\. Vokabeltest ${KLASSE} – Unit 2`).test(x)), `Demnächst: Vokabeltest mit Datum und weitester Unit (${bald.join(' | ')})`)
   pruefe(bald.some((x) => new RegExp(`^(Mo|Di|Mi|Do|Fr) \\d\\d\\.\\d\\d\\. Haltepunkt „Besprechung" \\(${KLASSE}\\)`).test(x)), 'Demnächst: Haltepunkt mit Datum und Klasse')
   const tage = bald.map((x) => x.match(/^\S+ (\d\d)\.(\d\d)\./)).filter(Boolean).map((m) => Number(m[2]) * 100 + Number(m[1]))
   pruefe(tage.every((t, i) => i === 0 || t >= tage[i - 1]), 'Demnächst zeitlich geordnet')
   pruefe((await p.getByText('Programme', { exact: true }).count()) === 0, 'Keine Programmliste mehr auf der Startseite')
+  // Rahmen (10.10.2026): Kopfleiste über die volle Breite, mit der Seitenleiste EIN Stück; Datum und Info-Chips rechts
+  const kopfP = p.locator('[data-rahmen-kopf="gross"]')
+  pruefe(await da(kopfP), 'PC: Kopfleiste des Rahmens')
+  pruefe((await p.locator('.home-hero, [data-home-kopf]').count()) === 0, 'PC: kein eigener Kopf mehr auf der Startseite (nichts doppelt)')
+  const datumP = ((await kopfP.locator('[data-rahmen-datum]').innerText().catch(() => '')) ?? '').trim()
+  pruefe(/^(Mo|Di|Mi|Do|Fr|Sa|So) \d\d\.\d\d\.$/.test(datumP), `PC: Datum im Kopf („${datumP}")`)
+  const farben = await p.evaluate(() => {
+    const kopf = document.querySelector('.rahmen-kopf')
+    const leiste = document.querySelector('.app-leiste')
+    const kb = kopf?.getBoundingClientRect()
+    return { verlauf: kopf ? getComputedStyle(kopf).backgroundImage : '', leiste: leiste ? getComputedStyle(leiste).backgroundColor : '', breite: kb?.width ?? 0, links: kb?.left ?? -1 }
+  })
+  pruefe(/linear-gradient/.test(farben.verlauf) && farben.breite >= 1400 && farben.links === 0, `PC: Kopf mit Verlauf über die volle Breite (${Math.round(farben.breite)} px)`)
+  pruefe(Boolean(farben.leiste) && farben.verlauf.startsWith(`linear-gradient(90deg, ${farben.leiste}`), `PC: Kopf und Leiste teilen den Grund – Ecke nahtlos (Leiste ${farben.leiste})`)
+  pruefe(await da(kopfP.locator('[data-rahmen-chip="geplant"]'), 8000), 'PC: Chip „1 Test geplant" im Kopf')
+  const chipGeplant = (await kopfP.locator('[data-rahmen-chip="geplant"]').innerText().catch(() => '')).trim()
+  pruefe(chipGeplant === '1 Test geplant', `PC: Chip-Text „${chipGeplant}"`)
+  pruefe((await kopfP.locator('[data-rahmen-chip="vokabeltest"]').getAttribute('data-anzahl').catch(() => null)) === '1', 'PC: Chip „1 Vokabeltest bald" (Testtermin in 3 Tagen)')
+  const chips = await kopfP.locator('[data-rahmen-chip]').evaluateAll((e) => e.map((x) => Number(x.getAttribute('data-anzahl'))))
+  pruefe(chips.length > 0 && chips.every((n) => n > 0), `PC: nur Chips mit Zahl > 0 (${chips.join(', ')})`)
+  const kachel = await kopfP.locator('[data-rahmen-logo-kachel]').boundingBox()
+  const leisteB = await p.locator('.app-leiste').boundingBox()
+  pruefe(kachel && leisteB && kachel.x + kachel.width <= leisteB.width + 1, 'PC: Logo-Kachel in der Ecke über der Leiste')
+  await p.screenshot({ path: join(out, '0-rahmen-pc.png'), clip: { x: 0, y: 0, width: 1440, height: 420 } })
+  // Schmal: passen die Chips nicht, stehen sie in „N Hinweise ▾"
+  await p.setViewportSize({ width: 720, height: 1000 })
+  const hinweise = p.locator('[data-rahmen-kopf="gross"] [data-rahmen-hinweise]')
+  pruefe(await da(hinweise, 5000), 'Schmal: Chips eingeklappt in „N Hinweise ▾"')
+  if (await hinweise.isVisible().catch(() => false)) {
+    await hinweise.click()
+    pruefe(await da(p.locator('[data-rahmen-hinweise-liste] [data-rahmen-chip="geplant"]'), 3000), 'Schmal: „Hinweise" zeigt die Chips')
+    await p.waitForTimeout(400)
+    await p.screenshot({ path: join(out, '0b-rahmen-schmal.png'), clip: { x: 0, y: 0, width: 720, height: 420 } })
+    await hinweise.click()
+  }
+  await p.setViewportSize({ width: 1440, height: 1000 })
   await p.screenshot({ path: join(out, '1-startseite.png'), fullPage: true })
   await termineP.screenshot({ path: join(out, '1b-termine-pc.png') })
   // Suche (10.10.2026): das Suchergebnis steht direkt unter dem Suchfeld, über dem Schnellzugriff
@@ -255,6 +304,8 @@ try {
   // Laufende Reihen → Übersicht der Reihe
   await p.locator('.app-leiste [aria-label="Laufende Reihen"]').click()
   pruefe(await da(p.locator('[data-laufende-reihen] [data-laufende-reihe]')), 'App „Laufende Reihen" mit Karte')
+  // Der Rahmen steht auf jeder Seite – mit denselben Chips
+  pruefe(await da(p.locator('[data-rahmen-kopf="gross"] [data-rahmen-chip="geplant"]'), 5000), 'Andere App: Kopfleiste mit Chips bleibt')
   await p.screenshot({ path: join(out, '2-laufende-reihen.png'), fullPage: true })
   await p.locator('[data-laufende-reihen] [data-reihe-oeffnen-uebersicht]').first().click()
   pruefe(await da(p.locator('[data-reihe-uebersicht]')), 'Sprung in die Übersicht der Reihe')
@@ -289,10 +340,11 @@ try {
   await anmelden(handy, lehrer.benutzer, lehrer.passwort)
   const h = await handy.newPage()
   await h.goto(`${A}/`)
-  pruefe(await da(h.locator('[data-home-kopf="handy"]')), 'Smartphone: eigener Kopf der Startseite')
+  pruefe(await da(h.locator('[data-rahmen-kopf="handy"]')), 'Smartphone: schmale Kopfleiste')
   pruefe(!(await h.getByText('Material für den Unterricht und').isVisible().catch(() => false)), 'Smartphone: ohne Untertitel')
-  pruefe(await da(h.locator('[data-home-logo]')), 'Smartphone: Schullogo links im Kopf')
-  const ecke = await h.locator('[data-home-logo]').evaluate(
+  pruefe((await h.locator('.app-leiste').count()) === 0 && (await h.locator('.mobil-tabs').count()) === 1, 'Smartphone: keine Seitenleiste, Tabs unten')
+  pruefe(await da(h.locator('[data-rahmen-logo]')), 'Smartphone: Schullogo links im Kopf')
+  const ecke = await h.locator('[data-rahmen-logo]').evaluate(
     (img) =>
       new Promise((ok) => {
         const pruef = () => {
@@ -313,6 +365,25 @@ try {
     const [mk, su] = [await h.locator('[data-home-meineklassen]').boundingBox(), await suche.boundingBox()]
     pruefe(mk && su && mk.y < su.y, '„Meine Klassen" steht über der Materialsuche')
   }
+  // Kopf (10.10.2026): Logo auf weißer Kachel, Schulname gekürzt, Chips in „Heute ▾"
+  const kopfH = h.locator('[data-rahmen-kopf="handy"]')
+  pruefe(
+    (await kopfH.locator('[data-rahmen-logo-kachel]').evaluate((e) => getComputedStyle(e).backgroundColor).catch(() => '')) === 'rgb(255, 255, 255)',
+    'Smartphone: Logo auf weißer Kachel'
+  )
+  const kopfHB = await kopfH.boundingBox()
+  pruefe(kopfHB && kopfHB.height <= 56, `Smartphone: Kopfleiste kompakt (${kopfHB?.height} px)`)
+  const heute = kopfH.locator('[data-rahmen-hinweise]')
+  if (await da(heute, 8000)) {
+    pruefe((await heute.innerText()).startsWith('Heute'), 'Smartphone: Knopf „Heute ▾"')
+    await heute.click()
+    pruefe(await da(h.locator('[data-rahmen-hinweise-liste] [data-rahmen-chip="geplant"]'), 3000), 'Smartphone: „Heute" zeigt die Chips')
+    await h.screenshot({ path: join(out, '4a-handy-heute.png') })
+    await heute.click()
+    await h.locator('[data-rahmen-hinweise-liste]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => undefined)
+  } else pruefe(false, 'Smartphone: „Heute ▾" im Kopf')
+  const breiteH = await h.evaluate(() => document.documentElement.scrollWidth)
+  pruefe(breiteH <= 390, `Smartphone: kein waagerechtes Scrollen (${breiteH})`)
   await h.screenshot({ path: join(out, '4-handy-kopf.png') })
 
   // ---------- Termine & Vokabeltraining (10.10.2026): auch ein laufender Kurs OHNE Testtermin
@@ -323,6 +394,18 @@ try {
   pruefe(textFr.includes(`${KLASSE} · Französisch`) && /\d+ %/.test(textFr) && !/heute geübt/.test(textFr), `Smartphone: Kurszeile „${KLASSE} · Französisch" mit „n %", ohne „heute geübt"`)
   pruefe((await zeileFr.locator('[data-start-badge]').count()) === 1, `Smartphone: Kurszeile mit genau einem Abzeichen (${await zeileFr.getAttribute('data-start-abzeichen')})`)
   pruefe((await termine.locator('[data-start-demnaechst]').count()) >= 1, 'Smartphone: „Demnächst" unter den Kursen')
+  // Weitester Abschnitt (10.10.2026): auch am Smartphone in EINER Zeile (gekürzt mit „…"), voller Text im Tooltip
+  const kopfEnH = termine.locator(`[data-start-kurs="${kursMitTermin}"] button[title] > p`).first()
+  const hoeheEnH = (await kopfEnH.boundingBox().catch(() => null))?.height ?? 0
+  pruefe(
+    hoeheEnH > 0 && hoeheEnH < 28 && (await termine.locator(`[data-start-kurs="${kursMitTermin}"] button[title]`).getAttribute('title')) === 'Green Line 1 · Unit 2 (Abschnitt 3 von 7)',
+    `Smartphone: Kurszeile einzeilig (${hoeheEnH} px), voller Abschnitt im Tooltip`
+  )
+  const unitFrH = termine.locator(`[data-start-kurs="${kursOhneTermin}"] [data-start-unit]`)
+  pruefe(
+    await unitFrH.evaluate((e) => e.textContent.includes('Unité 1') && e.scrollWidth <= e.clientWidth + 1).catch(() => false),
+    'Smartphone: die Unit bleibt ungekürzt (zuerst kürzt der Band)'
+  )
   // Hinweis „Schuldaten übernehmen?" verdeckt sonst die Karte im Bild
   const neinDanke = h.getByRole('button', { name: 'Nein, danke' })
   if (await neinDanke.isVisible().catch(() => false)) await neinDanke.click()
@@ -388,9 +471,46 @@ try {
   await anmelden(gross, lehrer.benutzer, lehrer.passwort)
   const gp = await gross.newPage()
   await gp.goto(`${A}/`)
-  pruefe(await da(gp.locator('[data-home-kopf="gross"] [data-home-logo]'), 15000), 'PC: Schullogo im Kopf der Startseite')
+  pruefe(await da(gp.locator('[data-rahmen-kopf="gross"] [data-rahmen-logo-kachel] [data-rahmen-logo]'), 15000), 'PC: Schullogo auf der Kachel im Kopf')
   pruefe(!(await gp.getByText('Material für den Unterricht und').isVisible().catch(() => false)), 'PC: ohne Untertitel')
+  pruefe(((await gp.locator('[data-rahmen-schule]').innerText().catch(() => '')) ?? '').trim().length > 0, 'PC: Schulname im Kopf')
   await gp.screenshot({ path: join(out, '4c-pc-kopf.png') })
+  // Rahmen in weiteren Farbschemata zum Ansehen (Testkonto, wird gelöscht): Lila hell, Orange hell, Rot dunkel – PC, iPad-Breite, Telefon
+  for (const [theme, colorScheme] of [['grape', 'light'], ['orange', 'light'], ['red', 'dark']]) {
+    await api(gross)('settings:set', { appearance: { colorScheme, theme, dunkelVorgabe: false } })
+    await gp.reload()
+    await da(gp.locator('[data-rahmen-kopf="gross"] [data-rahmen-chip]'), 10000)
+    await gp.screenshot({ path: join(out, `4d-rahmen-${theme}-${colorScheme}.png`) })
+    await gp.setViewportSize({ width: 1024, height: 768 })
+    await gp.waitForTimeout(300)
+    await gp.screenshot({ path: join(out, `4e-rahmen-ipad-${theme}-${colorScheme}.png`) })
+    await gp.setViewportSize({ width: 390, height: 844 })
+    await da(gp.locator('[data-rahmen-kopf="handy"]'), 5000)
+    await gp.screenshot({ path: join(out, `4f-rahmen-handy-${theme}-${colorScheme}.png`) })
+    await gp.setViewportSize({ width: 1280, height: 860 })
+  }
+  // Breite Leiste: Namen ausgeklappt, „Schul-Apps" steht in der Ecke über der Leiste
+  const breitKnopf = gp.locator('.app-leiste [aria-label="Leiste mit Namen ausklappen"]')
+  if (await breitKnopf.isVisible().catch(() => false)) {
+    await breitKnopf.click()
+    await gp.waitForTimeout(300)
+    await gp.screenshot({ path: join(out, '4g-rahmen-breit.png') })
+    await gp.locator('.app-leiste [aria-label="Namen einklappen"]').click()
+  }
+  // Ein Chip führt in die passende App; der Rahmen bleibt stehen
+  const chipT = gp.locator('[data-rahmen-kopf="gross"] [data-rahmen-chip="geplant"]')
+  if (await da(chipT, 8000)) {
+    await chipT.click()
+    pruefe(
+      await gp.locator('[data-schnellzugriff-raster]').waitFor({ state: 'detached', timeout: 8000 }).then(
+        () => true,
+        () => false
+      ),
+      'Chip „Test geplant" öffnet die App Onlinetest (Startseite verlassen)'
+    )
+    pruefe(await gp.locator('[data-rahmen-kopf="gross"]').isVisible(), 'Onlinetest: Kopfleiste des Rahmens bleibt')
+    await gp.screenshot({ path: join(out, '4h-chip-onlinetest.png') })
+  } else pruefe(false, 'PC: Chip „Test geplant" nach dem Farbwechsel')
   await gross.close()
   await verwaltung.request.post(`${A}/server/schule/logo`, { headers: KOPF, data: { logo: null } })
   if (vorher.schule) await verwaltung.request.post(`${A}/server/schule`, { headers: KOPF, data: vorher.schule })

@@ -668,6 +668,24 @@ export function KursSeite({
       ) : (
         <Alert>{d.code ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.' : 'Noch niemand in der Lerngruppe.'}</Alert>
       )}
+      {(d.ruhend ?? []).length > 0 && (
+        // Wiederholer/Klassenwechsel (10.10.2026): Die Einzel-Freigabe ruht – der Lernstand bleibt, wieder aufnehmen geht hier
+        <Alert color="gray" title="Ruht nach Klassenwechsel" data-kurs-ruhend>
+          <Text size="sm" mb={6}>
+            In der neuen Klasse gelten deren Freigaben. Der Lernstand bleibt erhalten und zählt, sobald die Klasse dieselben Wörter freigibt.
+          </Text>
+          <Stack gap={4}>
+            {(d.ruhend ?? []).map((r) => (
+              <Group key={r.id} gap="xs">
+                <Text size="sm">{r.name}</Text>
+                <Button size="compact-xs" variant="light" onClick={() => aendern('ruhend-aufheben', { schueler: r.id })} data-ruhend-aufheben={r.id}>
+                  Wieder aufnehmen
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </Alert>
+      )}
     </Stack>
   )
 

@@ -7,6 +7,8 @@
 // Im Browser sind die Werte von env(safe-area-inset-*) 0 – die Prüfung setzt deshalb die Variablen
 // der Datei (--sicher-oben …) wie auf einem iPad bzw. iPhone quer und färbt die verdeckten Streifen
 // halbdurchsichtig rot ein. Die Bildschirmfotos zeigen, dass dort nur Hintergrund liegt.
+// Seit dem Rahmen (10.10.2026) steht oben die Kopfleiste: Ihr Grund reicht unter die Statusleiste, ihr Inhalt beginnt
+// darunter; Seitenleiste und Inhalt rücken um Kopfhöhe plus Statusleiste ab.
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { createServer } from 'http'
@@ -55,11 +57,16 @@ for (const [name, w, h, oben, unten, links] of [['ipad', 1180, 820, 24, 20, 0], 
     const nav = document.querySelector('.mantine-AppShell-navbar')?.getBoundingClientRect()
     const main = document.querySelector('.mantine-AppShell-main')
     const erstes = main?.firstElementChild?.getBoundingClientRect()
-    return { navTop: nav?.top, navBottom: nav?.bottom, navLeft: nav?.left, mainPadTop: main && getComputedStyle(main).paddingTop, mainPadBottom: main && getComputedStyle(main).paddingBottom, inhaltTop: erstes?.top, hoehe: innerHeight }
+    const kopf = document.querySelector('.mantine-AppShell-header')
+    const kr = kopf?.getBoundingClientRect()
+    return { kopfTop: kr?.top, kopfHoehe: kr?.height, kopfPad: kopf && parseFloat(getComputedStyle(kopf).paddingTop), navTop: nav?.top, navBottom: nav?.bottom, navLeft: nav?.left, mainPadTop: main && getComputedStyle(main).paddingTop, mainPadBottom: main && getComputedStyle(main).paddingBottom, inhaltTop: erstes?.top, hoehe: innerHeight }
   })
-  pruefe(r.navTop === oben && r.navLeft === links, `${name}: Seitenleiste beginnt unter der Statusleiste bzw. neben der Aussparung (${r.navTop}/${r.navLeft})`)
+  // Höhe der Kopfleiste ohne den Streifen der Statusleiste
+  const kopf = (r.kopfHoehe ?? 0) - (r.kopfPad ?? 0)
+  pruefe(r.kopfTop === 0 && r.kopfPad === oben && kopf > 40, `${name}: Kopfleiste reicht unter die Statusleiste, ihr Inhalt beginnt darunter (oben ${r.kopfTop}, Abstand ${r.kopfPad}, Höhe ${kopf})`)
+  pruefe(r.navTop === oben + kopf && r.navLeft === links, `${name}: Seitenleiste beginnt unter der Statusleiste bzw. neben der Aussparung (${r.navTop}/${r.navLeft})`)
   pruefe(r.navBottom === r.hoehe - unten, `${name}: Seitenleiste endet über dem App-Wechsel-Balken (${r.navBottom} von ${r.hoehe})`)
-  pruefe(r.mainPadTop === `${oben}px` && r.mainPadBottom === `${unten}px`, `${name}: Inhalt rückt oben und unten ab (${r.mainPadTop}/${r.mainPadBottom})`)
+  pruefe(r.mainPadTop === `${oben + kopf}px` && r.mainPadBottom === `${unten}px`, `${name}: Inhalt rückt oben und unten ab (${r.mainPadTop}/${r.mainPadBottom})`)
   await page.getByRole('button', { name: /Einstellungen/ }).filter({ visible: true }).first().click().catch(() => undefined)
   await page.waitForTimeout(800)
   await page.screenshot({ path: join(out, `sicher-${name}-einstellungen.png`) })
@@ -72,9 +79,11 @@ for (const [name, w, h, oben, unten, links] of [['ipad', 1180, 820, 24, 20, 0], 
   await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
   const r = await page.evaluate(() => ({
     navTop: document.querySelector('.mantine-AppShell-navbar')?.getBoundingClientRect().top,
-    pad: getComputedStyle(document.querySelector('.mantine-AppShell-main')).paddingTop
+    pad: getComputedStyle(document.querySelector('.mantine-AppShell-main')).paddingTop,
+    kopf: document.querySelector('.mantine-AppShell-header')?.getBoundingClientRect().height ?? 0
   }))
-  pruefe(r.navTop === 0 && r.pad === '0px', `ohne Aussparungen unverändert (${r.navTop}/${r.pad})`)
+  // Nur die Kopfleiste des Rahmens rückt ab – kein Streifen für eine Statusleiste
+  pruefe(r.kopf > 40 && r.navTop === r.kopf && r.pad === `${r.kopf}px`, `ohne Aussparungen nur um die Kopfleiste abgerückt (${r.navTop}/${r.pad}, Kopf ${r.kopf})`)
 }
 await browser.close()
 server.close()

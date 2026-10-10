@@ -74,10 +74,22 @@ function aufraeumen(v: Datei, jetzt: Date): void {
 }
 
 /**
+ * Haken für den Server (10.10.2026, server/kiNutzung.ts › meldeTokens): Token eines Aufrufs über den Schlüssel der
+ * Schule landen zusätzlich in der Nutzung der Schule (Verwaltung › KI-Zugänge, Kosten-Schätzung).
+ */
+let verbrauchsHaken: ((anbieter: string, modell: string, teil: Partial<Zaehler>) => void) | null = null
+export const setzeVerbrauchsHaken = (h: typeof verbrauchsHaken): void => void (verbrauchsHaken = h)
+
+/**
  * Zählt dazu. Fehler beim Schreiben werden verschluckt – zählen darf nie eine Anfrage scheitern lassen.
  * `art` (seit 09.10.2026): wofür die Anfrage war (shared/kiArten.ts) – für das Ringdiagramm „nach Programm".
  */
 export function merkeVerbrauch(anbieter: string, modell: string, teil: Partial<Zaehler>, art?: KiArt, jetzt = new Date()): void {
+  try {
+    verbrauchsHaken?.(anbieter, modell, teil)
+  } catch {
+    // Haken ist Beiwerk
+  }
   try {
     const v = lesen()
     const m = ((v as Verbrauch)[monat(jetzt)] ??= {})

@@ -42,6 +42,8 @@ import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
 import { FachschaftFachFrage, useFachschaftNeu } from './shared/components/Fachordner'
 import { useOffenGemerkt } from './shared/sitzung'
+import RahmenKopf, { KOPF_HOEHE, KOPF_HOEHE_TELEFON } from './shell/RahmenKopf'
+import { useKopfDatenAktuell } from './shell/kopfDaten'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
 const LEISTE_KEY = 'schul-apps-leiste-breit'
@@ -145,6 +147,16 @@ export default function App(): React.JSX.Element {
   }
   const schubladeAuf = useCallback(() => setSchublade(true), [])
   useRandWischen(ohneLeiste, schubladeAuf)
+  /*
+   * Rahmen (10.10.2026, Entscheidung der Lehrkraft): Kopfleiste und Seitenleiste bilden ein „L" um den Inhalt – auf
+   * jeder Seite, nur nicht im eigenen Fenster eines Programms. Die Info-Chips im Kopf bleiben aktuell (nur Server).
+   */
+  const rahmen = !einzeln
+  // Schmale Kopfleiste am Telefon – und in jedem schmalen Fenster (bis 700 px), sonst würde der Titel die Chips verdrängen
+  const schmalesFenster = useMediaQuery('(max-width: 700px)') ?? false
+  const kopfSchmal = telefon || schmalesFenster
+  useKopfDatenAktuell()
+  const leisteBreite = ohneLeiste ? 0 : breit ? 232 : 76
   const navDaten: NavigationsDaten = { programme: sichtbar, active, laufpunkte, oeffnen: oeffneProgramm }
   useEffect(() => {
     if (!einzeln) return
@@ -265,9 +277,20 @@ export default function App(): React.JSX.Element {
     )
 
   return (
-    <AppShell navbar={ohneLeiste ? undefined : { width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
+    <AppShell
+      header={rahmen ? { height: kopfSchmal ? KOPF_HOEHE_TELEFON : KOPF_HOEHE } : undefined}
+      navbar={ohneLeiste ? undefined : { width: leisteBreite, breakpoint: 0 }}
+      padding={0}
+      className="app-rahmen"
+      data-rahmen={rahmen || undefined}
+    >
+      {rahmen && (
+        <AppShell.Header className="rahmen-kopf" withBorder={false}>
+          <RahmenKopf telefon={kopfSchmal} eckeBreite={leisteBreite} />
+        </AppShell.Header>
+      )}
       {!ohneLeiste && (
-        <AppShell.Navbar p={10} className="app-leiste" data-breit={breit} data-dichte={dichte || undefined}>
+        <AppShell.Navbar p={10} className="app-leiste" withBorder={false} data-breit={breit} data-dichte={dichte || undefined}>
           <AppShell.Section>
             <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
               <IconHome size={22} />
@@ -285,7 +308,8 @@ export default function App(): React.JSX.Element {
               Leistungsüberprüfungen, Verwaltung. Ein Klick auf die Gruppe klappt ihre Apps auf oder zu;
               die Leiste merkt sich das je Sitzung (zu Beginn alle zu, 10.10.2026); die Gruppe einer geöffneten App klappt auf.
             */}
-            {/* Ganz oben ohne Gruppe (09.10.2026): Meine Klassen */}
+            {/* Ganz oben ohne Gruppe (09.10.2026): Meine Klassen – mit etwas Abstand zur ersten Gruppe (10.10.2026) */}
+            <div className="leiste-oben">
             {LEISTE_OBEN.flatMap((id) => sichtbar.filter((m) => m.id === id)).map((m) => (
               <NavIcon
                 key={m.id}
@@ -301,6 +325,7 @@ export default function App(): React.JSX.Element {
                 <m.icon size={22} />
               </NavIcon>
             ))}
+            </div>
             {MODUL_GRUPPEN.map((g) => {
               // In der Reihenfolge der Gruppe (wie abgestimmt), nicht der Registrierung
               const apps = g.apps.flatMap((id) => sichtbar.filter((m) => m.id === id))
@@ -419,7 +444,7 @@ export default function App(): React.JSX.Element {
       {/* Nach dem ersten Start und nach dem Zurücksetzen: die Einrichtung in drei Schritten */}
       {!einzeln && <Einrichtung />}
 
-      <AppShell.Main className="app-main" data-mobil-tabs={telefon || undefined}>
+      <AppShell.Main className="app-main" data-mobil-tabs={telefon || undefined} data-rahmen={rahmen || undefined}>
         {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}
         {active === 'home' && <Home />}
         {active === 'settings' && <SettingsPage />}

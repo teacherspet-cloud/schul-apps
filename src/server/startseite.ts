@@ -9,6 +9,12 @@
  * Fassung: Test bald > nicht geübt > Problemwörter > ✓, shared/startseiteKurse.ts `kursAbzeichen`); „nicht geübt" aus
  * dem Handlungsbedarf wie in „Meine Klassen" (`kursBedarfDerGruppe`, Ausgeblendetes bleibt ausgeblendet). Nur für
  * Lehrkräfte.
+ *
+ * Abschnitt je Kurszeile (10.10.2026, Entscheidung der Lehrkraft): der am weitesten fortgeschrittene freigeschaltete
+ * Abschnitt in Buchreihenfolge mit Fortschritt – „Green Line 3 · Unit 2 (Abschnitt 3 von 5)" (shared/startseiteKurse.ts
+ * `weitesterAbschnitt`); die Gliederung kommt aus der Lehrwerk-Datei (mitgeliefert, gemeinsam oder eigener Import,
+ * zwischengespeichert). Einzelfreigaben (nur für ausgewählte Lernende) stehen nicht als eigene Zeile neben dem Kurs der
+ * ganzen Lerngruppe in derselben Sprache.
  */
 import { json, type Anfrage } from './http'
 import { lerngruppenVon } from './onlinetest'
@@ -16,7 +22,17 @@ import { vokabelnDerGruppe } from './vokabeln'
 import { grammatikDerGruppe } from './grammatik'
 import { ausgeblendetVon, bedarfAufteilen, kursBedarfDerGruppe, klassenSchluessel, nachKlasse, type Bedarf } from './klassen'
 import { verborgeneGruppen } from './iservKursgruppen'
-import { abschnittText, einheitText, kursAbzeichen, type StartKlasse, type StartKurs, type StartseiteDaten } from '../shared/startseiteKurse'
+import type { Quelle } from '../shared/vokabelLaufbahn'
+import { lehrwerkGliederung, lehrwerkName } from './wartungAbschnitteTeilen'
+import { kursAbzeichen, kursStand, type StartKlasse, type StartKurs, type StartseiteDaten } from '../shared/startseiteKurse'
+
+const quelleVon = (roh: string | undefined): Partial<Quelle> | null => {
+  try {
+    return roh ? (JSON.parse(roh) as Partial<Quelle>) : null
+  } catch {
+    return null
+  }
+}
 
 export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): StartseiteDaten {
   const verborgen = verborgeneGruppen(lehrkraftId)
@@ -38,9 +54,12 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
     const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt).trainings.filter((t) => t.vokId && !t.extra && t.status === 'offen')
     // Handlungsbedarf wie in „Meine Klassen" – Ausgeblendetes zählt nicht (für „n nicht geübt")
     const { sichtbar } = bedarfAufteilen(kursBedarfDerGruppe(vok.hinweisDaten, offen, lehrkraftId, jetzt) as Bedarf[], ausgeblendetVon(lehrkraftId, g.id))
-    for (const t of offen) {
-      if (!t.woerter && !gram.some((x) => x.vokId === t.id)) continue
-      const teile = vok.hinweisDaten[t.id]?.eingabe.teile ?? []
+    const mitInhalt = offen.filter((t) => t.woerter || gram.some((x) => x.vokId === t.id))
+    const ganzeGruppe = new Set(mitInhalt.filter((t) => !vok.hinweisDaten[t.id]?.einzeln).map((t) => t.sprache))
+    for (const t of mitInhalt) {
+      const h = vok.hinweisDaten[t.id]
+      if (h?.einzeln && ganzeGruppe.has(t.sprache)) continue
+      const teile = h?.eingabe.teile ?? []
       const testTermin = t.testTermin && t.testTermin >= jetzt - 86_400_000 ? t.testTermin : null
       const inaktiv = sichtbar.find((b) => b.kurs === t.id && b.hinweis === 'inaktiv')?.ids ?? []
       kurse.push({
@@ -48,8 +67,11 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
         gruppeId: g.id,
         gruppe: g.name.trim(),
         fach: (g.fach || t.fach || '').trim(),
-        abschnitt: abschnittText(teile, t.baende, t.titel, jetzt),
-        einheit: einheitText(teile, t.baende, t.titel, jetzt),
+        ...kursStand(teile, t.baende, t.titel, jetzt, {
+          quelle: quelleVon(h?.quelle),
+          nameVon: (k) => lehrwerkName(k, lehrkraftId),
+          gliederung: (k, buch) => lehrwerkGliederung(k, buch, lehrkraftId)
+        }),
         woerter: t.woerter,
         sicher: t.woerter ? t.sicherSchnitt : null,
         lernende: t.lernende,

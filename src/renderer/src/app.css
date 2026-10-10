@@ -317,17 +317,236 @@ body {
   border-bottom: 3px solid var(--mantine-primary-color-filled);
 }
 
-/* Startseite */
-.home-hero {
-  background: var(--app-hero);
+/*
+ * Rahmen der App (10.10.2026, Entscheidung der Lehrkraft): Kopfleiste und Seitenleiste bilden ein „L" um den Inhalt.
+ * Kopf: Verlauf in der Akzentfarbe vom dunklen Ende (links, wie die Leiste – die Ecke ist nahtlos) zum hellen (rechts);
+ * weiße Schrift überall mindestens 4,8 : 1 (themes.ts kopfVerlauf). Punktmuster rechts, keine Bewegung.
+ * Der Inhalt liegt wie ein Blatt im Rahmen: oben links eine runde Innenecke.
+ */
+.rahmen-kopf {
+  background: linear-gradient(90deg, var(--app-kopf-bis) 0%, var(--app-kopf-bis) 12%, var(--app-kopf-von) 100%);
   color: #fff;
+  border: 0;
+  overflow: hidden;
+}
+.rahmen-kopf::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 40%;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 1.3px, transparent 1.8px);
+  background-size: 16px 16px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 80%);
+  mask-image: linear-gradient(to right, transparent, #000 80%);
+}
+.rahmen-kopf-innen {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-inline-end: 20px;
+}
+.rahmen-ecke {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+  padding-inline-start: 14px;
+  color: #fff;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.rahmen-ecke:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -4px;
+  border-radius: 10px;
+}
+.rahmen-logo-kachel {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+.rahmen-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.rahmen-logo-ersatz {
+  color: var(--app-kopf-bis);
+}
+.rahmen-titel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.rahmen-name {
+  font-family: var(--mantine-font-family-headings);
+  font-weight: 700;
+  font-size: 1.3rem;
+  white-space: nowrap;
+}
+.rahmen-schule {
+  font-size: var(--mantine-font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
+}
+.rahmen-chips {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.rahmen-chips-mass {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 8px;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+/* Chips dunkeln den Grund ab – der Kontrast der weißen Schrift steigt dadurch nur */
+.rahmen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.rahmen-chip:hover {
+  background: rgba(0, 0, 0, 0.32);
+}
+.rahmen-chip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.rahmen-hinweise-zahl {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--app-kopf-bis);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.rahmen-hinweise-liste {
+  max-width: min(360px, calc(100vw - 24px));
+}
+.rahmen-hinweis {
+  display: block;
+  padding: 8px 10px;
   border-radius: var(--mantine-radius-default);
-  padding: 28px 32px;
-  margin-bottom: 32px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--app-border);
+}
+.rahmen-hinweis:hover {
+  background: var(--mantine-color-default-hover);
+}
+.rahmen-datum {
+  flex: 0 0 auto;
+  color: #fff;
+  font-weight: 600;
+  font-size: var(--mantine-font-size-sm);
+  white-space: nowrap;
+}
+/* Telefon: schmale Leiste – Kachel kleiner, Schulname gekürzt */
+[data-rahmen-kopf='handy'].rahmen-kopf-innen {
+  gap: 8px;
+  padding-inline-end: 10px;
+}
+[data-rahmen-kopf='handy'] .rahmen-ecke {
+  gap: 10px;
+  padding-inline-start: 10px;
+}
+[data-rahmen-kopf='handy'] .rahmen-logo-kachel {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  padding: 3px;
+}
+[data-rahmen-kopf='handy'] .rahmen-name {
+  font-size: 1.05rem;
+}
+[data-rahmen-kopf='handy'] .rahmen-schule {
+  font-size: var(--mantine-font-size-xs);
+  max-width: 100%;
+}
+[data-rahmen-kopf='handy'] .rahmen-chips {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+[data-rahmen-kopf='handy'] .rahmen-chip {
+  min-height: 34px;
+  padding: 4px 10px;
+}
+/* Inhalt als Blatt im Rahmen: runde Innenecke oben links (über dem Inhalt, unter Kopf, Leiste und Dialogen) */
+.app-main[data-rahmen]::before {
+  content: '';
+  position: fixed;
+  top: var(--app-shell-header-offset, 0px);
+  left: var(--app-shell-navbar-offset, 0px);
+  width: 18px;
+  height: 18px;
+  z-index: 99;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 100%, transparent 17.5px, var(--app-kopf-bis) 18px);
+}
+@media print {
+  .rahmen-kopf,
+  .app-main[data-rahmen]::before {
+    display: none !important;
+  }
 }
 
-.home-hero .mantine-Title-root {
+/*
+ * Leiste im Rahmen (10.10.2026): weiße Symbole und Schrift auf dem dunklen Ende des Verlaufs; die aktive App als hellere,
+ * durchscheinende Pille mit feinem Rand (weiße Schrift darauf mindestens 4,5 : 1 in jedem Thema).
+ */
+:root[data-app-nav='filled'] .nav-icon[data-active='true'] {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.7);
+}
+:root[data-app-nav='filled'] .nav-icon[data-bild='true'][data-active='true'] {
+  background: rgba(255, 255, 255, 0.18);
+}
+:root[data-app-nav='filled'] .nav-icon[data-active='true'] .programm-symbol .sym-akzent {
+  fill: currentColor;
+  fill-opacity: 0.4;
+}
+:root[data-app-nav='filled'] {
+  --leiste-kopf-text: rgba(255, 255, 255, 0.85);
+}
+:root[data-app-nav='filled'] .app-leiste .mantine-Button-label {
   color: #fff;
 }
 
@@ -1227,22 +1446,6 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
   padding: 0 !important;
 }
 
-/* Startseite auf dem Smartphone (10.10.2026): Logo links, „Schul-Apps" und Schulname rechts daneben */
-.home-hero-handy {
-  padding: 16px 18px;
-  margin-bottom: 16px;
-}
-.home-hero-handy .mantine-Title-root {
-  font-size: 1.6rem;
-  line-height: 1.15;
-}
-.home-logo {
-  height: 56px;
-  width: auto;
-  max-width: 96px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
 .home-meineklassen {
   width: 100%;
 }
@@ -1346,8 +1549,10 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
   min-height: 48px;
 }
 
-/* Startseite PC/Tablet (10.10.2026): Logo wie am Telefon, etwas größer */
-.home-logo-gross {
-  height: 72px;
-  max-width: 140px;
+/* Leiste (10.10.2026): „Meine Klassen" oben etwas abgesetzt von der ersten Gruppe „Unterricht" */
+.app-leiste .leiste-oben {
+  margin-bottom: 10px;
+}
+.app-leiste[data-dichte] .leiste-oben {
+  margin-bottom: 6px;
 }

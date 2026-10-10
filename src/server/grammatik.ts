@@ -46,6 +46,7 @@ import {
   teileVon
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
+import { gramNachziehen, mitnahmeVon, ruht } from './mitnahme'
 import { rekordEintragen } from './rekordbuch'
 import { themenTeilung } from './grammatikTeilen'
 import { buchFuer } from './vokabelweg'
@@ -353,11 +354,18 @@ interface GramStand {
 const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'offen' && !(z.bis && z.bis < Date.now())
 const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM gram_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
 const paketVon = (z: Zeile): GrammatikPaket => json_(z.paket, { thema: z.thema, regeln: [], aufgaben: [] } as GrammatikPaket)
-const standVon = (zid: string, sid: string): GramStand =>
-  json_((db().prepare('SELECT daten FROM gram_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined)?.daten, {
+const standVon = (zid: string, sid: string): GramStand => {
+  const st = json_((db().prepare('SELECT daten FROM gram_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined)?.daten, {
     aufgaben: {},
     tage: []
   } as GramStand)
+  // Wiederholer/Klassenwechsel (10.10.2026, mitnahme.ts): Grammatik, die die Person schon geübt hat, zählt sofort
+  if (mitnahmeVon(sid)?.gram.length) {
+    const z = zeile(zid)
+    if (z && gramNachziehen(z, sid, st)) standSpeichern(zid, sid, st)
+  }
+  return st
+}
 function standSpeichern(zid: string, sid: string, s: GramStand): void {
   db()
     .prepare(
@@ -387,6 +395,8 @@ const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(12
 /** `kurse`: Merkliste der Kurse (Vokabeltrainings) für viele Prüfungen hintereinander – die Zeile samt Wortliste zu entschlüsseln kostet */
 function istFuer(z: Zeile, ich: NutzerInfo, kurse?: Map<string, ReturnType<typeof vokVon>>): boolean {
   if (ich.rolle !== 'schueler') return false
+  // Ruhende Einzel-Freigabe (Wiederholer/Klassenwechsel, 10.10.2026, mitnahme.ts)
+  if (ruht('gram', z.id, ich.id)) return false
   // Geplante Freischaltung (09.10.2026, freigabePlan.ts): die Aufgaben dürfen schon fertig sein, die Lernenden sehen sie erst ab dann
   if (nochGeplant('gram', z.id)) return false
   if (db().prepare('SELECT 1 FROM gram_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
@@ -404,7 +414,12 @@ function istFuer(z: Zeile, ich: NutzerInfo, kurse?: Map<string, ReturnType<typeo
   return !nur.length || nur.includes(ich.benutzer)
 }
 
+/** Lernende einer Grammatik – ohne die, für die sie ruht (Wiederholer/Klassenwechsel, 10.10.2026) */
 function lernendeVon(z: Zeile): NutzerInfo[] {
+  return lernendeAlle(z).filter((n) => !ruht('gram', z.id, n.id))
+}
+
+function lernendeAlle(z: Zeile): NutzerInfo[] {
   const nur = json_(z.schueler, [] as string[])
   if (istExtra(z)) {
     const feste = alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.includes(n.benutzer))

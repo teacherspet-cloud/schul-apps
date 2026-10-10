@@ -63,6 +63,16 @@ try {
   pruefe(/Ferien|keine Daten/.test(kopfKal), `Statuszeile Schulkalender: „${kopfKal}"`)
   const kopfFarben = await v.locator('[data-klappkarte="verwaltung-fachfarben"] [data-klappstatus]').innerText()
   pruefe(/Fächer festgelegt|Vorschläge/.test(kopfFarben), `Statuszeile Fachfarben: „${kopfFarben}"`)
+  // Alle Kästen gleich breit und bündig (10.10.2026: Fachfarben stand breiter daneben)
+  const lagen = await v.locator(KARTEN.map((id) => `[data-klappkarte="${id}"]`).join(', ')).evaluateAll((k) => k.map((x) => { const r = x.getBoundingClientRect(); return `${Math.round(r.left)}/${Math.round(r.width)}` }))
+  pruefe(lagen.length === KARTEN.length && new Set(lagen).size === 1, `Kästen gleich breit und bündig (${lagen.join(', ')})`)
+  // Speichern steht in den Kästen „Schule" und „Anschrift und Kontakt", keiner außerhalb (10.10.2026)
+  for (const id of ['verwaltung-schule', 'verwaltung-kontakt']) await v.locator(`[data-klappkarte="${id}"] [data-klappkopf]`).click()
+  await v.waitForTimeout(400)
+  const knoepfe = await v.locator('[data-schule-speichern]').evaluateAll((b) => b.map((x) => x.closest('[data-klappkarte]')?.getAttribute('data-klappkarte') ?? 'außerhalb'))
+  pruefe(knoepfe.join(',') === 'verwaltung-schule,verwaltung-kontakt', `„Speichern" je Kasten (${knoepfe.join(', ')})`)
+  for (const id of ['verwaltung-schule', 'verwaltung-kontakt']) await v.locator(`[data-klappkarte="${id}"] [data-klappkopf]`).click()
+  await v.waitForTimeout(300)
   await v.screenshot({ path: join(out, '1-kaesten-zu.png'), fullPage: true })
 
   // ---------- Schule wählen: „Kreisgymnasium Wesermünde"

@@ -254,3 +254,78 @@ export function zuordnungUeber<T>(alt: T[], neu: T[], id: (x: T) => string, schl
   }
   return aus
 }
+
+/**
+ * Wörter zuordnen (10.10.2026, Wiederholer und Klassenwechsel): zuerst über Wort + Übersetzung (wie beim Übernehmen), dann
+ * über das Wort allein – aber nur, wenn es im Ziel genau einmal vorkommt und dort noch nichts zugeordnet ist (andere
+ * Übersetzung in der Liste der neuen Klasse: „der Hund" statt „Hund").
+ */
+export function zuordnungWoerter<T extends { id: string; term: string; translation: string }>(alt: T[], neu: T[]): Map<string, string> {
+  const aus = zuordnungUeber(alt, neu, (w) => w.id, (w) => vergleichsSchluessel(w.term, w.translation))
+  const vergeben = new Set(aus.values())
+  const nurWort = new Map<string, string | null>()
+  for (const w of neu) {
+    const k = vergleichsSchluessel(w.term)
+    if (k) nurWort.set(k, nurWort.has(k) ? null : w.id)
+  }
+  for (const w of alt) {
+    if (aus.has(w.id)) continue
+    const ziel = nurWort.get(vergleichsSchluessel(w.term))
+    if (ziel && !vergeben.has(ziel)) (aus.set(w.id, ziel), vergeben.add(ziel))
+  }
+  return aus
+}
+
+/**
+ * Mitgebrachten Lernstand nachziehen (10.10.2026, Wiederholer): Einträge, die im Ziel FEHLEN, aus den Quellen füllen (bei
+ * mehreren Quellen der weiteste Stand). Vorhandene Einträge bleiben immer, wie sie sind – was die Person in der neuen
+ * Klasse schon geübt hat, gilt. Übungstage der Quellen, aus denen etwas kam, werden vereinigt.
+ */
+export function fehlendeAuffuellen<T extends Partial<EintragStand>>(
+  quellen: { eintraege: Record<string, T>; tage: string[]; zuordnung: Map<string, string> }[],
+  ziel: { eintraege: Record<string, T>; tage: string[] }
+): { eintraege: Record<string, T>; tage: string[]; neu: number } {
+  const weiter = (x: Partial<EintragStand> | undefined): number => (x?.fach ?? 0) * 1000 + (x?.versuche ?? 0)
+  const kandidat = new Map<string, T>()
+  const genutzt = new Set<number>()
+  quellen.forEach((q, i) => {
+    for (const [altId, s] of Object.entries(q.eintraege)) {
+      const neuId = q.zuordnung.get(altId)
+      if (!neuId || ziel.eintraege[neuId] || !s || !(s.versuche || s.fach)) continue
+      const da = kandidat.get(neuId)
+      if (!da || weiter(s) > weiter(da)) (kandidat.set(neuId, s), genutzt.add(i))
+    }
+  })
+  if (!kandidat.size) return { eintraege: ziel.eintraege, tage: ziel.tage, neu: 0 }
+  const tage = [...new Set([...ziel.tage, ...[...genutzt].flatMap((i) => quellen[i].tage)])].sort().slice(-400)
+  return { eintraege: { ...ziel.eintraege, ...Object.fromEntries(kandidat) }, tage, neu: kandidat.size }
+}
+
+// ---------------------------------------------------------------- Wiederholer und Klassenwechsel (10.10.2026)
+
+export type WechselGrund = 'wiederholung' | 'wechsel'
+
+/** Wiederholung, wenn die neue Klasse in einem niedrigeren Jahrgang ist als die bisherige (nach dem Aufrücken: 7b statt 8a) */
+export const wechselGrund = (jahrgangVorher: number | null, jahrgangNeu: number | null): WechselGrund =>
+  jahrgangVorher !== null && jahrgangNeu !== null && jahrgangNeu < jahrgangVorher ? 'wiederholung' : 'wechsel'
+
+/**
+ * Ab so vielen geübten Wörtern aus DIESEM Schuljahr, die die neue Klasse (noch) nicht freigegeben hat, ist sie „hinterher"
+ * – dann gelten auch bei einem Wechsel innerhalb des Jahrgangs die Freigaben der neuen Klasse (wie bei Wiederholern).
+ */
+export const HINTERHER_AB = 5
+export function istHinterher(geuebtDiesesJahr: string[], beiDerKlasse: Set<string>): boolean {
+  let n = 0
+  for (const k of new Set(geuebtDiesesJahr)) if (!beiDerKlasse.has(k) && ++n >= HINTERHER_AB) return true
+  return false
+}
+
+/**
+ * Gleiche Klasse (gleicher Jahrgang, gleicher Buchstabe – „7a", „Klasse 7a", „7a Englisch"), nur eine neue Lerngruppe – das
+ * ist kein Klassenwechsel (etwa wenn die Lehrkraft eine Klasse neu mit IServ verknüpft hat).
+ */
+export const gleicheKlasse = (a: string, b: string): boolean => {
+  const ja = jahrgangAmAnfang(a)
+  const erstes = (n: string): string => klassenZusatz(n).split(/\s+/)[0] ?? ''
+  return ja !== null && ja === jahrgangAmAnfang(b) && erstes(a) === erstes(b)
+}

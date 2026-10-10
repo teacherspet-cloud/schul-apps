@@ -2,7 +2,8 @@
 // Vorher: Server lokal mit SCHULAPPS_KALENDER_DATEI=tests/fixtures/openholidays-ni.json und SCHULAPPS_KALENDER_TESTUHR=1
 // (scripts/e2e-parallel.mjs setzt beides).
 // Prüft: Verwaltung › Schule zeigt den Kalender; „erster Schultag" per Testuhr → Klassen rücken auf, Lernstand bleibt,
-// Lehrkraft sieht den Hinweis in „Meine Klassen" und nimmt ihn zurück.
+// Lehrkraft sieht den Hinweis in „Meine Klassen" und nimmt ihn zurück. Wiederholer (10.10.2026): Tom bleibt in Klasse 5 –
+// übt nur, was die neue 5q freigegeben hat, sein Stand kommt mit, seine Einzel-Freigabe ruht bis „Rückgängig".
 // Aufruf: node tests/e2e/server-schuljahr.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
@@ -97,6 +98,20 @@ try {
     await miaCtx.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kurs.id, wortId: 'w1', uebung: 'karte', gewusst: true } })
   const vorher = await (await miaCtx.request.get(`${A}/s/api/vokabeln/liste?id=${kurs.id}`, { headers: KOPF })).json()
   pruefe(Boolean(vorher.staende?.w1), 'Mia hat Lernstand im Kurs')
+  // Tom (wird Wiederholer, 10.10.2026): übt dog und cat im Klassenkurs, dazu eine Einzel-Freigabe nur für ihn
+  const tomCtx = await browser.newContext()
+  await anmelden(tomCtx, tom.benutzer, tom.passwort)
+  for (const [wortId, gewusst] of [['w1', true], ['w2', false]])
+    await tomCtx.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kurs.id, wortId, uebung: 'karte', gewusst } })
+  const einzeln = await (
+    await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+      headers: KOPF,
+      data: { titel: 'Extra für Tom', sprache: 'en', fach: 'Englisch', schueler: [tom.benutzer], woerter: [{ id: 'e1', term: 'apple', translation: 'Apfel' }] }
+    })
+  ).json()
+  pruefe(Boolean(einzeln.id), 'Einzel-Freigabe für Tom')
+  const tomKurse0 = await (await tomCtx.request.get(`${A}/s/api/vokabeln`, { headers: KOPF })).json()
+  pruefe(JSON.stringify(tomKurse0).includes(einzeln.id), 'Tom sieht seine Einzel-Freigabe')
 
   // ---------- Elternbrief: Warnung bei Terminen in den Ferien (Herbstferien Niedersachsen 12.–24.10.2026)
   const eb = await seiteAuf(lk)
@@ -159,6 +174,34 @@ try {
   const proto = await (await verwaltung.request.get(`${A}/server/verwaltung/protokoll?anzahl=50`, { headers: KOPF })).json()
   pruefe(JSON.stringify(proto).includes('Schuljahreswechsel 2027/28'), 'Server-Protokoll nennt den Schuljahreswechsel')
 
+  // ---------- Wiederholer (10.10.2026): Tom bleibt in Klasse 5 – neue 5q mit eigenem Kurs, bisher nur „dog"
+  await verwaltung.request.post(`${A}/server/verwaltung/nutzer`, { headers: KOPF, data: { id: tom.id, klasse: KLASSE } })
+  const neue = await (
+    await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
+  ).json()
+  const neuKurs = await (
+    await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+      headers: KOPF,
+      data: { titel: `Englisch ${KLASSE} neu`, sprache: 'en', fach: 'Englisch', lerngruppeId: neue.id, woerter: [{ id: 'n1', term: 'dog', translation: 'Hund' }] }
+    })
+  ).json()
+  pruefe(Boolean(neue.id && neuKurs.id), `Neue ${KLASSE} mit Kurs (nur „dog")`)
+  // Beim Öffnen seiner Vokabeln erkennt der Server den Wechsel in den niedrigeren Jahrgang
+  await tomCtx.request.get(`${A}/s/api/sprachstand`, { headers: KOPF })
+  const tomListe = await (await tomCtx.request.get(`${A}/s/api/vokabeln/liste?id=sp:en`, { headers: KOPF })).json()
+  const begriffe = (l) => (l.woerter ?? []).map((w) => w.term).sort().join(',')
+  pruefe(begriffe(tomListe) === 'dog', `Tom übt nur, was die neue Klasse freigegeben hat (${begriffe(tomListe)}) – cat ruht`)
+  const dog = (tomListe.woerter ?? []).find((w) => w.term === 'dog')
+  pruefe((tomListe.staende?.[dog?.id]?.fach ?? 0) > 0, 'Sein Stand für „dog" kam mit')
+  const tomKurse = await (await tomCtx.request.get(`${A}/s/api/vokabeln`, { headers: KOPF })).json()
+  pruefe(!JSON.stringify(tomKurse).includes(einzeln.id), 'Einzel-Freigabe ruht (Tom sieht sie nicht)')
+  const ed = await (await lk.request.get(`${A}/server/vokabeln/${einzeln.id}`, { headers: KOPF })).json()
+  pruefe((ed.ruhend ?? []).some((r) => r.id === tom.id), 'Kursseite der Einzel-Freigabe: „ruht" für Tom (wieder aufnehmbar)')
+  await lk.request.post(`${A}/server/vokabeln/${neuKurs.id}/woerter`, { headers: KOPF, data: { woerter: [{ id: 'n2', term: 'cat', translation: 'Katze' }], titel: 'Nachtrag' } })
+  const tomListe2 = await (await tomCtx.request.get(`${A}/s/api/vokabeln/liste?id=sp:en`, { headers: KOPF })).json()
+  const cat = (tomListe2.woerter ?? []).find((w) => w.term === 'cat')
+  pruefe(Boolean(cat) && (tomListe2.staende?.[cat.id]?.versuche ?? 0) > 0, 'Klasse gibt „cat" frei: Toms Stand zählt sofort')
+
   // ---------- Meine Klassen: Hinweis und Rückgängig
   const p = await seiteAuf(lk)
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
@@ -166,16 +209,19 @@ try {
   const text = await p.locator('[data-schuljahr-hinweis]').innerText()
   pruefe(text.includes(`${KLASSE} → 6q`), `Zuordnung alt → neu steht da („${text.split('\n').find((z) => z.includes('→')) ?? ''}")`)
   pruefe(await da(p.locator('[data-klasse="6q"]')), 'Klassenkarte heißt 6q')
+  pruefe(await da(p.locator('[data-schuljahr-wiederholer="1"]')), 'Hinweis: „Wiederholer: 1 – Freigaben auf den Stand der Klasse gesetzt, Fortschritt behalten"')
   await p.screenshot({ path: join(out, '2-hinweis.png') })
   p.once('dialog', (d) => void d.accept())
   await p.locator('[data-schuljahr-rueckgaengig]').click()
   pruefe(await da(p.locator('[data-schuljahr-hinweis="rueckgaengig"]')), 'Nach „Rückgängig": Hinweis meldet die Rücknahme')
-  pruefe(await da(p.locator(`[data-klasse="${KLASSE}"]`)), `Klassenkarte heißt wieder ${KLASSE}`)
+  pruefe(await da(p.locator(`[data-klasse="${KLASSE}"]`).first()), `Klassenkarte heißt wieder ${KLASSE}`)
   await p.screenshot({ path: join(out, '3-rueckgaengig.png') })
   const miaWieder = await (await miaCtx.request.get(`${A}/s/api/vokabeln/liste?id=${kurs.id}`, { headers: KOPF })).json()
   pruefe(JSON.stringify(miaWieder.staende) === JSON.stringify(vorher.staende), 'Lernstand auch nach „Rückgängig" unverändert')
   const kd2 = await (await lk.request.get(`${A}/server/vokabeln/${kurs.id}`, { headers: KOPF })).json()
   pruefe(kd2.titel === `Englisch ${KLASSE}`, `Kurstitel wieder „Englisch ${KLASSE}" (${kd2.titel})`)
+  const tomKurse2 = await (await tomCtx.request.get(`${A}/s/api/vokabeln`, { headers: KOPF })).json()
+  pruefe(JSON.stringify(tomKurse2).includes(einzeln.id), '„Rückgängig": Toms Einzel-Freigabe ist wieder da')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser
