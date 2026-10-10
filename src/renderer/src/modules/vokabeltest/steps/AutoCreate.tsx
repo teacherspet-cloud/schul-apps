@@ -1,7 +1,7 @@
 import { genugFuerVarianten } from '../generation/distribute'
-import { Alert, Button, Checkbox, Group, Loader, Modal, MultiSelect, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, Popover, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
-import { IconSparkles } from '@tabler/icons-react'
+import { IconChevronDown, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { gradeOptions, suggestLevel } from '../../../shared/cefr'
@@ -280,21 +280,15 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
               Aufgabenformate (10.10.2026): alle Formate der Sprache; was für Klasse/Niveau nicht passt, steht
               grau mit Hinweis da. Die KI nutzt nur die gewählten und verteilt die Vokabeln etwa gleichmäßig.
             */}
-            <MultiSelect
-              label="Aufgabenformate"
-              description={experte ? 'Die KI nutzt nur diese Formate und verteilt die Vokabeln etwa gleichmäßig. Leer: Die KI wählt passende Formate.' : undefined}
-              placeholder={experte && !formate.length ? 'KI wählt passende Formate' : undefined}
-              data={formatDaten}
-              value={formate}
-              onChange={(v) => {
-                const neu = v as TaskTypeId[]
+            {/* Als Aufklapp-Menü mit Häkchen (10.10.2026, Befund der Lehrkraft: das Tag-Feld wirkte nicht wie ein Dropdown) */}
+            <FormatMenue
+              daten={formatDaten}
+              wert={formate}
+              experte={experte}
+              setzen={(neu) => {
                 setFormate(neu)
                 formateMerken(base, neu)
               }}
-              clearable
-              searchable
-              comboboxProps={{ withinPortal: true }}
-              data-aufgabenformate
             />
             <TextInput
               label="Themenbereich (optional)"
@@ -357,3 +351,64 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     </Modal>
   )
 }
+
+/** Aufgabenformate als Dropdown mit Mehrfachauswahl: Feld mit Zusammenfassung ▾, darin Häkchen; ungeeignete grau (10.10.2026) */
+function FormatMenue({
+  daten,
+  wert,
+  setzen,
+  experte
+}: {
+  daten: { value: string; label: string; disabled: boolean }[]
+  wert: TaskTypeId[]
+  setzen: (neu: TaskTypeId[]) => void
+  experte: boolean
+}): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const namen = daten.filter((d) => wert.includes(d.value as TaskTypeId)).map((d) => d.label)
+  const text = !namen.length ? (experte ? 'KI wählt passende Formate' : 'Keine ausgewählt') : namen.length <= 2 ? namen.join(', ') : `${namen.slice(0, 2).join(', ')} +${namen.length - 2}`
+  return (
+    <Stack gap={4}>
+      <Text size="sm" fw={500}>
+        Aufgabenformate
+      </Text>
+      {experte && (
+        <Text size="xs" c="dimmed">
+          Die KI nutzt nur diese Formate und verteilt die Vokabeln etwa gleichmäßig. Leer: Die KI wählt passende Formate.
+        </Text>
+      )}
+      <Popover opened={offen} onChange={setOffen} position="bottom-start" width="target" shadow="md" withinPortal>
+        <Popover.Target>
+          <Button
+            variant="default"
+            fullWidth
+            justify="space-between"
+            rightSection={<IconChevronDown size={16} />}
+            onClick={() => setOffen((o) => !o)}
+            data-aufgabenformate
+            styles={{ label: { overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 400 } }}
+          >
+            {text}
+          </Button>
+        </Popover.Target>
+        <Popover.Dropdown p="xs" style={{ maxHeight: 340, overflowY: 'auto' }}>
+          <Stack gap={6}>
+            {daten.map((d) => (
+              <Checkbox
+                key={d.value}
+                label={d.label}
+                disabled={d.disabled}
+                checked={wert.includes(d.value as TaskTypeId)}
+                onChange={(e) =>
+                  setzen(e.currentTarget.checked ? [...wert, d.value as TaskTypeId] : wert.filter((x) => x !== d.value))
+                }
+                data-format={d.value}
+              />
+            ))}
+          </Stack>
+        </Popover.Dropdown>
+      </Popover>
+    </Stack>
+  )
+}
+
