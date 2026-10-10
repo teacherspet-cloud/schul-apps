@@ -6,6 +6,8 @@
  * 10.10.2026: der kleine Kennzahlen-Kasten (`kopf`) steht vorn in derselben Reihe – drei Karten nebeneinander auf breiten
  * Schirmen, zwei auf dem Tablet, eine je Zeile auf dem Handy (dort mit knapperem Innenabstand); gleiche Höhe je Reihe.
  */
+import { vokabelnHinzufuegen } from '../lernen/kurs/KursSeite'
+import { IconPlus } from '@tabler/icons-react'
 import { Button, Card, Group, SimpleGrid, Text } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
@@ -60,9 +62,21 @@ export function SprachLernstand({
         <Card withBorder radius="md" padding="md" h="100%" data-sprach-units>
           <Group justify="space-between" mb="xs">
             <Text fw={700}>Units</Text>
-            <Button size="compact-xs" variant="subtle" onClick={zuAbschnitten}>
-              Alle Abschnitte
-            </Button>
+            <Group gap={4} wrap="nowrap">
+              {/* „+ Vokabeln hinzufügen" (10.10.2026): zum Reiter „Vokabeln" und gleich der Dialog */}
+              <Button
+                size="compact-xs"
+                variant="light"
+                leftSection={<IconPlus size={12} />}
+                onClick={() => (zuAbschnitten(), vokabelnHinzufuegen(kursId))}
+                data-units-hinzufuegen
+              >
+                Vokabeln hinzufügen
+              </Button>
+              <Button size="compact-xs" variant="subtle" onClick={zuAbschnitten}>
+                Alle Abschnitte
+              </Button>
+            </Group>
           </Group>
           <UnitsKompakt abschnitte={abschnitte} schluessel={kursId} />
         </Card>

@@ -381,6 +381,13 @@ export interface KursSeiteProps {
   einstellungenSchliessen?: () => void
 }
 
+/** Wunsch „Vokabeln hinzufügen" für einen Kurs (10.10.2026) – auch an eine Kursseite, die erst noch geladen wird */
+const vokabelnHinzuOffen: { kurs: string | null } = { kurs: null }
+export function vokabelnHinzufuegen(kursId: string): void {
+  vokabelnHinzuOffen.kurs = kursId
+  window.dispatchEvent(new CustomEvent('schulapps:vokabeln-hinzu', { detail: kursId }))
+}
+
 export function KursSeite({
   kursId: id,
   eingebettet = false,
@@ -407,7 +414,18 @@ export function KursSeite({
   const [loeschen, setLoeschen] = useState(false)
   const [entfernen, setEntfernen] = useState<Lernende | null>(null)
   const [gast, setGast] = useState<Lernende | null>(null)
-  const [hinzu, setHinzu] = useState(false)
+  // „+ Vokabeln hinzufügen" am Kasten „Units" (10.10.2026): öffnet gleich den Dialog – auch, wenn der Wunsch kam, bevor
+  // diese Kursseite (z. B. eingebettet in „Meine Klassen") geladen war
+  const [hinzu, setHinzu] = useState(() => vokabelnHinzuOffen.kurs === id && (vokabelnHinzuOffen.kurs = null, true))
+  useEffect(() => {
+    const auf = (e: Event): void => {
+      if ((e as CustomEvent<string>).detail !== id) return
+      vokabelnHinzuOffen.kurs = null
+      setHinzu(true)
+    }
+    window.addEventListener('schulapps:vokabeln-hinzu', auf)
+    return () => window.removeEventListener('schulapps:vokabeln-hinzu', auf)
+  }, [id])
   const [eintragen, setEintragen] = useState(false)
   const [klasse, setKlasse] = useState(false)
   const [grammatik, setGrammatik] = useState(false)
@@ -537,9 +555,14 @@ export function KursSeite({
           <Card withBorder radius="md" padding="md">
             <Group justify="space-between" mb="xs">
               <Text fw={700}>Units</Text>
-              <Button size="compact-xs" variant="subtle" onClick={() => setReiter('vokabeln')}>
-                Alle Abschnitte
-              </Button>
+              <Group gap={4} wrap="nowrap">
+                <Button size="compact-xs" variant="light" leftSection={<IconPlus size={12} />} onClick={() => setHinzu(true)} data-units-hinzufuegen>
+                  Vokabeln hinzufügen
+                </Button>
+                <Button size="compact-xs" variant="subtle" onClick={() => setReiter('vokabeln')}>
+                  Alle Abschnitte
+                </Button>
+              </Group>
             </Group>
             {statistik ? (
               <UnitsKompakt abschnitte={statistik.abschnitte} schluessel={id} />
