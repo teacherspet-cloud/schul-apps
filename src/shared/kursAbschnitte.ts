@@ -35,7 +35,17 @@ export interface AbschnittEinordnung {
   name: string
   /** Band, falls der Titel ihn nennt („Green Line 1 - Unit 1 - Station 1") */
   buch?: string
+  /**
+   * Stelle im Lehrwerk (10.10.2026, Befund der Lehrkraft: „Units" nicht in Buchreihenfolge – „Hello", „Media smart",
+   * „Across cultures 1" haben keine bzw. irreführende Nummern): Index der Unit im Band und des Abschnitts in der Unit
+   * laut Gliederung des Lehrwerks (`mitBuchRaengen`, Server). Fehlt, wenn die Gliederung unbekannt ist.
+   */
+  unitRang?: number
+  abschnittRang?: number
 }
+
+/** Unit- und Abschnittsnamen eines Bandes in Buchreihenfolge (server/wartungAbschnitteTeilen.ts `lehrwerkGliederung`) */
+export type BuchGliederung = { name: string; abschnitte: string[] }[]
 
 const TAG = 86_400_000
 /** Ab wann ein Abschnitt als „lange genug geübt" gilt (sicher braucht zwei Treffer im Abstand einer Woche) */
@@ -143,6 +153,42 @@ export function mitBaenden(
   })
 }
 
+/**
+ * Stelle im Buch je Abschnitt (10.10.2026): Unit und Abschnitt in der Gliederung des Lehrwerks suchen (Kennung des
+ * Abschnitts, sonst der Herkunft; Band aus der Einordnung). „Check-in, Station 1" → die spätere Stelle. Ohne Treffer
+ * bleibt der Eintrag ohne Rang (dann gelten in `nachUnits` die Nummern im Namen).
+ */
+export function mitBuchRaengen(
+  teile: Pick<KursTeil, 'lehrwerk'>[],
+  einordnung: AbschnittEinordnung[],
+  quelle: Partial<Quelle> | null | undefined,
+  gliederung: (kennung: string, buch: string) => BuchGliederung | null
+): AbschnittEinordnung[] {
+  const gemerkt = new Map<string, BuchGliederung | null>()
+  return einordnung.map((e, i) => {
+    if (!e.unit) return e
+    const kennung = teile[i]?.lehrwerk || quelle?.lehrwerk || ''
+    const buch = e.buch ?? ''
+    if (!kennung && !buch) return e
+    const s = `${kennung}|${buch}`
+    if (!gemerkt.has(s)) {
+      let g: BuchGliederung | null = null
+      try {
+        g = gliederung(kennung, buch)
+      } catch {
+        g = null
+      }
+      gemerkt.set(s, g)
+    }
+    const g = gemerkt.get(s)
+    if (!g) return e
+    const u = g.findIndex((x) => norm(x.name) === norm(e.unit))
+    if (u < 0) return e
+    const stelle = Math.max(-1, ...e.name.split(/,\s*|\s·\s/).map((a) => g[u].abschnitte.findIndex((x) => norm(x) === norm(a))))
+    return { ...e, unitRang: u, ...(stelle >= 0 ? { abschnittRang: stelle } : {}) }
+  })
+}
+
 /** Vergleichsform: ohne Akzente („Découvertes" = „decouvertes"), nur Buchstaben und Ziffern */
 const norm = (s: string): string =>
   s
@@ -201,6 +247,9 @@ export interface AbschnittStatistik {
   woerter: number
   /** Freigegeben (ms) */
   zeit: number
+  /** Stelle im Lehrwerk (10.10.2026, `mitBuchRaengen`) – Sortierung wie im Buch */
+  unitRang?: number
+  abschnittRang?: number
   /** Anteile über alle Lernenden und Wörter des Abschnitts (Summe 1) */
   sicher: number
   aufbau: number
@@ -277,6 +326,8 @@ export function abschnittStatistik(
       ...(einordnung[i]?.buch ? { buch: einordnung[i].buch } : {}),
       unit: einordnung[i]?.unit ?? '',
       name: einordnung[i]?.name || t.titel,
+      ...(einordnung[i]?.unitRang !== undefined ? { unitRang: einordnung[i].unitRang } : {}),
+      ...(einordnung[i]?.abschnittRang !== undefined ? { abschnittRang: einordnung[i].abschnittRang } : {}),
       woerter: liste.length,
       zeit: t.zeit,
       sicher: ges ? sicher / ges : 0,
@@ -314,9 +365,21 @@ export const abschnittStelle = (name: string): number | null => {
  * („Hello", „Media smart", eigene Namen) steht ein Eintrag gleich hinter dem bekannten davor (in Freigabe-Reihenfolge).
  */
 function buchRaenge<T>(liste: T[], stelle: (x: T) => number | null): number[] {
+  return raengeAus(liste.map(stelle))
+}
+
+/**
+ * Stellen aus dem Lehrwerk (10.10.2026) gehen vor: Ist für mindestens einen Eintrag der Rang im Buch bekannt, zählen nur
+ * diese Ränge (unbekannte stehen hinter dem Eintrag davor); sonst die Nummern im Namen (`ersatz`).
+ */
+function raengeMitBuch<T>(liste: T[], buch: (x: T) => number | undefined, ersatz: (x: T) => number | null): number[] {
+  const bekannt = liste.map(buch)
+  return bekannt.some((x) => x !== undefined) ? raengeAus(bekannt.map((x) => (x === undefined ? null : x))) : buchRaenge(liste, ersatz)
+}
+
+function raengeAus(stellen: (number | null)[]): number[] {
   let letzte = -1
-  return liste.map((x) => {
-    const s = stelle(x)
+  return stellen.map((s) => {
     if (s === null) return letzte + 0.5
     letzte = s
     return s
@@ -329,14 +392,22 @@ function buchRaenge<T>(liste: T[], stelle: (x: T) => number | null): number[] {
  * Ohne erkennbare Stelle entscheidet die Freigabe-Reihenfolge (später freigegeben = weiter oben). Die oberste Unit
  * steht offen. `zeilen` in Freigabe-Reihenfolge.
  */
-export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'> & { name?: string }>(zeilen: T[]): { unit: string; zeilen: T[]; neueste: number }[] {
+export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'> & { name?: string; unitRang?: number; abschnittRang?: number }>(
+  zeilen: T[]
+): { unit: string; zeilen: T[]; neueste: number }[] {
   const gruppen = new Map<string, { z: T; i: number }[]>()
   zeilen.forEach((z, i) => gruppen.set(z.unit, [...(gruppen.get(z.unit) ?? []), { z, i }]))
   const units = [...gruppen.entries()]
-  const unitRang = buchRaenge(units, ([unit]) => unitZahl(unit))
+  // Stelle im Lehrwerk vor den Nummern im Namen (10.10.2026)
+  const rangImBuch = ([, l]: [string, { z: T }[]]): number | undefined => l.find((x) => x.z.unitRang !== undefined)?.z.unitRang
+  const unitRang = raengeMitBuch(units, rangImBuch, ([unit]) => unitZahl(unit))
   return units
     .map(([unit, l], k) => {
-      const rang = buchRaenge(l, ({ z }) => (z.name === undefined ? null : abschnittStelle(z.name)))
+      const rang = raengeMitBuch(
+        l,
+        ({ z }) => z.abschnittRang,
+        ({ z }) => (z.name === undefined ? null : abschnittStelle(z.name))
+      )
       const zeilenSortiert = l
         .map((x, j) => ({ ...x, r: rang[j] }))
         .sort((a, b) => b.r - a.r || b.i - a.i)
@@ -351,7 +422,7 @@ export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'> & 
  * Gruppen nach Band (09.10.2026, Wunsch der Lehrkraft): neuester Band oben, ältester unten, nur Bände mit Inhalt; ohne
  * Band („Weitere Vokabeln") ganz unten. Im Band die Units wie bei `nachUnits` (absteigend wie im Buch, 10.10.2026).
  */
-export function nachBaenden<T extends Pick<AbschnittStatistik, 'unit' | 'zeit' | 'buch'> & { name?: string }>(
+export function nachBaenden<T extends Pick<AbschnittStatistik, 'unit' | 'zeit' | 'buch'> & { name?: string; unitRang?: number; abschnittRang?: number }>(
   zeilen: T[]
 ): { buch: string; units: { unit: string; zeilen: T[]; neueste: number }[]; neueste: number }[] {
   const baende = new Map<string, T[]>()

@@ -963,33 +963,40 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const sprachKurs = d.vokabeln.find((v) => v.id === d.klassenKurs) ?? d.vokabeln.find((v) => v.status === 'offen' && v.woerter > 0)
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
   const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
+  const sichtbarerBedarf = [...entwurfBedarf, ...d.bedarf]
+  const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
+  const mitLernstand = Boolean(d.sprachfach && sprachKurs && sprachKurs.woerter > 0)
   return (
     <Stack data-klasse-detail={d.titel}>
-      {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) */}
-      <FachKopf d={{ ...d, bedarf: [...entwurfBedarf, ...d.bedarf] }} gehe={(r) => setze({ reiter: r })} />
-      {/* ---------- Handlungsbedarf */}
-      <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
-        <Group gap={6} mb="xs">
-          <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
-          <Text fw={700}>Handlungsbedarf</Text>
-        </Group>
-        {d.bedarf.length + entwurfBedarf.length === 0 ? (
-          <Text c="dimmed" size="sm">
-            {d.bedarfAusgeblendet?.length ? 'Nichts weiter – der übrige Handlungsbedarf ist ausgeblendet.' : 'Nichts Dringendes – alle Abgaben geprüft, niemand hängt hinterher.'}
-          </Text>
-        ) : (
+      {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) – in Sprachklassen
+           mit Lernstand klein neben Karteikasten und Units (10.10.2026, unten) */}
+      {!mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
+      {/* ---------- Handlungsbedarf – nur wenn etwas Sichtbares ansteht (10.10.2026): ohne Bedarf, oder wenn alles
+           ausgeblendet ist, fällt der Kasten ganz weg; Ausgeblendetes kommt von selbst wieder, sobald sich etwas ändert */}
+      {sichtbarerBedarf.length > 0 && (
+        <Card withBorder radius="md" padding="md" data-handlungsbedarf data-gruppe={d.id} style={{ scrollMarginTop: 12 }}>
+          <Group gap={6} mb="xs">
+            <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
+            <Text fw={700}>Handlungsbedarf</Text>
+          </Group>
           <Stack gap={4}>
-            {[...entwurfBedarf, ...d.bedarf].map((b) => (
+            {sichtbarerBedarf.map((b) => (
               <BedarfZeile key={b.schluessel} b={b} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />
             ))}
           </Stack>
-        )}
-        {(d.bedarfAusgeblendet?.length ?? 0) > 0 && <AusgeblendeterBedarf liste={d.bedarfAusgeblendet!} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />}
-      </Card>
+          {(d.bedarfAusgeblendet?.length ?? 0) > 0 && <AusgeblendeterBedarf liste={d.bedarfAusgeblendet!} gruppeId={d.id} oeffnen={oeffneMitRueckweg} geaendert={bedarfNeu} />}
+        </Card>
+      )}
 
-      {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units */}
-      {d.sprachfach && sprachKurs && sprachKurs.woerter > 0 && (
-        <SprachLernstand kursId={sprachKurs.id} abschnitte={sprachKurs.abschnitte} zuAbschnitten={() => setze({ reiter: 'vokabeln' })} />
+      {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
+           seit 10.10.2026 mit dem kompakten Kennzahlen-Kasten vorn in derselben Reihe */}
+      {mitLernstand && sprachKurs && (
+        <SprachLernstand
+          kursId={sprachKurs.id}
+          abschnitte={sprachKurs.abschnitte}
+          zuAbschnitten={() => setze({ reiter: 'vokabeln' })}
+          kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt />}
+        />
       )}
 
       {/* ---------- Geplante Freischaltungen (09.10.2026) */}
@@ -1028,9 +1035,12 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
                   {v.art === 'vokabeln' ? <IconBook2 size={16} /> : <IconFileText size={16} />}
                   <Text fw={700}>{v.titel}</Text>
                 </Group>
-                <Text size="sm" c="dimmed" mb={6}>
-                  {v.text}
-                </Text>
+                {/* Wackelige Wörter: Erklärtext nur im Expertenmodus (10.10.2026, Wunsch der Lehrkraft) */}
+                {(v.art !== 'vokabeln' || experte) && (
+                  <Text size="sm" c="dimmed" mb={6}>
+                    {v.text}
+                  </Text>
+                )}
                 {v.art === 'blatt' && (
                   <Stack gap={2} mb="sm">
                     {v.schwerpunkte.map((s) => (

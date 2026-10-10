@@ -256,7 +256,8 @@ try {
   await p.locator('[data-fach-wahl]').click()
   await p.getByRole('option', { name: 'Französisch', exact: true }).click()
   pruefe(await da(p.locator('[data-fach-leiste] [data-fach="Französisch"]')), 'Fach hinzugefügt: Reiter „Französisch“')
-  pruefe(await da(p.locator('[data-handlungsbedarf]')), 'Danach Handlungsbedarf und Reiter des Fachs')
+  // Handlungsbedarf nur, wenn etwas ansteht (10.10.2026) – ein neues Fach zeigt sicher den Kopf mit Kennzahlen
+  pruefe(await da(p.locator('[data-fach-kopf]')), 'Danach Kopf und Reiter des Fachs')
   await p.screenshot({ path: join(out, '2b-fach-neu.png') })
   // Rechtsklick auf das Fach (08.10.2026): „Französisch in Klasse … abwählen" – ohne Material verschwindet es
   await p.locator('[data-fach-leiste] [data-fach="Französisch"]').click({ button: 'right' })
@@ -273,12 +274,16 @@ try {
   await p.locator('[data-fach-leiste] [data-fach]').first().waitFor({ timeout: 10000 })
   const faecher = await p.locator('[data-fach-leiste] [data-fach]').evaluateAll((e) => e.map((x) => x.getAttribute('data-fach')))
   pruefe(JSON.stringify(faecher) === JSON.stringify(['Englisch', 'Geschichte']), `Fach-Leiste (${faecher.join(' | ')})`)
-  await p.locator('[data-handlungsbedarf]').waitFor({ timeout: 10000 })
-  const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
-  const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
-  pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
-  // Ausblenden ganz links am Eintrag, darunter „Ausgeblendet (n)" zum Wiederherstellen (09.10.2026)
-  {
+  await p.locator('[data-fach-kopf]').waitFor({ timeout: 10000 })
+  const mitBedarfKasten = (await p.locator('[data-handlungsbedarf]').count()) > 0
+  if (mitBedarfKasten) {
+    const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
+    const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
+    pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
+  } else pruefe((await p.locator('[data-handlungsbedarf]').count()) === 0, 'Ohne Handlungsbedarf kein Kasten (10.10.2026)')
+  // Ausblenden ganz links am Eintrag, darunter „Ausgeblendet (n)" zum Wiederherstellen (09.10.2026) – nur mit mindestens
+  // zwei Einträgen (sonst verschwindet der Kasten samt „Ausgeblendet", 10.10.2026)
+  if ((await p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').count()) >= 2) {
     const zeile = p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').first()
     const knopf = zeile.locator('[data-bedarf-ausblenden]')
     const links = (await knopf.boundingBox())?.x ?? 1e9
@@ -293,8 +298,9 @@ try {
   }
   // Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter"): im Sprachfach mit „Wörter sicher" und „aktiv diese Woche"
   pruefe(await da(p.locator('[data-fach-kopf="sprache"] [data-kennzahl="sicher"]')), 'Kopf der Fachansicht: „Wörter sicher"')
-  pruefe(/\d+\/\d+/.test(await p.locator('[data-fach-kopf] [data-kennzahl="aktiv"]').innerText()), 'Kopf: „aktiv diese Woche n/m"')
-  pruefe(await da(p.locator('[data-fach-kopf] [data-kennzahl="tests"]')), 'Kopf: „Tests Ø"')
+  // kompakt neben Karteikasten und Units (10.10.2026): „aktiv n von m Lernenden", Tests Ø nur, wenn es Tests gibt
+  pruefe(/\d+ von \d+/.test(await p.locator('[data-fach-kopf] [data-kennzahl="aktiv"]').innerText()), 'Kopf: „aktiv diese Woche n von m"')
+  pruefe(await da(p.locator('[data-sprach-lernstand] [data-fach-kopf-kompakt]')), 'Kennzahlen-Kasten steht in der Reihe mit Karteikasten und Units')
   // Lernstand der Sprachklasse wie im Überblick der Kursseite (09.10.2026): Karteikasten-Säulen und Units je Band
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-stufen-diagramm]')), 'Sprachklasse: „Lernstand im Karteikasten"')
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-kurs-units] [data-band-gruppe]').first()), 'Sprachklasse: „Units" je Band (mit Cover/Kachel)')

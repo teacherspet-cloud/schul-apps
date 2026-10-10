@@ -6,9 +6,14 @@ import {
   baendeVon,
   buchAusKennung,
   kursName,
+  mitBaenden,
+  mitBuchRaengen,
+  nachBaenden,
   nachUnits,
+  type BuchGliederung,
   type KursTeil
 } from '../src/shared/kursAbschnitte'
+import greenLine1 from '../resources/lehrwerke/green-line-1.json'
 import type { Vokabel, WortStand } from '../src/shared/vokabeltrainer'
 
 /*
@@ -151,5 +156,32 @@ describe('Statistik je Abschnitt', () => {
     const s = abschnittStatistik(t, viele, st, [], JETZT)
     expect(s).toHaveLength(25)
     expect(performance.now() - start).toBeLessThan(200)
+  })
+})
+
+describe('Buchreihenfolge aus der Gliederung des Lehrwerks (10.10.2026, Klasse 5b, Green Line 1)', () => {
+  const g: BuchGliederung = (greenLine1 as { units: { name: string; sections?: { name: string }[] }[] }).units.map((u) => ({
+    name: u.name,
+    abschnitte: (u.sections ?? []).map((x) => x.name)
+  }))
+  it('„Units" und Abschnitte genau umgekehrt wie im Buch – auch ohne Nummern und unabhängig von der Freigabe-Reihenfolge', () => {
+    // Freigabe-Reihenfolge absichtlich durcheinander (Hello nach Unit 1, Media smart zuletzt)
+    const folge: [string, string][] = [
+      ['Unit 1', 'Check-in'],
+      ['Unit 1', 'Station 1'],
+      ['Hello', 'Check-in'],
+      ['Hello', 'Station 2'],
+      ['Unit 2', 'Station 1'],
+      ['Across cultures 1', 'Wortschatz'],
+      ['Unit 2', 'Check-in'],
+      ['Media smart', 'Wortschatz']
+    ]
+    const teile = folge.map(([u, a], i) => ({ titel: `Green Line 1 - ${u} - ${a}`, anzahl: 5, zeit: i + 1, lehrwerk: 'green-line-1' }))
+    const e = mitBuchRaengen(teile, mitBaenden(teile, abschnitteEinordnen(teile, null), null), null, (k) => (k === 'green-line-1' ? g : null))
+    const zeilen = e.map((x, i) => ({ ...x, zeit: teile[i].zeit }))
+    const [band] = nachBaenden(zeilen)
+    expect(band.units.map((u) => u.unit)).toEqual(['Across cultures 1', 'Unit 2', 'Media smart', 'Unit 1', 'Hello'])
+    expect(band.units.find((u) => u.unit === 'Unit 2')!.zeilen.map((z) => z.name)).toEqual(['Station 1', 'Check-in'])
+    expect(band.units.find((u) => u.unit === 'Hello')!.zeilen.map((z) => z.name)).toEqual(['Station 2', 'Check-in'])
   })
 })

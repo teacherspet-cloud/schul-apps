@@ -57,6 +57,8 @@ export function KennzahlenKopf({
   links,
   rechts,
   zahlen,
+  kacheln = false,
+  oben,
   ...rest
 }: {
   titel?: React.ReactNode
@@ -66,14 +68,24 @@ export function KennzahlenKopf({
   /** Aktionen rechts (Menü, Knöpfe) */
   rechts?: React.ReactNode
   zahlen: Kennzahl[]
+  /**
+   * Kompakt als Kacheln zu zweit nebeneinander statt einer Zeile (10.10.2026, Sprachklasse in „Meine Klassen": der
+   * Kasten steht neben „Lernstand im Karteikasten" und „Units"); füllt die Höhe der Nachbarkarten
+   */
+  kacheln?: boolean
+  /** Zwischen Titel und Zahlen, z. B. kleine Diagramme (10.10.2026) */
+  oben?: React.ReactNode
 } & Record<`data-${string}`, string | boolean | undefined>): React.JSX.Element {
   return (
-    <Card withBorder radius="md" padding="sm" {...rest}>
+    <Card withBorder radius="md" padding="sm" h={kacheln ? '100%' : undefined} {...rest}>
       <style>{`
         .kennzahl { padding: 6px 12px; border-radius: var(--mantine-radius-md); border-left: 1px solid var(--mantine-color-default-border); }
         .kennzahl-knopf:hover { background: var(--mantine-color-default-hover); }
         .kennzahl-knopf:focus-visible { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 1px; }
         .kennzahlen-zeile > :first-child .kennzahl, .kennzahlen-zeile > .kennzahl:first-child { border-left: 0; }
+        .kennzahlen-kacheln { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .kennzahl-bild { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 6px 8px; border: 1px solid var(--mantine-color-default-border); }
+        .kennzahlen-kacheln .kennzahl { display: block; width: 100%; height: 100%; padding: 6px 10px; border: 1px solid var(--mantine-color-default-border); }
       `}</style>
       {(titel || links || rechts) && (
         <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={zahlen.length ? 'xs' : 0}>
@@ -91,7 +103,15 @@ export function KennzahlenKopf({
           {rechts}
         </Group>
       )}
-      {zahlen.length > 0 && (
+      {oben}
+      {zahlen.length > 0 && kacheln && (
+        <div className="kennzahlen-kacheln" data-kennzahlen style={oben ? { marginTop: 6 } : undefined}>
+          {zahlen.map((k) => (
+            <Zahl key={k.id} k={k} />
+          ))}
+        </div>
+      )}
+      {zahlen.length > 0 && !kacheln && (
         <Group gap={4} className="kennzahlen-zeile" data-kennzahlen>
           {zahlen.map((k) => (
             <Zahl key={k.id} k={k} />

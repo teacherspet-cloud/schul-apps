@@ -74,6 +74,9 @@ export interface AbschnittsZeile<W, S> {
   buch: string
   unit: string
   name: string
+  /** Stelle im Lehrwerk (10.10.2026, Server) */
+  unitRang?: number
+  abschnittRang?: number
   /** Statistik des Abschnitts – nur, wenn sie zu den Abschnitten passt */
   stat?: S
   woerter: W[]
@@ -83,8 +86,8 @@ export interface AbschnittsZeile<W, S> {
  * Zeilen des Kastens: je Abschnitt Band, Unit, Name, Statistik (falls da) und seine Wörter. Band und Unit kommen vom Server
  * (`teile` mit buch/unit, sonst aus der Statistik), der Name aus der Statistik bzw. der Einordnung des Titels.
  */
-export function abschnittsZeilen<W, S extends Pick<AbschnittStatistik, 'name' | 'unit' | 'buch'>>(
-  teile: (Pick<KursTeil, 'titel' | 'anzahl' | 'zeit'> & { buch?: string; unit?: string })[],
+export function abschnittsZeilen<W, S extends Pick<AbschnittStatistik, 'name' | 'unit' | 'buch' | 'unitRang' | 'abschnittRang'>>(
+  teile: (Pick<KursTeil, 'titel' | 'anzahl' | 'zeit'> & { buch?: string; unit?: string; unitRang?: number; abschnittRang?: number })[],
   woerter: W[],
   quelle: Partial<Quelle> | null | undefined,
   statistik?: S[]
@@ -104,6 +107,9 @@ export function abschnittsZeilen<W, S extends Pick<AbschnittStatistik, 'name' | 
       buch: t.buch ?? st?.buch ?? einordnung[i]?.buch ?? '',
       unit: t.unit ?? st?.unit ?? einordnung[i]?.unit ?? '',
       name: st?.name || einordnung[i]?.name || t.titel,
+      // Stelle im Lehrwerk (10.10.2026) – Sortierung wie im Buch
+      ...((t.unitRang ?? st?.unitRang) !== undefined ? { unitRang: t.unitRang ?? st?.unitRang } : {}),
+      ...((t.abschnittRang ?? st?.abschnittRang) !== undefined ? { abschnittRang: t.abschnittRang ?? st?.abschnittRang } : {}),
       ...(st ? { stat: st } : {}),
       woerter: woerter.slice(von, bis)
     }

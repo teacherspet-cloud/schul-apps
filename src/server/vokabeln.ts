@@ -47,7 +47,7 @@ import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { schuljahrVon } from '../shared/schulkalender'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
-import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, type AbschnittEinordnung, type AbschnittStatistik } from '../shared/kursAbschnitte'
+import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, mitBuchRaengen, type AbschnittEinordnung, type AbschnittStatistik } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -57,7 +57,7 @@ import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen
 // Freischaltungen planen (09.10.2026): Lernende sehen nur freie Abschnitte
 import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
-import { abschnitteBeimSpeichern, lehrwerkName } from './wartungAbschnitteTeilen'
+import { abschnitteBeimSpeichern, lehrwerkGliederung, lehrwerkName } from './wartungAbschnitteTeilen'
 import { abkuerzungAus } from '../shared/abkuerzung'
 import { mitnahmeVon, ruhendAufheben, ruht, vokNachziehen } from './mitnahme'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
@@ -269,7 +269,9 @@ export function teileVon(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstell
  */
 export function teileEingeordnet(z: Pick<Zeile, 'quelle' | 'titel' | 'lehrkraft_id'>, teile: VokTeil[]): AbschnittEinordnung[] {
   const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
-  return mitBaenden(teile, abschnitteEinordnen(teile, q), q, z.titel, (k) => lehrwerkName(k, z.lehrkraft_id))
+  const e = mitBaenden(teile, abschnitteEinordnen(teile, q), q, z.titel, (k) => lehrwerkName(k, z.lehrkraft_id))
+  // Stelle im Lehrwerk je Abschnitt (10.10.2026): „Units" und „Abschnitte & Wörter" absteigend wie im Buch
+  return mitBuchRaengen(teile, e, q, (k, buch) => lehrwerkGliederung(k, buch, z.lehrkraft_id))
 }
 
 /**
@@ -1267,7 +1269,13 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           teile: (() => {
             const tl = woerter.length ? teileVon(z) : []
             const e = teileEingeordnet(z, tl)
-            return tl.map((t, i) => ({ ...t, ...(e[i]?.buch ? { buch: e[i].buch } : {}), ...(e[i]?.unit ? { unit: e[i].unit } : {}) }))
+            return tl.map((t, i) => ({
+              ...t,
+              ...(e[i]?.buch ? { buch: e[i].buch } : {}),
+              ...(e[i]?.unit ? { unit: e[i].unit } : {}),
+              ...(e[i]?.unitRang !== undefined ? { unitRang: e[i].unitRang } : {}),
+              ...(e[i]?.abschnittRang !== undefined ? { abschnittRang: e[i].abschnittRang } : {})
+            }))
           })(),
           // Entfernte Abschnitte (08.10.2026): Lernstand gespeichert, kommt beim erneuten Hinzufügen zurück
           entfernt: entferntVon(z).map((e) => ({ teil: e.teil, anzahl: e.woerter.length, zeit: e.zeit })),
