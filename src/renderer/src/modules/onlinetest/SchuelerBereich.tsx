@@ -708,7 +708,7 @@ function Startseite(): React.JSX.Element {
       {(naechstes || stand?.tipp) && (
       <div className={`sa-start-paar${naechstes && stand?.tipp ? ' zwei' : ''}`} data-start-paar>
       {naechstes && (
-        <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
+        <Paper className="sa-naechstes" withBorder radius="xl" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
           <div className="sa-naechstes-reihe">
             <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
               <ThemeIcon size={52} radius="xl" color={naechstes.farbe} className="sa-puls">
@@ -839,8 +839,10 @@ const STARTSEITE_CSS = `
 html.sa-ruhig .sa-puls { animation: none; }
 .sa-naechstes { background: var(--mantine-color-body); }
 /* „Als Nächstes" + Tipp nebeneinander (10.10.2026): links breit, rechts der Tipp kompakt; schmal untereinander */
-.sa-start-paar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }
-@media (min-width: 701px) { .sa-start-paar.zwei { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); } }
+.sa-start-paar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: stretch; }
+@media (min-width: 701px) { .sa-start-paar.zwei { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+/* Gleichmäßig zu den übrigen Kästen der Seite (10.10.2026): gleiche Breite, Höhe, Rundung und Innenabstand */
+.sa-start-paar > .sa-naechstes, .sa-start-paar > .sl-tipp { height: 100%; border-radius: 22px; padding: 18px; }
 /* Als Nächstes (10.10.2026, Befund: am Telefon stand nur „Voka…"): Knopf neben dem Text, wenn Platz ist, sonst darunter in voller Breite – nie abgeschnitten */
 .sa-naechstes-reihe { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 /* Knopf immer UNTER dem Text (10.10.2026, Befund der Lehrkraft am Tablet: rechts daneben sah es seltsam aus) */
