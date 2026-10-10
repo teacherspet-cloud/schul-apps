@@ -109,6 +109,7 @@ import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
 import { holen, senden } from './serverApi'
 import { Begruessung, Lernstand, MeinLernraum, TippKarte, type NeuesMaterial } from './SchuelerStart'
+import { TitelFormDialog, type TitelKurz } from './MedaillenTitel'
 import type { LernstandAntwort } from '@shared/lernstand'
 
 interface Beitritt {
@@ -499,6 +500,16 @@ function Startseite(): React.JSX.Element {
     []
   )
   useEffect(() => standLaden(), [standLaden])
+  // Titel und Profilbild für die Begrüßung (10.10.2026, Medaillen und Titel); beim ersten Titel die Form erfragen
+  const [titel, setTitel] = useState<TitelKurz | null>(null)
+  const [formFrage, setFormFrage] = useState(false)
+  useEffect(() => {
+    if (ich?.rolle !== 'schueler') return
+    void holen<TitelKurz>('/s/api/auszeichnungen/titel').then(
+      (t) => (setTitel(t), t.formOffen && !window.__schulappsServer?.vorschau && setFormFrage(true)),
+      () => undefined
+    )
+  }, [ich?.rolle])
   // Neue Freigaben ohne Neuladen (08.10.2026): beim Zurückkehren und jede Minute frisch
   const alleLaden = useCallback(() => {
     void holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
@@ -608,7 +619,14 @@ function Startseite(): React.JSX.Element {
           </Anchor>
         </Alert>
       )}
-      <Begruessung vorname={vorname} stand={stand} naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null} />
+      <TitelFormDialog offen={formFrage} beispiel={titel?.beispiel ?? null} fertig={(k) => (setFormFrage(false), k && setTitel({ ...titel, ...k }))} />
+      <Begruessung
+        vorname={vorname}
+        titel={titel?.anzeige?.text ?? null}
+        avatar={titel?.avatar ?? null}
+        stand={stand}
+        naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null}
+      />
       {stand && <TippKarte stand={stand} gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)} />}
 
       {naechstes && (

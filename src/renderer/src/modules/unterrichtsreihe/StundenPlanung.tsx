@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { SCHRITT_ARTEN, type Reihe, type ReihenPhase, type StundenPlanung } from '@shared/reihe'
 import { SOZIALFORMEN } from '../../shared/stundenverlauf/stundenverlauf'
 import { notifyError } from '../../shared/util'
+import { alsVorschau } from '../../shared/export/pdfVorschauLogik'
 import { minutenAnpassen, minutenLage, mitVerlauf, neuePhase, phasenVorlage, phaseVerschieben, verlaufVon } from './reihePlanung'
 import { starteVerlaufVorschlag, useVerlaufEntsteht } from './verlaufAuftrag'
 import { planungAusgeben } from './planungDruck'
@@ -318,6 +319,10 @@ export function PlanungExport({ reihe }: { reihe: Reihe }): React.JSX.Element {
         </Menu.Item>
         <Menu.Item onClick={() => void los('pdf')} data-planung-export-art="pdf">
           Als PDF speichern
+        </Menu.Item>
+        {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx) */}
+        <Menu.Item onClick={() => void alsVorschau(() => los('pdf'))} data-planung-export-art="vorschau">
+          PDF-Vorschau
         </Menu.Item>
         <Menu.Item onClick={() => void los('word')} data-planung-export-art="word">
           Als Word speichern

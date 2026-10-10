@@ -21,7 +21,7 @@
 //     der Art „touch"), Präsentation öffnen und Schritt für Schritt aufdecken. Seit dem Zoom: Der
 //     Finger rollt und zoomt, verschoben wird erst mit „Mit dem Finger zeichnen" (sonst mit dem Stift).
 import { chromium, webkit } from 'playwright-core'
-import { kartenAuf } from './warten.mjs'
+import { kartenAuf, leisteAuf } from './warten.mjs'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { extname, join, resolve } from 'path'
@@ -164,6 +164,8 @@ async function lauf(name, browserTyp, startOpt) {
     const spaeter = page.getByRole('button', { name: 'Später einrichten' })
     await spaeter.waitFor({ state: 'visible', timeout: 5000 }).catch(() => undefined)
     if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+    // Leistengruppen sind seit 10.10.2026 zu Sitzungsbeginn zugeklappt
+    await leisteAuf(page)
     await page.screenshot({ path: join(out, `${name}-1-start.png`) })
     pruefe(await page.locator('[aria-label="Vokabeltest"]').first().isVisible(), `${name}: Startseite mit den Programmen sichtbar`)
 

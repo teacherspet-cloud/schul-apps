@@ -2,14 +2,16 @@
  * Verwaltung › Schule: Schulkalender (10.10.2026, src/server/schulkalender.ts) – Quelle, letzter Abruf, Land, Beginn und
  * Ende der Schuljahre und die Liste der Ferien und Feiertage (nur lesen). Dazu der Stand des automatischen
  * Schuljahreswechsels (src/server/schuljahrWechsel.ts). Schuleigene bewegliche Ferientage gibt es bewusst nicht.
+ * Einklappbar mit Statuszeile „Ferien NI · Stand 10.10." (10.10.2026), offen/zu dauerhaft je Gerät (KlappKarte `dauerhaft`).
  */
-import { Alert, Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Group, Loader, SimpleGrid, Stack, Table, Text } from '@mantine/core'
 import { IconRefresh } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { schuljahrGrenzen, schuljahrText, schuljahrVon, tagText, type SchulkalenderDaten } from '@shared/schulkalender'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
 import { ladeSchulkalender } from '../../shared/schulkalenderLaden'
+import { KlappKarte } from '../../shared/components/KlappKarte'
 
 interface Antwort {
   daten: SchulkalenderDaten | null
@@ -55,9 +57,15 @@ export function SchulkalenderKarte(): React.JSX.Element {
   const ferien = (d?.ferien ?? []).filter((f) => f.bis >= ab)
   const feiertage = (d?.feiertage ?? []).filter((f) => f.bis >= ab)
   return (
-    <Card withBorder padding="lg" data-schulkalender>
-      <Group justify="space-between" mb={4} wrap="nowrap">
-        <Title order={5}>Schulkalender</Title>
+    <KlappKarte
+      id="verwaltung-kalender"
+      dauerhaft
+      titel="Schulkalender"
+      status={d ? `Ferien ${d.land} · Stand ${new Date(d.abgerufen).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })}` : 'noch keine Daten'}
+      ton={d && (!a.stand || a.stand.ok) ? 'neutral' : 'warnung'}
+      rahmen={{ 'data-schulkalender': true }}
+    >
+      <Group justify="flex-end" mb={4} wrap="nowrap">
         <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} loading={laeuft} onClick={() => void aktualisieren()} data-kalender-aktualisieren>
           Jetzt abrufen
         </Button>
@@ -145,6 +153,6 @@ export function SchulkalenderKarte(): React.JSX.Element {
           </SimpleGrid>
         </Stack>
       )}
-    </Card>
+    </KlappKarte>
   )
 }

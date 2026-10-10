@@ -22,6 +22,7 @@ import { NAMEN_KORRIGIEREN } from './wartungGastname'
 import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
+import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
 import { VERBFORM_TON } from './wartungVerbformTon'
 
@@ -155,7 +156,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Aufnahmen mit Abkürzungen löschen (09.10.2026, von der Lehrkraft bestätigt; wartungAbkuerzungTon.ts)
   ABKUERZUNG_TON,
   // Aufnahmen mit „slash" und alter Verbform-Aussprache entfernen, vorher gesichert (09.10.2026; wartungVerbformTon.ts)
-  VERBFORM_TON
+  VERBFORM_TON,
+  // Band je Vokabel-Abschnitt nachtragen (10.10.2026, mehrere Bände in einem Kurs; wartungVokabelBaende.ts)
+  VOKABEL_BAENDE
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

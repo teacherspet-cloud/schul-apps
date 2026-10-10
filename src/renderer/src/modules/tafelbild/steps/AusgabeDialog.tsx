@@ -7,6 +7,7 @@ import { IconFileTypePdf, IconPhoto, IconPresentation, IconPrinter, IconUsersGro
 import { useEffect, useState } from 'react'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { speichereAusgabe, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import { VorschauKnopf } from '../../../shared/export/PdfVorschau'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -123,6 +124,12 @@ export default function AusgabeDialog({
             <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
               PDF
             </Button>
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+            <VorschauKnopf
+              variant="light"
+              disabled={!tafeln.length || laeuft !== null}
+              ausgabe={() => speichereAusgabe([{ name: `${name}.pdf`, html: pdfHtml(t, w, schule) }], 'Tafelbild als PDF gespeichert.', ziel())}
+            />
             <Button
               variant="light"
               leftSection={<IconPhoto size={16} />}

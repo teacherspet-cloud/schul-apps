@@ -3,6 +3,7 @@ import type { AppSettings, DeepPartial } from '@shared/types'
 import { modules } from '../modules/registry'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
 import { programmPasst, programmSichtbar } from '../shared/programmSichtbarkeit'
+import { serverIch } from '../shared/plattform'
 
 type Update = (patch: DeepPartial<AppSettings>) => Promise<void>
 
@@ -46,6 +47,8 @@ export function ProgrammeAnzeigenCard({ settings, update }: { settings: AppSetti
   const eigene = settings.eigeneFaecher ?? []
   const anzeigen = settings.programmeAnzeigen ?? {}
   const festgelegt = Object.keys(anzeigen).some((id) => typeof anzeigen[id] === 'boolean')
+  // Admins sehen immer alle Programme (10.10.2026) – die Fächer blenden nichts aus
+  const admin = serverIch()?.rolle === 'admin'
   return (
     <Card withBorder padding="lg" data-programme-anzeigen>
       <Group justify="space-between" align="start" mb={4}>
@@ -62,7 +65,9 @@ export function ProgrammeAnzeigenCard({ settings, update }: { settings: AppSetti
         )}
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        {eigene.length
+        {admin
+          ? 'Als Admin sind alle Programme sichtbar – unabhängig von den Fächern. Einzelne lassen sich hier ausblenden.'
+          : eigene.length
           ? 'Nach den unterrichteten Fächern vorbelegt. Ausgeblendete Programme fehlen in Leiste und Startseite; ihre Materialien lassen sich über die Suche und „Zuletzt bearbeitet“ weiter öffnen.'
           : 'Ohne gewählte Fächer sind alle Programme sichtbar.'}
       </Text>
@@ -73,8 +78,8 @@ export function ProgrammeAnzeigenCard({ settings, update }: { settings: AppSetti
             <Switch
               key={m.id}
               label={m.name}
-              description={!passt && eigene.length ? 'passt zu keinem der unterrichteten Fächer' : undefined}
-              checked={programmSichtbar(m.id, m.faecher, eigene, anzeigen)}
+              description={!passt && eigene.length && !admin ? 'passt zu keinem der unterrichteten Fächer' : undefined}
+              checked={programmSichtbar(m.id, m.faecher, eigene, anzeigen, { admin })}
               onChange={(e) => void update({ programmeAnzeigen: { [m.id]: e.currentTarget.checked } })}
               data-programm-schalter={m.id}
             />

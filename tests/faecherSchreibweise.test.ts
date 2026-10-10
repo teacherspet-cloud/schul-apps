@@ -88,7 +88,8 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
       'namen-korrigieren-2026-10-09',
       'rekorde-zeit-2026-10-08',
       'there-was-klasse5-2026-10-09',
-      'verbform-ton-2026-10-09'
+      'verbform-ton-2026-10-09',
+      'vokabel-baende-2026-10-10'
     ])
     // Danach Eingetragenes bleibt beim nächsten Start, wie es ist (die Wartung ist erledigt)
     d.prepare("UPDATE lerngruppen SET fach = 'englisch' WHERE id = 'g1'").run()

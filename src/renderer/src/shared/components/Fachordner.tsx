@@ -18,12 +18,16 @@
  *    an; am Schalter ein Punkt, damit man findet, wo es steht. Findet eine Suche nur Fachschaftsmaterial, erscheint es
  *    trotzdem – mit Hinweis (wie bei Material aus Unterrichtsreihen).
  */
-import { ActionIcon, Anchor, Badge, Button, Card, Collapse, Group, Menu, SegmentedControl, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Anchor, Badge, Button, Card, Collapse, Group, Menu, Modal, SegmentedControl, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconChevronDown, IconChevronRight, IconDownload, IconFolders, IconShare, IconShareOff, IconTrash } from '@tabler/icons-react'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
-import { holen, senden } from '../../modules/onlinetest/serverApi'
+import { holen, senden, ServerFehler } from '../../modules/onlinetest/serverApi'
+import { FAECHER } from '@shared/faecher'
+import { fachVorschlag } from '@shared/fachschaftFach'
+import { useAppSettings } from '../settingsStore'
+import HaeufigSelect from './HaeufigSelect'
 import { aufServer, serverIch } from '../plattform'
 import { openDocument } from '../navigation'
 import { notifyError, notifySuccess } from '../util'
@@ -42,6 +46,9 @@ export interface Freigabe {
   vonName: string
   eigen: boolean
   datum: string
+  /** Überthema bzw. Thema des Materials (10.10.2026) */
+  thema?: string
+  jahrgang?: number
 }
 
 /** Kopie aus der ersten Fassung (Fachordner, /server/fach): zum Übernehmen in die eigene Ablage */
@@ -103,6 +110,11 @@ const zaehlEintraege = (eintraege: Freigabe[] | null, alt: AltEintrag[]): Fachsc
   ...alt.map((e) => ({ id: `alt:${e.id}`, art: e.art, eigen: e.von === serverIch()?.benutzer }))
 ]
 
+/** Alle Freigaben der Fachschaft (für die Materialien-Seite am Telefon) – lädt beim ersten Aufruf */
+export function useFachschaftEintraege(): Freigabe[] | null {
+  return useFreigaben()
+}
+
 function useFreigaben(): Freigabe[] | null {
   const eintraege = useFachschaft((s) => s.eintraege)
   useEffect(() => {
@@ -138,6 +150,91 @@ export async function freigabeOeffnen(f: Freigabe): Promise<void> {
   }
 }
 
+/** Material, für das gerade nach dem Fach gefragt wird (10.10.2026) */
+const useFachFrage = create<{ frage: { art: string; id: string; name: string } | null }>(() => ({ frage: null }))
+
+/**
+ * Für die Fachschaft freigeben – aus dem ⋯-Menü der Bibliothek und der Materialien-Seite am Telefon. Erkennt der Server
+ * kein Fach im Material (10.10.2026), fragt ein Dialog danach (`FachschaftFachFrage`, einmal in App.tsx).
+ */
+export async function fuerFachschaftFreigeben(art: string, id: string, name: string, fach?: string): Promise<boolean> {
+  try {
+    const r = await senden<{ label: string }>('/server/fachschaft/freigeben', { art, id, ...(fach ? { fach } : {}) })
+    notifySuccess(`„${name}“ ist für die Fachschaft ${r.label} freigegeben – wer das Fach unterrichtet, sieht und öffnet es.`)
+    void useFachschaft.getState().laden()
+    return true
+  } catch (e) {
+    if (e instanceof ServerFehler && (e.daten as { fachNoetig?: boolean } | undefined)?.fachNoetig) useFachFrage.setState({ frage: { art, id, name } })
+    else notifyError(e)
+    return false
+  }
+}
+
+const FACH_WAHL = FAECHER.filter((f) => f.id !== 'anderes').map((f) => ({ value: f.id, label: f.label }))
+
+/** Dialog „Für welches Fach?" – vorbelegt mit dem eigenen Fach, wenn es genau eines ist */
+export function FachschaftFachFrage(): React.JSX.Element | null {
+  const frage = useFachFrage((s) => s.frage)
+  const eigene = useAppSettings((s) => s.settings.eigeneFaecher)
+  const [fach, setFach] = useState<string | null>(null)
+  const [sendet, setSendet] = useState(false)
+  useEffect(() => {
+    if (frage) setFach(fachVorschlag(eigene))
+  }, [frage])
+  if (!frage) return null
+  const zu = (): void => useFachFrage.setState({ frage: null })
+  return (
+    <Modal opened onClose={zu} title="Für welches Fach freigeben?" data-fachschaft-fachfrage>
+      <Stack>
+        <Text size="sm">
+          In „{frage.name}“ ist kein Fach hinterlegt. Die Freigabe sehen alle Lehrkräfte, die das gewählte Fach unterrichten.
+        </Text>
+        <HaeufigSelect art="fach" label="Fach" data={FACH_WAHL} value={fach} onChange={setFach} searchable comboboxProps={{ withinPortal: true, zIndex: 400 }} data-fachschaft-fach />
+        <Group justify="flex-end">
+          <Button variant="default" onClick={zu}>
+            Abbrechen
+          </Button>
+          <Button
+            disabled={!fach}
+            loading={sendet}
+            data-fachschaft-fach-ok
+            onClick={() => {
+              if (!fach) return
+              setSendet(true)
+              void fuerFachschaftFreigeben(frage.art, frage.id, frage.name, fach).then((ok) => {
+                setSendet(false)
+                if (ok) zu()
+              })
+            }}
+          >
+            Freigeben
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+/** Darf dieses Programm für die Fachschaft freigeben? (nur am Server) */
+export const freigebbar = (moduleId: string): boolean => aufServer() && FREIGEBBAR.includes(moduleId)
+
+/** Ist dieses Material schon für die Fachschaft freigegeben? */
+export function useFreigegeben(moduleId: string, id: string): boolean {
+  const eintraege = useFreigaben()
+  return !!eintraege?.some((e) => e.eigen && e.art === moduleId && e.docId === id)
+}
+
+/** Freigabe zurücknehmen */
+export async function freigabeZuruecknehmen(art: string, id: string, name: string): Promise<void> {
+  try {
+    await senden('/server/fachschaft/zuruecknehmen', { art, id })
+    notifySuccess(`„${name}“ ist nicht mehr für die Fachschaft freigegeben.`)
+    void useFachschaft.getState().laden()
+  } catch (e) {
+    notifyError(e)
+  }
+}
+
 /** Menüpunkt im ⋯-Menü eines Eintrags (Bibliothek): freigeben bzw. zurücknehmen */
 export function TeilenMenuePunkt({ moduleId, id, name }: { moduleId?: string; id: string; name: string }): React.JSX.Element | null {
   const eintraege = useFreigaben()
@@ -146,15 +243,7 @@ export function TeilenMenuePunkt({ moduleId, id, name }: { moduleId?: string; id
   return freigegeben ? (
     <Menu.Item
       leftSection={<IconShareOff size={14} />}
-      onClick={() =>
-        void senden('/server/fachschaft/zuruecknehmen', { art: moduleId, id }).then(
-          () => {
-            notifySuccess(`„${name}“ ist nicht mehr für die Fachschaft freigegeben.`)
-            void useFachschaft.getState().laden()
-          },
-          (e: unknown) => notifyError(e)
-        )
-      }
+      onClick={() => void freigabeZuruecknehmen(moduleId, id, name)}
       data-fachschaft-zuruecknehmen
     >
       Freigabe für Fachschaft zurücknehmen
@@ -162,15 +251,7 @@ export function TeilenMenuePunkt({ moduleId, id, name }: { moduleId?: string; id
   ) : (
     <Menu.Item
       leftSection={<IconShare size={14} />}
-      onClick={() =>
-        void senden<{ label: string }>('/server/fachschaft/freigeben', { art: moduleId, id }).then(
-          (r) => {
-            notifySuccess(`„${name}“ ist für die Fachschaft ${r.label} freigegeben – wer das Fach unterrichtet, sieht und öffnet es.`)
-            void useFachschaft.getState().laden()
-          },
-          (e: unknown) => notifyError(e)
-        )
-      }
+      onClick={() => void fuerFachschaftFreigeben(moduleId, id, name)}
       data-fachschaft-freigeben
     >
       Für Fachschaft freigeben

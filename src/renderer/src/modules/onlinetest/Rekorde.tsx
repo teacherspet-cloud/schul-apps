@@ -11,6 +11,7 @@ import { IconTrophy } from '@tabler/icons-react'
 import { useState } from 'react'
 import { holen } from './serverApi'
 import { AchievementsInhalt } from './Achievements'
+import { MedaillenTitelInhalt } from './MedaillenTitel'
 
 interface Jahr {
   schuljahr: string
@@ -52,15 +53,22 @@ export function RekordKnopf({ gross = false, nurSymbol = false }: { gross?: bool
         </Button>
       )}
       <Modal opened={offen} onClose={() => setOffen(false)} title="Achievements" size="lg" zIndex={400}>
-        <Tabs defaultValue="achievements" keepMounted={false}>
+        {/* Medaillen und Titel je Sprache (10.10.2026) vorn; die einzelnen Achievements bleiben als eigener Reiter */}
+        <Tabs defaultValue="medaillen" keepMounted={false}>
           <Tabs.List mb="md">
+            <Tabs.Tab value="medaillen" data-tab-medaillen>
+              Medaillen & Titel
+            </Tabs.Tab>
             <Tabs.Tab value="achievements" data-tab-achievements>
-              Achievements
+              Einzelne Achievements
             </Tabs.Tab>
             <Tabs.Tab value="rekorde" data-tab-rekorde>
               Rekorde
             </Tabs.Tab>
           </Tabs.List>
+          <Tabs.Panel value="medaillen">
+            <MedaillenTitelInhalt />
+          </Tabs.Panel>
           <Tabs.Panel value="achievements">
             <AchievementsInhalt />
           </Tabs.Panel>

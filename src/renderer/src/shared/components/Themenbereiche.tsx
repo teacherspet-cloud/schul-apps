@@ -45,6 +45,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { useReiheZuordnung } from "../reiheZuordnung";
+import { istReiheMaterial } from "@shared/reiheMaterial";
 import type { Themenbereich } from "@shared/themen";
 import {
   automatikAn,
@@ -321,7 +322,8 @@ export function ThemenAnsicht({
       ...(geladen ?? []).filter(
         (m) =>
           m.moduleId !== moduleId &&
-          (reiheEinblenden || !reiheZuordnung.has(m.id))
+          // Seit 10.10.2026: nur FÜR die Reihe entstandenes Material ausblenden – eigene, in eine Reihe geholte Blätter bleiben
+          (reiheEinblenden || !istReiheMaterial(reiheZuordnung.get(m.id), m.name))
       ),
     ],
     [eigene, geladen, moduleId, reiheZuordnung, reiheEinblenden]
@@ -1938,8 +1940,8 @@ function baumListe(
   return out;
 }
 
-/** „Verschieben nach …" – für Tastatur und Tablet, wo Ziehen mühsam ist */
-function VerschiebenDialog({
+/** „Verschieben nach …" – für Tastatur und Tablet, wo Ziehen mühsam ist (auch die Materialien-Seite am Telefon) */
+export function VerschiebenDialog({
   schluessel,
   materialien,
   fachVon,

@@ -5,7 +5,7 @@
  * Der Code gilt für alle Vokabeltrainings, in die die Lehrkraft diese Person einträgt.
  */
 import { Alert, Button, FileButton, Group, Modal, Stack, Text, Textarea } from '@mantine/core'
-import { IconFileImport, IconPrinter, IconUsersPlus } from '@tabler/icons-react'
+import { IconEye, IconFileImport, IconPrinter, IconUsersPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { htmlAlsZeilen, kurzNamen, namenAusText } from '@shared/namenListe'
 import { senden } from '../onlinetest/serverApi'
@@ -13,6 +13,7 @@ import PrintPreview from '../../shared/components/PrintPreview'
 // Symbol eingebettet (08.10.2026): als Internetadresse kam es im Druckfenster nicht an – nur ein leeres Bildsymbol
 import webSymbol from '../../assets/web-symbol.png?inline'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
 
 export interface Zettel {
   name: string
@@ -73,6 +74,11 @@ ol { margin: 2mm 0 0; padding-left: 4.5mm; font-size: 8pt; color: #333; } li { m
 /** Zettel als PDF sichern */
 export function zettelAlsPdf(titel: string, zettel: Zettel[], adresse: string): void {
   void window.api.exporter.pdf(zettelHtml(titel, zettel, adresse), `Zugangszettel ${titel}.pdf`).catch((e: unknown) => notifyError(e))
+}
+
+/** Dasselbe PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx) */
+export function zettelVorschau(titel: string, zettel: Zettel[], adresse: string): void {
+  void pdfVorschauAusHtml(zettelHtml(titel, zettel, adresse), `Zugangszettel ${titel}.pdf`, async () => zettelAlsPdf(titel, zettel, adresse))
 }
 
 /**
@@ -179,6 +185,9 @@ export function LernendeEintragen({
             </Button>
             <Button variant="light" disabled={!fertig.length} onClick={() => zettelAlsPdf(titel, fertig, adresse)} data-zettel-pdf>
               Als PDF speichern
+            </Button>
+            <Button variant="light" leftSection={<IconEye size={16} />} disabled={!fertig.length} onClick={() => zettelVorschau(titel, fertig, adresse)} data-pdf-vorschau-knopf>
+              Vorschau
             </Button>
             <Button variant="default" onClick={schliessen}>
               Fertig

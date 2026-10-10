@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { modules, type SchulModule } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
 import { sichtbareProgramme } from '../shared/programmSichtbarkeit'
+import { serverIch } from '../shared/plattform'
 
 /**
  * Die sichtbaren Programme in der Reihenfolge der Leiste (Paket 12) – für Leiste, Startseite,
@@ -12,5 +13,7 @@ import { sichtbareProgramme } from '../shared/programmSichtbarkeit'
 export function useSichtbareProgramme(): SchulModule[] {
   const eigene = useAppSettings((s) => s.settings.eigeneFaecher)
   const anzeigen = useAppSettings((s) => s.settings.programmeAnzeigen)
-  return useMemo(() => sichtbareProgramme(modules, eigene, anzeigen), [eigene, anzeigen])
+  // Admins sehen immer alles (10.10.2026) – die Rolle steht beim Laden fest
+  const admin = serverIch()?.rolle === 'admin'
+  return useMemo(() => sichtbareProgramme(modules, eigene, anzeigen, { admin }), [eigene, anzeigen, admin])
 }

@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kartenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-schuljahr')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -59,6 +59,9 @@ try {
   const v = await seiteAuf(verwaltung)
   await v.locator('.app-leiste [aria-label="Schule & Daten"]').first().click()
   await v.getByRole('tab', { name: 'Schule', exact: true }).click()
+  // Seit 10.10.2026 einklappbar (Vorgabe zu, offen/zu dauerhaft je Gerät) – Status im Kopf, Inhalt nach dem Aufklappen
+  pruefe(await da(v.locator('[data-klappkarte="verwaltung-kalender"] [data-klappstatus]')), 'Verwaltung › Schule: Schulkalender mit Statuszeile')
+  await kartenAuf(v, 'verwaltung-kalender')
   pruefe(await da(v.locator('[data-schulkalender] [data-kalender-quelle="datei"]')), 'Verwaltung › Schule: Karte „Schulkalender" mit Quelle')
   pruefe((await v.locator('[data-kalender-ferien] tbody tr').count()) >= 6, 'Ferien stehen in der Liste (nur lesen)')
   pruefe((await v.locator('[data-kalender-schuljahre]').innerText()).includes('13.8.2026'), 'Erster Schultag 2026/27: 13.8.2026')

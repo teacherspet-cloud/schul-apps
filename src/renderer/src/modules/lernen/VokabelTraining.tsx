@@ -134,7 +134,9 @@ export default function VokabelTraining(): React.JSX.Element {
         const id = ziel.art === 'kurs' ? ziel.id : ziel.vokId
         const kurse = (await holen<{ zuweisungen: { id: string }[] }>('/server/vokabeln')).zuweisungen
         if (!kurse.some((k) => k.id === id)) return zurUebersicht()
-        setStartReiter(ziel.art === 'kursGrammatik' ? 'grammatik' : undefined)
+        setStartReiter(ziel.art === 'kursGrammatik' ? 'grammatik' : ziel.reiter)
+        // Bestimmter Reiter (Startseite, 10.10.2026): auch beim schon offenen Kurs neu aufbauen
+        if (ziel.art === 'kurs' && ziel.reiter) setOeffnung((n) => n + 1)
         if (ziel.art === 'kursGrammatik') {
           // Die Grammatik des Kurses zeigen – dort steht der Entwurf
           setOeffnung((n) => n + 1)

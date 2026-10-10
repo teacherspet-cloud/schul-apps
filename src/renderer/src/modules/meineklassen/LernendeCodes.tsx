@@ -6,10 +6,10 @@
  * Zettel und Druck kommen aus lernen/LernendeEintragen.tsx (ZettelDruck, zettelAlsPdf) – dieselben wie im Kurs.
  */
 import { Alert, Button, Group, Modal, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
-import { IconDownload, IconPrinter } from '@tabler/icons-react'
+import { IconDownload, IconEye, IconPrinter } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
-import { ZettelDruck, zettelAlsPdf, type Zettel } from '../lernen/LernendeEintragen'
+import { ZettelDruck, zettelAlsPdf, zettelVorschau, type Zettel } from '../lernen/LernendeEintragen'
 import { notifyError, notifySuccess } from '../../shared/util'
 
 export interface GastMitCode {
@@ -123,6 +123,11 @@ export function GastFenster({
             {zettel.length > 0 && (
               <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => zettelAlsPdf(titel, zettel, window.location.origin)} data-gast-zettel-pdf>
                 Als PDF sichern
+              </Button>
+            )}
+            {zettel.length > 0 && (
+              <Button variant="default" leftSection={<IconEye size={16} />} onClick={() => zettelVorschau(titel, zettel, window.location.origin)} data-pdf-vorschau-knopf>
+                Vorschau
               </Button>
             )}
             <Button variant="subtle" onClick={() => void neuerCode()} data-gast-code-neu>

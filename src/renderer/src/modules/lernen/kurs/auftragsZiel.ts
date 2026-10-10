@@ -9,14 +9,19 @@
  *  - `extra:<vokId>:<sid>:<zeit>` Förder-/Forderaufgaben für eine Person → Kurs, Grammatik (dort der Entwurf)
  *  - `grammatik-<zeit>`, `extra-<zeit>` (ältere bzw. ohne Kurs) → Übersicht
  *  - ältere `mehr-<gid>-<zeit>` → wie `g:<gid>`
+ *  - `kursr:<reiter>:<vokId>`     Kurs in einem bestimmten Reiter (Startseite, Handlungsbedarf; 10.10.2026)
  *  - sonst: eine Kurs-Kennung
  */
+import type { KursReiter } from './kursDaten'
+
 export type SprachenlernenZiel =
-  | { art: 'kurs'; id: string }
+  | { art: 'kurs'; id: string; reiter?: KursReiter }
   | { art: 'grammatik'; gid: string }
   | { art: 'kursGrammatik'; vokId: string }
   | { art: 'uebersicht' }
 
+const REITER: readonly KursReiter[] = ['ueberblick', 'vokabeln', 'grammatik', 'lernende', 'einstellungen']
+export const kursReiterDocId = (vokId: string, reiter: string): string => `kursr:${reiter}:${vokId}`
 export const mehrAufgabenDocId = (gid: string, zeit = Date.now()): string => `mehr:${gid}:${zeit}`
 export const kursGrammatikDocId = (vokId: string | undefined, zeit = Date.now()): string => (vokId ? `kursg:${vokId}:${zeit}` : `grammatik-${zeit}`)
 export const extraDocId = (vokId: string, schuelerId: string, zeit = Date.now()): string => `extra:${vokId}:${schuelerId}:${zeit}`
@@ -27,6 +32,10 @@ export function sprachenlernenZiel(docId: string): SprachenlernenZiel {
   if (id.startsWith('g:')) return id.length > 2 ? { art: 'grammatik', gid: id.slice(2) } : { art: 'uebersicht' }
   const teile = id.split(':')
   if (teile[0] === 'mehr' && teile[1]) return { art: 'grammatik', gid: teile[1] }
+  if (teile[0] === 'kursr' && teile[2]) {
+    const reiter = REITER.find((r) => r === teile[1])
+    return reiter ? { art: 'kurs', id: teile.slice(2).join(':'), reiter } : { art: 'kurs', id: teile.slice(2).join(':') }
+  }
   if ((teile[0] === 'kursg' || teile[0] === 'extra') && teile[1]) return { art: 'kursGrammatik', vokId: teile[1] }
   const alt = /^mehr-(.+)-\d+$/.exec(id)
   if (alt) return { art: 'grammatik', gid: alt[1] }

@@ -36,6 +36,8 @@ import { useMemo } from 'react'
 import type { LernstandAntwort, Strategie, Stufe, Zustand } from '@shared/lernstand'
 import { fachAusName } from '@shared/faecher'
 import { VorleseKnopf } from './SchuelerEinstellungen'
+import { mitTitel } from '@shared/auszeichnungen'
+import { bildAdresse } from '@shared/auszeichnungenBilder'
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
@@ -171,13 +173,20 @@ const STRATEGIE_NAME: Record<Strategie, string> = {
 /** Begrüßungsbox (Kopf der Startseite) */
 export function Begruessung({
   vorname,
+  titel = null,
+  avatar = null,
   stand,
   naechstes
 }: {
   vorname: string
+  /** Gewählter Titel (10.10.2026, Medaillen und Titel): „Guten Morgen, Sir Lars!" */
+  titel?: string | null
+  /** Profilbild aus der Sammlung (freigeschaltet) */
+  avatar?: string | null
   stand: LernstandAntwort | null
   naechstes: Knopf | null
 }): React.JSX.Element {
+  const name = mitTitel(titel, vorname)
   const stunde = new Date().getHours()
   const gruss = stunde < 11 ? 'Guten Morgen' : stunde < 17 ? 'Hallo' : 'Guten Abend'
   const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -211,10 +220,13 @@ export function Begruessung({
       <Group wrap="nowrap" align="center" gap="md" style={{ position: 'relative' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text className="sl-datum">{heute}</Text>
-          <Title order={2} className="sl-gruss" data-gruss>
-            {gruss}
-            {vorname ? `, ${vorname}` : ''}!
-          </Title>
+          <Group gap="sm" wrap="nowrap" align="center">
+            {avatar && <img src={bildAdresse(avatar)} alt="" width={40} height={47} style={{ objectFit: 'contain', flex: 'none' }} data-gruss-avatar={avatar} />}
+            <Title order={2} className="sl-gruss" data-gruss>
+              {gruss}
+              {name ? `, ${name}` : ''}!
+            </Title>
+          </Group>
           {/* Ohne Text (Kl. 5–6, neu: der Satz „Hier siehst du, was ansteht …" ist entfallen, 08.10.2026) keine leere Zeile */}
           {/* Smartphone (10.10.2026, Wunsch der Lehrkraft): der Einstiegssatz für Neue („Hier findest du … Wähl einen
               Startpunkt.") samt „Zum Lernraum" entfällt dort – CSS-Klasse sl-neu-hinweis */}
@@ -223,7 +235,7 @@ export function Begruessung({
               <Text className="sl-unter" data-begruessung-text>
                 {text}
               </Text>
-              {stand && <VorleseKnopf text={`${gruss}${vorname ? `, ${vorname}` : ''}! ${text}`} farbe="gray" />}
+              {stand && <VorleseKnopf text={`${gruss}${name ? `, ${name}` : ''}! ${text}`} farbe="gray" />}
             </Group>
           )}
           {stand && <Auszeichnungen a={stand} />}

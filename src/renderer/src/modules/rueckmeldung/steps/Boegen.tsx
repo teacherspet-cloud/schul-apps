@@ -29,6 +29,7 @@ import {
   IconCheck,
   IconChevronRight,
   IconDownload,
+  IconEye,
   IconFileTypeDocx,
   IconFileTypePdf,
   IconLanguage,
@@ -45,6 +46,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import { pdfVorschauAusHtml } from '../../../shared/export/PdfVorschau'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { SeitenWahlSchalter, useSeitenWahl } from '../../../shared/components/SeitenAuswahl'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
@@ -309,6 +311,23 @@ export default function Boegen(): React.JSX.Element | null {
               data-rm-alle-pdf
             >
               Alle als PDF
+            </Button>
+            {/* Vorschau (10.10.2026): dasselbe PDF ohne Speichern; „PDF speichern" nimmt den Weg von „Alle als PDF" */}
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconEye size={14} />}
+              disabled={!fertige.length}
+              onClick={() => {
+                const f = frisch(alleIds)
+                if (!f?.liste.length) return
+                void boegenDruckHtml(f.d, f.liste, { zeichen })
+                  .then((html) => pdfVorschauAusHtml(html, 'Rückmeldungen.pdf', async () => speichern(alleIds, 'pdf')))
+                  .catch(notifyError)
+              }}
+              data-pdf-vorschau-knopf
+            >
+              Vorschau
             </Button>
             <Button
               size="xs"

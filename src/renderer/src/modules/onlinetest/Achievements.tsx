@@ -227,9 +227,29 @@ function konfetti(): void {
   setTimeout(() => huelle.remove(), 2200)
 }
 
-function gluckwunsch(neu: Eintrag[]): void {
-  if (!neu.length) return
+/** Neue Medaille oder neuer Titel (10.10.2026, server/achievements.ts auszText) */
+interface AuszMeldung {
+  art: 'medaille' | 'titel'
+  sprache: string
+  stufe: number
+  titel: string
+  text: string
+}
+
+function gluckwunsch(neu: Eintrag[], ausz: AuszMeldung[] = []): void {
+  if (!neu.length && !ausz.length) return
   konfetti()
+  // Medaillen und Titel zuerst – höchstens zwei Meldungen, der Rest steht im Fenster
+  for (const a of ausz.slice(0, 2))
+    notifications.show({
+      title: a.art === 'titel' ? a.titel : `Neue Medaille: ${a.titel}`,
+      message: a.art === 'titel' ? `Du bist jetzt „${a.text}". Wie dein Titel lautet, wählst du unter „Achievements".` : a.text,
+      icon: <Medaille m={a.stufe >= 3 ? 'gold' : a.stufe === 2 ? 'silber' : 'bronze'} />,
+      autoClose: 6000,
+      withBorder: true,
+      radius: 'md'
+    })
+  if (ausz.length >= 2) return
   // Viele auf einmal (etwa beim ersten Öffnen nach der Einführung): zwei zeigen, der Rest steht im Fenster
   for (const e of neu.slice(0, 2))
     notifications.show({
@@ -261,8 +281,8 @@ async function nachfragen(): Promise<void> {
   if (fragt) return
   fragt = true
   try {
-    const r = await lesen<{ neu: Eintrag[] }>('/s/api/achievements/neu')
-    gluckwunsch(r?.neu ?? [])
+    const r = await lesen<{ neu: Eintrag[]; auszeichnungen?: AuszMeldung[] }>('/s/api/achievements/neu')
+    gluckwunsch(r?.neu ?? [], r?.auszeichnungen ?? [])
   } finally {
     fragt = false
   }

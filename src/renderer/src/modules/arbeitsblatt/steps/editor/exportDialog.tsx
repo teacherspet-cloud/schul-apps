@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { LoesungsWahl, merkeLoesungsWahl, type LoesungsModus } from '../../../../shared/components/LoesungsWahl'
 import { notifyError } from '../../../../shared/util'
 import { SeitenWahlSchalter } from '../../../../shared/components/SeitenAuswahl'
+import { VorschauKnopf } from '../../../../shared/export/PdfVorschau'
 import { tafelbildHinweis } from '../../export/tafelbildZiel'
 import '../../render/ws.css'
 import '../../../vokabeltest/steps/editor.css'
@@ -101,6 +102,17 @@ export function ExportModal({
           <Button variant="default" onClick={onClose}>
             Abbrechen
           </Button>
+          {/* PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx) */}
+          {mode === 'pdf' && (
+            <VorschauKnopf
+              disabled={running || (!sheetIds.length && !board)}
+              ausgabe={() => {
+                if (sheetIds.length) merkeLoesungsWahl('arbeitsblatt', key)
+                return run(sheetIds, sheetIds.length ? key : 'none', board, fillable)
+              }}
+              nachSpeichern={onClose}
+            />
+          )}
           <Button
             loading={running}
             disabled={!sheetIds.length && !board}

@@ -20,7 +20,8 @@ export interface SpielSicht {
   host: boolean
   min: number
   max: number
-  spieler: { id: string; name: string; verbunden: boolean; host: boolean }[]
+  /** Titel und Profilbild (10.10.2026, Medaillen und Titel) – nur, wenn die Person sie zeigt */
+  spieler: { id: string; name: string; verbunden: boolean; host: boolean; titel?: string | null; avatar?: string | null }[]
   schwierigkeit: Schwierigkeit
   schwierigkeiten: { id: Schwierigkeit; name: string; text: string }[]
   /** Zielsprache und Klasse des Kurses – Beschriftungen der Spielseite in der Zielsprache (09.10.2026) */

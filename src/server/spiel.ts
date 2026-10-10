@@ -40,6 +40,7 @@ import { quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '.
 import { grammatikFuerSpiel as G } from './grammatik'
 import { rekordEintragen } from './rekordbuch'
 import { achievementZusammen } from './achievementsDaten'
+import { profilFuer } from './achievements'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { sitzungsWoerter, tagVon, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { alsKarten, type GrammatikAufgabe } from '../shared/grammatiktrainer'
@@ -277,7 +278,8 @@ function sichtFuer(r: Raum, wer: string, jetzt: number) {
     host: l.host === wer,
     min: info.min,
     max: info.max,
-    spieler: l.spieler.map((s) => ({ id: s.id, name: namen.get(s.id) ?? s.name, verbunden: s.verbunden, host: s.id === l.host })),
+    // Titel und Profilbild der Sprache des Spiels (10.10.2026) – getrennt vom Namen, wie ihn die Person gewählt hat
+    spieler: l.spieler.map((s) => ({ id: s.id, name: namen.get(s.id) ?? s.name, verbunden: s.verbunden, host: s.id === l.host, ...profilFuer(s.id, r.sprache, jetzt) })),
     schwierigkeit: l.schwierigkeit,
     schwierigkeiten: schwierigkeitenIn(r.sprache, r.jahrgang),
     sprache: r.sprache,
@@ -495,7 +497,7 @@ function eintragen(r: Raum, e: SpielErgebnis, jetzt: number): void {
     // Rekordbuch und Achievements – nicht für Beschreib-Raten (abgestimmt)
     if (!info.achievements) continue
     const klasse = r.jahrgang
-    if (x.wert !== null && Number.isFinite(x.wert)) rekordEintragen(n, `${info.art}:${l.spiel}`, x.wert, klasse, jetzt, x.fehler.length)
+    if (x.wert !== null && Number.isFinite(x.wert)) rekordEintragen(n, `${info.art}:${l.spiel}`, x.wert, klasse, jetzt, x.fehler.length, r.sprache)
     achievementZusammen(
       n,
       {
@@ -507,7 +509,8 @@ function eintragen(r: Raum, e: SpielErgebnis, jetzt: number): void {
         fehlerfrei: e.fehlerfrei === true,
         unmoeglich: l.schwierigkeit === 'unmoeglich'
       },
-      jetzt
+      jetzt,
+      r.sprache
     )
   }
 }

@@ -2,6 +2,8 @@ import { Container, ScrollArea, Stack, Text, Title } from '@mantine/core'
 import { ThemenAnsicht } from '../shared/components/Themenbereiche'
 import { useNavigation } from '../shared/navigation'
 import type { Material } from './materialien'
+import { useTelefon } from '../shared/touch/touchModus'
+import MaterialienMobil from '../shared/components/MaterialienMobil'
 
 /** Die übergreifende Seite hat keine „eigenen" Materialien – alle kommen als Karte ihres Programms */
 const KEINE: Material[] = []
@@ -16,6 +18,9 @@ const KEINE: Material[] = []
  */
 export default function Themenuebersicht(): React.JSX.Element {
   const ziel = useNavigation((s) => s.themenZiel)
+  // Am Telefon eine eigene, einfachere Ansicht (10.10.2026, Option 1) – PC und iPad behalten den Baum
+  const telefon = useTelefon()
+  if (telefon) return <MaterialienMobil />
   return (
     <ScrollArea h="100%">
       <Container size="lg" py="lg">

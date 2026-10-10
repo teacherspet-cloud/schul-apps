@@ -7,13 +7,15 @@ import { imNetz } from '../netzZugang'
 import { aufIos } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 import { notifyError, notifySuccess } from '../util'
-import { frageSeitenWahl, nimmSeitenWunsch, type SeitenDokument } from '../components/SeitenAuswahl'
+import { frageSeitenWahl, nimmSeitenWunsch, useSeitenWahl, type SeitenDokument } from '../components/SeitenAuswahl'
 import { renderPages } from '../components/PrintPreview'
 import { seitenMarken, waehleSeitenImHtml, type SeitenMarke } from './seitenAuswahl'
 import { istIservPfad, iservAnzeige } from '@shared/iserv'
 import { mitOrt } from './ausgabeOrt'
 import { frageVorhanden, vorhandenRunde } from './vorhandenFrage'
 import { vorhandenName, type BeiVorhanden } from '@shared/vorhanden'
+import { meldeVorschauGespeichert, vorschauAktiv } from './pdfVorschauLogik'
+import { baueVorschau, zeigePdfVorschau } from './PdfVorschau'
 
 /**
  * Dateien ausgeben – eine mit dem gewohnten Speichern-Dialog, mehrere in EINEN Ordner.
@@ -245,9 +247,38 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
  */
 export async function speichereAusgabe(alle: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
   if (!alle.length) return 0
+  if (vorschauAktiv()) return alsVorschauZeigen(alle, meldung, ziel)
   // „Nur bestimmte Seiten" im Ausgabe-Dialog: erst die Seiten wählen (gilt für genau diese Ausgabe)
   const dateien = nimmSeitenWunsch() ? await mitSeitenWahl(alle) : alle
   if (!dateien?.length) return 0
+  return speichereGewaehlte(dateien, meldung, ziel)
+}
+
+/**
+ * Vorschau statt Speichern (10.10.2026, export/pdfVorschauLogik.ts): dieselben Dateien samt
+ * Seitenauswahl, die PDFs nur im Speicher gebaut und gezeigt. „PDF speichern" im Fenster speichert
+ * genau diese Auswahl auf dem gewohnten Weg. Der Wunsch „Nur bestimmte Seiten" bleibt beim
+ * Schließen stehen – er gilt für das Speichern danach.
+ */
+async function alsVorschauZeigen(alle: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
+  const dateien = useSeitenWahl.getState().gewuenscht ? await mitSeitenWahl(alle) : alle
+  if (!dateien?.length) return 0
+  const pdfs = dateien.flatMap((d) => ('html' in d ? [{ name: d.name, html: d.html, pdf: d.pdf }] : []))
+  if (!pdfs.length) {
+    notifyError(new Error('In dieser Ausgabe ist kein PDF – die Vorschau gibt es nur für PDFs.'), 'Keine Vorschau')
+    return 0
+  }
+  const gebaut = await baueVorschau(pdfs)
+  const weitere = dateien.flatMap((d) => ('html' in d ? [] : [d.name]))
+  if (!(await zeigePdfVorschau(gebaut, weitere))) return 0
+  nimmSeitenWunsch()
+  const anzahl = await speichereGewaehlte(dateien, meldung, ziel)
+  meldeVorschauGespeichert(anzahl)
+  return anzahl
+}
+
+/** Speichern der (schon nach Seiten gekürzten) Dateien */
+async function speichereGewaehlte(dateien: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
   // iPad: Ort wählen (Gerät, IServ, Dateien-App, Teilen – export/ausgabeOrt.tsx), EINMAL für alle Dateien
   const mitGewaehltemOrt = await mitOrt(ziel, dateien.length)
   if (mitGewaehltemOrt === null) return 0

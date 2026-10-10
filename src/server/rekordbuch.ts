@@ -66,7 +66,16 @@ const kleinerBesser = (schluessel: string): boolean => {
  * Spielergebnis eintragen; true = neuer Rekord des Schuljahres. `schluessel` = „vok:blitz" bzw. „gram:formenblitz".
  * `fehler` (falsche Antworten im Spiel, wenn bekannt) zählt für die Achievements (08.10.2026).
  */
-export function rekordEintragen(n: NutzerInfo, schluessel: string, wert: number, klasse: number | null, jetzt = Date.now(), fehler?: number): boolean {
+export function rekordEintragen(
+  n: NutzerInfo,
+  schluessel: string,
+  wert: number,
+  klasse: number | null,
+  jetzt = Date.now(),
+  fehler?: number,
+  /** Sprache des Kurses – Medaillen je Sprache (10.10.2026) */
+  sprache?: string
+): boolean {
   if (n.rolle !== 'schueler' || n.quelle === 'vorschau' || !Number.isFinite(wert)) return false
   const jahr = schuljahrVon(jetzt)
   const j = lesen(n.id, jahr)
@@ -76,7 +85,7 @@ export function rekordEintragen(n: NutzerInfo, schluessel: string, wert: number,
   if (besser) j.rekorde[schluessel] = { wert, datum: jetzt }
   schreiben(n.id, jahr, j)
   // Achievements: „Rekord gebrochen" nur, wenn es schon einen Rekord gab; dazu Spielarten, Blitzrunde, Verbformen
-  achievementSpiel(n, schluessel, wert, besser && Boolean(bisher), fehler, jetzt)
+  achievementSpiel(n, schluessel, wert, besser && Boolean(bisher), fehler, jetzt, sprache)
   return besser
 }
 

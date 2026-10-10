@@ -20,6 +20,8 @@ import type { Rolle } from './kontext'
 import { nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, nutzerNachId, passwortHashVon, protokolliereServer, serverGeheimnis, serverWert, type NutzerInfo } from './datenbank'
 import { passwortPruefen } from './geheim'
 import { registerVergessen } from './namensschutz'
+import { anmeldeMerkmal } from './feldschutz'
+import { fehlversuchText } from './serverRegeln'
 import { gastFuerIserv, gastSuchen, verknuepfen, vorschlaegeAnlegen } from './kontoVerknuepfung'
 
 export const ADMIN_BENUTZER = 't.kornahrens'
@@ -389,10 +391,28 @@ export function fehlversuch(schluessel: string): number {
 
 export const notzugangAn = (): boolean => serverWert('notzugang', true)
 
+/**
+ * Abgewiesene Versuche während einer Sperre (10.10.2026): je Konto und Adresse höchstens einmal je Sperrfenster
+ * protokolliert – sonst könnte jemand mit schnellen Anfragen das Protokoll (höchstens 20 000 Einträge) überfluten.
+ */
+const abgewiesenGemeldet = new Map<string, number>()
+function abgewiesenMelden(schluessel: string, jetzt = Date.now()): boolean {
+  const z = abgewiesenGemeldet.get(schluessel)
+  if (z && jetzt - z < 15 * 60_000) return false
+  if (abgewiesenGemeldet.size > 5000) abgewiesenGemeldet.clear()
+  abgewiesenGemeldet.set(schluessel, jetzt)
+  return true
+}
+
 /** Anmeldung mit Passwort: Testkonten immer, der Notzugang nur, solange er eingeschaltet ist */
 export async function passwortAnmeldung(benutzer: string, passwort: string, ip: string): Promise<NutzerInfo> {
   const b = benutzer.trim().toLowerCase()
-  if (gesperrtWegenVersuchen(`ip:${ip}`) || gesperrtWegenVersuchen(`b:${b}`)) throw new AnmeldeFehler('Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.')
+  // Merkmale für den Reiter „Server" (Rateversuche erkennen): nur HMAC, nie Name oder Adresse im Klartext (10.10.2026)
+  const merkmale = (abgewiesen = false): string => fehlversuchText(anmeldeMerkmal('konto', b), anmeldeMerkmal('adresse', ip), abgewiesen)
+  if (gesperrtWegenVersuchen(`ip:${ip}`) || gesperrtWegenVersuchen(`b:${b}`)) {
+    if (abgewiesenMelden(`${b}|${ip}`)) protokolliereServer('anmeldung', merkmale(true))
+    throw new AnmeldeFehler('Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.')
+  }
   const nutzer = nutzerNachBenutzer(b)
   // Testkonten und vom Admin angelegte Konten immer; der Notzugang nur, solange er eingeschaltet ist
   const erlaubt =
@@ -401,7 +421,7 @@ export async function passwortAnmeldung(benutzer: string, passwort: string, ip: 
   if (!stimmt || !nutzer) {
     const n = Math.max(fehlversuch(`ip:${ip}`), fehlversuch(`b:${b}`))
     await new Promise((r) => setTimeout(r, Math.min(4000, 300 * n)))
-    protokolliereServer('anmeldung', 'Anmeldung mit Passwort fehlgeschlagen')
+    protokolliereServer('anmeldung', merkmale())
     throw new AnmeldeFehler('Benutzername oder Passwort stimmen nicht.')
   }
   fehlversuche.delete(`b:${b}`)

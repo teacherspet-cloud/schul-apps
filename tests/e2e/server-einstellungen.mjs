@@ -2,7 +2,11 @@
 // 09.10.2026: Farbkonzept „Helle, ruhige Flächen + Akzentfarbe" (10 Farben mit Vorschau hell/dunkel, getönter Grund,
 // weiße Karten, Kopfband in der Farbe, hell/dunkel wirklich überall) und „Konto" nur für Konten mit eigenem Passwort
 // (nicht für Gäste mit Code und die Musterschüler-Vorschau; IServ verwaltet es selbst).
-// Vorher: Server lokal (KI wird nicht gebraucht), IServ NICHT eingerichtet.
+// 10.10.2026 Fehlerlog: fehlgeschlagene Anmeldungen zählen nicht als Fehler (eigener Abschnitt), Warnung nur bei
+// möglichem Rateversuch (≥ 10 für dasselbe Konto in 15 Minuten), „Fehlerlog leeren" setzt die Zahl auf 0.
+// Vorher: Server lokal (KI wird nicht gebraucht), IServ NICHT eingerichtet. Der Server muss mit SCHULAPPS_WEICHE=1
+// laufen (scripts/e2e-parallel.mjs): Die Fehlversuche kommen mit erfundenen Adressen (X-Real-IP, 192.0.2.x) – sonst
+// sperrte die Sperre nach 10 Fehlversuchen localhost für alle anderen Tests auf demselben Server.
 // Aufruf: node tests/e2e/server-einstellungen.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
@@ -236,6 +240,51 @@ try {
   await v.locator('.app-leiste [aria-label="Schule & Daten"]').first().click()
   await v.getByRole('tab', { name: 'Server', exact: true }).click()
   pruefe(await da(v.locator('[data-server-reiter] [data-server-ampel]').first(), 15000), 'Verwaltung › Server: Ampel erscheint')
+
+  // ---------- Fehlerlog (10.10.2026): Fehlversuche bei der Anmeldung, Rateversuch, Leeren
+  const zustand = async () => (await verwaltung.request.get(`${A}/server/verwaltung/zustand`, { headers: KOPF })).json()
+  const rateWarnung = (z) => z.gesundheit.some((b) => b.art === 'anmeldungen')
+  const z0 = await zustand()
+  const fremd = await browser.newContext()
+  const falsch = (b, ip) =>
+    fremd.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: 'ganz-falsch-123', ziel: '/' }, headers: { origin: A, 'x-real-ip': ip }, maxRedirects: 0 })
+  const stamm = `e2e.raten${Date.now() % 100000}`
+  for (let i = 0; i < 3; i++) await falsch(`${stamm}.a`, '192.0.2.10')
+  const z1 = await zustand()
+  pruefe(z1.anmeldungen.letzte24h >= z0.anmeldungen.letzte24h + 3, `3 Fehlversuche im Abschnitt „Anmeldungen" (${z0.anmeldungen.letzte24h} → ${z1.anmeldungen.letzte24h})`)
+  pruefe(!rateWarnung(z1), '3 Fehlversuche: keine Warnung in der Ampel')
+  pruefe(z1.fehler.letzte24h === z0.fehler.letzte24h, `Fehlversuche zählen nicht als Fehler (${z0.fehler.letzte24h} → ${z1.fehler.letzte24h})`)
+  // 11 schnell hintereinander für ein Konto (von wechselnden Adressen): der 11. wird wegen der Sperre abgewiesen
+  await Promise.all(Array.from({ length: 11 }, (_, i) => falsch(`${stamm}.b`, `192.0.2.${20 + i}`)))
+  const z2 = await zustand()
+  pruefe(rateWarnung(z2), '11 Fehlversuche für ein Konto: Ampel warnt vor einem Rateversuch')
+  pruefe(
+    z2.anmeldungen.verdacht.some((x) => x.art === 'konto' && x.anzahl >= 10) && !z2.anmeldungen.verdacht.some((x) => x.art === 'adresse'),
+    `Verdacht für dasselbe Konto, nicht für eine Adresse (${JSON.stringify(z2.anmeldungen.verdacht.map((x) => [x.art, x.anzahl]))})`
+  )
+  pruefe(z2.fehler.letzte24h === z0.fehler.letzte24h, `Auch dann keine Fehler (${z2.fehler.letzte24h})`)
+  const protokollText = JSON.stringify((await (await verwaltung.request.get(`${A}/server/verwaltung/protokoll?anzahl=50`, { headers: KOPF })).json()).eintraege)
+  pruefe(!protokollText.includes(stamm) && !protokollText.includes('192.0.2.'), 'Protokoll ohne Benutzername und Adresse im Klartext')
+  await fremd.close()
+  // Oberfläche: Reiter neu öffnen (lädt beim Sichtbarwerden)
+  await v.getByRole('tab', { name: 'Schule', exact: true }).click()
+  await v.getByRole('tab', { name: 'Server', exact: true }).click()
+  pruefe(await da(v.locator('[data-server-ampel] [data-befund-art="anmeldungen"]'), 15000), 'Ampel zeigt den möglichen Rateversuch')
+  pruefe(await da(v.locator('[data-anmeldungen] [data-anmelde-verdacht]')), 'Abschnitt „Anmeldungen" nennt den Rateversuch')
+  await v.locator('[data-anmeldungen]').scrollIntoViewIfNeeded()
+  await v.screenshot({ path: join(out, '5a-server-anmeldungen.png') })
+  // Leeren (mit Rückfrage)
+  v.once('dialog', (d) => void d.accept())
+  await v.locator('[data-fehler-leeren]').click()
+  pruefe(await da(v.locator('[data-fehler-geleert]')), 'Fehlerlog geleert: „Geleert am …" erscheint')
+  pruefe(await da(v.locator('[data-fehler-zahl="0"]')), 'Nach dem Leeren: 0 Fehler')
+  const z3 = await zustand()
+  pruefe(z3.fehler.letzte24h === 0 && !rateWarnung(z3) && z3.fehler.geleert.ab, `Nach dem Leeren: Zahl 0, keine Warnung (${z3.fehler.letzte24h}, ${rateWarnung(z3)})`)
+  pruefe(!(await v.locator('[data-server-ampel] [data-befund-art="anmeldungen"]').count()), 'Ampel ohne Rateversuch nach dem Leeren')
+  // „Ältere anzeigen": nichts gelöscht
+  await v.locator('[data-fehler-aeltere]').click()
+  pruefe(await da(v.locator('[data-anmeldungen] [data-anmelde-verdacht]')), '„Ältere anzeigen" bringt die ausgeblendeten Einträge zurück')
+  await v.screenshot({ path: join(out, '5b-server-geleert.png') })
   await v.getByRole('tab', { name: 'Schule', exact: true }).click()
   await v.waitForTimeout(1500)
   const meldungen = (await v.locator('.mantine-Notification-root').allInnerTexts()).join(' | ')

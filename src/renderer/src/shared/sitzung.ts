@@ -134,6 +134,38 @@ export function useOffenGemerkt<T>(schluessel: string, vorgabe: T): [T, (v: T | 
   return [wert, setzen]
 }
 
+// ---------------------------------------------------------------- Auf/Zu dauerhaft (Ausnahme)
+
+/*
+ * Ausnahme (10.10.2026, Entscheidung der Lehrkraft): Die Kästen der Verwaltung › „Schule & Daten" › „Schule" behalten
+ * ihr Auf/Zu über die Sitzung hinaus – dauerhaft je Gerät (KlappKarte mit `dauerhaft`). Alle anderen Kästen bleiben bei
+ * der Sitzungsregel oben. Gespeichert als einfache Zuordnung Kennung → offen, ohne Sitzung.
+ */
+export const DAUERHAFT_SCHLUESSEL = 'schulapps.klapp.dauerhaft'
+
+/** Gemerkte Zuordnung lesen – nur echte Wahrheitswerte, Kaputtes zählt als leer */
+export function dauerhaftAlle(): Record<string, boolean> {
+  try {
+    const d = JSON.parse(localStorage.getItem(DAUERHAFT_SCHLUESSEL) ?? 'null') as unknown
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return {}
+    return Object.fromEntries(Object.entries(d as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>
+  } catch {
+    return {}
+  }
+}
+
+/** Dauerhaft gemerktes Auf/Zu einer Kennung – undefined: nie umgeschaltet, dann gilt die Vorgabe */
+export const dauerhaftOffen = (id: string): boolean | undefined => dauerhaftAlle()[id]
+
+/** Auf/Zu dauerhaft merken (ohne Speicher gilt es nur, solange die Ansicht steht) */
+export function dauerhaftMerken(id: string, offen: boolean): void {
+  try {
+    localStorage.setItem(DAUERHAFT_SCHLUESSEL, JSON.stringify({ ...dauerhaftAlle(), [id]: offen }))
+  } catch {
+    // kein Speicher
+  }
+}
+
 // ---------------------------------------------------------------- Erstes Öffnen einer App
 
 /*

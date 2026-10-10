@@ -33,6 +33,7 @@ import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { LoesungsWahl, loesungsVorgabe, merkeLoesungsWahl, type LoesungsModus } from '../../../shared/components/LoesungsWahl'
 import { meldeAblage, speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import { VorschauKnopf } from '../../../shared/export/PdfVorschau'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { imageSize } from '../../../shared/images'
 import { notifyError, safeFileName } from '../../../shared/util'
@@ -822,6 +823,19 @@ function ExportModal({
     .join('')
   const suffix = doc.variants.length > 1 ? ` - Test ${labels}` : ''
 
+  /** PDF speichern – auch der Weg der Vorschau (10.10.2026, shared/export/PdfVorschau.tsx) */
+  const speicherePdf = (): Promise<number> => {
+    // Mit „als eigene Datei" zwei Dateien – dafür wird einmal ein Ordner gewählt (shared/export/ausgabe.tsx)
+    const dateien: AusgabeDatei[] = [{ name: `${baseName}${suffix}.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts) }]
+    if (key === 'separate')
+      dateien.push({ name: `${baseName}${suffix} - Lösungen.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts) })
+    return speichereAusgabe(
+      dateien,
+      'PDF gespeichert.',
+      ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })
+    )
+  }
+
   const run = async (): Promise<void> => {
     if (!mode) return
     setRunning(true)
@@ -839,15 +853,7 @@ function ExportModal({
           loesung: key === 'separate' ? { html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts), titel: 'Lösungen' } : null
         })
       } else if (mode === 'pdf') {
-        // Mit „als eigene Datei" zwei Dateien – dafür wird einmal ein Ordner gewählt (shared/export/ausgabe.tsx)
-        const dateien: AusgabeDatei[] = [{ name: `${baseName}${suffix}.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts) }]
-        if (key === 'separate')
-          dateien.push({ name: `${baseName}${suffix} - Lösungen.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts) })
-        await speichereAusgabe(
-          dateien,
-          'PDF gespeichert.',
-          ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })
-        )
+        await speicherePdf()
       } else {
         const dateien: AusgabeDatei[] = [
           {
@@ -914,6 +920,16 @@ function ExportModal({
             <Button variant="default" onClick={onClose}>
               Abbrechen
             </Button>
+            {mode === 'pdf' && (
+              <VorschauKnopf
+                disabled={running || variantIds.length === 0}
+                ausgabe={() => {
+                  merkeLoesungsWahl('vokabeltest', key)
+                  return speicherePdf()
+                }}
+                nachSpeichern={onClose}
+              />
+            )}
             <Button onClick={run} loading={running} disabled={variantIds.length === 0}>
               {mode === 'print' ? 'Weiter zur Druckvorschau' : 'Speichern …'}
             </Button>

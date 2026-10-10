@@ -922,3 +922,75 @@ html[data-touch]:has(.formular-fuss) .app-kopf-fab {
 html[data-touch] [data-grammatik-auswahl] [data-bereich] {
   min-height: 44px;
 }
+
+/* „Materialien" am Telefon (10.10.2026, shared/components/MaterialienMobil.tsx) */
+.mm-seite {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.mm-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--mantine-spacing-md));
+  padding: 2px var(--mantine-spacing-md);
+}
+.mm-chips::-webkit-scrollbar {
+  display: none;
+}
+.mm-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-text);
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mm-chip[data-aktiv='true'] {
+  background: var(--mantine-primary-color-filled);
+  border-color: var(--mantine-primary-color-filled);
+  color: var(--mantine-color-white);
+  font-weight: 600;
+}
+.mm-zeile {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+  text-align: left;
+}
+.mm-material {
+  padding: 6px 4px 6px 12px;
+}
+.mm-zurueck {
+  color: var(--mantine-primary-color-filled);
+  min-height: 40px;
+}
+.mm-neu {
+  position: sticky;
+  bottom: 0;
+  padding: 10px var(--mantine-spacing-md) 12px;
+  background: var(--mantine-color-body);
+  border-top: 1px solid var(--mantine-color-default-border);
+  z-index: 5;
+}
+/* Der Knopf „Neu in diesem Thema" steht auch bei wenig Inhalt unten am Bildschirm */
+.mm-ebene {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.mm-ebene > :first-child {
+  flex: 1 0 auto;
+}

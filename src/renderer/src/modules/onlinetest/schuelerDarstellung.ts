@@ -68,6 +68,8 @@ export interface Darstellung {
   regal?: string[]
   /** Willkommens-Assistent gesehen oder übersprungen (09.10.2026) – am Konto, nicht je Gerät (willkommenLogik.ts) */
   willkommenErledigt?: boolean
+  /** Profilbild aus der Sammlung der Medaillen und Titel (10.10.2026); leer = keins. Der Server nimmt nur freigeschaltete */
+  avatar?: string
 }
 
 /** Nur auf dem Gerät – gehen nicht an den Server */

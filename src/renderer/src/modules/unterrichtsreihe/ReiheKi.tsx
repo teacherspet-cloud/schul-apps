@@ -24,7 +24,7 @@ import {
   Textarea,
   Tooltip
 } from '@mantine/core'
-import { IconArrowDown, IconArrowRight, IconArrowUp, IconBook, IconGripVertical, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowRight, IconArrowUp, IconBook, IconEye, IconGripVertical, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
 import { schritteInStunde, stundeAnhaengen, stundeEntfernen, stundeVerschieben, type StundenPatch } from './stundenRaster'
 import { dokumentOeffnenWennBereit, useNavigation } from '../../shared/navigation'
 import { useEffect, useState } from 'react'
@@ -35,6 +35,7 @@ import { starteReihenPlanung, usePlaene, usePlantGerade, type PlanErgebnis } fro
 import { erzeugeFuerPlatzhalter, useErzeugtGerade } from './platzhalterAuftrag'
 import { KiEntwurfMarke, SchrittKiStatus } from './SchrittStatus'
 import { reiheAusgeben, schrittAusgeben, type DruckArt } from './reiheDruck'
+import { alsVorschau } from '../../shared/export/pdfVorschauLogik'
 import type { ReiheNiveau } from '@shared/reihe'
 import { NiveauWahl } from './ReiheNiveau'
 import { pruefeAbdeckung } from './planAbdeckung'
@@ -676,6 +677,10 @@ export function DruckMenue({ schritt, reihe }: { schritt?: Schritt; reihe?: Reih
             {e.label}
           </Menu.Item>
         ))}
+        {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx) */}
+        <Menu.Item leftSection={<IconEye size={14} />} onClick={() => void alsVorschau(() => los('pdf', false))} data-druck-art="vorschau">
+          PDF-Vorschau
+        </Menu.Item>
         <Menu.Divider />
         <Menu.Label>Mit Lösungsteil</Menu.Label>
         {eintraege.map((e) => (
@@ -683,6 +688,9 @@ export function DruckMenue({ schritt, reihe }: { schritt?: Schritt; reihe?: Reih
             {e.label}
           </Menu.Item>
         ))}
+        <Menu.Item leftSection={<IconEye size={14} />} onClick={() => void alsVorschau(() => los('pdf', true))} data-druck-art="vorschau-loesung">
+          PDF-Vorschau
+        </Menu.Item>
       </Menu.Dropdown>
     </Menu>
   )

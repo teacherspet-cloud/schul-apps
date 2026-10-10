@@ -11,6 +11,9 @@
  *    durchlaufen, höchstens 300 000 Einträge.
  *  - Zertifikat: Ablaufdatum aus der Datei (crypto.X509Certificate), gemerkt bis zur nächsten Änderung der Datei.
  *  - Fehler: die letzten Zeilen der Diagnose-Protokolle und des Server-Protokolls, zusammengefasst (serverRegeln.ts).
+ *    Seit 10.10.2026 getrennt: fehlgeschlagene Passwort-Anmeldungen (Abschnitt „Anmeldungen", Ampel nur bei möglichem
+ *    Rateversuch), Browser-Meldungen ohne Einzelheiten („Script error."), und „Fehlerlog leeren" als Marke
+ *    `fehler-geleert-ab` in server_einstellungen – die Protokolle selbst bleiben (Nachweis).
  */
 import { X509Certificate } from 'node:crypto'
 import { existsSync, readFileSync, statSync, statfsSync } from 'node:fs'
@@ -18,20 +21,27 @@ import { opendir, stat } from 'node:fs/promises'
 import { availableParallelism, freemem, loadavg, totalmem } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { datenbank, leseServerProtokoll } from './datenbank'
+import { datenbank, leseServerProtokoll, protokolliereServer, serverWert, setzeServerWert } from './datenbank'
 import { leseDiagnose } from './diagnose'
 import { offeneStroeme } from './ereignisse'
 import { listeSicherungen, sicherungsStand } from './sicherungen'
 import {
+  anmeldungenUebersicht,
   diagnoseZeile,
   fehlerGruppieren,
+  fehlversuchMerkmale,
   gesundheitPruefen,
+  istFehlversuch,
+  istOhneDetails,
   istProtokollFehler,
   istServerFehler,
+  nachMarke,
   tageAuffuellen,
   tagVon,
   verdichten,
+  type AnmeldeUebersicht,
   type FehlerZeile,
+  type Fehlversuch,
   type Messwert
 } from './serverRegeln'
 
@@ -409,42 +419,105 @@ export function zertifikate(env = process.env): { name: string; bis: number }[] 
 
 // ---------------------------------------------------------------- Fehler
 
-let fehlerMerk: { zeit: number; zeilen: FehlerZeile[]; langsam24h: number } | null = null
+let diagnoseMerk: { zeit: number; zeilen: FehlerZeile[]; ohneDetails: FehlerZeile[]; langsam24h: number } | null = null
 
-/** Fehlerzeilen der letzten 7 Tage aus Diagnose-Protokollen und Server-Protokoll, dazu die langsamen Anfragen der letzten 24 h (60 s gemerkt) */
-export function fehlerZeilen(jetzt = Date.now()): { zeilen: FehlerZeile[]; langsam24h: number } {
-  if (fehlerMerk && jetzt - fehlerMerk.zeit < 60_000) return fehlerMerk
+export interface FehlerQuellen {
+  /** echte Fehler (zählen für Zahl und Ampel) */
+  zeilen: FehlerZeile[]
+  /** Browser-Meldungen ohne Einzelheiten („Script error.") – eigener Abschnitt, zählen nicht */
+  ohneDetails: FehlerZeile[]
+  /** fehlgeschlagene Passwort-Anmeldungen – eigener Abschnitt */
+  versuche: Fehlversuch[]
+  langsam24h: number
+}
+
+/**
+ * Zeilen der letzten 7 Tage aus Diagnose-Protokollen (60 s gemerkt – Dateien lesen und entschlüsseln kostet) und dem
+ * Server-Protokoll (immer frisch: eine Abfrage, so erscheinen Anmeldeversuche und das Leeren sofort), dazu die
+ * langsamen Anfragen der letzten 24 h
+ */
+export function fehlerZeilen(jetzt = Date.now()): FehlerQuellen {
   const ab = new Date(jetzt - 7 * 864e5).toISOString()
-  const ab24 = new Date(jetzt - 864e5).toISOString()
-  const zeilen: FehlerZeile[] = []
-  let langsam24h = 0
-  for (const z of leseDiagnose('langsam', 3000)) {
-    const { zeit, text } = diagnoseZeile(z)
-    if (zeit < ab) continue
-    if (istServerFehler(text)) zeilen.push({ zeit, quelle: 'server', text })
-    else if (zeit >= ab24 && /^\d+ ms /.test(text)) langsam24h++
+  if (!diagnoseMerk || jetzt - diagnoseMerk.zeit >= 60_000 || jetzt < diagnoseMerk.zeit) {
+    const ab24 = new Date(jetzt - 864e5).toISOString()
+    const zeilen: FehlerZeile[] = []
+    const ohneDetails: FehlerZeile[] = []
+    let langsam24h = 0
+    for (const z of leseDiagnose('langsam', 3000)) {
+      const { zeit, text } = diagnoseZeile(z)
+      if (zeit < ab) continue
+      if (istServerFehler(text)) zeilen.push({ zeit, quelle: 'server', text })
+      else if (zeit >= ab24 && /^\d+ ms /.test(text)) langsam24h++
+    }
+    for (const z of leseDiagnose('browser', 1500)) {
+      const { zeit, text } = diagnoseZeile(z)
+      if (zeit >= ab) (istOhneDetails(text) ? ohneDetails : zeilen).push({ zeit, quelle: 'browser', text })
+    }
+    diagnoseMerk = { zeit: jetzt, zeilen, ohneDetails, langsam24h }
   }
-  for (const z of leseDiagnose('browser', 1500)) {
-    const { zeit, text } = diagnoseZeile(z)
-    if (zeit >= ab) zeilen.push({ zeit, quelle: 'browser', text })
-  }
+  const zeilen = diagnoseMerk.zeilen.filter((z) => z.zeit >= ab)
+  const versuche: Fehlversuch[] = []
   try {
-    for (const e of leseServerProtokoll(2000)) if (e.zeit >= ab && istProtokollFehler(e.text)) zeilen.push({ zeit: e.zeit, quelle: 'protokoll', text: `${e.art}: ${e.text}` })
+    for (const e of leseServerProtokoll(2000)) {
+      if (e.zeit < ab) continue
+      if (istFehlversuch(e.text)) versuche.push({ zeit: e.zeit, ...fehlversuchMerkmale(e.text) })
+      else if (istProtokollFehler(e.text)) zeilen.push({ zeit: e.zeit, quelle: 'protokoll', text: `${e.art}: ${e.text}` })
+    }
   } catch {
     // keine Datenbank
   }
-  fehlerMerk = { zeit: jetzt, zeilen, langsam24h }
-  return fehlerMerk
+  return { zeilen, ohneDetails: diagnoseMerk.ohneDetails.filter((z) => z.zeit >= ab), versuche, langsam24h: diagnoseMerk.langsam24h }
 }
 
-export function fehlerUebersicht(jetzt = Date.now()): { gruppen: ReturnType<typeof fehlerGruppieren>; letzte24h: number; langsam24h: number; roh: FehlerZeile[] } {
-  const { zeilen, langsam24h } = fehlerZeilen(jetzt)
+/** Marke „Fehlerlog geleert" (ISO-Zeit) – '' = nie geleert */
+export const FEHLER_MARKE = 'fehler-geleert-ab'
+export function fehlerMarke(): string {
+  try {
+    return serverWert<string>(FEHLER_MARKE, '')
+  } catch {
+    return ''
+  }
+}
+
+/** „Fehlerlog leeren": nur die Marke setzen; Diagnose-Dateien und Protokoll bleiben (Nachweis) */
+export function fehlerLeeren(nutzerId: string, jetzt = Date.now()): string {
+  const marke = new Date(jetzt).toISOString()
+  setzeServerWert(FEHLER_MARKE, marke)
+  protokolliereServer('verwaltung', 'Fehlerlog geleert', nutzerId)
+  return marke
+}
+
+export interface FehlerUebersicht {
+  gruppen: ReturnType<typeof fehlerGruppieren>
+  letzte24h: number
+  langsam24h: number
+  roh: FehlerZeile[]
+  /** Browser-Meldungen ohne Einzelheiten (zählen nicht) */
+  ohneDetails: { anzahl: number; letzte24h: number; gruppen: ReturnType<typeof fehlerGruppieren> }
+  anmeldungen: AnmeldeUebersicht
+  /** Marke des Leerens und wie viele Einträge (7 Tage) davor ausgeblendet sind; `alle`: Marke nicht angewandt */
+  geleert: { ab: string; ausgeblendet: number; alle: boolean }
+}
+
+/** Übersicht; ohne `alle` nur Einträge ab der Marke „Fehlerlog geleert" */
+export function fehlerUebersicht(jetzt = Date.now(), alle = false): FehlerUebersicht {
+  const q = fehlerZeilen(jetzt)
+  const marke = fehlerMarke()
+  const m = alle ? '' : marke
+  const zeilen = nachMarke(q.zeilen, m)
+  const ohne = nachMarke(q.ohneDetails, m)
+  const versuche = nachMarke(q.versuche, m)
   const ab = new Date(jetzt - 864e5).toISOString()
+  const vorher = (l: { zeit: string }[]): number => (marke ? l.filter((z) => z.zeit < marke).length : 0)
+  const ausgeblendet = vorher(q.zeilen) + vorher(q.ohneDetails) + vorher(q.versuche)
   return {
     gruppen: fehlerGruppieren(zeilen),
     letzte24h: zeilen.filter((z) => z.zeit >= ab).length,
-    langsam24h,
-    roh: [...zeilen].sort((a, b) => b.zeit.localeCompare(a.zeit)).slice(0, 300)
+    langsam24h: q.langsam24h,
+    roh: [...zeilen, ...ohne].sort((a, b) => b.zeit.localeCompare(a.zeit)).slice(0, 300),
+    ohneDetails: { anzahl: ohne.length, letzte24h: ohne.filter((z) => z.zeit >= ab).length, gruppen: fehlerGruppieren(ohne, 10) },
+    anmeldungen: anmeldungenUebersicht(versuche, jetzt),
+    geleert: { ab: marke, ausgeblendet, alle }
   }
 }
 
@@ -500,6 +573,7 @@ export function serverZustand(daten: string, zeitraum: '24h' | '7d', jetzt = Dat
     zertifikatTage: tls.length ? Math.min(...tls.map((t) => (t.bis - jetzt) / 864e5)) : null,
     sicherungStunden: neueste ? (jetzt - neueste.zeit) / 36e5 : null,
     fehler24h: fehler.letzte24h,
+    rateVerdacht: fehler.anmeldungen.verdacht,
     langsam24h: fehler.langsam24h,
     anfragen24h: zweiTage.reduce((a, t) => a + t.anfragen, 0)
   })
@@ -529,6 +603,7 @@ export function serverZustand(daten: string, zeitraum: '24h' | '7d', jetzt = Dat
     sicherung: sicherungsStand(),
     tls,
     ki: kiJeTag(14, jetzt),
-    fehler: { letzte24h: fehler.letzte24h, gruppen: fehler.gruppen.slice(0, 8) }
+    fehler: { letzte24h: fehler.letzte24h, gruppen: fehler.gruppen.slice(0, 8), ohneDetails: fehler.ohneDetails, geleert: fehler.geleert },
+    anmeldungen: fehler.anmeldungen
   }
 }

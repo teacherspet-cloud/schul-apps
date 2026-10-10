@@ -374,8 +374,10 @@ try {
   // Vorwahl: übliche Reihe der Lehrkraft (Green Line), Band nach Jahrgang der Klasse 5 → Green Line 1
   await p.waitForTimeout(1500)
   const band = await p.locator('[data-vokabel-band]').inputValue().catch(() => '')
-  const reiheWahl = await p.locator('[data-vokabel-buch]').inputValue().catch(() => '')
-  pruefe(reiheWahl === 'Green Line' && /^Green Line 1\b/.test(band), `Lehrwerk vorgewählt (${reiheWahl} · ${band})`)
+  // Im Kurs (10.10.2026): kompakter Band-Kopf mit Cover („Green Line 1 ▾ · anderes Lehrwerk …") statt Lehrwerk + Band
+  const kompakt = await p.locator('[data-band-kopf-wahl]').count()
+  const reiheWahl = kompakt ? 'Green Line' : await p.locator('[data-vokabel-buch]').inputValue().catch(() => '')
+  pruefe(reiheWahl === 'Green Line' && /^Green Line 1\b/.test(band), `Lehrwerk vorgewählt (${reiheWahl} · ${band}${kompakt ? ', kompakter Band-Kopf' : ''})`)
   await p.getByRole('button', { name: 'Abbrechen' }).click()
   await p.waitForTimeout(400)
   pruefe(await da(p.locator('[data-kurs="Weather"][data-klassen-kurs] [data-vokabel-kasten]')), 'Kursseite (Vokabeln) eingebettet')

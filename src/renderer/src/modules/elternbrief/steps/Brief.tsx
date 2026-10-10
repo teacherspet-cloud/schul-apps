@@ -21,9 +21,10 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconAlertTriangle, IconFileTypeDocx, IconFileTypePdf, IconHistory, IconLanguage, IconRefresh, IconTrash, IconWand } from '@tabler/icons-react'
+import { IconAlertTriangle, IconEye, IconFileTypeDocx, IconFileTypePdf, IconHistory, IconLanguage, IconRefresh, IconTrash, IconWand } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { pdfVorschauAusHtml } from '../../../shared/export/PdfVorschau'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -250,6 +251,21 @@ export default function Brief(): React.JSX.Element | null {
               data-eb-pdf
             >
               {signieren ? 'PDF (signiert)' : 'PDF'}
+            </Button>
+            {/*
+             * Vorschau (10.10.2026): das PDF ohne Speichern ansehen. Die Signatur sieht man im Bild nicht –
+             * „PDF speichern" nimmt deshalb denselben Weg wie der PDF-Knopf (mit Passwortfrage).
+             */}
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconEye size={14} />}
+              onClick={() =>
+                void pdfVorschauAusHtml(briefHtml(b, kopf), `${name}.pdf`, async () => (signieren ? setPasswortFrage(true) : speichern('pdf')))
+              }
+              data-pdf-vorschau-knopf
+            >
+              Vorschau
             </Button>
             <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => speichern('docx')}>
               Word

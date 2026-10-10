@@ -19,6 +19,12 @@ export interface KursTeil {
   zeit: number
   /** Lehrwerk-Kennung, aus der der Abschnitt kam (seit 09.10.2026 beim Hinzufügen gemerkt – Sortierung nach Band) */
   lehrwerk?: string
+  /**
+   * Unit im Lehrwerk (10.10.2026): beim Freigeben gemerkt, wenn der Titel sie nicht nennt („Station 1"). Die Herkunft des
+   * Kurses (`quelle`) beschreibt nur den zuletzt hinzugefügten Band – ohne diese Angabe landeten ältere Abschnitte eines
+   * anderen Bands in dessen Units.
+   */
+  unit?: string
 }
 
 export interface AbschnittEinordnung {
@@ -48,7 +54,10 @@ const istBuchTitel = (teile: string[]): boolean =>
  *  - „Station 1" (eine Unit, je Abschnitt ein Teil) – die Unit kommt aus der Herkunft des Kurses (in Buchreihenfolge)
  *  - Listentitel ohne Lehrwerk („Weather") – ohne Unit
  */
-export function abschnitteEinordnen(teile: Pick<KursTeil, 'titel'>[], quelle: Partial<Quelle> | null | undefined): AbschnittEinordnung[] {
+export function abschnitteEinordnen(
+  teile: (Pick<KursTeil, 'titel'> & Partial<Pick<KursTeil, 'unit'>>)[],
+  quelle: Partial<Quelle> | null | undefined
+): AbschnittEinordnung[] {
   const folge = quelleUnits(quelle).flatMap((u) => u.abschnitte.map((a) => ({ unit: u.unit, a: a.trim().toLowerCase() })))
   let zeiger = 0
   let letzte = ''
@@ -77,7 +86,8 @@ export function abschnitteEinordnen(teile: Pick<KursTeil, 'titel'>[], quelle: Pa
       const [unit, ...rest] = titel.split(' · ').map((x) => x.trim())
       e = { unit, name: rest.join(' · ') }
     } else {
-      e = { unit: suche(titel) ?? (folge.length ? letzte : ''), name: titel }
+      // Beim Freigeben gemerkte Unit (10.10.2026) vor der Herkunft des Kurses (die nur den neuesten Band kennt)
+      e = { unit: t.unit || (suche(titel) ?? (folge.length ? letzte : '')), name: titel }
     }
     // Zeiger hinter die Abschnitte dieses Teils (für die folgenden „Station 1" ohne Unit)
     if (e.unit) for (const a of e.name.split(/,\s*|\s·\s/)) suche(a, e.unit)
@@ -96,29 +106,37 @@ export function buchAusKennung(kennung: string): string {
 
 /**
  * Band je Abschnitt (09.10.2026, Sortierung nach Band): aus dem Titel („Green Line 6 - Unit 1 - …"), sonst aus der beim
- * Hinzufügen gemerkten Lehrwerk-Kennung, sonst – nur mit erkannter Unit – vom Abschnitt davor (gleiche Freigabe) bzw. aus
- * dem Kurstitel oder der Herkunft des Kurses. Ohne jeden Hinweis bleibt `buch` leer („Weitere Vokabeln").
+ * Freigeben gemerkten Lehrwerk-Kennung des Abschnitts, sonst – nur mit erkannter Unit – vom Abschnitt davor (gleiche
+ * Freigabe) bzw. aus dem Kurstitel oder der Herkunft des Kurses. Ohne jeden Hinweis bleibt `buch` leer („Weitere Vokabeln").
+ *
+ * Mehrere Bände in einem Kurs (10.10.2026, Befund der Lehrkraft: nur EIN Band zu sehen): Die Herkunft `quelle` nennt nur
+ * den zuletzt hinzugefügten Band – sie ist deshalb nur noch der letzte Rückfall; die Kennung je Abschnitt gilt zuerst.
+ * `nameVon` liefert den Namen des Lehrwerks zur Kennung (Server: aus der Lehrwerk-Datei, auch eigene Importe und
+ * Platzhalter wie „¡Apúntate! 1"); ohne ihn wird der Name aus der Kennung gebildet.
  */
 export function mitBaenden(
   teile: Pick<KursTeil, 'titel' | 'lehrwerk'>[],
   einordnung: AbschnittEinordnung[],
   quelle: Partial<Quelle> | null | undefined,
-  titel = ''
+  titel = '',
+  nameVon: (kennung: string) => string = buchAusKennung
 ): AbschnittEinordnung[] {
   const kopf = titel.split(' - ').map((x) => x.trim())
   let letzte = istBuchTitel(kopf) ? kopf[0] : ''
-  const rueckfall = quelle?.lehrwerk ? buchAusKennung(quelle.lehrwerk) : ''
+  const name = (k: string | undefined): string => (k ? nameVon(k) || buchAusKennung(k) : '')
+  const rueckfall = name(quelle?.lehrwerk)
   return einordnung.map((e, i) => {
     const kennung = teile[i]?.lehrwerk
+    const band = name(kennung)
     // Ganze Unit in einem Teil („Green Line 1 - Unit 3", ältere Freigaben): Band und Unit aus dem Titel
     const zwei = (teile[i]?.titel ?? '').split(' - ').map((x) => x.trim())
-    const bandTitel = zwei.length === 2 && zwei[1] && [rueckfall, kennung ? buchAusKennung(kennung) : ''].some((b) => b && norm(b) === norm(zwei[0]))
+    const bandTitel = zwei.length === 2 && zwei[1] && [rueckfall, band].some((b) => b && norm(b) === norm(zwei[0]))
     if (!e.buch && bandTitel) {
-      letzte = zwei[0]
-      return { ...e, buch: zwei[0], unit: e.unit || zwei[1] }
+      letzte = band || zwei[0]
+      return { ...e, buch: letzte, unit: e.unit || zwei[1] }
     }
     // Ohne Unit (eigene Liste wie „Weather") kein geerbter Band
-    const buch = e.buch || (kennung ? buchAusKennung(kennung) : '') || (e.unit ? letzte || rueckfall : '')
+    const buch = e.buch || band || (e.unit ? letzte || rueckfall : '')
     if (buch) letzte = buch
     return buch ? { ...e, buch } : e
   })
@@ -133,7 +151,12 @@ const norm = (s: string): string =>
     .replace(/[^a-z0-9]/g, '')
 
 /** Bände des Kurses in Freigabe-Reihenfolge: aus Kurstitel, Abschnittstiteln und der Herkunft */
-export function baendeVon(titel: string, einordnung: AbschnittEinordnung[], quelle: Partial<Quelle> | null | undefined): string[] {
+export function baendeVon(
+  titel: string,
+  einordnung: AbschnittEinordnung[],
+  quelle: Partial<Quelle> | null | undefined,
+  nameVon: (kennung: string) => string = buchAusKennung
+): string[] {
   const namen: string[] = []
   const dazu = (n: string | undefined): void => {
     if (n && !namen.some((x) => norm(x) === norm(n))) namen.push(n)
@@ -142,7 +165,8 @@ export function baendeVon(titel: string, einordnung: AbschnittEinordnung[], quel
   if (istBuchTitel(kopf)) dazu(kopf[0])
   for (const e of einordnung) dazu(e.buch)
   const kennung = quelle?.lehrwerk ?? ''
-  if (kennung && !namen.some((n) => norm(kennung).startsWith(norm(n)) || norm(n).startsWith(norm(buchAusKennung(kennung))))) dazu(buchAusKennung(kennung))
+  const name = kennung ? nameVon(kennung) || buchAusKennung(kennung) : ''
+  if (kennung && !namen.some((n) => norm(kennung).startsWith(norm(n)) || norm(n).startsWith(norm(name)))) dazu(name)
   return namen
 }
 

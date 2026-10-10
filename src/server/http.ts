@@ -16,6 +16,8 @@
  */
 import { fruehGrund } from '../shared/schuelerFarben'
 import { darstellungPruefen } from './darstellungFelder'
+import { auszeichnungenVon } from './achievementsDaten'
+import { freigeschaltet } from '../shared/auszeichnungenBilder'
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { berichtErlaubt, protokoll } from './diagnose'
@@ -695,7 +697,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         } catch {
           alt = null
         }
-        const darstellung = darstellungPruefen(k0, alt)
+        // Profilbild nur, wenn es freigeschaltet ist (10.10.2026)
+        const darstellung = darstellungPruefen(k0, alt, (id) => freigeschaltet(auszeichnungenVon(sitzung.nutzer.id).ausz, id))
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,
           JSON.stringify(darstellung)

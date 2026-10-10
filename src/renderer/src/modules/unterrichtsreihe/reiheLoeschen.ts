@@ -23,7 +23,8 @@ interface Ablage {
   geloescht: () => void
 }
 
-function ablageVon(moduleId: string): Ablage | null {
+/** Ablage eines Programms zum Löschen (auch die Materialien-Seite am Telefon, 10.10.2026) – null, wo es keinen Weg gibt */
+export function ablageVon(moduleId: string): Ablage | null {
   switch (moduleId) {
     case 'arbeitsblatt':
       return {

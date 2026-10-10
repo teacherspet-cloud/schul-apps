@@ -28,7 +28,8 @@ export interface Lernstanddaten {
   tagesziel?: number
   adresse?: string
   ueberschrift?: string
-  teile?: { titel: string; anzahl: number; zeit: number }[]
+  /** Mit Band und Unit (10.10.2026, Server: teileEingeordnet) – Wortliste je Band gruppiert */
+  teile?: { titel: string; anzahl: number; zeit: number; buch?: string; unit?: string }[]
   /** Entfernte Abschnitte (08.10.2026): Lernstand gespeichert */
   entfernt?: { teil: string; anzahl: number; zeit: number }[]
   sprache?: string

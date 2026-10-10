@@ -26,7 +26,7 @@ import { createServer as tcpServer, connect as tcpVerbinden } from 'net'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join, resolve } from 'path'
-import { kartenAuf, warteAufOberflaeche } from './warten.mjs'
+import { kartenAuf, leisteAuf, warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/mobil-pc-ki')
 mkdirSync(out, { recursive: true })
@@ -191,6 +191,7 @@ try {
   const sichtbar = (l) => l.filter({ visible: true }).first()
   // Elternbriefe über die Leiste (Strg+7 ist seit der Leisten-Ordnung Tafelbilder); erstes Öffnen in der Sitzung zeigt
   // die Übersicht (09.10.2026, shared/sitzung.ts) – von dort ein neuer Brief
+  await leisteAuf(page)
   await sichtbar(page.locator('[aria-label="Elternbriefe"]')).click()
   const neuerBrief = sichtbar(page.getByRole('button', { name: 'Neuer Elternbrief' }))
   if (await neuerBrief.waitFor({ timeout: 8000 }).then(() => true, () => false)) await neuerBrief.click()

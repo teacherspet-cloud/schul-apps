@@ -40,7 +40,7 @@ import { useTelefon, useTouch } from './shared/touch/touchModus'
 import { useLeistenDichte } from './shell/leistenDichte'
 import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
-import { useFachschaftNeu } from './shared/components/Fachordner'
+import { FachschaftFachFrage, useFachschaftNeu } from './shared/components/Fachordner'
 import { useOffenGemerkt } from './shared/sitzung'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
@@ -269,8 +269,12 @@ export default function App(): React.JSX.Element {
       {!ohneLeiste && (
         <AppShell.Navbar p={10} className="app-leiste" data-breit={breit} data-dichte={dichte || undefined}>
           <AppShell.Section>
-            <NavIcon label="Startseite" breit={breit} active={active === 'home' || active === 'themen'} onClick={() => openModule('home')}>
+            <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
               <IconHome size={22} />
+            </NavIcon>
+            {/* Alle Materialien je Fach und Thema (10.10.2026) – vorher nur am Telefon (Tab „Materialien") direkt erreichbar */}
+            <NavIcon label="Materialien" breit={breit} active={active === 'themen'} onClick={() => openModule('themen')}>
+              <IconFolders size={22} />
             </NavIcon>
           </AppShell.Section>
           {/*
@@ -466,6 +470,8 @@ export default function App(): React.JSX.Element {
       <AuftragsLayer />
       {/* Datenschutzhinweis vor dem Hochladen an eine KI (Großprogramm 0.4) */}
       <DatenschutzDialog />
+      {/* Freigabe für die Fachschaft ohne erkanntes Fach: Frage nach dem Fach (10.10.2026) */}
+      <FachschaftFachFrage />
     </AppShell>
   )
 }

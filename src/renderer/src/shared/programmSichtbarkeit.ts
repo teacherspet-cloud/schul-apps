@@ -107,18 +107,31 @@ export function programmPasst(faecher: ProgrammFaecher | undefined, eigene: read
   return faecher.some((f) => eigene.includes(f))
 }
 
+/** Weitere Umstände der Regel (10.10.2026) */
+export interface SichtbarkeitsOptionen {
+  /**
+   * Admin am Server (Entscheidung der Lehrkraft, 10.10.2026): sieht immer alle Programme – auch mit eigenen Fächern.
+   * Der Admin betreut die ganze Schule und muss jede App erreichen können; nur die eigene Wahl unter „Programme
+   * anzeigen" gilt weiter.
+   */
+  admin?: boolean
+}
+
 /**
  * Ist das Programm sichtbar? Die eigene Wahl unter „Programme anzeigen" (`anzeigen[id]`)
- * geht der Regel vor – in beide Richtungen.
+ * geht der Regel vor – in beide Richtungen. EINE Regel für Leiste, Startseite, Telefon-Blätter, iPad-Schublade und
+ * die Karten „Auf einen Blick" (10.10.2026).
  */
 export function programmSichtbar(
   id: string,
   faecher: ProgrammFaecher | undefined,
   eigene: readonly string[] | undefined,
-  anzeigen: Record<string, boolean | null> | undefined
+  anzeigen: Record<string, boolean | null> | undefined,
+  opts: SichtbarkeitsOptionen = {}
 ): boolean {
   const wahl = anzeigen?.[id]
   if (typeof wahl === 'boolean') return wahl
+  if (opts.admin) return true
   return programmPasst(faecher, eigene)
 }
 
@@ -126,7 +139,37 @@ export function programmSichtbar(
 export function sichtbareProgramme<T extends { id: string; faecher?: ProgrammFaecher }>(
   programme: readonly T[],
   eigene: readonly string[] | undefined,
-  anzeigen: Record<string, boolean | null> | undefined
+  anzeigen: Record<string, boolean | null> | undefined,
+  opts: SichtbarkeitsOptionen = {}
 ): T[] {
-  return programme.filter((p) => programmSichtbar(p.id, p.faecher, eigene, anzeigen))
+  return programme.filter((p) => programmSichtbar(p.id, p.faecher, eigene, anzeigen, opts))
+}
+
+/** Unterrichtet die Lehrkraft eine Sprache mit Vokabeln? Ohne eigene Fächer: ja (es bleibt alles sichtbar). */
+export function mitSprachfach(eigene: readonly string[] | undefined): boolean {
+  return programmPasst(SPRACH_FAECHER, eigene)
+}
+
+/** Welche Karten „Auf einen Blick" die Startseite zeigt (10.10.2026) */
+export interface StartKarten {
+  reihen: boolean
+  tests: boolean
+  freigaben: boolean
+  /** 'voll' = „Termine & Vokabeltraining", 'termine' = nur „Termine" (Haltepunkte), null = keine Karte */
+  termine: 'voll' | 'termine' | null
+}
+
+/**
+ * Karten der Startseite nach derselben Regel wie die Leiste (Entscheidung der Lehrkraft, 10.10.2026): Eine Karte steht
+ * nur da, wenn ihre App sichtbar ist. Ohne Sprachenlernen (keine Sprache unterrichtet) heißt „Termine & Vokabeltraining"
+ * nur „Termine" und zeigt nur, was nichts mit Vokabeln zu tun hat (Haltepunkte der laufenden Reihen).
+ */
+export function startKarten(sichtbar: readonly string[]): StartKarten {
+  const hat = (id: string): boolean => sichtbar.includes(id)
+  return {
+    reihen: hat('laufendereihen'),
+    tests: hat('onlinetest'),
+    freigaben: hat('freigaben') || hat('rueckmeldung'),
+    termine: hat('sprachenlernen') ? 'voll' : hat('laufendereihen') || hat('unterrichtsreihe') ? 'termine' : null
+  }
 }

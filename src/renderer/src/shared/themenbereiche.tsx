@@ -18,6 +18,7 @@ import { automatischEinsortieren, einsortierBilanz, neuEinsortierenPlan, type Ka
 import { katalogFuer, ladeLehrplan } from './themenKatalog'
 import { useAppSettings } from './settingsStore'
 import { notifyError, uid } from './util'
+import { touchAktiv, TELEFON } from './touch/touchModus'
 
 /**
  * Themenbereiche in der Oberfläche (Paket 10b): Stand, Aktionen, Rückgängig.
@@ -65,25 +66,57 @@ export function ladeThemen(neu = false): Promise<ThemenDaten> {
   return laedt
 }
 
-/** Hinweis unten rechts mit einem Knopf „Rückgängig" */
-export function zeigeRueckgaengig(text: string, rueckgaengig: () => Promise<void>): void {
+/** Telefon (wie `useTelefon`, ohne React) */
+const amTelefon = (): boolean => {
+  try {
+    return touchAktiv() && window.matchMedia(TELEFON).matches
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Hinweis unten rechts mit einem Knopf „Rückgängig". Am Telefon (10.10.2026, Befund: der lange Text „N Materialien nach
+ * dem Lehrplan einsortiert (…)" verdeckte den Kopf, der Knopf war abgeschnitten) mit `kurz` nur der kurze Text, dazu
+ * „Ansehen"; die Knöpfe brechen in eine eigene Zeile um statt abgeschnitten zu werden.
+ */
+export function zeigeRueckgaengig(text: string, rueckgaengig: () => Promise<void>, kurz?: { text: string; ansehen: () => void }): void {
   const id = `themen-${uid()}`
+  const telefon = amTelefon()
+  const knapp = telefon && kurz
   notifications.show({
     id,
     autoClose: 8000,
     message: (
-      <Group justify="space-between" wrap="nowrap" gap="sm" data-rueckgaengig-hinweis>
-        <Text size="sm">{text}</Text>
-        <Button
-          size="compact-xs"
-          variant="light"
-          onClick={() => {
-            notifications.hide(id)
-            rueckgaengig().catch(notifyError)
-          }}
-        >
-          Rückgängig
-        </Button>
+      <Group justify="space-between" wrap={telefon ? 'wrap' : 'nowrap'} gap="sm" data-rueckgaengig-hinweis data-kurz={knapp ? true : undefined}>
+        <Text size="sm" style={{ minWidth: 0 }}>
+          {knapp ? kurz.text : text}
+        </Text>
+        <Group gap={6} wrap="nowrap" style={{ flex: 'none' }}>
+          {knapp && (
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              data-hinweis-ansehen
+              onClick={() => {
+                notifications.hide(id)
+                kurz.ansehen()
+              }}
+            >
+              Ansehen
+            </Button>
+          )}
+          <Button
+            size="compact-xs"
+            variant="light"
+            onClick={() => {
+              notifications.hide(id)
+              rueckgaengig().catch(notifyError)
+            }}
+          >
+            Rückgängig
+          </Button>
+        </Group>
       </Group>
     )
   })
@@ -257,6 +290,10 @@ export async function abgleichen(materialien: ThemenMaterial[]): Promise<void> {
             await window.api.themen.zuordnen(Object.fromEntries(schluessel.map((k) => [k, { bereichId: null, von: 'hand', am } satisfies Zuordnung])))
             for (const b of [...angelegt].reverse()) await window.api.themen.delete(b.id).catch(() => undefined)
             setze(await window.api.themen.list())
+          },
+          {
+            text: `${anzahl(schluessel.length)} einsortiert`,
+            ansehen: () => void import('./navigation').then((n) => n.openModule('themen'))
           }
         )
     }

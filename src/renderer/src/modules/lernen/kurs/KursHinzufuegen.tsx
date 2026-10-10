@@ -100,14 +100,21 @@ export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => 
     }
   }
   return (
-    <Modal opened onClose={schliessen} title="Vokabeln hinzufügen" size="lg">
+    <Modal opened onClose={schliessen} title="Vokabeln hinzufügen" size="lg" fullScreen={typeof window !== 'undefined' && window.innerWidth < 700}>
       <Stack>
         <VokabelQuelle wahl={setAuswahl} kurs={id} />
-        {auswahl && (
-          <Text size="sm" c="dimmed">
-            {auswahl.woerter.length} Wörter gewählt – schon vorhandene werden übersprungen.
-          </Text>
-        )}
+        {/* Zusammenfassung (10.10.2026): Abschnitte und Wörter der Auswahl */}
+        <Text size="sm" fw={600} data-auswahl-zusammenfassung>
+          {auswahl
+            ? `${((n) => `${n} ${n === 1 ? 'Abschnitt' : 'Abschnitte'}`)(auswahl.quelle?.abschnitte.length || auswahl.teile?.length || 1)} · ${auswahl.woerter.length} Wörter ausgewählt`
+            : 'Noch nichts ausgewählt'}
+          {auswahl && (
+            <Text span size="xs" c="dimmed" fw={400}>
+              {' '}
+              – schon vorhandene werden übersprungen
+            </Text>
+          )}
+        </Text>
         <FreigabePlanen wert={plan} aendern={setPlan} abschnitte={auswahl?.teile?.map((t) => t.titel) ?? (auswahl ? [auswahl.titel] : undefined)} mitTest />
         <Group justify="flex-end" className="dialog-fuss">
           <Button variant="default" onClick={schliessen}>

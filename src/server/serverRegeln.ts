@@ -6,12 +6,18 @@
  *  - `verdichten`: 5-Minuten-Messwerte zu Stundenmitteln (Ansicht „7 Tage").
  *  - `tageAuffuellen`: Tageszahlen der letzten n Tage, fehlende Tage als 0.
  *  - `fehlerGruppieren`: gleiche Meldungen zusammenfassen (Anzahl, zuletzt) mit Hinweis, wo er naheliegt.
+ *  - Anmeldungen (10.10.2026): fehlgeschlagene Passwort-Anmeldungen sind keine Fehler mehr, sondern ein eigener Abschnitt;
+ *    die Ampel warnt nur bei einem möglichen Rateversuch (`rateVerdacht`).
+ *  - Browser-Meldung „Script error." ohne Datei und Zeile (fremdes Skript, meist Erweiterung): eigener Abschnitt, zählt nicht.
+ *  - „Fehlerlog leeren" (10.10.2026): Einträge vor der Marke sind ausgeblendet (`nachMarke`), gelöscht wird nichts.
  */
 
 export type Stufe = 'ok' | 'hinweis' | 'warnung' | 'kritisch'
 
 export interface Befund {
   stufe: Stufe
+  /** Bereich des Befunds, wo die Oberfläche ihn erkennen muss (z. B. 'anmeldungen') */
+  art?: string
   /** kurze Aussage, z. B. „Der Arbeitsspeicher ist fast voll (86 %)." */
   titel: string
   /** was zu tun ist */
@@ -33,6 +39,8 @@ export interface GesundheitsWerte {
   langsam24h: number
   /** Anfragen in den letzten 24 Stunden (für den Anteil der langsamen) */
   anfragen24h: number
+  /** Mögliche Rateversuche bei der Passwort-Anmeldung (10.10.2026) – leer = keiner */
+  rateVerdacht?: RateVerdacht[]
 }
 
 export const GRENZEN = {
@@ -85,6 +93,20 @@ export function gesundheitPruefen(w: GesundheitsWerte): Befund[] {
       titel: `In den letzten 24 Stunden gab es ${w.fehler24h} Fehler.`,
       tun: 'Unter „Fehler“ steht, welche Meldung sich häuft und was meist dahintersteckt.'
     })
+  const verdacht = w.rateVerdacht ?? []
+  if (verdacht.length) {
+    const groesster = verdacht.reduce((a, b) => (b.anzahl > a.anzahl ? b : a))
+    const konto = verdacht.some((v) => v.art === 'konto')
+    const adresse = verdacht.some((v) => v.art === 'adresse')
+    aus.push({
+      stufe: 'warnung',
+      art: 'anmeldungen',
+      titel: `Möglicher Rateversuch bei der Anmeldung: ${groesster.anzahl} fehlgeschlagene Versuche innerhalb von 15 Minuten ${
+        konto && adresse ? 'für dasselbe Konto bzw. von derselben Adresse' : konto ? 'für dasselbe Konto' : 'von derselben Adresse'
+      }.`,
+      tun: 'Nach 10 Fehlversuchen wird 15 Minuten gesperrt. Unter „Anmeldungen“ steht, wann es war. Wiederholt es sich, die Passwörter der Konten mit Passwort prüfen und den Notzugang ausschalten, solange er nicht gebraucht wird.'
+    })
+  }
   const anteil = w.anfragen24h ? w.langsam24h / w.anfragen24h : 0
   if (w.langsam24h >= GRENZEN.langsam24h && anteil >= GRENZEN.langsamAnteil / 5)
     aus.push({
@@ -211,11 +233,135 @@ export function diagnoseZeile(z: string): { zeit: string; text: string } {
   return m ? { zeit: m[1], text: m[2] } : { zeit: '', text: z }
 }
 
+/**
+ * Browser-Meldung ohne Einzelheiten (10.10.2026): „Script error." kommt aus einem fremden Skript (andere Herkunft, meist
+ * eine Browser-Erweiterung) – ohne Datei und Zeile, also nichts, was Schul-Apps beheben könnte. Zeilenform aus http.ts:
+ * „<art> <seite> | <meldung> | <ort> | <rolle> | <Browser>".
+ */
+export function istOhneDetails(text: string): boolean {
+  const teile = text.split(/\s*\|\s*/)
+  const i = teile.findIndex((t) => /^\s*Script error\.?\s*$/i.test(t))
+  if (i < 0) return false
+  // Ort (Datei:Zeile) leer oder nur „:0" – sobald eine Datei genannt ist, ist es ein echter Fehler
+  return i === teile.length - 1 || !/[a-z]/i.test(teile[i + 1])
+}
+
 /** Ist eine Zeile aus langsam.log ein Fehler (nicht nur langsam)? „FEHLER …" oder Status 5xx */
 export const istServerFehler = (text: string): boolean => /^FEHLER\b/.test(text) || /^\d+ ms \S+ \S+ 5\d\d$/.test(text)
 
-/** Protokolleinträge, die einen Fehlschlag melden */
-export const istProtokollFehler = (text: string): boolean => /fehlgeschlagen|nicht möglich|nicht angelegt|nicht verknüpft|Fehler/i.test(text)
+/** Protokolleinträge, die einen Fehlschlag melden – fehlgeschlagene Anmeldungen zählen nicht (eigener Abschnitt, 10.10.2026) */
+export const istProtokollFehler = (text: string): boolean => !istFehlversuch(text) && !/^Fehlerlog geleert/.test(text) && /fehlgeschlagen|nicht möglich|nicht angelegt|nicht verknüpft|Fehler/i.test(text)
+
+// ---------------------------------------------------------------- Anmeldungen (10.10.2026)
+
+/** Ab so vielen Fehlversuchen für dasselbe Konto oder von derselben Adresse innerhalb des Fensters warnt die Ampel */
+export const RATEN = { anzahl: 10, fensterMs: 15 * 60_000 }
+
+const FEHLVERSUCH = /Anmeldung mit Passwort (fehlgeschlagen|abgewiesen)/i
+
+/** Protokolltext einer fehlgeschlagenen (bzw. wegen Sperre abgewiesenen) Passwort-Anmeldung */
+export const istFehlversuch = (text: string): boolean => FEHLVERSUCH.test(text)
+
+/**
+ * Protokolltext mit den Merkmalen für die Gruppierung – Konto und Adresse nur als nicht umkehrbarer HMAC
+ * (feldschutz.ts `anmeldeMerkmal`), nie im Klartext.
+ */
+export function fehlversuchText(konto: string, adresse: string, abgewiesen = false): string {
+  return `Anmeldung mit Passwort ${abgewiesen ? 'abgewiesen – zu viele Fehlversuche' : 'fehlgeschlagen'} (Konto ${konto}, Adresse ${adresse})`
+}
+
+/** Merkmale aus dem Protokolltext lesen – alte Einträge haben keine (zählen nur mit) */
+export function fehlversuchMerkmale(text: string): { konto?: string; adresse?: string } {
+  const konto = /Konto (k:[0-9a-f]{8,})/.exec(text)?.[1]
+  const adresse = /Adresse (a:[0-9a-f]{8,})/.exec(text)?.[1]
+  return { ...(konto ? { konto } : {}), ...(adresse ? { adresse } : {}) }
+}
+
+export interface Fehlversuch {
+  /** ISO-Zeit */
+  zeit: string
+  konto?: string
+  adresse?: string
+}
+
+export interface RateVerdacht {
+  art: 'konto' | 'adresse'
+  /** HMAC-Merkmal (nicht umkehrbar) */
+  merkmal: string
+  /** höchste Zahl an Versuchen in einem Fenster von 15 Minuten */
+  anzahl: number
+  /** Anfang und Ende dieses Fensters (ISO) */
+  von: string
+  bis: string
+}
+
+/** Mögliche Rateversuche: ≥ RATEN.anzahl Versuche für dasselbe Konto ODER von derselben Adresse in RATEN.fensterMs */
+export function rateVerdacht(versuche: Fehlversuch[], grenzen = RATEN): RateVerdacht[] {
+  const aus: RateVerdacht[] = []
+  for (const art of ['konto', 'adresse'] as const) {
+    const je = new Map<string, number[]>()
+    for (const v of versuche) {
+      const m = v[art]
+      const t = Date.parse(v.zeit)
+      if (!m || !Number.isFinite(t)) continue
+      const l = je.get(m)
+      if (l) l.push(t)
+      else je.set(m, [t])
+    }
+    for (const [merkmal, zeiten] of je) {
+      if (zeiten.length < grenzen.anzahl) continue
+      zeiten.sort((a, b) => a - b)
+      let best = { anzahl: 0, von: 0, bis: 0 }
+      for (let a = 0, b = 0; b < zeiten.length; b++) {
+        while (zeiten[b] - zeiten[a] > grenzen.fensterMs) a++
+        if (b - a + 1 > best.anzahl) best = { anzahl: b - a + 1, von: zeiten[a], bis: zeiten[b] }
+      }
+      if (best.anzahl >= grenzen.anzahl) aus.push({ art, merkmal, anzahl: best.anzahl, von: new Date(best.von).toISOString(), bis: new Date(best.bis).toISOString() })
+    }
+  }
+  return aus.sort((a, b) => b.anzahl - a.anzahl || b.bis.localeCompare(a.bis))
+}
+
+export interface AnmeldeUebersicht {
+  letzte24h: number
+  letzte7d: number
+  /** Fehlversuche je Stunde der letzten 24 Stunden (Anfang der Stunde, ISO, neueste zuerst) – nur Stunden mit Versuchen */
+  jeStunde: { zeit: string; anzahl: number }[]
+  /** Fehlversuche je Tag der letzten 7 Tage (JJJJ-MM-TT, älteste zuerst, fehlende Tage 0) */
+  jeTag: { tag: string; anzahl: number }[]
+  /** mögliche Rateversuche, deren Fenster in den letzten 24 Stunden endet */
+  verdacht: RateVerdacht[]
+}
+
+/** Abschnitt „Anmeldungen": Zahlen nach Zeit und möglicher Rateversuch */
+export function anmeldungenUebersicht(versuche: Fehlversuch[], jetzt: number): AnmeldeUebersicht {
+  const ab24 = new Date(jetzt - 864e5).toISOString()
+  const ab7 = new Date(jetzt - 7 * 864e5).toISOString()
+  const sieben = versuche.filter((v) => v.zeit >= ab7)
+  const heute = sieben.filter((v) => v.zeit >= ab24)
+  const stunden = new Map<string, number>()
+  for (const v of heute) {
+    const k = `${v.zeit.slice(0, 13)}:00:00.000Z`
+    stunden.set(k, (stunden.get(k) ?? 0) + 1)
+  }
+  const tage = new Map<string, Partial<{ anzahl: number }>>()
+  for (const v of sieben) {
+    const k = v.zeit.slice(0, 10)
+    tage.set(k, { anzahl: (tage.get(k)?.anzahl ?? 0) + 1 })
+  }
+  return {
+    letzte24h: heute.length,
+    letzte7d: sieben.length,
+    jeStunde: [...stunden.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([zeit, anzahl]) => ({ zeit, anzahl })),
+    jeTag: tageAuffuellen(tage, jetzt, 7, { anzahl: 0 }),
+    verdacht: rateVerdacht(sieben).filter((v) => v.bis >= ab24)
+  }
+}
+
+// ---------------------------------------------------------------- Fehlerlog leeren (10.10.2026)
+
+/** Einträge ab der Marke (ISO) – ohne Marke alle */
+export const nachMarke = <T extends { zeit: string }>(zeilen: T[], marke: string): T[] => (marke ? zeilen.filter((z) => z.zeit >= marke) : zeilen)
 
 // ---------------------------------------------------------------- Sicherungen
 

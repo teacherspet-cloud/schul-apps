@@ -8,6 +8,16 @@
 import { datenbank, type NutzerInfo } from './datenbank'
 import { LEERE_ZAEHLER, type AchGruppe, type AchZaehler, type Medaille } from '../shared/achievements'
 import { SPIELART_BIT, type MehrArt, type MehrspielId } from '../shared/mehrspieler/typen'
+import {
+  HOER_SPIELE,
+  HOER_UEBUNGEN,
+  HOERSPIEL_PUNKTE,
+  LEERE_SPRACH_ZAEHLER,
+  type AuszNeu,
+  type AuszStand,
+  type SprachZaehler,
+  type TitelWahl
+} from '../shared/auszeichnungen'
 
 let bereit = false
 const db = () => {
@@ -39,9 +49,31 @@ export interface AchDaten {
   /** Kasten heute: Antworten und Fehler (für „fehlerfreie Tagesrunde", ausgewertet, wenn der Tag vorbei ist) */
   runde?: { tag: string; n: number; falsch: number }
   warSchwaeche: string[]
+  // Medaillen und Titel je Sprache (10.10.2026, shared/auszeichnungen.ts)
+  /** Zähler und Übungstage je Sprache (was sich nur im Moment des Geschehens zählen lässt) */
+  je: Record<string, { z: SprachZaehler; tage: string[] }>
+  /** Gehaltene Medaillen und Titel je Sprache – nie entzogen */
+  ausz: AuszStand
+  /** Erreicht, aber noch nicht als Glückwunsch gezeigt */
+  offenAusz: AuszNeu[]
+  /** Form und angezeigter Titel – wählt die Person selbst */
+  titelWahl: TitelWahl
+  /** Alte Achievements einmalig übernommen (Sprache) */
+  uebernommen?: string
 }
 
-const leer = (): AchDaten => ({ erreicht: {}, offen: [], zaehler: { ...LEERE_ZAEHLER }, tage: [], warSchwaeche: [] })
+const leer = (): AchDaten => ({
+  erreicht: {},
+  offen: [],
+  zaehler: { ...LEERE_ZAEHLER },
+  tage: [],
+  warSchwaeche: [],
+  je: {},
+  ausz: { medaillen: {}, titel: {} },
+  offenAusz: [],
+  titelWahl: {}
+})
+const objekt = <T>(x: unknown, r: T): T => (x && typeof x === 'object' && !Array.isArray(x) ? (x as T) : r)
 
 export function achDatenLesen(nutzerId: string): AchDaten {
   const z = db().prepare('SELECT daten FROM achievements WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined
@@ -54,7 +86,12 @@ export function achDatenLesen(nutzerId: string): AchDaten {
       zaehler: { ...l.zaehler, ...(d.zaehler ?? {}) },
       tage: Array.isArray(d.tage) ? d.tage : [],
       runde: d.runde,
-      warSchwaeche: Array.isArray(d.warSchwaeche) ? d.warSchwaeche : []
+      warSchwaeche: Array.isArray(d.warSchwaeche) ? d.warSchwaeche : [],
+      je: objekt(d.je, l.je),
+      ausz: { medaillen: objekt(d.ausz?.medaillen, {}), titel: objekt(d.ausz?.titel, {}) },
+      offenAusz: Array.isArray(d.offenAusz) ? d.offenAusz : [],
+      titelWahl: objekt(d.titelWahl, {}),
+      ...(typeof d.uebernommen === 'string' ? { uebernommen: d.uebernommen } : {})
     }
   } catch {
     return leer()
@@ -95,6 +132,17 @@ export function tageVereinen(a: string[], b: Iterable<string>): string[] {
     .slice(-1100)
 }
 
+/** Zähler und Tage einer Sprache (angelegt, wenn nötig); heute als Übungstag eintragen */
+export function jeSprache(d: AchDaten, sprache: string, jetzt: number): SprachZaehler {
+  const s = sprache.trim().toLowerCase().slice(0, 8)
+  const e = (d.je[s] ??= { z: LEERE_SPRACH_ZAEHLER(), tage: [] })
+  e.z = { ...LEERE_SPRACH_ZAEHLER(), ...e.z }
+  const heute = isoTag(jetzt)
+  if (!Array.isArray(e.tage)) e.tage = []
+  if (!e.tage.includes(heute)) e.tage = tageVereinen(e.tage, [heute])
+  return e.z
+}
+
 /** Ein abgelaufener Kastentag mit mindestens 10 Antworten und keinem Fehler zählt als fehlerfreie Tagesrunde */
 export function rundeAbschliessen(d: AchDaten, jetzt: number): void {
   if (d.runde && d.runde.tag < isoTag(jetzt)) {
@@ -106,7 +154,7 @@ export function rundeAbschliessen(d: AchDaten, jetzt: number): void {
 /** Eine Antwort im Vokabelkasten (Liste oder Vokabelweg) */
 export function achievementAntwort(
   n: NutzerInfo,
-  a: { uebung: string; urteil: string; eingabe?: unknown },
+  a: { uebung: string; urteil: string; eingabe?: unknown; sprache?: string },
   jetzt = Date.now()
 ): void {
   if (!zaehlt(n)) return
@@ -125,6 +173,11 @@ export function achievementAntwort(
     if (a.uebung === 'diktat' && a.urteil === 'richtig') d.zaehler.diktate++
     // „Lege das Wort" von Hand geschrieben (Eingabeart kommt vom Trainer mit)
     if (a.uebung === 'buchstaben' && a.eingabe === 'schreiben') d.zaehler.handschrift++
+    // Je Sprache (10.10.2026): Übungstag und „Hören & Sprechen"
+    if (a.sprache) {
+      const z = jeSprache(d, a.sprache, jetzt)
+      if (a.urteil === 'richtig' && HOER_UEBUNGEN.has(a.uebung)) z.hoeren++
+    }
     achDatenSchreiben(n.id, d)
   } catch {
     // Achievements dürfen das Üben nie stören
@@ -135,7 +188,16 @@ export function achievementAntwort(
 const VERBSPIELE = new Set(['vok:formenblitz', 'vok:bildverb', 'gram:verbblitz', 'gram:bildverb', 'gram:formenblitz'])
 
 /** Ein Spiel ist zu Ende (aus dem Rekordbuch): `gebrochen` = früherer Rekord übertroffen; `fehler` = falsche Antworten, wenn bekannt */
-export function achievementSpiel(n: NutzerInfo, schluessel: string, wert: number, gebrochen: boolean, fehler?: number, jetzt = Date.now()): void {
+export function achievementSpiel(
+  n: NutzerInfo,
+  schluessel: string,
+  wert: number,
+  gebrochen: boolean,
+  fehler?: number,
+  jetzt = Date.now(),
+  /** Sprache des Kurses (10.10.2026: Medaillen je Sprache) */
+  sprache?: string
+): void {
   if (!zaehlt(n)) return
   try {
     const d = achDatenLesen(n.id)
@@ -144,6 +206,13 @@ export function achievementSpiel(n: NutzerInfo, schluessel: string, wert: number
     if (gebrochen) d.zaehler.rekordeGebrochen++
     if (schluessel === 'vok:blitz' && fehler === 0 && wert >= 10) d.zaehler.blitzFehlerfrei++
     if (VERBSPIELE.has(schluessel) && wert > 0) d.zaehler.verbformen += Math.min(200, Math.round(wert))
+    if (sprache) {
+      const z = jeSprache(d, sprache, jetzt)
+      // Einzelspiele zählen als Spielrunde; gemeinsame Runden zählt achievementZusammen
+      if (schluessel.startsWith('vok:') || schluessel.startsWith('gram:')) z.spielrunden++
+      if (gebrochen) z.rekorde++
+      if (HOER_SPIELE.has(schluessel)) z.hoeren += HOERSPIEL_PUNKTE
+    }
     achDatenSchreiben(n.id, d)
   } catch {
     // wie oben
@@ -157,7 +226,8 @@ export function achievementSpiel(n: NutzerInfo, schluessel: string, wert: number
 export function achievementZusammen(
   n: NutzerInfo,
   e: { spiel: MehrspielId; art: MehrArt; teamZiel: boolean; gewonnen: boolean; comeback: boolean; fehlerfrei: boolean; unmoeglich: boolean },
-  jetzt = Date.now()
+  jetzt = Date.now(),
+  sprache?: string
 ): void {
   if (!zaehlt(n) || e.spiel === 'beschreiben') return
   try {
@@ -178,8 +248,31 @@ export function achievementZusammen(
       if (e.gewonnen && e.comeback) z.comebackSiege++
       if (e.unmoeglich && e.gewonnen) z.unmoeglich++
     }
+    if (sprache) {
+      const j = jeSprache(d, sprache, jetzt)
+      j.zusammenRunden++
+      if (e.art === 'koop' && e.teamZiel) j.teamZiele++
+    }
     achDatenSchreiben(n.id, d)
   } catch {
     // Achievements dürfen das Spielen nie stören
   }
+}
+
+/** Medaillen, Titel und Titelwahl einer Person (Lehrkraftansicht, Spielraum) – nur lesen */
+export function auszeichnungenVon(nutzerId: string): { ausz: AuszStand; titelWahl: TitelWahl } {
+  try {
+    const d = achDatenLesen(nutzerId)
+    return { ausz: d.ausz, titelWahl: d.titelWahl }
+  } catch {
+    return { ausz: { medaillen: {}, titel: {} }, titelWahl: {} }
+  }
+}
+
+/** Form bzw. angezeigten Titel speichern (frisch gelesen, damit nichts anderes überschrieben wird) */
+export function titelWahlSetzen(n: NutzerInfo, wahl: TitelWahl): TitelWahl {
+  const d = achDatenLesen(n.id)
+  d.titelWahl = { ...d.titelWahl, ...wahl }
+  if (zaehlt(n)) achDatenSchreiben(n.id, d)
+  return d.titelWahl
 }

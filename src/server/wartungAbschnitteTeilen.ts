@@ -87,6 +87,49 @@ export function buchSync(kennung: string, bandName: string, lehrkraftId = ''): B
   return null
 }
 
+/**
+ * Name des Lehrwerks zur Kennung (10.10.2026, Bände je Abschnitt): „green-line-2" → „Green Line 2",
+ * „apuntate-2016-1" → „¡Apúntate! 1" – auch eigene Importe der Lehrkraft und Platzhalter-Lehrwerke ohne Units.
+ * '' = unbekannt (dann bildet kursAbschnitte.ts den Namen aus der Kennung). Nur Namen werden gemerkt (klein).
+ */
+const namenCache = new Map<string, string>()
+export function lehrwerkName(kennung: string, lehrkraftId = ''): string {
+  if (!/^[A-Za-z0-9_-]{2,80}$/.test(kennung)) return ''
+  const schluessel = `${lehrkraftId}|${kennung}`
+  const da = namenCache.get(schluessel)
+  if (da !== undefined) return da
+  let name = ''
+  for (const o of ordnerVon(lehrkraftId)) {
+    const datei = join(o, `${kennung}.json`)
+    if (!existsSync(datei)) continue
+    name = lies(datei, false)?.name ?? ''
+    if (name) break
+  }
+  if (namenCache.size > 500) namenCache.clear()
+  namenCache.set(schluessel, name)
+  return name
+}
+
+/** Alle Lehrwerke mit Units (gemeinsame, eigene Importe, mitgelieferte; je Kennung die erste Fassung) – für die Wartung */
+export function alleLehrwerke(lehrkraftId = ''): (BuchFuerTeilen & { reihe?: string; language?: string })[] {
+  const aus = new Map<string, BuchFuerTeilen & { reihe?: string; language?: string }>()
+  for (const o of ordnerVon(lehrkraftId)) {
+    if (!existsSync(o)) continue
+    let dateien: string[] = []
+    try {
+      dateien = readdirSync(o).filter((f) => f.endsWith('.json'))
+    } catch {
+      continue
+    }
+    for (const f of dateien) {
+      const b = lies(join(o, f), false) as (BuchFuerTeilen & { reihe?: string; language?: string }) | null
+      const id = b?.id || f.replace(/\.json$/, '')
+      if (b && b.units.length && !aus.has(id)) aus.set(id, { ...b, id })
+    }
+  }
+  return [...aus.values()]
+}
+
 /** Beim Speichern: Abschnitte teilen, falls nötig – null = unverändert */
 export function abschnitteBeimSpeichern<T extends TeilBasis, W extends WortBasis>(
   teile: T[],

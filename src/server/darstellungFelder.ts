@@ -8,7 +8,12 @@
  */
 import { FARB_WERTE } from '../shared/schuelerFarben'
 
-export function darstellungPruefen(k0: Record<string, unknown>, alt?: Record<string, unknown> | null): Record<string, unknown> {
+export function darstellungPruefen(
+  k0: Record<string, unknown>,
+  alt?: Record<string, unknown> | null,
+  /** Profilbild (10.10.2026): nur Kennungen freigeschalteter Bilder (shared/auszeichnungenBilder.ts) */
+  avatarErlaubt?: (id: string) => boolean
+): Record<string, unknown> {
   const wahl = (wert: unknown, erlaubt: string[], vorgabe: string): string => (erlaubt.includes(String(wert)) ? String(wert) : vorgabe)
   return {
     modus: wahl(k0.modus, ['hell', 'dunkel', 'auto'], 'auto'),
@@ -51,6 +56,8 @@ export function darstellungPruefen(k0: Record<string, unknown>, alt?: Record<str
     materialien: wahl(k0.materialien, ['regal', 'liste'], 'regal'),
     regal: (Array.isArray(k0.regal) ? k0.regal : []).filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 60).slice(0, 40),
     // Willkommens-Assistent gesehen (09.10.2026) – einmal gesetzt, bleibt es (siehe oben)
-    willkommenErledigt: k0.willkommenErledigt === true || alt?.willkommenErledigt === true
+    willkommenErledigt: k0.willkommenErledigt === true || alt?.willkommenErledigt === true,
+    // Profilbild aus der Sammlung der Medaillen und Titel (10.10.2026) – sonst keins (Anfangsbuchstabe)
+    avatar: typeof k0.avatar === 'string' && /^[a-z0-9-]{3,40}$/.test(k0.avatar) && avatarErlaubt?.(k0.avatar) ? k0.avatar : ''
   }
 }

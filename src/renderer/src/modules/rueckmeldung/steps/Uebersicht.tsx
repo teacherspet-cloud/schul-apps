@@ -2,6 +2,7 @@ import { Badge, Button, Card, Checkbox, Group, Stack, Table, Text, Title } from 
 import { IconFileSpreadsheet, IconFileTypePdf, IconNotebook } from '@tabler/icons-react'
 import { useState } from 'react'
 import { speichereAusgabe } from '../../../shared/export/ausgabe'
+import { VorschauKnopf } from '../../../shared/export/PdfVorschau'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { useRueckmeldung } from '../store'
 import { setzeFachVorgabe, setzeThemaVorgabe } from '../../../shared/fachVorgabe'
@@ -61,6 +62,12 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
             >
               PDF
             </Button>
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+            <VorschauKnopf
+              size="xs"
+              variant="light"
+              ausgabe={() => speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage())}
+            />
             <Button
               size="xs"
               variant="light"

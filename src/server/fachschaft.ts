@@ -8,8 +8,8 @@
  *    Ändert jemand anderes als der Originalersteller etwas, wird daraus eine eigene, namentlich
  *    benannte Kopie („Titel – Kopie Vorname Nachname"). Für die Fachschaft sichtbar wird sie nur,
  *    wenn man sie selbst freigibt.
- *  - Fach: Fach des Materials; Vokabeltest über die Sprache; ohne Fach (Elternbriefe) „Allgemein"
- *    – für alle Lehrkräfte.
+ *  - Fach: Fach des Materials; Vokabeltest über die Sprache. Seit 10.10.2026 (shared/fachschaftFach.ts): ohne
+ *    erkanntes Fach fragt die Freigabe nach dem Fach; „Allgemein" (Altbestand) sehen nur Lehrkräfte ohne eigene Fächer.
  *  - Rückmeldungen sind nicht freigebbar (Namen und Arbeiten von Lernenden).
  *
  * Löst die erste Fassung ab (Fachordner mit Kopien als Schulpaket, server/fachordner.ts): deren
@@ -18,6 +18,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { FAECHER } from '@shared/faecher'
 import { faecherAusGruppen } from '@shared/iservFaecher'
+import { ALLGEMEIN, fachAusDokument, freigabeFach, freigabeSichtbar } from '@shared/fachschaftFach'
 import { getSettings } from '../main/services/storage/settings'
 import { erstellePaket, lesePaketEin, WEGE } from '../main/services/paket/wege'
 import type { PaketArt } from '../main/services/paket/paket'
@@ -101,15 +102,9 @@ interface Kopie {
 
 const pruefsumme = (payload: unknown): string => createHash('sha256').update(JSON.stringify(payload ?? null)).digest('hex')
 
-/** Fach eines Materials (aus dem gespeicherten Dokument) */
+/** Fach eines Materials (aus dem gespeicherten Dokument) – „allgemein", wenn keins zu erkennen ist */
 export function fachVon(art: PaketArt, dok: Record<string, unknown>): string {
-  const p = (dok.payload ?? {}) as { meta?: { subjectId?: string }; settings?: { targetLanguage?: string } }
-  if (art === 'vokabeltest') {
-    const sprache = p.settings?.targetLanguage
-    return FAECHER.find((f) => f.sprache === sprache)?.id ?? 'allgemein'
-  }
-  const fach = p.meta?.subjectId ?? (dok.subjectId as string | undefined)
-  return fach && FAECHER.some((f) => f.id === fach) ? fach : 'allgemein'
+  return fachAusDokument(art, dok) ?? ALLGEMEIN
 }
 
 const name = (dok: Record<string, unknown> | null): string => String(dok?.name ?? '').trim() || 'Material'
@@ -123,9 +118,9 @@ const lesen = (besitzer: string, art: PaketArt, id: string): Record<string, unkn
   }
 }
 
-/** Darf diese Lehrkraft die Freigabe sehen? Eigene Fächer (leer = alle) oder „Allgemein" */
+/** Darf diese Lehrkraft die Freigabe sehen? Eigene Fächer (leer = alle); „Allgemein" seit 10.10.2026 nur ohne Fächer */
 function sichtbarFuer(f: Freigabe, eigeneFaecher: string[]): boolean {
-  return f.fach === 'allgemein' || !eigeneFaecher.length || eigeneFaecher.includes(f.fach)
+  return freigabeSichtbar(f.fach, eigeneFaecher)
 }
 
 
@@ -205,7 +200,25 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
           const dok = lesen(f.besitzer_id, f.art, f.doc_id)
           if (!dok) return []
           const b = namen.get(f.besitzer_id)
-          return [{ id: f.id, art: f.art, docId: f.doc_id, fach: f.fach, titel: name(dok), vonName: b?.name || b?.benutzer || '', eigen: f.besitzer_id === n.id, datum: String(dok.updatedAt ?? f.erstellt) }]
+          // Thema und Jahrgang (10.10.2026): die Materialien-Seite am Telefon zeigt Freigaben im passenden Thema
+          const st = { ...((dok.stats ?? {}) as Record<string, unknown>), ...dok }
+          const text = (x: unknown): string => (typeof x === 'string' ? x.trim() : '')
+          const thema = text(st.ueberthema) || text(st.topic) || text(st.thema)
+          const jahrgang = typeof st.grade === 'number' ? st.grade : undefined
+          return [
+            {
+              id: f.id,
+              art: f.art,
+              docId: f.doc_id,
+              fach: f.fach,
+              titel: name(dok),
+              vonName: b?.name || b?.benutzer || '',
+              eigen: f.besitzer_id === n.id,
+              datum: String(dok.updatedAt ?? f.erstellt),
+              ...(thema ? { thema } : {}),
+              ...(jahrgang ? { jahrgang } : {})
+            }
+          ]
         })
       const faecher = [...new Set(eintraege.map((e) => e.fach))].map((id) => ({ id, label: id === 'allgemein' ? 'Allgemein' : (FAECHER.find((f) => f.id === id)?.label ?? id) }))
       return (json(res, 200, { eintraege, faecher }), true)
@@ -234,7 +247,10 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
       // Eine noch unveränderte Arbeitskopie ist kein eigenes Material
       const k = db().prepare('SELECT geaendert FROM fach_kopien WHERE nutzer_id = ? AND art = ? AND doc_id = ?').get(n.id, art, docId) as { geaendert: number } | undefined
       if (k && !k.geaendert) return (json(res, 400, { fehler: 'Das ist das Material eines anderen – es ist bereits freigegeben.' }), true)
-      const fach = fachVon(art, dok)
+      // Kein Fach im Material: die Oberfläche fragt nach (k0.fach) – ohne Fach keine Freigabe (10.10.2026)
+      const ergebnis = freigabeFach(art, dok, k0.fach)
+      if ('fachNoetig' in ergebnis) return (json(res, 400, { fehler: 'Für welches Fach ist das Material? Bitte ein Fach wählen.', fachNoetig: true }), true)
+      const fach = ergebnis.fach
       const id = randomBytes(8).toString('hex')
       db().prepare('INSERT OR IGNORE INTO fach_freigaben (id, besitzer_id, art, doc_id, fach, erstellt) VALUES (?, ?, ?, ?, ?, ?)').run(id, n.id, art, docId, fach, new Date().toISOString())
       protokolliereServer('fachschaft', `Material freigegeben (${art}, ${fach})`, n.id)

@@ -12,7 +12,7 @@
  * sind NICHT teilbar (Nutzungsbedingungen) – jede Lehrkraft meldet ihr eigenes an.
  */
 import { leseDiagnose } from './diagnose'
-import { fehlerUebersicht, serverZustand } from './serverZustand'
+import { fehlerLeeren, fehlerUebersicht, serverZustand } from './serverZustand'
 import { sicherungStarten, sicherungsStand } from './sicherungen'
 import { freemem, loadavg, totalmem } from 'node:os'
 import { statfsSync } from 'node:fs'
@@ -126,7 +126,8 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     }
     // Reiter „Server" (09.10.2026): Ampel, Verlauf, Nutzung, Platz, Sicherungen, Fehler – Zeitraum 24h oder 7d
     if (was === 'zustand') return (json(res, 200, serverZustand(DATEN, url.searchParams.get('zeitraum') === '7d' ? '7d' : '24h')), true)
-    if (was === 'fehler') return (json(res, 200, fehlerUebersicht()), true)
+    // ?alle=1: auch Einträge vor „Fehlerlog leeren" (10.10.2026)
+    if (was === 'fehler') return (json(res, 200, fehlerUebersicht(Date.now(), url.searchParams.get('alle') === '1')), true)
     if (was === 'protokoll') return (json(res, 200, { eintraege: leseServerProtokoll(Number(url.searchParams.get('anzahl')) || 300) }), true)
     // Diagnose-Protokolle (zeilenweise verschlüsselt, diagnose.ts) entschlüsselt lesen – 08.10.2026
     if (was === 'diagnose') {
@@ -350,6 +351,11 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     // „Sicherung jetzt anlegen" (09.10.2026): läuft im Hintergrund, Fortschritt über GET zustand
     const r = sicherungStarten(DATEN, ich)
     return (json(res, r.ok ? 200 : 409, r.ok ? { ok: true, stand: sicherungsStand() } : { fehler: r.fehler }), true)
+  }
+  if (was === 'fehler-leeren') {
+    // „Fehlerlog leeren" (10.10.2026): nur eine Marke – Diagnose-Dateien und Protokoll bleiben als Nachweis
+    fehlerLeeren(ich)
+    return (json(res, 200, fehlerUebersicht()), true)
   }
   if (was === 'notzugang') {
     setzeServerWert('notzugang', Boolean(k0.an))

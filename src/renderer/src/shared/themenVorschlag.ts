@@ -24,6 +24,7 @@
 import { STOPPWOERTER } from '@shared/stoppwoerter'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon } from '@shared/themen'
+import { doppelteEinheiten, einheitSchluessel, einheitZuText } from '@shared/materialienMobil'
 
 /*
  * SCHWELLEN – was belegt ist und was nicht:
@@ -75,6 +76,13 @@ const gleich = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de
 export function bereichZumUeberthema(m: Pick<ThemenMaterial, 'fachId' | 'ueberthema'>, bereiche: Themenbereich[]): Themenbereich | null {
   const ue = (m.ueberthema ?? '').trim()
   if (!ue) return null
+  /*
+   * Lehrwerks-Unit zuerst (10.10.2026, Befund der Analyse): „Green Line 2 Unit 1" als Überthema gehört in den Bereich
+   * „Green Line 2 › Unit 1: The new boy" aus dem Lehrwerk – vorher entstand daneben ein zweiter Ordner mit dem Wortlaut
+   * des Überthemas (shared/materialienMobil.ts, `einheitSchluessel`).
+   */
+  const unit = einheitZuText(bereiche, m.fachId, ue)
+  if (unit) return bereiche.find((b) => b.id === unit.id) ?? null
   const letzter = ue.split('›').pop()!.trim()
   const imFach = bereiche.filter((b) => b.fachId === m.fachId)
   return imFach.find((b) => gleich(b.name, ue)) ?? imFach.find((b) => gleich(b.name, letzter)) ?? null
@@ -296,13 +304,23 @@ function mitgliederWoerter(materialien: ThemenMaterial[], daten: ThemenDaten): M
 export function einsortieren(materialien: ThemenMaterial[], daten: ThemenDaten, heute = new Date().toISOString()): Record<string, Zuordnung> {
   const neu: Record<string, Zuordnung> = {}
   const mitglieder = mitgliederWoerter(materialien, daten)
+  const doppelt = doppelteEinheiten(daten.bereiche)
   for (const m of materialien) {
     const k = schluesselVon(m)
     if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
-    const b = bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder)
+    const b = stattDoppel(bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder), daten.bereiche, doppelt)
     if (b) neu[k] = { bereichId: b.id, von: 'auto', am: heute }
   }
   return neu
+}
+
+/**
+ * Ein frei benannter Ordner, der eine Lehrwerks-Unit doppelt („Green Line 2 Unit 1" neben „Green Line 2 › Unit 1: …"),
+ * wird nicht mehr befüllt (10.10.2026): Neues kommt in die Unit (shared/materialienMobil.ts, `doppelteEinheiten`).
+ */
+function stattDoppel(b: Themenbereich | null, bereiche: Themenbereich[], doppelt: Map<string, string>): Themenbereich | null {
+  const ziel = b ? doppelt.get(b.id) : undefined
+  return (ziel ? bereiche.find((x) => x.id === ziel) : undefined) ?? b
 }
 
 // ---------- Lehrplan- und Lehrwerksthemen ----------
@@ -407,6 +425,7 @@ export function automatischEinsortieren(
   const gruppen = new Map<string, BereichsUebernahme>()
   const mitglieder = mitgliederWoerter(materialien, daten)
   const kataloge = new Map<string, KatalogMitWoertern>()
+  const doppelt = doppelteEinheiten(daten.bereiche)
   for (const m of materialien) {
     const k = schluesselVon(m)
     if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
@@ -416,7 +435,7 @@ export function automatischEinsortieren(
      * einen Material (die Mindestgruppe gilt hier nicht: Die Lehrkraft bzw. die Planung hat den
      * Namen ausdrücklich genannt). Erst danach Wortähnlichkeit und Lehrplan.
      */
-    const b = bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder)
+    const b = stattDoppel(bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder), daten.bereiche, doppelt)
     if (b) {
       zuordnungen[k] = { bereichId: b.id, von: 'auto', am: heute }
       continue
@@ -463,6 +482,21 @@ export function automatischEinsortieren(
    * angelegt wird („Lineare Zusammenhänge" über „Lineare Gleichungen") –, kommt auch das eine
    * Material dorthin. Sonst stünde es neben dem frisch angelegten Ordner seines Themas.
    */
+  /*
+   * Im selben Durchgang (10.10.2026): Entsteht die Lehrwerks-Unit gerade erst („Green Line 2" › „Unit 1: The new boy"),
+   * kommen Materialien mit dem Überthema „Green Line 2 Unit 1" in diese Unit statt in einen zweiten Ordner.
+   */
+  for (const [schl, u] of gruppen) {
+    if (u.herkunft !== 'ueberthema') continue
+    const k = einheitSchluessel(u.name)
+    if (!k) continue
+    const ziel = [...gruppen.values()].find(
+      (x) => x !== u && x.fachId === u.fachId && x.herkunft === 'lehrwerk' && einheitSchluessel([...(x.pfad ?? []), x.name].join(' › ')) === k
+    )
+    if (!ziel) continue
+    ziel.schluessel.push(...u.schluessel)
+    gruppen.delete(schl)
+  }
   const alle = [...gruppen.values()]
   const pfadText = (u: BereichsUebernahme): string => [...(u.pfad ?? []), u.name].join('›').toLocaleLowerCase('de')
   const behalten = alle.filter((u) => u.pfad?.length || u.herkunft === 'ueberthema' || u.schluessel.length >= MIN_GRUPPE)

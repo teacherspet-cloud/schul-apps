@@ -3,6 +3,7 @@ import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconArrowDown, IconArrowUp, IconFileTypeDocx, IconFileTypePdf, IconListDetails, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { VorschauKnopf } from '../../../shared/export/PdfVorschau'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { verlaufDocx } from '../../../shared/stundenverlauf/docx'
 import {
@@ -76,10 +77,10 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
     }
   }
 
-  const speichern = (art: 'docx' | 'pdf'): void => {
-    if (!v) return
+  const speichern = (art: 'docx' | 'pdf'): Promise<unknown> => {
+    if (!v) return Promise.resolve(0)
     const name = safeFileName(`${titel} - Stundenverlauf`)
-    void speichereAusgabe(
+    return speichereAusgabe(
       art === 'docx'
         ? [{ name: `${name}.docx`, filter: WORD_FILTER, daten: () => verlaufDocx(v, titel, untertitel, ws.meta.ki) }]
         : [{ name: `${name}.pdf`, html: verlaufHtml(v, titel, untertitel, ws.meta.ki) }],
@@ -154,6 +155,8 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
             <Button size="xs" variant="light" leftSection={<IconFileTypePdf size={14} />} onClick={() => speichern('pdf')}>
               PDF
             </Button>
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+            <VorschauKnopf size="xs" variant="light" ausgabe={() => speichern('pdf')} />
             {/* Seitenauswahl (01.10.2026) – beim PDF; Word bricht den Verlauf selbst um */}
             <SeitenWahlSchalter kompakt beschreibung="Gilt für das PDF: Vor dem Speichern erscheinen die Seiten zum Auswählen." />
             <Tooltip label="Stundenverlauf entfernen">

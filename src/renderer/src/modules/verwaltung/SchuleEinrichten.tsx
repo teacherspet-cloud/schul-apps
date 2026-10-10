@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, Group, Loader, MultiSelect, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Box, Button, Group, Loader, MultiSelect, Paper, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconDeviceFloppy, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { LAENDER, schulformenDes } from '@shared/schulformen'
@@ -8,8 +8,9 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { ladeServerSchule, type ServerSchule } from '../../shared/serverSchule'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../../shared/util'
 import DropZone, { FILE_TYPES } from '../../shared/components/DropZone'
+import { KlappKarte } from '../../shared/components/KlappKarte'
 import { appSchulform, type SchulTreffer } from '@shared/schulsuche'
-import { verzeichnisAbgleich, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
+import { schulWahl, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
 import { SchulSuchfeld, VerzeichnisAbweichung } from '../../shell/Schulsuche'
 import { SchulkalenderKarte } from './SchulkalenderKarte'
 
@@ -22,9 +23,27 @@ import { SchulkalenderKarte } from './SchulkalenderKarte'
  * Programme (shared/schulEinrichtung.ts). Gespeichert wird auf dem Server (src/server/schule.ts).
  *
  * Schulsuche (09.10.2026): Der Name lässt sich im Schulverzeichnis suchen; die Wahl füllt leere Felder (Anschrift,
- * Telefon, Bundesland, Schulform) – Abweichungen bei gefüllten Feldern nur auf Klick (shared/schulVerzeichnisDaten.ts).
+ * Telefon, E-Mail, Bundesland, Schulform) – Abweichungen bei gefüllten Feldern nur auf Klick (shared/schulVerzeichnisDaten.ts).
+ *
+ * 10.10.2026 (Befund der Lehrkraft „Kreisgymnasium Wesermünde"): Die Wahl setzt auch hier das Vorgabe-Logo der Schule
+ * (resources/schulen/logos, bisher nur in den Einstellungen der Lehrkraft verdrahtet), wenn noch keins hinterlegt ist –
+ * bei einem anderen nach Rückfrage. Ein eigener längerer Name („Kreisgymnasium …" statt „Gymnasium …") bleibt stehen.
+ * Alle Kästen sind einklappbar (Vorgabe: zu) mit Statuszeile im Kopf; offen/zu bleibt dauerhaft je Gerät
+ * (KlappKarte `dauerhaft`, Entscheidung der Lehrkraft – anders als die übrigen Kästen, die je Sitzung gelten).
  */
 const LEER: SchulEinrichtung = { name: '', stateId: '', schulformen: [], strasse: '', plz: '', ort: '', telefon: '', email: '' }
+
+/** Statuszeile „Kreisgymnasium Wesermünde · NI · Gymnasium" */
+function schulStatus(w: SchulEinrichtung): string {
+  const form = w.stateId && w.schulformen[0] ? schulformenDes(w.stateId).find((s) => s.id === w.schulformen[0])?.name : ''
+  return [w.name.trim(), w.stateId, form].filter(Boolean).join(' · ')
+}
+
+/** Statuszeile „Humboldtstraße 12-14, 27570 Bremerhaven · sekretariat@…" */
+function kontaktStatus(w: SchulEinrichtung): string {
+  const ort = [w.plz.trim(), w.ort.trim()].filter(Boolean).join(' ')
+  return [[w.strasse.trim(), ort].filter(Boolean).join(', '), w.email.trim()].filter(Boolean).join(' · ')
+}
 
 export function SchuleEinrichten(): React.JSX.Element {
   const [werte, setWerte] = useState<SchulEinrichtung | null>(null)
@@ -33,6 +52,7 @@ export function SchuleEinrichten(): React.JSX.Element {
   const [logoLaedt, setLogoLaedt] = useState(false)
   const [fehler, setFehler] = useState('')
   const [abweichung, setAbweichung] = useState<{ treffer: SchulTreffer; felder: Abweichung[] } | null>(null)
+  const [logoFrage, setLogoFrage] = useState<{ schule: string; png: string } | null>(null)
 
   useEffect(() => {
     void holen<ServerSchule>('/server/schule')
@@ -47,13 +67,27 @@ export function SchuleEinrichten(): React.JSX.Element {
   }, [])
 
   if (!werte) return <Loader />
-  const setze = (patch: Partial<SchulEinrichtung>): void => setWerte({ ...werte, ...patch })
+  const setze = (patch: Partial<SchulEinrichtung>): void => setWerte((alt) => ({ ...(alt ?? LEER), ...patch }))
   const formen = werte.stateId ? schulformenDes(werte.stateId) : []
 
-  /** Schule aus dem Verzeichnis gewählt: Name setzen, leere Felder füllen, Abweichungen anbieten */
-  const waehleSchule = (t: SchulTreffer): void => {
-    const { gefuellt, abweichend } = verzeichnisAbgleich(werte, t)
-    const patch: Partial<SchulEinrichtung> = { name: t.name, ...gefuellt }
+  const logoSetzen = async (neu: string | null, meldung?: string): Promise<void> => {
+    setLogoLaedt(true)
+    try {
+      await senden('/server/schule/logo', { logo: neu })
+      setLogo(neu)
+      void ladeServerSchule(true)
+      notifySuccess(meldung ?? (neu ? 'Schullogo gespeichert.' : 'Schullogo entfernt.'))
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setLogoLaedt(false)
+    }
+  }
+
+  /** Schule aus dem Verzeichnis gewählt: Name setzen, leere Felder füllen, Abweichungen anbieten, Vorgabe-Logo */
+  const waehleSchule = async (t: SchulTreffer): Promise<void> => {
+    const w = schulWahl(werte, t, logo, null)
+    const patch: Partial<SchulEinrichtung> = { name: w.name, ...w.gefuellt }
     if (!werte.stateId && LAENDER.some((l) => l.id === t.land)) patch.stateId = t.land
     const land = patch.stateId ?? werte.stateId
     if (!werte.schulformen.length && land && land === t.land) {
@@ -64,7 +98,17 @@ export function SchuleEinrichten(): React.JSX.Element {
       if (form) patch.schulformen = [form]
     }
     setze(patch)
-    setAbweichung(abweichend.length ? { treffer: t, felder: abweichend } : null)
+    setAbweichung(w.abweichend.length ? { treffer: t, felder: w.abweichend } : null)
+    setLogoFrage(null)
+    if (!t.logo) return
+    try {
+      const png = await window.api.schulen.logo(t.id)
+      const art = schulWahl(werte, t, logo, png).logo
+      if (art === 'setzen' && png) await logoSetzen(png, `Schullogo von „${t.name}“ übernommen.`)
+      else if (art === 'fragen' && png) setLogoFrage({ schule: t.name, png })
+    } catch (e) {
+      notifyError(e, 'Das Logo der Schule ließ sich nicht laden')
+    }
   }
 
   const speichern = async (): Promise<void> => {
@@ -84,23 +128,12 @@ export function SchuleEinrichten(): React.JSX.Element {
     }
   }
 
-  const logoSetzen = async (neu: string | null): Promise<void> => {
-    setLogoLaedt(true)
-    try {
-      await senden('/server/schule/logo', { logo: neu })
-      setLogo(neu)
-      void ladeServerSchule(true)
-      notifySuccess(neu ? 'Schullogo gespeichert.' : 'Schullogo entfernt.')
-    } catch (e) {
-      notifyError(e)
-    } finally {
-      setLogoLaedt(false)
-    }
-  }
-
   const feld = (name: 'strasse' | 'plz' | 'ort' | 'telefon' | 'email', label: string, placeholder = ''): React.JSX.Element => (
     <TextInput label={label} placeholder={placeholder} value={werte[name]} onChange={(e) => setze({ [name]: e.currentTarget.value })} data-schule-feld={name} />
   )
+
+  const schule = schulStatus(werte)
+  const kontakt = kontaktStatus(werte)
 
   return (
     <Stack maw={720} data-schule-einrichten>
@@ -109,19 +142,23 @@ export function SchuleEinrichten(): React.JSX.Element {
         noch keine Schuldaten hat, wird einmal gefragt, ob sie übernommen werden sollen. Eigene Angaben der Lehrkräfte werden nie überschrieben. Solange
         eine Lehrkraft kein eigenes Bundesland und keine eigene Schulform gewählt hat, gelten die hier eingetragenen.
       </Alert>
-      <Card withBorder padding="lg">
-        <Title order={5} mb="sm">
-          Schule
-        </Title>
+      <KlappKarte
+        id="verwaltung-schule"
+        dauerhaft
+        titel="Schule"
+        status={schule || 'noch nicht eingerichtet'}
+        ton={schule ? 'neutral' : 'warnung'}
+        rahmen={{ 'data-schule-karte': 'schule' }}
+      >
         <Stack gap="sm">
           <SchulSuchfeld
             label="Name der Schule"
-            description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder; die Wahl ergänzt leere Felder (Anschrift, Telefon, Land, Schulform)."
+            description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder; die Wahl ergänzt leere Felder (Anschrift, Telefon, E-Mail, Land, Schulform) und das Logo der Schule, falls eins beiliegt."
             placeholder="Namen oder Ort der Schule eingeben"
             required
             value={werte.name}
             onChange={(x) => setze({ name: x })}
-            onWaehle={waehleSchule}
+            onWaehle={(t) => void waehleSchule(t)}
             land={werte.stateId || undefined}
             schulform={werte.schulformen[0]}
             kennung="verwaltung"
@@ -135,6 +172,31 @@ export function SchuleEinrichten(): React.JSX.Element {
               }}
               schliessen={() => setAbweichung(null)}
             />
+          )}
+          {logoFrage && (
+            <Paper withBorder p="xs" radius="sm" data-logo-frage>
+              <Group gap="xs" justify="space-between" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap">
+                  <img src={logoFrage.png} alt="" style={{ height: 28, width: 'auto' }} />
+                  <Text size="xs">Logo von „{logoFrage.schule}“ übernehmen? Das bisherige Schullogo wird dabei ersetzt.</Text>
+                </Group>
+                <Group gap={4} wrap="nowrap">
+                  <Button
+                    size="compact-xs"
+                    variant="light"
+                    onClick={() => {
+                      void logoSetzen(logoFrage.png, 'Schullogo übernommen.')
+                      setLogoFrage(null)
+                    }}
+                  >
+                    Übernehmen
+                  </Button>
+                  <Button size="compact-xs" variant="subtle" color="gray" onClick={() => setLogoFrage(null)}>
+                    Nein
+                  </Button>
+                </Group>
+              </Group>
+            </Paper>
           )}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
             <Select
@@ -166,11 +228,8 @@ export function SchuleEinrichten(): React.JSX.Element {
             />
           </SimpleGrid>
         </Stack>
-      </Card>
-      <Card withBorder padding="lg">
-        <Title order={5} mb={4}>
-          Anschrift und Kontakt
-        </Title>
+      </KlappKarte>
+      <KlappKarte id="verwaltung-kontakt" dauerhaft titel="Anschrift und Kontakt" status={kontakt || 'noch leer'} rahmen={{ 'data-schule-karte': 'kontakt' }}>
         <Text size="xs" c="dimmed" mb="sm">
           Für den Briefkopf der Elternbriefe.
         </Text>
@@ -183,7 +242,7 @@ export function SchuleEinrichten(): React.JSX.Element {
             {feld('email', 'E-Mail', 'z. B. sekretariat@schule.de')}
           </SimpleGrid>
         </Stack>
-      </Card>
+      </KlappKarte>
       {fehler && (
         <Alert color="red" variant="light" data-schule-fehler>
           {fehler}
@@ -191,20 +250,23 @@ export function SchuleEinrichten(): React.JSX.Element {
       )}
       <Group justify="flex-end">
         <Button leftSection={<IconDeviceFloppy size={16} />} onClick={() => void speichern()} loading={speichert} data-schule-speichern>
-          Speichern
+          Schule und Kontakt speichern
         </Button>
       </Group>
-      <Card withBorder padding="lg">
-        <Title order={5} mb={4}>
-          Schullogo
-        </Title>
+      <KlappKarte
+        id="verwaltung-logo"
+        dauerhaft
+        titel="Schullogo"
+        status={logo ? 'Logo hinterlegt' : 'kein Logo'}
+        rahmen={{ 'data-schule-karte': 'logo', 'data-logo-gesetzt': logo ? 'true' : 'false' }}
+      >
         <Text size="xs" c="dimmed" mb="sm">
           Wird als PNG gespeichert (höchstens 800 Pixel, bis 1 MB) und Lehrkräften ohne eigenes Logo angeboten.
         </Text>
         <Group align="stretch" wrap="nowrap">
           {logo && (
             <Stack gap={6} align="center" justify="center" className="picker-tile" p="sm" w={180}>
-              <img src={logo} alt="Schullogo" style={{ maxWidth: 150, maxHeight: 90, objectFit: 'contain' }} />
+              <img src={logo} alt="Schullogo" style={{ maxWidth: 150, maxHeight: 90, objectFit: 'contain' }} data-schullogo />
               <Button size="compact-xs" variant="subtle" color="red" leftSection={<IconTrash size={12} />} onClick={() => void logoSetzen(null)}>
                 Entfernen
               </Button>
@@ -230,7 +292,7 @@ export function SchuleEinrichten(): React.JSX.Element {
             />
           </Box>
         </Group>
-      </Card>
+      </KlappKarte>
       <SchulkalenderKarte />
     </Stack>
   )

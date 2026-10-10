@@ -7,9 +7,11 @@
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { eigeneWerte } from '../../shared/haeufig'
-import { Group, Loader, MultiSelect, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { Button, Group, Loader, MultiSelect, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { naechsterAbschnitt, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
+import { bandStand, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
+import { abschnittKey, AbschnittWahl, TRENNER } from './kurs/AbschnittWahl'
+import { BandCover } from '../../shared/components/BandCover'
 import { holen } from '../onlinetest/serverApi'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import type { Vokabel } from '@shared/vokabeltrainer'
@@ -29,10 +31,6 @@ export interface VokabelAuswahl {
   /** Je gewähltem Abschnitt ein Teil {titel, anzahl} in Wortreihenfolge (Kasten „Freigegebene Abschnitte") */
   teile?: { titel: string; anzahl: number }[]
 }
-
-/** Kennung eines Abschnitts in der Mehrfachauswahl: Unit und Abschnitt (Abschnittsnamen wiederholen sich je Unit) */
-const TRENNER = '\u0001'
-const abschnittKey = (unit: string, abschnitt: string): string => `${unit}${TRENNER}${abschnitt}`
 
 const FACH_ZU: Record<string, string> = {
   en: 'Englisch',
@@ -109,6 +107,8 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
     void window.api.library.list().then(setListen, () => setListen([]))
   }, [])
   const [vorwahl, setVorwahl] = useState<VorwahlDaten | null>(null)
+  // Im Kurs (10.10.2026): kompakter Band-Kopf und Abschnittsbaum; „anderes Lehrwerk …" zeigt die vollständige Auswahl
+  const [andereWahl, setAndereWahl] = useState(false)
   const vorgewaehlt = useRef(false)
   useEffect(() => {
     if (!kurs) return
@@ -151,7 +151,8 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
     setSprache(b.language)
     setReihe(reiheVon(b))
     bandWaehlen(b.id)
-    const naechster = b.id === vorwahl.kursLehrwerk ? naechsterAbschnitt(b, vorwahl.kursUnits) : null
+    // Vorschlag (10.10.2026): der erste noch nicht freigegebene Abschnitt nach dem letzten freigegebenen dieses Bands
+    const naechster = bandStand(b, vorwahl).naechster
     if (naechster) {
       setUnits([naechster.unit])
       setAbschnitte([abschnittKey(naechster.unit, naechster.abschnitt)])
@@ -242,7 +243,40 @@ export function VokabelQuelle({ wahl, kurs }: { wahl: (a: VokabelAuswahl | null)
           { value: 'liste', label: 'Eigene Liste' }
         ]}
       />
-      {art === 'buch' ? (
+      {art === 'buch' && kurs && buch && !andereWahl ? (
+        <>
+          <Group gap="xs" wrap="nowrap" data-band-kopf-wahl>
+            <BandCover band={{ name: buch.name }} breite={30} />
+            <Select
+              size="xs"
+              data={baende.map((b) => ({ value: b.id, label: mehrereAusgaben && b.ausgabe ? `${b.name} (${b.ausgabe})` : b.name }))}
+              value={bandId}
+              onChange={(id) => id && bandWaehlen(id)}
+              allowDeselect={false}
+              w={190}
+              aria-label="Band"
+              data-vokabel-band
+            />
+            <Button size="compact-xs" variant="subtle" onClick={() => setAndereWahl(true)} data-anderes-lehrwerk>
+              anderes Lehrwerk …
+            </Button>
+          </Group>
+          {laeuft ? (
+            <Loader size="sm" />
+          ) : (
+            <AbschnittWahl
+              key={buch.id}
+              buch={buch}
+              vorwahl={vorwahl}
+              abschnitte={abschnitte}
+              setAbschnitte={(a) => {
+                setAbschnitte(a)
+                setUnits([...new Set(a.map((k) => k.split(TRENNER)[0]))])
+              }}
+            />
+          )}
+        </>
+      ) : art === 'buch' ? (
         <>
           {sprachen.length > 1 && (
             <HaeufigSelect

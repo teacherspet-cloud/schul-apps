@@ -18,6 +18,7 @@ import { ListenSuche } from '../../shared/components/AppSuche'
 import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFenster'
 import { buendeln, type Fall } from './entscheidungBuendeln'
 import { useAppSettings } from '../../shared/settingsStore'
+import { useSichtbareProgramme } from '../../shell/programme'
 import { thresholdsForSubject } from '../../shared/gradeScale'
 import type { Kurztest } from '../lernzielkontrolle/model/types'
 import { kurztestToWorksheetAlle } from '../lernzielkontrolle/render/kurztestWorksheet'
@@ -93,6 +94,7 @@ import { antwortAlsText, felderVon, loesungAlsText, type Antworten, type Bewertu
 import { auffaellig, VorfallAbzeichen, vorfallKurz, type Vorfall } from './VorfallAnzeige'
 import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
 import { hatClient } from '../../shared/plattform'
 import { AbgabeBlatt, abgabenHtml, type BlattKopf } from './blattAnsicht'
 import type { Variant } from '../vokabeltest/model/types'
@@ -684,6 +686,15 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
           </Menu.Item>
           <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>
             PDF
+          </Menu.Item>
+          {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+          <Menu.Item
+            onClick={() =>
+              void pdfVorschauAusHtml(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`, () => window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`))
+            }
+            data-pdf-vorschau-knopf
+          >
+            PDF-Vorschau
           </Menu.Item>
           <Menu.Item onClick={() => void speichern('xlsx', 'Excel', ergebnisXlsx(daten, format))}>Excel (.xlsx)</Menu.Item>
           <Menu.Item onClick={() => void ergebnisDocx(daten, format).then((b) => speichern('docx', 'Word', b))}>Word (.docx)</Menu.Item>
@@ -1878,10 +1889,10 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
  * eigenen gespeicherten Dokumenten – dieselbe Durchführung wie über den Knopf im jeweiligen Editor.
  */
 type NeuArt = 'vokabeltest' | 'grammatiktest' | 'lernzielkontrolle'
-const NEU_ARTEN: { value: NeuArt; label: string; app: string }[] = [
-  { value: 'vokabeltest', label: 'Vokabeltest', app: 'Vokabeltest' },
-  { value: 'grammatiktest', label: 'Grammatiktest', app: 'Grammatiktest' },
-  { value: 'lernzielkontrolle', label: 'Lernzielkontrolle', app: 'Lernzielkontrolle' }
+const NEU_ARTEN: { value: NeuArt; label: string; app: string; welche: string }[] = [
+  { value: 'vokabeltest', label: 'Vokabeltest', app: 'Vokabeltest', welche: 'Welcher' },
+  { value: 'grammatiktest', label: 'Grammatiktest', app: 'Grammatiktest', welche: 'Welcher' },
+  { value: 'lernzielkontrolle', label: 'Lernzielkontrolle', app: 'Lernzielkontrolle', welche: 'Welche' }
 ]
 
 /** Gespeicherte Vokabeltests, Grammatiktests und Lernzielkontrollen mit ihren Kennzahlen (06.10.2026) */
@@ -1999,7 +2010,15 @@ function VorlagenWahl({ art, liste, waehlen }: { art: NeuArt; liste: VorlageMeta
 }
 
 function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.Element {
-  const [art, setArt] = useState<NeuArt>('vokabeltest')
+  /*
+   * Onlinetest für alle Fächer (10.10.2026, Entscheidung der Lehrkraft): Nur die Arten, deren App zu den eigenen Fächern
+   * passt – eine Geschichtslehrkraft sieht Lernzielkontrollen, keine Vokabel- oder Grammatiktests (dieselbe Regel wie die
+   * Leiste, shared/programmSichtbarkeit.ts). Ist keine der Apps sichtbar, bleiben alle Arten wählbar.
+   */
+  const sichtbar = useSichtbareProgramme()
+  const arten = NEU_ARTEN.filter((a) => sichtbar.some((m) => m.id === a.value))
+  const wahl = arten.length ? arten : NEU_ARTEN
+  const [art, setArt] = useState<NeuArt>(wahl[0].value)
   const [liste, setListe] = useState<VorlageMeta[] | null>(null)
   const [doc, setDoc] = useState<TestDocument | null>(null)
   const [blatt, setBlatt] = useState<BlattQuelleOnline | null>(null)
@@ -2056,14 +2075,16 @@ function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.
   return (
     <Modal opened onClose={schliessen} title="Neuer Onlinetest" size="lg">
       <Stack>
-        <SegmentedControl
-          value={art}
-          onChange={(v) => setArt(v as NeuArt)}
-          data={NEU_ARTEN.map(({ value, label }) => ({ value, label }))}
-          data-onlinetest-art
-        />
+        {wahl.length > 1 && (
+          <SegmentedControl
+            value={art}
+            onChange={(v) => setArt(v as NeuArt)}
+            data={wahl.map(({ value, label }) => ({ value, label }))}
+            data-onlinetest-art
+          />
+        )}
         <Text size="sm" c="dimmed">
-          Welcher {name.label} soll online geschrieben werden? Neue entstehen in der App „{name.app}“.
+          {name.welche} {name.label} soll online geschrieben werden? Neue entstehen in der App „{name.app}“.
         </Text>
         {!liste && <Loader size="sm" />}
         {liste?.length === 0 && <Text c="dimmed">Noch nichts gespeichert.</Text>}

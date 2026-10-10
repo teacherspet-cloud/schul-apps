@@ -18,6 +18,7 @@ import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
+import { startseiteRoute } from './startseite'
 import { klassenGaesteRoute } from './klassenGaeste'
 import { kontoVerknuepfungRoute } from './kontoVerknuepfungRoute'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
@@ -217,6 +218,8 @@ async function main(): Promise<void> {
       // Gastkonto ↔ IServ zusammenführen (09.10.2026, kontoVerknuepfungRoute.ts)
       kontoVerknuepfungRoute(),
       klassenRoute(),
+      // Startseite der Lehrkraft: Vokabelkurse und Klassen auf einen Blick (10.10.2026)
+      startseiteRoute(),
       fachordnerRoute(),
       // Schul-Einrichtung (09.10.2026): lesen alle Lehrkräfte, ändern nur Admins
       schuleRoute,

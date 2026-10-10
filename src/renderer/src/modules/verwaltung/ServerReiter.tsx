@@ -6,7 +6,9 @@
  *  3. Nutzung: aktive Lehrkräfte und Lernende je Tag (nur Zahlen), langsame Anfragen.
  *  4. Platz und Sicherungen: Ring der Plattenbelegung, Liste der Sicherungen, Zertifikat, „Sicherung jetzt anlegen".
  *  5. KI: Anfragen über die Schlüssel der Schule je Tag – die Einzelheiten stehen unter „KI-Zugänge".
- *  6. Fehler: gleiche Meldungen zusammengefasst, mit Hinweis.
+ *  6. Fehler: gleiche Meldungen zusammengefasst, mit Hinweis. Seit 10.10.2026 ohne fehlgeschlagene Anmeldungen (eigener
+ *     Abschnitt „Anmeldungen", Ampel nur bei möglichem Rateversuch) und Browser-Meldungen ohne Einzelheiten (eingeklappt,
+ *     zählen nicht); „Fehlerlog leeren" blendet Älteres aus (Protokolle bleiben), „Ältere anzeigen" holt es zurück.
  * Genaue Zahlen, Rohprotokolle und Diagnose unter „Technische Details" (im Expertenmodus gleich offen).
  * Daten: GET /server/verwaltung/zustand (server/serverZustand.ts).
  */
@@ -29,7 +31,7 @@ import {
   Title,
   UnstyledButton
 } from '@mantine/core'
-import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconCircleCheck, IconDatabaseExport, IconInfoCircle, IconRefresh } from '@tabler/icons-react'
+import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconCircleCheck, IconDatabaseExport, IconInfoCircle, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -39,6 +41,7 @@ import { LinienDiagramm, RingDiagramm, SaeulenDiagramm, useReihenFarben } from '
 type Stufe = 'ok' | 'hinweis' | 'warnung' | 'kritisch'
 interface Befund {
   stufe: Stufe
+  art?: string
   titel: string
   tun: string
 }
@@ -64,6 +67,38 @@ interface FehlerGruppe {
   anzahl: number
   zuletzt: string
   hinweis: string
+}
+interface RateVerdacht {
+  art: 'konto' | 'adresse'
+  merkmal: string
+  anzahl: number
+  von: string
+  bis: string
+}
+interface Anmeldungen {
+  letzte24h: number
+  letzte7d: number
+  jeStunde: { zeit: string; anzahl: number }[]
+  jeTag: { tag: string; anzahl: number }[]
+  verdacht: RateVerdacht[]
+}
+interface OhneDetails {
+  anzahl: number
+  letzte24h: number
+  gruppen: FehlerGruppe[]
+}
+interface Geleert {
+  ab: string
+  ausgeblendet: number
+  alle?: boolean
+}
+interface FehlerAntwort {
+  gruppen: FehlerGruppe[]
+  letzte24h: number
+  roh: { zeit: string; quelle: string; text: string }[]
+  ohneDetails: OhneDetails
+  anmeldungen: Anmeldungen
+  geleert: Geleert
 }
 interface Zustand {
   gesundheit: Befund[]
@@ -101,7 +136,8 @@ interface Zustand {
   sicherung: { laeuft: boolean; schritt: string; anteil: number; meldung: string; datei: string; zeit: number }
   tls: { name: string; bis: number }[]
   ki: { tag: string; auftraege: number; anfragen: number }[] | null
-  fehler: { letzte24h: number; gruppen: FehlerGruppe[] }
+  fehler: { letzte24h: number; gruppen: FehlerGruppe[]; ohneDetails: OhneDetails; geleert: Geleert }
+  anmeldungen: Anmeldungen
 }
 
 export const groesseText = (b: number): string =>
@@ -203,7 +239,7 @@ export function ServerReiter({ sichtbar, zuKi }: { sichtbar: boolean; zuKi: () =
         >
           <Stack gap={6}>
             {z.gesundheit.map((b) => (
-              <div key={b.titel}>
+              <div key={b.titel} data-befund-art={b.art}>
                 <Group gap={6} wrap="nowrap" align="baseline">
                   <Badge size="xs" color={FARBE[b.stufe]} variant="filled" style={{ flexShrink: 0 }}>
                     {b.stufe === 'kritisch' ? 'dringend' : b.stufe === 'warnung' ? 'bald' : 'Hinweis'}
@@ -436,8 +472,8 @@ export function ServerReiter({ sichtbar, zuKi }: { sichtbar: boolean; zuKi: () =
         )}
       </Card>
 
-      {/* 6. Fehler */}
-      <Fehler z={z} />
+      {/* 6. Fehler und Anmeldungen */}
+      <Fehler z={z} neuLaden={laden} />
 
       {/* Technische Details */}
       <Card withBorder>
@@ -449,66 +485,180 @@ export function ServerReiter({ sichtbar, zuKi }: { sichtbar: boolean; zuKi: () =
   )
 }
 
-function Fehler({ z }: { z: Zustand }): React.JSX.Element {
-  const [alle, setAlle] = useState<{ gruppen: FehlerGruppe[]; roh: { zeit: string; quelle: string; text: string }[] } | null>(null)
-  const [roh, setRoh] = useState(false)
-  const gruppen = alle?.gruppen ?? z.fehler.gruppen
-  const ladeAlle = (): void => void holen<typeof alle>('/server/verwaltung/fehler').then(setAlle, (e: unknown) => notifyError(e))
+const VERDACHT_ART: Record<RateVerdacht['art'], string> = { konto: 'für dasselbe Konto', adresse: 'von derselben Adresse' }
+
+/** Liste zusammengefasster Meldungen */
+function Gruppen({ gruppen, merkmal }: { gruppen: FehlerGruppe[]; merkmal: string }): React.JSX.Element {
   return (
-    <Card withBorder>
-      <Group justify="space-between" mb="xs">
-        <div>
-          <Title order={5}>Fehler</Title>
+    <Stack gap={6}>
+      {gruppen.map((g) => (
+        <Card key={`${g.quelle}|${g.meldung}`} withBorder padding="xs" {...{ [merkmal]: '' }}>
+          <Group gap={8} wrap="nowrap" align="flex-start">
+            <Badge variant="light" color={g.anzahl >= 10 && merkmal === 'data-fehler-gruppe' ? 'red' : 'gray'} style={{ flexShrink: 0 }}>
+              {g.anzahl}×
+            </Badge>
+            <div style={{ minWidth: 0 }}>
+              <Text size="sm" style={{ wordBreak: 'break-word' }}>
+                {g.meldung.length > 220 ? `${g.meldung.slice(0, 220)} …` : g.meldung}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {QUELLE[g.quelle]} · zuletzt {g.zuletzt ? datumZeit(Date.parse(g.zuletzt)) : 'unbekannt'}
+              </Text>
+              {g.hinweis && (
+                <Text size="xs" c="blue" mt={2}>
+                  {g.hinweis}
+                </Text>
+              )}
+            </div>
+          </Group>
+        </Card>
+      ))}
+    </Stack>
+  )
+}
+
+function Fehler({ z, neuLaden }: { z: Zustand; neuLaden: () => void }): React.JSX.Element {
+  // Geladene Gesamtansicht (alle Gruppen und Rohzeilen); `aeltere`: auch Einträge vor dem Leeren
+  const [alle, setAlle] = useState<FehlerAntwort | null>(null)
+  const [aeltere, setAeltere] = useState(false)
+  const [roh, setRoh] = useState(false)
+  const [ohneOffen, setOhneOffen] = useState(false)
+  const [stundenOffen, setStundenOffen] = useState(false)
+  const farben = useReihenFarben()
+  const f = alle ?? { ...z.fehler, anmeldungen: z.anmeldungen, roh: null }
+  const lade = (mitAelteren: boolean): void =>
+    void holen<FehlerAntwort>(`/server/verwaltung/fehler${mitAelteren ? '?alle=1' : ''}`).then(
+      (r) => (setAlle(r), setAeltere(mitAelteren)),
+      (e: unknown) => notifyError(e)
+    )
+  const leeren = (): void => {
+    if (!window.confirm('Fehlerlog leeren? Die bisherigen Einträge werden ausgeblendet. Die Protokolle selbst bleiben für Nachweise erhalten („Ältere anzeigen“).')) return
+    void senden<FehlerAntwort>('/server/verwaltung/fehler-leeren', {}).then(
+      (r) => (setAlle(r), setAeltere(false), notifySuccess('Fehlerlog geleert.'), neuLaden()),
+      (e: unknown) => notifyError(e)
+    )
+  }
+  const a = f.anmeldungen
+  const g = f.geleert
+  return (
+    <>
+      <Card withBorder data-fehler-bereich>
+        <Group justify="space-between" mb="xs" align="flex-start">
+          <div>
+            <Title order={5}>Fehler</Title>
+            <Text size="sm" c="dimmed" data-fehler-zahl={f.letzte24h}>
+              {f.letzte24h ? `${f.letzte24h} in den letzten 24 Stunden, gleiche Meldungen zusammengefasst (7 Tage).` : 'Keine Fehler in den letzten 24 Stunden.'}
+            </Text>
+            {g.ab && (
+              <Text size="xs" c="dimmed" data-fehler-geleert>
+                Geleert am {datumZeit(Date.parse(g.ab))}
+                {g.ausgeblendet ? ` – ${g.ausgeblendet} ältere ${g.ausgeblendet === 1 ? 'Eintrag' : 'Einträge'} ${aeltere ? 'wieder eingeblendet' : 'ausgeblendet'}` : ''}
+                {g.ausgeblendet > 0 && (
+                  <>
+                    {' · '}
+                    <UnstyledButton onClick={() => lade(!aeltere)} style={{ fontSize: 'inherit', textDecoration: 'underline' }} data-fehler-aeltere>
+                      {aeltere ? 'Ältere ausblenden' : 'Ältere anzeigen'}
+                    </UnstyledButton>
+                  </>
+                )}
+              </Text>
+            )}
+          </div>
+          <Group gap={4}>
+            <Button size="xs" variant="subtle" leftSection={<IconRefresh size={14} />} onClick={() => lade(aeltere)}>
+              {alle ? 'Neu laden' : 'Alle zeigen'}
+            </Button>
+            <Button size="xs" variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={leeren} data-fehler-leeren>
+              Fehlerlog leeren
+            </Button>
+          </Group>
+        </Group>
+        {f.gruppen.length === 0 ? (
           <Text size="sm" c="dimmed">
-            {z.fehler.letzte24h ? `${z.fehler.letzte24h} in den letzten 24 Stunden, gleiche Meldungen zusammengefasst (7 Tage).` : 'Keine Fehler in den letzten 24 Stunden.'}
+            {g.ab && !aeltere ? 'Seit dem Leeren wurden keine Fehler aufgezeichnet.' : 'In den letzten 7 Tagen wurden keine Fehler aufgezeichnet.'}
           </Text>
-        </div>
-        <Button size="xs" variant="subtle" leftSection={<IconRefresh size={14} />} onClick={ladeAlle}>
-          {alle ? 'Neu laden' : 'Alle zeigen'}
-        </Button>
-      </Group>
-      {gruppen.length === 0 ? (
-        <Text size="sm" c="dimmed">
-          In den letzten 7 Tagen wurden keine Fehler aufgezeichnet.
+        ) : (
+          <Gruppen gruppen={f.gruppen} merkmal="data-fehler-gruppe" />
+        )}
+        {f.ohneDetails.anzahl > 0 && (
+          <div style={{ marginTop: 12 }} data-fehler-ohne-details={f.ohneDetails.anzahl}>
+            <Klappe
+              titel={`Ohne Details – vermutlich Browser-Erweiterung (${f.ohneDetails.anzahl} in 7 Tagen, zählen nicht als Fehler)`}
+              offen={ohneOffen}
+              setOffen={setOhneOffen}
+            >
+              <Text size="xs" c="dimmed" mb={6}>
+                „Script error.“ ohne Datei und Zeile stammt aus einem fremden Skript (meist eine Erweiterung im Browser). Schul-Apps kann daran nichts ändern; die Zeilen bleiben zur Kontrolle sichtbar.
+              </Text>
+              <Gruppen gruppen={f.ohneDetails.gruppen} merkmal="data-fehler-ohne-details-gruppe" />
+            </Klappe>
+          </div>
+        )}
+        {f.roh && (
+          <div style={{ marginTop: 12 }}>
+            <Klappe titel={`Rohprotokoll (${f.roh.length} Zeilen)`} offen={roh} setOffen={setRoh}>
+              <ScrollArea h={300}>
+                <Code block fz="xs">
+                  {f.roh.map((r) => `${r.zeit} [${r.quelle}] ${r.text}`).join('\n')}
+                </Code>
+              </ScrollArea>
+            </Klappe>
+          </div>
+        )}
+      </Card>
+
+      {/* Anmeldungen: fehlgeschlagene Passwort-Anmeldungen (keine Fehler; Ampel nur bei möglichem Rateversuch) */}
+      <Card withBorder data-anmeldungen data-anmeldungen-24h={a.letzte24h}>
+        <Title order={5}>Anmeldungen</Title>
+        <Text size="sm" c="dimmed" mb="xs">
+          {a.letzte7d
+            ? `${a.letzte24h} fehlgeschlagene Anmeldungen mit Passwort in den letzten 24 Stunden, ${a.letzte7d} in 7 Tagen. Einzelne Fehlversuche (vertippt) sind normal.`
+            : 'Keine fehlgeschlagenen Anmeldungen mit Passwort in den letzten 7 Tagen.'}
         </Text>
-      ) : (
-        <Stack gap={6}>
-          {gruppen.map((g) => (
-            <Card key={`${g.quelle}|${g.meldung}`} withBorder padding="xs" data-fehler-gruppe>
-              <Group gap={8} wrap="nowrap" align="flex-start">
-                <Badge variant="light" color={g.anzahl >= 10 ? 'red' : 'gray'} style={{ flexShrink: 0 }}>
-                  {g.anzahl}×
-                </Badge>
-                <div style={{ minWidth: 0 }}>
-                  <Text size="sm" style={{ wordBreak: 'break-word' }}>
-                    {g.meldung.length > 220 ? `${g.meldung.slice(0, 220)} …` : g.meldung}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {QUELLE[g.quelle]} · zuletzt {g.zuletzt ? datumZeit(Date.parse(g.zuletzt)) : 'unbekannt'}
-                  </Text>
-                  {g.hinweis && (
-                    <Text size="xs" c="blue" mt={2}>
-                      {g.hinweis}
-                    </Text>
-                  )}
-                </div>
-              </Group>
-            </Card>
-          ))}
-        </Stack>
-      )}
-      {alle && (
-        <div style={{ marginTop: 12 }}>
-          <Klappe titel={`Rohprotokoll (${alle.roh.length} Zeilen)`} offen={roh} setOffen={setRoh}>
-            <ScrollArea h={300}>
-              <Code block fz="xs">
-                {alle.roh.map((r) => `${r.zeit} [${r.quelle}] ${r.text}`).join('\n')}
-              </Code>
-            </ScrollArea>
-          </Klappe>
-        </div>
-      )}
-    </Card>
+        {a.verdacht.length > 0 && (
+          <Alert color="yellow" variant="light" icon={<IconAlertTriangle />} title="Möglicher Rateversuch" mb="xs" data-anmelde-verdacht={a.verdacht.length}>
+            <Stack gap={2}>
+              {a.verdacht.map((v) => (
+                <Text size="sm" key={`${v.art}|${v.merkmal}`}>
+                  {v.anzahl} Fehlversuche {VERDACHT_ART[v.art]} am {tagKurz(Date.parse(v.bis))} zwischen {uhrzeit(Date.parse(v.von))} und {uhrzeit(Date.parse(v.bis))} Uhr
+                </Text>
+              ))}
+              <Text size="xs" c="dimmed">
+                Konto und Adresse stehen nur verschlüsselt (nicht umkehrbar) im Protokoll – erkennbar ist nur, dass es dasselbe war.
+              </Text>
+            </Stack>
+          </Alert>
+        )}
+        {a.letzte7d > 0 && (
+          <>
+            <SaeulenDiagramm
+              tage={a.jeTag.map((t) => t.tag)}
+              reihen={[{ name: 'Fehlgeschlagene Anmeldungen', farbe: farben[1], werte: a.jeTag.map((t) => t.anzahl) }]}
+              beschreibung={`Fehlgeschlagene Anmeldungen je Tag: ${a.jeTag.map((t) => `${t.tag}: ${t.anzahl}`).join('; ')}`}
+              hoehe={100}
+            />
+            {a.jeStunde.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <Klappe titel="Letzte 24 Stunden nach Uhrzeit" offen={stundenOffen} setOffen={setStundenOffen}>
+                  <Table verticalSpacing={2} fz="sm" maw={360}>
+                    <Table.Tbody>
+                      {a.jeStunde.map((s) => (
+                        <Table.Tr key={s.zeit}>
+                          <Table.Td c="dimmed">
+                            {tagKurz(Date.parse(s.zeit))}, {uhrzeit(Date.parse(s.zeit))}–{uhrzeit(Date.parse(s.zeit) + 36e5)} Uhr
+                          </Table.Td>
+                          <Table.Td>{s.anzahl}</Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Klappe>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+    </>
   )
 }
 

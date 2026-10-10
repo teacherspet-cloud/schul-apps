@@ -13,6 +13,7 @@
 import { schuljahrText, schuljahrVon } from '@shared/schulkalender'
 import { pfadTeile } from '@shared/iserv'
 import { ordnerFuerKurs } from '@shared/iservKurse'
+import { kursOrdnerKandidaten, kursPfadNachMuster, kursWahlSchluessel } from '@shared/kursAblage'
 import type { AblageZiel } from '@shared/types'
 import type { GrammatikPaket } from '@shared/grammatiktrainer'
 import { buildWorksheetDocx } from '../arbeitsblatt/export/docx'
@@ -63,9 +64,60 @@ export function kursOrdnerPfad(iservGruppe: string, ordner: string[] = []): stri
   return ['Gruppen', sauber(ordnerFuerKurs(ordner, { roh: iservGruppe }) ?? iservGruppe)]
 }
 
-async function kursOrdner(iservGruppe: string): Promise<string[]> {
-  const ordner = (await window.api.iserv.ordner('Groups').catch(() => [] as { name: string }[])).map((e) => e.name)
-  return kursOrdnerPfad(iservGruppe, ordner)
+/** Gruppenordner aus IServ (oberste Ebene heißt je nach Server „Groups" oder „Gruppen") */
+async function gruppenOrdner(): Promise<string[]> {
+  for (const wurzel of ['Groups', 'Gruppen']) {
+    const liste = await window.api.iserv.ordner(wurzel).catch(() => null)
+    if (liste?.length) return liste.map((e) => e.name)
+  }
+  return []
+}
+
+export interface IservZiele {
+  /** Passende Kursordner (mehrere = Auswahl „In welchen Kursordner?") */
+  kurse: string[][]
+  /** Klassenordner nach der Ablagestruktur der Verwaltung */
+  klasse: string[]
+}
+
+/**
+ * Kursordner erkennen (10.10.2026, Wunsch der Lehrkraft): Kurse quer zu den Klassen (FR/SN/RE/WN in der Sek I,
+ * „EN 13 eA Kon" in der Sek II) gehören in ihren IServ-Gruppenordner. Die Gruppenordner werden gelesen und mit der
+ * Lerngruppe (Klasse bzw. Kursname), dem Fach und dem Kürzel der Lehrkraft verglichen (shared/kursAblage.ts).
+ */
+export async function iservZiele(ort: { klasse: string; fach: string; muster: string; iservGruppe?: string; kuerzel?: string | null }): Promise<IservZiele> {
+  const klasse = iservPfadAus(ort.muster, ort.klasse, ort.fach)
+  const ordner = await gruppenOrdner()
+  const namen = kursOrdnerKandidaten(ordner, { lerngruppe: ort.klasse, fach: ort.fach, kuerzel: ort.kuerzel, iservGruppe: ort.iservGruppe })
+  const sauber = (t: string): string => t.replace(/[\\/<>:"|?*]/g, '-').trim()
+  const ersetzen = (t: string): string => t.replace(/\{Schuljahr\}/gi, schuljahr()).replace(/\{Fach\}/gi, sauber(ort.fach || 'Ohne Fach'))
+  const kurse = namen.map((n) => kursPfadNachMuster(ort.muster, n, ersetzen) ?? ['Gruppen', n])
+  // Aus IServ erkannter Kurs ohne gefundenen Ordner: wie bisher der Name der IServ-Gruppe
+  if (!kurse.length && ort.iservGruppe) kurse.push(kursOrdnerPfad(ort.iservGruppe, ordner))
+  return { kurse, klasse }
+}
+
+const WAHL = 'schulapps.kursordner'
+
+/** Gemerkte Wahl je Lerngruppe und Fach (dieses Gerät – IServ-Ablage gibt es nur in der Exe am PC) */
+export function gemerkterOrdner(klasse: string, fach: string): string[] | null {
+  try {
+    const alle = JSON.parse(localStorage.getItem(WAHL) ?? '{}') as Record<string, string[]>
+    const p = alle[kursWahlSchluessel(klasse, fach)]
+    return Array.isArray(p) && p.length ? p : null
+  } catch {
+    return null
+  }
+}
+
+export function ordnerMerken(klasse: string, fach: string, pfad: string[]): void {
+  try {
+    const alle = JSON.parse(localStorage.getItem(WAHL) ?? '{}') as Record<string, string[]>
+    alle[kursWahlSchluessel(klasse, fach)] = pfad
+    localStorage.setItem(WAHL, JSON.stringify(alle))
+  } catch {
+    /* ohne Speicher eben nicht gemerkt */
+  }
 }
 
 export const dateiName = (t: string): string =>
@@ -78,7 +130,7 @@ export const dateiName = (t: string): string =>
 export async function ablegen(
   art: AblageArt,
   q: AblageQuelle,
-  ort: { klasse: string; fach: string; muster: string; programm: string; iservGruppe?: string }
+  ort: { klasse: string; fach: string; muster: string; programm: string; iservGruppe?: string; iservPfad?: string[] }
 ): Promise<string | null> {
   const ziel: AblageZiel = { programm: ort.programm, fach: ort.fach }
   if (art === 'drucken') {
@@ -91,7 +143,8 @@ export async function ablegen(
   }
   const html = await q.html()
   if (art === 'iserv') {
-    const iservPfad = ort.iservGruppe ? await kursOrdner(ort.iservGruppe) : iservPfadAus(ort.muster, ort.klasse, ort.fach)
+    // Gewählter Ordner (Dialog „In IServ ablegen“); sonst der erste passende Kursordner bzw. die Klassenstruktur
+    const iservPfad = ort.iservPfad?.length ? ort.iservPfad : await iservZiele(ort).then((z) => z.kurse[0] ?? z.klasse)
     return window.api.exporter.pdf(html, `${q.name}.pdf`, undefined, { ...ziel, ort: 'iserv', iservPfad })
   }
   return window.api.exporter.pdf(html, `${q.name}.pdf`, undefined, ziel)

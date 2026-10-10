@@ -70,7 +70,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { FAECHER, fachAusName, fachSchreibweise } from '@shared/faecher'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
-import { ListenSuche } from '../../shared/components/AppSuche'
+import { KlassenSuche, type SuchTreffer } from './KlassenSuche'
+import { KursWahl, LernendeDetails } from './LernendeDetails'
 import { neuAnlegen, openDocument, openModule, useDokumentOeffner, useNavigation } from '../../shared/navigation'
 import { setzeFachVorgabe, setzeJahrgangVorgabe } from '../../shared/fachVorgabe'
 import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
@@ -92,6 +93,7 @@ import { KlassenKurs } from './KlassenKurs'
 import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
+import { LernendeAuszeichnung, type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
 import { IservVorschlaege } from './IservVorschlaege'
 import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
 import { kursEintragOeffnen, useEntwurfBedarf, type KursEintrag } from './kursBedarf'
@@ -144,6 +146,8 @@ interface KlasseDetail {
   ablageMuster: string
   /** Aus IServ erkannt: Name der IServ-Gruppe = ihr Gruppenordner (10.10.2026) */
   iserv?: IservAngabe | null
+  /** Kürzel der Lehrkraft für die Kursordner-Erkennung beim Ablegen (10.10.2026) */
+  iservKuerzel?: string | null
   lernende: {
     id: string
     name: string
@@ -157,6 +161,8 @@ interface KlasseDetail {
     tests: number
     reihenFortschritt: number | null
     blaetterEingereicht: number
+    /** Medaillen und Titel in der Sprache der Lerngruppe (10.10.2026) */
+    auszeichnung?: AuszeichnungLehrkraft
   }[]
   tests: {
     id: string
@@ -371,7 +377,8 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
   const [klassen, setKlassen] = useState<KlasseKurz[] | null>(null)
   const [iservDaten, setIservDaten] = useState<IservUebersicht>({})
   const { klasse, setze } = useSicht()
-  const [suche, setSuche] = useState('')
+  // Suche (10.10.2026): Person gewählt → Kurswahl (mehrere Kurse) bzw. Details
+  const [person, setPerson] = useState<{ p: SuchTreffer; gruppe: string | null } | null>(null)
   const laden = useCallback(() => {
     void holen<{ klassen: KlasseKurz[] } & IservUebersicht>('/server/klassen').then(
       (d) => (setKlassen(d.klassen), setIservDaten({ iservAusgeblendet: d.iservAusgeblendet, iservKuerzel: d.iservKuerzel })),
@@ -396,15 +403,39 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
     }
   })
   if (!active) return null
-  const q = suche.trim().toLowerCase()
-  const sichtbar = (klassen ?? []).filter((k) => !q || `${k.name} ${k.faecher.map((f) => f.fach).join(' ')}`.toLowerCase().includes(q))
+  const sichtbar = klassen ?? []
   const gewaehlt = klassen?.find((k) => k.schluessel === klasse)
+  /** Klasse einer Lerngruppe öffnen (aus der Suche bzw. den Details) */
+  const zurGruppe = (gruppeId: string, reiter?: string): void => {
+    const k = (klassen ?? []).find((x) => x.gruppen.includes(gruppeId) || x.faecher.some((f) => f.id === gruppeId))
+    if (k) setze({ klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null, ...(reiter ? { reiter } : {}) })
+  }
   return (
     <Container size="xl" py="lg" data-meine-klassen>
       <AppKopf
         beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
-        suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Klasse, Fach …" />}
+        suche={
+          <KlassenSuche
+            klassen={klassen ?? []}
+            aktuell={gewaehlt ?? null}
+            klasseWaehlen={(k) => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })}
+            personWaehlen={(p) => setPerson({ p, gruppe: p.gruppen.length === 1 ? p.gruppen[0].id : null })}
+          />
+        }
       />
+      {person && !person.gruppe && (
+        <KursWahl name={person.p.name} gruppen={person.p.gruppen} waehlen={(g) => setPerson({ ...person, gruppe: g })} schliessen={() => setPerson(null)} />
+      )}
+      {person?.gruppe && (
+        <LernendeDetails
+          key={`${person.p.id}:${person.gruppe}`}
+          gruppeId={person.gruppe}
+          personId={person.p.id}
+          name={person.p.name}
+          schliessen={() => setPerson(null)}
+          zurKlasse={(g) => (setPerson(null), zurGruppe(g, 'lernende'))}
+        />
+      )}
       {!klasse && <SchuljahrHinweis geaendert={laden} />}
       {klasse && gewaehlt ? (
         <KlasseAnsicht k={gewaehlt} neu={laden} zurueck={() => (setze({ klasse: null, gruppe: null }), laden())} />
@@ -901,7 +932,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Loader />
       </Center>
     )
-  const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster, iservGruppe: d.iserv?.roh }
+  const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster, iservGruppe: d.iserv?.roh, kuerzel: d.iservKuerzel ?? null }
   /*
    * „Wackelige Wörter" (09.10.2026, Wunsch der Lehrkraft): kein neuer Kurs mehr (er erschien als zweiter Kurs im Ordner der
    * Lernenden) – die Wörter stehen schon im Kurs der Klasse und werden dort wieder fällig; oder ein kurzes Arbeitsblatt.
@@ -1533,6 +1564,7 @@ function LernendeTabelle({ d, neuLaden }: { d: KlasseDetail; neuLaden: () => voi
   const zeigtVokabeln = zeilen.some((l) => l.vokabelnSicher !== null)
   const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
   const zeigtGrammatik = zeilen.some((l) => l.grammatikSicher != null)
+  const zeigtAuszeichnung = zeilen.some((l) => l.auszeichnung)
   return (
     <Stack gap="xs">
       {gaeste.some((g) => g.zugang.length === 8) && (
@@ -1564,6 +1596,7 @@ function LernendeTabelle({ d, neuLaden }: { d: KlasseDetail; neuLaden: () => voi
             <Table.Th>Testschnitt</Table.Th>
             {zeigtReihen && <Table.Th>Reihen</Table.Th>}
             <Table.Th>Blätter eingereicht</Table.Th>
+            {zeigtAuszeichnung && <Table.Th title="Medaillen und Titel – als Gesprächsanlass, ohne Rangfolge">Medaillen & Titel</Table.Th>}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -1608,6 +1641,11 @@ function LernendeTabelle({ d, neuLaden }: { d: KlasseDetail; neuLaden: () => voi
                 </Table.Td>
               )}
               <Table.Td>{l.blaetterEingereicht}</Table.Td>
+              {zeigtAuszeichnung && (
+                <Table.Td>
+                  <LernendeAuszeichnung a={l.auszeichnung} />
+                </Table.Td>
+              )}
             </Table.Tr>
           ))}
         </Table.Tbody>

@@ -105,7 +105,15 @@ export interface AchEingabe {
   wochenziel: number
   woerter: { gelernt: number; sicher: number; langzeit: number }
   /** Je Lehrwerksband der eigenen Kurse: Wörter gesamt/kennengelernt, je Unit (aus der man Wörter bekam) gesamt/sicher */
-  lehrwerk: { buch: string; name: string; gesamt: number; gelernt: number; units: { unit: string; gesamt: number; sicher: number }[] }[]
+  lehrwerk: {
+    buch: string
+    name: string
+    gesamt: number
+    gelernt: number
+    /** Sprache des Bandes (Medaillen je Sprache, 10.10.2026) */
+    sprache?: string
+    units: { unit: string; gesamt: number; sicher: number; gelernt?: number }[]
+  }[]
   /** Grammatikregeln (über alle Pakete nach Titel zusammengefasst) */
   regeln: { schluessel: string; sicher: boolean; schwaeche: boolean; staerke: boolean }[]
   /** Regeln, die irgendwann eine Schwäche waren (gespeichert) */

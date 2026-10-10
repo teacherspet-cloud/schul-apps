@@ -11,6 +11,7 @@ import FachfarbenSettings from '../../shell/FachfarbenSettings'
  * Verwaltung › Schule › Fachfarben (09.10.2026, Entscheidung der Lehrkraft): Die Fachfarben gelten für die ganze
  * Schule – Materialien aller Lehrkräfte, Fachordner der Lernenden, „Meine Klassen". Festgelegt nur hier (Admin),
  * gespeichert auf dem Server (src/server/fachfarben.ts). Derselbe Editor wie früher in den eigenen Einstellungen.
+ * 10.10.2026: Statuszeile mit der Zahl der festgelegten Fächer; offen/zu dauerhaft je Gerät (wie alle Kästen unter „Schule").
  */
 export function SchulFachfarben(): React.JSX.Element {
   const [farben, setFarben] = useState<Record<string, string> | null>(null)
@@ -45,7 +46,17 @@ export function SchulFachfarben(): React.JSX.Element {
   }
 
   return (
-    <KlappKarte id="verwaltung-fachfarben" titel="Fachfarben" status="gelten für alle Lehrkräfte und Lernenden" rahmen={{ 'data-schul-fachfarben': true }}>
+    <KlappKarte
+      id="verwaltung-fachfarben"
+      dauerhaft
+      titel="Fachfarben"
+      status={
+        farben === null
+          ? 'gelten für alle Lehrkräfte und Lernenden'
+          : `${Object.keys(farben).length ? `${Object.keys(farben).length} Fächer festgelegt` : 'Vorschläge des Katalogs'} · gelten für alle`
+      }
+      rahmen={{ 'data-schul-fachfarben': true }}
+    >
       {farben === null ? <Loader size="sm" /> : <FachfarbenSettings settings={{ ...DEFAULT_SETTINGS, fachfarben: farben }} update={update} eingebettet />}
     </KlappKarte>
   )

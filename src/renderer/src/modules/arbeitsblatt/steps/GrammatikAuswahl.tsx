@@ -81,6 +81,8 @@ export default function GrammatikAuswahl({
   unitSofort = false,
   kurs = false,
   ausblenden,
+  vorschlag,
+  hinweise,
   beschreibung
 }: {
   query: GrammarQuery
@@ -109,8 +111,17 @@ export default function GrammatikAuswahl({
    * Grammatik-Tabelle des Kurses, weitere Aufgaben gibt es dort über „+ Aufgaben".
    */
   ausblenden?: string[]
+  /**
+   * Vorschlag „als Nächstes" (10.10.2026, Wunsch der Lehrkraft): die nächste Form in der Reihenfolge des Lehrwerks, die
+   * für Kurs bzw. Klasse noch nicht freigegeben ist (shared/lehrwerkVorwahl.ts `naechsteGrammatik`)
+   */
+  vorschlag?: string
+  /** Kleine Hinweise je Thema, z. B. „für 2 Lernende schon freigegeben" (Einzel-Freigaben zählen nicht als freigegeben) */
+  hinweise?: Record<string, string>
   beschreibung?: string
 }): React.JSX.Element {
+  // Ausgeblendetes (schon freigegeben) auf Wunsch zeigen – „Bereits freigegebene zeigen (n)" (10.10.2026)
+  const [freiZeigen, setFreiZeigen] = useState(false)
   const fach = query.subjectId
   const { themen, teilformen } = wahl
   const [suche, setSuche] = useState('')
@@ -273,7 +284,9 @@ export default function GrammatikAuswahl({
   if (bereich && !unitAnsicht) liste = liste.filter((t) => oberBereich(t.area) === bereich)
   // Bei der Suche: Passendes vor Unpassendem
   if (suchAktiv && !unitAnsicht) liste = [...liste.filter((t) => passendIds.has(t.id)), ...liste.filter((t) => !passendIds.has(t.id))]
-  const verborgen = new Set(ausblenden ?? [])
+  const schonFrei = new Set(ausblenden ?? [])
+  const versteckt = liste.filter((t) => schonFrei.has(t.id)).length
+  const verborgen = freiZeigen ? new Set<string>() : schonFrei
   if (verborgen.size) liste = liste.filter((t) => !verborgen.has(t.id))
 
   const gruppen = new Map<string, GrammarTopic[]>()
@@ -520,6 +533,15 @@ export default function GrammatikAuswahl({
         </SimpleGrid>
       )}
 
+      {(versteckt > 0 || freiZeigen) && (
+        <Switch
+          size="xs"
+          label={`Bereits freigegebene zeigen (${versteckt})`}
+          checked={freiZeigen}
+          onChange={(e) => setFreiZeigen(e.currentTarget.checked)}
+          data-frei-zeigen={versteckt}
+        />
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: schmal || !voll ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 1fr)', gap: 8 }}>
         <Paper withBorder radius="sm" p={4}>
           <ScrollArea.Autosize mah={schmal ? 280 : 380} type="auto">
@@ -549,6 +571,15 @@ export default function GrammatikAuswahl({
                         oeffnen={() => setFokus(t.id)}
                         stern={() => stern(t.id)}
                         einfach={!voll}
+                        marke={
+                          t.id === vorschlag
+                            ? { text: 'Vorschlag: als Nächstes', farbe: 'grape', art: 'vorschlag' }
+                            : schonFrei.has(t.id)
+                              ? { text: 'bereits freigegeben', farbe: 'gray', art: 'frei' }
+                              : hinweise?.[t.id]
+                                ? { text: hinweise[t.id], farbe: 'yellow', art: 'einzeln' }
+                                : undefined
+                        }
                       />
                     )
                   })}
@@ -645,7 +676,8 @@ function ThemaZeile({
   umschalten,
   oeffnen,
   stern,
-  einfach
+  einfach,
+  marke
 }: {
   t: GrammarTopic
   gewaehlt: boolean
@@ -663,6 +695,8 @@ function ThemaZeile({
   stern: () => void
   /** Standardmodus: ohne Zähler, Stern und Länder-/Quellenhinweise */
   einfach?: boolean
+  /** Vorschlag, schon freigegeben bzw. Einzel-Freigabe (10.10.2026) */
+  marke?: { text: string; farbe: string; art: string }
 }): React.JSX.Element {
   const ueber = ueberNiveau(t, niveau)
   return (
@@ -693,6 +727,11 @@ function ThemaZeile({
           <Text size="xs" span c="dimmed" fs="italic" lineClamp={1}>
             {t.term}
           </Text>
+        )}
+        {marke && (
+          <Badge size="xs" variant={marke.art === 'vorschlag' ? 'filled' : 'light'} color={marke.farbe} tt="none" data-thema-marke={marke.art}>
+            {marke.text}
+          </Badge>
         )}
         <Badge size="xs" variant="light" color={ueber ? 'orange' : 'gray'} data-niveau data-ueber-niveau={ueber || undefined}>
           {t.level}

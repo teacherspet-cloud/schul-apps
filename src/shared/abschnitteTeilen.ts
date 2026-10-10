@@ -190,14 +190,16 @@ export function kursAbschnitteTeilen<T extends TeilBasis, W extends WortBasis>(
     const ende = i === teile.length - 1 ? woerter.length : Math.min(woerter.length, start + Math.max(0, t.anzahl))
     const bereich = woerter.slice(start, ende)
     start = ende
-    let r: { teile: T[]; woerter: W[] } | null = null
+    let r: { teile: T[]; woerter: W[]; lehrwerk?: string } | null = null
     if (/,|:/.test(t.titel) && bereich.length > 1) {
       const buch = buchVon(quelle?.lehrwerk ?? '', bandImTitel(t.titel))
-      if (buch) r = teilAufteilen({ ...t, anzahl: bereich.length }, bereich, buch, quelle)
+      const geteilt = buch ? teilAufteilen({ ...t, anzahl: bereich.length }, bereich, buch, quelle) : null
+      if (geteilt) r = { ...geteilt, lehrwerk: buch?.id }
     }
     if (r) {
       geteilt++
-      neuT.push(...r.teile)
+      // Der geteilte Titel nennt den Band nicht mehr („Unit 1 · Check-in") – die Kennung des Lehrwerks wandert mit (10.10.2026)
+      neuT.push(...r.teile.map((x) => (r.lehrwerk && !(x as { lehrwerk?: string }).lehrwerk ? { ...x, lehrwerk: r.lehrwerk } : x)))
       neuW.push(...r.woerter)
     } else {
       neuT.push(t)

@@ -8,7 +8,7 @@
  * (Lücken je Land in resources/schulen/README.md), und manche Schule nennt sich im Kopf ihrer
  * Blätter kürzer als amtlich.
  *
- * Anschrift und Telefon (09.10.2026): Die Wahl einer Schule füllt NUR leere Felder des Briefkopfs
+ * Anschrift, Telefon und E-Mail (09.10.2026, E-Mail seit 10.10.2026): Die Wahl einer Schule füllt NUR leere Felder des Briefkopfs
  * (shared/schulVerzeichnisDaten.ts); weicht ein gefülltes Feld vom Verzeichnis ab, bietet ein Hinweis
  * „Daten aus dem Schulverzeichnis übernehmen" an. Dasselbe Suchfeld (`SchulSuchfeld`) nutzt die
  * Verwaltung beim Einrichten der Schule.
@@ -21,7 +21,7 @@ import { Anchor, Badge, Button, CloseButton, Combobox, Group, List, Loader, Moda
 import { IconSchool } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { appSchulform, type SchulQuelle, type SchulTreffer } from '@shared/schulsuche'
-import { VERZEICHNIS_FELDNAME, verzeichnisAbgleich, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
+import { eigenerNameBleibt, VERZEICHNIS_FELDNAME, verzeichnisAbgleich, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
 import type { AppSettings, CefrTable, DeepPartial } from '@shared/types'
 import { useAppSettings } from '../shared/settingsStore'
 import { notifyError, notifySuccess } from '../shared/util'
@@ -204,13 +204,15 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
   useEffect(() => setText(settings.schoolName), [settings.schoolName])
 
   const waehle = async (t: SchulTreffer): Promise<void> => {
-    setText(t.name)
+    // Eigener längerer Name bleibt („Kreisgymnasium Wesermünde" statt „Gymnasium Wesermünde", 10.10.2026)
+    const name = eigenerNameBleibt(text, t.name) ? text.trim() : t.name
+    setText(name)
     // Anschrift für den Briefkopf der Elternbriefe (29.09.2026; 09.10.2026: nur leere Felder füllen, Abweichungen
     // als Angebot – shared/schulVerzeichnisDaten.ts)
     const { settings: aktuell } = useAppSettings.getState()
     const bisher = aktuell.briefkopf ?? {}
     const { gefuellt, abweichend } = verzeichnisAbgleich(bisher, t)
-    await update({ schoolName: t.name, briefkopf: { ...bisher, ...gefuellt } })
+    await update({ schoolName: name, briefkopf: { ...bisher, ...gefuellt } })
     setAbweichung(abweichend.length ? { treffer: t, felder: abweichend } : null)
     setGewaehlt(t)
     setLogoFrage(null)
@@ -256,7 +258,7 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
         land={stateId}
         schulform={schoolTypeId}
         label="Schulname (erscheint im Kopf von Tests und Arbeitsblättern)"
-        description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder – eigener Wortlaut bleibt möglich. Die Wahl ergänzt leere Felder der Anschrift."
+        description="Beim Tippen erscheinen Schulen aus dem Schulverzeichnis der Länder – eigener Wortlaut bleibt möglich. Die Wahl ergänzt leere Felder der Anschrift (auch E-Mail)."
         placeholder="Namen oder Ort der Schule eingeben"
         disabled={disabled}
       />
@@ -267,7 +269,7 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
           uebernehmen={() => {
             const bisher = useAppSettings.getState().settings.briefkopf ?? {}
             void Promise.resolve(update({ briefkopf: { ...bisher, ...verzeichnisUebernehmen(abweichung.treffer) } }))
-              .then(() => notifySuccess('Anschrift und Telefon aus dem Schulverzeichnis übernommen.'))
+              .then(() => notifySuccess('Anschrift und Kontakt aus dem Schulverzeichnis übernommen.'))
               .catch(notifyError)
             setAbweichung(null)
           }}

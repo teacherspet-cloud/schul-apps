@@ -735,6 +735,36 @@ export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => 
 }
 
 /**
+ * Schon freigegebene Grammatik eines Kurses bzw. einer Klasse (10.10.2026, Wunsch der Lehrkraft: im Dialog „Grammatik zum
+ * Üben freigeben" standardmäßig ausblenden). Als freigegeben zählt nur, was für den GANZEN Kurs bzw. die ganze Klasse gilt:
+ * Grammatik der Kurse `kurse` (ganze Gruppe) und der Lerngruppen `gruppen` ohne Einzel-Empfänger. Einzel-Freigaben
+ * (Förder-/Forder-Extras, einzelne Lernende) zählen NICHT – sie kommen als Hinweis „für n Lernende schon freigegeben".
+ */
+export function grammatikFreigegeben(
+  lehrkraftId: string,
+  kurse: Set<string>,
+  gruppen: Set<string>,
+  sprache: string
+): { frei: string[]; einzeln: { id: string; lernende: number }[] } {
+  const frei = new Set<string>()
+  const einzeln = new Map<string, Set<string>>()
+  const zeilen = db()
+    .prepare("SELECT id, lerngruppe_id, schueler, sprache, status, vok_id, art, info FROM gram_zuweisungen WHERE lehrkraft_id = ? AND status != 'entfernt'")
+    .all(lehrkraftId) as unknown as Pick<Zeile, 'id' | 'lerngruppe_id' | 'schueler' | 'sprache' | 'status' | 'vok_id' | 'art' | 'info'>[]
+  for (const z of zeilen) {
+    if (z.sprache && sprache && z.sprache !== sprache) continue
+    const imKurs = Boolean(z.vok_id && kurse.has(z.vok_id))
+    const inGruppe = Boolean(z.lerngruppe_id && gruppen.has(z.lerngruppe_id))
+    if (!imKurs && !inGruppe) continue
+    const themen = json_(z.info ?? '', { themen: [] as string[] } as Partial<GrammatikInfo>).themen ?? []
+    const schueler = json_(z.schueler, [] as string[])
+    if (!z.art && (imKurs || !schueler.length)) for (const t of themen) frei.add(t)
+    else for (const t of themen) einzeln.set(t, new Set([...(einzeln.get(t) ?? []), ...(schueler.length ? schueler : [z.id])]))
+  }
+  return { frei: [...frei], einzeln: [...einzeln.entries()].filter(([id]) => !frei.has(id)).map(([id, l]) => ({ id, lernende: l.size })) }
+}
+
+/**
  * „Meine Klassen": Grammatiktrainings einer Lerngruppe – Anteil sicherer Aufgaben je Person (nur laufende), dazu je
  * Training Status, Zeitraum, Umfang, aktive Lernende der letzten 7 Tage und die schwierigsten Aufgaben (Runde 2, 06.10.2026).
  */
@@ -1065,7 +1095,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
         // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres
         const v = vokVon(z)
-        rekordEintragen(ich, `gram:${spiel}`, wert, v ? klasseFuer(v, ich) : klasseFuer({ lerngruppe_id: z.lerngruppe_id }, ich))
+        rekordEintragen(ich, `gram:${spiel}`, wert, v ? klasseFuer(v, ich) : klasseFuer({ lerngruppe_id: z.lerngruppe_id }, ich), Date.now(), undefined, z.sprache)
         // Fehler wie bei den Vokabelspielen: wackelig, gleich wieder dran; sichere ein Fach zurück
         const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((x) => p.aufgaben.some((a) => a.id === x))
         st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
@@ -1368,23 +1398,27 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
  * Profils. Dazu, wie viele „Extra für dich" ganz bearbeitet sind. Nur Pakete, in denen die Person schon geübt hat.
  */
 export function grammatikFuerAchievements(ich: NutzerInfo): {
-  regeln: { schluessel: string; sicher: boolean; schwaeche: boolean; staerke: boolean }[]
+  regeln: { schluessel: string; sicher: boolean; schwaeche: boolean; staerke: boolean; sprache: string }[]
   extrasGeschafft: number
   tage: string[]
+  /** Medaillen je Sprache (10.10.2026): Übungstage je Sprache */
+  tageJe: Record<string, string[]>
 } {
-  const jeRegel = new Map<string, { n: number; sicher: number; versuche: number; richtig: number; fachSumme: number; geuebt: number }>()
+  const jeRegel = new Map<string, { n: number; sicher: number; versuche: number; richtig: number; fachSumme: number; geuebt: number; sprache: string }>()
   let extrasGeschafft = 0
   const tage = new Set<string>()
+  const tageJe: Record<string, string[]> = {}
   for (const { zuweisung_id } of db().prepare('SELECT zuweisung_id FROM gram_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string }[]) {
     const z = zeile(zuweisung_id)
     if (!z || z.status === 'entfernt' || !istFuer(z, ich)) continue
     const p = paketVon(z)
     const st = standVon(z.id, ich.id)
     for (const t of st.tage ?? []) tage.add(t)
+    if (z.sprache) tageJe[z.sprache] = [...(tageJe[z.sprache] ?? []), ...(st.tage ?? [])]
     if (istExtra(z) && p.aufgaben.length && p.aufgaben.every((a) => st.aufgaben[a.id]?.versuche)) extrasGeschafft++
     for (const r of p.regeln) {
       const k = norm(r.titel)
-      const e = jeRegel.get(k) ?? { n: 0, sicher: 0, versuche: 0, richtig: 0, fachSumme: 0, geuebt: 0 }
+      const e = jeRegel.get(k) ?? { n: 0, sicher: 0, versuche: 0, richtig: 0, fachSumme: 0, geuebt: 0, sprache: z.sprache }
       for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
         e.n++
         const s = st.aufgaben[a.id]
@@ -1407,11 +1441,13 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
           schluessel,
           sicher: e.sicher >= Math.min(3, e.n),
           schwaeche: e.versuche >= MIN_VERSUCHE && quote < SCHWAECHE_UNTER,
-          staerke: e.versuche >= MIN_VERSUCHE && quote >= STAERKE_AB && e.fachSumme / e.geuebt >= 3
+          staerke: e.versuche >= MIN_VERSUCHE && quote >= STAERKE_AB && e.fachSumme / e.geuebt >= 3,
+          sprache: e.sprache
         }
       }),
     extrasGeschafft,
-    tage: [...tage]
+    tage: [...tage],
+    tageJe
   }
 }
 

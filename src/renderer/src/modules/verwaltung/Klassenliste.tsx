@@ -7,11 +7,12 @@
  * Die Passwörter stehen nur jetzt im Klartext da – der Server speichert sie nicht.
  */
 import { Alert, Button, Card, Group, Stack, Table, Text, TextInput, Textarea } from '@mantine/core'
-import { IconPrinter, IconUsersPlus } from '@tabler/icons-react'
+import { IconEye, IconPrinter, IconUsersPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
 import { senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
+import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
 import PrintPreview from '../../shared/components/PrintPreview'
 
 interface Konto {
@@ -109,6 +110,19 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
               </Button>
               <Button variant="light" onClick={() => drucken(true)}>
                 Als PDF
+              </Button>
+              {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+              <Button
+                variant="light"
+                leftSection={<IconEye size={16} />}
+                onClick={() =>
+                  void pdfVorschauAusHtml(zugangskartenHtml(ergebnis.klasse, ergebnis.angelegt, window.location.origin), `Zugangskarten ${ergebnis.klasse}.pdf`, async () =>
+                    drucken(true)
+                  )
+                }
+                data-pdf-vorschau-knopf
+              >
+                Vorschau
               </Button>
             </Group>
             <Table striped data-karten>

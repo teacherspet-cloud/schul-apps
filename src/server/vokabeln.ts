@@ -44,7 +44,7 @@ import { verbenFrei } from '../shared/verbFreigabe'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
-import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, type AbschnittStatistik } from '../shared/kursAbschnitte'
+import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, type AbschnittEinordnung, type AbschnittStatistik } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -54,7 +54,7 @@ import { entfernteKennungen, kennungenWiederverwenden, nurAktuell, teilEntfernen
 // Freischaltungen planen (09.10.2026): Lernende sehen nur freie Abschnitte
 import { ersteFreischaltung, kursFuerLernende } from '../shared/freigabePlan'
 import { vokAbschnittePlanen } from './freigabePlan'
-import { abschnitteBeimSpeichern } from './wartungAbschnitteTeilen'
+import { abschnitteBeimSpeichern, lehrwerkName } from './wartungAbschnitteTeilen'
 import { abkuerzungAus } from '../shared/abkuerzung'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
 import {
@@ -249,11 +249,39 @@ export interface VokTeil {
   zeit: number
   /** Lehrwerk-Kennung des Abschnitts (seit 09.10.2026) */
   lehrwerk?: string
+  /** Unit im Lehrwerk, wenn der Titel sie nicht nennt (10.10.2026, shared/kursAbschnitte.ts) */
+  unit?: string
 }
 /** Abschnitte eines Trainings; ältere Freigaben: einer mit dem Titel und allen Wörtern */
 export function teileVon(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstellt'>): VokTeil[] {
   const t = json_(z.teile || '[]', [] as VokTeil[])
   return t.length ? t : [{ titel: z.titel, anzahl: json_(z.woerter, [] as unknown[]).length, zeit: Date.parse(z.erstellt) || 0 }]
+}
+
+/**
+ * Band und Unit je Abschnitt (10.10.2026, mehrere Bände in einem Kurs): Die Kennung je Abschnitt gilt vor der Herkunft
+ * des Kurses (die nur den zuletzt hinzugefügten Band nennt); Namen der Lehrwerke aus ihren Dateien – auch eigene Importe
+ * der Lehrkraft und Platzhalter („¡Apúntate! 1").
+ */
+export function teileEingeordnet(z: Pick<Zeile, 'quelle' | 'titel' | 'lehrkraft_id'>, teile: VokTeil[]): AbschnittEinordnung[] {
+  const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
+  return mitBaenden(teile, abschnitteEinordnen(teile, q), q, z.titel, (k) => lehrwerkName(k, z.lehrkraft_id))
+}
+
+/**
+ * Neue Abschnitte einer Freigabe aus dem Lehrwerk (10.10.2026): Kennung und – wo der Titel sie nicht nennt („Station 1")
+ * – Unit merken, eingeordnet nach der Herkunft DIESER Freigabe. So bleibt der Band jedes Abschnitts erhalten, auch wenn
+ * später Vokabeln aus einem anderen Band dazukommen.
+ */
+export function teileMitHerkunft(teile: VokTeil[], quelleJson: string): VokTeil[] {
+  const q = json_(quelleJson || '{}', {} as Partial<Quelle>)
+  if (!q.lehrwerk) return teile
+  const e = abschnitteEinordnen(teile, q)
+  return teile.map((t, i) => ({
+    ...t,
+    lehrwerk: q.lehrwerk,
+    ...(e[i]?.unit && !e[i].buch && !t.titel.includes(' · ') ? { unit: e[i].unit } : {})
+  }))
 }
 
 /** Entfernte Abschnitte eines Kurses (08.10.2026) */
@@ -591,9 +619,10 @@ export function vokabelnZuweisen(e: {
     const r = abschnitteBeimSpeichern(teile ?? [{ titel: e.titel.slice(0, 160), anzahl: woerter.length, zeit: jetzt }], woerter, quelle, e.lehrkraftId)
     if (r) ((woerter = r.woerter), (teile = r.teile))
   }
-  // Band je Abschnitt merken (09.10.2026, Sortierung nach Band)
+  // Band (und Unit) je Abschnitt merken (09./10.10.2026, Sortierung nach Band) – auch bei nur einem Abschnitt
   const lehrwerk = quelle ? json_(quelle, {} as Partial<Quelle>).lehrwerk : undefined
-  if (teile && lehrwerk) teile = teile.map((t) => ({ ...t, lehrwerk }))
+  if (lehrwerk && !teile && woerter.length) teile = [{ titel: e.titel.slice(0, 160), anzahl: woerter.length, zeit: jetzt }]
+  if (teile && lehrwerk) teile = teileMitHerkunft(teile, quelle)
   db()
     .prepare(
       "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle, verben, teile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?, ?, ?)"
@@ -614,7 +643,7 @@ export function vokabelnZuweisen(e: {
       e.bis ?? null,
       quelle,
       verbenBereinigt(e.verben ?? standardVerben(woerter, e.sprache)),
-      teile && teile.length > 1 ? JSON.stringify(teile) : ''
+      teile && (teile.length > 1 || lehrwerk) ? JSON.stringify(teile) : ''
     )
   return id
 }
@@ -784,8 +813,8 @@ export function abfrageAuswerten(
   k0: Record<string, unknown>,
   stand: VokStand,
   testTermin?: number,
-  /** Rekordbuch (08.10.2026): wer übt, in welcher Klasse */
-  buch?: { ich: NutzerInfo; klasse: number | null }
+  /** Rekordbuch (08.10.2026): wer übt, in welcher Klasse; Sprache für die Medaillen (10.10.2026) */
+  buch?: { ich: NutzerInfo; klasse: number | null; sprache?: string }
 ): { ergebnis: { urteil: Urteil; hinweis?: string; richtig: string }; neu: WortStand } | null {
   const uebung = String(k0.uebung ?? '') as Uebung
   if (!UEBUNGEN.includes(uebung)) return null
@@ -817,7 +846,7 @@ export function abfrageAuswerten(
   if (buch)
     woerterEintragen(buch.ich, { gelernt: !alt?.versuche ? 1 : 0, sicher: istSicher(neu) && !(alt && istSicher(alt)) ? 1 : 0 }, buch.klasse, jetzt)
   // Achievements (08.10.2026): Tagesrunde, Diktate, „Lege das Wort" von Hand (`eingabe` schickt der Trainer mit)
-  if (buch) achievementAntwort(buch.ich, { uebung, urteil: ergebnis.urteil, eingabe: k0.eingabe }, jetzt)
+  if (buch) achievementAntwort(buch.ich, { uebung, urteil: ergebnis.urteil, eingabe: k0.eingabe, sprache: buch.sprache }, jetzt)
   // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
   if (ergebnis.urteil === 'richtig' && stand.ansehen?.includes(v.id)) stand.ansehen = stand.ansehen.filter((x) => x !== v.id)
   const heute = new Date(jetzt).toISOString().slice(0, 10)
@@ -830,7 +859,7 @@ export function spielEintragen(
   stand: VokStand,
   k0: Record<string, unknown>,
   gueltig: (wortId: string) => boolean,
-  buch?: { ich: NutzerInfo; klasse: number | null }
+  buch?: { ich: NutzerInfo; klasse: number | null; sprache?: string }
 ): { rekord: boolean } | null {
   const spiel = String(k0.spiel ?? '') as SpielId
   const wert = Number(k0.wert)
@@ -845,7 +874,7 @@ export function spielEintragen(
   const heute = new Date().toISOString().slice(0, 10)
   if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
   // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres über alle Trainings
-  if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt, fehler.length)
+  if (buch) rekordEintragen(buch.ich, `vok:${spiel}`, wert, buch.klasse, jetzt, fehler.length, buch.sprache)
   return { rekord }
 }
 
@@ -1004,7 +1033,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         )
       // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
-        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), { ich, klasse: klasseFuer(z, ich) })
+        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), { ich, klasse: klasseFuer(z, ich), sprache: z.sprache })
         if (!r) return json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true
         standSpeichern(z.id, ich.id, st)
         return json(res, 200, { rekord: r.rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true
@@ -1013,7 +1042,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (!istOffen(z)) return json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
-        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich) }) : null
+        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich), sprache: z.sprache }) : null
         if (!r) return json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true
         standSpeichern(z.id, ich.id, st)
         const { ergebnis, neu } = r
@@ -1052,7 +1081,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               // Bände des Kurses (09.10.2026) statt der ersten Abschnitte im Titel: „Green Line 1–2"
               baende: (() => {
                 const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
-                return baendeText(baendeVon(z.titel, abschnitteEinordnen(woerter.length ? teileVon(z) : [], q), q))
+                return baendeText(baendeVon(z.titel, teileEingeordnet(z, woerter.length ? teileVon(z) : []), q, (k) => lehrwerkName(k, z.lehrkraft_id)))
               })(),
               symbol: z.symbol === 'farbe' ? 'farbe' : 'verlauf',
               // Wörter je Fach über alle Lernenden – für den Verlauf im Symbol
@@ -1172,8 +1201,12 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           erinnerungen: z.erinnerungen === 'an',
           erinnerungenAktiv: kursHaken.erinnerungenAktiv?.(lernende.map((l) => l.id)) ?? 0,
           tagesziel: tageszielVon(z),
-          // Freigegebene Abschnitte (08.10.2026)
-          teile: woerter.length ? teileVon(z) : [],
+          // Freigegebene Abschnitte (08.10.2026) – mit Band und Unit (10.10.2026: Wortliste je Band gruppiert)
+          teile: (() => {
+            const tl = woerter.length ? teileVon(z) : []
+            const e = teileEingeordnet(z, tl)
+            return tl.map((t, i) => ({ ...t, ...(e[i]?.buch ? { buch: e[i].buch } : {}), ...(e[i]?.unit ? { unit: e[i].unit } : {}) }))
+          })(),
           // Entfernte Abschnitte (08.10.2026): Lernstand gespeichert, kommt beim erneuten Hinzufügen zurück
           entfernt: entferntVon(z).map((e) => ({ teil: e.teil, anzahl: e.woerter.length, zeit: e.zeit })),
           lerngruppeId: z.lerngruppe_id,
@@ -1183,10 +1216,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           // aus „Meine Klassen" (/server/klassen/<id>)
           ...(!z.lerngruppe_id && woerter.length
             ? (() => {
-                const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
                 const tl = teileVon(z)
                 return {
-                  abschnitte: abschnittStatistik(tl, woerter, lernende.map((l) => l.stand), mitBaenden(tl, abschnitteEinordnen(tl, q), q, z.titel), jetzt),
+                  abschnitte: abschnittStatistik(tl, woerter, lernende.map((l) => l.stand), teileEingeordnet(z, tl), jetzt),
                   lernendeNamen: lernende.map((l) => l.name)
                 }
               })()
@@ -1427,9 +1459,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           const r = abschnitteBeimSpeichern(neueTeile, neu, quelleBereinigt(k0.quelle), ich.id)
           if (r) (neu.splice(0, neu.length, ...r.woerter), (neueTeile = r.teile))
         }
-        // Band je Abschnitt merken (09.10.2026): Sortierung nach Band, auch wenn der Titel nur „Station 1" heißt
-        const neuLehrwerk = json_(quelleBereinigt(k0.quelle) || '{}', {} as Partial<Quelle>).lehrwerk
-        if (neuLehrwerk) neueTeile = neueTeile.map((t) => ({ ...t, lehrwerk: neuLehrwerk }))
+        // Band (und Unit) je Abschnitt merken (09./10.10.2026): Sortierung nach Band, auch wenn der Titel nur „Station 1"
+        // heißt – die Herkunft des Kurses nennt danach den neuen Band, die älteren Abschnitte behalten ihren
+        neueTeile = teileMitHerkunft(neueTeile, quelleBereinigt(k0.quelle))
         const teile = [
           // Leerer Kurs (z. B. automatisch für eine Klasse angelegt): sein „Titel-Teil" ohne Wörter fällt weg
           ...(alt.length ? teileVon(z) : []),
@@ -1663,8 +1695,9 @@ export function vokabelnDerGruppe(
     const q = json_(z.quelle || '{}', {} as Partial<Quelle>)
     // Kurs nach Bänden benennen, Abschnitte je Unit (09.10.2026, shared/kursAbschnitte.ts)
     const teile = woerter.length ? teileVon(z) : []
-    const einordnung = abschnitteEinordnen(teile, q)
-    const baende = baendeVon(z.titel, einordnung, q)
+    // Band je Abschnitt (10.10.2026): Kennung des Abschnitts vor der Herkunft des Kurses – alle Bände des Kurses
+    const einordnung = teileEingeordnet(z, teile)
+    const baende = baendeVon(z.titel, einordnung, q, (k) => lehrwerkName(k, z.lehrkraft_id))
     if (offen) {
       const wVoll = json_(zVoll.woerter, [] as Vokabel[])
       hinweisDaten[z.id] = {
@@ -1690,7 +1723,7 @@ export function vokabelnDerGruppe(
             abschnitte: (() => {
               const wVoll = json_(zVoll.woerter, [] as Vokabel[])
               const tVoll = wVoll.length ? teileVon(zVoll) : []
-              return abschnittStatistik(tVoll, wVoll, staende, mitBaenden(tVoll, abschnitteEinordnen(tVoll, q), q, z.titel), jetzt)
+              return abschnittStatistik(tVoll, wVoll, staende, teileEingeordnet(z, tVoll), jetzt)
             })(),
             lernendeNamen: lernende.map((n) => n.name || n.benutzer)
           }

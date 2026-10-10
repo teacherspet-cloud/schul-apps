@@ -2,7 +2,8 @@
  * Einklappbare Karte (09.10.2026, Einstellungen › KI-Zugang und › Bilder und Hörtexte): Kopf mit Titel und einer
  * Statuszeile („Claude · Abo eingerichtet"), Inhalt erst beim Aufklappen (die Karten fragen dann erst ihre Dienste
  * ab). Eingeklappt ist die Vorgabe; offen/zu gilt für die Sitzung (shared/sitzung.ts, 09.10.2026) – in einer neuen
- * Sitzung stehen die Karten wieder eingeklappt.
+ * Sitzung stehen die Karten wieder eingeklappt. Ausnahme `dauerhaft` (10.10.2026, Verwaltung › Schule): offen/zu bleibt je Gerät
+ * über die Sitzung hinaus (shared/sitzung.ts › dauerhaftMerken).
  *
  * Für die Oberflächentests: `data-klappkarte` (Kennung) und `data-offen` am Rahmen, `data-klappkopf` am Knopf
  * (tests/e2e/warten.mjs › karteAuf/kartenAuf).
@@ -11,7 +12,7 @@ import { Badge, Card, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import { IconChevronRight } from '@tabler/icons-react'
 import { useId, useState } from 'react'
 import { KLAPP_SCHLUESSEL, leseOffen } from '@shared/einstellungsStatus'
-import { offenLesen, offenMerken } from '../sitzung'
+import { dauerhaftMerken, dauerhaftOffen, offenLesen, offenMerken } from '../sitzung'
 
 const alleGemerkten = (): Record<string, boolean> => leseOffen(JSON.stringify(offenLesen<unknown>(KLAPP_SCHLUESSEL) ?? null))
 
@@ -24,8 +25,10 @@ function merke(id: string, offen: boolean): void {
 }
 
 export interface KlappKarteProps {
-  /** Kennung zum Merken (je Sitzung) */
+  /** Kennung zum Merken (je Sitzung bzw. dauerhaft) */
   id: string
+  /** Auf/Zu dauerhaft je Gerät merken statt nur für die Sitzung (nur Verwaltung › Schule, Entscheidung der Lehrkraft) */
+  dauerhaft?: boolean
   titel: React.ReactNode
   /** Kurze Zusammenfassung im Kopf */
   status?: React.ReactNode
@@ -37,12 +40,13 @@ export interface KlappKarteProps {
   rahmen?: Record<string, string | boolean | undefined>
 }
 
-export function KlappKarte({ id, titel, status, ton = 'neutral', standardOffen = false, children, rahmen }: KlappKarteProps): React.JSX.Element {
-  const [offen, setOffen] = useState(() => gemerkt(id) ?? standardOffen)
+export function KlappKarte({ id, titel, status, ton = 'neutral', standardOffen = false, dauerhaft = false, children, rahmen }: KlappKarteProps): React.JSX.Element {
+  const [offen, setOffen] = useState(() => (dauerhaft ? dauerhaftOffen(id) : gemerkt(id)) ?? standardOffen)
   const inhalt = useId()
   const umschalten = (): void => {
     setOffen((o) => {
-      merke(id, !o)
+      if (dauerhaft) dauerhaftMerken(id, !o)
+      else merke(id, !o)
       return !o
     })
   }

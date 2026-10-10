@@ -52,7 +52,7 @@ export function SprachLernstand({
               Alle Abschnitte
             </Button>
           </Group>
-          <UnitsKompakt abschnitte={abschnitte} />
+          <UnitsKompakt abschnitte={abschnitte} schluessel={kursId} />
         </Card>
       )}
     </SimpleGrid>

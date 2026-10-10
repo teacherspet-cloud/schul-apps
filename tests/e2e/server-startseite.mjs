@@ -1,4 +1,6 @@
 // Startseite und Leiste der Lehrkraft (03.10.2026): Schnellzugriff, Gruppen in der Leiste, Apps
+// (10.10.2026: Smartphone mit Anzahl je Karte, Kursen ohne Testtermin und Kasten „Meine Klassen“; Fachrelevanz: Onlinetest
+// für Geschichte, Karte „Termine" ohne Vokabeln, Admin sieht alle Apps auch mit eigenen Fächern)
 // „Laufende Reihen" und „Freigegebene Blätter". Vorher: Server lokal (KI-Attrappe), IServ NICHT eingerichtet.
 // Aufruf: node tests/e2e/server-startseite.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -146,6 +148,24 @@ try {
       testTermin: Date.now() + 3 * 864e5
     }
   })
+  // Zweites Fach der Klasse mit einem Kurs OHNE Testtermin (10.10.2026: fehlte auf der Startseite)
+  const gruppeFr = await (
+    await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Französisch', iservGruppe: `klasse:${KLASSE}` } })
+  ).json()
+  const kursOhneTermin = (
+    await (
+      await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+        headers: KOPF,
+        data: {
+          lerngruppeId: gruppeFr.id,
+          titel: 'Découvertes 2 - Unité 1 - Atelier A',
+          sprache: 'fr',
+          fach: 'Französisch',
+          woerter: [{ id: 'f1', term: 'la ville', translation: 'die Stadt' }]
+        }
+      })
+    ).json()
+  ).id
 
   const p = await lk.newPage()
   await p.goto(A)
@@ -251,11 +271,122 @@ try {
     pruefe(mk && su && mk.y < su.y, '„Meine Klassen" steht über der Materialsuche')
   }
   await h.screenshot({ path: join(out, '4-handy-kopf.png') })
-  await h.locator('[data-home-meineklassen]').click()
-  pruefe(await da(h.locator('[data-klassen-liste], [data-klassen-leer]').first(), 10000), 'Zeile öffnet „Meine Klassen"')
+
+  // ---------- Termine & Vokabeltraining (10.10.2026): auch ein laufender Kurs OHNE Testtermin
+  const termine = h.locator('[data-schnellzugriff="termine"]')
+  pruefe(await da(termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)), 'Smartphone: Kurs ohne Testtermin in „Termine & Vokabeltraining"')
+  pruefe(
+    await termine
+      .locator(`[data-start-kurs="${kursOhneTermin}"]`)
+      .getByText(/heute geübt: 0 von \d+/)
+      .isVisible()
+      .catch(() => false),
+    'Kurszeile: „heute geübt: 0 von …"'
+  )
+
+  // ---------- Anzahl je Karte (10.10.2026): Vorgabe 5, Wahl bleibt dauerhaft je Gerät
+  const wahlTermine = h.locator('[data-start-anzahl="termine"]')
+  pruefe(await da(wahlTermine), 'Smartphone: Anzahl-Wahl an „Termine & Vokabeltraining"')
+  pruefe((await wahlTermine.innerText()).trim().startsWith('5'), `Anzahl-Vorgabe 5 (${(await wahlTermine.innerText()).trim()})`)
+  pruefe(await h.locator('[data-start-anzahl="tests"]').isVisible(), 'Anzahl-Wahl auch an „Onlinetests"')
+  await wahlTermine.click()
+  await h.locator('[data-start-anzahl-wahl="10"]').click()
+  await h.waitForTimeout(300)
+  pruefe((await wahlTermine.innerText()).trim().startsWith('10'), 'Anzahl 10 gewählt')
+  await h.reload()
+  pruefe(await da(h.locator('[data-start-anzahl="termine"]')), 'Nach dem Neuladen: Anzahl-Wahl da')
+  pruefe((await h.locator('[data-start-anzahl="termine"]').innerText()).trim().startsWith('10'), 'Nach dem Neuladen: weiterhin 10')
+  pruefe((await h.locator('[data-start-anzahl="tests"]').innerText()).trim().startsWith('5'), 'Andere Karte: weiterhin 5 (Wahl je Karte)')
+  // Neue Sitzung im selben Gerät (gleicher Speicher): die Wahl bleibt (Ansichtswunsch, kein Auf/Zu)
+  const handy2 = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    storageState: await handy.storageState()
+  })
+  const h2 = await handy2.newPage()
+  await h2.goto(`${A}/`)
+  pruefe(await da(h2.locator('[data-start-anzahl="termine"]')), 'Neuer Kontext mit gleichem Speicher: Anzahl-Wahl da')
+  pruefe((await h2.locator('[data-start-anzahl="termine"]').innerText()).trim().startsWith('10'), 'Neuer Kontext mit gleichem Speicher: weiterhin 10')
+  await handy2.close()
+
+  // ---------- Kasten „Meine Klassen" (10.10.2026): zugeklappt, aufgeklappt mit Klassen, Tipp öffnet die Klasse
+  const kasten = h.locator('[data-home-meineklassen]')
+  pruefe((await kasten.getAttribute('data-offen')) === 'false' && !(await h.locator('[data-home-meineklassen-liste]').isVisible()), 'Kasten „Meine Klassen" zunächst zugeklappt')
+  await h.locator('[data-home-meineklassen-kopf]').click()
+  pruefe(await da(h.locator(`[data-home-meineklassen-liste] [data-home-klasse="${KLASSE}"]`)), 'Aufgeklappt: die Klasse steht darin')
+  pruefe(await h.locator('[data-home-alle-klassen]').isVisible(), 'Aufgeklappt: „Alle Klassen"')
+  await h.screenshot({ path: join(out, '5-handy-klassen-kasten.png') })
+  await h.locator(`[data-home-klasse="${KLASSE}"] button`).first().click()
+  pruefe(await da(h.locator(`[data-klasse-ansicht="${KLASSE}"]`), 10000), 'Tipp auf die Klasse öffnet sie in „Meine Klassen"')
+  await h.screenshot({ path: join(out, '6-handy-klasse.png') })
   await handy.close()
   await verwaltung.request.post(`${A}/server/schule/logo`, { headers: KOPF, data: { logo: null } })
   if (vorher.schule) await verwaltung.request.post(`${A}/server/schule`, { headers: KOPF, data: vorher.schule })
+
+  // ---------- Fachrelevanz (10.10.2026): Geschichte ohne Sprache – Onlinetest sichtbar, Karte „Termine" ohne Vokabeln
+  const api = (ctx) => async (channel, ...args) => {
+    const r = await (await ctx.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).json()
+    if (!r.ok) throw new Error(`${channel}: ${r.error}`)
+    return r.value
+  }
+  const ge = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Gero Geschichte' } })).json()
+  zuLoeschen.push(ge.id)
+  const geCtx = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+  await anmelden(geCtx, ge.benutzer, ge.passwort)
+  await api(geCtx)('settings:set', { eigeneFaecher: ['geschichte'] })
+  const g = await geCtx.newPage()
+  await g.goto(A)
+  await g.waitForTimeout(2000)
+  const spG = g.getByRole('button', { name: 'Später einrichten' })
+  if (await spG.isVisible().catch(() => false)) await spG.click()
+  pruefe(await da(g.locator('[data-schnellzugriff-raster]')), 'Geschichte: Schnellzugriff')
+  await g.locator('.app-leiste [data-gruppe="unterricht"] [data-leiste-gruppe-kopf]').click()
+  pruefe(await da(g.locator('.app-leiste [aria-label="Onlinetest"]'), 5000), 'Geschichte: Onlinetest in der Leiste (alle Fächer)')
+  pruefe((await g.locator('.app-leiste [aria-label="Sprachenlernen"]').count()) === 0, 'Geschichte: kein Sprachenlernen')
+  pruefe(await g.locator('[data-schnellzugriff="tests"]').isVisible(), 'Geschichte: Karte „Onlinetests"')
+  const termineG = g.locator('[data-schnellzugriff="termine"]')
+  pruefe(await da(termineG), 'Geschichte: Karte „Termine"')
+  pruefe((await termineG.innerText()).includes('Termine') && !(await termineG.innerText()).includes('Vokabeltraining'), 'Geschichte: Titel „Termine" ohne „Vokabeltraining"')
+  pruefe((await termineG.locator('[data-start-kurs], [data-start-grammatik]').count()) === 0, 'Geschichte: keine Kurse/Grammatik in „Termine"')
+  pruefe(await da(g.locator('.app-leiste [aria-label="Materialien"]'), 3000), 'Leiste: „Materialien" neben der Startseite')
+  await g.screenshot({ path: join(out, '7-geschichte-start.png') })
+  // „Neuer Onlinetest": ohne Sprache nur die Lernzielkontrolle
+  await g.locator('.app-leiste [aria-label="Onlinetest"]').click()
+  const neuOT = g.getByRole('button', { name: /Neuer Onlinetest/ }).first()
+  if (await da(neuOT, 8000)) {
+    await neuOT.click()
+    await g.waitForTimeout(800)
+    pruefe((await g.locator('[data-onlinetest-art]').count()) === 0, 'Geschichte: „Neuer Onlinetest" ohne Wahl Vokabel-/Grammatiktest')
+    pruefe(await g.getByText(/Welche Lernzielkontrolle soll online/).isVisible(), 'Geschichte: „Neuer Onlinetest" mit Lernzielkontrollen')
+    await g.keyboard.press('Escape')
+  } else pruefe(false, 'Onlinetest: Knopf „Neuer Onlinetest"')
+  await geCtx.close()
+
+  // ---------- Admin sieht alles – auch mit eigenen Fächern (10.10.2026)
+  const adminApi = api(verwaltung)
+  const adminVorher = (await adminApi('settings:get')).eigeneFaecher ?? []
+  await adminApi('settings:set', { eigeneFaecher: ['geschichte'] })
+  try {
+    const a = await verwaltung.newPage()
+    await a.setViewportSize({ width: 1440, height: 1000 })
+    await a.goto(A)
+    await a.waitForTimeout(2000)
+    const spA = a.getByRole('button', { name: 'Später einrichten' })
+    if (await spA.isVisible().catch(() => false)) await spA.click()
+    await da(a.locator('.app-leiste [data-gruppe="pruefung"] [data-leiste-gruppe-kopf]'))
+    for (const gr of ['unterricht', 'pruefung']) {
+      const kopf = a.locator(`.app-leiste [data-gruppe="${gr}"] [data-leiste-gruppe-kopf]`)
+      if ((await kopf.getAttribute('data-offen')) !== 'true') await kopf.click()
+    }
+    pruefe(await da(a.locator('.app-leiste [aria-label="Vokabeltest"]'), 5000), 'Admin mit Fach Geschichte: Vokabeltest bleibt sichtbar')
+    pruefe(await da(a.locator('.app-leiste [aria-label="Sprachenlernen"]'), 3000), 'Admin mit Fach Geschichte: Sprachenlernen bleibt sichtbar')
+    await a.screenshot({ path: join(out, '8-admin-alles.png') })
+    await a.close()
+  } finally {
+    await adminApi('settings:set', { eigeneFaecher: adminVorher })
+  }
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

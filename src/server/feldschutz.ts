@@ -89,6 +89,18 @@ export function kennung(benutzer: string): string {
   return `k1:${createHmac('sha256', k).update(benutzer.trim().toLowerCase()).digest('hex')}`
 }
 
+/**
+ * Merkmal einer fehlgeschlagenen Anmeldung (10.10.2026, Reiter „Server": Rateversuche erkennen): HMAC des Benutzernamens
+ * bzw. der Adresse mit eigenem, aus dem Hauptschlüssel abgeleiteten Schlüssel, gekürzt auf 16 Hexzeichen – gleiche
+ * Konten/Adressen lassen sich gruppieren, ohne dass Name oder Adresse im Protokoll stehen. Bewusst nicht `kennung()`:
+ * Das Merkmal lässt sich so nicht mit der Spalte nutzer.benutzer verknüpfen.
+ */
+export function anmeldeMerkmal(art: 'konto' | 'adresse', wert: string): string {
+  const k = createHmac('sha256', hauptschluessel()).update(`anmeldung-merkmal-${art}`).digest()
+  const norm = art === 'konto' ? wert.trim().toLowerCase() : wert.trim().replace(/^::ffff:/i, '')
+  return `${art === 'konto' ? 'k' : 'a'}:${createHmac('sha256', k).update(norm).digest('hex').slice(0, 16)}`
+}
+
 const istKennung = (s: unknown): boolean => typeof s === 'string' && s.startsWith('k1:')
 
 function blobZu(b: Uint8Array): Buffer {

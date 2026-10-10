@@ -37,6 +37,19 @@ function Bild({ p, groesse }: { p: Programm; groesse: number }): React.JSX.Eleme
   return p.leistenbild ? <img src={p.leistenbild} alt="" width={groesse} height={groesse} draggable={false} /> : <p.icon size={groesse - 6} />
 }
 
+/**
+ * Programme in den Gruppen der Leiste (10.10.2026): „Meine Klassen" oben, dann Unterricht, Planung, Tests, Organisation –
+ * dieselbe Folge in der Seitenleiste, im Blatt „Mehr" am Telefon und in der Schublade am iPad.
+ */
+export function programmGruppen(programme: Programm[]): { id: string; name: string; programme: Programm[] }[] {
+  const nach = (ids: string[]): Programm[] => ids.flatMap((id) => programme.filter((p) => p.id === id))
+  const gruppiert = [{ id: 'klassen', name: 'Klassen', programme: nach(LEISTE_OBEN) }, ...MODUL_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))].filter(
+    (g) => g.programme.length
+  )
+  const uebrige = programme.filter((p) => !MODUL_GRUPPEN.some((g) => g.apps.includes(p.id)) && !LEISTE_OBEN.includes(p.id))
+  return uebrige.length ? [...gruppiert, { id: 'weitere', name: 'Weitere', programme: uebrige }] : gruppiert
+}
+
 /** Die Programmliste als Schublade (unten auf dem iPhone, links auf dem iPad) */
 export function ProgrammSchublade({
   offen,
@@ -76,11 +89,17 @@ export function ProgrammSchublade({
       styles={position === 'bottom' ? { content: { borderRadius: '16px 16px 0 0', maxHeight: '85dvh' } } : undefined}
     >
       <Stack gap="md">
-        <div className="mobil-programme">
-          {eintrag('home', 'Startseite', <IconHome size={30} />)}
-          {daten.programme.map((p) => eintrag(p.id, p.name, <Bild p={p} groesse={36} />))}
-          {eintrag('settings', 'Einstellungen', <IconSettings size={30} />)}
-        </div>
+        <div className="mobil-programme">{eintrag('home', 'Startseite', <IconHome size={30} />)}</div>
+        {/* In den Gruppen der Leiste, „Meine Klassen" oben (10.10.2026) – vorher eine flache Liste in anderer Folge */}
+        {programmGruppen(daten.programme).map((g) => (
+          <div key={g.id} data-blatt-gruppe={g.id}>
+            <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={6}>
+              {g.name}
+            </Text>
+            <div className="mobil-programme">{g.programme.map((p) => eintrag(p.id, p.name, <Bild p={p} groesse={36} />))}</div>
+          </div>
+        ))}
+        <div className="mobil-programme">{eintrag('settings', 'Einstellungen', <IconSettings size={30} />)}</div>
         {/* Standard-/Expertenmodus (07.10.2026) – wie links in der Leiste am PC */}
         <ModusSchalter breit />
         {onLeisteEinblenden && (
@@ -209,11 +228,7 @@ export function MobilTabs({
   const unterricht = nach(UNTERRICHT_APPS)
   const erstellen = ERSTELLEN_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))
   // „Meine Klassen" zuerst (09.10.2026, wie in der Leiste)
-  const gruppiert = [{ id: 'klassen', name: 'Klassen', programme: nach(LEISTE_OBEN) }, ...MODUL_GRUPPEN.map((g) => ({ id: g.id, name: g.name, programme: nach(g.apps) }))].filter(
-    (g) => g.programme.length
-  )
-  const uebrige = daten.programme.filter((p) => !MODUL_GRUPPEN.some((g) => g.apps.includes(p.id)) && !LEISTE_OBEN.includes(p.id))
-  const alle = uebrige.length ? [...gruppiert, { id: 'weitere', name: 'Weitere', programme: uebrige }] : gruppiert
+  const alle = programmGruppen(daten.programme)
   const laeuft = (liste: Programm[]): boolean => liste.some((p) => daten.laufpunkte[p.id])
   const inUnterricht = unterricht.some((p) => p.id === daten.active)
   const inErstellen = ERSTELLEN_APPS.includes(daten.active)
@@ -257,7 +272,7 @@ export function MobilTabs({
           daten.active === 'settings' || (!inUnterricht && !inErstellen && !['home', 'themen'].includes(daten.active)),
           () => setMehrOffen(true),
           { 'data-tab': 'mehr', 'data-programme-knopf': true },
-          laeuft(uebrige) || laeuft(gruppiert.flatMap((g) => g.programme))
+          laeuft(alle.flatMap((g) => g.programme))
         )}
       </nav>
       <ProgrammBlatt

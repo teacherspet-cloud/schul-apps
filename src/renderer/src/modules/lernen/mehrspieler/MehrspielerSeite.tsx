@@ -3,6 +3,8 @@
  * Grammatik die Form, Start), laufendes Spiel (Bausteine vom Server) und Ergebnis (Versus: nur Sieger öffentlich, die
  * eigene Leistung privat – kein letzter Platz). Feste Kurzrufe statt Chat.
  */
+import { bildAdresse } from '@shared/auszeichnungenBilder'
+import { mitTitel } from '@shared/auszeichnungen'
 import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconCrown, IconDoorExit, IconPlayerPlay, IconTrophy, IconUsers, IconWifiOff, IconX } from '@tabler/icons-react'
 import { Bloecke } from './Bloecke'
@@ -69,7 +71,16 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
             <Group key={p.id} justify="space-between" data-mehr-spieler={p.name}>
               <Group gap={6}>
                 {p.host && <IconCrown size={16} color="var(--mantine-color-yellow-6)" />}
-                <Text fw={p.id === s.ich ? 700 : 400}>{p.name}</Text>
+                {/* Profilbild und Titel (10.10.2026): „Sir Lars R." */}
+                {p.avatar && <img src={bildAdresse(p.avatar)} alt="" width={26} height={30} style={{ objectFit: 'contain' }} data-mehr-avatar={p.avatar} />}
+                <Text fw={p.id === s.ich ? 700 : 400} data-mehr-anzeige={mitTitel(p.titel, p.name)}>
+                  {p.titel && (
+                    <Text span inherit c="dimmed" data-mehr-titel={p.titel}>
+                      {p.titel}{' '}
+                    </Text>
+                  )}
+                  {p.name}
+                </Text>
                 {!p.verbunden && (
                   <Tooltip label={t('uiGetrennt')}>
                     <span data-mehr-getrennt>

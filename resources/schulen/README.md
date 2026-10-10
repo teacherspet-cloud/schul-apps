@@ -9,7 +9,7 @@ Erzeugt von `recherche/schulen/aktualisieren.mjs`; die Rohdaten liegen in `reche
 
 ```json
 { "stand": "2026-09-26",
-  "felder": ["name","ort","plz","land","schulformen","id"],
+  "felder": ["name","ort","plz","land","schulformen","id","strasse","telefon","email"],
   "schulformen": { "gs": "Grundschule", "hs": "Hauptschule/Mittelschule", "rs": "Realschule",
                    "igs": "Gesamt-/Gemeinschaftsschule", "gym": "Gymnasium", "fs": "Förderschule",
                    "bbs": "berufsbildende Schule", "sonst": "sonstige" },
@@ -20,6 +20,7 @@ Erzeugt von `recherche/schulen/aktualisieren.mjs`; die Rohdaten liegen in `reche
 - `land`: ISO-3166-2-Kürzel ohne `DE-` (BW, BY, BE, BB, HB, HH, HE, MV, NI, NW, RP, SL, SN, ST, SH, TH).
 - `schulformen`: Liste der Kürzel. Schulen mit mehreren Zweigen haben mehrere Einträge (z. B. Oberschule NI = `hs, rs`). Wenn die Quelle keine Schulart angibt, wird sie aus dem Namen abgeleitet; bleibt sie offen, steht dort `sonst`.
 - `plz` kann leer sein (nur SN/ST aus OpenStreetMap, dazu 4 Einzelfälle).
+- `strasse`, `telefon` (seit 29.09.2026) und `email` (seit 10.10.2026) können leer sein. `email` stammt nur aus Quellen, deren Lizenz die Weitergabe erlaubt: JedeSchule-Länder (BY dort ohne E-Mail), HE (Verz-6/7), RP und OSM (`email`/`contact:email`). Das LSN-Verzeichnis (NI) führt keine E-Mail, die nibis-Datenbank nennt keine Lizenz. Für NI steht deshalb nur die einzeln geprüfte Ergänzung des Gymnasiums Wesermünde (`ERGAENZUNGEN` in `aktualisieren.mjs`, laut Website der Schule). Neu aufbereiten ohne Abruf mit `--stand=JJJJ-MM-TT`, damit der Stand der Rohdaten bleibt.
 - `id`: Kennung der Quelle (Schulnummer mit Länderpräfix, z. B. `NW-184858`; OpenStreetMap: `OSM-n…`/`OSM-w…`). Sie ist nicht zwingend über Jahre stabil.
 - Sortiert nach Land und Name. Eine Schule pro Zeile, deshalb lassen sich Unterschiede zwischen zwei Ständen gut lesen.
 

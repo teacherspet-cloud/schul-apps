@@ -20,7 +20,22 @@
  *   https://www.klett.de/lehrwerk/green-line-oberstufe-ausgabe-bayern-ab-2024/produktuebersicht
  * Alle Adressen am 09.10.2026 geprüft (HTTP 200, image/jpeg, ohne Referrer).
  *
- * Bildquelle ist allein assets.klett.de. Die CSP der Oberfläche (src/renderer/index.html) lässt Bilder über https: zu.
+ * Französisch und Spanisch (10.10.2026, zu den Platzhalter-Lehrwerken vom 09.10.2026):
+ *   https://www.klett.de/lehrwerk/decouvertes-serie-jaune-ausgabe-ab-2012/produktuebersicht
+ *   https://www.klett.de/lehrwerk/decouvertes-ausgabe-ab-2020/produktuebersicht
+ *     → wie oben das Bild „…_2469_200.jpg" des Schulbuchs (fester Einband); Band 5 der Série jaune heißt beim Verlag
+ *       „Découvertes 5 Série jaune – Passerelle". Bundesländer aus „In mehreren Bundesländern verfügbar" der Produktseite.
+ *   https://www.cornelsen.de/reihen/apuntate-120001230000/spanisch-als-2-fremdsprache-ausgabe-2016-120001230004
+ *   https://www.cornelsen.de/reihen/apuntate-120001230000/spanisch-als-2-fremdsprache-ausgabe-2024-120001230005
+ *     → Produktseiten der Schulbücher (cornelsen.de/produkte/<ISBN ohne Striche>), Bild auf static.cornelsen.de:
+ *       „media/<ISBN>/<ISBN>_COVER_STD_B110_X2.png" (220 px breit; B160/B260 wären größer). Bundesländer aus der Angabe
+ *       „Bundesland" der Produktseite. Eigene Niedersachsen-Schulbücher gibt es nicht: Niedersachsen nutzt dieselben Bände,
+ *       nur die Arbeitshefte unterscheiden sich (Cuaderno 1A/1B, Nivel avanzado/elemental). Ausgabe 2024 hat bisher die
+ *       Bände 1–4 (Band 4 laut Verlag 2026) – für Band 5 gibt es noch kein Cover (Ersatzkachel).
+ * Alle Adressen am 10.10.2026 geprüft (HTTP 200, image/jpeg bzw. image/png, ohne Referrer und ohne Cookies).
+ *
+ * Bildquellen sind allein assets.klett.de und static.cornelsen.de. Die CSP der Oberfläche (src/renderer/index.html) lässt
+ * Bilder über https: zu.
  */
 
 export interface CoverAusgabe {
@@ -38,15 +53,35 @@ export interface CoverAusgabe {
   laender: string[]
   /** Allgemeine Ausgabe – Rückfall, wenn keine Ausgabe zum Land passt */
   allgemein?: boolean
+  /**
+   * Nur für Bände genau dieser Ausgabe (10.10.2026): nennt der Band ein Jahr („ab 2024"), gilt das Cover nur bei gleichem
+   * Jahr. Für Reihen, deren Ausgaben eigene Bände mit anderem Inhalt haben (¡Apúntate! 2016/2024) – ein Band 5 der Ausgabe
+   * 2024 soll nicht das Cover der Ausgabe 2016 zeigen. Green Line braucht das nicht (BW ab 2016 nutzt Bände der
+   * Bundesausgabe ab 2014).
+   */
+  nurEigeneAusgabe?: boolean
+  /** Verlag („Klett", „Cornelsen") */
+  verlag: string
   /** Bild beim Verlag */
   url: string
 }
 
 const KLETT = 'https://assets.klett.de/assets/'
+const CORNELSEN = 'https://static.cornelsen.de/media/'
 const OHNE_BY = ['BW', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH']
 
+const klett = (reihe: string, ausgabe: string, jahr: number, laender: string[], allgemein: boolean, baende: [string, string, string][]): CoverAusgabe[] =>
+  baende.map(([band, isbn, pfad]) => ({ reihe, ausgabe, jahr, band, isbn, laender, allgemein: allgemein || undefined, verlag: 'Klett', url: KLETT + pfad }))
+
 const gl = (ausgabe: string, jahr: number, laender: string[], allgemein: boolean, baende: [string, string, string][]): CoverAusgabe[] =>
-  baende.map(([band, isbn, pfad]) => ({ reihe: 'Green Line', ausgabe, jahr, band, isbn, laender, allgemein: allgemein || undefined, url: KLETT + pfad }))
+  klett('Green Line', ausgabe, jahr, laender, allgemein, baende)
+
+/** Cornelsen: Bild unter der ISBN ohne Striche */
+const cornelsen = (reihe: string, ausgabe: string, jahr: number, laender: string[], baende: [string, string][]): CoverAusgabe[] =>
+  baende.map(([band, isbn]) => {
+    const nr = isbn.replace(/-/g, '')
+    return { reihe, ausgabe, jahr, band, isbn, laender, allgemein: true, nurEigeneAusgabe: true, verlag: 'Cornelsen', url: `${CORNELSEN}${nr}/${nr}_COVER_STD_B110_X2.png` }
+  })
 
 export const COVER_AUSGABEN: CoverAusgabe[] = [
   // Bundesausgabe ab 2021 – Bände 1–4 (alle Länder außer Bayern; Niedersachsen G9 nutzt sie)
@@ -114,6 +149,40 @@ export const COVER_AUSGABEN: CoverAusgabe[] = [
   ...gl('Oberstufe Ausgabe Baden-Württemberg ab 2021', 2021, ['BW'], false, [['Oberstufe', '978-3-12-550003-7', 'a99d334/Cover_550003_Rahmen_2469_200.jpg']]),
   ...gl('Oberstufe Ausgabe Bayern ab 2024', 2024, ['BY'], false, [
     ['Oberstufe', '978-3-12-550000-6', '1217077a365771d663525842827c7fe3d5e6ee0b65f9804000b5e9efed970995/Cover_550000_2469_200.jpg']
+  ]),
+
+  // Französisch (10.10.2026): Découvertes Série jaune (ab Klasse 6), Ausgabe ab 2012 – laut Verlag BW, HB, HH, HE, NI, NW,
+  // RP, SL, SN, SH, TH; als einzige Ausgabe der Reihe auch der Rückfall
+  ...klett('Découvertes Série jaune', 'Série jaune (ab Klasse 6) Ausgabe ab 2012', 2012, ['BW', 'HB', 'HH', 'HE', 'NI', 'NW', 'RP', 'SL', 'SN', 'SH', 'TH'], true, [
+    ['1', '978-3-12-622011-8', '296c1976/Cover_622011_Rahmen_2469_200.jpg'],
+    ['2', '978-3-12-622021-7', '360cb0ee/Cover_622021_Rahmen_2469_200.jpg'],
+    ['3', '978-3-12-622031-6', 'e839abe/Cover_622031_Rahmen_2469_200.jpg'],
+    ['4', '978-3-12-622041-5', '7d1ecb75/Cover_622041_Rahmen_2469_200.jpg'],
+    ['5', '978-3-12-622051-4', '9687fa95/Cover_622051_Rahmen_2469_200.jpg']
+  ]),
+  // Découvertes, Ausgabe 1. oder 2. Fremdsprache ab 2020 – alle Länder außer Bayern
+  ...klett('Découvertes', 'Ausgabe 1. oder 2. Fremdsprache ab 2020', 2020, OHNE_BY, true, [
+    ['1', '978-3-12-624011-6', 'dd5d80b2/Cover_624011_Rahmen_2469_200.jpg'],
+    ['2', '978-3-12-624021-5', '530cb51/Cover_624021_Rahmen_2469_200.jpg'],
+    ['3', '978-3-12-624031-4', 'be43c9aa/Cover_624031_Rahmen_2469_200.jpg'],
+    ['4', '978-3-12-624041-3', '940cb0a1/Cover_624041_2469_200.jpg'],
+    ['5', '978-3-12-624051-2', 'dd2d87d31924f1fe143a8cb927db971e21f1a48601f7e106e6fae3ead247c3e0/Cover_624051_2469_200.jpg']
+  ]),
+
+  // Spanisch (10.10.2026): ¡Apúntate! Spanisch als 2. Fremdsprache – Ausgabe 2016 (Länder laut Verlag ohne BW, BY)
+  ...cornelsen('¡Apúntate!', 'Spanisch als 2. Fremdsprache – Ausgabe 2016', 2016, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'], [
+    ['1', '978-3-06-024837-7'],
+    ['2', '978-3-06-121118-9'],
+    ['3', '978-3-06-121196-7'],
+    ['4', '978-3-06-121197-4'],
+    ['5', '978-3-06-121198-1']
+  ]),
+  // Ausgabe 2024 (Länder laut Verlag ohne BW, BY, RP, SL); Band 5 noch nicht erschienen
+  ...cornelsen('¡Apúntate!', 'Spanisch als 2. Fremdsprache – Ausgabe 2024', 2024, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'SN', 'ST', 'SH', 'TH'], [
+    ['1', '978-3-06-122987-0'],
+    ['2', '978-3-06-123052-4'],
+    ['3', '978-3-06-123053-1'],
+    ['4', '978-3-06-123054-8']
   ])
 ]
 
@@ -126,15 +195,28 @@ export interface CoverBand {
   stateId?: string
 }
 
-const norm = (s: string | undefined): string => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+/** Vergleichsform: Akzente weg („Découvertes" → „decouvertes"), Satzzeichen wie „¡" und „!" weg, klein */
+const norm = (s: string | undefined): string =>
+  (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
 
 /** Reihe und Band – aus den Angaben, sonst aus dem Namen („Green Line 3", „Green Line Transition") */
 function reiheUndBand(b: CoverBand): { reihe: string; band: string } | null {
-  const reihen = [...new Set(COVER_AUSGABEN.map((a) => a.reihe))]
+  // längste Reihe zuerst: „Découvertes Série jaune 1" gehört zu „Découvertes Série jaune", nicht zu „Découvertes"
+  const reihen = [...new Set(COVER_AUSGABEN.map((a) => a.reihe))].sort((x, y) => norm(y).length - norm(x).length)
   const reihe = reihen.find((r) => norm(r) === norm(b.reihe)) ?? reihen.find((r) => norm(b.name).startsWith(norm(r)))
   if (!reihe) return null
   let band = (b.band ?? '').trim()
-  if (!band) band = b.name.trim().slice(reihe.length).trim().split(/\s+/)[0] ?? ''
+  if (!band) {
+    // Rest des Namens hinter der Reihe – auch wenn der Name sie anders schreibt („Apuntate 1" zu „¡Apúntate!")
+    const name = b.name.trim()
+    let ende = 0
+    for (let i = 1; i <= name.length; i++) if (norm(name.slice(0, i)) === norm(reihe)) ende = i
+    band = name.slice(ende).trim().split(/\s+/)[0] ?? ''
+  }
   const treffer = COVER_AUSGABEN.find((a) => a.reihe === reihe && norm(a.band) === norm(band))
   return treffer ? { reihe, band: treffer.band } : null
 }
@@ -150,15 +232,16 @@ function reiheUndBand(b: CoverBand): { reihe: string; band: string } | null {
 export function coverAusgabe(b: CoverBand, land?: string): CoverAusgabe | null {
   const rb = reiheUndBand(b)
   if (!rb) return null
-  const kandidaten = COVER_AUSGABEN.filter((a) => a.reihe === rb.reihe && a.band === rb.band)
-  const ziel = b.stateId || land
   const jahr = Number(/\d{4}/.exec(b.ausgabe ?? '')?.[0] ?? 0)
+  const kandidaten = COVER_AUSGABEN.filter(
+    (a) => a.reihe === rb.reihe && a.band === rb.band && !(a.nurEigeneAusgabe && jahr && a.jahr !== jahr)
+  )
+  const ziel = b.stateId || land
+  const reihenfolge = (x: CoverAusgabe, y: CoverAusgabe): number =>
+    Number(y.jahr === jahr) - Number(x.jahr === jahr) || y.jahr - x.jahr || x.laender.length - y.laender.length
   const passend = ziel ? kandidaten.filter((a) => a.laender.includes(ziel)) : []
-  if (passend.length)
-    return [...passend].sort(
-      (x, y) => Number(y.jahr === jahr) - Number(x.jahr === jahr) || y.jahr - x.jahr || x.laender.length - y.laender.length
-    )[0]
-  return kandidaten.find((a) => a.allgemein) ?? kandidaten[0] ?? null
+  if (passend.length) return [...passend].sort(reihenfolge)[0]
+  return [...kandidaten.filter((a) => a.allgemein)].sort(reihenfolge)[0] ?? kandidaten[0] ?? null
 }
 
 /** Kurzzeichen für die Ersatzkachel: Bandnummer, „T" (Transition), „O" (Oberstufe) */

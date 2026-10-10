@@ -65,7 +65,7 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { nachBaenden, type AbschnittStatistik } from '@shared/kursAbschnitte'
-import { BandGruppe } from '../../../shared/components/BandCover'
+import { BandGruppe, useBaendeOffen } from '../../../shared/components/BandCover'
 import { empfehlung } from '@shared/grammatikBereiche'
 import { useRueckweg } from '../../../shared/navigation'
 import { useExperte } from '../../../shared/settingsStore'
@@ -239,9 +239,11 @@ function HinweisListe({
  * Units kompakt: je Band (neuester oben, mit Cover – 09.10.2026), darin die Units; die neueste Unit des neuesten Bands
  * offen (Abschnitte mit Balken), ältere zugeklappt mit „% sicher". Auch in „Meine Klassen" (Lernstand der Klasse).
  */
-export function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] }): React.JSX.Element {
+export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { abschnitte: AbschnittStatistik[]; schluessel?: string }): React.JSX.Element {
   const baende = useMemo(() => nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
   const [umgeschaltet, setUmgeschaltet] = useState<Set<string>>(new Set())
+  // Mehrere Bände (10.10.2026): je Band aufklappbar, der neueste offen
+  const bandAuf = useBaendeOffen(`units-${kursSchluessel}`, baende.map((b) => b.buch))
   if (!baende.length)
     return (
       <Text size="sm" c="dimmed">
@@ -270,7 +272,8 @@ export function UnitsKompakt({ abschnitte }: { abschnitte: AbschnittStatistik[] 
           key={b.buch || 'ohne'}
           buch={b.buch}
           ohneBand="Weitere Vokabeln"
-          zusatz={`${prozent(mittel(b.units.flatMap((u) => u.zeilen), 'sicher'))} sicher`}
+          zusatz={`${b.units.length} ${b.units.length === 1 ? 'Unit' : 'Units'} · ${prozent(mittel(b.units.flatMap((u) => u.zeilen), 'sicher'))} sicher`}
+          {...(baende.length > 1 ? { offen: bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
         >
           <Stack gap={4}>
             {b.units.map((g) => {
@@ -539,7 +542,7 @@ export function KursSeite({
               </Button>
             </Group>
             {statistik ? (
-              <UnitsKompakt abschnitte={statistik.abschnitte} />
+              <UnitsKompakt abschnitte={statistik.abschnitte} schluessel={id} />
             ) : (
               <Stack gap={2}>
                 {(d.teile ?? []).filter((t) => t.zeit <= Date.now()).slice(-6).reverse().map((t, i) => (
@@ -605,7 +608,7 @@ export function KursSeite({
             data-kurs-abschnitte-kopf
           />
           {abschnitteOffen ? (
-            <AbschnittUebersicht abschnitte={statistik.abschnitte} namen={statistik.namen} />
+            <AbschnittUebersicht abschnitte={statistik.abschnitte} namen={statistik.namen} schluessel={id} />
           ) : (
             <Text size="xs" c="dimmed" ml={26} data-kurs-abschnitte-kurz>
               {abschnitteKurz(statistik.abschnitte)}
@@ -614,7 +617,7 @@ export function KursSeite({
         </Card>
       )}
       {(mitWoertern || (d.entfernt ?? []).length > 0) && (
-        <AbschnitteVerwalten teile={d.teile ?? []} gesamt={d.woerter.length} entfernt={d.entfernt ?? []} ausfuehren={abschnitt} />
+        <AbschnitteVerwalten teile={d.teile ?? []} gesamt={d.woerter.length} entfernt={d.entfernt ?? []} ausfuehren={abschnitt} schluessel={id} />
       )}
       {mitWoertern && <ProblemWoerter d={d} aendern={aendern} />}
       {eingebettet && lernende.length > 0 && mitWoertern && (

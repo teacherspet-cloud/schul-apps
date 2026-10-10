@@ -2,6 +2,7 @@ import { Button, Group, Modal, Radio, Stack } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { notifyError } from '../util'
 import { SeitenWahlSchalter } from './SeitenAuswahl'
+import { VorschauKnopf } from '../export/PdfVorschau'
 import { loesungsTexte, loesungsVorgabe, merkeLoesungsWahl, type AusgabeModus, type LoesungsModus } from '../loesungen'
 
 export { loesungsTexte, loesungsVorgabe, merkeLoesungsWahl }
@@ -78,6 +79,17 @@ export function AusgabeDialog({
           <Button variant="default" onClick={onClose}>
             Abbrechen
           </Button>
+          {/* PDF ansehen, ohne zu speichern (10.10.2026, export/PdfVorschau.tsx) */}
+          {modus === 'pdf' && (
+            <VorschauKnopf
+              disabled={laeuft}
+              ausgabe={() => {
+                merkeLoesungsWahl(modul, loesung)
+                return onAusgabe('pdf', loesung)
+              }}
+              nachSpeichern={onClose}
+            />
+          )}
           <Button
             loading={laeuft}
             onClick={async () => {

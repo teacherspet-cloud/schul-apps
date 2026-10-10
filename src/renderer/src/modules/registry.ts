@@ -123,13 +123,15 @@ export const modules: SchulModule[] = [
         {
           id: 'onlinetest',
           name: 'Onlinetest',
-          description: 'Vokabeltests am iPad der Lernenden: Code oder QR-Code, Zeitlimit, Live-Stand, Auswertung mit KI – dazu Lerngruppen mit Notenverlauf.',
+          // Für alle Fächer (10.10.2026): Lernzielkontrollen, Grammatik- und Vokabeltests – Vokabel-Teile nur bei Sprachen
+          description: 'Tests am iPad der Lernenden: Lernzielkontrollen, Grammatik- und Vokabeltests per Code oder QR-Code, Zeitlimit, Live-Stand, Auswertung mit KI – dazu Lerngruppen mit Notenverlauf.',
           icon: programmSymbol('onlinetest', 'teal'),
           color: 'teal',
           illustration: illustration('onlinetest'),
           leistenbild: leistenbild('onlinetest'),
-          // Nur mit dem Schul-Apps-Server – deshalb nicht in PROGRAMM_FAECHER (feste Folge der Programme überall)
-          faecher: SPRACH_FAECHER,
+          // Nur mit dem Schul-Apps-Server – deshalb nicht in PROGRAMM_FAECHER (feste Folge der Programme überall). Seit
+          // 10.10.2026 für alle Fächer (vorher nur Sprachen – Lernzielkontrollen gibt es in jedem Fach)
+          faecher: 'alle' as const,
           component: OnlinetestModule
         },
         // Laufende Reihen und freigegebene Blätter (03.10.2026): Überblick über den laufenden Unterricht

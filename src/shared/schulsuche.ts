@@ -13,8 +13,8 @@
 /** Schulform-Kürzel der Datei (Feld `schulformen`) */
 export type SchulformKuerzel = 'gs' | 'hs' | 'rs' | 'igs' | 'gym' | 'fs' | 'bbs' | 'sonst'
 
-/** Eine Zeile der Datei: [name, ort, plz, land, schulformen, id, strasse?, telefon?] – Anschrift seit 29.09.2026 */
-export type SchulZeile = [string, string, string, string, string[], string, string?, string?]
+/** Eine Zeile der Datei: [name, ort, plz, land, schulformen, id, strasse?, telefon?, email?] – Anschrift seit 29.09.2026, E-Mail seit 10.10.2026 */
+export type SchulZeile = [string, string, string, string, string[], string, string?, string?, string?]
 
 export interface SchulTreffer {
   id: string
@@ -30,6 +30,8 @@ export interface SchulTreffer {
   strasse: string
   /** Telefon der Schule – leer, wenn die Quelle keins führt (z. B. BY, RP, SH) */
   telefon: string
+  /** E-Mail der Schule (10.10.2026) – leer, wenn die Quelle keine führt (z. B. NI, BY) */
+  email: string
 }
 
 export interface SchulQuelle {
@@ -170,6 +172,8 @@ export function sucheSchulen(index: SchulEintrag[], eingabe: string, opt: SuchOp
       else if (e.name.includes(anfang)) wert += 50
       else if (e.ort.includes(anfang) || e.zeile[2].startsWith(w)) wert += 30
       else if (w.length >= 3 && (e.name.includes(w) || e.ort.includes(w))) wert += 10
+      // Zusammengesetztes Wort (10.10.2026): „Kreisgymnasium Wesermünde" findet „Gymnasium Wesermünde" (Wort endet auf ein Namenswort)
+      else if (w.length >= 8 && e.name.split(' ').some((n) => n.length >= 6 && w.endsWith(n))) wert += 8
       else {
         alle = false
         break
@@ -183,8 +187,8 @@ export function sucheSchulen(index: SchulEintrag[], eingabe: string, opt: SuchOp
   }
   bewertet.sort((a, b) => b.wert - a.wert || a.e.zeile[0].localeCompare(b.e.zeile[0], 'de') || a.e.zeile[1].localeCompare(b.e.zeile[1], 'de'))
   return bewertet.slice(0, max).map(({ e }) => {
-    const [name, ort, plz, land, schulformen, id, strasse, telefon] = e.zeile
-    return { id, name, ort, plz, land, schulformen, logo: hatLogo(id), strasse: strasse ?? '', telefon: telefon ?? '' }
+    const [name, ort, plz, land, schulformen, id, strasse, telefon, email] = e.zeile
+    return { id, name, ort, plz, land, schulformen, logo: hatLogo(id), strasse: strasse ?? '', telefon: telefon ?? '', email: email ?? '' }
   })
 }
 

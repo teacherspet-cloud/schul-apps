@@ -63,8 +63,8 @@ import { erzeugeGrammatikPaket, lateinLernjahr, erzeugungsHinweis } from './gram
 import { bekanntNachStand } from '@shared/zeitformSperre'
 import { ausFeld, useLerngruppen } from './VokabelTraining'
 import { kursGrammatikDocId } from './kurs/auftragsZiel'
-import { grammatikUnits, normName, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
-import { grammatikKapitel, lehrwerkeMitGrammatik } from '../arbeitsblatt/didactics/grammatikAuswahl'
+import { grammatikUnits, naechsteGrammatik, normName, vorwahlBuch, type VorwahlDaten } from '@shared/lehrwerkVorwahl'
+import { grammatikKapitel, lehrwerkeMitGrammatik, unitEintraege } from '../arbeitsblatt/didactics/grammatikAuswahl'
 import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 
@@ -367,6 +367,12 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
    * (shared/lehrwerkVorwahl.ts). undefined = lädt noch; null = nichts Passendes (dann wie bisher die Vorgabe des Kurses).
    */
   const [kursLehrwerk, setKursLehrwerk] = useState<{ buch?: string; unit?: string; units?: string[] } | null | undefined>(vorgabe ? undefined : null)
+  /*
+   * Schon für Kurs bzw. Klasse freigegebene Grammatik (10.10.2026, Wunsch der Lehrkraft): standardmäßig ausgeblendet –
+   * nur, was für die GANZE Gruppe gilt; Einzel-Freigaben bleiben sichtbar mit Hinweis. Dazu der Vorschlag „als Nächstes"
+   * in der Reihenfolge des Lehrwerks.
+   */
+  const [klassenFrei, setKlassenFrei] = useState<{ frei: string[]; hinweise: Record<string, string>; vorschlag?: string }>({ frei: [], hinweise: {} })
   useEffect(() => {
     if (!vorgabe) return
     let aktiv = true
@@ -383,7 +389,17 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               .filter((b) => normName(buch.id).startsWith(normName(b)) || normName(buch.name) === normName(b))
               .sort((a, b) => b.length - a.length)[0]
           : undefined
-        if (aktiv) setKursLehrwerk(band ? { buch: band, units: grammatikUnits(grammatikKapitel(band), band, d) } : null)
+        const kapitel = band ? grammatikKapitel(band) : []
+        const frei = [...new Set([...(d.grammatikFrei ?? [])])]
+        const naechste = band && kapitel.length ? naechsteGrammatik(unitEintraege(fachKennung, band, kapitel[kapitel.length - 1], 'bis'), frei) : null
+        const naechsteUnit = naechste ? kapitel.find((k) => naechste.kapitel === k || naechste.kapitel.startsWith(`${k} · `)) : undefined
+        if (aktiv)
+          setKlassenFrei({
+            frei,
+            hinweise: Object.fromEntries((d.grammatikEinzeln ?? []).map((e) => [e.id, `für ${e.lernende} ${e.lernende === 1 ? 'Lernende/n' : 'Lernende'} schon freigegeben`])),
+            ...(naechste ? { vorschlag: naechste.id } : {})
+          })
+        if (aktiv) setKursLehrwerk(band ? { buch: band, units: naechsteUnit ? [naechsteUnit] : grammatikUnits(kapitel, band, d) } : null)
         // Klasse des Kurses vorbelegen (09.10.2026): die Zeitform-Sperre richtet sich ohne Lehrwerk-Stand nach ihr
         if (aktiv && d.jahrgang && d.jahrgang >= 1 && d.jahrgang <= 13) setJahrgang(d.jahrgang)
       } catch {
@@ -583,7 +599,9 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                 key={`${fachId}-${lehrwerkVorwahl?.buch ?? ''}`}
                 unitSofort={!vorgabe}
                 kurs={Boolean(vorgabe)}
-                ausblenden={vorgabe ? schonImKurs(bestehend ?? []) : undefined}
+                ausblenden={vorgabe ? [...new Set([...schonImKurs(bestehend ?? []), ...klassenFrei.frei])] : undefined}
+                vorschlag={vorgabe ? klassenFrei.vorschlag : undefined}
+                hinweise={vorgabe ? klassenFrei.hinweise : undefined}
                 lehrwerk={lehrwerkVorwahl}
                 query={query}
                 wahl={{ themen: themenIds, teilformen: teilWahl }}

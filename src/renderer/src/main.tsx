@@ -23,6 +23,7 @@ import { MantineProvider } from '@mantine/core'
 import { useColorScheme } from '@mantine/hooks'
 import { Notifications } from '@mantine/notifications'
 import { SeitenWahlHost } from './shared/components/SeitenAuswahl'
+import { PdfVorschauHost } from './shared/export/PdfVorschau'
 import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt'
 import { EingabeOrtDialog, installiereDateiWahl } from './shared/export/eingabeOrt'
 import { installiereVorhandenFrage, VorhandenDialog } from './shared/export/vorhandenFrage'
@@ -77,6 +78,8 @@ function Root(): React.JSX.Element {
       <Notifications position="top-right" />
       {/* Seitenauswahl vor dem Speichern (shared/export/ausgabe.tsx) */}
       <SeitenWahlHost />
+      {/* PDF ansehen, ohne zu speichern (shared/export/PdfVorschau.tsx) */}
+      <PdfVorschauHost />
       {/* iPad: wohin speichern – Gerät, IServ, Dateien-App, Teilen (shared/export/ausgabeOrt.tsx) */}
       <AusgabeOrtDialog />
       {/* Datei öffnen: dieses Gerät oder IServ (shared/export/eingabeOrt.tsx) */}

@@ -5,7 +5,7 @@
 // Aufruf: node scripts/e2e-parallel.mjs [--server 4] [--attrappe <attrappe.json>] [test1 test2 …]
 //   ohne Testnamen: alle tests/e2e/server-*.mjs
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -67,6 +67,11 @@ try {
     const port = 18461 + n
     const daten = join(basis, `s${n}`)
     mkdirSync(join(daten, 'geheim'), { recursive: true })
+    // Eigene Kopie der Attrappe je Server (10.10.2026): Tests schreiben ihre Antworten hinein und stellen sie danach
+    // wieder her – mit EINER gemeinsamen Datei überschrieben sich parallele Tests gegenseitig (Grundbestand ging verloren)
+    const eigene = join(daten, 'attrappe.json')
+    const roh = JSON.parse(readFileSync(attrappe, 'utf8'))
+    writeFileSync(eigene, JSON.stringify({ ...roh, ...(roh.protokoll ? { protokoll: join(daten, 'ki-protokoll.jsonl') } : {}) }, null, 2))
     const p = spawn(process.execPath, ['out/server/start.mjs'], {
       cwd: wurzel,
       env: {
@@ -79,7 +84,10 @@ try {
         SCHULAPPS_OBERFLAECHE: join(wurzel, 'out', 'renderer'),
         SCHULAPPS_RESSOURCEN: join(wurzel, 'resources'),
         SCHULAPPS_NOTZUGANG_PASSWORT: 'test-notzugang-123',
-        SCHULAPPS_KI_ATTRAPPE: attrappe,
+        // wie auf dem Server hinter der Weiche: Besucheradresse aus X-Real-IP (server-einstellungen erfindet Adressen
+        // für Fehlversuche, damit die Sperre nicht localhost für alle Tests trifft – 10.10.2026)
+        SCHULAPPS_WEICHE: '1',
+        SCHULAPPS_KI_ATTRAPPE: eigene,
         // Erinnerungen (10.10.2026): lokaler Empfänger als Push-Dienst (tests/e2e/server-erinnerungen.mjs)
         SCHULAPPS_PUSH_LOKAL: '1',
         // Schulkalender (10.10.2026): Ferien/Feiertage aus der Datei statt aus dem Netz, Testuhr für den Schuljahreswechsel
@@ -91,7 +99,7 @@ try {
       },
       stdio: 'ignore'
     })
-    server.push({ port, p })
+    server.push({ port, p, attrappe: eigene })
   }
   for (const s of server) if (!(await bereit(s.port))) throw new Error(`Testserver auf ${s.port} startet nicht`)
   console.log(`${anzahl} Testserver bereit, ${tests.length} Tests`)
@@ -100,7 +108,7 @@ try {
     server.map(async (s) => {
       for (let t = warteschlange.shift(); t; t = warteschlange.shift()) {
         const t0 = Date.now()
-        const r = await lauf(process.execPath, [`tests/e2e/server-${t}.mjs`, join(basis, 'e2e', t), `http://localhost:${s.port}`], { SCHULAPPS_KI_ATTRAPPE: attrappe })
+        const r = await lauf(process.execPath, [`tests/e2e/server-${t}.mjs`, join(basis, 'e2e', t), `http://localhost:${s.port}`], { SCHULAPPS_KI_ATTRAPPE: s.attrappe })
         const gut = /Alles in Ordnung/.test(r.text)
         const probleme = r.text.split('\n').filter((z) => z.includes('!!')).slice(0, 6)
         ergebnisse.push({ t, gut, probleme, s: Math.round((Date.now() - t0) / 1000) })

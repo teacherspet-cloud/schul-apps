@@ -21,9 +21,9 @@
 import { fachAusName, SPRACHFAECHER } from '../shared/faecher'
 import { blaetterDerGruppe } from './arbeitsblaetter'
 import { createHash } from 'node:crypto'
-import { datenbank, serverWert } from './datenbank'
+import { alleNutzer, datenbank, serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
-import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
+import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, gehoertZu, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
 import {
   db as vokDb,
@@ -35,19 +35,25 @@ import {
   sprachfaecherDerGruppe,
   standSpeichern,
   standVon,
+  teileEingeordnet,
+  teileVon,
   ueberschriftVon,
   vokabelnDerGruppe,
   zeile,
   type Zeile
 } from './vokabeln'
 import type { Vokabel } from '../shared/vokabeltrainer'
-import { grammatikDerGruppe, grammatikFoerder, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
+import { grammatikDerGruppe, grammatikFoerder, grammatikFreigegeben, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
+import type { FreiAbschnitt } from '../shared/lehrwerkVorwahl'
+import { lehrwerkName } from './wartungAbschnitteTeilen'
 import { kursBedarf, kursHinweise, type HinweisReiter, type KursBedarf, type KursHinweisArt } from '../shared/kursHinweise'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import type { VorwahlDaten } from '../shared/lehrwerkVorwahl'
 import type { NutzerInfo } from './datenbank'
 import { ausgeblendeteKurse, erkanntVon, kuerzelSetzen, kursAusblenden, kursEinblenden, kursInfoVon, kursUmbenennen, verborgeneGruppen, type KursLink } from './iservKursgruppen'
 import { erkanntText } from '../shared/iservKurse'
+import { auszeichnungFuerLehrkraft } from './achievements'
+import { klasseAusGruppen, lernendeSuchen, stichwortArten, SUCHE_MIN, type ProblemArt, type SuchPerson } from '../shared/klassenSuche'
 
 const TAG = 86_400_000
 
@@ -354,6 +360,31 @@ export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
       stand = auto ? { buch: auto.buch, unit: '' } : null
     }
   }
+  /*
+   * Schon Freigegebenes (10.10.2026, Wunsch der Lehrkraft: im Dialog standardmäßig ausblenden). Nur was für den GANZEN Kurs
+   * gilt; Einzel-Freigaben (andere Kurse nur für einzelne Lernende der Klasse) kommen als Hinweis „für n Lernende".
+   */
+  const freigegeben = abschnitteVon(z)
+  const kursLehrwerke = [...new Set(freigegeben.map((f) => f.lehrwerk).filter(Boolean))]
+  const mitglieder = g ? new Set(mitgliederVon(g).map((n) => n.benutzer)) : new Set<string>()
+  const einzeln = new Map<string, FreiAbschnitt & { lernende: Set<string> }>()
+  for (const k of alle) {
+    if (k.id === z.id || k.sprache !== z.sprache) continue
+    const schueler = json_(k.schueler, [] as string[]).filter((b) => mitglieder.has(b))
+    if (!schueler.length) continue
+    for (const f of abschnitteVon(k)) {
+      const s = `${f.lehrwerk || f.buch}|${f.unit}|${f.abschnitt}`
+      const e = einzeln.get(s) ?? { ...f, lernende: new Set<string>() }
+      for (const b of schueler) e.lernende.add(b)
+      einzeln.set(s, e)
+    }
+  }
+  // Grammatik: Kurs und alle Kurse bzw. Lerngruppen der Klasse in derselben Sprache – nur für die ganze Gruppe
+  const ganzeKurse = new Set([
+    z.id,
+    ...alle.filter((k) => k.sprache === z.sprache && klasse.has(k.lerngruppe_id) && !json_(k.schueler, [] as string[]).length).map((k) => k.id)
+  ])
+  const gram = grammatikFreigegeben(ich.id, ganzeKurse, klasse, z.sprache)
   return {
     sprache: z.sprache,
     jahrgang: klasseFuer(z, ich),
@@ -361,8 +392,38 @@ export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
     kursUnits: quelleUnits(q),
     stand,
     klassenLehrwerke,
-    ueblicheLehrwerke: [...zahl.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
+    ueblicheLehrwerke: [...zahl.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id),
+    kursLehrwerke,
+    freigegeben,
+    einzeln: [...einzeln.values()].map((e) => ({ ...e, lernende: e.lernende.size })),
+    grammatikFrei: gram.frei,
+    grammatikEinzeln: gram.einzeln
   }
+}
+
+/**
+ * Abschnitte eines Kurses mit Band und Unit (10.10.2026): je Teil Kennung (bzw. die der Herkunft, wenn der Band passt),
+ * Name des Bands, Unit und Abschnitt. Titelformen: „Station 1", „Unit 1 · Station 1", „Check-in, Station 1",
+ * „Unit 1: a, b · Unit 2: c". Ein ganzer Titel ohne Abschnitte („Green Line 1 - Unit 3") nennt keine.
+ */
+export function abschnitteVon(z: Zeile): FreiAbschnitt[] {
+  if (!json_(z.woerter, [] as unknown[]).length) return []
+  const q = json_(z.quelle, {} as Partial<Quelle>)
+  const teile = teileVon(z)
+  const quelleName = q.lehrwerk ? lehrwerkName(q.lehrwerk, z.lehrkraft_id) : ''
+  const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const aus: FreiAbschnitt[] = []
+  for (const [i, e] of teileEingeordnet(z, teile).entries()) {
+    if (!e.buch || e.name.includes(' - ')) continue
+    const lehrwerk = teile[i]?.lehrwerk || (q.lehrwerk && quelleName && norm(quelleName) === norm(e.buch) ? q.lehrwerk : '')
+    for (const stueck of e.name.split(' · ')) {
+      const k = stueck.indexOf(':')
+      const unit = k > 0 ? stueck.slice(0, k).trim() : e.unit
+      const namen = (k > 0 ? stueck.slice(k + 1) : stueck).split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean)
+      if (unit) for (const abschnitt of namen) aus.push({ lehrwerk, buch: e.buch, unit, abschnitt })
+    }
+  }
+  return aus
 }
 
 /**
@@ -509,6 +570,46 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
     })(),
     vorschlaege
   }
+}
+
+/**
+ * Suche in „Meine Klassen" (10.10.2026, Entscheidung der Lehrkraft): nur die Lernenden der EIGENEN Lerngruppen, nur
+ * Anzeigename, Klasse, Fächer, Lerngruppen und Art des Handlungsbedarfs – nichts, was „Meine Klassen" nicht ohnehin zeigt.
+ * Gesucht wird über den Namen (nicht Benutzername oder Code); Stichwörter („nicht geübt", „wackelig" …) über den
+ * Handlungsbedarf der Kurse. Die Konten werden einmal gelesen (alleNutzer, gemerkt); den Handlungsbedarf rechnet sie nur
+ * bei einem Stichwort. Mindestens 2 Zeichen, höchstens 30 Treffer.
+ */
+export function klassenSuche(lehrkraftId: string, q: string, klasse = '', jetzt = Date.now()): ReturnType<typeof lernendeSuchen> {
+  if (q.trim().length < SUCHE_MIN) return []
+  const verborgen = verborgeneGruppen(lehrkraftId)
+  const gruppen = lerngruppenVon(lehrkraftId).filter((g) => !verborgen.has(g.id) && !g.ausgeblendet)
+  const nutzer = alleNutzer().filter((n) => n.rolle === 'schueler')
+  const stichwort = stichwortArten(q)
+  const personen = new Map<string, SuchPerson>()
+  for (const g of gruppen) {
+    const mitglieder = nutzer.filter((n) => (n.quelle === 'gast' ? g.mitglieder.includes(n.benutzer) : gehoertZu(g, n)))
+    if (!mitglieder.length) continue
+    // Handlungsbedarf je Person nur bei einem Stichwort (Kennungen der Einträge, auch ausgeblendete)
+    const probleme = new Map<string, Set<ProblemArt>>()
+    if (stichwort)
+      for (const b of detail(g, lehrkraftId, jetzt, true).bedarfAlle)
+        if ('hinweis' in b && (b.hinweis === 'inaktiv' || b.hinweis === 'schwach' || b.hinweis === 'foerdern'))
+          for (const id of ('ids' in b && Array.isArray(b.ids) ? b.ids : []) as string[]) probleme.set(id, (probleme.get(id) ?? new Set()).add(b.hinweis as ProblemArt))
+    for (const n of mitglieder) {
+      // Ohne Anzeigenamen kein Treffer über den Namen (der Benutzername wird nicht durchsucht, nur angezeigt)
+      const name = n.name.trim()
+      const p = personen.get(n.id) ?? { id: n.id, name: name || n.benutzer, suchName: name, klasse: '', faecher: [], gruppen: [], probleme: [] }
+      personen.set(n.id, p)
+      p.gruppen.push({ id: g.id, name: g.name.trim(), fach: g.fach })
+      if (g.fach.trim() && !p.faecher.includes(g.fach.trim())) p.faecher.push(g.fach.trim())
+      for (const a of probleme.get(n.id) ?? []) if (!p.probleme.includes(a)) p.probleme.push(a)
+    }
+  }
+  return lernendeSuchen(
+    [...personen.values()].map((p) => ({ ...p, klasse: klasseAusGruppen(p.gruppen) })),
+    q,
+    klasse
+  )
 }
 
 export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
@@ -665,6 +766,8 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    // Suche (10.10.2026): eigene Lernende nach Namen bzw. Handlungsbedarf (shared/klassenSuche.ts)
+    if (teile[0] === 'suche') return (json(res, 200, { lernende: klassenSuche(ich.id, url.searchParams.get('q') ?? '', url.searchParams.get('klasse') ?? '') }), true)
     if (teile[0] === 'vorwahl') {
       const z = zeile(String(url.searchParams.get('kurs') ?? ''))
       if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diesen Kurs gibt es nicht.' }), true)
@@ -676,8 +779,15 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
     let klassenKurs = istSprachfach(g.fach) ? klassenKursVon(g, ich.id) : null
     if (istSprachfach(g.fach) && !klassenKurs && klassenKurseSichern(ich.id)) klassenKurs = klassenKursVon(g, ich.id)
     const { bedarfAlle: _alle, ...d } = detail(g, ich.id)
+    // Medaillen und Titel der Lernenden in der Sprache der Lerngruppe (10.10.2026) – Gesprächsanlass, keine Rangliste:
+    // nichts wird danach sortiert
+    const sprache = sprachfaecherDerGruppe(g.fach)[0]?.sprache
+    if (sprache) for (const l of d.lernende) Object.assign(l, { auszeichnung: auszeichnungFuerLehrkraft(l.id, sprache) })
     // Aus IServ erkannt (10.10.2026): Name der IServ-Gruppe = ihr Gruppenordner („Ablegen ▾" legt Kursmaterial dort ab)
     const iserv = iservAngabe(kursInfoVon(ich.id).get(g.id))
-    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs, iserv }), true)
+    // Kürzel der Lehrkraft (eingestellt oder erkannt) – „Ablegen ▾" sucht damit den eigenen Kursordner (10.10.2026)
+    const erkannt = erkanntVon(ich.id)
+    const iservKuerzel = erkannt?.kuerzelEigen || erkannt?.kuerzel || null
+    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs, iserv, iservKuerzel }), true)
   }
 }

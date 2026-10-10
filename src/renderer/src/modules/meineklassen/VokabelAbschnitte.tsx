@@ -10,7 +10,7 @@ import { Badge, Collapse, Group, Progress, Stack, Table, Text, TextInput, Toolti
 import { IconChevronDown, IconChevronRight, IconSearch } from '@tabler/icons-react'
 import { Fragment, useMemo, useState } from 'react'
 import { nachBaenden, REIF_TAGE, SCHWACH_UNTER, type AbschnittStatistik } from '@shared/kursAbschnitte'
-import { BandGruppe } from '../../shared/components/BandCover'
+import { BandGruppe, useBaendeOffen } from '../../shared/components/BandCover'
 import { ampel } from './MaterialListe'
 import { GeplantMarke } from '../../shared/components/FreigabePlanen'
 import { useExperte } from '../../shared/settingsStore'
@@ -52,7 +52,16 @@ function PersonenAmpeln({ a, namen }: { a: AbschnittStatistik; namen: string[] }
   )
 }
 
-export function VokabelAbschnitte({ abschnitte, namen }: { abschnitte: AbschnittStatistik[]; namen: string[] }): React.JSX.Element | null {
+export function VokabelAbschnitte({
+  abschnitte,
+  namen,
+  schluessel: kursSchluessel = ''
+}: {
+  abschnitte: AbschnittStatistik[]
+  namen: string[]
+  /** Kurs – für das gemerkte Auf/Zu der Bände */
+  schluessel?: string
+}): React.JSX.Element | null {
   const experte = useExperte()
   const [suche, setSuche] = useState('')
   /** Zu- bzw. aufgeklappte Units (Abweichung vom Standard: neueste offen) */
@@ -67,6 +76,9 @@ export function VokabelAbschnitte({ abschnitte, namen }: { abschnitte: Abschnitt
       : abschnitte
     return nachBaenden(passend)
   }, [abschnitte, q])
+  // Mehrere Bände (10.10.2026): je Band aufklappbar, der neueste offen (Reihenfolge ohne Suche)
+  const alleBaende = useMemo(() => nachBaenden(abschnitte).map((b) => b.buch), [abschnitte])
+  const bandAuf = useBaendeOffen(`abschnitte-${kursSchluessel}`, alleBaende)
   if (!abschnitte.length) return null
   // Schlüssel je Unit mit Band („Unit 1" gibt es in jedem Band); offen: die neueste Unit des neuesten Bands
   const schluessel = (buch: string, unit: string): string => `${buch}|${unit}`
@@ -102,7 +114,12 @@ export function VokabelAbschnitte({ abschnitte, namen }: { abschnitte: Abschnitt
           key={b.buch || OHNE_UNIT}
           buch={b.buch}
           ohneBand="Ohne Lehrwerk"
-          zusatz={((n) => `${n} ${n === 1 ? 'Abschnitt' : 'Abschnitte'}`)(b.units.reduce((n, u) => n + u.zeilen.length, 0))}
+          zusatz={((zeilen) => {
+            const w = zeilen.reduce((n, z) => n + z.woerter, 0)
+            const sicher = w ? zeilen.reduce((n, z) => n + z.sicher * z.woerter, 0) / w : 0
+            return `${b.units.length} ${b.units.length === 1 ? 'Unit' : 'Units'} · ${zeilen.length} ${zeilen.length === 1 ? 'Abschnitt' : 'Abschnitte'} · ${prozent(sicher)} sicher`
+          })(b.units.flatMap((u) => u.zeilen))}
+          {...(alleBaende.length > 1 ? { offen: Boolean(q) || bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
         >
           <Stack gap={4}>
             {b.units.map((g) => {

@@ -22,13 +22,16 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMediaQuery } from "@mantine/hooks";
-import { IconUsersGroup } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronRight, IconUsersGroup } from "@tabler/icons-react";
+import { useOffenGemerkt } from "../shared/sitzung";
+import { holen } from "../modules/onlinetest/serverApi";
+import { begrenzt, type StartKlasse, type StartseiteDaten } from "@shared/startseiteKurse";
+import { AnzahlWahl, useStartAnzahl } from "./StartAnzahl";
 import { ladeServerSchule } from "../shared/serverSchule";
 import { logoFreigestellt } from "../shared/logoFreistellen";
 import { modules } from "../modules/registry";
 import { useAppSettings } from "../shared/settingsStore";
 import {
-  oeffneProgramm,
   openDocument,
   openSettings,
   openThemen,
@@ -159,10 +162,14 @@ export default function Home(): React.JSX.Element {
           ...(materialien ?? []).filter((m) => !istReiheMaterial(reiheZuordnung.get(m.id), m.name)),
           ...reihenListe.map(reiheAlsMaterial),
         ],
-        ZULETZT_ANZAHL
+        // Smartphone (10.10.2026): Anzahl wählbar (bis „alle") – erst beim Zeigen gekürzt
+        handy ? Number.MAX_SAFE_INTEGER : ZULETZT_ANZAHL
       ),
-    [materialien, reiheZuordnung, reihenListe]
+    [materialien, reiheZuordnung, reihenListe, handy]
   );
+  // „Zuletzt bearbeitet" am Smartphone: zunächst 5, Anzahl wählbar und dauerhaft je Gerät (StartAnzahl.tsx)
+  const [zuletztAnzahl, setZuletztAnzahl] = useStartAnzahl("zuletzt");
+  const zuletztSichtbar = handy ? begrenzt(zuletzt, zuletztAnzahl) : zuletzt;
   const { liste: treffer, nurReihe } = useMemo(
     () =>
       suchtrefferMitReihen(
@@ -239,26 +246,8 @@ export default function Home(): React.JSX.Element {
         </Stack>
       )}
 
-      {/* Smartphone: „Meine Klassen" als eigene Zeile über der Materialsuche (10.10.2026) */}
-      {handy && aufServer() && modules.some((m) => m.id === "meineklassen") && (
-        <UnstyledButton
-          className="home-material home-meineklassen"
-          onClick={() => oeffneProgramm("meineklassen")}
-          data-home-meineklassen
-          mb="sm"
-        >
-          <Group gap="sm" wrap="nowrap">
-            {modules.find((m) => m.id === "meineklassen")?.leistenbild ? (
-              <img src={modules.find((m) => m.id === "meineklassen")?.leistenbild} width={36} height={36} alt="" />
-            ) : (
-              <ThemeIcon variant="light" size={36} radius="md">
-                <IconUsersGroup size={20} />
-              </ThemeIcon>
-            )}
-            <Text fw={600}>Meine Klassen</Text>
-          </Group>
-        </UnstyledButton>
-      )}
+      {/* Smartphone: „Meine Klassen" über der Materialsuche (10.10.2026) – aufklappbar mit Klassen und Kursen */}
+      {handy && aufServer() && modules.some((m) => m.id === "meineklassen") && <MeineKlassenKasten />}
 
       {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer erscheinen unten unter „Suchergebnis" */}
       {(materialien?.length ?? 0) > 0 && (
@@ -373,9 +362,14 @@ export default function Home(): React.JSX.Element {
       {(materialien?.length ?? 0) > 0 && (
         <Stack gap="sm" mb={40}>
           <Group justify="space-between" align="end" wrap="wrap" gap="sm">
-            <Title order={3}>
-              {suchtAktiv ? "Suchergebnis" : "Zuletzt bearbeitet"}
-            </Title>
+            <Group gap="xs" wrap="nowrap">
+              <Title order={3}>
+                {suchtAktiv ? "Suchergebnis" : "Zuletzt bearbeitet"}
+              </Title>
+              {handy && !suchtAktiv && (
+                <AnzahlWahl karte="zuletzt" wert={zuletztAnzahl} setzen={setZuletztAnzahl} />
+              )}
+            </Group>
           </Group>
           {suchtAktiv && bereichTreffer.length > 0 && (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
@@ -404,7 +398,7 @@ export default function Home(): React.JSX.Element {
                   <NurReiheHinweis />
                 </div>
               )}
-              {(suchtAktiv ? treffer.slice(0, 40) : zuletzt).map((m) => (
+              {(suchtAktiv ? treffer.slice(0, 40) : zuletztSichtbar).map((m) => (
                 <MaterialZeile key={`${m.moduleId}-${m.id}`} material={m} />
               ))}
             </SimpleGrid>
@@ -544,5 +538,102 @@ function BereichZeile({
         </div>
       </Group>
     </UnstyledButton>
+  );
+}
+
+/**
+ * „Meine Klassen" am Smartphone (10.10.2026, Wunsch der Lehrkraft): ein Kasten, zunächst zugeklappt (Auf/Zu gilt nur
+ * für die Sitzung, shared/sitzung.ts). Aufgeklappt stehen die Klassen und Kurse der Lehrkraft darin – ein Tipp öffnet
+ * „Meine Klassen" direkt bei dieser Klasse bzw. diesem Fach; dazu „Alle Klassen". Geladen wird erst beim Aufklappen.
+ */
+function MeineKlassenKasten(): React.JSX.Element {
+  const [offen, setOffen] = useOffenGemerkt<boolean>("home-meineklassen-offen", false);
+  const [klassen, setKlassen] = useState<StartKlasse[] | null>(null);
+  const modul = modules.find((m) => m.id === "meineklassen");
+  useEffect(() => {
+    if (!offen || klassen) return;
+    let weg = false;
+    void holen<StartseiteDaten>("/server/startseite").then(
+      (d) => !weg && setKlassen(d.klassen),
+      () => !weg && setKlassen([])
+    );
+    return () => {
+      weg = true;
+    };
+  }, [offen, klassen]);
+  return (
+    <div className="home-material home-meineklassen" data-home-meineklassen data-offen={offen} style={{ marginBottom: "var(--mantine-spacing-sm)" }}>
+      <UnstyledButton
+        onClick={() => setOffen((o) => !o)}
+        data-home-meineklassen-kopf
+        aria-expanded={offen}
+        style={{ display: "block", width: "100%" }}
+      >
+        <Group gap="sm" wrap="nowrap">
+          {modul?.leistenbild ? (
+            <img src={modul.leistenbild} width={36} height={36} alt="" />
+          ) : (
+            <ThemeIcon variant="light" size={36} radius="md">
+              <IconUsersGroup size={20} />
+            </ThemeIcon>
+          )}
+          <Text fw={600} style={{ flex: 1 }}>
+            Meine Klassen
+          </Text>
+          {offen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
+        </Group>
+      </UnstyledButton>
+      {offen && (
+        <Stack gap={6} mt="sm" data-home-meineklassen-liste>
+          {klassen === null ? (
+            <Text size="sm" c="dimmed">
+              Wird geladen …
+            </Text>
+          ) : klassen.length === 0 ? (
+            <Text size="sm" c="dimmed">
+              Noch keine Klassen oder Kurse.
+            </Text>
+          ) : (
+            klassen.map((k) => (
+              <Group key={k.schluessel} gap={6} wrap="wrap" data-home-klasse={k.name}>
+                <Button
+                  size="compact-sm"
+                  variant="light"
+                  onClick={() => void openDocument("meineklassen", k.faecher[0]?.id ?? k.gruppeId)}
+                >
+                  {k.name}
+                </Button>
+                {k.faecher.length > 1 &&
+                  k.faecher.map((f) => (
+                    <Button
+                      key={f.id}
+                      size="compact-xs"
+                      variant="subtle"
+                      onClick={() => void openDocument("meineklassen", f.id)}
+                      data-home-klasse-fach={f.fach}
+                    >
+                      {f.fach}
+                    </Button>
+                  ))}
+                {k.faecher.length === 1 && (
+                  <Text size="xs" c="dimmed">
+                    {k.faecher[0].fach}
+                  </Text>
+                )}
+              </Group>
+            ))
+          )}
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            w="fit-content"
+            onClick={() => void openDocument("meineklassen", "uebersicht")}
+            data-home-alle-klassen
+          >
+            Alle Klassen
+          </Button>
+        </Stack>
+      )}
+    </div>
   );
 }
