@@ -19,18 +19,25 @@ export function useLeistenDichte(schluessel: string, touch: boolean): number {
     window.addEventListener('resize', neu)
     return () => window.removeEventListener('resize', neu)
   }, [])
+  // Gemessen wird nur nach einer Änderung von Fensterhöhe, Leistenbreite oder Programmliste – NICHT beim Auf- und
+  // Zuklappen einer Gruppe (10.10.2026, Befund der Lehrkraft: beim Öffnen rückte alles enger zusammen, beim Schließen
+  // wieder auseinander). Passt eine aufgeklappte Gruppe nicht mehr, rollt die Leiste, statt ihre Dichte zu wechseln.
+  const fertig = useRef(false)
   useLayoutEffect(() => {
     const k = `${schluessel}|${hoehe}|${touch}`
     if (zuletzt.current !== k) {
       zuletzt.current = k
+      fertig.current = false
       if (stufe !== 0) {
         setStufe(0)
         return
       }
     }
+    if (fertig.current) return
     const liste = document.querySelector<HTMLElement>('.app-leiste .leiste-liste')
     if (!liste) return
     if (stufe < (touch ? 1 : 2) && liste.scrollHeight > liste.clientHeight + 1) setStufe(stufe + 1)
+    else fertig.current = true
   })
   return stufe
 }

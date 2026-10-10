@@ -136,7 +136,7 @@ export default function App(): React.JSX.Element {
   const einzeln = einzelnesProgramm()
   const ohneLeiste = Boolean(einzeln) || telefon || (touch && leisteAus)
   // Leiste dichter, solange sie sonst rollen müsste (09.10.2026, Notebook 1366 × 768) – shell/leistenDichte.ts
-  const dichte = useLeistenDichte(`${breit}|${aufGruppen.join(',')}|${sichtbar.map((m) => m.id).join(',')}|${active}|${ohneLeiste}`, touch)
+  const dichte = useLeistenDichte(`${breit}|${sichtbar.map((m) => m.id).join(',')}|${ohneLeiste}`, touch)
   const leisteAusblenden = (aus: boolean): void => {
     setLeisteAus(aus)
     try {
