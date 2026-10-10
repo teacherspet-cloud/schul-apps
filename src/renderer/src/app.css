@@ -4,8 +4,15 @@ body,
   height: 100%;
 }
 
+/*
+ * Kein weißer Rand beim Überziehen (10.10.2026, Befund der Lehrkraft: zu schnell über Anfang/Ende gescrollt, kam
+ * eine weiße Fläche). html UND body tragen den Seitengrund, das Nachfedern (iOS/Mac) ist aus.
+ */
+html,
 body {
-  background: var(--app-bg);
+  background-color: var(--app-bg);
+  min-height: 100%;
+  overscroll-behavior-y: none;
 }
 
 .app-main {

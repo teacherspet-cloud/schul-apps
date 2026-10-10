@@ -76,6 +76,7 @@ import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, vokabelBlattFuerKlasse, type FertigesBlatt } from './klassenMaterial'
+import { ProblemWoerterFenster } from './ProblemWoerterFenster'
 import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -778,6 +779,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
   const [wiederholt, setWiederholt] = useState(false)
+  // Pop-up „Problemwörter" (10.10.2026): Kachel in „Auf einen Blick"
+  const [problemeOffen, setProblemeOffen] = useState(false)
   const { reiter, setze } = useSicht()
   const laden = useCallback(() => {
     void holen<KlasseDetail>(`/server/klassen/${id}`).then(setD, (e: unknown) => notifyError(e))
@@ -841,50 +844,22 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const wackeligVorschlag = d.vorschlaege.find((v): v is Extract<Vorschlag, { art: 'vokabeln' }> => v.art === 'vokabeln') ?? null
   const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
   const mitLernstand = Boolean(d.sprachfach && sprachKurs && sprachKurs.woerter > 0)
-  return (
-    <Stack data-klasse-detail={d.titel}>
-      {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) – in Sprachklassen
-           mit Lernstand klein neben Karteikasten und Units (10.10.2026, unten) */}
-      {!mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
-      {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
-           seit 10.10.2026 mit dem kompakten Kennzahlen-Kasten vorn in derselben Reihe */}
-      {mitLernstand && sprachKurs && (
-        <SprachLernstand
-          kursId={sprachKurs.id}
-          abschnitte={sprachKurs.abschnitte}
-          zuAbschnitten={() => setze({ reiter: 'vokabeln' })}
-          kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt />}
-        />
-      )}
-
-      {/* ---------- Handlungsbedarf als Pop-up (10.10.2026): öffnet die Kachel „Handlungsbedarf" bzw. die Zahl am Fach */}
-      {bedarfFenster === d.id && (
-        <HandlungsbedarfFenster
-          gruppeId={d.id}
-          titel={d.titel}
-          bedarf={sichtbarerBedarf}
-          ausgeblendet={d.bedarfAusgeblendet ?? []}
-          wackelig={wackeligVorschlag ? { woerter: wackeligVorschlag.woerter.length, gesamt: d.problemZahl ?? wackeligVorschlag.woerter.length } : null}
-          oeffnen={oeffneMitRueckweg}
-          setzeReiter={(r) => setze({ reiter: r })}
-          geaendert={bedarfNeu}
-          wackeligAnsehen={() => wackeligVorschlag && setVorschau(wackeligVorschlag)}
-          wackeligWiederholen={() => void imKursWiederholen()}
-          wiederholtLaeuft={wiederholt}
-        />
-      )}
-
-      {/* ---------- Geplante Freischaltungen (09.10.2026) */}
-      <GeplantKarte gruppeId={d.id} neuLaden={laden} />
-
-      {/* ---------- Vorschläge für Material */}
-      {(d.vorschlaege.length > 0 || fertige.length > 0) && (
-        <div>
-          <Group gap={6} mb={6}>
-            <IconSparkles size={18} color="var(--mantine-color-grape-6)" />
-            <Text fw={700}>Passendes Material</Text>
-          </Group>
-          <SimpleGrid cols={{ base: 1, md: 2 }}>
+  /*
+   * „Passendes Material" (10.10.2026): Problemwörter stehen nicht mehr hier – die Kachel „Problemwörter" in „Auf einen
+   * Blick" öffnet ihr eigenes Pop-up (ProblemWoerterFenster.tsx). In Sprachklassen mit Lernstand ein Kasten in der Reihe
+   * neben „Units" (SprachLernstand), sonst wie bisher eigene Karten unter dem Kopf.
+   */
+  const materialVorschlaege = d.vorschlaege.filter((v): v is Extract<Vorschlag, { art: 'blatt' }> => v.art === 'blatt')
+  const materialKasten = (alsKarte: boolean): React.JSX.Element | null => {
+    if (!materialVorschlaege.length && !fertige.length) return null
+    const kopf = (
+      <Group gap={6} mb={alsKarte ? 'xs' : 6}>
+        <IconSparkles size={18} color="var(--mantine-color-grape-6)" />
+        <Text fw={700}>Passendes Material</Text>
+      </Group>
+    )
+    const karten = (
+      <>
             {fertige.map((f) => (
               <Card key={f.docId} withBorder radius="md" padding="md" style={{ borderColor: 'var(--mantine-color-teal-6)' }} data-blatt-fertig>
                 <Badge color="teal" mb={6}>
@@ -904,43 +879,82 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
                 </Group>
               </Card>
             ))}
-            {d.vorschlaege.map((v, i) => (
+            {materialVorschlaege.map((v, i) => (
               <Card key={i} withBorder radius="md" padding="md" data-vorschlag={v.art}>
                 <Group gap={6} mb={4}>
-                  {v.art === 'vokabeln' ? <IconBook2 size={16} /> : <IconFileText size={16} />}
+                  <IconFileText size={16} />
                   <Text fw={700}>{v.titel}</Text>
                 </Group>
-                {/* Wackelige Wörter: Erklärtext nur im Expertenmodus (10.10.2026, Wunsch der Lehrkraft) */}
-                {(v.art !== 'vokabeln' || experte) && (
-                  <Text size="sm" c="dimmed" mb={6}>
-                    {v.text}
-                  </Text>
-                )}
-                {v.art === 'blatt' && (
-                  <Stack gap={2} mb="sm">
-                    {v.schwerpunkte.map((s) => (
-                      <Text key={s} size="xs">
-                        • {s}
-                      </Text>
-                    ))}
-                  </Stack>
-                )}
-                {v.art === 'vokabeln' ? (
-                  <Button size="xs" onClick={() => setVorschau(v)} data-vorschlag-ansehen>
-                    Ansehen und wiederholen lassen
+                <Text size="sm" c="dimmed" mb={6}>
+                  {v.text}
+                </Text>
+                <Stack gap={2} mb="sm">
+                  {v.schwerpunkte.map((s) => (
+                    <Text key={s} size="xs">
+                      • {s}
+                    </Text>
+                  ))}
+                </Stack>
+                <Tooltip label="Entsteht im Hintergrund mit dem eigenen KI-Zugang; ist es fertig, erscheint es hier zum Freischalten">
+                  <Button size="xs" leftSection={<IconSparkles size={14} />} onClick={() => blattFuerKlasse(d, v)} data-blatt-erstellen>
+                    Übungsblatt erstellen lassen
                   </Button>
-                ) : (
-                  <Tooltip label="Entsteht im Hintergrund mit dem eigenen KI-Zugang; ist es fertig, erscheint es hier zum Freischalten">
-                    <Button size="xs" leftSection={<IconSparkles size={14} />} onClick={() => blattFuerKlasse(d, v)} data-blatt-erstellen>
-                      Übungsblatt erstellen lassen
-                    </Button>
-                  </Tooltip>
-                )}
+                </Tooltip>
               </Card>
             ))}
-          </SimpleGrid>
-        </div>
+      </>
+    )
+    return alsKarte ? (
+      <Card withBorder radius="md" padding="md" h="100%" data-passendes-material>
+        {kopf}
+        <Stack gap="xs">{karten}</Stack>
+      </Card>
+    ) : (
+      <div data-passendes-material>
+        {kopf}
+        <SimpleGrid cols={{ base: 1, md: 2 }}>{karten}</SimpleGrid>
+      </div>
+    )
+  }
+  return (
+    <Stack data-klasse-detail={d.titel}>
+      {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) – in Sprachklassen
+           mit Lernstand klein neben Karteikasten und Units (10.10.2026, unten) */}
+      {!mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
+      {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
+           seit 10.10.2026 mit dem kompakten Kennzahlen-Kasten vorn in derselben Reihe */}
+      {mitLernstand && sprachKurs && (
+        <SprachLernstand
+          kursId={sprachKurs.id}
+          abschnitte={sprachKurs.abschnitte}
+          zuAbschnitten={() => setze({ reiter: 'vokabeln' })}
+          kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt problemeOeffnen={() => setProblemeOffen(true)} />}
+          material={materialKasten(true)}
+        />
       )}
+
+      {/* ---------- Handlungsbedarf als Pop-up (10.10.2026): öffnet die Kachel „Handlungsbedarf" bzw. die Zahl am Fach */}
+      {bedarfFenster === d.id && (
+        <HandlungsbedarfFenster
+          gruppeId={d.id}
+          titel={d.titel}
+          bedarf={sichtbarerBedarf}
+          ausgeblendet={d.bedarfAusgeblendet ?? []}
+          wackelig={wackeligVorschlag ? { woerter: wackeligVorschlag.woerter.length, gesamt: d.problemZahl ?? wackeligVorschlag.woerter.length } : null}
+          oeffnen={oeffneMitRueckweg}
+          setzeReiter={(r) => setze({ reiter: r })}
+          geaendert={bedarfNeu}
+          wackeligAnsehen={() => (mitLernstand ? setProblemeOffen(true) : wackeligVorschlag && setVorschau(wackeligVorschlag))}
+          wackeligWiederholen={() => void imKursWiederholen()}
+          wiederholtLaeuft={wiederholt}
+        />
+      )}
+
+      {/* ---------- Geplante Freischaltungen (09.10.2026) */}
+      <GeplantKarte gruppeId={d.id} neuLaden={laden} />
+
+      {/* ---------- Vorschläge für Material: in Sprachklassen mit Lernstand oben in der Reihe neben „Units" (10.10.2026) */}
+      {!mitLernstand && materialKasten(false)}
 
       {/* ---------- Reiter (Runde 2): Reihen & Blätter, Vokabeln & Grammatik (Sprachfach), Tests & Noten, Lernende */}
       <Tabs value={aktiverReiter} onChange={(v) => v && setze({ reiter: v })} keepMounted={false}>
@@ -1045,6 +1059,16 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
             </Group>
           </Stack>
         </Modal>
+      )}
+      {problemeOffen && sprachKurs && (
+        <ProblemWoerterFenster
+          kursId={sprachKurs.id}
+          klasse={d}
+          schliessen={() => setProblemeOffen(false)}
+          wiederholen={imKursWiederholen}
+          wiederholtLaeuft={wiederholt}
+          geaendert={bedarfNeu}
+        />
       )}
       {freigabe && (
         <BlattFreigabeDialog

@@ -5,6 +5,9 @@
  *
  * 10.10.2026: der kleine Kennzahlen-Kasten (`kopf`) steht vorn in derselben Reihe – drei Karten nebeneinander auf breiten
  * Schirmen, zwei auf dem Tablet, eine je Zeile auf dem Handy (dort mit knapperem Innenabstand); gleiche Höhe je Reihe.
+ *
+ * 10.10.2026: „Passendes Material" (`material`) kann mit in die Reihe – dann zwei Spalten ab Tablet (Kennzahlen +
+ * Karteikasten, darunter Units + Passendes Material nebeneinander, gleiche Höhe je Reihe), eine je Zeile auf dem Handy.
  */
 import { vokabelnHinzufuegen } from '../lernen/kurs/KursSeite'
 import { IconPlus } from '@tabler/icons-react'
@@ -20,13 +23,16 @@ export function SprachLernstand({
   kursId,
   abschnitte,
   zuAbschnitten,
-  kopf
+  kopf,
+  material
 }: {
   kursId: string
   /** Kennzahlen-Kasten (FachKopf kompakt) – vorn in der Reihe */
   kopf?: React.ReactNode
   abschnitte?: AbschnittStatistik[]
   zuAbschnitten: () => void
+  /** Kasten „Passendes Material" – in derselben Reihe wie „Units" */
+  material?: React.ReactNode
 }): React.JSX.Element | null {
   const [gesamt, setGesamt] = useState<Uebersicht | null>(null)
   useEffect(() => {
@@ -38,9 +44,9 @@ export function SprachLernstand({
       aus = true
     }
   }, [kursId])
-  if (!gesamt && !abschnitte?.length && !kopf) return null
+  if (!gesamt && !abschnitte?.length && !kopf && !material) return null
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" data-sprach-lernstand>
+    <SimpleGrid cols={material ? { base: 1, sm: 2 } : { base: 1, sm: 2, lg: 3 }} spacing="md" data-sprach-lernstand>
       <style>{`
         @media (max-width: 700px) {
           [data-sprach-lernstand] > .mantine-Card-root { --card-padding: 10px !important; padding: 10px; }
@@ -81,6 +87,7 @@ export function SprachLernstand({
           <UnitsKompakt abschnitte={abschnitte} schluessel={kursId} />
         </Card>
       )}
+      {material}
     </SimpleGrid>
   )
 }

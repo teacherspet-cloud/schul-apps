@@ -530,9 +530,12 @@ try {
   }
   const faelligVorher = await faellig()
   const kurseVorher = ((await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen ?? []).length
-  await p.locator('[data-vorschlag="vokabeln"] [data-vorschlag-ansehen]').click()
-  pruefe(await da(p.locator('[data-wackelig-blatt]')), 'Vorschau bietet „Als kurzes Arbeitsblatt“')
-  await p.locator('[data-wackelig-wiederholen]').click()
+  // Seit 10.10.2026: Kachel „Problemwörter" in „Auf einen Blick" öffnet das Pop-up (nicht mehr unter „Passendes Material")
+  pruefe(!(await da(p.locator('[data-vorschlag="vokabeln"]'), 500)), 'Problemwörter nicht mehr unter „Passendes Material“')
+  await p.locator('[data-fach-kopf-kompakt] [data-kennzahl="probleme"]').click()
+  pruefe(await da(p.locator('[data-problem-blatt]')), 'Pop-up bietet „Als Arbeitsblatt (Vokabelübung)“')
+  pruefe(await da(p.locator('[data-problem-test]')), 'Pop-up bietet „Als Vokabeltest“')
+  await p.locator('[data-problem-wiederholen]').click()
   pruefe(await da(p.getByText(/wieder dran – im Kurs „/), 8000), 'Meldung: wackelige Wörter sind im Kurs wieder dran')
   const faelligNachher = await faellig()
   pruefe(faelligVorher === 0 && faelligNachher === 5, `Wörter bei Mia wieder fällig (vorher ${faelligVorher}, nachher ${faelligNachher} von 5)`)

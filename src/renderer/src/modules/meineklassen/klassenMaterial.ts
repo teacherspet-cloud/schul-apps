@@ -22,6 +22,8 @@ import { defaultMeta } from '../arbeitsblatt/model/defaults'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import type { Worksheet, WorksheetMeta } from '../arbeitsblatt/model/types'
 import { profileFromMeta } from '../arbeitsblatt/render/SheetPages'
+import { newId } from '../vokabeltest/model/random'
+import { testAusListe } from '../vokabeltest/library'
 
 const SCHLUESSEL = (klasseId: string): string => `meineklassen-fertig:${klasseId}`
 const EREIGNIS = 'meineklassen-fertig'
@@ -224,4 +226,28 @@ export function vokabelBlattFuerKlasse(
   v: { fach: string; woerter: { term: string; translation: string; example?: string }[] }
 ): void {
   klassenBlattAuftrag(k, vokabelBlattMeta(k, v), `meineklassen:${k.id}:wackelig`, 'Vokabelblatt')
+}
+
+/**
+ * Problemwörter als Vokabeltest (10.10.2026, Pop-up „Problemwörter" in „Meine Klassen"): die Wörter als Vokabelliste
+ * ablegen (Sprache und Jahrgang der Klasse) und daraus einen neuen Vokabeltest beginnen – derselbe Weg wie „Test aus
+ * dieser Liste". Die Liste bleibt unter „Vokabellisten" liegen.
+ */
+export async function vokabeltestFuerKlasse(
+  k: { name: string; titel: string },
+  v: { sprache?: string; woerter: { term: string; translation: string }[] }
+): Promise<void> {
+  const id = newId()
+  const datum = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  await window.api.library.save({
+    id,
+    name: `Problemwörter ${k.titel} (${datum})`,
+    updatedAt: '',
+    // Nur ein Sprachkürzel (en, fr …) – sonst fragt der Vokabeltest die Sprache selbst ab
+    ...(v.sprache && /^[a-z]{2}$/.test(v.sprache) ? { language: v.sprache } : {}),
+    grade: jahrgangAus(k.name),
+    source: `Problemwörter ${k.titel}`,
+    entries: v.woerter.map((w) => ({ term: w.term.trim(), translation: w.translation.trim() })).filter((w) => w.term)
+  })
+  await testAusListe(id)
 }

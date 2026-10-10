@@ -108,7 +108,18 @@ export function relevanteKennzahlen<T extends { id: string }>(zahlen: T[], k: Re
   })
 }
 
-export function FachKopf({ d, gehe, kompakt = false }: { d: FachDaten; gehe: (reiter: string) => void; kompakt?: boolean }): React.JSX.Element {
+export function FachKopf({
+  d,
+  gehe,
+  kompakt = false,
+  problemeOeffnen
+}: {
+  d: FachDaten
+  gehe: (reiter: string) => void
+  kompakt?: boolean
+  /** Kachel „Problemwörter" öffnet das Pop-up (10.10.2026, ProblemWoerterFenster.tsx); ohne: Reiter „Vokabeln" */
+  problemeOeffnen?: () => void
+}): React.JSX.Element {
   const k = fachKennzahlen(d)
   // Handlungsbedarf als Pop-up (10.10.2026, Entscheidung der Lehrkraft) – nach Art gruppiert, mit nächstem Schritt
   const zumBedarf = (): void => useBedarfFenster.getState().oeffne(d.id)
@@ -118,7 +129,7 @@ export function FachKopf({ d, gehe, kompakt = false }: { d: FachDaten; gehe: (re
           { id: 'sicher', label: 'Wörter sicher', wert: `${Math.round(k.vokabeln.sicher * 100)} %`, farbe: 'teal', klick: () => gehe('vokabeln') },
           { id: 'aktiv', label: 'aktiv diese Woche', wert: `${k.vokabeln.aktiv}/${k.vokabeln.von}`, klick: () => gehe('vokabeln') },
           ...(kompakt && k.vokabeln.probleme
-            ? [{ id: 'probleme', label: k.vokabeln.probleme === 1 ? 'Problemwort' : 'Problemwörter', wert: k.vokabeln.probleme, farbe: 'orange', klick: () => gehe('vokabeln') }]
+            ? [{ id: 'probleme', label: k.vokabeln.probleme === 1 ? 'Problemwort' : 'Problemwörter', wert: k.vokabeln.probleme, farbe: 'orange', klick: problemeOeffnen ?? (() => gehe('vokabeln')) }]
             : []),
           ...(k.vokabeln.test ? [{ id: 'vokabeltest', label: 'nächster Vokabeltest', wert: kurzTag(k.vokabeln.test), klick: () => gehe('vokabeln') }] : [])
         ]

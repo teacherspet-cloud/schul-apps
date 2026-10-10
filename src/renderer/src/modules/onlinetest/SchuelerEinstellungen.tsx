@@ -94,6 +94,8 @@ html.sa-kontrast[data-mantine-color-scheme='dark'] { --mantine-color-dimmed: #e9
 html.sa-kontrast[data-mantine-color-scheme='light'] { --sa-grund: #fff; }
 /* Seitengrund leicht getönt, Karten (--mantine-color-body) weiß bzw. eine Stufe heller (09.10.2026) */
 html:root, html:root body { background: var(--sa-grund, var(--mantine-color-body)); }
+/* Kein weißer Rand beim Überziehen (10.10.2026): html und body tragen den Grund, kein Nachfedern über Anfang/Ende */
+html:root, html:root body { background-color: var(--sa-grund, var(--mantine-color-body)); min-height: 100%; overscroll-behavior-y: none; }
 html.sa-kontrast .mantine-Paper-root, html.sa-kontrast .mantine-Card-root { border-color: var(--mantine-color-default-border) !important; }
 html.sa-kontrast a:focus-visible, html.sa-kontrast button:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
 .sa-vorlese-leiste { position: fixed; right: 16px; bottom: 16px; z-index: 300; }
@@ -131,6 +133,30 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
   }, [d.schrift, d.ruhig, d.zeilen, d.kontrast, d.leseschrift])
   const schema = d.modus === 'auto' ? (systemDunkel ? 'dark' : 'light') : d.modus === 'dunkel' ? 'dark' : 'light'
   const { theme, variablen } = useMemo(() => schuelerTheme(d.farbe), [d.farbe])
+  /*
+   * Weiße Fläche beim Überziehen (10.10.2026, Befund der Lehrkraft auf allen Geräten): Schnell über Anfang oder Ende
+   * hinaus gescrollt, zeigte der Browser hinter der Seite Weiß. Jetzt tragen html UND body den Seitengrund (auch die
+   * Tönung der gewählten Farbe, hell/dunkel, Kontrast) direkt am Element, Nachfedern ist aus, und die Browser-/
+   * Statusleiste (theme-color, iOS) hat dieselbe Farbe.
+   */
+  useEffect(() => {
+    const grund = d.kontrast ? (schema === 'dark' ? '#000000' : '#ffffff') : farbSatz(d.farbe)[schema === 'dark' ? 'dunkel' : 'hell'].grund
+    const html = document.documentElement
+    for (const el of [html, document.body]) {
+      el.style.backgroundColor = grund
+      el.style.setProperty('overscroll-behavior-y', 'none')
+    }
+    html.style.colorScheme = schema
+    // Das Vorab-Skript (/server/vorab.js) räumt seinen Grund sonst nach dem ersten Bild wieder ab
+    html.setAttribute('data-sa-grund', '')
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.content = grund
+  }, [d.farbe, d.kontrast, schema])
   return (
     <MantineProvider theme={theme} cssVariablesResolver={variablen} forceColorScheme={schema}>
       <style>{LESEN_CSS}</style>
