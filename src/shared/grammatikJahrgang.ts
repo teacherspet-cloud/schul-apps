@@ -4,12 +4,14 @@
  *  1. dem Lehrwerk-Band der Grammatik (Angaben der Freigabe, z. B. „Green Line 1");
  *  2. dem Lehrwerk des Kurses (Band mit Jahrgang aus den Lehrwerksdaten, sonst die Bandnummer);
  *  3. der Klasse beim Freigeben (Angabe im Freigabe-Dialog, sonst Name der Lerngruppe);
- *  4. der heutigen Klasse der Person, zurückgerechnet auf das Schuljahr der Freigabe (Wechsel am 1. August).
+ *  4. der heutigen Klasse der Person, zurückgerechnet auf das Schuljahr der Freigabe (Schulkalender, sonst 1. August).
  *
  * Faustregel Band → Jahrgang (es gibt keine Tabelle in den Lehrwerksdaten): Band 1 steht am Anfang der Fremdsprache in
  * der weiterführenden Schule – Englisch ab Klasse 5 (Green Line 1 = Klasse 5), zweite Fremdsprachen (Französisch,
  * Spanisch, Latein, Italienisch, Russisch) ab Klasse 6. Band n = Startklasse + n − 1.
  */
+
+import { schuljahrVon as kalenderSchuljahr } from './schulkalender'
 
 /** Klasse, in der Band 1 einer Sprache üblicherweise beginnt (Faustregel, Niedersachsen/G9) */
 export const STARTKLASSE: Record<string, number> = { en: 5, fr: 6, es: 6, la: 6, it: 6, ru: 6 }
@@ -30,10 +32,12 @@ export function jahrgangAusBand(band: string | undefined | null, sprache: string
   return j >= 1 && j <= 13 ? j : null
 }
 
-/** Beginn-Jahr des Schuljahres zu einem Zeitpunkt (Wechsel am 1. August) */
+/**
+ * Beginn-Jahr des Schuljahres zu einem Zeitpunkt – genau nach dem Schulkalender (erster Schultag nach den
+ * Sommerferien, 10.10.2026), ohne Kalenderdaten Wechsel am 1. August (shared/schulkalender.ts)
+ */
 export function schuljahrVon(ms: number): number {
-  const d = new Date(ms)
-  return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1
+  return kalenderSchuljahr(ms)
 }
 
 const gueltig = (j: number | null | undefined): j is number => typeof j === 'number' && Number.isFinite(j) && j >= 1 && j <= 13

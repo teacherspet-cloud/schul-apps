@@ -238,6 +238,10 @@ try {
   pruefe(true, 'Planung als fertiger Auftrag in der Leiste')
   await p.screenshot({ path: join(out, '1-auftrag.png') })
   await zeile.getByRole('button', { name: 'Öffnen', exact: true }).click()
+  // Die Auftragsleiste bleibt seit 09.10.2026 in der Sitzung offen (shared/sitzung.ts) – sie würde später Knöpfe verdecken
+  const einklappen = p.getByRole('button', { name: 'Aufträge einklappen' })
+  if (await einklappen.isVisible().catch(() => false)) await einklappen.evaluate((el) => el.click())
+  await p.waitForTimeout(400)
   await p.locator('[data-reihe-editor]').waitFor({ timeout: 15000 })
   await p.locator('[data-plan-uebernehmen]').waitFor({ timeout: 15000 })
   pruefe((await p.locator('[data-reihe-titel]').inputValue()) === 'KI-Reihe Probe', 'Öffnen führt in die geplante Reihe mit Plan-Vorschau')

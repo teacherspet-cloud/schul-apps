@@ -24,6 +24,7 @@
  * Andere Schulformen mit gymnasialer Oberstufe (Gesamtschulen, Gemeinschaftsschulen,
  * Stadtteilschulen …) führen in neun Jahren zum Abitur; ihre Oberstufe beginnt mit Klasse 11.
  */
+import { schuljahrVon } from '@shared/schulkalender'
 import { stateInfo } from './states'
 
 export type Bildungsgang = 'G8' | 'G9'
@@ -46,8 +47,8 @@ export function merkeBildungsgang(werte: BildungsgangEinstellung | null | undefi
   eingestellt = werte ?? null
 }
 
-/** Schuljahr (Beginn), das heute läuft: ab August zählt das neue */
-export const laufendesSchuljahr = (heute: Date = new Date()): number => (heute.getMonth() >= 7 ? heute.getFullYear() : heute.getFullYear() - 1)
+/** Schuljahr (Beginn), das heute läuft: Schulkalender (erster Schultag nach den Sommerferien), sonst ab August */
+export const laufendesSchuljahr = (heute: Date = new Date()): number => schuljahrVon(heute)
 
 /**
  * Bildungsgang des Gymnasiums für einen Jahrgang – oder null für andere Schulformen.

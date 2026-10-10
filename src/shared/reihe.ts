@@ -365,6 +365,12 @@ export interface Reihe {
   /** Stundenraster (05.10.2026): Einzel- (45 min) und Doppelstunden in ihrer Reihenfolge */
   stunden?: StundenArt[]
   /**
+   * Termine der Stunden (10.10.2026, Schulkalender): erste Stunde am `beginn` (JJJJ-MM-TT), danach an den Wochentagen
+   * `tage` (1 = Montag … 5 = Freitag) – Ferien und Feiertage werden übersprungen (shared/schulkalender.ts
+   * `unterrichtsTage`). Fehlt = Stunden ohne Datum.
+   */
+  stundenTermine?: { beginn: string; tage: number[] }
+  /**
    * Optionale Schritte (06.10.2026): so viele davon müssen geschafft sein, damit die Reihe als abgeschlossen gilt
    * (fehlt/0 = keine nötig; mehr als vorhanden zählt nur bis zur vorhandenen Zahl)
    */

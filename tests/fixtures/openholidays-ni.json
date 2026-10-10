@@ -1,0 +1,699 @@
+{
+ "land": "NI",
+ "herkunft": "OpenHolidays API, echte Antworten vom 10.10.2026: /SchoolHolidays und /PublicHolidays?countryIsoCode=DE&subdivisionCode=DE-NI&languageIsoCode=DE&validFrom=2025-08-01&validTo=2027-07-31",
+ "schulferien": [
+  {
+   "id": "e7df00a7-8a7c-4b6d-99fe-802c18caef70",
+   "startDate": "2025-07-03",
+   "endDate": "2025-08-13",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Sommerferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "c1767d00-1904-4c33-95a5-b7c74f0dea96",
+   "startDate": "2025-10-13",
+   "endDate": "2025-10-25",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Herbstferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "511c6b06-758a-4935-9cbb-5e9fd674ce9f",
+   "startDate": "2025-12-22",
+   "endDate": "2026-01-05",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Weihnachtsferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "84fc149f-5a2e-44f4-b01f-7ec103e93e33",
+   "startDate": "2026-02-02",
+   "endDate": "2026-02-03",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Halbjahresferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "3df2322a-8fbd-49bb-a390-a41451dddc33",
+   "startDate": "2026-03-23",
+   "endDate": "2026-04-07",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Osterferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "9457b164-1eab-4e97-903a-9eecc5a4e777",
+   "startDate": "2026-05-15",
+   "endDate": "2026-05-15",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag nach Himmelfahrt"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "151fd363-157b-4ecd-ac18-79c815cce3af",
+   "startDate": "2026-05-26",
+   "endDate": "2026-05-26",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Pfingstferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "33549564-dce8-4d67-8fb7-722140ebd17e",
+   "startDate": "2026-07-02",
+   "endDate": "2026-08-12",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Sommerferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "a6dee455-36a5-4052-95cc-9718def865a4",
+   "startDate": "2026-10-12",
+   "endDate": "2026-10-24",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Herbstferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "dff6eef5-93a1-4137-8953-2fba1dc16cf1",
+   "startDate": "2026-12-23",
+   "endDate": "2027-01-09",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Weihnachtsferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "2f5b4b35-6e1a-40e4-b038-9a0cd49f5472",
+   "startDate": "2027-02-01",
+   "endDate": "2027-02-02",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Halbjahresferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "1d54b897-82b2-4387-ad03-0cacce0c37e4",
+   "startDate": "2027-03-22",
+   "endDate": "2027-04-03",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Osterferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "20f944cd-8f4d-43a7-8021-a7e0551fa594",
+   "startDate": "2027-05-07",
+   "endDate": "2027-05-07",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag nach Himmelfahrt"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "8eb4cf06-1d5a-49e3-8783-252639e216d2",
+   "startDate": "2027-05-18",
+   "endDate": "2027-05-18",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Pfingstferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  },
+  {
+   "id": "4825be2e-7c32-4ed5-a5bd-03783dff602b",
+   "startDate": "2027-07-08",
+   "endDate": "2027-08-18",
+   "type": "School",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Sommerferien"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    }
+   ]
+  }
+ ],
+ "feiertage": [
+  {
+   "id": "ac964e18-2d34-497a-a9c5-b8ab065b7238",
+   "startDate": "2025-10-03",
+   "endDate": "2025-10-03",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag der Deutschen Einheit"
+    }
+   ],
+   "regionalScope": "National",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "2514f889-8ff3-460c-b12c-c886f8b653de",
+   "startDate": "2025-10-31",
+   "endDate": "2025-10-31",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Reformationstag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-SH",
+     "shortName": "SH"
+    },
+    {
+     "code": "DE-ST",
+     "shortName": "ST"
+    },
+    {
+     "code": "DE-HH",
+     "shortName": "HH"
+    },
+    {
+     "code": "DE-HB",
+     "shortName": "HB"
+    },
+    {
+     "code": "DE-TH",
+     "shortName": "TH"
+    },
+    {
+     "code": "DE-MV",
+     "shortName": "MV"
+    },
+    {
+     "code": "DE-SN",
+     "shortName": "SN"
+    },
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    },
+    {
+     "code": "DE-BB",
+     "shortName": "BB"
+    }
+   ]
+  },
+  {
+   "id": "92b270e3-247f-4f82-b79d-b5ad77a67d95",
+   "startDate": "2025-12-25",
+   "endDate": "2025-12-25",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "1. Weihnachtsfeiertag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "28bf580c-9787-4d67-ab3e-06a5e6597c1c",
+   "startDate": "2025-12-26",
+   "endDate": "2025-12-26",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "2. Weihnachtsfeiertag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "9ac6fd8b-aec4-41f0-916b-f03af58ecdab",
+   "startDate": "2026-01-01",
+   "endDate": "2026-01-01",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Neujahr"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "f80fd9dc-41b4-4203-8fea-2cf36d365fbb",
+   "startDate": "2026-04-03",
+   "endDate": "2026-04-03",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Karfreitag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "8d8ad831-8d60-429f-ad46-7f842c9fe2d9",
+   "startDate": "2026-04-06",
+   "endDate": "2026-04-06",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Ostermontag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "6f661249-94cb-4a54-a063-20dde86ebde6",
+   "startDate": "2026-05-01",
+   "endDate": "2026-05-01",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag der Arbeit"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "0905ed2a-46a7-4731-87e2-a8c53c42b0e2",
+   "startDate": "2026-05-14",
+   "endDate": "2026-05-14",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Christi Himmelfahrt"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "ce6dcd62-b512-4075-be98-73ffc3dee4db",
+   "startDate": "2026-05-25",
+   "endDate": "2026-05-25",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Pfingstmontag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "555eaa64-b8f6-44ce-850b-6af0d75555e9",
+   "startDate": "2026-10-03",
+   "endDate": "2026-10-03",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag der Deutschen Einheit"
+    }
+   ],
+   "regionalScope": "National",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "6febea3c-594a-42ff-9e77-eb5e53c4aadd",
+   "startDate": "2026-10-31",
+   "endDate": "2026-10-31",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Reformationstag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": false,
+   "subdivisions": [
+    {
+     "code": "DE-SH",
+     "shortName": "SH"
+    },
+    {
+     "code": "DE-ST",
+     "shortName": "ST"
+    },
+    {
+     "code": "DE-HH",
+     "shortName": "HH"
+    },
+    {
+     "code": "DE-HB",
+     "shortName": "HB"
+    },
+    {
+     "code": "DE-TH",
+     "shortName": "TH"
+    },
+    {
+     "code": "DE-MV",
+     "shortName": "MV"
+    },
+    {
+     "code": "DE-SN",
+     "shortName": "SN"
+    },
+    {
+     "code": "DE-NI",
+     "shortName": "NI"
+    },
+    {
+     "code": "DE-BB",
+     "shortName": "BB"
+    }
+   ]
+  },
+  {
+   "id": "b37c8536-925e-455c-9e61-8e2b984a74d1",
+   "startDate": "2026-12-25",
+   "endDate": "2026-12-25",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "1. Weihnachtsfeiertag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "fafc28cf-c8fc-4290-97b0-99904f920d4f",
+   "startDate": "2026-12-26",
+   "endDate": "2026-12-26",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "2. Weihnachtsfeiertag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "a9951b88-fbfa-4634-8b80-39c60abb2a0c",
+   "startDate": "2027-01-01",
+   "endDate": "2027-01-01",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Neujahr"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "f5967e35-9fbb-4cd9-ae3d-622f6cf90028",
+   "startDate": "2027-03-26",
+   "endDate": "2027-03-26",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Karfreitag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "fcd0558e-3e01-4902-b785-d8bd45baba24",
+   "startDate": "2027-03-29",
+   "endDate": "2027-03-29",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Ostermontag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "5dce4648-d6e6-400a-936e-b85edbf85622",
+   "startDate": "2027-05-01",
+   "endDate": "2027-05-01",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Tag der Arbeit"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "889b46cc-0934-44a1-9468-d88f880acc94",
+   "startDate": "2027-05-06",
+   "endDate": "2027-05-06",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Christi Himmelfahrt"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  },
+  {
+   "id": "689daf70-cc0e-44d6-a501-8a17d4a551dc",
+   "startDate": "2027-05-17",
+   "endDate": "2027-05-17",
+   "type": "Public",
+   "name": [
+    {
+     "language": "DE",
+     "text": "Pfingstmontag"
+    }
+   ],
+   "regionalScope": "Regional",
+   "temporalScope": "FullDay",
+   "nationwide": true
+  }
+ ]
+}

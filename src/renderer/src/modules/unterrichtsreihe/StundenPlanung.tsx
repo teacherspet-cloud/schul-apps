@@ -14,6 +14,7 @@ import { notifyError } from '../../shared/util'
 import { minutenAnpassen, minutenLage, mitVerlauf, neuePhase, phasenVorlage, phaseVerschieben, verlaufVon } from './reihePlanung'
 import { starteVerlaufVorschlag, useVerlaufEntsteht } from './verlaufAuftrag'
 import { planungAusgeben } from './planungDruck'
+import { datumKurz, stundenDaten } from './stundenAnsicht'
 import type { DruckArt } from './reiheDruck'
 
 const PHASEN = ['Einstieg', 'Erarbeitung', 'Sicherung', 'Übung', 'Vertiefung', 'Transfer', 'Reflexion', 'Hausaufgabe']
@@ -39,6 +40,7 @@ export function PlanungsStunde({
   const lage = minutenLage(r, i)
   const entsteht = useVerlaufEntsteht(r.id || undefined, i)
   const art = r.stunden?.[i] ?? 'einzel'
+  const datum = stundenDaten(r)[i]
   const setzeP = (neu: StundenPlanung): void => setze(mitVerlauf(r, i, neu))
   const setzePhase = (k: number, patch: Partial<ReihenPhase>): void => setzeP({ ...p, phasen: p.phasen.map((x, j) => (j === k ? { ...x, ...patch } : x)) })
   const schrittWahl = r.schritte.map((s, k) => ({
@@ -60,7 +62,8 @@ export function PlanungsStunde({
       <Stack gap="xs">
         <Group justify="space-between" wrap="wrap" gap="xs">
           <Text fw={700}>
-            Stunde {i + 1} · {art === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'} · {lage.laenge} min
+            Stunde {i + 1}
+            {datum ? ` · ${datumKurz(datum)}` : ''} · {art === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'} · {lage.laenge} min
           </Text>
           <Group gap="xs" wrap="wrap">
             <Group gap={4} wrap="nowrap" data-planung-summe={lage.summe}>

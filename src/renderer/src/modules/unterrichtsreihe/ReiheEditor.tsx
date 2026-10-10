@@ -84,7 +84,8 @@ import { SchrittKarte } from './SchrittKarte'
 import { ansichtGemerkt, kopfGemerkt, KopfZeile, LeitfrageFeld, merkeAnsicht, merkeKopf, PlanHinweis } from './ReiheKopf'
 import { ReiheAlsSchueler } from './ReiheVorschau'
 import { merkeKcAuszug } from './grundlage'
-import { ansichtFuer, stundenGruppen, stundenTitel } from './stundenAnsicht'
+import { ansichtFuer, stundenDaten, stundenGruppen, stundenTitel } from './stundenAnsicht'
+import { StundenTermine } from './StundenTermine'
 import { ArtPlakette, ArtWahl } from './ReiheArt'
 import { PlanungExport, PlanungHinweis, PlanungOhneStunden, PlanungsStunde } from './StundenPlanung'
 import { fuerDigital, nichtAmGeraet, schritteAlsPhasen, wechsleArt } from './reihePlanung'
@@ -725,6 +726,7 @@ export function ReiheEditor({
         {ansicht === 'planung' && (
           <Stack gap="sm" data-planung-ansicht>
             {(r.stunden?.length ?? 0) === 0 && <PlanungOhneStunden leiste={<StundenLeiste reihe={r} setze={setze} />} />}
+            {(r.stunden?.length ?? 0) > 0 && <StundenTermine reihe={r} setze={setze} />}
             {(r.stunden ?? []).map((_, i) => (
               <PlanungsStunde
                 key={i}
@@ -760,6 +762,7 @@ export function ReiheEditor({
         )}
         {ansicht === 'stunden' && (
           <Stack gap="sm" data-stunden-ansicht>
+            <StundenTermine reihe={r} setze={setze} />
             {stundenGruppen(r).map((g) => (
               <Paper
                 key={g.stunde ?? 'ohne'}
@@ -785,7 +788,7 @@ export function ReiheEditor({
                 style={{ outline: ueber === `stunde:${g.stunde ?? ''}` ? '2px dashed var(--mantine-color-blue-5)' : undefined }}
               >
                 <Group justify="space-between" mb={6} wrap="nowrap">
-                  <Text fw={700}>{stundenTitel(g)}</Text>
+                  <Text fw={700}>{stundenTitel(g, g.stunde === null ? null : stundenDaten(r)[g.stunde])}</Text>
                   {experte && g.stunde !== null && (
                     <Group gap={4} wrap="nowrap" data-stunde-summe>
                       {g.ueberlang && <IconAlertTriangle size={14} color="var(--mantine-color-red-6)" />}

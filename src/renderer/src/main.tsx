@@ -29,6 +29,7 @@ import { installiereVorhandenFrage, VorhandenDialog } from './shared/export/vorh
 import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeitsblatt/render/tabellenAuswahl'
 import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
 import { aufServer, hatClient } from './shared/plattform'
+import { ladeSchulkalender } from './shared/schulkalenderLaden'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -112,6 +113,8 @@ function Root(): React.JSX.Element {
  */
 // Nie mehr leere Seite (06.10.2026): Nachladefehler nach Updates → einmal neu laden; Zeichenfehler → Hinweis
 nachladeFehlerAbfangen()
+// Schulkalender des Servers (10.10.2026): Ferien, Feiertage, genaues Schuljahr – für Lehrkräfte und Lernende
+void ladeSchulkalender()
 if (aufServer() && window.location.pathname.startsWith('/s/')) {
   void Promise.all([import('./modules/onlinetest/SchuelerBereich'), import('./modules/onlinetest/SchuelerEinstellungen')]).then(
     ([{ default: SchuelerBereich }, { SchuelerRahmen }]) =>

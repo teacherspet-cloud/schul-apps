@@ -7,6 +7,7 @@
  * gemeinsamen Weg und würden die Stunde sonst rechnerisch überfüllen.
  */
 import { STUNDEN_MINUTEN, teileVon, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
+import { unterrichtsTage, wochentag } from '@shared/schulkalender'
 
 export interface StundenZeile {
   schritt: Schritt
@@ -45,9 +46,26 @@ export function stundenGruppen(r: Pick<Reihe, 'stunden' | 'schritte' | 'teile'>)
   return ohne.zeilen.length ? [...gruppen, ohne] : gruppen
 }
 
-/** „Stunde 3 · Doppelstunde · 90 min" bzw. „Ohne Stunde" */
-export const stundenTitel = (g: Pick<StundenGruppe, 'stunde' | 'art' | 'laenge'>): string =>
-  g.stunde === null ? 'Ohne Stunde' : `Stunde ${g.stunde + 1} · ${g.art === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'} · ${g.laenge} min`
+/** „Stunde 3 · Mo., 12.10. · Doppelstunde · 90 min" bzw. „Ohne Stunde" (Datum nur mit Stundenterminen) */
+export const stundenTitel = (g: Pick<StundenGruppe, 'stunde' | 'art' | 'laenge'>, datum?: string | null): string =>
+  g.stunde === null
+    ? 'Ohne Stunde'
+    : `Stunde ${g.stunde + 1}${datum ? ` · ${datumKurz(datum)}` : ''} · ${g.art === 'doppel' ? 'Doppelstunde' : 'Einzelstunde'} · ${g.laenge} min`
+
+const WOCHENTAGE = ['Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.', 'So.']
+/** „Mo., 12.10." */
+export const datumKurz = (tag: string): string => `${WOCHENTAGE[wochentag(tag) - 1]}, ${Number(tag.slice(8, 10))}.${Number(tag.slice(5, 7))}.`
+
+/**
+ * Datum je Stunde (10.10.2026): aus dem Beginn und den Wochentagen der Reihe, Ferien und Feiertage übersprungen
+ * (Schulkalender). Ohne Termine: lauter null.
+ */
+export function stundenDaten(r: Pick<Reihe, 'stunden' | 'stundenTermine'>): (string | null)[] {
+  const n = r.stunden?.length ?? 0
+  const t = r.stundenTermine
+  const tage = t ? unterrichtsTage(t.beginn, t.tage, n) : []
+  return Array.from({ length: n }, (_, i) => tage[i] ?? null)
+}
 
 /** Ansicht, die der Editor zeigt: Stunden nur, wenn es ein Stundenraster gibt (Expertenmodus: gewählt) */
 export function ansichtFuer(r: Pick<Reihe, 'stunden'>, experte: boolean, gewaehlt: 'stunden' | 'teile' | null): 'stunden' | 'teile' {

@@ -10,6 +10,7 @@
  *  - Wochenende an (Tage wählbar), Ferien-Pause als Schalter der Lernenden (die App kennt keinen Ferienkalender).
  *  - Texte: kurz, freundlich, abwechselnd, nie Druck oder schlechtes Gewissen; Deutsch und Englisch. Keine Namen.
  */
+import { istFerienZeit } from './schulkalender'
 
 export type Ausloeser = 'tagesziel' | 'serie' | 'neu' | 'woche'
 export const AUSLOESER: Ausloeser[] = ['tagesziel', 'serie', 'neu', 'woche']
@@ -225,13 +226,19 @@ export function ausloeserWaehlen(w: ErinnerungsWahl, lage: ErinnerungsLage, art:
   return null
 }
 
-/** Übungstage in Folge: endet heute (wenn heute geübt) bzw. gestern */
-export function serieVon(tage: Iterable<string>, heute: string): number {
+/**
+ * Übungstage in Folge: endet heute (wenn heute geübt) bzw. gestern. Ferien und Feiertage (Schulkalender, 10.10.2026)
+ * (samt angrenzendem Wochenende) unterbrechen die Serie nicht – sie pausiert: Ein Ferientag ohne Übung zählt nicht mit, beendet aber auch nichts; wer
+ * in den Ferien übt, bekommt den Tag dazu. `pause` nur für Tests (Vorgabe: shared/schulkalender.ts).
+ */
+export function serieVon(tage: Iterable<string>, heute: string, pause: (tag: string) => boolean = istFerienZeit): number {
   const menge = new Set(tage)
-  let tag = menge.has(heute) ? heute : tagPlus(heute, -1)
+  let tag = heute
+  if (!menge.has(tag)) tag = tagPlus(tag, -1)
   let n = 0
-  while (menge.has(tag) && n < 1000) {
-    n++
+  for (let schritte = 0; schritte < 2000 && n < 1000; schritte++) {
+    if (menge.has(tag)) n++
+    else if (!pause(tag)) break
     tag = tagPlus(tag, -1)
   }
   return n

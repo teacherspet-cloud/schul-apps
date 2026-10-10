@@ -45,6 +45,7 @@ import { ListenSuche } from '../../shared/components/AppSuche'
 import { starteAuftrag } from '../../shared/auftraege'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
+import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { GRAMMAR_TOPICS, hasGrammar, teilformenAuftrag } from '../arbeitsblatt/didactics/grammar'
 import GrammatikAuswahl from '../arbeitsblatt/steps/GrammatikAuswahl'
@@ -698,7 +699,10 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
             </>
           )}
           {!festeKlasse && (
-            <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} data-grammatik-bis />
+            <div>
+              <TextInput type="date" label="Übungszeitraum bis (optional)" value={bis} onChange={(e) => setBis(e.currentTarget.value)} data-grammatik-bis />
+              <KalenderHinweis wert={bis} richtung="vor" verschieben={setBis} />
+            </div>
           )}
           {!mitVerben && (
             <Text size="xs" c="dimmed" mb={-6}>

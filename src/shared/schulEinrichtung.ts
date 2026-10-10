@@ -14,8 +14,8 @@
  *   Vorwahl …), gelten die der Schule, solange die Lehrkraft keine eigenen gewählt hat. „Keine eigene Wahl" heißt:
  *   kein Schulname, Bundesland und Schulform noch auf der Voreinstellung und nie selbst geändert (`schulwahlEigen`).
  *
- * Schuljahresbeginn/Ferien und Lehrwerke je Fach gehören bewusst nicht hierher: Die App liest dazu keine
- * Einstellung (Schuljahr = ab August, shared/lehrwerkBand.ts), es gäbe also nichts, was sie verwendet.
+ * Lehrwerke je Fach gehören bewusst nicht hierher. Ferien und Feiertage gibt man nicht ein: Der Server holt sie für das
+ * Bundesland der Schule selbst (10.10.2026, src/server/schulkalender.ts, shared/schulkalender.ts).
  */
 import { DEFAULT_SETTINGS, type AppSettings, type DeepPartial } from './types'
 import { LAENDER, schulformenDes } from './schulformen'

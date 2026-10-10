@@ -1,6 +1,7 @@
 import { Button, Card, Container, Group, ScrollArea, Select, SimpleGrid, Stack, Switch, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { IconMail } from '@tabler/icons-react'
 import Formularfuss from '../../../shared/components/Formularfuss'
+import KalenderHinweis from '../../../shared/components/KalenderHinweis'
 import { briefSchreiben } from '../auftrag'
 import { ANLAESSE, TOENE, type Elternbrief } from '../model'
 import { useElternbrief } from '../store'
@@ -70,6 +71,8 @@ export default function Inhalt(): React.JSX.Element | null {
                     data-eb-uhrzeit
                   />
                 </Group>
+                {/* Schulkalender (10.10.2026): Warnung, wenn der Termin in den Ferien oder auf einem Feiertag liegt – hindert nichts */}
+                <KalenderHinweis wert={m.termin?.datum} />
                 <Switch
                   label="Mit Rücklaufzettel zum Abschneiden"
                   checked={m.ruecklauf}
@@ -91,6 +94,7 @@ export default function Inhalt(): React.JSX.Element | null {
                     data-eb-frist
                   />
                 )}
+                {m.ruecklauf && <KalenderHinweis wert={m.rueckgabeBis} />}
               </Stack>
             </Card>
             <Card withBorder>

@@ -12,6 +12,7 @@
  *  - Übernahme Standard: VERWEISEN („Buch S. 39, Nr. 4"). Abschrift oder Bildausschnitt nur, wenn die Lehrkraft es
  *    je Abschnitt anklickt – dann mit Quellenangabe; Seitenzähler je Lerngruppe + Buch + Schuljahr, Warnung ab 20 Seiten.
  */
+import { schuljahrText, schuljahrVon as kalenderSchuljahr } from '@shared/schulkalender'
 import type { StructuredRequest } from '@shared/types'
 import { SCHULFORMEN, type SchulProfil } from '@shared/schulformen'
 import {
@@ -535,10 +536,9 @@ export const GESAMTVERTRAG_KURZ =
 
 export const SEITEN_GRENZE = 20
 
-/** Schuljahr ab 1. August: „2026/27" */
+/** Schuljahr „2026/27" – nach dem Schulkalender (ohne Daten ab 1. August) */
 export function schuljahrVon(d = new Date()): string {
-  const j = d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1
-  return `${j}/${String((j + 1) % 100).padStart(2, '0')}`
+  return schuljahrText(kalenderSchuljahr(d))
 }
 
 export const zaehlerSchluessel = (lerngruppe: string, buch: string, schuljahr: string): string =>

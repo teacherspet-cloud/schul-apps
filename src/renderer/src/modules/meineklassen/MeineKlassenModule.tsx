@@ -14,6 +14,7 @@
  *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
+import { SchuljahrHinweis } from './SchuljahrHinweis'
 import { useExperte } from '../../shared/settingsStore'
 import {
   ActionIcon,
@@ -396,6 +397,7 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
         beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
         suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Klasse, Fach …" />}
       />
+      {!klasse && <SchuljahrHinweis geaendert={laden} />}
       {klasse && gewaehlt ? (
         <KlasseAnsicht k={gewaehlt} neu={laden} zurueck={() => (setze({ klasse: null, gruppe: null }), laden())} />
       ) : !klassen ? (

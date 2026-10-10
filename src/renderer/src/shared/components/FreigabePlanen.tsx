@@ -10,6 +10,7 @@
 import { Badge, Group, NumberInput, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { IconClock } from '@tabler/icons-react'
 import { abschnittsTermine, kurzDatum, naechsterSchultag, testterminNach } from '@shared/freigabePlan'
+import KalenderHinweis from './KalenderHinweis'
 
 /** Kurzangabe „geplant ab Mo., 13.10., 07:30" (leer, wenn nichts mehr aussteht) */
 export const geplantText = (ab: number | null | undefined): string => (ab && ab > Date.now() ? `geplant ab ${kurzDatum(ab)}, ${zeitFeld(new Date(ab))}` : '')
@@ -161,6 +162,7 @@ export default function FreigabePlanen({
             />
             <TextInput type="time" label="Uhrzeit" value={wert.zeit} onChange={(e) => setze({ zeit: e.currentTarget.value })} w={120} data-plan-zeit />
           </Group>
+          <KalenderHinweis wert={wert.datum} verschieben={(datum) => setze({ datum })} />
           <Text size="xs" c="dimmed">
             Bis dahin sehen die Lernenden nur einen grauen Hinweis „Demnächst“ im Fachordner – ohne Inhalt. Verschieben, früher freischalten oder absagen
             geht in „Meine Klassen“ unter „Geplant“.
@@ -235,6 +237,7 @@ export default function FreigabePlanen({
           {wert.bisDatum && <TextInput type="time" label="Uhrzeit" value={wert.bisZeit} onChange={(e) => setze({ bisZeit: e.currentTarget.value })} w={120} />}
         </Group>
       )}
+      {mitEnde && <KalenderHinweis wert={wert.bisDatum} richtung="vor" verschieben={(bisDatum) => setze({ bisDatum })} />}
     </Stack>
   )
 }

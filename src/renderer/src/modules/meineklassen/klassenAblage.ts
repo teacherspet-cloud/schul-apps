@@ -10,6 +10,7 @@
  * liegt), Onlinetest (Vokabeltest-Original → Druck/Word wie im Editor; sonst eine schlichte Fassung aus den Aufgaben),
  * Vokabeltraining (Wortliste), Grammatiktraining (Regelkarten, Aufgaben, Lösungen).
  */
+import { schuljahrText, schuljahrVon } from '@shared/schulkalender'
 import { pfadTeile } from '@shared/iserv'
 import type { AblageZiel } from '@shared/types'
 import type { GrammatikPaket } from '@shared/grammatiktrainer'
@@ -34,10 +35,9 @@ export interface AblageQuelle {
   word?: () => Promise<Uint8Array>
 }
 
-/** Schuljahr „2026-27" (ab August das neue) */
+/** Schuljahr „2026-27" – nach dem Schulkalender (ab dem ersten Schultag nach den Sommerferien, sonst ab August) */
 export function schuljahr(jetzt = new Date()): string {
-  const j = jetzt.getMonth() >= 7 ? jetzt.getFullYear() : jetzt.getFullYear() - 1
-  return `${j}-${String((j + 1) % 100).padStart(2, '0')}`
+  return schuljahrText(schuljahrVon(jetzt), '-')
 }
 
 /** Ablagestruktur der Verwaltung mit Klasse und Fach → Ordnerteile („Gruppen", „Klasse 10b", „Englisch") */

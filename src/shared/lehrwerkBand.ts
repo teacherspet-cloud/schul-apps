@@ -20,6 +20,7 @@
  */
 import { ABSCHNITT_FOLGE, istOptional, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { schulformVon } from './schulformen'
+import { schuljahrVon } from './schulkalender'
 
 export interface SchulOrt {
   land?: string
@@ -29,8 +30,8 @@ export interface SchulOrt {
 /** Erster G9-Jahrgang (Schuljahr, in dem er in Klasse 5 war) in Ländern mit G9 im Aufbau */
 const G9_AB: Record<string, number> = { BW: 2024, SL: 2023 }
 
-/** Beginn des laufenden Schuljahres (ab August) */
-export const schuljahrBeginn = (heute: Date): number => (heute.getMonth() >= 7 ? heute.getFullYear() : heute.getFullYear() - 1)
+/** Beginn des laufenden Schuljahres (Schulkalender, sonst ab August) */
+export const schuljahrBeginn = (heute: Date): number => schuljahrVon(heute)
 
 /** Lernt dieser Jahrgang am Gymnasium nach G9? Ohne Land: G9 (die Lehrwerke im Programm sind G9-Ausgaben). */
 export function istG9(land: string | undefined, jahrgang: number, heute = new Date()): boolean {

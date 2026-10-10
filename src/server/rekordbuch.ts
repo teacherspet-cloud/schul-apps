@@ -1,10 +1,11 @@
 /**
  * Rekordbuch der Lernenden (08.10.2026, Wunsch der Lehrkraft): persönliche Rekorde je Spiel über alle Trainings – je
- * Schuljahr neu (Wechsel am 1. August), frühere Jahre bleiben als Rekordgeschichte einsehbar („Klasse 5: …"), dazu je
- * Schuljahr, wie viele Wörter neu gelernt und sicher geworden sind. Keine Rangliste: nur die eigenen Werte.
+ * Schuljahr neu (Schulkalender: erster Schultag nach den Sommerferien, sonst 1. August), frühere Jahre bleiben als
+ * Rekordgeschichte einsehbar („Klasse 5: …"), dazu je Schuljahr, wie viele Wörter neu gelernt und sicher geworden sind. Keine Rangliste: nur die eigenen Werte.
  *
  *  Lernende: GET /s/api/rekorde
  */
+import { schuljahrText, schuljahrVon as kalenderSchuljahr } from '@shared/schulkalender'
 import { datenbank, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
 import { SPIELE } from '../shared/vokabelSpiele'
@@ -34,12 +35,9 @@ interface Jahr {
   sicher: number
 }
 
-/** Schuljahr eines Zeitpunkts – Wechsel am 1. August: „2026/27" */
+/** Schuljahr eines Zeitpunkts – nach dem Schulkalender (ohne Daten Wechsel am 1. August): „2026/27" */
 export function schuljahrVon(ms: number): string {
-  const d = new Date(ms)
-  const y = d.getFullYear()
-  const ab = d.getMonth() >= 7 ? y : y - 1
-  return `${ab}/${String((ab + 1) % 100).padStart(2, '0')}`
+  return schuljahrText(kalenderSchuljahr(ms))
 }
 
 const lesen = (nutzerId: string, jahr: string): Jahr => {

@@ -11,6 +11,7 @@ import DropZone, { FILE_TYPES } from '../../shared/components/DropZone'
 import { appSchulform, type SchulTreffer } from '@shared/schulsuche'
 import { verzeichnisAbgleich, verzeichnisUebernehmen, type Abweichung } from '@shared/schulVerzeichnisDaten'
 import { SchulSuchfeld, VerzeichnisAbweichung } from '../../shell/Schulsuche'
+import { SchulkalenderKarte } from './SchulkalenderKarte'
 
 /**
  * Verwaltung › Schule (09.10.2026): die Schule einrichten, die diesen Server nutzt.
@@ -230,6 +231,7 @@ export function SchuleEinrichten(): React.JSX.Element {
           </Box>
         </Group>
       </Card>
+      <SchulkalenderKarte />
     </Stack>
   )
 }

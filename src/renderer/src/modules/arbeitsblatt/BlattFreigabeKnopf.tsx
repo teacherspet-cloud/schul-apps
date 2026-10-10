@@ -7,6 +7,7 @@
  * Server – nur für die KI, nie an die Lernenden. Dazu die verknüpfte Rückmeldung (Aufgaben +
  * Lösungsblatt als Erwartungshorizont), in der alle Abgaben landen.
  */
+import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { hilfenZuordnung } from './didactics/aufgabenVerweise'
 import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
 import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
@@ -348,6 +349,7 @@ export function BlattFreigabeDialog({
           maw={260}
           data-blatt-frist
         />
+        <KalenderHinweis wert={bis} richtung="vor" verschieben={setBis} />
         {bis && (
           <Checkbox
             label="Nach der Frist nur noch ansehen"

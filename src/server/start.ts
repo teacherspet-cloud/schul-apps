@@ -31,6 +31,9 @@ import { getSettings, hatEigenesGeheimnis, setzeFachfarbenQuelle, setzeGeheimRue
 import { fachfarbenRoute, leseSchulFachfarben, uebernimmFachfarbenEinmal } from './fachfarben'
 import { schuleFest } from '@shared/schulFest'
 import { leseSchule, schuleRoute } from './schule'
+import { kalenderLaden, kalenderStarten, landAusLehrkraeften, schulkalenderRoute, setzeLandRueckfall } from './schulkalender'
+import { schuljahrRoute, schuljahrWechselStarten, setzeOrtQuelle } from './schuljahrWechsel'
+import { schulOrtVon } from './grammatik'
 import { setzeRolleQuelle } from '../main/services/rolle'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
@@ -68,6 +71,8 @@ const env = process.env
 async function main(): Promise<void> {
   hauptschluessel()
   datenbank()
+  // Gespeicherten Schulkalender gleich setzen – Rechnungen vor dem ersten Abruf nutzen schon die letzten Daten
+  kalenderLaden()
 
   // Notzugang des Admins (solange IServ noch nicht freigeschaltet ist)
   const pw = env.SCHULAPPS_NOTZUGANG_PASSWORT
@@ -210,6 +215,10 @@ async function main(): Promise<void> {
       fachordnerRoute(),
       // Schul-Einrichtung (09.10.2026): lesen alle Lehrkräfte, ändern nur Admins
       schuleRoute,
+      // Schulkalender (10.10.2026): lesen alle Angemeldeten, neu abrufen nur Admins
+      schulkalenderRoute,
+      // Schuljahreswechsel: Hinweis und „Rückgängig" in „Meine Klassen" (10.10.2026)
+      schuljahrRoute,
       // Fachfarben der Schule: lesen alle Lehrkräfte, ändern nur Admins (09.10.2026)
       fachfarbenRoute,
       // KI-Zugänge der Schule: Adressen, Verbindungstest, Nutzungsübersicht (09.10.2026, kiZugaenge.ts)
@@ -225,6 +234,11 @@ async function main(): Promise<void> {
   messungenStarten()
   // Erinnerungen zum Üben (10.10.2026): Zeitplaner alle 5 Minuten, nur fällige Lernende
   erinnerungenStarten(adresse)
+  // Schulkalender und Schuljahreswechsel (10.10.2026): Ferien/Feiertage des Landes, Hochstufen am ersten Schultag
+  setzeLandRueckfall(() => landAusLehrkraeften(schulOrtVon))
+  setzeOrtQuelle(schulOrtVon)
+  schuljahrWechselStarten()
+  kalenderStarten()
   const stuendlich = setInterval(() => {
     abgelaufeneSitzungenEntfernen()
     cleanupWorkDirs()

@@ -86,6 +86,7 @@ import { AbschnitteVerwalten, type AbschnittFrage } from './AbschnitteVerwalten'
 import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
+import KalenderHinweis from '../../../shared/components/KalenderHinweis'
 import { alsFeld, ausFeld, type KursReiter, type Lernende, type Lernstanddaten } from './kursDaten'
 import { entwurfHinweis, geplanteAbschnitte, HINWEIS_FARBE, kursHinweise, kursKennzahlen, type KursBedarf, type KursHinweis } from './kursHinweise'
 import { zumHinweis } from './kursFokus'
@@ -1023,26 +1024,30 @@ function Einstellungen({
           <Group gap="md" align="flex-start">
             {/* Feste Klasse (09.10.2026, abgestimmt): kein Enddatum – ein schon gesetztes lässt sich noch löschen */}
             {(!d.klassenKurs || d.bis) && (
+              <div style={{ width: 220 }}>
+                <TextInput
+                  type="date"
+                  label="Lernzeitraum bis"
+                  description={d.klassenKurs ? 'Kurs der Klasse: Datum löschen, dann läuft er weiter.' : 'Danach ist der Kurs abgeschlossen.'}
+                  leftSection={<IconCalendarEvent size={14} />}
+                  value={alsFeld(d.bis)}
+                  onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
+                  data-vokabel-bis-aendern
+                />
+                <KalenderHinweis wert={alsFeld(d.bis)} richtung="vor" verschieben={(t) => aendern('zeitraum', { bis: ausFeld(t, '23:59:00') })} />
+              </div>
+            )}
+            <div style={{ width: 220 }}>
               <TextInput
                 type="date"
-                label="Lernzeitraum bis"
-                description={d.klassenKurs ? 'Kurs der Klasse: Datum löschen, dann läuft er weiter.' : 'Danach ist der Kurs abgeschlossen.'}
-                leftSection={<IconCalendarEvent size={14} />}
-                value={alsFeld(d.bis)}
-                onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
-                w={220}
-                data-vokabel-bis-aendern
+                label="Testtermin"
+                description="Der Karteikasten plant bis dahin."
+                value={alsFeld(d.testTermin)}
+                onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
+                data-vokabel-termin
               />
-            )}
-            <TextInput
-              type="date"
-              label="Testtermin"
-              description="Der Karteikasten plant bis dahin."
-              value={alsFeld(d.testTermin)}
-              onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
-              w={220}
-              data-vokabel-termin
-            />
+              <KalenderHinweis wert={alsFeld(d.testTermin)} verschieben={(t) => aendern('termin', { testTermin: ausFeld(t, '08:00:00') })} />
+            </div>
           </Group>
         </Card>
         {mitWoertern && (

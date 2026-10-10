@@ -10,6 +10,7 @@
  * erreicht sind. Vergleich nur über Zahlen: Anteil der Lernenden der Schule und der eigene Platz in der Klasse
  * (shared/achievementsVergleich.ts) – nie Namen oder Werte anderer.
  */
+import { istFerienOderFeiertag } from './schulkalender'
 
 export type AchGruppe = 'dranbleiben' | 'lehrwerk' | 'wortschatz' | 'grammatik' | 'spiele' | 'zusammen' | 'besonderes'
 export const ACH_GRUPPEN: { id: AchGruppe; name: string }[] = [
@@ -121,13 +122,15 @@ const istWochenende = (n: number): boolean => {
   const d = new Date(n * TAG_MS).getUTCDay()
   return d === 0 || d === 6
 }
+const isoVon = (n: number): string => new Date(n * TAG_MS).toISOString().slice(0, 10)
 const sortiert = (tage: string[]): number[] => [...new Set(tage.map(tagNr).filter((n) => Number.isFinite(n)))].sort((a, b) => a - b)
 
 /**
  * Längste Serie von Übungstagen: Ein Werktag ohne Übung beendet sie, Samstag und Sonntag nicht (abgestimmt) – wer am
- * Wochenende übt, bekommt den Tag trotzdem dazu.
+ * Wochenende übt, bekommt den Tag trotzdem dazu. Ferien und Feiertage (Schulkalender, 10.10.2026) zählen wie das
+ * Wochenende: Die Serie pausiert. `pause` nur für Tests.
  */
-export function besteSerie(tage: string[]): number {
+export function besteSerie(tage: string[], pause: (tag: string) => boolean = istFerienOderFeiertag): number {
   const nr = sortiert(tage)
   if (!nr.length) return 0
   const da = new Set(nr)
@@ -135,7 +138,7 @@ export function besteSerie(tage: string[]): number {
   let jetzt = 0
   for (let n = nr[0]; n <= nr[nr.length - 1]; n++) {
     if (da.has(n)) beste = Math.max(beste, ++jetzt)
-    else if (!istWochenende(n)) jetzt = 0
+    else if (!istWochenende(n) && !pause(isoVon(n))) jetzt = 0
   }
   return beste
 }

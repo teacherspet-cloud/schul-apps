@@ -31,6 +31,7 @@ const FELDER = [
   'lernziele',
   'teile',
   'stunden',
+  'stundenTermine',
   'optionalMindestens',
   'planHinweis',
   'art',

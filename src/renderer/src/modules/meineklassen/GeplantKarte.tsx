@@ -4,6 +4,7 @@
  * (geplante Freigabe löschen; Vokabelabschnitte werden wie „Abschnitt entfernen" sanft herausgenommen – ein Lernstand
  * bliebe erhalten). Server: src/server/planen.ts. Ohne Geplantes erscheint nichts.
  */
+import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { ActionIcon, Button, Card, Group, Menu, Modal, Stack, Text, TextInput, ThemeIcon, Tooltip } from '@mantine/core'
 import { IconAbc, IconBook2, IconCalendarTime, IconChalkboard, IconClock, IconDots, IconFileText, IconPencil, IconRoute } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -186,6 +187,7 @@ function Verschieben({ e, laeuft, schliessen, los }: { e: Geplant; laeuft: boole
           <TextInput type="date" label="Freischalten ab" value={datum} onChange={(x) => setDatum(x.currentTarget.value)} data-verschieben-datum />
           <TextInput type="time" label="Uhrzeit" value={zeit} onChange={(x) => setZeit(x.currentTarget.value)} w={120} data-verschieben-zeit />
         </Group>
+        <KalenderHinweis wert={datum} verschieben={setDatum} />
         {e.typ === 'vok' && (
           <Text size="xs" c="dimmed">
             Hängt der Testtermin an diesem Abschnitt, rückt er mit.

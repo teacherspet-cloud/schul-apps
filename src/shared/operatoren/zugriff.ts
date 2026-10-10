@@ -8,6 +8,7 @@
  */
 import type { BestandsListe, LandesBestand, Listensprache, OperatorDefinition, Operatorenliste } from './typen'
 import { datenSchulform } from '../schulformen'
+import { schuljahrVon } from '../schulkalender'
 
 const dateien = import.meta.glob<LandesBestand>('./daten/*.json', { eager: true, import: 'default' })
 
@@ -99,7 +100,7 @@ export interface OperatorenAuswahl {
 }
 
 /** Das Prüfungsjahr, für das eine Liste jetzt gelten muss: ab August zählt das Abitur des Folgejahres */
-const aktuellesPruefungsjahr = (heute: Date): number => heute.getFullYear() + (heute.getMonth() >= 7 ? 1 : 0)
+const aktuellesPruefungsjahr = (heute: Date): number => schuljahrVon(heute) + 1
 
 /**
  * Gilt die Fassung jetzt nicht? Abgelöst („letztmalig Prüfungsjahr 2026", „gültig bis Abitur

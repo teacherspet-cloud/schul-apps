@@ -10,6 +10,7 @@
 import { abschnitteEinordnen } from './kursAbschnitte'
 import { quelleUnits, type Quelle } from './vokabelLaufbahn'
 import { verbSchluesselVonWort } from './verbTraining'
+import { istSchultag } from './schulkalender'
 
 /** Was sich planen lässt. Onlinetests startet die Lehrkraft live – sie werden nicht geplant. */
 export type PlanTyp = 'vok' | 'gram' | 'blatt' | 'tafel' | 'feedback' | 'reihe'
@@ -32,26 +33,37 @@ export const istGeplant = (ab: number | null | undefined, jetzt = Date.now()): b
 /** Ende erreicht (danach nur ansehen)? */
 export const istVorbei = (bis: number | null | undefined, jetzt = Date.now()): boolean => typeof bis === 'number' && bis > 0 && bis <= jetzt
 
-/** Nächster Schultag (Mo–Fr, ab morgen) um 7:30 Uhr Ortszeit – Vorgabe für „Planen …" (ohne Ferienkalender) */
-export function naechsterSchultag(jetzt = new Date(), stunde = 7, minute = 30): Date {
-  const d = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1, stunde, minute, 0, 0)
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1)
+/** Tag (Ortszeit) auf den nächsten Schultag schieben – Ferien, Feiertage und Wochenende laut Schulkalender (10.10.2026) */
+function aufSchultag(d: Date): Date {
+  for (let n = 0; n < 120 && !istSchultag(d); n++) d.setDate(d.getDate() + 1)
   return d
 }
 
-/** Termine für Abschnitte nacheinander: der erste am Start, jeder weitere `abstandTage` später (gleiche Uhrzeit, auch über die Zeitumstellung) */
+/**
+ * Nächster Schultag (ab morgen) um 7:30 Uhr Ortszeit – Vorgabe für „Planen …". Seit 10.10.2026 mit Schulkalender:
+ * Ferien und Feiertage werden übersprungen (ohne Kalenderdaten nur das Wochenende).
+ */
+export function naechsterSchultag(jetzt = new Date(), stunde = 7, minute = 30): Date {
+  return aufSchultag(new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1, stunde, minute, 0, 0))
+}
+
+/**
+ * Termine für Abschnitte nacheinander: der erste am Start, jeder weitere `abstandTage` später (gleiche Uhrzeit, auch über
+ * die Zeitumstellung). Ein Vorschlag in Ferien oder an einem Feiertag rückt auf den ersten Schultag danach (10.10.2026).
+ */
 export function abschnittsTermine(start: number, anzahl: number, abstandTage: number): number[] {
   const s = new Date(start)
   const schritt = Math.max(0, Math.round(abstandTage))
-  return Array.from({ length: Math.max(0, anzahl) }, (_, i) =>
-    new Date(s.getFullYear(), s.getMonth(), s.getDate() + i * schritt, s.getHours(), s.getMinutes(), 0, 0).getTime()
-  )
+  return Array.from({ length: Math.max(0, anzahl) }, (_, i) => {
+    const d = new Date(s.getFullYear(), s.getMonth(), s.getDate() + i * schritt, s.getHours(), s.getMinutes(), 0, 0)
+    return (i === 0 ? d : aufSchultag(d)).getTime()
+  })
 }
 
-/** Testtermin am letzten Abschnitt: einen Abstand nach dessen Freischaltung, 8:00 Uhr */
+/** Testtermin am letzten Abschnitt: einen Abstand nach dessen Freischaltung, 8:00 Uhr – an einem Schultag (Schulkalender) */
 export function testterminNach(letzterAbschnitt: number, abstandTage: number): number {
   const d = new Date(letzterAbschnitt)
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + Math.max(1, Math.round(abstandTage)), 8, 0, 0, 0).getTime()
+  return aufSchultag(new Date(d.getFullYear(), d.getMonth(), d.getDate() + Math.max(1, Math.round(abstandTage)), 8, 0, 0, 0)).getTime()
 }
 
 /** Angaben der Lehrkraft aus dem Anfragekörper (`plan`) */

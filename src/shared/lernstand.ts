@@ -13,6 +13,8 @@
  *  - feste Lerntipps aus einer Regel-Liste (ohne KI) und die Prüfung von KI-Tipps
  */
 
+import { istFerienOderFeiertag } from './schulkalender'
+
 export type Stufe = 'grund' | 'unter' | 'mittel' | 'ober' | 'neutral'
 export type Zustand = 'erfolgreich_fleissig' | 'fleissig' | 'erfolgreich' | 'inaktiv' | 'neu' | 'neutral'
 export type Strategie = 'abruf' | 'verteilen' | 'interleaving' | 'selbsterklaerung' | 'elaboration' | 'fehleranalyse' | 'planung'
@@ -67,6 +69,10 @@ export function fleissAus(tage: string[], jetzt: number, wochenziel = 3): Fleiss
   return { tage7, tage14, seitTagen: letzte === null ? null : h - letzte, fleissig: tage7 >= ziel || tage14 >= 5 }
 }
 
+/** Woche ohne Schultag (Montag bis Freitag nur Ferien/Feiertage, Schulkalender 10.10.2026): zählt nicht als Lücke */
+const ganzFrei = (montag: number, pause: (tag: string) => boolean): boolean =>
+  [0, 1, 2, 3, 4].every((i) => pause(new Date((montag + i) * TAG_MS).toISOString().slice(0, 10)))
+
 /** Montag (Tagesnummer) der Woche eines Tages */
 const wochenStart = (n: number): number => n - ((n + 3) % 7)
 
@@ -78,7 +84,12 @@ export const wocheVon = (jetzt: number): string => new Date(wochenStart(heuteNr(
  * erreicht ist (sonst ist sie einfach noch offen); eine einzelne Woche ohne Übung wird übersprungen
  * (Ferien, Krankheit) – erst zwei leere Wochen in Folge beenden die Serie, ohne Aufhebens.
  */
-export function wochenSerie(tage: string[], jetzt: number, wochenziel = 3): { serie: number; dieseWoche: number; ziel: number } {
+export function wochenSerie(
+  tage: string[],
+  jetzt: number,
+  wochenziel = 3,
+  pause: (tag: string) => boolean = istFerienOderFeiertag
+): { serie: number; dieseWoche: number; ziel: number } {
   const ziel = Math.max(1, Math.min(7, Math.round(wochenziel)))
   const h = heuteNr(jetzt)
   const jeWoche = new Map<number, number>()
@@ -92,7 +103,8 @@ export function wochenSerie(tage: string[], jetzt: number, wochenziel = 3): { se
     if ((jeWoche.get(w) ?? 0) >= ziel) {
       serie++
       luecken = 0
-    } else if (++luecken >= 2) break
+    } else if (ganzFrei(w, pause)) continue
+    else if (++luecken >= 2) break
   }
   return { serie, dieseWoche, ziel }
 }

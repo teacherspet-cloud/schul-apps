@@ -72,7 +72,9 @@ export const SENSIBEL: Record<string, string[]> = {
   ki_nutzung: ['daten'],
   // Erinnerungen zum Üben (10.10.2026, erinnerungen.ts): Einstellungen samt eigenem Text, Push-Geräte (Endpunkt, Schlüssel)
   push_wahl: ['daten'],
-  push_geraete: ['daten']
+  push_geraete: ['daten'],
+  // Schuljahreswechsel (10.10.2026, schuljahrWechsel.ts): alte/neue Klassennamen, Mitglieder, Lernstände für „Rückgängig"
+  schuljahr_wechsel: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

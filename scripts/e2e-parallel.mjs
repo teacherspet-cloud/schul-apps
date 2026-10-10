@@ -81,7 +81,11 @@ try {
         SCHULAPPS_NOTZUGANG_PASSWORT: 'test-notzugang-123',
         SCHULAPPS_KI_ATTRAPPE: attrappe,
         // Erinnerungen (10.10.2026): lokaler Empfänger als Push-Dienst (tests/e2e/server-erinnerungen.mjs)
-        SCHULAPPS_PUSH_LOKAL: '1'
+        SCHULAPPS_PUSH_LOKAL: '1',
+        // Schulkalender (10.10.2026): Ferien/Feiertage aus der Datei statt aus dem Netz, Testuhr für den Schuljahreswechsel
+        // (tests/e2e/server-schuljahr.mjs)
+        SCHULAPPS_KALENDER_DATEI: join(wurzel, 'tests', 'fixtures', 'openholidays-ni.json'),
+        SCHULAPPS_KALENDER_TESTUHR: '1'
       },
       stdio: 'ignore'
     })

@@ -43,6 +43,7 @@ import { mitBildern, VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 import { KursSeite } from './kurs/KursSeite'
 import { ausFeld } from './kurs/kursDaten'
+import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import type { KursReiter } from './kurs/kursDaten'
 import { grammatikVorgabe, verbenDerListe } from './kurs/KursHinzufuegen'
 import { LernstandSymbol } from './kurs/LernstandVerlauf'
@@ -489,23 +490,29 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         <Group align="flex-start" grow>
           {/* Feste Klasse (09.10.2026, abgestimmt): der Kurs läuft mit der Klasse weiter – kein Enddatum */}
           {art !== 'gruppe' && (
+            <div>
+              <TextInput
+                type="date"
+                label="Lernzeitraum bis (optional)"
+                description="Danach ist das Training abgeschlossen; ohne Datum läuft es, bis es beendet wird."
+                value={bis}
+                onChange={(e) => setBis(e.currentTarget.value)}
+                data-vokabel-bis
+              />
+              <KalenderHinweis wert={bis} richtung="vor" verschieben={setBis} />
+            </div>
+          )}
+          <div>
             <TextInput
               type="date"
-              label="Lernzeitraum bis (optional)"
-              description="Danach ist das Training abgeschlossen; ohne Datum läuft es, bis es beendet wird."
-              value={bis}
-              onChange={(e) => setBis(e.currentTarget.value)}
-              data-vokabel-bis
+              label="Testtermin (optional)"
+              description="Bis dahin plant der Karteikasten so, dass jedes Wort vorher mehrmals verteilt geübt ist."
+              value={termin}
+              onChange={(e) => setTermin(e.currentTarget.value)}
+              disabled={plan.modus === 'planen' && plan.testKoppeln}
             />
-          )}
-          <TextInput
-            type="date"
-            label="Testtermin (optional)"
-            description="Bis dahin plant der Karteikasten so, dass jedes Wort vorher mehrmals verteilt geübt ist."
-            value={termin}
-            onChange={(e) => setTermin(e.currentTarget.value)}
-            disabled={plan.modus === 'planen' && plan.testKoppeln}
-          />
+            {!(plan.modus === 'planen' && plan.testKoppeln) && <KalenderHinweis wert={termin} verschieben={setTermin} />}
+          </div>
         </Group>
         {!nurGrammatik && (
           <FreigabePlanen wert={plan} aendern={setPlan} abschnitte={auswahl?.teile?.map((t) => t.titel) ?? (auswahl ? [auswahl.titel] : undefined)} mitTest />

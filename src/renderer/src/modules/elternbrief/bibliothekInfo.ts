@@ -182,7 +182,7 @@ export function klassenListe(klasse: string): string[] {
   return out
 }
 
-/** Beginn-Jahr des Schuljahres eines Datums (1. August bis 31. Juli) */
+/** Beginn-Jahr des Schuljahres eines Datums (Schulkalender: ab dem ersten Schultag nach den Sommerferien; sonst 1. August) */
 export const schuljahrAus = (s: string): number => schuljahrVon(alsDatum(s).getTime())
 /** „2026/27" */
 export const schuljahrName = (j: number): string => `${j}/${String((j + 1) % 100).padStart(2, '0')}`
