@@ -537,7 +537,7 @@ try {
   const faelligNachher = await faellig()
   pruefe(faelligVorher === 0 && faelligNachher === 5, `Wörter bei Mia wieder fällig (vorher ${faelligVorher}, nachher ${faelligNachher} von 5)`)
   const vt = await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()
-  pruefe((vt.zuweisungen ?? []).length === kurseVorher && !(vt.zuweisungen ?? []).some((z) => /Wackelige Wörter/.test(z.titel)), 'Kein zweiter Kurs „Wackelige Wörter“')
+  pruefe((vt.zuweisungen ?? []).length === kurseVorher && !(vt.zuweisungen ?? []).some((z) => /Wackelige Wörter|Problemwörter/.test(z.titel)), 'Kein zweiter Kurs „Wackelige Wörter“')
   for (const z of vt.zuweisungen ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } })
 
   // ---------- Verwaltung: Ablagestruktur ändern und zurücksetzen

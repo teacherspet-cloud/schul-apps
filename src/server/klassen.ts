@@ -66,6 +66,7 @@ import type { NutzerInfo } from './datenbank'
 import { ausgeblendeteKurse, erkanntVon, kuerzelSetzen, kursAusblenden, kursEinblenden, kursInfoVon, kursUmbenennen, verborgeneGruppen, type KursLink } from './iservKursgruppen'
 import { erkanntText } from '../shared/iservKurse'
 import { auszeichnungFuerLehrkraft } from './achievements'
+import { problemWoerterText } from '../shared/problemWoerter'
 import { klasseAusGruppen, lernendeSuchen, stichwortArten, SUCHE_MIN, type ProblemArt, type SuchPerson } from '../shared/klassenSuche'
 
 const TAG = 86_400_000
@@ -538,8 +539,9 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
   if (vok.wackelig.length >= 5)
     vorschlaege.push({
       art: 'vokabeln',
-      titel: `Wackelige Wörter – ${klassenTitel(g)}`,
-      text: `Die ${vok.wackelig.length} Wörter, die gerade am meisten wackeln (höchstens 20: zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern zuletzt danebengingen) – im Kurs gleich wiederholen lassen oder als kurzes Arbeitsblatt.`,
+      titel: `Problemwörter – ${klassenTitel(g)}`,
+      // Eine Zahl für dasselbe (10.10.2026): gekürzte Liste als „20 von N Problemwörtern" (shared/problemWoerter.ts)
+      text: `${problemWoerterText(vok.problemZahl, vok.wackelig.length)} (${vok.wackelig.length < vok.problemZahl ? 'die wichtigsten: ' : ''}zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern gerade wackeln) – im Kurs gleich wiederholen lassen oder als kurzes Arbeitsblatt.`,
       sprache: vok.wackelig[0].sprache,
       fach: vok.wackelig[0].fach,
       woerter: vok.wackelig.map(({ term, translation, example }) => ({ term, translation, ...(example ? { example } : {}) }))
@@ -576,6 +578,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
     vokabeln: vok.trainings,
     grammatik: gram.trainings,
     wackelig: vok.wackelig,
+    // Alle Problemwörter der laufenden Kurse – `wackelig` sind höchstens 20 davon (10.10.2026)
+    problemZahl: vok.problemZahl,
     reihen: reihen.map(({ lernende: l, bedarf: _b, ...rest }) => ({ ...rest, lernende: l.length })),
     blaetter: blaetter.map(({ eingereichtVon: _e, ...rest }) => rest),
     // Ausgeblendetes (09.10.2026) zählt nicht mit; überholte Merkmale fallen weg

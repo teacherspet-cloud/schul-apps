@@ -1144,19 +1144,19 @@ function Einstellungen({
             </Stack>
           </Card>
         )}
-        {/* Erinnerungen zum Üben (10.10.2026): die Lehrkraft bietet an, die Lernenden schalten selbst ein */}
+        {/* Erinnerungen zum Üben (10.10.2026): Vorgabe angeboten (auch in älteren Kursen), die Lehrkraft kann abschalten; Lernende erlauben sie auf ihrem Gerät */}
         <Card withBorder radius="md" padding="md" data-kurs-erinnerungen>
           <Text fw={700} mb="sm">
             Erinnerungen
           </Text>
           <Switch
             label="Erinnerungen zum Üben anbieten"
-            description="Lernende können sich dann selbst kurze Hinweise aufs Handy oder Tablet schicken lassen – höchstens einen am Tag, nie während der Schulzeit, ohne Namen in der Nachricht."
-            checked={Boolean(d.erinnerungen)}
+            description="Vorgabe: an. Lernende werden einmal gefragt, ob ihr Handy oder Tablet kurze Hinweise zum Üben zeigen darf – höchstens einen am Tag, nie während der Schulzeit, ohne Namen in der Nachricht. Sie können sie jederzeit selbst ausschalten."
+            checked={d.erinnerungen !== false}
             onChange={(e) => aendern('erinnerungen', { an: e.currentTarget.checked })}
             data-kurs-erinnerungen-an
           />
-          {d.erinnerungen && (
+          {d.erinnerungen !== false && (
             <Text size="sm" c="dimmed" mt="xs" data-kurs-erinnerungen-aktiv={d.erinnerungenAktiv ?? 0}>
               {d.erinnerungenAktiv === 1 ? '1 Lernende/r hat' : `${d.erinnerungenAktiv ?? 0} Lernende haben`} Erinnerungen eingeschaltet.
             </Text>

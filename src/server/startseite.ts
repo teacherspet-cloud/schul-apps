@@ -76,7 +76,8 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
         sicher: t.woerter ? t.sicherSchnitt : null,
         lernende: t.lernende,
         testTermin,
-        abzeichen: kursAbzeichen({ testTermin, inaktiv, problem: vok.wackelig.filter((w) => w.kurs === t.id).length, lernende: t.lernende }, jetzt)
+        // Problemwörter (10.10.2026): dieselbe Zahl wie Kursseite und „Meine Klassen" (shared/problemWoerter.ts)
+        abzeichen: kursAbzeichen({ testTermin, inaktiv, problem: t.problemZahl, lernende: t.lernende }, jetzt)
       })
     }
   }

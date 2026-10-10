@@ -44,6 +44,8 @@ export interface BuecherTexte {
   alleWoerter: string
   /** Wort noch nicht freigegeben (nur in „Alle Wörter") */
   nichtDran: string
+  /** Knopf „↑ Nach oben" der alphabetischen Liste (10.10.2026) */
+  nachOben: string
 }
 
 const eins = (n: number, ein: string, viele: string): string => `${n} ${n === 1 ? ein : viele}`
@@ -75,7 +77,8 @@ const DE: BuecherTexte = {
   sicherP: (p) => `${p} % sicher`,
   meineWoerter: 'Meine Wörter',
   alleWoerter: 'Alle Wörter',
-  nichtDran: 'noch nicht dran'
+  nichtDran: 'noch nicht dran',
+  nachOben: 'Nach oben'
 }
 
 const SPRACHEN: Record<string, BuecherTexte> = {
@@ -106,7 +109,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % known`,
     meineWoerter: 'My words',
     alleWoerter: 'All words',
-    nichtDran: 'not yet'
+    nichtDran: 'not yet',
+    nachOben: 'Back to top'
   },
   fr: {
     suche: 'Chercher un mot – en français ou en allemand …',
@@ -135,7 +139,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % acquis`,
     meineWoerter: 'Mes mots',
     alleWoerter: 'Tous les mots',
-    nichtDran: 'pas encore'
+    nichtDran: 'pas encore',
+    nachOben: 'Haut de page'
   },
   es: {
     suche: 'Buscar una palabra – en español o en alemán …',
@@ -164,7 +169,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % dominadas`,
     meineWoerter: 'Mis palabras',
     alleWoerter: 'Todas',
-    nichtDran: 'todavía no'
+    nichtDran: 'todavía no',
+    nachOben: 'Arriba'
   },
   it: {
     suche: 'Cerca una parola – in italiano o in tedesco …',
@@ -193,7 +199,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % sicure`,
     meineWoerter: 'Le mie parole',
     alleWoerter: 'Tutte',
-    nichtDran: 'non ancora'
+    nichtDran: 'non ancora',
+    nachOben: 'Torna su'
   },
   la: {
     suche: 'Verbum quaere – Latine aut Theodisce …',
@@ -222,7 +229,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % certa`,
     meineWoerter: 'Mea verba',
     alleWoerter: 'Omnia verba',
-    nichtDran: 'nondum'
+    nichtDran: 'nondum',
+    nachOben: 'Sursum'
   },
   ru: {
     suche: 'Найти слово – по-русски или по-немецки …',
@@ -251,7 +259,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % выучено`,
     meineWoerter: 'Мои слова',
     alleWoerter: 'Все слова',
-    nichtDran: 'ещё не было'
+    nichtDran: 'ещё не было',
+    nachOben: 'Наверх'
   },
   nl: {
     suche: 'Woord zoeken – Nederlands of Duits …',
@@ -280,7 +289,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % gekend`,
     meineWoerter: 'Mijn woorden',
     alleWoerter: 'Alle woorden',
-    nichtDran: 'nog niet'
+    nichtDran: 'nog niet',
+    nachOben: 'Naar boven'
   },
   pl: {
     suche: 'Szukaj słowa – po polsku lub po niemiecku …',
@@ -309,7 +319,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % opanowane`,
     meineWoerter: 'Moje słowa',
     alleWoerter: 'Wszystkie słowa',
-    nichtDran: 'jeszcze nie'
+    nichtDran: 'jeszcze nie',
+    nachOben: 'Do góry'
   },
   cs: {
     suche: 'Hledat slovo – česky nebo německy …',
@@ -338,7 +349,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % umím`,
     meineWoerter: 'Moje slova',
     alleWoerter: 'Všechna slova',
-    nichtDran: 'ještě ne'
+    nichtDran: 'ještě ne',
+    nachOben: 'Nahoru'
   },
   pt: {
     suche: 'Procurar uma palavra – em português ou alemão …',
@@ -367,7 +379,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % dominadas`,
     meineWoerter: 'As minhas palavras',
     alleWoerter: 'Todas',
-    nichtDran: 'ainda não'
+    nichtDran: 'ainda não',
+    nachOben: 'Voltar ao topo'
   },
   tr: {
     suche: 'Kelime ara – Türkçe veya Almanca …',
@@ -396,7 +409,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % bilinen`,
     meineWoerter: 'Kelimelerim',
     alleWoerter: 'Tüm kelimeler',
-    nichtDran: 'henüz değil'
+    nichtDran: 'henüz değil',
+    nachOben: 'Yukarı'
   },
   da: {
     suche: 'Søg efter et ord – dansk eller tysk …',
@@ -425,7 +439,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % kan`,
     meineWoerter: 'Mine ord',
     alleWoerter: 'Alle ord',
-    nichtDran: 'ikke endnu'
+    nichtDran: 'ikke endnu',
+    nachOben: 'Til toppen'
   },
   grc: {
     suche: 'Λέξιν ζήτει – Ἑλληνιστὶ ἢ Γερμανιστί …',
@@ -454,7 +469,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % βέβαια`,
     meineWoerter: 'Τὰ ἐμὰ ῥήματα',
     alleWoerter: 'Πάντα',
-    nichtDran: 'οὔπω'
+    nichtDran: 'οὔπω',
+    nachOben: 'Ἄνω'
   },
   el: {
     suche: 'Αναζήτηση λέξης – στα ελληνικά ή στα γερμανικά …',
@@ -483,7 +499,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % σίγουρες`,
     meineWoerter: 'Οι λέξεις μου',
     alleWoerter: 'Όλες οι λέξεις',
-    nichtDran: 'όχι ακόμα'
+    nichtDran: 'όχι ακόμα',
+    nachOben: 'Επάνω'
   },
   zh: {
     suche: '搜索词语 – 中文或德语 …',
@@ -512,7 +529,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % 已掌握`,
     meineWoerter: '我的单词',
     alleWoerter: '全部单词',
-    nichtDran: '尚未学习'
+    nichtDran: '尚未学习',
+    nachOben: '回到顶部'
   },
   ja: {
     suche: '単語を検索 – 日本語またはドイツ語 …',
@@ -541,7 +559,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `${p} % 習得`,
     meineWoerter: '自分の単語',
     alleWoerter: 'すべての単語',
-    nichtDran: 'まだ'
+    nichtDran: 'まだ',
+    nachOben: 'トップへ'
   },
   ar: {
     suche: 'ابحث عن كلمة – بالعربية أو بالألمانية …',
@@ -570,7 +589,8 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     sicherP: (p) => `محفوظة ${p} %`,
     meineWoerter: 'كلماتي',
     alleWoerter: 'كل الكلمات',
-    nichtDran: 'ليس بعد'
+    nichtDran: 'ليس بعد',
+    nachOben: 'إلى الأعلى'
   }
 }
 

@@ -2,10 +2,13 @@
  * Erinnerungen zum Üben per Web Push (10.10.2026, Entscheidungen der Lehrkraft; Regeln in shared/erinnerungen.ts,
  * Verschlüsselung in webPush.ts, Hintergrund in recherche/web-push-erinnerungen.md).
  *
- *  - Die Lehrkraft bietet Erinnerungen je Kurs an (Kurseinstellungen, Vorgabe: nicht angeboten). Zieht sie das Angebot
- *    zurück oder endet der Kurs, kommen keine mehr.
- *  - Lernende schalten sie selbst ein (Einstellungen › Erinnerungen; Erlaubnis des Browsers erst nach Antippen), wählen
- *    Uhrzeit, Tage, Auslöser, Ferien-Pause, Sprache und optional einen eigenen Text.
+ *  - Die Lehrkraft bietet Erinnerungen je Kurs an (Kurseinstellungen; seit 10.10.2026 abends Vorgabe: angeboten, auch
+ *    in bestehenden Kursen, solange sie nie ausgeschaltet wurden – gespeichert wird nur ein ausdrückliches 'aus').
+ *    Zieht sie das Angebot zurück oder endet der Kurs, kommen keine mehr.
+ *  - Lernende: alle Einstellungen sind vorab an (16:00, alle Tage, alle Auslöser). Der Browser zeigt aber erst nach der
+ *    Erlaubnis etwas – die erfragt die Startseite einmal freundlich (ErinnerungenFrage.tsx) bzw. Einstellungen ›
+ *    Erinnerungen, jeweils erst nach Antippen. Uhrzeit, Tage, Auslöser, Ferien-Pause, Sprache und eigener Text sind
+ *    dort wählbar; Ausschalten geht jederzeit.
  *  - Ein leichter Zeitplaner (alle 5 Minuten) liest nur die fälligen Zeilen (Index auf aktiv/naechste) und entscheidet je
  *    Person, ob es etwas zu sagen gibt.
  *
@@ -215,14 +218,27 @@ export function schreiben(nid: string, g: Gespeichert, jetzt = Date.now()): void
     .run(nid, JSON.stringify(g), g.wahl.an ? 1 : 0, naechste)
 }
 
+/** Hat die Person schon gespeicherte Einstellungen? (sonst gilt die Vorgabe – an) */
+const gespeichert = (nid: string): boolean => Boolean(db().prepare('SELECT 1 FROM push_wahl WHERE nutzer_id = ?').get(nid))
+
+/**
+ * Erstes Gerät ohne gespeicherte Einstellungen (10.10.2026, Vorgabe an): die Vorgabe festhalten, damit der Zeitplaner
+ * die Person kennt – „neu" gilt erst ab jetzt, und wer gerade einschaltet, bekommt nicht im selben Moment eine Erinnerung.
+ */
+export function vorgabeFesthalten(nid: string, jetzt = Date.now()): void {
+  if (gespeichert(nid)) return
+  wahlSetzen(nid, STANDARD_WAHL, jetzt)
+}
+
 /**
  * Neue Einstellungen der Person. Beim Einschalten gilt erst ab jetzt etwas als „neu"; ein Termin, der schon vorbei
  * ist oder gleich käme, gilt für heute als erledigt – wer gerade einstellt, bekommt nicht im selben Moment eine Erinnerung.
  */
 export function wahlSetzen(nid: string, roh: unknown, jetzt = Date.now()): ErinnerungsWahl {
+  const neuAngelegt = !gespeichert(nid)
   const g = lesen(nid)
   const wahl = wahlBereinigt(roh)
-  if (wahl.an && !g.wahl.an) g.zustand.neuSeit = jetzt
+  if (wahl.an && (!g.wahl.an || neuAngelegt)) g.zustand.neuSeit = jetzt
   g.wahl = wahl
   const t = naechsterTermin(wahl, g.zustand.erledigt, jetzt)
   if (t && t.ms <= jetzt + 5 * 60_000) g.zustand.erledigt = t.tag
@@ -253,7 +269,7 @@ function sicherAngekuendigt(n: NutzerInfo, jetzt: number): ReturnType<typeof ang
 /** Offene Kurse dieser Person, in denen die Lehrkraft Erinnerungen anbietet */
 export function angeboteneKurse(n: NutzerInfo): VokZeile[] {
   if (n.rolle !== 'schueler' || n.quelle === 'vorschau') return []
-  return (vokDb().prepare("SELECT * FROM vok_zuweisungen WHERE erinnerungen = 'an' AND status = 'offen'").all() as unknown as VokZeile[]).filter(
+  return (vokDb().prepare("SELECT * FROM vok_zuweisungen WHERE erinnerungen != 'aus' AND status = 'offen'").all() as unknown as VokZeile[]).filter(
     (z) => istOffen(z) && vokIstFuer(z, n)
   )
 }
@@ -458,6 +474,7 @@ export function erinnerungenRoute(adresse = ''): (k: Anfrage) => Promise<boolean
       if (!abo) return json(res, 400, { fehler: 'Dieses Gerät lässt sich für Erinnerungen nicht anmelden.' }), true
       if (typeof k0.alt === 'string' && k0.alt !== abo.endpoint) geraetEntfernen(ich.id, k0.alt)
       geraetSpeichern(ich.id, sitzung.kennung, abo)
+      vorgabeFesthalten(ich.id)
       return json(res, 200, { ok: true, geraete: geraeteVon(ich.id).length }), true
     }
     if (teil === 'geraet-pruefen') {

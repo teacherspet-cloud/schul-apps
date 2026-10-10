@@ -155,7 +155,7 @@ export function vokabelBlattMeta(
     subjectId: fach.id,
     subjectLabel: fach.label,
     grade: jahrgangAus(k.name),
-    title: 'Vokabelübung: wackelige Wörter',
+    title: 'Vokabelübung: Problemwörter',
     topic: `Kurze Vokabelübung mit ${v.woerter.length} Wörtern, die in der Klasse gerade wackeln (${k.titel})`,
     learningGoals: [
       `Kurzes Übungsblatt (höchstens zwei Seiten) mit GENAU diesen ${v.woerter.length} Wörtern – keine weiteren Vokabeln abfragen:`,

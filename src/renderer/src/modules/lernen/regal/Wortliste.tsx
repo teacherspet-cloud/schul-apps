@@ -9,12 +9,14 @@
  *    allen Büchern – sofort, in beiden Sprachen und im Beispielsatz, ohne Rücksicht auf Groß/klein und Akzente.
  *  - Alphabetisch: alle Wörter aus „Meine Bücher" nach dem Wort in der Fremdsprache (ohne „to ", Artikel, Akzente),
  *    Sprungleiste A–Z (nur Buchstaben mit Wörtern), Buchstaben-Überschriften, kurze Zeilen mit Fundstelle („GL 2 · U3"),
- *    gleiche Wörter einmal mit allen Fundstellen. Gezeichnet wird nur, was im Bild ist – auch bei Tausenden Wörtern flüssig.
+ *    gleiche Wörter einmal mit allen Fundstellen. Die Liste fließt in der Seite (nur die Seite scrollt), oben klebt die
+ *    Kopfleiste, „↑ Nach oben" führt zurück; gezeichnet werden nur Blöcke in der Nähe des Bildes – auch bei Tausenden
+ *    Wörtern flüssig (10.10.2026).
  */
-import { ActionIcon, Badge, Button, Loader, SegmentedControl, Stack, Text } from '@mantine/core'
-import { IconVolume } from '@tabler/icons-react'
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { abcEintraege, alphabetisch, fenster, mitKoepfen, type AbcZeile, type MeinBuch } from '@shared/meineBuecher'
+import { ActionIcon, Badge, Button, Loader, Portal, SegmentedControl, Stack, Text } from '@mantine/core'
+import { IconArrowUp, IconVolume } from '@tabler/icons-react'
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { abcEintraege, alphabetisch, mitKoepfen, type AbcPosten, type AbcZeile, type MeinBuch } from '@shared/meineBuecher'
 import { suchform, suchindex, wortlisteFiltern, type Wortliste as Liste, type WortlisteGruppe, type WortlisteWort, type WortStatus } from '@shared/wortliste'
 import { holen } from '../../onlinetest/serverApi'
 import { BandCover } from '../../../shared/components/BandCover'
@@ -72,17 +74,26 @@ button.wl-paar:focus-visible { outline: 2px solid var(--og-akzent); outline-offs
 .mb-umschlag { position: absolute; pointer-events: none; transform-style: preserve-3d; transform-origin: 0 50%; z-index: 6; }
 .mb-umschlag > * { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 0 6px 6px 0; overflow: hidden; }
 .mb-umschlag > .mb-vorn img, .mb-umschlag > .mb-vorn > div { width: 100% !important; height: 100% !important; object-fit: cover; border-radius: 0 !important; }
-.ab-leiste { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 0; background: var(--og-papier, var(--mantine-color-body));
-  border-bottom: 2px solid var(--og-akzent); }
+.ab-kopfleiste { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 2px; padding-top: 4px;
+  background: var(--og-papier, var(--mantine-color-body)); border-bottom: 2px solid var(--og-akzent); }
+.ab-leiste { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 0 6px; background: var(--og-papier, var(--mantine-color-body)); }
 .ab-leiste button { min-width: 26px; height: 26px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit;
   font-weight: 700; font-size: .85rem; cursor: pointer; }
 .ab-leiste button[aria-current="true"] { background: var(--og-akzent); color: var(--og-akzent-text, #fff); }
 .ab-leiste button:focus-visible { outline: 2px solid var(--og-akzent); }
-.ab-liste { position: relative; }
-.ab-kopf { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; font-weight: 800; font-size: 1.15rem; padding: 0 4px 3px;
+.ab-kopf { display: flex; align-items: flex-end; box-sizing: border-box; height: 40px; font-weight: 800; font-size: 1.15rem; padding: 0 4px 3px;
   border-bottom: 1px solid var(--og-akzent); }
-.ab-zeile { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 28px; gap: 0 8px; align-items: center;
-  padding: 0 2px 0 4px; border-bottom: 1px solid var(--og-linie, rgba(0,0,0,.08)); }
+.ab-zeile { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 28px; gap: 0 8px; align-items: center; box-sizing: border-box; min-height: 36px;
+  padding: 2px 2px 2px 4px; border-bottom: 1px solid var(--og-linie, rgba(0,0,0,.08)); }
+.ab-nach-oben { position: fixed; z-index: 250; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; min-height: 40px; border-radius: 999px; font: inherit; font-weight: 700;
+  font-size: .9rem; cursor: pointer; color: var(--mantine-color-text); background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border); box-shadow: 0 4px 14px rgba(0,0,0,.22); animation: ab-ein .18s ease-out; }
+.ab-nach-oben:focus-visible { outline: 3px solid var(--mantine-primary-color-filled); outline-offset: 2px; }
+body:has([data-schueler-tabs]) .ab-nach-oben { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+html[data-touch] .ab-nach-oben { min-height: 44px; }
+@keyframes ab-ein { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ab-nach-oben { animation: none; } }
 .ab-text { display: flex; gap: 10px; min-width: 0; align-items: baseline; }
 .ab-text > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ab-text .wl-wort { flex: 0 1 auto; max-width: 55%; overflow-wrap: normal; }
@@ -93,6 +104,10 @@ button.wl-paar:focus-visible { outline: 2px solid var(--og-akzent); outline-offs
   .wl-paar { grid-template-columns: minmax(0, 1fr); }
   .wl-bed { opacity: .85; }
   .mb-bord { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 14px 8px; padding: 10px 4px 0; }
+  /* Telefon: nur die Buchstaben kleben oben (die Suche bleibt oben auf der Seite) – die Hülle gibt ihre Kinder frei */
+  .ab-kopfleiste { display: contents; }
+  .ab-leiste { position: sticky; top: 0; z-index: 3; border-bottom: 2px solid var(--og-akzent); }
+  .ab-zeile { min-height: 52px; }
   .ab-text { flex-direction: column; gap: 0; align-items: stretch; }
   .ab-text .wl-wort { max-width: 100%; }
   .ab-text .wl-bed { flex: none; }
@@ -142,8 +157,8 @@ function useWortDaten(o: FachOrdner, alle: boolean): { d: ListeMitAllen | null; 
 }
 
 /** Aussprache: Aufnahmen der Medienbank dazuladen; Stimmen kommen u. U. später – dann neu zeichnen */
-function useAussprache(sprache: string, terme: string[]): void {
-  const [, setNeu] = useState(0)
+function useAussprache(sprache: string, terme: string[]): number {
+  const [stand, setNeu] = useState(0)
   const schluessel = terme.slice(0, 600).join('\u0001')
   useEffect(() => {
     if (!sprache || !terme.length) return
@@ -158,6 +173,8 @@ function useAussprache(sprache: string, terme: string[]): void {
     window.speechSynthesis?.addEventListener?.('voiceschanged', s)
     return () => window.speechSynthesis?.removeEventListener?.('voiceschanged', s)
   }, [])
+  // Zähler: Teile, die sich nicht von selbst neu zeichnen (Blöcke der alphabetischen Liste), erfahren so von neuen Aufnahmen
+  return stand
 }
 
 const tonDa = (sprache: string, term: string): boolean => (Boolean(sprache) && kannSprechen(sprache)) || Boolean(medium(term.trim())?.ton?.url)
@@ -596,14 +613,26 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
 
 // ------------------------------------------------------------------ Alphabetisch
 
-/** Höhen der Posten (fest – nur so lässt sich ohne Messen jedes Eintrags im Fenster zeichnen) */
+/*
+ * Alphabetische Liste ohne eigenes Fenster (10.10.2026, Befund der Lehrkraft): Vorher standen die Zeilen einzeln absolut in
+ * einem Kasten fester Höhe, gezeichnet wurde nur der Ausschnitt im Bild. Beim Hochscrollen wirkte das wie eine Liste in der
+ * Liste („erst ganz nach oben, dann erst die Seite"), beim Sprung nach „Z" blieb unten leeres Papier. Jetzt fließt die Liste
+ * in der Seite (nur die Seite scrollt – Mausrad, Finger und Tastatur wie überall). Oben klebt die Kopfleiste (Suche und A–Z,
+ * am Telefon nur A–Z), unten erscheint nach dem Hinunterscrollen „↑ Nach oben". Damit auch Tausende Wörter („Alle Wörter")
+ * flüssig bleiben, ist die Liste in Blöcke geteilt (je Buchstabe, höchstens BLOCK Zeilen); gezeichnet wird ein Block erst,
+ * wenn er in die Nähe des Bildes kommt, sonst steht ein Platzhalter seiner (gemessenen bzw. geschätzten) Höhe da.
+ */
+
+/** Zeilen je Block */
+const BLOCK = 60
+/** Schätzhöhen, bis der erste Block gemessen ist */
 const HOEHE = { kopf: 40, zeile: 36, zeileSchmal: 52 }
+const SCHMAL = '(max-width: 560px)'
 
 function useSchmal(): boolean {
-  const abfrage = '(max-width: 560px)'
-  const [schmal, setSchmal] = useState(() => window.matchMedia?.(abfrage).matches ?? false)
+  const [schmal, setSchmal] = useState(() => window.matchMedia?.(SCHMAL).matches ?? false)
   useEffect(() => {
-    const m = window.matchMedia?.(abfrage)
+    const m = window.matchMedia?.(SCHMAL)
     if (!m) return
     const f = (): void => setSchmal(m.matches)
     m.addEventListener?.('change', f)
@@ -622,27 +651,12 @@ const alleGemerkt = (): boolean => {
   }
 }
 
-function AbcZeileAnsicht({
-  z,
-  sprache,
-  oben,
-  hoehe,
-  schmal,
-  t
-}: {
-  z: AbcZeile
-  sprache: string
-  oben: number
-  hoehe: number
-  schmal: boolean
-  t: BuecherTexte
-}): React.JSX.Element {
+function AbcZeileAnsicht({ z, sprache, schmal, t }: { z: AbcZeile; sprache: string; schmal: boolean; t: BuecherTexte }): React.JSX.Element {
   // Telefon: Fundstellen untereinander rechts – höchstens zwei Plaketten (die zweite ggf. „+n")
   const zeigen = z.quellen.slice(0, schmal && z.quellen.length > 2 ? 1 : 2)
   return (
     <div
       className="ab-zeile"
-      style={{ top: oben, height: hoehe }}
       data-abc-wort={z.term}
       data-abc-nicht-dran={z.nichtDran || undefined}
       data-abc-quellen={z.quellen.length}
@@ -673,6 +687,125 @@ function AbcZeileAnsicht({
   )
 }
 
+/** Ein Block der Liste: Buchstabenkopf (beim ersten Block eines Buchstabens) und bis zu BLOCK Zeilen */
+interface AbcBlockDaten {
+  nr: number
+  buchstabe: string
+  /** Beginnt hier ein Buchstabe (mit Kopf)? */
+  anfang: boolean
+  posten: AbcPosten[]
+  zeilen: number
+}
+
+function bloecke(posten: AbcPosten[]): AbcBlockDaten[] {
+  const aus: AbcBlockDaten[] = []
+  let b: AbcBlockDaten | undefined
+  for (const p of posten) {
+    if (p.art === 'kopf' || !b || b.zeilen >= BLOCK) {
+      const buchstabe: string = p.art === 'kopf' ? p.buchstabe : (aus[aus.length - 1]?.buchstabe ?? '')
+      b = { nr: aus.length, buchstabe, anfang: p.art === 'kopf', posten: [], zeilen: 0 }
+      aus.push(b)
+    }
+    b.posten.push(p)
+    if (p.art === 'zeile') b.zeilen++
+  }
+  return aus
+}
+
+type Beobachten = (el: Element, f: (nah: boolean, hoehe: number) => void) => () => void
+
+/** Gemeinsamer Beobachter aller Blöcke: je ein Bild Vorrat über und unter dem sichtbaren Teil */
+function useBeobachter(): Beobachten {
+  const io = useRef<IntersectionObserver | null>(null)
+  const ziele = useRef(new Map<Element, (nah: boolean, hoehe: number) => void>())
+  useEffect(
+    () => () => {
+      io.current?.disconnect()
+      io.current = null
+    },
+    []
+  )
+  return useCallback<Beobachten>((el, f) => {
+    if (typeof IntersectionObserver === 'undefined') {
+      f(true, 0)
+      return () => undefined
+    }
+    io.current ??= new IntersectionObserver(
+      (eintraege) => {
+        // offsetHeight statt boundingClientRect: Das Blatt kommt mit einer Drehung herein (og-blatt), gedreht wären die Maße verzerrt
+        for (const e of eintraege) ziele.current.get(e.target)?.(e.isIntersecting, (e.target as HTMLElement).offsetHeight)
+      },
+      { rootMargin: '100% 0px 100% 0px' }
+    )
+    ziele.current.set(el, f)
+    io.current.observe(el)
+    return () => {
+      ziele.current.delete(el)
+      io.current?.unobserve(el)
+    }
+  }, [])
+}
+
+const AbcBlock = memo(function AbcBlock({
+  b,
+  schaetzung,
+  anfangs,
+  sprache,
+  schmal,
+  t,
+  beobachten,
+  melden
+}: {
+  b: AbcBlockDaten
+  schaetzung: number
+  anfangs: boolean
+  sprache: string
+  schmal: boolean
+  t: BuecherTexte
+  /** Nur damit sich der Block neu zeichnet, wenn Aufnahmen dazukommen */
+  tonStand: number
+  beobachten: Beobachten
+  melden: (nr: number, an: boolean, el: HTMLElement | null) => void
+}): React.JSX.Element {
+  const [an, setAn] = useState(anfangs)
+  const el = useRef<HTMLDivElement>(null)
+  // Zuletzt gemessene Höhe – der Platzhalter ist danach genau so hoch wie der gezeichnete Block (nichts springt)
+  const hoehe = useRef<number | null>(null)
+  useEffect(() => {
+    const knoten = el.current
+    if (!knoten) return
+    return beobachten(knoten, (nah, h) => {
+      if (!nah && h > 0) hoehe.current = h
+      setAn(nah)
+    })
+  }, [beobachten])
+  useLayoutEffect(() => {
+    if (an && el.current) hoehe.current = el.current.offsetHeight
+    melden(b.nr, an, an ? el.current : null)
+  }, [an, b.nr, melden])
+  useEffect(() => () => melden(b.nr, false, null), [b.nr, melden])
+  return (
+    <div
+      ref={el}
+      className="ab-block"
+      data-abc-block={b.buchstabe}
+      data-abc-block-start={b.anfang ? b.buchstabe : undefined}
+      style={an ? undefined : { height: hoehe.current ?? schaetzung }}
+    >
+      {an &&
+        b.posten.map((p) =>
+          p.art === 'kopf' ? (
+            <div key={`k-${p.buchstabe}`} className="ab-kopf" data-abc-kopf={p.buchstabe} role="heading" aria-level={3}>
+              {p.buchstabe}
+            </div>
+          ) : (
+            <AbcZeileAnsicht key={p.z.key} z={p.z} sprache={sprache} schmal={schmal} t={t} />
+          )
+        )}
+    </div>
+  )
+})
+
 export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   // „Meine Wörter | Alle Wörter" (10.10.2026, Wunsch der Lehrkraft): links nur Freigegebenes, rechts alle Wörter der Bände
   const [alle, setAlle] = useState(alleGemerkt)
@@ -695,63 +828,137 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
     return teile.length ? zeilen.filter((_, i) => teile.every((t) => suchtexte[i].includes(t))) : zeilen
   }, [zeilen, suchtexte, verzoegert])
   const posten = useMemo(() => mitKoepfen(gefiltert), [gefiltert])
+  const teile = useMemo(() => bloecke(posten), [posten])
   const schmal = useSchmal()
-  const zh = schmal ? HOEHE.zeileSchmal : HOEHE.zeile
-  const oben = useMemo(() => {
-    const o2 = new Array<number>(posten.length + 1)
-    let y = 0
-    posten.forEach((p, i) => {
-      o2[i] = y
-      y += p.art === 'kopf' ? HOEHE.kopf : zh
-    })
-    o2[posten.length] = y
-    return o2
-  }, [posten, zh])
 
-  // Fenster: nur zeichnen, was (mit Vorrat) im Bild ist; die Seite scrollt als Ganzes
+  // Höhen: geschätzt, bis der erste gezeichnete Block gemessen ist (dann stimmen auch die Platzhalter darunter)
+  const [mass, setMass] = useState<{ kopf: number; zeile: number; schmal: boolean } | null>(null)
+  const kopfH = mass?.schmal === schmal ? mass.kopf : HOEHE.kopf
+  const zh = mass?.schmal === schmal ? mass.zeile : schmal ? HOEHE.zeileSchmal : HOEHE.zeile
+  const schaetzungen = useMemo(() => teile.map((b) => (b.anfang ? kopfH : 0) + b.zeilen * zh), [teile, kopfH, zh])
+  // Zu Beginn gezeichnet: was ungefähr in die ersten zwei Bildschirmhöhen passt (danach entscheidet der Beobachter)
+  const anfangs = useMemo(() => {
+    const grenze = window.innerHeight * 2
+    let y = 0
+    return schaetzungen.map((h) => {
+      const ja = y < grenze
+      y += h
+      return ja
+    })
+  }, [schaetzungen])
+
+  // Gezeichnete Blöcke (für Aussprache und Zähler)
+  const [gezeichnet, setGezeichnet] = useState<ReadonlySet<number>>(() => new Set())
+  const melden = useCallback((nr: number, an: boolean, el: HTMLElement | null) => {
+    setGezeichnet((s) => {
+      if (s.has(nr) === an) return s
+      const n = new Set(s)
+      if (an) n.add(nr)
+      else n.delete(nr)
+      return n
+    })
+    // Gezeichneter Block mit genug Zeilen: Kopf- und Zeilenhöhe messen (je Breite einmal)
+    if (!an || !el) return
+    const z = el.querySelectorAll<HTMLElement>('.ab-zeile')
+    if (z.length < 5) return
+    const k = el.querySelector<HTMLElement>('.ab-kopf')
+    const kopf = k?.offsetHeight ?? 0
+    const zeile = (el.offsetHeight - kopf) / z.length
+    const schmalJetzt = window.matchMedia?.(SCHMAL).matches ?? false
+    setMass((m) =>
+      m && m.schmal === schmalJetzt && (k ? Math.abs(m.kopf - kopf) < 0.5 : true) && Math.abs(m.zeile - zeile) < 0.5
+        ? m
+        : { kopf: k ? kopf : (m?.kopf ?? HOEHE.kopf), zeile, schmal: schmalJetzt }
+    )
+  }, [])
+  const beobachten = useBeobachter()
+
+  // Aussprache für das, was gerade gezeichnet ist (verzögert, damit Scrollen keine Anfragen auslöst)
+  const [ton, setTon] = useState<string[]>([])
+  const tonTerme = useMemo(
+    () => teile.filter((b) => gezeichnet.has(b.nr)).flatMap((b) => b.posten.flatMap((p) => (p.art === 'zeile' ? [p.z.term] : []))),
+    [teile, gezeichnet]
+  )
+  const tonSchluessel = tonTerme.join('\u0001')
+  useEffect(() => {
+    const uhr = window.setTimeout(() => setTon(tonTerme), 400)
+    return () => window.clearTimeout(uhr)
+  }, [tonSchluessel]) // eslint-disable-line react-hooks/exhaustive-deps
+  const tonStand = useAussprache(d?.sprache ?? '', ton)
+
+  // Kopfleiste, aktueller Buchstabe, „Nach oben"
   const liste = useRef<HTMLDivElement>(null)
-  const leiste = useRef<HTMLDivElement>(null)
-  const [sicht, setSicht] = useState({ von: 0, bis: 1200 })
-  useLayoutEffect(() => {
+  const kopfleiste = useRef<HTMLDivElement>(null)
+  const leiste = useRef<HTMLElement>(null)
+  const suchfeld = useRef<HTMLDivElement>(null)
+  /** Höhe dessen, was oben klebt (am Telefon nur die Buchstaben – die Hülle ist dort `display: contents`) */
+  const klebt = (): number => Math.max(kopfleiste.current?.offsetHeight ?? 0, leiste.current?.offsetHeight ?? 0)
+  const [jetzt, setJetzt] = useState('')
+  const [weitUnten, setWeitUnten] = useState(false)
+  // Angetippter Buchstabe: gilt, bis selbst gescrollt wird – auch wenn er am Ende der Liste nicht bis nach oben reicht
+  const ziel = useRef<string | null>(null)
+  useEffect(() => {
     let uhr = 0
     const messen = (): void => {
       uhr = 0
-      const el = liste.current
-      if (!el) return
-      const t = el.getBoundingClientRect().top
-      setSicht((s) => {
-        const von = Math.round(-t)
-        const bis = Math.round(-t + window.innerHeight)
-        return Math.abs(s.von - von) < 40 && Math.abs(s.bis - bis) < 40 ? s : { von, bis }
-      })
+      const l = liste.current
+      if (!l) return
+      const kante = klebt() + 8
+      let b = ''
+      for (const k of l.querySelectorAll<HTMLElement>('.ab-block[data-abc-block-start]')) {
+        if (k.getBoundingClientRect().top > kante) break
+        b = k.dataset.abcBlockStart ?? b
+      }
+      const amEnde = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+      if (ziel.current && amEnde) b = ziel.current
+      setJetzt(b)
+      setWeitUnten(l.getBoundingClientRect().top < -window.innerHeight)
     }
     const anstossen = (): void => {
       if (!uhr) uhr = requestAnimationFrame(messen)
     }
+    const selbst = (): void => {
+      ziel.current = null
+    }
+    const arten = ['wheel', 'touchstart', 'keydown'] as const
     messen()
     window.addEventListener('scroll', anstossen, { passive: true })
     window.addEventListener('resize', anstossen)
-    // Das Blatt kommt mit einer kleinen Drehung herein (og-blatt) – danach stimmt die Lage erst
-    document.addEventListener('animationend', anstossen, true)
-    const spaeter = window.setTimeout(anstossen, 500)
+    for (const e of arten) window.addEventListener(e, selbst, { passive: true })
     return () => {
       window.removeEventListener('scroll', anstossen)
       window.removeEventListener('resize', anstossen)
-      document.removeEventListener('animationend', anstossen, true)
-      window.clearTimeout(spaeter)
+      for (const e of arten) window.removeEventListener(e, selbst)
       if (uhr) cancelAnimationFrame(uhr)
     }
-  }, [d])
-  const { von, bis } = fenster(oben, sicht.von, sicht.bis, 600)
-  const sichtbar = posten.slice(von, bis)
-  // Aussprache für das, was gerade zu sehen ist (verzögert, damit Scrollen keine Anfragen auslöst)
-  const [ton, setTon] = useState<string[]>([])
-  const tonSchluessel = sichtbar.map((p) => (p.art === 'zeile' ? p.z.term : '')).join('\u0001')
-  useEffect(() => {
-    const uhr = window.setTimeout(() => setTon(sichtbar.flatMap((p) => (p.art === 'zeile' ? [p.z.term] : []))), 400)
-    return () => window.clearTimeout(uhr)
-  }, [tonSchluessel]) // eslint-disable-line react-hooks/exhaustive-deps
-  useAussprache(d?.sprache ?? '', ton)
+  }, [d, teile])
+
+  const springe = (b: string): void => {
+    const el = [...(liste.current?.querySelectorAll<HTMLElement>('.ab-block[data-abc-block-start]') ?? [])].find((x) => x.dataset.abcBlockStart === b)
+    if (!el) return
+    const zielY = (): number => Math.max(0, Math.round(el.getBoundingClientRect().top + window.scrollY - klebt()))
+    const y = zielY()
+    // Weite Sprünge sofort (sanftes Scrollen über Tausende Zeilen dauert Sekunden), kurze sanft. Reicht das Ende der
+    // Liste nicht bis nach oben (etwa „Z"), scrollt die Seite nur so weit sie kann – kein künstlicher Leerraum darunter.
+    const sofort = ruhig() || Math.abs(y - window.scrollY) > window.innerHeight * 2
+    window.scrollTo({ top: y, behavior: sofort ? 'auto' : 'smooth' })
+    ziel.current = b
+    setJetzt(b)
+    // Blöcke um das Ziel werden erst beim Ankommen gezeichnet; weicht ihre Höhe von der Schätzung ab, nachziehen
+    if (sofort)
+      for (const ms of [60, 250])
+        window.setTimeout(() => {
+          const max = document.documentElement.scrollHeight - window.innerHeight
+          const y2 = Math.min(zielY(), max)
+          if (ziel.current === b && Math.abs(y2 - window.scrollY) > 2) window.scrollTo({ top: y2, behavior: 'auto' })
+        }, ms)
+  }
+  const nachOben = (e: React.MouseEvent): void => {
+    ziel.current = null
+    window.scrollTo({ top: 0, behavior: ruhig() || window.scrollY > window.innerHeight * 3 ? 'auto' : 'smooth' })
+    // Mit der Tastatur ausgelöst: weiter im Suchfeld (mit Finger/Maus nicht – sonst springt am Tablet die Tastatur auf)
+    if (e.detail === 0) suchfeld.current?.querySelector('input')?.focus({ preventScroll: true })
+  }
 
   const umschalter = (
     <SegmentedControl
@@ -781,48 +988,57 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
         {t.leer}
       </Text>
     )
-  const koepfe = posten.flatMap((p, i) => (p.art === 'kopf' ? [{ b: p.buchstabe, i }] : []))
-  // Aktueller Buchstabe: der letzte Kopf oberhalb der Mitte der Leiste
-  const leisteH = leiste.current?.offsetHeight ?? 40
-  const jetzt = [...koepfe].reverse().find((k) => oben[k.i] <= sicht.von + leisteH + 4)?.b ?? koepfe[0]?.b
-  const springe = (i: number): void => {
-    const el = liste.current
-    if (!el) return
-    const y = Math.max(0, el.getBoundingClientRect().top + window.scrollY + oben[i] - (leiste.current?.offsetHeight ?? 40) - 2)
-    // Weite Sprünge sofort (sanftes Scrollen über Tausende Zeilen dauert Sekunden), kurze sanft
-    const weit = Math.abs(y - window.scrollY) > window.innerHeight * 2
-    window.scrollTo({ top: y, behavior: ruhig() || weit ? 'auto' : 'smooth' })
-  }
+  const koepfe = teile.filter((b) => b.anfang).map((b) => b.buchstabe)
+  const aktuell = koepfe.includes(jetzt) ? jetzt : koepfe[0]
+  const gezeichneteZeilen = teile.reduce((n, b) => n + (gezeichnet.has(b.nr) ? b.zeilen : 0), 0)
   const sucht = Boolean(verzoegert.trim())
+  // Neue Auswahl (Suche, Umschalter, Telefon/breit): Blöcke frisch – gemessene Höhen gelten nur für ihren Inhalt
+  const lauf = `${alle ? 'a' : 'm'}|${schmal ? 's' : 'b'}|${verzoegert}`
   return (
     <Stack gap="xs" data-wortliste data-alphabetisch>
       <style>{CSS}</style>
       {umschalter}
-      <Suche wert={suche} setWert={setSuche} t={t} />
       <Text size="sm" c="dimmed" aria-live="polite" data-wortliste-anzahl={gefiltert.length}>
         {sucht ? (gefiltert.length ? t.treffer(gefiltert.length) : t.nichts(verzoegert.trim())) : t.woerter(zeilen.length)}
       </Text>
-      {koepfe.length > 0 && (
-        <nav className="ab-leiste" ref={leiste} aria-label={t.springen} data-abc-leiste>
-          {koepfe.map((k) => (
-            <button key={k.b} type="button" aria-current={k.b === jetzt} onClick={() => springe(k.i)} data-abc-sprung={k.b}>
-              {k.b}
-            </button>
-          ))}
-        </nav>
-      )}
-      <div ref={liste} className="ab-liste" style={{ height: oben[posten.length] }} data-abc-liste={posten.length} data-abc-gezeichnet={sichtbar.length}>
-        {sichtbar.map((p, k) => {
-          const i = von + k
-          return p.art === 'kopf' ? (
-            <div key={`k-${p.buchstabe}`} className="ab-kopf" style={{ top: oben[i], height: HOEHE.kopf }} data-abc-kopf={p.buchstabe} role="heading" aria-level={3}>
-              {p.buchstabe}
-            </div>
-          ) : (
-            <AbcZeileAnsicht key={p.z.key} z={p.z} sprache={d.sprache} oben={oben[i]} hoehe={zh} schmal={schmal} t={t} />
-          )
-        })}
+      <div className="ab-kopfleiste" ref={kopfleiste} data-abc-kopfleiste>
+        <div ref={suchfeld}>
+          <Suche wert={suche} setWert={setSuche} t={t} />
+        </div>
+        {koepfe.length > 0 && (
+          <nav className="ab-leiste" ref={leiste} aria-label={t.springen} data-abc-leiste>
+            {koepfe.map((b) => (
+              <button key={b} type="button" aria-current={b === aktuell} onClick={() => springe(b)} data-abc-sprung={b}>
+                {b}
+              </button>
+            ))}
+          </nav>
+        )}
       </div>
+      <div ref={liste} className="ab-liste" data-abc-liste={posten.length} data-abc-gezeichnet={gezeichneteZeilen}>
+        {teile.map((b, i) => (
+          <AbcBlock
+            key={`${lauf}|${b.nr}`}
+            b={b}
+            schaetzung={schaetzungen[i]}
+            anfangs={anfangs[i]}
+            sprache={d.sprache}
+            schmal={schmal}
+            t={t}
+            tonStand={tonStand}
+            beobachten={beobachten}
+            melden={melden}
+          />
+        ))}
+      </div>
+      {weitUnten && (
+        <Portal>
+          <button type="button" className="ab-nach-oben" onClick={nachOben} data-abc-nach-oben>
+            <IconArrowUp size={16} aria-hidden />
+            {t.nachOben}
+          </button>
+        </Portal>
+      )}
     </Stack>
   )
 }

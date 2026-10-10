@@ -25,6 +25,7 @@
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
 import { geraetAbmelden } from './erinnerungenGeraet'
+import { ErinnerungenFrage } from './ErinnerungenFrage'
 import { RekordKnopf } from './Rekorde'
 import { usePfad } from './schuelerNavigation'
 import { useAuffrischen } from '../../shared/auffrischen'
@@ -702,6 +703,8 @@ function Startseite(): React.JSX.Element {
         figurFach={naechstes?.fach || sprachen?.[0]?.fach || vok?.find((v) => !v.alt)?.fach || null}
         figurAnfragen={konto}
       />
+      {/* Erinnerungen zum Üben (10.10.2026, Vorgabe an): einmal freundlich nach der Erlaubnis des Geräts fragen */}
+      <ErinnerungenFrage />
 
       {/* „Als Nächstes" breit, daneben kompakt der Tipp (10.10.2026); am Telefon untereinander, „Als Nächstes" zuerst.
           Die Sprachkarten darunter sind entfallen – die Runde steht unter „Als Nächstes". */}

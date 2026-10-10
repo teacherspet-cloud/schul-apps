@@ -10,6 +10,7 @@
  * Rein rechnend, ohne Datenbank – der Server reicht Wörter und Lernstände herein.
  */
 import { istSicher, type Vokabel, type WortStand } from './vokabeltrainer'
+import { problemWoerter } from './problemWoerter'
 import { quelleUnits, type Quelle } from './vokabelLaufbahn'
 import { bandRang } from './lehrwerkBand'
 import { ABSCHNITT_FOLGE } from '../renderer/src/shared/lehrwerkGrammatik'
@@ -256,7 +257,7 @@ export interface AbschnittStatistik {
   neu: number
   /** Lernende unter 30 % sicher, wenn der Abschnitt mindestens 14 Tage alt ist; null = noch zu jung */
   schwach: number | null
-  /** Schwierigste Wörter (mindestens 3 Versuche über alle, mit Fehlern) */
+  /** Problemwörter des Abschnitts (shared/problemWoerter.ts), die wichtigsten 5 */
   probleme: { term: string; translation: string; quote: number }[]
   /** Je Lernende(r) in der Reihenfolge der Namen: [Anteil sicher, Anteil im Aufbau], auf zwei Stellen */
   jeLernende: [number, number][]
@@ -295,7 +296,6 @@ export function abschnittStatistik(
     let aufbau = 0
     let neu = 0
     const jeLernende: [number, number][] = []
-    const jeWort = new Map<string, { versuche: number; falsch: number }>()
     const reif = Boolean(t.zeit) && jetzt - t.zeit >= REIF_TAGE * TAG
     let schwach = 0
     for (const st of staende) {
@@ -305,12 +305,6 @@ export function abschnittStatistik(
         const w = st[v.id]
         if (w && istSicher(w)) s++
         else if (w && (w.fach > 0 || w.versuche > 0)) a++
-        if (w?.versuche) {
-          const j = jeWort.get(v.id) ?? { versuche: 0, falsch: 0 }
-          j.versuche += w.versuche
-          j.falsch += w.falsch
-          jeWort.set(v.id, j)
-        }
       }
       const n = liste.length
       sicher += s
@@ -320,7 +314,6 @@ export function abschnittStatistik(
       if (reif && n && s / n < SCHWACH_UNTER) schwach++
     }
     const ges = sicher + aufbau + neu
-    const nachId = new Map(liste.map((v) => [v.id, v]))
     return {
       index: i,
       ...(einordnung[i]?.buch ? { buch: einordnung[i].buch } : {}),
@@ -334,11 +327,10 @@ export function abschnittStatistik(
       aufbau: ges ? aufbau / ges : 0,
       neu: ges ? neu / ges : 1,
       schwach: reif ? schwach : null,
-      probleme: [...jeWort.entries()]
-        .filter(([, j]) => j.versuche >= 3 && j.falsch > 0)
-        .sort((x, y) => y[1].falsch / y[1].versuche - x[1].falsch / x[1].versuche)
+      // Dieselbe Definition wie überall (10.10.2026, shared/problemWoerter.ts) – hier die wichtigsten 5 des Abschnitts
+      probleme: problemWoerter(liste, staende, {}, jetzt)
         .slice(0, 5)
-        .map(([id, j]) => ({ term: nachId.get(id)!.term, translation: nachId.get(id)!.translation, quote: j.falsch / j.versuche })),
+        .map((p) => ({ term: p.term, translation: p.translation, quote: p.quote })),
       jeLernende
     }
   })

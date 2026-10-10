@@ -136,10 +136,16 @@ describe('Auslöser und Texte', () => {
     expect(nachrichtFuer('tagesziel', wahl({ text: 'Vokabeln, dann Fußball!' }), lage(), () => 0).text).toBe('Vokabeln, dann Fußball!')
     expect(wahlBereinigt({ an: 'ja', zeit: '25:00', tage: [0, 3, 3, 9, 1], text: '<x>', sprache: 'fr', ausloeser: { serie: false } })).toEqual({
       ...STANDARD_WAHL,
+      an: false,
       tage: [1, 3],
       ausloeser: { tagesziel: true, serie: false, neu: true, woche: true },
       text: 'x'
     })
+  })
+  it('Vorgabe (10.10.2026): alles an – 16:00, alle Tage, alle Auslöser; nur ein ausdrückliches false schaltet aus', () => {
+    expect(STANDARD_WAHL).toMatchObject({ an: true, zeit: '16:00', tage: [1, 2, 3, 4, 5, 6, 7], ausloeser: { tagesziel: true, serie: true, neu: true, woche: true } })
+    expect(wahlBereinigt({}).an).toBe(true)
+    expect(wahlBereinigt({ an: false }).an).toBe(false)
   })
   it('Inhalt der Nachricht: Titel, Text, Ziel, Sprache – sonst nichts', () => {
     const n = JSON.parse(nutzlast(nachrichtFuer('tagesziel', wahl(), lage(), () => 0)))
@@ -208,8 +214,11 @@ describe('Erinnerungen auf dem Server', () => {
   })
   afterAll(() => empfang?.close())
 
-  it('ohne Angebot der Lehrkraft: nichts anzumelden', async () => {
+  it('Vorgabe angeboten (10.10.2026); ausdrücklich abgeschaltet: nichts anzumelden', async () => {
     expect(kurs).toBeTruthy()
+    expect((await rufe(ein, lena, 'GET', '/s/api/erinnerungen')).d.angeboten).toBe(true)
+    expect((await rufe(vok, lk, 'GET', `/server/vokabeln/${kurs}`)).d.erinnerungen).toBe(true)
+    expect((await rufe(vok, lk, 'POST', `/server/vokabeln/${kurs}/erinnerungen`, { an: false })).code).toBe(200)
     const g = await rufe(ein, lena, 'GET', '/s/api/erinnerungen')
     expect(g.d.angeboten).toBe(false)
     expect(g.d.schluessel).toBeUndefined()
@@ -221,9 +230,13 @@ describe('Erinnerungen auf dem Server', () => {
     const g = await rufe(ein, lena, 'GET', '/s/api/erinnerungen')
     expect(g.d.angeboten).toBe(true)
     expect(String(g.d.schluessel)).toMatch(/^B[\w-]{86}$/)
-    expect((g.d.wahl as ErinnerungsWahl).an).toBe(false)
+    // Einstellungen vorab an; das erste Gerät hält die Vorgabe fest – schon aktiv, ohne eigenes Speichern
+    expect((g.d.wahl as ErinnerungsWahl).an).toBe(true)
+    expect(aktiveZahl([lena.id])).toBe(0)
     expect((await rufe(ein, lena, 'POST', '/s/api/erinnerungen/geraet', { abo: { ...abo(), endpoint: 'https://intern.example/x' } })).code).toBe(400)
     expect((await rufe(ein, lena, 'POST', '/s/api/erinnerungen/geraet', { abo: abo() })).code).toBe(200)
+    expect(aktiveZahl([lena.id])).toBe(1)
+    expect(lesen(lena.id).zustand.neuSeit).toBeGreaterThan(0)
     expect((await rufe(ein, lena, 'POST', '/s/api/erinnerungen/wahl', { wahl: { ...STANDARD_WAHL, an: true } })).code).toBe(200)
     expect((await rufe(ein, lena, 'POST', '/s/api/erinnerungen/geraet-pruefen', { endpoint: abo().endpoint })).d.registriert).toBe(true)
     const d = (await rufe(vok, lk, 'GET', `/server/vokabeln/${kurs}`)).d

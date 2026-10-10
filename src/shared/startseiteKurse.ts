@@ -10,6 +10,7 @@
  * Rein rechnend; der Server (server/startseite.ts) liefert die Kurse mit EINER Anfrage, die Haltepunkte kommen mit den
  * laufenden Reihen (server/reihen.ts › laufend).
  */
+import { problemWoerterText } from './problemWoerter'
 import { abschnitteEinordnen, abschnittStelle, mitBaenden, unitZahl, type KursTeil } from './kursAbschnitte'
 import { bandRang } from './lehrwerkBand'
 import type { Quelle } from './vokabelLaufbahn'
@@ -209,7 +210,7 @@ export function kursAbzeichen(
   const test = testBaldText(k.testTermin, jetzt)
   if (test) return { art: 'test', text: test, reiter: 'vokabeln', hinweis: 'termin' }
   if (k.inaktiv.length) return { art: 'inaktiv', text: `${k.inaktiv.length} nicht geübt`, reiter: 'lernende', hinweis: 'inaktiv', ids: k.inaktiv }
-  if (k.problem >= 3) return { art: 'problem', text: `${k.problem} Problemwörter`, reiter: 'vokabeln', hinweis: 'problem' }
+  if (k.problem >= 3) return { art: 'problem', text: problemWoerterText(k.problem), reiter: 'vokabeln', hinweis: 'problem' }
   if (!k.lernende) return { art: 'leer', text: 'leer', reiter: 'lernende', hinweis: 'leer' }
   return { art: 'ok', text: '✓' }
 }

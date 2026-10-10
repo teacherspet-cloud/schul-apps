@@ -131,14 +131,22 @@ try {
   const m = await (await verwaltung.request.get(`${A}/s/manifest.webmanifest`)).json()
   pruefe(m.display === 'standalone' && m.start_url === '/s/' && m.short_name === 'Schul-Apps', `Manifest der Lernenden (${m.short_name})`)
 
-  // ---------- Ohne Angebot: nur ein Hinweis
+  // ---------- Vorgabe an (10.10.2026): Kurs bietet Erinnerungen an, die Startseite fragt einmal freundlich
   const s = await browser.newContext({ viewport: { width: 430, height: 900 } })
   await s.addInitScript(pushAttrappe, ABO)
   await anmelden(s, kind.benutzer, kind.passwort)
   const p = await s.newPage()
   p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
-  await p.goto(`${A}/s/einstellungen`)
-  pruefe(await da(p.locator('[data-erinnerung-nicht-angeboten]')), 'Ohne Angebot der Lehrkraft: Hinweis statt Schalter')
+  const st0 = await (await s.request.get(`${A}/s/api/erinnerungen`, { headers: KOPF })).json()
+  pruefe(st0.angeboten === true && st0.wahl?.an === true && st0.geraete === 0, `Vorgabe: angeboten, Einstellungen an, noch kein Gerät (${JSON.stringify({ a: st0.angeboten, an: st0.wahl?.an, g: st0.geraete })})`)
+  await p.goto(`${A}/s/`)
+  pruefe(await da(p.locator('[data-erinnerung-frage="frage"]')), 'Startseite: „Erinnerungen zum Üben einschalten?"')
+  await p.screenshot({ path: join(out, '0-startseite-frage.png'), fullPage: true })
+  await p.locator('[data-erinnerung-frage-spaeter]').click()
+  pruefe((await p.locator('[data-erinnerung-frage]').count()) === 0, '„Später": ausgeblendet')
+  await p.reload()
+  await p.waitForTimeout(2500)
+  pruefe((await p.locator('[data-erinnerung-frage]').count()) === 0, '„Später": auch nach dem Neuladen nicht (7 Tage)')
 
   // ---------- Lehrkraft: Schalter in den Kurseinstellungen
   const l = await lk.newPage()
@@ -152,17 +160,31 @@ try {
   await l.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursReiter(l, 'einstellungen')
   pruefe(await da(l.locator('[data-kurs-erinnerungen]')), 'Kurseinstellungen: Karte „Erinnerungen"')
-  pruefe(!(await l.locator('[data-kurs-erinnerungen-an]').isChecked()), 'Vorgabe: nicht angeboten')
-  await l.locator('[data-kurs-erinnerungen-an]').click({ force: true })
+  pruefe(await l.locator('[data-kurs-erinnerungen-an]').isChecked(), 'Vorgabe: angeboten')
   pruefe(await da(l.locator('[data-kurs-erinnerungen-aktiv="0"]')), 'Angeboten – 0 Lernende haben sie eingeschaltet')
+  // Ausdrücklich abschalten …
+  await l.locator('[data-kurs-erinnerungen-an]').click({ force: true })
+  await l.waitForTimeout(800)
+  const k0 = await (await lk.request.get(`${A}/server/vokabeln/${vid}`, { headers: KOPF })).json()
+  pruefe(k0.erinnerungen === false, 'Abgeschaltet gespeichert')
+  await p.goto(`${A}/s/einstellungen`)
+  pruefe(await da(p.locator('[data-erinnerung-nicht-angeboten]')), 'Abgeschaltet: Hinweis statt Schalter')
+  // … und wieder an
+  await l.locator('[data-kurs-erinnerungen-an]').click({ force: true })
+  pruefe(await da(l.locator('[data-kurs-erinnerungen-aktiv="0"]')), 'Wieder angeboten')
   const k1 = await (await lk.request.get(`${A}/server/vokabeln/${vid}`, { headers: KOPF })).json()
   pruefe(k1.erinnerungen === true, 'Angebot gespeichert')
 
-  // ---------- Lernende: einschalten
-  await p.reload()
+  // ---------- Lernende: „Ja, gerne" auf der Startseite (nach Ablauf von „Später")
+  await p.evaluate(() => localStorage.removeItem('sa-erinnerung-spaeter'))
+  await p.goto(`${A}/s/`)
+  pruefe(await da(p.locator('[data-erinnerung-frage="frage"]')), 'Frage nach Ablauf von „Später" wieder da')
+  await p.locator('[data-erinnerung-frage-ja]').click()
+  pruefe(await da(p.locator('[data-erinnerung-frage="erledigt"]')), '„Ja, gerne": Erlaubnis, Gerät angemeldet, kurze Bestätigung')
+  await p.goto(`${A}/s/einstellungen`)
   pruefe(await da(p.locator('[data-erinnerungen]')), 'Einstellungen › Erinnerungen')
-  await p.locator('[data-erinnerung-an]').click({ force: true })
   pruefe(await da(p.locator('[data-erinnerung-test]')), 'Eingeschaltet: Uhrzeit, Tage, Auslöser, Test-Knopf')
+  pruefe(await p.locator('[data-erinnerung-an]').isChecked(), 'Schalter in den Einstellungen an')
   await p.waitForTimeout(800)
   const st = await (await s.request.get(`${A}/s/api/erinnerungen`, { headers: KOPF })).json()
   pruefe(st.wahl?.an === true && st.geraete === 1 && st.wahl.zeit === '16:00', `Server: an, 1 Gerät, 16:00 (${JSON.stringify({ an: st.wahl?.an, g: st.geraete, z: st.wahl?.zeit })})`)
@@ -217,6 +239,10 @@ try {
   await p.locator('[data-erinnerung-test]').waitFor({ state: 'detached', timeout: 10000 }).catch(() => undefined)
   const st3 = await (await s.request.get(`${A}/s/api/erinnerungen`, { headers: KOPF })).json()
   pruefe(st3.wahl.an === false && st3.geraete === 0, `Ausgeschaltet: aus, kein Gerät (${st3.wahl.an}, ${st3.geraete})`)
+  await p.evaluate(() => localStorage.removeItem('sa-erinnerung-spaeter'))
+  await p.goto(`${A}/s/`)
+  await p.waitForTimeout(2500)
+  pruefe((await p.locator('[data-erinnerung-frage]').count()) === 0, 'Selbst ausgeschaltet: die Startseite fragt nicht mehr')
 
   // ---------- Abmelden entfernt das Gerät dieser Sitzung
   await s.request.post(`${A}/s/api/erinnerungen/geraet`, { headers: KOPF, data: { abo: { endpoint: ENDPUNKT, keys: { p256dh: ABO.p256dh, auth: ABO.auth } } } })
@@ -225,10 +251,16 @@ try {
   await anmelden(s, kind.benutzer, kind.passwort)
   pruefe((await (await s.request.get(`${A}/s/api/erinnerungen`, { headers: KOPF })).json()).geraete === 0, 'Nach dem Abmelden: kein Gerät mehr')
 
-  // ---------- iPhone im Safari-Tab: Anleitung zum Home-Bildschirm
+  // ---------- iPhone im Safari-Tab: Anleitung zum Home-Bildschirm (Startseite genau einmal)
+  await s.request.post(`${A}/s/api/erinnerungen/wahl`, { headers: KOPF, data: { wahl: { ...st3.wahl, an: true } } })
   const ip = await browser.newContext({ ...devices['iPhone 13'] })
   await anmelden(ip, kind.benutzer, kind.passwort)
   const ipp = await ip.newPage()
+  await ipp.goto(`${A}/s/`)
+  pruefe(await da(ipp.locator('[data-erinnerung-frage="ios"]')), 'iPhone im Browser: Startseite zeigt die Home-Bildschirm-Anleitung')
+  await ipp.reload()
+  await ipp.waitForTimeout(2500)
+  pruefe((await ipp.locator('[data-erinnerung-frage]').count()) === 0, 'iPhone im Browser: Anleitung nur einmal')
   await ipp.goto(`${A}/s/einstellungen`)
   pruefe(await da(ipp.locator('[data-erinnerung-ios]')), 'iPhone im Browser: Anleitung „Teilen › Zum Home-Bildschirm"')
   pruefe(await ipp.locator('[data-erinnerung-an]').isDisabled(), 'iPhone im Browser: Schalter erst in der Web-App')
@@ -236,7 +268,7 @@ try {
 
   // ---------- Lehrkraft zieht das Angebot zurück
   await lk.request.post(`${A}/server/vokabeln/${vid}/erinnerungen`, { headers: KOPF, data: { an: false } })
-  await p.reload()
+  await p.goto(`${A}/s/einstellungen`)
   pruefe(await da(p.locator('[data-erinnerung-nicht-angeboten]')), 'Angebot zurückgezogen: wieder nur der Hinweis')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${String(e?.message ?? e).split('\n').slice(0, 4).join(' | ')}`)

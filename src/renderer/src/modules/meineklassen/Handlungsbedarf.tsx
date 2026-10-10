@@ -7,6 +7,7 @@
  * Schritt. Die Knöpfe nutzen die vorhandenen Wege (Reiter + Sprung an die Stelle, Öffnen mit Rückweg, „Im Kurs
  * wiederholen"). „Ausblenden" bleibt je Eintrag möglich; „Ausgeblendet (n)" unten holt Ausgeblendetes wieder.
  */
+import { problemWoerterText } from '@shared/problemWoerter'
 import { ActionIcon, Badge, Button, Collapse, Group, Modal, Stack, Text, ThemeIcon, Tooltip, UnstyledButton } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import {
@@ -86,7 +87,7 @@ export function bedarfGruppiert<T extends Pick<Bedarf, 'art' | 'hinweis'>>(liste
 
 const GRUPPE: Record<BedarfGruppe, { titel: string; farbe: string; symbol: React.ReactNode }> = {
   inaktiv: { titel: 'Nicht geübt', farbe: 'gray', symbol: <IconZzz size={16} /> },
-  wackelig: { titel: 'Wackelige Wörter', farbe: 'red', symbol: <IconBook2 size={16} /> },
+  wackelig: { titel: 'Problemwörter & schwache Vokabeln', farbe: 'red', symbol: <IconBook2 size={16} /> },
   grammatik: { titel: 'Grammatik schwach', farbe: 'orange', symbol: <IconUserExclamation size={16} /> },
   abgaben: { titel: 'Abgaben & Reihen', farbe: 'cyan', symbol: <IconFileText size={16} /> },
   pruefen: { titel: 'Antworten prüfen', farbe: 'orange', symbol: <IconClipboardCheck size={16} /> },
@@ -209,8 +210,8 @@ export function HandlungsbedarfFenster({
   titel: string
   bedarf: Bedarf[]
   ausgeblendet: Bedarf[]
-  /** Vorschlag „Wackelige Wörter" (Zahl der Wörter), falls vorhanden */
-  wackelig: { woerter: number } | null
+  /** Vorschlag „Problemwörter" (10.10.2026): `woerter` im Vorschlag (höchstens 20) von `gesamt` (alle, shared/problemWoerter.ts) */
+  wackelig: { woerter: number; gesamt: number } | null
   oeffnen: (modul: string, id?: string) => void
   setzeReiter: (reiter: string) => void
   geaendert: () => void
@@ -272,11 +273,11 @@ export function HandlungsbedarfFenster({
                 {eintraege.map((b) => (
                   <BedarfZeile key={b.schluessel} b={b} gruppeId={gruppeId} los={los} geaendert={geaendert} />
                 ))}
-                {/* Wackelige Wörter (Vorschlag der Klasse): im Kurs gleich wiederholen lassen – ohne neuen Kurs */}
+                {/* Problemwörter (Vorschlag der Klasse): im Kurs gleich wiederholen lassen – ohne neuen Kurs; dieselbe Zahl wie oben */}
                 {gruppe === 'wackelig' && wackelig && (
                   <Group gap={6} wrap="wrap" pl={28} data-bedarf-wackelig={wackelig.woerter}>
                     <Text size="sm" c="dimmed" style={{ flex: 1, minWidth: 160 }}>
-                      {wackelig.woerter} {wackelig.woerter === 1 ? 'Wort wackelt' : 'Wörter wackeln'} gerade bei vielen.
+                      {problemWoerterText(wackelig.gesamt, wackelig.woerter)} – wackeln gerade bei mehreren Kindern.
                     </Text>
                     <Button size="compact-xs" variant="default" onClick={() => (schliesse(), wackeligAnsehen())} data-bedarf-wackelig-ansehen>
                       Wörter ansehen

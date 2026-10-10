@@ -15,6 +15,7 @@
  *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
+import { problemWoerterText } from '@shared/problemWoerter'
 import { SchuljahrHinweis } from './SchuljahrHinweis'
 import { LerngruppeAnlegenKnoepfe } from './LerngruppeAnlegen'
 import { useExperte } from '../../shared/settingsStore'
@@ -186,6 +187,8 @@ interface KlasseDetail {
     quelle: string
     lernende: number
     aktiv7: number
+    /** Problemwörter des Kurses (alle, shared/problemWoerter.ts); `probleme` nur die wichtigsten 5 */
+    problemZahl?: number
     probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
     /** Kurs-Karte (08.10.2026): Anteile sicher / kennengelernt / neu über alle Lernenden */
     anteil?: { sicher: number; aufbau: number; neu: number }
@@ -215,6 +218,8 @@ interface KlasseDetail {
     extra?: boolean
   }[]
   wackelig: { term: string; translation: string; quote: number; kurs?: string; id?: string }[]
+  /** Alle Problemwörter der laufenden Kurse – `wackelig` sind höchstens 20 davon (10.10.2026) */
+  problemZahl?: number
   /** Kurs der Klasse in Sprachenlernen (09.10.2026) – Ziel von „Vokabeln/Grammatik hinzufügen" */
   klassenKurs?: string | null
   reihen: {
@@ -812,7 +817,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
       const r = await senden<{ woerter: number; lernende: number; kurse: string[] }>(`/server/klassen/${d.id}/wackelig-wiederholen`, {})
       notifySuccess(
         r.woerter
-          ? `${r.woerter} wackelige ${r.woerter === 1 ? 'Wort ist' : 'Wörter sind'} für ${r.lernende} Lernende wieder dran – im Kurs ${r.kurse.map((k) => `„${k}“`).join(', ')}.`
+          ? `${r.woerter} ${r.woerter === 1 ? 'Problemwort ist' : 'Problemwörter sind'} für ${r.lernende} Lernende wieder dran – im Kurs ${r.kurse.map((k) => `„${k}“`).join(', ')}.`
           : 'Gerade wackelt bei niemandem eines dieser Wörter – nichts zu wiederholen.'
       )
       setVorschau(null)
@@ -859,7 +864,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           titel={d.titel}
           bedarf={sichtbarerBedarf}
           ausgeblendet={d.bedarfAusgeblendet ?? []}
-          wackelig={wackeligVorschlag ? { woerter: wackeligVorschlag.woerter.length } : null}
+          wackelig={wackeligVorschlag ? { woerter: wackeligVorschlag.woerter.length, gesamt: d.problemZahl ?? wackeligVorschlag.woerter.length } : null}
           oeffnen={oeffneMitRueckweg}
           setzeReiter={(r) => setze({ reiter: r })}
           geaendert={bedarfNeu}
@@ -972,7 +977,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
               {d.wackelig.length > 0 && experte && (
                 <Card withBorder padding="sm" radius="md" data-haeufig-daneben>
                   <Text fw={700} size="sm" mb={6}>
-                    Am häufigsten daneben (alle laufenden Trainings)
+                    {problemWoerterText(d.problemZahl ?? d.wackelig.length, d.wackelig.length)} (alle laufenden Kurse)
                   </Text>
                   <Group gap={6}>
                     {d.wackelig.map((w) => (

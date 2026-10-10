@@ -112,7 +112,8 @@ describe('Statistik je Abschnitt', () => {
     // Mia: A ganz sicher, B zur Hälfte im Aufbau
     { w0: SICHER, w1: SICHER, w2: SICHER, w3: SICHER, w4: AUFBAU, w5: AUFBAU, w6: AUFBAU },
     // Ben: A ein Wort sicher (25 % → Schwierigkeiten), w1 oft falsch
-    { w0: SICHER, w1: stand({ fach: 1, versuche: 5, falsch: 4 }) },
+    // (gestern geübt: wackelt aktuell – Problemwort nach shared/problemWoerter.ts)
+    { w0: SICHER, w1: stand({ fach: 1, versuche: 5, falsch: 4, zuletzt: JETZT - TAG }) },
     // Ela: nichts geübt
     {}
   ]

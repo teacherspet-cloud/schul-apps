@@ -61,6 +61,7 @@ import { abschnitteBeimSpeichern, lehrwerkGliederung, lehrwerkName } from './war
 import { abkuerzungAus } from '../shared/abkuerzung'
 import { mitnahmeVon, ruhendAufheben, ruht, vokNachziehen } from './mitnahme'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
+import { ausgeblendetFiltern, problemWoerter } from '../shared/problemWoerter'
 import {
   bewerte,
   bewerteAbkuerzung,
@@ -137,7 +138,8 @@ export const db = () => {
     if (!spalten.has('entfernt')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN entfernt TEXT NOT NULL DEFAULT ''")
     // Zusammen spielen (08.10.2026): 'aus' = Kooperativ/Versus für diesen Kurs (samt Grammatik) abgeschaltet
     if (!spalten.has('zusammen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN zusammen TEXT NOT NULL DEFAULT ''")
-    // Erinnerungen zum Üben (10.10.2026): 'an' = die Lehrkraft bietet sie in diesem Kurs an (Vorgabe: nicht angeboten)
+    // Erinnerungen zum Üben (10.10.2026): seit dem Abend Vorgabe angeboten – nur 'aus' = von der Lehrkraft ausdrücklich
+    // abgeschaltet; leer (nie umgeschaltet) und das frühere 'an' gelten als angeboten
     if (!spalten.has('erinnerungen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN erinnerungen TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
@@ -182,7 +184,7 @@ export interface Zeile {
   verbspiele?: string
   /** 'aus' = Zusammen spielen abgeschaltet (08.10.2026) */
   zusammen?: string
-  /** 'an' = Erinnerungen zum Üben angeboten (10.10.2026, erinnerungen.ts) */
+  /** 'aus' = Erinnerungen zum Üben abgeschaltet; sonst angeboten (Vorgabe an, 10.10.2026, erinnerungen.ts) */
   erinnerungen?: string
   /** Neue Vokabeln je Tag (08.10.2026) */
   tagesziel?: number
@@ -197,55 +199,9 @@ export interface Zeile {
   entfernt?: string
 }
 
-/**
- * „Aus der Liste nehmen" (08.10.2026, Problemwörter/häufigste Fehler): ein Eintrag bleibt verborgen, solange seine
- * Fehlerzahl nicht über die beim Entfernen gemerkte steigt. Gibt die sichtbaren Einträge und die noch gültige Merkliste
- * zurück (überholte Einträge fallen heraus).
- */
-export function ausgeblendetFiltern<T extends { id: string; falsch: number }>(
-  liste: T[],
-  gemerkt: Record<string, number>
-): { sichtbar: T[]; gueltig: Record<string, number> } {
-  const gueltig: Record<string, number> = {}
-  const sichtbar: T[] = []
-  for (const p of liste) {
-    const n = gemerkt[p.id]
-    if (typeof n === 'number' && p.falsch <= n) gueltig[p.id] = n
-    else sichtbar.push(p)
-  }
-  return { sichtbar, gueltig }
-}
-
-/** Problemwörter eines Trainings (ohne Grenze): ab 3 Versuchen mit Fehlern, höchste Fehlerquote zuerst */
-function problemWoerter(woerter: Vokabel[], staende: Record<string, WortStand>[]) {
-  return woerter
-    .map((v) => {
-      let versuche = 0
-      let falsch = 0
-      const texte = new Map<string, number>()
-      for (const st of staende) {
-        const s = st[v.id]
-        if (!s) continue
-        versuche += s.versuche
-        falsch += s.falsch
-        for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
-      }
-      return {
-        id: v.id,
-        term: v.term,
-        translation: v.translation,
-        versuche,
-        falsch,
-        quote: versuche ? falsch / versuche : 0,
-        typisch: [...texte.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([t]) => t)
-      }
-    })
-    .filter((p) => p.versuche >= 3 && p.falsch > 0)
-    .sort((a, b) => b.quote - a.quote)
-}
+// Problemwörter (10.10.2026): eine Definition für alle Stellen – shared/problemWoerter.ts; `ausgeblendetFiltern`
+// bleibt hier erreichbar (Grammatik nutzt es ebenso)
+export { ausgeblendetFiltern }
 
 export interface VokTeil {
   titel: string
@@ -1242,12 +1198,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           stand: st.woerter
         }
       })
-      // Problemwörter: höchste Fehlerquote über die Lerngruppe, mit typischen Falschantworten; aus der Liste
-      // genommene erst wieder bei neuen Fehlern (08.10.2026), die 12 erst nach dem Ausblenden
-      const problem = ausgeblendetFiltern(
-        problemWoerter(frei, lernende.map((l) => l.stand)),
-        json_(z.problem_aus, {} as Record<string, number>)
-      ).sichtbar.slice(0, 12)
+      // Problemwörter (10.10.2026: eine Definition, shared/problemWoerter.ts) – die ganze Liste, damit „Nur
+      // Problemwörter", ⚠ und die Zahl in „Meine Klassen"/Startseite übereinstimmen; Ausgeblendete erst bei neuen Fehlern
+      const problem = problemWoerter(frei, lernende.map((l) => l.stand), json_(z.problem_aus, {} as Record<string, number>), jetzt)
       return (
         json(res, 200, {
           id: z.id,
@@ -1262,7 +1215,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           verbspiele: z.verbspiele ?? '',
           zusammen: z.zusammen !== 'aus',
           // Erinnerungen zum Üben (10.10.2026): angeboten? und wie viele sie eingeschaltet haben (nur die Zahl)
-          erinnerungen: z.erinnerungen === 'an',
+          erinnerungen: z.erinnerungen !== 'aus',
           erinnerungenAktiv: kursHaken.erinnerungenAktiv?.(lernende.map((l) => l.id)) ?? 0,
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026) – mit Band und Unit (10.10.2026: Wortliste je Band gruppiert)
@@ -1395,9 +1348,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       }
       // Erinnerungen zum Üben anbieten bzw. zurückziehen (10.10.2026) – zurückgezogen kommen keine mehr
       if (teile[1] === 'erinnerungen') {
-        const w = k0.an === true ? 'an' : ''
+        // Ausdrücklich gespeichert: 'an' bzw. 'aus' (leer = nie umgeschaltet = angeboten)
+        const w = k0.an === false ? 'aus' : 'an'
         db().prepare('UPDATE vok_zuweisungen SET erinnerungen = ? WHERE id = ?').run(w, z.id)
-        protokolliereServer('vokabeln', w ? 'Erinnerungen angeboten' : 'Erinnerungen nicht mehr angeboten', ich.id)
+        protokolliereServer('vokabeln', w === 'an' ? 'Erinnerungen angeboten' : 'Erinnerungen nicht mehr angeboten', ich.id)
         return json(res, 200, { ok: true, erinnerungen: w === 'an' }), true
       }
       if (teile[1] === 'verbspiele') {
@@ -1691,6 +1645,8 @@ export function vokabelnDerGruppe(
     quelle: string
     lernende: number
     aktiv7: number
+    /** Problemwörter des Kurses (shared/problemWoerter.ts) – alle; `probleme` nur die wichtigsten 5 */
+    problemZahl: number
     probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
     /** Kurs-Karte in „Meine Klassen" (08.10.2026): Anteile aller Wörter aller Lernenden – sicher, im Aufbau (kennengelernt), neu */
     anteil: { sicher: number; aufbau: number; neu: number }
@@ -1712,6 +1668,8 @@ export function vokabelnDerGruppe(
   jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
   /** `kurs` und `id`: wo das Wort steht (erster offener Kurs) – „Im Kurs wiederholen" in „Meine Klassen" (09.10.2026) */
   wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string; betroffen: number; kurs: string; id: string }[]
+  /** Alle Problemwörter der laufenden Kurse (je Sprache und Wort einmal) – `wackelig` zeigt höchstens 20 davon */
+  problemZahl: number
   /**
    * Handlungsbedarf je laufendem Kurs (09.10.2026): Eingabe für shared/kursHinweise.ts – dieselben Zahlen wie GET
    * /server/vokabeln/<id> (nur freigeschaltete Wörter); `nutzer` für das Grammatik-Profil (Fördern). Nur serverintern.
@@ -1722,8 +1680,9 @@ export function vokabelnDerGruppe(
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
   const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }> = {}
-  // Wackelige Wörter der Klasse (08.10.2026, abgestimmt): nur aktuell wackelig (Fach 1–2, Fehler, in den letzten 14 Tagen geübt),
-  // Rang: Test in den nächsten 14 Tagen → bei wie vielen Kindern wackelig → wie oft falsch → Fehlerquote; höchstens 20
+  // Problemwörter der Klasse (10.10.2026, früher „Wackelige Wörter" mit eigener Regel): die Problemwörter der laufenden
+  // Kurse nach shared/problemWoerter.ts, je Sprache und Wort einmal. Rang: Test in den nächsten 14 Tagen → bei wie vielen
+  // Kindern aktuell wackelig → wie oft falsch → Fehlerquote; für Vorschlag/Wiederholen höchstens 20, `problemZahl` = alle
   const woerterFehler = new Map<
     string,
     { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
@@ -1737,7 +1696,6 @@ export function vokabelnDerGruppe(
     const woerter = json_(z.woerter, [] as Vokabel[])
     const anteile: number[] = []
     let aktiv7 = 0
-    const jeWort = new Map<string, { v: Vokabel; versuche: number; falsch: number; texte: Map<string, number> }>()
     const lernende = lernendeVon(z)
     // Reife Wörter (08.10.2026): die Abschnitte stehen in Freigabe-Reihenfolge hintereinander in der Wortliste
     const reifGrenze = jetzt - 14 * TAG
@@ -1778,24 +1736,19 @@ export function vokabelnDerGruppe(
         const letzter = st.tage[st.tage.length - 1] ?? null
         if (letzter && (!p.zuletzt || letzter > p.zuletzt)) p.zuletzt = letzter
       }
-      for (const v of woerter) {
-        const w = st.woerter[v.id]
-        if (!w || !w.versuche) continue
-        const j = jeWort.get(v.id) ?? { v, versuche: 0, falsch: 0, texte: new Map<string, number>() }
-        j.versuche += w.versuche
-        j.falsch += w.falsch
-        for (const t of w.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
-        jeWort.set(v.id, j)
-        if (!offen) continue
-        const k = `${z.sprache}|${v.term}`
-        const e = woerterFehler.get(k) ?? { v, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach, betroffen: 0, testBald: false, kurs: z.id }
-        const aktuellWackelig = w.fach >= 1 && w.fach <= 2 && w.falsch > 0 && jetzt - (w.zuletzt || 0) < 14 * TAG
-        if (aktuellWackelig) {
-          e.betroffen++
-          e.versuche += w.versuche
-          e.falsch += w.falsch
-        }
-        if (z.test_termin && z.test_termin >= jetzt && z.test_termin - jetzt <= 14 * TAG) e.testBald = true
+    }
+    // Problemwörter des Kurses (10.10.2026): dieselbe Liste wie auf der Kursseite (ohne Ausgeblendete)
+    const problem = problemWoerter(woerter, staende, json_(zVoll.problem_aus, {} as Record<string, number>), jetzt)
+    if (offen) {
+      const testBald = Boolean(z.test_termin && z.test_termin >= jetzt && z.test_termin - jetzt <= 14 * TAG)
+      const nachId = new Map(woerter.map((v) => [v.id, v]))
+      for (const p of problem) {
+        const k = `${z.sprache}|${p.term}`
+        const e = woerterFehler.get(k) ?? { v: nachId.get(p.id)!, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach, betroffen: 0, testBald: false, kurs: z.id }
+        e.betroffen += p.betroffen
+        e.versuche += p.versuche
+        e.falsch += p.falsch
+        e.testBald ||= testBald
         woerterFehler.set(k, e)
       }
     }
@@ -1857,27 +1810,18 @@ export function vokabelnDerGruppe(
       heuteAktiv,
       ersterTag,
       reifeWoerter,
-      probleme: [...jeWort.values()]
-        .filter((e) => e.versuche >= 3 && e.falsch > 0)
-        .sort((a, b) => b.falsch / b.versuche - a.falsch / a.versuche)
-        .slice(0, 5)
-        .map((e) => ({
-          term: e.v.term,
-          translation: e.v.translation,
-          quote: e.falsch / e.versuche,
-          typisch: [...e.texte.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 2)
-            .map(([t]) => t)
-        }))
+      // Die wichtigsten 5 zum Anzeigen; gezählt wird immer `problemZahl` (alle, wie auf der Kursseite)
+      problemZahl: problem.length,
+      probleme: problem.slice(0, 5).map((p) => ({ term: p.term, translation: p.translation, quote: p.quote, typisch: p.typisch.slice(0, 2) }))
     }
   })
-  const wackelig = [...woerterFehler.values()]
+  const alleProbleme = [...woerterFehler.values()]
     .filter((e) => e.betroffen > 0 && e.falsch > 0)
     .sort(
       (a, b) =>
         Number(b.testBald) - Number(a.testBald) || b.betroffen - a.betroffen || b.falsch - a.falsch || b.falsch / b.versuche - a.falsch / a.versuche
     )
+  const wackelig = alleProbleme
     .slice(0, 20)
     .map((e) => ({
       term: e.v.term,
@@ -1890,5 +1834,5 @@ export function vokabelnDerGruppe(
       kurs: e.kurs,
       id: e.v.id
     }))
-  return { trainings, jePerson, wackelig, hinweisDaten }
+  return { trainings, jePerson, wackelig, problemZahl: alleProbleme.length, hinweisDaten }
 }

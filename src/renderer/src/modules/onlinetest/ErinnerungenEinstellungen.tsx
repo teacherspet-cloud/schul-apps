@@ -6,9 +6,10 @@ import { holen, senden } from './serverApi'
 import { geraetAbmelden, geraetAnmelden, pushUnterstuetzung, vorhandeneAnmeldung, type PushUnterstuetzung } from './erinnerungenGeraet'
 
 /**
- * Einstellungen › Erinnerungen (10.10.2026, Entscheidungen der Lehrkraft): Lernende schalten Erinnerungen zum Üben
- * selbst ein – nur, wenn die Lehrkraft sie in einem ihrer Kurse anbietet. Die Erlaubnis des Browsers wird erst nach dem
- * Antippen erfragt. Auf iPhone/iPad erklärt ein Hinweis den Weg über „Zum Home-Bildschirm".
+ * Einstellungen › Erinnerungen (10.10.2026, Entscheidungen der Lehrkraft): nur, wenn die Lehrkraft sie in einem Kurs
+ * anbietet (Vorgabe dort: an). Die Einstellungen sind vorab an (16:00, alle Tage, alle Auslöser); das Gerät braucht aber
+ * die Erlaubnis des Browsers, die erst nach dem Antippen erfragt wird (hier oder über die Frage auf der Startseite,
+ * ErinnerungenFrage.tsx). Ausschalten geht jederzeit. Auf iPhone/iPad erklärt ein Hinweis den Weg über „Zum Home-Bildschirm".
  */
 interface Stand {
   angeboten: boolean
@@ -163,12 +164,14 @@ export function ErinnerungenEinstellungen({ melde }: { melde: (art: 'konto' | 'f
       <GeraetHinweis art={art} />
       <Switch
         checked={an && hier !== false}
-        disabled={arbeitet || (art !== 'ok' && !an)}
+        disabled={arbeitet || (art !== 'ok' && !(an && hier))}
         onChange={(e) => void (e.currentTarget.checked ? einschalten() : ausschalten())}
         label="Erinnerungen auf diesem Gerät"
         description={
-          an && hier === false
+          an && hier === false && stand.geraete > 0
             ? 'Auf einem anderen Gerät eingeschaltet – hier antippen, um auch dieses Gerät anzumelden.'
+            : an && hier === false
+            ? 'Vorab eingeschaltet – hier antippen, damit dieses Gerät Erinnerungen zeigen darf (es fragt einmal nach).'
             : stand.geraete > 1
             ? `Angemeldet auf ${stand.geraete} Geräten.`
             : 'Dein Gerät fragt einmal, ob es Benachrichtigungen zeigen darf.'

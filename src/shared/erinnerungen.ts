@@ -17,7 +17,10 @@ export const AUSLOESER: Ausloeser[] = ['tagesziel', 'serie', 'neu', 'woche']
 export type ErinnerungsSprache = 'de' | 'en'
 
 export interface ErinnerungsWahl {
-  /** Erinnerungen eingeschaltet (Vorgabe aus – Einwilligung durch Antippen) */
+  /**
+   * Erinnerungen eingeschaltet – Vorgabe an (10.10.2026, Entscheidung der Lehrkraft); ankommen können sie trotzdem erst,
+   * wenn das Gerät nach Antippen die Erlaubnis bekommen hat. Ausschalten speichert ein ausdrückliches false.
+   */
   an: boolean
   /** Uhrzeit „HH:MM" */
   zeit: string
@@ -33,7 +36,7 @@ export interface ErinnerungsWahl {
 }
 
 export const STANDARD_WAHL: ErinnerungsWahl = {
-  an: false,
+  an: true,
   zeit: '16:00',
   tage: [1, 2, 3, 4, 5, 6, 7],
   ausloeser: { tagesziel: true, serie: true, neu: true, woche: true },
@@ -67,7 +70,7 @@ export function wahlBereinigt(roh: unknown): ErinnerungsWahl {
   const a = (r.ausloeser && typeof r.ausloeser === 'object' ? r.ausloeser : {}) as Partial<Record<Ausloeser, unknown>>
   const tage = Array.isArray(r.tage) ? [...new Set(r.tage.map(Number).filter((t) => Number.isInteger(t) && t >= 1 && t <= 7))].sort() : STANDARD_WAHL.tage
   return {
-    an: r.an === true,
+    an: r.an === undefined ? STANDARD_WAHL.an : r.an === true,
     zeit: typeof r.zeit === 'string' && ZEIT.test(r.zeit) ? r.zeit : STANDARD_WAHL.zeit,
     tage,
     ausloeser: Object.fromEntries(AUSLOESER.map((x) => [x, a[x] === undefined ? STANDARD_WAHL.ausloeser[x] : a[x] === true])) as Record<Ausloeser, boolean>,

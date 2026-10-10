@@ -38,6 +38,8 @@ interface FachDaten {
     woerter: number
     heuteAktiv?: number
     probleme?: unknown[]
+    /** Alle Problemwörter des Kurses (10.10.2026, shared/problemWoerter.ts) – `probleme` sind nur die wichtigsten 5 */
+    problemZahl?: number
   }[]
 }
 
@@ -73,7 +75,8 @@ export function fachKennzahlen(d: FachDaten, jetzt = Date.now()): {
             test: tests.length ? Math.min(...tests) : null,
             woerter: kurs.woerter,
             heute: kurs.heuteAktiv ?? 0,
-            probleme: kurs.probleme?.length ?? 0
+            // Dieselbe Zahl wie Kursseite, Handlungsbedarf und Startseite (10.10.2026) – nicht die Länge der 5er-Liste
+            probleme: kurs.problemZahl ?? kurs.probleme?.length ?? 0
           } : null
   }
 }
@@ -115,7 +118,7 @@ export function FachKopf({ d, gehe, kompakt = false }: { d: FachDaten; gehe: (re
           { id: 'sicher', label: 'Wörter sicher', wert: `${Math.round(k.vokabeln.sicher * 100)} %`, farbe: 'teal', klick: () => gehe('vokabeln') },
           { id: 'aktiv', label: 'aktiv diese Woche', wert: `${k.vokabeln.aktiv}/${k.vokabeln.von}`, klick: () => gehe('vokabeln') },
           ...(kompakt && k.vokabeln.probleme
-            ? [{ id: 'probleme', label: 'Problemwörter', wert: k.vokabeln.probleme, farbe: 'orange', klick: () => gehe('vokabeln') }]
+            ? [{ id: 'probleme', label: k.vokabeln.probleme === 1 ? 'Problemwort' : 'Problemwörter', wert: k.vokabeln.probleme, farbe: 'orange', klick: () => gehe('vokabeln') }]
             : []),
           ...(k.vokabeln.test ? [{ id: 'vokabeltest', label: 'nächster Vokabeltest', wert: kurzTag(k.vokabeln.test), klick: () => gehe('vokabeln') }] : [])
         ]
