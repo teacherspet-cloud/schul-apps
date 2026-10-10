@@ -718,7 +718,7 @@ function Startseite(): React.JSX.Element {
                 <Text size="xs" tt="uppercase" fw={700} c={`${naechstes.farbe}.7`}>
                   Als Nächstes
                 </Text>
-                <Text fw={700} size="lg" truncate>
+                <Text fw={700} size="lg" lineClamp={2}>
                   {naechstes.titel}
                 </Text>
                 <Text size="sm" c="dimmed">
@@ -842,10 +842,11 @@ html.sa-ruhig .sa-puls { animation: none; }
 .sa-start-paar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }
 @media (min-width: 701px) { .sa-start-paar.zwei { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); } }
 /* Als Nächstes (10.10.2026, Befund: am Telefon stand nur „Voka…"): Knopf neben dem Text, wenn Platz ist, sonst darunter in voller Breite – nie abgeschnitten */
-.sa-naechstes-reihe { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
-.sa-naechstes-knopf { flex: none; }
+.sa-naechstes-reihe { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+/* Knopf immer UNTER dem Text (10.10.2026, Befund der Lehrkraft am Tablet: rechts daneben sah es seltsam aus) */
+.sa-naechstes-knopf { flex: none; align-self: flex-start; margin-left: 68px; }
 .sa-naechstes-knopf .mantine-Button-label { overflow: visible; white-space: nowrap; }
-@media (max-width: 560px) { .sa-naechstes-knopf { width: 100%; } }
+@media (max-width: 560px) { .sa-naechstes-knopf { width: 100%; margin-left: 0; align-self: stretch; } }
 .sa-kachel { position: relative; overflow: hidden; display: block; text-decoration: none; color: inherit; border-radius: 22px; padding: 18px;
   transition: transform .18s ease, box-shadow .18s ease; min-height: 128px;
   background: linear-gradient(140deg, var(--k0) 0%, var(--k1) 100%); border: 1px solid var(--k2); }
