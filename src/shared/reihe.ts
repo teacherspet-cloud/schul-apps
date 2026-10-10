@@ -78,6 +78,11 @@ export type SchrittInhalt =
   | {
       art: 'arbeitsblatt'
       quelle: string
+      /**
+       * Herkunft des Dokuments `quelle` (10.10.2026, shared/reiheMaterial.ts): true = für die Reihe erzeugt (Platzhalter),
+       * false = vorhandenes Blatt in die Reihe geholt. Nur Erzeugtes ist in den Bibliotheken ausgeblendet.
+       */
+      erzeugt?: boolean
       titel: string
       html: string
       aufgaben: { nr: number; anweisung: string; erwartung: string }[]

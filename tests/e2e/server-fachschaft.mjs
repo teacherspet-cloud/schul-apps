@@ -6,6 +6,9 @@
 // eigene Kopie „Titel – Kopie Name", die die Fachschaft nicht sieht; das Original bleibt
 // unverändert; Oberfläche: „Von der Fachschaft" in der Bibliothek und ⋯ › „Für Fachschaft
 // freigeben"; Zurücknehmen beendet die Sichtbarkeit.
+// Seit 10.10.2026: Schalter „Nur meine Materialien" | „Auch Fachschaftsmaterial (n)" im Kopf der Bibliothek – Vorgabe nur
+// die eigenen, Punkt am Schalter bei Neuem, Wahl je Gerät gemerkt; eine Suche, die nur bei der Fachschaft etwas findet,
+// zeigt es trotzdem (mit Hinweis).
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
@@ -154,23 +157,39 @@ try {
     .click()
     .catch(() => undefined)
   const fl = p.locator('[data-fachschaftsliste]').filter({ visible: true })
-  pruefe(
-    await fl.waitFor({ timeout: 10000 }).then(
+  const schalter = p.locator('[data-fachschaft-schalter]').filter({ visible: true })
+  const kommt = (l) =>
+    l.waitFor({ timeout: 10000 }).then(
       () => true,
       () => false
-    ),
-    'Bibliothek: „Von der Fachschaft"'
-  )
+    )
+  pruefe(await kommt(schalter), 'Bibliothek: Schalter „Nur meine Materialien | Auch Fachschaftsmaterial"')
+  pruefe((await schalter.getAttribute('data-fachschaft-schalter')) === 'nur', 'Vorgabe: nur die eigenen Materialien')
+  pruefe((await schalter.innerText()).includes('Auch Fachschaftsmaterial (1)'), 'Schalter nennt die Zahl: „Auch Fachschaftsmaterial (1)"')
+  pruefe((await schalter.locator('[data-fachschaft-schalter-neu]').count()) === 1, 'Punkt am Schalter: Neues von der Fachschaft')
+  pruefe((await fl.count()) === 0, 'Vorgabe: „Von der Fachschaft" ausgeblendet')
   await p.screenshot({ path: join(out, '1-bibliothek.png') })
   // ⋯ an Bens Kopie: freigeben
   const eintrag = p.getByText('Weather Unit 1 – Kopie Ben Englisch').first()
   pruefe(await eintrag.isVisible(), 'Bens Kopie steht in seiner Bibliothek')
-
-  pruefe((await fl.locator('[data-fachschaft-neu]').count()) === 1, 'Bibliothek: Kennzeichen „neu" an „Von der Fachschaft"')
-  // Öffnen über die Oberfläche, ansehen, zurück – ohne Änderung keine weitere Kopie
-  await fl.getByRole('button').first().click()
+  // Suche, die nur bei der Fachschaft etwas findet: erscheint trotzdem – mit Hinweis
+  const suche = p.getByLabel('Meine Vokabeltests durchsuchen')
+  await suche.fill('Lea Englisch')
+  pruefe(await kommt(p.locator('[data-nur-fachschaft-treffer]')), 'Suche nur mit Fachschafts-Treffern: Hinweis')
+  pruefe((await p.locator('[data-bibliothek-leer]').filter({ visible: true }).count()) === 0, 'Darunter kein „Nichts gefunden“ (10.10.2026)')
+  pruefe(await kommt(fl.locator('[data-freigabe-oeffnen]')), '… und der Treffer von der Fachschaft')
+  await p.screenshot({ path: join(out, '1b-suche.png') })
+  await suche.fill('')
   await p.waitForTimeout(300)
-  pruefe((await fl.locator('[data-fachschaft-neu]').count()) === 0, 'aufgeklappt: „neu" verschwindet')
+  pruefe((await fl.count()) === 0, 'Suche geleert: wieder ausgeblendet')
+
+  // Einblenden: Liste erscheint aufgeklappt, „neu" verschwindet
+  await schalter.locator('[data-fachschaft-schalter-auch]').click()
+  pruefe(await kommt(fl), 'Eingeblendet: „Von der Fachschaft"')
+  await p.waitForTimeout(300)
+  pruefe((await fl.locator('[data-fachschaft-neu]').count()) === 0, 'eingeblendet und aufgeklappt: „neu" verschwindet')
+  pruefe((await schalter.locator('[data-fachschaft-schalter-neu]').count()) === 0, '… auch der Punkt am Schalter')
+  pruefe(await p.evaluate(() => localStorage.getItem('schulapps-fachschaft-einblenden') === '1'), 'Wahl je Gerät gemerkt')
   pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"] [data-fachschaft-neu]').count()) === 0, 'aufgeklappt: Zahl in der Leiste verschwindet')
   await fl.locator('[data-freigabe-oeffnen]').first().click()
   await p.waitForTimeout(4000)

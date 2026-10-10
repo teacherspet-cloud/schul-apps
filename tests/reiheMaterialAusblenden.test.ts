@@ -4,7 +4,9 @@ import {
   freigabenAus,
   loeschFrage,
   loeschPlan,
+  istReiheMaterial,
   materialVerweise,
+  nameAusReihe,
   ohneReiheMaterial,
   suchtrefferMitReihen,
   zuordnungAus,
@@ -14,7 +16,8 @@ import {
 /**
  * Material aus Unterrichtsreihen in den Bibliotheken (09.10.2026, Befund am Server: viele Blätter „Ursachen, Verlauf
  * und Folgen des Ersten Weltkriegs" aus einer Reihe): zunächst ausgeblendet, Zuordnung aus den Schritten abgeleitet
- * (kein Nachtragen am Dokument), Löschen der Reihe mit oder ohne Material.
+ * (kein Nachtragen am Dokument), Löschen der Reihe mit oder ohne Material. Seit 10.10.2026 nur Material, das für die
+ * Reihe ENTSTANDEN ist – in eine Reihe geholtes eigenes Material bleibt sichtbar.
  */
 
 const schritt = (id: string, teil: Partial<Schritt> = {}): Schritt => ({
@@ -26,10 +29,11 @@ const schritt = (id: string, teil: Partial<Schritt> = {}): Schritt => ({
   inhalt: leererInhalt('aufgabe'),
   ...teil
 })
-const blatt = (quelle: string): Schritt['inhalt'] => ({
+const blatt = (quelle: string, teil: Partial<Extract<Schritt['inhalt'], { art: 'arbeitsblatt' }>> = { erzeugt: true }): Schritt['inhalt'] => ({
   ...(leererInhalt('arbeitsblatt') as Extract<Schritt['inhalt'], { art: 'arbeitsblatt' }>),
   quelle,
-  titel: 'Blatt'
+  titel: 'Blatt',
+  ...teil
 })
 
 describe('Zuordnung aus den Schritten (statt Nachtragen am Dokument)', () => {
@@ -49,10 +53,10 @@ describe('Zuordnung aus den Schritten (statt Nachtragen am Dokument)', () => {
       ]
     })
     expect(verweise).toEqual([
-      { moduleId: 'arbeitsblatt', docId: 'ws1' },
-      { moduleId: 'lernzielkontrolle', docId: 'lzk1' },
-      { moduleId: 'grammatiktest', docId: 'gt1' },
-      { moduleId: 'klassenarbeit', docId: 'ka1' }
+      { moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: true },
+      { moduleId: 'lernzielkontrolle', docId: 'lzk1', erzeugt: true },
+      { moduleId: 'grammatiktest', docId: 'gt1', erzeugt: true },
+      { moduleId: 'klassenarbeit', docId: 'ka1', erzeugt: true }
     ])
   })
 
@@ -62,18 +66,129 @@ describe('Zuordnung aus den Schritten (statt Nachtragen am Dokument)', () => {
 
   it('ordnet jedes Dokument der zuerst genannten Reihe zu', () => {
     const z = zuordnungAus([
-      { id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1' }] },
-      { id: 'r2', titel: 'Julikrise', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1' }, { moduleId: 'vokabeltest', docId: 'vt1' }] },
+      { id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: true }] },
+      { id: 'r2', titel: 'Julikrise', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: true }, { moduleId: 'vokabeltest', docId: 'vt1' }] },
       { id: 'r3', titel: 'Ohne Material' }
     ])
-    expect(z.get('ws1')).toEqual({ reiheId: 'r1', titel: 'Erster Weltkrieg' })
+    expect(z.get('ws1')).toEqual({ reiheId: 'r1', titel: 'Erster Weltkrieg', erzeugt: true })
     expect(z.get('vt1')).toEqual({ reiheId: 'r2', titel: 'Julikrise' })
     expect(z.size).toBe(2)
+  })
+
+  it('nimmt die Reihe, die das Dokument erzeugt hat, wenn eine andere es nur hereingeholt hat', () => {
+    const z = zuordnungAus([
+      { id: 'r1', titel: 'Wiederholung', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: false }] },
+      { id: 'r2', titel: 'Julikrise', material: [{ moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: true }] }
+    ])
+    expect(z.get('ws1')).toEqual({ reiheId: 'r2', titel: 'Julikrise', erzeugt: true })
+  })
+})
+
+describe('Nur für die Reihe ENTSTANDENES Material ist ausgeblendet (10.10.2026)', () => {
+  it('Marke am Schritt: erzeugt, hereingeholt, Tests immer erzeugt', () => {
+    const v = materialVerweise({
+      schritte: [
+        schritt('a', { inhalt: blatt('neu', { erzeugt: true }) }),
+        schritt('b', { inhalt: blatt('eigen', { erzeugt: false }) }),
+        schritt('c', { test: { modul: 'vokabeltest', docId: 'vt1' } })
+      ]
+    })
+    expect(v).toEqual([
+      { moduleId: 'arbeitsblatt', docId: 'neu', erzeugt: true },
+      { moduleId: 'arbeitsblatt', docId: 'eigen', erzeugt: false },
+      { moduleId: 'vokabeltest', docId: 'vt1', erzeugt: true }
+    ])
+  })
+
+  it('Altbestand ohne Marke: deutliche Spuren des Erzeugens zählen, sonst unklar', () => {
+    const v = materialVerweise({
+      schritte: [
+        schritt('a', { kiEntwurf: true, inhalt: blatt('ki', { erzeugt: undefined }) }),
+        schritt('b', { inhalt: blatt('rolle', { erzeugt: undefined, zweck: 'abschluss' }) }),
+        schritt('c', { inhalt: blatt('schrittweise', { erzeugt: undefined, schrittweiseGrund: 'lange Aufgaben' }) }),
+        schritt('d', { inhalt: blatt('alt', { erzeugt: undefined }) })
+      ]
+    })
+    expect(v.map((m) => [m.docId, m.erzeugt])).toEqual([
+      ['ki', true],
+      ['rolle', true],
+      ['schrittweise', true],
+      ['alt', undefined]
+    ])
+  })
+
+  it('dasselbe Blatt in zwei Schritten: erzeugt geht vor hereingeholt', () => {
+    const v = materialVerweise({ schritte: [schritt('a', { inhalt: blatt('ws', { erzeugt: false }) }), schritt('b', { inhalt: blatt('ws', { erzeugt: true }) })] })
+    expect(v).toEqual([{ moduleId: 'arbeitsblatt', docId: 'ws', erzeugt: true }])
+  })
+
+  it('unklarer Altbestand: der Name verrät Erzeugtes, sonst bleibt es sichtbar', () => {
+    expect(nameAusReihe('Erster Weltkrieg – Julikrise', 'Erster Weltkrieg')).toBe(true)
+    expect(nameAusReihe('erster weltkrieg', 'Erster Weltkrieg')).toBe(true)
+    expect(nameAusReihe('Erster Weltkrieg im Überblick', 'Erster Weltkrieg')).toBe(false)
+    expect(nameAusReihe('Mein Blatt', 'Erster Weltkrieg')).toBe(false)
+    expect(nameAusReihe('', 'Erster Weltkrieg')).toBe(false)
+    const verweis = { reiheId: 'r1', titel: 'Erster Weltkrieg' }
+    expect(istReiheMaterial(verweis, 'Erster Weltkrieg – Julikrise')).toBe(true)
+    expect(istReiheMaterial(verweis, 'Quellenarbeit Julikrise')).toBe(false)
+    expect(istReiheMaterial(verweis)).toBe(false)
+    // Marke geht vor Name
+    expect(istReiheMaterial({ ...verweis, erzeugt: false }, 'Erster Weltkrieg – Julikrise')).toBe(false)
+    expect(istReiheMaterial({ ...verweis, erzeugt: true }, 'Mein Blatt')).toBe(true)
+    expect(istReiheMaterial(undefined, 'Erster Weltkrieg')).toBe(false)
+  })
+
+  it('Bibliothek: eigenes, in die Reihe geholtes Blatt bleibt sichtbar (mit Marke), Erzeugtes nicht', () => {
+    const z = zuordnungAus([
+      {
+        id: 'r1',
+        titel: 'Erster Weltkrieg',
+        material: [
+          { moduleId: 'arbeitsblatt', docId: 'neu', erzeugt: true },
+          { moduleId: 'arbeitsblatt', docId: 'eigen', erzeugt: false },
+          { moduleId: 'arbeitsblatt', docId: 'altNeu' },
+          { moduleId: 'arbeitsblatt', docId: 'altEigen' }
+        ]
+      }
+    ])
+    const liste = [
+      { id: 'neu', name: 'Erster Weltkrieg – Ursachen' },
+      { id: 'eigen', name: 'Quellenarbeit' },
+      { id: 'altNeu', name: 'Erster Weltkrieg – Folgen' },
+      { id: 'altEigen', name: 'Karikaturen 1914' }
+    ]
+    const r = ohneReiheMaterial(liste, (e) => e.id, z, { einblenden: false, name: (e) => e.name })
+    expect(r.sichtbar.map((e) => e.id)).toEqual(['eigen', 'altEigen'])
+    expect(r.ausReihen).toBe(2)
+    // Die Marke bleibt für alle verknüpften
+    expect(z.has('eigen')).toBe(true)
+    // Suche: hereingeholtes eigenes Material ist ein gewöhnlicher Treffer
+    expect(suchtrefferMitReihen([liste[0], liste[1]], (e) => e.id, z, false, (e) => e.name)).toEqual({ liste: [liste[1]], nurReihe: false })
+  })
+
+  it('Reihe und Material löschen: hereingeholtes Material bleibt stehen', () => {
+    const reihen: ReiheMitMaterial[] = [
+      {
+        id: 'r1',
+        titel: 'Erster Weltkrieg',
+        material: [
+          { moduleId: 'arbeitsblatt', docId: 'neu', erzeugt: true },
+          { moduleId: 'arbeitsblatt', docId: 'eigen', erzeugt: false },
+          { moduleId: 'arbeitsblatt', docId: 'altNeu' },
+          { moduleId: 'arbeitsblatt', docId: 'altEigen' }
+        ]
+      }
+    ]
+    const namen: Record<string, string> = { altNeu: 'Erster Weltkrieg – Folgen', altEigen: 'Karikaturen 1914' }
+    expect(loeschPlan('r1', reihen, (id) => namen[id]).loeschen.map((m) => m.docId)).toEqual(['neu', 'altNeu'])
+    // Ohne Namen zählt nur die Marke
+    expect(loeschPlan('r1', reihen).loeschen.map((m) => m.docId)).toEqual(['neu'])
+    expect(loeschFrage('r1', reihen, [], (id) => namen[id]).anzahl).toBe(2)
   })
 })
 
 describe('Bibliothek: Material aus Reihen zunächst ausgeblendet', () => {
-  const z = zuordnungAus([{ id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'b' }, { moduleId: 'arbeitsblatt', docId: 'c' }] }])
+  const z = zuordnungAus([{ id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'b', erzeugt: true }, { moduleId: 'arbeitsblatt', docId: 'c', erzeugt: true }] }])
   const liste = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
   const id = (e: { id: string }): string => e.id
 
@@ -99,7 +214,7 @@ describe('Bibliothek: Material aus Reihen zunächst ausgeblendet', () => {
 })
 
 describe('Suche: nur Treffer aus Reihen erscheinen doch – mit Hinweis', () => {
-  const z = zuordnungAus([{ id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'b' }] }])
+  const z = zuordnungAus([{ id: 'r1', titel: 'Erster Weltkrieg', material: [{ moduleId: 'arbeitsblatt', docId: 'b', erzeugt: true }] }])
   const id = (e: { id: string }): string => e.id
 
   it('blendet Reihen-Material aus, solange es andere Treffer gibt', () => {
@@ -122,12 +237,12 @@ describe('Reihe löschen: mit oder ohne Material', () => {
       id: 'r1',
       titel: 'Erster Weltkrieg',
       material: [
-        { moduleId: 'arbeitsblatt', docId: 'ws1' },
-        { moduleId: 'arbeitsblatt', docId: 'ws2' },
-        { moduleId: 'lernzielkontrolle', docId: 'lzk1' }
+        { moduleId: 'arbeitsblatt', docId: 'ws1', erzeugt: true },
+        { moduleId: 'arbeitsblatt', docId: 'ws2', erzeugt: true },
+        { moduleId: 'lernzielkontrolle', docId: 'lzk1', erzeugt: true }
       ]
     },
-    { id: 'r2', titel: 'Julikrise', material: [{ moduleId: 'arbeitsblatt', docId: 'ws2' }] },
+    { id: 'r2', titel: 'Julikrise', material: [{ moduleId: 'arbeitsblatt', docId: 'ws2', erzeugt: true }] },
     { id: 'r3', titel: 'Leer', material: [] }
   ]
 

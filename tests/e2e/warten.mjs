@@ -15,6 +15,7 @@ export async function warteAufOberflaeche(page, versuche = 3, { assistent = fals
     try {
       await page.waitForSelector('text=Schul-Apps', { timeout: 15000 })
       if (!assistent) await schliesseAssistent(page)
+      await leisteAuf(page)
       return
     } catch (e) {
       if (i === versuche) throw e
@@ -66,9 +67,12 @@ export async function schliesseAssistent(page) {
  * `hauptapp.mjs` prüft den Standardmodus selbst.
  */
 export async function expertenmodus(page) {
-  if (!(await page.locator('[data-modus-schalter][data-modus="standard"]').count())) return
-  await page.locator('.modus-schalter-knopf').filter({ visible: true }).first().click()
-  await page.waitForTimeout(300)
+  if (await page.locator('[data-modus-schalter][data-modus="standard"]').count()) {
+    await page.locator('.modus-schalter-knopf').filter({ visible: true }).first().click()
+    await page.waitForTimeout(300)
+  }
+  // Volle Oberfläche heißt auch: alle Gruppen der Leiste aufgeklappt (seit 10.10.2026 zu Beginn jeder Sitzung zu)
+  await leisteAuf(page)
 }
 
 /**
@@ -131,4 +135,23 @@ export async function kartenAuf(page, id) {
     await page.waitForTimeout(150)
   }
   await page.waitForTimeout(200)
+}
+
+/**
+ * Leiste (10.10.2026, Entscheidung der Lehrkraft): Zu Beginn jeder Sitzung sind alle Gruppen zugeklappt. `leisteAuf`
+ * klappt die zugeklappten auf (bleibt so für die Sitzung), `leisteApp` liefert danach den Eintrag einer App.
+ */
+export async function leisteAuf(page) {
+  if (!(await page.locator('.app-leiste').count())) return
+  for (let i = 0; i < 10; i++) {
+    const zu = page.locator('.app-leiste [data-leiste-gruppe-kopf][data-offen="false"]').filter({ visible: true })
+    if (!(await zu.count())) return
+    await zu.first().click()
+    await page.waitForTimeout(100)
+  }
+}
+
+export async function leisteApp(page, label) {
+  await leisteAuf(page)
+  return page.locator(`.app-leiste [aria-label="${label}"]`)
 }

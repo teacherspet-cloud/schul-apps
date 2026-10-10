@@ -10,6 +10,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
+import { leisteAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/eigenes-fenster')
 mkdirSync(out, { recursive: true })
@@ -37,6 +38,9 @@ try {
   )
     await spaeter.click()
   // Die Startseite hat seit dem 03.10.2026 keine Programmkacheln mehr – seit 06.10.2026: Doppelklick in der Leiste
+  // Seit 10.10.2026 sind die Gruppen der Leiste zu Beginn jeder Sitzung zugeklappt
+  await haupt.locator('.app-leiste [data-leiste-gruppe-kopf]').first().waitFor({ timeout: 15000 })
+  await leisteAuf(haupt)
   const vt = haupt.locator('.app-leiste [aria-label="Vokabeltest"]')
   await vt.waitFor({ timeout: 15000 })
   pruefe((await vt.getAttribute('data-doppelklick-fenster')) !== null, 'Leiste: Vokabeltest per Doppelklick im eigenen Fenster')

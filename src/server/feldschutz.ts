@@ -69,7 +69,10 @@ export const SENSIBEL: Record<string, string[]> = {
   // Ausgeblendeter Handlungsbedarf (09.10.2026): Merkmale mit Kennungen Betroffener – im Zweifel verschlüsseln
   klassen_ausgeblendet: ['merkmal'],
   // KI-Nutzung der Lehrkräfte über Schlüssel der Schule (09.10.2026, kiNutzung.ts): nur Zahlen, trotzdem verschlüsselt
-  ki_nutzung: ['daten']
+  ki_nutzung: ['daten'],
+  // Erinnerungen zum Üben (10.10.2026, erinnerungen.ts): Einstellungen samt eigenem Text, Push-Geräte (Endpunkt, Schlüssel)
+  push_wahl: ['daten'],
+  push_geraete: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

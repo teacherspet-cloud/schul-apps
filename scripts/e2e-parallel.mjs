@@ -79,7 +79,9 @@ try {
         SCHULAPPS_OBERFLAECHE: join(wurzel, 'out', 'renderer'),
         SCHULAPPS_RESSOURCEN: join(wurzel, 'resources'),
         SCHULAPPS_NOTZUGANG_PASSWORT: 'test-notzugang-123',
-        SCHULAPPS_KI_ATTRAPPE: attrappe
+        SCHULAPPS_KI_ATTRAPPE: attrappe,
+        // Erinnerungen (10.10.2026): lokaler Empfänger als Push-Dienst (tests/e2e/server-erinnerungen.mjs)
+        SCHULAPPS_PUSH_LOKAL: '1'
       },
       stdio: 'ignore'
     })

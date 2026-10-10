@@ -12,6 +12,16 @@
  *  - Löschen einer Reihe: „Reihe und Material löschen" oder „Nur die Reihe löschen" – Material, das auch eine ANDERE
  *    Reihe nutzt, bleibt immer stehen.
  *
+ * Seit 10.10.2026 (Entscheidung der Lehrkraft): Ausgeblendet wird nur Material, das FÜR die Reihe ENTSTANDEN ist (von
+ * der KI für einen Platzhalter erzeugt, Test aus der Reihe). Ein selbst erstelltes Blatt, das die Lehrkraft später in
+ * eine Reihe holt (von Hand oder per KI-Planung „vorhandenes Material"), bleibt gewöhnliches Material der Bibliothek –
+ * mit der Marke „Reihe: …", aber sichtbar; „Reihe und Material löschen" lässt es ebenfalls stehen.
+ *  - Marke am Schritt: Arbeitsblatt `inhalt.erzeugt` (true beim Erzeugen, false beim Auswählen); Tests aus der Reihe
+ *    (`test.docId`, Onlinefassung `inhalt.blatt.quelle`) entstehen immer für die Reihe.
+ *  - Altbestand ohne Marke: erzeugt, wenn der Schritt es deutlich zeigt (KI-Entwurf, Rolle bzw. „schrittweise"-Vorschlag
+ *    vom Erzeugen); sonst unklar – dann entscheidet der Name des Dokuments: Erzeugtes heißt „<Reihe> – <Schritt>"
+ *    (`materialName`). Im Zweifel bleibt es SICHTBAR.
+ *
  * Gemeinsam für Server (Liste der Reihen) und Oberfläche; ohne Oberfläche prüfbar (tests/reiheMaterial.test.ts).
  */
 import type { Reihe } from './reihe'
@@ -21,12 +31,31 @@ export interface MaterialVerweis {
   /** Programm aus modules/registry.ts */
   moduleId: string
   docId: string
+  /** Für die Reihe entstanden (true), in die Reihe geholt (false) oder Altbestand ohne Marke (fehlt) – siehe oben */
+  erzeugt?: boolean
 }
 
 /** Zu welcher Reihe ein Dokument gehört */
 export interface ReiheVerweis {
   reiheId: string
   titel: string
+  /** wie `MaterialVerweis.erzeugt` */
+  erzeugt?: boolean
+}
+
+/** Name eines Dokuments, wie ihn das Erzeugen in der Reihe vergibt („<Reihe> – <Schritt>" bzw. nur der Titel der Reihe) */
+export function nameAusReihe(name: string | undefined, reiheTitel: string): boolean {
+  const n = (name ?? '').trim().toLocaleLowerCase('de')
+  const t = reiheTitel.trim().toLocaleLowerCase('de')
+  if (!n || !t) return false
+  return n === t || n.startsWith(`${t} – `)
+}
+
+/** Wird dieses Dokument als Material der Reihe ausgeblendet? (Marke, sonst Name – im Zweifel nein) */
+export function istReiheMaterial(verweis: ReiheVerweis | undefined, name?: string): boolean {
+  if (!verweis) return false
+  if (verweis.erzeugt !== undefined) return verweis.erzeugt
+  return nameAusReihe(name, verweis.titel)
 }
 
 /** Kennung → Reihe (die zuerst genannte, wenn mehrere Reihen dasselbe Dokument nutzen) */
@@ -45,18 +74,33 @@ function modulDerFassung(art: string): string | null {
 /** Alle Dokumente der Ablage, auf die die Schritte einer Reihe verweisen – jedes nur einmal */
 export function materialVerweise(r: Pick<Reihe, 'schritte'>): MaterialVerweis[] {
   const liste: MaterialVerweis[] = []
-  const dazu = (moduleId: string | null, docId: unknown): void => {
+  const dazu = (moduleId: string | null, docId: unknown, erzeugt: boolean | undefined): void => {
     if (!moduleId || typeof docId !== 'string' || !docId.trim()) return
-    if (!liste.some((m) => m.docId === docId)) liste.push({ moduleId, docId })
+    const da = liste.find((m) => m.docId === docId)
+    if (!da) liste.push({ moduleId, docId, ...(erzeugt === undefined ? {} : { erzeugt }) })
+    // Mehrere Schritte mit demselben Dokument: erzeugt geht vor unklar, unklar vor „hereingeholt"
+    else if (rang(erzeugt) > rang(da.erzeugt)) {
+      if (erzeugt === undefined) delete da.erzeugt
+      else da.erzeugt = erzeugt
+    }
   }
   for (const s of r.schritte ?? []) {
-    const i = s.inhalt as { art?: string; quelle?: unknown; blatt?: { art?: unknown; quelle?: unknown } } | undefined
-    if (i?.art === 'arbeitsblatt') dazu('arbeitsblatt', i.quelle)
-    if (i?.art === 'onlinetest' && i.blatt) dazu(modulDerFassung(String(i.blatt.art ?? '')), i.blatt.quelle)
-    if (s.test) dazu(s.test.modul, s.test.docId)
+    const i = s.inhalt as
+      | { art?: string; quelle?: unknown; erzeugt?: unknown; zweck?: unknown; schrittweiseGrund?: unknown; blatt?: { art?: unknown; quelle?: unknown } }
+      | undefined
+    if (i?.art === 'arbeitsblatt') {
+      // Marke vom Erzeugen bzw. Auswählen; Altbestand: deutliche Spuren des Erzeugens, sonst unklar (Name entscheidet)
+      const erzeugt = typeof i.erzeugt === 'boolean' ? i.erzeugt : s.kiEntwurf || i.zweck || i.schrittweiseGrund ? true : undefined
+      dazu('arbeitsblatt', i.quelle, erzeugt)
+    }
+    // Tests entstehen immer in der Reihe („Test hier erstellen")
+    if (i?.art === 'onlinetest' && i.blatt) dazu(modulDerFassung(String(i.blatt.art ?? '')), i.blatt.quelle, true)
+    if (s.test) dazu(s.test.modul, s.test.docId, true)
   }
   return liste
 }
+
+const rang = (e: boolean | undefined): number => (e === true ? 2 : e === undefined ? 1 : 0)
 
 /** Eine Reihe, wie sie die Liste `/server/reihen` nennt */
 export interface ReiheMitMaterial {
@@ -71,11 +115,19 @@ export interface ReiheMitMaterial {
   geaendert?: string
 }
 
-/** Zuordnung Dokument → Reihe aus der Liste der Reihen */
+/**
+ * Zuordnung Dokument → Reihe aus der Liste der Reihen – ALLE verknüpften Dokumente (für die Marke „Reihe: …"). Nutzen
+ * mehrere Reihen dasselbe Dokument, gilt die erste – außer eine spätere hat es erzeugt (bzw. ist unklar, wo die erste es
+ * nur hereingeholt hat): Dann zählt diese, damit Erzeugtes ausgeblendet bleibt.
+ */
 export function zuordnungAus(reihen: ReiheMitMaterial[]): ReiheZuordnung {
   const karte: ReiheZuordnung = new Map()
   for (const r of reihen)
-    for (const m of r.material ?? []) if (!karte.has(m.docId)) karte.set(m.docId, { reiheId: r.id, titel: r.titel })
+    for (const m of r.material ?? []) {
+      const da = karte.get(m.docId)
+      if (da && rang(m.erzeugt) <= rang(da.erzeugt)) continue
+      karte.set(m.docId, { reiheId: r.id, titel: r.titel, ...(m.erzeugt === undefined ? {} : { erzeugt: m.erzeugt }) })
+    }
   return karte
 }
 
@@ -87,11 +139,12 @@ export function ohneReiheMaterial<T>(
   liste: T[],
   id: (e: T) => string,
   zuordnung: ReiheZuordnung,
-  opts: { einblenden: boolean; offen?: string | null }
+  opts: { einblenden: boolean; offen?: string | null; name?: (e: T) => string | undefined }
 ): { sichtbar: T[]; ausReihen: number } {
-  const ausReihen = liste.filter((e) => zuordnung.has(id(e))).length
+  const verborgen = (e: T): boolean => istReiheMaterial(zuordnung.get(id(e)), opts.name?.(e))
+  const ausReihen = liste.filter(verborgen).length
   if (opts.einblenden || !ausReihen) return { sichtbar: liste, ausReihen }
-  return { sichtbar: liste.filter((e) => !zuordnung.has(id(e)) || id(e) === opts.offen), ausReihen }
+  return { sichtbar: liste.filter((e) => !verborgen(e) || id(e) === opts.offen), ausReihen }
 }
 
 /**
@@ -102,20 +155,30 @@ export function suchtrefferMitReihen<T>(
   treffer: T[],
   id: (e: T) => string,
   zuordnung: ReiheZuordnung,
-  einblenden: boolean
+  einblenden: boolean,
+  name?: (e: T) => string | undefined
 ): { liste: T[]; nurReihe: boolean } {
   if (einblenden) return { liste: treffer, nurReihe: false }
-  const eigene = treffer.filter((e) => !zuordnung.has(id(e)))
+  const eigene = treffer.filter((e) => !istReiheMaterial(zuordnung.get(id(e)), name?.(e)))
   if (eigene.length || !treffer.length) return { liste: eigene, nurReihe: false }
   return { liste: treffer, nurReihe: true }
 }
 
 /**
  * Was beim Löschen einer Reihe mit „Reihe und Material löschen" wegfällt: ihr Material – außer dem, das auch eine andere
- * Reihe nutzt (`bleibt`, sonst fehlte dort plötzlich das Blatt).
+ * Reihe nutzt (`bleibt`, sonst fehlte dort plötzlich das Blatt). Seit 10.10.2026 nur, was für die Reihe ENTSTANDEN ist
+ * (Marke bzw. Name, `istReiheMaterial`); in die Reihe geholtes eigenes Material bleibt immer stehen.
  */
-export function loeschPlan(reiheId: string, reihen: ReiheMitMaterial[]): { loeschen: MaterialVerweis[]; bleibt: MaterialVerweis[] } {
-  const eigene = reihen.find((r) => r.id === reiheId)?.material ?? []
+export function loeschPlan(
+  reiheId: string,
+  reihen: ReiheMitMaterial[],
+  /** Name eines Dokuments (für Altbestand ohne Marke) – ohne Namen zählt nur die Marke */
+  name?: (docId: string) => string | undefined
+): { loeschen: MaterialVerweis[]; bleibt: MaterialVerweis[] } {
+  const reihe = reihen.find((r) => r.id === reiheId)
+  const eigene = (reihe?.material ?? []).filter((m) =>
+    istReiheMaterial({ reiheId, titel: reihe?.titel ?? '', ...(m.erzeugt === undefined ? {} : { erzeugt: m.erzeugt }) }, name?.(m.docId))
+  )
   const anderswo = new Set(reihen.filter((r) => r.id !== reiheId).flatMap((r) => (r.material ?? []).map((m) => m.docId)))
   return { loeschen: eigene.filter((m) => !anderswo.has(m.docId)), bleibt: eigene.filter((m) => anderswo.has(m.docId)) }
 }
@@ -135,9 +198,10 @@ export type LoeschWahl = 'mit-material' | 'nur-reihe' | 'abbrechen'
 export function loeschFrage(
   reiheId: string,
   reihen: ReiheMitMaterial[],
-  freigaben: { einstellungen?: { quelle?: { docId?: string } | null } }[] = []
+  freigaben: { einstellungen?: { quelle?: { docId?: string } | null } }[] = [],
+  name?: (docId: string) => string | undefined
 ): { anzahl: number; bleibt: number; freigegeben: number; wahl: LoeschWahl[] } {
-  const plan = loeschPlan(reiheId, reihen)
+  const plan = loeschPlan(reiheId, reihen, name)
   const anzahl = plan.loeschen.length
   return {
     anzahl,

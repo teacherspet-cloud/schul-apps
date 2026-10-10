@@ -152,6 +152,13 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  // Leiste (10.10.2026): zu Beginn jeder Sitzung sind alle Gruppen zugeklappt
+  await da(p.locator('.app-leiste [data-leiste-gruppe-kopf]').first())
+  pruefe(
+    (await p.locator('.app-leiste [data-leiste-gruppe-kopf]').count()) > 0 &&
+      (await p.locator('.app-leiste [data-leiste-gruppe-kopf][data-offen="true"]').count()) === 0,
+    'Leiste: zu Beginn der Sitzung alle Gruppen zugeklappt'
+  )
   await expertenmodus(p)
   pruefe(await da(p.locator('[data-schnellzugriff-raster]')), 'Startseite: Schnellzugriff')
   pruefe(await da(p.locator('[data-schnellzugriff="reihen"] [data-laufende-reihe]')), 'Laufende Reihe auf der Startseite')
@@ -171,6 +178,15 @@ try {
   pruefe(gruppen.join(',') === 'unterricht,planung,pruefung,verwaltung', `Gruppen in der Leiste: ${gruppen.join(', ')}`)
   await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Tests"]').first().click()
   pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"]').count()) === 0, 'Gruppe zugeklappt: Apps verborgen')
+  // Neu laden in derselben Anmeldung ist keine neue Sitzung: zugeklappt bleibt zu, aufgeklappt auf
+  await p.reload()
+  await da(p.locator('.app-leiste [data-gruppe="pruefung"]'))
+  await p.waitForTimeout(500)
+  pruefe(
+    (await p.locator('.app-leiste [aria-label="Vokabeltest"]').count()) === 0 &&
+      (await p.locator('.app-leiste [data-gruppe="unterricht"] [data-leiste-gruppe-kopf][data-offen="true"]').count()) === 1,
+    'Neu geladen (gleiche Sitzung): Auf/Zu der Gruppen bleibt'
+  )
   await p.locator('.app-leiste [data-gruppe="pruefung"] [aria-label="Tests"]').first().click()
   pruefe((await p.locator('.app-leiste [aria-label="Vokabeltest"]').count()) === 1, 'Gruppe aufgeklappt: Apps wieder da')
   // Laufende Reihen → Übersicht der Reihe

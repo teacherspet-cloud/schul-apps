@@ -12,8 +12,14 @@
  *    Kopien aus der ersten Fassung (Übernehmen/Entfernen) und die eigenen Freigaben. Noch nicht
  *    angesehene Einträge zählen Leiste und Bibliothek (shared/fachschaftNeu.ts).
  *  - Sichtbar für alle, die das Fach unterrichten (eigene Fächer oder IServ-Gruppen).
+ *  - Seit 10.10.2026 (Entscheidung der Lehrkraft): Im Kopf jeder Bibliothek wählt ein Schalter „Nur meine Materialien" |
+ *    „Auch Fachschaftsmaterial (n)". Vorgabe: nur die eigenen – „Von der Fachschaft" steht erst nach dem Umschalten da.
+ *    Die Wahl gilt dauerhaft je Gerät (Ansichtswunsch, kein Auf/Zu – shared/sitzung.ts). Neues zeigt die Leiste weiter
+ *    an; am Schalter ein Punkt, damit man findet, wo es steht. Findet eine Suche nur Fachschaftsmaterial, erscheint es
+ *    trotzdem – mit Hinweis (wie bei Material aus Unterrichtsreihen).
  */
-import { ActionIcon, Badge, Button, Card, Collapse, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Anchor, Badge, Button, Card, Collapse, Group, Menu, SegmentedControl, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { IconChevronDown, IconChevronRight, IconDownload, IconFolders, IconShare, IconShareOff, IconTrash } from '@tabler/icons-react'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
@@ -23,6 +29,7 @@ import { openDocument } from '../navigation'
 import { notifyError, notifySuccess } from '../util'
 import { AktuellesProgramm } from '../eigenesFenster'
 import { gesehenErgaenzen, gesehenLesen, gesehenSchreiben, neueJeProgramm, type FachschaftsEintrag } from '../fachschaftNeu'
+import { passtZurSuche } from '../bibliothek'
 
 const FREIGEBBAR = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'elternbrief', 'tafelbild']
 
@@ -243,43 +250,182 @@ function AltZeile({ e }: { e: AltEintrag }): React.JSX.Element {
   )
 }
 
-/**
- * In jeder Bibliothek (BibliothekKopf): „Von der Fachschaft" für dieses Programm – Freigaben anderer
- * Lehrkräfte (Öffnen), Kopien aus der ersten Fassung (Übernehmen/Entfernen) und die eigenen Freigaben.
- * Die Zahl „neu" verschwindet, sobald die Liste einmal aufgeklappt war.
- */
-export function FachschaftsListe(): React.JSX.Element | null {
+// ---------------------------------------------------------------- Schalter „Nur meine" | „Auch Fachschaftsmaterial"
+
+const ANSICHT_SCHLUESSEL = 'schulapps-fachschaft-einblenden'
+
+function ansichtGemerkt(): boolean {
+  try {
+    return window.localStorage.getItem(ANSICHT_SCHLUESSEL) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Fachschaftsmaterial in den Bibliotheken zeigen? Vorgabe: nein; gemerkt je Gerät, für alle Bibliotheken zugleich */
+export const useFachschaftAnsicht = create<{ auch: boolean; setAuch: (an: boolean) => void }>((set) => ({
+  auch: typeof window !== 'undefined' ? ansichtGemerkt() : false,
+  setAuch: (an) => {
+    try {
+      window.localStorage.setItem(ANSICHT_SCHLUESSEL, an ? '1' : '0')
+    } catch {
+      /* ohne Speicher gilt es nur, solange die Seite steht */
+    }
+    set({ auch: an })
+  }
+}))
+
+/** Fachschaftsmaterial des aktuellen Programms (Bibliothek) – null ohne Server bzw. ohne Material */
+export interface FachschaftDaten {
+  programm: string
+  fremd: Freigabe[]
+  eigene: Freigabe[]
+  kopien: AltEintrag[]
+  /** Noch nicht angesehene Einträge */
+  neu: number
+  /** Material anderer (Freigaben und Kopien der ersten Fassung) – die Zahl am Schalter */
+  anzahl: number
+  /** Zur Suche passend (ohne Suche: alles) */
+  treffer: { fremd: Freigabe[]; eigene: Freigabe[]; kopien: AltEintrag[] }
+  trefferAnzahl: number
+}
+
+export function useFachschaftDaten(suche: string): FachschaftDaten | null {
   const programm = useContext(AktuellesProgramm)
   const eintraege = useFreigaben()
   const alt = useFachschaft((s) => s.alt)
   const gesehen = useFachschaft((s) => s.gesehen)
-  const faecher = useFachschaft((s) => s.faecher)
-  const [offen, setOffen] = useState(false)
   // Beim Öffnen der Bibliothek frisch laden – so erscheint Neues ohne Neustart
   useEffect(() => {
     if (aufServer() && programm) void useFachschaft.getState().laden()
   }, [programm])
-  if (!aufServer() || !programm) return null
-  const fremd = (eintraege ?? []).filter((e) => e.art === programm && !e.eigen)
-  const eigene = (eintraege ?? []).filter((e) => e.art === programm && e.eigen)
-  const kopien = alt.filter((e) => e.art === programm)
-  if (!fremd.length && !eigene.length && !kopien.length) return null
-  const neu = neueJeProgramm(zaehlEintraege(eintraege, alt), gesehen)[programm] ?? 0
+  return useMemo(() => {
+    if (!aufServer() || !programm) return null
+    const fremd = (eintraege ?? []).filter((e) => e.art === programm && !e.eigen)
+    const eigene = (eintraege ?? []).filter((e) => e.art === programm && e.eigen)
+    const kopien = alt.filter((e) => e.art === programm)
+    if (!fremd.length && !eigene.length && !kopien.length) return null
+    const s = suche.trim()
+    const passt = (felder: string[]): boolean => !s || passtZurSuche(felder, s)
+    const treffer = {
+      fremd: fremd.filter((f) => passt([f.titel, f.vonName])),
+      eigene: eigene.filter((f) => passt([f.titel])),
+      kopien: kopien.filter((e) => passt([e.titel, e.vonName || e.von]))
+    }
+    return {
+      programm,
+      fremd,
+      eigene,
+      kopien,
+      neu: neueJeProgramm(zaehlEintraege(eintraege, alt), gesehen)[programm] ?? 0,
+      anzahl: fremd.length + kopien.length,
+      treffer,
+      trefferAnzahl: treffer.fremd.length + treffer.eigene.length + treffer.kopien.length
+    }
+  }, [programm, eintraege, alt, gesehen, suche])
+}
+
+/** Schalter im Kopf der Bibliothek: „Nur meine Materialien" | „Auch Fachschaftsmaterial (n)" – Punkt bei Neuem */
+export function FachschaftSchalter({ daten, onEinblenden }: { daten: FachschaftDaten; onEinblenden?: () => void }): React.JSX.Element {
+  const auch = useFachschaftAnsicht((s) => s.auch)
+  const setAuch = useFachschaftAnsicht((s) => s.setAuch)
+  const schmal = useMediaQuery('(max-width: 600px)') ?? false
+  const punkt =
+    daten.neu > 0 && !auch ? (
+      <Tooltip label={`${daten.neu} neu von der Fachschaft – hier einblenden`} withinPortal>
+        <span
+          data-fachschaft-schalter-neu={daten.neu}
+          aria-label={`${daten.neu} neu`}
+          style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: 'var(--mantine-color-orange-6)', marginLeft: 6, verticalAlign: 'middle' }}
+        />
+      </Tooltip>
+    ) : null
+  return (
+    <SegmentedControl
+      size="xs"
+      radius="xl"
+      value={auch ? 'auch' : 'nur'}
+      onChange={(v) => {
+        setAuch(v === 'auch')
+        if (v === 'auch') onEinblenden?.()
+      }}
+      data={[
+        { value: 'nur', label: schmal ? 'Nur meine' : 'Nur meine Materialien' },
+        {
+          value: 'auch',
+          label: (
+            <span data-fachschaft-schalter-auch>
+              {schmal ? 'Mit Fachschaft' : 'Auch Fachschaftsmaterial'} ({daten.anzahl}){punkt}
+            </span>
+          )
+        }
+      ]}
+      aria-label="Welches Material die Bibliothek zeigt"
+      data-fachschaft-schalter={auch ? 'auch' : 'nur'}
+      style={{ maxWidth: '100%' }}
+    />
+  )
+}
+
+/** Hinweis über einem Suchergebnis, das nur aus Fachschaftsmaterial besteht (sonst ausgeblendet) */
+/** Steht gerade ein Fachschafts-Treffer da? Dann zeigt BibliothekLeer kein „Nichts gefunden" darunter (10.10.2026) */
+export const useFachschaftTreffer = create<{ n: number }>(() => ({ n: 0 }))
+
+export function NurFachschaftHinweis({ onEinblenden }: { onEinblenden: () => void }): React.JSX.Element {
+  useEffect(() => {
+    useFachschaftTreffer.setState((z) => ({ n: z.n + 1 }))
+    return () => useFachschaftTreffer.setState((z) => ({ n: z.n - 1 }))
+  }, [])
+  return (
+    <Text size="xs" c="dimmed" data-nur-fachschaft-treffer>
+      Nur Treffer von der Fachschaft – sonst ausgeblendet.{' '}
+      <Anchor component="button" type="button" size="xs" onClick={onEinblenden}>
+        Immer einblenden
+      </Anchor>
+    </Text>
+  )
+}
+
+/**
+ * In jeder Bibliothek (BibliothekKopf): „Von der Fachschaft" für dieses Programm – Freigaben anderer
+ * Lehrkräfte (Öffnen), Kopien aus der ersten Fassung (Übernehmen/Entfernen) und die eigenen Freigaben.
+ * Die Zahl „neu" verschwindet, sobald die Liste einmal aufgeklappt war. Seit 10.10.2026 nur nach dem Schalter
+ * „Auch Fachschaftsmaterial" (bzw. bei einer Suche, die nur hier etwas findet); mit Suche nur die passenden Einträge.
+ */
+export function FachschaftsListe({
+  daten,
+  suche = '',
+  offenAnfang = false
+}: {
+  daten: FachschaftDaten
+  suche?: string
+  /** Gleich aufgeklappt (eben eingeblendet) */
+  offenAnfang?: boolean
+}): React.JSX.Element | null {
+  const faecher = useFachschaft((s) => s.faecher)
+  const [offen, setOffen] = useState(offenAnfang)
+  const programm = daten.programm
+  // Aufgeklappt = angesehen
+  useEffect(() => {
+    if (offen) useFachschaft.getState().gesehenMarkieren(programm)
+  }, [offen, programm])
+  const sucht = suche.trim().length > 0
+  if (sucht && !daten.trefferAnzahl) return null
+  const { fremd, eigene, kopien } = daten.treffer
+  const neu = daten.neu
+  // Mit Suche aufgeklappt – die Treffer sollen zu sehen sein
+  const aufgeklappt = offen || sucht
   const fachName = (id: string): string => faecher.find((f) => f.id === id)?.label ?? id
-  const umschalten = (): void => {
-    if (!offen) useFachschaft.getState().gesehenMarkieren(programm)
-    setOffen(!offen)
-  }
   // Mehrere Fächer: nach Fach getrennt (wie früher die Sammelkarte)
   const fachIds = [...new Set([...fremd, ...kopien].map((e) => e.fach))]
   return (
     <Card withBorder padding="sm" data-fachschaftsliste>
-      <UnstyledButton onClick={umschalten} style={{ width: '100%' }} aria-expanded={offen}>
+      <UnstyledButton onClick={() => setOffen(!aufgeklappt)} style={{ width: '100%' }} aria-expanded={aufgeklappt}>
         <Group gap="xs">
-          {offen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          {aufgeklappt ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
           <IconFolders size={16} />
           <Text fw={600} size="sm">
-            Von der Fachschaft ({fremd.length + kopien.length})
+            Von der Fachschaft ({sucht ? `${fremd.length + kopien.length} von ${daten.anzahl}` : daten.anzahl})
           </Text>
           {neu > 0 && (
             <Badge size="sm" color="orange" variant="filled" data-fachschaft-neu={neu}>
@@ -291,11 +437,11 @@ export function FachschaftsListe(): React.JSX.Element | null {
           </Text>
         </Group>
       </UnstyledButton>
-      <Collapse expanded={offen}>
+      <Collapse expanded={aufgeklappt}>
         <Stack gap={6} mt="xs">
           {!fremd.length && !kopien.length && (
             <Text size="sm" c="dimmed">
-              Von anderen Lehrkräften ist für diese App noch nichts freigegeben.
+              {sucht ? 'Von anderen Lehrkräften passt nichts zur Suche.' : 'Von anderen Lehrkräften ist für diese App noch nichts freigegeben.'}
             </Text>
           )}
           {fachIds.map((fach) => (

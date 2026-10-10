@@ -14,6 +14,7 @@
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
 import { grammatikRoute } from './grammatik'
+import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
@@ -186,6 +187,8 @@ async function main(): Promise<void> {
       rekordbuchRoute(),
       // Achievements der Lernenden (08.10.2026)
       achievementsRoute(),
+      // Erinnerungen zum Üben per Web Push (10.10.2026)
+      erinnerungenRoute(adresse),
       // Zusammen spielen: Kooperativ und Versus (08.10.2026)
       spielRoute(),
       lernenRoute(),
@@ -220,6 +223,8 @@ async function main(): Promise<void> {
   herzschlagStarten()
   // Messwerte für Verwaltung › Server (09.10.2026): alle 5 Minuten, 8 Tage aufgehoben
   messungenStarten()
+  // Erinnerungen zum Üben (10.10.2026): Zeitplaner alle 5 Minuten, nur fällige Lernende
+  erinnerungenStarten(adresse)
   const stuendlich = setInterval(() => {
     abgelaufeneSitzungenEntfernen()
     cleanupWorkDirs()

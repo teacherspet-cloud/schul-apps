@@ -24,6 +24,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { geraetAbmelden } from './erinnerungenGeraet'
 import { RekordKnopf } from './Rekorde'
 import { usePfad } from './schuelerNavigation'
 import { useAuffrischen } from '../../shared/auffrischen'
@@ -165,6 +166,8 @@ function personenbezogenesVergessen(): void {
 }
 
 async function abmelden(ziel = '/anmelden?ziel=/s/'): Promise<void> {
+  // Erinnerungen dieses Geräts abmelden (10.10.2026): auf geteilten iPads bekäme sonst das nächste Kind sie
+  await geraetAbmelden()
   await fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } }).catch(() => undefined)
   // Zwischengespeicherte Daten dieses Kontos (Regal, gewählter Kurs) nicht für das nächste Kind stehen lassen (08.10.2026)
   try {

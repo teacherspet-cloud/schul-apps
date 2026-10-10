@@ -21,7 +21,7 @@ import {
   type GrammatikPaket,
   type GrammatikSpielId
 } from '../shared/grammatiktrainer'
-import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
+import { istSicher, nachAbfrage, sitzungsWoerter, TAG, tagVon, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
@@ -1413,6 +1413,27 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
     extrasGeschafft,
     tage: [...tage]
   }
+}
+
+/**
+ * Erinnerungen zum Üben (10.10.2026, erinnerungen.ts): die Grammatik einer Person aus Kursen mit angebotenen
+ * Erinnerungen – je Freigabe, seit wann sie da ist, was heute offen ist (fällige Aufgaben und neue bis zu 10 je Tag,
+ * wie vor den Spielen) und die Übungstage. Nur Zahlen, keine Inhalte.
+ */
+export function grammatikFuerErinnerung(ich: NutzerInfo, vokIds: Set<string>, jetzt = Date.now()): { id: string; seit: number; offen: number; tage: string[] }[] {
+  if (!vokIds.size) return []
+  const heute = tagVon(jetzt)
+  return (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[])
+    .filter((z) => vokIds.has(z.vok_id ?? '') && istOffen(z) && istFuer(z, ich))
+    .map((z) => {
+      const p = paketVon(z)
+      const st = standVon(z.id, ich.id)
+      const auf = st.aufgaben ?? {}
+      const faellig = sitzungsWoerter(karten(p), auf, jetzt, 0).length
+      const schonNeu = p.aufgaben.filter((a) => auf[a.id]?.erstmals && tagVon(auf[a.id].erstmals!) === heute).length
+      const neu = Math.min(Math.max(0, 10 - schonNeu), p.aufgaben.filter((a) => !auf[a.id]?.versuche).length)
+      return { id: z.id, seit: Date.parse(z.erstellt) || 0, offen: faellig + neu, tage: st.tage ?? [] }
+    })
 }
 
 /**

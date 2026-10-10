@@ -84,10 +84,21 @@ export default function App(): React.JSX.Element {
   const current = modules.find((m) => m.id === active)
   // Nur die Programme zu den eigenen Fächern (Paket 12) – geladen bleiben trotzdem alle
   const sichtbar = useSichtbareProgramme()
-  // Zugeklappte Gruppen der Leiste – je Sitzung (shared/sitzung.ts, 09.10.2026); zu Beginn einer Sitzung alle offen
-  const [zuGruppen, setZuGruppen] = useOffenGemerkt<string[]>('leiste-gruppen-zu', [])
+  /*
+   * Aufgeklappte Gruppen der Leiste – je Sitzung (shared/sitzung.ts). Seit 10.10.2026 (Entscheidung der Lehrkraft) sind
+   * zu Beginn jeder Sitzung ALLE Gruppen zugeklappt (nur „Meine Klassen" steht ohne Gruppe oben); innerhalb der Sitzung
+   * bleibt, was die Lehrkraft auf- und zuklappt. Wird eine App geöffnet (auch per Sprung von der Startseite, aus der
+   * Suche oder einem Verweis), klappt ihre Gruppe einmal auf – zuklappen lässt sie sich danach trotzdem.
+   * Neuer Schlüssel: Der frühere („leiste-gruppen-zu") merkte die ZUgeklappten.
+   */
+  const [aufGruppen, setAufGruppen] = useOffenGemerkt<string[]>('leiste-gruppen-auf', [])
   const gruppeUmschalten = (id: string, offen: boolean): void =>
-    setZuGruppen(offen ? [...new Set([...zuGruppen, id])] : zuGruppen.filter((x) => x !== id))
+    setAufGruppen((alt) => (offen ? alt.filter((x) => x !== id) : [...new Set([...alt, id])]))
+  useEffect(() => {
+    const g = MODUL_GRUPPEN.find((x) => x.apps.includes(active))
+    if (g) setAufGruppen((alt) => (alt.includes(g.id) ? alt : [...alt, g.id]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Wechsel der App
+  }, [active])
   // Der Tastenhorcher (unten) bleibt stehen; die aktuelle Liste liest er hier
   const sichtbarRef = useRef(sichtbar)
   sichtbarRef.current = sichtbar
@@ -123,7 +134,7 @@ export default function App(): React.JSX.Element {
   const einzeln = einzelnesProgramm()
   const ohneLeiste = Boolean(einzeln) || telefon || (touch && leisteAus)
   // Leiste dichter, solange sie sonst rollen müsste (09.10.2026, Notebook 1366 × 768) – shell/leistenDichte.ts
-  const dichte = useLeistenDichte(`${breit}|${zuGruppen.join(',')}|${sichtbar.map((m) => m.id).join(',')}|${active}|${ohneLeiste}`, touch)
+  const dichte = useLeistenDichte(`${breit}|${aufGruppen.join(',')}|${sichtbar.map((m) => m.id).join(',')}|${active}|${ohneLeiste}`, touch)
   const leisteAusblenden = (aus: boolean): void => {
     setLeisteAus(aus)
     try {
@@ -271,7 +282,7 @@ export default function App(): React.JSX.Element {
             {/*
               Gruppen (03.10.2026, Entscheidung der Lehrkraft): Unterricht, Unterrichtsplanung,
               Leistungsüberprüfungen, Verwaltung. Ein Klick auf die Gruppe klappt ihre Apps auf oder zu;
-              die Leiste merkt sich das. Die Gruppe der offenen App bleibt immer aufgeklappt.
+              die Leiste merkt sich das je Sitzung (zu Beginn alle zu, 10.10.2026); die Gruppe einer geöffneten App klappt auf.
             */}
             {/* Ganz oben ohne Gruppe (09.10.2026): Meine Klassen */}
             {LEISTE_OBEN.flatMap((id) => sichtbar.filter((m) => m.id === id)).map((m) => (
@@ -294,7 +305,7 @@ export default function App(): React.JSX.Element {
               const apps = g.apps.flatMap((id) => sichtbar.filter((m) => m.id === id))
               if (!apps.length) return null
               const hatAktive = apps.some((m) => m.id === active)
-              const offen = !zuGruppen.includes(g.id) || hatAktive
+              const offen = aufGruppen.includes(g.id)
               const Symbol = GRUPPEN_SYMBOL[g.id] ?? IconApps
               return (
                 <div key={g.id} className="leiste-gruppe" data-gruppe={g.id} data-offen={offen}>
@@ -574,7 +585,7 @@ function NavKnopf(props: {
         offset={props.bild ? 2 : 4}
         color="orange"
         position="bottom-end"
-        title={props.neu ? `${props.neu} neu von der Fachschaft` : undefined}
+        title={props.neu ? `${props.neu} neu von der Fachschaft – in der Bibliothek unter „Auch Fachschaftsmaterial“` : undefined}
         data-fachschaft-neu={props.neu || undefined}
       >
         {props.bild ? (

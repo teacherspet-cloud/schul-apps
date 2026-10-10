@@ -435,7 +435,8 @@ function Inhalt({
             laden={async () => (await window.api.sheets.list()).map((m) => ({ id: m.id, name: m.name }))}
             gewaehlt={async (id) => {
               const b = await beschaeftigt(ladeBlattAlsSchritt(id, undefined, i.korrekturrand !== false))
-              setzeInhalt({ ...b.inhalt, auswahl: undefined, auswahlVorschlag: undefined })
+              // Vorhandenes Blatt hereingeholt (10.10.2026): bleibt in der Bibliothek sichtbar (shared/reiheMaterial.ts)
+              setzeInhalt({ ...b.inhalt, erzeugt: false, auswahl: undefined, auswahlVorschlag: undefined })
               setze({ ...(s.titel ? {} : { titel: b.titel }), ...(s.lernziele.length ? {} : { lernziele: b.lernziele }), platzhalter: undefined })
             }}
           />

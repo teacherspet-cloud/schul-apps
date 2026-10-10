@@ -55,6 +55,7 @@ import { auftragsRegister, buendel, oeffneStrom, sitzungVergessen } from './erei
 import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
 import { ANMELDE_CSP, anmeldeSeite, passwortSeite } from './seiten'
+import { SERVICE_WORKER } from './serviceWorker'
 
 export type Aufruf = (kanal: string, args: unknown[]) => Promise<unknown>
 
@@ -94,6 +95,12 @@ export interface ServerOptionen {
 }
 
 const COOKIE = 'sa_sitzung'
+
+/**
+ * Beim Abmelden (10.10.2026): z. B. die Erinnerungs-Geräte dieser Sitzung entfernen (erinnerungen.ts) – auf geteilten
+ * iPads bekäme sonst das nächste Kind die Erinnerungen des vorigen.
+ */
+export const beimAbmelden: ((nutzerId: string, kennung: string) => void)[] = []
 
 // ---------------------------------------------------------------- Hilfen
 
@@ -195,11 +202,13 @@ const loescheCookie = (res: ServerResponse, sicher: boolean): void =>
 /**
  * Web-App für den Home-Bildschirm (02.10.2026): je ein Manifest für Lehrkräfte (Start „/") und
  * für Lernende (Start und Bereich „/s/") – wer den Onlinetest ablegt, landet nicht in den Programmen.
+ * Lernende (10.10.2026): „Schul-Apps" statt „Onlinetest" – unter diesem Namen erscheinen auf iPhone/iPad auch die
+ * Erinnerungen zum Üben (erinnerungen.ts), und der Bereich ist längst mehr als der Onlinetest.
  */
 export function webManifest(fuerSchueler: boolean): string {
   return JSON.stringify({
-    name: fuerSchueler ? 'Schul-Apps · Onlinetest' : 'Schul-Apps',
-    short_name: fuerSchueler ? 'Onlinetest' : 'Schul-Apps',
+    name: fuerSchueler ? 'Schul-Apps · Lernen' : 'Schul-Apps',
+    short_name: 'Schul-Apps',
     lang: 'de',
     start_url: fuerSchueler ? '/s/' : '/',
     scope: fuerSchueler ? '/s/' : '/',
@@ -293,7 +302,7 @@ function programmSeite(fuerSchueler = false): string {
       `<link rel="manifest" href="${fuerSchueler ? '/s/manifest.webmanifest' : '/manifest.webmanifest'}" />`,
       '<meta name="apple-mobile-web-app-capable" content="yes" />',
       '<meta name="mobile-web-app-capable" content="yes" />',
-      `<meta name="apple-mobile-web-app-title" content="${fuerSchueler ? 'Onlinetest' : 'Schul-Apps'}" />`,
+      '<meta name="apple-mobile-web-app-title" content="Schul-Apps" />',
       '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
       '<meta name="theme-color" content="#0f7b6c" />',
       // Symbol im Browser-Reiter (07.10.2026): ausdrücklich das von Schul-Apps – ohne Angabe zeigte der Browser unter
@@ -457,6 +466,13 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       return void res.end(webManifest(url.pathname.startsWith('/s/')))
     }
 
+    // Service Worker der Erinnerungen (10.10.2026, serviceWorker.ts) – ohne Anmeldung (der Browser prüft ihn auch so auf
+    // Neues), Bereich „/s/", nie lange zwischengespeichert
+    if (req.method === 'GET' && url.pathname === '/s/sw.js') {
+      res.writeHead(200, { 'content-type': TYPEN['.js'], 'cache-control': 'no-cache', 'service-worker-allowed': '/s/' })
+      return void res.end(SERVICE_WORKER)
+    }
+
     if (req.method === 'GET' && url.pathname === '/server/vorab.js') {
       res.writeHead(200, { 'content-type': TYPEN['.js'], 'cache-control': 'public, max-age=3600' })
       return void res.end(VORAB_JS)
@@ -551,6 +567,13 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       if (!mitKopf) return json(res, 403, { fehler: 'Nur aus der App.' })
       // Abmelden in der Vorschau beendet nie die Sitzung der Lehrkraft
       if (inVorschau) return json(res, 200, { ok: true, vorschau: true })
+      if (sitzung)
+        for (const f of beimAbmelden)
+          try {
+            f(sitzung.nutzer.id, sitzung.kennung)
+          } catch {
+            /* Abmelden geht immer */
+          }
       if (keks) sitzungBeenden(keks)
       if (sitzung) sitzungVergessen(sitzung.kennung)
       loescheCookie(res, sicher)

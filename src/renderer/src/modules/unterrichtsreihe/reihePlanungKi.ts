@@ -428,7 +428,8 @@ export function planUebernehmen(
           schritte.push({
             ...basis,
             lernziele: lernziele.length ? lernziele : b.lernziele,
-            inhalt: { ...(basis.inhalt as Extract<SchrittInhalt, { art: 'arbeitsblatt' }>), ...b.inhalt },
+            // Vorhandenes Material (10.10.2026): bleibt in der Bibliothek sichtbar (shared/reiheMaterial.ts)
+            inhalt: { ...(basis.inhalt as Extract<SchrittInhalt, { art: 'arbeitsblatt' }>), ...b.inhalt, erzeugt: false },
             begruendung: String(x.begruendung ?? '').trim() || undefined
           })
           continue

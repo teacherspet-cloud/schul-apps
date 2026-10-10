@@ -22,6 +22,9 @@ export interface Lernstanddaten {
   verbspiele?: '' | 'an' | 'aus'
   /** Kooperativ/Versus erlaubt (08.10.2026) */
   zusammen?: boolean
+  /** Erinnerungen zum Üben angeboten und wie viele Lernende sie eingeschaltet haben – nur die Zahl (10.10.2026) */
+  erinnerungen?: boolean
+  erinnerungenAktiv?: number
   tagesziel?: number
   adresse?: string
   ueberschrift?: string

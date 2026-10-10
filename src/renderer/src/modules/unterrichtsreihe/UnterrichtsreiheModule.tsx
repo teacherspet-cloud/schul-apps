@@ -17,6 +17,7 @@ import { useAppSettings } from '../../shared/settingsStore'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { loeschFrage, loeschPlan, type MaterialVerweis } from '@shared/reiheMaterial'
 import { loescheReihe } from './reiheLoeschen'
+import { ladeMaterialien } from '../../shell/materialien'
 import { holen, senden } from '../onlinetest/serverApi'
 import { ReiheEditor } from './ReiheEditor'
 import { useDokumentOeffner, useZielZeiger } from '../../shared/navigation'
@@ -279,13 +280,21 @@ function ReiheLoeschenDialog({
       (d) => setFreigaben(d.blaetter ?? []),
       () => undefined
     )
+    // Altbestand ohne Marke (10.10.2026): ob für die Reihe erzeugt, sagt der Name des Dokuments (shared/reiheMaterial.ts)
+    if (reihe.material.some((m) => m.erzeugt === undefined))
+      void ladeMaterialien().then(
+        (l) => setNamen(new Map(l.map((m) => [m.id, m.name]))),
+        () => undefined
+      )
   }, [reihe])
-  const frage = loeschFrage(reihe.id, reihen, freigaben)
+  const [namen, setNamen] = useState<Map<string, string>>(new Map())
+  const name = (docId: string): string | undefined => namen.get(docId)
+  const frage = loeschFrage(reihe.id, reihen, freigaben, name)
   const zugewiesen = reihe.zuweisungen.length > 0
   const los = async (mitMaterial: boolean): Promise<void> => {
     setLaeuft(true)
     try {
-      const material = mitMaterial ? loeschPlan(reihe.id, reihen).loeschen : []
+      const material = mitMaterial ? loeschPlan(reihe.id, reihen, name).loeschen : []
       const { fehlgeschlagen } = await loescheReihe(reihe.id, material)
       if (fehlgeschlagen) notifyError(new Error(`${fehlgeschlagen} Dokument(e) ließen sich nicht löschen – sie stehen jetzt wieder in den Bibliotheken.`))
       else

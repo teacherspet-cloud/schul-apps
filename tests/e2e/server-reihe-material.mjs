@@ -3,6 +3,8 @@
 // „Reihe: <Titel>", Suche mit nur Reihen-Treffern zeigt sie mit Hinweis; Reihe löschen mit Rückfrage „Zugehöriges
 // Material ebenfalls löschen? (n Dokumente)" – „Nur die Reihe löschen" macht das Material wieder sichtbar,
 // „Reihe und Material löschen" entfernt es aus der Ablage. Ohne KI.
+// Seit 10.10.2026: Ausgeblendet wird nur, was FÜR die Reihe entstanden ist (Marke `inhalt.erzeugt`, Altbestand am Namen
+// „<Reihe> – <Schritt>"); ein eigenes Blatt, das in eine Reihe geholt wurde, bleibt sichtbar (mit Marke „Reihe: …").
 // Vorher: Server lokal (KI-Attrappe genügt).
 // Aufruf: node tests/e2e/server-reihe-material.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -31,7 +33,10 @@ const R2 = `Julikrise Probe ${N}`
 const BLATT = {
   aus1: { id: `rm-a-${N}`, name: `${R1} – Ursachen` },
   aus2: { id: `rm-c-${N}`, name: `${R2} – Attentat` },
-  eigen: { id: `rm-b-${N}`, name: `Eigenes Blatt ${N}` }
+  eigen: { id: `rm-b-${N}`, name: `Eigenes Blatt ${N}` },
+  // In die Reihe geholt (Marke erzeugt: false) bzw. Altbestand ohne Marke mit eigenem Namen – beide bleiben sichtbar
+  geholt: { id: `rm-d-${N}`, name: `Quellenarbeit ${N}` },
+  altEigen: { id: `rm-e-${N}`, name: `Karikaturen ${N}` }
 }
 const payload = (titel) => ({
   version: 1,
@@ -42,7 +47,15 @@ const payload = (titel) => ({
   sources: [],
   createdAt: new Date().toISOString()
 })
-const reihe = (titel, quelle) => ({
+const schritt = (id, quelle, extra = {}) => ({
+  id,
+  titel: `Blatt ${id}`,
+  lernziele: [],
+  rolle: 'pflicht',
+  erfolg: { art: 'abgabe' },
+  inhalt: { art: 'arbeitsblatt', quelle, titel: 'Blatt', html: '', aufgaben: [], vorlage: null, runden: 1, stift: false, ...extra }
+})
+const reihe = (titel, quelle, weitere = [], extra = {}) => ({
   id: '',
   titel,
   fachId: 'geschichte',
@@ -53,16 +66,7 @@ const reihe = (titel, quelle) => ({
   oberthema: 'Erster Weltkrieg',
   lernziele: [],
   art: 'digital',
-  schritte: [
-    {
-      id: 'a',
-      titel: 'Blatt',
-      lernziele: [],
-      rolle: 'pflicht',
-      erfolg: { art: 'abgabe' },
-      inhalt: { art: 'arbeitsblatt', quelle, titel: 'Blatt', html: '', aufgaben: [], vorlage: null, runden: 1, stift: false }
-    }
-  ]
+  schritte: [schritt('a', quelle, extra), ...weitere]
 })
 
 const browser = await chromium.launch({ channel: 'msedge' })
@@ -82,14 +86,27 @@ try {
   const api = async (channel, args = []) =>
     JSON.parse((await (await lk.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).text()).trim()).value
   for (const b of Object.values(BLATT)) await api('sheets:save', [{ id: b.id, name: b.name, stats: { sheetCount: 0 }, payload: payload(b.name) }])
-  const r1 = await (await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: reihe(R1, BLATT.aus1.id) } })).json()
-  const r2 = await (await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: reihe(R2, BLATT.aus2.id) } })).json()
+  // R1: Altbestand ohne Marke (Name „R1 – Ursachen" = erzeugt), dazu ein hereingeholtes und ein unklares eigenes Blatt
+  const r1 = await (
+    await lk.request.post(`${A}/server/reihen/speichern`, {
+      headers: KOPF,
+      data: { reihe: reihe(R1, BLATT.aus1.id, [schritt('b', BLATT.geholt.id, { erzeugt: false }), schritt('c', BLATT.altEigen.id)]) }
+    })
+  ).json()
+  // R2: mit Marke „erzeugt"
+  const r2 = await (await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe: reihe(R2, BLATT.aus2.id, [], { erzeugt: true }) } })).json()
   reihenWeg.push(r1.id, r2.id)
   const liste = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen
   pruefe(
     liste.find((r) => r.id === r1.id)?.material?.[0]?.docId === BLATT.aus1.id,
     'Liste der Reihen nennt das verknüpfte Material (Zuordnung aus den Schritten)'
   )
+  const m1 = liste.find((r) => r.id === r1.id)?.material ?? []
+  pruefe(
+    m1.find((m) => m.docId === BLATT.geholt.id)?.erzeugt === false && m1.find((m) => m.docId === BLATT.altEigen.id)?.erzeugt === undefined,
+    'Liste nennt die Herkunft: hereingeholt (false), Altbestand ohne Marke (offen)'
+  )
+  pruefe(liste.find((r) => r.id === r2.id)?.material?.[0]?.erzeugt === true, 'Liste nennt die Herkunft: erzeugt (true)')
 
   const p = await lk.newPage()
   await p.goto(A)
@@ -101,6 +118,7 @@ try {
   await p.waitForTimeout(1500)
   const zuletzt = await p.locator('.home-material').allInnerTexts()
   pruefe(zuletzt.some((t) => t.includes(BLATT.eigen.name)), '„Zuletzt bearbeitet“ zeigt das eigene Blatt')
+  pruefe(zuletzt.some((t) => t.includes(BLATT.geholt.name)), '„Zuletzt bearbeitet“ zeigt das in die Reihe geholte eigene Blatt')
   pruefe(!zuletzt.some((t) => t.includes(BLATT.aus1.name) || t.includes(BLATT.aus2.name)), '„Zuletzt bearbeitet“ ohne Material aus Reihen')
   // Nur die Reihe als Ganzes (09.10.2026) – auch wenn Reihen-Material eingeblendet ist
   pruefe(zuletzt.some((t) => t.includes(R1)), '„Zuletzt bearbeitet“ zeigt die Reihe als Ganzes')
@@ -116,6 +134,12 @@ try {
   await p.mouse.move(800, 700)
   await da(p.locator(`[data-bibliothek-eintrag="${BLATT.eigen.name}"]`))
   pruefe((await p.locator(`[data-bibliothek-eintrag="${BLATT.aus1.name}"]`).count()) === 0, 'Bibliothek: Blatt aus Reihe zunächst ausgeblendet')
+  pruefe((await p.locator(`[data-bibliothek-eintrag="${BLATT.aus2.name}"]`).count()) === 0, 'Bibliothek: erzeugtes Blatt (Marke) ausgeblendet')
+  // Eigenes Blatt, in die Reihe geholt: bleibt sichtbar – mit Marke „Reihe: …"
+  const geholt = p.locator(`[data-bibliothek-eintrag="${BLATT.geholt.name}"]`)
+  pruefe(await da(geholt), 'Bibliothek: in die Reihe geholtes eigenes Blatt bleibt sichtbar')
+  pruefe((await geholt.locator(`[data-reihe-marke="${R1}"]`).count()) === 1, '… mit Marke „Reihe: …“')
+  pruefe(await da(p.locator(`[data-bibliothek-eintrag="${BLATT.altEigen.name}"]`)), 'Bibliothek: Altbestand ohne Marke mit eigenem Namen bleibt sichtbar')
   const schalter = p.getByText('Material aus Unterrichtsreihen einblenden (2)')
   pruefe(await da(schalter), 'Schalter „Material aus Unterrichtsreihen einblenden (2)“ im Kopf')
   await p.screenshot({ path: join(out, '1-ausgeblendet.png'), fullPage: true })
@@ -128,7 +152,7 @@ try {
   const schalterFeld = p.locator('[data-reihe-material-schalter]')
   await schalterFeld.check()
   pruefe(await da(p.locator(`[data-bibliothek-eintrag="${BLATT.aus1.name}"]`)), 'Eingeblendet: Blatt aus Reihe sichtbar')
-  pruefe(await da(p.locator(`[data-reihe-marke="${R1}"]`)), `Marke „Reihe: ${R1}“ am Blatt`)
+  pruefe(await da(p.locator(`[data-bibliothek-eintrag="${BLATT.aus1.name}"] [data-reihe-marke="${R1}"]`)), `Marke „Reihe: ${R1}“ am Blatt`)
   await p.screenshot({ path: join(out, '2-eingeblendet.png'), fullPage: true })
   // Zurück auf „aus" (gilt je Gerät für alle Bibliotheken)
   await schalterFeld.uncheck()
@@ -155,6 +179,7 @@ try {
   const nachher1 = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen
   pruefe(!nachher1.some((r) => r.id === r1.id), '„Nur die Reihe löschen“: Reihe weg')
   pruefe(((await api('sheets:list')) ?? []).some((b) => b.id === BLATT.aus1.id), '… Blatt bleibt in der Ablage')
+  pruefe(((await api('sheets:list')) ?? []).some((b) => b.id === BLATT.geholt.id), '… hereingeholtes Blatt ebenso')
 
   await loeschen(R2)
   await p.locator('[data-reihe-loeschen-mit-material]').click()

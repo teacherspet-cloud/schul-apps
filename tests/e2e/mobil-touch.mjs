@@ -21,6 +21,7 @@ import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { extname, join, resolve } from 'path'
+import { leisteAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/mobil-touch')
 const wurzel = resolve(process.argv[3] ?? 'out/mobil')
@@ -383,6 +384,7 @@ async function lauf(name, breite, hoehe) {
     )
   const oeffne = async (label) => {
     for (let versuch = 0; versuch < 2; versuch++) {
+      await leisteAuf(page)
       const direkt = page.locator(`.app-leiste [aria-label="${label}"], .mobil-tabs [aria-label="${label}"]`).filter({ visible: true })
       if (await direkt.count()) await direkt.first().tap({ timeout: 8000 })
       else {
@@ -715,6 +717,7 @@ function helfer(page, name) {
   const sichtbar = (sel) => page.locator(sel).filter({ visible: true }).first()
   const bild = (n) => page.screenshot({ path: join(out, `${name}-${n}.png`) })
   const oeffne = async (label) => {
+    await leisteAuf(page)
     const direkt = page.locator(`.app-leiste [aria-label="${label}"], .mobil-tabs [aria-label="${label}"]`).filter({ visible: true })
     if (await direkt.count()) await direkt.first().click({ timeout: 8000 })
     await page.waitForTimeout(600)
@@ -729,6 +732,8 @@ async function starten(page) {
   await spaeter.waitFor({ state: 'visible', timeout: 8000 }).catch(() => undefined)
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
   await page.waitForTimeout(500)
+  // Seit 10.10.2026 sind die Gruppen der Leiste zu Beginn jeder Sitzung zugeklappt
+  await leisteAuf(page)
 }
 
 /**

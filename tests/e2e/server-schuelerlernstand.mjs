@@ -124,7 +124,9 @@ try {
   // ---------- Einstellungen
   await p.goto(`${A}/s/einstellungen`)
   await p.locator('[data-schueler-einstellungen]').waitFor()
-  pruefe((await p.locator('[data-bereich-kachel]').count()) === 4, 'Vier Bereiche als Kacheln')
+  // Seit 10.10.2026 fünf: dazu „Erinnerungen" (Web-Push)
+  pruefe((await p.locator('[data-bereich-kachel]').count()) === 5, 'Fünf Bereiche als Kacheln (mit Erinnerungen)')
+  pruefe((await p.locator('[data-bereich-kachel="erinnerungen"]').count()) === 1, 'Kachel „Erinnerungen“ ist da')
   await p.locator('[data-bereich-kachel="lernen"]').click()
   await p.locator('[data-wochenziel]').getByText('1', { exact: true }).click()
   pruefe(await da(p.locator('[data-gespeichert="konto"]'), 5000), '„Gespeichert" nach Wochenziel 1')

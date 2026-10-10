@@ -334,9 +334,11 @@ export function erzeugeBlattFuerPlatzhalter(r: Reihe, s: Schritt, zweck: BlattZw
       const b = await blattAlsSchrittGemessen(id, ws)
       const leer = leererInhalt('arbeitsblatt') as Extract<Schritt['inhalt'], { art: 'arbeitsblatt' }>
       // Als Blatt entstandene Zwischenaufgabe/Abschluss/Reflexion: Art „arbeitsblatt", Rolle und Erfolg dazu (Plan G.2, G.5)
-      const umgewandelt = zweck ? alsBlattSchritt(s.inhalt, zweck, b.inhalt, artVon(r)) : null
+      // Für die Reihe entstanden (10.10.2026): in den Bibliotheken ausgeblendet (shared/reiheMaterial.ts)
+      const erzeugt = { ...b.inhalt, erzeugt: true }
+      const umgewandelt = zweck ? alsBlattSchritt(s.inhalt, zweck, erzeugt, artVon(r)) : null
       const patch: Partial<Schritt> = {
-        ...(umgewandelt ?? { inhalt: { ...leer, ...(s.inhalt.art === 'arbeitsblatt' ? s.inhalt : {}), ...b.inhalt } }),
+        ...(umgewandelt ?? { inhalt: { ...leer, ...(s.inhalt.art === 'arbeitsblatt' ? s.inhalt : {}), ...erzeugt } }),
         platzhalter: undefined,
         kiEntwurf: true,
         ...(s.lernziele.length ? {} : { lernziele: b.lernziele })

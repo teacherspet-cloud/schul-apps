@@ -45,7 +45,7 @@ import {
   ReiheMarke,
   useReiheZuordnung,
 } from "../shared/reiheZuordnung";
-import { suchtrefferMitReihen, type ReiheMitMaterial } from "@shared/reiheMaterial";
+import { istReiheMaterial, suchtrefferMitReihen, type ReiheMitMaterial } from "@shared/reiheMaterial";
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8;
@@ -123,9 +123,10 @@ export default function Home(): React.JSX.Element {
   const zuletzt = useMemo(
     () =>
       neueste(
-        // Startseite (09.10.2026, Wunsch der Lehrkraft): immer nur die Reihe als Ganzes – ihr Material nie, auch nicht eingeblendet
+        // Startseite (09.10.2026, Wunsch der Lehrkraft): immer nur die Reihe als Ganzes – ihr Material nie, auch nicht eingeblendet.
+        // Seit 10.10.2026: nur, was für die Reihe entstanden ist; in eine Reihe geholtes eigenes Material bleibt stehen
         [
-          ...(materialien ?? []).filter((m) => !reiheZuordnung.has(m.id)),
+          ...(materialien ?? []).filter((m) => !istReiheMaterial(reiheZuordnung.get(m.id), m.name)),
           ...reihenListe.map(reiheAlsMaterial),
         ],
         ZULETZT_ANZAHL
@@ -138,7 +139,8 @@ export default function Home(): React.JSX.Element {
         suche(materialien ?? [], suchtext),
         (m) => m.id,
         reiheZuordnung,
-        reiheEinblenden
+        reiheEinblenden,
+        (m) => m.name
       ),
     [materialien, suchtext, reiheZuordnung, reiheEinblenden]
   );

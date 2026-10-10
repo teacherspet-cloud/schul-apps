@@ -1,7 +1,7 @@
 import { AppKopf } from './AppKopf'
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
 import { nurPcNetz } from '../plattform'
-import { FachschaftsListe, TeilenMenuePunkt } from './Fachordner'
+import { FachschaftSchalter, FachschaftsListe, NurFachschaftHinweis, TeilenMenuePunkt, useFachschaftAnsicht, useFachschaftDaten, useFachschaftTreffer } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
@@ -70,8 +70,10 @@ export interface Bibliothek<M extends BibliotheksEintrag> {
    * Material aus Unterrichtsreihen (09.10.2026, shared/reiheMaterial.ts): `eintraege` und `treffer` lassen es weg,
    * solange es nicht eingeblendet ist. `anzahl` = wie viele Einträge zu Reihen gehören (für den Schalter im Kopf),
    * `verweis` = Reihe eines Eintrags (Marke), `nurReiheTreffer` = die letzte Suche fand nur solches Material.
+   * `treffer` = wie viele Einträge die letzte Suche zeigt (null ohne Suche) – findet sie nichts Eigenes, zeigt der Kopf
+   * passendes Fachschaftsmaterial auch, wenn es ausgeblendet ist (10.10.2026).
    */
-  reihe: { anzahl: number; verweis: (id: string) => ReiheVerweis | undefined; nurReiheTreffer: () => boolean }
+  reihe: { anzahl: number; verweis: (id: string) => ReiheVerweis | undefined; nurReiheTreffer: () => boolean; treffer: () => number | null }
 }
 
 /**
@@ -112,11 +114,12 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   }, [])
   const offenJetzt = opts.offeneId()
   const { sichtbar, ausReihen } = useMemo(
-    () => ohneReiheMaterial(alleEintraege ?? [], (e) => e.id, zuordnung, { einblenden, offen: offenJetzt }),
+    () => ohneReiheMaterial(alleEintraege ?? [], (e) => e.id, zuordnung, { einblenden, offen: offenJetzt, name: (e) => e.name }),
     [alleEintraege, zuordnung, einblenden, offenJetzt]
   )
   const eintraege = alleEintraege ? sichtbar : null
   const nurReihe = useRef(false)
+  const trefferZahl = useRef<number | null>(null)
 
   /** Gespeicherten Stand holen – vorher das offene Dokument sichern, damit nichts Älteres kopiert wird */
   const holen = async (id: string): Promise<{ name: string; stats: object; payload: unknown; thumb?: string }> => {
@@ -186,11 +189,13 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   const treffer = (felder: (e: M) => (string | number | null | undefined)[]): M[] => {
     if (!suche.trim()) {
       nurReihe.current = false
+      trefferZahl.current = null
       return eintraege ?? []
     }
     const alle = (alleEintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
-    const { liste, nurReihe: nur } = suchtrefferMitReihen(alle, (e) => e.id, zuordnung, einblenden)
+    const { liste, nurReihe: nur } = suchtrefferMitReihen(alle, (e) => e.id, zuordnung, einblenden, (e) => e.name)
     nurReihe.current = nur
+    trefferZahl.current = liste.length
     return liste
   }
 
@@ -215,7 +220,7 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     neuId,
     moduleId: opts.moduleId,
     neuLaden,
-    reihe: { anzahl: ausReihen, verweis: (id) => zuordnung.get(id), nurReiheTreffer: () => nurReihe.current }
+    reihe: { anzahl: ausReihen, verweis: (id) => zuordnung.get(id), nurReiheTreffer: () => nurReihe.current, treffer: () => trefferZahl.current }
   }
 }
 
@@ -248,6 +253,17 @@ export function BibliothekKopf({
   children?: React.ReactNode
 }): React.JSX.Element {
   const setEinblenden = useReiheZuordnung((z) => z.setEinblenden)
+  /*
+   * Fachschaftsmaterial (10.10.2026, shared/components/Fachordner.tsx): Schalter „Nur meine Materialien" | „Auch
+   * Fachschaftsmaterial (n)"; Vorgabe nur die eigenen. Findet eine Suche nichts Eigenes, aber bei der Fachschaft etwas,
+   * steht das trotzdem da – mit Hinweis. `frischAn`: eben eingeblendet – dann gleich aufgeklappt.
+   */
+  const fachschaft = useFachschaftDaten(suche)
+  const fachschaftAuch = useFachschaftAnsicht((s) => s.auch)
+  const setFachschaftAuch = useFachschaftAnsicht((s) => s.setAuch)
+  const [frischAn, setFrischAn] = useState(false)
+  const nurFachschaft = Boolean(fachschaft && !fachschaftAuch && suche.trim() && fachschaft.trefferAnzahl > 0 && reihe?.treffer() === 0)
+  const reiheSchalter = Boolean(reihe && reihe.anzahl > 0)
   // Gemeinsamer Kopf (Phase 6a): Titel „Meine …" links, Datei öffnen und „Neu" rechts, Suche in der zweiten Zeile
   return (
     <Stack gap="sm" mb="md">
@@ -277,15 +293,24 @@ export function BibliothekKopf({
         }
         links={<span />}
       />
-      {/* Material aus Unterrichtsreihen (09.10.2026): zunächst ausgeblendet, hier einblenden */}
-      {reihe && reihe.anzahl > 0 && (
-        <Group justify="flex-end" gap="sm" data-reihe-material-kopf>
-          {suche.trim() && reihe.nurReiheTreffer() && <NurReiheHinweis onEinblenden={() => setEinblenden(true)} />}
-          <ReiheSchalter anzahl={reihe.anzahl} />
+      {/*
+        Ansicht: Material aus Unterrichtsreihen (09.10.2026) und Fachschaftsmaterial (10.10.2026) – beides zunächst
+        ausgeblendet, hier einblenden
+      */}
+      {(reiheSchalter || fachschaft) && (
+        <Group justify="flex-end" gap="sm" wrap="wrap" data-bibliothek-ansicht>
+          {reihe && suche.trim() && reihe.nurReiheTreffer() && <NurReiheHinweis onEinblenden={() => setEinblenden(true)} />}
+          {nurFachschaft && <NurFachschaftHinweis onEinblenden={() => setFachschaftAuch(true)} />}
+          {reiheSchalter && reihe && (
+            <span data-reihe-material-kopf>
+              <ReiheSchalter anzahl={reihe.anzahl} />
+            </span>
+          )}
+          {fachschaft && <FachschaftSchalter daten={fachschaft} onEinblenden={() => setFrischAn(true)} />}
         </Group>
       )}
-      {/* Server: freigegebenes Material der Fachschaft für dieses Programm */}
-      <FachschaftsListe />
+      {/* Server: freigegebenes Material der Fachschaft für dieses Programm – nur eingeblendet bzw. als einzige Treffer */}
+      {fachschaft && (fachschaftAuch || nurFachschaft) && <FachschaftsListe daten={fachschaft} suche={suche} offenAnfang={frischAn} />}
     </Stack>
   )
 }
@@ -302,6 +327,9 @@ export function BibliothekLeer({
   ausgeblendet?: number
 }): React.JSX.Element {
   const einblenden = useReiheZuordnung((z) => z.einblenden)
+  // Die Suche fand nur Fachschaftsmaterial (Hinweis darüber, 10.10.2026) – dann ist „Nichts gefunden" falsch
+  const fachschaftTreffer = useFachschaftTreffer((z) => z.n > 0)
+  if (!leer && fachschaftTreffer) return <></>
   return (
     <Text c="dimmed" size="sm" ta="center" py="xl" data-bibliothek-leer>
       {!leer

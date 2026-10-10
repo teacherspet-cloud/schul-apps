@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { kursKaestenAuf } from './warten.mjs'
+import { kursKaestenAuf, leisteApp } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-spiele-medien')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -409,7 +409,7 @@ try {
     ).json()
   ).id
   const vCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === vKurs)?.code
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await (await leisteApp(p, 'Sprachenlernen')).click()
   await p.locator(`[data-vokabel-zuweisung="${vKurs}"]`).click()
   await kursKaestenAuf(p)
   await p.locator('[data-vokabel-grammatik]').click()

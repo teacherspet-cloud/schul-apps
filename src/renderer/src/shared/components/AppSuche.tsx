@@ -15,7 +15,7 @@ import { ladeMaterialien, suche, type Material } from '../../shell/materialien'
 import { AktuellesProgramm } from '../eigenesFenster'
 import { openDocument } from '../navigation'
 import { ReiheMarke, useReiheZuordnung } from '../reiheZuordnung'
-import { suchtrefferMitReihen } from '@shared/reiheMaterial'
+import { istReiheMaterial, suchtrefferMitReihen } from '@shared/reiheMaterial'
 
 const BREITE = 240
 
@@ -65,8 +65,8 @@ export function DokumentSuche({ platzhalter, alle }: { platzhalter?: string; all
   const { liste: gefunden, nurReihe } = useMemo(
     () =>
       eingabe.trim()
-        ? suchtrefferMitReihen(suche(eigene, eingabe), (m) => m.id, reiheZuordnung, reiheEinblenden)
-        : { liste: eigene.filter((m) => reiheEinblenden || !reiheZuordnung.has(m.id)), nurReihe: false },
+        ? suchtrefferMitReihen(suche(eigene, eingabe), (m) => m.id, reiheZuordnung, reiheEinblenden, (m) => m.name)
+        : { liste: eigene.filter((m) => reiheEinblenden || !istReiheMaterial(reiheZuordnung.get(m.id), m.name)), nurReihe: false },
     [eigene, eingabe, reiheZuordnung, reiheEinblenden]
   )
   const treffer = gefunden.slice(0, 8)

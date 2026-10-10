@@ -23,6 +23,7 @@ import {
 } from '@mantine/core'
 import {
   IconArrowLeft,
+  IconBell,
   IconBook2,
   IconCheck,
   IconDeviceDesktop,
@@ -50,13 +51,15 @@ import {
   type Darstellung
 } from './schuelerDarstellung'
 import { useWillkommen, willkommenAnsehen } from './willkommenLogik'
+import { ErinnerungenEinstellungen } from './ErinnerungenEinstellungen'
 
 /**
  * Einstellungen der Lernenden (03.10.2026; neu gegliedert 06.10.2026 nach der Recherche
  * recherche/einstellungen-und-themenauswahl-2026-10-06.md, Teil A, und den Entscheidungen der Lehrkraft):
  * vier Bereiche als Kacheln – Aussehen, Lesen und Hören, Lernen, Konto. Jede Änderung wirkt sofort und
- * wird gespeichert („Gespeichert"), mit Vorschau. Nicht dabei (abgestimmt): Avatar, Spitzname, Push,
- * Grenzen durch die Lehrkraft.
+ * wird gespeichert („Gespeichert"), mit Vorschau. Nicht dabei (abgestimmt): Avatar, Spitzname,
+ * Grenzen durch die Lehrkraft. Seit 10.10.2026 ein fünfter Bereich „Erinnerungen" (Web Push, ErinnerungenEinstellungen.tsx)
+ * – für Konten und Gäste, nicht in der Musterschüler-Vorschau.
  */
 export { useDarstellung, type Darstellung }
 
@@ -380,6 +383,7 @@ const BEREICHE = [
   { id: 'aussehen', titel: 'Aussehen', text: 'Hell oder dunkel, Farbe, Schriftgröße', farbe: 'grape', symbol: <IconPalette size={26} /> },
   { id: 'lesen', titel: 'Lesen und Hören', text: 'Vorlesen, Zeilenabstand, Kontrast, Stimme', farbe: 'blue', symbol: <IconBook2 size={26} /> },
   { id: 'lernen', titel: 'Lernen', text: 'Wochenziel, Lerntipps, Spiele, Töne, Vollbild', farbe: 'teal', symbol: <IconTarget size={26} /> },
+  { id: 'erinnerungen', titel: 'Erinnerungen', text: 'Hinweise zum Üben aufs Handy oder Tablet', farbe: 'yellow', symbol: <IconBell size={26} /> },
   { id: 'konto', titel: 'Konto', text: 'Passwort ändern', farbe: 'orange', symbol: <IconUserCircle size={26} /> }
 ] as const
 
@@ -418,6 +422,8 @@ export function SchuelerEinstellungen(): React.JSX.Element {
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null)
   const konto = mitKonto()
   const passwort = mitPasswort()
+  // Erinnerungen (10.10.2026): nur mit Konto (auch Gäste), nie in der Vorschau
+  const erinnerungen = konto && !window.__schulappsServer?.vorschau
   const melde = (art: 'konto' | 'geraet' | 'fehler'): void => {
     setGespeichert(art)
     if (zeit.current) clearTimeout(zeit.current)
@@ -456,8 +462,8 @@ export function SchuelerEinstellungen(): React.JSX.Element {
       <Button variant="light" w="fit-content" leftSection={<IconSparkles size={16} />} onClick={willkommenAnsehen} data-willkommen-ansehen>
         Willkommens-Tour erneut ansehen
       </Button>
-      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
-        {BEREICHE.filter((b) => b.id !== 'konto' || passwort).map((b) => (
+      <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} spacing="sm">
+        {BEREICHE.filter((b) => (b.id !== 'konto' || passwort) && (b.id !== 'erinnerungen' || erinnerungen)).map((b) => (
           <UnstyledButton key={b.id} className="se-kachel" onClick={() => hin(b.id)} data-bereich-kachel={b.id}>
             <ThemeIcon size={46} radius="md" color={b.farbe} variant="light">
               {b.symbol}
@@ -667,6 +673,12 @@ export function SchuelerEinstellungen(): React.JSX.Element {
           data-vollbild
         />
       </Bereich>
+
+      {erinnerungen && (
+        <Bereich id="erinnerungen">
+          <ErinnerungenEinstellungen melde={melde} />
+        </Bereich>
+      )}
 
       {passwort && (
         <Bereich id="konto">

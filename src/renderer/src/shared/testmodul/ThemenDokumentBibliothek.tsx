@@ -131,6 +131,9 @@ export default function ThemenDokumentBibliothek({
     else oeffnen(e.id).then(props.onOpened).catch(notifyError)
   }
   const alle = bib.eintraege ?? []
+  // Die Liste sucht selbst (ThemenBibliothek); gezählt wird hier nur, ob die Suche Eigenes findet – sonst zeigt der Kopf
+  // passendes Fachschaftsmaterial auch ausgeblendet (10.10.2026)
+  bib.treffer((m) => [text(m.thema), text(m.ueberthema), text(m.themenbereich), text(m.subjectLabel), m.grade ? `Klasse ${m.grade}` : ''])
 
   return (
     <ScrollArea h="100%">

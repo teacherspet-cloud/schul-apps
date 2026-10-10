@@ -133,6 +133,8 @@ export const db = () => {
     if (!spalten.has('entfernt')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN entfernt TEXT NOT NULL DEFAULT ''")
     // Zusammen spielen (08.10.2026): 'aus' = Kooperativ/Versus für diesen Kurs (samt Grammatik) abgeschaltet
     if (!spalten.has('zusammen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN zusammen TEXT NOT NULL DEFAULT ''")
+    // Erinnerungen zum Üben (10.10.2026): 'an' = die Lehrkraft bietet sie in diesem Kurs an (Vorgabe: nicht angeboten)
+    if (!spalten.has('erinnerungen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN erinnerungen TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -176,6 +178,8 @@ export interface Zeile {
   verbspiele?: string
   /** 'aus' = Zusammen spielen abgeschaltet (08.10.2026) */
   zusammen?: string
+  /** 'an' = Erinnerungen zum Üben angeboten (10.10.2026, erinnerungen.ts) */
+  erinnerungen?: string
   /** Neue Vokabeln je Tag (08.10.2026) */
   tagesziel?: number
   /** Überschrift der Lehrkraft ('' = Standard „Lerngruppe - Fach", seit 08.10.2026 ohne Jahr) und Symbol ('' = Verlauf, 'farbe') */
@@ -305,6 +309,8 @@ export const kursHaken: {
   profil?: (n: NutzerInfo, sprache: string, lehrkraftId: string) => unknown
   /** Bekannte Grammatik eines Kindes (grammatik.ts `bekannteGrammatikFuer`) – für die Freigabe der Verbspiele */
   bekannt?: (n: NutzerInfo) => string[]
+  /** Wie viele dieser Lernenden Erinnerungen eingeschaltet haben (erinnerungen.ts, 10.10.2026) – nur die Zahl */
+  erinnerungenAktiv?: (nutzerIds: string[]) => number
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -1162,6 +1168,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           spieleFrei: spieleHeuteFrei(z),
           verbspiele: z.verbspiele ?? '',
           zusammen: z.zusammen !== 'aus',
+          // Erinnerungen zum Üben (10.10.2026): angeboten? und wie viele sie eingeschaltet haben (nur die Zahl)
+          erinnerungen: z.erinnerungen === 'an',
+          erinnerungenAktiv: kursHaken.erinnerungenAktiv?.(lernende.map((l) => l.id)) ?? 0,
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026)
           teile: woerter.length ? teileVon(z) : [],
@@ -1266,6 +1275,13 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const w = k0.an === false ? 'aus' : ''
         db().prepare('UPDATE vok_zuweisungen SET zusammen = ? WHERE id = ?').run(w, z.id)
         return json(res, 200, { ok: true, zusammen: w !== 'aus' }), true
+      }
+      // Erinnerungen zum Üben anbieten bzw. zurückziehen (10.10.2026) – zurückgezogen kommen keine mehr
+      if (teile[1] === 'erinnerungen') {
+        const w = k0.an === true ? 'an' : ''
+        db().prepare('UPDATE vok_zuweisungen SET erinnerungen = ? WHERE id = ?').run(w, z.id)
+        protokolliereServer('vokabeln', w ? 'Erinnerungen angeboten' : 'Erinnerungen nicht mehr angeboten', ich.id)
+        return json(res, 200, { ok: true, erinnerungen: w === 'an' }), true
       }
       if (teile[1] === 'verbspiele') {
         const w = k0.wert === 'an' || k0.wert === 'aus' ? k0.wert : ''
