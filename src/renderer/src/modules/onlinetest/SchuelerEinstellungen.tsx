@@ -624,7 +624,7 @@ export function SchuelerEinstellungen(): React.JSX.Element {
           <SegmentedControl
             fullWidth
             value={String(d.wochenziel)}
-            onChange={(v) => aendern({ wochenziel: Number(v) })}
+            onChange={(v) => aendern({ wochenziel: Number(v), wochenzielGesetzt: true })}
             data={['1', '2', '3', '4', '5', '6', '7'].map((n) => ({ value: n, label: n }))}
             data-wochenziel
           />

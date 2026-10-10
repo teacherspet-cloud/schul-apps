@@ -232,6 +232,8 @@ export interface TippDaten {
   grammatik?: { id: string; titel: string; faellig: number; href: string }[]
   blatt?: { titel: string; href: string } | null
   reihe?: { titel: string; href: string } | null
+  /** Ausdrücklich gewähltes Wochenziel (Übungstage) – null/fehlt = noch keins gewählt (10.10.2026) */
+  wochenziel?: number | null
 }
 
 /**
@@ -390,7 +392,21 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
   },
   {
     id: 'planen',
-    tipp: (d) => ({
+    // Mit gewähltem Wochenziel (10.10.2026, Befund der Lehrkraft: der Tipp „Wochenziel festlegen" blieb stehen): an das
+    // Ziel erinnern und in den Lernraum führen statt erneut zum Festlegen
+    tipp: (d) =>
+      d.wochenziel
+        ? {
+            strategie: 'planung',
+            text: nachStufe(d.stufe, {
+              grund: `Dein Ziel: ${d.wochenziel} Übungstage in dieser Woche. Such dir jetzt schon aus, an welchen Tagen du übst.`,
+              unter: `Dein Wochenziel: ${d.wochenziel} Übungstage. Leg gleich fest, an welchen Tagen – kurz und verteilt wirkt am besten.`,
+              mittel: `Dein Wochenziel: ${d.wochenziel} Übungstage. Plane sie verteilt über die Woche – verteiltes Üben hält länger.`,
+              ober: `Wochenziel ${d.wochenziel} Übungstage: Verteil die Wiederholungen mit Abstand über die Woche – das stabilisiert am besten.`
+            }),
+            knopf: { text: 'Zum Lernraum', href: '/s/lernen' }
+          }
+        : {
       strategie: 'planung',
       text: nachStufe(d.stufe, {
         grund: 'Kurz üben und dann Pause machen – das hilft deinem Kopf. Such dir zwei Tage in dieser Woche zum Üben aus.',
@@ -399,7 +415,7 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
         ober: 'Plane diese Woche zwei kurze Wiederholungen mit ein paar Tagen Abstand – das stabilisiert das Gelernte am besten.'
       }),
       knopf: { text: 'Wochenziel festlegen', href: '/s/einstellungen#lernen' }
-    })
+    }
   }
 ]
 

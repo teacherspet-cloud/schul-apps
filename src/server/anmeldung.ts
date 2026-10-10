@@ -246,7 +246,7 @@ export async function iservRueckruf(
     protokolliereServer('anmeldung', `IServ-Token abgelehnt (${token.status}${grund ? `, ${grund}` : ''})`)
     throw new AnmeldeFehler(`IServ hat die Anmeldung nicht bestätigt (${token.status}${grund ? ` – ${grund}` : ''}).`)
   }
-  const t = (await token.json()) as { access_token?: string; id_token?: string }
+  const t = (await token.json()) as { access_token?: string; id_token?: string; scope?: string }
   if (!t.access_token) throw new AnmeldeFehler('IServ hat keinen Zugang geliefert.')
   const idt = t.id_token ? jwtInhalt(t.id_token) : {}
   if (t.id_token) {
@@ -257,6 +257,17 @@ export async function iservRueckruf(
   const info = await abruf(d.userinfo_endpoint, { headers: { authorization: `Bearer ${t.access_token}` }, signal: AbortSignal.timeout(20_000) })
   if (!info.ok) throw new AnmeldeFehler(`IServ hat die Angaben nicht geliefert (${info.status}).`)
   const claims = { ...idt, ...((await info.json()) as Record<string, unknown>) }
+  // Befund 10.10.2026 (keine Gruppen am Server): gewährte Berechtigungen und vorhandene Angaben mitschreiben – nur
+  // Namen der Berechtigungen/Felder und die Zahl der Gruppen, keine Inhalte
+  const gruppenZahl = gruppenAus(claims).length
+  protokolliereServer(
+    'anmeldung',
+    `IServ-Angaben: Stufe ${v.stufe + 1}, Berechtigungen „${(t.scope ?? scopeStufen(e.scopes)[v.stufe] ?? '').slice(0, 300)}", Felder ${Object.keys(claims)
+      .filter((x) => !['nonce', 'at_hash', 'iat', 'exp', 'auth_time', 'jti'].includes(x))
+      .sort()
+      .join(' ')
+      .slice(0, 400)}, Gruppen ${gruppenZahl}`
+  )
   const nutzer = iservAngabenUebernehmen(claims)
   guteStufe = v.stufe
   return { nutzer, ziel: v.ziel }

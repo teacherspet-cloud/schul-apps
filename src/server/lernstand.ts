@@ -122,17 +122,19 @@ function fruehereWoche(sid: string, woche: string): WochenDaten | null {
 }
 
 /** Einstellungen der Person (Einstellungen › Lernen), gespeichert mit der Darstellung (http.ts) */
-function lernWahl(sid: string): { wochenziel: number; tipps: boolean } {
+function lernWahl(sid: string): { wochenziel: number; tipps: boolean; wochenzielGesetzt: boolean } {
   const d = sicher(
     () =>
       json_(
         (db().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(sid) as { daten: string } | undefined)?.daten,
-        {} as { wochenziel?: number; tipps?: boolean }
+        {} as { wochenziel?: number; tipps?: boolean; wochenzielGesetzt?: boolean }
       ),
-    {} as { wochenziel?: number; tipps?: boolean }
+    {} as { wochenziel?: number; tipps?: boolean; wochenzielGesetzt?: boolean }
   )
   const ziel = Number(d.wochenziel)
-  return { wochenziel: Number.isFinite(ziel) && ziel >= 1 && ziel <= 7 ? Math.round(ziel) : 3, tipps: d.tipps !== false }
+  const wochenziel = Number.isFinite(ziel) && ziel >= 1 && ziel <= 7 ? Math.round(ziel) : 3
+  // Ausdrücklich gewählt (10.10.2026) – ältere Konten ohne Merker: ein vom Standard (3) abweichender Wert zählt auch
+  return { wochenziel, tipps: d.tipps !== false, wochenzielGesetzt: d.wochenzielGesetzt === true || (d.wochenziel !== undefined && wochenziel !== 3) }
 }
 
 /** Lerngruppen der Person (mit Lehrkraft) */
@@ -163,7 +165,7 @@ interface Gesammelt {
 }
 
 function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
-  const { wochenziel, tipps } = lernWahl(ich.id)
+  const { wochenziel, tipps, wochenzielGesetzt } = lernWahl(ich.id)
   const jahrgang = jahrgangVon(ich)
   const stufe = stufeVon(jahrgang)
   const tage = new Set<string>()
@@ -365,7 +367,8 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
     vokabeln: vokDaten,
     grammatik: gramDaten,
     blatt: offenesBlatt ? { titel: offenesBlatt.titel, href: `/s/b/${offenesBlatt.id}` } : null,
-    reihe: null
+    reihe: null,
+    wochenziel: wochenzielGesetzt ? wochenziel : null
   }
   const aktionen: Gesammelt['aktionen'] = {}
   const vf = vokDaten.find((v) => v.faellig > 0) ?? vokDaten[0]
@@ -376,7 +379,8 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
   if (gf) aktionen.grammatik = { text: 'Grammatik üben', href: gf.href }
   if (daten.blatt) aktionen.arbeitsblatt = { text: 'Arbeitsblatt öffnen', href: daten.blatt.href }
   aktionen.lernraum = { text: 'Zum Lernraum', href: '/s/lernen' }
-  aktionen.wochenziel = { text: 'Wochenziel festlegen', href: '/s/einstellungen#lernen' }
+  // Schon gewählt (10.10.2026): kein „festlegen" mehr anbieten, nur ändern
+  aktionen.wochenziel = { text: wochenzielGesetzt ? 'Wochenziel ändern' : 'Wochenziel festlegen', href: '/s/einstellungen#lernen' }
 
   const tipp = tipps ? regelTipp(daten, jetzt) : null
   return {

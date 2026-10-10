@@ -26,6 +26,8 @@ export function darstellungPruefen(k0: Record<string, unknown>, alt?: Record<str
     // Aufgenommene Aussprache: weibliche oder männliche Fassung (07.10.2026)
     aussprache: wahl(k0.aussprache, ['w', 'm'], 'm'),
     wochenziel: Math.max(1, Math.min(7, Math.round(Number(k0.wochenziel) || 3))),
+    // Wochenziel ausdrücklich gewählt (10.10.2026) – dann entfällt der Tipp „Wochenziel festlegen"
+    wochenzielGesetzt: k0.wochenzielGesetzt === true,
     tipps: k0.tipps !== false,
     spiele: k0.spiele !== false,
     zeitdruck: k0.zeitdruck !== false,

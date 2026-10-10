@@ -40,6 +40,8 @@ export interface Darstellung {
   // ---------- Lernen (06.10.2026)
   /** Übungstage je Woche */
   wochenziel: number
+  /** Wochenziel ausdrücklich gewählt (10.10.2026) */
+  wochenzielGesetzt?: boolean
   tipps: boolean
   /** Spiele nach dem Karteikasten */
   spiele: boolean

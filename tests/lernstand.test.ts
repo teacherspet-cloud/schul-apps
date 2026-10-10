@@ -214,3 +214,15 @@ describe('Prompt für den Wochenrückblick', () => {
     expect((a.schema.properties as Record<string, { enum?: string[] }>).aktion.enum).toEqual(['vokabeln'])
   })
 })
+
+describe('Tipp „Wochenziel festlegen" (10.10.2026)', () => {
+  it('ohne gewähltes Ziel: festlegen; mit Ziel: kein „festlegen" mehr, sondern Erinnerung an das Ziel', async () => {
+    const { regelTipp } = await import('../src/shared/lernstand')
+    const basis = { stufe: 'mittel', fleiss: { fleissig: false }, leistung: {} } as never
+    const ohne = regelTipp(basis)
+    expect(ohne.knopf?.text).toBe('Wochenziel festlegen')
+    const mit = regelTipp({ ...(basis as object), wochenziel: 4 } as never)
+    expect(mit.knopf?.text).not.toBe('Wochenziel festlegen')
+    expect(mit.text).toMatch(/4 Übungstage/)
+  })
+})
