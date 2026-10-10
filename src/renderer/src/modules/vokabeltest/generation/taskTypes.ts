@@ -17,6 +17,25 @@ import { baueVerbBlock } from './verbAufgabe'
 import { LUECKEN_REGELN, ohneDoppelte, optionalesInLoesung, teileVon } from '@shared/luecken'
 import { ersatzWoerter, wortartenVon, wortartVon } from './wortart'
 import { abkuerzungAus, abkUeben } from '@shared/abkuerzung'
+import { bildVerwechselbar, bildVorpruefung } from '@shared/bildEindeutig'
+import { formenDerEinstellungen, ohneUnbekannteFormen } from '../../../shared/bekannteFormen'
+
+/**
+ * „Auch richtig" zum Bild (10.10.2026): die Alternativen der KI-Prüfung und die von der Lehrkraft eingetragenen –
+ * nie ein anderes Wort derselben Aufgabe (sonst wäre das falsche Wort an der falschen Stelle richtig).
+ */
+export function bildAuchRichtig(v: Pick<VocabEntry, 'id' | 'term' | 'auchRichtig' | 'bildAlternativen'>, aufgabe: Pick<VocabEntry, 'id' | 'term'>[]): string[] {
+  const andere = new Set(aufgabe.filter((x) => x.id !== v.id).map((x) => baseForm(x.term)))
+  const eigen = baseForm(v.term)
+  const out: string[] = []
+  for (const a of [...(v.auchRichtig ?? []), ...(v.bildAlternativen ?? [])]) {
+    const t = String(a ?? '').trim()
+    const b = baseForm(t)
+    if (!t || b === eigen || andere.has(b) || out.some((x) => baseForm(x) === b)) continue
+    out.push(t)
+  }
+  return out
+}
 
 export interface GenContext {
   settings: TestSettings
@@ -57,6 +76,11 @@ export interface TaskTypeDef {
   defaultInstructionSie?: string
   accepts?: (v: VocabEntry) => boolean
   /**
+   * Passt das Wort zu den schon gewählten Wörtern derselben Aufgabe? (10.10.2026: Bilder beschriften – keine zwei
+   * Wörter, deren Bilder man vertauschen könnte, z. B. give/bring, cup/mug)
+   */
+  vertraegtSich?: (v: VocabEntry, gewaehlt: VocabEntry[], sprache: string) => boolean
+  /**
    * Braucht diese Aufgabe für DIESE Wörter die KI? Fehlt = ja, sobald es ein Schema gibt.
    * (Lesung: nur, wenn in der Liste Pinyin/Hiragana fehlen – 30.09.2026)
    */
@@ -96,7 +120,8 @@ function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction
   const sie = def.defaultInstructionSie && anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId, ctx.settings.stateId) === 'sie'
   const sprache = ctx.settings.targetLanguage
   const fest = aufgabenText(def.id, sprache)
-  const ki = typeof data?.instruction === 'string' ? data.instruction.trim() : ''
+  // Keine noch nicht eingeführten Formen in der KI-Anweisung (10.10.2026, z. B. „past tense" in Klasse 5)
+  const ki = typeof data?.instruction === 'string' ? ohneUnbekannteFormen(data.instruction.trim(), formenDerEinstellungen(ctx.settings, ctx.known)) : ''
   return {
     id: newId(ctx.rng),
     taskType: def.id,
@@ -444,8 +469,12 @@ const defs: TaskTypeDef[] = [
     defaultPoints: 1,
     defaultTitle: 'Label the pictures',
     defaultInstruction: PICTURE_INSTRUCTIONS.en,
-    accepts: (v) => v.depictable === true,
+    // Strenger seit 10.10.2026: KI-Urteil UND deterministische Vorprüfung (shared/bildEindeutig.ts)
+    accepts: (v) => v.depictable === true && bildVorpruefung(v).ok,
+    vertraegtSich: (v, gewaehlt, sprache) =>
+      !gewaehlt.some((x) => bildVerwechselbar(v, x, sprache) || v.bildKonflikte?.includes(x.id) || x.bildKonflikte?.includes(v.id)),
     build(vocab, data, ctx) {
+      const extra = ctx.settings.pictureWordBank ? ensureExtraWords([], vocab, ctx) : []
       return {
         ...base(this, data, ctx),
         instruction:
@@ -453,11 +482,15 @@ const defs: TaskTypeDef[] = [
           PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ??
           PICTURE_INSTRUCTIONS.en,
         kind: 'picture',
-        items: vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term] })),
+        items: vocab.map((v) => {
+          // Nie ein anderes Wort der Aufgabe oder des Wortkastens (überzählige Wörter)
+          const auch = bildAuchRichtig(v, [...vocab, ...extra.map((t, i) => ({ id: `extra${i}`, term: t }))])
+          return { id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term], ...(auch.length ? { auchRichtig: auch } : {}) }
+        }),
         // Wortkasten nur, wenn die Lehrkraft ihn will: Die Wörter wären sonst eine Hilfe,
         // die am Gymnasium nicht vorgesehen ist. Mit Kasten kommen überzählige Wörter dazu,
         // damit ein Bild nicht durch Ausschluss zu beschriften ist.
-        extraBankWords: ctx.settings.pictureWordBank ? ensureExtraWords([], vocab, ctx) : [],
+        extraBankWords: extra,
         wordBank: Boolean(ctx.settings.pictureWordBank),
         columns: 4
       }

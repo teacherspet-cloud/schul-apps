@@ -55,6 +55,7 @@ import { mitNamensliste, registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
 import { terminBereinigt, terminSichtbar, type OnlineTermin } from '@shared/onlinetestTermin'
 import { tagVon } from '@shared/schulkalender'
+import { akzeptierteListe, alternativeEntfernen, beimUrteil, listeSortiert, schonAkzeptierteMarkieren } from './akzeptierteAlternativen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS lerngruppen (
@@ -590,12 +591,15 @@ function abschliessen(t: TeilnahmeZeile, test: Test, antworten: Antworten, grund
   if (t.abgabe) return
   const fassung = test.fassungen[t.variante]?.fassung
   if (!fassung) return
-  const bewertung = bewerte(fassung, antworten, json_(t.bewertung, {} as Bewertung))
+  const bewertung = schonAkzeptierteMarkieren(test.lehrkraft_id, vokabelSprache(test), fassung, antworten, bewerte(fassung, antworten, json_(t.bewertung, {} as Bewertung)))
   db()
     .prepare('UPDATE teilnahmen SET abgabe = ?, grund = ?, antworten = ?, bewertung = ?, verlassen = ? WHERE id = ? AND abgabe IS NULL')
     .run(Date.now(), grund, JSON.stringify(antworten), JSON.stringify(bewertung), t.verlassen, t.id)
   kiPlanen(test.id)
 }
+
+/** Sprache eines Vokabeltests für die bereits akzeptierten Alternativen (10.10.2026) – leer bei anderen Testarten */
+const vokabelSprache = (test: Test): string => ((test.einstellungen.art ?? 'Vokabeltest') === 'Vokabeltest' ? test.einstellungen.zielsprache || '' : '')
 
 /** Antworten nur für bekannte Felder, als kurze Texte */
 function bereinigeAntworten(f: OnlineFassung, roh: unknown): Antworten {
@@ -1442,6 +1446,20 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
       }
     }
+    /*
+     * Bereits akzeptierte Alternativen der Lehrkraft (10.10.2026): ansehen und entfernen – je Sprache, nur die eigenen.
+     * GET ?sprache=en → { liste }, POST entfernen { sprache, wort, text }
+     */
+    if (teile[0] === 'alternativen') {
+      const sprache = String((req.method === 'GET' ? url.searchParams.get('sprache') : '') ?? '')
+      if (req.method === 'GET' && teile.length === 1) return (json(res, 200, { liste: listeSortiert(akzeptierteListe(ich.id, sprache)) }), true)
+      if (req.method === 'POST' && teile[1] === 'entfernen') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        const liste = alternativeEntfernen(ich.id, String(k0.sprache ?? ''), String(k0.wort ?? ''), String(k0.text ?? ''))
+        return (json(res, 200, { liste: listeSortiert(liste) }), true)
+      }
+      return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+    }
     const test = teile[0] ? testNachId(teile[0]) : null
     if (!test || test.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannter Test.' }), true)
     abgelaufeneAbschliessen(test)
@@ -1596,8 +1614,12 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         ...(alt?.pruefen ? { pruefen: alt.pruefen } : {}),
         ...(alt?.fehlerGruppe ? { fehlerGruppe: alt.fehlerGruppe } : {}),
         ...(alt?.fehlerArt ? { fehlerArt: alt.fehlerArt } : {}),
+        ...(alt?.schonAkzeptiert ? { schonAkzeptiert: alt.schonAkzeptiert } : {}),
+        ...(alt?.alsAlternativeGemerkt ? { alsAlternativeGemerkt: true } : {}),
         ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : alt?.hinweis ? { hinweis: alt.hinweis } : {})
       }
+      // Bereits akzeptierte Alternativen (10.10.2026): laut Lösung falsche Wort-Antwort akzeptiert → merken (ohne Person)
+      b[e.id] = beimUrteil(ich.id, vokabelSprache(test), test.fassungen[t.variante].fassung, e, json_(t.antworten, {} as Antworten), alt, b[e.id])
       db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), t.id)
       return (json(res, 200, { ok: true }), true)
     }

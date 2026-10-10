@@ -53,6 +53,7 @@ import type { LanguageSkill, OriginalMaterialAblage, Sheet, WorksheetMeta, WsBlo
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
 import { knownVocabRulesDe } from '../../../shared/knownVocab'
+import { formenRegelFuerFach } from '../../../shared/bekannteFormen'
 import { bilingualAktiv, checkBilingualOperatoren, PRUEFUNGSSPRACHE_HINWEIS } from '../../arbeitsblatt/didactics/bilingual'
 import { glossarFuerArbeit } from './glossar'
 import { generateSprechDaten, sprechBausteine } from './sprechpruefung'
@@ -310,7 +311,9 @@ export function vocabRules(exam: Exam): string {
     '- Baue Material und Aufgaben so, dass dieser Wortschatz vorkommt; er gilt als bekannt.',
     '- Anderer Wortschatz nur, soweit er auf dem Niveau der Lerngruppe selbstverständlich ist.',
     // Vokabeln der vorherigen Units und Bände: gerade in jüngeren Klassen ist alles andere unbekannt
-    ...exam.meta.vocab.map((v) => knownVocabRulesDe(v.known)).filter(Boolean)
+    ...exam.meta.vocab.map((v) => knownVocabRulesDe(v.known)).filter(Boolean),
+    // Bekannte Wortformen (10.10.2026): keine noch nicht eingeführten Formen verlangen oder nennen
+    formenRegelFuerFach({ ...exam.meta, known: exam.meta.vocab.find((v) => v.known)?.known })
   ]
     .filter(Boolean)
     .join('\n')

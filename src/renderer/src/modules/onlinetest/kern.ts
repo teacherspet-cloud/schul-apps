@@ -376,7 +376,8 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         for (const it of b.items) {
           const f = feldId(b.id, it.id)
           a.eintraege.push({ einheit: f, ...(it.image?.dataUrl ? { bild: it.image.dataUrl } : {}), felder: [{ id: f, art: 'text' }] })
-          loesungen[f] = { art: 'genau', werte: [it.answer], artikelFrei: true }
+          // Auch richtig (10.10.2026): Antworten, die zum Bild ebenso passen (KI-Prüfung bzw. Lehrkraft)
+          loesungen[f] = { art: 'genau', werte: [it.answer, ...(it.auchRichtig ?? [])], artikelFrei: true }
           einheit(f, [f])
         }
         break
@@ -473,6 +474,10 @@ export interface EinheitBewertung {
   knapp?: boolean
   /** Lehrkraft: Fragezeichen – zu allgemein bzw. unklar, keine Punkte (03.10.2026) */
   frage?: boolean
+  /** Dieselbe Antwort hat die Lehrkraft schon n-mal als richtig akzeptiert (10.10.2026, akzeptiert.ts) – sie entscheidet erneut */
+  schonAkzeptiert?: number
+  /** Diese Akzeptanz ist als Alternative gemerkt (10.10.2026) – beim Umentscheiden wird sie wieder zurückgenommen */
+  alsAlternativeGemerkt?: boolean
 }
 
 /** Korrekturzeichen der Lehrkraft in der Blattansicht */

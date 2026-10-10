@@ -102,7 +102,12 @@ export async function createAdditionalBlock(
   const def = TASK_TYPES[type]
   const candidates = vocab.filter((v) => !used.has(v.id) && (!def.accepts || def.accepts(v)))
   const pool = candidates.length >= count ? candidates : vocab.filter((v) => !def.accepts || def.accepts(v))
-  const picked = pool.slice(0, def.usesVocab ? count : 0)
+  // Keine zwei verwechselbaren Bild-Wörter in einer Aufgabe (10.10.2026)
+  const picked: VocabEntry[] = []
+  for (const v of pool) {
+    if (!def.usesVocab || picked.length >= count) break
+    if (!def.vertraegtSich || def.vertraegtSich(v, picked, doc.settings.targetLanguage)) picked.push(v)
+  }
   const settings = {
     ...doc.settings,
     tasks: [...doc.settings.tasks.filter((t) => t.type !== type), { type, count, pointsPerItem: def.defaultPoints }]

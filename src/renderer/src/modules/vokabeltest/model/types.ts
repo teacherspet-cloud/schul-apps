@@ -9,6 +9,13 @@ export interface VocabEntry {
   /** Ergebnis der KI-Analyse (für Bild-/Rätselaufgaben) */
   depictable?: boolean
   imageKeywords?: string[]
+  /**
+   * Eindeutige Bilder (10.10.2026): Kennungen anderer Wörter der Liste, deren Bild mit diesem verwechselbar ist (KI-Prüfung)
+   * – beide stehen nie zusammen in einer Bildaufgabe (shared/bildEindeutig.ts).
+   */
+  bildKonflikte?: string[]
+  /** Antworten, die zum Bild ebenso passen (KI-Prüfung, z. B. „mug" zum Bild einer Tasse) – „auch richtig" im Bild-Item */
+  bildAlternativen?: string[]
   /** Kurze englische Bildidee für genau diese Bedeutung (z. B. „a flying bat, the animal“) */
   imageHint?: string
   /** In der Vorlage grau bzw. unauffälliger gedruckt (oft passiver Wortschatz) */
@@ -306,6 +313,8 @@ export interface PictureItem {
   answer: string
   image?: ImageRef
   imageKeywords: string[]
+  /** Auch richtig (10.10.2026): Antworten, die zum Bild ebenso passen – im Lösungsblatt genannt, im Onlinetest gewertet */
+  auchRichtig?: string[]
 }
 
 export interface PictureBlock extends BlockBase {

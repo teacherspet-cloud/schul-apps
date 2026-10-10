@@ -4,6 +4,7 @@ import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor, anweisungFuer } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
 import { blockHelp, errechneteHilfe } from './helpTexts'
+import { formenDerEinstellungen, type BekannteFormen } from '../../../shared/bekannteFormen'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { continuedNote } from '../../../shared/continuedNote'
@@ -15,6 +16,7 @@ import { vokabeltestFigur } from './maskottchen'
 import { kopfTexte } from './aufgabenTexte'
 import { istRtl, schriftFamilie } from '../../../shared/sprachSchrift'
 import { MindmapBild } from './MindmapBild'
+import { SchonAkzeptiert } from './SchonAkzeptiert'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -86,6 +88,8 @@ export function TestPage({
   const sprache = doc.settings.targetLanguage
   const schrift = schriftFamilie(sprache)
   const rtl = istRtl(sprache)
+  // Bekannte Wortformen der Klasse: Beispiele im Hinweis „Form anpassen" (10.10.2026)
+  const formen = formenDerEinstellungen(doc.settings)
 
   return (
     <>
@@ -107,7 +111,7 @@ export function TestPage({
             const range =
               placed.from !== undefined && placed.to !== undefined ? { from: placed.from, to: placed.to, continued: Boolean(placed.continued) } : undefined
             const key = `${block.id}-${placed.from ?? 0}`
-            const content = <BlockView key={key} block={block} number={index + 1} lang={doc.settings.targetLanguage} range={range} />
+            const content = <BlockView key={key} block={block} number={index + 1} lang={doc.settings.targetLanguage} range={range} formen={formen} />
             return wrapBlock ? <div key={key}>{wrapBlock(block, index, content)}</div> : content
           })}
           {pi === pages.length - 1 && footer}
@@ -203,7 +207,19 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
   )
 }
 
-export function BlockView({ block, number, lang = 'en', range }: { block: Block; number: number; lang?: string; range?: BlockRange }): React.JSX.Element {
+export function BlockView({
+  block,
+  number,
+  lang = 'en',
+  range,
+  formen
+}: {
+  block: Block
+  number: number
+  lang?: string
+  range?: BlockRange
+  formen?: BekannteFormen
+}): React.JSX.Element {
   const { mode, updateBlock, abgabe } = useRender()
   // Abgabe als Blatt: erreichte Punkte je Aufgabe (Onlinetest – ganze Punkte je Teilaufgabe)
   const erreicht = abgabe?.jeAufgabe?.[block.id]
@@ -216,7 +232,7 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
       : undefined
   const points = blockPoints(block)
   const continued = range?.continued ?? false
-  const help = !showsAnswers(mode) ? blockHelp(block, lang) : []
+  const help = !showsAnswers(mode) ? blockHelp(block, lang, formen) : []
 
   return (
     <section className={`vt-block vt-kind-${block.kind} ${continued ? 'vt-block-continued' : ''}`}>
@@ -258,7 +274,7 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
                     ? (v) =>
                         updateBlock(block.id, (d) => {
                           const neu = v.replace(/\s+/g, ' ').trim()
-                          if (neu === errechneteHilfe(d, lang).join(' ')) delete d.helpText
+                          if (neu === errechneteHilfe(d, lang, formen).join(' ')) delete d.helpText
                           else d.helpText = neu
                         })
                     : undefined
@@ -298,12 +314,21 @@ function EditableGap({ answer, onChange, hintFirstLetter }: { answer: string; on
   const { mode } = useRender()
   if (mode === 'editKey') {
     return (
-      <span className="vt-gap vt-gap-answer vt-gap-edit">
-        <T value={answer} onChange={onChange} />
-      </span>
+      <>
+        <span className="vt-gap vt-gap-answer vt-gap-edit">
+          <T value={answer} onChange={onChange} />
+        </span>
+        {/* Bereits akzeptierte Alternativen aus Onlinetests (10.10.2026) */}
+        <SchonAkzeptiert loesung={answer} />
+      </>
     )
   }
-  return <Gap answer={answer} hintFirstLetter={hintFirstLetter} />
+  return (
+    <>
+      <Gap answer={answer} hintFirstLetter={hintFirstLetter} />
+      <SchonAkzeptiert loesung={answer} />
+    </>
+  )
 }
 
 const LEADING_PUNCTUATION = /^[,.;:!?)\]}»«"'’”…]+/
@@ -888,6 +913,13 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                 {answers ? (
                   <div className="vt-picture-answer">
                     <T value={it.answer} onChange={set((d, v) => ((d as typeof block).items[idx].answer = v))} />
+                    {/* Auch richtig (10.10.2026): Antworten, die zum Bild ebenso passen */}
+                    {it.auchRichtig?.length ? (
+                      <div className="vt-picture-auch" data-auch-richtig style={{ fontSize: '0.8em', fontWeight: 'normal' }}>
+                        auch richtig: {it.auchRichtig.join('; ')}
+                      </div>
+                    ) : null}
+                    <SchonAkzeptiert loesung={it.answer} auch={it.auchRichtig} />
                   </div>
                 ) : (
                   <div className="vt-picture-line" />

@@ -3,6 +3,7 @@
  * den schon gelernten Wörtern, je Spiel der eigene Rekord – keine Ranglisten. Wörter, die im Spiel danebengingen,
  * landen auf „nochmal ansehen" und (seit 06.10.2026) wackelig im Kasten; Treffer befördern nichts.
  */
+import { spielBildWoerter } from '@shared/bildEindeutig'
 import { Badge, Button, Card, Group, Modal, SimpleGrid, Stack, Table, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import {
   IconArrowLeft,
@@ -260,7 +261,7 @@ export function Spielwahl({
   const pool = useMemo(() => spielWoerter(woerter, staende), [woerter, staende, spiel, runde]) // eslint-disable-line react-hooks/exhaustive-deps
   const mitSatz = pool.filter((w) => w.example && w.example.split(/\s+/).length >= 3).length
   // Medienbank (05.10.2026): Bilder und Aufnahmen – aus allen Wörtern der Liste, nicht nur den gelernten
-  const mitBild = woerter.filter((w) => w.bild).length
+  const mitBild = spielBildWoerter(woerter, sprache).length
   const mitTon = woerter.filter(hatWortAufnahme).length
   // Hörspiele (07.10.2026): Aufnahme ODER Stimme des Geräts
   const geraet = kannSprechen(sprache)

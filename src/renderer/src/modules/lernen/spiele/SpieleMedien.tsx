@@ -11,6 +11,7 @@ import { IconVolume } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { auswahlOptionen, type Vokabel } from '@shared/vokabeltrainer'
 import { spielform } from '@shared/vokabelSpiele'
+import { spielBildWoerter } from '@shared/bildEindeutig'
 import { useVtFarbe } from '../vtFarben'
 import { aufnahmeSpielen, medium } from '../medienCache'
 import { gemischt, type SpielProps } from './SpieleErkennen'
@@ -103,8 +104,9 @@ function Runden({
 }
 
 /** Bilderrätsel: Bild zeigen, Wort in der Fremdsprache wählen */
-export function BildRaetsel({ woerter, ende }: SpielProps): React.JSX.Element {
-  const mitBild = useMemo(() => woerter.filter((w) => w.bild), [woerter])
+export function BildRaetsel({ woerter, sprache, ende }: SpielProps): React.JSX.Element {
+  // Keine zwei verwechselbaren Bilder in einer Runde (10.10.2026, shared/bildEindeutig.ts)
+  const mitBild = useMemo(() => spielBildWoerter(woerter, sprache), [woerter, sprache])
   const fragen = useMemo(() => gemischt(mitBild).slice(0, RUNDEN), []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Runden

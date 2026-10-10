@@ -6,6 +6,8 @@ import { runLimited } from '../../../shared/async'
 import { GREEN_SCREEN_PROMPT } from '../../../shared/images'
 import type { PictureItem, TestSettings, VocabEntry } from '../model/types'
 import { LANGUAGES } from '../model/types'
+import { bildVerwechselbar, bildVorpruefung } from '@shared/bildEindeutig'
+import { bildAuchRichtig } from './taskTypes'
 
 export interface PictureDeps {
   ai: AiCall
@@ -25,6 +27,9 @@ export function pictureRules(items: PictureItem[], settings: TestSettings): stri
     'Ein Bild ist nur „eindeutig“, wenn ein Kind dieses Alters ohne Zögern GENAU dieses Wort in GENAU dieser Bedeutung nennt:',
     '- ein einzelner, klar erkennbarer Gegenstand bzw. eine klar erkennbare Handlung; nichts Ablenkendes, keine Szene mit vielen Dingen',
     '- nicht mit einem anderen Wort dieser Aufgabe oder einem naheliegenden Oberbegriff/Synonym verwechselbar',
+    // 10.10.2026 (Befund der Lehrkraft: „to give" und „to bring" zeigten beide einen Jungen, der einem Mädchen etwas reicht)
+    '- Vergleiche die Szenen ALLER Bilder dieser Aufgabe miteinander: Könnte man zwei Bilder vertauschen (z. B. „Kind reicht einem anderen etwas" für give und bring, Tasse/Becher, Stift/Bleistift), ist das Bild für das spätere bzw. weniger eindeutige Wort „ungeeignet". Dasselbe Bild nie für zwei Wörter.',
+    '- Verben nur, wenn die Handlung allein am Bild unverwechselbar ist (schwimmen, schlafen); Geben/Bringen/Nehmen, Gehen/Kommen, Sehen/Schauen, Sagen/Sprechen sind es nicht.',
     '- richtige Bedeutung – maßgeblich ist die deutsche Bedeutung (z. B. „bat“ = Fledermaus, nicht Schläger)',
     '- keine Schrift, Buchstaben oder Zahlen im Bild, die die Lösung verraten',
     '- kindgerecht, keine Gewalt, keine Marken',
@@ -91,7 +96,9 @@ export async function findVocabPictures(
     const choice = choices.get(g.need.id)
     // Lässt sich das gewählte Bild nicht laden (z. B. 403 beim Anbieter), gilt nur DIESES Wort als ohne Bild (03.10.2026)
     const geladen = choice?.candidate && choice.fit === 'eindeutig' ? await loadRef(choice.candidate).catch(() => undefined) : undefined
-    if (geladen) {
+    // Dasselbe Bild nie für zwei Wörter der Aufgabe (10.10.2026) – das zweite sucht weiter bzw. bekommt Ersatz
+    const doppelt = geladen && items.some((i) => i !== g.item && i.image?.dataUrl === geladen.dataUrl)
+    if (geladen && !doppelt) {
       g.item.image = geladen
     } else {
       missing.push(g)
@@ -138,19 +145,29 @@ export async function findVocabPictures(
   const open = missing.filter((g) => !g.item.image)
   if (open.length) {
     const used = new Set(items.map((i) => i.vocabId).filter((id): id is string => Boolean(id)))
-    const pool = ersatz.filter((v) => v.term.trim() && !used.has(v.id) && v.depictable !== false)
+    // Ersatz nur, wenn zeigbar und mit keinem Wort der Aufgabe verwechselbar (10.10.2026)
+    const imTest = (): VocabEntry[] =>
+      items.map((i) => (i.vocabId ? entries.get(i.vocabId) ?? ersatz.find((x) => x.id === i.vocabId) : undefined)).filter((x): x is VocabEntry => Boolean(x))
+    const pool = ersatz.filter((v) => v.term.trim() && !used.has(v.id) && v.depictable !== false && bildVorpruefung(v, settings.targetLanguage).ok)
     for (const g of open) {
       const before = g.item.answer
       for (let tries = 0; tries < 3 && pool.length; tries++) {
         const next = pool.shift()
         if (!next) break
         used.add(next.id)
+        if (imTest().some((x) => x.id !== g.item.vocabId && (bildVerwechselbar(next, x, settings.targetLanguage) || next.bildKonflikte?.includes(x.id)))) {
+          tries--
+          continue
+        }
         const image = await imageFor(next, rules, deps).catch(() => undefined)
         if (!image) continue
         g.item.vocabId = next.id
         g.item.answer = next.term
         g.item.imageKeywords = next.imageKeywords ?? [next.term]
         g.item.image = image
+        const auch = bildAuchRichtig(next, imTest())
+        if (auch.length) g.item.auchRichtig = auch
+        else delete g.item.auchRichtig
         notes.push(`Statt „${before}“ steht jetzt „${next.term}“ im Bild-Teil – zu „${before}“ gab es kein eindeutiges Bild.`)
         break
       }

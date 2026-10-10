@@ -4,6 +4,7 @@ import { querNachAnkern } from '../../arbeitsblatt/model/seitenformat'
 import type { PageLimit, TestDocument } from '../model/types'
 import { RenderContext } from './RenderContext'
 import { BlockView, PageLayout, SPLITTABLE_KINDS, TestHeader } from './TestPage'
+import { formenDerEinstellungen } from '../../../shared/bekannteFormen'
 
 const PX_PER_MM = 96 / 25.4
 const PAGE_HEIGHT_MM = 297
@@ -190,7 +191,7 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
       <div className="vt-measure" ref={ref} aria-hidden onLoadCapture={() => setTick((n) => n + 1)}>
         {doc.variants.flatMap((v, vi) =>
           [false, true].map((key) => (
-            <RenderContext.Provider key={`${v.id}-${key}`} value={{ mode: key ? 'key' : 'print' }}>
+            <RenderContext.Provider key={`${v.id}-${key}`} value={{ mode: key ? 'key' : 'print', language: doc.settings.targetLanguage }}>
               <div
                 data-layout={`${v.id}-${key ? 'key' : 'student'}`}
                 className={`vt-page ${key ? 'vt-key' : ''} ${candidate.compact ? 'vt-compact' : ''}`}
@@ -207,7 +208,7 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
                 </div>
                 {v.blocks.map((b, bi) => (
                   <div key={b.id} data-measure-block={b.id} style={{ display: 'flow-root' }}>
-                    <BlockView block={b} number={bi + 1} lang={doc.settings.targetLanguage} />
+                    <BlockView block={b} number={bi + 1} lang={doc.settings.targetLanguage} formen={formenDerEinstellungen(doc.settings)} />
                   </div>
                 ))}
               </div>
@@ -221,7 +222,7 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
                   {v.blocks.map((b, bi) =>
                     querNachAnkern(v.blocks).has(b.id) ? (
                       <div key={b.id} data-measure-quer={b.id} style={{ display: 'flow-root' }}>
-                        <BlockView block={b} number={bi + 1} lang={doc.settings.targetLanguage} />
+                        <BlockView block={b} number={bi + 1} lang={doc.settings.targetLanguage} formen={formenDerEinstellungen(doc.settings)} />
                       </div>
                     ) : null
                   )}

@@ -17,6 +17,8 @@ import type { SavedGrammarTestStats, SavedKurztestStats, SavedTestStats } from '
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFenster'
 import { buendeln, type Fall } from './entscheidungBuendeln'
+import { AkzeptierteAlternativenKnopf } from './AkzeptierteAlternativen'
+import { akzeptierteVergessen } from './akzeptiertSpeicher'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useSichtbareProgramme } from '../../shell/programme'
 import { terminKurz } from '@shared/onlinetestTermin'
@@ -157,6 +159,7 @@ interface TestDetail {
     art?: string
     blatt?: BlattKopf
     gaeste?: boolean
+    zielsprache?: string
   }
   lerngruppe: { name: string } | null
   ohneIserv: boolean
@@ -780,6 +783,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const [verdeckt, setVerdeckt] = useNamenVerdeckt()
   const [umbenennen, setUmbenennen] = useState<string | null>(null)
   const laden = useCallback(() => {
+    // Entscheidungen ändern die bereits akzeptierten Alternativen (10.10.2026): Lösungsblätter holen sie danach neu
+    akzeptierteVergessen()
     void holen<TestDetail>(`/server/onlinetest/${id}`)
       .then(setD)
       .catch((e: unknown) => notifyError(e))
@@ -931,6 +936,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                   Nichts zu entscheiden.
                 </Text>
               )}
+              {(d.einstellungen.art ?? 'Vokabeltest') === 'Vokabeltest' && <AkzeptierteAlternativenKnopf sprache={d.einstellungen.zielsprache ?? ''} />}
               {d.ohneIserv && d.status !== 'beendet' && (
                 <Tooltip label="Nur mit Konto: Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben nur ihren Namen ein.">
                   <Switch
@@ -1155,6 +1161,14 @@ function EinheitZeile({
             {b.quelle === 'lehrkraft' ? (b.status === 'richtig' ? ' – akzeptiert' : ' – nicht akzeptiert') : ''}
           </Text>
         )}
+        {/* Schon einmal als richtig akzeptiert (10.10.2026): ein Klick akzeptiert erneut – entschieden wird trotzdem hier */}
+        {offen && b?.schonAkzeptiert ? (
+          <Group gap={6} mt={2}>
+            <Button size="compact-xs" color="green" variant="light" leftSection={<IconCheck size={12} />} onClick={() => urteil(e.id, true)} data-wieder-akzeptieren>
+              Wieder akzeptieren
+            </Button>
+          </Group>
+        ) : null}
         {b?.hinweis && (
           <Text size="xs" c={b.quelle === 'ki' ? 'violet' : 'dimmed'}>
             {b.quelle === 'ki' && !b.hinweis.startsWith('KI') ? 'KI: ' : ''}

@@ -16,6 +16,7 @@ import { narrationRules } from '../../didactics/narration'
 import { zuhoerenRules } from '../../didactics/zuhoeren'
 import { vocabFocusRules } from '../../didactics/vocabWork'
 import { knownVocabRulesDe } from '../../../../shared/knownVocab'
+import { formenRegelFuerFach } from '../../../../shared/bekannteFormen'
 import { rolePlayRules } from '../../didactics/rolePlay'
 import { demandRules } from '../../didactics/demand'
 import { interkulturellRegeln } from '../../didactics/interkulturell'
@@ -195,7 +196,9 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     // Fremdsprachen: nur Wortschatz, den die Klasse im Lehrwerk schon hatte.
     // Steht ABSICHTLICH nach den Vorrangvokabeln: Die Obergrenze ist die stärkere Regel –
     // ein Vorrangwort rechtfertigt nicht, Wortschatz späterer Bände vorauszusetzen.
-    knownVocabRulesDe(meta.knownVocab)
+    knownVocabRulesDe(meta.knownVocab),
+    // Bekannte Wortformen (10.10.2026): Lücken und Hinweise verlangen bzw. nennen keine noch nicht eingeführten Formen
+    formenRegelFuerFach({ ...meta, known: meta.knownVocab })
   ]
     .filter(Boolean)
     .join('\n')

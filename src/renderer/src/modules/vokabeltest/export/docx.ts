@@ -27,6 +27,7 @@ import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBa
 import type { Block, TestDocument, Variant } from '../model/types'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { blockHelp } from '../render/helpTexts'
+import { formenDerEinstellungen } from '../../../shared/bekannteFormen'
 import type { TestLayouts } from '../render/useTestLayout'
 import { vtSeitenGruppe } from '../render/printHtml'
 import type { SeitenMarke } from '../../../shared/export/seitenAuswahl'
@@ -421,7 +422,7 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
   if (block.instruction) {
     out.push(new Paragraph({ keepNext: true, spacing: { after: 60 }, children: [run(anweisungFuer(block), { italics: true })] }))
   }
-  const help = mode === 'print' ? blockHelp(block, ctx.doc.settings.targetLanguage) : []
+  const help = mode === 'print' ? blockHelp(block, ctx.doc.settings.targetLanguage, formenDerEinstellungen(ctx.doc.settings)) : []
   if (help.length) {
     out.push(new Paragraph({ keepNext: true, spacing: { after: 120 }, children: [run('ⓘ ', { bold: true }), run(help.join(' '), { size: ctx.size - 3 })] }))
   }
@@ -795,7 +796,15 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
           }
           children.push(
             mode === 'key'
-              ? new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120 }, children: [run(it.answer, { bold: true, color: RED })] })
+              ? new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  spacing: { before: 120 },
+                  children: [
+                    run(it.answer, { bold: true, color: RED }),
+                    // Auch richtig (10.10.2026)
+                    ...(it.auchRichtig?.length ? [run(` (auch richtig: ${it.auchRichtig.join('; ')})`, { color: RED })] : [])
+                  ]
+                })
               : new Paragraph({
                   spacing: { before: 360 },
                   border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 1 } },

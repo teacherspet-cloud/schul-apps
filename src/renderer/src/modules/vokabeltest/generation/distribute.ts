@@ -68,7 +68,7 @@ export function planVariants(vocab: VocabEntry[], settings: TestSettings): Varia
   const plans: VariantPlan[] = []
   for (let v = 0; v < settings.variantCount; v++) {
     let assignments: TaskAssignment[]
-    if (v === 0) assignments = assign(pool, settings.tasks)
+    if (v === 0) assignments = assign(pool, settings.tasks, settings.targetLanguage)
     else if (settings.variantMode === 'sameVocab' || usable.length <= needed) {
       /*
        * Dieselben Wörter wie Variante A – aber in ANDEREN Aufgaben (06.10.2026, Wunsch der Lehrkraft: „damit nicht
@@ -82,12 +82,14 @@ export function planVariants(vocab: VocabEntry[], settings: TestSettings): Varia
         pool.filter((x) => !drin.has(x.id)),
         settings.tasks,
         plans,
-        rng
+        rng,
+        undefined,
+        settings.targetLanguage
       )
     } else {
       const selection = mitUeberschneidung(pool, plans, needed, rng)
       const n = Math.min(needed, selection.length)
-      assignments = andereAufgaben(selection.slice(0, n), selection.slice(n), settings.tasks, plans, rng)
+      assignments = andereAufgaben(selection.slice(0, n), selection.slice(n), settings.tasks, plans, rng, undefined, settings.targetLanguage)
     }
     plans.push({ label: VARIANT_LABELS[v] ?? String(v + 1), assignments })
   }
@@ -105,7 +107,8 @@ export function andereAufgaben(
   tasks: TaskSelection[],
   bisher: VariantPlan[],
   rng: ReturnType<typeof createRng>,
-  versuche = 24
+  versuche = 24,
+  sprache = 'en'
 ): TaskAssignment[] {
   // Bisherige Aufgabe(n) je Wort (Index der Aufgabe in der Auswahl)
   const frueher = new Map<string, Set<number>>()
@@ -120,7 +123,7 @@ export function andereAufgaben(
   let beste: TaskAssignment[] | null = null
   let besteWert = -1
   for (let k = 0; k < versuche; k++) {
-    const versuch = assign([...shuffle(woerter, rng), ...ersatz], tasks)
+    const versuch = assign([...shuffle(woerter, rng), ...ersatz], tasks, sprache)
     // Wörter in einer neuen Aufgabe zählen, fehlende Wörter (shortfall) bestrafen
     let wert = 0
     versuch.forEach((a, i) => {
@@ -132,7 +135,7 @@ export function andereAufgaben(
       beste = versuch
     }
   }
-  return beste ?? assign([...woerter, ...ersatz], tasks)
+  return beste ?? assign([...woerter, ...ersatz], tasks, sprache)
 }
 
 /**
@@ -169,7 +172,7 @@ function mitUeberschneidung(pool: VocabEntry[], bisher: VariantPlan[], needed: n
   return [...kern, ...pool.filter((x) => !drin.has(x.id))]
 }
 
-function assign(selection: VocabEntry[], tasks: TaskSelection[]): TaskAssignment[] {
+function assign(selection: VocabEntry[], tasks: TaskSelection[], sprache = 'en'): TaskAssignment[] {
   const remaining = [...selection]
   const result = new Map<TaskSelection, TaskAssignment>()
 
@@ -183,7 +186,7 @@ function assign(selection: VocabEntry[], tasks: TaskSelection[]): TaskAssignment
     }
     const picked: VocabEntry[] = []
     for (let i = 0; i < remaining.length && picked.length < task.count;) {
-      if (!def.accepts || def.accepts(remaining[i])) {
+      if ((!def.accepts || def.accepts(remaining[i])) && (!def.vertraegtSich || def.vertraegtSich(remaining[i], picked, sprache))) {
         picked.push(remaining[i])
         remaining.splice(i, 1)
       } else i++

@@ -7,7 +7,9 @@ import type { Block, ImageRef, PictureItem, TestDocument, TestHeader, TestSettin
 import { LANGUAGES } from '../model/types'
 import { planVariants } from './distribute'
 import { checkBlock, describeBlock, Issue } from './quality'
-import { arr, bool, obj, str } from '../../../shared/aiSchema'
+import { arr, bool, int, obj, str } from '../../../shared/aiSchema'
+import { bildVorpruefung } from '@shared/bildEindeutig'
+import { baseForm } from '../render/helpTexts'
 import { runLimited } from '../../../shared/async'
 import { knownVocabRules } from '../../../shared/knownVocab'
 import type { KnownVocab } from '../../../shared/knownVocab'
@@ -21,6 +23,7 @@ import { anredeMeldung, anredeRegel, falscheAnrede } from '../../../shared/anred
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { formBefunde, formVorwissen, vorwissenRegel } from '../didactics/formVorwissen'
 import { LUECKEN_PRUEFUNG } from '@shared/luecken'
+import { formenDerEinstellungen, formenRegel } from '../../../shared/bekannteFormen'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type ImageFinder = (item: PictureItem, settings: TestSettings) => Promise<ImageRef | undefined>
@@ -70,6 +73,8 @@ export function systemPrompt(settings: TestSettings, variantLabel?: string, know
     ...knownVocabRules(known).map((r) => `- ${r}`),
     // Vorwissen bei Wortformen (30.09.2026): simple past & Co. erst, wenn eingeführt
     vorwissenRegel(formVorwissen(settings, known)),
+    // Bekannte Wortformen STRIKT (10.10.2026, Klasse 5: kein past tense verlangen oder nennen) – shared/bekannteFormen.ts
+    formenRegel(formenDerEinstellungen(settings, known)),
     /*
      * Latein arbeitet anders. Die Regeln stehen auf Deutsch, weil sie deutsche Fachbegriffe
      * tragen (Nennform, Stammformen, Monosemieren) und weil bei Latein alles Schülermaterial
@@ -89,22 +94,116 @@ ${anredeRegel(anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId
     .join('\n')
 }
 
-/** KI-Analyse: welche Vokabeln lassen sich eindeutig als Bild darstellen? */
+/** Unter dieser Sicherheit (0–100) gilt ein Wort nicht als Bild-Item (10.10.2026) */
+export const BILD_SICHERHEIT = 80
+/** Verben ohne feste Liste klarer Handlungen brauchen mehr Sicherheit */
+export const BILD_SICHERHEIT_VERB = 90
+
+/**
+ * KI-Analyse: welche Vokabeln lassen sich eindeutig als Bild darstellen?
+ *
+ * Seit 10.10.2026 (Befund der Lehrkraft: „to give" und „to bring" mit fast gleichem Bild) deutlich strenger:
+ *  - deterministische Vorprüfung vorab (shared/bildEindeutig.ts: Wortart, abstrakte Wörter, Verwandtschaft,
+ *    Verwechslungsgruppen wie give/bring/take) – solche Wörter fragt die KI gar nicht erst als Bild ab;
+ *  - die KI urteilt RELATIV zu den anderen Wörtern der Liste (`confusableWith`), nennt ihre Sicherheit
+ *    (`confidence`, unter BILD_SICHERHEIT → kein Bild-Item) und passende Alternativantworten zum Bild
+ *    (`alternatives` → „auch richtig" im Bild-Item; nie ein anderes Wort der Liste).
+ */
 export async function analyzeVocab(vocab: VocabEntry[], settings: TestSettings, ai: AiCall): Promise<VocabEntry[]> {
   const todo = vocab.filter((v) => v.depictable === undefined)
   if (todo.length === 0) return vocab
-  const res = await ai<{ entries: { id: string; depictable: boolean; imageKeywords: string[]; picture: string; pos: string }[] }>({
+  const sprache = settings.targetLanguage
+  const vorab = new Map(todo.map((v) => [v.id, bildVorpruefung(v, sprache)]))
+  const res = await ai<{
+    entries: {
+      id: string
+      depictable: boolean
+      confidence?: number
+      confusableWith?: string[]
+      alternatives?: string[]
+      imageKeywords: string[]
+      picture: string
+      pos: string
+    }[]
+  }>({
     system: systemPrompt(settings),
-    user:
-      'For each word decide whether it can be shown UNAMBIGUOUSLY as a simple picture/pictogram so that students name exactly this word (concrete nouns like "ladder", "bread", "cow", clear actions like "to swim"). Concrete everyday objects, food, animals, clothes, places and clear actions ARE depictable, even with an article (e.g. "le pain"). Abstract words, feelings/relationships, words whose picture would clearly be named with a different or more general word (e.g. "trainers" → "shoes"), or words needing context are NOT depictable. Give 2–4 simple English search keywords for a pictogram/clipart library (most specific first, in the correct meaning), a short English picture idea that shows exactly this meaning (e.g. "a bat, the flying animal"), and the word class.\n\n' +
-      todo.map((v) => `- id="${v.id}" | ${v.term} | German: ${v.translation}`).join('\n'),
+    user: [
+      'For each word decide whether it can be shown UNAMBIGUOUSLY as a simple picture/pictogram so that students of this class name EXACTLY this word from the picture alone – and could not confuse it with any OTHER word of this list.',
+      'Depictable: concrete everyday objects, food, animals, clothes, clearly recognisable places, colours, and actions that are unmistakable on their own (to swim, to sleep, to climb).',
+      'NOT depictable (depictable = false): abstract nouns, feelings, relationships and family words (brother/sister, mum/woman – the picture only shows a person), adjectives other than colours, function words, phrases,',
+      'verbs whose picture overlaps with other verbs (give/bring/take/get/hand/pass, go/come/walk, look/see/watch, say/tell/speak/talk, make/do, put/take, carry/bring), words whose picture would clearly be named with a different or more general word (trainers → shoes, mug → cup), and words that need context.',
+      'Compare the depicted scenes of ALL words in this list: if two pictures could be swapped (e.g. "a boy handing something to a girl" for both to give and to bring; cup/mug, pen/pencil, sea/ocean, house/home), list the other id(s) in "confusableWith" for BOTH words and give at most one of them depictable = true – or neither.',
+      '"confidence": 0–100, how sure you are that a student names exactly this word from the picture. Below 80 counts as not depictable.',
+      '"alternatives": other answers a student at this level could reasonably and correctly write for the same picture (synonyms or near-synonyms, e.g. "mug" for a cup picture; with/without article; singular/plural if the number in the picture is unclear). Never another word of this list; empty if none.',
+      'Give 2–4 simple English search keywords for a pictogram/clipart library (most specific first, in the correct meaning), a short English picture idea that shows exactly this meaning (e.g. "a bat, the flying animal"), and the word class.',
+      '',
+      ...todo.map((v) => `- id="${v.id}" | ${v.term} | German: ${v.translation}${vorab.get(v.id)?.ok ? '' : ` | (not depictable: ${vorab.get(v.id)?.grund})`}`)
+    ].join('\n'),
     schemaName: 'vocab_analysis',
-    schema: obj({ entries: arr(obj({ id: str(), depictable: bool(), imageKeywords: arr(str()), picture: str(), pos: str() })) })
+    schema: obj({
+      entries: arr(
+        obj({
+          id: str(),
+          depictable: bool(),
+          confidence: int('0–100'),
+          confusableWith: arr(str(), 'ids of other words in the list whose pictures could be swapped with this one'),
+          alternatives: arr(str(), 'other correct answers for the same picture; never another word of the list'),
+          imageKeywords: arr(str()),
+          picture: str(),
+          pos: str()
+        })
+      )
+    })
   })
-  const byId = new Map(res.entries.map((e) => [e.id, e]))
+  return bildAnalyseUebernehmen(vocab, res?.entries ?? [], sprache)
+}
+
+/**
+ * Ergebnis der Bildprüfung übernehmen (ohne KI testbar): Vorprüfung, Sicherheitsschwelle, gemeldete Verwechslungen
+ * (beide Wörter merken sich das andere) und Alternativen ohne andere Wörter der Liste.
+ */
+export function bildAnalyseUebernehmen(
+  vocab: VocabEntry[],
+  entries: { id: string; depictable: boolean; confidence?: number; confusableWith?: string[]; alternatives?: string[]; imageKeywords?: string[]; picture?: string; pos?: string }[],
+  sprache: string
+): VocabEntry[] {
+  const byId = new Map(entries.map((e) => [e.id, e]))
+  const ids = new Set(vocab.map((v) => v.id))
+  const konflikte = new Map<string, Set<string>>()
+  const merke = (a: string, b: string): void => {
+    if (a === b || !ids.has(a) || !ids.has(b)) return
+    if (!konflikte.has(a)) konflikte.set(a, new Set())
+    konflikte.get(a)!.add(b)
+  }
+  for (const e of entries)
+    for (const k of e.confusableWith ?? []) {
+      merke(e.id, k)
+      merke(k, e.id)
+    }
+  const listenWoerter = new Set(vocab.map((v) => baseForm(v.term)))
   return vocab.map((v) => {
     const e = byId.get(v.id)
-    return e ? { ...v, depictable: e.depictable, imageKeywords: e.imageKeywords, imageHint: e.picture || undefined, pos: v.pos || e.pos } : v
+    if (!e || v.depictable !== undefined) return v
+    const pos = v.pos || e.pos
+    const vorab = bildVorpruefung({ term: v.term, translation: v.translation, pos }, sprache)
+    // Fehlt die Angabe (ältere KI-Antwort), zählt die Entscheidung der KI wie bisher
+    const sicherheit = typeof e.confidence === 'number' && Number.isFinite(e.confidence) ? e.confidence : 100
+    const schwelle = vorab.unsicher ? BILD_SICHERHEIT_VERB : BILD_SICHERHEIT
+    const depictable = Boolean(e.depictable) && vorab.ok && sicherheit >= schwelle
+    const eigen = baseForm(v.term)
+    const alternativen = [
+      ...new Set((e.alternatives ?? []).map((x) => String(x ?? '').trim()).filter((x) => x && baseForm(x) !== eigen && !listenWoerter.has(baseForm(x))))
+    ].slice(0, 6)
+    const k = [...(konflikte.get(v.id) ?? [])]
+    return {
+      ...v,
+      depictable,
+      imageKeywords: e.imageKeywords,
+      imageHint: e.picture || undefined,
+      pos,
+      ...(k.length ? { bildKonflikte: k } : {}),
+      ...(alternativen.length ? { bildAlternativen: alternativen } : {})
+    }
   })
 }
 

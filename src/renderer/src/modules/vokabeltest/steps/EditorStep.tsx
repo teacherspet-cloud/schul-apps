@@ -1,4 +1,5 @@
 import OnlinetestKnopf from '../../onlinetest/OnlinetestKnopf'
+import { AkzeptierteAlternativenKnopf } from '../../onlinetest/AkzeptierteAlternativen'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import {
@@ -402,6 +403,8 @@ function EditorInhalt(): React.JSX.Element {
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
             {/* Onlinetest (02.10.2026) – nur mit dem Schul-Apps-Server */}
             <OnlinetestKnopf doc={doc} listName={listName} />
+            {/* In Onlinetests schon einmal akzeptierte Antworten (10.10.2026) – in der Lösungsansicht, nur mit dem Server */}
+            {view === 'key' && <AkzeptierteAlternativenKnopf sprache={doc.settings.targetLanguage} />}
           </>
         }
       />

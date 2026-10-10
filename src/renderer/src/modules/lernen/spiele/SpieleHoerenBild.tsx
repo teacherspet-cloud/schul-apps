@@ -10,9 +10,10 @@
 import { ActionIcon, Badge, Button, Group, Progress, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconBackspace, IconCheck, IconVolume, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { auswahlOptionen, bewerte, ohneAuslassung, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { auswahlOptionen, bewerteMitAuchRichtig, ohneAuslassung, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { apostrophNormal, istApostroph } from '@shared/apostroph'
 import { spielform } from '@shared/vokabelSpiele'
+import { spielBildWoerter } from '@shared/bildEindeutig'
 import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
@@ -39,7 +40,7 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
         onSubmit={(e) => {
           e.preventDefault()
           if (!text.trim()) return
-          const gut = bewerte(text, v.term).urteil !== 'falsch'
+          const gut = bewerteMitAuchRichtig(text, v.term, v.auchRichtig).urteil !== 'falsch'
           if (gut) apostrophHinweis(text)
           fertig(gut)
         }}
@@ -205,7 +206,7 @@ export function BildMemory({ woerter, sprache, ende }: SpielProps): React.JSX.El
   const karten = useMemo(
     () =>
       gemischt(
-        gemischt(woerter.filter((w) => w.bild))
+        gemischt(spielBildWoerter(woerter, sprache))
           .slice(0, 6)
           .flatMap((v) => [
             { key: `${v.id}-b`, wid: v.id, seite: 'a' as const, inhalt: <img src={v.bild} alt="" style={BILD} />, label: 'Bildkarte' },
@@ -542,7 +543,7 @@ export function HoerBingo({ woerter, sprache, ende }: SpielProps): React.JSX.Ele
 
 export function WasFehlt({ woerter, sprache, ende, staende }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
-  const mitBild = useMemo(() => woerter.filter((w) => w.bild), [woerter])
+  const mitBild = useMemo(() => spielBildWoerter(woerter, sprache), [woerter])
   const RUNDEN = 5
   const neu = (): { bilder: Vokabel[]; fehlt: Vokabel } => {
     const bilder = gemischt(mitBild).slice(0, Math.min(9, Math.max(6, mitBild.length)))
@@ -630,7 +631,7 @@ export function WasFehlt({ woerter, sprache, ende, staende }: SpielProps): React
 export function BildAufdecken({ woerter, sprache, ende, staende }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
   const KACHELN = 12
-  const reihe = useMemo(() => gemischt(woerter.filter((w) => w.bild)).slice(0, 6), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const reihe = useMemo(() => gemischt(spielBildWoerter(woerter, sprache)).slice(0, 6), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [i, setI] = useState(0)
   const [weg, setWeg] = useState<number[]>([])
   const [rueck, setRueck] = useState<boolean | null>(null)
@@ -687,7 +688,7 @@ export function BildAufdecken({ woerter, sprache, ende, staende }: SpielProps): 
         </div>
       </div>
       {rueck === null ? (
-        <Antwort key={v.id} v={v} alle={woerter.filter((w) => w.bild)} schreiben={schreibt(v, staende)} fertig={fertig} />
+        <Antwort key={v.id} v={v} alle={spielBildWoerter(woerter, sprache)} schreiben={schreibt(v, staende)} fertig={fertig} />
       ) : (
         <Rueck gut={rueck} richtig={spielform(v.term)} />
       )}
@@ -699,7 +700,7 @@ export function BildAufdecken({ woerter, sprache, ende, staende }: SpielProps): 
 
 export function WortBild({ woerter, sprache, ende }: SpielProps): React.JSX.Element {
   const farbe = useVtFarbe()
-  const mitBild = useMemo(() => woerter.filter((w) => w.bild), [woerter])
+  const mitBild = useMemo(() => spielBildWoerter(woerter, sprache), [woerter])
   const reihe = useMemo(() => gemischt(mitBild).slice(0, 10), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [i, setI] = useState(0)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)

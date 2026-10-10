@@ -2,6 +2,7 @@ import { unneededWordCount } from '../model/blocks'
 import type { Block } from '../model/types'
 import { RU_SLOVO, russischPlural } from '../../../shared/russischPlural'
 import { polnischPlural, tschechischPlural } from '../../../shared/kopfSprache'
+import { formAenderung, formHinweisText, type BekannteFormen, type FormArt } from '../../../shared/bekannteFormen'
 
 type HelpKey =
   | 'useEachOnce'
@@ -61,24 +62,14 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     da: 'Der er flere ord i boksen, end du skal bruge.',
     el: 'Στο πλαίσιο υπάρχουν περισσότερες λέξεις απ’ όσες χρειάζεσαι.'
   },
-  changeForm: {
-    en: 'You may have to change the form of the word (e.g. plural, past tense).',
-    fr: 'Il faut parfois changer la forme du mot (p. ex. pluriel, temps du verbe).',
-    es: 'A veces tienes que cambiar la forma de la palabra (p. ej. plural, tiempo verbal).',
-    it: 'A volte devi cambiare la forma della parola (per esempio il plurale o il tempo verbale).',
-    nl: 'Soms moet je de vorm van het woord veranderen (bijv. meervoud, verleden tijd).',
-    ru: 'Иногда слово нужно поставить в другую форму (например, во множественное число или в прошедшее время).',
-    de: 'Manchmal muss die Form des Wortes angepasst werden.',
-    pl: 'Czasem trzeba zmienić formę wyrazu (np. przypadek, liczbę, czas).',
-    cs: 'Někdy musíš změnit tvar slova (např. pád, číslo, čas).',
-    pt: 'Às vezes tens de mudar a forma da palavra (p. ex. plural, tempo verbal).',
-    tr: 'Bazen kelimenin biçimini değiştirmen gerekir (ör. çoğul, zaman eki).',
-    zh: '有的词语需要根据句子稍作改变。',
-    ja: 'ことばの形を変える必要がある場合があります（例：動詞の活用）。',
-    ar: 'قد تحتاج أحيانًا إلى تغيير صيغة الكلمة (مثل الجمع أو زمن الفعل).',
-    da: 'Nogle gange skal du ændre ordets form (f.eks. flertal, datid).',
-    el: 'Μερικές φορές πρέπει να αλλάξεις τη μορφή της λέξης (π.χ. πτώση, αριθμό, χρόνο).'
-  },
+  /*
+   * Ohne Beispiele (10.10.2026): Vorher stand fest „(e.g. plural, past tense)" da – auch in Klasse 5, die das simple
+   * past noch nicht kennt. Die Beispiele kommen jetzt aus den bekannten Formen der Klasse (shared/bekannteFormen.ts,
+   * `formHinweisText`); dieser Text ist der Rückfall ohne Angaben zur Klasse.
+   */
+  changeForm: Object.fromEntries(
+    ['en', 'fr', 'es', 'it', 'nl', 'ru', 'de', 'pl', 'cs', 'pt', 'tr', 'zh', 'ja', 'ar', 'da', 'el'].map((l) => [l, formHinweisText(l)])
+  ),
   firstLetter: {
     en: 'The first letter is given.',
     fr: 'La première lettre est donnée.',
@@ -424,16 +415,30 @@ export function baseForm(word: string): string {
  * Hinweise, die eindeutig machen, was in welcher Lücke/Zeile verlangt ist.
  * Sie werden unter der Arbeitsanweisung gedruckt und lassen sich pro Aufgabe abschalten.
  */
-export function blockHelp(block: Block, lang: string): string[] {
+export function blockHelp(block: Block, lang: string, formen?: BekannteFormen): string[] {
   if (block.showHelp === false) return []
   // Von Hand geänderte Zeile hat Vorrang (30.09.2026); leer = keine Hinweiszeile
   if (block.helpText !== undefined) return block.helpText.trim() ? [block.helpText.trim()] : []
-  return errechneteHilfe(block, lang)
+  return errechneteHilfe(block, lang, formen)
+}
+
+/** Formänderungen, die in den Lücken wirklich vorkommen (Englisch; Grundform im Wortkasten → Lösung) */
+function vorkommendeFormen(paare: { bankWord?: string; answer: string }[], lang: string): FormArt[] {
+  if (lang !== 'en') return []
+  const out: FormArt[] = []
+  for (const p of paare) {
+    if (!p.bankWord) continue
+    const a = formAenderung(baseForm(p.bankWord), baseForm(p.answer), /^to\s/i.test(p.bankWord.trim()) ? 'verb' : '')
+    if (a && !out.includes(a)) out.push(a)
+  }
+  return out
 }
 
 /** Der errechnete Hinweis ohne Änderung von Hand – Ausgangstext beim Bearbeiten. */
-export function errechneteHilfe(block: Block, lang: string): string[] {
+export function errechneteHilfe(block: Block, lang: string, formen?: BekannteFormen): string[] {
   const out: (HelpKey | { notNeeded: number })[] = []
+  // „Form anpassen" mit Beispielen nur aus den bekannten Formen der Klasse (10.10.2026)
+  let arten: FormArt[] = []
   const unneeded = unneededWordCount(block)
   switch (block.kind) {
     case 'gap': {
@@ -444,7 +449,10 @@ export function errechneteHilfe(block: Block, lang: string): string[] {
       if (block.wordBank) {
         out.push('useEachOnce')
         if (unneeded > 0) out.push({ notNeeded: unneeded })
-        if (block.items.some((i) => i.bankWord && baseForm(i.bankWord) !== baseForm(i.answer))) out.push('changeForm')
+        if (block.items.some((i) => i.bankWord && baseForm(i.bankWord) !== baseForm(i.answer))) {
+          out.push('changeForm')
+          arten = vorkommendeFormen(block.items, lang)
+        }
       }
       if (block.firstLetterHint || block.items.some((i) => i.firstLetter)) out.push('firstLetter')
       break
@@ -455,7 +463,10 @@ export function errechneteHilfe(block: Block, lang: string): string[] {
       if (block.wordBank) {
         out.push('useEachOnce')
         if (unneeded > 0) out.push({ notNeeded: unneeded })
-        if (gaps.some((g) => g.type === 'gap' && g.bankWord && baseForm(g.bankWord) !== baseForm(g.answer))) out.push('changeForm')
+        if (gaps.some((g) => g.type === 'gap' && g.bankWord && baseForm(g.bankWord) !== baseForm(g.answer))) {
+          out.push('changeForm')
+          arten = vorkommendeFormen(gaps.flatMap((g) => (g.type === 'gap' ? [g] : [])), lang)
+        }
       }
       if (block.firstLetterHint || gaps.some((g) => g.type === 'gap' && g.firstLetter)) out.push('firstLetter')
       break
@@ -487,5 +498,7 @@ export function errechneteHilfe(block: Block, lang: string): string[] {
       out.push('oddOneOut')
       break
   }
-  return out.map((k) => (typeof k === 'string' ? text(k, lang) : notNeededText(k.notNeeded, lang)))
+  return out.map((k) =>
+    k === 'changeForm' ? formHinweisText(hilfeSprache(lang), formen, arten) : typeof k === 'string' ? text(k, lang) : notNeededText(k.notNeeded, lang)
+  )
 }
