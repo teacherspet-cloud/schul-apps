@@ -9,6 +9,7 @@ import { useExperte } from '../../shared/settingsStore'
 import { ActionIcon, Badge, Button, Card, Checkbox, Collapse, Group, Menu, Progress, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconChevronDown, IconChevronRight, IconFilter, IconRestore } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useAufZu } from '../../shared/sitzung'
 
 /** Ampel wie in der Lernenden-Tabelle: unter 30 % rot, unter 60 % gelb, sonst grün */
 export const ampel = (x: number | null | undefined): string => (x == null ? 'gray' : x < 0.3 ? 'red' : x < 0.6 ? 'yellow' : 'teal')
@@ -184,6 +185,7 @@ export function MaterialListe({
 
 /** Ein Eintrag: Kopf, Kurzangaben, Ampel-Balken, aufklappbare Details */
 export function MaterialKarte({
+  kennung,
   symbol,
   titel,
   art,
@@ -196,6 +198,8 @@ export function MaterialKarte({
   details,
   zusatz
 }: {
+  /** Kennung zum Merken des Auf/Zu der Details (in „Meine Klassen" dauerhaft, 10.10.2026) */
+  kennung?: string
   symbol: React.ReactNode
   titel: string
   art: string
@@ -208,7 +212,7 @@ export function MaterialKarte({
   details?: React.ReactNode
   zusatz?: React.ReactNode
 }): React.JSX.Element {
-  const [auf, setAuf] = useState(false)
+  const [auf, setAuf] = useAufZu(`material-details-${kennung ?? `${art}:${titel}`}`, false)
   return (
     <Card withBorder padding="sm" radius="md" data-material={art} data-material-titel={titel} data-status={status}>
       <Group justify="space-between" wrap="nowrap" gap="xs">

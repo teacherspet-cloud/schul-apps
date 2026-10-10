@@ -3,7 +3,8 @@
  * Statuszeile („Claude · Abo eingerichtet"), Inhalt erst beim Aufklappen (die Karten fragen dann erst ihre Dienste
  * ab). Eingeklappt ist die Vorgabe; offen/zu gilt für die Sitzung (shared/sitzung.ts, 09.10.2026) – in einer neuen
  * Sitzung stehen die Karten wieder eingeklappt. Ausnahme `dauerhaft` (10.10.2026, Verwaltung › Schule): offen/zu bleibt je Gerät
- * über die Sitzung hinaus (shared/sitzung.ts › dauerhaftMerken).
+ * über die Sitzung hinaus (shared/sitzung.ts › dauerhaftMerken). Ebenso in „Meine Klassen" (10.10.2026): innerhalb von
+ * `DauerhaftMerken` dauerhaft je Gerät unter der Vorsilbe des Bereichs („mk:…").
  *
  * Für die Oberflächentests: `data-klappkarte` (Kennung) und `data-offen` am Rahmen, `data-klappkopf` am Knopf
  * (tests/e2e/warten.mjs › karteAuf/kartenAuf).
@@ -12,7 +13,7 @@ import { Badge, Card, Group, Text, Title, UnstyledButton } from '@mantine/core'
 import { IconChevronRight } from '@tabler/icons-react'
 import { useId, useState } from 'react'
 import { KLAPP_SCHLUESSEL, leseOffen } from '@shared/einstellungsStatus'
-import { dauerhaftMerken, dauerhaftOffen, offenLesen, offenMerken } from '../sitzung'
+import { dauerhaftMerken, dauerhaftOffen, offenLesen, offenMerken, useDauerhaftVorsilbe } from '../sitzung'
 
 const alleGemerkten = (): Record<string, boolean> => leseOffen(JSON.stringify(offenLesen<unknown>(KLAPP_SCHLUESSEL) ?? null))
 
@@ -41,11 +42,14 @@ export interface KlappKarteProps {
 }
 
 export function KlappKarte({ id, titel, status, ton = 'neutral', standardOffen = false, dauerhaft = false, children, rahmen }: KlappKarteProps): React.JSX.Element {
-  const [offen, setOffen] = useState(() => (dauerhaft ? dauerhaftOffen(id) : gemerkt(id)) ?? standardOffen)
+  // In „Meine Klassen" (DauerhaftMerken, 10.10.2026) dauerhaft unter der Vorsilbe des Bereichs
+  const vorsilbe = useDauerhaftVorsilbe()
+  const dauerId = dauerhaft ? id : vorsilbe !== null ? `${vorsilbe}${id}` : null
+  const [offen, setOffen] = useState(() => (dauerId !== null ? dauerhaftOffen(dauerId) : gemerkt(id)) ?? standardOffen)
   const inhalt = useId()
   const umschalten = (): void => {
     setOffen((o) => {
-      if (dauerhaft) dauerhaftMerken(id, !o)
+      if (dauerId !== null) dauerhaftMerken(dauerId, !o)
       else merke(id, !o)
       return !o
     })

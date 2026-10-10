@@ -81,6 +81,7 @@ import { KlasseZuordnen } from '../KlasseZuordnen'
 import { AlsSchuelerAnsehen } from '../../meineklassen/SchuelerVorschau'
 import { KursGrammatik } from './KursGrammatik'
 import { KastenKopf, useGemerkt } from './Kasten'
+import { useAufZu } from '../../../shared/sitzung'
 import { AbschnitteWoerter, type AbschnittFrage } from './AbschnitteWoerter'
 import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
@@ -165,7 +166,8 @@ function HinweisListe({
   ausgeblendet?: HinweisZeile[]
   laedt?: boolean
 }): React.JSX.Element {
-  const [zeigeAus, setZeigeAus] = useState(false)
+  // „Ausgeblendet (n)": in „Meine Klassen" dauerhaft je Klasse gemerkt (10.10.2026), sonst wie bisher ungemerkt
+  const [zeigeAus, setZeigeAus] = useAufZu('kurs-bedarf-ausgeblendet', false)
   const zeile = (h: HinweisZeile, aus: boolean): React.JSX.Element => (
     <Group key={h.schluessel ?? h.art} gap={6} wrap="nowrap" align="center" data-kurs-bedarf-zeile={h.schluessel ?? h.art}>
       {ausblenden && h.schluessel && (
@@ -241,7 +243,8 @@ function HinweisListe({
  */
 export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { abschnitte: AbschnittStatistik[]; schluessel?: string }): React.JSX.Element {
   const baende = useMemo(() => nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
-  const [umgeschaltet, setUmgeschaltet] = useState<Set<string>>(new Set())
+  // Auf/Zu je Unit (abweichend von der Vorgabe); in „Meine Klassen" dauerhaft je Kurs gemerkt (10.10.2026)
+  const [unitAuf, setUnitAuf] = useAufZu<Record<string, boolean>>(`units-auf-${kursSchluessel}`, {})
   // Mehrere Bände (10.10.2026): je Band aufklappbar, der neueste offen
   const bandAuf = useBaendeOffen(`units-${kursSchluessel}`, baende.map((b) => b.buch))
   if (!baende.length)
@@ -279,20 +282,13 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
           <Stack gap={10}>
             {b.units.map((g) => {
               const k = schluessel(b.buch, g.unit)
-              const auf = (k === erste) !== umgeschaltet.has(k)
+              const auf = unitAuf[k] ?? k === erste
               return (
                 <div key={k} data-kurs-unit={g.unit || 'Weitere Vokabeln'} data-offen={auf || undefined}>
                   <UnstyledButton
                     w="100%"
                     aria-expanded={auf}
-                    onClick={() =>
-                      setUmgeschaltet((s) => {
-                        const n = new Set(s)
-                        if (n.has(k)) n.delete(k)
-                        else n.add(k)
-                        return n
-                      })
-                    }
+                    onClick={() => setUnitAuf((m) => ({ ...m, [k]: !(m[k] ?? k === erste) }))}
                   >
                     <Group gap={6} wrap="nowrap">
                       {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}

@@ -5,6 +5,7 @@
 import { ActionIcon, Badge, Button, Card, Group, Modal, Progress, SegmentedControl, Stack, Switch, Table, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconUser, IconUserMinus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
+import { useAufZu } from '../../../shared/sitzung'
 import { AktiveFilter, SortKopf, useSortierTabelle, type Spalte } from '../../../shared/components/SortierTabelle'
 import { useExperte } from '../../../shared/settingsStore'
 import { holen } from '../../onlinetest/serverApi'
@@ -119,8 +120,9 @@ function GrammatikDetails({
 }): React.JSX.Element {
   const [filter, setFilter] = useState<DetailFilter>(null)
   const [ansicht, setAnsicht] = useGemerktText('vok-details-ansicht', 'bereiche')
-  const [umgeschaltet, setUmgeschaltet] = useState<Record<string, boolean>>({})
-  const [alleOffen, setAlleOffen] = useState(false)
+  // Auf/Zu der Gruppen und von „Alle Formen": in „Meine Klassen" dauerhaft je Klasse (10.10.2026), sonst ungemerkt
+  const [umgeschaltet, setUmgeschaltet] = useAufZu<Record<string, boolean>>('grammatik-details-gruppen', {})
+  const [alleOffen, setAlleOffen] = useAufZu('grammatik-details-alle-formen', false)
   const [fokus, setFokus] = useState<string | null>(null)
   const jetzt = Date.now()
   const regeln = regelnVon(l).map((p) => ({ p, a: ampelVon(p), b: bereichVonRegel(p.titel, p.kennungen ?? []), s: stelleVon(p, band) }))

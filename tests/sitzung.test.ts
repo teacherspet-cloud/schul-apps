@@ -20,6 +20,8 @@ vi.stubGlobal('localStorage', {
 })
 
 const sitzung = await import('../src/renderer/src/shared/sitzung')
+const { createElement } = await import('react')
+const { renderToString } = await import('react-dom/server')
 const { ladeOffen, speichereOffen } = await import('../src/renderer/src/modules/lernen/regal/grammatikJahrgaenge')
 const { kopfGemerkt, merkeKopf, ansichtGemerkt, merkeAnsicht } = await import('../src/renderer/src/modules/unterrichtsreihe/ReiheKopf')
 const { weitereOptionenOffen, merkeWeitereOptionen } = await import('../src/renderer/src/shared/components/WeitereOptionen')
@@ -152,5 +154,68 @@ describe('Erstes Öffnen einer App in der Sitzung', () => {
       ab2()
       vi.stubGlobal('window', undefined)
     }
+  })
+})
+
+/*
+ * „Meine Klassen" (10.10.2026, Entscheidung der Lehrkraft): innerhalb von `DauerhaftMerken` merken die Auf/Zu-Helfer
+ * dauerhaft je Gerät (Vorsilbe „mk:", je Lerngruppe mit `bereich`), außerhalb gilt weiter die Sitzungsregel.
+ */
+describe('Auf/Zu dauerhaft in „Meine Klassen"', () => {
+  type Fund = { speicher: ReturnType<typeof sitzung.useOffenSpeicher>; gemerkt: unknown; aufZu: unknown; vorsilbe: string | null }
+  const pruefe = (umschliessen: ((kind: React.ReactNode) => React.ReactNode) | null): Fund => {
+    let fund: Fund | null = null
+    const Sonde = (): null => {
+      const speicher = sitzung.useOffenSpeicher()
+      const [gemerkt] = sitzung.useOffenGemerkt('kasten', false)
+      const [aufZu] = sitzung.useAufZu('details', false)
+      fund = { speicher, gemerkt, aufZu, vorsilbe: sitzung.useDauerhaftVorsilbe() }
+      return null
+    }
+    const kind = createElement(Sonde)
+    renderToString(umschliessen ? (umschliessen(kind) as React.ReactElement) : kind)
+    return fund!
+  }
+  const mk = (kind: React.ReactNode): React.ReactNode => createElement(sitzung.DauerhaftMerken, { vorsilbe: 'mk:' }, kind)
+
+  it('innen dauerhaft (überlebt eine neue Sitzung), außen nur für die Sitzung', () => {
+    const innen = pruefe(mk)
+    expect(innen.vorsilbe).toBe('mk:')
+    expect(innen.speicher.dauerhaft).toBe(true)
+    innen.speicher.merken('kasten', true)
+    innen.speicher.merken('details', true)
+    const aussen = pruefe(null)
+    expect(aussen.vorsilbe).toBeNull()
+    expect(aussen.speicher.dauerhaft).toBe(false)
+    // Getrennt: derselbe Baustein außerhalb (Sprachenlernen) sieht den Stand aus „Meine Klassen" nicht
+    expect(aussen.gemerkt).toBe(false)
+    expect(aussen.aufZu).toBe(false)
+    aussen.speicher.merken('kasten', true)
+    // Neue Sitzung (Neustart, neue Anmeldung): innen bleibt alles, außen wieder die Vorgabe
+    sitzung.sitzungFuerTests('pc-start-2')
+    const innen2 = pruefe(mk)
+    expect(innen2.gemerkt).toBe(true)
+    expect(innen2.aufZu).toBe(true)
+    expect(pruefe(null).gemerkt).toBe(false)
+  })
+
+  it('je Lerngruppe eigener Stand; nie Umgeschaltetes steht wie vorgegeben', () => {
+    const klasse = (id: string) => (kind: React.ReactNode): React.ReactNode => mk(createElement(sitzung.DauerhaftMerken, { bereich: id }, kind))
+    const a = pruefe(klasse('gruppe-a'))
+    expect(a.vorsilbe).toBe('mk:gruppe-a:')
+    a.speicher.merken('details', true)
+    expect(pruefe(klasse('gruppe-a')).aufZu).toBe(true)
+    expect(pruefe(klasse('gruppe-b')).aufZu).toBe(false)
+    expect(pruefe(mk).aufZu).toBe(false)
+    // Kaputter Speicherinhalt zählt als nie gemerkt
+    localStorage.setItem('schulapps.dauerhaft.mk:gruppe-b:details', '{kaputt')
+    expect(pruefe(klasse('gruppe-b')).aufZu).toBe(false)
+  })
+
+  it('KlappKarte-Speicher: dauerhaftOffen unter der Vorsilbe, unabhängig von der Sitzung', () => {
+    sitzung.dauerhaftMerken('mk:gruppe-a:karte', true)
+    sitzung.sitzungFuerTests('pc-start-3')
+    expect(sitzung.dauerhaftOffen('mk:gruppe-a:karte')).toBe(true)
+    expect(sitzung.dauerhaftOffen('karte')).toBeUndefined()
   })
 })

@@ -67,6 +67,7 @@ import {
   IconZzz
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { DauerhaftMerken, useAufZu } from '../../shared/sitzung'
 import { create } from 'zustand'
 import { FAECHER, fachAusName, fachSchreibweise } from '@shared/faecher'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
@@ -410,52 +411,60 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
     const k = (klassen ?? []).find((x) => x.gruppen.includes(gruppeId) || x.faecher.some((f) => f.id === gruppeId))
     if (k) setze({ klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null, ...(reiter ? { reiter } : {}) })
   }
+  /*
+   * Auf/Zu (10.10.2026, Entscheidung der Lehrkraft): Alles Aufklappbare in „Meine Klassen" bleibt dauerhaft je Gerät so,
+   * wie die Lehrkraft es verlassen hat (Vorsilbe „mk:", getrennt von Sprachenlernen); je Lerngruppe eigener Stand.
+   */
   return (
-    <Container size="xl" py="lg" data-meine-klassen>
-      <AppKopf
-        beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
-        suche={
-          <KlassenSuche
-            klassen={klassen ?? []}
-            aktuell={gewaehlt ?? null}
-            klasseWaehlen={(k) => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })}
-            personWaehlen={(p) => setPerson({ p, gruppe: p.gruppen.length === 1 ? p.gruppen[0].id : null })}
-          />
-        }
-      />
-      {person && !person.gruppe && (
-        <KursWahl name={person.p.name} gruppen={person.p.gruppen} waehlen={(g) => setPerson({ ...person, gruppe: g })} schliessen={() => setPerson(null)} />
-      )}
-      {person?.gruppe && (
-        <LernendeDetails
-          key={`${person.p.id}:${person.gruppe}`}
-          gruppeId={person.gruppe}
-          personId={person.p.id}
-          name={person.p.name}
-          schliessen={() => setPerson(null)}
-          zurKlasse={(g) => (setPerson(null), zurGruppe(g, 'lernende'))}
+    <DauerhaftMerken vorsilbe="mk:">
+      <Container size="xl" py="lg" data-meine-klassen>
+        <AppKopf
+          beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
+          suche={
+            <KlassenSuche
+              klassen={klassen ?? []}
+              aktuell={gewaehlt ?? null}
+              klasseWaehlen={(k) => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })}
+              personWaehlen={(p) => setPerson({ p, gruppe: p.gruppen.length === 1 ? p.gruppen[0].id : null })}
+            />
+          }
         />
-      )}
-      {!klasse && <SchuljahrHinweis geaendert={laden} />}
-      {klasse && gewaehlt ? (
-        <KlasseAnsicht k={gewaehlt} neu={laden} zurueck={() => (setze({ klasse: null, gruppe: null }), laden())} />
-      ) : !klassen ? (
-        <Center h="40vh">
-          <Loader />
-        </Center>
-      ) : klassen.length === 0 ? (
-        <Alert icon={<IconUsers size={18} />} title="Noch keine Lerngruppen" data-klassen-leer>
-          Lerngruppen entstehen in der App „Onlinetest“ unter „Lerngruppen“ (aus IServ oder von Hand). Danach stehen sie hier mit ihrem Lernstand.
-        </Alert>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} data-klassen-liste>
-          {sichtbar.map((k) => (
-            <KlassenKarte key={k.schluessel} k={k} waehlen={() => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })} />
-          ))}
-        </SimpleGrid>
-      )}
-      {!klasse && klassen && <IservErkennung key={JSON.stringify(iservDaten.iservKuerzel ?? {})} d={iservDaten} geaendert={laden} />}
-    </Container>
+        {person && !person.gruppe && (
+          <KursWahl name={person.p.name} gruppen={person.p.gruppen} waehlen={(g) => setPerson({ ...person, gruppe: g })} schliessen={() => setPerson(null)} />
+        )}
+        {person?.gruppe && (
+          <DauerhaftMerken bereich={person.gruppe}>
+            <LernendeDetails
+              key={`${person.p.id}:${person.gruppe}`}
+              gruppeId={person.gruppe}
+              personId={person.p.id}
+              name={person.p.name}
+              schliessen={() => setPerson(null)}
+              zurKlasse={(g) => (setPerson(null), zurGruppe(g, 'lernende'))}
+            />
+          </DauerhaftMerken>
+        )}
+        {!klasse && <SchuljahrHinweis geaendert={laden} />}
+        {klasse && gewaehlt ? (
+          <KlasseAnsicht k={gewaehlt} neu={laden} zurueck={() => (setze({ klasse: null, gruppe: null }), laden())} />
+        ) : !klassen ? (
+          <Center h="40vh">
+            <Loader />
+          </Center>
+        ) : klassen.length === 0 ? (
+          <Alert icon={<IconUsers size={18} />} title="Noch keine Lerngruppen" data-klassen-leer>
+            Lerngruppen entstehen in der App „Onlinetest“ unter „Lerngruppen“ (aus IServ oder von Hand). Danach stehen sie hier mit ihrem Lernstand.
+          </Alert>
+        ) : (
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} data-klassen-liste>
+            {sichtbar.map((k) => (
+              <KlassenKarte key={k.schluessel} k={k} waehlen={() => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })} />
+            ))}
+          </SimpleGrid>
+        )}
+        {!klasse && klassen && <IservErkennung key={JSON.stringify(iservDaten.iservKuerzel ?? {})} d={iservDaten} geaendert={laden} />}
+      </Container>
+    </DauerhaftMerken>
   )
 }
 
@@ -698,7 +707,9 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
           </Center>
         </Card>
       ) : (
-        <FachAnsicht key={aktiv.id} id={aktiv.id} bedarfGeaendert={neu} />
+        <DauerhaftMerken key={aktiv.id} bereich={aktiv.id}>
+          <FachAnsicht id={aktiv.id} bedarfGeaendert={neu} />
+        </DauerhaftMerken>
       )}
     </Stack>
   )
@@ -879,7 +890,7 @@ function AusgeblendeterBedarf({
   oeffnen: (modul: string, id?: string) => void
   geaendert: () => void
 }): React.JSX.Element {
-  const [offen, setOffen] = useState(false)
+  const [offen, setOffen] = useAufZu('bedarf-ausgeblendet', false)
   return (
     <div style={{ marginTop: 8 }} data-bedarf-ausgeblendet={liste.length}>
       <UnstyledButton onClick={() => setOffen((o) => !o)} aria-expanded={offen} data-bedarf-ausgeblendet-knopf>
@@ -1213,6 +1224,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
     wert: r.schnitt,
     inhalt: (
       <MaterialKarte
+        kennung={`r${r.zid}`}
         symbol={<IconRoute size={16} />}
         titel={r.titel}
         art="Reihe"
@@ -1257,6 +1269,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
       wert: b.ergebnis ?? abgegeben,
       inhalt: (
         <MaterialKarte
+          kennung={`b${b.id}`}
           symbol={<IconFileText size={16} />}
           titel={b.titel}
           art="Blatt"
@@ -1315,7 +1328,7 @@ function GrammatikReiter({ d, ort, nurWeitere = false }: { d: KlasseDetail; ort:
   // Eingebettete Kursseite (09.10.2026): hier nur noch, was zu keinem Kurs gehört
   if (nurWeitere)
     return weitere.length ? (
-      <Aufklapp titel={`Grammatik ohne Kurs (${weitere.length})`} kennung="weitere" rahmen>
+      <Aufklapp titel={`Grammatik ohne Kurs (${weitere.length})`} kennung="weitere" merken="weitere-ohne-kurs" rahmen>
         <MaterialListe eintraege={grammatikEintraege(weitere, ort)} leer="" />
       </Aufklapp>
     ) : null
@@ -1339,7 +1352,7 @@ function GrammatikReiter({ d, ort, nurWeitere = false }: { d: KlasseDetail; ort:
             </Text>
             <MaterialListe eintraege={grammatikEintraege(normal, ort)} leer="Nur Extra-Aufgaben in diesem Kurs." />
             {extras.length > 0 && (
-              <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras">
+              <Aufklapp titel={`Extra-Aufgaben (${extras.length})`} kennung="extras" merken={`extras-${v.id}`}>
                 {extras.map((g) => (
                   <KursZeile key={g.id} g={g} />
                 ))}
@@ -1357,9 +1370,9 @@ function GrammatikReiter({ d, ort, nurWeitere = false }: { d: KlasseDetail; ort:
   )
 }
 
-/** Zugeklappte Gruppe in einer Kurs-Karte */
-function Aufklapp({ titel, kennung, rahmen, children }: { titel: string; kennung: string; rahmen?: boolean; children: React.ReactNode }): React.JSX.Element {
-  const [auf, setAuf] = useState(false)
+/** Zugeklappte Gruppe in einer Kurs-Karte (Auf/Zu dauerhaft unter `merken`, sonst `kennung`) */
+function Aufklapp({ titel, kennung, merken, rahmen, children }: { titel: string; kennung: string; merken?: string; rahmen?: boolean; children: React.ReactNode }): React.JSX.Element {
+  const [auf, setAuf] = useAufZu(`aufklapp-${merken ?? kennung}`, false)
   return (
     <div data-aufklapp={kennung}>
       <UnstyledButton mt={6} onClick={() => setAuf((x) => !x)} aria-expanded={auf} data-aufklapp-knopf={kennung}>
@@ -1428,6 +1441,7 @@ function grammatikEintraege(liste: KlasseDetail['grammatik'], ort: Ort): Eintrag
     wert: g.sicherSchnitt,
     inhalt: (
       <MaterialKarte
+        kennung={`g${g.id}`}
         symbol={<IconBook2 size={16} />}
         titel={g.titel}
         art="Grammatik"
@@ -1484,6 +1498,7 @@ function testEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
       wert,
       inhalt: (
         <MaterialKarte
+          kennung={`t${t.id}`}
           symbol={<IconClipboardCheck size={16} />}
           titel={t.titel}
           art={art}

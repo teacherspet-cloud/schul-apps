@@ -43,7 +43,7 @@ import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { BandCover } from '../../../shared/components/BandCover'
 import { jahrgangName } from '../regal/beschriftung'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
-import { offenLesen, offenMerken } from '../../../shared/sitzung'
+import { useAufZu, useOffenGemerkt } from '../../../shared/sitzung'
 
 /** Land und Schulform aus den Einstellungen – Maßstab für das Niveau der Grammatikaufgaben (09.10.2026, grammatikNiveau.ts) */
 const niveauOrt = (): { land?: string; schulform?: string } => {
@@ -299,9 +299,8 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
   )
 }
 
-/** Offene Jahre je Kurs, gemerkt für die Sitzung (shared/sitzung.ts, 09.10.2026) */
+/** Offene Jahre je Kurs, gemerkt für die Sitzung (shared/sitzung.ts, 09.10.2026; in „Meine Klassen" dauerhaft, 10.10.2026) */
 const JAHRE_SCHLUESSEL = (vokId: string): string => `schulapps-vok-grammatik-jahre-${vokId}`
-const ladeJahre = (vokId: string): Record<string, boolean> => offenLesen<Record<string, boolean>>(JAHRE_SCHLUESSEL(vokId)) ?? {}
 
 /**
  * Die Grammatik des Kurses (08.10.2026, abgestimmt): zugeklappter Kasten, „Grammatik hinzufügen" im Kopf (auch
@@ -338,9 +337,10 @@ export function KursGrammatik({
   const [entwurf, setEntwurf] = useState<Entwurf | null>(null)
   const [offenGemerkt, setOffen] = useGemerkt(eingebettet ? 'mk-grammatik-liste-offen' : 'vok-kasten-grammatik', eingebettet)
   const offen = (immerOffen && !eingebettet) || offenGemerkt
-  const [entferntOffen, setEntferntOffen] = useState(false)
+  // „Entfernt (n)": bisher ungemerkt; in „Meine Klassen" dauerhaft (10.10.2026)
+  const [entferntOffen, setEntferntOffen] = useAufZu(`grammatik-entfernt-${vokId}`, false)
   const [suche, setSuche] = useState('')
-  const [jahre, setJahre] = useState<Record<string, boolean>>(() => ladeJahre(vokId))
+  const [jahre, setJahre] = useOffenGemerkt<Record<string, boolean>>(JAHRE_SCHLUESSEL(vokId), {})
   const [frage, setFrage] = useState<{ was: 'entfernen' | 'loeschen'; g: GrammatikZeile } | null>(null)
   const [mehr, setMehr] = useState<GrammatikZeile | null>(null)
   const [bearbeiten, setBearbeiten] = useState<string | null>(null)
@@ -410,7 +410,6 @@ export function KursGrammatik({
     const jetzt = gruppeOffen(gruppen[i], i)
     const neu = { ...jahre, [k]: !jetzt }
     setJahre(neu)
-    offenMerken(JAHRE_SCHLUESSEL(vokId), neu)
   }
   const gruppenTitel = (g: KursGruppe<Zeile>): React.ReactNode =>
     g.buch ? (

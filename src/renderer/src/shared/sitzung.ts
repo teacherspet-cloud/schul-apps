@@ -20,7 +20,7 @@
  * Gespeichert wird ein Auf/Zu als `{"s": <Sitzung>, "v": <Wert>}`; stammt es aus einer anderen Sitzung (oder aus der Zeit
  * vor dieser Regel), gilt die Vorgabe.
  */
-import { useState } from 'react'
+import { createContext, createElement, useContext, useMemo, useState, type ReactNode, type JSX } from 'react'
 
 declare global {
   interface Window {
@@ -122,13 +122,27 @@ export function offenMerken(schluessel: string, wert: unknown): void {
   }
 }
 
-/** React: Auf/Zu-Zustand, gemerkt für diese Sitzung; in einer neuen Sitzung gilt `vorgabe` */
+/** React: Auf/Zu-Zustand, gemerkt für diese Sitzung; in einer neuen Sitzung gilt `vorgabe` (in `DauerhaftMerken`: dauerhaft je Gerät) */
 export function useOffenGemerkt<T>(schluessel: string, vorgabe: T): [T, (v: T | ((alt: T) => T)) => void] {
-  const [wert, setWert] = useState<T>(() => offenLesen<T>(schluessel) ?? vorgabe)
+  return useAufZuIntern(schluessel, vorgabe, true)
+}
+
+/**
+ * React: Auf/Zu, das bisher gar nicht gemerkt wurde (schlichtes useState) – außerhalb von `DauerhaftMerken` bleibt das so,
+ * darin (Meine Klassen, 10.10.2026) wird es dauerhaft je Gerät gemerkt.
+ */
+export function useAufZu<T>(schluessel: string, vorgabe: T): [T, (v: T | ((alt: T) => T)) => void] {
+  return useAufZuIntern(schluessel, vorgabe, false)
+}
+
+function useAufZuIntern<T>(schluessel: string, vorgabe: T, sitzungMerken: boolean): [T, (v: T | ((alt: T) => T)) => void] {
+  const speicher = useOffenSpeicher()
+  const merkt = speicher.dauerhaft || sitzungMerken
+  const [wert, setWert] = useState<T>(() => (merkt ? speicher.lesen<T>(schluessel) : undefined) ?? vorgabe)
   const setzen = (v: T | ((alt: T) => T)): void =>
     setWert((alt) => {
       const neu = typeof v === 'function' ? (v as (a: T) => T)(alt) : v
-      offenMerken(schluessel, neu)
+      if (merkt) speicher.merken(schluessel, neu)
       return neu
     })
   return [wert, setzen]
@@ -164,6 +178,72 @@ export function dauerhaftMerken(id: string, offen: boolean): void {
   } catch {
     // kein Speicher
   }
+}
+
+// ---------------------------------------------------------------- Auf/Zu dauerhaft in „Meine Klassen"
+
+/*
+ * „Meine Klassen" (10.10.2026, Entscheidung der Lehrkraft): Jeder aufklappbare Bereich darin – auch die geteilten Teile der
+ * Kursseite (Abschnitte & Wörter, Bände, Kästen, Lernende …) – bleibt über Sitzung und Neuladen hinaus genau so, wie die
+ * Lehrkraft ihn verlassen hat. `DauerhaftMerken` umschließt das Modul; die Helfer oben (useOffenGemerkt, useAufZu,
+ * useOffenSpeicher, KlappKarte) merken darin dauerhaft je Gerät, mit Vorsilbe „mk:" – getrennt von denselben Bausteinen
+ * in Sprachenlernen, die bei der Sitzungsregel bleiben. Verschachtelt mit `bereich` (Lerngruppe) merkt sich jede Klasse
+ * ihren eigenen Stand. Nie Umgeschaltetes steht wie vorgegeben.
+ */
+const DauerhaftKontext = createContext<string | null>(null)
+
+/** Vorsilbe des dauerhaften Merkens – null: außerhalb von `DauerhaftMerken` (dann gilt die Sitzungsregel) */
+export const useDauerhaftVorsilbe = (): string | null => useContext(DauerhaftKontext)
+
+/** Umschließt einen Bereich, dessen Auf/Zu dauerhaft gemerkt wird (`vorsilbe` nur ganz außen, `bereich` hängt eine Kennung an) */
+export function DauerhaftMerken({ vorsilbe = 'mk:', bereich, children }: { vorsilbe?: string; bereich?: string; children?: ReactNode }): JSX.Element {
+  const aussen = useContext(DauerhaftKontext)
+  const basis = aussen ?? vorsilbe
+  return createElement(DauerhaftKontext.Provider, { value: bereich ? `${basis}${bereich}:` : basis }, children)
+}
+
+const DAUERHAFT_WERT = (schluessel: string): string => `schulapps.dauerhaft.${schluessel}`
+
+/** Dauerhaft gemerkten Wert (beliebig, z. B. Zuordnung Unit → offen) lesen – undefined: nie gemerkt oder kaputt */
+export function dauerhaftLesen<T>(schluessel: string): T | undefined {
+  try {
+    const roh = localStorage.getItem(DAUERHAFT_WERT(schluessel))
+    return roh === null ? undefined : (JSON.parse(roh) as T)
+  } catch {
+    return undefined
+  }
+}
+
+/** Wert dauerhaft je Gerät merken */
+export function dauerhaftSchreiben(schluessel: string, wert: unknown): void {
+  try {
+    localStorage.setItem(DAUERHAFT_WERT(schluessel), JSON.stringify(wert))
+  } catch {
+    // kein Speicher
+  }
+}
+
+export interface OffenSpeicher {
+  /** true: dauerhaft (in `DauerhaftMerken`), false: nur für die Sitzung */
+  dauerhaft: boolean
+  lesen<T>(schluessel: string): T | undefined
+  merken(schluessel: string, wert: unknown): void
+}
+
+/** Speicher für Auf/Zu je Vorsilbe (null = Sitzungsregel) */
+export function offenSpeicher(vorsilbe: string | null): OffenSpeicher {
+  if (vorsilbe === null) return { dauerhaft: false, lesen: offenLesen, merken: offenMerken }
+  return {
+    dauerhaft: true,
+    lesen: <T>(schluessel: string) => dauerhaftLesen<T>(vorsilbe + schluessel),
+    merken: (schluessel, wert) => dauerhaftSchreiben(vorsilbe + schluessel, wert)
+  }
+}
+
+/** React: der passende Speicher (offenLesen/offenMerken bzw. dauerhaft in `DauerhaftMerken`) */
+export function useOffenSpeicher(): OffenSpeicher {
+  const vorsilbe = useContext(DauerhaftKontext)
+  return useMemo(() => offenSpeicher(vorsilbe), [vorsilbe])
 }
 
 // ---------------------------------------------------------------- Erstes Öffnen einer App
