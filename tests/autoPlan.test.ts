@@ -188,7 +188,8 @@ describe('Abwechslung bei der automatischen Formatwahl', () => {
       const picked = fallbackTypes({ level: 'A1' }, 8)
       expect(new Set(picked).size).toBe(picked.length)
       for (const t of picked) {
-        expect(levelAtLeast('A1', TASK_TYPES[t].minLevel)).toBe(true)
+        // Formatwahl 10.10.2026: `ab.niveau` ersetzt minLevel (Richtig/Falsch schon ab A1)
+        expect(levelAtLeast('A1', TASK_TYPES[t].ab?.niveau ?? TASK_TYPES[t].minLevel)).toBe(true)
         expect(TASK_TYPES[t].minItems ?? 1).toBeLessThanOrEqual(4)
       }
     }

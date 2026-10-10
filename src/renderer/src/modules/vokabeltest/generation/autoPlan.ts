@@ -6,8 +6,8 @@ import type { TaskSelection, TaskTypeId, TestSettings, VocabEntry } from '../mod
 import { distributeEvenly } from './distribute'
 import { AiCall, systemPrompt } from './generate'
 import { TASK_TYPE_LIST, TASK_TYPES } from './taskTypes'
-import { formVorwissen, formZuSchwer, planHinweis, type FormSettings } from '../didactics/formVorwissen'
-import { passtZurSprache } from '../didactics/latein'
+import { formVorwissen, planHinweis, type FormSettings } from '../didactics/formVorwissen'
+import { anGleichverteilungBinden, formatGeeignet, gleichVerteilen } from './formatAuswahl'
 
 /** Formate, die für einen automatisch erstellten Test in Frage kommen (ohne Kreuzworträtsel/Freitext). */
 const AUTO_CANDIDATES: TaskTypeId[] = [
@@ -43,21 +43,12 @@ const AUTO_CANDIDATES: TaskTypeId[] = [
 export type AutoSettings = Pick<TestSettings, 'level'> & Partial<Omit<FormSettings, 'level'>>
 
 /**
- * Vorwissen der Klasse bei Wortformen (30.09.2026): Formate, die Wortbildung verlangen, fallen
- * weg, solange sie nicht eingeführt ist. Ohne Sprache oder Jahrgang bleibt alles wie bisher.
+ * Formate für die automatische Wahl: Niveau und Klasse (minLevel bzw. `ab` der Formate, 10.10.2026),
+ * Vorwissen bei Wortformen (Wortbildung erst, wenn eingeführt – 30.09.2026) und Sprache
+ * (generation/formatAuswahl.ts). Ohne Sprache oder Jahrgang zählt nur das Niveau.
  */
-function formFilter(settings: AutoSettings): (id: TaskTypeId) => boolean {
-  if (!settings.targetLanguage || !settings.grade) return () => true
-  const v = formVorwissen({ targetLanguage: settings.targetLanguage, grade: settings.grade, languageOrder: settings.languageOrder ?? 1, stateId: settings.stateId ?? '', level: settings.level })
-  return (id) => !formZuSchwer(id, v)
-}
-
 export function availableAutoTypes(settings: AutoSettings): TaskTypeId[] {
-  const passt = formFilter(settings)
-  const sprache = settings.targetLanguage
-  return AUTO_CANDIDATES.filter(
-    (id) => TASK_TYPES[id] && levelAtLeast(settings.level, TASK_TYPES[id].minLevel) && passt(id) && (!sprache || passtZurSprache(id, sprache))
-  )
+  return AUTO_CANDIDATES.filter((id) => TASK_TYPES[id] && formatGeeignet(id, settings))
 }
 
 /** Wie viele Vokabeln abgefragt werden: bei wenig Punkten nur so viele wie Punkte (1 Punkt je Vokabel). */
@@ -199,15 +190,16 @@ export function normalizeTasks(types: { type: TaskTypeId; count: number }[], tot
   return tasks.filter((t) => t.count > 0)
 }
 
-const PLAN_SCHEMA = obj({
-  tasks: arr(
-    obj({
-      type: enumOf(AUTO_CANDIDATES),
-      count: int('Number of tested words in this task'),
-      reason: str('Short reason in German')
-    })
-  )
-})
+const planSchema = (formate: TaskTypeId[]): Record<string, unknown> =>
+  obj({
+    tasks: arr(
+      obj({
+        type: enumOf(formate),
+        count: int('Number of tested words in this task'),
+        reason: str('Short reason in German')
+      })
+    )
+  })
 
 /**
  * Schwierigkeit der Formate nach Klasse (29.09.2026, Wunsch der Lehrkraft): Die aus dem
@@ -223,7 +215,7 @@ export function schwierigkeitNachKlasse(settings: Pick<TestSettings, 'grade' | '
 }
 
 /** Ergebnis einer KI-Planung, bevor Anzahl und Mindestmengen geprüft sind */
-interface KiPlan {
+export interface KiPlan {
   planned: { type: TaskTypeId; count: number }[]
   reasons: string[]
 }
@@ -268,7 +260,7 @@ async function kiPlan(vocab: VocabEntry[], settings: TestSettings, ziel: { min: 
         .filter(Boolean)
         .join('\n'),
       schemaName: 'testplan',
-      schema: PLAN_SCHEMA
+      schema: planSchema(AUTO_CANDIDATES)
     })
     const planned = res.tasks.filter((t) => allowed.includes(t.type) && t.count > 0)
     // Doppelte Formate zusammenfassen
@@ -281,6 +273,53 @@ async function kiPlan(vocab: VocabEntry[], settings: TestSettings, ziel: { min: 
   } catch {
     return { planned: [], reasons: [] }
   }
+}
+
+/**
+ * KI-Anfrage mit fest gewählten Formaten (10.10.2026, Formatwahl der Lehrkraft): nur diese Formate,
+ * Vokabeln ungefähr gleichmäßig verteilt; je nach Eignung der Wörter darf die KI etwas verschieben.
+ */
+async function kiPlanMitFormaten(vocab: VocabEntry[], settings: TestSettings, anzahl: number, formate: TaskTypeId[], ai: AiCall): Promise<KiPlan> {
+  const gleich = gleichVerteilen(formate, anzahl)
+  if (!gleich.length) return { planned: [], reasons: [] }
+  const ids = gleich.map((g) => g.type)
+  try {
+    const res = await ai<{ tasks: { type: TaskTypeId; count: number; reason: string }[] }>({
+      system: systemPrompt(settings),
+      user: [
+        `Plan a vocabulary test for the following ${vocab.length} words. Exactly ${anzahl} words will be tested in total.`,
+        `The teacher has chosen the task formats. Use ONLY these formats, each of them: ${ids.join(', ')}.`,
+        `Distribute the words roughly EVENLY across them (about ${gleich.map((g) => `${g.type}=${g.count}`).join(', ')}). You may shift one or two words between formats if some words clearly suit one format better (e.g. concrete nouns for pictureLabel). The counts must add up exactly to ${anzahl}.`,
+        'Consider parts of speech and the kind of expressions (single words, phrases, verbs, adjectives) when deciding which words fit which format.',
+        `Minimum words per task: ${ids.map((id) => `${id}=${TASK_TYPES[id].minItems ?? 1}`).join(', ')}.`,
+        'Formats:',
+        ...ids.map((id) => `- ${id}: ${TASK_TYPES[id].label} – ${TASK_TYPES[id].description}`),
+        '',
+        'Words:',
+        ...vocab.map((v) => `- ${v.term} (${v.translation}${v.pos ? `, ${v.pos}` : ''})`)
+      ].join('\n'),
+      schemaName: 'testplan',
+      schema: planSchema(ids)
+    })
+    const merged = new Map<TaskTypeId, number>()
+    for (const t of res.tasks) if (ids.includes(t.type) && t.count > 0) merged.set(t.type, (merged.get(t.type) ?? 0) + t.count)
+    return {
+      planned: [...merged].map(([type, count]) => ({ type, count })),
+      reasons: res.tasks.filter((t) => TASK_TYPES[t.type]).map((t) => `${TASK_TYPES[t.type].label}: ${t.reason}`)
+    }
+  } catch {
+    return { planned: [], reasons: [] }
+  }
+}
+
+/**
+ * Gewählte Formate: KI-Plan an die Gleichverteilung binden (generation/formatAuswahl.ts); ohne
+ * KI-Plan wird lokal gleichmäßig verteilt.
+ */
+export function festigenMitFormaten(plan: KiPlan, formate: TaskTypeId[], vocabCount: number): { tasks: TaskSelection[]; reasons: string[] } {
+  const gebunden = normalizeTasks(anGleichverteilungBinden(plan.planned, formate, vocabCount), vocabCount)
+  if (gebunden.length && gebunden.reduce((s, t) => s + t.count, 0) === vocabCount) return { tasks: gebunden, reasons: plan.planned.length ? plan.reasons : [] }
+  return { tasks: normalizeTasks(gleichVerteilen(formate, vocabCount), vocabCount), reasons: [] }
 }
 
 /** Plan auf genau `vocabCount` bringen; misslingt das, regelbasiert auswählen */
@@ -303,6 +342,8 @@ function festigen(plan: KiPlan, settings: TestSettings, vocabCount: number, rnd:
 /**
  * Lässt die KI passende Aufgabenformate wählen (Wortarten, Wendungen, Niveau, Abwechslung)
  * und verteilt die Vokabeln darauf. Bei Problemen greift eine regelbasierte Auswahl.
+ * `formate` (10.10.2026): von der Lehrkraft gewählte Formate – dann nur diese, ungefähr gleich
+ * viele Vokabeln je Format; leer = die KI wählt.
  */
 export async function planAutoTasks(
   vocab: VocabEntry[],
@@ -310,9 +351,15 @@ export async function planAutoTasks(
   totalPoints: number,
   ai: AiCall,
   /** Zufallsquelle für die Formatauswahl – im Test austauschbar */
-  rnd: () => number = Math.random
+  rnd: () => number = Math.random,
+  formate: TaskTypeId[] = []
 ): Promise<{ tasks: TaskSelection[]; vocabCount: number; reasons: string[] }> {
   const vocabCount = vocabCountFor(totalPoints, vocab.length)
+  const gewaehlt = formate.filter((id) => TASK_TYPES[id]?.usesVocab)
+  if (gewaehlt.length) {
+    const { tasks, reasons } = festigenMitFormaten(await kiPlanMitFormaten(vocab, settings, vocabCount, gewaehlt, ai), gewaehlt, vocabCount)
+    if (tasks.length) return { tasks: fitPoints(tasks, totalPoints), vocabCount, reasons }
+  }
   const { tasks, reasons } = festigen(await kiPlan(vocab, settings, { min: vocabCount, max: vocabCount }, ai, rnd), settings, vocabCount, rnd)
   return { tasks: fitPoints(tasks, totalPoints), vocabCount, reasons }
 }

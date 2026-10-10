@@ -1,5 +1,5 @@
 import { genugFuerVarianten } from '../generation/distribute'
-import { Alert, Button, Checkbox, Group, Loader, Modal, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, MultiSelect, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
@@ -9,10 +9,12 @@ import { notifyError } from '../../../shared/util'
 import { planAutoTasks, suggestLevelFromVocab, VocabLevelSuggestion, vocabCountFor } from '../generation/autoPlan'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPES } from '../generation/taskTypes'
+import { formateMerken, formatListe, gemerkteFormate, vorauswahlFormate } from '../generation/formatAuswahl'
+import { useExperte } from '../../../shared/settingsStore'
 import { formatPoints, variantPoints } from '../model/blocks'
 import { randomSeed } from '../model/random'
 import { grundEinstellungen } from '../model/grundeinstellungen'
-import { LANGUAGES, TestSettings } from '../model/types'
+import { LANGUAGES, TaskTypeId, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
 import { aiCall, useVokabeltest } from '../store'
 import type { VocabListContext } from '../store'
@@ -104,6 +106,9 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
   const [base, setBase] = useState<TestSettings | null>(null)
   const [table, setTable] = useState<CefrTable | null>(null)
   const [economy, setEconomy] = useState(true)
+  const experte = useExperte()
+  /** Gewählte Aufgabenformate (10.10.2026); leer = die KI wählt */
+  const [formate, setFormate] = useState<TaskTypeId[]>([])
 
   useEffect(() => {
     if (!opened) return
@@ -148,6 +153,16 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, baseReady])
 
+  // Formatwahl je Klasse/Niveau: zuletzt auf diesem Gerät gewählt, sonst typische Vorauswahl
+  useEffect(() => {
+    if (!base) return
+    setFormate(gemerkteFormate(base) ?? vorauswahlFormate(base))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base?.targetLanguage, base?.grade, base?.level])
+  const formatDaten = base
+    ? formatListe(base).map((f) => ({ value: f.id, label: f.geeignet ? f.label : `${f.label} (${f.hinweis})`, disabled: !f.geeignet }))
+    : []
+
   const tested = vocabCountFor(points, usable.length)
   const patch = (p: Partial<TestSettings>): void => setBase((b) => (b ? { ...b, ...p } : b))
   const grades = base && table ? gradeOptions(table, base.stateId, base.schoolTypeId, base.languageOrder) : []
@@ -179,7 +194,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
       known: listContext?.known,
       vorbereiten: async (settings, k) => {
         k.melde('Passende Aufgabenformate werden ausgewählt …')
-        const { tasks, vocabCount } = await planAutoTasks(usable, settings, points, k.ai)
+        const { tasks, vocabCount } = await planAutoTasks(usable, settings, points, k.ai, undefined, formate)
         // Die Vorgabe reist mit: Nach der Erzeugung werden die Punkte auf genau diese Summe gebracht (generation/punkteZiel.ts)
         return { ...settings, tasks, vocabCount, zielPunkte: points, seed: randomSeed() }
       },
@@ -196,17 +211,22 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
   return (
     <Modal opened={opened} onClose={onClose} title="Test automatisch erstellen">
       <Stack>
-        <Text size="sm">
-          Die KI wählt passende Aufgabenformate für die {usable.length} abgefragten Vokabeln und verteilt die Punkte. Der fertige Test lässt sich anschließend
-          bearbeiten.
-        </Text>
+        {/* Erklärtexte nur im Expertenmodus (10.10.2026) */}
+        {experte && (
+          <Text size="sm">
+            Die KI wählt passende Aufgabenformate für die {usable.length} abgefragten Vokabeln und verteilt die Punkte. Der fertige Test lässt sich anschließend
+            bearbeiten.
+          </Text>
+        )}
         <ZahlFeld label="Gesamtpunktzahl" min={2} max={200} step={1} value={points} onChange={(v) => setPoints(Math.max(2, Number(v) || 2))} data-autofocus />
-        <Text size="xs" c="dimmed">
-          {tested < usable.length
-            ? `Bei ${points} Punkten werden ${tested} der ${usable.length} Vokabeln abgefragt (1 Punkt je Vokabel).`
-            : `Alle ${usable.length} Vokabeln werden abgefragt.`}
-          {base && ` Sprache: ${language}.`}
-        </Text>
+        {experte && (
+          <Text size="xs" c="dimmed">
+            {tested < usable.length
+              ? `Bei ${points} Punkten werden ${tested} der ${usable.length} Vokabeln abgefragt (1 Punkt je Vokabel).`
+              : `Alle ${usable.length} Vokabeln werden abgefragt.`}
+            {base && ` Sprache: ${language}.`}
+          </Text>
+        )}
         {base && (
           <>
             <SimpleGrid cols={2} spacing="sm">
@@ -240,11 +260,13 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                 </Text>
               </Group>
             ) : analysis.result ? (
-              <Text size="xs" c="dimmed" mt={-8}>
-                Vorschlag aus der Vokabelanalyse: Klasse {analysis.result.grade} · {analysis.result.level}
-                {analysis.result.reason ? ` – ${analysis.result.reason}` : ''}
-                {suggestion && suggestion.level !== base.level ? ` (Lehrplan-Richtwert für Klasse ${base.grade}: ${suggestion.level})` : ''}
-              </Text>
+              experte && (
+                <Text size="xs" c="dimmed" mt={-8}>
+                  Vorschlag aus der Vokabelanalyse: Klasse {analysis.result.grade} · {analysis.result.level}
+                  {analysis.result.reason ? ` – ${analysis.result.reason}` : ''}
+                  {suggestion && suggestion.level !== base.level ? ` (Lehrplan-Richtwert für Klasse ${base.grade}: ${suggestion.level})` : ''}
+                </Text>
+              )
             ) : (
               suggestion && (
                 <Text size="xs" c="dimmed" mt={-8}>
@@ -254,9 +276,29 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                 </Text>
               )
             )}
+            {/*
+              Aufgabenformate (10.10.2026): alle Formate der Sprache; was für Klasse/Niveau nicht passt, steht
+              grau mit Hinweis da. Die KI nutzt nur die gewählten und verteilt die Vokabeln etwa gleichmäßig.
+            */}
+            <MultiSelect
+              label="Aufgabenformate"
+              description={experte ? 'Die KI nutzt nur diese Formate und verteilt die Vokabeln etwa gleichmäßig. Leer: Die KI wählt passende Formate.' : undefined}
+              placeholder={experte && !formate.length ? 'KI wählt passende Formate' : undefined}
+              data={formatDaten}
+              value={formate}
+              onChange={(v) => {
+                const neu = v as TaskTypeId[]
+                setFormate(neu)
+                formateMerken(base, neu)
+              }}
+              clearable
+              searchable
+              comboboxProps={{ withinPortal: true }}
+              data-aufgabenformate
+            />
             <TextInput
               label="Themenbereich (optional)"
-              description="Die Sätze und Texte der Aufgaben werden nach Möglichkeit in diesem Kontext angesiedelt."
+              description={experte ? 'Die Sätze und Texte der Aufgaben werden nach Möglichkeit in diesem Kontext angesiedelt.' : undefined}
               placeholder={analysis.result?.topic ? `z. B. ${analysis.result.topic}` : 'z. B. Urlaub am Meer, Schule in England'}
               value={base.topic}
               onChange={(e) => patch({ topic: e.currentTarget.value })}
