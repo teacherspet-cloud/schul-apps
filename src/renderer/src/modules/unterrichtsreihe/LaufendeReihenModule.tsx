@@ -34,6 +34,8 @@ export interface LaufendeReihe {
   bedarf: number
   bedarfArten: string[]
   halte: string[]
+  /** Dieselben Haltepunkte mit dem Tag ihrer Stunde (10.10.2026, Startseite „Demnächst"; ohne Stundentermin: null) */
+  halteTermine?: { titel: string; tag: string | null }[]
 }
 
 export const oeffneReihe = (zid: string): void => {

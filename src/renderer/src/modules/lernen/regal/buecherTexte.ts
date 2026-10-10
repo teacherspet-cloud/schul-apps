@@ -31,6 +31,19 @@ export interface BuecherTexte {
   anhoeren: (w: string) => string
   beispiel: string
   oeffnen: (name: string) => string
+  /** Bücherbord nach Schuljahren (10.10.2026): „Dieses Jahr" / „Frühere Jahre" */
+  diesesJahr: string
+  fruehereJahre: string
+  /** „Klasse 6 · 2025/26" (ohne Angaben leer) */
+  jahrgang: (klasse: number | null, schuljahr: string | null) => string
+  /** „80 % kennengelernt" / „62 % sicher" am Cover */
+  kennenP: (p: number) => string
+  sicherP: (p: number) => string
+  /** Umschalter der alphabetischen Liste (10.10.2026): nur Freigegebenes | alle Wörter der Bände */
+  meineWoerter: string
+  alleWoerter: string
+  /** Wort noch nicht freigegeben (nur in „Alle Wörter") */
+  nichtDran: string
 }
 
 const eins = (n: number, ein: string, viele: string): string => `${n} ${n === 1 ? ein : viele}`
@@ -54,7 +67,15 @@ const DE: BuecherTexte = {
   springen: 'Zum Buchstaben springen',
   anhoeren: (w) => `${w} anhören`,
   beispiel: 'Beispielsatz anhören',
-  oeffnen: (n) => `${n} öffnen`
+  oeffnen: (n) => `${n} öffnen`,
+  diesesJahr: 'Dieses Jahr',
+  fruehereJahre: 'Frühere Jahre',
+  jahrgang: (k, sj) => [k ? `Klasse ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+  kennenP: (p) => `${p} % kennengelernt`,
+  sicherP: (p) => `${p} % sicher`,
+  meineWoerter: 'Meine Wörter',
+  alleWoerter: 'Alle Wörter',
+  nichtDran: 'noch nicht dran'
 }
 
 const SPRACHEN: Record<string, BuecherTexte> = {
@@ -77,7 +98,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Jump to a letter',
     anhoeren: (w) => `Listen to “${w}”`,
     beispiel: 'Listen to the example',
-    oeffnen: (n) => `Open ${n}`
+    oeffnen: (n) => `Open ${n}`,
+    diesesJahr: 'This year',
+    fruehereJahre: 'Earlier years',
+    jahrgang: (k, sj) => [k ? `Year ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % met`,
+    sicherP: (p) => `${p} % known`,
+    meineWoerter: 'My words',
+    alleWoerter: 'All words',
+    nichtDran: 'not yet'
   },
   fr: {
     suche: 'Chercher un mot – en français ou en allemand …',
@@ -98,7 +127,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Aller à la lettre',
     anhoeren: (w) => `Écouter « ${w} »`,
     beispiel: "Écouter l'exemple",
-    oeffnen: (n) => `Ouvrir ${n}`
+    oeffnen: (n) => `Ouvrir ${n}`,
+    diesesJahr: 'Cette année',
+    fruehereJahre: 'Années précédentes',
+    jahrgang: (k, sj) => [k ? `Classe ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % vus`,
+    sicherP: (p) => `${p} % acquis`,
+    meineWoerter: 'Mes mots',
+    alleWoerter: 'Tous les mots',
+    nichtDran: 'pas encore'
   },
   es: {
     suche: 'Buscar una palabra – en español o en alemán …',
@@ -119,7 +156,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Ir a la letra',
     anhoeren: (w) => `Escuchar «${w}»`,
     beispiel: 'Escuchar el ejemplo',
-    oeffnen: (n) => `Abrir ${n}`
+    oeffnen: (n) => `Abrir ${n}`,
+    diesesJahr: 'Este año',
+    fruehereJahre: 'Años anteriores',
+    jahrgang: (k, sj) => [k ? `Curso ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % vistas`,
+    sicherP: (p) => `${p} % dominadas`,
+    meineWoerter: 'Mis palabras',
+    alleWoerter: 'Todas',
+    nichtDran: 'todavía no'
   },
   it: {
     suche: 'Cerca una parola – in italiano o in tedesco …',
@@ -140,7 +185,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Vai alla lettera',
     anhoeren: (w) => `Ascolta «${w}»`,
     beispiel: "Ascolta l'esempio",
-    oeffnen: (n) => `Apri ${n}`
+    oeffnen: (n) => `Apri ${n}`,
+    diesesJahr: "Quest'anno",
+    fruehereJahre: 'Anni precedenti',
+    jahrgang: (k, sj) => [k ? `Classe ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % viste`,
+    sicherP: (p) => `${p} % sicure`,
+    meineWoerter: 'Le mie parole',
+    alleWoerter: 'Tutte',
+    nichtDran: 'non ancora'
   },
   la: {
     suche: 'Verbum quaere – Latine aut Theodisce …',
@@ -161,7 +214,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Ad litteram',
     anhoeren: (w) => `Audi: ${w}`,
     beispiel: 'Exemplum audi',
-    oeffnen: (n) => `Aperi: ${n}`
+    oeffnen: (n) => `Aperi: ${n}`,
+    diesesJahr: 'Hoc anno',
+    fruehereJahre: 'Anni priores',
+    jahrgang: (k, sj) => [k ? `Classis ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % cognita`,
+    sicherP: (p) => `${p} % certa`,
+    meineWoerter: 'Mea verba',
+    alleWoerter: 'Omnia verba',
+    nichtDran: 'nondum'
   },
   ru: {
     suche: 'Найти слово – по-русски или по-немецки …',
@@ -182,7 +243,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'К букве',
     anhoeren: (w) => `Слушать: ${w}`,
     beispiel: 'Слушать пример',
-    oeffnen: (n) => `Открыть: ${n}`
+    oeffnen: (n) => `Открыть: ${n}`,
+    diesesJahr: 'Этот год',
+    fruehereJahre: 'Прошлые годы',
+    jahrgang: (k, sj) => [k ? `Класс ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % знакомо`,
+    sicherP: (p) => `${p} % выучено`,
+    meineWoerter: 'Мои слова',
+    alleWoerter: 'Все слова',
+    nichtDran: 'ещё не было'
   },
   nl: {
     suche: 'Woord zoeken – Nederlands of Duits …',
@@ -203,7 +272,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Naar letter',
     anhoeren: (w) => `Luister: ${w}`,
     beispiel: 'Luister naar het voorbeeld',
-    oeffnen: (n) => `Open ${n}`
+    oeffnen: (n) => `Open ${n}`,
+    diesesJahr: 'Dit jaar',
+    fruehereJahre: 'Eerdere jaren',
+    jahrgang: (k, sj) => [k ? `Klas ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % gezien`,
+    sicherP: (p) => `${p} % gekend`,
+    meineWoerter: 'Mijn woorden',
+    alleWoerter: 'Alle woorden',
+    nichtDran: 'nog niet'
   },
   pl: {
     suche: 'Szukaj słowa – po polsku lub po niemiecku …',
@@ -224,7 +301,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Przejdź do litery',
     anhoeren: (w) => `Posłuchaj: ${w}`,
     beispiel: 'Posłuchaj przykładu',
-    oeffnen: (n) => `Otwórz: ${n}`
+    oeffnen: (n) => `Otwórz: ${n}`,
+    diesesJahr: 'Ten rok',
+    fruehereJahre: 'Poprzednie lata',
+    jahrgang: (k, sj) => [k ? `Klasa ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % poznane`,
+    sicherP: (p) => `${p} % opanowane`,
+    meineWoerter: 'Moje słowa',
+    alleWoerter: 'Wszystkie słowa',
+    nichtDran: 'jeszcze nie'
   },
   cs: {
     suche: 'Hledat slovo – česky nebo německy …',
@@ -245,7 +330,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Přejít na písmeno',
     anhoeren: (w) => `Poslechnout: ${w}`,
     beispiel: 'Poslechnout příklad',
-    oeffnen: (n) => `Otevřít: ${n}`
+    oeffnen: (n) => `Otevřít: ${n}`,
+    diesesJahr: 'Tento rok',
+    fruehereJahre: 'Dřívější roky',
+    jahrgang: (k, sj) => [k ? `Třída ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % viděná`,
+    sicherP: (p) => `${p} % umím`,
+    meineWoerter: 'Moje slova',
+    alleWoerter: 'Všechna slova',
+    nichtDran: 'ještě ne'
   },
   pt: {
     suche: 'Procurar uma palavra – em português ou alemão …',
@@ -266,7 +359,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Ir para a letra',
     anhoeren: (w) => `Ouvir «${w}»`,
     beispiel: 'Ouvir o exemplo',
-    oeffnen: (n) => `Abrir ${n}`
+    oeffnen: (n) => `Abrir ${n}`,
+    diesesJahr: 'Este ano',
+    fruehereJahre: 'Anos anteriores',
+    jahrgang: (k, sj) => [k ? `Ano ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % vistas`,
+    sicherP: (p) => `${p} % dominadas`,
+    meineWoerter: 'As minhas palavras',
+    alleWoerter: 'Todas',
+    nichtDran: 'ainda não'
   },
   tr: {
     suche: 'Kelime ara – Türkçe veya Almanca …',
@@ -287,7 +388,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Harfe git',
     anhoeren: (w) => `Dinle: ${w}`,
     beispiel: 'Örneği dinle',
-    oeffnen: (n) => `Aç: ${n}`
+    oeffnen: (n) => `Aç: ${n}`,
+    diesesJahr: 'Bu yıl',
+    fruehereJahre: 'Önceki yıllar',
+    jahrgang: (k, sj) => [k ? `Sınıf ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % görülen`,
+    sicherP: (p) => `${p} % bilinen`,
+    meineWoerter: 'Kelimelerim',
+    alleWoerter: 'Tüm kelimeler',
+    nichtDran: 'henüz değil'
   },
   da: {
     suche: 'Søg efter et ord – dansk eller tysk …',
@@ -308,7 +417,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Gå til bogstav',
     anhoeren: (w) => `Lyt: ${w}`,
     beispiel: 'Lyt til eksemplet',
-    oeffnen: (n) => `Åbn ${n}`
+    oeffnen: (n) => `Åbn ${n}`,
+    diesesJahr: 'I år',
+    fruehereJahre: 'Tidligere år',
+    jahrgang: (k, sj) => [k ? `Klasse ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % set`,
+    sicherP: (p) => `${p} % kan`,
+    meineWoerter: 'Mine ord',
+    alleWoerter: 'Alle ord',
+    nichtDran: 'ikke endnu'
   },
   grc: {
     suche: 'Λέξιν ζήτει – Ἑλληνιστὶ ἢ Γερμανιστί …',
@@ -329,7 +446,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Πρὸς τὸ γράμμα',
     anhoeren: (w) => `Ἄκουε: ${w}`,
     beispiel: 'Ἄκουε τὸ παράδειγμα',
-    oeffnen: (n) => `Ἄνοιξον: ${n}`
+    oeffnen: (n) => `Ἄνοιξον: ${n}`,
+    diesesJahr: 'Τοῦτο τὸ ἔτος',
+    fruehereJahre: 'Τὰ πρότερα ἔτη',
+    jahrgang: (k, sj) => [k ? `Τάξις ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % γνωστά`,
+    sicherP: (p) => `${p} % βέβαια`,
+    meineWoerter: 'Τὰ ἐμὰ ῥήματα',
+    alleWoerter: 'Πάντα',
+    nichtDran: 'οὔπω'
   },
   el: {
     suche: 'Αναζήτηση λέξης – στα ελληνικά ή στα γερμανικά …',
@@ -350,7 +475,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'Μετάβαση σε γράμμα',
     anhoeren: (w) => `Άκου: ${w}`,
     beispiel: 'Άκου το παράδειγμα',
-    oeffnen: (n) => `Άνοιγμα: ${n}`
+    oeffnen: (n) => `Άνοιγμα: ${n}`,
+    diesesJahr: 'Φέτος',
+    fruehereJahre: 'Προηγούμενα χρόνια',
+    jahrgang: (k, sj) => [k ? `Τάξη ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % γνωστές`,
+    sicherP: (p) => `${p} % σίγουρες`,
+    meineWoerter: 'Οι λέξεις μου',
+    alleWoerter: 'Όλες οι λέξεις',
+    nichtDran: 'όχι ακόμα'
   },
   zh: {
     suche: '搜索词语 – 中文或德语 …',
@@ -371,7 +504,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: '跳到字母',
     anhoeren: (w) => `听：${w}`,
     beispiel: '听例句',
-    oeffnen: (n) => `打开：${n}`
+    oeffnen: (n) => `打开：${n}`,
+    diesesJahr: '今年',
+    fruehereJahre: '往年',
+    jahrgang: (k, sj) => [k ? `${k}年级` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % 已见过`,
+    sicherP: (p) => `${p} % 已掌握`,
+    meineWoerter: '我的单词',
+    alleWoerter: '全部单词',
+    nichtDran: '尚未学习'
   },
   ja: {
     suche: '単語を検索 – 日本語またはドイツ語 …',
@@ -392,7 +533,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: '文字へ移動',
     anhoeren: (w) => `聞く：${w}`,
     beispiel: '例文を聞く',
-    oeffnen: (n) => `開く：${n}`
+    oeffnen: (n) => `開く：${n}`,
+    diesesJahr: '今年',
+    fruehereJahre: '前の年',
+    jahrgang: (k, sj) => [k ? `${k}学年` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `${p} % 見た`,
+    sicherP: (p) => `${p} % 習得`,
+    meineWoerter: '自分の単語',
+    alleWoerter: 'すべての単語',
+    nichtDran: 'まだ'
   },
   ar: {
     suche: 'ابحث عن كلمة – بالعربية أو بالألمانية …',
@@ -413,7 +562,15 @@ const SPRACHEN: Record<string, BuecherTexte> = {
     springen: 'انتقل إلى الحرف',
     anhoeren: (w) => `استمع: ${w}`,
     beispiel: 'استمع إلى المثال',
-    oeffnen: (n) => `افتح: ${n}`
+    oeffnen: (n) => `افتح: ${n}`,
+    diesesJahr: 'هذا العام',
+    fruehereJahre: 'الأعوام السابقة',
+    jahrgang: (k, sj) => [k ? `الصف ${k}` : '', sj ?? ''].filter(Boolean).join(' · '),
+    kennenP: (p) => `تعرّفت عليها ${p} %`,
+    sicherP: (p) => `محفوظة ${p} %`,
+    meineWoerter: 'كلماتي',
+    alleWoerter: 'كل الكلمات',
+    nichtDran: 'ليس بعد'
   }
 }
 

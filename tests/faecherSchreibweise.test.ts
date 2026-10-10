@@ -80,11 +80,13 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
     expect(erledigt).toEqual([
       'abkuerzung-ton-2026-10-09',
       'abschnitte-teilen-2026-10-09',
+      'auszeichnungen-jahre-2026-10-10',
       'codes-hmac-2026-10-08',
       'faecher-schreibweise-2026-10-08',
       'grammatik-je-thema-2026-10-08',
       'grammatik-klasse10-loeschen-2026-10-09',
       'klartext-reste-2026-10-08',
+      'medien-kanon-2026-10-10',
       'namen-korrigieren-2026-10-09',
       'rekorde-zeit-2026-10-08',
       'there-was-klasse5-2026-10-09',

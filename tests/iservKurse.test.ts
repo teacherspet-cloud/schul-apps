@@ -282,3 +282,14 @@ describe('IServ-Ordner und neues Schuljahr', () => {
     ])
   })
 })
+
+describe('IServ-Gruppen in verschiedenen Formen (10.10.2026)', () => {
+  it('Liste, Zuordnung { act: Name }, verschachtelt', async () => {
+    const { gruppenAus, gruppenForm } = await import('../src/server/anmeldung')
+    expect(gruppenAus({ 'iserv:groups': ['klasse.7b'] })).toEqual([{ id: 'klasse.7b', name: 'klasse.7b' }])
+    expect(gruppenAus({ 'iserv:groups': { 'fr.7.kon': 'FR 7 Kon' } })).toEqual([{ id: 'fr.7.kon', name: 'FR 7 Kon' }])
+    expect(gruppenAus({ 'iserv:groups': { groups: [{ act: 'en.13', name: 'EN 13 eA Kon' }] } })).toEqual([{ id: 'en.13', name: 'EN 13 eA Kon' }])
+    expect(gruppenAus({ 'iserv:groups': [] })).toEqual([])
+    expect(gruppenForm({ 'iserv:groups': [] })).toBe('iserv:groups=Liste(0)')
+  })
+})

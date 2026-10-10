@@ -19,7 +19,6 @@ import {
   Autocomplete,
   Badge,
   Button,
-  Card,
   Code,
   Container,
   CopyButton,
@@ -52,6 +51,7 @@ import { ServerReiter } from './ServerReiter'
 import MaskottchenSettings from '../../shell/MaskottchenSettings'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useZielZeiger } from '../../shared/navigation'
+import { KlappKarte } from '../../shared/components/KlappKarte'
 
 interface Uebersicht {
   nutzer: {
@@ -231,10 +231,8 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   }
   return (
     <Stack>
-      <Card withBorder data-nutzer-anlegen>
-        <Text fw={600} mb="xs">
-          Neuen Nutzer anlegen
-        </Text>
+      {/* Kästen auf- und zuklappbar (10.10.2026, Wunsch der Lehrkraft), standardmäßig zu */}
+      <KlappKarte id="nutzer-anlegen" titel="Neuen Nutzer anlegen" rahmen={{ 'data-nutzer-anlegen': true }}>
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
           <TextInput
             label="Benutzername"
@@ -291,9 +289,9 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
             Nutzer anlegen
           </Button>
         </Group>
-      </Card>
+      </KlappKarte>
       <KlassenlisteKarte fertig={neu} />
-      <Card withBorder>
+      <KlappKarte id="nutzer-testkonto" titel="Testkonto anlegen">
         <Group align="end">
           <Select
             label="Testkonto anlegen als"
@@ -313,9 +311,9 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
         <Text size="xs" c="dimmed" mt="xs">
           Testkonten melden sich mit Benutzername und Passwort an (Anmeldeseite › Testkonto). Löschen entfernt das Konto mit allen Daten.
         </Text>
-      </Card>
+      </KlappKarte>
       <IservAbgleich d={d} neu={neu} />
-      <Card withBorder data-nutzer-suche>
+      <KlappKarte id="nutzer-suche" titel="Nutzer suchen" status={`${ohneGaeste.length} Konten`} rahmen={{ 'data-nutzer-suche': true }}>
         <TextInput
           label="Nutzer suchen"
           description={`Name, Benutzername, Rolle, Anmeldeart oder Klasse – ab ${SUCHE_MIN} Zeichen. ${ohneGaeste.length} Konten insgesamt.`}
@@ -337,7 +335,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
                 : `${gesamt} Treffer`}
           </Text>
         )}
-      </Card>
+      </KlappKarte>
       {!zuKurz && konten.length > 0 && (
       <Table striped highlightOnHover data-karten>
         <Table.Thead>
@@ -521,10 +519,7 @@ function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JS
     }
   }
   return (
-    <Card withBorder data-iserv-abgleich>
-      <Text fw={600} mb={4}>
-        Mit IServ abgleichen
-      </Text>
+    <KlappKarte id="nutzer-iserv-abgleich" titel="Mit IServ abgleichen" rahmen={{ 'data-iserv-abgleich': true }}>
       <Text size="xs" c="dimmed" mb="xs">
         Konten mit IServ-Anmeldung, die es in IServ nicht mehr gibt, aus Schul-Apps entfernen. „Prüfen“ zeigt zuerst die Liste, entfernt wird erst nach
         Bestätigung. Admins, das eigene Konto und Konten ohne IServ bleiben immer.
@@ -605,7 +600,7 @@ function IservAbgleich({ d, neu }: { d: Uebersicht; neu: () => void }): React.JS
           )}
         </Stack>
       )}
-    </Card>
+    </KlappKarte>
   )
 }
 

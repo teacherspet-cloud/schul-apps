@@ -37,7 +37,7 @@ export interface Lernstanddaten {
   code?: string
   link?: string
   lerngruppe: string
-  woerter: { id: string; term: string; translation: string }[]
+  woerter: { id: string; term: string; translation: string; auchRichtig?: string[]; aussprache?: string; bild?: string }[]
   lernende: {
     id: string
     name: string
@@ -66,6 +66,10 @@ export interface Lernstanddaten {
   lernendeNamen?: string[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
+  /** Kasten „Abschnitte & Wörter" (10.10.2026): Anteil der Lernenden, für die das Wort sicher ist */
+  wortSicher?: Record<string, number>
+  /** … und je Problemwort, wer Schwierigkeiten hat (meiste Fehler zuerst) */
+  problemWer?: Record<string, { name: string; falsch: number; versuche: number }[]>
 }
 
 export type Lernende = Lernstanddaten['lernende'][number]

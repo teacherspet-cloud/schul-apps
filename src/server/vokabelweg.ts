@@ -72,7 +72,7 @@ export const wegStand = (sid: string, reihe: string): VokStand => {
   const z = ldb().prepare('SELECT daten FROM vok_laufbahn WHERE schueler_id = ? AND reihe = ?').get(sid, reihe) as { daten: string } | undefined
   return json_(z?.daten, { woerter: {}, tage: [] } as VokStand)
 }
-function wegSpeichern(sid: string, reihe: string, s: VokStand): void {
+export function wegSpeichern(sid: string, reihe: string, s: VokStand): void {
   ldb()
     .prepare(
       'INSERT INTO vok_laufbahn (schueler_id, reihe, daten, aktualisiert) VALUES (?, ?, ?, ?) ON CONFLICT (schueler_id, reihe) DO UPDATE SET daten = excluded.daten, aktualisiert = excluded.aktualisiert'

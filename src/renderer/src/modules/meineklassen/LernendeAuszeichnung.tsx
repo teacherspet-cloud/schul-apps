@@ -1,7 +1,8 @@
 /**
  * Medaillen und Titel einer lernenden Person in „Meine Klassen" (10.10.2026, Wunsch der Lehrkraft): Profilbild, Titel
  * in der Sprache der Lerngruppe und sieben kleine Medaillen (Bronze … Meister) – als Gesprächsanlass, nicht als
- * Rangliste: neutral dargestellt, nicht sortierbar.
+ * Rangliste: neutral dargestellt, nicht sortierbar. Seit den Jahresreihen (10.10.2026): die Medaillen des laufenden
+ * Schuljahres („Kl. 7 (2026/27)"), der Titel ist der Haupttitel über alle Jahre.
  */
 import { Group, Text, Tooltip } from '@mantine/core'
 import { KATEGORIEN, stufenName } from '@shared/auszeichnungen'
@@ -13,6 +14,9 @@ export interface AuszeichnungLehrkraft {
   punkte: number
   avatar: string | null
   medaillen: { kategorie: string; stufe: number }[]
+  /** Schuljahr der Medaillen („2026/27") und Beschriftung („Kl. 7 (2026/27)") */
+  schuljahr?: string
+  jahr?: string
 }
 
 /** Stufenfarben wie bei den Lernenden */
@@ -20,9 +24,9 @@ export const STUFEN_FARBE = ['#ced4da', '#b8733a', '#8f9aa6', '#d4a017', '#5fa8a
 
 export function LernendeAuszeichnung({ a }: { a: AuszeichnungLehrkraft | undefined }): React.JSX.Element {
   if (!a) return <>–</>
-  const beschreibung = a.medaillen.map((m) => `${KATEGORIEN.find((k) => k.id === m.kategorie)?.name ?? m.kategorie}: ${stufenName(m.stufe)}`).join(' · ')
+  const beschreibung = `${a.jahr ? `Medaillen ${a.jahr}: ` : ''}${a.medaillen.map((m) => `${KATEGORIEN.find((k) => k.id === m.kategorie)?.name ?? m.kategorie}: ${stufenName(m.stufe)}`).join(' · ')}`
   return (
-    <Group gap={6} wrap="nowrap" data-lernende-auszeichnung={a.titel ?? ''} data-medaillen={a.medaillen.map((m) => m.stufe).join('')}>
+    <Group gap={6} wrap="nowrap" data-lernende-auszeichnung={a.titel ?? ''} data-medaillen={a.medaillen.map((m) => m.stufe).join('')} data-medaillen-jahr={a.schuljahr ?? ''}>
       {a.avatar && <img src={bildAdresse(a.avatar)} alt="" width={22} height={26} style={{ objectFit: 'contain' }} data-lernende-avatar={a.avatar} />}
       {a.titel && (
         <Text size="xs" fw={600} style={{ whiteSpace: 'nowrap' }}>

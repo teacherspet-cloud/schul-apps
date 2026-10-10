@@ -8,10 +8,9 @@
  * (Darstellung.vokabelwegOffen). Ein freier Abschnitt lässt sich antippen – der Trainer öffnet dann ein Fenster
  * mit genau dessen Wörtern (`oeffne`); gesperrte bleiben ohne Klick, ein Hinweis sagt warum.
  */
-import { Collapse, Group, Progress, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { holen, senden } from '../onlinetest/serverApi'
+import { Collapse, Group, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { senden } from '../onlinetest/serverApi'
 import { fuerServer, useDarstellung } from '../onlinetest/schuelerDarstellung'
-import { lesbarAuf } from './vtFarben'
 import { IconCheck, IconChevronDown, IconConfetti, IconLock, IconMapPin } from '@tabler/icons-react'
 import { forwardRef, useEffect, useMemo, useState } from 'react'
 import { fehlenBis, type Stufe } from '@shared/vokabelLaufbahn'
@@ -236,61 +235,3 @@ const Knoten = forwardRef<HTMLElement, { klickbar: boolean; children: React.Reac
     )
   }
 )
-
-/** Einstieg in den Vokabelweg (Lernraum, Fachzimmer): je Lehrwerksreihe eine Karte mit Fortschritt */
-export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element | null {
-  const [wege, setWege] = useState<WegKurz[] | null>(null)
-  useEffect(() => {
-    void holen<{ wege: WegKurz[] }>('/s/api/vokabelweg').then(
-      (d) => setWege(d.wege),
-      () => setWege([])
-    )
-  }, [])
-  const sichtbar = (wege ?? []).filter((w) => !fach || w.fach === fach)
-  if (!sichtbar.length) return null
-  return (
-    <Stack gap="xs">
-      {sichtbar.map((w) => {
-        const gelernt = w.stufen.filter((s) => s.gelernt).length
-        const aktuell = w.stufen.find((s) => s.aktuell)
-        const farbe = w.farbe ?? '#ea580c'
-        // Schrift auf der Fachfarbe: Schwarz oder Weiß, was besser trägt
-        const schrift = lesbarAuf(farbe)
-        return (
-          <a
-            key={w.key}
-            href={`/s/vw/${encodeURIComponent(w.key)}`}
-            style={{
-              textDecoration: 'none',
-              color: 'inherit',
-              display: 'block',
-              borderRadius: 18,
-              padding: '14px 16px',
-              background: `linear-gradient(120deg, ${farbe}, ${farbe}cc)`,
-              boxShadow: `0 10px 22px ${farbe}44`
-            }}
-            data-vokabelweg-karte={w.key}
-          >
-            <Group justify="space-between" wrap="nowrap">
-              <div style={{ color: schrift }}>
-                <Text size="xs" fw={600} style={{ opacity: 0.9 }}>
-                  Mein Vokabelweg · {w.fach}
-                </Text>
-                <Text fw={800} size="lg">
-                  {w.band}
-                </Text>
-                <Text size="sm" style={{ opacity: 0.92 }}>
-                  {aktuell ? `Gerade dran: ${aktuell.unit} · ${aktuell.section}` : 'Alles freigeschaltete ist gelernt.'}
-                </Text>
-              </div>
-              <Text fw={800} size="xl" c={schrift} style={{ whiteSpace: 'nowrap' }}>
-                {gelernt}/{w.stufen.length}
-              </Text>
-            </Group>
-            <Progress value={(gelernt / Math.max(1, w.stufen.length)) * 100} color="rgba(255,255,255,0.9)" bg="rgba(255,255,255,0.25)" mt={8} radius="xl" />
-          </a>
-        )
-      })}
-    </Stack>
-  )
-}

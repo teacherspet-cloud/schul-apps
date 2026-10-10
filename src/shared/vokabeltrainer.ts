@@ -33,6 +33,8 @@ export interface Vokabel {
   aussprache?: string
   /** Weitere richtige Antworten, von der Lehrkraft eingetragen („auch richtig", 09.10.2026) */
   auchRichtig?: string[]
+  /** Tagesrunde einer Sprache (10.10.2026, shared/sprachstand.ts): Wort aus einem früheren Band – „aus Green Line 1 · Unit 2" */
+  herkunft?: string
 }
 
 /** Stand eines Wortes für eine Person */
@@ -569,6 +571,21 @@ export function sitzungsWoerter(liste: Vokabel[], staende: Record<string, WortSt
 /** Schrittgröße beim Üben: die Tagesration kommt in Zehnerschritten (der letzte Schritt ggf. kleiner) */
 export const SCHRITT = 10
 
+/**
+ * Die Tagesrunde (10.10.2026, Befund der Lehrkraft: die Startseite nannte „88 Vokabeln sind heute dran", der Ordner
+ * „heute noch 45" – drei verschiedene Rechnungen). EINE Zahl überall: fällige Wiederholungen (älteste zuerst), dann neue
+ * Wörter bis zum Tagesziel – höchstens so viele wie das Tagesziel (mindestens ein Zehnerschritt). Weitere fällige
+ * Wiederholungen nennt `extra`: freiwillig, ruhig erwähnt, sie kommen sonst morgen zuerst.
+ */
+export const rundenGrenze = (ziel: number): number => Math.max(SCHRITT, Math.round(ziel) || 0)
+export function tagesRunde(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), ziel = NEU_JE_TAG): { woerter: Vokabel[]; extra: number } {
+  const alle = sitzungsWoerter(liste, staende, jetzt, ziel, Number.MAX_SAFE_INTEGER)
+  const grenze = rundenGrenze(ziel)
+  const woerter = alle.slice(0, grenze)
+  const neuIds = new Set(neueWoerter(liste, staende, jetzt).map((v) => v.id))
+  return { woerter, extra: alle.slice(grenze).filter((v) => !neuIds.has(v.id)).length }
+}
+
 /** Freiwillig weiter (nach der Tagesration): die nächsten `n` neuen Wörter */
 export const weitereNeue = (liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), n = NEU_JE_TAG): Vokabel[] =>
   neueWoerter(liste, staende, jetzt).slice(0, n)
@@ -604,7 +621,7 @@ export function uebersicht(liste: Vokabel[], staende: Record<string, WortStand>,
   }
   const heute = tagVon(jetzt)
   const heuteGeuebt = liste.filter((v) => (staende[v.id]?.zuletzt ?? 0) > 0 && tagVon(staende[v.id].zuletzt) === heute).length
-  const heuteOffen = sitzungsWoerter(liste, staende, jetzt, tagesziel, tagesziel + 25).length
+  const heuteOffen = tagesRunde(liste, staende, jetzt, tagesziel).woerter.length
   return {
     gesamt: liste.length,
     neu: faecher[0],
@@ -767,8 +784,8 @@ export function buchstaben(term: string, zufall: () => number = Math.random): st
 export const istWackelig = (s: WortStand, jetzt = Date.now()): boolean => s.fach >= 1 && s.fach <= 2 && s.falsch > 0 && jetzt - (s.zuletzt || 0) < 14 * TAG
 
 /** Übungen, die ein Link direkt startet (`/s/v/<ID>?uebung=…`, Tipps der Startseite, 09.10.2026) */
-export type LinkUebung = 'runde' | 'abfragen' | 'wackelig'
-export const LINK_UEBUNGEN: readonly LinkUebung[] = ['runde', 'abfragen', 'wackelig']
+export type LinkUebung = 'runde' | 'abfragen' | 'wackelig' | 'neu'
+export const LINK_UEBUNGEN: readonly LinkUebung[] = ['runde', 'abfragen', 'wackelig', 'neu']
 
 /**
  * Welche Runde ein Link startet (09.10.2026, Befund der Lehrkraft: „Abfrage ohne Hinschauen starten" öffnete nur die
@@ -784,8 +801,14 @@ export function linkRunde(
   tagesziel = NEU_JE_TAG
 ): { woerter: Vokabel[]; abfragen: boolean; freiwillig: boolean } | null {
   if (!art || !(LINK_UEBUNGEN as readonly string[]).includes(art)) return null
-  const heute = sitzungsWoerter(liste, staende, jetzt, tagesziel, tagesziel + 25)
+  const heute = tagesRunde(liste, staende, jetzt, tagesziel).woerter
   const frei = (): Vokabel[] => freiwilligeWoerter(liste, staende, jetzt)
+  // Freiwillig Neues aus einem früheren Band (10.10.2026, „Noch nicht gelernte Wörter lernen"): die nächsten zehn neuen
+  if (art === 'neu') {
+    const w = weitereNeue(liste, staende, jetzt, SCHRITT)
+    if (w.length) return { woerter: w, abfragen: false, freiwillig: false }
+    art = 'runde'
+  }
   if (art === 'wackelig') {
     const w = liste.filter((v) => staende[v.id] && istWackelig(staende[v.id], jetzt)).slice(0, SCHRITT)
     if (w.length) return { woerter: w, abfragen: false, freiwillig: true }

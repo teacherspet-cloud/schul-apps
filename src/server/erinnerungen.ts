@@ -26,11 +26,12 @@ import { createHmac } from 'node:crypto'
 import { datenbank, nutzerNachId, protokolliereServer, serverGeheimnis, setzeServerGeheimnis, type NutzerInfo } from './datenbank'
 import { hauptschluessel } from './geheim'
 import { beimAbmelden, json, type Anfrage } from './http'
-import { db as vokDb, istOffen, json_, kursHaken, standVon as vokStandVon, tageszielVon, teileVon, vokIstFuer, type Zeile as VokZeile } from './vokabeln'
+import { db as vokDb, istOffen, json_, kursHaken, standVon as vokStandVon, tageszielVon, teileVon, vokIstFuer, woerterDiesesJahres, type Zeile as VokZeile } from './vokabeln'
 import { grammatikFuerErinnerung } from './grammatik'
 import { achDatenLesen } from './achievementsDaten'
 import { kursFuerLernende } from '../shared/freigabePlan'
-import { sitzungsWoerter, type Vokabel } from '../shared/vokabeltrainer'
+import { fachAusName } from '../shared/faecher'
+import { tagesRunde, type Vokabel } from '../shared/vokabeltrainer'
 import { endpunktErlaubt, pushSenden, vapidErzeugen, vapidGueltig, vonB64u, type PushZiel, type VapidSchluessel } from './webPush'
 import {
   ausloeserWaehlen,
@@ -263,8 +264,12 @@ export function lageVon(n: NutzerInfo, zustand: Pick<Zustand, 'neuSeit' | 'termi
     for (const t of st.tage ?? []) tage.add(t)
     if (woerter.length) {
       const ziel = tageszielVon(z)
-      const o = sitzungsWoerter(woerter, st.woerter, jetzt, ziel, ziel + 25).length
-      if (o && !offenZiel) offenZiel = `/s/v/${z.id}`
+      // Nur Abschnitte dieses Schuljahres bringen eine Runde (10.10.2026); Konten üben im Fachordner (eine Runde je Sprache)
+      const o = tagesRunde(woerterDiesesJahres(z, jetzt), st.woerter, jetzt, ziel).woerter.length
+      const fach = fachAusName(z.fach)?.label ?? z.fach
+      // Mit Lehrwerk: die Runde der Sprache im Fachordner; ohne (eigene Listen) und für Gäste: der Kurs selbst
+      const mitBuch = Boolean(json_(z.quelle || '{}', {} as { lehrwerk?: string }).lehrwerk) || /"lehrwerk"/.test(z.teile ?? '')
+      if (o && !offenZiel) offenZiel = n.quelle !== 'gast' && mitBuch ? `/s/ordner/${encodeURIComponent(fach)}?r=vok&uebung=runde` : `/s/v/${z.id}`
       offen += o
       // Neu: Abschnitte, die seit der letzten Meldung frei wurden (geplante ab ihrem Zeitpunkt)
       for (const t of teileVon(z0) as { zeit: number; ab?: number | null }[]) {

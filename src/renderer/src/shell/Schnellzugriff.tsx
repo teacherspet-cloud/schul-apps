@@ -4,11 +4,11 @@
  *  - laufende Unterrichtsreihen mit Handlungsbedarf,
  *  - Onlinetests: geplant, laufend, zu prüfen,
  *  - Freigaben & Rückmeldungen mit neuen Abgaben,
- *  - Termine & Vokabeltraining: anstehende Vokabeltests mit Prognose, laufende Kurse mit Lernstand und Handlungsbedarf,
- *    freigegebene Grammatik und Haltepunkte in Reihen (10.10.2026: auch Kurse ohne Testtermin).
+ *  - Termine & Vokabeltraining (10.10.2026, zweite Fassung): EINE Zeile je laufendem Kurs mit Balken und höchstens einem
+ *    Abzeichen (Test bald > nicht geübt > Problemwörter > ✓), darunter „Demnächst" mit Vokabeltests und Haltepunkten.
  * Am Smartphone (10.10.2026) je Karte zunächst 5 Einträge, Anzahl wählbar (StartAnzahl.tsx).
  * Fachrelevanz (10.10.2026): Eine Karte steht nur da, wenn ihre App sichtbar ist (`startKarten`); ohne Sprachfach heißt
- * die letzte Karte nur „Termine" und zeigt nur Haltepunkte.
+ * die letzte Karte nur „Termine" und zeigt nur „Demnächst".
  * Nur mit dem Schul-Apps-Server (die Exe ohne Server hat diese Dinge nicht).
  */
 import { Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
@@ -20,7 +20,16 @@ import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte, useLaufendeReihen } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe, useFreigaben } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
-import { begrenzt, type StartseiteDaten } from '@shared/startseiteKurse'
+import {
+  begrenzt,
+  demnaechst,
+  kursKopf,
+  tagKurz,
+  type DemnaechstEintrag,
+  type StartAbzeichen,
+  type StartKurs,
+  type StartseiteDaten
+} from '@shared/startseiteKurse'
 import { kursReiterDocId } from '../modules/lernen/kurs/auftragsZiel'
 import { zumHinweis } from '../modules/lernen/kurs/kursFokus'
 import type { KursReiter } from '../modules/lernen/kurs/kursDaten'
@@ -49,16 +58,6 @@ interface RueckmeldungKurz {
   /** Für wie viele Personen (Fortschrittsbalken) */
   gesamt?: number
 }
-interface VokabelKurz {
-  id: string
-  titel: string
-  lerngruppe: string
-  lernende: number
-  sicherSchnitt: number
-  testTermin: number | null
-  status: string
-}
-
 /** Am Smartphone: Anzahl je Karte wählbar (StartAnzahl.tsx); am PC feste Höchstzahl wie bisher */
 interface Begrenzung {
   karte: string
@@ -124,7 +123,6 @@ export function Schnellzugriff(): React.JSX.Element {
   const { liste: blaetter } = useFreigaben()
   const [tests, setTests] = useState<TestKurz[] | null>(null)
   const [rueck, setRueck] = useState<RueckmeldungKurz[] | null>(null)
-  const [vok, setVok] = useState<VokabelKurz[] | null>(null)
   const [start, setStart] = useState<StartseiteDaten | null>(null)
   // Smartphone (10.10.2026): Anzahl je Karte wählbar, dauerhaft je Gerät
   const handy = useMediaQuery('(max-width: 700px)') ?? false
@@ -147,11 +145,7 @@ export function Schnellzugriff(): React.JSX.Element {
       (d) => setRueck(d.freigaben),
       () => setRueck([])
     )
-    void holen<{ zuweisungen: VokabelKurz[] }>('/server/vokabeln').then(
-      (d) => setVok(d.zuweisungen),
-      () => setVok([])
-    )
-    // Laufende Kurse, ihr Handlungsbedarf und ihre Grammatik (10.10.2026) – eine Anfrage für alle Kurse
+    // Laufende Kurse mit ihrem einen Abzeichen und Testtermin (10.10.2026) – eine Anfrage für alle Kurse
     void holen<StartseiteDaten>('/server/startseite').then(
       (d) => setStart(d),
       () => setStart({ kurse: [], klassen: [] })
@@ -165,8 +159,6 @@ export function Schnellzugriff(): React.JSX.Element {
   const blattOffen = ids.includes('freigaben') ? (blaetter ?? []).filter((b) => b.status === 'offen') : []
   const rueckOffen = ids.includes('rueckmeldung') ? (rueck ?? []).filter((r) => r.status === 'offen' && !r.art) : []
   const jetzt = Date.now()
-  const termine = (vokabeln ? (vok ?? []) : []).filter((v) => v.status === 'offen' && v.testTermin && v.testTermin >= jetzt - 864e5).sort((a, b) => a.testTermin! - b.testTermin!)
-  const halte = (reihen ?? []).flatMap((r) => r.halte.map((h) => ({ r, h })))
   const kurse = vokabeln ? (start?.kurse ?? []) : []
 
   const reihenZeilen = (reihen ?? []).map((r) => <ReiheKarte key={r.zid} r={r} />)
@@ -240,89 +232,34 @@ export function Schnellzugriff(): React.JSX.Element {
     ? [...blattOffen.map(blattZeile), ...rueckOffen.map(rueckZeile)]
     : [...blattOffen.slice(0, 5).map(blattZeile), ...rueckOffen.slice(0, 4).map(rueckZeile)]
 
-  // Termine & Vokabeltraining (10.10.2026): a) Testtermine, b) laufende Kurse, c) Handlungsbedarf, d) Grammatik und Haltepunkte
-  const terminZeilen: React.ReactNode[] = [
-    ...termine.map((v) => {
-      const tage = Math.round((v.testTermin! - jetzt) / 864e5)
-      return (
-        <div key={`t-${v.id}`}>
-          <Zeile
-            titel={v.titel}
-            unter={`${v.lerngruppe} · Test ${tage <= 0 ? 'heute' : tage === 1 ? 'morgen' : `in ${tage} Tagen`} (${new Date(v.testTermin!).toLocaleDateString('de-DE')})`}
-            onClick={() => void openDocument('sprachenlernen', v.id)}
-          >
-            <Badge variant="light" color={ampelFarbe(v.sicherSchnitt)}>
-              {Math.round(v.sicherSchnitt * 100)} % sicher
-            </Badge>
-          </Zeile>
-          <Progress value={v.sicherSchnitt * 100} size="xs" color={ampelFarbe(v.sicherSchnitt)} />
-        </div>
-      )
-    }),
-    ...kurse.map((k) => (
-      <Zeile
-        key={`k-${k.id}`}
-        titel={k.titel}
-        unter={k.lernende ? `heute geübt: ${k.heute} von ${k.lernende}` : 'noch niemand im Kurs'}
-        onClick={() => void openDocument('sprachenlernen', k.id)}
-        daten={{ 'data-start-kurs': k.id }}
-        unten={k.sicher !== null ? <Progress value={k.sicher * 100} size="xs" color={ampelFarbe(k.sicher)} /> : undefined}
-      >
-        {k.sicher !== null ? (
-          <Badge variant="light" color={ampelFarbe(k.sicher)}>
-            {Math.round(k.sicher * 100)} % sicher
-          </Badge>
-        ) : (
-          <Badge variant="light" color="gray">
-            Grammatik
-          </Badge>
-        )}
-      </Zeile>
-    )),
-    ...kurse.flatMap((k) =>
-      k.hinweise.map((h) => (
-        <UnstyledButton
-          key={`h-${k.id}-${h.hinweis}`}
-          data-start-hinweis={h.hinweis}
-          onClick={() =>
-            void openDocument('sprachenlernen', kursReiterDocId(k.id, h.reiter)).then(() =>
-              zumHinweis({ kurs: k.id, hinweis: h.hinweis, reiter: h.reiter as KursReiter, ids: h.ids })
-            )
-          }
-          style={{ display: 'block', width: '100%', textAlign: 'left' }}
-        >
-          <Group gap={6} wrap="nowrap">
-            <IconAlertCircle size={14} color={`var(--mantine-color-${h.farbe}-6)`} style={{ flex: 'none' }} />
-            <Text size="xs" truncate>
-              <b>{gruppeVon(k.titel)}:</b> {h.text}
-            </Text>
-          </Group>
-        </UnstyledButton>
-      ))
-    ),
-    ...kurse.flatMap((k) =>
-      k.grammatik.map((g) => (
-        <Zeile
-          key={`g-${g.id}`}
-          titel={`Grammatik: ${g.titel}`}
-          unter={`${gruppeVon(k.titel)} · ${
-            g.status === 'geplant' && g.geplantAb ? `frei ab ${new Date(g.geplantAb).toLocaleDateString('de-DE')}` : `${Math.round(g.sicher * 100)} % sicher`
-          }`}
-          onClick={() => void openDocument('sprachenlernen', `g:${g.id}`)}
-          daten={{ 'data-start-grammatik': g.id }}
-        >
-          <Badge variant="light" color={g.status === 'geplant' ? 'gray' : 'teal'}>
-            {g.status === 'geplant' ? 'geplant' : 'läuft'}
-          </Badge>
-        </Zeile>
-      ))
-    ),
-    ...halte.map(({ r, h }) => (
-      <Zeile key={`${r.zid}-${h}`} titel={`Haltepunkt: ${h}`} unter={`${r.titel} · ${r.gruppe}`} onClick={() => oeffneReihe(r.zid)}>
-        <IconFlag size={16} color="var(--mantine-color-violet-6)" />
-      </Zeile>
-    ))
-  ]
+  /*
+   * Termine & Vokabeltraining (10.10.2026, zweite Fassung – Befund „zu unübersichtlich"): EINE Zeile je laufendem Kurs
+   * mit Balken und höchstens einem Abzeichen, darunter „Demnächst" (Vokabeltests und Haltepunkte mit Datum). Hinweise
+   * und Grammatik stehen im Kurs. Die Anzahl-Wahl gilt für die Kurszeilen; „Demnächst" zeigt höchstens 5.
+   */
+  const kursZeilen = kurse.map((k) => <KursZeile key={k.id} k={k} />)
+  const maxKurse = handy ? nTermine : 10
+  const kursRest = maxKurse ? Math.max(0, kursZeilen.length - maxKurse) : 0
+  const bald = demnaechst(kurse, reihen ?? [], jetzt)
+  const geladen = (vokabeln ? start !== null : true) && reihen !== null
+  const baldListe = (
+    <Stack gap={4} data-start-demnaechst-liste>
+      {vokabeln && (
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+          Demnächst
+        </Text>
+      )}
+      {bald.slice(0, 5).map((e) => (
+        <DemnaechstZeile key={`${e.art}-${e.ziel}-${e.text}`} e={e} />
+      ))}
+      {bald.length > 5 && (
+        <Text size="xs" c="dimmed" data-start-demnaechst-weitere={bald.length - 5}>
+          und {bald.length - 5} weitere
+        </Text>
+      )}
+      {geladen && !bald.length && (kurse.length || !vokabeln) && <Leer text={vokabeln ? 'Nichts geplant.' : 'Keine anstehenden Termine.'} />}
+    </Stack>
+  )
 
   return (
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb={40} data-schnellzugriff-raster>
@@ -388,12 +325,27 @@ export function Schnellzugriff(): React.JSX.Element {
           farbe="orange"
           alle={vokabeln ? () => oeffneProgramm('sprachenlernen') : ids.includes('laufendereihen') ? () => oeffneProgramm('laufendereihen') : undefined}
           daten="termine"
-          zeilen={terminZeilen}
-          max={10}
-          anzahl={wahl('termine', nTermine, setNTermine)}
+          anzahl={vokabeln ? wahl('termine', nTermine, setNTermine) : undefined}
         >
-          {(vokabeln ? vok !== null && start !== null : true) && reihen !== null && !terminZeilen.length && (
-            <Leer text={vokabeln ? 'Keine anstehenden Termine und kein laufender Kurs.' : 'Keine anstehenden Termine.'} />
+          {!vokabeln ? (
+            baldListe
+          ) : geladen && !kurse.length && !bald.length ? (
+            <Leer text="Keine anstehenden Termine und kein laufender Kurs." />
+          ) : (
+            // Am PC zwei Spalten, wenn die Karte breit genug ist (Containerabfrage), sonst untereinander
+            <SimpleGrid type="container" cols={{ base: 1, '680px': 2 }} spacing="md" verticalSpacing="sm">
+              {kurse.length > 0 && (
+                <Stack gap={6} data-start-kurse>
+                  {begrenzt(kursZeilen, maxKurse)}
+                  {kursRest > 0 && (
+                    <Text size="xs" c="dimmed" data-schnellzugriff-weitere={kursRest}>
+                      und {kursRest} weitere
+                    </Text>
+                  )}
+                </Stack>
+              )}
+              {baldListe}
+            </SimpleGrid>
           )}
         </Bereich>
       )}
@@ -401,8 +353,84 @@ export function Schnellzugriff(): React.JSX.Element {
   )
 }
 
-/** „7b – Englisch · Green Line 3 Unit 2" → „7b – Englisch" (Bezug in Hinweis- und Grammatikzeilen) */
-const gruppeVon = (titel: string): string => titel.split(' · ')[0]
+const ABZEICHEN_FARBE: Record<StartAbzeichen['art'], string> = { test: 'orange', inaktiv: 'red', problem: 'yellow', leer: 'gray', ok: 'green' }
+
+/** Eine Kurszeile (10.10.2026): „7b · Englisch", Balken mit „64 %", EIN Abzeichen – das Abzeichen führt in den passenden Reiter */
+function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
+  const a = k.abzeichen
+  const oeffnen = (): void => void openDocument('sprachenlernen', k.id)
+  const zumAbzeichen = (): void => {
+    if (!a.reiter) return oeffnen()
+    void openDocument('sprachenlernen', kursReiterDocId(k.id, a.reiter)).then(() =>
+      zumHinweis({ kurs: k.id, hinweis: a.hinweis ?? a.art, reiter: a.reiter as KursReiter, ids: a.ids })
+    )
+  }
+  return (
+    <Card withBorder padding={8} radius="md" data-start-kurs={k.id} data-start-abzeichen={a.art}>
+      <Group justify="space-between" wrap="nowrap" gap="xs">
+        <UnstyledButton onClick={oeffnen} style={{ minWidth: 0, flex: 1 }} title={k.abschnitt}>
+          <Text size="sm" fw={600} truncate>
+            {kursKopf(k.gruppe, k.fach)}
+            {k.abschnitt && (
+              <Text span size="xs" c="dimmed" fw={400}>
+                {' '}
+                · {k.abschnitt}
+              </Text>
+            )}
+          </Text>
+          {k.sicher !== null ? (
+            <Group gap={6} wrap="nowrap" mt={4}>
+              <Progress value={k.sicher * 100} size="xs" color={ampelFarbe(k.sicher)} style={{ flex: 1 }} aria-label="sicher" />
+              <Text size="xs" c="dimmed" w={36} ta="right" style={{ flex: 'none' }} data-start-sicher>
+                {Math.round(k.sicher * 100)} %
+              </Text>
+            </Group>
+          ) : (
+            <Text size="xs" c="dimmed" mt={2}>
+              Grammatik
+            </Text>
+          )}
+        </UnstyledButton>
+        {a.art === 'ok' ? (
+          <Text c="green.6" fw={700} px={6} style={{ flex: 'none' }} aria-label="alles in Ordnung" data-start-badge="ok">
+            ✓
+          </Text>
+        ) : (
+          <UnstyledButton onClick={zumAbzeichen} style={{ flex: 'none' }} data-start-badge={a.art}>
+            <Badge variant={a.art === 'test' ? 'filled' : 'light'} color={ABZEICHEN_FARBE[a.art]} tt="none">
+              {a.text}
+            </Badge>
+          </UnstyledButton>
+        )}
+      </Group>
+    </Card>
+  )
+}
+
+/** „Fr 17.10.  Vokabeltest 7b – Unit 2" – ein Eintrag unter „Demnächst" */
+function DemnaechstZeile({ e }: { e: DemnaechstEintrag }): React.JSX.Element {
+  return (
+    <UnstyledButton
+      onClick={() => (e.art === 'test' ? void openDocument('sprachenlernen', kursReiterDocId(e.ziel, 'vokabeln')) : oeffneReihe(e.ziel))}
+      style={{ display: 'block', width: '100%', textAlign: 'left' }}
+      data-start-demnaechst={e.art}
+    >
+      <Group gap={8} wrap="nowrap">
+        {e.art === 'test' ? (
+          <IconCalendarEvent size={14} color="var(--mantine-color-orange-6)" style={{ flex: 'none' }} />
+        ) : (
+          <IconFlag size={14} color="var(--mantine-color-violet-6)" style={{ flex: 'none' }} />
+        )}
+        <Text size="sm" fw={600} w={72} style={{ flex: 'none', fontVariantNumeric: 'tabular-nums' }} c={e.tag ? undefined : 'dimmed'}>
+          {e.tag ? tagKurz(e.tag) : 'offen'}
+        </Text>
+        <Text size="sm" truncate>
+          {e.text}
+        </Text>
+      </Group>
+    </UnstyledButton>
+  )
+}
 
 function Zeile(p: {
   titel: string

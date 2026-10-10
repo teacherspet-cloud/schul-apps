@@ -78,10 +78,10 @@ try {
   await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursKaestenAuf(p, 'vokabeln')
-  // Abschnitte nur in den Details, zugeklappt: Wörterzahl, neu Hinzugekommenes hervorgehoben
-  pruefe(await da(p.locator('[data-vokabel-neu14]', { hasText: '+2' })), 'Kasten „32 Wörter" mit „+2 in den letzten 2 Wochen"')
-  pruefe(!(await p.locator('[data-vokabel-abschnitte]').getByText('Unit 1 Wörter').isVisible()), 'Abschnitte zugeklappt')
-  await p.locator('[data-vokabel-abschnitte-kopf]').click()
+  // Kasten „Abschnitte & Wörter" (10.10.2026, statt „32 Wörter"): Wörterzahl, neu Hinzugekommenes hervorgehoben
+  pruefe(await da(p.locator('[data-vokabel-neu14]', { hasText: '+2' })), 'Kasten „Abschnitte & Wörter" (32 Wörter) mit „+2 in den letzten 2 Wochen"')
+  pruefe(/32 Wörter/.test(await p.locator('[data-vokabel-abschnitte-kopf]').innerText()), 'Kopf nennt „32 Wörter"')
+  if (!(await p.locator('[data-vok-abschnitte]').isVisible().catch(() => false))) await p.locator('[data-vokabel-abschnitte-kopf]').click()
   pruefe(await da(p.locator('[data-vokabel-abschnitte]').getByText('Unit 1 Wörter')), 'Aufgeklappt: die Abschnitte')
   await kursReiter(p, 'lernende')
   await p.locator('[data-lernende-eintragen]').click()

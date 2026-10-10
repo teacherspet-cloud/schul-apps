@@ -12,6 +12,7 @@
 import { istSicher, type Vokabel, type WortStand } from './vokabeltrainer'
 import { quelleUnits, type Quelle } from './vokabelLaufbahn'
 import { bandRang } from './lehrwerkBand'
+import { ABSCHNITT_FOLGE } from '../renderer/src/shared/lehrwerkGrammatik'
 
 export interface KursTeil {
   titel: string
@@ -214,6 +215,18 @@ export interface AbschnittStatistik {
 
 const zwei = (x: number): number => Math.round(x * 100) / 100
 
+/** Wortbereiche [von, bis) der Abschnitte – der letzte nimmt den Rest, falls die Zahlen nicht genau passen */
+export function wortBereiche(teile: Pick<KursTeil, 'anzahl'>[], gesamt: number): [number, number][] {
+  const bereiche: [number, number][] = []
+  let start = 0
+  for (const [i, t] of teile.entries()) {
+    const ende = i === teile.length - 1 ? gesamt : Math.min(gesamt, start + Math.max(0, t.anzahl))
+    bereiche.push([start, ende])
+    start = ende
+  }
+  return bereiche
+}
+
 /**
  * Statistik je Abschnitt. Laufzeit: jede Person einmal über alle Wörter (30 Lernende × 500 Wörter = 15 000 Schritte).
  * `staende` je Person die Wortstände des Kurses (Reihenfolge = Reihenfolge der Namen beim Aufrufer).
@@ -225,14 +238,7 @@ export function abschnittStatistik(
   einordnung: AbschnittEinordnung[],
   jetzt = Date.now()
 ): AbschnittStatistik[] {
-  // Wortbereiche der Abschnitte (der letzte nimmt den Rest, falls die Zahlen nicht genau passen)
-  const bereiche: [number, number][] = []
-  let start = 0
-  for (const [i, t] of teile.entries()) {
-    const ende = i === teile.length - 1 ? woerter.length : Math.min(woerter.length, start + Math.max(0, t.anzahl))
-    bereiche.push([start, ende])
-    start = ende
-  }
+  const bereiche = wortBereiche(teile, woerter.length)
   return teile.map((t, i) => {
     const [von, bis] = bereiche[i]
     const liste = woerter.slice(von, bis)
@@ -287,26 +293,70 @@ export function abschnittStatistik(
   })
 }
 
-/** Gruppen für die Anzeige: je Unit in Freigabe-Reihenfolge, die neueste zuerst (sie steht offen) */
-export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'>>(zeilen: T[]): { unit: string; zeilen: T[]; neueste: number }[] {
-  const gruppen = new Map<string, T[]>()
-  for (const z of zeilen) gruppen.set(z.unit, [...(gruppen.get(z.unit) ?? []), z])
-  return [...gruppen.entries()]
-    .map(([unit, l]) => ({ unit, zeilen: l, neueste: Math.max(0, ...l.map((x) => x.zeit)) }))
-    .sort((a, b) => b.neueste - a.neueste)
+/** Unit-Nummer im Namen („Unit 3" → 3, „Lección 12" → 12); ohne Zahl („Hello", „Media smart") null */
+export const unitZahl = (unit: string): number | null => {
+  const m = /(\d+)/.exec(unit)
+  return m ? Number(m[1]) : null
+}
+
+/** Stelle eines Abschnitts im Buch (ABSCHNITT_FOLGE, „Check-in, Station 1" → die spätere); unbekannt null */
+export const abschnittStelle = (name: string): number | null => {
+  const folge = ABSCHNITT_FOLGE.map((a) => a.toLowerCase())
+  const stellen = name
+    .split(/,\s*|\s·\s|\s-\s/)
+    .map((a) => folge.indexOf(a.trim().toLowerCase()))
+    .filter((i) => i >= 0)
+  return stellen.length ? Math.max(...stellen) : null
+}
+
+/**
+ * Rang in Buchreihenfolge (10.10.2026): bekannte Stelle (Zahl bzw. Abschnittsfolge) zählt selbst; ohne bekannte Stelle
+ * („Hello", „Media smart", eigene Namen) steht ein Eintrag gleich hinter dem bekannten davor (in Freigabe-Reihenfolge).
+ */
+function buchRaenge<T>(liste: T[], stelle: (x: T) => number | null): number[] {
+  let letzte = -1
+  return liste.map((x) => {
+    const s = stelle(x)
+    if (s === null) return letzte + 0.5
+    letzte = s
+    return s
+  })
+}
+
+/**
+ * Gruppen für die Anzeige (10.10.2026, Wunsch der Lehrkraft: absteigend wie im Buch, später Gelerntes oben): Units in
+ * absteigender Buchreihenfolge (Unit 3 über Unit 2 über Unit 1), darin die Abschnitte ebenso („Story" über „Check-in").
+ * Ohne erkennbare Stelle entscheidet die Freigabe-Reihenfolge (später freigegeben = weiter oben). Die oberste Unit
+ * steht offen. `zeilen` in Freigabe-Reihenfolge.
+ */
+export function nachUnits<T extends Pick<AbschnittStatistik, 'unit' | 'zeit'> & { name?: string }>(zeilen: T[]): { unit: string; zeilen: T[]; neueste: number }[] {
+  const gruppen = new Map<string, { z: T; i: number }[]>()
+  zeilen.forEach((z, i) => gruppen.set(z.unit, [...(gruppen.get(z.unit) ?? []), { z, i }]))
+  const units = [...gruppen.entries()]
+  const unitRang = buchRaenge(units, ([unit]) => unitZahl(unit))
+  return units
+    .map(([unit, l], k) => {
+      const rang = buchRaenge(l, ({ z }) => (z.name === undefined ? null : abschnittStelle(z.name)))
+      const zeilenSortiert = l
+        .map((x, j) => ({ ...x, r: rang[j] }))
+        .sort((a, b) => b.r - a.r || b.i - a.i)
+        .map((x) => x.z)
+      return { unit, zeilen: zeilenSortiert, neueste: Math.max(0, ...l.map((x) => x.z.zeit)), r: unit ? unitRang[k] : -Infinity, erste: l[0].i }
+    })
+    .sort((a, b) => b.r - a.r || b.erste - a.erste)
+    .map(({ unit, zeilen: z, neueste }) => ({ unit, zeilen: z, neueste }))
 }
 
 /**
  * Gruppen nach Band (09.10.2026, Wunsch der Lehrkraft): neuester Band oben, ältester unten, nur Bände mit Inhalt; ohne
- * Band („Weitere Vokabeln") ganz unten. Im Band die Units wie bei `nachUnits` (neueste Freigabe zuerst).
+ * Band („Weitere Vokabeln") ganz unten. Im Band die Units wie bei `nachUnits` (absteigend wie im Buch, 10.10.2026).
  */
-export function nachBaenden<T extends Pick<AbschnittStatistik, 'unit' | 'zeit' | 'buch'>>(
+export function nachBaenden<T extends Pick<AbschnittStatistik, 'unit' | 'zeit' | 'buch'> & { name?: string }>(
   zeilen: T[]
 ): { buch: string; units: { unit: string; zeilen: T[]; neueste: number }[]; neueste: number }[] {
   const baende = new Map<string, T[]>()
   for (const z of zeilen) baende.set(z.buch ?? '', [...(baende.get(z.buch ?? '') ?? []), z])
   return [...baende.entries()]
-    // Gleichzeitig freigegebene Units: die spätere im Buch zuerst
-    .map(([buch, l]) => ({ buch, units: nachUnits(l).sort((a, b) => b.neueste - a.neueste || bandRang(b.unit) - bandRang(a.unit)), neueste: Math.max(0, ...l.map((x) => x.zeit)) }))
+    .map(([buch, l]) => ({ buch, units: nachUnits(l), neueste: Math.max(0, ...l.map((x) => x.zeit)) }))
     .sort((a, b) => Number(!a.buch) - Number(!b.buch) || bandRang(b.buch) - bandRang(a.buch) || b.neueste - a.neueste)
 }

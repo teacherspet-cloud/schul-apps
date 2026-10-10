@@ -5,13 +5,17 @@
  * „Meine Rekorde" der Lernenden (08.10.2026, Wunsch der Lehrkraft): kleines Menü neben „Einstellungen". Persönliche
  * Rekorde je Spiel des laufenden Schuljahres, frühere Schuljahre als Rekordgeschichte (z. B. „Klasse 5"), dazu je
  * Schuljahr neu gelernte und sicher gewordene Wörter. Nur die eigenen Werte – keine Rangliste (Server: rekordbuch.ts).
+ * Seit 10.10.2026 (Wunsch der Lehrkraft): auf dem Telefon füllt das Fenster den Bildschirm; im Reiter „Rekorde" sind
+ * „Wörter" und „Rekorde" einklappbare Abschnitte mit Zusammenfassung (AuszKlapp.tsx), wie in den anderen Reitern.
  */
 import { ActionIcon, Badge, Button, Card, Group, Loader, Modal, Select, SimpleGrid, Stack, Table, Tabs, Text } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { IconTrophy } from '@tabler/icons-react'
 import { useState } from 'react'
 import { holen } from './serverApi'
 import { AchievementsInhalt } from './Achievements'
 import { MedaillenTitelInhalt } from './MedaillenTitel'
+import { AuszKlapp } from './AuszKlapp'
 
 interface Jahr {
   schuljahr: string
@@ -28,6 +32,7 @@ export function RekordKnopf({ gross = false, nurSymbol = false }: { gross?: bool
   const [offen, setOffen] = useState(false)
   const [d, setD] = useState<{ aktuell: string; jahre: Jahr[] } | null>(null)
   const [wahl, setWahl] = useState<string | null>(null)
+  const telefon = useMediaQuery('(max-width: 36em)') ?? false
   const oeffnen = (): void => {
     setOffen(true)
     void holen<{ aktuell: string; jahre: Jahr[] }>('/s/api/rekorde').then(
@@ -52,10 +57,10 @@ export function RekordKnopf({ gross = false, nurSymbol = false }: { gross?: bool
           Achievements
         </Button>
       )}
-      <Modal opened={offen} onClose={() => setOffen(false)} title="Achievements" size="lg" zIndex={400}>
+      <Modal opened={offen} onClose={() => setOffen(false)} title="Achievements" size="lg" zIndex={400} fullScreen={telefon}>
         {/* Medaillen und Titel je Sprache (10.10.2026) vorn; die einzelnen Achievements bleiben als eigener Reiter */}
         <Tabs defaultValue="medaillen" keepMounted={false}>
-          <Tabs.List mb="md">
+          <Tabs.List mb="sm">
             <Tabs.Tab value="medaillen" data-tab-medaillen>
               Medaillen & Titel
             </Tabs.Tab>
@@ -76,7 +81,7 @@ export function RekordKnopf({ gross = false, nurSymbol = false }: { gross?: bool
             {!d ? (
               <Loader size="sm" />
             ) : (
-              <Stack data-rekorde>
+              <Stack gap="xs" data-rekorde>
                 {d.jahre.length > 1 && (
                   <Select
                     label="Schuljahr"
@@ -90,59 +95,68 @@ export function RekordKnopf({ gross = false, nurSymbol = false }: { gross?: bool
                 {j && (
                   <>
                     <Text fw={700}>{jahrName(j, d.aktuell)}</Text>
-                    <SimpleGrid cols={2}>
-                      <Card withBorder padding="sm" radius="md">
-                        <Text size="xs" c="dimmed">
-                          Wörter neu gelernt
+                    <AuszKlapp id="rek-woerter" titel="Wörter in diesem Schuljahr" status={`${j.gelernt} neu gelernt · ${j.sicher} sicher`} rahmen={{ 'data-rekorde-woerter': true }}>
+                      <SimpleGrid cols={2}>
+                        <Card withBorder padding="sm" radius="md">
+                          <Text size="xs" c="dimmed">
+                            Wörter neu gelernt
+                          </Text>
+                          <Text fz={26} fw={800} data-rekorde-gelernt>
+                            {j.gelernt}
+                          </Text>
+                        </Card>
+                        <Card withBorder padding="sm" radius="md">
+                          <Text size="xs" c="dimmed">
+                            Wörter sicher
+                          </Text>
+                          <Text fz={26} fw={800}>
+                            {j.sicher}
+                          </Text>
+                        </Card>
+                      </SimpleGrid>
+                    </AuszKlapp>
+                    <AuszKlapp
+                      id="rek-spiele"
+                      titel="Rekorde"
+                      status={j.rekorde.length ? `${j.rekorde.length} ${j.rekorde.length === 1 ? 'Spiel' : 'Spiele'} mit Rekord` : 'noch keine'}
+                      rahmen={{ 'data-rekorde-spiele': j.rekorde.length }}
+                    >
+                      {j.rekorde.length === 0 ? (
+                        <Text size="sm" c="dimmed">
+                          {j.schuljahr === d.aktuell
+                            ? 'Noch keine Rekorde in diesem Schuljahr – spiel nach dem Üben ein Spiel!'
+                            : 'In diesem Schuljahr gab es keine Rekorde.'}
                         </Text>
-                        <Text fz={26} fw={800} data-rekorde-gelernt>
-                          {j.gelernt}
-                        </Text>
-                      </Card>
-                      <Card withBorder padding="sm" radius="md">
-                        <Text size="xs" c="dimmed">
-                          Wörter sicher
-                        </Text>
-                        <Text fz={26} fw={800}>
-                          {j.sicher}
-                        </Text>
-                      </Card>
-                    </SimpleGrid>
-                    {j.rekorde.length === 0 ? (
-                      <Text size="sm" c="dimmed">
-                        {j.schuljahr === d.aktuell
-                          ? 'Noch keine Rekorde in diesem Schuljahr – spiel nach dem Üben ein Spiel!'
-                          : 'In diesem Schuljahr gab es keine Rekorde.'}
-                      </Text>
-                    ) : (
-                      <Table striped data-karten data-rekorde-tabelle>
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th>Spiel</Table.Th>
-                            <Table.Th>Rekord</Table.Th>
-                            <Table.Th>am</Table.Th>
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {j.rekorde.map((r) => (
-                            <Table.Tr key={r.schluessel}>
-                              <Table.Td>
-                                <Group gap={6} wrap="nowrap">
-                                  <Badge size="xs" variant="light" color={r.bereich === 'Grammatik' ? 'grape' : 'orange'} tt="none">
-                                    {r.bereich}
-                                  </Badge>
-                                  <Text size="sm">{r.name}</Text>
-                                </Group>
-                              </Table.Td>
-                              <Table.Td fw={700}>
-                                {r.wert} {r.einheit}
-                              </Table.Td>
-                              <Table.Td>{new Date(r.datum).toLocaleDateString('de-DE')}</Table.Td>
+                      ) : (
+                        <Table striped data-karten data-rekorde-tabelle>
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th>Spiel</Table.Th>
+                              <Table.Th>Rekord</Table.Th>
+                              <Table.Th>am</Table.Th>
                             </Table.Tr>
-                          ))}
-                        </Table.Tbody>
-                      </Table>
-                    )}
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {j.rekorde.map((r) => (
+                              <Table.Tr key={r.schluessel}>
+                                <Table.Td>
+                                  <Group gap={6} wrap="nowrap">
+                                    <Badge size="xs" variant="light" color={r.bereich === 'Grammatik' ? 'grape' : 'orange'} tt="none">
+                                      {r.bereich}
+                                    </Badge>
+                                    <Text size="sm">{r.name}</Text>
+                                  </Group>
+                                </Table.Td>
+                                <Table.Td fw={700}>
+                                  {r.wert} {r.einheit}
+                                </Table.Td>
+                                <Table.Td>{new Date(r.datum).toLocaleDateString('de-DE')}</Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      )}
+                    </AuszKlapp>
                     <Text size="xs" c="dimmed">
                       Mit jedem neuen Schuljahr beginnen die Rekorde neu – die alten bleiben hier als Rekordgeschichte.
                     </Text>

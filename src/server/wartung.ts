@@ -25,6 +25,8 @@ import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
 import { VERBFORM_TON } from './wartungVerbformTon'
+import { MEDIEN_KANON } from './wartungMedienKanon'
+import { AUSZEICHNUNGEN_JAHRE } from './wartungAuszeichnungenJahre'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
 export const ZEIT_GRENZE: Record<string, number> = { blitz: 30, richtiggehoert: 30, formenblitz: 30, verbblitz: 30, richtigfalsch: 30 }
@@ -157,8 +159,12 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   ABKUERZUNG_TON,
   // Aufnahmen mit „slash" und alter Verbform-Aussprache entfernen, vorher gesichert (09.10.2026; wartungVerbformTon.ts)
   VERBFORM_TON,
+  // Medienbank auf einheitliche Schlüssel, Dubletten zusammenführen – nach den Aufnahme-Wartungen, ohne Datei zu löschen (10.10.2026; wartungMedienKanon.ts)
+  MEDIEN_KANON,
   // Band je Vokabel-Abschnitt nachtragen (10.10.2026, mehrere Bände in einem Kurs; wartungVokabelBaende.ts)
-  VOKABEL_BAENDE
+  VOKABEL_BAENDE,
+  // Medaillen der ersten Fassung als Reihe des Schuljahres 2026/27 (10.10.2026, Jahresreihen; wartungAuszeichnungenJahre.ts)
+  AUSZEICHNUNGEN_JAHRE
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

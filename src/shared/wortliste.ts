@@ -32,6 +32,9 @@ export interface WortlisteGruppe {
   /** Reihenfolge bei gleicher Zeit (Buchreihenfolge im Vokabelweg) */
   folge: number
   woerter: WortlisteWort[]
+  /** Im Buch (10.10.2026): Unit und Abschnitt einzeln – die Buchansicht gruppiert Abschnitte in ihre Unit */
+  unit?: string
+  abschnitt?: string
 }
 
 export interface Wortliste {

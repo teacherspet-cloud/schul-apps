@@ -1,6 +1,8 @@
 // Mehrere Bände je Kurs, Suche in „Meine Klassen", „Vokabeln/Grammatik hinzufügen" (10.10.2026, Wünsche der Lehrkraft):
-//  1. Ein Kurs mit Green Line 1 UND Green Line 2: „Units", „X Wörter" und „Abschnitte und Stand der Lernenden" zeigen
-//     beide Bände als aufklappbare Gruppen mit Cover (neuester oben und offen).
+//  1. Ein Kurs mit Green Line 1 UND Green Line 2: „Units" und „Abschnitte & Wörter" zeigen beide Bände als aufklappbare
+//     Gruppen mit Cover (neuester oben und offen); Units und Abschnitte absteigend wie im Buch (10.10.2026).
+//  1b. Kasten „Abschnitte & Wörter" (10.10.2026): ein Kasten, Abschnitt aufklappen zeigt Wörter mit „% sicher",
+//     Aussprache und Bearbeiten; Suche über alle Wörter; „Nur Problemwörter" mit ⚠ (wer Schwierigkeiten hat).
 //  2. Suche: findet Lernende über den Namen (Übersicht → Details), in einer Klasse ihre Lernenden zuerst, „nicht geübt"
 //     findet die Inaktive; in zwei Kursen erst die Kurswahl.
 //  3. „Vokabeln hinzufügen": richtiger Band, Freigegebenes ausgeblendet (Schalter zeigt es), Vorschlag offen, Einzel-
@@ -170,6 +172,16 @@ try {
   const wB = (await get(`/server/vokabeln/${kursB}`)).woerter
   await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kursB, wortId: wB[0].id, uebung: 'karte', gewusst: true } })
 
+  // Jil Vogel (Klasse A) liegt bei einem Wort dreimal falsch – es wird Problemwort (Kasten „Abschnitte & Wörter")
+  const jil = la.find((x) => x.name === 'Jil Vogel')
+  const sj = await browser.newContext()
+  await anmelden(sj, jil.benutzer, jil.passwort)
+  await sj.request.post(`${A}/auth/passwort`, { form: { neu: 'NeuesPasswort-99', neu2: 'NeuesPasswort-99', ziel: '/s/' }, headers: { origin: A }, maxRedirects: 0 })
+  const wA = (await get(`/server/vokabeln/${kursA}`)).woerter
+  const problemWort = wA[0].id
+  for (let i = 0; i < 3; i++) await sj.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kursA, wortId: problemWort, uebung: 'frei', antwort: 'völlig falsch' } })
+  pruefe((await get(`/server/vokabeln/${kursA}`)).problem?.some((x) => x.id === problemWort), 'Jils Fehler machen ein Problemwort')
+
   // ---------- Suche (Schnittstelle)
   const s1 = (await get(`/server/klassen/suche?q=jil`)).lernende
   pruefe(s1.length === 1 && s1[0].name === 'Jil Vogel' && s1[0].klasse === KA, `Suche „jil" findet Jil Vogel (${s1.map((x) => `${x.name} · ${x.klasse}`).join('; ')})`)
@@ -275,18 +287,60 @@ try {
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-band-gruppe="Green Line 1"][data-band-offen]')), '„Units": älterer Band aufklappbar')
   await p.screenshot({ path: join(out, '6-units.png') })
   await p.getByRole('tab', { name: /^Vokabeln/ }).click()
+  // EIN Kasten „Abschnitte & Wörter" (10.10.2026) statt „Abschnitte und Stand" + Wortliste „X Wörter"
+  await p.locator('[data-kurs-abschnitte]').first().waitFor({ timeout: 10000 })
+  pruefe((await p.locator('[data-klassen-kurs] [data-kurs-abschnitte]').count()) === 1, 'Ein Kasten „Abschnitte & Wörter“ (keine eigene Wortliste)')
   if (!(await p.locator('[data-vok-abschnitte]').isVisible().catch(() => false))) await p.locator('[data-kurs-abschnitte-kopf]').click()
   const abs = p.locator('[data-vok-abschnitte] [data-band-gruppe]')
   await abs.first().waitFor({ timeout: 10000 })
   const absBaende = await abs.evaluateAll((e) => e.map((x) => `${x.getAttribute('data-band-gruppe')}${x.hasAttribute('data-band-offen') ? '+' : ''}`))
-  pruefe(JSON.stringify(absBaende) === JSON.stringify(['Green Line 2+', 'Green Line 1']), `„Abschnitte und Stand": zwei Bände (${absBaende.join(', ')})`)
-  pruefe((await p.locator('[data-vok-abschnitte] [data-band-kopf] :is([data-cover], [data-cover-ersatz])').count()) === 2, '„Abschnitte und Stand": Cover je Band')
-  await p.locator('[data-vokabel-abschnitte-kopf]').click()
-  const wl = p.locator('[data-vokabel-abschnitte] [data-band-gruppe]')
-  await wl.first().waitFor({ timeout: 10000 })
-  const wlBaende = await wl.evaluateAll((e) => e.map((x) => `${x.getAttribute('data-band-gruppe')}${x.hasAttribute('data-band-offen') ? '+' : ''}`))
-  pruefe(JSON.stringify(wlBaende) === JSON.stringify(['Green Line 2+', 'Green Line 1']), `„6 Wörter": zwei Bände (${wlBaende.join(', ')})`)
-  pruefe((await p.locator('[data-vokabel-abschnitte] [data-band-kopf] :is([data-cover], [data-cover-ersatz])').count()) === 2, '„6 Wörter": Cover je Band')
+  pruefe(JSON.stringify(absBaende) === JSON.stringify(['Green Line 2+', 'Green Line 1']), `„Abschnitte & Wörter": zwei Bände (${absBaende.join(', ')})`)
+  pruefe((await p.locator('[data-vok-abschnitte] [data-band-kopf] :is([data-cover], [data-cover-ersatz])').count()) === 2, '„Abschnitte & Wörter": Cover je Band')
+  // Absteigend wie im Buch (10.10.2026): im offenen Band Station 2 über Station 1, Unit 1 über Hello
+  const gl2 = await p.locator('[data-vok-abschnitte] [data-band-gruppe="Green Line 2"] [data-abschnitt]').evaluateAll((e) => e.map((x) => x.getAttribute('data-abschnitt')))
+  pruefe(gl2.join(',') === 'Station 2,Station 1', `Abschnitte absteigend (${gl2.join(', ')})`)
+  await p.locator('[data-vok-abschnitte] [data-band-gruppe="Green Line 1"] [data-band-kopf]').click()
+  await p.waitForTimeout(400)
+  const gl1Units = await p.locator('[data-vok-abschnitte] [data-band-gruppe="Green Line 1"] [data-abschnitt-gruppe]').evaluateAll((e) => e.map((x) => x.getAttribute('data-abschnitt-gruppe')))
+  pruefe(gl1Units.join(',') === 'Unit 1,Hello', `Units absteigend (${gl1Units.join(', ')})`)
+  // Abschnitt aufklappen: seine Wörter mit „% sicher" der Klasse, Aussprache und Bearbeiten
+  const st1 = p.locator('[data-band-gruppe="Green Line 2"] [data-abschnitt="Station 1"]')
+  await st1.locator('[data-abschnitt-knopf]').click()
+  pruefe(await da(st1.locator('[data-kurs-wort]').first()), 'Klick auf den Abschnitt zeigt seine Wörter')
+  pruefe((await st1.locator('[data-kurs-wort] [data-wort-sicher]').count()) >= 1, 'Wort mit „% sicher" der Klasse')
+  pruefe(
+    (await st1.locator('[data-kurs-wort] [data-wort-medien] :is([data-wort-sprechen], [data-aussprache], [data-aussprache-erzeugen])').count()) >= 1,
+    'Wort mit Aussprache-Knopf'
+  )
+  pruefe((await st1.locator('[data-kurs-wort] [data-wort-bearbeiten]').count()) >= 1, 'Wort mit „Bearbeiten"')
+  await p.screenshot({ path: join(out, '7-abschnitte-woerter.png'), fullPage: true })
+  // Bearbeiten: „auch richtig" speichern
+  const erstes = st1.locator('[data-kurs-wort]').first()
+  const wortId = await erstes.getAttribute('data-kurs-wort')
+  await erstes.locator('[data-wort-bearbeiten]').click()
+  await erstes.locator('input[data-wort-feld="auchRichtig"]').fill('probe eins; probe zwei')
+  await erstes.locator('[data-wort-speichern]').click()
+  await p.waitForTimeout(1200)
+  const nachher = (await get(`/server/vokabeln/${kursA}`)).woerter.find((w) => w.id === wortId)
+  pruefe(JSON.stringify(nachher?.auchRichtig) === JSON.stringify(['probe eins', 'probe zwei']), `Bearbeiten speichert „auch richtig" (${JSON.stringify(nachher?.auchRichtig)})`)
+  // Suche über alle Wörter: nur der Treffer, aufgeklappt
+  await p.locator('input[data-woerter-suche]').fill('testword1')
+  await p.waitForTimeout(500)
+  const treffer = await p.locator('[data-vok-abschnitte] [data-kurs-wort]').count()
+  pruefe(treffer === 1, `Suche „testword1" zeigt genau ein Wort (${treffer})`)
+  await p.locator('input[data-woerter-suche]').fill('')
+  // „Nur Problemwörter": Jils Fehler machen das Wort zum Problemwort; ⚠ zeigt, wer Schwierigkeiten hat
+  const nurProblem = p.locator('input[data-nur-problemwoerter]')
+  pruefe(await nurProblem.isEnabled(), '„Nur Problemwörter" schaltbar')
+  await nurProblem.check({ force: true })
+  await p.waitForTimeout(500)
+  const problemWoerter = await p.locator('[data-vok-abschnitte] [data-kurs-wort]').evaluateAll((e) => e.map((x) => x.getAttribute('data-kurs-wort')))
+  pruefe(problemWoerter.length === 1 && problemWoerter[0] === problemWort, `„Nur Problemwörter" zeigt nur das Problemwort (${problemWoerter.join(', ')})`)
+  await p.locator(`[data-wort-problem="${problemWort}"]`).click()
+  pruefe(await da(p.locator(`[data-wort-problem-wer="${problemWort}"]`, { hasText: 'Jil Vogel' })), '⚠ zeigt, wer Schwierigkeiten hat (Jil Vogel)')
+  await p.screenshot({ path: join(out, '8-problemwoerter.png') })
+  await p.keyboard.press('Escape')
+  await nurProblem.uncheck({ force: true })
   const echteCover = await p.locator('[data-cover]').count()
   console.log(`   (Verlagscover geladen: ${echteCover}, sonst Kachel)`)
   await p.screenshot({ path: join(out, '7-woerter-und-abschnitte.png'), fullPage: true })

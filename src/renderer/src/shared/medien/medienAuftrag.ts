@@ -13,7 +13,7 @@
  * - Ein Pop-up („Von der KI erzeugen") darf geschlossen werden: Der Auftrag läuft weiter, die Tabelle zeigt das
  *   Bild, sobald es da ist (`medienGeaendert`).
  */
-import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
+import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonPasst, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
 import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
@@ -26,9 +26,8 @@ import { sprechText, sprechTextFuerWort } from '@shared/sprechtext'
 export const gesprochenFuer = (art: 'wort' | 'satz', text: string, v: Pick<Vokabel, 'term' | 'aussprache'>, sprache: string): string =>
   art === 'wort' ? sprechTextFuerWort(v, sprache) : sprechText(text, sprache)
 
-/** Passt die Aufnahme noch zum Wort und zu seinem Sprechtext? (Ältere Aufnahmen ohne `gesprochen`: Text = Sprechtext) */
-export const tonPasst = (ton: { text: string; gesprochen?: string } | undefined, text: string, gesprochen: string): boolean =>
-  Boolean(ton) && ton!.text.trim() === text.trim() && (ton!.gesprochen ?? ton!.text).trim() === gesprochen.trim()
+/** Passt die Aufnahme noch zum Wort und zu seinem Sprechtext? (seit 10.10.2026 gemeinsam in shared/medienbank.ts) */
+export { tonPasst }
 
 export const MEDIEN_MODUL = 'vokabelliste'
 

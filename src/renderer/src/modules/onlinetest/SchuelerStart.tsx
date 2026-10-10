@@ -176,8 +176,11 @@ export function Begruessung({
   titel = null,
   avatar = null,
   stand,
-  naechstes
+  naechstes,
+  ohneKnopf = false
 }: {
+  /** Kein eigener Knopf (10.10.2026, Wunsch der Lehrkraft: nur EIN Knopf für dieselbe Runde – „Als Nächstes" bzw. Sprachkarte haben ihn) */
+  ohneKnopf?: boolean
   vorname: string
   /** Gewählter Titel (10.10.2026, Medaillen und Titel): „Guten Morgen, Sir Lars!" */
   titel?: string | null
@@ -198,8 +201,9 @@ export function Begruessung({
   const text = stand ? begruessung(z, s, stand) : '…'
   // Bei „wenig aktiv" und „länger inaktiv": eine kurze Runde vorschlagen (nie eine Fehltage-Zahl für Jüngere)
   const runde = stand?.bereiche.find((b) => b.faellig > 0 && b.art !== 'blaetter') ?? stand?.bereiche.find((b) => b.art !== 'blaetter')
-  const knopf: Knopf | null =
-    (z === 'erfolgreich' || z === 'inaktiv') && runde
+  const knopf: Knopf | null = ohneKnopf
+    ? null
+    : (z === 'erfolgreich' || z === 'inaktiv') && runde
       ? { text: z === 'inaktiv' ? (s === 'grund' ? 'Leichte Runde starten' : 'Aufwärmrunde starten') : 'Kurze Runde starten', href: runde.href }
       : z === 'neu' && naechstes
         ? { text: s === 'grund' ? 'Los geht’s' : naechstes.text, href: naechstes.href }

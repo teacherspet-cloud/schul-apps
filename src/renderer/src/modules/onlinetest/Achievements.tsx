@@ -6,6 +6,9 @@
  * (ab 10 Lernenden) und oben der eigene Platz in der Klasse nach Übungstagen der letzten 4 Wochen (ab 5 Lernenden) –
  * keine Namen, keine Plätze anderer.
  *
+ * Seit 10.10.2026 (Wunsch der Lehrkraft): Platz in der Klasse und jede Gruppe als einklappbarer Abschnitt (AuszKlapp.tsx),
+ * eingeklappt mit Zusammenfassung („3 von 8 geschafft · als Nächstes: …"); offen/zu gilt für die Sitzung.
+ *
  * Glückwunsch: Nach Antworten und Spielen (Ereignis „schulapps-gesendet" aus serverApi.ts) fragt die Seite kurz danach
  * nach neu Erreichtem und zeigt eine kurze Meldung – mit etwas Konfetti, außer bei „ruhiger Darstellung"
  * (html.sa-ruhig) oder reduzierter Bewegung im System.
@@ -15,6 +18,7 @@ import { notifications } from '@mantine/notifications'
 import { IconAward, IconLock, IconStarFilled, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { abrufen } from './serverApi'
+import { AuszKlapp } from './AuszKlapp'
 
 type Medaille = 'bronze' | 'silber' | 'gold' | null
 interface Eintrag {
@@ -88,13 +92,18 @@ export function AchievementsInhalt(): React.JSX.Element {
   const alle: Sicht[] = d.alle ?? d.erreicht.map((e) => ({ ...e, erreicht: true, ist: 1, ziel: 1, anteil: null }))
   const geschafft = alle.filter((e) => e.erreicht).length
   return (
-    <Stack gap="md" data-achievements>
+    <Stack gap="xs" data-achievements>
       <Text size="sm" fw={600} data-achievements-zahl={`${geschafft}/${alle.length}`}>
         {geschafft} von {alle.length} Achievements geschafft
       </Text>
       {/* Eigener Platz in der Klasse (09.10.2026): nur die eigene Zahl – keine Namen, keine Plätze anderer */}
       {d.platz && (
-        <Card withBorder padding="xs" radius="md" data-achievements-platz={`${d.platz.platz}/${d.platz.von}`}>
+        <AuszKlapp
+          id="ach-platz"
+          titel="Platz in deiner Klasse"
+          status={`Platz ${d.platz.platz} von ${d.platz.von} · nach Übungstagen der letzten 4 Wochen`}
+          rahmen={{ 'data-achievements-platz': `${d.platz.platz}/${d.platz.von}` }}
+        >
           <Group gap="sm" wrap="nowrap">
             <ThemeIcon variant="light" radius="xl" size="lg" color="indigo">
               <IconUsersGroup size={18} />
@@ -108,7 +117,7 @@ export function AchievementsInhalt(): React.JSX.Element {
               </Text>
             </Stack>
           </Group>
-        </Card>
+        </AuszKlapp>
       )}
       {d.verborgen > 0 && (
         <Group gap="xs" wrap="nowrap" data-achievements-verborgen={d.verborgen}>
@@ -123,75 +132,81 @@ export function AchievementsInhalt(): React.JSX.Element {
       {d.gruppen.map((g) => {
         const liste = alle.filter((e) => e.gruppe === g.id)
         if (!liste.length) return null
+        const zahl = liste.filter((e) => e.erreicht).length
+        // Als Nächstes: das offene, dem am wenigsten fehlt
+        const naechstes = liste.filter((e) => !e.erreicht && e.ziel > 1).sort((a, b) => b.ist / b.ziel - a.ist / a.ziel)[0]
+        const neuHier = liste.filter((e) => neu.has(e.id)).length
         return (
-          <Stack key={g.id} gap={6} data-achievements-gruppe={g.id}>
-            <Group gap={8}>
-              <Text fw={800}>{g.name}</Text>
-              <Badge size="sm" variant="light" color="gray" tt="none">
-                {liste.filter((e) => e.erreicht).length}/{liste.length}
-              </Badge>
-            </Group>
-            {liste.map((e) => (
-              <Card
-                key={e.id}
-                withBorder
-                padding="xs"
-                radius="md"
-                style={neu.has(e.id) ? { borderColor: FARBE[e.medaille ?? 'ohne'], borderWidth: 2 } : undefined}
-                data-achievement={e.id}
-                data-erreicht={e.erreicht}
-              >
-                <Group gap="sm" wrap="nowrap" align="flex-start">
-                  <div style={e.erreicht ? undefined : { opacity: 0.35, filter: 'grayscale(1)' }}>
-                    <Medaille m={e.medaille} />
-                  </div>
-                  <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
-                    <Group gap={6}>
-                      <Text fw={700} size="sm" c={e.erreicht ? undefined : 'dimmed'}>
-                        {e.titel}
-                      </Text>
-                      {neu.has(e.id) && (
-                        <Badge size="xs" color="green" tt="none">
-                          neu
-                        </Badge>
-                      )}
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {e.text}
-                    </Text>
-                    {e.erreicht ? (
-                      <Text size="xs" c="dimmed">
-                        {e.medaille ? `${STUFE[e.medaille]} · ` : ''}erreicht{e.am ? ` am ${new Date(e.am).toLocaleDateString('de-DE')}` : ''}
-                      </Text>
-                    ) : e.ziel > 1 ? (
-                      <Group gap={8} wrap="nowrap" data-achievement-fortschritt={`${e.ist}/${e.ziel}`}>
-                        <Progress
-                          value={(e.ist / e.ziel) * 100}
-                          size="sm"
-                          radius="xl"
-                          color={FARBE[e.medaille ?? 'ohne']}
-                          style={{ flex: 1 }}
-                          aria-label={`Fortschritt ${e.ist} von ${e.ziel}`}
-                        />
-                        <Text size="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>
-                          {e.ist}/{e.ziel}
+          <AuszKlapp
+            key={g.id}
+            id={`ach-gruppe-${g.id}`}
+            titel={g.name}
+            status={`${zahl} von ${liste.length} geschafft${neuHier ? ` · ${neuHier} neu` : ''}${naechstes ? ` · als Nächstes: ${naechstes.titel} (${naechstes.ist}/${naechstes.ziel})` : ''}`}
+            rahmen={{ 'data-achievements-gruppe': g.id }}
+          >
+            <Stack gap={6}>
+              {liste.map((e) => (
+                <Card
+                  key={e.id}
+                  withBorder
+                  padding="xs"
+                  radius="md"
+                  style={neu.has(e.id) ? { borderColor: FARBE[e.medaille ?? 'ohne'], borderWidth: 2 } : undefined}
+                  data-achievement={e.id}
+                  data-erreicht={e.erreicht}
+                >
+                  <Group gap="sm" wrap="nowrap" align="flex-start">
+                    <div style={e.erreicht ? undefined : { opacity: 0.35, filter: 'grayscale(1)' }}>
+                      <Medaille m={e.medaille} />
+                    </div>
+                    <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                      <Group gap={6}>
+                        <Text fw={700} size="sm" c={e.erreicht ? undefined : 'dimmed'}>
+                          {e.titel}
                         </Text>
+                        {neu.has(e.id) && (
+                          <Badge size="xs" color="green" tt="none">
+                            neu
+                          </Badge>
+                        )}
                       </Group>
-                    ) : (
-                      <Text size="xs" c="dimmed" data-achievement-fortschritt="0/1">
-                        noch nicht erreicht
+                      <Text size="xs" c="dimmed">
+                        {e.text}
                       </Text>
-                    )}
-                    {e.anteil !== null && (
-                      <Text size="xs" c="dimmed" data-achievement-anteil={e.anteil}>
-                        {e.anteil === 0 ? 'Noch niemand an der Schule hat es' : `${e.anteil} % der Lernenden der Schule haben es`}
-                      </Text>
-                    )}
-                  </Stack>
-                </Group>
-              </Card>
-            ))}
-          </Stack>
+                      {e.erreicht ? (
+                        <Text size="xs" c="dimmed">
+                          {e.medaille ? `${STUFE[e.medaille]} · ` : ''}erreicht{e.am ? ` am ${new Date(e.am).toLocaleDateString('de-DE')}` : ''}
+                        </Text>
+                      ) : e.ziel > 1 ? (
+                        <Group gap={8} wrap="nowrap" data-achievement-fortschritt={`${e.ist}/${e.ziel}`}>
+                          <Progress
+                            value={(e.ist / e.ziel) * 100}
+                            size="sm"
+                            radius="xl"
+                            color={FARBE[e.medaille ?? 'ohne']}
+                            style={{ flex: 1 }}
+                            aria-label={`Fortschritt ${e.ist} von ${e.ziel}`}
+                          />
+                          <Text size="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>
+                            {e.ist}/{e.ziel}
+                          </Text>
+                        </Group>
+                      ) : (
+                        <Text size="xs" c="dimmed" data-achievement-fortschritt="0/1">
+                          noch nicht erreicht
+                        </Text>
+                      )}
+                      {e.anteil !== null && (
+                        <Text size="xs" c="dimmed" data-achievement-anteil={e.anteil}>
+                          {e.anteil === 0 ? 'Noch niemand an der Schule hat es' : `${e.anteil} % der Lernenden der Schule haben es`}
+                        </Text>
+                      )}
+                    </Stack>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+          </AuszKlapp>
         )
       })}
     </Stack>

@@ -10,7 +10,7 @@ import type { BuchFuerTeilen } from '../src/shared/abschnitteTeilen'
 import { kursAbschnitteTeilen } from '../src/shared/abschnitteTeilen'
 import { alleLehrwerke, lehrwerkName } from '../src/server/wartungAbschnitteTeilen'
 import { kandidaten, vokabelBaende } from '../src/server/wartungVokabelBaende'
-import { teileNachBaenden } from '../src/renderer/src/modules/lernen/kurs/AbschnitteVerwalten'
+import { abschnittsZeilen } from '../src/shared/kursWoerter'
 
 /*
  * Mehrere Bände in einem Kurs (10.10.2026, Befund der Lehrkraft): Vokabeln aus Green Line 1 UND Green Line 2 in einem
@@ -63,11 +63,11 @@ describe('Bände je Abschnitt', () => {
     expect(gruppen[1].units.map((u) => [u.unit, u.zeilen.length])).toEqual([['Unit 3', 2]])
     // Kursname nennt beide Bände
     expect(baendeVon('Englisch', e, QUELLE)).toEqual(['Green Line 1', 'Green Line 2'])
-    // Wortliste („X Wörter") je Band: neuester oben, Stellen der Abschnitte bleiben
-    const liste = teileNachBaenden(neu.map((t, i) => ({ ...t, buch: e[i].buch, unit: e[i].unit })))
-    expect(liste.map((b) => [b.buch, b.zeilen.map((z) => z.i), b.units])).toEqual([
+    // Kasten „Abschnitte & Wörter" (10.10.2026) je Band: neuester oben, Stellen der Abschnitte bleiben, im Band absteigend
+    const liste = nachBaenden(abschnittsZeilen(neu.map((t, i) => ({ ...t, buch: e[i].buch, unit: e[i].unit })), WOERTER, QUELLE))
+    expect(liste.map((b) => [b.buch, b.units.flatMap((u) => u.zeilen.map((z) => z.index)), b.units.length])).toEqual([
       ['Green Line 2', [2], 1],
-      ['Green Line 1', [0, 1], 1]
+      ['Green Line 1', [1, 0], 1]
     ])
   })
 

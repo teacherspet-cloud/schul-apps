@@ -96,6 +96,8 @@ try {
   await g.request.post(`${A}/s/api/vokabeln/spiel`, { headers: KOPF, data: { id: kurs, spiel: 'blitz', wert: 9, fehler: [] } })
   await p.locator('[data-rekorde-knopf]').first().click()
   await p.locator('[data-tab-rekorde]').click()
+  // Abschnitte sind eingeklappt (10.10.2026)
+  await p.locator('[data-klappkopf="rek-spiele"]').click()
   pruefe(await da(p.locator('[data-rekorde-tabelle]', { hasText: 'Blitzrunde' })), 'Rekordmenü zeigt die Blitzrunde')
   pruefe((await p.locator('[data-rekorde-tabelle]').innerText()).includes('12'), 'Bestwert 12 (nicht 9)')
   await p.screenshot({ path: join(out, '2-rekorde.png') })

@@ -60,6 +60,7 @@ import type { BlattAufgabe } from '../shared/blattFreigabe'
 import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type VorschauZustand } from './vorschau'
 import { geplantAb, nachFreigabe, nochGeplant, planVon, planVorbei } from './freigabePlan'
 import { reiheMitPlanen, zugangPlan } from './planen'
+import { haltepunktTermine } from '../shared/startseiteKurse'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reihen (
@@ -1208,7 +1209,9 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             verteilung: [0, 1, 2, 3].map((k) => fortschritte.filter((f) => Math.min(3, Math.floor(f * 4)) === k).length),
             bedarf: bedarf.length,
             bedarfArten: [...new Set(bedarf.map((b) => b.art))],
-            halte: r.schritte.filter((s) => s.halt?.art === 'freigabe' && !halteFrei.includes(s.id)).map((s) => s.titel)
+            halte: r.schritte.filter((s) => s.halt?.art === 'freigabe' && !halteFrei.includes(s.id)).map((s) => s.titel),
+            // Startseite „Demnächst" (10.10.2026): dieselben Haltepunkte mit dem Tag ihrer Stunde (ohne Stundentermin: null)
+            halteTermine: haltepunktTermine(r, halteFrei)
           }
         ]
       })

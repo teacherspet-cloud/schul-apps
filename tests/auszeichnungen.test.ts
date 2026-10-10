@@ -169,9 +169,11 @@ describe('Fortschreiben und Übernahme', () => {
   it('neue Medaillen und Titel genau einmal, nie abwärts', () => {
     const st = leer()
     const neu = fortschreiben(st, [eingabe({ zaehler: { spielrunden: 3 } }), eingabe({ sprache: 'fr' })], 100)
+    // Seit den Jahresreihen (10.10.2026) mit Schuljahr, dazu der Jahrestitel
     expect(neu).toEqual([
-      { art: 'medaille', sprache: 'en', kategorie: 'spiele', stufe: 1 },
-      { art: 'titel', sprache: 'en', stufe: 1 }
+      expect.objectContaining({ art: 'medaille', sprache: 'en', kategorie: 'spiele', stufe: 1 }),
+      { art: 'titel', sprache: 'en', stufe: 1 },
+      expect.objectContaining({ art: 'jahrestitel', sprache: 'en', stufe: 1 })
     ])
     expect(fortschreiben(st, [eingabe({ zaehler: { spielrunden: 3 } })], 200)).toEqual([])
     // Werte sinken (Kurs entfernt) – Medaille und Titel bleiben
@@ -346,7 +348,7 @@ describe('Medaillen und Titel am Server', () => {
     const ach = achievementsRoute()
     const neu = await rufe(ach, lia, 'GET', '/s/api/achievements/neu')
     const meldungen = neu.d.auszeichnungen as { art: string; sprache: string; text: string }[]
-    expect(meldungen).toEqual(expect.arrayContaining([expect.objectContaining({ art: 'medaille', sprache: 'en', text: 'Spiele' }), expect.objectContaining({ art: 'titel', sprache: 'en', text: 'Traveller' })]))
+    expect(meldungen).toEqual(expect.arrayContaining([expect.objectContaining({ art: 'medaille', sprache: 'en', text: expect.stringMatching(/^Spiele · Kl\. 5 \(\d{4}\/\d{2}\)$/) }), expect.objectContaining({ art: 'titel', sprache: 'en', text: 'Traveller' })]))
     expect((await rufe(ach, lia, 'GET', '/s/api/achievements/neu')).d.auszeichnungen).toEqual([])
 
     const a = await rufe(ach, lia, 'GET', '/s/api/auszeichnungen')

@@ -242,7 +242,12 @@ export interface TippDaten {
  * Andere Ziele bleiben, wie sie sind.
  */
 export const mitUebung = (href: string, uebung: 'runde' | 'abfragen' | 'wackelig'): string =>
-  /^\/s\/v\/[^?#]+$/.test(href) ? `${href}?uebung=${uebung}` : href
+  /^\/s\/v\/[^?#]+$/.test(href)
+    ? `${href}?uebung=${uebung}`
+    : // Tagesrunde einer Sprache im Fachordner (10.10.2026): „/s/ordner/Englisch?r=vok"
+      /^\/s\/ordner\/[^?#]+\?r=vok$/.test(href)
+      ? `${href}&uebung=${uebung}`
+      : href
 
 const nachStufe = (s: Stufe, t: { grund: string; unter: string; mittel: string; ober: string }): string =>
   s === 'grund' ? t.grund : s === 'unter' ? t.unter : s === 'ober' ? t.ober : t.mittel
@@ -281,10 +286,11 @@ const REGELN: { id: string; tipp: (d: TippDaten) => RegelTipp | null }[] = [
         text: nachStufe(d.stufe, {
           grund: 'Du übst so tapfer! Probier heute einen Trick: Deck das Wort zu und sag es dir laut vor, bevor du nachschaust.',
           unter: 'Du bleibst dran – das zählt. Probier einen Trick: erst selbst überlegen, dann nachschauen. Genau dieses Erinnern macht Wörter sicher.',
-          mittel: `Du hast an ${d.fleiss.tage14} Tagen geübt. Mehr Wiederholen allein bringt hier weniger: Beantworte erst ohne Hinschauen und prüf danach. Bleibt etwas hängen, zeig es deiner Lehrkraft.`,
+          mittel: `Du hast an ${d.fleiss.tage14} Tagen geübt. Mehr Wiederholen allein bringt hier weniger: Beantworte erst aus dem Kopf – ohne Antworten zur Auswahl – und prüf danach. Bleibt etwas hängen, zeig es deiner Lehrkraft.`,
           ober: `Hohe Aktivität (${d.fleiss.tage14} Tage), die Treffer steigen noch nicht. Wechsle von Wiederlesen zu Abfragen ohne Vorlage. Hilft das nicht, sprich deine Lehrkraft an.`
         }),
-        knopf: { text: 'Abfrage ohne Hinschauen starten', href: mitUebung(href, 'abfragen') }
+        // „Abfrage ohne Hinschauen" war unklar (10.10.2026, Befund der Lehrkraft) – gemeint: selbst erinnern, keine Auswahl
+        knopf: { text: 'Aus dem Kopf abfragen', href: mitUebung(href, 'abfragen') }
       }
     }
   },

@@ -6,7 +6,7 @@
  * Name, Benutzername, Startpasswort und QR-Code zur Anmeldeseite (Benutzername schon eingetragen).
  * Die Passwörter stehen nur jetzt im Klartext da – der Server speichert sie nicht.
  */
-import { Alert, Button, Card, Group, Stack, Table, Text, TextInput, Textarea } from '@mantine/core'
+import { Alert, Button, Group, Stack, Table, Text, TextInput, Textarea } from '@mantine/core'
 import { IconEye, IconPrinter, IconUsersPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
@@ -14,6 +14,7 @@ import { senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
 import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
 import PrintPreview from '../../shared/components/PrintPreview'
+import { KlappKarte } from '../../shared/components/KlappKarte'
 
 interface Konto {
   name: string
@@ -75,10 +76,8 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
   }
   const neu = ergebnis?.angelegt.filter((k) => !k.schonDa) ?? []
   return (
-    <Card withBorder data-klassenliste>
-      <Text fw={600} mb="xs">
-        Schülerkonten aus einer Klassenliste
-      </Text>
+    // Auf- und zuklappbar (10.10.2026, Wunsch der Lehrkraft), standardmäßig zu
+    <KlappKarte id="nutzer-klassenliste" titel="Schülerkonten aus einer Klassenliste" rahmen={{ 'data-klassenliste': true }}>
       <Stack gap="xs">
         <TextInput label="Klasse" placeholder="10b" value={klasse} onChange={(e) => setKlasse(e.currentTarget.value)} w={160} data-feld="klasse" />
         <Textarea
@@ -147,6 +146,6 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
         )}
       </Stack>
       {druckHtml && <PrintPreview html={druckHtml} title={`Zugangskarten ${ergebnis?.klasse ?? ''}`.trim()} onClose={() => setDruckHtml(null)} />}
-    </Card>
+    </KlappKarte>
   )
 }

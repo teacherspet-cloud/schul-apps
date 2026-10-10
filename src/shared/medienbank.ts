@@ -147,7 +147,10 @@ export const sprachKurz = (s: string): string =>
     .split(/[-_]/)[0]
     .slice(0, 8) || 'xx'
 
-/** Wort vergleichbar machen: ohne Artikel-Klammern und Satzzeichen am Rand, klein, Leerraum zusammengefasst */
+/**
+ * Bisheriger Schlüssel (bis 10.10.2026): ohne Artikel-Klammern und Satzzeichen am Rand, klein, Leerraum zusammengefasst.
+ * Bleibt für den Rückfall: Einträge der Medienbank liegen noch unter diesen Schlüsseln (storage/medienbank.ts).
+ */
 export const wortNormiert = (w: string): string =>
   String(w ?? '')
     .normalize('NFC')
@@ -157,15 +160,130 @@ export const wortNormiert = (w: string): string =>
     .trim()
     .slice(0, 160)
 
-export const medienSchluessel = (sprache: string, wort: string): string => `${sprachKurz(sprache)}:${wortNormiert(wort)}`
-
-/** Schlüssel eines Beispielsatzes: normierter Wortlaut (Satzzeichen innen bleiben – sie klingen mit) */
-export const satzSchluessel = (satz: string): string =>
-  String(satz ?? '')
+/**
+ * Text vereinheitlichen (10.10.2026, Wunsch der Lehrkraft: gleiche Vokabel = EINE Aufnahme): Unicode NFC, typografische
+ * Apostrophe und Anführungszeichen wie gerade, „…" wie „...", Leerraum um „/" weg („a / one" = „a/one"), Leerraum
+ * zusammengefasst. Groß-/Kleinschreibung und Satzzeichen bleiben – das entscheidet der Aufrufer.
+ */
+export const textKanon = (s: string): string =>
+  String(s ?? '')
     .normalize('NFC')
+    .replace(/[‘’‚‛ʼ′´`]/g, "'")
+    .replace(/[“”„‟«»″]/g, '"')
+    .replace(/…/g, '...')
+    .replace(/\s*\/\s*/g, '/')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 600)
+
+/** Initialwort („US", „YA", „R&B"): bleibt groß – die Sprach-KI buchstabiert es, „us" dagegen nicht (shared/sprechtext.ts) */
+const istInitialwort = (w: string): boolean => /^[\p{Lu}\d&]{2,6}$/u.test(w) && (w.match(/\p{Lu}/gu)?.length ?? 0) >= 2
+
+/**
+ * Wort vergleichbar machen (Schlüssel der Medienbank, 10.10.2026): wie `textKanon`, dazu klein (außer Initialwörtern,
+ * die anders klingen) und ohne Satzzeichen, Anführungszeichen und Klammern am Rand. Gleich sind damit „a / one" und
+ * „a/one", „it’s" und „it's", „…" und „...", „Park" und „park"; verschieden bleiben „US" und „us".
+ */
+export const wortKanon = (w: string): string =>
+  textKanon(w)
+    .replace(/[\p{L}\p{M}\d&]+/gu, (t) => (istInitialwort(t) ? t : t.toLowerCase()))
+    .replace(/^[\s.,;:!?¡¿"'()[\]]+|[\s.,;:!?¡¿"'()[\]]+$/g, '')
+    .trim()
+    .slice(0, 160)
+
+/** Schlüssel der Medienbank: Sprache + vereinheitlichtes Wort – für alle Lehrwerke, Listen, Tests und Lernenden gleich */
+export const medienSchluessel = (sprache: string, wort: string): string => `${sprachKurz(sprache)}:${wortKanon(wort)}`
+/** Bisheriger Schlüssel (Rückfall beim Nachschlagen) */
+export const medienSchluesselAlt = (sprache: string, wort: string): string => `${sprachKurz(sprache)}:${wortNormiert(wort)}`
+
+/**
+ * Schlüssel eines Beispielsatzes bzw. einer Verbform: vereinheitlichter Wortlaut (`textKanon`; Satzzeichen innen bleiben
+ * – sie klingen mit). „read (Vergangenheit)" bleibt ein eigener Schlüssel.
+ */
+export const satzSchluessel = (satz: string): string => textKanon(satz).slice(0, 600)
+
+/** Gesprochenen Text vergleichen: vereinheitlicht und klein (Initialwörter stehen dort schon buchstabiert) */
+const sprechKanon = (s: string): string => textKanon(s).toLowerCase()
+
+/**
+ * Passt die Aufnahme noch zum Wort bzw. Satz und zu seinem Sprechtext? (10.10.2026 gemeinsam für Aufträge und Knöpfe:
+ * Schreibvarianten wie „a / one" – „a/one" gelten als gleich, sonst würde dieselbe Vokabel doppelt erzeugt.) Ältere
+ * Aufnahmen ohne `gesprochen`: Text = Sprechtext. `gesprochen` fehlt = nur den Text prüfen.
+ */
+export const tonPasst = (ton: { text: string; gesprochen?: string } | undefined, text: string, gesprochen?: string, art: TonArt = 'wort'): boolean => {
+  if (!ton) return false
+  const gleich = art === 'wort' ? wortKanon(ton.text) === wortKanon(text) : satzSchluessel(ton.text) === satzSchluessel(text)
+  return gleich && (gesprochen === undefined || sprechKanon(ton.gesprochen ?? ton.text) === sprechKanon(gesprochen))
+}
+
+/** Kennung einer Aufnahme für die Erzeugungssperre (ohne Stimme und Sprechtext – die prüft `tonPasst` danach) */
+export const tonKennung = (sprache: string, wort: string, art: TonArt, lage: Stimmlage, text: string): string =>
+  `${medienSchluessel(sprache, wort)}|${art}|${lage}${art === 'satz' ? `|${satzSchluessel(text)}` : ''}`
+
+/**
+ * Dieselbe Aufnahme nie zweimal erzeugen (10.10.2026): Wer erzeugen will, reserviert die Kennung (`reservieren`, am Server
+ * für alle Lehrkräfte gemeinsam). Ist sie belegt, wartet er und sieht danach nach, ob die Aufnahme jetzt passt (`passt`)
+ * – dann ist nichts zu tun. `trotzdem` (ausdrücklich „neu erzeugen"): auch eine passende Aufnahme ersetzen.
+ */
+export async function einmalErzeugen(o: {
+  reservieren: () => Promise<boolean>
+  freigeben: () => Promise<unknown> | unknown
+  passt: () => Promise<boolean>
+  erzeugen: () => Promise<void>
+  trotzdem?: boolean
+  /** Höchstens so oft auf eine fremde Erzeugung warten, dann selbst erzeugen */
+  versuche?: number
+}): Promise<'erzeugt' | 'vorhanden'> {
+  const max = o.versuche ?? 8
+  let eigen = false
+  for (let n = 0; n < max && !eigen; n++) {
+    eigen = await o.reservieren()
+    if (eigen) break
+    // Ein anderer hat eben erzeugt (oder erzeugt noch) – passt seine Aufnahme, ist nichts mehr zu tun
+    if (!o.trotzdem && (await o.passt())) return 'vorhanden'
+  }
+  try {
+    if (!o.trotzdem && (await o.passt())) return 'vorhanden'
+    await o.erzeugen()
+    return 'erzeugt'
+  } finally {
+    if (eigen) await (async () => o.freigeben())().catch(() => undefined)
+  }
+}
+
+/**
+ * Erzeugungssperre (10.10.2026): Kennung → laufende Erzeugung. `reservieren` gibt true, wenn frei (dann gehört sie dem
+ * Aufrufer bis `freigeben` oder bis `haltMs` abgelaufen ist – abgestürzte Seiten blockieren nicht ewig). Ist sie belegt,
+ * wartet es höchstens `wartenMs` auf die Freigabe und gibt false.
+ */
+export class ErzeugungsSperre {
+  private belegt = new Map<string, { bis: number; fertig: Promise<void>; los: () => void }>()
+  constructor(
+    private haltMs = 120_000,
+    private wartenMs = 30_000
+  ) {}
+  async reservieren(kennung: string): Promise<boolean> {
+    const r = this.belegt.get(kennung)
+    if (r && r.bis > Date.now()) {
+      let uhr: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([r.fertig, new Promise<void>((ok) => (uhr = setTimeout(ok, Math.min(this.wartenMs, r.bis - Date.now()))))])
+      if (uhr) clearTimeout(uhr)
+      return false
+    }
+    let los = (): void => undefined
+    const fertig = new Promise<void>((ok) => (los = ok))
+    this.belegt.set(kennung, { bis: Date.now() + this.haltMs, fertig, los })
+    return true
+  }
+  freigeben(kennung: string): void {
+    const r = this.belegt.get(kennung)
+    if (!r) return
+    this.belegt.delete(kennung)
+    r.los()
+  }
+  get anzahl(): number {
+    return this.belegt.size
+  }
+}
 
 /** Ist ein ganzer Satz (nicht nur eine Wendung)? – nur dann gibt es eine Satz-Aussprache */
 export const istGanzerSatz = (t: string | undefined): boolean => {

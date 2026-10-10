@@ -11,7 +11,7 @@
  *    Sprungleiste A–Z (nur Buchstaben mit Wörtern), Buchstaben-Überschriften, kurze Zeilen mit Fundstelle („GL 2 · U3"),
  *    gleiche Wörter einmal mit allen Fundstellen. Gezeichnet wird nur, was im Bild ist – auch bei Tausenden Wörtern flüssig.
  */
-import { ActionIcon, Badge, Button, Loader, Stack, Text } from '@mantine/core'
+import { ActionIcon, Badge, Button, Loader, SegmentedControl, Stack, Text } from '@mantine/core'
 import { IconVolume } from '@tabler/icons-react'
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { abcEintraege, alphabetisch, fenster, mitKoepfen, type AbcZeile, type MeinBuch } from '@shared/meineBuecher'
@@ -21,6 +21,10 @@ import { BandCover } from '../../../shared/components/BandCover'
 import { kannSprechen, sprich } from '../VokabelTrainer'
 import { medienErgaenzen, medium } from '../medienCache'
 import { useBlaettern } from './blaettern'
+import { schuljahrText } from '@shared/schulkalender'
+import { zahlenAus, type StandZahlen } from '@shared/sprachstand'
+import { useOffenGemerkt } from '../../../shared/sitzung'
+import { BandMedailleBild, SPRACH_CSS, StandKreise } from './Sprachstand'
 import { buecherTexte, type BuecherTexte } from './buecherTexte'
 import { ruhig, sichtbarerTeil } from './ordnerAnimation'
 import type { FachOrdner } from './regalDaten'
@@ -34,6 +38,15 @@ const CSS = `
 .wl-punkt[data-wort-status="neu"] { --wl-f: #868e96; background: transparent; }
 .wl-punkt[data-wort-status="aufbau"] { --wl-f: #e8590c; background: linear-gradient(90deg, var(--wl-f) 50%, transparent 50%); }
 .wl-punkt[data-wort-status="sicher"] { --wl-f: #2b8a3e; background: var(--wl-f); }
+.wl-punkt[data-wort-status="nichtDran"] { --wl-f: #adb5bd; border-style: dashed; background: transparent; opacity: .6; }
+.ab-zeile[data-abc-nicht-dran] .ab-text { opacity: .5; }
+.mb-medaille { position: absolute; right: -12px; bottom: -10px; line-height: 0; }
+.mb-unit-kopf, .mb-abschnitt-kopf { flex-wrap: wrap; row-gap: 2px; }
+.mb-unit-kopf .sk-kreise, .mb-abschnitt-kopf .sk-kreise { font-weight: 600; font-size: .75rem; opacity: .85; }
+.mb-unit { border-bottom: 1px solid var(--og-linie, rgba(0,0,0,.08)); }
+.mb-unit-inhalt { padding-left: 16px; }
+.mb-abschnitt-kopf { font-size: .95rem; font-weight: 700; }
+.ab-umschalter { align-self: flex-start; }
 .wl-zeile { display: grid; grid-template-columns: 14px minmax(0, 1fr) 30px; align-items: center; gap: 2px 10px;
   padding: 5px 4px; border-bottom: 1px solid var(--og-linie, rgba(0,0,0,.08)); }
 .wl-paar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 10px; align-items: baseline; min-width: 0;
@@ -90,12 +103,16 @@ button.wl-paar:focus-visible { outline: 2px solid var(--og-akzent); outline-offs
 
 // ------------------------------------------------------------------ Daten (einmal je Ordner, beide Register teilen sie)
 
-const zwischen = new Map<string, { zeit: number; laden: Promise<Liste>; fertig?: Liste }>()
+const zwischen = new Map<string, { zeit: number; laden: Promise<Liste & { nichtDran?: MeinBuch[] }>; fertig?: Liste & { nichtDran?: MeinBuch[] } }>()
 
-function useWortDaten(o: FachOrdner): { d: Liste | null; fehler: string } {
+type ListeMitAllen = Liste & { nichtDran?: MeinBuch[] }
+
+/** Wörter des Fachs; `alle` (10.10.2026): dazu alle übrigen Wörter der Bände der Reihe – erst auf Anforderung geladen */
+function useWortDaten(o: FachOrdner, alle: boolean): { d: ListeMitAllen | null; fehler: string } {
   const ids = o.vokabeln.map((v) => v.id)
-  const schluessel = `${o.fach}|${ids.join(',')}`
-  const [d, setD] = useState<Liste | null>(() => zwischen.get(schluessel)?.fertig ?? null)
+  const schluessel = `${o.fach}|${ids.join(',')}|${alle ? 'alle' : 'meine'}`
+  const [d, setD] = useState<ListeMitAllen | null>(() => zwischen.get(schluessel)?.fertig ?? null)
+  useEffect(() => setD(zwischen.get(schluessel)?.fertig ?? null), [schluessel])
   const [fehler, setFehler] = useState('')
   useEffect(() => {
     let aktiv = true
@@ -104,7 +121,8 @@ function useWortDaten(o: FachOrdner): { d: Liste | null; fehler: string } {
     if (!c || Date.now() - c.zeit > 60_000) {
       const q = new URLSearchParams({ fach: o.fach })
       for (const id of ids) q.append('id', id)
-      const neu: { zeit: number; laden: Promise<Liste>; fertig?: Liste } = { zeit: Date.now(), laden: holen<Liste>(`/s/api/wortliste?${q.toString()}`) }
+      if (alle) q.set('alle', '1')
+      const neu: { zeit: number; laden: Promise<ListeMitAllen>; fertig?: ListeMitAllen } = { zeit: Date.now(), laden: holen<ListeMitAllen>(`/s/api/wortliste?${q.toString()}`) }
       neu.laden.then(
         (x) => (neu.fertig = x),
         () => zwischen.delete(schluessel)
@@ -189,85 +207,74 @@ function Suche({ wert, setWert, t }: { wert: string; setWert: (s: string) => voi
   )
 }
 
+/** Eine Wortzeile: Punkt, Wort und Bedeutung, Aussprache; der Beispielsatz klappt beim Antippen auf */
+function WortZeile({ w, sprache, t }: { w: WortlisteWort; sprache: string; t: BuecherTexte }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const sprechen = Boolean(sprache) && kannSprechen(sprache)
+  return (
+    <div className="wl-zeile" data-wortliste-wort={w.term}>
+      <Punkt s={w.status} t={t} />
+      {w.example ? (
+        <button type="button" className="wl-paar" aria-expanded={offen} onClick={() => setOffen(!offen)} data-wortliste-aufklappen>
+          {paar(w)}
+        </button>
+      ) : (
+        <div className="wl-paar">{paar(w)}</div>
+      )}
+      <span className="wl-ton">
+        {tonDa(sprache, w.term) && (
+          <ActionIcon variant="subtle" size="md" onClick={() => sprich(w.term, sprache)} aria-label={t.anhoeren(w.term)} data-wortliste-anhoeren>
+            <IconVolume size={16} />
+          </ActionIcon>
+        )}
+      </span>
+      {offen && w.example && (
+        <div className="wl-beispiel" data-wortliste-beispiel>
+          <div style={{ minWidth: 0 }}>
+            <Text size="sm" fs="italic">
+              {w.example}
+            </Text>
+            {w.exampleTranslation && (
+              <Text size="sm" c="dimmed">
+                {w.exampleTranslation}
+              </Text>
+            )}
+          </div>
+          {sprechen && (
+            <ActionIcon variant="subtle" size="sm" onClick={() => sprich(w.example!, sprache)} aria-label={t.beispiel}>
+              <IconVolume size={14} />
+            </ActionIcon>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const zahlenVon = (woerter: WortlisteWort[]): StandZahlen => zahlenAus(woerter.map((w) => w.status))
+
 /**
- * Gruppen (Abschnitte) zum Auf- und Zuklappen, je Zeile Wort, Bedeutung, Stand, Aussprache; der Beispielsatz klappt beim
- * Antippen auf. `offen`: welche Gruppe ohne Suche offen ist. Höchstens GRENZE Zeilen auf einmal.
+ * Suchtreffer: Gruppen offen untereinander (die Suche zeigt alles Gefundene). Höchstens GRENZE Zeilen auf einmal.
  */
-function Gruppen({
-  gruppen,
-  sprache,
-  sucht,
-  offen: start,
-  t
-}: {
-  gruppen: WortlisteGruppe[]
-  sprache: string
-  sucht: boolean
-  offen: 'erste' | 'letzte'
-  t: BuecherTexte
-}): React.JSX.Element {
-  const [offen, setOffen] = useState<Record<string, boolean>>({})
-  const [beispiel, setBeispiel] = useState<string | null>(null)
+function Gruppen({ gruppen, sprache, t }: { gruppen: WortlisteGruppe[]; sprache: string; t: BuecherTexte }): React.JSX.Element {
   const [grenze, setGrenze] = useState(GRENZE)
   const anzahl = gruppen.reduce((n, g) => n + g.woerter.length, 0)
   useEffect(() => setGrenze(GRENZE), [gruppen])
-  const sprechen = Boolean(sprache) && kannSprechen(sprache)
   let gezeigt = 0
   return (
     <>
-      {gruppen.map((g, i) => {
-        const auf = sucht || (offen[g.key] ?? (start === 'erste' ? i === 0 : i === gruppen.length - 1))
-        const zeilen = auf ? g.woerter.slice(0, Math.max(0, grenze - gezeigt)) : []
+      {gruppen.map((g) => {
+        const zeilen = g.woerter.slice(0, Math.max(0, grenze - gezeigt))
         gezeigt += zeilen.length
         return (
-          <div key={g.key} data-wortliste-gruppe={g.titel} data-offen={auf}>
-            <button type="button" className="og-jahr" aria-expanded={auf} disabled={sucht} onClick={() => setOffen({ ...offen, [g.key]: !auf })}>
-              <span aria-hidden>{auf ? '▾' : '▸'}</span>
+          <div key={g.key} data-wortliste-gruppe={g.titel} data-offen>
+            <div className="og-jahr">
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{g.titel}</span>
               <span className="og-jahr-zahl">{g.woerter.length}</span>
-            </button>
-            {zeilen.map((w) => {
-              const k = `${g.key}|${w.id}`
-              const zu = beispiel !== k
-              return (
-                <div key={w.id} className="wl-zeile" data-wortliste-wort={w.term}>
-                  <Punkt s={w.status} t={t} />
-                  {w.example ? (
-                    <button type="button" className="wl-paar" aria-expanded={!zu} onClick={() => setBeispiel(zu ? k : null)} data-wortliste-aufklappen>
-                      {paar(w)}
-                    </button>
-                  ) : (
-                    <div className="wl-paar">{paar(w)}</div>
-                  )}
-                  <span className="wl-ton">
-                    {tonDa(sprache, w.term) && (
-                      <ActionIcon variant="subtle" size="md" onClick={() => sprich(w.term, sprache)} aria-label={t.anhoeren(w.term)} data-wortliste-anhoeren>
-                        <IconVolume size={16} />
-                      </ActionIcon>
-                    )}
-                  </span>
-                  {!zu && w.example && (
-                    <div className="wl-beispiel" data-wortliste-beispiel>
-                      <div style={{ minWidth: 0 }}>
-                        <Text size="sm" fs="italic">
-                          {w.example}
-                        </Text>
-                        {w.exampleTranslation && (
-                          <Text size="sm" c="dimmed">
-                            {w.exampleTranslation}
-                          </Text>
-                        )}
-                      </div>
-                      {sprechen && (
-                        <ActionIcon variant="subtle" size="sm" onClick={() => sprich(w.example!, sprache)} aria-label={t.beispiel}>
-                          <IconVolume size={14} />
-                        </ActionIcon>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            </div>
+            {zeilen.map((w) => (
+              <WortZeile key={w.id} w={w} sprache={sprache} t={t} />
+            ))}
           </div>
         )
       })}
@@ -277,6 +284,71 @@ function Gruppen({
         </Button>
       )}
     </>
+  )
+}
+
+/**
+ * Ein Buch (10.10.2026, Wunsch der Lehrkraft): Units zugeklappt, darin die Abschnitte – ebenfalls zugeklappt; je Unit und
+ * Abschnitt die drei Kreise mit Zahlen (neu / im Aufbau / sicher). Auf/Zu gilt für die Sitzung (shared/sitzung.ts).
+ * Abschnitte stehen aufsteigend wie im Buch.
+ */
+function BuchInhalt({ buchId, gruppen, sprache, t }: { buchId: string; gruppen: WortlisteGruppe[]; sprache: string; t: BuecherTexte }): React.JSX.Element {
+  const units: { unit: string; gruppen: WortlisteGruppe[] }[] = []
+  for (const g of gruppen) {
+    const unit = g.unit ?? (g.titel.includes(' · ') ? g.titel.split(' · ')[0] : '')
+    const letzte = units[units.length - 1]
+    if (unit && letzte && letzte.unit === unit) letzte.gruppen.push(g)
+    else units.push({ unit, gruppen: [g] })
+  }
+  return (
+    <div data-buch-inhalt={buchId}>
+      {units.map((u, i) =>
+        u.unit ? (
+          <UnitZeile key={`${u.unit}-${i}`} buchId={buchId} unit={u.unit} gruppen={u.gruppen} sprache={sprache} t={t} />
+        ) : (
+          u.gruppen.map((g) => <AbschnittZeile key={g.key} buchId={buchId} g={g} titel={g.titel} sprache={sprache} t={t} />)
+        )
+      )}
+    </div>
+  )
+}
+
+function UnitZeile({ buchId, unit, gruppen, sprache, t }: { buchId: string; unit: string; gruppen: WortlisteGruppe[]; sprache: string; t: BuecherTexte }): React.JSX.Element {
+  const [offen, setOffen] = useOffenGemerkt(`sa-buch-${buchId}-u-${unit}`, false)
+  const z = useMemo(() => zahlenVon(gruppen.flatMap((g) => g.woerter)), [gruppen])
+  // Eine Unit ohne eigene Abschnitte (nur „Wortschatz" o. Ä. mit gleichem Namen): die Wörter direkt
+  const einzeln = gruppen.length === 1 && (gruppen[0].abschnitt ?? '') === unit
+  return (
+    <div className="mb-unit" data-buch-unit={unit} data-offen={offen}>
+      <button type="button" className="og-jahr mb-unit-kopf" aria-expanded={offen} onClick={() => setOffen(!offen)}>
+        <span aria-hidden>{offen ? '▾' : '▸'}</span>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{unit}</span>
+        <StandKreise z={z} t={t} />
+      </button>
+      {offen && (
+        <div className="mb-unit-inhalt">
+          {einzeln
+            ? gruppen[0].woerter.map((w) => <WortZeile key={w.id} w={w} sprache={sprache} t={t} />)
+            : gruppen.map((g) => <AbschnittZeile key={g.key} buchId={buchId} g={g} titel={g.abschnitt || g.titel} sprache={sprache} t={t} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AbschnittZeile({ buchId, g, titel, sprache, t }: { buchId: string; g: WortlisteGruppe; titel: string; sprache: string; t: BuecherTexte }): React.JSX.Element {
+  const [offen, setOffen] = useOffenGemerkt(`sa-buch-${buchId}-a-${g.key}`, false)
+  const z = useMemo(() => zahlenVon(g.woerter), [g])
+  useAussprache(offen ? sprache : '', useMemo(() => (offen ? g.woerter.map((w) => w.term) : []), [offen, g]))
+  return (
+    <div className="mb-abschnitt" data-wortliste-gruppe={g.titel} data-offen={offen}>
+      <button type="button" className="og-jahr mb-abschnitt-kopf" aria-expanded={offen} onClick={() => setOffen(!offen)}>
+        <span aria-hidden>{offen ? '▾' : '▸'}</span>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{titel}</span>
+        <StandKreise z={z} t={t} />
+      </button>
+      {offen && g.woerter.map((w) => <WortZeile key={w.id} w={w} sprache={sprache} t={t} />)}
+    </div>
   )
 }
 
@@ -335,61 +407,108 @@ function coverAufschlagen(knopf: HTMLElement): void {
   a.oncancel = weg
 }
 
-function Bord({ buecher, weitere, t, oeffnen }: { buecher: MeinBuch[]; weitere: WortlisteGruppe[]; t: BuecherTexte; oeffnen: (id: string) => (e: React.MouseEvent<HTMLButtonElement>) => void }): React.JSX.Element {
+/** Ein Cover auf dem Bord: Name, Klasse und Schuljahr, bei früheren Jahren Medaille und Anteile */
+function BuchKnopf({ b, t, oeffnen }: { b: MeinBuch; t: BuecherTexte; oeffnen: (id: string) => (e: React.MouseEvent<HTMLButtonElement>) => void }): React.JSX.Element {
+  const n = woerterIn(b.gruppen)
+  const jahr = t.jahrgang(b.klasse ?? null, b.schuljahr ? schuljahrText(b.schuljahr) : null)
   return (
-    <div className="mb-bord" aria-label={t.bord} data-buecherbord>
-      {buecher.map((b) => {
-        const n = woerterIn(b.gruppen)
-        const sicher = b.gruppen.reduce((x, g) => x + g.woerter.filter((w) => w.status === 'sicher').length, 0)
-        return (
-          <button
-            key={b.id}
-            type="button"
-            className="mb-buch"
-            onClick={oeffnen(b.id)}
-            aria-label={`${t.oeffnen(b.name)}: ${t.woerter(n)}${b.aktuell ? `, ${t.freigegeben}` : ''}`}
-            data-buch={b.id}
-            data-buch-aktuell={b.aktuell || undefined}
-          >
-            <span className="mb-cover" data-buch-cover>
-              <BandCover band={b} land={b.stateId ?? ''} breite={84} />
-            </span>
-            <span className="mb-buch-name">{b.name}</span>
-            <span className="mb-buch-zahl">
-              {t.woerter(n)}
-              {sicher > 0 ? ` · ${t.sicher(sicher)}` : ''}
-            </span>
-            {b.aktuell && (
-              <Badge size="xs" variant="light" style={{ marginTop: -2 }}>
-                {t.bisJetzt}
-              </Badge>
-            )}
-          </button>
-        )
-      })}
-      {weitere.length > 0 && (
-        <button
-          type="button"
-          className="mb-buch"
-          onClick={oeffnen(WEITERE)}
-          aria-label={`${t.oeffnen(t.weitere)}: ${t.woerter(woerterIn(weitere))}`}
-          data-buch={WEITERE}
-        >
-          <span className="mb-cover" data-buch-cover>
-            <span className="mb-ersatz" aria-hidden>
-              +
-            </span>
+    <button
+      type="button"
+      className="mb-buch"
+      onClick={oeffnen(b.id)}
+      aria-label={`${t.oeffnen(b.name)}: ${t.woerter(n)}${b.aktuell ? `, ${t.freigegeben}` : ''}`}
+      data-buch={b.id}
+      data-buch-aktuell={b.aktuell || undefined}
+      data-medaille-stufe={b.medaille ?? undefined}
+    >
+      <span className="mb-cover" data-buch-cover>
+        <BandCover band={b} land={b.stateId ?? ''} breite={84} />
+        {b.medaille && (
+          <span className="mb-medaille">
+            <BandMedailleBild m={b.medaille} groesse={32} />
           </span>
-          <span className="mb-buch-name">{t.weitere}</span>
-          <span className="mb-buch-zahl">{t.woerter(woerterIn(weitere))}</span>
-        </button>
+        )}
+      </span>
+      <span className="mb-buch-name">{b.name}</span>
+      {jahr && <span className="mb-buch-zahl">{jahr}</span>}
+      <span className="mb-buch-zahl">{t.woerter(n)}</span>
+      {!b.aktuell && typeof b.sicherProzent === 'number' && (b.kennenProzent ?? 0) > 0 && (
+        <span className="mb-buch-zahl" data-buch-prozent={`${b.sicherProzent}/${b.kennenProzent ?? 0}`}>
+          {t.sicherP(b.sicherProzent)} · {t.kennenP(b.kennenProzent ?? 0)}
+        </span>
       )}
-    </div>
+      {b.aktuell && (
+        <Badge size="xs" variant="light" style={{ marginTop: -2 }}>
+          {t.bisJetzt}
+        </Badge>
+      )}
+    </button>
+  )
+}
+
+/** Bücherbord nach Schuljahren (10.10.2026): „Dieses Jahr" (aktueller Band, weitere Wörter) und „Frühere Jahre" */
+function Bord({
+  buecher,
+  weitere,
+  t,
+  oeffnen
+}: {
+  buecher: MeinBuch[]
+  weitere: WortlisteGruppe[]
+  t: BuecherTexte
+  oeffnen: (id: string) => (e: React.MouseEvent<HTMLButtonElement>) => void
+}): React.JSX.Element {
+  const jetzt = buecher.filter((b) => b.aktuell)
+  const frueher = buecher.filter((b) => !b.aktuell)
+  return (
+    <Stack gap="sm" aria-label={t.bord} data-buecherbord>
+      {(jetzt.length > 0 || weitere.length > 0) && (
+        <div data-bord-jahr="jetzt">
+          <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={6} style={{ letterSpacing: '.06em' }}>
+            {t.diesesJahr}
+          </Text>
+          <div className="mb-bord">
+            {jetzt.map((b) => (
+              <BuchKnopf key={b.id} b={b} t={t} oeffnen={oeffnen} />
+            ))}
+            {weitere.length > 0 && (
+              <button
+                type="button"
+                className="mb-buch"
+                onClick={oeffnen(WEITERE)}
+                aria-label={`${t.oeffnen(t.weitere)}: ${t.woerter(woerterIn(weitere))}`}
+                data-buch={WEITERE}
+              >
+                <span className="mb-cover" data-buch-cover>
+                  <span className="mb-ersatz" aria-hidden>
+                    +
+                  </span>
+                </span>
+                <span className="mb-buch-name">{t.weitere}</span>
+                <span className="mb-buch-zahl">{t.woerter(woerterIn(weitere))}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {frueher.length > 0 && (
+        <div data-bord-jahr="frueher">
+          <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={6} style={{ letterSpacing: '.06em' }}>
+            {t.fruehereJahre}
+          </Text>
+          <div className="mb-bord">
+            {frueher.map((b) => (
+              <BuchKnopf key={b.id} b={b} t={t} oeffnen={oeffnen} />
+            ))}
+          </div>
+        </div>
+      )}
+    </Stack>
   )
 }
 
 export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
-  const { d, fehler } = useWortDaten(o)
+  const { d, fehler } = useWortDaten(o, false)
   const t = useMemo(() => buecherTexte(o.fach), [o.fach])
   const blaettern = useBlaettern()
   const [offen, setOffen] = useState<string | null>(null)
@@ -409,8 +528,7 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
   const treffer = useMemo(() => wortlisteFiltern(alle, verzoegert, index), [alle, index, verzoegert])
   const buch = buecher.find((b) => b.id === offen) ?? null
   const sucht = Boolean(verzoegert.trim())
-  const sichtbar = sucht ? treffer.gruppen : buch ? buch.gruppen : offen === WEITERE || !buecher.length ? weitere : []
-  useAussprache(d?.sprache ?? '', useMemo(() => sichtbar.flatMap((g) => g.woerter.map((w) => w.term)), [sichtbar]))
+  useAussprache(d?.sprache ?? '', useMemo(() => (sucht ? treffer.gruppen.flatMap((g) => g.woerter.map((w) => w.term)) : []), [sucht, treffer]))
 
   if (fehler) return <Text c="dimmed">{fehler}</Text>
   if (!d) return <Loader size="sm" />
@@ -429,9 +547,11 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
       blaettern.oeffne('buch', () => setOffen(id), () => setOffen(null), `${window.location.pathname}?r=wort&buch=${encodeURIComponent(id)}`, true)
       coverAufschlagen(knopf)
     }
+  const inhalt = buch ? buch.gruppen : offen === WEITERE || !buecher.length ? weitere : null
   return (
     <Stack gap="xs" data-wortliste data-meine-buecher>
       <style>{CSS}</style>
+      <style>{SPRACH_CSS}</style>
       <Suche wert={suche} setWert={setSuche} t={t} />
       <Text size="sm" c="dimmed" aria-live="polite" data-wortliste-anzahl={sucht ? treffer.anzahl : gesamt}>
         {sucht ? (treffer.anzahl ? t.trefferAlle(treffer.anzahl) : t.nichts(verzoegert.trim())) : buch ? '' : t.woerter(gesamt)}
@@ -449,16 +569,25 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
           <div style={{ minWidth: 0 }}>
             <Text fw={800}>{buch ? buch.name : t.weitere}</Text>
             <Text size="sm" c="dimmed">
-              {t.woerter(woerterIn(buch ? buch.gruppen : weitere))}
+              {buch
+                ? [t.jahrgang(buch.klasse ?? null, buch.schuljahr ? schuljahrText(buch.schuljahr) : null), t.woerter(woerterIn(buch.gruppen))].filter(Boolean).join(' · ')
+                : t.woerter(woerterIn(weitere))}
               {` · ${buch ? (buch.aktuell ? t.freigegeben : t.ganzerBand) : t.ohneBuch}`}
             </Text>
+            {buch && <StandKreise z={zahlenVon(buch.gruppen.flatMap((g) => g.woerter))} t={t} balken />}
           </div>
         </div>
       )}
-      {(sucht || buch || offen === WEITERE || !buecher.length) && (
+      {sucht && (
         <>
           <Legende t={t} />
-          <Gruppen key={sucht ? 'suche' : offen ?? 'alle'} gruppen={sichtbar} sprache={d.sprache} sucht={sucht} offen={buch?.aktuell ? 'letzte' : 'erste'} t={t} />
+          <Gruppen key="suche" gruppen={treffer.gruppen} sprache={d.sprache} t={t} />
+        </>
+      )}
+      {!sucht && inhalt && (
+        <>
+          <Legende t={t} />
+          <BuchInhalt key={offen ?? 'alle'} buchId={buch?.id ?? WEITERE} gruppen={inhalt} sprache={d.sprache} t={t} />
         </>
       )}
     </Stack>
@@ -483,6 +612,16 @@ function useSchmal(): boolean {
   return schmal
 }
 
+const ALLE_SCHLUESSEL = 'sa-abc-alle'
+/** Ansichtswunsch „Alle Wörter" – dauerhaft je Gerät (kein Auf/Zu, shared/sitzung.ts) */
+const alleGemerkt = (): boolean => {
+  try {
+    return localStorage.getItem(ALLE_SCHLUESSEL) === '1'
+  } catch {
+    return false
+  }
+}
+
 function AbcZeileAnsicht({
   z,
   sprache,
@@ -505,10 +644,15 @@ function AbcZeileAnsicht({
       className="ab-zeile"
       style={{ top: oben, height: hoehe }}
       data-abc-wort={z.term}
+      data-abc-nicht-dran={z.nichtDran || undefined}
       data-abc-quellen={z.quellen.length}
       title={z.example ? `${z.example}${z.exampleTranslation ? ` – ${z.exampleTranslation}` : ''}` : undefined}
     >
-      <Punkt s={z.status} t={t} />
+      {z.nichtDran ? (
+        <span className="wl-punkt" data-wort-status="nichtDran" role="img" aria-label={t.nichtDran} title={t.nichtDran} />
+      ) : (
+        <Punkt s={z.status} t={t} />
+      )}
       <span className="ab-text">{paar(z)}</span>
       <span className="ab-quellen" title={z.quellen.join(', ')}>
         {zeigen.map((q) => (
@@ -530,11 +674,21 @@ function AbcZeileAnsicht({
 }
 
 export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
-  const { d, fehler } = useWortDaten(o)
+  // „Meine Wörter | Alle Wörter" (10.10.2026, Wunsch der Lehrkraft): links nur Freigegebenes, rechts alle Wörter der Bände
+  const [alle, setAlle] = useState(alleGemerkt)
+  const umschalten = (v: string): void => {
+    setAlle(v === 'alle')
+    try {
+      localStorage.setItem(ALLE_SCHLUESSEL, v === 'alle' ? '1' : '0')
+    } catch {
+      /* ohne Speicher gilt die Wahl nur jetzt */
+    }
+  }
+  const { d, fehler } = useWortDaten(o, alle)
   const t = useMemo(() => buecherTexte(o.fach), [o.fach])
   const [suche, setSuche] = useState('')
   const verzoegert = useDeferredValue(suche)
-  const zeilen = useMemo(() => (d ? alphabetisch(abcEintraege(d.buecher ?? [], d.gruppen, t.weitere), d.sprache) : []), [d, t])
+  const zeilen = useMemo(() => (d ? alphabetisch(abcEintraege(d.buecher ?? [], d.gruppen, t.weitere, alle ? d.nichtDran ?? [] : []), d.sprache) : []), [d, t, alle])
   const suchtexte = useMemo(() => zeilen.map((z) => suchform(`${z.term} \u0001 ${z.translation} \u0001 ${z.example ?? ''} \u0001 ${z.quellen.join(' ')}`)), [zeilen])
   const gefiltert = useMemo(() => {
     const teile = suchform(verzoegert).split(' ').filter(Boolean)
@@ -599,8 +753,28 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   }, [tonSchluessel]) // eslint-disable-line react-hooks/exhaustive-deps
   useAussprache(d?.sprache ?? '', ton)
 
+  const umschalter = (
+    <SegmentedControl
+      className="ab-umschalter"
+      size="xs"
+      radius="xl"
+      value={alle ? 'alle' : 'meine'}
+      onChange={umschalten}
+      data={[
+        { value: 'meine', label: t.meineWoerter },
+        { value: 'alle', label: t.alleWoerter }
+      ]}
+      data-abc-umschalter={alle ? 'alle' : 'meine'}
+    />
+  )
   if (fehler) return <Text c="dimmed">{fehler}</Text>
-  if (!d) return <Loader size="sm" />
+  if (!d)
+    return (
+      <Stack gap="xs">
+        {umschalter}
+        <Loader size="sm" />
+      </Stack>
+    )
   if (!zeilen.length)
     return (
       <Text c="dimmed" data-wortliste-leer>
@@ -623,6 +797,7 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   return (
     <Stack gap="xs" data-wortliste data-alphabetisch>
       <style>{CSS}</style>
+      {umschalter}
       <Suche wert={suche} setWert={setSuche} t={t} />
       <Text size="sm" c="dimmed" aria-live="polite" data-wortliste-anzahl={gefiltert.length}>
         {sucht ? (gefiltert.length ? t.treffer(gefiltert.length) : t.nichts(verzoegert.trim())) : t.woerter(zeilen.length)}

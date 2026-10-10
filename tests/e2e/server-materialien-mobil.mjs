@@ -262,8 +262,9 @@ try {
   await q.goto(A + '/')
   const spq = q.getByRole('button', { name: /Später einrichten|Überspringen/ })
   if (await da(spq.first(), 4000)) await spq.first().click()
-  await q.locator('.app-leiste [aria-label="Materialien"]').click()
-  pruefe(await da(q.getByRole('heading', { name: 'Themenbereiche' })), 'PC: „Materialien" in der Leiste öffnet den Baum')
+  // „Materialien" steht nicht mehr in der Leiste (10.10.2026 wieder entfernt); die Telefon-Ansicht gibt es am PC nicht
+  await q.waitForTimeout(1500)
+  pruefe((await q.locator('.app-leiste [aria-label="Materialien"]').count()) === 0, 'PC: kein Punkt „Materialien" in der Leiste')
   pruefe((await q.locator('[data-materialien-mobil]').count()) === 0, 'PC: keine Telefon-Ansicht')
   await q.screenshot({ path: join(out, '6-pc.png') })
   await pc.close()

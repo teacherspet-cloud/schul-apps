@@ -5,8 +5,10 @@
  *   GET /server/startseite   → StartseiteDaten (shared/startseiteKurse.ts)
  *
  * Kurse: jeder laufende Kurs einer eigenen (nicht verborgenen) Lerngruppe mit Wörtern oder Grammatik – auch ohne
- * Testtermin (Befund der Lehrkraft: die Karte zeigte nur Kurse mit Termin). Handlungsbedarf wie in „Meine Klassen"
- * (`kursBedarfDerGruppe`, Ausgeblendetes bleibt ausgeblendet), knapp und ohne Namen. Nur für Lehrkräfte.
+ * Testtermin (Befund der Lehrkraft: die Karte zeigte nur Kurse mit Termin). Je Kurs EIN Abzeichen (10.10.2026, zweite
+ * Fassung: Test bald > nicht geübt > Problemwörter > ✓, shared/startseiteKurse.ts `kursAbzeichen`); „nicht geübt" aus
+ * dem Handlungsbedarf wie in „Meine Klassen" (`kursBedarfDerGruppe`, Ausgeblendetes bleibt ausgeblendet). Nur für
+ * Lehrkräfte.
  */
 import { json, type Anfrage } from './http'
 import { lerngruppenVon } from './onlinetest'
@@ -14,18 +16,7 @@ import { vokabelnDerGruppe } from './vokabeln'
 import { grammatikDerGruppe } from './grammatik'
 import { ausgeblendetVon, bedarfAufteilen, kursBedarfDerGruppe, klassenSchluessel, nachKlasse, type Bedarf } from './klassen'
 import { verborgeneGruppen } from './iservKursgruppen'
-import {
-  abschnittText,
-  endetHinweis,
-  hinweisKurz,
-  kursZeilenTitel,
-  problemHinweis,
-  type StartHinweis,
-  type StartKlasse,
-  type StartKurs,
-  type StartseiteDaten
-} from '../shared/startseiteKurse'
-import { HINWEIS_FARBE, type KursHinweisArt } from '../shared/kursHinweise'
+import { abschnittText, einheitText, kursAbzeichen, type StartKlasse, type StartKurs, type StartseiteDaten } from '../shared/startseiteKurse'
 
 export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): StartseiteDaten {
   const verborgen = verborgeneGruppen(lehrkraftId)
@@ -45,40 +36,25 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
     const offen = vok.trainings.filter((t) => t.status === 'offen')
     if (!offen.length) continue
     const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt).trainings.filter((t) => t.vokId && !t.extra && t.status === 'offen')
-    // Handlungsbedarf wie in „Meine Klassen" – Ausgeblendetes zählt nicht
+    // Handlungsbedarf wie in „Meine Klassen" – Ausgeblendetes zählt nicht (für „n nicht geübt")
     const { sichtbar } = bedarfAufteilen(kursBedarfDerGruppe(vok.hinweisDaten, offen, lehrkraftId, jetzt) as Bedarf[], ausgeblendetVon(lehrkraftId, g.id))
     for (const t of offen) {
-      const grammatik = gram
-        .filter((x) => x.vokId === t.id)
-        .map((x) => ({
-          id: x.id,
-          titel: x.titel,
-          status: x.geplantAb && x.geplantAb > jetzt ? ('geplant' as const) : ('laeuft' as const),
-          sicher: x.sicherSchnitt,
-          geplantAb: x.geplantAb
-        }))
-      if (!t.woerter && !grammatik.length) continue
-      const hinweise: StartHinweis[] = []
-      for (const b of sichtbar) {
-        if (b.kurs !== t.id || !b.hinweis || !b.reiter) continue
-        const text = hinweisKurz(b.hinweis, b.ids?.length, b.text)
-        if (text) hinweise.push({ hinweis: b.hinweis, text, reiter: b.reiter, farbe: HINWEIS_FARBE[b.hinweis as KursHinweisArt] ?? 'gray', ...(b.ids ? { ids: b.ids } : {}) })
-      }
-      const problem = problemHinweis(vok.wackelig.filter((w) => w.kurs === t.id).length)
-      if (problem) hinweise.push(problem)
-      const endet = endetHinweis(t.bis, jetzt)
-      if (endet) hinweise.push(endet)
+      if (!t.woerter && !gram.some((x) => x.vokId === t.id)) continue
+      const teile = vok.hinweisDaten[t.id]?.eingabe.teile ?? []
+      const testTermin = t.testTermin && t.testTermin >= jetzt - 86_400_000 ? t.testTermin : null
+      const inaktiv = sichtbar.find((b) => b.kurs === t.id && b.hinweis === 'inaktiv')?.ids ?? []
       kurse.push({
         id: t.id,
         gruppeId: g.id,
-        titel: kursZeilenTitel(g.name, g.fach || t.fach, abschnittText(vok.hinweisDaten[t.id]?.eingabe.teile ?? [], t.baende, t.titel, jetzt)),
+        gruppe: g.name.trim(),
+        fach: (g.fach || t.fach || '').trim(),
+        abschnitt: abschnittText(teile, t.baende, t.titel, jetzt),
+        einheit: einheitText(teile, t.baende, t.titel, jetzt),
         woerter: t.woerter,
         sicher: t.woerter ? t.sicherSchnitt : null,
         lernende: t.lernende,
-        heute: t.heuteAktiv,
-        testTermin: t.testTermin && t.testTermin >= jetzt - 86_400_000 ? t.testTermin : null,
-        hinweise,
-        grammatik
+        testTermin,
+        abzeichen: kursAbzeichen({ testTermin, inaktiv, problem: vok.wackelig.filter((w) => w.kurs === t.id).length, lernende: t.lernende }, jetzt)
       })
     }
   }

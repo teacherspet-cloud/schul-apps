@@ -503,6 +503,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
         call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
       tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w') =>
         call<void>('medien:ton-loeschen', sprache, wort, art, satz, lage),
+      /** Erzeugungssperre (10.10.2026, `tonKennung`): true = frei, false = ein anderer erzeugte eben – erst nachsehen */
+      tonReservieren: (kennung: string) => call<boolean>('medien:ton-reservieren', kennung),
+      tonFreigeben: (kennung: string) => call<void>('medien:ton-freigeben', kennung),
       /** Darf diese Person die Medienbank (und gemeinsame Lehrwerke) bearbeiten? */
       admin: () => call<boolean>('medien:admin')
     },

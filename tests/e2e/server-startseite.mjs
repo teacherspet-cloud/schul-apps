@@ -84,6 +84,11 @@ const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
 const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
+const api = (ctx) => async (channel, ...args) => {
+  const r = await (await ctx.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).json()
+  if (!r.ok) throw new Error(`${channel}: ${r.error}`)
+  return r.value
+}
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
   const lehrer = await (
@@ -127,9 +132,13 @@ try {
         rolle: 'pflicht',
         halt: { art: 'freigabe' },
         erfolg: { art: 'abgabe' },
-        inhalt: { art: 'reflexion', frage: 'Was war schwer?' }
+        inhalt: { art: 'reflexion', frage: 'Was war schwer?' },
+        // Stunde 2 – mit den Stundenterminen bekommt der Haltepunkt ein Datum („Demnächst", 10.10.2026)
+        stunde: 1
       }
-    ]
+    ],
+    stunden: ['einzel', 'einzel'],
+    stundenTermine: { beginn: new Date().toISOString().slice(0, 10), tage: [1, 2, 3, 4, 5] }
   }
   const r = await (await lk.request.post(`${A}/server/reihen/speichern`, { headers: KOPF, data: { reihe } })).json()
   await lk.request.post(`${A}/server/reihen/${r.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: gruppe.id } })
@@ -137,16 +146,27 @@ try {
     headers: KOPF,
     data: { titel: `${KLASSE} – Unit 3 Test`, test: TEST, lerngruppeId: gruppe.id, zeitMin: 10 }
   })
-  await lk.request.post(`${A}/server/vokabeln/freigeben`, {
-    headers: KOPF,
-    data: {
-      lerngruppeId: gruppe.id,
-      titel: 'Unit 3 words',
-      sprache: 'en',
-      fach: 'Englisch',
-      woerter: [{ id: 'w1', term: 'park', translation: 'Park' }],
-      testTermin: Date.now() + 3 * 864e5
-    }
+  const kursMitTermin = (
+    await (
+      await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+        headers: KOPF,
+        data: {
+          lerngruppeId: gruppe.id,
+          titel: 'Unit 3 words',
+          sprache: 'en',
+          fach: 'Englisch',
+          woerter: [{ id: 'w1', term: 'park', translation: 'Park' }],
+          testTermin: Date.now() + 3 * 864e5
+        }
+      })
+    ).json()
+  ).id
+  // Ein Material für die Suche auf der Startseite (Suchergebnis direkt unter dem Suchfeld, 10.10.2026)
+  await api(lk)('tests:save', {
+    id: `such-${KLASSE}`,
+    name: `Suchprobe ${KLASSE}`,
+    stats: { vocabCount: 0, includedCount: 0, hasTest: true, variantCount: 1, totalPoints: 0, language: 'en', subjectLabel: 'Englisch', grade: 6 },
+    payload: TEST
   })
   // Zweites Fach der Klasse mit einem Kurs OHNE Testtermin (10.10.2026: fehlte auf der Startseite)
   const gruppeFr = await (
@@ -183,16 +203,39 @@ try {
   pruefe(await da(p.locator('[data-schnellzugriff-raster]')), 'Startseite: Schnellzugriff')
   pruefe(await da(p.locator('[data-schnellzugriff="reihen"] [data-laufende-reihe]')), 'Laufende Reihe auf der Startseite')
   pruefe(await p.locator('[data-schnellzugriff="tests"]').getByText('geplant').isVisible(), 'Geplanter Onlinetest auf der Startseite')
-  pruefe(
-    await p
-      .locator('[data-schnellzugriff="termine"]')
-      .getByText(/Test in 3 Tagen/)
-      .isVisible(),
-    'Vokabeltest-Termin mit Prognose'
-  )
-  pruefe(await p.locator('[data-schnellzugriff="termine"]').getByText('Haltepunkt: Besprechung').isVisible(), 'Haltepunkt der Reihe')
+  // Termine & Vokabeltraining (10.10.2026, zweite Fassung): EINE Zeile je Kurs mit EINEM Abzeichen, darunter „Demnächst"
+  const termineP = p.locator('[data-schnellzugriff="termine"]')
+  const zeileEn = termineP.locator(`[data-start-kurs="${kursMitTermin}"]`)
+  pruefe(await da(zeileEn), 'Kurszeile des Kurses mit Testtermin')
+  pruefe((await zeileEn.innerText()).includes(`${KLASSE} · Englisch`), `Kurszeile „${KLASSE} · Englisch"`)
+  pruefe(/\d+ %/.test(await zeileEn.innerText()), 'Kurszeile mit „n %" (sicher)')
+  const badgeEn = (await zeileEn.locator('[data-start-badge]').allInnerTexts()).map((x) => x.trim())
+  pruefe(badgeEn.length === 1 && /^Test (heute|morgen|Mo|Di|Mi|Do|Fr|Sa|So)$/.test(badgeEn[0]), `Genau ein Abzeichen „Test …" (${badgeEn.join(' | ')})`)
+  const zeilenAnzahl = await termineP.locator('[data-start-kurs]').count()
+  const abzeichenAnzahl = await termineP.locator('[data-start-kurs] [data-start-badge]').count()
+  pruefe(zeilenAnzahl >= 2 && abzeichenAnzahl === zeilenAnzahl, `Jede Kurszeile genau ein Abzeichen (${zeilenAnzahl} Zeilen, ${abzeichenAnzahl} Abzeichen)`)
+  const termineText = await termineP.innerText()
+  pruefe(!/heute geübt/.test(termineText) && (await termineP.locator('[data-start-hinweis], [data-start-grammatik]').count()) === 0, 'Keine Zeile „heute geübt", keine Hinweis-/Grammatikzeilen')
+  const bald = (await termineP.locator('[data-start-demnaechst]').allInnerTexts()).map((x) => x.replace(/\s+/g, ' ').trim())
+  pruefe(bald.some((x) => new RegExp(`^(Mo|Di|Mi|Do|Fr|Sa|So) \\d\\d\\.\\d\\d\\. Vokabeltest ${KLASSE}`).test(x)), `Demnächst: Vokabeltest mit Datum (${bald.join(' | ')})`)
+  pruefe(bald.some((x) => new RegExp(`^(Mo|Di|Mi|Do|Fr) \\d\\d\\.\\d\\d\\. Haltepunkt „Besprechung" \\(${KLASSE}\\)`).test(x)), 'Demnächst: Haltepunkt mit Datum und Klasse')
+  const tage = bald.map((x) => x.match(/^\S+ (\d\d)\.(\d\d)\./)).filter(Boolean).map((m) => Number(m[2]) * 100 + Number(m[1]))
+  pruefe(tage.every((t, i) => i === 0 || t >= tage[i - 1]), 'Demnächst zeitlich geordnet')
   pruefe((await p.getByText('Programme', { exact: true }).count()) === 0, 'Keine Programmliste mehr auf der Startseite')
   await p.screenshot({ path: join(out, '1-startseite.png'), fullPage: true })
+  await termineP.screenshot({ path: join(out, '1b-termine-pc.png') })
+  // Suche (10.10.2026): das Suchergebnis steht direkt unter dem Suchfeld, über dem Schnellzugriff
+  const sucheP = p.locator('[data-home-suche]')
+  if (await da(sucheP, 8000)) {
+    await sucheP.fill(`Suchprobe ${KLASSE}`)
+    const titelSuche = p.getByRole('heading', { name: 'Suchergebnis' })
+    pruefe(await da(titelSuche, 5000), 'Suche: Titel „Suchergebnis"')
+    pruefe(await da(p.getByText(`Suchprobe ${KLASSE}`).first(), 5000), 'Suche: Material gefunden')
+    const [fb, tb, rb] = [await sucheP.boundingBox(), await titelSuche.boundingBox(), await p.locator('[data-schnellzugriff-raster]').boundingBox()]
+    pruefe(fb && tb && rb && tb.y >= fb.y + fb.height && tb.y - (fb.y + fb.height) < 120 && tb.y < rb.y, `Suchergebnis direkt unter dem Suchfeld und über dem Schnellzugriff (Feld ${fb?.y}, Titel ${tb?.y}, Raster ${rb?.y})`)
+    await p.screenshot({ path: join(out, '1c-suche.png') })
+    await sucheP.fill('')
+  } else pruefe(false, 'Suche: Suchfeld auf der Startseite')
   // Leiste: vier Gruppen, aufklappbar
   const gruppen = await p.locator('.app-leiste [data-gruppe]').evaluateAll((e) => e.map((x) => x.getAttribute('data-gruppe')))
   pruefe(gruppen.join(',') === 'unterricht,planung,pruefung,verwaltung', `Gruppen in der Leiste: ${gruppen.join(', ')}`)
@@ -275,14 +318,16 @@ try {
   // ---------- Termine & Vokabeltraining (10.10.2026): auch ein laufender Kurs OHNE Testtermin
   const termine = h.locator('[data-schnellzugriff="termine"]')
   pruefe(await da(termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)), 'Smartphone: Kurs ohne Testtermin in „Termine & Vokabeltraining"')
-  pruefe(
-    await termine
-      .locator(`[data-start-kurs="${kursOhneTermin}"]`)
-      .getByText(/heute geübt: 0 von \d+/)
-      .isVisible()
-      .catch(() => false),
-    'Kurszeile: „heute geübt: 0 von …"'
-  )
+  const zeileFr = termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)
+  const textFr = await zeileFr.innerText()
+  pruefe(textFr.includes(`${KLASSE} · Französisch`) && /\d+ %/.test(textFr) && !/heute geübt/.test(textFr), `Smartphone: Kurszeile „${KLASSE} · Französisch" mit „n %", ohne „heute geübt"`)
+  pruefe((await zeileFr.locator('[data-start-badge]').count()) === 1, `Smartphone: Kurszeile mit genau einem Abzeichen (${await zeileFr.getAttribute('data-start-abzeichen')})`)
+  pruefe((await termine.locator('[data-start-demnaechst]').count()) >= 1, 'Smartphone: „Demnächst" unter den Kursen')
+  // Hinweis „Schuldaten übernehmen?" verdeckt sonst die Karte im Bild
+  const neinDanke = h.getByRole('button', { name: 'Nein, danke' })
+  if (await neinDanke.isVisible().catch(() => false)) await neinDanke.click()
+  await termine.scrollIntoViewIfNeeded()
+  await termine.screenshot({ path: join(out, '4b-handy-termine.png') })
 
   // ---------- Anzahl je Karte (10.10.2026): Vorgabe 5, Wahl bleibt dauerhaft je Gerät
   const wahlTermine = h.locator('[data-start-anzahl="termine"]')
@@ -314,23 +359,43 @@ try {
   // ---------- Kasten „Meine Klassen" (10.10.2026): zugeklappt, aufgeklappt mit Klassen, Tipp öffnet die Klasse
   const kasten = h.locator('[data-home-meineklassen]')
   pruefe((await kasten.getAttribute('data-offen')) === 'false' && !(await h.locator('[data-home-meineklassen-liste]').isVisible()), 'Kasten „Meine Klassen" zunächst zugeklappt')
+  // Zugeklappt: kurze Übersicht im Kopf (zweite Fassung, 10.10.2026)
+  pruefe(await da(h.locator('[data-home-meineklassen-uebersicht]')), 'Zugeklappt: Übersicht im Kopf')
+  const ueb = (await h.locator('[data-home-meineklassen-uebersicht]').innerText()).trim()
+  pruefe(/^\d+ Klassen? · \d+ Kurse?$/.test(ueb), `Zugeklappt: Übersicht „n Klassen · n Kurse" (${ueb})`)
+  await kasten.screenshot({ path: join(out, '5a-handy-klassen-zu.png') })
   await h.locator('[data-home-meineklassen-kopf]').click()
   pruefe(await da(h.locator(`[data-home-meineklassen-liste] [data-home-klasse="${KLASSE}"]`)), 'Aufgeklappt: die Klasse steht darin')
   pruefe(await h.locator('[data-home-alle-klassen]').isVisible(), 'Aufgeklappt: „Alle Klassen"')
-  await h.screenshot({ path: join(out, '5-handy-klassen-kasten.png') })
-  await h.locator(`[data-home-klasse="${KLASSE}"] button`).first().click()
+  pruefe(!(await h.locator('[data-home-meineklassen-uebersicht]').isVisible().catch(() => false)), 'Aufgeklappt: keine Übersicht im Kopf')
+  // Eine Zeile je Klasse: volle Breite, mindestens 48 px hoch, Fächer als Chips; „Alle Klassen" als gleich breite Zeile
+  const zeile = h.locator(`[data-home-klasse="${KLASSE}"]`)
+  const [zb, kb, ab] = [await zeile.boundingBox(), await kasten.boundingBox(), await h.locator('[data-home-alle-klassen]').boundingBox()]
+  pruefe(zb && kb && ab && zb.height >= 48 && zb.width >= kb.width - 4 && Math.abs(ab.width - zb.width) < 2 && ab.height >= 48, `Klassenzeile und „Alle Klassen" volle Breite, ≥ 48 px hoch (${zb?.width}×${zb?.height}, ${ab?.width}×${ab?.height})`)
+  pruefe((await zeile.locator('[data-home-klasse-fach]').count()) === 2, 'Klassenzeile: beide Fächer als Chips')
+  await kasten.screenshot({ path: join(out, '5-handy-klassen-kasten.png') })
+  // Auch im hellen Schema ein Bild zum Ansehen (Schema nur kurz umgeschaltet)
+  const schema = await h.evaluate(() => document.documentElement.getAttribute('data-mantine-color-scheme'))
+  await h.evaluate(() => document.documentElement.setAttribute('data-mantine-color-scheme', 'light'))
+  await kasten.screenshot({ path: join(out, '5b-handy-klassen-hell.png') })
+  await h.evaluate((c) => document.documentElement.setAttribute('data-mantine-color-scheme', c), schema ?? 'dark')
+  await zeile.locator('button').first().click({ position: { x: (zb?.width ?? 300) - 24, y: 12 } })
   pruefe(await da(h.locator(`[data-klasse-ansicht="${KLASSE}"]`), 10000), 'Tipp auf die Klasse öffnet sie in „Meine Klassen"')
   await h.screenshot({ path: join(out, '6-handy-klasse.png') })
   await handy.close()
+  // PC/Tablet (10.10.2026): derselbe Kopf mit Logo und Schulname, ohne Untertitel
+  const gross = await browser.newContext({ viewport: { width: 1280, height: 860 } })
+  await anmelden(gross, lehrer.benutzer, lehrer.passwort)
+  const gp = await gross.newPage()
+  await gp.goto(`${A}/`)
+  pruefe(await da(gp.locator('[data-home-kopf="gross"] [data-home-logo]'), 15000), 'PC: Schullogo im Kopf der Startseite')
+  pruefe(!(await gp.getByText('Material für den Unterricht und').isVisible().catch(() => false)), 'PC: ohne Untertitel')
+  await gp.screenshot({ path: join(out, '4c-pc-kopf.png') })
+  await gross.close()
   await verwaltung.request.post(`${A}/server/schule/logo`, { headers: KOPF, data: { logo: null } })
   if (vorher.schule) await verwaltung.request.post(`${A}/server/schule`, { headers: KOPF, data: vorher.schule })
 
   // ---------- Fachrelevanz (10.10.2026): Geschichte ohne Sprache – Onlinetest sichtbar, Karte „Termine" ohne Vokabeln
-  const api = (ctx) => async (channel, ...args) => {
-    const r = await (await ctx.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).json()
-    if (!r.ok) throw new Error(`${channel}: ${r.error}`)
-    return r.value
-  }
   const ge = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Gero Geschichte' } })).json()
   zuLoeschen.push(ge.id)
   const geCtx = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
@@ -350,7 +415,7 @@ try {
   pruefe(await da(termineG), 'Geschichte: Karte „Termine"')
   pruefe((await termineG.innerText()).includes('Termine') && !(await termineG.innerText()).includes('Vokabeltraining'), 'Geschichte: Titel „Termine" ohne „Vokabeltraining"')
   pruefe((await termineG.locator('[data-start-kurs], [data-start-grammatik]').count()) === 0, 'Geschichte: keine Kurse/Grammatik in „Termine"')
-  pruefe(await da(g.locator('.app-leiste [aria-label="Materialien"]'), 3000), 'Leiste: „Materialien" neben der Startseite')
+  pruefe((await g.locator('.app-leiste [aria-label="Materialien"]').count()) === 0, 'Leiste: kein eigener Punkt „Materialien" (10.10.2026 wieder entfernt)')
   await g.screenshot({ path: join(out, '7-geschichte-start.png') })
   // „Neuer Onlinetest": ohne Sprache nur die Lernzielkontrolle
   await g.locator('.app-leiste [aria-label="Onlinetest"]').click()

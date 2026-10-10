@@ -25,8 +25,15 @@ export interface MeinBuch {
   aktuell: boolean
   /** Kurzname für Fundstellen („GL 2") */
   kurz: string
-  /** Abschnitte in Buchreihenfolge */
+  /** Abschnitte in Buchreihenfolge (aufsteigend wie im Buch) */
   gruppen: WortlisteGruppe[]
+  /** Dieses Jahr / frühere Jahre (10.10.2026, shared/sprachstand.ts): Schuljahr (Beginn) und Klassenstufe darin */
+  schuljahr?: number | null
+  klasse?: number | null
+  /** Anteile über den ganzen gezeigten Inhalt und die Medaille früherer Bände */
+  sicherProzent?: number
+  kennenProzent?: number
+  medaille?: 'bronze' | 'silber' | 'gold' | null
 }
 
 // ---------------------------------------------------------------- Bände wählen
@@ -84,7 +91,11 @@ export function unitKurz(unit: string): string {
 
 // ---------------------------------------------------------------- Alphabetisch
 
-/** Artikel und Verbmarken am Anfang, je Sprache (nur wenn danach noch etwas kommt) */
+/**
+ * Artikel und Verbmarken am Anfang, je Sprache (nur wenn danach noch ein Wort kommt). Latein hat keine Artikel.
+ * 10.10.2026 (Befund der Lehrkraft: „the … the" stand unter „#"): Ein Artikel fällt nur weg, wenn der Rest – nach
+ * Auslassungspunkten und Zeichen – mit einem Buchstaben beginnt; Zeichen am Anfang zählen nie mit.
+ */
 const VORNE: Record<string, RegExp> = {
   en: /^(?:\(?to\)?|the|an?)\s+/,
   fr: /^(?:l'|(?:le|la|les|un|une|des|se)\s+|s')/,
@@ -96,18 +107,23 @@ const VORNE: Record<string, RegExp> = {
   da: /^(?:at|en|et)\s+/
 }
 
+/** Zeichen am Anfang, die beim Sortieren nicht zählen: Leerraum, Satzzeichen, Auslassungspunkte („…", „..."), Klammern, Striche */
+const ZEICHEN_VORN = /^[\s.,;:!?¡¿"„“”'«»()[\]{}…–—\-/*+~_]+/
+
 /**
  * Sortierform eines Wortes: klein, ohne Akzente (suchform), ohne Artikel bzw. „to " am Anfang, ohne Klammern und
- * Zeichen davor („(the) UK" → „uk", „…" → Wort). Leer bleibt nie: Ohne Rest gilt das ganze Wort.
+ * Zeichen davor („(the) UK" → „uk", „…ago" → „ago", „the more … the better" → „more … the better"). Leer bleibt nie:
+ * Ohne Rest gilt das ganze Wort.
  */
 export function sortierform(term: string, sprache = ''): string {
-  let s = suchform(term)
-    .replace(/[’`´]/g, "'")
-    .replace(/^[\s.,;:!?¡¿"„“”'«»()[\]…–-]+/, '')
+  let s = suchform(term).replace(/[’`´]/g, "'").replace(ZEICHEN_VORN, '')
   const muster = VORNE[sprache.toLowerCase()]
   for (let i = 0; muster && i < 2; i++) {
-    const rest = s.replace(muster, '').replace(/^[\s"„“”'«»()[\]…–-]+/, '')
-    if (!rest || rest === s) break
+    const ohne = s.replace(muster, '')
+    if (ohne === s) break
+    const rest = ohne.replace(ZEICHEN_VORN, '')
+    // Nur wenn danach ein Wort kommt („the … the" → „the", nicht „… the")
+    if (!rest || !/^\p{L}/u.test(rest)) break
     s = rest
   }
   return s || suchform(term)
@@ -125,6 +141,8 @@ export interface AbcEintrag {
   w: WortlisteWort
   /** Fundstelle („GL 2 · U3") */
   quelle: string
+  /** „Alle Wörter" (10.10.2026): noch nicht freigegeben – ohne eigenen Stand, blass gezeigt */
+  nichtDran?: boolean
 }
 
 export interface AbcZeile {
@@ -139,44 +157,122 @@ export interface AbcZeile {
   quellen: string[]
   sort: string
   buchstabe: string
+  /** Nur in „Alle Wörter": noch an keiner Fundstelle freigegeben */
+  nichtDran?: boolean
 }
 
 const RANG: Record<WortStatus, number> = { neu: 0, aufbau: 1, sicher: 2 }
 
+/*
+ * Doppelte zusammenführen (10.10.2026, Befund der Lehrkraft: „a/one hundred" stand zweimal – einmal als „phrase" mit
+ * „(ein)hundert", einmal als „number" mit „100, hundert, einhundert"). Gleich ist ein Eintrag, wenn
+ *  - der Begriff gleich ist – ohne Groß/klein und Akzente, Leerraum um „/" und Auslassungspunkte („a / one" = „a/one",
+ *    „..." = „…"), Klammerzeichen und Zeichen am Ende, und
+ *  - die Bedeutungen sich überschneiden: Die Übersetzung zerfällt an „,", „;" und „/" in Varianten, Klammern sind
+ *    wahlweise („(ein)hundert" = „hundert" oder „einhundert"); eine gemeinsame Variante genügt.
+ * Gleicher Begriff ohne gemeinsame Bedeutung (bank – Bank / Ufer) bleibt eine eigene Zeile. Der Lernstand je Wort-Kennung
+ * bleibt unberührt – zusammengeführt wird nur die Anzeige.
+ */
+
+/** Vergleichsform eines Begriffs */
+export function begriffSchluessel(term: string): string {
+  return suchform(term)
+    .replace(/[’`´]/g, "'")
+    .replace(/\.{3}|…/g, ' … ')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/[()[\]{}]/g, '')
+    .replace(/[\s.,;:!?]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Varianten einer Übersetzung: „(ein)hundert" → hundert, einhundert; „100, hundert" → 100, hundert */
+export function bedeutungen(translation: string): Set<string> {
+  const aus = new Set<string>()
+  for (const teil of suchform(translation).split(/[,;/]|\s+-\s+/)) {
+    const t = teil.replace(/\.{3}|…/g, ' … ').replace(/\s+/g, ' ').trim()
+    if (!t) continue
+    const mit = t.replace(/[()[\]]/g, '').replace(/\s+/g, ' ').trim()
+    const ohne = t.replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim()
+    for (const x of [mit, ohne]) if (x) aus.add(x)
+  }
+  return aus
+}
+
+const ueberschneiden = (a: Set<string>, b: Set<string>): boolean => [...a].some((x) => b.has(x))
+
 /**
- * Alle Wörter alphabetisch: gleiches Wort mit gleicher Bedeutung (ohne Rücksicht auf Groß/klein und Akzente) wird EINE
- * Zeile mit allen Fundstellen; der Stand ist der beste. Gleiches Wort mit anderer Bedeutung bleibt eine eigene Zeile.
- * Zeichen und Ziffern („#") kommen zuerst, dann A–Z, dann andere Schriften.
+ * Doppelte Einträge (gleicher Begriff, gemeinsame Bedeutung) in einer Wortliste zählen – für die Prüfung beim Start und
+ * nach Freigaben (server/wortliste.ts). Liefert, wie viele Einträge überzählig sind.
+ */
+export function doppelteZaehlen(woerter: Pick<WortlisteWort, 'term' | 'translation'>[]): number {
+  const nachBegriff = new Map<string, Set<string>[]>()
+  let doppelt = 0
+  for (const w of woerter) {
+    const k = begriffSchluessel(w.term)
+    const b = bedeutungen(w.translation)
+    const liste = nachBegriff.get(k) ?? []
+    const da = liste.find((x) => ueberschneiden(x, b))
+    if (da) {
+      doppelt++
+      for (const x of b) da.add(x)
+    } else liste.push(b)
+    nachBegriff.set(k, liste)
+  }
+  return doppelt
+}
+
+/**
+ * Alle Wörter alphabetisch: gleiches Wort mit gleicher Bedeutung (siehe oben) wird EINE Zeile mit allen Fundstellen; der
+ * Stand ist der beste, die Wortart bleibt nur, wenn alle übereinstimmen; als Übersetzung gilt die ausführlichste.
+ * Gleiches Wort mit anderer Bedeutung bleibt eine eigene Zeile. Zeichen und Ziffern („#") kommen zuerst, dann A–Z, dann
+ * andere Schriften.
  */
 export function alphabetisch(eintraege: AbcEintrag[], sprache = ''): AbcZeile[] {
-  const nach = new Map<string, AbcZeile>()
-  for (const { w, quelle } of eintraege) {
-    const key = `${suchform(w.term)}\u0001${suchform(w.translation)}`
-    const z = nach.get(key)
-    if (z) {
+  const nachBegriff = new Map<string, { z: AbcZeile; b: Set<string>; pos: Set<string> }[]>()
+  const zeilen: AbcZeile[] = []
+  for (const { w, quelle, nichtDran } of eintraege) {
+    const kb = begriffSchluessel(w.term)
+    const b = bedeutungen(w.translation)
+    const liste = nachBegriff.get(kb) ?? []
+    const da = liste.find((x) => ueberschneiden(x.b, b))
+    if (da) {
+      const z = da.z
       if (quelle && !z.quellen.includes(quelle)) z.quellen.push(quelle)
-      if (RANG[w.status] > RANG[z.status]) z.status = w.status
+      if (nichtDran) {
+        // Noch nicht freigegeben: zählt nur als Fundstelle
+      } else if (z.nichtDran) {
+        z.nichtDran = undefined
+        z.status = w.status
+      } else if (RANG[w.status] > RANG[z.status]) z.status = w.status
+      for (const x of b) da.b.add(x)
+      if (w.translation.length > z.translation.length) z.translation = w.translation
       if (!z.example && w.example) Object.assign(z, { example: w.example, exampleTranslation: w.exampleTranslation })
-      if (!z.pos && w.pos) z.pos = w.pos
+      da.pos.add(w.pos ?? '')
+      if (da.pos.size > 1) delete z.pos
       continue
     }
     const sort = sortierform(w.term, sprache)
-    nach.set(key, {
-      key,
+    const z: AbcZeile = {
+      key: `${kb}\u0001${suchform(w.translation)}`,
       term: w.term,
       translation: w.translation,
       ...(w.pos ? { pos: w.pos } : {}),
       ...(w.example ? { example: w.example } : {}),
       ...(w.exampleTranslation ? { exampleTranslation: w.exampleTranslation } : {}),
-      status: w.status,
+      status: nichtDran ? 'neu' : w.status,
       quellen: quelle ? [quelle] : [],
       sort,
-      buchstabe: anfangsbuchstabe(sort)
-    })
+      buchstabe: anfangsbuchstabe(sort),
+      ...(nichtDran ? { nichtDran: true } : {})
+    }
+    liste.push({ z, b, pos: new Set([w.pos ?? '']) })
+    nachBegriff.set(kb, liste)
+    zeilen.push(z)
   }
   const vergleich = new Intl.Collator(sprache || 'en', { sensitivity: 'base', numeric: true })
   const gruppe = (b: string): number => (b === '#' ? 0 : /^[A-Z]$/.test(b) ? 1 : 2)
-  return [...nach.values()].sort(
+  return zeilen.sort(
     (a, b) =>
       gruppe(a.buchstabe) - gruppe(b.buchstabe) ||
       vergleich.compare(a.sort, b.sort) ||
@@ -185,15 +281,22 @@ export function alphabetisch(eintraege: AbcEintrag[], sprache = ''): AbcZeile[] 
   )
 }
 
-/** Einträge der Bücher (und weiterer Gruppen) für die alphabetische Liste – mit Fundstelle je Wort */
-export function abcEintraege(buecher: MeinBuch[], weitere: WortlisteGruppe[], weitereName: string): AbcEintrag[] {
+/**
+ * Einträge der Bücher (und weiterer Gruppen) für die alphabetische Liste – mit Fundstelle je Wort. `nichtDran`
+ * („Alle Wörter", 10.10.2026): die übrigen Wörter der Bände der Reihe, die noch nicht freigegeben sind.
+ */
+export function abcEintraege(buecher: MeinBuch[], weitere: WortlisteGruppe[], weitereName: string, nichtDran: MeinBuch[] = []): AbcEintrag[] {
   const aus: AbcEintrag[] = []
-  for (const b of buecher)
-    for (const g of b.gruppen) {
-      const unit = unitKurz(g.titel.split(' · ')[0] ?? g.titel)
-      for (const w of g.woerter) aus.push({ w, quelle: `${b.kurz} · ${unit}` })
-    }
+  const buchEintraege = (liste: MeinBuch[], offen: boolean): void => {
+    for (const b of liste)
+      for (const g of b.gruppen) {
+        const unit = unitKurz(g.unit ?? g.titel.split(' · ')[0] ?? g.titel)
+        for (const w of g.woerter) aus.push({ w, quelle: `${b.kurz} · ${unit}`, ...(offen ? { nichtDran: true } : {}) })
+      }
+  }
+  buchEintraege(buecher, false)
   for (const g of weitere) for (const w of g.woerter) aus.push({ w, quelle: weitereName })
+  buchEintraege(nichtDran, true)
   return aus
 }
 

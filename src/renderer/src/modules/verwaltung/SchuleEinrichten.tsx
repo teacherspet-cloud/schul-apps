@@ -137,11 +137,6 @@ export function SchuleEinrichten(): React.JSX.Element {
 
   return (
     <Stack maw={720} data-schule-einrichten>
-      <Alert variant="light">
-        Die Schule, die diesen Server nutzt. Lehrkräfte bekommen diese Angaben beim ersten Anmelden vorausgefüllt und können sie für sich ändern; wer
-        noch keine Schuldaten hat, wird einmal gefragt, ob sie übernommen werden sollen. Eigene Angaben der Lehrkräfte werden nie überschrieben. Solange
-        eine Lehrkraft kein eigenes Bundesland und keine eigene Schulform gewählt hat, gelten die hier eingetragenen.
-      </Alert>
       <KlappKarte
         id="verwaltung-schule"
         dauerhaft

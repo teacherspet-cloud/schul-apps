@@ -11,19 +11,16 @@
  * Vokabelrunde und Spiele, Arbeitsblätter öffnen sich als nächste Seite IM Ordner – die Seite schlägt nach links um,
  * „Zurück" (Knopf, Browser, Wischen) blättert zurück. Die Adresse nennt die Ebene (?r=gram&g=<ID>, ?r=mat&b=<ID>).
  */
-import { kursReiterNamen } from '@shared/ohneKlasse'
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
 import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconFileText, IconSortAscendingLetters } from '@tabler/icons-react'
-import { SegmentedControl } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
-import VokabelTrainer from '../VokabelTrainer'
 import GrammatikTrainer from '../GrammatikTrainer'
 import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
 import { Alphabetisch, MeineBuecher } from './Wortliste'
 import { BlaetternRahmen, useOrdnerBlaettern } from './blaettern'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
-import { VokabelwegKarten } from '../VokabelLeiter'
+import { KursRegister, SprachRegister } from './Sprachstand'
 import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
 import { istOffen, ladeOffen, nachJahrgaengen, speichereOffen } from './grammatikJahrgaenge'
 import { herkunft, ordnerUebergangLaeuft, ordnerZu } from './ordnerAnimation'
@@ -103,6 +100,8 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   const o = ordner?.find((x) => x.fach === fachName(fach))
   const vorgabe = new URLSearchParams(window.location.search).get('r') as Register | null
   const [wahl, setWahl] = useState<Register | null>(vorgabe)
+  // „Heute üben" von der Startseite bzw. aus einem Tipp (?r=vok&uebung=runde, 10.10.2026): einmal beim Öffnen gelesen
+  const [startUebung] = useState(() => new URLSearchParams(window.location.search).get('uebung'))
   // Geöffnete Unterseite des Ordners selbst (Grammatiktraining, Arbeitsblatt); tiefere Ebenen gehören den Bausteinen
   const [seite, setSeite] = useState<Seite | null>(null)
   const papierEl = useRef<HTMLDivElement>(null)
@@ -192,7 +191,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                   )}
                   {/* Geplante Freischaltungen (09.10.2026): nur Titel und Datum */}
                   {tiefe === 0 && <Demnaechst fach={o.fach} register={aktiv} vorhanden={register} />}
-                  {aktiv === 'vok' && <VokabelRegister o={o} oben={tiefe === 0} />}
+                  {aktiv === 'vok' && <VokabelRegister o={o} oben={tiefe === 0} startUebung={startUebung} />}
                   {aktiv === 'wort' && <MeineBuecher o={o} />}
                   {aktiv === 'abc' && <Alphabetisch o={o} />}
                   {aktiv === 'gram' &&
@@ -306,48 +305,13 @@ function Wiederherstellen({ setSeite, register }: { setSeite: (s: Seite | null) 
 const zurueckZiel = (): string => herkunft(!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
 
 /**
- * Register Vocabulary (08.10.2026, Wunsch der Lehrkraft): der Kurs gleich hier – Karteikasten, Tagesrunde, Spiele –
- * statt einer Karte, die erst eine eigene Seite öffnet. Mehrere Kurse im Fach: Umschalter oben (gemerkt je Fach).
+ * Register Vocabulary (08.10.2026, Wunsch der Lehrkraft): der Kurs gleich hier – Karteikasten, Tagesrunde, Spiele.
+ * Seit 10.10.2026 (Option A, Sprachstand.tsx) für Konten je Sprache: aktueller Band, frühere Jahre, EINE Runde über alle
+ * Kurse; Gäste und Fächer ohne Lehrwerk mit Wörtern behalten die Kurswahl.
  */
-function VokabelRegister({ o, oben }: { o: FachOrdner; oben: boolean }): React.JSX.Element {
+function VokabelRegister({ o, oben, startUebung }: { o: FachOrdner; oben: boolean; startUebung: string | null }): React.JSX.Element {
   const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
-  const schluessel = `sa-ordner-kurs-${o.fach}`
-  const [wahl, setWahl] = useState<string>(() => {
-    try {
-      return sessionStorage.getItem(schluessel) ?? ''
-    } catch {
-      return ''
-    }
-  })
-  const kurs = o.vokabeln.find((v) => v.id === wahl) ?? o.vokabeln[0]
-  const waehle = (id: string): void => {
-    setWahl(id)
-    try {
-      sessionStorage.setItem(schluessel, id)
-    } catch {
-      /* egal */
-    }
-  }
-  return (
-    <Stack gap="sm">
-      {/* Auf Unterseiten (Runde, Spiel) nur der Kurs – er bleibt dabei bestehen, damit nichts verloren geht */}
-      {konto && oben && <VokabelwegKarten fach={o.fach} />}
-      {o.vokabeln.length > 1 && oben && (
-        <SegmentedControl
-          value={kurs?.id ?? ''}
-          onChange={waehle}
-          data={kursReiterNamen(o.vokabeln).map((label, i) => ({ value: o.vokabeln[i].id, label }))}
-          fullWidth
-          data-ordner-kurswahl
-        />
-      )}
-      {kurs && (
-        <div data-ordner-kurs-inhalt={kurs.id}>
-          <VokabelTrainer key={kurs.id} id={kurs.id} eingebettet />
-        </div>
-      )}
-    </Stack>
-  )
+  return konto ? <SprachRegister o={o} oben={oben} startUebung={startUebung} /> : <KursRegister o={o} oben={oben} startUebung={startUebung} />
 }
 
 function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; setSeite: (s: Seite | null) => void }): React.JSX.Element {
@@ -357,7 +321,6 @@ function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; 
   // Suche im Grammatikhefter (08.10.2026, Wunsch der Lehrkraft): filtert die Einträge nach dem Titel
   const s = suche.trim().toLocaleLowerCase('de')
   const liste = s ? alle.filter((v) => v.titel.toLocaleLowerCase('de').includes(s)) : alle
-  const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
   // Grammatik nach Schuljahren (08.10.2026, abgestimmt): neuestes Jahr oben und offen, Auf/Zu je Gerät gemerkt
   const [gemerkt, setGemerkt] = useState<Record<string, boolean>>(() => ladeOffen(o.fach))
   const gruppen = grammatik ? nachJahrgaengen(liste) : []
@@ -395,7 +358,6 @@ function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; 
   )
   return (
     <Stack gap="xs">
-      {!grammatik && konto && <VokabelwegKarten fach={o.fach} />}
       {grammatik && alle.length > 1 && (
         <input
           type="search"

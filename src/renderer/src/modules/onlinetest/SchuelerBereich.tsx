@@ -97,6 +97,7 @@ import LernRaum from '../lernen/LernRaum'
 import Regal from '../lernen/regal/Regal'
 import { FreischaltungHinweis } from '../lernen/regal/planHinweise'
 import Ordner from '../lernen/regal/Ordner'
+import { StartVokabeln, useSprachstand } from '../lernen/regal/Sprachstand'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { useDarstellung } from './schuelerDarstellung'
 import Willkommen from './Willkommen'
@@ -104,7 +105,6 @@ import SchuelerTabs, { useSchuelerTelefon } from './SchuelerTabs'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
-import VokabelwegSeite from '../lernen/VokabelwegPfad'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
 import { holen, senden } from './serverApi'
@@ -254,7 +254,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
   ) : vokWeg && !gast ? (
-    <VokabelwegSeite wegKey={decodeURIComponent(vokWeg)} />
+    <VokabelwegUmleitung wegKey={decodeURIComponent(vokWeg)} />
   ) : vokabeln ? (
     <VokabelTrainer id={vokabeln} />
   ) : ordnerFach && ich?.angemeldet ? (
@@ -477,6 +477,20 @@ function Kachel(props: {
  * schwebenden Formen, darunter „Als Nächstes" (die wichtigste offene Sache mit großem Knopf) und
  * farbige Kacheln mit den App-Bildern und Zählern. Keine Vergleiche mit anderen.
  */
+/**
+ * Die Seite „Mein Vokabelweg" gibt es nicht mehr (10.10.2026, Option A): alte Links (/s/vw/<reihe>) führen in den
+ * Fachordner › Vocabulary der Sprache der Reihe (Schlüssel „reihe|ausgabe|sprache").
+ */
+const FACH_DER_SPRACHE: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', ru: 'Russisch' }
+function VokabelwegUmleitung({ wegKey }: { wegKey: string }): React.JSX.Element {
+  useEffect(() => {
+    const sprache = wegKey.split('|').pop() ?? ''
+    const fach = FACH_DER_SPRACHE[sprache]
+    window.location.replace(fach ? `/s/ordner/${encodeURIComponent(fach)}?r=vok` : '/s/lernen')
+  }, [wegKey])
+  return <Loader />
+}
+
 function Startseite(): React.JSX.Element {
   const ich = window.__schulappsServer
   const [tests, setTests] = useState<{ code: string; titel: string; abgegeben: boolean; wartend: boolean; fach?: string; erstellt?: string }[] | null>(null)
@@ -485,7 +499,7 @@ function Startseite(): React.JSX.Element {
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   const [reihen, setReihen] = useState<{ id: string; titel: string; fortschritt: number; fertig: boolean }[] | null>(null)
   const [vok, setVok] = useState<
-    { id: string; titel: string; fach?: string; erstellt?: string; uebersicht: { faellig: number; sicher: number; gesamt: number } }[] | null
+    { id: string; titel: string; fach?: string; erstellt?: string; alt?: boolean; uebersicht: { faellig: number; sicher: number; gesamt: number; heuteOffen?: number } }[] | null
   >(null)
   const [gram, setGram] = useState<{ id: string; titel: string; fach?: string; erstellt?: string }[] | null>(null)
   // Lernstand, Begrüßung und Lerntipp (06.10.2026, SchuelerStart.tsx / server/lernstand.ts)
@@ -543,11 +557,16 @@ function Startseite(): React.JSX.Element {
   }, [])
   useEffect(alleLaden, [alleLaden])
   useAuffrischen(() => (alleLaden(), standLaden()))
+  // Vokabeln je Sprache (10.10.2026, Option A): aktueller Band und die EINE Runde – gleiche Zahl wie im Ordner und im Tipp
+  const konto = ich?.rolle === 'schueler' && ich.quelle !== 'gast'
+  const { sprachen } = useSprachstand(undefined, konto)
+  const sprachRunde = (sprachen ?? []).find((x) => !x.nurKurse && x.heute.anzahl > 0)
   const offeneTests = tests?.filter((t) => !t.abgegeben) ?? []
   const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden) ?? []
   const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
   const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
-  const faelligeVok = vok?.filter((v) => v.uebersicht.faellig > 0) ?? []
+  // Kurse nur aus früheren Schuljahren (`alt`) melden nichts (10.10.2026)
+  const faelligeVok = vok?.filter((v) => !v.alt && (v.uebersicht.heuteOffen ?? v.uebersicht.faellig) > 0) ?? []
   /*
    * „Mein Lernraum" (08.10.2026, Befund der Lehrkraft): statt der wachsenden Themenbereiche die fünf neuesten
    * Materialien jeder Art, jedes direkt zu öffnen. Erst wenn alle Listen da sind – sonst springt die Reihenfolge.
@@ -583,10 +602,18 @@ function Startseite(): React.JSX.Element {
         knopf: 'Weitermachen',
         farbe: 'indigo'
       }
-    : faelligeVok[0]
+    : sprachRunde
+    ? {
+        titel: sprachRunde.aktuell ? `${sprachRunde.fach} · ${sprachRunde.aktuell.name}` : sprachRunde.fach,
+        text: `${sprachRunde.heute.anzahl} ${sprachRunde.heute.anzahl === 1 ? 'Wort' : 'Wörter'} für heute – ein paar Minuten genügen.`,
+        href: `/s/ordner/${encodeURIComponent(sprachRunde.fach)}?r=vok&uebung=runde`,
+        knopf: 'Vokabeln üben',
+        farbe: 'grape'
+      }
+    : faelligeVok[0] && !konto
     ? {
         titel: faelligeVok[0].titel,
-        text: `${faelligeVok[0].uebersicht.faellig} Vokabeln sind heute dran – ein paar Minuten genügen.`,
+        text: `${faelligeVok[0].uebersicht.heuteOffen ?? faelligeVok[0].uebersicht.faellig} Wörter für heute – ein paar Minuten genügen.`,
         href: `/s/v/${faelligeVok[0].id}`,
         knopf: 'Vokabeln üben',
         farbe: 'grape'
@@ -626,13 +653,15 @@ function Startseite(): React.JSX.Element {
         avatar={titel?.avatar ?? null}
         stand={stand}
         naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null}
+        // EIN Knopf je Runde (10.10.2026): „Als Nächstes" oder die Sprachkarte haben ihn schon
+        ohneKnopf={Boolean(naechstes) || Boolean(konto && (sprachen ?? []).some((x) => !x.nurKurse && x.aktuell))}
       />
       {stand && <TippKarte stand={stand} gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)} />}
 
       {naechstes && (
         <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
-          <Group justify="space-between" wrap="nowrap" align="center">
-            <Group gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
+          <div className="sa-naechstes-reihe">
+            <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
               <ThemeIcon size={52} radius="xl" color={naechstes.farbe} className="sa-puls">
                 <IconPlayerPlay size={26} />
               </ThemeIcon>
@@ -648,12 +677,23 @@ function Startseite(): React.JSX.Element {
                 </Text>
               </div>
             </Group>
-            <Button component="a" href={naechstes.href} color={naechstes.farbe} radius="xl" size="md" rightSection={<IconArrowRight size={16} />}>
+            <Button
+              component="a"
+              href={naechstes.href}
+              color={naechstes.farbe}
+              radius="xl"
+              size="md"
+              rightSection={<IconArrowRight size={16} />}
+              className="sa-naechstes-knopf"
+              data-naechstes-knopf
+            >
               {naechstes.knopf}
             </Button>
-          </Group>
+          </div>
         </Paper>
       )}
+
+      {konto && <StartVokabeln sprachen={sprachen} ohneKnopf={Boolean(naechstes && /\/s\/(ordner|v|vw)\//.test(naechstes.href))} />}
 
       {stand ? <Lernstand stand={stand} neueste={neueste} /> : standFehlt && <MeinLernraum neueste={neueste} />}
 
@@ -746,6 +786,11 @@ const STARTSEITE_CSS = `
 .sa-puls { animation: sa-pulsieren 1.6s ease-out 1; }
 html.sa-ruhig .sa-puls { animation: none; }
 .sa-naechstes { background: var(--mantine-color-body); }
+/* Als Nächstes (10.10.2026, Befund: am Telefon stand nur „Voka…"): Knopf neben dem Text, wenn Platz ist, sonst darunter in voller Breite – nie abgeschnitten */
+.sa-naechstes-reihe { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.sa-naechstes-knopf { flex: none; }
+.sa-naechstes-knopf .mantine-Button-label { overflow: visible; white-space: nowrap; }
+@media (max-width: 560px) { .sa-naechstes-knopf { width: 100%; } }
 .sa-kachel { position: relative; overflow: hidden; display: block; text-decoration: none; color: inherit; border-radius: 22px; padding: 18px;
   transition: transform .18s ease, box-shadow .18s ease; min-height: 128px;
   background: linear-gradient(140deg, var(--k0) 0%, var(--k1) 100%); border: 1px solid var(--k2); }

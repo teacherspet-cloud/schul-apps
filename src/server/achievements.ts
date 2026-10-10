@@ -19,9 +19,10 @@
  */
 import { datenbank, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
-import { db as vokDb, json_, klasseFuer, vokIstFuer, zeile as vokZeile, type VokStand, type Zeile as VokZeile } from './vokabeln'
+import { db as vokDb, json_, klasseFuer, teileVon, vokIstFuer, zeile as vokZeile, type VokStand, type Zeile as VokZeile } from './vokabeln'
 import { buchFuer, buchNamen } from './vokabelweg'
-import { grammatikFuerAchievements } from './grammatik'
+import { grammatikFuerAchievements, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
+import { kalenderHeute } from './schulkalender'
 import { gespielteSpiele } from './rekordbuch'
 import { achDatenLesen, achDatenSchreiben, auszeichnungenVon, rundeAbschliessen, tageVereinen, titelWahlSetzen, type AchDaten, type Erreicht } from './achievementsDaten'
 import { bildInfo, bildSvg, bilderFuerSprache, freigeschaltet, freigeschaltetIn } from '../shared/auszeichnungenBilder'
@@ -33,25 +34,42 @@ import {
   fortschreiben,
   hatFormen,
   hauptsprache,
+  jahresLabel,
+  jahresMedaillen,
+  schwellenVon,
+  jahresPunkte,
+  jahresTitelText,
+  jahresWerte,
   jahrgangsBand,
+  jahreUmstellen,
   KATEGORIEN,
   LEERE_SPRACH_ZAEHLER,
-  medaillen,
+  medaillenMit,
   punkteVon,
+  schuljahrRahmen,
   sprachName,
   sprachWerte,
   stufenName,
+  tageImRahmen,
   TITEL_AB,
+  TITEL_AB_GESAMT,
+  TYPISCHER_BAND,
   titelLeiter,
   titelFuerSprache,
   titelText,
   uebernahmeAnwenden,
   zaehlerAusAlt,
   type AuszNeu,
+  type AuszStand,
+  type JahresGrundlage,
+  type JahrStand,
   type SprachEingabe,
   type TitelForm,
   type TitelWahl
 } from '../shared/auszeichnungen'
+import { bandFuerJahr, bandKapitel, bandWoerter, grammatikBandZu, grammatikImBand, grammatikLatein, lateinBuch, lateinLernjahr } from '../shared/auszeichnungenBand'
+import { schuljahrText, schuljahrVon } from '../shared/schulkalender'
+import { normName } from '../shared/lehrwerkVorwahl'
 import { ACH_GRUPPEN, achievementSicht, berechneAchievements, type Achievement, type AchEingabe } from '../shared/achievements'
 import { klassenPlatz, schulAnteile } from './achievementsVergleich'
 import { abschnitteAus, quelleAusTitel, quelleUnits, reiheVon, type Buch, type Quelle } from '../shared/vokabelLaufbahn'
@@ -73,6 +91,8 @@ async function wortschatz(ich: NutzerInfo): Promise<{
   tage: string[]
   /** Je Sprache (10.10.2026): Wörter ab Fach 2, sichere Wörter, Übungstage */
   jeSprache: Map<string, { ab2: number; sicher: number; tage: Set<string> }>
+  /** Bester Stand je Wort („sprache:begriff") – für die Etappen im Band des Schuljahres */
+  best: Map<string, { g: boolean; s: boolean; f: number }>
 }> {
   const best = new Map<string, { g: boolean; s: boolean; f: number }>()
   const merke = (k: string, st: WortStand | undefined): void => {
@@ -177,7 +197,8 @@ async function wortschatz(ich: NutzerInfo): Promise<{
     woerter: { gelernt: werte.filter((b) => b.g).length, sicher: werte.filter((b) => b.s).length, langzeit: werte.filter((b) => b.f >= 6).length },
     lehrwerk,
     tage: [...tage],
-    jeSprache
+    jeSprache,
+    best
   }
 }
 
@@ -189,14 +210,93 @@ const SPRACHE = /^[a-z]{2,3}$/
  * Jahrgang des neuesten Kurses mit Angabe – für die Medaillen je Sprache (10.10.2026).
  */
 export function sprachKurse(ich: NutzerInfo): Map<string, number | null> {
-  const aus = new Map<string, number | null>()
+  return kurseDerSprachen(ich).jahrgang
+}
+
+/** Wie `sprachKurse`, dazu die Kurse je Sprache (älteste zuerst) – für den Band des Schuljahres */
+function kurseDerSprachen(ich: NutzerInfo): { jahrgang: Map<string, number | null>; kurse: Map<string, VokZeile[]> } {
+  const jahrgang = new Map<string, number | null>()
+  const kurse = new Map<string, VokZeile[]>()
   const zeilen = sicher(() => vokDb().prepare('SELECT * FROM vok_zuweisungen ORDER BY erstellt ASC').all() as unknown as VokZeile[], [])
   for (const z of zeilen) {
     const s = String(z.sprache ?? '').toLowerCase()
     if (!SPRACHE.test(s) || !sicher(() => vokIstFuer(z, ich), false)) continue
-    aus.set(s, sicher(() => klasseFuer(z, ich), null) ?? aus.get(s) ?? null)
+    jahrgang.set(s, sicher(() => klasseFuer(z, ich), null) ?? jahrgang.get(s) ?? null)
+    kurse.set(s, [...(kurse.get(s) ?? []), z])
   }
-  return aus
+  return { jahrgang, kurse }
+}
+
+/** Band des Schuljahres mit seinem Umfang (Jahresreihen, 10.10.2026) */
+interface JahresBand {
+  id: string
+  name: string
+  buch: Buch | null
+  woerter: number | null
+  units: number | null
+  grammatik: number | null
+}
+
+/**
+ * Lehrwerksband des laufenden Schuljahres einer Sprache: aus den Kursen der Person (Herkunft und Band je Abschnitt) der
+ * Band zum Jahrgang, sonst der höchste; ohne Lehrwerk in den Kursen der Lehrwerk-Stand der Lerngruppe („Meine Klassen",
+ * gesetzt oder automatisch erkannt). Latein: das Lehrwerk der Lerngruppe, Grammatik der Lektionen dieses Lernjahres.
+ * null = kein Lehrwerk bekannt (dann gilt ein typischer Band, shared/auszeichnungen.ts `TYPISCHER_BAND`).
+ */
+async function jahresBand(kurse: VokZeile[], jahrgang: number | null): Promise<JahresBand | null> {
+  const buecher = new Map<string, Buch & { grade?: number }>()
+  for (const z of [...kurse].reverse()) {
+    const q = json_(z.quelle, null as Quelle | null)
+    const ids = new Set<string>([q?.lehrwerk ?? '', ...sicher(() => teileVon(z), []).map((t) => t.lehrwerk ?? '')].filter(Boolean))
+    for (const id of ids) {
+      if (buecher.has(id)) continue
+      const b = await buchFuer(id, z.lehrkraft_id).catch(() => null)
+      if (b) buecher.set(id, b as Buch & { grade?: number })
+    }
+  }
+  const umfang = (b: Buch, latein?: string): JahresBand => {
+    const lat = latein ? grammatikLatein(latein, lateinLernjahr(jahrgang)) : null
+    const gb = grammatikBandZu(b.id, b.name)
+    return { id: b.id, name: b.name, buch: b, woerter: bandWoerter(b), units: bandKapitel(b), grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null) }
+  }
+  const gewaehlt = bandFuerJahr([...buecher.values()], jahrgang)
+  if (gewaehlt) return umfang(gewaehlt)
+  // Lehrwerk-Stand der Lerngruppen (neueste Kurse zuerst)
+  for (const z of [...kurse].reverse()) {
+    if (!z.lerngruppe_id) continue
+    const stand = sicher(() => lehrwerkStandVon(z.lerngruppe_id), null) ?? sicher(() => lehrwerkAutomatisch(z.lerngruppe_id), null)
+    const name = stand?.buch ?? ''
+    if (!name) continue
+    const latein = lateinBuch(name)
+    const treffer = (await buchNamen(z.lehrkraft_id).catch(() => [])).filter((b) => normName(b.name) === normName(name) || normName(b.id).startsWith(normName(name)))
+    const b = treffer.length ? await buchFuer(treffer.sort((a, c) => a.id.length - c.id.length)[0].id, z.lehrkraft_id).catch(() => null) : null
+    if (b) return umfang(b, latein)
+    const lat = latein ? grammatikLatein(latein, lateinLernjahr(jahrgang)) : null
+    const gb = grammatikBandZu(name)
+    return { id: `band:${normName(name)}`, name, buch: null, woerter: null, units: null, grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null) }
+  }
+  return null
+}
+
+/** Etappen im Band des Jahres: jedes Kapitel des Bands (nicht nur die freigegebenen) mit dem besten Stand je Wort */
+function bandEtappen(band: JahresBand, best: Map<string, { g: boolean; s: boolean }>): number | null {
+  if (!band.buch || !band.units) return null
+  let n = 0
+  const abschnitte = abschnitteAus(band.buch)
+  for (const unit of new Set(abschnitte.map((a) => a.unit))) {
+    const terme = new Set(abschnitte.filter((a) => a.unit === unit).flatMap((a) => a.woerter.map((v) => `${band.buch!.language}:${normal(v.term)}`)))
+    if (!terme.size) continue
+    let gelernt = 0
+    let sicherN = 0
+    for (const t of terme) {
+      const b = best.get(t)
+      if (b?.g) gelernt++
+      if (b?.s) sicherN++
+    }
+    if (gelernt / terme.size >= 0.8 - 1e-9) n++
+    if (sicherN / terme.size >= 0.8 - 1e-9) n += 2
+  }
+  return n
 }
 
 /** Wochenziel aus Einstellungen › Lernen (wie lernstand.ts) */
@@ -228,6 +328,8 @@ interface Auswertung {
   katalog: Achievement[]
   /** Medaillen je Sprache: was gesammelt wurde (Sprachen mit Kurs zuerst) */
   eingaben: SprachEingabe[]
+  /** Laufendes Schuljahr (Beginn-Jahr) */
+  schuljahr: number
 }
 
 /**
@@ -242,11 +344,16 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
     const gr = sicher(() => grammatikFuerAchievements(ich), { regeln: [], extrasGeschafft: 0, tage: [] as string[], tageJe: {} as Record<string, string[]> })
     const spiele = sicher(() => gespielteSpiele(ich.id).size, 0)
     const wochenziel = wochenzielVon(ich.id)
-    const kurse = sprachKurse(ich)
+    const { jahrgang: kurse, kurse: kurseJe } = kurseDerSprachen(ich)
+    // Jahresreihen (10.10.2026): Schuljahr nach dem Schulkalender (in Browsertests mit verstellbarer Uhr), Band je Sprache
+    const schuljahr = schuljahrVon(kalenderHeute())
+    const baende = new Map<string, JahresBand | null>()
+    for (const [s, z] of kurseJe) baende.set(s, await jahresBand(z, kurse.get(s) ?? null).catch(() => null))
     const d = achDatenLesen(ich.id)
     // Medaillen je Sprache (10.10.2026): Eingaben sammeln; Übernahme der alten Achievements vor deren Neuberechnung
-    const eingaben = sprachEingaben(kurse, ws, gr, d)
-    if (!d.uebernommen) uebernehmen(d, eingaben, spiele, jetzt)
+    jahreUmstellen(d.ausz, schuljahr, jetzt)
+    const eingaben = sprachEingaben(kurse, ws, gr, d, schuljahr, baende)
+    if (!d.uebernommen) uebernehmen(d, eingaben, spiele, jetzt, schuljahr)
     rundeAbschliessen(d, jetzt)
     d.tage = tageVereinen(d.tage, [...ws.tage, ...gr.tage])
     for (const r of gr.regeln) if (r.schwaeche && !d.warSchwaeche.includes(r.schluessel)) d.warSchwaeche.push(r.schluessel)
@@ -269,7 +376,7 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
     const neu = fortschreiben(d.ausz, eingaben, jetzt)
     d.offenAusz = [...d.offenAusz, ...neu].slice(-30)
     if (zaehlt(ich)) achDatenSchreiben(ich.id, d)
-    return { d, katalog, eingaben }
+    return { d, katalog, eingaben, schuljahr }
   })().finally(() => laufend.delete(ich.id))
   laufend.set(ich.id, p)
   return p
@@ -280,8 +387,11 @@ function sprachEingaben(
   kurse: Map<string, number | null>,
   ws: Awaited<ReturnType<typeof wortschatz>>,
   gr: { regeln: { sicher: boolean; sprache?: string }[]; tageJe?: Record<string, string[]> },
-  d: AchDaten
+  d: AchDaten,
+  schuljahr = schuljahrVon(kalenderHeute()),
+  baende: Map<string, JahresBand | null> = new Map()
 ): SprachEingabe[] {
+  const rahmen = schuljahrRahmen(schuljahr)
   const sprachen = new Set<string>(kurse.keys())
   for (const s of [...ws.jeSprache.keys(), ...Object.keys(d.je), ...Object.keys(d.ausz.medaillen), ...gr.regeln.map((r) => r.sprache ?? '')]) if (SPRACHE.test(s)) sprachen.add(s)
   return [...sprachen]
@@ -290,9 +400,20 @@ function sprachEingaben(
       const w = ws.jeSprache.get(s)
       const regeln = gr.regeln.filter((r) => r.sprache === s)
       const tage = new Set<string>([...(w?.tage ?? []), ...(gr.tageJe?.[s] ?? []), ...(d.je[s]?.tage ?? [])])
+      const jahrgang = kurse.get(s) ?? null
+      const band = baende.get(s) ?? null
+      const grundlage: JahresGrundlage = {
+        jahrgang,
+        band: band ? { id: band.id, name: band.name } : null,
+        woerter: band?.woerter ?? null,
+        grammatik: band?.grammatik ?? null,
+        units: band?.units ?? null,
+        schultage: rahmen.schultage
+      }
       return {
         sprache: s,
-        jahrgang: kurse.get(s) ?? null,
+        jahrgang,
+        jahr: { schuljahr, grundlage, tageImJahr: tageImRahmen(tage, rahmen), bandEtappen: band ? bandEtappen(band, ws.best) : null },
         woerterAb2: w?.ab2 ?? 0,
         woerterSicher: w?.sicher ?? 0,
         regelnGeuebt: regeln.length,
@@ -309,7 +430,7 @@ function sprachEingaben(
  * (die alten galten für alle Sprachen zusammen), dazu die alten Zähler als Startwerte – abzüglich dessen, was seit der
  * Umstellung schon je Sprache gezählt wurde. Ohne Sprache wird gewartet, bis eine da ist.
  */
-function uebernehmen(d: AchDaten, eingaben: SprachEingabe[], spiele: number, jetzt: number): void {
+function uebernehmen(d: AchDaten, eingaben: SprachEingabe[], spiele: number, jetzt: number, schuljahr: number): void {
   if (!Object.keys(d.erreicht).length) {
     d.uebernommen = '-'
     return
@@ -335,37 +456,109 @@ function uebernehmen(d: AchDaten, eingaben: SprachEingabe[], spiele: number, jet
   e.z.teamZiele += Math.max(0, alt.teamZiele - schon.teamZiele)
   const ein = eingaben.find((x) => x.sprache === h)
   if (ein) ein.zaehler = e.z
-  uebernahmeAnwenden(d.ausz, d.erreicht, h, jetzt)
+  uebernahmeAnwenden(d.ausz, d.erreicht, h, jetzt, schuljahr)
   d.uebernommen = h
 }
 
 /** Text eines neuen Medaillen- oder Titel-Ereignisses für den Glückwunsch */
-function auszText(n: AuszNeu, form: TitelForm | undefined): { art: AuszNeu['art']; sprache: string; stufe: number; titel: string; text: string } {
+function auszText(n: AuszNeu, form: TitelForm | undefined): { art: 'medaille' | 'titel'; sprache: string; stufe: number; titel: string; text: string } {
   if (n.art === 'titel')
     return { art: 'titel', sprache: n.sprache, stufe: n.stufe, titel: `Neuer Titel in ${sprachName(n.sprache)}`, text: titelText(n.sprache, n.stufe, form) ?? '' }
+  // Jahrestitel (10.10.2026): wie ein Titel gemeldet, mit dem Schuljahr
+  if (n.art === 'jahrestitel')
+    return {
+      art: 'titel',
+      sprache: n.sprache,
+      stufe: n.stufe,
+      titel: `Jahrestitel ${schuljahrText(n.schuljahr)} in ${sprachName(n.sprache)}`,
+      text: jahresTitelText(n.sprache, n.stufe, form, n.jahrgang, n.schuljahr) ?? ''
+    }
   const k = KATEGORIEN.find((x) => x.id === n.kategorie)
-  return { art: 'medaille', sprache: n.sprache, stufe: n.stufe, titel: `${stufenName(n.stufe)} in ${sprachName(n.sprache)}`, text: k?.name ?? '' }
+  return {
+    art: 'medaille',
+    sprache: n.sprache,
+    stufe: n.stufe,
+    titel: `${stufenName(n.stufe)} in ${sprachName(n.sprache)}`,
+    text: `${k?.name ?? ''}${n.schuljahr ? ` · ${jahresLabel(n.jahrgang ?? null, n.schuljahr)}` : ''}`
+  }
+}
+
+/** Woraus die Schwellen des Jahres stammen – für die Zeile über den Medaillen */
+function grundlageSicht(js: JahrStand): Record<string, unknown> {
+  const g = js.grundlage
+  return {
+    band: g?.band?.name ?? null,
+    woerter: g?.woerter ?? null,
+    grammatik: g?.grammatik ?? null,
+    units: g?.units ?? null,
+    schultage: g?.schultage ?? null,
+    // Ohne bekannten Umfang: typischer Band (shared/auszeichnungen.ts `TYPISCHER_BAND`)
+    typisch: TYPISCHER_BAND
+  }
+}
+
+/** Frühere Schuljahre einer Sprache: erreichte Medaillen mit Jahr und Jahrestitel (neueste zuerst) */
+function fruehereJahre(ausz: AuszStand, sprache: string, schuljahr: number, form: TitelForm | undefined): Record<string, unknown>[] {
+  return Object.entries(ausz.jahre?.[sprache] ?? {})
+    .map(([j, js]) => [Number(j), js] as const)
+    .filter(([j, js]) => j < schuljahr && jahresPunkte(js) > 0)
+    .sort((a, b) => b[0] - a[0])
+    .map(([j, js]) => ({
+      schuljahr: j,
+      label: jahresLabel(js.jahrgang, j),
+      punkte: jahresPunkte(js),
+      medaillen: KATEGORIEN.filter((k) => (js.medaillen[k.id]?.stufe ?? 0) >= 1).map((k) => ({
+        kategorie: k.id,
+        name: k.name,
+        stufe: js.medaillen[k.id]!.stufe,
+        am: js.medaillen[k.id]!.am
+      })),
+      jahrestitel: js.titel ? jahresTitelText(sprache, js.titel.stufe, form, js.jahrgang, j) : null,
+      jahrestitelStufe: js.titel?.stufe ?? 0
+    }))
 }
 
 /** Was die Seite „Medaillen und Titel" braucht */
 function auszeichnungenSicht(a: Auswertung): Record<string, unknown> {
-  const { d, eingaben } = a
+  const { d, eingaben, schuljahr } = a
+  const form = d.titelWahl.form
   const sprachen = eingaben.map((e) => {
-    const m = medaillen(sprachWerte(e), e.jahrgang, d.ausz.medaillen[e.sprache] ?? {})
+    // Jahresreihe des laufenden Schuljahres (in der Vorschau nicht gespeichert, aber in `d` fortgeschrieben)
+    const js = d.ausz.jahre?.[e.sprache]?.[String(schuljahr)]
+    const k = e.jahr
+    const m0 = js && k ? jahresMedaillen(js, jahresWerte(sprachWerte(e), js.start, k)) : medaillenMit({}, {})
+    // Schwellen aller Stufen (10.10.2026): das Medaillen-Raster nennt auch für spätere Stufen die Zahl
+    const sw = js ? schwellenVon(js) : {}
+    const m = m0.map((x) => ({ ...x, schwellen: sw[x.kategorie]?.length === 6 ? sw[x.kategorie] : null }))
     const stufe = d.ausz.titel[e.sprache]?.stufe ?? 0
+    const jt = js?.titel?.stufe ?? 0
+    const jahrgang = js?.jahrgang ?? e.jahrgang
     return {
       sprache: e.sprache,
       name: sprachName(e.sprache),
-      jahrgang: e.jahrgang,
-      band: jahrgangsBand(e.jahrgang).name,
+      jahrgang,
+      band: jahrgangsBand(jahrgang).name,
+      // Jahresreihe (10.10.2026)
+      schuljahr,
+      schuljahrText: schuljahrText(schuljahr),
+      jahr: jahresLabel(jahrgang, schuljahr),
+      grundlage: js ? grundlageSicht(js) : null,
       punkte: punkteVon(d.ausz, e.sprache),
+      punkteJahr: jahresPunkte(js),
       medaillen: m,
+      jahrestitel: {
+        stufe: jt,
+        text: jahresTitelText(e.sprache, jt, form, jahrgang, schuljahr),
+        naechsteAb: jt < TITEL_AB.length ? TITEL_AB[jt] : null,
+        naechster: jt < TITEL_AB.length ? jahresTitelText(e.sprache, jt + 1, form, jahrgang, schuljahr) : null
+      },
+      frueher: fruehereJahre(d.ausz, e.sprache, schuljahr, form),
       titel: {
         stufe,
-        text: titelText(e.sprache, stufe, d.titelWahl.form),
+        text: titelText(e.sprache, stufe, form),
         am: d.ausz.titel[e.sprache]?.am ?? null,
-        naechsteAb: stufe < TITEL_AB.length ? TITEL_AB[stufe] : null,
-        leiter: titelLeiter(e.sprache).map((x, i) => ({ stufe: i + 1, ab: TITEL_AB[i], ...x }))
+        naechsteAb: stufe < TITEL_AB_GESAMT.length ? TITEL_AB_GESAMT[stufe] : null,
+        leiter: titelLeiter(e.sprache).map((x, i) => ({ stufe: i + 1, ab: TITEL_AB_GESAMT[i], ...x }))
       },
       // Sammlung (10.10.2026): alle Bilder dieser Sprache, gesperrt oder frei
       sammlung: bilderFuerSprache(e.sprache).map((b) => ({ id: b.id, art: b.art, name: b.name, wie: b.wie, stufe: b.stufe, frei: freigeschaltetIn(d.ausz, e.sprache, b.id) }))
@@ -409,16 +602,32 @@ export function profilFuer(nutzerId: string, sprache: string, jetzt = Date.now()
 export function auszeichnungFuerLehrkraft(
   nutzerId: string,
   sprache: string
-): { titel: string | null; titelStufe: number; punkte: number; avatar: string | null; medaillen: { kategorie: string; stufe: number }[] } {
+): {
+  titel: string | null
+  titelStufe: number
+  punkte: number
+  avatar: string | null
+  medaillen: { kategorie: string; stufe: number }[]
+  /** Jahresreihe (10.10.2026): die Medaillen oben sind die des laufenden Schuljahres */
+  schuljahr: string
+  jahr: string
+  punkteJahr: number
+} {
   const { ausz, titelWahl } = auszeichnungenVon(nutzerId)
-  const m = ausz.medaillen[sprache] ?? {}
+  const sj = schuljahrVon(kalenderHeute())
+  // Vor der Umstellung (seitdem nichts geöffnet): wie die Wartung – Bisheriges gehört zum laufenden Jahr (nur gelesen)
+  jahreUmstellen(ausz, sj, Date.now())
+  const js = ausz.jahre?.[sprache]?.[String(sj)]
   const stufe = ausz.titel[sprache]?.stufe ?? 0
   return {
     titel: titelWahl.anzeige === 'aus' ? null : titelText(sprache, stufe, titelWahl.form),
     titelStufe: stufe,
     punkte: punkteVon(ausz, sprache),
     avatar: avatarVon(nutzerId, ausz),
-    medaillen: KATEGORIEN.map((k) => ({ kategorie: k.id, stufe: m[k.id]?.stufe ?? 0 }))
+    medaillen: KATEGORIEN.map((k) => ({ kategorie: k.id, stufe: js?.medaillen[k.id]?.stufe ?? 0 })),
+    schuljahr: schuljahrText(sj),
+    jahr: jahresLabel(js?.jahrgang ?? null, sj),
+    punkteJahr: jahresPunkte(js)
   }
 }
 

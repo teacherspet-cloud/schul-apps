@@ -272,10 +272,7 @@ export default function App(): React.JSX.Element {
             <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
               <IconHome size={22} />
             </NavIcon>
-            {/* Alle Materialien je Fach und Thema (10.10.2026) – vorher nur am Telefon (Tab „Materialien") direkt erreichbar */}
-            <NavIcon label="Materialien" breit={breit} active={active === 'themen'} onClick={() => openModule('themen')}>
-              <IconFolders size={22} />
-            </NavIcon>
+            {/* „Materialien" in der Leiste wieder entfernt (10.10.2026, Wunsch der Lehrkraft) – am Telefon bleibt der Tab */}
           </AppShell.Section>
           {/*
           Die Programmliste rollt nur senkrecht und ohne eigenen Balken-Rahmen. Vorher lag sie in

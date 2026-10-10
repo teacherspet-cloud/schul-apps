@@ -42,7 +42,7 @@ import { rekordEintragen } from './rekordbuch'
 import { achievementZusammen } from './achievementsDaten'
 import { profilFuer } from './achievements'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
-import { sitzungsWoerter, tagVon, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
+import { sitzungsWoerter, tagesRunde, tagVon, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { alsKarten, type GrammatikAufgabe } from '../shared/grammatiktrainer'
 import { verbenFrei } from '../shared/verbFreigabe'
 import { istVerbSprache } from '../shared/verben'
@@ -143,7 +143,7 @@ export function spieleFrei(bereich: Bereich, kurs: string, n: NutzerInfo, jetzt 
     if (z.zusammen === 'aus') return false
     if (spieleHeuteFrei(z)) return true
     const ziel = tageszielVon(z)
-    return sitzungsWoerter(json_(z.woerter, [] as Vokabel[]), vokStand(z.id, n.id).woerter, jetzt, ziel, ziel + 25).length === 0
+    return tagesRunde(json_(z.woerter, [] as Vokabel[]), vokStand(z.id, n.id).woerter, jetzt, ziel).woerter.length === 0
   }
   const vokId = G.kopf(kurs)?.vokId
   if (vokId && vokZeile(vokId)?.zusammen === 'aus') return false

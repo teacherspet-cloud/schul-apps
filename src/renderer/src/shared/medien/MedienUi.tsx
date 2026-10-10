@@ -35,6 +35,7 @@ import {
   sprachKurz,
   STIMMLAGE_NAME,
   stufeVon,
+  tonPasst,
   type Bildstufe,
   type MedienKandidat,
   type MedienSicht,
@@ -195,7 +196,8 @@ export function TonZelle({
   const [laeuft, setLaeuft] = useState(false)
   if (!text.trim()) return null
   if (art === 'satz' && !istGanzerSatz(text)) return null
-  const veraltet = ton && (ton.text.trim() !== text.trim() || (gesprochen !== undefined && (ton.gesprochen ?? ton.text).trim() !== gesprochen.trim()))
+  // Schreibvarianten („a / one" – „a/one", „it’s" – „it's") gelten als dieselbe Aufnahme (10.10.2026, shared/medienbank.ts)
+  const veraltet = ton && !tonPasst(ton, text, gesprochen, art)
   const fassung = lage ? ` (${STIMMLAGE_NAME[lage]})` : ''
   const marke = (knopf: React.JSX.Element): React.JSX.Element =>
     lage ? (

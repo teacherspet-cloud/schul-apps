@@ -62,8 +62,32 @@ export function claimTexte(wert: unknown): string[] {
   })
 }
 
+/** Gruppen-Angabe als Liste – IServ liefert sie je nach Version als Liste, als Zuordnung { act: Name } oder verschachtelt (10.10.2026) */
+function gruppenListe(g: unknown): unknown[] | null {
+  if (Array.isArray(g)) return g.length ? g : null
+  if (g && typeof g === 'object') {
+    const o = g as Record<string, unknown>
+    for (const k of ['groups', 'gruppen', 'items', 'data']) if (Array.isArray(o[k]) && (o[k] as unknown[]).length) return o[k] as unknown[]
+    const e = Object.entries(o)
+    if (e.length && e.every(([, v]) => typeof v === 'string')) return e.map(([act, name]) => ({ act, name }))
+    if (e.length && e.every(([, v]) => v && typeof v === 'object')) return e.map(([act, v]) => ({ act, ...(v as Record<string, unknown>) }))
+  }
+  if (typeof g === 'string' && g.trim()) return g.split(/[,\s]+/).filter(Boolean)
+  return null
+}
+
+/** Form der Gruppen-Angabe ohne Inhalte – für das Protokoll (10.10.2026) */
+export const gruppenForm = (claims: Record<string, unknown>): string =>
+  (['iserv:groups', 'groups', 'groups2'] as const)
+    .filter((k) => k in claims)
+    .map((k) => {
+      const g = claims[k]
+      return `${k}=${Array.isArray(g) ? `Liste(${g.length}${g.length ? `, ${typeof g[0]}` : ''})` : g && typeof g === 'object' ? `Objekt(${Object.keys(g).length})` : typeof g}`
+    })
+    .join(' ')
+
 export function gruppenAus(claims: Record<string, unknown>): { id: string; name: string }[] {
-  const roh = [claims['iserv:groups'], claims.groups, claims.groups2].find((g) => Array.isArray(g) && g.length) as unknown[] | undefined
+  const roh = [claims['iserv:groups'], claims.groups, claims.groups2].map(gruppenListe).find((g) => g) ?? undefined
   if (!roh) return []
   const out: { id: string; name: string }[] = []
   for (const g of roh) {
@@ -268,7 +292,7 @@ export async function iservRueckruf(
       .filter((x) => !['nonce', 'at_hash', 'iat', 'exp', 'auth_time', 'jti'].includes(x))
       .sort()
       .join(' ')
-      .slice(0, 400)}, Gruppen ${gruppenZahl}`
+      .slice(0, 400)}, Gruppen ${gruppenZahl} (${gruppenForm(claims)})`
   )
   const nutzer = iservAngabenUebernehmen(claims)
   guteStufe = v.stufe

@@ -23,7 +23,8 @@ import { klassenGaesteRoute } from './klassenGaeste'
 import { kontoVerknuepfungRoute } from './kontoVerknuepfungRoute'
 import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
-import { wortlisteRoute } from './wortliste'
+import { sprachstandRoute } from './sprachstand'
+import { doppeltePruefen, wortlisteRoute } from './wortliste'
 import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { kiAblagenAufraeumen } from './kiAblage'
@@ -54,6 +55,7 @@ import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
 import { medienRoute } from './medien'
+import { dublettenMelder, dublettenPruefen } from '../main/services/storage/medienbank'
 import { lehrkraftRoute, schuelerRoute } from './onlinetest'
 import { lernstandRoute } from './lernstand'
 import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
@@ -187,6 +189,8 @@ async function main(): Promise<void> {
       feedbackRoute(aufruf, adresse),
       blaetterRoute(aufruf, adresse),
       reihenRoute(aufruf, adresse),
+      // Vokabeln je Sprache (10.10.2026): Stand, Tagesrunde „sp:…" und frühere Bände „bd:…" – vor den Listen
+      sprachstandRoute(),
       // Vokabelweg vor den Listen: er übernimmt die Kennungen „lb:…"
       vokabelwegRoute(),
       vokabelRoute(adresse),
@@ -247,6 +251,11 @@ async function main(): Promise<void> {
   setzeOrtQuelle(schulOrtVon)
   schuljahrWechselStarten()
   kalenderStarten()
+  // Doppelte Vokabeln in laufenden Kursen zählen (10.10.2026) – Protokollzeile nur, wenn es welche gibt
+  setTimeout(() => doppeltePruefen('Start'), 20_000).unref?.()
+  // Medienbank (10.10.2026): doppelte Aufnahmen derselben Vokabel zählen – beim Start und nach Medienaufträgen, Protokollzeile nur bei Dubletten
+  dublettenMelder((zeile) => protokolliereServer('medien', zeile))
+  setTimeout(() => dublettenPruefen(), 25_000).unref?.()
   // Kurse aus IServ (10.10.2026): beim Start einmal für alle Lehrkräfte (Gruppen aus ihrer letzten Anmeldung)
   try {
     const k = alleKursgruppenSichern()

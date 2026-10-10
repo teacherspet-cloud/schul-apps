@@ -4,6 +4,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   CloseButton,
   Container,
   Group,
@@ -44,7 +45,7 @@ import {
   neueste,
   suche,
 } from "./materialien";
-import { FachOrdnerSymbol, FachPunkt } from "../shared/components/FachFarbe";
+import { FachOrdnerSymbol, FachPunkt, useFachFarbe } from "../shared/components/FachFarbe";
 import { abgleichen, ladeThemen, useThemen } from "../shared/themenbereiche";
 import { nachfahrenVon, pfadVon, type Themenbereich } from "@shared/themen";
 import SchulpaketKnoepfe from "./Schulpaket";
@@ -110,13 +111,13 @@ export default function Home(): React.JSX.Element {
   const logoQuelle = serverLogo || eigenesLogo;
   const [logo, setLogo] = useState<string | null>(null);
   useEffect(() => {
-    if (!handy || !logoQuelle) return setLogo(null);
+    if (!logoQuelle) return setLogo(null);
     let weg = false;
     void logoFreigestellt(logoQuelle).then((l) => !weg && setLogo(l));
     return () => {
       weg = true;
     };
-  }, [handy, logoQuelle]);
+  }, [logoQuelle]);
   const schulName = serverName || schoolName;
   const letzteSicherung = useAppSettings((s) => s.settings.letzteSicherung);
   const [materialien, setMaterialien] = useState<Material[] | null>(null);
@@ -222,34 +223,83 @@ export default function Home(): React.JSX.Element {
       Number.isNaN(tageSeitSicherung) ||
       tageSeitSicherung > SICHERUNG_NACH_TAGEN);
 
+  const materialListe = (materialien?.length ?? 0) > 0 && (
+        <Stack gap="sm" mb={40}>
+          <Group justify="space-between" align="end" wrap="wrap" gap="sm">
+            <Group gap="xs" wrap="nowrap">
+              <Title order={3}>
+                {suchtAktiv ? "Suchergebnis" : "Zuletzt bearbeitet"}
+              </Title>
+              {handy && !suchtAktiv && (
+                <AnzahlWahl karte="zuletzt" wert={zuletztAnzahl} setzen={setZuletztAnzahl} />
+              )}
+            </Group>
+          </Group>
+          {suchtAktiv && bereichTreffer.length > 0 && (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {bereichTreffer.map((b) => (
+                <BereichZeile
+                  key={b.id}
+                  bereich={b}
+                  anzahl={bereichZahl(b)}
+                  oben={pfadVon(themen, b.id)
+                    .slice(0, -1)
+                    .map((x) => x.name)}
+                />
+              ))}
+            </SimpleGrid>
+          )}
+          {suchtAktiv && treffer.length === 0 ? (
+            bereichTreffer.length === 0 && (
+              <Text c="dimmed" size="sm">
+                Keine Materialien gefunden.
+              </Text>
+            )
+          ) : (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {suchtAktiv && nurReihe && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <NurReiheHinweis />
+                </div>
+              )}
+              {(suchtAktiv ? treffer.slice(0, 40) : zuletztSichtbar).map((m) => (
+                <MaterialZeile key={`${m.moduleId}-${m.id}`} material={m} />
+              ))}
+            </SimpleGrid>
+          )}
+          {suchtAktiv && treffer.length > 40 && (
+            <Text c="dimmed" size="xs">
+              {treffer.length - 40} weitere Treffer – Suche genauer fassen.
+            </Text>
+          )}
+        </Stack>
+  );
+
   return (
     <Container size="lg" py={48} style={{ height: "100%", overflow: "auto" }}>
-      {handy ? (
-        <Group gap="sm" wrap="nowrap" className="home-hero home-hero-handy" data-home-kopf="handy">
-          {logo && <img src={logo} alt="" className="home-logo" data-home-logo />}
-          <div style={{ minWidth: 0 }}>
-            <Title order={1}>Schul-Apps</Title>
-            {schulName && (
-              <Text opacity={0.92} size="sm" lineClamp={2}>
-                {schulName}
-              </Text>
-            )}
-          </div>
-        </Group>
-      ) : (
-        <Stack gap={4} className="home-hero">
+      {/* Kopf überall wie am Telefon (10.10.2026, Wunsch der Lehrkraft): Schullogo freigestellt links, „Schul-Apps" und
+          der Schulname rechts daneben – ohne Untertitel */}
+      <Group
+        gap={handy ? "sm" : "lg"}
+        wrap="nowrap"
+        className={handy ? "home-hero home-hero-handy" : "home-hero"}
+        data-home-kopf={handy ? "handy" : "gross"}
+      >
+        {logo && <img src={logo} alt="" className={handy ? "home-logo" : "home-logo home-logo-gross"} data-home-logo />}
+        <div style={{ minWidth: 0 }}>
           <Title order={1}>Schul-Apps</Title>
-          <Text opacity={0.92}>
-            {schoolName ? `${schoolName} · ` : ""}Material für den Unterricht und
-            Organisatorisches schnell erstellen.
-          </Text>
-        </Stack>
-      )}
+          {schulName && (
+            <Text opacity={0.92} size={handy ? "sm" : "md"} lineClamp={2}>
+              {schulName}
+            </Text>
+          )}
+        </div>
+      </Group>
 
       {/* Smartphone: „Meine Klassen" über der Materialsuche (10.10.2026) – aufklappbar mit Klassen und Kursen */}
       {handy && aufServer() && modules.some((m) => m.id === "meineklassen") && <MeineKlassenKasten />}
 
-      {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer erscheinen unten unter „Suchergebnis" */}
+      {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer seit 10.10.2026 direkt darunter */}
       {(materialien?.length ?? 0) > 0 && (
       <TextInput
         aria-label="Materialien durchsuchen"
@@ -277,6 +327,8 @@ export default function Home(): React.JSX.Element {
         data-home-suche
       />
       )}
+      {/* Suchergebnis direkt unter dem Suchfeld (10.10.2026, Wunsch der Lehrkraft) */}
+      {suchtAktiv && materialListe}
 
       {(ohneKi || sicherungFaellig) && (
         <Stack gap="sm" mb="xl">
@@ -359,57 +411,8 @@ export default function Home(): React.JSX.Element {
         </Group>
       )}
 
-      {(materialien?.length ?? 0) > 0 && (
-        <Stack gap="sm" mb={40}>
-          <Group justify="space-between" align="end" wrap="wrap" gap="sm">
-            <Group gap="xs" wrap="nowrap">
-              <Title order={3}>
-                {suchtAktiv ? "Suchergebnis" : "Zuletzt bearbeitet"}
-              </Title>
-              {handy && !suchtAktiv && (
-                <AnzahlWahl karte="zuletzt" wert={zuletztAnzahl} setzen={setZuletztAnzahl} />
-              )}
-            </Group>
-          </Group>
-          {suchtAktiv && bereichTreffer.length > 0 && (
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              {bereichTreffer.map((b) => (
-                <BereichZeile
-                  key={b.id}
-                  bereich={b}
-                  anzahl={bereichZahl(b)}
-                  oben={pfadVon(themen, b.id)
-                    .slice(0, -1)
-                    .map((x) => x.name)}
-                />
-              ))}
-            </SimpleGrid>
-          )}
-          {suchtAktiv && treffer.length === 0 ? (
-            bereichTreffer.length === 0 && (
-              <Text c="dimmed" size="sm">
-                Keine Materialien gefunden.
-              </Text>
-            )
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-              {suchtAktiv && nurReihe && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <NurReiheHinweis />
-                </div>
-              )}
-              {(suchtAktiv ? treffer.slice(0, 40) : zuletztSichtbar).map((m) => (
-                <MaterialZeile key={`${m.moduleId}-${m.id}`} material={m} />
-              ))}
-            </SimpleGrid>
-          )}
-          {suchtAktiv && treffer.length > 40 && (
-            <Text c="dimmed" size="xs">
-              {treffer.length - 40} weitere Treffer – Suche genauer fassen.
-            </Text>
-          )}
-        </Stack>
-      )}
+      {/* Ohne Suche: „Zuletzt bearbeitet" hier unten; mit Suche stehen die Treffer direkt unter dem Feld (10.10.2026) */}
+      {!suchtAktiv && materialListe}
 
 
     </Container>
@@ -543,31 +546,52 @@ function BereichZeile({
 
 /**
  * „Meine Klassen" am Smartphone (10.10.2026, Wunsch der Lehrkraft): ein Kasten, zunächst zugeklappt (Auf/Zu gilt nur
- * für die Sitzung, shared/sitzung.ts). Aufgeklappt stehen die Klassen und Kurse der Lehrkraft darin – ein Tipp öffnet
- * „Meine Klassen" direkt bei dieser Klasse bzw. diesem Fach; dazu „Alle Klassen". Geladen wird erst beim Aufklappen.
+ * für die Sitzung, shared/sitzung.ts). Zugeklappt steht rechts eine kurze Übersicht („3 Klassen · 5 Kurse"),
+ * aufgeklappt EINE Zeile je Klasse (10.10.2026, zweite Fassung): rundes Klassenzeichen, „Klasse 7b", darunter die Fächer
+ * als Chips in ihrer Fachfarbe (Tipp = Klasse + Fach direkt), ein Tipp auf die Zeile öffnet die Klasse; ein roter
+ * Zähler nennt Kurse mit Handlungsbedarf (Abzeichen „Test bald"/„nicht geübt"/„Problemwörter" aus derselben Anfrage).
+ * Unten als gleich gestaltete Zeile „Alle Klassen ›". Die Daten (leichte Anfrage /server/startseite) kommen gleich
+ * beim Anzeigen – für die Übersicht im zugeklappten Kopf.
  */
 function MeineKlassenKasten(): React.JSX.Element {
   const [offen, setOffen] = useOffenGemerkt<boolean>("home-meineklassen-offen", false);
-  const [klassen, setKlassen] = useState<StartKlasse[] | null>(null);
+  const [daten, setDaten] = useState<StartseiteDaten | null>(null);
   const modul = modules.find((m) => m.id === "meineklassen");
   useEffect(() => {
-    if (!offen || klassen) return;
     let weg = false;
     void holen<StartseiteDaten>("/server/startseite").then(
-      (d) => !weg && setKlassen(d.klassen),
-      () => !weg && setKlassen([])
+      (d) => !weg && setDaten(d),
+      () => !weg && setDaten({ kurse: [], klassen: [] })
     );
     return () => {
       weg = true;
     };
-  }, [offen, klassen]);
+  }, []);
+  const klassen = daten?.klassen ?? null;
+  const kursAnzahl = (klassen ?? []).reduce((s, k) => s + k.faecher.length, 0);
+  const uebersicht = klassen?.length
+    ? [
+        klassen.length === 1 ? "1 Klasse" : `${klassen.length} Klassen`,
+        kursAnzahl ? (kursAnzahl === 1 ? "1 Kurs" : `${kursAnzahl} Kurse`) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
   return (
-    <div className="home-material home-meineklassen" data-home-meineklassen data-offen={offen} style={{ marginBottom: "var(--mantine-spacing-sm)" }}>
+    <Card
+      withBorder
+      radius="lg"
+      padding={0}
+      className="home-meineklassen"
+      data-home-meineklassen
+      data-offen={offen}
+      mb="sm"
+    >
       <UnstyledButton
         onClick={() => setOffen((o) => !o)}
         data-home-meineklassen-kopf
         aria-expanded={offen}
-        style={{ display: "block", width: "100%" }}
+        className="home-mk-kopf"
       >
         <Group gap="sm" wrap="nowrap">
           {modul?.leistenbild ? (
@@ -580,60 +604,110 @@ function MeineKlassenKasten(): React.JSX.Element {
           <Text fw={600} style={{ flex: 1 }}>
             Meine Klassen
           </Text>
+          {!offen && uebersicht && (
+            <Text size="xs" c="dimmed" data-home-meineklassen-uebersicht style={{ whiteSpace: "nowrap" }}>
+              {uebersicht}
+            </Text>
+          )}
           {offen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
         </Group>
       </UnstyledButton>
       {offen && (
-        <Stack gap={6} mt="sm" data-home-meineklassen-liste>
+        <div className="home-mk-liste" data-home-meineklassen-liste>
           {klassen === null ? (
-            <Text size="sm" c="dimmed">
+            <Text size="sm" c="dimmed" className="home-mk-hinweis">
               Wird geladen …
             </Text>
           ) : klassen.length === 0 ? (
-            <Text size="sm" c="dimmed">
+            <Text size="sm" c="dimmed" className="home-mk-hinweis">
               Noch keine Klassen oder Kurse.
             </Text>
           ) : (
-            klassen.map((k) => (
-              <Group key={k.schluessel} gap={6} wrap="wrap" data-home-klasse={k.name}>
-                <Button
-                  size="compact-sm"
-                  variant="light"
-                  onClick={() => void openDocument("meineklassen", k.faecher[0]?.id ?? k.gruppeId)}
-                >
-                  {k.name}
-                </Button>
-                {k.faecher.length > 1 &&
-                  k.faecher.map((f) => (
-                    <Button
-                      key={f.id}
-                      size="compact-xs"
-                      variant="subtle"
-                      onClick={() => void openDocument("meineklassen", f.id)}
-                      data-home-klasse-fach={f.fach}
-                    >
-                      {f.fach}
-                    </Button>
-                  ))}
-                {k.faecher.length === 1 && (
-                  <Text size="xs" c="dimmed">
-                    {k.faecher[0].fach}
-                  </Text>
-                )}
-              </Group>
-            ))
+            klassen.map((k) => <KlassenZeile key={k.schluessel} k={k} kurse={daten?.kurse ?? []} />)
           )}
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            w="fit-content"
+          <UnstyledButton
+            className="home-mk-zeile home-mk-alle"
             onClick={() => void openDocument("meineklassen", "uebersicht")}
             data-home-alle-klassen
           >
-            Alle Klassen
-          </Button>
-        </Stack>
+            <Text fw={600} size="sm" c="var(--mantine-primary-color-light-color)" style={{ flex: 1 }}>
+              Alle Klassen
+            </Text>
+            <IconChevronRight size={18} className="home-mk-pfeil" />
+          </UnstyledButton>
+        </div>
       )}
+    </Card>
+  );
+}
+
+/** „7b" → „Klasse 7b"; Kursnamen („EN 13 eA Kon", „6s579") bleiben, wie sie sind */
+const klassenTitel = (name: string): string => (/^\d{1,2}\s?[a-zA-Z]{0,2}$/.test(name) ? `Klasse ${name}` : name);
+
+/** Abzeichen, die Handlungsbedarf anzeigen (wie in der Karte „Termine & Vokabeltraining") */
+const BEDARF_ARTEN = new Set(["test", "inaktiv", "problem"]);
+
+/**
+ * Eine Klassenzeile im Kasten: die ganze Zeile öffnet die Klasse (Knopf über die volle Fläche), die Fach-Chips liegen
+ * darüber und öffnen Klasse + Fach.
+ */
+function KlassenZeile({ k, kurse }: { k: StartKlasse; kurse: StartseiteDaten["kurse"] }): React.JSX.Element {
+  const gruppen = new Set([k.gruppeId, ...k.faecher.map((f) => f.id)]);
+  const bedarf = kurse.filter((x) => gruppen.has(x.gruppeId) && BEDARF_ARTEN.has(x.abzeichen.art)).length;
+  const titel = klassenTitel(k.name);
+  return (
+    <div className="home-mk-zeile home-mk-klasse" data-home-klasse={k.name}>
+      <UnstyledButton
+        className="home-mk-flaeche"
+        aria-label={`${titel} öffnen`}
+        onClick={() => void openDocument("meineklassen", k.faecher[0]?.id ?? k.gruppeId)}
+      />
+      <span className="home-mk-zeichen" data-lang={k.name.length > 3 || undefined} aria-hidden>
+        {k.name}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Group gap={6} wrap="nowrap">
+          <Text fw={600} size="sm" truncate>
+            {titel}
+          </Text>
+          {bedarf > 0 && (
+            <span
+              className="home-mk-bedarf"
+              title={bedarf === 1 ? "1 Kurs mit Handlungsbedarf" : `${bedarf} Kurse mit Handlungsbedarf`}
+              data-home-klasse-bedarf={bedarf}
+            >
+              {bedarf}
+            </span>
+          )}
+        </Group>
+        {k.faecher.length > 0 && (
+          <div className="home-mk-faecher">
+            {k.faecher.map((f) => (
+              <FachChip key={f.id} fach={f.fach} onClick={() => void openDocument("meineklassen", f.id)} />
+            ))}
+          </div>
+        )}
+      </div>
+      <IconChevronRight size={18} className="home-mk-pfeil" />
     </div>
+  );
+}
+
+/** Fach als kleiner Chip in seiner Fachfarbe (getönter Grund, Farbpunkt) – tippbar */
+function FachChip({ fach, onClick }: { fach: string; onClick: () => void }): React.JSX.Element {
+  const farbe = useFachFarbe(fach) ?? "var(--mantine-color-gray-6)";
+  return (
+    <UnstyledButton
+      className="home-mk-fach"
+      onClick={onClick}
+      data-home-klasse-fach={fach}
+      style={{
+        background: `color-mix(in srgb, ${farbe} 16%, transparent)`,
+        borderColor: `color-mix(in srgb, ${farbe} 45%, transparent)`,
+      }}
+    >
+      <FachPunkt fach={fach} groesse={8} />
+      {fach}
+    </UnstyledButton>
   );
 }

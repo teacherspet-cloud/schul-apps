@@ -78,11 +78,10 @@ import { Zugang } from '../../onlinetest/OnlinetestModule'
 import { Freigeben as GrammatikFreigeben, useEntwuerfe } from '../GrammatikTraining'
 import { LernendeEintragen, ZettelDruck, type Zettel } from '../LernendeEintragen'
 import { KlasseZuordnen } from '../KlasseZuordnen'
-import { VokabelAbschnitte as AbschnittUebersicht } from '../../meineklassen/VokabelAbschnitte'
 import { AlsSchuelerAnsehen } from '../../meineklassen/SchuelerVorschau'
 import { KursGrammatik } from './KursGrammatik'
 import { KastenKopf, useGemerkt } from './Kasten'
-import { AbschnitteVerwalten, type AbschnittFrage } from './AbschnitteVerwalten'
+import { AbschnitteWoerter, type AbschnittFrage } from './AbschnitteWoerter'
 import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
@@ -236,8 +235,9 @@ function HinweisListe({
 }
 
 /**
- * Units kompakt: je Band (neuester oben, mit Cover – 09.10.2026), darin die Units; die neueste Unit des neuesten Bands
- * offen (Abschnitte mit Balken), ältere zugeklappt mit „% sicher". Auch in „Meine Klassen" (Lernstand der Klasse).
+ * Units kompakt: je Band (neuester oben, mit Cover – 09.10.2026), darin die Units absteigend wie im Buch (10.10.2026:
+ * Unit 3 über Unit 2, im Unit „Story" über „Check-in"); die oberste Unit des neuesten Bands offen (Abschnitte mit
+ * Balken), die anderen zugeklappt mit „% sicher". Auch in „Meine Klassen" (Lernstand der Klasse).
  */
 export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { abschnitte: AbschnittStatistik[]; schluessel?: string }): React.JSX.Element {
   const baende = useMemo(() => nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
@@ -252,7 +252,7 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
     )
   const balken = (s: number, a: number, n: number, breite?: number): React.JSX.Element => (
     <Tooltip label={`sicher ${prozent(s)} · im Aufbau ${prozent(a)} · neu ${prozent(n)}`}>
-      <Progress.Root size="md" radius="xl" w={breite} style={{ flex: breite ? undefined : 1, gap: 2 }}>
+      <Progress.Root size="md" radius="xl" w={breite} style={{ flex: breite ? undefined : 1, gap: 2, minWidth: 32 }}>
         <Progress.Section value={s * 100} color="teal" />
         <Progress.Section value={a * 100} color="yellow" />
         <Progress.Section value={n * 100} color="gray.4" />
@@ -275,7 +275,8 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
           zusatz={`${b.units.length} ${b.units.length === 1 ? 'Unit' : 'Units'} · ${prozent(mittel(b.units.flatMap((u) => u.zeilen), 'sicher'))} sicher`}
           {...(baende.length > 1 ? { offen: bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
         >
-          <Stack gap={4}>
+          {/* Abstände (10.10.2026): Abschnitte 4 px, zwischen Units 10 px – die Units heben sich ab */}
+          <Stack gap={10}>
             {b.units.map((g) => {
               const k = schluessel(b.buch, g.unit)
               const auf = (k === erste) !== umgeschaltet.has(k)
@@ -293,32 +294,37 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
                       })
                     }
                   >
-                    <Group gap="xs" wrap="nowrap">
+                    <Group gap={6} wrap="nowrap">
                       {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                      <Text size="sm" fw={600} w={120} truncate style={{ flexShrink: 0 }}>
+                      {/* Telefon (10.10.2026): schmalere Spalten, damit Balken und Prozent nicht abgeschnitten werden */}
+                      <Text size="sm" fw={600} w={{ base: 84, sm: 120 }} truncate style={{ flexShrink: 0 }}>
                         {g.unit || 'Weitere Vokabeln'}
                       </Text>
                       {balken(mittel(g.zeilen, 'sicher'), mittel(g.zeilen, 'aufbau'), mittel(g.zeilen, 'neu'))}
-                      <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
-                        {prozent(mittel(g.zeilen, 'sicher'))} sicher
+                      <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
+                        {prozent(mittel(g.zeilen, 'sicher'))}
+                        <Text span size="xs" visibleFrom="sm">
+                          {' '}
+                          sicher
+                        </Text>
                       </Text>
                     </Group>
                   </UnstyledButton>
-                  <Collapse expanded={auf}>
-                    <Stack gap={3} mt={4} pl={22}>
+                  {auf && (
+                    <Stack gap={4} mt={4} pl={22}>
                       {g.zeilen.map((a) => (
-                        <Group key={a.index} gap="xs" wrap="nowrap">
-                          <Text size="xs" w={98} truncate style={{ flexShrink: 0 }}>
+                        <Group key={a.index} gap={6} wrap="nowrap">
+                          <Text size="xs" w={{ base: 80, sm: 98 }} truncate style={{ flexShrink: 0 }}>
                             {a.name}
                           </Text>
                           {balken(a.sicher, a.aufbau, a.neu)}
-                          <Text size="xs" c="dimmed" w={70} ta="right" style={{ flexShrink: 0 }}>
+                          <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
                             {prozent(a.sicher)}
                           </Text>
                         </Group>
                       ))}
                     </Stack>
-                  </Collapse>
+                  )}
                 </div>
               )
             })}
@@ -425,8 +431,6 @@ export function KursSeite({
   // Lerngruppe laden: für die Abschnitts-Übersicht (falls nicht mitgegeben) und den Handlungsbedarf im Überblick
   const klassenDetail = useKlassenDetail(id, d?.lerngruppeId || undefined, !vorgabe || !(eingebettet && nurReiter), stand + bedarfStand)
   const statistik = vorgabe ?? klassenDetail.statistik
-  // Zuklappbar (09.10.2026, Wunsch der Lehrkraft): in „Meine Klassen" zu Beginn zu, in Sprachenlernen offen
-  const [abschnitteOffen, setAbschnitteOffen] = useGemerkt(eingebettet ? 'mk-abschnitte-offen' : 'kurs-abschnitte-offen', !eingebettet)
   const entwuerfe = useEntwuerfe().filter((e) => e.empfaenger.vokId === id).length
   if (!d)
     return (
@@ -599,25 +603,17 @@ export function KursSeite({
           Dieser Kurs hat bisher nur Grammatik. Mit „Vokabeln hinzufügen“ kommen Wörter dazu – dann gibt es Tagesziel, Spiele und Lernzeitraum.
         </Text>
       )}
-      {mitWoertern && statistik && statistik.abschnitte.length > 0 && (
-        <Card withBorder radius="md" padding="sm" data-kurs-abschnitte>
-          <KastenKopf
-            titel="Abschnitte und Stand der Lernenden"
-            offen={abschnitteOffen}
-            umschalten={() => setAbschnitteOffen(!abschnitteOffen)}
-            data-kurs-abschnitte-kopf
-          />
-          {abschnitteOffen ? (
-            <AbschnittUebersicht abschnitte={statistik.abschnitte} namen={statistik.namen} schluessel={id} />
-          ) : (
-            <Text size="xs" c="dimmed" ml={26} data-kurs-abschnitte-kurz>
-              {abschnitteKurz(statistik.abschnitte)}
-            </Text>
-          )}
-        </Card>
-      )}
+      {/* Ein Kasten „Abschnitte & Wörter" (10.10.2026) statt „Abschnitte und Stand der Lernenden" + Wortliste */}
       {(mitWoertern || (d.entfernt ?? []).length > 0) && (
-        <AbschnitteVerwalten teile={d.teile ?? []} gesamt={d.woerter.length} entfernt={d.entfernt ?? []} ausfuehren={abschnitt} schluessel={id} />
+        <AbschnitteWoerter
+          d={d}
+          kursId={id}
+          statistik={statistik ?? undefined}
+          eingebettet={eingebettet}
+          ausfuehren={abschnitt}
+          geaendert={neuLaden}
+          kurzzeile={statistik?.abschnitte.length ? abschnitteKurz(statistik.abschnitte) : undefined}
+        />
       )}
       {mitWoertern && <ProblemWoerter d={d} aendern={aendern} />}
       {eingebettet && lernende.length > 0 && mitWoertern && (

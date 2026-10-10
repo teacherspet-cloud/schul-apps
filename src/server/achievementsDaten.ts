@@ -88,7 +88,12 @@ export function achDatenLesen(nutzerId: string): AchDaten {
       runde: d.runde,
       warSchwaeche: Array.isArray(d.warSchwaeche) ? d.warSchwaeche : [],
       je: objekt(d.je, l.je),
-      ausz: { medaillen: objekt(d.ausz?.medaillen, {}), titel: objekt(d.ausz?.titel, {}) },
+      // Jahresreihen (10.10.2026): fehlen sie, stellt die Auswertung bzw. die Wartung einmalig um (jahreUmstellen)
+      ausz: {
+        medaillen: objekt(d.ausz?.medaillen, {}),
+        titel: objekt(d.ausz?.titel, {}),
+        ...(d.ausz?.jahre && typeof d.ausz.jahre === 'object' && !Array.isArray(d.ausz.jahre) ? { jahre: d.ausz.jahre } : {})
+      },
       offenAusz: Array.isArray(d.offenAusz) ? d.offenAusz : [],
       titelWahl: objekt(d.titelWahl, {}),
       ...(typeof d.uebernommen === 'string' ? { uebernommen: d.uebernommen } : {})

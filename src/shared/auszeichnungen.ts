@@ -10,7 +10,17 @@
  *    anderen, für alle erreichbar, nie wieder entzogen. Kulturelle Ränge in der Zielsprache, jeweils männlich, weiblich
  *    und neutral; die Form wählt die Person selbst (nie aus dem Vornamen abgeleitet).
  *  - Altes (die Achievements vom 08.10.2026) wird einmalig auf Medaillen abgebildet – niemand verliert etwas.
+ *
+ * Jahresreihen (10.10.2026, zweite Entscheidung der Lehrkraft): Jedes Schuljahr (genau nach shared/schulkalender.ts,
+ * ohne Daten ab 1. August) öffnet je Sprache eine NEUE Medaillenreihe („Wortschatz Gold · Kl. 7 (2026/27)"). Die
+ * Schwellen kommen aus dem Lehrwerksband dieses Schuljahres (Wörter, Grammatik, Kapitel) bzw. aus den Schultagen des
+ * Jahres; ohne Lehrwerk aus den Jahrgangstabellen unten. Sie werden beim Start der Reihe festgelegt und nur neu
+ * gerechnet, wenn sich Band oder Jahrgang ändert – erreichte Medaillen bleiben immer. Gezählt wird ab Beginn des
+ * Schuljahres (Zuwachs seit der letzten Auswertung im alten Jahr; Übungstage genau nach Datum). Der Haupttitel wächst
+ * aus den Medaillenpunkten ALLER Jahre; dazu gibt es je Schuljahr einen Jahrestitel („Knight of Year 7"). Formeln und
+ * Beispiele: recherche/achievements-medaillen-titel.md, Abschnitt 7.
  */
+import { ersterSchultag, istSchultag, letzterSchultag, schulkalender, schuljahrText, schuljahrVon, tagPlus, type SchulkalenderDaten } from './schulkalender'
 
 export type KategorieId = 'wortschatz' | 'grammatik' | 'dranbleiben' | 'hoeren' | 'lehrwerk' | 'spiele' | 'zusammen'
 /** 0 = noch keine Medaille, 1 = Bronze … 6 = Meister */
@@ -137,13 +147,37 @@ export interface MedaillenSicht {
  * Medaillen einer Sprache: aus den Werten und dem Gespeicherten (die höhere Stufe gilt – nichts wird entzogen).
  */
 export function medaillen(werte: Partial<Werte>, jahrgang: number | null | undefined, gespeichert: Partial<Record<KategorieId, { stufe: number; am: number }>> = {}): MedaillenSicht[] {
+  return medaillenMit(werte, Object.fromEntries(KATEGORIE_IDS.map((k) => [k, schwellen(k, jahrgang)])) as Record<KategorieId, number[]>, gespeichert)
+}
+
+/** Wie `medaillen`, aber mit festen Schwellen je Kategorie (Jahresreihe) */
+export function medaillenMit(
+  werte: Partial<Werte>,
+  s0: Partial<Record<KategorieId, number[]>>,
+  gespeichert: Partial<Record<KategorieId, { stufe: number; am: number }>> = {}
+): MedaillenSicht[] {
   return KATEGORIEN.map((k) => {
-    const s = schwellen(k.id, jahrgang)
+    const s = s0[k.id]?.length === 6 ? s0[k.id]! : schwellen(k.id, null)
     const wert = Math.max(0, Math.floor(Number(werte[k.id]) || 0))
     const g = gespeichert[k.id]
     const stufe = Math.max(stufeFuer(wert, s), Math.min(6, Math.max(0, Math.floor(g?.stufe ?? 0)))) as MedaillenStufe
     return { kategorie: k.id, name: k.name, text: k.text, stufe, wert, ziel: stufe >= 6 ? null : s[stufe], von: stufe ? s[stufe - 1] : 0, am: g?.am ?? null }
   })
+}
+
+/** Zahl mit Tausenderpunkt („1.240") */
+export const zahlText = (n: number): string => Math.round(n).toLocaleString('de-DE')
+
+/**
+ * Die nächste Stufe in Worten (10.10.2026, Jahresreihen): „bei 240 Punkten (etwa 120 sichere Wörter)", „bei 38
+ * Übungstagen", „bei 5 Etappen" – konkrete Zahlen statt nur eines Balkens.
+ */
+export function naechsteStufeText(k: KategorieId, ziel: number): string {
+  const z = zahlText(ziel)
+  if (k === 'wortschatz') return `bei ${z} Punkten (etwa ${zahlText(Math.ceil(ziel / 2))} sichere Wörter)`
+  if (k === 'dranbleiben') return `bei ${z} ${ziel === 1 ? 'Übungstag' : 'Übungstagen'}`
+  if (k === 'lehrwerk') return `bei ${z} ${ziel === 1 ? 'Etappe' : 'Etappen'}`
+  return `bei ${z} ${ziel === 1 ? 'Punkt' : 'Punkten'}`
 }
 
 /** Punkte für den Titel: Summe der Stufen (Bronze = 1 … Meister = 6), höchstens 42 */
@@ -161,6 +195,13 @@ export const medaillenPunkte = (stufen: Iterable<number>): number => {
  * höchsten – so bleibt er erreichbar, auch wenn ein Kurs etwa keine Grammatik oder kein gemeinsames Spielen anbietet.
  */
 export const TITEL_AB = [1, 3, 6, 10, 15, 20, 25, 30] as const
+
+/**
+ * Haupttitel (seit den Jahresreihen, 10.10.2026): aus den Medaillenpunkten ALLER Schuljahre – je Jahr höchstens 42.
+ * Die ersten vier Stufen wie bisher (niemand verliert etwas an Bedeutung), danach steiler: wer jedes Jahr rund 20 Punkte
+ * sammelt, steht nach etwa vier Jahren ganz oben. Die Jahrestitel nutzen TITEL_AB mit den Punkten nur dieses Jahres.
+ */
+export const TITEL_AB_GESAMT = [1, 3, 6, 10, 20, 35, 55, 80] as const
 
 export interface TitelStufe {
   m: string
@@ -239,11 +280,94 @@ export const TITEL_LEITERN: Record<string, TitelStufe[]> = {
 
 export const titelLeiter = (sprache: string): TitelStufe[] => TITEL_LEITERN[sprache] ?? TITEL_LEITERN.allgemein
 
-/** Titelstufe aus Punkten: 0 = noch kein Titel, 1 … 8 */
+/** Titelstufe aus Punkten (Jahrestitel – Punkte eines Schuljahres): 0 = noch kein Titel, 1 … 8 */
 export function titelStufe(punkte: number): number {
   let n = 0
   for (const ab of TITEL_AB) if (punkte >= ab) n++
   return n
+}
+
+/** Stufe des Haupttitels aus den Punkten aller Schuljahre */
+export function titelStufeGesamt(punkte: number): number {
+  let n = 0
+  for (const ab of TITEL_AB_GESAMT) if (punkte >= ab) n++
+  return n
+}
+
+/** Klassenstufe in der Zielsprache – für den Jahrestitel („of Year 7", „de la 5e" …) */
+const KLASSE_FR: Record<number, string> = {
+  5: 'du CM2',
+  6: 'de la 6e',
+  7: 'de la 5e',
+  8: 'de la 4e',
+  9: 'de la 3e',
+  10: 'de la Seconde',
+  11: 'de la Première',
+  12: 'de la Terminale',
+  13: 'de la 13e année'
+}
+const KLASSE_ES: Record<number, string> = {
+  5: 'de 5.º de Primaria',
+  6: 'de 6.º de Primaria',
+  7: 'de 1.º de ESO',
+  8: 'de 2.º de ESO',
+  9: 'de 3.º de ESO',
+  10: 'de 4.º de ESO',
+  11: 'de 1.º de Bachillerato',
+  12: 'de 2.º de Bachillerato',
+  13: 'del 13.º curso'
+}
+const KLASSE_IT: Record<number, string> = {
+  5: 'della quinta elementare',
+  6: 'della prima media',
+  7: 'della seconda media',
+  8: 'della terza media',
+  9: 'del primo anno',
+  10: 'del secondo anno',
+  11: 'del terzo anno',
+  12: 'del quarto anno',
+  13: 'del quinto anno'
+}
+const ORDINAL_LA: Record<number, string> = {
+  1: 'primi',
+  2: 'secundi',
+  3: 'tertii',
+  4: 'quarti',
+  5: 'quinti',
+  6: 'sexti',
+  7: 'septimi',
+  8: 'octavi',
+  9: 'noni',
+  10: 'decimi',
+  11: 'undecimi',
+  12: 'duodecimi',
+  13: 'tertii decimi'
+}
+
+/**
+ * Jahrestitel (10.10.2026): der Titel der Stufe, die in diesem Schuljahr erreicht wurde, mit Klassenstufe in der
+ * Zielsprache – „Knight of Year 7", „Chevalière de la 5e", „Caballero de 1.º de ESO", „Consul anni septimi",
+ * „Talent der Klasse 7". Ohne Jahrgang mit dem Schuljahr („Knight of 2026/27"). null ohne Titel.
+ */
+export function jahresTitelText(sprache: string, stufe: number, form: TitelForm | null | undefined, jahrgang: number | null | undefined, schuljahr: number): string | null {
+  const t = titelText(sprache, stufe, form)
+  if (!t) return null
+  const j = Number(jahrgang) >= 1 && Number(jahrgang) <= 13 ? Math.floor(Number(jahrgang)) : null
+  const sj = schuljahrText(schuljahr)
+  switch (TITEL_LEITERN[sprache] ? sprache : 'allgemein') {
+    case 'en':
+      return j ? `${t} of Year ${j}` : `${t} of ${sj}`
+    case 'fr':
+      return j && KLASSE_FR[j] ? `${t} ${KLASSE_FR[j]}` : `${t} de l’année ${sj}`
+    case 'es':
+      return j && KLASSE_ES[j] ? `${t} ${KLASSE_ES[j]}` : `${t} del curso ${sj}`
+    case 'it':
+      return j && KLASSE_IT[j] ? `${t} ${KLASSE_IT[j]}` : `${t} dell’anno ${sj}`
+    case 'la':
+      return j && ORDINAL_LA[j] ? `${t} anni ${ORDINAL_LA[j]}` : `${t} anni ${sj}`
+    default:
+      return j ? `${t} der Klasse ${j}` : `${t} ${sj}`
+  }
 }
 
 /** Titel in der gewählten Form; ohne Wahl neutral. null ohne Titel */
@@ -414,6 +538,8 @@ export interface SprachEingabe {
   /** Units aus den eigenen Kursen: Wörter gesamt, kennengelernt, sicher */
   units: { gesamt: number; gelernt: number; sicher: number }[]
   zaehler: Partial<SprachZaehler>
+  /** Schuljahr dieser Auswertung (Jahresreihe, 10.10.2026) – ohne Angabe: Schuljahr von `jetzt`, Grundlage nach Jahrgang */
+  jahr?: JahresKontext
 }
 
 /** Lehrwerk-Etappen: Unit zu 80 % kennengelernt = 1, zu 80 % sicher = 2 weitere */
@@ -438,46 +564,296 @@ export function sprachWerte(e: SprachEingabe): Werte {
   }
 }
 
-/** Gespeicherter Stand je Person (in den Achievement-Daten) */
-export interface AuszStand {
-  medaillen: Record<string, Partial<Record<KategorieId, { stufe: number; am: number }>>>
-  titel: Record<string, { stufe: number; am: number }>
+// ---------------------------------------------------------------- Schuljahr (Jahresreihen, 10.10.2026)
+
+/** Woraus die Schwellen eines Schuljahres gerechnet werden – fest für dieses Jahr */
+export interface JahresGrundlage {
+  jahrgang: number | null
+  /** Band des Schuljahres (Kennung und Name) – null ohne Lehrwerk */
+  band: { id: string; name: string } | null
+  /** Wörter des Bands (verschiedene Begriffe) – null: unbekannt (Platzhalter, kein Band) */
+  woerter: number | null
+  /** Grammatikthemen des Bands – null: unbekannt */
+  grammatik: number | null
+  /** Kapitel (Units) des Bands mit Wörtern – null: unbekannt */
+  units: number | null
+  /** Schultage des ganzen Schuljahres (Montag–Freitag ohne Ferien und Feiertage) */
+  schultage: number
 }
 
-export type AuszNeu = { art: 'medaille'; sprache: string; kategorie: KategorieId; stufe: number } | { art: 'titel'; sprache: string; stufe: number }
+/** Was die Auswertung je Sprache für das laufende Schuljahr mitbringt */
+export interface JahresKontext {
+  /** Beginn-Jahr (2026 = 2026/27) */
+  schuljahr: number
+  grundlage: JahresGrundlage
+  /** Verschiedene Übungstage dieser Sprache im Schuljahr */
+  tageImJahr: number
+  /** Lehrwerk-Etappen im Band des Jahres (alle seine Kapitel); null = Band unbekannt → Zuwachs seit Jahresbeginn */
+  bandEtappen: number | null
+}
+
+/** Eine Jahresreihe einer Sprache */
+export interface JahrStand {
+  jahrgang: number | null
+  /** Band + Jahrgang, aus denen die Schwellen stammen – ändert er sich, werden sie neu gerechnet */
+  basis?: string
+  grundlage?: JahresGrundlage
+  schwellen?: Partial<Record<KategorieId, number[]>>
+  /** Gesamtwerte zu Beginn der Reihe – gezählt wird der Zuwachs */
+  start: Partial<Werte>
+  /** Gesamtwerte bei der letzten Auswertung in diesem Jahr (Start der nächsten Reihe) */
+  zuletzt?: Partial<Werte>
+  medaillen: Partial<Record<KategorieId, { stufe: number; am: number }>>
+  /** Jahrestitel */
+  titel?: { stufe: number; am: number }
+}
+
+/** Anteile der Höchstpunkte für Bronze … Meister (Wortschatz, Grammatik) */
+export const ANTEILE = [0.02, 0.1, 0.25, 0.45, 0.7, 0.9] as const
+/** Lehrwerk-Etappen: Bronze = 1 Etappe, Meister = alle Kapitel zu 80 % sicher (3 Etappen je Kapitel) */
+export const ETAPPEN_ANTEILE = [0, 0.15, 0.35, 0.55, 0.75, 1] as const
+/** Zeit-Kategorien: Anteile der Jahresbasis für Silber … Meister (Bronze fest, in der ersten Woche erreichbar) */
+export const ZEIT_ANTEILE = [0, 0.08, 0.2, 0.4, 0.6, 0.8] as const
+/** Zeit-Kategorien: Bronze und Basis (Dranbleiben: Schultage des Jahres; sonst Punkte je Schulwoche × Schulwochen) */
+export const ZEIT_KATEGORIEN: Record<'dranbleiben' | 'spiele' | 'hoeren' | 'zusammen', { bronze: number; jeWoche: number | null }> = {
+  dranbleiben: { bronze: 3, jeWoche: null },
+  spiele: { bronze: 3, jeWoche: 12 },
+  hoeren: { bronze: 10, jeWoche: 40 },
+  zusammen: { bronze: 1, jeWoche: 3 }
+}
+/** Ohne Kalenderdaten: übliche Zahl der Schultage (Niedersachsen, rund 38 Schulwochen) */
+export const SCHULTAGE_UEBLICH = 188
+
+/** Gut lesbar runden: bis 50 genau, bis 200 auf 5, darüber auf 10 */
+export const schoeneZahl = (x: number): number => {
+  const r = Math.round(x)
+  return r <= 50 ? r : r <= 200 ? Math.round(x / 5) * 5 : Math.round(x / 10) * 10
+}
+
+/** Streng steigend, mindestens 1 */
+function steigend(werte: number[]): number[] {
+  const aus: number[] = []
+  for (const w of werte) {
+    const x = Math.max(1, Math.round(w))
+    aus.push(aus.length && x <= aus[aus.length - 1] ? aus[aus.length - 1] + 1 : x)
+  }
+  return aus
+}
+
+/**
+ * Typischer Band (10.10.2026, Entscheidung der Lehrkraft): gilt, wenn Wörter, Grammatik oder Kapitel des Bands nicht
+ * bekannt sind (kein Lehrwerk, Platzhalter ohne Wortliste) – statt der früheren Jahrgangstabellen.
+ */
+export const TYPISCHER_BAND = { woerter: 900, grammatik: 15, units: 9 } as const
+
+const etappenSchwellen = (u: number): number[] => steigend(ETAPPEN_ANTEILE.map((p, i) => (i === 0 ? 1 : i === 5 ? 3 * u : Math.round(p * 3 * u))))
+
+/** Schwellen eines Schuljahres aus seiner Grundlage (ohne bekannten Umfang: ein typischer Band) */
+export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[]> {
+  const anteilig = (max: number, mindest: number): number[] => steigend(ANTEILE.map((p, i) => (i === 0 ? Math.max(mindest, Math.round(p * max)) : schoeneZahl(p * max))))
+  const wochen = Math.max(1, g.schultage) / 5
+  const zeit = (k: keyof typeof ZEIT_KATEGORIEN): number[] => {
+    const z = ZEIT_KATEGORIEN[k]
+    const basis = z.jeWoche === null ? Math.max(1, g.schultage) : z.jeWoche * wochen
+    return steigend(ZEIT_ANTEILE.map((p, i) => (i === 0 ? z.bronze : schoeneZahl(p * basis))))
+  }
+  return {
+    // Ohne bekannten Umfang (10.10.2026, Entscheidung der Lehrkraft): ein typischer Band statt der Jahrgangstabellen
+    wortschatz: anteilig(2 * (g.woerter || TYPISCHER_BAND.woerter), 5),
+    grammatik: anteilig(3 * (g.grammatik || TYPISCHER_BAND.grammatik), 2),
+    lehrwerk: etappenSchwellen(g.units || TYPISCHER_BAND.units),
+    dranbleiben: zeit('dranbleiben'),
+    spiele: zeit('spiele'),
+    hoeren: zeit('hoeren'),
+    zusammen: zeit('zusammen')
+  }
+}
+
+/**
+ * Schlüssel der Grundlage: Band, Jahrgang und welche Umfänge bekannt sind (ändert er sich, werden die Schwellen neu
+ * gerechnet – etwa wenn ein Platzhalter-Band Wörter bekommt). Geänderte Zahlen allein ändern nichts.
+ */
+export const grundlageSchluessel = (g: JahresGrundlage): string =>
+  // „v2": Rückfall typischer Band statt Jahrgangstabelle – ältere Schwellen werden einmal neu gerechnet (Erreichtes bleibt)
+  `v2|${g.band?.id ?? '-'}|${g.jahrgang ?? '-'}|${g.woerter ? 'w' : '-'}${g.grammatik ? 'g' : '-'}${g.units ? 'u' : '-'}`
+
+/** Erster und letzter Tag eines Schuljahres und seine Schultage (ohne Kalenderdaten: 1.8.–31.7., übliche Zahl) */
+export function schuljahrRahmen(schuljahr: number, k: SchulkalenderDaten | null = schulkalender()): { schuljahr: number; beginn: string; ende: string; schultage: number; geschaetzt: boolean } {
+  const erster = ersterSchultag(schuljahr, k)
+  const naechster = ersterSchultag(schuljahr + 1, k)
+  const beginn = erster ?? `${schuljahr}-08-01`
+  const ende = naechster ? tagPlus(naechster, -1) : `${schuljahr + 1}-07-31`
+  const letzter = letzterSchultag(schuljahr, k)
+  if (!k || !erster || !letzter) return { schuljahr, beginn, ende, schultage: SCHULTAGE_UEBLICH, geschaetzt: true }
+  let n = 0
+  for (let t = erster, i = 0; t <= letzter && i < 400; t = tagPlus(t, 1), i++) if (istSchultag(t, k)) n++
+  return { schuljahr, beginn, ende, schultage: n || SCHULTAGE_UEBLICH, geschaetzt: !n }
+}
+
+/** Übungstage im Schuljahr (nach Datum) */
+export const tageImRahmen = (tage: Iterable<string>, r: { beginn: string; ende: string }): number => {
+  let n = 0
+  for (const t of new Set(tage)) if (t >= r.beginn && t <= r.ende) n++
+  return n
+}
+
+/** „Kl. 7 (2026/27)" bzw. „2026/27" ohne Jahrgang */
+export const jahresLabel = (jahrgang: number | null | undefined, schuljahr: number): string => (jahrgang ? `Kl. ${jahrgang} (${schuljahrText(schuljahr)})` : schuljahrText(schuljahr))
+
+/** Kontext ohne Server-Angaben (Tests, Übernahme): Schuljahr von `jetzt`, Grundlage nach Jahrgang, alle Tage zählen */
+export function standardKontext(e: Pick<SprachEingabe, 'jahrgang' | 'tage'>, jetzt: number): JahresKontext {
+  const schuljahr = schuljahrVon(jetzt)
+  return {
+    schuljahr,
+    grundlage: { jahrgang: e.jahrgang, band: null, woerter: null, grammatik: null, units: null, schultage: schuljahrRahmen(schuljahr).schultage },
+    tageImJahr: Math.max(0, Math.floor(Number(e.tage) || 0)),
+    bandEtappen: null
+  }
+}
+
+/** Werte des Schuljahres: Zuwachs seit Beginn der Reihe; Tage nach Datum; Etappen im Band des Jahres */
+export function jahresWerte(gesamt: Werte, start: Partial<Werte>, k: Pick<JahresKontext, 'tageImJahr' | 'bandEtappen'>): Werte {
+  const zuwachs = (x: KategorieId): number => Math.max(0, gesamt[x] - Math.max(0, Math.floor(Number(start[x]) || 0)))
+  return {
+    wortschatz: zuwachs('wortschatz'),
+    grammatik: zuwachs('grammatik'),
+    dranbleiben: Math.max(0, Math.floor(k.tageImJahr)),
+    lehrwerk: k.bandEtappen === null ? zuwachs('lehrwerk') : Math.max(0, Math.floor(k.bandEtappen)),
+    spiele: zuwachs('spiele'),
+    hoeren: zuwachs('hoeren'),
+    zusammen: zuwachs('zusammen')
+  }
+}
+
+/** Gespeicherter Stand je Person (in den Achievement-Daten) */
+export interface AuszStand {
+  /** Beste je erreichte Stufe je Kategorie über alle Jahre (Bilder der Sammlung, Profilbild) */
+  medaillen: Record<string, Partial<Record<KategorieId, { stufe: number; am: number }>>>
+  /** Haupttitel (aus den Punkten aller Jahre) */
+  titel: Record<string, { stufe: number; am: number }>
+  /** Jahresreihen je Sprache und Schuljahr („2026") – fehlt vor der Umstellung (`jahreUmstellen`) */
+  jahre?: Record<string, Record<string, JahrStand>>
+}
+
+export type AuszNeu =
+  | { art: 'medaille'; sprache: string; kategorie: KategorieId; stufe: number; schuljahr?: number; jahrgang?: number | null }
+  | { art: 'titel'; sprache: string; stufe: number }
+  | { art: 'jahrestitel'; sprache: string; stufe: number; schuljahr: number; jahrgang: number | null }
+
+/**
+ * Einmalige Umstellung auf Jahresreihen (10.10.2026, Entscheidung der Lehrkraft): Die bisherigen Medaillen gehören zum
+ * laufenden Schuljahr – nichts geht verloren, der Jahrestitel kommt aus ihren Punkten. Gezählt wurde bis dahin ab null,
+ * also beginnt diese Reihe bei null. Wiederholt aufgerufen ändert sie nichts (Merker: `jahre` ist da).
+ */
+export function jahreUmstellen(stand: AuszStand, schuljahr: number, jetzt: number): boolean {
+  if (stand.jahre && typeof stand.jahre === 'object') return false
+  stand.jahre = {}
+  for (const [sprache, m] of Object.entries(stand.medaillen ?? {})) {
+    const medaillen: JahrStand['medaillen'] = {}
+    for (const [k, x] of Object.entries(m ?? {})) if (x && x.stufe >= 1) medaillen[k as KategorieId] = { stufe: Math.min(6, Math.floor(x.stufe)), am: x.am }
+    const js: JahrStand = { jahrgang: null, start: {}, medaillen }
+    const p = medaillenPunkte(Object.values(medaillen).map((x) => x?.stufe ?? 0))
+    if (titelStufe(p) >= 1) js.titel = { stufe: titelStufe(p), am: Math.max(0, ...Object.values(medaillen).map((x) => x?.am ?? 0)) || jetzt }
+    stand.jahre[sprache] = { [String(schuljahr)]: js }
+  }
+  return true
+}
+
+/** Jahresreihe einer Sprache holen bzw. beginnen: Start = Stand der letzten Auswertung im Vorjahr (sonst null) */
+export function jahrHolen(stand: AuszStand, sprache: string, schuljahr: number): JahrStand {
+  const je = ((stand.jahre ??= {})[sprache] ??= {})
+  const da = je[String(schuljahr)]
+  if (da) return da
+  const vorher = Object.keys(je)
+    .map(Number)
+    .filter((j) => j < schuljahr)
+    .sort((a, b) => b - a)[0]
+  const v = vorher !== undefined ? je[String(vorher)] : undefined
+  const js: JahrStand = { jahrgang: null, start: { ...(v?.zuletzt ?? v?.start ?? {}) }, medaillen: {} }
+  je[String(schuljahr)] = js
+  return js
+}
+
+/** Schwellen der Reihe festlegen – neu nur, wenn sich Band oder Jahrgang geändert hat (Erreichtes bleibt) */
+export function jahrGrundlageSetzen(js: JahrStand, g: JahresGrundlage): void {
+  const schluessel = grundlageSchluessel(g)
+  if (js.schwellen && js.basis === schluessel && js.grundlage) return
+  js.basis = schluessel
+  js.grundlage = g
+  js.schwellen = jahresSchwellen(g)
+  if (g.jahrgang) js.jahrgang = g.jahrgang
+}
+
+/** Punkte einer Jahresreihe */
+export const jahresPunkte = (js: JahrStand | undefined): number => medaillenPunkte(Object.values(js?.medaillen ?? {}).map((x) => x?.stufe ?? 0))
+
+/** Medaillen der Jahresreihe (Sicht mit Wert, Ziel und Start des Balkens) */
+export function jahresMedaillen(js: JahrStand, werte: Partial<Werte>): MedaillenSicht[] {
+  return medaillenMit(werte, schwellenVon(js), js.medaillen)
+}
+
+/** Schwellen einer Jahresreihe (gespeichert, sonst aus der Grundlage) – auch für die Stufen-Übersicht der Sammlung (10.10.2026) */
+export function schwellenVon(js: JahrStand): Partial<Record<KategorieId, number[]>> {
+  return js.schwellen ?? jahresSchwellen(js.grundlage ?? { jahrgang: js.jahrgang, band: null, woerter: null, grammatik: null, units: null, schultage: SCHULTAGE_UEBLICH })
+}
 
 /**
  * Medaillen und Titel fortschreiben: nur aufwärts (nie entzogen), Neues mit Zeitpunkt. Gibt zurück, was neu ist –
- * je Kategorie nur die höchste neue Stufe.
+ * je Kategorie nur die höchste neue Stufe. Seit den Jahresreihen: in der Reihe des laufenden Schuljahres, dazu die beste
+ * Stufe je Kategorie (Sammlung), der Jahrestitel und der Haupttitel aus den Punkten aller Jahre.
  */
 export function fortschreiben(stand: AuszStand, eingaben: SprachEingabe[], jetzt: number): AuszNeu[] {
   const neu: AuszNeu[] = []
+  jahreUmstellen(stand, eingaben[0]?.jahr?.schuljahr ?? schuljahrVon(jetzt), jetzt)
   for (const e of eingaben) {
-    const gespeichert = (stand.medaillen[e.sprache] ??= {})
-    for (const m of medaillen(sprachWerte(e), e.jahrgang, gespeichert)) {
-      const alt = gespeichert[m.kategorie]?.stufe ?? 0
+    const k = e.jahr ?? standardKontext(e, jetzt)
+    const js = jahrHolen(stand, e.sprache, k.schuljahr)
+    jahrGrundlageSetzen(js, k.grundlage)
+    if (e.jahrgang && !js.jahrgang) js.jahrgang = e.jahrgang
+    const gesamt = sprachWerte(e)
+    for (const m of jahresMedaillen(js, jahresWerte(gesamt, js.start, k))) {
+      const alt = js.medaillen[m.kategorie]?.stufe ?? 0
       if (m.stufe > alt) {
-        gespeichert[m.kategorie] = { stufe: m.stufe, am: jetzt }
-        neu.push({ art: 'medaille', sprache: e.sprache, kategorie: m.kategorie, stufe: m.stufe })
+        js.medaillen[m.kategorie] = { stufe: m.stufe, am: jetzt }
+        neu.push({ art: 'medaille', sprache: e.sprache, kategorie: m.kategorie, stufe: m.stufe, schuljahr: k.schuljahr, jahrgang: js.jahrgang })
       }
+    }
+    js.zuletzt = gesamt
+    besteNachziehen(stand, e.sprache)
+    const jt = titelStufe(jahresPunkte(js))
+    if (jt > (js.titel?.stufe ?? 0)) {
+      js.titel = { stufe: jt, am: jetzt }
+      neu.push({ art: 'jahrestitel', sprache: e.sprache, stufe: jt, schuljahr: k.schuljahr, jahrgang: js.jahrgang })
     }
     titelNachziehen(stand, e.sprache, jetzt, neu)
   }
-  return neu
+  // Haupttitel vor dem Jahrestitel melden (der Glückwunsch zeigt höchstens zwei)
+  return neu.sort((a, b) => RANG[a.art] - RANG[b.art])
+}
+const RANG: Record<AuszNeu['art'], number> = { medaille: 0, titel: 1, jahrestitel: 2 }
+
+/** Beste Stufe je Kategorie über alle Jahre (für Sammlung und Profilbild) – nur aufwärts */
+function besteNachziehen(stand: AuszStand, sprache: string): void {
+  const beste = (stand.medaillen[sprache] ??= {})
+  for (const js of Object.values(stand.jahre?.[sprache] ?? {}))
+    for (const [k, x] of Object.entries(js.medaillen ?? {}) as [KategorieId, { stufe: number; am: number }][])
+      if (x && x.stufe > (beste[k]?.stufe ?? 0)) beste[k] = { stufe: x.stufe, am: x.am }
 }
 
 function titelNachziehen(stand: AuszStand, sprache: string, jetzt: number, neu?: AuszNeu[]): void {
-  const punkte = medaillenPunkte(Object.values(stand.medaillen[sprache] ?? {}).map((x) => x?.stufe ?? 0))
-  const s = titelStufe(punkte)
+  const s = titelStufeGesamt(punkteVon(stand, sprache))
   if (s > (stand.titel[sprache]?.stufe ?? 0)) {
     stand.titel[sprache] = { stufe: s, am: jetzt }
     neu?.push({ art: 'titel', sprache, stufe: s })
   }
 }
 
-/** Punkte einer Sprache aus dem gespeicherten Stand */
-export const punkteVon = (stand: AuszStand, sprache: string): number =>
-  medaillenPunkte(Object.values(stand.medaillen[sprache] ?? {}).map((x) => x?.stufe ?? 0))
+/** Punkte einer Sprache: Summe über alle Jahresreihen (vor der Umstellung: die gespeicherten Medaillen) */
+export const punkteVon = (stand: AuszStand, sprache: string): number => {
+  const jahre = stand.jahre?.[sprache]
+  if (jahre && Object.keys(jahre).length) return Object.values(jahre).reduce((a, js) => a + jahresPunkte(js), 0)
+  return medaillenPunkte(Object.values(stand.medaillen[sprache] ?? {}).map((x) => x?.stufe ?? 0))
+}
 
 /** Hauptsprache für die Übernahme: die mit den meisten Übungstagen, dann den meisten Wörtern, sonst die erste */
 export function hauptsprache(eingaben: SprachEingabe[]): string | null {
@@ -487,10 +863,17 @@ export function hauptsprache(eingaben: SprachEingabe[]): string | null {
 
 /**
  * Einmalige Übernahme der alten Achievements in die Hauptsprache (die alten galten für alle Sprachen zusammen). Hebt
- * Medaillen nur an (nie ab) und zieht den Titel nach; wiederholt aufgerufen ändert sie nichts mehr.
+ * Medaillen nur an (nie ab) und zieht den Titel nach; wiederholt aufgerufen ändert sie nichts mehr. Gibt es schon
+ * Jahresreihen, landet das Übernommene in der Reihe des laufenden Schuljahres.
  */
-export function uebernahmeAnwenden(stand: AuszStand, erreichtAlt: Record<string, { gruppe: string; medaille: string | null; am?: number }>, sprache: string, jetzt: number): void {
-  const ziel = (stand.medaillen[sprache] ??= {})
+export function uebernahmeAnwenden(
+  stand: AuszStand,
+  erreichtAlt: Record<string, { gruppe: string; medaille: string | null; am?: number }>,
+  sprache: string,
+  jetzt: number,
+  schuljahr = schuljahrVon(jetzt)
+): void {
+  const ziel = stand.jahre ? jahrHolen(stand, sprache, schuljahr).medaillen : (stand.medaillen[sprache] ??= {})
   for (const [k, s] of Object.entries(uebernahmeAusAlt(erreichtAlt)) as [KategorieId, MedaillenStufe][]) {
     if (s > (ziel[k]?.stufe ?? 0)) {
       // Zeitpunkt: das früheste alte Achievement dieser Kategorie
@@ -503,6 +886,12 @@ export function uebernahmeAnwenden(stand: AuszStand, erreichtAlt: Record<string,
       ziel[k] = { stufe: s, am }
     }
   }
+  if (stand.jahre) {
+    besteNachziehen(stand, sprache)
+    const js = jahrHolen(stand, sprache, schuljahr)
+    const jt = titelStufe(jahresPunkte(js))
+    if (jt > (js.titel?.stufe ?? 0)) js.titel = { stufe: jt, am: jetzt }
+  } else stand.medaillen[sprache] ??= {}
   titelNachziehen(stand, sprache, jetzt)
 }
 

@@ -1246,3 +1246,108 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
 .home-meineklassen {
   width: 100%;
 }
+/* „Meine Klassen" am Smartphone, zweite Fassung (10.10.2026): Kopf + eine Zeile je Klasse mit Trennlinien */
+.home-mk-kopf {
+  display: block;
+  width: 100%;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+.home-mk-kopf:focus-visible,
+.home-mk-flaeche:focus-visible,
+.home-mk-alle:focus-visible,
+.home-mk-fach:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: -2px;
+}
+.home-mk-hinweis {
+  padding: 12px var(--mantine-spacing-md);
+  border-top: 1px solid var(--app-border);
+}
+.home-mk-zeile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px var(--mantine-spacing-md);
+  border-top: 1px solid var(--app-border);
+  transition: background 120ms ease;
+}
+.home-mk-zeile:hover,
+.home-mk-zeile:active {
+  background: var(--mantine-color-default-hover);
+}
+/* Der Knopf der Zeile liegt über der ganzen Fläche; die Fach-Chips darüber */
+.home-mk-flaeche {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.home-mk-zeichen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 6px;
+  border-radius: 20px;
+  background: var(--mantine-primary-color-light);
+  color: var(--mantine-primary-color-light-color);
+  font-weight: 700;
+  font-size: 15px;
+  pointer-events: none;
+}
+.home-mk-zeichen[data-lang] {
+  font-size: 12px;
+}
+.home-mk-bedarf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--mantine-color-red-filled);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.home-mk-faecher {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  width: fit-content;
+  max-width: 100%;
+}
+.home-mk-fach {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mantine-color-text);
+}
+.home-mk-pfeil {
+  flex-shrink: 0;
+  color: var(--mantine-color-dimmed);
+}
+.home-mk-alle {
+  min-height: 48px;
+}
+
+/* Startseite PC/Tablet (10.10.2026): Logo wie am Telefon, etwas größer */
+.home-logo-gross {
+  height: 72px;
+  max-width: 140px;
+}

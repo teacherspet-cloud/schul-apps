@@ -238,6 +238,16 @@ try {
   if (await vSpaeter.isVisible().catch(() => false)) await vSpaeter.click()
   await expertenmodus(v)
   await v.locator('.app-leiste [aria-label="Schule & Daten"]').first().click()
+  // Reiter „Nutzer" (10.10.2026): alle Kästen auf- und zuklappbar, standardmäßig zu
+  await v.getByRole('tab', { name: 'Nutzer', exact: true }).click()
+  await da(v.locator('[data-klappkarte="nutzer-anlegen"]'), 10000)
+  const nutzerKaesten = await v.locator('[data-klappkarte^="nutzer-"]').evaluateAll((k) => k.map((x) => `${x.getAttribute('data-klappkarte')}=${x.getAttribute('data-offen')}`))
+  pruefe(nutzerKaesten.length >= 5 && nutzerKaesten.every((x) => x.endsWith('=false')), `Nutzer: Kästen zugeklappt (${nutzerKaesten.join(', ')})`)
+  await v.locator('[data-klappkarte="nutzer-anlegen"] [data-klappkopf]').click()
+  pruefe(await da(v.locator('[data-nutzer-anlegen] [data-feld="benutzer"]'), 5000), 'Nutzer: „Neuen Nutzer anlegen" klappt auf')
+  await v.getByRole('tab', { name: 'Schule', exact: true }).click()
+  await da(v.locator('[data-schule-einrichten]'), 10000)
+  pruefe(!(await v.getByText('Die Schule, die diesen Server nutzt').count()), 'Schule: ohne Einleitungstext')
   await v.getByRole('tab', { name: 'Server', exact: true }).click()
   pruefe(await da(v.locator('[data-server-reiter] [data-server-ampel]').first(), 15000), 'Verwaltung › Server: Ampel erscheint')
 

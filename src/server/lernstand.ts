@@ -21,6 +21,9 @@ import { alsNutzer, json, type Anfrage, type Aufruf } from './http'
 import { gehoertZu, klasseVon, lerngruppe, onlinetestStand } from './onlinetest'
 import { vokabelListenFuer, standVon as vokStandVon, zeile as vokZeile } from './vokabeln'
 import { grammatikFuer } from './grammatik'
+import { sprachStaende } from './sprachstand'
+import type { SprachStand } from '../shared/sprachstand'
+import { fachAusName } from '../shared/faecher'
 import { blattIstFuer, blattKurz } from './arbeitsblaetter'
 import type { WortStand } from '../shared/vokabeltrainer'
 import type { StructuredRequest } from '../shared/types'
@@ -152,8 +155,14 @@ function jahrgangVon(ich: NutzerInfo): number | null {
   return null
 }
 
-/** Heute dran wie im Trainer (sitzungsWoerter): fällige Wiederholungen und bis zu 10 neue, höchstens 25 */
-const heuteDran = (u: { faellig: number; neu: number }): number => Math.min(25, u.faellig + Math.min(10, u.neu))
+/**
+ * Heute dran: die Tagesrunde wie im Trainer (shared/vokabeltrainer `tagesRunde`, über `uebersicht.heuteOffen`).
+ * Ursache des Befunds vom 10.10.2026 („88 Vokabeln sind heute dran", im Ordner „heute noch 45"): Hier stand eine eigene
+ * Rechnung (alle fälligen + 10 neue, höchstens 25 je Kurs), die Startseite nahm alle fälligen ohne Grenze (auch aus
+ * Abschnitten früherer Schuljahre), der Ordner die Tagesration bis Tagesziel + 25. Jetzt zählt überall dieselbe Runde –
+ * bei Konten die EINE Runde je Sprache (server/sprachstand.ts).
+ */
+const heuteDran = (u: { faellig: number; neu: number; heuteOffen?: number }): number => u.heuteOffen ?? Math.min(25, u.faellig + Math.min(10, u.neu))
 const istWackelig = (s: WortStand, jetzt: number): boolean => s.fach >= 1 && s.fach <= 2 && s.falsch > 0 && jetzt - (s.zuletzt || 0) < 14 * TAG_MS
 
 interface Gesammelt {
@@ -164,7 +173,7 @@ interface Gesammelt {
   aktionen: Record<string, { text: string; href: string }>
 }
 
-function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
+function sammeln(ich: NutzerInfo, jetzt = Date.now(), sprachen: SprachStand[] = []): Gesammelt {
   const { wochenziel, tipps, wochenzielGesetzt } = lernWahl(ich.id)
   const jahrgang = jahrgangVon(ich)
   const stufe = stufeVon(jahrgang)
@@ -220,6 +229,31 @@ function sammeln(ich: NutzerInfo, jetzt = Date.now()): Gesammelt {
         (wackelig.length ? `, wackelig: ${wackelig.slice(0, 5).map((w) => w.term).join(', ')}` : '') +
         (testInTagen !== null && testInTagen >= 0 ? `, Vokabeltest in ${testInTagen} Tagen` : '')
     )
+  }
+  // Eine Runde je Sprache (10.10.2026): Tipp und Knopf nennen die Größe der heutigen Sprachrunde und öffnen sie im Ordner
+  if (sprachen.length) {
+    const jeSprache = sprachen.filter((s) => !s.nurKurse && (s.kurse.length || s.heute.anzahl))
+    const kursSprache = new Map(vok.map((v) => [v.id, (v.sprache || '').toLowerCase()]))
+    const ersetzt = jeSprache.map((s) => {
+      const eigene = vokDaten.filter((v) => kursSprache.get(v.id) === s.sprache)
+      const tests = eigene.map((v) => v.testInTagen).filter((t): t is number => t !== null && t >= 0)
+      return {
+        id: `sp:${s.sprache}`,
+        titel: s.fach,
+        faellig: s.heute.anzahl,
+        wackelig: eigene.reduce((n, v) => n + v.wackelig, 0),
+        testInTagen: tests.length ? Math.min(...tests) : null,
+        href: `/s/ordner/${encodeURIComponent(s.fach)}?r=vok`
+      }
+    })
+    const andere = vokDaten.filter((v) => !jeSprache.some((s) => s.sprache === kursSprache.get(v.id)))
+    faelligGesamt += ersetzt.reduce((n, v) => n + v.faellig, 0) + andere.reduce((n, v) => n + v.faellig, 0) - vokDaten.reduce((n, v) => n + v.faellig, 0)
+    for (const b of bereiche) {
+      const fl = fachAusName(b.fach ?? '')?.label ?? b.fach
+      const s = jeSprache.find((x) => x.fach === fl || x.sprache === b.fach)
+      if (b.art === 'vokabeln' && s) Object.assign(b, { href: `/s/ordner/${encodeURIComponent(s.fach)}?r=vok`, faellig: s.heute.anzahl })
+    }
+    vokDaten.splice(0, vokDaten.length, ...ersetzt, ...andere)
   }
   for (const z of sicher(() => db().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[], [])) {
     const st = json_(z.daten, { woerter: {}, tage: [] } as { woerter: Record<string, WortStand>; tage: string[] })
@@ -537,7 +571,9 @@ export function lernstandRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean>
     if (!sitzung || sitzung.nutzer.quelle === 'gast') return (json(res, 401, { fehler: 'Nur mit Konto.' }), true)
     const ich = sitzung.nutzer
     if (req.method === 'GET' && url.pathname === '/s/api/lernstand') {
-      const g = sammeln(ich)
+      // Konten: die Runde je Sprache (gleiche Zahl wie im Ordner); Fehler dort bremsen den Lernstand nicht
+      const sprachen = ich.rolle === 'schueler' ? await sprachStaende(ich).catch(() => []) : []
+      const g = sammeln(ich, Date.now(), sprachen)
       if (g.antwort.tippsAn) {
         const ki = kiTippAnzeigen(ich, g)
         if (ki) {

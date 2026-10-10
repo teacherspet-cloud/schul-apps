@@ -147,7 +147,12 @@ try {
   pruefe((await p.locator('[data-lasche="wort"]').innerText()).includes('My Books'), 'Lasche „My Books" in der Fremdsprache')
   pruefe(await da(p.locator('[data-buecherbord]')), 'My Books zeigt das Bücherbord')
   const buecher = await p.locator('[data-buch]').evaluateAll((els) => els.map((e) => e.getAttribute('data-buch')))
-  pruefe(JSON.stringify(buecher) === '["green-line-1","green-line-2","green-line-3","__weitere"]', `Bord: GL 1, GL 2, GL 3 und Weitere Wörter (${buecher})`)
+  // Nach Schuljahren (10.10.2026): „This year" (GL 3, Weitere Wörter), dann „Earlier years" (GL 1, GL 2)
+  pruefe(JSON.stringify(buecher) === '["green-line-3","__weitere","green-line-1","green-line-2"]', `Bord: GL 3 und Weitere Wörter, dann GL 1 und GL 2 (${buecher})`)
+  pruefe(
+    (await p.locator('[data-bord-jahr="jetzt"]').textContent()).includes('This year') && (await p.locator('[data-bord-jahr="frueher"]').textContent()).includes('Earlier years'),
+    'Bord-Abschnitte „This year" / „Earlier years" in der Fremdsprache'
+  )
   pruefe((await p.locator('[data-buch-aktuell]').getAttribute('data-buch')) === 'green-line-3', 'Green Line 3 ist der aktuelle Band')
   pruefe((await p.locator('[data-buch] [data-cover], [data-buch] [data-cover-ersatz], [data-buch] .mb-ersatz').count()) === 4, 'Je Buch ein Cover (oder Ersatzkachel)')
   pruefe((await p.getByText('Vokabelweg').count()) === 0, 'Keine Gruppen „Vokabelweg …" mehr')
@@ -178,21 +183,24 @@ try {
   await p.waitForTimeout(400)
   await p.screenshot({ path: join(out, '2c-buch-aufschlagen.png') })
   await p.locator('[data-buch-aufschlagen]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined)
+  // Units und Abschnitte zugeklappt (10.10.2026), je mit drei Kreisen; Abschnitte IN ihrer Unit
+  pruefe((await da(p.locator('[data-buch-offen="green-line-3"]'))) && (await p.locator('[data-buch-unit][data-offen="false"]').count()) === 1, 'GL 3: Unit zugeklappt')
+  await p.locator('[data-buch-unit="Unit 1"] .mb-unit-kopf').click()
   const gruppen = await p.locator('[data-wortliste-gruppe]').evaluateAll((els) => els.map((e) => e.getAttribute('data-wortliste-gruppe')))
-  pruefe(
-    (await da(p.locator('[data-buch-offen="green-line-3"]'))) && JSON.stringify(gruppen) === '["Unit 1 · Check-in","Unit 1 · Station 1"]',
-    `GL 3 nur mit den freigegebenen Abschnitten (${gruppen})`
-  )
-  pruefe((await p.locator('[data-wort-status="neu"]').count()) >= 10 && /\?r=wort&buch=green-line-3/.test(p.url()), `Wörter mit Stand, Adresse nennt das Buch (${p.url()})`)
+  pruefe(JSON.stringify(gruppen) === '["Unit 1 · Check-in","Unit 1 · Station 1"]', `GL 3 nur mit den freigegebenen Abschnitten, aufsteigend (${gruppen})`)
+  pruefe((await p.locator('[data-buch-unit] [data-stand-kreise]').count()) === 3, 'Drei Kreise an Unit und Abschnitten')
+  await p.locator('[data-wortliste-gruppe="Unit 1 · Check-in"] .mb-abschnitt-kopf').click()
+  pruefe((await p.locator('[data-wortliste-wort] [data-wort-status="neu"]').count()) >= 5 && /\?r=wort&buch=green-line-3/.test(p.url()), `Wörter mit Stand, Adresse nennt das Buch (${p.url()})`)
   await p.screenshot({ path: join(out, '2d-buch-gl3.png') })
   await p.locator('[data-ordner-zurueck]').click()
   pruefe(await da(p.locator('[data-buecherbord]')), 'Zurück blättert zum Bord')
   await p.locator('[data-buch="green-line-1"]').click()
   await p.locator('[data-buch-offen="green-line-1"]').waitFor()
-  pruefe((await p.locator('[data-wortliste-gruppe]').count()) > 10, `GL 1 vollständig (${await p.locator('[data-wortliste-gruppe]').count()} Abschnitte)`)
+  pruefe((await p.locator('[data-buch-unit]').count()) > 5, `GL 1 vollständig (${await p.locator('[data-buch-unit]').count()} Units)`)
   await p.goBack()
   await p.locator('[data-buecherbord]').waitFor()
   await p.locator('[data-buch="__weitere"]').click()
+  await p.locator('[data-buch-inhalt="__weitere"] .mb-abschnitt-kopf').first().click()
   pruefe(await da(p.locator('[data-wortliste-wort="quokka"]')), 'Weitere Wörter: die Liste ohne Lehrwerk')
   pruefe((await p.locator('[data-wortliste-wort]').count()) === 6, `Alle 6 Wörter der Liste (${await p.locator('[data-wortliste-wort]').count()})`)
   await p.locator('[data-ordner-zurueck]').click()
@@ -221,6 +229,19 @@ try {
   await p.locator('[data-wortliste-suche]').fill('attend')
   await p.waitForTimeout(300)
   pruefe((await p.locator('[data-abc-wort="to attend"]').count()) === 1, '„to attend" unter A (ohne „to ")')
+  // Doppelte (10.10.2026): „a/one hundred" (GL 1, phrase und number) nur einmal
+  await p.locator('[data-wortliste-suche]').fill('hundred')
+  await p.waitForTimeout(300)
+  pruefe((await p.locator('[data-abc-wort="a/one hundred"]').count()) === 1, '„a/one hundred" nur einmal')
+  // Umschalter „My words | All words": rechts auch „the … the" (GL 3 Unit 2, noch nicht freigegeben) – unter T, blass
+  await p.locator('[data-abc-umschalter] label', { hasText: 'All words' }).click()
+  await p.locator('[data-wortliste-suche]').fill('desto')
+  await p.locator('[data-abc-wort="the … the"]').waitFor({ timeout: 15000 }).catch(() => undefined)
+  pruefe(
+    (await p.locator('[data-abc-wort="the … the"][data-abc-nicht-dran]').count()) === 1 && (await p.locator('[data-abc-kopf="#"]').count()) === 0,
+    '„All words": „the … the" unter T (nicht „#"), als noch nicht dran'
+  )
+  await p.locator('[data-abc-umschalter] label', { hasText: 'My words' }).click()
   await p.screenshot({ path: join(out, '2f-alphabetisch-suche.png') })
   await p.locator('[data-wortliste-suche]').fill('')
   // Register Vocabulary zeigt den Kurs direkt (08.10.2026): Karteikasten ohne eigenen Rückweg

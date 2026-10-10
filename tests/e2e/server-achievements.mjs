@@ -4,6 +4,13 @@
 // Medaillen und Titel je Sprache (10.10.2026): Mia lernt Englisch und Französisch → zwei Reihen, Bronze in „Spiele"
 // (Englisch), erster Titel „Traveller", Form wählen, Begrüßung mit Titel und Profilbild, Titel im Spielraum, die
 // Lehrkraft sieht Medaillen und Titel in „Meine Klassen", Sammlung mit gesperrten und freien Bildern.
+// Jahresreihen (10.10.2026): Medaillen des Schuljahres mit Beschriftung „Kl. 7 (2026/27)" und konkreter Zahl zur
+// nächsten Stufe; nach einem Schuljahreswechsel (Testuhr SCHULAPPS_KALENDER_TESTUHR) neue Reihe, die alte unter
+// „Frühere Jahre", Haupttitel bleibt. Danach Testuhr zurück und Klassenwechsel der Testlehrkraft zurückgenommen.
+// Aufbau des Fensters (10.10.2026): alle Abschnitte eingeklappt mit Zusammenfassung (data-klappkarte/data-offen,
+// Kopf data-klappkopf) – vor dem Prüfen des Inhalts aufklappen. Medaillen als Raster 7 × 6 (data-medaille-zelle), Tipp
+// öffnet ein Blatt; Titel und Jahrestitel als Streifen; Sammlung mit „Profilbild wählen". Bildschirmfotos auch für
+// Telefon (390 × 844) und iPad (820 × 1180).
 // Vorher: Server lokal (KI-Attrappe). Es wird keine KI gebraucht.
 // Aufruf: node tests/e2e/server-achievements.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
@@ -25,6 +32,18 @@ const da = (l, ms = 15000) =>
     () => true,
     () => false
   )
+// Abschnitt aufklappen (nur, wenn er zu ist – offen/zu gilt für die Sitzung)
+const auf = async (pg, id) => {
+  await da(pg.locator(`[data-klappkarte="${id}"]`), 8000)
+  const k = pg.locator(`[data-klappkarte="${id}"][data-offen="false"] [data-klappkopf]`)
+  if (await k.count()) await k.first().click()
+  await pg.waitForTimeout(150)
+}
+// Blatt (Telefon: von unten, sonst Fenster) schließen
+const blattZu = async (pg) => {
+  await pg.locator('.mantine-Drawer-close, .mantine-Modal-close').last().click().catch(() => undefined)
+  await pg.waitForTimeout(300)
+}
 
 const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
@@ -32,6 +51,8 @@ const trainings = []
 const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
 let lk
+let uhrVerstellt = false
+let gewechselt = false
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
   const neu = async (rolle, name) => {
@@ -93,7 +114,7 @@ try {
   const gemeldet = await (await mia.request.get(`${A}/s/api/achievements/neu`, { headers: KOPF })).json()
   const ausz = gemeldet.auszeichnungen ?? []
   pruefe(
-    ausz.some((x) => x.art === 'medaille' && x.sprache === 'en' && x.text === 'Spiele') && ausz.some((x) => x.art === 'titel' && x.text === 'Traveller'),
+    ausz.some((x) => x.art === 'medaille' && x.sprache === 'en' && /^Spiele · Kl\. 7 \(\d{4}\/\d{2}\)$/.test(x.text)) && ausz.some((x) => x.art === 'titel' && x.text === 'Traveller'),
     `Glückwunsch: Bronze „Spiele" und Titel „Traveller" (${ausz.map((x) => `${x.titel}: ${x.text}`).join(' · ')})`
   )
   const m = await (await mia.request.get(`${A}/s/api/auszeichnungen`, { headers: KOPF })).json()
@@ -102,6 +123,12 @@ try {
   pruefe(mEn?.jahrgang === 7 && mEn?.medaillen.find((x) => x.kategorie === 'spiele')?.stufe === 1, `Englisch (Klasse ${mEn?.jahrgang}): Bronze in „Spiele"`)
   pruefe(m.sprachen?.find((x) => x.sprache === 'fr')?.medaillen.every((x) => x.stufe === 0), 'Französisch: noch keine Medaille')
   pruefe(m.formOffen === true, 'Form des Titels noch nicht gewählt')
+  // Jahresreihe (10.10.2026): Beschriftung und konkrete Zahl zur nächsten Stufe
+  const jahrEn = mEn?.jahr ?? ''
+  const zielWort = mEn?.medaillen.find((x) => x.kategorie === 'wortschatz')?.ziel
+  pruefe(/^Kl\. 7 \(\d{4}\/\d{2}\)$/.test(jahrEn) && mEn?.schuljahrText && jahrEn.includes(mEn.schuljahrText), `Jahresreihe beschriftet: „${jahrEn}"`)
+  pruefe(Number.isInteger(zielWort) && zielWort > 0 && mEn?.grundlage?.schultage > 100, `Wortschatz: nächste Stufe bei ${zielWort} Punkten (Grundlage ${mEn?.grundlage?.band ?? 'Jahrgangstabelle'}, ${mEn?.grundlage?.schultage} Schultage)`)
+  pruefe(mEn?.jahrestitel?.text === 'Traveller of Year 7' && Array.isArray(mEn?.frueher) && mEn.frueher.length === 0, `Jahrestitel „${mEn?.jahrestitel?.text}", noch keine früheren Jahre`)
 
   const ben = await browser.newContext()
   await anmelden(ben, kinder[1].benutzer, kinder[1].passwort)
@@ -143,28 +170,108 @@ try {
   pruefe(await da(p.locator('[data-medaillen-titel]')), 'Fenster öffnet mit „Medaillen & Titel"')
   pruefe((await da(p.locator('[data-ausz-sprache="en"]'))) && (await p.locator('[data-ausz-sprache="fr"]').count()) === 1, 'Reiter je Sprache: Englisch und Französisch')
   pruefe(!(await p.locator('[data-titel-form="m"]').isVisible().catch(() => false)), 'Form schon gewählt: keine zweite Frage')
-  pruefe(await da(p.locator('[data-ausz-reihe="en"] [data-medaille="spiele"][data-stufe="1"]')), 'Medaille „Spiele" in Bronze')
-  pruefe(await da(p.locator('[data-ausz-reihe="en"] [data-medaille="wortschatz"][data-stufe="0"]')), 'Noch nicht erreichte Medaille mit Fortschritt')
+  // Eingeklappt mit Zusammenfassung
+  const zu = await p.locator('[data-ausz-reihe="en"] [data-klappkarte][data-offen="false"]').count()
+  pruefe(zu === 4 && (await p.locator('[data-ausz-reihe="en"] [data-klappkarte][data-offen="true"]').count()) === 0, `Alle vier Abschnitte eingeklappt (${zu})`)
+  pruefe(await da(p.locator(`[data-ausz-reihe="en"] [data-ausz-jahr="${jahrEn}"]`)), `Zusammenfassung „Medaillen ${jahrEn}"`)
+  const zMed = await p.locator('[data-klappkarte="medaillen-en"] [data-klappstatus]').innerText().catch(() => '')
+  pruefe(zMed.includes('1 von 42'), `Zusammenfassung Medaillen: „${zMed}"`)
+  const zTit = await p.locator('[data-klappkarte="titel-en"] [data-klappstatus]').innerText().catch(() => '')
+  pruefe(zTit.includes('Traveller · nächster bei 3 Punkten'), `Zusammenfassung Titel: „${zTit}"`)
+  const zSam = await p.locator('[data-klappkarte="sammlung-en"] [data-klappstatus]').innerText().catch(() => '')
+  pruefe(zSam.includes('2 von 50'), `Zusammenfassung Sammlung: „${zSam}"`)
+  await p.screenshot({ path: join(out, '0-eingeklappt.png') })
+  // Medaillen: Raster 7 × 6
+  await auf(p, 'medaillen-en')
+  pruefe((await p.locator('[data-ausz-medaillen="en"] [data-raster-jetzt] [data-medaille-zelle]').count()) === 42, 'Raster mit 42 Feldern (7 Kategorien × 6 Stufen)')
+  pruefe(await da(p.locator('[data-ausz-reihe="en"] [data-medaille="spiele"][data-stufe="1"] [data-medaille-zelle="spiele-1"][data-erreicht="true"]')), 'Medaille „Spiele" in Bronze')
+  pruefe(
+    (await da(p.locator('[data-ausz-reihe="en"] [data-medaille="wortschatz"][data-stufe="0"] [data-medaille-zelle="wortschatz-1"][data-naechste]'))) &&
+      (await p.locator('[data-raster-jetzt] [data-medaille-zelle="wortschatz-2"][data-erreicht="false"]').count()) === 1,
+    'Noch nicht erreichte Medaille: nächste Stufe hervorgehoben, spätere gesperrt'
+  )
+  pruefe(await da(p.locator('[data-ausz-medaillen="en"] [data-medaillen-zahl="1/42"]')), '„1 von 42 Medaillen"')
+  await p.locator('[data-ausz-medaillen="en"] [data-medaille-zelle="wortschatz-1"]').click()
+  const naechste = p.locator(`[data-medaille-blatt="m-wortschatz-1"] [data-medaille-naechste="${zielWort}"]`)
+  pruefe((await da(naechste)) && (await naechste.innerText()).includes(`Nächste Stufe (Bronze) bei ${zielWort} Punkten`), `Blatt mit konkreter Zahl: „${await naechste.innerText().catch(() => '–')}"`)
+  await blattZu(p)
+  await p.locator('[data-ausz-medaillen="en"] [data-medaille-zelle="spiele-1"]').click()
+  const erreicht = p.locator('[data-medaille-blatt="m-spiele-1"] [data-medaille-erreicht]')
+  pruefe((await da(erreicht)) && /Erreicht am \d+\.\d+\.\d{4} · Kl\. 7/.test(await erreicht.innerText()), `Blatt „${await erreicht.innerText().catch(() => '–')}"`)
+  await blattZu(p)
+  // Titel und Jahrestitel als Streifen
+  await auf(p, 'jahrestitel-en')
+  pruefe(await da(p.locator('[data-jahrestitel="en"][data-jahrestitel-stufe="1"] [data-jahrestitel-text="Traveller of Year 7"]')), 'Jahrestitel „Traveller of Year 7" sichtbar')
+  await auf(p, 'titel-en')
   pruefe(await da(p.locator('[data-titel-leiter="en"][data-titel-stufe="1"] [data-titel="1"][aria-current="step"]')), 'Titelleiter: „Traveller" hervorgehoben')
+  pruefe((await p.locator('[data-titel-leiter="en"] [data-titel][data-erreicht="false"]').count()) === 7, 'Sieben Titel noch gesperrt')
+  await p.locator('[data-titel-leiter="en"] [data-titel="1"]').click()
+  pruefe(await da(p.locator('[data-titel-blatt="1"] [data-titel-zeigen="1"]')), 'Titel-Blatt: „Neben meinem Namen zeigen"')
+  await blattZu(p)
+  // Sammlung
+  await auf(p, 'sammlung-en')
   pruefe(await da(p.locator('[data-sammlung="en"][data-sammlung-zahl="2/50"]')), `Sammlung: 2 von 50 (${await p.locator('[data-sammlung]').getAttribute('data-sammlung-zahl').catch(() => '–')})`)
-  pruefe((await p.locator('[data-sammlung-bild="m-spiele-2"][data-frei="false"]').count()) === 1, 'Gesperrtes Bild in der Sammlung')
+  pruefe((await p.locator('[data-sammlung-raster] [data-medaille-zelle="spiele-2"][data-erreicht="false"]').count()) === 1, 'Gesperrtes Bild in der Sammlung')
+  pruefe((await p.locator('[data-sammlung-bild="t-en-1"][data-frei="true"]').count()) === 1, 'Titel-Wappen „Traveller" freigeschaltet')
   await p.waitForTimeout(800)
-  const bildOk = await p.locator('[data-sammlung-bild="m-spiele-1"] img').evaluate((i) => i.complete && i.naturalWidth > 0).catch(() => false)
+  const bildOk = await p.locator('[data-sammlung-raster] [data-medaille-zelle="spiele-1"] img').evaluate((i) => i.complete && i.naturalWidth > 0).catch(() => false)
   pruefe(bildOk, 'Platzhalterbild wird geladen')
   await p.screenshot({ path: join(out, '0-medaillen.png'), fullPage: true })
-  await p.locator('[data-sammlung-bild="m-spiele-1"]').click()
-  await p.locator('[data-avatar-setzen="m-spiele-1"]').click()
-  await p.waitForTimeout(800)
+  // Profilbild wählen: nur Freigeschaltetes wählbar
+  await p.locator('[data-profilbild-waehlen]').click()
+  pruefe(await p.locator('[data-sammlung-raster] [data-medaille-zelle="spiele-2"]').isDisabled(), 'Profilbild-Wahl: gesperrtes Bild nicht wählbar')
+  await p.locator('[data-sammlung-raster] [data-medaille-zelle="spiele-1"]').click()
+  await p.waitForTimeout(600)
+  pruefe((await p.locator('[data-sammlung-raster] [data-medaille-zelle="spiele-1"]').getAttribute('aria-pressed')) === 'true', 'Profilbild gewählt')
+  await p.locator('[data-profilbild-waehlen]').click()
+  // Ansichten für Telefon und iPad
+  for (const [n, w, h] of [
+    ['telefon', 390, 844],
+    ['ipad', 820, 1180]
+  ]) {
+    await p.setViewportSize({ width: w, height: h })
+    await p.locator('[data-klappkopf="medaillen-en"]').scrollIntoViewIfNeeded().catch(() => undefined)
+    await p.waitForTimeout(600)
+    await p.screenshot({ path: join(out, `nachher-${n}.png`) })
+    await p.locator('[data-klappkopf="sammlung-en"]').scrollIntoViewIfNeeded().catch(() => undefined)
+    await p.waitForTimeout(300)
+    await p.screenshot({ path: join(out, `nachher-${n}-titel.png`) })
+    await p.locator('[data-ausz-medaillen="en"] [data-medaille-zelle="spiele-1"]').click()
+    await p.waitForTimeout(600)
+    await p.screenshot({ path: join(out, `nachher-${n}-blatt.png`) })
+    await blattZu(p)
+  }
+  await p.setViewportSize({ width: 1000, height: 900 })
   await p.locator('[data-ausz-sprache="fr"]').click()
+  await auf(p, 'medaillen-fr')
   pruefe(await da(p.locator('[data-ausz-reihe="fr"] [data-medaille="spiele"][data-stufe="0"]')), 'Französisch: eigene Reihe ohne Medaille')
   await p.locator('[data-tab-achievements]').click()
   pruefe(await da(p.locator('[data-achievements]')), 'Fenster mit Achievements')
+  pruefe(
+    (await da(p.locator('[data-achievements] [data-achievements-gruppe][data-offen="false"]').first())) &&
+      (await p.locator('[data-achievements] [data-klappkarte][data-offen="true"]').count()) === 0,
+    'Achievements: Gruppen eingeklappt'
+  )
+  const zPlatz = await p.locator('[data-achievements-platz] [data-klappstatus]').innerText().catch(() => '')
+  pruefe(zPlatz.startsWith('Platz 1 von 5'), `Zusammenfassung Platz: „${zPlatz}"`)
+  const zGr = await p.locator('[data-achievements-gruppe] [data-klappstatus]').first().innerText().catch(() => '')
+  pruefe(/\d+ von \d+ geschafft/.test(zGr), `Zusammenfassung Gruppe: „${zGr}"`)
+  await p.screenshot({ path: join(out, '1-achievements-zu.png') })
+  for (let i = 0; i < 20; i++) {
+    const k = p.locator('[data-achievements] [data-klappkarte][data-offen="false"] [data-klappkopf]')
+    if (!(await k.count())) break
+    await k.first().click()
+    await p.waitForTimeout(100)
+  }
   pruefe(await da(p.locator('[data-achievements-platz="1/5"]')), 'Platz in der Klasse sichtbar')
   pruefe((await p.locator('[data-achievements-platz]').innerText()).includes('nach Übungstagen der letzten 4 Wochen'), 'Maßstab wird genannt')
   pruefe(await da(p.locator('[data-achievement="diktat-10"][data-erreicht="false"] [data-achievement-fortschritt="3/10"]')), 'Fortschrittsbalken 3/10')
   pruefe((await p.locator('[data-achievement="comeback"]').count()) === 0 && (await da(p.locator('[data-achievements-verborgen="3"]'))), 'Geheime nur als Zahl')
   pruefe((await p.locator('[data-achievement-anteil]').count()) === 0, 'Kein Schulanteil unter 10 Lernenden')
   await p.screenshot({ path: join(out, '1-achievements.png'), fullPage: true })
+  // Rekorde: ebenfalls eingeklappt
+  await p.locator('[data-tab-rekorde]').click()
+  pruefe(await da(p.locator('[data-rekorde-spiele][data-offen="false"] [data-klappstatus]')), 'Rekorde: Abschnitt eingeklappt mit Zusammenfassung')
   await p.keyboard.press('Escape')
 
   // Begrüßung mit Titel und Profilbild
@@ -224,9 +331,47 @@ try {
   const zahl = vp.locator('[data-achievements-zahl]')
   pruefe((await da(zahl)) && !(await zahl.getAttribute('data-achievements-zahl')).endsWith('/0'), `Vorschau-Fenster: ${await zahl.innerText().catch(() => '–')}`)
   await vp.screenshot({ path: join(out, '2-vorschau-achievements.png'), fullPage: true })
+
+  // ---------- Schuljahreswechsel (Testuhr): neue Reihe, alte unter „Frühere Jahre", Haupttitel bleibt
+  const sj = mEn?.schuljahr
+  const uhr = await (await verwaltung.request.post(`${A}/server/schulkalender/testuhr`, { headers: KOPF, data: { heute: `${sj + 1}-10-01` } })).json()
+  uhrVerstellt = true
+  gewechselt = uhr.ergebnis?.art === 'gewechselt'
+  const n = await (await mia.request.get(`${A}/s/api/auszeichnungen`, { headers: KOPF })).json()
+  const nEn = n.sprachen?.find((x) => x.sprache === 'en')
+  pruefe(nEn?.schuljahr === sj + 1 && nEn?.medaillen.every((x) => x.stufe === 0), `Neues Schuljahr ${nEn?.schuljahrText}: neue Reihe ohne Medaille`)
+  const alt = nEn?.frueher?.[0]
+  pruefe(
+    alt?.schuljahr === sj && alt?.label === jahrEn && alt?.medaillen.some((x) => x.kategorie === 'spiele' && x.stufe === 1) && alt?.jahrestitel === 'Traveller of Year 7',
+    `Frühere Jahre: ${alt?.label} mit Bronze „Spiele" und „${alt?.jahrestitel}"`
+  )
+  pruefe(nEn?.titel?.stufe === 1 && nEn?.punkte === 1, `Haupttitel bleibt (Stufe ${nEn?.titel?.stufe}, ${nEn?.punkte} Punkt)`)
+  const lkNeu = (await (await lk.request.get(`${A}/server/klassen/${g.id}`, { headers: KOPF })).json()).lernende?.find((l) => l.benutzer === kinder[0].benutzer)?.auszeichnung
+  pruefe(
+    lkNeu?.schuljahr === nEn?.schuljahrText && lkNeu?.medaillen.every((x) => x.stufe === 0) && lkNeu?.titel === 'Traveller' && lkNeu?.punkte === 1,
+    `Lehrkraft: Medaillen des laufenden Schuljahres ${lkNeu?.schuljahr}, Titel über alle Jahre`
+  )
+  const pj = await mia.newPage()
+  pj.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 300)))
+  await pj.goto(`${A}/s/`)
+  await pj.locator('[data-rekorde-knopf]').first().click()
+  pruefe(await da(pj.locator(`[data-ausz-reihe="en"] [data-ausz-jahr="${nEn?.jahr}"]`)), `Zusammenfassung der neuen Reihe „${nEn?.jahr}"`)
+  await auf(pj, 'medaillen-en')
+  pruefe(await da(pj.locator('[data-ausz-medaillen="en"] [data-raster-jetzt] [data-medaille="spiele"][data-stufe="0"]')), 'Neue Reihe: Raster ohne Medaille')
+  await pj.locator(`[data-fruehere-jahre="en"] [data-ausz-jahr-wahl="${sj}"]`).click()
+  pruefe(await da(pj.locator(`[data-frueheres-jahr="${sj}"] [data-medaille="spiele"][data-stufe="1"]`)), 'Jahreswahl: Raster des Vorjahres mit Bronze „Spiele"')
+  await auf(pj, 'jahrestitel-en')
+  pruefe(
+    await da(pj.locator(`[data-jahrestitel="en"] [data-frueheres-jahrestitel-jahr="${sj}"][data-frueherer-jahrestitel="Traveller of Year 7"]`)),
+    'Jahrestitel-Streifen: „Traveller of Year 7" des Vorjahres'
+  )
+  await pj.screenshot({ path: join(out, '4-fruehere-jahre.png'), fullPage: true })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${String(e?.message ?? e).split('\n').slice(0, 4).join(' | ')}`)
 } finally {
+  // Testuhr zurück; den dabei ausgelösten Klassenwechsel der Testlehrkraft zurücknehmen
+  if (uhrVerstellt) await verwaltung.request.post(`${A}/server/schulkalender/testuhr`, { headers: KOPF, data: { heute: null } }).catch(() => undefined)
+  if (gewechselt && lk) await lk.request.post(`${A}/server/schuljahr/rueckgaengig`, { headers: KOPF, data: {} }).catch(() => undefined)
   for (const id of trainings) if (lk) await lk.request.post(`${A}/server/vokabeln/${id}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Trainings und Konten gelöscht (${zuLoeschen.length})`)

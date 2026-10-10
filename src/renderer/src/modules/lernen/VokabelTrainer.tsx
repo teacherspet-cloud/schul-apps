@@ -86,7 +86,7 @@ import {
   STUFEN,
   satzMitLuecke,
   SCHRITT,
-  sitzungsWoerter,
+  tagesRunde,
   weitereNeue,
   freiwilligeWoerter,
   uebersicht,
@@ -352,7 +352,25 @@ function StationFenster({
   )
 }
 
-export default function VokabelTrainer({ id, eingebettet = false }: { id: string; eingebettet?: boolean }): React.JSX.Element {
+export default function VokabelTrainer({
+  id,
+  eingebettet = false,
+  uebung: startUebung,
+  ohneKopf = false,
+  nachRunde
+}: {
+  id: string
+  eingebettet?: boolean
+  /** Übung, die gleich startet (10.10.2026: „Heute üben" im Fachordner) – sonst `?uebung=` aus der Adresse */
+  uebung?: string | null
+  /**
+   * Sprachrunde im Fachordner (10.10.2026): Kopf und Startknopf zeigt die Karte des aktuellen Bandes darüber (EIN Knopf
+   * „Heute üben") – hier nur Karteikasten, Zahlen und Spiele.
+   */
+  ohneKopf?: boolean
+  /** Nach jeder Runde (die Karte darüber zählt neu) */
+  nachRunde?: () => void
+}): React.JSX.Element {
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
@@ -384,7 +402,7 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
     if (!d || linkGenutzt.current) return
     linkGenutzt.current = true
     const q = new URLSearchParams(window.location.search)
-    const art = q.get('uebung')
+    const art = startUebung ?? q.get('uebung')
     if (!art) return
     q.delete('uebung')
     const rest = q.toString()
@@ -414,7 +432,7 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
           freiwillig={freiwillig}
           abfragen={abfragen}
           // Im Fachordner (09.10.2026, regal/blaettern.tsx): zurückblättern statt nur ausblenden
-          fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), blatt ? blatt.zurueck(() => setSitzung(null)) : setSitzung(null))}
+          fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), nachRunde?.(), blatt ? blatt.zurueck(() => setSitzung(null)) : setSitzung(null))}
         />
       ) : (
         <Kasten
@@ -431,6 +449,7 @@ export default function VokabelTrainer({ id, eingebettet = false }: { id: string
           vorher={vorher}
           oeffneStation={d.weg ? setStation : undefined}
           eingebettet={eingebettet}
+          ohneKopf={ohneKopf}
         />
       )}
       {/* Abschnitt des Vokabelwegs angetippt (08.10.2026): seine Wörter im Fenster, danach zurück zum Pfad */}
@@ -475,7 +494,8 @@ function Kasten({
   aktualisieren,
   vorher,
   oeffneStation,
-  eingebettet = false
+  eingebettet = false,
+  ohneKopf = false
 }: {
   d: Liste
   /** Im Fachordner (Register Vocabulary) gezeigt: ohne eigenen Rückweg (08.10.2026) */
@@ -486,12 +506,14 @@ function Kasten({
   vorher?: Record<string, WortStand> | null
   /** Vokabelweg: freien Abschnitt im Fenster üben (08.10.2026) */
   oeffneStation?: (s: Stufe) => void
+  ohneKopf?: boolean
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const u = uebersicht(d.woerter, d.staende)
   // Tagesration nach dem Tagesziel der Lehrkraft (08.10.2026), geübt in Zehnerschritten
   const ziel = d.tagesziel ?? 10
-  const heute = sitzungsWoerter(d.woerter, d.staende, Date.now(), ziel, ziel + 25)
+  const runde = tagesRunde(d.woerter, d.staende, Date.now(), ziel)
+  const heute = runde.woerter
   const schritt = heute.slice(0, SCHRITT)
   const weitere = heute.length ? [] : weitereNeue(d.woerter, d.staende)
   const freiwilligListe = heute.length ? [] : freiwilligeWoerter(d.woerter, d.staende)
@@ -571,6 +593,7 @@ function Kasten({
       )}
       {!spielt && (
         <>
+          {!ohneKopf && (
           <div className="vt-kopf">
             <div className="vt-kopf-zeile">
               <div style={{ minWidth: 0 }}>
@@ -602,6 +625,7 @@ function Kasten({
               </div>
             </div>
           </div>
+          )}
           {d.weg && <VokabelLeiter weg={d.weg} oeffne={oeffneStation} />}
           <div>
             <Text size="sm" fw={700} mb={6} c="var(--vt-a-dunkel)">
@@ -679,14 +703,20 @@ function Kasten({
           </div>
         </>
       )}
-      {heute.length > 0 && !spielt && (
+ {heute.length > 0 && !spielt && !ohneKopf && (
         <Button size="xl" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={22} />} onClick={() => starten(schritt)} data-vokabel-start>
           Jetzt üben · {schritt.length} {schritt.length === 1 ? 'Wort' : 'Wörter'}
         </Button>
       )}
-      {heute.length > schritt.length && !spielt && (
+      {heute.length > schritt.length && !spielt && !ohneKopf && (
         <Text size="sm" c="dimmed" ta="center" data-vokabel-rest>
           Heute noch {heute.length} Wörter bis zu den Spielen – Schritt für Schritt je {SCHRITT}.
+        </Text>
+      )}
+      {/* Weitere fällige Wiederholungen (10.10.2026): nur ruhig erwähnt – sie kommen sonst morgen zuerst */}
+      {runde.extra > 0 && heute.length > 0 && !spielt && !ohneKopf && (
+        <Text size="xs" c="dimmed" ta="center" data-vokabel-extra={runde.extra}>
+          Danach kannst du freiwillig noch {runde.extra} weitere fällige {runde.extra === 1 ? 'Wiederholung' : 'Wiederholungen'} üben.
         </Text>
       )}
       {/* Spiele nach der Tagesrunde – oder schon vorher, wenn die Lehrkraft sie für heute freigeschaltet hat (08.10.2026) */}
@@ -739,11 +769,6 @@ function Kasten({
           Sprache › Sprache hinzufügen (mit Sprachausgabe). Am iPad: Einstellungen › Bedienungshilfen › Gesprochene Inhalte › Stimmen.
         </Alert>
       )}
-      <Text size="xs" c="dimmed">
-        So funktioniert der Kasten: Richtig gewusst steigt ein Wort eine Stufe auf (Neu → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im
-        Langzeitgedächtnis) und kommt später wieder; falsch geht es zwei Stufen zurück. Tippe ein Fach an, um zu sehen, wie ein Wort hineinkommt. „Sicher“ ist
-        ein Wort, wenn du es zweimal im Abstand von einer Woche richtig geschrieben hast.
-      </Text>
     </Stack>
   )
 }
@@ -926,9 +951,17 @@ function Sitzung({
         <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
           Beenden
         </Button>
-        <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
-          {STUFEN[Math.min(6, st!.fach)].name}
-        </Badge>
+        <Group gap={6} wrap="nowrap">
+          {/* Wort aus einem früheren Band (10.10.2026, Sprachrunde) */}
+          {v.herkunft && (
+            <Badge variant="outline" color="gray" size="sm" radius="sm" tt="none" data-herkunft={v.herkunft}>
+              {v.herkunft}
+            </Badge>
+          )}
+          <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
+            {STUFEN[Math.min(6, st!.fach)].name}
+          </Badge>
+        </Group>
       </Group>
       <Progress value={fortschritt} radius="xl" size="lg" color={farbe.a} />
       {schnell.hinweis}

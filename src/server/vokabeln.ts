@@ -15,6 +15,7 @@
  *             GET /s/api/vokabeln/zugang?code= · POST /s/api/vokabeln/gast {code, name} → persönlicher
  *             Wiedereinstiegs-Code · POST /s/api/vokabeln/wieder {code, name, wieder}
  */
+import { problemLernende, wortSicherAnteile } from '../shared/kursWoerter'
 import { istRekord, nachSpielfehler, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
@@ -43,6 +44,7 @@ import { istVerbSprache, type VerbSprache } from '../shared/verben'
 import { verbenFrei } from '../shared/verbFreigabe'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
+import { schuljahrVon } from '../shared/schulkalender'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, type AbschnittEinordnung, type AbschnittStatistik } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
@@ -339,6 +341,8 @@ export const kursHaken: {
   bekannt?: (n: NutzerInfo) => string[]
   /** Wie viele dieser Lernenden Erinnerungen eingeschaltet haben (erinnerungen.ts, 10.10.2026) – nur die Zahl */
   erinnerungenAktiv?: (nutzerIds: string[]) => number
+  /** Nach einer Freigabe (10.10.2026, wortliste.ts): doppelte Vokabeln zählen, nur die Zahl ins Protokoll */
+  nachFreigabe?: (kursId: string) => void
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -478,10 +482,18 @@ function verknuepfenOhneFolgen(z: Zeile, g: Lerngruppe, lernende: NutzerInfo[]):
   return gleicheMengen(vorher, nachher)
 }
 
-/** Wörter bereinigen (Bilder höchstens 200 KB, höchstens 400 Wörter) */
+/**
+ * Höchstzahl Vokabeln je Kurs. Bis 10.10.2026 schnitt eine Freigabe still nach 400 Wörtern ab (Befund: eine ganze Unit
+ * bzw. mehrere Units auf einmal haben mehr – dann passten auch die Abschnittsgrenzen nicht mehr, alles landete in einem
+ * Abschnitt). Jetzt gilt dieselbe Grenze wie für den ganzen Kurs, und darüber gibt es eine klare Meldung statt Abschneiden.
+ */
+export const MAX_WOERTER = 1500
+const zuViele = (n: number): string => `Das sind ${n} Vokabeln – höchstens ${MAX_WOERTER} passen in einen Kurs. Bitte in kleineren Schritten freigeben.`
+
+/** Wörter bereinigen (Bilder höchstens 200 KB, höchstens MAX_WOERTER Wörter) */
 function bereinigeWoerter(roh: unknown): Vokabel[] {
   return (Array.isArray(roh) ? roh : [])
-    .slice(0, 400)
+    .slice(0, MAX_WOERTER)
     .map((x, i) => {
       const y = (x ?? {}) as Record<string, unknown>
       const t = (k: string, n = 400): string => String(y[k] ?? '').slice(0, n)
@@ -770,10 +782,39 @@ export function vokabelStand(zid: string, sid: string): { eingereicht: number; r
   return { eingereicht: Object.keys(st.woerter).length ? 1 : 0, runden: 99, prozent }
 }
 
+/**
+ * Übersicht eines Kurses für Lernende (10.10.2026, Entscheidung der Lehrkraft): Abschnitte FRÜHERER Schuljahre bringen
+ * keine Pflicht-Neuwörter und keine Zahl „heute offen" mehr – sie speisen nur die Wiederholung der Sprachrunde
+ * (server/sprachstand.ts). Ein Kurs nur aus früheren Schuljahren heißt `alt` (keine roten Zahlen).
+ */
+/** Wörter aus Abschnitten DIESES Schuljahres (10.10.2026) – nur sie bringen eine Tagesrunde */
+export function woerterDiesesJahres(z: Pick<Zeile, 'teile' | 'titel' | 'woerter' | 'erstellt'>, jetzt = Date.now()): Vokabel[] {
+  const woerter = json_(z.woerter, [] as Vokabel[])
+  const jahr = schuljahrVon(jetzt)
+  const aktuell: Vokabel[] = []
+  let pos = 0
+  const teile = teileVon(z)
+  teile.forEach((t, i) => {
+    const stueck = i === teile.length - 1 ? woerter.slice(pos) : woerter.slice(pos, pos + Math.max(0, t.anzahl))
+    pos += stueck.length
+    if (schuljahrVon(t.zeit || Date.parse(z.erstellt) || jetzt) >= jahr) aktuell.push(...stueck)
+  })
+  return aktuell
+}
+
+function kursUebersicht(z: Zeile, staende: Record<string, WortStand>, jetzt = Date.now()): { uebersicht: ReturnType<typeof uebersicht>; alt: boolean } {
+  const woerter = json_(z.woerter, [] as Vokabel[])
+  const aktuell = woerterDiesesJahres(z, jetzt)
+  const ganz = uebersicht(woerter, staende, jetzt, tageszielVon(z))
+  if (aktuell.length === woerter.length) return { uebersicht: ganz, alt: false }
+  const jetztTeil = uebersicht(aktuell, staende, jetzt, tageszielVon(z))
+  return { uebersicht: { ...ganz, faellig: jetztTeil.faellig, heuteOffen: jetztTeil.heuteOffen }, alt: aktuell.length === 0 }
+}
+
 /** Kurzfassung für die Lernenden (auch für die Lern-App) */
 export function vokabelListenFuer(
   ich: NutzerInfo
-): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht> }[] {
+): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht>; alt: boolean }[] {
   return (
     (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
       // Geplante Abschnitte (09.10.2026) gibt es für Lernende noch nicht – ein ganz geplanter Kurs erscheint nicht
@@ -791,7 +832,7 @@ export function vokabelListenFuer(
         testTermin: z.test_termin,
         // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026: die neuesten Materialien)
         erstellt: z.erstellt,
-        uebersicht: uebersicht(json_(z.woerter, [] as Vokabel[]), standVon(z.id, ich.id).woerter, Date.now(), tageszielVon(z))
+        ...kursUebersicht(z, standVon(z.id, ich.id).woerter)
       }))
   )
 }
@@ -1119,6 +1160,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       if (!g && !einzelne.length && !mitGaesten)
         return json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder den Zugang per QR-Code wählen.' }), true
       const bis = typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null
+      if (Array.isArray(k0.woerter) && k0.woerter.length > MAX_WOERTER) return json(res, 400, { fehler: zuViele(k0.woerter.length) }), true
       try {
         const id = vokabelnZuweisen({
           lehrkraftId: ich.id,
@@ -1141,6 +1183,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // „Planen …" / „nacheinander freischalten" (09.10.2026): Zeitpunkte je Abschnitt
         const geplant = vokAbschnittePlanen(ziel, 0, k0)
         protokolliereServer('vokabeln', geplant ? 'Vokabeln geplant freigegeben' : 'Vokabeln zum Lernen freigegeben', ich.id)
+        kursHaken.nachFreigabe?.(ziel)
         return json(res, 200, { id: ziel, geplant }), true
       } catch (e) {
         return json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true
@@ -1240,7 +1283,13 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             Object.fromEntries(lernende.flatMap((l) => Object.entries(l.stand).map(([wid, s]) => [`${l.id}:${wid}`, s]))),
             jetzt
           ),
-          problem
+          problem,
+          // Kasten „Abschnitte & Wörter" (10.10.2026): Stand der Klasse je Wort, wer mit den Problemwörtern kämpft
+          wortSicher: wortSicherAnteile(woerter, lernende.map((l) => l.stand)),
+          problemWer: problemLernende(
+            problem.map((p) => p.id),
+            lernende
+          )
         }),
         true
       )
@@ -1412,7 +1461,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const neu: Vokabel[] = []
         const neuTeil: (string | undefined)[] = []
         // Mehrere Abschnitte/Units auf einmal (08.10.2026): je Abschnitt ein Teil, gezählt nach dem Überspringen von Doppeltem
-        const rohe = (Array.isArray(k0.woerter) ? (k0.woerter as unknown[]) : []).slice(0, 400)
+        if (Array.isArray(k0.woerter) && k0.woerter.length > MAX_WOERTER) return json(res, 400, { fehler: zuViele(k0.woerter.length) }), true
+        const rohe = Array.isArray(k0.woerter) ? (k0.woerter as unknown[]) : []
         const teilGrenzen = (Array.isArray(k0.teile) ? (k0.teile as unknown[]) : []).slice(0, 60).map((t) => {
           const x = (t ?? {}) as Record<string, unknown>
           return { titel: String(x.titel ?? '').slice(0, 160), anzahl: Math.max(0, Math.round(Number(x.anzahl) || 0)) }
@@ -1441,7 +1491,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           entferntVorher
         )
         neu.splice(0, neu.length, ...wieder.woerter)
-        if (alt.length + neu.length > 1500) return json(res, 400, { fehler: 'Höchstens 1500 Vokabeln je Training.' }), true
+        if (alt.length + neu.length > MAX_WOERTER) return json(res, 400, { fehler: `Höchstens ${MAX_WOERTER} Vokabeln je Kurs – mit diesen wären es ${alt.length + neu.length}.` }), true
         const verbenAlt = json_(z.verben, null as { sprache: string; karten: { id: string }[] } | null)
         const verbenNeu = verbenBereinigt(k0.verben) ? (JSON.parse(verbenBereinigt(k0.verben)) as { sprache: string; karten: { id: string }[] }) : null
         const verben =
@@ -1481,6 +1531,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           )
         // „Planen …" / „nacheinander freischalten" (09.10.2026): die neuen Abschnitte ab ihrer Stelle
         const geplant = neu.length ? vokAbschnittePlanen(z.id, alt.length ? teileVon(z).length : 0, k0) : false
+        kursHaken.nachFreigabe?.(z.id)
         return json(res, 200, { ok: true, neu: neu.length, wieder: wieder.wieder, geplant }), true
       }
       /*
@@ -1513,6 +1564,26 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (endgueltig) lernstandLoeschen(z.id, weg.map((v) => v.id))
         protokolliereServer('vokabeln', `Abschnitt ${endgueltig ? 'endgültig gelöscht' : 'entfernt'} (${weg.length} Wörter)`, ich.id)
         return json(res, 200, { ok: true, woerter: weg.length }), true
+      }
+      // Ein Wort bearbeiten (10.10.2026, Kasten „Abschnitte & Wörter"): Begriff, Übersetzung, „auch richtig", Aussprache.
+      // Die Kennung bleibt – der Lernstand gilt weiter.
+      if (teile[1] === 'wort') {
+        const woerter = json_(z.woerter, [] as Vokabel[])
+        const i = woerter.findIndex((v) => v.id === String(k0.wortId ?? ''))
+        if (i < 0) return json(res, 404, { fehler: 'Dieses Wort gibt es im Kurs nicht (mehr).' }), true
+        const text = (x: unknown, n: number): string => String(x ?? '').trim().slice(0, n)
+        const term = typeof k0.term === 'string' ? text(k0.term, 400) : woerter[i].term
+        const translation = typeof k0.translation === 'string' ? text(k0.translation, 400) : woerter[i].translation
+        if (!term || !translation) return json(res, 400, { fehler: 'Wort und Übersetzung dürfen nicht leer sein.' }), true
+        const { aussprache: _a, auchRichtig: _r, ...rest } = woerter[i]
+        const aussprache = typeof k0.aussprache === 'string' ? text(k0.aussprache, 200) : woerter[i].aussprache ?? ''
+        const auch = Array.isArray(k0.auchRichtig)
+          ? k0.auchRichtig.map((a) => text(a, 200)).filter(Boolean).slice(0, 10)
+          : woerter[i].auchRichtig ?? []
+        woerter[i] = { ...rest, term, translation, ...(aussprache ? { aussprache } : {}), ...(auch.length ? { auchRichtig: auch } : {}) }
+        db().prepare('UPDATE vok_zuweisungen SET woerter = ? WHERE id = ?').run(JSON.stringify(woerter), z.id)
+        protokolliereServer('vokabeln', 'Wort im Kurs bearbeitet', ich.id)
+        return json(res, 200, { ok: true, wort: woerter[i] }), true
       }
       if (teile[1] === 'zeitraum') {
         db()

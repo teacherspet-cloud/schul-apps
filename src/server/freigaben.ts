@@ -67,7 +67,10 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:bild-loeschen',
   'medien:ohne-bild',
   'medien:ton-setzen',
-  'medien:ton-loeschen'
+  'medien:ton-loeschen',
+  // Erzeugungssperre der Aussprache (10.10.2026)
+  'medien:ton-reservieren',
+  'medien:ton-freigeben'
 ])
 
 /** Einstellungen, die eine Lehrkraft auf dem Server nicht setzen darf */

@@ -10,7 +10,19 @@
  *
  * Electron-Fassung der Umgebung: main/umgebung.ts. iPad-Fassung: mobil/umgebung.ts.
  */
-import { bildLoeschen, bildSetzen, medienDatei, medienFuer, ohneBildMerken, stimmeSetzen, stimmenLesen, tonLoeschen, tonSetzen } from './services/storage/medienbank'
+import {
+  bildLoeschen,
+  bildSetzen,
+  medienDatei,
+  medienFuer,
+  ohneBildMerken,
+  stimmeSetzen,
+  stimmenLesen,
+  tonFreigeben,
+  tonLoeschen,
+  tonReservieren,
+  tonSetzen
+} from './services/storage/medienbank'
 import { istStufe, type Bildstufe, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
@@ -569,6 +581,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
       nurAdmin('Die Aussprache'), tonLoeschen(sprache, wort, art, satz, lage === 'm' ? 'm' : 'w')
     )
   )
+  // Erzeugungssperre (10.10.2026): dieselbe Aufnahme nie zweimal zugleich erzeugen – am Server für alle Lehrkräfte
+  handle('medien:ton-reservieren', (kennung: string) => (nurAdmin('Die Aussprache'), tonReservieren(String(kennung))))
+  handle('medien:ton-freigeben', (kennung: string) => (nurAdmin('Die Aussprache'), tonFreigeben(String(kennung))))
   handle('medien:admin', () => istAdmin())
 
   handle('audio:voices', () => listVoices())

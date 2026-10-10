@@ -172,7 +172,7 @@ describe('Abfrage ohne Hinschauen und Links aus den Tipps', () => {
       vokabeln: [{ id: 'v1', titel: 'Unit 1', faellig: 4, wackelig: 0, testInTagen: null, href: '/s/v/v1' }]
     }
     const t = regelTipp(d)
-    expect(t.knopf?.text).toBe('Abfrage ohne Hinschauen starten')
+    expect(t.knopf?.text).toBe('Aus dem Kopf abfragen')
     expect(t.knopf?.href).toBe('/s/v/v1?uebung=abfragen')
   })
   it('linkRunde: bekannte zuerst beim Abfragen, wackelige freiwillig, Unbekanntes → nichts', () => {

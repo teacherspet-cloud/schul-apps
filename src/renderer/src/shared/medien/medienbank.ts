@@ -18,7 +18,20 @@
  * in der Fassung der Zielkultur, wo sie dort typisch anders aussehen.
  */
 import type { OnlineImageHit, OnlineImageSource, StructuredRequest } from '@shared/types'
-import { stufeVon, type Bildstufe, type MedienKandidat, type Stimmlage, type TonArt } from '@shared/medienbank'
+import {
+  einmalErzeugen,
+  saetzeVon,
+  satzSchluessel,
+  stufeVon,
+  tonKennung,
+  tonPasst,
+  tonVon,
+  type Bildstufe,
+  type MedienKandidat,
+  type MedienSicht,
+  type Stimmlage,
+  type TonArt
+} from '@shared/medienbank'
 import { istBegrenzung } from './medienWarten'
 
 export interface Vokabel {
@@ -301,13 +314,34 @@ export async function tonErzeugen(
   text: string,
   stimme: string,
   lage: Stimmlage = 'w',
-  gesprochen?: string
-): Promise<void> {
-  const id = `vok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  gesprochen?: string,
+  /** Ausdrücklich „neu erzeugen": auch eine passende Aufnahme ersetzen */
+  trotzdem = false
+): Promise<'erzeugt' | 'vorhanden'> {
   const sprech = gesprochen?.trim() || text
-  const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache })
-  if (!r?.dataUrl) throw new Error('Die Sprach-KI hat keine Aufnahme geliefert.')
-  await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text, ...(sprech !== text ? { gesprochen: sprech } : {}) }, lage)
+  /*
+   * Nie doppelt (10.10.2026, Wunsch der Lehrkraft): Liegt für dieselbe Vokabel – aus welchem Lehrwerk, Kurs oder Test
+   * auch immer – schon eine passende Aufnahme in der Medienbank, wird sie genommen. Erzeugt gerade jemand anderes
+   * dieselbe (zweiter Auftrag, andere Lehrkraft), wartet dieser Aufruf darauf (Sperre im Hauptprozess bzw. am Server).
+   */
+  const kennung = tonKennung(sprache, wort, art, lage, text)
+  const passt = async (): Promise<boolean> => {
+    const sicht = (await window.api.medien.eintraege(sprache, [wort]).catch(() => ({}) as Record<string, MedienSicht>))[wort]
+    const ton = art === 'wort' ? tonVon(sicht, lage) : saetzeVon(sicht, lage)?.[satzSchluessel(text)]
+    return tonPasst(ton, text, sprech, art)
+  }
+  return einmalErzeugen({
+    reservieren: () => window.api.medien.tonReservieren(kennung),
+    freigeben: () => window.api.medien.tonFreigeben(kennung),
+    passt,
+    trotzdem,
+    erzeugen: async () => {
+      const id = `vok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+      const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache })
+      if (!r?.dataUrl) throw new Error('Die Sprach-KI hat keine Aufnahme geliefert.')
+      await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text, ...(sprech !== text ? { gesprochen: sprech } : {}) }, lage)
+    }
+  })
 }
 
 let laeuft: HTMLAudioElement | null = null
