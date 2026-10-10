@@ -111,6 +111,9 @@ import { holen, senden } from './serverApi'
 import { Begruessung, Lernstand, MeinLernraum, TippKarte, type NeuesMaterial } from './SchuelerStart'
 import { TitelFormDialog, type TitelKurz } from './MedaillenTitel'
 import type { LernstandAntwort } from '@shared/lernstand'
+import { ankuendigungFaellig, ankuendigungText, testStatusText } from '@shared/onlinetestTermin'
+import { tagVon } from '@shared/schulkalender'
+import { fachAusName } from '@shared/faecher'
 
 interface Beitritt {
   id: string
@@ -493,7 +496,9 @@ function VokabelwegUmleitung({ wegKey }: { wegKey: string }): React.JSX.Element 
 
 function Startseite(): React.JSX.Element {
   const ich = window.__schulappsServer
-  const [tests, setTests] = useState<{ code: string; titel: string; abgegeben: boolean; wartend: boolean; fach?: string; erstellt?: string }[] | null>(null)
+  const [tests, setTests] = useState<
+    { code: string; titel: string; abgegeben: boolean; wartend: boolean; fach?: string; erstellt?: string; termin?: string; art?: string; thema?: string }[] | null
+  >(null)
   const [ergebnisse, setErgebnisse] = useState<FruehereErgebnis[] | null>(null)
   const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
@@ -562,6 +567,14 @@ function Startseite(): React.JSX.Element {
   const { sprachen } = useSprachstand(undefined, konto)
   const sprachRunde = (sprachen ?? []).find((x) => !x.nurKurse && x.heute.anzahl > 0)
   const offeneTests = tests?.filter((t) => !t.abgegeben) ?? []
+  /*
+   * Angekündigte Tests (Termin, 10.10.2026): noch nicht gestartet und für einen späteren Tag angekündigt – sie stehen
+   * nicht als „startet gleich" vorne, sondern ab 7 Tagen vorher als Übungsanstoß unter „Als Nächstes".
+   */
+  const heuteTag = tagVon(Date.now())
+  const istAngekuendigt = (t: { wartend: boolean; termin?: string }): boolean => Boolean(t.wartend && t.termin && t.termin > heuteTag)
+  const jetztTests = offeneTests.filter((t) => !istAngekuendigt(t))
+  const angekuendigt = offeneTests.filter((t) => istAngekuendigt(t) && ankuendigungFaellig(t.termin!)).sort((a, b) => a.termin!.localeCompare(b.termin!))
   const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden) ?? []
   const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
   const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
@@ -590,13 +603,34 @@ function Startseite(): React.JSX.Element {
   }, [vok, gram, tests, blaetter, aufgaben])
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
   // Das Wichtigste zuerst: ein laufender Test, dann die Reihe, dann Blätter und Aufgaben
-  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = offeneTests[0]
+  // Wohin „Jetzt üben" bei einem angekündigten Test führt: Vokabeln → Runde der Sprache, Grammatik → Fachordner
+  const uebenZiel = (t: { fach?: string; art?: string }): { href: string; knopf: string } => {
+    const fach = t.fach ? (fachAusName(t.fach)?.label ?? t.fach) : ''
+    const gleich = (x?: string): boolean => Boolean(x && fach && (fachAusName(x)?.label ?? x) === fach)
+    if (t.art === 'Vokabeltest') {
+      const runde = (sprachen ?? []).find((x) => !x.nurKurse && gleich(x.fach))
+      if (runde) return { href: `/s/ordner/${encodeURIComponent(runde.fach)}?r=vok&uebung=runde`, knopf: 'Jetzt üben' }
+      const kurs = faelligeVok.find((v) => gleich(v.fach)) ?? vok?.find((v) => !v.alt && gleich(v.fach))
+      if (kurs) return { href: `/s/v/${kurs.id}`, knopf: 'Jetzt üben' }
+    }
+    if (fach && (t.art === 'Vokabeltest' || t.art === 'Grammatiktest')) return { href: `/s/ordner/${encodeURIComponent(fach)}`, knopf: 'Jetzt üben' }
+    return { href: '/s/tests', knopf: 'Ansehen' }
+  }
+  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = jetztTests[0]
     ? {
-        fach: offeneTests[0].fach,
-        titel: offeneTests[0].titel,
-        text: offeneTests[0].wartend ? 'Dein Test startet gleich.' : 'Ein Test ist für dich offen.',
-        href: `/s/t/${offeneTests[0].code}`,
+        fach: jetztTests[0].fach,
+        titel: jetztTests[0].titel,
+        text: jetztTests[0].wartend ? 'Dein Test startet gleich.' : 'Ein Test ist für dich offen.',
+        href: `/s/t/${jetztTests[0].code}`,
         knopf: 'Zum Test',
+        farbe: 'teal'
+      }
+    : angekuendigt[0]
+    ? {
+        fach: angekuendigt[0].fach,
+        titel: angekuendigt[0].titel,
+        text: ankuendigungText({ art: angekuendigt[0].art, termin: angekuendigt[0].termin!, thema: angekuendigt[0].thema }),
+        ...uebenZiel(angekuendigt[0]),
         farbe: 'teal'
       }
     : offeneReihen[0]
@@ -720,12 +754,14 @@ function Startseite(): React.JSX.Element {
           farbe="teal"
           titel="Onlinetest"
           daten="tests"
-          zahl={offeneTests.length}
+          zahl={jetztTests.length}
           text={
             tests === null
               ? '…'
+              : jetztTests.length
+              ? `${jetztTests.length} offene${jetztTests.length === 1 ? 'r' : ''} Test${jetztTests.length === 1 ? '' : 's'}`
               : offeneTests.length
-              ? `${offeneTests.length} offene${offeneTests.length === 1 ? 'r' : ''} Test${offeneTests.length === 1 ? '' : 's'}`
+              ? `${offeneTests.length} Test${offeneTests.length === 1 ? '' : 's'} angekündigt`
               : 'Code eingeben oder QR-Code scannen'
           }
         />
@@ -1303,7 +1339,7 @@ function GastAbmelden(): React.JSX.Element {
 }
 
 function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): React.JSX.Element {
-  const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
+  const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean; termin?: string }[] | null>(null)
   const [code, setCode] = useState('')
   const [scannen, setScannen] = useState(false)
   // Ohne Anmeldung (Beitritt mit Namen): nur Code eingeben oder scannen
@@ -1419,8 +1455,8 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
           <Group justify="space-between">
             <div>
               <Text fw={600}>{t.titel}</Text>
-              <Text size="sm" c="dimmed">
-                {t.zeitMin} Minuten{t.wartend ? ' · startet gleich' : ''}
+              <Text size="sm" c="dimmed" data-test-status={testStatusText(t) ? 'angekuendigt' : undefined}>
+                {testStatusText(t) ?? `${t.zeitMin} Minuten${t.wartend ? ' · startet gleich' : ''}`}
               </Text>
             </div>
             {t.abgegeben ? (

@@ -16,6 +16,7 @@
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
 import { SchuljahrHinweis } from './SchuljahrHinweis'
+import { LerngruppeAnlegenKnoepfe } from './LerngruppeAnlegen'
 import { useExperte } from '../../shared/settingsStore'
 import {
   ActionIcon,
@@ -379,6 +380,8 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
       <Container size="xl" py="lg" data-meine-klassen>
         <AppKopf
           beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
+          // Lerngruppen entstehen nur noch hier (10.10.2026, Entscheidung der Lehrkraft) – in der Übersicht
+          hauptknopf={!klasse ? <LerngruppeAnlegenKnoepfe geaendert={laden} /> : undefined}
           suche={
             <KlassenSuche
               klassen={klassen ?? []}
@@ -412,7 +415,7 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
           </Center>
         ) : klassen.length === 0 ? (
           <Alert icon={<IconUsers size={18} />} title="Noch keine Lerngruppen" data-klassen-leer>
-            Lerngruppen entstehen in der App „Onlinetest“ unter „Lerngruppen“ (aus IServ oder von Hand). Danach stehen sie hier mit ihrem Lernstand.
+            Lerngruppen entstehen hier über „Lerngruppe anlegen“ (von Hand) oder „Aus IServ übernehmen“. Danach stehen sie hier mit ihrem Lernstand.
           </Alert>
         ) : (
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} data-klassen-liste>

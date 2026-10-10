@@ -23,7 +23,20 @@ import { blaetterDerGruppe } from './arbeitsblaetter'
 import { createHash } from 'node:crypto'
 import { alleNutzer, datenbank, serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
-import { fachAbwaehlen, fachHinzufuegen, fehlerSchwerpunkte, gehoertZu, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
+import {
+  angekuendigteDerGruppe,
+  fachAbwaehlen,
+  fachHinzufuegen,
+  fehlerSchwerpunkte,
+  gehoertZu,
+  historie,
+  lerngruppe,
+  lerngruppenVon,
+  mitgliederVon,
+  testDetailsDerGruppe,
+  type Lerngruppe
+} from './onlinetest'
+import { onlinetestBaldBedarf } from '../shared/onlinetestTermin'
 import { reihenDerGruppe } from './reihen'
 import {
   db as vokDb,
@@ -480,6 +493,11 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
         schluessel: `test:${t.id}`,
         merkmal: { art: 'entscheiden', zahl: t.offen }
       })
+  // Angekündigte Onlinetests (Termin, 10.10.2026): „Test bald" in den 7 Tagen davor – nur, was die Lernenden auch sehen
+  for (const t of angekuendigteDerGruppe(g.id, jetzt)) {
+    const b = onlinetestBaldBedarf(t, jetzt)
+    if (b) bedarf.push({ art: 'termin', ...b, ziel: { modul: 'onlinetest', id: t.id } })
+  }
   // Sprachkurse der Klasse (09.10.2026): dieselben Hinweise wie auf der Kursseite (shared/kursHinweise.ts) – je Kurs
   bedarf.push(...kursBedarfDerGruppe(vok.hinweisDaten, offeneVok, lehrkraftId, jetzt))
   for (const r of reihen)

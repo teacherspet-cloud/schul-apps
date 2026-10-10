@@ -28,6 +28,8 @@ import { hauptschluessel } from './geheim'
 import { beimAbmelden, json, type Anfrage } from './http'
 import { db as vokDb, istOffen, json_, kursHaken, standVon as vokStandVon, tageszielVon, teileVon, vokIstFuer, woerterDiesesJahres, type Zeile as VokZeile } from './vokabeln'
 import { grammatikFuerErinnerung } from './grammatik'
+import { angekuendigteTests } from './onlinetest'
+import { terminMs } from '../shared/onlinetestTermin'
 import { achDatenLesen } from './achievementsDaten'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { fachAusName } from '../shared/faecher'
@@ -239,6 +241,15 @@ export function aktiveZahl(nutzerIds: string[]): number {
 
 // ---------------------------------------------------------------- Lage einer Person
 
+/** Angekündigte Onlinetests – ein Fehler dort darf keine Erinnerung verhindern */
+function sicherAngekuendigt(n: NutzerInfo, jetzt: number): ReturnType<typeof angekuendigteTests> {
+  try {
+    return angekuendigteTests(n, jetzt)
+  } catch {
+    return []
+  }
+}
+
 /** Offene Kurse dieser Person, in denen die Lehrkraft Erinnerungen anbietet */
 export function angeboteneKurse(n: NutzerInfo): VokZeile[] {
   if (n.rolle !== 'schueler' || n.quelle === 'vorschau') return []
@@ -286,6 +297,16 @@ export function lageVon(n: NutzerInfo, zustand: Pick<Zustand, 'neuSeit' | 'termi
     if (bis > jetzt && bis - jetzt <= 3 * TAG_MS && !zustand.termine.includes(`${z0.id}:e:${bis}`))
       termin ??= { ziel: woerter.length ? `/s/v/${z0.id}` : '/s/', schluessel: `${z0.id}:e:${bis}`, art: 'ende' }
   }
+  // Angekündigte Onlinetests der Lerngruppen (10.10.2026): „Test bald" wie beim Testtermin eines Kurses – je Test einmal
+  if (!termin && kurse.length)
+    for (const t of sicherAngekuendigt(n, jetzt)) {
+      const tt = terminMs(t.termin)
+      const schluessel = `ot:${t.id}:${t.termin}`
+      if (tt > jetzt - 8 * 60 * 60_000 && tt - jetzt <= 2 * TAG_MS && !zustand.termine.includes(schluessel)) {
+        termin = { ziel: '/s/tests', schluessel, art: 'test' }
+        break
+      }
+    }
   for (const g of grammatikFuerErinnerung(n, new Set(kurse.map((z) => z.id)), jetzt)) {
     for (const t of g.tage) tage.add(t)
     if (g.offen && !offenZiel) offenZiel = `/s/g/${g.id}`

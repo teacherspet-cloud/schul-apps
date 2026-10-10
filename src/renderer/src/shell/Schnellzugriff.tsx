@@ -142,7 +142,12 @@ export function Schnellzugriff(): React.JSX.Element {
       </Zeile>
     )),
     ...geplant.map((t) => (
-      <Zeile key={t.id} titel={t.titel} unter={`${t.lerngruppe || 'Gäste'} · noch nicht gestartet`} onClick={() => void openDocument('onlinetest', t.id)}>
+      <Zeile
+        key={t.id}
+        titel={t.titel}
+        unter={`${t.lerngruppe || 'Gäste'} · ${t.termin ? `Termin ${tagKurz(t.termin)}${t.terminVerborgen ? ' (für Lernende ausgeblendet)' : ''} · ` : ''}noch nicht gestartet`}
+        onClick={() => void openDocument('onlinetest', t.id)}
+      >
         <Badge variant="light">geplant</Badge>
       </Zeile>
     )),
@@ -206,7 +211,7 @@ export function Schnellzugriff(): React.JSX.Element {
   const kursZeilen = kurse.map((k) => <KursZeile key={k.id} k={k} />)
   const maxKurse = handy ? nTermine : 10
   const kursRest = maxKurse ? Math.max(0, kursZeilen.length - maxKurse) : 0
-  const bald = demnaechst(kurse, reihen ?? [], jetzt)
+  const bald = demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? (tests ?? []) : [])
   const geladen = (vokabeln ? start !== null : true) && reihen !== null
   const baldListe = (
     <Stack gap={4} data-start-demnaechst-liste>
@@ -401,13 +406,21 @@ function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
 function DemnaechstZeile({ e }: { e: DemnaechstEintrag }): React.JSX.Element {
   return (
     <UnstyledButton
-      onClick={() => (e.art === 'test' ? void openDocument('sprachenlernen', kursReiterDocId(e.ziel, 'vokabeln')) : oeffneReihe(e.ziel))}
+      onClick={() =>
+        e.art === 'test'
+          ? void openDocument('sprachenlernen', kursReiterDocId(e.ziel, 'vokabeln'))
+          : e.art === 'onlinetest'
+            ? void openDocument('onlinetest', e.ziel)
+            : oeffneReihe(e.ziel)
+      }
       style={{ display: 'block', width: '100%', textAlign: 'left' }}
       data-start-demnaechst={e.art}
     >
       <Group gap={8} wrap="nowrap">
         {e.art === 'test' ? (
           <IconCalendarEvent size={14} color="var(--mantine-color-orange-6)" style={{ flex: 'none' }} />
+        ) : e.art === 'onlinetest' ? (
+          <IconDeviceLaptop size={14} color="var(--mantine-color-teal-6)" style={{ flex: 'none' }} />
         ) : (
           <IconFlag size={14} color="var(--mantine-color-violet-6)" style={{ flex: 'none' }} />
         )}

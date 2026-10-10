@@ -154,7 +154,7 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           value={gruppe}
           onChange={setGruppe}
           clearable
-          placeholder={gruppen.length ? 'wählen …' : 'in der App „Onlinetest“ anlegen'}
+          placeholder={gruppen.length ? 'wählen …' : 'in „Meine Klassen“ anlegen'}
           w={220}
         />
         <NurExperte>

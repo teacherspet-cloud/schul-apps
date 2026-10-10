@@ -38,6 +38,8 @@ export interface TestEintrag {
   abgegeben: boolean
   wartend: boolean
   fach?: string
+  /** Angekündigt (Termin, 10.10.2026): Tag „JJJJ-MM-TT" – nur wenn für Lernende sichtbar */
+  termin?: string
 }
 export interface AufgabeEintrag {
   id: string

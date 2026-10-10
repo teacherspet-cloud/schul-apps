@@ -234,6 +234,9 @@ try {
   await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
   await p.locator('[data-klassen-liste]').waitFor({ timeout: 10000 })
+  // Lerngruppen entstehen nur noch in „Meine Klassen" (10.10.2026): „Lerngruppe anlegen" und „Aus IServ übernehmen" in der Übersicht
+  pruefe(await da(p.locator('[data-lerngruppe-anlegen]')), '„Lerngruppe anlegen" in der Übersicht von „Meine Klassen"')
+  pruefe(await da(p.locator('[data-lerngruppe-anlegen-knoepfe] [data-iserv-gruppen]')), '„Aus IServ übernehmen" in der Übersicht von „Meine Klassen"')
   const karten = await p.locator('[data-klasse]').evaluateAll((e) => e.map((x) => x.getAttribute('data-klasse')))
   pruefe(JSON.stringify(karten) === JSON.stringify([K5, K7, K10]), `Karten je Klasse in der App (${karten.join(' · ')})`)
   // Gleiche Ausrichtung: Karten gleich hoch, Inhalt der Karte ohne Fach nicht nach oben gerutscht

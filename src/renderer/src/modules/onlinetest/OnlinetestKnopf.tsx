@@ -18,6 +18,8 @@ import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
 import type { OnlineFassung } from './kern'
 import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
+import { nameMitTermin } from '@shared/onlinetestTermin'
+import KalenderHinweis from '../../shared/components/KalenderHinweis'
 
 /** Thema des Tests (Unit, Themenbereich, Thema) – macht gleichnamige Tests unterscheidbar */
 export function testThema(doc: Pick<TestDocument, 'header' | 'settings'>): string {
@@ -128,7 +130,15 @@ export function Erstellen({
   schliessen: () => void
 }): React.JSX.Element {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const nameFuer = (gruppe: string): string => (doc ? onlinetestName(doc, gruppe, undefined, listName) : blattTestName(blatt!, gruppe))
+  /*
+   * Termin (10.10.2026, Entscheidung der Lehrkraft): optionaler Tag für alle Testarten. Er steht im Namen an der Stelle des
+   * Datums („10b Fr 17.10. - Green Line 6 - Unit 3"), die Lernenden sehen ihn als Ankündigung (außer „Für Lernende
+   * ausblenden"). Gestartet wird weiter von Hand.
+   */
+  const [termin, setTermin] = useState('')
+  const [terminVerborgen, setTerminVerborgen] = useState(false)
+  const nameFuer = (gruppe: string, tag = termin): string =>
+    nameMitTermin(doc ? onlinetestName(doc, gruppe, undefined, listName) : blattTestName(blatt!, gruppe), tag || null)
   const [titel, setTitel] = useState(() => nameFuer(''))
   // Solange der Name nicht von Hand geändert ist, folgt er der gewählten Lerngruppe
   const [titelVonHand, setTitelVonHand] = useState(false)
@@ -164,6 +174,7 @@ export function Erstellen({
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         handschrift,
         gaeste,
+        ...(termin ? { termin, terminVerborgen } : {}),
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
       })
@@ -219,8 +230,42 @@ export function Erstellen({
                 if (!titelVonHand) setTitel(nameFuer(gruppen.find((x) => x.id === g)?.name ?? ''))
               }}
               clearable
-              placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
+              placeholder={gruppen.length ? 'wählen …' : 'noch keine – in „Meine Klassen“ anlegen'}
             />
+            <Group align="flex-start" gap="md" wrap="wrap">
+              <div style={{ width: 220 }}>
+                <TextInput
+                  type="date"
+                  label="Termin (Tag)"
+                  description="Optional – steht im Namen und wird angekündigt. Gestartet wird trotzdem von Hand."
+                  value={termin}
+                  onChange={(e) => {
+                    const t = e.currentTarget.value
+                    setTermin(t)
+                    const gruppenName = gruppen.find((x) => x.id === gruppe)?.name ?? ''
+                    setTitel(titelVonHand ? nameMitTermin(titel, t || null) : nameFuer(gruppenName, t))
+                  }}
+                  data-onlinetest-termin
+                />
+                <KalenderHinweis
+                  wert={termin}
+                  verschieben={(t) => {
+                    setTermin(t)
+                    setTitel(titelVonHand ? nameMitTermin(titel, t) : nameFuer(gruppen.find((x) => x.id === gruppe)?.name ?? '', t))
+                  }}
+                />
+              </div>
+              {termin && (
+                <Checkbox
+                  mt={28}
+                  label="Für Lernende ausblenden"
+                  description="Sonst sehen die Lernenden den Test vorher als angekündigt und üben gezielt."
+                  checked={terminVerborgen}
+                  onChange={(e) => setTerminVerborgen(e.currentTarget.checked)}
+                  data-termin-verborgen
+                />
+              )}
+            </Group>
             <NurExperte geaendert={gaeste && 'auch Gäste'}>
               <Radio.Group
                 label="Wer darf teilnehmen?"

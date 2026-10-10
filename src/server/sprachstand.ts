@@ -73,6 +73,8 @@ import {
 } from './vokabeln'
 import { buchFuer, buchNamen, wegSpeichern, wegStand } from './vokabelweg'
 import { klassenwechselPruefen } from './schuljahrWechsel'
+import { angekuendigteTests } from './onlinetest'
+import { kursTerminMitOnlinetests } from '../shared/onlinetestTermin'
 
 const FACH_ZU: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', ru: 'Russisch' }
 
@@ -379,8 +381,12 @@ async function rundeAus(
   const herkunft = new Map<string, Herkunft>()
   const gesehen = new Set<string>()
   const offen = a.kurse.filter((k) => k.offen)
+  // Angekündigte Vokabel-Onlinetests der Lerngruppe zählen wie der Testtermin des Kurses (10.10.2026)
+  const ichInfo = nutzerNachId(ichId)
+  const onlineTermine = ichInfo ? angekuendigteTests(ichInfo, jetzt) : []
+  const terminVon = (k: Kurs): number | null => kursTerminMitOnlinetests(k.z, onlineTermine, jetzt)
   // Test in den nächsten drei Tagen: nur dessen Kurse
-  const testKurse = offen.filter((k) => testPause([k.z.test_termin], jetzt))
+  const testKurse = offen.filter((k) => testPause([terminVon(k)], jetzt))
   const test = testKurse.length ? new Set(testKurse.flatMap((k) => k.woerter.map((w) => w.zid))) : null
   const aktuellIds = new Set<string>()
   for (const k of offen)
@@ -428,7 +434,7 @@ async function rundeAus(
     if (st) staende[v.id] = { ...st, faellig: Math.min(st.faellig, jetzt) }
   }
   const tagesziel = Math.max(0, ...offen.map((k) => tageszielVon(k.z))) || 10
-  const testTermin = offen.map((k) => k.z.test_termin).filter((t): t is number => typeof t === 'number' && t >= jetzt - 864e5).sort((x, y) => x - y)[0] ?? null
+  const testTermin = offen.map((k) => terminVon(k)).filter((t): t is number => typeof t === 'number' && t >= jetzt - 864e5).sort((x, y) => x - y)[0] ?? null
   const kasten: Kasten = {
     woerter: r.woerter,
     staende,

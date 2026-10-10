@@ -6,8 +6,8 @@
  *    die KI wertet nach jeder Abgabe selbst aus; Durchsicht jeder Antwort zum Überstimmen,
  *    „Zu entscheiden" für kleine Fehler und vertretbare Abweichungen; Ergebnisse freigeben;
  *    Export (PDF, Excel, Word, Drucken, TeacherTool).
- *  - Lerngruppen: aus IServ (Anmeldung oder Ordner „Gruppen") oder von Hand; Historie mit Datum,
- *    Ergebnissen, Notenverteilung, Durchschnittsnote und Durchschnitt je Schülerin/Schüler.
+ *  - Lerngruppen: Historie mit Datum, Ergebnissen, Notenverteilung, Durchschnittsnote und Durchschnitt je
+ *    Schülerin/Schüler. Angelegt werden sie seit 10.10.2026 nur in „Meine Klassen“.
  *
  * Wichtig (Wunsch der Lehrkraft): Die Auswertung ist ein VORSCHLAG – die Abgaben bitte trotzdem prüfen.
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
@@ -19,6 +19,7 @@ import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFen
 import { buendeln, type Fall } from './entscheidungBuendeln'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useSichtbareProgramme } from '../../shell/programme'
+import { terminKurz } from '@shared/onlinetestTermin'
 import { thresholdsForSubject } from '../../shared/gradeScale'
 import type { Kurztest } from '../lernzielkontrolle/model/types'
 import { kurztestToWorksheetAlle } from '../lernzielkontrolle/render/kurztestWorksheet'
@@ -27,17 +28,16 @@ import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
 import { fassungenAusBlatt } from './blattOnline'
 import { Erstellen, type BlattQuelleOnline } from './OnlinetestKnopf'
 import { AppKopf } from '../../shared/components/AppKopf'
-import { FAECHER, fachSchreibweise } from '@shared/faecher'
-import HaeufigSelect from '../../shared/components/HaeufigSelect'
-import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
+import { fachSchreibweise } from '@shared/faecher'
+import { openModule, useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import type { TestDocument } from '../vokabeltest/model/types'
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Button,
   Card,
-  Checkbox,
   Collapse,
   Container,
   Group,
@@ -56,7 +56,6 @@ import {
   Tabs,
   Text,
   TextInput,
-  Textarea,
   Title,
   Tooltip,
   UnstyledButton
@@ -77,7 +76,6 @@ import {
   IconEyeOff,
   IconFileText,
   IconFilter,
-  IconFolders,
   IconPencil,
   IconPlayerPlay,
   IconPlayerStop,
@@ -95,7 +93,6 @@ import { auffaellig, VorfallAbzeichen, vorfallKurz, type Vorfall } from './Vorfa
 import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
-import { hatClient } from '../../shared/plattform'
 import { AbgabeBlatt, abgabenHtml, type BlattKopf } from './blattAnsicht'
 import type { Variant } from '../vokabeltest/model/types'
 import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
@@ -117,6 +114,9 @@ interface TestListe {
   zuEntscheiden: number
   beendet?: string | null
   ausgeblendet?: boolean
+  /** Termin „JJJJ-MM-TT" (10.10.2026); die Lehrkraft sieht ihn immer */
+  termin?: string | null
+  terminVerborgen?: boolean
 }
 
 interface Teilnahme {
@@ -482,7 +482,15 @@ function Tests({
                 </Table.Td>
                 <Table.Td>{t.lerngruppe || '–'}</Table.Td>
                 <Table.Td>{t.art}</Table.Td>
-                <Table.Td>{datum(t.erstellt)}</Table.Td>
+                <Table.Td>
+                  {datum(t.erstellt)}
+                  {t.termin && (
+                    <Text size="xs" c={t.status === 'wartend' ? 'teal.7' : 'dimmed'} data-test-termin={t.termin}>
+                      Termin {terminKurz(t.termin)}
+                      {t.terminVerborgen ? ' · für Lernende ausgeblendet' : ''}
+                    </Text>
+                  )}
+                </Table.Td>
                 <Table.Td>
                   {t.abgegeben}/{t.teilnehmer}
                   {t.offen + t.zuEntscheiden > 0 && (
@@ -1568,91 +1576,11 @@ interface Historie {
 }
 
 /**
- * Gruppen aus den IServ-ORDNERN (02.10.2026, Wunsch der Lehrkraft): Solange IServ die Gruppen
- * nicht über die Anmeldung liefert, zeigt der Ordner „Groups" (Gruppen), wo jemand Mitglied ist –
- * „Klasse 10b" heißt: Lerngruppe 10b. Lesen kann das nur die Exe (IServ-Passwort bleibt am PC).
+ * Lerngruppen (10.10.2026, Entscheidung der Lehrkraft): angelegt wird nur noch in „Meine Klassen“ (dort „+ Lerngruppe
+ * anlegen“ und „Aus IServ übernehmen“, meineklassen/LerngruppeAnlegen.tsx). Hier bleiben Liste und Historie.
  */
-const KLASSE_ODER_KURS = /^(klasse|kl\.?|jahrgang|jg\.?|kurs|q[12]|e[f]?|\d{1,2}\s*[a-z]{0,2}\b)/i
-export const lerngruppenName = (ordner: string): string => ordner.replace(/^klasse\s+/i, '').trim()
-
-async function iservGruppenordner(): Promise<string[] | null> {
-  if (!hatClient()) return null
-  const status = (await window.api.iserv.status().catch(() => null)) as { verbunden?: boolean } | null
-  if (!status?.verbunden) return null
-  return (await window.api.iserv.ordner('Groups')).map((e) => e.name).sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
-}
-
-function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: string[]; fertig: () => void }): React.JSX.Element {
-  const [ordner, setOrdner] = useState<string[] | null>(null)
-  const [fehler, setFehler] = useState('')
-  const [wahl, setWahl] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    iservGruppenordner()
-      .then((o) => {
-        if (!o)
-          return setFehler(
-            hatClient()
-              ? 'IServ ist in der Exe noch nicht verbunden (Einstellungen › Material › IServ).'
-              : 'Die IServ-Ordner kann nur die Exe „Schul-Apps Online“ lesen – das IServ-Passwort bleibt am PC.'
-          )
-        setOrdner(o)
-        setWahl(new Set(o.filter((n) => KLASSE_ODER_KURS.test(n) && !vorhanden.includes(lerngruppenName(n).toLowerCase()))))
-      })
-      .catch((e: unknown) => setFehler(e instanceof Error ? e.message : String(e)))
-  }, [vorhanden])
-  const uebernehmen = async (): Promise<void> => {
-    try {
-      for (const n of wahl) await senden('/server/lerngruppen/anlegen', { name: lerngruppenName(n), iservGruppe: n })
-      notifySuccess(`${wahl.size} Lerngruppe${wahl.size === 1 ? '' : 'n'} angelegt.`)
-      fertig()
-    } catch (e) {
-      notifyError(e)
-    }
-  }
-  return (
-    <Modal opened onClose={fertig} title="Gruppen aus IServ übernehmen" size="lg">
-      <Stack>
-        <Text size="sm" c="dimmed">
-          Aus dem IServ-Ordner „Gruppen“: Jeder Gruppenordner zeigt eine Mitgliedschaft (z. B. „Klasse 10b“ → Lerngruppe „10b“). Klassen und Kurse sind
-          vorausgewählt.
-        </Text>
-        {fehler && <Alert color="orange">{fehler}</Alert>}
-        {!ordner && !fehler && <Loader />}
-        {ordner?.length === 0 && <Text c="dimmed">Im Ordner „Gruppen“ ist nichts.</Text>}
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          {ordner?.map((n) => {
-            const da = vorhanden.includes(lerngruppenName(n).toLowerCase())
-            return (
-              <Checkbox
-                key={n}
-                label={da ? `${n} (schon angelegt)` : n}
-                disabled={da}
-                checked={wahl.has(n)}
-                onChange={(e) => {
-                  const w = new Set(wahl)
-                  if (e.currentTarget.checked) w.add(n)
-                  else w.delete(n)
-                  setWahl(w)
-                }}
-              />
-            )
-          })}
-        </SimpleGrid>
-        <Group justify="flex-end">
-          <Button disabled={!wahl.size} onClick={() => void uebernehmen()}>
-            {wahl.size} übernehmen
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
-  )
-}
-
 function Lerngruppen(): React.JSX.Element {
-  const [d, setD] = useState<{ gruppen: Gruppe[]; iservGruppen: { id: string; name: string }[] } | null>(null)
-  const [neu, setNeu] = useState(false)
-  const [ausIserv, setAusIserv] = useState(false)
-  const [ordnerGruppen, setOrdnerGruppen] = useState<{ id: string; name: string }[]>([])
+  const [d, setD] = useState<{ gruppen: Gruppe[] } | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const laden = useCallback(() => {
     void holen<NonNullable<typeof d>>('/server/lerngruppen')
@@ -1660,24 +1588,9 @@ function Lerngruppen(): React.JSX.Element {
       .catch((e: unknown) => notifyError(e))
   }, [])
   useEffect(laden, [laden])
-  // In der Exe: Gruppenordner still mitlesen – sie stehen dann beim Anlegen zur Auswahl
-  useEffect(() => {
-    void iservGruppenordner()
-      .then((o) => setOrdnerGruppen((o ?? []).map((n) => ({ id: n, name: n }))))
-      .catch(() => undefined)
-  }, [])
   if (gewaehlt) return <GruppenHistorie id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
-  const auswahl = [...(d?.iservGruppen ?? []), ...ordnerGruppen.filter((o) => !d?.iservGruppen.some((g) => g.id === o.id))]
   return (
     <Stack>
-      <Group>
-        <Button onClick={() => setNeu(true)}>Lerngruppe anlegen</Button>
-        <Tooltip label={hatClient() ? 'Klassen und Kurse aus dem IServ-Ordner „Gruppen“' : 'Nur in der Exe „Schul-Apps Online“ (IServ-Passwort bleibt am PC)'}>
-          <Button variant="light" leftSection={<IconFolders size={16} />} onClick={() => setAusIserv(true)} data-iserv-gruppen>
-            Aus IServ übernehmen
-          </Button>
-        </Tooltip>
-      </Group>
       {!d && <Loader />}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
         {d?.gruppen.map((g) => (
@@ -1689,82 +1602,13 @@ function Lerngruppen(): React.JSX.Element {
           </Card>
         ))}
       </SimpleGrid>
-      {d?.gruppen.length === 0 && <Text c="dimmed">Noch keine Lerngruppe. Am einfachsten aus einer IServ-Gruppe (Klasse oder Kurs).</Text>}
-      {ausIserv && d && (
-        <IservGruppenUebernehmen
-          vorhanden={d.gruppen.map((g) => g.name.toLowerCase())}
-          fertig={() => {
-            setAusIserv(false)
-            laden()
-          }}
-        />
-      )}
-      {neu && d && (
-        <NeueGruppe
-          iservGruppen={auswahl}
-          fertig={() => {
-            setNeu(false)
-            laden()
-          }}
-        />
-      )}
+      <Text size="sm" c="dimmed" data-lerngruppen-hinweis>
+        {d?.gruppen.length === 0 ? 'Noch keine Lerngruppe. ' : ''}Lerngruppen entstehen in der App „Meine Klassen“ (aus IServ oder von Hand).{' '}
+        <Anchor component="button" type="button" size="sm" onClick={() => openModule('meineklassen')} data-zu-meine-klassen>
+          Zu „Meine Klassen“
+        </Anchor>
+      </Text>
     </Stack>
-  )
-}
-
-function NeueGruppe({ iservGruppen, fertig }: { iservGruppen: { id: string; name: string }[]; fertig: () => void }): React.JSX.Element {
-  const [name, setName] = useState('')
-  const [fach, setFach] = useState('')
-  const [iserv, setIserv] = useState<string | null>(null)
-  const [mitglieder, setMitglieder] = useState('')
-  return (
-    <Modal opened onClose={fertig} title="Lerngruppe anlegen">
-      <Stack>
-        <Select
-          label="IServ-Gruppe (Klasse oder Kurs)"
-          description="Wer in dieser Gruppe ist und sich anmeldet, gehört automatisch dazu."
-          data={iservGruppen.map((g) => ({ value: g.id, label: g.name }))}
-          value={iserv}
-          onChange={(v) => {
-            setIserv(v)
-            if (v && !name) setName(lerngruppenName(iservGruppen.find((g) => g.id === v)?.name ?? ''))
-          }}
-          searchable
-          clearable
-          nothingFoundMessage={
-            iservGruppen.length ? 'Nicht gefunden' : 'Keine Gruppen – Anmeldung über IServ oder die Exe „Schul-Apps Online“ mit verbundenem IServ'
-          }
-        />
-        <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="z. B. 8b Englisch" />
-        <HaeufigSelect
-          art="fach"
-          label="Fach (optional)"
-          searchable
-          clearable
-          data={FAECHER.filter((f) => f.id !== 'anderes').map((f) => ({ value: f.label, label: f.label }))}
-          value={fach || null}
-          onChange={(v) => setFach(v ?? '')}
-        />
-        <Textarea
-          label="Weitere Mitglieder (IServ-Benutzernamen, optional)"
-          description="Eine Zeile je Person, z. B. für Kurse ohne eigene IServ-Gruppe."
-          value={mitglieder}
-          onChange={(e) => setMitglieder(e.currentTarget.value)}
-          autosize
-          minRows={2}
-        />
-        <Button
-          disabled={!name.trim()}
-          onClick={() =>
-            void senden('/server/lerngruppen/anlegen', { name, fach, iservGruppe: iserv ?? '', mitglieder: mitglieder.split(/[\s,;]+/).filter(Boolean) })
-              .then(fertig)
-              .catch((e: unknown) => notifyError(e))
-          }
-        >
-          Anlegen
-        </Button>
-      </Stack>
-    </Modal>
   )
 }
 
@@ -1816,8 +1660,9 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
         </ActionIcon>
       </Group>
       <Title order={3}>{h.gruppe.name}</Title>
+      {/* Ohne Namensliste oben (10.10.2026, Entscheidung der Lehrkraft): die Namen stehen je Zeile in den Tabellen darunter */}
       <Text size="sm" c="dimmed">
-        {h.mitglieder.length} Schülerinnen und Schüler angemeldet{h.mitglieder.length ? `: ${h.mitglieder.map((m) => m.name).join(', ')}` : ''}
+        {h.mitglieder.length} {h.mitglieder.length === 1 ? 'Schülerin bzw. Schüler' : 'Schülerinnen und Schüler'} angemeldet
       </Text>
       <Title order={4}>Tests</Title>
       {h.tests.length === 0 ? (

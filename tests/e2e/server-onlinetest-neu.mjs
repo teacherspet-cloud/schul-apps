@@ -128,6 +128,17 @@ try {
   const tag = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const name = await p.locator('[data-onlinetest-name]').inputValue()
   pruefe(name === `10b ${tag} - Green Line 6 - Unit 1 - Station 2`, `Name nach Muster: „${name}"`)
+  // Termin (10.10.2026): optionaler Tag ersetzt das Datum im Namen; „Für Lernende ausblenden" erst mit Termin
+  const terminTag = new Date(Date.now() + 5 * 864e5)
+  const terminIso = `${terminTag.getFullYear()}-${String(terminTag.getMonth() + 1).padStart(2, '0')}-${String(terminTag.getDate()).padStart(2, '0')}`
+  const wt = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][terminTag.getDay()]
+  const terminKurz = `${wt} ${terminIso.slice(8, 10)}.${terminIso.slice(5, 7)}.`
+  pruefe((await p.locator('[data-termin-verborgen]').count()) === 0, 'Ohne Termin kein „Für Lernende ausblenden"')
+  await p.locator('[data-onlinetest-termin]').fill(terminIso)
+  const mitTermin = await p.locator('[data-onlinetest-name]').inputValue()
+  pruefe(mitTermin === `10b ${terminKurz} - Green Line 6 - Unit 1 - Station 2`, `Termin steht im Namen an der Stelle des Datums: „${mitTermin}"`)
+  pruefe(await p.locator('[data-termin-verborgen]').isVisible(), '„Für Lernende ausblenden" erscheint mit Termin')
+  pruefe(!(await p.locator('[data-termin-verborgen] input, input[data-termin-verborgen]').first().isChecked()), '„Für Lernende ausblenden" ist zuerst aus')
   await p.screenshot({ path: join(out, '1-dialog.png') })
   await p
     .getByRole('dialog')
@@ -145,6 +156,10 @@ try {
     'Nach dem Erstellen: Detailansicht mit „Test für alle starten"'
   )
   await p.screenshot({ path: join(out, '2-detail.png') })
+  // Termin in der Liste der Lehrkraft
+  const liste = (await (await lk.request.get(`${A}/server/onlinetest`, { headers: KOPF })).json()).tests ?? []
+  const neuer = liste.find((t) => t.titel === `10b ${terminKurz} - Green Line 6 - Unit 1 - Station 2`)
+  pruefe(neuer?.termin === terminIso && neuer?.terminVerborgen === false, `Termin gespeichert und sichtbar (${JSON.stringify({ termin: neuer?.termin, verborgen: neuer?.terminVerborgen })})`)
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

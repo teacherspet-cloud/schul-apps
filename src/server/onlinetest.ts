@@ -53,6 +53,8 @@ import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type A
 import { iservBereit } from './anmeldung'
 import { mitNamensliste, registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
+import { terminBereinigt, terminSichtbar, type OnlineTermin } from '@shared/onlinetestTermin'
+import { tagVon } from '@shared/schulkalender'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS lerngruppen (
@@ -288,6 +290,12 @@ export interface Einstellungen {
   reihe?: boolean
   /** Kopf und Einstellungen des Vokabeltests – für die Abgabe als Blatt (renderer/modules/onlinetest/blattAnsicht.tsx) */
   blatt?: Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
+  /**
+   * Termin (Tag „JJJJ-MM-TT", 10.10.2026, shared/onlinetestTermin.ts): angekündigt für die Lernenden, gestartet wird
+   * weiter von der Lehrkraft. `terminVerborgen` = „Für Lernende ausblenden" (die Lehrkraft sieht ihn immer).
+   */
+  termin?: string
+  terminVerborgen?: boolean
 }
 
 interface TestZeile {
@@ -396,6 +404,9 @@ export function testErstellen(
     figur?: { winkend?: unknown; jubelnd?: unknown }
     handschrift?: boolean
     gaeste?: boolean
+    /** Termin „JJJJ-MM-TT" (10.10.2026) und „Für Lernende ausblenden" */
+    termin?: string | null
+    terminVerborgen?: boolean
   }
 ): Test {
   if (!e.test?.variants?.length && !e.blatt?.fassungen?.length) throw new Error('Der Test hat keine Variante.')
@@ -422,6 +433,7 @@ export function testErstellen(
     ...(figuren.length ? { figur: true } : {}),
     handschrift: e.handschrift !== false,
     gaeste: e.gaeste !== false,
+    ...(terminBereinigt(e.termin) ? { termin: terminBereinigt(e.termin)!, ...(e.terminVerborgen ? { terminVerborgen: true } : {}) } : {}),
     ...(e.test ? { blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize } } : {})
   }
   const fassungen = e.test
@@ -449,6 +461,57 @@ export function testErstellen(
   for (const [pose, png] of figuren) db().prepare('INSERT INTO onlinetest_figuren (test_id, pose, png) VALUES (?, ?, ?)').run(id, pose, png)
   protokolliereServer('onlinetest', `Onlinetest erstellt (${fassungen.length} Fassung(en))`, lehrkraft.id)
   return testNachId(id)!
+}
+
+// ---------------------------------------------------------------- Angekündigte Tests (Termin, 10.10.2026)
+
+/** Angekündigter Onlinetest: nur Kennung, Titel, Tag, Art, Thema, Fach und Lerngruppe – nichts vom Inhalt */
+export interface Angekuendigt extends OnlineTermin {
+  id: string
+  titel: string
+  thema: string
+  verborgen: boolean
+}
+
+const alsAngekuendigt = (t: Test): Angekuendigt => ({
+  id: t.id,
+  titel: t.titel,
+  termin: t.einstellungen.termin!,
+  art: t.einstellungen.art ?? 'Vokabeltest',
+  thema: t.einstellungen.thema ?? '',
+  fach: t.einstellungen.fach ?? '',
+  zielsprache: t.einstellungen.zielsprache ?? '',
+  lerngruppeId: t.lerngruppe_id,
+  verborgen: Boolean(t.einstellungen.terminVerborgen)
+})
+
+/** Noch nicht gestartete Tests mit Termin heute oder später (alle Lehrkräfte) */
+function wartendeMitTermin(jetzt: number): Test[] {
+  const heute = tagVon(jetzt)
+  return (db().prepare("SELECT * FROM onlinetests WHERE status = 'wartend'").all() as unknown as TestZeile[])
+    .map(alsTest)
+    .filter((t) => !t.einstellungen.reihe && terminBereinigt(t.einstellungen.termin) && t.einstellungen.termin! >= heute)
+}
+
+/** Für diese Person sichtbar angekündigte Tests (Lerngruppen, in denen sie ist) – Sprachrunde, Erinnerungen */
+export function angekuendigteTests(n: Pick<NutzerInfo, 'benutzer' | 'gruppen' | 'quelle'>, jetzt = Date.now()): Angekuendigt[] {
+  return wartendeMitTermin(jetzt)
+    .filter((t) => terminSichtbar(t.einstellungen) && t.lerngruppe_id)
+    .filter((t) => {
+      if (n.quelle === 'gast') return gastInLerngruppe(t.lerngruppe_id, n)
+      const g = lerngruppe(t.lerngruppe_id!)
+      return Boolean(g && gehoertZu(g, n))
+    })
+    .map(alsAngekuendigt)
+    .sort((a, b) => a.termin.localeCompare(b.termin))
+}
+
+/** Tests mit Termin einer Lerngruppe (Lehrkraft, „Meine Klassen") – auch die für Lernende ausgeblendeten */
+export function angekuendigteDerGruppe(gruppeId: string, jetzt = Date.now()): Angekuendigt[] {
+  return wartendeMitTermin(jetzt)
+    .filter((t) => t.lerngruppe_id === gruppeId)
+    .map(alsAngekuendigt)
+    .sort((a, b) => a.termin.localeCompare(b.termin))
 }
 
 const figurPosen = (testId: string): string[] =>
@@ -966,6 +1029,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       const tests = (db().prepare("SELECT * FROM onlinetests WHERE status != 'beendet'").all() as unknown as TestZeile[]).map(alsTest).filter((t) => {
         if (gast) return meine.has(t.id) || (!t.einstellungen.reihe && gastInLerngruppe(t.lerngruppe_id, ich))
         if (t.einstellungen.reihe) return false
+        // Termin für Lernende ausgeblendet (10.10.2026): bis zum Start nicht in der Liste – mit Code geht es trotzdem
+        if (t.status === 'wartend' && t.einstellungen.termin && t.einstellungen.terminVerborgen && !meine.has(t.id)) return false
         const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
         return g && gehoertZu(g, ich)
       })
@@ -980,7 +1045,11 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
             // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
             erstellt: t.erstellt,
             abgegeben: Boolean(meine.get(t.id)),
-            wartend: t.status === 'wartend'
+            wartend: t.status === 'wartend',
+            // Angekündigt (10.10.2026): nur Tag, Testart und Thema – nichts vom Inhalt; nur wenn nicht ausgeblendet
+            ...(t.status === 'wartend' && terminSichtbar(t.einstellungen)
+              ? { termin: t.einstellungen.termin, art: t.einstellungen.art ?? 'Vokabeltest', thema: t.einstellungen.thema ?? '' }
+              : {})
           }))
         }),
         true
@@ -1318,7 +1387,10 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
               offen: bs.reduce((s, b) => s + offeneEinheiten(b), 0),
               zuEntscheiden: bs.reduce((s, b) => s + zuEntscheiden(b), 0),
               beendet: t.beendet ?? null,
-              ausgeblendet: Boolean(t.einstellungen.ausgeblendet)
+              ausgeblendet: Boolean(t.einstellungen.ausgeblendet),
+              // Termin (10.10.2026): die Lehrkraft sieht ihn immer, auch wenn er für Lernende ausgeblendet ist
+              termin: t.einstellungen.termin ?? null,
+              terminVerborgen: Boolean(t.einstellungen.terminVerborgen)
             }
           })
         }),
@@ -1361,7 +1433,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           thema: typeof k0.thema === 'string' ? k0.thema : undefined,
           figur: k0.figur && typeof k0.figur === 'object' ? (k0.figur as { winkend?: unknown; jubelnd?: unknown }) : undefined,
           handschrift: k0.handschrift !== false,
-          gaeste: k0.gaeste !== false
+          gaeste: k0.gaeste !== false,
+          termin: typeof k0.termin === 'string' ? k0.termin : null,
+          terminVerborgen: k0.terminVerborgen === true
         })
         return (json(res, 200, { id: t.id, code: t.code, link: link(t.code) }), true)
       } catch (e) {

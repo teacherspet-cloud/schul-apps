@@ -19,6 +19,7 @@ import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
 import { Alphabetisch, MeineBuecher } from './Wortliste'
 import { BlaetternRahmen, useOrdnerBlaettern } from './blaettern'
 import { GrammatikStand } from '../../onlinetest/SchuelerBereich'
+import { testStatusText } from '@shared/onlinetestTermin'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { KursRegister, SprachRegister } from './Sprachstand'
 import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
@@ -445,7 +446,7 @@ function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | nul
             <a key={t.code} className="og-karte" href={`/s/t/${t.code}`} data-ordner-test>
               <Text fw={700}>{t.titel}</Text>
               <Text size="sm" c="dimmed">
-                {t.zeitMin} Minuten{t.wartend ? ' · startet gleich' : ''}
+                {testStatusText(t) ?? `${t.zeitMin} Minuten${t.wartend ? ' · startet gleich' : ''}`}
               </Text>
             </a>
           ))}

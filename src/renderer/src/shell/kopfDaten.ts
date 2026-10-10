@@ -25,6 +25,9 @@ export interface TestKurz {
   offen: number
   zuEntscheiden: number
   erstellt: string
+  /** Termin „JJJJ-MM-TT" (10.10.2026) und ob er für Lernende ausgeblendet ist */
+  termin?: string | null
+  terminVerborgen?: boolean
 }
 export interface RueckmeldungKurz {
   id: string
@@ -121,7 +124,7 @@ export function useKopfZahlen(): KopfZahl[] {
           ? (blaetter ?? []).filter((b) => b.status === 'offen' && b.zuletzt > jetzt - 2 * 864e5 && b.abgaben > 0).length
           : 0,
       bedarf: karten.reihen ? (reihen ?? []).reduce((s, r) => s + r.bedarf, 0) : 0,
-      bald: karten.termine ? demnaechst(kurse, reihen ?? [], jetzt) : []
+      bald: karten.termine ? demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? t : []) : []
     },
     jetzt
   )

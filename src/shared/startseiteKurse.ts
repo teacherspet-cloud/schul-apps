@@ -219,10 +219,10 @@ export function kursAbzeichen(
 export interface DemnaechstEintrag {
   /** „JJJJ-MM-TT"; null = Haltepunkt ohne Stundentermin */
   tag: string | null
-  art: 'test' | 'halt'
-  /** „Vokabeltest 7b – Unit 2" bzw. „Haltepunkt „Julikrise" (9c)" */
+  art: 'test' | 'halt' | 'onlinetest'
+  /** „Vokabeltest 7b – Unit 2" bzw. „Haltepunkt „Julikrise" (9c)" bzw. Name des Onlinetests */
   text: string
-  /** Kurs (Vokabeltest) bzw. Zuweisung der Reihe (Haltepunkt) */
+  /** Kurs (Vokabeltest) bzw. Zuweisung der Reihe (Haltepunkt) bzw. Onlinetest */
   ziel: string
 }
 
@@ -246,19 +246,24 @@ export function haltepunktTermine(
 
 /**
  * „Demnächst": Vokabeltests der Kurse und Haltepunkte der Reihen – nur heute und später, zeitlich geordnet (am selben
- * Tag Tests zuerst), Haltepunkte ohne Datum am Ende.
+ * Tag Tests zuerst), Haltepunkte ohne Datum am Ende. Seit 10.10.2026 auch noch nicht gestartete Onlinetests mit Termin,
+ * sofern der Termin für die Lernenden nicht ausgeblendet ist.
  */
 export function demnaechst(
   kurse: Pick<StartKurs, 'id' | 'gruppe' | 'einheit' | 'testTermin'>[],
   reihen: { zid: string; gruppe: string; halteTermine?: { titel: string; tag: string | null }[] }[],
-  jetzt = Date.now()
+  jetzt = Date.now(),
+  onlinetests: { id: string; titel: string; status: string; termin?: string | null; terminVerborgen?: boolean }[] = []
 ): DemnaechstEintrag[] {
   const heute = tagVon(jetzt)
   const liste: DemnaechstEintrag[] = [
+    ...onlinetests.flatMap((t) =>
+      t.status === 'wartend' && t.termin && !t.terminVerborgen ? [{ tag: t.termin, art: 'onlinetest' as const, text: t.titel, ziel: t.id }] : []
+    ),
     ...kurse.flatMap((k) => (k.testTermin ? [{ tag: tagVon(k.testTermin), art: 'test' as const, text: vokabeltestText(k.gruppe, k.einheit), ziel: k.id }] : [])),
     ...reihen.flatMap((r) => (r.halteTermine ?? []).map((h) => ({ tag: h.tag, art: 'halt' as const, text: haltepunktText(h.titel, r.gruppe), ziel: r.zid })))
   ]
-  const rang = (e: DemnaechstEintrag): string => `${e.tag ?? '9999-99-99'}${e.art === 'test' ? 0 : 1}`
+  const rang = (e: DemnaechstEintrag): string => `${e.tag ?? '9999-99-99'}${e.art === 'halt' ? 1 : 0}`
   return liste.filter((e) => !e.tag || e.tag >= heute).sort((a, b) => (rang(a) < rang(b) ? -1 : rang(a) > rang(b) ? 1 : 0))
 }
 
