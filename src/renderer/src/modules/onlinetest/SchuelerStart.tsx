@@ -216,8 +216,10 @@ export function Begruessung({
             {vorname ? `, ${vorname}` : ''}!
           </Title>
           {/* Ohne Text (Kl. 5–6, neu: der Satz „Hier siehst du, was ansteht …" ist entfallen, 08.10.2026) keine leere Zeile */}
+          {/* Smartphone (10.10.2026, Wunsch der Lehrkraft): der Einstiegssatz für Neue („Hier findest du … Wähl einen
+              Startpunkt.") samt „Zum Lernraum" entfällt dort – CSS-Klasse sl-neu-hinweis */}
           {text && (
-            <Group gap={6} wrap="nowrap" align="flex-start">
+            <Group gap={6} wrap="nowrap" align="flex-start" className={z === 'neu' ? 'sl-neu-hinweis' : undefined}>
               <Text className="sl-unter" data-begruessung-text>
                 {text}
               </Text>
@@ -233,7 +235,7 @@ export function Begruessung({
                 </Button>
               )}
               {z === 'neu' && s === 'mittel' && (
-                <Button component="a" href="/s/lernen" radius="xl" variant="outline" color="gray.0">
+                <Button component="a" href="/s/lernen" radius="xl" variant="outline" color="gray.0" className="sl-neu-hinweis" data-zum-lernraum>
                   Zum Lernraum
                 </Button>
               )}
@@ -527,6 +529,7 @@ export function Lernstand({ stand, neueste }: { stand: LernstandAntwort; neueste
  * im Verlauf. Oberstufe: ruhige Karte mit Farbstreifen.
  */
 const START_CSS = `
+@media (max-width: 700px) { .sl-neu-hinweis { display: none !important; } }
 .sl-kopf { position: relative; overflow: hidden; border-radius: 24px; padding: 24px 22px 24px; color: #fff;
   background: linear-gradient(135deg, var(--mantine-primary-color-6) 0%, var(--mantine-primary-color-8) 100%);
   box-shadow: 0 10px 26px color-mix(in srgb, var(--mantine-primary-color-6) 22%, transparent);

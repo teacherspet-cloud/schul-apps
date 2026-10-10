@@ -143,6 +143,15 @@ try {
   await p.waitForURL(/\/s\/?$/, { timeout: 15000 })
   await p.locator('[data-startseite]').waitFor({ timeout: 15000 })
   pruefe(/Mia!/.test((await p.locator('[data-gruss]').textContent()) ?? ''), 'Startseite begrüßt mit Vornamen')
+  // Smartphone (10.10.2026): ohne Einstiegssatz „Hier findest du … Wähl einen Startpunkt." und ohne „Zum Lernraum"
+  if ((await p.locator('[data-begruessung="neu"]').count()) > 0) {
+    await p.setViewportSize({ width: 390, height: 844 })
+    await p.waitForTimeout(300)
+    pruefe(!(await p.getByText('Wähl einen Startpunkt').isVisible().catch(() => false)), 'Smartphone: ohne „Wähl einen Startpunkt“')
+    pruefe(!(await p.locator('[data-zum-lernraum]').isVisible().catch(() => false)), 'Smartphone: ohne „Zum Lernraum“')
+    await p.screenshot({ path: join(out, 'handy-start.png') })
+    await p.setViewportSize({ width: 820, height: 1180 })
+  }
   pruefe(await p.locator('[data-naechstes]').isVisible(), '„Als Nächstes": der offene Test')
   const kacheln = await p.locator('[data-kachel]').evaluateAll((k) => k.map((x) => x.getAttribute('data-kachel')))
   pruefe(
