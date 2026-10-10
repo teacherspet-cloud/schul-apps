@@ -10,11 +10,11 @@
  *    darunter sein Kasten – nichts ist Pflicht, nichts rot.
  *  - Darunter der gemeinsame Kasten der Sprache (Karteikasten, Spiele) – der Trainer mit der Kennung „sp:<sprache>".
  *  - Ohne Lehrwerk mit Wörtern (eigene Listen, Platzhalter-Bände wie ¡Apúntate!): nur die Kursliste wie bisher.
- * Die Startseite zeigt je Sprache eine kleine Fassung der Karte (`StartVokabeln`).
+ * Die Startseite zeigt keine Sprachkarte mehr (10.10.2026) – die Runde steht dort unter „Als Nächstes“.
  */
-import { Button, Group, Loader, SegmentedControl, Stack, Text, UnstyledButton } from '@mantine/core'
-import { IconCheck, IconChevronRight, IconPlayerPlay } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Button, Group, Loader, SegmentedControl, Stack, Text } from '@mantine/core'
+import { IconCheck, IconPlayerPlay } from '@tabler/icons-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { kursReiterNamen } from '@shared/ohneKlasse'
 import { schuljahrText } from '@shared/schulkalender'
 import { prozent, type AktuellerBand, type BandMedaille, type FruehererBand, type SprachStand, type StandZahlen } from '@shared/sprachstand'
@@ -35,12 +35,23 @@ export const SPRACH_CSS = `
 .sk-punkt[data-status="sicher"] { --sk-f: #2b8a3e; background: var(--sk-f); }
 .sk-balken { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: rgba(134,142,150,.25); }
 .sk-balken > span { display: block; height: 100%; }
-.sk-karte { border-radius: 16px; padding: 14px 16px; background: var(--og-karte, var(--mantine-color-body)); box-shadow: 0 1px 0 rgba(0,0,0,.06), inset 4px 0 0 var(--sk-akzent, #1971c2); }
-.sk-units { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.sk-unit { font-size: .78rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(134,142,150,.45); display: inline-flex; align-items: center; gap: 4px; }
+.sk-karte { min-width: 0; max-width: 100%; overflow: hidden; box-sizing: border-box; border-radius: 16px; padding: 14px 16px; background: var(--og-karte, var(--mantine-color-body)); box-shadow: 0 1px 0 rgba(0,0,0,.06), inset 4px 0 0 var(--sk-akzent, #1971c2); }
+.sk-units-rahmen { position: relative; min-width: 0; max-width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%); }
+.sk-units { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  scrollbar-width: none; padding: 4px 14px; min-width: 0; }
+.sk-units::-webkit-scrollbar { display: none; }
+.sk-unit { flex: none; scroll-snap-align: center; font: inherit; font-size: .78rem; font-weight: 700; padding: 4px 11px; min-height: 32px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(134,142,150,.45); background: transparent; color: inherit; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+html[data-touch] .sk-unit { min-height: 44px; padding: 4px 14px; }
 .sk-unit[data-lage="aktuell"] { background: var(--sk-akzent, #1971c2); border-color: transparent; color: #fff; }
 .sk-unit[data-lage="kennen"] { opacity: .8; }
-.sk-abschnitte { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 8px; }
+.sk-unit[aria-selected="true"] { box-shadow: 0 0 0 2px var(--og-karte, var(--mantine-color-body)), 0 0 0 4px var(--sk-akzent, #1971c2); }
+.sk-unit:focus-visible { outline: 3px solid var(--sk-akzent, #1971c2); outline-offset: 2px; }
+.sk-weitere { flex: none; font-size: .74rem; opacity: .65; white-space: nowrap; padding-right: 4px; }
+.sk-abschnitte { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 2px; min-width: 0; }
+.sk-abschnitt-balken { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .sk-abschnitt { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; text-align: center; }
 .sk-ring { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; }
 .sk-ring > span { width: 20px; height: 20px; border-radius: 50%; background: var(--og-karte, var(--mantine-color-body)); display: grid; place-items: center; }
@@ -110,6 +121,83 @@ function AbschnittRing({ z }: { z: StandZahlen }): React.JSX.Element {
 
 /** Abschnitts-Kurzname für die Punkte („Station 1" → „St. 1") */
 const kurz = (s: string): string => s.replace(/^Station\s*/i, 'St. ').replace(/^Unit\s*/i, 'U ')
+
+/** Höchstens so viele Abschnitte als Punkte – darüber ein kompakter Balken „5 von 12" (10.10.2026) */
+const MAX_PUNKTE = 8
+
+type UnitStandT = AktuellerBand['units'][number]
+const abschnittFertig = (x: UnitStandT['abschnitte'][number]): boolean => x.zahlen.gesamt > 0 && x.zahlen.kennengelernt >= x.zahlen.gesamt
+const unitFertig = (u: UnitStandT): boolean => u.abschnitte.length > 0 && u.abschnitte.every(abschnittFertig)
+
+/**
+ * Units als Stationen und die Abschnitte EINER Unit (10.10.2026, Befund am Telefon: die Reihe wurde breiter als der
+ * Bildschirm). Die Units stehen in einem waagerecht rollbaren Streifen (Einrasten, weiche Ränder, die aktuelle Unit
+ * ist sichtbar); Antippen zeigt die Abschnitte dieser Unit. Bis 8 Abschnitte als Ringe, mehr als Balken „5 von 12".
+ */
+function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): React.JSX.Element {
+  const [wahl, setWahl] = useState(aktuell)
+  const streifen = useRef<HTMLDivElement>(null)
+  const u = b.units.find((x) => x.unit === wahl) ?? b.units.find((x) => x.unit === aktuell) ?? b.units[b.units.length - 1]
+  // Die aktuelle Unit in den sichtbaren Bereich rollen – nur den Streifen, nie die Seite
+  useEffect(() => {
+    const el = streifen.current
+    const knopf = el?.querySelector<HTMLElement>('[data-lage="aktuell"]')
+    if (el && knopf) el.scrollLeft = Math.max(0, knopf.offsetLeft - el.clientWidth / 2 + knopf.offsetWidth / 2)
+  }, [aktuell])
+  const fertig = u ? u.abschnitte.filter(abschnittFertig).length : 0
+  return (
+    <Stack gap={6} mt="sm" style={{ minWidth: 0 }}>
+      <div className="sk-units-rahmen">
+        <div className="sk-units" ref={streifen} data-units role="tablist" aria-label="Units">
+          {b.units.map((x) => {
+            const kennen = unitFertig(x)
+            const lage = x.unit === aktuell ? 'aktuell' : kennen ? 'kennen' : 'offen'
+            return (
+              <button
+                key={x.unit}
+                type="button"
+                role="tab"
+                aria-selected={x.unit === u?.unit}
+                className="sk-unit"
+                data-lage={lage}
+                data-unit={x.unit}
+                onClick={() => setWahl(x.unit)}
+              >
+                {kennen && <IconCheck size={12} />}
+                {x.unit}
+              </button>
+            )
+          })}
+          {b.weitereUnits > 0 && (
+            <span className="sk-weitere" data-weitere-units={b.weitereUnits}>
+              · weitere Units folgen
+            </span>
+          )}
+        </div>
+      </div>
+      {u && u.abschnitte.length <= MAX_PUNKTE && (
+        <div className="sk-abschnitte" data-abschnitt-punkte={u.abschnitte.length} data-abschnitte-unit={u.unit}>
+          {u.abschnitte.map((x) => (
+            <div key={x.key} className="sk-abschnitt" title={`${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`}>
+              <AbschnittRing z={x.zahlen} />
+              <span className="sk-abschnitt-name">{kurz(x.name)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {u && u.abschnitte.length > MAX_PUNKTE && (
+        <div className="sk-abschnitt-balken" data-abschnitt-balken={`${fertig}/${u.abschnitte.length}`} data-abschnitte-unit={u.unit}>
+          <Text size="xs" fw={700}>
+            {u.unit}: {fertig} von {u.abschnitte.length} Abschnitten kennengelernt
+          </Text>
+          <div className="sk-balken" aria-hidden>
+            <span style={{ width: `${(fertig / u.abschnitte.length) * 100}%`, background: FARBE.sicher }} />
+          </div>
+        </div>
+      )}
+    </Stack>
+  )
+}
 
 /** Stand der Sprachen laden (alle oder nur ein Fach); frisch beim Zurückkehren */
 export function useSprachstand(fach?: string, aktiv = true): { sprachen: SprachStand[] | null; laden: () => void } {
@@ -192,38 +280,11 @@ export function AktuellerBandKarte({
           )}
         </div>
       </Group>
+      {b && !kompakt && aktUnit && <UnitLeiste b={b} aktuell={aktUnit.unit} />}
       {b && !kompakt && (
-        <Stack gap={8} mt="sm">
-          {/* Units als Stationen – nur Freigegebenes; spätere als „weitere Units folgen" */}
-          <div className="sk-units" data-units>
-            {b.units.map((u) => {
-              const kennen = u.abschnitte.every((x) => x.zahlen.gesamt > 0 && x.zahlen.kennengelernt >= x.zahlen.gesamt)
-              const lage = u.unit === aktUnit?.unit ? 'aktuell' : kennen ? 'kennen' : 'offen'
-              return (
-                <span key={u.unit} className="sk-unit" data-lage={lage} data-unit={u.unit}>
-                  {kennen && <IconCheck size={12} />}
-                  {u.unit}
-                </span>
-              )
-            })}
-            {b.weitereUnits > 0 && (
-              <Text size="xs" c="dimmed" data-weitere-units={b.weitereUnits}>
-                · weitere Units folgen
-              </Text>
-            )}
-          </div>
-          {aktUnit && (
-            <div className="sk-abschnitte" data-abschnitt-punkte={aktUnit.abschnitte.length}>
-              {aktUnit.abschnitte.map((x) => (
-                <div key={x.key} className="sk-abschnitt" title={`${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`}>
-                  <AbschnittRing z={x.zahlen} />
-                  <span className="sk-abschnitt-name">{kurz(x.name)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={{ marginTop: 8 }}>
           <StandKreise z={b.zahlen} t={t} balken />
-        </Stack>
+        </div>
       )}
       <Stack gap={4} mt="sm" align="flex-start">
         {knopf}
@@ -380,7 +441,6 @@ export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: 
   const blaettern = useBlaettern()
   const [band, setBand] = useState<FruehererBand | null>(null)
   const [lauf, setLauf] = useState<{ n: number; uebung: string | null }>({ n: 0, uebung: startUebung })
-  const [kurseOffen, setKurseOffen] = useState(false)
   if (!sprachen) return <Loader size="sm" />
   const s = sprachen[0]
   // Ohne Lehrwerk mit Wörtern: wie bisher die Kurse (kein Weg, kein „Alles gelernt 0/0")
@@ -406,41 +466,6 @@ export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: 
       <div data-sprach-kasten={s.sprache}>
         <VokabelTrainer key={`sp:${s.sprache}:${lauf.n}`} id={`sp:${s.sprache}`} eingebettet uebung={lauf.uebung} ohneKopf nachRunde={laden} />
       </div>
-      {oben && s.kurse.length > 0 && (
-        <Stack gap={4}>
-          <UnstyledButton onClick={() => setKurseOffen((x) => !x)} aria-expanded={kurseOffen} data-einzelne-kurse>
-            <Text size="sm" c="dimmed" fw={600}>
-              {kurseOffen ? '▾' : '▸'} Einzelne Kurse ({s.kurse.length})
-            </Text>
-          </UnstyledButton>
-          {kurseOffen &&
-            o.vokabeln
-              .filter((v) => s.kurse.some((k) => k.id === v.id))
-              .map((v) => (
-                <a key={v.id} className="og-karte" href={`/s/v/${v.id}`} data-ordner-kurs="vokabeln">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Text fw={600} size="sm">
-                      {v.titel}
-                    </Text>
-                    <IconChevronRight size={16} />
-                  </Group>
-                </a>
-              ))}
-        </Stack>
-      )}
-    </Stack>
-  )
-}
-
-/** Startseite: je Sprache die kleine Karte mit „Heute üben" (führt in den Fachordner und startet die Runde) */
-export function StartVokabeln({ sprachen, ohneKnopf = false }: { sprachen: SprachStand[] | null; ohneKnopf?: boolean }): React.JSX.Element | null {
-  const liste = (sprachen ?? []).filter((s) => !s.nurKurse && s.aktuell)
-  if (!liste.length) return null
-  return (
-    <Stack gap="sm" data-start-vokabeln={liste.length}>
-      {liste.map((s) => (
-        <AktuellerBandKarte key={s.sprache} s={s} kompakt ohneKnopf={ohneKnopf} href={`/s/ordner/${encodeURIComponent(s.fach)}?r=vok&uebung=runde`} />
-      ))}
     </Stack>
   )
 }

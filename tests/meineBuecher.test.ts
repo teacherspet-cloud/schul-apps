@@ -136,8 +136,9 @@ describe('Alphabetisch: Fenster', () => {
 })
 
 describe('Ordner: Register und Deckelmaß', () => {
-  it('„Meine Bücher" und „Alphabetisch" gleich hinter „Vokabeln"', () => {
-    expect(mitWortliste(['vok', 'gram', 'mat'])).toEqual(['vok', 'wort', 'abc', 'gram', 'mat'])
+  it('„Meine Bücher" und „Alphabetisch" hinter „Vokabeln" und „Grammatik"', () => {
+    expect(mitWortliste(['mat', 'vok', 'gram'])).toEqual(['mat', 'vok', 'gram', 'wort', 'abc'])
+    expect(mitWortliste(['mat', 'vok'])).toEqual(['mat', 'vok', 'wort', 'abc'])
     expect(mitWortliste(['gram'])).toEqual(['gram'])
   })
   it('Deckel genau so breit wie der Ordner, bei langem Inhalt bis zum Bildrand', () => {

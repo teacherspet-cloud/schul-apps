@@ -773,12 +773,18 @@ export function mitApostrophen(term: string, gelegt: string): string {
 }
 
 export function buchstaben(term: string, zufall: () => number = Math.random): string[] {
-  const kern = kernform(varianten(term)[0] ?? term)
-  return kern
+  return [...loesungsBuchstaben(term)].sort(() => zufall() - 0.5)
+}
+
+/**
+ * Die Buchstaben der Plättchen in der Reihenfolge der Lösung (10.10.2026) – ohne Leerzeichen, Apostrophe und
+ * Auslassungspunkte. „Lege das Wort" ordnet damit getippte Buchstaben dem Plättchen in der Schreibung ihrer Stelle zu.
+ */
+export const loesungsBuchstaben = (term: string): string =>
+  kernform(varianten(term)[0] ?? term)
     .split('')
     .filter((c) => c !== ' ' && !istApostroph(c))
-    .sort(() => zufall() - 0.5)
-}
+    .join('')
 
 /** Wackelig wie im Lernstand der Startseite: Fach 1–2, schon einmal falsch, in den letzten 14 Tagen geübt */
 export const istWackelig = (s: WortStand, jetzt = Date.now()): boolean => s.fach >= 1 && s.fach <= 2 && s.falsch > 0 && jetzt - (s.zuletzt || 0) < 14 * TAG

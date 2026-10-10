@@ -6,6 +6,7 @@ import {
   ERKENNEN,
   leerzeichenSelbst,
   linkRunde,
+  loesungsBuchstaben,
   mitApostrophen,
   mitLeerzeichenVoraus,
   neuerStand,
@@ -16,7 +17,7 @@ import {
 import { schnellWaechter, SCHNELL_FOLGE } from '../src/shared/schnellKlick'
 import { mitUebung, regelTipp, type TippDaten } from '../src/shared/lernstand'
 import { fremdSeiteSichtbar, KEIN_ZUG, zugAbbrechen, zugBeenden, zugBeginnen, zugBewegen } from '../src/renderer/src/modules/lernen/kartenZug'
-import { gelegtText, LEER, leerAnhaengen, nurBuchstaben, tippStand, zuordnen, type Kachel } from '../src/renderer/src/modules/lernen/handschrift/legeLogik'
+import { gelegtText, LEER, leerAnhaengen, nurBuchstaben, passendeKachel, tippStand, zuordnen, type Kachel } from '../src/renderer/src/modules/lernen/handschrift/legeLogik'
 
 /* Runde 09.10.2026: Vokabeltrainer und Spiele (Wünsche und Befunde der Lehrkraft) */
 
@@ -203,5 +204,51 @@ describe('Zu schnell geklickt – nur blindes Raten (09.10.2026)', () => {
     const erg = [true, false, true, false, true].map((ok, i) => r.melden('passt', 200, i, ok))
     expect(erg[4].werten).toBe(false)
     expect(erg[4].hinweis).toBe(true)
+  })
+})
+
+describe('Lege das Wort: Groß/Klein der Plättchen folgt der Stelle (10.10.2026, „I like …" wurde zu „i lIke")', () => {
+  // Plättchen gemischt wie im Trainer
+  const gemischt = (term: string): Kachel[] => buchstaben(term, () => 0.5).reverse().map((b, i) => ({ b, i }))
+  const anzeige = (term: string, g: number[], k: Kachel[]): string => mitLeerzeichenVoraus(term, gelegtText(g, k))
+  it('klein getipptes „i like" legt „I like" – Taste für Taste und im Tippfeld', () => {
+    const term = 'I like …'
+    const k = gemischt(term)
+    const l = loesungsBuchstaben(term)
+    expect(l).toBe('Ilike')
+    // Ohne Lösung (alter Weg): das kleine „i" nimmt das „i" aus „like"
+    expect(anzeige(term, zuordnen('ilike', k).gelegt, k)).toBe('i lIke')
+    // Tippfeld (ganzer Text)
+    expect(anzeige(term, zuordnen('ilike', k, false, l).gelegt, k)).toBe('I like')
+    expect(anzeige(term, tippStand({ text: 'I l', gelegt: zuordnen('il', k, false, l).gelegt }, 'I li', k, false, l).gelegt, k)).toBe('I li')
+    // Taste für Taste (freie Plättchen, Stelle zählt mit)
+    let g: number[] = []
+    for (const z of 'ilike') g = [...g, ...zuordnen(z, k.filter((x) => !g.includes(x.i)), false, l, nurBuchstaben(g).length).gelegt]
+    expect(anzeige(term, g, k)).toBe('I like')
+    // Groß getippt an kleiner Stelle: ebenfalls die Schreibung der Lösung
+    expect(anzeige(term, zuordnen('ILIKE', k, false, l).gelegt, k)).toBe('I like')
+    // Schwerste Stufe mit selbst gesetzten Leerzeichen
+    expect(mitApostrophen(term, gelegtText(zuordnen('i like', k, true, l).gelegt, k))).toBe('I like')
+  })
+  it('gilt für alle Wörter mit gleichen Buchstaben in beiden Schreibungen', () => {
+    for (const [term, getippt, soll] of [
+      ['Anna and Alex', 'annaandalex', 'Anna and Alex'],
+      ["Don't do it", 'dontdoit', "Don't do it"],
+      ['Salvador está aquí', 'SALVADORESTÁAQUÍ', 'Salvador está aquí'],
+      ['Ostern', 'ostern', 'Ostern']
+    ]) {
+      const k = gemischt(term)
+      const g = zuordnen(getippt, k, false, loesungsBuchstaben(term)).gelegt
+      expect(nurBuchstaben(g)).toHaveLength(k.length)
+      expect(gelegtText(g, k)).toBe(soll.replace(/[\s']/g, ''))
+    }
+  })
+  it('falsche Buchstaben: getippte Schreibung, sonst irgendeins; fehlende melden', () => {
+    const k: Kachel[] = [{ b: 'A', i: 0 }, { b: 'a', i: 1 }, { b: 'b', i: 2 }]
+    expect(passendeKachel(k, 'a', 'b')).toBe(1)
+    expect(passendeKachel(k, 'A', 'b')).toBe(0)
+    expect(passendeKachel(k, 'B', 'a')).toBe(2)
+    expect(passendeKachel(k, 'x', 'a')).toBe(-1)
+    expect(zuordnen('ax', k, false, 'Aab').fehlt).toBe('x')
   })
 })

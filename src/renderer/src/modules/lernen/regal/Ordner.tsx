@@ -64,22 +64,27 @@ const CSS = `
 .og-karte:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12), inset 4px 0 0 var(--og-akzent); }
 @keyframes og-auf { from { opacity: 0; transform: perspective(1400px) rotateY(-8deg) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes og-blatt { from { opacity: 0; transform: perspective(1200px) rotateY(-14deg); } to { opacity: 1; transform: none; } }
-@media (max-width: 560px) {
+/* Mit dem Finger (09.10.2026): Laschen mindestens 44 Punkte */
+html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
+.og-kurz { display: none; }
+/*
+ * Telefon (10.10.2026, Befund: die Laschen passten nicht in die Breite): oben eine Symbolleiste – je Register Symbol und
+ * kleine Beschriftung (höchstens zwei Zeilen), alle gleich breit, ohne Rollen; bis 5 Register passen in 360 px.
+ */
+@media (max-width: 700px) {
   .og-ordner { grid-template-columns: 22px 1fr; }
   .og-ringe { padding: 20px 0; } .og-ring { width: 22px; height: 12px; margin-right: -12px; border-width: 3px; }
   .og-papier { padding: 16px 12px 22px 22px; } .og-papier::before { left: 8px; }
   .og-ringe, .og-papier { grid-row: 2; }
-  .og-laschen { grid-column: 1 / -1; grid-row: 1; flex-direction: row; padding: 4px 0 0 26px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-  .og-lasche { writing-mode: horizontal-tb; border-radius: 10px 10px 0 0; padding: 7px 10px; margin: 0 0 -2px; font-size: .82rem; white-space: nowrap; flex: none; }
-  .og-lasche[aria-selected="true"] { transform: translateY(-4px); }
-  .og-lasche svg { transform: none; }
-}
-/* Mit dem Finger (09.10.2026): Laschen mindestens 44 Punkte; am Telefon nur die offene mit Symbol, damit mehr Laschen ohne Rollen zu sehen sind */
-html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
-@media (max-width: 560px) {
-  .og-laschen { padding-left: 22px; gap: 3px; scroll-snap-type: x proximity; }
-  .og-lasche { padding: 6px 9px; scroll-snap-align: start; }
-  .og-lasche:not([aria-selected="true"]) svg { display: none; }
+  .og-laschen { grid-column: 1 / -1; grid-row: 1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; padding: 4px 0 0 0; }
+  .og-lasche { writing-mode: horizontal-tb; position: relative; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; min-height: 52px;
+    padding: 6px 2px 5px; margin: 0 0 -2px; border-radius: 10px 10px 0 0; font-size: 10.5px; line-height: 1.15; text-align: center; white-space: normal; }
+  .og-lasche[aria-selected="true"] { transform: translateY(-3px); }
+  .og-lasche svg { transform: none; flex: none; width: 18px; height: 18px; }
+  .og-lang { display: none; }
+  .og-kurz { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; hyphens: auto; max-width: 100%; }
+  .og-lasche .og-zahl { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; font-size: .6rem; padding: 0 3px; }
+  html[data-touch] .og-lasche { min-width: 0; min-height: 52px; }
 }
 .og-zurueck-leiste { margin: -6px 0 10px -6px; }
 @media (prefers-reduced-motion: reduce) { .og-ordner, .og-seite { animation: none; } .og-lasche { transition: none; } }
@@ -122,7 +127,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
       </Stack>
     )
   const f = ordnerFarben(o.farbe, dunkel)
-  // Meine Bücher und Alphabetisch (09.10.2026): eigene Register gleich nach den Vokabeln – nur im Ordner, der Rücken im Regal bleibt
+  // Meine Bücher und Alphabetisch (09.10.2026): eigene Register hinter Vokabeln und Grammatik (10.10.2026) – nur im Ordner, der Rücken im Regal bleibt
   const register = mitWortliste(registerVon(o))
   const aktiv: Register = wahl && register.includes(wahl) ? wahl : register[0] ?? 'mat'
   const zeigen = (r: Register): void => {
@@ -224,9 +229,14 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                     // Offene Unterseiten zuklappen (Verlauf zurück), dann das Register zeigen
                     onClick={() => alleZu(() => zeigen(r))}
                     data-lasche={r}
+                    aria-label={zuTun(o, r) > 0 ? `${s[r]}, ${zuTun(o, r)} offen` : s[r]}
                   >
                     {SYMBOL[r]}
-                    {s[r]}
+                    <span className="og-lang">{s[r]}</span>
+                    {/* Telefon: kurze Beschriftung (höchstens zwei Zeilen) – „Alphabetisch" als „A–Z" */}
+                    <span className="og-kurz" aria-hidden>
+                      {r === 'abc' ? 'A–Z' : s[r]}
+                    </span>
                     {zuTun(o, r) > 0 && (
                       <span className="og-zahl" title="Hier ist etwas zu tun" data-lasche-offen={zuTun(o, r)}>
                         {zuTun(o, r)}
@@ -243,8 +253,15 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   )
 }
 
-/** Register „Meine Bücher" und „Alphabetisch": gleich hinter „Vokabeln" (es gibt sie, sobald es Vokabeln gibt) */
-export const mitWortliste = (r: Register[]): Register[] => r.flatMap((x) => (x === 'vok' ? (['vok', 'wort', 'abc'] as Register[]) : [x]))
+/**
+ * Register „Meine Bücher" und „Alphabetisch" (es gibt sie, sobald es Vokabeln gibt). Seit 10.10.2026 steht Grammatik
+ * direkt hinter „Vokabeln" – die beiden Wortlisten folgen danach (ohne Grammatik gleich hinter „Vokabeln").
+ */
+export const mitWortliste = (r: Register[]): Register[] => {
+  if (!r.includes('vok')) return r
+  const nach: Register = r.includes('gram') ? 'gram' : 'vok'
+  return r.flatMap((x) => (x === nach ? ([x, 'wort', 'abc'] as Register[]) : [x]))
+}
 
 /** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
 export function zuTun(o: FachOrdner, r: Register): number {

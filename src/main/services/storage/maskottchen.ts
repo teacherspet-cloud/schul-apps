@@ -100,6 +100,11 @@ function figurenIn(schule: boolean): MaskottchenInfo[] {
     .sort((a, b) => a.angelegt.localeCompare(b.angelegt))
 }
 
+/** Nur die Figuren der Schule (am Server; Begrüßung der Lernenden ohne Figur der Lehrkraft, 10.10.2026) */
+export function schulMaskottchen(): MaskottchenInfo[] {
+  return aufServer() ? figurenIn(true) : []
+}
+
 /** Eigene Figuren, am Server dazu die der Schule (eigene gleicher Kennung haben Vorrang) */
 export function listMaskottchen(): MaskottchenInfo[] {
   migriere()

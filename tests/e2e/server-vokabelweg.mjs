@@ -152,7 +152,7 @@ try {
       mkdirSync(ziel, { recursive: true })
       await p.goto(`${A}/s/`)
       await p.locator('[data-startseite]').waitFor()
-      await p.locator('[data-start-vokabeln]').waitFor({ timeout: 8000 }).catch(() => undefined)
+      await p.locator('[data-naechstes]').waitFor({ timeout: 8000 }).catch(() => undefined)
       await p.keyboard.press('Escape').catch(() => undefined)
       await p.waitForTimeout(600)
       await p.screenshot({ path: join(ziel, '01-start.png'), fullPage: true })
@@ -281,11 +281,12 @@ try {
   const s = await ada.newPage()
   await s.setViewportSize({ width: 390, height: 844 })
   await s.goto(`${A}/s/`)
-  await s.locator('[data-start-vokabeln]').waitFor()
-  const nStart = Number(await s.locator('[data-start-vokabeln] [data-heute-ueben]').getAttribute('data-heute-ueben'))
+  // Sprachkarte auf der Startseite entfallen (10.10.2026): die Runde steht nur noch unter „Als Nächstes"
   await s.locator('[data-naechstes]').waitFor()
+  pruefe((await s.locator('[data-start-vokabeln]').count()) === 0, 'Startseite ohne Sprachkarte')
   const naechstes = await s.locator('[data-naechstes]').innerText()
-  pruefe(nStart === sAda.heute.anzahl && naechstes.includes(`${nStart} Wörter für heute`), `Startseite: „Heute üben · ${nStart}" und „${nStart} Wörter für heute" (Ordner: ${sAda.heute.anzahl})`)
+  const nStart = Number(/(\d+) Wörter für heute/.exec(naechstes)?.[1] ?? -1)
+  pruefe(nStart === sAda.heute.anzahl, `Startseite: „${nStart} Wörter für heute" (Ordner: ${sAda.heute.anzahl})`)
   const tipp = await s.locator('[data-tipp], [data-lerntipp]').first().innerText().catch(() => '')
   const tippZahl = /(\d+) Vokabeln (sind|stehen) heute/.exec(tipp)?.[1]
   pruefe(!tippZahl || Number(tippZahl) === nStart, `Tipp nennt dieselbe Zahl (${tippZahl ?? 'kein Zahl-Tipp'})`)
@@ -296,9 +297,8 @@ try {
   })
   pruefe(knopf.text === 'Vokabeln üben' && knopf.ganz && knopf.drin, `Telefon: „Als Nächstes"-Knopf ganz lesbar (${JSON.stringify(knopf)})`)
   await s.screenshot({ path: join(out, 'ada-start-telefon.png'), fullPage: true })
-  // EIN Knopf für dieselbe Runde (10.10.2026): „Als Nächstes" hat ihn, Begrüßung und Sprachkarte nicht
+  // EIN Knopf für dieselbe Runde (10.10.2026): „Als Nächstes" hat ihn, die Begrüßung nicht
   pruefe((await s.locator('[data-begruessung-knopf]').count()) === 0, 'Begrüßung ohne eigenen Runden-Knopf')
-  pruefe((await s.locator('[data-start-vokabeln] [data-heute-ohne-knopf]').count()) === 1 && (await s.locator('[data-start-vokabeln] button, [data-start-vokabeln] a.mantine-Button-root').count()) === 0, 'Sprachkarte zeigt nur die Zahl, keinen zweiten Knopf')
   await s.locator('[data-naechstes-knopf]').click()
   pruefe(await da(s.locator('[data-sitzung]')), '„Als Nächstes" öffnet den Ordner und startet die Runde')
   // Alte Links

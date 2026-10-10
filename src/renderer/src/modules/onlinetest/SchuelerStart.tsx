@@ -32,7 +32,7 @@ import {
   IconStarFilled,
   IconTrendingUp
 } from '@tabler/icons-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { LernstandAntwort, Strategie, Stufe, Zustand } from '@shared/lernstand'
 import { fachAusName } from '@shared/faecher'
 import { VorleseKnopf } from './SchuelerEinstellungen'
@@ -160,6 +160,32 @@ export function Eule({ pose, groesse = 96 }: { pose: 'jubelt' | 'winkt' | 'coach
   )
 }
 
+type Pose = 'jubelt' | 'winkt' | 'coach' | 'lupe' | 'cool'
+
+/**
+ * Figur der Begrüßung (10.10.2026, Wunsch der Lehrkraft): Hat die Lehrkraft des Fachs (bzw. die Schule) ein Maskottchen
+ * angelegt, steht es statt der Eule da – Bild über /s/api/maskottchen (nur das PNG). Fehlt es, bleibt die Eule.
+ */
+function StartFigur({ pose, groesse, fach, anfragen }: { pose: Pose; groesse: number; fach: string | null; anfragen: boolean }): React.JSX.Element {
+  const adresse = anfragen ? `/s/api/maskottchen?pose=${pose}${fach ? `&fach=${encodeURIComponent(fach)}` : ''}` : ''
+  const [lage, setLage] = useState<'laedt' | 'da' | 'fehlt'>(adresse ? 'laedt' : 'fehlt')
+  useEffect(() => setLage(adresse ? 'laedt' : 'fehlt'), [adresse])
+  if (lage === 'fehlt') return <Eule pose={pose} groesse={groesse} />
+  return (
+    <img
+      src={adresse}
+      alt=""
+      width={groesse}
+      height={groesse}
+      style={{ objectFit: 'contain', display: 'block', visibility: lage === 'da' ? 'visible' : 'hidden' }}
+      onLoad={() => setLage('da')}
+      onError={() => setLage('fehlt')}
+      data-maskottchen={pose}
+      data-maskottchen-bild
+    />
+  )
+}
+
 const STRATEGIE_NAME: Record<Strategie, string> = {
   abruf: 'Abrufen',
   verteilen: 'Verteilt üben',
@@ -177,8 +203,14 @@ export function Begruessung({
   avatar = null,
   stand,
   naechstes,
-  ohneKnopf = false
+  ohneKnopf = false,
+  figurFach = null,
+  figurAnfragen = false
 }: {
+  /** Fach für das Maskottchen (10.10.2026): das von „Als Nächstes", sonst das Hauptfach */
+  figurFach?: string | null
+  /** Nur Konten fragen die Figur der Lehrkraft an */
+  figurAnfragen?: boolean
   /** Kein eigener Knopf (10.10.2026, Wunsch der Lehrkraft: nur EIN Knopf für dieselbe Runde – „Als Nächstes" bzw. Sprachkarte haben ihn) */
   ohneKnopf?: boolean
   vorname: string
@@ -197,7 +229,7 @@ export function Begruessung({
   const z = stand?.zustand ?? 'neutral'
   // „Cool" nur mit Fleiß-Anteil (kosmetisch): wer dranbleibt, bekommt den Look – unabhängig von der Leistung
   const cool = Boolean(stand?.fleiss.fleissig)
-  const pose = z === 'erfolgreich_fleissig' ? (s === 'unter' ? 'cool' : 'jubelt') : z === 'fleissig' ? (s === 'grund' ? 'lupe' : 'coach') : z === 'neu' || z === 'inaktiv' ? 'winkt' : s === 'unter' ? 'coach' : 'winkt'
+  const pose: Pose = z === 'erfolgreich_fleissig' ? (s === 'unter' ? 'cool' : 'jubelt') : z === 'fleissig' ? (s === 'grund' ? 'lupe' : 'coach') : z === 'neu' || z === 'inaktiv' ? 'winkt' : s === 'unter' ? 'coach' : 'winkt'
   const text = stand ? begruessung(z, s, stand) : '…'
   // Bei „wenig aktiv" und „länger inaktiv": eine kurze Runde vorschlagen (nie eine Fehltage-Zahl für Jüngere)
   const runde = stand?.bereiche.find((b) => b.faellig > 0 && b.art !== 'blaetter') ?? stand?.bereiche.find((b) => b.art !== 'blaetter')
@@ -260,7 +292,7 @@ export function Begruessung({
         </div>
         {(s === 'grund' || s === 'unter') && (
           <div className="sl-figur">
-            <Eule pose={pose} groesse={s === 'grund' ? 112 : 88} />
+            <StartFigur pose={pose} groesse={s === 'grund' ? 112 : 88} fach={figurFach} anfragen={figurAnfragen} />
           </div>
         )}
       </Group>
@@ -302,13 +334,15 @@ function Auszeichnungen({ a }: { a: LernstandAntwort }): React.JSX.Element | nul
   }
   if (!liste.length) return null
   return (
-    <Group gap={6} mt={8} data-abzeichen>
+    // Kleine Pillen nebeneinander (10.10.2026), auch am Telefon – umbrechen nur, wenn der Platz nicht reicht
+    <div className="sl-abzeichen-reihe" data-abzeichen>
       {liste.map((x) => (
         <span key={x.text} className={`sl-abzeichen sl-${x.art}`}>
-          {x.art === 'fleiss' ? <IconFlame size={14} /> : <IconCheck size={14} />} {x.text}
+          {x.art === 'fleiss' ? <IconFlame size={12} /> : <IconCheck size={12} />}
+          {x.text}
         </span>
       ))}
-    </Group>
+    </div>
   )
 }
 
@@ -342,13 +376,14 @@ export function TippKarte({ stand, gelesen }: { stand: LernstandAntwort; gelesen
   if (!t) return null
   const ki = stand.wochenrueckblick
   return (
-    <Paper className="sl-tipp" radius="xl" p="lg" data-tipp={ki ? 'ki' : 'regel'}>
-      <Group wrap="nowrap" align="flex-start" gap="md">
-        <ThemeIcon size={46} radius="xl" variant="light" color={ki ? 'grape' : 'yellow'} className="sl-tipp-symbol">
-          {ki ? <IconSparkles size={24} /> : <IconBulb size={24} />}
+    // Kompakt neben „Als Nächstes" (10.10.2026): kleineres Symbol, kleinere Schrift und Knöpfe
+    <Paper className="sl-tipp" radius="lg" p="sm" h="100%" data-tipp={ki ? 'ki' : 'regel'} data-tipp-kompakt>
+      <Group wrap="nowrap" align="flex-start" gap="sm">
+        <ThemeIcon size={30} radius="xl" variant="light" color={ki ? 'grape' : 'yellow'} className="sl-tipp-symbol">
+          {ki ? <IconSparkles size={17} /> : <IconBulb size={17} />}
         </ThemeIcon>
-        <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
-          <Group gap={8}>
+        <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+          <Group gap={6}>
             <Text size="xs" tt="uppercase" fw={800} c={ki ? 'grape' : 'yellow.8'}>
               {ki ? 'Dein Wochenrückblick' : 'Dein Tipp'}
             </Text>
@@ -358,19 +393,19 @@ export function TippKarte({ stand, gelesen }: { stand: LernstandAntwort; gelesen
             </Badge>
           </Group>
           <Group gap={4} wrap="nowrap" align="flex-start">
-            <Text fw={500} data-tipp-text style={{ flex: 1 }}>
+            <Text fw={500} size="sm" data-tipp-text style={{ flex: 1 }}>
               {t.text}
             </Text>
             <VorleseKnopf text={t.text} />
           </Group>
-          <Group gap="xs" mt={4}>
+          <Group gap={6} mt={2}>
             {t.knopf && (
-              <Button component="a" href={t.knopf.href} radius="xl" rightSection={<IconArrowRight size={16} />} data-tipp-knopf>
+              <Button component="a" href={t.knopf.href} radius="xl" size="compact-sm" variant="light" rightSection={<IconArrowRight size={14} />} data-tipp-knopf>
                 {t.knopf.text}
               </Button>
             )}
             {ki && (
-              <Button variant="subtle" color="gray" radius="xl" onClick={gelesen} data-tipp-gelesen>
+              <Button variant="subtle" color="gray" radius="xl" size="compact-sm" onClick={gelesen} data-tipp-gelesen>
                 Gelesen
               </Button>
             )}
@@ -568,8 +603,9 @@ const START_CSS = `
 .sl-eule-jubelt { animation: sl-hops .9s ease-out 2; }
 .sl-regen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .sl-regen span { position: absolute; top: -24px; color: #ffe066; font-size: 20px; animation: sl-fallen 1.7s ease-in 1 both; text-shadow: 0 0 6px rgba(255,224,102,0.7); }
-.sl-abzeichen { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700;
-  background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); }
+.sl-abzeichen-reihe { display: flex; flex-flow: row wrap; gap: 4px 6px; margin-top: 8px; position: relative; }
+.sl-abzeichen { flex: none; width: auto; display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 999px; font-size: 12.5px; line-height: 1.5;
+  font-weight: 700; white-space: nowrap; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); }
 .sl-mittel .sl-abzeichen.sl-sicher { border-color: rgba(255,255,255,0.6); }
 .sl-zahl { border-radius: 12px; padding: 8px 10px; background: rgba(255,255,255,0.12); }
 .sl-stern { color: rgba(255,255,255,0.55); display: inline-flex; }

@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { fuerServer, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 import { senden } from '../../onlinetest/serverApi'
 import { erkenne, type Strich } from './erkennung'
-import { gelegtText, LEER, leerAnhaengen, nurBuchstaben, tippStand, zuordnen, type Kachel } from './legeLogik'
+import { gelegtText, LEER, leerAnhaengen, nurBuchstaben, passendeKachel, tippStand, zuordnen, type Kachel } from './legeLogik'
 
-export { gelegtText, LEER, leerAnhaengen, nurBuchstaben, tippStand, zuordnen, type Kachel }
+export { gelegtText, LEER, leerAnhaengen, nurBuchstaben, passendeKachel, tippStand, zuordnen, type Kachel }
 
 type Art = 'legen' | 'tippen' | 'schreiben'
 
@@ -27,6 +27,8 @@ const imFeld = (t: EventTarget | null): boolean => {
  *  - `leerzeichen` (schwerste Stufe): Leerzeichen setzen die Lernenden selbst – mit der Leertaste oder dem Knopf
  *    „Leerzeichen", der bei JEDEM Wort bereitsteht und so nichts verrät.
  *  - `anzeige`: was das Tippfeld zeigt (im Trainer mit den Leerzeichen der Lösung, die schon dastehen).
+ *  - `loesung` (10.10.2026): Buchstaben der Lösung der Reihe nach – getippte/geschriebene Buchstaben nehmen das Plättchen
+ *    in der Schreibung ihrer Stelle („i like" → „I like", nicht „i lIke").
  */
 export default function LegeEingabe({
   kacheln,
@@ -37,6 +39,7 @@ export default function LegeEingabe({
   anzahl,
   leerzeichen = false,
   anzeige,
+  loesung = '',
   children
 }: {
   kacheln: Kachel[]
@@ -51,6 +54,8 @@ export default function LegeEingabe({
   leerzeichen?: boolean
   /** Text im Tippfeld zum Gelegten (sonst die Buchstaben hintereinander) */
   anzeige?: (gelegt: number[]) => string
+  /** Buchstaben der Lösung der Reihe nach, ohne Leerzeichen/Apostrophe (Groß/Klein der Plättchen je Stelle) */
+  loesung?: string
   /** Die Plättchen zum Antippen (bleiben in jeder Art sichtbar) */
   children: React.ReactNode
 }): React.JSX.Element {
@@ -66,8 +71,8 @@ export default function LegeEingabe({
   }
   const komplett = nurBuchstaben(gelegt).length >= voll
   // Aktueller Stand für die Tastatur (der Horcher hängt einmal am Fenster)
-  const stand = useRef({ gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll })
-  stand.current = { gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll }
+  const stand = useRef({ gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll, loesung })
+  stand.current = { gelegt, kacheln, art, gesperrt, komplett, fertig, setGelegt, leerzeichen, voll, loesung }
   useEffect(() => {
     const taste = (e: KeyboardEvent): void => {
       const s = stand.current
@@ -99,7 +104,10 @@ export default function LegeEingabe({
       else tippFeld.current?.focus()
       const r = zuordnen(
         e.key,
-        s.kacheln.filter((k) => !s.gelegt.includes(k.i))
+        s.kacheln.filter((k) => !s.gelegt.includes(k.i)),
+        false,
+        s.loesung,
+        nurBuchstaben(s.gelegt).length
       )
       if (!r.fehlt && nurBuchstaben(s.gelegt).length < s.voll) s.setGelegt([...s.gelegt, ...r.gelegt])
     }
@@ -145,9 +153,10 @@ export default function LegeEingabe({
           voll={voll}
           leerzeichen={leerzeichen}
           anzeige={anzeige}
+          loesung={loesung}
         />
       )}
-      {art === 'schreiben' && <Schreiben kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} voll={voll} />}
+      {art === 'schreiben' && <Schreiben kacheln={kacheln} gelegt={gelegt} setGelegt={setGelegt} gesperrt={gesperrt} voll={voll} loesung={loesung} />}
     </Stack>
   )
 }
@@ -170,7 +179,8 @@ function Tippen({
   fertig,
   voll,
   leerzeichen,
-  anzeige
+  anzeige,
+  loesung
 }: {
   feld: React.RefObject<HTMLInputElement | null>
   kacheln: Kachel[]
@@ -181,6 +191,7 @@ function Tippen({
   voll: number
   leerzeichen: boolean
   anzeige?: (gelegt: number[]) => string
+  loesung: string
 }): React.JSX.Element {
   const [fehlt, setFehlt] = useState('')
   const text = anzeige ? anzeige(gelegt) : gelegtText(gelegt, kacheln)
@@ -197,7 +208,7 @@ function Tippen({
         ref={feld}
         value={text}
         onChange={(e) => {
-          const r = tippStand({ text, gelegt }, e.currentTarget.value, kacheln, leerzeichen)
+          const r = tippStand({ text, gelegt }, e.currentTarget.value, kacheln, leerzeichen, loesung)
           setFehlt(r.fehlt ?? '')
           if (!r.fehlt && nurBuchstaben(r.gelegt).length <= voll) setGelegt(r.gelegt)
         }}
@@ -238,13 +249,15 @@ function Schreiben({
   gelegt,
   setGelegt,
   gesperrt,
-  voll
+  voll,
+  loesung
 }: {
   kacheln: Kachel[]
   gelegt: number[]
   setGelegt: (g: number[]) => void
   gesperrt: boolean
   voll: number
+  loesung: string
 }): React.JSX.Element {
   const flaeche = useRef<HTMLCanvasElement>(null)
   const striche = useRef<Strich[]>([])
@@ -252,8 +265,8 @@ function Schreiben({
   const uhr = useRef<number | undefined>(undefined)
   // Für die Korrektur: die anderen Möglichkeiten zum zuletzt erkannten Buchstaben
   const [andere, setAndere] = useState<string[]>([])
-  const stand = useRef({ gelegt, kacheln, setGelegt })
-  stand.current = { gelegt, kacheln, setGelegt }
+  const stand = useRef({ gelegt, kacheln, setGelegt, loesung })
+  stand.current = { gelegt, kacheln, setGelegt, loesung }
 
   const freie = (g: number[]): Kachel[] => kacheln.filter((k) => !g.includes(k.i))
 
@@ -265,13 +278,13 @@ function Schreiben({
   }
 
   const auswerten = (): void => {
-    const { gelegt: g, kacheln: alle, setGelegt: legen } = stand.current
+    const { gelegt: g, kacheln: alle, setGelegt: legen, loesung: soll } = stand.current
     const frei = alle.filter((k) => !g.includes(k.i))
     const treffer = erkenne(striche.current, frei.map((k) => k.b))
     leeren()
     if (!treffer.length) return
     const z = treffer[0].zeichen
-    const k = frei.find((x) => x.b === z) ?? frei.find((x) => x.b.toLowerCase() === z)
+    const k = frei[passendeKachel(frei, z, [...soll][nurBuchstaben(g).length])]
     if (!k) return
     legen([...g, k.i])
     setAndere(treffer.slice(1, 4).map((t) => t.zeichen))
@@ -368,7 +381,8 @@ function Schreiben({
                   variant="default"
                   onClick={() => {
                     const vorher = gelegt.slice(0, -1)
-                    const k = freie(vorher).find((x) => x.b.toLowerCase() === z)
+                    const frei = freie(vorher)
+                    const k = frei[passendeKachel(frei, z, [...loesung][nurBuchstaben(vorher).length])]
                     if (!k) return
                     setGelegt([...vorher, k.i])
                     setAndere([])

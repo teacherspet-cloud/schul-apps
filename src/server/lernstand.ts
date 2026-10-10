@@ -4,6 +4,7 @@
  *
  *  GET  /s/api/lernstand          Stand (je Bereich), Fleiß, Leistung, Zustand der Begrüßung, Wochenserie, genau ein Tipp
  *  POST /s/api/lernstand/gelesen  Wochenrückblick (KI-Tipp) gelesen – danach wieder die festen Tipps
+ *  GET  /s/api/maskottchen?fach=&pose=  Bild der Figur für die Begrüßung (10.10.2026), nur PNG, sonst 404 (Eule)
  *
  * Getragen von dem, was es schon gibt: Kästen (Vokabeln, Grammatik), Arbeitsblätter, Reihen, Tests.
  * Neu ist nur ein Wochen-Schnappschuss je Person (für den Trend gegenüber früher – nie gegen andere)
@@ -27,6 +28,9 @@ import { fachAusName } from '../shared/faecher'
 import { blattIstFuer, blattKurz } from './arbeitsblaetter'
 import type { WortStand } from '../shared/vokabeltrainer'
 import type { StructuredRequest } from '../shared/types'
+import type { MaskottchenInfo } from '../shared/maskottchen'
+import { listMaskottchen, schulMaskottchen } from '../main/services/storage/maskottchen'
+import { getSettings } from '../main/services/storage/settings'
 import {
   fleissAus,
   jahrgangAus,
@@ -502,13 +506,19 @@ export function lerntippAnfrage(g: Pick<Gesammelt, 'antwort' | 'prompt' | 'aktio
 }
 
 /** Lehrkraft, in deren Namen der Tipp entsteht: die mit den meisten Materialien für die Person, sonst die einer Lerngruppe */
-function lehrkraftFuer(ich: NutzerInfo): NutzerInfo | null {
+function lehrkraftFuer(ich: NutzerInfo, fach?: string): NutzerInfo | null {
   const punkte = new Map<string, number>()
+  // Mit Fach (Maskottchen der Startseite, 10.10.2026): Material dieses Fachs zählt zehnfach
+  const ziel = fach ? (fachAusName(fach)?.label ?? fach) : ''
+  const gewicht = (f: string | undefined): number => (ziel && f && (fachAusName(f)?.label ?? f) === ziel ? 10 : 1)
   const plus = (id: string | undefined, n: number): void => void (id && punkte.set(id, (punkte.get(id) ?? 0) + n))
-  for (const g of gruppenVon(ich)) plus(g.lehrkraft_id, 1)
-  for (const v of sicher(() => vokabelListenFuer(ich), [])) plus(sicher(() => vokZeile(v.id)?.lehrkraft_id, undefined), 2)
+  for (const g of gruppenVon(ich)) plus(g.lehrkraft_id, gewicht(g.fach))
+  for (const v of sicher(() => vokabelListenFuer(ich), [])) plus(sicher(() => vokZeile(v.id)?.lehrkraft_id, undefined), 2 * gewicht(v.fach))
   for (const g of sicher(() => grammatikFuer(ich), []))
-    plus(sicher(() => (db().prepare('SELECT lehrkraft_id FROM gram_zuweisungen WHERE id = ?').get(g.id) as { lehrkraft_id: string } | undefined)?.lehrkraft_id, undefined), 2)
+    plus(
+      sicher(() => (db().prepare('SELECT lehrkraft_id FROM gram_zuweisungen WHERE id = ?').get(g.id) as { lehrkraft_id: string } | undefined)?.lehrkraft_id, undefined),
+      2 * gewicht(g.fach)
+    )
   const beste = [...punkte.entries()].sort((a, b) => b[1] - a[1])
   for (const [id] of beste) {
     const n = nutzerNachId(id)
@@ -564,9 +574,66 @@ function kiTippAnzeigen(ich: NutzerInfo, g: Gesammelt, jetzt = Date.now()): Tipp
   return { text: w.ki.text, knopf, strategie: w.ki.strategie, quelle: 'ki' }
 }
 
+/*
+ * Maskottchen der Begrüßung (10.10.2026, Wunsch der Lehrkraft): statt der Eule die Figur der Lehrkraft des Fachs, um
+ * das es „Als Nächstes" geht (sonst des Hauptfachs) – ihre Standardfigur aus den Einstellungen, sonst ihre erste, sonst
+ * eine Figur der Schule. Nur das Bild geht an die Lernenden (kein Name, keine Beschreibung). Ohne Figur 404 – dann
+ * zeigt die Startseite die Eule.
+ */
+const START_POSE: Record<string, string[]> = {
+  jubelt: ['jubelnd'],
+  winkt: ['winkend'],
+  coach: ['zeigend', 'sprechend'],
+  lupe: ['denkend', 'lesend'],
+  cool: ['jubelnd', 'winkend']
+}
+const figurCache = new Map<string, { png: Buffer | null; zeit: number }>()
+
+function bildAusDataUrl(d: string | undefined): Buffer | null {
+  const komma = d ? d.indexOf(',') : -1
+  return d && komma > 0 && /^data:image\/png;base64/i.test(d) ? Buffer.from(d.slice(komma + 1), 'base64') : null
+}
+
+function figurWaehlen(liste: MaskottchenInfo[], standardId: string | undefined, pose: string): Buffer | null {
+  const m = liste.find((x) => x.id === standardId) ?? liste[0]
+  if (!m) return null
+  const passend = (START_POSE[pose] ?? ['winkend']).map((p) => m.posen[p]).find(Boolean)
+  return bildAusDataUrl(passend || m.posen.winkend || m.vorlage)
+}
+
+export function startMaskottchen(ich: NutzerInfo, fach: string, pose: string): Buffer | null {
+  const lk = sicher(() => lehrkraftFuer(ich, fach || undefined), null)
+  const schluessel = `${lk?.id ?? '-'}|${fach}|${pose}`
+  const c = figurCache.get(schluessel)
+  if (c && Date.now() - c.zeit < 10 * 60_000) return c.png
+  let png: Buffer | null = null
+  if (lk)
+    png = sicher(
+      () =>
+        imNutzer(alsNutzer(lk), () => {
+          const liste = listMaskottchen()
+          return figurWaehlen(liste, getSettings().illustrationen?.standardId, pose)
+        }),
+      null
+    )
+  if (!png) png = sicher(() => figurWaehlen(schulMaskottchen(), undefined, pose), null)
+  figurCache.set(schluessel, { png, zeit: Date.now() })
+  return png
+}
+
 export function lernstandRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
   return async (k) => {
     const { url, req, res, sitzung } = k
+    if (url.pathname === '/s/api/maskottchen') {
+      if (req.method !== 'GET') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
+      if (!sitzung || sitzung.nutzer.rolle !== 'schueler' || sitzung.nutzer.quelle === 'gast') return (json(res, 404, { fehler: 'Keine Figur.' }), true)
+      const pose = String(url.searchParams.get('pose') ?? 'winkt')
+      const fach = String(url.searchParams.get('fach') ?? '').trim().slice(0, 60)
+      const png = startMaskottchen(sitzung.nutzer, fach, START_POSE[pose] ? pose : 'winkt')
+      if (!png) return (json(res, 404, { fehler: 'Keine Figur.' }), true)
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'private, max-age=600' })
+      return (res.end(png), true)
+    }
     if (url.pathname !== '/s/api/lernstand' && url.pathname !== '/s/api/lernstand/gelesen') return false
     if (!sitzung || sitzung.nutzer.quelle === 'gast') return (json(res, 401, { fehler: 'Nur mit Konto.' }), true)
     const ich = sitzung.nutzer

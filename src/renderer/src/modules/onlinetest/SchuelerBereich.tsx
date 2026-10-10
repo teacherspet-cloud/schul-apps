@@ -97,7 +97,7 @@ import LernRaum from '../lernen/LernRaum'
 import Regal from '../lernen/regal/Regal'
 import { FreischaltungHinweis } from '../lernen/regal/planHinweise'
 import Ordner from '../lernen/regal/Ordner'
-import { StartVokabeln, useSprachstand } from '../lernen/regal/Sprachstand'
+import { useSprachstand } from '../lernen/regal/Sprachstand'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { useDarstellung } from './schuelerDarstellung'
 import Willkommen from './Willkommen'
@@ -567,6 +567,10 @@ function Startseite(): React.JSX.Element {
   const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
   // Kurse nur aus früheren Schuljahren (`alt`) melden nichts (10.10.2026)
   const faelligeVok = vok?.filter((v) => !v.alt && (v.uebersicht.heuteOffen ?? v.uebersicht.faellig) > 0) ?? []
+  // Kurse, die schon in einer Sprachrunde stecken, nicht noch einmal einzeln anbieten (Konten); eigene Listen ohne
+  // Lehrwerk (nurKurse) dagegen schon – so gibt es immer einen Weg zum Üben (10.10.2026, Sprachkarte entfallen)
+  const inSprachrunde = new Set((sprachen ?? []).filter((x) => !x.nurKurse).flatMap((x) => x.kurse.map((k) => k.id)))
+  const kursRunde = faelligeVok.find((v) => !konto || !inSprachrunde.has(v.id))
   /*
    * „Mein Lernraum" (08.10.2026, Befund der Lehrkraft): statt der wachsenden Themenbereiche die fünf neuesten
    * Materialien jeder Art, jedes direkt zu öffnen. Erst wenn alle Listen da sind – sonst springt die Reihenfolge.
@@ -586,8 +590,9 @@ function Startseite(): React.JSX.Element {
   }, [vok, gram, tests, blaetter, aufgaben])
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
   // Das Wichtigste zuerst: ein laufender Test, dann die Reihe, dann Blätter und Aufgaben
-  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string } | null = offeneTests[0]
+  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = offeneTests[0]
     ? {
+        fach: offeneTests[0].fach,
         titel: offeneTests[0].titel,
         text: offeneTests[0].wartend ? 'Dein Test startet gleich.' : 'Ein Test ist für dich offen.',
         href: `/s/t/${offeneTests[0].code}`,
@@ -604,22 +609,25 @@ function Startseite(): React.JSX.Element {
       }
     : sprachRunde
     ? {
+        fach: sprachRunde.fach,
         titel: sprachRunde.aktuell ? `${sprachRunde.fach} · ${sprachRunde.aktuell.name}` : sprachRunde.fach,
         text: `${sprachRunde.heute.anzahl} ${sprachRunde.heute.anzahl === 1 ? 'Wort' : 'Wörter'} für heute – ein paar Minuten genügen.`,
         href: `/s/ordner/${encodeURIComponent(sprachRunde.fach)}?r=vok&uebung=runde`,
         knopf: 'Vokabeln üben',
         farbe: 'grape'
       }
-    : faelligeVok[0] && !konto
+    : kursRunde
     ? {
-        titel: faelligeVok[0].titel,
-        text: `${faelligeVok[0].uebersicht.heuteOffen ?? faelligeVok[0].uebersicht.faellig} Wörter für heute – ein paar Minuten genügen.`,
-        href: `/s/v/${faelligeVok[0].id}`,
+        fach: kursRunde.fach,
+        titel: kursRunde.titel,
+        text: `${kursRunde.uebersicht.heuteOffen ?? kursRunde.uebersicht.faellig} Wörter für heute – ein paar Minuten genügen.`,
+        href: `/s/v/${kursRunde.id}`,
         knopf: 'Vokabeln üben',
         farbe: 'grape'
       }
     : offeneBlaetter[0]
     ? {
+        fach: offeneBlaetter[0].fach,
         titel: offeneBlaetter[0].titel,
         text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
         href: `/s/b/${offeneBlaetter[0].id}`,
@@ -628,6 +636,7 @@ function Startseite(): React.JSX.Element {
       }
     : offeneAufgaben[0]
     ? {
+        fach: offeneAufgaben[0].fach,
         titel: offeneAufgaben[0].titel,
         text: 'Eine Aufgabe mit Feedback ist offen.',
         href: `/s/a/${offeneAufgaben[0].id}`,
@@ -653,11 +662,17 @@ function Startseite(): React.JSX.Element {
         avatar={titel?.avatar ?? null}
         stand={stand}
         naechstes={naechstes ? { text: naechstes.knopf, href: naechstes.href } : null}
-        // EIN Knopf je Runde (10.10.2026): „Als Nächstes" oder die Sprachkarte haben ihn schon
-        ohneKnopf={Boolean(naechstes) || Boolean(konto && (sprachen ?? []).some((x) => !x.nurKurse && x.aktuell))}
+        // EIN Knopf je Runde (10.10.2026): „Als Nächstes" hat ihn, die Begrüßung dann keinen
+        ohneKnopf={Boolean(naechstes)}
+        // Maskottchen (10.10.2026): Figur der Lehrkraft des Fachs von „Als Nächstes", sonst des Hauptfachs
+        figurFach={naechstes?.fach || sprachen?.[0]?.fach || vok?.find((v) => !v.alt)?.fach || null}
+        figurAnfragen={konto}
       />
-      {stand && <TippKarte stand={stand} gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)} />}
 
+      {/* „Als Nächstes" breit, daneben kompakt der Tipp (10.10.2026); am Telefon untereinander, „Als Nächstes" zuerst.
+          Die Sprachkarten darunter sind entfallen – die Runde steht unter „Als Nächstes". */}
+      {(naechstes || stand?.tipp) && (
+      <div className={`sa-start-paar${naechstes && stand?.tipp ? ' zwei' : ''}`} data-start-paar>
       {naechstes && (
         <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
           <div className="sa-naechstes-reihe">
@@ -692,8 +707,9 @@ function Startseite(): React.JSX.Element {
           </div>
         </Paper>
       )}
-
-      {konto && <StartVokabeln sprachen={sprachen} ohneKnopf={Boolean(naechstes && /\/s\/(ordner|v|vw)\//.test(naechstes.href))} />}
+      {stand && <TippKarte stand={stand} gelesen={() => void senden('/s/api/lernstand/gelesen', {}).then(standLaden, () => undefined)} />}
+      </div>
+      )}
 
       {stand ? <Lernstand stand={stand} neueste={neueste} /> : standFehlt && <MeinLernraum neueste={neueste} />}
 
@@ -786,6 +802,9 @@ const STARTSEITE_CSS = `
 .sa-puls { animation: sa-pulsieren 1.6s ease-out 1; }
 html.sa-ruhig .sa-puls { animation: none; }
 .sa-naechstes { background: var(--mantine-color-body); }
+/* „Als Nächstes" + Tipp nebeneinander (10.10.2026): links breit, rechts der Tipp kompakt; schmal untereinander */
+.sa-start-paar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }
+@media (min-width: 701px) { .sa-start-paar.zwei { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); } }
 /* Als Nächstes (10.10.2026, Befund: am Telefon stand nur „Voka…"): Knopf neben dem Text, wenn Platz ist, sonst darunter in voller Breite – nie abgeschnitten */
 .sa-naechstes-reihe { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
 .sa-naechstes-knopf { flex: none; }

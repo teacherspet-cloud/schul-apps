@@ -130,8 +130,8 @@ try {
   pruefe(await da(p.locator('[data-ordner="Englisch"]')), 'Ordner Englisch aufgeschlagen')
   await p.waitForTimeout(700)
   pruefe(
-    JSON.stringify(await p.locator('[data-lasche]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lasche')))) === '["vok","wort","abc","gram"]',
-    'Register: Vocabulary, My Books, Alphabetical list und Grammar (ohne Materialien)'
+    JSON.stringify(await p.locator('[data-lasche]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lasche')))) === '["vok","gram","wort","abc"]',
+    'Register: Vocabulary, Grammar, My Books und Alphabetical list (ohne Materialien)'
   )
   await p.screenshot({ path: join(out, '2-ordner-vok.png') })
   await p.locator('[data-lasche="gram"]').click()

@@ -413,6 +413,7 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
         gesperrt={rueck !== null}
         fertig={pruefen}
         anzahl={ziel.length}
+        loesung={ziel}
       >
         <Group gap={6} justify="center" maw={520}>
           {kacheln.map((b, k) => (

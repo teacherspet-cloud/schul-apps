@@ -74,6 +74,7 @@ import {
   auswahlFsOptionen,
   auswahlOptionen,
   buchstaben,
+  loesungsBuchstaben,
   leerzeichenSelbst,
   mitApostrophen,
   mitLeerzeichen,
@@ -1545,6 +1546,7 @@ function Buchstaben({
         gesperrt={gesperrt}
         fertig={() => pruefen(wort)}
         leerzeichen={schwer}
+        loesung={loesungsBuchstaben(ziel)}
         anzeige={(g) => (schwer ? mitApostrophen(ziel, gelegtText(g, kacheln)) : mitLeerzeichenVoraus(ziel, gelegtText(g, kacheln)))}
       >
         <Group gap={6} justify="center">
