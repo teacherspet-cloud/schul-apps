@@ -1,6 +1,6 @@
-import { AppKopf } from '../../shared/components/AppKopf'
-import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Select, Stack, Text, Title } from '@mantine/core'
-import { IconPencil } from '@tabler/icons-react'
+import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
+import { BandCover } from '../../shared/components/BandCover'
+import { Alert, Badge, Chip, Container, Group, Progress, ScrollArea, Stack, Text, Title, UnstyledButton } from '@mantine/core'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { reiheTitel } from '@shared/lehrwerkReihe'
@@ -30,6 +30,7 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
   const [books, setBooks] = useState<TextbookMeta[]>([])
   const [eintraege, setEintraege] = useState<LehrwerkGrammatikEintrag[]>([])
   const [offen, setOffen] = useState<string | null>(null)
+  const farbe = useProgrammFarbe()
   const [sprache, setSprache] = useState<string>(() => {
     try {
       return localStorage.getItem(SPRACHE_KEY) || 'en'
@@ -103,74 +104,104 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
           suche={false}
           beschreibung="Grammatik je Lehrwerk, Unit und Abschnitt – Grundlage für die Grammatikauswahl, die Kurse im Sprachenlernen und das Vorwissen bei der Materialerstellung."
         />
-        <Card withBorder mb="md">
-          <Group align="flex-end">
-            <Select
-              label="Fach"
-              data={sprachen}
-              value={sprache}
-              onChange={(v) => v && setSprache(v)}
-              allowDeselect={false}
-              leftSection={<FachPunkt fach={sprache} />}
-              w={240}
-              data-grammatikformen-fach
-            />
-            {!darfLehrwerkBearbeiten(sprache) && (
-              <Text size="sm" c="dimmed">
-                Nur ansehen – bearbeiten dürfen Admins und die Fachobleute dieses Fachs.
-              </Text>
-            )}
-          </Group>
-        </Card>
+        <Stack gap={6} mb="lg">
+          <Chip.Group value={sprache} onChange={(v) => typeof v === 'string' && setSprache(v)}>
+            <Group gap={6} data-grammatikformen-fach>
+              {sprachen.map((s) => (
+                <Chip key={s.value} value={s.value} color={farbe} variant="light" data-grammatikformen-fach-chip={s.value}>
+                  <Group gap={6} wrap="nowrap" component="span">
+                    <FachPunkt fach={s.value} />
+                    {s.label}
+                  </Group>
+                </Chip>
+              ))}
+            </Group>
+          </Chip.Group>
+          {!darfLehrwerkBearbeiten(sprache) && (
+            <Text size="xs" c="dimmed">
+              Nur ansehen – bearbeiten dürfen Admins und die Fachobleute dieses Fachs.
+            </Text>
+          )}
+        </Stack>
         {!liste.length && <Alert color="gray">Für dieses Fach ist noch kein Lehrwerk hinterlegt. Lehrwerke kommen über „Vokabellisten“ dazu.</Alert>}
-        <Stack gap="lg">
+        <Stack gap={36}>
           {reihen.map(([reihe, baende]) => (
-            <Stack key={reihe} gap="xs">
-              <Title order={4}>{reihe}</Title>
-              {baende.map((b) => {
-                const bearbeitet = eintraege.some((e) => e.lehrwerkId === b.id)
-                const eingebaut = Boolean(LEHRWERK_GRAMMATIK_EINGEBAUT[b.name])
-                const zahl = punkteIn(b.name)
-                return (
-                  <Card key={b.id} withBorder padding="sm" data-grammatikformen-buch={b.id}>
-                    <Group justify="space-between" wrap="nowrap">
-                      <div style={{ minWidth: 0 }}>
-                        <Group gap="xs">
-                          <Text fw={600}>{b.name}</Text>
-                          {bearbeitet ? (
-                            <Badge variant="light" color="violet">
-                              bearbeitet
-                            </Badge>
-                          ) : eingebaut ? (
-                            <Badge variant="light">eingebaut</Badge>
-                          ) : null}
-                          <Badge variant="light" color={zahl ? 'teal' : 'gray'}>
-                            {zahl ? `${zahl} ${zahl === 1 ? 'Grammatikpunkt' : 'Grammatikpunkte'}` : 'noch keine Grammatik'}
-                          </Badge>
-                        </Group>
-                        <Text size="xs" c="dimmed">
-                          {[
-                            b.grade ? `Klasse ${b.grade}` : '',
-                            schulformName(b.schoolTypeId, b.stateId) ?? '',
-                            b.edition ?? '',
-                            b.ausgabe ?? '',
-                            `${b.units.length} Units`
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </Text>
-                      </div>
-                      <Button size="xs" leftSection={<IconPencil size={14} />} onClick={() => setOffen(b.id)}>
-                        {darfLehrwerkBearbeiten(b.language) ? 'Bearbeiten' : 'Ansehen'}
-                      </Button>
-                    </Group>
-                  </Card>
-                )
-              })}
-            </Stack>
+            <section key={reihe} data-grammatikformen-reihe={reihe}>
+              <Title order={4} mb="sm">
+                {reihe}
+              </Title>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: 16,
+                  alignItems: 'end',
+                  paddingBottom: 10,
+                  borderBottom: '6px solid var(--mantine-color-default-border)',
+                  borderRadius: 2
+                }}
+              >
+                {baende.map((b) => (
+                  <BandKachel key={b.id} buch={b} farbe={farbe} bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)} onOpen={() => setOffen(b.id)} />
+                ))}
+              </div>
+            </section>
           ))}
         </Stack>
       </Container>
     </ScrollArea>
+  )
+}
+
+/** Ein Band im Regal: Cover oben, darunter Name, Klasse, Zahl der Grammatikpunkte, Füllbalken und Kennzeichen */
+function BandKachel({ buch, farbe, bearbeitet, onOpen }: { buch: TextbookMeta; farbe: string; bearbeitet: boolean; onOpen: () => void }): React.JSX.Element {
+  const eingebaut = Boolean(LEHRWERK_GRAMMATIK_EINGEBAUT[buch.name])
+  const zahl = punkteIn(buch.name)
+  const g = LEHRWERK_GRAMMATIK[buch.name] ?? {}
+  const mit = buch.units.filter((u) => Object.values(g[u.name] ?? {}).some((l) => l.length)).length
+  const gesamt = buch.units.length
+  const zeile = [buch.grade ? `Klasse ${buch.grade}` : '', schulformName(buch.schoolTypeId, buch.stateId) ?? '', buch.ausgabe ?? ''].filter(Boolean).join(' · ')
+  return (
+    <UnstyledButton
+      onClick={onOpen}
+      data-grammatikformen-buch={buch.id}
+      aria-label={`${buch.name} ${darfLehrwerkBearbeiten(buch.language) ? 'bearbeiten' : 'ansehen'}`}
+      className="grammatikformen-kachel"
+      style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 'var(--mantine-radius-md)' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <BandCover band={buch} land={buch.stateId ?? ''} breite={104} />
+      </div>
+      <Text fw={700} size="sm" lh={1.25} lineClamp={2}>
+        {buch.name}
+      </Text>
+      {zeile && (
+        <Text size="xs" c="dimmed" lh={1.25} lineClamp={2}>
+          {zeile}
+        </Text>
+      )}
+      <Text size="xs" c={zahl ? undefined : 'dimmed'}>
+        {zahl ? `${zahl} ${zahl === 1 ? 'Grammatikpunkt' : 'Grammatikpunkte'}` : 'noch keine Grammatik'}
+      </Text>
+      <div title="Units mit Grammatik">
+        <Progress value={gesamt ? (mit / gesamt) * 100 : 0} size={4} color={farbe} radius="xl" aria-label="Units mit Grammatik" />
+        <Text size="10px" c="dimmed" mt={2}>
+          Units mit Grammatik {mit}/{gesamt}
+        </Text>
+      </div>
+      {(bearbeitet || eingebaut) && (
+        <Group gap={4}>
+          {bearbeitet ? (
+            <Badge size="xs" variant="light" color="gray" tt="none">
+              bearbeitet
+            </Badge>
+          ) : (
+            <Badge size="xs" variant="light" color="gray" tt="none">
+              eingebaut
+            </Badge>
+          )}
+        </Group>
+      )}
+    </UnstyledButton>
   )
 }

@@ -16,7 +16,7 @@
 import { grammatikRoute } from './grammatik'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
-import { achievementsRoute } from './achievements'
+import { achievementsRoute, alleBerichtigen } from './achievements'
 import { klassenRoute } from './klassen'
 import { foerdernRoute } from './foerdern'
 import { startseiteRoute } from './startseite'
@@ -273,6 +273,8 @@ async function main(): Promise<void> {
   // Medienbank (10.10.2026): doppelte Aufnahmen derselben Vokabel zählen – beim Start und nach Medienaufträgen, Protokollzeile nur bei Dubletten
   dublettenMelder((zeile) => protokolliereServer('medien', zeile))
   setTimeout(() => dublettenPruefen(), 25_000).unref?.()
+  // Medaillen still auf die neue Regel berichtigen (12.10.2026) – einmal je Person, auch ohne dass sie die App öffnet
+  setTimeout(() => void alleBerichtigen().catch(() => undefined), 30_000).unref?.()
   // Kurse aus IServ (10.10.2026): beim Start einmal für alle Lehrkräfte (Gruppen aus ihrer letzten Anmeldung)
   try {
     const k = alleKursgruppenSichern()

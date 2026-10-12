@@ -249,7 +249,7 @@ try {
   pruefe(await da(kopfP), 'PC: Kopfleiste des Rahmens')
   // Kopf-Kasten wie in den Apps (12.10.2026, Wunsch der Lehrkraft) – genau einer, der alte Startseiten-Kopf bleibt weg
   pruefe(
-    (await p.locator('.home-hero, [data-home-kopf]').count()) === 0 && (await p.locator('[data-startseite] [data-app-kopf]').count()) === 1,
+    (await p.locator('.home-hero, [data-home-kopf]').count()) === 0 && (await p.locator('[data-startseite] [data-start-begruessung]').count()) === 1,
     'PC: Kopf-Kasten wie in den Apps (einmal, nichts doppelt)'
   )
   const datumP = ((await kopfP.locator('[data-rahmen-datum]').innerText().catch(() => '')) ?? '').trim()

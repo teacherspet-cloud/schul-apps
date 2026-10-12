@@ -107,7 +107,8 @@ describe('Medienauftrag wartet bei Begrenzung und macht weiter', () => {
       return 'ok'
     })
     await vi.advanceTimersByTimeAsync(0)
-    expect(gruende[0]).toMatch(/^Die Sprach-KI ist ausgelastet – wartet bis \d{2}:\d{2}$/)
+    // Ehrlicher Wartetext (12.10.2026): eine 429 heißt „zu viele Anfragen", nicht pauschal „ausgelastet"
+    expect(gruende[0]).toMatch(/^Die Sprach-KI meldet zu viele Anfragen – wartet bis \d{2}:\d{2}$/)
     // Der Nachbarauftrag fragt während der Sperre nicht an
     let nachbar = 0
     const zweiter = beimDienst(k, 'sprache', async () => ++nachbar)

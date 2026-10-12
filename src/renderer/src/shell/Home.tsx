@@ -8,7 +8,8 @@ import { IconChevronDown, IconChevronRight, IconUsersGroup } from '@tabler/icons
 import { kurzfassung, type StartKlasse, type StartseiteDaten } from '@shared/startseiteKurse'
 import { useKopfDaten } from './kopfDaten'
 import { useStartAnzahl, useStartOffen } from './StartAnzahl'
-import { AppKopf, ProgrammInfo } from '../shared/components/AppKopf'
+import { ProgrammInfo } from '../shared/components/AppKopf'
+import StartBegruessung from './StartBegruessung'
 import { modules } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
 import { openDocument, openSettings, openThemen } from '../shared/navigation'
@@ -233,9 +234,8 @@ export default function Home(): React.JSX.Element {
   return (
     <ProgrammInfo.Provider value={START_INFO}>
       <Container size="lg" py={handy ? 16 : 32} style={{ height: '100%', overflow: 'auto' }} data-startseite>
-        {/* Kopf-Kasten wie in den Apps (12.10.2026); Schulpaket (nur am PC) bei den Zusätzen rechts */}
-        <AppKopf
-          suche={false}
+        {/* Kopf (12.10.2026, abgestimmt): Begrüßung + Tagesleiste mit Bild; Schulpaket (nur am PC) unter der Begrüßung */}
+        <StartBegruessung
           zusaetze={
             !imNetz() ? (
               <SchulpaketKnoepfe

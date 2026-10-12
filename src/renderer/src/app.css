@@ -1578,3 +1578,8 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
 .app-leiste[data-dichte] .leiste-oben {
   margin-bottom: 6px;
 }
+
+/* App „Grammatikformen" (12.10.2026): Band-Kacheln im Regal */
+.grammatikformen-kachel { transition: background-color 120ms ease, transform 120ms ease; }
+.grammatikformen-kachel:hover { background: var(--mantine-color-default-hover); transform: translateY(-2px); }
+.grammatikformen-kachel:focus-visible { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 2px; }

@@ -52,6 +52,15 @@ import { verknuepfungLoesen } from './kontoVerknuepfung'
 import type { NutzerInfo } from './datenbank'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
+/**
+ * Grund eines fehlgeschlagenen IServ-Abgleichs fürs Protokoll (12.10.2026, Befund der Lehrkraft: „Prüfen fehlgeschlagen"
+ * ohne Grund war nicht nachvollziehbar). Nur die Fehlermeldung – sie nennt keine Konten oder Personen.
+ */
+function abgleichGrund(e: unknown): string {
+  const m = (e instanceof Error ? e.message : String(e ?? '')).replace(/\s+/g, ' ').trim()
+  return (e instanceof AbgleichFehler ? m : `IServ nicht erreichbar (${m || 'unbekannter Fehler'})`).slice(0, 300)
+}
+
 export const TEILBARE_SCHLUESSEL: SecretName[] = [
   'openai',
   'anthropic',
@@ -249,7 +258,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
       protokolliereServer('verwaltung', `IServ-Abgleich geprüft (${plan.entfernen.length} von ${plan.geprueft} fehlen in IServ, ${plan.loesen.length} Verknüpfungen${plan.abbruch ? ', abgebrochen' : ''})`, ich)
       return (json(res, 200, { ...plan, schwelle, kennung }), true)
     } catch (e) {
-      protokolliereServer('verwaltung', 'IServ-Abgleich: Prüfen fehlgeschlagen', ich)
+      protokolliereServer('verwaltung', `IServ-Abgleich: Prüfen fehlgeschlagen – ${abgleichGrund(e)}`, ich)
       return (json(res, e instanceof AbgleichFehler ? 400 : 502, { fehler: e instanceof AbgleichFehler ? e.message : 'IServ war für den Abgleich nicht erreichbar.' }), true)
     }
   }
@@ -269,7 +278,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
         .filter((n): n is NutzerInfo => Boolean(n) && !abgleichGeschuetzt(n!, ich))
       loesen = plan.loesen.filter((x) => gezeigt.has(x.id)).map((x) => x.id)
     } catch (e) {
-      protokolliereServer('verwaltung', 'IServ-Abgleich: erneutes Prüfen fehlgeschlagen, nichts entfernt', ich)
+      protokolliereServer('verwaltung', `IServ-Abgleich: erneutes Prüfen fehlgeschlagen, nichts entfernt – ${abgleichGrund(e)}`, ich)
       return (json(res, e instanceof AbgleichFehler ? 400 : 502, { fehler: e instanceof AbgleichFehler ? e.message : 'IServ war für den Abgleich nicht erreichbar – nichts entfernt.' }), true)
     }
     if (!ziele.length && !loesen.length) return (json(res, 200, { entfernt: 0, geloest: 0, sicherung: '' }), true)
@@ -277,7 +286,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     try {
       sicherung = basename(sicherungVorAbgleich(DATEN))
     } catch (e) {
-      protokolliereServer('verwaltung', 'IServ-Abgleich: Sicherung fehlgeschlagen, nichts entfernt', ich)
+      protokolliereServer('verwaltung', `IServ-Abgleich: Sicherung fehlgeschlagen, nichts entfernt – ${abgleichGrund(e)}`, ich)
       return (json(res, 500, { fehler: e instanceof AbgleichFehler ? e.message : 'Die Sicherung vor dem Abgleich ist fehlgeschlagen – nichts entfernt.' }), true)
     }
     for (const n of ziele) kontoEntfernen(n)

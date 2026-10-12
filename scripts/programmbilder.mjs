@@ -56,7 +56,9 @@ const IDS = [
   'spiel-kreuzwort',
   'spiel-fallend',
   'spiel-suchsel',
-  'meineklassen'
+  'meineklassen',
+  // 12.10.2026: Kopf der Startseite
+  'startseite'
 ]
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320

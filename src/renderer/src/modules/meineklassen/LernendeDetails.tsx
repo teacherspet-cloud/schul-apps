@@ -132,7 +132,7 @@ export function LernendeDetails({
                 <Table.Tr>
                   <Table.Td fw={600}>Medaillen & Titel</Table.Td>
                   <Table.Td>
-                    <LernendeAuszeichnung a={l.auszeichnung} />
+                    <LernendeAuszeichnung a={l.auszeichnung} name={l.name} />
                   </Table.Td>
                 </Table.Tr>
               )}

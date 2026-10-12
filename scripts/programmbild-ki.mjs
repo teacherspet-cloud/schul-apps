@@ -17,6 +17,10 @@ const STIL =
   'matching a set of school app icons (worksheet with a pencil on blue, speech bubbles on green, letter with fountain pen on yellow).'
 
 const MOTIVE = {
+  // 12.10.2026: Kopf der Startseite (Begrüßung + Tagesleiste, Wunsch der Lehrkraft)
+  startseite:
+    'Tile colour: warm morning gradient from soft yellow to orange (#ffd43b to #fd7e14). Motif: a small friendly white school building with a round clock above the door, ' +
+    'a half sun rising behind it, in front an open white planner with a few coloured dots and a white coffee cup with a little steam.',
   onlinetest:
     'Tile colour: teal (#12b886 to #0c8599). Motif: a white tablet computer standing slightly tilted, its screen shows a short checklist with two green check marks and one empty box; ' +
     'in front of the tablet a small round white stopwatch with a teal hand; a tiny QR-code sticker in the corner of the tablet.',

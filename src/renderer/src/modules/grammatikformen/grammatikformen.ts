@@ -94,6 +94,37 @@ export function verschiebe(liste: LehrwerkGrammatikPunkt[], i: number, richtung:
   return neu
 }
 
+/** Punkt per Ziehen an eine neue Stelle (Index in der Liste vor dem Verschieben) */
+export function verschiebeNach(liste: LehrwerkGrammatikPunkt[], von: number, nach: number): LehrwerkGrammatikPunkt[] {
+  if (von < 0 || von >= liste.length || nach < 0 || nach >= liste.length || von === nach) return liste
+  const neu = [...liste]
+  const [p] = neu.splice(von, 1)
+  neu.splice(nach, 0, p)
+  return neu
+}
+
+/**
+ * Darstellung eines Punkts als Pille (12.10.2026, Neugestaltung): Bezeichnung = Buchtext; ist er leer oder gleich dem
+ * Katalognamen, der Katalogname. `abweichend` = der Buchtext nennt die Form anders (Katalogname dann nur im Tooltip).
+ * `status`: ok = alle Kennungen gültig, fehlt = keine Katalogform, ungueltig = mindestens eine unbekannte Kennung.
+ */
+export function pillenInfo(
+  p: LehrwerkGrammatikPunkt,
+  fach?: string
+): { name: string; katalog: string; abweichend: boolean; status: 'ok' | 'fehlt' | 'ungueltig'; ungueltig: string[] } {
+  const katalog = p.t.map(kennungLabel).join(' · ')
+  const text = p.text.trim()
+  const gleich = !text || (p.t.length > 0 && (text === textZu(p.t) || text === katalog))
+  const ungueltig = p.t.filter((k) => !kennungGueltig(k, fach))
+  return {
+    name: gleich ? katalog || text || '(ohne Bezeichnung)' : text,
+    katalog,
+    abweichend: !gleich && p.t.length > 0,
+    status: !p.t.length ? 'fehlt' : ungueltig.length ? 'ungueltig' : 'ok',
+    ungueltig
+  }
+}
+
 /** Text zu gewählten Kennungen (Bezeichnungen der Themen, Teilformen ohne doppeltes Thema) */
 export function textZu(kennungen: string[]): string {
   const themen = [...new Set(kennungen.map(themaVon))]

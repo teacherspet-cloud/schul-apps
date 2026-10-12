@@ -47,4 +47,5 @@ export function artVonSchema(schemaName: string | undefined, kanal = 'ai:structu
 }
 
 /** Begrenzung erreicht (429, Kontingent, Guthaben)? */
-export const istLimit = (meldung: string): boolean => /\b429\b|limit|kontingent|guthaben|quota|rate/i.test(meldung)
+// „Nutzungsgrenze" (12.10.2026): so meldet die App das ausgeschöpfte Abo-Kontingent – vorher fehlte es in der Statistik
+export const istLimit = (meldung: string): boolean => /\b429\b|limit|kontingent|guthaben|quota|rate|nutzungsgrenze/i.test(meldung)

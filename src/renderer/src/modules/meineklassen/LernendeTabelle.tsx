@@ -295,7 +295,7 @@ export function LernendeTabelle({
             </SimpleGrid>
             {l.auszeichnung && (
               <div style={{ marginTop: 6 }}>
-                <LernendeAuszeichnung a={l.auszeichnung} />
+                <LernendeAuszeichnung a={l.auszeichnung} name={l.name} />
               </div>
             )}
           </Paper>
@@ -339,7 +339,7 @@ export function LernendeTabelle({
                 <Table.Td>{reihenBlaetter(l)}</Table.Td>
                 {zeigtAuszeichnung && (
                   <Table.Td>
-                    <LernendeAuszeichnung a={l.auszeichnung} />
+                    <LernendeAuszeichnung a={l.auszeichnung} name={l.name} />
                   </Table.Td>
                 )}
               </Table.Tr>

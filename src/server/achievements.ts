@@ -17,7 +17,7 @@
  *            GET  /s/api/auszeichnungen/titel  → { wahl, anzeige, formOffen } (Startseite; nur Gespeichertes)
  *            POST /s/api/auszeichnungen/wahl   {form?, anzeige?} → wie GET /titel
  */
-import { datenbank, type NutzerInfo } from './datenbank'
+import { datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
 import { db as vokDb, json_, klasseFuer, teileVon, vokIstFuer, zeile as vokZeile, type VokStand, type Zeile as VokZeile } from './vokabeln'
 import { buchFuer, buchNamen } from './vokabelweg'
@@ -702,7 +702,7 @@ export function auszeichnungFuerLehrkraft(
   titelStufe: number
   punkte: number
   avatar: string | null
-  medaillen: { kategorie: string; stufe: number }[]
+  medaillen: { kategorie: string; stufe: number; wert?: number; schwellen?: number[]; am?: number }[]
   /** Jahresreihe (10.10.2026): die Medaillen oben sind die des laufenden Schuljahres */
   schuljahr: string
   jahr: string
@@ -719,7 +719,15 @@ export function auszeichnungFuerLehrkraft(
     titelStufe: stufe,
     punkte: punkteVon(ausz, sprache),
     avatar: avatarVon(nutzerId, ausz),
-    medaillen: KATEGORIEN.map((k) => ({ kategorie: k.id, stufe: js?.medaillen[k.id]?.stufe ?? 0 })),
+    // Für das Medaillen-Fenster in „Meine Klassen" (12.10.2026): aktueller Wert, Schwellen und Datum je Kategorie
+    medaillen: KATEGORIEN.map((k) => ({
+      kategorie: k.id,
+      stufe: js?.medaillen[k.id]?.stufe ?? 0,
+      // Gezählt wird der Zuwachs seit Beginn der Reihe (zuletzt − start)
+      ...(typeof js?.zuletzt?.[k.id] === 'number' ? { wert: Math.max(0, js.zuletzt[k.id]! - (js.start?.[k.id] ?? 0)) } : {}),
+      ...(js?.schwellen?.[k.id]?.length ? { schwellen: js.schwellen[k.id] } : {}),
+      ...(js?.medaillen[k.id]?.am ? { am: js.medaillen[k.id]!.am } : {})
+    })),
     schuljahr: schuljahrText(sj),
     jahr: jahresLabel(js?.jahrgang ?? null, sj),
     punkteJahr: jahresPunkte(js)
@@ -879,4 +887,34 @@ export function achievementsRoute(): (k: Anfrage) => Promise<boolean> {
       true
     )
   }
+}
+
+/**
+ * Stille Berichtigung für alle (12.10.2026, Befund der Lehrkraft: Erin W. hatte nach dem Update noch alle Medaillen): Die
+ * Berichtigung lief nur, wenn das Kind selbst die App öffnet. Jetzt wertet der Server beim Start jede Person mit älterem
+ * Regelstand einmal aus – nacheinander, im Hintergrund. Das Protokoll nennt nur Zahlen.
+ */
+export async function alleBerichtigen(): Promise<number> {
+  const d = datenbank()
+  if (!d.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'achievements'").get()) return 0
+  let n = 0
+  for (const z of d.prepare('SELECT nutzer_id, daten FROM achievements').all() as { nutzer_id: string; daten: string }[]) {
+    let regel = 0
+    try {
+      regel = Number((JSON.parse(z.daten) as { ausz?: { regel?: number } })?.ausz?.regel ?? 0)
+    } catch {
+      continue
+    }
+    if (regel >= AUSZ_REGEL) continue
+    const nutzer = nutzerNachId(z.nutzer_id)
+    if (!nutzer || nutzer.rolle !== 'schueler') continue
+    try {
+      await achievementsAuswerten(nutzer)
+      n++
+    } catch {
+      // eine Person ohne lesbare Daten hält die anderen nicht auf
+    }
+  }
+  if (n) protokolliereServer('achievements', `Medaillen nach neuer Regel berichtigt: ${n} Lernende`)
+  return n
 }

@@ -383,6 +383,10 @@ export class CodexCliProvider implements AiProvider {
           cwd,
           instructions: 'You create exactly one image with your image generation tool when asked. Do nothing else and answer briefly.'
         }),
+        // Sparsam (12.10.2026): Jedes Bild ist ein ganzer Codex-Auftrag und zählt gegen das 5-Stunden-Kontingent des Abos.
+        // Zum Weiterreichen eines fertigen Motivs ans Bildwerkzeug genügt wenig Nachdenken („low", nicht „minimal" – das schaltet bei manchen Modellen Werkzeuge ab; Faustregel).
+        '-c',
+        'model_reasoning_effort="low"',
         '-'
       ]
       const res = await run(this.exe, args, { cwd, stdin: text, timeoutMs: IMAGE_TIMEOUT_MS, signal })

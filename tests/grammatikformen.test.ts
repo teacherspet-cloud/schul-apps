@@ -15,7 +15,9 @@ import {
   ordneBand,
   pruefeVorschlaege,
   uebernimmVorschlaege,
+  pillenInfo,
   verschiebe,
+  verschiebeNach,
   type BuchGliederung
 } from '../src/renderer/src/modules/grammatikformen/grammatikformen'
 
@@ -148,5 +150,22 @@ describe('KI-Vorschläge prüfen und übernehmen', () => {
     ]
     expect(verschiebe(l, 0, 1).map((p) => p.text)).toEqual(['2', '1'])
     expect(verschiebe(l, 0, -1)).toBe(l)
+  })
+
+  it('verschiebt per Ziehen an eine neue Stelle', () => {
+    const l = ['a', 'b', 'c'].map((text) => ({ text, t: [] }))
+    expect(verschiebeNach(l, 0, 2).map((p) => p.text)).toEqual(['b', 'c', 'a'])
+    expect(verschiebeNach(l, 2, 0).map((p) => p.text)).toEqual(['c', 'a', 'b'])
+    expect(verschiebeNach(l, 1, 1)).toBe(l)
+  })
+
+  it('Pille: Katalogname statt leerem/gleichem Text, Abweichung und Warnung', () => {
+    const k = 'en.verb.past_simple'
+    const name = kennungLabel(k)
+    expect(pillenInfo({ text: '', t: [k] }, 'englisch')).toMatchObject({ name, abweichend: false, status: 'ok' })
+    expect(pillenInfo({ text: name, t: [k] }, 'englisch').abweichend).toBe(false)
+    expect(pillenInfo({ text: 'simple past mit did', t: [k] }, 'englisch')).toMatchObject({ name: 'simple past mit did', abweichend: true, katalog: name })
+    expect(pillenInfo({ text: 'nur genannt', t: [] }).status).toBe('fehlt')
+    expect(pillenInfo({ text: 'x', t: ['en.gibtsnicht'] }).status).toBe('ungueltig')
   })
 })

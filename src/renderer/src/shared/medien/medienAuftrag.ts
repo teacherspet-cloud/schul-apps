@@ -102,6 +102,18 @@ const fehlendeTexte = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefine
 export const medienSchluessel = (art: MedienArt, wort?: string): string => `medien:${art}${wort ? `:${wort}` : ''}`
 
 const sperren = new DienstSperren()
+/** Letzte Begrenzungsmeldung je Dienst – für einen ehrlichen Wartetext (12.10.2026) */
+const grund = new Map<Dienst, string>()
+/**
+ * „ausgelastet" stimmte meist nicht (12.10.2026): Ist das Codex-Kontingent des ChatGPT-Abos (5-Stunden-Fenster)
+ * ausgeschöpft, steht das so da – Bilder auf chatgpt.com laufen über ein eigenes Kontingent und gehen dann oft noch.
+ */
+function warteGrund(dienst: Dienst): string {
+  const m = grund.get(dienst) ?? ''
+  if (/nutzungsgrenze|usage limit/i.test(m)) return 'Das KI-Kontingent des ChatGPT-Abos (Codex, 5-Stunden-Fenster) ist ausgeschöpft'
+  if (/\b429\b|zu viele anfragen|too many requests|rate.?limit/i.test(m)) return `${DIENST_NAME[dienst]} meldet zu viele Anfragen`
+  return `${DIENST_NAME[dienst]} ist ausgelastet`
+}
 const plaetze = new Plaetze(2)
 const schlafe = (ms: number): Promise<void> => new Promise((ok) => setTimeout(ok, ms))
 
@@ -116,7 +128,7 @@ export async function beimDienst<T>(k: Pick<AuftragsKontext, 'signal' | 'pausier
     if (bis) {
       const ms = bis - Date.now()
       gewartet += ms
-      await k.pausiere(`${DIENST_NAME[dienst]} ist ausgelastet – wartet bis ${uhrzeitLabel(bis)}`, schlafe(ms))
+      await k.pausiere(`${warteGrund(dienst)} – wartet bis ${uhrzeitLabel(bis)}`, schlafe(ms))
     }
     try {
       return await schritt()
@@ -124,6 +136,7 @@ export async function beimDienst<T>(k: Pick<AuftragsKontext, 'signal' | 'pausier
       if (k.signal.aborted) throw e
       const ms = wartezeit(e, versuch)
       if (ms === null || gewartet + ms > MAX_WARTEN_MS) throw e
+      grund.set(dienst, e instanceof Error ? e.message : String(e))
       sperren.sperre(dienst, Date.now() + ms)
     }
   }
