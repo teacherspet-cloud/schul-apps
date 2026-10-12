@@ -19,6 +19,7 @@ import { generateSvgImage } from './svg'
 import { textSammler } from './textstrom'
 import { AbbruchFehler } from '@shared/abbruch'
 import { BILD_BLOCKIERT, klingtNachAblehnung } from '@shared/bildBlockiert'
+import { protokolliere } from '../protokoll'
 
 // ---------- Programm finden ----------
 
@@ -308,6 +309,28 @@ export const IMAGE_TIMEOUT_MS = 6 * 60 * 1000
 
 const IMAGE_ONLY = 'Führe keine anderen Aktionen aus (keine Befehle, keine weiteren Dateien). Antworte danach nur mit „fertig".'
 
+/** Bis wann das sparsame Modell für Bilder übersprungen wird (es lieferte kein Bild) */
+let sparOhneBildBis = 0
+
+/**
+ * Das sparsamste sichtbare Codex-Modell des Abos (12.10.2026) – für Aufträge, die kein großes Modell brauchen (Bild-Lauf,
+ * Motivplanung). Aus der Modellliste, die Codex selbst zwischenspeichert (models_cache.json): bevorzugt „luna"/„mini"/
+ * „nano" bzw. die Beschreibung „fast … efficient/affordable"; versteckte Modelle nie. null = unbekannt (dann Standard).
+ */
+export function sparModellCodex(): string | null {
+  try {
+    const datei = join(codexHome(), 'models_cache.json')
+    if (!existsSync(datei)) return null
+    const liste = (JSON.parse(readFileSync(datei, 'utf8')) as { models?: { slug: string; description?: string; visibility?: string }[] }).models ?? []
+    const sichtbar = liste.filter((m) => m.slug && m.visibility !== 'hide')
+    const nachName = sichtbar.find((m) => /luna|mini|nano|lite/i.test(m.slug))
+    const nachText = sichtbar.find((m) => /fast/i.test(m.description ?? '') && /efficient|affordable|cheap/i.test(m.description ?? ''))
+    return (nachName ?? nachText)?.slug ?? null
+  } catch {
+    return null
+  }
+}
+
 function codexHome(): string {
   if (aufServer()) return serverKiOrdner('codex')
   return process.env.CODEX_HOME || join(home, '.codex')
@@ -365,8 +388,29 @@ function notFound(provider: AiProviderId): Error {
 export class CodexCliProvider implements AiProvider {
   constructor(private exe: string) {}
 
-  /** Nutzt die Bildgenerierung von ChatGPT; Codex legt das Bild unter CODEX_HOME/generated_images/<Sitzung> ab. */
-  generateImage(prompt: string, _model?: string, signal?: AbortSignal): Promise<string> {
+  /**
+   * Nutzt die Bildgenerierung von ChatGPT; Codex legt das Bild unter CODEX_HOME/generated_images/<Sitzung> ab.
+   *
+   * Sparsames Modell (12.10.2026, Befund: ohne Modellangabe lief jeder Bild-Auftrag mit dem Codex-Standardmodell – im Abo
+   * der Lehrkraft das Spitzenmodell „Frontier intelligence" –, obwohl es nur das fertige Motiv ans Bildwerkzeug reicht):
+   * erst mit dem sparsamsten Modell der Liste (`sparModellCodex`); liefert es kein Bild, ohne abgelehnt oder begrenzt zu
+   * sein, einmal mit dem Standard – und dieser Weg gilt dann für den Rest des Tages.
+   */
+  async generateImage(prompt: string, _model?: string, signal?: AbortSignal): Promise<string> {
+    const spar = sparOhneBildBis > Date.now() ? null : sparModellCodex()
+    if (!spar) return this.bildLauf(prompt, undefined, signal)
+    try {
+      return await this.bildLauf(prompt, spar, signal)
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e)
+      if (signal?.aborted || e instanceof AbbruchFehler || m.startsWith(BILD_BLOCKIERT) || /nutzungsgrenze|nicht mit einem ChatGPT-Konto/i.test(m)) throw e
+      sparOhneBildBis = Date.now() + 24 * 60 * 60 * 1000
+      protokolliere('warnung', 'bild', `Sparsames Modell ${spar} lieferte kein Bild – heute mit dem Standardmodell: ${m.slice(0, 200)}`)
+      return this.bildLauf(prompt, undefined, signal)
+    }
+  }
+
+  private bildLauf(prompt: string, modell: string | undefined, signal?: AbortSignal): Promise<string> {
     return withWorkDir(async (cwd) => {
       const text = `Erzeuge mit deinem Bildgenerierungswerkzeug genau ein Bild nach dieser Beschreibung:\n\n${prompt}\n\n${IMAGE_ONLY}`
       const args = [
@@ -387,6 +431,7 @@ export class CodexCliProvider implements AiProvider {
         // Zum Weiterreichen eines fertigen Motivs ans Bildwerkzeug genügt wenig Nachdenken („low", nicht „minimal" – das schaltet bei manchen Modellen Werkzeuge ab; Faustregel).
         '-c',
         'model_reasoning_effort="low"',
+        ...(modell ? ['--model', modell] : []),
         '-'
       ]
       const res = await run(this.exe, args, { cwd, stdin: text, timeoutMs: IMAGE_TIMEOUT_MS, signal })

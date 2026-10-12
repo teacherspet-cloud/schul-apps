@@ -58,7 +58,7 @@ import {
   AblageZiel
 } from '@shared/types'
 import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
-import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
+import { createCliProvider, sparModellCodex, subscriptionModels, subscriptionStatus } from './services/ai/cli'
 import { generateSvgImage } from './services/ai/svg'
 import { bildWege, mitErsatz, weg } from './services/ai/bildErsatz'
 import { KiPlaetze } from './services/ai/kiPlaetze'
@@ -360,7 +360,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
         }
       : undefined
     const anbieter = req.provider ?? getSettings().ai.textProvider
-    const modell = req.model || model
+    // Sparsam (12.10.2026): kleine Aufgaben über das Abo mit dem sparsamsten Codex-Modell
+    const modell =
+      req.model || (req.sparsam && anbieter === 'openai' && getSettings().ai.access.openai === 'subscription' ? (sparModellCodex() ?? model) : model)
     // Auftragsart für den Verbrauch je Programm (09.10.2026)
     const auftragsArt = artVonSchema(req.schemaName)
     merkeVerbrauch(anbieter, modell, { anfragen: 1 }, auftragsArt)

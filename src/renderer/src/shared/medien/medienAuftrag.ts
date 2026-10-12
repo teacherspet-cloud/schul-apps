@@ -15,7 +15,7 @@
  */
 import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonPasst, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
-import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
+import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, MOTIVE_JE_ANFRAGE, motiveWaehlen, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
 import { istBildBlockiert } from '@shared/bildBlockiert'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
 import { sprechText, sprechTextFuerWort } from '@shared/sprechtext'
@@ -220,7 +220,9 @@ async function eines(
   /** Meldet ein vom Sicherheitssystem abgelehntes Bild (12.10.2026) */
   abgelehnt?: (wort: string) => void,
   /** „Neue Aussprache erzeugen" (12.10.2026): ersetzen, bisherige als Rückfall */
-  neu?: { grund?: string }
+  neu?: { grund?: string },
+  /** Schon gebündelt geplantes Bildmotiv (12.10.2026, `motiveWaehlen`) – sonst plant das Wort einzeln */
+  geplant?: { eindeutig: boolean; motiv: string }
 ): Promise<boolean> {
   const ki: Ki = { ai: k.ai, bild: k.bild }
   if (art === 'formen' || art === 'hinweis') {
@@ -253,7 +255,7 @@ async function eines(
   const stufe = stufeDer(lernende)
   if (art === 'bildKi') {
     // Erst das Motiv (und ob es sich für diese Stufe eindeutig zeigen lässt); einzeln angefordert, wird es trotzdem versucht
-    const m = await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki))
+    const m = geplant ?? (await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki)))
     if (!m.eindeutig && !einzeln) return await window.api.medien.ohneBild(sp, v.term, stufe), false
     /*
      * Abgelehnt (12.10.2026, abgestimmt mit der Lehrkraft): Lehnt das Sicherheitssystem das Motiv ab, wird sofort – ohne
@@ -373,13 +375,23 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
           )
         const erg: MedienErgebnis = { erledigt: 0, leer: 0, fehler: 0, gesamt: liste.length }
         let ersterFehler: unknown = null
+        // Bildmotive gebündelt planen (12.10.2026): je 20 Wörter EINE Abo-Anfrage statt einer je Wort
+        const motive = new Map<string, { eindeutig: boolean; motiv: string }>()
         for (const [i, v] of liste.entries()) {
           if (k.signal.aborted) break
           k.melde(`„${v.term}" (${i + 1} von ${liste.length})`, i, liste.length)
           try {
             const abgelehnt = (w: string): void => void (erg.blockiert ??= []).push(w)
             const lernende = { klasse: e.ziel.klasse, stufe: e.ziel.stufe }
-            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), lernende, k, abgelehnt, e.neu)) erg.erledigt++
+            if (e.art === 'bildKi' && liste.length > 1 && i % MOTIVE_JE_ANFRAGE === 0)
+              try {
+                const teil = liste.slice(i, i + MOTIVE_JE_ANFRAGE)
+                for (const [t, m] of await beimDienst(k, 'ki', () => motiveWaehlen(sp, teil, lernende, { ai: k.ai, bild: k.bild }))) motive.set(t, m)
+              } catch (f) {
+                if (k.signal.aborted) throw f
+                // Ohne Bündel plant jedes Wort einzeln – wie bisher
+              }
+            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), lernende, k, abgelehnt, e.neu, motive.get(v.term))) erg.erledigt++
             else erg.leer++
             medienGeaendert(sp)
           } catch (fehler) {

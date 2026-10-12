@@ -17,6 +17,10 @@ const STIL =
   'matching a set of school app icons (worksheet with a pencil on blue, speech bubbles on green, letter with fountain pen on yellow).'
 
 const MOTIVE = {
+  // 12.10.2026: App „Grammatikformen" (Organisation; Kachelfarbe grape wie Grammatiktraining)
+  grammatikformen:
+    'Tile colour: grape purple (#cc5de8 to #9c36b5). Motif: a closed white textbook standing upright with three coloured bookmark tabs sticking out of the top, ' +
+    'next to it a small white card with two short grey lines and a green check mark, and a tiny white puzzle piece in front.',
   // 12.10.2026: Kopf der Startseite (Begrüßung + Tagesleiste, Wunsch der Lehrkraft)
   startseite:
     'Tile colour: warm morning gradient from soft yellow to orange (#ffd43b to #fd7e14). Motif: a small friendly white school building with a round clock above the door, ' +

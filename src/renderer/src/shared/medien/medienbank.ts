@@ -274,6 +274,67 @@ export async function kandidatUebernehmen(
   )
 }
 
+/** Regeln für Bildmotive einer Stufe – gemeinsam für ein Wort und für viele auf einmal */
+function motivRegeln(sprache: string, lernende?: Lernende): string[] {
+  const s = stufeDer(lernende)
+  const a = ALTER[s]
+  return [
+    `Du planst Beispielbilder für Vokabelkarten von Lernenden der Klassen ${a.klassen} (etwa ${a.jahre} Jahre).`,
+    WAS_ZEIGEN[s],
+    'Ein mehrdeutiges Bild schadet mehr als keines. Funktionswörter (although, of, the …) und Wendungen ohne eindeutiges Bild: eindeutig = false.',
+    `Kommen Menschen vor, dann ${a.personen} (Erwachsene nur, wo das Wort sie verlangt, z. B. teacher, doctor); Aussehen, Hautfarbe und Rollen natürlich abwechselnd und ohne Klischees – nicht in jedem Bild alles.`,
+    `Sieht der Gegenstand im Land der Zielsprache (${SPRACHE_NAME[sprache] ?? sprache}) typisch anders aus (z. B. Doppeldeckerbus, Baguette, britische Schuluniform), zeige diese Fassung; sonst neutral.`,
+    'motiv: ein bis zwei englische Sätze, die genau beschreiben, was zu sehen ist – ein klarer Hauptgegenstand bzw. eine einfache Szene, keine Nebensachen, kein Text. Auch wenn eindeutig = false, beschreibe den besten Versuch.'
+  ]
+}
+
+/** Höchstens so viele Wörter je Motiv-Anfrage */
+export const MOTIVE_JE_ANFRAGE = 20
+
+/**
+ * Motive für viele Wörter in EINER Anfrage (12.10.2026, Befund: je Wort eine eigene Abo-Anfrage – bei 100 Bildern 100
+ * zusätzliche Codex-Läufe). Gleiche Regeln wie `motivWaehlen`; Wörter ohne Antwort plant der Auftrag einzeln nach.
+ */
+export async function motiveWaehlen(
+  sprache: string,
+  vokabeln: Vokabel[],
+  lernende?: Lernende,
+  ki: Ki = direkt()
+): Promise<Map<string, { eindeutig: boolean; motiv: string }>> {
+  const aus = new Map<string, { eindeutig: boolean; motiv: string }>()
+  if (!vokabeln.length) return aus
+  const antwort = await ki.ai<{ motive: { nr: number; eindeutig: boolean; motiv: string }[] }>({
+    sparsam: true,
+    system: [...motivRegeln(sprache, lernende), 'Mehrere Vokabeln: Antworte für JEDE Nummer mit genau einem Eintrag (nr wie vorgegeben).'].join('\n'),
+    user: vokabeln
+      .map((v, i) => `${i + 1}. „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`)
+      .join('\n'),
+    schemaName: 'vokabel_bildmotive',
+    schema: {
+      type: 'object',
+      properties: {
+        motive: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { nr: { type: 'integer' }, eindeutig: { type: 'boolean' }, motiv: { type: 'string' } },
+            required: ['nr', 'eindeutig', 'motiv'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['motive'],
+      additionalProperties: false
+    }
+  })
+  for (const m of antwort?.motive ?? []) {
+    const v = vokabeln[Number(m.nr) - 1]
+    const motiv = String(m.motiv ?? '').trim()
+    if (v && motiv) aus.set(v.term, { eindeutig: m.eindeutig !== false, motiv })
+  }
+  return aus
+}
+
 /**
  * Motiv für die Bild-KI (Bildstufen, 07.10.2026): Die Sprach-KI prüft, ob sich das Wort für diese Altersstufe
  * eindeutig zeigen lässt, und beschreibt das Motiv – Personen im Alter der Lernenden, vielfältig ohne Klischees,
@@ -287,16 +348,11 @@ export async function motivWaehlen(
   /** Motiv, das das Sicherheitssystem der Bild-KI eben abgelehnt hat – dann ein vorsichtigeres (12.10.2026) */
   abgelehnt?: string
 ): Promise<{ eindeutig: boolean; motiv: string }> {
-  const s = stufeDer(lernende)
-  const a = ALTER[s]
   const antwort = await ki.ai<{ eindeutig: boolean; motiv: string }>({
+    // Kleine Aufgabe (12.10.2026): über das Abo mit dem sparsamsten Modell
+    sparsam: true,
     system: [
-      `Du planst Beispielbilder für Vokabelkarten von Lernenden der Klassen ${a.klassen} (etwa ${a.jahre} Jahre).`,
-      WAS_ZEIGEN[s],
-      'Ein mehrdeutiges Bild schadet mehr als keines. Funktionswörter (although, of, the …) und Wendungen ohne eindeutiges Bild: eindeutig = false.',
-      `Kommen Menschen vor, dann ${a.personen} (Erwachsene nur, wo das Wort sie verlangt, z. B. teacher, doctor); Aussehen, Hautfarbe und Rollen natürlich abwechselnd und ohne Klischees – nicht in jedem Bild alles.`,
-      `Sieht der Gegenstand im Land der Zielsprache (${SPRACHE_NAME[sprache] ?? sprache}) typisch anders aus (z. B. Doppeldeckerbus, Baguette, britische Schuluniform), zeige diese Fassung; sonst neutral.`,
-      'motiv: ein bis zwei englische Sätze, die genau beschreiben, was zu sehen ist – ein klarer Hauptgegenstand bzw. eine einfache Szene, keine Nebensachen, kein Text. Auch wenn eindeutig = false, beschreibe den besten Versuch.',
+      ...motivRegeln(sprache, lernende),
       ...(abgelehnt
         ? [
             `Das Motiv „${abgelehnt}" hat das Sicherheitssystem der Bild-KI abgelehnt. Beschreibe ein harmloses, kindgerechtes Motiv: keine Gewalt, Waffen, Verletzungen, Blut, Drogen, Nacktheit oder Körperdetails, keine echten Personen, Marken oder Figuren aus Filmen/Spielen; zeige den Begriff lieber über einen Gegenstand, ein Symbol oder eine neutrale Alltagsszene.`

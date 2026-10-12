@@ -58,7 +58,8 @@ const IDS = [
   'spiel-suchsel',
   'meineklassen',
   // 12.10.2026: Kopf der Startseite
-  'startseite'
+  'startseite',
+  'grammatikformen'
 ]
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320

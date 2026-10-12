@@ -678,6 +678,11 @@ export interface StructuredRequest {
   /** Abweichendes Modell; ohne Angabe gilt das eingestellte Modell des Anbieters */
   model?: string
   /**
+   * Kleine Aufgabe (12.10.2026, z. B. Bildmotive planen): über das ChatGPT-Abo mit dem sparsamsten Modell statt des
+   * eingestellten – schont das 5-Stunden-Kontingent. Bei API-Schlüsseln ohne Wirkung.
+   */
+  sparsam?: boolean
+  /**
    * Kennung für die Fortschrittsmeldung. Ist sie gesetzt, wird die Antwort im Strom
    * empfangen und die Zahl der eingetroffenen Zeichen laufend gemeldet.
    */
