@@ -542,6 +542,13 @@ export interface TtsRequest {
    * übernommen, nur geänderte neu vertont (`shared/vertonung.ts`).
    */
   vorher?: { fileName: string; segmente: import('./vertonung').TtsSegment[] }
+  /**
+   * Unhörbarer Zusammenhang (12.10.2026, Aussprache einzelner Wörter): geht bei ElevenLabs als `previous_text`/`next_text`
+   * mit – das Modell spricht das Wort dann wie in einem Satz eingebettet, ohne den Zusatz selbst zu sprechen.
+   */
+  kontext?: { davor?: string; danach?: string }
+  /** Sprechanweisung für OpenAI-Stimmen (`instructions`) statt der allgemeinen – z. B. für Einzelwörter */
+  anweisung?: string
 }
 
 export interface TtsResult {

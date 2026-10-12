@@ -24,6 +24,43 @@ import type { TtsSettings } from './types'
 /** Voreinstellung von ElevenLabs (abgefragt über /v1/voices/settings/default). */
 export const TTS_DEFAULTS: TtsSettings = { stability: 0.5, similarity: 0.75, style: 0, speed: 1, speakerBoost: true }
 
+/**
+ * Aussprache einzelner Wörter der Medienbank (12.10.2026, Wunsch der Lehrkraft: einsilbige Wörter waren oft nicht zu
+ * erkennen). FAUSTREGELN, nicht gemessen: etwas langsamer (speed 0.9 – Einzelwörter sprechen die Stimmen bei 1.0 hastig
+ * und verschluckt) und stabiler (stability 0.7 – weniger Ausdrucksschwankung, gleichmäßige Artikulation; ElevenLabs
+ * beschreibt höhere Stabilität als „konsistenter, weniger emotional"). Sätze bleiben bei den Voreinstellungen.
+ */
+export const WORT_TTS_SETTINGS: TtsSettings = { ...TTS_DEFAULTS, stability: 0.7, speed: 0.9 }
+
+/**
+ * Unhörbarer Zusammenhang für Einzelwörter (12.10.2026): BELEGT ist, dass die ElevenLabs-Schnittstelle (auch
+ * `…/with-timestamps`) `previous_text` und `next_text` annimmt und damit die Sprechmelodie an den Zusammenhang anpasst,
+ * ohne ihn zu sprechen. FAUSTREGEL ist, dass ein Vorsprech-Rahmen („Listen and repeat the word.") das Wort deutlicher und
+ * vollständig (mit fallender Satzmelodie) sprechen lässt. Sprachen ohne Eintrag: ohne Zusammenhang.
+ */
+export const WORT_KONTEXT: Record<string, { davor: string; danach: string }> = {
+  en: { davor: 'Listen and repeat the word.', danach: 'Now you say it.' },
+  fr: { davor: 'Écoute et répète le mot.', danach: 'À toi maintenant.' },
+  es: { davor: 'Escucha y repite la palabra.', danach: 'Ahora tú.' },
+  it: { davor: 'Ascolta e ripeti la parola.', danach: 'Ora tocca a te.' },
+  de: { davor: 'Hör zu und sprich das Wort nach.', danach: 'Jetzt du.' },
+  nl: { davor: 'Luister en herhaal het woord.', danach: 'Nu jij.' }
+}
+
+/** Sprechanweisung für OpenAI-Stimmen bei Einzelwörtern (12.10.2026, Vorgabe der Lehrkraft) */
+export const WORT_ANWEISUNG_OPENAI =
+  'Sprich das einzelne Wort langsam, deutlich und vollständig, mit klarer Betonung, wie ein Lehrer beim Vorsprechen. Sprich nur das Wort, nichts sonst.'
+
+/**
+ * Satzpunkt am Wortende (12.10.2026, FAUSTREGEL): Mit Punkt spricht die Stimme das Wort als abgeschlossene Äußerung mit
+ * fallender Melodie zu Ende, statt es wie einen abgebrochenen Satzanfang auszusprechen. Nur für den Auftrag an die
+ * Sprach-KI – der gespeicherte Sprechtext bleibt unverändert (sonst gälten alle Aufnahmen als veraltet).
+ */
+export const mitSatzpunkt = (text: string): string => {
+  const t = String(text ?? '').trim()
+  return !t || /[.!?…。？！]["'”’)]*$/.test(t) ? t : `${t}.`
+}
+
 /** Grenzen der Regler. `speed` ist von ElevenLabs vorgegeben, der Rest ist 0…1. */
 export const SPEED_RANGE = { min: 0.7, max: 1.2, step: 0.01 }
 

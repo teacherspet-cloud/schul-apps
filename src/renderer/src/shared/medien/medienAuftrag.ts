@@ -16,8 +16,10 @@
 import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonPasst, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
 import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
+import { istBildBlockiert } from '@shared/bildBlockiert'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
 import { sprechText, sprechTextFuerWort } from '@shared/sprechtext'
+import { figurenAus, fassungenAusAntwort, fassungsAuftrag, istFassungsKandidat, satzFuerLage, type FassungsAntwort } from '@shared/satzFassung'
 
 /**
  * Sprechtext (09.10.2026): Abkürzungen gesprochen statt gelesen („YA (= young adults)" → „Y. A., young adults",
@@ -136,6 +138,13 @@ export interface MedienStart {
   lagen?: Stimmlage[]
   /** Nur diese Wörter, auch wenn sie schon Medien haben (einzelne Zelle, Pop-up) – sonst nur, was fehlt */
   einzeln?: boolean
+  /**
+   * „Neue Aussprache erzeugen" der Admins (12.10.2026, Rechtsklick auf das Aussprache-Symbol): auch eine passende
+   * Aufnahme ersetzen; die bisherige bleibt als Rückfall (`vorher`). `grund`: was bemängelt wurde.
+   */
+  neu?: { grund?: string }
+  /** Figuren des Lehrwerks für angepasste Beispielsätze (12.10.2026) – fehlt = aus den Beispielsätzen geschätzt */
+  figuren?: string[]
 }
 
 export interface MedienErgebnis {
@@ -143,13 +152,22 @@ export interface MedienErgebnis {
   leer: number
   fehler: number
   gesamt: number
+  /** Wörter, deren KI-Bild das Sicherheitssystem abgelehnt hat (12.10.2026) – Ersatz kam aus der Bildsuche */
+  blockiert?: string[]
 }
 
 /** Fehlt diesem Wort die Aussprache in dieser Fassung? */
 const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage, sprache: string): boolean => {
   if (art === 'formen' || art === 'hinweis') return fehlendeTexte(art, v, sicht, lage).length > 0
   if (art === 'aussprache') return !tonPasst(tonVon(sicht, lage), v.term, gesprochenFuer('wort', v.term, v, sprachKurz(sprache)))
-  return istGanzerSatz(v.example) && !saetzeVon(sicht, lage)?.[satzSchluessel(v.example!)]
+  if (!istGanzerSatz(v.example)) return false
+  /*
+   * Geschlechtsbezogene Beispielsätze (12.10.2026, shared/satzFassung.ts): Ein Kandidat des Vorfilters ohne gemerkte
+   * Entscheidung ist offen (die KI prüft ihn im Auftrag); sonst spricht jede Stimme ihre Fassung – fehlt deren Aufnahme,
+   * ist der Satz offen, auch wenn das Original schon vertont ist.
+   */
+  if (istFassungsKandidat(v.example, sprache) && !sicht?.fassungen?.[satzSchluessel(v.example!)]) return true
+  return !saetzeVon(sicht, lage)?.[satzSchluessel(satzFuerLage(v.example!, sicht?.fassungen, lage))]
 }
 
 /**
@@ -185,7 +203,11 @@ async function eines(
   sicht: MedienSicht | undefined,
   einzeln: boolean,
   lernende: Lernende,
-  k: AuftragsKontext
+  k: AuftragsKontext,
+  /** Meldet ein vom Sicherheitssystem abgelehntes Bild (12.10.2026) */
+  abgelehnt?: (wort: string) => void,
+  /** „Neue Aussprache erzeugen" (12.10.2026): ersetzen, bisherige als Rückfall */
+  neu?: { grund?: string }
 ): Promise<boolean> {
   const ki: Ki = { ai: k.ai, bild: k.bild }
   if (art === 'formen' || art === 'hinweis') {
@@ -203,11 +225,14 @@ async function eines(
     // Je Fassung mit eingestellter Stimme – nur die fehlende, außer bei einzelnem Neu-Erzeugen
     for (const l of lagen) {
       if (!einzeln && !tonFehlt(art, v, sicht, l, sp)) continue
+      // Beispielsatz: die Fassung dieser Stimme (geschlechtsbezogene Sätze, 12.10.2026), sonst das Original
+      const satzFuer = (lage: Stimmlage): string => satzFuerLage(v.example ?? '', sicht?.fassungen, lage)
+      const neuOpt = neu ? { behalteVorher: true, grund: neu.grund } : {}
       const stimme = stimmen[l]!
       await beimDienst(k, 'sprache', () =>
         art === 'aussprache'
-          ? tonErzeugen(sp, v.term, 'wort', v.term, stimme, l, gesprochenFuer('wort', v.term, v, sp))
-          : tonErzeugen(sp, v.term, 'satz', v.example ?? '', stimme, l, gesprochenFuer('satz', v.example ?? '', v, sp))
+          ? tonErzeugen(sp, v.term, 'wort', v.term, stimme, l, gesprochenFuer('wort', v.term, v, sp), Boolean(neu), neuOpt)
+          : tonErzeugen(sp, v.term, 'satz', satzFuer(l), stimme, l, gesprochenFuer('satz', satzFuer(l), v, sp), Boolean(neu), neuOpt)
       )
     }
     return true
@@ -217,7 +242,30 @@ async function eines(
     // Erst das Motiv (und ob es sich für diese Stufe eindeutig zeigen lässt); einzeln angefordert, wird es trotzdem versucht
     const m = await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki))
     if (!m.eindeutig && !einzeln) return await window.api.medien.ohneBild(sp, v.term, stufe), false
-    return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki, m.motiv)), true
+    /*
+     * Abgelehnt (12.10.2026, abgestimmt mit der Lehrkraft): Lehnt das Sicherheitssystem das Motiv ab, wird sofort – ohne
+     * Warten – einmal mit einem vorsichtigeren, kindgerechten Motiv versucht; klappt auch das nicht, kommt das Bild aus
+     * der Bildsuche und das Wort wird in der Vokabelliste markiert. Früher hieß das „ausgelastet" und der Auftrag wartete.
+     */
+    const blockiert = (e: unknown): boolean => !k.signal.aborted && istBildBlockiert(e instanceof Error ? e.message : String(e))
+    try {
+      return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki, m.motiv)), true
+    } catch (e) {
+      if (!blockiert(e)) throw e
+    }
+    try {
+      const vorsichtig = await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki, m.motiv || v.term))
+      return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki, vorsichtig.motiv)), true
+    } catch (e) {
+      if (!blockiert(e)) throw e
+    }
+    abgelehnt?.(v.term)
+    const ersatz = await beimDienst(k, 'bildsuche', () => bildKandidaten(sp, v, lernende))
+    if (!ersatz.length) return false
+    const wahl = await beimDienst(k, 'ki', () => kiWaehltMehr(sp, v, ersatz, lernende, ki))
+    if (wahl.i < 0) return false
+    await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, ersatz[wahl.i], ersatz, stufe, true))
+    return true
   }
   const kandidaten = await beimDienst(k, 'bildsuche', () => bildKandidaten(sp, v, lernende))
   if (!kandidaten.length) return false
@@ -226,6 +274,35 @@ async function eines(
   if (w.i < 0) return false
   await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, kandidaten[w.i], kandidaten, stufe))
   return true
+}
+
+/**
+ * Geschlechtsbezogene Beispielsätze (12.10.2026, shared/satzFassung.ts): Kandidaten des Vorfilters ohne gemerkte
+ * Entscheidung gehen gebündelt an die KI (ein Aufruf je Liste, höchstens 40 Sätze je Aufruf). Das Ergebnis – auch
+ * „keine Anpassung nötig" – kommt in die Medienbank. Scheitert die KI, geht es ohne Fassungen weiter (die Sätze bleiben
+ * offen und werden beim nächsten Auftrag erneut geprüft). true = es wurde etwas gespeichert.
+ */
+async function fassungenErmitteln(sp: string, liste: Vokabel[], daten: Record<string, MedienSicht>, figuren: string[], k: AuftragsKontext): Promise<boolean> {
+  const offen = liste.filter((v) => istFassungsKandidat(v.example, sp) && !daten[v.term]?.fassungen?.[satzSchluessel(v.example!)])
+  let gespeichert = false
+  for (let i = 0; i < offen.length && !k.signal.aborted; i += 40) {
+    const teil = offen.slice(i, i + 40)
+    const kandidaten = teil.map((v, j) => ({ nr: j + 1, satz: v.example!, ...(v.exampleTranslation ? { uebersetzung: v.exampleTranslation } : {}) }))
+    k.melde(`Beispielsätze prüfen: Ich-Form mit Geschlecht (${teil.length})`, 0, Math.max(1, liste.length))
+    try {
+      const antwort = await beimDienst(k, 'ki', () => k.ai<FassungsAntwort>(fassungsAuftrag(sp, kandidaten, figuren)))
+      const neu = fassungenAusAntwort(kandidaten, antwort)
+      for (const v of teil) {
+        const f = neu[satzSchluessel(v.example!)]
+        if (!f) continue
+        await window.api.medien.fassungSetzen(sp, v.term, v.example!, f)
+        gespeichert = true
+      }
+    } catch (fehler) {
+      if (k.signal.aborted) throw fehler
+    }
+  }
+  return gespeichert
 }
 
 /**
@@ -270,18 +347,26 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
         if (ton && !lagen.length)
           throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“).')
         // Frisch nachsehen, was fehlt – inzwischen kann ein anderer Auftrag einiges erledigt haben
-        const daten = await window.api.medien.eintraege(
+        let daten = await window.api.medien.eintraege(
           sp,
           liste.map((v) => v.term)
         )
         if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe }), sp)
+        // Geschlechtsbezogene Beispielsätze (12.10.2026): ungeprüfte Kandidaten vorher in EINEM KI-Aufruf, dann frisch laden
+        if (e.art === 'satz' && (await fassungenErmitteln(sp, liste, daten, e.figuren ?? figurenAus(e.vokabeln.map((v) => v.example)), k)))
+          daten = await window.api.medien.eintraege(
+            sp,
+            liste.map((v) => v.term)
+          )
         const erg: MedienErgebnis = { erledigt: 0, leer: 0, fehler: 0, gesamt: liste.length }
         let ersterFehler: unknown = null
         for (const [i, v] of liste.entries()) {
           if (k.signal.aborted) break
           k.melde(`„${v.term}" (${i + 1} von ${liste.length})`, i, liste.length)
           try {
-            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), { klasse: e.ziel.klasse, stufe: e.ziel.stufe }, k)) erg.erledigt++
+            const abgelehnt = (w: string): void => void (erg.blockiert ??= []).push(w)
+            const lernende = { klasse: e.ziel.klasse, stufe: e.ziel.stufe }
+            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), lernende, k, abgelehnt, e.neu)) erg.erledigt++
             else erg.leer++
             medienGeaendert(sp)
           } catch (fehler) {
@@ -301,7 +386,11 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
     abschluss: (r) =>
       r.gesamt === 0
         ? 'Nichts zu tun – alles schon vorhanden.'
-        : `${r.erledigt} von ${r.gesamt} erledigt${r.leer ? `, ${r.leer} ohne passendes Bild` : ''}${r.fehler ? `, ${r.fehler} mit Fehler` : ''}.`,
+        : `${r.erledigt} von ${r.gesamt} erledigt${r.leer ? `, ${r.leer} ohne passendes Bild` : ''}${r.fehler ? `, ${r.fehler} mit Fehler` : ''}.${
+            r.blockiert?.length
+              ? ` KI-Bild vom Sicherheitssystem abgelehnt (Ersatz aus der Bildsuche, in der Liste markiert): ${r.blockiert.slice(0, 8).join(', ')}${r.blockiert.length > 8 ? ' …' : ''}.`
+              : ''
+          }`,
     ablegen: async () => medienGeaendert(sp)
   })
 }

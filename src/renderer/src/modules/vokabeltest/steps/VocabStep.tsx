@@ -1,5 +1,5 @@
 import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, Text, TextInput, Title } from '@mantine/core'
-import { useExperte } from '../../../shared/settingsStore'
+import { useAppSettings, useExperte } from '../../../shared/settingsStore'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import { IconArrowRight, IconBook2, IconClipboard, IconDeviceFloppy, IconFileUpload, IconList } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -92,6 +92,22 @@ export default function VocabStep(): React.JSX.Element {
   const filled = vocab.filter((v) => v.term.trim())
   const selected = includedVocab(vocab)
   const sprache = settings?.targetLanguage || listContext?.language || loadLastChoice('vokabeltest').targetLanguage || ''
+  /*
+   * Lehrwerk vorwählen (12.10.2026, Wunsch der Lehrkraft): nach den Test-Metadaten bzw. der Herkunft der Liste, sonst
+   * der zuletzt getroffenen Wahl und der Schule aus den Einstellungen. Die zuletzt genutzte Lehrwerk-Auswahl gilt nur,
+   * wenn sie zu Fach, Jahrgang und Schulform passt (@shared/lehrwerkSchulform `vorwahlImAuswaehler`). Einmal beim
+   * Öffnen festgelegt – sonst spränge die Auswahl, sobald Vokabeln übernommen sind.
+   */
+  const [lehrwerkWunsch] = useState(() => {
+    const zuletzt = loadLastChoice('vokabeltest')
+    const schule = useAppSettings.getState().settings.defaults
+    return {
+      language: sprache || undefined,
+      grade: settings?.grade || listContext?.grade || zuletzt.grade || undefined,
+      stateId: settings?.stateId || listContext?.stateId || zuletzt.stateId || schule?.stateId || undefined,
+      schoolTypeId: settings?.schoolTypeId || listContext?.schoolTypeId || zuletzt.schoolTypeId || schule?.schoolTypeId || undefined
+    }
+  })
 
   const zaehler = `${selected.length} von ${filled.length} werden abgefragt`
   /*
@@ -163,6 +179,8 @@ export default function VocabStep(): React.JSX.Element {
               <Tabs.Panel value="schulbuch">
                 <TextbookPicker
                   rahmen={false}
+                  prefer={lehrwerkWunsch}
+                  nurSprache={false}
                   onSelection={(selection) => {
                     setBookSelection(selection)
                     // Der Listenname zeigt, was gerade gewählt ist – bis er von Hand geändert wird

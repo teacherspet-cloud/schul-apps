@@ -24,6 +24,8 @@ import type { Worksheet, WorksheetMeta } from '../arbeitsblatt/model/types'
 import { profileFromMeta } from '../arbeitsblatt/render/SheetPages'
 import { newId } from '../vokabeltest/model/random'
 import { testAusListe } from '../vokabeltest/library'
+import { fachAusName } from '@shared/faecher'
+import { foerderBaustein, neutralerTitel } from '../arbeitsblatt/didactics/foerdernFordern'
 
 const SCHLUESSEL = (klasseId: string): string => `meineklassen-fertig:${klasseId}`
 const EREIGNIS = 'meineklassen-fertig'
@@ -31,6 +33,11 @@ const EREIGNIS = 'meineklassen-fertig'
 interface Gemerkt {
   docId: string
   titel: string
+  /**
+   * Förder-/Fordermaterial (12.10.2026): Auftrag und Gruppe auf dem Server (foerdern.ts) – beim Freischalten werden
+   * daraus die Lernenden der Gruppe vorgewählt („Für dich"). Hier stehen bewusst keine Namen (nur Kennungen des Auftrags).
+   */
+  foerder?: { auftrag: string; gruppe: string; art: 'foerder' | 'forder'; gruppenTitel: string }
 }
 export interface FertigesBlatt extends Gemerkt {
   ws: Worksheet
@@ -171,7 +178,14 @@ export function vokabelBlattMeta(
 }
 
 /** Gemeinsamer Hintergrundauftrag: Blatt planen, ausformulieren, fertigstellen; fertig → „Passendes Material" */
-function klassenBlattAuftrag(k: { id: string; titel: string }, meta: WorksheetMeta, schluessel: string, art: string): void {
+function klassenBlattAuftrag(
+  k: { id: string; titel: string },
+  meta: WorksheetMeta,
+  schluessel: string,
+  art: string,
+  /** Förder-/Fordermaterial (12.10.2026): Verweis auf die Gruppe und angepasste Darstellung (Nachteilsausgleich) */
+  extra?: { foerder?: Gemerkt['foerder']; design?: (d: Worksheet['design']) => Worksheet['design'] }
+): void {
   void starteAuftrag({
     moduleId: 'meineklassen',
     docId: k.id,
@@ -184,7 +198,8 @@ function klassenBlattAuftrag(k: { id: string; titel: string }, meta: WorksheetMe
     arbeit: async (m, ctx) => {
       const profile = profileFromMeta(m)
       ctx.melde(`Die KI plant das ${art} …`)
-      const ws: Worksheet = { version: 1, meta: m, design: presetDesigns()[0], outline: null, sheets: [], sources: [], createdAt: new Date().toISOString() }
+      const grund = presetDesigns()[0]
+      const ws: Worksheet = { version: 1, meta: m, design: extra?.design ? extra.design(grund) : grund, outline: null, sheets: [], sources: [], createdAt: new Date().toISOString() }
       ws.outline = await generateOutline(m, profile, [], ctx.ai)
       const result = await generateWorksheet(ws, profile, {
         ai: ctx.ai,
@@ -203,7 +218,7 @@ function klassenBlattAuftrag(k: { id: string; titel: string }, meta: WorksheetMe
     ablegen: async (ws) => {
       const { logoDataUrl, settings } = useAppSettings.getState()
       const docId = await speichereNeuesArbeitsblatt(ws, logoDataUrl ?? null, settings.schoolName ?? '')
-      schreiben(k.id, [...lesen(k.id).filter((x) => x.docId !== docId), { docId, titel: ws.meta.title || meta.title }])
+      schreiben(k.id, [...lesen(k.id).filter((x) => x.docId !== docId), { docId, titel: ws.meta.title || meta.title, ...(extra?.foerder ? { foerder: extra.foerder } : {}) }])
       notifySuccess(`${art} für ${k.titel} ist fertig – in „Meine Klassen" ansehen und freischalten.`)
       // „Öffnen" im fertigen Auftrag: das Blatt im Editor (während er läuft: die Klasse, docId = Lerngruppe)
       return { moduleId: 'arbeitsblatt', docId }
@@ -226,6 +241,92 @@ export function vokabelBlattFuerKlasse(
   v: { fach: string; woerter: { term: string; translation: string; example?: string }[] }
 ): void {
   klassenBlattAuftrag(k, vokabelBlattMeta(k, v), `meineklassen:${k.id}:wackelig`, 'Vokabelblatt')
+}
+
+/** Eine bestätigte Gruppe des Förder-/Fordermaterials, wie sie in die Erzeugung geht – ohne Namen */
+export interface FoerderGruppeWahl {
+  /** Auftrag (Server) und Schlüssel der Gruppe – beim Freischalten werden daraus die Lernenden vorgewählt */
+  auftrag: string
+  schluessel: string
+  gruppenTitel: string
+  art: 'foerder' | 'forder'
+  thema: string
+  ziel: string
+  bedarfe: string[]
+  befunde: string[]
+  niveau: string | null
+  nachteilsausgleich: boolean
+  ohneRechtschreibung: boolean
+}
+
+/**
+ * Förder- bzw. Forderblatt (12.10.2026, Entscheidung der Lehrkraft): über die BESTEHENDE Arbeitsblatt-Erzeugung mit dem
+ * Prompt-Baustein aus didactics/foerdernFordern.ts (Fach, Jahrgang, Land/Schulform der Lerngruppe, Ziel, Bedarf –
+ * keine Namen). Förderblatt: grundlegend, Hilfekarten an; Forderblatt: anspruchsvoll, keine Hilfekarten mit
+ * Teillösungen. 15–30 Minuten (Nachteilsausgleich: mehr Zeit, Niveau gleich). Niveau dezent als Blattnummer im Kopf.
+ */
+export function foerderBlattMeta(k: { name: string; fach: string; titel: string }, w: FoerderGruppeWahl): WorksheetMeta {
+  const { settings } = useAppSettings.getState()
+  const land = settings.defaults?.stateId ?? 'NI'
+  const form = settings.defaults?.schoolTypeId ?? 'gymnasium'
+  const schulform = SCHULFORMEN[land]?.find((f) => f.id === form)?.name ?? ''
+  const fach = blattFach(k.fach)
+  const fachId = fachAusName(k.fach)?.id ?? fach.id
+  const grade = jahrgangAus(k.name)
+  const foerder = w.art === 'foerder'
+  return {
+    ...defaultMeta(land, form, schulform),
+    subjectId: fach.id,
+    subjectLabel: fach.label,
+    grade,
+    title: neutralerTitel(w.art, w.thema),
+    topic: w.thema,
+    learningGoals: foerderBaustein({
+      fachId,
+      jahrgang: grade,
+      land,
+      schulform: form,
+      art: w.art,
+      ziel: w.ziel,
+      bedarfe: w.bedarfe,
+      befunde: w.befunde,
+      niveau: w.niveau,
+      nachteilsausgleich: w.nachteilsausgleich,
+      ohneRechtschreibung: w.ohneRechtschreibung
+    }),
+    priorKnowledge: foerder
+      ? 'Die Grundlagen des Themas wurden im Unterricht behandelt, sitzen bei dieser Gruppe aber noch nicht sicher (Befund in den Lernzielen).'
+      : 'Die Grundlagen des Themas sitzen bei dieser Gruppe sicher; das Blatt vertieft und überträgt.',
+    sheetType: 'uebung',
+    pages: 1,
+    pagesBis: 2,
+    // 15–30 Minuten (Festlegung der Lehrkraft); Nachteilsausgleich: mehr Zeit bei gleichem Niveau
+    minutes: w.nachteilsausgleich ? 40 : foerder ? 25 : 30,
+    helpCards: foerder,
+    differentiation: {
+      levels: 1,
+      mode: 'separate',
+      schwierigkeit: foerder
+        ? { anspruch: 'grundlegend', sprache: 'grundlegend' }
+        : { anspruch: 'anspruchsvoll', sprache: w.nachteilsausgleich ? 'grundlegend' : 'mittel' }
+    },
+    sheetNumber: w.niveau ? `Niveau ${w.niveau}` : ''
+  }
+}
+
+/** Darstellung bei Nachteilsausgleich: größere Schrift, weiter Zeilenabstand, linksbündig – Inhalt unverändert */
+const ausgleichsDesign = (d: Worksheet['design']): Worksheet['design'] => ({
+  ...d,
+  page: { ...d.page, autoFontSize: false, baseFontPt: Math.max(13, d.page.baseFontPt + 1.5), lineHeight: 1.5, justifyText: false }
+})
+
+/** Förder-/Forderblatt einer bestätigten Gruppe im Hintergrund erzeugen; fertig → „Passendes Material" zum Freischalten */
+export function foerderBlattFuerKlasse(k: { id: string; name: string; fach: string; titel: string }, w: FoerderGruppeWahl): void {
+  const meta = foerderBlattMeta(k, w)
+  klassenBlattAuftrag(k, meta, `meineklassen:${k.id}:foerdern:${w.auftrag}:${w.schluessel}`, w.art === 'foerder' ? 'Förderblatt' : 'Forderblatt', {
+    foerder: { auftrag: w.auftrag, gruppe: w.schluessel, art: w.art, gruppenTitel: w.gruppenTitel },
+    ...(w.nachteilsausgleich ? { design: ausgleichsDesign } : {})
+  })
 }
 
 /**

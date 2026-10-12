@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { merkeVerbrauch } from './verbrauch'
 import { abrufe } from '../images/politeFetch'
 import { StructuredRequest } from '@shared/types'
+import { BILD_BLOCKIERT } from '@shared/bildBlockiert'
 import { AiProvider, ChunkListener, RawModel } from './provider'
 
 export class OpenAiProvider implements AiProvider {
@@ -71,6 +72,8 @@ export class OpenAiProvider implements AiProvider {
       }
       throw new Error('Kein Bild erhalten.')
     } catch (e) {
+      // Inhaltlich abgelehnt (12.10.2026): keine Begrenzung – siehe shared/bildBlockiert.ts
+      if (e instanceof OpenAI.APIError && /moderation|content.?polic|safety/i.test(`${e.code ?? ''} ${e.message}`)) throw new Error(`${BILD_BLOCKIERT}: ${e.message}`)
       throw new Error(describeError(e))
     }
   }

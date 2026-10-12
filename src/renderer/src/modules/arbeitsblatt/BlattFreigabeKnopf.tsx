@@ -157,7 +157,9 @@ export function BlattFreigabeDialog({
   ohneListe,
   freigegeben,
   gruppeVorwahl,
-  docId
+  docId,
+  einzelneVorwahl,
+  fuerDich
 }: {
   ws: Worksheet
   layouts: Map<string, PagePlan[]>
@@ -172,6 +174,12 @@ export function BlattFreigabeDialog({
   gruppeVorwahl?: string
   /** Kennung des Arbeitsblatts in der eigenen Bibliothek – „Meine Klassen" kann es dann als Word ablegen */
   docId?: string
+  /**
+   * Förder-/Fordermaterial (12.10.2026): Lernende der bestätigten Gruppe vorgewählt (Benutzernamen, nur zusammen mit
+   * `gruppeVorwahl`); `fuerDich` legt das Blatt bei ihnen in den Bereich „Für dich" des Fachordners.
+   */
+  einzelneVorwahl?: string[]
+  fuerDich?: boolean
 }): React.JSX.Element {
   const eigeneId = useArbeitsblatt((s) => s.docId)
   const quelleId = docId ?? eigeneId
@@ -186,7 +194,7 @@ export function BlattFreigabeDialog({
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(gruppeVorwahl ?? null)
   const [mitglieder, setMitglieder] = useState<{ benutzer: string; name: string }[]>([])
-  const [einzelne, setEinzelne] = useState<string[]>([])
+  const [einzelne, setEinzelne] = useState<string[]>(einzelneVorwahl ?? [])
   const [gaeste, setGaeste] = useState(false)
   const [feedback, setFeedback] = useState(true)
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
@@ -215,7 +223,8 @@ export function BlattFreigabeDialog({
     laden()
   }, [])
   useEffect(() => {
-    setEinzelne([])
+    // Vorwahl der Förder-/Fordergruppe (12.10.2026) bleibt bei der vorgewählten Lerngruppe stehen
+    setEinzelne(gruppe && gruppe === gruppeVorwahl && einzelneVorwahl?.length ? einzelneVorwahl : [])
     if (!gruppe) return setMitglieder([])
     void holen<{ mitglieder: { benutzer: string; name: string }[] }>(`/server/feedback/mitglieder?gruppe=${encodeURIComponent(gruppe)}`).then(
       (d) => setMitglieder(d.mitglieder),
@@ -258,6 +267,8 @@ export function BlattFreigabeDialog({
           stift,
           ...(schrittweise ? { schrittweise: true } : {}),
           ...(merkAmEnde ? { merkAmEnde: true } : {}),
+          // „Für dich" im Fachordner (12.10.2026) – der Server setzt es nur bei Einzel-Freigabe
+          ...(fuerDich && einzelne.length ? { fuerDich: true } : {}),
           ...(bis ? { bis: new Date(`${bis}T23:59:00`).getTime(), ...(fristHart ? { fristHart: true } : {}) } : {}),
           ...(quelleId ? { quelle: { docId: quelleId, sheetId: sheet.id } } : {})
         },
@@ -314,9 +325,17 @@ export function BlattFreigabeDialog({
               searchable
               clearable
               placeholder="alle"
+              data-blatt-einzelne
             />
           )}
         </Group>
+        {fuerDich && (
+          <Text size="xs" c="dimmed" data-blatt-fuer-dich={einzelne.length ? '' : undefined}>
+            {einzelne.length
+              ? 'Förder-/Fordermaterial: Nur die gewählten Lernenden sehen das Blatt – in ihrem Fachordner unter „Für dich“. Mitschüler sehen nicht, wer welches Blatt hat.'
+              : 'Ohne Auswahl einzelner Lernender erscheint das Blatt bei allen unter „Arbeitsblätter“ (nicht unter „Für dich“).'}
+          </Text>
+        )}
         <Checkbox
           label="Auch Gäste per QR-Code und Namen (ohne Konto)"
           checked={gaeste}

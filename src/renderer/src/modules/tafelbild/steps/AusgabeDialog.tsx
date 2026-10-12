@@ -121,15 +121,15 @@ export default function AusgabeDialog({
           {/* Seitenauswahl (01.10.2026): für PDF und PNG; beim Drucken in der Druckvorschau */}
           <SeitenWahlSchalter beschreibung="Gilt für PDF (Seiten) und PNG (Bilder): Vor dem Speichern erscheinen sie zum Auswählen." />
           <Group gap="xs" mt="sm">
-            <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
-              PDF
-            </Button>
-            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026); seit 12.10.2026 links von „PDF" */}
             <VorschauKnopf
               variant="light"
               disabled={!tafeln.length || laeuft !== null}
               ausgabe={() => speichereAusgabe([{ name: `${name}.pdf`, html: pdfHtml(t, w, schule) }], 'Tafelbild als PDF gespeichert.', ziel())}
             />
+            <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
+              PDF
+            </Button>
             <Button
               variant="light"
               leftSection={<IconPhoto size={16} />}

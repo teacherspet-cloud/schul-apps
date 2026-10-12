@@ -9,17 +9,31 @@
  *  - „Als Vokabeltest" (Liste ablegen und daraus einen neuen Vokabeltest beginnen).
  * Arbeitsblatt und Test nehmen höchstens die wichtigsten 20 – dann steht „20 von N" dabei. Je Wort „aus der Liste
  * nehmen" wie auf der Kursseite (kommt wieder, wenn neue Fehler dazukommen). Auf dem Handy bildschirmfüllend.
+ *
+ * Regler „Empfindlichkeit" (12.10.2026): je Kurs abweichend vom Standard der Lehrkraft (Einstellungen); beim Schieben
+ * zeigt er sofort, wie viele Wörter jede Stufe ergibt (Server liefert die Zahlen aller Stufen mit).
  */
 import { ActionIcon, Button, Center, Group, Loader, Modal, ScrollArea, Stack, Table, Text, Tooltip } from '@mantine/core'
 import { IconFileText, IconListCheck, IconRepeat, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
-import { problemWoerterText } from '@shared/problemWoerter'
+import { problemWoerterText, type ProblemStufe } from '@shared/problemWoerter'
+import { ProblemRegler } from '../../shared/components/ProblemRegler'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { vokabelBlattFuerKlasse, vokabeltestFuerKlasse } from './klassenMaterial'
 
 /** Höchstens so viele Wörter für Arbeitsblatt und Test */
 const GRENZE = 20
+
+interface Daten {
+  problem: Wort[]
+  fach?: string
+  sprache?: string
+  problemStufe?: ProblemStufe
+  problemStufeEigen?: ProblemStufe | null
+  problemStufeStandard?: ProblemStufe
+  problemZahlen?: number[]
+}
 
 interface Wort {
   id: string
@@ -48,11 +62,11 @@ export function ProblemWoerterFenster({
   /** Nach „aus der Liste nehmen": Zahlen der Fachansicht neu laden */
   geaendert: () => void
 }): React.JSX.Element {
-  const [d, setD] = useState<{ problem: Wort[]; fach?: string; sprache?: string } | null>(null)
+  const [d, setD] = useState<Daten | null>(null)
   const [testLaeuft, setTestLaeuft] = useState(false)
   const laden = useCallback(
     () =>
-      void holen<{ problem: Wort[]; fach?: string; sprache?: string }>(`/server/vokabeln/${encodeURIComponent(kursId)}`).then(setD, (e: unknown) => {
+      void holen<Daten>(`/server/vokabeln/${encodeURIComponent(kursId)}`).then(setD, (e: unknown) => {
         notifyError(e)
         setD({ problem: [] })
       }),
@@ -70,6 +84,33 @@ export function ProblemWoerterFenster({
       },
       (e: unknown) => notifyError(e)
     )
+  const stufeSetzen = (stufe: ProblemStufe | null): void =>
+    void senden(`/server/vokabeln/${encodeURIComponent(kursId)}/problem-stufe`, { stufe: stufe === d?.problemStufeStandard ? null : stufe }).then(
+      () => {
+        laden()
+        geaendert()
+      },
+      (e: unknown) => notifyError(e)
+    )
+  const regler = d?.problemStufe ? (
+    <Stack gap={2} data-problem-kursregler>
+      <Group justify="space-between" gap="xs">
+        <Text size="sm" fw={600}>
+          Empfindlichkeit für diesen Kurs
+        </Text>
+        {d.problemStufeEigen ? (
+          <Button size="compact-xs" variant="subtle" onClick={() => stufeSetzen(null)} data-problem-standard>
+            Standard nehmen (Stufe {d.problemStufeStandard})
+          </Button>
+        ) : (
+          <Text size="xs" c="dimmed">
+            Standard aus den Einstellungen
+          </Text>
+        )}
+      </Group>
+      <ProblemRegler wert={d.problemStufe} zahlen={d.problemZahlen} onAendern={stufeSetzen} />
+    </Stack>
+  ) : null
   const alsBlatt = (): void => {
     vokabelBlattFuerKlasse(klasse, {
       fach: d?.fach ?? klasse.fach,
@@ -101,11 +142,15 @@ export function ProblemWoerterFenster({
           <Loader />
         </Center>
       ) : liste.length === 0 ? (
-        <Text size="sm" c="dimmed">
-          Gerade keine Problemwörter – sie erscheinen, sobald genug geübt ist und ein Wort bei jemandem wackelt.
-        </Text>
+        <Stack gap="sm">
+          {regler}
+          <Text size="sm" c="dimmed">
+            Gerade keine Problemwörter – sie erscheinen, sobald genug geübt ist und ein Wort bei mehreren Kindern wackelt.
+          </Text>
+        </Stack>
       ) : (
         <Stack gap="sm">
+          {regler}
           <Text size="sm" c="dimmed">
             Wörter, die bei Lernenden gerade wackeln (Fach 1–2, mit Fehlern, in den letzten 14 Tagen geübt) – wichtigste zuerst.
           </Text>

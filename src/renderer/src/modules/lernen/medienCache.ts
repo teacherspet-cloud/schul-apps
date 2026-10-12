@@ -41,9 +41,31 @@ export async function medienErgaenzen(sprache: string, woerter: string[], klasse
 
 export const medium = (wort: string): MedienSicht | undefined => medien[wort]
 
+/**
+ * Angepasste Fassung eines geschlechtsbezogenen Beispielsatzes (12.10.2026, shared/satzFassung.ts): Der Server liefert sie
+ * nur, wenn die Lernenden ihre Aufnahme hören (bevorzugte Stimme, sonst die andere) – dann passt sie zur Stimme
+ * („My name is Emma." statt „… Tom."). null = Original.
+ */
+export function satzFassung(satz: string | undefined): { text: string; uebersetzung?: string } | null {
+  if (!satz) return null
+  const k = satzSchluessel(satz)
+  for (const m of Object.values(medien)) {
+    const f = m.fassungen?.[k]
+    if (f?.text) return { text: f.text, ...(f.uebersetzung ? { uebersetzung: f.uebersetzung } : {}) }
+  }
+  return null
+}
+
+/** Beispielsatz und Übersetzung so, wie die Lernenden sie sehen und hören (Fassung ihrer Stimme, sonst das Original) */
+export function beispielFuerLernende<T extends { example?: string; exampleTranslation?: string }>(v: T): T {
+  const f = satzFassung(v.example)
+  return f ? { ...v, example: f.text, exampleTranslation: f.uebersetzung } : v
+}
+
 /** Gespeicherte Aufnahme abspielen; false = keine da (dann spricht das Gerät) */
 export function aufnahmeSpielen(text: string): boolean {
-  const t = text.trim()
+  // Original eines geschlechtsbezogenen Satzes: die Aufnahme seiner Fassung (12.10.2026)
+  const t = (satzFassung(text.trim())?.text ?? text).trim()
   let url: string | undefined
   const w = medien[t]
   if (w?.ton?.url && w.ton.text.trim() === t) url = w.ton.url
@@ -67,6 +89,6 @@ export function aufnahmeSpielen(text: string): boolean {
 /** Gibt es eine Aufnahme des Beispielsatzes? */
 export const hatSatzAufnahme = (satz: string | undefined): boolean => {
   if (!satz) return false
-  const k = satzSchluessel(satz)
+  const k = satzSchluessel(satzFassung(satz)?.text ?? satz)
   return Object.values(medien).some((m) => Boolean(m.saetze?.[k]?.url))
 }

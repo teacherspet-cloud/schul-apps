@@ -37,6 +37,8 @@ import {
   type MedienTon,
   type TonArt
 } from '@shared/medienbank'
+import { pruefungBereinigt, type TonPruefung } from '@shared/tonPruefung'
+import { fassungBereinigt, type SatzFassung, type SatzFassungSicht } from '@shared/satzFassung'
 
 const wurzelPfad = (): string =>
   process.env.SCHULAPPS_SERVER ? resolve(process.env.SCHULAPPS_DATEN || './server-daten', 'medienbank') : join(app.getPath('userData'), 'medienbank')
@@ -84,7 +86,8 @@ const istLeer = (e: MedienEintrag | null): boolean =>
     !e.ton &&
     !e.tonM &&
     !Object.keys(e.saetze ?? {}).length &&
-    !Object.keys(e.saetzeM ?? {}).length)
+    !Object.keys(e.saetzeM ?? {}).length &&
+    !Object.keys(e.fassungen ?? {}).length)
 
 /*
  * Einheitliche Schlüssel (10.10.2026, Wunsch der Lehrkraft: dieselbe Vokabel nie zweimal vertonen). Der Schlüssel ist
@@ -292,16 +295,20 @@ export function medienFuer(
       const andere: Stimmlage = opts.lage === 'w' ? 'm' : 'w'
       const ton = tonVon(e, opts.lage) ?? tonVon(e, andere)
       const saetze = saetzeMitUrl({ ...(saetzeVon(e, andere) ?? {}), ...(saetzeVon(e, opts.lage) ?? {}) })
+      const fassungen = fassungenFuerLernende(e, opts.lage)
       aus[w] = {
         ...bildTeil,
         ...(ton ? { ton: mitUrl(ton) } : {}),
-        ...(saetze ? { saetze } : {})
+        ...(saetze ? { saetze } : {}),
+        ...(fassungen ? { fassungen } : {})
       }
       continue
     }
     const saetzeM = saetzeMitUrl(e.saetzeM)
     const da = BILDSTUFEN.filter((s) => bildDerStufe(e, s))
     aus[w] = {
+      // Geschlechtsbezogene Beispielsätze (12.10.2026): die Lehrkraft sieht alle Fassungen
+      ...(e.fassungen && Object.keys(e.fassungen).length ? { fassungen: e.fassungen } : {}),
       ...(e.tonM ? { tonM: mitUrl(e.tonM) } : {}),
       ...(saetzeM ? { saetzeM } : {}),
       ...bildTeil,
@@ -317,13 +324,31 @@ export function medienFuer(
   return aus
 }
 
+/**
+ * Fassungen für Lernende (12.10.2026, shared/satzFassung.ts): Sie sehen die angepasste Fassung nur, wenn sie deren Aufnahme
+ * auch hören – mit ihrer bevorzugten Stimme oder, wenn es von ihr gar keine Aufnahme des Originals gibt, mit der anderen.
+ * Sonst bleibt das Original (Text und Ton passen dann zusammen).
+ */
+export function fassungenFuerLernende(e: MedienEintrag, lage: Stimmlage): Record<string, SatzFassungSicht> | undefined {
+  const andere: Stimmlage = lage === 'w' ? 'm' : 'w'
+  const aus: Record<string, SatzFassungSicht> = {}
+  const da = (l: Stimmlage, t: string): boolean => Object.keys(saetzeVon(e, l) ?? {}).some((k) => satzSchluessel(k) === satzSchluessel(t))
+  for (const [k, f] of Object.entries(e.fassungen ?? {})) {
+    if (!f?.lage || !f.text) continue
+    const eigene = f.lage === lage && da(lage, f.text)
+    const rueckfall = f.lage === andere && !da(lage, f.original || k) && da(andere, f.text)
+    if (eigene || rueckfall) aus[satzSchluessel(k)] = { text: f.text, ...(f.uebersetzung ? { uebersetzung: f.uebersetzung } : {}) }
+  }
+  return Object.keys(aus).length ? aus : undefined
+}
+
 /** Datei als data-URL (Ton abspielen, Bild groß) */
 export const medienDatei = (datei: string): string | null => dataUrlVon(datei) ?? null
 
 export function bildSetzen(
   sprache: string,
   wort: string,
-  b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] },
+  b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[]; kiAbgelehnt?: boolean },
   stufe: Bildstufe = 's2'
 ): MedienBild {
   const { bytes, endung } = ausDataUrl(b.dataUrl)
@@ -335,6 +360,7 @@ export function bildSetzen(
     herkunft: b.herkunft === 'ki' ? 'ki' : 'suche',
     nachweis: String(b.nachweis ?? '').slice(0, 400),
     ...(b.kandidaten?.length ? { kandidaten: bereinigeKandidaten(b.kandidaten) } : {}),
+    ...(b.kiAbgelehnt === true ? { kiAbgelehnt: true } : {}),
     zeit: Date.now()
   }
   aendern(sprache, wort, (e) => {
@@ -456,7 +482,18 @@ export function tonSetzen(
   sprache: string,
   wort: string,
   art: TonArt,
-  t: { dataUrl: string; stimme: string; text: string; gesprochen?: string },
+  t: {
+    dataUrl: string
+    stimme: string
+    text: string
+    gesprochen?: string
+    /** Prüfung per Messung (12.10.2026, shared/tonPruefung.ts) */
+    pruefung?: TonPruefung
+    /** „Neue Aussprache erzeugen" der Admins (12.10.2026): die bisherige Datei als Rückfall behalten */
+    behalteVorher?: boolean
+    /** … und was bemängelt wurde */
+    grund?: string
+  },
   lage: Stimmlage = 'w'
 ): MedienTon {
   const { bytes, endung } = ausDataUrl(t.dataUrl)
@@ -472,25 +509,103 @@ export function tonSetzen(
     ...(gesprochen && gesprochen !== t.text ? { gesprochen } : {}),
     zeit: Date.now()
   }
+  const pruefung = pruefungBereinigt(t.pruefung)
+  if (pruefung) ton.pruefung = pruefung
+  const grund = typeof t.grund === 'string' ? t.grund.slice(0, 120) : ''
+  /*
+   * Rückfall (12.10.2026): Bei „Neue Aussprache erzeugen" bleibt die bisherige Datei als `vorher` liegen; die davor
+   * gemerkte weicht. Sonst wird die alte Datei wie bisher gelöscht (samt einer gemerkten).
+   */
+  const ersetze = (alt: MedienTon | undefined): void => {
+    if (!alt) return
+    weg(alt.vorher?.datei)
+    if (t.behalteVorher) ton.vorher = { datei: alt.datei, stimme: alt.stimme, zeit: alt.zeit, ...(grund ? { grund } : {}) }
+    else weg(alt.datei)
+  }
   const tonFeld = lage === 'm' ? 'tonM' : 'ton'
   const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(sprache, wort, (e) => {
     if (art === 'wort') {
-      weg(e[tonFeld]?.datei)
+      ersetze(e[tonFeld])
       return { ...e, [tonFeld]: ton }
     }
-    // Ersetzt wird die Aufnahme dieses Satzes in jeder Schreibweise („it’s" = „it's", 10.10.2026)
+    // Ersetzt wird die Aufnahme dieses Satzes in jeder Schreibweise („it’s" = „it's", 10.10.2026) – die neueste als Rückfall
     const k = satzSchluessel(t.text)
     const saetze = { ...(e[satzFeld] ?? {}) }
-    for (const [alt, x] of Object.entries(saetze))
-      if (satzSchluessel(alt) === k) {
+    const gleiche = Object.entries(saetze)
+      .filter(([alt]) => satzSchluessel(alt) === k)
+      .sort((a, b) => b[1].zeit - a[1].zeit)
+    gleiche.forEach(([alt, x], i) => {
+      if (i === 0) ersetze(x)
+      else {
         weg(x.datei)
-        delete saetze[alt]
+        weg(x.vorher?.datei)
       }
+      delete saetze[alt]
+    })
     return { ...e, [satzFeld]: { ...saetze, [k]: ton } }
   })
   medienGeaendert()
   return ton
+}
+
+/**
+ * Prüfung einer vorhandenen Aufnahme speichern (12.10.2026, Nachprüfung beim Öffnen einer Liste). Nur, wenn die Aufnahme
+ * noch dieselbe Datei hat – inzwischen neu erzeugte bekommen ihre eigene Prüfung. `satz`: Wortlaut bei Satz-Aufnahmen.
+ * true = gespeichert.
+ */
+export function tonPruefungSetzen(
+  sprache: string,
+  wort: string,
+  art: TonArt,
+  lage: Stimmlage,
+  satz: string | undefined,
+  datei: string,
+  p: TonPruefung
+): boolean {
+  const pruefung = pruefungBereinigt(p)
+  if (!pruefung || !MEDIEN_DATEI.test(String(datei))) return false
+  // Kein Eintrag: nichts anlegen
+  if (!finde(index(), sprache, wort)) return false
+  let getroffen = false
+  const tonFeld = lage === 'm' ? 'tonM' : 'ton'
+  const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
+  aendern(sprache, wort, (e) => {
+    if (art === 'wort') {
+      const t = e[tonFeld]
+      if (t?.datei !== datei) return e
+      getroffen = true
+      return { ...e, [tonFeld]: { ...t, pruefung } }
+    }
+    const k = satzSchluessel(satz ?? '')
+    const saetze = { ...(e[satzFeld] ?? {}) }
+    for (const [alt, x] of Object.entries(saetze))
+      if (satzSchluessel(alt) === k && x.datei === datei) {
+        saetze[alt] = { ...x, pruefung }
+        getroffen = true
+      }
+    return getroffen ? { ...e, [satzFeld]: saetze } : e
+  })
+  return getroffen
+}
+
+/**
+ * Fassung eines geschlechtsbezogenen Beispielsatzes setzen (12.10.2026, shared/satzFassung.ts) – von der KI oder von Hand.
+ * `fassung` null = vergessen (die KI prüft beim nächsten Auftrag erneut).
+ */
+export function fassungSetzen(sprache: string, wort: string, original: string, fassung: Partial<SatzFassung> | null): SatzFassung | null {
+  const k = satzSchluessel(original)
+  if (!k) throw new Error('Kein Beispielsatz.')
+  const f = fassung ? fassungBereinigt(fassung, original) : null
+  aendern(sprache, wort, (e) => {
+    const fassungen = { ...(e.fassungen ?? {}) }
+    if (f) fassungen[k] = f
+    else delete fassungen[k]
+    const rest: MedienEintrag = { ...e, fassungen }
+    if (!Object.keys(fassungen).length) delete rest.fassungen
+    return rest
+  })
+  return f
 }
 
 /*
@@ -617,6 +732,7 @@ export function tonLoeschen(sprache: string, wort: string, art: TonArt, satz?: s
   aendern(sprache, wort, (e) => {
     if (art === 'wort') {
       weg(e[tonFeld]?.datei)
+      weg(e[tonFeld]?.vorher?.datei)
       const rest = { ...e }
       delete rest[tonFeld]
       return rest
@@ -626,6 +742,7 @@ export function tonLoeschen(sprache: string, wort: string, art: TonArt, satz?: s
     for (const [alt, x] of Object.entries(saetze))
       if (satzSchluessel(alt) === k) {
         weg(x.datei)
+        weg(x.vorher?.datei)
         delete saetze[alt]
       }
     return { ...e, [satzFeld]: saetze }

@@ -1,6 +1,6 @@
 import { Alert, Badge, Box, Button, Card, Chip, Collapse, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
 import { IconCheck, IconChevronRight, IconDeviceFloppy, IconListDetails, IconStack2 } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../../shared/useUndoKeys'
 import { useVerlauf } from '../../../shared/useVerlauf'
@@ -15,8 +15,11 @@ import type { VocabRow } from './VocabRow'
 import { istVerbSprache } from '@shared/verben'
 import VerbListeDialog from '../../../shared/verben/VerbListeDialog'
 import { aufServer } from '../../../shared/plattform'
+import { darfLehrwerkBearbeiten } from '../../../shared/fachobleute'
+import { schulformName } from '@shared/lehrwerkSchulform'
 import { AbschnitteDialog, MedienLeiste, useMedienAdmin, useMedienbank, useMedienZiel } from '../../../shared/medien/MedienUi'
 import { setzeVokabelAnsicht, zielBuch } from '../../../shared/medien/medienAuftrag'
+import { figurenAus } from '@shared/satzFassung'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
 function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
@@ -72,7 +75,9 @@ export default function BookEditor({
    */
   const admin = useMedienAdmin()
   const gemeinsam = aufServer() && Boolean(book?.builtIn)
-  const gesperrt = gemeinsam && !admin
+  // Fachobleute (12.10.2026): bearbeiten gemeinsame Lehrwerke ihres Fachs wie der Admin; die Medienbank bleibt beim Admin
+  const pflegt = admin || (book ? darfLehrwerkBearbeiten(book.language) : false)
+  const gesperrt = gemeinsam && !pflegt
   useEffect(() => {
     window.api.textbooks
       .list()
@@ -126,6 +131,8 @@ export default function BookEditor({
     rows.map((r) => r.term),
     zielMitStufe.stufe
   )
+  // Figuren des Lehrwerks (12.10.2026): Eigennamen aus allen Beispielsätzen des Bandes – für angepasste Fassungen geschlechtsbezogener Sätze
+  const figuren = useMemo(() => figurenAus((book?.units ?? []).flatMap((u) => u.sections.flatMap((s) => s.entries.map((e) => e.example)))), [book])
   const ansicht = medienZiel?.docId ?? null
   useEffect(() => {
     if (!aktiv || !ansicht) return
@@ -248,7 +255,7 @@ export default function BookEditor({
               Unregelmäßige Verben
             </Button>
           )}
-          {(!book.builtIn || (gemeinsam && admin)) && (
+          {(!book.builtIn || (gemeinsam && pflegt)) && (
             <Button variant="subtle" color="red" onClick={() => setConfirmReset(true)}>
               Änderungen verwerfen
             </Button>
@@ -348,7 +355,7 @@ export default function BookEditor({
         )}
       </Card>
 
-      {/* Reihe, Band, Verlag, Landesausgabe, Ausgabe (Paket 15) – gespeichert wie jede Änderung, von selbst */}
+      {/* Reihe, Band, Jahrgang, Verlag, Landesausgabe, Schulform, Ausgabe (Paket 15, Jahrgang/Schulform 12.10.2026) – gespeichert wie jede Änderung, von selbst */}
       <Card withBorder>
         <UnstyledButton onClick={() => setAngabenOffen((o) => !o)} aria-expanded={angabenOffen} style={{ width: '100%' }}>
           <Group gap="xs" wrap="nowrap">
@@ -357,7 +364,14 @@ export default function BookEditor({
               Reihe und Ausgabe
             </Text>
             <Text size="xs" c="dimmed" truncate>
-              {[reiheTitel(book), book.band ? `Band ${book.band}` : ''].filter(Boolean).join(' · ')}
+              {[
+                reiheTitel(book),
+                book.band ? `Band ${book.band}` : '',
+                book.grade ? `Klasse ${book.grade}` : '',
+                schulformName(book.schoolTypeId, book.stateId) ?? ''
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </Group>
         </UnstyledButton>
@@ -369,7 +383,11 @@ export default function BookEditor({
               onChange={(patch) => {
                 // Geleerte Felder entfallen ganz (Reihe und Band leitet die App dann wieder aus dem Namen ab)
                 const neu: Textbook = { ...book }
-                for (const [k, v] of Object.entries(patch) as [keyof LehrwerkAngabenWerte, string][]) neu[k] = v.trim() ? v : undefined
+                // Jahrgang, Land und Schulform (12.10.2026): Zahl bzw. Kennung, leer = entfällt
+                for (const [k, v] of Object.entries(patch) as [keyof LehrwerkAngabenWerte, string | number | undefined][]) {
+                  if (k === 'grade') neu.grade = typeof v === 'number' ? v : undefined
+                  else neu[k] = typeof v === 'string' && v.trim() ? v : undefined
+                }
                 setBook(neu)
                 geaendert()
               }}
@@ -382,7 +400,7 @@ export default function BookEditor({
         <Alert color={gemeinsam ? 'violet' : 'gray'} p="xs" data-lehrwerk-hinweis>
           <Text size="xs">
             {gesperrt
-              ? 'Gemeinsames Lehrwerk der Schule – nur Admins können es bearbeiten. Für eigene Änderungen eine eigene Vokabelliste anlegen.'
+              ? 'Gemeinsames Lehrwerk der Schule – nur Admins und die Fachobleute des Fachs können es bearbeiten. Für eigene Änderungen eine eigene Vokabelliste anlegen.'
               : gemeinsam
               ? 'Gemeinsames Lehrwerk der Schule: Änderungen gelten sofort für alle Lehrkräfte und Lernenden. „Änderungen verwerfen" stellt die mitgelieferte Fassung wieder her.'
               : 'Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.'}
@@ -415,8 +433,15 @@ export default function BookEditor({
         {admin && medienZiel && (
           <MedienLeiste
             sprache={book.language}
-            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example, aussprache: r.aussprache }))}
+            vokabeln={rows.map((r) => ({
+              term: r.term,
+              translation: r.translation,
+              example: r.example,
+              exampleTranslation: r.exampleTranslation,
+              aussprache: r.aussprache
+            }))}
             daten={medien.daten} bereit={medien.bereit}
+            figuren={figuren}
             ziel={medienZiel}
             mehr={
               <Button size="xs" variant="light" leftSection={<IconStack2 size={14} />} onClick={() => setAbschnitteOffen(true)} data-medien-mehrere>
@@ -439,6 +464,7 @@ export default function BookEditor({
                   term: e.term,
                   translation: e.translation,
                   example: e.example,
+                  exampleTranslation: e.exampleTranslation,
                   aussprache: e.aussprache
                 })),
                 ziel: { ...zielBuch(book.id, book.name, u.name, s.name, book.grade), stufe: zielMitStufe.stufe }

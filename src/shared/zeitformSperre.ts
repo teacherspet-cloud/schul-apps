@@ -11,7 +11,7 @@
  * Seit 09.10.2026 (Nachtrag der Lehrkraft) für alle Fremdsprachen mit Daten im Grammatikkatalog: Französisch, Spanisch,
  * Italienisch, Latein, Russisch, Niederländisch, Portugiesisch (shared/zeitformSprachen.ts). Englisch steht hier.
  */
-import { bekannteGrammatik, istOptional, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
+import { bekannteGrammatik, fruehereBaendeDerReihe, istOptional, LEHRWERK_GRAMMATIK, reiheDesBands } from '../renderer/src/shared/lehrwerkGrammatik'
 import { BASIS, bekanntLatein, lateinLehrwerk, ZEITFORMEN_SPRACHEN } from './zeitformSprachen'
 
 export interface SperrbareZeitform {
@@ -178,15 +178,16 @@ export function grammatikBandVon(lehrwerk: string): string | undefined {
 export function bekanntNachStand(lehrwerk: { buch?: string; unit?: string } | undefined, jahrgang?: number): string[] {
   // Latein (09.10.2026): Stichwörter der Lektionen bis zum Stand (Pontes, Campus, prima …)
   if (lehrwerk?.buch && lateinLehrwerk(lehrwerk.buch)) return bekanntLatein(lehrwerk.buch, lehrwerk.unit)
-  const baende = Object.keys(LEHRWERK_GRAMMATIK)
+  // Rückfall nach Jahrgang: nur die Green-Line-Bände (12.10.2026 – weitere Lehrwerke aus der App „Grammatikformen")
+  const baende = Object.keys(LEHRWERK_GRAMMATIK).filter((x) => reiheDesBands(x) === 'Green Line')
   const alle = (b: string, nurPflicht: boolean): string[] =>
     Object.entries(LEHRWERK_GRAMMATIK[b])
       .filter(([k]) => !nurPflicht || !istOptional(k))
       .flatMap(([, s]) => Object.values(s).flat().flatMap((p) => p.t))
   const buch = lehrwerk?.buch ? grammatikBandVon(lehrwerk.buch) : undefined
   if (buch) {
-    const i = baende.indexOf(buch)
-    const frueher = baende.slice(0, i).flatMap((b) => alle(b, true))
+    // Frühere Bände derselben Reihe (12.10.2026, weitere Lehrwerke aus der App „Grammatikformen")
+    const frueher = fruehereBaendeDerReihe(buch).flatMap((b) => alle(b, true))
     if (!lehrwerk?.unit || !LEHRWERK_GRAMMATIK[buch][lehrwerk.unit]) return frueher
     const kapitel = Object.keys(LEHRWERK_GRAMMATIK[buch])
     const { bekannt, neu } = bekannteGrammatik(kapitel, buch, lehrwerk.unit)

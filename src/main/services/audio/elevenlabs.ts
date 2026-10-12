@@ -507,9 +507,12 @@ function soloSynthese(req: TtsRequest, woerterbuch: WoerterbuchVerweis | null = 
       const voiceId = zeilen[0].voiceId
       const texte = zeilen.map((z) => ohneTags(z.text).trim())
       const text = texte.filter(Boolean).join(` ${TURN_BREAK} `)
+      // Unhörbarer Zusammenhang der Aussprache einzelner Wörter (12.10.2026, TtsRequest.kontext) – Nachbarzeilen gehen vor
+      const davor = kontext.davor ?? req.kontext?.davor
+      const danach = kontext.danach ?? req.kontext?.danach
       const rand = {
-        ...(kontext.davor && ohneTags(kontext.davor).trim() ? { previous_text: ohneTags(kontext.davor).trim() } : {}),
-        ...(kontext.danach && ohneTags(kontext.danach).trim() ? { next_text: ohneTags(kontext.danach).trim() } : {})
+        ...(davor && ohneTags(davor).trim() ? { previous_text: ohneTags(davor).trim().slice(0, 600) } : {}),
+        ...(danach && ohneTags(danach).trim() ? { next_text: ohneTags(danach).trim().slice(0, 600) } : {})
       }
       const stuecke = textStuecke(text, SOLO_MAX_ZEICHEN)
       if (stuecke.length === 1) {

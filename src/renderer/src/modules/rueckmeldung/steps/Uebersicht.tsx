@@ -52,6 +52,12 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
         <Group justify="space-between" mb="sm">
           <Title order={4}>Notenübersicht</Title>
           <Group gap="xs">
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026); seit 12.10.2026 links von „PDF" */}
+            <VorschauKnopf
+              size="xs"
+              variant="light"
+              ausgabe={() => speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage())}
+            />
             <Button
               size="xs"
               variant="light"
@@ -62,12 +68,6 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
             >
               PDF
             </Button>
-            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
-            <VorschauKnopf
-              size="xs"
-              variant="light"
-              ausgabe={() => speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage())}
-            />
             <Button
               size="xs"
               variant="light"

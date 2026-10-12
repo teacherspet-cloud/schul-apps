@@ -71,6 +71,9 @@ await page.evaluate(() =>
 await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
 await page.keyboard.press('Control+0')
 await page.getByText('Zuletzt bearbeitet').waitFor({ timeout: 10000 })
+// Kasten „Zuletzt bearbeitet" (12.10.2026): zunächst zugeklappt, Auf/Zu dauerhaft gemerkt
+pruefe((await page.locator('[data-klappkarte="start-zuletzt"]').getAttribute('data-offen')) === 'false', '„Zuletzt bearbeitet" zunächst zugeklappt')
+await kartenAuf(page, 'start-zuletzt')
 const zuletzt = await page.locator('.home-material').allInnerTexts()
 pruefe(zuletzt.length >= 3, `„Zuletzt bearbeitet" zeigt die Probe-Einträge (${zuletzt.length})`)
 pruefe(

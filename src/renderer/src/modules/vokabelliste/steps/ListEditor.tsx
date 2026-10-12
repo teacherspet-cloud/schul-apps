@@ -14,7 +14,7 @@ import { LANGUAGES, type VocabEntry } from '../../vokabeltest/model/types'
 import { alsListenEintrag } from '../../vokabeltest/model/vocab'
 import { aiCall } from '../../vokabeltest/store'
 import { TextbookPicker } from '../../vokabeltest/steps/TextbookPicker'
-import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
+import VokabelTabelle, { leereZeile, satzDerZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
 import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelUebernahme'
 import type { VocabRow } from './VocabRow'
 import { MedienLeiste, useMedienAdmin, useMedienbank, useMedienZiel } from '../../../shared/medien/MedienUi'
@@ -276,7 +276,14 @@ export default function ListEditor({
           />
         </Group>
         {medienAdmin && (
-          <MedienLeiste sprache={language} vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, aussprache: r.aussprache }))} daten={medien.daten} bereit={medien.bereit} ziel={medienZiel} />
+          <MedienLeiste
+            sprache={language}
+            // Beispielsatz im Hinweis (12.10.2026): vorher fehlte er – „Satz-Aussprache erzeugen" zählte in Listen immer 0
+            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: satzDerZeile(r, false), aussprache: r.aussprache }))}
+            daten={medien.daten}
+            bereit={medien.bereit}
+            ziel={medienZiel}
+          />
         )}
         <VokabelTabelle
           zeilen={rows}

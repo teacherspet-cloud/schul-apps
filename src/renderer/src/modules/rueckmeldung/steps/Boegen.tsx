@@ -302,17 +302,10 @@ export default function Boegen(): React.JSX.Element | null {
                 Fehlende Bögen schreiben
               </Button>
             )}
-            <Button
-              size="xs"
-              variant="light"
-              leftSection={<IconFileTypePdf size={14} />}
-              disabled={!fertige.length}
-              onClick={() => speichern(alleIds, 'pdf')}
-              data-rm-alle-pdf
-            >
-              Alle als PDF
-            </Button>
-            {/* Vorschau (10.10.2026): dasselbe PDF ohne Speichern; „PDF speichern" nimmt den Weg von „Alle als PDF" */}
+            {/*
+             * Vorschau (10.10.2026): dasselbe PDF ohne Speichern; „PDF speichern" nimmt den Weg von „Alle als PDF".
+             * Seit 12.10.2026 links von „Alle als PDF" (in allen Programmen gleich).
+             */}
             <Button
               size="xs"
               variant="light"
@@ -328,6 +321,16 @@ export default function Boegen(): React.JSX.Element | null {
               data-pdf-vorschau-knopf
             >
               Vorschau
+            </Button>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconFileTypePdf size={14} />}
+              disabled={!fertige.length}
+              onClick={() => speichern(alleIds, 'pdf')}
+              data-rm-alle-pdf
+            >
+              Alle als PDF
             </Button>
             <Button
               size="xs"

@@ -120,14 +120,15 @@ export function GastFenster({
                 Zettel drucken
               </Button>
             )}
-            {zettel.length > 0 && (
-              <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => zettelAlsPdf(titel, zettel, window.location.origin)} data-gast-zettel-pdf>
-                Als PDF sichern
-              </Button>
-            )}
+            {/* Vorschau links von „PDF" (12.10.2026, in allen Programmen gleich) */}
             {zettel.length > 0 && (
               <Button variant="default" leftSection={<IconEye size={16} />} onClick={() => zettelVorschau(titel, zettel, window.location.origin)} data-pdf-vorschau-knopf>
                 Vorschau
+              </Button>
+            )}
+            {zettel.length > 0 && (
+              <Button variant="default" leftSection={<IconDownload size={16} />} onClick={() => zettelAlsPdf(titel, zettel, window.location.origin)} data-gast-zettel-pdf>
+                Als PDF sichern
               </Button>
             )}
             <Button variant="subtle" onClick={() => void neuerCode()} data-gast-code-neu>

@@ -11,10 +11,13 @@
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
 import type { Bildstufe, MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
+import type { TonPruefung } from './tonPruefung'
+import type { SatzFassung } from './satzFassung'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
 import type { VerbListe, VerbListeMeta } from './verben'
+import type { LehrwerkGrammatikEintrag } from '../renderer/src/shared/lehrwerkGrammatik'
 import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
@@ -405,6 +408,15 @@ export function buildApi(call: Call, extras: ApiExtras) {
       save: (books: Textbook[]) => call<TextbookMeta[]>('textbooks:save', books),
       delete: (id: string) => call<TextbookMeta[]>('textbooks:delete', id)
     },
+    /**
+     * Grammatikformen je Lehrwerk-Band (12.10.2026, App „Grammatikformen"): Bearbeitungen, die die eingebaute Liste
+     * (renderer/src/shared/lehrwerkGrammatik.ts) überlagern – am Server gemeinsam, ändern nur Admin/Fachobleute
+     */
+    lehrwerkGrammatik: {
+      list: () => call<LehrwerkGrammatikEintrag[]>('lehrwerkGrammatik:list'),
+      save: (eintrag: LehrwerkGrammatikEintrag) => call<LehrwerkGrammatikEintrag[]>('lehrwerkGrammatik:save', eintrag),
+      delete: (lehrwerkId: string) => call<LehrwerkGrammatikEintrag[]>('lehrwerkGrammatik:delete', lehrwerkId)
+    },
     /** Listen unregelmäßiger Verben je Lehrwerk-Band (30.09.2026, shared/verben.ts) */
     verbLists: {
       list: () => call<VerbListeMeta[]>('verbLists:list'),
@@ -493,14 +505,25 @@ export function buildApi(call: Call, extras: ApiExtras) {
       bildSetzen: (
         sprache: string,
         wort: string,
-        b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] },
+        b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[]; kiAbgelehnt?: boolean },
         stufe: Bildstufe = 's2'
       ) => call<MedienBild>('medien:bild-setzen', sprache, wort, b, stufe),
       bildLoeschen: (sprache: string, wort: string, stufe: Bildstufe = 's2') => call<void>('medien:bild-loeschen', sprache, wort, stufe),
       /** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken */
       ohneBild: (sprache: string, wort: string, stufe: Bildstufe) => call<void>('medien:ohne-bild', sprache, wort, stufe),
-      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string; gesprochen?: string }, lage: Stimmlage = 'w') =>
-        call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
+      tonSetzen: (
+        sprache: string,
+        wort: string,
+        art: TonArt,
+        t: { dataUrl: string; stimme: string; text: string; gesprochen?: string; pruefung?: TonPruefung; behalteVorher?: boolean; grund?: string },
+        lage: Stimmlage = 'w'
+      ) => call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
+      /** Prüfung per Messung an einer vorhandenen Aufnahme speichern (12.10.2026); true = gespeichert */
+      tonPruefung: (sprache: string, wort: string, art: TonArt, lage: Stimmlage, satz: string | undefined, datei: string, p: TonPruefung) =>
+        call<boolean>('medien:ton-pruefung', sprache, wort, art, lage, satz, datei, p),
+      /** Fassung eines geschlechtsbezogenen Beispielsatzes (12.10.2026); null = vergessen */
+      fassungSetzen: (sprache: string, wort: string, original: string, f: Partial<SatzFassung> | null) =>
+        call<SatzFassung | null>('medien:fassung-setzen', sprache, wort, original, f),
       tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w') =>
         call<void>('medien:ton-loeschen', sprache, wort, art, satz, lage),
       /** Erzeugungssperre (10.10.2026, `tonKennung`): true = frei, false = ein anderer erzeugte eben – erst nachsehen */

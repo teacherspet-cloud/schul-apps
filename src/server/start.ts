@@ -18,6 +18,7 @@ import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute } from './achievements'
 import { klassenRoute } from './klassen'
+import { foerdernRoute } from './foerdern'
 import { startseiteRoute } from './startseite'
 import { klassenGaesteRoute } from './klassenGaeste'
 import { kontoVerknuepfungRoute } from './kontoVerknuepfungRoute'
@@ -36,7 +37,9 @@ import { leseSchule, schuleRoute } from './schule'
 import { kalenderLaden, kalenderStarten, landAusLehrkraeften, schulkalenderRoute, setzeLandRueckfall } from './schulkalender'
 import { schuljahrRoute, schuljahrWechselStarten, setzeOrtQuelle } from './schuljahrWechsel'
 import { schulOrtVon } from './grammatik'
-import { setzeRolleQuelle } from '../main/services/rolle'
+import { setzeFachobmannQuelle, setzeRolleQuelle } from '../main/services/rolle'
+import { fachobleuteRoute, fachobmannFaecher } from './fachobleute'
+import { ladeLehrwerkGrammatik } from '../main/services/storage/lehrwerkGrammatik'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
 import { hauptschluessel, passwortHash } from './geheim'
@@ -105,6 +108,13 @@ async function main(): Promise<void> {
   setzeSchuleFest(() => schuleFest(aktuellerNutzer()))
   // Gemeinsame Lehrwerke und Medienbank: bearbeiten nur Admins (main/services/rolle.ts)
   setzeRolleQuelle(() => aktuellerNutzer()?.rolle)
+  // Fachobleute (12.10.2026, fachobleute.ts): bearbeiten gemeinsame Lehrwerke ihres Fachs wie der Admin
+  setzeFachobmannQuelle(() => {
+    const n = aktuellerNutzer()
+    return n && n.rolle !== 'schueler' ? fachobmannFaecher(n.id) : []
+  })
+  // Grammatikformen der Lehrwerke (12.10.2026): gemeinsame Bearbeitungen über die eingebauten legen
+  ladeLehrwerkGrammatik()
   // Kurse aus IServ (10.10.2026, iservKursgruppen.ts): nach jeder Anmeldung über IServ erkennen und Kursgruppen sichern
   anmeldeHaken.nachIserv = nachIservAnmeldung
 
@@ -186,6 +196,8 @@ async function main(): Promise<void> {
     routen: [
       // Klasse und Kurse aus IServ für Lernende (10.10.2026, iservKursgruppen.ts) – vor den Routen, die /s/api/ ganz übernehmen
       iservKurseRoute(),
+      // Förder- und Fordermaterial: Lerndaten je Kind, Gruppen, Bündel „Für dich" (12.10.2026, foerdern.ts)
+      foerdernRoute(),
       hoertextRoute,
       // Medienbank der Vokabeln für Lernende (05.10.2026)
       medienRoute,
@@ -236,6 +248,8 @@ async function main(): Promise<void> {
       schuljahrRoute,
       // Fachfarben der Schule: lesen alle Lehrkräfte, ändern nur Admins (09.10.2026)
       fachfarbenRoute,
+      // Fachobleute: Admin ernennt, Lehrkräfte lesen die eigenen Fächer (12.10.2026)
+      fachobleuteRoute,
       // KI-Zugänge der Schule: Adressen, Verbindungstest, Nutzungsübersicht (09.10.2026, kiZugaenge.ts)
       kiZugaengeRoute,
       verwaltungsRoute

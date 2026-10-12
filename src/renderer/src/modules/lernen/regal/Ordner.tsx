@@ -5,7 +5,8 @@
  *  - Grammatik / Grammar …: Grammatiktrainings
  *  - Materialien / Materials …: Arbeitsblätter, Onlinetests, Rückmeldungen (Schreibaufgaben), dazu bei Konten Mappen
  *    (Ergebnisse, Tafelbilder, Lernprodukte) und Merkzettel; Arbeitsblätter aus Unterrichtsreihen je Reihe (08.10.2026)
- * Registerwechsel blättert um; ruhige Darstellung ohne Bewegung.
+ * Registerwechsel blättert um – seit 12.10.2026 als kurzes Umblättern in Richtung der Lasche (blaettern.tsx umblaettern);
+ * ruhige Darstellung bzw. reduzierte Bewegung: nur eine kurze Überblendung.
  *
  * Unterseiten im Ordner (09.10.2026, Wunsch der Lehrkraft, blaettern.tsx): Grammatikform → Training → Übung/Spiel,
  * Vokabelrunde und Spiele, Arbeitsblätter öffnen sich als nächste Seite IM Ordner – die Seite schlägt nach links um,
@@ -29,6 +30,7 @@ import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
 import { Demnaechst, NeuFreigeschaltet } from './planHinweise'
+import { fuerDichAufteilen } from '@shared/fuerDich'
 
 const CSS = `
 .og-ordner { display: grid; grid-template-columns: 46px 1fr auto; min-height: 70vh; border-radius: 10px; overflow: visible; position: relative;
@@ -40,7 +42,7 @@ const CSS = `
 .og-papier { background: var(--og-papier); color: var(--og-tinte); padding: 22px 22px 28px 30px; border-radius: 0 6px 6px 0; min-width: 0;
   background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--og-linie) 31px 32px); position: relative; }
 .og-papier::before { content: ''; position: absolute; left: 14px; top: 0; bottom: 0; width: 2px; background: rgba(220, 80, 80, .35); }
-.og-seite { animation: og-blatt .35s ease-out; transform-origin: left center; }
+.og-seite { transform-origin: left center; }
 .og-ordner.mit-deckel { animation: none; }
 .og-zahl { writing-mode: horizontal-tb; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; font-size: .7rem; font-weight: 800;
   background: #e03131; color: #fff; display: inline-grid; place-items: center; }
@@ -65,6 +67,7 @@ const CSS = `
 .og-karte:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12), inset 4px 0 0 var(--og-akzent); }
 @keyframes og-auf { from { opacity: 0; transform: perspective(1400px) rotateY(-8deg) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes og-blatt { from { opacity: 0; transform: perspective(1200px) rotateY(-14deg); } to { opacity: 1; transform: none; } }
+@keyframes og-ueberblenden { from { opacity: 0; } to { opacity: 1; } }
 /* Mit dem Finger (09.10.2026): Laschen mindestens 44 Punkte */
 html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
 .og-kurz { display: none; }
@@ -73,7 +76,9 @@ html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
  * kleine Beschriftung (höchstens zwei Zeilen), alle gleich breit, ohne Rollen; bis 5 Register passen in 360 px.
  */
 @media (max-width: 700px) {
-  .og-ordner { grid-template-columns: 22px 1fr; }
+  /* 12.10.2026 (Befund am Telefon: beim Registerwechsel wurde die Reiterleiste mal sehr hoch): Bei kurzem Inhalt teilten
+     sich die zwei automatischen Zeilen die Resthöhe der Mindesthöhe – jetzt bekommt nur das Blatt den Rest */
+  .og-ordner { grid-template-columns: 22px 1fr; grid-template-rows: auto 1fr; align-content: start; }
   .og-ringe { padding: 20px 0; } .og-ring { width: 22px; height: 12px; margin-right: -12px; border-width: 3px; }
   .og-papier { padding: 16px 12px 22px 22px; } .og-papier::before { left: 8px; }
   .og-ringe, .og-papier { grid-row: 2; }
@@ -88,8 +93,11 @@ html[data-touch] .og-lasche { min-width: 44px; min-height: 44px; }
   html[data-touch] .og-lasche { min-width: 0; min-height: 52px; }
 }
 .og-zurueck-leiste { margin: -6px 0 10px -6px; }
-@media (prefers-reduced-motion: reduce) { .og-ordner, .og-seite { animation: none; } .og-lasche { transition: none; } }
-html.sa-ruhig .og-ordner, html.sa-ruhig .og-seite { animation: none; }
+/* Registerwechsel (12.10.2026): umgeblättert wird in blaettern.tsx – bei reduzierter Bewegung bzw. ruhiger Darstellung
+   statt dessen nur eine kurze Überblendung des neuen Registers */
+@media (prefers-reduced-motion: reduce) { .og-ordner { animation: none; } .og-seite { animation: og-ueberblenden .18s ease-out; } .og-lasche { transition: none; } }
+html.sa-ruhig .og-ordner { animation: none; }
+html.sa-ruhig .og-seite { animation: og-ueberblenden .18s ease-out; }
 `
 
 const SYMBOL: Record<Register, React.ReactNode> = {
@@ -174,7 +182,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
         }}
       >
         <BlaetternRahmen papier={papierEl} buehne={ordnerEl}>
-          {({ tiefe, zurueck, alleZu, wischen }) => (
+          {({ tiefe, zurueck, alleZu, umblaettern, wischen }) => (
             <>
               <div className="og-ringe" aria-hidden>
                 <span className="og-ring" />
@@ -227,8 +235,13 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                     aria-selected={r === aktiv}
                     className="og-lasche"
                     style={{ background: f.register[r].bg, color: f.register[r].text }}
-                    // Offene Unterseiten zuklappen (Verlauf zurück), dann das Register zeigen
-                    onClick={() => alleZu(() => zeigen(r))}
+                    // Offene Unterseiten zuklappen (Verlauf zurück), dann das Register zeigen – umgeblättert in Richtung der
+                    // Lasche (12.10.2026): ein späteres Register vorwärts, ein früheres (oder zurück zur Registerseite) rückwärts
+                    onClick={() => {
+                      if (r === aktiv && tiefe === 0) return
+                      const richtung = register.indexOf(r) > register.indexOf(aktiv) ? 'vor' : 'zurueck'
+                      alleZu(() => umblaettern(richtung, () => zeigen(r)))
+                    }}
                     data-lasche={r}
                     aria-label={zuTun(o, r) > 0 ? `${s[r]}, ${zuTun(o, r)} offen` : s[r]}
                   >
@@ -314,7 +327,13 @@ function Wiederherstellen({ setSeite, register }: { setSeite: (s: Seite | null) 
     const x: Seite | null = g && /^[a-f0-9]{8,32}$/.test(g) ? { art: 'gram', id: g } : bl && /^[a-f0-9]{8,32}$/.test(bl) ? { art: 'blatt', id: bl } : null
     window.history.replaceState({ ...(window.history.state ?? {}), ordnerTiefe: 0 }, '', `${window.location.pathname}?r=${register}`)
     if (x && ((x.art === 'gram' && register === 'gram') || (x.art === 'blatt' && register === 'mat')))
-      b.oeffne(x.art, () => setSeite(x), () => setSeite(null), seitenAdresse(register, x), true)
+      b.oeffne(
+        x.art,
+        () => setSeite(x),
+        () => setSeite(null),
+        seitenAdresse(register, x),
+        true
+      )
   }, [b, register, setSeite])
   return null
 }
@@ -438,8 +457,70 @@ function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | nul
   const [merk, setMerk] = useState<Merkkasten | null>(null)
   const offeneTests = o.tests.filter((t) => !t.abgegeben)
   const fertigeTests = o.tests.filter((t) => t.abgegeben)
+  // „Für dich" (12.10.2026): eigene Förder-/Forderblätter (Einzel-Freigabe) und freigegebene Übungsbündel
+  const { fuerDich, andere } = fuerDichAufteilen(o.blaetter)
+  const buendel = o.fuerDich ?? []
+  const blattKarte = (b: (typeof o.blaetter)[number]): React.JSX.Element => (
+    <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} onClick={oeffnen('mat', { art: 'blatt', id: b.id })} data-ordner-blatt>
+      <Group justify="space-between" wrap="nowrap">
+        <div style={{ minWidth: 0 }}>
+          <Text fw={700}>{b.titel}</Text>
+          {b.thema && (
+            <Text size="sm" c="dimmed">
+              {b.thema}
+            </Text>
+          )}
+        </div>
+        <Badge variant="light" style={{ flex: 'none' }}>
+          {!b.offen || b.genutzt >= b.runden ? 'Ansehen' : b.begonnen ? 'Weiter' : 'Öffnen'}
+        </Badge>
+      </Group>
+    </a>
+  )
   return (
     <div>
+      {(fuerDich.length > 0 || buendel.length > 0) && (
+        <div data-ordner-fuer-dich>
+          <Abschnitt titel="Für dich">
+            {fuerDich.map(blattKarte)}
+            {buendel.map((b) => (
+              <div key={b.id} className="og-karte" data-ordner-buendel>
+                <Text fw={700}>Dein Ziel</Text>
+                <Text size="sm" mb={4}>
+                  {b.ziel}
+                </Text>
+                {b.woerter.length > 0 && (
+                  <Text size="sm">
+                    <b>Wörter zum Üben:</b> {b.woerter.map((w) => `${w.term} – ${w.translation}`).join(' · ')}
+                  </Text>
+                )}
+                {b.grammatik.map((g) => (
+                  <div key={g.titel}>
+                    <Text size="sm" fw={600} mt={4}>
+                      {g.titel}
+                    </Text>
+                    {g.erklaerung && (
+                      <Text size="sm" c="dimmed">
+                        {g.erklaerung}
+                      </Text>
+                    )}
+                    {(g.beispiele ?? []).map((x) => (
+                      <Text key={x} size="sm" fs="italic">
+                        {x}
+                      </Text>
+                    ))}
+                  </div>
+                ))}
+                {b.hinweise.length > 0 && (
+                  <Text size="sm" mt={4}>
+                    <b>Tipps:</b> {b.hinweise.join(' · ')}
+                  </Text>
+                )}
+              </div>
+            ))}
+          </Abschnitt>
+        </div>
+      )}
       {offeneTests.length > 0 && (
         <Abschnitt titel="Onlinetests">
           {offeneTests.map((t) => (
@@ -452,27 +533,7 @@ function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | nul
           ))}
         </Abschnitt>
       )}
-      {o.blaetter.length > 0 && (
-        <Abschnitt titel="Arbeitsblätter">
-          {o.blaetter.map((b) => (
-            <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} onClick={oeffnen('mat', { art: 'blatt', id: b.id })} data-ordner-blatt>
-              <Group justify="space-between" wrap="nowrap">
-                <div style={{ minWidth: 0 }}>
-                  <Text fw={700}>{b.titel}</Text>
-                  {b.thema && (
-                    <Text size="sm" c="dimmed">
-                      {b.thema}
-                    </Text>
-                  )}
-                </div>
-                <Badge variant="light" style={{ flex: 'none' }}>
-                  {!b.offen || b.genutzt >= b.runden ? 'Ansehen' : b.begonnen ? 'Weiter' : 'Öffnen'}
-                </Badge>
-              </Group>
-            </a>
-          ))}
-        </Abschnitt>
-      )}
+      {andere.length > 0 && <Abschnitt titel="Arbeitsblätter">{andere.map(blattKarte)}</Abschnitt>}
       {/* Unterrichtsreihen (08.10.2026, Plan G.3): ihre Arbeitsblätter, je Reihe – mit Weg zu „Meine Abgaben" */}
       {o.reihen.map((r) => (
         <Abschnitt key={r.zid} titel={`Reihe: ${r.titel}`}>

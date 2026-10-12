@@ -47,6 +47,7 @@ import { pdfOhneSkripte, seitenMitTinte } from './druck'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
 import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { abschrift, abschriftZaehlt, blattText, deckeln } from '../shared/abschrift'
+import { ausgangstextAusMaterial, geschichteFeedbackBaustein, type FeedbackBaustein } from '../shared/operatoren/geschichteSchreibformen'
 import { fachAusName } from '../shared/faecher'
 import { geplantAb, nachFreigabe, nochGeplant, planVorbei } from './freigabePlan'
 import { istVorbei } from '../shared/freigabePlan'
@@ -169,6 +170,11 @@ export interface BlattEinstellungen {
   fristHart?: boolean
   /** Original in der Bibliothek der Lehrkraft (Word-Export aus „Meine Klassen") */
   quelle?: { docId: string; sheetId?: string }
+  /**
+   * Förder-/Fordermaterial für einzelne Lernende (12.10.2026): erscheint im Fachordner unter „Für dich" – nur mit
+   * Einzel-Freigabe (`schueler` nicht leer); jede Person sieht ohnehin nur ihre eigenen Blätter.
+   */
+  fuerDich?: boolean
 }
 
 interface Zeile {
@@ -301,6 +307,39 @@ const bereinigeFelder = (roh: unknown): BlattFeld[] =>
     }))
 
 /**
+ * Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft (Merkblatt Zusammenfassung,
+ * „Beurteilen") nach Stufe und Land, dazu die Vorprüfung der Antwort als Fakten (Wortzahl/⅓ des Ausgangstexts,
+ * Zitate, Zeilenangaben, Ich-Form, Konjunktiv) – @shared/operatoren/geschichteSchreibformen. Null außerhalb von
+ * Geschichte bzw. ohne einen der beiden Operatoren. Auf dem Blatt werden die Lernenden geduzt (wie im übrigen Feedback).
+ */
+function schreibformFuer(
+  z: Zeile,
+  aufgabe: BlattAufgabe,
+  felder: BlattFeld[],
+  antworten: Record<string, string>,
+  ich: NutzerInfo,
+  material: string
+): FeedbackBaustein | null {
+  const k = kontextVon(z)
+  const roh = felder
+    .filter((f) => f.nr === aufgabe.nr)
+    .map((f) => (antworten[f.id] ?? '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+  // Zitate aus der Antwort stehen im Befund – Namen vorher durch Kürzel ersetzen (wie beim Antworttext)
+  const antwort = ohneNamen({ id: 'a', kuerzel: 'S1', name: ich.name, dateiname: '', text: roh, bilder: [] }).text
+  return geschichteFeedbackBaustein({
+    fach: k.fach,
+    anweisung: aufgabe.anweisung,
+    antwort,
+    ...(k.jahrgang ? { jahrgang: k.jahrgang } : {}),
+    ...(k.land ? { stateId: k.land } : {}),
+    original: material ? ausgangstextAusMaterial(material, aufgabe.anweisung) : null,
+    anrede: 'du'
+  })
+}
+
+/**
  * Prüfung beim Einreichen (08.10.2026, shared/blattPruefung.ts): Ankreuzen, Richtig/Falsch, Lücken, Zuordnen, Ordnen
  * ohne KI; offene Aufgaben in EINER KI-Anfrage (Zugang der Lehrkraft, ohne Namen). Die Einträge landen im
  * Feedback-Verlauf der Aufgaben (Ampel, Hinweis an der Aufgabe) – zählen aber nicht als „prüfen lassen".
@@ -327,6 +366,8 @@ async function pruefungBeimEinreichen(p: {
     const objekte = blattExtra(p.antworten).objekte
     const offen: AbgabeEintrag[] = []
     const teilweise: Record<string, Pick<AbgabeFeedback, 'auto' | 'marken'>> = {}
+    // Geschichte (12.10.2026): gezählter Verstoß gegen den Operator (Zitat/Zeilenangabe, Ich-Form …) → höchstens „teilweise"
+    const gedeckelt = new Set<string>()
     for (const a of p.aufgaben) {
       if (!a.nr) continue
       const eigene = p.felder.filter((f) => f.nr === a.nr)
@@ -359,7 +400,9 @@ async function pruefungBeimEinreichen(p: {
         text: [blattAbgabeText([a], eigene, p.antworten), eigene.length ? '' : objekteText(objekte)].filter(Boolean).join('\n'),
         bilder: []
       }).text
-      offen.push({ aufgabe: a, antwort: text })
+      const gs = schreibformFuer(p.z, a, p.felder, p.antworten, p.ich, p.material)
+      offen.push({ aufgabe: a, antwort: text, ...(gs ? { schreibform: gs.text } : {}) })
+      if (gs?.fehler.length) gedeckelt.add(String(a.nr))
       if (au) teilweise[String(a.nr)] = { auto: { richtig: au.richtig, gesamt: au.gesamt }, ...mitMarken }
     }
     const lehrkraft = nutzerNachId(p.z.lehrkraft_id)
@@ -375,7 +418,14 @@ async function pruefungBeimEinreichen(p: {
         )
         for (const o of offen) {
           const u = urteile[String(o.aufgabe.nr)]
-          if (u) eintraege[String(o.aufgabe.nr)] = { einschaetzung: u.einschaetzung, text: u.hinweis, zeit, abgabe: p.abgabe, ...teilweise[String(o.aufgabe.nr)] }
+          if (u)
+            eintraege[String(o.aufgabe.nr)] = {
+              einschaetzung: u.einschaetzung === 'sicher' && gedeckelt.has(String(o.aufgabe.nr)) ? 'teilweise' : u.einschaetzung,
+              text: u.hinweis,
+              zeit,
+              abgabe: p.abgabe,
+              ...teilweise[String(o.aufgabe.nr)]
+            }
         }
         protokolliereServer('arbeitsblatt', 'Feedback je Aufgabe beim Einreichen', p.ich.id)
       } catch (err) {
@@ -441,7 +491,9 @@ function kurz(z: Zeile, ich: NutzerInfo) {
     thema: (z as Zeile & { thema?: string }).thema ?? '',
     // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
     erstellt: z.erstellt,
-    ...(stand ? { stand } : {})
+    ...(stand ? { stand } : {}),
+    // Fachordner „Für dich" (12.10.2026): nur bei Einzel-Freigabe gesetzt
+    ...(e.fuerDich ? { fuerDich: true } : {})
   }
 }
 
@@ -669,18 +721,23 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           const einst = (await imNutzer(alsNutzer(lehrkraft), () => aufruf('settings:get', [])).catch(() => undefined)) as Parameters<typeof zeichenFuer>[1]
           const nurZeichenflaeche = k0.nurZeichenflaeche === true && !felder.some((f) => f.art === 'zeilen' || f.art === 'text')
           const material = typeof k0.material === 'string' ? k0.material.slice(0, 24000) : ''
+          // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten
+          const gs = schreibformFuer(z, aufgabe, felder, antworten, ich, material)
           const zusatz = {
             zeichen: zeichenFuer(fachId, einst),
             ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}),
             ...(material ? { material } : {}),
-            ...(befund ? { abschrift: befund } : {})
+            ...(befund ? { abschrift: befund } : {}),
+            ...(gs ? { schreibform: gs.text } : {})
           }
           const antwort = await mitNamensliste(
             { namen: namenFuerKi(z, ich), sprache: e.sprache, material: `${material} ${aufgabe.anweisung ?? ''} ${aufgabe.erwartung ?? ''}` },
             () => imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)]))
           )
           const roh = aufgabenFeedbackAus(antwort)
-          const fb = befund ? { ...roh, einschaetzung: deckeln(roh.einschaetzung, befund) } : roh
+          const fb0 = befund ? { ...roh, einschaetzung: deckeln(roh.einschaetzung, befund) } : roh
+          // Gezählter Verstoß gegen den Operator (Geschichte, 12.10.2026): höchstens „teilweise"
+          const fb = gs?.fehler.length && fb0.einschaetzung === 'sicher' ? { ...fb0, einschaetzung: 'teilweise' as const } : fb0
           bisher[String(nr)] = [...liste, { ...fb, zeit: Date.now() }]
           speichern(antworten, k0.tinte ? tinte : null, { aufgaben_feedback: JSON.stringify(bisher) })
           protokolliereServer('arbeitsblatt', 'Feedback zu einer Aufgabe', ich.id)
@@ -825,6 +882,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         ...(typeof e0.bis === 'number' && e0.bis > 0 ? { bis: e0.bis } : {}),
         // Harte Frist nur auf ausdrücklichen Wunsch (09.10.2026)
         ...(e0.fristHart === true && typeof e0.bis === 'number' && e0.bis > 0 ? { fristHart: true } : {}),
+        // „Für dich" (12.10.2026, Förder-/Fordermaterial): nur bei Einzel-Freigabe
+        ...(e0.fuerDich === true && einzelne.length ? { fuerDich: true } : {}),
         ...(e0.quelle && typeof (e0.quelle as { docId?: unknown }).docId === 'string'
           ? {
               quelle: {
@@ -1285,6 +1344,48 @@ const extraVon = (fid: string, sid: string): number =>
 export function blattZusatzrunde(fid: string, sid: string): void {
   const da = db().prepare('SELECT 1 FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid)
   if (da) db().prepare('UPDATE blatt_abgaben SET extra = extra + 1 WHERE freigabe_id = ? AND schueler_id = ?').run(fid, sid)
+}
+
+/**
+ * Arbeitsblätter je Person (12.10.2026, Förder- und Fordermaterial, server/foerdern.ts): Ampeln je Aufgabe aus dem
+ * KI-Feedback je Aufgabe über alle eingereichten Blätter der Lerngruppe (ohne Reihen), die Anweisungen der roten
+ * Aufgaben (gekürzt) und die „nächsten Schritte" aus dem jeweils letzten Bogen. Nur Blätter mit Feedback je Aufgabe
+ * zählen für die Ampeln (sonst gibt es keine).
+ */
+export function blattAmpelnJePerson(
+  lehrkraftId: string,
+  lerngruppeId: string
+): Record<string, { gruen: number; gelb: number; rot: number; schwierig: string[]; schritte: string[] }> {
+  const aus: Record<string, { gruen: number; gelb: number; rot: number; schwierig: string[]; schritte: string[] }> = {}
+  const zeilen = db()
+    .prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
+    .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  for (const z of zeilen.slice(0, 20)) {
+    const e = einstellungenVon(z)
+    const aufgaben = json_(z.aufgaben, [] as BlattAufgabe[]).filter((a) => !a.freiwillig)
+    const abgaben = db()
+      .prepare(`SELECT schueler_id, abgaben, aufgaben_feedback, freigeschaltet FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`)
+      .all(z.id) as { schueler_id: string; abgaben: number; aufgaben_feedback: string; freigeschaltet: string }[]
+    for (const a of abgaben) {
+      const p = (aus[a.schueler_id] ??= { gruen: 0, gelb: 0, rot: 0, schwierig: [], schritte: [] })
+      if (e.aufgabenFeedback && aufgaben.length) {
+        const verlauf = json_(a.aufgaben_feedback, {} as AufgabenVerlauf)
+        const frei = json_(a.freigeschaltet, [] as number[])
+        for (const x of aufgaben) {
+          const amp = ampelVon(verlauf[String(x.nr)], frei.includes(x.nr))
+          p[amp]++
+          if (amp === 'rot' && p.schwierig.length < 3) p.schwierig.push(x.anweisung.slice(0, 120))
+        }
+      }
+      if (p.schritte.length < 3) {
+        const bogen = blattFassungen(z.rueckmeldung_id, a.schueler_id)
+          .filter((f) => f.bogen)
+          .at(-1)?.bogen
+        for (const s of bogen?.schritte ?? []) if (p.schritte.length < 3 && typeof s === 'string' && s.trim()) p.schritte.push(s.trim().slice(0, 300))
+      }
+    }
+  }
+  return aus
 }
 
 /**

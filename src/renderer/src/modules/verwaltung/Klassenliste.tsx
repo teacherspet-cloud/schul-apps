@@ -107,10 +107,7 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
               <Button leftSection={<IconPrinter size={16} />} onClick={() => drucken(false)}>
                 Zugangskarten drucken
               </Button>
-              <Button variant="light" onClick={() => drucken(true)}>
-                Als PDF
-              </Button>
-              {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+              {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026); seit 12.10.2026 links von „Als PDF" */}
               <Button
                 variant="light"
                 leftSection={<IconEye size={16} />}
@@ -122,6 +119,9 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
                 data-pdf-vorschau-knopf
               >
                 Vorschau
+              </Button>
+              <Button variant="light" onClick={() => drucken(true)}>
+                Als PDF
               </Button>
             </Group>
             <Table striped data-karten>

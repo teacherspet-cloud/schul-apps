@@ -29,7 +29,13 @@ export function auszeichnungenJahre(d: DatabaseSync, jetzt = Date.now(), schulja
       continue
     }
     if (!daten || typeof daten !== 'object' || !daten.ausz || typeof daten.ausz !== 'object') continue
-    const ausz: AuszStand = { medaillen: daten.ausz.medaillen ?? {}, titel: daten.ausz.titel ?? {}, ...(daten.ausz.jahre ? { jahre: daten.ausz.jahre } : {}) }
+    // Regelstand der Berichtigung (12.10.2026) bleibt erhalten
+    const ausz: AuszStand = {
+      ...(typeof daten.ausz.regel === 'number' ? { regel: daten.ausz.regel } : {}),
+      medaillen: daten.ausz.medaillen ?? {},
+      titel: daten.ausz.titel ?? {},
+      ...(daten.ausz.jahre ? { jahre: daten.ausz.jahre } : {})
+    }
     if (!jahreUmstellen(ausz, schuljahr, jetzt)) continue
     personen++
     for (const m of Object.values(ausz.medaillen)) medaillen += Object.values(m ?? {}).filter((x) => (x?.stufe ?? 0) >= 1).length

@@ -87,6 +87,7 @@ import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
 import KalenderHinweis from '../../../shared/components/KalenderHinweis'
+import { TestAbschnitte } from './TestAbschnitte'
 import { alsFeld, ausFeld, type KursReiter, type Lernende, type Lernstanddaten } from './kursDaten'
 import { entwurfHinweis, geplanteAbschnitte, HINWEIS_FARBE, kursHinweise, kursKennzahlen, type KursBedarf, type KursHinweis } from './kursHinweise'
 import { zumHinweis } from './kursFokus'
@@ -667,30 +668,44 @@ export function KursSeite({
 
   const lernendeInhalt = (
     <Stack gap="md">
-      <Group gap="xs" data-lernende-knoepfe>
-        <Button variant="light" leftSection={<IconUserPlus size={16} />} onClick={() => setEintragen(true)} data-lernende-eintragen>
-          Lernende eintragen
-        </Button>
-        {lernende.length > 0 && (
-          <Button variant="default" leftSection={<IconSchool size={16} />} onClick={() => setKlasse(true)} data-klasse-zuordnen-knopf>
-            Lernende einer Klasse zuordnen…
+      {/* Lerngruppe aus IServ (12.10.2026, Wunsch der Lehrkraft): Lernende kommen von dort – kein Eintragen, Zuordnen,
+          keine Zettel und kein QR-Code. Wer schon einen Code hat, meldet sich damit weiter an (nur die Knöpfe fehlen). */}
+      {d.iservGruppe ? (
+        <Text size="sm" c="dimmed" data-lernende-knoepfe data-lernende-iserv={d.iservGruppe}>
+          Lernende kommen aus IServ (Gruppe {d.iservGruppe}).
+        </Text>
+      ) : (
+        <Group gap="xs" data-lernende-knoepfe>
+          <Button variant="light" leftSection={<IconUserPlus size={16} />} onClick={() => setEintragen(true)} data-lernende-eintragen>
+            Lernende eintragen
           </Button>
-        )}
-        {zettel.length > 0 && (
-          <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => setZettelDruck(zettel)} data-zettel-alle>
-            Zettel für alle ({zettel.length})
-          </Button>
-        )}
-        {d.code && d.link && (
-          <Button variant="default" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)}>
-            QR-Code zum Mitlernen
-          </Button>
-        )}
-      </Group>
+          {lernende.length > 0 && (
+            <Button variant="default" leftSection={<IconSchool size={16} />} onClick={() => setKlasse(true)} data-klasse-zuordnen-knopf>
+              Lernende einer Klasse zuordnen…
+            </Button>
+          )}
+          {zettel.length > 0 && (
+            <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => setZettelDruck(zettel)} data-zettel-alle>
+              Zettel für alle ({zettel.length})
+            </Button>
+          )}
+          {d.code && d.link && (
+            <Button variant="default" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)}>
+              QR-Code zum Mitlernen
+            </Button>
+          )}
+        </Group>
+      )}
       {lernende.length > 0 ? (
         <LernendeTabelle lernende={lernende} gastZeigen={setGast} entfernen={setEntfernen} kurs={kursInfo(d, id)} immerOffen />
       ) : (
-        <Alert>{d.code ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.' : 'Noch niemand in der Lerngruppe.'}</Alert>
+        <Alert>
+          {d.iservGruppe
+            ? 'Noch niemand aus der IServ-Gruppe hat hier geübt.'
+            : d.code
+            ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.'
+            : 'Noch niemand in der Lerngruppe.'}
+        </Alert>
       )}
       {(d.ruhend ?? []).length > 0 && (
         // Wiederholer/Klassenwechsel (10.10.2026): Die Einzel-Freigabe ruht – der Lernstand bleibt, wieder aufnehmen geht hier
@@ -892,7 +907,7 @@ export function KursSeite({
             <Group gap="xs">
               {/* „Als Schüler ansehen" (09.10.2026, wie in „Meine Klassen"): Fenster gleich auf diesem Kurs */}
               <AlsSchuelerAnsehen kursId={id} gruppe={d.lerngruppeId || undefined} klasse={d.lerngruppeId && d.lerngruppe ? d.lerngruppe : titel} />
-              {d.code && d.link && (
+              {d.code && d.link && !d.iservGruppe && (
                 <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
                   QR-Code
                 </Button>
@@ -1090,6 +1105,10 @@ function Einstellungen({
               <KalenderHinweis wert={alsFeld(d.testTermin)} verschieben={(t) => aendern('termin', { testTermin: ausFeld(t, '08:00:00') })} />
             </div>
           </Group>
+          {/* Abschnitte des Tests (12.10.2026): nur mit kommendem Termin */}
+          {d.testTermin && d.testTermin > Date.now() && d.testAbschnitte && (
+            <TestAbschnitte daten={d.testAbschnitte} speichern={(keys) => aendern('termin', { testTermin: d.testTermin, testAbschnitte: keys })} />
+          )}
         </Card>
         {mitWoertern && (
           <Card withBorder radius="md" padding="md" data-vokabel-tag>

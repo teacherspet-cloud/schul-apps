@@ -41,7 +41,7 @@ const leer = (): AuszStand => ({ medaillen: {}, titel: {} })
 const eingabe = (e: Partial<SprachEingabe> = {}): SprachEingabe => ({
   sprache: 'en',
   jahrgang: 9,
-  woerterAb2: 0,
+  woerterErkannt: 0,
   woerterSicher: 0,
   regelnGeuebt: 0,
   regelnSicher: 0,
@@ -99,7 +99,7 @@ describe('Werte je Sprache', () => {
   it('Wortschatz, Grammatik, Etappen und Zähler', () => {
     const w = sprachWerte(
       eingabe({
-        woerterAb2: 10,
+        woerterErkannt: 10,
         woerterSicher: 4,
         regelnGeuebt: 3,
         regelnSicher: 2,
@@ -112,7 +112,9 @@ describe('Werte je Sprache', () => {
         zaehler: { spielrunden: 3, rekorde: 1, hoeren: 12, zusammenRunden: 2, teamZiele: 1 }
       })
     )
-    expect(w).toEqual({ wortschatz: 14, grammatik: 7, dranbleiben: 5, lehrwerk: 4, spiele: 4, hoeren: 12, zusammen: 3 })
+    // Gestuft (12.10.2026): 10 wiedererkannt + 2 × 4 sicher
+    expect(w).toEqual({ wortschatz: 18, grammatik: 7, dranbleiben: 5, lehrwerk: 4, spiele: 4, hoeren: 12, zusammen: 3 })
+    expect(sprachWerte(eingabe({ woerterErkannt: 10, woerterFrei: 3, woerterSicher: 2 })).wortschatz).toBe(17)
     expect(etappen([{ gesamt: 5, gelernt: 4, sicher: 3 }])).toBe(1)
   })
 })
@@ -404,7 +406,9 @@ describe('Medaillen und Titel am Server', () => {
     const ach = achievementsRoute()
     const a = await rufe(ach, alt, 'GET', '/s/api/auszeichnungen')
     const en = (a.d.sprachen as { sprache: string; medaillen: { kategorie: string; stufe: number; wert: number }[] }[]).find((s) => s.sprache === 'en')!
-    expect(en.medaillen.find((m) => m.kategorie === 'dranbleiben')!.stufe).toBe(2)
+    // 12.10.2026 (Berichtigung): Übernommenes bleibt nur, soweit es nach der neuen Regel ebenfalls erreicht ist – die
+    // alte Serie ohne Übungstage in diesem Schuljahr nicht, die Team-Ziele (22 Punkte ≥ Silber) schon
+    expect(en.medaillen.find((m) => m.kategorie === 'dranbleiben')!.stufe).toBe(0)
     expect(en.medaillen.find((m) => m.kategorie === 'zusammen')).toMatchObject({ stufe: 2, wert: 22 })
     const nach = achDatenLesen(alt.id)
     expect(nach.uebernommen).toBe('en')

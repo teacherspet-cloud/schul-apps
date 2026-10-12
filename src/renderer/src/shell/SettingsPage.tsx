@@ -70,6 +70,7 @@ import GradeScaleSettings from './GradeScaleSettings'
 import KorrekturzeichenSettings from './KorrekturzeichenSettings'
 import SchreibanteilSettings from './SchreibanteilSettings'
 import MaskottchenSettings from './MaskottchenSettings'
+import ProblemWoerterCard from './ProblemWoerterCard'
 import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
 import WartungCard from './WartungCard'
@@ -245,6 +246,8 @@ export default function SettingsPage(): React.JSX.Element {
               ) : (
                 <FachfarbenSettings settings={settings} update={update} />
               )}
+              {/* Empfindlichkeit der Problemwörter (12.10.2026) – nur am Server, dort liegen die Kurse */}
+              {aufServer() && serverIch()?.rolle !== 'schueler' && <ProblemWoerterCard />}
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />
               <SchreibanteilSettings settings={settings} update={update} />

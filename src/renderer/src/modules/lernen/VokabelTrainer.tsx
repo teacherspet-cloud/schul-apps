@@ -8,7 +8,7 @@
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
 import { useAuffrischen } from '../../shared/auffrischen'
-import { aufnahmeSpielen, hatSatzAufnahme, medienLaden } from './medienCache'
+import { aufnahmeSpielen, beispielFuerLernende, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
 import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
 import type { Stufe } from '@shared/vokabelLaufbahn'
@@ -358,6 +358,8 @@ export default function VokabelTrainer({
   eingebettet = false,
   uebung: startUebung,
   ohneKopf = false,
+  nurRunde = false,
+  beimUeben,
   nachRunde
 }: {
   id: string
@@ -371,7 +373,11 @@ export default function VokabelTrainer({
   ohneKopf?: boolean
   /** Nach jeder Runde (die Karte darüber zählt neu) */
   nachRunde?: () => void
-}): React.JSX.Element {
+  /** Nur die Runde, kein Kasten (12.10.2026: Angebote früherer Bände unter „Meine Bücher") */
+  nurRunde?: boolean
+  /** Läuft gerade eine Runde? (12.10.2026: die Seite darum blendet dann alles andere aus) */
+  beimUeben?: (an: boolean) => void
+}): React.JSX.Element | null {
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
@@ -413,8 +419,17 @@ export default function VokabelTrainer({
     setVorher(null)
     setFreiwillig(r.freiwillig)
     setAbfragen(r.abfragen)
-    setSitzung(r.woerter)
+    // Im Fachordner als eigene Seite (12.10.2026, Befund der Lehrkraft: „Heute üben" setzte die Runde direkt – nach
+    // „Vollbild aus" stand sie unter Bandkarte, „Demnächst" und Registertitel). Wie „Jetzt üben" im Kasten: nächste Seite,
+    // Zurück lädt den Stand neu.
+    if (blatt) blatt.oeffne('uebung', () => setSitzung(r.woerter), () => (setSitzung(null), laden()))
+    else setSitzung(r.woerter)
   }, [d])
+  const uebt = Boolean(sitzung)
+  useEffect(() => {
+    beimUeben?.(uebt)
+    return () => beimUeben?.(false)
+  }, [uebt]) // eslint-disable-line react-hooks/exhaustive-deps
   // Neue Vokabeln ohne Neuladen (08.10.2026) – nicht mitten in einer Runde oder einem Spiel
   useAuffrischen(() => !document.querySelector('[data-spiel], [data-verbspiel], [data-sitzung]') && laden(), !sitzung)
   if (d === undefined)
@@ -424,6 +439,7 @@ export default function VokabelTrainer({
       </Center>
     )
   if (!d) return <Alert color="orange">{fehler || 'Diese Vokabeln gibt es nicht.'}</Alert>
+  if (nurRunde && !sitzung) return null
   return (
     <TrainerFarben fach={d.fach} fachFarbe={d.farbe}>
       {sitzung ? (
@@ -1175,7 +1191,8 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
       )}
       {v.example && (
         <Text size="sm" mt="sm" fs="italic">
-          {v.example}
+          {/* Geschlechtsbezogener Satz (12.10.2026): die Fassung der gehörten Stimme */}
+          {beispielFuerLernende(v).example}
           {hatSatzAufnahme(v.example) && fremdSichtbar && (
             <ActionIcon
               size="sm"
@@ -1199,9 +1216,9 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
       <Text fw={800} size="1.5rem">
         {v.translation}
       </Text>
-      {v.exampleTranslation && (
+      {beispielFuerLernende(v).exampleTranslation && (
         <Text size="xs" c="dimmed">
-          {v.exampleTranslation}
+          {beispielFuerLernende(v).exampleTranslation}
         </Text>
       )}
     </>

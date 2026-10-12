@@ -21,13 +21,13 @@ import {
   type GrammatikPaket,
   type GrammatikSpielId
 } from '../shared/grammatiktrainer'
-import { istSicher, nachAbfrage, sitzungsWoerter, TAG, tagVon, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
+import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
 import { imNutzer } from './kontext'
 import { getSettings } from '../main/services/storage/settings'
-import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, iservGruppeVon, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { gastEntfernen } from './gaeste'
 import {
@@ -43,7 +43,9 @@ import {
   zeile as vokZeile,
   ausgeblendetFiltern,
   sprachfaecherDerGruppe,
-  teileVon
+  teileVon,
+  kursTest,
+  onlineTermineVon
 } from './vokabeln'
 import { registerVergessen } from './namensschutz'
 import { gramNachziehen, mitnahmeVon, ruht } from './mitnahme'
@@ -54,7 +56,11 @@ import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
 import { ampelVon } from '../shared/grammatikBereiche'
-import { bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
+import { formBefund, mitErstemVersuch, nachSpielfehlerGrammatik, type FormAmpel } from '../shared/grammatikSicher'
+import { GRAMMATIK_NEU_JE_TAG, grammatikHeute, grammatikKarten } from '../shared/grammatikVorrang'
+import { tageszielVorTest } from '../shared/uebungsVorrang'
+import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
+import { bekannteGrammatik, fruehereBaendeDerReihe, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
 import { abschnitteAusName, bandErkennen, bekanntNachBand, stationInUnit, stelleImLehrwerk, type Erkennung, type FreigegebeneUnit, type SchulOrt } from '../shared/lehrwerkBand'
 import { abschnitteEinordnen, buchAusKennung, mitBaenden } from '../shared/kursAbschnitte'
@@ -220,7 +226,8 @@ export function bisUnit(buch: string, unit: string): string[] {
   const i = baende.indexOf(buch)
   if (i < 0) return []
   const kapitel = Object.keys(LEHRWERK_GRAMMATIK[buch])
-  const fruehere = baende.slice(0, i).map((b) => ({ buch: b, kapitel: Object.keys(LEHRWERK_GRAMMATIK[b]) }))
+  // Frühere Bände derselben Reihe (12.10.2026, weitere Lehrwerke aus der App „Grammatikformen")
+  const fruehere = fruehereBaendeDerReihe(buch).map((b) => ({ buch: b, kapitel: Object.keys(LEHRWERK_GRAMMATIK[b]) }))
   const { bekannt, neu } = bekannteGrammatik(kapitel, buch, unit, undefined, fruehere)
   return [...bekannt, ...neu].flatMap((p) => p.t)
 }
@@ -601,6 +608,12 @@ export interface ProfilPunkt {
   fach?: number
   /** Band und Unit der Freigabe, falls angegeben – Lehrwerk-Stelle (08.10.2026) */
   lehrwerk?: { buch: string; unit: string }
+  /**
+   * Ampel nach der Regel „erster Versuch" (12.10.2026, shared/grammatikSicher.ts `formBefund`); `quote` ist seitdem der
+   * Anteil der beim ERSTEN Versuch richtigen Aufgaben, `aufgaben` die Zahl der bearbeiteten verschiedenen Aufgaben.
+   */
+  ampel?: FormAmpel
+  aufgaben?: number
 }
 export interface GrammatikProfil {
   staerken: ProfilPunkt[]
@@ -623,7 +636,8 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
   const zs = (
     db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND status != 'entfernt'").all(lehrkraftId, sprache) as unknown as Zeile[]
   ).filter((z) => istFuer(z, n))
-  const jeRegel = new Map<string, ProfilPunkt & { fachSumme: number; geuebt: number }>()
+  type Sammel = ProfilPunkt & { fachSumme: number; geuebt: number; liste: { id: string; stufe?: number }[]; staende: Record<string, WortStand | undefined> }
+  const jeRegel = new Map<string, Sammel>()
   const extra: GrammatikProfil['extra'] = []
   for (const z of zs) {
     const p = paketVon(z)
@@ -650,11 +664,16 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
         kennungen: [],
         zuletzt: 0,
         fachSumme: 0,
-        geuebt: 0
+        geuebt: 0,
+        liste: [],
+        staende: {}
       }
       let richtig = e.quote * e.versuche
       for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
         const s = st[a.id]
+        // Aufgabenreihe der Form (12.10.2026): Kennung je Freigabe – gleiche Kennungen in verschiedenen Paketen sind verschiedene Aufgaben
+        e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe })
+        e.staende[`${z.id}:${a.id}`] = s
         if (!s?.versuche) continue
         e.versuche += s.versuche
         richtig += s.versuche - s.falsch
@@ -673,25 +692,48 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
       jeRegel.set(schluessel, e)
     }
   }
-  const alle = [...jeRegel.values()].filter((e) => e.versuche >= MIN_VERSUCHE)
-  const ohne = ({ fachSumme, geuebt, ...rest }: ProfilPunkt & { fachSumme: number; geuebt: number }): ProfilPunkt => ({
+  /*
+   * Ampel je Form (12.10.2026, Entscheidung der Lehrkraft – shared/grammatikSicher.ts): nach den VERSCHIEDENEN Aufgaben
+   * beim ersten Versuch statt nach allen Versuchen; Stärke = sicher, Schwäche = unter 60 % beim ersten Versuch.
+   */
+  for (const e of jeRegel.values()) {
+    const b = formBefund(e.liste, e.staende)
+    e.ampel = b.ampel
+    e.quote = b.quote
+    e.aufgaben = b.bearbeitet
+  }
+  const alle = [...jeRegel.values()].filter((e) => e.ampel !== 'wenig')
+  const ohne = ({ fachSumme, geuebt, liste: _l, staende: _s, ...rest }: Sammel): ProfilPunkt => ({
     ...rest,
     fach: geuebt ? Math.round((fachSumme / geuebt) * 10) / 10 : 0
   })
   return {
     schwaechen: alle
-      .filter((e) => e.quote < SCHWAECHE_UNTER)
+      .filter((e) => e.ampel === 'schwaeche')
       .sort((a, b) => a.quote - b.quote)
       .slice(0, 3)
       .map(ohne),
     staerken: alle
-      .filter((e) => e.quote >= STAERKE_AB && e.geuebt && e.fachSumme / e.geuebt >= 3)
+      .filter((e) => e.ampel === 'sicher')
       .sort((a, b) => b.quote - a.quote)
       .slice(0, 3)
       .map(ohne),
     extra,
     regeln: [...jeRegel.values()].filter((e) => e.versuche > 0).map(ohne)
   }
+}
+
+/**
+ * „Sicher" in Aufgaben gezählt (12.10.2026, Klassenzahlen): die Aufgaben der Formen, die nach shared/grammatikSicher.ts
+ * sicher sind – je Paket (die Zahl teilt durch die Aufgaben des Pakets).
+ */
+export function sicherAufgaben(p: GrammatikPaket, st: Record<string, WortStand | undefined>): { sicher: number; gesamt: number } {
+  let sicher = 0
+  for (const r of p.regeln) {
+    const reihe = p.aufgaben.filter((a) => a.regelId === r.id)
+    if (reihe.length && formBefund(reihe, st).ampel === 'sicher') sicher += reihe.length
+  }
+  return { sicher, gesamt: p.aufgaben.length }
 }
 kursHaken.profil = grammatikProfil
 
@@ -724,23 +766,23 @@ export function grammatikFoerder(nutzer: NutzerInfo[], sprache: string, lehrkraf
   const kurse = new Map<string, ReturnType<typeof vokVon>>()
   for (const [sid, liste] of paare) {
     const n = jeId.get(sid)!
-    const jeRegel = new Map<string, { versuche: number; richtig: number }>()
+    // Je Form die Aufgabenreihe samt Ständen – Ampel nach dem ersten Versuch (12.10.2026, shared/grammatikSicher.ts)
+    const jeRegel = new Map<string, { liste: { id: string; stufe?: number }[]; staende: Record<string, WortStand | undefined> }>()
     for (const z of liste) {
       if (!istFuer(z, n, kurse)) continue
       const p = paket(z)
       const st = standVon(z.id, n.id).aufgaben
       for (const r of p.regeln) {
-        const e = jeRegel.get(norm(r.titel)) ?? { versuche: 0, richtig: 0 }
+        const e = jeRegel.get(norm(r.titel)) ?? { liste: [], staende: {} }
         for (const a of p.aufgaben) {
-          const s = a.regelId === r.id ? st[a.id] : undefined
-          if (!s?.versuche) continue
-          e.versuche += s.versuche
-          e.richtig += s.versuche - s.falsch
+          if (a.regelId !== r.id) continue
+          e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe })
+          e.staende[`${z.id}:${a.id}`] = st[a.id]
         }
         jeRegel.set(norm(r.titel), e)
       }
     }
-    if ([...jeRegel.values()].some((e) => e.versuche > 0 && ampelVon({ versuche: e.versuche, quote: e.richtig / e.versuche }) === 'schwaeche')) aus.add(sid)
+    if ([...jeRegel.values()].some((e) => ampelVon({ versuche: 0, quote: 0, ampel: formBefund(e.liste, e.staende).ampel }) === 'schwaeche')) aus.add(sid)
   }
   return aus
 }
@@ -748,6 +790,43 @@ kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
 kursHaken.grammatikZahl = (vokId) =>
   (db().prepare("SELECT art FROM gram_zuweisungen WHERE vok_id = ? AND status != 'entfernt'").all(vokId) as { art: string }[]).filter((z) => !z.art).length
+// Testabschnitte (12.10.2026): die Grammatik des Kurses (ohne Extras) steht in der Auswahl unter dem Testtermin
+kursHaken.grammatikTeile = (vokId) =>
+  (db().prepare("SELECT * FROM gram_zuweisungen WHERE vok_id = ? AND status != 'entfernt' ORDER BY erstellt ASC, rowid").all(vokId) as unknown as Zeile[])
+    .filter((z) => !istExtra(z))
+    .map((z) => ({ id: z.id, titel: z.thema || z.titel, zeit: Date.parse(z.erstellt) || 0 }))
+
+/**
+ * Angekündigter Test, der diese Grammatik abfragt (12.10.2026, Übungsvorrang): der Testtermin des verbundenen Kurses
+ * (bzw. ein angekündigter Vokabel-Onlinetest der Lerngruppe), wenn die Lehrkraft die Grammatik dafür gewählt hat bzw.
+ * die Vorbelegung sie nennt. Dann mehr neue Aufgaben je Tag, bis jede bis 3 Tage vorher einmal dran war.
+ */
+function grammatikUebung(
+  z: Zeile,
+  p: GrammatikPaket,
+  st: Record<string, WortStand>,
+  ich: NutzerInfo,
+  jetzt = Date.now()
+): { neuJeTag: number; test: boolean; termin: number | null } {
+  const v = vokVon(z)
+  let t: { termin: number; keys: string[] } | null = null
+  try {
+    t = v ? kursTest(kursFuerLernende(v, jetzt), onlineTermineVon(ich, jetzt), jetzt) : null
+  } catch {
+    t = null
+  }
+  if (!t || !t.keys.includes(`${GRAM_PRAEFIX}${z.id}`)) return { neuJeTag: GRAMMATIK_NEU_JE_TAG, test: false, termin: null }
+  const karten = grammatikKarten(p, Date.parse(z.erstellt) || 0, true)
+  return { neuJeTag: tageszielVorTest(GRAMMATIK_NEU_JE_TAG, karten, st, t.termin, jetzt), test: true, termin: t.termin }
+}
+
+/** Heute offene Aufgaben einer Freigabe für eine Person (Trainer, Erinnerungen, Mehrspieler-Freigabe – 12.10.2026) */
+export function grammatikHeuteOffen(z: Zeile, ich: NutzerInfo, jetzt = Date.now()): number {
+  const p = paketVon(z)
+  const auf = standVon(z.id, ich.id).aufgaben ?? {}
+  const u = grammatikUebung(z, p, auf, ich, jetzt)
+  return grammatikHeute(p, auf, { erstellt: Date.parse(z.erstellt) || 0, neuJeTag: u.neuJeTag, test: u.test, jetzt }).length
+}
 
 /** Vorschaukonto („Als Schüler ansehen", vorschau.ts): Beispielstand je offenem Training – `stand` bekommt die Kennungen der Aufgaben */
 export function grammatikStandSetzen(ich: NutzerInfo, stand: (ids: string[]) => { aufgaben: Record<string, WortStand>; tage: string[] }): void {
@@ -839,14 +918,14 @@ export function grammatikDerGruppe(
   const trainings = zs.map((z) => {
     const offen = istOffen(z)
     const p = paketVon(z)
-    const k = karten(p)
     const lernende = lernendeVon(z)
     let aktiv7 = 0
     const geplant = geplantAb('gram', z.id, jetzt)
     const jeAufgabe = new Map<string, { versuche: number; falsch: number; texte: Map<string, number> }>()
     const anteile = lernende.map((n) => {
       const st = standVon(z.id, n.id)
-      const u = uebersicht(k, st.aufgaben, jetzt)
+      // „Sicher" nach der Form-Regel (12.10.2026, shared/grammatikSicher.ts) statt je Aufgabe nach dem Karteikasten
+      const u = sicherAufgaben(p, st.aufgaben)
       if (st.tage.some((t) => t >= vor7)) aktiv7++
       for (const [id, s] of Object.entries(st.aufgaben)) {
         if (!s.versuche) continue
@@ -1082,7 +1161,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             info: infoVon(z),
             // „Gerade dran" (08.10.2026): in den letzten 14 Tagen freigegeben
             erstellt: z.erstellt,
-            bekannt: bekannteGrammatikFuer(ich)
+            bekannt: bekannteGrammatikFuer(ich),
+            // Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag – vor einem Test mehr
+            ...((u) => ({ neuJeTag: u.neuJeTag, test: u.test }))(grammatikUebung(z, p, st.aufgaben, ich))
           }),
           true
         )
@@ -1095,12 +1176,20 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const selbst = k0.selbst === 'richtig' || k0.selbst === 'fast' || k0.selbst === 'falsch' ? k0.selbst : undefined
         const e = pruefeGrammatik(a, antwort, typeof k0.wort === 'string' ? k0.wort : undefined, selbst)
         const jetzt = Date.now()
-        const neu = nachAbfrage(
-          st.aufgaben[a.id] ?? { fach: 0, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche: 0, falsch: 0, fehlerTexte: [], zuletzt: 0 },
-          'frei',
-          e.urteil,
-          antwort,
-          jetzt
+        const alt = st.aufgaben[a.id]
+        // Erster Versuch und spätere Fehler festhalten (12.10.2026, „sicher" nach shared/grammatikSicher.ts); Termin-Anker
+        // wie bei den Vokabeln, wenn ein angekündigter Test diese Grammatik abfragt
+        const neu = mitErstemVersuch(
+          alt,
+          nachAbfrage(
+            alt ?? { fach: 0, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche: 0, falsch: 0, fehlerTexte: [], zuletzt: 0 },
+            'frei',
+            e.urteil,
+            antwort,
+            jetzt,
+            grammatikUebung(z, p, st.aufgaben, ich, jetzt).termin ?? undefined
+          ),
+          e.urteil
         )
         st.aufgaben[a.id] = neu
         if (e.urteil === 'richtig' && st.ansehen?.includes(a.id)) st.ansehen = st.ansehen.filter((x) => x !== a.id)
@@ -1122,7 +1211,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // Fehler wie bei den Vokabelspielen: wackelig, gleich wieder dran; sichere ein Fach zurück
         const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((x) => p.aufgaben.some((a) => a.id === x))
         st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
-        for (const f of new Set(fehler)) if (st.aufgaben[f]) st.aufgaben[f] = nachSpielfehler(st.aufgaben[f])
+        // Spielfehler gelten als späterer Fehler der Aufgabe – die Form ist dann „im Aufbau" (12.10.2026)
+        for (const f of new Set(fehler)) if (st.aufgaben[f]) st.aufgaben[f] = nachSpielfehlerGrammatik(nachSpielfehler(st.aufgaben[f]))
         const heute = new Date().toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
         standSpeichern(z.id, ich.id, st)
@@ -1153,7 +1243,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             const l = lernendeVon(z)
             // Je Person EINMAL lesen (09.10.2026, Leistung: vorher je Aufgabe neu entschlüsselt)
             const staende = l.map((n) => standVon(z.id, n.id).aufgaben)
-            const sicherZahl = staende.map((st) => uebersicht(kk, st).sicher)
+            // „Sicher" nach der Form-Regel (12.10.2026, shared/grammatikSicher.ts)
+            const sicherZahl = staende.map((st) => sicherAufgaben(paketVon(z), st).sicher)
             return {
               id: z.id,
               titel: z.titel,
@@ -1320,6 +1411,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           bis: z.bis,
           ...(z.code ? { code: z.code, link: link(z.code) } : {}),
           lerngruppe: gruppeName(z),
+          // Lernende aus IServ (12.10.2026): kein QR-Code in der Ansicht der Lehrkraft
+          iservGruppe: iservGruppeVon(z.lerngruppe_id),
           paket: p,
           lernende: lernende.map(({ stand: _s, ...rest }) => rest),
           problem
@@ -1417,17 +1510,34 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
 
 /**
  * Achievements der Lernenden (08.10.2026): Regeln über alle eigenen Grammatik-Pakete (nach Titel zusammengefasst wie im
- * Profil). Sicher = mindestens drei (bei kleinen Regeln alle) Aufgaben sicher; Schwäche/Stärke mit den Schwellen des
- * Profils. Dazu, wie viele „Extra für dich" ganz bearbeitet sind. Nur Pakete, in denen die Person schon geübt hat.
+ * Profil). Schwäche/Stärke mit den Schwellen des Profils. Dazu, wie viele „Extra für dich" ganz bearbeitet sind. Nur
+ * Pakete, in denen die Person schon geübt hat.
+ * Seit 12.10.2026 (Entscheidung der Lehrkraft, Medaillen sollen echtes Können zeigen): „geübt" erst mit mindestens einer
+ * RICHTIG beantworteten Aufgabe (nicht schon beim bloßen Ansehen oder nur Fehlversuchen); „sicher" nach der gemeinsamen
+ * Regel shared/grammatikSicher.ts `formBefund` (≥ 80 % der verschiedenen Aufgaben beim ersten Versuch richtig, mindestens
+ * 5 bzw. alle; Bilden-Aufgaben ebenso; kein offener späterer Fehler) – statt „drei Aufgaben weit gerückt".
  */
 export function grammatikFuerAchievements(ich: NutzerInfo): {
-  regeln: { schluessel: string; sicher: boolean; schwaeche: boolean; staerke: boolean; sprache: string }[]
+  /** `geuebt` (12.10.2026): mindestens eine Aufgabe richtig – nur solche zählen für die Medaille „Grammatik" */
+  regeln: { schluessel: string; sicher: boolean; geuebt: boolean; schwaeche: boolean; staerke: boolean; sprache: string }[]
   extrasGeschafft: number
   tage: string[]
   /** Medaillen je Sprache (10.10.2026): Übungstage je Sprache */
   tageJe: Record<string, string[]>
 } {
-  const jeRegel = new Map<string, { n: number; sicher: number; versuche: number; richtig: number; fachSumme: number; geuebt: number; sprache: string }>()
+  const jeRegel = new Map<
+    string,
+    {
+      aufgaben: { id: string; stufe?: number }[]
+      staende: Record<string, WortStand | undefined>
+      richtigeAufgaben: number
+      versuche: number
+      richtig: number
+      fachSumme: number
+      geuebt: number
+      sprache: string
+    }
+  >()
   let extrasGeschafft = 0
   const tage = new Set<string>()
   const tageJe: Record<string, string[]> = {}
@@ -1441,12 +1551,15 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
     if (istExtra(z) && p.aufgaben.length && p.aufgaben.every((a) => st.aufgaben[a.id]?.versuche)) extrasGeschafft++
     for (const r of p.regeln) {
       const k = norm(r.titel)
-      const e = jeRegel.get(k) ?? { n: 0, sicher: 0, versuche: 0, richtig: 0, fachSumme: 0, geuebt: 0, sprache: z.sprache }
+      const e = jeRegel.get(k) ?? { aufgaben: [], staende: {}, richtigeAufgaben: 0, versuche: 0, richtig: 0, fachSumme: 0, geuebt: 0, sprache: z.sprache }
       for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
-        e.n++
         const s = st.aufgaben[a.id]
+        // Kennung je Freigabe – gleiche Aufgaben-Kennungen in verschiedenen Paketen sind verschiedene Aufgaben
+        const id = `${z.id}:${a.id}`
+        e.aufgaben.push({ id, stufe: a.stufe })
+        e.staende[id] = s
         if (!s?.versuche) continue
-        if (istSicher(s)) e.sicher++
+        if (s.versuche > s.falsch) e.richtigeAufgaben++
         e.versuche += s.versuche
         e.richtig += s.versuche - s.falsch
         e.fachSumme += s.fach
@@ -1459,12 +1572,14 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
     regeln: [...jeRegel.entries()]
       .filter(([, e]) => e.geuebt > 0)
       .map(([schluessel, e]) => {
-        const quote = e.versuche ? e.richtig / e.versuche : 0
+        // Eine Regel für Ampel, Lehrkraft und Medaillen (12.10.2026): Befund der Aufgabenreihe beim ersten Versuch
+        const ampel = formBefund(e.aufgaben, e.staende).ampel
         return {
           schluessel,
-          sicher: e.sicher >= Math.min(3, e.n),
-          schwaeche: e.versuche >= MIN_VERSUCHE && quote < SCHWAECHE_UNTER,
-          staerke: e.versuche >= MIN_VERSUCHE && quote >= STAERKE_AB && e.fachSumme / e.geuebt >= 3,
+          sicher: ampel === 'sicher',
+          geuebt: e.richtigeAufgaben > 0,
+          schwaeche: ampel === 'schwaeche',
+          staerke: ampel === 'sicher',
           sprache: e.sprache
         }
       }),
@@ -1481,17 +1596,12 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
  */
 export function grammatikFuerErinnerung(ich: NutzerInfo, vokIds: Set<string>, jetzt = Date.now()): { id: string; seit: number; offen: number; tage: string[] }[] {
   if (!vokIds.size) return []
-  const heute = tagVon(jetzt)
   return (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[])
     .filter((z) => vokIds.has(z.vok_id ?? '') && istOffen(z) && istFuer(z, ich))
     .map((z) => {
-      const p = paketVon(z)
       const st = standVon(z.id, ich.id)
-      const auf = st.aufgaben ?? {}
-      const faellig = sitzungsWoerter(karten(p), auf, jetzt, 0).length
-      const schonNeu = p.aufgaben.filter((a) => auf[a.id]?.erstmals && tagVon(auf[a.id].erstmals!) === heute).length
-      const neu = Math.min(Math.max(0, 10 - schonNeu), p.aufgaben.filter((a) => !auf[a.id]?.versuche).length)
-      return { id: z.id, seit: Date.parse(z.erstellt) || 0, offen: faellig + neu, tage: st.tage ?? [] }
+      // Dieselbe Rechnung wie im Trainer (12.10.2026, shared/grammatikVorrang.ts – vor einem Test mehr neue)
+      return { id: z.id, seit: Date.parse(z.erstellt) || 0, offen: grammatikHeuteOffen(z, ich, jetzt), tage: st.tage ?? [] }
     })
 }
 
@@ -1529,5 +1639,10 @@ export const grammatikFuerSpiel = {
     (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[])
       .filter((z) => istOffen(z) && !istExtra(z) && (!sprache || z.sprache === sprache))
       .map((z) => z.id),
-  bekannt: (ich: NutzerInfo): string[] => bekannteGrammatikFuer(ich)
+  bekannt: (ich: NutzerInfo): string[] => bekannteGrammatikFuer(ich),
+  /** Heute noch offene Aufgaben (Mehrspieler erst danach frei) – wie im Trainer (12.10.2026) */
+  heuteOffen: (id: string, ich: NutzerInfo, jetzt = Date.now()): number => {
+    const z = zeile(id)
+    return z ? grammatikHeuteOffen(z, ich, jetzt) : 0
+  }
 }

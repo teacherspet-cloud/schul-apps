@@ -18,7 +18,7 @@ import type { Textbook, TextbookMeta } from '@shared/types'
 import { resourcePath } from './paths'
 import { loescheDatei } from './atomar'
 import { mitReihe } from '@shared/lehrwerkReihe'
-import { aufServer, istAdmin } from '../rolle'
+import { aufServer, darfLehrwerkSprache } from '../rolle'
 
 /** Gemeinsame (vom Admin bearbeitete) Fassungen am Server */
 function gemeinsamDir(): string {
@@ -123,11 +123,16 @@ export function getTextbook(id: string): Textbook {
   return book
 }
 
-/** Speichert importierte Lehrwerke (gleiche ID wird ersetzt); gemeinsame am Server nur als Admin, für alle. */
+/**
+ * Speichert importierte Lehrwerke (gleiche ID wird ersetzt); gemeinsame am Server nur als Admin bzw. (seit 12.10.2026)
+ * als Fachobfrau/-mann des Fachs (Sprache des Lehrwerks, shared/fachobleute.ts), für alle.
+ */
 export function saveTextbooks(books: Textbook[]): TextbookMeta[] {
   for (const b of books) {
     const gemeinsam = istGemeinsam(checkId(b.id))
-    if (gemeinsam && !istAdmin()) throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins bearbeiten.')
+    // Fach nach der gespeicherten Fassung – eine geänderte Sprache öffnet kein fremdes Fach
+    if (gemeinsam && !(darfLehrwerkSprache(b.language) && darfLehrwerkSprache(gemeinsameBooks().find((x) => x.id === b.id)?.language ?? b.language)))
+      throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins und die Fachobleute des Fachs bearbeiten.')
     const file = join(gemeinsam ? gemeinsamDir() : userDir(), `${checkId(b.id)}.json`)
     const { builtIn: _ignored, ...data } = b
     void _ignored
@@ -140,7 +145,8 @@ export function saveTextbooks(books: Textbook[]): TextbookMeta[] {
 export function deleteTextbook(id: string): TextbookMeta[] {
   if (istGemeinsam(checkId(id))) {
     // Gemeinsam: die Änderungen des Admins verwerfen → wieder die mitgelieferte Fassung
-    if (!istAdmin()) throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins bearbeiten.')
+    if (!darfLehrwerkSprache(gemeinsameBooks().find((x) => x.id === id)?.language ?? ''))
+      throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins und die Fachobleute des Fachs bearbeiten.')
     loescheDatei(join(gemeinsamDir(), `${id}.json`))
     return listTextbooks()
   }

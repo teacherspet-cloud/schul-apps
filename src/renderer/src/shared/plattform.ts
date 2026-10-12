@@ -87,6 +87,8 @@ export interface ServerIch {
   adresse: string
   /** Kennung der Anmeldesitzung (abgeleitet, 09.10.2026) – neue Anmeldung = neue Sitzung (shared/sitzung.ts) */
   sitzung?: string
+  /** Fächer, für die die Lehrkraft Fachobfrau/-mann ist (12.10.2026, server/fachobleute.ts) */
+  fachobmann?: string[]
 }
 
 export const serverIch = (): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)

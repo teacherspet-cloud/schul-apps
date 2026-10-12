@@ -10,6 +10,7 @@
  *
  * Ohne Fenster und ohne `window` – damit lässt sich die Logik ohne Oberfläche prüfen (tests/medienWarten.test.ts).
  */
+import { istBildBlockiert } from '@shared/bildBlockiert'
 
 /** Die Dienste, die ein Medienauftrag nutzt */
 export type Dienst = 'ki' | 'bildki' | 'sprache' | 'bildsuche'
@@ -32,8 +33,10 @@ export const MAX_WARTEN_MS = 12 * 60 * 60 * 1000
  * Tarif zählen nicht – da hilft Warten nicht, die Lehrkraft muss etwas tun.
  */
 export function istBegrenzung(meldung: string): boolean {
+  // Vom Sicherheitssystem abgelehnte Bilder sind keine Begrenzung – Warten hilft nicht (12.10.2026)
+  if (istBildBlockiert(meldung)) return false
   if (/kein guthaben|credit balance|insufficient_quota|lehnt den schlüssel|api key|unauthori[sz]ed|\b401\b|\b402\b|paid_plan|tarif/i.test(meldung)) return false
-  return /429|rate.?limit|too many requests|zu viele anfragen|kontingent|nutzungsgrenze|usage limit|limit erreicht|limit reached|quota|concurrent|ausgelastet|überlastet|system_busy|503/i.test(
+  return /\b429\b|rate.?limit|too many requests|zu viele anfragen|kontingent|nutzungsgrenze|usage limit|limit erreicht|limit reached|quota|concurrent|ausgelastet|überlastet|system_busy|\b503\b/i.test(
     meldung
   )
 }

@@ -14,6 +14,8 @@ export interface Lernstanddaten {
   titel: string
   fach: string
   testTermin: number | null
+  /** Abschnitte des angekündigten Tests (12.10.2026, TestAbschnitte.tsx) */
+  testAbschnitte?: import('./TestAbschnitte').TestAbschnitteDaten
   status: string
   bis: number | null
   /** Spiele heute freigeschaltet / neue Vokabeln je Tag (08.10.2026) */
@@ -59,6 +61,8 @@ export interface Lernstanddaten {
     }
   }[]
   lerngruppeId?: string
+  /** IServ-Gruppe der Lerngruppe (12.10.2026): Lernende kommen aus IServ – keine Knöpfe zum Eintragen, keine Zettel/QR-Codes */
+  iservGruppe?: string
   /** Kurs einer festen Klasse (09.10.2026): nicht beenden/löschen, kein Lernzeitraum-Ende */
   klassenKurs?: boolean
   /** Übersicht je Abschnitt – nur bei Kursen ohne Lerngruppe (09.10.2026) */

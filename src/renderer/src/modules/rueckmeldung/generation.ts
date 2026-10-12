@@ -7,6 +7,7 @@ import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, 
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
 import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
+import { geschichteFeedbackBaustein } from '@shared/operatoren/geschichteSchreibformen'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
 import { describeBlock, describeSheet } from '../arbeitsblatt/generation/describe'
@@ -421,7 +422,9 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
     ...(m.digitalesBlatt ? BLATT_REGELN : []),
     ...sprachRegeln(r, a, art !== 'keine'),
-    ...abgabeRegeln(r, a)
+    ...abgabeRegeln(r, a),
+    // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten
+    schreibformRegeln(r, a)
   ]
   const ausgleich = ausgleichAnweisung(a.ausgleich)
   const land = kiLandesregeln(m, art)
@@ -514,6 +517,55 @@ export function pruefeBogen(b: Bogen, modus: PruefModus = {}): Bogen {
     eltern,
     ...(entfernt ? { entfernt } : {})
   }
+}
+
+/** Arbeitsanweisungen aus der Grundlage (Format von describeSheet: „(3) Aufgabe [AFB II, …]: Anweisung") */
+export function anweisungenAusGrundlage(aufgaben: string): string[] {
+  return [...(aufgaben ?? '').matchAll(/^\(\d+\) Aufgabe[^[\n]*\[[^\]\n]*\]: (.+)$/gm)].map((m) => m[1].trim())
+}
+
+/**
+ * Ausgangstext einer Zusammenfassung aus der Grundlage (Format von describeSheet: „(2) Text „Titel“: …"): nur, wenn
+ * es genau einen Textbaustein gibt – sonst ist unklar, welcher zusammengefasst wird (dann keine Längenprüfung).
+ */
+export function ausgangstextAusGrundlage(aufgaben: string): string | null {
+  const texte = (aufgaben ?? '')
+    .split(/\n\n(?=\(\d+\) )/)
+    .map((t) => /^\(\d+\) Text „[^“]*“: ([\s\S]*)$/.exec(t.trim())?.[1])
+    .filter((t): t is string => Boolean(t))
+    .map((t) => t.replace(/^\[Einleitung: [^\]]*\] /, '').replace(/ \| Worterklärungen: [^|]*$/, ''))
+  return texte.length === 1 ? texte[0] : null
+}
+
+/**
+ * Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): die Vorlagen der Lehrkraft (Merkblatt Zusammenfassung,
+ * „Beurteilen") als verbindliche Grundlage – Kriterien der Stufe, Fehlerkategorien, Formulierungsbeispiele in der
+ * Anrede des Bogens. Die Vorprüfung (Wortzahl/⅓, Zitate, Zeilenangaben, Ich-Form, Konjunktiv) läuft nur, wenn die
+ * Grundlage genau EINE Aufgabe hat – bei mehreren gehört die Abgabe nicht als Ganzes zu dieser Schreibform.
+ */
+export function schreibformRegeln(r: Rueckmeldung, a: Abgabe): string {
+  const m = r.meta
+  const anweisungen = anweisungenAusGrundlage(r.grundlage.aufgaben)
+  const eine = anweisungen.length <= 1
+  const b = geschichteFeedbackBaustein({
+    fach: m.subjectId,
+    anweisung: anweisungen.length ? anweisungen.join('\n') : r.grundlage.aufgaben,
+    antwort: eine ? ohneKiTest(klartext(a.text)).text : '',
+    jahrgang: m.grade,
+    sek2: oberstufeVon(m),
+    stateId: m.stateId,
+    schulform: m.schoolTypeId,
+    original: ausgangstextAusGrundlage(r.grundlage.aufgaben),
+    anrede: m.anrede
+  })
+  if (!b) return ''
+  return [
+    b.text,
+    eine ? '' : '- Die Arbeit enthält mehrere Aufgaben: Wende diese Vorgaben nur auf die Antwort zur betreffenden Aufgabe an (keine automatische Zählung).',
+    b.fehler.length ? '- Die gezählten Verstöße gegen den Operator gehören in die Kriterien (Einschätzung höchstens „teilweise") und in die nächsten Schritte.' : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /**

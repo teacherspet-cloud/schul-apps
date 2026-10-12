@@ -17,11 +17,14 @@
  * Stufe ohne Bild (gemerkt in `ohneBild`). Personen im Alter der Lernenden, vielfältig ohne Klischees, Gegenstände
  * in der Fassung der Zielkultur, wo sie dort typisch anders aussehen.
  */
-import type { OnlineImageHit, OnlineImageSource, StructuredRequest } from '@shared/types'
+import type { OnlineImageHit, OnlineImageSource, StructuredRequest, TtsRequest } from '@shared/types'
+import { mitSatzpunkt, WORT_ANWEISUNG_OPENAI, WORT_KONTEXT, WORT_TTS_SETTINGS } from '@shared/voiceSettings'
+import { tonMessen } from './tonMessung'
 import {
   einmalErzeugen,
   saetzeVon,
   satzSchluessel,
+  sprachKurz,
   stufeVon,
   tonKennung,
   tonPasst,
@@ -38,6 +41,8 @@ export interface Vokabel {
   term: string
   translation: string
   example?: string
+  /** Übersetzung des Beispielsatzes – für angepasste Fassungen geschlechtsbezogener Sätze (12.10.2026) */
+  exampleTranslation?: string
   /** Unregelmäßige Verben (07.10.2026): die gesprochenen Formen (infinitive, simple past, past participle) */
   formen?: string[]
   /** … und was die Stimme bei jeder Form sagt (Schlüssel = Eintrag aus `formen`; 09.10.2026: Pause statt „slash") */
@@ -245,7 +250,15 @@ export async function kiWaehlt(sprache: string, v: Vokabel, kandidaten: MedienKa
 }
 
 /** Ein Kandidat als Bild der Medienbank (in voller Größe geladen, dann verkleinert) */
-export async function kandidatUebernehmen(sprache: string, wort: string, k: MedienKandidat, alle?: MedienKandidat[], stufe: Bildstufe = 's2'): Promise<void> {
+export async function kandidatUebernehmen(
+  sprache: string,
+  wort: string,
+  k: MedienKandidat,
+  alle?: MedienKandidat[],
+  stufe: Bildstufe = 's2',
+  /** Ersatz für ein abgelehntes KI-Bild (12.10.2026) – die Vokabelliste markiert das Wort */
+  kiAbgelehnt = false
+): Promise<void> {
   const d = await window.api.images.fetch(k.url).catch(() => window.api.images.fetch(k.vorschau))
   await window.api.medien.bildSetzen(
     sprache,
@@ -254,7 +267,8 @@ export async function kandidatUebernehmen(sprache: string, wort: string, k: Medi
       dataUrl: await verkleinern(d),
       herkunft: 'suche',
       nachweis: nachweisVon(k),
-      ...(alle ? { kandidaten: alle } : {})
+      ...(alle ? { kandidaten: alle } : {}),
+      ...(kiAbgelehnt ? { kiAbgelehnt: true } : {})
     },
     stufe
   )
@@ -265,7 +279,14 @@ export async function kandidatUebernehmen(sprache: string, wort: string, k: Medi
  * eindeutig zeigen lässt, und beschreibt das Motiv – Personen im Alter der Lernenden, vielfältig ohne Klischees,
  * Gegenstände in der Fassung der Zielkultur, wo sie dort typisch anders aussehen.
  */
-export async function motivWaehlen(sprache: string, v: Vokabel, lernende?: Lernende, ki: Ki = direkt()): Promise<{ eindeutig: boolean; motiv: string }> {
+export async function motivWaehlen(
+  sprache: string,
+  v: Vokabel,
+  lernende?: Lernende,
+  ki: Ki = direkt(),
+  /** Motiv, das das Sicherheitssystem der Bild-KI eben abgelehnt hat – dann ein vorsichtigeres (12.10.2026) */
+  abgelehnt?: string
+): Promise<{ eindeutig: boolean; motiv: string }> {
   const s = stufeDer(lernende)
   const a = ALTER[s]
   const antwort = await ki.ai<{ eindeutig: boolean; motiv: string }>({
@@ -275,7 +296,12 @@ export async function motivWaehlen(sprache: string, v: Vokabel, lernende?: Lerne
       'Ein mehrdeutiges Bild schadet mehr als keines. Funktionswörter (although, of, the …) und Wendungen ohne eindeutiges Bild: eindeutig = false.',
       `Kommen Menschen vor, dann ${a.personen} (Erwachsene nur, wo das Wort sie verlangt, z. B. teacher, doctor); Aussehen, Hautfarbe und Rollen natürlich abwechselnd und ohne Klischees – nicht in jedem Bild alles.`,
       `Sieht der Gegenstand im Land der Zielsprache (${SPRACHE_NAME[sprache] ?? sprache}) typisch anders aus (z. B. Doppeldeckerbus, Baguette, britische Schuluniform), zeige diese Fassung; sonst neutral.`,
-      'motiv: ein bis zwei englische Sätze, die genau beschreiben, was zu sehen ist – ein klarer Hauptgegenstand bzw. eine einfache Szene, keine Nebensachen, kein Text. Auch wenn eindeutig = false, beschreibe den besten Versuch.'
+      'motiv: ein bis zwei englische Sätze, die genau beschreiben, was zu sehen ist – ein klarer Hauptgegenstand bzw. eine einfache Szene, keine Nebensachen, kein Text. Auch wenn eindeutig = false, beschreibe den besten Versuch.',
+      ...(abgelehnt
+        ? [
+            `Das Motiv „${abgelehnt}" hat das Sicherheitssystem der Bild-KI abgelehnt. Beschreibe ein harmloses, kindgerechtes Motiv: keine Gewalt, Waffen, Verletzungen, Blut, Drogen, Nacktheit oder Körperdetails, keine echten Personen, Marken oder Figuren aus Filmen/Spielen; zeige den Begriff lieber über einen Gegenstand, ein Symbol oder eine neutrale Alltagsszene.`
+          ]
+        : [])
     ].join('\n'),
     user: `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`,
     schemaName: 'vokabel_bildmotiv',
@@ -316,7 +342,9 @@ export async function tonErzeugen(
   lage: Stimmlage = 'w',
   gesprochen?: string,
   /** Ausdrücklich „neu erzeugen": auch eine passende Aufnahme ersetzen */
-  trotzdem = false
+  trotzdem = false,
+  /** „Neue Aussprache erzeugen" der Admins (12.10.2026): bisherige Datei als Rückfall behalten, Grund merken */
+  opt: { behalteVorher?: boolean; grund?: string } = {}
 ): Promise<'erzeugt' | 'vorhanden'> {
   const sprech = gesprochen?.trim() || text
   /*
@@ -337,11 +365,46 @@ export async function tonErzeugen(
     trotzdem,
     erzeugen: async () => {
       const id = `vok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-      const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache })
+      const r = await window.api.audio.speak(sprechAuftrag(id, sprache, art, stimme, sprech))
       if (!r?.dataUrl) throw new Error('Die Sprach-KI hat keine Aufnahme geliefert.')
-      await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text, ...(sprech !== text ? { gesprochen: sprech } : {}) }, lage)
+      // Prüfung per Messung (12.10.2026, shared/tonPruefung.ts) – gleich mit der Aufnahme gespeichert
+      const pruefung = await tonMessen(r.dataUrl, art, sprech).catch(() => undefined)
+      await window.api.medien.tonSetzen(
+        sprache,
+        wort,
+        art,
+        {
+          dataUrl: r.dataUrl,
+          stimme,
+          text,
+          ...(sprech !== text ? { gesprochen: sprech } : {}),
+          ...(pruefung ? { pruefung } : {}),
+          ...(opt.behalteVorher ? { behalteVorher: true } : {}),
+          ...(opt.grund ? { grund: opt.grund } : {})
+        },
+        lage
+      )
     }
   })
+}
+
+/**
+ * Auftrag an die Sprach-KI (12.10.2026, Wunsch der Lehrkraft: einsilbige Wörter identifizierbar). Einzelwörter bekommen
+ * eigene Sprech-Einstellungen (langsamer, stabiler), einen Satzpunkt und – bei ElevenLabs – einen unhörbaren
+ * Vorsprech-Rahmen als `previous_text`/`next_text`; OpenAI-Stimmen eine Sprechanweisung (Begründung: voiceSettings.ts).
+ * Der gespeicherte Sprechtext bleibt unverändert. Sätze gehen wie bisher.
+ */
+export function sprechAuftrag(id: string, sprache: string, art: TonArt, stimme: string, sprech: string): TtsRequest {
+  if (art !== 'wort') return { id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache }
+  const kontext = WORT_KONTEXT[sprachKurz(sprache)]
+  return {
+    id,
+    turns: [{ voiceId: stimme, text: mitSatzpunkt(sprech) }],
+    languageCode: sprache,
+    settings: WORT_TTS_SETTINGS,
+    ...(kontext ? { kontext } : {}),
+    anweisung: WORT_ANWEISUNG_OPENAI
+  }
 }
 
 let laeuft: HTMLAudioElement | null = null

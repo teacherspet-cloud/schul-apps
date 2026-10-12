@@ -115,6 +115,8 @@ export interface SichtbarkeitsOptionen {
    * anzeigen" gilt weiter.
    */
   admin?: boolean
+  /** Fachobfrau/-mann am Server (12.10.2026): sieht „Vokabellisten" immer */
+  fachobmann?: boolean
 }
 
 /**
@@ -132,6 +134,8 @@ export function programmSichtbar(
   const wahl = anzeigen?.[id]
   if (typeof wahl === 'boolean') return wahl
   if (opts.admin) return true
+  // Fachobleute pflegen die gemeinsamen Lehrwerke (12.10.2026) – Vokabellisten unabhängig von den eigenen Fächern
+  if (id === 'vokabelliste' && opts.fachobmann) return true
   return programmPasst(faecher, eigene)
 }
 

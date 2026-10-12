@@ -3,7 +3,7 @@
  * Satzpuzzle. Jedes Spiel meldet am Ende seinen Wert (Züge, Sekunden, Treffer) und die Wörter, die
  * danebengingen – der Karteikasten bleibt unverändert.
  */
-import { hatSatzAufnahme } from '../medienCache'
+import { beispielFuerLernende, hatSatzAufnahme } from '../medienCache'
 import { HoerKnopf } from './SpieleMedien'
 import { Badge, Button, Group, Progress, SimpleGrid, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -271,7 +271,11 @@ export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
 export function Satzpuzzle({ woerter, ende, hoeren = false }: SpielProps & { hoeren?: boolean }): React.JSX.Element {
   const farbe = useVtFarbe()
   const saetze = useMemo(
-    () => gemischt(woerter.filter((w) => w.example && satzTeile(w.example).length >= 3 && (!hoeren || hatSatzAufnahme(w.example)))).slice(0, 5),
+    // Geschlechtsbezogene Sätze (12.10.2026): Puzzle und Ton in der Fassung der gehörten Stimme
+    () =>
+      gemischt(woerter.filter((w) => w.example && satzTeile(w.example).length >= 3 && (!hoeren || hatSatzAufnahme(w.example))))
+        .slice(0, 5)
+        .map(beispielFuerLernende),
     [] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const [i, setI] = useState(0)

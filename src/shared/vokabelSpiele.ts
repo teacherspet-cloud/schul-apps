@@ -8,6 +8,7 @@
  */
 import { ohneAngaben, varianten, type Vokabel, type WortStand } from './vokabeltrainer'
 import { abkSpiel, abkuerzungAus } from './abkuerzung'
+import { SPIEL_VORRANG_ANTEIL } from './uebungsVorrang'
 
 export type SpielId =
   | 'memory'
@@ -149,6 +150,9 @@ export const spielform = (term: string): string => {
  * im Karteikasten), gemischt aus etwa 60 % heute fälligen, 30 % wackeligen (niedrige Fächer, zuletzt falsch) und 10 %
  * sicheren zur Auffrischung. Fehlt eine Gruppe, füllen die anderen auf; sind es insgesamt zu wenige, kommen weitere
  * (zuletzt auch noch neue) dazu, damit jedes Spiel startet.
+ *
+ * Übungsvorrang (12.10.2026, shared/uebungsVorrang.ts): Gibt der Server Vorrang-Wörter mit (`vorrang`), stammen etwa
+ * 70 % aus ihnen – Test-Abschnitte vor der neuesten Freigabe –, der Rest wie oben. Ohne Vorrang-Wörter wie bisher.
  */
 export function spielWoerter(
   liste: Vokabel[],
@@ -171,7 +175,19 @@ export function spielWoerter(
       .map((x) => x[1])
   const anteil = (l: Vokabel[], n: number): Vokabel[] => mischen(l).slice(0, n)
   const n = Math.max(mindestens, Math.min(ziel, gelernt.length))
-  let aus = [...anteil(faellig, Math.round(n * 0.6)), ...anteil(wackelig, Math.round(n * 0.3)), ...anteil(sichere, Math.max(1, Math.round(n * 0.1)))]
+  // Vorrang (12.10.2026): Test-Abschnitte, dann neueste Freigabe – höchstens ~70 % des Spiels
+  const vorne = [...mischen(gelernt.filter((v) => v.vorrang === 'test')), ...mischen(gelernt.filter((v) => v.vorrang === 'neu'))].slice(
+    0,
+    Math.round(n * SPIEL_VORRANG_ANTEIL)
+  )
+  const rest = n - vorne.length
+  const ohne = (l: Vokabel[]): Vokabel[] => (vorne.length ? l.filter((v) => !vorne.includes(v)) : l)
+  let aus = [
+    ...vorne,
+    ...anteil(ohne(faellig), Math.round(rest * 0.6)),
+    ...anteil(ohne(wackelig), Math.round(rest * 0.3)),
+    ...anteil(ohne(sichere), Math.max(rest > 0 ? 1 : 0, Math.round(rest * 0.1)))
+  ]
   // Auffüllen: erst übrige Gelernte, dann neue
   for (const v of [...mischen(gelernt), ...liste.filter((x) => !gelernt.includes(x))]) {
     if (aus.length >= n) break

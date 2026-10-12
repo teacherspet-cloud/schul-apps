@@ -155,7 +155,12 @@ export default function Brief(): React.JSX.Element | null {
               // Seitenauswahl (01.10.2026): je Fassung eine Seite – Word bekommt die gewählten Fassungen
               seiten: {
                 html: () => briefHtml(b, kopf),
-                mitAuswahl: (_s, marken) => briefDocx(b, kopf, marken.map((m) => m.art ?? '')),
+                mitAuswahl: (_s, marken) =>
+                  briefDocx(
+                    b,
+                    kopf,
+                    marken.map((m) => m.art ?? '')
+                  ),
                 hinweis: 'Gespeichert werden die Fassungen (Sprachen) der gewählten Seiten.'
               }
             }
@@ -243,6 +248,20 @@ export default function Brief(): React.JSX.Element | null {
         <Group justify="space-between" mb="md">
           <Title order={2}>{b.text.betreff || 'Elternbrief'}</Title>
           <Group gap="xs">
+            {/*
+             * Vorschau (10.10.2026): das PDF ohne Speichern ansehen. Die Signatur sieht man im Bild nicht –
+             * „PDF speichern" nimmt deshalb denselben Weg wie der PDF-Knopf (mit Passwortfrage).
+             * Seit 12.10.2026 links von „PDF" (Wunsch der Lehrkraft, in allen Programmen gleich).
+             */}
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconEye size={14} />}
+              onClick={() => void pdfVorschauAusHtml(briefHtml(b, kopf), `${name}.pdf`, async () => (signieren ? setPasswortFrage(true) : speichern('pdf')))}
+              data-pdf-vorschau-knopf
+            >
+              Vorschau
+            </Button>
             <Button
               size="xs"
               variant="light"
@@ -251,21 +270,6 @@ export default function Brief(): React.JSX.Element | null {
               data-eb-pdf
             >
               {signieren ? 'PDF (signiert)' : 'PDF'}
-            </Button>
-            {/*
-             * Vorschau (10.10.2026): das PDF ohne Speichern ansehen. Die Signatur sieht man im Bild nicht –
-             * „PDF speichern" nimmt deshalb denselben Weg wie der PDF-Knopf (mit Passwortfrage).
-             */}
-            <Button
-              size="xs"
-              variant="light"
-              leftSection={<IconEye size={14} />}
-              onClick={() =>
-                void pdfVorschauAusHtml(briefHtml(b, kopf), `${name}.pdf`, async () => (signieren ? setPasswortFrage(true) : speichern('pdf')))
-              }
-              data-pdf-vorschau-knopf
-            >
-              Vorschau
             </Button>
             <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => speichern('docx')}>
               Word
@@ -393,8 +397,7 @@ export default function Brief(): React.JSX.Element | null {
           </Text>
         </Card>
         <Text size="xs" c="dimmed" mb="xs" data-eb-fett-hinweis>
-          Text zwischen **zwei Sternchen** erscheint im Brief fett; die Rückgabefrist zusätzlich unterstrichen. Der Brief wird nach DIN 5008 (Form B)
-          gesetzt.
+          Text zwischen **zwei Sternchen** erscheint im Brief fett; die Rückgabefrist zusätzlich unterstrichen. Der Brief wird nach DIN 5008 (Form B) gesetzt.
         </Text>
         <Tabs defaultValue="de" keepMounted={false}>
           <Tabs.List>

@@ -9,6 +9,8 @@ import { subjectById } from '../../model/subjects'
 import { mediaSourceRules, textSourceRules } from '../../didactics/mediaArchives'
 import { sourceHeaderRules } from '../../didactics/sourceHeader'
 import { quellenkritikRegeln } from '../../didactics/quellenkritik'
+import { geschichteErzeugungsRegeln, geschichtsStufe } from '@shared/operatoren/geschichteSchreibformen'
+import { gehoertZurSekII } from '../../didactics/bildungsgang'
 import { bildRegeln } from '../../didactics/bildarbeit'
 import { abiturRegeln } from '../abiturPrompt'
 import { bilingualRegeln } from '../../didactics/bilingual'
@@ -160,6 +162,19 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     sourceHeaderRules(meta),
     // Was die Lernenden mit der Quelle tun, bevor sie sie benutzen
     quellenkritikRegeln(meta),
+    /*
+     * Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): verbindliche Vorlagen der Lehrkraft (Merkblatt
+     * Zusammenfassung, „Beurteilen" Abi BW) mit Stufenplan Kl. 5/6 – 7/8 – 9/10 – Sek II; Hilfen nur außerhalb von
+     * Leistungssituationen (Lernkontrolle/Klassenarbeit). Inhalte: @shared/operatoren/geschichteSchreibformen.
+     */
+    meta.subjectId === 'geschichte'
+      ? geschichteErzeugungsRegeln({
+          stufe: geschichtsStufe(meta.grade, gehoertZurSekII(meta.grade, meta.schoolTypeId, meta.stateId)),
+          stateId: meta.stateId,
+          schulform: meta.schoolTypeId,
+          pruefung: meta.sheetType === 'lernkontrolle'
+        })
+      : '',
     // Bilingualer Sachfachunterricht: Arbeitssprache, Operatoren, zweisprachiges Glossar, Bewertung
     bilingualRegeln(meta),
     // Was in diesem Fach mit einem Bild geschieht – und was der Alternativtext verraten darf

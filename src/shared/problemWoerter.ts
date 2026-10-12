@@ -9,10 +9,14 @@
  * „wackelig" mit eigener Regel (Fach 1–2, kürzlich, höchstens 20 über alle Kurse). „Wackelig" und „Problemwort"
  * meinten dasselbe – jetzt ein Begriff („Problemwörter") und eine Zahl.
  *
- * Ein Wort ist ein Problemwort, wenn
- *  1. über alle Lernenden des Kurses mindestens 3 Abfragen vorliegen und mindestens eine davon falsch war, und
- *  2. es bei mindestens einem Kind noch aktuell wackelt: Fach 1–2, mit Fehlern, in den letzten 14 Tagen geübt.
- *     (Wer das Wort inzwischen gefestigt hat oder seit zwei Wochen nicht mehr geübt hat, macht es nicht mehr zum Problem.)
+ * Neue Regel (12.10.2026, abgestimmt mit der Lehrkraft – die alte Regel „ein wackelndes Kind genügt" machte die Listen
+ * zu lang): Ein Wort ist ein Problemwort, wenn
+ *  1. es bei genügend Kindern aktuell wackelt (Fach 1–2, mit Fehlern, in den letzten 14 Tagen geübt): mindestens
+ *     `minKinder` – in kleinen Kursen genügt der Anteil `anteil` der Kinder, die das Wort geübt haben – UND
+ *  2. die Fehlerquote des Kurses bei diesem Wort mindestens `minQuote` beträgt, bei mindestens `minVersuche` Abfragen.
+ * Die Schwellen hängen an der „Empfindlichkeit" (Stufe 1–5): Standard je Lehrkraft (Einstellungen), je Kurs im Pop-up
+ * änderbar. Stufe 3 ist die abgestimmte Grundeinstellung (2 Kinder bzw. 20 %, Quote 30 %, 6 Abfragen); Stufe 5 entspricht
+ * etwa der früheren Regel. Die Zwischenstufen sind Faustregeln.
  * Von der Lehrkraft „aus der Liste genommene" Wörter zählen nicht, bis neue Fehler dazukommen.
  * Reihenfolge: bei den meisten Kindern aktuell wackelig → am häufigsten falsch → höchste Fehlerquote.
  * Die Zahl ist immer die ganze Liste; wo nur ein Teil gezeigt wird, steht „20 von N".
@@ -20,8 +24,41 @@
 import type { Vokabel, WortStand } from './vokabeltrainer'
 
 const TAG = 86_400_000
-/** Mindestzahl Abfragen über alle Lernenden */
+/** Mindestzahl Abfragen über alle Lernenden in der lockersten Stufe (frühere feste Regel) */
 export const PROBLEM_MIN_VERSUCHE = 3
+
+/** Empfindlichkeit 1 („nur deutliche Probleme") … 5 („schon kleine Unsicherheiten") */
+export type ProblemStufe = 1 | 2 | 3 | 4 | 5
+export const PROBLEM_STUFE_STANDARD: ProblemStufe = 3
+export const PROBLEM_STUFEN: ProblemStufe[] = [1, 2, 3, 4, 5]
+export interface ProblemSchwellen {
+  minKinder: number
+  /** Anteil der übenden Kinder, der in kleinen Kursen genügt */
+  anteil: number
+  minQuote: number
+  minVersuche: number
+}
+export const PROBLEM_SCHWELLEN: Record<ProblemStufe, ProblemSchwellen> = {
+  1: { minKinder: 4, anteil: 0.35, minQuote: 0.45, minVersuche: 10 },
+  2: { minKinder: 3, anteil: 0.25, minQuote: 0.375, minVersuche: 8 },
+  3: { minKinder: 2, anteil: 0.2, minQuote: 0.3, minVersuche: 6 },
+  4: { minKinder: 2, anteil: 0.1, minQuote: 0.2, minVersuche: 4 },
+  5: { minKinder: 1, anteil: 0, minQuote: 0, minVersuche: PROBLEM_MIN_VERSUCHE }
+}
+export const PROBLEM_STUFE_NAME: Record<ProblemStufe, string> = {
+  1: 'nur deutliche Probleme',
+  2: 'eher deutliche Probleme',
+  3: 'ausgewogen (Standard)',
+  4: 'auch leichtere Unsicherheiten',
+  5: 'schon kleine Unsicherheiten'
+}
+/** Gültige Stufe aus beliebigem Wert (sonst `ersatz`) */
+export const problemStufe = (x: unknown, ersatz: ProblemStufe = PROBLEM_STUFE_STANDARD): ProblemStufe =>
+  PROBLEM_STUFEN.includes(Number(x) as ProblemStufe) ? (Number(x) as ProblemStufe) : ersatz
+/** Wie viele aktuell wackelnde Kinder nötig sind, wenn `uebende` Kinder das Wort geübt haben */
+export function noetigeKinder(sw: ProblemSchwellen, uebende: number): number {
+  return Math.max(1, Math.min(sw.minKinder, Math.ceil(sw.anteil * uebende) || 1))
+}
 /** „Aktuell": in so vielen Tagen zuletzt geübt */
 export const PROBLEM_AKTUELL_TAGE = 14
 
@@ -67,24 +104,41 @@ export function problemWoerter(
   woerter: (Pick<Vokabel, 'id' | 'term' | 'translation'> & { example?: string })[],
   staende: Record<string, WortStand>[],
   ausgeblendet: Record<string, number> = {},
-  jetzt = Date.now()
+  jetzt = Date.now(),
+  stufe: ProblemStufe = PROBLEM_STUFE_STANDARD
 ): ProblemWort[] {
-  const liste: ProblemWort[] = []
+  return problemWoerterJeStufe(woerter, staende, ausgeblendet, jetzt)[stufe]
+}
+
+/**
+ * Problemwörter für alle fünf Stufen auf einmal (12.10.2026): Der Regler im Pop-up zeigt beim Schieben sofort, wie viele
+ * Wörter jede Stufe ergäbe – ohne neue Anfrage. Die Stufen sind geschachtelt (lockerere enthalten die strengeren).
+ */
+export function problemWoerterJeStufe(
+  woerter: (Pick<Vokabel, 'id' | 'term' | 'translation'> & { example?: string })[],
+  staende: Record<string, WortStand>[],
+  ausgeblendet: Record<string, number> = {},
+  jetzt = Date.now()
+): Record<ProblemStufe, ProblemWort[]> {
+  const kandidaten: (ProblemWort & { uebende: number })[] = []
   for (const v of woerter) {
     let versuche = 0
     let falsch = 0
     let betroffen = 0
+    let uebende = 0
     const texte = new Map<string, number>()
     for (const st of staende) {
       const s = st[v.id]
       if (!s) continue
+      if (s.versuche > 0) uebende++
       versuche += s.versuche
       falsch += s.falsch
       if (wackeltAktuell(s, jetzt)) betroffen++
       for (const t of s.fehlerTexte ?? []) texte.set(t, (texte.get(t) ?? 0) + 1)
     }
     if (versuche < PROBLEM_MIN_VERSUCHE || falsch <= 0 || betroffen <= 0) continue
-    liste.push({
+    kandidaten.push({
+      uebende,
       id: v.id,
       term: v.term,
       translation: v.translation,
@@ -99,8 +153,17 @@ export function problemWoerter(
         .map(([t]) => t)
     })
   }
-  liste.sort((a, b) => b.betroffen - a.betroffen || b.falsch - a.falsch || b.quote - a.quote)
-  return ausgeblendetFiltern(liste, ausgeblendet).sichtbar
+  kandidaten.sort((a, b) => b.betroffen - a.betroffen || b.falsch - a.falsch || b.quote - a.quote)
+  const sichtbar = ausgeblendetFiltern(kandidaten, ausgeblendet).sichtbar
+  const aus = {} as Record<ProblemStufe, ProblemWort[]>
+  for (const st of PROBLEM_STUFEN) {
+    const sw = PROBLEM_SCHWELLEN[st]
+    aus[st] = sichtbar
+      .filter((p) => p.versuche >= sw.minVersuche && p.quote >= sw.minQuote && p.betroffen >= noetigeKinder(sw, p.uebende))
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ uebende, ...p }) => p)
+  }
+  return aus
 }
 
 /** Einheitliche Beschriftung: „1 Problemwort", „12 Problemwörter"; gekürzte Liste „20 von 34 Problemwörtern" */

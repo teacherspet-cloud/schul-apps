@@ -75,11 +75,76 @@ export const KOPF = {
   /** Informationsblock ab linkem/oberem Druckrand und seine nutzbare Breite bis zum rechten Rand */
   infoLinksMm: DIN5008.infoblock.linksMm - DIN5008.rand.linksMm,
   infoObenMm: DIN5008.infoblock.obenMm - DIN5008.rand.obenMm,
-  infoBreiteMm: Math.min(DIN5008.infoblock.breiteMaxMm, DIN5008.seite.breiteMm - DIN5008.rand.rechtsMm - DIN5008.infoblock.linksMm)
+  infoBreiteMm: Math.min(DIN5008.infoblock.breiteMaxMm, DIN5008.seite.breiteMm - DIN5008.rand.rechtsMm - DIN5008.infoblock.linksMm),
+  /**
+   * Breite des Satzspiegels (12.10.2026): Die Zeile „An die Eltern … der Klasse 9c" ist keine Postanschrift – sie nutzt
+   * die volle Breite statt der 80 mm des Anschriftfelds und bricht so nicht um.
+   */
+  satzBreiteMm: DIN5008.seite.breiteMm - DIN5008.rand.linksMm - DIN5008.rand.rechtsMm
 } as const
 
 /** Zeile in der Anschriftzone: „An die Eltern und Erziehungsberechtigten der Klasse 6b" */
 export function empfaengerZeile(klasse: string): string {
   const k = klasse.trim().replace(/^Klasse\s+/i, '')
   return `An die Eltern und Erziehungsberechtigten${k ? ` der Klasse ${k}` : ''}`
+}
+
+/*
+ * Amtsbezeichnungen in der Unterschrift (12.10.2026, Wunsch der Lehrkraft): Unter dem Gruß steht nur der Name –
+ * „Frau StR' Müller" → „Frau Müller", „Müller, StR" → „Müller". Im Briefkopf (Absender) bleibt die Bezeichnung
+ * stehen. Akademische Titel (Dr., Prof.) bleiben. Kürzel zählen nur mit genauer Schreibung (sonst träfe es „Str."),
+ * ausgeschriebene Bezeichnungen in jeder Schreibung. Ein einzelnes „L." bleibt – das ist eher ein Vorname-Kürzel.
+ */
+const APOSTROPH = "['’´`ʼ]"
+/** Weibliche Endung an Kürzeln: StR', StR'in, StRin, StR’in */
+const KURZ_WEIBLICH = `(?:${APOSTROPH}?in|${APOSTROPH})?`
+/** „z. A." (zur Anstellung) hinter der Bezeichnung */
+const ZUR_ANSTELLUNG = String.raw`(?:\s*z\.\s*A\.)?`
+const KUERZEL = ['OStD', 'OStR', 'StD', 'StR', 'StAss', 'StRef', 'LiA', 'LAA', 'RSL', 'RL', 'KR', 'FL', 'FöL', 'Ref']
+const AUSGESCHRIEBEN = [
+  'Oberstudiendirektor',
+  'Studiendirektor',
+  'Oberstudienrat',
+  'Oberstudienrätin',
+  'Studienrat',
+  'Studienrätin',
+  'Studienassessor',
+  'Studienreferendar',
+  'Referendar',
+  'Lehramtsanwärter',
+  'Realschullehrer',
+  'Förderschullehrer',
+  'Fachlehrer',
+  'Lehrer',
+  'Lehrkraft',
+  'Konrektor',
+  'Rektor'
+]
+/** Weibliche Formen der ausgeschriebenen Bezeichnungen: -in, /in, /-in, *in, :in, (in), In */
+const LANG_WEIBLICH = String.raw`(?:in|In|\/-?in|\*in|:in|\(in\))?`
+const VOR = String.raw`(^|[\s,;/(])`
+const NACH = String.raw`(?=$|[\s,;/)])`
+const KURZ_MUSTER = new RegExp(
+  String.raw`${VOR}\(?(?:(?:${KUERZEL.join('|')})${KURZ_WEIBLICH}\.?|L(?:${APOSTROPH}?in|${APOSTROPH})?)${ZUR_ANSTELLUNG}\)?${NACH}`,
+  'gu'
+)
+const LANG_MUSTER = new RegExp(String.raw`${VOR}\(?(?:${AUSGESCHRIEBEN.join('|')})${LANG_WEIBLICH}${ZUR_ANSTELLUNG}\)?${NACH}`, 'giu')
+/** Was nach dem Entfernen allein kein Name ist */
+const NUR_ANREDE = /^(?:(?:Frau|Herr|Herrn|Dr\.|Prof\.|med\.|phil\.|rer\.|nat\.)\s*)*$/i
+
+/** Name für die Unterschrift ohne Amtsbezeichnung; bleibt kein Name übrig (z. B. „Herr Lehrer"), bleibt er unverändert */
+export function ohneAmtsbezeichnung(name: string): string {
+  const roh = name.trim()
+  if (!roh) return ''
+  let s = roh
+  // Zweimal: Nebeneinanderliegende Bezeichnungen teilen sich das Trennzeichen
+  for (let i = 0; i < 2; i++) s = s.replace(KURZ_MUSTER, '$1').replace(LANG_MUSTER, '$1')
+  s = s
+    .replace(/\(\s*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,;])/g, '$1')
+    .replace(/([,;])(?:\s*[,;])+/g, '$1')
+    .replace(/^[\s,;/–-]+|[\s,;/–-]+$/g, '')
+    .trim()
+  return s && !NUR_ANREDE.test(s) ? s : roh
 }

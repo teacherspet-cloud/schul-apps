@@ -25,6 +25,8 @@ import { describeSheet } from './describe'
 import type { AiCall } from './generate'
 import { materialText } from './prompts'
 import { diagramDrawing } from '../render/diagramSvg'
+import { geschichteLoesungsRegeln, geschichtsStufe, schreibformenIn } from '@shared/operatoren/geschichteSchreibformen'
+import { gehoertZurSekII } from '../didactics/bildungsgang'
 
 const TEIL = obj({
   solution: str('Erwartungshorizont der Teilaufgabe: knappe Stichpunkte, was eine vollständige und richtige Antwort enthält'),
@@ -137,6 +139,14 @@ export async function generateSolution(block: TaskBlock, sheet: Sheet, ws: Works
           : '- „parts" bleibt leer.',
         '- Ändere nichts an der Aufgabe.'
       ].join('\n'),
+      // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft für Musterlösung und Erwartungshorizont
+      meta.subjectId === 'geschichte'
+        ? geschichteLoesungsRegeln(schreibformenIn([plainText(block.instruction), ...block.parts.map((p) => plainText(p.instruction))].join('\n')), {
+            stufe: geschichtsStufe(meta.grade, gehoertZurSekII(meta.grade, meta.schoolTypeId, meta.stateId)),
+            stateId: meta.stateId,
+            schulform: meta.schoolTypeId
+          })
+        : '',
       materialText(ws.sources)
     ]
       .filter(Boolean)

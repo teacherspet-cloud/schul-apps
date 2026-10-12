@@ -16,6 +16,8 @@ import TafelbildModule from './tafelbild/TafelbildModule'
 import OnlinetestModule from './onlinetest/OnlinetestModule'
 import UnterrichtsreiheModule from './unterrichtsreihe/UnterrichtsreiheModule'
 import VerwaltungModule from './verwaltung/VerwaltungModule'
+import GrammatikformenModule from './grammatikformen/GrammatikformenModule'
+import { siehtLehrwerkApps } from '../shared/fachobleute'
 import { aufServer, serverIch } from '../shared/plattform'
 import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
@@ -68,6 +70,15 @@ const bilder = import.meta.glob<string>('../assets/programme/*.{webp,png}', { ea
 const illustration = (id: string): string | undefined => bilder[`../assets/programme/${id}.webp`] ?? bilder[`../assets/programme/${id}.png`]
 // Die kleine Fassung, sonst die große (der Browser verkleinert sie dann selbst)
 const leistenbild = (id: string): string | undefined => bilder[`../assets/programme/${id}-96.webp`] ?? illustration(id)
+
+/**
+ * Vokabellisten nur für Admins und Fachobleute (12.10.2026, Wunsch der Lehrkraft; am PC ohne Server die eine Lehrkraft):
+ * Gemeinsame Lehrwerke pflegen sie für die Schule. Ausgefiltert statt bedingt eingetragen, damit die Reihenfolge der Leiste
+ * an EINER Stelle steht (tests/programmSichtbarkeit.test.ts liest sie aus dieser Liste).
+ */
+// Nachtrag 12.10.2026: Vokabellisten bleiben für alle Sprachlehrkräfte sichtbar (sonst verlören sie ihre eigenen Listen);
+// gemeinsame Lehrwerke bearbeiten nur Admins und Fachobleute (BookEditor). Fachobleute sehen sie zusätzlich immer.
+const NUR_LEHRWERK_PFLEGE: string[] = []
 
 export const modules: SchulModule[] = [
   {
@@ -257,6 +268,26 @@ export const modules: SchulModule[] = [
     component: VokabellisteModule
   },
   /*
+   * Grammatikformen (12.10.2026, Wunsch der Lehrkraft): Lehrwerke mit Units/Abschnitten und je Abschnitt die
+   * zugeordneten Grammatikformen – pflegen Admins und Fachobleute (am PC die eine Lehrkraft), siehe shared/fachobleute.ts.
+   */
+  ...(siehtLehrwerkApps()
+    ? [
+        {
+          id: 'grammatikformen',
+          name: 'Grammatikformen',
+          description:
+            'Grammatik je Lehrwerk, Unit und Abschnitt pflegen – von Hand oder mit KI-Vorschlägen aus Schulbuchseiten; Grundlage für Grammatikauswahl, Kurse und Vorwissen.',
+          icon: programmSymbol('grammatiktraining', 'cyan'),
+          color: 'cyan',
+          illustration: illustration('grammatikformen') ?? illustration('grammatiktraining'),
+          leistenbild: leistenbild('grammatikformen') ?? leistenbild('grammatiktraining'),
+          faecher: SPRACH_FAECHER,
+          component: GrammatikformenModule
+        }
+      ]
+    : []),
+  /*
    * Schule & Daten – nur für Admins auf dem Server (09.10.2026, Entscheidung des Admins): Nutzer, KI-Zugänge, IServ,
    * Maskottchen, Server. Das Menü „Daten und Material" (bis dahin für Lehrkräfte die ganze App) entfällt: Freigaben der
    * Fachschaft stehen in der Bibliothek jeder App, Themenbereiche und Sicherung unter Einstellungen › Material.
@@ -277,7 +308,7 @@ export const modules: SchulModule[] = [
         }
       ]
     : [])
-]
+].filter((m) => !NUR_LEHRWERK_PFLEGE.includes(m.id) || siehtLehrwerkApps())
 
 /**
  * Gruppen der Seitenleiste (03.10.2026, Entscheidung der Lehrkraft): vier Übermenüs; ein Klick
@@ -298,5 +329,5 @@ export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'sprachenlernen'] },
   { id: 'planung', name: 'Planung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Tests', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'grammatikformen', 'verwaltung'] }
 ]

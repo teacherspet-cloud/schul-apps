@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kartenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-reihe-material')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -113,7 +113,8 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  // Startseite: „Zuletzt bearbeitet" ohne Material aus Reihen
+  // Startseite: „Zuletzt bearbeitet" ohne Material aus Reihen (Kasten seit 12.10.2026 zunächst zugeklappt)
+  await kartenAuf(p, 'start-zuletzt')
   await da(p.locator('.home-material').first())
   await p.waitForTimeout(1500)
   const zuletzt = await p.locator('.home-material').allInnerTexts()

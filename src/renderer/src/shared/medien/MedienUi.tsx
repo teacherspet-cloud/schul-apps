@@ -17,6 +17,8 @@ import {
   Image,
   Loader,
   Modal,
+  Popover,
+  Radio,
   ScrollArea,
   SegmentedControl,
   SimpleGrid,
@@ -25,24 +27,41 @@ import {
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconListCheck, IconPhoto, IconPhotoSearch, IconSparkles, IconTrash, IconVolume, IconMessage2 } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  IconAlertTriangle,
+  IconListCheck,
+  IconPhoto,
+  IconPhotoSearch,
+  IconRefresh,
+  IconSparkles,
+  IconTrash,
+  IconVolume,
+  IconMessage2
+} from '@tabler/icons-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import {
   BILDSTUFE_NAME,
   BILDSTUFEN,
   istGanzerSatz,
+  saetzeVon,
+  satzSchluessel,
   sprachKurz,
   STIMMLAGE_NAME,
   stufeVon,
   tonPasst,
+  tonVon,
   type Bildstufe,
   type MedienKandidat,
   type MedienSicht,
+  type MedienTon,
   type Stimmen,
   type Stimmlage,
   type TonArt
 } from '@shared/medienbank'
+import { istGeprueft, verdachtText, type TonPruefung } from '@shared/tonPruefung'
+import { satzFuerLage } from '@shared/satzFassung'
+import { aufMessung, gemesseneVon, merkeMessung, pruefungVon, tonMessen } from './tonMessung'
 import { notifyError, notifySuccess } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
 import { abspielen, bildKandidaten, kandidatUebernehmen, type Vokabel } from './medienbank'
@@ -126,7 +145,17 @@ export const spiele = (q: { datei?: string; url?: string } | undefined): void =>
 }
 
 /** Zelle „Beispielbild" – `stufe`: Bildstufe der Ansicht; ein Bild einer anderen Stufe erscheint blass mit deren Namen */
-export function BildZelle({ sicht, wort, onOeffnen, stufe }: { sicht?: MedienSicht; wort: string; onOeffnen: () => void; stufe?: Bildstufe }): React.JSX.Element {
+export function BildZelle({
+  sicht,
+  wort,
+  onOeffnen,
+  stufe
+}: {
+  sicht?: MedienSicht
+  wort: string
+  onOeffnen: () => void
+  stufe?: Bildstufe
+}): React.JSX.Element {
   const b = sicht?.bild
   const fremd = Boolean(stufe && sicht?.bildStufe && sicht.bildStufe !== stufe)
   return (
@@ -142,11 +171,38 @@ export function BildZelle({ sicht, wort, onOeffnen, stufe }: { sicht?: MedienSic
       {b?.dataUrl || b?.url ? (
         <>
           <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" style={fremd ? { opacity: 0.45 } : undefined} />
+          {/* KI-Bild vom Sicherheitssystem abgelehnt, Ersatz aus der Bildsuche (12.10.2026) */}
+          {b.kiAbgelehnt && !fremd && (
+            <Tooltip label="KI-Bild wurde vom Sicherheitssystem abgelehnt – dieses Bild kommt aus der Bildsuche. Bitte prüfen.">
+              <span
+                data-bild-abgelehnt
+                style={{
+                  position: 'absolute',
+                  top: -3,
+                  right: -3,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  background: 'var(--mantine-color-orange-6)',
+                  border: '2px solid var(--mantine-color-body)'
+                }}
+              />
+            </Tooltip>
+          )}
           {fremd && (
             <Text
               size="9px"
               fw={700}
-              style={{ position: 'absolute', bottom: 1, left: 1, right: 1, textAlign: 'center', background: 'var(--mantine-color-body)', borderRadius: 3, lineHeight: 1.3 }}
+              style={{
+                position: 'absolute',
+                bottom: 1,
+                left: 1,
+                right: 1,
+                textAlign: 'center',
+                background: 'var(--mantine-color-body)',
+                borderRadius: 3,
+                lineHeight: 1.3
+              }}
             >
               {BILDSTUFE_NAME[sicht!.bildStufe!].replace('Kl. ', '')}
             </Text>
@@ -181,9 +237,12 @@ export function TonZelle({
   admin,
   erzeugen,
   lage,
-  gesprochen
+  gesprochen,
+  stimmlage,
+  lagenDa,
+  neuErzeugen
 }: {
-  ton?: { datei: string; url?: string; text: string; gesprochen?: string }
+  ton?: { datei: string; url?: string; text: string; gesprochen?: string; pruefung?: TonPruefung; vorher?: { datei: string } }
   text: string
   /** Erwarteter Sprechtext (Abkürzungen, eigene Aussprache, 09.10.2026) – weicht die Aufnahme ab, ist sie veraltet */
   gesprochen?: string
@@ -192,8 +251,17 @@ export function TonZelle({
   erzeugen: () => Promise<void>
   /** Fassung (07.10.2026) – steht klein am Knopf, wenn es zwei gibt */
   lage?: Stimmlage
+  /** Fassung dieser Zelle, auch wenn es nur eine gibt (12.10.2026, Vorwahl im Menü „Neue Aussprache") */
+  stimmlage?: Stimmlage
+  /** Fassungen mit eingestellter Standardstimme */
+  lagenDa?: Stimmlage[]
+  /** Nur Admins (12.10.2026): Rechtsklick bzw. langer Druck auf das Symbol – neu erzeugen, die bisherige bleibt als Rückfall */
+  neuErzeugen?: (lagen: Stimmlage[], grund: string) => Promise<void>
 }): React.JSX.Element | null {
   const [laeuft, setLaeuft] = useState(false)
+  // Prüfung per Messung (12.10.2026): gespeichert oder in dieser Sitzung nachgeprüft
+  useMessungen()
+  const pruefung = pruefungVon(ton)
   if (!text.trim()) return null
   if (art === 'satz' && !istGanzerSatz(text)) return null
   // Schreibvarianten („a / one" – „a/one", „it’s" – „it's") gelten als dieselbe Aufnahme (10.10.2026, shared/medienbank.ts)
@@ -210,14 +278,44 @@ export function TonZelle({
     ) : (
       knopf
     )
-  if (ton && !veraltet)
-    return marke(
-      <Tooltip label={(art === 'wort' ? 'Aussprache anhören' : 'Beispielsatz anhören') + fassung}>
-        <ActionIcon variant="light" onClick={() => spiele(ton)} aria-label={`Aussprache „${text}“ anhören${fassung}`} data-aussprache={art}>
+  if (ton && !veraltet) {
+    /*
+     * Verdacht (12.10.2026, shared/tonPruefung.ts): orangefarbener Rand und Warnzeichen, im Tooltip die gemessenen Gründe.
+     * Admins öffnen mit Rechtsklick (Tablet: langer Druck) das Menü „Neue Aussprache erzeugen".
+     */
+    const verdacht = pruefung?.stufe === 'verdacht'
+    const hinweis = (art === 'wort' ? 'Aussprache anhören' : 'Beispielsatz anhören') + fassung
+    const knopf = (
+      <Tooltip label={verdacht ? `${verdachtText(pruefung)}${fassung}` : hinweis} multiline maw={320}>
+        <ActionIcon
+          variant="light"
+          color={verdacht ? 'orange' : undefined}
+          onClick={() => spiele(ton)}
+          aria-label={`Aussprache „${text}“ anhören${fassung}${verdacht ? ' – vielleicht undeutlich' : ''}`}
+          data-aussprache={art}
+          data-aussprache-verdacht={verdacht ? '' : undefined}
+          style={verdacht ? { outline: '2px solid var(--mantine-color-orange-6)', outlineOffset: 1, position: 'relative' } : undefined}
+        >
           {art === 'wort' ? <IconVolume size={16} /> : <IconMessage2 size={16} />}
+          {verdacht && <IconAlertTriangle size={10} style={{ position: 'absolute', top: -4, right: -4, color: 'var(--mantine-color-orange-7)' }} />}
         </ActionIcon>
       </Tooltip>
     )
+    return marke(
+      admin && neuErzeugen ? (
+        <NeuErzeugenMenue
+          lagenDa={lagenDa ?? (stimmlage ? [stimmlage] : ['w'])}
+          vorwahl={stimmlage ?? lage ?? 'w'}
+          vorher={ton.vorher}
+          neuErzeugen={neuErzeugen}
+        >
+          {knopf}
+        </NeuErzeugenMenue>
+      ) : (
+        knopf
+      )
+    )
+  }
   if (!admin)
     return (
       <Text size="xs" c="dimmed">
@@ -243,6 +341,206 @@ export function TonZelle({
       </ActionIcon>
     </Tooltip>
   )
+}
+
+/** Neu zeichnen, sobald eine Nachprüfung fertig ist (12.10.2026) */
+function useMessungen(): void {
+  const [, setN] = useState(0)
+  useEffect(() => aufMessung(() => setN((n) => n + 1)), [])
+}
+
+/** Gründe im Menü „Neue Aussprache erzeugen" (12.10.2026, Vorgabe der Lehrkraft) */
+const NEU_GRUENDE = ['undeutlich', 'falsche Betonung', 'abgeschnitten', 'falsches Wort']
+
+/**
+ * Menü „Neue Aussprache erzeugen" (12.10.2026, nur Admins): Rechtsklick auf das Aussprache-Symbol, auf dem Tablet langer
+ * Druck. Stimme (weiblich/männlich/beide) und Grund wählen; erzeugt sofort über den gewohnten Auftragsweg, misst die neue
+ * Aufnahme und ersetzt die alte – die bleibt als Rückfall gespeichert und lässt sich hier anhören.
+ */
+function NeuErzeugenMenue({
+  lagenDa,
+  vorwahl,
+  vorher,
+  neuErzeugen,
+  children
+}: {
+  lagenDa: Stimmlage[]
+  vorwahl: Stimmlage
+  vorher?: { datei: string }
+  neuErzeugen: (lagen: Stimmlage[], grund: string) => Promise<void>
+  children: React.ReactNode
+}): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const [wahl, setWahl] = useState<string>(lagenDa.includes(vorwahl) ? vorwahl : lagenDa[0] ?? 'w')
+  const [grund, setGrund] = useState(NEU_GRUENDE[0])
+  const [laeuft, setLaeuft] = useState(false)
+  const druck = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lang = useRef(false)
+  const loslassen = (): void => {
+    if (druck.current) clearTimeout(druck.current)
+    druck.current = null
+  }
+  useEffect(() => loslassen, [])
+  const starten = (): void => {
+    const lagen: Stimmlage[] = wahl === 'beide' ? lagenDa : [wahl as Stimmlage]
+    setLaeuft(true)
+    void neuErzeugen(lagen, grund)
+      .then(() => setOffen(false))
+      .catch((e: unknown) => notifyError(e, 'Keine neue Aussprache'))
+      .finally(() => setLaeuft(false))
+  }
+  return (
+    <Popover opened={offen} onChange={setOffen} position="bottom" withArrow shadow="md" withinPortal trapFocus>
+      <Popover.Target>
+        <span
+          style={{ display: 'inline-flex', WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setOffen(true)
+          }}
+          onTouchStart={() => {
+            lang.current = false
+            loslassen()
+            druck.current = setTimeout(() => {
+              lang.current = true
+              setOffen(true)
+            }, 550)
+          }}
+          onTouchEnd={loslassen}
+          onTouchMove={loslassen}
+          onTouchCancel={loslassen}
+          onClickCapture={(e) => {
+            // Nach langem Druck nicht zusätzlich abspielen
+            if (!lang.current) return
+            lang.current = false
+            e.stopPropagation()
+            e.preventDefault()
+          }}
+          data-neu-erzeugen-ziel
+        >
+          {children}
+        </span>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Stack gap="xs" w={230} data-neu-erzeugen-menue>
+          <Text size="sm" fw={600}>
+            Neue Aussprache erzeugen
+          </Text>
+          <Radio.Group value={wahl} onChange={setWahl} label="Stimme" size="xs">
+            <Stack gap={4} mt={4}>
+              <Radio value="w" label="weibliche Stimme" disabled={!lagenDa.includes('w')} data-neu-lage="w" />
+              <Radio value="m" label="männliche Stimme" disabled={!lagenDa.includes('m')} data-neu-lage="m" />
+              <Radio value="beide" label="beide" disabled={lagenDa.length < 2} data-neu-lage="beide" />
+            </Stack>
+          </Radio.Group>
+          <Radio.Group value={grund} onChange={setGrund} label="Grund" size="xs">
+            <Stack gap={4} mt={4}>
+              {NEU_GRUENDE.map((g) => (
+                <Radio key={g} value={g} label={g} data-neu-grund={g} />
+              ))}
+            </Stack>
+          </Radio.Group>
+          {vorher && (
+            <Button
+              variant="subtle"
+              size="compact-xs"
+              leftSection={<IconVolume size={12} />}
+              onClick={() => spiele({ datei: vorher.datei })}
+              data-vorher-anhoeren
+            >
+              Vorige Aufnahme anhören
+            </Button>
+          )}
+          <Button size="xs" leftSection={<IconRefresh size={14} />} loading={laeuft} onClick={starten} data-neu-erzeugen-start>
+            Neue Aussprache erzeugen
+          </Button>
+          <Text size="10px" c="dimmed">
+            Die bisherige Aufnahme bleibt als Rückfall gespeichert; die neue wird gleich gemessen.
+          </Text>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
+  )
+}
+
+/** Aufnahme des Beispielsatzes einer Stimme – bei geschlechtsbezogenen Sätzen die ihrer Fassung (12.10.2026) */
+export const satzTonVon = (sicht: MedienSicht | undefined, satz: string | undefined, l: Stimmlage): (MedienTon & { url?: string }) | undefined =>
+  satz ? saetzeVon(sicht, l)?.[satzSchluessel(satzFuerLage(satz, sicht?.fassungen, l))] : undefined
+
+/** Vokabeln mit Verdacht je Art und Stimme (12.10.2026) – für Zähler, Filter und „neu erzeugen" */
+export function verdaechtige(
+  vokabeln: Vokabel[],
+  daten: Record<string, MedienSicht>,
+  lagen: Stimmlage[]
+): { art: 'aussprache' | 'satz'; lage: Stimmlage; vokabeln: Vokabel[] }[] {
+  const aus: { art: 'aussprache' | 'satz'; lage: Stimmlage; vokabeln: Vokabel[] }[] = []
+  for (const l of lagen) {
+    const w = vokabeln.filter((v) => v.term.trim() && pruefungVon(tonVon(daten[v.term], l))?.stufe === 'verdacht')
+    const s = vokabeln.filter((v) => v.term.trim() && istGanzerSatz(v.example) && pruefungVon(satzTonVon(daten[v.term], v.example, l))?.stufe === 'verdacht')
+    if (w.length) aus.push({ art: 'aussprache', lage: l, vokabeln: w })
+    if (s.length) aus.push({ art: 'satz', lage: l, vokabeln: s })
+  }
+  return aus
+}
+
+/** Hat diese Zeile eine Aufnahme mit Verdacht (Wort oder Beispielsatz, eine der Stimmen)? */
+export const zeileMitVerdacht = (sicht: MedienSicht | undefined, satz: string | undefined): boolean =>
+  (['w', 'm'] as Stimmlage[]).some((l) => pruefungVon(tonVon(sicht, l))?.stufe === 'verdacht' || pruefungVon(satzTonVon(sicht, satz, l))?.stufe === 'verdacht')
+
+/* Filter „vielleicht undeutlich" der Medienleiste (12.10.2026) – je Stelle, solange das Programm offen ist */
+const useVerdachtFilter = create<{ an: Record<string, boolean>; setze: (docId: string, an: boolean) => void }>((set) => ({
+  an: {},
+  setze: (docId, an) => set((x) => ({ an: { ...x.an, [docId]: an } }))
+}))
+export const useNurVerdacht = (docId: string | undefined): boolean => useVerdachtFilter((x) => Boolean(docId && x.an[docId]))
+
+/*
+ * Nachprüfung vorhandener Aufnahmen (12.10.2026): Beim Öffnen einer Liste werden noch ungeprüfte Aufnahmen (ohne Prüfung
+ * oder mit älterer Regelfassung) im Hintergrund gemessen – eine nach der anderen mit kurzer Pause, damit die Oberfläche
+ * flüssig bleibt. Admins speichern das Ergebnis in der Medienbank; andere Lehrkräfte sehen es nur in dieser Sitzung.
+ */
+const inArbeit = new Set<string>()
+export function useTonNachpruefung(sprache: string | undefined, daten: Record<string, MedienSicht>, admin: boolean): void {
+  useEffect(() => {
+    if (!sprache) return
+    const sp = sprachKurz(sprache)
+    type Auftrag = { wort: string; art: TonArt; lage: Stimmlage; satz?: string; ton: MedienTon & { url?: string } }
+    const offen: Auftrag[] = []
+    const dazu = (a: Auftrag): void => {
+      if (istGeprueft(a.ton.pruefung) || gemesseneVon(a.ton.datei) || inArbeit.has(a.ton.datei)) return
+      offen.push(a)
+    }
+    for (const [wort, sicht] of Object.entries(daten))
+      for (const lage of ['w', 'm'] as Stimmlage[]) {
+        const t = tonVon(sicht, lage)
+        if (t) dazu({ wort, art: 'wort', lage, ton: t })
+        for (const [satz, st] of Object.entries(saetzeVon(sicht, lage) ?? {})) dazu({ wort, art: 'satz', lage, satz: st.text || satz, ton: st })
+      }
+    if (!offen.length) return
+    let weg = false
+    void (async () => {
+      for (const a of offen) {
+        if (weg) break
+        if (inArbeit.has(a.ton.datei) || gemesseneVon(a.ton.datei)) continue
+        inArbeit.add(a.ton.datei)
+        try {
+          const quelle = a.ton.url ?? (await window.api.medien.datei(a.ton.datei))
+          if (!quelle) continue
+          const p = await tonMessen(quelle, a.art, a.ton.gesprochen ?? a.ton.text)
+          merkeMessung(a.ton.datei, p)
+          if (admin) await window.api.medien.tonPruefung(sp, a.wort, a.art, a.lage, a.satz, a.ton.datei, p).catch(() => false)
+        } catch {
+          // Nicht messbar (Datei fehlt): beim nächsten Öffnen erneut
+        } finally {
+          inArbeit.delete(a.ton.datei)
+        }
+        await new Promise((ok) => setTimeout(ok, 60))
+      }
+    })()
+    return () => {
+      weg = true
+    }
+  }, [sprache, daten, admin])
 }
 
 /** Pop-up eines Beispielbilds: groß ansehen; Admins: löschen, anderes wählen, neu suchen, KI erzeugen */
@@ -295,7 +593,8 @@ export function BildDialog({
             </Text>
             {fremd && (
               <Text size="xs" c="orange.8" ta="center" data-bild-fremde-stufe>
-                Bild der Stufe {BILDSTUFE_NAME[sicht!.bildStufe!]} – für {BILDSTUFE_NAME[stufe]} gibt es noch kein eigenes. Lernende dieser Stufe sehen bis dahin dieses.
+                Bild der Stufe {BILDSTUFE_NAME[sicht!.bildStufe!]} – für {BILDSTUFE_NAME[stufe]} gibt es noch kein eigenes. Lernende dieser Stufe sehen bis
+                dahin dieses.
               </Text>
             )}
           </Stack>
@@ -424,13 +723,16 @@ export function MedienLeiste({
   daten,
   ziel,
   mehr,
-  bereit = true
+  bereit = true,
+  figuren
 }: {
   sprache: string
   vokabeln: Vokabel[]
   daten: Record<string, MedienSicht>
   ziel: MedienZiel
   mehr?: React.ReactNode
+  /** Figuren des Lehrwerks für angepasste Beispielsätze (12.10.2026, shared/satzFassung.ts) */
+  figuren?: string[]
   /** Medienbank-Daten für diese Wörter geladen? Vorher Knöpfe gesperrt ohne Zahl (09.10.2026) */
   bereit?: boolean
 }): React.JSX.Element {
@@ -446,7 +748,30 @@ export function MedienLeiste({
   const ohneTon = offeneVokabeln('aussprache', woerter, daten, lagen.length ? lagen : ['w'], stufe, sp)
   const ohneSatz = offeneVokabeln('satz', woerter, daten, lagen.length ? lagen : ['w'], stufe, sp)
   const ohneStimme = stimmen !== null && !lagen.length
-  const start = (art: MedienArt, liste: Vokabel[]): void => void starteMedienAuftrag({ art, sprache: sp, vokabeln: liste, ziel })
+  const start = (art: MedienArt, liste: Vokabel[]): void =>
+    void starteMedienAuftrag({ art, sprache: sp, vokabeln: liste, ziel, ...(figuren ? { figuren } : {}) })
+  /*
+   * „vielleicht undeutlich (N)" (12.10.2026): Aufnahmen mit Verdacht aus der Messung – als Filter der Tabelle und zum
+   * Neu-Erzeugen (je Art und Stimme ein Auftrag; die bisherige Aufnahme bleibt als Rückfall).
+   */
+  useMessungen()
+  const verdacht = verdaechtige(woerter, daten, lagen.length ? lagen : ['w'])
+  const verdachtZahl = new Set(verdacht.flatMap((x) => x.vokabeln.map((v) => v.term))).size
+  const nurVerdacht = useNurVerdacht(ziel.docId)
+  const setzeFilter = useVerdachtFilter((x) => x.setze)
+  const neuLaeuft = laufend.has(medienSchluessel('aussprache')) || laufend.has(medienSchluessel('satz'))
+  const verdachtNeu = (): void => {
+    for (const x of verdacht)
+      void starteMedienAuftrag({
+        art: x.art,
+        sprache: sp,
+        vokabeln: x.vokabeln,
+        ziel,
+        lagen: [x.lage],
+        einzeln: true,
+        neu: { grund: 'Messung: vielleicht undeutlich' }
+      })
+  }
   const knopf = (art: MedienArt, label: string, liste: Vokabel[], icon: React.ReactNode, kennung: string, braucheStimme = false): React.JSX.Element => {
     const laeuft = laufend.has(medienSchluessel(art))
     return (
@@ -475,6 +800,40 @@ export function MedienLeiste({
           {bildKi && knopf('bildKi', 'Beispielbild von KI generieren lassen', ohneBild, <IconSparkles size={14} />, 'data-medien-bild-ki')}
           {knopf('aussprache', 'Aussprache erzeugen', ohneTon, <IconVolume size={14} />, 'data-medien-aussprache', true)}
           {knopf('satz', 'Satz-Aussprache erzeugen', ohneSatz, <IconMessage2 size={14} />, 'data-medien-satz', true)}
+          {(verdachtZahl > 0 || nurVerdacht) && (
+            <Button.Group>
+              <Tooltip
+                label={nurVerdacht ? 'Wieder alle Wörter zeigen' : 'Nur Wörter zeigen, deren Aufnahme laut Messung vielleicht undeutlich ist'}
+                multiline
+                maw={300}
+              >
+                <Button
+                  size="xs"
+                  color="orange"
+                  variant={nurVerdacht ? 'filled' : 'light'}
+                  leftSection={<IconAlertTriangle size={14} />}
+                  onClick={() => setzeFilter(ziel.docId, !nurVerdacht)}
+                  data-medien-verdacht-filter
+                >
+                  vielleicht undeutlich ({verdachtZahl})
+                </Button>
+              </Tooltip>
+              <Tooltip label="Diese Aufnahmen neu erzeugen – die bisherigen bleiben als Rückfall gespeichert" multiline maw={300}>
+                <Button
+                  size="xs"
+                  color="orange"
+                  variant="light"
+                  leftSection={<IconRefresh size={14} />}
+                  loading={neuLaeuft}
+                  disabled={!verdachtZahl || neuLaeuft || ohneStimme}
+                  onClick={verdachtNeu}
+                  data-medien-verdacht-neu
+                >
+                  neu erzeugen
+                </Button>
+              </Tooltip>
+            </Button.Group>
+          )}
           {mehr}
         </Group>
         <Group gap="xs" wrap="wrap">

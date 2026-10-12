@@ -1,4 +1,5 @@
 import { ApiError, GoogleGenAI, Part } from '@google/genai'
+import { BILD_BLOCKIERT } from '@shared/bildBlockiert'
 import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel, splitDataUrl } from './provider'
@@ -76,7 +77,7 @@ export class GoogleProvider implements AiProvider {
       if (model.startsWith('imagen')) {
         const res = await this.client.models.generateImages({ model, prompt, config: { numberOfImages: 1, abortSignal: signal } })
         const img = res.generatedImages?.[0]?.image
-        if (!img?.imageBytes) throw new Error('Kein Bild erhalten (evtl. vom Sicherheitsfilter blockiert).')
+        if (!img?.imageBytes) throw new Error(`${BILD_BLOCKIERT}: Kein Bild erhalten (vermutlich vom Sicherheitsfilter blockiert).`)
         return `data:${img.mimeType ?? 'image/png'};base64,${img.imageBytes}`
       }
       // Gemini-Bildmodelle liefern das Bild als Teil einer normalen Antwort

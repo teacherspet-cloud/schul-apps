@@ -139,3 +139,35 @@ describe('Problemwörter: eine Definition, eine Zahl', () => {
     expect(problemWoerterText(5, 5)).toBe('5 Problemwörter')
   })
 })
+
+/*
+ * Empfindlichkeit (12.10.2026, abgestimmt mit der Lehrkraft): Standard = ≥ 2 Kinder (bzw. 20 % der Übenden) aktuell
+ * unsicher UND Kursquote ≥ 30 % bei ≥ 6 Abfragen; Stufe 5 ≈ frühere Regel (ein Kind genügt).
+ */
+describe('Problemwörter je Empfindlichkeit', () => {
+  const w = [{ id: 'w1', term: 'cat', translation: 'Katze' }]
+  const wackelnd = stand({ fach: 1, versuche: 3, falsch: 2, zuletzt: jetzt - TAG })
+  const sicher = stand({ fach: 4, versuche: 3, falsch: 0, zuletzt: jetzt - TAG })
+  it('ein einzelnes wackelndes Kind reicht nur auf der lockersten Stufe', async () => {
+    const { problemWoerterJeStufe } = await import('../src/shared/problemWoerter')
+    const staende = [{ w1: wackelnd }, ...Array.from({ length: 9 }, () => ({ w1: sicher }))]
+    const je = problemWoerterJeStufe(w, staende, {}, jetzt)
+    expect(je[5]).toHaveLength(1)
+    expect(je[3]).toHaveLength(0)
+    expect(problemWoerter(w, staende, {}, jetzt)).toHaveLength(0)
+  })
+  it('zwei wackelnde Kinder mit hoher Quote zählen im Standard', async () => {
+    const { problemWoerterJeStufe } = await import('../src/shared/problemWoerter')
+    const staende = [{ w1: wackelnd }, { w1: wackelnd }, { w1: sicher }]
+    const je = problemWoerterJeStufe(w, staende, {}, jetzt)
+    expect(je[3]).toHaveLength(1)
+    // strengste Stufe verlangt 4 Kinder bzw. 35 % (hier 2 von 3 übenden = genug Anteil) und Quote ≥ 45 %
+    expect(je[1].length).toBeLessThanOrEqual(je[3].length)
+  })
+  it('die Stufen sind geschachtelt', async () => {
+    const { problemWoerterJeStufe, PROBLEM_STUFEN } = await import('../src/shared/problemWoerter')
+    const staende = [{ w1: wackelnd }, { w1: wackelnd }, { w1: wackelnd }, { w1: sicher }]
+    const je = problemWoerterJeStufe(w, staende, {}, jetzt)
+    for (let i = 1; i < PROBLEM_STUFEN.length; i++) expect(je[PROBLEM_STUFEN[i]].length).toBeGreaterThanOrEqual(je[PROBLEM_STUFEN[i - 1]].length)
+  })
+})

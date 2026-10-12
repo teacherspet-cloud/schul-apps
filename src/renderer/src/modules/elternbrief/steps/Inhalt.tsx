@@ -110,7 +110,8 @@ export default function Inhalt(): React.JSX.Element | null {
                 />
                 <TextInput
                   label="Unterschrift"
-                  description="Vorgabe aus Einstellungen › Schule"
+                  // 12.10.2026: Amtsbezeichnungen („StR'") fallen unter dem Gruß weg, das Bild der Unterschrift steht darüber
+                  description="Vorgabe aus Einstellungen › Schule. Amtsbezeichnungen (z. B. StR') stehen nur im Briefkopf, nicht unter dem Gruß; eine hinterlegte Unterschrift erscheint über dem Namen."
                   placeholder="Name der Lehrkraft"
                   value={m.absender}
                   onChange={(e) => {

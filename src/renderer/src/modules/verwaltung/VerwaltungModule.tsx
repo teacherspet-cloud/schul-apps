@@ -47,6 +47,7 @@ import { KlassenlisteKarte } from './Klassenliste'
 import { KiZugaenge } from './KiZugaenge'
 import { SchuleEinrichten } from './SchuleEinrichten'
 import { SchulFachfarben } from './SchulFachfarben'
+import { SchulFachobleute } from './SchulFachobleute'
 import { serverIch } from '../../shared/plattform'
 import { ServerReiter } from './ServerReiter'
 import MaskottchenSettings from '../../shell/MaskottchenSettings'
@@ -139,6 +140,8 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
                 <SchuleEinrichten />
                 {/* Fachfarben gelten für die ganze Schule (09.10.2026, SchulFachfarben.tsx) */}
                 <SchulFachfarben />
+                {/* Fachobleute je Fach (12.10.2026, SchulFachobleute.tsx): pflegen gemeinsame Lehrwerke ihres Fachs */}
+                <SchulFachobleute />
               </Stack>
             </Tabs.Panel>
             <Tabs.Panel value="ki">

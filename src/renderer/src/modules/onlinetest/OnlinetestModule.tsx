@@ -695,10 +695,7 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
           >
             Drucken
           </Menu.Item>
-          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>
-            PDF
-          </Menu.Item>
-          {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
+          {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026); seit 12.10.2026 vor „PDF" */}
           <Menu.Item
             onClick={() =>
               void pdfVorschauAusHtml(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`, () => window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`))
@@ -706,6 +703,9 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
             data-pdf-vorschau-knopf
           >
             PDF-Vorschau
+          </Menu.Item>
+          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>
+            PDF
           </Menu.Item>
           <Menu.Item onClick={() => void speichern('xlsx', 'Excel', ergebnisXlsx(daten, format))}>Excel (.xlsx)</Menu.Item>
           <Menu.Item onClick={() => void ergebnisDocx(daten, format).then((b) => speichern('docx', 'Word', b))}>Word (.docx)</Menu.Item>

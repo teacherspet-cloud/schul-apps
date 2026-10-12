@@ -14,7 +14,7 @@
  * fehlende Angaben bleiben leer.
  */
 
-import { grammatikText, LEHRWERK_GRAMMATIK, QUELLE_NDS } from './lehrwerkGrammatik'
+import { beiGrammatikAenderung, grammatikText, istUeberlagert, LEHRWERK_GRAMMATIK, QUELLE_NDS } from './lehrwerkGrammatik'
 import { LEHRWERKE_LATEIN } from './lehrwerkeLatein'
 
 export interface KapitelThema {
@@ -242,15 +242,31 @@ Object.assign(LEHRWERK_THEMEN, LEHRWERKE_LATEIN)
  * Grammatik nach der Liste der Lehrkraft (Niedersachsen, je Station – lehrwerkGrammatik.ts, 07.10.2026) ersetzt die
  * Angabe aus den Klett-Planungsmustern; Kapitel, die nur dort vorkommen (Trailer), kommen ans Ende des Bandes.
  */
-for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK)) {
-  const band = LEHRWERK_THEMEN[buch]
-  if (!band) continue
-  band.quelle = `${band.quelle}; Grammatik: ${QUELLE_NDS}`
-  for (const k of Object.keys(kapitel)) {
-    band.kapitel[k] ??= { titel: k }
-    band.kapitel[k].grammatik = grammatikText(buch, k)
+// Seit 12.10.2026 wiederholbar: Bearbeitungen aus der App „Grammatikformen" überlagern die Liste (wendeGrammatikAn) –
+// vorher wird der Stand aus den Planungsmustern wiederhergestellt, damit entfernte Grammatik nicht stehen bleibt.
+const URSPRUNG_QUELLE = new Map<string, string>()
+const URSPRUNG_GRAMMATIK = new Map<string, { buch: string; kapitel: string; grammatik: string | undefined }>()
+function uebertrageGrammatik(): void {
+  for (const u of URSPRUNG_GRAMMATIK.values()) {
+    const k = LEHRWERK_THEMEN[u.buch]?.kapitel[u.kapitel]
+    if (k) k.grammatik = u.grammatik
+  }
+  for (const [buch, quelle] of URSPRUNG_QUELLE) if (LEHRWERK_THEMEN[buch]) LEHRWERK_THEMEN[buch].quelle = quelle
+  for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK)) {
+    const band = LEHRWERK_THEMEN[buch]
+    if (!band) continue
+    if (!URSPRUNG_QUELLE.has(buch)) URSPRUNG_QUELLE.set(buch, band.quelle)
+    band.quelle = `${URSPRUNG_QUELLE.get(buch)}; Grammatik: ${istUeberlagert(buch) ? 'Grammatikformen der Schule (App „Grammatikformen")' : QUELLE_NDS}`
+    for (const k of Object.keys(kapitel)) {
+      const schluessel = `${buch}|${k}`
+      if (!URSPRUNG_GRAMMATIK.has(schluessel)) URSPRUNG_GRAMMATIK.set(schluessel, { buch, kapitel: k, grammatik: band.kapitel[k]?.grammatik })
+      band.kapitel[k] ??= { titel: k }
+      band.kapitel[k].grammatik = grammatikText(buch, k)
+    }
   }
 }
+uebertrageGrammatik()
+beiGrammatikAenderung(uebertrageGrammatik)
 
 /** Themen eines Kapitels, falls hinterlegt */
 export function kapitelThema(buch: string, kapitel: string): KapitelThema | undefined {

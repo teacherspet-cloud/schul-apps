@@ -53,7 +53,9 @@ import { alsKarten, grammatikSpielPasst } from '@shared/grammatiktrainer'
 import { einzelBeschreibung, spielName } from '@shared/spielSprache'
 import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
 import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from './spiele/SpieleGrammatik'
-import { sitzungsWoerter, STUFEN, tagVon, uebersicht, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { STUFEN, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { grammatikHeute } from '@shared/grammatikVorrang'
+import { formSicher } from '@shared/grammatikSicher'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
@@ -110,6 +112,9 @@ interface Daten {
   /** Angaben der Freigabe (Katalog-Kennungen → Bereiche) und Freigabedatum („Gerade dran"), 08.10.2026 */
   info?: { themen?: string[]; teilformen?: string[] }
   erstellt?: string
+  /** Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag (vor einem Test mehr) und Teststoff */
+  neuJeTag?: number
+  test?: boolean
 }
 interface Ergebnis {
   urteil: Urteil
@@ -184,23 +189,17 @@ function Kasten({
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const karten = useMemo(() => alsKarten(d.paket.aufgaben) as Vokabel[], [d.paket.aufgaben])
-  const u = uebersicht(karten, d.staende)
   /*
    * Heute dran (08.10.2026): fällige Wiederholungen, dann unbearbeitete Übungen in der Reihenfolge der Regeln (bei
-   * Förderaufgaben nach Stufen) – je Tag höchstens 10 neue.
+   * Förderaufgaben nach Stufen) – je Tag höchstens 10 neue. Seit 12.10.2026 (Übungsvorrang, shared/grammatikVorrang.ts):
+   * zuletzt freigegebene Aufgaben zuerst, vor einem angekündigten Test mehr neue je Tag (Zahl vom Server).
    */
   const heute = useMemo(() => {
-    const faellig = sitzungsWoerter(karten, d.staende, Date.now(), 0)
-    const heuteTag = tagVon(Date.now())
-    const schonNeu = d.paket.aufgaben.filter((a) => d.staende[a.id]?.erstmals && tagVon(d.staende[a.id].erstmals!) === heuteTag).length
-    const regelIndex = new Map(d.paket.regeln.map((r, i) => [r.id, i]))
-    const neue = d.paket.aufgaben
-      .filter((a) => !d.staende[a.id]?.versuche)
-      .sort((a, b) => (a.stufe ?? 0) - (b.stufe ?? 0) || (regelIndex.get(a.regelId) ?? 0) - (regelIndex.get(b.regelId) ?? 0))
-      .slice(0, Math.max(0, 10 - schonNeu))
     const nachId = new Map(karten.map((k) => [k.id, k]))
-    return [...faellig, ...neue.map((a) => nachId.get(a.id)!)].filter(Boolean)
-  }, [karten, d.staende, d.paket])
+    return grammatikHeute(d.paket, d.staende, { erstellt: Date.parse(d.erstellt ?? '') || 0, neuJeTag: d.neuJeTag, test: d.test })
+      .map((id) => nachId.get(id)!)
+      .filter(Boolean)
+  }, [karten, d.staende, d.paket, d.erstellt, d.neuJeTag, d.test])
   const [offeneRegel, setOffeneRegel] = useState<string | null>(null)
   const [offeneBereiche, bereichKlappen] = useOffeneBereiche(d.id)
   const [suche, setSuche] = useState('')
@@ -307,15 +306,18 @@ function Kasten({
   // ---------------------------------------------------------------- Ansicht nach Regeln (08.10.2026, abgestimmt)
   const jetzt = Date.now()
   const bearbeitet = d.paket.aufgaben.filter((a) => d.staende[a.id]?.versuche).length
+  const regelnMitUebungen = d.paket.regeln.filter((r) => d.paket.aufgaben.some((a) => a.regelId === r.id)).length
+  const regelnSicher = d.paket.regeln.filter((r) => formSicher(d.paket.aufgaben.filter((a) => a.regelId === r.id), d.staende)).length
   const erklaerungen: Record<string, string> = {
     bearbeitet: 'So viele Übungen hast du schon mindestens einmal gemacht. Unbearbeitete kommen bei „Weiter üben" zuerst nach den fälligen dran.',
+    // „Sicher" je Regel nach dem ersten Versuch (12.10.2026, Entscheidung der Lehrkraft – shared/grammatikSicher.ts)
     sicher:
-      'Eine Übung ist sicher, wenn du sie zweimal selbst richtig gelöst hast – mit mindestens einer Woche Abstand dazwischen. Das klappt erst nach gut einer Woche.',
+      'Eine Regel ist sicher, wenn du mindestens 80 % ihrer verschiedenen Übungen (mindestens 5, bei weniger alle) gleich beim ersten Versuch richtig gelöst hast – bei Übungen, in denen du selbst Formen bildest, auch davon 80 %. Ein späterer Fehler (Wiederholung oder Spiel) stuft sie zurück, bis du die Übung wieder richtig löst.',
     'heute dran': 'Wiederholungen, die heute fällig sind, und die nächsten neuen Übungen. Danach sind die Spiele frei.'
   }
   const werte = [
     { name: 'bearbeitet', wert: `${bearbeitet} / ${d.paket.aufgaben.length}`, farbe: farbe.a, symbol: <IconStairsUp size={20} /> },
-    { name: 'sicher', wert: String(u.sicher), farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
+    { name: 'sicher', wert: `${regelnSicher} / ${regelnMitUebungen}`, farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
     { name: 'heute dran', wert: String(heute.length), farbe: '#f59e0b', symbol: <IconFlame size={20} /> }
   ]
   /** Übungen einer Regel: unbearbeitete, dann fällige, dann wackelige (Fach 1–2), höchstens 10 */
@@ -353,9 +355,11 @@ function Kasten({
   const regelInfos = d.paket.regeln.flatMap((r, i) => {
     const l = d.paket.aufgaben.filter((a) => a.regelId === r.id)
     if (!l.length) return []
-    const ru = uebersicht(alsKarten(l) as Vokabel[], d.staende)
     const fertig = l.filter((a) => d.staende[a.id]?.versuche).length
-    return [{ r, i, l, ru, fertig, sicher: ru.sicher >= l.length, dran: neuFreigegeben || fertig < l.length, bereich: bereichVonRegel(r.titel, kennungen) }]
+    // Regel sicher nach dem ersten Versuch (12.10.2026, shared/grammatikSicher.ts) – dann zählen alle bearbeiteten als sicher
+    const sicher = formSicher(l, d.staende)
+    const ru = { sicher: sicher ? fertig : 0 }
+    return [{ r, i, l, ru, fertig, sicher, dran: neuFreigegeben || fertig < l.length, bereich: bereichVonRegel(r.titel, kennungen) }]
   })
   type RegelInfo = (typeof regelInfos)[number]
   const geradeDran = regelInfos.filter((x) => x.dran)

@@ -15,7 +15,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche, blattoptionen } from './warten.mjs'
+import { warteAufOberflaeche, blattoptionen, kartenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/fachfarben')
 mkdirSync(out, { recursive: true })
@@ -150,6 +150,8 @@ try {
   await page.waitForTimeout(2500) // Autosave
   await page.click('[aria-label="Startseite"]')
   await page.waitForTimeout(1200)
+  // Kasten „Zuletzt bearbeitet" ist seit 12.10.2026 zunächst zugeklappt
+  await kartenAuf(page, 'start-zuletzt')
   const punkte = await page.$$eval('.home-material .fach-punkt', (els) => els.map((e) => e.getAttribute('data-farbe')))
   console.log(`  Farbpunkte auf der Startseite: ${punkte.join(', ')}`)
   pruefe(punkte.includes(MAGENTA), '„Zuletzt bearbeitet" zeigt den Farbpunkt des Arbeitsblatt-Fachs')

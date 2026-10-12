@@ -18,6 +18,7 @@ import { AiProvider, ChunkListener, Netzfund, RawModel, splitDataUrl } from './p
 import { generateSvgImage } from './svg'
 import { textSammler } from './textstrom'
 import { AbbruchFehler } from '@shared/abbruch'
+import { BILD_BLOCKIERT, klingtNachAblehnung } from '@shared/bildBlockiert'
 
 // ---------- Programm finden ----------
 
@@ -393,7 +394,6 @@ export class CodexCliProvider implements AiProvider {
       } finally {
         if (dir) rmSync(dir, { recursive: true, force: true })
       }
-      if (res.code !== 0) throw new Error(describeCodexError(res))
       const said = res.stdout
         .split(/\r?\n/)
         .map((line) => {
@@ -406,9 +406,14 @@ export class CodexCliProvider implements AiProvider {
         })
         .filter(Boolean)
         .pop()
-      throw new Error(
-        `Codex hat kein Bild erzeugt${said ? ` (Antwort: „${said}")` : ''}. Möglicherweise ist die Bildgenerierung im Abo gerade nicht verfügbar oder das Kontingent erschöpft.`
-      )
+      /*
+       * Abgelehnt statt ausgelastet (12.10.2026): Lehnt das Sicherheitssystem das Motiv ab, steht das in der Antwort
+       * („… vom Sicherheitssystem blockiert"). Früher hieß es hier pauschal „… oder das Kontingent erschöpft" – das galt
+       * als Begrenzung, und der Auftrag wartete halbstündlich auf dasselbe abgelehnte Motiv.
+       */
+      if (said && klingtNachAblehnung(said)) throw new Error(`${BILD_BLOCKIERT}: „${said}"`)
+      if (res.code !== 0) throw new Error(describeCodexError(res))
+      throw new Error(`Codex hat kein Bild erzeugt${said ? ` (Antwort: „${said}")` : ''}. Möglicherweise ist die Bildgenerierung im Abo gerade nicht verfügbar.`)
     })
   }
 
@@ -627,12 +632,24 @@ function resetTime(text: string): string | null {
   return `${String(hour).padStart(2, '0')}:${m[2]} Uhr`
 }
 
+/**
+ * Nur die Fehlerteile der Ausgabe (12.10.2026): Mit --json enthält stdout den ganzen Ereignisstrom samt Token-Zählern
+ * und Kennungen – ein „429" darin (z. B. "input_tokens":14290) machte früher aus jedem Fehler „Nutzungsgrenze erreicht".
+ */
+export function fehlerText(res: Pick<RunResult, 'stdout' | 'stderr'>): string {
+  const ereignisse = res.stdout
+    .split(/\r?\n/)
+    .filter((z) => (z.trim().startsWith('{') ? /"type"\s*:\s*"[^"]*(error|fail)/i.test(z) : z.trim().length > 0))
+    .join('\n')
+  return `${res.stderr}\n${ereignisse}`
+}
+
 function describeCodexError(res: RunResult): string {
-  const all = `${res.stderr}\n${res.stdout}`
-  if (/401|Unauthorized|not logged in|login/i.test(all)) {
+  const all = fehlerText(res)
+  if (/\b401\b|Unauthorized|not logged in|login/i.test(all)) {
     return 'Codex ist nicht mit einem ChatGPT-Konto angemeldet. Bitte in den Einstellungen unter „Künstliche Intelligenz" auf „Mit ChatGPT anmelden" klicken.'
   }
-  if (/usage limit|rate limit|429|quota/i.test(all)) {
+  if (/usage limit|rate limit|\b429\b|quota/i.test(all)) {
     const at = resetTime(all)
     return `Die Nutzungsgrenze des ChatGPT-Abos ist erreicht${at ? ` – wieder verfügbar ab ${at}` : ''}. Die Grenze gilt für alle Modelle gemeinsam (je 5 Stunden bzw. je Woche); kleinere Modelle und der Sparmodus verbrauchen deutlich weniger.`
   }

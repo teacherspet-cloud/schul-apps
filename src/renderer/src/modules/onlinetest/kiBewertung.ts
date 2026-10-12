@@ -15,6 +15,40 @@
  * dafür keine Punkte (Urteil „kleinerFehler" bzw. „vertretbar").
  */
 import type { StructuredRequest } from '@shared/types'
+import {
+  befundZeilen,
+  geschichteFeedbackRegeln,
+  geschichtsStufe,
+  istGeschichte,
+  schreibformenIn,
+  vorpruefen,
+  type Schreibform
+} from '@shared/operatoren/geschichteSchreibformen'
+
+/**
+ * Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft einmal je Anfrage, Befund der
+ * Vorprüfung je Fall. Die Stufe kommt aus dem Niveau, wenn dort ein Jahrgang steht – sonst Kl. 9/10 (Faustregel).
+ */
+function geschichteTeile(niveau: string, faelle: KiFall[], andere?: { art: string; fach: string }): { regeln: string; befund: Map<string, string> } {
+  const befund = new Map<string, string>()
+  if (!andere || !istGeschichte(andere.fach)) return { regeln: '', befund }
+  const jg = Number(/\b(\d{1,2})\b/.exec(niveau ?? '')?.[1])
+  const stufe = geschichtsStufe(jg >= 5 && jg <= 13 ? jg : undefined)
+  const formen = new Set<Schreibform>()
+  for (const f of faelle) {
+    const fs = f.wortloesung ? [] : schreibformenIn(f.frage)
+    fs.forEach((x) => formen.add(x))
+    if (fs.length === 1 && f.antwort.trim()) befund.set(f.id, befundZeilen(vorpruefen(fs[0], f.antwort, stufe)).join('\n'))
+  }
+  if (!formen.size) return { regeln: '', befund }
+  return {
+    regeln: [
+      ...[...formen].map((x) => geschichteFeedbackRegeln(x, { stufe, anrede: 'du' })),
+      'Im Onlinetest: Liegt ein Verstoß gegen den Operator vor (laut Vorgaben bzw. Befund), ist die Antwort NICHT „richtig" – höchstens „vertretbar" (die Lehrkraft entscheidet); nenne den Verstoß in der Begründung.'
+    ].join('\n'),
+    befund
+  }
+}
 
 export interface KiFall {
   /** Kennung für die KI (A1 …) – wird auf Teilnahme und Feld zurückgeführt */
@@ -61,6 +95,7 @@ export interface KiUrteil {
  * trifft (Fachbegriffe, Zusammenhänge), nicht die Wortgenauigkeit eines Vokabeltests.
  */
 export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[], andere?: { art: string; fach: string }): StructuredRequest {
+  const g = geschichteTeile(niveau, faelle, andere)
   return {
     schemaName: 'onlinetest_bewertung',
     system: [
@@ -79,12 +114,16 @@ export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[],
       '- "falsch": passt nicht, falsches Wort, sinnlos oder leer.',
       'Fälle mit „Wortlösung": Die Lösung ist vorgegeben und die Antwort wurde bereits als abweichend erkannt. Prüfe nur, ob die Abweichung ein kleiner Fehler ist oder die Antwort im Zusammenhang trotzdem sinnvoll wäre – sonst "falsch". Nie "richtig".',
       'begruendung: ein kurzer Satz auf Deutsch für die Lehrkraft, warum (bei falsch: was fehlt oder falsch ist; bei kleinerFehler: welcher Fehler).',
-      'fehlerGruppe und fehlerArt (für die Lehrkraft, die ähnliche Fehler gebündelt entscheidet): bei "kleinerFehler" und "vertretbar" die Art der Abweichung – fehlerGruppe aus der Liste (rechtschreibung, grossklein, endung, grammatik, artikel, praeposition, wortwahl, inhalt, andere), fehlerArt als 1–4 Wörter auf Deutsch, die das Phänomen benennen, NICHT das einzelne Wort (z. B. „Doppelkonsonant", „ie/ei vertauscht", „3. Person -s fehlt", „Plural-Endung", „unbestimmter Artikel", „Synonym"). Gleiche Phänomene immer GLEICH benennen. Bei "richtig" und "falsch": fehlerGruppe "andere", fehlerArt leer.'
-    ].join('\n'),
+      'fehlerGruppe und fehlerArt (für die Lehrkraft, die ähnliche Fehler gebündelt entscheidet): bei "kleinerFehler" und "vertretbar" die Art der Abweichung – fehlerGruppe aus der Liste (rechtschreibung, grossklein, endung, grammatik, artikel, praeposition, wortwahl, inhalt, andere), fehlerArt als 1–4 Wörter auf Deutsch, die das Phänomen benennen, NICHT das einzelne Wort (z. B. „Doppelkonsonant", „ie/ei vertauscht", „3. Person -s fehlt", „Plural-Endung", „unbestimmter Artikel", „Synonym"). Gleiche Phänomene immer GLEICH benennen. Bei "richtig" und "falsch": fehlerGruppe "andere", fehlerArt leer.',
+      g.regeln
+    ]
+      .filter(Boolean)
+      .join('\n'),
     user: faelle
       .map(
         (f) =>
-          `${f.id}${f.wortloesung ? ' (Wortlösung)' : ''}\nAufgabe: ${f.frage}\n${f.wortloesung ? 'Lösung' : 'Erwartung (Beispiel)'}: ${f.erwartung || '–'}\nAntwort: ${f.antwort.trim() || '(leer)'}`
+          `${f.id}${f.wortloesung ? ' (Wortlösung)' : ''}\nAufgabe: ${f.frage}\n${f.wortloesung ? 'Lösung' : 'Erwartung (Beispiel)'}: ${f.erwartung || '–'}\nAntwort: ${f.antwort.trim() || '(leer)'}` +
+          (g.befund.has(f.id) ? `\nBefund der App (gezählt):\n${g.befund.get(f.id)}` : '')
       )
       .join('\n\n'),
     schema: {

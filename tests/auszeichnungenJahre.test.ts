@@ -63,7 +63,7 @@ const grundlage = (g: Partial<JahresGrundlage> = {}): JahresGrundlage => ({ jahr
 const eingabe = (e: Partial<SprachEingabe> = {}): SprachEingabe => ({
   sprache: 'en',
   jahrgang: 7,
-  woerterAb2: 0,
+  woerterErkannt: 0,
   woerterSicher: 0,
   regelnGeuebt: 0,
   regelnSicher: 0,
@@ -125,11 +125,15 @@ describe('Umfang eines Bands', () => {
 })
 
 describe('Schwellen eines Schuljahres', () => {
-  it('Wortschatz aus den Wörtern des Bands (Höchstpunkte 2 × Wörter), gut lesbar gerundet', () => {
+  it('Wortschatz aus den Wörtern des Bands (Höchstpunkte 4 × Wörter, gestuft seit 12.10.2026), gut lesbar gerundet', () => {
     const s = jahresSchwellen(grundlage({ woerter: 1198, units: 11, grammatik: 20 }))
-    expect(s.wortschatz).toEqual([48, 240, 600, 1080, 1680, 2160])
-    // Grammatik: Höchstpunkte 3 × Themen (geübt 1 + sicher 2)
-    expect(s.grammatik).toEqual([2, 6, 15, 27, 42, 55])
+    expect(s.wortschatz).toEqual([48, 240, 1440, 2640, 3590, 4310])
+    // Gold > 1 × Wörter (nur Erkennen reicht nicht), Platin > 2 × Wörter (ohne sichere Wörter nicht erreichbar)
+    expect(s.wortschatz[2]).toBeGreaterThan(1198)
+    expect(s.wortschatz[3]).toBeGreaterThan(2 * 1198)
+    // Grammatik: Höchstpunkte 3 × Themen (geübt 1 + sicher 2); Gold > 1 × Themen
+    expect(s.grammatik).toEqual([2, 6, 24, 36, 45, 55])
+    expect(s.grammatik[2]).toBeGreaterThan(20)
     // Etappen: Bronze 1, Meister = jedes Kapitel zu 80 % sicher (3 je Kapitel)
     expect(s.lehrwerk).toEqual([1, 5, 12, 18, 25, 33])
   })
@@ -144,8 +148,12 @@ describe('Schwellen eines Schuljahres', () => {
   })
   it('kleiner Band: Mindestwerte und streng steigend', () => {
     const s = jahresSchwellen(grundlage({ woerter: 30, grammatik: 1, units: 1 }))
-    expect(s.wortschatz[0]).toBe(5)
+    // Mindestumfang (12.10.2026): wie 150 Wörter, 5 Formen, 3 Kapitel – kein Gold nach wenigen Minuten
+    expect(s).toEqual(jahresSchwellen(grundlage({ woerter: 150, grammatik: 5, units: 3 })))
+    expect(s.wortschatz[0]).toBe(6)
+    expect(s.wortschatz[2]).toBe(180)
     expect(s.grammatik[0]).toBe(2)
+    expect(s.lehrwerk).toEqual([1, 2, 3, 5, 7, 9])
     for (const k of Object.values(s)) {
       expect(k).toHaveLength(6)
       for (let i = 1; i < 6; i++) expect(k[i]).toBeGreaterThan(k[i - 1])
@@ -153,17 +161,17 @@ describe('Schwellen eines Schuljahres', () => {
   })
   it('ohne bekannten Umfang: ein typischer Band (900 Wörter, 15 Grammatikthemen, 9 Kapitel), für jeden Jahrgang gleich', () => {
     const s = jahresSchwellen(grundlage({ jahrgang: 5 }))
-    expect(s.wortschatz).toEqual([36, 180, 450, 810, 1260, 1620])
-    expect(s.grammatik).toEqual([2, 5, 11, 20, 31, 41])
+    expect(s.wortschatz).toEqual([36, 180, 1080, 1980, 2700, 3240])
+    expect(s.grammatik).toEqual([2, 5, 18, 27, 34, 41])
     expect(s.lehrwerk).toEqual([1, 4, 9, 15, 20, 27])
     expect(jahresSchwellen(grundlage({ jahrgang: 11 }))).toEqual(s)
     // Latein: Grammatik aus den Lektionen des Lernjahres, Wörter und Kapitel typisch
     const la = jahresSchwellen(grundlage({ jahrgang: 6, grammatik: grammatikLatein('Pontes', 1)!.grammatik }))
-    expect(la.grammatik).toEqual([2, 12, 31, 55, 85, 110])
+    expect(la.grammatik).toEqual([2, 12, 49, 75, 90, 110])
     expect(la.wortschatz).toEqual(s.wortschatz)
   })
   it('nächste Stufe in Worten', () => {
-    expect(naechsteStufeText('wortschatz', 1300)).toBe('bei 1.300 Punkten (etwa 650 sichere Wörter)')
+    expect(naechsteStufeText('wortschatz', 1300)).toBe('bei 1.300 Punkten (etwa 325 sichere Wörter)')
     expect(naechsteStufeText('dranbleiben', 38)).toBe('bei 38 Übungstagen')
     expect(naechsteStufeText('lehrwerk', 1)).toBe('bei 1 Etappe')
   })
@@ -217,7 +225,7 @@ describe('Jahresreihen fortschreiben', () => {
   })
   it('Werte sinken (Kurs entfernt) oder Schwellen ändern sich – Erreichtes bleibt', () => {
     const st: AuszStand = { medaillen: {}, titel: {}, jahre: {} }
-    fortschreiben(st, [{ ...eingabe({ woerterAb2: 30, woerterSicher: 20 }), jahr: kontext(2026, { woerter: 1000 }) }], 100)
+    fortschreiben(st, [{ ...eingabe({ woerterErkannt: 30, woerterSicher: 20 }), jahr: kontext(2026, { woerter: 1000 }) }], 100)
     // 50 Punkte, Band 1000 Wörter: Bronze ab 40
     expect(st.jahre!.en['2026'].schwellen!.wortschatz![0]).toBe(40)
     expect(st.jahre!.en['2026'].medaillen.wortschatz!.stufe).toBe(1)
@@ -234,7 +242,7 @@ describe('Jahresreihen fortschreiben', () => {
     const st: AuszStand = { medaillen: {}, titel: {}, jahre: {} }
     const band = { id: 'apuntate-2024-2', name: '¡Apúntate! 2' }
     fortschreiben(st, [{ ...eingabe(), jahr: kontext(2026, { band }) }], 100)
-    expect(st.jahre!.en['2026'].schwellen!.wortschatz!).toEqual([36, 180, 450, 810, 1260, 1620])
+    expect(st.jahre!.en['2026'].schwellen!.wortschatz!).toEqual([36, 180, 1080, 1980, 2700, 3240])
     fortschreiben(st, [{ ...eingabe(), jahr: kontext(2026, { band, woerter: 500 }) }], 200)
     expect(st.jahre!.en['2026'].schwellen!.wortschatz![1]).toBe(100)
   })
@@ -246,7 +254,7 @@ describe('Jahresreihen fortschreiben', () => {
     js.schwellen = { ...jahresSchwellen(grundlage()), wortschatz: schwellen('wortschatz', 7) }
     js.medaillen.wortschatz = { stufe: 2, am: 5 }
     fortschreiben(st, [{ ...eingabe(), jahr: kontext(2026) }], 100)
-    expect(js.schwellen.wortschatz).toEqual([36, 180, 450, 810, 1260, 1620])
+    expect(js.schwellen.wortschatz).toEqual([36, 180, 1080, 1980, 2700, 3240])
     expect(js.medaillen.wortschatz).toEqual({ stufe: 2, am: 5 })
     const basis = js.basis
     fortschreiben(st, [{ ...eingabe(), jahr: kontext(2026) }], 200)
@@ -400,8 +408,12 @@ describe('Jahresreihen am Server', () => {
     expect(b.punkte).toBe(1)
     // Lehrkraft: Medaillen des laufenden Schuljahres, Titel über alle Jahre
     expect(auszeichnungFuerLehrkraft(ida.id, 'en')).toMatchObject({ titel: 'Traveller', punkte: 1, punkteJahr: 0, schuljahr: '2027/28' })
-    // Weiter üben im neuen Jahr: neue Bronze, alte bleibt
+    // 12.10.2026: Runden ohne sinnvolle Leistung (nur 1 richtig) zählen nicht für „Spiele"
     for (let i = 0; i < 3; i++) await rufe(vok, ida, 'POST', '/s/api/vokabeln/spiel', { id: kurs, spiel: 'blitz', wert: 1, fehler: [] })
+    const c0 = ((await rufe(ach, ida, 'GET', '/s/api/auszeichnungen')).sprachen as SichtSprache[]).find((s) => s.sprache === 'en')!
+    expect(c0.medaillen.find((m) => m.kategorie === 'spiele')!.stufe).toBe(0)
+    // Weiter üben im neuen Jahr: neue Bronze, alte bleibt
+    for (let i = 0; i < 3; i++) await rufe(vok, ida, 'POST', '/s/api/vokabeln/spiel', { id: kurs, spiel: 'blitz', wert: 4, fehler: [] })
     const c = ((await rufe(ach, ida, 'GET', '/s/api/auszeichnungen')).sprachen as SichtSprache[]).find((s) => s.sprache === 'en')!
     expect(c.medaillen.find((m) => m.kategorie === 'spiele')!.stufe).toBe(1)
     expect(c.punkte).toBe(2)

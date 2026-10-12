@@ -183,11 +183,12 @@ export function LernendeEintragen({
             <Button leftSection={<IconPrinter size={16} />} disabled={!fertig.length} onClick={() => setDruck(true)}>
               Zettel drucken
             </Button>
-            <Button variant="light" disabled={!fertig.length} onClick={() => zettelAlsPdf(titel, fertig, adresse)} data-zettel-pdf>
-              Als PDF speichern
-            </Button>
+            {/* Vorschau links von „PDF" (12.10.2026, in allen Programmen gleich) */}
             <Button variant="light" leftSection={<IconEye size={16} />} disabled={!fertig.length} onClick={() => zettelVorschau(titel, fertig, adresse)} data-pdf-vorschau-knopf>
               Vorschau
+            </Button>
+            <Button variant="light" disabled={!fertig.length} onClick={() => zettelAlsPdf(titel, fertig, adresse)} data-zettel-pdf>
+              Als PDF speichern
             </Button>
             <Button variant="default" onClick={schliessen}>
               Fertig

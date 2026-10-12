@@ -317,12 +317,12 @@ export function PlanungExport({ reihe }: { reihe: Reihe }): React.JSX.Element {
         <Menu.Item onClick={() => void los('drucken')} data-planung-export-art="drucken">
           Drucken
         </Menu.Item>
-        <Menu.Item onClick={() => void los('pdf')} data-planung-export-art="pdf">
-          Als PDF speichern
-        </Menu.Item>
-        {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx) */}
+        {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026, shared/export/PdfVorschau.tsx); seit 12.10.2026 vor „PDF" */}
         <Menu.Item onClick={() => void alsVorschau(() => los('pdf'))} data-planung-export-art="vorschau">
           PDF-Vorschau
+        </Menu.Item>
+        <Menu.Item onClick={() => void los('pdf')} data-planung-export-art="pdf">
+          Als PDF speichern
         </Menu.Item>
         <Menu.Item onClick={() => void los('word')} data-planung-export-art="word">
           Als Word speichern

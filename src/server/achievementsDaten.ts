@@ -13,6 +13,7 @@ import {
   HOER_UEBUNGEN,
   HOERSPIEL_PUNKTE,
   LEERE_SPRACH_ZAEHLER,
+  spielZaehlt,
   type AuszNeu,
   type AuszStand,
   type SprachZaehler,
@@ -90,6 +91,8 @@ export function achDatenLesen(nutzerId: string): AchDaten {
       je: objekt(d.je, l.je),
       // Jahresreihen (10.10.2026): fehlen sie, stellt die Auswertung bzw. die Wartung einmalig um (jahreUmstellen)
       ausz: {
+        // Regelstand der stillen Berichtigung (12.10.2026, shared/auszeichnungen.ts `berichtigen`)
+        ...(typeof d.ausz?.regel === 'number' ? { regel: d.ausz.regel } : {}),
         medaillen: objekt(d.ausz?.medaillen, {}),
         titel: objekt(d.ausz?.titel, {}),
         ...(d.ausz?.jahre && typeof d.ausz.jahre === 'object' && !Array.isArray(d.ausz.jahre) ? { jahre: d.ausz.jahre } : {})
@@ -201,7 +204,9 @@ export function achievementSpiel(
   fehler?: number,
   jetzt = Date.now(),
   /** Sprache des Kurses (10.10.2026: Medaillen je Sprache) */
-  sprache?: string
+  sprache?: string,
+  /** Weniger ist besser (Züge, Sekunden) – für „sinnvolle Leistung" (12.10.2026) */
+  kleinerBesser = false
 ): void {
   if (!zaehlt(n)) return
   try {
@@ -213,9 +218,11 @@ export function achievementSpiel(
     if (VERBSPIELE.has(schluessel) && wert > 0) d.zaehler.verbformen += Math.min(200, Math.round(wert))
     if (sprache) {
       const z = jeSprache(d, sprache, jetzt)
-      // Einzelspiele zählen als Spielrunde; gemeinsame Runden zählt achievementZusammen
-      if (schluessel.startsWith('vok:') || schluessel.startsWith('gram:')) z.spielrunden++
-      if (gebrochen) z.rekorde++
+      // Einzelspiele zählen als Spielrunde; gemeinsame Runden zählt achievementZusammen. Seit 12.10.2026 (Entscheidung
+      // der Lehrkraft) nur mit sinnvoller Leistung (`spielZaehlt`) – Öffnen und gleich Beenden gibt keinen Punkt
+      const sinnvoll = spielZaehlt(wert, kleinerBesser)
+      if (sinnvoll && (schluessel.startsWith('vok:') || schluessel.startsWith('gram:'))) z.spielrunden++
+      if (gebrochen && sinnvoll) z.rekorde++
       if (HOER_SPIELE.has(schluessel)) z.hoeren += HOERSPIEL_PUNKTE
     }
     achDatenSchreiben(n.id, d)
@@ -232,7 +239,9 @@ export function achievementZusammen(
   n: NutzerInfo,
   e: { spiel: MehrspielId; art: MehrArt; teamZiel: boolean; gewonnen: boolean; comeback: boolean; fehlerfrei: boolean; unmoeglich: boolean },
   jetzt = Date.now(),
-  sprache?: string
+  sprache?: string,
+  /** Hat die Person in der Runde etwas beigetragen? (12.10.2026: sonst zählt die Runde nicht für die Medaille) */
+  beteiligt = true
 ): void {
   if (!zaehlt(n) || e.spiel === 'beschreiben') return
   try {
@@ -253,7 +262,7 @@ export function achievementZusammen(
       if (e.gewonnen && e.comeback) z.comebackSiege++
       if (e.unmoeglich && e.gewonnen) z.unmoeglich++
     }
-    if (sprache) {
+    if (sprache && beteiligt) {
       const j = jeSprache(d, sprache, jetzt)
       j.zusammenRunden++
       if (e.art === 'koop' && e.teamZiel) j.teamZiele++

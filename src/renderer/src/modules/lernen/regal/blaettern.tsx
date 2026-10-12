@@ -86,7 +86,8 @@ function abbild(papier: HTMLElement): HTMLElement {
   const k = papier.cloneNode(true) as HTMLElement
   const alle = [k, ...Array.from(k.querySelectorAll<HTMLElement>('*'))]
   for (const el of alle) {
-    for (const a of Array.from(el.attributes)) if (a.name.startsWith('data-') || a.name === 'id' || a.name === 'name' || a.name === 'for') el.removeAttribute(a.name)
+    for (const a of Array.from(el.attributes))
+      if (a.name.startsWith('data-') || a.name === 'id' || a.name === 'name' || a.name === 'for') el.removeAttribute(a.name)
     if (el.tagName === 'IFRAME' || el.tagName === 'VIDEO' || el.tagName === 'AUDIO') el.remove()
   }
   k.setAttribute('aria-hidden', 'true')
@@ -96,6 +97,8 @@ function abbild(papier: HTMLElement): HTMLElement {
 }
 
 const DAUER = 520
+/** Registerwechsel (12.10.2026, Wunsch der Lehrkraft): kürzer und dezenter als das Öffnen einer Unterseite */
+const DAUER_REGISTER = 400
 
 /**
  * Blättern-Stapel des Ordners. `papier` = die Seite (.og-papier), `buehne` = der Ordner (position: relative).
@@ -108,7 +111,13 @@ export function BlaetternRahmen({
 }: {
   papier: React.RefObject<HTMLDivElement | null>
   buehne: React.RefObject<HTMLDivElement | null>
-  children: (b: { tiefe: number; zurueck: () => void; alleZu: (danach: () => void) => void; wischen: React.HTMLAttributes<HTMLDivElement> }) => React.ReactNode
+  children: (b: {
+    tiefe: number
+    zurueck: () => void
+    alleZu: (danach: () => void) => void
+    umblaettern: (richtung: 'vor' | 'zurueck', wechsel: () => void) => void
+    wischen: React.HTMLAttributes<HTMLDivElement>
+  }) => React.ReactNode
 }): React.JSX.Element {
   const stapel = useRef<Ebene[]>([])
   const vorwaerts = useRef<Ebene[]>([])
@@ -141,7 +150,7 @@ export function BlaetternRahmen({
 
   /** Vorwärts: die alte Seite (Abbild) schlägt nach links um, darunter liegt schon die neue */
   const umschlagen = useCallback(
-    (v: ReturnType<typeof vorher>) => {
+    (v: ReturnType<typeof vorher>, dauer = DAUER) => {
       const o = buehne.current
       if (!v || !o) return
       const blatt = document.createElement('div')
@@ -161,9 +170,9 @@ export function BlaetternRahmen({
           { transform: 'perspective(1800px) rotateY(-165deg)', opacity: 0.85, offset: 0.85 },
           { transform: 'perspective(1800px) rotateY(-180deg)', opacity: 0 }
         ],
-        { duration: DAUER, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' }
+        { duration: dauer, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' }
       )
-      schatten.animate([{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: DAUER, fill: 'forwards' })
+      schatten.animate([{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: dauer, fill: 'forwards' })
       // Safari/WebKit zeigt die Vorderseite trotz backface-visibility gespiegelt – ab der Hälfte ausdrücklich tauschen
       const wechsel = (sichtbarVorn: boolean): Keyframe[] => [
         { opacity: sichtbarVorn ? 1 : 0 },
@@ -171,8 +180,8 @@ export function BlaetternRahmen({
         { opacity: sichtbarVorn ? 0 : 1, offset: 0.5 },
         { opacity: sichtbarVorn ? 0 : 1 }
       ]
-      v.bild.animate(wechsel(true), { duration: DAUER, fill: 'forwards' })
-      rueck.animate(wechsel(false), { duration: DAUER, fill: 'forwards' })
+      v.bild.animate(wechsel(true), { duration: dauer, fill: 'forwards' })
+      rueck.animate(wechsel(false), { duration: dauer, fill: 'forwards' })
       const weg = (): void => blatt.remove()
       a.onfinish = weg
       a.oncancel = weg
@@ -183,7 +192,7 @@ export function BlaetternRahmen({
 
   /** Zurück: die vorige Seite kommt von links zurück und legt sich über die jetzige (Abbild darunter) */
   const zurueckSchlagen = useCallback(
-    (v: ReturnType<typeof vorher>) => {
+    (v: ReturnType<typeof vorher>, dauer = DAUER) => {
       const o = buehne.current
       const p = papier.current
       if (!v || !o || !p) return
@@ -193,7 +202,12 @@ export function BlaetternRahmen({
       Object.assign(unten.style, { left: `${v.x}px`, top: `${v.y}px`, width: `${v.b}px`, height: `${v.h}px`, zIndex: '0' })
       unten.append(v.bild)
       o.appendChild(unten)
-      const alt = { z: p.style.zIndex, bf: p.style.backfaceVisibility, wbf: p.style.getPropertyValue('-webkit-backface-visibility'), to: p.style.transformOrigin }
+      const alt = {
+        z: p.style.zIndex,
+        bf: p.style.backfaceVisibility,
+        wbf: p.style.getPropertyValue('-webkit-backface-visibility'),
+        to: p.style.transformOrigin
+      }
       Object.assign(p.style, { zIndex: '1', backfaceVisibility: 'hidden', transformOrigin: '0 50%' })
       p.style.setProperty('-webkit-backface-visibility', 'hidden')
       const a = p.animate(
@@ -204,7 +218,7 @@ export function BlaetternRahmen({
           { transform: 'perspective(1800px) rotateY(-90deg)', filter: 'brightness(.85)', opacity: 1, offset: 0.5 },
           { transform: 'perspective(1800px) rotateY(0deg)', filter: 'brightness(1)', opacity: 1 }
         ],
-        { duration: DAUER, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'backwards' }
+        { duration: dauer, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'backwards' }
       )
       const weg = (): void => {
         unten.remove()
@@ -238,6 +252,20 @@ export function BlaetternRahmen({
     if (!stapel.current.length) return ersatz?.()
     window.history.back()
   }, [])
+
+  /**
+   * Registerwechsel umblättern (12.10.2026, Wunsch der Lehrkraft – Telefon, Tablet und PC): Abbild der jetzigen Seite,
+   * dann `wechsel` (neues Register) und dieselbe Bewegung wie bei Unterseiten, nur kürzer – vorwärts schlägt die alte
+   * Seite nach links um, rückwärts kommt die neue von links. Das Abbild liegt absolut über dem Ordner: nichts springt.
+   * Ruhige Darstellung bzw. reduzierte Bewegung: kein Umblättern (vorher() liefert dann null), nur die Überblendung
+   * der Seite (CSS .og-seite im Ordner).
+   */
+  const umblaettern = (richtung: 'vor' | 'zurueck', wechsel: () => void): void => {
+    const v = vorher()
+    if (richtung === 'vor') umschlagen(v, DAUER_REGISTER)
+    wechsel()
+    if (richtung === 'zurueck') zurueckSchlagen(v, DAUER_REGISTER)
+  }
 
   const alleZu = (danach: () => void): void => {
     fertig()
@@ -328,7 +356,7 @@ export function BlaetternRahmen({
   return (
     <Kontext.Provider value={wert}>
       <style>{CSS}</style>
-      {children({ tiefe, zurueck: () => zurueck(), alleZu, wischen })}
+      {children({ tiefe, zurueck: () => zurueck(), alleZu, umblaettern, wischen })}
     </Kontext.Provider>
   )
 }

@@ -152,11 +152,11 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
             <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => speichern('docx')}>
               Word
             </Button>
+            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026); seit 12.10.2026 links von „PDF" */}
+            <VorschauKnopf size="xs" variant="light" ausgabe={() => speichern('pdf')} />
             <Button size="xs" variant="light" leftSection={<IconFileTypePdf size={14} />} onClick={() => speichern('pdf')}>
               PDF
             </Button>
-            {/* Dasselbe PDF ansehen, ohne zu speichern (10.10.2026) */}
-            <VorschauKnopf size="xs" variant="light" ausgabe={() => speichern('pdf')} />
             {/* Seitenauswahl (01.10.2026) – beim PDF; Word bricht den Verlauf selbst um */}
             <SeitenWahlSchalter kompakt beschreibung="Gilt für das PDF: Vor dem Speichern erscheinen die Seiten zum Auswählen." />
             <Tooltip label="Stundenverlauf entfernen">

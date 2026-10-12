@@ -132,8 +132,14 @@ export const STAERKE_FACH = 3
 export type Ampel = 'sicher' | 'aufbau' | 'schwaeche' | 'wenig'
 export const AMPEL_NAME: Record<Ampel, string> = { sicher: 'sicher', aufbau: 'im Aufbau', schwaeche: 'Schwäche', wenig: 'zu wenig geübt' }
 
-/** Ampel einer Regel; `fach` = mittleres Fach der geübten Aufgaben (ältere Server ohne Angabe: nur nach Anteil) */
-export function ampelVon(p: { versuche: number; quote: number; fach?: number }): Ampel {
+/**
+ * Ampel einer Regel; `fach` = mittleres Fach der geübten Aufgaben (ältere Server ohne Angabe: nur nach Anteil).
+ * Seit 12.10.2026 (Entscheidung der Lehrkraft) bringt der Server die Ampel nach der Regel „erster Versuch" mit
+ * (shared/grammatikSicher.ts `formBefund`, `quote` = Anteil beim ersten Versuch richtig) – dann gilt sie. Die Schwellen
+ * unten bleiben nur für ältere Antworten ohne `ampel`.
+ */
+export function ampelVon(p: { versuche: number; quote: number; fach?: number; ampel?: Ampel }): Ampel {
+  if (p.ampel === 'sicher' || p.ampel === 'aufbau' || p.ampel === 'schwaeche' || p.ampel === 'wenig') return p.ampel
   if (p.versuche < MIN_VERSUCHE) return 'wenig'
   if (p.quote < SCHWAECHE_UNTER) return 'schwaeche'
   if (p.quote >= STAERKE_AB && (p.fach ?? STAERKE_FACH) >= STAERKE_FACH) return 'sicher'

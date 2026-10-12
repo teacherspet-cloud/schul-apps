@@ -98,6 +98,8 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
       'exams:save',
       'grammarTests:save',
       'kurztests:save',
+      // Grammatikformen je Lehrwerk-Band (12.10.2026)
+      'lehrwerkGrammatik:save',
       'library:save',
       // Rückmeldung (29.09.2026): Tabellenvorlagen und gemerkte Nachteilsausgleiche
       'nachteilsausgleiche:save',

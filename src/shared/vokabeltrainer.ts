@@ -35,6 +35,14 @@ export interface Vokabel {
   auchRichtig?: string[]
   /** Tagesrunde einer Sprache (10.10.2026, shared/sprachstand.ts): Wort aus einem früheren Band – „aus Green Line 1 · Unit 2" */
   herkunft?: string
+  /**
+   * Übungsvorrang (12.10.2026, shared/uebungsVorrang.ts – nur in der Antwort an Lernende gesetzt): `rang` ordnet die
+   * neuen Wörter (zuletzt freigeschalteter Abschnitt zuerst, darin Lehrwerk-Reihenfolge); `vorrang` markiert Wörter aus
+   * den Abschnitten eines angekündigten Tests ('test') bzw. der neuesten Freigabe ('neu') – ihre fälligen
+   * Wiederholungen kommen zuerst, die Spiele ziehen ~70 % aus ihnen. Ohne Angabe: wie bisher.
+   */
+  rang?: number
+  vorrang?: 'test' | 'neu'
 }
 
 /** Stand eines Wortes für eine Person */
@@ -59,6 +67,13 @@ export interface WortStand {
   erstmals?: number
   /** Zuletzt in ein höheres Fach gerückt (ms) – freiwilliges Üben rückt am selben Tag nicht noch einmal vor */
   vor?: number
+  /**
+   * Grammatik (12.10.2026, shared/grammatikSicher.ts): Ergebnis des ERSTEN Versuchs ('r' richtig, 'f' falsch) und ob
+   * ein späterer Fehler (Wiederholung, Spiel) noch nicht durch eine richtige Antwort ausgeglichen ist. Fehlt bei älteren
+   * Ständen – dann aus `versuche`/`falsch` abgeleitet.
+   */
+  erster?: 'r' | 'f'
+  nachFehler?: boolean
 }
 
 export const TAG = 86_400_000
@@ -537,18 +552,26 @@ const streu = (s: string): number => {
 }
 
 /** Wurde das Wort heute zum ersten Mal geübt? (Ältere Stände ohne `erstmals`: heute geübt und höchstens in Fach 1) */
-const heuteNeu = (st: WortStand, heute: string): boolean =>
+export const heuteNeu = (st: WortStand, heute: string): boolean =>
   st.erstmals ? tagVon(st.erstmals) === heute : st.versuche > 0 && st.fach <= 1 && tagVon(st.zuletzt) === heute
 
-/** Noch nie geübte Wörter in der Reihenfolge des Tages (zufällig, aber je Tag fest) */
+/**
+ * Noch nie geübte Wörter in der Reihenfolge des Tages. Seit 12.10.2026 (Übungsvorrang, Entscheidung der Lehrkraft) in
+ * Freigabe-Reihenfolge, wo der Server sie mitgibt (`rang`: zuletzt freigeschalteter bzw. Test-Abschnitt zuerst, darin
+ * Lehrwerk-Reihenfolge); Wörter ohne Rang danach zufällig, aber je Tag fest – wie bisher.
+ */
 export function neueWoerter(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now()): Vokabel[] {
   const heute = tagVon(jetzt)
+  const rang = (v: Vokabel): number => (typeof v.rang === 'number' && Number.isFinite(v.rang) ? v.rang : Number.POSITIVE_INFINITY)
   return liste
     .filter((v) => (staende[v.id]?.versuche ?? 0) === 0 && (staende[v.id]?.fach ?? 0) === 0)
-    .map((v) => [streu(`${heute}|${v.id}`), v] as const)
-    .sort((a, b) => a[0] - b[0])
-    .map(([, v]) => v)
+    .map((v) => [rang(v), streu(`${heute}|${v.id}`), v] as const)
+    .sort((a, b) => (a[0] === b[0] ? 0 : a[0] < b[0] ? -1 : 1) || a[1] - b[1])
+    .map(([, , v]) => v)
 }
+
+/** Vorrang-Stufe für fällige Wiederholungen (12.10.2026): Test-Abschnitte, dann neueste Freigabe, dann alle übrigen */
+export const vorrangStufe = (v: Pick<Vokabel, 'vorrang'>): number => (v.vorrang === 'test' ? 0 : v.vorrang === 'neu' ? 1 : 2)
 
 /**
  * Tagesration (08.10.2026, abgestimmt): fällige Wiederholungen (älteste zuerst; dazu kennengelernte, aber noch nicht
@@ -562,7 +585,8 @@ export function sitzungsWoerter(liste: Vokabel[], staende: Record<string, WortSt
     // Neue und angefangene Wörter (Fach 0–1), heute schon geübt (auch nicht gewusst), kommen erst morgen wieder – sie
     // wurden in der Runde selbst wiederholt; so endet die Tagesration. Ab Fach 2 bleibt „fast" heute noch fällig.
     .filter((v) => (st(v).fach > 0 || st(v).versuche > 0) && st(v).faellig <= jetzt && !(st(v).fach <= 1 && st(v).zuletzt && tagVon(st(v).zuletzt) === heute))
-    .sort((a, b) => st(a).faellig - st(b).faellig)
+    // Übungsvorrang (12.10.2026): Fälliges aus Test- bzw. neuesten Abschnitten vor älterem Fälligen, sonst älteste zuerst
+    .sort((a, b) => vorrangStufe(a) - vorrangStufe(b) || st(a).faellig - st(b).faellig)
   const schonNeu = liste.filter((v) => heuteNeu(st(v), heute)).length
   const neue = neueWoerter(liste, staende, jetzt).slice(0, Math.max(0, neu - schonNeu))
   return [...faellig, ...neue].slice(0, max)

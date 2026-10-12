@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus } from './warten.mjs'
+import { expertenmodus, kartenAuf } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-startseite')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -209,6 +209,15 @@ try {
   )
   await expertenmodus(p)
   pruefe(await da(p.locator('[data-schnellzugriff-raster]')), 'Startseite: Schnellzugriff')
+  // Kästen (12.10.2026): zunächst zugeklappt, Kurzfassung im Kopf; Auf/Zu dauerhaft gemerkt
+  pruefe(
+    (await p.locator('[data-klappkarte^="start-"]').count()) >= 4 && (await p.locator('[data-klappkarte^="start-"][data-offen="true"]').count()) === 0,
+    'Startseite: alle Kästen zunächst zugeklappt'
+  )
+  pruefe(await da(p.locator('[data-start-kurz="termine"]'), 8000), 'Zugeklappt: Kurzfassung im Kopf von „Termine"')
+  pruefe(/^\d+ Termine? · \d+ Kurse?$/.test(((await p.locator('[data-start-kurz="termine"]').innerText().catch(() => '')) ?? '').trim()), 'Kurzfassung „n Termine · n Kurse"')
+  await kartenAuf(p)
+  pruefe(await da(p.locator('[data-start-anzahl="reihen"]')), 'PC: Anzahl-Wahl auch am PC (Vorgabe 5)')
   pruefe(await da(p.locator('[data-schnellzugriff="reihen"] [data-laufende-reihe]')), 'Laufende Reihe auf der Startseite')
   pruefe(await p.locator('[data-schnellzugriff="tests"]').getByText('geplant').isVisible(), 'Geplanter Onlinetest auf der Startseite')
   // Termine & Vokabeltraining (10.10.2026, zweite Fassung): EINE Zeile je Kurs mit EINEM Abzeichen, darunter „Demnächst"
@@ -238,7 +247,11 @@ try {
   // Rahmen (10.10.2026): Kopfleiste über die volle Breite, mit der Seitenleiste EIN Stück; Datum und Info-Chips rechts
   const kopfP = p.locator('[data-rahmen-kopf="gross"]')
   pruefe(await da(kopfP), 'PC: Kopfleiste des Rahmens')
-  pruefe((await p.locator('.home-hero, [data-home-kopf]').count()) === 0, 'PC: kein eigener Kopf mehr auf der Startseite (nichts doppelt)')
+  // Kopf-Kasten wie in den Apps (12.10.2026, Wunsch der Lehrkraft) – genau einer, der alte Startseiten-Kopf bleibt weg
+  pruefe(
+    (await p.locator('.home-hero, [data-home-kopf]').count()) === 0 && (await p.locator('[data-startseite] [data-app-kopf]').count()) === 1,
+    'PC: Kopf-Kasten wie in den Apps (einmal, nichts doppelt)'
+  )
   const datumP = ((await kopfP.locator('[data-rahmen-datum]').innerText().catch(() => '')) ?? '').trim()
   pruefe(/^(Mo|Di|Mi|Do|Fr|Sa|So) \d\d\.\d\d\.$/.test(datumP), `PC: Datum im Kopf („${datumP}")`)
   const farben = await p.evaluate(() => {
@@ -386,7 +399,8 @@ try {
   pruefe(breiteH <= 390, `Smartphone: kein waagerechtes Scrollen (${breiteH})`)
   await h.screenshot({ path: join(out, '4-handy-kopf.png') })
 
-  // ---------- Termine & Vokabeltraining (10.10.2026): auch ein laufender Kurs OHNE Testtermin
+  // ---------- Termine & Vokabeltraining (10.10.2026): auch ein laufender Kurs OHNE Testtermin (Kästen seit 12.10.2026 zunächst zu)
+  await kartenAuf(h)
   const termine = h.locator('[data-schnellzugriff="termine"]')
   pruefe(await da(termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)), 'Smartphone: Kurs ohne Testtermin in „Termine & Vokabeltraining"')
   const zeileFr = termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)

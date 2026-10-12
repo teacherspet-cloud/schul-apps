@@ -25,12 +25,18 @@ export interface LehrwerkGrammatikPunkt {
 }
 
 type Band = Record<string, Record<string, LehrwerkGrammatikPunkt[]>>
+/** Band → Kapitel (Unit) → Station ('' = ganzes Kapitel) → Punkte */
+export type LehrwerkGrammatikBand = Band
 
 const P = (text: string, t: string[], w?: true): LehrwerkGrammatikPunkt => (w ? { text, t, w } : { text, t })
 
 export const QUELLE_NDS = 'Grammatikthemen Green Line Niedersachsen (Liste der Lehrkraft, 07.10.2026)'
 
-export const LEHRWERK_GRAMMATIK: Record<string, Band> = {
+/**
+ * Die eingebaute Liste (unverändert seit 07.10.2026). Gelesen wird überall `LEHRWERK_GRAMMATIK` – die wirksame Fassung
+ * mit den Bearbeitungen aus der App „Grammatikformen" (12.10.2026, siehe `wendeGrammatikAn`).
+ */
+export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
   'Green Line 1': {
     'Unit 1': {
       'Station 1': [
@@ -328,6 +334,107 @@ export const LEHRWERK_GRAMMATIK: Record<string, Band> = {
   }
 }
 
+const kopie = (b: Record<string, Band>): Record<string, Band> => JSON.parse(JSON.stringify(b)) as Record<string, Band>
+
+/**
+ * Die WIRKSAME Grammatik je Band (12.10.2026, App „Grammatikformen"): die eingebaute Liste, überlagert von den
+ * Bearbeitungen der Admins und Fachobleute (Server: gemeinsamer Speicher <DATEN>/lehrwerke-grammatik, PC: userData).
+ * Dasselbe Objekt für alle Nutzer (Grammatikauswahl, Kurse, Vorwissen, Zeitform-Sperre, Server) – `wendeGrammatikAn`
+ * ändert es an Ort und Stelle, damit alle bisherigen Aufrufer ohne Umbau die überlagerte Fassung lesen. Ohne
+ * Bearbeitungen ist es eine Kopie der eingebauten Liste (Rückfall).
+ */
+export const LEHRWERK_GRAMMATIK: Record<string, Band> = kopie(LEHRWERK_GRAMMATIK_EINGEBAUT)
+
+/** Eine gespeicherte Bearbeitung: die GANZE Grammatik eines Bands (ersetzt die eingebaute bzw. kommt hinzu) */
+export interface LehrwerkGrammatikEintrag {
+  /** Kennung des Lehrwerks (Dateiname) */
+  lehrwerkId: string
+  /** Name des Bands – Schlüssel in LEHRWERK_GRAMMATIK („Green Line 1") */
+  buch: string
+  /** Sprache des Lehrwerks (Fach für die Rechte) */
+  sprache: string
+  /** Kapitel in Buchreihenfolge → Station ('' = ganzes Kapitel) → Punkte */
+  kapitel: Band
+  /** Zeitpunkt der letzten Änderung (ISO) */
+  geaendert?: string
+}
+
+let stand = 0
+const hoerer = new Set<() => void>()
+const ueberlagert = new Set<string>()
+
+/** Gilt für diesen Band eine Bearbeitung aus der App „Grammatikformen" (statt der eingebauten Liste)? */
+export const istUeberlagert = (buch: string): boolean => ueberlagert.has(buch)
+
+/** Zählt jede Überlagerung – Oberflächen merken daran, dass sie neu rechnen müssen */
+export const grammatikStand = (): number => stand
+
+/** Bei jeder neuen Überlagerung benachrichtigen (z. B. lehrwerkThemen.ts); liefert das Abmelden */
+export function beiGrammatikAenderung(fn: () => void): () => void {
+  hoerer.add(fn)
+  return () => void hoerer.delete(fn)
+}
+
+/** Ist ein Eintrag brauchbar? (Kapitel → Station → Punkte mit Text und Kennungen) */
+export function gueltigerEintrag(e: unknown): e is LehrwerkGrammatikEintrag {
+  if (!e || typeof e !== 'object') return false
+  const x = e as Partial<LehrwerkGrammatikEintrag>
+  if (typeof x.buch !== 'string' || !x.buch.trim() || typeof x.lehrwerkId !== 'string' || !x.kapitel || typeof x.kapitel !== 'object') return false
+  return Object.values(x.kapitel).every(
+    (k) =>
+      k &&
+      typeof k === 'object' &&
+      Object.values(k).every(
+        (l) => Array.isArray(l) && l.every((p) => p && typeof p.text === 'string' && Array.isArray(p.t) && p.t.every((t) => typeof t === 'string'))
+      )
+  )
+}
+
+const sammler = new Intl.Collator('de', { numeric: true })
+
+/**
+ * Bearbeitungen über die eingebaute Liste legen (12.10.2026). Jeder Eintrag ersetzt die Grammatik SEINES Bands ganz;
+ * Bände ohne Eintrag bleiben eingebaut. Bände, die es eingebaut nicht gibt (Découvertes, ¡Apúntate! …), kommen
+ * dahinter. Ein leerer Aufruf stellt die eingebaute Liste wieder her.
+ */
+export function wendeGrammatikAn(eintraege: readonly LehrwerkGrammatikEintrag[]): void {
+  const ueber = new Map<string, Band>()
+  for (const e of eintraege) if (gueltigerEintrag(e)) ueber.set(e.buch, e.kapitel)
+  const neu = kopie(LEHRWERK_GRAMMATIK_EINGEBAUT)
+  for (const [buch, kapitel] of ueber) neu[buch] = kopie({ x: kapitel }).x
+  const reihenfolge = [
+    ...Object.keys(LEHRWERK_GRAMMATIK_EINGEBAUT),
+    ...[...ueber.keys()].filter((b) => !(b in LEHRWERK_GRAMMATIK_EINGEBAUT)).sort(sammler.compare)
+  ]
+  for (const k of Object.keys(LEHRWERK_GRAMMATIK)) delete LEHRWERK_GRAMMATIK[k]
+  for (const k of reihenfolge) LEHRWERK_GRAMMATIK[k] = neu[k]
+  ueberlagert.clear()
+  for (const b of ueber.keys()) ueberlagert.add(b)
+  stand++
+  for (const fn of hoerer) {
+    try {
+      fn()
+    } catch {
+      // ein fehlerhafter Hörer hält die anderen nicht auf
+    }
+  }
+}
+
+/** Reihe eines Bands („Green Line 3", „Green Line Transition" → „Green Line") */
+export const reiheDesBands = (band: string): string => band.replace(/\s*(\d+|transition|oberstufe)\s*$/i, '').trim() || band
+
+/**
+ * Frühere Bände DERSELBEN Reihe in der Reihenfolge der Liste (12.10.2026): Seit andere Lehrwerke hinzukommen können,
+ * sind „alle Schlüssel davor" nicht mehr nur Green Line – Französisch soll nicht die Green-Line-Grammatik als bekannt
+ * voraussetzen.
+ */
+export function fruehereBaendeDerReihe(band: string): string[] {
+  const baende = Object.keys(LEHRWERK_GRAMMATIK)
+  const i = baende.indexOf(band)
+  const reihe = reiheDesBands(band)
+  return baende.slice(0, Math.max(0, i)).filter((b) => reiheDesBands(b) === reihe)
+}
+
 /** Reihenfolge der Abschnitte innerhalb einer Unit (wie in den Lehrwerksdateien) */
 export const ABSCHNITT_FOLGE = ['Check-in', 'Introduction', 'Station 1', 'Station 2', 'Station 3', 'Story', 'Unit task', 'Check-out']
 
@@ -383,7 +490,7 @@ export function bekannteGrammatik(
   return { bekannt, neu, spaeter }
 }
 
-/** Alle Katalogkennungen (Themen und Teilformen) der Liste – für die Prüfung in tests/lehrwerkGrammatik.test.ts */
-export const ALLE_KENNUNGEN = Object.values(LEHRWERK_GRAMMATIK).flatMap((b) =>
+/** Alle Katalogkennungen (Themen und Teilformen) der eingebauten Liste – für die Prüfung in tests/lehrwerkGrammatik.test.ts */
+export const ALLE_KENNUNGEN = Object.values(LEHRWERK_GRAMMATIK_EINGEBAUT).flatMap((b) =>
   Object.values(b).flatMap((k) => Object.values(k).flatMap((l) => l.flatMap((p) => p.t)))
 )

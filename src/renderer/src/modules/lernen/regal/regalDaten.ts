@@ -30,6 +30,18 @@ export interface BlattEintrag {
   begonnen: boolean
   fach?: string
   thema?: string
+  /** Förder-/Fordermaterial nur für diese Person (12.10.2026) – steht im Fachordner unter „Für dich" */
+  fuerDich?: boolean
+}
+/** Bündel „Für dich" (12.10.2026, shared/fuerDich.ts): Ziel, Wörter, Grammatik, Hinweise – erst nach Freigabe */
+export interface FuerDichBuendel {
+  id: string
+  erstellt: number
+  fach: string
+  ziel: string
+  woerter: { term: string; translation: string }[]
+  grammatik: { titel: string; erklaerung?: string; beispiele?: string[] }[]
+  hinweise: string[]
 }
 export interface TestEintrag {
   code: string
@@ -91,6 +103,8 @@ export interface FachOrdner {
   /** Nur Konten: Mappen ohne Arbeitsblätter und Schreibaufgaben (die stehen oben schon) */
   mappen: Mappe[]
   merk: Merkkasten[]
+  /** Bündel „Für dich" (12.10.2026) – fehlt bei älteren Zwischenständen */
+  fuerDich?: FuerDichBuendel[]
 }
 
 const leer = <T>(): Promise<T[]> => Promise.resolve([])
@@ -133,8 +147,10 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
         ? holen<{ raeume: { fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }[] }>(
             '/s/api/lernen'
           ).then((d) => d.raeume ?? [], leer<{ fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }>)
-        : leer<{ fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }>()
-    ]).then(([vok, gram, blaetter, tests, aufgaben, reihen, farben, raeume]) => {
+        : leer<{ fach: string; karteikaesten: { art: string; titel: string; karten?: { titel: string; text: string }[] }[]; mappen: Mappe[] }>(),
+      // Bündel „Für dich" (12.10.2026): nur die eigenen, freigegebenen
+      holen<{ buendel: FuerDichBuendel[] }>('/s/api/fuerdich').then((d) => d.buendel ?? [], leer<FuerDichBuendel>)
+    ]).then(([vok, gram, blaetter, tests, aufgaben, reihen, farben, raeume, buendel]) => {
       const nach = new Map<string, FachOrdner>()
       const o = (f: string | undefined): FachOrdner => {
         const n = fachName(f ?? '')
@@ -150,7 +166,8 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
             aufgaben: [],
             reihen: [],
             mappen: [],
-            merk: []
+            merk: [],
+            fuerDich: []
           }
           nach.set(n, x)
         }
@@ -162,6 +179,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
       for (const t of tests) o(t.fach).tests.push(t)
       for (const a of aufgaben) o(a.fach).aufgaben.push(a)
       for (const r of reihen) o(r.fach).reihen.push(r)
+      for (const b of buendel) (o(b.fach).fuerDich ??= []).push(b)
       for (const r of raeume) {
         const mappen = r.mappen
           .map((m) => ({ ...m, seiten: m.seiten.filter((s) => s.art !== 'blatt' && s.art !== 'schreiben') }))

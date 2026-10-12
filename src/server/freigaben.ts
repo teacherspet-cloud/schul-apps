@@ -42,6 +42,8 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'nachteilsausgleiche:list',
   'textbooks:delete',
   'verbLists:delete',
+  // Grammatikformen: Bearbeitung verwerfen (nur Admin/Fachobleute – prüft der Dienst, 12.10.2026)
+  'lehrwerkGrammatik:delete',
   'library:delete',
   'themen:delete',
   'designs:delete',
@@ -70,7 +72,10 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:ton-loeschen',
   // Erzeugungssperre der Aussprache (10.10.2026)
   'medien:ton-reservieren',
-  'medien:ton-freigeben'
+  'medien:ton-freigeben',
+  // Prüfung per Messung und Fassungen geschlechtsbezogener Beispielsätze (12.10.2026)
+  'medien:ton-pruefung',
+  'medien:fassung-setzen'
 ])
 
 /** Einstellungen, die eine Lehrkraft auf dem Server nicht setzen darf */

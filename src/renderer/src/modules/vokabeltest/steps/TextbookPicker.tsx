@@ -32,6 +32,7 @@ import { newId } from '../model/random'
 import { LANGUAGES, VocabEntry } from '../model/types'
 import { lehrwerkOptionen, mitReihe, reiheTitel } from '@shared/lehrwerkReihe'
 import LehrwerkAngaben, { angabenSauber, type LehrwerkAngabenWerte } from '../../../shared/components/LehrwerkAngaben'
+import { besterBand, vorwahlImAuswaehler } from '@shared/lehrwerkSchulform'
 
 const STORAGE_KEY = 'vokabeltest-lehrwerk-auswahl'
 
@@ -155,16 +156,11 @@ export interface BookPreference {
 /**
  * Wählt das Lehrwerk, das am besten zur Lerngruppe passt: gleiche Sprache, gleiches
  * Bundesland und gleiche Schulform, und der Jahrgang möglichst genau getroffen.
+ * Seit 12.10.2026 in @shared/lehrwerkSchulform (`besterBand`): Schulformen gleichen Profils passen auch über
+ * Ländergrenzen, genaues Land und genaue Schulform gehen bei gleichem Jahrgang vor.
  */
 export function bookForGroup(books: TextbookMeta[], want: BookPreference): TextbookMeta | undefined {
-  const fits = books.filter(
-    (b) =>
-      (!want.language || b.language === want.language) &&
-      (!want.stateId || !b.stateId || b.stateId === want.stateId) &&
-      (!want.schoolTypeId || !b.schoolTypeId || b.schoolTypeId === want.schoolTypeId)
-  )
-  if (!fits.length || !want.grade) return fits[0]
-  return [...fits].sort((a, b) => Math.abs((a.grade ?? 99) - want.grade!) - Math.abs((b.grade ?? 99) - want.grade!))[0]
+  return besterBand(books, want)
 }
 
 /** Karte auf der ersten Seite: Lehrwerk → Unit → Abschnitte wählen und Vokabeln übernehmen. */
@@ -175,7 +171,8 @@ export function TextbookPicker({
   title,
   multiUnit,
   grau = 'kennzeichnen',
-  rahmen = true
+  rahmen = true,
+  nurSprache = true
 }: {
   onEntries: (entries: VocabEntry[], name: string, context: BookContext) => void
   /** Meldet die aktuelle Auswahl, damit „Test automatisch erstellen" sie schon nutzen kann */
@@ -201,6 +198,11 @@ export function TextbookPicker({
   grau?: 'kennzeichnen' | 'filtern'
   /** Eigene Karte drumherum – ohne, wenn der Auswähler schon in einer Karte steht (Reiter) */
   rahmen?: boolean
+  /**
+   * Mit `prefer.language` nur Lehrwerke dieser Sprache zeigen (Vorgabe). false = alle zeigen, die Sprache entscheidet
+   * nur über die Vorwahl (Vokabeltest, 12.10.2026: die Sprache steht dort erst im nächsten Schritt fest).
+   */
+  nurSprache?: boolean
 }): React.JSX.Element {
   const [books, setBooks] = useState<TextbookMeta[]>([])
   const [bookId, setBookId] = useState<string | null>(null)
@@ -218,22 +220,25 @@ export function TextbookPicker({
       .list()
       .then((all) => {
         // Mit Lerngruppe: nur Lehrwerke der passenden Sprache und ein Vorschlag dazu
-        const list = prefer?.language ? all.filter((b) => b.language === prefer.language) : all
+        const list = prefer?.language && nurSprache ? all.filter((b) => b.language === prefer.language) : all
         setBooks(list)
-        if (prefer) {
-          setBookId(bookForGroup(list, prefer)?.id ?? null)
-          return
-        }
+        let saved: { bookId: string; unit: string } | null = null
         try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as { bookId: string; unit: string } | null
-          const book = list.find((b) => b.id === saved?.bookId)
-          if (book) {
-            setBookId(book.id)
-            if (book.units.some((u) => u.name === saved?.unit)) setUnits([saved!.unit])
-          }
+          saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as { bookId: string; unit: string } | null
         } catch {
           // keine gespeicherte Auswahl
         }
+        /*
+         * Mit Lerngruppe (12.10.2026): Die zuletzt genutzte Auswahl gilt nur, wenn sie zu Fach, Jahrgang und Schulform
+         * passt – sonst das passendste Lehrwerk (@shared/lehrwerkSchulform `vorwahlImAuswaehler`).
+         */
+        const book = vorwahlImAuswaehler(list, prefer, saved?.bookId)
+        if (!book) {
+          if (prefer) setBookId(null)
+          return
+        }
+        setBookId(book.id)
+        if (book.id === saved?.bookId && book.units.some((u) => u.name === saved?.unit)) setUnits([saved.unit])
       })
       .catch(notifyError)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -625,19 +630,37 @@ function TextbookImportModal({
     if (!roh.length) return {}
     const erstes = mitReihe({ ...roh[0], ...(angaben.reihe?.trim() ? { reihe: angaben.reihe.trim() } : {}) })
     const gleich = vorhandene.find((b) => b.reihe && erstes.reihe && b.reihe.toLocaleLowerCase('de') === erstes.reihe.toLocaleLowerCase('de'))
-    return { reihe: erstes.reihe, band: erstes.band, publisher: gleich?.publisher, edition: gleich?.edition, ausgabe: gleich?.ausgabe }
+    // Jahrgang aus der Datei (Spalte „Klasse"), Land und Schulform von einer vorhandenen Reihe gleichen Namens (12.10.2026)
+    return {
+      reihe: erstes.reihe,
+      band: erstes.band,
+      grade: roh[0].grade,
+      publisher: gleich?.publisher,
+      edition: gleich?.edition,
+      stateId: gleich?.stateId,
+      schoolTypeId: gleich?.schoolTypeId,
+      ausgabe: gleich?.ausgabe
+    }
   }, [roh, vorhandene, angaben.reihe])
-  const gezeigt: LehrwerkAngabenWerte = Object.fromEntries(
-    (['reihe', 'band', 'publisher', 'edition', 'ausgabe'] as const).map((k) => [k, angaben[k] ?? vorschlag[k] ?? ''])
-  )
+  const gezeigt: LehrwerkAngabenWerte = {
+    ...Object.fromEntries((['reihe', 'band', 'publisher', 'edition', 'ausgabe'] as const).map((k) => [k, angaben[k] ?? vorschlag[k] ?? ''])),
+    // Zahl bzw. Kennung: eine geleerte Angabe bleibt leer (statt wieder den Vorschlag zu zeigen)
+    ...Object.fromEntries((['grade', 'stateId', 'schoolTypeId'] as const).map((k) => [k, k in angaben ? angaben[k] : vorschlag[k]]))
+  }
   const gezeigtText = JSON.stringify(gezeigt)
   const books = useMemo(
     () =>
       roh.map((b) => {
-        const { reihe, publisher, edition, ausgabe, band } = angabenSauber(JSON.parse(gezeigtText) as LehrwerkAngabenWerte)
-        // Mehrere Bände in einer Datei: der Band jedes Buches aus seinem Namen
+        const { reihe, publisher, edition, ausgabe, band, grade, stateId, schoolTypeId } = angabenSauber(JSON.parse(gezeigtText) as LehrwerkAngabenWerte)
+        // Mehrere Bände in einer Datei: der Band jedes Buches aus seinem Namen, der Jahrgang aus der Datei
         const eigen = roh.length === 1 ? { reihe, band } : mitReihe({ name: b.name, reihe: reihe ?? b.reihe, band: b.band })
-        return { ...b, ...angabenSauber({ reihe: eigen.reihe, band: eigen.band, publisher, edition, ausgabe }) }
+        const jahrgang = roh.length === 1 ? grade : b.grade
+        const { grade: _alt, ...ohneJahrgang } = b
+        void _alt
+        return {
+          ...ohneJahrgang,
+          ...angabenSauber({ reihe: eigen.reihe, band: eigen.band, grade: jahrgang, publisher, edition, stateId, schoolTypeId, ausgabe })
+        }
       }),
     [roh, gezeigtText]
   )

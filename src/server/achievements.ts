@@ -31,6 +31,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   angezeigterTitel,
+  AUSZ_REGEL,
+  berichtigen,
   fortschreiben,
   hatFormen,
   hauptsprache,
@@ -45,6 +47,7 @@ import {
   KATEGORIEN,
   LEERE_SPRACH_ZAEHLER,
   medaillenMit,
+  offenBerichtigt,
   punkteVon,
   schuljahrRahmen,
   sprachName,
@@ -84,25 +87,57 @@ const sicher = <T>(f: () => T, r: T): T => {
   }
 }
 
-/** Wortschatz über alle Listen und den Vokabelweg: gleiches Wort (je Sprache) zählt einmal, mit seinem besten Stand */
+/** Bester Stand eines Worts über alle Listen und den Vokabelweg */
+export interface WortBest {
+  /** Kennengelernt = mindestens einmal richtig erkannt oder geschrieben (12.10.2026: nicht schon beim Zeigen) */
+  g: boolean
+  /** Mindestens einmal frei (selbst geschrieben) richtig gewusst */
+  frei: boolean
+  s: boolean
+  f: number
+}
+
+/**
+ * Kennengelernt im Sinne der Medaillen und Etappen (12.10.2026, Entscheidung der Lehrkraft): erst mit einer richtigen
+ * Antwort – Fach ≥ 2 (einmal richtig erkannt oder geschrieben), ein richtiges Erkennen oder ein freier Abruf. Bloßes
+ * Zeigen der Lernkarte, „wusste ich" auf der Karte (Selbsteinschätzung) oder nur Fehlversuche zählen nicht.
+ */
+export const wortKennengelernt = (st: Pick<WortStand, 'fach' | 'erkannt' | 'frei'>): boolean =>
+  st.fach >= 2 || (Number(st.erkannt) || 0) > 0 || (Array.isArray(st.frei) && st.frei.length > 0)
+
+/** Wortkennung im Vokabelweg „b:<band>:<unit>:<abschnitt>:<nr>" → Band (12.10.2026) */
+export const bandAusWortId = (id: string): string | null => /^b:(.+):\d+:\d+:\d+$/.exec(id)?.[1] ?? null
+
+/** Besten Stand eines Worts fortschreiben (gleiches Wort aus mehreren Listen bzw. dem Vokabelweg) */
+export function wortMerken(best: Map<string, WortBest>, k: string, st: WortStand | undefined): void {
+  if (!st || !st.versuche) return
+  const b = best.get(k) ?? { g: false, frei: false, s: false, f: 0 }
+  b.g = b.g || wortKennengelernt(st)
+  b.frei = b.frei || (Array.isArray(st.frei) && st.frei.length > 0)
+  b.s = b.s || istSicher(st)
+  b.f = Math.max(b.f, st.fach)
+  best.set(k, b)
+}
+
+/**
+ * Wortschatz über alle Listen und den Vokabelweg: gleiches Wort (je Sprache) zählt einmal, mit seinem besten Stand.
+ * 12.10.2026: Die Wörter des Vokabelwegs werden über den Band in ihrer Kennung auf ihr Wort abgebildet – auch wenn
+ * kein eigener Kurs aus diesem Band einen Lernstand hat. Vorher landeten sie dann unter einer erfundenen Sprache „lb"
+ * (Phantom-Reihe bei den Medaillen) bzw. – bei Wörtern anderer Bände derselben Reihe – doppelt neben dem gleichen Wort
+ * aus dem Kurs. Was sich keinem Band zuordnen lässt, zählt nur noch für die alten Achievements (ohne Sprache), nie für
+ * eine Medaillenreihe.
+ */
 async function wortschatz(ich: NutzerInfo): Promise<{
   woerter: AchEingabe['woerter']
   lehrwerk: AchEingabe['lehrwerk']
   tage: string[]
-  /** Je Sprache (10.10.2026): Wörter ab Fach 2, sichere Wörter, Übungstage */
-  jeSprache: Map<string, { ab2: number; sicher: number; tage: Set<string> }>
+  /** Je Sprache (10.10.2026; gestuft seit 12.10.2026): wiedererkannt, frei gewusst, sichere Wörter, Übungstage */
+  jeSprache: Map<string, WortschatzSprache>
   /** Bester Stand je Wort („sprache:begriff") – für die Etappen im Band des Schuljahres */
-  best: Map<string, { g: boolean; s: boolean; f: number }>
+  best: Map<string, WortBest>
 }> {
-  const best = new Map<string, { g: boolean; s: boolean; f: number }>()
-  const merke = (k: string, st: WortStand | undefined): void => {
-    if (!st || !st.versuche) return
-    const b = best.get(k) ?? { g: false, s: false, f: 0 }
-    b.g = true
-    b.s = b.s || istSicher(st)
-    b.f = Math.max(b.f, st.fach)
-    best.set(k, b)
-  }
+  const best = new Map<string, WortBest>()
+  const merke = (k: string, st: WortStand | undefined): void => wortMerken(best, k, st)
   const tage = new Set<string>()
   const tageJe = new Map<string, Set<string>>()
   const tagJe = (sprache: string | undefined, t: string): void => {
@@ -112,10 +147,12 @@ async function wortschatz(ich: NutzerInfo): Promise<{
     tageJe.set(sprache, m)
   }
   const buecher = new Map<string, { buch: Buch; units: Set<string> }>()
+  const lehrkraefte = new Set<string>()
   const zeilen = sicher(() => vokDb().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[], [])
   for (const r of zeilen) {
     const z = vokZeile(r.zuweisung_id)
     if (!z) continue
+    lehrkraefte.add(z.lehrkraft_id)
     const st = json_(r.daten, { woerter: {}, tage: [] } as VokStand)
     for (const t of st.tage ?? []) {
       tage.add(t)
@@ -132,22 +169,36 @@ async function wortschatz(ich: NutzerInfo): Promise<{
     for (const u of quelleUnits(q)) e.units.add(u.unit)
     buecher.set(buch.id, e)
   }
-  // Vokabelweg: Lehrwerkswörter über die geladenen Bände auf ihr Wort abbilden, sonst nach Kennung
+  // Vokabelweg: Lehrwerkswörter über ihren Band (steht in der Kennung) auf ihr Wort abbilden
+  const weg = sicher(() => datenbank().prepare('SELECT reihe, daten FROM vok_laufbahn WHERE schueler_id = ?').all(ich.id) as { reihe: string; daten: string }[], [])
+  const wegStaende = weg.map((r) => ({ reihe: r.reihe, st: json_(r.daten, { woerter: {}, tage: [] } as VokStand) }))
+  const baende = new Map<string, Buch>()
+  for (const { buch } of buecher.values()) baende.set(buch.id, buch)
+  if (wegStaende.length) for (const liste of sicher(() => kurseDerSprachen(ich).kurse, new Map<string, VokZeile[]>()).values()) for (const k of liste) lehrkraefte.add(k.lehrkraft_id)
+  for (const id of new Set(wegStaende.flatMap((w) => Object.keys(w.st.woerter ?? {}).map(bandAusWortId)))) {
+    if (!id || baende.has(id)) continue
+    for (const lk of lehrkraefte) {
+      const b = await buchFuer(id, lk).catch(() => null)
+      if (b) {
+        baende.set(id, b)
+        break
+      }
+    }
+  }
   const begriff = new Map<string, string>()
   const reiheSprache = new Map<string, string>()
-  for (const { buch } of buecher.values()) reiheSprache.set(reiheVon(buch), buch.language)
-  for (const { buch } of buecher.values())
-    for (const a of abschnitteAus(buch)) for (const v of a.woerter) begriff.set(`${reiheVon(buch)}|${v.id}`, `${buch.language}:${normal(v.term)}`)
-  const weg = sicher(() => datenbank().prepare('SELECT reihe, daten FROM vok_laufbahn WHERE schueler_id = ?').all(ich.id) as { reihe: string; daten: string }[], [])
-  for (const r of weg) {
-    const st = json_(r.daten, { woerter: {}, tage: [] } as VokStand)
-    const sprache = reiheSprache.get(r.reihe)
+  for (const buch of baende.values()) {
+    reiheSprache.set(reiheVon(buch), buch.language)
+    for (const a of abschnitteAus(buch)) for (const v of a.woerter) begriff.set(v.id, `${buch.language}:${normal(v.term)}`)
+  }
+  for (const { reihe, st } of wegStaende) {
+    const sprache = reiheSprache.get(reihe)
     for (const t of st.tage ?? []) {
       tage.add(t)
       tagJe(sprache, t)
     }
-    // Ohne geladenen Band: eigene Kennung (Sprache vorn, wenn bekannt – für die Medaillen je Sprache)
-    for (const [id, s] of Object.entries(st.woerter ?? {})) merke(begriff.get(`${r.reihe}|${id}`) ?? `${sprache ?? 'lb'}:§lb:${r.reihe}:${id}`, s)
+    // Ohne auffindbaren Band: eigene Kennung ohne Sprache (zählt für keine Medaillenreihe – keine Phantom-Sprache)
+    for (const [id, x] of Object.entries(st.woerter ?? {})) merke(begriff.get(id) ?? `§weg:${reihe}:${id}`, x)
   }
   const lehrwerk: AchEingabe['lehrwerk'] = []
   for (const { buch, units } of buecher.values()) {
@@ -179,27 +230,45 @@ async function wortschatz(ich: NutzerInfo): Promise<{
     })
   }
   const werte = [...best.values()]
-  const jeSprache = new Map<string, { ab2: number; sicher: number; tage: Set<string> }>()
-  const eintrag = (sprache: string): { ab2: number; sicher: number; tage: Set<string> } => {
-    const e = jeSprache.get(sprache) ?? { ab2: 0, sicher: 0, tage: new Set<string>() }
-    jeSprache.set(sprache, e)
-    return e
-  }
-  for (const [k, b] of best) {
-    const sprache = k.slice(0, k.indexOf(':'))
-    if (!SPRACHE.test(sprache)) continue
-    const e = eintrag(sprache)
-    if (b.f >= 2) e.ab2++
-    if (b.s) e.sicher++
-  }
-  for (const [sprache, t] of tageJe) if (SPRACHE.test(sprache)) for (const x of t) eintrag(sprache).tage.add(x)
   return {
     woerter: { gelernt: werte.filter((b) => b.g).length, sicher: werte.filter((b) => b.s).length, langzeit: werte.filter((b) => b.f >= 6).length },
     lehrwerk,
     tage: [...tage],
-    jeSprache,
+    jeSprache: wortschatzJeSprache(best, tageJe),
     best
   }
+}
+
+/** Wortschatz einer Sprache für die Medaillen (12.10.2026, gestuft) */
+export interface WortschatzSprache {
+  erkannt: number
+  frei: number
+  sicher: number
+  tage: Set<string>
+}
+
+/**
+ * Wortschatz je Sprache (12.10.2026, gestuft): wiedererkannt, frei gewusst, sicher – jedes Wort einmal, nur
+ * kennengelernte. Nur echte Sprachkürzel vor dem Begriff zählen (keine Phantom-Sprache aus dem Vokabelweg).
+ */
+export function wortschatzJeSprache(best: Map<string, WortBest>, tageJe: Map<string, Set<string>> = new Map()): Map<string, WortschatzSprache> {
+  const jeSprache = new Map<string, WortschatzSprache>()
+  const eintrag = (sprache: string): WortschatzSprache => {
+    const e = jeSprache.get(sprache) ?? { erkannt: 0, frei: 0, sicher: 0, tage: new Set<string>() }
+    jeSprache.set(sprache, e)
+    return e
+  }
+  for (const [k, b] of best) {
+    const i = k.indexOf(':')
+    const sprache = i > 0 ? k.slice(0, i) : ''
+    if (!SPRACHE.test(sprache) || !b.g) continue
+    const e = eintrag(sprache)
+    e.erkannt++
+    if (b.frei) e.frei++
+    if (b.s) e.sicher++
+  }
+  for (const [sprache, t] of tageJe) if (SPRACHE.test(sprache)) for (const x of t) eintrag(sprache).tage.add(x)
+  return jeSprache
 }
 
 /** Sprachkürzel (en, fr, la, grc …) */
@@ -352,8 +421,14 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
     const d = achDatenLesen(ich.id)
     // Medaillen je Sprache (10.10.2026): Eingaben sammeln; Übernahme der alten Achievements vor deren Neuberechnung
     jahreUmstellen(d.ausz, schuljahr, jetzt)
+    // Berichtigung (12.10.2026): die Phantom-Sprache des Vokabelwegs („lb") verschwindet ganz – ohne Kurs in dieser Sprache
+    if ((d.ausz.regel ?? 0) < AUSZ_REGEL) phantomEntfernen(d, kurse)
     const eingaben = sprachEingaben(kurse, ws, gr, d, schuljahr, baende)
+    const frischUebernommen = !d.uebernommen
     if (!d.uebernommen) uebernehmen(d, eingaben, spiele, jetzt, schuljahr)
+    // Einmal still auf die neue Regel berichtigen (12.10.2026, shared/auszeichnungen.ts `berichtigen`) – auch gleich nach
+    // einer Übernahme: Übernommenes bleibt nur, soweit es nach der neuen Regel ebenfalls erreicht wäre
+    if (berichtigen(d.ausz, eingaben, jetzt, frischUebernommen && Boolean(d.uebernommen) && d.uebernommen !== '-')) d.offenAusz = offenBerichtigt(d.ausz, d.offenAusz)
     rundeAbschliessen(d, jetzt)
     d.tage = tageVereinen(d.tage, [...ws.tage, ...gr.tage])
     for (const r of gr.regeln) if (r.schwaeche && !d.warSchwaeche.includes(r.schluessel)) d.warSchwaeche.push(r.schluessel)
@@ -386,7 +461,7 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
 function sprachEingaben(
   kurse: Map<string, number | null>,
   ws: Awaited<ReturnType<typeof wortschatz>>,
-  gr: { regeln: { sicher: boolean; sprache?: string }[]; tageJe?: Record<string, string[]> },
+  gr: { regeln: { sicher: boolean; geuebt?: boolean; sprache?: string }[]; tageJe?: Record<string, string[]> },
   d: AchDaten,
   schuljahr = schuljahrVon(kalenderHeute()),
   baende: Map<string, JahresBand | null> = new Map()
@@ -398,10 +473,13 @@ function sprachEingaben(
     .sort((a, b) => Number(kurse.has(b)) - Number(kurse.has(a)) || sprachName(a).localeCompare(sprachName(b), 'de'))
     .map((s) => {
       const w = ws.jeSprache.get(s)
-      const regeln = gr.regeln.filter((r) => r.sprache === s)
+      // Grammatik (12.10.2026): „geübt" erst mit einer richtigen Aufgabe; Zähler höchstens so groß wie der Nenner (Formen
+      // des Bands) – Themen aus anderen Bänden oder feiner geteilte Regeln heben die Punkte nicht über das Mögliche
+      const regeln = gr.regeln.filter((r) => r.sprache === s && r.geuebt !== false)
       const tage = new Set<string>([...(w?.tage ?? []), ...(gr.tageJe?.[s] ?? []), ...(d.je[s]?.tage ?? [])])
       const jahrgang = kurse.get(s) ?? null
       const band = baende.get(s) ?? null
+      const deckel = band?.grammatik ?? Infinity
       const grundlage: JahresGrundlage = {
         jahrgang,
         band: band ? { id: band.id, name: band.name } : null,
@@ -414,15 +492,32 @@ function sprachEingaben(
         sprache: s,
         jahrgang,
         jahr: { schuljahr, grundlage, tageImJahr: tageImRahmen(tage, rahmen), bandEtappen: band ? bandEtappen(band, ws.best) : null },
-        woerterAb2: w?.ab2 ?? 0,
+        woerterErkannt: w?.erkannt ?? 0,
+        woerterFrei: w?.frei ?? 0,
         woerterSicher: w?.sicher ?? 0,
-        regelnGeuebt: regeln.length,
-        regelnSicher: regeln.filter((r) => r.sicher).length,
+        regelnGeuebt: Math.min(deckel, regeln.length),
+        regelnSicher: Math.min(deckel, regeln.filter((r) => r.sicher).length),
         tage: tage.size,
         units: ws.lehrwerk.filter((b) => b.sprache === s).flatMap((b) => b.units.map((u) => ({ gesamt: u.gesamt, gelernt: u.gelernt ?? 0, sicher: u.sicher }))),
         zaehler: d.je[s]?.z ?? {}
       }
     })
+}
+
+/**
+ * Phantom-Sprache „lb" (12.10.2026): Wörter des Vokabelwegs ohne geladenen Band liefen unter der Kennung „lb:§lb:…" und
+ * öffneten eine eigene Medaillenreihe. Ohne Kurs in dieser Sprache wird sie samt Zählern einmal entfernt.
+ */
+function phantomEntfernen(d: AchDaten, kurse: Map<string, number | null>): void {
+  for (const s of ['lb']) {
+    if (kurse.has(s)) continue
+    delete d.ausz.medaillen[s]
+    delete d.ausz.titel[s]
+    if (d.ausz.jahre) delete d.ausz.jahre[s]
+    delete d.je[s]
+    d.offenAusz = d.offenAusz.filter((n) => n.sprache !== s)
+    if (d.titelWahl.anzeige && typeof d.titelWahl.anzeige === 'object' && d.titelWahl.anzeige.sprache === s) d.titelWahl.anzeige = undefined
+  }
 }
 
 /**

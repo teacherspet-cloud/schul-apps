@@ -134,6 +134,19 @@ export function kursTerminMitOnlinetests(
   jetzt = Date.now()
 ): number | null {
   const eigener = typeof kurs.test_termin === 'number' ? kurs.test_termin : null
+  return kursTestMitOnlinetests(kurs, tests, jetzt)?.termin ?? eigener
+}
+
+/**
+ * Wie `kursTerminMitOnlinetests`, aber mit der Quelle (12.10.2026, Abschnitte des Tests): der frühere von Kurstermin und
+ * Onlinetest-Termin (ab gestern), dazu der Onlinetest, wenn er es ist. null = kein solcher Termin.
+ */
+export function kursTestMitOnlinetests<T extends OnlineTermin>(
+  kurs: { lerngruppe_id?: string | null; fach?: string | null; sprache?: string | null; test_termin?: number | null },
+  tests: T[],
+  jetzt = Date.now()
+): { termin: number; online: T | null } | null {
+  const eigener = typeof kurs.test_termin === 'number' ? kurs.test_termin : null
   const gruppe = kurs.lerngruppe_id || ''
   const fachId = (x: string | null | undefined): string => (x ? (fachAusName(x)?.id ?? x.trim().toLowerCase()) : '')
   const fach = fachId(kurs.fach)
@@ -148,10 +161,11 @@ export function kursTerminMitOnlinetests(
         t.termin >= heute &&
         ((fach && fachId(t.fach) === fach) || (sprache && t.zielsprache.toLowerCase() === sprache))
     )
-    .map((t) => terminMs(t.termin))
-  const kandidaten = [...(eigener !== null ? [eigener] : []), ...online].filter((x) => x >= jetzt - TAG)
-  if (!kandidaten.length) return eigener
-  return Math.min(...kandidaten)
+    .map((t) => ({ termin: terminMs(t.termin), online: t as T | null }))
+  const kandidaten = [...(eigener !== null ? [{ termin: eigener, online: null as T | null }] : []), ...online].filter((x) => x.termin >= jetzt - TAG)
+  if (!kandidaten.length) return null
+  // Bei gleichem Tag gilt der Kurstermin (seine Auswahl der Lehrkraft)
+  return kandidaten.reduce((a, b) => (b.termin < a.termin ? b : a))
 }
 
 /**

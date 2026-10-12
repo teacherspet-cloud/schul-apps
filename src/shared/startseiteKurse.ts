@@ -137,7 +137,7 @@ export function weitesterAbschnitt(teile: KursTeil[], titel: string, jetzt = Dat
     const teil = e.name.split(/,\s*|\s·\s/).map(vgl)
     const s = g && u >= 0 ? Math.max(-1, ...teil.map((a) => g[u].abschnitte.findIndex((x) => vgl(x) === a))) : -1
     const n = g && u >= 0 ? g[u].abschnitte.length : 0
-    const rang = [buch ? bandRang(buch) : -1, g ? u : (unitZahl(e.unit) ?? -1), g ? s : (abschnittStelle(e.name) ?? -1), i]
+    const rang = [buch ? bandRang(buch) : -1, g ? u : unitZahl(e.unit) ?? -1, g ? s : abschnittStelle(e.name) ?? -1, i]
     // Eine Unit mit nur einem Abschnitt („Wortschatz") braucht kein „Abschnitt 1 von 1"
     return { e, buch, rang, k: s >= 0 && n > 1 ? s + 1 : null, n: s >= 0 && n > 1 ? n : null }
   })
@@ -203,14 +203,12 @@ export function testBaldText(termin: number | null | undefined, jetzt = Date.now
  * Das EINE Abzeichen einer Kurszeile nach Vorrang: Test bald > nicht geübt (Lernende ohne Übung seit 7 Tagen) >
  * Problemwörter (ab 3) > ✓. Ein Kurs ohne Lernende zeigt statt ✓ ein stilles „leer".
  */
-export function kursAbzeichen(
-  k: { testTermin: number | null; inaktiv: string[]; problem: number; lernende: number },
-  jetzt = Date.now()
-): StartAbzeichen {
+export function kursAbzeichen(k: { testTermin: number | null; inaktiv: string[]; problem: number; lernende: number }, jetzt = Date.now()): StartAbzeichen {
   const test = testBaldText(k.testTermin, jetzt)
   if (test) return { art: 'test', text: test, reiter: 'vokabeln', hinweis: 'termin' }
   if (k.inaktiv.length) return { art: 'inaktiv', text: `${k.inaktiv.length} nicht geübt`, reiter: 'lernende', hinweis: 'inaktiv', ids: k.inaktiv }
-  if (k.problem >= 3) return { art: 'problem', text: problemWoerterText(k.problem), reiter: 'vokabeln', hinweis: 'problem' }
+  // Ab dem ersten Problemwort (12.10.2026): die Regel selbst ist strenger und per Regler einstellbar
+  if (k.problem >= 1) return { art: 'problem', text: problemWoerterText(k.problem), reiter: 'vokabeln', hinweis: 'problem' }
   if (!k.lernende) return { art: 'leer', text: 'leer', reiter: 'lernende', hinweis: 'leer' }
   return { art: 'ok', text: '✓' }
 }
@@ -234,15 +232,12 @@ export const haltepunktText = (titel: string, gruppe: string): string => `Haltep
  * Offene Haltepunkte einer Reihe mit dem Tag ihrer Stunde (Stundentermine der Reihe, Ferien übersprungen) – ohne
  * Stundentermin bzw. ohne Stunde: tag = null.
  */
-export function haltepunktTermine(
-  r: Pick<Reihe, 'schritte' | 'stunden' | 'stundenTermine'>,
-  frei: string[] = []
-): { titel: string; tag: string | null }[] {
+export function haltepunktTermine(r: Pick<Reihe, 'schritte' | 'stunden' | 'stundenTermine'>, frei: string[] = []): { titel: string; tag: string | null }[] {
   const t = r.stundenTermine
   const tage = t && r.stunden?.length ? unterrichtsTage(t.beginn, t.tage, r.stunden.length) : []
   return (r.schritte ?? [])
     .filter((s) => s.halt?.art === 'freigabe' && !frei.includes(s.id))
-    .map((s) => ({ titel: s.titel, tag: s.stunde !== undefined ? (tage[s.stunde] ?? null) : null }))
+    .map((s) => ({ titel: s.titel, tag: s.stunde !== undefined ? tage[s.stunde] ?? null : null }))
 }
 
 /**
@@ -261,7 +256,9 @@ export function demnaechst(
     ...onlinetests.flatMap((t) =>
       t.status === 'wartend' && t.termin && !t.terminVerborgen ? [{ tag: t.termin, art: 'onlinetest' as const, text: t.titel, ziel: t.id }] : []
     ),
-    ...kurse.flatMap((k) => (k.testTermin ? [{ tag: tagVon(k.testTermin), art: 'test' as const, text: vokabeltestText(k.gruppe, k.einheit), ziel: k.id }] : [])),
+    ...kurse.flatMap((k) =>
+      k.testTermin ? [{ tag: tagVon(k.testTermin), art: 'test' as const, text: vokabeltestText(k.gruppe, k.einheit), ziel: k.id }] : []
+    ),
     ...reihen.flatMap((r) => (r.halteTermine ?? []).map((h) => ({ tag: h.tag, art: 'halt' as const, text: haltepunktText(h.titel, r.gruppe), ziel: r.zid })))
   ]
   const rang = (e: DemnaechstEintrag): string => `${e.tag ?? '9999-99-99'}${e.art === 'halt' ? 1 : 0}`
@@ -308,9 +305,27 @@ export function kopfZahlen(
   const halte = d.bald.filter((e) => e.art === 'halt' && nah(e))
   const liste = (e: DemnaechstEintrag[]): string => e.map((x) => `${tagKurz(x.tag ?? '')} ${x.text}`).join('\n')
   const alle: KopfZahl[] = [
-    { id: 'laeuft', anzahl: d.laufend, text: d.laufend === 1 ? '1 Test läuft' : `${d.laufend} Tests laufen`, titel: 'Laufende Onlinetests', ziel: 'onlinetest' },
-    { id: 'geplant', anzahl: d.geplant, text: `${zahlWort(d.geplant, 'Test', 'Tests')} geplant`, titel: 'Geplante, noch nicht gestartete Onlinetests', ziel: 'onlinetest' },
-    { id: 'pruefen', anzahl: d.zuPruefen, text: `${zahlWort(d.zuPruefen, 'Test', 'Tests')} zu prüfen`, titel: 'Beendete Onlinetests mit Antworten zu prüfen', ziel: 'onlinetest' },
+    {
+      id: 'laeuft',
+      anzahl: d.laufend,
+      text: d.laufend === 1 ? '1 Test läuft' : `${d.laufend} Tests laufen`,
+      titel: 'Laufende Onlinetests',
+      ziel: 'onlinetest'
+    },
+    {
+      id: 'geplant',
+      anzahl: d.geplant,
+      text: `${zahlWort(d.geplant, 'Test', 'Tests')} geplant`,
+      titel: 'Geplante, noch nicht gestartete Onlinetests',
+      ziel: 'onlinetest'
+    },
+    {
+      id: 'pruefen',
+      anzahl: d.zuPruefen,
+      text: `${zahlWort(d.zuPruefen, 'Test', 'Tests')} zu prüfen`,
+      titel: 'Beendete Onlinetests mit Antworten zu prüfen',
+      ziel: 'onlinetest'
+    },
     {
       id: 'abgaben',
       anzahl: d.neueAbgaben,
@@ -319,7 +334,13 @@ export function kopfZahlen(
       ziel: 'freigaben'
     },
     { id: 'bedarf', anzahl: d.bedarf, text: `${d.bedarf} × Handlungsbedarf`, titel: 'Unterrichtsreihen: Abgaben, Fragen, Hilferufe', ziel: 'laufendereihen' },
-    { id: 'vokabeltest', anzahl: tests.length, text: `${zahlWort(tests.length, 'Vokabeltest', 'Vokabeltests')} bald`, titel: liste(tests), ziel: 'sprachenlernen' },
+    {
+      id: 'vokabeltest',
+      anzahl: tests.length,
+      text: `${zahlWort(tests.length, 'Vokabeltest', 'Vokabeltests')} bald`,
+      titel: liste(tests),
+      ziel: 'sprachenlernen'
+    },
     { id: 'haltepunkt', anzahl: halte.length, text: `${zahlWort(halte.length, 'Haltepunkt', 'Haltepunkte')} bald`, titel: liste(halte), ziel: 'laufendereihen' }
   ]
   return alle.filter((z) => z.anzahl > 0)
@@ -341,3 +362,17 @@ export const anzahlText = (n: number): string => (n === 0 ? 'alle' : String(n))
 
 /** Die ersten `n` (0 = alle) */
 export const begrenzt = <T>(liste: T[], n: number): T[] => (n === 0 ? liste : liste.slice(0, n))
+
+// ---------------------------------------------------------------- Zugeklappte Kästen der Startseite
+
+/** Ein Teil der Kurzfassung: Anzahl, Wort für 1 und für mehrere („1 Termin", „3 Termine") */
+export type KurzTeil = [anzahl: number, eins: string, viele: string]
+
+/**
+ * Kurzfassung im Kopf eines zugeklappten Kastens (12.10.2026, Wunsch der Lehrkraft), z. B. „3 Termine · 2 Kurse":
+ * nur Teile mit Anzahl > 0; ist alles 0, steht `leer` da.
+ */
+export function kurzfassung(teile: KurzTeil[], leer: string): string {
+  const da = teile.filter(([n]) => n > 0).map(([n, eins, viele]) => zahlWort(n, eins, viele))
+  return da.length ? da.join(' · ') : leer
+}

@@ -31,6 +31,7 @@ import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeit
 import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
 import { aufServer, hatClient } from './shared/plattform'
 import { ladeSchulkalender } from './shared/schulkalenderLaden'
+import { ladeGrammatikformen } from './shared/grammatikformenLaden'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -137,7 +138,9 @@ if (aufServer() && window.location.pathname.startsWith('/s/')) {
   )
 } else {
   const ersterLauf = imNetz() && abgemeldet() ? Promise.resolve() : useAppSettings.getState().load()
-  ersterLauf.finally(() => {
+  // Grammatikformen der Lehrwerke (12.10.2026): Bearbeitungen der Schule vor dem ersten Zeichnen über die eingebaute Liste legen
+  const grammatik = imNetz() && abgemeldet() ? Promise.resolve() : ladeGrammatikformen()
+  Promise.allSettled([ersterLauf, grammatik]).finally(() => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <Fehlergrenze>

@@ -19,6 +19,7 @@ import {
   kursAbzeichen,
   kopfZahlen,
   kursKopf,
+  kurzfassung,
   tagKurz,
   testBaldText,
   type Gliederung
@@ -46,6 +47,31 @@ describe('Anzahl je Karte', () => {
   it('kürzt, 0 = alle', () => {
     expect(begrenzt([1, 2, 3, 4, 5, 6], 5)).toEqual([1, 2, 3, 4, 5])
     expect(begrenzt([1, 2, 3], 0)).toEqual([1, 2, 3])
+  })
+})
+
+describe('Kurzfassung zugeklappter Kästen (12.10.2026)', () => {
+  it('nennt nur Teile mit Anzahl, Einzahl/Mehrzahl, sonst den Leertext', () => {
+    expect(
+      kurzfassung(
+        [
+          [3, 'Termin', 'Termine'],
+          [1, 'Kurs', 'Kurse']
+        ],
+        'nichts geplant'
+      )
+    ).toBe('3 Termine · 1 Kurs')
+    expect(
+      kurzfassung(
+        [
+          [0, 'Blatt', 'Blätter'],
+          [2, 'Rückmeldung', 'Rückmeldungen']
+        ],
+        'nichts offen'
+      )
+    ).toBe('2 Rückmeldungen')
+    expect(kurzfassung([[0, 'Termin', 'Termine']], 'nichts geplant')).toBe('nichts geplant')
+    expect(kurzfassung([], 'leer')).toBe('leer')
   })
 })
 
@@ -121,7 +147,10 @@ describe('Kurszeile: weitester Abschnitt in Buchreihenfolge (10.10.2026)', () =>
     expect(abschnittText([teil('Green Line 1 - Extra - Liste', 1, { lehrwerk: 'green-line-1' })], '', 'x', jetzt, { gliederung })).toBe('Green Line 1 · Extra')
   })
   it('geplante Abschnitte zählen erst ab ihrer Freischaltung', () => {
-    const teile = [teil('Green Line 1 - Unit 1 - Story', 5, { lehrwerk: 'green-line-1' }), teil('Green Line 1 - Unit 3 - Check-in', -3, { lehrwerk: 'green-line-1' })]
+    const teile = [
+      teil('Green Line 1 - Unit 1 - Story', 5, { lehrwerk: 'green-line-1' }),
+      teil('Green Line 1 - Unit 3 - Check-in', -3, { lehrwerk: 'green-line-1' })
+    ]
     expect(abschnittText(teile, 'Green Line 1', 'x', jetzt, { gliederung })).toBe('Green Line 1 · Unit 1 (Abschnitt 5 von 6)')
     expect(abschnittText(teile, 'Green Line 1', 'x', jetzt + 5 * TAG, { gliederung })).toBe('Green Line 1 · Unit 3 (Abschnitt 1 von 6)')
   })
@@ -158,7 +187,8 @@ describe('EIN Abzeichen je Kurs', () => {
   })
   it('Problemwörter erst ab 3, sonst ✓', () => {
     expect(kursAbzeichen({ ...basis, problem: 3 }, jetzt)).toMatchObject({ art: 'problem', text: '3 Problemwörter', reiter: 'vokabeln' })
-    expect(kursAbzeichen({ ...basis, problem: 2 }, jetzt)).toMatchObject({ art: 'ok', text: '✓' })
+    expect(kursAbzeichen({ ...basis, problem: 1 }, jetzt)).toMatchObject({ art: 'problem', text: '1 Problemwort' })
+    expect(kursAbzeichen({ ...basis, problem: 0 }, jetzt)).toMatchObject({ art: 'ok', text: '✓' })
     expect(kursAbzeichen(basis, jetzt).reiter).toBeUndefined()
   })
   it('ohne Lernende kein ✓, sondern „leer"', () => {

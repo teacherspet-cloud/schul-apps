@@ -11,6 +11,7 @@
  * ChatGPT-Abo. Scheitert ein Abo, wird es eine Weile übersprungen: Sonst liefe in einem Test mit
  * zehn Bildern jedes Bild erst eine Minute in denselben Fehler.
  */
+import { istBildBlockiert } from '@shared/bildBlockiert'
 import type { AppSettings, AiProviderId } from '@shared/types'
 
 export interface BildWeg {
@@ -67,12 +68,17 @@ export async function mitErsatz(
       return { bild: await erzeuge(w), weg: w, fehler }
     } catch (e) {
       if (istAbbruch(e)) throw e
-      fehler.push({ weg: w, text: e instanceof Error ? e.message : String(e) })
-      if (w.zugang === 'abo') pausieren(nutzer, w, jetzt())
+      const text = e instanceof Error ? e.message : String(e)
+      fehler.push({ weg: w, text })
+      // Ein abgelehntes Motiv sagt nichts über das Abo – nicht pausieren (12.10.2026, siehe shared/bildBlockiert.ts)
+      if (w.zugang === 'abo' && !istBildBlockiert(text)) pausieren(nutzer, w, jetzt())
     }
   }
   if (!wege.length) throw new Error('Es ist keine KI für Bilder eingerichtet (Einstellungen › KI-Zugang).')
   const [erster] = fehler
+  // Hat ein Weg das Motiv abgelehnt, zählt das vorn – sonst ginge die Ablehnung in der Sammelmeldung unter (12.10.2026)
+  const abgelehnt = fehler.find((f) => istBildBlockiert(f.text))
+  if (abgelehnt) throw new Error(`${abgelehnt.text}${fehler.length > 1 ? ` (weitere Wege: ${fehler.filter((f) => f !== abgelehnt).map((f) => `${weg(f.weg)}: ${f.text}`).join(' | ')})` : ''}`)
   throw new Error(
     reihe.length > 1
       ? `Kein Bild erzeugt – alle Wege scheiterten: ${fehler.map((f) => `${weg(f.weg)}: ${f.text}`).join(' | ')}`

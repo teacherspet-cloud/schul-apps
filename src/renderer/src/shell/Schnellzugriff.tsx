@@ -6,84 +6,133 @@
  *  - Freigaben & Rückmeldungen mit neuen Abgaben,
  *  - Termine & Vokabeltraining (10.10.2026, zweite Fassung): EINE Zeile je laufendem Kurs mit Balken und höchstens einem
  *    Abzeichen (Test bald > nicht geübt > Problemwörter > ✓), darunter „Demnächst" mit Vokabeltests und Haltepunkten.
- * Am Smartphone (10.10.2026) je Karte zunächst 5 Einträge, Anzahl wählbar (StartAnzahl.tsx).
+ * Am Smartphone (10.10.2026) je Karte zunächst 5 Einträge, Anzahl wählbar (StartAnzahl.tsx) – seit 12.10.2026 auf allen
+ * Geräten; jeder Kasten ist auf-/zuklappbar (zunächst zu, dauerhaft gemerkt) und nennt zugeklappt eine Kurzfassung.
  * Fachrelevanz (10.10.2026): Eine Karte steht nur da, wenn ihre App sichtbar ist (`startKarten`); ohne Sprachfach heißt
  * die letzte Karte nur „Termine" und zeigt nur „Demnächst".
  * Nur mit dem Schul-Apps-Server (die Exe ohne Server hat diese Dinge nicht).
  */
 import { Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
-import { useMediaQuery } from '@mantine/hooks'
-import { IconAlertCircle, IconCalendarEvent, IconChalkboard, IconDeviceLaptop, IconShare, IconFlag, IconPlayerPlay } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconCalendarEvent,
+  IconChalkboard,
+  IconChevronRight,
+  IconDeviceLaptop,
+  IconShare,
+  IconFlag,
+  IconPlayerPlay
+} from '@tabler/icons-react'
 import { useEffect } from 'react'
 import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
-import {
-  begrenzt,
-  demnaechst,
-  kursKopf,
-  tagKurz,
-  type DemnaechstEintrag,
-  type StartAbzeichen,
-  type StartKurs
-} from '@shared/startseiteKurse'
+import { begrenzt, demnaechst, kursKopf, kurzfassung, tagKurz, type DemnaechstEintrag, type StartAbzeichen, type StartKurs } from '@shared/startseiteKurse'
 import { kursReiterDocId } from '../modules/lernen/kurs/auftragsZiel'
 import { zumHinweis } from '../modules/lernen/kurs/kursFokus'
 import type { KursReiter } from '../modules/lernen/kurs/kursDaten'
-import { AnzahlWahl, useStartAnzahl } from './StartAnzahl'
+import { AnzahlWahl, startKastenId, useStartAnzahl, useStartOffen } from './StartAnzahl'
 import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
 
-/** Am Smartphone: Anzahl je Karte wählbar (StartAnzahl.tsx); am PC feste Höchstzahl wie bisher */
-interface Begrenzung {
+/** Anzahl je Kasten wählbar (StartAnzahl.tsx) – seit 12.10.2026 auf allen Geräten */
+export interface Begrenzung {
   karte: string
   wert: number
   setzen: (n: number) => void
 }
 
-function Bereich(p: {
+/**
+ * Ein Kasten der Startseite (12.10.2026, Wunsch der Lehrkraft): auf-/zuklappbar, zunächst zugeklappt, Stand dauerhaft je
+ * Gerät (StartAnzahl.tsx › useStartOffen). Zugeklappt nennt der Kopf eine Kurzfassung („3 Termine"), aufgeklappt stehen
+ * dort die Anzahl-Wahl und „Alle". Auch „Zuletzt bearbeitet" (Home.tsx) nutzt ihn.
+ * Für die Oberflächentests: `data-klappkarte="start-<Kasten>"`, `data-offen`, `data-klappkopf` wie bei KlappKarte
+ * (tests/e2e/warten.mjs › kartenAuf), dazu weiter `data-schnellzugriff`.
+ */
+export function StartKasten(p: {
+  /** Kennung des Kastens (Auf/Zu, Anzahl) */
+  id: string
   titel: string
   symbol: React.ReactNode
   farbe: string
   alle?: () => void
   children?: React.ReactNode
   daten?: string
-  /** Zeilen der Karte – werden auf `max` gekürzt (0 = alle), dahinter „und N weitere" */
+  /** Kurzfassung im zugeklappten Kopf; undefined, solange nichts geladen ist */
+  kurz?: string
+  /** Zeilen des Kastens – werden auf die gewählte Anzahl gekürzt (0 = alle), dahinter „und N weitere" */
   zeilen?: React.ReactNode[]
-  max?: number
   anzahl?: Begrenzung
+  /** Zeilen nebeneinander (z. B. „Zuletzt bearbeitet": zwei Spalten ab sm) */
+  spalten?: boolean
+  /** Weitere Attribute am Rahmen (data-… der Tests) */
+  rahmen?: Record<string, string | boolean | undefined>
 }): React.JSX.Element {
+  const [offen, umschalten] = useStartOffen(p.id)
   const zeilen = p.zeilen ?? []
-  const max = p.anzahl ? p.anzahl.wert : (p.max ?? 0)
+  const max = p.anzahl?.wert ?? 0
   const rest = max ? Math.max(0, zeilen.length - max) : 0
+  const sichtbar = begrenzt(zeilen, max)
   return (
-    <Card withBorder radius="lg" padding="md" data-schnellzugriff={p.daten}>
+    <Card
+      withBorder
+      radius="lg"
+      padding="md"
+      // Zugeklappt nicht auf die Höhe des Nachbarn gezogen
+      style={{ alignSelf: 'start' }}
+      data-schnellzugriff={p.daten}
+      data-klappkarte={startKastenId(p.id)}
+      data-offen={offen ? 'true' : 'false'}
+      {...p.rahmen}
+    >
       {/* Telefon (09.10.2026): „Alle" rutschte bei langen Titeln in eine eigene Zeile – der Titel bricht jetzt selbst um */}
-      <Group justify="space-between" mb="sm" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-          <ThemeIcon variant="light" color={p.farbe} radius="md">
-            {p.symbol}
-          </ThemeIcon>
-          <Text fw={700}>{p.titel}</Text>
-          {p.anzahl && <AnzahlWahl karte={p.anzahl.karte} wert={p.anzahl.wert} setzen={p.anzahl.setzen} />}
-        </Group>
+      <Group justify="space-between" wrap="nowrap" gap="xs">
+        <UnstyledButton onClick={umschalten} aria-expanded={offen} data-klappkopf={startKastenId(p.id)} style={{ flex: 1, minWidth: 0, display: 'block' }}>
+          <Group gap="xs" wrap="nowrap">
+            <IconChevronRight
+              size={18}
+              aria-hidden
+              style={{ flex: 'none', transition: 'transform 150ms ease', transform: offen ? 'rotate(90deg)' : 'none', color: 'var(--mantine-color-dimmed)' }}
+            />
+            <ThemeIcon variant="light" color={p.farbe} radius="md" style={{ flex: 'none' }}>
+              {p.symbol}
+            </ThemeIcon>
+            <Text fw={700} style={{ minWidth: 0 }}>
+              {p.titel}
+            </Text>
+            {!offen && p.kurz && (
+              <Text size="xs" c="dimmed" truncate ml="auto" pl="xs" style={{ flex: '0 1 auto', minWidth: 0 }} data-start-kurz={p.id}>
+                {p.kurz}
+              </Text>
+            )}
+          </Group>
+        </UnstyledButton>
+        {offen && p.anzahl && <AnzahlWahl karte={p.anzahl.karte} wert={p.anzahl.wert} setzen={p.anzahl.setzen} />}
         {p.alle && (
           <Button size="compact-xs" variant="subtle" onClick={p.alle} miw={44} style={{ flex: 'none' }}>
             Alle
           </Button>
         )}
       </Group>
-      <Stack gap={6}>
-        {p.children}
-        {begrenzt(zeilen, max)}
-        {rest > 0 && (
-          <Text size="xs" c="dimmed" data-schnellzugriff-weitere={rest}>
-            und {rest} weitere
-          </Text>
-        )}
-      </Stack>
+      {offen && (
+        <Stack gap={6} mt="sm">
+          {p.children}
+          {p.spalten
+            ? sichtbar.length > 0 && (
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+                  {sichtbar}
+                </SimpleGrid>
+              )
+            : sichtbar}
+          {rest > 0 && (
+            <Text size="xs" c="dimmed" data-schnellzugriff-weitere={rest}>
+              und {rest} weitere
+            </Text>
+          )}
+        </Stack>
+      )}
     </Card>
   )
 }
@@ -102,13 +151,12 @@ const ampelFarbe = (x: number): string => (x >= 0.7 ? 'green' : x >= 0.4 ? 'yell
  */
 export function Schnellzugriff(): React.JSX.Element {
   const { reihen, blaetter, tests, rueck, start } = useKopfDaten()
-  // Smartphone (10.10.2026): Anzahl je Karte wählbar, dauerhaft je Gerät
-  const handy = useMediaQuery('(max-width: 700px)') ?? false
+  // Anzahl je Kasten wählbar, dauerhaft je Gerät (10.10.2026 am Smartphone, seit 12.10.2026 überall; Vorgabe 5)
   const [nReihen, setNReihen] = useStartAnzahl('reihen')
   const [nTests, setNTests] = useStartAnzahl('tests')
   const [nFreigaben, setNFreigaben] = useStartAnzahl('freigaben')
   const [nTermine, setNTermine] = useStartAnzahl('termine')
-  const wahl = (karte: string, wert: number, setzen: (n: number) => void): Begrenzung | undefined => (handy ? { karte, wert, setzen } : undefined)
+  const wahl = (karte: string, wert: number, setzen: (n: number) => void): Begrenzung => ({ karte, wert, setzen })
   // Nur Karten sichtbarer Apps – dieselbe Regel wie die Leiste (10.10.2026)
   const sichtbar = useSichtbareProgramme()
   const ids = sichtbar.map((m) => m.id)
@@ -125,7 +173,7 @@ export function Schnellzugriff(): React.JSX.Element {
   const blattOffen = ids.includes('freigaben') ? (blaetter ?? []).filter((b) => b.status === 'offen') : []
   const rueckOffen = ids.includes('rueckmeldung') ? (rueck ?? []).filter((r) => r.status === 'offen' && !r.art) : []
   const jetzt = Date.now()
-  const kurse = vokabeln ? (start?.kurse ?? []) : []
+  const kurse = vokabeln ? start?.kurse ?? [] : []
 
   const reihenZeilen = (reihen ?? []).map((r) => <ReiheKarte key={r.zid} r={r} />)
   const testZeilen = [
@@ -145,7 +193,9 @@ export function Schnellzugriff(): React.JSX.Element {
       <Zeile
         key={t.id}
         titel={t.titel}
-        unter={`${t.lerngruppe || 'Gäste'} · ${t.termin ? `Termin ${tagKurz(t.termin)}${t.terminVerborgen ? ' (für Lernende ausgeblendet)' : ''} · ` : ''}noch nicht gestartet`}
+        unter={`${t.lerngruppe || 'Gäste'} · ${
+          t.termin ? `Termin ${tagKurz(t.termin)}${t.terminVerborgen ? ' (für Lernende ausgeblendet)' : ''} · ` : ''
+        }noch nicht gestartet`}
         onClick={() => void openDocument('onlinetest', t.id)}
       >
         <Badge variant="light">geplant</Badge>
@@ -198,20 +248,19 @@ export function Schnellzugriff(): React.JSX.Element {
       </Badge>
     </Zeile>
   )
-  // Am PC wie bisher höchstens 5 Blätter und 4 Rückmeldungen; am Smartphone zählt die gewählte Anzahl über beide
-  const freigabeZeilen = handy
-    ? [...blattOffen.map(blattZeile), ...rueckOffen.map(rueckZeile)]
-    : [...blattOffen.slice(0, 5).map(blattZeile), ...rueckOffen.slice(0, 4).map(rueckZeile)]
+  // Die gewählte Anzahl zählt über Blätter und Rückmeldungen zusammen (12.10.2026 auf allen Geräten; vorher am PC 5 + 4)
+  const freigabeZeilen = [...blattOffen.map(blattZeile), ...rueckOffen.map(rueckZeile)]
 
   /*
    * Termine & Vokabeltraining (10.10.2026, zweite Fassung – Befund „zu unübersichtlich"): EINE Zeile je laufendem Kurs
    * mit Balken und höchstens einem Abzeichen, darunter „Demnächst" (Vokabeltests und Haltepunkte mit Datum). Hinweise
-   * und Grammatik stehen im Kurs. Die Anzahl-Wahl gilt für die Kurszeilen; „Demnächst" zeigt höchstens 5.
+   * und Grammatik stehen im Kurs. Die Anzahl-Wahl gilt für die Kurszeilen und „Demnächst" (12.10.2026: die nächsten 5,
+   * erhöhbar; vorher fest 5 bzw. am PC 10 Kurse).
    */
   const kursZeilen = kurse.map((k) => <KursZeile key={k.id} k={k} />)
-  const maxKurse = handy ? nTermine : 10
+  const maxKurse = nTermine
   const kursRest = maxKurse ? Math.max(0, kursZeilen.length - maxKurse) : 0
-  const bald = demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? (tests ?? []) : [])
+  const bald = demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? tests ?? [] : [])
   const geladen = (vokabeln ? start !== null : true) && reihen !== null
   const baldListe = (
     <Stack gap={4} data-start-demnaechst-liste>
@@ -220,29 +269,72 @@ export function Schnellzugriff(): React.JSX.Element {
           Demnächst
         </Text>
       )}
-      {bald.slice(0, 5).map((e) => (
+      {begrenzt(bald, nTermine).map((e) => (
         <DemnaechstZeile key={`${e.art}-${e.ziel}-${e.text}`} e={e} />
       ))}
-      {bald.length > 5 && (
-        <Text size="xs" c="dimmed" data-start-demnaechst-weitere={bald.length - 5}>
-          und {bald.length - 5} weitere
+      {nTermine > 0 && bald.length > nTermine && (
+        <Text size="xs" c="dimmed" data-start-demnaechst-weitere={bald.length - nTermine}>
+          und {bald.length - nTermine} weitere
         </Text>
       )}
       {geladen && !bald.length && (kurse.length || !vokabeln) && <Leer text={vokabeln ? 'Nichts geplant.' : 'Keine anstehenden Termine.'} />}
     </Stack>
   )
 
+  // Kurzfassungen für die zugeklappten Köpfe (12.10.2026) – erst, wenn die Daten da sind
+  const kurzReihen =
+    reihen === null
+      ? undefined
+      : kurzfassung(
+          [
+            [reihen.length, 'Reihe', 'Reihen'],
+            [bedarf, '× Handlungsbedarf', '× Handlungsbedarf']
+          ],
+          'keine laufend'
+        )
+  const kurzTests =
+    tests === null
+      ? undefined
+      : kurzfassung(
+          [
+            [laufend.length, 'läuft', 'laufen'],
+            [geplant.length, 'geplant', 'geplant'],
+            [zuPruefen.length, 'zu prüfen', 'zu prüfen']
+          ],
+          'nichts offen'
+        )
+  const kurzFreigaben =
+    blaetter === null || rueck === null
+      ? undefined
+      : kurzfassung(
+          [
+            [blattOffen.length, 'Blatt', 'Blätter'],
+            [rueckOffen.length, 'Rückmeldung', 'Rückmeldungen']
+          ],
+          'nichts offen'
+        )
+  const kurzTermine = !geladen
+    ? undefined
+    : kurzfassung(
+        [
+          [bald.length, 'Termin', 'Termine'],
+          [kurse.length, 'Kurs', 'Kurse']
+        ],
+        'nichts geplant'
+      )
+
   return (
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb={40} data-schnellzugriff-raster>
       {karten.reihen && (
-        <Bereich
+        <StartKasten
+          id="reihen"
           titel="Laufende Unterrichtsreihen"
           symbol={<IconChalkboard size={18} />}
           farbe="violet"
           alle={() => oeffneProgramm('laufendereihen')}
           daten="reihen"
+          kurz={kurzReihen}
           zeilen={reihenZeilen}
-          max={2}
           anzahl={wahl('reihen', nReihen, setNReihen)}
         >
           {bedarf > 0 && (
@@ -258,45 +350,54 @@ export function Schnellzugriff(): React.JSX.Element {
             </Button>
           )}
           {reihen !== null && !reihen.length && <Leer text="Gerade läuft keine Unterrichtsreihe." />}
-        </Bereich>
+        </StartKasten>
       )}
 
       {karten.tests && (
-        <Bereich
+        <StartKasten
+          id="tests"
           titel="Onlinetests"
           symbol={<IconDeviceLaptop size={18} />}
           farbe="teal"
           alle={() => oeffneProgramm('onlinetest')}
           daten="tests"
+          kurz={kurzTests}
           zeilen={testZeilen}
           anzahl={wahl('tests', nTests, setNTests)}
         >
           {tests !== null && !testZeilen.length && <Leer text="Kein Test geplant oder offen." />}
-        </Bereich>
+        </StartKasten>
       )}
 
       {karten.freigaben && (
-        <Bereich
-          titel={ids.includes('freigaben') && ids.includes('rueckmeldung') ? 'Freigaben & Rückmeldungen' : ids.includes('freigaben') ? 'Freigaben' : 'Rückmeldungen'}
+        <StartKasten
+          id="freigaben"
+          titel={
+            ids.includes('freigaben') && ids.includes('rueckmeldung') ? 'Freigaben & Rückmeldungen' : ids.includes('freigaben') ? 'Freigaben' : 'Rückmeldungen'
+          }
           symbol={<IconShare size={18} />}
           farbe="blue"
           alle={() => oeffneProgramm(ids.includes('freigaben') ? 'freigaben' : 'rueckmeldung')}
           daten="freigaben"
+          kurz={kurzFreigaben}
           zeilen={freigabeZeilen}
           anzahl={wahl('freigaben', nFreigaben, setNFreigaben)}
         >
           {blaetter !== null && rueck !== null && !blattOffen.length && !rueckOffen.length && <Leer text="Nichts freigegeben." />}
-        </Bereich>
+        </StartKasten>
       )}
 
       {karten.termine && (
-        <Bereich
+        <StartKasten
+          id="termine"
           titel={vokabeln ? 'Termine & Vokabeltraining' : 'Termine'}
           symbol={<IconCalendarEvent size={18} />}
           farbe="orange"
           alle={vokabeln ? () => oeffneProgramm('sprachenlernen') : ids.includes('laufendereihen') ? () => oeffneProgramm('laufendereihen') : undefined}
           daten="termine"
-          anzahl={vokabeln ? wahl('termine', nTermine, setNTermine) : undefined}
+          kurz={kurzTermine}
+          // Ohne `zeilen`: die Anzahl gilt hier für Kurse und „Demnächst" (oben gekürzt)
+          anzahl={wahl('termine', nTermine, setNTermine)}
         >
           {!vokabeln ? (
             baldListe
@@ -318,7 +419,7 @@ export function Schnellzugriff(): React.JSX.Element {
               {baldListe}
             </SimpleGrid>
           )}
-        </Bereich>
+        </StartKasten>
       )}
     </SimpleGrid>
   )
@@ -410,8 +511,8 @@ function DemnaechstZeile({ e }: { e: DemnaechstEintrag }): React.JSX.Element {
         e.art === 'test'
           ? void openDocument('sprachenlernen', kursReiterDocId(e.ziel, 'vokabeln'))
           : e.art === 'onlinetest'
-            ? void openDocument('onlinetest', e.ziel)
-            : oeffneReihe(e.ziel)
+          ? void openDocument('onlinetest', e.ziel)
+          : oeffneReihe(e.ziel)
       }
       style={{ display: 'block', width: '100%', textAlign: 'left' }}
       data-start-demnaechst={e.art}

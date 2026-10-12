@@ -29,7 +29,18 @@ import { createHmac } from 'node:crypto'
 import { datenbank, nutzerNachId, protokolliereServer, serverGeheimnis, setzeServerGeheimnis, type NutzerInfo } from './datenbank'
 import { hauptschluessel } from './geheim'
 import { beimAbmelden, json, type Anfrage } from './http'
-import { db as vokDb, istOffen, json_, kursHaken, standVon as vokStandVon, tageszielVon, teileVon, vokIstFuer, woerterDiesesJahres, type Zeile as VokZeile } from './vokabeln'
+import {
+  db as vokDb,
+  istOffen,
+  json_,
+  kursHaken,
+  kursTageszielFuer,
+  standVon as vokStandVon,
+  teileVon,
+  vokIstFuer,
+  woerterDiesesJahres,
+  type Zeile as VokZeile
+} from './vokabeln'
 import { grammatikFuerErinnerung } from './grammatik'
 import { angekuendigteTests } from './onlinetest'
 import { terminMs } from '../shared/onlinetestTermin'
@@ -290,7 +301,8 @@ export function lageVon(n: NutzerInfo, zustand: Pick<Zustand, 'neuSeit' | 'termi
     const st = vokStandVon(z.id, n.id)
     for (const t of st.tage ?? []) tage.add(t)
     if (woerter.length) {
-      const ziel = tageszielVon(z)
+      // Vor einem angekündigten Test erhöht – dieselbe Zahl wie im Trainer (12.10.2026, Übungsvorrang)
+      const ziel = kursTageszielFuer(z, n, st.woerter, jetzt)
       // Nur Abschnitte dieses Schuljahres bringen eine Runde (10.10.2026); Konten üben im Fachordner (eine Runde je Sprache)
       const o = tagesRunde(woerterDiesesJahres(z, jetzt), st.woerter, jetzt, ziel).woerter.length
       const fach = fachAusName(z.fach)?.label ?? z.fach

@@ -95,6 +95,11 @@ export interface FeedbackZusatz {
   nurZeichenflaeche?: boolean
   /** Materialtexte mit Zeilennummern, wie gedruckt (materialZeilen.ts) */
   material?: string
+  /**
+   * Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Regeln der Vorlagen der Lehrkraft mit dem Befund der
+   * Vorprüfung (Wortzahl/⅓, Zitate, Zeilenangaben, Ich-Form, Konjunktiv) – @shared/operatoren/geschichteSchreibformen
+   */
+  schreibform?: string
 }
 
 /**
@@ -135,6 +140,7 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       zusatz.material
         ? `${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; nicht Teil der Antwort):'}\n${zusatz.material}`
         : '',
+      zusatz.schreibform ?? '',
       `AUFGABE ${a.nr}: ${a.anweisung}`,
       `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten):\n${a.erwartung}`,
       'ANTWORT DER PERSON (zwischen <<< und >>>):',

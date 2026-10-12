@@ -49,8 +49,8 @@ export const SENSIBEL: Record<string, string[]> = {
   reihen_zuweisungen: ['schueler', 'halte_frei', 'verknuepft'],
   reihen_stand: ['daten'],
   reihen_dateien: ['daten', 'name'],
-  // entfernt: entfernte Abschnitte samt Wörtern (08.10.2026)
-  vok_zuweisungen: ['schueler', 'titel', 'woerter', 'quelle', 'verben', 'teile', 'ueberschrift', 'problem_aus', 'entfernt'],
+  // entfernt: entfernte Abschnitte samt Wörtern (08.10.2026); test_abschnitte: Abschnitte des angekündigten Tests (12.10.2026)
+  vok_zuweisungen: ['schueler', 'titel', 'woerter', 'quelle', 'verben', 'teile', 'ueberschrift', 'problem_aus', 'entfernt', 'test_abschnitte'],
   vok_stand: ['daten'],
   vok_laufbahn: ['daten'],
   // Persönlicher Zugangscode der Gäste – für die Lehrkraft lesbar (08.10.2026), sonst nur als Prüfwert (codePruefwert)
@@ -79,7 +79,12 @@ export const SENSIBEL: Record<string, string[]> = {
   iserv_erkannt: ['daten'],
   iserv_kursgruppen: ['daten'],
   // Bereits akzeptierte Alternativen der Lehrkraft (10.10.2026, akzeptierteAlternativen.ts): nur Antworttexte ohne Personenbezug – trotzdem verschlüsselt
-  akzeptierte_alternativen: ['daten']
+  akzeptierte_alternativen: ['daten'],
+  // Fachobleute je Lehrkraft (12.10.2026, fachobleute.ts): Fächer einer Person – Angabe zur Person, verschlüsselt
+  fach_obleute: ['daten'],
+  // Förder-/Fordermaterial (12.10.2026, foerdern.ts): Gruppen mit Kennungen der Kinder und Bündel „Für dich" je Kind
+  foerder_auftraege: ['daten'],
+  foerder_buendel: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

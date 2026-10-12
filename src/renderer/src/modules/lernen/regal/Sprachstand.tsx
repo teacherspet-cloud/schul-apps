@@ -5,9 +5,8 @@
  *  - Karte AKTUELLER Band („Green Line 3 · Klasse 7"): Units als Stationen, die Abschnitte der aktuellen Unit als Punkte
  *    (Anteil sicher / im Aufbau / neu), „12 von 21 Abschnitten kennengelernt", EIN Knopf „Heute üben · N Wörter" (eine
  *    Runde über alle Kurse der Sprache). Spätere Units nur als „weitere Units folgen" – nichts Gesperrtes.
- *  - „Frühere Jahre": Cover mit „Klasse 6 · 2025/26", Medaille (Bronze/Silber/Gold) und „kennengelernt". Ein Band öffnet
- *    sich als nächste Seite im Ordner: ruhige Angebote „Wiederholen? N Wörter" und „Noch nicht gelernte Wörter lernen",
- *    darunter sein Kasten – nichts ist Pflicht, nichts rot.
+ *  - Frühere Jahre (seit 12.10.2026 nur unter „Meine Bücher"): Cover mit Medaille; ein aufgeschlagener früherer Band
+ *    bietet ruhig „Wiederholen? N Wörter" und „Noch nicht gelernte Wörter lernen" an (BandAngebote) – nichts ist Pflicht.
  *  - Darunter der gemeinsame Kasten der Sprache (Karteikasten, Spiele) – der Trainer mit der Kennung „sp:<sprache>".
  *  - Ohne Lehrwerk mit Wörtern (eigene Listen, Platzhalter-Bände wie ¡Apúntate!): nur die Kursliste wie bisher.
  * Die Startseite zeigt keine Sprachkarte mehr (10.10.2026) – die Runde steht dort unter „Als Nächstes“.
@@ -16,13 +15,11 @@ import { Button, Group, Loader, SegmentedControl, Stack, Text } from '@mantine/c
 import { IconCheck, IconPlayerPlay } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { kursReiterNamen } from '@shared/ohneKlasse'
-import { schuljahrText } from '@shared/schulkalender'
-import { prozent, type AktuellerBand, type BandMedaille, type FruehererBand, type SprachStand, type StandZahlen } from '@shared/sprachstand'
+import { type AktuellerBand, type BandMedaille, type FruehererBand, type SprachStand, type StandZahlen } from '@shared/sprachstand'
 import { holen } from '../../onlinetest/serverApi'
 import { useAuffrischen } from '../../../shared/auffrischen'
 import { BandCover } from '../../../shared/components/BandCover'
 import VokabelTrainer from '../VokabelTrainer'
-import { useBlaettern } from './blaettern'
 import { BUECHER_DEUTSCH, type BuecherTexte } from './buecherTexte'
 import type { FachOrdner } from './regalDaten'
 
@@ -178,7 +175,11 @@ function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): Reac
       {u && u.abschnitte.length <= MAX_PUNKTE && (
         <div className="sk-abschnitte" data-abschnitt-punkte={u.abschnitte.length} data-abschnitte-unit={u.unit}>
           {u.abschnitte.map((x) => (
-            <div key={x.key} className="sk-abschnitt" title={`${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`}>
+            <div
+              key={x.key}
+              className="sk-abschnitt"
+              title={`${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`}
+            >
               <AbschnittRing z={x.zahlen} />
               <span className="sk-abschnitt-name">{kurz(x.name)}</span>
             </div>
@@ -213,9 +214,6 @@ export function useSprachstand(fach?: string, aktiv = true): { sprachen: SprachS
   useAuffrischen(() => !document.querySelector('[data-sitzung], [data-spiel], [data-verbspiel]') && laden())
   return { sprachen, laden }
 }
-
-/** „Klasse 7 · 2026/27" */
-const jahrText = (t: BuecherTexte, klasse: number | null, schuljahr: number | null): string => t.jahrgang(klasse, schuljahr ? schuljahrText(schuljahr) : null)
 
 /**
  * Karte des aktuellen Bandes. `start`: Knopf startet die Runde hier (Ordner); `href`: Knopf führt dorthin (Startseite).
@@ -303,82 +301,49 @@ export function AktuellerBandKarte({
   )
 }
 
-/** Regal „Frühere Jahre": Cover mit Klasse und Schuljahr, Medaille, sicher und kennengelernt */
-export function FruehereJahre({ s, oeffnen }: { s: SprachStand; oeffnen: (b: FruehererBand) => void }): React.JSX.Element | null {
-  const t = BUECHER_DEUTSCH
-  if (!s.frueher.length) return null
-  return (
-    <Stack gap={6} data-fruehere-jahre={s.frueher.length}>
-      <style>{SPRACH_CSS}</style>
-      <Text size="xs" fw={700} tt="uppercase" c="dimmed" style={{ letterSpacing: '.06em' }}>
-        {t.fruehereJahre}
-      </Text>
-      <div className="sk-bord">
-        {s.frueher.map((b) => (
-          <button key={b.id} type="button" className="sk-buch" onClick={() => oeffnen(b)} data-frueherer-band={b.id} data-medaille-stufe={b.medaille ?? ''}>
-            <span className="sk-cover">
-              <BandCover band={b} land={b.stateId ?? ''} breite={60} />
-              {b.medaille && (
-                <span className="sk-medaille">
-                  <BandMedailleBild m={b.medaille} />
-                </span>
-              )}
-            </span>
-            <span className="sk-buch-name">{b.name}</span>
-            <span className="sk-buch-zeile">{jahrText(t, b.klasse, b.schuljahr)}</span>
-            {b.zahlen.kennengelernt > 0 ? (
-              <span className="sk-buch-zeile" data-band-prozent={`${prozent(b.zahlen.sicher, b.zahlen.gesamt)}/${prozent(b.zahlen.kennengelernt, b.zahlen.gesamt)}`}>
-                {t.sicherP(prozent(b.zahlen.sicher, b.zahlen.gesamt))} · {t.kennenP(prozent(b.zahlen.kennengelernt, b.zahlen.gesamt))}
-              </span>
-            ) : (
-              <span className="sk-buch-zeile">{t.woerter(b.zahlen.gesamt)}</span>
-            )}
-          </button>
-        ))}
-      </div>
-    </Stack>
-  )
-}
+/*
+ * „Frühere Jahre" unter „Heute üben" entfernt (12.10.2026, Wunsch der Lehrkraft): Die früheren Bände stehen unter
+ * „Meine Bücher" auf dem Bord (Cover, Medaille, Anteile). Ihre ruhigen Angebote („Wiederholen?", „Noch nicht gelernte
+ * Wörter lernen") stehen jetzt dort, wenn ein früherer Band aufgeschlagen ist (BandAngebote, Wortliste.tsx).
+ */
 
-/** Ein früherer Band als Seite im Ordner: ruhige Angebote und sein Kasten */
-function FruehererBandSeite({ b }: { b: FruehererBand }): React.JSX.Element {
-  const t = BUECHER_DEUTSCH
+/** Ruhige Angebote eines früheren Bandes (in „Meine Bücher"): Medaillen-Hinweis und zwei freiwillige Runden */
+export function BandAngebote({
+  b,
+  nachRunde,
+  beimUeben
+}: {
+  b: FruehererBand
+  nachRunde?: () => void
+  /** Runde läuft: „Meine Bücher" zeigt dann nur noch sie (12.10.2026) */
+  beimUeben?: (an: boolean) => void
+}): React.JSX.Element | null {
   const [lauf, setLauf] = useState<{ n: number; uebung: string | null }>({ n: 0, uebung: null })
-  const p = prozent(b.zahlen.sicher, b.zahlen.gesamt)
+  const [uebt, setUebt] = useState(false)
+  const melden = useCallback(
+    (an: boolean) => {
+      setUebt(an)
+      beimUeben?.(an)
+    },
+    [beimUeben]
+  )
+  if (!b.naechste && b.wiederholen <= 0 && b.neu <= 0) return null
   return (
-    <Stack gap="sm" data-band-seite={b.id}>
-      <style>{SPRACH_CSS}</style>
-      <Group gap="md" wrap="nowrap" align="flex-start">
-        <span className="sk-cover">
-          <BandCover band={b} land={b.stateId ?? ''} breite={56} />
-          {b.medaille && (
-            <span className="sk-medaille">
-              <BandMedailleBild m={b.medaille} groesse={26} />
-            </span>
-          )}
-        </span>
-        <div style={{ minWidth: 0 }}>
-          <Text fw={800} size="lg" lh={1.2}>
-            {b.name}
-          </Text>
-          <Text size="sm" c="dimmed">
-            {jahrText(t, b.klasse, b.schuljahr)}
-          </Text>
-          <Text size="sm" mt={4}>
-            {b.medaille ? `${MEDAILLE_NAME[b.medaille]} · ` : ''}
-            {t.sicherP(p)} · {t.kennenP(prozent(b.zahlen.kennengelernt, b.zahlen.gesamt))}
-          </Text>
-          {b.naechste && (
-            <Text size="xs" c="dimmed" data-naechste-medaille={b.naechste.medaille}>
-              Noch {b.naechste.fehlen} sichere {b.naechste.fehlen === 1 ? 'Wort' : 'Wörter'} bis {MEDAILLE_NAME[b.naechste.medaille]}.
-            </Text>
-          )}
-        </div>
-      </Group>
-      <StandKreise z={b.zahlen} t={t} balken />
-      <Group gap="xs">
+    <Stack gap={6} data-band-seite={b.id}>
+      {!uebt && b.naechste && (
+        <Text size="xs" c="dimmed" data-naechste-medaille={b.naechste.medaille}>
+          Noch {b.naechste.fehlen} sichere {b.naechste.fehlen === 1 ? 'Wort' : 'Wörter'} bis {MEDAILLE_NAME[b.naechste.medaille]}.
+        </Text>
+      )}
+      <Group gap="xs" style={uebt ? { display: 'none' } : undefined}>
         {b.wiederholen > 0 && (
-          <Button variant="light" radius="xl" size="sm" onClick={() => setLauf((l) => ({ n: l.n + 1, uebung: 'wackelig' }))} data-band-wiederholen={b.wiederholen}>
+          <Button
+            variant="light"
+            radius="xl"
+            size="sm"
+            onClick={() => setLauf((l) => ({ n: l.n + 1, uebung: 'wackelig' }))}
+            data-band-wiederholen={b.wiederholen}
+          >
             Wiederholen? {b.wiederholen} {b.wiederholen === 1 ? 'Wort' : 'Wörter'}
           </Button>
         )}
@@ -388,7 +353,10 @@ function FruehererBandSeite({ b }: { b: FruehererBand }): React.JSX.Element {
           </Button>
         )}
       </Group>
-      <VokabelTrainer key={`bd:${b.id}:${lauf.n}`} id={`bd:${b.id}`} eingebettet uebung={lauf.uebung} />
+      {/* Nur die Runde (als nächste Seite im Ordner) – kein zweiter Kasten unter dem Buch */}
+      {lauf.uebung && (
+        <VokabelTrainer key={`bd:${b.id}:${lauf.n}`} id={`bd:${b.id}`} eingebettet uebung={lauf.uebung} nurRunde nachRunde={nachRunde} beimUeben={melden} />
+      )}
     </Stack>
   )
 }
@@ -433,23 +401,17 @@ export function KursRegister({ o, oben, startUebung = null }: { o: FachOrdner; o
 }
 
 /**
- * Register „Vocabulary" für Konten: je Sprache des Fachs die Karte des aktuellen Bandes, „Frühere Jahre" und der
- * gemeinsame Kasten. `startUebung` (aus der Adresse, z. B. vom Tipp der Startseite): die Runde startet gleich.
+ * Register „Vocabulary" für Konten: je Sprache des Fachs die Karte des aktuellen Bandes und der gemeinsame Kasten
+ * (frühere Bände seit 12.10.2026 nur unter „Meine Bücher"). `startUebung` (aus der Adresse, z. B. vom Tipp der
+ * Startseite): die Runde startet gleich – als nächste Seite im Ordner (VokabelTrainer, 12.10.2026).
  */
 export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: boolean; startUebung: string | null }): React.JSX.Element {
   const { sprachen, laden } = useSprachstand(o.fach)
-  const blaettern = useBlaettern()
-  const [band, setBand] = useState<FruehererBand | null>(null)
   const [lauf, setLauf] = useState<{ n: number; uebung: string | null }>({ n: 0, uebung: startUebung })
   if (!sprachen) return <Loader size="sm" />
   const s = sprachen[0]
   // Ohne Lehrwerk mit Wörtern: wie bisher die Kurse (kein Weg, kein „Alles gelernt 0/0")
   if (!s || s.nurKurse) return <KursRegister o={o} oben={oben} startUebung={startUebung} />
-  if (band) return <FruehererBandSeite b={band} />
-  const oeffnen = (b: FruehererBand): void => {
-    if (!blaettern) return setBand(b)
-    blaettern.oeffne('band', () => setBand(b), () => (setBand(null), laden()), `${window.location.pathname}?r=vok&band=${encodeURIComponent(b.id)}`)
-  }
   const starten = (): void => {
     window.scrollTo({ top: 0 })
     setLauf((l) => ({ n: l.n + 1, uebung: 'runde' }))
@@ -462,7 +424,6 @@ export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: 
           In diesem Schuljahr ist noch nichts aus dem Buch freigegeben.
         </Text>
       )}
-      {oben && <FruehereJahre s={s} oeffnen={oeffnen} />}
       <div data-sprach-kasten={s.sprache}>
         <VokabelTrainer key={`sp:${s.sprache}:${lauf.n}`} id={`sp:${s.sprache}`} eingebettet uebung={lauf.uebung} ohneKopf nachRunde={laden} />
       </div>

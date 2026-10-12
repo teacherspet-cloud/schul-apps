@@ -16,6 +16,7 @@
  */
 import { fruehGrund } from '../shared/schuelerFarben'
 import { darstellungPruefen } from './darstellungFelder'
+import { fachobmannFaecher } from './fachobleute'
 import { auszeichnungenVon } from './achievementsDaten'
 import { freigeschaltet } from '../shared/auszeichnungenBilder'
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
@@ -730,6 +731,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             // Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): neue Anmeldung = Übersichten und
             // eingeklappte Kästen wie vorgegeben. Nur ein Fingerabdruck der Kennung, nicht die Kennung selbst.
             sitzung: sitzungsAnzeige(sitzung.kennung),
+            // Fachobleute (12.10.2026, fachobleute.ts): Fächer, deren gemeinsame Lehrwerke die Lehrkraft pflegt
+            ...(sitzung.nutzer.rolle !== 'schueler' && !inVorschau ? { fachobmann: fachobmannFaecher(sitzung.nutzer.id) } : {}),
             ...(inVorschau ? { vorschau: true } : {})
           }
         : { angemeldet: false, adresse: opts.adresse }

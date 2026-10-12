@@ -64,6 +64,10 @@ import {
   standVon,
   standardVerben,
   tageszielVon,
+  ankerTermin,
+  kursAbschnitteFuerVorrang,
+  kursTest,
+  onlineTermineVon,
   teileEingeordnet,
   teileVon,
   vokIstFuer,
@@ -75,6 +79,7 @@ import { buchFuer, buchNamen, wegSpeichern, wegStand } from './vokabelweg'
 import { klassenwechselPruefen } from './schuljahrWechsel'
 import { angekuendigteTests } from './onlinetest'
 import { kursTerminMitOnlinetests } from '../shared/onlinetestTermin'
+import { tageszielVorTest, vorrangSetzen } from '../shared/uebungsVorrang'
 
 const FACH_ZU: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', ru: 'Russisch' }
 
@@ -387,7 +392,18 @@ async function rundeAus(
   const terminVon = (k: Kurs): number | null => kursTerminMitOnlinetests(k.z, onlineTermine, jetzt)
   // Test in den nächsten drei Tagen: nur dessen Kurse
   const testKurse = offen.filter((k) => testPause([terminVon(k)], jetzt))
-  const test = testKurse.length ? new Set(testKurse.flatMap((k) => k.woerter.map((w) => w.zid))) : null
+  /*
+   * Abschnitte der angekündigten Tests (12.10.2026, shared/testAbschnitte.ts): Hat die Lehrkraft Abschnitte gewählt (bzw.
+   * gilt die Vorbelegung), besteht die Runde in den 3 Tagen davor nur aus deren Wörtern – nicht mehr aus dem ganzen Kurs.
+   * Ohne erkennbare Vokabelabschnitte bleibt es beim ganzen Kurs.
+   */
+  const kursTests = new Map(offen.map((k) => [k.z.id, kursTest(k.z, onlineTermine, jetzt)]))
+  const vorrangAbschnitte = offen.flatMap((k) => kursAbschnitteFuerVorrang(k.z, kursTests.get(k.z.id) ?? null, (wid) => `z:${k.z.id}:${wid}`))
+  const testWoerter = (k: Kurs): string[] => {
+    const ids = vorrangAbschnitte.filter((x) => x.test && x.ids[0]?.startsWith(`z:${k.z.id}:`)).flatMap((x) => x.ids)
+    return ids.length ? ids : k.woerter.map((w) => w.zid)
+  }
+  const test = testKurse.length ? new Set(testKurse.flatMap(testWoerter)) : null
   const aktuellIds = new Set<string>()
   for (const k of offen)
     for (const w of k.woerter) {
@@ -424,7 +440,9 @@ async function rundeAus(
           altHerkunft.set(v.id, { art: 'b', reihe })
         }
   }
-  const r = rundenWoerter(woerter, alt, { test, jetzt })
+  const r0 = rundenWoerter(woerter, alt, { test, jetzt })
+  // Übungsvorrang (12.10.2026, shared/uebungsVorrang.ts): neueste Freigabe bzw. Testabschnitte zuerst – über alle Kurse
+  const r = { ...r0, woerter: vorrangSetzen(r0.woerter, vorrangAbschnitte) }
   for (const v of r.woerter.slice(woerter.length)) {
     const h = altHerkunft.get(v.id)
     if (!h) continue
@@ -433,7 +451,9 @@ async function rundeAus(
     // Im Kasten gleich fällig: sie sind für diese Runde gewählt
     if (st) staende[v.id] = { ...st, faellig: Math.min(st.faellig, jetzt) }
   }
-  const tagesziel = Math.max(0, ...offen.map((k) => tageszielVon(k.z))) || 10
+  // Vor einem angekündigten Test steigt das Tagesziel, bis jedes Testwort einmal dran war (Faustregel, 12.10.2026)
+  const naechsterTest = [...kursTests.values()].map((t) => t?.termin ?? null).filter((t): t is number => typeof t === 'number').sort((x, y) => x - y)[0] ?? null
+  const tagesziel = tageszielVorTest(Math.max(0, ...offen.map((k) => tageszielVon(k.z))) || 10, r.woerter, staende, naechsterTest, jetzt)
   const testTermin = offen.map((k) => terminVon(k)).filter((t): t is number => typeof t === 'number' && t >= jetzt - 864e5).sort((x, y) => x - y)[0] ?? null
   const kasten: Kasten = {
     woerter: r.woerter,
@@ -571,7 +591,12 @@ export function sprachstandRoute(): (k: Anfrage) => Promise<boolean> {
       const z = zeile(h.kurs)
       if (!z || !vokIstFuer(z, ich)) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       const st = standVon(z.id, ich.id)
-      const r = abfrageAuswerten({ ...v, id: h.wort }, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich), sprache: z.sprache || sprache })
+      // Termin-Anker auch für angekündigte Vokabel-Onlinetests (12.10.2026)
+      const r = abfrageAuswerten({ ...v, id: h.wort }, k0, st, ankerTermin(z, onlineTermineVon(ich, jetzt), jetzt), {
+        ich,
+        klasse: klasseFuer(z, ich),
+        sprache: z.sprache || sprache
+      })
       if (!r) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
       standSpeichern(z.id, ich.id, st)
       if (r.ergebnis.urteil === 'richtig' && ws.ansehen?.includes(wid)) {

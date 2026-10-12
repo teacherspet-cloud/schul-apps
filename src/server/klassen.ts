@@ -595,6 +595,22 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
 }
 
 /**
+ * Handlungsbedarf je Person (12.10.2026, Förder- und Fordermaterial, server/foerdern.ts): die Arten der Kurs-Hinweise
+ * („inaktiv", „schwach", „foerdern") mit den Kennungen der Betroffenen – derselbe Weg wie die Suche (auch Ausgeblendetes).
+ */
+export function bedarfJePerson(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()): Map<string, string[]> {
+  const aus = new Map<string, string[]>()
+  for (const b of detail(g, lehrkraftId, jetzt, true).bedarfAlle)
+    if ('hinweis' in b && (b.hinweis === 'inaktiv' || b.hinweis === 'schwach' || b.hinweis === 'foerdern'))
+      for (const id of ('ids' in b && Array.isArray(b.ids) ? b.ids : []) as string[]) {
+        const l = aus.get(id) ?? []
+        if (!l.includes(b.hinweis as string)) l.push(b.hinweis as string)
+        aus.set(id, l)
+      }
+  return aus
+}
+
+/**
  * Suche in „Meine Klassen" (10.10.2026, Entscheidung der Lehrkraft): nur die Lernenden der EIGENEN Lerngruppen, nur
  * Anzeigename, Klasse, Fächer, Lerngruppen und Art des Handlungsbedarfs – nichts, was „Meine Klassen" nicht ohnehin zeigt.
  * Gesucht wird über den Namen (nicht Benutzername oder Code); Stichwörter („nicht geübt", „wackelig" …) über den

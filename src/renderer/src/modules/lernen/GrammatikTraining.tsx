@@ -882,6 +882,8 @@ interface Lernstanddaten {
   lerngruppe: string
   code?: string
   link?: string
+  /** IServ-Gruppe der Lerngruppe (12.10.2026): Lernende kommen aus IServ – kein QR-Code */
+  iservGruppe?: string
   paket: GrammatikPaket
   lernende: { id: string; name: string; gast: boolean; uebersicht: { gesamt: number; sicher: number; faellig: number; imAufbau: number }; tage7: number }[]
   problem: { id: string; art: string; satz: string; loesung: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
@@ -924,7 +926,12 @@ export function Lernstand({ id, zurueck, imFenster }: { id: string; zurueck: () 
       <Text c="dimmed">
         {d.fach} · {d.lerngruppe} · {d.paket.aufgaben.length} Aufgaben, {d.paket.regeln.length} Regelkarten
       </Text>
-      {d.code && d.link && <Zugang code={d.code} link={d.link} />}
+      {d.code && d.link && !d.iservGruppe && <Zugang code={d.code} link={d.link} />}
+      {d.iservGruppe && (
+        <Text size="sm" c="dimmed" data-lernende-iserv={d.iservGruppe}>
+          Lernende kommen aus IServ (Gruppe {d.iservGruppe}).
+        </Text>
+      )}
       <Table striped data-karten>
         <Table.Thead>
           <Table.Tr>

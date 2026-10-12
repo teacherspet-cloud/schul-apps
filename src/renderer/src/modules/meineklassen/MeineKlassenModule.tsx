@@ -76,6 +76,9 @@ import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, vokabelBlattFuerKlasse, type FertigesBlatt } from './klassenMaterial'
+// Förder- und Fordermaterial (12.10.2026): Dialog „Für wen" und Bündel „Für dich"
+import { FoerderDialog } from './FoerderDialog'
+import { FoerderBuendel } from './FoerderBuendel'
 import { ProblemWoerterFenster } from './ProblemWoerterFenster'
 import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
@@ -778,6 +781,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
+  // Förder-/Fordermaterial (12.10.2026): Dialog und Vorwahl der Gruppe beim Freischalten
+  const [foerderOffen, setFoerderOffen] = useState(false)
+  const [foerderVorwahl, setFoerderVorwahl] = useState<string[] | null>(null)
   const [wiederholt, setWiederholt] = useState(false)
   // Pop-up „Problemwörter" (10.10.2026): Kachel in „Auf einen Blick"
   const [problemeOffen, setProblemeOffen] = useState(false)
@@ -836,6 +842,22 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     notifySuccess('Die KI erstellt das Arbeitsblatt im Hintergrund – fertig steht es hier unter „Passendes Material“ zum Freischalten.')
     setVorschau(null)
   }
+  /*
+   * Freischalten (12.10.2026): Förder-/Forderblätter einer Gruppe – die Lernenden der bestätigten Gruppe vom Server
+   * vorwählen und das Blatt bei ihnen unter „Für dich" ablegen. Ganze Lerngruppe: wie jedes Blatt. Abgelaufen: ohne Vorwahl.
+   */
+  const freischalten = async (f: FertigesBlatt): Promise<void> => {
+    setFoerderVorwahl(null)
+    if (f.foerder && f.foerder.gruppe !== 'alle')
+      try {
+        const r = await holen<{ schueler: string[] }>(`/server/foerdern/auftrag?id=${encodeURIComponent(f.foerder.auftrag)}&gruppe=${encodeURIComponent(f.foerder.gruppe)}`)
+        setFoerderVorwahl(r.schueler)
+      } catch (e) {
+        notifyError(e)
+        setFoerderVorwahl([])
+      }
+    setFreigabe(f)
+  }
   // Kurs der Klasse (sonst der erste laufende mit Wörtern) – für den Lernstand oben
   const sprachKurs = d.vokabeln.find((v) => v.id === d.klassenKurs) ?? d.vokabeln.find((v) => v.status === 'offen' && v.woerter > 0)
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
@@ -862,18 +884,26 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
       <>
             {fertige.map((f) => (
               <Card key={f.docId} withBorder radius="md" padding="md" style={{ borderColor: 'var(--mantine-color-teal-6)' }} data-blatt-fertig>
-                <Badge color="teal" mb={6}>
-                  fertig
-                </Badge>
+                <Group gap={6} mb={6}>
+                  <Badge color="teal">fertig</Badge>
+                  {/* Förder-/Forderblatt (12.10.2026): nur für die Lehrkraft gekennzeichnet */}
+                  {f.foerder && (
+                    <Badge color={f.foerder.art === 'forder' ? 'grape' : 'blue'} variant="light" data-blatt-foerder={f.foerder.art}>
+                      {f.foerder.art === 'forder' ? 'Forderblatt' : 'Förderblatt'} · {f.foerder.gruppenTitel}
+                    </Badge>
+                  )}
+                </Group>
                 <Text fw={700}>{f.titel}</Text>
                 <Text size="sm" c="dimmed" mb="sm">
-                  Kurz ansehen, dann für {d.titel} freischalten.
+                  {f.foerder && f.foerder.gruppe !== 'alle'
+                    ? 'Kurz ansehen, dann für die Kinder der Gruppe freischalten (erscheint bei ihnen oben im Fachordner).'
+                    : `Kurz ansehen, dann für ${d.titel} freischalten.`}
                 </Text>
                 <Group gap="xs">
                   <Button size="xs" variant="default" onClick={() => void openDocument('arbeitsblatt', f.docId)}>
                     Im Editor ansehen
                   </Button>
-                  <Button size="xs" leftSection={<IconLock size={14} />} onClick={() => setFreigabe(f)} data-jetzt-freischalten>
+                  <Button size="xs" leftSection={<IconLock size={14} />} onClick={() => void freischalten(f)} data-jetzt-freischalten>
                     Jetzt freischalten
                   </Button>
                 </Group>
@@ -975,7 +1005,12 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
             <Button size="xs" variant="light" leftSection={<IconFileText size={14} />} onClick={() => void blattNeuFuerKlasse(d)} data-arbeitsblatt-erstellen>
               Arbeitsblatt erstellen
             </Button>
+            {/* Förder- und Fordermaterial (12.10.2026, Entscheidung der Lehrkraft): rechts neben „Arbeitsblatt erstellen" */}
+            <Button size="xs" variant="light" color="grape" leftSection={<IconUsers size={14} />} onClick={() => setFoerderOffen(true)} data-foerder-erstellen-knopf>
+              Förder- und Fordermaterial erstellen
+            </Button>
           </Group>
+          <FoerderBuendel gruppeId={d.id} klasse={d.name} fach={d.fach} />
           <MaterialListe eintraege={reihenEintraege(d, ort)} leer="Noch keine Unterrichtsreihen oder Blätter in dieser Lerngruppe." />
         </Tabs.Panel>
         {d.sprachfach && (
@@ -1080,6 +1115,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           ohneListe
           gruppeVorwahl={d.id}
           docId={freigabe.docId}
+          {...(freigabe.foerder && freigabe.foerder.gruppe !== 'alle' ? { einzelneVorwahl: foerderVorwahl ?? [], fuerDich: true } : {})}
           freigegeben={() => {
             freigabe.erledigt()
             setFreigabe(null)
@@ -1087,6 +1123,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           }}
         />
       )}
+      {foerderOffen && <FoerderDialog klasse={d} schliessen={() => setFoerderOffen(false)} />}
     </Stack>
   )
 }

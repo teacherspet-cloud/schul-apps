@@ -18,7 +18,7 @@
  * ersten G9-Jahrgang als G9 (Baden-Württemberg: Klasse 5 im Schuljahr 2024/25 oder später – „ab 2025/26 für Klasse 5
  * und 6"; Saarland: ab 2023/24), ältere Jahrgänge als G8.
  */
-import { ABSCHNITT_FOLGE, istOptional, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
+import { ABSCHNITT_FOLGE, fruehereBaendeDerReihe, istOptional, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { schulformVon } from './schulformen'
 import { schuljahrVon } from './schulkalender'
 
@@ -128,14 +128,16 @@ export function bekanntNachBand(buch: string, freigegeben: FreigegebeneUnit[] = 
   const baende = Object.keys(LEHRWERK_GRAMMATIK)
   const reihe = norm(reiheAus(buch))
   const imKatalog = baende.some((b) => norm(reiheAus(b)) === reihe)
-  let i = -1
   const band = grammatikBand(buch)
-  if (band) i = baende.indexOf(band)
-  else if (imKatalog) i = baende.filter((b) => norm(reiheAus(b)) === reihe && bandRang(b) < bandRang(buch)).length
+  /*
+   * Frühere Bände nur derselben Reihe (12.10.2026): Seit die App „Grammatikformen" weitere Lehrwerke in die Liste
+   * bringt, stehen dort nicht mehr nur Green-Line-Bände.
+   */
+  const fruehere = band ? fruehereBaendeDerReihe(band) : imKatalog ? baende.filter((b) => norm(reiheAus(b)) === reihe && bandRang(b) < bandRang(buch)) : []
   const aus = new Set<string>()
   const alle = (b: string, k: string): string[] => Object.values(LEHRWERK_GRAMMATIK[b]?.[k] ?? {}).flatMap((l) => l.flatMap((p) => p.t))
-  for (const b of baende.slice(0, Math.max(0, i))) for (const k of Object.keys(LEHRWERK_GRAMMATIK[b])) if (!istOptional(k)) alle(b, k).forEach((t) => aus.add(t))
-  const frueher = new Set(baende.slice(0, Math.max(0, i)))
+  for (const b of fruehere) for (const k of Object.keys(LEHRWERK_GRAMMATIK[b])) if (!istOptional(k)) alle(b, k).forEach((t) => aus.add(t))
+  const frueher = new Set(fruehere)
   for (const f of freigegeben) {
     const b = grammatikBand(f.buch)
     const kapitel = b ? LEHRWERK_GRAMMATIK[b]?.[f.unit] : undefined

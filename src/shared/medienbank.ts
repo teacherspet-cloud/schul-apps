@@ -11,6 +11,9 @@
  * am Server nur Admins (server/freigaben.ts ADMIN_KANAELE); lesen alle Lehrkräfte und Lernenden.
  */
 
+import type { TonPruefung } from './tonPruefung'
+import type { SatzFassung, SatzFassungSicht } from './satzFassung'
+
 /** Ein Bild zur Auswahl (Treffer der Bildsuche) */
 export interface MedienKandidat {
   url: string
@@ -30,6 +33,8 @@ export interface MedienBild {
   nachweis: string
   /** Weitere gefundene Bilder zum Umwählen */
   kandidaten?: MedienKandidat[]
+  /** Das KI-Bild wurde vom Sicherheitssystem abgelehnt; dieses Bild ist der Ersatz aus der Bildsuche (12.10.2026) */
+  kiAbgelehnt?: boolean
   zeit: number
 }
 
@@ -45,6 +50,16 @@ export interface MedienTon {
    */
   gesprochen?: string
   zeit: number
+  /**
+   * Prüfung per Messung (12.10.2026, shared/tonPruefung.ts): Dauer, Pegel, Stille, abgeschnittenes Ende – einmal
+   * gerechnet und gespeichert. Fehlt bzw. ältere Regelfassung = noch ungeprüft (die Tabelle prüft dann nach).
+   */
+  pruefung?: TonPruefung
+  /**
+   * Vorige Aufnahme als Rückfall (12.10.2026, „Neue Aussprache erzeugen" der Admins): Die ersetzte Datei bleibt liegen,
+   * bis die nächste Neuerzeugung sie verdrängt. `grund`: was die Lehrkraft bemängelt hat.
+   */
+  vorher?: { datei: string; stimme: string; zeit: number; grund?: string }
 }
 
 /**
@@ -93,6 +108,11 @@ export interface MedienEintrag {
   /** Männliche Fassung */
   tonM?: MedienTon
   saetzeM?: Record<string, MedienTon>
+  /**
+   * Geschlechtsbezogene Beispielsätze (12.10.2026, shared/satzFassung.ts): angepasste Fassung für eine Stimme, Schlüssel =
+   * satzSchluessel des Originals. Ohne `lage` = geprüft, keine Anpassung nötig.
+   */
+  fassungen?: Record<string, SatzFassung>
 }
 
 type TonSicht = MedienTon & { url?: string }
@@ -110,6 +130,11 @@ export interface MedienSicht {
   saetze?: Record<string, TonSicht>
   tonM?: TonSicht
   saetzeM?: Record<string, TonSicht>
+  /**
+   * Fassungen geschlechtsbezogener Beispielsätze (12.10.2026): Lehrkraft = alle; Lernende (mit `lage`) nur die, deren
+   * Aufnahme sie hören – dann zeigen sie Text und Übersetzung der Fassung statt des Originals.
+   */
+  fassungen?: Record<string, SatzFassung | SatzFassungSicht>
 }
 
 /** Ton bzw. Sätze einer Fassung */

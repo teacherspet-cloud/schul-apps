@@ -21,8 +21,12 @@ import {
   tonFreigeben,
   tonLoeschen,
   tonReservieren,
-  tonSetzen
+  tonSetzen,
+  tonPruefungSetzen,
+  fassungSetzen
 } from './services/storage/medienbank'
+import type { TonPruefung } from '@shared/tonPruefung'
+import type { SatzFassung } from '@shared/satzFassung'
 import { istStufe, type Bildstufe, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
@@ -77,6 +81,8 @@ import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePo
 import { audioPath, bibliothekSuchen, bibliothekUebernehmen, elevenlabsKontingent, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { importiereAudio } from './services/audio/importAudio'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
+import { listeLehrwerkGrammatik, loescheLehrwerkGrammatik, speichereLehrwerkGrammatik } from './services/storage/lehrwerkGrammatik'
+import type { LehrwerkGrammatikEintrag } from '../renderer/src/shared/lehrwerkGrammatik'
 import { deleteVerbList, getVerbList, listVerbLists, saveVerbList } from './services/storage/verbListen'
 import type { VerbListe } from '@shared/verben'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
@@ -478,6 +484,10 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('textbooks:get', (id: string) => getTextbook(id))
   handle('textbooks:save', (books: Textbook[]) => saveTextbooks(books))
   handle('textbooks:delete', (id: string) => deleteTextbook(id))
+  // Grammatikformen je Lehrwerk-Band (12.10.2026) – am Server gemeinsam, ändern nur Admin/Fachobleute (prüft der Dienst)
+  handle('lehrwerkGrammatik:list', () => listeLehrwerkGrammatik())
+  handle('lehrwerkGrammatik:save', (eintrag: LehrwerkGrammatikEintrag) => speichereLehrwerkGrammatik(eintrag))
+  handle('lehrwerkGrammatik:delete', (id: string) => loescheLehrwerkGrammatik(String(id)))
   // Unregelmäßige Verben je Lehrwerk-Band (30.09.2026) – Ablage im geschützten Ordner der Lehrwerke
   handle('verbLists:list', () => listVerbLists())
   handle('verbLists:get', (id: string) => getVerbList(id))
@@ -584,6 +594,18 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   // Erzeugungssperre (10.10.2026): dieselbe Aufnahme nie zweimal zugleich erzeugen – am Server für alle Lehrkräfte
   handle('medien:ton-reservieren', (kennung: string) => (nurAdmin('Die Aussprache'), tonReservieren(String(kennung))))
   handle('medien:ton-freigeben', (kennung: string) => (nurAdmin('Die Aussprache'), tonFreigeben(String(kennung))))
+  // Prüfung per Messung speichern (12.10.2026, shared/tonPruefung.ts) – Nachprüfung vorhandener Aufnahmen
+  handle(
+    'medien:ton-pruefung',
+    (sprache: string, wort: string, art: TonArt, lage: Stimmlage, satz: string | undefined, datei: string, p: TonPruefung) => (
+      nurAdmin('Die Aussprache'),
+      tonPruefungSetzen(String(sprache), String(wort), art === 'satz' ? 'satz' : 'wort', lage === 'm' ? 'm' : 'w', satz ? String(satz) : undefined, String(datei), p)
+    )
+  )
+  // Geschlechtsbezogene Beispielsätze (12.10.2026, shared/satzFassung.ts)
+  handle('medien:fassung-setzen', (sprache: string, wort: string, original: string, f: Partial<SatzFassung> | null) => (
+    nurAdmin('Die Beispielsätze'), fassungSetzen(String(sprache), String(wort), String(original), f && typeof f === 'object' ? f : null)
+  ))
   handle('medien:admin', () => istAdmin())
 
   handle('audio:voices', () => listVoices())

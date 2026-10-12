@@ -1,9 +1,22 @@
-import { saetzeVon, satzSchluessel, sprachKurz, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
-import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
+import {
+  istGanzerSatz,
+  satzSchluessel,
+  sprachKurz,
+  STIMMLAGE_NAME,
+  tonVon,
+  type Bildstufe,
+  type MedienSicht,
+  type Stimmen,
+  type Stimmlage,
+  type TonArt
+} from '@shared/medienbank'
+import { BildDialog, BildZelle, satzTonVon, TonZelle, useNurVerdacht, useTonNachpruefung, zeileMitVerdacht } from '../../../shared/medien/MedienUi'
 import { gesprochenFuer, lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
+import { satzFuerLage, type SatzFassung } from '@shared/satzFassung'
+import { notifyError } from '../../../shared/util'
 import { abkuerzungAus, abkVoll } from '@shared/abkuerzung'
 import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Stack, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
-import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconArrowsExchange, IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { newId } from '../model/random'
 import SonderzeichenLeiste from '../../../shared/components/SonderzeichenLeiste'
@@ -52,6 +65,15 @@ type Feld = 'term' | 'translation' | 'pos' | 'example' | 'note'
 export const ZUSATZ = 'Zusatzwortschatz (im Buch grau)'
 
 export const leereZeile = <T extends TabellenZeile>(): T => ({ id: newId(), term: '', translation: '' } as T)
+
+/**
+ * Beispielsatz einer Zeile für die Satz-Aussprache (12.10.2026): in Schulbüchern das eigene Feld, in Listen der Hinweis,
+ * wenn er ein ganzer Satz ist (vorher zählte die Medienleiste der Listen nie einen Satz).
+ */
+export const satzDerZeile = (z: Pick<TabellenZeile, 'example' | 'note'>, mitBeispiel: boolean): string | undefined =>
+  mitBeispiel ? z.example : istGanzerSatz(z.note) ? z.note : undefined
+
+const KEINE_MEDIEN: Record<string, MedienSicht> = {}
 
 /**
  * Sprache der Tabelle (30.09.2026): Schrift, Schreibrichtung und Sonderzeichen der Wortspalte,
@@ -148,7 +170,15 @@ export default function VokabelTabelle<T extends TabellenZeile>({
       await starteMedienAuftrag({
         art: art === 'wort' ? 'aussprache' : 'satz',
         sprache: medienSprache,
-        vokabeln: [{ term: wort, translation: zeile?.translation ?? '', example: art === 'satz' ? text : zeile?.example, aussprache: zeile?.aussprache }],
+        vokabeln: [
+          {
+            term: wort,
+            translation: zeile?.translation ?? '',
+            example: art === 'satz' ? text : zeile?.example,
+            exampleTranslation: zeile?.exampleTranslation,
+            aussprache: zeile?.aussprache
+          }
+        ],
         ziel: zielRef.current,
         lagen: [lage],
         einzeln: true
@@ -157,6 +187,41 @@ export default function VokabelTabelle<T extends TabellenZeile>({
     },
     [stimmen, medienSprache, neuLaden]
   )
+  /*
+   * „Neue Aussprache erzeugen" der Admins (12.10.2026, Rechtsklick bzw. langer Druck auf das Symbol): sofort über den
+   * Auftragsweg, auch wenn die Aufnahme passt; die bisherige bleibt als Rückfall. Satz: das Original – der Auftrag
+   * nimmt für jede Stimme ihre Fassung.
+   */
+  const neuErzeugenFuer = useCallback(
+    async (wort: string, art: TonArt, satz: string | undefined, lagen: Stimmlage[], grund: string): Promise<void> => {
+      const zeile = aktuell.current.zeilen.find((z) => z.term === wort)
+      await starteMedienAuftrag({
+        art: art === 'wort' ? 'aussprache' : 'satz',
+        sprache: medienSprache,
+        vokabeln: [
+          { term: wort, translation: zeile?.translation ?? '', example: satz, exampleTranslation: zeile?.exampleTranslation, aussprache: zeile?.aussprache }
+        ],
+        ziel: zielRef.current,
+        lagen,
+        einzeln: true,
+        neu: { grund }
+      })
+      neuLaden?.()
+    },
+    [medienSprache, neuLaden]
+  )
+  /** Fassung eines geschlechtsbezogenen Beispielsatzes speichern (12.10.2026); null = vergessen */
+  const fassungSpeichern = useCallback(
+    async (wort: string, original: string, f: Partial<SatzFassung> | null): Promise<void> => {
+      await window.api.medien.fassungSetzen(medienSprache, wort, original, f)
+      neuLaden?.()
+    },
+    [medienSprache, neuLaden]
+  )
+  // Nachprüfung vorhandener Aufnahmen per Messung (12.10.2026) – gedrosselt im Hintergrund, Admins speichern das Ergebnis
+  useTonNachpruefung(medien ? medienSprache : undefined, medien?.daten ?? KEINE_MEDIEN, medienAdmin)
+  // Filter „vielleicht undeutlich" der Medienleiste (12.10.2026)
+  const nurVerdacht = useNurVerdacht(medien?.ziel?.docId)
 
   useEffect(() => {
     if (!fokus) return
@@ -238,37 +303,41 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 <>
                   <Table.Th w={64}>Beispielbild</Table.Th>
                   <Table.Th w={72}>Aussprache</Table.Th>
-                  {mitBeispiel && <Table.Th w={72}>Satz-Aussprache</Table.Th>}
+                  <Table.Th w={72}>Satz-Aussprache</Table.Th>
                 </>
               )}
               {!nurLesen && <Table.Th w={72} />}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {zeilen.map((z, i) => (
-              <Zeile
-                key={z.id}
-                zeile={z}
-                nr={i + 1}
-                letzte={i === zeilen.length - 1}
-                abfragen={abfragen}
-                mitBeispiel={mitBeispiel}
-                mitVerlauf={mitVerlauf}
-                aendern={aendern}
-                loeschen={loeschen}
-                weiter={weiter}
-                neueZeile={neueZeile}
-                sprache={sprache}
-                nurLesen={nurLesen}
-                medienAn={Boolean(medien)}
-                bildStufe={medien?.ziel?.stufe}
-                sicht={medien?.daten[z.term]}
-                medienAdmin={medienAdmin}
-                bildOeffnen={setBildOffen}
-                tonErzeugen={tonErzeugenFuer}
-                lagen={lagenVon(stimmen).join(',')}
-              />
-            ))}
+            {zeilen.map((z, i) =>
+              nurVerdacht && medien && !zeileMitVerdacht(medien.daten[z.term], satzDerZeile(z, mitBeispiel)) ? null : (
+                <Zeile
+                  key={z.id}
+                  zeile={z}
+                  nr={i + 1}
+                  letzte={i === zeilen.length - 1}
+                  abfragen={abfragen}
+                  mitBeispiel={mitBeispiel}
+                  mitVerlauf={mitVerlauf}
+                  aendern={aendern}
+                  loeschen={loeschen}
+                  weiter={weiter}
+                  neueZeile={neueZeile}
+                  sprache={sprache}
+                  nurLesen={nurLesen}
+                  medienAn={Boolean(medien)}
+                  bildStufe={medien?.ziel?.stufe}
+                  sicht={medien?.daten[z.term]}
+                  medienAdmin={medienAdmin}
+                  bildOeffnen={setBildOffen}
+                  tonErzeugen={tonErzeugenFuer}
+                  lagen={lagenVon(stimmen).join(',')}
+                  neuErzeugen={neuErzeugenFuer}
+                  fassungSpeichern={fassungSpeichern}
+                />
+              )
+            )}
           </Table.Tbody>
         </Table>
       </Box>
@@ -315,6 +384,115 @@ interface ZeilenProps {
   tonErzeugen: (wort: string, art: TonArt, text: string, lage?: Stimmlage) => Promise<void>
   /** Fassungen mit Standardstimme (weiblich/männlich) – eine Zelle je Fassung */
   lagen: string
+  /** „Neue Aussprache erzeugen" (12.10.2026, nur Admins) */
+  neuErzeugen: (wort: string, art: TonArt, satz: string | undefined, lagen: Stimmlage[], grund: string) => Promise<void>
+  /** Fassung eines geschlechtsbezogenen Beispielsatzes speichern (12.10.2026) */
+  fassungSpeichern: (wort: string, original: string, f: Partial<SatzFassung> | null) => Promise<void>
+}
+
+/**
+ * Angepasste Fassung eines geschlechtsbezogenen Beispielsatzes (12.10.2026, shared/satzFassung.ts): unter dem Original,
+ * mit Übersetzung. Admins bearbeiten sie (gespeichert beim Verlassen des Feldes), tauschen die Stimme oder verwerfen sie
+ * („keine Anpassung" – die KI schlägt sie dann nicht erneut vor).
+ */
+function FassungFeld({
+  f,
+  admin,
+  speichern,
+  sprache
+}: {
+  f: SatzFassung
+  admin: boolean
+  speichern: (f: Partial<SatzFassung> | null) => Promise<void>
+  sprache?: string
+}): React.JSX.Element | null {
+  const [text, setText] = useState(f.text ?? '')
+  const [ueb, setUeb] = useState(f.uebersetzung ?? '')
+  useEffect(() => {
+    setText(f.text ?? '')
+    setUeb(f.uebersetzung ?? '')
+  }, [f.text, f.uebersetzung])
+  if (!f.lage) return null
+  const lage = f.lage
+  const sichern = (patch: Partial<SatzFassung>): void =>
+    void speichern({ lage, text, uebersetzung: ueb, von: 'hand', ...patch }).catch((e: unknown) => notifyError(e, 'Fassung nicht gespeichert'))
+  const attr = sprachAttribute(sprache)
+  return (
+    <Box
+      mt={4}
+      px={6}
+      py={2}
+      style={{ borderLeft: '3px solid var(--mantine-color-grape-5)', background: 'var(--mantine-color-grape-light)', borderRadius: 4 }}
+      data-satz-fassung={lage}
+    >
+      <Group gap={4} justify="space-between" wrap="nowrap">
+        <Tooltip
+          label="Der Satz legt die sprechende Person auf ein Geschlecht fest – diese Stimme spricht (und Lernende mit ihr sehen) die angepasste Fassung. Tests und Arbeitsblätter behalten das Original."
+          multiline
+          maw={320}
+        >
+          <Text size="10px" fw={600} c="grape.8">
+            Fassung für {STIMMLAGE_NAME[lage]}e Stimme{f.von === 'ki' ? ' (KI-Vorschlag)' : ''}
+          </Text>
+        </Tooltip>
+        {admin && (
+          <Group gap={0} wrap="nowrap">
+            <Tooltip label={`Stattdessen für die ${STIMMLAGE_NAME[lage === 'w' ? 'm' : 'w']}e Stimme`}>
+              <ActionIcon
+                size="xs"
+                variant="subtle"
+                color="grape"
+                aria-label="Fassung der anderen Stimme zuordnen"
+                onClick={() => sichern({ lage: lage === 'w' ? 'm' : 'w' })}
+              >
+                <IconArrowsExchange size={12} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Keine Anpassung – beide Stimmen sprechen das Original">
+              <ActionIcon
+                size="xs"
+                variant="subtle"
+                color="gray"
+                aria-label="Fassung verwerfen"
+                onClick={() => void speichern({ von: 'hand' }).catch((e: unknown) => notifyError(e, 'Fassung nicht gespeichert'))}
+                data-satz-fassung-weg
+              >
+                <IconTrash size={12} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        )}
+      </Group>
+      <Textarea
+        variant="unstyled"
+        size="xs"
+        autosize
+        minRows={1}
+        readOnly={!admin}
+        value={text}
+        lang={attr.lang}
+        dir={attr.dir}
+        aria-label={`Fassung für ${STIMMLAGE_NAME[lage]}e Stimme`}
+        styles={{ input: { ...UMBRUCH, paddingTop: 2, paddingBottom: 2, ...(attr.style ?? {}) } }}
+        onChange={(e) => setText(e.currentTarget.value)}
+        onBlur={() => text.trim() && text !== (f.text ?? '') && sichern({ text: text.trim() })}
+        data-satz-fassung-text
+      />
+      <Textarea
+        variant="unstyled"
+        size="xs"
+        autosize
+        minRows={1}
+        readOnly={!admin}
+        value={ueb}
+        placeholder="Übersetzung der Fassung"
+        aria-label="Übersetzung der Fassung"
+        styles={{ input: { ...UMBRUCH, paddingTop: 2, paddingBottom: 2, color: 'var(--mantine-color-dimmed)' } }}
+        onChange={(e) => setUeb(e.currentTarget.value)}
+        onBlur={() => ueb !== (f.uebersetzung ?? '') && sichern({ uebersetzung: ueb.trim() })}
+      />
+    </Box>
+  )
 }
 
 /** Mitwachsende Felder: eng wie eine Eingabezeile, ohne Ziehgriff, Umbruch auch in langen Wörtern */
@@ -347,7 +525,9 @@ const Zeile = memo(function Zeile({
   medienAdmin,
   bildOeffnen,
   tonErzeugen: tonFuer,
-  lagen: lagenText
+  lagen: lagenText,
+  neuErzeugen: neuFuer,
+  fassungSpeichern
 }: ZeilenProps): React.JSX.Element {
   // Fassungen der Aussprache (07.10.2026): ohne eingestellte Stimme eine Zelle wie bisher (weiblich = bisherige Felder)
   const lagen: Stimmlage[] = lagenText ? (lagenText.split(',') as Stimmlage[]) : ['w']
@@ -362,6 +542,13 @@ const Zeile = memo(function Zeile({
   const abk = useMemo(() => abkuerzungAus(v.term), [v.term])
   const sprechtext = medienAn ? gesprochenFuer('wort', v.term, v, sprache ?? 'en') : undefined
   const abgefragt = v.include !== false
+  // Beispielsatz für die Satz-Aussprache und seine angepasste Fassung (geschlechtsbezogene Sätze, 12.10.2026)
+  const satz = satzDerZeile(v, mitBeispiel)
+  const fassungDa = satz ? (sicht?.fassungen?.[satzSchluessel(satz)] as SatzFassung | undefined) : undefined
+  const fassungFeld =
+    medienAn && satz && fassungDa?.lage ? (
+      <FassungFeld f={fassungDa} admin={medienAdmin} sprache={sprache} speichern={(f) => fassungSpeichern(v.term, satz, f)} />
+    ) : null
   // Wort, Beispiel und Nennform/Lesung in der Schrift der Sprache; Deutsch und Hinweis bleiben, wie sie sind
   const zielsprachig = (f: Feld): boolean => f === 'term' || f === 'example' || f === 'pos'
   /*
@@ -500,9 +687,13 @@ const Zeile = memo(function Zeile({
             readOnly={nurLesen}
             onChange={(e) => aendern(v.id, { exampleTranslation: e.currentTarget.value }, `zeile:${v.id}:exampleTranslation`)}
           />
+          {fassungFeld}
         </Table.Td>
       )}
-      <Table.Td>{feld('note', mitBeispiel ? 'Hinweis' : 'Beispiel oder Hinweis', undefined, true)}</Table.Td>
+      <Table.Td>
+        {feld('note', mitBeispiel ? 'Hinweis' : 'Beispiel oder Hinweis', undefined, true)}
+        {!mitBeispiel && fassungFeld}
+      </Table.Td>
       {medienAn && (
         <>
           <Table.Td>
@@ -517,30 +708,35 @@ const Zeile = memo(function Zeile({
                   text={v.term}
                   art="wort"
                   lage={zwei ? l : undefined}
+                  stimmlage={l}
+                  lagenDa={lagenText ? lagen : undefined}
                   admin={medienAdmin}
                   gesprochen={sprechtext}
                   erzeugen={() => tonFuer(v.term, 'wort', v.term, l)}
+                  neuErzeugen={medienAdmin && lagenText ? (ls, grund) => neuFuer(v.term, 'wort', undefined, ls, grund) : undefined}
                 />
               ))}
             </Group>
           </Table.Td>
-          {mitBeispiel && (
-            <Table.Td>
-              <Group gap={4} wrap="nowrap">
-                {lagen.map((l) => (
-                  <TonZelle
-                    key={l}
-                    ton={v.example ? saetzeVon(sicht, l)?.[satzSchluessel(v.example)] : undefined}
-                    text={v.example ?? ''}
-                    art="satz"
-                    lage={zwei ? l : undefined}
-                    admin={medienAdmin}
-                    erzeugen={() => tonFuer(v.term, 'satz', v.example ?? '', l)}
-                  />
-                ))}
-              </Group>
-            </Table.Td>
-          )}
+          <Table.Td>
+            <Group gap={4} wrap="nowrap">
+              {lagen.map((l) => (
+                <TonZelle
+                  key={l}
+                  // Geschlechtsbezogene Sätze (12.10.2026): jede Stimme mit ihrer Fassung
+                  ton={satzTonVon(sicht, satz, l)}
+                  text={satz ? satzFuerLage(satz, sicht?.fassungen, l) : ''}
+                  art="satz"
+                  lage={zwei ? l : undefined}
+                  stimmlage={l}
+                  lagenDa={lagenText ? lagen : undefined}
+                  admin={medienAdmin}
+                  erzeugen={() => tonFuer(v.term, 'satz', satz ?? '', l)}
+                  neuErzeugen={medienAdmin && lagenText ? (ls, grund) => neuFuer(v.term, 'satz', satz, ls, grund) : undefined}
+                />
+              ))}
+            </Group>
+          </Table.Td>
         </>
       )}
       {!nurLesen && (
@@ -565,6 +761,19 @@ const Zeile = memo(function Zeile({
                 {!zusatz && (
                   <Menu.Item onClick={() => setZusatzOffen(true)} data-zusatz-oeffnen>
                     Aussprache / weitere richtige Antworten …
+                  </Menu.Item>
+                )}
+                {/* Geschlechtsbezogener Beispielsatz von Hand (12.10.2026): Fassung für die männliche Stimme anlegen, dann bearbeiten */}
+                {medienAn && medienAdmin && satz && !fassungDa?.lage && (
+                  <Menu.Item
+                    onClick={() =>
+                      void fassungSpeichern(v.term, satz, { lage: 'm', text: satz, uebersetzung: v.exampleTranslation, von: 'hand' }).catch((e: unknown) =>
+                        notifyError(e, 'Fassung nicht gespeichert')
+                      )
+                    }
+                    data-satz-fassung-anlegen
+                  >
+                    Beispielsatz für die andere Stimme anpassen …
                   </Menu.Item>
                 )}
               </Menu.Dropdown>

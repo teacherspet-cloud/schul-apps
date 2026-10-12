@@ -63,6 +63,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   // Unregelmäßige Verben je Lehrwerk-Band (30.09.2026)
   'verbLists:list',
   'verbLists:get',
+  // Grammatikformen je Lehrwerk-Band (12.10.2026) – lesen für Vorwissen und Grammatikauswahl
+  'lehrwerkGrammatik:list',
   'library:list',
 
   /*
@@ -172,6 +174,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'nachteilsausgleiche:save',
   'textbooks:save',
   'verbLists:save',
+  'lehrwerkGrammatik:save',
   'library:save',
   /*
    * Themenbereiche ordnen wie die übrigen Bibliotheks-Schreibwege: anlegen, umbenennen,

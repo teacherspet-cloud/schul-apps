@@ -53,6 +53,9 @@ export function openAiStimmen(): TtsVoice[] {
 /** Sprechanweisung: deutlich, im Tempo der Regler, ohne Vorlesen von Regieanweisungen */
 function anweisung(req: TtsRequest): string {
   const tempo = req.settings?.speed
+  // Eigene Anweisung (12.10.2026: Einzelwörter langsam und vollständig vorsprechen) – die Sprache bleibt dabei
+  if (req.anweisung?.trim())
+    return [req.anweisung.trim().slice(0, 600), req.languageCode ? `Sprache des Textes: ${req.languageCode}.` : ''].filter(Boolean).join(' ')
   return [
     'Sprich deutlich und natürlich, wie in einem Hörtext für Lernende.',
     tempo && tempo < 0.95 ? 'Sprich etwas langsamer als gewöhnlich.' : tempo && tempo > 1.05 ? 'Sprich etwas zügiger als gewöhnlich.' : '',

@@ -13,20 +13,22 @@
  *    Kopfleiste, „↑ Nach oben" führt zurück; gezeichnet werden nur Blöcke in der Nähe des Bildes – auch bei Tausenden
  *    Wörtern flüssig (10.10.2026).
  */
-import { ActionIcon, Badge, Button, Loader, Portal, SegmentedControl, Stack, Text } from '@mantine/core'
-import { IconArrowUp, IconVolume } from '@tabler/icons-react'
+import { ActionIcon, Badge, Button, Group, Loader, Modal, Portal, SegmentedControl, Stack, Text } from '@mantine/core'
+import { IconArrowUp, IconPhotoOff, IconVolume } from '@tabler/icons-react'
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { abcEintraege, alphabetisch, mitKoepfen, type AbcPosten, type AbcZeile, type MeinBuch } from '@shared/meineBuecher'
 import { suchform, suchindex, wortlisteFiltern, type Wortliste as Liste, type WortlisteGruppe, type WortlisteWort, type WortStatus } from '@shared/wortliste'
 import { holen } from '../../onlinetest/serverApi'
 import { BandCover } from '../../../shared/components/BandCover'
 import { kannSprechen, sprich } from '../VokabelTrainer'
-import { medienErgaenzen, medium } from '../medienCache'
+import { beispielFuerLernende, medienErgaenzen, medium } from '../medienCache'
 import { useBlaettern } from './blaettern'
 import { schuljahrText } from '@shared/schulkalender'
+import { stufeVon, type MedienSicht } from '@shared/medienbank'
+import { useDarstellung } from '../../onlinetest/schuelerDarstellung'
 import { zahlenAus, type StandZahlen } from '@shared/sprachstand'
 import { useOffenGemerkt } from '../../../shared/sitzung'
-import { BandMedailleBild, SPRACH_CSS, StandKreise } from './Sprachstand'
+import { BandAngebote, BandMedailleBild, SPRACH_CSS, StandKreise, useSprachstand } from './Sprachstand'
 import { buecherTexte, type BuecherTexte } from './buecherTexte'
 import { ruhig, sichtbarerTeil } from './ordnerAnimation'
 import type { FachOrdner } from './regalDaten'
@@ -95,6 +97,15 @@ html[data-touch] .ab-nach-oben { min-height: 44px; }
 @keyframes ab-ein { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .ab-nach-oben { animation: none; } }
 .ab-text { display: flex; gap: 10px; min-width: 0; align-items: baseline; }
+/* Wort antippen (12.10.2026): kleines Fenster mit Bild, Wort, Übersetzung und Aussprache */
+button.ab-text { border: 0; background: transparent; color: inherit; font: inherit; text-align: left; padding: 4px 2px; margin: 0; width: 100%;
+  cursor: pointer; border-radius: 6px; min-height: 32px; }
+@media (hover: hover) { button.ab-text:hover .wl-wort { text-decoration: underline; text-decoration-color: var(--og-akzent); text-underline-offset: 3px; } }
+button.ab-text:focus-visible { outline: 2px solid var(--og-akzent); outline-offset: 1px; }
+.wf-bild { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; max-height: 46vh; border-radius: 12px; overflow: hidden;
+  background: rgba(134,142,150,.12); }
+.wf-bild img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.wf-ohne { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; text-align: center; opacity: .75; }
 .ab-text > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ab-text .wl-wort { flex: 0 1 auto; max-width: 55%; overflow-wrap: normal; }
 .ab-text .wl-bed { flex: 1 1 0; opacity: .85; }
@@ -137,7 +148,10 @@ function useWortDaten(o: FachOrdner, alle: boolean): { d: ListeMitAllen | null; 
       const q = new URLSearchParams({ fach: o.fach })
       for (const id of ids) q.append('id', id)
       if (alle) q.set('alle', '1')
-      const neu: { zeit: number; laden: Promise<ListeMitAllen>; fertig?: ListeMitAllen } = { zeit: Date.now(), laden: holen<ListeMitAllen>(`/s/api/wortliste?${q.toString()}`) }
+      const neu: { zeit: number; laden: Promise<ListeMitAllen>; fertig?: ListeMitAllen } = {
+        zeit: Date.now(),
+        laden: holen<ListeMitAllen>(`/s/api/wortliste?${q.toString()}`)
+      }
       neu.laden.then(
         (x) => (neu.fertig = x),
         () => zwischen.delete(schluessel)
@@ -248,17 +262,18 @@ function WortZeile({ w, sprache, t }: { w: WortlisteWort; sprache: string; t: Bu
       {offen && w.example && (
         <div className="wl-beispiel" data-wortliste-beispiel>
           <div style={{ minWidth: 0 }}>
+            {/* Geschlechtsbezogener Satz (12.10.2026): die Fassung der gehörten Stimme */}
             <Text size="sm" fs="italic">
-              {w.example}
+              {beispielFuerLernende(w).example}
             </Text>
-            {w.exampleTranslation && (
+            {beispielFuerLernende(w).exampleTranslation && (
               <Text size="sm" c="dimmed">
-                {w.exampleTranslation}
+                {beispielFuerLernende(w).exampleTranslation}
               </Text>
             )}
           </div>
           {sprechen && (
-            <ActionIcon variant="subtle" size="sm" onClick={() => sprich(w.example!, sprache)} aria-label={t.beispiel}>
+            <ActionIcon variant="subtle" size="sm" onClick={() => sprich(beispielFuerLernende(w).example!, sprache)} aria-label={t.beispiel}>
               <IconVolume size={14} />
             </ActionIcon>
           )}
@@ -330,7 +345,19 @@ function BuchInhalt({ buchId, gruppen, sprache, t }: { buchId: string; gruppen: 
   )
 }
 
-function UnitZeile({ buchId, unit, gruppen, sprache, t }: { buchId: string; unit: string; gruppen: WortlisteGruppe[]; sprache: string; t: BuecherTexte }): React.JSX.Element {
+function UnitZeile({
+  buchId,
+  unit,
+  gruppen,
+  sprache,
+  t
+}: {
+  buchId: string
+  unit: string
+  gruppen: WortlisteGruppe[]
+  sprache: string
+  t: BuecherTexte
+}): React.JSX.Element {
   const [offen, setOffen] = useOffenGemerkt(`sa-buch-${buchId}-u-${unit}`, false)
   const z = useMemo(() => zahlenVon(gruppen.flatMap((g) => g.woerter)), [gruppen])
   // Eine Unit ohne eigene Abschnitte (nur „Wortschatz" o. Ä. mit gleichem Namen): die Wörter direkt
@@ -353,10 +380,25 @@ function UnitZeile({ buchId, unit, gruppen, sprache, t }: { buchId: string; unit
   )
 }
 
-function AbschnittZeile({ buchId, g, titel, sprache, t }: { buchId: string; g: WortlisteGruppe; titel: string; sprache: string; t: BuecherTexte }): React.JSX.Element {
+function AbschnittZeile({
+  buchId,
+  g,
+  titel,
+  sprache,
+  t
+}: {
+  buchId: string
+  g: WortlisteGruppe
+  titel: string
+  sprache: string
+  t: BuecherTexte
+}): React.JSX.Element {
   const [offen, setOffen] = useOffenGemerkt(`sa-buch-${buchId}-a-${g.key}`, false)
   const z = useMemo(() => zahlenVon(g.woerter), [g])
-  useAussprache(offen ? sprache : '', useMemo(() => (offen ? g.woerter.map((w) => w.term) : []), [offen, g]))
+  useAussprache(
+    offen ? sprache : '',
+    useMemo(() => (offen ? g.woerter.map((w) => w.term) : []), [offen, g])
+  )
   return (
     <div className="mb-abschnitt" data-wortliste-gruppe={g.titel} data-offen={offen}>
       <button type="button" className="og-jahr mb-abschnitt-kopf" aria-expanded={offen} onClick={() => setOffen(!offen)}>
@@ -425,7 +467,15 @@ function coverAufschlagen(knopf: HTMLElement): void {
 }
 
 /** Ein Cover auf dem Bord: Name, Klasse und Schuljahr, bei früheren Jahren Medaille und Anteile */
-function BuchKnopf({ b, t, oeffnen }: { b: MeinBuch; t: BuecherTexte; oeffnen: (id: string) => (e: React.MouseEvent<HTMLButtonElement>) => void }): React.JSX.Element {
+function BuchKnopf({
+  b,
+  t,
+  oeffnen
+}: {
+  b: MeinBuch
+  t: BuecherTexte
+  oeffnen: (id: string) => (e: React.MouseEvent<HTMLButtonElement>) => void
+}): React.JSX.Element {
   const n = woerterIn(b.gruppen)
   const jahr = t.jahrgang(b.klasse ?? null, b.schuljahr ? schuljahrText(b.schuljahr) : null)
   return (
@@ -545,7 +595,16 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
   const treffer = useMemo(() => wortlisteFiltern(alle, verzoegert, index), [alle, index, verzoegert])
   const buch = buecher.find((b) => b.id === offen) ?? null
   const sucht = Boolean(verzoegert.trim())
-  useAussprache(d?.sprache ?? '', useMemo(() => (sucht ? treffer.gruppen.flatMap((g) => g.woerter.map((w) => w.term)) : []), [sucht, treffer]))
+  useAussprache(
+    d?.sprache ?? '',
+    useMemo(() => (sucht ? treffer.gruppen.flatMap((g) => g.woerter.map((w) => w.term)) : []), [sucht, treffer])
+  )
+  // Früherer Band aufgeschlagen (12.10.2026, vorher „Frühere Jahre" unter „Heute üben"): seine ruhigen Angebote – nur Konten
+  const konto = Boolean(window.__schulappsServer?.angemeldet && window.__schulappsServer.quelle !== 'gast')
+  const { sprachen, laden: standLaden } = useSprachstand(o.fach, konto && Boolean(buch && !buch.aktuell))
+  const frueherBand = buch && !buch.aktuell ? (sprachen ?? []).flatMap((x) => x.frueher).find((x) => x.id === buch.id) : undefined
+  // Läuft eine dieser Runden, steht nur sie auf der Seite (12.10.2026: keine Suche, kein Buchkopf, keine Wörter darüber)
+  const [uebt, setUebt] = useState(false)
 
   if (fehler) return <Text c="dimmed">{fehler}</Text>
   if (!d) return <Loader size="sm" />
@@ -561,7 +620,13 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
     (e: React.MouseEvent<HTMLButtonElement>): void => {
       const knopf = e.currentTarget
       if (!blaettern) return setOffen(id)
-      blaettern.oeffne('buch', () => setOffen(id), () => setOffen(null), `${window.location.pathname}?r=wort&buch=${encodeURIComponent(id)}`, true)
+      blaettern.oeffne(
+        'buch',
+        () => setOffen(id),
+        () => setOffen(null),
+        `${window.location.pathname}?r=wort&buch=${encodeURIComponent(id)}`,
+        true
+      )
       coverAufschlagen(knopf)
     }
   const inhalt = buch ? buch.gruppen : offen === WEITERE || !buecher.length ? weitere : null
@@ -569,12 +634,14 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
     <Stack gap="xs" data-wortliste data-meine-buecher>
       <style>{CSS}</style>
       <style>{SPRACH_CSS}</style>
-      <Suche wert={suche} setWert={setSuche} t={t} />
-      <Text size="sm" c="dimmed" aria-live="polite" data-wortliste-anzahl={sucht ? treffer.anzahl : gesamt}>
-        {sucht ? (treffer.anzahl ? t.trefferAlle(treffer.anzahl) : t.nichts(verzoegert.trim())) : buch ? '' : t.woerter(gesamt)}
-      </Text>
+      {!uebt && <Suche wert={suche} setWert={setSuche} t={t} />}
+      {!uebt && (
+        <Text size="sm" c="dimmed" aria-live="polite" data-wortliste-anzahl={sucht ? treffer.anzahl : gesamt}>
+          {sucht ? (treffer.anzahl ? t.trefferAlle(treffer.anzahl) : t.nichts(verzoegert.trim())) : buch ? '' : t.woerter(gesamt)}
+        </Text>
+      )}
       {!sucht && buecher.length > 0 && !offen && <Bord buecher={buecher} weitere={weitere} t={t} oeffnen={oeffnen} />}
-      {!sucht && (buch || offen === WEITERE) && (
+      {!uebt && !sucht && (buch || offen === WEITERE) && (
         <div className="mb-kopf" data-buch-offen={offen}>
           {buch ? (
             <BandCover band={buch} land={buch.stateId ?? ''} breite={44} />
@@ -587,7 +654,9 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
             <Text fw={800}>{buch ? buch.name : t.weitere}</Text>
             <Text size="sm" c="dimmed">
               {buch
-                ? [t.jahrgang(buch.klasse ?? null, buch.schuljahr ? schuljahrText(buch.schuljahr) : null), t.woerter(woerterIn(buch.gruppen))].filter(Boolean).join(' · ')
+                ? [t.jahrgang(buch.klasse ?? null, buch.schuljahr ? schuljahrText(buch.schuljahr) : null), t.woerter(woerterIn(buch.gruppen))]
+                    .filter(Boolean)
+                    .join(' · ')
                 : t.woerter(woerterIn(weitere))}
               {` · ${buch ? (buch.aktuell ? t.freigegeben : t.ganzerBand) : t.ohneBuch}`}
             </Text>
@@ -595,13 +664,14 @@ export function MeineBuecher({ o }: { o: FachOrdner }): React.JSX.Element {
           </div>
         </div>
       )}
+      {!sucht && frueherBand && <BandAngebote key={frueherBand.id} b={frueherBand} nachRunde={standLaden} beimUeben={setUebt} />}
       {sucht && (
         <>
           <Legende t={t} />
           <Gruppen key="suche" gruppen={treffer.gruppen} sprache={d.sprache} t={t} />
         </>
       )}
-      {!sucht && inhalt && (
+      {!uebt && !sucht && inhalt && (
         <>
           <Legende t={t} />
           <BuchInhalt key={offen ?? 'alle'} buchId={buch?.id ?? WEITERE} gruppen={inhalt} sprache={d.sprache} t={t} />
@@ -651,7 +721,19 @@ const alleGemerkt = (): boolean => {
   }
 }
 
-function AbcZeileAnsicht({ z, sprache, schmal, t }: { z: AbcZeile; sprache: string; schmal: boolean; t: BuecherTexte }): React.JSX.Element {
+function AbcZeileAnsicht({
+  z,
+  sprache,
+  schmal,
+  t,
+  oeffnen
+}: {
+  z: AbcZeile
+  sprache: string
+  schmal: boolean
+  t: BuecherTexte
+  oeffnen: (z: AbcZeile) => void
+}): React.JSX.Element {
   // Telefon: Fundstellen untereinander rechts – höchstens zwei Plaketten (die zweite ggf. „+n")
   const zeigen = z.quellen.slice(0, schmal && z.quellen.length > 2 ? 1 : 2)
   return (
@@ -667,7 +749,9 @@ function AbcZeileAnsicht({ z, sprache, schmal, t }: { z: AbcZeile; sprache: stri
       ) : (
         <Punkt s={z.status} t={t} />
       )}
-      <span className="ab-text">{paar(z)}</span>
+      <button type="button" className="ab-text" onClick={() => oeffnen(z)} aria-haspopup="dialog" data-abc-oeffnen>
+        {paar(z)}
+      </button>
       <span className="ab-quellen" title={z.quellen.join(', ')}>
         {zeigen.map((q) => (
           <span key={q} className="ab-quelle" data-abc-quelle={q}>
@@ -702,7 +786,7 @@ function bloecke(posten: AbcPosten[]): AbcBlockDaten[] {
   let b: AbcBlockDaten | undefined
   for (const p of posten) {
     if (p.art === 'kopf' || !b || b.zeilen >= BLOCK) {
-      const buchstabe: string = p.art === 'kopf' ? p.buchstabe : (aus[aus.length - 1]?.buchstabe ?? '')
+      const buchstabe: string = p.art === 'kopf' ? p.buchstabe : aus[aus.length - 1]?.buchstabe ?? ''
       b = { nr: aus.length, buchstabe, anfang: p.art === 'kopf', posten: [], zeilen: 0 }
       aus.push(b)
     }
@@ -754,7 +838,8 @@ const AbcBlock = memo(function AbcBlock({
   schmal,
   t,
   beobachten,
-  melden
+  melden,
+  oeffnen
 }: {
   b: AbcBlockDaten
   schaetzung: number
@@ -766,6 +851,7 @@ const AbcBlock = memo(function AbcBlock({
   tonStand: number
   beobachten: Beobachten
   melden: (nr: number, an: boolean, el: HTMLElement | null) => void
+  oeffnen: (z: AbcZeile) => void
 }): React.JSX.Element {
   const [an, setAn] = useState(anfangs)
   const el = useRef<HTMLDivElement>(null)
@@ -799,12 +885,150 @@ const AbcBlock = memo(function AbcBlock({
               {p.buchstabe}
             </div>
           ) : (
-            <AbcZeileAnsicht key={p.z.key} z={p.z} sprache={sprache} schmal={schmal} t={t} />
+            <AbcZeileAnsicht key={p.z.key} z={p.z} sprache={sprache} schmal={schmal} t={t} oeffnen={oeffnen} />
           )
         )}
     </div>
   )
 })
+
+/** Klasse für die Bildstufe: die des aktuellen Bandes, sonst die höchste der Bände (ohne Angabe: Stufe 5–6) */
+const aktuelleKlasse = (buecher: MeinBuch[] | undefined): number | null => {
+  const b = buecher ?? []
+  const akt = b.find((x) => x.aktuell && x.klasse)?.klasse
+  if (akt) return akt
+  const alle = b.map((x) => x.klasse ?? 0).filter((k) => k > 0)
+  return alle.length ? Math.max(...alle) : null
+}
+
+/** Bilder je Sprache, Stufe und Wort – einmal geladen (auch „kein Bild") */
+const bildZwischen = new Map<string, Promise<MedienSicht | null>>()
+
+function bildLaden(sprache: string, term: string, klasse: number | null): Promise<MedienSicht | null> {
+  const stufe = stufeVon(klasse)
+  const k = `${sprache}|${stufe}|${term}`
+  let p = bildZwischen.get(k)
+  if (!p) {
+    // Wie im Vokabeltraining (medienCache.ts): der Server liefert das Bild der Stufe, sonst das der nächstliegenden
+    const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe, w: term })
+    p = holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).then(
+      (d) => d.medien?.[term] ?? null,
+      () => {
+        bildZwischen.delete(k)
+        return null
+      }
+    )
+    bildZwischen.set(k, p)
+  }
+  return p
+}
+
+/**
+ * Wort aus der alphabetischen Liste (12.10.2026, Wunsch der Lehrkraft): kleines Fenster auf der Seite mit dem Bild aus
+ * der Medienbank (Bildstufe nach Klasse, Rückfall am Server), Wort, Übersetzung und Aussprache; ohne Bild ein
+ * freundlicher Platzhalter. Schließen mit ×, Tippen daneben oder Esc (Mantine-Fenster); am Telefon fast bildschirmbreit.
+ */
+function WortFenster({
+  z,
+  sprache,
+  klasse,
+  t,
+  schliessen
+}: {
+  z: AbcZeile | null
+  sprache: string
+  klasse: number | null
+  t: BuecherTexte
+  schliessen: () => void
+}): React.JSX.Element {
+  // Zuletzt gezeigtes Wort: bleibt beim Ausblenden stehen (sonst wird das Fenster beim Schließen leer)
+  const [zuletzt, setZuletzt] = useState<AbcZeile | null>(z)
+  useEffect(() => {
+    if (z) setZuletzt(z)
+  }, [z])
+  const w = z ?? zuletzt
+  const [bild, setBild] = useState<{ term: string; m: MedienSicht | null } | null>(null)
+  useEffect(() => {
+    if (!z || !sprache) return
+    let aktiv = true
+    void bildLaden(sprache, z.term, klasse).then((m) => aktiv && setBild({ term: z.term, m }))
+    return () => {
+      aktiv = false
+    }
+  }, [z, sprache, klasse])
+  const geladen = Boolean(bild && w && bild.term === w.term)
+  const quelle = geladen ? bild?.m?.bild?.url ?? bild?.m?.bild?.dataUrl : undefined
+  return (
+    <Modal
+      opened={Boolean(z)}
+      onClose={schliessen}
+      centered
+      radius="lg"
+      size="sm"
+      withCloseButton
+      closeButtonProps={{ 'aria-label': 'Schließen', size: 'lg' }}
+      styles={{ header: { minHeight: 0, paddingBottom: 0 }, body: { paddingTop: 4 } }}
+      data-abc-fenster={w?.term ?? ''}
+    >
+      {w && (
+        <Stack gap="sm" data-abc-fenster-wort={w.term}>
+          <div className="wf-bild" data-abc-fenster-bild={quelle ? 'da' : geladen ? 'ohne' : 'laedt'}>
+            {quelle ? (
+              <img src={quelle} alt={w.term} decoding="async" />
+            ) : geladen ? (
+              <div className="wf-ohne">
+                <IconPhotoOff size={34} stroke={1.5} aria-hidden />
+                <Text size="sm">Zu diesem Wort gibt es noch kein Bild.</Text>
+              </div>
+            ) : (
+              <Loader size="sm" />
+            )}
+          </div>
+          <Group gap="xs" wrap="nowrap" align="center" justify="space-between">
+            <div style={{ minWidth: 0 }}>
+              <Text fw={800} size="xl" lh={1.2} style={{ overflowWrap: 'anywhere' }}>
+                {w.term}
+                {w.pos && <span className="wl-pos">{w.pos}</span>}
+              </Text>
+              <Text size="md" style={{ overflowWrap: 'anywhere' }}>
+                {w.translation}
+              </Text>
+            </div>
+            {tonDa(sprache, w.term) && (
+              <ActionIcon
+                variant="light"
+                size="xl"
+                radius="xl"
+                onClick={() => sprich(w.term, sprache)}
+                aria-label={t.anhoeren(w.term)}
+                data-abc-fenster-anhoeren
+              >
+                <IconVolume size={22} />
+              </ActionIcon>
+            )}
+          </Group>
+          {w.example && (
+            <div>
+              <Text size="sm" fs="italic">
+                {w.example}
+              </Text>
+              {w.exampleTranslation && (
+                <Text size="sm" c="dimmed">
+                  {w.exampleTranslation}
+                </Text>
+              )}
+            </div>
+          )}
+          {quelle && bild?.m?.bild?.nachweis && (
+            <Text size="xs" c="dimmed" style={{ overflowWrap: 'anywhere' }}>
+              {bild.m.bild.nachweis}
+            </Text>
+          )}
+        </Stack>
+      )}
+    </Modal>
+  )
+}
 
 export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   // „Meine Wörter | Alle Wörter" (10.10.2026, Wunsch der Lehrkraft): links nur Freigegebenes, rechts alle Wörter der Bände
@@ -821,8 +1045,14 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   const t = useMemo(() => buecherTexte(o.fach), [o.fach])
   const [suche, setSuche] = useState('')
   const verzoegert = useDeferredValue(suche)
-  const zeilen = useMemo(() => (d ? alphabetisch(abcEintraege(d.buecher ?? [], d.gruppen, t.weitere, alle ? d.nichtDran ?? [] : []), d.sprache) : []), [d, t, alle])
-  const suchtexte = useMemo(() => zeilen.map((z) => suchform(`${z.term} \u0001 ${z.translation} \u0001 ${z.example ?? ''} \u0001 ${z.quellen.join(' ')}`)), [zeilen])
+  const zeilen = useMemo(
+    () => (d ? alphabetisch(abcEintraege(d.buecher ?? [], d.gruppen, t.weitere, alle ? d.nichtDran ?? [] : []), d.sprache) : []),
+    [d, t, alle]
+  )
+  const suchtexte = useMemo(
+    () => zeilen.map((z) => suchform(`${z.term} \u0001 ${z.translation} \u0001 ${z.example ?? ''} \u0001 ${z.quellen.join(' ')}`)),
+    [zeilen]
+  )
   const gefiltert = useMemo(() => {
     const teile = suchform(verzoegert).split(' ').filter(Boolean)
     return teile.length ? zeilen.filter((_, i) => teile.every((t) => suchtexte[i].includes(t))) : zeilen
@@ -830,6 +1060,9 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   const posten = useMemo(() => mitKoepfen(gefiltert), [gefiltert])
   const teile = useMemo(() => bloecke(posten), [posten])
   const schmal = useSchmal()
+  // Angetipptes Wort (12.10.2026): kleines Fenster auf der Seite, kein Seitenwechsel
+  const [wahl, setWahl] = useState<AbcZeile | null>(null)
+  const oeffnen = useCallback((z: AbcZeile) => setWahl(z), [])
 
   // Höhen: geschätzt, bis der erste gezeichnete Block gemessen ist (dann stimmen auch die Platzhalter darunter)
   const [mass, setMass] = useState<{ kopf: number; zeile: number; schmal: boolean } | null>(null)
@@ -868,7 +1101,7 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
     setMass((m) =>
       m && m.schmal === schmalJetzt && (k ? Math.abs(m.kopf - kopf) < 0.5 : true) && Math.abs(m.zeile - zeile) < 0.5
         ? m
-        : { kopf: k ? kopf : (m?.kopf ?? HOEHE.kopf), zeile, schmal: schmalJetzt }
+        : { kopf: k ? kopf : m?.kopf ?? HOEHE.kopf, zeile, schmal: schmalJetzt }
     )
   }, [])
   const beobachten = useBeobachter()
@@ -1028,9 +1261,11 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
             tonStand={tonStand}
             beobachten={beobachten}
             melden={melden}
+            oeffnen={oeffnen}
           />
         ))}
       </div>
+      <WortFenster z={wahl} sprache={d.sprache} klasse={aktuelleKlasse(d.buecher)} t={t} schliessen={() => setWahl(null)} />
       {weitUnten && (
         <Portal>
           <button type="button" className="ab-nach-oben" onClick={nachOben} data-abc-nach-oben>

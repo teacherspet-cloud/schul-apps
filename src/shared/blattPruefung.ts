@@ -345,6 +345,8 @@ export interface AbgabeEintrag {
   aufgabe: BlattAufgabe
   /** Antwort als Text (ohne Namen) */
   antwort: string
+  /** Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Regeln der Vorlagen + Befund der Vorprüfung */
+  schreibform?: string
 }
 
 /**
@@ -373,9 +375,12 @@ export function abgabeAufgabenAnfrage(
         [
           `AUFGABE ${e.aufgabe.nr}: ${e.aufgabe.anweisung}`,
           `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten):\n${e.aufgabe.erwartung}`,
+          e.schreibform ? `VORGABEN UND BEFUND ZU AUFGABE ${e.aufgabe.nr}:\n${e.schreibform}` : '',
           'ANTWORT (zwischen <<< und >>>):',
           `<<<\n${e.antwort.trim() || '(nur auf dem Blatt eingezeichnet, siehe Bild)'}\n>>>`
-        ].join('\n')
+        ]
+          .filter(Boolean)
+          .join('\n')
       )
     ]
       .filter(Boolean)

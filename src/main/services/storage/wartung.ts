@@ -80,7 +80,8 @@ const MATERIAL = [
  * Maskottchen in KEINER Sicherung – ausgerechnet die Bestände, die sich nicht neu erzeugen lassen.
  * Ordner werden mit Unterordnern gesichert (Maskottchen liegen je Figur in einem eigenen Ordner).
  */
-export const NUR_SICHERN_ORDNER = ['lehrwerke', 'maskottchen']
+// Grammatikformen der Lehrwerke (12.10.2026, App „Grammatikformen“): eigene Bearbeitungen am PC
+export const NUR_SICHERN_ORDNER = ['lehrwerke', 'maskottchen', 'lehrwerke-grammatik']
 export const NUR_SICHERN_DATEIEN = ['vocab-library.json']
 
 /** Alle Ordner und Dateien, die in eine Sicherung gehören – Grundlage auch für den Vollständigkeitstest */

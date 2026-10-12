@@ -180,6 +180,16 @@ export function lerngruppe(id: string): Lerngruppe | null {
   return z ? alsGruppe(z) : null
 }
 
+/**
+ * IServ-Gruppe einer Lerngruppe (12.10.2026, Kursseite: Lernende kommen dann aus IServ – keine Knöpfe zum Eintragen,
+ * keine Zettel und QR-Codes). Klassenlisten („klasse:…") und Vorschaukonten zählen nicht; ohne Lerngruppe ''.
+ */
+export function iservGruppeVon(lerngruppeId: string | null | undefined): string {
+  if (!lerngruppeId) return ''
+  const g = (lerngruppe(lerngruppeId)?.iserv_gruppe ?? '').trim()
+  return g && !g.startsWith('klasse:') && !g.startsWith('vorschau:') ? g : ''
+}
+
 /** Gehört die Schülerin/der Schüler zur Lerngruppe? (IServ-Gruppe oder von Hand eingetragen) */
 export function gehoertZu(g: Lerngruppe, n: Pick<NutzerInfo, 'benutzer' | 'gruppen'>): boolean {
   if (g.mitglieder.includes(n.benutzer)) return true

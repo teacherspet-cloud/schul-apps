@@ -25,15 +25,14 @@ import {
   empfehlung,
   langeNichtGeuebt,
   lehrwerkStelle,
-  MIN_VERSUCHE,
   stellenRang,
   type Ampel
 } from '@shared/grammatikBereiche'
 
-/** Schwellen wie im Server (grammatik.ts): Schwäche unter 60 %, Stärke ab 85 %, Befund erst ab 5 Versuchen */
+/** Farbe aus der Ampel des Servers (12.10.2026: „sicher" nach der Aufgabenreihe beim ersten Versuch, shared/grammatikSicher.ts) */
 type Stufe = 'rot' | 'gelb' | 'gruen' | 'grau'
-const stufeVon = (r: { versuche: number; quote: number } | undefined): Stufe | null =>
-  !r ? null : r.versuche < 5 ? 'grau' : r.quote < 0.6 ? 'rot' : r.quote < 0.85 ? 'gelb' : 'gruen'
+const STUFE_DER_AMPEL: Record<Ampel, Stufe> = { wenig: 'grau', schwaeche: 'rot', aufbau: 'gelb', sicher: 'gruen' }
+const stufeVon = (r: { versuche: number; quote: number; ampel?: Ampel } | undefined): Stufe | null => (!r ? null : STUFE_DER_AMPEL[ampelVon(r)])
 const prozent = (p: { quote: number }): string => `${Math.round(p.quote * 100)} %`
 /** Alle geübten Regeln einer Person (ältere Server ohne `regeln`: nur Stärken und Schwächen) */
 /** Kurzzeile im zugeklappten Kopf (09.10.2026): wie viele üben, wie sicher bzw. wer Förderung oder Forderung braucht */
@@ -138,7 +137,7 @@ function GrammatikDetails({
   ]
   // Kursschnitt je Form (die Information der früheren „Übersicht")
   const kursSchnitt = (titel: string): { quote: number; n: number } | null => {
-    const q = alle.map((x) => regelVon(x, titel)).filter((p): p is ProfilPunkt => Boolean(p && p.versuche >= MIN_VERSUCHE))
+    const q = alle.map((x) => regelVon(x, titel)).filter((p): p is ProfilPunkt => Boolean(p && ampelVon(p) !== 'wenig'))
     return q.length ? { quote: q.reduce((s, p) => s + p.quote, 0) / q.length, n: q.length } : null
   }
   // Gruppen: Bereiche (Schwächen zuerst, sonst feste Reihenfolge) oder Lehrwerk-Units (chronologisch, ohne Stelle zuletzt)

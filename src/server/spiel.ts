@@ -28,7 +28,7 @@ import {
   standardVerben,
   standSpeichern as vokSpeichern,
   standVon as vokStand,
-  tageszielVon,
+  kursTageszielFuer,
   titelFuerLernende,
   vokIstFuer,
   zeile as vokZeile,
@@ -42,8 +42,9 @@ import { rekordEintragen } from './rekordbuch'
 import { achievementZusammen } from './achievementsDaten'
 import { profilFuer } from './achievements'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
-import { sitzungsWoerter, tagesRunde, tagVon, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
-import { alsKarten, type GrammatikAufgabe } from '../shared/grammatiktrainer'
+import { nachSpielfehlerGrammatik } from '../shared/grammatikSicher'
+import { tagesRunde, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
+import { type GrammatikAufgabe } from '../shared/grammatiktrainer'
 import { verbenFrei } from '../shared/verbFreigabe'
 import { istVerbSprache } from '../shared/verben'
 import { formSpalten, type VerbKarte } from '../shared/verbTraining'
@@ -142,19 +143,16 @@ export function spieleFrei(bereich: Bereich, kurs: string, n: NutzerInfo, jetzt 
     // Lehrkraft hat „Zusammen spielen" für den Kurs abgeschaltet (z. B. vor einem Test)
     if (z.zusammen === 'aus') return false
     if (spieleHeuteFrei(z)) return true
-    const ziel = tageszielVon(z)
+    // Vor einem angekündigten Test erhöht – dieselbe Zahl wie im Trainer (12.10.2026, Übungsvorrang)
+    const ziel = kursTageszielFuer(z, n, vokStand(z.id, n.id).woerter, jetzt)
     return tagesRunde(json_(z.woerter, [] as Vokabel[]), vokStand(z.id, n.id).woerter, jetzt, ziel).woerter.length === 0
   }
   const vokId = G.kopf(kurs)?.vokId
   if (vokId && vokZeile(vokId)?.zusammen === 'aus') return false
   const p = G.paket(kurs)
   if (!p) return false
-  const st = G.stand(kurs, n.id).aufgaben
-  const karten = alsKarten(p.aufgaben) as Vokabel[]
-  if (sitzungsWoerter(karten, st, jetzt, 0).length) return false
-  const heute = tagVon(jetzt)
-  const schonNeu = p.aufgaben.filter((a) => st[a.id]?.erstmals && tagVon(st[a.id].erstmals!) === heute).length
-  return p.aufgaben.filter((a) => !st[a.id]?.versuche).slice(0, Math.max(0, 10 - schonNeu)).length === 0
+  // Wie im Grammatiktrainer (12.10.2026, shared/grammatikVorrang.ts – vor einem Test mehr neue je Tag)
+  return G.heuteOffen(kurs, n, jetzt) === 0
 }
 
 function kursKopf(bereich: Bereich, kurs: string, host: NutzerInfo): { titel: string; sprache: string; jahrgang: number | null } {
@@ -490,7 +488,8 @@ function eintragen(r: Raum, e: SpielErgebnis, jetzt: number): void {
       const ids = new Set((G.paket(form)?.aufgaben ?? []).map((a) => a.id))
       const fehler = x.fehler.filter((f) => ids.has(f))
       st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
-      for (const f of fehler) if (st.aufgaben[f]) st.aufgaben[f] = nachSpielfehler(st.aufgaben[f], jetzt)
+      // Spielfehler gelten als späterer Fehler der Aufgabe – die Form ist dann „im Aufbau" (12.10.2026, grammatikSicher.ts)
+      for (const f of fehler) if (st.aufgaben[f]) st.aufgaben[f] = nachSpielfehlerGrammatik(nachSpielfehler(st.aufgaben[f], jetzt))
       if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
       G.speichern(form, id, st)
     }
@@ -510,7 +509,9 @@ function eintragen(r: Raum, e: SpielErgebnis, jetzt: number): void {
         unmoeglich: l.schwierigkeit === 'unmoeglich'
       },
       jetzt,
-      r.sprache
+      r.sprache,
+      // Medaille „Zusammen" (12.10.2026): nur wer selbst mitgespielt hat (eine eigene Antwort, richtig oder falsch)
+      x.richtig > 0 || x.fehler.length > 0
     )
   }
 }

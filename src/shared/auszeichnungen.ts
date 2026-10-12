@@ -45,14 +45,15 @@ export const KATEGORIEN: Kategorie[] = [
   {
     id: 'wortschatz',
     name: 'Wortschatz sicher',
-    text: 'Jedes Wort ab Fach 2 im Karteikasten zählt einen Punkt, jedes sichere Wort (nach einer Woche noch gewusst) einen weiteren.',
+    // Gestufte Punkte (12.10.2026, Entscheidung der Lehrkraft): Erkennen allein trägt bis Silber, Gold verlangt Behalten
+    text: 'Jedes wiedererkannte Wort zählt einen Punkt, frei gewusst (selbst geschrieben) einen weiteren, sicher (nach einer Woche noch frei gewusst) zwei weitere.',
     nachJahrgang: true,
     basis: [20, 150, 500, 1200, 2500, 4500]
   },
   {
     id: 'grammatik',
     name: 'Grammatik sicher',
-    text: 'Jede geübte Grammatikregel zählt einen Punkt, jede sichere Regel zwei weitere.',
+    text: 'Jede geübte Grammatikform (mindestens eine Aufgabe richtig) zählt einen Punkt, jede sichere Form zwei weitere.',
     nachJahrgang: true,
     basis: [3, 15, 40, 90, 160, 260]
   },
@@ -73,7 +74,7 @@ export const KATEGORIEN: Kategorie[] = [
   {
     id: 'lehrwerk',
     name: 'Lehrwerk-Etappen',
-    text: 'Eine Unit zu 80 % kennengelernt ist eine Etappe, zu 80 % sicher zwei weitere.',
+    text: 'Eine Unit zu 80 % kennengelernt (jedes Wort mindestens einmal richtig) ist eine Etappe, zu 80 % sicher zwei weitere.',
     nachJahrgang: false,
     basis: [1, 4, 10, 20, 35, 55]
   },
@@ -174,7 +175,8 @@ export const zahlText = (n: number): string => Math.round(n).toLocaleString('de-
  */
 export function naechsteStufeText(k: KategorieId, ziel: number): string {
   const z = zahlText(ziel)
-  if (k === 'wortschatz') return `bei ${z} Punkten (etwa ${zahlText(Math.ceil(ziel / 2))} sichere Wörter)`
+  // Je sicheres Wort 4 Punkte (12.10.2026: wiedererkannt 1 + frei gewusst 1 + sicher 2)
+  if (k === 'wortschatz') return `bei ${z} Punkten (etwa ${zahlText(Math.ceil(ziel / WORT_PUNKTE_MAX))} sichere Wörter)`
   if (k === 'dranbleiben') return `bei ${z} ${ziel === 1 ? 'Übungstag' : 'Übungstagen'}`
   if (k === 'lehrwerk') return `bei ${z} ${ziel === 1 ? 'Etappe' : 'Etappen'}`
   return `bei ${z} ${ziel === 1 ? 'Punkt' : 'Punkten'}`
@@ -528,8 +530,13 @@ export interface SprachEingabe {
   sprache: string
   /** Jahrgang des Kurses (der neueste mit Angabe), sonst null */
   jahrgang: number | null
-  /** Wörter ab Fach 2 und sichere Wörter (gleiches Wort zählt einmal) */
-  woerterAb2: number
+  /**
+   * Wortschatz (12.10.2026, gestuft; gleiches Wort zählt einmal): wiedererkannt = mindestens einmal richtig erkannt
+   * oder geschrieben (Fach ≥ 2), frei gewusst = mindestens einmal selbst richtig geschrieben, sicher = zweimal frei
+   * gewusst mit mindestens einer Woche Abstand (shared/vokabeltrainer.ts `istSicher`).
+   */
+  woerterErkannt: number
+  woerterFrei?: number
   woerterSicher: number
   regelnGeuebt: number
   regelnSicher: number
@@ -553,10 +560,14 @@ export function etappen(units: SprachEingabe['units']): number {
   return n
 }
 
+/** Höchstpunkte je Wort: wiedererkannt 1 + frei gewusst 1 + sicher 2 (12.10.2026) */
+export const WORT_PUNKTE_MAX = 4
+
 export function sprachWerte(e: SprachEingabe): Werte {
   const n = (x: unknown): number => Math.max(0, Math.floor(Number(x) || 0))
   return {
-    wortschatz: n(e.woerterAb2) + n(e.woerterSicher),
+    // Gestuft (12.10.2026, Entscheidung der Lehrkraft): Erkennen 1, frei gewusst +1, sicher +2
+    wortschatz: n(e.woerterErkannt) + n(e.woerterFrei) + 2 * n(e.woerterSicher),
     grammatik: n(e.regelnGeuebt) + 2 * n(e.regelnSicher),
     dranbleiben: n(e.tage),
     lehrwerk: etappen(e.units),
@@ -608,8 +619,33 @@ export interface JahrStand {
   titel?: { stufe: number; am: number }
 }
 
-/** Anteile der Höchstpunkte für Bronze … Meister (Wortschatz, Grammatik) */
+/** Anteile der Höchstpunkte für Bronze … Meister (Grundidee; Wortschatz und Grammatik haben seit 12.10.2026 eigene) */
 export const ANTEILE = [0.02, 0.1, 0.25, 0.45, 0.7, 0.9] as const
+/**
+ * Wortschatz (12.10.2026, Entscheidung der Lehrkraft): Anteile von 4 × Bandwörter (Höchstpunkte, WORT_PUNKTE_MAX).
+ * Rechnung für Klasse 5, Green Line 1 (1.089 Wörter, Höchstpunkte 4.356):
+ *   Bronze   1 % →    44 Punkte  ≈ 44 Wörter wiedererkannt – bei 10 neuen Wörtern am Tag nach etwa 4–5 Übungstagen
+ *   Silber   5 % →   220 Punkte  ≈ 220 Wörter wiedererkannt (oder 110 wiedererkannt + frei gewusst) – mit fleißigem
+ *                                 Erkennen (15–20 Wörter am Tag) in etwa 1–2 Wochen
+ *   Gold    30 % → 1.310 Punkte  > 1.089: mit Erkennen allein nicht erreichbar (höchstens 1 Punkt je Wort), z. B.
+ *                                 600 wiedererkannt + 400 frei gewusst + 155 sicher
+ *   Platin  55 % → 2.400 Punkte  > 2 × 1.089: ohne sichere Wörter (behalten nach einer Woche) nicht erreichbar
+ *   Diamant 75 % → 3.270, Meister 90 % → 3.920 (fast der ganze Band sicher)
+ * Faustregel (nicht gemessen): 10 neue Wörter je Übungstag sind die Vorgabe der Kurse (Tagesziel); Fleißige schaffen
+ * mehr. Gold > 1 × Wörter und Platin > 2 × Wörter gelten für jeden Band (Abstand 0,2 × Wörter ≥ 30 > Rundung).
+ */
+export const WORT_ANTEILE = [0.01, 0.05, 0.3, 0.55, 0.75, 0.9] as const
+/**
+ * Grammatik (12.10.2026): Anteile von 3 × Formen des Bands (geübt 1 + sicher 2). Gold (40 % = 1,2 × Formen) ist mit
+ * bloßem Üben (höchstens 1 Punkt je Form) nicht erreichbar – es braucht sichere Formen. Green Line 1 (21 Formen,
+ * Höchstpunkte 63): Bronze 2, Silber 6, Gold 25, Platin 38, Diamant 47, Meister 55.
+ */
+export const GRAMMATIK_ANTEILE = [0.02, 0.1, 0.4, 0.6, 0.75, 0.9] as const
+/**
+ * Kleine Nenner absichern (12.10.2026): Ein Band mit sehr wenigen Wörtern, Formen oder Kapiteln (Platzhalter, kleine
+ * eigene Liste) gäbe sonst Gold nach wenigen Minuten. Darunter gilt dieser Mindestumfang.
+ */
+export const MIN_BAND = { woerter: 150, grammatik: 5, units: 3 } as const
 /** Lehrwerk-Etappen: Bronze = 1 Etappe, Meister = alle Kapitel zu 80 % sicher (3 Etappen je Kapitel) */
 export const ETAPPEN_ANTEILE = [0, 0.15, 0.35, 0.55, 0.75, 1] as const
 /** Zeit-Kategorien: Anteile der Jahresbasis für Silber … Meister (Bronze fest, in der ersten Woche erreichbar) */
@@ -650,7 +686,8 @@ const etappenSchwellen = (u: number): number[] => steigend(ETAPPEN_ANTEILE.map((
 
 /** Schwellen eines Schuljahres aus seiner Grundlage (ohne bekannten Umfang: ein typischer Band) */
 export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[]> {
-  const anteilig = (max: number, mindest: number): number[] => steigend(ANTEILE.map((p, i) => (i === 0 ? Math.max(mindest, Math.round(p * max)) : schoeneZahl(p * max))))
+  const anteilig = (max: number, mindest: number, anteile: readonly number[] = ANTEILE): number[] =>
+    steigend(anteile.map((p, i) => (i === 0 ? Math.max(mindest, Math.round(p * max)) : schoeneZahl(p * max))))
   const wochen = Math.max(1, g.schultage) / 5
   const zeit = (k: keyof typeof ZEIT_KATEGORIEN): number[] => {
     const z = ZEIT_KATEGORIEN[k]
@@ -658,10 +695,11 @@ export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[
     return steigend(ZEIT_ANTEILE.map((p, i) => (i === 0 ? z.bronze : schoeneZahl(p * basis))))
   }
   return {
-    // Ohne bekannten Umfang (10.10.2026, Entscheidung der Lehrkraft): ein typischer Band statt der Jahrgangstabellen
-    wortschatz: anteilig(2 * (g.woerter || TYPISCHER_BAND.woerter), 5),
-    grammatik: anteilig(3 * (g.grammatik || TYPISCHER_BAND.grammatik), 2),
-    lehrwerk: etappenSchwellen(g.units || TYPISCHER_BAND.units),
+    // Ohne bekannten Umfang (10.10.2026, Entscheidung der Lehrkraft): ein typischer Band statt der Jahrgangstabellen;
+    // seit 12.10.2026 gestufte Wortschatzpunkte (4 je Wort), eigene Anteile und ein Mindestumfang (MIN_BAND)
+    wortschatz: anteilig(WORT_PUNKTE_MAX * Math.max(MIN_BAND.woerter, g.woerter || TYPISCHER_BAND.woerter), 5, WORT_ANTEILE),
+    grammatik: anteilig(3 * Math.max(MIN_BAND.grammatik, g.grammatik || TYPISCHER_BAND.grammatik), 2, GRAMMATIK_ANTEILE),
+    lehrwerk: etappenSchwellen(Math.max(MIN_BAND.units, g.units || TYPISCHER_BAND.units)),
     dranbleiben: zeit('dranbleiben'),
     spiele: zeit('spiele'),
     hoeren: zeit('hoeren'),
@@ -675,7 +713,8 @@ export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[
  */
 export const grundlageSchluessel = (g: JahresGrundlage): string =>
   // „v2": Rückfall typischer Band statt Jahrgangstabelle – ältere Schwellen werden einmal neu gerechnet (Erreichtes bleibt)
-  `v2|${g.band?.id ?? '-'}|${g.jahrgang ?? '-'}|${g.woerter ? 'w' : '-'}${g.grammatik ? 'g' : '-'}${g.units ? 'u' : '-'}`
+  // „v3" (12.10.2026): gestufte Wortschatzpunkte, eigene Anteile, Mindestumfang – einmal neu gerechnet (Berichtigung: `berichtigen`)
+  `v3|${g.band?.id ?? '-'}|${g.jahrgang ?? '-'}|${g.woerter ? 'w' : '-'}${g.grammatik ? 'g' : '-'}${g.units ? 'u' : '-'}`
 
 /** Erster und letzter Tag eines Schuljahres und seine Schultage (ohne Kalenderdaten: 1.8.–31.7., übliche Zahl) */
 export function schuljahrRahmen(schuljahr: number, k: SchulkalenderDaten | null = schulkalender()): { schuljahr: number; beginn: string; ende: string; schultage: number; geschaetzt: boolean } {
@@ -727,6 +766,8 @@ export function jahresWerte(gesamt: Werte, start: Partial<Werte>, k: Pick<Jahres
 
 /** Gespeicherter Stand je Person (in den Achievement-Daten) */
 export interface AuszStand {
+  /** Regelstand (12.10.2026): fehlt oder kleiner als AUSZ_REGEL → einmal still berichtigen (`berichtigen`) */
+  regel?: number
   /** Beste je erreichte Stufe je Kategorie über alle Jahre (Bilder der Sammlung, Profilbild) */
   medaillen: Record<string, Partial<Record<KategorieId, { stufe: number; am: number }>>>
   /** Haupttitel (aus den Punkten aller Jahre) */
@@ -857,7 +898,7 @@ export const punkteVon = (stand: AuszStand, sprache: string): number => {
 
 /** Hauptsprache für die Übernahme: die mit den meisten Übungstagen, dann den meisten Wörtern, sonst die erste */
 export function hauptsprache(eingaben: SprachEingabe[]): string | null {
-  const s = [...eingaben].sort((a, b) => b.tage - a.tage || b.woerterAb2 + b.woerterSicher - (a.woerterAb2 + a.woerterSicher))[0]
+  const s = [...eingaben].sort((a, b) => b.tage - a.tage || b.woerterErkannt + b.woerterSicher - (a.woerterErkannt + a.woerterSicher))[0]
   return s?.sprache ?? null
 }
 
@@ -908,4 +949,84 @@ export function zaehlerAusAlt(
     zusammenRunden: n(alt.koopRunden) + n(alt.versusSpiele),
     teamZiele: n(alt.teamZiele)
   }
+}
+
+// ---------------------------------------------------------------- Berichtigung (12.10.2026)
+
+/**
+ * Regelstand der Medaillen. 2 (12.10.2026, Entscheidung der Lehrkraft): gestufte Wortschatzpunkte, „geübt"/„sicher" in
+ * Grammatik nach shared/grammatikSicher.ts, „kennengelernt" erst mit einer richtigen Antwort, Spiele nur mit
+ * sinnvoller Leistung, Mindestumfang kleiner Bände, keine Phantom-Sprache aus dem Vokabelweg.
+ */
+export const AUSZ_REGEL = 2
+
+/**
+ * Einmalige, stille Berichtigung (12.10.2026, Entscheidung der Lehrkraft): Medaillen der Reihe des laufenden
+ * Schuljahres, die nach der neuen Regel (noch) nicht verdient sind, werden auf den verdienten Stand gesetzt – auch
+ * übernommene aus den alten Achievements (`uebernahmeAusAlt`) bleiben nur, soweit sie auch nach der neuen Regel erreicht
+ * wären. Danach Jahrestitel, Sammlung (beste Stufe je Kategorie) und Haupttitel aus den berichtigten Reihen. Nur
+ * abwärts – Höheres trägt danach `fortschreiben` wie gewohnt nach (und meldet es). Keine Meldung an das Kind. Frühere
+ * Schuljahre bleiben, wie sie sind (ihre Werte sind nicht mehr bekannt). Merker `regel`: wiederholt ohne Wirkung; nach
+ * der Berichtigung wird wieder nie entzogen. `erzwingen`: auch bei gesetztem Merker (Übernahme erst jetzt geschehen).
+ * Ergebnis: ob berichtigt wurde.
+ */
+export function berichtigen(stand: AuszStand, eingaben: SprachEingabe[], jetzt: number, erzwingen = false): boolean {
+  if (!erzwingen && (stand.regel ?? 0) >= AUSZ_REGEL) return false
+  jahreUmstellen(stand, eingaben[0]?.jahr?.schuljahr ?? schuljahrVon(jetzt), jetzt)
+  for (const e of eingaben) {
+    const k = e.jahr ?? standardKontext(e, jetzt)
+    const js = jahrHolen(stand, e.sprache, k.schuljahr)
+    jahrGrundlageSetzen(js, k.grundlage)
+    if (e.jahrgang && !js.jahrgang) js.jahrgang = e.jahrgang
+    const verdient = medaillenMit(jahresWerte(sprachWerte(e), js.start, k), schwellenVon(js))
+    for (const m of verdient) {
+      const g = js.medaillen[m.kategorie]
+      if (!g || g.stufe <= m.stufe) continue
+      if (m.stufe >= 1) js.medaillen[m.kategorie] = { stufe: m.stufe, am: g.am }
+      else delete js.medaillen[m.kategorie]
+    }
+    const jt = titelStufe(jahresPunkte(js))
+    if (js.titel && js.titel.stufe > jt) {
+      if (jt >= 1) js.titel = { stufe: jt, am: js.titel.am }
+      else delete js.titel
+    }
+  }
+  // Sammlung und Haupttitel aus den (berichtigten) Reihen – hier einmalig auch abwärts
+  for (const sprache of new Set([...Object.keys(stand.jahre ?? {}), ...Object.keys(stand.medaillen), ...Object.keys(stand.titel)])) {
+    const beste: Partial<Record<KategorieId, { stufe: number; am: number }>> = {}
+    for (const js of Object.values(stand.jahre?.[sprache] ?? {}))
+      for (const [k, x] of Object.entries(js.medaillen ?? {}) as [KategorieId, { stufe: number; am: number }][])
+        if (x && x.stufe > (beste[k]?.stufe ?? 0)) beste[k] = { stufe: x.stufe, am: x.am }
+    stand.medaillen[sprache] = beste
+    const s = titelStufeGesamt(punkteVon(stand, sprache))
+    const t = stand.titel[sprache]
+    if (t && t.stufe > s) {
+      if (s >= 1) stand.titel[sprache] = { stufe: s, am: t.am }
+      else delete stand.titel[sprache]
+    }
+  }
+  stand.regel = AUSZ_REGEL
+  return true
+}
+
+/** Noch nicht gemeldete Glückwünsche, die nach einer Berichtigung nicht mehr stimmen, fallen still weg */
+export function offenBerichtigt(stand: AuszStand, offen: AuszNeu[]): AuszNeu[] {
+  return offen.filter((n) => {
+    if (n.art === 'titel') return (stand.titel[n.sprache]?.stufe ?? 0) >= n.stufe
+    const js = n.schuljahr !== undefined ? stand.jahre?.[n.sprache]?.[String(n.schuljahr)] : undefined
+    if (n.art === 'jahrestitel') return (js?.titel?.stufe ?? 0) >= n.stufe
+    return ((js ? js.medaillen[n.kategorie]?.stufe : stand.medaillen[n.sprache]?.[n.kategorie]?.stufe) ?? 0) >= n.stufe
+  })
+}
+
+/**
+ * Zählt ein Einzelspiel als Runde für „Spiele"? (12.10.2026, Entscheidung der Lehrkraft: nur mit sinnvoller Leistung –
+ * kein Punkt fürs bloße Öffnen und Abbrechen.) Spiele, in denen weniger besser ist (Züge, Sekunden), melden nur beendete
+ * Runden – dort genügt ein Wert über 0. Sonst (richtige Antworten, Sätze, Punkte) mindestens SPIEL_MIN_WERT.
+ * Faustregel: drei richtige Antworten zeigen, dass wirklich gespielt wurde.
+ */
+export const SPIEL_MIN_WERT = 3
+export function spielZaehlt(wert: number, kleinerBesser: boolean): boolean {
+  if (!Number.isFinite(wert) || wert <= 0) return false
+  return kleinerBesser || wert >= SPIEL_MIN_WERT
 }

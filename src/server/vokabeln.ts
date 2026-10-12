@@ -31,14 +31,20 @@ import {
   gastName,
   gehoertZu,
   gleicheMengen,
+  iservGruppeVon,
   lerngruppe,
   lerngruppeErgaenzen,
   lerngruppenHaken,
   lerngruppenVon,
   mitgliederErgaenzen,
   mitgliederVon,
+  angekuendigteTests,
+  type Angekuendigt,
   type Lerngruppe
 } from './onlinetest'
+import { kursTerminMitOnlinetests, kursTestMitOnlinetests } from '../shared/onlinetestTermin'
+import { tageszielVorTest, vorrangSetzen, type VorrangAbschnitt } from '../shared/uebungsVorrang'
+import { abschnitteAusThema, GRAM_PRAEFIX, teilSchluessel, testAuswahlAus, testKeysBereinigt, vorbelegung, type TestAuswahl } from '../shared/testAbschnitte'
 import { iservBereit } from './anmeldung'
 import { bereinigeVerbKarten, verbenUnterWoertern, verbKarten, type VerbKarte } from '../shared/verbTraining'
 import { istVerbSprache, type VerbSprache } from '../shared/verben'
@@ -61,7 +67,8 @@ import { abschnitteBeimSpeichern, lehrwerkGliederung, lehrwerkName } from './war
 import { abkuerzungAus } from '../shared/abkuerzung'
 import { mitnahmeVon, ruhendAufheben, ruht, vokNachziehen } from './mitnahme'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
-import { ausgeblendetFiltern, problemWoerter } from '../shared/problemWoerter'
+import { ausgeblendetFiltern, problemStufe, problemWoerter, problemWoerterJeStufe, PROBLEM_STUFEN } from '../shared/problemWoerter'
+import { kursProblemStufe, lehrkraftProblemStufe, setzeLehrkraftProblemStufe } from './problemStufe'
 import {
   bewerte,
   bewerteAbkuerzung,
@@ -134,6 +141,8 @@ export const db = () => {
     // Verbspiele (08.10.2026): '' = automatisch ab bekannter Vergangenheit, 'an'/'aus' = Schalter der Lehrkraft
     if (!spalten.has('verbspiele')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN verbspiele TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('problem_aus')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN problem_aus TEXT NOT NULL DEFAULT ''")
+    // Empfindlichkeit der Problemwörter je Kurs (12.10.2026): 0 = Standard der Lehrkraft (server/problemStufe.ts)
+    if (!spalten.has('problem_stufe')) d.exec('ALTER TABLE vok_zuweisungen ADD COLUMN problem_stufe INTEGER NOT NULL DEFAULT 0')
     // Entfernte Abschnitte (08.10.2026): JSON [{teil, woerter, zeit}] – Wörter samt Kennungen, der Lernstand bleibt in vok_stand
     if (!spalten.has('entfernt')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN entfernt TEXT NOT NULL DEFAULT ''")
     // Zusammen spielen (08.10.2026): 'aus' = Kooperativ/Versus für diesen Kurs (samt Grammatik) abgeschaltet
@@ -141,6 +150,8 @@ export const db = () => {
     // Erinnerungen zum Üben (10.10.2026): seit dem Abend Vorgabe angeboten – nur 'aus' = von der Lehrkraft ausdrücklich
     // abgeschaltet; leer (nie umgeschaltet) und das frühere 'an' gelten als angeboten
     if (!spalten.has('erinnerungen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN erinnerungen TEXT NOT NULL DEFAULT ''")
+    // Abschnitte des angekündigten Tests (12.10.2026, shared/testAbschnitte.ts): JSON {keys, letzter} – verschlüsselt
+    if (!spalten.has('test_abschnitte')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN test_abschnitte TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -195,8 +206,12 @@ export interface Zeile {
   teile?: string
   /** JSON {wortId: falsch beim Entfernen} – aus den Problemwörtern genommen, bis neue Fehler dazukommen (08.10.2026) */
   problem_aus?: string
+  /** Empfindlichkeit der Problemwörter 1–5, 0 = Standard der Lehrkraft (12.10.2026) */
+  problem_stufe?: number
   /** JSON EntfernterTeil[] – entfernte Abschnitte mit ihren Wörtern (08.10.2026, shared/kursEntfernen.ts) */
   entfernt?: string
+  /** JSON TestAuswahl {keys, letzter} – Abschnitte des angekündigten Tests (12.10.2026, shared/testAbschnitte.ts) */
+  test_abschnitte?: string
 }
 
 // Problemwörter (10.10.2026): eine Definition für alle Stellen – shared/problemWoerter.ts; `ausgeblendetFiltern`
@@ -303,6 +318,8 @@ export const kursHaken: {
   erinnerungenAktiv?: (nutzerIds: string[]) => number
   /** Nach einer Freigabe (10.10.2026, wortliste.ts): doppelte Vokabeln zählen, nur die Zahl ins Protokoll */
   nachFreigabe?: (kursId: string) => void
+  /** Verbundene Grammatik eines Kurses für die Auswahl der Testabschnitte (12.10.2026, grammatik.ts) */
+  grammatikTeile?: (vokId: string) => { id: string; titel: string; zeit: number }[]
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -317,6 +334,115 @@ export function kursGastAufnehmen(vokId: string, nutzerId: string, wieder: strin
 
 /** Tagesziel begrenzt (1–200, Vorgabe 10) */
 export const tageszielVon = (z: Pick<Zeile, 'tagesziel'>): number => Math.max(1, Math.min(200, Math.round(Number(z.tagesziel) || 10)))
+
+// ---------------------------------------------------------------- Übungsvorrang und Testabschnitte (12.10.2026)
+
+/** Gespeicherte Auswahl der Testabschnitte */
+export const testAuswahlVon = (z: Pick<Zeile, 'test_abschnitte'>): TestAuswahl => testAuswahlAus(z.test_abschnitte)
+
+/** Auswahlliste für die Lehrkraft: Vokabelabschnitte (Titel, Freigabezeit) und verbundene Grammatik („gram:<id>") */
+export function testEintraege(z: Zeile): { key: string; titel: string; zeit: number; art: 'vok' | 'gram' }[] {
+  const teile = json_(z.woerter, [] as unknown[]).length ? teileVon(z) : []
+  const vok = teile.map((t) => ({ key: teilSchluessel(t), titel: t.titel, zeit: t.zeit || 0, art: 'vok' as const }))
+  const gram = (kursHaken.grammatikTeile?.(z.id) ?? []).map((g) => ({ key: `${GRAM_PRAEFIX}${g.id}`, titel: g.titel, zeit: g.zeit, art: 'gram' as const }))
+  return [...vok, ...gram]
+}
+
+/**
+ * Gewählte Testabschnitte des Kurstermins: die gespeicherte Auswahl, sonst die Vorbelegung (seit dem letzten Test, sonst
+ * die neueste Freigabe – getrennt für Vokabeln und Grammatik).
+ */
+export function testKeysVon(z: Zeile): string[] {
+  const a = testAuswahlVon(z)
+  if (a.keys) return a.keys
+  const e = testEintraege(z)
+  return [...vorbelegung(e.filter((x) => x.art === 'vok'), a.letzter), ...vorbelegung(e.filter((x) => x.art === 'gram'), a.letzter)]
+}
+
+/**
+ * Angekündigter Test eines Kurses (noch nicht vorbei): Kurstermin oder Vokabel-Onlinetest der Lerngruppe, der frühere.
+ * Abschnitte: beim Kurstermin die Auswahl der Lehrkraft; beim Onlinetest die aus seinem Thema erkannten (sonst wie beim
+ * Kurstermin). `online`: angekündigte Onlinetests der Person (einmal je Anfrage lesen – `onlineTermineVon`).
+ */
+export function kursTest(z: Zeile, online: Angekuendigt[], jetzt = Date.now()): { termin: number; keys: string[] } | null {
+  const t = kursTestMitOnlinetests(z, online, jetzt)
+  if (!t || t.termin <= jetzt) return null
+  if (t.online?.thema) {
+    const teile = json_(z.woerter, [] as unknown[]).length ? teileVon(z) : []
+    const e = teileEingeordnet(z, teile)
+    const keys = abschnitteAusThema(
+      t.online.thema,
+      teile.map((x, i) => ({ key: teilSchluessel(x), titel: x.titel, unit: e[i]?.unit ?? '', name: e[i]?.name ?? x.titel }))
+    )
+    if (keys.length) return { termin: t.termin, keys }
+  }
+  return { termin: t.termin, keys: testKeysVon(z) }
+}
+
+/** Termin für den Termin-Anker (nachAbfrage): Kurstermin oder angekündigter Vokabel-Onlinetest (12.10.2026) */
+export const ankerTermin = (z: Zeile, online: Angekuendigt[], jetzt = Date.now()): number | undefined =>
+  kursTerminMitOnlinetests(z, online, jetzt) ?? undefined
+
+/**
+ * Abschnitte eines Kurses (Sicht der Lernenden, `kursFuerLernende`) für den Übungsvorrang: Freigabezeit und Stelle je
+ * Abschnitt, die des angekündigten Tests markiert. `idVon` bildet die Kennung im Kasten (Sprachrunde: „z:<kurs>:<wort>").
+ */
+export function kursAbschnitteFuerVorrang(z: Zeile, test: { keys: string[] } | null, idVon: (wortId: string) => string = (x) => x): VorrangAbschnitt[] {
+  const woerter = json_(z.woerter, [] as Vokabel[])
+  if (!woerter.length) return []
+  const teile = teileVon(z)
+  const keys = test ? new Set(test.keys) : null
+  const aus: VorrangAbschnitt[] = []
+  let pos = 0
+  teile.forEach((t, i) => {
+    const stueck = i === teile.length - 1 ? woerter.slice(pos) : woerter.slice(pos, pos + Math.max(0, t.anzahl))
+    pos += stueck.length
+    aus.push({ ids: stueck.map((v) => idVon(v.id)), zeit: t.zeit || 0, stelle: i, ...(keys?.has(teilSchluessel(t)) ? { test: true } : {}) })
+  })
+  return aus
+}
+
+/**
+ * Übungsdaten eines Kurses (Sicht der Lernenden) für eine Person: Wörter mit Vorrang, Tagesziel (vor einem Test erhöht,
+ * shared/uebungsVorrang.ts) und Testtermin (auch aus einem angekündigten Vokabel-Onlinetest).
+ */
+export function kursUebung(
+  z: Zeile,
+  staende: Record<string, WortStand>,
+  online: Angekuendigt[],
+  jetzt = Date.now()
+): { woerter: Vokabel[]; tagesziel: number; testTermin: number | null } {
+  const test = kursTest(z, online, jetzt)
+  const woerter = vorrangSetzen(json_(z.woerter, [] as Vokabel[]), kursAbschnitteFuerVorrang(z, test))
+  const tagesziel = tageszielVorTest(tageszielVon(z), woerter, staende, test?.termin ?? null, jetzt)
+  return { woerter, tagesziel, testTermin: kursTerminMitOnlinetests(z, online, jetzt) }
+}
+
+/** Auswahl der Testabschnitte für die Kurseinstellungen der Lehrkraft (12.10.2026) */
+export function testAbschnitteFuerLehrkraft(z: Zeile): {
+  eintraege: { key: string; titel: string; zeit: number; art: 'vok' | 'gram' }[]
+  gewaehlt: string[]
+  eigeneWahl: boolean
+  letzter: number | null
+} {
+  const a = testAuswahlVon(z)
+  return { eintraege: testEintraege(z), gewaehlt: testKeysVon(z), eigeneWahl: Boolean(a.keys), letzter: a.letzter ?? null }
+}
+
+/** Angekündigte Onlinetests einer Person (nur Lernende); Fehler halten nichts auf */
+export function onlineTermineVon(ich: NutzerInfo, jetzt = Date.now()): Angekuendigt[] {
+  if (ich.rolle !== 'schueler') return []
+  try {
+    return angekuendigteTests(ich, jetzt)
+  } catch {
+    return []
+  }
+}
+
+/** Tagesziel eines Kurses (Sicht der Lernenden) für eine Person – dieselbe Zahl wie im Trainer (Erinnerungen, Spiele) */
+export function kursTageszielFuer(z: Zeile, ich: NutzerInfo, staende: Record<string, WortStand>, jetzt = Date.now(), online?: Angekuendigt[]): number {
+  return kursUebung(z, staende, online ?? onlineTermineVon(ich, jetzt), jetzt).tagesziel
+}
 
 /** Heutiger Tag in Deutschland (JJJJ-MM-TT) – für die Freischaltung der Spiele */
 export const heuteTag = (jetzt = new Date()): string => jetzt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' })
@@ -779,12 +905,18 @@ export function woerterDiesesJahres(z: Pick<Zeile, 'teile' | 'titel' | 'woerter'
   return aktuell
 }
 
-function kursUebersicht(z: Zeile, staende: Record<string, WortStand>, jetzt = Date.now()): { uebersicht: ReturnType<typeof uebersicht>; alt: boolean } {
+function kursUebersicht(
+  z: Zeile,
+  staende: Record<string, WortStand>,
+  jetzt = Date.now(),
+  /** Tagesziel für die Person – vor einem angekündigten Test erhöht (12.10.2026, `kursUebung`) */
+  ziel = tageszielVon(z)
+): { uebersicht: ReturnType<typeof uebersicht>; alt: boolean } {
   const woerter = json_(z.woerter, [] as Vokabel[])
   const aktuell = woerterDiesesJahres(z, jetzt)
-  const ganz = uebersicht(woerter, staende, jetzt, tageszielVon(z))
+  const ganz = uebersicht(woerter, staende, jetzt, ziel)
   if (aktuell.length === woerter.length) return { uebersicht: ganz, alt: false }
-  const jetztTeil = uebersicht(aktuell, staende, jetzt, tageszielVon(z))
+  const jetztTeil = uebersicht(aktuell, staende, jetzt, ziel)
   return { uebersicht: { ...ganz, faellig: jetztTeil.faellig, heuteOffen: jetztTeil.heuteOffen }, alt: aktuell.length === 0 }
 }
 
@@ -792,6 +924,9 @@ function kursUebersicht(z: Zeile, staende: Record<string, WortStand>, jetzt = Da
 export function vokabelListenFuer(
   ich: NutzerInfo
 ): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht>; alt: boolean }[] {
+  // Angekündigte Onlinetests einmal lesen (12.10.2026): Tagesziel vor einem Test wie im Trainer
+  const online = onlineTermineVon(ich)
+  const jetzt = Date.now()
   return (
     (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
       // Geplante Abschnitte (09.10.2026) gibt es für Lernende noch nicht – ein ganz geplanter Kurs erscheint nicht
@@ -809,7 +944,7 @@ export function vokabelListenFuer(
         testTermin: z.test_termin,
         // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026: die neuesten Materialien)
         erstellt: z.erstellt,
-        ...kursUebersicht(z, standVon(z.id, ich.id).woerter)
+        ...((st) => kursUebersicht(z, st, jetzt, kursUebung(z, st, online, jetzt).tagesziel))(standVon(z.id, ich.id).woerter)
       }))
   )
 }
@@ -1023,20 +1158,24 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       // Nur freie Abschnitte (geplante Freischaltung, 09.10.2026)
       const woerter = json_(kursFuerLernende(z).woerter, [] as Vokabel[])
       const st = standVon(z.id, ich.id)
-      if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste')
+      // Angekündigte Onlinetests der Person (12.10.2026): Termin-Anker und Übungsvorrang auch für sie
+      const online = onlineTermineVon(ich)
+      if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste') {
+        // Übungsvorrang (12.10.2026, shared/uebungsVorrang.ts): Rang/Vorrang an den Wörtern, Tagesziel vor einem Test erhöht
+        const ueb = kursUebung(kursFuerLernende(z), st.woerter, online)
         return (
           json(res, 200, {
             id: z.id,
             titel: titelFuerLernende(z),
             sprache: z.sprache,
             fach: z.fach,
-            testTermin: z.test_termin,
-            woerter,
+            testTermin: ueb.testTermin,
+            woerter: ueb.woerter,
             staende: st.woerter,
             farbe: await fachfarbeDerLehrkraft(z),
             // Spiele heute schon vor der Tagesrunde (Freischaltung der Lehrkraft, 08.10.2026)
             spieleFrei: spieleHeuteFrei(z),
-            tagesziel: tageszielVon(z),
+            tagesziel: ueb.tagesziel,
             // Unregelmäßige Verben der Liste (07.10.2026) – erst ab bekannter Vergangenheit oder per Schalter (08.10.2026)
             verben: verbenFrei(z.sprache, kursHaken.bekannt?.(ich) ?? [], z.verbspiele ?? '')
               ? // Verben geplanter Abschnitte erst mit ihnen (09.10.2026)
@@ -1049,6 +1188,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           }),
           true
         )
+      }
       // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
         const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), { ich, klasse: klasseFuer(z, ich), sprache: z.sprache })
@@ -1060,7 +1200,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (!istOffen(z)) return json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
-        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined, { ich, klasse: klasseFuer(z, ich), sprache: z.sprache }) : null
+        const r = v ? abfrageAuswerten(v, k0, st, ankerTermin(z, online), { ich, klasse: klasseFuer(z, ich), sprache: z.sprache }) : null
         if (!r) return json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true
         standSpeichern(z.id, ich.id, st)
         const { ergebnis, neu } = r
@@ -1072,6 +1212,14 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     // ---------------------------------------------------------------- Lehrkraft
     if (ich.rolle === 'schueler') return json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
+    // Standard-Empfindlichkeit der Problemwörter dieser Lehrkraft (12.10.2026, Einstellungen › Material)
+    if (teile.length === 1 && teile[0] === 'problem-stufe') {
+      if (req.method === 'POST') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        return json(res, 200, { stufe: setzeLehrkraftProblemStufe(ich.id, k0.stufe) }), true
+      }
+      return json(res, 200, { stufe: lehrkraftProblemStufe(ich.id) }), true
+    }
     if (req.method === 'GET' && teile.length === 0) {
       // Sprachenlernen (08.10.2026): Grammatiktrainings ohne Kurs werden einmalig zu Kursen
       kursHaken.vorListe?.(ich.id)
@@ -1200,7 +1348,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       })
       // Problemwörter (10.10.2026: eine Definition, shared/problemWoerter.ts) – die ganze Liste, damit „Nur
       // Problemwörter", ⚠ und die Zahl in „Meine Klassen"/Startseite übereinstimmen; Ausgeblendete erst bei neuen Fehlern
-      const problem = problemWoerter(frei, lernende.map((l) => l.stand), json_(z.problem_aus, {} as Record<string, number>), jetzt)
+      // Empfindlichkeit (12.10.2026): alle Stufen auf einmal, damit der Regler im Pop-up die Zahl sofort zeigt
+      const jeStufe = problemWoerterJeStufe(frei, lernende.map((l) => l.stand), json_(z.problem_aus, {} as Record<string, number>), jetzt)
+      const stufe = kursProblemStufe(z)
+      const problem = jeStufe[stufe]
       return (
         json(res, 200, {
           id: z.id,
@@ -1209,6 +1360,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           fach: z.fach,
           sprache: z.sprache,
           testTermin: z.test_termin,
+          // Abschnitte des Tests (12.10.2026): Auswahl unter dem Testtermin der Kurseinstellungen
+          testAbschnitte: testAbschnitteFuerLehrkraft(z),
           status: istOffen(z) ? 'offen' : 'beendet',
           bis: z.bis,
           spieleFrei: spieleHeuteFrei(z),
@@ -1233,6 +1386,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           // Entfernte Abschnitte (08.10.2026): Lernstand gespeichert, kommt beim erneuten Hinzufügen zurück
           entfernt: entferntVon(z).map((e) => ({ teil: e.teil, anzahl: e.woerter.length, zeit: e.zeit })),
           lerngruppeId: z.lerngruppe_id,
+          // Lernende aus IServ (12.10.2026): die Kursseite blendet Eintragen, Zettel und QR-Codes aus
+          iservGruppe: iservGruppeVon(z.lerngruppe_id),
           // Kurs einer festen Klasse (09.10.2026): kein „Kurs beenden/löschen", kein Lernzeitraum-Ende
           klassenKurs: istKlassenKurs(z),
           // Übersicht je Abschnitt auch ohne Lerngruppe (09.10.2026: Units je Band im Überblick) – mit Lerngruppe kommt sie
@@ -1266,6 +1421,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             jetzt
           ),
           problem,
+          problemStufe: stufe,
+          problemStufeEigen: z.problem_stufe ? stufe : null,
+          problemStufeStandard: lehrkraftProblemStufe(z.lehrkraft_id),
+          problemZahlen: PROBLEM_STUFEN.map((st) => jeStufe[st].length),
           // Kasten „Abschnitte & Wörter" (10.10.2026): Stand der Klasse je Wort, wer mit den Problemwörtern kämpft
           wortSicher: wortSicherAnteile(woerter, lernende.map((l) => l.stand)),
           problemWer: problemLernende(
@@ -1320,17 +1479,36 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return json(res, 200, { ok: true }), true
       }
       if (teile[1] === 'termin') {
-        db()
-          .prepare('UPDATE vok_zuweisungen SET test_termin = ? WHERE id = ?')
-          .run(typeof k0.testTermin === 'number' ? k0.testTermin : null, z.id)
-        return json(res, 200, { ok: true }), true
+        const termin = typeof k0.testTermin === 'number' ? k0.testTermin : null
+        /*
+         * Abschnitte des Tests (12.10.2026, shared/testAbschnitte.ts): Ist der bisherige Termin vorbei und kommt ein neuer,
+         * merkt sich der Kurs den alten (Vorbelegung „seit dem letzten Test") und die alte Auswahl gilt nicht weiter.
+         * `testAbschnitte` (Liste) setzt die Auswahl, null stellt die Vorbelegung wieder her, fehlt es, bleibt sie.
+         */
+        const vorbei = typeof z.test_termin === 'number' && z.test_termin < Date.now() && termin !== z.test_termin
+        let auswahl: TestAuswahl = vorbei ? { keys: null, letzter: z.test_termin! } : testAuswahlVon(z)
+        const keys = testKeysBereinigt(k0.testAbschnitte, new Set(testEintraege(z).map((e) => e.key)))
+        if (keys !== undefined) auswahl = { ...auswahl, keys }
+        db().prepare('UPDATE vok_zuweisungen SET test_termin = ?, test_abschnitte = ? WHERE id = ?').run(termin, JSON.stringify(auswahl), z.id)
+        const neu = zeile(z.id)
+        return json(res, 200, { ok: true, testAbschnitte: neu ? testAbschnitteFuerLehrkraft(neu) : null }), true
       }
       // Problemwort aus der Liste nehmen (08.10.2026): gemerkt wird die jetzige Fehlerzahl – steigt sie, kommt es wieder
+      // Empfindlichkeit dieses Kurses (12.10.2026): 1–5, null/0 = Standard der Lehrkraft
+      if (teile[1] === 'problem-stufe') {
+        const st = k0.stufe === null || k0.stufe === 0 ? 0 : problemStufe(k0.stufe)
+        db().prepare('UPDATE vok_zuweisungen SET problem_stufe = ? WHERE id = ?').run(st, z.id)
+        return json(res, 200, { ok: true }), true
+      }
       if (teile[1] === 'problem-aus') {
         const wid = String(k0.id ?? '')
+        // Lockerste Stufe (12.10.2026): umfasst die Listen aller Stufen
         const alle = problemWoerter(
           json_(z.woerter, [] as Vokabel[]),
-          lernendeVon(z).map((n) => standVon(z.id, n.id).woerter)
+          lernendeVon(z).map((n) => standVon(z.id, n.id).woerter),
+          {},
+          Date.now(),
+          5
         )
         const p = alle.find((x) => x.id === wid)
         if (!p) return json(res, 404, { fehler: 'Dieses Wort steht nicht in der Liste.' }), true
@@ -1738,7 +1916,7 @@ export function vokabelnDerGruppe(
       }
     }
     // Problemwörter des Kurses (10.10.2026): dieselbe Liste wie auf der Kursseite (ohne Ausgeblendete)
-    const problem = problemWoerter(woerter, staende, json_(zVoll.problem_aus, {} as Record<string, number>), jetzt)
+    const problem = problemWoerter(woerter, staende, json_(zVoll.problem_aus, {} as Record<string, number>), jetzt, kursProblemStufe(zVoll))
     if (offen) {
       const testBald = Boolean(z.test_termin && z.test_termin >= jetzt && z.test_termin - jetzt <= 14 * TAG)
       const nachId = new Map(woerter.map((v) => [v.id, v]))

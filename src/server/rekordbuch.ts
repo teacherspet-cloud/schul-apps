@@ -85,7 +85,8 @@ export function rekordEintragen(
   if (besser) j.rekorde[schluessel] = { wert, datum: jetzt }
   schreiben(n.id, jahr, j)
   // Achievements: „Rekord gebrochen" nur, wenn es schon einen Rekord gab; dazu Spielarten, Blitzrunde, Verbformen
-  achievementSpiel(n, schluessel, wert, besser && Boolean(bisher), fehler, jetzt, sprache)
+  // „Weniger ist besser" geht mit (12.10.2026): Spiele zählen nur mit sinnvoller Leistung (shared/auszeichnungen.ts `spielZaehlt`)
+  achievementSpiel(n, schluessel, wert, besser && Boolean(bisher), fehler, jetzt, sprache, kleinerBesser(schluessel))
   return besser
 }
 

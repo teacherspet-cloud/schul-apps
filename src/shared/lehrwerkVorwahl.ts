@@ -10,6 +10,7 @@
  *  3. sonst nichts.
  * Vokabeln: dazu der nächste Abschnitt nach dem höchsten schon im Kurs. Grammatik: die Units bis zum Stand der Klasse.
  */
+import { passtZurGruppe, passung } from './lehrwerkSchulform'
 
 export interface VorwahlBuch {
   id: string
@@ -60,7 +61,12 @@ export interface FreiAbschnitt {
 export const normName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const reiheVon = (b: Pick<VorwahlBuch, 'reihe' | 'name'>): string => b.reihe || b.name.replace(/\s*\d+\s*$/, '') || b.name
 
-/** Band einer Reihe für einen Jahrgang – Land und Schulform der Schule zuerst */
+/**
+ * Band einer Reihe für einen Jahrgang – Land und Schulform der Schule zuerst.
+ * Seit 12.10.2026 (Jahrgang/Schulform je Lehrwerk pflegbar, shared/lehrwerkSchulform.ts): Bände, deren Land oder
+ * Schulform der Schule widerspricht (Gymnasial-Ausgabe an der Realschule, Ausgabe Bayern in Niedersachsen), treten
+ * zurück, solange es einen passenden Band gibt; Schulformen gleichen Profils (Gymnasium eines anderen Landes) passen.
+ */
 export function bandFuerJahrgang<B extends VorwahlBuch>(
   buecher: B[],
   reihe: string,
@@ -69,9 +75,10 @@ export function bandFuerJahrgang<B extends VorwahlBuch>(
   schule: { land?: string; schulform?: string } = {}
 ): B | null {
   const passend = buecher.filter((b) => b.language === sprache && reiheVon(b) === reihe && b.grade === jahrgang)
-  const punkte = (b: VorwahlBuch): number =>
-    (schule.land && b.stateId === schule.land ? 2 : 0) + (schule.schulform && b.schoolTypeId === schule.schulform ? 1 : 0)
-  return [...passend].sort((a, b) => punkte(b) - punkte(a))[0] ?? null
+  const wunsch = { stateId: schule.land, schoolTypeId: schule.schulform }
+  const ohneWiderspruch = passend.filter((b) => passtZurGruppe(b, wunsch))
+  const kandidaten = ohneWiderspruch.length ? ohneWiderspruch : passend
+  return [...kandidaten].sort((a, b) => passung(b, wunsch) - passung(a, wunsch))[0] ?? null
 }
 
 /** Lehrwerk zu einem Grammatik-Band („Green Line 1" → green-line-1, auch „green-line-1-nds") */
