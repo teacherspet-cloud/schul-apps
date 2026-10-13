@@ -180,6 +180,8 @@ export default defineConfig({
     outDir: r('out/mobil'),
     emptyOutDir: true,
     target: 'safari16',
+    // Kleine Symbole der Leiste immer einbetten (13.10.2026, wie electron.vite.config.ts)
+    assetsInlineLimit: (datei: string) => (/-96\.webp$/.test(datei) ? true : undefined),
     chunkSizeWarningLimit: 8000,
     reportCompressedSize: false
   },
