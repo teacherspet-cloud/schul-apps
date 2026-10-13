@@ -13,6 +13,8 @@ import {
   AUFGABEN_JE_FELD,
   stufeVon,
   STUFEN,
+  STUFE_NAME,
+  UEBUNG_NAME,
   aufgabeKern,
   ohneDoppelte,
   UEBUNGEN,
@@ -160,7 +162,12 @@ let kette: Promise<void> = Promise.resolve()
 /** So viele Aufgaben je Übungsart mehr als fehlen (die Prüfung streicht im Schnitt etwa ein Viertel) */
 const PUFFER = 2
 
-type BankAuftragEingabe = Omit<BankAuftrag, 'vorhanden'> & { vorhanden?: string[]; nurWennLeer?: boolean }
+type BankAuftragEingabe = Omit<BankAuftrag, 'vorhanden'> & {
+  vorhanden?: string[]
+  nurWennLeer?: boolean
+  /** Ohne Durchsicht gleich in die Bank (13.10.2026, Knopf „Ergänzen" je Zeile) – sonst als Entwurf */
+  direkt?: boolean
+}
 
 /**
  * KI-Aufgaben für mehrere Schlüssel im Hintergrund erzeugen (eine Anfrage je Schlüssel, nacheinander). Jeder fertige
@@ -168,6 +175,7 @@ type BankAuftragEingabe = Omit<BankAuftrag, 'vorhanden'> & { vorhanden?: string[
  * geprüft, was noch fehlt (Bank und Entwürfe, auch aus früheren Schritten der Warteschlange) – Erledigtes entfällt.
  */
 export function bankErzeugenStarten(auftraege: BankAuftragEingabe[], titel: string, docId = 'grammatikformen'): void {
+  const direkt = auftraege.every((a) => a.direkt)
   if (!auftraege.length) return
   void starteAuftrag({
     moduleId: 'grammatikformen',
@@ -190,11 +198,15 @@ export function bankErzeugenStarten(auftraege: BankAuftragEingabe[], titel: stri
       }
     },
     ablegen: async (n) => {
-      notifySuccess(`${n} Aufgaben der KI liegen in „Grammatikformen“ zum Durchsehen bereit.`)
+      notifySuccess(direkt ? `${n} Aufgaben ergänzt und gespeichert.` : `${n} Aufgaben der KI liegen in „Grammatikformen“ zum Durchsehen bereit.`)
     },
-    abschluss: (n) => `${n} Aufgaben fertig – in „Grammatikformen“ durchsehen und speichern`
+    abschluss: (n) => (direkt ? `${n} Aufgaben ergänzt und gespeichert` : `${n} Aufgaben fertig – in „Grammatikformen“ durchsehen und speichern`)
   })
-  notifySuccess('Die KI schreibt die Aufgaben im Hintergrund – sie erscheinen hier zum Durchsehen.')
+  notifySuccess(
+    direkt
+      ? 'Die KI ergänzt die fehlenden Aufgaben im Hintergrund und speichert sie gleich.'
+      : 'Die KI schreibt die Aufgaben im Hintergrund – sie erscheinen hier zum Durchsehen.'
+  )
 }
 
 /** Die Schritte eines Auftrags: je Schlüssel und Stufe neu prüfen, dann erzeugen und als Entwurf ablegen */
@@ -225,6 +237,7 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
     const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
     const da = a.vorhanden ?? bank.map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
     const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
+      if (a.direkt) return direktSpeichern(a, r)
       bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
       return r
     })
@@ -236,6 +249,34 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
     }
   }
   return n
+}
+
+/**
+ * Ohne Durchsicht speichern (13.10.2026, Wunsch der Lehrkraft: Knopf „Ergänzen"): zu den hinterlegten Aufgaben hinzu,
+ * ohne Dopplungen; die Regelkarte bleibt, wenn es schon eine gibt.
+ */
+async function direktSpeichern(
+  a: BankAuftragEingabe,
+  r: { regel: BankRegel; aufgaben: BankAufgabe[] }
+): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[] }> {
+  const da = (await bankLesen([a.schluessel]))[0]
+  const neu = ohneDoppelte(r.aufgaben, new Set((da?.aufgaben ?? []).map(aufgabeKern).filter(Boolean)))
+  await bankSpeichern(a.sprache, a.schluessel, da?.regel?.titel ? da.regel : r.regel, [...(da?.aufgaben ?? []), ...neu])
+  window.dispatchEvent(new Event(BANK_EREIGNIS))
+  return { regel: r.regel, aufgaben: neu }
+}
+
+/**
+ * Was fehlt noch? (13.10.2026, Tooltip in Grammatikformen): je Stufe die Übungsarten unter dem Ziel mit ihrer Zahl, dazu
+ * ein Hinweis auf Entwürfe, die erst nach dem Speichern zählen.
+ */
+export function fehltText(zahl: BankZahlen[string] | undefined, stufen: readonly Stufe[], entwurf?: BankEntwurf): string[] {
+  const zeilen = stufen.flatMap((st) => {
+    const fehlt = UEBUNGEN.filter((u) => feldZahl(zahl, u, st) < AUFGABEN_JE_FELD)
+    return fehlt.length ? [`${STUFE_NAME[st]}: ${fehlt.map((u) => `${UEBUNG_NAME[u]} ${feldZahl(zahl, u, st)} von ${AUFGABEN_JE_FELD}`).join(', ')}`] : []
+  })
+  if (entwurf?.aufgaben.length) zeilen.push(`${entwurf.aufgaben.length} Aufgaben der KI warten aufs Durchsehen – sie zählen erst nach dem Speichern.`)
+  return zeilen
 }
 
 /**

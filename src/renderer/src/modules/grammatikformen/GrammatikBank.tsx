@@ -64,6 +64,7 @@ import {
   bankSpeichern,
   bankZahlenLaden,
   fehlendeFelder,
+  fehltText,
   feldZahl,
   useSchulStufen,
   useBankEntwuerfe,
@@ -247,6 +248,9 @@ export function BankKarte({
           const n = UEBUNGEN.reduce((m, u) => m + (z?.[u] ?? 0), 0)
           const e = entwurfVon(r.schluessel)
           const voll = n > 0 && !fehlendeFelder(z, schulStufen).length
+          // Was fehlt (13.10.2026): Tooltip an „teilweise"; „Ergänzen" füllt es ohne Durchsicht auf
+          const fehlt = fehltText(z, schulStufen, e)
+          const ergaenzbar = darfReiter(r) && felderVon(r).length > 0
           const ampel = !n
             ? { farbe: 'gray', icon: <IconCircleDashed size={14} /> }
             : voll
@@ -263,12 +267,52 @@ export function BankKarte({
                     <Text size="sm" fw={600} truncate title={r.name}>
                       {r.name}
                     </Text>
-                    <Text size="xs" c="dimmed">
-                      {!n ? 'noch keine Aufgaben' : voll ? `${n} Aufgaben – vollständig` : `${n} Aufgaben – teilweise`}
-                      {e ? ` · ${e.aufgaben.length} neue zum Durchsehen` : ''}
-                    </Text>
+                    <Tooltip
+                      label={
+                        <Stack gap={2}>
+                          <Text size="xs" fw={600}>
+                            Es fehlen (Ziel je Übungsart und Stufe: {AUFGABEN_JE_FELD}):
+                          </Text>
+                          {fehlt.map((z0) => (
+                            <Text key={z0} size="xs">
+                              {z0}
+                            </Text>
+                          ))}
+                        </Stack>
+                      }
+                      disabled={voll || !fehlt.length}
+                      multiline
+                      w={360}
+                      withinPortal
+                    >
+                      <Text size="xs" c="dimmed" style={{ cursor: voll ? undefined : 'help' }} data-bank-stand>
+                        {!n ? 'noch keine Aufgaben' : voll ? `${n} Aufgaben – vollständig` : `${n} Aufgaben – teilweise`}
+                        {e ? ` · ${e.aufgaben.length} neue zum Durchsehen` : ''}
+                      </Text>
+                    </Tooltip>
                   </div>
                 </Group>
+                {ergaenzbar && (
+                  <Tooltip label="Die KI ergänzt, was noch fehlt, und speichert es gleich – ohne Durchsehen">
+                    <Button
+                      size="compact-sm"
+                      variant="light"
+                      color="violet"
+                      leftSection={<IconSparkles size={14} />}
+                      onClick={() =>
+                        bankErzeugenStarten(
+                          felderVon(r).map((f) => ({ ...auftrag(r, f.uebungen, f.stufe), direkt: true })),
+                          `Ergänzen: ${r.titel}`,
+                          ziel
+                        )
+                      }
+                      style={{ flexShrink: 0 }}
+                      data-bank-ergaenzen
+                    >
+                      Ergänzen
+                    </Button>
+                  </Tooltip>
+                )}
                 <Button
                   size="compact-sm"
                   variant={e ? 'filled' : 'light'}
