@@ -33,6 +33,7 @@ import type { TextbookMeta } from '@shared/types'
 import {
   AUFGABEN_JE_FELD,
   istKern,
+  istMix,
   mixSchluessel,
   regelIdVon,
   STUFE_NAME,
@@ -200,8 +201,27 @@ export function BankKarte({
   const felderVon = (r: Reiter): ReturnType<typeof fehlendeFelder> => fehlendeFelder(zahlen[r.schluessel], schulStufen, entwurfVon(r.schluessel))
   // Je Stufe der Schule eine Anfrage je Bereich (13.10.2026)
   const auftraegeVon = (r: Reiter): ReturnType<typeof auftrag>[] => felderVon(r).map((f) => auftrag(r, f.uebungen, f.stufe))
-  const offeneReiter = reiter.filter((r) => darfReiter(r) && felderVon(r).length)
-  const alleFehlenden = (): void => bankErzeugenStarten(offeneReiter.flatMap(auftraegeVon), `Übungsaufgaben: ${punkt.text}`, ziel)
+  /*
+   * „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach erzeugt): Gemischtes (je Punkt, je Unit) nur in
+   * Stufen, in denen es noch gar keine Aufgaben hat – sonst holte jeder Punkt der Unit die gemischte Wiederholung erneut,
+   * solange die Prüfung ein Feld unter dem Ziel ließ. Auffüllen: „Mit KI erzeugen" im eigenen Reiter.
+   */
+  const felderFuerAlle = (r: Reiter): ReturnType<typeof fehlendeFelder> =>
+    istMix(r.schluessel)
+      ? felderVon(r).filter(
+          (f) =>
+            !UEBUNGEN.some((u) => feldZahl(zahlen[r.schluessel], u, f.stufe) > 0) && !entwurfVon(r.schluessel)?.aufgaben.some((a) => stufeVon(a) === f.stufe)
+        )
+      : felderVon(r)
+  const offeneReiter = reiter.filter((r) => darfReiter(r) && felderFuerAlle(r).length)
+  const alleFehlenden = (): void =>
+    bankErzeugenStarten(
+      offeneReiter.flatMap((r) =>
+        felderFuerAlle(r).map((f) => ({ ...auftrag(r, f.uebungen, f.stufe), ...(istMix(r.schluessel) ? { nurWennLeer: true } : {}) }))
+      ),
+      `Übungsaufgaben: ${punkt.text}`,
+      ziel
+    )
 
   const editor = bearbeiten && (
     <BankEditor

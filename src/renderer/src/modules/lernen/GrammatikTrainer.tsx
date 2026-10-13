@@ -132,7 +132,7 @@ interface Ergebnis {
 function sende<T>(d: Daten, pfad: string, k: Record<string, unknown>): Promise<T> {
   if (!d.vorschau) return senden<T>(pfad, k)
   if (pfad === '/s/api/grammatik/antwort') {
-    const a = d.paket.aufgaben.find((x) => x.id === k.aufgabeId)
+    const a = d.paket.aufgaben.find((x) => x.id === k.aufgabeId) ?? d.paket.reserve?.find((x) => x.id === k.aufgabeId)
     if (!a) return Promise.reject(new Error('Unbekannte Aufgabe.'))
     const antwort = String(k.antwort ?? '')
     const selbst = k.selbst === 'richtig' || k.selbst === 'fast' || k.selbst === 'falsch' ? k.selbst : undefined
@@ -227,7 +227,8 @@ function Kasten({
   aktualisieren: (r: Partial<Daten>) => void
 }): React.JSX.Element {
   const farbe = useVtFarbe()
-  const karten = useMemo(() => alsKarten(d.paket.aufgaben) as Vokabel[], [d.paket.aufgaben])
+  // Mit Förderreserve (13.10.2026): ihre Aufgaben kommen nur über grammatikHeute bei Schwierigkeiten dran
+  const karten = useMemo(() => alsKarten([...d.paket.aufgaben, ...(d.paket.reserve ?? [])]) as Vokabel[], [d.paket.aufgaben, d.paket.reserve])
   /*
    * Heute dran (08.10.2026): fällige Wiederholungen, dann unbearbeitete Übungen in der Reihenfolge der Regeln (bei
    * Förderaufgaben nach Stufen) – je Tag höchstens 10 neue. Seit 12.10.2026 (Übungsvorrang, shared/grammatikVorrang.ts):
@@ -273,7 +274,7 @@ function Kasten({
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const ich = window.__schulappsServer
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
-  const nachId = new Map(d.paket.aufgaben.map((a) => [a.id, a]))
+  const nachId = new Map([...d.paket.aufgaben, ...(d.paket.reserve ?? [])].map((a) => [a.id, a]))
   const tagesAufgaben = heute.map((k) => nachId.get(k.id)!).filter(Boolean)
   // Spiele nur mit Aufgaben, die der Kasten schon eingeführt hat (wie bei den Vokabeln)
   const bekannt = useMemo(() => ({ ...d.paket, aufgaben: d.paket.aufgaben.filter((a) => (d.staende[a.id]?.fach ?? 0) > 0) }), [d.paket, d.staende])

@@ -186,6 +186,33 @@ describe('Aufgabenbank: Stufen und Namen (13.10.2026)', () => {
     expect(bankPaket('x', [e], ['g', 'm']).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3'])
     expect(bankPaket('x', [e]).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3', 'b1'])
   })
+  it('Förderreserve: Gymnasium übt mittel/anspruchsvoll, grundlegend nur bei Schwierigkeiten (13.10.2026)', async () => {
+    const { foerderAusReserve } = await import('../src/shared/grammatikVorrang')
+    const e = {
+      schluessel: 'en.a/x',
+      regel: { titel: 'A', erklaerung: 'a', beispiele: [] },
+      aufgaben: [
+        aufgabe('m1', 'bilden'),
+        aufgabe('m2', 'bilden'),
+        ...['g1', 'g2', 'g3', 'g4'].map((id) => ({ ...aufgabe(id, 'bilden'), niveau: 'g' as const })),
+        { ...aufgabe('g5', 'erkennen'), niveau: 'g' as const }
+      ]
+    }
+    const p = bankPaket('x', [e], ['m', 'a'])
+    expect(p.aufgaben.map((a) => a.id)).toEqual(['m1', 'm2'])
+    expect(p.reserve?.map((a) => a.id)).toEqual(['g1', 'g2', 'g3', 'g4', 'g5'])
+    expect(bankPaket('x', [e], ['g', 'm']).reserve).toBeUndefined()
+    const st = (versuche: number, falsch: number): WortStand =>
+      ({ fach: 1, faellig: 0, frei: [], erkannt: 0, erkennenVersuche: 0, versuche, falsch, fehlerTexte: [], zuletzt: 0 } as WortStand)
+    // Ohne Schwierigkeiten: keine Reserve
+    expect(foerderAusReserve(p, { m1: st(3, 0) })).toEqual([])
+    // Zwei Fehler bei 50 %: drei grundlegende Aufgaben derselben Übungsart (nicht „erkennen")
+    expect(foerderAusReserve(p, { m1: st(2, 1), m2: st(2, 1) })).toEqual(['g1', 'g2', 'g3'])
+    // Drei davon geschafft: Hilfe getan
+    expect(foerderAusReserve(p, { m1: st(2, 1), m2: st(2, 1), g1: st(1, 0), g2: st(1, 0), g3: st(1, 0) })).toEqual([])
+    // grammatikHeute nimmt sie vor die neuen
+    expect(grammatikHeute(p, { m1: st(2, 1), m2: st(2, 1) }, { erstellt: 0 }).slice(-3)).toEqual(['g1', 'g2', 'g3'])
+  })
   it('Namen der Teilbereiche sind für sich verständlich', async () => {
     const { teilKurzname, kennungLabel } = await import('../src/renderer/src/modules/grammatikformen/grammatikformen')
     expect(teilKurzname('en.syn.short_answers/be')).toMatch(/^Kurzantworten.*: mit be$/)

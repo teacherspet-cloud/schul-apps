@@ -155,9 +155,14 @@ export const kernZahl = (z: Partial<Record<Uebung, number>> | undefined): number
 export function bankPaket(thema: string, eintraege: readonly BankEintrag[], stufen?: readonly Stufe[]): GrammatikPaket {
   const regeln: GrammatikRegel[] = []
   const aufgaben: GrammatikAufgabe[] = []
+  const reserve: GrammatikAufgabe[] = []
+  // Förderreserve (13.10.2026): Übt der Kurs nicht „grundlegend", liegen die grundlegenden Aufgaben als Reserve bereit
+  const mitReserve = Boolean(stufen?.length && !stufen.includes('g'))
   for (const e of eintraege) {
     const passend = stufen?.length ? e.aufgaben.filter((a) => stufen.includes(stufeVon(a))) : e.aufgaben
     if (!passend.length) continue
+    if (mitReserve)
+      for (const a of e.aufgaben.filter((x) => stufeVon(x) === 'g')) reserve.push({ ...a, regelId: regelIdVon(e.schluessel), stufe: uebungStufe(a.uebung) })
     const regelId = regelIdVon(e.schluessel)
     regeln.push({
       id: regelId,
@@ -172,7 +177,7 @@ export function bankPaket(thema: string, eintraege: readonly BankEintrag[], stuf
     )
     for (const a of sortiert) aufgaben.push({ ...a, regelId, stufe: uebungStufe(a.uebung) })
   }
-  return { thema, regeln, aufgaben }
+  return { thema, regeln, aufgaben, ...(reserve.length ? { reserve } : {}) }
 }
 
 // ---------------------------------------------------------------- „sicher" (13.10.2026, Entscheidung der Lehrkraft)

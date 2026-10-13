@@ -63,5 +63,46 @@ export function grammatikHeute(
     )
     .slice(0, neu)
     .map((x) => x.a.id)
-  return [...faellig, ...neue]
+  return [...faellig, ...foerderAusReserve(paket, staende), ...neue]
+}
+
+/** Schwierigkeiten in Regel und Übungsart: mindestens so viele Fehler … */
+export const RESERVE_AB_FEHLER = 2
+/** … bei mindestens diesem Fehleranteil */
+export const RESERVE_AB_ANTEIL = 0.4
+/** Höchstens so viele grundlegende Aufgaben je Regel und Übungsart auf einmal */
+export const RESERVE_JE_MAL = 3
+
+/**
+ * Förderreserve (13.10.2026, Entscheidung der Lehrkraft: „die grundlegenden dürfen als Fördermaterial dienen, wenn Schüler
+ * Schwierigkeiten mit der mittleren Schwierigkeit haben"): Hat ein Kind in einer Regel und Übungsart mindestens
+ * RESERVE_AB_FEHLER Fehler bei RESERVE_AB_ANTEIL Fehleranteil, kommen bis zu RESERVE_JE_MAL noch nicht geübte grundlegende
+ * Aufgaben genau dieser Regel und Übungsart vor den neuen dran. Wiederholt werden sie nicht (keine Karten im Kasten).
+ */
+export function foerderAusReserve(paket: Pick<GrammatikPaket, 'aufgaben' | 'reserve'>, staende: Record<string, WortStand>): string[] {
+  if (!paket.reserve?.length) return []
+  const aus: string[] = []
+  const gruppen = new Map<string, { versuche: number; falsch: number }>()
+  for (const a of paket.aufgaben) {
+    const s = staende[a.id]
+    if (!s?.versuche || !a.uebung) continue
+    const g = gruppen.get(`${a.regelId}|${a.uebung}`) ?? { versuche: 0, falsch: 0 }
+    g.versuche += s.versuche
+    g.falsch += s.falsch ?? 0
+    gruppen.set(`${a.regelId}|${a.uebung}`, g)
+  }
+  for (const [k, g] of gruppen) {
+    if (g.falsch < RESERVE_AB_FEHLER || g.falsch / g.versuche < RESERVE_AB_ANTEIL) continue
+    // Schon geübte Reserve dieser Gruppe zählt mit: nach RESERVE_JE_MAL richtigen ist die Hilfe getan
+    const eigene = paket.reserve.filter((a) => `${a.regelId}|${a.uebung}` === k)
+    const geschafft = eigene.filter((a) => (staende[a.id]?.versuche ?? 0) > (staende[a.id]?.falsch ?? 0)).length
+    if (geschafft >= RESERVE_JE_MAL) continue
+    aus.push(
+      ...eigene
+        .filter((a) => !staende[a.id]?.versuche)
+        .slice(0, RESERVE_JE_MAL - geschafft)
+        .map((a) => a.id)
+    )
+  }
+  return aus
 }

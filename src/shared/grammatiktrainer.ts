@@ -94,6 +94,12 @@ export interface GrammatikPaket {
   thema: string
   regeln: GrammatikRegel[]
   aufgaben: GrammatikAufgabe[]
+  /**
+   * Förderreserve (13.10.2026, Entscheidung der Lehrkraft): grundlegende Aufgaben aus der Aufgabenbank für Kurse, die sonst
+   * nur mittel/anspruchsvoll üben (Gymnasium). Sie zählen nirgends mit (nicht für „sicher", nicht in Spielen) und kommen
+   * nur dran, wenn ein Kind in derselben Regel und Übungsart Schwierigkeiten hat (shared/grammatikVorrang.ts).
+   */
+  reserve?: GrammatikAufgabe[]
   /** Unregelmäßige Verben (07.10.2026): die Karten für die Verbspiele und die Sprache der Liste */
   verben?: VerbKarte[]
   verbSprache?: VerbSprache

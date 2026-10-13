@@ -1363,7 +1363,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         )
       if (req.method === 'POST' && url.pathname === '/s/api/grammatik/antwort') {
         if (!istOffen(z)) return json(res, 409, { fehler: 'Dieses Training ist abgeschlossen.' }), true
-        const a = p.aufgaben.find((x) => x.id === k0.aufgabeId)
+        // Auch Aufgaben der Förderreserve (13.10.2026, grundlegend bei Schwierigkeiten)
+        const a = p.aufgaben.find((x) => x.id === k0.aufgabeId) ?? p.reserve?.find((x) => x.id === k0.aufgabeId)
         if (!a) return json(res, 400, { fehler: 'Unbekannte Aufgabe.' }), true
         // Tabellen und Bestimmungen kommen als JSON – deshalb mehr Platz als für einen Satz
         const antwort = String(k0.antwort ?? '').slice(0, 4000)
