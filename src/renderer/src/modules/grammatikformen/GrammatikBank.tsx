@@ -535,6 +535,17 @@ function BankEditor({
               Hinterlegte Aufgaben ändern nur Admins und die Fachobleute des Fachs.
             </Alert>
           )}
+          {/* Speichern auch oben (13.10.2026, Wunsch der Lehrkraft) – beim Durchsehen langer Listen nicht erst nach unten */}
+          {darf && (
+            <Group justify="space-between" gap="xs" data-bank-kopf>
+              <Text size="sm" c="dimmed">
+                {aufgaben.length} Aufgaben{neu.size ? `, davon ${neu.size} neu von der KI zum Durchsehen` : ''}
+              </Text>
+              <Button loading={laeuft} onClick={() => void speichern()} data-bank-speichern-oben>
+                Speichern ({aufgaben.length} Aufgaben)
+              </Button>
+            </Group>
+          )}
           <Card withBorder radius="md" padding="sm">
             <Text fw={600} size="sm" mb={6}>
               Regelkarte
