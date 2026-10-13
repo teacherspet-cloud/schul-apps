@@ -34,3 +34,8 @@ export const aufServer = (): boolean => false
 export function findCli(): string | null {
   return null
 }
+
+/** Sparsames Codex-Modell für Bilder (0.4.117) – ohne Abo-Zugang gibt es keines */
+export function sparModellCodex(): string | null {
+  return null
+}
