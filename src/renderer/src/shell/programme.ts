@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { siehtLehrwerkPflege } from '@shared/fachobleute'
 import { modules, type SchulModule } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
 import { sichtbareProgramme } from '../shared/programmSichtbarkeit'
@@ -15,6 +16,7 @@ export function useSichtbareProgramme(): SchulModule[] {
   const anzeigen = useAppSettings((s) => s.settings.programmeAnzeigen)
   // Admins sehen immer alles (10.10.2026) – die Rolle steht beim Laden fest
   const admin = serverIch()?.rolle === 'admin'
-  const fachobmann = Boolean(serverIch()?.fachobmann?.length)
+  // Vokabellisten nur für Fachobleute eines Fachs mit Lehrwerken (13.10.2026: Fachobleute gibt es jetzt für alle Fächer)
+  const fachobmann = siehtLehrwerkPflege('lehrkraft', serverIch()?.fachobmann)
   return useMemo(() => sichtbareProgramme(modules, eigene, anzeigen, { admin, fachobmann }), [eigene, anzeigen, admin, fachobmann])
 }

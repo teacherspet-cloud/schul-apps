@@ -24,6 +24,7 @@ import { erstellePaket, lesePaketEin, WEGE } from '../main/services/paket/wege'
 import type { PaketArt } from '../main/services/paket/paket'
 import { aktuellerNutzer, imNutzer } from './kontext'
 import { alleNutzer, datenbank, nutzerNachId, protokolliereServer } from './datenbank'
+import { fachobmannFaecher } from './fachobleute'
 import { alsNutzer, json, type Anfrage, type Aufruf } from './http'
 
 export const FREIGEBBAR: PaketArt[] = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'elternbrief', 'tafelbild']
@@ -38,6 +39,15 @@ export const KANAL: Record<string, string> = {
   elternbrief: 'elternbriefe',
   tafelbild: 'tafelbilder'
 }
+/** Ordnung durch die Fachobleute (13.10.2026) */
+interface Meta {
+  freigabe_id: string
+  empfohlen: number
+  ausgeblendet: number
+  jahrgang: number | null
+  thema: string
+}
+
 const ART_ZU_KANAL = new Map(Object.entries(KANAL).map(([art, k]) => [k, art as PaketArt]))
 
 const SCHEMA = `
@@ -54,6 +64,13 @@ CREATE TABLE IF NOT EXISTS fach_iserv (
   nutzer_id TEXT PRIMARY KEY REFERENCES nutzer(id) ON DELETE CASCADE,
   faecher TEXT NOT NULL DEFAULT '[]',
   stand TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fach_freigabe_meta (
+  freigabe_id TEXT PRIMARY KEY,
+  empfohlen INTEGER NOT NULL DEFAULT 0,
+  ausgeblendet INTEGER NOT NULL DEFAULT 0,
+  jahrgang INTEGER,
+  thema TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS fach_kopien (
   nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
@@ -191,11 +208,20 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
     const ausIserv = iservFaecher(n.id)
     const eigeneFaecher = eingestellt.length || ausIserv.length ? [...new Set([...eingestellt, ...ausIserv])] : []
 
+    /*
+     * Fachobleute (13.10.2026, abgestimmt): Material ihres Fachs als „empfohlen" markieren, für die Fachschaft ausblenden
+     * und Jahrgang/Thema zuordnen (Tabelle fach_freigabe_meta). Ausgeblendetes sehen nur die Erstellerin und die Fachobleute.
+     */
+    const obmann = n.rolle === 'admin' ? null : fachobmannFaecher(n.id)
+    const darfOrdnen = (f: Pick<Freigabe, 'fach'>): boolean => obmann === null || obmann.includes(f.fach)
+    const metaVon = (id: string): Meta | undefined => db().prepare('SELECT * FROM fach_freigabe_meta WHERE freigabe_id = ?').get(id) as Meta | undefined
+
     if (req.method === 'GET' && !was) {
       const namen = new Map(alleNutzer().map((x) => [x.id, x]))
       const alle = db().prepare('SELECT * FROM fach_freigaben ORDER BY erstellt DESC').all() as unknown as Freigabe[]
+      const metas = new Map((db().prepare('SELECT * FROM fach_freigabe_meta').all() as unknown as Meta[]).map((m) => [m.freigabe_id, m]))
       const eintraege = alle
-        .filter((f) => f.besitzer_id === n.id || sichtbarFuer(f, eigeneFaecher))
+        .filter((f) => f.besitzer_id === n.id || ((darfOrdnen(f) || sichtbarFuer(f, eigeneFaecher)) && (!metas.get(f.id)?.ausgeblendet || darfOrdnen(f))))
         .flatMap((f) => {
           const dok = lesen(f.besitzer_id, f.art, f.doc_id)
           if (!dok) return []
@@ -203,8 +229,9 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
           // Thema und Jahrgang (10.10.2026): die Materialien-Seite am Telefon zeigt Freigaben im passenden Thema
           const st = { ...((dok.stats ?? {}) as Record<string, unknown>), ...dok }
           const text = (x: unknown): string => (typeof x === 'string' ? x.trim() : '')
-          const thema = text(st.ueberthema) || text(st.topic) || text(st.thema)
-          const jahrgang = typeof st.grade === 'number' ? st.grade : undefined
+          const m = metas.get(f.id)
+          const thema = text(m?.thema) || text(st.ueberthema) || text(st.topic) || text(st.thema)
+          const jahrgang = m?.jahrgang || (typeof st.grade === 'number' ? st.grade : undefined)
           return [
             {
               id: f.id,
@@ -216,10 +243,16 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
               eigen: f.besitzer_id === n.id,
               datum: String(dok.updatedAt ?? f.erstellt),
               ...(thema ? { thema } : {}),
-              ...(jahrgang ? { jahrgang } : {})
+              ...(jahrgang ? { jahrgang } : {}),
+              ...(m?.empfohlen ? { empfohlen: true } : {}),
+              ...(m?.ausgeblendet ? { ausgeblendet: true } : {}),
+              ...(m?.thema || m?.jahrgang ? { zugeordnet: true } : {}),
+              ...(darfOrdnen(f) ? { darfOrdnen: true } : {})
             }
           ]
         })
+        // Empfohlenes zuerst, sonst wie bisher (neueste zuerst)
+        .sort((a, b) => Number(Boolean(b.empfohlen)) - Number(Boolean(a.empfohlen)))
       const faecher = [...new Set(eintraege.map((e) => e.fach))].map((id) => ({ id, label: id === 'allgemein' ? 'Allgemein' : (FAECHER.find((f) => f.id === id)?.label ?? id) }))
       return (json(res, 200, { eintraege, faecher }), true)
     }
@@ -227,6 +260,25 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
     if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
     const k0 = (await k.koerper()) as Record<string, unknown>
 
+    if (was === 'ordnen') {
+      const f = db().prepare('SELECT * FROM fach_freigaben WHERE id = ?').get(String(k0.id ?? '')) as Freigabe | undefined
+      if (!f) return (json(res, 404, { fehler: 'Diese Freigabe gibt es nicht (mehr).' }), true)
+      if (!darfOrdnen(f)) return (json(res, 403, { fehler: 'Nur die Fachobleute des Fachs und Admins.' }), true)
+      const alt = metaVon(f.id)
+      const jg = Number(k0.jahrgang)
+      const neu: Meta = {
+        freigabe_id: f.id,
+        empfohlen: 'empfohlen' in k0 ? (k0.empfohlen ? 1 : 0) : (alt?.empfohlen ?? 0),
+        ausgeblendet: 'ausgeblendet' in k0 ? (k0.ausgeblendet ? 1 : 0) : (alt?.ausgeblendet ?? 0),
+        jahrgang: 'jahrgang' in k0 ? (Number.isInteger(jg) && jg >= 1 && jg <= 13 ? jg : null) : (alt?.jahrgang ?? null),
+        thema: 'thema' in k0 ? String(k0.thema ?? '').replace(/\s+/g, ' ').trim().slice(0, 120) : (alt?.thema ?? '')
+      }
+      db()
+        .prepare('INSERT OR REPLACE INTO fach_freigabe_meta (freigabe_id, empfohlen, ausgeblendet, jahrgang, thema) VALUES (?, ?, ?, ?, ?)')
+        .run(neu.freigabe_id, neu.empfohlen, neu.ausgeblendet, neu.jahrgang, neu.thema)
+      protokolliereServer('fachschaft', `Fachschafts-Material geordnet (${f.fach})`, n.id)
+      return (json(res, 200, { ok: true }), true)
+    }
     if (was === 'iserv-gruppen') {
       // Die Exe meldet die Namen der Gruppenordner; gespeichert werden nur die erkannten Fächer
       const ordner = Array.isArray(k0.ordner) ? (k0.ordner as unknown[]).map((x) => String(x).slice(0, 120)).slice(0, 500) : []

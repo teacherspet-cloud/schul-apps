@@ -67,6 +67,8 @@ export interface VorwissenLerngruppe {
   spanne: string
   /** Wie viele fremde Kurse eingeflossen sind (nur zur Anzeige der Zahl, ohne Herkunft) */
   andereKurse: number
+  /** Schulinternes Curriculum (13.10.2026): Themen früherer Jahrgänge (behandelt) und späterer (noch nicht) */
+  curriculum?: { frueher: string[]; spaeter: string[] }
 }
 
 const leer = (): VorwissenTeil => ({ behandelt: [], sicher: [], unsicher: [], fehler: [] })
@@ -217,6 +219,7 @@ const teilZeilen = (t: VorwissenTeil): string[] => [
 ]
 
 export const UEBERSCHRIFT_HIER = 'Aus diesem Kurs:'
+export const UEBERSCHRIFT_CURRICULUM = 'Laut schulinternem Curriculum:'
 export const UEBERSCHRIFT_ANDERE = 'Aus anderen Kursen:'
 
 /** Text für das Feld „Vorwissen der Lerngruppe" (die Lehrkraft kann alles ändern oder löschen) */
@@ -226,6 +229,10 @@ export function vorwissenText(v: VorwissenLerngruppe): string {
   return [
     ...(hier.length ? [UEBERSCHRIFT_HIER, ...hier] : []),
     ...(andere.length ? [...(hier.length ? [''] : []), UEBERSCHRIFT_ANDERE, ...andere] : []),
+    ...((c) => (c.length ? [...(hier.length || andere.length ? [''] : []), UEBERSCHRIFT_CURRICULUM, ...c] : []))([
+      ...(v.curriculum?.frueher ?? []).map((x) => `Behandelt: ${x}`),
+      ...(v.curriculum?.spaeter ?? []).map((x) => `Noch nicht behandelt: ${x}`)
+    ]),
     ...(v.spanne ? ['', `Leistungsspanne: ${v.spanne}`] : [])
   ].join('\n')
 }
@@ -261,9 +268,9 @@ export function vorwissenFuerGruppe(text: string, art: 'foerder' | 'forder'): st
   // Überschriften ohne Inhalt darunter entfernen
   const aus: string[] = []
   for (const [i, z] of zeilen.entries()) {
-    const kopf = /^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(z.trim())
+    const istKopf = (x: string): boolean => /^(?:aus (?:diesem kurs|anderen kursen)|laut schulinternem curriculum)\s*:?$/i.test(x.trim())
     const naechste = zeilen.slice(i + 1).find((x) => x.trim())
-    if (kopf && (!naechste || /^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(naechste.trim()))) continue
+    if (istKopf(z) && (!naechste || istKopf(naechste))) continue
     aus.push(z)
   }
   return aus

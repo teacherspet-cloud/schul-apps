@@ -281,7 +281,7 @@ export function grundlageChips(r: Reihe, s: Schritt, kc: KcAuszug | null): Grund
   const vw = (r.vorwissen ?? '')
     .split('\n')
     .map((z) => z.trim())
-    .filter((z) => z && !/^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(z))
+    .filter((z) => z && !/^(?:aus (?:diesem kurs|anderen kursen)|laut schulinternem curriculum)\s*:?$/i.test(z))
   if (vw.length)
     chips.push({
       id: 'vorwissen',

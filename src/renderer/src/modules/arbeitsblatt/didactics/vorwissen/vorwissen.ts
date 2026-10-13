@@ -165,7 +165,7 @@ export function teileVorwissen(text: string): VorwissenTeile {
     const z = roh.trim().replace(/^[-•*]\s*/, '')
     if (!z) continue
     // Überschriften des Vorwissens aus „Meine Klassen" („Aus diesem Kurs:") tragen keinen Inhalt
-    if (/^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(z)) continue
+    if (/^(?:aus (?:diesem kurs|anderen kursen)|laut schulinternem curriculum)\s*:?$/i.test(z)) continue
     const fv = z.match(/^fehlvorstellung(?:en)?\s*:\s*(.+)$/i)
     const nn = z.match(/^noch nicht (?:behandelt|eingeführt|bekannt)\s*:\s*(.+)$/i)
     const un = z.match(/^(?:unsicher|schwäche)\s*:\s*(.+)$/i)

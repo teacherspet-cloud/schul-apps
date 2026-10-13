@@ -1,4 +1,5 @@
 import { ProgrammInfo } from './shared/components/AppKopf'
+import { fachVorgabenLaden } from './shared/fachvorgaben'
 import { ActionIcon, Anchor, AppShell, Button, Indicator, Tooltip, UnstyledButton } from '@mantine/core'
 import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
@@ -179,6 +180,10 @@ export default function App(): React.JSX.Element {
   // Server mit der Exe „Schul-Apps Online": Fächer aus den IServ-Gruppen still abgleichen (Fachschaft)
   useEffect(() => {
     if (aufServer() && hatClient()) void faecherAusIservUebernehmen().catch(() => undefined)
+  }, [])
+  // Vorgaben der Fächer (13.10.2026, Fachobleute): Curriculum, Standards, schulinterne Operatoren
+  useEffect(() => {
+    void fachVorgabenLaden()
   }, [])
 
   // Im Browser (Zugang aus dem Netz) gibt es kein Schließen-Ereignis – dort zumindest anstoßen

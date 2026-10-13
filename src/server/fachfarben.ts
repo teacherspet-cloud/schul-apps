@@ -2,7 +2,7 @@
  * Fachfarben der Schule (09.10.2026, shared/schulFachfarben.ts).
  *
  *   GET  /server/fachfarben  – Farben der Schule (Lehrkräfte und Admins; Lernende bekommen ihre über /s/api/regal/farben)
- *   POST /server/fachfarben  – { farben: { fach: '#rrggbb' } } speichern (nur Admin, mit x-schulapps-token)
+ *   POST /server/fachfarben  – { farben: { fach: "#rrggbb" } } speichern (Admin; Fachobleute nur ihre Fächer – 13.10.2026)
  *
  * Gespeichert in server_einstellungen unter 'fachfarben'. Ohne Eintrag gelten die Vorschläge des Katalogs. Einmalige
  * Übernahme beim Start bzw. beim ersten Lesen: Hat die Schule noch keine Farben, werden die eigenen Farben des ersten
@@ -13,6 +13,7 @@ import { eigeneFachfarben } from '../main/services/storage/settings'
 import { alleNutzer, protokolliereServer, serverWert, setzeServerWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
 import { imNutzer } from './kontext'
+import { fachobmannFaecher } from './fachobleute'
 
 const SCHLUESSEL = 'fachfarben'
 
@@ -61,9 +62,15 @@ export async function fachfarbenRoute(k: Anfrage): Promise<boolean> {
   }
   if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
   if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
-  if (sitzung.nutzer.rolle !== 'admin') return (json(res, 403, { fehler: 'Nur für die Verwaltung.' }), true)
+  // Fachobleute (13.10.2026): nur die Farben ihrer Fächer – die übrigen bleiben, wie sie sind
+  const obmann = sitzung.nutzer.rolle === 'admin' ? null : fachobmannFaecher(sitzung.nutzer.id)
+  if (obmann && !obmann.length) return (json(res, 403, { fehler: 'Nur für die Verwaltung und die Fachobleute.' }), true)
   const k0 = ((await k.koerper()) ?? {}) as Record<string, unknown>
-  const r = speichereSchulFachfarben(k0.farben)
+  const neu = (k0.farben ?? {}) as Record<string, unknown>
+  const farben = obmann
+    ? { ...leseSchulFachfarben(), ...Object.fromEntries(Object.entries(neu).filter(([f]) => obmann.includes(f))) }
+    : k0.farben
+  const r = speichereSchulFachfarben(farben)
   if ('fehler' in r) return (json(res, 400, r), true)
   protokolliereServer('verwaltung', 'Fachfarben der Schule geändert', sitzung.nutzer.id)
   return (json(res, 200, r), true)

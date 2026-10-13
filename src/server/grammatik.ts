@@ -75,6 +75,8 @@ import {
 } from '../shared/lehrwerkBand'
 import { abschnitteEinordnen, buchAusKennung, mitBaenden } from '../shared/kursAbschnitte'
 import { kursFuerLernende } from '../shared/freigabePlan'
+import { curriculumBand } from '../shared/fachvorgaben'
+import { fachVorgaben } from './fachvorgaben'
 import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
 import { zugangPlan } from './planen'
 import { bankEintraege, bankMixe, beiBankAenderung } from './grammatikBank'
@@ -333,6 +335,9 @@ export function lehrwerkAutomatisch(gid: string): (Erkennung & { freigegeben: Fr
     // Noch keine Vokabeltrainings (Tabelle fehlt)
   }
   const { baende, freigegeben } = lehrwerkAusKursen(kurse)
+  // Schulinternes Curriculum (13.10.2026, Vorgaben der Fachobleute): Band des Jahrgangs vor der Erkennung
+  const laut = curriculumBand(fachVorgaben(g.fach), jahrgangAus(g.name))
+  if (laut) return { buch: laut, grund: 'jahrgang', freigegeben }
   const e = bandErkennen({ jahrgang: jahrgangAus(g.name), ort: schulOrtVon(g.lehrkraft_id), baende, ueblich })
   return e ? { ...e, freigegeben } : null
 }

@@ -154,6 +154,23 @@ const schuleFest = (): boolean => {
   }
 }
 
+/**
+ * Server (13.10.2026, src/server/fachvorgaben.ts): Notenschlüssel je Fach aus den Vorgaben der Fachobleute – Standard für
+ * alle Lehrkräfte des Fachs; ein eigener Schlüssel der Lehrkraft für das Fach geht vor. Am PC und auf dem iPad nie gesetzt.
+ */
+let notenVorgabenQuelle: (() => Record<string, number[]>) | null = null
+export const setzeNotenVorgabenQuelle = (fn: (() => Record<string, number[]>) | null): void => {
+  notenVorgabenQuelle = fn
+}
+const notenVorgaben = (): Record<string, number[]> => {
+  try {
+    return notenVorgabenQuelle?.() ?? {}
+  } catch {
+    return {}
+  }
+}
+const gleicheWerte = (a: readonly number[] | undefined, b: readonly number[] | undefined): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
 /** Gespeicherte Einstellungen ohne Rückfall */
 const gespeicherteEinstellungen = (): AppSettings => mergeSettings(DEFAULT_SETTINGS, readJson('settings.json', {}))
 
@@ -163,7 +180,9 @@ export const eigeneFachfarben = (): Record<string, string> => gespeicherteEinste
 /** Was gilt: gespeicherte Einstellungen mit Rückfall bzw. fester Schule und den Fachfarben der Schule */
 function wirksam(s: AppSettings, schule: SchulEinrichtung | null): AppSettings {
   const mitSchule = schuleFest() ? mitFesterSchule(s, schule) : mitSchulRueckfall(s, schule)
-  return mitSchulFachfarben(mitSchule, schulFachfarben())
+  const mitFarben = mitSchulFachfarben(mitSchule, schulFachfarben())
+  const noten = notenVorgaben()
+  return Object.keys(noten).length ? { ...mitFarben, gradeScale: { ...mitFarben.gradeScale, jeFach: { ...noten, ...mitFarben.gradeScale.jeFach } } } : mitFarben
 }
 
 export function getSettings(): AppSettings {
@@ -175,6 +194,15 @@ export function setSettings(patch: DeepPartial<AppSettings>): AppSettings {
   // Am Server: Fachfarben legt die Verwaltung fest, die Schule der IServ-Konten ebenso (09.10.2026)
   if (fachfarbenQuelle) patch = ohneFachfarben(patch)
   if (schuleFest()) patch = ohneSchulangaben(patch, schule)
+  // Notenschlüssel der Fachvorgabe nicht als eigenen speichern (die Oberfläche schickt die wirksamen Werte zurück)
+  const noten = notenVorgaben()
+  if (patch.gradeScale?.jeFach && Object.keys(noten).length) {
+    const eigene = gespeicherteEinstellungen().gradeScale.jeFach
+    const jeFach = Object.fromEntries(
+      Object.entries(patch.gradeScale.jeFach as Record<string, number[]>).filter(([f, w]) => eigene[f] || !gleicheWerte(w, noten[f]))
+    )
+    patch = { ...patch, gradeScale: { ...patch.gradeScale, jeFach } }
+  }
   // Gespeichert wird ohne Rückfall – außer die Lehrkraft macht erstmals eigene Schulangaben: dann bleibt, was sie sah
   const basis = vorSchulAenderung(gespeicherteEinstellungen(), patch, schule)
   const next = mergeSettings(basis, patch as DeepPartial<AppSettings> & { ai?: Record<string, unknown> })

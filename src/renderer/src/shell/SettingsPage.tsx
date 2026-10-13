@@ -34,6 +34,7 @@ import {
   IconFileText,
   IconMoon,
   IconPalette,
+  IconBooks,
   IconPhoto,
   IconRefresh,
   IconKey,
@@ -97,6 +98,7 @@ import SchulnameFeld from './Schulsuche'
 import BriefkopfFelder from './BriefkopfFelder'
 import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
 import { EigeneFaecherFeld, ProgrammeAnzeigenCard } from './ProgrammeAnzeigen'
+import MeinFach from './MeinFach'
 
 /**
  * Die Einstellungen in Reitern.
@@ -115,6 +117,8 @@ export default function SettingsPage(): React.JSX.Element {
   const { settings, update } = useAppSettings()
   const gewuenscht = useNavigation((s) => s.settingsTab)
   const setTab = useNavigation((s) => s.setSettingsTab)
+  // Mein Fach (13.10.2026): Fachobleute und Admins am Server
+  const meinFach = aufServer() && (serverIch()?.rolle === 'admin' || Boolean(serverIch()?.fachobmann?.length))
   const [passwortOffen, setPasswortOffen] = useState(false)
   // Verbrauch nur, wenn mindestens ein KI-Zugang eingerichtet ist (09.10.2026)
   const kiStand = useKiStatus()
@@ -180,6 +184,12 @@ export default function SettingsPage(): React.JSX.Element {
           <Tabs.Tab value="darstellung" leftSection={<IconPalette size={16} />}>
             Darstellung
           </Tabs.Tab>
+          {/* Mein Fach (13.10.2026): schulweite Vorgaben – nur Fachobleute und Admins, nur mit dem Server */}
+          {meinFach && (
+            <Tabs.Tab value="meinfach" leftSection={<IconBooks size={16} />} data-reiter-mein-fach>
+              Mein Fach
+            </Tabs.Tab>
+          )}
           {/*
            * KI-Zugang und Netzwerk gibt es nur am Rechner.
            *
@@ -312,6 +322,11 @@ export default function SettingsPage(): React.JSX.Element {
             </Stack>
           </Tabs.Panel>
 
+          {meinFach && (
+            <Tabs.Panel value="meinfach">
+              <MeinFach />
+            </Tabs.Panel>
+          )}
           <Tabs.Panel value="darstellung">
             <AppearanceCard settings={settings} update={update} />
           </Tabs.Panel>

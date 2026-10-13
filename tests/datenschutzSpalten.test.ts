@@ -49,6 +49,7 @@ const AUSNAHMEN: Record<string, string> = {
   'reihen_dateien.typ': 'MIME-Typ',
   'lehrwerk_stand.buch': 'Lehrwerk (z. B. Green Line 1)',
   'lehrwerk_stand.unit': 'Stelle im Lehrwerk',
+  'fach_freigabe_meta.thema': 'Thema eines Fachschafts-Materials, von den Fachobleuten zugeordnet (z. B. „Weather") – keine Person',
   'vorschau_konten.klasse': 'Klassenstufe des erfundenen Musterschülers',
   'vorschau_konten.anzeige': 'Anzeigename des erfundenen Musterschülers (keine echte Person)',
   'wartung.name': 'Name einer Wartungsaufgabe',

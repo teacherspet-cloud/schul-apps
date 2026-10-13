@@ -20,6 +20,8 @@ import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute, alleBerichtigen } from './achievements'
 import { klassenRoute } from './klassen'
 import { vorwissenRoute } from './vorwissen'
+import { alleFachVorgaben, fachvorgabenRoute } from './fachvorgaben'
+import { setzeSchulOperatoren } from '../shared/operatoren/zugriff'
 import { foerdernRoute } from './foerdern'
 import { startseiteRoute } from './startseite'
 import { klassenGaesteRoute } from './klassenGaeste'
@@ -32,7 +34,15 @@ import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { kiAblagenAufraeumen } from './kiAblage'
 import { registriereKanaele, type Handle } from '../main/kanaele'
-import { getSettings, hatEigenesGeheimnis, setzeFachfarbenQuelle, setzeGeheimRueckfall, setzeSchuleFest, setzeSchulRueckfall } from '../main/services/storage/settings'
+import {
+  getSettings,
+  hatEigenesGeheimnis,
+  setzeFachfarbenQuelle,
+  setzeGeheimRueckfall,
+  setzeNotenVorgabenQuelle,
+  setzeSchuleFest,
+  setzeSchulRueckfall
+} from '../main/services/storage/settings'
 import { fachfarbenRoute, leseSchulFachfarben, uebernimmFachfarbenEinmal } from './fachfarben'
 import { schuleFest } from '@shared/schulFest'
 import { leseSchule, schuleRoute } from './schule'
@@ -106,6 +116,12 @@ async function main(): Promise<void> {
   // Fachfarben legt die Verwaltung für alle fest (09.10.2026, fachfarben.ts) – einmal die des Admins übernehmen
   uebernimmFachfarbenEinmal()
   setzeFachfarbenQuelle(leseSchulFachfarben)
+  // Schulinterne Operatoren der Fächer auch für Erzeugung am Server (13.10.2026)
+  setzeSchulOperatoren((fach) => alleFachVorgaben()[fach]?.operatoren)
+  // Notenschlüssel je Fach aus den Vorgaben der Fachobleute (13.10.2026, fachvorgaben.ts)
+  setzeNotenVorgabenQuelle(() =>
+    Object.fromEntries(Object.entries(alleFachVorgaben()).flatMap(([f, v]) => (v.notenschluessel ? [[f, v.notenschluessel]] : [])))
+  )
   // IServ-Konten gehören fest zur Schule des Servers (09.10.2026, shared/schulFest.ts)
   setzeSchuleFest(() => schuleFest(aktuellerNutzer()))
   // Gemeinsame Lehrwerke und Medienbank: bearbeiten nur Admins (main/services/rolle.ts)
@@ -202,6 +218,8 @@ async function main(): Promise<void> {
       foerdernRoute(),
       // Vorwissen der Lerngruppe für Reihe, Arbeitsblatt und Förder-/Fordermaterial (13.10.2026, vorwissen.ts)
       vorwissenRoute(),
+      // Vorgaben der Fächer: Curriculum und Standards, gepflegt von den Fachobleuten (13.10.2026, fachvorgaben.ts)
+      fachvorgabenRoute(),
       hoertextRoute,
       // Medienbank der Vokabeln für Lernende (05.10.2026)
       medienRoute,

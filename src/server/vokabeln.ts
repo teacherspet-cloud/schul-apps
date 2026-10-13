@@ -79,6 +79,7 @@ import { mitnahmeVon, ruhendAufheben, ruht, vokNachziehen } from './mitnahme'
 import type { KursHinweisEingabe } from '../shared/kursHinweise'
 import { ausgeblendetFiltern, problemStufe, problemWoerter, problemWoerterJeStufe, PROBLEM_STUFEN } from '../shared/problemWoerter'
 import { kursProblemStufe, lehrkraftProblemStufe, setzeLehrkraftProblemStufe } from './problemStufe'
+import { erinnerungenAngeboten } from './fachvorgaben'
 import {
   bewerte,
   bewerteAbkuerzung,
@@ -1417,7 +1418,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           verbspiele: z.verbspiele ?? '',
           zusammen: z.zusammen !== 'aus',
           // Erinnerungen zum Üben (10.10.2026): angeboten? und wie viele sie eingeschaltet haben (nur die Zahl)
-          erinnerungen: z.erinnerungen !== 'aus',
+          erinnerungen: erinnerungenAngeboten(z),
           erinnerungenAktiv: kursHaken.erinnerungenAktiv?.(lernende.map((l) => l.id)) ?? 0,
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026) – mit Band und Unit (10.10.2026: Wortliste je Band gruppiert)
@@ -1478,7 +1479,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           problem,
           problemStufe: stufe,
           problemStufeEigen: z.problem_stufe ? stufe : null,
-          problemStufeStandard: lehrkraftProblemStufe(z.lehrkraft_id),
+          problemStufeStandard: lehrkraftProblemStufe(z.lehrkraft_id, z.fach),
           problemZahlen: PROBLEM_STUFEN.map((st) => jeStufe[st].length),
           // Kasten „Abschnitte & Wörter" (10.10.2026): Stand der Klasse je Wort, wer mit den Problemwörtern kämpft
           wortSicher: wortSicherAnteile(

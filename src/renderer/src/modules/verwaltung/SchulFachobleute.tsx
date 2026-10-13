@@ -1,6 +1,6 @@
 import { Group, Loader, MultiSelect, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useState } from 'react'
-import { fachVon, SPRACHFAECHER } from '@shared/faecher'
+import { FAECHER, fachVon, SPRACHFAECHER } from '@shared/faecher'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
 import { KlappKarte } from '../../shared/components/KlappKarte'
@@ -71,13 +71,7 @@ export function SchulFachobleute(): React.JSX.Element {
       id="verwaltung-fachobleute"
       dauerhaft
       titel="Fachobleute"
-      status={
-        daten === null
-          ? 'pflegen gemeinsame Lehrwerke ihres Fachs'
-          : zahl
-          ? `${zahl} ${zahl === 1 ? 'Lehrkraft' : 'Lehrkräfte'} ernannt`
-          : 'noch niemand ernannt'
-      }
+      status={daten === null ? 'pflegen ihr Fach schulweit' : zahl ? `${zahl} ${zahl === 1 ? 'Lehrkraft' : 'Lehrkräfte'} ernannt` : 'noch niemand ernannt'}
       rahmen={{ 'data-schul-fachobleute': true }}
     >
       {daten === null ? (
@@ -85,10 +79,12 @@ export function SchulFachobleute(): React.JSX.Element {
       ) : (
         <Stack gap="xs">
           <Text size="sm" c="dimmed">
-            Fachobleute bearbeiten die gemeinsamen Lehrwerke ihres Fachs in „Vokabellisten“ und „Grammatikformen“ – wie der Admin. Eine Lehrkraft kann es für
-            mehrere Fächer sein. Bilder und Aussprache (Medienbank) bleiben beim Admin.
+            Fachobleute pflegen ihr Fach schulweit: gemeinsame Lehrwerke („Vokabellisten“, „Grammatikformen“), unter Einstellungen › „Mein Fach“ das
+            schulinterne Curriculum und die Vorgaben (Notenschlüssel, Problemwörter, Erinnerungen, Operatoren, Fachfarbe) und das Material der Fachschaft
+            (empfehlen, ausblenden, ordnen). Eine Lehrkraft kann es für mehrere Fächer sein. Bilder und Aussprache (Medienbank) bleiben beim Admin.
           </Text>
-          {SPRACHFAECHER.map((fach) => {
+          {/* Alle Fächer (13.10.2026, Fachobleute pflegen auch Curriculum und Vorgaben) – die Sprachen mit Lehrwerken zuerst */}
+          {[...SPRACHFAECHER, ...FAECHER.map((f) => f.id).filter((f) => !SPRACHFAECHER.includes(f) && f !== 'anderes')].map((fach) => {
             const gewaehlt = Object.entries(daten.obleute)
               .filter(([, f]) => f.includes(fach))
               .map(([id]) => id)

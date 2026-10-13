@@ -49,6 +49,7 @@ import { kursFuerLernende } from '../shared/freigabePlan'
 import { fachAusName } from '../shared/faecher'
 import { tagesRunde, type Vokabel } from '../shared/vokabeltrainer'
 import { endpunktErlaubt, pushSenden, vapidErzeugen, vapidGueltig, vonB64u, type PushZiel, type VapidSchluessel } from './webPush'
+import { erinnerungenAngeboten } from './fachvorgaben'
 import {
   ausloeserWaehlen,
   berlin,
@@ -280,8 +281,9 @@ function sicherAngekuendigt(n: NutzerInfo, jetzt: number): ReturnType<typeof ang
 /** Offene Kurse dieser Person, in denen die Lehrkraft Erinnerungen anbietet */
 export function angeboteneKurse(n: NutzerInfo): VokZeile[] {
   if (n.rolle !== 'schueler' || n.quelle === 'vorschau') return []
+  // Ohne eigene Wahl der Lehrkraft gilt die Vorgabe des Fachs (13.10.2026, fachvorgaben.ts)
   return (vokDb().prepare("SELECT * FROM vok_zuweisungen WHERE erinnerungen != 'aus' AND status = 'offen'").all() as unknown as VokZeile[]).filter(
-    (z) => istOffen(z) && vokIstFuer(z, n)
+    (z) => istOffen(z) && erinnerungenAngeboten(z) && vokIstFuer(z, n)
   )
 }
 

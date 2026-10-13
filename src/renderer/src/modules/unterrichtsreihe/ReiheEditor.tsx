@@ -96,6 +96,7 @@ import { ServerFehler } from '../onlinetest/serverApi'
 import { fuehreZusammen, type Veroeffentlichung } from '@shared/reiheSpeichern'
 import { planAufRaster } from './planAbdeckung'
 import { NiveauWahl } from './ReiheNiveau'
+import { useFachVorgaben } from '../../shared/fachvorgaben'
 import { feldMitVorwissen, ladeVorwissen, LerngruppeWahl, type LerngruppeBezug, type VorwissenAntwort } from '../../shared/lerngruppeVorwissen'
 import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
@@ -197,6 +198,8 @@ export function ReiheEditor({
       aktiv = false
     }
   }, [r.stateId, r.fachId, r.schoolTypeId, r.grade])
+  // Themen des schulinternen Curriculums für Fach und Jahrgang zuerst (13.10.2026, Vorgaben der Fachobleute)
+  const curriculum = useFachVorgaben((s) => s.vorgaben[r.fachId]?.themen?.[String(r.grade)]) ?? []
   const gewaehlt = kc.find((k) => k.name === r.oberthema)
   const auszug: KcAuszug | null = gewaehlt
     ? { zeilen: [gewaehlt.wortlaut ?? gewaehlt.name, ...zeilenVon(gewaehlt)].slice(0, 60), quelle: `Kerncurriculum ${r.stateId} ${r.fachLabel}` }
@@ -626,7 +629,7 @@ export function ReiheEditor({
                   : 'Kein Kerncurriculum für diese Auswahl gefunden – eigenes Oberthema eintippen'
               }
               searchable
-              data={[...new Set([...kc.map((k) => k.name), ...(r.oberthema ? [r.oberthema] : [])])]}
+              data={[...new Set([...curriculum, ...kc.map((k) => k.name), ...(r.oberthema ? [r.oberthema] : [])])]}
               value={r.oberthema || null}
               onChange={(v) => setze({ oberthema: v ?? '' })}
               onSearchChange={(t) => {

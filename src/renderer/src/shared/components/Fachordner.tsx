@@ -18,9 +18,26 @@
  *    an; am Schalter ein Punkt, damit man findet, wo es steht. Findet eine Suche nur Fachschaftsmaterial, erscheint es
  *    trotzdem – mit Hinweis (wie bei Material aus Unterrichtsreihen).
  */
-import { ActionIcon, Anchor, Badge, Button, Card, Collapse, Group, Menu, Modal, SegmentedControl, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import {
+  ActionIcon,
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  Collapse,
+  Group,
+  Menu,
+  Modal,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+  Tooltip,
+  UnstyledButton
+} from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconChevronDown, IconChevronRight, IconDownload, IconFolders, IconShare, IconShareOff, IconTrash } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconDots, IconDownload, IconFolders, IconShare, IconShareOff, IconStar, IconTrash } from '@tabler/icons-react'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { holen, senden, ServerFehler } from '../../modules/onlinetest/serverApi'
@@ -49,6 +66,12 @@ export interface Freigabe {
   /** Überthema bzw. Thema des Materials (10.10.2026) */
   thema?: string
   jahrgang?: number
+  /** Ordnung durch die Fachobleute (13.10.2026): empfohlen, für die Fachschaft ausgeblendet, Jahrgang/Thema zugeordnet */
+  empfohlen?: boolean
+  ausgeblendet?: boolean
+  zugeordnet?: boolean
+  /** Darf diese Person ordnen? (Fachobleute des Fachs, Admin) */
+  darfOrdnen?: boolean
 }
 
 /** Kopie aus der ersten Fassung (Fachordner, /server/fach): zum Übernehmen in die eigene Ablage */
@@ -264,20 +287,97 @@ export function TeilenDialog(): null {
   return null
 }
 
+/** Ordnen durch die Fachobleute (13.10.2026): empfehlen, ausblenden, Jahrgang/Thema */
+async function ordnen(f: Freigabe, aenderung: { empfohlen?: boolean; ausgeblendet?: boolean; jahrgang?: number | null; thema?: string }): Promise<void> {
+  try {
+    await senden('/server/fachschaft/ordnen', { id: f.id, ...aenderung })
+    await useFachschaft.getState().laden()
+  } catch (e) {
+    notifyError(e)
+  }
+}
+
 function FreigabeZeile({ f }: { f: Freigabe }): React.JSX.Element {
+  const [zuordnen, setZuordnen] = useState(false)
+  const [jahrgang, setJahrgang] = useState<string | null>(f.jahrgang ? String(f.jahrgang) : null)
+  const [thema, setThema] = useState(f.thema ?? '')
   return (
-    <Group justify="space-between" wrap="nowrap" data-freigabe={f.id}>
+    <Group justify="space-between" wrap="nowrap" data-freigabe={f.id} style={{ opacity: f.ausgeblendet ? 0.6 : 1 }}>
       <div style={{ minWidth: 0 }}>
-        <Text size="sm" truncate>
-          {f.titel}
-        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Text size="sm" truncate>
+            {f.titel}
+          </Text>
+          {f.empfohlen && (
+            <Badge size="xs" color="yellow" variant="light" leftSection={<IconStar size={10} />} data-freigabe-empfohlen>
+              empfohlen
+            </Badge>
+          )}
+          {f.ausgeblendet && (
+            <Badge size="xs" color="gray" variant="light" data-freigabe-ausgeblendet>
+              für die Fachschaft ausgeblendet
+            </Badge>
+          )}
+        </Group>
         <Text size="xs" c="dimmed">
           {f.eigen ? 'eigenes Material' : f.vonName} · {new Date(f.datum).toLocaleDateString('de-DE')}
+          {f.zugeordnet ? ` · ${[f.jahrgang ? `Klasse ${f.jahrgang}` : '', f.thema ?? ''].filter(Boolean).join(', ')}` : ''}
         </Text>
       </div>
-      <Button size="xs" variant="light" onClick={() => void freigabeOeffnen(f)} data-freigabe-oeffnen>
-        Öffnen
-      </Button>
+      <Group gap={4} wrap="nowrap">
+        {f.darfOrdnen && (
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label="Als Fachobfrau/-mann ordnen" data-freigabe-ordnen>
+                <IconDots size={16} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Fachobleute</Menu.Label>
+              <Menu.Item onClick={() => void ordnen(f, { empfohlen: !f.empfohlen })} data-freigabe-empfehlen>
+                {f.empfohlen ? 'Nicht mehr empfehlen' : 'Als „empfohlen“ markieren'}
+              </Menu.Item>
+              <Menu.Item onClick={() => void ordnen(f, { ausgeblendet: !f.ausgeblendet })} data-freigabe-ausblenden>
+                {f.ausgeblendet ? 'Für die Fachschaft wieder einblenden' : 'Für die Fachschaft ausblenden'}
+              </Menu.Item>
+              <Menu.Item onClick={() => setZuordnen(true)} data-freigabe-zuordnen>
+                Jahrgang und Thema zuordnen …
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
+        <Button size="xs" variant="light" onClick={() => void freigabeOeffnen(f)} data-freigabe-oeffnen>
+          Öffnen
+        </Button>
+      </Group>
+      <Modal opened={zuordnen} onClose={() => setZuordnen(false)} title={`„${f.titel}“ zuordnen`} zIndex={500}>
+        <Stack gap="sm">
+          <Select
+            label="Jahrgang"
+            data={Array.from({ length: 13 }, (_, i) => ({ value: String(i + 1), label: `Klasse ${i + 1}` }))}
+            value={jahrgang}
+            onChange={setJahrgang}
+            clearable
+            comboboxProps={{ withinPortal: true, zIndex: 600 }}
+            data-zuordnen-jahrgang
+          />
+          <TextInput label="Thema" value={thema} onChange={(e) => setThema(e.currentTarget.value)} data-zuordnen-thema />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setZuordnen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={() => {
+                setZuordnen(false)
+                void ordnen(f, { jahrgang: jahrgang ? Number(jahrgang) : null, thema })
+              }}
+              data-zuordnen-ok
+            >
+              Speichern
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Group>
   )
 }
@@ -532,11 +632,18 @@ export function FachschaftsListe({
                   {fachName(fach)}
                 </Text>
               )}
-              {fremd
-                .filter((f) => f.fach === fach)
-                .map((f) => (
-                  <FreigabeZeile key={f.id} f={f} />
-                ))}
+              {nachJahrgang(fremd.filter((f) => f.fach === fach)).map(([titel, liste]) => (
+                <Stack key={titel || 'alle'} gap={4}>
+                  {titel && (
+                    <Text size="xs" fw={600} c="dimmed" mt={2} data-fachschaft-jahrgang={titel}>
+                      {titel}
+                    </Text>
+                  )}
+                  {liste.map((f) => (
+                    <FreigabeZeile key={f.id} f={f} />
+                  ))}
+                </Stack>
+              ))}
               {kopien
                 .filter((e) => e.fach === fach)
                 .map((e) => (
@@ -558,6 +665,21 @@ export function FachschaftsListe({
       </Collapse>
     </Card>
   )
+}
+
+/**
+ * Nach Jahrgang gruppiert (13.10.2026, Ordnung durch die Fachobleute): erst „Empfohlen", dann Klasse 5, 6 …, zuletzt ohne
+ * Jahrgang. Ohne zugeordnete Jahrgänge eine Gruppe ohne Überschrift (wie bisher).
+ */
+function nachJahrgang(l: Freigabe[]): [string, Freigabe[]][] {
+  if (!l.some((f) => f.zugeordnet)) return [['', l]]
+  const empfohlen = l.filter((f) => f.empfohlen)
+  const rest = l.filter((f) => !f.empfohlen)
+  const jahrgaenge = [...new Set(rest.map((f) => f.jahrgang ?? 0))].sort((a, b) => (a || 99) - (b || 99))
+  return [
+    ...(empfohlen.length ? [['Empfohlen', empfohlen] as [string, Freigabe[]]] : []),
+    ...jahrgaenge.map((j) => [j ? `Klasse ${j}` : 'Ohne Jahrgang', rest.filter((f) => (f.jahrgang ?? 0) === j)] as [string, Freigabe[]])
+  ]
 }
 
 /** Andere Bezeichnung derselben Liste (Eingang der Fachschaft in jeder Bibliothek) */

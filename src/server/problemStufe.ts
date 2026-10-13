@@ -8,11 +8,22 @@
  */
 import { problemStufe, PROBLEM_STUFE_STANDARD, type ProblemStufe } from '../shared/problemWoerter'
 import { serverWert, setzeServerWert } from './datenbank'
+import { fachVorgaben } from './fachvorgaben'
 
 const schluessel = (lehrkraftId: string): string => `problem-stufe:${lehrkraftId}`
 
-/** Standard-Stufe der Lehrkraft */
-export const lehrkraftProblemStufe = (lehrkraftId: string): ProblemStufe => problemStufe(serverWert<number>(schluessel(lehrkraftId), PROBLEM_STUFE_STANDARD))
+/** Eigene Standard-Stufe der Lehrkraft – null, solange sie keine gewählt hat */
+export const eigeneProblemStufe = (lehrkraftId: string): ProblemStufe | null => {
+  const v = serverWert<number | null>(schluessel(lehrkraftId), null)
+  return v === null ? null : problemStufe(v)
+}
+
+/**
+ * Standard-Stufe der Lehrkraft: eigene Wahl, sonst die Vorgabe des Fachs (13.10.2026, Fachobleute – shared/fachvorgaben.ts),
+ * sonst die Grundeinstellung.
+ */
+export const lehrkraftProblemStufe = (lehrkraftId: string, fach?: string | null): ProblemStufe =>
+  eigeneProblemStufe(lehrkraftId) ?? problemStufe(fachVorgaben(fach)?.problemStufe, PROBLEM_STUFE_STANDARD)
 
 export const setzeLehrkraftProblemStufe = (lehrkraftId: string, stufe: unknown): ProblemStufe => {
   const s = problemStufe(stufe)
@@ -20,6 +31,6 @@ export const setzeLehrkraftProblemStufe = (lehrkraftId: string, stufe: unknown):
   return s
 }
 
-/** Stufe eines Kurses: eigene Einstellung, sonst Standard der Lehrkraft */
-export const kursProblemStufe = (z: { lehrkraft_id: string; problem_stufe?: number | null }): ProblemStufe =>
-  z.problem_stufe ? problemStufe(z.problem_stufe, lehrkraftProblemStufe(z.lehrkraft_id)) : lehrkraftProblemStufe(z.lehrkraft_id)
+/** Stufe eines Kurses: eigene Einstellung, sonst Standard der Lehrkraft (bzw. des Fachs) */
+export const kursProblemStufe = (z: { lehrkraft_id: string; problem_stufe?: number | null; fach?: string | null }): ProblemStufe =>
+  z.problem_stufe ? problemStufe(z.problem_stufe, lehrkraftProblemStufe(z.lehrkraft_id, z.fach)) : lehrkraftProblemStufe(z.lehrkraft_id, z.fach)

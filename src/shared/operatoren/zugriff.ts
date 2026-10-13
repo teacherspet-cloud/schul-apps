@@ -172,8 +172,34 @@ export function zusammenfuehren(listen: BestandsListe[]): OperatorDefinition[] {
 /** Ergänzungstabellen mit zwei, drei Einträgen (BB Englisch: nur AFB III) sind allein keine Liste */
 const MINDESTZAHL = 6
 
+/**
+ * Schulinterne Operatoren (13.10.2026, Vorgaben der Fachobleute – shared/fachvorgaben.ts): je Fach zusätzliche Operatoren
+ * (mit Erklärung) und nicht verwendete. Die Quelle setzt die Oberfläche bzw. der Server; ohne Quelle gilt die amtliche Liste.
+ */
+let schulOperatorenQuelle: ((fach: string) => { zusatz?: { name: string; erklaerung: string }[]; weglassen?: string[] } | undefined) | null = null
+export const setzeSchulOperatoren = (fn: typeof schulOperatorenQuelle): void => {
+  schulOperatorenQuelle = fn
+}
+export function mitSchulOperatoren(fach: string, operatoren: OperatorDefinition[]): OperatorDefinition[] {
+  let s: ReturnType<NonNullable<typeof schulOperatorenQuelle>>
+  try {
+    s = schulOperatorenQuelle?.(fach)
+  } catch {
+    s = undefined
+  }
+  if (!s) return operatoren
+  const n = (x: string): string => x.trim().toLowerCase()
+  const weg = new Set((s.weglassen ?? []).map(n))
+  const bleiben = operatoren.filter((o) => !weg.has(n(o.operator)))
+  const da = new Set(bleiben.map((o) => n(o.operator)))
+  const dazu = (s.zusatz ?? [])
+    .filter((z) => !da.has(n(z.name)))
+    .map((z) => ({ operator: z.name, definition: z.erklaerung, zusatz: { Herkunft: 'schulintern' } }))
+  return [...bleiben, ...dazu]
+}
+
 function auswahl(herkunft: Herkunft, listen: BestandsListe[], a: OperatorenAnfrage, stufe: 'sek1' | 'sek2', stand: string): OperatorenAuswahl {
-  const operatoren = zusammenfuehren(listen)
+  const operatoren = mitSchulOperatoren(a.fach, zusammenfuehren(listen))
   const mitAfb = listen.find((l) => l.afbLogik !== 'keine' && l.operatoren.some((o) => o.afb))
   return {
     herkunft,

@@ -11,6 +11,8 @@
  */
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { jahrgangAus } from '../shared/lernstand'
+import { curriculumBand, curriculumThemen } from '../shared/fachvorgaben'
+import { fachVorgaben } from './fachvorgaben'
 import type { Vokabel } from '../shared/vokabeltrainer'
 import { MIN_GEMEINSAM, vorwissenAus, vorwissenText, type KindKurz, type KursDaten, type VorwissenAntwort } from '../shared/vorwissenLerngruppe'
 import { blaetterDerGruppe } from './arbeitsblaetter'
@@ -33,7 +35,10 @@ export function lehrwerkVon(g: Lerngruppe): { buch: string; unit: string } | nul
   const hand = lehrwerkStandVon(g.id)
   if (hand?.buch) return hand
   const letzte = lehrwerkAutomatisch(g.id)?.freigegeben.at(-1)
-  return letzte ? { buch: letzte.buch, unit: letzte.unit } : null
+  if (letzte) return { buch: letzte.buch, unit: letzte.unit }
+  // Schulinternes Curriculum (13.10.2026): Band des Jahrgangs – Wissen der Schule, nicht geraten
+  const laut = curriculumBand(fachVorgaben(g.fach), jahrgangAus(g.name))
+  return laut ? { buch: laut, unit: '' } : null
 }
 
 const lehrwerkText = (l: { buch: string; unit: string } | null): string | undefined => (l?.buch ? (l.unit ? `${l.buch}, bis ${l.unit}` : l.buch) : undefined)
@@ -119,6 +124,15 @@ export function vorwissenDerGruppe(g: Lerngruppe, jetzt = Date.now()): Vorwissen
       }
     }
   const vorwissen = vorwissenAus(eigen, andere)
+  // Schulinternes Curriculum (13.10.2026): frühere Jahrgänge behandelt, spätere noch nicht (je höchstens 8)
+  const jg = jahrgangAus(g.name)
+  const vg = fachVorgaben(g.fach)
+  if (vg?.themen && jg) {
+    const spaeter: string[] = []
+    for (let j = jg + 1; j <= 13; j++) spaeter.push(...(vg.themen[String(j)] ?? []))
+    const frueher = curriculumThemen(vg, jg).frueher.slice(-8)
+    if (frueher.length || spaeter.length) vorwissen.curriculum = { frueher, spaeter: spaeter.slice(0, 8) }
+  }
   const w = bekannteWoerter(g, jetzt)
   return {
     gruppe: { id: g.id, name: g.name, fach: g.fach },
