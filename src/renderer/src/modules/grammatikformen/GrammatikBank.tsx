@@ -27,11 +27,12 @@ import {
   ThemeIcon,
   Tooltip
 } from '@mantine/core'
-import { IconCheck, IconCircleDashed, IconCircleHalf2, IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconCheck, IconChecks, IconCircleDashed, IconCircleHalf2, IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import {
   AUFGABEN_JE_FELD,
+  MIN_JE_UEBUNG,
   istKern,
   istMix,
   aufgabeKern,
@@ -65,6 +66,7 @@ import {
   bankZahlenLaden,
   fehlendeFelder,
   fehltText,
+  bankStand,
   feldZahl,
   useSchulStufen,
   useBankEntwuerfe,
@@ -247,15 +249,20 @@ export function BankKarte({
           const z = zahlen[r.schluessel]
           const n = UEBUNGEN.reduce((m, u) => m + (z?.[u] ?? 0), 0)
           const e = entwurfVon(r.schluessel)
-          const voll = n > 0 && !fehlendeFelder(z, schulStufen).length
+          // Ampel (13.10.2026, Entscheidung der Lehrkraft): grau keine · orange noch zu wenig · grün genug zum Üben · Doppelhaken vollständig
+          const stand = bankStand(z, schulStufen)
+          const voll = stand === 'voll'
           // Was fehlt (13.10.2026): Tooltip an „teilweise"; „Ergänzen" füllt es ohne Durchsicht auf
           const fehlt = fehltText(z, schulStufen, e)
           const ergaenzbar = darfReiter(r) && felderVon(r).length > 0
-          const ampel = !n
-            ? { farbe: 'gray', icon: <IconCircleDashed size={14} /> }
-            : voll
-            ? { farbe: 'teal', icon: <IconCheck size={14} /> }
-            : { farbe: 'orange', icon: <IconCircleHalf2 size={14} /> }
+          const ampel =
+            stand === 'keine'
+              ? { farbe: 'gray', icon: <IconCircleDashed size={14} /> }
+              : stand === 'voll'
+              ? { farbe: 'teal', icon: <IconChecks size={14} /> }
+              : stand === 'genug'
+              ? { farbe: 'teal', icon: <IconCheck size={14} /> }
+              : { farbe: 'orange', icon: <IconCircleHalf2 size={14} /> }
           return (
             <Paper key={r.schluessel} withBorder radius="md" px="sm" py={8} data-bank-zeile={r.schluessel}>
               <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -271,7 +278,8 @@ export function BankKarte({
                       label={
                         <Stack gap={2}>
                           <Text size="xs" fw={600}>
-                            Es fehlen (Ziel je Übungsart und Stufe: {AUFGABEN_JE_FELD}):
+                            {stand === 'genug' ? 'Genug zum Üben. Für „vollständig“' : 'Für Lernende noch zu wenig. Für „vollständig“'} fehlen (Ziel je
+                            Übungsart und Stufe: {AUFGABEN_JE_FELD}; zum Üben reichen je Stufe {MIN_JE_UEBUNG} in Erkennen, Bilden und Anwenden):
                           </Text>
                           {fehlt.map((z0) => (
                             <Text key={z0} size="xs">
@@ -286,7 +294,13 @@ export function BankKarte({
                       withinPortal
                     >
                       <Text size="xs" c="dimmed" style={{ cursor: voll ? undefined : 'help' }} data-bank-stand>
-                        {!n ? 'noch keine Aufgaben' : voll ? `${n} Aufgaben – vollständig` : `${n} Aufgaben – teilweise`}
+                        {stand === 'keine'
+                          ? 'noch keine Aufgaben'
+                          : stand === 'voll'
+                          ? `${n} Aufgaben – vollständig`
+                          : stand === 'genug'
+                          ? `${n} Aufgaben – genug zum Üben`
+                          : `${n} Aufgaben – noch zu wenig zum Üben`}
                         {e ? ` · ${e.aufgaben.length} neue zum Durchsehen` : ''}
                       </Text>
                     </Tooltip>

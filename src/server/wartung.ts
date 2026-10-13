@@ -22,6 +22,7 @@ import { codePruefwertAusAlt } from './feldschutz'
 import { NAMEN_KORRIGIEREN } from './wartungGastname'
 import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
+import { GRAMMATIK_BANK_LOESCHEN } from './wartungBankLoeschen'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
@@ -167,7 +168,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Medaillen der ersten Fassung als Reihe des Schuljahres 2026/27 (10.10.2026, Jahresreihen; wartungAuszeichnungenJahre.ts)
   AUSZEICHNUNGEN_JAHRE,
   // Alle bisherigen Grammatik-Trainings samt Lernstand löschen – Aufgabenbank statt Pools je Kurs (13.10.2026, von der Lehrkraft gewünscht; wartungGrammatikAlle.ts)
-  GRAMMATIK_ALLE
+  GRAMMATIK_ALLE,
+  // Aufgabenbank der Grammatik und die Kurs-Trainings daraus löschen (13.10.2026, von der Lehrkraft gewünscht; wartungBankLoeschen.ts)
+  GRAMMATIK_BANK_LOESCHEN
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

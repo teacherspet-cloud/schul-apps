@@ -96,7 +96,9 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
   useEffect(() => {
     if (!aufServer()) return
     entwuerfeBereinigen().then(
-      (n) => n > 0 && notifySuccess(`${n} doppelte ${n === 1 ? 'Aufgabe' : 'Aufgaben'} aus den Entwürfen zum Durchsehen entfernt.`),
+      (n) =>
+        n > 0 &&
+        notifySuccess(`${n} ${n === 1 ? 'Aufgabe' : 'Aufgaben'} aus den Entwürfen zum Durchsehen entfernt (doppelt oder von vor dem Leeren der Bank).`),
       () => undefined
     )
   }, [])

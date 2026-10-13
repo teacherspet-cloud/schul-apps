@@ -84,6 +84,7 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
       'codes-hmac-2026-10-08',
       'faecher-schreibweise-2026-10-08',
       'grammatik-alle-loeschen-2026-10-13',
+      'grammatik-bank-loeschen-2026-10-13',
       'grammatik-je-thema-2026-10-08',
       'grammatik-klasse10-loeschen-2026-10-09',
       'klartext-reste-2026-10-08',

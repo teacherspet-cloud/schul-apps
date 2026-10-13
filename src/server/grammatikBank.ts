@@ -12,7 +12,7 @@
  *   POST /server/grammatik-bank/speichern {sprache, schluessel, regel, aufgaben} → { zahlen, kurse }
  */
 import { randomBytes } from 'node:crypto'
-import { datenbank, protokolliereServer } from './datenbank'
+import { datenbank, protokolliereServer, serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
 import { imNutzer } from './kontext'
 import { darfLehrwerkSprache } from '../main/services/rolle'
@@ -270,7 +270,8 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && url.pathname === '/server/grammatik-bank') {
       const s = sprache(url.searchParams.get('sprache'))
       if (!s) return json(res, 400, { fehler: 'Bitte eine Sprache angeben.' }), true
-      return json(res, 200, { zahlen: bankZahlen(s), darf: darf(s) }), true
+      // geleert (13.10.2026, wartungBankLoeschen.ts): KI-Entwürfe von davor verwirft die Oberfläche
+      return json(res, 200, { zahlen: bankZahlen(s), darf: darf(s), geleert: serverWert<number>('grammatik-bank-geleert', 0) }), true
     }
     if (req.method === 'POST' && url.pathname === '/server/grammatik-bank/lesen') {
       const k0 = (await k.koerper()) as Record<string, unknown>

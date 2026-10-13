@@ -14,6 +14,8 @@ import {
   stufeVon,
   STUFEN,
   STUFE_NAME,
+  MIN_JE_UEBUNG,
+  istKern,
   UEBUNG_NAME,
   aufgabeKern,
   ohneDoppelte,
@@ -84,8 +86,16 @@ export function bankEntwurfAblegen(e: BankEntwurf): void {
  * ganz. Liefert die Zahl entfernter Aufgaben. Läuft beim Öffnen von „Grammatikformen".
  */
 export async function entwuerfeBereinigen(): Promise<number> {
-  const alle = ladeBankEntwuerfe()
-  if (!alle.length) return 0
+  // Entwürfe aus der Zeit vor dem Leeren der Bank (13.10.2026, Wunsch der Lehrkraft) verwerfen
+  const geleert = await holen<{ geleert?: number }>('/server/grammatik-bank?sprache=en').then(
+    (d) => d.geleert ?? 0,
+    () => 0
+  )
+  const vorher = ladeBankEntwuerfe()
+  const alle = vorher.filter((e) => !geleert || e.am > geleert)
+  if (alle.length !== vorher.length) speichereBankEntwuerfe(alle)
+  const verworfen = vorher.length - alle.length ? vorher.filter((e) => !alle.includes(e)).reduce((n, e) => n + e.aufgaben.length, 0) : 0
+  if (!alle.length) return verworfen
   const bank = new Map((await bankLesen(alle.map((e) => e.schluessel))).map((e) => [e.schluessel, e.aufgaben]))
   let weg = 0
   const neu = alle
@@ -97,7 +107,7 @@ export async function entwuerfeBereinigen(): Promise<number> {
     })
     .filter((e) => e.aufgaben.length)
   if (weg || neu.length !== alle.length) speichereBankEntwuerfe(neu)
-  return weg
+  return weg + verworfen
 }
 
 export const bankEntwurfWeg = (schluessel: string): void => speichereBankEntwuerfe(ladeBankEntwuerfe().filter((x) => x.schluessel !== schluessel))
@@ -161,6 +171,8 @@ const inArbeit = new Map<string, Promise<unknown>>()
 let kette: Promise<void> = Promise.resolve()
 /** So viele Aufgaben je Übungsart mehr als fehlen (die Prüfung streicht im Schnitt etwa ein Viertel) */
 const PUFFER = 2
+/** Höchstens so viele Durchgänge je Feld (erster + 2 zum Nachlegen) */
+const RUNDEN = 3
 
 type BankAuftragEingabe = Omit<BankAuftrag, 'vorhanden'> & {
   vorhanden?: string[]
@@ -220,32 +232,39 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
       k.melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
       await w.catch(() => undefined)
     }
-    // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
-    const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
-    // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)?
-    const entwurf = ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
-    const st = a.niveau ?? 'm'
-    const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
-    const uebungen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
-    // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
-    // Stufe noch gar nichts da ist – Auffüllen geht über „Mit KI erzeugen" im eigenen Reiter
-    if (!uebungen.length || (a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
-      k.melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
-      continue
-    }
-    // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
-    const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
-    const da = a.vorhanden ?? bank.map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
-    const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
-      if (a.direkt) return direktSpeichern(a, r)
-      bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
-      return r
-    })
-    inArbeit.set(feld, lauf)
-    try {
-      n += (await lauf).aufgaben.length
-    } finally {
-      if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
+    // Bis zu RUNDEN Durchgänge (13.10.2026, Wunsch der Lehrkraft): Streicht die Prüfung zu viel, legt die KI gezielt nach
+    for (let runde = 0; runde < RUNDEN; runde++) {
+      // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
+      const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
+      // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)?
+      const entwurf = ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
+      const st = a.niveau ?? 'm'
+      const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
+      const uebungen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+      // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
+      // Stufe noch gar nichts da ist – Auffüllen geht über „Ergänzen" bzw. „Mit KI erzeugen" im eigenen Reiter
+      if (!uebungen.length || (runde === 0 && a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
+        if (runde === 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
+        break
+      }
+      if (runde > 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht genug, die KI legt nach (Runde ${runde + 1})`)
+      // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
+      const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
+      const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
+      const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
+        if (a.direkt) return direktSpeichern(a, r)
+        bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
+        return r
+      })
+      inArbeit.set(feld, lauf)
+      try {
+        const neu = (await lauf).aufgaben.length
+        n += neu
+        // Nichts Brauchbares mehr: nicht endlos weiterfragen
+        if (!neu) break
+      } finally {
+        if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
+      }
     }
   }
   return n
@@ -287,5 +306,19 @@ export function aufgabenAmpel(teile: readonly string[], zahlen: BankZahlen, stuf
   if (!teile.length) return 'keine'
   const n = teile.reduce((m, k) => m + UEBUNGEN.reduce((x, u) => x + (zahlen[k]?.[u] ?? 0), 0), 0)
   if (!n) return 'keine'
-  return teile.every((k) => !fehlendeFelder(zahlen[k], stufen).length) ? 'voll' : 'teil'
+  // Grün = genug zum Üben (13.10.2026, Entscheidung der Lehrkraft) – „vollständig" zeigt die Zeile im Pop-up zusätzlich
+  return teile.every((k) => bankStand(zahlen[k], stufen) !== 'wenig' && bankStand(zahlen[k], stufen) !== 'keine') ? 'voll' : 'teil'
+}
+
+/**
+ * Stand eines Bereichs (13.10.2026, Entscheidung der Lehrkraft): „keine"; „wenig" – für Lernende noch zu wenig; „genug" –
+ * genug zum Üben (je Stufe die Kern-Übungsarten Erkennen, Bilden, Anwenden mit mindestens MIN_JE_UEBUNG Aufgaben, wie die
+ * „sicher"-Regel); „voll" – vollständig (alle Übungsarten in allen Stufen mit AUFGABEN_JE_FELD).
+ */
+export type BankStand = 'keine' | 'wenig' | 'genug' | 'voll'
+export function bankStand(zahl: BankZahlen[string] | undefined, stufen: readonly Stufe[]): BankStand {
+  const n = UEBUNGEN.reduce((m, u) => m + (zahl?.[u] ?? 0), 0)
+  if (!n) return 'keine'
+  if (!fehlendeFelder(zahl, stufen).length) return 'voll'
+  return stufen.every((st) => UEBUNGEN.filter(istKern).every((u) => feldZahl(zahl, u, st) >= MIN_JE_UEBUNG)) ? 'genug' : 'wenig'
 }
