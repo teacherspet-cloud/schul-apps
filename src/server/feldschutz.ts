@@ -84,7 +84,10 @@ export const SENSIBEL: Record<string, string[]> = {
   fach_obleute: ['daten'],
   // Förder-/Fordermaterial (12.10.2026, foerdern.ts): Gruppen mit Kennungen der Kinder und Bündel „Für dich" je Kind
   foerder_auftraege: ['daten'],
-  foerder_buendel: ['daten']
+  foerder_buendel: ['daten'],
+  // Aufgabenbank der Grammatik (13.10.2026, grammatikBank.ts): schulweite Aufgaben ohne Personenbezug – im Zweifel verschlüsselt
+  gram_bank: ['bank_aufgabe'],
+  gram_bank_regel: ['bank_regel']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

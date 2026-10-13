@@ -47,7 +47,11 @@ import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { GRAMMAR_TOPICS, hasGrammar, teilformenAuftrag } from '../arbeitsblatt/didactics/grammar'
+import { GRAMMAR_TOPICS, hasGrammar, teilformenAuftrag, teilformenFuer } from '../arbeitsblatt/didactics/grammar'
+import { AUFGABEN_JE_FELD, kernZahl, regelIdVon, UEBUNGEN, type BankZahlen } from '@shared/grammatikBank'
+import { BANK_EREIGNIS, bankSpeichern, bankZahlenLaden } from '../grammatikformen/bank'
+import { teilbereicheVon, teilHinweise, kennungLabel } from '../grammatikformen/grammatikformen'
+import { erzeugeBankAufgaben } from './grammatikBankErzeugen'
 import GrammatikAuswahl from '../arbeitsblatt/steps/GrammatikAuswahl'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { Zugang } from '../onlinetest/OnlinetestModule'
@@ -107,6 +111,11 @@ export interface Entwurf {
   /** Angaben der Freigabe (Themen, Teilformen, Klasse, Lehrwerk – 08.10.2026) */
   info?: { themen: string[]; teilformen: string[]; jahrgang?: number; lehrwerk?: { buch?: string; unit?: string }; fuerRegeln?: string[] }
   paket: GrammatikPaket
+  /**
+   * Aufgabenbank (13.10.2026): Formen ohne hinterlegte Aufgaben – die KI hat sie je Teilbereich erzeugt; beim Freigeben
+   * werden sie an der Form hinterlegt und dem Kurs aus der Bank zugewiesen. Je Regelkarte steht der Teilbereich in `kennung`.
+   */
+  bank?: { formen: { thema: string; titel: string; teile: string[] }[] }
 }
 
 const ENTWUERFE = 'grammatik-entwuerfe'
@@ -349,7 +358,11 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
         const liste: BestehendeGrammatik[] = [
           ...r.zuweisungen
             .filter((g) => g.vokId === vorgabe.vokId && !g.art)
-            .map((g) => ({ id: g.id, themen: g.themen ?? [], status: (g.status === 'entfernt' ? 'entfernt' : g.status === 'offen' ? 'offen' : 'beendet') as BestehendeGrammatik['status'] })),
+            .map((g) => ({
+              id: g.id,
+              themen: g.themen ?? [],
+              status: (g.status === 'entfernt' ? 'entfernt' : g.status === 'offen' ? 'offen' : 'beendet') as BestehendeGrammatik['status']
+            })),
           ...ladeEntwuerfe()
             .filter((e) => e.empfaenger.vokId === vorgabe.vokId && !e.empfaenger.art)
             .map((e) => ({ id: e.schluessel, themen: e.info?.themen ?? [], status: 'entwurf' as const }))
@@ -396,7 +409,9 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
         if (aktiv)
           setKlassenFrei({
             frei,
-            hinweise: Object.fromEntries((d.grammatikEinzeln ?? []).map((e) => [e.id, `für ${e.lernende} ${e.lernende === 1 ? 'Lernende/n' : 'Lernende'} schon freigegeben`])),
+            hinweise: Object.fromEntries(
+              (d.grammatikEinzeln ?? []).map((e) => [e.id, `für ${e.lernende} ${e.lernende === 1 ? 'Lernende/n' : 'Lernende'} schon freigegeben`])
+            ),
             ...(naechste ? { vorschlag: naechste.id } : {})
           })
         if (aktiv) setKursLehrwerk(band ? { buch: band, units: naechsteUnit ? [naechsteUnit] : grammatikUnits(kapitel, band, d) } : null)
@@ -410,6 +425,15 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       aktiv = false
     }
   }, [vorgabe?.vokId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Aufgabenbank (13.10.2026): Was schon hinterlegt ist, wird ohne KI zugewiesen
+  const [bankZahlen, setBankZahlen] = useState<BankZahlen | null>(null)
+  useEffect(() => {
+    if (!vorgabe || !fach?.sprache) return
+    bankZahlenLaden(fach.sprache).then(
+      (r) => setBankZahlen(r.zahlen),
+      () => setBankZahlen({})
+    )
+  }, [vorgabe?.vokId, fach?.sprache]) // eslint-disable-line react-hooks/exhaustive-deps
   const lehrwerkVorwahl = kursLehrwerk ?? vorgabe?.lehrwerk
   const abgleich = vorgabe && !eigenesAn ? freigabeAbgleich(themenIds, bestehend ?? []) : null
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
@@ -428,13 +452,26 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
    * mit der Klasse weiter); spontane Gruppen (QR-Code, einzelne Lernende) behalten das Enddatum.
    */
   const festeKlasse =
-    art === 'gruppe' || (art === 'vok' && (vorgabe?.vokId === vokId && vorgabe?.klassenKurs !== undefined ? vorgabe.klassenKurs : Boolean(vokListe.find((v) => v.id === vokId)?.lerngruppe)))
+    art === 'gruppe' ||
+    (art === 'vok' &&
+      (vorgabe?.vokId === vokId && vorgabe?.klassenKurs !== undefined ? vorgabe.klassenKurs : Boolean(vokListe.find((v) => v.id === vokId)?.lerngruppe)))
   const empfaengerDa = art === 'gruppe' ? Boolean(gruppe) : art === 'einzeln' ? einzelne.length > 0 : art === 'vok' ? Boolean(vokId) : true
   const kursAbgleich = abgleich && !mitVerben ? abgleich : null
   const aenderungen = kursAbgleich ? kursAbgleich.erzeugen.length + kursAbgleich.wiederherstellen.length : 0
-  const bereit = Boolean(
-    fach && (mitVerben ? verbWahl.verben.length >= 4 : kursAbgleich ? bestehend && aenderungen > 0 : thema) && empfaengerDa
-  )
+  const bereit = Boolean(fach && (mitVerben ? verbWahl.verben.length >= 4 : kursAbgleich ? bestehend && aenderungen > 0 : thema) && empfaengerDa)
+  const vokIdKurs = vorgabe?.vokId ?? (art === 'vok' && vokId ? vokId : undefined)
+  /** Teilbereiche einer Form im Kurs: gewählte Teilformen, sonst die zur Klasse passenden, sonst alle (13.10.2026) */
+  const teileDerForm = (themaId: string): string[] => {
+    const gewaehlt = teilWahl.filter((k) => k.startsWith(`${themaId}/`))
+    if (gewaehlt.length) return gewaehlt
+    const t = GRAMMAR_TOPICS.find((x) => x.id === themaId)
+    const passend = t
+      ? teilformenFuer(t, query)
+          .filter((x) => x.status !== 'spaeter')
+          .map((x) => `${themaId}/${x.teil.id}`)
+      : []
+    return passend.length ? passend : teilbereicheVon([themaId])
+  }
   const erstellen = (): void => {
     if (!fach || !bereit) return
     const empfaenger = {
@@ -507,6 +544,96 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
     }
     const titel = kursAbgleich ? neueThemen.map((t) => t.label).join(' · ') : `${thema}`
     const info = { themen: neueIds, teilformen: neueTeile, jahrgang, ...(vorgabe?.lehrwerk?.buch ? { lehrwerk: vorgabe.lehrwerk } : {}) }
+    /*
+     * Aufgabenbank (13.10.2026, abgestimmt): Im Kurs bekommt jede Form ihre hinterlegten Aufgaben – sofort freigeschaltet,
+     * ohne KI. Formen ohne hinterlegte Aufgaben: die KI erzeugt sie je Teilbereich (Durchsicht, dann an der Form gespeichert).
+     */
+    if (kursAbgleich && vokIdKurs) {
+      const formen = neueThemen.map((t) => ({ thema: t.id, titel: t.label, teile: teileDerForm(t.id) }))
+      const mitBank = formen.filter((f) => f.teile.some((k) => kernZahl(bankZahlen?.[k]) > 0))
+      const ohneBank = formen.filter((f) => !mitBank.includes(f))
+      if (mitBank.length)
+        void senden<{ ids: string[]; mixe: number }>('/server/grammatik/aus-bank', {
+          vokId: vokIdKurs,
+          formen: mitBank,
+          info: { jahrgang, ...(info.lehrwerk ? { lehrwerk: info.lehrwerk } : {}) }
+        }).then(
+          (r) => {
+            notifySuccess(
+              `${r.ids.length === 1 ? `„${mitBank[0].titel}“ ist` : `${r.ids.length} Grammatikformen sind`} mit den hinterlegten Aufgaben freigeschaltet${
+                r.mixe ? ` – dazu ${r.mixe} gemischte Übungen` : ''
+              }.`
+            )
+            window.dispatchEvent(new Event('kurs-grammatik-geaendert'))
+          },
+          (e: unknown) => notifyError(e, 'Nicht freigeschaltet')
+        )
+      if (!ohneBank.length) return schliessen()
+      const bankTitel = ohneBank.map((f) => f.titel).join(' · ')
+      void starteAuftrag({
+        moduleId: 'sprachenlernen',
+        docId: kursGrammatikDocId(vokIdKurs),
+        titel: bankTitel,
+        art: 'Grammatikaufgaben',
+        eingabe: { formen: ohneBank, fach: fach.label, sprache: fach.sprache, jahrgang },
+        sperrt: false,
+        fehlerTitel: 'Aufgaben konnten nicht erstellt werden',
+        arbeit: async (e, k) => {
+          const regeln: GrammatikPaket['regeln'] = []
+          const aufgaben: GrammatikPaket['aufgaben'] = []
+          const teile = e.formen.flatMap((f) => f.teile)
+          for (const [i, teil] of teile.entries()) {
+            const r = await erzeugeBankAufgaben(
+              {
+                schluessel: teil,
+                titel: kennungLabel(teil),
+                fach: e.fach,
+                sprache: e.sprache,
+                jahrgang: e.jahrgang,
+                land: settings.defaults?.stateId || undefined,
+                schulform: settings.defaults?.schoolTypeId || undefined,
+                uebungen: UEBUNGEN,
+                anzahl: AUFGABEN_JE_FELD,
+                themenIds: [teil.split('/')[0]],
+                hinweise: teilHinweise(teil),
+                ...(lehrwerkVorwahl?.buch ? { lehrwerk: { buch: lehrwerkVorwahl.buch, unit: kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit } } : {}),
+                vorhanden: []
+              },
+              k.ai,
+              (t) => k.melde(`${i + 1} von ${teile.length}: ${t}`)
+            )
+            const id = regelIdVon(teil)
+            regeln.push({ id, ...r.regel, erklaerung: r.regel.erklaerung || r.regel.titel, kennung: teil })
+            aufgaben.push(...r.aufgaben.map((a) => ({ ...a, regelId: id })))
+          }
+          return { thema: bankTitel, regeln, aufgaben } as GrammatikPaket
+        },
+        ablegen: async (paket) => {
+          speichereEntwuerfe([
+            ...ladeEntwuerfe(),
+            {
+              schluessel: `${Date.now()}`,
+              titel: bankTitel,
+              fach: fach.label,
+              sprache: fach.sprache,
+              thema: bankTitel,
+              empfaenger,
+              info: { ...info, themen: ohneBank.map((f) => f.thema) },
+              paket,
+              bank: { formen: ohneBank }
+            }
+          ])
+          notifySuccess(`Aufgaben zu „${bankTitel}" sind fertig – beim Kurs ansehen und freigeben.`)
+        },
+        abschluss: (p) => `${p.aufgaben.length} Aufgaben fertig – ansehen und freigeben`
+      })
+      notifySuccess(
+        `Für ${
+          ohneBank.length === 1 ? `„${ohneBank[0].titel}“` : `${ohneBank.length} Formen`
+        } sind noch keine Aufgaben hinterlegt – die KI erstellt sie im Hintergrund.`
+      )
+      return schliessen()
+    }
     void starteAuftrag({
       moduleId: 'sprachenlernen',
       // „Öffnen" im Auftrag führt zum Kurs und seiner Grammatik (kurs/auftragsZiel.ts)
@@ -736,11 +863,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
           <Group justify="flex-end" className="dialog-fuss">
             {kursAbgleich && (
               <Text size="sm" c="dimmed" data-grammatik-abgleich>
-                {!bestehend
-                  ? 'Lade die Grammatik des Kurses …'
-                  : aenderungen
-                    ? abgleichText(kursAbgleich)
-                    : 'Noch nichts gewählt'}
+                {!bestehend ? 'Lade die Grammatik des Kurses …' : aenderungen ? abgleichText(kursAbgleich) : 'Noch nichts gewählt'}
               </Text>
             )}
             <Button
@@ -778,6 +901,40 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
   const fuer = [...(e.empfaenger.fuer ?? []), ...(e.empfaenger.gleiche ?? []).filter((g) => auchFuer.includes(g.id))]
   const freigeben = async (): Promise<void> => {
     setLaeuft(true)
+    if (e.bank && e.empfaenger.vokId) {
+      try {
+        // Aufgabenbank (13.10.2026): je Teilbereich an der Form hinterlegen, dann dem Kurs aus der Bank zuweisen
+        for (const r of paket.regeln) {
+          if (!r.kennung) continue
+          const aufgaben = paket.aufgaben.filter((a) => a.regelId === r.id && a.uebung)
+          if (aufgaben.length)
+            await bankSpeichern(
+              e.sprache,
+              r.kennung,
+              { titel: r.titel, erklaerung: r.erklaerung, beispiele: r.beispiele },
+              aufgaben as Parameters<typeof bankSpeichern>[3]
+            )
+        }
+        const z = await senden<{ ids: string[]; mixe: number }>('/server/grammatik/aus-bank', {
+          vokId: e.empfaenger.vokId,
+          formen: e.bank.formen,
+          info: { jahrgang: e.info?.jahrgang, ...(e.info?.lehrwerk ? { lehrwerk: e.info.lehrwerk } : {}) }
+        })
+        speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== e.schluessel))
+        window.dispatchEvent(new Event(BANK_EREIGNIS))
+        notifySuccess(
+          `„${e.titel}“ ist freigeschaltet und an der Form hinterlegt – weitere Kurse bekommen dieselben Aufgaben${
+            z.mixe ? ` (dazu ${z.mixe} gemischte Übungen)` : ''
+          }.`
+        )
+        fertig()
+      } catch (er) {
+        notifyError(er, 'Nicht freigegeben')
+      } finally {
+        setLaeuft(false)
+      }
+      return
+    }
     try {
       const r = await senden<{ ids?: string[] }>('/server/grammatik/freigeben', {
         titel: e.titel,
@@ -798,11 +955,11 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
       planGeaendert()
       notifySuccess(
         planMeldung(plan, `„${e.titel}“`) ||
-        (extra
-          ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.`
-          : (r?.ids?.length ?? 1) > 1
-          ? `„${e.titel}" ist freigegeben – als ${r!.ids!.length} Trainings, eines je Thema. Die Lernenden finden sie in ihrer Lern-App.`
-          : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`)
+          (extra
+            ? `Freigeschaltet für ${fuer.map((f) => f.name).join(', ')}.`
+            : (r?.ids?.length ?? 1) > 1
+            ? `„${e.titel}" ist freigegeben – als ${r!.ids!.length} Trainings, eines je Thema. Die Lernenden finden sie in ihrer Lern-App.`
+            : `„${e.titel}" ist freigegeben – die Lernenden finden es in ihrer Lern-App.`)
       )
       fertig()
     } catch (er) {
@@ -850,7 +1007,13 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
             </Group>
           </Card>
         )}
-        <FreigabePlanen wert={plan} aendern={setPlan} />
+        {e.bank ? (
+          <Text size="xs" c="dimmed">
+            Beim Freigeben werden die Aufgaben an der Grammatikform hinterlegt (App „Grammatikformen“) und sind gleich für die Lernenden freigeschaltet.
+          </Text>
+        ) : (
+          <FreigabePlanen wert={plan} aendern={setPlan} />
+        )}
         <Group justify="space-between" className="dialog-fuss">
           <Button variant="subtle" color="red" onClick={verwerfen} data-entwurf-verwerfen>
             Verwerfen
@@ -863,8 +1026,8 @@ export function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliess
               {plan.modus === 'planen'
                 ? `${planKnopf(plan, '')} (${paket.aufgaben.length} Aufgaben)`
                 : extra
-                  ? `Für ${fuer.length === 1 ? fuer[0].name : `${fuer.length} Lernende`} freischalten`
-                  : `Freigeben (${paket.aufgaben.length} Aufgaben)`}
+                ? `Für ${fuer.length === 1 ? fuer[0].name : `${fuer.length} Lernende`} freischalten`
+                : `Freigeben (${paket.aufgaben.length} Aufgaben)`}
             </Button>
           </Group>
         </Group>

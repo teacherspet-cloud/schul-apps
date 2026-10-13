@@ -1,10 +1,10 @@
 /**
  * Kopf der Startseite (12.10.2026, abgestimmt mit der Lehrkraft: „Begrüßung + Tagesleiste"): große Tagesbegrüßung
- * (unpersönlich), Wochentag und Datum im sanften Farbverlauf der Akzentfarbe, rechts das Programmbild „startseite";
+ * (unpersönlich), Wochentag und Datum im sanften Farbverlauf der Akzentfarbe (Bild oben rechts am 13.10.2026 entfernt);
  * darunter – am Server – kleine Kacheln „Heute": nächster Termin, offene Freigaben/Rückmeldungen, Kurse mit
  * Problemwörtern, laufende Onlinetests. Ein Klick öffnet den passenden Kasten weiter unten und springt dorthin.
  */
-import { Box, Group, Image, Paper, SimpleGrid, Text, Title, UnstyledButton } from '@mantine/core'
+import { Box, Group, Paper, SimpleGrid, Text, Title, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconCalendarEvent, IconPlayerPlay, IconSend } from '@tabler/icons-react'
 import { useEffect } from 'react'
 import { demnaechst, tagKurz } from '@shared/startseiteKurse'
@@ -13,9 +13,6 @@ import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten } from './kopfDaten'
 import { useSichtbareProgramme } from './programme'
 import { startKastenId } from './StartAnzahl'
-
-const bilder = import.meta.glob('../assets/programme/startseite.webp', { eager: true, import: 'default' }) as Record<string, string>
-const BILD = Object.values(bilder)[0]
 
 /** „Guten Morgen" bis 11 Uhr, „Guten Tag" bis 17 Uhr, sonst „Guten Abend" */
 export function begruessung(d = new Date()): string {
@@ -163,7 +160,6 @@ export default function StartBegruessung({ zusaetze }: { zusaetze?: React.ReactN
             </Group>
           )}
         </div>
-        {BILD && <Image src={BILD} alt="" w={{ base: 64, sm: 104 }} h={{ base: 64, sm: 104 }} fit="contain" style={{ flexShrink: 0 }} />}
       </Group>
       {kacheln.length > 0 && (
         <SimpleGrid cols={{ base: 1, xs: 2, md: Math.min(4, kacheln.length) }} spacing="sm" mt="lg" data-start-heute-leiste>

@@ -406,7 +406,7 @@ const vorhandeneSaetze = (p: GrammatikPaket): string[] =>
   p.aufgaben.map((x) => (x.satz || x.form || (x.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean)
 
 /** 2. Schritt: Eine zweite Anfrage prüft jede Aufgabe (korrigiert Lösungen bzw. streicht) – auch für „+ Aufgaben" */
-async function gepruefterPool(
+export async function gepruefterPool(
   start: GrammatikPaket,
   a: GrammatikAuftrag,
   ai: Ai,

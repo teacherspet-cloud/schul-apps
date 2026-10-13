@@ -131,9 +131,8 @@ describe('Schwellen eines Schuljahres', () => {
     // Gold > 1 × Wörter (nur Erkennen reicht nicht), Platin > 2 × Wörter (ohne sichere Wörter nicht erreichbar)
     expect(s.wortschatz[2]).toBeGreaterThan(1198)
     expect(s.wortschatz[3]).toBeGreaterThan(2 * 1198)
-    // Grammatik: Höchstpunkte 3 × Themen (geübt 1 + sicher 2); Gold > 1 × Themen
-    expect(s.grammatik).toEqual([2, 6, 24, 36, 45, 55])
-    expect(s.grammatik[2]).toBeGreaterThan(20)
+    // Grammatik (13.10.2026): Prozent des ganzen Bands – feste Stufen
+    expect(s.grammatik).toEqual([10, 25, 50, 75, 90, 100])
     // Etappen: Bronze 1, Meister = jedes Kapitel zu 80 % sicher (3 je Kapitel)
     expect(s.lehrwerk).toEqual([1, 5, 12, 18, 25, 33])
   })
@@ -152,7 +151,7 @@ describe('Schwellen eines Schuljahres', () => {
     expect(s).toEqual(jahresSchwellen(grundlage({ woerter: 150, grammatik: 5, units: 3 })))
     expect(s.wortschatz[0]).toBe(6)
     expect(s.wortschatz[2]).toBe(180)
-    expect(s.grammatik[0]).toBe(2)
+    expect(s.grammatik[0]).toBe(10)
     expect(s.lehrwerk).toEqual([1, 2, 3, 5, 7, 9])
     for (const k of Object.values(s)) {
       expect(k).toHaveLength(6)
@@ -162,12 +161,12 @@ describe('Schwellen eines Schuljahres', () => {
   it('ohne bekannten Umfang: ein typischer Band (900 Wörter, 15 Grammatikthemen, 9 Kapitel), für jeden Jahrgang gleich', () => {
     const s = jahresSchwellen(grundlage({ jahrgang: 5 }))
     expect(s.wortschatz).toEqual([36, 180, 1080, 1980, 2700, 3240])
-    expect(s.grammatik).toEqual([2, 5, 18, 27, 34, 41])
+    expect(s.grammatik).toEqual([10, 25, 50, 75, 90, 100])
     expect(s.lehrwerk).toEqual([1, 4, 9, 15, 20, 27])
     expect(jahresSchwellen(grundlage({ jahrgang: 11 }))).toEqual(s)
     // Latein: Grammatik aus den Lektionen des Lernjahres, Wörter und Kapitel typisch
     const la = jahresSchwellen(grundlage({ jahrgang: 6, grammatik: grammatikLatein('Pontes', 1)!.grammatik }))
-    expect(la.grammatik).toEqual([2, 12, 49, 75, 90, 110])
+    expect(la.grammatik).toEqual([10, 25, 50, 75, 90, 100])
     expect(la.wortschatz).toEqual(s.wortschatz)
   })
   it('nächste Stufe in Worten', () => {

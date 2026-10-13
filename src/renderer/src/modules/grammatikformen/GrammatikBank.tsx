@@ -1,0 +1,479 @@
+/**
+ * Übungsaufgaben im Seitenfenster der App „Grammatikformen" (13.10.2026, mit der Lehrkraft abgestimmt; Regeln in
+ * shared/grammatikBank.ts, Server server/grammatikBank.ts).
+ *
+ * Reiter je Teilbereich des Grammatikpunkts, dazu „Gemischt" (Formen des Punkts) und „Unit gemischt" (Wiederholung der
+ * Unit). Je Reiter die fünf Übungsarten mit Anzahl (Ziel rund 8): Erkennen, Bilden, Anwenden (Kern) und Unterscheiden,
+ * Fehler finden (Zusatz). „Mit KI erzeugen" füllt fehlende Übungsarten im Hintergrund; das Ergebnis erscheint als Entwurf
+ * und wird erst nach dem Durchsehen gespeichert. „Bearbeiten" öffnet alle Aufgaben des Reiters.
+ */
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Modal,
+  Progress,
+  ScrollArea,
+  SegmentedControl,
+  Stack,
+  Tabs,
+  Text,
+  Textarea,
+  TextInput,
+  Tooltip
+} from '@mantine/core'
+import { IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { useEffect, useMemo, useState } from 'react'
+import type { TextbookMeta } from '@shared/types'
+import {
+  AUFGABEN_JE_FELD,
+  istKern,
+  mixSchluessel,
+  regelIdVon,
+  UEBUNG_NAME,
+  UEBUNG_TEXT,
+  UEBUNGEN,
+  unitSchluessel,
+  type BankAufgabe,
+  type BankRegel,
+  type BankZahlen,
+  type Uebung
+} from '@shared/grammatikBank'
+import type { GrammatikPaket } from '@shared/grammatiktrainer'
+import type { LehrwerkGrammatikPunkt } from '../../shared/lehrwerkGrammatik'
+import { notifyError, notifySuccess } from '../../shared/util'
+import { AufgabenEditor } from '../lernen/kurs/AufgabenEditor'
+import { kennungLabel, teilbereicheVon, teilHinweise, teilKurzname, themaZu } from './grammatikformen'
+import {
+  BANK_EREIGNIS,
+  bankEntwurfWeg,
+  bankErzeugenStarten,
+  bankLesen,
+  bankSpeichern,
+  bankZahlenLaden,
+  fehlendeUebungen,
+  useBankEntwuerfe,
+  type BankEntwurf
+} from './bank'
+import { aufServer } from '../../shared/plattform'
+import { fachVon } from '@shared/faecher'
+
+/** Ein Reiter: Schlüssel, Name, Formen (für die KI), Katalog-Hinweise */
+interface Reiter {
+  schluessel: string
+  name: string
+  titel: string
+  themen: string[]
+  formen?: string[]
+  hinweise?: string
+}
+
+/** Zahlen der Bank je Sprache – einmal laden, nach dem Speichern neu */
+export function useBankZahlen(sprache: string): { zahlen: BankZahlen; darf: boolean; geladen: boolean; neu: () => void } {
+  const [d, setD] = useState<{ zahlen: BankZahlen; darf: boolean; geladen: boolean }>({ zahlen: {}, darf: false, geladen: false })
+  const laden = (): void => {
+    if (!aufServer()) return
+    bankZahlenLaden(sprache).then(
+      (r) => setD({ ...r, geladen: true }),
+      () => setD((x) => ({ ...x, geladen: true }))
+    )
+  }
+  useEffect(() => {
+    laden()
+    window.addEventListener(BANK_EREIGNIS, laden)
+    return () => window.removeEventListener(BANK_EREIGNIS, laden)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sprache])
+  return { ...d, neu: laden }
+}
+
+export function BankKarte({
+  punkt,
+  unit,
+  unitPunkte,
+  buch,
+  fach,
+  farbe,
+  zahlen,
+  darf
+}: {
+  punkt: LehrwerkGrammatikPunkt
+  unit: string
+  /** Alle Punkte der Unit (für „Unit gemischt") */
+  unitPunkte: LehrwerkGrammatikPunkt[]
+  buch: TextbookMeta
+  fach: string
+  farbe: string
+  zahlen: BankZahlen
+  /** Admin bzw. Fachobfrau/-mann – darf Hinterlegtes ändern */
+  darf: boolean
+}): React.JSX.Element {
+  const entwuerfe = useBankEntwuerfe()
+  const [bearbeiten, setBearbeiten] = useState<Reiter | null>(null)
+  const reiter = useMemo<Reiter[]>(() => {
+    const teile = teilbereicheVon(punkt.t)
+    const aus: Reiter[] = teile.map((k) => ({
+      schluessel: k,
+      name: teilKurzname(k),
+      titel: kennungLabel(k),
+      themen: [k.split('/')[0]],
+      hinweise: teilHinweise(k)
+    }))
+    if (teile.length >= 2)
+      aus.push({
+        schluessel: mixSchluessel(punkt.t),
+        name: 'Gemischt',
+        titel: `Gemischt: ${punkt.text}`,
+        themen: [...new Set(punkt.t.map((k) => k.split('/')[0]))],
+        formen: teile.map(kennungLabel)
+      })
+    const unitKennungen = [...new Set(unitPunkte.flatMap((p) => p.t))]
+    if (unitPunkte.length >= 2 && unitKennungen.length >= 2)
+      aus.push({
+        schluessel: unitSchluessel(buch.name, unit),
+        name: `${unit} gemischt`,
+        titel: `Wiederholung ${unit}`,
+        themen: [...new Set(unitKennungen.map((k) => k.split('/')[0]))],
+        formen: unitPunkte.map((p) => p.text)
+      })
+    return aus
+  }, [punkt, unitPunkte, buch.name, unit])
+  const [aktiv, setAktiv] = useState<string | null>(reiter[0]?.schluessel ?? null)
+  useEffect(() => {
+    if (!reiter.some((r) => r.schluessel === aktiv)) setAktiv(reiter[0]?.schluessel ?? null)
+  }, [reiter, aktiv])
+
+  if (!aufServer())
+    return (
+      <Text size="sm" c="dimmed">
+        Übungsaufgaben werden am Server der Schule hinterlegt – in der Online-Fassung verfügbar.
+      </Text>
+    )
+  if (!reiter.length)
+    return (
+      <Text size="sm" c="dimmed">
+        Ohne Katalogform gibt es keine Übungsaufgaben.
+      </Text>
+    )
+
+  const darfReiter = (r: Reiter): boolean => darf || !Object.keys(zahlen[r.schluessel] ?? {}).length
+  const auftrag = (r: Reiter, uebungen: Uebung[]): Parameters<typeof bankErzeugenStarten>[0][number] => ({
+    schluessel: r.schluessel,
+    titel: r.titel,
+    fach: fachVon(fach)?.label ?? fach,
+    sprache: buch.language,
+    jahrgang: buch.grade ?? themaZu(r.themen[0])?.from ?? 7,
+    land: buch.stateId,
+    schulform: buch.schoolTypeId,
+    uebungen,
+    anzahl: AUFGABEN_JE_FELD,
+    themenIds: r.themen,
+    hinweise: r.hinweise,
+    formen: r.formen,
+    lehrwerk: { buch: buch.name, unit }
+  })
+  const entwurfVon = (s: string): BankEntwurf | undefined => entwuerfe.find((e) => e.schluessel === s)
+  const offeneReiter = reiter.filter((r) => darfReiter(r) && fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)).length)
+  const alleFehlenden = (): void =>
+    bankErzeugenStarten(
+      offeneReiter.map((r) => auftrag(r, fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)))),
+      `Übungsaufgaben: ${punkt.text}`
+    )
+
+  return (
+    <Stack gap="sm" data-grammatik-bank>
+      <Tabs value={aktiv} onChange={setAktiv} color={farbe} variant="pills" radius="xl">
+        <ScrollArea type="auto" scrollbarSize={4} offsetScrollbars>
+          <Tabs.List style={{ flexWrap: 'nowrap' }}>
+            {reiter.map((r) => {
+              const z = zahlen[r.schluessel]
+              const n = UEBUNGEN.reduce((m, u) => m + (z?.[u] ?? 0), 0)
+              return (
+                <Tabs.Tab
+                  key={r.schluessel}
+                  value={r.schluessel}
+                  data-bank-reiter={r.schluessel}
+                  rightSection={
+                    n ? (
+                      <Badge size="xs" variant="white" color={farbe}>
+                        {n}
+                      </Badge>
+                    ) : undefined
+                  }
+                >
+                  {r.name}
+                </Tabs.Tab>
+              )
+            })}
+          </Tabs.List>
+        </ScrollArea>
+        {reiter.map((r) => {
+          const z = zahlen[r.schluessel]
+          const e = entwurfVon(r.schluessel)
+          const fehlend = fehlendeUebungen(z, e)
+          return (
+            <Tabs.Panel key={r.schluessel} value={r.schluessel} pt="sm">
+              <Stack gap={6}>
+                {r.formen && (
+                  <Text size="xs" c="dimmed">
+                    {r.formen.join(' · ')}
+                  </Text>
+                )}
+                {UEBUNGEN.map((u) => {
+                  const n = z?.[u] ?? 0
+                  const dazu = e?.aufgaben.filter((a) => a.uebung === u).length ?? 0
+                  return (
+                    <Group key={u} gap="xs" wrap="nowrap" title={UEBUNG_TEXT[u]} data-bank-uebung={u}>
+                      <Text size="sm" w={110} fw={istKern(u) ? 600 : 400} c={istKern(u) ? undefined : 'dimmed'} style={{ flexShrink: 0 }}>
+                        {UEBUNG_NAME[u]}
+                      </Text>
+                      <Progress value={Math.min(100, (n / AUFGABEN_JE_FELD) * 100)} color={istKern(u) ? farbe : 'orange'} size="sm" style={{ flex: 1 }} />
+                      <Text size="xs" c="dimmed" w={58} ta="right" style={{ flexShrink: 0 }}>
+                        {n}
+                        {dazu ? ` +${dazu}` : ''} / {AUFGABEN_JE_FELD}
+                      </Text>
+                    </Group>
+                  )
+                })}
+                <Text size="xs" c="dimmed">
+                  Erkennen, Bilden und Anwenden zählen für „sicher“; Unterscheiden und Fehler finden sind Zusatzaufgaben.
+                </Text>
+                {e && (
+                  <Alert color="violet" p="xs" data-bank-entwurf>
+                    <Group justify="space-between" gap="xs">
+                      <Text size="sm">{e.aufgaben.length} Aufgaben der KI warten aufs Durchsehen.</Text>
+                      <Button size="compact-sm" color="violet" onClick={() => setBearbeiten(r)} data-bank-entwurf-ansehen>
+                        Durchsehen
+                      </Button>
+                    </Group>
+                  </Alert>
+                )}
+                <Group gap="xs" mt={4}>
+                  <Button size="xs" variant="light" color={farbe} leftSection={<IconPencil size={14} />} onClick={() => setBearbeiten(r)} data-bank-bearbeiten>
+                    {darfReiter(r) ? 'Bearbeiten' : 'Ansehen'}
+                  </Button>
+                  {darfReiter(r) && (
+                    <Tooltip
+                      label={
+                        fehlend.length
+                          ? `Füllt ${fehlend.map((u) => UEBUNG_NAME[u]).join(', ')} auf je ${AUFGABEN_JE_FELD} Aufgaben auf`
+                          : 'Alle Übungsarten haben genug Aufgaben'
+                      }
+                    >
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="violet"
+                        leftSection={<IconSparkles size={14} />}
+                        disabled={!fehlend.length}
+                        onClick={() => bankErzeugenStarten([auftrag(r, fehlend)], `Übungsaufgaben: ${r.titel}`)}
+                        data-bank-ki
+                      >
+                        Mit KI erzeugen
+                      </Button>
+                    </Tooltip>
+                  )}
+                </Group>
+              </Stack>
+            </Tabs.Panel>
+          )
+        })}
+      </Tabs>
+      {offeneReiter.length > 1 && (
+        <Button
+          size="xs"
+          variant="subtle"
+          color="violet"
+          leftSection={<IconSparkles size={14} />}
+          onClick={alleFehlenden}
+          style={{ alignSelf: 'flex-start' }}
+          data-bank-ki-alle
+        >
+          Alle fehlenden mit KI erzeugen ({offeneReiter.length} Bereiche)
+        </Button>
+      )}
+      {bearbeiten && (
+        <BankEditor
+          reiter={bearbeiten}
+          sprache={buch.language}
+          darf={darfReiter(bearbeiten)}
+          entwurf={entwurfVon(bearbeiten.schluessel)}
+          schliessen={() => setBearbeiten(null)}
+        />
+      )}
+    </Stack>
+  )
+}
+
+/** Alle Aufgaben eines Schlüssels: Regelkarte, Filter nach Übungsart, Entwurf der KI hervorgehoben */
+function BankEditor({
+  reiter,
+  sprache,
+  darf,
+  entwurf,
+  schliessen
+}: {
+  reiter: Reiter
+  sprache: string
+  darf: boolean
+  entwurf?: BankEntwurf
+  schliessen: () => void
+}): React.JSX.Element {
+  const [regel, setRegel] = useState<BankRegel | null>(null)
+  const [aufgaben, setAufgaben] = useState<BankAufgabe[]>([])
+  const [neu, setNeu] = useState<Set<string>>(new Set())
+  const [filter, setFilter] = useState<'alle' | Uebung>('alle')
+  const [laeuft, setLaeuft] = useState(false)
+  const [geladen, setGeladen] = useState(false)
+  useEffect(() => {
+    let aktiv = true
+    bankLesen([reiter.schluessel]).then(
+      (l) => {
+        if (!aktiv) return
+        const da = l[0]
+        setRegel(da?.regel ?? entwurf?.regel ?? { titel: reiter.titel, erklaerung: '', beispiele: [] })
+        setAufgaben([...(da?.aufgaben ?? []), ...(entwurf?.aufgaben ?? [])])
+        setNeu(new Set(entwurf?.aufgaben.map((a) => a.id) ?? []))
+        setGeladen(true)
+      },
+      (e: unknown) => (notifyError(e), setGeladen(true))
+    )
+    return () => {
+      aktiv = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reiter.schluessel])
+  const regelId = regelIdVon(reiter.schluessel)
+  const sichtbar = filter === 'alle' ? aufgaben : aufgaben.filter((a) => a.uebung === filter)
+  const paket: GrammatikPaket = {
+    thema: reiter.titel,
+    regeln: [{ id: regelId, titel: regel?.titel ?? reiter.titel, erklaerung: regel?.erklaerung ?? '', beispiele: regel?.beispiele ?? [] }],
+    aufgaben: sichtbar.map((a) => ({ ...a, regelId }))
+  }
+  // Gefilterte Liste zurück in die ganze: Reihenfolge der übrigen bleibt
+  const aendern = (p: GrammatikPaket): void => {
+    const geaendert = p.aufgaben as BankAufgabe[]
+    if (filter === 'alle') return setAufgaben(geaendert)
+    const rest = aufgaben.filter((a) => a.uebung !== filter)
+    setAufgaben([...rest, ...geaendert])
+  }
+  const speichern = async (): Promise<void> => {
+    if (!regel) return
+    setLaeuft(true)
+    try {
+      const r = await bankSpeichern(sprache, reiter.schluessel, regel, aufgaben)
+      bankEntwurfWeg(reiter.schluessel)
+      window.dispatchEvent(new Event(BANK_EREIGNIS))
+      notifySuccess(`${r.aufgaben} Aufgaben gespeichert${r.kurse ? ` – ${r.kurse} Kurs-Trainings aktualisiert` : ''}.`)
+      schliessen()
+    } catch (e) {
+      notifyError(e, 'Nicht gespeichert')
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  const zahl = (u: Uebung): number => aufgaben.filter((a) => a.uebung === u).length
+  return (
+    <Modal
+      opened
+      onClose={schliessen}
+      title={reiter.titel}
+      size="xl"
+      fullScreen={window.matchMedia?.('(max-width: 700px)').matches}
+      zIndex={400}
+      data-bank-editor
+    >
+      {!geladen || !regel ? (
+        <Text c="dimmed">Lädt …</Text>
+      ) : (
+        <Stack>
+          {!darf && (
+            <Alert color="gray" p="xs">
+              Hinterlegte Aufgaben ändern nur Admins und die Fachobleute des Fachs.
+            </Alert>
+          )}
+          <Card withBorder radius="md" padding="sm">
+            <Text fw={600} size="sm" mb={6}>
+              Regelkarte
+            </Text>
+            <Stack gap="xs">
+              <TextInput label="Titel" value={regel.titel} disabled={!darf} onChange={(e) => setRegel({ ...regel, titel: e.currentTarget.value })} />
+              <Textarea
+                label="Erklärung"
+                autosize
+                minRows={2}
+                value={regel.erklaerung}
+                disabled={!darf}
+                onChange={(e) => setRegel({ ...regel, erklaerung: e.currentTarget.value })}
+              />
+              <Textarea
+                label="Beispiele (eines je Zeile)"
+                autosize
+                minRows={2}
+                value={regel.beispiele.join('\n')}
+                disabled={!darf}
+                onChange={(e) =>
+                  setRegel({
+                    ...regel,
+                    beispiele: e.currentTarget.value
+                      .split('\n')
+                      .map((x) => x.trim())
+                      .filter(Boolean)
+                  })
+                }
+              />
+            </Stack>
+          </Card>
+          <SegmentedControl
+            size="xs"
+            value={filter}
+            onChange={(v) => setFilter(v as 'alle' | Uebung)}
+            data={[{ value: 'alle', label: `Alle (${aufgaben.length})` }, ...UEBUNGEN.map((u) => ({ value: u, label: `${UEBUNG_NAME[u]} (${zahl(u)})` }))]}
+            data-bank-filter
+          />
+          {sichtbar.length ? (
+            <AufgabenEditor paket={paket} aendern={aendern} neu={neu} ohneRegeln />
+          ) : (
+            <Text size="sm" c="dimmed">
+              Noch keine Aufgaben{filter !== 'alle' ? ` zu „${UEBUNG_NAME[filter]}“` : ''}.
+            </Text>
+          )}
+          <Group justify="space-between" className="dialog-fuss">
+            {entwurf && darf ? (
+              <Tooltip label="Die Aufgaben der KI verwerfen, die noch nicht gespeichert sind">
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  size="lg"
+                  onClick={() => {
+                    bankEntwurfWeg(reiter.schluessel)
+                    schliessen()
+                  }}
+                  aria-label="Entwurf verwerfen"
+                  data-bank-entwurf-verwerfen
+                >
+                  <IconTrash size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <span />
+            )}
+            <Group>
+              <Button variant="default" onClick={schliessen}>
+                {darf ? 'Abbrechen' : 'Schließen'}
+              </Button>
+              {darf && (
+                <Button loading={laeuft} onClick={() => void speichern()} data-bank-speichern>
+                  Speichern ({aufgaben.length} Aufgaben)
+                </Button>
+              )}
+            </Group>
+          </Group>
+        </Stack>
+      )}
+    </Modal>
+  )
+}

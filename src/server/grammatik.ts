@@ -18,6 +18,7 @@ import {
   paketBereinigt,
   pruefeGrammatik,
   alsKarten,
+  type GrammatikAufgabe,
   type GrammatikPaket,
   type GrammatikSpielId
 } from '../shared/grammatiktrainer'
@@ -56,17 +57,28 @@ import { jahrgangDerFreigabe, unitStelle } from '../shared/grammatikJahrgang'
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import { jahrgangAus } from '../shared/lernstand'
 import { ampelVon } from '../shared/grammatikBereiche'
-import { formBefund, mitErstemVersuch, nachSpielfehlerGrammatik, type FormAmpel } from '../shared/grammatikSicher'
+import { formAusTeilen, formBefund, mitErstemVersuch, nachSpielfehlerGrammatik, type FormAmpel } from '../shared/grammatikSicher'
 import { GRAMMATIK_NEU_JE_TAG, grammatikHeute, grammatikKarten } from '../shared/grammatikVorrang'
 import { tageszielVorTest } from '../shared/uebungsVorrang'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
 import { bekannteGrammatik, fruehereBaendeDerReihe, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
 import { aufgabenAnhaengen, gleichesThema, paketeZusammen } from '../shared/kursEntfernen'
-import { abschnitteAusName, bandErkennen, bekanntNachBand, stationInUnit, stelleImLehrwerk, type Erkennung, type FreigegebeneUnit, type SchulOrt } from '../shared/lehrwerkBand'
+import {
+  abschnitteAusName,
+  bandErkennen,
+  bekanntNachBand,
+  stationInUnit,
+  stelleImLehrwerk,
+  type Erkennung,
+  type FreigegebeneUnit,
+  type SchulOrt
+} from '../shared/lehrwerkBand'
 import { abschnitteEinordnen, buchAusKennung, mitBaenden } from '../shared/kursAbschnitte'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
 import { zugangPlan } from './planen'
+import { bankEintraege, bankMixe, beiBankAenderung } from './grammatikBank'
+import { bankPaket, formVon, istKern, mixKennungen, schluesselGueltig, unitVon } from '../shared/grammatikBank'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -166,6 +178,11 @@ export interface GrammatikInfo {
   lehrwerk?: { buch?: string; unit?: string }
   /** Extra: die Regeln, für die sie gedacht sind */
   fuerRegeln?: string[]
+  /**
+   * Aufgabenbank (13.10.2026): Schlüssel der hinterlegten Aufgaben (Teilbereiche bzw. gemischt) – das Paket wird aus der
+   * Bank gebaut und nach jeder Änderung dort neu (grammatikBank.ts); Bearbeiten nur in der App „Grammatikformen".
+   */
+  bank?: string[]
 }
 export function infoBereinigt(roh: unknown): GrammatikInfo {
   const r = (roh ?? {}) as Record<string, unknown>
@@ -184,7 +201,8 @@ export function infoBereinigt(roh: unknown): GrammatikInfo {
     ...(typeof lw.buch === 'string' && lw.buch
       ? { lehrwerk: { buch: lw.buch.slice(0, 80), ...(typeof lw.unit === 'string' ? { unit: lw.unit.slice(0, 80) } : {}) } }
       : {}),
-    ...(liste(r.fuerRegeln, 6).length ? { fuerRegeln: liste(r.fuerRegeln, 6) } : {})
+    ...(liste(r.fuerRegeln, 6).length ? { fuerRegeln: liste(r.fuerRegeln, 6) } : {}),
+    ...(Array.isArray(r.bank) && r.bank.some(schluesselGueltig) ? { bank: [...new Set(r.bank.filter(schluesselGueltig))].slice(0, 80) } : {})
   }
 }
 const infoVon = (z: Zeile): GrammatikInfo => infoBereinigt(json_(z.info, {}))
@@ -286,7 +304,9 @@ export function lehrwerkAutomatisch(gid: string): (Erkennung & { freigegeben: Fr
   let ueblich: string[] = []
   try {
     kurse = (
-      db().prepare("SELECT * FROM vok_zuweisungen WHERE lerngruppe_id = ? AND lehrkraft_id = ? AND status = 'offen'").all(gid, g.lehrkraft_id) as unknown as VokKurs[]
+      db()
+        .prepare("SELECT * FROM vok_zuweisungen WHERE lerngruppe_id = ? AND lehrkraft_id = ? AND status = 'offen'")
+        .all(gid, g.lehrkraft_id) as unknown as VokKurs[]
     ).filter((z) => !sprache || z.sprache === sprache)
     ueblich = (
       db()
@@ -362,10 +382,13 @@ const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'of
 const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM gram_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
 const paketVon = (z: Zeile): GrammatikPaket => json_(z.paket, { thema: z.thema, regeln: [], aufgaben: [] } as GrammatikPaket)
 const standVon = (zid: string, sid: string): GramStand => {
-  const st = json_((db().prepare('SELECT daten FROM gram_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined)?.daten, {
-    aufgaben: {},
-    tage: []
-  } as GramStand)
+  const st = json_(
+    (db().prepare('SELECT daten FROM gram_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined)?.daten,
+    {
+      aufgaben: {},
+      tage: []
+    } as GramStand
+  )
   // Wiederholer/Klassenwechsel (10.10.2026, mitnahme.ts): Grammatik, die die Person schon geübt hat, zählt sofort
   if (mitnahmeVon(sid)?.gram.length) {
     const z = zeile(zid)
@@ -539,7 +562,10 @@ export async function jahrgangDerGrammatik(z: Zeile, ich: NutzerInfo): Promise<{
   })
   const stelle = info.lehrwerk?.unit
     ? unitStelle(info.lehrwerk.unit, band && LEHRWERK_GRAMMATIK[band] ? Object.keys(LEHRWERK_GRAMMATIK[band]) : undefined)
-    : unitStelle(q.unit, buch?.units.map((u) => u.name))
+    : unitStelle(
+        q.unit,
+        buch?.units.map((u) => u.name)
+      )
   return { jahrgang, stelle }
 }
 
@@ -634,9 +660,16 @@ export const MIN_VERSUCHE = 5
  */
 export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: string): GrammatikProfil {
   const zs = (
-    db().prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND status != 'entfernt'").all(lehrkraftId, sprache) as unknown as Zeile[]
+    db()
+      .prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND sprache = ? AND status != 'entfernt'")
+      .all(lehrkraftId, sprache) as unknown as Zeile[]
   ).filter((z) => istFuer(z, n))
-  type Sammel = ProfilPunkt & { fachSumme: number; geuebt: number; liste: { id: string; stufe?: number }[]; staende: Record<string, WortStand | undefined> }
+  type Sammel = ProfilPunkt & {
+    fachSumme: number
+    geuebt: number
+    liste: { id: string; stufe?: number; uebung?: GrammatikAufgabe['uebung'] }[]
+    staende: Record<string, WortStand | undefined>
+  }
   const jeRegel = new Map<string, Sammel>()
   const extra: GrammatikProfil['extra'] = []
   for (const z of zs) {
@@ -672,7 +705,7 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
       for (const a of p.aufgaben.filter((x) => x.regelId === r.id)) {
         const s = st[a.id]
         // Aufgabenreihe der Form (12.10.2026): Kennung je Freigabe – gleiche Kennungen in verschiedenen Paketen sind verschiedene Aufgaben
-        e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe })
+        e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe, uebung: a.uebung })
         e.staende[`${z.id}:${a.id}`] = s
         if (!s?.versuche) continue
         e.versuche += s.versuche
@@ -767,7 +800,10 @@ export function grammatikFoerder(nutzer: NutzerInfo[], sprache: string, lehrkraf
   for (const [sid, liste] of paare) {
     const n = jeId.get(sid)!
     // Je Form die Aufgabenreihe samt Ständen – Ampel nach dem ersten Versuch (12.10.2026, shared/grammatikSicher.ts)
-    const jeRegel = new Map<string, { liste: { id: string; stufe?: number }[]; staende: Record<string, WortStand | undefined> }>()
+    const jeRegel = new Map<
+      string,
+      { liste: { id: string; stufe?: number; uebung?: GrammatikAufgabe['uebung'] }[]; staende: Record<string, WortStand | undefined> }
+    >()
     for (const z of liste) {
       if (!istFuer(z, n, kurse)) continue
       const p = paket(z)
@@ -776,7 +812,7 @@ export function grammatikFoerder(nutzer: NutzerInfo[], sprache: string, lehrkraf
         const e = jeRegel.get(norm(r.titel)) ?? { liste: [], staende: {} }
         for (const a of p.aufgaben) {
           if (a.regelId !== r.id) continue
-          e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe })
+          e.liste.push({ id: `${z.id}:${a.id}`, stufe: a.stufe, uebung: a.uebung })
           e.staende[`${z.id}:${a.id}`] = st[a.id]
         }
         jeRegel.set(norm(r.titel), e)
@@ -885,6 +921,8 @@ export function grammatikDerGruppe(
     thema: string
     aufgaben: number
     regeln: number
+    /** Aus der Aufgabenbank (13.10.2026) */
+    bank?: boolean
     lernende: number
     aktiv7: number
     probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
@@ -902,7 +940,7 @@ export function grammatikDerGruppe(
   try {
     zs = db()
       .prepare(
-        'SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND (lerngruppe_id = ? OR (vok_id != \'\' AND vok_id IN (SELECT id FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ?))) ORDER BY erstellt DESC, rowid'
+        "SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND (lerngruppe_id = ? OR (vok_id != '' AND vok_id IN (SELECT id FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ?))) ORDER BY erstellt DESC, rowid"
       )
       .all(lehrkraftId, lerngruppeId, lehrkraftId, lerngruppeId) as unknown as Zeile[]
   } catch {
@@ -950,6 +988,7 @@ export function grammatikDerGruppe(
       status: offen ? ('offen' as const) : ('beendet' as const),
       erstellt: z.erstellt,
       bis: z.bis ?? null,
+      ...(infoVon(z).bank?.length ? { bank: true } : {}),
       thema: z.thema,
       aufgaben: p.aufgaben.length,
       regeln: p.regeln.length,
@@ -1063,6 +1102,124 @@ export function grammatikAnlegen(f: {
   })
 }
 
+// ---------------------------------------------------------------- Aufgabenbank (13.10.2026, abgestimmt)
+
+/** Paket eines Trainings aus den hinterlegten Aufgaben (shared/grammatikBank.ts `bankPaket`) */
+const paketAusBank = (titel: string, schluessel: readonly string[]): GrammatikPaket => bankPaket(titel, bankEintraege(schluessel))
+
+/** Formen (Katalogthemen) einer gemischten Wiederholung je Unit aus der Lehrwerk-Liste */
+function unitFormen(schluessel: string): string[] {
+  const u = unitVon(schluessel)
+  const kapitel = u ? LEHRWERK_GRAMMATIK[u.band]?.[u.unit] : undefined
+  return kapitel ? [...new Set(Object.values(kapitel).flatMap((punkte) => punkte.flatMap((p) => p.t.map(formVon))))] : []
+}
+
+/** Ein Training aus der Bank für einen Kurs anlegen – sofort freigeschaltet (abgestimmt), ohne Code und Enddatum */
+function bankTrainingAnlegen(lehrkraftId: string, vok: VokKurs, titel: string, paket: GrammatikPaket, info: GrammatikInfo): string {
+  const id = randomBytes(8).toString('hex')
+  db()
+    .prepare(
+      "INSERT INTO gram_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, fach, sprache, thema, paket, status, erstellt, code, bis, vok_id, art, info) VALUES (?, ?, '', '[]', ?, ?, ?, ?, ?, 'offen', ?, '', NULL, ?, '', ?)"
+    )
+    .run(
+      id,
+      lehrkraftId,
+      titel.slice(0, 160),
+      String(vok.fach ?? '').slice(0, 40),
+      String(vok.sprache ?? '').slice(0, 8),
+      titel.slice(0, 160),
+      JSON.stringify(paket),
+      new Date().toISOString(),
+      vok.id,
+      JSON.stringify(infoBereinigt(info))
+    )
+  return id
+}
+
+/**
+ * Gemischte Aufgaben zuweisen (abgestimmt): je Grammatikpunkt bzw. je Unit, sobald ALLE ihre Formen im Kurs sind und
+ * die Bank Aufgaben dazu hat. Einmal Zugewiesenes (auch später Entferntes) kommt nicht von selbst wieder.
+ */
+function mixeZuweisen(lehrkraftId: string, vokId: string): string[] {
+  const vok = vokZeile(vokId)
+  if (!vok || !vok.sprache) return []
+  const zeilen = (db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = ?').all(lehrkraftId, vokId) as unknown as Zeile[]).filter(
+    (z) => !istExtra(z)
+  )
+  const formen = new Set(zeilen.filter((z) => z.status !== 'entfernt').flatMap((z) => infoVon(z).themen))
+  if (!formen.size) return []
+  const schon = new Set(zeilen.flatMap((z) => infoVon(z).bank ?? []))
+  const ids: string[] = []
+  for (const m of bankMixe(vok.sprache)) {
+    if (schon.has(m)) continue
+    const noetig = m.startsWith('unit:') ? unitFormen(m) : [...new Set(mixKennungen(m).map(formVon))]
+    if (!noetig.length || !noetig.every((f) => formen.has(f))) continue
+    const e = bankEintraege([m])[0]
+    if (!e?.aufgaben.length) continue
+    const titel = e.regel.titel || 'Gemischte Übung'
+    ids.push(bankTrainingAnlegen(lehrkraftId, vok, titel, paketAusBank(titel, [m]), { themen: [], teilformen: [], bank: [m] }))
+  }
+  return ids
+}
+
+/**
+ * Nach einer Änderung in der Bank: alle Trainings neu bauen, die auf einen der Schlüssel verweisen (Kennungen bleiben,
+ * gelöschte Aufgaben fallen weg). Neue gemischte Aufgaben bekommen gleich die Kurse, die schon alle Formen haben.
+ */
+export function bankKurseNeu(schluessel: string[]): number {
+  const s = new Set(schluessel)
+  let n = 0
+  const kurse = new Map<string, string>()
+  for (const z of db().prepare('SELECT * FROM gram_zuweisungen').all() as unknown as Zeile[]) {
+    const bank = infoVon(z).bank
+    if (!bank?.length) continue
+    if (z.vok_id && z.status !== 'entfernt') kurse.set(z.vok_id, z.lehrkraft_id)
+    if (!bank.some((x) => s.has(x))) continue
+    db()
+      .prepare('UPDATE gram_zuweisungen SET paket = ? WHERE id = ?')
+      .run(JSON.stringify(paketAusBank(z.thema || z.titel, bank)), z.id)
+    n++
+  }
+  if (schluessel.some((x) => !formVon(x))) for (const [vokId, lk] of kurse) n += mixeZuweisen(lk, vokId).length
+  return n
+}
+beiBankAenderung(bankKurseNeu)
+
+/**
+ * „Grammatik hinzufügen" mit hinterlegten Aufgaben (13.10.2026): je Form ein Training aus der Bank, sofort für die
+ * Lernenden des Kurses freigeschaltet. Schon (oder früher) vorhandene Kurs-Grammatik derselben Form wird übernommen.
+ */
+export function ausBankZuweisen(
+  lehrkraftId: string,
+  vok: VokKurs,
+  formen: { thema: string; titel: string; teile: string[] }[],
+  info0: GrammatikInfo
+): { ids: string[]; leer: string[]; mixe: number } {
+  const vorhanden = (
+    db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = ?').all(lehrkraftId, vok.id) as unknown as Zeile[]
+  ).filter((z) => !istExtra(z))
+  const ids: string[] = []
+  const leer: string[] = []
+  for (const f of formen) {
+    const paket = paketAusBank(f.titel, f.teile)
+    if (!paket.aufgaben.length) {
+      leer.push(f.thema)
+      continue
+    }
+    const info: GrammatikInfo = { ...info0, themen: [f.thema], teilformen: f.teile.filter((t) => t.includes('/')), bank: f.teile }
+    const alt = vorhanden.find((z) => infoVon(z).themen.includes(f.thema))
+    if (alt) {
+      db()
+        .prepare("UPDATE gram_zuweisungen SET status = 'offen', paket = ?, info = ? WHERE id = ?")
+        .run(JSON.stringify(paket), JSON.stringify(infoBereinigt({ ...infoVon(alt), ...info })), alt.id)
+      ids.push(alt.id)
+      continue
+    }
+    ids.push(bankTrainingAnlegen(lehrkraftId, vok, f.titel, paket, info))
+  }
+  return { ids, leer, mixe: mixeZuweisen(lehrkraftId, vok.id).length }
+}
+
 export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
   const link = (code: string): string => `${adresse.replace(/\/$/, '')}/s/gt/${code}`
   return async (k) => {
@@ -1077,7 +1234,17 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && url.pathname === '/s/api/grammatik/zugang') {
       const z = nachCode(String(url.searchParams.get('code') ?? ''))
       if (!z || !istOffen(z)) return json(res, 404, { fehler: 'Dieses Grammatiktraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true
-      return json(res, 200, { id: z.id, titel: ohneKlasse(z.titel), gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)), bis: z.bis, ...zugangPlan('gram', z.id, sitzung?.nutzer) }), true
+      return (
+        json(res, 200, {
+          id: z.id,
+          titel: ohneKlasse(z.titel),
+          gaeste: !iservBereit(),
+          dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)),
+          bis: z.bis,
+          ...zugangPlan('gram', z.id, sitzung?.nutzer)
+        }),
+        true
+      )
     }
     if (req.method === 'POST' && (url.pathname === '/s/api/grammatik/gast' || url.pathname === '/s/api/grammatik/wieder')) {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -1207,7 +1374,15 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
         // Rekordbuch (08.10.2026): persönlicher Rekord des Schuljahres
         const v = vokVon(z)
-        rekordEintragen(ich, `gram:${spiel}`, wert, v ? klasseFuer(v, ich) : klasseFuer({ lerngruppe_id: z.lerngruppe_id }, ich), Date.now(), undefined, z.sprache)
+        rekordEintragen(
+          ich,
+          `gram:${spiel}`,
+          wert,
+          v ? klasseFuer(v, ich) : klasseFuer({ lerngruppe_id: z.lerngruppe_id }, ich),
+          Date.now(),
+          undefined,
+          z.sprache
+        )
         // Fehler wie bei den Vokabelspielen: wackelig, gleich wieder dran; sichere ein Fach zurück
         const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((x) => p.aufgaben.some((a) => a.id === x))
         st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
@@ -1258,9 +1433,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               art: z.art ?? '',
               ...(istExtra(z) ? { fuer: l.map((n) => ({ id: n.id, name: n.name || n.benutzer })) } : {}),
               bearbeitetSchnitt:
-                l.length && kk.length
-                  ? staende.reduce((s, st) => s + kk.filter((k) => st[k.id]?.versuche).length, 0) / l.length / kk.length
-                  : 0,
+                l.length && kk.length ? staende.reduce((s, st) => s + kk.filter((k) => st[k.id]?.versuche).length, 0) / l.length / kk.length : 0,
               aufgaben: kk.length,
               lernende: l.length,
               sicherSchnitt: l.length && kk.length ? sicherZahl.reduce((a, b) => a + b, 0) / l.length / kk.length : 0,
@@ -1269,6 +1442,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               regeln: paketVon(z).regeln.map((r) => r.titel),
               // Katalog-Themen der Freigabe (08.10.2026): im Dialog „Grammatik hinzufügen" vorab angehakt
               themen: infoVon(z).themen,
+              // Aus der Aufgabenbank (13.10.2026): Aufgaben werden in „Grammatikformen" gepflegt
+              ...(infoVon(z).bank?.length ? { bank: true } : {}),
               erstellt: z.erstellt,
               jahrgang: jahre[i].jahrgang,
               stelle: jahre[i].stelle,
@@ -1316,6 +1491,30 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .run(gid, ich.id, buch, unit)
       }
       return json(res, 200, { ok: true }), true
+    }
+    if (req.method === 'POST' && teile[0] === 'aus-bank') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const vok = vokZeile(String(k0.vokId ?? ''))
+      if (!vok || vok.lehrkraft_id !== ich.id) return json(res, 400, { fehler: 'Bitte einen eigenen Kurs wählen.' }), true
+      const formen = (Array.isArray(k0.formen) ? k0.formen : [])
+        .slice(0, 40)
+        .map((f) => {
+          const x = (f ?? {}) as Record<string, unknown>
+          return {
+            thema: String(x.thema ?? ''),
+            titel: String(x.titel ?? '').slice(0, 160),
+            teile: (Array.isArray(x.teile) ? x.teile : []).filter(schluesselGueltig).slice(0, 40)
+          }
+        })
+        .filter((f) => /^[a-z]{2,3}\.[a-z0-9_.-]+$/i.test(f.thema) && f.titel && f.teile.length)
+      if (!formen.length) return json(res, 400, { fehler: 'Keine Grammatikform gewählt.' }), true
+      const r = ausBankZuweisen(ich.id, vok, formen, infoBereinigt(k0.info))
+      protokolliereServer(
+        'grammatik',
+        `Grammatik aus der Aufgabenbank zugewiesen – ${r.ids.length} Formen${r.mixe ? `, ${r.mixe} gemischte Übungen` : ''}`,
+        ich.id
+      )
+      return json(res, 200, r), true
     }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -1365,12 +1564,22 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       // Gäste unter den Empfängern einer Extra-Freigabe
       for (const n of extraFuer.filter((x) => x.quelle === 'gast'))
         db().prepare('INSERT OR IGNORE INTO gram_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(id, n.id, '')
-      const geplant = nachFreigabe('gram', ids.filter((x) => !schonSichtbar.has(x)), k0, ich.id, art ? '' : g?.id ?? vok?.lerngruppe_id ?? '')
+      const geplant = nachFreigabe(
+        'gram',
+        ids.filter((x) => !schonSichtbar.has(x)),
+        k0,
+        ich.id,
+        art ? '' : g?.id ?? vok?.lerngruppe_id ?? ''
+      )
       protokolliereServer(
         'grammatik',
         geplant
           ? 'Grammatik-Freigabe geplant'
-          : art ? `Extra-Aufgaben (${art}) freigegeben` : ids.length > 1 ? `Grammatik freigegeben – ${ids.length} Trainings (je Thema eines)` : 'Grammatiktraining freigegeben',
+          : art
+          ? `Extra-Aufgaben (${art}) freigegeben`
+          : ids.length > 1
+          ? `Grammatik freigegeben – ${ids.length} Trainings (je Thema eines)`
+          : 'Grammatiktraining freigegeben',
         ich.id
       )
       return json(res, 200, { id, ids, aufgaben: paket.aufgaben.length, geplant }), true
@@ -1395,7 +1604,10 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       })
       // Aus der Liste genommene erst wieder bei neuen Fehlern (08.10.2026); die 10 erst nach dem Ausblenden
       const problem = ausgeblendetFiltern(
-        haeufigFalsch(p, lernende.map((l) => l.stand)),
+        haeufigFalsch(
+          p,
+          lernende.map((l) => l.stand)
+        ),
         json_(z.problem_aus, {} as Record<string, number>)
       ).sichtbar.slice(0, 10)
       return (
@@ -1451,6 +1663,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         return json(res, 200, { ok: true }), true
       }
       // Aufgaben und Regeln bearbeiten (08.10.2026, Grammatik-Fenster): Kennungen bleiben, der Lernstand gilt weiter
+      if ((teile[1] === 'paket' || teile[1] === 'anhaengen') && infoVon(z).bank?.length)
+        return json(res, 400, { fehler: 'Diese Aufgaben sind in der App „Grammatikformen“ hinterlegt und werden dort bearbeitet.' }), true
       if (teile[1] === 'paket') {
         const paket = paketBereinigt(k0.paket, z.thema)
         if (paket.aufgaben.length < 3) return json(res, 400, { fehler: 'Es müssen mindestens 3 brauchbare Aufgaben bleiben.' }), true
@@ -1470,8 +1684,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const { paket: zusammen } = aufgabenAnhaengen(alt, neu, `m${Date.now().toString(36)}`)
         const paket = paketBereinigt(zusammen, z.thema)
         const dazu = paket.aufgaben.length - alt.aufgaben.length
-        if (dazu <= 0)
-          return json(res, 400, { fehler: 'Keine neuen Aufgaben übernommen – alle waren schon da, oder die Höchstzahl ist erreicht.' }), true
+        if (dazu <= 0) return json(res, 400, { fehler: 'Keine neuen Aufgaben übernommen – alle waren schon da, oder die Höchstzahl ist erreicht.' }), true
         db().prepare('UPDATE gram_zuweisungen SET paket = ? WHERE id = ?').run(JSON.stringify(paket), z.id)
         protokolliereServer('grammatik', `${dazu} Aufgaben angehängt`, ich.id)
         return json(res, 200, { ok: true, dazu, aufgaben: paket.aufgaben.length }), true
@@ -1524,11 +1737,16 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
   tage: string[]
   /** Medaillen je Sprache (10.10.2026): Übungstage je Sprache */
   tageJe: Record<string, string[]>
+  /**
+   * Aufgabenbank (13.10.2026): je Sprache die Ampel jeder Form (aus ihren Teilbereichen, shared/grammatikSicher.ts
+   * `formAusTeilen`) und je Form die richtig gelösten Kern-Aufgaben (verschiedene, mindestens einmal richtig)
+   */
+  bank: Record<string, { formen: Record<string, FormAmpel>; geloest: Record<string, number> }>
 } {
   const jeRegel = new Map<
     string,
     {
-      aufgaben: { id: string; stufe?: number }[]
+      aufgaben: { id: string; stufe?: number; uebung?: GrammatikAufgabe['uebung'] }[]
       staende: Record<string, WortStand | undefined>
       richtigeAufgaben: number
       versuche: number
@@ -1541,11 +1759,32 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
   let extrasGeschafft = 0
   const tage = new Set<string>()
   const tageJe: Record<string, string[]> = {}
+  // Aufgabenbank: je Sprache und Teilbereich die Aufgaben (Bank-Kennungen sind schulweit eindeutig) und ihr bester Stand
+  const teile = new Map<
+    string,
+    { sprache: string; aufgaben: Map<string, { id: string; uebung?: GrammatikAufgabe['uebung'] }>; staende: Record<string, WortStand> }
+  >()
+  const geloest = new Map<string, Set<string>>()
   for (const { zuweisung_id } of db().prepare('SELECT zuweisung_id FROM gram_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string }[]) {
     const z = zeile(zuweisung_id)
     if (!z || z.status === 'entfernt' || !istFuer(z, ich)) continue
     const p = paketVon(z)
     const st = standVon(z.id, ich.id)
+    for (const r of p.regeln) {
+      if (!r.kennung || !formVon(r.kennung)) continue
+      const t = teile.get(r.kennung) ?? { sprache: z.sprache, aufgaben: new Map(), staende: {} as Record<string, WortStand> }
+      for (const a of p.aufgaben.filter((x) => x.regelId === r.id && x.uebung)) {
+        t.aufgaben.set(a.id, { id: a.id, uebung: a.uebung })
+        const s0 = st.aufgaben[a.id]
+        // Dieselbe Aufgabe in zwei Kursen: der Stand mit mehr Versuchen zählt
+        if (s0 && (s0.versuche ?? 0) >= (t.staende[a.id]?.versuche ?? 0)) t.staende[a.id] = s0
+        if (s0?.versuche && s0.versuche > s0.falsch && istKern(a.uebung)) {
+          const k = `${z.sprache}|${formVon(r.kennung)}`
+          geloest.set(k, (geloest.get(k) ?? new Set()).add(a.id))
+        }
+      }
+      teile.set(r.kennung, t)
+    }
     for (const t of st.tage ?? []) tage.add(t)
     if (z.sprache) tageJe[z.sprache] = [...(tageJe[z.sprache] ?? []), ...(st.tage ?? [])]
     if (istExtra(z) && p.aufgaben.length && p.aufgaben.every((a) => st.aufgaben[a.id]?.versuche)) extrasGeschafft++
@@ -1556,7 +1795,7 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
         const s = st.aufgaben[a.id]
         // Kennung je Freigabe – gleiche Aufgaben-Kennungen in verschiedenen Paketen sind verschiedene Aufgaben
         const id = `${z.id}:${a.id}`
-        e.aufgaben.push({ id, stufe: a.stufe })
+        e.aufgaben.push({ id, stufe: a.stufe, uebung: a.uebung })
         e.staende[id] = s
         if (!s?.versuche) continue
         if (s.versuche > s.falsch) e.richtigeAufgaben++
@@ -1568,7 +1807,20 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
       jeRegel.set(k, e)
     }
   }
+  const bank: Record<string, { formen: Record<string, FormAmpel>; geloest: Record<string, number> }> = {}
+  const jeForm = new Map<string, FormAmpel[]>()
+  for (const [kennung, t] of teile) {
+    const k = `${t.sprache}|${formVon(kennung)}`
+    jeForm.set(k, [...(jeForm.get(k) ?? []), formBefund([...t.aufgaben.values()], t.staende).ampel])
+  }
+  for (const [k, ampeln] of jeForm) {
+    const [sprache, form] = k.split('|')
+    const b = (bank[sprache] ??= { formen: {}, geloest: {} })
+    b.formen[form] = formAusTeilen(ampeln)
+    b.geloest[form] = geloest.get(k)?.size ?? 0
+  }
   return {
+    bank,
     regeln: [...jeRegel.entries()]
       .filter(([, e]) => e.geuebt > 0)
       .map(([schluessel, e]) => {
@@ -1594,7 +1846,11 @@ export function grammatikFuerAchievements(ich: NutzerInfo): {
  * Erinnerungen – je Freigabe, seit wann sie da ist, was heute offen ist (fällige Aufgaben und neue bis zu 10 je Tag,
  * wie vor den Spielen) und die Übungstage. Nur Zahlen, keine Inhalte.
  */
-export function grammatikFuerErinnerung(ich: NutzerInfo, vokIds: Set<string>, jetzt = Date.now()): { id: string; seit: number; offen: number; tage: string[] }[] {
+export function grammatikFuerErinnerung(
+  ich: NutzerInfo,
+  vokIds: Set<string>,
+  jetzt = Date.now()
+): { id: string; seit: number; offen: number; tage: string[] }[] {
   if (!vokIds.size) return []
   return (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen'").all() as unknown as Zeile[])
     .filter((z) => vokIds.has(z.vok_id ?? '') && istOffen(z) && istFuer(z, ich))

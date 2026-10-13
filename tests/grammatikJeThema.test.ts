@@ -217,6 +217,8 @@ describe('Wartung: bestehende Grammatik je Thema teilen', () => {
 
   it('läuft beim Start genau einmal', () => {
     const { d } = probeDb()
+    // Die Löschung aller Grammatik (13.10.2026) gilt hier als erledigt – sonst wäre nichts mehr zu prüfen
+    d.exec("CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL); INSERT OR IGNORE INTO wartung VALUES ('grammatik-alle-loeschen-2026-10-13', 'x')")
     wartungAusfuehren(d)
     expect(zeilenVon(d)).toHaveLength(5)
     expect(d.prepare("SELECT 1 FROM wartung WHERE name = 'grammatik-je-thema-2026-10-08'").get()).toBeTruthy()

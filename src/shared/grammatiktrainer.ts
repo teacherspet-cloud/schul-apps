@@ -14,6 +14,7 @@ import { abstand, type Urteil } from './vokabeltrainer'
 import { bereinigeVerbKarten, type VerbKarte } from './verbTraining'
 import { istVerbSprache, type VerbSprache } from './verben'
 import { APOSTROPHE } from './apostroph'
+import type { Uebung } from './grammatikBank'
 
 export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau' | 'bestimmen' | 'mehrfach' | 'tabelle' | 'uebersetzen'
 
@@ -43,6 +44,8 @@ export interface GrammatikRegel {
   stolperfallen?: string[]
   /** Thema (Katalog-Bezeichnung), zu dem die Regel gehört – bei mehreren Themen je Freigabe ein Training je Thema (08.10.2026) */
   thema?: string
+  /** Aufgabenbank (13.10.2026): Schlüssel des Teilbereichs bzw. der gemischten Aufgaben (shared/grammatikBank.ts) */
+  kennung?: string
 }
 
 export interface GrammatikAufgabe {
@@ -67,6 +70,8 @@ export interface GrammatikAufgabe {
   erklaerung?: string
   /** Förderaufgaben (08.10.2026): Stufe 1 erkennen, 2 gelenkt bilden, 3 selbst bilden */
   stufe?: 1 | 2 | 3
+  /** Aufgabenbank (13.10.2026): Übungsart – Erkennen, Bilden, Anwenden (Kern) oder Unterscheiden, Fehler finden (Zusatz) */
+  uebung?: Uebung
   /** Hilfe vor der Antwort (Tipp-Knopf) */
   tipp?: string
   /** bestimmen: die Form (steht sie im `satz`, gilt nur die Lesart im Satz) */
@@ -124,11 +129,21 @@ const liste = (x: unknown, n = 12, m = 200): string[] =>
  */
 /** Höchstzahl der Aufgaben eines Pakets */
 export const GRAMMATIK_HOECHSTENS = 120
+/**
+ * Pakete aus der Aufgabenbank (13.10.2026): je Teilbereich eine Regelkarte und rund 8 Aufgaben je Übungsart – eine
+ * Form mit vielen Teilformen hat deutlich mehr als ein KI-Pool.
+ */
+export const BANK_GRENZEN = { aufgaben: 1200, regeln: 40 } as const
+const UEBUNG_WERTE = ['erkennen', 'bilden', 'anwenden', 'unterscheiden', 'fehler']
 
-export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
+export function paketBereinigt(
+  roh: unknown,
+  thema = '',
+  grenzen: { aufgaben: number; regeln: number } = { aufgaben: GRAMMATIK_HOECHSTENS, regeln: 12 }
+): GrammatikPaket {
   const r = (roh ?? {}) as Record<string, unknown>
   const regeln: GrammatikRegel[] = (Array.isArray(r.regeln) ? r.regeln : [])
-    .slice(0, 12)
+    .slice(0, grenzen.regeln)
     .map((x, i) => {
       const y = (x ?? {}) as Record<string, unknown>
       return {
@@ -137,7 +152,8 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
         erklaerung: text(y.erklaerung, 900),
         beispiele: liste(y.beispiele, 6, 240),
         ...(liste(y.stolperfallen, 5, 240).length ? { stolperfallen: liste(y.stolperfallen, 5, 240) } : {}),
-        ...(text(y.thema, 160) ? { thema: text(y.thema, 160) } : {})
+        ...(text(y.thema, 160) ? { thema: text(y.thema, 160) } : {}),
+        ...(text(y.kennung, 400) ? { kennung: text(y.kennung, 400) } : {})
       }
     })
     .filter((x) => x.titel && x.erklaerung)
@@ -157,7 +173,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     while (vergeben.has(`a${n}`)) n++
     return `a${n}`
   }
-  for (const [i, x] of (Array.isArray(r.aufgaben) ? r.aufgaben : []).slice(0, 160).entries()) {
+  for (const [i, x] of (Array.isArray(r.aufgaben) ? r.aufgaben : []).slice(0, Math.max(160, grenzen.aufgaben + 40)).entries()) {
     const y = (x ?? {}) as Record<string, unknown>
     const art = String(y.art ?? '') as AufgabenArt
     if (!ARTEN.includes(art)) continue
@@ -174,7 +190,8 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
       ...(art === 'satzbau' ? { teile: liste(y.teile, 16, 80) } : {}),
       ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {}),
       ...(y.stufe === 1 || y.stufe === 2 || y.stufe === 3 ? { stufe: y.stufe } : {}),
-      ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {})
+      ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {}),
+      ...(UEBUNG_WERTE.includes(String(y.uebung)) ? { uebung: y.uebung as Uebung } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
     if (art === 'bestimmen') {
@@ -236,7 +253,7 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     gesehen.add(schluessel)
     vergeben.add(a.id)
     aufgaben.push(a)
-    if (aufgaben.length >= GRAMMATIK_HOECHSTENS) break
+    if (aufgaben.length >= grenzen.aufgaben) break
   }
   // Verben (07.10.2026): Karten bereinigt übernehmen
   const verbSprache = istVerbSprache(String(r.verbSprache ?? '')) ? (String(r.verbSprache) as VerbSprache) : undefined
@@ -258,15 +275,17 @@ export const ohneLaengen = (s: string): string =>
 
 /** Für den Vergleich: Kleinschreibung, typografische Zeichen vereinheitlicht, Satzzeichen am Ende und Längenzeichen egal */
 export function normiert(s: string): string {
-  return ohneLaengen(s)
-    .normalize('NFC')
-    // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
-    .replace(APOSTROPHE, "'")
-    .replace(/[“”„]/g, '"')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*([.,!?;:])\s*$/g, '')
-    .trim()
-    .toLowerCase()
+  return (
+    ohneLaengen(s)
+      .normalize('NFC')
+      // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
+      .replace(APOSTROPHE, "'")
+      .replace(/[“”„]/g, '"')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*([.,!?;:])\s*$/g, '')
+      .trim()
+      .toLowerCase()
+  )
 }
 const gleich = (a: string, b: string): boolean => normiert(a) === normiert(b)
 /** Merkmalswerte vergleichen: „Gen." = „Genitiv" = „gen" (Abkürzung oder ausgeschrieben, Punkt egal) */

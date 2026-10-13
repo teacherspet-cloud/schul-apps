@@ -279,3 +279,44 @@ export function vorschlagAuftrag(buchName: string, buch: BuchGliederung, fach: s
     ].join('\n')
   }
 }
+
+// ---------------------------------------------------------------- Aufgabenbank (13.10.2026, abgestimmt)
+
+/**
+ * Teilbereiche zu den Kennungen eines Grammatikpunkts: eine Teilform steht für sich; ein Thema zerfällt in seine
+ * Teilformen (ohne Teilformen: das Thema selbst). Unbekannte Kennungen fallen weg. Reihenfolge wie im Katalog.
+ */
+export function teilbereicheVon(kennungen: readonly string[]): string[] {
+  const aus: string[] = []
+  for (const k of kennungen) {
+    const t = themaZu(k)
+    if (!t) continue
+    if (k.includes('/')) aus.push(k)
+    else if (t.teilformen?.length) aus.push(...t.teilformen.map((x) => `${t.id}/${x.id}`))
+    else aus.push(t.id)
+  }
+  return [...new Set(aus)]
+}
+
+/** Kurzname eines Teilbereichs im Reiter („Fragen"); ohne Teilform der Name des Themas */
+export function teilKurzname(kennung: string): string {
+  const t = themaZu(kennung)
+  if (!t) return kennung
+  const teil = kennung.includes('/') ? t.teilformen?.find((x) => x.id === kennung.split('/')[1]) : undefined
+  return teil?.label ?? t.label
+}
+
+/** Angaben des Katalogs zu einem Teilbereich für die KI (erkennen/bilden, Beispiele, typische Fehler) */
+export function teilHinweise(kennung: string): string {
+  const t = themaZu(kennung)
+  if (!t) return ''
+  const teil = kennung.includes('/') ? t.teilformen?.find((x) => x.id === kennung.split('/')[1]) : undefined
+  return [
+    `${t.label}${t.term && t.term !== t.label ? ` (${t.term})` : ''}${teil ? ` – Teilform: ${teil.label}${teil.term ? ` (${teil.term})` : ''}` : ''}`,
+    teil?.nurErkennen ? 'Auf dieser Stufe nur erkennen – Bilden und Anwenden einfach halten.' : '',
+    teil?.beispiele?.length ? `Beispiele: ${teil.beispiele.slice(0, 4).join('; ')}` : '',
+    teil?.fehler ? `Typischer Fehler: ${teil.fehler}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
+}

@@ -57,8 +57,9 @@ describe('Medaillen: Schwellen nach Jahrgang', () => {
     expect(schwellen('wortschatz', 5)).toEqual([12, 90, 300, 720, 1500, 2700])
     expect(schwellen('wortschatz', 7)).toEqual([16, 120, 400, 960, 2000, 3600])
     expect(schwellen('wortschatz', 12)).toEqual([24, 180, 600, 1440, 3000, 5400])
-    expect(schwellen('grammatik', 5)).toEqual([2, 9, 24, 54, 96, 156])
-    for (const k of ['dranbleiben', 'hoeren', 'lehrwerk', 'spiele', 'zusammen'] as const) expect(schwellen(k, 5)).toEqual(schwellen(k, 12))
+    // Grammatik seit 13.10.2026: Prozent des Bands – für alle Jahrgänge gleich
+    expect(schwellen('grammatik', 5)).toEqual([10, 25, 50, 75, 90, 100])
+    for (const k of ['grammatik', 'dranbleiben', 'hoeren', 'lehrwerk', 'spiele', 'zusammen'] as const) expect(schwellen(k, 5)).toEqual(schwellen(k, 12))
     // Ohne Jahrgang wie Klasse 7–8
     expect(schwellen('wortschatz', null)).toEqual(schwellen('wortschatz', 8))
   })

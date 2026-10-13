@@ -49,6 +49,8 @@ import { useProgrammFarbe } from '../../shared/components/AppKopf'
 import { extractContent, MATERIAL_ACCEPT } from '../../shared/files/extractContent'
 import { pruefeHochladen } from '../../shared/datenschutz'
 import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
+import { BankKarte, useBankZahlen } from './GrammatikBank'
+import type { BankZahlen } from '@shared/grammatikBank'
 import {
   LEHRWERK_GRAMMATIK,
   LEHRWERK_GRAMMATIK_EINGEBAUT,
@@ -114,6 +116,8 @@ export default function GrammatikformenEditor({
   const fachName = fachVon(fach)?.label ?? fach
   const farbe = useProgrammFarbe()
   const schmal = useMediaQuery('(max-width: 700px)') ?? false
+  // Aufgabenbank (13.10.2026): Zahlen je Teilbereich und Übungsart für das Seitenfenster
+  const bank = useBankZahlen(buch.language)
   const ausgangsBand = (): LehrwerkGrammatikBand => kopie(eintrag?.kapitel ?? LEHRWERK_GRAMMATIK[buch.name] ?? {})
   const [band, setBand] = useState<LehrwerkGrammatikBand>(ausgangsBand)
   const [dirty, setDirty] = useState(false)
@@ -565,14 +569,39 @@ export default function GrammatikformenEditor({
         opened={Boolean(offen && offenPunkt)}
         onClose={() => setOffen(null)}
         position="right"
-        size={schmal ? '100%' : 'md'}
-        title={offen ? `${offen.unit} · ${abschnittName(offen.abschnitt)}` : ''}
+        size={schmal ? '100%' : 560}
+        padding={0}
+        title={
+          offen && offenPunkt ? (
+            <div style={{ minWidth: 0 }}>
+              <Text size="xs" fw={600} tt="uppercase" c={`${farbe}.8`} style={{ letterSpacing: 0.4 }}>
+                {offen.unit} · {abschnittName(offen.abschnitt)}
+              </Text>
+              <Text fw={700} size="lg" lh={1.25} lineClamp={2}>
+                {pillenInfo(offenPunkt, fach).name}
+              </Text>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        styles={{
+          header: {
+            background: `linear-gradient(135deg, var(--mantine-color-${farbe}-light) 0%, var(--mantine-color-body) 85%)`,
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--mantine-color-default-border)'
+          },
+          body: { padding: 0 }
+        }}
         data-grammatikformen-drawer
       >
         {offen && offenPunkt && (
           <PunktFenster
             punkt={offenPunkt}
             ort={offen}
+            buch={buch}
+            unitPunkte={Object.values(band[offen.unit] ?? {}).flat()}
+            bank={bank}
             anzahl={offenListe.length}
             darf={darf}
             fach={fach}
@@ -780,10 +809,66 @@ function Pille({
   )
 }
 
-/** Inhalt des Seitenfensters zu einem Punkt (ohne Bearbeitungsrecht nur Ansicht) */
+/** Abschnitt im Seitenfenster: Überschrift mit Symbol, Inhalt in einer Karte (13.10.2026, an die übrige Oberfläche angeglichen) */
+function FensterKarte({
+  titel,
+  icon,
+  rechts,
+  children
+}: {
+  titel: string
+  icon: React.ReactNode
+  rechts?: React.ReactNode
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <Card withBorder radius="lg" padding="md" shadow="xs">
+      <Group justify="space-between" mb="sm" wrap="nowrap">
+        <Group gap={8} wrap="nowrap">
+          {icon}
+          <Text fw={700} size="sm">
+            {titel}
+          </Text>
+        </Group>
+        {rechts}
+      </Group>
+      {children}
+    </Card>
+  )
+}
+
+/** Kleines rundes Symbol in der Fachfarbe */
+function SymbolRund({ farbe, children }: { farbe: string; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 24,
+        height: 24,
+        borderRadius: 999,
+        background: `var(--mantine-color-${farbe}-light)`,
+        color: `var(--mantine-color-${farbe}-filled)`,
+        flexShrink: 0
+      }}
+    >
+      {children}
+    </span>
+  )
+}
+
+/**
+ * Inhalt des Seitenfensters zu einem Punkt (ohne Bearbeitungsrecht nur Ansicht). Seit 13.10.2026 (Wunsch der Lehrkraft:
+ * „mehr ans GUI angepasst") in Karten: Grammatikform (Bezeichnung, verknüpfte Formen als Pillen), Übungsaufgaben
+ * (Aufgabenbank, GrammatikBank.tsx), Einordnung (Wiederholung, Abschnitt, Reihenfolge); „Entfernen" fest unten.
+ */
 function PunktFenster({
   punkt,
   ort,
+  buch,
+  unitPunkte,
+  bank,
   anzahl,
   darf,
   fach,
@@ -800,6 +885,9 @@ function PunktFenster({
 }: {
   punkt: LehrwerkGrammatikPunkt
   ort: Ort
+  buch: TextbookMeta
+  unitPunkte: LehrwerkGrammatikPunkt[]
+  bank: { zahlen: BankZahlen; darf: boolean }
   anzahl: number
   darf: boolean
   fach: string
@@ -816,137 +904,176 @@ function PunktFenster({
 }): React.JSX.Element {
   const info = pillenInfo(punkt, fach)
   return (
-    <Stack gap="lg">
-      {darf ? (
-        <TextInput
-          label="Bezeichnung"
-          description="Nur ändern, wenn das Buch die Form anders nennt."
-          value={punkt.text}
-          placeholder={info.katalog || 'Bezeichnung'}
-          onChange={(e) => onText(e.currentTarget.value)}
-          data-grammatikformen-bezeichnung
-        />
-      ) : (
-        <div>
-          <Text size="xs" c="dimmed">
-            Bezeichnung
-          </Text>
-          <Text fw={600}>{info.name}</Text>
-        </div>
-      )}
-
-      <div>
-        <Group justify="space-between" mb={6}>
-          <Text size="sm" fw={500}>
-            Verknüpfte Formen
-          </Text>
-          {darf && (
-            <Button size="compact-xs" variant="light" color={farbe} leftSection={<IconPencil size={12} />} onClick={onFormen} data-grammatikformen-formen>
-              Formen ändern
-            </Button>
-          )}
-        </Group>
-        <Stack gap={4}>
-          {punkt.t.map((k) => {
-            const ok = kennungGueltig(k, fach)
-            return (
-              <Group key={k} gap={6} wrap="nowrap" title={k}>
-                {ok ? (
-                  <IconCheck size={14} style={{ flexShrink: 0, color: `var(--mantine-color-${farbe}-filled)` }} />
-                ) : (
-                  <IconAlertTriangle size={14} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} />
-                )}
-                <Text size="sm">{ok ? kennungLabel(k) : `${k} (nicht im Katalog)`}</Text>
-              </Group>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 90px)' }}>
+      <Stack gap="md" p="md" style={{ flex: 1 }}>
+        <FensterKarte
+          titel="Grammatikform"
+          icon={
+            <SymbolRund farbe={farbe}>
+              <IconCheck size={14} />
+            </SymbolRund>
+          }
+          rechts={
+            darf && (
+              <Button size="compact-xs" variant="light" color={farbe} leftSection={<IconPencil size={12} />} onClick={onFormen} data-grammatikformen-formen>
+                Formen ändern
+              </Button>
             )
-          })}
-          {!punkt.t.length && (
-            <Group gap={6} wrap="nowrap">
-              <IconAlertTriangle size={14} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} />
-              <Text size="sm" c="dimmed">
-                Keine Katalogform – der Punkt wird nur genannt.
+          }
+        >
+          <Stack gap="sm">
+            {darf ? (
+              <TextInput
+                label="Bezeichnung"
+                description="Nur ändern, wenn das Buch die Form anders nennt."
+                value={punkt.text}
+                placeholder={info.katalog || 'Bezeichnung'}
+                onChange={(e) => onText(e.currentTarget.value)}
+                data-grammatikformen-bezeichnung
+              />
+            ) : (
+              <div>
+                <Text size="xs" c="dimmed">
+                  Bezeichnung
+                </Text>
+                <Text fw={600}>{info.name}</Text>
+              </div>
+            )}
+            <div>
+              <Text size="xs" c="dimmed" mb={6}>
+                Verknüpfte Formen
               </Text>
+              <Group gap={6}>
+                {punkt.t.map((k) => {
+                  const ok = kennungGueltig(k, fach)
+                  return (
+                    <Badge
+                      key={k}
+                      title={k}
+                      size="lg"
+                      radius="xl"
+                      tt="none"
+                      fw={500}
+                      variant="light"
+                      color={ok ? farbe : 'orange'}
+                      leftSection={ok ? <IconCheck size={12} /> : <IconAlertTriangle size={12} />}
+                      styles={{ root: { height: 'auto', minHeight: 26, paddingBlock: 3 }, label: { whiteSpace: 'normal' } }}
+                    >
+                      {ok ? kennungLabel(k) : `${k} (nicht im Katalog)`}
+                    </Badge>
+                  )
+                })}
+                {!punkt.t.length && (
+                  <Group gap={6} wrap="nowrap">
+                    <IconAlertTriangle size={14} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} />
+                    <Text size="sm" c="dimmed">
+                      Keine Katalogform – der Punkt wird nur genannt.
+                    </Text>
+                  </Group>
+                )}
+              </Group>
+            </div>
+          </Stack>
+        </FensterKarte>
+
+        <FensterKarte
+          titel="Übungsaufgaben"
+          icon={
+            <SymbolRund farbe={farbe}>
+              <IconSparkles size={14} />
+            </SymbolRund>
+          }
+        >
+          <BankKarte punkt={punkt} unit={ort.unit} unitPunkte={unitPunkte} buch={buch} fach={fach} farbe={farbe} zahlen={bank.zahlen} darf={bank.darf} />
+        </FensterKarte>
+
+        <FensterKarte
+          titel="Einordnung"
+          icon={
+            <SymbolRund farbe={farbe}>
+              <IconGripVertical size={14} />
+            </SymbolRund>
+          }
+        >
+          <Stack gap="sm">
+            <Switch
+              label="Wiederholung eines früher eingeführten Themas"
+              checked={Boolean(punkt.w)}
+              disabled={!darf}
+              color={farbe}
+              onChange={(e) => onWiederholung(e.currentTarget.checked)}
+              data-grammatikformen-wdh
+            />
+            <Select
+              label="Abschnitt"
+              data={abschnitte.map((a) => ({ value: a || '(ganz)', label: abschnittName(a) }))}
+              value={ort.abschnitt || '(ganz)'}
+              disabled={!darf}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true, zIndex: 400 }}
+              onChange={(v) => v !== null && onAbschnitt(v === '(ganz)' ? '' : v)}
+              data-grammatikformen-abschnitt-wahl
+            />
+            {darf && anzahl > 1 && (
+              <div>
+                <Group gap={6} mb={6}>
+                  <Text size="sm" fw={500}>
+                    Reihenfolge
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Platz {ort.index + 1} von {anzahl} – auch per Ziehen
+                  </Text>
+                </Group>
+                <Group gap="xs">
+                  <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} disabled={ort.index === 0} onClick={() => onVerschieben(-1)}>
+                    Nach vorn
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="default"
+                    rightSection={<IconArrowRight size={14} />}
+                    disabled={ort.index === anzahl - 1}
+                    onClick={() => onVerschieben(1)}
+                  >
+                    Nach hinten
+                  </Button>
+                </Group>
+              </div>
+            )}
+          </Stack>
+        </FensterKarte>
+      </Stack>
+
+      {darf && (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            padding: '12px 16px',
+            background: 'var(--mantine-color-body)',
+            borderTop: '1px solid var(--mantine-color-default-border)'
+          }}
+        >
+          {entfernenFrage ? (
+            <Group justify="space-between" gap="xs">
+              <Text size="sm">Diesen Grammatikpunkt entfernen?</Text>
+              <Group gap="xs">
+                <Button size="xs" variant="default" onClick={() => setEntfernenFrage(false)}>
+                  Abbrechen
+                </Button>
+                <Button size="xs" color="red" autoFocus onClick={onEntfernen} data-grammatikformen-entfernen-ok>
+                  Entfernen
+                </Button>
+              </Group>
             </Group>
+          ) : (
+            <Button variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={() => setEntfernenFrage(true)} data-grammatikformen-entfernen>
+              Grammatikpunkt entfernen
+            </Button>
           )}
-        </Stack>
-      </div>
-
-      <Switch
-        label="Wiederholung eines früher eingeführten Themas"
-        checked={Boolean(punkt.w)}
-        disabled={!darf}
-        color={farbe}
-        onChange={(e) => onWiederholung(e.currentTarget.checked)}
-        data-grammatikformen-wdh
-      />
-
-      <Select
-        label="Abschnitt"
-        data={abschnitte.map((a) => ({ value: a || '(ganz)', label: abschnittName(a) }))}
-        value={ort.abschnitt || '(ganz)'}
-        disabled={!darf}
-        allowDeselect={false}
-        comboboxProps={{ withinPortal: true, zIndex: 400 }}
-        onChange={(v) => v !== null && onAbschnitt(v === '(ganz)' ? '' : v)}
-        data-grammatikformen-abschnitt-wahl
-      />
-
-      {darf && anzahl > 1 && (
-        <div>
-          <Group gap={6} mb={6}>
-            <IconGripVertical size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
-            <Text size="sm" fw={500}>
-              Reihenfolge
-            </Text>
-            <Text size="xs" c="dimmed">
-              Platz {ort.index + 1} von {anzahl} – auch per Ziehen
-            </Text>
-          </Group>
-          <Group gap="xs">
-            <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} disabled={ort.index === 0} onClick={() => onVerschieben(-1)}>
-              Nach vorn
-            </Button>
-            <Button
-              size="xs"
-              variant="default"
-              rightSection={<IconArrowRight size={14} />}
-              disabled={ort.index === anzahl - 1}
-              onClick={() => onVerschieben(1)}
-            >
-              Nach hinten
-            </Button>
-          </Group>
         </div>
       )}
-
-      {darf &&
-        (entfernenFrage ? (
-          <Alert color="red" p="xs">
-            <Text size="sm" mb="xs">
-              Diesen Grammatikpunkt entfernen?
-            </Text>
-            <Group gap="xs">
-              <Button size="xs" variant="default" onClick={() => setEntfernenFrage(false)}>
-                Abbrechen
-              </Button>
-              <Button size="xs" color="red" autoFocus onClick={onEntfernen} data-grammatikformen-entfernen-ok>
-                Entfernen
-              </Button>
-            </Group>
-          </Alert>
-        ) : (
-          <Button
-            variant="subtle"
-            color="red"
-            leftSection={<IconTrash size={14} />}
-            onClick={() => setEntfernenFrage(true)}
-            style={{ alignSelf: 'flex-start' }}
-            data-grammatikformen-entfernen
-          >
-            Entfernen
-          </Button>
-        ))}
-    </Stack>
+    </div>
   )
 }
 

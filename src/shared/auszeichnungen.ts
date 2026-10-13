@@ -53,9 +53,10 @@ export const KATEGORIEN: Kategorie[] = [
   {
     id: 'grammatik',
     name: 'Grammatik sicher',
-    text: 'Jede geübte Grammatikform (mindestens eine Aufgabe richtig) zählt einen Punkt, jede sichere Form zwei weitere.',
-    nachJahrgang: true,
-    basis: [3, 15, 40, 90, 160, 260]
+    // Seit 13.10.2026 (Entscheidung der Lehrkraft): Anteil am ganzen Band in Prozent
+    text: 'Wie viel Grammatik des Bands du beherrschst, in Prozent: zur Hälfte die sicheren Grammatikformen, zur Hälfte die richtig gelösten Aufgaben (Erkennen, Bilden, Anwenden).',
+    nachJahrgang: false,
+    basis: [10, 25, 50, 75, 90, 100]
   },
   {
     id: 'dranbleiben',
@@ -147,7 +148,11 @@ export interface MedaillenSicht {
 /**
  * Medaillen einer Sprache: aus den Werten und dem Gespeicherten (die höhere Stufe gilt – nichts wird entzogen).
  */
-export function medaillen(werte: Partial<Werte>, jahrgang: number | null | undefined, gespeichert: Partial<Record<KategorieId, { stufe: number; am: number }>> = {}): MedaillenSicht[] {
+export function medaillen(
+  werte: Partial<Werte>,
+  jahrgang: number | null | undefined,
+  gespeichert: Partial<Record<KategorieId, { stufe: number; am: number }>> = {}
+): MedaillenSicht[] {
   return medaillenMit(werte, Object.fromEntries(KATEGORIE_IDS.map((k) => [k, schwellen(k, jahrgang)])) as Record<KategorieId, number[]>, gespeichert)
 }
 
@@ -351,7 +356,13 @@ const ORDINAL_LA: Record<number, string> = {
  * Zielsprache – „Knight of Year 7", „Chevalière de la 5e", „Caballero de 1.º de ESO", „Consul anni septimi",
  * „Talent der Klasse 7". Ohne Jahrgang mit dem Schuljahr („Knight of 2026/27"). null ohne Titel.
  */
-export function jahresTitelText(sprache: string, stufe: number, form: TitelForm | null | undefined, jahrgang: number | null | undefined, schuljahr: number): string | null {
+export function jahresTitelText(
+  sprache: string,
+  stufe: number,
+  form: TitelForm | null | undefined,
+  jahrgang: number | null | undefined,
+  schuljahr: number
+): string | null {
   const t = titelText(sprache, stufe, form)
   if (!t) return null
   const j = Number(jahrgang) >= 1 && Number(jahrgang) <= 13 ? Math.floor(Number(jahrgang)) : null
@@ -404,7 +415,10 @@ export interface TitelWahl {
  * Der angezeigte Titel (Startseite): gewählter Titel, wenn noch erreicht; ohne Wahl der höchste über alle Sprachen
  * (bei Gleichstand die Sprache mit mehr Punkten); 'aus' = keiner.
  */
-export function angezeigterTitel(erreicht: Record<string, { stufe: number; punkte?: number }>, wahl: TitelWahl): { sprache: string; stufe: number; text: string } | null {
+export function angezeigterTitel(
+  erreicht: Record<string, { stufe: number; punkte?: number }>,
+  wahl: TitelWahl
+): { sprache: string; stufe: number; text: string } | null {
   if (wahl.anzeige === 'aus') return null
   const form = wahl.form
   if (wahl.anzeige && typeof wahl.anzeige === 'object') {
@@ -540,6 +554,11 @@ export interface SprachEingabe {
   woerterSicher: number
   regelnGeuebt: number
   regelnSicher: number
+  /**
+   * Grammatik (13.10.2026, Entscheidung der Lehrkraft): Anteil am ganzen Band in Prozent (0–100) – zur Hälfte sichere
+   * Formen, zur Hälfte richtig gelöste Kern-Aufgaben. Ohne Angabe (ältere Tests) gilt die frühere Punktrechnung.
+   */
+  grammatikProzent?: number
   /** Verschiedene Übungstage in dieser Sprache */
   tage: number
   /** Units aus den eigenen Kursen: Wörter gesamt, kennengelernt, sicher */
@@ -568,7 +587,7 @@ export function sprachWerte(e: SprachEingabe): Werte {
   return {
     // Gestuft (12.10.2026, Entscheidung der Lehrkraft): Erkennen 1, frei gewusst +1, sicher +2
     wortschatz: n(e.woerterErkannt) + n(e.woerterFrei) + 2 * n(e.woerterSicher),
-    grammatik: n(e.regelnGeuebt) + 2 * n(e.regelnSicher),
+    grammatik: e.grammatikProzent !== undefined ? Math.min(100, n(e.grammatikProzent)) : n(e.regelnGeuebt) + 2 * n(e.regelnSicher),
     dranbleiben: n(e.tage),
     lehrwerk: etappen(e.units),
     ...zaehlerWerte(e.zaehler)
@@ -642,6 +661,11 @@ export const WORT_ANTEILE = [0.01, 0.05, 0.3, 0.55, 0.75, 0.9] as const
  */
 export const GRAMMATIK_ANTEILE = [0.02, 0.1, 0.4, 0.6, 0.75, 0.9] as const
 /**
+ * Grammatik seit 13.10.2026 (Entscheidung der Lehrkraft): Prozent des ganzen Bands – Bronze 10 %, Silber 25 %, Gold 50 %,
+ * Platin 75 %, Diamant 90 %, Meister 100 % (abgestimmt waren 10/25/50/75 und Meister 100; Diamant dazwischen).
+ */
+export const GRAMMATIK_PROZENT = [10, 25, 50, 75, 90, 100] as const
+/**
  * Kleine Nenner absichern (12.10.2026): Ein Band mit sehr wenigen Wörtern, Formen oder Kapiteln (Platzhalter, kleine
  * eigene Liste) gäbe sonst Gold nach wenigen Minuten. Darunter gilt dieser Mindestumfang.
  */
@@ -698,7 +722,7 @@ export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[
     // Ohne bekannten Umfang (10.10.2026, Entscheidung der Lehrkraft): ein typischer Band statt der Jahrgangstabellen;
     // seit 12.10.2026 gestufte Wortschatzpunkte (4 je Wort), eigene Anteile und ein Mindestumfang (MIN_BAND)
     wortschatz: anteilig(WORT_PUNKTE_MAX * Math.max(MIN_BAND.woerter, g.woerter || TYPISCHER_BAND.woerter), 5, WORT_ANTEILE),
-    grammatik: anteilig(3 * Math.max(MIN_BAND.grammatik, g.grammatik || TYPISCHER_BAND.grammatik), 2, GRAMMATIK_ANTEILE),
+    grammatik: [...GRAMMATIK_PROZENT],
     lehrwerk: etappenSchwellen(Math.max(MIN_BAND.units, g.units || TYPISCHER_BAND.units)),
     dranbleiben: zeit('dranbleiben'),
     spiele: zeit('spiele'),
@@ -714,10 +738,14 @@ export function jahresSchwellen(g: JahresGrundlage): Record<KategorieId, number[
 export const grundlageSchluessel = (g: JahresGrundlage): string =>
   // „v2": Rückfall typischer Band statt Jahrgangstabelle – ältere Schwellen werden einmal neu gerechnet (Erreichtes bleibt)
   // „v3" (12.10.2026): gestufte Wortschatzpunkte, eigene Anteile, Mindestumfang – einmal neu gerechnet (Berichtigung: `berichtigen`)
-  `v3|${g.band?.id ?? '-'}|${g.jahrgang ?? '-'}|${g.woerter ? 'w' : '-'}${g.grammatik ? 'g' : '-'}${g.units ? 'u' : '-'}`
+  // „v4" (13.10.2026): Grammatik in Prozent des Bands – einmal neu gerechnet
+  `v4|${g.band?.id ?? '-'}|${g.jahrgang ?? '-'}|${g.woerter ? 'w' : '-'}${g.grammatik ? 'g' : '-'}${g.units ? 'u' : '-'}`
 
 /** Erster und letzter Tag eines Schuljahres und seine Schultage (ohne Kalenderdaten: 1.8.–31.7., übliche Zahl) */
-export function schuljahrRahmen(schuljahr: number, k: SchulkalenderDaten | null = schulkalender()): { schuljahr: number; beginn: string; ende: string; schultage: number; geschaetzt: boolean } {
+export function schuljahrRahmen(
+  schuljahr: number,
+  k: SchulkalenderDaten | null = schulkalender()
+): { schuljahr: number; beginn: string; ende: string; schultage: number; geschaetzt: boolean } {
   const erster = ersterSchultag(schuljahr, k)
   const naechster = ersterSchultag(schuljahr + 1, k)
   const beginn = erster ?? `${schuljahr}-08-01`
@@ -737,7 +765,8 @@ export const tageImRahmen = (tage: Iterable<string>, r: { beginn: string; ende: 
 }
 
 /** „Kl. 7 (2026/27)" bzw. „2026/27" ohne Jahrgang */
-export const jahresLabel = (jahrgang: number | null | undefined, schuljahr: number): string => (jahrgang ? `Kl. ${jahrgang} (${schuljahrText(schuljahr)})` : schuljahrText(schuljahr))
+export const jahresLabel = (jahrgang: number | null | undefined, schuljahr: number): string =>
+  jahrgang ? `Kl. ${jahrgang} (${schuljahrText(schuljahr)})` : schuljahrText(schuljahr)
 
 /** Kontext ohne Server-Angaben (Tests, Übernahme): Schuljahr von `jetzt`, Grundlage nach Jahrgang, alle Tage zählen */
 export function standardKontext(e: Pick<SprachEingabe, 'jahrgang' | 'tage'>, jetzt: number): JahresKontext {
@@ -755,7 +784,8 @@ export function jahresWerte(gesamt: Werte, start: Partial<Werte>, k: Pick<Jahres
   const zuwachs = (x: KategorieId): number => Math.max(0, gesamt[x] - Math.max(0, Math.floor(Number(start[x]) || 0)))
   return {
     wortschatz: zuwachs('wortschatz'),
-    grammatik: zuwachs('grammatik'),
+    // Prozent des Bands dieses Jahres (13.10.2026) – kein Zuwachs
+    grammatik: Math.max(0, Math.min(100, Math.floor(gesamt.grammatik))),
     dranbleiben: Math.max(0, Math.floor(k.tageImJahr)),
     lehrwerk: k.bandEtappen === null ? zuwachs('lehrwerk') : Math.max(0, Math.floor(k.bandEtappen)),
     spiele: zuwachs('spiele'),
@@ -835,7 +865,10 @@ export function jahresMedaillen(js: JahrStand, werte: Partial<Werte>): Medaillen
 
 /** Schwellen einer Jahresreihe (gespeichert, sonst aus der Grundlage) – auch für die Stufen-Übersicht der Sammlung (10.10.2026) */
 export function schwellenVon(js: JahrStand): Partial<Record<KategorieId, number[]>> {
-  return js.schwellen ?? jahresSchwellen(js.grundlage ?? { jahrgang: js.jahrgang, band: null, woerter: null, grammatik: null, units: null, schultage: SCHULTAGE_UEBLICH })
+  return (
+    js.schwellen ??
+    jahresSchwellen(js.grundlage ?? { jahrgang: js.jahrgang, band: null, woerter: null, grammatik: null, units: null, schultage: SCHULTAGE_UEBLICH })
+  )
 }
 
 /**
@@ -957,8 +990,10 @@ export function zaehlerAusAlt(
  * Regelstand der Medaillen. 2 (12.10.2026, Entscheidung der Lehrkraft): gestufte Wortschatzpunkte, „geübt"/„sicher" in
  * Grammatik nach shared/grammatikSicher.ts, „kennengelernt" erst mit einer richtigen Antwort, Spiele nur mit
  * sinnvoller Leistung, Mindestumfang kleiner Bände, keine Phantom-Sprache aus dem Vokabelweg.
+ * 3 (13.10.2026, Entscheidung der Lehrkraft): Grammatik in Prozent des ganzen Bands (Aufgabenbank); die alten
+ * Grammatik-Trainings wurden gelöscht – Grammatik-Medaillen und -Achievements still auf den neuen Stand (meist null).
  */
-export const AUSZ_REGEL = 2
+export const AUSZ_REGEL = 3
 
 /**
  * Einmalige, stille Berichtigung (12.10.2026, Entscheidung der Lehrkraft): Medaillen der Reihe des laufenden

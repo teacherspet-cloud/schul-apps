@@ -168,9 +168,11 @@ describe('Stille Berichtigung', () => {
     expect(js.medaillen.lehrwerk!.stufe).toBe(1)
     expect(js.medaillen.dranbleiben!.stufe).toBe(1)
     const punkte = Object.values(js.medaillen).reduce((a, x) => a + (x?.stufe ?? 0), 0)
-    expect(punkte).toBe(9)
-    expect(js.titel!.stufe).toBe(titelStufe(9))
-    expect(st.titel.en.stufe).toBe(titelStufeGesamt(9))
+    // Grammatik (13.10.2026): Prozent des Bands – mit den alten Punkten keine Medaille mehr
+    expect(js.medaillen.grammatik).toBeUndefined()
+    expect(punkte).toBe(8)
+    expect(js.titel!.stufe).toBe(titelStufe(8))
+    expect(st.titel.en.stufe).toBe(titelStufeGesamt(8))
     expect(st.titel.en.stufe).toBe(3)
     // Sammlung folgt der Reihe
     expect(st.medaillen.en.wortschatz!.stufe).toBe(2)

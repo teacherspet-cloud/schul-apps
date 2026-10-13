@@ -24,7 +24,16 @@ import { buchFuer, buchNamen } from './vokabelweg'
 import { grammatikFuerAchievements, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
 import { kalenderHeute } from './schulkalender'
 import { gespielteSpiele } from './rekordbuch'
-import { achDatenLesen, achDatenSchreiben, auszeichnungenVon, rundeAbschliessen, tageVereinen, titelWahlSetzen, type AchDaten, type Erreicht } from './achievementsDaten'
+import {
+  achDatenLesen,
+  achDatenSchreiben,
+  auszeichnungenVon,
+  rundeAbschliessen,
+  tageVereinen,
+  titelWahlSetzen,
+  type AchDaten,
+  type Erreicht
+} from './achievementsDaten'
 import { bildInfo, bildSvg, bilderFuerSprache, freigeschaltet, freigeschaltetIn } from '../shared/auszeichnungenBilder'
 import { RESSOURCEN } from './pfade'
 import { existsSync, readFileSync } from 'node:fs'
@@ -70,7 +79,18 @@ import {
   type TitelForm,
   type TitelWahl
 } from '../shared/auszeichnungen'
-import { bandFuerJahr, bandKapitel, bandWoerter, grammatikBandZu, grammatikImBand, grammatikLatein, lateinBuch, lateinLernjahr } from '../shared/auszeichnungenBand'
+import {
+  bandFuerJahr,
+  bandKapitel,
+  bandWoerter,
+  grammatikBandZu,
+  grammatikFormenImBand,
+  grammatikImBand,
+  grammatikLatein,
+  lateinBuch,
+  lateinLernjahr
+} from '../shared/auszeichnungenBand'
+import { bankKernJeForm } from './grammatikBank'
 import { schuljahrText, schuljahrVon } from '../shared/schulkalender'
 import { normName } from '../shared/lehrwerkVorwahl'
 import { ACH_GRUPPEN, achievementSicht, berechneAchievements, type Achievement, type AchEingabe } from '../shared/achievements'
@@ -148,7 +168,10 @@ async function wortschatz(ich: NutzerInfo): Promise<{
   }
   const buecher = new Map<string, { buch: Buch; units: Set<string> }>()
   const lehrkraefte = new Set<string>()
-  const zeilen = sicher(() => vokDb().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[], [])
+  const zeilen = sicher(
+    () => vokDb().prepare('SELECT zuweisung_id, daten FROM vok_stand WHERE schueler_id = ?').all(ich.id) as { zuweisung_id: string; daten: string }[],
+    []
+  )
   for (const r of zeilen) {
     const z = vokZeile(r.zuweisung_id)
     if (!z) continue
@@ -170,11 +193,16 @@ async function wortschatz(ich: NutzerInfo): Promise<{
     buecher.set(buch.id, e)
   }
   // Vokabelweg: Lehrwerkswörter über ihren Band (steht in der Kennung) auf ihr Wort abbilden
-  const weg = sicher(() => datenbank().prepare('SELECT reihe, daten FROM vok_laufbahn WHERE schueler_id = ?').all(ich.id) as { reihe: string; daten: string }[], [])
+  const weg = sicher(
+    () => datenbank().prepare('SELECT reihe, daten FROM vok_laufbahn WHERE schueler_id = ?').all(ich.id) as { reihe: string; daten: string }[],
+    []
+  )
   const wegStaende = weg.map((r) => ({ reihe: r.reihe, st: json_(r.daten, { woerter: {}, tage: [] } as VokStand) }))
   const baende = new Map<string, Buch>()
   for (const { buch } of buecher.values()) baende.set(buch.id, buch)
-  if (wegStaende.length) for (const liste of sicher(() => kurseDerSprachen(ich).kurse, new Map<string, VokZeile[]>()).values()) for (const k of liste) lehrkraefte.add(k.lehrkraft_id)
+  if (wegStaende.length)
+    for (const liste of sicher(() => kurseDerSprachen(ich).kurse, new Map<string, VokZeile[]>()).values())
+      for (const k of liste) lehrkraefte.add(k.lehrkraft_id)
   for (const id of new Set(wegStaende.flatMap((w) => Object.keys(w.st.woerter ?? {}).map(bandAusWortId)))) {
     if (!id || baende.has(id)) continue
     for (const lk of lehrkraefte) {
@@ -304,6 +332,8 @@ interface JahresBand {
   woerter: number | null
   units: number | null
   grammatik: number | null
+  /** Formen (Katalogthemen) des Bands aus der Grammatikliste (13.10.2026) – leer: unbekannt (z. B. Latein) */
+  formen?: string[]
 }
 
 /**
@@ -326,7 +356,15 @@ async function jahresBand(kurse: VokZeile[], jahrgang: number | null): Promise<J
   const umfang = (b: Buch, latein?: string): JahresBand => {
     const lat = latein ? grammatikLatein(latein, lateinLernjahr(jahrgang)) : null
     const gb = grammatikBandZu(b.id, b.name)
-    return { id: b.id, name: b.name, buch: b, woerter: bandWoerter(b), units: bandKapitel(b), grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null) }
+    return {
+      id: b.id,
+      name: b.name,
+      buch: b,
+      woerter: bandWoerter(b),
+      units: bandKapitel(b),
+      grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null),
+      formen: gb ? grammatikFormenImBand(gb) : []
+    }
   }
   const gewaehlt = bandFuerJahr([...buecher.values()], jahrgang)
   if (gewaehlt) return umfang(gewaehlt)
@@ -337,12 +375,22 @@ async function jahresBand(kurse: VokZeile[], jahrgang: number | null): Promise<J
     const name = stand?.buch ?? ''
     if (!name) continue
     const latein = lateinBuch(name)
-    const treffer = (await buchNamen(z.lehrkraft_id).catch(() => [])).filter((b) => normName(b.name) === normName(name) || normName(b.id).startsWith(normName(name)))
+    const treffer = (await buchNamen(z.lehrkraft_id).catch(() => [])).filter(
+      (b) => normName(b.name) === normName(name) || normName(b.id).startsWith(normName(name))
+    )
     const b = treffer.length ? await buchFuer(treffer.sort((a, c) => a.id.length - c.id.length)[0].id, z.lehrkraft_id).catch(() => null) : null
     if (b) return umfang(b, latein)
     const lat = latein ? grammatikLatein(latein, lateinLernjahr(jahrgang)) : null
     const gb = grammatikBandZu(name)
-    return { id: `band:${normName(name)}`, name, buch: null, woerter: null, units: null, grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null) }
+    return {
+      id: `band:${normName(name)}`,
+      name,
+      buch: null,
+      woerter: null,
+      units: null,
+      grammatik: lat?.grammatik ?? (gb ? grammatikImBand(gb) : null),
+      formen: gb ? grammatikFormenImBand(gb) : []
+    }
   }
   return null
 }
@@ -372,9 +420,12 @@ function bandEtappen(band: JahresBand, best: Map<string, { g: boolean; s: boolea
 function wochenzielVon(nutzerId: string): number {
   const d = sicher(
     () =>
-      json_((datenbank().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined)?.daten, {} as {
-        wochenziel?: number
-      }),
+      json_(
+        (datenbank().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined)?.daten,
+        {} as {
+          wochenziel?: number
+        }
+      ),
     {} as { wochenziel?: number }
   )
   const z = Number(d.wochenziel)
@@ -410,7 +461,13 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
   if (da) return da
   const p = (async () => {
     const ws = await wortschatz(ich)
-    const gr = sicher(() => grammatikFuerAchievements(ich), { regeln: [], extrasGeschafft: 0, tage: [] as string[], tageJe: {} as Record<string, string[]> })
+    const gr = sicher(() => grammatikFuerAchievements(ich), {
+      regeln: [],
+      extrasGeschafft: 0,
+      tage: [] as string[],
+      tageJe: {} as Record<string, string[]>,
+      bank: {}
+    })
     const spiele = sicher(() => gespielteSpiele(ich.id).size, 0)
     const wochenziel = wochenzielVon(ich.id)
     const { jahrgang: kurse, kurse: kurseJe } = kurseDerSprachen(ich)
@@ -423,12 +480,15 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
     jahreUmstellen(d.ausz, schuljahr, jetzt)
     // Berichtigung (12.10.2026): die Phantom-Sprache des Vokabelwegs („lb") verschwindet ganz – ohne Kurs in dieser Sprache
     if ((d.ausz.regel ?? 0) < AUSZ_REGEL) phantomEntfernen(d, kurse)
+    // Regelstand 3 (13.10.2026): die alten Grammatik-Trainings sind gelöscht – ihre Achievements fallen still weg
+    if ((d.ausz.regel ?? 0) < 3) grammatikAltEntfernen(d)
     const eingaben = sprachEingaben(kurse, ws, gr, d, schuljahr, baende)
     const frischUebernommen = !d.uebernommen
     if (!d.uebernommen) uebernehmen(d, eingaben, spiele, jetzt, schuljahr)
     // Einmal still auf die neue Regel berichtigen (12.10.2026, shared/auszeichnungen.ts `berichtigen`) – auch gleich nach
     // einer Übernahme: Übernommenes bleibt nur, soweit es nach der neuen Regel ebenfalls erreicht wäre
-    if (berichtigen(d.ausz, eingaben, jetzt, frischUebernommen && Boolean(d.uebernommen) && d.uebernommen !== '-')) d.offenAusz = offenBerichtigt(d.ausz, d.offenAusz)
+    if (berichtigen(d.ausz, eingaben, jetzt, frischUebernommen && Boolean(d.uebernommen) && d.uebernommen !== '-'))
+      d.offenAusz = offenBerichtigt(d.ausz, d.offenAusz)
     rundeAbschliessen(d, jetzt)
     d.tage = tageVereinen(d.tage, [...ws.tage, ...gr.tage])
     for (const r of gr.regeln) if (r.schwaeche && !d.warSchwaeche.includes(r.schluessel)) d.warSchwaeche.push(r.schluessel)
@@ -461,14 +521,19 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
 function sprachEingaben(
   kurse: Map<string, number | null>,
   ws: Awaited<ReturnType<typeof wortschatz>>,
-  gr: { regeln: { sicher: boolean; geuebt?: boolean; sprache?: string }[]; tageJe?: Record<string, string[]> },
+  gr: {
+    regeln: { sicher: boolean; geuebt?: boolean; sprache?: string }[]
+    tageJe?: Record<string, string[]>
+    bank?: Record<string, { formen: Record<string, string>; geloest: Record<string, number> }>
+  },
   d: AchDaten,
   schuljahr = schuljahrVon(kalenderHeute()),
   baende: Map<string, JahresBand | null> = new Map()
 ): SprachEingabe[] {
   const rahmen = schuljahrRahmen(schuljahr)
   const sprachen = new Set<string>(kurse.keys())
-  for (const s of [...ws.jeSprache.keys(), ...Object.keys(d.je), ...Object.keys(d.ausz.medaillen), ...gr.regeln.map((r) => r.sprache ?? '')]) if (SPRACHE.test(s)) sprachen.add(s)
+  for (const s of [...ws.jeSprache.keys(), ...Object.keys(d.je), ...Object.keys(d.ausz.medaillen), ...gr.regeln.map((r) => r.sprache ?? '')])
+    if (SPRACHE.test(s)) sprachen.add(s)
   return [...sprachen]
     .sort((a, b) => Number(kurse.has(b)) - Number(kurse.has(a)) || sprachName(a).localeCompare(sprachName(b), 'de'))
     .map((s) => {
@@ -497,11 +562,44 @@ function sprachEingaben(
         woerterSicher: w?.sicher ?? 0,
         regelnGeuebt: Math.min(deckel, regeln.length),
         regelnSicher: Math.min(deckel, regeln.filter((r) => r.sicher).length),
+        grammatikProzent: grammatikProzent(gr.bank?.[s], band, s),
         tage: tage.size,
         units: ws.lehrwerk.filter((b) => b.sprache === s).flatMap((b) => b.units.map((u) => ({ gesamt: u.gesamt, gelernt: u.gelernt ?? 0, sicher: u.sicher }))),
         zaehler: d.je[s]?.z ?? {}
       }
     })
+}
+
+/** Alte Grammatik-Achievements (Regeln geübt/sicher, Schwäche → Stärke, Extras) samt gemerkter Schwächen entfernen */
+function grammatikAltEntfernen(d: AchDaten): void {
+  for (const [id, e] of Object.entries(d.erreicht)) if (e.gruppe === 'grammatik') delete d.erreicht[id]
+  d.offen = d.offen.filter((id) => d.erreicht[id])
+  d.warSchwaeche = []
+}
+
+/**
+ * Grammatik in Prozent des ganzen Bands (13.10.2026, Entscheidung der Lehrkraft): zur Hälfte die sicheren Formen (von
+ * allen Formen des Bands), zur Hälfte die richtig gelösten Kern-Aufgaben (von allen hinterlegten Kern-Aufgaben zu diesen
+ * Formen). Ohne Formenliste des Bands (Latein, unbekannter Band): die Formen, die der Person zugewiesen sind, mindestens
+ * so viele wie der Band Grammatikthemen hat.
+ */
+export function grammatikProzent(
+  b: { formen: Record<string, string>; geloest: Record<string, number> } | undefined,
+  band: { formen?: string[]; grammatik: number | null } | null,
+  sprache: string,
+  kernJeForm: (sprache: string) => Record<string, number> = (x) => sicher(() => bankKernJeForm(x), {})
+): number {
+  if (!b) return 0
+  const bandFormen = band?.formen ?? []
+  const formen = bandFormen.length ? bandFormen : Object.keys(b.formen)
+  const nenner = bandFormen.length ? bandFormen.length : Math.max(formen.length, band?.grammatik ?? 0)
+  if (!nenner) return 0
+  const sichere = formen.filter((f) => b.formen[f] === 'sicher').length
+  const kern = kernJeForm(sprache)
+  const gesamt = formen.reduce((n, f) => n + (kern[f] ?? 0), 0)
+  const geloest = formen.reduce((n, f) => n + Math.min(kern[f] ?? 0, b.geloest[f] ?? 0), 0)
+  const anteil = 0.5 * (sichere / nenner) + 0.5 * (gesamt ? geloest / gesamt : 0)
+  return Math.max(0, Math.min(100, Math.floor(anteil * 100 + 1e-9)))
 }
 
 /**
@@ -558,7 +656,13 @@ function uebernehmen(d: AchDaten, eingaben: SprachEingabe[], spiele: number, jet
 /** Text eines neuen Medaillen- oder Titel-Ereignisses für den Glückwunsch */
 function auszText(n: AuszNeu, form: TitelForm | undefined): { art: 'medaille' | 'titel'; sprache: string; stufe: number; titel: string; text: string } {
   if (n.art === 'titel')
-    return { art: 'titel', sprache: n.sprache, stufe: n.stufe, titel: `Neuer Titel in ${sprachName(n.sprache)}`, text: titelText(n.sprache, n.stufe, form) ?? '' }
+    return {
+      art: 'titel',
+      sprache: n.sprache,
+      stufe: n.stufe,
+      titel: `Neuer Titel in ${sprachName(n.sprache)}`,
+      text: titelText(n.sprache, n.stufe, form) ?? ''
+    }
   // Jahrestitel (10.10.2026): wie ein Titel gemeldet, mit dem Schuljahr
   if (n.art === 'jahrestitel')
     return {
@@ -656,7 +760,14 @@ function auszeichnungenSicht(a: Auswertung): Record<string, unknown> {
         leiter: titelLeiter(e.sprache).map((x, i) => ({ stufe: i + 1, ab: TITEL_AB_GESAMT[i], ...x }))
       },
       // Sammlung (10.10.2026): alle Bilder dieser Sprache, gesperrt oder frei
-      sammlung: bilderFuerSprache(e.sprache).map((b) => ({ id: b.id, art: b.art, name: b.name, wie: b.wie, stufe: b.stufe, frei: freigeschaltetIn(d.ausz, e.sprache, b.id) }))
+      sammlung: bilderFuerSprache(e.sprache).map((b) => ({
+        id: b.id,
+        art: b.art,
+        name: b.name,
+        wie: b.wie,
+        stufe: b.stufe,
+        frei: freigeschaltetIn(d.ausz, e.sprache, b.id)
+      }))
     }
   })
   return { sprachen, ...titelKurz(d) }
@@ -665,7 +776,11 @@ function auszeichnungenSicht(a: Auswertung): Record<string, unknown> {
 /** Profilbild aus der Darstellung – nur, wenn es (noch) freigeschaltet ist */
 function avatarVon(nutzerId: string, ausz: AchDaten['ausz']): string | null {
   const d = sicher(
-    () => json_((datenbank().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined)?.daten, {} as { avatar?: unknown }),
+    () =>
+      json_(
+        (datenbank().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined)?.daten,
+        {} as { avatar?: unknown }
+      ),
     {} as { avatar?: unknown }
   )
   return typeof d.avatar === 'string' && d.avatar && freigeschaltet(ausz, d.avatar) ? d.avatar : null
@@ -771,7 +886,9 @@ function titelKurz(d: AchDaten): {
   const formOffen = !d.titelWahl.form && Object.entries(d.ausz.titel).some(([s, t]) => t.stufe >= 1 && titelLeiter(s).some((_, i) => hatFormen(s, i + 1)))
   const hoechster = Object.entries(d.ausz.titel).sort((a, b) => b[1].stufe - a[1].stufe)[0]
   const leiter = hoechster ? titelLeiter(hoechster[0]) : []
-  const x = hoechster ? leiter.slice(hoechster[1].stufe - 1).find((_, i) => hatFormen(hoechster[0], hoechster[1].stufe + i)) ?? leiter[hoechster[1].stufe - 1] : undefined
+  const x = hoechster
+    ? leiter.slice(hoechster[1].stufe - 1).find((_, i) => hatFormen(hoechster[0], hoechster[1].stufe + i)) ?? leiter[hoechster[1].stufe - 1]
+    : undefined
   return { wahl: d.titelWahl, anzeige: angezeigterTitel(erreicht, d.titelWahl), formOffen, beispiel: x ? { m: x.m, w: x.w, n: x.n } : null }
 }
 
@@ -856,7 +973,13 @@ export function achievementsRoute(): (k: Anfrage) => Promise<boolean> {
     const ich = sitzung.nutzer
     if (!siehtListe(ich) || (!zaehlt(ich) && url.pathname.endsWith('/neu')))
       return (
-        json(res, 200, url.pathname.endsWith('/neu') ? { neu: [], auszeichnungen: [] } : { alle: [], erreicht: [], verborgen: 0, gruppen: ACH_GRUPPEN, neu: [], lernende: 0, platz: null }),
+        json(
+          res,
+          200,
+          url.pathname.endsWith('/neu')
+            ? { neu: [], auszeichnungen: [] }
+            : { alle: [], erreicht: [], verborgen: 0, gruppen: ACH_GRUPPEN, neu: [], lernende: 0, platz: null }
+        ),
         true
       )
     const { d, katalog } = await achievementsAuswerten(ich)

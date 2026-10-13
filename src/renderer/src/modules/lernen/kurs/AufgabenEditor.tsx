@@ -9,6 +9,7 @@ import { ActionIcon, Badge, Button, Card, Group, Select, SegmentedControl, Simpl
 import { IconArrowDown, IconArrowUp, IconPencil, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { ART_NAME, type GrammatikAufgabe, type GrammatikPaket, type GrammatikRegel } from '@shared/grammatiktrainer'
+import { istKern, UEBUNG_NAME, UEBUNGEN, type Uebung } from '@shared/grammatikBank'
 import { lateinVorschau } from '../LateinAufgaben'
 
 /** „a | b | c" ↔ Liste */
@@ -106,7 +107,18 @@ function AufgabeFelder({ a, regeln, aendern }: { a: GrammatikAufgabe; regeln: Gr
           onChange={(e) => setze({ erklaerung: e.currentTarget.value || undefined })}
         />
       </Group>
-      {a.stufe && (
+      {a.uebung && (
+        <Select
+          label="Übungsart"
+          data={UEBUNGEN.map((u) => ({ value: u, label: `${UEBUNG_NAME[u]}${istKern(u) ? '' : ' (Zusatz)'}` }))}
+          value={a.uebung}
+          onChange={(v) => v && setze({ uebung: v as Uebung })}
+          allowDeselect={false}
+          comboboxProps={{ withinPortal: true, zIndex: 500 }}
+          data-feld-uebung
+        />
+      )}
+      {a.stufe && !a.uebung && (
         <SegmentedControl
           size="xs"
           value={String(a.stufe)}
@@ -178,7 +190,19 @@ function RegelFelder({ r, aendern, loeschen }: { r: GrammatikRegel; aendern: (r:
   )
 }
 
-export function AufgabenEditor({ paket, aendern }: { paket: GrammatikPaket; aendern: (p: GrammatikPaket) => void }): React.JSX.Element {
+export function AufgabenEditor({
+  paket,
+  aendern,
+  neu,
+  ohneRegeln
+}: {
+  paket: GrammatikPaket
+  aendern: (p: GrammatikPaket) => void
+  /** Aufgabenbank (13.10.2026): frisch von der KI – hervorgehoben, bis gespeichert */
+  neu?: ReadonlySet<string>
+  /** Regelkarten zeigt der Aufrufer selbst */
+  ohneRegeln?: boolean
+}): React.JSX.Element {
   const [offen, setOffen] = useState<string | null>(null)
   const aufgaben = paket.aufgaben
   const setzeAufgaben = (l: GrammatikAufgabe[]): void => aendern({ ...paket, aufgaben: l })
@@ -192,8 +216,8 @@ export function AufgabenEditor({ paket, aendern }: { paket: GrammatikPaket; aend
   const regelName = new Map(paket.regeln.map((r) => [r.id, r.titel]))
   return (
     <Stack data-aufgaben-editor>
-      <Title order={5}>Regelkarten ({paket.regeln.length})</Title>
-      <SimpleGrid cols={{ base: 1, md: 2 }}>
+      {!ohneRegeln && <Title order={5}>Regelkarten ({paket.regeln.length})</Title>}
+      <SimpleGrid cols={{ base: 1, md: 2 }} display={ohneRegeln ? 'none' : undefined}>
         {paket.regeln.map((r, i) => (
           <RegelFelder
             key={r.id}
@@ -217,15 +241,34 @@ export function AufgabenEditor({ paket, aendern }: { paket: GrammatikPaket; aend
         {aufgaben.map((a, i) => {
           const v = aufgabeVorschau(a)
           return (
-            <Card key={a.id} withBorder padding="xs" radius="md" data-entwurf-aufgabe data-aufgabe={a.id}>
+            <Card
+              key={a.id}
+              withBorder
+              padding="xs"
+              radius="md"
+              data-entwurf-aufgabe
+              data-aufgabe={a.id}
+              style={neu?.has(a.id) ? { borderColor: 'var(--mantine-color-violet-5)', background: 'var(--mantine-color-violet-light)' } : undefined}
+            >
               <Group wrap="nowrap" align="flex-start" gap="xs">
                 <Stack gap={2} style={{ flex: 'none' }}>
                   <Badge size="sm" variant="light">
                     {ART_NAME[a.art]}
                   </Badge>
-                  {a.stufe && (
-                    <Badge size="xs" variant="outline" color="gray">
-                      Stufe {a.stufe}
+                  {a.uebung ? (
+                    <Badge size="xs" variant="outline" color={istKern(a.uebung) ? 'gray' : 'orange'} tt="none">
+                      {UEBUNG_NAME[a.uebung]}
+                    </Badge>
+                  ) : (
+                    a.stufe && (
+                      <Badge size="xs" variant="outline" color="gray">
+                        Stufe {a.stufe}
+                      </Badge>
+                    )
+                  )}
+                  {neu?.has(a.id) && (
+                    <Badge size="xs" color="violet" variant="filled">
+                      neu
                     </Badge>
                   )}
                 </Stack>

@@ -6,6 +6,7 @@
  */
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Card,
@@ -22,6 +23,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  Tooltip,
   UnstyledButton
 } from '@mantine/core'
 import { IconChevronDown, IconDots, IconPencil, IconPlus, IconSearch, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
@@ -77,6 +79,8 @@ export interface GrammatikZeile {
   station?: string
   /** Geplante Freischaltung (ms) – noch nicht bei den Lernenden */
   geplantAb?: number | null
+  /** Aus der Aufgabenbank (13.10.2026): Aufgaben werden in „Grammatikformen" gepflegt */
+  bank?: boolean
 }
 
 /** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
@@ -90,12 +94,12 @@ const ART_TEXT = (art: string | undefined, fuer?: { name: string }[]): string =>
 
 /** Grammatik-Fenster: Aufgaben bearbeiten | Lernstand und Einstellungen */
 export function GrammatikFenster({ id, schliessen, nurAufgaben }: { id: string; schliessen: () => void; nurAufgaben?: boolean }): React.JSX.Element {
-  const [d, setD] = useState<{ titel: string; paket: GrammatikPaket } | null>(null)
+  const [d, setD] = useState<{ titel: string; paket: GrammatikPaket; info?: { bank?: string[] } } | null>(null)
   const [paket, setPaket] = useState<GrammatikPaket | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const laden = useCallback(
     () =>
-      void holen<{ titel: string; paket: GrammatikPaket }>(`/server/grammatik/${id}`).then(
+      void holen<{ titel: string; paket: GrammatikPaket; info?: { bank?: string[] } }>(`/server/grammatik/${id}`).then(
         (r) => (setD(r), setPaket(r.paket)),
         (e: unknown) => notifyError(e)
       ),
@@ -120,6 +124,17 @@ export function GrammatikFenster({ id, schliessen, nurAufgaben }: { id: string; 
   }
   const editor = !paket ? (
     <Loader size="sm" />
+  ) : d?.info?.bank?.length ? (
+    // Aufgabenbank (13.10.2026): hier nur ansehen – geändert wird an der Form, dann gilt es in allen Kursen
+    <Stack data-grammatik-aus-bank>
+      <Alert color="blue" p="sm">
+        Diese Aufgaben sind an der Grammatikform hinterlegt. Ändern und ergänzen in der App „Grammatikformen“ (Grammatikpunkt anklicken → Übungsaufgaben) – die
+        Änderung gilt dann in allen Kursen.
+      </Alert>
+      <Text size="sm" c="dimmed">
+        {paket.aufgaben.length} Aufgaben in {paket.regeln.length} Teilbereichen: {paket.regeln.map((r) => r.titel).join(' · ')}
+      </Text>
+    </Stack>
   ) : (
     <Stack>
       <AufgabenEditor paket={paket} aendern={setPaket} />
@@ -487,12 +502,35 @@ export function KursGrammatik({
           <Text size="sm" fw={600} miw={22}>
             {g.aufgaben}
           </Text>
-          <Button size="compact-xs" variant="light" color="grape" leftSection={<IconPlus size={12} />} onClick={() => setMehr(g)} data-grammatik-mehr={g.id}>
-            Aufgaben
-          </Button>
-          <Button size="compact-xs" variant="default" leftSection={<IconPencil size={12} />} onClick={() => setBearbeiten(g.id)} data-grammatik-bearbeiten={g.id}>
-            Bearbeiten
-          </Button>
+          {g.bank ? (
+            <Tooltip label="An der Grammatikform hinterlegt – ändern in der App „Grammatikformen“">
+              <Badge variant="light" color="blue" tt="none" data-grammatik-bank={g.id}>
+                hinterlegt
+              </Badge>
+            </Tooltip>
+          ) : (
+            <>
+              <Button
+                size="compact-xs"
+                variant="light"
+                color="grape"
+                leftSection={<IconPlus size={12} />}
+                onClick={() => setMehr(g)}
+                data-grammatik-mehr={g.id}
+              >
+                Aufgaben
+              </Button>
+              <Button
+                size="compact-xs"
+                variant="default"
+                leftSection={<IconPencil size={12} />}
+                onClick={() => setBearbeiten(g.id)}
+                data-grammatik-bearbeiten={g.id}
+              >
+                Bearbeiten
+              </Button>
+            </>
+          )}
         </Group>
       </Table.Td>
       <Table.Td>{Math.round((g.bearbeitetSchnitt ?? 0) * 100)} %</Table.Td>
@@ -725,7 +763,13 @@ export function KursGrammatik({
                         <Button size="compact-xs" variant="light" onClick={() => ausfuehren('wiederherstellen', g)} data-grammatik-wiederherstellen={g.id}>
                           Wiederherstellen
                         </Button>
-                        <Button size="compact-xs" variant="subtle" color="red" onClick={() => setFrage({ was: 'loeschen', g })} data-grammatik-endgueltig={g.id}>
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => setFrage({ was: 'loeschen', g })}
+                          data-grammatik-endgueltig={g.id}
+                        >
                           Endgültig löschen
                         </Button>
                       </Group>

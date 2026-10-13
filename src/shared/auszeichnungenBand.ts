@@ -62,6 +62,21 @@ export function grammatikImBand(band: string): number | null {
   return s.size || null
 }
 
+/**
+ * Formen (Katalogthemen) eines Bands (13.10.2026, Medaille „Grammatik" nach dem Anteil des ganzen Bands): neu
+ * eingeführte Punkte, ohne Wiederholungen und optionale Trailer – Teilformen zählen zu ihrem Thema.
+ */
+export function grammatikFormenImBand(band: string): string[] {
+  const kapitel = LEHRWERK_GRAMMATIK[band]
+  if (!kapitel) return []
+  const s = new Set<string>()
+  for (const [k, stationen] of Object.entries(kapitel)) {
+    if (istOptional(k)) continue
+    for (const punkte of Object.values(stationen)) for (const p of punkte) if (!p.w) for (const t of p.t) s.add(t.split('/')[0])
+  }
+  return [...s]
+}
+
 /** Lateinisches Lehrwerk zu einem Namen („Pontes", „prima.nova") */
 export function lateinBuch(name: string): string | undefined {
   const n = norm(name)

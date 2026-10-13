@@ -55,6 +55,8 @@ export function grammatikHeute(
     .sort(
       (x, y) =>
         Math.floor(y.zeit / GLEICHE_FREIGABE_MS) - Math.floor(x.zeit / GLEICHE_FREIGABE_MS) ||
+        // Aufgabenbank (13.10.2026, abgestimmt): Teilbereiche der Reihe nach, darin erst Erkennen, dann Bilden …
+        (x.a.uebung && y.a.uebung ? (regelIndex.get(x.a.regelId) ?? 0) - (regelIndex.get(y.a.regelId) ?? 0) : 0) ||
         (x.a.stufe ?? 0) - (y.a.stufe ?? 0) ||
         (regelIndex.get(x.a.regelId) ?? 0) - (regelIndex.get(y.a.regelId) ?? 0) ||
         x.i - y.i

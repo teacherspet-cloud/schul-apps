@@ -13,6 +13,7 @@
  * grammatik-je-thema-2026-10-08: Kurs-Grammatik mit mehreren Themen in ein Training je Thema teilen (abgestimmt mit der
  * Lehrkraft; grammatikTeilen.ts). Die erste Gruppe behält die Kennung, der Lernstand zieht je Aufgabe mit um.
  */
+import { GRAMMATIK_ALLE } from './wartungGrammatikAlle'
 import type { DatabaseSync } from 'node:sqlite'
 import { fachSchreibweise } from '../shared/faecher'
 import { protokoll } from './diagnose'
@@ -164,7 +165,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Band je Vokabel-Abschnitt nachtragen (10.10.2026, mehrere Bände in einem Kurs; wartungVokabelBaende.ts)
   VOKABEL_BAENDE,
   // Medaillen der ersten Fassung als Reihe des Schuljahres 2026/27 (10.10.2026, Jahresreihen; wartungAuszeichnungenJahre.ts)
-  AUSZEICHNUNGEN_JAHRE
+  AUSZEICHNUNGEN_JAHRE,
+  // Alle bisherigen Grammatik-Trainings samt Lernstand löschen – Aufgabenbank statt Pools je Kurs (13.10.2026, von der Lehrkraft gewünscht; wartungGrammatikAlle.ts)
+  GRAMMATIK_ALLE
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

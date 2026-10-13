@@ -15,8 +15,16 @@
  *
  * Ältere Stände ohne `erster`: aus `versuche`/`falsch` abgeleitet – nie falsch → erster Versuch richtig, sonst
  * vorsichtig falsch; ohne `nachFehler` gilt kein späterer Fehler als offen.
+ *
+ * Aufgabenbank (13.10.2026, Entscheidung der Lehrkraft) – gilt, sobald die Aufgaben eine Übungsart tragen:
+ *  - Teilbereich sicher: Erkennen, Bilden und Anwenden JE mindestens 80 % beim ersten Versuch richtig, je mindestens
+ *    5 bearbeitet (bzw. alle, wenn es weniger gibt). Unterscheiden und Fehler finden zählen nicht.
+ *  - Zurückgestuft wird erst ab 2 offenen späteren Fehlern im Teilbereich.
+ *  - Schwäche: die Kernaufgaben zusammen unter 60 % (bei genug bearbeiteten).
+ *  - Form sicher (`formAusTeilen`): mindestens 80 % ihrer Teilbereiche sicher und keiner schwach.
  */
 import type { Urteil, WortStand } from './vokabeltrainer'
+import { FORM_TEILE_SICHER_AB, KERN_UEBUNGEN, MIN_JE_UEBUNG, SPAETER_FEHLER_AB, type Uebung } from './grammatikBank'
 
 export const SICHER_ERSTE_AB = 0.8
 export const SCHWAECHE_ERSTE_UNTER = 0.6
@@ -71,9 +79,10 @@ export interface FormBefund {
  * Befund einer Form aus ihrer Aufgabenreihe (alle Aufgaben der Regel, ggf. über mehrere Freigaben) und den Ständen der
  * Person. `stufe` 2/3 = Bilden-Aufgabe.
  */
-export function formBefund(aufgaben: readonly { id: string; stufe?: number }[], staende: Record<string, Stand | undefined>): FormBefund {
+export function formBefund(aufgaben: readonly { id: string; stufe?: number; uebung?: Uebung }[], staende: Record<string, Stand | undefined>): FormBefund {
   const gesehen = new Set<string>()
   const liste = aufgaben.filter((a) => (gesehen.has(a.id) ? false : (gesehen.add(a.id), true)))
+  if (liste.some((a) => a.uebung)) return teilBefund(liste, staende)
   let bearbeitet = 0
   let ersteRichtig = 0
   let nachFehler = false
@@ -103,6 +112,59 @@ export function formBefund(aufgaben: readonly { id: string; stufe?: number }[], 
   return { ampel, gesamt: liste.length, bearbeitet, ersteRichtig, quote, bilden, nachFehler }
 }
 
+/** Befund eines Teilbereichs der Aufgabenbank (13.10.2026): je Kern-Übungsart 80 %, Zusatz zählt nicht */
+function teilBefund(liste: readonly { id: string; uebung?: Uebung }[], staende: Record<string, Stand | undefined>): FormBefund {
+  const kern = liste.filter((a) => a.uebung && KERN_UEBUNGEN.includes(a.uebung))
+  let bearbeitet = 0
+  let ersteRichtig = 0
+  let offeneFehler = 0
+  const je = new Map<Uebung, { gesamt: number; bearbeitet: number; richtig: number }>()
+  for (const a of kern) {
+    const z = je.get(a.uebung!) ?? { gesamt: 0, bearbeitet: 0, richtig: 0 }
+    z.gesamt++
+    je.set(a.uebung!, z)
+    const s = staende[a.id]
+    const e = ersterVersuch(s)
+    if (!e) continue
+    z.bearbeitet++
+    bearbeitet++
+    if (e === 'r') {
+      z.richtig++
+      ersteRichtig++
+    }
+    if (spaeterFehlerOffen(s)) offeneFehler++
+  }
+  const quote = bearbeitet ? ersteRichtig / bearbeitet : 0
+  const genug = (z: { gesamt: number; bearbeitet: number }): boolean => z.bearbeitet >= Math.max(1, Math.min(MIN_JE_UEBUNG, z.gesamt))
+  const arten = [...je.values()]
+  const nachFehler = offeneFehler >= SPAETER_FEHLER_AB
+  const bilden = je.get('bilden')
+  let ampel: FormAmpel
+  if (!arten.length || !arten.every(genug)) ampel = bearbeitet >= Math.min(MIN_JE_UEBUNG, kern.length) && quote < SCHWAECHE_ERSTE_UNTER ? 'schwaeche' : 'wenig'
+  else if (quote < SCHWAECHE_ERSTE_UNTER) ampel = 'schwaeche'
+  else if (arten.every((z) => z.richtig / z.bearbeitet >= SICHER_ERSTE_AB) && !nachFehler) ampel = 'sicher'
+  else ampel = 'aufbau'
+  return {
+    ampel,
+    gesamt: kern.length,
+    bearbeitet,
+    ersteRichtig,
+    quote,
+    bilden: bilden ? { gesamt: bilden.gesamt, bearbeitet: bilden.bearbeitet, ersteRichtig: bilden.richtig } : null,
+    nachFehler
+  }
+}
+
+/**
+ * Form aus ihren Teilbereichen (13.10.2026): sicher, wenn mindestens 80 % der Teilbereiche sicher sind und keiner schwach;
+ * schwach, wenn einer schwach ist; noch nichts bearbeitet: wenig.
+ */
+export function formAusTeilen(teile: readonly FormAmpel[]): FormAmpel {
+  if (!teile.length || teile.every((a) => a === 'wenig')) return 'wenig'
+  if (teile.includes('schwaeche')) return 'schwaeche'
+  return teile.filter((a) => a === 'sicher').length / teile.length >= FORM_TEILE_SICHER_AB - 1e-9 ? 'sicher' : 'aufbau'
+}
+
 /** Kurzform: ist die Form sicher? */
-export const formSicher = (aufgaben: readonly { id: string; stufe?: number }[], staende: Record<string, Stand | undefined>): boolean =>
+export const formSicher = (aufgaben: readonly { id: string; stufe?: number; uebung?: Uebung }[], staende: Record<string, Stand | undefined>): boolean =>
   formBefund(aufgaben, staende).ampel === 'sicher'

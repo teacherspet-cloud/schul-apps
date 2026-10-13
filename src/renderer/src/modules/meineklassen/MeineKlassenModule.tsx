@@ -214,6 +214,8 @@ interface KlasseDetail {
     thema: string
     aufgaben: number
     regeln: number
+    /** Aus der Aufgabenbank (13.10.2026): „+ Aufgaben" nur in „Grammatikformen" */
+    bank?: boolean
     lernende: number
     aktiv7: number
     probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
@@ -1382,7 +1384,7 @@ function grammatikEintraege(liste: KlasseDetail['grammatik'], ort: Ort): Eintrag
         oeffnen={() => oeffneMitRueckweg('grammatiktraining', g.id)}
         aktionen={
           <>
-            {g.status === 'offen' && <MehrAufgabenKnopf g={g} />}
+            {g.status === 'offen' && !g.bank && <MehrAufgabenKnopf g={g} />}
             <AblegenKnopf quelle={grammatikQuelle(g.id, g.titel)} {...ort} programm="grammatiktest" klein />
             {oeffnenKnopf(g.titel, () => oeffneMitRueckweg('grammatiktraining', g.id))}
           </>
