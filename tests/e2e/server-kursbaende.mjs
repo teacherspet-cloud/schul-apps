@@ -172,14 +172,14 @@ try {
   const wB = (await get(`/server/vokabeln/${kursB}`)).woerter
   await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kursB, wortId: wB[0].id, uebung: 'karte', gewusst: true } })
 
-  // Jil Vogel (Klasse A) liegt bei einem Wort dreimal falsch – es wird Problemwort (Kasten „Abschnitte & Wörter")
+  // Jil Vogel (Klasse A) liegt bei einem Wort sechsmal falsch – es wird Problemwort (Kasten „Abschnitte & Wörter"; Stufe 3: ab 6 Abfragen)
   const jil = la.find((x) => x.name === 'Jil Vogel')
   const sj = await browser.newContext()
   await anmelden(sj, jil.benutzer, jil.passwort)
   await sj.request.post(`${A}/auth/passwort`, { form: { neu: 'NeuesPasswort-99', neu2: 'NeuesPasswort-99', ziel: '/s/' }, headers: { origin: A }, maxRedirects: 0 })
   const wA = (await get(`/server/vokabeln/${kursA}`)).woerter
   const problemWort = wA[0].id
-  for (let i = 0; i < 3; i++) await sj.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kursA, wortId: problemWort, uebung: 'frei', antwort: 'völlig falsch' } })
+  for (let i = 0; i < 6; i++) await sj.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: kursA, wortId: problemWort, uebung: 'frei', antwort: 'völlig falsch' } })
   pruefe((await get(`/server/vokabeln/${kursA}`)).problem?.some((x) => x.id === problemWort), 'Jils Fehler machen ein Problemwort')
 
   // ---------- Suche (Schnittstelle)

@@ -517,7 +517,8 @@ export function AbschnitteWoerter({
           data-vokabel-band={b.buch || 'ohne'}
           {...(alleBaende.length > 1 ? { offen: filter || bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
         >
-          <Stack gap={10}>
+          {/* Abstände (13.10.2026, Befund der Lehrkraft): Abschnitte 6 px, zwischen Units 16 px – die Unit-Überschrift gehört sichtbar zu ihren Abschnitten */}
+          <Stack gap={16}>
             {b.units.map((g) => {
               const schluessel = k(b.buch, g.unit)
               const auf = unitOffen(schluessel)
@@ -539,7 +540,7 @@ export function AbschnitteWoerter({
                     </Group>
                   </UnstyledButton>
                   {auf && (
-                    <Stack gap={4} mt={4} pl={{ base: 6, sm: 20 }}>
+                    <Stack gap={6} mt={6} pl={{ base: 6, sm: 20 }}>
                       {g.zeilen.map(abschnittZeile)}
                     </Stack>
                   )}
