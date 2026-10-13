@@ -123,8 +123,16 @@ export function fehlendeUebungen(zahl: BankZahlen[string] | undefined, entwurf?:
 }
 
 /**
+ * Felder (Schlüssel × Stufe), an denen gerade ein Auftrag schreibt (13.10.2026, Befund der Lehrkraft): „Unit gemischt"
+ * steht bei jedem Grammatikpunkt der Unit – wer nacheinander mehrere Punkte ergänzen lässt, stellt dieselbe gemischte
+ * Übung mehrfach in die Warteschlange. Ein späterer Schritt wartet auf den laufenden und prüft dann neu.
+ */
+const inArbeit = new Map<string, Promise<unknown>>()
+
+/**
  * KI-Aufgaben für mehrere Schlüssel im Hintergrund erzeugen (eine Anfrage je Schlüssel, nacheinander). Jeder fertige
- * Schlüssel liegt gleich als Entwurf bereit – bricht ein späterer ab, bleibt das Fertige.
+ * Schlüssel liegt gleich als Entwurf bereit – bricht ein späterer ab, bleibt das Fertige. Vor jedem Schritt wird neu
+ * geprüft, was noch fehlt (Bank und Entwürfe, auch aus früheren Schritten der Warteschlange) – Erledigtes entfällt.
  */
 export function bankErzeugenStarten(auftraege: (Omit<BankAuftrag, 'vorhanden'> & { vorhanden?: string[] })[], titel: string, docId = 'grammatikformen'): void {
   if (!auftraege.length) return
@@ -141,11 +149,34 @@ export function bankErzeugenStarten(auftraege: (Omit<BankAuftrag, 'vorhanden'> &
       let n = 0
       for (const [i, a] of liste.entries()) {
         k.melde(`${i + 1} von ${liste.length}: ${a.titel} …`)
+        const feld = `${a.schluessel}|${a.niveau ?? 'm'}`
+        // Schreibt ein anderer Auftrag gerade an diesem Feld, erst sein Ergebnis abwarten
+        for (let w = inArbeit.get(feld); w; w = inArbeit.get(feld)) {
+          k.melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
+          await w.catch(() => undefined)
+        }
         // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
-        const da = a.vorhanden ?? (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben.map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120)) ?? []
-        const r = await erzeugeBankAufgaben({ ...a, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`))
-        bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
-        n += r.aufgaben.length
+        const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
+        // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)?
+        const entwurf = ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
+        const st = a.niveau ?? 'm'
+        const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
+        const uebungen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+        if (!uebungen.length) {
+          k.melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
+          continue
+        }
+        const da = a.vorhanden ?? bank.map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
+        const lauf = erzeugeBankAufgaben({ ...a, uebungen, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
+          bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
+          return r
+        })
+        inArbeit.set(feld, lauf)
+        try {
+          n += (await lauf).aufgaben.length
+        } finally {
+          if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
+        }
       }
       return n
     },
