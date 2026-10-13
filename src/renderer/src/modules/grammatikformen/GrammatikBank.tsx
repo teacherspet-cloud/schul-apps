@@ -34,6 +34,8 @@ import {
   AUFGABEN_JE_FELD,
   istKern,
   istMix,
+  aufgabeKern,
+  ohneDoppelte,
   mixSchluessel,
   regelIdVon,
   STUFE_NAME,
@@ -471,8 +473,10 @@ function BankEditor({
         if (!aktiv) return
         const da = l[0]
         setRegel(da?.regel ?? entwurf?.regel ?? { titel: reiter.titel, erklaerung: '', beispiele: [] })
-        setAufgaben([...(da?.aufgaben ?? []), ...(entwurf?.aufgaben ?? [])])
-        setNeu(new Set(entwurf?.aufgaben.map((a) => a.id) ?? []))
+        // Entwurf ohne Dopplungen zur Bank (13.10.2026)
+        const frisch = ohneDoppelte(entwurf?.aufgaben ?? [], new Set((da?.aufgaben ?? []).map(aufgabeKern).filter(Boolean)))
+        setAufgaben([...(da?.aufgaben ?? []), ...frisch])
+        setNeu(new Set(frisch.map((a) => a.id)))
         setGeladen(true)
       },
       (e: unknown) => (notifyError(e), setGeladen(true))

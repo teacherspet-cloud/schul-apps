@@ -21,6 +21,7 @@ import {
   formVon,
   istStufe,
   istUebung,
+  ohneDoppelte,
   regelIdVon,
   schluesselGueltig,
   type BankAufgabe,
@@ -58,8 +59,40 @@ const db = () => {
     const spalten = new Set((d.prepare('PRAGMA table_info(gram_bank)').all() as { name: string }[]).map((s) => s.name))
     if (!spalten.has('niveau')) d.exec("ALTER TABLE gram_bank ADD COLUMN niveau TEXT NOT NULL DEFAULT 'm'")
     bereit = true
+    doppelteEinmal(d)
   }
   return d
+}
+
+/** Einmal (13.10.2026, Wunsch der Lehrkraft): Dopplungen in der Bank entfernen – beim ersten Zugriff, gemerkt in `wartung` */
+function doppelteEinmal(d: ReturnType<typeof datenbank>): void {
+  const name = 'grammatik-bank-doppelte-2026-10-13'
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(name)) return
+    const n = bankDoppelteEntfernen()
+    d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(name, new Date().toISOString())
+    protokolliereServer('grammatik', `WARTUNG ${name}: ${n} doppelte Bank-Aufgaben entfernt`)
+  } catch {
+    // Beim nächsten Start erneut
+  }
+}
+
+/** Je Schlüssel doppelte Aufgaben (gleicher Satz, gleiche Lösung) löschen – die erste bleibt; Kurse werden neu gebaut */
+export function bankDoppelteEntfernen(): number {
+  const schluessel = (db().prepare('SELECT DISTINCT schluessel FROM gram_bank').all() as { schluessel: string }[]).map((z) => z.schluessel)
+  let n = 0
+  const geaendert: string[] = []
+  for (const e of bankEintraege(schluessel)) {
+    const bleiben = new Set(ohneDoppelte(e.aufgaben).map((a) => a.id))
+    const weg = e.aufgaben.filter((a) => !bleiben.has(a.id))
+    if (!weg.length) continue
+    for (const a of weg) db().prepare('DELETE FROM gram_bank WHERE id = ?').run(a.id)
+    n += weg.length
+    geaendert.push(e.schluessel)
+  }
+  if (geaendert.length) kurseNeu(geaendert)
+  return n
 }
 export const bankZuruecksetzen = (): void => {
   bereit = false
@@ -167,7 +200,11 @@ function regelBereinigt(roh: unknown, schluessel: string): BankRegel {
  */
 export function bankSpeichern(sprache: string, schluessel: string, regelRoh: unknown, aufgabenRoh: unknown): { aufgaben: number } {
   const regel = regelBereinigt(regelRoh, schluessel)
-  const roh = (Array.isArray(aufgabenRoh) ? aufgabenRoh : []).slice(0, BANK_JE_SCHLUESSEL) as Record<string, unknown>[]
+  // Ohne Dopplungen (13.10.2026): gleicher Satz mit gleicher Lösung nur einmal
+  const roh = ohneDoppelte((Array.isArray(aufgabenRoh) ? aufgabenRoh : []) as { satz?: string; teile?: string[]; loesungen?: string[] }[]).slice(
+    0,
+    BANK_JE_SCHLUESSEL
+  ) as Record<string, unknown>[]
   const regelId = regelIdVon(schluessel)
   // Kennungen vorab festlegen: vorhandene „b…" behalten, sonst neu – paketBereinigt behält sie dann
   const fremd = new Set((db().prepare('SELECT id FROM gram_bank WHERE schluessel != ?').all(schluessel) as { id: string }[]).map((z) => z.id))

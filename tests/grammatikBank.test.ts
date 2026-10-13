@@ -186,6 +186,15 @@ describe('Aufgabenbank: Stufen und Namen (13.10.2026)', () => {
     expect(bankPaket('x', [e], ['g', 'm']).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3'])
     expect(bankPaket('x', [e]).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3', 'b1'])
   })
+  it('Dopplungen: gleicher Satz mit gleicher Lösung zählt einmal – auch gegen die Bank (13.10.2026)', async () => {
+    const { aufgabeKern, ohneDoppelte } = await import('../src/shared/grammatikBank')
+    const a = { ...aufgabe('x1', 'bilden'), satz: 'She ___ to school.', loesungen: ['goes'] }
+    const b = { ...aufgabe('x2', 'anwenden'), satz: 'she  ___ to school', loesungen: ['Goes'] }
+    const c = { ...aufgabe('x3', 'bilden'), satz: 'She ___ to school.', loesungen: ['went'] }
+    expect(aufgabeKern(a)).toBe(aufgabeKern(b))
+    expect(ohneDoppelte([a, b, c]).map((x) => x.id)).toEqual(['x1', 'x3'])
+    expect(ohneDoppelte([b, c], new Set([aufgabeKern(a)])).map((x) => x.id)).toEqual(['x3'])
+  })
   it('Förderreserve: Gymnasium übt mittel/anspruchsvoll, grundlegend nur bei Schwierigkeiten (13.10.2026)', async () => {
     const { foerderAusReserve } = await import('../src/shared/grammatikVorrang')
     const e = {

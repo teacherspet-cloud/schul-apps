@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { reiheTitel } from '@shared/lehrwerkReihe'
 import { schulformName } from '@shared/lehrwerkSchulform'
-import { notifyError } from '../../shared/util'
+import { notifyError, notifySuccess } from '../../shared/util'
+import { aufServer } from '../../shared/plattform'
 import { LANGUAGES } from '../vokabeltest/model/types'
 import { FachPunkt } from '../../shared/components/FachFarbe'
 import { LEHRWERK_GRAMMATIK, LEHRWERK_GRAMMATIK_EINGEBAUT, wendeGrammatikAn, type LehrwerkGrammatikEintrag } from '../../shared/lehrwerkGrammatik'
@@ -15,7 +16,7 @@ import LehrplanAnsicht from './LehrplanAnsicht'
 import { tonVoll, tonZart } from './farbton'
 import { useGrammatikFarbe } from './farbton'
 import { useBankZahlen } from './GrammatikBank'
-import { aufgabenAmpel, useSchulStufen } from './bank'
+import { aufgabenAmpel, entwuerfeBereinigen, useSchulStufen } from './bank'
 import { teilbereicheVon } from './grammatikformen'
 import type { BankZahlen, Stufe } from '@shared/grammatikBank'
 import { lateinBaende, zielAusDocId, type GrammatikformenZiel } from './grammatikformen'
@@ -91,6 +92,14 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
   const farbe = useGrammatikFarbe(sprache)
   const bank = useBankZahlen(sprache)
   const schulStufen = useSchulStufen()
+  // Dopplungen in den KI-Entwürfen entfernen (13.10.2026): was die Bank schon hat oder doppelt im Entwurf steht
+  useEffect(() => {
+    if (!aufServer()) return
+    entwuerfeBereinigen().then(
+      (n) => n > 0 && notifySuccess(`${n} doppelte ${n === 1 ? 'Aufgabe' : 'Aufgaben'} aus den Entwürfen zum Durchsehen entfernt.`),
+      () => undefined
+    )
+  }, [])
   // Latein (13.10.2026): die Lehrwerke aus der Lektionsübersicht der Verlage als Bände, sofern nicht eingelesen
   const alleBuecher = useMemo<TextbookMeta[]>(
     () => [

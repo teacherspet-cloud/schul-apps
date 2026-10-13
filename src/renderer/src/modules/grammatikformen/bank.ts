@@ -13,6 +13,8 @@ import {
   AUFGABEN_JE_FELD,
   stufeVon,
   STUFEN,
+  aufgabeKern,
+  ohneDoppelte,
   UEBUNGEN,
   type BankAufgabe,
   type BankEintrag,
@@ -67,13 +69,35 @@ export function speichereBankEntwuerfe(l: BankEntwurf[]): void {
   }
   window.dispatchEvent(new Event(EREIGNIS))
 }
-/** Entwurf ablegen – ein neuer zum selben Schlüssel kommt zu einem älteren dazu */
+/** Entwurf ablegen – ein neuer zum selben Schlüssel kommt zu einem älteren dazu (ohne Dopplungen, 13.10.2026) */
 export function bankEntwurfAblegen(e: BankEntwurf): void {
   const alle = ladeBankEntwuerfe()
   const alt = alle.find((x) => x.schluessel === e.schluessel)
-  const neu = alt ? { ...alt, aufgaben: [...alt.aufgaben, ...e.aufgaben], am: e.am } : e
+  const neu = alt ? { ...alt, aufgaben: ohneDoppelte([...alt.aufgaben, ...e.aufgaben]), am: e.am } : { ...e, aufgaben: ohneDoppelte(e.aufgaben) }
   speichereBankEntwuerfe([...alle.filter((x) => x.schluessel !== e.schluessel), neu])
 }
+/**
+ * Entwürfe bereinigen (13.10.2026, Wunsch der Lehrkraft: „Dopplungen zu den noch zur Durchsicht verfügbaren Aufgaben
+ * entfernen"): Aufgaben, die es in der Bank schon gibt oder die im Entwurf doppelt stehen, fallen weg; leere Entwürfe
+ * ganz. Liefert die Zahl entfernter Aufgaben. Läuft beim Öffnen von „Grammatikformen".
+ */
+export async function entwuerfeBereinigen(): Promise<number> {
+  const alle = ladeBankEntwuerfe()
+  if (!alle.length) return 0
+  const bank = new Map((await bankLesen(alle.map((e) => e.schluessel))).map((e) => [e.schluessel, e.aufgaben]))
+  let weg = 0
+  const neu = alle
+    .map((e) => {
+      const schon = new Set((bank.get(e.schluessel) ?? []).map(aufgabeKern).filter(Boolean))
+      const aufgaben = ohneDoppelte(e.aufgaben, schon)
+      weg += e.aufgaben.length - aufgaben.length
+      return { ...e, aufgaben }
+    })
+    .filter((e) => e.aufgaben.length)
+  if (weg || neu.length !== alle.length) speichereBankEntwuerfe(neu)
+  return weg
+}
+
 export const bankEntwurfWeg = (schluessel: string): void => speichereBankEntwuerfe(ladeBankEntwuerfe().filter((x) => x.schluessel !== schluessel))
 
 export function useBankEntwuerfe(): BankEntwurf[] {

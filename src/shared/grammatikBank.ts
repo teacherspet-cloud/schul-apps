@@ -88,6 +88,32 @@ export const stufenBereinigt = (x: unknown): Stufe[] | undefined => {
 
 // ---------------------------------------------------------------- Schlüssel
 
+/**
+ * Kern einer Aufgabe zum Erkennen von Dopplungen (13.10.2026, Wunsch der Lehrkraft): derselbe Satz (bzw. dieselben Teile)
+ * mit derselben ersten Lösung – unabhängig von Groß-/Kleinschreibung, Satzzeichen und Leerzeichen. Leer = nicht vergleichbar.
+ */
+export function aufgabeKern(a: { satz?: string; teile?: string[]; loesungen?: string[] }): string {
+  const n = (s: unknown): string =>
+    String(s ?? '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+  const text = n(a.satz) || n((a.teile ?? []).join(' '))
+  return text ? `${text}|${n(a.loesungen?.[0])}` : ''
+}
+
+/** Ohne Dopplungen (die erste bleibt); `schon` = Kerne, die es anderswo schon gibt (z. B. in der Bank) */
+export function ohneDoppelte<T extends { satz?: string; teile?: string[]; loesungen?: string[] }>(l: readonly T[], schon: Set<string> = new Set()): T[] {
+  const da = new Set(schon)
+  return l.filter((a) => {
+    const k = aufgabeKern(a)
+    if (!k) return true
+    if (da.has(k)) return false
+    da.add(k)
+    return true
+  })
+}
+
 export const MIX = 'mix:'
 export const UNIT = 'unit:'
 /** Gemischte Aufgaben eines Grammatikpunkts: seine Kennungen (sortiert) */
