@@ -78,7 +78,17 @@ import { kursFuerLernende } from '../shared/freigabePlan'
 import { geplantAb, kennungenVon, nachFreigabe, nochGeplant } from './freigabePlan'
 import { zugangPlan } from './planen'
 import { bankEintraege, bankMixe, beiBankAenderung } from './grammatikBank'
-import { bankPaket, formVon, istKern, mixKennungen, schluesselGueltig, unitVon } from '../shared/grammatikBank'
+import {
+  bankPaket,
+  formVon,
+  istKern,
+  mixKennungen,
+  schluesselGueltig,
+  stufenBereinigt,
+  stufenFuerSchulform,
+  unitVon,
+  type Stufe
+} from '../shared/grammatikBank'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS gram_zuweisungen (
@@ -183,6 +193,8 @@ export interface GrammatikInfo {
    * Bank gebaut und nach jeder Änderung dort neu (grammatikBank.ts); Bearbeiten nur in der App „Grammatikformen".
    */
   bank?: string[]
+  /** Stufen der Aufgaben im Kurs (13.10.2026): nach Schulform vorbelegt, je Kurs änderbar */
+  stufen?: Stufe[]
 }
 export function infoBereinigt(roh: unknown): GrammatikInfo {
   const r = (roh ?? {}) as Record<string, unknown>
@@ -202,7 +214,8 @@ export function infoBereinigt(roh: unknown): GrammatikInfo {
       ? { lehrwerk: { buch: lw.buch.slice(0, 80), ...(typeof lw.unit === 'string' ? { unit: lw.unit.slice(0, 80) } : {}) } }
       : {}),
     ...(liste(r.fuerRegeln, 6).length ? { fuerRegeln: liste(r.fuerRegeln, 6) } : {}),
-    ...(Array.isArray(r.bank) && r.bank.some(schluesselGueltig) ? { bank: [...new Set(r.bank.filter(schluesselGueltig))].slice(0, 80) } : {})
+    ...(Array.isArray(r.bank) && r.bank.some(schluesselGueltig) ? { bank: [...new Set(r.bank.filter(schluesselGueltig))].slice(0, 80) } : {}),
+    ...(stufenBereinigt(r.stufen) ? { stufen: stufenBereinigt(r.stufen) } : {})
   }
 }
 const infoVon = (z: Zeile): GrammatikInfo => infoBereinigt(json_(z.info, {}))
@@ -1105,7 +1118,17 @@ export function grammatikAnlegen(f: {
 // ---------------------------------------------------------------- Aufgabenbank (13.10.2026, abgestimmt)
 
 /** Paket eines Trainings aus den hinterlegten Aufgaben (shared/grammatikBank.ts `bankPaket`) */
-const paketAusBank = (titel: string, schluessel: readonly string[]): GrammatikPaket => bankPaket(titel, bankEintraege(schluessel))
+const paketAusBank = (titel: string, schluessel: readonly string[], stufen?: readonly Stufe[]): GrammatikPaket =>
+  bankPaket(titel, bankEintraege(schluessel), stufen)
+
+/** Stufen eines Kurses: was die Lehrkraft je Kurs gewählt hat (an seiner Bank-Grammatik), sonst nach Schulform */
+function kursStufen(lehrkraftId: string, vokId: string): Stufe[] {
+  for (const z of db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = ?').all(lehrkraftId, vokId) as unknown as Zeile[]) {
+    const st = infoVon(z).stufen
+    if (st?.length && infoVon(z).bank?.length) return st
+  }
+  return stufenFuerSchulform(schulOrtVon(lehrkraftId).schulform)
+}
 
 /** Formen (Katalogthemen) einer gemischten Wiederholung je Unit aus der Lehrwerk-Liste */
 function unitFormen(schluessel: string): string[] {
@@ -1157,7 +1180,10 @@ function mixeZuweisen(lehrkraftId: string, vokId: string): string[] {
     const e = bankEintraege([m])[0]
     if (!e?.aufgaben.length) continue
     const titel = e.regel.titel || 'Gemischte Übung'
-    ids.push(bankTrainingAnlegen(lehrkraftId, vok, titel, paketAusBank(titel, [m]), { themen: [], teilformen: [], bank: [m] }))
+    const stufen = kursStufen(lehrkraftId, vokId)
+    const paket = paketAusBank(titel, [m], stufen)
+    if (!paket.aufgaben.length) continue
+    ids.push(bankTrainingAnlegen(lehrkraftId, vok, titel, paket, { themen: [], teilformen: [], bank: [m], stufen }))
   }
   return ids
 }
@@ -1177,7 +1203,7 @@ export function bankKurseNeu(schluessel: string[]): number {
     if (!bank.some((x) => s.has(x))) continue
     db()
       .prepare('UPDATE gram_zuweisungen SET paket = ? WHERE id = ?')
-      .run(JSON.stringify(paketAusBank(z.thema || z.titel, bank)), z.id)
+      .run(JSON.stringify(paketAusBank(z.thema || z.titel, bank, infoVon(z).stufen)), z.id)
     n++
   }
   if (schluessel.some((x) => !formVon(x))) for (const [vokId, lk] of kurse) n += mixeZuweisen(lk, vokId).length
@@ -1200,13 +1226,14 @@ export function ausBankZuweisen(
   ).filter((z) => !istExtra(z))
   const ids: string[] = []
   const leer: string[] = []
+  const stufen = info0.stufen ?? kursStufen(lehrkraftId, vok.id)
   for (const f of formen) {
-    const paket = paketAusBank(f.titel, f.teile)
+    const paket = paketAusBank(f.titel, f.teile, stufen)
     if (!paket.aufgaben.length) {
       leer.push(f.thema)
       continue
     }
-    const info: GrammatikInfo = { ...info0, themen: [f.thema], teilformen: f.teile.filter((t) => t.includes('/')), bank: f.teile }
+    const info: GrammatikInfo = { ...info0, themen: [f.thema], teilformen: f.teile.filter((t) => t.includes('/')), bank: f.teile, stufen }
     const alt = vorhanden.find((z) => infoVon(z).themen.includes(f.thema))
     if (alt) {
       db()
@@ -1491,6 +1518,29 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .run(gid, ich.id, buch, unit)
       }
       return json(res, 200, { ok: true }), true
+    }
+    // Stufen eines Kurses ändern (13.10.2026): gilt für alle Bank-Trainings des Kurses, Pakete neu gebaut
+    if (req.method === 'POST' && teile[0] === 'kurs-stufen') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const vok = vokZeile(String(k0.vokId ?? ''))
+      if (!vok || vok.lehrkraft_id !== ich.id) return json(res, 400, { fehler: 'Bitte einen eigenen Kurs wählen.' }), true
+      const stufen = stufenBereinigt(k0.stufen)
+      if (!stufen) return json(res, 400, { fehler: 'Bitte mindestens eine Stufe wählen.' }), true
+      let n = 0
+      for (const z of db().prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND vok_id = ?').all(ich.id, vok.id) as unknown as Zeile[]) {
+        const info = infoVon(z)
+        if (!info.bank?.length) continue
+        db()
+          .prepare('UPDATE gram_zuweisungen SET paket = ?, info = ? WHERE id = ?')
+          .run(JSON.stringify(paketAusBank(z.thema || z.titel, info.bank, stufen)), JSON.stringify(infoBereinigt({ ...info, stufen })), z.id)
+        n++
+      }
+      return json(res, 200, { stufen, trainings: n }), true
+    }
+    if (req.method === 'GET' && teile[0] === 'kurs-stufen') {
+      const vok = vokZeile(String(url.searchParams.get('vokId') ?? ''))
+      if (!vok || vok.lehrkraft_id !== ich.id) return json(res, 400, { fehler: 'Bitte einen eigenen Kurs wählen.' }), true
+      return json(res, 200, { stufen: kursStufen(ich.id, vok.id), schulform: stufenFuerSchulform(schulOrtVon(ich.id).schulform) }), true
     }
     if (req.method === 'POST' && teile[0] === 'aus-bank') {
       const k0 = (await k.koerper()) as Record<string, unknown>

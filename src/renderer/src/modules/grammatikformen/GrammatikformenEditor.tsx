@@ -50,7 +50,7 @@ import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import { useExperte } from '../../shared/settingsStore'
 import { BankKarte, useBankZahlen } from './GrammatikBank'
 import { AMPEL_FARBE, AMPEL_TEXT, tonHell, tonText, tonVoll, tonZart, useGrammatikFarbe, type AufgabenAmpel } from './farbton'
-import { aufgabenAmpel } from './bank'
+import { aufgabenAmpel, useSchulStufen } from './bank'
 import { aufServer } from '../../shared/plattform'
 import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
 import type { BankZahlen } from '@shared/grammatikBank'
@@ -80,6 +80,8 @@ import {
   type Vorschlag,
   teilbereicheVon,
   zielIndex,
+  stichwoerterJeLektion,
+  stichwortZuordnung,
   type GrammatikformenZiel
 } from './grammatikformen'
 
@@ -129,6 +131,7 @@ export default function GrammatikformenEditor({
   const experte = useExperte()
   // Aufgabenbank (13.10.2026): Zahlen je Teilbereich und Übungsart für das Pop-up
   const bank = useBankZahlen(buch.language)
+  const schulStufen = useSchulStufen()
   const ausgangsBand = (): LehrwerkGrammatikBand => kopie(eintrag?.kapitel ?? LEHRWERK_GRAMMATIK[buch.name] ?? {})
   const [band, setBand] = useState<LehrwerkGrammatikBand>(ausgangsBand)
   const [dirty, setDirty] = useState(false)
@@ -219,6 +222,42 @@ export default function GrammatikformenEditor({
   }
 
   /** Schulbuchseiten → KI-Vorschläge (nur Vorschläge; nichts wird ohne Abhaken übernommen) */
+  /*
+   * Latein-Lehrwerke (13.10.2026, abgestimmt): Grammatik aus der Lektionsübersicht des Verlags (lehrwerkeLatein.ts) –
+   * eindeutige Stichwörter gleich zugeordnet, die übrigen ordnet die KI zu. Alles erscheint als Vorschlag zum Durchsehen.
+   */
+  const stichwoerter = stichwoerterJeLektion(buch.name)
+  const ausStichwoertern = async (): Promise<void> => {
+    setKiOffen(true)
+    try {
+      const { sicher, rest } = stichwortZuordnung(stichwoerter, fach)
+      let ki: unknown[] = []
+      if (rest.length) {
+        setLiest(`Die KI ordnet ${rest.length} Stichwörter zu …`)
+        const auftrag = vorschlagAuftrag(buch.name, buch, fach, fachName)
+        const roh = await window.api.ai.structured<{ vorschlaege?: unknown[] }>({
+          system: auftrag.system.replace('Grundlage sind die hochgeladenen Seiten', 'Grundlage ist die Lektionsübersicht des Verlags'),
+          user: `${
+            auftrag.user
+          }\n\nSTICHWÖRTER JE LEKTION (Lektionsübersicht des Verlags; je Stichwort höchstens ein Vorschlag, abschnitt ""; fundstelle „Lektionsübersicht des Verlags"):\n${rest
+            .map((r) => `${r.unit}: ${r.stichwort}`)
+            .join('\n')}`,
+          schemaName: 'grammatikformen_vorschlaege',
+          schema: VORSCHLAG_SCHEMA
+        })
+        ki = roh?.vorschlaege ?? []
+      }
+      const v = pruefeVorschlaege({ vorschlaege: [...sicher, ...ki] }, buch, band, fach)
+      if (!v.length) throw new Error('Keine Grammatik zuordenbar.')
+      setVorschlaege(v)
+    } catch (e) {
+      notifyError(e)
+      setKiOffen(false)
+    } finally {
+      setLiest(null)
+    }
+  }
+
   const seitenLesen = async (dateien: File[]): Promise<void> => {
     try {
       const gelesen = []
@@ -305,6 +344,17 @@ export default function GrammatikformenEditor({
             <IconSparkles size={18} />
           </ActionIcon>
         )}
+        {darf && stichwoerter.length > 0 && (
+          <Button
+            variant="light"
+            color={farbe}
+            leftSection={<IconSparkles size={16} />}
+            onClick={() => void ausStichwoertern()}
+            data-grammatikformen-stichwoerter
+          >
+            Aus Lektionsübersicht zuordnen
+          </Button>
+        )}
         <SchuelerAnsichtKnopf
           buch={buch}
           titel={buch.name}
@@ -345,7 +395,7 @@ export default function GrammatikformenEditor({
    * zum Umsortieren nur im Expertenmodus.
    */
   const ziehbar = darf && experte
-  const ampelVon = (p: LehrwerkGrammatikPunkt): AufgabenAmpel => aufgabenAmpel(teilbereicheVon(p.t), bank.zahlen)
+  const ampelVon = (p: LehrwerkGrammatikPunkt): AufgabenAmpel => aufgabenAmpel(teilbereicheVon(p.t), bank.zahlen, schulStufen)
   const mitAmpel = aufServer()
   const unitKarten = (
     <Stack gap="sm" data-grammatikformen-units>
@@ -924,7 +974,7 @@ function FormPillen({ punkt, fach, farbe }: { punkt: LehrwerkGrammatikPunkt; fac
  *    (Bezeichnung, Formen ändern, Wiederholung, Abschnitt, Reihenfolge).
  * Ohne Bearbeitungsrecht nur Ansicht.
  */
-function PunktFenster({
+export function PunktFenster({
   punkt,
   ort,
   buch,

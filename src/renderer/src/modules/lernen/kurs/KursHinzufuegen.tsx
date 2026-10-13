@@ -2,6 +2,7 @@
  * Vokabeln hinzufügen, Grammatik-Vorgabe und unregelmäßige Verben einer Liste (aus VokabelTraining.tsx herausgelöst am
  * 09.10.2026 – die gemeinsame Kursseite in Sprachenlernen und „Meine Klassen" braucht sie).
  */
+import { fachDerSprache } from '@shared/fachobleute'
 import { Button, Group, Modal, Stack, Text } from '@mantine/core'
 import { useState } from 'react'
 import type { GrammatikVorgabe } from '../GrammatikTraining'
@@ -27,7 +28,7 @@ export function grammatikVorgabe(
   klassenKurs?: boolean
 ): GrammatikVorgabe {
   const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const fach = sprache === 'la' ? 'latein' : 'englisch'
+  const fach = fachDerSprache(sprache || 'en')
   const id = norm(quelle?.lehrwerk ?? '')
   const buch = id
     ? lehrwerkeMitGrammatik(fach)
@@ -106,7 +107,9 @@ export function Hinzufuegen({ id, schliessen }: { id: string; schliessen: () => 
         {/* Zusammenfassung (10.10.2026): Abschnitte und Wörter der Auswahl */}
         <Text size="sm" fw={600} data-auswahl-zusammenfassung>
           {auswahl
-            ? `${((n) => `${n} ${n === 1 ? 'Abschnitt' : 'Abschnitte'}`)(auswahl.quelle?.abschnitte.length || auswahl.teile?.length || 1)} · ${auswahl.woerter.length} Wörter ausgewählt`
+            ? `${((n) => `${n} ${n === 1 ? 'Abschnitt' : 'Abschnitte'}`)(auswahl.quelle?.abschnitte.length || auswahl.teile?.length || 1)} · ${
+                auswahl.woerter.length
+              } Wörter ausgewählt`
             : 'Noch nichts ausgewählt'}
           {auswahl && (
             <Text span size="xs" c="dimmed" fw={400}>

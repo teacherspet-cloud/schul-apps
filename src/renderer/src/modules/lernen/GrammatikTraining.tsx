@@ -7,6 +7,7 @@
  *    freigeben. Freigegeben wird nie ungesehen.
  *  - Lernstand je Person (sicher / heute fällig / aktiv in den letzten 7 Tagen), Problemaufgaben, Regelkarten.
  */
+import { fachDerSprache } from '@shared/fachobleute'
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import {
@@ -48,7 +49,7 @@ import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { GRAMMAR_TOPICS, hasGrammar, teilformenAuftrag, teilformenFuer } from '../arbeitsblatt/didactics/grammar'
-import { AUFGABEN_JE_FELD, kernZahl, regelIdVon, UEBUNGEN, type BankZahlen } from '@shared/grammatikBank'
+import { AUFGABEN_JE_FELD, kernZahl, regelIdVon, UEBUNGEN, type BankZahlen, type Stufe } from '@shared/grammatikBank'
 import { BANK_EREIGNIS, bankSpeichern, bankZahlenLaden } from '../grammatikformen/bank'
 import { teilbereicheVon, teilHinweise, kennungLabel } from '../grammatikformen/grammatikformen'
 import { erzeugeBankAufgaben } from './grammatikBankErzeugen'
@@ -300,7 +301,11 @@ export interface GrammatikVorgabe {
 export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vorgabe?: GrammatikVorgabe }): React.JSX.Element {
   const faecher = useSprachFaecher()
   const { settings } = useAppSettings()
-  const [fachId, setFachId] = useState<string | null>((vorgabe?.sprache && faecher.find((f) => f.sprache === vorgabe.sprache)?.id) || (faecher[0]?.id ?? null))
+  // Fach des Kurses: zuerst das Fach der Sprache (de → Deutsch, nicht DaZ; 13.10.2026), sonst das erste mit dieser Sprache
+  const [fachId, setFachId] = useState<string | null>(
+    (vorgabe?.sprache && (faecher.find((f) => f.id === fachDerSprache(vorgabe.sprache!))?.id ?? faecher.find((f) => f.sprache === vorgabe.sprache)?.id)) ||
+      (faecher[0]?.id ?? null)
+  )
   const [jahrgang, setJahrgang] = useState<number>(6)
   const [themenIds, setThemenIds] = useState<string[]>([])
   const [eigenes, setEigenes] = useState('')
@@ -395,7 +400,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
           holen<VorwahlDaten>(`/server/klassen/vorwahl?kurs=${encodeURIComponent(vorgabe.vokId)}`),
           window.api.textbooks.list()
         ])
-        const fachKennung = d.sprache === 'la' ? 'latein' : 'englisch'
+        const fachKennung = fachDerSprache(d.sprache || 'en')
         const buch = vorwahlBuch(d, buecher, { land: settings.defaults?.stateId, schulform: settings.defaults?.schoolTypeId })
         const band = buch
           ? lehrwerkeMitGrammatik(fachKennung)
@@ -427,11 +432,17 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
   }, [vorgabe?.vokId]) // eslint-disable-line react-hooks/exhaustive-deps
   // Aufgabenbank (13.10.2026): Was schon hinterlegt ist, wird ohne KI zugewiesen
   const [bankZahlen, setBankZahlen] = useState<BankZahlen | null>(null)
+  // Stufen des Kurses (13.10.2026): nach Schulform bzw. wie im Kurs gewählt – die KI schreibt nur für diese
+  const [kursStufen, setKursStufen] = useState<Stufe[]>(['m'])
   useEffect(() => {
     if (!vorgabe || !fach?.sprache) return
     bankZahlenLaden(fach.sprache).then(
       (r) => setBankZahlen(r.zahlen),
       () => setBankZahlen({})
+    )
+    holen<{ stufen: Stufe[] }>(`/server/grammatik/kurs-stufen?vokId=${encodeURIComponent(vorgabe.vokId)}`).then(
+      (r) => r.stufen?.length && setKursStufen(r.stufen),
+      () => undefined
     )
   }, [vorgabe?.vokId, fach?.sprache]) // eslint-disable-line react-hooks/exhaustive-deps
   const lehrwerkVorwahl = kursLehrwerk ?? vorgabe?.lehrwerk
@@ -575,16 +586,22 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
         docId: kursGrammatikDocId(vokIdKurs),
         titel: bankTitel,
         art: 'Grammatikaufgaben',
-        eingabe: { formen: ohneBank, fach: fach.label, sprache: fach.sprache, jahrgang },
+        eingabe: { formen: ohneBank, fach: fach.label, sprache: fach.sprache, jahrgang, stufen: kursStufen },
         sperrt: false,
         fehlerTitel: 'Aufgaben konnten nicht erstellt werden',
         arbeit: async (e, k) => {
           const regeln: GrammatikPaket['regeln'] = []
           const aufgaben: GrammatikPaket['aufgaben'] = []
           const teile = e.formen.flatMap((f) => f.teile)
-          for (const [i, teil] of teile.entries()) {
+          // Je Teilbereich und Stufe des Kurses eine Anfrage; die Regelkarte entsteht mit der ersten
+          const schritte = teile.flatMap((teil) => e.stufen.map((st) => ({ teil, st })))
+          const regelVon = new Map<string, GrammatikPaket['regeln'][number]>()
+          for (const [i, { teil, st }] of schritte.entries()) {
+            const vorher = regelVon.get(teil)
             const r = await erzeugeBankAufgaben(
               {
+                niveau: st,
+                ...(vorher ? { regel: { titel: vorher.titel, erklaerung: vorher.erklaerung, beispiele: vorher.beispiele } } : {}),
                 schluessel: teil,
                 titel: kennungLabel(teil),
                 fach: e.fach,
@@ -600,10 +617,14 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                 vorhanden: []
               },
               k.ai,
-              (t) => k.melde(`${i + 1} von ${teile.length}: ${t}`)
+              (t) => k.melde(`${i + 1} von ${schritte.length}: ${t}`)
             )
             const id = regelIdVon(teil)
-            regeln.push({ id, ...r.regel, erklaerung: r.regel.erklaerung || r.regel.titel, kennung: teil })
+            if (!vorher) {
+              const regel = { id, ...r.regel, erklaerung: r.regel.erklaerung || r.regel.titel, kennung: teil }
+              regelVon.set(teil, regel)
+              regeln.push(regel)
+            }
             aufgaben.push(...r.aufgaben.map((a) => ({ ...a, regelId: id })))
           }
           return { thema: bankTitel, regeln, aufgaben } as GrammatikPaket

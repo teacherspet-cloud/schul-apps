@@ -449,6 +449,8 @@ export function titelFuerSprache(sprache: string, stufe: number, wahl: TitelWahl
 // ---------------------------------------------------------------- Sprachen
 
 const SPRACH_NAMEN: Record<string, string> = {
+  // Deutsch (13.10.2026): Grammatik-Kurse in Deutsch
+  de: 'Deutsch',
   en: 'Englisch',
   fr: 'Französisch',
   es: 'Spanisch',

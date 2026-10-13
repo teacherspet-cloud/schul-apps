@@ -7,7 +7,18 @@
  */
 import type { StructuredRequest } from '@shared/types'
 import { paketBereinigt, BANK_GRENZEN, type GrammatikPaket } from '@shared/grammatiktrainer'
-import { istUebung, regelIdVon, UEBUNG_ARTEN, UEBUNG_NAME, UEBUNG_TEXT, type BankAufgabe, type BankRegel, type Uebung } from '@shared/grammatikBank'
+import {
+  istUebung,
+  regelIdVon,
+  STUFE_TEXT,
+  UEBUNG_ARTEN,
+  UEBUNG_NAME,
+  UEBUNG_TEXT,
+  type BankAufgabe,
+  type BankRegel,
+  type Stufe,
+  type Uebung
+} from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
@@ -37,6 +48,8 @@ export interface BankAuftrag {
   /** Welche Übungsarten und wie viele je Art */
   uebungen: Uebung[]
   anzahl: number
+  /** Stufe der Aufgaben (13.10.2026): grundlegend, mittel, anspruchsvoll – ohne Angabe mittel */
+  niveau?: Stufe
   /** Gemischt: die Formen, die zusammen geübt werden (Bezeichnungen) */
   formen?: string[]
   /** Katalogkennungen der Formen (ihre Zeitformen sind erlaubt) */
@@ -83,8 +96,11 @@ export async function erzeugeBankAufgaben(
         : 'Regelkarte: EINE kurze Karte – Titel, Erklärung in 2–4 Sätzen auf Deutsch (altersgerecht), 2–3 Beispiele in der Zielsprache.',
       `Aufgaben: je Übungsart GENAU ${anzahl}, jede mit „uebung":`,
       ...uebungen.map((u) => `- ${u} (${UEBUNG_NAME[u]}): ${UEBUNG_TEXT[u]}${latein ? '' : `; Aufgabenarten: ${UEBUNG_ARTEN[u].join(', ')}`}`),
+      `SCHWIERIGKEIT dieser Aufgaben: ${STUFE_TEXT[a.niveau ?? 'm']} – relativ zum Niveau der Klasse.`,
       'Innerhalb jeder Übungsart vom Leichteren zum Schwereren.',
-      latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : niveauRegel(a, ger),
+      latein
+        ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
+        : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
       'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an (z. B. Kurz- und Langform).',
       'Auswahl: 3–4 Möglichkeiten in „optionen", die richtige dabei, die anderen typische Fehlformen.',
@@ -149,5 +165,8 @@ export async function erzeugeBankAufgaben(
     latein ? undefined : ger
   )
   const ohne = ohneGesperrteZeitformen(geprueft, gesperrt)
-  return { regel, aufgaben: ohne.aufgaben.filter((x): x is BankAufgabe => istUebung(x.uebung)).map((x, i) => ({ ...x, id: neueKennung(i) })) }
+  return {
+    regel,
+    aufgaben: ohne.aufgaben.filter((x): x is BankAufgabe => istUebung(x.uebung)).map((x, i) => ({ ...x, id: neueKennung(i), niveau: a.niveau ?? 'm' }))
+  }
 }

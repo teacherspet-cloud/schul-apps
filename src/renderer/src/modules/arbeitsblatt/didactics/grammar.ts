@@ -230,6 +230,20 @@ function fenster(t: GrammarTopic, query: GrammarQuery, sequence: LanguageSequenc
   return { start, end, belegt: false }
 }
 
+/**
+ * Jahrgang (Deutsch) bzw. Lernjahr (Fremdsprachen), in dem ein Thema für Land und Schulform eingeführt wird – null, wenn
+ * es dort entfällt (13.10.2026, Regal „Nach Lehrplan" in Grammatikformen). Haupt-/Mittelschule ohne belegte Abweichung
+ * ein Jahr später, wie bei `topicFits`.
+ */
+export function einfuehrungsStufe(t: GrammarTopic, query: Omit<GrammarQuery, 'grade'> & { grade?: number }): number | null {
+  const q = { ...query, grade: query.grade ?? 7 }
+  const sequence = q.sequence ?? defaultSequence(t.subject, q.grade)
+  if (t.scale === 'erwerbsstufe') return t.from
+  const f = fenster(t, q, sequence)
+  if (!f) return null
+  return f.start + (!f.belegt && REDUCED.includes(q.schoolTypeId ?? '') ? 1 : 0)
+}
+
 /** Passt ein Thema zur Lerngruppe? */
 export function topicFits(t: GrammarTopic, query: GrammarQuery): boolean {
   const { grade, schoolTypeId = '', stateId = '' } = query
@@ -263,10 +277,10 @@ export function abweichungsHinweis(t: GrammarTopic, query: GrammarQuery): string
   const was = a.entfaellt
     ? 'im Lehrplan dieser Schulform nicht genannt'
     : a.from !== undefined
-      ? `dort ${skala} ${a.to === undefined || a.from === a.to ? a.from : `${a.from}–${a.to}`}`
-      : a.niveau
-        ? `dort auf ${a.niveau}`
-        : ''
+    ? `dort ${skala} ${a.to === undefined || a.from === a.to ? a.from : `${a.from}–${a.to}`}`
+    : a.niveau
+    ? `dort auf ${a.niveau}`
+    : ''
   return [wo && `${wo}:`, was, a.nurErkennen ? '(nur erkennen)' : '', a.fakultativ ? '(Wahlinhalt)' : '', a.hinweis ? `– ${a.hinweis}` : '']
     .filter(Boolean)
     .join(' ')
@@ -305,8 +319,8 @@ export function teilformenFuer(t: GrammarTopic, query: GrammarQuery): { teil: Gr
       eigene?.from !== undefined
         ? eigene.from
         : t.scale === 'jahrgang'
-          ? teil.from + versatz
-          : topicStart({ ...t, from: teil.from, lateStart: undefined }, sequence) + versatz
+        ? teil.from + versatz
+        : topicStart({ ...t, from: teil.from, lateStart: undefined }, sequence) + versatz
     if (now < von + shift) return { teil, status: 'spaeter' as const }
     const ueber = t.scale === 'lernjahr' && teil.bilden && query.cefrLevel ? ueberNiveau({ level: teil.bilden }, query.cefrLevel) : false
     const erkennen = teil.nurErkennen || eigene?.nurErkennen || ueber

@@ -72,6 +72,8 @@ export interface GrammatikAufgabe {
   stufe?: 1 | 2 | 3
   /** Aufgabenbank (13.10.2026): Übungsart – Erkennen, Bilden, Anwenden (Kern) oder Unterscheiden, Fehler finden (Zusatz) */
   uebung?: Uebung
+  /** Aufgabenbank (13.10.2026): Stufe – g grundlegend, m mittel (ohne Angabe), a anspruchsvoll */
+  niveau?: 'g' | 'm' | 'a'
   /** Hilfe vor der Antwort (Tipp-Knopf) */
   tipp?: string
   /** bestimmen: die Form (steht sie im `satz`, gilt nur die Lesart im Satz) */
@@ -191,7 +193,8 @@ export function paketBereinigt(
       ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {}),
       ...(y.stufe === 1 || y.stufe === 2 || y.stufe === 3 ? { stufe: y.stufe } : {}),
       ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {}),
-      ...(UEBUNG_WERTE.includes(String(y.uebung)) ? { uebung: y.uebung as Uebung } : {})
+      ...(UEBUNG_WERTE.includes(String(y.uebung)) ? { uebung: y.uebung as Uebung } : {}),
+      ...(y.niveau === 'g' || y.niveau === 'm' || y.niveau === 'a' ? { niveau: y.niveau } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
     if (art === 'bestimmen') {

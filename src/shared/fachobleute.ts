@@ -13,8 +13,11 @@
  */
 import { FACH_ZU_SPRACHE, fachVon } from './faecher'
 
-/** Fach eines Lehrwerks aus seiner Sprache („en" → „englisch"); unbekannt: die Sprache selbst */
-export const fachDerSprache = (sprache: string): string => FACH_ZU_SPRACHE[sprache] ?? sprache
+/**
+ * Fach eines Lehrwerks aus seiner Sprache („en" → „englisch"); unbekannt: die Sprache selbst. Deutsch („de") gehört seit
+ * 13.10.2026 zum Fach Deutsch (Grammatikformen und Aufgabenbank für Deutsch; DaZ-Formen bleiben dort gültig).
+ */
+export const fachDerSprache = (sprache: string): string => (sprache === 'de' ? 'deutsch' : FACH_ZU_SPRACHE[sprache] ?? sprache)
 
 /** Gültige, eindeutige Fachkennungen (nur Fächer des Katalogs) */
 export function pruefeFaecher(roh: unknown): string[] {

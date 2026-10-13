@@ -8,6 +8,7 @@ import {
   ActionIcon,
   Alert,
   Badge,
+  Chip,
   Button,
   Card,
   Checkbox,
@@ -29,6 +30,7 @@ import {
 import { IconChevronDown, IconDots, IconPencil, IconPlus, IconSearch, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { STUFE_NAME, STUFEN, type Stufe } from '@shared/grammatikBank'
 import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { starteAuftrag } from '../../../shared/auftraege'
@@ -81,6 +83,53 @@ export interface GrammatikZeile {
   geplantAb?: number | null
   /** Aus der Aufgabenbank (13.10.2026): Aufgaben werden in „Grammatikformen" gepflegt */
   bank?: boolean
+}
+
+/**
+ * Stufen der hinterlegten Aufgaben in diesem Kurs (13.10.2026, abgestimmt): nach Schulform vorbelegt (Hauptschule
+ * grundlegend, Gymnasium mittel + anspruchsvoll, sonst grundlegend + mittel), hier je Kurs änderbar – z. B. „anspruchsvoll"
+ * für einen E-Kurs. Gilt für alle Grammatik des Kurses aus der Aufgabenbank; der Lernstand bleibt.
+ */
+function KursStufen({ vokId, geaendert }: { vokId: string; geaendert: () => void }): React.JSX.Element | null {
+  const [stufen, setStufen] = useState<Stufe[] | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  useEffect(() => {
+    void holen<{ stufen: Stufe[] }>(`/server/grammatik/kurs-stufen?vokId=${encodeURIComponent(vokId)}`).then(
+      (r) => setStufen(r.stufen),
+      () => setStufen(null)
+    )
+  }, [vokId])
+  if (!stufen) return null
+  const setze = async (neu: Stufe[]): Promise<void> => {
+    if (!neu.length) return
+    setLaeuft(true)
+    try {
+      const r = await senden<{ stufen: Stufe[] }>('/server/grammatik/kurs-stufen', { vokId, stufen: neu })
+      setStufen(r.stufen)
+      notifySuccess(`Übungen jetzt: ${r.stufen.map((st) => STUFE_NAME[st]).join(', ')}.`)
+      geaendert()
+    } catch (e) {
+      notifyError(e, 'Nicht gespeichert')
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Group gap="xs" data-kurs-stufen>
+      <Text size="xs" c="dimmed">
+        Schwierigkeit der Übungen:
+      </Text>
+      <Chip.Group multiple value={stufen} onChange={(v) => void setze(STUFEN.filter((st) => v.includes(st)))}>
+        <Group gap={4}>
+          {STUFEN.map((st) => (
+            <Chip key={st} value={st} size="xs" disabled={laeuft} data-kurs-stufe={st}>
+              {STUFE_NAME[st]}
+            </Chip>
+          ))}
+        </Group>
+      </Chip.Group>
+    </Group>
+  )
 }
 
 /** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
@@ -595,6 +644,7 @@ export function KursGrammatik({
                 size="xs"
                 data-grammatik-suche
               />
+              {aktive.some((g) => g.bank) && <KursStufen vokId={vokId} geaendert={laden} />}
               <AktiveFilter spalten={spalten} tabelle={t} />
               <Table data-karten highlightOnHover data-grammatik-gruppe-tabelle>
                 <Table.Thead>

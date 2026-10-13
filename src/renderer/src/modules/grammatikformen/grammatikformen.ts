@@ -14,6 +14,7 @@
 import { GRAMMAR_TOPICS } from '../arbeitsblatt/didactics/grammar'
 import type { GrammarTopic } from '../arbeitsblatt/didactics/grammar'
 import { ABSCHNITT_FOLGE, type LehrwerkGrammatikBand, type LehrwerkGrammatikPunkt } from '../../shared/lehrwerkGrammatik'
+import { LEHRWERKE_LATEIN } from '../../shared/lehrwerkeLatein'
 
 /** Units und Abschnitte eines Lehrwerks (TextbookMeta) */
 export interface BuchGliederung {
@@ -33,13 +34,16 @@ export function kennungLabel(kennung: string): string {
   const t = themaZu(kennung)
   if (!t) return kennung
   const teil = kennung.includes('/') ? t.teilformen?.find((x) => x.id === kennung.split('/')[1]) : undefined
-  return teil ? `${t.label}: ${teil.label}` : t.label
+  // Ohne interne Verweise aus dem Katalog („– siehe la.syn.…", 13.10.2026)
+  const ohne = (s: string): string => s.replace(/\s*[–-]\s*siehe\s+[a-z]{2,3}\.[\w./-]+/gi, '').trim()
+  return teil ? `${ohne(t.label)}: ${ohne(teil.label)}` : ohne(t.label)
 }
 
 /** Gibt es die Kennung im Katalog (Thema bzw. Teilform des Themas)? */
 export function kennungGueltig(kennung: string, fach?: string): boolean {
   const t = themaZu(kennung)
-  if (!t || (fach && t.subject !== fach)) return false
+  // Deutsch: auch die DaZ-Formen gelten (Lehrwerke mit Sprache „de" sind teils DaZ-Bände)
+  if (!t || (fach && t.subject !== fach && !(fach === 'deutsch' && t.subject === 'daz'))) return false
   if (!kennung.includes('/')) return true
   return Boolean(t.teilformen?.some((x) => x.id === kennung.split('/')[1]))
 }
@@ -298,12 +302,30 @@ export function teilbereicheVon(kennungen: readonly string[]): string[] {
   return [...new Set(aus)]
 }
 
-/** Kurzname eines Teilbereichs im Reiter („Fragen"); ohne Teilform der Name des Themas */
-export function teilKurzname(kennung: string): string {
+/** Name eines Themas ohne Klammerzusatz („Adverbialsätze (Zweck, Einräumung …)" → „Adverbialsätze") – als Vorsilbe */
+const themaKurz = (label: string): string => label.replace(/\s*\([^)]*\)\s*/g, ' ').trim() || label
+
+/**
+ * Teilformen, die ohne ihr Thema nicht verständlich sind (13.10.2026, Befund der Lehrkraft: Reiter „mit be"): beginnen
+ * mit einem kleinen Verhältniswort („mit be", „als Pronomen …", „nach Präpositionen") oder sind ein einzelnes Wort.
+ */
+const brauchtThema = (teil: string): boolean => /^(mit|ohne|als|nach|bei|für|im|in|zur|zum|vor|auf|statt|kein|keine)\b/.test(teil) || !/\s/.test(teil.trim())
+
+/** Interne Verweise aus dem Katalog („– siehe la.syn.begehrsaetze") gehören nicht in die Oberfläche */
+const ohneVerweis = (s: string): string => s.replace(/\s*[–-]\s*siehe\s+[a-z]{2,3}\.[\w./-]+/gi, '').trim()
+
+/**
+ * Name eines Teilbereichs in den Übungsaufgaben: die Teilform allein („Fragen"), wenn sie für sich verständlich ist – sonst
+ * mit dem Thema davor, ohne dessen Klammerzusatz („Kurzantworten: mit be"). `mitThema` erzwingt die Vorsilbe (Punkt aus
+ * mehreren Themen). Ohne Teilform: der Name des Themas.
+ */
+export function teilKurzname(kennung: string, mitThema = false): string {
   const t = themaZu(kennung)
   if (!t) return kennung
   const teil = kennung.includes('/') ? t.teilformen?.find((x) => x.id === kennung.split('/')[1]) : undefined
-  return teil?.label ?? t.label
+  if (!teil) return ohneVerweis(t.label)
+  const name = ohneVerweis(teil.label)
+  return mitThema || brauchtThema(name) ? `${themaKurz(t.label)}: ${name}` : name
 }
 
 /** Angaben des Katalogs zu einem Teilbereich für die KI (erkennen/bilden, Beispiele, typische Fehler) */
@@ -354,4 +376,60 @@ export function zielIndex(punkte: readonly LehrwerkGrammatikPunkt[], z: Pick<Gra
   const gleich = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|')
   const i = z.kennungen.length ? punkte.findIndex((p) => gleich(p.t, z.kennungen)) : -1
   return i >= 0 ? i : punkte.findIndex((p) => p.text === z.text)
+}
+
+// ---------------------------------------------------------------- Latein-Lehrwerke (13.10.2026, abgestimmt)
+
+/** Lateinische Lehrwerke als Bände für Grammatikformen: Lektionen aus der Lektionsübersicht der Verlage (lehrwerkeLatein.ts) */
+export function lateinBaende(): { id: string; name: string; units: { name: string; sections: { name: string }[] }[] }[] {
+  return Object.entries(LEHRWERKE_LATEIN).map(([name, l]) => ({
+    id: `latein-${name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+$/, '')}`,
+    name,
+    units: Object.keys(l.kapitel).map((k) => ({ name: k, sections: [] }))
+  }))
+}
+
+/** Stichwörter der Grammatik je Lektion eines Lehrwerks (mit „; " getrennt in der Übersicht) */
+export function stichwoerterJeLektion(buchName: string): { unit: string; stichwort: string }[] {
+  const l = LEHRWERKE_LATEIN[buchName]
+  if (!l) return []
+  return Object.entries(l.kapitel).flatMap(([unit, k]) =>
+    String(k.grammatik ?? '')
+      .split(/\s*;\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((stichwort) => ({ unit, stichwort }))
+  )
+}
+
+const kern = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-zäöüß0-9]+/g, ' ')
+    .trim()
+
+/**
+ * Stichwörter den Katalogformen zuordnen (13.10.2026): EINDEUTIG ist nur, was genau einem Thema im Namen oder Fachbegriff
+ * gleicht – das wird direkt vorgeschlagen; alles Übrige geht an die KI. Vorschläge im Format der KI-Antwort
+ * (`pruefeVorschlaege`), Abschnitt '' (ganze Lektion).
+ */
+export function stichwortZuordnung(
+  eintraege: readonly { unit: string; stichwort: string }[],
+  fach: string
+): { sicher: { unit: string; abschnitt: string; text: string; kennungen: string[]; fundstelle: string }[]; rest: { unit: string; stichwort: string }[] } {
+  const themen = GRAMMAR_TOPICS.filter((t) => t.subject === fach)
+  const sicher: { unit: string; abschnitt: string; text: string; kennungen: string[]; fundstelle: string }[] = []
+  const rest: { unit: string; stichwort: string }[] = []
+  for (const e of eintraege) {
+    const k = kern(e.stichwort)
+    const treffer = k ? themen.filter((t) => kern(t.label) === k || (t.term && kern(t.term) === k)) : []
+    if (treffer.length === 1)
+      sicher.push({ unit: e.unit, abschnitt: '', text: e.stichwort, kennungen: [treffer[0].id], fundstelle: 'Lektionsübersicht des Verlags' })
+    else rest.push(e)
+  }
+  return { sicher, rest }
 }

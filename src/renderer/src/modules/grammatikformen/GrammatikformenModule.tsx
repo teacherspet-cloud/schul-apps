@@ -1,6 +1,6 @@
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { BandCover } from '../../shared/components/BandCover'
-import { Alert, Badge, Chip, Container, Group, Progress, ScrollArea, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { Button, Paper, Badge, Chip, Container, Group, Progress, ScrollArea, Stack, Text, Title, UnstyledButton } from '@mantine/core'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { reiheTitel } from '@shared/lehrwerkReihe'
@@ -11,12 +11,14 @@ import { FachPunkt } from '../../shared/components/FachFarbe'
 import { LEHRWERK_GRAMMATIK, LEHRWERK_GRAMMATIK_EINGEBAUT, wendeGrammatikAn, type LehrwerkGrammatikEintrag } from '../../shared/lehrwerkGrammatik'
 import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import GrammatikformenEditor from './GrammatikformenEditor'
+import LehrplanAnsicht from './LehrplanAnsicht'
+import { tonVoll, tonZart } from './farbton'
 import { useGrammatikFarbe } from './farbton'
 import { useBankZahlen } from './GrammatikBank'
-import { aufgabenAmpel } from './bank'
+import { aufgabenAmpel, useSchulStufen } from './bank'
 import { teilbereicheVon } from './grammatikformen'
-import type { BankZahlen } from '@shared/grammatikBank'
-import { zielAusDocId, type GrammatikformenZiel } from './grammatikformen'
+import type { BankZahlen, Stufe } from '@shared/grammatikBank'
+import { lateinBaende, zielAusDocId, type GrammatikformenZiel } from './grammatikformen'
 import { useDokumentOeffner } from '../../shared/navigation'
 
 const collator = new Intl.Collator('de', { numeric: true })
@@ -79,14 +81,27 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
     }
   }, [sprache])
 
+  // Deutsch und Latein immer (13.10.2026: Grammatikformen auch ohne Lehrwerk, Regal „Nach Lehrplan")
   const sprachen = useMemo(() => {
-    const da = new Set(books.map((b) => b.language))
-    return LANGUAGES.filter((l) => da.has(l.value)).map((l) => ({ value: l.value, label: l.label }))
+    const da = new Set([...books.map((b) => b.language), 'de', 'la'])
+    return LANGUAGES.filter((l) => da.has(l.value)).map((l) => ({ value: l.value, label: l.value === 'de' ? 'Deutsch' : l.label }))
   }, [books])
+  const [lehrplan, setLehrplan] = useState(false)
   // Fachfarbe und Stand der Übungsaufgaben (13.10.2026, abgestimmt)
   const farbe = useGrammatikFarbe(sprache)
   const bank = useBankZahlen(sprache)
-  const liste = books.filter((b) => b.language === sprache).sort((a, b) => collator.compare(a.name, b.name))
+  const schulStufen = useSchulStufen()
+  // Latein (13.10.2026): die Lehrwerke aus der Lektionsübersicht der Verlage als Bände, sofern nicht eingelesen
+  const alleBuecher = useMemo<TextbookMeta[]>(
+    () => [
+      ...books,
+      ...lateinBaende()
+        .filter((l) => !books.some((b) => b.language === 'la' && b.name === l.name))
+        .map((l) => ({ ...l, units: l.units.map((u) => ({ name: u.name, sections: [] })), language: 'la', reihe: l.name, entryCount: 0 }))
+    ],
+    [books]
+  )
+  const liste = alleBuecher.filter((b) => b.language === sprache).sort((a, b) => collator.compare(a.name, b.name))
   // Nach Reihe gruppiert, wie in den Vokabellisten
   const reihen = useMemo(() => {
     const m = new Map<string, TextbookMeta[]>()
@@ -97,7 +112,15 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
     return [...m.entries()]
   }, [liste])
 
-  const buch = offen ? books.find((b) => b.id === offen) : undefined
+  if (lehrplan)
+    return (
+      <ScrollArea h="100%">
+        <Container size="lg" py="lg">
+          <LehrplanAnsicht key={sprache} sprache={sprache} onBack={() => setLehrplan(false)} />
+        </Container>
+      </ScrollArea>
+    )
+  const buch = offen ? alleBuecher.find((b) => b.id === offen) : undefined
   if (buch)
     return (
       <ScrollArea h="100%">
@@ -105,7 +128,7 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
           <GrammatikformenEditor
             key={buch.id}
             buch={buch}
-            alle={books}
+            alle={alleBuecher}
             eintrag={eintraege.find((e) => e.lehrwerkId === buch.id)}
             ziel={ziel?.buchId === buch.id ? ziel : null}
             onBack={() => {
@@ -145,7 +168,31 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
             </Text>
           )}
         </Stack>
-        {!liste.length && <Alert color="gray">Für dieses Fach ist noch kein Lehrwerk hinterlegt. Lehrwerke kommen über „Vokabellisten“ dazu.</Alert>}
+        <Paper
+          withBorder
+          radius="lg"
+          p="md"
+          mb="lg"
+          style={{ borderLeft: `4px solid ${tonVoll(farbe)}`, background: tonZart(farbe) }}
+          data-grammatikformen-lehrplan-kachel
+        >
+          <Group justify="space-between" wrap="wrap" gap="sm">
+            <div>
+              <Text fw={700}>Nach Lehrplan</Text>
+              <Text size="sm" c="dimmed">
+                Alle Grammatikformen des Fachs nach Jahrgang – auch ohne Lehrwerk. Übungsaufgaben gelten für alle Lehrwerke.
+              </Text>
+            </div>
+            <Button color={farbe} variant="light" onClick={() => setLehrplan(true)} data-grammatikformen-lehrplan-oeffnen>
+              Öffnen
+            </Button>
+          </Group>
+        </Paper>
+        {!liste.length && (
+          <Text size="sm" c="dimmed" mb="md">
+            Für dieses Fach ist kein Lehrwerk hinterlegt – Lehrwerke kommen über „Vokabellisten“ dazu.
+          </Text>
+        )}
         <Stack gap={36}>
           {reihen.map(([reihe, baende]) => (
             <section key={reihe} data-grammatikformen-reihe={reihe}>
@@ -169,6 +216,7 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
                     buch={b}
                     farbe={farbe}
                     zahlen={bank.geladen ? bank.zahlen : null}
+                    stufen={schulStufen}
                     bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)}
                     onOpen={() => setOffen(b.id)}
                   />
@@ -187,6 +235,7 @@ function BandKachel({
   buch,
   farbe,
   zahlen,
+  stufen,
   bearbeitet,
   onOpen
 }: {
@@ -194,6 +243,7 @@ function BandKachel({
   farbe: string
   /** Aufgabenbank (nur am Server) – null: kein Balken */
   zahlen: BankZahlen | null
+  stufen: Stufe[]
   bearbeitet: boolean
   onOpen: () => void
 }): React.JSX.Element {
@@ -229,14 +279,14 @@ function BandKachel({
       {zahlen && zahl > 0 && (
         <div title="Formen mit Übungsaufgaben">
           <Progress
-            value={(punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen) !== 'keine').length / zahl) * 100}
+            value={(punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen, stufen) !== 'keine').length / zahl) * 100}
             size={4}
             color="teal"
             radius="xl"
             aria-label="Formen mit Übungsaufgaben"
           />
           <Text size="10px" c="dimmed" mt={2}>
-            Übungsaufgaben: {punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen) !== 'keine').length} von {zahl} Formen
+            Übungsaufgaben: {punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen, stufen) !== 'keine').length} von {zahl} Formen
           </Text>
         </div>
       )}

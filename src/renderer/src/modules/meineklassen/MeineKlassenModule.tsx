@@ -137,6 +137,8 @@ interface KlasseDetail {
   fach: string
   titel: string
   sprachfach: boolean
+  /** Deutsch (13.10.2026): Grammatik ohne Vokabeln – fehlt bei älteren Servern (dann wie Sprachfach) */
+  vokabelfach?: boolean
   ablageMuster: string
   /** Aus IServ erkannt: Name der IServ-Gruppe = ihr Gruppenordner (10.10.2026) */
   iserv?: IservAngabe | null
@@ -369,7 +371,9 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
       const d = await holen<{ klassen: KlasseKurz[] }>('/server/klassen')
       setKlassen(d.klassen)
       const k = d.klassen.find((x) => x.faecher.some((f) => f.id === gruppeId) || x.gruppen.includes(gruppeId))
-      setze(k ? { klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null } : { klasse: null, gruppe: null })
+      setze(
+        k ? { klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null } : { klasse: null, gruppe: null }
+      )
     } catch {
       setze({ klasse: null, gruppe: null })
     }
@@ -380,7 +384,8 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
   /** Klasse einer Lerngruppe öffnen (aus der Suche bzw. den Details) */
   const zurGruppe = (gruppeId: string, reiter?: string): void => {
     const k = (klassen ?? []).find((x) => x.gruppen.includes(gruppeId) || x.faecher.some((f) => f.id === gruppeId))
-    if (k) setze({ klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null, ...(reiter ? { reiter } : {}) })
+    if (k)
+      setze({ klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null, ...(reiter ? { reiter } : {}) })
   }
   /*
    * Auf/Zu (10.10.2026, Entscheidung der Lehrkraft): Alles Aufklappbare in „Meine Klassen" bleibt dauerhaft je Gerät so,
@@ -524,7 +529,10 @@ function FachHinzufuegen({ k, fertig }: { k: KlasseKurz; fertig: (id: string) =>
   // Wert ist der Fachname; die eigenen Fächer stellt HaeufigSelect nach oben (im Standardmodus nur sie, weitere per Eintippen)
   const data = useMemo(
     () =>
-      FAECHER.filter((f) => f.id !== 'anderes' && !vorhanden.has(f.id) && !vorhanden.has(f.label.toLowerCase())).map((f) => ({ value: f.label, label: f.label })),
+      FAECHER.filter((f) => f.id !== 'anderes' && !vorhanden.has(f.id) && !vorhanden.has(f.label.toLowerCase())).map((f) => ({
+        value: f.label,
+        label: f.label
+      })),
     [k.faecher] // eslint-disable-line react-hooks/exhaustive-deps
   )
   const waehlen = async (fach: string | null): Promise<void> => {
@@ -605,8 +613,8 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
       <Modal opened={Boolean(abwahl)} onClose={() => setAbwahl(null)} title={abwahl ? `${fachSchreibweise(abwahl.fach)} in ${klasse} abwählen?` : ''} centered>
         <Stack>
           <Text size="sm">
-            Das Fach steht dann nicht mehr bei {klasse} in „Meine Klassen". Bereits freigegebenes Material (Kurse, Tests, Arbeitsblätter, Reihen) bleibt für
-            die Lernenden erhalten. Über „+ Fach hinzufügen" lässt sich das Fach jederzeit zurückholen.
+            Das Fach steht dann nicht mehr bei {klasse} in „Meine Klassen". Bereits freigegebenes Material (Kurse, Tests, Arbeitsblätter, Reihen) bleibt für die
+            Lernenden erhalten. Über „+ Fach hinzufügen" lässt sich das Fach jederzeit zurückholen.
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setAbwahl(null)}>
@@ -738,9 +746,7 @@ function LehrwerkStand({ gruppeId }: { gruppeId: string }): React.JSX.Element | 
           <Text size="xs" c="dimmed">
             Bestimmt, welche Grammatik als bekannt gilt – für passende Spiele und Forderaufgaben. Automatisch: der Band zu Klassenstufe, Schulform und
             Bundesland; bekannt sind alle früheren Bände und was aus diesem Band schon freigegeben ist.{' '}
-            <span data-lehrwerk-auto-text>
-              {auto ? `automatisch: ${auto.buch}` : 'Zurzeit keiner erkannt (noch keine Vokabeln aus einem Lehrwerk).'}
-            </span>
+            <span data-lehrwerk-auto-text>{auto ? `automatisch: ${auto.buch}` : 'Zurzeit keiner erkannt (noch keine Vokabeln aus einem Lehrwerk).'}</span>
           </Text>
           <Select
             label="Band"
@@ -828,7 +834,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
       const r = await senden<{ woerter: number; lernende: number; kurse: string[] }>(`/server/klassen/${d.id}/wackelig-wiederholen`, {})
       notifySuccess(
         r.woerter
-          ? `${r.woerter} ${r.woerter === 1 ? 'Problemwort ist' : 'Problemwörter sind'} für ${r.lernende} Lernende wieder dran – im Kurs ${r.kurse.map((k) => `„${k}“`).join(', ')}.`
+          ? `${r.woerter} ${r.woerter === 1 ? 'Problemwort ist' : 'Problemwörter sind'} für ${r.lernende} Lernende wieder dran – im Kurs ${r.kurse
+              .map((k) => `„${k}“`)
+              .join(', ')}.`
           : 'Gerade wackelt bei niemandem eines dieser Wörter – nichts zu wiederholen.'
       )
       setVorschau(null)
@@ -852,7 +860,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     setFoerderVorwahl(null)
     if (f.foerder && f.foerder.gruppe !== 'alle')
       try {
-        const r = await holen<{ schueler: string[] }>(`/server/foerdern/auftrag?id=${encodeURIComponent(f.foerder.auftrag)}&gruppe=${encodeURIComponent(f.foerder.gruppe)}`)
+        const r = await holen<{ schueler: string[] }>(
+          `/server/foerdern/auftrag?id=${encodeURIComponent(f.foerder.auftrag)}&gruppe=${encodeURIComponent(f.foerder.gruppe)}`
+        )
         setFoerderVorwahl(r.schueler)
       } catch (e) {
         notifyError(e)
@@ -863,7 +873,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   // Kurs der Klasse (sonst der erste laufende mit Wörtern) – für den Lernstand oben
   const sprachKurs = d.vokabeln.find((v) => v.id === d.klassenKurs) ?? d.vokabeln.find((v) => v.status === 'offen' && v.woerter > 0)
   // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
-  const aktiverReiter = (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter
+  const aktiverReiter =
+    (reiter === 'vokabeln' || reiter === 'grammatik') && !d.sprachfach ? 'reihen' : reiter === 'vokabeln' && d.vokabelfach === false ? 'grammatik' : reiter
   const sichtbarerBedarf = [...entwurfBedarf, ...d.bedarf]
   const wackeligVorschlag = d.vorschlaege.find((v): v is Extract<Vorschlag, { art: 'vokabeln' }> => v.art === 'vokabeln') ?? null
   const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
@@ -884,56 +895,56 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     )
     const karten = (
       <>
-            {fertige.map((f) => (
-              <Card key={f.docId} withBorder radius="md" padding="md" style={{ borderColor: 'var(--mantine-color-teal-6)' }} data-blatt-fertig>
-                <Group gap={6} mb={6}>
-                  <Badge color="teal">fertig</Badge>
-                  {/* Förder-/Forderblatt (12.10.2026): nur für die Lehrkraft gekennzeichnet */}
-                  {f.foerder && (
-                    <Badge color={f.foerder.art === 'forder' ? 'grape' : 'blue'} variant="light" data-blatt-foerder={f.foerder.art}>
-                      {f.foerder.art === 'forder' ? 'Forderblatt' : 'Förderblatt'} · {f.foerder.gruppenTitel}
-                    </Badge>
-                  )}
-                </Group>
-                <Text fw={700}>{f.titel}</Text>
-                <Text size="sm" c="dimmed" mb="sm">
-                  {f.foerder && f.foerder.gruppe !== 'alle'
-                    ? 'Kurz ansehen, dann für die Kinder der Gruppe freischalten (erscheint bei ihnen oben im Fachordner).'
-                    : `Kurz ansehen, dann für ${d.titel} freischalten.`}
+        {fertige.map((f) => (
+          <Card key={f.docId} withBorder radius="md" padding="md" style={{ borderColor: 'var(--mantine-color-teal-6)' }} data-blatt-fertig>
+            <Group gap={6} mb={6}>
+              <Badge color="teal">fertig</Badge>
+              {/* Förder-/Forderblatt (12.10.2026): nur für die Lehrkraft gekennzeichnet */}
+              {f.foerder && (
+                <Badge color={f.foerder.art === 'forder' ? 'grape' : 'blue'} variant="light" data-blatt-foerder={f.foerder.art}>
+                  {f.foerder.art === 'forder' ? 'Forderblatt' : 'Förderblatt'} · {f.foerder.gruppenTitel}
+                </Badge>
+              )}
+            </Group>
+            <Text fw={700}>{f.titel}</Text>
+            <Text size="sm" c="dimmed" mb="sm">
+              {f.foerder && f.foerder.gruppe !== 'alle'
+                ? 'Kurz ansehen, dann für die Kinder der Gruppe freischalten (erscheint bei ihnen oben im Fachordner).'
+                : `Kurz ansehen, dann für ${d.titel} freischalten.`}
+            </Text>
+            <Group gap="xs">
+              <Button size="xs" variant="default" onClick={() => void openDocument('arbeitsblatt', f.docId)}>
+                Im Editor ansehen
+              </Button>
+              <Button size="xs" leftSection={<IconLock size={14} />} onClick={() => void freischalten(f)} data-jetzt-freischalten>
+                Jetzt freischalten
+              </Button>
+            </Group>
+          </Card>
+        ))}
+        {materialVorschlaege.map((v, i) => (
+          <Card key={i} withBorder radius="md" padding="md" data-vorschlag={v.art}>
+            <Group gap={6} mb={4}>
+              <IconFileText size={16} />
+              <Text fw={700}>{v.titel}</Text>
+            </Group>
+            <Text size="sm" c="dimmed" mb={6}>
+              {v.text}
+            </Text>
+            <Stack gap={2} mb="sm">
+              {v.schwerpunkte.map((s) => (
+                <Text key={s} size="xs">
+                  • {s}
                 </Text>
-                <Group gap="xs">
-                  <Button size="xs" variant="default" onClick={() => void openDocument('arbeitsblatt', f.docId)}>
-                    Im Editor ansehen
-                  </Button>
-                  <Button size="xs" leftSection={<IconLock size={14} />} onClick={() => void freischalten(f)} data-jetzt-freischalten>
-                    Jetzt freischalten
-                  </Button>
-                </Group>
-              </Card>
-            ))}
-            {materialVorschlaege.map((v, i) => (
-              <Card key={i} withBorder radius="md" padding="md" data-vorschlag={v.art}>
-                <Group gap={6} mb={4}>
-                  <IconFileText size={16} />
-                  <Text fw={700}>{v.titel}</Text>
-                </Group>
-                <Text size="sm" c="dimmed" mb={6}>
-                  {v.text}
-                </Text>
-                <Stack gap={2} mb="sm">
-                  {v.schwerpunkte.map((s) => (
-                    <Text key={s} size="xs">
-                      • {s}
-                    </Text>
-                  ))}
-                </Stack>
-                <Tooltip label="Entsteht im Hintergrund mit dem eigenen KI-Zugang; ist es fertig, erscheint es hier zum Freischalten">
-                  <Button size="xs" leftSection={<IconSparkles size={14} />} onClick={() => blattFuerKlasse(d, v)} data-blatt-erstellen>
-                    Übungsblatt erstellen lassen
-                  </Button>
-                </Tooltip>
-              </Card>
-            ))}
+              ))}
+            </Stack>
+            <Tooltip label="Entsteht im Hintergrund mit dem eigenen KI-Zugang; ist es fertig, erscheint es hier zum Freischalten">
+              <Button size="xs" leftSection={<IconSparkles size={14} />} onClick={() => blattFuerKlasse(d, v)} data-blatt-erstellen>
+                Übungsblatt erstellen lassen
+              </Button>
+            </Tooltip>
+          </Card>
+        ))}
       </>
     )
     return alsKarte ? (
@@ -993,7 +1004,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Tabs.List>
           <Tabs.Tab value="reihen">Unterrichtsreihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
           {/* Vokabeln und Grammatik getrennt (08.10.2026, Wunsch der Lehrkraft) */}
-          {d.sprachfach && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.length})</Tabs.Tab>}
+          {d.sprachfach && d.vokabelfach !== false && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.length})</Tabs.Tab>}
           {d.sprachfach && <Tabs.Tab value="grammatik">Grammatik ({d.grammatik.length})</Tabs.Tab>}
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
@@ -1008,7 +1019,14 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
               Arbeitsblatt erstellen
             </Button>
             {/* Förder- und Fordermaterial (12.10.2026, Entscheidung der Lehrkraft): rechts neben „Arbeitsblatt erstellen" */}
-            <Button size="xs" variant="light" color="grape" leftSection={<IconUsers size={14} />} onClick={() => setFoerderOffen(true)} data-foerder-erstellen-knopf>
+            <Button
+              size="xs"
+              variant="light"
+              color="grape"
+              leftSection={<IconUsers size={14} />}
+              onClick={() => setFoerderOffen(true)}
+              data-foerder-erstellen-knopf
+            >
               Förder- und Fordermaterial erstellen
             </Button>
           </Group>
@@ -1019,7 +1037,10 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           <Tabs.Panel value="vokabeln" pt="sm">
             <Stack gap="xs">
               {/* Dieselbe Kursseite wie in Sprachenlernen, eingebettet (09.10.2026); Lehrwerk-Stand rechts in der Kopfzeile */}
-              <KlassenKurs kurse={d.vokabeln} klassenKurs={d.klassenKurs} bereich="vokabeln"
+              <KlassenKurs
+                kurse={d.vokabeln}
+                klassenKurs={d.klassenKurs}
+                bereich="vokabeln"
                 rechts={<LehrwerkStand gruppeId={id} />}
                 aktionen={(k) => <AblegenKnopf quelle={vokabelQuelle(k.id, k.titel)} {...ort} programm="vokabelliste" klein />}
                 geaendert={laden}
@@ -1069,9 +1090,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Modal opened onClose={() => setVorschau(null)} title={vorschau.titel} size="lg">
           <Stack>
             <Text size="sm" c="dimmed">
-              {vorschau.woerter.length} Wörter für {d.titel}. Sie stehen schon im Kurs der Klasse: „Im Kurs wiederholen“ macht sie bei allen, die
-              darin wackeln, in der nächsten Tagesrunde wieder fällig – ohne neuen Kurs. Oder die KI erstellt daraus ein kurzes Arbeitsblatt
-              (höchstens zwei Seiten), das danach hier zum Freischalten bereitsteht.
+              {vorschau.woerter.length} Wörter für {d.titel}. Sie stehen schon im Kurs der Klasse: „Im Kurs wiederholen“ macht sie bei allen, die darin wackeln,
+              in der nächsten Tagesrunde wieder fällig – ohne neuen Kurs. Oder die KI erstellt daraus ein kurzes Arbeitsblatt (höchstens zwei Seiten), das
+              danach hier zum Freischalten bereitsteht.
             </Text>
             <Table withRowBorders={false} verticalSpacing={2}>
               <Table.Tbody>
@@ -1298,7 +1319,19 @@ function GrammatikReiter({ d, ort, nurWeitere = false }: { d: KlasseDetail; ort:
 }
 
 /** Zugeklappte Gruppe in einer Kurs-Karte (Auf/Zu dauerhaft unter `merken`, sonst `kennung`) */
-function Aufklapp({ titel, kennung, merken, rahmen, children }: { titel: string; kennung: string; merken?: string; rahmen?: boolean; children: React.ReactNode }): React.JSX.Element {
+function Aufklapp({
+  titel,
+  kennung,
+  merken,
+  rahmen,
+  children
+}: {
+  titel: string
+  kennung: string
+  merken?: string
+  rahmen?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
   const [auf, setAuf] = useAufZu(`aufklapp-${merken ?? kennung}`, false)
   return (
     <div data-aufklapp={kennung}>
@@ -1349,7 +1382,16 @@ function MehrAufgabenKnopf({ g }: { g: KlasseDetail['grammatik'][number] }): Rea
       </Tooltip>
       {offen && (
         <MehrAufgabenFenster
-          g={{ id: g.id, titel: g.titel, thema: g.thema, aufgaben: g.aufgaben, lernende: g.lernende, sicherSchnitt: g.sicherSchnitt, status: g.status, erstellt: g.erstellt }}
+          g={{
+            id: g.id,
+            titel: g.titel,
+            thema: g.thema,
+            aufgaben: g.aufgaben,
+            lernende: g.lernende,
+            sicherSchnitt: g.sicherSchnitt,
+            status: g.status,
+            erstellt: g.erstellt
+          }}
           schliessen={() => setOffen(false)}
         />
       )}

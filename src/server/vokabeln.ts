@@ -53,7 +53,17 @@ import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { schuljahrVon } from '../shared/schulkalender'
 import { quelleText, quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
-import { abschnitteEinordnen, abschnittStatistik, baendeText, baendeVon, kursName, mitBaenden, mitBuchRaengen, type AbschnittEinordnung, type AbschnittStatistik } from '../shared/kursAbschnitte'
+import {
+  abschnitteEinordnen,
+  abschnittStatistik,
+  baendeText,
+  baendeVon,
+  kursName,
+  mitBaenden,
+  mitBuchRaengen,
+  type AbschnittEinordnung,
+  type AbschnittStatistik
+} from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -270,7 +280,7 @@ export function lernstandLoeschen(zid: string, wortIds: string[]): void {
   for (const r of db().prepare('SELECT schueler_id FROM vok_stand WHERE zuweisung_id = ?').all(zid) as { schueler_id: string }[]) {
     const st = standVon(zid, r.schueler_id)
     let anders = false
-    for (const id of wortIds) if (id in st.woerter) (delete st.woerter[id], (anders = true))
+    for (const id of wortIds) if (id in st.woerter) delete st.woerter[id], (anders = true)
     if (anders) standSpeichern(zid, r.schueler_id, st)
   }
 }
@@ -356,7 +366,16 @@ export function testKeysVon(z: Zeile): string[] {
   const a = testAuswahlVon(z)
   if (a.keys) return a.keys
   const e = testEintraege(z)
-  return [...vorbelegung(e.filter((x) => x.art === 'vok'), a.letzter), ...vorbelegung(e.filter((x) => x.art === 'gram'), a.letzter)]
+  return [
+    ...vorbelegung(
+      e.filter((x) => x.art === 'vok'),
+      a.letzter
+    ),
+    ...vorbelegung(
+      e.filter((x) => x.art === 'gram'),
+      a.letzter
+    )
+  ]
 }
 
 /**
@@ -380,8 +399,7 @@ export function kursTest(z: Zeile, online: Angekuendigt[], jetzt = Date.now()): 
 }
 
 /** Termin für den Termin-Anker (nachAbfrage): Kurstermin oder angekündigter Vokabel-Onlinetest (12.10.2026) */
-export const ankerTermin = (z: Zeile, online: Angekuendigt[], jetzt = Date.now()): number | undefined =>
-  kursTerminMitOnlinetests(z, online, jetzt) ?? undefined
+export const ankerTermin = (z: Zeile, online: Angekuendigt[], jetzt = Date.now()): number | undefined => kursTerminMitOnlinetests(z, online, jetzt) ?? undefined
 
 /**
  * Abschnitte eines Kurses (Sicht der Lernenden, `kursFuerLernende`) für den Übungsvorrang: Freigabezeit und Stelle je
@@ -574,7 +592,13 @@ const schonMitglied = (g: Lerngruppe, n: NutzerInfo): boolean => (n.quelle === '
 function verknuepfenOhneFolgen(z: Zeile, g: Lerngruppe, lernende: NutzerInfo[]): boolean {
   if (z.lerngruppe_id) return false
   const vorher = new Set(lernendeVon(z).map((n) => n.id))
-  const g2: Lerngruppe = { ...g, mitglieder: mitgliederErgaenzen(g.mitglieder, lernende.map((n) => n.benutzer)).mitglieder }
+  const g2: Lerngruppe = {
+    ...g,
+    mitglieder: mitgliederErgaenzen(
+      g.mitglieder,
+      lernende.map((n) => n.benutzer)
+    ).mitglieder
+  }
   const nur = json_(z.schueler, [] as string[])
   const nachher = new Set([
     ...mitgliederVon(g2)
@@ -612,7 +636,12 @@ function bereinigeWoerter(roh: unknown): Vokabel[] {
         // Abkürzungen (09.10.2026): eigene Aussprache und weitere richtige Antworten der Lehrkraft
         ...(typeof y.aussprache === 'string' && y.aussprache.trim() ? { aussprache: t('aussprache', 200) } : {}),
         ...(Array.isArray(y.auchRichtig) && y.auchRichtig.length
-          ? { auchRichtig: y.auchRichtig.map((a) => String(a ?? '').slice(0, 200)).filter((a) => a.trim()).slice(0, 10) }
+          ? {
+              auchRichtig: y.auchRichtig
+                .map((a) => String(a ?? '').slice(0, 200))
+                .filter((a) => a.trim())
+                .slice(0, 10)
+            }
           : {}),
         ...(bild ? { bild } : {})
       }
@@ -732,7 +761,7 @@ export function vokabelnZuweisen(e: {
   // Zusammengefasster Abschnitt (älterer Stand der App, 09.10.2026): je Lehrwerk-Abschnitt ein Teil
   if (quelle && woerter.length > 1 && (!teile || teile.length < 2)) {
     const r = abschnitteBeimSpeichern(teile ?? [{ titel: e.titel.slice(0, 160), anzahl: woerter.length, zeit: jetzt }], woerter, quelle, e.lehrkraftId)
-    if (r) ((woerter = r.woerter), (teile = r.teile))
+    if (r) (woerter = r.woerter), (teile = r.teile)
   }
   // Band (und Unit) je Abschnitt merken (09./10.10.2026, Sortierung nach Band) – auch bei nur einem Abschnitt
   const lehrwerk = quelle ? json_(quelle, {} as Partial<Quelle>).lehrwerk : undefined
@@ -770,8 +799,10 @@ export function sprachfaecherDerGruppe(fach: string): { fach: string; sprache: s
   const aus: { fach: string; sprache: string; id: string }[] = []
   for (const teil of [fach, ...fach.split(/\s*[,;]\s*/)]) {
     const f = teil.trim() ? fachAusName(teil) : undefined
-    const sprache = f ? f.sprache ?? f.uebersetzungssprache : undefined
-    if (!f || !sprache || (f.art !== 'fremdsprache' && f.art !== 'alte-sprache') || aus.some((x) => x.id === f.id)) continue
+    // Deutsch (13.10.2026, abgestimmt): Kurs „de" für die Grammatik (ohne Vokabeln) – wie die Fremdsprachen
+    const deutsch = f?.id === 'deutsch'
+    const sprache = f ? (deutsch ? 'de' : f.sprache ?? f.uebersetzungssprache) : undefined
+    if (!f || !sprache || (!deutsch && f.art !== 'fremdsprache' && f.art !== 'alte-sprache') || aus.some((x) => x.id === f.id)) continue
     aus.push({ fach: f.label, sprache, id: f.id })
   }
   return aus
@@ -795,9 +826,7 @@ export function klassenKurseSichern(lehrkraftId: string): number {
     const name = g.name.trim().toLowerCase()
     const geschwister = new Set(gruppen.filter((x) => x.name.trim().toLowerCase() === name).map((x) => x.id))
     for (const s of sprachfaecherDerGruppe(g.fach)) {
-      const da = kurse.some(
-        (k) => geschwister.has(k.lerngruppe_id) && (k.sprache === s.sprache || fachAusName(k.fach)?.id === s.id)
-      )
+      const da = kurse.some((k) => geschwister.has(k.lerngruppe_id) && (k.sprache === s.sprache || fachAusName(k.fach)?.id === s.id))
       if (da) continue
       const id = vokabelnZuweisen({ lehrkraftId, lerngruppeId: g.id, schueler: [], titel: s.fach, sprache: s.sprache, fach: s.fach, woerter: [], leer: true })
       kurse.push({ id, lerngruppe_id: g.id, sprache: s.sprache, fach: s.fach })
@@ -831,7 +860,9 @@ export function leerenKursFuellen(neuId: string, lehrkraftId: string, lerngruppe
   if (!neu) return neuId
   const leer = (
     db()
-      .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' AND id != ? ORDER BY erstellt ASC")
+      .prepare(
+        "SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' AND id != ? ORDER BY erstellt ASC"
+      )
       .all(lehrkraftId, lerngruppeId, neuId) as unknown as Zeile[]
   ).find(
     (z) =>
@@ -923,7 +954,17 @@ function kursUebersicht(
 /** Kurzfassung für die Lernenden (auch für die Lern-App) */
 export function vokabelListenFuer(
   ich: NutzerInfo
-): { id: string; titel: string; name: string; fach: string; sprache: string; testTermin: number | null; erstellt: string; uebersicht: ReturnType<typeof uebersicht>; alt: boolean }[] {
+): {
+  id: string
+  titel: string
+  name: string
+  fach: string
+  sprache: string
+  testTermin: number | null
+  erstellt: string
+  uebersicht: ReturnType<typeof uebersicht>
+  alt: boolean
+}[] {
   // Angekündigte Onlinetests einmal lesen (12.10.2026): Tagesziel vor einem Test wie im Trainer
   const online = onlineTermineVon(ich)
   const jetzt = Date.now()
@@ -996,8 +1037,7 @@ export function abfrageAuswerten(
   )
   stand.woerter[v.id] = neu
   // Rekordbuch: neu gelernt (erster Kontakt) und sicher geworden – je Schuljahr
-  if (buch)
-    woerterEintragen(buch.ich, { gelernt: !alt?.versuche ? 1 : 0, sicher: istSicher(neu) && !(alt && istSicher(alt)) ? 1 : 0 }, buch.klasse, jetzt)
+  if (buch) woerterEintragen(buch.ich, { gelernt: !alt?.versuche ? 1 : 0, sicher: istSicher(neu) && !(alt && istSicher(alt)) ? 1 : 0 }, buch.klasse, jetzt)
   // Achievements (08.10.2026): Tagesrunde, Diktate, „Lege das Wort" von Hand (`eingabe` schickt der Trainer mit)
   if (buch) achievementAntwort(buch.ich, { uebung, urteil: ergebnis.urteil, eingabe: k0.eingabe, sprache: buch.sprache }, jetzt)
   // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
@@ -1191,7 +1231,11 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       }
       // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
-        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), { ich, klasse: klasseFuer(z, ich), sprache: z.sprache })
+        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid), {
+          ich,
+          klasse: klasseFuer(z, ich),
+          sprache: z.sprache
+        })
         if (!r) return json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true
         standSpeichern(z.id, ich.id, st)
         return json(res, 200, { rekord: r.rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true
@@ -1349,7 +1393,12 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       // Problemwörter (10.10.2026: eine Definition, shared/problemWoerter.ts) – die ganze Liste, damit „Nur
       // Problemwörter", ⚠ und die Zahl in „Meine Klassen"/Startseite übereinstimmen; Ausgeblendete erst bei neuen Fehlern
       // Empfindlichkeit (12.10.2026): alle Stufen auf einmal, damit der Regler im Pop-up die Zahl sofort zeigt
-      const jeStufe = problemWoerterJeStufe(frei, lernende.map((l) => l.stand), json_(z.problem_aus, {} as Record<string, number>), jetzt)
+      const jeStufe = problemWoerterJeStufe(
+        frei,
+        lernende.map((l) => l.stand),
+        json_(z.problem_aus, {} as Record<string, number>),
+        jetzt
+      )
       const stufe = kursProblemStufe(z)
       const problem = jeStufe[stufe]
       return (
@@ -1396,7 +1445,13 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             ? (() => {
                 const tl = teileVon(z)
                 return {
-                  abschnitte: abschnittStatistik(tl, woerter, lernende.map((l) => l.stand), teileEingeordnet(z, tl), jetzt),
+                  abschnitte: abschnittStatistik(
+                    tl,
+                    woerter,
+                    lernende.map((l) => l.stand),
+                    teileEingeordnet(z, tl),
+                    jetzt
+                  ),
                   lernendeNamen: lernende.map((l) => l.name)
                 }
               })()
@@ -1426,7 +1481,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           problemStufeStandard: lehrkraftProblemStufe(z.lehrkraft_id),
           problemZahlen: PROBLEM_STUFEN.map((st) => jeStufe[st].length),
           // Kasten „Abschnitte & Wörter" (10.10.2026): Stand der Klasse je Wort, wer mit den Problemwörtern kämpft
-          wortSicher: wortSicherAnteile(woerter, lernende.map((l) => l.stand)),
+          wortSicher: wortSicherAnteile(
+            woerter,
+            lernende.map((l) => l.stand)
+          ),
           problemWer: problemLernende(
             problem.map((p) => p.id),
             lernende
@@ -1465,8 +1523,16 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         if (!lernende.length) return json(res, 400, { fehler: 'In diesem Training sind noch keine Lernenden.' }), true
         const verknuepfen = k0.verknuepfen === true && !z.lerngruppe_id
         if (verknuepfen && !verknuepfenOhneFolgen(z, g, lernende))
-          return json(res, 409, { fehler: 'Die Lerngruppe hat weitere Mitglieder – mit ihr verbunden, bekämen sie das Training auch. Bitte ohne Verbinden zuordnen.' }), true
-        const dazu = lerngruppeErgaenzen(g, lernende.filter((n) => !schonMitglied(g, n)).map((n) => n.benutzer))
+          return (
+            json(res, 409, {
+              fehler: 'Die Lerngruppe hat weitere Mitglieder – mit ihr verbunden, bekämen sie das Training auch. Bitte ohne Verbinden zuordnen.'
+            }),
+            true
+          )
+        const dazu = lerngruppeErgaenzen(
+          g,
+          lernende.filter((n) => !schonMitglied(g, n)).map((n) => n.benutzer)
+        )
         if (verknuepfen) db().prepare('UPDATE vok_zuweisungen SET lerngruppe_id = ? WHERE id = ?').run(g.id, z.id)
         protokolliereServer('vokabeln', `${dazu.length} Lernende einer Lerngruppe zugeordnet${verknuepfen ? ' (Training verbunden)' : ''}`, ich.id)
         return json(res, 200, { ok: true, dazu: dazu.length, schon: lernende.length - dazu.length, verknuepft: verknuepfen }), true
@@ -1635,7 +1701,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           const x = (t ?? {}) as Record<string, unknown>
           return { titel: String(x.titel ?? '').slice(0, 160), anzahl: Math.max(0, Math.round(Number(x.anzahl) || 0)) }
         })
-        const teilePassen = teilGrenzen.length > 1 && teilGrenzen.every((t) => t.titel && t.anzahl > 0) && teilGrenzen.reduce((s, t) => s + t.anzahl, 0) === rohe.length
+        const teilePassen =
+          teilGrenzen.length > 1 && teilGrenzen.every((t) => t.titel && t.anzahl > 0) && teilGrenzen.reduce((s, t) => s + t.anzahl, 0) === rohe.length
         const teilIndex = (i: number): number => {
           let summe = 0
           for (const [j, t] of teilGrenzen.entries()) if (i < (summe += t.anzahl)) return j
@@ -1659,7 +1726,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           entferntVorher
         )
         neu.splice(0, neu.length, ...wieder.woerter)
-        if (alt.length + neu.length > MAX_WOERTER) return json(res, 400, { fehler: `Höchstens ${MAX_WOERTER} Vokabeln je Kurs – mit diesen wären es ${alt.length + neu.length}.` }), true
+        if (alt.length + neu.length > MAX_WOERTER)
+          return json(res, 400, { fehler: `Höchstens ${MAX_WOERTER} Vokabeln je Kurs – mit diesen wären es ${alt.length + neu.length}.` }), true
         const verbenAlt = json_(z.verben, null as { sprache: string; karten: { id: string }[] } | null)
         const verbenNeu = verbenBereinigt(k0.verben) ? (JSON.parse(verbenBereinigt(k0.verben)) as { sprache: string; karten: { id: string }[] }) : null
         const verben =
@@ -1675,7 +1743,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // Mehrere Lehrwerk-Abschnitte in einem Teil (älterer Stand der App, 09.10.2026): je Abschnitt ein Teil
         if (!teilePassen && neu.length > 1) {
           const r = abschnitteBeimSpeichern(neueTeile, neu, quelleBereinigt(k0.quelle), ich.id)
-          if (r) (neu.splice(0, neu.length, ...r.woerter), (neueTeile = r.teile))
+          if (r) neu.splice(0, neu.length, ...r.woerter), (neueTeile = r.teile)
         }
         // Band (und Unit) je Abschnitt merken (09./10.10.2026): Sortierung nach Band, auch wenn der Titel nur „Station 1"
         // heißt – die Herkunft des Kurses nennt danach den neuen Band, die älteren Abschnitte behalten ihren
@@ -1717,11 +1785,14 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           if (!e || (typeof k0.titel === 'string' && e.teil !== k0.titel)) return json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht (mehr).' }), true
           weg = e.woerter
           entfernt = entfernt.filter((_, i) => i !== k0.entfernt)
-          db().prepare('UPDATE vok_zuweisungen SET entfernt = ? WHERE id = ?').run(entfernt.length ? JSON.stringify(entfernt) : '', z.id)
+          db()
+            .prepare('UPDATE vok_zuweisungen SET entfernt = ? WHERE id = ?')
+            .run(entfernt.length ? JSON.stringify(entfernt) : '', z.id)
         } else {
           const tl = woerter.length ? teileVon(z) : []
           const i = Math.round(Number(k0.index))
-          if (!tl[i] || (typeof k0.titel === 'string' && tl[i].titel !== k0.titel)) return json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht (mehr).' }), true
+          if (!tl[i] || (typeof k0.titel === 'string' && tl[i].titel !== k0.titel))
+            return json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht (mehr).' }), true
           const r = teilEntfernen(woerter, tl, i, Date.now())!
           weg = r.entfernt.woerter
           if (!endgueltig) entfernt = [...entfernt, r.entfernt]
@@ -1729,7 +1800,11 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             .prepare('UPDATE vok_zuweisungen SET woerter = ?, teile = ?, entfernt = ? WHERE id = ?')
             .run(JSON.stringify(r.woerter), r.teile.length ? JSON.stringify(r.teile) : '', entfernt.length ? JSON.stringify(entfernt) : '', z.id)
         }
-        if (endgueltig) lernstandLoeschen(z.id, weg.map((v) => v.id))
+        if (endgueltig)
+          lernstandLoeschen(
+            z.id,
+            weg.map((v) => v.id)
+          )
         protokolliereServer('vokabeln', `Abschnitt ${endgueltig ? 'endgültig gelöscht' : 'entfernt'} (${weg.length} Wörter)`, ich.id)
         return json(res, 200, { ok: true, woerter: weg.length }), true
       }
@@ -1739,14 +1814,20 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const woerter = json_(z.woerter, [] as Vokabel[])
         const i = woerter.findIndex((v) => v.id === String(k0.wortId ?? ''))
         if (i < 0) return json(res, 404, { fehler: 'Dieses Wort gibt es im Kurs nicht (mehr).' }), true
-        const text = (x: unknown, n: number): string => String(x ?? '').trim().slice(0, n)
+        const text = (x: unknown, n: number): string =>
+          String(x ?? '')
+            .trim()
+            .slice(0, n)
         const term = typeof k0.term === 'string' ? text(k0.term, 400) : woerter[i].term
         const translation = typeof k0.translation === 'string' ? text(k0.translation, 400) : woerter[i].translation
         if (!term || !translation) return json(res, 400, { fehler: 'Wort und Übersetzung dürfen nicht leer sein.' }), true
         const { aussprache: _a, auchRichtig: _r, ...rest } = woerter[i]
         const aussprache = typeof k0.aussprache === 'string' ? text(k0.aussprache, 200) : woerter[i].aussprache ?? ''
         const auch = Array.isArray(k0.auchRichtig)
-          ? k0.auchRichtig.map((a) => text(a, 200)).filter(Boolean).slice(0, 10)
+          ? k0.auchRichtig
+              .map((a) => text(a, 200))
+              .filter(Boolean)
+              .slice(0, 10)
           : woerter[i].auchRichtig ?? []
         woerter[i] = { ...rest, term, translation, ...(aussprache ? { aussprache } : {}), ...(auch.length ? { auchRichtig: auch } : {}) }
         db().prepare('UPDATE vok_zuweisungen SET woerter = ? WHERE id = ?').run(JSON.stringify(woerter), z.id)
@@ -1782,7 +1863,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       if (teile[1] === 'loeschen') {
         // Kurs einer festen Klasse (09.10.2026, abgestimmt): nicht löschen – nur spontane Gruppen (QR-Code, Code)
         if (istKlassenKurs(z) && k0.klassenkurs !== true)
-          return json(res, 400, { fehler: 'Der Kurs einer festen Klasse lässt sich nicht löschen – Abschnitte und Grammatik lassen sich einzeln entfernen.' }), true
+          return (
+            json(res, 400, { fehler: 'Der Kurs einer festen Klasse lässt sich nicht löschen – Abschnitte und Grammatik lassen sich einzeln entfernen.' }), true
+          )
         // Gastkonten, die nur für dieses Training angelegt wurden, gehen mit
         const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
         db().prepare('DELETE FROM vok_zuweisungen WHERE id = ?').run(z.id)
@@ -1894,7 +1977,12 @@ export function vokabelnDerGruppe(
       const st = standVon(z.id, n.id)
       staende.push(st.woerter)
       const u = uebersicht(woerter, st.woerter, jetzt)
-      hinweisLernende.push({ id: n.id, name: n.name || n.benutzer, tage7: st.tage.filter((t) => t >= vor7).length, uebersicht: { gesamt: u.gesamt, sicher: u.sicher } })
+      hinweisLernende.push({
+        id: n.id,
+        name: n.name || n.benutzer,
+        tage7: st.tage.filter((t) => t >= vor7).length,
+        uebersicht: { gesamt: u.gesamt, sicher: u.sicher }
+      })
       anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
       summe.sicher += u.sicher
       summe.aufbau += u.imAufbau
@@ -1904,7 +1992,7 @@ export function vokabelnDerGruppe(
       for (const t of st.tage) if (!ersterTag || t < ersterTag) ersterTag = t
       // Leerer Kurs (automatisch für die Klasse angelegt, 08.10.2026): kein Lernstand, kein „nicht geübt"
       if (offen && woerter.length) {
-        const p = (jePerson[n.id] ??={ sicher: 0, gesamt: 0, zuletzt: null, reifSicher: 0, reifGesamt: 0 })
+        const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null, reifSicher: 0, reifGesamt: 0 })
         p.sicher += u.sicher
         p.gesamt += u.gesamt
         if (reif.length) {
@@ -1922,7 +2010,16 @@ export function vokabelnDerGruppe(
       const nachId = new Map(woerter.map((v) => [v.id, v]))
       for (const p of problem) {
         const k = `${z.sprache}|${p.term}`
-        const e = woerterFehler.get(k) ?? { v: nachId.get(p.id)!, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach, betroffen: 0, testBald: false, kurs: z.id }
+        const e = woerterFehler.get(k) ?? {
+          v: nachId.get(p.id)!,
+          versuche: 0,
+          falsch: 0,
+          sprache: z.sprache,
+          fach: z.fach,
+          betroffen: 0,
+          testBald: false,
+          kurs: z.id
+        }
         e.betroffen += p.betroffen
         e.versuche += p.versuche
         e.falsch += p.falsch
@@ -1944,7 +2041,10 @@ export function vokabelnDerGruppe(
           testTermin: z.test_termin ?? null,
           woerter: woerter.length,
           teile: wVoll.length ? teileVon(zVoll) : [],
-          gesamt: { gesamt: hinweisLernende.reduce((a, l) => a + l.uebersicht.gesamt, 0), sicher: hinweisLernende.reduce((a, l) => a + l.uebersicht.sicher, 0) },
+          gesamt: {
+            gesamt: hinweisLernende.reduce((a, l) => a + l.uebersicht.gesamt, 0),
+            sicher: hinweisLernende.reduce((a, l) => a + l.uebersicht.sicher, 0)
+          },
           lernende: hinweisLernende
         },
         sprache: z.sprache,
@@ -1996,21 +2096,18 @@ export function vokabelnDerGruppe(
   const alleProbleme = [...woerterFehler.values()]
     .filter((e) => e.betroffen > 0 && e.falsch > 0)
     .sort(
-      (a, b) =>
-        Number(b.testBald) - Number(a.testBald) || b.betroffen - a.betroffen || b.falsch - a.falsch || b.falsch / b.versuche - a.falsch / a.versuche
+      (a, b) => Number(b.testBald) - Number(a.testBald) || b.betroffen - a.betroffen || b.falsch - a.falsch || b.falsch / b.versuche - a.falsch / a.versuche
     )
-  const wackelig = alleProbleme
-    .slice(0, 20)
-    .map((e) => ({
-      term: e.v.term,
-      translation: e.v.translation,
-      ...(e.v.example ? { example: e.v.example } : {}),
-      quote: e.falsch / e.versuche,
-      sprache: e.sprache,
-      fach: e.fach,
-      betroffen: e.betroffen,
-      kurs: e.kurs,
-      id: e.v.id
-    }))
+  const wackelig = alleProbleme.slice(0, 20).map((e) => ({
+    term: e.v.term,
+    translation: e.v.translation,
+    ...(e.v.example ? { example: e.v.example } : {}),
+    quote: e.falsch / e.versuche,
+    sprache: e.sprache,
+    fach: e.fach,
+    betroffen: e.betroffen,
+    kurs: e.kurs,
+    id: e.v.id
+  }))
   return { trainings, jePerson, wackelig, problemZahl: alleProbleme.length, hinweisDaten }
 }

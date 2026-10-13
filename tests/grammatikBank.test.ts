@@ -167,3 +167,39 @@ describe('Wartung 13.10.2026: alle Grammatik-Trainings löschen', () => {
     ).toEqual(['g2', 's1'])
   })
 })
+
+describe('Aufgabenbank: Stufen und Namen (13.10.2026)', () => {
+  it('Stufen nach Schulform', async () => {
+    const { stufenFuerSchulform } = await import('../src/shared/grammatikBank')
+    expect(stufenFuerSchulform('gymnasium')).toEqual(['m', 'a'])
+    expect(stufenFuerSchulform('hauptschule')).toEqual(['g'])
+    expect(stufenFuerSchulform('oberschule')).toEqual(['g', 'm'])
+    expect(stufenFuerSchulform('integrierte-gesamtschule')).toEqual(['g', 'm'])
+    expect(stufenFuerSchulform('')).toEqual(['g', 'm', 'a'])
+  })
+  it('Paket nur mit den Stufen des Kurses, darin vom Leichten zum Schweren', () => {
+    const e = {
+      schluessel: 'en.a/x',
+      regel: { titel: 'A', erklaerung: 'a', beispiele: [] },
+      aufgaben: [{ ...aufgabe('b1', 'erkennen'), niveau: 'a' as const }, { ...aufgabe('b2', 'erkennen'), niveau: 'g' as const }, aufgabe('b3', 'erkennen')]
+    }
+    expect(bankPaket('x', [e], ['g', 'm']).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3'])
+    expect(bankPaket('x', [e]).aufgaben.map((a) => a.id)).toEqual(['b2', 'b3', 'b1'])
+  })
+  it('Namen der Teilbereiche sind für sich verständlich', async () => {
+    const { teilKurzname, kennungLabel } = await import('../src/renderer/src/modules/grammatikformen/grammatikformen')
+    expect(teilKurzname('en.syn.short_answers/be')).toMatch(/^Kurzantworten.*: mit be$/)
+    expect(teilKurzname('en.verb.be_have/be-fragen', true)).toContain(': ')
+    for (const k of ['la.syn.begehrsaetze', 'la.syn.verba_timendi']) expect(kennungLabel(k)).not.toMatch(/siehe la\./)
+  })
+  it('Lehrplan: Einführungsjahrgang je Land und Schulform', async () => {
+    const { GRAMMAR_TOPICS, einfuehrungsStufe } = await import('../src/renderer/src/modules/arbeitsblatt/didactics/grammar')
+    const t = GRAMMAR_TOPICS.find((x) => x.subject === 'deutsch')!
+    const n = einfuehrungsStufe(t, { subjectId: 'deutsch', stateId: 'NI', schoolTypeId: 'gymnasium' })
+    expect(n === null || (n >= 1 && n <= 13)).toBe(true)
+    const la = GRAMMAR_TOPICS.filter((x) => x.subject === 'latein').map((x) =>
+      einfuehrungsStufe(x, { subjectId: 'latein', stateId: 'NI', schoolTypeId: 'gymnasium' })
+    )
+    expect(la.filter((x) => x !== null).every((x) => x! >= 1 && x! <= 7)).toBe(true)
+  })
+})

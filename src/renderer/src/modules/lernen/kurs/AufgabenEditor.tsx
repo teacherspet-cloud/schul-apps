@@ -9,7 +9,7 @@ import { ActionIcon, Badge, Button, Card, Group, Select, SegmentedControl, Simpl
 import { IconArrowDown, IconArrowUp, IconPencil, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { ART_NAME, type GrammatikAufgabe, type GrammatikPaket, type GrammatikRegel } from '@shared/grammatiktrainer'
-import { istKern, UEBUNG_NAME, UEBUNGEN, type Uebung } from '@shared/grammatikBank'
+import { istKern, STUFE_NAME, STUFEN, UEBUNG_NAME, UEBUNGEN, type Uebung } from '@shared/grammatikBank'
 import { lateinVorschau } from '../LateinAufgaben'
 
 /** „a | b | c" ↔ Liste */
@@ -116,6 +116,15 @@ function AufgabeFelder({ a, regeln, aendern }: { a: GrammatikAufgabe; regeln: Gr
           allowDeselect={false}
           comboboxProps={{ withinPortal: true, zIndex: 500 }}
           data-feld-uebung
+        />
+      )}
+      {a.uebung && (
+        <SegmentedControl
+          size="xs"
+          value={a.niveau ?? 'm'}
+          onChange={(v) => setze({ niveau: v as 'g' | 'm' | 'a' })}
+          data={STUFEN.map((st) => ({ value: st, label: STUFE_NAME[st] }))}
+          data-feld-stufe
         />
       )}
       {a.stufe && !a.uebung && (
@@ -265,6 +274,11 @@ export function AufgabenEditor({
                         Stufe {a.stufe}
                       </Badge>
                     )
+                  )}
+                  {a.uebung && (
+                    <Badge size="xs" variant="dot" color={a.niveau === 'g' ? 'teal' : a.niveau === 'a' ? 'grape' : 'blue'} tt="none">
+                      {STUFE_NAME[a.niveau ?? 'm']}
+                    </Badge>
                   )}
                   {neu?.has(a.id) && (
                     <Badge size="xs" color="violet" variant="filled">

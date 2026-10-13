@@ -63,7 +63,17 @@ import { kursBedarf, kursHinweise, type HinweisReiter, type KursBedarf, type Kur
 import { quelleUnits, type Quelle } from '../shared/vokabelLaufbahn'
 import type { VorwahlDaten } from '../shared/lehrwerkVorwahl'
 import type { NutzerInfo } from './datenbank'
-import { ausgeblendeteKurse, erkanntVon, kuerzelSetzen, kursAusblenden, kursEinblenden, kursInfoVon, kursUmbenennen, verborgeneGruppen, type KursLink } from './iservKursgruppen'
+import {
+  ausgeblendeteKurse,
+  erkanntVon,
+  kuerzelSetzen,
+  kursAusblenden,
+  kursEinblenden,
+  kursInfoVon,
+  kursUmbenennen,
+  verborgeneGruppen,
+  type KursLink
+} from './iservKursgruppen'
 import { erkanntText } from '../shared/iservKurse'
 import { auszeichnungFuerLehrkraft } from './achievements'
 import { problemWoerterText } from '../shared/problemWoerter'
@@ -92,8 +102,11 @@ export const iservAngabe = (l: KursLink | undefined | null): { roh: string; text
 /** Fremdsprache (oder alte Sprache, DaZ): dann gibt es den Reiter „Vokabeln & Grammatik" */
 export const istSprachfach = (fach: string): boolean => {
   const f = fachAusName(fach)
-  return Boolean(f && SPRACHFAECHER.includes(f.id))
+  // Deutsch (13.10.2026): Grammatik wie in den Fremdsprachen – der Reiter Vokabeln entfällt (`vokabelfach`)
+  return Boolean(f && (SPRACHFAECHER.includes(f.id) || f.id === 'deutsch'))
 }
+/** Hat das Fach Vokabeln? (Deutsch nur Grammatik) */
+export const istVokabelfach = (fach: string): boolean => istSprachfach(fach) && fachAusName(fach)?.id !== 'deutsch'
 
 /**
  * Merkmal eines Handlungsbedarf-Eintrags (09.10.2026, „Ausblenden"): woran sich erkennen lässt, ob die Lage gleich
@@ -148,10 +161,7 @@ export function bedarfWiederSichtbar(alt: Merkmal, neu: Merkmal): boolean {
 }
 
 /** Einträge nach den gemerkten Merkmalen aufteilen; `veraltet` = gemerkte Schlüssel, die nicht mehr gelten */
-export function bedarfAufteilen(
-  liste: Bedarf[],
-  gemerkt: Map<string, Merkmal>
-): { sichtbar: Bedarf[]; ausgeblendet: Bedarf[]; veraltet: string[] } {
+export function bedarfAufteilen(liste: Bedarf[], gemerkt: Map<string, Merkmal>): { sichtbar: Bedarf[]; ausgeblendet: Bedarf[]; veraltet: string[] } {
   const sichtbar: Bedarf[] = []
   const ausgeblendet: Bedarf[] = []
   const gueltig = new Set<string>()
@@ -185,7 +195,9 @@ const ausDb = () => {
 }
 export function ausgeblendetVon(lehrkraftId: string, gruppeId: string): Map<string, Merkmal> {
   const m = new Map<string, Merkmal>()
-  for (const z of ausDb().prepare('SELECT schluessel, merkmal FROM klassen_ausgeblendet WHERE lehrkraft_id = ? AND gruppe_id = ?').all(lehrkraftId, gruppeId) as {
+  for (const z of ausDb()
+    .prepare('SELECT schluessel, merkmal FROM klassen_ausgeblendet WHERE lehrkraft_id = ? AND gruppe_id = ?')
+    .all(lehrkraftId, gruppeId) as {
     schluessel: string
     merkmal: string
   }[])
@@ -241,11 +253,19 @@ export function vokabelBedarf(
   const teile: string[] = []
   if (termin)
     teile.push(
-      `Vokabeltest „${termin.titel}" am ${new Date(termin.testTermin!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} – Klasse im Schnitt ${Math.round(termin.sicherSchnitt * 100)} % sicher`
+      `Vokabeltest „${termin.titel}" am ${new Date(termin.testTermin!).toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit'
+      })} – Klasse im Schnitt ${Math.round(termin.sicherSchnitt * 100)} % sicher`
     )
   if (schwach.length) teile.push(`Vokabeln unter 30 % sicher (Wörter seit mind. 14 Tagen): ${schwach.map((l) => l.name).join(', ')}`)
   if (inaktiv.length)
-    teile.push(`${inaktiv.length} ${inaktiv.length === 1 ? 'Lernende/r hat' : 'Lernende haben'} in den letzten 7 Tagen nicht geübt: ${inaktiv.map((l) => l.name).join(', ')}`)
+    teile.push(
+      `${inaktiv.length} ${inaktiv.length === 1 ? 'Lernende/r hat' : 'Lernende haben'} in den letzten 7 Tagen nicht geübt: ${inaktiv
+        .map((l) => l.name)
+        .join(', ')}`
+    )
   if (!teile.length) return null
   const art = schwach.length ? 'foerdern' : termin ? 'termin' : 'inaktiv'
   return {
@@ -294,15 +314,18 @@ export function klassenKursVon(g: Lerngruppe, lehrkraftId: string): string | nul
   const sprachen = sprachfaecherDerGruppe(g.fach).map((s) => s.sprache)
   if (!sprachen.length) return null
   const name = g.name.trim().toLowerCase()
-  const geschwister = new Set(lerngruppenVon(lehrkraftId).filter((x) => x.name.trim().toLowerCase() === name).map((x) => x.id))
+  const geschwister = new Set(
+    lerngruppenVon(lehrkraftId)
+      .filter((x) => x.name.trim().toLowerCase() === name)
+      .map((x) => x.id)
+  )
   geschwister.add(g.id)
   const kurse = (
     vokDb()
       .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND reihe = '' AND lerngruppe_id != '' ORDER BY erstellt ASC")
       .all(lehrkraftId) as unknown as Zeile[]
   ).filter((k) => geschwister.has(k.lerngruppe_id ?? '') && sprachen.includes(k.sprache))
-  const rang = (k: Zeile): number =>
-    (k.lerngruppe_id === g.id ? 0 : 4) + (k.status === 'offen' ? 0 : 2) + (json_(k.schueler, [] as string[]).length ? 1 : 0)
+  const rang = (k: Zeile): number => (k.lerngruppe_id === g.id ? 0 : 4) + (k.status === 'offen' ? 0 : 2) + (json_(k.schueler, [] as string[]).length ? 1 : 0)
   return [...kurse].sort((a, b) => rang(a) - rang(b))[0]?.id ?? null
 }
 
@@ -311,11 +334,7 @@ export function klassenKursVon(g: Lerngruppe, lehrkraftId: string): string | nul
  * stehen schon in den Kursen der Klasse. Wer ein Wort schon gesehen hat (Versuche > 0) und darin wackelt (Fehler oder
  * Fach 1–2), bekommt es jetzt fällig – es kommt in der nächsten Tagesrunde. Kein Fachwechsel, kein neuer Kurs.
  */
-export function wackeligWiederholen(
-  g: Lerngruppe,
-  lehrkraftId: string,
-  jetzt = Date.now()
-): { woerter: number; lernende: number; kurse: string[] } {
+export function wackeligWiederholen(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()): { woerter: number; lernende: number; kurse: string[] } {
   const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt)
   const schluessel = new Set(vok.wackelig.map((w) => `${w.sprache}|${w.term}`))
   const woerter = new Set<string>()
@@ -354,14 +373,23 @@ export function wackeligWiederholen(
 export function vorwahlDaten(z: Zeile, ich: NutzerInfo): VorwahlDaten {
   const q = json_(z.quelle, {} as Partial<Quelle>)
   const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
-  const alle = vokDb()
-    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND reihe = '' ORDER BY erstellt DESC")
-    .all(ich.id) as unknown as Zeile[]
+  const alle = vokDb().prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND reihe = '' ORDER BY erstellt DESC").all(ich.id) as unknown as Zeile[]
   const lehrwerk = (k: Zeile): string => json_(k.quelle, {} as Partial<Quelle>).lehrwerk ?? ''
   const name = g?.name.trim().toLowerCase() ?? ''
-  const klasse = new Set(name ? lerngruppenVon(ich.id).filter((x) => x.name.trim().toLowerCase() === name).map((x) => x.id) : [])
+  const klasse = new Set(
+    name
+      ? lerngruppenVon(ich.id)
+          .filter((x) => x.name.trim().toLowerCase() === name)
+          .map((x) => x.id)
+      : []
+  )
   const klassenLehrwerke = [
-    ...new Set(alle.filter((k) => k.id !== z.id && k.sprache === z.sprache && klasse.has(k.lerngruppe_id)).map(lehrwerk).filter(Boolean))
+    ...new Set(
+      alle
+        .filter((k) => k.id !== z.id && k.sprache === z.sprache && klasse.has(k.lerngruppe_id))
+        .map(lehrwerk)
+        .filter(Boolean)
+    )
   ]
   const zahl = new Map<string, number>()
   for (const k of alle) if (k.sprache === z.sprache && lehrwerk(k)) zahl.set(lehrwerk(k), (zahl.get(lehrwerk(k)) ?? 0) + 1)
@@ -433,7 +461,10 @@ export function abschnitteVon(z: Zeile): FreiAbschnitt[] {
     for (const stueck of e.name.split(' · ')) {
       const k = stueck.indexOf(':')
       const unit = k > 0 ? stueck.slice(0, k).trim() : e.unit
-      const namen = (k > 0 ? stueck.slice(k + 1) : stueck).split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean)
+      const namen = (k > 0 ? stueck.slice(k + 1) : stueck)
+        .split(/\s*,\s*/)
+        .map((x) => x.trim())
+        .filter(Boolean)
       if (unit) for (const abschnitt of namen) aus.push({ lehrwerk, buch: e.buch, unit, abschnitt })
     }
   }
@@ -463,8 +494,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
       // Gäste (Anmeldecode, 08.10.2026) führt die Testhistorie ohne Benutzernamen, über ihren Namen
       const gast = n.quelle === 'gast'
       // Zuerst über die Kennung (09.10.2026: nach dem Umbenennen bleiben die Ergebnisse dran), sonst wie bisher
-      const t =
-        h.schueler.find((s) => s.ids.includes(n.id)) ?? h.schueler.find((s) => (gast ? !s.benutzer && s.name === n.name : s.benutzer === n.benutzer))
+      const t = h.schueler.find((s) => s.ids.includes(n.id)) ?? h.schueler.find((s) => (gast ? !s.benutzer && s.name === n.name : s.benutzer === n.benutzer))
       const r = reihen.filter((x) => x.status === 'offen').flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
       return {
         id: n.id,
@@ -541,7 +571,9 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
       art: 'vokabeln',
       titel: `Problemwörter – ${klassenTitel(g)}`,
       // Eine Zahl für dasselbe (10.10.2026): gekürzte Liste als „20 von N Problemwörtern" (shared/problemWoerter.ts)
-      text: `${problemWoerterText(vok.problemZahl, vok.wackelig.length)} (${vok.wackelig.length < vok.problemZahl ? 'die wichtigsten: ' : ''}zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern gerade wackeln) – im Kurs gleich wiederholen lassen oder als kurzes Arbeitsblatt.`,
+      text: `${problemWoerterText(vok.problemZahl, vok.wackelig.length)} (${
+        vok.wackelig.length < vok.problemZahl ? 'die wichtigsten: ' : ''
+      }zuerst Wörter für den nächsten Test, dann die, die bei den meisten Kindern gerade wackeln) – im Kurs gleich wiederholen lassen oder als kurzes Arbeitsblatt.`,
       sprache: vok.wackelig[0].sprache,
       fach: vok.wackelig[0].fach,
       woerter: vok.wackelig.map(({ term, translation, example }) => ({ term, translation, ...(example ? { example } : {}) }))
@@ -563,6 +595,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
     fach: g.fach,
     titel: klassenTitel(g),
     sprachfach: istSprachfach(g.fach),
+    vokabelfach: istVokabelfach(g.fach),
     lernende,
     tests: h.tests.map((t) => ({
       id: t.id,
@@ -632,7 +665,8 @@ export function klassenSuche(lehrkraftId: string, q: string, klasse = '', jetzt 
     if (stichwort)
       for (const b of detail(g, lehrkraftId, jetzt, true).bedarfAlle)
         if ('hinweis' in b && (b.hinweis === 'inaktiv' || b.hinweis === 'schwach' || b.hinweis === 'foerdern'))
-          for (const id of ('ids' in b && Array.isArray(b.ids) ? b.ids : []) as string[]) probleme.set(id, (probleme.get(id) ?? new Set()).add(b.hinweis as ProblemArt))
+          for (const id of ('ids' in b && Array.isArray(b.ids) ? b.ids : []) as string[])
+            probleme.set(id, (probleme.get(id) ?? new Set()).add(b.hinweis as ProblemArt))
     for (const n of mitglieder) {
       // Ohne Anzeigenamen kein Treffer über den Namen (der Benutzername wird nicht durchsucht, nur angezeigt)
       const name = n.name.trim()
@@ -654,82 +688,82 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
   return async (k) => {
     const { url, req, res, sitzung } = k
     if (!url.pathname.startsWith('/server/klassen')) return false
-    if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
-    if (sitzung.nutzer.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
+    if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
+    if (sitzung.nutzer.rolle === 'schueler') return json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true
     const ich = alsNutzer(sitzung.nutzer, sitzung.kennung)
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
 
     if (req.method === 'POST') {
-      if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      if (typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nur aus der App.' }), true
       // Wackelige Wörter im Kurs wiederholen (09.10.2026)
       if (teile.length === 2 && teile[1] === 'wackelig-wiederholen') {
         const g = lerngruppe(teile[0])
-        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
-        return (json(res, 200, wackeligWiederholen(g, ich.id)), true)
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
+        return json(res, 200, wackeligWiederholen(g, ich.id)), true
       }
       // Fach abwählen (08.10.2026): mit Material nur ausblenden, sonst entfernen (leere Kurse gehen mit)
       if (teile.length === 2 && teile[1] === 'abwaehlen') {
         const g = lerngruppe(teile[0])
-        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
         const d = detail(g, ich.id)
         const material = d.tests.length + d.vokabeln.filter((v) => v.woerter > 0).length + d.grammatik.length + d.reihen.length + d.blaetter.length
         if (!material) for (const v of d.vokabeln) leerenKursLoeschen(v.id, ich.id)
-        return (json(res, 200, { art: fachAbwaehlen(ich.id, g.id, material > 0), material }), true)
+        return json(res, 200, { art: fachAbwaehlen(ich.id, g.id, material > 0), material }), true
       }
       // Handlungsbedarf ausblenden / wieder einblenden (09.10.2026): {schluessel}
       if (teile.length === 2 && (teile[1] === 'bedarf-ausblenden' || teile[1] === 'bedarf-einblenden')) {
         const g = lerngruppe(teile[0])
-        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
         const k0 = (await k.koerper()) as Record<string, unknown>
         const schluessel = String(k0.schluessel ?? '').slice(0, 200)
-        if (teile[1] === 'bedarf-einblenden') return (bedarfEinblenden(ich.id, g.id, [schluessel]), json(res, 200, { ok: true }), true)
+        if (teile[1] === 'bedarf-einblenden') return bedarfEinblenden(ich.id, g.id, [schluessel]), json(res, 200, { ok: true }), true
         const b = detail(g, ich.id).bedarfAlle.find((x) => x.schluessel === schluessel)
-        if (!b) return (json(res, 404, { fehler: 'Diesen Eintrag gibt es nicht mehr.' }), true)
+        if (!b) return json(res, 404, { fehler: 'Diesen Eintrag gibt es nicht mehr.' }), true
         bedarfAusblenden(ich.id, g.id, b.schluessel, b.merkmal)
-        return (json(res, 200, { ok: true }), true)
+        return json(res, 200, { ok: true }), true
       }
       // Kurse aus IServ korrigieren (10.10.2026)
       if (teile.length === 2 && teile[1] === 'iserv-ausblenden') {
         const g = lerngruppe(teile[0])
-        if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+        if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
         const d = detail(g, ich.id)
         const material = d.tests.length + d.vokabeln.filter((v) => v.woerter > 0).length + d.grammatik.length + d.reihen.length + d.blaetter.length
         const art = kursAusblenden(ich.id, g.id, material)
-        if (!art) return (json(res, 404, { fehler: 'Diese Lerngruppe ist nicht aus IServ erkannt.' }), true)
+        if (!art) return json(res, 404, { fehler: 'Diese Lerngruppe ist nicht aus IServ erkannt.' }), true
         if (art === 'geloescht') for (const v of d.vokabeln) leerenKursLoeschen(v.id, ich.id)
-        return (json(res, 200, { art, material }), true)
+        return json(res, 200, { art, material }), true
       }
       if (teile.length === 1 && teile[0] === 'iserv-einblenden') {
         const k0 = (await k.koerper()) as Record<string, unknown>
-        if (!kursEinblenden(ich.id, String(k0.id ?? ''))) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
-        return (json(res, 200, { ok: true }), true)
+        if (!kursEinblenden(ich.id, String(k0.id ?? ''))) return json(res, 404, { fehler: 'Unbekannt.' }), true
+        return json(res, 200, { ok: true }), true
       }
       if (teile.length === 1 && teile[0] === 'iserv-kuerzel') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         try {
           const p = kuerzelSetzen(ich.id, String(k0.kuerzel ?? ''))
-          return (json(res, 200, { kuerzel: p?.kuerzel ?? null, kuerzelEigen: p?.kuerzelEigen ?? '' }), true)
+          return json(res, 200, { kuerzel: p?.kuerzel ?? null, kuerzelEigen: p?.kuerzelEigen ?? '' }), true
         } catch (e) {
-          return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+          return json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true
         }
       }
       if (teile.length === 2 && teile[1] === 'umbenennen') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         try {
-          return (json(res, 200, { name: kursUmbenennen(ich.id, teile[0], String(k0.name ?? '')) }), true)
+          return json(res, 200, { name: kursUmbenennen(ich.id, teile[0], String(k0.name ?? '')) }), true
         } catch (e) {
-          return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+          return json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true
         }
       }
-      if (teile.length !== 2 || teile[1] !== 'fach') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      if (teile.length !== 2 || teile[1] !== 'fach') return json(res, 404, { fehler: 'Unbekannt.' }), true
       const k0 = (await k.koerper()) as Record<string, unknown>
       try {
-        return (json(res, 200, { id: fachHinzufuegen(ich.id, teile[0], String(k0.fach ?? '')) }), true)
+        return json(res, 200, { id: fachHinzufuegen(ich.id, teile[0], String(k0.fach ?? '')) }), true
       } catch (e) {
-        return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+        return json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true
       }
     }
-    if (req.method !== 'GET') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
+    if (req.method !== 'GET') return json(res, 405, { fehler: 'Nicht erlaubt.' }), true
 
     if (!teile.length) {
       // Je Klasse (Name) ihre Fächer – Lerngruppen ohne Fach zählen als Klasse ohne Fach
@@ -763,7 +797,16 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
       for (const g of lerngruppenVon(ich.id).sort(nachKlasse)) {
         if (verborgen.has(g.id)) continue
         const s = klassenSchluessel(g.name)
-        const kl = klassen.get(s) ?? { schluessel: s, name: g.name.trim(), gruppen: [], lernende: new Set<string>(), bedarf: 0, vorschlaege: 0, faecher: [], iserv: null }
+        const kl = klassen.get(s) ?? {
+          schluessel: s,
+          name: g.name.trim(),
+          gruppen: [],
+          lernende: new Set<string>(),
+          bedarf: 0,
+          vorschlaege: 0,
+          faecher: [],
+          iserv: null
+        }
         klassen.set(s, kl)
         kl.gruppen.push(g.id)
         const iserv = iservAngabe(kursInfo.get(g.id))
@@ -805,14 +848,15 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
       )
     }
     // Suche (10.10.2026): eigene Lernende nach Namen bzw. Handlungsbedarf (shared/klassenSuche.ts)
-    if (teile[0] === 'suche') return (json(res, 200, { lernende: klassenSuche(ich.id, url.searchParams.get('q') ?? '', url.searchParams.get('klasse') ?? '') }), true)
+    if (teile[0] === 'suche')
+      return json(res, 200, { lernende: klassenSuche(ich.id, url.searchParams.get('q') ?? '', url.searchParams.get('klasse') ?? '') }), true
     if (teile[0] === 'vorwahl') {
       const z = zeile(String(url.searchParams.get('kurs') ?? ''))
-      if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diesen Kurs gibt es nicht.' }), true)
-      return (json(res, 200, vorwahlDaten(z, sitzung.nutzer)), true)
+      if (!z || z.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diesen Kurs gibt es nicht.' }), true
+      return json(res, 200, vorwahlDaten(z, sitzung.nutzer)), true
     }
     const g = lerngruppe(teile[0])
-    if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
+    if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
     // Kurs der Klasse (09.10.2026) – fehlt er (z. B. gelöscht), wie bei neuen Lerngruppen gleich anlegen
     let klassenKurs = istSprachfach(g.fach) ? klassenKursVon(g, ich.id) : null
     if (istSprachfach(g.fach) && !klassenKurs && klassenKurseSichern(ich.id)) klassenKurs = klassenKursVon(g, ich.id)
@@ -826,6 +870,6 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
     // Kürzel der Lehrkraft (eingestellt oder erkannt) – „Ablegen ▾" sucht damit den eigenen Kursordner (10.10.2026)
     const erkannt = erkanntVon(ich.id)
     const iservKuerzel = erkannt?.kuerzelEigen || erkannt?.kuerzel || null
-    return (json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs, iserv, iservKuerzel }), true)
+    return json(res, 200, { ...d, ablageMuster: ablageMuster(), klassenKurs, iserv, iservKuerzel }), true
   }
 }

@@ -19,6 +19,7 @@ import { darfLehrwerkSprache } from '../main/services/rolle'
 import { BANK_GRENZEN, paketBereinigt } from '../shared/grammatiktrainer'
 import {
   formVon,
+  istStufe,
   istUebung,
   regelIdVon,
   schluesselGueltig,
@@ -53,6 +54,9 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Stufe je Aufgabe (13.10.2026): g grundlegend, m mittel, a anspruchsvoll – Bisheriges gilt als mittel
+    const spalten = new Set((d.prepare('PRAGMA table_info(gram_bank)').all() as { name: string }[]).map((s) => s.name))
+    if (!spalten.has('niveau')) d.exec("ALTER TABLE gram_bank ADD COLUMN niveau TEXT NOT NULL DEFAULT 'm'")
     bereit = true
   }
   return d
@@ -77,15 +81,21 @@ export function bankEintraege(schluessel: readonly string[]): BankEintrag[] {
   const aus: BankEintrag[] = []
   for (const s of [...new Set(schluessel)]) {
     const r = db().prepare('SELECT bank_regel FROM gram_bank_regel WHERE schluessel = ?').get(s) as { bank_regel: string } | undefined
-    const zeilen = db().prepare('SELECT id, uebung, bank_aufgabe FROM gram_bank WHERE schluessel = ? ORDER BY pos, rowid').all(s) as {
+    const zeilen = db().prepare('SELECT id, uebung, niveau, bank_aufgabe FROM gram_bank WHERE schluessel = ? ORDER BY pos, rowid').all(s) as {
       id: string
       uebung: string
+      niveau: string
       bank_aufgabe: string
     }[]
     if (!r && !zeilen.length) continue
     const regel = json_(r?.bank_regel, { titel: '', erklaerung: '', beispiele: [] } as BankRegel)
     const aufgaben = zeilen
-      .map((z) => ({ ...json_(z.bank_aufgabe, {} as BankAufgabe), id: z.id, uebung: z.uebung as Uebung }))
+      .map((z) => ({
+        ...json_(z.bank_aufgabe, {} as BankAufgabe),
+        id: z.id,
+        uebung: z.uebung as Uebung,
+        niveau: istStufe(z.niveau) ? z.niveau : ('m' as const)
+      }))
       .filter((a) => istUebung(a.uebung) && a.art)
     aus.push({ schluessel: s, regel, aufgaben })
   }
@@ -95,13 +105,19 @@ export function bankEintraege(schluessel: readonly string[]): BankEintrag[] {
 /** Aufgaben je Schlüssel und Übungsart einer Sprache */
 export function bankZahlen(sprache: string): BankZahlen {
   const aus: BankZahlen = {}
-  for (const z of db().prepare('SELECT schluessel, uebung, COUNT(*) AS n FROM gram_bank WHERE sprache = ? GROUP BY schluessel, uebung').all(sprache) as {
+  for (const z of db()
+    .prepare('SELECT schluessel, uebung, niveau, COUNT(*) AS n FROM gram_bank WHERE sprache = ? GROUP BY schluessel, uebung, niveau')
+    .all(sprache) as {
     schluessel: string
     uebung: string
+    niveau: string
     n: number
   }[]) {
     if (!istUebung(z.uebung)) continue
-    ;(aus[z.schluessel] ??= {})[z.uebung] = Number(z.n)
+    const e = (aus[z.schluessel] ??= {})
+    e[z.uebung] = (e[z.uebung] ?? 0) + Number(z.n)
+    const st = istStufe(z.niveau) ? z.niveau : 'm'
+    ;((e.stufen ??= {})[z.uebung] ??= {})[st] = Number(z.n)
   }
   // Schlüssel mit Regelkarte, aber (noch) ohne Aufgaben
   for (const z of db().prepare('SELECT schluessel FROM gram_bank_regel WHERE sprache = ?').all(sprache) as { schluessel: string }[]) aus[z.schluessel] ??= {}
@@ -179,13 +195,15 @@ export function bankSpeichern(sprache: string, schluessel: string, regelRoh: unk
       JSON.stringify(regel),
       jetzt
     )
-    const rein = d.prepare('INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, pos, bank_aufgabe, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    const rein = d.prepare(
+      'INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
     aufgaben.forEach((a, i) => {
       // Ohne Kennung, Regel und Stufe gespeichert – die vergibt das Paket des Kurses
-      const { id, regelId: _r, stufe: _s, uebung, ...rest } = a
+      const { id, regelId: _r, stufe: _s, uebung, niveau, ...rest } = a
       void _r
       void _s
-      rein.run(id, sprache, schluessel, formVon(schluessel), uebung, i, JSON.stringify(rest), jetzt)
+      rein.run(id, sprache, schluessel, formVon(schluessel), uebung, istStufe(niveau) ? niveau : 'm', i, JSON.stringify(rest), jetzt)
     })
     d.exec('COMMIT')
   } catch (e) {

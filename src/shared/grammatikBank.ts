@@ -49,8 +49,42 @@ export const UEBUNG_ARTEN: Record<Uebung, string[]> = {
 /** Stufe für Reihenfolge und ältere Ansichten: Erkennen 1, Bilden 2, sonst 3 */
 export const uebungStufe = (u: Uebung): 1 | 2 | 3 => (u === 'erkennen' ? 1 : u === 'bilden' ? 2 : 3)
 
-/** Aufgaben je Feld (Teilbereich × Übungsart), die der KI-Knopf schreibt (abgestimmt: rund 8) */
+/** Aufgaben je Feld (Teilbereich × Übungsart × Stufe), die der KI-Knopf schreibt (abgestimmt: rund 8) */
 export const AUFGABEN_JE_FELD = 8
+
+// ---------------------------------------------------------------- Stufen (13.10.2026, abgestimmt)
+
+/**
+ * Schwierigkeit je Aufgabe: grundlegend, mittel, anspruchsvoll – für alle Fächer. Ein Kurs bekommt die Stufen seiner
+ * Schulform (`stufenFuerSchulform`), je Kurs änderbar. Aufgaben ohne Angabe gelten als mittel.
+ */
+export type Stufe = 'g' | 'm' | 'a'
+export const STUFEN: Stufe[] = ['g', 'm', 'a']
+export const STUFE_NAME: Record<Stufe, string> = { g: 'grundlegend', m: 'mittel', a: 'anspruchsvoll' }
+export const istStufe = (x: unknown): x is Stufe => x === 'g' || x === 'm' || x === 'a'
+export const stufeVon = (a: { niveau?: Stufe }): Stufe => a.niveau ?? 'm'
+/** Was die Stufe für die KI heißt */
+export const STUFE_TEXT: Record<Stufe, string> = {
+  g: 'grundlegend – kurze Sätze, einfacher Wortschatz, die Regel in ihrer Grundform, viel Hilfe durch Vorgaben',
+  m: 'mittel – wie im Unterricht üblich, gemischte Fälle',
+  a: 'anspruchsvoll – längere Sätze, Ausnahmen und Sonderfälle, Transfer, wenig Vorgaben'
+}
+/**
+ * Stufen eines Kurses nach Schulform (abgestimmt): Hauptschule, Mittelschule, Förderschule grundlegend; Gymnasium mittel und
+ * anspruchsvoll; alle übrigen (Real-, Ober-, Gesamtschule …) grundlegend und mittel – anspruchsvoll ergänzt die Lehrkraft
+ * je Kurs (z. B. IGS-E-Kurs). Ohne Schulform: alle drei.
+ */
+export function stufenFuerSchulform(schulform: string | undefined | null): Stufe[] {
+  const s = String(schulform ?? '').toLowerCase()
+  if (!s) return [...STUFEN]
+  if (/gymnas/.test(s)) return ['m', 'a']
+  if (/haupt|mittelschule|foerder|förder|werkreal/.test(s)) return ['g']
+  return ['g', 'm']
+}
+export const stufenBereinigt = (x: unknown): Stufe[] | undefined => {
+  const l = Array.isArray(x) ? STUFEN.filter((s) => x.includes(s)) : []
+  return l.length ? l : undefined
+}
 
 // ---------------------------------------------------------------- Schlüssel
 
@@ -100,7 +134,7 @@ export interface BankRegel {
   erklaerung: string
   beispiele: string[]
 }
-/** Eine Aufgabe der Bank: wie im Training, dazu die Übungsart; `id` ist die feste Kennung der Bank („b…") */
+/** Eine Aufgabe der Bank: wie im Training, dazu die Übungsart (und die Stufe); `id` ist die feste Kennung der Bank („b…") */
 export type BankAufgabe = GrammatikAufgabe & { uebung: Uebung }
 export interface BankEintrag {
   schluessel: string
@@ -108,8 +142,8 @@ export interface BankEintrag {
   aufgaben: BankAufgabe[]
 }
 
-/** Zahlen je Schlüssel und Übungsart (Übersicht im Seitenfenster) */
-export type BankZahlen = Record<string, Partial<Record<Uebung, number>>>
+/** Zahlen je Schlüssel und Übungsart (Übersicht im Pop-up), dazu je Übungsart und Stufe */
+export type BankZahlen = Record<string, Partial<Record<Uebung, number>> & { stufen?: Partial<Record<Uebung, Partial<Record<Stufe, number>>>> }>
 
 /** Kern-Aufgaben eines Eintrags */
 export const kernZahl = (z: Partial<Record<Uebung, number>> | undefined): number => KERN_UEBUNGEN.reduce((n, u) => n + (z?.[u] ?? 0), 0)
@@ -118,11 +152,12 @@ export const kernZahl = (z: Partial<Record<Uebung, number>> | undefined): number
  * Paket eines Kurs-Trainings aus Bank-Einträgen: je Schlüssel mit Aufgaben eine Regelkarte (Kennung `regelIdVon`, mit
  * Schlüssel als `kennung`), die Aufgaben in Teilbereich- und Übungs-Reihenfolge mit Stufe (Erkennen vor Bilden).
  */
-export function bankPaket(thema: string, eintraege: readonly BankEintrag[]): GrammatikPaket {
+export function bankPaket(thema: string, eintraege: readonly BankEintrag[], stufen?: readonly Stufe[]): GrammatikPaket {
   const regeln: GrammatikRegel[] = []
   const aufgaben: GrammatikAufgabe[] = []
   for (const e of eintraege) {
-    if (!e.aufgaben.length) continue
+    const passend = stufen?.length ? e.aufgaben.filter((a) => stufen.includes(stufeVon(a))) : e.aufgaben
+    if (!passend.length) continue
     const regelId = regelIdVon(e.schluessel)
     regeln.push({
       id: regelId,
@@ -131,7 +166,10 @@ export function bankPaket(thema: string, eintraege: readonly BankEintrag[]): Gra
       beispiele: e.regel.beispiele,
       kennung: e.schluessel
     })
-    const sortiert = [...e.aufgaben].sort((a, b) => UEBUNGEN.indexOf(a.uebung) - UEBUNGEN.indexOf(b.uebung))
+    // Übungsart, darin vom Leichten zum Schweren
+    const sortiert = [...passend].sort(
+      (a, b) => UEBUNGEN.indexOf(a.uebung) - UEBUNGEN.indexOf(b.uebung) || STUFEN.indexOf(stufeVon(a)) - STUFEN.indexOf(stufeVon(b))
+    )
     for (const a of sortiert) aufgaben.push({ ...a, regelId, stufe: uebungStufe(a.uebung) })
   }
   return { thema, regeln, aufgaben }

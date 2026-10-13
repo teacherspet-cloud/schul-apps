@@ -35,6 +35,9 @@ import {
   istKern,
   mixSchluessel,
   regelIdVon,
+  STUFE_NAME,
+  STUFEN,
+  stufeVon,
   UEBUNG_NAME,
   UEBUNG_TEXT,
   UEBUNGEN,
@@ -42,6 +45,7 @@ import {
   type BankAufgabe,
   type BankRegel,
   type BankZahlen,
+  type Stufe,
   type Uebung
 } from '@shared/grammatikBank'
 import type { GrammatikPaket } from '@shared/grammatiktrainer'
@@ -56,7 +60,9 @@ import {
   bankLesen,
   bankSpeichern,
   bankZahlenLaden,
-  fehlendeUebungen,
+  fehlendeFelder,
+  feldZahl,
+  useSchulStufen,
   useBankEntwuerfe,
   type BankEntwurf
 } from './bank'
@@ -120,12 +126,16 @@ export function BankKarte({
   darf: boolean
 }): React.JSX.Element {
   const entwuerfe = useBankEntwuerfe()
+  // Stufen der Schule (Schulform in den Einstellungen) – danach Zähler, Ampel und KI-Knopf
+  const schulStufen = useSchulStufen()
   const [bearbeiten, setBearbeiten] = useState<Reiter | null>(null)
   const reiter = useMemo<Reiter[]>(() => {
     const teile = teilbereicheVon(punkt.t)
+    // Teilbereiche aus mehreren Themen (z. B. „be" und „Kurzantworten"): voller Name, sonst stünde nur „mit be" da (13.10.2026)
+    const mehrereThemen = new Set(teile.map((k) => k.split('/')[0])).size > 1
     const aus: Reiter[] = teile.map((k) => ({
       schluessel: k,
-      name: teilKurzname(k),
+      name: teilKurzname(k, mehrereThemen),
       titel: kennungLabel(k),
       themen: [k.split('/')[0]],
       hinweise: teilHinweise(k)
@@ -168,7 +178,8 @@ export function BankKarte({
     )
 
   const darfReiter = (r: Reiter): boolean => darf || !Object.keys(zahlen[r.schluessel] ?? {}).length
-  const auftrag = (r: Reiter, uebungen: Uebung[]): Parameters<typeof bankErzeugenStarten>[0][number] => ({
+  const auftrag = (r: Reiter, uebungen: Uebung[], niveau: Stufe): Parameters<typeof bankErzeugenStarten>[0][number] => ({
+    niveau,
     schluessel: r.schluessel,
     titel: r.titel,
     fach: fachVon(fach)?.label ?? fach,
@@ -186,13 +197,11 @@ export function BankKarte({
   const entwurfVon = (s: string): BankEntwurf | undefined => entwuerfe.find((e) => e.schluessel === s)
   // „Öffnen" in der Auftragsleiste führt zu diesem Grammatikpunkt
   const ziel = zielDocId({ buchId: buch.id, unit, abschnitt: abschnitt ?? '', kennungen: punkt.t, text: punkt.text })
-  const offeneReiter = reiter.filter((r) => darfReiter(r) && fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)).length)
-  const alleFehlenden = (): void =>
-    bankErzeugenStarten(
-      offeneReiter.map((r) => auftrag(r, fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)))),
-      `Übungsaufgaben: ${punkt.text}`,
-      ziel
-    )
+  const felderVon = (r: Reiter): ReturnType<typeof fehlendeFelder> => fehlendeFelder(zahlen[r.schluessel], schulStufen, entwurfVon(r.schluessel))
+  // Je Stufe der Schule eine Anfrage je Bereich (13.10.2026)
+  const auftraegeVon = (r: Reiter): ReturnType<typeof auftrag>[] => felderVon(r).map((f) => auftrag(r, f.uebungen, f.stufe))
+  const offeneReiter = reiter.filter((r) => darfReiter(r) && felderVon(r).length)
+  const alleFehlenden = (): void => bankErzeugenStarten(offeneReiter.flatMap(auftraegeVon), `Übungsaufgaben: ${punkt.text}`, ziel)
 
   const editor = bearbeiten && (
     <BankEditor
@@ -215,7 +224,7 @@ export function BankKarte({
           const z = zahlen[r.schluessel]
           const n = UEBUNGEN.reduce((m, u) => m + (z?.[u] ?? 0), 0)
           const e = entwurfVon(r.schluessel)
-          const voll = n > 0 && !fehlendeUebungen(z).length
+          const voll = n > 0 && !fehlendeFelder(z, schulStufen).length
           const ampel = !n
             ? { farbe: 'gray', icon: <IconCircleDashed size={14} /> }
             : voll
@@ -229,7 +238,7 @@ export function BankKarte({
                     {ampel.icon}
                   </ThemeIcon>
                   <div style={{ minWidth: 0 }}>
-                    <Text size="sm" fw={600} truncate>
+                    <Text size="sm" fw={600} truncate title={r.name}>
                       {r.name}
                     </Text>
                     <Text size="xs" c="dimmed">
@@ -284,8 +293,20 @@ export function BankKarte({
                       </Badge>
                     ) : undefined
                   }
+                  title={r.name}
                 >
-                  {r.name}
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      maxWidth: 260,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      verticalAlign: 'bottom'
+                    }}
+                  >
+                    {r.name}
+                  </span>
                 </Tabs.Tab>
               )
             })}
@@ -294,7 +315,7 @@ export function BankKarte({
         {reiter.map((r) => {
           const z = zahlen[r.schluessel]
           const e = entwurfVon(r.schluessel)
-          const fehlend = fehlendeUebungen(z, e)
+          const fehlend = felderVon(r)
           return (
             <Tabs.Panel key={r.schluessel} value={r.schluessel} pt="sm">
               <Stack gap={6}>
@@ -303,22 +324,41 @@ export function BankKarte({
                     {r.formen.join(' · ')}
                   </Text>
                 )}
-                {UEBUNGEN.map((u) => {
-                  const n = z?.[u] ?? 0
-                  const dazu = e?.aufgaben.filter((a) => a.uebung === u).length ?? 0
-                  return (
-                    <Group key={u} gap="xs" wrap="nowrap" title={UEBUNG_TEXT[u]} data-bank-uebung={u}>
-                      <Text size="sm" w={110} fw={istKern(u) ? 600 : 400} c={istKern(u) ? undefined : 'dimmed'} style={{ flexShrink: 0 }}>
-                        {UEBUNG_NAME[u]}
-                      </Text>
-                      <Progress value={Math.min(100, (n / AUFGABEN_JE_FELD) * 100)} color={istKern(u) ? farbe : 'orange'} size="sm" style={{ flex: 1 }} />
-                      <Text size="xs" c="dimmed" w={58} ta="right" style={{ flexShrink: 0 }}>
-                        {n}
-                        {dazu ? ` +${dazu}` : ''} / {AUFGABEN_JE_FELD}
-                      </Text>
-                    </Group>
-                  )
-                })}
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="xs" c="dimmed" w={110} style={{ flexShrink: 0 }}>
+                    Übungsart
+                  </Text>
+                  {schulStufen.map((st) => (
+                    <Text key={st} size="xs" c="dimmed" style={{ flex: 1 }} ta="center">
+                      {STUFE_NAME[st]}
+                    </Text>
+                  ))}
+                </Group>
+                {UEBUNGEN.map((u) => (
+                  <Group key={u} gap="xs" wrap="nowrap" title={UEBUNG_TEXT[u]} data-bank-uebung={u}>
+                    <Text size="sm" w={110} fw={istKern(u) ? 600 : 400} c={istKern(u) ? undefined : 'dimmed'} style={{ flexShrink: 0 }}>
+                      {UEBUNG_NAME[u]}
+                    </Text>
+                    {schulStufen.map((st) => {
+                      const n = feldZahl(z, u, st)
+                      const dazu = e?.aufgaben.filter((a) => a.uebung === u && stufeVon(a) === st).length ?? 0
+                      return (
+                        <Tooltip
+                          key={st}
+                          label={`${UEBUNG_NAME[u]}, ${STUFE_NAME[st]}: ${n} von ${AUFGABEN_JE_FELD}${dazu ? ` (+${dazu} zum Durchsehen)` : ''}`}
+                        >
+                          <div style={{ flex: 1 }} data-bank-feld={`${u}-${st}`}>
+                            <Progress value={Math.min(100, (n / AUFGABEN_JE_FELD) * 100)} color={istKern(u) ? farbe : 'orange'} size="sm" />
+                            <Text size="10px" c="dimmed" ta="center">
+                              {n}
+                              {dazu ? ` +${dazu}` : ''}
+                            </Text>
+                          </div>
+                        </Tooltip>
+                      )
+                    })}
+                  </Group>
+                ))}
                 <Text size="xs" c="dimmed">
                   Erkennen, Bilden und Anwenden zählen für „sicher“; Unterscheiden und Fehler finden sind Zusatzaufgaben.
                 </Text>
@@ -340,7 +380,7 @@ export function BankKarte({
                     <Tooltip
                       label={
                         fehlend.length
-                          ? `Füllt ${fehlend.map((u) => UEBUNG_NAME[u]).join(', ')} auf je ${AUFGABEN_JE_FELD} Aufgaben auf`
+                          ? `Füllt fehlende Felder auf je ${AUFGABEN_JE_FELD} Aufgaben auf (${fehlend.map((f) => STUFE_NAME[f.stufe]).join(', ')})`
                           : 'Alle Übungsarten haben genug Aufgaben'
                       }
                     >
@@ -350,7 +390,7 @@ export function BankKarte({
                         color="violet"
                         leftSection={<IconSparkles size={14} />}
                         disabled={!fehlend.length}
-                        onClick={() => bankErzeugenStarten([auftrag(r, fehlend)], `Übungsaufgaben: ${r.titel}`, ziel)}
+                        onClick={() => bankErzeugenStarten(auftraegeVon(r), `Übungsaufgaben: ${r.titel}`, ziel)}
                         data-bank-ki
                       >
                         Mit KI erzeugen
@@ -399,6 +439,9 @@ function BankEditor({
   const [aufgaben, setAufgaben] = useState<BankAufgabe[]>([])
   const [neu, setNeu] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'alle' | Uebung>('alle')
+  // Stufe (13.10.2026): grundlegend, mittel, anspruchsvoll
+  const [stufe, setStufe] = useState<'alle' | Stufe>('alle')
+  const passt = (a: BankAufgabe): boolean => (filter === 'alle' || a.uebung === filter) && (stufe === 'alle' || stufeVon(a) === stufe)
   const [laeuft, setLaeuft] = useState(false)
   const [geladen, setGeladen] = useState(false)
   useEffect(() => {
@@ -420,7 +463,7 @@ function BankEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reiter.schluessel])
   const regelId = regelIdVon(reiter.schluessel)
-  const sichtbar = filter === 'alle' ? aufgaben : aufgaben.filter((a) => a.uebung === filter)
+  const sichtbar = aufgaben.filter(passt)
   const paket: GrammatikPaket = {
     thema: reiter.titel,
     regeln: [{ id: regelId, titel: regel?.titel ?? reiter.titel, erklaerung: regel?.erklaerung ?? '', beispiele: regel?.beispiele ?? [] }],
@@ -429,8 +472,8 @@ function BankEditor({
   // Gefilterte Liste zurück in die ganze: Reihenfolge der übrigen bleibt
   const aendern = (p: GrammatikPaket): void => {
     const geaendert = p.aufgaben as BankAufgabe[]
-    if (filter === 'alle') return setAufgaben(geaendert)
-    const rest = aufgaben.filter((a) => a.uebung !== filter)
+    if (filter === 'alle' && stufe === 'alle') return setAufgaben(geaendert)
+    const rest = aufgaben.filter((a) => !passt(a))
     setAufgaben([...rest, ...geaendert])
   }
   const speichern = async (): Promise<void> => {
@@ -506,6 +549,16 @@ function BankEditor({
             onChange={(v) => setFilter(v as 'alle' | Uebung)}
             data={[{ value: 'alle', label: `Alle (${aufgaben.length})` }, ...UEBUNGEN.map((u) => ({ value: u, label: `${UEBUNG_NAME[u]} (${zahl(u)})` }))]}
             data-bank-filter
+          />
+          <SegmentedControl
+            size="xs"
+            value={stufe}
+            onChange={(v) => setStufe(v as 'alle' | Stufe)}
+            data={[
+              { value: 'alle', label: 'Alle Stufen' },
+              ...STUFEN.map((st) => ({ value: st, label: `${STUFE_NAME[st]} (${aufgaben.filter((a) => stufeVon(a) === st).length})` }))
+            ]}
+            data-bank-stufe
           />
           {sichtbar.length ? (
             <AufgabenEditor paket={paket} aendern={aendern} neu={neu} ohneRegeln />

@@ -5,6 +5,7 @@
  */
 import { useFachFarbe } from '../../shared/components/FachFarbe'
 import { useProgrammFarbe } from '../../shared/components/AppKopf'
+import { fachDerSprache } from '@shared/fachobleute'
 
 const istHex = (f: string): boolean => f.startsWith('#') || f.startsWith('rgb')
 
@@ -20,7 +21,8 @@ export const tonText = (f: string): string => (istHex(f) ? `color-mix(in srgb, $
 /** Farbe eines Fachs (Sprachcode), sonst die Programmfarbe */
 export function useGrammatikFarbe(sprache: string | undefined): string {
   const programm = useProgrammFarbe()
-  return useFachFarbe(sprache) ?? programm
+  // Über das Fach (de → Deutsch, nicht DaZ)
+  return useFachFarbe(sprache ? fachDerSprache(sprache) : undefined) ?? programm
 }
 
 /** Ampel der Übungsaufgaben einer Form: vollständig, teilweise, noch keine */

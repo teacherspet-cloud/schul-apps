@@ -98,13 +98,14 @@ describe('Herkunft mit mehreren Units', () => {
 })
 
 describe('Sprachfächer einer Lerngruppe', () => {
-  it('erkennt moderne und alte Fremdsprachen, nicht Deutsch, DaZ oder Sachfächer', () => {
+  it('erkennt moderne und alte Fremdsprachen und Deutsch (Grammatik-Kurs „de", 13.10.2026), nicht DaZ oder Sachfächer', () => {
     expect(sprachfaecherDerGruppe('Englisch')).toEqual([{ fach: 'Englisch', sprache: 'en', id: 'englisch' }])
     expect(sprachfaecherDerGruppe('englisch')).toEqual([{ fach: 'Englisch', sprache: 'en', id: 'englisch' }])
     expect(sprachfaecherDerGruppe('Latein')).toEqual([{ fach: 'Latein', sprache: 'la', id: 'latein' }])
     expect(sprachfaecherDerGruppe('Altgriechisch')[0]?.sprache).toBe('grc')
     expect(sprachfaecherDerGruppe('Englisch, Französisch').map((s) => s.sprache)).toEqual(['en', 'fr'])
-    for (const f of ['Deutsch', 'Mathematik', 'Geschichte', '', 'Eigenes Fach']) expect(sprachfaecherDerGruppe(f)).toEqual([])
+    expect(sprachfaecherDerGruppe('Deutsch')).toEqual([{ fach: 'Deutsch', sprache: 'de', id: 'deutsch' }])
+    for (const f of ['Mathematik', 'Geschichte', '', 'Eigenes Fach']) expect(sprachfaecherDerGruppe(f)).toEqual([])
   })
 })
 
