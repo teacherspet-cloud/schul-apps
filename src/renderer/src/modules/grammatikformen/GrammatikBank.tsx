@@ -306,37 +306,42 @@ export function BankKarte({
                     </Tooltip>
                   </div>
                 </Group>
-                {ergaenzbar && (
-                  <Tooltip label="Die KI ergänzt, was noch fehlt, und speichert es gleich – ohne Durchsehen">
-                    <Button
-                      size="compact-sm"
-                      variant="light"
-                      color="violet"
-                      leftSection={<IconSparkles size={14} />}
-                      onClick={() =>
-                        bankErzeugenStarten(
-                          felderVon(r).map((f) => ({ ...auftrag(r, f.uebungen, f.stufe), direkt: true })),
-                          `Ergänzen: ${r.titel}`,
-                          ziel
-                        )
-                      }
-                      style={{ flexShrink: 0 }}
-                      data-bank-ergaenzen
-                    >
-                      Ergänzen
-                    </Button>
-                  </Tooltip>
-                )}
-                <Button
-                  size="compact-sm"
-                  variant={e ? 'filled' : 'light'}
-                  color={e ? 'violet' : farbe}
-                  onClick={() => setBearbeiten(r)}
-                  style={{ flexShrink: 0 }}
-                  data-bank-bearbeiten
-                >
-                  {e ? 'Durchsehen' : n || !darfReiter(r) ? 'Ansehen' : 'Anlegen'}
-                </Button>
+                {/* Knöpfe rechts in festen Spalten (13.10.2026): „Ergänzen" und „Ansehen" stehen in jeder Zeile untereinander */}
+                <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }} data-bank-knoepfe>
+                  <div style={{ width: 112, display: 'flex', justifyContent: 'flex-end' }}>
+                    {ergaenzbar && (
+                      <Tooltip label="Die KI ergänzt, was noch fehlt, und speichert es gleich – ohne Durchsehen">
+                        <Button
+                          size="compact-sm"
+                          variant="light"
+                          color="violet"
+                          leftSection={<IconSparkles size={14} />}
+                          onClick={() =>
+                            bankErzeugenStarten(
+                              felderVon(r).map((f) => ({ ...auftrag(r, f.uebungen, f.stufe), direkt: true })),
+                              `Ergänzen: ${r.titel}`,
+                              ziel
+                            )
+                          }
+                          fullWidth
+                          data-bank-ergaenzen
+                        >
+                          Ergänzen
+                        </Button>
+                      </Tooltip>
+                    )}
+                  </div>
+                  <Button
+                    size="compact-sm"
+                    variant={e ? 'filled' : 'light'}
+                    color={e ? 'violet' : farbe}
+                    onClick={() => setBearbeiten(r)}
+                    w={104}
+                    data-bank-bearbeiten
+                  >
+                    {e ? 'Durchsehen' : n || !darfReiter(r) ? 'Ansehen' : 'Anlegen'}
+                  </Button>
+                </Group>
               </Group>
             </Paper>
           )
