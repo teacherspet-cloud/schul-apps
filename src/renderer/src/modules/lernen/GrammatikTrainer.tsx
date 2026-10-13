@@ -49,13 +49,13 @@ import {
   type GrammatikPaket,
   type GrammatikSpielId
 } from '@shared/grammatiktrainer'
-import { alsKarten, grammatikSpielPasst } from '@shared/grammatiktrainer'
+import { alsKarten, grammatikSpielPasst, pruefeGrammatik } from '@shared/grammatiktrainer'
 import { einzelBeschreibung, spielName } from '@shared/spielSprache'
 import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
 import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from './spiele/SpieleGrammatik'
-import { STUFEN, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
+import { nachAbfrage, STUFEN, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { grammatikHeute } from '@shared/grammatikVorrang'
-import { formSicher } from '@shared/grammatikSicher'
+import { formSicher, mitErstemVersuch } from '@shared/grammatikSicher'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
@@ -115,12 +115,45 @@ interface Daten {
   /** Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag (vor einem Test mehr) und Teststoff */
   neuJeTag?: number
   test?: boolean
+  /**
+   * Vorschau der Lehrkraft (13.10.2026, „Schüleransicht zeigen" in Grammatikformen): ohne Kurs und ohne Server – Antworten
+   * werden hier geprüft, nichts wird gespeichert (`sende`).
+   */
+  vorschau?: boolean
 }
 interface Ergebnis {
   urteil: Urteil
   richtig: string
   erklaerung: string
   stand: WortStand
+}
+
+/** Anfrage an den Server – in der Vorschau beantwortet sie die Oberfläche selbst und speichert nichts */
+function sende<T>(d: Daten, pfad: string, k: Record<string, unknown>): Promise<T> {
+  if (!d.vorschau) return senden<T>(pfad, k)
+  if (pfad === '/s/api/grammatik/antwort') {
+    const a = d.paket.aufgaben.find((x) => x.id === k.aufgabeId)
+    if (!a) return Promise.reject(new Error('Unbekannte Aufgabe.'))
+    const antwort = String(k.antwort ?? '')
+    const selbst = k.selbst === 'richtig' || k.selbst === 'fast' || k.selbst === 'falsch' ? k.selbst : undefined
+    const e = pruefeGrammatik(a, antwort, typeof k.wort === 'string' ? k.wort : undefined, selbst)
+    const alt = d.staende[a.id]
+    const leer: WortStand = {
+      fach: 0,
+      faellig: 0,
+      frei: [],
+      erkannt: 0,
+      erkennenVersuche: 0,
+      versuche: 0,
+      falsch: 0,
+      fehlerTexte: [],
+      zuletzt: 0
+    } as unknown as WortStand
+    const stand = mitErstemVersuch(alt, nachAbfrage(alt ?? leer, 'frei', e.urteil, antwort, Date.now()), e.urteil)
+    return Promise.resolve({ urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', stand } as T)
+  }
+  if (pfad === '/s/api/grammatik/spiel') return Promise.resolve({ rekord: false, rekorde: d.rekorde, ansehen: d.ansehen } as T)
+  return Promise.resolve({} as T)
 }
 
 const mische = <T,>(l: T[]): T[] => {
@@ -140,17 +173,18 @@ const teileGemischt = (teile: string[]): string[] => {
   return [...teile].reverse()
 }
 
-export default function GrammatikTrainer({ id }: { id: string }): React.JSX.Element {
-  const [d, setD] = useState<Daten | null | undefined>(undefined)
+export default function GrammatikTrainer({ id, vorschau }: { id: string; vorschau?: Daten }): React.JSX.Element {
+  const [d, setD] = useState<Daten | null | undefined>(vorschau)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzungRoh] = useState<GrammatikAufgabe[] | null>(null)
   const blatt = useBlaettern()
   const laden = useCallback(() => {
+    if (vorschau) return
     void holen<Daten>(`/s/api/grammatik/liste?id=${encodeURIComponent(id)}`).then(setD, (e: unknown) => {
       setFehler(e instanceof Error ? e.message : String(e))
       setD(null)
     })
-  }, [id])
+  }, [id, vorschau])
   useEffect(laden, [laden])
   // Änderungen der Lehrkraft ohne Neuladen (08.10.2026) – nicht mitten in einer Runde oder einem Spiel
   useAuffrischen(() => !document.querySelector('[data-spiel], [data-verbspiel], [data-sitzung]') && laden(), !sitzung)
@@ -164,7 +198,12 @@ export default function GrammatikTrainer({ id }: { id: string }): React.JSX.Elem
   // Im Ordner: Runde als nächste Seite; Zurück (auch mitten in der Runde) lädt den Stand neu
   const setSitzung = (a: GrammatikAufgabe[] | null): void => {
     if (!blatt) return setSitzungRoh(a)
-    if (a) blatt.oeffne('uebung', () => setSitzungRoh(a), () => (setSitzungRoh(null), laden()))
+    if (a)
+      blatt.oeffne(
+        'uebung',
+        () => setSitzungRoh(a),
+        () => (setSitzungRoh(null), laden())
+      )
     else blatt.zurueck(() => setSitzungRoh(null))
   }
   return (
@@ -206,7 +245,7 @@ function Kasten({
   // „Extra für dich" aus anderen Freigaben (nur auf der normalen Grammatik-Seite)
   const [extras, setExtras] = useState<{ id: string; titel: string; fach: string; uebersicht: { unbearbeitet: number; gesamt: number } }[]>([])
   useEffect(() => {
-    if (d.art) return
+    if (d.art || d.vorschau) return
     let aus = false
     void holen<{ listen: { id: string; titel: string; fach: string; extra: boolean; uebersicht: { unbearbeitet: number; gesamt: number } }[] }>(
       '/s/api/grammatik'
@@ -223,7 +262,12 @@ function Kasten({
   const blatt = useBlaettern()
   const setSpiel = (s: GrammatikSpielId | null): void => {
     if (!blatt) return setSpielRoh(s)
-    if (s) blatt.oeffne('spiel', () => setSpielRoh(s), () => setSpielRoh(null))
+    if (s)
+      blatt.oeffne(
+        'spiel',
+        () => setSpielRoh(s),
+        () => setSpielRoh(null)
+      )
     else blatt.zurueck(() => setSpielRoh(null))
   }
   const { d: wahl, setze: setzeWahl } = useDarstellung()
@@ -307,7 +351,12 @@ function Kasten({
   const jetzt = Date.now()
   const bearbeitet = d.paket.aufgaben.filter((a) => d.staende[a.id]?.versuche).length
   const regelnMitUebungen = d.paket.regeln.filter((r) => d.paket.aufgaben.some((a) => a.regelId === r.id)).length
-  const regelnSicher = d.paket.regeln.filter((r) => formSicher(d.paket.aufgaben.filter((a) => a.regelId === r.id), d.staende)).length
+  const regelnSicher = d.paket.regeln.filter((r) =>
+    formSicher(
+      d.paket.aufgaben.filter((a) => a.regelId === r.id),
+      d.staende
+    )
+  ).length
   const erklaerungen: Record<string, string> = {
     bearbeitet: 'So viele Übungen hast du schon mindestens einmal gemacht. Unbearbeitete kommen bei „Weiter üben" zuerst nach den fälligen dran.',
     // „Sicher" je Regel nach dem ersten Versuch (12.10.2026, Entscheidung der Lehrkraft – shared/grammatikSicher.ts)
@@ -339,7 +388,7 @@ function Kasten({
   const spieleKlappen = (): void => {
     const neu = { ...wahl, spielGruppen: { ...(wahl.spielGruppen ?? {}), grammatik: !spieleOffen } }
     setzeWahl(neu)
-    if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
+    if (window.__schulappsServer?.angemeldet && !d.vorschau) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
   }
   const spiele = GRAMMATIK_SPIELE.filter(
     (s) => (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length) && spielPasst(s.id)
@@ -394,7 +443,13 @@ function Kasten({
         {offen && (
           <Stack gap="xs" mt="sm">
             <RegelKarte r={r} />
-            <Button variant="light" color={farbe.a} leftSection={<IconPlayerPlay size={16} />} onClick={() => starten(regelAufgaben(r.id))} data-regel-ueben={r.id}>
+            <Button
+              variant="light"
+              color={farbe.a}
+              leftSection={<IconPlayerPlay size={16} />}
+              onClick={() => starten(regelAufgaben(r.id))}
+              data-regel-ueben={r.id}
+            >
               Diese Regel üben
             </Button>
           </Stack>
@@ -513,7 +568,11 @@ function Kasten({
                     onClick={(e: React.MouseEvent) => {
                       if (!blatt || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
                       e.preventDefault()
-                      blatt.oeffne('extra', () => setExtraRoh(x.id), () => setExtraRoh(null))
+                      blatt.oeffne(
+                        'extra',
+                        () => setExtraRoh(x.id),
+                        () => setExtraRoh(null)
+                      )
                     }}
                     withBorder
                     radius="lg"
@@ -577,7 +636,7 @@ function Kasten({
           {spieleOffen && (
             <>
               {/* Einladungscode für Kooperativ/Versus oben im Spielbereich (09.10.2026) */}
-              {!d.paket.verben?.length && (
+              {!d.paket.verben?.length && !d.vorschau && (
                 <div style={{ marginTop: 8 }}>
                   <EinladungsCode sprache={d.sprache} />
                 </div>
@@ -605,7 +664,7 @@ function Kasten({
                 ))}
               </SimpleGrid>
               {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) */}
-              {!d.paket.verben?.length && (
+              {!d.paket.verben?.length && !d.vorschau && (
                 <Stack gap="xs" mt="sm">
                   <ZusammenSpielen bereich="gram" kurs={d.id} sprache={d.sprache} mitCode={false} />
                 </Stack>
@@ -641,7 +700,7 @@ function VerbSpielLauf({
   const info = GRAMMATIK_SPIELE.find((s) => s.id === spiel)!
   const [ende, setEnde] = useState<{ wert: number; rekord: boolean } | null>(null)
   const abschliessen = (wert: number, fehler: string[]): void => {
-    void senden<{ rekord: boolean; rekorde: Record<string, number> }>('/s/api/grammatik/spiel', {
+    void sende<{ rekord: boolean; rekorde: Record<string, number> }>(d, '/s/api/grammatik/spiel', {
       id: d.id,
       spiel,
       wert,
@@ -672,35 +731,35 @@ function VerbSpielLauf({
   return (
     // Vollbild beim Lernen (09.10.2026): das laufende Spiel füllt den Bildschirm, das Ergebnis zeigt die normale Ansicht
     <FokusRahmen name="grammatikspiel" onEnde={() => fertig()}>
-    <Stack className="vt" data-verbspiel={spiel}>
-      <style>{CSS}</style>
-      <style>{SPIELE_CSS}</style>
-      <Group justify="space-between">
-        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4} data-eigenes-beenden>
-          Beenden
-        </Button>
-        <Text fw={800}>{spielName('gram', spiel, d.sprache, info.name)}</Text>
-      </Group>
-      <div className="vt-buehne">
-        {spiel === 'richtigfalsch' ? (
-          <RichtigFalsch aufgaben={aufgaben} ende={abschliessen} />
-        ) : spiel === 'formenmemory' ? (
-          <FormenMemory aufgaben={aufgaben} ende={abschliessen} />
-        ) : spiel === 'tabellenpuzzle' ? (
-          <TabellenPuzzle aufgaben={aufgaben} ende={abschliessen} />
-        ) : spiel === 'signalwort' ? (
-          <SignalwortSortierer zeitformen={zeitformen} ende={abschliessen} />
-        ) : !daten ? null : spiel === 'verbtrio' ? (
-          <StammformenTrio verben={daten} ende={abschliessen} />
-        ) : spiel === 'verbblitz' ? (
-          <FormenBlitz verben={daten} ende={abschliessen} />
-        ) : spiel === 'bildverb' ? (
-          <BildVerb verben={daten} ende={abschliessen} />
-        ) : (
-          <MusterSortieren verben={daten} ende={abschliessen} />
-        )}
-      </div>
-    </Stack>
+      <Stack className="vt" data-verbspiel={spiel}>
+        <style>{CSS}</style>
+        <style>{SPIELE_CSS}</style>
+        <Group justify="space-between">
+          <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig()} px={4} data-eigenes-beenden>
+            Beenden
+          </Button>
+          <Text fw={800}>{spielName('gram', spiel, d.sprache, info.name)}</Text>
+        </Group>
+        <div className="vt-buehne">
+          {spiel === 'richtigfalsch' ? (
+            <RichtigFalsch aufgaben={aufgaben} ende={abschliessen} />
+          ) : spiel === 'formenmemory' ? (
+            <FormenMemory aufgaben={aufgaben} ende={abschliessen} />
+          ) : spiel === 'tabellenpuzzle' ? (
+            <TabellenPuzzle aufgaben={aufgaben} ende={abschliessen} />
+          ) : spiel === 'signalwort' ? (
+            <SignalwortSortierer zeitformen={zeitformen} ende={abschliessen} />
+          ) : !daten ? null : spiel === 'verbtrio' ? (
+            <StammformenTrio verben={daten} ende={abschliessen} />
+          ) : spiel === 'verbblitz' ? (
+            <FormenBlitz verben={daten} ende={abschliessen} />
+          ) : spiel === 'bildverb' ? (
+            <BildVerb verben={daten} ende={abschliessen} />
+          ) : (
+            <MusterSortieren verben={daten} ende={abschliessen} />
+          )}
+        </div>
+      </Stack>
     </FokusRahmen>
   )
 }
@@ -753,7 +812,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
     setAufgegeben(zeigen)
     setLaeuft(true)
     try {
-      const e = await senden<Ergebnis>('/s/api/grammatik/antwort', {
+      const e = await sende<Ergebnis>(d, '/s/api/grammatik/antwort', {
         id: d.id,
         aufgabeId: a.id,
         antwort,
@@ -823,90 +882,90 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   return (
     // Vollbild beim Lernen (09.10.2026): die laufende Runde füllt den Bildschirm
     <FokusRahmen name="grammatikrunde" onEnde={() => fertig(staende)}>
-    <Stack className="vt" data-sitzung>
-      <style>{CSS}</style>
-      <Group justify="space-between">
-        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
-          Beenden
-        </Button>
-        <Group gap={6}>
-          <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
-            {ART_NAME[a.art]}
-          </Badge>
-          <Badge variant="outline" color={farbe.a} size="lg" radius="sm" tt="none">
-            {a.stufe ? `Stufe ${a.stufe}` : STUFEN[Math.min(6, st?.fach ?? 0)].name}
-          </Badge>
-        </Group>
-      </Group>
-      <Progress value={(zaehler.gesamt / Math.max(1, zaehler.gesamt + schlange.length)) * 100} radius="xl" size="lg" color={farbe.a} />
-      {netz && (
-        <Alert color="orange" data-netz-fehler>
-          {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.
-        </Alert>
-      )}
-      <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
-        <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
-      </div>
-      {!ergebnis && MIT_LOESUNG_ZEIGEN.includes(a.art) && (
-        <Group justify="center">
-          <LoesungZeigen zeigen={() => void antworten('', undefined, undefined, true)} gesperrt={laeuft} />
-        </Group>
-      )}
-      {a.tipp && !ergebnis && (
-        <Stack gap={4}>
-          <Button variant="light" size="xs" color="yellow" w="fit-content" onClick={() => setTippFuer(`${a.id}-${frage}`)} data-tipp-zeigen>
-            Tipp
+      <Stack className="vt" data-sitzung>
+        <style>{CSS}</style>
+        <Group justify="space-between">
+          <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
+            Beenden
           </Button>
-          {tippFuer === `${a.id}-${frage}` && (
-            <Alert color="yellow" variant="light" data-tipp-text>
-              {a.tipp}
-            </Alert>
-          )}
-        </Stack>
-      )}
-      {r && (
-        <Button
-          variant="subtle"
-          size="xs"
-          color={farbe.a}
-          leftSection={<IconBook2 size={14} />}
-          w="fit-content"
-          onClick={() => setRegel((x) => !x)}
-          data-regel-zeigen
-        >
-          {regel ? 'Regel ausblenden' : 'Regel ansehen'}
-        </Button>
-      )}
-      {r && (regel || (ergebnis && ergebnis.urteil !== 'richtig')) && <RegelKarte r={r} />}
-      {ergebnis && (
-        <Alert color={ergebnis.urteil === 'richtig' ? 'green' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
-          <Text fw={700}>
-            {ergebnis.urteil === 'richtig'
-              ? 'Richtig!'
-              : aufgegeben
-              ? 'Hier ist die Lösung – die Aufgabe kommt bald wieder.'
-              : ergebnis.urteil === 'fast'
-              ? a.art === 'bestimmen' || a.art === 'mehrfach' || a.art === 'tabelle'
-                ? 'Teilweise richtig.'
-                : a.art === 'uebersetzen'
-                ? 'Fast.'
-                : 'Fast – achte auf die Schreibweise.'
-              : 'Leider falsch.'}
-          </Text>
-          {ergebnis.urteil !== 'richtig' && (
-            <Text size="sm" data-loesung-text>
-              {aufgegeben ? 'Lösung' : 'Richtig'}: {ergebnis.richtig}
+          <Group gap={6}>
+            <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
+              {ART_NAME[a.art]}
+            </Badge>
+            <Badge variant="outline" color={farbe.a} size="lg" radius="sm" tt="none">
+              {a.stufe ? `Stufe ${a.stufe}` : STUFEN[Math.min(6, st?.fach ?? 0)].name}
+            </Badge>
+          </Group>
+        </Group>
+        <Progress value={(zaehler.gesamt / Math.max(1, zaehler.gesamt + schlange.length)) * 100} radius="xl" size="lg" color={farbe.a} />
+        {netz && (
+          <Alert color="orange" data-netz-fehler>
+            {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.
+          </Alert>
+        )}
+        <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
+          <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
+        </div>
+        {!ergebnis && MIT_LOESUNG_ZEIGEN.includes(a.art) && (
+          <Group justify="center">
+            <LoesungZeigen zeigen={() => void antworten('', undefined, undefined, true)} gesperrt={laeuft} />
+          </Group>
+        )}
+        {a.tipp && !ergebnis && (
+          <Stack gap={4}>
+            <Button variant="light" size="xs" color="yellow" w="fit-content" onClick={() => setTippFuer(`${a.id}-${frage}`)} data-tipp-zeigen>
+              Tipp
+            </Button>
+            {tippFuer === `${a.id}-${frage}` && (
+              <Alert color="yellow" variant="light" data-tipp-text>
+                {a.tipp}
+              </Alert>
+            )}
+          </Stack>
+        )}
+        {r && (
+          <Button
+            variant="subtle"
+            size="xs"
+            color={farbe.a}
+            leftSection={<IconBook2 size={14} />}
+            w="fit-content"
+            onClick={() => setRegel((x) => !x)}
+            data-regel-zeigen
+          >
+            {regel ? 'Regel ausblenden' : 'Regel ansehen'}
+          </Button>
+        )}
+        {r && (regel || (ergebnis && ergebnis.urteil !== 'richtig')) && <RegelKarte r={r} />}
+        {ergebnis && (
+          <Alert color={ergebnis.urteil === 'richtig' ? 'green' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
+            <Text fw={700}>
+              {ergebnis.urteil === 'richtig'
+                ? 'Richtig!'
+                : aufgegeben
+                ? 'Hier ist die Lösung – die Aufgabe kommt bald wieder.'
+                : ergebnis.urteil === 'fast'
+                ? a.art === 'bestimmen' || a.art === 'mehrfach' || a.art === 'tabelle'
+                  ? 'Teilweise richtig.'
+                  : a.art === 'uebersetzen'
+                  ? 'Fast.'
+                  : 'Fast – achte auf die Schreibweise.'
+                : 'Leider falsch.'}
             </Text>
-          )}
-          {ergebnis.erklaerung && <Text size="sm">{ergebnis.erklaerung}</Text>}
-        </Alert>
-      )}
-      {ergebnis && (
-        <Button size="lg" radius="xl" className="vt-los" onClick={weiter} data-weiter autoFocus>
-          Weiter
-        </Button>
-      )}
-    </Stack>
+            {ergebnis.urteil !== 'richtig' && (
+              <Text size="sm" data-loesung-text>
+                {aufgegeben ? 'Lösung' : 'Richtig'}: {ergebnis.richtig}
+              </Text>
+            )}
+            {ergebnis.erklaerung && <Text size="sm">{ergebnis.erklaerung}</Text>}
+          </Alert>
+        )}
+        {ergebnis && (
+          <Button size="lg" radius="xl" className="vt-los" onClick={weiter} data-weiter autoFocus>
+            Weiter
+          </Button>
+        )}
+      </Stack>
     </FokusRahmen>
   )
 }
@@ -1174,7 +1233,7 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
       if (beendet.current) return
       beendet.current = true
       try {
-        const r = await senden<{ rekord: boolean; rekorde: Record<string, number>; ansehen: string[] }>('/s/api/grammatik/spiel', {
+        const r = await sende<{ rekord: boolean; rekorde: Record<string, number>; ansehen: string[] }>(d, '/s/api/grammatik/spiel', {
           id: d.id,
           spiel,
           wert: p,

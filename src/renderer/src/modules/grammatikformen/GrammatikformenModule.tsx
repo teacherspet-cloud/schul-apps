@@ -11,6 +11,13 @@ import { FachPunkt } from '../../shared/components/FachFarbe'
 import { LEHRWERK_GRAMMATIK, LEHRWERK_GRAMMATIK_EINGEBAUT, wendeGrammatikAn, type LehrwerkGrammatikEintrag } from '../../shared/lehrwerkGrammatik'
 import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import GrammatikformenEditor from './GrammatikformenEditor'
+import { useGrammatikFarbe } from './farbton'
+import { useBankZahlen } from './GrammatikBank'
+import { aufgabenAmpel } from './bank'
+import { teilbereicheVon } from './grammatikformen'
+import type { BankZahlen } from '@shared/grammatikBank'
+import { zielAusDocId, type GrammatikformenZiel } from './grammatikformen'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 const collator = new Intl.Collator('de', { numeric: true })
 const SPRACHE_KEY = 'grammatikformen-sprache'
@@ -30,7 +37,17 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
   const [books, setBooks] = useState<TextbookMeta[]>([])
   const [eintraege, setEintraege] = useState<LehrwerkGrammatikEintrag[]>([])
   const [offen, setOffen] = useState<string | null>(null)
-  const farbe = useProgrammFarbe()
+  // „Öffnen" in der Auftragsleiste (13.10.2026): Band, Unit und Grammatikpunkt (grammatikformen.ts `zielDocId`)
+  const [ziel, setZiel] = useState<GrammatikformenZiel | null>(null)
+  useDokumentOeffner('grammatikformen', async (docId) => {
+    const z = zielAusDocId(docId)
+    if (!z) return
+    const buecher = books.length ? books : await window.api.textbooks.list()
+    if (!buecher.some((b) => b.id === z.buchId)) return
+    setOffen(z.buchId)
+    setZiel({ ...z })
+  })
+  const programmFarbe = useProgrammFarbe()
   const [sprache, setSprache] = useState<string>(() => {
     try {
       return localStorage.getItem(SPRACHE_KEY) || 'en'
@@ -66,6 +83,9 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
     const da = new Set(books.map((b) => b.language))
     return LANGUAGES.filter((l) => da.has(l.value)).map((l) => ({ value: l.value, label: l.label }))
   }, [books])
+  // Fachfarbe und Stand der Übungsaufgaben (13.10.2026, abgestimmt)
+  const farbe = useGrammatikFarbe(sprache)
+  const bank = useBankZahlen(sprache)
   const liste = books.filter((b) => b.language === sprache).sort((a, b) => collator.compare(a.name, b.name))
   // Nach Reihe gruppiert, wie in den Vokabellisten
   const reihen = useMemo(() => {
@@ -87,8 +107,10 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
             buch={buch}
             alle={books}
             eintrag={eintraege.find((e) => e.lehrwerkId === buch.id)}
+            ziel={ziel?.buchId === buch.id ? ziel : null}
             onBack={() => {
               setOffen(null)
+              setZiel(null)
               laden()
             }}
             onGespeichert={(l) => setEintraege(l)}
@@ -108,7 +130,7 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
           <Chip.Group value={sprache} onChange={(v) => typeof v === 'string' && setSprache(v)}>
             <Group gap={6} data-grammatikformen-fach>
               {sprachen.map((s) => (
-                <Chip key={s.value} value={s.value} color={farbe} variant="light" data-grammatikformen-fach-chip={s.value}>
+                <Chip key={s.value} value={s.value} color={programmFarbe} variant="light" data-grammatikformen-fach-chip={s.value}>
                   <Group gap={6} wrap="nowrap" component="span">
                     <FachPunkt fach={s.value} />
                     {s.label}
@@ -142,7 +164,14 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
                 }}
               >
                 {baende.map((b) => (
-                  <BandKachel key={b.id} buch={b} farbe={farbe} bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)} onOpen={() => setOffen(b.id)} />
+                  <BandKachel
+                    key={b.id}
+                    buch={b}
+                    farbe={farbe}
+                    zahlen={bank.geladen ? bank.zahlen : null}
+                    bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)}
+                    onOpen={() => setOffen(b.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -154,9 +183,23 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
 }
 
 /** Ein Band im Regal: Cover oben, darunter Name, Klasse, Zahl der Grammatikpunkte, Füllbalken und Kennzeichen */
-function BandKachel({ buch, farbe, bearbeitet, onOpen }: { buch: TextbookMeta; farbe: string; bearbeitet: boolean; onOpen: () => void }): React.JSX.Element {
+function BandKachel({
+  buch,
+  farbe,
+  zahlen,
+  bearbeitet,
+  onOpen
+}: {
+  buch: TextbookMeta
+  farbe: string
+  /** Aufgabenbank (nur am Server) – null: kein Balken */
+  zahlen: BankZahlen | null
+  bearbeitet: boolean
+  onOpen: () => void
+}): React.JSX.Element {
   const eingebaut = Boolean(LEHRWERK_GRAMMATIK_EINGEBAUT[buch.name])
   const zahl = punkteIn(buch.name)
+  const punkteListe = Object.values(LEHRWERK_GRAMMATIK[buch.name] ?? {}).flatMap((k) => Object.values(k).flat())
   const g = LEHRWERK_GRAMMATIK[buch.name] ?? {}
   const mit = buch.units.filter((u) => Object.values(g[u.name] ?? {}).some((l) => l.length)).length
   const gesamt = buch.units.length
@@ -183,6 +226,20 @@ function BandKachel({ buch, farbe, bearbeitet, onOpen }: { buch: TextbookMeta; f
       <Text size="xs" c={zahl ? undefined : 'dimmed'}>
         {zahl ? `${zahl} ${zahl === 1 ? 'Grammatikpunkt' : 'Grammatikpunkte'}` : 'noch keine Grammatik'}
       </Text>
+      {zahlen && zahl > 0 && (
+        <div title="Formen mit Übungsaufgaben">
+          <Progress
+            value={(punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen) !== 'keine').length / zahl) * 100}
+            size={4}
+            color="teal"
+            radius="xl"
+            aria-label="Formen mit Übungsaufgaben"
+          />
+          <Text size="10px" c="dimmed" mt={2}>
+            Übungsaufgaben: {punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen) !== 'keine').length} von {zahl} Formen
+          </Text>
+        </div>
+      )}
       <div title="Units mit Grammatik">
         <Progress value={gesamt ? (mit / gesamt) * 100 : 0} size={4} color={farbe} radius="xl" aria-label="Units mit Grammatik" />
         <Text size="10px" c="dimmed" mt={2}>

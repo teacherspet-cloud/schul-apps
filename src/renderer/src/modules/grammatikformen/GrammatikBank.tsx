@@ -1,5 +1,5 @@
 /**
- * Übungsaufgaben im Seitenfenster der App „Grammatikformen" (13.10.2026, mit der Lehrkraft abgestimmt; Regeln in
+ * Übungsaufgaben im Pop-up der App „Grammatikformen" (13.10.2026, mit der Lehrkraft abgestimmt; Regeln in
  * shared/grammatikBank.ts, Server server/grammatikBank.ts).
  *
  * Reiter je Teilbereich des Grammatikpunkts, dazu „Gemischt" (Formen des Punkts) und „Unit gemischt" (Wiederholung der
@@ -15,6 +15,7 @@ import {
   Card,
   Group,
   Modal,
+  Paper,
   Progress,
   ScrollArea,
   SegmentedControl,
@@ -23,9 +24,10 @@ import {
   Text,
   Textarea,
   TextInput,
+  ThemeIcon,
   Tooltip
 } from '@mantine/core'
-import { IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconCheck, IconCircleDashed, IconCircleHalf2, IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import {
@@ -46,7 +48,7 @@ import type { GrammatikPaket } from '@shared/grammatiktrainer'
 import type { LehrwerkGrammatikPunkt } from '../../shared/lehrwerkGrammatik'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { AufgabenEditor } from '../lernen/kurs/AufgabenEditor'
-import { kennungLabel, teilbereicheVon, teilHinweise, teilKurzname, themaZu } from './grammatikformen'
+import { kennungLabel, teilbereicheVon, teilHinweise, teilKurzname, themaZu, zielDocId } from './grammatikformen'
 import {
   BANK_EREIGNIS,
   bankEntwurfWeg,
@@ -98,8 +100,14 @@ export function BankKarte({
   fach,
   farbe,
   zahlen,
-  darf
+  darf,
+  einfach,
+  abschnitt
 }: {
+  /** Abschnitt des Punkts (Ziel für „Öffnen") */
+  abschnitt?: string
+  /** Standardmodus: eine Zeile je Bereich mit Ampel, ohne Übungsarten */
+  einfach?: boolean
   punkt: LehrwerkGrammatikPunkt
   unit: string
   /** Alle Punkte der Unit (für „Unit gemischt") */
@@ -176,11 +184,84 @@ export function BankKarte({
     lehrwerk: { buch: buch.name, unit }
   })
   const entwurfVon = (s: string): BankEntwurf | undefined => entwuerfe.find((e) => e.schluessel === s)
+  // „Öffnen" in der Auftragsleiste führt zu diesem Grammatikpunkt
+  const ziel = zielDocId({ buchId: buch.id, unit, abschnitt: abschnitt ?? '', kennungen: punkt.t, text: punkt.text })
   const offeneReiter = reiter.filter((r) => darfReiter(r) && fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)).length)
   const alleFehlenden = (): void =>
     bankErzeugenStarten(
       offeneReiter.map((r) => auftrag(r, fehlendeUebungen(zahlen[r.schluessel], entwurfVon(r.schluessel)))),
-      `Übungsaufgaben: ${punkt.text}`
+      `Übungsaufgaben: ${punkt.text}`,
+      ziel
+    )
+
+  const editor = bearbeiten && (
+    <BankEditor
+      reiter={bearbeiten}
+      sprache={buch.language}
+      darf={darfReiter(bearbeiten)}
+      entwurf={entwurfVon(bearbeiten.schluessel)}
+      schliessen={() => setBearbeiten(null)}
+    />
+  )
+
+  /*
+   * Standardmodus (13.10.2026, abgestimmt): je Teilbereich bzw. gemischter Übung eine Zeile mit Ampel und EINEM Knopf –
+   * ohne die einzelnen Übungsarten. Darunter „Fehlende Aufgaben mit KI ergänzen".
+   */
+  if (einfach)
+    return (
+      <Stack gap="xs" data-grammatik-bank data-bank-einfach>
+        {reiter.map((r) => {
+          const z = zahlen[r.schluessel]
+          const n = UEBUNGEN.reduce((m, u) => m + (z?.[u] ?? 0), 0)
+          const e = entwurfVon(r.schluessel)
+          const voll = n > 0 && !fehlendeUebungen(z).length
+          const ampel = !n
+            ? { farbe: 'gray', icon: <IconCircleDashed size={14} /> }
+            : voll
+            ? { farbe: 'teal', icon: <IconCheck size={14} /> }
+            : { farbe: 'orange', icon: <IconCircleHalf2 size={14} /> }
+          return (
+            <Paper key={r.schluessel} withBorder radius="md" px="sm" py={8} data-bank-zeile={r.schluessel}>
+              <Group justify="space-between" wrap="nowrap" gap="xs">
+                <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                  <ThemeIcon size={26} radius="xl" variant="light" color={ampel.farbe}>
+                    {ampel.icon}
+                  </ThemeIcon>
+                  <div style={{ minWidth: 0 }}>
+                    <Text size="sm" fw={600} truncate>
+                      {r.name}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {!n ? 'noch keine Aufgaben' : voll ? `${n} Aufgaben – vollständig` : `${n} Aufgaben – teilweise`}
+                      {e ? ` · ${e.aufgaben.length} neue zum Durchsehen` : ''}
+                    </Text>
+                  </div>
+                </Group>
+                <Button
+                  size="compact-sm"
+                  variant={e ? 'filled' : 'light'}
+                  color={e ? 'violet' : farbe}
+                  onClick={() => setBearbeiten(r)}
+                  style={{ flexShrink: 0 }}
+                  data-bank-bearbeiten
+                >
+                  {e ? 'Durchsehen' : n || !darfReiter(r) ? 'Ansehen' : 'Anlegen'}
+                </Button>
+              </Group>
+            </Paper>
+          )
+        })}
+        {offeneReiter.length > 0 && (
+          <Button variant="light" color="violet" leftSection={<IconSparkles size={16} />} onClick={alleFehlenden} data-bank-ki-alle>
+            Fehlende Aufgaben mit KI ergänzen
+          </Button>
+        )}
+        <Text size="xs" c="dimmed">
+          Lernende bekommen diese Aufgaben, sobald die Form einem Kurs hinzugefügt wird.
+        </Text>
+        {editor}
+      </Stack>
     )
 
   return (
@@ -269,7 +350,7 @@ export function BankKarte({
                         color="violet"
                         leftSection={<IconSparkles size={14} />}
                         disabled={!fehlend.length}
-                        onClick={() => bankErzeugenStarten([auftrag(r, fehlend)], `Übungsaufgaben: ${r.titel}`)}
+                        onClick={() => bankErzeugenStarten([auftrag(r, fehlend)], `Übungsaufgaben: ${r.titel}`, ziel)}
                         data-bank-ki
                       >
                         Mit KI erzeugen
@@ -295,15 +376,7 @@ export function BankKarte({
           Alle fehlenden mit KI erzeugen ({offeneReiter.length} Bereiche)
         </Button>
       )}
-      {bearbeiten && (
-        <BankEditor
-          reiter={bearbeiten}
-          sprache={buch.language}
-          darf={darfReiter(bearbeiten)}
-          entwurf={entwurfVon(bearbeiten.schluessel)}
-          schliessen={() => setBearbeiten(null)}
-        />
-      )}
+      {editor}
     </Stack>
   )
 }

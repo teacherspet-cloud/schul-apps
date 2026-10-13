@@ -31,7 +31,8 @@ import BookEditor from './steps/BookEditor'
 import ListEditor from './steps/ListEditor'
 import NewListWizard from './steps/NewListWizard'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { geheZuDokument, useDokumentOeffner } from '../../shared/navigation'
+import { kursReiterDocId } from '../lernen/kurs/auftragsZiel'
 import { EintragMenue, EintragRueckfragen, Oeffnen, useBibliothek } from '../../shared/components/Bibliothek'
 import { passtZurSuche } from '../../shared/bibliothek'
 import { testAusListe } from '../vokabeltest/library'
@@ -103,8 +104,31 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
     }
     // Allgemeiner Medienauftrag ohne Stelle: nur das Programm
     if (id === 'vokabeln') return
-    // Unregelmäßige Verben (07.10.2026): die Liste steht im Dialog beim Lehrwerk – nur ins Programm wechseln
-    if (id.startsWith('verben:')) return
+    /*
+     * Bilder/Aussprache aus einem Sprachenlernen-Kurs (13.10.2026, Befund „Öffnen führt ins Leere"): zum Kurs, Reiter
+     * Vokabeln – dort wurden sie angestoßen und dort erscheinen sie.
+     */
+    if (id.startsWith('kurs:')) return void (await geheZuDokument('sprachenlernen', kursReiterDocId(id.slice(5), 'vokabeln'), false))
+    /*
+     * Unregelmäßige Verben (07.10.2026): Die Liste steht in einem Dialog verschiedener Programme. Seit 13.10.2026 führt
+     * „Öffnen" zum Lehrwerk (bzw. zur Liste) der Verben – dort stehen Bild und Aussprache unter der Grundform.
+     */
+    if (id.startsWith('verben:')) {
+      const quelle = id.slice(7)
+      if ((await window.api.textbooks.list()).some((b) => b.id === quelle)) {
+        setOpenList(null)
+        setWizard(false)
+        setOpenBook(quelle)
+        return
+      }
+      const l = (await window.api.library.list()).find((x) => x.id === quelle)
+      if (l) {
+        setOpenBook(null)
+        setWizard(false)
+        setOpenList(l)
+      }
+      return
+    }
     const alle = await window.api.library.list()
     const liste = alle.find((l) => l.id === id)
     if (!liste) throw new Error('Die Liste gibt es nicht mehr.')
@@ -543,7 +567,8 @@ function Schulbuecher({
               )}
             </Group>
             <Text size="xs" c="dimmed">
-              {b.platzhalter && !b.units.length ? 'Platzhalter – Wortschatz folgt' : `${b.units.length} Units`}{b.band ? ` · Band ${b.band}` : ''}
+              {b.platzhalter && !b.units.length ? 'Platzhalter – Wortschatz folgt' : `${b.units.length} Units`}
+              {b.band ? ` · Band ${b.band}` : ''}
             </Text>
           </div>
         </Group>

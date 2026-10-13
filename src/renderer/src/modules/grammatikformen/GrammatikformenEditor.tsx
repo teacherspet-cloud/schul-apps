@@ -5,18 +5,17 @@ import {
   Button,
   Card,
   Checkbox,
-  Chip,
-  Drawer,
+  Collapse,
   Group,
   Menu,
   Modal,
   Paper,
   Progress,
-  ScrollArea,
   Select,
   Stack,
   Switch,
   Table,
+  Tabs,
   Text,
   TextInput,
   Title,
@@ -29,27 +28,31 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconCheck,
+  IconChevronRight,
   IconDeviceFloppy,
   IconDots,
-  IconGripVertical,
   IconPencil,
   IconPlus,
   IconRepeat,
   IconSparkles,
   IconTrash
 } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { fachDerSprache } from '@shared/fachobleute'
 import { fachVon } from '@shared/faecher'
 import { notifyError, notifySuccess } from '../../shared/util'
 import DropZone from '../../shared/components/DropZone'
 import { BandCover } from '../../shared/components/BandCover'
-import { useProgrammFarbe } from '../../shared/components/AppKopf'
 import { extractContent, MATERIAL_ACCEPT } from '../../shared/files/extractContent'
 import { pruefeHochladen } from '../../shared/datenschutz'
 import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
+import { useExperte } from '../../shared/settingsStore'
 import { BankKarte, useBankZahlen } from './GrammatikBank'
+import { AMPEL_FARBE, AMPEL_TEXT, tonHell, tonText, tonVoll, tonZart, useGrammatikFarbe, type AufgabenAmpel } from './farbton'
+import { aufgabenAmpel } from './bank'
+import { aufServer } from '../../shared/plattform'
+import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
 import type { BankZahlen } from '@shared/grammatikBank'
 import {
   LEHRWERK_GRAMMATIK,
@@ -74,7 +77,10 @@ import {
   verschiebeNach,
   VORSCHLAG_SCHEMA,
   vorschlagAuftrag,
-  type Vorschlag
+  type Vorschlag,
+  teilbereicheVon,
+  zielIndex,
+  type GrammatikformenZiel
 } from './grammatikformen'
 
 const kopie = (b: LehrwerkGrammatikBand): LehrwerkGrammatikBand => JSON.parse(JSON.stringify(b ?? {})) as LehrwerkGrammatikBand
@@ -83,7 +89,7 @@ const wahlVon = (t: string[]): GrammatikWahl => ({ themen: t.filter((k) => !k.in
 
 /** Was der Auswahl-Dialog gerade bearbeitet: neuer Punkt in einem Abschnitt oder die Formen eines Punkts */
 type Auswahl = { unit: string; abschnitt: string; index?: number; wahl: GrammatikWahl }
-/** Ort eines Punkts (Seitenfenster, Ziehen) */
+/** Ort eines Punkts (Pop-up, Ziehen) */
 type Ort = { unit: string; abschnitt: string; index: number }
 
 /**
@@ -91,7 +97,7 @@ type Ort = { unit: string; abschnitt: string; index: number }
  *
  * Links die Units als schmale Leiste (Handy: Chips oben), rechts die Abschnitte der gewählten Unit als Zeitstrahl, je
  * Abschnitt die Grammatikpunkte als Pillen (Bezeichnung + ✓/⚠/↻ – keine Textfelder in der Liste). Ein Klick auf eine Pille
- * öffnet das Seitenfenster (Bezeichnung, Formen, Wiederholung, Abschnitt, Reihenfolge, Entfernen). Umsortieren per Ziehen
+ * öffnet ein Pop-up (seit 13.10.2026; Standardmodus: Formen + Übungsaufgaben, Expertenmodus: Reiter mit Einordnung). Umsortieren per Ziehen
  * innerhalb eines Abschnitts. „Form hinzufügen" nutzt dieselbe Themen-/Teilformen-Auswahl wie Arbeitsblatt und
  * Grammatiktraining (GrammatikAuswahl). KI-Vorschläge aus Schulbuchseiten (Fenster „Aus Buchseiten ergänzen") erscheinen
  * als Liste zum Abhaken – übernommen wird nur Angehaktes, und nur DAZU. Gespeichert wird erst mit „Speichern" in der
@@ -101,9 +107,12 @@ export default function GrammatikformenEditor({
   buch,
   alle,
   eintrag,
+  ziel,
   onBack,
   onGespeichert
 }: {
+  /** „Öffnen" aus der Auftragsleiste (13.10.2026): diesen Grammatikpunkt gleich im Pop-up zeigen */
+  ziel?: GrammatikformenZiel | null
   buch: TextbookMeta
   alle: TextbookMeta[]
   /** Gespeicherte Bearbeitung dieses Bands (sonst gilt die eingebaute Liste bzw. noch keine) */
@@ -114,9 +123,11 @@ export default function GrammatikformenEditor({
   const darf = darfLehrwerkBearbeiten(buch.language)
   const fach = fachDerSprache(buch.language)
   const fachName = fachVon(fach)?.label ?? fach
-  const farbe = useProgrammFarbe()
+  // Fachfarbe (13.10.2026, abgestimmt) – wie Meine Klassen und Sprachenlernen
+  const farbe = useGrammatikFarbe(buch.language)
   const schmal = useMediaQuery('(max-width: 700px)') ?? false
-  // Aufgabenbank (13.10.2026): Zahlen je Teilbereich und Übungsart für das Seitenfenster
+  const experte = useExperte()
+  // Aufgabenbank (13.10.2026): Zahlen je Teilbereich und Übungsart für das Pop-up
   const bank = useBankZahlen(buch.language)
   const ausgangsBand = (): LehrwerkGrammatikBand => kopie(eintrag?.kapitel ?? LEHRWERK_GRAMMATIK[buch.name] ?? {})
   const [band, setBand] = useState<LehrwerkGrammatikBand>(ausgangsBand)
@@ -125,9 +136,17 @@ export default function GrammatikformenEditor({
   const [zurueckFrage, setZurueckFrage] = useState(false)
   const [verwerfenFrage, setVerwerfenFrage] = useState(false)
   const unitNamen = useMemo(() => [...buch.units.map((u) => u.name), ...Object.keys(band).filter((k) => !buch.units.some((u) => u.name === k))], [buch, band])
-  const [unit, setUnit] = useState<string>(() => unitNamen.find((u) => band[u]) ?? unitNamen[0] ?? '')
+  const [aufUnits, setAufUnits] = useState<string[]>(() => [unitNamen.find((u) => band[u]) ?? unitNamen[0] ?? ''])
   const [auswahl, setAuswahl] = useState<Auswahl | null>(null)
   const [offen, setOffen] = useState<Ort | null>(null)
+  // „Öffnen" aus der Auftragsleiste: Unit wählen und den Punkt im Pop-up zeigen (ist er weg: nur die Unit)
+  useEffect(() => {
+    if (!ziel) return
+    if (unitNamen.includes(ziel.unit)) setAufUnits((l) => (l.includes(ziel.unit) ? l : [...l, ziel.unit]))
+    const i = zielIndex(band[ziel.unit]?.[ziel.abschnitt] ?? [], ziel)
+    if (i >= 0) setOffen({ unit: ziel.unit, abschnitt: ziel.abschnitt, index: i })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ziel])
   const [entfernenFrage, setEntfernenFrage] = useState(false)
   const [ziehen, setZiehen] = useState<Ort | null>(null)
   const [ueber, setUeber] = useState<number | null>(null)
@@ -239,13 +258,6 @@ export default function GrammatikformenEditor({
     }
   }
 
-  const unitAbschnitte = abschnitteDer(buch, unit, band[unit])
-  const zahlIn = (u: string): number => Object.values(band[u] ?? {}).reduce((m, l) => m + l.length, 0)
-  /** Anteil der Abschnitte einer Unit mit Grammatik (Füllbalken in der Unit-Leiste) */
-  const anteilIn = (u: string): number => {
-    const ab = abschnitteDer(buch, u, band[u])
-    return ab.length ? (ab.filter((a) => band[u]?.[a]?.length).length / ab.length) * 100 : 0
-  }
   const offenPunkt = offen ? punkteVon(offen.unit, offen.abschnitt)[offen.index] : undefined
   const offenListe = offen ? punkteVon(offen.unit, offen.abschnitt) : []
 
@@ -276,7 +288,7 @@ export default function GrammatikformenEditor({
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
-        {darf && (
+        {darf && experte && (
           <Button
             variant="light"
             color={farbe}
@@ -288,11 +300,19 @@ export default function GrammatikformenEditor({
             Aus Buchseiten ergänzen
           </Button>
         )}
-        {darf && (
+        {darf && experte && (
           <ActionIcon variant="light" color={farbe} size="lg" hiddenFrom="xs" aria-label="Aus Buchseiten ergänzen" onClick={() => setKiOffen(true)}>
             <IconSparkles size={18} />
           </ActionIcon>
         )}
+        <SchuelerAnsichtKnopf
+          buch={buch}
+          titel={buch.name}
+          farbe={farbe}
+          punkte={unitNamen.flatMap((u) =>
+            Object.entries(band[u] ?? {}).flatMap(([abschnitt, liste]) => liste.map((punkt) => ({ unit: u, abschnitt, punkt })))
+          )}
+        />
         <Button
           variant="default"
           leftSection={<IconArrowLeft size={16} />}
@@ -301,7 +321,7 @@ export default function GrammatikformenEditor({
         >
           Zurück
         </Button>
-        {darf && eintrag && (
+        {darf && eintrag && experte && (
           <Menu position="bottom-end" withinPortal>
             <Menu.Target>
               <ActionIcon variant="subtle" color="gray" size="lg" aria-label="Weitere Aktionen" data-grammatikformen-menue>
@@ -319,157 +339,154 @@ export default function GrammatikformenEditor({
     </Group>
   )
 
-  const unitLeiste = schmal ? (
-    <ScrollArea type="never" offsetScrollbars={false}>
-      <Chip.Group value={unit} onChange={(v) => typeof v === 'string' && setUnit(v)}>
-        <Group gap={6} wrap="nowrap" pb={4}>
-          {unitNamen.map((u) => {
-            const n = zahlIn(u)
-            return (
-              <Chip key={u} value={u} size="sm" color={farbe} variant="light" data-grammatikformen-unit={u}>
-                {u}
-                {n ? ` · ${n}` : ''}
-              </Chip>
-            )
-          })}
-        </Group>
-      </Chip.Group>
-    </ScrollArea>
-  ) : (
-    <Stack gap={2} w={210} style={{ flexShrink: 0, position: 'sticky', top: 8, alignSelf: 'flex-start' }} data-grammatikformen-unitleiste>
-      <Text size="xs" c="dimmed" fw={600} tt="uppercase" px="xs" mb={4} style={{ letterSpacing: 0.4 }}>
-        Units
-      </Text>
+  /*
+   * Unit-Karten (13.10.2026, abgestimmt; wie die Karten in Meine Klassen): je Unit eine aufklappbare Karte in der
+   * Fachfarbe, darin je Abschnitt eine Zeile mit den Grammatikformen als Pillen samt Ampel der Übungsaufgaben. Ziehen
+   * zum Umsortieren nur im Expertenmodus.
+   */
+  const ziehbar = darf && experte
+  const ampelVon = (p: LehrwerkGrammatikPunkt): AufgabenAmpel => aufgabenAmpel(teilbereicheVon(p.t), bank.zahlen)
+  const mitAmpel = aufServer()
+  const unitKarten = (
+    <Stack gap="sm" data-grammatikformen-units>
       {unitNamen.map((u) => {
-        const n = zahlIn(u)
-        const aktiv = u === unit
+        const abschnitte = abschnitteDer(buch, u, band[u])
+        const punkteU = abschnitte.flatMap((a) => punkteVon(u, a))
+        const n = punkteU.length
+        const mitAufgaben = punkteU.filter((p) => ampelVon(p) !== 'keine').length
+        const auf = aufUnits.includes(u)
         return (
-          <UnstyledButton
+          <Paper
             key={u}
-            onClick={() => setUnit(u)}
-            aria-current={aktiv || undefined}
+            withBorder
+            radius="lg"
+            style={{ overflow: 'hidden', borderLeft: `4px solid ${n ? tonVoll(farbe) : 'var(--mantine-color-default-border)'}` }}
             data-grammatikformen-unit={u}
-            style={{
-              padding: '7px 10px',
-              borderRadius: 'var(--mantine-radius-md)',
-              borderLeft: `3px solid ${aktiv ? `var(--mantine-color-${farbe}-filled)` : 'transparent'}`,
-              background: aktiv ? `var(--mantine-color-${farbe}-light)` : undefined,
-              color: aktiv ? `var(--mantine-color-${farbe}-light-color)` : undefined
-            }}
           >
-            <Group justify="space-between" wrap="nowrap" gap={6}>
-              <Text size="sm" fw={aktiv ? 600 : 500} truncate>
-                {u}
-              </Text>
-              <Text size="xs" c={aktiv ? undefined : 'dimmed'}>
-                {n || '–'}
-              </Text>
-            </Group>
-            <Progress value={anteilIn(u)} size={3} mt={5} color={farbe} radius="xl" aria-label="Abschnitte mit Grammatik" />
-          </UnstyledButton>
+            <UnstyledButton
+              onClick={() => setAufUnits((l) => (auf ? l.filter((x) => x !== u) : [...l, u]))}
+              w="100%"
+              px="md"
+              py="sm"
+              style={{ background: auf ? tonZart(farbe) : undefined }}
+              aria-expanded={auf}
+              data-grammatikformen-unit-kopf={u}
+            >
+              <Group justify="space-between" wrap="nowrap" gap="sm">
+                <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                  <IconChevronRight size={16} style={{ transform: auf ? 'rotate(90deg)' : undefined, transition: 'transform 150ms', flexShrink: 0 }} />
+                  <Text fw={700} truncate>
+                    {u}
+                  </Text>
+                </Group>
+                <Group gap="md" wrap="nowrap">
+                  <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                    {n ? `${n} ${n === 1 ? 'Form' : 'Formen'}` : 'keine Grammatik'}
+                  </Text>
+                  {n > 0 && mitAmpel && (
+                    <Tooltip label={`Übungsaufgaben: ${mitAufgaben} von ${n} Formen`}>
+                      <Progress
+                        value={(mitAufgaben / n) * 100}
+                        w={80}
+                        size="sm"
+                        color="teal"
+                        radius="xl"
+                        visibleFrom="xs"
+                        aria-label="Formen mit Übungsaufgaben"
+                      />
+                    </Tooltip>
+                  )}
+                </Group>
+              </Group>
+            </UnstyledButton>
+            <Collapse expanded={auf}>
+              <Stack gap={0} px="md" pb="xs">
+                {abschnitte.map((a) => {
+                  const punkte = punkteVon(u, a)
+                  if (!punkte.length && !darf) return null
+                  return (
+                    <Group
+                      key={a || '(ganz)'}
+                      align="flex-start"
+                      wrap={schmal ? 'wrap' : 'nowrap'}
+                      gap="sm"
+                      py={10}
+                      style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+                      data-grammatikformen-abschnitt={a || 'ganz'}
+                    >
+                      <Text size="sm" fw={600} w={schmal ? '100%' : 150} c={punkte.length ? undefined : 'dimmed'} style={{ flexShrink: 0, paddingTop: 5 }}>
+                        {abschnittName(a)}
+                      </Text>
+                      <Group gap={6} wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+                        {punkte.map((p, i) => (
+                          <Pille
+                            key={i}
+                            punkt={p}
+                            fach={fach}
+                            farbe={farbe}
+                            experte={experte}
+                            ampel={mitAmpel ? ampelVon(p) : undefined}
+                            ziehbar={ziehbar && punkte.length > 1}
+                            markiert={Boolean(ziehen && ziehen.unit === u && ziehen.abschnitt === a && ueber === i && ziehen.index !== i)}
+                            gezogen={Boolean(ziehen && ziehen.unit === u && ziehen.abschnitt === a && ziehen.index === i)}
+                            onClick={() => {
+                              setEntfernenFrage(false)
+                              setOffen({ unit: u, abschnitt: a, index: i })
+                            }}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = 'move'
+                              e.dataTransfer.setData('text/plain', String(i))
+                              setZiehen({ unit: u, abschnitt: a, index: i })
+                            }}
+                            onDragOver={(e) => {
+                              if (!ziehen || ziehen.unit !== u || ziehen.abschnitt !== a) return
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = 'move'
+                              if (ueber !== i) setUeber(i)
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              if (ziehen && ziehen.unit === u && ziehen.abschnitt === a) setzePunkte(u, a, verschiebeNach(punkte, ziehen.index, i))
+                              setZiehen(null)
+                              setUeber(null)
+                            }}
+                            onDragEnd={() => {
+                              setZiehen(null)
+                              setUeber(null)
+                            }}
+                          />
+                        ))}
+                        {!punkte.length && (
+                          <Text size="xs" c="dimmed" pt={6}>
+                            keine Grammatik
+                          </Text>
+                        )}
+                        {darf && (
+                          <Button
+                            size="compact-sm"
+                            variant="subtle"
+                            color={farbe}
+                            leftSection={<IconPlus size={14} />}
+                            onClick={() => setAuswahl({ unit: u, abschnitt: a, wahl: { themen: [], teilformen: [] } })}
+                            data-grammatikformen-hinzufuegen
+                          >
+                            Form hinzufügen
+                          </Button>
+                        )}
+                      </Group>
+                    </Group>
+                  )
+                })}
+                {!darf && !n && (
+                  <Text size="sm" c="dimmed" py="xs">
+                    Für diese Unit ist keine Grammatik hinterlegt.
+                  </Text>
+                )}
+              </Stack>
+            </Collapse>
+          </Paper>
         )
       })}
-    </Stack>
-  )
-
-  const zeitstrahl = (
-    <Stack gap={0} style={{ flex: 1, minWidth: 0 }} data-grammatikformen-zeitstrahl>
-      <Title order={4} mb="sm">
-        {unit}
-      </Title>
-      {unitAbschnitte.map((a, ai) => {
-        const punkte = punkteVon(unit, a)
-        if (!punkte.length && !darf) return null
-        const letzter = ai === unitAbschnitte.length - 1
-        return (
-          <div
-            key={a || '(ganz)'}
-            style={{ position: 'relative', paddingLeft: 26, paddingBottom: letzter ? 4 : 22 }}
-            data-grammatikformen-abschnitt={a || 'ganz'}
-          >
-            {!letzter && (
-              <span aria-hidden style={{ position: 'absolute', left: 6, top: 18, bottom: 0, width: 2, background: 'var(--mantine-color-default-border)' }} />
-            )}
-            <span
-              aria-hidden
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 4,
-                width: 14,
-                height: 14,
-                borderRadius: '50%',
-                border: `2px solid ${punkte.length ? `var(--mantine-color-${farbe}-filled)` : 'var(--mantine-color-default-border)'}`,
-                background: punkte.length ? `var(--mantine-color-${farbe}-filled)` : 'var(--mantine-color-body)'
-              }}
-            />
-            <Text fw={600} size="sm" c={punkte.length ? undefined : 'dimmed'} mb={6}>
-              {abschnittName(a)}
-            </Text>
-            <Group gap={6} wrap="wrap">
-              {punkte.map((p, i) => (
-                <Pille
-                  key={i}
-                  punkt={p}
-                  fach={fach}
-                  farbe={farbe}
-                  ziehbar={darf && punkte.length > 1}
-                  markiert={Boolean(ziehen && ziehen.unit === unit && ziehen.abschnitt === a && ueber === i && ziehen.index !== i)}
-                  gezogen={Boolean(ziehen && ziehen.unit === unit && ziehen.abschnitt === a && ziehen.index === i)}
-                  onClick={() => {
-                    setEntfernenFrage(false)
-                    setOffen({ unit, abschnitt: a, index: i })
-                  }}
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', String(i))
-                    setZiehen({ unit, abschnitt: a, index: i })
-                  }}
-                  onDragOver={(e) => {
-                    if (!ziehen || ziehen.unit !== unit || ziehen.abschnitt !== a) return
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    if (ueber !== i) setUeber(i)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    if (ziehen && ziehen.unit === unit && ziehen.abschnitt === a) setzePunkte(unit, a, verschiebeNach(punkte, ziehen.index, i))
-                    setZiehen(null)
-                    setUeber(null)
-                  }}
-                  onDragEnd={() => {
-                    setZiehen(null)
-                    setUeber(null)
-                  }}
-                />
-              ))}
-              {!punkte.length && (
-                <Text size="xs" c="dimmed">
-                  keine Grammatik
-                </Text>
-              )}
-            </Group>
-            {darf && (
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="gray"
-                mt={6}
-                leftSection={<IconPlus size={12} />}
-                onClick={() => setAuswahl({ unit, abschnitt: a, wahl: { themen: [], teilformen: [] } })}
-                data-grammatikformen-hinzufuegen
-              >
-                Grammatik hinzufügen
-              </Button>
-            )}
-          </div>
-        )
-      })}
-      {!darf && !unitAbschnitte.some((a) => punkteVon(unit, a).length) && (
-        <Text size="sm" c="dimmed">
-          Für diese Unit ist keine Grammatik hinterlegt.
-        </Text>
-      )}
     </Stack>
   )
 
@@ -528,17 +545,7 @@ export default function GrammatikformenEditor({
         </Alert>
       )}
 
-      {schmal ? (
-        <Stack gap="md">
-          {unitLeiste}
-          {zeitstrahl}
-        </Stack>
-      ) : (
-        <Group align="flex-start" gap="xl" wrap="nowrap">
-          {unitLeiste}
-          {zeitstrahl}
-        </Group>
-      )}
+      {unitKarten}
 
       {darf && dirty && (
         <Paper withBorder shadow="md" radius="md" p="xs" px="md" style={{ position: 'sticky', bottom: 12, zIndex: 5 }} data-grammatikformen-speicherleiste>
@@ -565,16 +572,16 @@ export default function GrammatikformenEditor({
         </Paper>
       )}
 
-      <Drawer
+      <Modal
         opened={Boolean(offen && offenPunkt)}
-        onClose={() => setOffen(null)}
-        position="right"
-        size={schmal ? '100%' : 560}
-        padding={0}
+        onClose={() => (setOffen(null), setEntfernenFrage(false))}
+        size={experte ? 'xl' : 'lg'}
+        fullScreen={schmal}
+        radius="lg"
         title={
           offen && offenPunkt ? (
             <div style={{ minWidth: 0 }}>
-              <Text size="xs" fw={600} tt="uppercase" c={`${farbe}.8`} style={{ letterSpacing: 0.4 }}>
+              <Text size="xs" fw={600} tt="uppercase" style={{ letterSpacing: 0.4, color: tonText(farbe) }}>
                 {offen.unit} · {abschnittName(offen.abschnitt)}
               </Text>
               <Text fw={700} size="lg" lh={1.25} lineClamp={2}>
@@ -587,13 +594,12 @@ export default function GrammatikformenEditor({
         }
         styles={{
           header: {
-            background: `linear-gradient(135deg, var(--mantine-color-${farbe}-light) 0%, var(--mantine-color-body) 85%)`,
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--mantine-color-default-border)'
-          },
-          body: { padding: 0 }
+            background: `linear-gradient(135deg, ${tonHell(farbe)} 0%, var(--mantine-color-body) 85%)`,
+            borderBottom: '1px solid var(--mantine-color-default-border)',
+            marginBottom: 16
+          }
         }}
-        data-grammatikformen-drawer
+        data-grammatikformen-popup-fenster
       >
         {offen && offenPunkt && (
           <PunktFenster
@@ -602,11 +608,12 @@ export default function GrammatikformenEditor({
             buch={buch}
             unitPunkte={Object.values(band[offen.unit] ?? {}).flat()}
             bank={bank}
+            schliessen={() => (setOffen(null), setEntfernenFrage(false))}
             anzahl={offenListe.length}
             darf={darf}
             fach={fach}
             farbe={farbe}
-            abschnitte={unitAbschnitte}
+            abschnitte={abschnitteDer(buch, offen.unit, band[offen.unit])}
             entfernenFrage={entfernenFrage}
             setEntfernenFrage={setEntfernenFrage}
             onText={(text) => aenderePunkt(offen, (x) => ({ ...x, text }))}
@@ -639,7 +646,7 @@ export default function GrammatikformenEditor({
             }}
           />
         )}
-      </Drawer>
+      </Modal>
 
       <Modal
         opened={kiOffen}
@@ -735,6 +742,8 @@ function Pille({
   punkt,
   fach,
   farbe,
+  experte,
+  ampel,
   ziehbar,
   markiert,
   gezogen,
@@ -747,6 +756,10 @@ function Pille({
   punkt: LehrwerkGrammatikPunkt
   fach: string
   farbe: string
+  /** Kennungen und Katalog-Warnungen nur im Expertenmodus (13.10.2026) */
+  experte: boolean
+  /** Stand der Übungsaufgaben (nur am Server) */
+  ampel?: AufgabenAmpel
   ziehbar: boolean
   markiert: boolean
   gezogen: boolean
@@ -758,9 +771,10 @@ function Pille({
 }): React.JSX.Element {
   const info = pillenInfo(punkt, fach)
   const hinweise = [
-    info.abweichend ? `Katalog: ${info.katalog}` : '',
-    info.status === 'fehlt' ? 'Keine Katalogform verknüpft' : '',
-    info.status === 'ungueltig' ? `Unbekannte Katalogform: ${info.ungueltig.join(', ')}` : '',
+    ampel ? AMPEL_TEXT[ampel] : '',
+    experte && info.abweichend ? `Katalog: ${info.katalog}` : '',
+    experte && info.status === 'fehlt' ? 'Keine Katalogform verknüpft' : '',
+    experte && info.status === 'ungueltig' ? `Unbekannte Katalogform: ${info.ungueltig.join(', ')}` : '',
     punkt.w ? 'Wiederholung eines früher eingeführten Themas' : ''
   ].filter(Boolean)
   const knopf = (
@@ -780,20 +794,28 @@ function Pille({
         maxWidth: '100%',
         padding: '5px 12px',
         borderRadius: 999,
-        border: `1px solid ${markiert ? `var(--mantine-color-${farbe}-filled)` : 'var(--mantine-color-default-border)'}`,
-        boxShadow: markiert ? `-3px 0 0 var(--mantine-color-${farbe}-filled)` : undefined,
-        background: 'var(--mantine-color-default)',
+        border: `1px solid ${markiert ? tonVoll(farbe) : `color-mix(in srgb, ${tonVoll(farbe)} 35%, var(--mantine-color-default-border))`}`,
+        boxShadow: markiert ? `-3px 0 0 ${tonVoll(farbe)}` : undefined,
+        background: tonZart(farbe),
         opacity: gezogen ? 0.45 : 1,
         cursor: ziehbar ? 'grab' : 'pointer',
         fontSize: 'var(--mantine-font-size-sm)',
         lineHeight: 1.3
       }}
     >
-      {info.status === 'ok' ? (
-        <IconCheck size={13} style={{ flexShrink: 0, color: `var(--mantine-color-${farbe}-filled)` }} aria-label="mit Katalogform verknüpft" />
-      ) : (
-        <IconAlertTriangle size={13} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} aria-label="ohne gültige Katalogform" />
+      {ampel && (
+        <span
+          aria-label={AMPEL_TEXT[ampel]}
+          data-grammatikformen-ampel={ampel}
+          style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: `var(--mantine-color-${AMPEL_FARBE[ampel]}-filled)` }}
+        />
       )}
+      {experte &&
+        (info.status === 'ok' ? (
+          <IconCheck size={13} style={{ flexShrink: 0, color: tonVoll(farbe) }} aria-label="mit Katalogform verknüpft" />
+        ) : (
+          <IconAlertTriangle size={13} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} aria-label="ohne gültige Katalogform" />
+        ))}
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
       {punkt.w && (
         <IconRepeat size={13} style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)' }} aria-label="Wiederholung" data-grammatikformen-wiederholung />
@@ -809,7 +831,7 @@ function Pille({
   )
 }
 
-/** Abschnitt im Seitenfenster: Überschrift mit Symbol, Inhalt in einer Karte (13.10.2026, an die übrige Oberfläche angeglichen) */
+/** Abschnitt im Pop-up: Überschrift mit Symbol, Inhalt in einer Karte */
 function FensterKarte({
   titel,
   icon,
@@ -822,7 +844,7 @@ function FensterKarte({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <Card withBorder radius="lg" padding="md" shadow="xs">
+    <Card withBorder radius="lg" padding="md">
       <Group justify="space-between" mb="sm" wrap="nowrap">
         <Group gap={8} wrap="nowrap">
           {icon}
@@ -848,8 +870,8 @@ function SymbolRund({ farbe, children }: { farbe: string; children: React.ReactN
         width: 24,
         height: 24,
         borderRadius: 999,
-        background: `var(--mantine-color-${farbe}-light)`,
-        color: `var(--mantine-color-${farbe}-filled)`,
+        background: tonHell(farbe),
+        color: tonVoll(farbe),
         flexShrink: 0
       }}
     >
@@ -858,10 +880,49 @@ function SymbolRund({ farbe, children }: { farbe: string; children: React.ReactN
   )
 }
 
+/** Verknüpfte Formen als Pillen (✓ im Katalog, ⚠ unbekannt) */
+function FormPillen({ punkt, fach, farbe }: { punkt: LehrwerkGrammatikPunkt; fach: string; farbe: string }): React.JSX.Element {
+  return (
+    <Group gap={6}>
+      {punkt.t.map((k) => {
+        const ok = kennungGueltig(k, fach)
+        return (
+          <Badge
+            key={k}
+            title={k}
+            size="lg"
+            radius="xl"
+            tt="none"
+            fw={500}
+            variant="light"
+            color={ok ? farbe : 'orange'}
+            leftSection={ok ? <IconCheck size={12} /> : <IconAlertTriangle size={12} />}
+            styles={{ root: { height: 'auto', minHeight: 26, paddingBlock: 3 }, label: { whiteSpace: 'normal' } }}
+          >
+            {ok ? kennungLabel(k) : `${k} (nicht im Katalog)`}
+          </Badge>
+        )
+      })}
+      {!punkt.t.length && (
+        <Group gap={6} wrap="nowrap">
+          <IconAlertTriangle size={14} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} />
+          <Text size="sm" c="dimmed">
+            Keine Katalogform – der Punkt wird nur genannt.
+          </Text>
+        </Group>
+      )}
+    </Group>
+  )
+}
+
 /**
- * Inhalt des Seitenfensters zu einem Punkt (ohne Bearbeitungsrecht nur Ansicht). Seit 13.10.2026 (Wunsch der Lehrkraft:
- * „mehr ans GUI angepasst") in Karten: Grammatikform (Bezeichnung, verknüpfte Formen als Pillen), Übungsaufgaben
- * (Aufgabenbank, GrammatikBank.tsx), Einordnung (Wiederholung, Abschnitt, Reihenfolge); „Entfernen" fest unten.
+ * Inhalt des Pop-ups zu einem Grammatikpunkt (13.10.2026, Wunsch der Lehrkraft: Pop-up wie überall statt Leiste rechts,
+ * „intuitiv und leicht verständlich"; abgestimmt):
+ *  - Standardmodus: Formen als Pillen, darunter die Übungsaufgaben mit Ampel je Bereich (Ansehen/Anlegen, „Fehlende
+ *    Aufgaben mit KI ergänzen"). Unten „Entfernen", „Alle Optionen" und „Schließen".
+ *  - Expertenmodus (oder „Alle Optionen"): Reiter Überblick | Übungsaufgaben (je Teilbereich und Übungsart) | Einordnung
+ *    (Bezeichnung, Formen ändern, Wiederholung, Abschnitt, Reihenfolge).
+ * Ohne Bearbeitungsrecht nur Ansicht.
  */
 function PunktFenster({
   punkt,
@@ -876,6 +937,7 @@ function PunktFenster({
   abschnitte,
   entfernenFrage,
   setEntfernenFrage,
+  schliessen,
   onText,
   onWiederholung,
   onFormen,
@@ -895,6 +957,7 @@ function PunktFenster({
   abschnitte: string[]
   entfernenFrage: boolean
   setEntfernenFrage: (b: boolean) => void
+  schliessen: () => void
   onText: (t: string) => void
   onWiederholung: (w: boolean) => void
   onFormen: () => void
@@ -902,178 +965,188 @@ function PunktFenster({
   onVerschieben: (r: -1 | 1) => void
   onEntfernen: () => void
 }): React.JSX.Element {
-  const info = pillenInfo(punkt, fach)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 90px)' }}>
-      <Stack gap="md" p="md" style={{ flex: 1 }}>
-        <FensterKarte
-          titel="Grammatikform"
-          icon={
-            <SymbolRund farbe={farbe}>
-              <IconCheck size={14} />
-            </SymbolRund>
-          }
-          rechts={
-            darf && (
-              <Button size="compact-xs" variant="light" color={farbe} leftSection={<IconPencil size={12} />} onClick={onFormen} data-grammatikformen-formen>
-                Formen ändern
-              </Button>
-            )
-          }
-        >
-          <Stack gap="sm">
-            {darf ? (
-              <TextInput
-                label="Bezeichnung"
-                description="Nur ändern, wenn das Buch die Form anders nennt."
-                value={punkt.text}
-                placeholder={info.katalog || 'Bezeichnung'}
-                onChange={(e) => onText(e.currentTarget.value)}
-                data-grammatikformen-bezeichnung
-              />
-            ) : (
-              <div>
-                <Text size="xs" c="dimmed">
-                  Bezeichnung
-                </Text>
-                <Text fw={600}>{info.name}</Text>
-              </div>
-            )}
-            <div>
-              <Text size="xs" c="dimmed" mb={6}>
-                Verknüpfte Formen
-              </Text>
-              <Group gap={6}>
-                {punkt.t.map((k) => {
-                  const ok = kennungGueltig(k, fach)
-                  return (
-                    <Badge
-                      key={k}
-                      title={k}
-                      size="lg"
-                      radius="xl"
-                      tt="none"
-                      fw={500}
-                      variant="light"
-                      color={ok ? farbe : 'orange'}
-                      leftSection={ok ? <IconCheck size={12} /> : <IconAlertTriangle size={12} />}
-                      styles={{ root: { height: 'auto', minHeight: 26, paddingBlock: 3 }, label: { whiteSpace: 'normal' } }}
-                    >
-                      {ok ? kennungLabel(k) : `${k} (nicht im Katalog)`}
-                    </Badge>
-                  )
-                })}
-                {!punkt.t.length && (
-                  <Group gap={6} wrap="nowrap">
-                    <IconAlertTriangle size={14} style={{ flexShrink: 0, color: 'var(--mantine-color-orange-filled)' }} />
-                    <Text size="sm" c="dimmed">
-                      Keine Katalogform – der Punkt wird nur genannt.
-                    </Text>
-                  </Group>
-                )}
-              </Group>
-            </div>
-          </Stack>
-        </FensterKarte>
-
-        <FensterKarte
-          titel="Übungsaufgaben"
-          icon={
-            <SymbolRund farbe={farbe}>
-              <IconSparkles size={14} />
-            </SymbolRund>
-          }
-        >
-          <BankKarte punkt={punkt} unit={ort.unit} unitPunkte={unitPunkte} buch={buch} fach={fach} farbe={farbe} zahlen={bank.zahlen} darf={bank.darf} />
-        </FensterKarte>
-
-        <FensterKarte
-          titel="Einordnung"
-          icon={
-            <SymbolRund farbe={farbe}>
-              <IconGripVertical size={14} />
-            </SymbolRund>
-          }
-        >
-          <Stack gap="sm">
-            <Switch
-              label="Wiederholung eines früher eingeführten Themas"
-              checked={Boolean(punkt.w)}
-              disabled={!darf}
-              color={farbe}
-              onChange={(e) => onWiederholung(e.currentTarget.checked)}
-              data-grammatikformen-wdh
-            />
-            <Select
-              label="Abschnitt"
-              data={abschnitte.map((a) => ({ value: a || '(ganz)', label: abschnittName(a) }))}
-              value={ort.abschnitt || '(ganz)'}
-              disabled={!darf}
-              allowDeselect={false}
-              comboboxProps={{ withinPortal: true, zIndex: 400 }}
-              onChange={(v) => v !== null && onAbschnitt(v === '(ganz)' ? '' : v)}
-              data-grammatikformen-abschnitt-wahl
-            />
-            {darf && anzahl > 1 && (
-              <div>
-                <Group gap={6} mb={6}>
-                  <Text size="sm" fw={500}>
-                    Reihenfolge
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    Platz {ort.index + 1} von {anzahl} – auch per Ziehen
-                  </Text>
-                </Group>
-                <Group gap="xs">
-                  <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} disabled={ort.index === 0} onClick={() => onVerschieben(-1)}>
-                    Nach vorn
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="default"
-                    rightSection={<IconArrowRight size={14} />}
-                    disabled={ort.index === anzahl - 1}
-                    onClick={() => onVerschieben(1)}
-                  >
-                    Nach hinten
-                  </Button>
-                </Group>
-              </div>
-            )}
-          </Stack>
-        </FensterKarte>
-      </Stack>
-
-      {darf && (
-        <div
-          style={{
-            position: 'sticky',
-            bottom: 0,
-            padding: '12px 16px',
-            background: 'var(--mantine-color-body)',
-            borderTop: '1px solid var(--mantine-color-default-border)'
-          }}
-        >
-          {entfernenFrage ? (
-            <Group justify="space-between" gap="xs">
-              <Text size="sm">Diesen Grammatikpunkt entfernen?</Text>
-              <Group gap="xs">
-                <Button size="xs" variant="default" onClick={() => setEntfernenFrage(false)}>
-                  Abbrechen
-                </Button>
-                <Button size="xs" color="red" autoFocus onClick={onEntfernen} data-grammatikformen-entfernen-ok>
-                  Entfernen
-                </Button>
-              </Group>
-            </Group>
-          ) : (
-            <Button variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={() => setEntfernenFrage(true)} data-grammatikformen-entfernen>
-              Grammatikpunkt entfernen
-            </Button>
-          )}
+  const experte = useExperte()
+  // „Alle Optionen" im Standardmodus: nur für dieses Pop-up, ohne den Modus umzuschalten
+  const [alle, setAlle] = useState(false)
+  const voll = experte || alle
+  const [reiter, setReiter] = useState<string | null>('ueberblick')
+  const bankKarte = (einfach: boolean): React.JSX.Element => (
+    <BankKarte
+      punkt={punkt}
+      unit={ort.unit}
+      abschnitt={ort.abschnitt}
+      unitPunkte={unitPunkte}
+      buch={buch}
+      fach={fach}
+      farbe={farbe}
+      zahlen={bank.zahlen}
+      darf={bank.darf}
+      einfach={einfach}
+    />
+  )
+  const ueberblick = (
+    <Stack gap="md">
+      <div>
+        <Text size="xs" c="dimmed" mb={6}>
+          Verknüpfte Formen
+        </Text>
+        <FormPillen punkt={punkt} fach={fach} farbe={farbe} />
+        <Group mt={10}>
+          <SchuelerAnsichtKnopf buch={buch} punkte={[{ unit: ort.unit, abschnitt: ort.abschnitt, punkt }]} titel={punkt.text} farbe={farbe} klein />
+        </Group>
+        {punkt.w && (
+          <Badge mt={8} variant="outline" color="gray" tt="none" leftSection={<IconRepeat size={12} />}>
+            Wiederholung eines früher eingeführten Themas
+          </Badge>
+        )}
+      </div>
+      <FensterKarte
+        titel="Übungsaufgaben"
+        icon={
+          <SymbolRund farbe={farbe}>
+            <IconSparkles size={14} />
+          </SymbolRund>
+        }
+      >
+        {bankKarte(true)}
+      </FensterKarte>
+    </Stack>
+  )
+  const einordnung = (
+    <Stack gap="md">
+      {darf ? (
+        <TextInput
+          label="Bezeichnung"
+          description="Nur ändern, wenn das Buch die Form anders nennt."
+          value={punkt.text}
+          placeholder={pillenInfo(punkt, fach).katalog || 'Bezeichnung'}
+          onChange={(e) => onText(e.currentTarget.value)}
+          data-grammatikformen-bezeichnung
+        />
+      ) : (
+        <div>
+          <Text size="xs" c="dimmed">
+            Bezeichnung
+          </Text>
+          <Text fw={600}>{pillenInfo(punkt, fach).name}</Text>
         </div>
       )}
-    </div>
+      <div>
+        <Group justify="space-between" mb={6}>
+          <Text size="sm" fw={500}>
+            Verknüpfte Formen
+          </Text>
+          {darf && (
+            <Button size="compact-xs" variant="light" color={farbe} leftSection={<IconPencil size={12} />} onClick={onFormen} data-grammatikformen-formen>
+              Formen ändern
+            </Button>
+          )}
+        </Group>
+        <FormPillen punkt={punkt} fach={fach} farbe={farbe} />
+      </div>
+      <Switch
+        label="Wiederholung eines früher eingeführten Themas"
+        checked={Boolean(punkt.w)}
+        disabled={!darf}
+        color={farbe}
+        onChange={(e) => onWiederholung(e.currentTarget.checked)}
+        data-grammatikformen-wdh
+      />
+      <Select
+        label="Abschnitt"
+        data={abschnitte.map((a) => ({ value: a || '(ganz)', label: abschnittName(a) }))}
+        value={ort.abschnitt || '(ganz)'}
+        disabled={!darf}
+        allowDeselect={false}
+        comboboxProps={{ withinPortal: true, zIndex: 500 }}
+        onChange={(v) => v !== null && onAbschnitt(v === '(ganz)' ? '' : v)}
+        data-grammatikformen-abschnitt-wahl
+      />
+      {darf && anzahl > 1 && (
+        <div>
+          <Group gap={6} mb={6}>
+            <Text size="sm" fw={500}>
+              Reihenfolge
+            </Text>
+            <Text size="xs" c="dimmed">
+              Platz {ort.index + 1} von {anzahl} – auch per Ziehen
+            </Text>
+          </Group>
+          <Group gap="xs">
+            <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} disabled={ort.index === 0} onClick={() => onVerschieben(-1)}>
+              Nach vorn
+            </Button>
+            <Button
+              size="xs"
+              variant="default"
+              rightSection={<IconArrowRight size={14} />}
+              disabled={ort.index === anzahl - 1}
+              onClick={() => onVerschieben(1)}
+            >
+              Nach hinten
+            </Button>
+          </Group>
+        </div>
+      )}
+    </Stack>
+  )
+  return (
+    <Stack gap="md" data-grammatikformen-popup={voll ? 'experte' : 'standard'}>
+      {voll ? (
+        <Tabs value={reiter} onChange={setReiter} color={farbe}>
+          <Tabs.List mb="md">
+            <Tabs.Tab value="ueberblick">Überblick</Tabs.Tab>
+            <Tabs.Tab value="aufgaben" data-reiter-aufgaben>
+              Übungsaufgaben
+            </Tabs.Tab>
+            <Tabs.Tab value="einordnung" data-reiter-einordnung>
+              Einordnung
+            </Tabs.Tab>
+          </Tabs.List>
+          <Tabs.Panel value="ueberblick">{ueberblick}</Tabs.Panel>
+          <Tabs.Panel value="aufgaben">{bankKarte(false)}</Tabs.Panel>
+          <Tabs.Panel value="einordnung">{einordnung}</Tabs.Panel>
+        </Tabs>
+      ) : (
+        ueberblick
+      )}
+
+      {entfernenFrage ? (
+        <Alert color="red" p="sm" data-grammatikformen-entfernen-frage>
+          <Group justify="space-between" gap="xs">
+            <Text size="sm">Diesen Grammatikpunkt aus dem Lehrwerk entfernen?</Text>
+            <Group gap="xs">
+              <Button size="xs" variant="default" onClick={() => setEntfernenFrage(false)}>
+                Abbrechen
+              </Button>
+              <Button size="xs" color="red" autoFocus onClick={onEntfernen} data-grammatikformen-entfernen-ok>
+                Entfernen
+              </Button>
+            </Group>
+          </Group>
+        </Alert>
+      ) : (
+        <Group justify="space-between" className="dialog-fuss">
+          {darf ? (
+            <Button variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={() => setEntfernenFrage(true)} data-grammatikformen-entfernen>
+              Entfernen
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Group gap="xs">
+            {!experte && (
+              <Button variant="subtle" color="gray" onClick={() => setAlle(!alle)} data-grammatikformen-alle-optionen>
+                {alle ? 'Weniger Optionen' : 'Alle Optionen'}
+              </Button>
+            )}
+            <Button onClick={schliessen} color={farbe}>
+              Fertig
+            </Button>
+          </Group>
+        </Group>
+      )}
+    </Stack>
   )
 }
 

@@ -1,7 +1,7 @@
 /**
  * Aufgabenbank der Grammatik in der Oberfläche (13.10.2026, abgestimmt; Server: server/grammatikBank.ts).
  *
- *  - Zahlen je Schlüssel und Übungsart für das Seitenfenster in „Grammatikformen", Lesen und Speichern einzelner Einträge.
+ *  - Zahlen je Schlüssel und Übungsart für das Pop-up in „Grammatikformen", Lesen und Speichern einzelner Einträge.
  *  - KI-Entwürfe: Der KI-Knopf läuft als Hintergrund-Auftrag; das Ergebnis liegt als Entwurf je Schlüssel bereit
  *    (dieses Gerät), bis die Lehrkraft es durchsieht und speichert oder verwirft – gespeichert wird nur Durchgesehenes.
  */
@@ -26,7 +26,7 @@ export const bankSpeichern = (
   aufgaben: BankAufgabe[]
 ): Promise<{ aufgaben: number; kurse: number; zahlen: BankZahlen }> => senden('/server/grammatik-bank/speichern', { sprache, schluessel, regel, aufgaben })
 
-/** Nach dem Speichern: offene Seitenfenster und Kurse laden neu */
+/** Nach dem Speichern: offene Pop-ups und Kurse laden neu */
 export const BANK_EREIGNIS = 'grammatik-bank-geaendert'
 
 // ---------------------------------------------------------------- Entwürfe der KI (je Schlüssel)
@@ -88,11 +88,12 @@ export function fehlendeUebungen(zahl: Partial<Record<Uebung, number>> | undefin
  * KI-Aufgaben für mehrere Schlüssel im Hintergrund erzeugen (eine Anfrage je Schlüssel, nacheinander). Jeder fertige
  * Schlüssel liegt gleich als Entwurf bereit – bricht ein späterer ab, bleibt das Fertige.
  */
-export function bankErzeugenStarten(auftraege: (Omit<BankAuftrag, 'vorhanden'> & { vorhanden?: string[] })[], titel: string): void {
+export function bankErzeugenStarten(auftraege: (Omit<BankAuftrag, 'vorhanden'> & { vorhanden?: string[] })[], titel: string, docId = 'grammatikformen'): void {
   if (!auftraege.length) return
   void starteAuftrag({
     moduleId: 'grammatikformen',
-    docId: 'grammatikformen',
+    // „Öffnen" führt zum Grammatikpunkt (grammatikformen.ts `zielDocId`, 13.10.2026)
+    docId,
     titel,
     art: 'Grammatikaufgaben',
     eingabe: auftraege,
@@ -116,4 +117,15 @@ export function bankErzeugenStarten(auftraege: (Omit<BankAuftrag, 'vorhanden'> &
     abschluss: (n) => `${n} Aufgaben fertig – in „Grammatikformen“ durchsehen und speichern`
   })
   notifySuccess('Die KI schreibt die Aufgaben im Hintergrund – sie erscheinen hier zum Durchsehen.')
+}
+
+/**
+ * Ampel der Übungsaufgaben eines Grammatikpunkts (13.10.2026, Unit-Karten und Regal): vollständig, wenn jeder
+ * Teilbereich in jeder Übungsart genug Aufgaben hat; teilweise, wenn es überhaupt welche gibt; sonst keine.
+ */
+export function aufgabenAmpel(teile: readonly string[], zahlen: BankZahlen): 'voll' | 'teil' | 'keine' {
+  if (!teile.length) return 'keine'
+  const n = teile.reduce((m, k) => m + UEBUNGEN.reduce((x, u) => x + (zahlen[k]?.[u] ?? 0), 0), 0)
+  if (!n) return 'keine'
+  return teile.every((k) => !fehlendeUebungen(zahlen[k]).length) ? 'voll' : 'teil'
 }

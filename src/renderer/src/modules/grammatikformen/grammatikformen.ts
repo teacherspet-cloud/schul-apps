@@ -320,3 +320,38 @@ export function teilHinweise(kennung: string): string {
     .filter(Boolean)
     .join('\n')
 }
+
+// ---------------------------------------------------------------- „Öffnen" aus der Auftragsleiste (13.10.2026)
+
+/** Wohin „Öffnen" führt: Band, Unit, Abschnitt und der Grammatikpunkt (nach seinen Kennungen, sonst nach dem Namen) */
+export interface GrammatikformenZiel {
+  buchId: string
+  unit: string
+  abschnitt: string
+  kennungen: string[]
+  text: string
+}
+export const zielDocId = (z: GrammatikformenZiel): string => `gf:${encodeURIComponent(JSON.stringify(z))}`
+export function zielAusDocId(docId: string): GrammatikformenZiel | null {
+  if (!docId?.startsWith('gf:')) return null
+  try {
+    const z = JSON.parse(decodeURIComponent(docId.slice(3))) as Partial<GrammatikformenZiel>
+    return typeof z.buchId === 'string' && typeof z.unit === 'string'
+      ? {
+          buchId: z.buchId,
+          unit: z.unit,
+          abschnitt: String(z.abschnitt ?? ''),
+          kennungen: Array.isArray(z.kennungen) ? z.kennungen.map(String) : [],
+          text: String(z.text ?? '')
+        }
+      : null
+  } catch {
+    return null
+  }
+}
+/** Index des Zielpunkts in seinem Abschnitt (gleiche Kennungen, sonst gleicher Name); -1 = nicht mehr da */
+export function zielIndex(punkte: readonly LehrwerkGrammatikPunkt[], z: Pick<GrammatikformenZiel, 'kennungen' | 'text'>): number {
+  const gleich = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|')
+  const i = z.kennungen.length ? punkte.findIndex((p) => gleich(p.t, z.kennungen)) : -1
+  return i >= 0 ? i : punkte.findIndex((p) => p.text === z.text)
+}
