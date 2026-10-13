@@ -31,7 +31,7 @@ import {
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { describeBlock } from '../arbeitsblatt/generation/describe'
 import { blattAlsSchritt, blattAlsSchrittGemessen } from './schrittAusBlatt'
-import { grundlageEingabe, grundlageZeilen, kcAuszugFuer } from './grundlage'
+import { grundlageEingabe, grundlageZeilen, kcAuszugFuer, vorwissenZeilen } from './grundlage'
 import type { KcAuszug } from './Lernziele'
 import { istAbbruch } from '@shared/abbruch'
 import { abdeckungText, pruefeAbdeckung, verteileAufStunden } from './planAbdeckung'
@@ -229,6 +229,8 @@ export function planAnfrage(
         ? `LERNZIELE DER REIHE (Nummern für "lernziele"):\n${r.lernziele.map((l, i) => `${i}: ${l.text}`).join('\n')}`
         : 'Noch keine Lernziele – leite sie aus dem Kerncurriculum ab; "lernziele" bleibt dann leer.',
       `STUNDEN (nummeriert ab 1; Stunde = Termin – eine Doppelstunde zählt als EINE Stunde mit 90 min): ${stundenText(stunden)}`,
+      // Vorwissen der Lerngruppe (13.10.2026): Bekanntes, Unsicheres, häufige Fehler, Leistungsspanne
+      ...vorwissenZeilen(r.vorwissen, true),
       ...planungsDidaktik(r),
       ...reihenmusterZeilen(r),
       materialien.length

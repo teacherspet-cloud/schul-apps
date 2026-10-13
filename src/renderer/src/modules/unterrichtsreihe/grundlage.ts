@@ -15,8 +15,9 @@
 import type { Reihe, Schritt } from '@shared/reihe'
 import type { KcAuszug } from './Lernziele'
 import { useAppSettings } from '../../shared/settingsStore'
+import { lerngruppenRegeln, teileVorwissen } from '../arbeitsblatt/didactics/vorwissen/vorwissen'
 
-export type GrundlageArt = 'lerngruppe' | 'kc' | 'lernziele' | 'buch' | 'minuten' | 'davor' | 'funktion' | 'niveau'
+export type GrundlageArt = 'lerngruppe' | 'kc' | 'lernziele' | 'buch' | 'minuten' | 'davor' | 'funktion' | 'niveau' | 'vorwissen'
 
 export interface GrundlageChip {
   id: GrundlageArt
@@ -69,6 +70,36 @@ export interface GrundlageEingabe {
   /** Sprache relativ zum Jahrgang (Niveau der Reihe, 08.10.2026) – fehlt = wie `niveau` */
   sprache?: NonNullable<Schritt['kiVorgabe']>['niveau']
   stufen?: NonNullable<Schritt['kiVorgabe']>['stufen']
+  /** Vorwissen der Lerngruppe (13.10.2026, `Reihe.vorwissen`) – eine Angabe je Zeile */
+  vorwissen?: string
+}
+
+/**
+ * Vorwissen der Lerngruppe als Zeilen der Anfrage (13.10.2026) – für Planung und Schritte ohne Arbeitsblatt (das Blatt
+ * bekommt den Text als `priorKnowledge` und dieselben Regeln über vorwissenRegeln).
+ */
+export function vorwissenZeilen(text: string | undefined, fuerPlanung = false): string[] {
+  const t = teileVorwissen(text ?? '')
+  return [
+    t.vorwissen.length ? 'VORWISSEN DER LERNGRUPPE (von der Lehrkraft bestätigt):' : '',
+    ...t.vorwissen.map((z) => `- ${z}`),
+    t.vorwissen.length
+      ? fuerPlanung
+        ? '- Baue darauf auf: Bekanntes nicht neu einführen; der Einstieg knüpft daran an; Neues schließt erkennbar an.'
+        : '- Setze dieses Vorwissen voraus und knüpfe daran an – erkläre es nicht neu.'
+      : '',
+    t.fehlvorstellungen.length ? 'MÖGLICHE FEHLVORSTELLUNGEN – gezielt aufgreifen:' : '',
+    ...t.fehlvorstellungen.map((z) => `- ${z}`),
+    t.nochNicht.length ? 'NOCH NICHT BEHANDELT – nicht voraussetzen:' : '',
+    ...t.nochNicht.map((z) => `- ${z}`),
+    ...lerngruppenRegeln(t),
+    fuerPlanung && (t.unsicher.length || t.fehler.length)
+      ? '- In der PLANUNG: Unsicheres und häufige Fehler, die zum Oberthema gehören, bekommen eine Wiederholung bzw. einen Förderschritt an passender Stelle (nicht alles, nur was die Reihe trägt).'
+      : '',
+    fuerPlanung && t.spanne.length
+      ? '- Förder- ("foerder") und Forderschritte ("forder") sowie optionale Vertiefungen nach der Leistungsspanne planen.'
+      : ''
+  ].filter(Boolean)
 }
 
 /** Expertenmodus? (ohne geladene Einstellungen: ja – wie `useExperte`) */
@@ -132,7 +163,8 @@ export function grundlageEingabe(r: Reihe, s: Schritt, kc: KcAuszug | null): Gru
     ...(funktion && !istAus(s, 'funktion') ? { funktion } : {}),
     davor: istAus(s, 'davor') ? [] : davor,
     ...(s.platzhalter?.buch?.trim() ? { buch: s.platzhalter.buch.trim() } : {}),
-    ...schrittNiveau(r, s)
+    ...schrittNiveau(r, s),
+    ...(r.vorwissen?.trim() && !istAus(s, 'vorwissen') ? { vorwissen: r.vorwissen.trim() } : {})
   }
 }
 
@@ -146,7 +178,8 @@ export function grundlageZeilen(e: GrundlageEingabe): string[] {
     e.funktion ? `DIDAKTISCHE FUNKTION AN DIESER STELLE: ${e.funktion}` : '',
     e.niveau ? `ANSPRUCH: ${e.niveau} (gemessen am Jahrgang; „mittel" = jahrgangsgemäß)` : '',
     e.sprache && e.sprache !== e.niveau ? `SPRACHE: ${e.sprache} (Satzlänge, Lesbarkeit, Fachsprache – gemessen am Jahrgang)` : '',
-    e.davor.length ? `DAVOR IN DER REIHE: ${e.davor.join('; ')}` : ''
+    e.davor.length ? `DAVOR IN DER REIHE: ${e.davor.join('; ')}` : '',
+    ...vorwissenZeilen(e.vorwissen)
   ].filter(Boolean)
 }
 
@@ -244,6 +277,20 @@ export function grundlageChips(r: Reihe, s: Schritt, kc: KcAuszug | null): Grund
   const funktion = funktionVon(s)
   if (funktion)
     chips.push({ id: 'funktion', label: 'Didaktische Funktion', titel: 'Didaktische Funktion an dieser Stelle', zeilen: [funktion], abwaehlbar: true, aus: istAus(s, 'funktion') })
+  // Vorwissen der Lerngruppe (13.10.2026)
+  const vw = (r.vorwissen ?? '')
+    .split('\n')
+    .map((z) => z.trim())
+    .filter((z) => z && !/^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(z))
+  if (vw.length)
+    chips.push({
+      id: 'vorwissen',
+      label: 'Vorwissen der Lerngruppe',
+      titel: r.lerngruppe ? `Vorwissen der Lerngruppe ${r.lerngruppe.name}` : 'Vorwissen der Lerngruppe',
+      zeilen: vw.slice(0, 30),
+      abwaehlbar: true,
+      aus: istAus(s, 'vorwissen')
+    })
   const nv = schrittNiveau(r, s)
   if (nv.niveau || (nv.stufen ?? 1) > 1)
     chips.push({

@@ -225,7 +225,8 @@ export function blattMeta(r: Reihe, s: Schritt, zweck: BlattZweck | null = blatt
     title: s.titel,
     topic: `${s.titel}${r.oberthema ? ` (Reihe „${r.titel}", Oberthema: ${r.oberthema})` : ''}`,
     learningGoals: [blattZiele(s.platzhalter?.beschreibung ?? '', g), ...rolle].filter(Boolean).join('\n'),
-    priorKnowledge: g.davor.length ? `Vorher in der Reihe: ${g.davor.join('; ')}` : '',
+    // Vorwissen der Lerngruppe (13.10.2026) und was vorher in der Reihe kam
+    priorKnowledge: [g.vorwissen ?? '', g.davor.length ? `Vorher in der Reihe: ${g.davor.join('; ')}` : ''].filter(Boolean).join('\n'),
     ...(g.minuten ? { minutes: g.minuten } : {}),
     ...(g.stufen
       ? { differentiation: { ...basis.differentiation, levels: g.stufen, mode: 'separate' as const } }

@@ -43,6 +43,8 @@ export interface ReihenVorgabe {
   fachId?: string
   grade?: number
   titel?: string
+  /** Lerngruppe (13.10.2026): der Editor lädt ihr Vorwissen */
+  lerngruppe?: { id: string; name: string }
 }
 
 function neueReihe(vorgabe?: ReihenVorgabe | null): Reihe {
@@ -58,7 +60,8 @@ function neueReihe(vorgabe?: ReihenVorgabe | null): Reihe {
     grade: vorgabe?.grade && vorgabe.grade >= 1 && vorgabe.grade <= 13 ? vorgabe.grade : 7,
     oberthema: '',
     lernziele: [],
-    schritte: []
+    schritte: [],
+    ...(vorgabe?.lerngruppe ? { lerngruppe: vorgabe.lerngruppe } : {})
   }
 }
 

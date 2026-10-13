@@ -175,6 +175,11 @@ export function lerngruppenVon(lehrkraftId: string): Lerngruppe[] {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
+/** Alle Lerngruppen der Schule (13.10.2026, Vorwissen aus Kursen anderer Lehrkräfte – vorwissen.ts) */
+export function alleLerngruppen(): Lerngruppe[] {
+  return (db().prepare('SELECT * FROM lerngruppen').all() as Record<string, unknown>[]).map(alsGruppe)
+}
+
 export function lerngruppe(id: string): Lerngruppe | null {
   const z = db().prepare('SELECT * FROM lerngruppen WHERE id = ?').get(id) as Record<string, unknown> | undefined
   return z ? alsGruppe(z) : null

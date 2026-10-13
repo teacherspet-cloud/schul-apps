@@ -28,6 +28,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Textarea,
   Tooltip
 } from '@mantine/core'
 import {
@@ -95,6 +96,7 @@ import { ServerFehler } from '../onlinetest/serverApi'
 import { fuehreZusammen, type Veroeffentlichung } from '@shared/reiheSpeichern'
 import { planAufRaster } from './planAbdeckung'
 import { NiveauWahl } from './ReiheNiveau'
+import { feldMitVorwissen, ladeVorwissen, LerngruppeWahl, type LerngruppeBezug, type VorwissenAntwort } from '../../shared/lerngruppeVorwissen'
 import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 
@@ -158,6 +160,30 @@ export function ReiheEditor({
     setR((x) => ({ ...x, ...teil }))
     setGeaendert(true)
   }
+  /**
+   * Für Lerngruppe (13.10.2026, abgestimmt): Jahrgang und Vorwissen aus dem, was die Schule über diese Lernenden weiß. Ein
+   * früher übernommener Text wird ersetzt, Eigenes bleibt; abwählen nimmt ihn heraus.
+   */
+  const lerngruppeWaehlen = (g: LerngruppeBezug | null, a: VorwissenAntwort | null): void => {
+    const x = rAktuell.current
+    const alt = x.lerngruppe?.text
+    if (!g || !a) return setze({ lerngruppe: undefined, vorwissen: alt ? feldMitVorwissen(x.vorwissen ?? '', alt, '') : x.vorwissen })
+    setze({
+      lerngruppe: { ...g, text: a.text },
+      vorwissen: feldMitVorwissen(x.vorwissen ?? '', alt, a.text),
+      ...(a.jahrgang ? { grade: a.jahrgang } : {})
+    })
+  }
+  // Neue Reihe aus „Meine Klassen" (Lerngruppe vorgegeben, noch ohne Text): Vorwissen einmal laden
+  useEffect(() => {
+    const g = start.lerngruppe
+    if (!g || g.text !== undefined || start.vorwissen) return
+    ladeVorwissen(g.id).then(
+      (a) => lerngruppeWaehlen({ id: g.id, name: g.name }, a),
+      (e: unknown) => notifyError(e, 'Vorwissen der Lerngruppe nicht geladen')
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     let aktiv = true
     void ladeLehrplan(r.stateId).then((lp) => {
@@ -608,6 +634,18 @@ export function ReiheEditor({
               }}
               clearable
               data-reihe-oberthema
+            />
+            {/* Vorwissen der Lerngruppe (13.10.2026): geht in Planung und alle Schritte – Lernende sehen es nicht */}
+            <LerngruppeWahl wert={r.lerngruppe} fachId={r.fachId} onWahl={lerngruppeWaehlen} />
+            <Textarea
+              label="Vorwissen der Lerngruppe (optional)"
+              description="Eine Angabe je Zeile. „Unsicher: …“ und „Häufiger Fehler: …“ plant die KI gezielt ein, „Leistungsspanne: …“ bestimmt Förder- und Forderschritte, „Noch nicht behandelt: …“ setzt sie nicht voraus. Lernende sehen das nicht."
+              autosize
+              minRows={1}
+              maxRows={14}
+              value={r.vorwissen ?? ''}
+              onChange={(e) => setze({ vorwissen: e.currentTarget.value })}
+              data-reihe-vorwissen
             />
             {/* Leitfrage (08.10.2026, Reihenmuster): sehen die Lernenden oben in der Reihe */}
             <LeitfrageFeld wert={r.leitfrage ?? ''} setze={(leitfrage) => setze({ leitfrage })} />

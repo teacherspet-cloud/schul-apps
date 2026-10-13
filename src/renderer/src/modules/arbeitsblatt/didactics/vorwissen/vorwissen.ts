@@ -151,20 +151,62 @@ export interface VorwissenTeile {
   vorwissen: string[]
   fehlvorstellungen: string[]
   nochNicht: string[]
+  /** Vorwissen der Lerngruppe aus „Meine Klassen" (13.10.2026, shared/vorwissenLerngruppe.ts): Unsicheres mit Anteilen */
+  unsicher: string[]
+  /** … häufige Fehler (Grammatik, Fehlerschwerpunkte der Tests) */
+  fehler: string[]
+  /** … Leistungsspanne für die Differenzierung */
+  spanne: string[]
 }
 
 export function teileVorwissen(text: string): VorwissenTeile {
-  const t: VorwissenTeile = { vorwissen: [], fehlvorstellungen: [], nochNicht: [] }
+  const t: VorwissenTeile = { vorwissen: [], fehlvorstellungen: [], nochNicht: [], unsicher: [], fehler: [], spanne: [] }
   for (const roh of (text ?? '').split('\n')) {
     const z = roh.trim().replace(/^[-•*]\s*/, '')
     if (!z) continue
+    // Überschriften des Vorwissens aus „Meine Klassen" („Aus diesem Kurs:") tragen keinen Inhalt
+    if (/^aus (?:diesem kurs|anderen kursen)\s*:?$/i.test(z)) continue
     const fv = z.match(/^fehlvorstellung(?:en)?\s*:\s*(.+)$/i)
     const nn = z.match(/^noch nicht (?:behandelt|eingeführt|bekannt)\s*:\s*(.+)$/i)
+    const un = z.match(/^(?:unsicher|schwäche)\s*:\s*(.+)$/i)
+    const hf = z.match(/^häufige[rn]? fehler\s*:\s*(.+)$/i)
+    const ls = z.match(/^leistungsspanne\s*:\s*(.+)$/i)
+    const be = z.match(/^behandelt\s*:\s*(.+)$/i)
+    const si = z.match(/^sicher\s*:\s*(.+)$/i)
     if (fv) t.fehlvorstellungen.push(fv[1].trim())
     else if (nn) t.nochNicht.push(nn[1].trim())
+    else if (un) t.unsicher.push(un[1].trim())
+    else if (hf) t.fehler.push(hf[1].trim())
+    else if (ls) t.spanne.push(ls[1].trim())
+    else if (be) t.vorwissen.push(be[1].trim())
+    else if (si) t.vorwissen.push(`${si[1].trim()} (sicher)`)
     else t.vorwissen.push(z)
   }
   return t
+}
+
+/**
+ * Regeln zu Unsicherheiten, häufigen Fehlern und Leistungsspanne (13.10.2026, Wunsch der Lehrkraft: „mögliche Schwächen
+ * der Lerngruppe und einzelner Schüler, häufige Fehler usw. berücksichtigen") – auch für die Unterrichtsreihe.
+ */
+export function lerngruppenRegeln(t: Pick<VorwissenTeile, 'unsicher' | 'fehler' | 'spanne'>): string[] {
+  return [
+    t.unsicher.length ? 'UNSICHER IN DER LERNGRUPPE (in Klammern: wie viele) – nicht als sicher voraussetzen:' : '',
+    ...t.unsicher.map((z) => `- ${z}`),
+    t.unsicher.length
+      ? '- Wo es zum Thema passt: kurz wiederholen und festigen, mit gestuften Hilfen (Tipp, Beispiel, Wortspeicher). Was nicht zum Thema passt, NICHT hineinziehen.'
+      : '',
+    t.fehler.length ? 'HÄUFIGE FEHLER DER LERNGRUPPE – gezielt vorbeugen:' : '',
+    ...t.fehler.map((z) => `- ${z}`),
+    t.fehler.length
+      ? '- Plane, wo es passt, mindestens eine Aufgabe, die genau diese Fehler sichtbar macht (z. B. Fehler finden, richtig/falsch begründen, Gegenüberstellung) und den richtigen Gebrauch übt; im Erwartungshorizont kurz nennen, woran man den Fehler erkennt.'
+      : '',
+    t.spanne.length ? 'LEISTUNGSSPANNE DER LERNGRUPPE:' : '',
+    ...t.spanne.map((z) => `- ${z}`),
+    t.spanne.length
+      ? '- Differenziere danach: ein gestützter Weg (Hilfen, kleinere Schritte, Förderaufgabe) für die, die mehr Unterstützung brauchen, und Zusatz-/Forderaufgaben für die Sicheren – ohne Namen, ohne Etiketten wie „schwach“.'
+      : ''
+  ].filter(Boolean)
 }
 
 /**
@@ -177,7 +219,7 @@ export function teileVorwissen(text: string): VorwissenTeile {
  */
 export function vorwissenRegeln(text: string): string {
   const t = teileVorwissen(text)
-  if (!t.vorwissen.length && !t.fehlvorstellungen.length && !t.nochNicht.length) return ''
+  if (!t.vorwissen.length && !t.fehlvorstellungen.length && !t.nochNicht.length && !t.unsicher.length && !t.fehler.length && !t.spanne.length) return ''
   return [
     t.vorwissen.length ? 'VORWISSEN DER LERNGRUPPE (von der Lehrkraft bestätigt):' : '',
     ...t.vorwissen.map((z) => `- ${z}`),
@@ -196,7 +238,8 @@ export function vorwissenRegeln(text: string): string {
     ...t.nochNicht.map((z) => `- ${z}`),
     t.nochNicht.length
       ? '- Verwende diese Inhalte, Begriffe und Verfahren NICHT als bekannt. Wo sie sich nicht vermeiden lassen, erkläre sie knapp auf dem Blatt.'
-      : ''
+      : '',
+    ...lerngruppenRegeln(t)
   ]
     .filter(Boolean)
     .join('\n')

@@ -113,7 +113,7 @@ try {
     ).json()
   await blatt('Ohne Frist', null)
   await blatt('Mit Frist', Date.now() + 86_400_000)
-  // Mia übt: alle Wörter kennengelernt, fünf davon dreimal falsch geschrieben → wackelig
+  // Mia übt: alle Wörter kennengelernt, fünf davon sechsmal falsch geschrieben (Problemwort-Regel seit 12.10.2026: ab 6 Abfragen) → wackelig
   const mia = liste.angelegt[0]
   const sm = await browser.newContext()
   await anmelden(sm, mia.benutzer, mia.passwort)
@@ -125,7 +125,7 @@ try {
   for (const w of WOERTER)
     await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'karte', gewusst: true } })
   for (const w of WOERTER.slice(0, 5))
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 6; i++)
       await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'frei', antwort: 'xyz' } })
   // Grammatik im Kurs der Klasse (für „+ Aufgaben" im Reiter Grammatik)
   const gram = await (
@@ -284,7 +284,7 @@ try {
   const bedarfKachel = p.locator('[data-fach-kopf] [data-kennzahl="bedarf"]')
   if (await bedarfKachel.count()) {
     await bedarfKachel.click()
-    pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-gruppe]')), 'Kachel „Handlungsbedarf" öffnet das Pop-up mit Gruppen')
+    pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-gruppe]').first()), 'Kachel „Handlungsbedarf" öffnet das Pop-up mit Gruppen')
     pruefe(await da(p.locator('[data-handlungsbedarf] [data-bedarf-aktion]').first()), 'Je Eintrag ein Knopf mit dem nächsten Schritt')
     if ((await p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').count()) >= 1) {
       const zeile = p.locator('[data-handlungsbedarf] [data-bedarf-zeile]').first()
@@ -496,6 +496,10 @@ try {
     await gramEintrag.click()
     pruefe(await da(p.locator('[role="tab"][aria-selected="true"]', { hasText: /^Grammatik/ })), 'Grammatik-Hinweis öffnet den Reiter „Grammatik"')
     pruefe(await da(p.locator('[data-kurs-seite] [data-kurs-grammatik]'), 10000), 'Grammatik-Hinweis zeigt die Grammatik-Liste')
+  } else if (await p.locator('[data-handlungsbedarf]').count()) {
+    // Ohne Grammatik-Hinweis das Pop-up wieder schließen – sonst verdeckt es die Reiter
+    await p.keyboard.press('Escape')
+    await p.locator('[data-handlungsbedarf]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
   }
 
   // Rückweg: Blatt öffnen → „Meine Klassen" führt zurück in dieselbe Klasse

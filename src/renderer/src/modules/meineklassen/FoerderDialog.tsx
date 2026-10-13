@@ -63,6 +63,8 @@ import {
 import { ladeGedaechtnis } from '../rueckmeldung/ablagen'
 import { gemerkterAusgleich } from '../rueckmeldung/nachteilsausgleich'
 import { foerderBlattFuerKlasse } from './klassenMaterial'
+import { ladeVorwissen } from '../../shared/lerngruppeVorwissen'
+import { vorwissenFuerGruppe } from '@shared/vorwissenLerngruppe'
 
 /** Maßnahmen, bei denen Rechtschreibung kein Förderziel ist (rueckmeldung/nachteilsausgleich.ts) */
 const RS_MASSNAHMEN = ['ns-rechtschreibung', 'ns-rs-kennzeichnen', 'ns-sprachrichtigkeit', 'computer', 'diktiert', 'richtiges']
@@ -107,6 +109,18 @@ export function FoerderDialog({
   const [mitBuendel, setMitBuendel] = useState(true)
   const [laeuft, setLaeuft] = useState(false)
   const [bausteine, setBausteine] = useState<{ name: string; text: string }[]>([])
+  // Vorwissen der Lerngruppe (13.10.2026): vorausgefüllt, änderbar, geht gefiltert in jedes Blatt
+  const [vorwissen, setVorwissen] = useState('')
+  useEffect(() => {
+    let aktiv = true
+    ladeVorwissen(klasse.id).then(
+      (a) => aktiv && setVorwissen(a.text),
+      () => undefined
+    )
+    return () => {
+      aktiv = false
+    }
+  }, [klasse.id])
 
   useEffect(() => {
     let aktiv = true
@@ -239,6 +253,7 @@ export function FoerderDialog({
           .filter(Boolean)
           .map((z) => ohneNamen(z, alleNamen))
         foerderBlattFuerKlasse(klasse, {
+          vorwissen: ohneNamen(vorwissenFuerGruppe(vorwissen, g.art), alleNamen),
           auftrag,
           schluessel: g.schluessel,
           gruppenTitel: g.titel,
@@ -431,6 +446,17 @@ export function FoerderDialog({
               ? 'Vorschlag der App nach ähnlichem Bedarf. Kinder per Ziehen verschieben – oder antippen und bei der Zielgruppe „Hierher" tippen. Jede Gruppe einzeln prüfen und bestätigen.'
               : 'Bitte prüfen und bestätigen.'}
           </Text>
+          <Textarea
+            size="xs"
+            label="Vorwissen der Lerngruppe (gilt für alle Blätter)"
+            description="Aus diesem und anderen Kursen dieser Lernenden – änderbar. Förderblätter setzen „Sicher: …“ nicht voraus, Forderblätter üben „Unsicher: …“ nicht."
+            autosize
+            minRows={1}
+            maxRows={10}
+            value={vorwissen}
+            onChange={(e) => setVorwissen(e.currentTarget.value)}
+            data-foerder-vorwissen
+          />
           <SimpleGrid cols={{ base: 1, md: 2, xl: Math.min(4, Math.max(2, gruppen.length)) }}>
             {gruppen.map((g) => {
               const ks = g.kinder.map((id) => nachId.get(id)).filter((k): k is KindDaten => Boolean(k))

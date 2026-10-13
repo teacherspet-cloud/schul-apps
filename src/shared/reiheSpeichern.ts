@@ -39,7 +39,10 @@ const FELDER = [
   'niveau',
   // 08.10.2026: Reihenmuster
   'leitfrage',
-  'reihentyp'
+  'reihentyp',
+  // 13.10.2026: Vorwissen der Lerngruppe
+  'vorwissen',
+  'lerngruppe'
 ] as const
 
 /** Schritt beim Zusammenführen: Wer ihn geändert hat, gewinnt; beide geändert → ein gefüllter Platzhalter (Auftrag) vor dem leeren */

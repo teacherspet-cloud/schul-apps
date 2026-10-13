@@ -70,3 +70,19 @@ export function nimmJahrgangVorgabe(moduleId: string): number | null {
   jahrgaenge.delete(moduleId)
   return g
 }
+
+/**
+ * Lerngruppe für ein neues Material vorgeben (13.10.2026, „Erstellen" in Meine Klassen): Das Programm lädt damit das
+ * Vorwissen der Lerngruppe (shared/lerngruppeVorwissen.tsx). Wie Fach und Thema genau einmal abgeholt.
+ */
+const lerngruppen = new Map<string, { id: string; name: string }>()
+
+export function setzeLerngruppeVorgabe(moduleId: string, g: { id: string; name: string }): void {
+  if (g.id) lerngruppen.set(moduleId, g)
+}
+
+export function nimmLerngruppeVorgabe(moduleId: string): { id: string; name: string } | null {
+  const g = lerngruppen.get(moduleId) ?? null
+  lerngruppen.delete(moduleId)
+  return g
+}

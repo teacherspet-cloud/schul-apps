@@ -245,6 +245,8 @@ export function vokabelBlattFuerKlasse(
 
 /** Eine bestätigte Gruppe des Förder-/Fordermaterials, wie sie in die Erzeugung geht – ohne Namen */
 export interface FoerderGruppeWahl {
+  /** Vorwissen der Lerngruppe (13.10.2026), schon für Förder- bzw. Forderblatt gefiltert und ohne Namen */
+  vorwissen?: string
   /** Auftrag (Server) und Schlüssel der Gruppe – beim Freischalten werden daraus die Lernenden vorgewählt */
   auftrag: string
   schluessel: string
@@ -294,9 +296,15 @@ export function foerderBlattMeta(k: { name: string; fach: string; titel: string 
       nachteilsausgleich: w.nachteilsausgleich,
       ohneRechtschreibung: w.ohneRechtschreibung
     }),
-    priorKnowledge: foerder
-      ? 'Die Grundlagen des Themas wurden im Unterricht behandelt, sitzen bei dieser Gruppe aber noch nicht sicher (Befund in den Lernzielen).'
-      : 'Die Grundlagen des Themas sitzen bei dieser Gruppe sicher; das Blatt vertieft und überträgt.',
+    priorKnowledge: [
+      foerder
+        ? 'Die Grundlagen des Themas wurden im Unterricht behandelt, sitzen bei dieser Gruppe aber noch nicht sicher (Befund in den Lernzielen).'
+        : 'Die Grundlagen des Themas sitzen bei dieser Gruppe sicher; das Blatt vertieft und überträgt.',
+      // Vorwissen der Lerngruppe aus allen Kursen (13.10.2026)
+      w.vorwissen?.trim() ?? ''
+    ]
+      .filter(Boolean)
+      .join('\n'),
     sheetType: 'uebung',
     pages: 1,
     pagesBis: 2,

@@ -161,7 +161,7 @@ describe('Zeilen im Feld und Wirkung im Prompt', () => {
 
   it('trennt das Feld nach Wirkung', () => {
     const t = teileVorwissen('Bruchrechnung\nFehlvorstellung: +20 % und −20 % heben sich auf\nNoch nicht behandelt: Zinseszins')
-    expect(t).toEqual({ vorwissen: ['Bruchrechnung'], fehlvorstellungen: ['+20 % und −20 % heben sich auf'], nochNicht: ['Zinseszins'] })
+    expect(t).toEqual({ vorwissen: ['Bruchrechnung'], fehlvorstellungen: ['+20 % und −20 % heben sich auf'], nochNicht: ['Zinseszins'], unsicher: [], fehler: [], spanne: [] })
   })
 
   it('verlangt voraussetzen, aktivieren, aufgreifen und nicht voraussetzen', () => {

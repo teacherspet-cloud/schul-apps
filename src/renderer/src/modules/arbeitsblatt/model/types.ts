@@ -976,6 +976,8 @@ export interface WorksheetMeta {
   topic: string
   learningGoals: string
   priorKnowledge: string
+  /** Für Lerngruppe (13.10.2026): Vorwissen, Jahrgang und Wortschatz kamen aus ihr; `text` = übernommener Vorwissenstext */
+  lerngruppe?: import('@shared/vorwissenLerngruppe').LerngruppeBezug
   stateId: string
   schoolTypeId: string
   schoolTypeName: string

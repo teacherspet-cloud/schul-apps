@@ -89,8 +89,11 @@ export interface KindDatenServer {
   handlungsbedarf: string[]
 }
 
-/** Lerndaten je Kind einer Lerngruppe (nur für deren Lehrkraft) */
-export function foerderDaten(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()): KindDatenServer[] {
+/**
+ * Lerndaten je Kind einer Lerngruppe (nur für deren Lehrkraft). `mitBedarf` (13.10.2026): Das Vorwissen aus fremden Kursen
+ * (vorwissen.ts) braucht den Handlungsbedarf nicht – und dessen Berechnung räumt Ausgeblendetes der Lehrkraft auf.
+ */
+export function foerderDaten(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), mitBedarf = true): KindDatenServer[] {
   const mitglieder = mitgliederVon(g)
   const sprache = spracheVon(g)
   // Vokabeln: laufende Kurse der Lerngruppe (nur freigeschaltete Abschnitte, wie in „Meine Klassen")
@@ -101,7 +104,7 @@ export function foerderDaten(g: Lerngruppe, lehrkraftId: string, jetzt = Date.no
     .filter((z) => istOffen(z))
   const blaetter = blattAmpelnJePerson(lehrkraftId, g.id)
   const h = historie(g)
-  const bedarf = bedarfJePerson(g, lehrkraftId, jetzt)
+  const bedarf = mitBedarf ? bedarfJePerson(g, lehrkraftId, jetzt) : new Map<string, string[]>()
   return mitglieder
     .map((n): KindDatenServer => {
       let sicher = 0

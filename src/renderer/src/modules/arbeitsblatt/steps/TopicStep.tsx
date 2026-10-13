@@ -7,7 +7,15 @@ import { sehtextQuelle } from '../didactics/sehtext'
 import VersuchKarte from './VersuchKarte'
 import { versuchAuftrag } from '../auftraege'
 import { hatProtokolle } from '../didactics/protokoll'
-import { nimmFachVorgabe, nimmJahrgangVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
+import { nimmFachVorgabe, nimmJahrgangVorgabe, nimmLerngruppeVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
+import {
+  feldMitVorwissen,
+  knownVocabAus,
+  ladeVorwissen,
+  LerngruppeWahl,
+  type LerngruppeBezug,
+  type VorwissenAntwort
+} from '../../../shared/lerngruppeVorwissen'
 import { pruefeHochladen } from '../../../shared/datenschutz'
 import {
   Alert,
@@ -35,7 +43,7 @@ import {
 } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconDownload, IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import UrlQuelleEingabe from '../../../shared/components/UrlQuelleEingabe'
 import StufenWahl from './StufenWahl'
 import { STANDARD_STUFEN, stufeFuer } from '../didactics/schwierigkeit'
@@ -174,6 +182,13 @@ export default function TopicStep(): React.JSX.Element {
           const thema = nimmThemaVorgabe('arbeitsblatt')
           // „Arbeitsblatt erstellen" in Meine Klassen gibt den Jahrgang der Klasse vor (08.10.2026)
           const jahrgang = nimmJahrgangVorgabe('arbeitsblatt')
+          // … und die Lerngruppe (13.10.2026): ihr Vorwissen wird geladen und übernommen
+          const lg = nimmLerngruppeVorgabe('arbeitsblatt')
+          if (lg)
+            ladeVorwissen(lg.id).then(
+              (a) => setLerngruppeGeladen({ g: lg, a }),
+              (e: unknown) => notifyError(e, 'Vorwissen der Lerngruppe nicht geladen')
+            )
           const fachId = vorgabe && subjectById(vorgabe).id === vorgabe ? vorgabe : last.subjectId
           const subject = fachId ? subjectById(fachId) : null
           const ws: Worksheet = {
@@ -215,6 +230,15 @@ export default function TopicStep(): React.JSX.Element {
     // Schritt legt sofort ein frisches an – sonst stünde das Formular leer da.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worksheet === null])
+
+  // Vorwissen der Lerngruppe aus „Meine Klassen" übernehmen, sobald Blatt und Länderdaten da sind (13.10.2026)
+  const [lerngruppeGeladen, setLerngruppeGeladen] = useState<{ g: LerngruppeBezug; a: VorwissenAntwort } | null>(null)
+  const lerngruppeRef = useRef<((g: LerngruppeBezug | null, a: VorwissenAntwort | null) => void) | null>(null)
+  useEffect(() => {
+    if (!lerngruppeGeladen || !worksheet || !lerngruppeRef.current) return
+    lerngruppeRef.current(lerngruppeGeladen.g, lerngruppeGeladen.a)
+    setLerngruppeGeladen(null)
+  }, [lerngruppeGeladen, worksheet])
 
   // Auswahl für das nächste Mal merken
   useEffect(() => {
@@ -299,6 +323,27 @@ export default function TopicStep(): React.JSX.Element {
     }
     setWorksheet({ ...worksheet, meta: next })
   }
+
+  /**
+   * Für Lerngruppe (13.10.2026, abgestimmt): Jahrgang, bekannter Wortschatz (Sprachfächer) und Vorwissen aus dem, was die
+   * Schule über diese Lernenden weiß. Ein früher übernommener Text wird ersetzt, Eigenes bleibt; abwählen nimmt ihn heraus.
+   */
+  const lerngruppeWaehlen = (g: LerngruppeBezug | null, a: VorwissenAntwort | null): void => {
+    const alt = meta.lerngruppe?.text
+    if (!g || !a) return patch({ lerngruppe: undefined, priorKnowledge: alt ? feldMitVorwissen(meta.priorKnowledge, alt, '') : meta.priorKnowledge })
+    const r = gradeRange(table, meta.stateId, meta.schoolTypeId)
+    const grade = a.jahrgang && a.jahrgang >= r.min && a.jahrgang <= r.max ? a.jahrgang : meta.grade
+    const sprache = subject.foreignLanguage || meta.subjectId === 'daz'
+    const kv = sprache ? knownVocabAus(a, grade) : undefined
+    const kvErsetzen = kv && (!meta.knownVocab || meta.knownVocab.source.startsWith('Kurs '))
+    patchGroup({
+      lerngruppe: { ...g, text: a.text },
+      priorKnowledge: feldMitVorwissen(meta.priorKnowledge, alt, a.text),
+      ...(grade !== meta.grade ? { grade } : {}),
+      ...(kvErsetzen ? { knownVocab: kv } : {})
+    })
+  }
+  lerngruppeRef.current = lerngruppeWaehlen
 
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const courseOptions = courseLevelOptions(meta.stateId, meta.schoolTypeId, meta.grade)
@@ -440,6 +485,8 @@ export default function TopicStep(): React.JSX.Element {
                       Lerngruppe
                     </Title>
                     <Stack gap="sm">
+                      {/* Für Lerngruppe (13.10.2026): nur mit dem Schul-Apps-Server */}
+                      <LerngruppeWahl wert={meta.lerngruppe} fachId={meta.subjectId} onWahl={lerngruppeWaehlen} />
                       <SchulortFelder
                         table={table}
                         stateId={meta.stateId}
@@ -834,7 +881,7 @@ export default function TopicStep(): React.JSX.Element {
                       />
                       <Textarea
                         label="Vorwissen der Lerngruppe (optional)"
-                        description="Eine Angabe je Zeile. „Fehlvorstellung: …“ greift das Blatt gezielt auf, „Noch nicht behandelt: …“ setzt es nicht voraus."
+                        description="Eine Angabe je Zeile. „Fehlvorstellung: …“ greift das Blatt gezielt auf, „Noch nicht behandelt: …“ setzt es nicht voraus; „Unsicher: …“ und „Häufiger Fehler: …“ werden geübt, „Leistungsspanne: …“ bestimmt die Differenzierung."
                         autosize
                         minRows={1}
                         value={meta.priorKnowledge}

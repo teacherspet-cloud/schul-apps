@@ -19,6 +19,7 @@ import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute, alleBerichtigen } from './achievements'
 import { klassenRoute } from './klassen'
+import { vorwissenRoute } from './vorwissen'
 import { foerdernRoute } from './foerdern'
 import { startseiteRoute } from './startseite'
 import { klassenGaesteRoute } from './klassenGaeste'
@@ -199,6 +200,8 @@ async function main(): Promise<void> {
       iservKurseRoute(),
       // Förder- und Fordermaterial: Lerndaten je Kind, Gruppen, Bündel „Für dich" (12.10.2026, foerdern.ts)
       foerdernRoute(),
+      // Vorwissen der Lerngruppe für Reihe, Arbeitsblatt und Förder-/Fordermaterial (13.10.2026, vorwissen.ts)
+      vorwissenRoute(),
       hoertextRoute,
       // Medienbank der Vokabeln für Lernende (05.10.2026)
       medienRoute,

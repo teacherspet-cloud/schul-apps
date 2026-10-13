@@ -19,6 +19,7 @@ import {
   Card,
   Code,
   Collapse,
+  CopyButton,
   Group,
   Loader,
   Progress,
@@ -36,6 +37,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useExperte } from '../../shared/settingsStore'
+import { VORWISSEN_HINWEIS } from '@shared/vorwissenLerngruppe'
 import { LinienDiagramm, RingDiagramm, SaeulenDiagramm, useReihenFarben } from './ServerDiagramme'
 
 type Stufe = 'ok' | 'hinweis' | 'warnung' | 'kritisch'
@@ -196,6 +198,7 @@ export function ServerReiter({ sichtbar, zuKi }: { sichtbar: boolean; zuKi: () =
   const [z, setZ] = useState<Zustand | null>(null)
   const [zeitraum, setZeitraum] = useState<'24h' | '7d'>('24h')
   const [technik, setTechnik] = useState(experte)
+  const [hinweisOffen, setHinweisOffen] = useState(false)
   const [alleSicherungen, setAlleSicherungen] = useState(false)
   const laden = useCallback(() => {
     void holen<Zustand>(`/server/verwaltung/zustand?zeitraum=${zeitraum}`).then(setZ, (e: unknown) => notifyError(e))
@@ -474,6 +477,27 @@ export function ServerReiter({ sichtbar, zuKi }: { sichtbar: boolean; zuKi: () =
 
       {/* 6. Fehler und Anmeldungen */}
       <Fehler z={z} neuLaden={laden} />
+
+      {/* Datenschutz: Vorwissen der Lerngruppe (13.10.2026) – Entwurf zum Abstimmen mit der Schule */}
+      <Card withBorder data-vorwissen-hinweis>
+        <Klappe titel="Datenschutz-Hinweis: Vorwissen der Lerngruppe" offen={hinweisOffen} setOffen={setHinweisOffen}>
+          <Stack gap="xs" mt="xs">
+            <Text size="xs" c="dimmed">
+              Entwurf für die Datenschutzhinweise bzw. das Verzeichnis der Verarbeitungstätigkeiten – bitte mit der Schule abstimmen.
+            </Text>
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {VORWISSEN_HINWEIS}
+            </Text>
+            <CopyButton value={VORWISSEN_HINWEIS}>
+              {({ copied, copy }) => (
+                <Button size="xs" variant="light" onClick={copy} style={{ alignSelf: 'flex-start' }}>
+                  {copied ? 'Kopiert' : 'Text kopieren'}
+                </Button>
+              )}
+            </CopyButton>
+          </Stack>
+        </Klappe>
+      </Card>
 
       {/* Technische Details */}
       <Card withBorder>

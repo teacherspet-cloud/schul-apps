@@ -71,7 +71,7 @@ import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { KlassenSuche, type SuchTreffer } from './KlassenSuche'
 import { KursWahl, LernendeDetails } from './LernendeDetails'
 import { neuAnlegen, openDocument, openModule, useDokumentOeffner, useNavigation } from '../../shared/navigation'
-import { setzeFachVorgabe, setzeJahrgangVorgabe } from '../../shared/fachVorgabe'
+import { setzeFachVorgabe, setzeJahrgangVorgabe, setzeLerngruppeVorgabe } from '../../shared/fachVorgabe'
 import { useReihenZiel } from '../unterrichtsreihe/UnterrichtsreiheModule'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -300,19 +300,21 @@ export const jahrgangAusKlasse = (name: string): number | undefined => {
 
 /**
  * Neu für diese Klasse (08.10.2026, Wunsch der Lehrkraft): Unterrichtsreihe bzw. Arbeitsblatt mit Fach und Jahrgang der
- * Klasse beginnen. Die Lerngruppe wählt man wie gewohnt beim Zuweisen bzw. Freigeben.
+ * Klasse beginnen. Die Lerngruppe wählt man wie gewohnt beim Zuweisen bzw. Freigeben. Seit 13.10.2026 geht die Lerngruppe
+ * mit: Reihe und Blatt übernehmen ihr Vorwissen (shared/lerngruppeVorwissen.tsx).
  */
-function reiheFuerKlasse(d: Pick<KlasseDetail, 'name' | 'fach'>): void {
+function reiheFuerKlasse(d: Pick<KlasseDetail, 'id' | 'name' | 'fach'>): void {
   useNavigation.getState().setRueckweg({ fuer: 'unterrichtsreihe', nach: 'meineklassen', name: 'Meine Klassen' })
-  useReihenZiel.getState().setzeNeu(true, { fachId: fachAusName(d.fach)?.id, grade: jahrgangAusKlasse(d.name) })
+  useReihenZiel.getState().setzeNeu(true, { fachId: fachAusName(d.fach)?.id, grade: jahrgangAusKlasse(d.name), lerngruppe: { id: d.id, name: d.name } })
   openModule('unterrichtsreihe')
 }
 
-async function blattNeuFuerKlasse(d: Pick<KlasseDetail, 'name' | 'fach'>): Promise<void> {
+async function blattNeuFuerKlasse(d: Pick<KlasseDetail, 'id' | 'name' | 'fach'>): Promise<void> {
   const fachId = fachAusName(d.fach)?.id
   const jahrgang = jahrgangAusKlasse(d.name)
   if (fachId) setzeFachVorgabe('arbeitsblatt', fachId)
   if (jahrgang) setzeJahrgangVorgabe('arbeitsblatt', jahrgang)
+  setzeLerngruppeVorgabe('arbeitsblatt', { id: d.id, name: d.name })
   useNavigation.getState().setRueckweg({ fuer: 'arbeitsblatt', nach: 'meineklassen', name: 'Meine Klassen' })
   try {
     if (!(await neuAnlegen('arbeitsblatt'))) openModule('arbeitsblatt')

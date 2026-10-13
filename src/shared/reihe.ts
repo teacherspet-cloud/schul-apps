@@ -357,6 +357,13 @@ export interface Reihe {
   lernziele: Lernziel[]
   schritte: Schritt[]
   /**
+   * Vorwissen der Lerngruppe (13.10.2026, abgestimmt): eine Angabe je Zeile wie beim Arbeitsblatt („Behandelt: …",
+   * „Unsicher: … (k von n)", „Häufiger Fehler: …", „Leistungsspanne: …") – geht in Planung und alle Schritte.
+   */
+  vorwissen?: string
+  /** Für Lerngruppe: aus ihr kam das Vorwissen (shared/vorwissenLerngruppe.ts) */
+  lerngruppe?: import('./vorwissenLerngruppe').LerngruppeBezug
+  /**
    * Teile der Reihe in ihrer Reihenfolge (03.10.2026: von Hand anlegen, umbenennen, verschieben –
    * auch leer). Ein Schritt gehört über `abschnitt` (Name des Teils) dazu; Schritte ohne Teil stehen vorn.
    */
