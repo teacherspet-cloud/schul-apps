@@ -162,7 +162,9 @@ export async function erzeugeBankAufgaben(
     ai,
     melde,
     gesperrt,
-    latein ? undefined : ger
+    // „Trivial für das GER-Niveau" nicht bei grundlegend (13.10.2026, Befund am VPS: grundlegende Stufen blieben nach
+    // „Ergänzen" leer) – dort sind leichte Aufgaben gewollt
+    latein || a.niveau === 'g' ? undefined : ger
   )
   const ohne = ohneGesperrteZeitformen(geprueft, gesperrt)
   return {

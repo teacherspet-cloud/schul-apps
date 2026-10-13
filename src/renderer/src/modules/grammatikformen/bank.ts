@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
-import { notifySuccess } from '../../shared/util'
+import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import {
   AUFGABEN_JE_FELD,
@@ -171,8 +171,13 @@ const inArbeit = new Map<string, Promise<unknown>>()
 let kette: Promise<void> = Promise.resolve()
 /** So viele Aufgaben je Übungsart mehr als fehlen (die Prüfung streicht im Schnitt etwa ein Viertel) */
 const PUFFER = 2
-/** Höchstens so viele Durchgänge je Feld (erster + 2 zum Nachlegen) */
-const RUNDEN = 3
+/**
+ * Höchstens so viele Durchgänge je Stufe (13.10.2026, Befund am VPS: nach „Ergänzen" blieben Felder bei 6–7, ganze Stufen
+ * leer). Je Durchgang höchstens ARTEN_JE_ANFRAGE Übungsarten – alle fünf in einer Anfrage (bis zu 60 Aufgaben) lieferte
+ * die KI nur zum Teil; ein Durchgang ohne Ertrag beendet die Stufe erst beim zweiten Mal in Folge.
+ */
+const RUNDEN = 6
+const ARTEN_JE_ANFRAGE = 3
 
 type BankAuftragEingabe = Omit<BankAuftrag, 'vorhanden'> & {
   vorhanden?: string[]
@@ -224,6 +229,9 @@ export function bankErzeugenStarten(auftraege: BankAuftragEingabe[], titel: stri
 /** Die Schritte eines Auftrags: je Schlüssel und Stufe neu prüfen, dann erzeugen und als Entwurf ablegen */
 async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Promise<number> {
   let n = 0
+  // Bricht die KI in einem Schritt ab, laufen die übrigen Schritte trotzdem (vorher endete der ganze Auftrag)
+  let fehler: unknown = null
+  let fehlerZahl = 0
   for (const [i, a] of liste.entries()) {
     k.melde(`${i + 1} von ${liste.length}: ${a.titel} …`)
     const feld = `${a.schluessel}|${a.niveau ?? 'm'}`
@@ -233,21 +241,25 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
       await w.catch(() => undefined)
     }
     // Bis zu RUNDEN Durchgänge (13.10.2026, Wunsch der Lehrkraft): Streicht die Prüfung zu viel, legt die KI gezielt nach
+    let ohneErtrag = 0
     for (let runde = 0; runde < RUNDEN; runde++) {
       // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
       const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
-      // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)?
-      const entwurf = ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
+      // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)? Beim direkten Ergänzen zählt
+      // nur die Bank – ein ungesehener Entwurf füllt kein Feld
+      const entwurf = a.direkt ? [] : ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
       const st = a.niveau ?? 'm'
       const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
-      const uebungen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+      const offen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+      // Die am weitesten zurückliegenden Übungsarten zuerst
+      const uebungen = [...offen].sort((x, y) => zahl(x) - zahl(y)).slice(0, ARTEN_JE_ANFRAGE)
       // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
       // Stufe noch gar nichts da ist – Auffüllen geht über „Ergänzen" bzw. „Mit KI erzeugen" im eigenen Reiter
       if (!uebungen.length || (runde === 0 && a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
         if (runde === 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
         break
       }
-      if (runde > 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht genug, die KI legt nach (Runde ${runde + 1})`)
+      if (runde > 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
       // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
       const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
       const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
@@ -260,13 +272,23 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
       try {
         const neu = (await lauf).aufgaben.length
         n += neu
-        // Nichts Brauchbares mehr: nicht endlos weiterfragen
-        if (!neu) break
+        // Zweimal in Folge nichts Brauchbares: nicht endlos weiterfragen
+        ohneErtrag = neu ? 0 : ohneErtrag + 1
+        if (ohneErtrag >= 2) break
+      } catch (e) {
+        // Abbruch der KI (Zeitüberschreitung, Abo): diese Stufe beenden, mit der nächsten weitermachen
+        if (k.signal.aborted) throw e
+        fehler = e
+        fehlerZahl++
+        break
       } finally {
         if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
       }
     }
   }
+  if (fehler && !n) throw fehler
+  if (fehler)
+    notifyError(`Bei ${fehlerZahl} ${fehlerZahl === 1 ? 'Schritt' : 'Schritten'} brach die KI ab – das Übrige ist gespeichert. „Ergänzen" noch einmal drücken.`)
   return n
 }
 
@@ -280,9 +302,11 @@ async function direktSpeichern(
 ): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[] }> {
   const da = (await bankLesen([a.schluessel]))[0]
   const neu = ohneDoppelte(r.aufgaben, new Set((da?.aufgaben ?? []).map(aufgabeKern).filter(Boolean)))
-  await bankSpeichern(a.sprache, a.schluessel, da?.regel?.titel ? da.regel : r.regel, [...(da?.aufgaben ?? []), ...neu])
+  const gespeichert = await bankSpeichern(a.sprache, a.schluessel, da?.regel?.titel ? da.regel : r.regel, [...(da?.aufgaben ?? []), ...neu])
   window.dispatchEvent(new Event(BANK_EREIGNIS))
-  return { regel: r.regel, aufgaben: neu }
+  // Was der Server wirklich aufgenommen hat (er sortiert Unbrauchbares aus)
+  const dazu = Math.max(0, gespeichert.aufgaben - (da?.aufgaben.length ?? 0))
+  return { regel: r.regel, aufgaben: neu.slice(0, dazu) }
 }
 
 /**
