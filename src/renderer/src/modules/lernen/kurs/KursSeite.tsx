@@ -339,22 +339,25 @@ export function UnitsKompakt({
                       aria-expanded={auf}
                       onClick={() => setUnitAuf((m) => ({ ...m, [k]: !(m[k] ?? k === erste) }))}
                     >
-                      <Group gap={6} wrap="nowrap" align={g.vok.length && g.gram.length ? 'flex-start' : 'center'}>
-                        {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                        {/* Telefon (10.10.2026): schmalere Spalten, damit Balken und Prozent nicht abgeschnitten werden */}
-                        <Text size="sm" fw={600} w={{ base: 84, sm: 120 }} truncate style={{ flexShrink: 0 }}>
-                          {name}
-                        </Text>
+                      <Group gap={6} wrap="nowrap" align="flex-start">
+                        {/* Pfeil und Name auf einer Höhe mit der ersten Balkenzeile (17.10.2026: „Unit 1" stand tiefer als der Pfeil) */}
+                        <Group gap={6} wrap="nowrap" align="center" h={ZEILE} style={{ flexShrink: 0 }}>
+                          {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                          {/* Telefon (10.10.2026): schmalere Spalten, damit Balken und Prozent nicht abgeschnitten werden */}
+                          <Text size="sm" fw={600} lh={1} w={{ base: 84, sm: 120 }} truncate>
+                            {name}
+                          </Text>
+                        </Group>
                         <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
                           {g.vok.length > 0 && (
-                            <Group gap={6} wrap="nowrap" data-unit-vokabeln>
+                            <Group gap={6} wrap="nowrap" h={ZEILE} data-unit-vokabeln>
                               {mitGrammatik && art('Vokabeln')}
                               {balken(mittel(g.vok, 'sicher'), mittel(g.vok, 'aufbau'), mittel(g.vok, 'neu'))}
                               {prozentText(mittel(g.vok, 'sicher'))}
                             </Group>
                           )}
                           {g.gram.length > 0 && (
-                            <Group gap={6} wrap="nowrap" data-unit-grammatik>
+                            <Group gap={6} wrap="nowrap" h={ZEILE} data-unit-grammatik>
                               {art('Grammatik')}
                               {gramBalken(gramMittel(g.gram, 'sicher'), gramMittel(g.gram, 'bearbeitet'))}
                               {prozentText(gramMittel(g.gram, 'sicher'))}
@@ -445,6 +448,8 @@ export function UnitsKompakt({
 }
 
 const KEINE_GRAMMATIK: GrammatikStandKurz[] = []
+/** Höhe einer Zeile im Unit-Kopf (Name bzw. Balken) – gleich hoch, damit alles auf einer Linie steht */
+const ZEILE = 20
 
 /**
  * Abschnitte einer Unit mit ihrer Grammatik (17.10.2026): jede Grammatik hängt am Vokabel-Abschnitt davor
