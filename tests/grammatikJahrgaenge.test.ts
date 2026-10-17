@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bandNummer, jahrgangAusBand, jahrgangDerFreigabe, schuljahrVon, unitStelle } from '../src/shared/grammatikJahrgang'
-import { stelleImBand } from '../src/shared/lehrwerkBand'
+import { stelleImBand, stelleImLehrwerk } from '../src/shared/lehrwerkBand'
+import { formVon, mixKennungen, mixSchluessel } from '../src/shared/grammatikBank'
 import { unitsMitGrammatik } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
 import { istOffen, nachJahrgaengen, nachUnits, teilOffen } from '../src/renderer/src/modules/lernen/regal/grammatikJahrgaenge'
 import { jahrgangName, roemisch } from '../src/renderer/src/modules/lernen/regal/beschriftung'
@@ -129,5 +130,16 @@ describe('Units mit Grammatik (17.10.2026)', () => {
     expect(r[0].units.map((u) => u.unit)).toEqual(['Unit 3', 'Unit 2', 'Unit 1'])
     expect(r[0].units[2].zeilen.map((z) => (z.art === 'vok' ? z.z.name : z.g.id))).toEqual(['Station 2', 'there', 'Station 1', 'be'])
     expect(r[1].units[0].gram.map((x) => x.id)).toEqual(['frei'])
+  })
+})
+
+describe('Gemischte Übungen aus der Aufgabenbank (17.10.2026)', () => {
+  it('Stelle aus den gemischten Formen', () => {
+    const stelle = (k: string) => {
+      const ks = mixKennungen(k)
+      return stelleImLehrwerk([...new Set(ks.map(formVon))], ks.filter((x) => x.includes('/')))
+    }
+    expect(stelle(mixSchluessel(['en.verb.there_is/praesens', 'en.verb.there_is/fragen']))).toEqual({ buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 2' })
+    expect(stelle(mixSchluessel(['en.verb.be_have/be-kurzformen', 'en.verb.be_have/be-praesens']))).toEqual({ buch: 'Green Line 1', unit: 'Unit 1', station: 'Station 1' })
   })
 })

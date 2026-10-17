@@ -73,6 +73,19 @@ export function useBaendeOffen(schluessel: string, baende: string[]): { offen: (
  * Ohne Band („Weitere Vokabeln", eigene Listen): eine schlichte graue Kachel. Mit `umschalten` (10.10.2026) klappt ein
  * Klick auf den Kopf (Cover, Name, Zusatz) die Gruppe auf und zu.
  */
+/** Platzhalter ohne Band (17.10.2026, Befund der Lehrkraft: in Cover-Größe „riesengroß" neben „Weitere …") – klein wie die Schrift */
+function OhneCover(): React.JSX.Element {
+  return (
+    <div
+      aria-hidden
+      data-cover-ersatz
+      style={{ width: 18, height: 18, borderRadius: 3, flexShrink: 0, background: 'var(--mantine-color-gray-3)', color: 'var(--mantine-color-gray-7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, lineHeight: 1 }}
+    >
+      …
+    </div>
+  )
+}
+
 export function BandGruppe({
   buch,
   ohneBand = 'Weitere',
@@ -99,13 +112,7 @@ export function BandGruppe({
             {buch ? (
               <BandCover band={{ name: buch }} breite={offen ? 34 : 26} />
             ) : (
-              <div
-                aria-hidden
-                data-cover-ersatz
-                style={{ width: offen ? 34 : 26, height: offen ? 45 : 35, borderRadius: 3, flexShrink: 0, background: 'var(--mantine-color-gray-3)', color: 'var(--mantine-color-gray-7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
-              >
-                …
-              </div>
+              <OhneCover />
             )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 'var(--mantine-font-size-sm)' }}>{buch || ohneBand}</span>
@@ -124,13 +131,7 @@ export function BandGruppe({
       {buch ? (
         <BandCover band={{ name: buch }} breite={34} />
       ) : (
-        <div
-          aria-hidden
-          data-cover-ersatz
-          style={{ width: 34, height: 45, borderRadius: 3, flexShrink: 0, background: 'var(--mantine-color-gray-3)', color: 'var(--mantine-color-gray-7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
-        >
-          …
-        </div>
+        <OhneCover />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 2 }}>

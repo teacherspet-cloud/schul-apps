@@ -603,6 +603,20 @@ export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string; 
     const station = unit ? stationInUnit(buch, unit, info.themen, info.teilformen) : undefined
     return { buch, ...(unit ? { unit } : {}), ...(station ? { station } : {}) }
   }
+  /*
+   * Gemischte Übungen aus der Aufgabenbank (17.10.2026, Befund der Lehrkraft: „there is / there are" und „to be:
+   * Kurzformen" standen unter „Weitere Grammatik"): Die App weist sie selbst zu (`mixeZuweisen`) – ohne Themen. Ihre
+   * Stelle kommt aus den Formen, aus denen sie gemischt sind, bzw. aus Band und Unit des Unit-Mixes.
+   */
+  if (!info.themen.length && info.bank?.length) {
+    for (const k of info.bank) {
+      const u = k.startsWith('unit:') ? unitVon(k) : null
+      if (u) return { buch: u.band, unit: u.unit }
+      const kennungen = mixKennungen(k)
+      const stelle = kennungen.length ? stelleImLehrwerk([...new Set(kennungen.map(formVon))], kennungen.filter((x) => x.includes('/'))) : null
+      if (stelle) return stelle
+    }
+  }
   return stelleImLehrwerk(info.themen, info.teilformen) ?? {}
 }
 
