@@ -19,6 +19,11 @@ export interface KursKurz {
   /** Grammatik (08.10.2026): Jahrgang und Stelle im Lehrwerk – das Register gliedert nach Schuljahren */
   jahrgang?: number | null
   stelle?: number | null
+  /** Grammatik (17.10.2026): Band, Unit und Station im Lehrwerk – im Jahr gliedert das Register nach Unit › Station */
+  buch?: string
+  unit?: string
+  station?: string
+  extra?: boolean
 }
 export interface BlattEintrag {
   id: string

@@ -8,6 +8,9 @@
  *    nach Stufen (Förderaufgaben) und der Reihenfolge der Regeln.
  *  - Neue je Tag: 10 (bisher fest); vor einem angekündigten Test mehr, damit jede Aufgabe des Tests bis 3 Tage vorher
  *    einmal dran war (`neuJeTag` vom Server, Faustregel `tageszielVorTest`).
+ *  - Alle (17.10.2026, Wunsch der Lehrkraft, nur Grammatik): Im Trainer sind alle Aufgaben möglich – `alle` liefert alle
+ *    fälligen und alle unbearbeiteten in derselben Reihenfolge. Erinnerungen und Spiele-Freigabe zählen weiter die
+ *    Tagesrunde (ohne `alle`).
  */
 import { alsKarten, type GrammatikPaket } from './grammatiktrainer'
 import { sitzungsWoerter, tagVon, type Vokabel, type WortStand } from './vokabeltrainer'
@@ -40,14 +43,16 @@ export function grammatikKarten(paket: Pick<GrammatikPaket, 'aufgaben'>, erstell
 export function grammatikHeute(
   paket: Pick<GrammatikPaket, 'aufgaben' | 'regeln'>,
   staende: Record<string, WortStand>,
-  o: { erstellt: number; neuJeTag?: number; test?: boolean; jetzt?: number }
+  o: { erstellt: number; neuJeTag?: number; test?: boolean; jetzt?: number; alle?: boolean }
 ): string[] {
   const jetzt = o.jetzt ?? Date.now()
-  const faellig = sitzungsWoerter(grammatikKarten(paket, o.erstellt, o.test), staende, jetzt, 0).map((k) => k.id)
+  const faellig = sitzungsWoerter(grammatikKarten(paket, o.erstellt, o.test), staende, jetzt, 0, o.alle ? Number.MAX_SAFE_INTEGER : undefined).map(
+    (k) => k.id
+  )
   const heute = tagVon(jetzt)
   const schonNeu = paket.aufgaben.filter((a) => staende[a.id]?.erstmals && tagVon(staende[a.id].erstmals!) === heute).length
   const regelIndex = new Map(paket.regeln.map((r, i) => [r.id, i]))
-  const neu = Math.max(0, (o.neuJeTag ?? GRAMMATIK_NEU_JE_TAG) - schonNeu)
+  const neu = o.alle ? Number.MAX_SAFE_INTEGER : Math.max(0, (o.neuJeTag ?? GRAMMATIK_NEU_JE_TAG) - schonNeu)
   const neue = paket.aufgaben
     .map((a, i) => ({ a, i, zeit: aufgabeFreigabe(a.id, o.erstellt) }))
     .filter((x) => !staende[x.a.id]?.versuche)

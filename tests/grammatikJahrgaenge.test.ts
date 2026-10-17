@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bandNummer, jahrgangAusBand, jahrgangDerFreigabe, schuljahrVon, unitStelle } from '../src/shared/grammatikJahrgang'
-import { istOffen, nachJahrgaengen } from '../src/renderer/src/modules/lernen/regal/grammatikJahrgaenge'
+import { istOffen, nachJahrgaengen, nachUnits, teilOffen } from '../src/renderer/src/modules/lernen/regal/grammatikJahrgaenge'
 import { jahrgangName, roemisch } from '../src/renderer/src/modules/lernen/regal/beschriftung'
 
 /*
@@ -66,5 +66,36 @@ describe('Register nach Schuljahren', () => {
     expect(jahrgangName('Niederländisch', 6)).toBe('Klasse 6')
     expect(jahrgangName('Deutsch', 5)).toBe('Klasse 5')
     expect([4, 9, 12, 13].map(roemisch)).toEqual(['IV', 'IX', 'XII', 'XIII'])
+  })
+})
+
+describe('Grammatik im Jahr nach Unit › Station (17.10.2026)', () => {
+  const e = (titel: string, unit?: string, station?: string, extra = false) => ({
+    titel,
+    ...(unit ? { buch: 'Green Line 1', unit, ...(station ? { station } : {}) } : {}),
+    extra
+  })
+  it('Späteres oben: Unit 2 über Unit 1, Station 3 über Station 1; Extra oben, Unbekanntes unter „Weitere"', () => {
+    const r = nachUnits(
+      [
+        e('A', 'Unit 1', 'Station 1'),
+        e('B', 'Unit 1', 'Station 3'),
+        e('C', 'Unit 2', 'Station 1'),
+        e('D', 'Unit 1', 'Station 2'),
+        e('Frei'),
+        e('Extra', undefined, undefined, true)
+      ],
+      () => []
+    )
+    expect(r.extras.map((x) => x.titel)).toEqual(['Extra'])
+    expect(r.units.map((u) => u.name)).toEqual(['Unit 2', 'Unit 1'])
+    expect(r.units[1].stationen.map((s) => s.station)).toEqual(['Station 3', 'Station 2', 'Station 1'])
+    expect(r.weitere.map((x) => x.titel)).toEqual(['Frei'])
+  })
+  it('oberste Unit bzw. Station offen, sonst gemerkt; beim Suchen alles offen', () => {
+    expect(teilOffen('x', 0, {}, false)).toBe(true)
+    expect(teilOffen('x', 1, {}, false)).toBe(false)
+    expect(teilOffen('x', 0, { x: false }, false)).toBe(false)
+    expect(teilOffen('x', 1, {}, true)).toBe(true)
   })
 })

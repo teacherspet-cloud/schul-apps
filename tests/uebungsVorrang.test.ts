@@ -183,4 +183,16 @@ describe('Grammatik heute', () => {
     expect(grammatikHeute(paket, {}, { erstellt, jetzt: JETZT })).toEqual([`${spaeter}-1`, `${spaeter}-2`, 'a2', 'a1'])
     expect(grammatikHeute(paket, {}, { erstellt, jetzt: JETZT, neuJeTag: 2 })).toHaveLength(2)
   })
+
+  it('alle Aufgaben möglich (17.10.2026): ohne Tagesgrenze, Tagesrunde ist der Anfang davon', () => {
+    const paket = {
+      regeln: [{ id: 'r1' }],
+      aufgaben: Array.from({ length: 30 }, (_, i) => a(`a${i}`, 'r1'))
+    } as unknown as GrammatikPaket
+    const heute = grammatikHeute(paket, {}, { erstellt, jetzt: JETZT })
+    const alle = grammatikHeute(paket, {}, { erstellt, jetzt: JETZT, alle: true })
+    expect(heute).toHaveLength(10)
+    expect(alle).toHaveLength(30)
+    expect(alle.slice(0, 10)).toEqual(heute)
+  })
 })

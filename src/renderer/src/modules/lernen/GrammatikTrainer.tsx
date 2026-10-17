@@ -73,6 +73,9 @@ import { FokusRahmen } from './fokus/FokusRahmen'
 import { BEREICHE, bereichVonRegel, type BereichId } from '@shared/grammatikBereiche'
 import { offenLesen, offenMerken } from '../../shared/sitzung'
 
+/** Schrittgröße beim Grammatiküben (17.10.2026, abgestimmt): je Runde höchstens 20 Aufgaben, danach freiwillig weiter */
+const GRAMMATIK_SCHRITT = 20
+
 /** Offene Bereiche der Regel-Seite, je Training gemerkt (08.10.2026) – für die Sitzung (shared/sitzung.ts, 09.10.2026) */
 function useOffeneBereiche(id: string): [Set<string>, (b: string) => void] {
   const schluessel = `schulapps-gram-bereiche-${id}`
@@ -240,6 +243,13 @@ function Kasten({
       .map((id) => nachId.get(id)!)
       .filter(Boolean)
   }, [karten, d.staende, d.paket, d.erstellt, d.neuJeTag, d.test])
+  // Alle Aufgaben möglich (17.10.2026, Wunsch der Lehrkraft): nach der Tagesrunde freiwillig weiter, in 20er-Schritten
+  const alle = useMemo(() => {
+    const nachId = new Map(karten.map((k) => [k.id, k]))
+    return grammatikHeute(d.paket, d.staende, { erstellt: Date.parse(d.erstellt ?? '') || 0, neuJeTag: d.neuJeTag, test: d.test, alle: true })
+      .map((id) => nachId.get(id)!)
+      .filter(Boolean)
+  }, [karten, d.staende, d.paket, d.erstellt, d.neuJeTag, d.test])
   const [offeneRegel, setOffeneRegel] = useState<string | null>(null)
   const [offeneBereiche, bereichKlappen] = useOffeneBereiche(d.id)
   const [suche, setSuche] = useState('')
@@ -275,7 +285,10 @@ function Kasten({
   const ich = window.__schulappsServer
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
   const nachId = new Map([...d.paket.aufgaben, ...(d.paket.reserve ?? [])].map((a) => [a.id, a]))
-  const tagesAufgaben = heute.map((k) => nachId.get(k.id)!).filter(Boolean)
+  const naechste = alle
+    .slice(0, GRAMMATIK_SCHRITT)
+    .map((k) => nachId.get(k.id)!)
+    .filter(Boolean)
   // Spiele nur mit Aufgaben, die der Kasten schon eingeführt hat (wie bei den Vokabeln)
   const bekannt = useMemo(() => ({ ...d.paket, aufgaben: d.paket.aufgaben.filter((a) => (d.staende[a.id]?.fach ?? 0) > 0) }), [d.paket, d.staende])
   /*
@@ -375,7 +388,7 @@ function Kasten({
     const l = d.paket.aufgaben.filter((a) => a.regelId === rid)
     const st = (a: GrammatikAufgabe): WortStand | undefined => d.staende[a.id]
     const rang = (a: GrammatikAufgabe): number => (!st(a)?.versuche ? 0 : (st(a)!.faellig ?? 0) <= jetzt ? 1 : (st(a)!.fach ?? 0) <= 2 ? 2 : 3)
-    return [...l].sort((a, b) => rang(a) - rang(b) || (a.stufe ?? 0) - (b.stufe ?? 0)).slice(0, 10)
+    return [...l].sort((a, b) => rang(a) - rang(b) || (a.stufe ?? 0) - (b.stufe ?? 0)).slice(0, GRAMMATIK_SCHRITT)
   }
   const arten = Object.entries(d.paket.aufgaben.reduce<Record<string, number>>((m, a) => ((m[a.art] = (m[a.art] ?? 0) + 1), m), {})) as [
     keyof typeof ART_NAME,
@@ -451,7 +464,7 @@ function Kasten({
               onClick={() => starten(regelAufgaben(r.id))}
               data-regel-ueben={r.id}
             >
-              Diese Regel üben
+              Diese Regel üben{l.length > GRAMMATIK_SCHRITT ? ` · nächste ${GRAMMATIK_SCHRITT}` : ''}
             </Button>
           </Stack>
         )}
@@ -520,10 +533,30 @@ function Kasten({
             ))}
         </Group>
       )}
-      {heute.length > 0 ? (
-        <Button size="lg" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={18} />} onClick={() => starten(tagesAufgaben)} data-grammatik-start>
-          Weiter üben · {heute.length} {heute.length === 1 ? 'Übung' : 'Übungen'}
-        </Button>
+      {alle.length > 0 ? (
+        <Stack gap={4}>
+          {heute.length === 0 && (
+            <Alert color="teal" icon={<IconCheck size={16} />} data-grammatik-tagesrunde-geschafft>
+              Die Übungen für heute sind geschafft – du kannst freiwillig weiterüben.
+            </Alert>
+          )}
+          <Button
+            size="lg"
+            radius="xl"
+            className="vt-los"
+            variant={heute.length ? 'filled' : 'light'}
+            leftSection={<IconPlayerPlay size={18} />}
+            onClick={() => starten(naechste)}
+            data-grammatik-start
+          >
+            Weiter üben · {naechste.length} {naechste.length === 1 ? 'Übung' : 'Übungen'}
+          </Button>
+          {alle.length > GRAMMATIK_SCHRITT && (
+            <Text size="sm" c="dimmed" ta="center" data-grammatik-rest={alle.length}>
+              Noch {alle.length} offen – nach je {GRAMMATIK_SCHRITT} kannst du aufhören oder weitermachen.
+            </Text>
+          )}
+        </Stack>
       ) : (
         <Alert color="teal" icon={<IconCheck size={16} />} data-grammatik-geschafft>
           {bearbeitet < d.paket.aufgaben.length

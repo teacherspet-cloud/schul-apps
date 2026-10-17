@@ -24,7 +24,9 @@ import { testStatusText } from '@shared/onlinetestTermin'
 import { MappeAnsicht, MerkKasten } from '../LernRaum'
 import { KursRegister, SprachRegister } from './Sprachstand'
 import { beschriftung, fachName, jahrgangName, type Register } from './beschriftung'
-import { istOffen, ladeOffen, nachJahrgaengen, speichereOffen } from './grammatikJahrgaenge'
+import { istOffen, ladeOffen, nachJahrgaengen, nachUnits, speichereOffen, teilOffen } from './grammatikJahrgaenge'
+import { bandGleich } from '../kurs/kursAnsicht'
+import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { herkunft, ordnerUebergangLaeuft, ordnerZu } from './ordnerAnimation'
 import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
@@ -64,6 +66,10 @@ const CSS = `
 .og-jahr:disabled { cursor: default; }
 .og-jahr:focus-visible { outline: 2px solid var(--og-akzent); outline-offset: 2px; border-radius: 6px; }
 .og-jahr-zahl { font-size: .75rem; font-weight: 700; opacity: .6; }
+.og-unit { padding-left: 10px; }
+.og-unit-kopf { font-size: .98rem; }
+.og-station { padding-left: 12px; }
+.og-station-kopf { font-size: .9rem; font-weight: 700; }
 .og-karte:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12), inset 4px 0 0 var(--og-akzent); }
 @keyframes og-auf { from { opacity: 0; transform: perspective(1400px) rotateY(-8deg) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes og-blatt { from { opacity: 0; transform: perspective(1200px) rotateY(-14deg); } to { opacity: 1; transform: none; } }
@@ -339,6 +345,10 @@ function Wiederherstellen({ setSeite, register }: { setSeite: (s: Seite | null) 
 }
 
 /** Zurück: Gäste auf die Startseite, Konten in ihren Lernraum (dort steht das Regal) */
+/** Units eines Bandes in Buchreihenfolge (Grammatik-Katalog) – für Units ohne Nummer im Namen */
+const unitFolge = (buch: string): string[] =>
+  Object.keys(LEHRWERK_GRAMMATIK[Object.keys(LEHRWERK_GRAMMATIK).find((k) => bandGleich(k, buch)) ?? ''] ?? {})
+
 const zurueckZiel = (): string => herkunft(!window.__schulappsServer?.angemeldet || window.__schulappsServer.quelle === 'gast' ? '/s/' : '/s/lernen')
 
 /**
@@ -393,6 +403,75 @@ function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; 
       </Group>
     </a>
   )
+  const klappen = (schluessel: string, offen: boolean): void => {
+    const neu = { ...gemerkt, [schluessel]: !offen }
+    setGemerkt(neu)
+    speichereOffen(o.fach, neu)
+  }
+  // Im Jahr nach Unit › Station (17.10.2026, abgestimmt): Späteres oben, oberste Unit und darin oberste Station offen
+  const inhalt = (eintraege: KursKurz[], jahr: string): React.ReactNode => {
+    const { extras, units, weitere } = nachUnits(eintraege, unitFolge)
+    if (!units.length) return eintraege.map(karte)
+    return (
+      <>
+        {extras.map(karte)}
+        {units.map((u, ui) => {
+          const uk = `${jahr}|${u.schluessel}`
+          const uOffen = teilOffen(uk, ui, gemerkt, Boolean(s))
+          const nurUnit = u.stationen.length === 1 && !u.stationen[0].station
+          return (
+            <div key={uk} className="og-unit" data-ordner-unit={u.name} data-offen={uOffen}>
+              <button type="button" className="og-jahr og-unit-kopf" aria-expanded={uOffen} onClick={() => klappen(uk, uOffen)} disabled={Boolean(s)}>
+                <span aria-hidden>{uOffen ? '▾' : '▸'}</span>
+                {u.name}
+                <span className="og-jahr-zahl">{u.anzahl}</span>
+              </button>
+              {uOffen && (
+                <Stack gap="xs" mt={4}>
+                  {nurUnit
+                    ? u.stationen[0].eintraege.map(karte)
+                    : u.stationen.map((st, si) => {
+                        const sk = `${uk}|${st.station}`
+                        const sOffen = teilOffen(sk, si, gemerkt, Boolean(s))
+                        return (
+                          <div key={sk} className="og-station" data-ordner-station={st.station || 'Unit'} data-offen={sOffen}>
+                            <button
+                              type="button"
+                              className="og-jahr og-station-kopf"
+                              aria-expanded={sOffen}
+                              onClick={() => klappen(sk, sOffen)}
+                              disabled={Boolean(s)}
+                            >
+                              <span aria-hidden>{sOffen ? '▾' : '▸'}</span>
+                              {st.station || 'Weitere in dieser Unit'}
+                              <span className="og-jahr-zahl">{st.eintraege.length}</span>
+                            </button>
+                            {sOffen && (
+                              <Stack gap="xs" mt={4}>
+                                {st.eintraege.map(karte)}
+                              </Stack>
+                            )}
+                          </div>
+                        )
+                      })}
+                </Stack>
+              )}
+            </div>
+          )
+        })}
+        {weitere.length > 0 && (
+          <div className="og-unit" data-ordner-unit="weitere">
+            <Text size="sm" fw={700} c="dimmed" mt={4}>
+              Weitere
+            </Text>
+            <Stack gap="xs" mt={4}>
+              {weitere.map(karte)}
+            </Stack>
+          </div>
+        )}
+      </>
+    )
+  }
   return (
     <Stack gap="xs">
       {grammatik && alle.length > 1 && (
@@ -411,7 +490,9 @@ function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; 
           Nichts gefunden zu „{suche.trim()}“.
         </Text>
       )}
-      {!mitJahren
+      {grammatik && !mitJahren
+        ? inhalt(liste, 'ohne')
+        : !mitJahren
         ? liste.map(karte)
         : gruppen.map((g, i) => {
             const k = String(g.jahrgang ?? 'ohne')
@@ -430,7 +511,7 @@ function Kurse({ o, grammatik, setSeite }: { o: FachOrdner; grammatik: boolean; 
                 </button>
                 {offen && (
                   <Stack gap="xs" mt={6}>
-                    {g.eintraege.map(karte)}
+                    {inhalt(g.eintraege, k)}
                   </Stack>
                 )}
               </div>

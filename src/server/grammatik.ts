@@ -1329,11 +1329,16 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     // ---------------------------------------------------------------- Lernende
     if (schueler) {
       if (req.method === 'GET' && url.pathname === '/s/api/grammatik') {
-        // Jahrgang und Lehrwerk-Stelle je Training (08.10.2026): der Ordner gliedert danach
+        // Jahrgang und Lehrwerk-Stelle je Training (08.10.2026): der Ordner gliedert danach – seit 17.10.2026 im Jahr
+        // nach Unit › Station (Band, Unit und Station wie auf der Kursseite der Lehrkraft)
         const listen = await Promise.all(
           grammatikFuer(ich).map(async (l) => {
             const z = zeile(l.id)
-            return { ...l, ...(z ? await jahrgangDerGrammatik(z, ich).catch(() => ({ jahrgang: null, stelle: null })) : {}) }
+            return {
+              ...l,
+              ...(z ? await jahrgangDerGrammatik(z, ich).catch(() => ({ jahrgang: null, stelle: null })) : {}),
+              ...(z ? lehrwerkDerGrammatik(z) : {})
+            }
           })
         )
         return json(res, 200, { listen }), true
