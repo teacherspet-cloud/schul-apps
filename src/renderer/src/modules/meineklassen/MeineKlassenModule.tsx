@@ -880,7 +880,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const sichtbarerBedarf = [...entwurfBedarf, ...d.bedarf]
   const wackeligVorschlag = d.vorschlaege.find((v): v is Extract<Vorschlag, { art: 'vokabeln' }> => v.art === 'vokabeln') ?? null
   const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
-  const mitLernstand = Boolean(d.sprachfach && sprachKurs && sprachKurs.woerter > 0)
+  // Auch Kurse nur mit Grammatik (17.10.2026, abgestimmt): der Kasten „Units" zeigt dann die Grammatik je Unit
+  const mitLernstand = Boolean(d.sprachfach && sprachKurs && (sprachKurs.woerter > 0 || d.grammatik.some((g) => g.vokId === sprachKurs.id)))
   /*
    * „Passendes Material" (10.10.2026): Problemwörter stehen nicht mehr hier – die Kachel „Problemwörter" in „Auf einen
    * Blick" öffnet ihr eigenes Pop-up (ProblemWoerterFenster.tsx). In Sprachklassen mit Lernstand ein Kasten in der Reihe
@@ -973,6 +974,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           kursId={sprachKurs.id}
           abschnitte={sprachKurs.abschnitte}
           zuAbschnitten={() => setze({ reiter: 'vokabeln' })}
+          zuGrammatik={() => setze({ reiter: 'grammatik' })}
           kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt problemeOeffnen={() => setProblemeOffen(true)} />}
           material={materialKasten(true)}
         />

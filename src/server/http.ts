@@ -533,14 +533,22 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             'IServ gibt die nötigen Angaben nicht frei. Bitte in IServ (Verwaltung › Single-Sign-On › OAuth/OpenID Connect) beim Client für Schul-Apps die Scopes „openid", „profile" und „email" (am besten auch „roles" und „groups") erlauben.'
           )
         }
-        if (fehlerVonIserv)
-          throw new AnmeldeFehler(fehlerVonIserv === 'access_denied' ? 'Die Anmeldung bei IServ wurde abgebrochen.' : `IServ: ${fehlerVonIserv}`)
+        if (fehlerVonIserv) {
+          // Begründung von IServ mit anzeigen und protokollieren (17.10.2026: „IServ: invalid_request" ohne erkennbaren Grund)
+          const grund = (url.searchParams.get('error_description') ?? '').slice(0, 300)
+          protokolliereServer('anmeldung', `IServ lehnt ab: ${fehlerVonIserv}${grund ? ` – ${grund}` : ''}${url.searchParams.get('state') ? '' : ' (ohne state)'}`)
+          console.warn(`IServ-Rückruf mit Fehler: ${fehlerVonIserv}${grund ? ` – ${grund}` : ''}`)
+          throw new AnmeldeFehler(
+            fehlerVonIserv === 'access_denied' ? 'Die Anmeldung bei IServ wurde abgebrochen.' : `IServ: ${fehlerVonIserv}${grund ? ` – ${grund}` : ''}`
+          )
+        }
         const { nutzer, ziel } = await iservRueckruf(rueckruf, url.searchParams.get('state') ?? '', url.searchParams.get('code') ?? '')
         const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
         setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
         res.writeHead(302, { location: zielFuer(nutzer.rolle, ziel), 'cache-control': 'no-store' })
         return void res.end()
       } catch (e) {
+        if (!(e instanceof AnmeldeFehler)) console.warn(`IServ-Rückruf fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`)
         res.writeHead(302, {
           location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Die Anmeldung bei IServ ist fehlgeschlagen.')}`
         })

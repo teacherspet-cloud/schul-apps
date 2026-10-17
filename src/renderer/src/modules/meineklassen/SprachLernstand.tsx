@@ -9,7 +9,8 @@
  * 10.10.2026: „Passendes Material" (`material`) kann mit in die Reihe – dann zwei Spalten ab Tablet (Kennzahlen +
  * Karteikasten, darunter Units + Passendes Material nebeneinander, gleiche Höhe je Reihe), eine je Zeile auf dem Handy.
  */
-import { vokabelnHinzufuegen } from '../lernen/kurs/KursSeite'
+import { grammatikHinzufuegen, vokabelnHinzufuegen } from '../lernen/kurs/KursSeite'
+import { useKursGrammatikStand } from '../lernen/kurs/KursGrammatik'
 import { IconPlus } from '@tabler/icons-react'
 import { Button, Card, Group, SimpleGrid, Text } from '@mantine/core'
 import { useEffect, useState } from 'react'
@@ -23,6 +24,7 @@ export function SprachLernstand({
   kursId,
   abschnitte,
   zuAbschnitten,
+  zuGrammatik,
   kopf,
   material
 }: {
@@ -31,6 +33,8 @@ export function SprachLernstand({
   kopf?: React.ReactNode
   abschnitte?: AbschnittStatistik[]
   zuAbschnitten: () => void
+  /** Zum Reiter „Grammatik" (17.10.2026: „+ Grammatik hinzufügen" am Kasten „Units") */
+  zuGrammatik: () => void
   /** Kasten „Passendes Material" – in derselben Reihe wie „Units" */
   material?: React.ReactNode
 }): React.JSX.Element | null {
@@ -44,7 +48,9 @@ export function SprachLernstand({
       aus = true
     }
   }, [kursId])
-  if (!gesamt && !abschnitte?.length && !kopf && !material) return null
+  // Grammatik des Kurses je Unit (17.10.2026, abgestimmt): zweiter Balken und Einzelzeilen im Kasten „Units"
+  const grammatik = useKursGrammatikStand(kursId)
+  if (!gesamt && !abschnitte?.length && !grammatik.length && !kopf && !material) return null
   return (
     <SimpleGrid cols={material ? { base: 1, sm: 2 } : { base: 1, sm: 2, lg: 3 }} spacing="md" data-sprach-lernstand>
       <style>{`
@@ -53,7 +59,7 @@ export function SprachLernstand({
         }
       `}</style>
       {kopf}
-      {gesamt && (
+      {gesamt && gesamt.gesamt > 0 && (
         <Card withBorder radius="md" padding="md" h="100%" data-kurs-lernstand>
           <Group justify="space-between" mb="xs">
             <Text fw={700}>Lernstand im Karteikasten</Text>
@@ -64,11 +70,12 @@ export function SprachLernstand({
           <StufenDiagramm u={gesamt} hoehe={110} />
         </Card>
       )}
-      {abschnitte && abschnitte.length > 0 && (
+      {((abschnitte && abschnitte.length > 0) || grammatik.length > 0) && (
         <Card withBorder radius="md" padding="md" h="100%" data-sprach-units>
-          <Group justify="space-between" mb="xs">
+          <Group justify="space-between" mb="xs" gap="xs">
             <Text fw={700}>Units</Text>
-            <Group gap={4} wrap="nowrap">
+            {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
+            <Group gap={4} justify="flex-end">
               {/* „+ Vokabeln hinzufügen" (10.10.2026): zum Reiter „Vokabeln" und gleich der Dialog */}
               <Button
                 size="compact-xs"
@@ -79,12 +86,22 @@ export function SprachLernstand({
               >
                 Vokabeln hinzufügen
               </Button>
+              <Button
+                size="compact-xs"
+                variant="light"
+                color="grape"
+                leftSection={<IconPlus size={12} />}
+                onClick={() => (zuGrammatik(), grammatikHinzufuegen(kursId))}
+                data-units-grammatik-hinzufuegen
+              >
+                Grammatik hinzufügen
+              </Button>
               <Button size="compact-xs" variant="subtle" onClick={zuAbschnitten}>
                 Alle Abschnitte
               </Button>
             </Group>
           </Group>
-          <UnitsKompakt abschnitte={abschnitte} schluessel={kursId} />
+          <UnitsKompakt abschnitte={abschnitte ?? []} grammatik={grammatik} schluessel={kursId} />
         </Card>
       )}
       {material}

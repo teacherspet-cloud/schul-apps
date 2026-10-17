@@ -841,6 +841,14 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   // „Lösung zeigen" (09.10.2026): leere Antwort = falsch; die Rückmeldung nennt nur die Lösung
   const [aufgegeben, setAufgegeben] = useState(false)
   const a = schlange[0]
+  /*
+   * Zählen nach Aufgaben, nicht nach Fragen (17.10.2026, Befund der Lehrkraft: 20 Übungen, aber über 40 Fragen, weil
+   * falsch Beantwortetes in der Runde wiederkommt). Fortschritt und Abschluss nennen die Aufgaben der Runde; je Aufgabe
+   * zählt der erste Versuch und ob sie am Ende richtig war.
+   */
+  const anzahl = useMemo(() => new Set(aufgaben.map((x) => x.id)).size, [aufgaben])
+  const [urteile, setUrteile] = useState<Record<string, { erst: boolean; richtig: boolean }>>({})
+  const erledigt = anzahl - new Set(schlange.map((x) => x.id)).size
   const antworten = async (antwort: string, wort?: string, selbst?: Urteil, zeigen = false): Promise<void> => {
     if (!a || laeuft || ergebnis) return
     setAufgegeben(zeigen)
@@ -856,6 +864,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
       setStaende((s) => ({ ...s, [a.id]: e.stand }))
       setErgebnis(e)
       setZaehler((z) => ({ ...z, richtig: z.richtig + (e.urteil === 'richtig' ? 1 : 0), gesamt: z.gesamt + 1 }))
+      setUrteile((u) => ({ ...u, [a.id]: { erst: u[a.id]?.erst ?? e.urteil === 'richtig', richtig: e.urteil === 'richtig' } }))
       if (e.urteil === 'richtig') ton('richtig')
       // Getippt richtig, aber mit typografischem Apostroph (don’t): Tastatur-Hinweis (08.10.2026)
       if (e.urteil === 'richtig' && !selbst && GETIPPT.includes(a.art)) apostrophHinweis(antwort)
@@ -890,27 +899,44 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
     window.addEventListener('keydown', taste)
     return () => window.removeEventListener('keydown', taste)
   })
-  if (!a)
+  if (!a) {
+    const liste = Object.values(urteile)
+    const anhieb = liste.filter((x) => x.erst).length
+    const spaeter = liste.filter((x) => !x.erst && x.richtig).length
+    const offen = liste.filter((x) => !x.richtig).length
+    const wort = (n: number): string => (n === 1 ? 'Übung' : 'Übungen')
     return (
       <Stack align="center" py="xl" className="vt vt-rein" data-sitzung-fertig>
         <style>{CSS}</style>
         <div
           className="vt-ring"
-          style={{ background: `conic-gradient(var(--vt-a) ${(zaehler.richtig / Math.max(1, zaehler.gesamt)) * 360}deg, var(--vt-a-rand) 0deg)` }}
+          style={{ background: `conic-gradient(var(--vt-a) ${((anhieb + spaeter) / Math.max(1, liste.length)) * 360}deg, var(--vt-a-rand) 0deg)` }}
         >
           <div className="vt-ring-innen">
             <IconCheck size={30} />
           </div>
         </div>
         <Title order={2}>Geschafft!</Title>
-        <Text c="dimmed">
-          {zaehler.richtig} von {zaehler.gesamt} Aufgaben auf Anhieb richtig.
+        <Text fw={700} fz="lg" ta="center" data-runde-uebungen={liste.length}>
+          {liste.length} {wort(liste.length)} erledigt{offen === 0 ? ' – alle richtig gelöst' : ''}
         </Text>
+        <Text c="dimmed" ta="center" data-runde-stand={`${anhieb}|${spaeter}|${offen}`}>
+          {anhieb} auf Anhieb richtig
+          {spaeter > 0 ? ` · ${spaeter} beim zweiten Anlauf richtig` : ''}
+          {offen > 0 ? ` · ${offen} noch nicht richtig – ${offen === 1 ? 'sie kommt' : 'sie kommen'} bald wieder dran` : ''}
+        </Text>
+        {zaehler.gesamt > liste.length && (
+          <Text size="sm" c="dimmed" ta="center" maw={420} data-runde-fragen={zaehler.gesamt}>
+            Falsch Beantwortetes kam in der Runde noch einmal – deshalb waren es {zaehler.gesamt} Fragen, aber nur {liste.length}{' '}
+            {wort(liste.length)}.
+          </Text>
+        )}
         <Button size="lg" radius="xl" className="vt-los" onClick={() => fertig(staende)}>
           Zurück zum Kasten
         </Button>
       </Stack>
     )
+  }
   const r = d.paket.regeln.find((x) => x.id === a.regelId)
   const st = staende[a.id]
   return (
@@ -931,7 +957,17 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
             </Badge>
           </Group>
         </Group>
-        <Progress value={(zaehler.gesamt / Math.max(1, zaehler.gesamt + schlange.length)) * 100} radius="xl" size="lg" color={farbe.a} />
+        <Group gap="xs" wrap="nowrap">
+          <Progress value={(erledigt / Math.max(1, anzahl)) * 100} radius="xl" size="lg" color={farbe.a} style={{ flex: 1 }} />
+          <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-runde-fortschritt={`${erledigt}/${anzahl}`}>
+            {erledigt} von {anzahl} {anzahl === 1 ? 'Übung' : 'Übungen'}
+          </Text>
+        </Group>
+        {(zaehler.wiederholt.get(a.id) ?? 0) > 0 && !ergebnis && (
+          <Text size="sm" c="dimmed" data-runde-wiederholung>
+            Noch einmal: Diese Übung war eben noch nicht richtig – sie zählt nicht extra.
+          </Text>
+        )}
         {netz && (
           <Alert color="orange" data-netz-fehler>
             {netz} Deine Antwort ist noch nicht angekommen – tippe einfach noch einmal.

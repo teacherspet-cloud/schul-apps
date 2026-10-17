@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bandNummer, jahrgangAusBand, jahrgangDerFreigabe, schuljahrVon, unitStelle } from '../src/shared/grammatikJahrgang'
+import { stelleImBand } from '../src/shared/lehrwerkBand'
+import { unitsMitGrammatik } from '../src/renderer/src/modules/lernen/kurs/kursAnsicht'
 import { istOffen, nachJahrgaengen, nachUnits, teilOffen } from '../src/renderer/src/modules/lernen/regal/grammatikJahrgaenge'
 import { jahrgangName, roemisch } from '../src/renderer/src/modules/lernen/regal/beschriftung'
 
@@ -97,5 +99,35 @@ describe('Grammatik im Jahr nach Unit › Station (17.10.2026)', () => {
     expect(teilOffen('x', 1, {}, false)).toBe(false)
     expect(teilOffen('x', 0, { x: false }, false)).toBe(false)
     expect(teilOffen('x', 1, {}, true)).toBe(true)
+  })
+})
+
+describe('Stelle der Grammatik im Band (17.10.2026)', () => {
+  it('Einführung im Lehrwerk statt der Unit der Freigabe', () => {
+    expect(stelleImBand('Green Line 1', ['en.verb.there_is/praesens'])).toEqual({ unit: 'Unit 1', station: 'Station 2' })
+    expect(stelleImBand('Green Line 1', ['en.verb.be_have/be-kurzformen'])).toEqual({ unit: 'Unit 1', station: 'Station 1' })
+    expect(stelleImBand('Green Line 1', ['en.verb.passive'])).toBeNull()
+    expect(stelleImBand('Unbekanntes Buch 1', ['en.verb.there_is/praesens'])).toBeNull()
+  })
+})
+
+describe('Units mit Grammatik (17.10.2026)', () => {
+  const g = (id: string, unit?: string, station?: string, buch = 'Green Line 1') => ({ id, titel: id, buch, unit, station, aufgaben: 10, bearbeitet: 0.5, sicher: 0.2 })
+  const folge = () => ['Unit 1', 'Unit 2', 'Unit 3']
+  it('Grammatik hinter den Vokabeln derselben Station, Units nur mit Grammatik an ihrer Stelle im Buch', () => {
+    const baende = [
+      {
+        buch: 'Green Line 1',
+        units: [
+          { unit: 'Unit 3', zeilen: [{ name: 'Station 1' }] },
+          { unit: 'Unit 1', zeilen: [{ name: 'Station 2' }, { name: 'Station 1' }] }
+        ]
+      }
+    ]
+    const r = unitsMitGrammatik(baende, [g('there', 'Unit 1', 'Station 2'), g('be', 'Unit 1', 'Station 1'), g('genitiv', 'Unit 2', 'Station 1'), g('frei', undefined, undefined, '')], folge)
+    expect(r.map((b) => b.buch)).toEqual(['Green Line 1', ''])
+    expect(r[0].units.map((u) => u.unit)).toEqual(['Unit 3', 'Unit 2', 'Unit 1'])
+    expect(r[0].units[2].zeilen.map((z) => (z.art === 'vok' ? z.z.name : z.g.id))).toEqual(['Station 2', 'there', 'Station 1', 'be'])
+    expect(r[1].units[0].gram.map((x) => x.id)).toEqual(['frei'])
   })
 })

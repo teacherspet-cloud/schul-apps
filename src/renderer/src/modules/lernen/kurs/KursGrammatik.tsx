@@ -41,7 +41,7 @@ import { bekanntNachStand } from '@shared/zeitformSperre'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { AufgabenEditor } from './AufgabenEditor'
 import { KastenKopf, useGemerkt } from './Kasten'
-import { bandGleich, grammatikNachLehrwerk, passtSuche, type KursAbschnittBezug } from './kursAnsicht'
+import { bandGleich, grammatikNachLehrwerk, passtSuche, type GrammatikStandKurz, type KursAbschnittBezug } from './kursAnsicht'
 import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { BandCover } from '../../../shared/components/BandCover'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
@@ -134,6 +134,42 @@ function KursStufen({ vokId, geaendert }: { vokId: string; geaendert: () => void
 
 /** Nach Änderungen im Hintergrund (z. B. „+ Aufgaben" fertig) lädt die Grammatik des Kurses neu */
 export const GRAMMATIK_GEAENDERT = 'kurs-grammatik-geaendert'
+
+/**
+ * Grammatik eines Kurses mit Lernstand für den Kasten „Units" (17.10.2026): nur, was beim ganzen Kurs angekommen ist –
+ * ohne Entferntes, Geplantes und Extra für Einzelne. Lädt nach Änderungen an der Grammatik neu.
+ */
+export function useKursGrammatikStand(vokId: string, stand = 0): GrammatikStandKurz[] {
+  const [liste, setListe] = useState<GrammatikStandKurz[]>([])
+  const laden = useCallback(
+    () =>
+      void holen<{ zuweisungen: GrammatikZeile[] }>('/server/grammatik').then(
+        (r) =>
+          setListe(
+            r.zuweisungen
+              .filter((g) => g.vokId === vokId && g.status !== 'entfernt' && !g.art && !((g.geplantAb ?? 0) > Date.now()))
+              .map((g) => ({
+                id: g.id,
+                titel: g.titel,
+                buch: g.buch,
+                unit: g.unit,
+                station: g.station,
+                aufgaben: g.aufgaben,
+                bearbeitet: g.bearbeitetSchnitt ?? 0,
+                sicher: g.sicherSchnitt
+              }))
+          ),
+        () => setListe([])
+      ),
+    [vokId]
+  )
+  useEffect(laden, [laden, stand])
+  useEffect(() => {
+    window.addEventListener(GRAMMATIK_GEAENDERT, laden)
+    return () => window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
+  }, [laden])
+  return liste
+}
 
 /** Zeile der Tabelle: freigegeben oder Entwurf */
 type Zeile = { art: 'frei'; g: GrammatikZeile } | { art: 'entwurf'; e: Entwurf }

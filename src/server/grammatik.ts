@@ -68,6 +68,7 @@ import {
   bandErkennen,
   bekanntNachBand,
   stationInUnit,
+  stelleImBand,
   stelleImLehrwerk,
   type Erkennung,
   type FreigegebeneUnit,
@@ -595,6 +596,9 @@ export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string; 
   const info = infoVon(z)
   if (info.lehrwerk?.buch) {
     const buch = grammatikBand(info.lehrwerk.buch) ?? info.lehrwerk.buch
+    // Stelle im Lehrwerk vor der Unit der Freigabe (17.10.2026, shared/lehrwerkBand.ts `stelleImBand`)
+    const imBand = stelleImBand(buch, info.themen, info.teilformen)
+    if (imBand) return { buch, ...imBand }
     const unit = info.lehrwerk.unit
     const station = unit ? stationInUnit(buch, unit, info.themen, info.teilformen) : undefined
     return { buch, ...(unit ? { unit } : {}), ...(station ? { station } : {}) }

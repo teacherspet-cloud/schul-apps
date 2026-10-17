@@ -192,6 +192,33 @@ export function stelleImLehrwerk(themen: string[], teilformen: string[] = []): {
   return null
 }
 
+/**
+ * Stelle einer Grammatik in EINEM Band (17.10.2026, Befund der Lehrkraft: „there is / there are" stand bei den Lernenden
+ * unter „Weitere", Formen aus Unit 1 Station 1 unter „Hello"): Die Freigabe nennt als Unit den gerade aktuellen
+ * Vokabel-Abschnitt des Kurses – maßgeblich ist aber, wo das Lehrwerk die Grammatik einführt. Erst die Einführung, dann
+ * eine Wiederholung in diesem Band, Trailer zuletzt; null, wenn der Band sie nicht nennt.
+ */
+export function stelleImBand(buch: string, themen: string[], teilformen: string[] = []): { unit: string; station?: string } | null {
+  const band = grammatikBand(buch)
+  const kapitel = band ? LEHRWERK_GRAMMATIK[band] : undefined
+  if (!kapitel) return null
+  const teile = new Set([...teilformen, ...themen.filter((t) => t.includes('/'))])
+  const ganze = new Set(themen.filter((t) => !t.includes('/')))
+  if (!teile.size && !ganze.size) return null
+  const themaVon = (t: string): string => t.split('/')[0]
+  const grob = new Set([...ganze, ...[...teile].map(themaVon)])
+  const passt: ((t: string) => boolean)[] = [(t) => teile.has(t) || ganze.has(themaVon(t)), (t) => grob.has(themaVon(t))]
+  for (const treffer of passt)
+    for (const wiederholung of [false, true])
+      for (const mitTrailer of [false, true])
+        for (const [unit, stationen] of Object.entries(kapitel)) {
+          if (istOptional(unit) !== mitTrailer) continue
+          for (const [station, punkte] of Object.entries(stationen))
+            for (const p of punkte) if (Boolean(p.w) === wiederholung && p.t.some(treffer)) return station ? { unit, station } : { unit }
+        }
+  return null
+}
+
 /** Station einer Grammatik in einer bekannten Unit (Freigabe nennt nur Band und Unit, 10.10.2026) – sonst undefined */
 export function stationInUnit(buch: string, unit: string, themen: string[], teilformen: string[] = []): string | undefined {
   const band = grammatikBand(buch)

@@ -243,3 +243,77 @@ export function grammatikNachLehrwerk<T>(
   ergebnis.sort((a, b) => Number(!a.buch) - Number(!b.buch) || bandRang(b.buch) - bandRang(a.buch) || a.buch.localeCompare(b.buch, 'de'))
   return { baende: ergebnis, ohne }
 }
+
+/** Grammatik eines Kurses mit Lernstand (Durchschnitt aller Lernenden) – für den Kasten „Units" */
+export interface GrammatikStandKurz {
+  id: string
+  titel: string
+  buch?: string
+  unit?: string
+  station?: string
+  aufgaben: number
+  /** Anteile 0–1: bearbeitet bzw. sicher */
+  bearbeitet: number
+  sicher: number
+}
+export type UnitZeile<T> = { art: 'vok'; z: T } | { art: 'gram'; g: GrammatikStandKurz }
+export interface UnitMitGrammatik<T> {
+  unit: string
+  zeilen: UnitZeile<T>[]
+  vok: T[]
+  gram: GrammatikStandKurz[]
+}
+
+/**
+ * Units mit Grammatik (17.10.2026, abgestimmt mit der Lehrkraft): Die Grammatik des Kurses kommt in die Units der
+ * Vokabeln – nach Band (`bandGleich`), Unit und Station (Stelle im Lehrwerk, server `lehrwerkDerGrammatik`). In der Unit
+ * steht sie hinter den Vokabel-Abschnitten derselben Station; Units und Bände nur mit Grammatik kommen an ihre Stelle im
+ * Buch (Grammatik-Katalog `unitFolge`), Grammatik ohne Band unter „ohne Band". Reihenfolge wie bei den Vokabeln: Späteres oben.
+ */
+export function unitsMitGrammatik<T extends { name: string }>(
+  baende: { buch: string; units: { unit: string; zeilen: T[] }[] }[],
+  grammatik: GrammatikStandKurz[],
+  unitFolge: (buch: string) => string[] = () => []
+): { buch: string; units: UnitMitGrammatik<T>[] }[] {
+  const aus: { buch: string; units: UnitMitGrammatik<T>[] }[] = baende.map((b) => ({
+    buch: b.buch,
+    units: b.units.map((u): UnitMitGrammatik<T> => ({ unit: u.unit, zeilen: u.zeilen.map((z) => ({ art: 'vok' as const, z })), vok: u.zeilen, gram: [] }))
+  }))
+  const katalogIndex = (buch: string, unit: string): number => unitFolge(buch).findIndex((u) => vergleich(u) === vergleich(unit))
+  for (const g of grammatik) {
+    let band = aus.find((b) => (g.buch ? b.buch && bandGleich(b.buch, g.buch) : !b.buch))
+    if (!band) {
+      band = { buch: g.buch ?? '', units: [] }
+      aus.push(band)
+    }
+    const unitName = g.unit ?? ''
+    let u = band.units.find((x) => vergleich(x.unit) === vergleich(unitName))
+    if (!u) {
+      u = { unit: unitName, zeilen: [], vok: [], gram: [] } as UnitMitGrammatik<T>
+      // An die Stelle im Buch: vor die erste Unit, die im Katalog davor liegt (Liste absteigend); ohne Stelle ans Ende
+      const ci = unitName ? katalogIndex(band.buch, unitName) : -1
+      const vor = ci < 0 ? -1 : band.units.findIndex((x) => x.unit && katalogIndex(band!.buch, x.unit) >= 0 && katalogIndex(band!.buch, x.unit) < ci)
+      band.units.splice(vor < 0 ? band.units.length : vor, 0, u)
+    }
+    u.gram.push(g)
+    const stelle = g.station ? abschnittStelle(g.station) : null
+    const zeile = { art: 'gram' as const, g }
+    if (stelle === null) {
+      u.zeilen.push(zeile)
+      continue
+    }
+    const stelleVon = (x: UnitZeile<T>): number | null => (x.art === 'vok' ? abschnittStelle(x.z.name) : x.g.station ? abschnittStelle(x.g.station) : null)
+    const gleich = u.zeilen.map(stelleVon).lastIndexOf(stelle)
+    if (gleich >= 0) {
+      u.zeilen.splice(gleich + 1, 0, zeile)
+      continue
+    }
+    const davor = u.zeilen.findIndex((x) => {
+      const s = stelleVon(x)
+      return s !== null && s < stelle
+    })
+    u.zeilen.splice(davor < 0 ? u.zeilen.length : davor, 0, zeile)
+  }
+  aus.sort((a, b) => Number(!a.buch) - Number(!b.buch) || bandRang(b.buch) - bandRang(a.buch))
+  return aus.filter((b) => b.units.length)
+}

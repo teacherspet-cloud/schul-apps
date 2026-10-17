@@ -79,7 +79,9 @@ import { Freigeben as GrammatikFreigeben, useEntwuerfe } from '../GrammatikTrain
 import { LernendeEintragen, ZettelDruck, type Zettel } from '../LernendeEintragen'
 import { KlasseZuordnen } from '../KlasseZuordnen'
 import { AlsSchuelerAnsehen } from '../../meineklassen/SchuelerVorschau'
-import { KursGrammatik } from './KursGrammatik'
+import { GRAMMATIK_GEAENDERT, KursGrammatik, useKursGrammatikStand } from './KursGrammatik'
+import { bandGleich, unitsMitGrammatik, type GrammatikStandKurz } from './kursAnsicht'
+import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { KastenKopf, useGemerkt } from './Kasten'
 import { useAufZu } from '../../../shared/sitzung'
 import { AbschnitteWoerter, type AbschnittFrage } from './AbschnitteWoerter'
@@ -241,9 +243,23 @@ function HinweisListe({
  * Units kompakt: je Band (neuester oben, mit Cover – 09.10.2026), darin die Units absteigend wie im Buch (10.10.2026:
  * Unit 3 über Unit 2, im Unit „Story" über „Check-in"); die oberste Unit des neuesten Bands offen (Abschnitte mit
  * Balken), die anderen zugeklappt mit „% sicher". Auch in „Meine Klassen" (Lernstand der Klasse).
+ * Seit 17.10.2026 (abgestimmt mit der Lehrkraft) mit der Grammatik des Kurses: in der Unit-Zeile ein zweiter Balken
+ * „Grammatik", aufgeklappt je Station hinter den Vokabel-Abschnitten die Grammatik mit eigenem Balken; Units nur mit
+ * Grammatik erscheinen ebenfalls (kursAnsicht.ts `unitsMitGrammatik`).
  */
-export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { abschnitte: AbschnittStatistik[]; schluessel?: string }): React.JSX.Element {
-  const baende = useMemo(() => nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), [abschnitte])
+export function UnitsKompakt({
+  abschnitte,
+  grammatik = KEINE_GRAMMATIK,
+  schluessel: kursSchluessel = ''
+}: {
+  abschnitte: AbschnittStatistik[]
+  grammatik?: GrammatikStandKurz[]
+  schluessel?: string
+}): React.JSX.Element {
+  const baende = useMemo(
+    () => unitsMitGrammatik(nachBaenden(abschnitte.filter((a) => a.zeit <= Date.now())), grammatik, unitFolgeImKatalog),
+    [abschnitte, grammatik]
+  )
   // Auf/Zu je Unit (abweichend von der Vorgabe); in „Meine Klassen" dauerhaft je Kurs gemerkt (10.10.2026)
   const [unitAuf, setUnitAuf] = useAufZu<Record<string, boolean>>(`units-auf-${kursSchluessel}`, {})
   // Mehrere Bände (10.10.2026): je Band aufklappbar, der neueste offen
@@ -263,76 +279,135 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
       </Progress.Root>
     </Tooltip>
   )
+  // Grammatik: sicher / bearbeitet (noch nicht sicher) / noch offen – Durchschnitt aller Lernenden
+  const gramBalken = (sicher: number, bearbeitet: number): React.JSX.Element => (
+    <Tooltip label={`Grammatik: sicher ${prozent(sicher)} · bearbeitet ${prozent(bearbeitet)} · noch offen ${prozent(1 - bearbeitet)}`}>
+      <Progress.Root size="md" radius="xl" style={{ flex: 1, gap: 2, minWidth: 32 }}>
+        <Progress.Section value={sicher * 100} color="teal" />
+        <Progress.Section value={Math.max(0, bearbeitet - sicher) * 100} color="grape.4" />
+        <Progress.Section value={Math.max(0, 1 - bearbeitet) * 100} color="gray.4" />
+      </Progress.Root>
+    </Tooltip>
+  )
   const schluessel = (buch: string, unit: string): string => `${buch}|${unit}`
   const erste = schluessel(baende[0].buch, baende[0].units[0]?.unit ?? '')
   const mittel = (zeilen: AbschnittStatistik[], k: 'sicher' | 'aufbau' | 'neu'): number => {
     const woerter = zeilen.reduce((s, z) => s + z.woerter, 0) || 1
     return zeilen.reduce((s, z) => s + z[k] * z.woerter, 0) / woerter
   }
+  const gramMittel = (l: GrammatikStandKurz[], k: 'sicher' | 'bearbeitet'): number => {
+    const aufgaben = l.reduce((s, g) => s + g.aufgaben, 0) || 1
+    return l.reduce((s, g) => s + g[k] * g.aufgaben, 0) / aufgaben
+  }
+  const mitGrammatik = baende.some((b) => b.units.some((u) => u.gram.length))
+  const prozentText = (x: number): React.JSX.Element => (
+    <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
+      {prozent(x)}
+      <Text span size="xs" visibleFrom="sm">
+        {' '}
+        sicher
+      </Text>
+    </Text>
+  )
+  const art = (t: string): React.JSX.Element => (
+    <Text size="xs" c="dimmed" w={58} style={{ flexShrink: 0 }}>
+      {t}
+    </Text>
+  )
   return (
     <Stack gap={8} data-kurs-units>
-      {baende.map((b) => (
-        <BandGruppe
-          key={b.buch || 'ohne'}
-          buch={b.buch}
-          ohneBand="Weitere Vokabeln"
-          zusatz={`${b.units.length} ${b.units.length === 1 ? 'Unit' : 'Units'} · ${prozent(mittel(b.units.flatMap((u) => u.zeilen), 'sicher'))} sicher`}
-          {...(baende.length > 1 ? { offen: bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
-        >
-          {/* Abstände (10.10.2026): Abschnitte 4 px, zwischen Units 10 px – die Units heben sich ab */}
-          <Stack gap={10}>
-            {b.units.map((g) => {
-              const k = schluessel(b.buch, g.unit)
-              const auf = unitAuf[k] ?? k === erste
-              return (
-                <div key={k} data-kurs-unit={g.unit || 'Weitere Vokabeln'} data-offen={auf || undefined}>
-                  <UnstyledButton
-                    w="100%"
-                    aria-expanded={auf}
-                    onClick={() => setUnitAuf((m) => ({ ...m, [k]: !(m[k] ?? k === erste) }))}
-                  >
-                    <Group gap={6} wrap="nowrap">
-                      {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                      {/* Telefon (10.10.2026): schmalere Spalten, damit Balken und Prozent nicht abgeschnitten werden */}
-                      <Text size="sm" fw={600} w={{ base: 84, sm: 120 }} truncate style={{ flexShrink: 0 }}>
-                        {g.unit || 'Weitere Vokabeln'}
-                      </Text>
-                      {balken(mittel(g.zeilen, 'sicher'), mittel(g.zeilen, 'aufbau'), mittel(g.zeilen, 'neu'))}
-                      <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
-                        {prozent(mittel(g.zeilen, 'sicher'))}
-                        <Text span size="xs" visibleFrom="sm">
-                          {' '}
-                          sicher
+      {baende.map((b) => {
+        const alleVok = b.units.flatMap((u) => u.vok)
+        return (
+          <BandGruppe
+            key={b.buch || 'ohne'}
+            buch={b.buch}
+            ohneBand={alleVok.length ? 'Weitere Vokabeln' : 'Weitere Grammatik'}
+            zusatz={`${b.units.length} ${b.units.length === 1 ? 'Unit' : 'Units'}${alleVok.length ? ` · ${prozent(mittel(alleVok, 'sicher'))} sicher` : ''}`}
+            {...(baende.length > 1 ? { offen: bandAuf.offen(b.buch), umschalten: () => bandAuf.umschalten(b.buch) } : {})}
+          >
+            {/* Abstände (10.10.2026): Abschnitte 4 px, zwischen Units 10 px – die Units heben sich ab */}
+            <Stack gap={10}>
+              {b.units.map((g) => {
+                const k = schluessel(b.buch, g.unit)
+                const auf = unitAuf[k] ?? k === erste
+                const name = g.unit || (g.vok.length ? 'Weitere Vokabeln' : 'Weitere Grammatik')
+                return (
+                  <div key={k} data-kurs-unit={name} data-offen={auf || undefined}>
+                    <UnstyledButton
+                      w="100%"
+                      aria-expanded={auf}
+                      onClick={() => setUnitAuf((m) => ({ ...m, [k]: !(m[k] ?? k === erste) }))}
+                    >
+                      <Group gap={6} wrap="nowrap" align={g.vok.length && g.gram.length ? 'flex-start' : 'center'}>
+                        {auf ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                        {/* Telefon (10.10.2026): schmalere Spalten, damit Balken und Prozent nicht abgeschnitten werden */}
+                        <Text size="sm" fw={600} w={{ base: 84, sm: 120 }} truncate style={{ flexShrink: 0 }}>
+                          {name}
                         </Text>
-                      </Text>
-                    </Group>
-                  </UnstyledButton>
-                  {auf && (
-                    <Stack gap={4} mt={4} pl={22}>
-                      {g.zeilen.map((a) => (
-                        <Group key={a.index} gap={6} wrap="nowrap">
-                          <Text size="xs" w={{ base: 80, sm: 98 }} truncate style={{ flexShrink: 0 }}>
-                            {a.name}
-                          </Text>
-                          {balken(a.sicher, a.aufbau, a.neu)}
-                          <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
-                            {prozent(a.sicher)}
-                          </Text>
-                        </Group>
-                      ))}
-                    </Stack>
-                  )}
-                </div>
-              )
-            })}
-          </Stack>
-        </BandGruppe>
-      ))}
+                        <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+                          {g.vok.length > 0 && (
+                            <Group gap={6} wrap="nowrap" data-unit-vokabeln>
+                              {mitGrammatik && art('Vokabeln')}
+                              {balken(mittel(g.vok, 'sicher'), mittel(g.vok, 'aufbau'), mittel(g.vok, 'neu'))}
+                              {prozentText(mittel(g.vok, 'sicher'))}
+                            </Group>
+                          )}
+                          {g.gram.length > 0 && (
+                            <Group gap={6} wrap="nowrap" data-unit-grammatik>
+                              {art('Grammatik')}
+                              {gramBalken(gramMittel(g.gram, 'sicher'), gramMittel(g.gram, 'bearbeitet'))}
+                              {prozentText(gramMittel(g.gram, 'sicher'))}
+                            </Group>
+                          )}
+                        </Stack>
+                      </Group>
+                    </UnstyledButton>
+                    {auf && (
+                      <Stack gap={4} mt={4} pl={22}>
+                        {g.zeilen.map((z) =>
+                          z.art === 'vok' ? (
+                            <Group key={`v${z.z.index}`} gap={6} wrap="nowrap">
+                              <Text size="xs" w={{ base: 80, sm: 98 }} truncate style={{ flexShrink: 0 }}>
+                                {z.z.name}
+                              </Text>
+                              {balken(z.z.sicher, z.z.aufbau, z.z.neu)}
+                              <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
+                                {prozent(z.z.sicher)}
+                              </Text>
+                            </Group>
+                          ) : (
+                            <Group key={`g${z.g.id}`} gap={6} wrap="nowrap" data-unit-grammatik-zeile={z.g.titel}>
+                              <Tooltip label={`Grammatik${z.g.station ? ` · ${z.g.station}` : ''}: ${z.g.titel}`}>
+                                <Group gap={4} wrap="nowrap" w={{ base: 80, sm: 98 }} style={{ flexShrink: 0, minWidth: 0 }}>
+                                  <IconBook2 size={12} color="var(--mantine-color-grape-6)" style={{ flexShrink: 0 }} />
+                                  <Text size="xs" truncate>
+                                    {z.g.titel}
+                                  </Text>
+                                </Group>
+                              </Tooltip>
+                              {gramBalken(z.g.sicher, z.g.bearbeitet)}
+                              <Text size="xs" c="dimmed" w={{ base: 40, sm: 70 }} ta="right" style={{ flexShrink: 0 }}>
+                                {prozent(z.g.sicher)}
+                              </Text>
+                            </Group>
+                          )
+                        )}
+                      </Stack>
+                    )}
+                  </div>
+                )
+              })}
+            </Stack>
+          </BandGruppe>
+        )
+      })}
       <Group gap="md" mt={2}>
         {[
           ['teal', 'sicher'],
           ['yellow', 'im Aufbau'],
-          ['gray.4', 'neu']
+          ['gray.4', 'neu'],
+          ...(mitGrammatik ? [['grape.4', 'Grammatik bearbeitet']] : [])
         ].map(([f, t]) => (
           <Group key={t} gap={4} wrap="nowrap">
             <div style={{ width: 10, height: 10, borderRadius: 3, background: `var(--mantine-color-${f.replace('.', '-')}${f.includes('.') ? '' : '-6'})` }} />
@@ -345,6 +420,12 @@ export function UnitsKompakt({ abschnitte, schluessel: kursSchluessel = '' }: { 
     </Stack>
   )
 }
+
+const KEINE_GRAMMATIK: GrammatikStandKurz[] = []
+
+/** Units eines Bandes in Buchreihenfolge (Grammatik-Katalog) – Units nur mit Grammatik kommen an ihre Stelle */
+const unitFolgeImKatalog = (buch: string): string[] =>
+  Object.keys(LEHRWERK_GRAMMATIK[Object.keys(LEHRWERK_GRAMMATIK).find((k) => bandGleich(k, buch)) ?? ''] ?? {})
 
 /** Kurzzeile der Abschnitte im zugeklappten Kopf (09.10.2026): Umfang, Stand, neuester Abschnitt */
 export function abschnitteKurz(abschnitte: AbschnittStatistik[]): string {
@@ -389,6 +470,13 @@ export function vokabelnHinzufuegen(kursId: string): void {
   window.dispatchEvent(new CustomEvent('schulapps:vokabeln-hinzu', { detail: kursId }))
 }
 
+/** Wunsch „Grammatik hinzufügen" für einen Kurs (17.10.2026) – wie `vokabelnHinzufuegen`, z. B. aus „Meine Klassen" */
+const grammatikHinzuOffen: { kurs: string | null } = { kurs: null }
+export function grammatikHinzufuegen(kursId: string): void {
+  grammatikHinzuOffen.kurs = kursId
+  window.dispatchEvent(new CustomEvent('schulapps:grammatik-hinzu', { detail: kursId }))
+}
+
 export function KursSeite({
   kursId: id,
   eingebettet = false,
@@ -429,7 +517,18 @@ export function KursSeite({
   }, [id])
   const [eintragen, setEintragen] = useState(false)
   const [klasse, setKlasse] = useState(false)
-  const [grammatik, setGrammatik] = useState(false)
+  // „+ Grammatik hinzufügen" am Kasten „Units" (17.10.2026): wie bei den Vokabeln auch aus „Meine Klassen" heraus
+  const [grammatik, setGrammatik] = useState(() => grammatikHinzuOffen.kurs === id && (grammatikHinzuOffen.kurs = null, true))
+  useEffect(() => {
+    const auf = (e: Event): void => {
+      if ((e as CustomEvent<string>).detail !== id) return
+      grammatikHinzuOffen.kurs = null
+      setGrammatik(true)
+    }
+    window.addEventListener('schulapps:grammatik-hinzu', auf)
+    return () => window.removeEventListener('schulapps:grammatik-hinzu', auf)
+  }, [id])
+  const grammatikStandKurs = useKursGrammatikStand(id, grammatikStand)
   const [zettelDruck, setZettelDruck] = useState<Zettel[] | null>(null)
   const laden = useCallback(
     () =>
@@ -552,21 +651,32 @@ export function KursSeite({
         )}
       </Stack>
       <Stack gap="md">
-        {mitWoertern && (
+        {(mitWoertern || grammatikStandKurs.length > 0) && (
           <Card withBorder radius="md" padding="md">
-            <Group justify="space-between" mb="xs">
+            <Group justify="space-between" mb="xs" gap="xs">
               <Text fw={700}>Units</Text>
-              <Group gap={4} wrap="nowrap">
+              {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
+              <Group gap={4} justify="flex-end">
                 <Button size="compact-xs" variant="light" leftSection={<IconPlus size={12} />} onClick={() => setHinzu(true)} data-units-hinzufuegen>
                   Vokabeln hinzufügen
+                </Button>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  color="grape"
+                  leftSection={<IconPlus size={12} />}
+                  onClick={() => setGrammatik(true)}
+                  data-units-grammatik-hinzufuegen
+                >
+                  Grammatik hinzufügen
                 </Button>
                 <Button size="compact-xs" variant="subtle" onClick={() => setReiter('vokabeln')}>
                   Alle Abschnitte
                 </Button>
               </Group>
             </Group>
-            {statistik ? (
-              <UnitsKompakt abschnitte={statistik.abschnitte} schluessel={id} />
+            {statistik || !mitWoertern ? (
+              <UnitsKompakt abschnitte={statistik?.abschnitte ?? []} grammatik={grammatikStandKurs} schluessel={id} />
             ) : (
               <Stack gap={2}>
                 {(d.teile ?? []).filter((t) => t.zeit <= Date.now()).slice(-6).reverse().map((t, i) => (
@@ -744,7 +854,7 @@ export function KursSeite({
       {grammatik && (
         <GrammatikFreigeben
           vorgabe={grammatikVorgabe(id, d.titel, d.sprache ?? '', d.quelle, Boolean(d.klassenKurs))}
-          schliessen={() => (setGrammatik(false), setGrammatikStand((n) => n + 1), geaendert?.())}
+          schliessen={() => (setGrammatik(false), setGrammatikStand((n) => n + 1), window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT)), geaendert?.())}
         />
       )}
       {zettelDruck && <ZettelDruck titel={titel} zettel={zettelDruck} adresse={d.adresse || window.location.origin} schliessen={() => setZettelDruck(null)} />}
