@@ -76,6 +76,8 @@ export interface ThemaMaterial {
   vonHand?: boolean
   /** Onlinetest: Code */
   code?: string
+  /** Arbeitsblatt: eingeholte Rückmeldungen */
+  rueckmeldungen?: number
 }
 
 export interface ThemaGruppe {
@@ -198,6 +200,8 @@ interface Roh {
   lehrkraftId: string
   /** Onlinetest: Code (Lernende kennen Tests nur darüber) */
   code?: string
+  /** Arbeitsblatt: eingeholte Rückmeldungen (Feedback außerhalb der App) */
+  rueckmeldungen?: number
 }
 
 const tabelleDa = (t: string): boolean => Boolean(datenbank().prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t))
@@ -209,8 +213,27 @@ function rohMaterial(gruppen: string[]): Roh[] {
   const aus: Roh[] = []
   const zeilen = <T>(t: string, sql: string): T[] => (tabelleDa(t) ? (d.prepare(sql).all(...gruppen) as T[]) : [])
   type Z = Record<string, string | null>
-  for (const z of zeilen<Z>('blatt_freigaben', `SELECT id, titel, thema, erstellt, status, lerngruppe_id, lehrkraft_id FROM blatt_freigaben WHERE reihe = '' AND lerngruppe_id IN (${platz})`))
-    aus.push({ art: 'blatt', id: String(z.id), titel: String(z.titel ?? ''), thema: String(z.thema ?? ''), oberthema: '', erstellt: String(z.erstellt), status: String(z.status), lerngruppeId: String(z.lerngruppe_id), lehrkraftId: String(z.lehrkraft_id) })
+  // Rückmeldungen zum Blatt (19.10.2026, abgestimmt): Teil des Blatts – gezählt, kein eigenes Material
+  const rueck = (id: string): number =>
+    tabelleDa('feedback_abgaben') && id
+      ? Number((d.prepare('SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ?').get(id) as { n: number }).n)
+      : 0
+  for (const z of zeilen<Z>(
+    'blatt_freigaben',
+    `SELECT id, titel, thema, erstellt, status, lerngruppe_id, lehrkraft_id, rueckmeldung_id FROM blatt_freigaben WHERE reihe = '' AND lerngruppe_id IN (${platz})`
+  ))
+    aus.push({
+      art: 'blatt',
+      id: String(z.id),
+      titel: String(z.titel ?? ''),
+      thema: String(z.thema ?? ''),
+      oberthema: '',
+      erstellt: String(z.erstellt),
+      status: String(z.status),
+      lerngruppeId: String(z.lerngruppe_id),
+      lehrkraftId: String(z.lehrkraft_id),
+      rueckmeldungen: rueck(String(z.rueckmeldung_id ?? ''))
+    })
   for (const z of zeilen<Z>(
     'reihen_zuweisungen',
     `SELECT z.id, z.erstellt, z.status, z.lerngruppe_id, z.lehrkraft_id, r.titel, r.daten FROM reihen_zuweisungen z JOIN reihen r ON r.id = z.reihe_id WHERE z.lerngruppe_id IN (${platz})`
@@ -225,7 +248,8 @@ function rohMaterial(gruppen: string[]): Roh[] {
   }
   for (const z of zeilen<Z>('onlinetests', `SELECT id, code, titel, erstellt, status, lerngruppe_id, lehrkraft_id FROM onlinetests WHERE lerngruppe_id IN (${platz})`))
     aus.push({ art: 'test', id: String(z.id), code: String(z.code ?? ''), titel: String(z.titel ?? ''), thema: '', oberthema: '', erstellt: String(z.erstellt), status: String(z.status), lerngruppeId: String(z.lerngruppe_id), lehrkraftId: String(z.lehrkraft_id) })
-  for (const z of zeilen<Z>('feedback_freigaben', `SELECT id, titel, erstellt, status, lerngruppe_id, lehrkraft_id FROM feedback_freigaben WHERE lerngruppe_id IN (${platz})`))
+  // Nur eigenständige Rückmeldungen – die zu einem Blatt bzw. einer Reihe gehören dorthin (art 'blatt' / 'reihe')
+  for (const z of zeilen<Z>('feedback_freigaben', `SELECT id, titel, erstellt, status, lerngruppe_id, lehrkraft_id FROM feedback_freigaben WHERE COALESCE(art, '') = '' AND lerngruppe_id IN (${platz})`))
     aus.push({ art: 'rueckmeldung', id: String(z.id), titel: String(z.titel ?? ''), thema: '', oberthema: '', erstellt: String(z.erstellt), status: String(z.status), lerngruppeId: String(z.lerngruppe_id), lehrkraftId: String(z.lehrkraft_id) })
   for (const z of zeilen<Z>('tafel_freigaben', `SELECT id, titel, thema, erstellt, lerngruppe_id, lehrkraft_id FROM tafel_freigaben WHERE lerngruppe_id IN (${platz})`))
     aus.push({ art: 'tafel', id: String(z.id), titel: String(z.titel ?? ''), thema: String(z.thema ?? ''), oberthema: '', erstellt: String(z.erstellt), status: 'offen', lerngruppeId: String(z.lerngruppe_id), lehrkraftId: String(z.lehrkraft_id) })
@@ -327,7 +351,8 @@ export function themenAus(g: Lerngruppe, gruppen: Lerngruppe[], jetzt = Date.now
       ...(m.lerngruppeId !== g.id ? { von: lehrkraefte.get(m.lehrkraftId) ?? '' } : {}),
       ...(!hand && auto?.modul ? { modul: auto.modul } : {}),
       ...(hand ? { vonHand: true } : {}),
-      ...(m.code ? { code: m.code } : {})
+      ...(m.code ? { code: m.code } : {}),
+      ...(m.rueckmeldungen ? { rueckmeldungen: m.rueckmeldungen } : {})
     })
   }
   for (const t of aus.values()) t.materialien.sort((a, b) => (Date.parse(b.erstellt) || 0) - (Date.parse(a.erstellt) || 0))

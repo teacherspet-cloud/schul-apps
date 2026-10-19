@@ -87,6 +87,7 @@ try {
   pruefe(Boolean(ind && ind.materialien.some((m) => m.id === b1.id)), `„Arbeit in der Fabrik" → ${INDUSTRIE} (${jetzt.map((x) => x.name).join(' | ')})`)
   pruefe(Boolean(ind && ind.materialien.some((m) => m.id === b4.id && m.von === 'Max Mitlehrer')), 'Blatt der Mitlehrkraft mit „von Max Mitlehrer"')
   pruefe(Boolean(jetzt.find((x) => x.schluessel === 'weitere')?.materialien.some((m) => m.id === b2.id)), '„Klassenfahrt-Infos" unter „Weitere Materialien"')
+  pruefe(!t.themen.some((x) => x.materialien.some((m) => m.art === 'rueckmeldung')), 'Rückmeldung zum Blatt ist kein eigenes Material (kein Doppelbalken)')
   const alt = t.themen.find((x) => x.materialien.some((m) => m.id === b3.id))
   pruefe(Boolean(alt && alt.schuljahr === t.schuljahr - 1 && alt.jahrgang === 7), `Vorjahr: Jahrgang 7 (${alt?.name}, ${alt?.jahrgang})`)
 
@@ -118,6 +119,10 @@ try {
   await p.locator(`[data-umhaengen-ziel="${INDUSTRIE}"]`).click()
   pruefe(await da(kasten.locator(`[data-ueberthema="${INDUSTRIE}"] [data-thema-material="blatt:${b2.id}"]`)), 'Umhängen: „Klassenfahrt-Infos" jetzt unter dem Überthema')
   await p.screenshot({ path: join(out, '2-umbenannt.png') })
+  // Zeitleiste: Klick öffnet das Blatt (Freigabe), nicht nur den Reiter
+  await p.locator('[data-fach-reihen-blaetter] [data-zeitleiste] [data-fach-eintrag="blatt"]').first().click()
+  pruefe(await da(p.locator('[data-zurueck="meineklassen"]')), 'Zeitleiste: Klick öffnet die Freigabe des Blatts (mit Rückweg)')
+  await p.screenshot({ path: join(out, '2b-blatt-geoeffnet.png') })
 
   // ---------- Mitlehrkraft: Blatt der Kollegin nur ansehen
   const d = await ctxB.request.get(`${A}/server/blaetter/${b1.id}`, { headers: KOPF })

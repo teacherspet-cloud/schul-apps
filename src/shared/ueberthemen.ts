@@ -47,8 +47,8 @@ const STOPP = new Set(
   )
 )
 
-/** Wörter → Stämme (klein, ohne Akzente/Umlaute, ab 4 Zeichen, auf 6 gekürzt) */
-export function stamme(text: string): string[] {
+/** Wörter klein, ohne Akzente/Umlaute, ab 4 Zeichen, ohne Füllwörter (ungekürzt) */
+export function woerter(text: string): string[] {
   const roh = text
     .toLowerCase()
     .replace(/ä/g, 'ae')
@@ -58,8 +58,17 @@ export function stamme(text: string): string[] {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .split(/[^a-z0-9]+/)
-  return [...new Set(roh.filter((w) => w.length >= 4 && !STOPP.has(w)).map((w) => w.slice(0, 6)))]
+  return [...new Set(roh.filter((w) => w.length >= 4 && !STOPP.has(w)))]
 }
+
+/** Wörter → Stämme (auf 6 Zeichen gekürzt) */
+export const stamme = (text: string): string[] => [...new Set(woerter(text).map((w) => w.slice(0, 6)))]
+
+/**
+ * Trifft ein Stamm ein Wort? Gleich, oder – bei zusammengesetzten Wörtern (19.10.2026, Befund 6e: „Weströmisches
+ * Reich" fand „Römische Republik" nicht) – ein Stamm ab 5 Zeichen steckt im längeren Wort.
+ */
+const trifft = (stamm: string, wort: string): boolean => wort.startsWith(stamm) || (stamm.length >= 5 && wort.length > stamm.length + 2 && wort.includes(stamm))
 
 const norm = (s: string): string => stamme(s).join(' ')
 
@@ -170,20 +179,22 @@ export function zuordnen(m: MaterialText, kandidaten: UeberthemaKandidat[]): { k
       if (mod) return { kandidat: k, modul: mod.name }
     }
   }
-  // 2) Stichwörter: Namenswörter zählen doppelt, mindestens 2 Punkte
-  const mw = new Set(stamme([m.titel, m.thema ?? '', m.oberthema ?? ''].join(' ')))
+  // 2) Stichwörter: Namenswörter zählen doppelt, mindestens 2 Punkte; Wortteile zählen mit
+  const voll = woerter([m.titel, m.thema ?? '', m.oberthema ?? ''].join(' '))
+  const mw = new Set(voll.map((w) => w.slice(0, 6)))
   if (!mw.size) return null
+  const hat = (stamm: string): boolean => mw.has(stamm) || voll.some((w) => trifft(stamm, w))
   let best: { k: UeberthemaKandidat; punkte: number } | null = null
   for (const k of kandidaten) {
     const name = new Set(k.namensWorte)
     let punkte = 0
-    for (const w of new Set(k.worte)) if (mw.has(w)) punkte += name.has(w) ? 2 : 1
+    for (const w of new Set(k.worte)) if (hat(w)) punkte += name.has(w) ? 2 : 1
     if (punkte >= 2 && (!best || punkte > best.punkte || (punkte === best.punkte && k.rang < best.k.rang))) best = { k, punkte }
   }
   if (!best) return null
   // Modul der Q-Phase: das mit den meisten gemeinsamen Wörtern
   const mod = best.k.module
-    ?.map((x) => ({ x, n: x.worte.filter((w) => mw.has(w)).length }))
+    ?.map((x) => ({ x, n: x.worte.filter(hat).length }))
     .filter((y) => y.n > 0)
     .sort((a, b) => b.n - a.n)[0]
   return { kandidat: best.k, ...(mod ? { modul: mod.x.name } : {}) }

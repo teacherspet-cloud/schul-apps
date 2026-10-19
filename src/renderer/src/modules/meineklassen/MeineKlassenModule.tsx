@@ -1203,6 +1203,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
     datum: ms(r.erstellt),
     frist: null,
     wert: r.schnitt,
+    geplant: Boolean(r.geplantAb && r.geplantAb > Date.now()),
     inhalt: (
       <MaterialKarte
         kennung={`r${r.zid}`}
@@ -1248,6 +1249,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
       datum: ms(b.erstellt),
       frist: b.bis,
       wert: b.ergebnis ?? abgegeben,
+      geplant: Boolean(b.geplantAb && b.geplantAb > Date.now()),
       inhalt: (
         <MaterialKarte
           kennung={`b${b.id}`}

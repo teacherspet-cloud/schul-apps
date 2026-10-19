@@ -4,11 +4,15 @@
  *  - Über die Pfeile ↑↓ je Kategorie umsortieren; Rechtsklick auf einen Pfeil filtert nach dieser Kategorie.
  *  - Je Eintrag Kopf (Titel, Art, Status, Ablegen ▾), Kurzangaben, Ampel-Balken, aufklappbare Details.
  * Dazu die Ampelfarben, die überall in „Meine Klassen" gelten (wie in der Lernenden-Tabelle).
+ *
+ * Zeitleiste (19.10.2026, Wunsch der Lehrkraft: „wie der Kasten Reihen & Blätter oben"): die Einträge stehen an einer
+ * senkrechten Linie mit Punkten (offen = gefüllt in der Farbe der Art, beendet = grau, geplant = gestrichelt), ohne
+ * schweren Kartenrahmen; Art als farbiges Etikett, schmalere Balken.
  */
 import { useExperte } from '../../shared/settingsStore'
 import { ActionIcon, Badge, Button, Card, Checkbox, Collapse, Group, Menu, Progress, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconChevronDown, IconChevronRight, IconFilter, IconRestore } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useAufZu } from '../../shared/sitzung'
 
 /** Ampel wie in der Lernenden-Tabelle: unter 30 % rot, unter 60 % gelb, sonst grün */
@@ -25,11 +29,17 @@ export interface Eintrag {
   frist: number | null
   /** 0–1 (Fortschritt, Ergebnis), null = keins */
   wert: number | null
+  /** Geplante Freischaltung (Punkt gestrichelt) */
+  geplant?: boolean
   /** Das Gezeigte */
   inhalt: React.ReactNode
 }
 
 type Kategorie = 'status' | 'datum' | 'frist' | 'art' | 'titel' | 'wert'
+
+/** Farbe je Art (wie die Zeitleiste in „Reihen & Blätter") */
+export const ART_FARBE: Record<string, string> = { Reihe: 'grape', Blatt: 'blue', Test: 'orange', Onlinetest: 'orange', Rückmeldung: 'teal' }
+const ImZeitleiste = createContext(false)
 
 const NAMEN: Record<Kategorie, string> = { status: 'Status', datum: 'Datum', frist: 'Frist', art: 'Art', titel: 'Titel', wert: 'Stand' }
 const TAG = 86_400_000
@@ -172,12 +182,29 @@ export function MaterialListe({
           </Button>
         )}
       </Group>
+      <style>{`
+        .mk-zl { position: relative; padding-left: 22px; }
+        .mk-zl::before { content: ''; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--mantine-color-default-border); border-radius: 1px; }
+        .mk-zl-eintrag { position: relative; }
+        .mk-zl-punkt { position: absolute; left: -21px; top: 13px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--mantine-color-body); }
+        .mk-zl-eintrag[data-status="beendet"] .mk-zl-punkt { background: var(--mantine-color-gray-5) !important; }
+        .mk-zl-eintrag[data-geplant] .mk-zl-punkt { background: transparent !important; border: 2px dashed var(--mantine-color-gray-5); }
+      `}</style>
       {sichtbar.length === 0 ? (
         <Text c="dimmed" size="sm" ta="center" py="md">
           {eintraege.length ? 'Kein Eintrag passt zum Filter.' : leer}
         </Text>
       ) : (
-        sichtbar.map((e) => <div key={e.key}>{e.inhalt}</div>)
+        <ImZeitleiste.Provider value>
+          <Stack gap={4} className="mk-zl" data-zeitleiste-liste>
+            {sichtbar.map((e) => (
+              <div key={e.key} className="mk-zl-eintrag" data-status={e.status} {...(e.geplant ? { 'data-geplant': true } : {})}>
+                <span className="mk-zl-punkt" style={{ background: `var(--mantine-color-${ART_FARBE[e.art] ?? 'blue'}-6)` }} />
+                {e.inhalt}
+              </div>
+            ))}
+          </Stack>
+        </ImZeitleiste.Provider>
       )}
     </Stack>
   )
@@ -213,8 +240,18 @@ export function MaterialKarte({
   zusatz?: React.ReactNode
 }): React.JSX.Element {
   const [auf, setAuf] = useAufZu(`material-details-${kennung ?? `${art}:${titel}`}`, false)
+  const zeitleiste = useContext(ImZeitleiste)
   return (
-    <Card withBorder padding="sm" radius="md" data-material={art} data-material-titel={titel} data-status={status}>
+    <Card
+      withBorder={!zeitleiste}
+      padding="sm"
+      radius="md"
+      bg={zeitleiste ? 'transparent' : undefined}
+      className={zeitleiste ? 'mk-zl-karte' : undefined}
+      data-material={art}
+      data-material-titel={titel}
+      data-status={status}
+    >
       <Group justify="space-between" wrap="nowrap" gap="xs">
         <UnstyledButton onClick={oeffnen} disabled={!oeffnen} style={{ flex: 1, minWidth: 0 }} data-material-oeffnen>
           <Group gap={6} wrap="nowrap">
@@ -222,7 +259,7 @@ export function MaterialKarte({
             <Text fw={600} truncate>
               {titel}
             </Text>
-            <Badge size="xs" variant="light" color="gray" style={{ flexShrink: 0 }}>
+            <Badge size="xs" variant="light" color={zeitleiste ? (ART_FARBE[art] ?? 'gray') : 'gray'} style={{ flexShrink: 0 }}>
               {art}
             </Badge>
             {status === 'beendet' && (
@@ -244,7 +281,7 @@ export function MaterialKarte({
       <Text size="xs" c="dimmed" mt={2}>
         {angaben.filter(Boolean).join(' · ')}
       </Text>
-      {wert != null && <Progress mt={6} value={wert * 100} radius="xl" color={ampel(wert)} data-ampel={ampel(wert)} />}
+      {wert != null && <Progress mt={6} size={zeitleiste ? 'sm' : 'md'} value={wert * 100} radius="xl" color={ampel(wert)} data-ampel={ampel(wert)} maw={zeitleiste ? 420 : undefined} />}
       {zusatz}
       {details && (
         <>

@@ -8,8 +8,9 @@
  *  - „Reihen & Blätter" als Zeitleiste (Neuestes oben, Geplantes gestrichelt), auch mit Material der Mitlehrkräfte.
  * Breite Schirme drei Karten nebeneinander, mit „Passendes Material" zwei Spalten, auf dem Handy eine.
  */
-import { ActionIcon, Badge, Button, Card, Group, Menu, Progress, SimpleGrid, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconChevronRight, IconDots, IconPencil, IconPlus } from '@tabler/icons-react'
+import { ActionIcon, Badge, Button, Card, Group, Menu, SimpleGrid, Stack, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core'
+import { IconChalkboard, IconChecklist, IconChevronDown, IconChevronRight, IconDots, IconFileText, IconMessage, IconPencil, IconPlus, IconRoute } from '@tabler/icons-react'
+import { FortschrittsRing } from '../../shared/components/diagramme'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
@@ -59,6 +60,8 @@ interface ThemaMaterial {
   von?: string
   modul?: string
   vonHand?: boolean
+  /** Arbeitsblatt: eingeholte Rückmeldungen (Feedback außerhalb der App) */
+  rueckmeldungen?: number
 }
 
 export interface ThemaGruppe {
@@ -84,6 +87,7 @@ interface ThemenAntwort {
 }
 
 const ART_NAME: Record<Art, string> = { blatt: 'Arbeitsblatt', reihe: 'Reihe', test: 'Onlinetest', rueckmeldung: 'Rückmeldung', tafel: 'Tafelbild' }
+const ART_SYMBOL: Record<Art, typeof IconFileText> = { blatt: IconFileText, reihe: IconRoute, test: IconChecklist, rueckmeldung: IconMessage, tafel: IconChalkboard }
 const ART_FARBE: Record<Art, string> = { blatt: 'blue', reihe: 'grape', test: 'orange', rueckmeldung: 'teal', tafel: 'gray' }
 const tag = (x: number): string => new Date(x).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
 const ms = (iso: string): number => Date.parse(iso) || 0
@@ -117,19 +121,6 @@ export function standVon(
     return { fertig: t.teilnehmer, begonnen: 0, offen: Math.max(0, von - t.teilnehmer), von, text: `${t.teilnehmer} von ${von} teilgenommen` }
   }
   return null
-}
-
-function Balken({ s }: { s: { fertig: number; begonnen: number; offen: number } }): React.JSX.Element {
-  const summe = Math.max(1, s.fertig + s.begonnen + s.offen)
-  return (
-    <Tooltip label={`fertig ${s.fertig} · begonnen ${s.begonnen} · offen ${s.offen}`}>
-      <Progress.Root size="md" radius="xl" style={{ flex: 1, gap: 2, minWidth: 32 }}>
-        <Progress.Section value={(s.fertig / summe) * 100} color="teal" />
-        <Progress.Section value={(s.begonnen / summe) * 100} color="yellow" />
-        <Progress.Section value={(s.offen / summe) * 100} color="gray.4" />
-      </Progress.Root>
-    </Tooltip>
-  )
 }
 
 /** Überthemen des laufenden Schuljahres: Neuestes oben (Oberstufe: späteres Halbjahr oben), „Weitere" zuletzt */
@@ -227,6 +218,16 @@ export function FachLernstand({
         .fz-eintrag { position: relative; display: block; width: 100%; text-align: left; padding: 2px 6px 6px; border-radius: 8px; }
         .fz-eintrag:hover { background: var(--mantine-color-default-hover); }
         .fz-eintrag[data-geplant] .fz-punkt { background: transparent !important; border: 2px dashed var(--fz-farbe); }
+        .fz-thema { padding: 6px 4px 6px 2px; border-radius: 10px; }
+        .fz-thema[data-offen] { background: var(--mantine-color-default-hover); }
+        .fz-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 2px 42px; }
+        .fz-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; border: 1px solid var(--mantine-color-default-border);
+          border-radius: 999px; background: var(--mantine-color-body); padding-right: 2px; }
+        .fz-chip[data-fremd] { border-style: dashed; }
+        .fz-chip-knopf { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 3px 4px 3px 9px; font-size: 12px; border-radius: 999px; }
+        .fz-chip-knopf:hover { text-decoration: underline; }
+        .fz-chip-titel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+        .fz-chip-stand { font-size: 11px; opacity: .75; white-space: nowrap; font-variant-numeric: tabular-nums; }
       `}</style>
       {kopf}
       <Card withBorder radius="md" padding="md" h="100%" data-fach-lernstand-kasten>
@@ -237,57 +238,58 @@ export function FachLernstand({
           </Text>
         </Group>
         {themen.length ? (
-          <Stack gap={6} data-ueberthemen>
+          <Stack gap={10} data-ueberthemen>
             {themen.map((t, i) => {
               const offen = auf[t.schluessel] ?? i === 0
               const staende = t.materialien
                 .map((m) => standVon(m, standDaten) ?? daten?.fremdStand?.[m.schluessel] ?? null)
                 .filter((s): s is NonNullable<typeof s> => Boolean(s))
-              const summe = staende.reduce((a, s) => ({ fertig: a.fertig + s.fertig, begonnen: a.begonnen + s.begonnen, offen: a.offen + s.offen }), {
-                fertig: 0,
-                begonnen: 0,
-                offen: 0
-              })
+              const von = staende.reduce((a, s) => a + s.von, 0)
+              const fertig = staende.reduce((a, s) => a + s.fertig, 0)
+              const anteil = von ? fertig / von : null
               const bearbeitet = bearbeiten?.schluessel === t.schluessel
+              const umschalten = (): void => setAuf((a) => ({ ...a, [t.schluessel]: !offen }))
               return (
-                <div key={t.schluessel} data-ueberthema={t.original}>
-                  <Group gap={4} wrap="nowrap">
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      size="sm"
-                      onClick={() => setAuf((a) => ({ ...a, [t.schluessel]: !offen }))}
-                      aria-label={offen ? 'Zuklappen' : 'Aufklappen'}
-                    >
-                      {offen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                    </ActionIcon>
-                    {t.semester && (
-                      <Badge size="xs" variant="light" style={{ flexShrink: 0 }} data-semester={t.semester}>
-                        {t.semester}
-                      </Badge>
-                    )}
-                    {bearbeitet ? (
-                      <TextInput
-                        size="xs"
-                        autoFocus
-                        style={{ flex: 1 }}
-                        value={bearbeiten.name}
-                        placeholder={t.original}
-                        onChange={(e) => setBearbeiten({ schluessel: t.schluessel, name: e.currentTarget.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') umbenennen(t.schluessel, bearbeiten.name)
-                          if (e.key === 'Escape') setBearbeiten(null)
-                        }}
-                        onBlur={() => umbenennen(t.schluessel, bearbeiten.name)}
-                        data-ueberthema-name-feld
-                      />
-                    ) : (
-                      <UnstyledButton onClick={() => setAuf((a) => ({ ...a, [t.schluessel]: !offen }))} style={{ minWidth: 0, flex: 1 }}>
-                        <Text size="sm" fw={600} truncate title={t.umbenannt ? `${t.name} (im Lehrplan: ${t.original})` : t.name} data-ueberthema-name>
-                          {t.name}
-                        </Text>
-                      </UnstyledButton>
-                    )}
+                <div key={t.schluessel} className="fz-thema" data-ueberthema={t.original} data-offen={offen || undefined}>
+                  <Group gap={8} wrap="nowrap" align="center">
+                    {/* Ring (19.10.2026, gewählte Darstellung): Anteil erledigt über alle Materialien des Themas */}
+                    <div style={{ flexShrink: 0, opacity: anteil === null ? 0.35 : 1 }} title={anteil === null ? 'noch kein Stand' : `${fertig} von ${von} erledigt`}>
+                      <FortschrittsRing anteil={anteil ?? 0} titel={t.name} groesse={34} farbe={farbe} ampel={false} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      {bearbeitet ? (
+                        <TextInput
+                          size="xs"
+                          autoFocus
+                          value={bearbeiten.name}
+                          placeholder={t.original}
+                          onChange={(e) => setBearbeiten({ schluessel: t.schluessel, name: e.currentTarget.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') umbenennen(t.schluessel, bearbeiten.name)
+                            if (e.key === 'Escape') setBearbeiten(null)
+                          }}
+                          onBlur={() => umbenennen(t.schluessel, bearbeiten.name)}
+                          data-ueberthema-name-feld
+                        />
+                      ) : (
+                        <UnstyledButton onClick={umschalten} style={{ display: 'block', width: '100%', minWidth: 0 }}>
+                          <Group gap={6} wrap="nowrap">
+                            {t.semester && (
+                              <Badge size="xs" variant="light" style={{ flexShrink: 0 }} data-semester={t.semester}>
+                                {t.semester}
+                              </Badge>
+                            )}
+                            <Text size="sm" fw={700} truncate title={t.umbenannt ? `${t.name} (im Lehrplan: ${t.original})` : t.name} data-ueberthema-name>
+                              {t.name}
+                            </Text>
+                          </Group>
+                          <Text size="xs" c="dimmed">
+                            {t.materialien.length} {t.materialien.length === 1 ? 'Material' : 'Materialien'}
+                            {anteil !== null ? ` · ${Math.round(anteil * 100)} % erledigt` : ''}
+                          </Text>
+                        </UnstyledButton>
+                      )}
+                    </div>
                     {!bearbeitet && t.schluessel !== 'weitere' && (
                       <Tooltip label="Umbenennen (nur für diese Lerngruppe; leer = Name aus dem Lehrplan)">
                         <ActionIcon
@@ -302,80 +304,77 @@ export function FachLernstand({
                         </ActionIcon>
                       </Tooltip>
                     )}
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={umschalten} aria-label={offen ? 'Zuklappen' : 'Aufklappen'}>
+                      {offen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                    </ActionIcon>
                   </Group>
-                  {staende.length > 0 && (
-                    <Group gap={6} wrap="nowrap" pl={28} mt={2}>
-                      <Balken s={summe} />
-                      <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                        {t.materialien.length} {t.materialien.length === 1 ? 'Material' : 'Materialien'}
-                      </Text>
-                    </Group>
-                  )}
                   {offen && (
-                    <Stack gap={6} pl={28} mt={6} data-ueberthema-materialien>
+                    <div className="fz-chips" data-ueberthema-materialien>
                       {t.materialien.map((m) => {
                         const s = standVon(m, standDaten) ?? daten?.fremdStand?.[m.schluessel] ?? null
-                        const klickbar = oeffnen && (m.von === undefined ? m.art !== 'tafel' : m.art === 'blatt')
+                        const klickbar = Boolean(oeffnen) && (m.von === undefined ? m.art !== 'tafel' : m.art === 'blatt')
+                        const Symbol = ART_SYMBOL[m.art]
+                        const hinweis = [
+                          `${ART_NAME[m.art]}: ${m.titel}`,
+                          m.modul ? `Modul: ${m.modul}` : '',
+                          s ? s.text : '',
+                          m.rueckmeldungen ? `${m.rueckmeldungen} Rückmeldung${m.rueckmeldungen === 1 ? '' : 'en'} eingeholt` : '',
+                          m.von !== undefined ? `von ${m.von || 'Kollegin/Kollege'} (nur ansehen)` : ''
+                        ]
+                          .filter(Boolean)
+                          .join('\n')
                         return (
-                          <div key={m.schluessel} data-thema-material={m.schluessel}>
-                            <Group justify="space-between" wrap="nowrap" gap={4}>
-                              <Text
-                                size="xs"
-                                truncate
-                                title={m.titel}
-                                style={{ minWidth: 0, cursor: klickbar ? 'pointer' : undefined }}
-                                onClick={klickbar ? () => oeffnen(m.art, m.id) : undefined}
-                                data-thema-material-oeffnen={klickbar ? '' : undefined}
-                              >
-                                <Text span c={ART_FARBE[m.art]} fw={700}>
-                                  {ART_NAME[m.art]}
-                                </Text>{' '}
-                                {m.titel}
-                                {m.modul ? <Text span c="dimmed"> · {m.modul}</Text> : null}
-                                {m.von !== undefined ? <Text span c="dimmed"> · von {m.von || 'Kollegin/Kollege'}</Text> : null}
-                              </Text>
-                              <Group gap={2} wrap="nowrap" style={{ flexShrink: 0 }}>
-                                {s && (
-                                  <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                                    {s.text}
-                                  </Text>
-                                )}
-                                {m.von === undefined && daten && (
-                                  <Menu position="bottom-end" withinPortal>
-                                    <Menu.Target>
-                                      <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Anderem Überthema zuordnen" data-umhaengen>
-                                        <IconDots size={12} />
-                                      </ActionIcon>
-                                    </Menu.Target>
-                                    <Menu.Dropdown mah={320} style={{ overflowY: 'auto' }}>
-                                      <Menu.Label>Zuordnen zu …</Menu.Label>
-                                      {daten.kandidaten.map((k) => (
-                                        <Menu.Item key={k.schluessel} onClick={() => umhaengen(m.schluessel, k.schluessel)} data-umhaengen-ziel={k.name}>
-                                          {k.semester ? `${k.semester} · ` : ''}
-                                          {k.name}
-                                        </Menu.Item>
-                                      ))}
-                                      <Menu.Item onClick={() => umhaengen(m.schluessel, 'weitere')}>Weitere Materialien</Menu.Item>
-                                      {m.vonHand && (
-                                        <>
-                                          <Menu.Divider />
-                                          <Menu.Item onClick={() => umhaengen(m.schluessel, '')}>Automatisch zuordnen</Menu.Item>
-                                        </>
-                                      )}
-                                    </Menu.Dropdown>
-                                  </Menu>
-                                )}
-                              </Group>
-                            </Group>
-                            {s && (
-                              <Group mt={2}>
-                                <Balken s={s} />
-                              </Group>
+                          <span key={m.schluessel} className="fz-chip" data-thema-material={m.schluessel} data-fremd={m.von !== undefined || undefined}>
+                            <UnstyledButton
+                              className="fz-chip-knopf"
+                              onClick={klickbar ? () => oeffnen?.(m.art, m.id) : undefined}
+                              title={hinweis}
+                              style={{ cursor: klickbar ? 'pointer' : 'default' }}
+                              data-thema-material-oeffnen={klickbar ? '' : undefined}
+                            >
+                              <Symbol size={13} color={`var(--mantine-color-${ART_FARBE[m.art]}-6)`} style={{ flexShrink: 0 }} />
+                              <span className="fz-chip-titel">{m.titel}</span>
+                              {s && (
+                                <span className="fz-chip-stand" style={{ color: s.fertig >= s.von && s.von ? 'var(--mantine-color-teal-6)' : undefined }}>
+                                  {s.fertig}/{s.von}
+                                </span>
+                              )}
+                              {m.rueckmeldungen ? (
+                                <span className="fz-chip-stand">
+                                  · {m.rueckmeldungen} <IconMessage size={11} style={{ verticalAlign: '-1px' }} />
+                                </span>
+                              ) : null}
+                              {m.von !== undefined && <span className="fz-chip-stand">· {m.von ? m.von.split(' ')[0] : 'Koll.'}</span>}
+                            </UnstyledButton>
+                            {m.von === undefined && daten && (
+                              <Menu position="bottom-end" withinPortal>
+                                <Menu.Target>
+                                  <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Anderem Überthema zuordnen" data-umhaengen>
+                                    <IconDots size={12} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown mah={320} style={{ overflowY: 'auto' }}>
+                                  <Menu.Label>Zuordnen zu …</Menu.Label>
+                                  {daten.kandidaten.map((k) => (
+                                    <Menu.Item key={k.schluessel} onClick={() => umhaengen(m.schluessel, k.schluessel)} data-umhaengen-ziel={k.name}>
+                                      {k.semester ? `${k.semester} · ` : ''}
+                                      {k.name}
+                                    </Menu.Item>
+                                  ))}
+                                  <Menu.Item onClick={() => umhaengen(m.schluessel, 'weitere')}>Weitere Materialien</Menu.Item>
+                                  {m.vonHand && (
+                                    <>
+                                      <Menu.Divider />
+                                      <Menu.Item onClick={() => umhaengen(m.schluessel, '')}>Automatisch zuordnen</Menu.Item>
+                                    </>
+                                  )}
+                                </Menu.Dropdown>
+                              </Menu>
                             )}
-                          </div>
+                          </span>
                         )
                       })}
-                    </Stack>
+                    </div>
                   )}
                 </div>
               )
@@ -408,7 +407,14 @@ export function FachLernstand({
               const istGeplant = geplant(e, jetzt)
               const themaName = thema.get(`${e.art}:${e.id}`)
               return (
-                <UnstyledButton key={`${e.art}-${e.id}`} className="fz-eintrag" onClick={zuReihen} data-fach-eintrag={e.art} {...(istGeplant ? { 'data-geplant': true } : {})}>
+                <UnstyledButton
+                  key={`${e.art}-${e.id}`}
+                  className="fz-eintrag"
+                  // Öffnet das Blatt bzw. die Reihe selbst (19.10.2026, Befund: der Klick führte nur zum Reiter darunter)
+                  onClick={() => (oeffnen && (!e.von || e.art === 'blatt') ? oeffnen(e.art, e.id) : zuReihen())}
+                  data-fach-eintrag={e.art}
+                  {...(istGeplant ? { 'data-geplant': true } : {})}
+                >
                   <span className="fz-punkt" style={{ background: e.art === 'reihe' ? 'var(--mantine-color-grape-6)' : farbe }} />
                   <Group justify="space-between" wrap="nowrap" gap="xs">
                     <Text size="sm" fw={700} truncate>

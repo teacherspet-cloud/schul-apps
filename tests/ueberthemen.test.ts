@@ -65,3 +65,11 @@ describe('Materialien der Lernenden nach Überthemen', () => {
     expect(themenGruppieren(items, st, 2026).map((x) => x.schuljahr)).toEqual([2026])
   })
 })
+
+describe('Überthemen: zusammengesetzte Wörter (Befund 6e, 19.10.2026)', () => {
+  it('„Warum zerfiel das Weströmische Reich?" landet bei einem Rom-Thema, nicht unter „Weitere"', () => {
+    const k = kandidatenFuer({ lehrplan: ni.eintraege, fachId: 'geschichte', schulformen: ['gymnasium'], jahrgang: 6 })
+    const z = zuordnen({ titel: 'Warum zerfiel das Weströmische Reich?', thema: 'Der Untergang des Weströmischen Reichs' }, k)
+    expect(z?.kandidat.name).toMatch(/Röm|Rom/)
+  })
+})
