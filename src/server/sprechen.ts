@@ -34,6 +34,7 @@ import { getSecret, getSettings } from '../main/services/storage/settings'
 import { anweisungen, WERKZEUG_BEENDEN, type Gespraech } from '../shared/sprechen/anweisungen'
 import { ATTRAPPE_EINSCHAETZUNG, bewertungsAnfrage, einschaetzungAus, istUmgehung, type Einschaetzung, type Kennzahlen, type TranskriptZeile } from '../shared/sprechen/bewertung'
 import { GRUNDKARTEN, karteBereinigt, type SprechKarte } from '../shared/sprechen/karten'
+import { bankKarten } from './sprechBank'
 import { punkteVon, type KriteriumId } from '../shared/sprechen/kriterien'
 import { hoechstMinuten, NIVEAUS, stufeVonNiveau, TEILE, zielNiveau, type Niveau, type SprechSprache, type Teil } from '../shared/sprechen/niveaus'
 
@@ -256,9 +257,16 @@ interface Sitzung {
 
 const sitzungen = new Map<string, Sitzung>()
 
-function karteWaehlen(sprache: SprechSprache, niveau: Niveau, teil: Teil): SprechKarte[] {
+/**
+ * Karten für eine Übung: zuerst aus dem Pool der Schule für Sprache und Jahrgang (App „Sprechprüfungen",
+ * sprechBank.ts; vorgegebene Karten der Freigabe zuerst), sonst der eingebaute Grundbestand der Stufe.
+ */
+function karteWaehlen(sprache: SprechSprache, niveau: Niveau, teil: Teil, jahrgang: number | null, vorgabe: string[] = []): SprechKarte[] {
   const stufe = stufeVonNiveau(niveau)
-  const grund = (GRUNDKARTEN[sprache]?.[stufe] ?? GRUNDKARTEN.en?.[stufe] ?? GRUNDKARTEN.en?.A2 ?? []).map((k) => karteBereinigt(k, k.id)).filter((k): k is SprechKarte => Boolean(k))
+  const pool = jahrgang ? bankKarten(sprache, jahrgang).map((b) => b.karte) : []
+  const gewaehlt = vorgabe.length ? pool.filter((k) => vorgabe.includes(k.id)) : []
+  const eingebaut = (GRUNDKARTEN[sprache]?.[stufe] ?? (sprache === 'en' ? GRUNDKARTEN.en?.A2 : []) ?? []).map((k) => karteBereinigt(k, k.id)).filter((k): k is SprechKarte => Boolean(k))
+  const grund = gewaehlt.length ? gewaehlt : pool.length ? [...pool, ...eingebaut.filter((k) => !pool.some((p) => p.art === k.art))] : eingebaut
   const zufall = <T>(l: T[]): T[] => (l.length ? [l[Math.floor(Math.random() * l.length)]] : [])
   if (teil === 'simulation') return [...zufall(grund.filter((k) => k.art === 'interview')), ...zufall(grund.filter((k) => k.art === 'monolog')), ...zufall(grund.filter((k) => k.art === 'dialog'))]
   return zufall(grund.filter((k) => k.art === teil))
@@ -438,7 +446,8 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
         const vokId = String(url.searchParams.get('kurs') ?? '')
         const vok = vokZeile(vokId)
         if (!vok || vok.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Unbekannter Kurs.' }), true
-        return json(res, 200, { verfuegbar: gespraechVerfuegbar(ich.id), sprache: vok.sprache, ...ueberblick(vokId, ich.id) }), true
+        const g = vok.lerngruppe_id ? lerngruppe(vok.lerngruppe_id) : null
+        return json(res, 200, { verfuegbar: gespraechVerfuegbar(ich.id), sprache: vok.sprache, jahrgang: g ? jahrgangDerGruppe(g) : null, ...ueberblick(vokId, ich.id) }), true
       }
       if (req.method !== 'POST' || typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nicht erlaubt.' }), true
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -453,7 +462,9 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
         const e: SprechEinstellungen = {
           minutenWoche: Math.max(5, Math.min(300, Math.round(Number(k0.minutenWoche) || 30))),
           nurSchulzeit: k0.nurSchulzeit !== false,
-          ...(NIVEAUS.includes(k0.niveau as Niveau) ? { niveau: k0.niveau as Niveau } : {})
+          ...(NIVEAUS.includes(k0.niveau as Niveau) ? { niveau: k0.niveau as Niveau } : {}),
+          // Vorgegebene Karten aus dem Pool (App „Sprechprüfungen")
+          ...(Array.isArray(k0.karten) && k0.karten.length ? { karten: (k0.karten as unknown[]).map(String).filter((x) => /^k[a-f0-9]{16}$/.test(x)).slice(0, 40) } : {})
         }
         const schueler = (Array.isArray(k0.schueler) ? k0.schueler : []).map(String).slice(0, 200)
         const id = `s${randomBytes(8).toString('hex')}`
@@ -506,7 +517,7 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
       const niveau = niveauVon(f)
       const oberstufe = ((sprachUndJahrgang(f).jahrgang ?? 0) >= 11)
       const minuten = Math.min(rest, hoechstMinuten(teil, niveau, oberstufe))
-      const karten = karteWaehlen(sprache, niveau, teil)
+      const karten = karteWaehlen(sprache, niveau, teil, sprachUndJahrgang(f).jahrgang, e.karten ?? [])
       if (!karten.length) return json(res, 409, { fehler: 'Für diesen Teil gibt es noch keine Aufgabenkarten. Bitte die Lehrkraft, welche anzulegen.' }), true
       const modus = teil === 'simulation' || k0.modus === 'pruefung' ? 'pruefung' : 'ueben'
       const vorname = (ich.name || '').split(/\s+/)[0] ?? ''

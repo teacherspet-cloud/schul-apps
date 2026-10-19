@@ -17,6 +17,7 @@ import OnlinetestModule from './onlinetest/OnlinetestModule'
 import UnterrichtsreiheModule from './unterrichtsreihe/UnterrichtsreiheModule'
 import VerwaltungModule from './verwaltung/VerwaltungModule'
 import GrammatikformenModule from './grammatikformen/GrammatikformenModule'
+import SprechpruefungenModule from './sprechpruefungen/SprechpruefungenModule'
 import { siehtLehrwerkApps } from '../shared/fachobleute'
 import { aufServer, serverIch } from '../shared/plattform'
 import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
@@ -288,6 +289,25 @@ export const modules: SchulModule[] = [
       ]
     : []),
   /*
+   * Sprechprüfungen (19.10.2026, Wunsch der Lehrkraft): Material je Jahrgang für Sprechprüfung und Sprechtraining –
+   * nur mit dem Schul-Apps-Server (schulweiter Pool) und nur für Englisch, Französisch, Spanisch.
+   */
+  ...(aufServer()
+    ? [
+        {
+          id: 'sprechpruefungen',
+          name: 'Sprechprüfungen',
+          description: 'Interview-Sets, Bildkarten und Dialogkarten je Jahrgang – für das Sprechtraining der Lernenden und druckbare Prüfungssets.',
+          icon: programmSymbol('rueckmeldung', 'grape'),
+          color: 'grape',
+          illustration: illustration('sprechpruefungen'),
+          leistenbild: leistenbild('sprechpruefungen'),
+          faecher: ['englisch', 'franzoesisch', 'spanisch'] as const,
+          component: SprechpruefungenModule
+        }
+      ]
+    : []),
+  /*
    * Schule & Daten – nur für Admins auf dem Server (09.10.2026, Entscheidung des Admins): Nutzer, KI-Zugänge, IServ,
    * Maskottchen, Server. Das Menü „Daten und Material" (bis dahin für Lehrkräfte die ganze App) entfällt: Freigaben der
    * Fachschaft stehen in der Bibliothek jeder App, Themenbereiche und Sicherung unter Einstellungen › Material.
@@ -329,5 +349,5 @@ export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'sprachenlernen'] },
   { id: 'planung', name: 'Planung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Tests', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'grammatikformen', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'grammatikformen', 'sprechpruefungen', 'verwaltung'] }
 ]

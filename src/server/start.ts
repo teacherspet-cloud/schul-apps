@@ -17,6 +17,7 @@ import { grammatikRoute } from './grammatik'
 import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { ueberthemenRoute } from './ueberthemen'
 import { sprechenRoute } from './sprechen'
+import { sprechBankRoute } from './sprechBank'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute, alleBerichtigen } from './achievements'
@@ -267,6 +268,8 @@ async function main(): Promise<void> {
       // Überthemen (19.10.2026): /s/api/themen – vor schuelerRoute, die /s/api/ ganz übernimmt
       ueberthemenRoute(),
       // Sprechprüfungstraining (19.10.2026) – vor schuelerRoute
+      // Kartenpool und Bilder der Sprechprüfungen (19.10.2026) – vor sprechenRoute (Bildpfad unter /s/api/sprechen/)
+      sprechBankRoute(),
       sprechenRoute(aufruf),
       // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
       planenRoute(),

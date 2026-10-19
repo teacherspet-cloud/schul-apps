@@ -17,6 +17,7 @@ import { gewertet, type Uebung } from './typen'
 interface Ueberblick {
   verfuegbar: boolean
   sprache: string
+  jahrgang: number | null
   freigaben: { id: string; teile: Teil[]; bis: number; status: string; einstellungen: { minutenWoche: number; nurSchulzeit: boolean; niveau?: Niveau }; schueler: string[]; niveau: Niveau }[]
   personen: { id: string; name: string; uebungen: Uebung[]; gesperrt: boolean; vorfaelle: { art: string; satz: string; zeit: number; freigabe: string }[] }[]
 }
@@ -48,11 +49,21 @@ export function SprechLehrkraft({ vokId, lernende = [] }: { vokId: string; lerne
   const [niveau, setNiveau] = useState<string | null>(null)
   const [schulzeit, setSchulzeit] = useState(true)
   const [einzelne, setEinzelne] = useState<string[]>([])
+  const [karten, setKarten] = useState<string[]>([])
+  // Karten aus dem Pool der Schule für diesen Jahrgang (App „Sprechprüfungen")
+  const [pool, setPool] = useState<{ id: string; jahrgang: number; teil: string; karte: { titel?: string; thema?: string } }[]>([])
+  useEffect(() => {
+    if (!d?.sprache || !['en', 'fr', 'es'].includes(d.sprache)) return
+    void holen<{ karten: typeof pool }>(`/server/sprech-bank?sprache=${d.sprache}`).then(
+      (r) => setPool(r.karten.filter((k) => !d.jahrgang || k.jahrgang === d.jahrgang)),
+      () => setPool([])
+    )
+  }, [d?.sprache, d?.jahrgang])
   if (!d) return <Loader size="sm" />
   if (!['en', 'fr', 'es'].includes(d.sprache))
     return <Text c="dimmed">Das Sprechtraining gibt es für Englisch, Französisch und Spanisch.</Text>
   const freigeben = (): void =>
-    void senden('/server/sprechen/freigeben', { kurs: vokId, teile, tage, minutenWoche: minuten, niveau, nurSchulzeit: schulzeit, schueler: einzelne }).then(
+    void senden('/server/sprechen/freigeben', { kurs: vokId, teile, tage, minutenWoche: minuten, niveau, nurSchulzeit: schulzeit, schueler: einzelne, karten }).then(
       () => (notifySuccess('Sprechtraining freigegeben.'), laden()),
       (e: unknown) => notifyError(e)
     )
@@ -83,8 +94,21 @@ export function SprechLehrkraft({ vokId, lernende = [] }: { vokId: string; lerne
             ))}
           </Group>
           <Text size="xs" c="dimmed">
-            Monolog braucht Bildkarten aus dem Pool der Schule; solange es keine gibt, bleibt er in der ganzen Prüfung weg.
+            {pool.some((k) => k.teil === 'monolog')
+              ? `Im Pool für Jahrgang ${d.jahrgang ?? '?'}: ${pool.length} Karten (App „Sprechprüfungen").`
+              : 'Monolog braucht Bildkarten – in der App „Sprechprüfungen" für diesen Jahrgang erstellen. Solange es keine gibt, bleibt er in der ganzen Prüfung weg.'}
           </Text>
+          {pool.length > 0 && (
+            <MultiSelect
+              label="Karten vorgeben (leer = die App wählt aus dem Pool)"
+              data={pool.map((k) => ({ value: k.id, label: `${TEIL_NAME[k.teil as Teil] ?? k.teil}: ${k.karte.titel ?? k.karte.thema ?? k.id}` }))}
+              value={karten}
+              onChange={setKarten}
+              searchable
+              clearable
+              data-sprech-karten-wahl
+            />
+          )}
           <Group gap="md" align="flex-end">
             <NumberInput label="Tage" min={1} max={90} value={tage} onChange={(v) => setTage(Number(v) || 14)} w={90} />
             <NumberInput label="Minuten je Woche und Person" min={5} max={300} value={minuten} onChange={(v) => setMinuten(Number(v) || 30)} w={210} />

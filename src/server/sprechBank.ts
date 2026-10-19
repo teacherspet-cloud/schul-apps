@@ -1,0 +1,152 @@
+/**
+ * Kartenpool der Sprechprüfungen (19.10.2026, App „Sprechprüfungen", abgestimmt mit der Lehrkraft): schulweit je Sprache
+ * und Jahrgang – Interview-Sets, Bildkarten (Monolog) und Dialogkarten (Rollenspiel, Info-Gap, Diskussion). Erstellt
+ * mit der KI (in der App, Durchsicht vor dem Speichern) oder von Hand; das Sprechtraining (sprechen.ts) wählt daraus.
+ * Lesen dürfen alle Lehrkräfte; ändern jede/r die eigenen Karten, Admins und Fachobleute des Fachs alle
+ * (main/services/rolle.ts `darfLehrwerkSprache`). Bilder liegen als Dateien unter <DATEN>/sprechbilder (ohne
+ * Personenbezug, wie die Medienbank).
+ *
+ *   GET  /server/sprech-bank?sprache=en         → { karten, darfAlle }
+ *   POST /server/sprech-bank/speichern {id?, sprache, jahrgang, teil, karte} → { id }
+ *   POST /server/sprech-bank/loeschen {id}
+ *   POST /server/sprech-bank/bild {dataUrl}       → { datei }
+ *   GET  /server/sprech-bank/bild/<datei> · /s/api/sprechen/bild/<datei>   Bild (angemeldet)
+ */
+import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { datenbank, protokolliereServer } from './datenbank'
+import { alsNutzer, json, type Anfrage } from './http'
+import { imNutzer } from './kontext'
+import { ordner } from './pfade'
+import { darfLehrwerkSprache } from '../main/services/rolle'
+import { karteBereinigt, type SprechKarte } from '../shared/sprechen/karten'
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS sprech_bank (
+  id TEXT PRIMARY KEY,
+  sprache TEXT NOT NULL,
+  jahrgang INTEGER NOT NULL,
+  teil TEXT NOT NULL,
+  karte TEXT NOT NULL,
+  lehrkraft_id TEXT NOT NULL DEFAULT '',
+  geaendert TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sprech_bank_sj ON sprech_bank(sprache, jahrgang);`
+
+let bereit = false
+const db = () => {
+  const d = datenbank()
+  if (!bereit) {
+    d.exec(SCHEMA)
+    bereit = true
+  }
+  return d
+}
+
+const BILD = /^[a-f0-9]{24}\.(png|jpe?g|webp)$/
+const TEILE = ['interview', 'monolog', 'dialog']
+const bildOrdner = (): string => ordner('sprechbilder')
+
+export interface BankKarte {
+  id: string
+  sprache: string
+  jahrgang: number
+  teil: string
+  karte: SprechKarte
+  lehrkraftId: string
+  geaendert: string
+}
+
+const alsKarte = (z: Record<string, unknown>): BankKarte | null => {
+  let roh: unknown
+  try {
+    roh = JSON.parse(String(z.karte))
+  } catch {
+    return null
+  }
+  const k = karteBereinigt(roh, String(z.id))
+  return k
+    ? { id: String(z.id), sprache: String(z.sprache), jahrgang: Number(z.jahrgang), teil: String(z.teil), karte: k, lehrkraftId: String(z.lehrkraft_id ?? ''), geaendert: String(z.geaendert) }
+    : null
+}
+
+/** Karten einer Sprache (optional Jahrgang und Teil) */
+export function bankKarten(sprache: string, jahrgang?: number | null, teil?: string): BankKarte[] {
+  const zeilen = db().prepare('SELECT * FROM sprech_bank WHERE sprache = ? ORDER BY jahrgang, teil, geaendert').all(sprache) as Record<string, unknown>[]
+  return zeilen
+    .map(alsKarte)
+    .filter((k): k is BankKarte => Boolean(k))
+    .filter((k) => (jahrgang == null || k.jahrgang === jahrgang) && (!teil || k.teil === teil))
+}
+
+/** Bilddatei lesen (null = gibt es nicht) */
+export function bildLesen(datei: string): { daten: Buffer; typ: string } | null {
+  if (!BILD.test(datei)) return null
+  const p = join(bildOrdner(), datei)
+  if (!existsSync(p)) return null
+  const typ = datei.endsWith('.png') ? 'image/png' : datei.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+  return { daten: readFileSync(p), typ }
+}
+
+export function sprechBankRoute(): (k: Anfrage) => Promise<boolean> {
+  return async (k) => {
+    const { url, req, res, sitzung } = k
+    const bildPfad = /^\/(?:server\/sprech-bank|s\/api\/sprechen)\/bild\/([^/]+)$/.exec(url.pathname)
+    if (!url.pathname.startsWith('/server/sprech-bank') && !bildPfad) return false
+    if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
+    if (bildPfad && req.method === 'GET') {
+      const b = bildLesen(bildPfad[1])
+      if (!b) return json(res, 404, { fehler: 'Bild nicht gefunden.' }), true
+      res.writeHead(200, { 'content-type': b.typ, 'cache-control': 'private, max-age=86400', 'content-length': b.daten.length })
+      res.end(b.daten)
+      return true
+    }
+    const ich = sitzung.nutzer
+    if (ich.rolle === 'schueler') return json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true
+    const darfAlle = (sprache: string): boolean => imNutzer(alsNutzer(ich, sitzung.kennung), () => darfLehrwerkSprache(sprache))
+    const sprache = (x: unknown): string => (/^(en|fr|es)$/.test(String(x ?? '')) ? String(x) : '')
+
+    if (req.method === 'GET' && url.pathname === '/server/sprech-bank') {
+      const s = sprache(url.searchParams.get('sprache'))
+      if (!s) return json(res, 400, { fehler: 'Unbekannte Sprache.' }), true
+      return json(res, 200, { karten: bankKarten(s).map((x) => ({ ...x, eigene: x.lehrkraftId === ich.id })), darfAlle: darfAlle(s) }), true
+    }
+    if (req.method !== 'POST' || typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nicht erlaubt.' }), true
+    const k0 = (await k.koerper()) as Record<string, unknown>
+
+    if (url.pathname === '/server/sprech-bank/bild') {
+      const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(k0.dataUrl ?? ''))
+      if (!m) return json(res, 400, { fehler: 'Kein Bild.' }), true
+      const daten = Buffer.from(m[2], 'base64')
+      if (daten.length > 4 * 1024 * 1024) return json(res, 400, { fehler: 'Das Bild ist zu groß.' }), true
+      const datei = `${randomBytes(12).toString('hex')}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`
+      writeFileSync(join(bildOrdner(), datei), daten)
+      return json(res, 200, { datei }), true
+    }
+    if (url.pathname === '/server/sprech-bank/speichern') {
+      const s = sprache(k0.sprache)
+      const jahrgang = Math.round(Number(k0.jahrgang))
+      const teil = String(k0.teil ?? '')
+      if (!s || !(jahrgang >= 5 && jahrgang <= 13) || !TEILE.includes(teil)) return json(res, 400, { fehler: 'Sprache, Jahrgang oder Teil fehlt.' }), true
+      const id = typeof k0.id === 'string' && /^k[a-f0-9]{16}$/.test(k0.id) ? k0.id : `k${randomBytes(8).toString('hex')}`
+      const karte = karteBereinigt({ ...(k0.karte as object), art: teil }, id)
+      if (!karte) return json(res, 400, { fehler: 'Die Karte ist unvollständig.' }), true
+      const alt = db().prepare('SELECT lehrkraft_id FROM sprech_bank WHERE id = ?').get(id) as { lehrkraft_id: string } | undefined
+      if (alt && alt.lehrkraft_id !== ich.id && !darfAlle(s)) return json(res, 403, { fehler: 'Nur die eigenen Karten (oder als Fachobfrau/Fachobmann alle).' }), true
+      db()
+        .prepare('INSERT OR REPLACE INTO sprech_bank (id, sprache, jahrgang, teil, karte, lehrkraft_id, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(id, s, jahrgang, teil, JSON.stringify(karte), alt?.lehrkraft_id ?? ich.id, new Date().toISOString())
+      if (!alt) protokolliereServer('sprechen', `Sprechkarte angelegt (${s}, Jg ${jahrgang}, ${teil})`, ich.id)
+      return json(res, 200, { id }), true
+    }
+    if (url.pathname === '/server/sprech-bank/loeschen') {
+      const z = db().prepare('SELECT sprache, lehrkraft_id FROM sprech_bank WHERE id = ?').get(String(k0.id ?? '')) as { sprache: string; lehrkraft_id: string } | undefined
+      if (!z) return json(res, 404, { fehler: 'Unbekannte Karte.' }), true
+      if (z.lehrkraft_id !== ich.id && !darfAlle(z.sprache)) return json(res, 403, { fehler: 'Nur die eigenen Karten.' }), true
+      db().prepare('DELETE FROM sprech_bank WHERE id = ?').run(String(k0.id))
+      return json(res, 200, { ok: true }), true
+    }
+    return json(res, 404, { fehler: 'Unbekannt.' }), true
+  }
+}
