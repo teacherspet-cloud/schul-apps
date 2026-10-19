@@ -42,8 +42,7 @@ import {
   Text,
   Title,
   Tooltip,
-  UnstyledButton
-} from '@mantine/core'
+  UnstyledButton, TextInput } from '@mantine/core'
 import {
   IconAlertTriangle,
   IconArrowLeft,
@@ -61,8 +60,7 @@ import {
   IconRepeat,
   IconRoute,
   IconSparkles,
-  IconUsers
-} from '@tabler/icons-react'
+  IconUsers, IconSearch } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DauerhaftMerken, useAufZu } from '../../shared/sitzung'
 import { create } from 'zustand'
@@ -820,6 +818,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const { logoDataUrl, settings } = useAppSettings()
   // Grammatik-Entwürfe der Kurse (nur in diesem Gerät, 09.10.2026) – wie auf der Kursseite vorne im Handlungsbedarf
   const entwurfBedarf = useEntwurfBedarf(d?.vokabeln ?? [])
+  // Suche im Reiter „Unterrichtsreihen & Blätter" (19.10.2026) – vor dem frühen Rücksprung (Hook-Reihenfolge)
+  const [reihenSuche, setReihenSuche] = useState('')
   if (!d)
     return (
       <Center h="30vh">
@@ -1062,9 +1062,23 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
             >
               Förder- und Fordermaterial erstellen
             </Button>
+            {/* Suche (19.10.2026, Wunsch der Lehrkraft): filtert Reihen und Blätter nach Titel, Thema und Oberthema */}
+            <TextInput
+              size="xs"
+              ml="auto"
+              w={220}
+              placeholder="Reihen und Blätter durchsuchen …"
+              leftSection={<IconSearch size={14} />}
+              value={reihenSuche}
+              onChange={(e) => setReihenSuche(e.currentTarget.value)}
+              data-reihen-suche
+            />
           </Group>
           <FoerderBuendel gruppeId={d.id} klasse={d.name} fach={d.fach} />
-          <MaterialListe eintraege={reihenEintraege(d, ort)} leer="Noch keine Unterrichtsreihen oder Blätter in dieser Lerngruppe." />
+          <MaterialListe
+            eintraege={reihenEintraege(d, ort).filter((e) => !reihenSuche.trim() || (e.suche ?? e.titel).toLowerCase().includes(reihenSuche.trim().toLowerCase()))}
+            leer={reihenSuche.trim() ? 'Nichts gefunden.' : 'Noch keine Unterrichtsreihen oder Blätter in dieser Lerngruppe.'}
+          />
         </Tabs.Panel>
         {d.sprachfach && (
           <Tabs.Panel value="vokabeln" pt="sm">
@@ -1199,6 +1213,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
     key: `r${r.zid}`,
     art: 'Reihe',
     titel: r.titel,
+    suche: [r.titel, r.oberthema].join(' '),
     status: r.status,
     datum: ms(r.erstellt),
     frist: null,
@@ -1245,6 +1260,7 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
       key: `b${b.id}`,
       art: 'Blatt',
       titel: b.titel,
+      suche: [b.titel, b.thema].join(' '),
       status: b.status,
       datum: ms(b.erstellt),
       frist: b.bis,

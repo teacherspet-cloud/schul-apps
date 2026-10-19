@@ -27,27 +27,38 @@ export async function iservGruppenordner(): Promise<string[] | null> {
   return (await window.api.iserv.ordner('Groups')).map((e) => e.name).sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
 }
 
-export function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: string[]; fertig: () => void }): React.JSX.Element {
-  const [ordner, setOrdner] = useState<string[] | null>(null)
-  const [fehler, setFehler] = useState('')
+/**
+ * „Aus IServ übernehmen" (19.10.2026 überarbeitet, Befund der Lehrkraft: Text und Ablauf passten nicht): Zur Auswahl
+ * stehen die IServ-Gruppen aus der Anmeldung über IServ und – in der Exe „Schul-Apps Online" mit verbundenem IServ –
+ * zusätzlich die Gruppenordner aus IServ. Klassen und Kurse sind vorausgewählt; was es schon gibt, ist ausgegraut.
+ */
+export function IservGruppenUebernehmen({
+  vorhanden,
+  iservGruppen,
+  fertig
+}: {
+  vorhanden: string[]
+  /** Gruppen aus der IServ-Anmeldung (Server) */
+  iservGruppen: { id: string; name: string }[]
+  fertig: () => void
+}): React.JSX.Element {
+  const [ordner, setOrdner] = useState<{ id: string; name: string }[] | null>(null)
   const [wahl, setWahl] = useState<Set<string>>(new Set())
   useEffect(() => {
-    iservGruppenordner()
+    void iservGruppenordner()
+      .catch(() => null)
       .then((o) => {
-        if (!o)
-          return setFehler(
-            hatClient()
-              ? 'IServ ist in der Exe noch nicht verbunden (Einstellungen › Material › IServ).'
-              : 'Die IServ-Ordner kann nur die Exe „Schul-Apps Online“ lesen – das IServ-Passwort bleibt am PC.'
-          )
-        setOrdner(o)
-        setWahl(new Set(o.filter((n) => KLASSE_ODER_KURS.test(n) && !vorhanden.includes(lerngruppenName(n).toLowerCase()))))
+        const ausOrdner = (o ?? []).map((n) => ({ id: n, name: n }))
+        const alle = [...iservGruppen, ...ausOrdner.filter((x) => !iservGruppen.some((g) => g.name.toLowerCase() === x.name.toLowerCase()))].sort((x, y) =>
+          x.name.localeCompare(y.name, 'de', { numeric: true })
+        )
+        setOrdner(alle)
+        setWahl(new Set(alle.filter((g) => KLASSE_ODER_KURS.test(g.name) && !vorhanden.includes(lerngruppenName(g.name).toLowerCase())).map((g) => g.id)))
       })
-      .catch((e: unknown) => setFehler(e instanceof Error ? e.message : String(e)))
-  }, [vorhanden])
+  }, [vorhanden, iservGruppen])
   const uebernehmen = async (): Promise<void> => {
     try {
-      for (const n of wahl) await senden('/server/lerngruppen/anlegen', { name: lerngruppenName(n), iservGruppe: n })
+      for (const g of (ordner ?? []).filter((x) => wahl.has(x.id))) await senden('/server/lerngruppen/anlegen', { name: lerngruppenName(g.name), iservGruppe: g.id })
       notifySuccess(`${wahl.size} Lerngruppe${wahl.size === 1 ? '' : 'n'} angelegt.`)
       fertig()
     } catch (e) {
@@ -55,37 +66,42 @@ export function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: stri
     }
   }
   return (
-    <Modal opened onClose={fertig} title="Gruppen aus IServ übernehmen" size="lg">
+    <Modal opened onClose={fertig} title="Klassen und Kurse aus IServ übernehmen" size="lg">
       <Stack>
         <Text size="sm" c="dimmed">
-          Aus dem IServ-Ordner „Gruppen“: Jeder Gruppenordner zeigt eine Mitgliedschaft (z. B. „Klasse 10b“ → Lerngruppe „10b“). Klassen und Kurse sind
-          vorausgewählt.
+          Wähle die IServ-Gruppen, die du als Lerngruppen anlegen möchtest. Klassen und Kurse sind schon ausgewählt. Wer in einer Gruppe ist und sich
+          anmeldet, gehört danach automatisch zur Lerngruppe – aus „Klasse 10b“ wird die Lerngruppe „10b“.
         </Text>
-        {fehler && <Alert color="orange">{fehler}</Alert>}
-        {!ordner && !fehler && <Loader />}
-        {ordner?.length === 0 && <Text c="dimmed">Im Ordner „Gruppen“ ist nichts.</Text>}
+        {!ordner && <Loader />}
+        {ordner?.length === 0 && (
+          <Alert color="orange" data-iserv-keine-gruppen>
+            Es sind noch keine IServ-Gruppen bekannt. Melde dich einmal über IServ an – dann kennt die App deine Klassen und Kurse.
+            {hatClient() ? ' Oder verbinde IServ hier in der Exe unter Einstellungen › Material › IServ.' : ' Alternativ liest die Exe „Schul-Apps Online“ mit verbundenem IServ deine Gruppenordner.'}
+          </Alert>
+        )}
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          {ordner?.map((n) => {
-            const da = vorhanden.includes(lerngruppenName(n).toLowerCase())
+          {ordner?.map((g) => {
+            const da = vorhanden.includes(lerngruppenName(g.name).toLowerCase())
             return (
               <Checkbox
-                key={n}
-                label={da ? `${n} (schon angelegt)` : n}
+                key={g.id}
+                label={da ? `${g.name} (schon angelegt)` : g.name}
                 disabled={da}
-                checked={wahl.has(n)}
+                checked={wahl.has(g.id)}
                 onChange={(e) => {
                   const w = new Set(wahl)
-                  if (e.currentTarget.checked) w.add(n)
-                  else w.delete(n)
+                  if (e.currentTarget.checked) w.add(g.id)
+                  else w.delete(g.id)
                   setWahl(w)
                 }}
+                data-iserv-gruppe={g.name}
               />
             )
           })}
         </SimpleGrid>
         <Group justify="flex-end">
-          <Button disabled={!wahl.size} onClick={() => void uebernehmen()}>
-            {wahl.size} übernehmen
+          <Button disabled={!wahl.size} onClick={() => void uebernehmen()} data-iserv-uebernehmen>
+            {wahl.size === 1 ? '1 Lerngruppe anlegen' : `${wahl.size} Lerngruppen anlegen`}
           </Button>
         </Group>
       </Stack>
@@ -179,13 +195,13 @@ export function LerngruppeAnlegenKnoepfe({ geaendert }: { geaendert: () => void 
       <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setNeu(true)} data-lerngruppe-anlegen>
         Lerngruppe anlegen
       </Button>
-      <Tooltip label={hatClient() ? 'Klassen und Kurse aus dem IServ-Ordner „Gruppen“' : 'Nur in der Exe „Schul-Apps Online“ (IServ-Passwort bleibt am PC)'}>
+      <Tooltip label="Deine Klassen und Kurse aus IServ als Lerngruppen anlegen">
         <Button size="xs" variant="light" leftSection={<IconFolders size={14} />} onClick={() => setAusIserv(true)} data-iserv-gruppen>
           Aus IServ übernehmen
         </Button>
       </Tooltip>
       {(neu || ausIserv) && !d && <Loader size="xs" />}
-      {ausIserv && d && <IservGruppenUebernehmen vorhanden={d.gruppen.map((g) => g.name.toLowerCase())} fertig={fertig} />}
+      {ausIserv && d && <IservGruppenUebernehmen vorhanden={d.gruppen.map((g) => g.name.toLowerCase())} iservGruppen={d.iservGruppen} fertig={fertig} />}
       {neu && d && <NeueGruppe iservGruppen={auswahl} fertig={fertig} />}
     </Group>
   )

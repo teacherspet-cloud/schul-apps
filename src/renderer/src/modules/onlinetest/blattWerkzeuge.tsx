@@ -22,7 +22,7 @@ import {
   IconTextPlus,
   IconX
 } from '@tabler/icons-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react'
 import type { BlattObjekt } from '@shared/blattObjekte'
 
 export type Werkzeug = 'tastatur' | 'stift' | 'marker' | 'radierer' | 'text' | 'linie' | 'punkt' | 'form'
@@ -115,7 +115,7 @@ export function Werkzeugleiste(p: {
     stift: 'Aufs Blatt schreiben oder zeichnen',
     marker: 'Text auf dem Blatt markieren',
     radierer: 'Über Striche wischen; Kästchen und Linien antippen',
-    text: 'Auf die Stelle tippen, an die das Kästchen soll',
+    text: 'Auf die Stelle tippen, an die das Kästchen soll – ein Klick daneben beendet das Schreiben',
     linie: 'Von einem Punkt zum anderen ziehen',
     punkt: 'Auf die Stelle im Diagramm tippen, dann den Wert eintragen',
     form: 'Form aufziehen (oder antippen); mit dem Radierer wieder entfernen'
@@ -389,6 +389,25 @@ export function ObjektEbene(p: {
   const eigene = p.objekte.filter((o) => o.s === p.seite)
   const fremde = p.objekte.filter((o) => o.s !== p.seite)
   const setzeEigene = (neu: BlattObjekt[]): void => p.aendern([...fremde, ...neu])
+  // Aktueller Stand für verzögerte Prüfungen (Verlassen eines leeren Kästchens)
+  const eigeneRef = useRef(eigene)
+  eigeneRef.current = eigene
+  const setzeEigeneRef = useRef(setzeEigene)
+  setzeEigeneRef.current = setzeEigene
+  /*
+   * Passt der Text nicht mehr ins Kästchen (schmaler gezogen, größere Schrift gewählt), wächst es mit (19.10.2026) –
+   * nach jedem Zeichnen geprüft, damit nichts unten unsichtbar wird.
+   */
+  useLayoutEffect(() => {
+    if (griff.current) return
+    const zuKlein = eigene.filter((o) => {
+      if (o.t !== 'text' || !o.h) return false
+      const t = flaeche.current?.querySelector<HTMLTextAreaElement>(`[data-objekt-id="${o.id}"]`)
+      return Boolean(t && t.scrollHeight > t.clientHeight + 2)
+    })
+    if (!zuKlein.length) return
+    setzeEigene(eigene.map((o) => (zuKlein.some((z) => z.id === o.id) ? { ...o, h: Math.min(900, textHoehe(o.id, o.w ?? 170)) } : o)))
+  })
   const punkt = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const r = flaeche.current!.getBoundingClientRect()
     // Die Ebene ist mit dem Blatt skaliert: Bildschirm- in Seitenpixel umrechnen
@@ -403,6 +422,22 @@ export function ObjektEbene(p: {
     if (o.h) return o.h
     const el = flaeche.current?.querySelector<HTMLElement>(`[data-kasten="${o.id}"]`)
     return el ? el.getBoundingClientRect().height * massstab() : KASTEN_MIN_H
+  }
+  /**
+   * Höhe, die der Text eines Kästchens bei der Breite `w` (Seitenpixel) braucht (19.10.2026, Befund der Lehrkraft: beim
+   * schmaler Ziehen rutschte der Text unten aus dem Kästchen) – am Eingabefeld selbst gemessen.
+   */
+  const textHoehe = (id: string, w: number): number => {
+    const t = flaeche.current?.querySelector<HTMLTextAreaElement>(`[data-objekt-id="${id}"]`)
+    if (!t) return KASTEN_MIN_H
+    // Die Ebene ist per CSS skaliert: Breite und scrollHeight sind schon Seitenpixel (nicht umrechnen)
+    const alt = { width: t.style.width, height: t.style.height }
+    t.style.width = `${w}px`
+    t.style.height = 'auto'
+    const noetig = t.scrollHeight + 2
+    t.style.width = alt.width || '100%'
+    t.style.height = alt.height || '100%'
+    return Math.max(KASTEN_MIN_H, noetig)
   }
   const kaesten = (): Kasten[] => eigene.filter((o) => o.t === 'text').map((o) => ({ id: o.id, x: o.x, y: o.y, w: o.w ?? 170, h: hoeheVon(o) }))
   /** Auf der Seite halten */
@@ -457,10 +492,12 @@ export function ObjektEbene(p: {
     const k = massstab()
     const dx = (e.clientX - g.px) * k
     const dy = (e.clientY - g.py) * k
+    const breite = Math.max(60, Math.min(p.lage.w - g.o.x - 2, (g.o.w ?? 170) + dx))
+    // Größe: nie kleiner, als der Text bei dieser Breite braucht – schmaler ziehen macht das Kästchen höher
     const neu =
       g.art === 'schieben'
         ? klemmen({ ...g.o, x: g.o.x + dx, y: g.o.y + dy }, g.h)
-        : { ...g.o, w: Math.max(60, Math.min(p.lage.w - g.o.x - 2, (g.o.w ?? 170) + dx)), h: Math.max(KASTEN_MIN_H, Math.min(p.lage.h - g.o.y - 2, g.h + dy)) }
+        : { ...g.o, w: breite, h: Math.min(p.lage.h - g.o.y - 2, Math.max(textHoehe(g.id, breite), g.h + dy)) }
     const ddx = neu.x - g.o.x
     const ddy = neu.y - g.o.y
     setzeEigene(
@@ -598,6 +635,17 @@ export function ObjektEbene(p: {
           return
         }
         if (p.werkzeug === 'text') {
+          /*
+           * Bearbeitung beenden statt neu setzen (19.10.2026, Befund der Lehrkraft: ein Klick neben das gerade gesetzte
+           * Kästchen setzte versehentlich ein weiteres). Ist ein Kästchen in Bearbeitung, beendet der Klick nur diese;
+           * leere Kästchen verschwinden dabei (onBlur). Erst der nächste Klick setzt ein neues Kästchen.
+           */
+          const aktiv = document.activeElement as HTMLElement | null
+          if (aktiv && flaeche.current?.contains(aktiv) && aktiv.matches('textarea[data-objekt-id]')) {
+            e.preventDefault()
+            aktiv.blur()
+            return
+          }
           const id = neueId()
           setzeEigene([
             ...eigene,
@@ -833,13 +881,24 @@ export function ObjektEbene(p: {
                 disabled={p.gesperrt}
                 readOnly={radiert}
                 data-objekt-id={o.id}
+                onBlur={() => {
+                  // Leer verlassen = nicht gewollt: entfernen (außer es wird gerade gezogen)
+                  setTimeout(() => {
+                    if (griff.current?.id === o.id) return
+                    const jetzt = eigeneRef.current.find((x) => x.id === o.id)
+                    if (jetzt && jetzt.t === 'text' && !(jetzt.text ?? '').trim() && document.activeElement?.getAttribute('data-objekt-id') !== o.id)
+                      setzeEigeneRef.current(eigeneRef.current.filter((x) => x.id !== o.id))
+                  }, 120)
+                }}
                 onChange={(e) => {
                   const t = e.currentTarget
                   const text = t.value
                   // Wächst mit dem Text, schrumpft aber nicht unter die gezogene Höhe
                   t.style.height = 'auto'
                   const noetig = t.scrollHeight + 2
-                  t.style.height = ''
+                  // Zurück auf 100 % – mit '' verlor das Feld seine Höhe und blieb zwei Zeilen hoch (19.10.2026, Befund der
+                  // Lehrkraft: das Kästchen wurde größer, der Text darin nicht – er rutschte unten aus dem Sichtbaren)
+                  t.style.height = '100%'
                   setzeEigene(eigene.map((x) => (x.id === o.id ? { ...x, text, ...(noetig > (x.h ?? 0) ? { h: Math.min(900, noetig) } : {}) } : x)))
                 }}
                 style={{

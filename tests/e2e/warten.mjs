@@ -115,7 +115,10 @@ export async function grammatikJahreAuf(page) {
   await page.locator('[data-kurs-grammatik]').first().waitFor({ timeout: 15000 }).catch(() => undefined)
   for (const j of await page.locator('[data-grammatik-jahr][aria-expanded="false"], [data-grammatik-band][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
   // Seit 10.10.2026 Band › Unit › Station: danach die zugeklappten Units und „Geplant"
+  // Seit 19.10.2026 als Gliederung wie bei den Vokabeln: Bänder (BandGruppe) und Stationen sind ebenfalls aufklappbar
+  for (const j of await page.locator('[data-grammatik-band]:not([data-band-offen]) [data-band-kopf]').all()) await j.click().catch(() => undefined)
   for (const j of await page.locator('[data-grammatik-unit][aria-expanded="false"], [data-grammatik-geplant][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
+  for (const j of await page.locator('[data-grammatik-station][aria-expanded="false"]').all()) await j.click().catch(() => undefined)
 }
 
 /** Früherer Name: Kursseite geöffnet, Reiter „Grammatik" (Vorgabe) bzw. der angegebene */

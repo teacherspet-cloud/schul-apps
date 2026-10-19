@@ -310,8 +310,10 @@ try {
   const kb2 = await s.locator('[data-kasten]').first().boundingBox()
   await s.mouse.click(kb2.x + kb2.width + 40, kb2.y + 4)
   const vorLeer = await s.locator('[data-kasten]').count()
+  // Seit 19.10.2026 verschwindet ein leeres Kästchen schon beim Verlassen (Werkzeugwechsel) – erst den Fokus abwarten
+  await s.waitForTimeout(250)
   await s.locator('[data-werkzeug="radierer"]').click()
-  await s.locator('[data-kasten]').last().dispatchEvent('pointerdown')
+  await s.waitForTimeout(300)
   pruefe(
     (await s.locator('[data-kasten]').count()) === vorLeer - 1 && !(await s.locator('[data-loesch-frage]').count()),
     'Leeres Kästchen verschwindet ohne Rückfrage'
@@ -449,6 +451,32 @@ try {
   await s.waitForTimeout(800)
   const fremd = await s.locator('[data-rand-kommentar], [data-rand-marke]').count()
   pruefe(fremd === 0, `Kein Randkommentar aus dem Feedback einer anderen Aufgabe (${fremd})`)
+  // ---------- Textkästchen bedienen (19.10.2026, Befunde der Lehrkraft) – zuletzt, damit die Lage der übrigen Prüfungen bleibt
+  await s.locator('[data-werkzeug="text"]').click()
+  // Schmaler ziehen (19.10.2026, Befund der Lehrkraft): das Kästchen wird höher, kein Text verschwindet unten
+  await s.locator('[data-kaestchen]').last().fill('Attentat von Sarajevo auf den österreichischen Thronfolger')
+  const gs = await s.locator('[data-kasten-groesse]').last().boundingBox()
+  await s.mouse.move(gs.x + gs.width / 2, gs.y + gs.height / 2)
+  await s.mouse.down()
+  await s.mouse.move(gs.x - 120, gs.y + gs.height / 2, { steps: 6 })
+  await s.mouse.up()
+  await s.waitForTimeout(200)
+  const passt = await s.locator('[data-kaestchen]').last().evaluate((t) => t.scrollHeight <= t.clientHeight + 3)
+  pruefe(passt, 'Schmaler gezogen: Kästchen wächst mit, der Text bleibt sichtbar')
+  // Klick daneben beendet nur das Schreiben – kein zweites Kästchen (19.10.2026)
+  await s.locator('[data-kaestchen]').last().focus()
+  const vorKlick = await s.locator('[data-kasten]').count()
+  const ac2 = await achseSuchen()
+  await s.mouse.click(ac2.x + 300, ac2.y + 55)
+  await s.waitForTimeout(250)
+  pruefe((await s.locator('[data-kasten]').count()) === vorKlick, 'Klick neben das Kästchen beim Schreiben: kein neues Kästchen')
+  await s.mouse.click(ac2.x + 300, ac2.y + 55)
+  pruefe((await s.locator('[data-kasten]').count()) === vorKlick + 1, 'Nächster Klick setzt ein neues Kästchen')
+  await s.waitForTimeout(250)
+  await s.waitForTimeout(200)
+  await s.mouse.click(ac2.x + 120, ac2.y + 95)
+  await s.waitForTimeout(300)
+  pruefe((await s.locator('[data-kasten]').count()) === vorKlick, 'Leeres Kästchen verschwindet beim Verlassen')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
 } finally {

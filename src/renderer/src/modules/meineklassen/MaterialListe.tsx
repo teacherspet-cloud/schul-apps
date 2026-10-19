@@ -31,6 +31,8 @@ export interface Eintrag {
   wert: number | null
   /** Geplante Freischaltung (Punkt gestrichelt) */
   geplant?: boolean
+  /** Text für die Suche (Titel, Thema …); sonst der Titel */
+  suche?: string
   /** Das Gezeigte */
   inhalt: React.ReactNode
 }

@@ -227,7 +227,7 @@ try {
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursKaestenAuf(p)
   // Auf den Titel klicken – die Aufgaben-Zelle hat eigene Knöpfe (+ Aufgaben, Bearbeiten)
-  await p.locator(`[data-grammatik-zeile="${zid}"] td`).first().click()
+  await p.locator(`[data-grammatik-zeile="${zid}"]`).first().click()
   await p.locator('[data-reiter-lernstand]').click()
   pruefe(await da(p.locator('[data-grammatik-lernstand]').getByText('Mia R.')), 'Lernstand im Grammatik-Fenster zeigt den Gast')
   await p.screenshot({ path: join(out, '8-lernstand.png'), fullPage: true })

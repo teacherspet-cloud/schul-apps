@@ -124,6 +124,14 @@ try {
   pruefe(await da(p.locator('[data-zurueck="meineklassen"]')), 'Zeitleiste: Klick öffnet die Freigabe des Blatts (mit Rückweg)')
   await p.screenshot({ path: join(out, '2b-blatt-geoeffnet.png') })
 
+  // Suche im Reiter „Unterrichtsreihen & Blätter" (19.10.2026)
+  await p.goto(A)
+  await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
+  await p.locator(`[data-klasse="${KLASSE}"]`).click()
+  await p.locator('[data-reihen-suche]').fill('Fabrik')
+  await p.waitForTimeout(300)
+  const gefunden = await p.locator('[data-zeitleiste-liste] [data-material-titel]').evaluateAll((l) => l.map((x) => x.getAttribute('data-material-titel')))
+  pruefe(gefunden.length === 1 && gefunden[0] === 'Arbeit in der Fabrik', `Suche filtert Reihen und Blätter (${gefunden.join(', ')})`)
   // ---------- Mitlehrkraft: Blatt der Kollegin nur ansehen
   const d = await ctxB.request.get(`${A}/server/blaetter/${b1.id}`, { headers: KOPF })
   pruefe(d.ok() && (await d.json()).nurLesen === true, 'Mitlehrkraft sieht das Blatt der Kollegin (nur ansehen)')
