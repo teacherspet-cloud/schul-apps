@@ -270,8 +270,9 @@ export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
   },
   'Green Line 5': {
     'Unit 1': {
+      // „Australisches Englisch" (Liste der Lehrkraft) am 19.10.2026 entfernt: Wortschatz, Aussprache und Schreibung,
+      // keine eigene Grammatik – es gab dazu keine Formen und keine Aufgaben
       'Station 1': [
-        P('Australisches Englisch', []),
         P('Emphatic forms (Inversion, betontes do, cleft sentences, -self zur Betonung)', [
           'en.focus.emphasis',
           'en.focus.emphatic_do',

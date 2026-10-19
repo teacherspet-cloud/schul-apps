@@ -216,6 +216,8 @@ interface Laufzeit {
   pause?: string
   /** Eine Anfrage hat schon gearbeitet (Meldung „laufend" des Hauptprozesses oder fertig) */
   gestartet?: boolean
+  /** Wann die erste Anfrage zu arbeiten begann – ab hier läuft die Uhr der Restzeit (19.10.2026) */
+  begonnen?: number
 }
 
 const laufzeit = new Map<string, Laufzeit>()
@@ -241,9 +243,14 @@ export const setzeFehlerMeldung = (fn: (e: unknown, titel: string) => void): voi
  * Wartezeit je Anfrage (07.10.2026, Befund der Lehrkraft): Eine Anfrage, die 30 Minuten auf einen freien Platz gewartet
  * hat, zeigte „noch etwa 20 Min." – die Restzeit rechnete die Wartezeit als Arbeitszeit. Gezählt wird deshalb, wie
  * lange jede Anfrage wartete; Restzeit und gelernte Dauern rechnen nur mit der Zeit, in der wirklich gearbeitet wurde.
+ *
+ * Nachtrag 19.10.2026 (Befund der Lehrkraft bei den Grammatikaufgaben: „noch etwa" enthielt die Zeit in der
+ * Warteschlange): Gezählt wird erst ab dem Beginn – je Anfrage ab ihrer Meldung „laufend" (`lief`), je Auftrag ab der
+ * ersten arbeitenden Anfrage (`Laufzeit.begonnen`). Was davor liegt (Warteschlange, Warten auf den vorigen Auftrag,
+ * Sichern, noch unbekannter Zustand), zählt nie mit – auch wenn es nicht als Warten gemeldet wurde.
  */
-const anfrageWarten = new Map<string, { summe: number; seit?: number }>()
-/** Bisherige Wartezeit einer Anfrage (ms), die laufende eingeschlossen */
+const anfrageWarten = new Map<string, { summe: number; seit?: number; lief?: number }>()
+/** Wartezeit einer Anfrage (ms) seit ihrem Beginn bzw. – solange keiner gemeldet ist – seit dem Absenden */
 export function gewartetVon(id: string, nun = Date.now()): number {
   const w = anfrageWarten.get(id)
   return w ? w.summe + (w.seit !== undefined ? nun - w.seit : 0) : 0
@@ -256,7 +263,17 @@ export function merkeWartezustand(id: string, wartend: boolean, nun = Date.now()
     w.summe += nun - w.seit
     w.seit = undefined
   }
+  // Beginn: ab jetzt zählt die Arbeit; das Warten davor ist mit dem späteren Start schon heraus
+  if (!wartend && w.lief === undefined) {
+    w.lief = nun
+    w.summe = 0
+  }
   anfrageWarten.set(id, w)
+}
+
+/** Arbeitszeit einer Anfrage: ab ihrem Beginn (sonst ab dem Absenden), ohne Wartezeit */
+export function arbeitszeitVon(id: string, abgesendet: number, nun = Date.now()): number {
+  return Math.max(0, nun - (anfrageWarten.get(id)?.lief ?? abgesendet) - gewartetVon(id, nun))
 }
 /** Aufträge hören mit, wenn eine ihrer Anfragen zu warten beginnt oder aufhört */
 const platzHoerer = new Set<() => void>()
@@ -270,7 +287,11 @@ function horchePlatz(): void {
       wartendeAnfragen.delete(id)
       // Die Anfrage arbeitet: ihr Auftrag hat begonnen
       if (anfrageWarten.has(id)) angelaufen.add(id)
-      for (const lz of laufzeit.values()) if (lz.anfragen.has(id)) lz.gestartet = true
+      for (const lz of laufzeit.values())
+        if (lz.anfragen.has(id)) {
+          lz.gestartet = true
+          lz.begonnen ??= Date.now()
+        }
     }
     if (anfrageWarten.has(id)) merkeWartezustand(id, zustand === 'wartend')
     for (const fn of platzHoerer) fn()
@@ -555,7 +576,14 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
    * alle seine Anfragen auf einen Platz warten. Sie zählt nicht als Arbeitszeit (07.10.2026).
    */
   const warten = { summe: 0, seit: undefined as number | undefined }
+  /** Ab welchem Beginn `warten` zählt – mit dem Beginn fängt die Rechnung neu an (19.10.2026) */
+  let wartenAb: number | undefined
   const pruefeWarten = (nun = Date.now()): void => {
+    if (lz.begonnen !== undefined && wartenAb !== lz.begonnen) {
+      wartenAb = lz.begonnen
+      warten.summe = 0
+      warten.seit = undefined
+    }
     const ids = [...lz.anfragen]
     const wartet = Boolean(lz.pause) || (ids.length > 0 && ids.every((x) => wartendeAnfragen.has(x)))
     if (wartet && warten.seit === undefined) warten.seit = nun
@@ -565,8 +593,10 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     }
   }
   const gewartet = (nun: number): number => warten.summe + (warten.seit !== undefined ? nun - warten.seit : 0)
-  /** Arbeitszeit einer Anfrage: seit ihrem Start, ohne ihre Wartezeit auf einen Platz */
-  const arbeitszeit = (anfrageId: string, l: { start: number }, nun: number): number => Math.max(0, nun - l.start - gewartetVon(anfrageId, nun))
+  /** Arbeitszeit einer Anfrage: seit ihrem Beginn, ohne ihre Wartezeit auf einen Platz */
+  const arbeitszeit = (anfrageId: string, l: { start: number }, nun: number): number => arbeitszeitVon(anfrageId, l.start, nun)
+  /** Arbeitszeit des Auftrags: erst ab der ersten arbeitenden Anfrage, ohne Wartezeiten danach */
+  const auftragsZeit = (nun: number): number => (lz.begonnen === undefined ? 0 : Math.max(0, nun - lz.begonnen - gewartet(nun)))
 
   // Ruhige Restzeit (08.10.2026, restzeit.ts `ruhigesZiel`): Ziel und Zeitpunkt seiner letzten Änderung
   let restStand: { ziel: number; seit: number } | undefined
@@ -576,7 +606,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     const { sekunden, laenger } = schaetzeRest({
       art: start.art,
       umfang: buch.umfang,
-      elapsedMs: Math.max(0, nun - jetzt - gewartet(nun)),
+      elapsedMs: auftragsZeit(nun),
       ratio: gezeigt,
       erledigt: buch.erledigt,
       laufend: [...buch.laufend].map(([anfrageId, l]) => ({ art: l.art, ki: l.ki, elapsedMs: arbeitszeit(anfrageId, l, nun), ...tracker.stand(anfrageId) })),
@@ -618,6 +648,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     anfrageWarten.set(anfrageId, { summe: 0 })
     lz.anfragen.add(anfrageId)
     buch.laufend.set(anfrageId, { art, ki: kiFuer(art, req), start: Date.now() })
+    // Ohne Meldungen des Hauptprozesses (kein Warteplatz bekannt) beginnt die Arbeit mit dem Absenden
+    if (!platzAbo) lz.begonnen ??= Date.now()
     // Schon jetzt schätzen: Mit Verlauf steht die Restzeit ab der ersten Sekunde da
     aktualisiere()
     let ok = false
@@ -631,6 +663,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       const lauf = buch.laufend.get(anfrageId)
       buch.laufend.delete(anfrageId)
       if (ok) lz.gestartet = true
+      // Fertig, ohne dass ein Beginn gemeldet wurde: dann ab dem Absenden (abzüglich gemeldeten Wartens)
+      if (ok && lauf && lz.begonnen === undefined) lz.begonnen = Date.now() - arbeitszeit(anfrageId, lauf, Date.now())
       angelaufen.delete(anfrageId)
       if (ok && lauf) {
         buch.erledigt[art] = (buch.erledigt[art] ?? 0) + 1
@@ -722,8 +756,9 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       const ziel = (await start.ablegen(ergebnis, eingabe)) as AuftragsZiel | undefined
       const ende = Date.now()
       pruefeWarten(ende)
-      // Aus diesem Lauf lernen: Dauer (ohne Wartezeit), Umfang und Mischung der Anfragen dieser Auftragsart
-      merkeAuftrag(start.art, { ms: Math.max(0, ende - jetzt - gewartet(ende)), umfang: buch.umfang, ki: kiFuer('text'), mix: { ...buch.erledigt } })
+      // Aus diesem Lauf lernen: Dauer ab Beginn (ohne Wartezeit), Umfang und Mischung der Anfragen dieser Auftragsart;
+      // ohne KI-Anfrage wie bisher ab dem Start des Auftrags
+      merkeAuftrag(start.art, { ms: lz.begonnen === undefined ? Math.max(0, ende - jetzt - gewartet(ende)) : auftragsZeit(ende), umfang: buch.umfang, ki: kiFuer('text'), mix: { ...buch.erledigt } })
       aendere(id, (a) => ({
         ...a,
         status: 'fertig',

@@ -111,11 +111,10 @@ describe('Lehrwerk-Grammatik je Unit', () => {
   })
 
   it('jede Grammatikangabe der Green-Line-Bände ist sicher oder als Vorschlag zugeordnet', () => {
-    // Seit 07.10.2026 je Station fest zugeordnet (lehrwerkGrammatik.ts); nur „Australisches Englisch" ist keine Grammatik
+    // Seit 07.10.2026 je Station fest zugeordnet (lehrwerkGrammatik.ts); „Australisches Englisch" seit 19.10.2026 entfernt
     for (const buch of lehrwerkeMitGrammatik())
       for (const kap of grammatikKapitel(buch))
-        for (const e of unitEintraege('englisch', buch, kap, 'nur'))
-          if (e.phrase !== 'Australisches Englisch') expect(e.ids.length, `${buch} ${kap}: ${e.phrase}`).toBeGreaterThan(0)
+        for (const e of unitEintraege('englisch', buch, kap, 'nur')) expect(e.ids.length, `${buch} ${kap}: ${e.phrase}`).toBeGreaterThan(0)
   })
 
   it('Kommas in Klammern trennen nicht', () => {

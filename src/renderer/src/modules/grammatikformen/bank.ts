@@ -273,7 +273,8 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
     // Schreibt ein anderer Auftrag gerade an diesem Feld, erst sein Ergebnis abwarten
     for (let w = inArbeit.get(feld); w; w = inArbeit.get(feld)) {
       melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
-      await w.catch(() => undefined)
+      // Als Warten melden: zählt nicht als Arbeitszeit der Restzeit (19.10.2026)
+      await k.pausiere('Wartet auf einen früheren Auftrag', w.catch(() => undefined))
     }
     // Bis zu RUNDEN Durchgänge (13.10.2026, Wunsch der Lehrkraft): Streicht die Prüfung zu viel, legt die KI gezielt nach
     let ohneErtrag = 0

@@ -507,3 +507,45 @@ describe('Sichtbar warten (k.pausiere, 06.10.2026)', () => {
     expect(auftrag()?.status).toBe('abgebrochen')
   })
 })
+
+describe('Restzeit erst ab Beginn (Befund 19.10.2026, Grammatikaufgaben)', () => {
+  it('Warten auf den vorigen Auftrag und ungemeldetes Warten vor dem Start zählen nicht', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    try {
+      let weiter = (): void => undefined
+      const vorher = new Promise<void>((r) => (weiter = r))
+      const lauf = starteAuftrag({
+        moduleId: 'grammatikformen',
+        docId: 'g1',
+        titel: 'x',
+        art: 'Probe Beginn',
+        eingabe: {},
+        arbeit: async (_e, k) => {
+          await k.pausiere('Wartet auf den vorherigen Grammatik-Auftrag', vorher)
+          return k.ai(REQ)
+        },
+        ablegen: async () => undefined
+      })
+      await tick()
+      // 10 Minuten hinter dem vorigen Auftrag
+      vi.advanceTimersByTime(10 * 60_000)
+      weiter()
+      await tick()
+      await tick()
+      // Anfrage abgesendet, aber 5 Minuten ohne jede Meldung (Zustand unbekannt), dann „laufend"
+      const id = [...offen.keys()].at(-1)!
+      vi.advanceTimersByTime(5 * 60_000)
+      platz!({ id, zustand: 'laufend' })
+      vi.advanceTimersByTime(8000)
+      await antworte({ ok: true })
+      await lauf
+      const auftraege = leseVerlauf().auftraege['Probe Beginn']
+      expect(auftraege.at(-1)!.ms).toBeLessThanOrEqual(9000)
+      expect(auftraege.at(-1)!.ms).toBeGreaterThanOrEqual(7000)
+      const anfragen = Object.entries(leseVerlauf().anfragen).find(([k]) => k.startsWith('probe@'))![1]
+      expect(anfragen.at(-1)!.ms).toBe(8000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

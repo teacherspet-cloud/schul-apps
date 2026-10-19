@@ -37,9 +37,10 @@ describe('Vorschläge je Unit', () => {
     expect(e[0].teile).toContain('en.verb.present_perfect/bildung')
     expect(e[2].ids).toEqual(['en.verb.pp_vs_past'])
   })
-  it('Australisches Englisch ist keine Katalog-Grammatik', () => {
+  it('Australisches Englisch ist keine Grammatikform mehr (19.10.2026)', () => {
     const e = unitEintraege('englisch', 'Green Line 5', 'Unit 1', 'nur')
-    expect(e.find((x) => x.phrase === 'Australisches Englisch')?.sicher).toBe(false)
+    expect(e.some((x) => x.phrase === 'Australisches Englisch')).toBe(false)
+    expect(e.length).toBeGreaterThan(0)
   })
 })
 
