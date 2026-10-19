@@ -226,18 +226,53 @@ export function bankErzeugenStarten(auftraege: BankAuftragEingabe[], titel: stri
   )
 }
 
+/**
+ * Geplante KI-Anfragen eines Schritts (19.10.2026, Befund der Lehrkraft: die Restzeit in der Warteschlange war „völlig
+ * unaussagefähig"): je ARTEN_JE_ANFRAGE fehlende Übungsarten eine Anfrage. Vorher meldete der Auftrag keine Schrittzahl –
+ * die Restzeit rechnete nur die gerade laufende Anfrage hoch und begann bei jeder neuen von vorn.
+ */
+export const geplanteAnfragen = (a: Pick<BankAuftragEingabe, 'uebungen'>): number => Math.max(1, Math.ceil(a.uebungen.length / ARTEN_JE_ANFRAGE))
+
+/**
+ * Fortschritt in Anfragen: erledigte plus geschätzter Rest. Der Rest sind die geplanten Anfragen der übrigen Schritte,
+ * mal dem Verhältnis „tatsächlich gebraucht / geplant" der schon fertigen Schritte dieses Auftrags (Nachlegen, wenn die
+ * Prüfung viel streicht; übersprungene Schritte zählen dabei nicht mit). Rein rechnend, für Tests.
+ */
+export function bankFortschritt(p: { plan: number[]; i: number; imSchritt: number; anfragen: number; planFertig: number; istFertig: number }): {
+  fertig: number
+  gesamt: number
+} {
+  const faktor = p.planFertig ? Math.min(3, Math.max(0.5, p.istFertig / p.planFertig)) : 1
+  const hier = Math.max(p.plan[p.i] * faktor - p.imSchritt, p.imSchritt < RUNDEN ? 0.5 : 0)
+  const danach = p.plan.slice(p.i + 1).reduce((s, x) => s + x, 0) * faktor
+  return { fertig: p.anfragen, gesamt: Math.max(p.anfragen + 1, Math.round(p.anfragen + hier + danach)) }
+}
+
 /** Die Schritte eines Auftrags: je Schlüssel und Stufe neu prüfen, dann erzeugen und als Entwurf ablegen */
 async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Promise<number> {
   let n = 0
+  // Restzeit (19.10.2026): Fortschritt in KI-Anfragen statt ohne Schrittzahl
+  const plan = liste.map(geplanteAnfragen)
+  let anfragen = 0
+  let planFertig = 0
+  let istFertig = 0
+  let schritt = 0
+  let imSchritt = 0
+  const melde = (text: string): void => {
+    const f = bankFortschritt({ plan, i: schritt, imSchritt, anfragen, planFertig, istFertig })
+    k.melde(text, f.fertig, f.gesamt)
+  }
   // Bricht die KI in einem Schritt ab, laufen die übrigen Schritte trotzdem (vorher endete der ganze Auftrag)
   let fehler: unknown = null
   let fehlerZahl = 0
   for (const [i, a] of liste.entries()) {
-    k.melde(`${i + 1} von ${liste.length}: ${a.titel} …`)
+    schritt = i
+    imSchritt = 0
+    melde(`${i + 1} von ${liste.length}: ${a.titel} …`)
     const feld = `${a.schluessel}|${a.niveau ?? 'm'}`
     // Schreibt ein anderer Auftrag gerade an diesem Feld, erst sein Ergebnis abwarten
     for (let w = inArbeit.get(feld); w; w = inArbeit.get(feld)) {
-      k.melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
+      melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
       await w.catch(() => undefined)
     }
     // Bis zu RUNDEN Durchgänge (13.10.2026, Wunsch der Lehrkraft): Streicht die Prüfung zu viel, legt die KI gezielt nach
@@ -256,14 +291,18 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
       // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
       // Stufe noch gar nichts da ist – Auffüllen geht über „Ergänzen" bzw. „Mit KI erzeugen" im eigenen Reiter
       if (!uebungen.length || (runde === 0 && a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
-        if (runde === 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
+        if (runde === 0) {
+          // Übersprungen: fällt aus dem Plan, ohne das Verhältnis der übrigen zu verfälschen
+          plan[i] = 0
+          melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
+        }
         break
       }
-      if (runde > 0) k.melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
+      if (runde > 0) melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
       // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
       const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
       const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
-      const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => k.melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
+      const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
         if (a.direkt) return direktSpeichern(a, r)
         bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
         return r
@@ -283,7 +322,13 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
         break
       } finally {
         if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
+        anfragen++
+        imSchritt++
       }
+    }
+    if (plan[i]) {
+      planFertig += plan[i]
+      istFertig += imSchritt
     }
   }
   if (fehler && !n) throw fehler

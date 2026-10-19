@@ -88,6 +88,8 @@ try {
         SCHULAPPS_SCHLUESSEL: join(daten, 'geheim', 'schluessel'),
         SCHULAPPS_OBERFLAECHE: join(wurzel, 'out', 'renderer'),
         SCHULAPPS_RESSOURCEN: join(wurzel, 'resources'),
+        // Testserver ohne Grundbestand (19.10.2026): keine 370 MB Medienbank und keine 50.000 Grammatikaufgaben je Lauf
+        SCHULAPPS_GRUNDBESTAND: '0',
         SCHULAPPS_NOTZUGANG_PASSWORT: 'test-notzugang-123',
         // wie auf dem Server hinter der Weiche: Besucheradresse aus X-Real-IP (server-einstellungen erfindet Adressen
         // für Fehlversuche, damit die Sperre nicht localhost für alle Tests trifft – 10.10.2026)

@@ -688,59 +688,62 @@ export function KursSeite({
             laedt={klassenBedarf === null}
           />
         </Card>
-        {mitWoertern && (
-          <Card withBorder radius="md" padding="md" data-kurs-lernstand>
-            <Group justify="space-between" mb="xs">
-              <Text fw={700}>Lernstand im Karteikasten</Text>
-              <Text size="xs" c="dimmed">
-                Anteil der Wörter je Stufe, alle Lernenden
-              </Text>
-            </Group>
+        {/* Karteikasten und Units auch ohne Inhalt (19.10.2026, Wunsch der Lehrkraft) – dann mit Platzhalter */}
+        <Card withBorder radius="md" padding="md" data-kurs-lernstand>
+          <Group justify="space-between" mb="xs">
+            <Text fw={700}>Lernstand im Karteikasten</Text>
+            <Text size="xs" c="dimmed">
+              Anteil der Wörter je Stufe, alle Lernenden
+            </Text>
+          </Group>
+          {mitWoertern ? (
             <StufenDiagramm u={d.gesamt} />
-          </Card>
-        )}
+          ) : (
+            <Text size="sm" c="dimmed" data-lernstand-leer>
+              Noch keine Wörter im Kurs – „Vokabeln hinzufügen" unter „Units".
+            </Text>
+          )}
+        </Card>
       </Stack>
       <Stack gap="md">
-        {(mitWoertern || grammatikStandKurs.length > 0) && (
-          <Card withBorder radius="md" padding="md">
-            <Group justify="space-between" mb="xs" gap="xs">
-              <Text fw={700}>Units</Text>
-              {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
-              <Group gap={4} justify="flex-end">
-                <Button size="compact-xs" variant="light" leftSection={<IconPlus size={12} />} onClick={() => setHinzu(true)} data-units-hinzufuegen>
-                  Vokabeln hinzufügen
-                </Button>
-                <Button
-                  size="compact-xs"
-                  variant="light"
-                  color="grape"
-                  leftSection={<IconPlus size={12} />}
-                  onClick={() => setGrammatik(true)}
-                  data-units-grammatik-hinzufuegen
-                >
-                  Grammatik hinzufügen
-                </Button>
-                <Button size="compact-xs" variant="subtle" onClick={() => setReiter('vokabeln')}>
-                  Alle Abschnitte
-                </Button>
-              </Group>
+        <Card withBorder radius="md" padding="md">
+          <Group justify="space-between" mb="xs" gap="xs">
+            <Text fw={700}>Units</Text>
+            {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
+            <Group gap={4} justify="flex-end">
+              <Button size="compact-xs" variant="light" leftSection={<IconPlus size={12} />} onClick={() => setHinzu(true)} data-units-hinzufuegen>
+                Vokabeln hinzufügen
+              </Button>
+              <Button
+                size="compact-xs"
+                variant="light"
+                color="grape"
+                leftSection={<IconPlus size={12} />}
+                onClick={() => setGrammatik(true)}
+                data-units-grammatik-hinzufuegen
+              >
+                Grammatik hinzufügen
+              </Button>
+              <Button size="compact-xs" variant="subtle" onClick={() => setReiter('vokabeln')}>
+                Alle Abschnitte
+              </Button>
             </Group>
-            {statistik || !mitWoertern ? (
-              <UnitsKompakt abschnitte={statistik?.abschnitte ?? []} grammatik={grammatikStandKurs} schluessel={id} />
-            ) : (
-              <Stack gap={2}>
-                {(d.teile ?? []).filter((t) => t.zeit <= Date.now()).slice(-6).reverse().map((t, i) => (
-                  <Text key={i} size="sm">
-                    {t.titel}{' '}
-                    <Text span size="xs" c="dimmed">
-                      · {t.anzahl} Wörter
-                    </Text>
+          </Group>
+          {statistik || !mitWoertern ? (
+            <UnitsKompakt abschnitte={statistik?.abschnitte ?? []} grammatik={grammatikStandKurs} schluessel={id} />
+          ) : (
+            <Stack gap={2}>
+              {(d.teile ?? []).filter((t) => t.zeit <= Date.now()).slice(-6).reverse().map((t, i) => (
+                <Text key={i} size="sm">
+                  {t.titel}{' '}
+                  <Text span size="xs" c="dimmed">
+                    · {t.anzahl} Wörter
                   </Text>
-                ))}
-              </Stack>
-            )}
-          </Card>
-        )}
+                </Text>
+              ))}
+            </Stack>
+          )}
+        </Card>
         <Card withBorder radius="md" padding="md" data-kurs-demnaechst>
           <Group gap={6} mb="xs">
             <IconClock size={18} />

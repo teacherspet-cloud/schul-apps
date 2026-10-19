@@ -37,7 +37,7 @@ export function SprachLernstand({
   zuGrammatik: () => void
   /** Kasten „Passendes Material" – in derselben Reihe wie „Units" */
   material?: React.ReactNode
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   const [gesamt, setGesamt] = useState<Uebersicht | null>(null)
   useEffect(() => {
     let aus = false
@@ -50,7 +50,6 @@ export function SprachLernstand({
   }, [kursId])
   // Grammatik des Kurses je Unit (17.10.2026, abgestimmt): zweiter Balken und Einzelzeilen im Kasten „Units"
   const grammatik = useKursGrammatikStand(kursId)
-  if (!gesamt && !abschnitte?.length && !grammatik.length && !kopf && !material) return null
   return (
     <SimpleGrid cols={material ? { base: 1, sm: 2 } : { base: 1, sm: 2, lg: 3 }} spacing="md" data-sprach-lernstand>
       <style>{`
@@ -59,51 +58,54 @@ export function SprachLernstand({
         }
       `}</style>
       {kopf}
-      {gesamt && gesamt.gesamt > 0 && (
-        <Card withBorder radius="md" padding="md" h="100%" data-kurs-lernstand>
-          <Group justify="space-between" mb="xs">
-            <Text fw={700}>Lernstand im Karteikasten</Text>
-            <Text size="xs" c="dimmed">
-              Anteil der Wörter je Stufe, alle Lernenden
-            </Text>
-          </Group>
+      {/* Beide Kästen auch ohne Inhalt (19.10.2026, Wunsch der Lehrkraft) – dann mit Platzhalter */}
+      <Card withBorder radius="md" padding="md" h="100%" data-kurs-lernstand>
+        <Group justify="space-between" mb="xs">
+          <Text fw={700}>Lernstand im Karteikasten</Text>
+          <Text size="xs" c="dimmed">
+            Anteil der Wörter je Stufe, alle Lernenden
+          </Text>
+        </Group>
+        {gesamt && gesamt.gesamt > 0 ? (
           <StufenDiagramm u={gesamt} hoehe={110} />
-        </Card>
-      )}
-      {((abschnitte && abschnitte.length > 0) || grammatik.length > 0) && (
-        <Card withBorder radius="md" padding="md" h="100%" data-sprach-units>
-          <Group justify="space-between" mb="xs" gap="xs">
-            <Text fw={700}>Units</Text>
-            {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
-            <Group gap={4} justify="flex-end">
-              {/* „+ Vokabeln hinzufügen" (10.10.2026): zum Reiter „Vokabeln" und gleich der Dialog */}
-              <Button
-                size="compact-xs"
-                variant="light"
-                leftSection={<IconPlus size={12} />}
-                onClick={() => (zuAbschnitten(), vokabelnHinzufuegen(kursId))}
-                data-units-hinzufuegen
-              >
-                Vokabeln hinzufügen
-              </Button>
-              <Button
-                size="compact-xs"
-                variant="light"
-                color="grape"
-                leftSection={<IconPlus size={12} />}
-                onClick={() => (zuGrammatik(), grammatikHinzufuegen(kursId))}
-                data-units-grammatik-hinzufuegen
-              >
-                Grammatik hinzufügen
-              </Button>
-              <Button size="compact-xs" variant="subtle" onClick={zuAbschnitten}>
-                Alle Abschnitte
-              </Button>
-            </Group>
+        ) : (
+          <Text size="sm" c="dimmed" data-lernstand-leer>
+            Noch keine Wörter im Kurs – „Vokabeln hinzufügen" unter „Units".
+          </Text>
+        )}
+      </Card>
+      <Card withBorder radius="md" padding="md" h="100%" data-sprach-units>
+        <Group justify="space-between" mb="xs" gap="xs">
+          <Text fw={700}>Units</Text>
+          {/* Drei Knöpfe (17.10.2026): dürfen umbrechen statt abgeschnitten zu werden */}
+          <Group gap={4} justify="flex-end">
+            {/* „+ Vokabeln hinzufügen" (10.10.2026): zum Reiter „Vokabeln" und gleich der Dialog */}
+            <Button
+              size="compact-xs"
+              variant="light"
+              leftSection={<IconPlus size={12} />}
+              onClick={() => (zuAbschnitten(), vokabelnHinzufuegen(kursId))}
+              data-units-hinzufuegen
+            >
+              Vokabeln hinzufügen
+            </Button>
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="grape"
+              leftSection={<IconPlus size={12} />}
+              onClick={() => (zuGrammatik(), grammatikHinzufuegen(kursId))}
+              data-units-grammatik-hinzufuegen
+            >
+              Grammatik hinzufügen
+            </Button>
+            <Button size="compact-xs" variant="subtle" onClick={zuAbschnitten}>
+              Alle Abschnitte
+            </Button>
           </Group>
-          <UnitsKompakt abschnitte={abschnitte ?? []} grammatik={grammatik} schluessel={kursId} />
-        </Card>
-      )}
+        </Group>
+        <UnitsKompakt abschnitte={abschnitte ?? []} grammatik={grammatik} schluessel={kursId} />
+      </Card>
       {material}
     </SimpleGrid>
   )

@@ -90,6 +90,7 @@ import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klass
 import { AlsSchuelerAnsehen } from './SchuelerVorschau'
 import { FachKopf } from './FachKopf'
 import { KlassenKurs } from './KlassenKurs'
+import { FachLernstand } from './FachLernstand'
 import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
@@ -880,8 +881,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const sichtbarerBedarf = [...entwurfBedarf, ...d.bedarf]
   const wackeligVorschlag = d.vorschlaege.find((v): v is Extract<Vorschlag, { art: 'vokabeln' }> => v.art === 'vokabeln') ?? null
   const kopfDaten = { ...d, bedarf: sichtbarerBedarf }
-  // Auch Kurse nur mit Grammatik (17.10.2026, abgestimmt): der Kasten „Units" zeigt dann die Grammatik je Unit
-  const mitLernstand = Boolean(d.sprachfach && sprachKurs && (sprachKurs.woerter > 0 || d.grammatik.some((g) => g.vokId === sprachKurs.id)))
+  // Auch Kurse nur mit Grammatik (17.10.2026, abgestimmt): der Kasten „Units" zeigt dann die Grammatik je Unit.
+  // 19.10.2026 (Wunsch der Lehrkraft): auch ganz ohne Vokabeln/Grammatik – die Kästen stehen dann mit Platzhalter da
+  const mitLernstand = Boolean(d.sprachfach && sprachKurs)
   /*
    * „Passendes Material" (10.10.2026): Problemwörter stehen nicht mehr hier – die Kachel „Problemwörter" in „Auf einen
    * Blick" öffnet ihr eigenes Pop-up (ProblemWoerterFenster.tsx). In Sprachklassen mit Lernstand ein Kasten in der Reihe
@@ -966,7 +968,20 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
     <Stack data-klasse-detail={d.titel}>
       {/* ---------- Kopf mit Kennzahlen (09.10.2026, „Kopf + Reiter" wie die Kursseite; für jedes Fach) – in Sprachklassen
            mit Lernstand klein neben Karteikasten und Units (10.10.2026, unten) */}
-      {!mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
+      {d.sprachfach && !mitLernstand && <FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} />}
+      {/* ---------- Andere Fächer (19.10.2026, abgestimmt): dieselbe Reihe aus Kästen – Auf einen Blick, Lernstand in
+           Reihen & Blättern, Reihen & Blätter – immer, auch ohne Material */}
+      {!d.sprachfach && (
+        <FachLernstand
+          reihen={d.reihen}
+          blaetter={d.blaetter}
+          kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt />}
+          material={materialKasten(true)}
+          zuReihen={() => setze({ reiter: 'reihen' })}
+          reiheErstellen={() => reiheFuerKlasse(d)}
+          blattErstellen={() => void blattNeuFuerKlasse(d)}
+        />
+      )}
       {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
            seit 10.10.2026 mit dem kompakten Kennzahlen-Kasten vorn in derselben Reihe */}
       {mitLernstand && sprachKurs && (
@@ -1001,7 +1016,7 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
       <GeplantKarte gruppeId={d.id} neuLaden={laden} />
 
       {/* ---------- Vorschläge für Material: in Sprachklassen mit Lernstand oben in der Reihe neben „Units" (10.10.2026) */}
-      {!mitLernstand && materialKasten(false)}
+      {d.sprachfach && !mitLernstand && materialKasten(false)}
 
       {/* ---------- Reiter (Runde 2): Reihen & Blätter, Vokabeln & Grammatik (Sprachfach), Tests & Noten, Lernende */}
       <Tabs value={aktiverReiter} onChange={(v) => v && setze({ reiter: v })} keepMounted={false}>

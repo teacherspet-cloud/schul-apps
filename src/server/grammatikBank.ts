@@ -12,6 +12,10 @@
  *   POST /server/grammatik-bank/speichern {sprache, schluessel, regel, aufgaben} → { zahlen, kurse }
  */
 import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { gunzipSync } from 'node:zlib'
+import { RESSOURCEN } from './pfade'
 import { datenbank, protokolliereServer, serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
 import { imNutzer } from './kontext'
@@ -62,6 +66,51 @@ const db = () => {
     doppelteEinmal(d)
   }
   return d
+}
+
+/**
+ * Grundbestand (19.10.2026, Wunsch der Lehrkraft: „sodass sie auch auf einem völlig neuen Server schon vorhanden wären"):
+ * resources/grammatik-bank/grundbestand.json.gz ist die entschlüsselte Bank des Schulservers vom 19.10.2026. Ein Server
+ * mit LEERER Bank spielt sie einmal ein (verschlüsselt wie jede Bank-Zeile); eine vorhandene Bank bleibt unberührt.
+ * Gemerkt in `wartung` – danach bewusst Geleertes kommt nicht wieder. Aufgerufen beim Start des Servers (start.ts), nicht
+ * beim ersten Zugriff – Tests mit eigener Datenbank bleiben leer.
+ */
+interface Grundbestand {
+  regeln: { schluessel: string; sprache: string; bank_regel: unknown; geaendert: string }[]
+  aufgaben: { id: string; sprache: string; schluessel: string; form: string; uebung: string; niveau: string; pos: number; bank_aufgabe: unknown; geaendert: string }[]
+}
+export const bankGrundbestand = (): number => grundbestandEinmal(db())
+export function grundbestandEinmal(d: ReturnType<typeof datenbank>, datei = join(RESSOURCEN, 'grammatik-bank', 'grundbestand.json.gz')): number {
+  const name = 'grammatik-bank-grundbestand-2026-10-19'
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(name)) return 0
+    const leer =
+      !d.prepare('SELECT 1 FROM gram_bank LIMIT 1').get() && !d.prepare('SELECT 1 FROM gram_bank_regel LIMIT 1').get()
+    let n = 0
+    if (leer && existsSync(datei)) {
+      const g = JSON.parse(gunzipSync(readFileSync(datei)).toString('utf8')) as Grundbestand
+      d.exec('BEGIN')
+      try {
+        const regel = d.prepare('INSERT OR IGNORE INTO gram_bank_regel (schluessel, sprache, bank_regel, geaendert) VALUES (?, ?, ?, ?)')
+        for (const r of g.regeln) regel.run(r.schluessel, r.sprache, JSON.stringify(r.bank_regel), r.geaendert)
+        const rein = d.prepare(
+          'INSERT OR IGNORE INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        for (const a of g.aufgaben) n += Number(rein.run(a.id, a.sprache, a.schluessel, a.form, a.uebung, a.niveau, a.pos, JSON.stringify(a.bank_aufgabe), a.geaendert).changes)
+        d.exec('COMMIT')
+      } catch (e) {
+        d.exec('ROLLBACK')
+        throw e
+      }
+    }
+    d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(name, new Date().toISOString())
+    protokolliereServer('grammatik', `WARTUNG ${name}: ${leer ? `${n} Aufgaben eingespielt` : 'Bank schon gefüllt, nichts eingespielt'}`)
+    return n
+  } catch {
+    // Beim nächsten Start erneut
+    return 0
+  }
 }
 
 /** Einmal (13.10.2026, Wunsch der Lehrkraft): Dopplungen in der Bank entfernen – beim ersten Zugriff, gemerkt in `wartung` */

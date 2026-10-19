@@ -26,8 +26,8 @@ interface FachDaten {
   lernende: unknown[]
   bedarf: unknown[]
   tests: { durchschnitt: number | null; status: string; offen: number }[]
-  blaetter: { status: string }[]
-  reihen: { status: string }[]
+  blaetter: { status: string; titel?: string; erstellt?: string; gesamt?: number; eingereicht?: number; geplantAb?: number | null }[]
+  reihen: { status: string; lernziele?: { erreicht: number }[]; geplantAb?: number | null }[]
   vokabeln: {
     id: string
     status: string
@@ -56,11 +56,21 @@ export function fachKennzahlen(d: FachDaten, jetzt = Date.now()): {
   blaetterOffen: number
   reihenOffen: number
   vokabeln: { sicher: number; aktiv: number; von: number; test: number | null; woerter: number; heute: number; probleme: number } | null
+  /** Andere Fächer (19.10.2026): Lernziele der laufenden Reihen im Schnitt, Abgaben beim neuesten offenen Blatt */
+  lernziele: number | null
+  blatt: { titel: string; eingereicht: number; von: number } | null
 } {
   const noten = d.tests.map((t) => t.durchschnitt).filter((x): x is number => x != null)
   const kurs = d.vokabeln.find((v) => v.id === d.klassenKurs) ?? d.vokabeln.find((v) => v.status === 'offen' && v.woerter > 0)
   const tests = d.vokabeln.map((v) => v.testTermin).filter((t): t is number => Boolean(t && t > jetzt - 86_400_000))
+  const laeuft = (x: { status: string; geplantAb?: number | null }): boolean => x.status === 'offen' && !(x.geplantAb && x.geplantAb > jetzt)
+  const ziele = d.reihen.filter(laeuft).flatMap((r) => r.lernziele ?? [])
+  const blatt = d.blaetter
+    .filter((b) => laeuft(b) && (b.gesamt ?? 0) > 0)
+    .sort((a, b) => (Date.parse(b.erstellt ?? '') || 0) - (Date.parse(a.erstellt ?? '') || 0))[0]
   return {
+    lernziele: ziele.length ? ziele.reduce((s, z) => s + z.erreicht, 0) / ziele.length : null,
+    blatt: blatt ? { titel: blatt.titel ?? '', eingereicht: Math.min(blatt.eingereicht ?? 0, blatt.gesamt ?? 0), von: blatt.gesamt ?? 0 } : null,
     lernende: d.lernende.length,
     bedarf: d.bedarf.length,
     testSchnitt: noten.length ? noten.reduce((a, b) => a + b, 0) / noten.length : null,
@@ -167,7 +177,7 @@ export function FachKopf({
               </Text>
               <FortschrittsRing anteil={v.sicher} titel="Wörter sicher" unten={`im Schnitt ${sicherWoerter} von ${v.woerter} Wörtern`} groesse={64} farbe="var(--mantine-color-teal-6)" ampel={false} />
               <Text size="xs" c="dimmed" lh={1.25} ta="center">
-                {sicherWoerter} von {v.woerter} Wörtern
+                {v.woerter ? `${sicherWoerter} von ${v.woerter} Wörtern` : 'noch keine Wörter'}
               </Text>
             </UnstyledButton>
             <UnstyledButton onClick={() => gehe('vokabeln')} className="kennzahl kennzahl-knopf kennzahl-bild" data-kennzahl="aktiv">
@@ -175,7 +185,7 @@ export function FachKopf({
                 aktiv diese Woche
               </Text>
               {v.von > 0 && v.von <= 40 ? (
-                <LernendenPunkte aktiv={v.aktiv} von={v.von} />
+                <LernendenPunkte aktiv={v.aktiv} von={v.von} was="diese Woche aktiv" />
               ) : (
                 <FortschrittsRing anteil={v.von ? v.aktiv / v.von : 0} titel="aktiv diese Woche" groesse={64} ampel={false} />
               )}
@@ -192,16 +202,55 @@ export function FachKopf({
       />
     )
   }
+  // Andere Fächer kompakt (19.10.2026, abgestimmt): „Lernziele erreicht" als Ring, „Blatt abgegeben" als Punkte – auch leer
+  if (kompakt && !d.sprachfach) {
+    const b = k.blatt
+    return (
+      <KennzahlenKopf
+        titel={<Text fw={700}>Auf einen Blick</Text>}
+        oben={
+          <SimpleGrid cols={2} spacing={6} data-kennzahlen-bild>
+            <UnstyledButton onClick={() => gehe('reihen')} className="kennzahl kennzahl-knopf kennzahl-bild" data-kennzahl="lernziele">
+              <Text size="xs" c="dimmed" lh={1.2}>
+                Lernziele erreicht
+              </Text>
+              <FortschrittsRing anteil={k.lernziele ?? 0} titel="Lernziele erreicht" groesse={64} farbe="var(--mantine-color-teal-6)" ampel={false} />
+              <Text size="xs" c="dimmed" lh={1.25} ta="center">
+                {k.lernziele == null ? 'noch keine laufende Reihe' : 'im Schnitt der laufenden Reihen'}
+              </Text>
+            </UnstyledButton>
+            <UnstyledButton onClick={() => gehe('reihen')} className="kennzahl kennzahl-knopf kennzahl-bild" data-kennzahl="abgaben">
+              <Text size="xs" c="dimmed" lh={1.2}>
+                Blatt abgegeben
+              </Text>
+              {b && b.von <= 40 ? (
+                <LernendenPunkte aktiv={b.eingereicht} von={b.von} was="haben das Blatt abgegeben" />
+              ) : (
+                <FortschrittsRing anteil={b ? b.eingereicht / b.von : 0} titel="Blatt abgegeben" groesse={64} ampel={false} />
+              )}
+              <Text size="xs" c="dimmed" lh={1.25} ta="center" lineClamp={2}>
+                {b ? `${b.eingereicht} von ${b.von} · „${b.titel}"` : 'noch kein offenes Blatt'}
+              </Text>
+            </UnstyledButton>
+          </SimpleGrid>
+        }
+        zahlen={relevanteKennzahlen(zahlen, k)}
+        kacheln
+        data-fach-kopf="fach"
+        data-fach-kopf-kompakt
+      />
+    )
+  }
   return <KennzahlenKopf zahlen={zahlen} data-fach-kopf={d.sprachfach ? 'sprache' : 'fach'} />
 }
 
-/** Ein Punkt je Lernende: gefüllt = diese Woche geübt (10.10.2026) */
-function LernendenPunkte({ aktiv, von }: { aktiv: number; von: number }): React.JSX.Element {
+/** Ein Punkt je Lernende: gefüllt = diese Woche geübt (10.10.2026) bzw. Blatt abgegeben (19.10.2026) */
+function LernendenPunkte({ aktiv, von, was }: { aktiv: number; von: number; was: string }): React.JSX.Element {
   const groesse = von > 24 ? 8 : 11
   return (
     <div
       role="img"
-      aria-label={`${aktiv} von ${von} Lernenden diese Woche aktiv`}
+      aria-label={`${aktiv} von ${von} Lernenden ${was}`}
       data-lernenden-punkte
       style={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center', alignContent: 'center', minHeight: 64, maxWidth: 150, margin: '0 auto' }}
     >

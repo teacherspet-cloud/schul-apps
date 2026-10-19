@@ -468,7 +468,11 @@ try {
     'Geschichte: ohne Reiter „Vokabeln“ und „Grammatik“'
   )
   // Derselbe Kopf für jedes Fach – ohne Sprach-Kennzahlen
-  pruefe(await da(p.locator('[data-fach-kopf="fach"] [data-kennzahl="tests"]')), 'Geschichte: Kopf mit „Tests Ø"')
+  // Andere Fächer (19.10.2026): dieselbe Reihe aus Kästen wie in Sprachklassen – auch ohne Material
+  pruefe(await da(p.locator('[data-fach-lernstand] [data-fach-kopf="fach"][data-fach-kopf-kompakt] [data-kennzahl="lernziele"]')), 'Geschichte: „Auf einen Blick" mit „Lernziele erreicht"')
+  pruefe(await da(p.locator('[data-fach-lernstand] [data-kennzahl="abgaben"]')), 'Geschichte: „Blatt abgegeben"')
+  pruefe(await da(p.locator('[data-fach-lernstand] [data-fach-lernstand-kasten]')), 'Geschichte: „Lernstand in Reihen & Blättern"')
+  pruefe(await da(p.locator('[data-fach-lernstand] [data-fach-reihen-blaetter] [data-fach-reihe-erstellen]')), 'Geschichte: „Reihen & Blätter" mit „Reihe erstellen"')
   pruefe((await p.locator('[data-fach-kopf] [data-kennzahl="sicher"]').count()) === 0, 'Geschichte: ohne „Wörter sicher"')
   await p.screenshot({ path: join(out, '4c-geschichte-kopf.png') })
   await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()

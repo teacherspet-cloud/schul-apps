@@ -14,7 +14,7 @@
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
 import { grammatikRoute } from './grammatik'
-import { grammatikBankRoute } from './grammatikBank'
+import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute, alleBerichtigen } from './achievements'
@@ -30,7 +30,9 @@ import { kontoZumSchluessel, vorschauRoute } from './vorschau'
 import { vokabelwegRoute } from './vokabelweg'
 import { sprachstandRoute } from './sprachstand'
 import { doppeltePruefen, wortlisteRoute } from './wortliste'
-import { existsSync } from 'node:fs'
+import { cpSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { DATEN, RESSOURCEN } from './pfade'
 import { ablageVerschluesseln } from './shims/fs'
 import { kiAblagenAufraeumen } from './kiAblage'
 import { registriereKanaele, type Handle } from '../main/kanaele'
@@ -84,7 +86,7 @@ import { lernenRoute } from './lernen'
 import { spielRoute } from './spiel'
 import { planenRoute } from './planen'
 import { aktuellerNutzer } from './kontext'
-import { DATEN, OBERFLAECHE } from './pfade'
+import { OBERFLAECHE } from './pfade'
 
 const env = process.env
 
@@ -133,6 +135,20 @@ async function main(): Promise<void> {
   })
   // Grammatikformen der Lehrwerke (12.10.2026): gemeinsame Bearbeitungen über die eingebauten legen
   ladeLehrwerkGrammatik()
+  // Medienbank-Grundbestand (19.10.2026, Wunsch der Lehrkraft): ein neuer Server ohne Medienbank übernimmt den Stand des
+  // Schulservers vom 19.10.2026 (resources/medienbank – Bilder, Aussprache, Beispielsätze); eine vorhandene bleibt, wie sie ist
+  // Grammatik-Aufgabenbank ebenso (grammatikBank.ts, nur bei leerer Bank). SCHULAPPS_GRUNDBESTAND=0 (Testserver): beides aus
+  const grundbestand = env.SCHULAPPS_GRUNDBESTAND !== '0'
+  if (grundbestand) bankGrundbestand()
+  const medienZiel = join(DATEN, 'medienbank')
+  const medienQuelle = join(RESSOURCEN, 'medienbank')
+  if (grundbestand && !existsSync(join(medienZiel, 'index.json')) && existsSync(join(medienQuelle, 'index.json')))
+    try {
+      cpSync(medienQuelle, medienZiel, { recursive: true, force: false })
+      protokolliereServer('system', 'Medienbank-Grundbestand eingespielt')
+    } catch (e) {
+      protokolliereServer('system', `Medienbank-Grundbestand fehlgeschlagen: ${fehlerKurz(e)}`)
+    }
   // Kurse aus IServ (10.10.2026, iservKursgruppen.ts): nach jeder Anmeldung über IServ erkennen und Kursgruppen sichern
   anmeldeHaken.nachIserv = nachIservAnmeldung
 

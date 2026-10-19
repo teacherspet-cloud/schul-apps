@@ -11,7 +11,8 @@ extraResources:
   - from: resources/
     to: resources/
     # Nur die gebündelte Piktogramm-Datei, keine Einzel-SVGs (schnelleres Entpacken beim Start)
-    filter: ['**/*', '!openmoji/svg/**']
+    # Medienbank und Grammatik-Aufgabenbank (19.10.2026) sind nur der Grundbestand neuer Server – nicht in die Exe
+    filter: ['**/*', '!openmoji/svg/**', '!medienbank/**', '!grammatik-bank/**']
 # Nur deutsche und englische Chromium-Sprachdateien (spart ~47 MB beim Entpacken)
 electronLanguages:
   - de
