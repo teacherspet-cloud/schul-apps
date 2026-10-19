@@ -7,7 +7,7 @@
 // Ergebnis: <Ausgabeordner>/<id>-<n>.png. Die gewählten Bilder als <id>.png in einen Ordner legen
 // und mit `npx electron scripts/programmbilder.mjs <Ordner>` zu Kachelbildern machen.
 import { _electron as electron } from 'playwright-core'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 
@@ -21,6 +21,11 @@ const MOTIVE = {
   grammatikformen:
     'Tile colour: grape purple (#cc5de8 to #9c36b5). Motif: a closed white textbook standing upright with three coloured bookmark tabs sticking out of the top, ' +
     'next to it a small white card with two short grey lines and a green check mark, and a tiny white puzzle piece in front.',
+  // 19.10.2026: App „Sprechprüfungen" (Organisation; Kachelfarbe grape)
+  sprechpruefungen:
+    'Tile colour: grape purple (#cc5de8 to #9c36b5). Motif: a classic white studio microphone on a small stand in the centre, ' +
+    'behind it two overlapping speech bubbles (one white, one light lilac) as if two people are talking, ' +
+    'and in front a small white clipboard with a short rating scale of five dots, three of them filled in green.',
   // 12.10.2026: Kopf der Startseite (Begrüßung + Tagesleiste, Wunsch der Lehrkraft)
   startseite:
     'Tile colour: warm morning gradient from soft yellow to orange (#ffd43b to #fd7e14). Motif: a small friendly white school building with a round clock above the door, ' +
@@ -98,6 +103,13 @@ mkdirSync(out, { recursive: true })
 const echt = join(process.env.APPDATA ?? '', 'schul-apps')
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-bilder-'))
 for (const f of ['settings.json', 'secrets.json', 'Local State']) if (existsSync(join(echt, f))) copyFileSync(join(echt, f), join(userData, f))
+// --codex=<Pfad> (19.10.2026): Codex-Programm des ChatGPT-Abos, wenn es nicht im Suchpfad der App liegt (z. B. aus der Codex-App)
+const codex = process.argv.find((a) => a.startsWith('--codex='))?.slice(8)
+if (codex && existsSync(join(userData, 'settings.json'))) {
+  const s = JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8'))
+  s.ai.cliPaths = { ...(s.ai.cliPaths ?? {}), openai: codex }
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify(s))
+}
 const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], env: { ...process.env, SCHULAPPS_KI_ATTRAPPE: '' } })
 try {
   // Das erste Fenster kann ein Zwischenfenster sein – das Hauptfenster hat window.api

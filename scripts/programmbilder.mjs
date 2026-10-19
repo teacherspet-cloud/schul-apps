@@ -59,7 +59,8 @@ const IDS = [
   'meineklassen',
   // 12.10.2026: Kopf der Startseite
   'startseite',
-  'grammatikformen'
+  'grammatikformen',
+  'sprechpruefungen'
 ]
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320

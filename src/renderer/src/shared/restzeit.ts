@@ -30,7 +30,13 @@
 import type { AppSettings, StructuredRequest } from '@shared/types'
 import { remainingLabel, remainingSeconds } from './aiProgress'
 
-const STORE_KEY = 'schul-apps-dauern'
+/*
+ * Fassung 2 (19.10.2026, Wunsch der Lehrkraft): Seit die Dauer erst ab dem Beginn der ersten Anfrage zählt
+ * (auftraege.ts), passen die alten Läufe nicht mehr – sie enthielten Zeit in der Warteschlange. Jedes Gerät verwirft
+ * sie beim ersten Lesen (ALTE_KEYS) und lernt neu.
+ */
+const STORE_KEY = 'schul-apps-dauern-2'
+const ALTE_KEYS = ['schul-apps-dauern']
 /** So viele Läufe je Schlüssel fließen ein – alte Zeiten eines Anbieters verblassen */
 export const HISTORY = 10
 
@@ -61,6 +67,11 @@ let cache: DauerVerlauf | null = null
 
 export function leseVerlauf(): DauerVerlauf {
   if (cache) return cache
+  try {
+    for (const k of ALTE_KEYS) localStorage.removeItem(k)
+  } catch {
+    // ohne lokalen Speicher nichts zu verwerfen
+  }
   try {
     const raw = localStorage.getItem(STORE_KEY)
     const v = raw ? (JSON.parse(raw) as Partial<DauerVerlauf>) : {}
