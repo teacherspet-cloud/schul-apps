@@ -45,7 +45,9 @@ export function ordnerFarben(farbe: string, dunkel: boolean): OrdnerFarben {
       // Alphabetische Liste (09.10.2026): gleich hinter „Meine Bücher"
       abc: flaecheMitSchrift(mische(basis, '#ffffff', 0.27)),
       gram: flaecheMitSchrift(mische(basis, '#ffffff', 0.35)),
-      mat: flaecheMitSchrift(mische(basis, '#000000', 0.35))
+      mat: flaecheMitSchrift(mische(basis, '#000000', 0.35)),
+      // Alle Jahrgänge (19.10.2026): dunkler als „Materialien", gleich dahinter
+      jahre: flaecheMitSchrift(mische(basis, '#000000', 0.5))
     }
   }
 }

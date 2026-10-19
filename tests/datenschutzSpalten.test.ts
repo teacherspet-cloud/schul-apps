@@ -39,6 +39,7 @@ const AUSNAHMEN: Record<string, string> = {
   'feedback_freigaben.art': "Art der Freigabe ('', 'reihe', 'blatt') – Material, keine Person",
   'fach_freigaben.art': 'Materialart (Arbeitsblatt, Test …)',
   'fach_kopien.art': 'Materialart',
+  'ueberthemen.art': "Art des Eingriffs ('name' | 'zuordnung'), keine Person",
   'fach_iserv.faecher': 'Fächerliste aus IServ (Deutsch, Mathe …), keine Person',
   'vok_gaeste.wieder': 'nur Prüfwert (HMAC, codePruefwert), Suchschlüssel',
   'vok_gaeste.anmelde': 'nur Prüfwert (HMAC, codePruefwert), Suchschlüssel',

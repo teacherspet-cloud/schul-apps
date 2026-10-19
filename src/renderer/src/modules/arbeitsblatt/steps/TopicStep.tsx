@@ -101,6 +101,7 @@ import {
 } from '../generation/prompts'
 import { istSprechblatt, SPRECH_TEILE, sprechTeile, type SprechTeil } from '../didactics/sprechen'
 import { defaultMeta } from '../model/defaults'
+import { ModulHinweis } from './ModulHinweis'
 import { subjectById, SUBJECTS } from '../model/subjects'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import type {
@@ -477,6 +478,8 @@ export default function TopicStep(): React.JSX.Element {
                         value={meta.topic}
                         onChange={(e) => patch({ topic: e.currentTarget.value })}
                       />
+                      {/* Q-Phase (19.10.2026): Rahmenthema und Modul des KC schon beim Erstellen */}
+                      <ModulHinweis fach={meta.subjectId} jahrgang={meta.grade} thema={meta.topic} setThema={(t) => patch({ topic: t })} />
                     </Stack>
                   </Card>
 

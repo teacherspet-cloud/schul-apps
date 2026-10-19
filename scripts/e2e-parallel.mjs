@@ -34,7 +34,7 @@ tests.sort((a, b) => (LANG.includes(b) ? 1 : 0) - (LANG.includes(a) ? 1 : 0))
 // Tests, die die Kalender-Testuhr verstellen (10.10.2026): „schuljahr" braucht einen frischen Server (läuft zuerst),
 // „achievements" stellt die Uhr ins nächste Schuljahr und zurück – zuletzt, damit kein anderer Test dazwischen gerät
 const ZUERST = ['schuljahr']
-const ZULETZT = ['achievements']
+const ZULETZT = ['ueberthemen', 'achievements']
 tests.sort((a, b) => (ZUERST.includes(b) ? 1 : 0) - (ZUERST.includes(a) ? 1 : 0) || (ZULETZT.includes(a) ? 1 : 0) - (ZULETZT.includes(b) ? 1 : 0))
 
 const basis = join(tmpdir(), `schulapps-e2e-${Date.now()}`)

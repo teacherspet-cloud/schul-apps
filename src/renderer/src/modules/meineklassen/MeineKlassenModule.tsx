@@ -973,13 +973,26 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
            Reihen & Blättern, Reihen & Blätter – immer, auch ohne Material */}
       {!d.sprachfach && (
         <FachLernstand
+          gruppeId={d.id}
+          fach={d.fach}
           reihen={d.reihen}
           blaetter={d.blaetter}
+          tests={d.tests}
+          lernende={d.lernende.length}
           kopf={<FachKopf d={kopfDaten} gehe={(r) => setze({ reiter: r })} kompakt />}
           material={materialKasten(true)}
           zuReihen={() => setze({ reiter: 'reihen' })}
           reiheErstellen={() => reiheFuerKlasse(d)}
           blattErstellen={() => void blattNeuFuerKlasse(d)}
+          oeffnen={(art, mid) =>
+            art === 'blatt'
+              ? oeffneMitRueckweg('freigaben', mid)
+              : art === 'reihe'
+                ? oeffneMitRueckweg('laufendereihen')
+                : art === 'test'
+                  ? oeffneMitRueckweg('onlinetest', mid)
+                  : oeffneMitRueckweg('rueckmeldung')
+          }
         />
       )}
       {/* ---------- Lernstand der Sprachklasse (09.10.2026): wie der Überblick der Kursseite – Karteikasten und Units;
@@ -1023,7 +1036,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Tabs.List>
           <Tabs.Tab value="reihen">Unterrichtsreihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
           {/* Vokabeln und Grammatik getrennt (08.10.2026, Wunsch der Lehrkraft) */}
-          {d.sprachfach && d.vokabelfach !== false && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.length})</Tabs.Tab>}
+          {/* Zahl nur Kurse mit Wörtern (19.10.2026, Befund 9c: der leere Klassenkurs zählte als „Vokabeln (1)") */}
+          {d.sprachfach && d.vokabelfach !== false && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.filter((v) => v.woerter > 0).length})</Tabs.Tab>}
           {d.sprachfach && <Tabs.Tab value="grammatik">Grammatik ({d.grammatik.length})</Tabs.Tab>}
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>

@@ -13,7 +13,7 @@
  * „Zurück" (Knopf, Browser, Wischen) blättert zurück. Die Adresse nennt die Ebene (?r=gram&g=<ID>, ?r=mat&b=<ID>).
  */
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
-import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconFileText, IconSortAscendingLetters } from '@tabler/icons-react'
+import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconChevronDown, IconChevronRight, IconFileText, IconHistory, IconSortAscendingLetters } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import GrammatikTrainer from '../GrammatikTrainer'
 import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
@@ -33,6 +33,9 @@ import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
 import { Demnaechst, NeuFreigeschaltet } from './planHinweise'
 import { fuerDichAufteilen } from '@shared/fuerDich'
+import { schuljahrText } from '@shared/schulkalender'
+import { holen } from '../../onlinetest/serverApi'
+import { themenGruppieren, type ThemenStand } from './materialThemen'
 
 const CSS = `
 .og-ordner { display: grid; grid-template-columns: 46px 1fr auto; min-height: 70vh; border-radius: 10px; overflow: visible; position: relative;
@@ -111,7 +114,8 @@ const SYMBOL: Record<Register, React.ReactNode> = {
   wort: <IconBooks size={16} />,
   abc: <IconSortAscendingLetters size={16} />,
   gram: <IconBook2 size={16} />,
-  mat: <IconFileText size={16} />
+  mat: <IconFileText size={16} />,
+  jahre: <IconHistory size={16} />
 }
 
 export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
@@ -129,6 +133,8 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   // Ordner und klappt auf (ordnerAnimation.ts) – der Ordner selbst blendet sich dann nicht noch einmal ein
   const [uebergang] = useState(ordnerUebergangLaeuft)
   const ordnerEl = useRef<HTMLDivElement>(null)
+  // Überthemen der Materialien (19.10.2026, Server ueberthemen.ts) – auch für „Alle Jahrgänge"
+  const themen = useThemen(fach)
   if (!ordner) return <Loader />
   const s = beschriftung(fach)
   if (!o)
@@ -143,7 +149,9 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
     )
   const f = ordnerFarben(o.farbe, dunkel)
   // Meine Bücher und Alphabetisch (09.10.2026): eigene Register hinter Vokabeln und Grammatik (10.10.2026) – nur im Ordner, der Rücken im Regal bleibt
-  const register = mitWortliste(registerVon(o))
+  // „Alle Jahrgänge" (19.10.2026): nur, wenn es Material aus früheren Schuljahren gibt
+  const fruehere = Boolean(themen && Object.values(themen.eintraege).some((x) => x.schuljahr < themen.schuljahr))
+  const register: Register[] = [...mitWortliste(registerVon(o)), ...(fruehere ? (['jahre'] as Register[]) : [])]
   const aktiv: Register = wahl && register.includes(wahl) ? wahl : register[0] ?? 'mat'
   const zeigen = (r: Register): void => {
     setWahl(r)
@@ -222,13 +230,13 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                     ) : (
                       <Kurse o={o} grammatik setSeite={setSeite} />
                     ))}
-                  {aktiv === 'mat' &&
+                  {(aktiv === 'mat' || aktiv === 'jahre') &&
                     (seite?.art === 'blatt' ? (
                       <div data-ordner-unterseite="blatt">
                         <BlattAusfuellen key={seite.id} id={seite.id} />
                       </div>
                     ) : (
-                      <Materialien o={o} setSeite={setSeite} />
+                      <Materialien o={o} setSeite={setSeite} themen={themen} alle={aktiv === 'jahre'} />
                     ))}
                 </div>
               </div>
@@ -285,7 +293,7 @@ export const mitWortliste = (r: Register[]): Register[] => {
 
 /** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
 export function zuTun(o: FachOrdner, r: Register): number {
-  if (r === 'wort' || r === 'abc') return 0
+  if (r === 'wort' || r === 'abc' || r === 'jahre') return 0
   if (r === 'vok') return o.vokabeln.filter((v) => (v.uebersicht.heuteOffen ?? 0) > 0 || v.uebersicht.faellig > 0).length
   if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
   return (
@@ -332,7 +340,7 @@ function Wiederherstellen({ setSeite, register }: { setSeite: (s: Seite | null) 
     const bl = q.get('b')
     const x: Seite | null = g && /^[a-f0-9]{8,32}$/.test(g) ? { art: 'gram', id: g } : bl && /^[a-f0-9]{8,32}$/.test(bl) ? { art: 'blatt', id: bl } : null
     window.history.replaceState({ ...(window.history.state ?? {}), ordnerTiefe: 0 }, '', `${window.location.pathname}?r=${register}`)
-    if (x && ((x.art === 'gram' && register === 'gram') || (x.art === 'blatt' && register === 'mat')))
+    if (x && ((x.art === 'gram' && register === 'gram') || (x.art === 'blatt' && (register === 'mat' || register === 'jahre'))))
       b.oeffne(
         x.art,
         () => setSeite(x),
@@ -532,23 +540,59 @@ function Abschnitt({ titel, children }: { titel: string; children: React.ReactNo
   )
 }
 
-function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | null) => void }): React.JSX.Element {
+/** Überthemen der Materialien eines Fachs (19.10.2026): Zuordnung je Material, ohne Titel (Server ueberthemen.ts) */
+function useThemen(fach: string): ThemenStand | null {
+  const [d, setD] = useState<ThemenStand | null>(null)
+  useEffect(() => {
+    let aus = false
+    void holen<ThemenStand>(`/s/api/themen?fach=${encodeURIComponent(fachName(fach))}`).then(
+      (r) => !aus && setD(r),
+      () => !aus && setD({ eintraege: {}, schuljahr: 0 })
+    )
+    return () => {
+      aus = true
+    }
+  }, [fach])
+  return d
+}
+
+/**
+ * Register „Materialien" (seit 19.10.2026 nach Überthemen, abgestimmt mit der Lehrkraft): oben „Für dich" und offene
+ * Onlinetests, dann je Überthema des laufenden Schuljahres Blätter, Reihen, Rückmeldungen und abgegebene Tests, zuletzt
+ * Mappen und Merkzettel. `alle` = Register „Alle Jahrgänge": alles aus allen Schuljahren des Kurses, Jahrgänge
+ * absteigend (aufklappbar, der neueste offen), mit Suche.
+ */
+function Materialien({
+  o,
+  setSeite,
+  themen,
+  alle = false
+}: {
+  o: FachOrdner
+  setSeite: (s: Seite | null) => void
+  themen: ThemenStand | null
+  alle?: boolean
+}): React.JSX.Element {
   const [mappe, setMappe] = useState<Mappe | null>(null)
   const oeffnen = useSeiteOeffnen(setSeite)
   const [merk, setMerk] = useState<Merkkasten | null>(null)
+  const [suche, setSuche] = useState('')
+  const [jahrAuf, setJahrAuf] = useState<Record<number, boolean>>({})
   const offeneTests = o.tests.filter((t) => !t.abgegeben)
   const fertigeTests = o.tests.filter((t) => t.abgegeben)
   // „Für dich" (12.10.2026): eigene Förder-/Forderblätter (Einzel-Freigabe) und freigegebene Übungsbündel
   const { fuerDich, andere } = fuerDichAufteilen(o.blaetter)
   const buendel = o.fuerDich ?? []
+  const register: Register = alle ? 'jahre' : 'mat'
+  const modulVon = (key: string): string | undefined => themen?.eintraege[key]?.modul
   const blattKarte = (b: (typeof o.blaetter)[number]): React.JSX.Element => (
-    <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} onClick={oeffnen('mat', { art: 'blatt', id: b.id })} data-ordner-blatt>
+    <a key={b.id} className="og-karte" href={`/s/b/${b.id}`} onClick={oeffnen(register, { art: 'blatt', id: b.id })} data-ordner-blatt>
       <Group justify="space-between" wrap="nowrap">
         <div style={{ minWidth: 0 }}>
           <Text fw={700}>{b.titel}</Text>
-          {b.thema && (
+          {(b.thema || modulVon(`blatt:${b.id}`)) && (
             <Text size="sm" c="dimmed">
-              {b.thema}
+              {[modulVon(`blatt:${b.id}`), b.thema].filter(Boolean).join(' · ')}
             </Text>
           )}
         </div>
@@ -558,6 +602,133 @@ function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | nul
       </Group>
     </a>
   )
+  const testKarte = (t: (typeof o.tests)[number]): React.JSX.Element => (
+    <a key={t.code} className="og-karte" href={`/s/t/${t.code}`} data-ordner-test>
+      <Text fw={700}>{t.titel}</Text>
+      <Text size="sm" c="dimmed">
+        {t.abgegeben ? 'abgegeben' : (testStatusText(t) ?? `${t.zeitMin} Minuten${t.wartend ? ' · startet gleich' : ''}`)}
+      </Text>
+    </a>
+  )
+  // Unterrichtsreihen (08.10.2026, Plan G.3): ihre Arbeitsblätter – mit Weg zu „Meine Abgaben"
+  const reiheBlock = (r: (typeof o.reihen)[number]): React.JSX.Element => (
+    <div key={r.zid} className="og-karte" data-ordner-reihe={r.titel}>
+      <Text fw={700} mb={4}>
+        Reihe: {r.titel}
+      </Text>
+      <Stack gap={4}>
+        {r.materialien.map((m) => {
+          const href = m.link ? `${m.link}${m.link.includes('?') ? '&' : '?'}reihe=${r.zid}` : m.stufeWaehlen ? `/s/r/${r.zid}/${m.schritt}` : undefined
+          return (
+            <a
+              key={m.schritt}
+              {...(href ? { href } : {})}
+              style={{ opacity: m.gesperrt ? 0.6 : 1, cursor: href ? undefined : 'default', color: 'inherit', textDecoration: 'none' }}
+              data-ordner-reihe-blatt
+            >
+              <Group justify="space-between" wrap="nowrap">
+                <div style={{ minWidth: 0 }}>
+                  <Text size="sm" fw={600}>
+                    {m.titel}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {m.gesperrt ? 'noch gesperrt' : m.eingereicht ? `eingereicht${m.loesung ? ' · Lösung im Blatt' : ''}` : 'noch offen'}
+                  </Text>
+                </div>
+                {href && (
+                  <Badge variant="light" size="sm" style={{ flex: 'none' }}>
+                    {m.eingereicht ? 'Ansehen' : 'Öffnen'}
+                  </Badge>
+                )}
+              </Group>
+            </a>
+          )
+        })}
+      </Stack>
+      <Group gap="xs" mt={4}>
+        <Button component="a" href={`/s/r/${r.zid}`} size="xs" variant="subtle">
+          Zur Reihe
+        </Button>
+        <Button component="a" href={`/s/r/${r.zid}/materialien?reiter=abgaben`} size="xs" variant="subtle" data-ordner-reihe-abgaben>
+          Meine Abgaben
+        </Button>
+      </Group>
+    </div>
+  )
+  const aufgabeKarte = (a: (typeof o.aufgaben)[number]): React.JSX.Element => (
+    <a key={a.id} className="og-karte" href={`/s/a/${a.id}`} data-ordner-aufgabe>
+      <Group justify="space-between" wrap="nowrap">
+        <div style={{ minWidth: 0 }}>
+          <Text fw={700}>{a.titel}</Text>
+          <Text size="sm" c="dimmed">
+            Rückmeldung · {a.fassungen.some((x) => x.bogen) ? 'Rückmeldung da' : a.fassungen.length ? 'abgegeben' : 'noch nicht abgegeben'}
+            {a.offen === false ? ' · abgeschlossen' : a.bis ? ` · bis ${new Date(a.bis).toLocaleDateString('de-DE')}` : ''}
+          </Text>
+        </div>
+        <Badge variant="light" style={{ flex: 'none' }}>
+          {a.offen === false ? 'Ansehen' : 'Öffnen'}
+        </Badge>
+      </Group>
+    </a>
+  )
+  // Alles, was einem Überthema zugeordnet wird (in „Alle Jahrgänge" auch „Für dich" und offene Tests)
+  const eintraege = [
+    ...(alle ? [...fuerDich, ...andere] : andere).map((b) => ({ key: `blatt:${b.id}`, titel: b.titel, knoten: blattKarte(b) })),
+    ...o.reihen.map((r) => ({ key: `reihe:${r.zid}`, titel: `${r.titel} ${r.materialien.map((m) => m.titel).join(' ')}`, knoten: reiheBlock(r) })),
+    ...o.aufgaben.map((a) => ({ key: `rueckmeldung:${a.id}`, titel: a.titel, knoten: aufgabeKarte(a) })),
+    ...(alle ? o.tests : fertigeTests).map((t) => ({ key: `test:${t.code}`, titel: t.titel, knoten: testKarte(t) }))
+  ]
+  const q = suche.trim().toLowerCase()
+  const gefiltert = alle && q ? eintraege.filter((e) => e.titel.toLowerCase().includes(q) || (themen?.eintraege[e.key]?.thema ?? '').toLowerCase().includes(q)) : eintraege
+  const jahre = themenGruppieren(gefiltert, themen, alle ? undefined : themen?.schuljahr)
+  const themaTitel = (t: { name: string; semester?: string }): string => (t.semester ? `${t.semester} · ${t.name}` : t.name)
+  const themenListe = (js: (typeof jahre)[number]): React.JSX.Element[] =>
+    js.themen.map((t) => (
+      <div key={t.schluessel} data-ordner-ueberthema={t.name}>
+        <Abschnitt titel={themaTitel(t)}>{t.items.map((x) => x.knoten)}</Abschnitt>
+      </div>
+    ))
+
+  if (alle)
+    return (
+      <div data-ordner-alle-jahrgaenge>
+        <input
+          type="search"
+          className="og-suche"
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          placeholder="Materialien durchsuchen …"
+          aria-label="Materialien aller Jahrgänge durchsuchen"
+          data-ordner-suche
+          style={{ marginBottom: 12 }}
+        />
+        {!jahre.length && (
+          <Text c="dimmed" size="sm">
+            {q ? 'Nichts gefunden.' : 'Noch keine Materialien.'}
+          </Text>
+        )}
+        {jahre.map((j, i) => {
+          const offen = q ? true : (jahrAuf[j.schuljahr] ?? i === 0)
+          return (
+            <div key={j.schuljahr} data-ordner-jahrgang={j.jahrgang ?? ''} data-schuljahr={j.schuljahr} style={{ marginBottom: 8 }}>
+              <button
+                type="button"
+                className="og-jahr"
+                disabled={Boolean(q)}
+                onClick={() => setJahrAuf((a) => ({ ...a, [j.schuljahr]: !offen }))}
+                aria-expanded={offen}
+              >
+                {offen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                {j.jahrgang ? jahrgangName(o.fach, j.jahrgang) : 'Schuljahr'}
+                <span className="og-jahr-zahl">{schuljahrText(j.schuljahr)}</span>
+              </button>
+              {offen && <div style={{ paddingLeft: 10, marginTop: 6 }}>{themenListe(j)}</div>}
+            </div>
+          )
+        })}
+      </div>
+    )
+
   return (
     <div>
       {(fuerDich.length > 0 || buendel.length > 0) && (
@@ -602,87 +773,13 @@ function Materialien({ o, setSeite }: { o: FachOrdner; setSeite: (s: Seite | nul
           </Abschnitt>
         </div>
       )}
-      {offeneTests.length > 0 && (
-        <Abschnitt titel="Onlinetests">
-          {offeneTests.map((t) => (
-            <a key={t.code} className="og-karte" href={`/s/t/${t.code}`} data-ordner-test>
-              <Text fw={700}>{t.titel}</Text>
-              <Text size="sm" c="dimmed">
-                {testStatusText(t) ?? `${t.zeitMin} Minuten${t.wartend ? ' · startet gleich' : ''}`}
-              </Text>
-            </a>
-          ))}
-        </Abschnitt>
-      )}
-      {andere.length > 0 && <Abschnitt titel="Arbeitsblätter">{andere.map(blattKarte)}</Abschnitt>}
-      {/* Unterrichtsreihen (08.10.2026, Plan G.3): ihre Arbeitsblätter, je Reihe – mit Weg zu „Meine Abgaben" */}
-      {o.reihen.map((r) => (
-        <Abschnitt key={r.zid} titel={`Reihe: ${r.titel}`}>
-          {r.materialien.map((m) => {
-            const href = m.link ? `${m.link}${m.link.includes('?') ? '&' : '?'}reihe=${r.zid}` : m.stufeWaehlen ? `/s/r/${r.zid}/${m.schritt}` : undefined
-            return (
-              <a
-                key={m.schritt}
-                className="og-karte"
-                {...(href ? { href } : {})}
-                style={{ opacity: m.gesperrt ? 0.6 : 1, cursor: href ? undefined : 'default' }}
-                data-ordner-reihe-blatt
-              >
-                <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0 }}>
-                    <Text fw={700}>{m.titel}</Text>
-                    <Text size="sm" c="dimmed">
-                      {m.gesperrt ? 'noch gesperrt' : m.eingereicht ? `eingereicht${m.loesung ? ' · Lösung im Blatt' : ''}` : 'noch offen'}
-                    </Text>
-                  </div>
-                  {href && (
-                    <Badge variant="light" style={{ flex: 'none' }}>
-                      {m.eingereicht ? 'Ansehen' : 'Öffnen'}
-                    </Badge>
-                  )}
-                </Group>
-              </a>
-            )
-          })}
-          <Group gap="xs">
-            <Button component="a" href={`/s/r/${r.zid}`} size="xs" variant="subtle">
-              Zur Reihe
-            </Button>
-            <Button component="a" href={`/s/r/${r.zid}/materialien?reiter=abgaben`} size="xs" variant="subtle" data-ordner-reihe-abgaben>
-              Meine Abgaben
-            </Button>
-          </Group>
-        </Abschnitt>
+      {offeneTests.length > 0 && <Abschnitt titel="Onlinetests">{offeneTests.map(testKarte)}</Abschnitt>}
+      {/* Nach Überthemen (19.10.2026): nur das laufende Schuljahr – Früheres unter „Alle Jahrgänge" */}
+      {jahre.map((j) => (
+        <div key={j.schuljahr} data-ordner-themen>
+          {themenListe(j)}
+        </div>
       ))}
-      {o.aufgaben.length > 0 && (
-        <Abschnitt titel="Rückmeldungen">
-          {o.aufgaben.map((a) => (
-            <a key={a.id} className="og-karte" href={`/s/a/${a.id}`} data-ordner-aufgabe>
-              <Group justify="space-between" wrap="nowrap">
-                <div style={{ minWidth: 0 }}>
-                  <Text fw={700}>{a.titel}</Text>
-                  <Text size="sm" c="dimmed">
-                    {a.fassungen.some((x) => x.bogen) ? 'Rückmeldung da' : a.fassungen.length ? 'abgegeben' : 'noch nicht abgegeben'}
-                    {a.offen === false ? ' · abgeschlossen' : a.bis ? ` · bis ${new Date(a.bis).toLocaleDateString('de-DE')}` : ''}
-                  </Text>
-                </div>
-                <Badge variant="light" style={{ flex: 'none' }}>
-                  {a.offen === false ? 'Ansehen' : 'Öffnen'}
-                </Badge>
-              </Group>
-            </a>
-          ))}
-        </Abschnitt>
-      )}
-      {fertigeTests.length > 0 && (
-        <Abschnitt titel="Abgegebene Tests">
-          {fertigeTests.map((t) => (
-            <a key={t.code} className="og-karte" href={`/s/t/${t.code}`}>
-              <Text fw={700}>{t.titel}</Text>
-            </a>
-          ))}
-        </Abschnitt>
-      )}
       {(o.mappen.length > 0 || o.merk.length > 0) && (
         <Abschnitt titel="Mappen und Merkzettel">
           <Group gap="xs">

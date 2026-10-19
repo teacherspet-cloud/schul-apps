@@ -18,6 +18,7 @@
  *  Lernende:   GET /s/api/blaetter · GET /s/api/blatt?id= · POST /s/api/blatt/speichern|aufgabe|abgeben
  *  Gäste:      GET /s/api/blatt/zugang?code= · POST /s/api/blatt/gast   (Seite /s/w/<CODE>)
  */
+import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { randomBytes } from 'node:crypto'
 import {
@@ -943,7 +944,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       return true
     }
     const z = teile[0] ? freigabe(teile[0]) : null
-    if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+    // Mitlehrkraft desselben Kurses (19.10.2026, ueberthemen.ts): nur ansehen – GET, ohne Ändern
+    const nurLesen = Boolean(z && z.lehrkraft_id !== ich.id && req.method === 'GET' && mitlehrkraftDarfSehen(ich.id, z.lerngruppe_id))
+    if (!z || (z.lehrkraft_id !== ich.id && !nurLesen)) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
       // Per Code beigetreten (Gäste mit Namen, auch IServ-Konten) – entfernbar (05.10.2026)
@@ -992,6 +995,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           id: z.id,
           titel: z.titel,
           status: z.status,
+          ...(nurLesen ? { nurLesen: true } : {}),
           rueckmeldungId: z.rueckmeldung_id,
           aufgaben: nummern,
           einstellungen: einstellungenVon(z),

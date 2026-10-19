@@ -9,7 +9,8 @@ import { fachAusName, FAECHER, type Fach } from '@shared/faecher'
 const fachFinden = (f: string): Fach | undefined => fachAusName(f) ?? FAECHER.find((x) => x.sprache === f.trim().toLowerCase())
 
 /** Register des Fachordners; „wort" = Meine Bücher (bis 09.10.2026 „Wortliste"), „abc" = alphabetische Liste (09.10.2026) */
-export type Register = 'vok' | 'wort' | 'abc' | 'gram' | 'mat'
+/** „jahre" (19.10.2026): Alle Jahrgänge – Materialien aller Schuljahre des Kurses, nur wenn es frühere gibt */
+export type Register = 'vok' | 'wort' | 'abc' | 'gram' | 'mat' | 'jahre'
 
 interface Sprachbeschriftung {
   fach: string
@@ -22,14 +23,16 @@ interface Sprachbeschriftung {
   mat: string
   /** Wort vor der Klassenstufe im Grammatik-Register (08.10.2026): „Year 6", „Classe 6" – deutsche Zählung */
   jahrgang?: string
+  /** Register „Alle Jahrgänge" (19.10.2026) */
+  jahre?: string
 }
 
 const DEUTSCH: Omit<Sprachbeschriftung, 'fach'> = { vok: 'Vokabeln', wort: 'Meine Bücher', abc: 'Alphabetisch', gram: 'Grammatik', mat: 'Materialien' }
 
 const SPRACHEN: Record<string, Sprachbeschriftung> = {
-  en: { fach: 'English', vok: 'Vocabulary', wort: 'My Books', abc: 'Alphabetical list', gram: 'Grammar', mat: 'Materials', jahrgang: 'Year' },
-  fr: { fach: 'Français', vok: 'Vocabulaire', wort: 'Mes livres', abc: 'Liste alphabétique', gram: 'Grammaire', mat: 'Documents', jahrgang: 'Classe' },
-  es: { fach: 'Español', vok: 'Vocabulario', wort: 'Mis libros', abc: 'Lista alfabética', gram: 'Gramática', mat: 'Materiales', jahrgang: 'Curso' },
+  en: { fach: 'English', vok: 'Vocabulary', wort: 'My Books', abc: 'Alphabetical list', gram: 'Grammar', mat: 'Materials', jahrgang: 'Year', jahre: 'All years' },
+  fr: { fach: 'Français', vok: 'Vocabulaire', wort: 'Mes livres', abc: 'Liste alphabétique', gram: 'Grammaire', mat: 'Documents', jahrgang: 'Classe', jahre: 'Toutes les années' },
+  es: { fach: 'Español', vok: 'Vocabulario', wort: 'Mis libros', abc: 'Lista alfabética', gram: 'Gramática', mat: 'Materiales', jahrgang: 'Curso', jahre: 'Todos los cursos' },
   it: { fach: 'Italiano', vok: 'Vocabolario', wort: 'I miei libri', abc: 'Elenco alfabetico', gram: 'Grammatica', mat: 'Materiali', jahrgang: 'Classe' },
   la: { fach: 'Latina', vok: 'Vocabula', wort: 'Libri mei', abc: 'Index alphabeticus', gram: 'Grammatica', mat: 'Materia', jahrgang: 'Classis' },
   ru: { fach: 'Русский язык', vok: 'Лексика', wort: 'Мои книги', abc: 'Алфавитный список', gram: 'Грамматика', mat: 'Материалы', jahrgang: 'Класс' },
@@ -53,10 +56,10 @@ const spracheVon = (fach: string): string | undefined => {
   return f?.sprache ?? (f?.id === 'latein' ? 'la' : f?.id === 'griechisch' ? 'grc' : undefined)
 }
 
-export function beschriftung(fach: string): Sprachbeschriftung & { sprache?: string } {
+export function beschriftung(fach: string): Sprachbeschriftung & { sprache?: string; jahre: string } {
   const sprache = spracheVon(fach)
   const s = sprache ? SPRACHEN[sprache] : undefined
-  return s ? { ...s, sprache } : { fach: fachFinden(fach)?.label ?? fach, ...DEUTSCH }
+  return s ? { jahre: 'Alle Jahrgänge', ...s, sprache } : { fach: fachFinden(fach)?.label ?? fach, jahre: 'Alle Jahrgänge', ...DEUTSCH }
 }
 
 const ROEMISCH: [number, string][] = [

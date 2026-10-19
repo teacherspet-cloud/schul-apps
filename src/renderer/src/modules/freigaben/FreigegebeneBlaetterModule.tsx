@@ -107,6 +107,8 @@ interface Detail {
   id: string
   titel: string
   status: string
+  /** Blatt einer Mitlehrkraft desselben Kurses (19.10.2026): nur ansehen */
+  nurLesen?: boolean
   /** Aufgabennummern in Blattreihenfolge */
   aufgaben?: number[]
   einstellungen?: { schrittweise?: boolean; merkAmEnde?: boolean; aufgabenFeedback?: boolean }
@@ -413,14 +415,20 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
               QR-Code
             </Button>
           )}
-          <Button
-            variant="default"
-            onClick={() =>
-              void senden(`/server/blaetter/${id}/status`, { status: d.status === 'offen' ? 'beendet' : 'offen' }).then(laden, (e: unknown) => notifyError(e))
-            }
-          >
-            {d.status === 'offen' ? 'Beenden' : 'Wieder öffnen'}
-          </Button>
+          {d.nurLesen ? (
+            <Badge variant="light" color="gray" data-nur-lesen>
+              von Kollegin/Kollege · nur ansehen
+            </Badge>
+          ) : (
+            <Button
+              variant="default"
+              onClick={() =>
+                void senden(`/server/blaetter/${id}/status`, { status: d.status === 'offen' ? 'beendet' : 'offen' }).then(laden, (e: unknown) => notifyError(e))
+              }
+            >
+              {d.status === 'offen' ? 'Beenden' : 'Wieder öffnen'}
+            </Button>
+          )}
         </Group>
       </Group>
       {auswertung.daten && d.abgaben.length > 0 && <AuswertungLeiste id={id} titel={d.titel} daten={auswertung.daten} setDaten={auswertung.setDaten} />}
@@ -479,7 +487,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                       nummern={d.aufgaben ?? []}
                       ampeln={a.ampeln ?? {}}
                       freischalten={
-                        d.einstellungen?.schrittweise
+                        d.einstellungen?.schrittweise && !d.nurLesen
                           ? (nr, weg) => void senden(`/server/blaetter/${id}/freischalten`, { id: a.id, nr, weg }).then(laden, (e: unknown) => notifyError(e))
                           : undefined
                       }
@@ -498,7 +506,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                   >
                     Blatt ansehen
                   </Button>
-                  {a.perCode && (
+                  {a.perCode && !d.nurLesen && (
                     <Button
                       size="xs"
                       variant="subtle"
