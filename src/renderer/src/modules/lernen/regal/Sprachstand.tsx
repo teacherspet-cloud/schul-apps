@@ -42,9 +42,13 @@ export const SPRACH_CSS = `
 .sk-unit { flex: none; scroll-snap-align: center; font: inherit; font-size: .78rem; font-weight: 700; padding: 4px 11px; min-height: 32px; border-radius: 999px; cursor: pointer;
   border: 1px solid rgba(134,142,150,.45); background: transparent; color: inherit; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 html[data-touch] .sk-unit { min-height: 44px; padding: 4px 14px; }
-.sk-unit[data-lage="aktuell"] { background: var(--sk-akzent, #1971c2); border-color: transparent; color: #fff; }
 .sk-unit[data-lage="kennen"] { opacity: .8; }
-.sk-unit[aria-selected="true"] { box-shadow: 0 0 0 2px var(--og-karte, var(--mantine-color-body)), 0 0 0 4px var(--sk-akzent, #1971c2); }
+/* Gewählt = gefüllt (19.10.2026, Befund der Lehrkraft: „Hello" antippen schien nichts zu tun – gefüllt blieb die aktuelle
+   Unit, die Wahl zeigte nur einen dünnen Ring). Die aktuelle Unit trägt einen Punkt, solange eine andere gewählt ist. */
+.sk-unit[aria-selected="true"] { background: var(--sk-akzent, #1971c2); border-color: transparent; color: #fff; opacity: 1; }
+.sk-unit[data-lage="aktuell"][aria-selected="false"] { border-color: var(--sk-akzent, #1971c2); }
+.sk-unit-punkt { width: 6px; height: 6px; border-radius: 50%; background: var(--sk-akzent, #1971c2); }
+.sk-unit-titel { font-size: .74rem; font-weight: 700; opacity: .85; }
 .sk-unit:focus-visible { outline: 3px solid var(--sk-akzent, #1971c2); outline-offset: 2px; }
 .sk-weitere { flex: none; font-size: .74rem; opacity: .65; white-space: nowrap; padding-right: 4px; }
 .sk-abschnitte { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 2px; min-width: 0; }
@@ -161,6 +165,7 @@ function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): Reac
                 onClick={() => setWahl(x.unit)}
               >
                 {kennen && <IconCheck size={12} />}
+                {lage === 'aktuell' && x.unit !== u?.unit && <span className="sk-unit-punkt" title="aktuelle Unit" />}
                 {x.unit}
               </button>
             )
@@ -172,6 +177,12 @@ function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): Reac
           )}
         </div>
       </div>
+      {u && u.abschnitte.length <= MAX_PUNKTE && (
+        <Text className="sk-unit-titel" data-unit-titel={u.unit}>
+          {u.unit}: {fertig} von {u.abschnitte.length} {u.abschnitte.length === 1 ? 'Abschnitt' : 'Abschnitten'} kennengelernt
+          {u.unit === aktuell ? ' · aktuelle Unit' : ''}
+        </Text>
+      )}
       {u && u.abschnitte.length <= MAX_PUNKTE && (
         <div className="sk-abschnitte" data-abschnitt-punkte={u.abschnitte.length} data-abschnitte-unit={u.unit}>
           {u.abschnitte.map((x) => (
