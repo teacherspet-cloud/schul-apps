@@ -322,8 +322,10 @@ try {
     /^Unterrichtsreihen & Blätter/.test(reiter[0]) &&
       /^Vokabeln/.test(reiter[1]) &&
       /^Grammatik/.test(reiter[2]) &&
-      /^Tests & Noten/.test(reiter[3]) &&
-      /^Lernende/.test(reiter[4]),
+      // Sprechprüfungstraining (19.10.2026) zwischen Grammatik und Tests & Noten – auf Testservern mit der Attrappe immer da
+      /^Sprechprüfungstraining/.test(reiter[3]) &&
+      /^Tests & Noten/.test(reiter[4]) &&
+      /^Lernende/.test(reiter[5]),
     `Reiter-Reihenfolge (${reiter.join(' | ')})`
   )
   // Reihen & Blätter: Standard offen + Frist zuerst; Pfeile sortieren, Rechtsklick filtert

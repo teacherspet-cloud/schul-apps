@@ -13,7 +13,7 @@
  * „Zurück" (Knopf, Browser, Wischen) blättert zurück. Die Adresse nennt die Ebene (?r=gram&g=<ID>, ?r=mat&b=<ID>).
  */
 import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
-import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconChevronDown, IconChevronRight, IconFileText, IconHistory, IconSortAscendingLetters } from '@tabler/icons-react'
+import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconChevronDown, IconChevronRight, IconFileText, IconHistory, IconMicrophone, IconSortAscendingLetters } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import GrammatikTrainer from '../GrammatikTrainer'
 import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
@@ -32,6 +32,7 @@ import { ordnerFarben } from './ordnerFarben'
 import { registerVon } from './Regal'
 import { useRegal, type FachOrdner, type KursKurz, type Mappe, type Merkkasten } from './regalDaten'
 import { Demnaechst, NeuFreigeschaltet } from './planHinweise'
+import { SprechOrdner } from '../../sprechen/SprechOrdner'
 import { fuerDichAufteilen } from '@shared/fuerDich'
 import { schuljahrText } from '@shared/schulkalender'
 import { holen } from '../../onlinetest/serverApi'
@@ -115,11 +116,12 @@ const SYMBOL: Record<Register, React.ReactNode> = {
   abc: <IconSortAscendingLetters size={16} />,
   gram: <IconBook2 size={16} />,
   mat: <IconFileText size={16} />,
-  jahre: <IconHistory size={16} />
+  jahre: <IconHistory size={16} />,
+  sprech: <IconMicrophone size={16} />
 }
 
 export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
-  const { ordner } = useRegal()
+  const { ordner, neuLaden } = useRegal()
   const dunkel = useComputedColorScheme('light') === 'dark'
   const o = ordner?.find((x) => x.fach === fachName(fach))
   const vorgabe = new URLSearchParams(window.location.search).get('r') as Register | null
@@ -151,7 +153,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
   // Meine Bücher und Alphabetisch (09.10.2026): eigene Register hinter Vokabeln und Grammatik (10.10.2026) – nur im Ordner, der Rücken im Regal bleibt
   // „Alle Jahrgänge" (19.10.2026): nur, wenn es Material aus früheren Schuljahren gibt
   const fruehere = Boolean(themen && Object.values(themen.eintraege).some((x) => x.schuljahr < themen.schuljahr))
-  const register: Register[] = [...mitWortliste(registerVon(o)), ...(fruehere ? (['jahre'] as Register[]) : [])]
+  const register: Register[] = [...mitSprechen(mitWortliste(registerVon(o).filter((r) => r !== 'sprech')), registerVon(o).includes('sprech')), ...(fruehere ? (['jahre'] as Register[]) : [])]
   const aktiv: Register = wahl && register.includes(wahl) ? wahl : register[0] ?? 'mat'
   const zeigen = (r: Register): void => {
     setWahl(r)
@@ -230,6 +232,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                     ) : (
                       <Kurse o={o} grammatik setSeite={setSeite} />
                     ))}
+                  {aktiv === 'sprech' && <SprechOrdner freigaben={o.sprechen ?? []} neuLaden={neuLaden} />}
                   {(aktiv === 'mat' || aktiv === 'jahre') &&
                     (seite?.art === 'blatt' ? (
                       <div data-ordner-unterseite="blatt">
@@ -291,9 +294,16 @@ export const mitWortliste = (r: Register[]): Register[] => {
   return r.flatMap((x) => (x === nach ? ([x, 'wort', 'abc'] as Register[]) : [x]))
 }
 
+/** Sprechtraining (19.10.2026): direkt hinter Grammatik (ohne Grammatik hinter Vokabeln, sonst ans Ende) */
+export const mitSprechen = (r: Register[], da: boolean): Register[] => {
+  if (!da) return r
+  const nach = r.includes('gram') ? 'gram' : r.includes('vok') ? 'vok' : null
+  return nach ? r.flatMap((x) => (x === nach ? ([x, 'sprech'] as Register[]) : [x])) : [...r, 'sprech']
+}
+
 /** Was in einem Register gerade zu tun ist (Hinweis an der Lasche, 08.10.2026) */
 export function zuTun(o: FachOrdner, r: Register): number {
-  if (r === 'wort' || r === 'abc' || r === 'jahre') return 0
+  if (r === 'wort' || r === 'abc' || r === 'jahre' || r === 'sprech') return 0
   if (r === 'vok') return o.vokabeln.filter((v) => (v.uebersicht.heuteOffen ?? 0) > 0 || v.uebersicht.faellig > 0).length
   if (r === 'gram') return o.grammatik.filter((g) => (g.uebersicht.unbearbeitet ?? 0) > 0 || g.uebersicht.faellig > 0).length
   return (

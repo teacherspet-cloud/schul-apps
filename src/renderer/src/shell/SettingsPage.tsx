@@ -1,30 +1,5 @@
 import { VokabelStimmenCard } from '../shared/medien/VokabelStimmen'
-import {
-  ActionIcon,
-  Anchor,
-  Badge,
-  Box,
-  Button,
-  Card,
-  Checkbox,
-  Container,
-  Divider,
-  Group,
-  Modal,
-  PasswordInput,
-  ScrollArea,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-  Switch,
-  Tabs,
-  Text,
-  Title,
-  Tooltip,
-  UnstyledButton,
-  useComputedColorScheme
-} from '@mantine/core'
+import { ActionIcon, Anchor, Badge, Box, Button, Card, Checkbox, Container, Divider, Group, Modal, PasswordInput, ScrollArea, SegmentedControl, Select, SimpleGrid, Stack, Switch, Tabs, Text, Title, Tooltip, UnstyledButton, useComputedColorScheme, Alert } from '@mantine/core'
 import {
   IconCheck,
   IconDeviceDesktop,
@@ -362,6 +337,8 @@ export default function SettingsPage(): React.JSX.Element {
               </BildsucheKarte>
 
               <HoertextCard settings={settings} update={update} klappbar />
+              {/* Gesprächs-KI für das Sprechprüfungstraining (19.10.2026) – getrennt von der Hörtexte-KI */}
+              <GespraechCard settings={settings} update={update} />
               {/* Standardstimme je Sprache für die Vokabel-Aussprache (05.10.2026) */}
               <VokabelStimmenCard klappbar />
             </Stack>
@@ -949,6 +926,73 @@ export function HoertextCard({ settings, update, klappbar = false }: { settings:
               der Übersicht steht, ist nur die Kennung des Schlüssels und funktioniert nicht.
             </Text>
           </div>
+        )}
+      </Stack>
+    </KartenRahmen>
+  )
+}
+
+/**
+ * Gesprächs-KI (19.10.2026, abgestimmt mit der Lehrkraft): Echtzeit-Gespräch für das Sprechprüfungstraining – Sprache
+ * rein und raus, getrennt von der Hörtexte-KI. Bisher OpenAI Realtime über den OpenAI-API-Schlüssel (eigener oder der
+ * der Schule); kein Abo-Weg. Die Lernenden-Gespräche laufen über den Schlüssel der Lehrkraft, die freigibt.
+ */
+export function GespraechCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+  const g = settings.ai.gespraech ?? { anbieter: 'none' as const, modell: 'mini' as const }
+  const openai = useSchluesselDa('openai')
+  const setze = (patch: Partial<NonNullable<AppSettings['ai']['gespraech']>>): void => void update({ ai: { gespraech: { ...g, ...patch } } })
+  const an = g.anbieter === 'openai'
+  return (
+    <KartenRahmen
+      klappbar
+      id="gespraech"
+      titel="Gesprächs-KI (Sprechtraining)"
+      status={an ? (openai ? 'OpenAI Realtime eingerichtet' : 'OpenAI-Schlüssel fehlt') : 'aus'}
+      ton={an && openai ? 'ok' : an ? 'warnung' : 'neutral'}
+      rahmen={{ 'data-ki-karte': 'gespraech' }}
+    >
+      <Stack gap="sm">
+        <Text size="sm" c="dimmed">
+          Für das Sprechprüfungstraining: Die Lernenden sprechen in Echtzeit mit einer KI (Interview, Monolog, Dialog, ganze Prüfung). Das Audio geht direkt
+          vom Gerät zum Anbieter – auf dem Schul-Apps-Server wird keine Aufnahme gespeichert. Die Gespräche laufen über den Schlüssel der Lehrkraft, die das
+          Training freigibt (sonst über den Schlüssel der Schule).
+        </Text>
+        <SegmentedControl
+          value={g.anbieter === 'openai' ? 'openai' : 'none'}
+          onChange={(v) => setze({ anbieter: v as 'openai' | 'none' })}
+          data={[
+            { value: 'none', label: 'Aus' },
+            { value: 'openai', label: 'OpenAI Realtime' }
+          ]}
+          data-gespraech-anbieter
+        />
+        {an && (
+          <>
+            <SegmentedControl
+              value={g.modell}
+              onChange={(v) => setze({ modell: v as 'mini' | 'gross' })}
+              data={[
+                { value: 'mini', label: 'Günstig (mini)' },
+                { value: 'gross', label: 'Bestes Modell' }
+              ]}
+            />
+            <Switch
+              label="Ganze Sprechprüfung immer mit dem besten Modell"
+              checked={Boolean(g.simulationGross)}
+              onChange={(e) => setze({ simulationGross: e.currentTarget.checked })}
+            />
+            <Text size="xs" c={openai ? 'dimmed' : 'orange'}>
+              {openai
+                ? 'Genutzt wird der OpenAI-API-Schlüssel aus „KI-Zugang“ (oder der für die Schule freigegebene). Kosten etwa 0,15–0,50 $ je 10 Minuten (günstiges Modell).'
+                : 'Es fehlt ein OpenAI-API-Schlüssel – unter „KI-Zugang“ eintragen oder von der Verwaltung freigeben lassen.'}
+            </Text>
+            <Alert color="yellow" variant="light" p="xs">
+              <Text size="xs">
+                Datenschutz: Für Lernende unter 16 verlangt OpenAI „Zero Data Retention“ – bitte bei OpenAI beantragen und den Datenschutz der Schule einbinden.
+                Die Teilnahme ist freiwillig und nicht notenrelevant.
+              </Text>
+            </Alert>
+          </>
         )}
       </Stack>
     </KartenRahmen>

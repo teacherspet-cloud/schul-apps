@@ -7,7 +7,7 @@ import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import type { ProfilPunkt } from './KursGrammatik'
 
 /** Reiter der Kursseite */
-export type KursReiter = 'ueberblick' | 'vokabeln' | 'grammatik' | 'lernende' | 'einstellungen'
+export type KursReiter = 'ueberblick' | 'vokabeln' | 'grammatik' | 'sprechen' | 'lernende' | 'einstellungen'
 
 export interface Lernstanddaten {
   id: string

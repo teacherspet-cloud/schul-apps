@@ -89,7 +89,11 @@ export const SENSIBEL: Record<string, string[]> = {
   gram_bank: ['bank_aufgabe'],
   gram_bank_regel: ['bank_regel'],
   // Überthemen je Lerngruppe (19.10.2026, ueberthemen.ts): eigene Namen und Umhängungen der Lehrkraft
-  ueberthemen: ['wert']
+  ueberthemen: ['wert'],
+  // Sprechprüfungstraining (19.10.2026, sprechen.ts): Auswahl Einzelner, Einschätzungen und Tipps, Satz eines Vorfalls
+  sprech_freigaben: ['schueler', 'einstellungen'],
+  sprech_stand: ['daten'],
+  sprech_vorfaelle: ['satz']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

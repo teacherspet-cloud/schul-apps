@@ -14,6 +14,7 @@
  *  - Eingebettet (`nurReiter`): nur der Inhalt dieses Reiters – plus die Lernenden-Tabelle des Bereichs (Vokabeln bzw.
  *    Grammatik), damit „Meine Klassen" ohne Wechsel in Sprachenlernen auskommt.
  */
+import { SprechLehrkraft, useSprechVerfuegbar } from '../../sprechen/SprechLehrkraft'
 import {
   ActionIcon,
   Alert,
@@ -61,8 +62,7 @@ import {
   IconTrash,
   IconUserPlus,
   IconUsers,
-  IconX
-} from '@tabler/icons-react'
+  IconX, IconMicrophone } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { abschnittStelle, nachBaenden, type AbschnittStatistik } from '@shared/kursAbschnitte'
 import { BandGruppe, useBaendeOffen } from '../../../shared/components/BandCover'
@@ -567,6 +567,8 @@ export function KursSeite({
   }, [id])
   const [eintragen, setEintragen] = useState(false)
   const [klasse, setKlasse] = useState(false)
+  // Sprechprüfungstraining (19.10.2026): Reiter nur mit eingerichteter Gesprächs-KI
+  const sprechDa = useSprechVerfuegbar()
   // „+ Grammatik hinzufügen" am Kasten „Units" (17.10.2026): wie bei den Vokabeln auch aus „Meine Klassen" heraus
   const [grammatik, setGrammatik] = useState(() => grammatikHinzuOffen.kurs === id && (grammatikHinzuOffen.kurs = null, true))
   useEffect(() => {
@@ -1104,6 +1106,11 @@ export function KursSeite({
           >
             Grammatik
           </Tabs.Tab>
+          {sprechDa && ['en', 'fr', 'es'].includes(d.sprache ?? '') && (
+            <Tabs.Tab value="sprechen" leftSection={<IconMicrophone size={16} />} data-kurs-reiter="sprechen">
+              Sprechprüfungstraining
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="lernende" leftSection={<IconUsers size={16} />} data-kurs-reiter="lernende">
             Lernende ({lernende.length})
           </Tabs.Tab>
@@ -1120,6 +1127,11 @@ export function KursSeite({
         <Tabs.Panel value="grammatik" pt="md">
           {grammatikInhalt}
         </Tabs.Panel>
+        {sprechDa && (
+          <Tabs.Panel value="sprechen" pt="md">
+            <SprechLehrkraft vokId={id} />
+          </Tabs.Panel>
+        )}
         <Tabs.Panel value="lernende" pt="md">
           {lernendeInhalt}
         </Tabs.Panel>

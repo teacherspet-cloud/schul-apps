@@ -40,6 +40,8 @@ const AUSNAHMEN: Record<string, string> = {
   'fach_freigaben.art': 'Materialart (Arbeitsblatt, Test …)',
   'fach_kopien.art': 'Materialart',
   'ueberthemen.art': "Art des Eingriffs ('name' | 'zuordnung'), keine Person",
+  'sprech_freigaben.teile': 'freigegebene Prüfungsteile (interview, monolog …), keine Person',
+  'sprech_vorfaelle.art': 'Art des Vorfalls (umgehung, themenfremd …) – der Satz selbst ist verschlüsselt',
   'fach_iserv.faecher': 'Fächerliste aus IServ (Deutsch, Mathe …), keine Person',
   'vok_gaeste.wieder': 'nur Prüfwert (HMAC, codePruefwert), Suchschlüssel',
   'vok_gaeste.anmelde': 'nur Prüfwert (HMAC, codePruefwert), Suchschlüssel',

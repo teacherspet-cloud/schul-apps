@@ -68,7 +68,9 @@ export const TEILBARE_SCHLUESSEL: SecretName[] = [
   // OpenAI-kompatible Anbieter (09.10.2026, kiZugaenge.ts) – lokale Modelle gibt es auf dem Server nicht
   ...KOMPATIBEL_IDS.filter((id) => !kompatibelVorgabe(id)?.nurPc),
   'elevenlabs',
-  'pixabay'
+  'pixabay',
+  // Aussprache im Sprechtraining (19.10.2026)
+  'azure_speech'
 ]
 
 /** Für main/services/storage/settings.ts `setzeGeheimRueckfall`: freigegebener Schlüssel oder nichts */

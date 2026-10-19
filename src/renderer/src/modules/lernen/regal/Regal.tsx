@@ -54,12 +54,14 @@ const offenIn = (o: FachOrdner): number =>
   o.aufgaben.filter((a) => a.offen !== false && !a.fassungen.length).length
 
 // Reihenfolge (10.10.2026, Wunsch der Lehrkraft): Arbeitsblätter/Materialien ganz oben, dann Vokabeln, gleich danach Grammatik
-export const registerVon = (o: FachOrdner): ('vok' | 'gram' | 'mat')[] =>
+export const registerVon = (o: FachOrdner): ('vok' | 'gram' | 'mat' | 'sprech')[] =>
   [
     o.blaetter.length || o.tests.length || o.aufgaben.length || o.reihen.length || o.mappen.length || o.merk.length ? ('mat' as const) : null,
     o.vokabeln.length ? ('vok' as const) : null,
-    o.grammatik.length ? ('gram' as const) : null
-  ].filter((x): x is 'vok' | 'gram' | 'mat' => Boolean(x))
+    o.grammatik.length ? ('gram' as const) : null,
+    // Sprechtraining (19.10.2026): neben Grammatik, nur während einer Freigabe
+    o.sprechen?.length ? ('sprech' as const) : null
+  ].filter((x): x is 'vok' | 'gram' | 'mat' | 'sprech' => Boolean(x))
 
 export const ordnerLink = (fach: string): string => `/s/ordner/${encodeURIComponent(fach)}`
 

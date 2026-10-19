@@ -22,7 +22,7 @@ export type AiProviderId = KernAnbieterId | KompatibelId
 export const KERN_ANBIETER: KernAnbieterId[] = ['openai', 'anthropic', 'google']
 export const istKernAnbieter = (id: string): id is KernAnbieterId => KERN_ANBIETER.includes(id as KernAnbieterId)
 export type ImageProviderId = 'openai' | 'google' | 'anthropic' | 'none'
-export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs' | 'iserv'
+export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs' | 'iserv' | 'azure_speech'
 export type ModelKind = 'text' | 'image'
 
 export interface AiProviderInfo {
@@ -198,6 +198,17 @@ export type CitationStyle = 'deutsch' | 'mla' | 'apa' | 'chicago'
 
 export type ColorSchemeSetting = 'light' | 'dark' | 'auto'
 
+export interface GespraechEinstellung {
+  anbieter: 'openai' | 'azure' | 'none'
+  /** Kleines (günstig) oder großes Modell; die Simulation kann eigens das große nutzen */
+  modell: 'mini' | 'gross'
+  simulationGross?: boolean
+  /** Azure OpenAI: Bereitstellungsname des Echtzeit-Modells */
+  azureBereitstellung?: string
+  /** Azure Speech (Aussprache), z. B. „westeurope" */
+  azureSpeechRegion?: string
+}
+
 export interface AppSettings {
   ai: {
     textProvider: AiProviderId
@@ -225,6 +236,12 @@ export interface AppSettings {
      * Fragen ohne den Text; Lösbares wird neu gefasst. Fehlt der Wert, ist sie an.
      */
     mcBlindprobe?: boolean
+    /**
+     * Gesprächs-KI für das Sprechprüfungstraining (19.10.2026, abgestimmt): Echtzeit-Sprache rein/raus, getrennt von der
+     * Hörtexte-KI. OpenAI Realtime (API-Schlüssel „openai") oder Azure OpenAI (Schlüssel „azure"); kein Abo-Weg.
+     * Optional Azure Speech für die Aussprache (Schlüssel „azure_speech", Region).
+     */
+    gespraech?: GespraechEinstellung
   }
   appearance: {
     colorScheme: ColorSchemeSetting

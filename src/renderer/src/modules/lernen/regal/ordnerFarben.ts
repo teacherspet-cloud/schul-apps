@@ -47,7 +47,9 @@ export function ordnerFarben(farbe: string, dunkel: boolean): OrdnerFarben {
       gram: flaecheMitSchrift(mische(basis, '#ffffff', 0.35)),
       mat: flaecheMitSchrift(mische(basis, '#000000', 0.35)),
       // Alle Jahrgänge (19.10.2026): dunkler als „Materialien", gleich dahinter
-      jahre: flaecheMitSchrift(mische(basis, '#000000', 0.5))
+      jahre: flaecheMitSchrift(mische(basis, '#000000', 0.5)),
+      // Sprechtraining (19.10.2026): gleich hinter Grammatik, etwas heller
+      sprech: flaecheMitSchrift(mische(basis, '#ffffff', 0.45))
     }
   }
 }

@@ -16,6 +16,7 @@
 import { grammatikRoute } from './grammatik'
 import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { ueberthemenRoute } from './ueberthemen'
+import { sprechenRoute } from './sprechen'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
 import { achievementsRoute, alleBerichtigen } from './achievements'
@@ -265,6 +266,8 @@ async function main(): Promise<void> {
       lernenRoute(),
       // Überthemen (19.10.2026): /s/api/themen – vor schuelerRoute, die /s/api/ ganz übernimmt
       ueberthemenRoute(),
+      // Sprechprüfungstraining (19.10.2026) – vor schuelerRoute
+      sprechenRoute(aufruf),
       // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
       planenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
