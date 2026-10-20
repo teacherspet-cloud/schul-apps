@@ -49,6 +49,7 @@ import { alleKursgruppenSichern } from './iservKursgruppen'
 import { AbgleichFehler, abgleichGeschuetzt, abgleichPruefen, abgleichSchwelle, pruefungEinloesen, pruefungMerken, sicherungVorAbgleich } from './iservAbgleich'
 import { basename } from 'node:path'
 import { verknuepfungLoesen } from './kontoVerknuepfung'
+import { klasseAusGruppen } from '@shared/iservKurse'
 import type { NutzerInfo } from './datenbank'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
@@ -111,7 +112,13 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
       const iserv = iservEinstellung()
       return (
         json(res, 200, {
-          nutzer: alleNutzer().map(({ gruppen, ...n }) => ({ ...n, gruppen: gruppen.length, klasse: gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? '' })),
+          // Klasse: von Hand zugeordnet („klasse:…"); iservKlasse: aus den IServ-Gruppen erkannt (20.10.2026, Anzeige in der Spalte)
+          nutzer: alleNutzer().map(({ gruppen, ...n }) => ({
+            ...n,
+            gruppen: gruppen.length,
+            klasse: gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? '',
+            iservKlasse: n.rolle === 'schueler' ? klasseAusGruppen(gruppen.filter((g) => !g.id.startsWith('klasse:'))) : ''
+          })),
           // Bekannte Klassen für die Zuordnung von Schülerkonten (06.10.2026)
           klassen: bekannteKlassen(),
           schluessel: TEILBARE_SCHLUESSEL.map((name) => ({ name, hinterlegt: verdeckt(serverGeheimnis(`schluessel:${name}`)), fuerAlle: Boolean(freigaben[name]) })),

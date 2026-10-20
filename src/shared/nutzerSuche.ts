@@ -10,6 +10,8 @@ export interface SuchbaresKonto {
   rolle: string
   quelle: string
   klasse?: string
+  /** Aus IServ erkannte Klasse (20.10.2026) – auch danach suchen */
+  iservKlasse?: string
 }
 
 export const ROLLEN_TEXT: Record<string, string> = { admin: 'Admin', lehrkraft: 'Lehrkraft', schueler: 'Schüler/in' }
@@ -29,7 +31,7 @@ const falte = (s: string): string =>
 function suchtext(k: SuchbaresKonto): string {
   const rolle = `${k.rolle} ${ROLLEN_TEXT[k.rolle] ?? ''} ${k.rolle === 'schueler' ? 'schülerin schüler' : ''}`
   const quelle = `${k.quelle} ${QUELLEN_TEXT[k.quelle] ?? ''}`
-  return falte(`${k.name} ${k.benutzer} ${rolle} ${quelle} ${k.klasse ?? ''}`)
+  return falte(`${k.name} ${k.benutzer} ${rolle} ${quelle} ${k.klasse ?? ''} ${k.iservKlasse ?? ''}`)
 }
 
 // Ab 3 Zeichen (10.10.2026, Wunsch des Admins): die Treffer erscheinen beim Tippen von selbst

@@ -21,6 +21,7 @@
  */
 import { alleNutzer, datenbank, iservKennungen, kontoEntfernen, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import { kennung } from './feldschutz'
+import { inIservGruppe } from './klassenliste'
 
 export interface IservIdentitaet {
   /** IServ-Benutzername (klein) */
@@ -181,7 +182,7 @@ export function gastSuchen(claims: Record<string, unknown>, benutzer: string, gr
   for (const g of alleLerngruppen()) {
     const eigene = [...klassenAus([{ id: '', name: g.name }])].filter((t) => KLASSE.test(t))
     const klassePasst =
-      klassen.has(lerngruppenKlasse(g.name)) || eigene.some((t) => klassen.has(t)) || Boolean(g.iserv_gruppe && gruppenIds.has(g.iserv_gruppe))
+      klassen.has(lerngruppenKlasse(g.name)) || eigene.some((t) => klassen.has(t)) || Boolean(g.iserv_gruppe && (gruppenIds.has(g.iserv_gruppe) || inIservGruppe(g.iserv_gruppe, gruppen)))
     if (klassePasst) klasseBekannt = true
     for (const b of g.mitglieder) {
       const n = gaeste.get(b)
@@ -277,7 +278,7 @@ export function zusammenfuehren(iserv: NutzerInfo, gast: NutzerInfo): void {
   for (const { tabelle, spalte } of personenSpalten()) d.prepare(`UPDATE OR IGNORE ${tabelle} SET ${spalte} = ? WHERE ${spalte} = ?`).run(gast.id, iserv.id)
   // Lerngruppen: wo das IServ-Konto Mitglied war (eingetragen oder über die IServ-Gruppe), steht künftig der Gast
   for (const g of alleLerngruppen()) {
-    const drin = g.mitglieder.includes(iserv.benutzer) || Boolean(g.iserv_gruppe && iserv.gruppen.some((x) => x.id === g.iserv_gruppe))
+    const drin = g.mitglieder.includes(iserv.benutzer) || inIservGruppe(g.iserv_gruppe, iserv.gruppen)
     if (!drin) continue
     const neu = [...g.mitglieder.filter((b) => b !== iserv.benutzer)]
     if (!neu.includes(gast.benutzer)) neu.push(gast.benutzer)

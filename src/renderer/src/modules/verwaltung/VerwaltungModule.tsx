@@ -37,7 +37,7 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
-import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDebouncedValue } from '@mantine/hooks'
 import { nutzerSuchen, QUELLEN_TEXT, SUCHE_MAX, SUCHE_MIN } from '@shared/nutzerSuche'
@@ -69,6 +69,8 @@ interface Uebersicht {
     passwortWechseln?: boolean
     /** Klasse eines Schülerkontos (Gruppe „klasse:…") */
     klasse?: string
+    /** Aus den IServ-Gruppen erkannte Klasse (20.10.2026) */
+    iservKlasse?: string
   }[]
   /** Bekannte Klassen (Schülerkonten und Lerngruppen) für die Zuordnung */
   klassen?: string[]
@@ -169,47 +171,93 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
  * Klasse eines Schülerkontos: wählen oder neu eintippen. Übernehmen (20.10.2026, Befund der Lehrkraft: „keine Möglichkeit,
  * die Auswahl zu bestätigen"): Häkchen-Knopf neben dem Feld, sobald etwas geändert ist, oder Enter bzw. Wahl aus der Liste;
  * danach kurze Bestätigung. Wegklicken speichert nicht mehr still – die Änderung bleibt markiert stehen, Esc verwirft sie.
+ *
+ * IServ-Klasse (20.10.2026, Wunsch der Lehrkraft): Ohne Zuordnung von Hand steht die aus IServ erkannte Klasse im Feld
+ * („aus IServ"). Eine andere Klasse von Hand überschreibt sie – nach einer Warnung, denn das Konto verlässt damit die
+ * Klassen-Lerngruppen seiner IServ-Klasse (onlinetest.ts, gehoertZu). Wer die IServ-Klasse wieder wählt oder das Feld
+ * leert, hebt die Zuordnung von Hand auf.
  */
-function KlasseFeld({ wert, klassen, speichern }: { wert: string; klassen: string[]; speichern: (klasse: string) => Promise<void> }): React.JSX.Element {
-  const [text, setText] = useState(wert)
+function KlasseFeld({
+  wert,
+  iserv,
+  klassen,
+  speichern
+}: {
+  wert: string
+  iserv: string
+  klassen: string[]
+  speichern: (klasse: string) => Promise<void>
+}): React.JSX.Element {
+  const gilt = wert || iserv
+  const [text, setText] = useState(gilt)
   const [laeuft, setLaeuft] = useState(false)
-  useEffect(() => setText(wert), [wert])
-  const geaendert = text.trim() !== wert
+  useEffect(() => setText(gilt), [gilt])
+  const geaendert = text.trim() !== gilt
+  const abweichend = Boolean(wert && iserv && wert !== iserv)
   const uebernehmen = (v = text): void => {
-    const klasse = v.trim()
-    if (klasse === wert || laeuft) return
+    let klasse = v.trim()
+    if (klasse === gilt || laeuft) return
+    // Gleich der IServ-Klasse: keine Zuordnung von Hand nötig
+    if (iserv && klasse === iserv) klasse = ''
+    else if (
+      iserv &&
+      klasse &&
+      !window.confirm(
+        `Laut IServ ist dieses Konto in Klasse ${iserv}.
+
+Mit der Zuordnung zu ${klasse} erscheint es nicht mehr in den Lerngruppen der ${iserv}, sondern in denen der ${klasse}. IServ-Kurse bleiben.
+
+Trotzdem zuordnen?`
+      )
+    ) {
+      setText(gilt)
+      return
+    }
+    if (klasse === wert) return setText(gilt)
     setLaeuft(true)
     void speichern(klasse)
-      .then(() => notifySuccess(klasse ? `Klasse ${klasse} übernommen.` : 'Klasse entfernt.'))
+      .then(() =>
+        notifySuccess(klasse ? `Klasse ${klasse} übernommen.` : iserv ? `Klasse aus IServ (${iserv}) gilt wieder.` : 'Klasse entfernt.')
+      )
       .catch(() => undefined)
       .finally(() => setLaeuft(false))
   }
   return (
-    <Group gap={4} wrap="nowrap">
-      <Autocomplete
-        size="xs"
-        w={120}
-        placeholder="keine"
-        data={klassen}
-        value={text}
-        onChange={setText}
-        onOptionSubmit={(v) => (setText(v), uebernehmen(v))}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') uebernehmen()
-          if (e.key === 'Escape') setText(wert)
-        }}
-        error={geaendert}
-        aria-label="Klasse"
-        data-klasse-feld
-      />
-      {geaendert && (
-        <Tooltip label={text.trim() ? `Klasse ${text.trim()} übernehmen (Enter)` : 'Klasse entfernen (Enter)'}>
-          <ActionIcon variant="filled" size="md" loading={laeuft} onClick={() => uebernehmen()} aria-label="Klasse übernehmen" data-klasse-uebernehmen>
-            <IconCheck size={16} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-    </Group>
+    <Stack gap={0}>
+      <Group gap={4} wrap="nowrap">
+        <Autocomplete
+          size="xs"
+          w={120}
+          placeholder="keine"
+          data={klassen}
+          value={text}
+          onChange={setText}
+          onOptionSubmit={(v) => (setText(v), uebernehmen(v))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') uebernehmen()
+            if (e.key === 'Escape') setText(gilt)
+          }}
+          error={geaendert}
+          aria-label="Klasse"
+          data-klasse-feld
+        />
+        {geaendert && (
+          <Tooltip label={text.trim() ? `Klasse ${text.trim()} übernehmen (Enter)` : iserv ? `Klasse aus IServ (${iserv}) verwenden (Enter)` : 'Klasse entfernen (Enter)'}>
+            <ActionIcon variant="filled" size="md" loading={laeuft} onClick={() => uebernehmen()} aria-label="Klasse übernehmen" data-klasse-uebernehmen>
+              <IconCheck size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+        {!geaendert && abweichend && (
+          <Tooltip label={`Von Hand zugeordnet – IServ meldet Klasse ${iserv}. Klicken: wieder die Klasse aus IServ verwenden.`} multiline w={260}>
+            <ActionIcon variant="light" color="orange" size="md" loading={laeuft} onClick={() => uebernehmen(iserv)} aria-label="Klasse aus IServ verwenden" data-klasse-abweichend>
+              <IconAlertTriangle size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+      {!geaendert && (wert ? abweichend && <Text size="10px" c="orange">überschreibt IServ ({iserv})</Text> : iserv && <Text size="10px" c="dimmed" data-klasse-iserv>aus IServ</Text>)}
+    </Stack>
   )
 }
 
@@ -329,7 +377,7 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
                 </Table.Td>
                 <Table.Td>
                   {n.rolle === 'schueler' ? (
-                    <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendernMit(n.id, { klasse })} />
+                    <KlasseFeld wert={n.klasse ?? ''} iserv={n.iservKlasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendernMit(n.id, { klasse })} />
                   ) : (
                     <Text size="xs" c="dimmed">
                       –

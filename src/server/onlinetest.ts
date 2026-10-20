@@ -51,6 +51,7 @@ import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, OHNE_VORSCHAU, nutzer
 import { imNutzer, type Nutzer } from './kontext'
 import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { iservBereit } from './anmeldung'
+import { inIservGruppe, klasseDerLerngruppe } from './klassenliste'
 import { mitNamensliste, registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
 import { terminBereinigt, terminSichtbar, type OnlineTermin } from '@shared/onlinetestTermin'
@@ -201,7 +202,14 @@ export function gehoertZu(g: Lerngruppe, n: Pick<NutzerInfo, 'benutzer' | 'grupp
   // Vorschaukonto („Als Schüler ansehen", vorschau.ts): gehört zu allen Lerngruppen gleichen Namens seiner Lehrkraft
   const vorschau = vorschauGruppe(g.lehrkraft_id, g.name)
   if (n.gruppen.some((x) => x.id === vorschau)) return true
-  return Boolean(g.iserv_gruppe) && n.gruppen.some((x) => x.id === g.iserv_gruppe)
+  const klasse = klasseDerLerngruppe(g)
+  const zugeordnet = n.gruppen.find((x) => x.id.startsWith('klasse:'))?.id
+  // IServ-Gruppe über Kennung oder Namen (20.10.2026, klassenliste.ts). Eine Klassenzuordnung der Verwaltung überschreibt
+  // die IServ-Klasse (Entscheidung der Lehrkraft 20.10.2026): von Hand der 5b zugeordnet → nicht mehr in Klassen-Lerngruppen
+  // der 5a aus IServ. IServ-Kurse bleiben.
+  if (inIservGruppe(g.iserv_gruppe, n.gruppen) && !(klasse && zugeordnet && zugeordnet !== klasse)) return true
+  // Klassenzuordnung aus der Verwaltung („klasse:5b") gilt für jede Lerngruppe dieser Klasse (20.10.2026)
+  return Boolean(klasse) && zugeordnet === klasse
 }
 
 /** Gruppenkennung des Vorschaukontos einer Klasse (Lerngruppen gleichen Namens, wie klassenSchluessel in klassen.ts) */

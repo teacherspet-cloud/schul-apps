@@ -46,3 +46,26 @@ export const startPasswort = (): string => `${WOERTER[randomInt(WOERTER.length)]
 
 /** Gruppe der Klasse an den Konten: „klasse:10b" – so findet die Lerngruppe ihre Mitglieder */
 export const klassenGruppe = (klasse: string): { id: string; name: string } => ({ id: `klasse:${kurz(klasse) || 'ohne'}`, name: klasse.trim() })
+
+/**
+ * Gehört ein Konto zur IServ-Gruppe einer Lerngruppe? (20.10.2026, Befund „Max Mustermann fehlt in der 5b") Über die
+ * Kennung („klasse.5b") oder über den Namen („Klasse 5b") – Lerngruppen aus der IServ-Ordnerliste tragen nur den Namen,
+ * die Konten bringen bei der Anmeldung Kennung und Namen mit. Groß-/Kleinschreibung zählt nicht.
+ */
+export function inIservGruppe(iservGruppe: string | null | undefined, gruppen: { id: string; name: string }[]): boolean {
+  const z = (iservGruppe ?? '').trim().toLowerCase()
+  return Boolean(z) && gruppen.some((x) => x.id.trim().toLowerCase() === z || (x.name ?? '').trim().toLowerCase() === z)
+}
+
+/**
+ * Klasse einer Lerngruppe als Gruppenkennung der Klassenzuordnung („klasse:5b"), sonst '' (20.10.2026): aus dem Namen
+ * („5b") oder der IServ-Gruppe („Klasse 5b"). Kurse („EN 13 eA Kon") sind keine Klasse. So erscheint ein in der
+ * Verwaltung der 5b zugeordnetes Konto in jeder Lerngruppe der 5b – wie der Hinweis dort verspricht.
+ */
+export function klasseDerLerngruppe(g: { name: string; iserv_gruppe?: string | null }): string {
+  for (const s of [g.name, g.iserv_gruppe ?? '']) {
+    const t = s.replace(/klasse/gi, '').replace(/\s+/g, '').trim()
+    if (/^\d{1,2}[a-z]{0,2}$/i.test(t)) return klassenGruppe(t).id
+  }
+  return ''
+}
