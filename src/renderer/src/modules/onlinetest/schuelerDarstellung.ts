@@ -24,6 +24,8 @@ export interface Darstellung {
   dunkelVorgabe?: boolean
   /** Töne an und männliche Aussprache als Vorgabe übernommen (08.10.2026) – fehlt sie, einmalig umgestellt */
   vorgabe0810?: boolean
+  /** Abendrot als Vorgabe übernommen (20.10.2026) – fehlt sie, wird die bisherige Vorgabe „blue" einmalig zu „abendrot" */
+  vorgabeAbendrot?: boolean
   // ---------- Lesen und Hören (06.10.2026)
   zeilen: 'normal' | 'weit' | 'sehrweit'
   kontrast: boolean
@@ -78,11 +80,12 @@ const NUR_GERAET = ['leseschrift', 'stimmen'] as const
 export const VORGABE: Darstellung = {
   modus: 'dunkel',
   schrift: 'normal',
-  farbe: 'blue',
+  farbe: 'abendrot',
   ruhig: false,
   design: 'fach',
   dunkelVorgabe: true,
   vorgabe0810: true,
+  vorgabeAbendrot: true,
   zeilen: 'normal',
   kontrast: false,
   leseschrift: false,
@@ -106,7 +109,9 @@ const SPEICHER = 'schulapps-darstellung'
 export const mitDunkelVorgabe = (d0: Darstellung): Darstellung => {
   const d = d0.dunkelVorgabe ? d0 : { ...d0, modus: d0.modus === 'auto' ? 'dunkel' : d0.modus, dunkelVorgabe: true }
   // Neue Vorgaben vom 08.10.2026 einmalig für alle: Töne an, männliche Aussprache – danach gilt die eigene Wahl
-  return d.vorgabe0810 ? d : { ...d, toene: true, aussprache: 'm', vorgabe0810: true }
+  const d2 = d.vorgabe0810 ? d : { ...d, toene: true, aussprache: 'm' as const, vorgabe0810: true }
+  // Abendrot als Vorgabe (20.10.2026): wer noch auf der bisherigen Vorgabe Blau stand, bekommt einmalig Abendrot
+  return d2.vorgabeAbendrot ? d2 : { ...d2, farbe: d2.farbe === 'blue' ? 'abendrot' : d2.farbe, vorgabeAbendrot: true }
 }
 
 /** Auf/Zu aus einer anderen Sitzung verwerfen (dann gilt die Vorgabe) und die aktuelle Sitzung vermerken */
@@ -123,8 +128,9 @@ const ausSpeicher = (): Darstellung => {
       ...VORGABE,
       dunkelVorgabe: false,
       vorgabe0810: false,
+      vorgabeAbendrot: false,
       ...roh,
-      ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true, vorgabe0810: true })
+      ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true, vorgabe0810: true, vorgabeAbendrot: true })
     }), sitzungsKennung())
   } catch {
     return VORGABE
@@ -155,7 +161,7 @@ export const fuerServer = (d: Darstellung): Partial<Darstellung> => {
 export const vomServer = (server: Partial<Darstellung>): Darstellung => {
   const hier = useDarstellung.getState().d
   return offenNurInSitzung(
-    mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, vorgabe0810: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen }),
+    mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, vorgabe0810: false, vorgabeAbendrot: false, ...server, leseschrift: hier.leseschrift, stimmen: hier.stimmen }),
     sitzungsKennung()
   )
 }

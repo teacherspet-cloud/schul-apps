@@ -3,8 +3,9 @@ import { FARB_WERTE, farbSatz, fruehGrund, kontrast, SCHUELER_FARBEN } from '../
 
 // Farben des Schülerbereichs (09.10.2026): „Helle, ruhige Flächen + Akzentfarbe", WCAG geprüft
 describe('Farben des Schülerbereichs', () => {
-  it('zehn Farben, darunter die vier neuen', () => {
-    expect(FARB_WERTE).toHaveLength(10)
+  it('elf Farben, darunter die vier neuen und Abendrot (20.10.2026)', () => {
+    expect(FARB_WERTE).toHaveLength(11)
+    expect(FARB_WERTE).toContain('abendrot')
     for (const w of ['lavendel', 'koralle', 'salbei', 'ozean']) expect(FARB_WERTE).toContain(w)
     // Bisherige Werte gelten weiter
     for (const w of ['blue', 'teal', 'green', 'grape', 'pink', 'orange']) expect(FARB_WERTE).toContain(w)

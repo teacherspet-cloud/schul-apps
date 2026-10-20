@@ -11,37 +11,72 @@ import { createHash } from 'node:crypto'
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const STIL = `
-/* Dunkel als Vorgabe (05.10.2026) */
-:root { color-scheme: dark; --grund: #11181d; --karte: #1b252c; --text: #e6edf1; --leise: #9fb0bb; --akzent: #34b39f; --rand: #2c3a43; --fehler: #ff8a80; }
+/*
+ * Abendrot (20.10.2026, Entscheidung der Lehrkraft): dunkler Grund mit weichen Farbwolken (Blau, Violett, warmer
+ * Schimmer unten), Karte wie Milchglas, Hauptknopf im Verlauf Blau → Violett – dieselben Töne wie das Farbprofil
+ * „Abendrot“ der App (themes.ts, schuelerFarben.ts). Alte Browser ohne color-mix/backdrop-filter zeigen schlicht dunkel.
+ */
+:root { color-scheme: dark; --grund: #120f22; --grund2: #1a1530; --karte: rgba(30, 24, 52, .72); --karte-rand: rgba(255,255,255,.09);
+  --feld: rgba(8, 6, 20, .55); --feld-rand: rgba(255,255,255,.12); --text: #eeecf8; --leise: #b0a8c8; --akzent: #9a8cff; --fehler: #ff8f86;
+  --verlauf: linear-gradient(135deg, #5b7cff 0%, #a35cff 100%); --verlauf-hover: linear-gradient(135deg, #7290ff 0%, #b677ff 100%); }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--grund); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-main { width: 100%; max-width: 420px; background: var(--karte); border: 1px solid var(--rand); border-radius: 16px; padding: 28px 24px; box-shadow: 0 8px 30px rgba(0,0,0,.06); }
-h1 { margin: 0 0 4px; font-size: 1.6rem; }
-p.leise { margin: 0 0 22px; color: var(--leise); }
-a.knopf, button { display: block; width: 100%; text-align: center; padding: 14px 16px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
-a.knopf { background: var(--akzent); color: #08201c; border: 0; }
-button { background: transparent; color: var(--akzent); border: 1.5px solid var(--akzent); margin-top: 12px; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: 16px; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background-color: var(--grund);
+  background-image: radial-gradient(520px 420px at 12% 8%, rgba(91,108,255,.38), transparent 70%), radial-gradient(560px 460px at 92% 22%, rgba(180,92,255,.34), transparent 70%),
+    radial-gradient(620px 520px at 50% 110%, rgba(255,122,89,.26), transparent 70%), linear-gradient(180deg, var(--grund2), var(--grund));
+  background-attachment: fixed; }
+.spalte { width: 100%; max-width: 400px; }
+header { text-align: center; margin-bottom: 22px; }
+.symbol { display: inline-block; padding: 4px; border-radius: 24px; background: var(--verlauf); box-shadow: 0 14px 40px rgba(130,92,255,.4); }
+.symbol img { display: block; width: 76px; height: 76px; border-radius: 20px; }
+h1 { margin: 0 0 4px; font-size: 1.6rem; letter-spacing: -.01em; }
+header h1 { margin: 14px 0 2px; font-size: 1.85rem; font-weight: 800; letter-spacing: -.02em; }
+header p { margin: 0; color: var(--leise); }
+main { width: 100%; max-width: 400px; background: var(--karte); border: 1px solid var(--karte-rand); border-radius: 22px; padding: 26px 22px 22px;
+  -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06); }
+p.leise { margin: 0 0 18px; color: var(--leise); }
+a.knopf, button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 15px 16px; border: 0; border-radius: 14px;
+  background: var(--verlauf); color: #fff; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer;
+  box-shadow: 0 10px 26px rgba(120,92,255,.35), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .08s, box-shadow .15s; }
+a.knopf:hover, button:hover { background: var(--verlauf-hover); }
+a.knopf:active, button:active { transform: translateY(1px); }
+a.knopf:focus-visible, button:focus-visible { outline: 3px solid rgba(154,140,255,.6); outline-offset: 3px; }
+a.knopf { font-size: 1.08rem; padding: 16px; }
+a.knopf svg { width: 22px; height: 22px; flex: none; }
 label { display: block; font-size: .9rem; color: var(--leise); margin: 12px 0 4px; }
-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--rand); background: transparent; color: var(--text); font: inherit; }
-details { margin-top: 20px; border-top: 1px solid var(--rand); padding-top: 14px; }
-summary { cursor: pointer; color: var(--leise); }
-.fehler { background: color-mix(in srgb, var(--fehler) 12%, transparent); color: var(--fehler); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
-.hinweis { font-size: .85rem; color: var(--leise); margin-top: 18px; }
-form.code button { margin-top: 10px; background: var(--akzent); color: #08201c; border: 0; }
-section.anmelden { margin-top: 28px; border-top: 1px solid var(--rand); padding-top: 18px; }
-section.anmelden p.leise { margin-bottom: 14px; }
-a.knopf2 { display: block; width: 100%; text-align: center; padding: 14px 16px; border-radius: 10px; font-weight: 600; text-decoration: none; color: var(--akzent); border: 1.5px solid var(--akzent); margin-top: 16px; }
+input { width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--feld-rand); background: var(--feld); color: var(--text); font: inherit; }
+input:focus-visible { outline: none; border-color: var(--akzent); box-shadow: 0 0 0 4px rgba(154,140,255,.25); }
+form button { margin-top: 16px; }
+.fehler { background: rgba(255,143,134,.12); color: var(--fehler); border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; }
+.hinweis { display: flex; gap: 8px; align-items: flex-start; margin: 10px 2px 0; font-size: .85rem; color: var(--leise); }
+.hinweis svg { flex: none; width: 15px; height: 15px; margin-top: 2px; color: var(--akzent); }
+.oder { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; color: var(--leise); font-size: .82rem; text-transform: uppercase; letter-spacing: .12em; }
+.oder::before, .oder::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--feld-rand), transparent); }
+/* Mit Code öffnen: Feld und Knopf in einer Zeile */
+form.code label { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+.codezeile { display: flex; gap: 8px; }
+.codezeile input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 14px; font: 600 1.3rem/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .16em; text-transform: uppercase; }
+.codezeile input::placeholder { color: rgba(176,168,200,.5); }
+.codezeile input[aria-invalid] { border-color: var(--fehler); }
+form.code button { width: auto; flex: none; margin: 0; padding: 0 18px; border: 1.5px solid rgba(154,140,255,.7); background: rgba(154,140,255,.12); color: var(--akzent); box-shadow: none; }
+form.code button:hover { background: rgba(154,140,255,.24); }
+form.code .fehler { margin: 0 0 8px; }
+.codehilfe { margin: 7px 2px 0; color: var(--leise); font-size: .85rem; }
+/* Nutzername/Passwort: kleiner Verweis unter der Karte */
+.fuss { text-align: center; margin-top: 18px; }
+a.knopf2 { color: var(--leise); font-size: .88rem; text-decoration: underline; text-decoration-color: rgba(176,168,200,.4); text-underline-offset: 3px; }
+a.knopf2:hover, a.knopf2:focus-visible { color: var(--text); }
 /* Anmeldefenster (08.10.2026): mit Skript echtes Dialogfenster (showModal), ohne Skript per #Anker */
-dialog.fenster { width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--rand); border-radius: 16px; background: var(--karte); color: var(--text); }
-dialog.fenster::backdrop { background: rgba(0,0,0,.6); }
-dialog.fenster:target, dialog.fenster.offen { display: block; position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 10; box-shadow: 0 0 0 100vmax rgba(0,0,0,.6); }
+dialog.fenster { width: min(400px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--karte-rand); border-radius: 20px; background: var(--grund2); color: var(--text); box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+dialog.fenster::backdrop { background: rgba(5,4,12,.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+dialog.fenster:target, dialog.fenster.offen { display: block; position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 10; box-shadow: 0 0 0 100vmax rgba(5,4,12,.6); }
 .fenster-innen { padding: 20px 22px 24px; }
 .fenster-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .fenster-kopf h2 { margin: 0; font-size: 1.15rem; }
 a.zu { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; color: var(--leise); text-decoration: none; font-size: 1.6rem; line-height: 1; }
-a.zu:hover, a.zu:focus-visible { background: var(--rand); color: var(--text); }
+a.zu:hover, a.zu:focus-visible { background: var(--feld-rand); color: var(--text); }
 .fenster .fehler { margin: 12px 0 0; }
-.fenster input:focus-visible { outline: 2px solid var(--akzent); outline-offset: 1px; }
 `
 
 /*
@@ -93,37 +128,43 @@ export function anmeldeSeite(o: {
 <style>${STIL}</style>
 </head>
 <body>
-<main>
+<div class="spalte">
+<header>
+  <span class="symbol"><img src="/web-app/icon-192.png" alt=""></span>
   <h1>Schul-Apps</h1>
+  <p>${fuerSchueler ? 'Arbeitsblätter, Vokabeln, Tests und Aufgaben' : 'Arbeitsblätter, Vokabeln, Tests und mehr'}</p>
+</header>
+<main>
   ${o.fehler && !kontoFehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
-  <!-- Mit Code öffnen (08.10.2026, Befund im Unterricht): der übliche Weg der Lernenden, deshalb oben und groß -->
+  <!-- Neu gestaltet (20.10.2026, Entscheidung der Lehrkraft): IServ als Hauptweg oben, „Mit Code öffnen" direkt darunter
+       ohne Aufklappen, Nutzername/Passwort als kleiner Verweis unter der Karte (Fenster wie seit 08.10.2026) -->
+  ${
+    o.iserv
+      ? `<a class="knopf" href="/auth/iserv?ziel=${encodeURIComponent(ziel)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>Mit IServ anmelden</a>
+  <p class="hinweis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Das Passwort wird nur bei IServ eingegeben – Schul-Apps sieht und speichert es nicht.</p>`
+      : `<p class="hinweis">Die Anmeldung über IServ ist noch nicht freigeschaltet.</p>`
+  }
+  <div class="oder">oder</div>
   <form method="get" action="/s/" class="code">
     <input type="hidden" name="von" value="anmelden">
     <label for="code">Mit Code öffnen</label>
     ${o.codeUnbekannt ? '<div class="fehler" role="alert" data-code-unbekannt>Diesen Code kennen wir nicht – bitte genau prüfen.</div>' : ''}
-    <input id="code" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" required enterkeyhint="go"
-      placeholder="z. B. AB12CD" value="${esc(code)}"${o.codeUnbekannt ? ' autofocus aria-invalid="true"' : ''} style="text-transform:uppercase;font-size:1.3rem;letter-spacing:.08em">
-    <button type="submit">Öffnen</button>
+    <div class="codezeile">
+      <input id="code" name="code" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" required enterkeyhint="go"
+        placeholder="AB12CD" aria-describedby="codehilfe" value="${esc(code)}"${o.codeUnbekannt ? ' autofocus aria-invalid="true"' : ''}>
+      <button type="submit">Öffnen →</button>
+    </div>
+    <p class="codehilfe" id="codehilfe">Der Code steht auf dem Zettel oder unter dem QR-Code der Lehrkraft.</p>
   </form>
-  <!-- Anmeldung (08.10.2026): IServ wie bisher, Nutzername/Passwort in einem kleinen Fenster -->
-  <section class="anmelden">
-  <p class="leise">${fuerSchueler ? 'Anmelden – zu den eigenen Arbeitsblättern, Vokabeln, Tests und Aufgaben.' : 'Anmelden mit dem Zugang der Schule.'}</p>
-  ${
-    o.iserv
-      ? `<a class="knopf" href="/auth/iserv?ziel=${encodeURIComponent(ziel)}">Mit IServ anmelden</a>
-  <p class="hinweis">Das IServ-Passwort gibst du nur bei IServ ein – Schul-Apps sieht und speichert es nicht.</p>`
-      : `<p class="hinweis">Die Anmeldung über IServ ist noch nicht freigeschaltet. Bis dahin geht es nur mit einem Testkonto.</p>`
-  }
-  <a class="knopf2" id="anmelden-oeffnen" href="#anmelden-fenster" aria-haspopup="dialog" data-anmelden-oeffnen>Mit Nutzername und Passwort anmelden</a>
-  </section>
 </main>
+<div class="fuss"><a class="knopf2" id="anmelden-oeffnen" href="#anmelden-fenster" aria-haspopup="dialog" data-anmelden-oeffnen>Mit Nutzername und Passwort anmelden</a></div>
+</div>
 <dialog id="anmelden-fenster" class="fenster${fensterOffen ? ' offen' : ''}" aria-labelledby="anmelden-titel" data-anmelden-fenster>
   <div class="fenster-innen">
   <div class="fenster-kopf">
     <h2 id="anmelden-titel">Mit Nutzername und Passwort anmelden</h2>
     <a class="zu" href="${fensterOffen ? `/anmelden?ziel=${encodeURIComponent(ziel)}` : '#'}" aria-label="Schließen" data-schliessen>×</a>
   </div>
-  <p class="leise" style="margin:0">${o.notzugang ? 'Testkonto oder Notzugang' : 'Testkonto'}</p>
   ${kontoFehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
     <form method="post" action="/auth/lokal">
       <input type="hidden" name="ziel" value="${esc(ziel)}">

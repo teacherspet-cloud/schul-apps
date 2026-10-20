@@ -47,7 +47,7 @@ try {
   const p = await g.newPage()
   p.on('pageerror', (e) => console.log('  SEITENFEHLER', e.message.slice(0, 200)))
   await p.goto(`${A}/`)
-  pruefe(await da(p.locator('form.code input[name="code"]')), 'Anmeldeseite: „Mit Code öffnen" oben')
+  pruefe(await da(p.locator('form.code input[name="code"]')), 'Anmeldeseite: „Mit Code öffnen" direkt sichtbar')
   // Nutzername/Passwort seit 08.10.2026 in einem kleinen Fenster statt zum Aufklappen
   const fenster = p.locator('[data-anmelden-fenster]')
   pruefe(!(await fenster.isVisible()), 'Anmeldefenster zunächst zu')

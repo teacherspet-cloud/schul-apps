@@ -263,7 +263,7 @@ if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.s
  * Darstellung der Lernenden (dunkel/hell), bis die App in #root etwas zeigt. Hat die App den Grund selbst gesetzt
  * (data-sa-grund, SchuelerRahmen, 10.10.2026), bleibt er stehen – sonst löschte das Aufräumen ihn wieder.
  */
-const VORAB_JS = `(function(){try{var d=document.documentElement,m='dunkel',g=${JSON.stringify(fruehGrund().blue)};try{var s=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');if(s.modus)m=s.modus;g=${JSON.stringify(fruehGrund())}[s.farbe]||g}catch(e){}
+const VORAB_JS = `(function(){try{var d=document.documentElement,m='dunkel',g=${JSON.stringify(fruehGrund().abendrot)};try{var s=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');if(s.modus)m=s.modus;g=${JSON.stringify(fruehGrund())}[s.farbe==='blue'&&!s.vorgabeAbendrot?'abendrot':s.farbe]||g}catch(e){}
 var dunkel=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
 d.style.background=dunkel?g[1]:g[0];d.style.colorScheme=dunkel?'dark':'light';
 var fertig=function(){if(d.hasAttribute('data-sa-grund'))return;d.style.background='';d.style.colorScheme=''};
@@ -754,7 +754,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         // Dunkel als Vorgabe (05.10.2026): ohne gespeicherte Wahl bzw. ältere „automatisch" → dunkel
         "var m=d.modus||'dunkel';if(m==='auto'&&!d.dunkelVorgabe)m='dunkel';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
         // Seitengrund leicht in der gewählten Farbe getönt (09.10.2026, shared/schuelerFarben.ts)
-        `var g=${JSON.stringify(fruehGrund())}[d.farbe]||${JSON.stringify(fruehGrund().blue)};` +
+        // Abendrot als Vorgabe (20.10.2026): ohne Wahl bzw. auf der bisherigen Vorgabe Blau ohne Marke → Abendrot
+        `var g=${JSON.stringify(fruehGrund())}[d.farbe==='blue'&&!d.vorgabeAbendrot?'abendrot':d.farbe]||${JSON.stringify(fruehGrund().abendrot)};` +
         "var s=document.createElement('style');s.id='sa-frueh';s.textContent=(dk?':where(html,body){background:'+g[1]+';color-scheme:dark}':':where(html,body){background:'+g[0]+'}')+':where(html,body){overscroll-behavior-y:none}';" +
         'document.head.appendChild(s)}catch(e){}})();'
       return void res.end(

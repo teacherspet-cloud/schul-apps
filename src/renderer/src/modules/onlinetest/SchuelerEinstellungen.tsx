@@ -96,6 +96,12 @@ html.sa-kontrast[data-mantine-color-scheme='light'] { --sa-grund: #fff; }
 html:root, html:root body { background: var(--sa-grund, var(--mantine-color-body)); }
 /* Kein weißer Rand beim Überziehen (10.10.2026): html und body tragen den Grund, kein Nachfedern über Anfang/Ende */
 html:root, html:root body { background-color: var(--sa-grund, var(--mantine-color-body)); min-height: 100%; overscroll-behavior-y: none; }
+/* Abendrot (20.10.2026): weiche Farbwolken wie auf der Anmeldeseite hinter dem Seitengrund (body), html bleibt einfarbig */
+html.sa-wolken:root body { background-image: radial-gradient(560px 440px at 8% 0%, rgba(91,108,255,.2), transparent 70%),
+  radial-gradient(600px 480px at 96% 12%, rgba(180,92,255,.18), transparent 70%), radial-gradient(700px 520px at 55% 112%, rgba(255,122,89,.12), transparent 70%);
+  background-attachment: fixed; }
+html.sa-wolken[data-mantine-color-scheme='light']:root body { background-image: radial-gradient(560px 440px at 8% 0%, rgba(91,108,255,.12), transparent 70%),
+  radial-gradient(600px 480px at 96% 12%, rgba(180,92,255,.1), transparent 70%), radial-gradient(700px 520px at 55% 112%, rgba(255,122,89,.08), transparent 70%); }
 html.sa-kontrast .mantine-Paper-root, html.sa-kontrast .mantine-Card-root { border-color: var(--mantine-color-default-border) !important; }
 html.sa-kontrast a:focus-visible, html.sa-kontrast button:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
 .sa-vorlese-leiste { position: fixed; right: 16px; bottom: 16px; z-index: 300; }
@@ -147,6 +153,7 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
       el.style.setProperty('overscroll-behavior-y', 'none')
     }
     html.style.colorScheme = schema
+    html.classList.toggle('sa-wolken', d.farbe === 'abendrot' && !d.kontrast)
     // Das Vorab-Skript (/server/vorab.js) räumt seinen Grund sonst nach dem ersten Bild wieder ab
     html.setAttribute('data-sa-grund', '')
     let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')

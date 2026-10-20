@@ -39,6 +39,8 @@ export function darstellungPruefen(
     toene: k0.toene !== false,
     // Neue Vorgaben vom 08.10.2026 (Töne an, männliche Stimme) schon übernommen – sonst würden sie die eigene Wahl überschreiben
     vorgabe0810: k0.vorgabe0810 === true,
+    // Abendrot als Vorgabe (20.10.2026) schon übernommen – sonst würde eine bewusst gewählte Farbe Blau umgestellt
+    vorgabeAbendrot: k0.vorgabeAbendrot === true,
     // Spielauswahl: auf- und zugeklappte Bereiche (08.10.2026)
     spielGruppen: Object.fromEntries(
       Object.entries(typeof k0.spielGruppen === 'object' && k0.spielGruppen ? (k0.spielGruppen as Record<string, unknown>) : {})

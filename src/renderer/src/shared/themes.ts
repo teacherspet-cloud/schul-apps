@@ -35,7 +35,7 @@ export interface AppTheme {
   /** border = Rahmen, shadow = schwebend mit Schatten, flat = flächig ohne Rahmen, bold = kräftiger Rahmen */
   cards: 'border' | 'shadow' | 'flat' | 'bold'
   /** Dezentes Hintergrundmuster */
-  pattern: 'none' | 'dots' | 'grid' | 'paper'
+  pattern: 'none' | 'dots' | 'grid' | 'paper' | 'wolken'
   light: ThemePalette
   dark: ThemePalette
 }
@@ -50,9 +50,50 @@ const GRAPE: MantineColorsTuple = ['#f8f0fc', '#f3d9fa', '#eebefa', '#e599f7', '
 const ORANGE: MantineColorsTuple = ['#fff4e6', '#ffe8cc', '#ffd8a8', '#ffc078', '#ffa94d', '#ff922b', '#fd7e14', '#f76707', '#e8590c', '#d9480f']
 const GREEN: MantineColorsTuple = ['#eef6ea', '#d9ebd1', '#b5d7a6', '#8fc278', '#6fb052', '#5aa33b', '#4a8f2f', '#3d7a27', '#31661f', '#255216']
 const RED: MantineColorsTuple = ['#fff5f5', '#ffe3e3', '#ffc9c9', '#ffa8a8', '#ff8787', '#ff6b6b', '#fa5252', '#f03e3e', '#e03131', '#c92a2a']
+// Abendrot (20.10.2026): Blau-Violett wie der Verlauf der Anmeldeseite (#5b7cff → #a35cff)
+const ABENDROT: MantineColorsTuple = ['#f1efff', '#e1dcff', '#c6bcff', '#a99aff', '#937dff', '#846bfb', '#7556ee', '#6446d6', '#5539bd', '#452d9e']
 const GRAPHITE: MantineColorsTuple = ['#f1f3f5', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#868e96', '#5c636a', '#454b51', '#343a40', '#212529']
 
 export const THEMES: AppTheme[] = [
+  /*
+   * Vorgabe seit 20.10.2026 (Entscheidung der Lehrkraft): nach der Anmeldung sieht die App aus wie die neue
+   * Anmeldeseite – dunkler Grund mit weichen Farbwolken, Verlauf Blau → Violett. Wer ein anderes Profil gewählt hat,
+   * behält es (settings.ts, Marke `abendrotVorgabe`).
+   */
+  {
+    id: 'abendrot',
+    label: 'Abendrot',
+    description: 'Blau bis Violett, weiche Farbwolken im Hintergrund',
+    primary: ABENDROT,
+    primaryShade: { light: 6, dark: 6 },
+    radius: 'lg',
+    fontFamily: SEGOE,
+    headingFontFamily: "'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif",
+    headingWeight: '700',
+    nav: 'filled',
+    cards: 'shadow',
+    pattern: 'wolken',
+    light: {
+      bg: '#f1effa',
+      surface: '#ffffff',
+      border: '#dcd6f1',
+      text: '#211c3a',
+      dimmed: '#665f85',
+      nav: '#ffffff',
+      canvas: '#e2def2',
+      hero: 'linear-gradient(135deg, #4f6cf0 0%, #8f4be6 100%)'
+    },
+    dark: {
+      bg: '#120f22',
+      surface: '#1c1830',
+      border: '#332c50',
+      text: '#ece9f7',
+      dimmed: '#a9a2c6',
+      nav: '#161229',
+      canvas: '#0b0916',
+      hero: 'linear-gradient(135deg, #3d4fc4 0%, #7a3fc8 100%)'
+    }
+  },
   {
     id: 'teal',
     label: 'Frisch',

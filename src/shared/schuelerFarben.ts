@@ -23,7 +23,9 @@ export const SCHUELER_FARBEN = [
   { wert: 'lavendel', name: 'Lavendel', basis: '#6a5ca8' },
   { wert: 'koralle', name: 'Koralle', basis: '#b14a42' },
   { wert: 'salbei', name: 'Salbei', basis: '#4f7356' },
-  { wert: 'ozean', name: 'Ozean', basis: '#2a6787' }
+  { wert: 'ozean', name: 'Ozean', basis: '#2a6787' },
+  // Neu 20.10.2026: Vorgabe für alle, die noch keine eigene Farbe gewählt haben (wie die Anmeldeseite)
+  { wert: 'abendrot', name: 'Abendrot', basis: '#6447d6' }
 ] as const
 
 export type SchuelerFarbe = (typeof SCHUELER_FARBEN)[number]['wert']

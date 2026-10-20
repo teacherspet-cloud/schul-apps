@@ -67,11 +67,16 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     },
     // Dunkel als Vorgabe (05.10.2026): Wer noch auf „automatisch" stand, bekommt einmalig „dunkel";
     // eine danach getroffene Wahl (auch „automatisch") bleibt, weil die Marke dann gespeichert ist.
-    appearance: ((a) => (a.dunkelVorgabe ? a : { ...a, colorScheme: a.colorScheme === 'auto' ? 'dark' : a.colorScheme, dunkelVorgabe: true }))({
-      ...base.appearance,
-      ...stored.appearance,
-      dunkelVorgabe: Boolean(stored.appearance?.dunkelVorgabe)
-    }),
+    // Abendrot als Vorgabe (20.10.2026): Wer noch auf der bisherigen Vorgabe „teal" stand, bekommt einmalig „abendrot";
+    // jede andere (und jede danach getroffene) Wahl bleibt.
+    appearance: ((a) => (a.abendrotVorgabe ? a : { ...a, theme: a.theme === 'teal' ? 'abendrot' : a.theme, abendrotVorgabe: true }))(
+      ((a) => (a.dunkelVorgabe ? a : { ...a, colorScheme: a.colorScheme === 'auto' ? 'dark' : a.colorScheme, dunkelVorgabe: true }))({
+        ...base.appearance,
+        ...stored.appearance,
+        dunkelVorgabe: Boolean(stored.appearance?.dunkelVorgabe),
+        abendrotVorgabe: Boolean(stored.appearance?.abendrotVorgabe)
+      })
+    ),
     // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)
     ...(base.pcKi || stored.pcKi
       ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } }

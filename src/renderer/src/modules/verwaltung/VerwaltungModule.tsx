@@ -165,27 +165,51 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
   )
 }
 
-/** Klasse eines Schülerkontos: wählen oder neu eintippen; gespeichert wird beim Verlassen des Felds bzw. mit Enter */
-function KlasseFeld({ wert, klassen, speichern }: { wert: string; klassen: string[]; speichern: (klasse: string) => void }): React.JSX.Element {
+/**
+ * Klasse eines Schülerkontos: wählen oder neu eintippen. Übernehmen (20.10.2026, Befund der Lehrkraft: „keine Möglichkeit,
+ * die Auswahl zu bestätigen"): Häkchen-Knopf neben dem Feld, sobald etwas geändert ist, oder Enter bzw. Wahl aus der Liste;
+ * danach kurze Bestätigung. Wegklicken speichert nicht mehr still – die Änderung bleibt markiert stehen, Esc verwirft sie.
+ */
+function KlasseFeld({ wert, klassen, speichern }: { wert: string; klassen: string[]; speichern: (klasse: string) => Promise<void> }): React.JSX.Element {
   const [text, setText] = useState(wert)
+  const [laeuft, setLaeuft] = useState(false)
   useEffect(() => setText(wert), [wert])
-  const fertig = (v = text): void => {
-    if (v.trim() !== wert) speichern(v.trim())
+  const geaendert = text.trim() !== wert
+  const uebernehmen = (v = text): void => {
+    const klasse = v.trim()
+    if (klasse === wert || laeuft) return
+    setLaeuft(true)
+    void speichern(klasse)
+      .then(() => notifySuccess(klasse ? `Klasse ${klasse} übernommen.` : 'Klasse entfernt.'))
+      .catch(() => undefined)
+      .finally(() => setLaeuft(false))
   }
   return (
-    <Autocomplete
-      size="xs"
-      w={120}
-      placeholder="keine"
-      data={klassen}
-      value={text}
-      onChange={setText}
-      onOptionSubmit={(v) => (setText(v), fertig(v))}
-      onBlur={() => fertig()}
-      onKeyDown={(e) => e.key === 'Enter' && fertig()}
-      aria-label="Klasse"
-      data-klasse-feld
-    />
+    <Group gap={4} wrap="nowrap">
+      <Autocomplete
+        size="xs"
+        w={120}
+        placeholder="keine"
+        data={klassen}
+        value={text}
+        onChange={setText}
+        onOptionSubmit={(v) => (setText(v), uebernehmen(v))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') uebernehmen()
+          if (e.key === 'Escape') setText(wert)
+        }}
+        error={geaendert}
+        aria-label="Klasse"
+        data-klasse-feld
+      />
+      {geaendert && (
+        <Tooltip label={text.trim() ? `Klasse ${text.trim()} übernehmen (Enter)` : 'Klasse entfernen (Enter)'}>
+          <ActionIcon variant="filled" size="md" loading={laeuft} onClick={() => uebernehmen()} aria-label="Klasse übernehmen" data-klasse-uebernehmen>
+            <IconCheck size={16} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+    </Group>
   )
 }
 
@@ -231,7 +255,12 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
       notifyError(e)
     }
   }
-  const aendern = (id: string, patch: object): void => void senden('/server/verwaltung/nutzer', { id, ...patch }).then(neu, (e: unknown) => notifyError(e))
+  const aendernMit = (id: string, patch: object): Promise<void> =>
+    senden('/server/verwaltung/nutzer', { id, ...patch }).then(neu, (e: unknown) => {
+      notifyError(e)
+      throw e
+    })
+  const aendern = (id: string, patch: object): void => void aendernMit(id, patch).catch(() => undefined)
   const loeschen = (n: Uebersicht['nutzer'][number]): void => {
     if (!window.confirm(`Konto „${n.benutzer}" samt ALLER Daten (Material, Einstellungen, Abo-Anmeldung) löschen?`)) return
     void senden('/server/verwaltung/nutzer-loeschen', { id: n.id }).then(neu, (e: unknown) => notifyError(e))
@@ -300,7 +329,7 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
                 </Table.Td>
                 <Table.Td>
                   {n.rolle === 'schueler' ? (
-                    <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendern(n.id, { klasse })} />
+                    <KlasseFeld wert={n.klasse ?? ''} klassen={d.klassen ?? []} speichern={(klasse) => aendernMit(n.id, { klasse })} />
                   ) : (
                     <Text size="xs" c="dimmed">
                       –

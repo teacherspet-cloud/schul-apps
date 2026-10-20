@@ -248,6 +248,8 @@ export interface AppSettings {
     theme: string
     /** Dunkel als Vorgabe übernommen (05.10.2026): einmalig „automatisch" → „dunkel", danach gilt die eigene Wahl */
     dunkelVorgabe?: boolean
+    /** Abendrot als Vorgabe übernommen (20.10.2026): einmalig „teal" (bisherige Vorgabe) → „abendrot" */
+    abendrotVorgabe?: boolean
   }
   schoolName: string
   defaults: {
@@ -615,7 +617,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     economy: 'auto'
   },
   // Dunkel als Vorgabe (05.10.2026, Wunsch der Lehrkraft)
-  appearance: { colorScheme: 'dark', theme: 'teal', dunkelVorgabe: true },
+  appearance: { colorScheme: 'dark', theme: 'abendrot', dunkelVorgabe: true, abendrotVorgabe: true },
   schoolName: '',
   defaults: { stateId: 'NI', schoolTypeId: 'gymnasium', targetLanguage: 'en' },
   audio: { voices: {} },
