@@ -11,10 +11,14 @@
  *  - Alle (17.10.2026, Wunsch der Lehrkraft, nur Grammatik): Im Trainer sind alle Aufgaben möglich – `alle` liefert alle
  *    fälligen und alle unbearbeiteten in derselben Reihenfolge. Erinnerungen und Spiele-Freigabe zählen weiter die
  *    Tagesrunde (ohne `alle`).
+ *  - Etappen (20.10.2026, abgestimmt – shared/grammatikEtappen.ts): Neue Übungen nur aus freigeschalteten Etappen
+ *    (Erkennen → Bilden → Anwenden → Profi → Bonus, weiter ab 80 % richtig). Vor einem angekündigten Test gilt das nicht –
+ *    dann soll jede Aufgabe des Tests rechtzeitig einmal dran gewesen sein.
  */
 import { alsKarten, type GrammatikPaket } from './grammatiktrainer'
 import { sitzungsWoerter, tagVon, type Vokabel, type WortStand } from './vokabeltrainer'
 import { GLEICHE_FREIGABE_MS } from './uebungsVorrang'
+import { freieAufgaben } from './grammatikEtappen'
 
 /** Neue Grammatikaufgaben je Tag (ohne angekündigten Test) */
 export const GRAMMATIK_NEU_JE_TAG = 10
@@ -52,10 +56,11 @@ export function grammatikHeute(
   const heute = tagVon(jetzt)
   const schonNeu = paket.aufgaben.filter((a) => staende[a.id]?.erstmals && tagVon(staende[a.id].erstmals!) === heute).length
   const regelIndex = new Map(paket.regeln.map((r, i) => [r.id, i]))
+  const frei = o.test ? null : freieAufgaben(paket, staende)
   const neu = o.alle ? Number.MAX_SAFE_INTEGER : Math.max(0, (o.neuJeTag ?? GRAMMATIK_NEU_JE_TAG) - schonNeu)
   const neue = paket.aufgaben
     .map((a, i) => ({ a, i, zeit: aufgabeFreigabe(a.id, o.erstellt) }))
-    .filter((x) => !staende[x.a.id]?.versuche)
+    .filter((x) => !staende[x.a.id]?.versuche && (!frei || frei.has(x.a.id)))
     // neueste Freigabe zuerst (zusammen angehängte als eine), darin Stufe, Regel und Reihenfolge wie bisher
     .sort(
       (x, y) =>

@@ -16,7 +16,7 @@ export interface KursKurz {
   /** Eigener Kursname ohne Klasse – unterscheidet mehrere Kurse eines Fachs (09.10.2026) */
   name?: string
   fach: string
-  uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number }
+  uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number; etappen?: { geschafft: number; gesamt: number; aktuell: { name: string; offen: number; gesamt: number } | null; offen: number } }
   /** Grammatik (08.10.2026): Jahrgang und Stelle im Lehrwerk – das Register gliedert nach Schuljahren */
   jahrgang?: number | null
   stelle?: number | null

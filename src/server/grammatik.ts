@@ -59,6 +59,7 @@ import { jahrgangAus } from '../shared/lernstand'
 import { ampelVon } from '../shared/grammatikBereiche'
 import { formAusTeilen, formBefund, mitErstemVersuch, nachSpielfehlerGrammatik, type FormAmpel } from '../shared/grammatikSicher'
 import { GRAMMATIK_NEU_JE_TAG, grammatikHeute, grammatikKarten } from '../shared/grammatikVorrang'
+import { etappenUebersicht } from '../shared/grammatikEtappen'
 import { tageszielVorTest } from '../shared/uebungsVorrang'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
 import { bekannteGrammatik, fruehereBaendeDerReihe, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
@@ -532,14 +533,16 @@ export function grammatikFuer(ich: NutzerInfo): {
   fach: string
   extra: boolean
   erstellt: string
-  uebersicht: ReturnType<typeof uebersicht> & { unbearbeitet: number }
+  uebersicht: ReturnType<typeof uebersicht> & { unbearbeitet: number; etappen: ReturnType<typeof etappenUebersicht> }
 }[] {
   return (
     (db().prepare("SELECT * FROM gram_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC, rowid").all() as unknown as Zeile[])
       .filter((z) => istOffen(z) && istFuer(z, ich))
       .map((z) => {
-        const kk = karten(paketVon(z))
+        const paket = paketVon(z)
+        const kk = karten(paket)
         const st = standVon(z.id, ich.id).aufgaben
+        const etappen = etappenUebersicht(paket, st)
         return {
           id: z.id,
           // Extra heißt bei den Lernenden „Extra für dich: …" – ohne Etikett Förder/Forder (abgestimmt)
@@ -548,8 +551,9 @@ export function grammatikFuer(ich: NutzerInfo): {
           extra: istExtra(z),
           // Freigabedatum für „Mein Lernraum" auf der Startseite (08.10.2026)
           erstellt: z.erstellt,
-          // Startkarte (08.10.2026): „Noch 23 von 40 Übungen nicht bearbeitet"
-          uebersicht: { ...uebersicht(kk, st), unbearbeitet: kk.filter((k) => !st[k.id]?.versuche).length }
+          // Startkarte (08.10.2026): offene Übungen – seit den Etappen (20.10.2026) nur die der freigeschalteten Etappen, und
+          // statt der Gesamtzahl die aktuelle Etappe („Etappe Bilden · noch 5 von 8")
+          uebersicht: { ...uebersicht(kk, st), unbearbeitet: etappen.offen, etappen }
         }
       })
       // Extra zuerst
@@ -1226,7 +1230,9 @@ export function bankKurseNeu(schluessel: string[]): number {
     if (!bank.some((x) => s.has(x))) continue
     db()
       .prepare('UPDATE gram_zuweisungen SET paket = ? WHERE id = ?')
-      .run(JSON.stringify(paketAusBank(z.thema || z.titel, bank, infoVon(z).stufen)), z.id)
+      // Ohne gespeicherte Stufen die des Kurses bzw. der Schulform (20.10.2026) – sonst kämen am Gymnasium auch die
+      // grundlegenden Aufgaben in den normalen Bestand statt in die Förderreserve
+      .run(JSON.stringify(paketAusBank(z.thema || z.titel, bank, infoVon(z).stufen ?? kursStufen(z.lehrkraft_id, z.vok_id ?? ''))), z.id)
     n++
   }
   if (schluessel.some((x) => !formVon(x))) for (const [vokId, lk] of kurse) n += mixeZuweisen(lk, vokId).length

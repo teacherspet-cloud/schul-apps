@@ -582,6 +582,11 @@ function grammatikAltEntfernen(d: AchDaten): void {
  * allen Formen des Bands), zur Hälfte die richtig gelösten Kern-Aufgaben (von allen hinterlegten Kern-Aufgaben zu diesen
  * Formen). Ohne Formenliste des Bands (Latein, unbekannter Band): die Formen, die der Person zugewiesen sind, mindestens
  * so viele wie der Band Grammatikthemen hat.
+ *
+ * Nachweis statt Vollständigkeit (20.10.2026, Entscheidung der Lehrkraft: „nicht erst gemeistert, wenn alle Übungen
+ * erledigt sind"): Eine sichere Form zählt auch bei den Kern-Aufgaben voll – „sicher" verlangt je Teilbereich in
+ * Erkennen, Bilden und Anwenden je mindestens 5 Übungen mit 80 % beim ersten Versuch richtig (shared/grammatikSicher.ts),
+ * das ist der Nachweis. Meister (100 %) = alle Formen des Bands sicher, nicht jede hinterlegte Aufgabe gelöst.
  */
 export function grammatikProzent(
   b: { formen: Record<string, string>; geloest: Record<string, number> } | undefined,
@@ -597,7 +602,7 @@ export function grammatikProzent(
   const sichere = formen.filter((f) => b.formen[f] === 'sicher').length
   const kern = kernJeForm(sprache)
   const gesamt = formen.reduce((n, f) => n + (kern[f] ?? 0), 0)
-  const geloest = formen.reduce((n, f) => n + Math.min(kern[f] ?? 0, b.geloest[f] ?? 0), 0)
+  const geloest = formen.reduce((n, f) => n + (b.formen[f] === 'sicher' ? kern[f] ?? 0 : Math.min(kern[f] ?? 0, b.geloest[f] ?? 0)), 0)
   const anteil = 0.5 * (sichere / nenner) + 0.5 * (gesamt ? geloest / gesamt : 0)
   return Math.max(0, Math.min(100, Math.floor(anteil * 100 + 1e-9)))
 }

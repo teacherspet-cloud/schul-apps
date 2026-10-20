@@ -31,6 +31,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconFlame,
+  IconLock,
   IconPlayerPlay,
   IconSearch,
   IconShieldCheck,
@@ -56,6 +57,7 @@ import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from
 import { nachAbfrage, STUFEN, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { grammatikHeute } from '@shared/grammatikVorrang'
 import { formSicher, mitErstemVersuch } from '@shared/grammatikSicher'
+import { aktuelleEtappe, etappenDesPakets, type Etappe } from '@shared/grammatikEtappen'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
@@ -364,6 +366,15 @@ function Kasten({
   // ---------------------------------------------------------------- Ansicht nach Regeln (08.10.2026, abgestimmt)
   const jetzt = Date.now()
   const bearbeitet = d.paket.aufgaben.filter((a) => d.staende[a.id]?.versuche).length
+  /*
+   * Etappen (20.10.2026, abgestimmt – shared/grammatikEtappen.ts): je Regel Erkennen → Bilden → Anwenden → Profi → Bonus,
+   * sichtbar nur die aktuelle Etappe statt aller Übungen (vorher bis zu ~200 je Form). Ohne Übungsarten (ältere Trainings,
+   * Extras) eine offene Etappe wie bisher.
+   */
+  const etappenJeRegel = etappenDesPakets(d.paket, d.staende)
+  const alleEtappen = [...etappenJeRegel.values()].flat()
+  const mitEtappen = d.paket.aufgaben.some((a) => a.uebung)
+  const etappenGeschafft = alleEtappen.filter((e) => e.geschafft).length
   const regelnMitUebungen = d.paket.regeln.filter((r) => d.paket.aufgaben.some((a) => a.regelId === r.id)).length
   const regelnSicher = d.paket.regeln.filter((r) =>
     formSicher(
@@ -373,19 +384,25 @@ function Kasten({
   ).length
   const erklaerungen: Record<string, string> = {
     bearbeitet: 'So viele Übungen hast du schon mindestens einmal gemacht. Unbearbeitete kommen bei „Weiter üben" zuerst nach den fälligen dran.',
+    etappen:
+      'Jede Regel hat kleine Etappen: Erkennen, Bilden, Anwenden – dann Profi und Bonus. Die nächste Etappe öffnet sich, sobald du 80 % gleich beim ersten Versuch richtig hast (mindestens 5 Übungen). Nach Erkennen, Bilden und Anwenden sitzt die Regel sicher – Profi und Bonus sind für alle, die mehr wollen.',
     // „Sicher" je Regel nach dem ersten Versuch (12.10.2026, Entscheidung der Lehrkraft – shared/grammatikSicher.ts)
     sicher:
       'Eine Regel ist sicher, wenn du mindestens 80 % ihrer verschiedenen Übungen (mindestens 5, bei weniger alle) gleich beim ersten Versuch richtig gelöst hast – bei Übungen, in denen du selbst Formen bildest, auch davon 80 %. Ein späterer Fehler (Wiederholung oder Spiel) stuft sie zurück, bis du die Übung wieder richtig löst.',
     'heute dran': 'Wiederholungen, die heute fällig sind, und die nächsten neuen Übungen. Danach sind die Spiele frei.'
   }
   const werte = [
-    { name: 'bearbeitet', wert: `${bearbeitet} / ${d.paket.aufgaben.length}`, farbe: farbe.a, symbol: <IconStairsUp size={20} /> },
+    mitEtappen
+      ? { name: 'etappen', wert: `${etappenGeschafft} / ${alleEtappen.length}`, farbe: farbe.a, symbol: <IconStairsUp size={20} /> }
+      : { name: 'bearbeitet', wert: `${bearbeitet} / ${d.paket.aufgaben.length}`, farbe: farbe.a, symbol: <IconStairsUp size={20} /> },
     { name: 'sicher', wert: `${regelnSicher} / ${regelnMitUebungen}`, farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
     { name: 'heute dran', wert: String(heute.length), farbe: '#f59e0b', symbol: <IconFlame size={20} /> }
   ]
   /** Übungen einer Regel: unbearbeitete, dann fällige, dann wackelige (Fach 1–2), höchstens 10 */
   const regelAufgaben = (rid: string): GrammatikAufgabe[] => {
-    const l = d.paket.aufgaben.filter((a) => a.regelId === rid)
+    // Nur Übungen freigeschalteter Etappen (20.10.2026)
+    const frei = new Set((etappenJeRegel.get(rid) ?? []).filter((e) => e.frei).flatMap((e) => e.aufgaben))
+    const l = d.paket.aufgaben.filter((a) => a.regelId === rid && frei.has(a.id))
     const st = (a: GrammatikAufgabe): WortStand | undefined => d.staende[a.id]
     const rang = (a: GrammatikAufgabe): number => (!st(a)?.versuche ? 0 : (st(a)!.faellig ?? 0) <= jetzt ? 1 : (st(a)!.fach ?? 0) <= 2 ? 2 : 3)
     return [...l].sort((a, b) => rang(a) - rang(b) || (a.stufe ?? 0) - (b.stufe ?? 0)).slice(0, GRAMMATIK_SCHRITT)
@@ -434,6 +451,11 @@ function Kasten({
   const gefunden = regelInfos.filter((x) => x.r.titel.toLowerCase().includes(suche.trim().toLowerCase()))
   const regelKarte = ({ r, i, l, ru, fertig }: RegelInfo): React.JSX.Element => {
     const offen = offeneRegel === r.id
+    const etappen = etappenJeRegel.get(r.id) ?? []
+    const aktuell = aktuelleEtappe(etappen)
+    const geschafft = etappen.filter((e) => e.geschafft).length
+    // Etappen (20.10.2026): Fortschritt in Etappen statt „0/196" – nur bei Aufgaben mit Übungsarten
+    const inEtappen = etappen.length > 1 || (etappen.length === 1 && etappen[0].id !== 'alle')
     return (
       <Card key={r.id} withBorder radius="lg" padding="sm" data-regel={r.id}>
         <UnstyledButton onClick={() => setOffeneRegel(offen ? null : r.id)} w="100%" aria-expanded={offen} data-regel-kopf={r.id}>
@@ -443,13 +465,33 @@ function Kasten({
                 {d.paket.regeln.length > 1 ? `${i + 1} ` : ''}
                 {r.titel}
               </Text>
-              <Progress.Root size={8} radius="xl" mt={6}>
-                <Progress.Section value={(ru.sicher / l.length) * 100} color="teal" />
-                <Progress.Section value={((fertig - ru.sicher) / l.length) * 100} color={farbe.a} />
-              </Progress.Root>
+              {inEtappen ? (
+                <Group gap={4} mt={6} wrap="nowrap" data-regel-etappen={`${geschafft}/${etappen.length}`}>
+                  {etappen.map((e) => (
+                    <div
+                      key={e.id}
+                      style={{
+                        flex: 1,
+                        height: 8,
+                        borderRadius: 999,
+                        background: e.geschafft
+                          ? 'var(--mantine-color-teal-6)'
+                          : e === aktuell
+                          ? `color-mix(in srgb, ${farbe.a} ${Math.round(15 + (85 * e.bearbeitet) / e.aufgaben.length)}%, var(--mantine-color-default-border))`
+                          : 'var(--mantine-color-default-border)'
+                      }}
+                    />
+                  ))}
+                </Group>
+              ) : (
+                <Progress.Root size={8} radius="xl" mt={6}>
+                  <Progress.Section value={(ru.sicher / l.length) * 100} color="teal" />
+                  <Progress.Section value={((fertig - ru.sicher) / l.length) * 100} color={farbe.a} />
+                </Progress.Root>
+              )}
             </div>
-            <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-regel-stand={`${fertig}/${l.length}`}>
-              {fertig}/{l.length}
+            <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }} data-regel-stand={inEtappen ? undefined : `${fertig}/${l.length}`}>
+              {inEtappen ? (aktuell ? `${aktuell.name} ${aktuell.bearbeitet}/${aktuell.aufgaben.length}` : '✓ alle Etappen') : `${fertig}/${l.length}`}
             </Text>
             <IconChevronDown size={16} style={{ transform: offen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flex: 'none' }} />
           </Group>
@@ -457,6 +499,7 @@ function Kasten({
         {offen && (
           <Stack gap="xs" mt="sm">
             <RegelKarte r={r} />
+            {inEtappen && <EtappenListe etappen={etappen} aktuell={aktuell} farbe={farbe.a} />}
             <Button
               variant="light"
               color={farbe.a}
@@ -464,7 +507,8 @@ function Kasten({
               onClick={() => starten(regelAufgaben(r.id))}
               data-regel-ueben={r.id}
             >
-              Diese Regel üben{l.length > GRAMMATIK_SCHRITT ? ` · nächste ${GRAMMATIK_SCHRITT}` : ''}
+              {inEtappen && aktuell ? `Etappe ${aktuell.name} üben` : 'Diese Regel üben'}
+              {!inEtappen && l.length > GRAMMATIK_SCHRITT ? ` · nächste ${GRAMMATIK_SCHRITT}` : ''}
             </Button>
           </Stack>
         )}
@@ -522,7 +566,7 @@ function Kasten({
         ))}
       </SimpleGrid>
       {/* Förderaufgaben: Stufen erkennen → gelenkt bilden → selbst bilden */}
-      {stufen.some((s) => s.gesamt) && (
+      {!mitEtappen && stufen.some((s) => s.gesamt) && (
         <Group gap="xs" data-stufen>
           {stufen
             .filter((s) => s.gesamt)
@@ -553,7 +597,8 @@ function Kasten({
           </Button>
           {alle.length > GRAMMATIK_SCHRITT && (
             <Text size="sm" c="dimmed" ta="center" data-grammatik-rest={alle.length}>
-              Noch {alle.length} offen – nach je {GRAMMATIK_SCHRITT} kannst du aufhören oder weitermachen.
+              {mitEtappen ? `Noch ${alle.length} in deinen offenen Etappen` : `Noch ${alle.length} offen`} – nach je {GRAMMATIK_SCHRITT} kannst du
+              aufhören oder weitermachen.
             </Text>
           )}
         </Stack>
@@ -651,8 +696,9 @@ function Kasten({
           </>
         )}
       </Stack>
+      {/* Etappen (20.10.2026): ohne Zahlen je Aufgabenart – sie verrieten wieder die Gesamtmenge */}
       <Text size="sm" c="dimmed" data-uebungsarten>
-        Übungsarten: {arten.map(([a, n]) => `${ART_NAME[a]} ${n}`).join(' · ')}
+        Übungsarten: {arten.map(([a, n]) => (mitEtappen ? ART_NAME[a] : `${ART_NAME[a]} ${n}`)).join(' · ')}
       </Text>
       {wahl.spiele && spiele.length > 0 && (
         <Card withBorder radius="lg" padding="sm" data-grammatik-spiele>
@@ -1450,6 +1496,38 @@ function RegelRunde({
           </Button>
         ))}
       </SimpleGrid>
+    </Stack>
+  )
+}
+
+/** Etappen einer Regel (20.10.2026, abgestimmt): geschafft ✓, aktuelle mit Stand, spätere mit Schloss */
+function EtappenListe({ etappen, aktuell, farbe }: { etappen: Etappe[]; aktuell: Etappe | null; farbe: string }): React.JSX.Element {
+  return (
+    <Stack gap={4} data-etappen>
+      {etappen.map((e, n) => (
+        <Group key={e.id} gap="xs" wrap="nowrap" data-etappe={e.id} data-etappe-stand={e.geschafft ? 'geschafft' : e.frei ? 'frei' : 'zu'}>
+          <Badge
+            size="lg"
+            circle
+            variant={e.geschafft ? 'filled' : e === aktuell ? 'light' : 'outline'}
+            color={e.geschafft ? 'teal' : e === aktuell ? farbe : 'gray'}
+          >
+            {e.geschafft ? <IconCheck size={14} /> : e.frei ? n + 1 : <IconLock size={12} />}
+          </Badge>
+          <Text size="sm" fw={e === aktuell ? 700 : 500} c={e.frei ? undefined : 'dimmed'} style={{ flex: 1 }}>
+            {e.name}
+            {e.id === 'profi' || e.id === 'bonus' ? (
+              <Text span size="xs" c="dimmed">
+                {' '}
+                · freiwillig
+              </Text>
+            ) : null}
+          </Text>
+          <Text size="sm" c={e === aktuell ? undefined : 'dimmed'}>
+            {e.geschafft ? 'geschafft' : e === aktuell ? `${e.bearbeitet}/${e.aufgaben.length} ← jetzt` : ''}
+          </Text>
+        </Group>
+      ))}
     </Stack>
   )
 }

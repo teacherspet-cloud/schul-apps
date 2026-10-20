@@ -1022,20 +1022,36 @@ function BlaetterSeite(): React.JSX.Element {
  * Stand einer Grammatik auf der Startkarte (08.10.2026, abgestimmt): „Noch 23 von 40 Übungen nicht bearbeitet",
  * darunter „heute dran: 10 · 12 sicher"; alles bearbeitet: „✓ Alle Übungen bearbeitet – heute noch 4 Wiederholungen".
  */
-export function GrammatikStand({ u }: { u: { gesamt: number; sicher: number; heuteOffen?: number; unbearbeitet?: number } }): React.JSX.Element {
+/**
+ * Stand einer Grammatik im Lernraum und Regal. Etappen (20.10.2026, abgestimmt – shared/grammatikEtappen.ts): statt
+ * „Noch 190 von 196 Übungen" die aktuelle Etappe („Etappe Bilden · noch 5 von 8") und wie viele Etappen geschafft sind.
+ */
+export function GrammatikStand({
+  u
+}: {
+  u: { gesamt: number; sicher: number; heuteOffen?: number; unbearbeitet?: number; etappen?: { geschafft: number; gesamt: number; aktuell: { name: string; offen: number; gesamt: number } | null; offen: number } }
+}): React.JSX.Element {
   const offen = u.unbearbeitet ?? 0
   const heute = u.heuteOffen ?? 0
+  const e = u.etappen
+  const alleGeschafft = Boolean(e && e.gesamt && e.geschafft >= e.gesamt)
   return (
     <>
       <Text size="sm" fw={600} c={offen ? 'orange' : heute ? 'grape' : 'teal'} data-grammatik-offen={offen}>
-        {offen
+        {e?.aktuell && e.aktuell.offen
+          ? `Etappe ${e.aktuell.name} · noch ${e.aktuell.offen} von ${e.aktuell.gesamt}`
+          : offen && !e
           ? `Noch ${offen} von ${u.gesamt} Übungen nicht bearbeitet`
           : heute
-          ? `✓ Alle Übungen bearbeitet – heute noch ${heute} ${heute === 1 ? 'Wiederholung' : 'Wiederholungen'}`
+          ? `✓ ${alleGeschafft ? 'Alle Etappen geschafft' : 'Etappe geschafft'} – heute noch ${heute} ${heute === 1 ? 'Wiederholung' : 'Wiederholungen'}`
+          : alleGeschafft
+          ? '✓ Alle Etappen geschafft'
           : '✓ Für heute geschafft'}
       </Text>
       <Text size="sm" c="dimmed">
-        {[offen && heute ? `heute dran: ${heute}` : '', `${u.sicher} sicher`].filter(Boolean).join(' · ')}
+        {[offen && heute ? `heute dran: ${heute}` : '', e?.gesamt ? `${e.geschafft} von ${e.gesamt} Etappen` : '', `${u.sicher} sicher`]
+          .filter(Boolean)
+          .join(' · ')}
       </Text>
     </>
   )
@@ -1214,7 +1230,7 @@ function GastStart(): React.JSX.Element {
         id: string
         titel: string
         fach: string
-        uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number }
+        uebersicht: { gesamt: number; neu: number; sicher: number; faellig: number; heuteGeuebt?: number; heuteOffen?: number; unbearbeitet?: number; etappen?: { geschafft: number; gesamt: number; aktuell: { name: string; offen: number; gesamt: number } | null; offen: number } }
         g?: boolean
       }[]
     | null

@@ -113,7 +113,9 @@ describe('Aufgabenbank: „sicher" (13.10.2026)', () => {
       { schluessel: 'en.a/x', regel: { titel: 'A', erklaerung: 'a', beispiele: [] }, aufgaben: [aufgabe('ba', 'bilden'), aufgabe('ea', 'erkennen')] },
       { schluessel: 'en.a/y', regel: { titel: 'B', erklaerung: 'b', beispiele: [] }, aufgaben: [aufgabe('eb', 'erkennen')] }
     ])
-    expect(grammatikHeute(p, {}, { erstellt: 0, jetzt: 1e12 })).toEqual(['ea', 'ba', 'eb'])
+    // Etappen (20.10.2026): Bilden erst, wenn Erkennen geschafft ist
+    expect(grammatikHeute(p, {}, { erstellt: 0, jetzt: 1e12 })).toEqual(['ea', 'eb'])
+    expect(grammatikHeute(p, {}, { erstellt: 0, jetzt: 1e12, test: true })).toEqual(['ea', 'ba', 'eb'])
   })
 })
 
@@ -127,6 +129,15 @@ describe('Aufgabenbank: Medaille „Grammatik" in Prozent des Bands', () => {
     expect(
       grammatikProzent(
         { formen: { 'en.a': 'sicher', 'en.b': 'sicher', 'en.c': 'sicher', 'en.d': 'sicher' }, geloest: { 'en.a': 30, 'en.b': 30, 'en.c': 40 } },
+        band,
+        'en',
+        kern
+      )
+    ).toBe(100)
+    // Nachweis statt Vollständigkeit (20.10.2026): sichere Formen zählen voll, auch wenn nur ein Teil der Aufgaben gelöst ist
+    expect(
+      grammatikProzent(
+        { formen: { 'en.a': 'sicher', 'en.b': 'sicher', 'en.c': 'sicher', 'en.d': 'sicher' }, geloest: { 'en.a': 15, 'en.b': 15, 'en.c': 15 } },
         band,
         'en',
         kern
