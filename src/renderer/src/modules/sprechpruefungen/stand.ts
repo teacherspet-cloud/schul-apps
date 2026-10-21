@@ -7,6 +7,8 @@
 import type { TextbookMeta } from '@shared/types'
 import type { SprechStand } from '@shared/sprechen/karten'
 import { bandRang } from '@shared/lehrwerkBand'
+import type { KartenTeil } from '@shared/sprechen/erstellen'
+import { ABSCHNITT_FOLGE } from '../../shared/lehrwerkGrammatik'
 
 const collator = new Intl.Collator('de', { numeric: true, sensitivity: 'base' })
 
@@ -66,4 +68,70 @@ export function spaetesteBis<T>(l: T[], stand: (x: T) => SprechStand | undefined
   const passend = l.filter((x) => standBis(stand(x), ziel, baende))
   const mit = passend.filter((x) => stand(x)).sort((a, b) => nachStand(stand(b), stand(a), baende))
   return [...mit, ...passend.filter((x) => !stand(x))]
+}
+
+/**
+ * Abschnitte des Buchs für „Ganzes Lehrwerk füllen" (21.10.2026): die Lehrbuch-Abschnitte (Check-in … Check-out, bei
+ * Transition die Topic-Abschnitte) – keine Wortlisten, Übungslisten oder Wortfelder
+ */
+const TOPIC_ABSCHNITTE = ['Introduction', 'Spot on facts', 'Spot on skills', 'Spot on language', 'Texts A', 'Texts B', 'Texts C', 'Topic task']
+const istBuchAbschnitt = (name: string): boolean => ABSCHNITT_FOLGE.includes(name) || TOPIC_ABSCHNITTE.includes(name)
+export function buchAbschnitte(band: Pick<TextbookMeta, 'units'>): { unit: string; abschnitt: string }[] {
+  return band.units.flatMap((u) => u.sections.filter((s) => istBuchAbschnitt(s.name)).map((s) => ({ unit: u.name, abschnitt: s.name })))
+}
+
+/** Soll je Abschnitt und Teil */
+export const SOLL_JE_ABSCHNITT: Record<KartenTeil, number> = { interview: 3, monolog: 4, dialog: 4 }
+const TEIL_FOLGE: KartenTeil[] = ['interview', 'monolog', 'dialog']
+
+export interface FuellSchritt {
+  unit: string
+  abschnitt: string
+  teil: KartenTeil
+  anzahl: number
+}
+
+/**
+ * Was zum Füllen fehlt: je Buchabschnitt und Teil die Zahl der Karten mit genau diesem Stand, bis zum Soll – volle
+ * Abschnitte entfallen, erneutes Drücken legt nichts doppelt an
+ */
+export function fuellPlan(band: Pick<TextbookMeta, 'name' | 'units'>, pool: { teil: string; stand?: SprechStand }[]): FuellSchritt[] {
+  return buchAbschnitte(band).flatMap(({ unit, abschnitt }) =>
+    TEIL_FOLGE.map((teil) => {
+      const da = pool.filter((p) => p.teil === teil && p.stand?.band === band.name && p.stand.unit === unit && p.stand.abschnitt === abschnitt).length
+      return { unit, abschnitt, teil, anzahl: Math.max(0, SOLL_JE_ABSCHNITT[teil] - da) }
+    }).filter((s) => s.anzahl > 0)
+  )
+}
+
+/**
+ * Zufällige Kombination für das Prüfungsset (21.10.2026): ein Interview-Set, zwei verschiedene Bildkarten, eine
+ * Dialogkarte bis zum Stand – Karten ohne Stand nur, wenn es sonst keine gibt. `zufall` liefert Zahlen in [0, 1).
+ */
+export function zufallsSet<T extends { id: string; teil: string; stand?: SprechStand }>(
+  pool: T[],
+  ziel: SprechStand | undefined,
+  baende: Baende,
+  zufall: () => number = Math.random
+): { interview: string | null; monologA: string | null; monologB: string | null; dialog: string | null } {
+  const kandidaten = (teil: string): T[] => {
+    const bis = pool.filter((p) => p.teil === teil && standBis(p.stand, ziel, baende))
+    const mit = bis.filter((p) => p.stand)
+    return mit.length ? mit : bis
+  }
+  const ziehe = (l: T[]): T | undefined => l[Math.min(l.length - 1, Math.floor(zufall() * l.length))]
+  const bilder = kandidaten('monolog')
+  const a = ziehe(bilder)
+  const b = ziehe(bilder.filter((x) => x !== a))
+  return {
+    interview: ziehe(kandidaten('interview'))?.id ?? null,
+    monologA: a?.id ?? null,
+    monologB: b?.id ?? null,
+    dialog: ziehe(kandidaten('dialog'))?.id ?? null
+  }
+}
+
+/** Auswahl des Prüfungssets auf den Bereich beschränken (21.10.2026): außerhalb gewählte Karten fallen weg */
+export function nurImBereich<K extends string>(wahl: Record<K, string | null>, imBereich: (id: string) => boolean): Record<K, string | null> {
+  return Object.fromEntries(Object.entries(wahl).map(([k, id]) => [k, typeof id === 'string' && imBereich(id) ? id : null])) as Record<K, string | null>
 }

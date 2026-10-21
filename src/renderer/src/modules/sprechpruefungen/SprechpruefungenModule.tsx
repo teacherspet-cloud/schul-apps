@@ -57,11 +57,11 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useAppSettings } from '../../shared/settingsStore'
 import { BandCover } from '../../shared/components/BandCover'
-import { starteAuftrag } from '../../shared/auftraege'
+import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
 import { drucken, pruefungsSetHtml } from './pruefungsset'
-import { gruppiere, nachStand, OHNE_STAND, spaetesteBis, standBis, type StandGruppe } from './stand'
+import { fuellPlan, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
 
 const FAECHER: { id: string; sprache: SprechSprache; name: string; ab: number }[] = [
   { id: 'englisch', sprache: 'en', name: 'Englisch', ab: 5 },
@@ -391,6 +391,55 @@ function Gruppe({ titel, anzahl, offen, umschalten, children }: { titel: string;
 type SpaltenEintrag = { e: Entwurf; p?: undefined } | { p: PoolKarte; e?: undefined }
 const karteVon = (x: SpaltenEintrag): SprechKarte => (x.e ? x.e.karte : x.p.karte)
 
+/** Was eine Karten-Anfrage braucht: Teil, Anzahl und die Stelle im Lehrwerk */
+interface KartenEingabe {
+  teil: KartenTeil
+  anzahl: number
+  bandId: string | null
+  unitName: string | null
+  abschnitt: string | null
+  stand?: SprechStand
+  vorhanden: string[]
+}
+/** Rahmen des Jahrgangs für die Anfrage */
+interface KartenRahmen {
+  sprache: SprechSprache
+  jahrgang: number
+  niveau: ReturnType<typeof zielNiveau>
+  themen: string[]
+  buecher: TextbookMeta[]
+}
+
+/**
+ * Karten für eine Stelle im Lehrwerk erzeugen (21.10.2026 aus „erstellen" herausgelöst, auch für „Ganzes Lehrwerk
+ * füllen"): Wortschatz und Grammatik bis zum Abschnitt, dazu die Lehrplan-Themen – eine KI-Anfrage
+ */
+async function kartenErzeugen(e: KartenEingabe, r: KartenRahmen, ai: AuftragsKontext['ai'], melde: (t: string) => void): Promise<Record<string, unknown>[]> {
+  melde('Grundlage wird zusammengestellt …')
+  let woerter: string[] = []
+  let bekannt: string[] = []
+  let neu: string[] = []
+  let quelle = ''
+  if (e.bandId && e.unitName) {
+    const voll: Textbook = await window.api.textbooks.get(e.bandId)
+    // Bis zum Abschnitt: sein Wortschatz zählt mit, seine Grammatik gilt als gerade gelernt (21.10.2026)
+    const kv = await collectKnownVocab(voll, e.unitName, e.abschnitt ? [e.abschnitt] : [], r.jahrgang, r.buecher, (id) => window.api.textbooks.get(id))
+    const dazu = e.abschnitt ? (voll.units.find((u) => u.name === e.unitName)?.sections.find((s) => s.name === e.abschnitt)?.entries.map((x) => x.term) ?? []) : []
+    woerter = [...new Set([...(kv?.words ?? []), ...dazu])]
+    quelle = kv?.source ?? ''
+    const gs = grammatikStand(kv)
+    bekannt = gs?.bekannt ?? []
+    neu = gs?.neu ?? []
+  }
+  const g: Grundlage = { sprache: r.sprache, jahrgang: r.jahrgang, niveau: r.niveau, quelle, woerter, grammatikBekannt: bekannt, grammatikNeu: neu, themen: r.themen }
+  melde('Die KI schreibt die Karten …')
+  const antwort = await ai<{ karten: Record<string, unknown>[] }>(kartenAnfrage(e.teil, e.anzahl, g, e.vorhanden))
+  return (antwort.karten ?? []).map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}) }))
+}
+
+/** Namen der Teile in der Fortschrittsmeldung */
+const TEIL_MEHRZAHL: Record<KartenTeil, string> = { interview: 'Interview-Sets', monolog: 'Bildkarten', dialog: 'Dialogkarten' }
+
 function Jahrgang({
   fach,
   jahrgang,
@@ -484,6 +533,7 @@ function Jahrgang({
   const [bearbeiten, setBearbeiten] = useState<{ p?: PoolKarte; e?: Entwurf } | null>(null)
   const [druck, setDruck] = useState(false)
 
+  const rahmen: KartenRahmen = { sprache: fach.sprache, jahrgang, niveau, themen, buecher }
   const erstellen = (teil: (typeof TEILE)[number]): void => {
     const vorhanden = pool.filter((p) => p.teil === teil.id).map((p) => titelVon(p.karte))
     void starteAuftrag({
@@ -494,30 +544,7 @@ function Jahrgang({
       eingabe: { teil: teil.id, anzahl: teil.anzahl, bandId: band?.id ?? null, unitName, abschnitt: abschnittName, stand, vorhanden },
       sperrt: false,
       fehlerTitel: 'Karten konnten nicht erstellt werden',
-      arbeit: async (e, k) => {
-        k.melde('Grundlage wird zusammengestellt …')
-        let woerter: string[] = []
-        let bekannt: string[] = []
-        let neu: string[] = []
-        let quelle = ''
-        if (e.bandId && e.unitName) {
-          const voll: Textbook = await window.api.textbooks.get(e.bandId)
-          // Bis zum Abschnitt: sein Wortschatz zählt mit, seine Grammatik gilt als gerade gelernt (21.10.2026)
-          const kv = await collectKnownVocab(voll, e.unitName, e.abschnitt ? [e.abschnitt] : [], jahrgang, buecher, (id) => window.api.textbooks.get(id))
-          const dazu = e.abschnitt
-            ? (voll.units.find((u) => u.name === e.unitName)?.sections.find((s) => s.name === e.abschnitt)?.entries.map((x) => x.term) ?? [])
-            : []
-          woerter = [...new Set([...(kv?.words ?? []), ...dazu])]
-          quelle = kv?.source ?? ''
-          const gs = grammatikStand(kv)
-          bekannt = gs?.bekannt ?? []
-          neu = gs?.neu ?? []
-        }
-        const g: Grundlage = { sprache: fach.sprache, jahrgang, niveau, quelle, woerter, grammatikBekannt: bekannt, grammatikNeu: neu, themen }
-        k.melde('Die KI schreibt die Karten …')
-        const r = await k.ai<{ karten: Record<string, unknown>[] }>(kartenAnfrage(e.teil, e.anzahl, g, e.vorhanden))
-        return (r.karten ?? []).map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}) }))
-      },
+      arbeit: (e, k) => kartenErzeugen(e, rahmen, k.ai, (t) => k.melde(t)),
       ablegen: async (karten) => {
         speichereEntwuerfe([
           ...ladeEntwuerfe(),
@@ -539,6 +566,75 @@ function Jahrgang({
       notifyError(e)
     }
   }
+  /*
+   * „Ganzes Lehrwerk füllen" (21.10.2026, abgestimmt): je Buchabschnitt des Bands 3 Interview-Sets, 4 Bildkarten und
+   * 4 Dialogkarten mit genau diesem Stand – nur was fehlt, gleich gespeichert (ohne Entwurf), Bilder danach im
+   * Hintergrund. Ein Auftrag, Abschnitte nacheinander; ein Fehler in einem Schritt hält die übrigen nicht auf.
+   */
+  const [fuellenFrage, setFuellenFrage] = useState(false)
+  const plan: FuellSchritt[] = band ? fuellPlan(band, pool.map((p) => ({ teil: p.teil, stand: p.karte.stand }))) : []
+  const fuellZahlen = {
+    abschnitte: new Set(plan.map((x) => `${x.unit}|${x.abschnitt}`)).size,
+    anfragen: plan.length,
+    karten: plan.reduce((n, x) => n + x.anzahl, 0),
+    bilder: plan.filter((x) => x.teil === 'monolog').reduce((n, x) => n + x.anzahl, 0)
+  }
+  const lehrwerkFuellen = (): void => {
+    if (!band) return
+    const titelJeTeil: Record<KartenTeil, string[]> = { interview: [], monolog: [], dialog: [] }
+    for (const p of pool) titelJeTeil[p.teil]?.push(titelVon(p.karte))
+    void starteAuftrag({
+      moduleId: 'sprechpruefungen',
+      docId: 'sprechpruefungen',
+      titel: `Ganzes Lehrwerk: ${band.name} · ${fach.name} Jg ${jahrgang}`,
+      art: 'Sprechkarten',
+      eingabe: { plan, bandId: band.id, bandName: band.name, titelJeTeil },
+      sperrt: false,
+      fehlerTitel: 'Lehrwerk konnte nicht gefüllt werden',
+      arbeit: async (e, k) => {
+        let gespeichert = 0
+        let fehlerZahl = 0
+        let fehler: unknown = null
+        for (const [i, x] of e.plan.entries()) {
+          const vor = `${x.unit} › ${x.abschnitt} – ${TEIL_MEHRZAHL[x.teil]} (${i + 1} von ${e.plan.length})`
+          k.melde(vor, i, e.plan.length)
+          const stand: SprechStand = { band: e.bandName, unit: x.unit, abschnitt: x.abschnitt }
+          try {
+            const karten = await kartenErzeugen(
+              { teil: x.teil, anzahl: x.anzahl, bandId: e.bandId, unitName: x.unit, abschnitt: x.abschnitt, stand, vorhanden: e.titelJeTeil[x.teil] },
+              rahmen,
+              k.ai,
+              (t) => k.melde(`${vor}: ${t}`, i, e.plan.length)
+            )
+            for (const roh of karten.slice(0, x.anzahl)) {
+              const { bildPrompt, ...karte } = roh as Record<string, unknown> & { bildPrompt?: string }
+              const r = await senden<{ id: string }>('/server/sprech-bank/speichern', { sprache: fach.sprache, jahrgang, teil: x.teil, karte })
+              gespeichert++
+              e.titelJeTeil[x.teil].push(titelVon(karte as unknown as SprechKarte))
+              const prompt = bildPrompt || (x.teil === 'monolog' ? String(karte.bildBeschreibung ?? '') : '')
+              if (x.teil === 'monolog' && prompt)
+                bildErzeugen({ id: r.id, sprache: fach.sprache, jahrgang, teil: x.teil, karte: karte as unknown as SprechKarte, eigene: true }, prompt, laden)
+            }
+          } catch (f) {
+            // Abbruch durch die Lehrkraft beendet alles; sonst weiter mit dem nächsten Schritt
+            if (k.signal.aborted) throw f
+            fehler = f
+            fehlerZahl++
+          }
+        }
+        if (fehler && !gespeichert) throw fehler
+        if (fehler)
+          notifyError(
+            `Bei ${fehlerZahl} ${fehlerZahl === 1 ? 'Schritt' : 'Schritten'} brach die KI ab – das Übrige ist gespeichert. „Ganzes Lehrwerk füllen" noch einmal drücken füllt nur die Lücken.`
+          )
+        return gespeichert
+      },
+      ablegen: async () => laden(),
+      abschluss: (n) => `${n} Karten gespeichert (${band.name})`
+    })
+    notifySuccess('Das Lehrwerk wird im Hintergrund gefüllt – die Karten erscheinen nach und nach.')
+  }
+
   const entwurfWeg = (s: string): void => speichereEntwuerfe(ladeEntwuerfe().filter((x) => x.schluessel !== s))
   const loeschen = (p: PoolKarte): void => void senden('/server/sprech-bank/loeschen', { id: p.id }).then(laden, (e: unknown) => notifyError(e))
 
@@ -667,11 +763,18 @@ function Jahrgang({
             disabled={!abschnitte.length}
             data-sprech-abschnitt
           />
-          <Text size="xs" c="dimmed" maw={360}>
-            {stand
-              ? `Gezeigt werden Karten ${standText(stand)}. Neue Karten entstehen für diesen Stand (Wortschatz und Grammatik bis hierhin, dazu ${themen.length} Lehrplan-Themen des Jahrgangs); das Prüfungsset nutzt ihn ebenfalls.`
-              : `Ohne Lehrwerk-Stand: alle Karten. Neue Karten entstehen ohne Lehrwerk-Stand, nur nach den ${themen.length} Lehrplan-Themen des Jahrgangs.`}
-          </Text>
+          <Tooltip label={band ? `Je Abschnitt von ${band.name} fehlende Karten ergänzen` : 'Erst einen Band wählen'}>
+            <Button
+              variant="light"
+              color="violet"
+              leftSection={<IconSparkles size={16} />}
+              disabled={!band}
+              onClick={() => (plan.length ? setFuellenFrage(true) : notifySuccess('Alle Abschnitte des Bands haben schon genug Karten.'))}
+              data-sprech-fuellen
+            >
+              Ganzes Lehrwerk füllen
+            </Button>
+          </Tooltip>
         </Group>
         <Group gap="md" align="center" wrap="wrap" mt="sm">
           <TextInput
@@ -784,9 +887,31 @@ function Jahrgang({
         />
       )}
       {ansehen && <KartenAnsicht k={ansehen} schliessen={() => setAnsehen(null)} />}
-      {druck && (
-        <DruckDialog fach={fach} jahrgang={jahrgang} pool={pool.filter((p) => standBis(p.karte.stand, stand, baende))} stand={stand} baende={baende} schliessen={() => setDruck(false)} />
+      {fuellenFrage && band && (
+        <Modal opened onClose={() => setFuellenFrage(false)} title={`Ganzes Lehrwerk füllen – ${band.name}`} data-sprech-fuellen-frage>
+          <Stack gap="sm">
+            <Text size="sm">
+              Je Abschnitt des Bands 3 Interview-Sets, 4 Bildkarten und 4 Dialogkarten – vorhandene Karten zählen mit, ergänzt wird nur, was fehlt. Die
+              Karten werden ohne Durchsicht gespeichert.
+            </Text>
+            <Text size="sm" data-sprech-fuellen-zahlen>
+              {fuellZahlen.abschnitte} Abschnitte · {fuellZahlen.anfragen} KI-Anfragen · {fuellZahlen.karten} Karten · {fuellZahlen.bilder} Bilder
+            </Text>
+            <Text size="sm" c="dimmed">
+              Läuft im Hintergrund und kann lange dauern; Abbrechen ist in der Auftragsleiste möglich. Bereits Gespeichertes bleibt.
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setFuellenFrage(false)}>
+                Abbrechen
+              </Button>
+              <Button color="violet" onClick={() => (setFuellenFrage(false), lehrwerkFuellen())} data-sprech-fuellen-start>
+                Füllen starten
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       )}
+      {druck && <DruckDialog fach={fach} jahrgang={jahrgang} pool={pool} stand={stand} baende={baende} schliessen={() => setDruck(false)} />}
     </Stack>
   )
 }
@@ -801,16 +926,28 @@ function DruckDialog({
 }: {
   fach: (typeof FAECHER)[number]
   jahrgang: number
-  /** Nur Karten bis zum gewählten Stand */
+  /** Alle Karten des Jahrgangs – zur Auswahl stehen die bis zum Stand */
   pool: PoolKarte[]
   stand?: SprechStand
   baende: TextbookMeta[]
   schliessen: () => void
 }): React.JSX.Element {
+  // Zufällige Kombination (21.10.2026) mit eigenem „bis"-Stand – vorbelegt mit dem Filter
+  const [zufall, setZufall] = useState(false)
+  const [zBandId, setZBandId] = useState<string | null>(baende.find((x) => x.name === stand?.band)?.id ?? null)
+  const zBand = baende.find((x) => x.id === zBandId)
+  const [zUnit, setZUnit] = useState<string | null>(stand?.unit ?? null)
+  const zUnitName = zBand && zUnit && zBand.units.some((u) => u.name === zUnit) ? zUnit : (zBand?.units[zBand.units.length - 1]?.name ?? null)
+  const [zAbschnitt, setZAbschnitt] = useState<string | null>(stand?.abschnitt ?? null)
+  const zAbschnitte = zBand?.units.find((u) => u.name === zUnitName)?.sections.map((x) => x.name) ?? []
+  const zStand: SprechStand | undefined =
+    zBand && zUnitName ? { band: zBand.name, unit: zUnitName, ...(zAbschnitt && zAbschnitte.includes(zAbschnitt) ? { abschnitt: zAbschnitt } : {}) } : undefined
+  const bis = zufall ? zStand : stand
+  const auswahl = pool.filter((p) => standBis(p.karte.stand, bis, baende))
   // Gruppiert nach Band › Unit, in Buchfolge; mit Abschnitt im Namen (21.10.2026)
   const von = (teil: KartenTeil): { group: string; items: { value: string; label: string }[] }[] =>
     gruppiere(
-      pool.filter((p) => p.teil === teil),
+      auswahl.filter((p) => p.teil === teil),
       (p) => p.karte.stand,
       baende
     ).map((g) => ({
@@ -829,18 +966,53 @@ function DruckDialog({
   const [a, setA] = useState(erste('monolog'))
   const [b, setB] = useState(erste('monolog', 1) ?? erste('monolog'))
   const [d, setD] = useState(erste('dialog'))
+  const wuerfeln = (): void => {
+    const z = zufallsSet(
+      pool.map((p) => ({ id: p.id, teil: p.teil, stand: p.karte.stand })),
+      zStand,
+      baende
+    )
+    setI(z.interview)
+    setA(z.monologA)
+    setB(z.monologB)
+    setD(z.dialog)
+  }
+  const [gewuerfelt, setGewuerfelt] = useState(false)
+  // Wird der Bereich nach dem Würfeln enger, fallen Karten außerhalb weg – gedruckt wird nur Sichtbares (21.10.2026)
+  const w = nurImBereich({ i, a, b, d }, (id) => auswahl.some((p) => p.id === id))
   const karte = <T,>(id: string | null): T | undefined => pool.find((p) => p.id === id)?.karte as T | undefined
   return (
     <Modal opened onClose={schliessen} title={`Prüfungsset drucken – ${fach.name} Jg ${jahrgang}`}>
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
           Für ein Prüflingspaar: Prüferblatt, Kandidatenkarten A und B und zwei Bewertungsbögen (30 Punkte).{' '}
-          {stand ? `Zur Auswahl stehen die Karten ${standText(stand)}.` : 'Zur Auswahl stehen alle Karten.'}
+          {bis ? `Zur Auswahl stehen die Karten ${standText(bis)}.` : 'Zur Auswahl stehen alle Karten.'}
         </Text>
-        <Select label="Interview-Set" data={von('interview')} value={i} onChange={setI} clearable />
-        <Select label="Bildkarte Kandidat/in A" data={von('monolog')} value={a} onChange={setA} clearable />
-        <Select label="Bildkarte Kandidat/in B" data={von('monolog')} value={b} onChange={setB} clearable />
-        <Select label="Dialogkarte" data={von('dialog')} value={d} onChange={setD} clearable />
+        <Checkbox label="Zufällige Kombination" checked={zufall} onChange={(e) => setZufall(e.currentTarget.checked)} data-pruefungsset-zufall />
+        {zufall && (
+          <Card withBorder radius="md" padding="sm">
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <Select
+                label="Band"
+                data={baende.map((x) => ({ value: x.id, label: x.name }))}
+                value={zBandId}
+                onChange={(v) => (setZBandId(v), setZUnit(null), setZAbschnitt(null))}
+                clearable
+                placeholder="alle Karten"
+                w={180}
+              />
+              <Select label="bis" data={(zBand?.units ?? []).map((u) => u.name)} value={zUnitName} onChange={(v) => (setZUnit(v), setZAbschnitt(null))} w={120} disabled={!zBand} />
+              <Select label="Abschnitt" data={zAbschnitte} value={zStand?.abschnitt ?? null} onChange={setZAbschnitt} placeholder="ganze Unit" clearable w={150} disabled={!zAbschnitte.length} />
+              <Button variant="light" onClick={() => (wuerfeln(), setGewuerfelt(true))} data-pruefungsset-wuerfeln>
+                {gewuerfelt ? 'Neu würfeln' : 'Zufällig wählen'}
+              </Button>
+            </Group>
+          </Card>
+        )}
+        <Select label="Interview-Set" data={von('interview')} value={w.i} onChange={setI} clearable />
+        <Select label="Bildkarte Kandidat/in A" data={von('monolog')} value={w.a} onChange={setA} clearable />
+        <Select label="Bildkarte Kandidat/in B" data={von('monolog')} value={w.b} onChange={setB} clearable />
+        <Select label="Dialogkarte" data={von('dialog')} value={w.d} onChange={setD} clearable />
         <Button
           leftSection={<IconPrinter size={16} />}
           onClick={() =>
@@ -849,10 +1021,10 @@ function DruckDialog({
                 fach: fach.name,
                 jahrgang,
                 niveau: zielNiveau(fach.sprache, jahrgang),
-                interview: karte<InterviewKarte>(i),
-                monologA: karte<BildKarte>(a),
-                monologB: karte<BildKarte>(b),
-                dialog: karte<DialogKarte>(d),
+                interview: karte<InterviewKarte>(w.i),
+                monologA: karte<BildKarte>(w.a),
+                monologB: karte<BildKarte>(w.b),
+                dialog: karte<DialogKarte>(w.d),
                 bildUrl: (x) => `${window.location.origin}${bildUrl(x)}`
               })
             )
