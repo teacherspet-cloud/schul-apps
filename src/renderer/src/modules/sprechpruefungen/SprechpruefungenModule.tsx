@@ -15,6 +15,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Chip,
   Collapse,
   Container,
   Group,
@@ -25,7 +26,6 @@ import {
   Select,
   SimpleGrid,
   Stack,
-  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -57,6 +57,8 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useAppSettings } from '../../shared/settingsStore'
 import { BandCover } from '../../shared/components/BandCover'
+import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
+import { FachPunkt } from '../../shared/components/FachFarbe'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
@@ -1043,6 +1045,7 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
   const faecher = FAECHER.filter((f) => !eigene?.length || eigene.includes(f.id))
   const [fachId, setFachId] = useState<string>(faecher[0]?.id ?? 'englisch')
   const fach = FAECHER.find((f) => f.id === fachId) ?? FAECHER[0]
+  const programmFarbe = useProgrammFarbe()
   const [daten, setDaten] = useState<{ karten: PoolKarte[]; darfAlle: boolean } | null>(null)
   const [jahrgang, setJahrgang] = useState<number | null>(null)
   const [buecher, setBuecher] = useState<TextbookMeta[]>([])
@@ -1063,25 +1066,21 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
       .pop()
   return (
     <Container size="xl" py="lg" data-sprechpruefungen>
-      <Group gap="sm" mb="md">
-        <IconMicrophone size={26} />
-        <div>
-          <Title order={2}>Sprechprüfungen</Title>
-          <Text size="sm" c="dimmed">
-            Material je Jahrgang für die Sprechprüfung und das Sprechtraining der Lernenden – für die ganze Fachschaft.
-          </Text>
-        </div>
-      </Group>
+      {/* Gemeinsamer Kopf wie in den anderen Programmen (21.10.2026, Befund der Lehrkraft); Fächer als Chips wie in „Grammatikformen" */}
+      <AppKopf suche={false} beschreibung="Material je Jahrgang für die Sprechprüfung und das Sprechtraining der Lernenden – für die ganze Fachschaft." />
       {faecher.length > 1 && (
-        <Tabs value={fachId} onChange={(v) => v && (setFachId(v), setJahrgang(null))} mb="md">
-          <Tabs.List>
+        <Chip.Group value={fachId} onChange={(v) => typeof v === 'string' && (setFachId(v), setJahrgang(null))}>
+          <Group gap={6} mb="lg">
             {faecher.map((f) => (
-              <Tabs.Tab key={f.id} value={f.id} data-sprech-fach={f.id}>
-                {f.name}
-              </Tabs.Tab>
+              <Chip key={f.id} value={f.id} color={programmFarbe} variant="light" data-sprech-fach={f.id}>
+                <Group gap={6} wrap="nowrap" component="span">
+                  <FachPunkt fach={f.id} />
+                  {f.name}
+                </Group>
+              </Chip>
             ))}
-          </Tabs.List>
-        </Tabs>
+          </Group>
+        </Chip.Group>
       )}
       {!daten ? (
         <Loader />
