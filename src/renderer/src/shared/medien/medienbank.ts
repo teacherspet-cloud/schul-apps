@@ -36,6 +36,7 @@ import {
   type TonArt
 } from '@shared/medienbank'
 import { istBegrenzung } from './medienWarten'
+import { bedeutungsHinweis, suchbegriffFuer, wortartFuer, type BedeutungKurz, type SinnAngabe, type Wortart } from '@shared/medienBedeutung'
 
 export interface Vokabel {
   term: string
@@ -51,7 +52,35 @@ export interface Vokabel {
   hinweis?: string
   /** Eigene Aussprache der Lehrkraft („Aussprache als …", 09.10.2026) – nur für den Ton */
   aussprache?: string
+  /** Wortart der Liste bzw. ausdrücklich (Verbliste) – Bilder je Bedeutung und Wortart (21.10.2026) */
+  pos?: string
+  wortart?: Wortart
+  /** Zugeordnete Bedeutung (erster Schritt des Medienauftrags) und die übrigen des Lemmas (ausdrücklich nicht gemeint) */
+  bedeutung?: BedeutungKurz
+  andere?: BedeutungKurz[]
 }
+
+/** Wortart einer Vokabel (ausdrücklich, aus der Liste, sonst „(to) …") */
+export const wortartDer = (sprache: string, v: Pick<Vokabel, 'term' | 'pos' | 'wortart'>): Wortart => wortartFuer({ term: v.term, pos: v.pos, art: v.wortart }, sprache)
+
+/** Für das Speichern: die Bedeutung, zu der das Bild gehört (ohne Zuordnung: Wortart und Übersetzung) */
+export const sinnVon = (sprache: string, v: Vokabel): SinnAngabe => ({
+  ...(v.bedeutung?.id ? { id: v.bedeutung.id } : {}),
+  wortart: v.bedeutung?.wortart ?? wortartDer(sprache, v),
+  deutsch: v.bedeutung?.deutsch ?? (v.translation || v.term)
+})
+
+/**
+ * Zeile einer Vokabel für die KI (21.10.2026, Befund der Lehrkraft: das Verb „bear" bekam einen Bären): Wort, Deutsch,
+ * Beispiel – dazu Wortart und Bedeutung samt der übrigen Bedeutungen des Lemmas, die ausdrücklich NICHT gemeint sind.
+ */
+export function vokabelZeile(sprache: string, v: Vokabel): string {
+  const hinweis = bedeutungsHinweis(sprache, v.term, v.bedeutung?.wortart ?? wortartDer(sprache, v), v.bedeutung?.deutsch ?? (v.translation || v.term), v.andere ?? [])
+  return `„${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''} – ${hinweis}`
+}
+
+/** Schlüssel einer Vokabel in einer Liste von Motiven (dasselbe Wort kann mit zwei Bedeutungen vorkommen) */
+export const motivSchluessel = (v: Pick<Vokabel, 'term' | 'translation'>): string => `${v.term}\u0001${v.translation}`
 
 /** Wie die Abläufe die KI erreichen – im Auftrag über dessen Kontext, sonst direkt */
 export interface Ki {
@@ -155,7 +184,9 @@ export function suchReihe(l?: Lernende): { zuerst: Suche[]; rueckfall: Suche[] }
 }
 
 /** Suchbegriff: der englische Begriff bei Englisch (und das Wort selbst bei Deutsch), sonst die deutsche Bedeutung */
-const suchbegriff = (sprache: string, v: Vokabel): string => (sprache === 'en' || sprache === 'de' ? v.term : v.translation || v.term)
+// Englische Verben als „to …" (21.10.2026): sonst findet die Suche zu „bear" Bären
+const suchbegriff = (sprache: string, v: Vokabel): string =>
+  sprache === 'en' || sprache === 'de' ? suchbegriffFuer(sprache, v.term, v.bedeutung?.wortart ?? wortartDer(sprache, v)) : v.translation || v.term
 
 /**
  * Kandidaten aus der Bildsuche. Scheitern ALLE Quellen an einer Begrenzung (z. B. Pixabay 429) und es gibt
@@ -225,7 +256,7 @@ export async function kiWaehltMehr(
       lernende
     )}`,
     user: [
-      `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`,
+      `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): ${vokabelZeile(sprache, v)}`,
       `Die ${vorschauen.length} Bilder sind von 1 bis ${vorschauen.length} nummeriert (in dieser Reihenfolge).`,
       'Antworte mit der Nummer des Bildes, das die Bedeutung am eindeutigsten zeigt; 0, wenn keines passt.',
       'nichtZeigbar = true, wenn sich das Wort für diese Altersstufe grundsätzlich nicht eindeutig bebildern lässt (nach den Regeln oben, z. B. abstrakte Wörter oder Funktionswörter) – dann ist wahl 0.'
@@ -257,7 +288,9 @@ export async function kandidatUebernehmen(
   alle?: MedienKandidat[],
   stufe: Bildstufe = 's2',
   /** Ersatz für ein abgelehntes KI-Bild (12.10.2026) – die Vokabelliste markiert das Wort */
-  kiAbgelehnt = false
+  kiAbgelehnt = false,
+  /** Bedeutung, zu der das Bild gehört (21.10.2026) */
+  sinn?: SinnAngabe
 ): Promise<void> {
   const d = await window.api.images.fetch(k.url).catch(() => window.api.images.fetch(k.vorschau))
   await window.api.medien.bildSetzen(
@@ -270,7 +303,8 @@ export async function kandidatUebernehmen(
       ...(alle ? { kandidaten: alle } : {}),
       ...(kiAbgelehnt ? { kiAbgelehnt: true } : {})
     },
-    stufe
+    stufe,
+    sinn
   )
 }
 
@@ -282,6 +316,8 @@ function motivRegeln(sprache: string, lernende?: Lernende): string[] {
     `Du planst Beispielbilder für Vokabelkarten von Lernenden der Klassen ${a.klassen} (etwa ${a.jahre} Jahre).`,
     WAS_ZEIGEN[s],
     'Ein mehrdeutiges Bild schadet mehr als keines. Funktionswörter (although, of, the …) und Wendungen ohne eindeutiges Bild: eindeutig = false.',
+    // Wortart und Bedeutung (21.10.2026): ein Verb nie als gleichnamiges Tier oder Ding
+    'Halte dich an Wortart und Bedeutung der Zeile: Ein Verb zeigt die Handlung, nie ein gleichnamiges Tier, einen Gegenstand oder eine Person („to bear" = ertragen ist kein Bär); bei Wörtern mit mehreren Bedeutungen genau die genannte.',
     `Kommen Menschen vor, dann ${a.personen} (Erwachsene nur, wo das Wort sie verlangt, z. B. teacher, doctor); Aussehen, Hautfarbe und Rollen natürlich abwechselnd und ohne Klischees – nicht in jedem Bild alles.`,
     `Sieht der Gegenstand im Land der Zielsprache (${SPRACHE_NAME[sprache] ?? sprache}) typisch anders aus (z. B. Doppeldeckerbus, Baguette, britische Schuluniform), zeige diese Fassung; sonst neutral.`,
     'motiv: ein bis zwei englische Sätze, die genau beschreiben, was zu sehen ist – ein klarer Hauptgegenstand bzw. eine einfache Szene, keine Nebensachen, kein Text. Auch wenn eindeutig = false, beschreibe den besten Versuch.'
@@ -307,7 +343,7 @@ export async function motiveWaehlen(
     sparsam: true,
     system: [...motivRegeln(sprache, lernende), 'Mehrere Vokabeln: Antworte für JEDE Nummer mit genau einem Eintrag (nr wie vorgegeben).'].join('\n'),
     user: vokabeln
-      .map((v, i) => `${i + 1}. „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`)
+      .map((v, i) => `${i + 1}. ${vokabelZeile(sprache, v)}`)
       .join('\n'),
     schemaName: 'vokabel_bildmotive',
     schema: {
@@ -330,7 +366,7 @@ export async function motiveWaehlen(
   for (const m of antwort?.motive ?? []) {
     const v = vokabeln[Number(m.nr) - 1]
     const motiv = String(m.motiv ?? '').trim()
-    if (v && motiv) aus.set(v.term, { eindeutig: m.eindeutig !== false, motiv })
+    if (v && motiv) aus.set(motivSchluessel(v), { eindeutig: m.eindeutig !== false, motiv })
   }
   return aus
 }
@@ -359,7 +395,7 @@ export async function motivWaehlen(
           ]
         : [])
     ].join('\n'),
-    user: `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): „${v.term}" – Deutsch: „${v.translation}"${v.example ? ` – Beispiel: „${v.example}"` : ''}`,
+    user: `Vokabel (${SPRACHE_NAME[sprache] ?? sprache}): ${vokabelZeile(sprache, v)}`,
     schemaName: 'vokabel_bildmotiv',
     schema: {
       type: 'object',
@@ -374,14 +410,20 @@ export async function motivWaehlen(
 /** Auftrag an die Bild-KI je Stufe */
 export function bildPrompt(sprache: string, v: Vokabel, lernende: Lernende | undefined, motiv: string): string {
   const s = stufeDer(lernende)
-  const was = motiv || `${v.translation || v.term} (${SPRACHE_NAME[sprache] ?? sprache} word: "${v.term}")`
+  // Ohne Motiv: bei Verben ausdrücklich die Handlung (21.10.2026)
+  const verb = (v.bedeutung?.wortart ?? wortartDer(sprache, v)) === 'verb'
+  const was =
+    motiv ||
+    (verb
+      ? `the action "${v.translation || v.term}" (${SPRACHE_NAME[sprache] ?? sprache} verb: "${v.term}") – show the action, not an animal or object with the same name`
+      : `${v.translation || v.term} (${SPRACHE_NAME[sprache] ?? sprache} word: "${v.term}")`)
   return `${BILDSTIL[s]}. Vocabulary flashcard image: ${was} One clear main subject filling most of the frame, recognisable at small size, plain light background, strong contrast, true-to-life proportions and colours, no text, no letters, no numbers, no logos.`
 }
 
 /** Bild von der Bild-KI erzeugen lassen – im Stil der Bildstufe (`motiv` aus `motivWaehlen`) */
 export async function bildErzeugen(sprache: string, v: Vokabel, lernende?: Lernende, ki: Ki = direkt(), motiv = ''): Promise<void> {
   const d = await ki.bild(bildPrompt(sprache, v, lernende, motiv))
-  await window.api.medien.bildSetzen(sprache, v.term, { dataUrl: await verkleinern(d), herkunft: 'ki', nachweis: 'KI-generiert' }, stufeDer(lernende))
+  await window.api.medien.bildSetzen(sprache, v.term, { dataUrl: await verkleinern(d), herkunft: 'ki', nachweis: 'KI-generiert' }, stufeDer(lernende), sinnVon(sprache, v))
 }
 
 /**

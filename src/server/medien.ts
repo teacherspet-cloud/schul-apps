@@ -2,6 +2,9 @@
  * Medienbank der Vokabeln für Lernende (05.10.2026; Ablage: main/services/storage/medienbank.ts).
  *
  *   GET /s/api/medien?sprache=en&w=park&w=river   Einträge (Bild, Aussprache, Satz-Aussprache) mit Adressen
+ *   POST /s/api/medien {sprache, lage, stufe, woerter: [{w, de?, pos?, art?}]}   dasselbe mit Bedeutung und Wortart je Wort
+ *        (21.10.2026, shared/medienBedeutung.ts): die Bilder kommen dann je Bedeutung in `bilder` – Übersetzungen
+ *        sprengten als Adresse die Länge
  *   GET /medien/<24 Hex>.jpg|png|webp|mp3         die Datei – mit Bereichsanfragen (Safari auf dem iPad)
  *
  * Nur mit Anmeldung (auch Gäste per QR-Code). Inhalt sind Wörter, Bilder und Aussprache – nichts Persönliches.
@@ -10,6 +13,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { json, type Anfrage } from './http'
 import { medienDateiPfad, medienFuer } from '../main/services/storage/medienbank'
 import { istStufe, MEDIEN_DATEI } from '../shared/medienbank'
+import { alsAnfrage, type MedienAnfrage } from '../shared/medienBedeutung'
 
 const TYP: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mp3: 'audio/mpeg' }
 
@@ -24,6 +28,18 @@ export async function medienRoute(k: Anfrage): Promise<boolean> {
     // Bildstufe nach Klasse der Lernenden (07.10.2026; die Seite kennt sie aus der Lerngruppe)
     const s = url.searchParams.get('stufe')
     const stufe = istStufe(s) ? s : 's2'
+    return json(res, 200, { medien: medienFuer(sprache, woerter, { basisUrl: '/medien/', lage, stufe }) }), true
+  }
+  if (url.pathname === '/s/api/medien' && req.method === 'POST') {
+    if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' }), true
+    const k0 = ((await k.koerper()) ?? {}) as Record<string, unknown>
+    const sprache = String(k0.sprache ?? '')
+    const woerter = (Array.isArray(k0.woerter) ? k0.woerter : [])
+      .slice(0, 600)
+      .map(alsAnfrage)
+      .filter((a): a is MedienAnfrage => Boolean(a))
+    const lage = k0.lage === 'w' ? 'w' : 'm'
+    const stufe = istStufe(k0.stufe) ? k0.stufe : 's2'
     return json(res, 200, { medien: medienFuer(sprache, woerter, { basisUrl: '/medien/', lage, stufe }) }), true
   }
   const m = /^\/medien\/([a-f0-9]{24}\.(jpg|png|webp|mp3))$/.exec(url.pathname)

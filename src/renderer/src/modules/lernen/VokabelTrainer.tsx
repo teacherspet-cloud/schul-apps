@@ -7,6 +7,7 @@
  * legen, frei schreiben (mit Akzentleiste), Diktat, Lückensatz. Falsches kommt in der Sitzung wieder.
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
+import { anfrageVon, bildVon } from '@shared/medienBedeutung'
 import { useAuffrischen } from '../../shared/auffrischen'
 import { aufnahmeSpielen, beispielFuerLernende, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
@@ -261,12 +262,19 @@ export const CSS = `
 
 /** Medienbank: Aussprache und Beispielbilder (05.10.2026) – ein fehlendes Bild kommt aus der Medienbank */
 async function mitMedien(liste: Liste): Promise<Liste> {
+  // Das Bild der Bedeutung (21.10.2026, shared/medienBedeutung.ts) – Aussprache und Sätze weiter je Wort
   const m = await medienLaden(
     liste.sprache,
-    liste.woerter.map((w) => w.term),
+    liste.woerter.map((w) => anfrageVon(w)),
     liste.klasse
   )
-  return { ...liste, woerter: liste.woerter.map((w) => (w.bild || !m[w.term]?.bild?.url ? w : { ...w, bild: m[w.term]!.bild!.url })) }
+  return {
+    ...liste,
+    woerter: liste.woerter.map((w) => {
+      const url = bildVon(m[w.term], w, liste.sprache)?.bild?.url
+      return w.bild || !url ? w : { ...w, bild: url }
+    })
+  }
 }
 
 /**

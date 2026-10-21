@@ -13,6 +13,11 @@
 import {
   bildLoeschen,
   bildSetzen,
+  altbildZuordnen,
+  sinneZuordnen,
+  sinnFestlegen,
+  sinneZusammenfuehren,
+  sinnStand,
   medienDatei,
   medienFuer,
   ohneBildMerken,
@@ -28,6 +33,7 @@ import {
 import type { TonPruefung } from '@shared/tonPruefung'
 import type { SatzFassung } from '@shared/satzFassung'
 import { istStufe, type Bildstufe, type Stimmlage, type TonArt } from '@shared/medienbank'
+import { alsAnfrage, sinnBereinigt, type MedienAnfrage } from '@shared/medienBedeutung'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
@@ -558,8 +564,12 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * Medienbank der Vokabeln (05.10.2026, storage/medienbank.ts): Beispielbild, Aussprache von Wort und
    * Beispielsatz – einmal je Sprache und Wort. Ändern am Server nur Admins (rolle.ts).
    */
-  handle('medien:eintraege', (sprache: string, woerter: string[], stufe?: Bildstufe) =>
-    medienFuer(sprache, Array.isArray(woerter) ? woerter.map(String) : [], { mitBildern: true, stufe: istStufe(stufe) ? stufe : 's2' })
+  // Wörter oder Anfragen mit Bedeutung und Wortart (21.10.2026, shared/medienBedeutung.ts)
+  handle('medien:eintraege', (sprache: string, woerter: unknown[], stufe?: Bildstufe) =>
+    medienFuer(sprache, Array.isArray(woerter) ? (woerter.map((w) => (typeof w === 'string' ? w : alsAnfrage(w))).filter(Boolean) as (string | MedienAnfrage)[]) : [], {
+      mitBildern: true,
+      stufe: istStufe(stufe) ? stufe : 's2'
+    })
   )
   handle('medien:datei', (datei: string) => medienDatei(String(datei)))
   handle('medien:stimmen', () => stimmenLesen())
@@ -570,17 +580,36 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   )
   handle(
     'medien:bild-setzen',
-    (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2], stufe?: Bildstufe) => (
-      nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b, istStufe(stufe) ? stufe : 's2')
+    (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2], stufe?: Bildstufe, sinn?: unknown) => (
+      nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b, istStufe(stufe) ? stufe : 's2', sinnBereinigt(sinn))
     )
   )
-  handle('medien:bild-loeschen', (sprache: string, wort: string, stufe?: Bildstufe) => (
-    nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort, istStufe(stufe) ? stufe : 's2')
+  handle('medien:bild-loeschen', (sprache: string, wort: string, stufe?: Bildstufe, sinn?: unknown) => (
+    nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort, istStufe(stufe) ? stufe : 's2', sinnBereinigt(sinn))
   ))
-  handle('medien:ohne-bild', (sprache: string, wort: string, stufe: Bildstufe) => {
+  handle('medien:ohne-bild', (sprache: string, wort: string, stufe: Bildstufe, sinn?: unknown) => {
     nurAdmin('Die Beispielbilder')
-    if (istStufe(stufe)) ohneBildMerken(sprache, wort, stufe)
+    if (istStufe(stufe)) ohneBildMerken(sprache, wort, stufe, sinnBereinigt(sinn))
   })
+  /*
+   * Bedeutungen der Bilder (21.10.2026, shared/medienBedeutung.ts): zuordnen (erster Schritt des Medienauftrags),
+   * Ergebnis der KI festhalten, Synonyme zusammenführen und alte Bilder zuordnen (Admin-Knopf „Mehrdeutige Wörter klären").
+   */
+  handle('medien:sinne-zuordnen', (sprache: string, anfragen: unknown[]) => (
+    nurAdmin('Die Beispielbilder'),
+    sinneZuordnen(String(sprache), (Array.isArray(anfragen) ? anfragen : []).map(alsAnfrage).filter((a): a is MedienAnfrage => Boolean(a)))
+  ))
+  handle('medien:sinn-festlegen', (sprache: string, wort: string, wortart: string, deutsch: string, ziel: string) => (
+    nurAdmin('Die Beispielbilder'), sinnFestlegen(String(sprache), String(wort), wortart === 'verb' ? 'verb' : 'andere', String(deutsch ?? '').slice(0, 300), String(ziel ?? 'neu'))
+  ))
+  handle('medien:sinn-stand', () => sinnStand())
+  handle('medien:sinne-zusammenfuehren', (schluessel: string, gruppen: string[][]) => (
+    nurAdmin('Die Beispielbilder'),
+    sinneZusammenfuehren(String(schluessel), (Array.isArray(gruppen) ? gruppen : []).map((g) => (Array.isArray(g) ? g.map(String) : [])))
+  ))
+  handle('medien:altbild-zuordnen', (schluessel: string, datei: string, id: string | null) => (
+    nurAdmin('Die Beispielbilder'), altbildZuordnen(String(schluessel), String(datei), id ? String(id) : null)
+  ))
   handle(
     'medien:ton-setzen',
     (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3], lage?: Stimmlage) => (

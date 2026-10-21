@@ -76,7 +76,8 @@ import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
 import { medienRoute } from './medien'
-import { dublettenMelder, dublettenPruefen } from '../main/services/storage/medienbank'
+import { dublettenMelder, dublettenPruefen, medienKorpusQuelle } from '../main/services/storage/medienbank'
+import { serverKorpus } from './wartungMedienBedeutungen'
 import { lehrkraftRoute, schuelerRoute } from './onlinetest'
 import { lernstandRoute } from './lernstand'
 import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
@@ -95,6 +96,8 @@ const env = process.env
 
 async function main(): Promise<void> {
   hauptschluessel()
+  // Bilder je Bedeutung (21.10.2026): Wörter aller Lehrkräfte für das Einrichten – vor der Wartung, die es auslöst
+  medienKorpusQuelle(serverKorpus)
   datenbank()
   // Gespeicherten Schulkalender gleich setzen – Rechnungen vor dem ersten Abruf nutzen schon die letzten Daten
   kalenderLaden()

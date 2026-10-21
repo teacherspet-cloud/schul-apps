@@ -10,6 +10,7 @@ import {
   type Stimmlage,
   type TonArt
 } from '@shared/medienbank'
+import { bildVon } from '@shared/medienBedeutung'
 import { BildDialog, BildZelle, satzTonVon, TonZelle, useNurVerdacht, useTonNachpruefung, zeileMitVerdacht } from '../../../shared/medien/MedienUi'
 import { gesprochenFuer, lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
 import { satzFuerLage, type SatzFassung } from '@shared/satzFassung'
@@ -349,8 +350,8 @@ export default function VokabelTabelle<T extends TabellenZeile>({
       {medien && bildOffen && (
         <BildDialog
           sprache={medienSprache}
-          v={{ term: bildOffen.term, translation: bildOffen.translation, example: bildOffen.example }}
-          sicht={medien.daten[bildOffen.term]}
+          v={{ term: bildOffen.term, translation: bildOffen.translation, example: bildOffen.example, ...(bildOffen.pos ? { pos: bildOffen.pos } : {}) }}
+          sicht={bildVon(medien.daten[bildOffen.term], bildOffen, medienSprache)}
           admin={medienAdmin}
           ziel={ziel}
           schliessen={() => setBildOffen(null)}
@@ -697,7 +698,8 @@ const Zeile = memo(function Zeile({
       {medienAn && (
         <>
           <Table.Td>
-            <BildZelle sicht={sicht} wort={v.term} onOeffnen={() => bildOeffnen(v)} stufe={bildStufe} />
+            {/* Das Bild der Bedeutung (21.10.2026, shared/medienBedeutung.ts) – Aussprache weiter je Wort */}
+            <BildZelle sicht={bildVon(sicht, v, sprache)} wort={v.term} onOeffnen={() => bildOeffnen(v)} stufe={bildStufe} />
           </Table.Td>
           <Table.Td>
             <Group gap={4} wrap="nowrap">

@@ -13,6 +13,7 @@
 
 import type { TonPruefung } from './tonPruefung'
 import type { SatzFassung, SatzFassungSicht } from './satzFassung'
+import type { BildTeil } from './medienBedeutung'
 
 /** Ein Bild zur Auswahl (Treffer der Bildsuche) */
 export interface MedienKandidat {
@@ -135,6 +136,16 @@ export interface MedienSicht {
    * Aufnahme sie hören – dann zeigen sie Text und Übersetzung der Fassung statt des Originals.
    */
   fassungen?: Record<string, SatzFassung | SatzFassungSicht>
+  /**
+   * Bilder je Bedeutung und Wortart (21.10.2026, shared/medienBedeutung.ts): Schlüssel `anfrageSchluessel` der Anfrage.
+   * Die Felder oben (`bild` …) gelten nur für einfache Anfragen (nur das Wort, ältere Seiten). Lesen über `bildVon`.
+   */
+  bilder?: Record<string, BildTeil>
+  /** Nur Lehrkraft, einfache Anfrage: wie in `BildTeil` */
+  bedeutung?: BildTeil['bedeutung']
+  vorlaeufig?: true
+  mehrdeutig?: true
+  andere?: BildTeil['andere']
 }
 
 /** Ton bzw. Sätze einer Fassung */

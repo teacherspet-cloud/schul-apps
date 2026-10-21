@@ -3,6 +3,7 @@
  *
  *   <Wurzel>/index.json      { "en:park": { bild, ton, saetze, tonM, saetzeM } }  (M = männliche Fassung)
  *   <Wurzel>/stimmen.json    Standardstimmen je Sprache { "en": { "w": "<voiceId>", "m": "<voiceId>" } }
+ *   <Wurzel>/bedeutungen.json Bilder je Bedeutung und Wortart (21.10.2026, shared/medienBedeutung.ts) { version, eintraege: { "en:bear": … } }
  *   <Wurzel>/dateien/<24 Hex>.jpg|png|mp3
  *
  * Wurzel: am Server <DATEN>/medienbank – EINMAL für alle (app.getPath('userData') zeigt dort auf den Ordner
@@ -11,8 +12,32 @@
  */
 import { app } from 'electron'
 import { randomBytes } from 'crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
+import {
+  altSchluesselFuer,
+  alsAnfrage,
+  anfrageSchluessel,
+  aufloesen,
+  bedeutungFinden,
+  bedeutungNorm,
+  gruppiereKorpus,
+  istEinfach,
+  neueBedeutungsId,
+  sinnSchluessel,
+  wortartFuer,
+  type BildTeil,
+  type KorpusWort,
+  type MedienAnfrage,
+  type MedienBedeutung,
+  type SinnAngabe,
+  type SinnDatei,
+  type SinnEintrag,
+  type SinnStandEintrag,
+  type Wortart,
+  type SinnZuordnung
+} from '@shared/medienBedeutung'
+import { resourcePath } from './paths'
 import {
   MEDIEN_DATEI,
   ErzeugungsSperre,
@@ -260,33 +285,80 @@ const dataUrlVon = (datei: string): string | undefined => {
  */
 export function medienFuer(
   sprache: string,
-  woerter: string[],
+  woerter: (string | MedienAnfrage)[],
   opts: { mitBildern?: boolean; basisUrl?: string; lage?: Stimmlage; stufe?: Bildstufe } = {}
 ): Record<string, MedienSicht> {
   const stufe = opts.stufe ?? 's2'
   const i = index()
+  const sinn = sinne()
   const aus: Record<string, MedienSicht> = {}
   const umziehenNach = new Set<string>()
-  for (const w of woerter.slice(0, 2000)) {
+  const url = (d: string): string | undefined => (opts.basisUrl ? `${opts.basisUrl}${d}` : undefined)
+  /*
+   * Bildstufen (07.10.2026): das Bild der eigenen Stufe, sonst das der nächstliegenden. Für eine Stufe, in der die
+   * KI kein eindeutiges Bild sieht (abstrakte Wörter für Jüngere), bleibt das Bild leer.
+   */
+  const bildAus = (e: Pick<MedienEintrag, 'bild' | 'bildStufen' | 'ohneBild'> | undefined): BildTeil => {
+    if (!e) return {}
+    const gefunden = e.ohneBild?.includes(stufe) ? undefined : stufenReihe(stufe).find((s) => bildDerStufe(e, s))
+    const b = gefunden ? bildDerStufe(e, gefunden) : undefined
+    const da = BILDSTUFEN.filter((s) => bildDerStufe(e, s))
+    return {
+      ...(b ? { bild: { ...b, ...(opts.basisUrl ? { url: url(b.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(b.datei) } : {}) }, bildStufe: gefunden } : {}),
+      // Für die Lehrkraft: Stufen mit eigenem Bild bzw. ohne eindeutiges Bild
+      ...(!opts.lage && da.length ? { bildStufenDa: da } : {}),
+      ...(!opts.lage && e.ohneBild?.length ? { ohneBild: e.ohneBild } : {})
+    }
+  }
+  /*
+   * Bilder je Bedeutung und Wortart (21.10.2026, shared/medienBedeutung.ts): erst die Bedeutung, dann – nur für Lemmata
+   * ohne Bedeutungen – das alte Bild aus index.json, und auch das nur unter einem Wort derselben Wortart.
+   */
+  const bildFuer = (a: MedienAnfrage): BildTeil => {
+    const art = wortartFuer(a, sprache)
+    const e = sinn.eintraege[sinnSchluessel(sprache, a.w, art)]
+    const r = aufloesen(e, a, sprache)
+    const andere = !opts.lage && e ? e.bedeutungen.filter((x) => x.id !== r.b?.id).map((x) => ({ id: x.id, deutsch: x.deutsch, wortart: x.wortart })) : []
+    const zusatz: BildTeil = {
+      ...(r.b && !opts.lage ? { bedeutung: { id: r.b.id, deutsch: r.b.deutsch, wortart: r.b.wortart } } : {}),
+      ...(r.vorlaeufig && !opts.lage ? { vorlaeufig: true as const } : {}),
+      ...(r.mehrdeutig && !opts.lage ? { mehrdeutig: true as const } : {}),
+      ...(andere.length ? { andere } : {})
+    }
+    if (r.b) return { ...bildAus(r.b), ...zusatz }
+    if (!r.altErlaubt) return zusatz
+    for (const w of altSchluesselFuer(sprache, a)) {
+      const f = finde(i, sprache, w)
+      const alt = f ? i[f.schluessel] : undefined
+      if (alt && (alt.bild || Object.keys(alt.bildStufen ?? {}).length || alt.ohneBild?.length)) return { ...bildAus(alt), ...zusatz }
+    }
+    return zusatz
+  }
+  for (const roh of woerter.slice(0, 2000)) {
+    const a = alsAnfrage(roh)
+    if (!a) continue
+    const w = a.w
+    const teil = bildFuer(a)
+    const schon = aus[w]
+    if (schon) {
+      // Dasselbe Wort mehrmals (verschiedene Bedeutungen): nur die Bilder ergänzen
+      if (!istEinfach(a)) schon.bilder = { ...(schon.bilder ?? {}), [anfrageSchluessel(a, sprache)]: teil }
+      else Object.assign(schon, teil)
+      continue
+    }
+    const bildTeil: Partial<MedienSicht> = istEinfach(a) ? teil : { bilder: { [anfrageSchluessel(a, sprache)]: teil } }
     const f = finde(i, sprache, w)
-    if (!f) continue
+    if (!f) {
+      if (Object.keys(teil).length) aus[w] = bildTeil
+      continue
+    }
     if (f.verschieben) umziehenNach.add(medienSchluessel(sprache, w))
     const e0 = i[f.schluessel]
     // Sätze unter ihren vereinheitlichten Schlüsseln – so finden die Seiten sie mit `satzSchluessel` (10.10.2026)
     const e: MedienEintrag = { ...e0, saetze: saetzeKanon(e0.saetze), saetzeM: saetzeKanon(e0.saetzeM) }
-    const url = (d: string): string | undefined => (opts.basisUrl ? `${opts.basisUrl}${d}` : undefined)
     const mitUrl = (t: MedienTon): MedienTon & { url?: string } => ({ ...t, ...(opts.basisUrl ? { url: url(t.datei) } : {}) })
     const saetzeMitUrl = (s: Record<string, MedienTon> | undefined): Record<string, MedienTon & { url?: string }> | undefined =>
       s && Object.keys(s).length ? Object.fromEntries(Object.entries(s).map(([k, t]) => [k, mitUrl(t)])) : undefined
-    /*
-     * Bildstufen (07.10.2026): das Bild der eigenen Stufe, sonst das der nächstliegenden. Für eine Stufe, in der die
-     * KI kein eindeutiges Bild sieht (abstrakte Wörter für Jüngere), bleibt das Bild leer.
-     */
-    const gefunden = e.ohneBild?.includes(stufe) ? undefined : stufenReihe(stufe).find((s) => bildDerStufe(e, s))
-    const b = gefunden ? bildDerStufe(e, gefunden) : undefined
-    const bildTeil: Partial<MedienSicht> = b
-      ? { bild: { ...b, ...(opts.basisUrl ? { url: url(b.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(b.datei) } : {}) }, bildStufe: gefunden }
-      : {}
     /*
      * Lernende (07.10.2026): nur ihre Fassung, gleich aufgelöst – `ton`/`saetze` sind die bevorzugte Fassung,
      * wo sie fehlt, die andere. Ohne `lage` (Lehrkraft) kommen beide Fassungen.
@@ -305,15 +377,12 @@ export function medienFuer(
       continue
     }
     const saetzeM = saetzeMitUrl(e.saetzeM)
-    const da = BILDSTUFEN.filter((s) => bildDerStufe(e, s))
     aus[w] = {
       // Geschlechtsbezogene Beispielsätze (12.10.2026): die Lehrkraft sieht alle Fassungen
       ...(e.fassungen && Object.keys(e.fassungen).length ? { fassungen: e.fassungen } : {}),
       ...(e.tonM ? { tonM: mitUrl(e.tonM) } : {}),
       ...(saetzeM ? { saetzeM } : {}),
       ...bildTeil,
-      ...(da.length ? { bildStufenDa: da } : {}),
-      ...(e.ohneBild?.length ? { ohneBild: e.ohneBild } : {}),
       ...(e.ton ? { ton: { ...e.ton, ...(opts.basisUrl ? { url: url(e.ton.datei) } : {}) } } : {}),
       ...(e.saetze && Object.keys(e.saetze).length
         ? { saetze: Object.fromEntries(Object.entries(e.saetze).map(([k, t]) => [k, { ...t, ...(opts.basisUrl ? { url: url(t.datei) } : {}) }])) }
@@ -349,7 +418,9 @@ export function bildSetzen(
   sprache: string,
   wort: string,
   b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[]; kiAbgelehnt?: boolean },
-  stufe: Bildstufe = 's2'
+  stufe: Bildstufe = 's2',
+  /** Bedeutung und Wortart (21.10.2026): dann kommt das Bild zu dieser Bedeutung, nicht an das Wort */
+  sinn?: SinnAngabe
 ): MedienBild {
   const { bytes, endung } = ausDataUrl(b.dataUrl)
   if (endung === 'mp3') throw new Error('Kein Bild.')
@@ -362,6 +433,10 @@ export function bildSetzen(
     ...(b.kandidaten?.length ? { kandidaten: bereinigeKandidaten(b.kandidaten) } : {}),
     ...(b.kiAbgelehnt === true ? { kiAbgelehnt: true } : {}),
     zeit: Date.now()
+  }
+  if (sinn) {
+    sinnBildAendern(sprache, wort, sinn, (e) => stufeSetzen(e, stufe, bild))
+    return bild
   }
   aendern(sprache, wort, (e) => {
     const vorher = bildDerStufe(e, stufe)
@@ -377,8 +452,20 @@ export function bildSetzen(
 }
 
 /** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken, damit kein Auftrag es erneut versucht */
-export function ohneBildMerken(sprache: string, wort: string, stufe: Bildstufe): void {
+export function ohneBildMerken(sprache: string, wort: string, stufe: Bildstufe, sinn?: SinnAngabe): void {
+  if (sinn) return void sinnBildAendern(sprache, wort, sinn, (e) => ({ ...e, ohneBild: [...new Set([...(e.ohneBild ?? []), stufe])] }))
   aendern(sprache, wort, (e) => ({ ...e, ohneBild: [...new Set([...(e.ohneBild ?? []), stufe])] }))
+}
+
+/** Bild einer Stufe setzen (die vorige Datei weicht, Kandidaten bleiben beim Umwählen) – für Wort und Bedeutung gleich */
+function stufeSetzen<E extends Pick<MedienEintrag, 'bild' | 'bildStufen' | 'ohneBild'>>(e: E, stufe: Bildstufe, bild: MedienBild): E {
+  const vorher = bildDerStufe(e, stufe)
+  if (vorher?.datei !== bild.datei) weg(vorher?.datei)
+  const neu: MedienBild = { ...bild, kandidaten: bild.kandidaten ?? vorher?.kandidaten }
+  const ohneBild = (e.ohneBild ?? []).filter((s) => s !== stufe)
+  const basis: E = { ...e, ...(ohneBild.length ? { ohneBild } : {}) }
+  if (!ohneBild.length) delete basis.ohneBild
+  return stufe === 's2' ? { ...basis, bild: neu } : { ...basis, bildStufen: { ...(e.bildStufen ?? {}), [stufe]: neu } }
 }
 
 function bereinigeKandidaten(k: MedienKandidat[]): MedienKandidat[] {
@@ -396,7 +483,19 @@ function bereinigeKandidaten(k: MedienKandidat[]): MedienKandidat[] {
     }))
 }
 
-export function bildLoeschen(sprache: string, wort: string, stufe: Bildstufe = 's2'): void {
+export function bildLoeschen(sprache: string, wort: string, stufe: Bildstufe = 's2', sinn?: SinnAngabe): void {
+  if (sinn)
+    return void sinnBildAendern(sprache, wort, sinn, (e) => {
+      weg(bildDerStufe(e, stufe)?.datei)
+      const rest = { ...e }
+      if (stufe === 's2') delete rest.bild
+      else {
+        const bildStufen = { ...(e.bildStufen ?? {}) }
+        delete bildStufen[stufe]
+        rest.bildStufen = bildStufen
+      }
+      return rest
+    })
   aendern(sprache, wort, (e) => {
     weg(bildDerStufe(e, stufe)?.datei)
     if (stufe === 's2') {
@@ -762,4 +861,389 @@ export function stimmeSetzen(sprache: string, stimme: string, lage: Stimmlage = 
   else delete s[k]
   schreibe(stimmenDatei(), s)
   return s
+}
+
+// ---------------------------------------------------------------- Bilder je Bedeutung (21.10.2026, shared/medienBedeutung.ts)
+
+
+const SINN_VERSION = 1
+const SINN_SICHERUNG = 'sicherung-bedeutungen-2026-10-21'
+const sinnDatei = (): string => join(wurzel(), 'bedeutungen.json')
+let sinnZwischen: { zeit: number; d: SinnDatei } | null = null
+
+/**
+ * Woher die Wörter für das Einrichten kommen (Lehrwerke, Verblisten): am Server meldet start.ts die Ordner aller
+ * Lehrkräfte an, in der Exe gelten die eigenen. Liefert die Wörter – ohne Personenbezug.
+ */
+let korpusQuelle: () => KorpusWort[] = () => korpusAusOrdnern(standardOrdner())
+export const medienKorpusQuelle = (fn: () => KorpusWort[]): void => void (korpusQuelle = fn)
+
+function standardOrdner(): { lehrwerke: string[]; verben: string[] } {
+  const lehrwerke: string[] = []
+  try {
+    lehrwerke.push(resourcePath('lehrwerke'))
+  } catch {
+    // ohne Electron (Tests): nur die eigenen Ordner
+  }
+  try {
+    const u = app.getPath('userData')
+    lehrwerke.push(join(u, 'lehrwerke'))
+    return { lehrwerke, verben: [join(u, 'lehrwerke', 'verben')] }
+  } catch {
+    return { lehrwerke, verben: [] }
+  }
+}
+
+/** Wörter aus Lehrwerk-Dateien und Verblisten (einzelne kaputte Dateien werden übersprungen) */
+export function korpusAusOrdnern(o: { lehrwerke: string[]; verben: string[] }): KorpusWort[] {
+  const aus: KorpusWort[] = []
+  const dateien = (d: string): string[] => {
+    try {
+      return existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => join(d, f)) : []
+    } catch {
+      return []
+    }
+  }
+  for (const d of o.lehrwerke)
+    for (const f of dateien(d)) {
+      const b = lies<{ language?: string; units?: { sections?: { entries?: { term?: string; translation?: string; pos?: string }[] }[] }[] }>(f, {})
+      const sprache = String(b.language ?? '')
+      if (!sprache || !Array.isArray(b.units)) continue
+      for (const u of b.units)
+        for (const s of u.sections ?? [])
+          for (const e of s.entries ?? [])
+            if (e?.term && e.translation) aus.push({ sprache, term: String(e.term), translation: String(e.translation), ...(e.pos ? { pos: String(e.pos) } : {}) })
+    }
+  for (const d of o.verben)
+    for (const f of dateien(d)) {
+      const l = lies<{ sprache?: string; eintraege?: { formen?: Record<string, string> }[] }>(f, {})
+      const sprache = String(l.sprache ?? '')
+      if (!sprache) continue
+      for (const e of l.eintraege ?? []) {
+        const inf = String(e?.formen?.inf ?? '').trim()
+        const de = String(e?.formen?.de ?? '').trim()
+        if (inf && de) aus.push({ sprache, term: inf, translation: de, art: 'verb' })
+      }
+    }
+  return aus
+}
+
+/** bedeutungen.json lesen – beim ersten Mal mit dem Einrichten aus dem Bestand (Phase A, ohne KI) */
+function sinne(): SinnDatei {
+  if (sinnZwischen && Date.now() - sinnZwischen.zeit < 2000) return sinnZwischen.d
+  let d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  if (!d.eintraege || typeof d.eintraege !== 'object') d = { eintraege: {} }
+  if ((d.version ?? 0) < SINN_VERSION)
+    try {
+      sinneEinrichten()
+      d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+    } catch {
+      // Einrichten scheiterte (z. B. unlesbare Lehrwerke): weiter mit dem, was da ist – die alten Bilder gelten dann
+    }
+  sinnZwischen = { zeit: Date.now(), d }
+  return d
+}
+/** Nur für Tests */
+export const bedeutungenNeuLesen = (): void => void (sinnZwischen = null)
+
+function sinnSchreiben(d: SinnDatei): void {
+  schreibe(sinnDatei(), { ...d, version: Math.max(d.version ?? 0, SINN_VERSION) })
+  sinnZwischen = null
+}
+
+/** Sicherung von index.json und bedeutungen.json – je Sicherungsordner nur einmal */
+function sinnSichern(): string {
+  const sich = join(wurzelPfad(), SINN_SICHERUNG)
+  if (!existsSync(sich)) mkdirSync(sich, { recursive: true })
+  for (const name of ['index.json', 'bedeutungen.json']) {
+    const von = join(wurzelPfad(), name)
+    if (existsSync(von) && !existsSync(join(sich, name))) copyFileSync(von, join(sich, name))
+  }
+  return sich
+}
+/** Eine Bilddatei in die Sicherung verschieben statt sie zu löschen (Zusammenführen, KI verwirft ein altes Bild) */
+function beiseiteDatei(datei: string | undefined): void {
+  if (!datei || !MEDIEN_DATEI.test(datei)) return
+  const von = join(wurzelPfad(), 'dateien', datei)
+  if (!existsSync(von)) return
+  try {
+    renameSync(von, join(sinnSichern(), datei))
+  } catch {
+    // Nur Aufräumen – lieber die Datei liegen lassen als scheitern
+  }
+}
+
+/** Neue Bedeutung anlegen */
+function bedeutungNeu(wortart: Wortart, deutsch: string, quelle: MedienBedeutung['quelle'], varianten: string[] = []): MedienBedeutung {
+  const n = bedeutungNorm(deutsch)
+  return {
+    id: neueBedeutungsId(),
+    wortart,
+    deutsch: deutsch.trim().slice(0, 160) || deutsch,
+    varianten: [...new Set([...(n ? [n] : []), ...varianten])],
+    quelle,
+    zeit: Date.now()
+  }
+}
+
+const bildFelder = (e: Pick<MedienEintrag, 'bild' | 'bildStufen' | 'ohneBild'>): boolean => Boolean(e.bild || Object.keys(e.bildStufen ?? {}).length || e.ohneBild?.length)
+
+/**
+ * Erste Bedeutung eines Lemmas ohne Einrichtung (neue Wörter nach dem Einrichten): Das alte Bild aus index.json zieht
+ * mit in die Bedeutung, sofern es unter einem Wort derselben Wortart liegt – sonst verschwände es aus der Ansicht und
+ * würde neu erzeugt.
+ */
+function altesBildUebernehmen(sprache: string, wort: string, b: MedienBedeutung): void {
+  const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
+  for (const w of altSchluesselFuer(sprache, { w: wort, art: b.wortart, de: b.deutsch })) {
+    const f = finde(i, sprache, w)
+    const e = f ? i[f.schluessel] : undefined
+    if (!f || !e || !bildFelder(e)) continue
+    if (e.bild) b.bild = e.bild
+    if (Object.keys(e.bildStufen ?? {}).length) b.bildStufen = e.bildStufen
+    if (e.ohneBild?.length) b.ohneBild = e.ohneBild
+    const rest: MedienEintrag = { ...e }
+    delete rest.bild
+    delete rest.bildStufen
+    delete rest.ohneBild
+    if (istLeer(rest)) delete i[f.schluessel]
+    else i[f.schluessel] = rest
+    schreibe(indexDatei(), i)
+    zwischen = null
+    return
+  }
+}
+
+/**
+ * Die Bedeutung zu einer Angabe finden oder anlegen: per Kennung, sonst über die Übersetzung (genau oder ein gemeinsamer
+ * Teil); sonst neu. Die Übersetzung kommt als Variante dazu – das ist der Merker der Zuordnung.
+ */
+function bedeutungSichern(d: SinnDatei, sprache: string, wort: string, sinn: SinnAngabe, quelle: MedienBedeutung['quelle'] = 'neu'): MedienBedeutung {
+  const schluessel = sinnSchluessel(sprache, wort, sinn.wortart)
+  const e: SinnEintrag = d.eintraege[schluessel] ?? { bedeutungen: [] }
+  const erste = !e.bedeutungen.length && !e.offen?.length
+  let b = sinn.id ? e.bedeutungen.find((x) => x.id === sinn.id && x.wortart === sinn.wortart) : undefined
+  if (!b) {
+    const f = bedeutungFinden(e, sinn.wortart, sinn.deutsch)
+    if (f.wie === 'genau' || f.wie === 'teil') b = f.b
+  }
+  if (!b) {
+    b = bedeutungNeu(sinn.wortart, sinn.deutsch || wort, quelle)
+    if (erste) altesBildUebernehmen(sprache, wort, b)
+    e.bedeutungen.push(b)
+    // Zweite Bedeutung derselben Wortart: vielleicht nur ein Synonym – die Klärung der Admins prüft
+    if (e.bedeutungen.filter((x) => x.wortart === sinn.wortart).length > 1) e.klaeren = true
+  }
+  const n = bedeutungNorm(sinn.deutsch)
+  if (n && !b.varianten.includes(n)) b.varianten.push(n)
+  d.eintraege[schluessel] = e
+  return b
+}
+
+/** Bilder einer Bedeutung ändern (sie wird bei Bedarf angelegt) */
+function sinnBildAendern(sprache: string, wort: string, sinn: SinnAngabe, fn: (b: MedienBedeutung) => MedienBedeutung): void {
+  // Erst einrichten (falls noch nicht geschehen) – sonst stünde die Version fest, bevor der Bestand eingeordnet ist
+  sinne()
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  const b = bedeutungSichern(d, sprache, wort, sinn)
+  const neu = fn({ ...b })
+  const e = d.eintraege[sinnSchluessel(sprache, wort, sinn.wortart)]
+  e.bedeutungen = e.bedeutungen.map((x) => (x.id === b.id ? neu : x))
+  sinnSchreiben(d)
+}
+
+
+/**
+ * Bedeutungen zuordnen (erster Schritt des Medienauftrags, ohne KI): passt eine Übersetzung genau oder über einen Teil,
+ * ist die Bedeutung klar; hat die Wortart noch keine, entsteht sie. Sonst (einzige andere oder mehrere) fragt der
+ * Auftrag die KI und meldet das Ergebnis mit `sinnFestlegen`.
+ */
+export function sinneZuordnen(sprache: string, anfragen: MedienAnfrage[]): SinnZuordnung[] {
+  sinne()
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  let geaendert = false
+  const aus = anfragen.slice(0, 2000).map((roh): SinnZuordnung => {
+    const a = alsAnfrage(roh)
+    if (!a) return { fragen: [] }
+    const art = wortartFuer(a, sprache)
+    const de = a.de ?? a.w
+    const e = d.eintraege[sinnSchluessel(sprache, a.w, art)]
+    const f = bedeutungFinden(e, art, de)
+    if (f.wie === 'genau' && f.b) return { id: f.b.id, deutsch: f.b.deutsch }
+    if (f.wie === 'teil' || f.wie === 'keine') {
+      geaendert = true
+      const b = bedeutungSichern(d, sprache, a.w, { wortart: art, deutsch: de }, 'neu')
+      return { id: b.id, deutsch: b.deutsch }
+    }
+    const gleich = (e?.bedeutungen ?? []).filter((b) => b.wortart === art)
+    return { fragen: gleich.map((b) => ({ id: b.id, deutsch: b.deutsch })) }
+  })
+  if (geaendert) sinnSchreiben(d)
+  return aus
+}
+
+/** Ergebnis der KI: diese Übersetzung gehört zu Bedeutung `ziel` – oder ist eine neue (`ziel` = 'neu') */
+export function sinnFestlegen(sprache: string, wort: string, wortart: Wortart, deutsch: string, ziel: string): { id: string; deutsch: string } {
+  sinne()
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  const art: Wortart = wortart === 'verb' ? 'verb' : 'andere'
+  const schluessel = sinnSchluessel(sprache, wort, art)
+  const e: SinnEintrag = d.eintraege[schluessel] ?? { bedeutungen: [] }
+  let b = ziel !== 'neu' ? e.bedeutungen.find((x) => x.id === ziel && x.wortart === art) : undefined
+  if (!b) {
+    b = bedeutungNeu(art, deutsch || wort, 'ki')
+    e.bedeutungen.push(b)
+    if (e.bedeutungen.filter((x) => x.wortart === art).length > 1) e.klaeren = true
+  }
+  const n = bedeutungNorm(deutsch)
+  if (n && !b.varianten.includes(n)) b.varianten.push(n)
+  d.eintraege[schluessel] = e
+  sinnSchreiben(d)
+  return { id: b.id, deutsch: b.deutsch }
+}
+
+
+/** Was auf die Klärung wartet (Admin-Knopf „Mehrdeutige Wörter klären") */
+export function sinnStand(max = 400): { klaeren: number; offen: number; liste: SinnStandEintrag[] } {
+  const d = sinne()
+  const aus = { klaeren: 0, offen: 0, liste: [] as SinnStandEintrag[] }
+  for (const [schluessel, e] of Object.entries(d.eintraege)) {
+    const offen = e.offen ?? []
+    if (!e.klaeren && !offen.length) continue
+    if (e.klaeren) aus.klaeren++
+    aus.offen += offen.length
+    if (aus.liste.length < max)
+      aus.liste.push({
+        schluessel,
+        bedeutungen: e.bedeutungen.map((b) => ({ id: b.id, wortart: b.wortart, deutsch: b.deutsch, varianten: b.varianten.slice(0, 12) })),
+        ...(e.klaeren ? { klaeren: true as const } : {}),
+        offen: offen.map((o) => ({ datei: o.datei, stufe: o.stufe, wortarten: o.wortarten }))
+      })
+  }
+  return aus
+}
+
+/**
+ * Synonyme zusammenführen (Ergebnis der KI): je Gruppe bleibt die erste Bedeutung mit Bild (sonst die erste), die
+ * übrigen gehen in ihr auf – Varianten zusammen, ihre überzähligen Bilder kommen in die Sicherung. Danach gilt das Lemma
+ * als geklärt.
+ */
+export function sinneZusammenfuehren(schluessel: string, gruppen: string[][]): number {
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  const e = d.eintraege?.[schluessel]
+  if (!e) return 0
+  let n = 0
+  for (const g of gruppen) {
+    const teil = g.map((id) => e.bedeutungen.find((b) => b.id === id)).filter((b): b is MedienBedeutung => Boolean(b))
+    if (teil.length < 2 || new Set(teil.map((b) => b.wortart)).size > 1) continue
+    const bleibt = teil.find((b) => bildFelder(b)) ?? teil[0]
+    for (const b of teil) {
+      if (b === bleibt) continue
+      bleibt.varianten = [...new Set([...bleibt.varianten, ...b.varianten])]
+      for (const s of BILDSTUFEN) {
+        const x = bildDerStufe(b, s)
+        if (!x) continue
+        if (!bildDerStufe(bleibt, s)) Object.assign(bleibt, stufeSetzenOhneLoeschen(bleibt, s, x))
+        else beiseiteDatei(x.datei)
+      }
+      e.bedeutungen = e.bedeutungen.filter((x) => x !== b)
+      n++
+    }
+  }
+  delete e.klaeren
+  e.geklaert = Date.now()
+  sinnSchreiben(d)
+  return n
+}
+
+/** Ein altes Bild zuordnen (Ergebnis der Bildprüfung): `id` = Bedeutung, null = passt zu keiner (Datei in die Sicherung) */
+export function altbildZuordnen(schluessel: string, datei: string, id: string | null): boolean {
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  const e = d.eintraege?.[schluessel]
+  const o = e?.offen?.find((x) => x.datei === datei)
+  if (!e || !o) return false
+  const b = id ? e.bedeutungen.find((x) => x.id === id && o.wortarten.includes(x.wortart)) : undefined
+  if (b && !bildDerStufe(b, o.stufe)) Object.assign(b, stufeSetzenOhneLoeschen(b, o.stufe, o.bild))
+  else beiseiteDatei(o.datei)
+  e.offen = (e.offen ?? []).filter((x) => x !== o)
+  if (!e.offen.length) delete e.offen
+  sinnSchreiben(d)
+  return true
+}
+
+/**
+ * Einrichten (Phase A, 21.10.2026, ohne KI): Aus allen bekannten Wörtern (Lehrwerke, Verblisten) entstehen je Lemma und
+ * Wortart die Bedeutungen (Übersetzungen mit gemeinsamem Teil = eine). Alte Bilder aus index.json ziehen in ihre
+ * Bedeutung, wenn sie eindeutig ist; sonst warten sie in `offen` auf die Bildprüfung der KI (Admin-Knopf). Vorher wird
+ * gesichert; ein zweiter Lauf ändert nichts (Lemmata mit Bedeutungen bleiben, wie sie sind). Ohne index.json geschieht
+ * nichts.
+ */
+export function sinneEinrichten(korpus?: KorpusWort[]): { lemmata: number; verschoben: number; offen: number; klaeren: number } {
+  const zahl = { lemmata: 0, verschoben: 0, offen: 0, klaeren: 0 }
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  // Ohne index.json nichts festschreiben: Ein neuer Server bekommt den Grundbestand erst nach der Wartung (start.ts) –
+  // eingerichtet wird dann beim ersten Nachschlagen
+  if (!existsSync(join(wurzelPfad(), 'index.json'))) return zahl
+  const woerter = korpus ?? korpusQuelle()
+  const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
+  let indexGeaendert = false
+  for (const [schluessel, g] of gruppiereKorpus(woerter)) {
+    if (d.eintraege[schluessel]) continue
+    const e: SinnEintrag = { bedeutungen: g.gruppen.map((x) => bedeutungNeu(x.wortart, x.deutsch, 'migration', x.varianten)) }
+    for (const art of ['verb', 'andere'] as Wortart[]) if (e.bedeutungen.filter((b) => b.wortart === art).length > 1) e.klaeren = true
+    // Wortarten je bisherigem Wort (ein Wort kann als Verb und als Nomen vorkommen: „bear" der Verbliste und die Vokabel)
+    const arten = new Map<string, Set<Wortart>>()
+    for (const w of g.woerter) arten.set(w.wort, new Set([...(arten.get(w.wort) ?? []), w.wortart]))
+    for (const [wort, wa] of arten) {
+      const f = finde(i, g.sprache, wort)
+      const alt = f ? i[f.schluessel] : undefined
+      if (!f || !alt || !bildFelder(alt)) continue
+      const kandidaten = e.bedeutungen.filter((b) => wa.has(b.wortart))
+      if (!kandidaten.length) continue
+      if (!indexGeaendert) sinnSichern()
+      for (const s of BILDSTUFEN) {
+        const bild = bildDerStufe(alt, s)
+        if (!bild) continue
+        if (kandidaten.length === 1) {
+          const b = kandidaten[0]
+          const da = bildDerStufe(b, s)
+          // Zwei Wörter derselben Bedeutung mit Bild („to bear" und „bear" der Verbliste): das neuere bleibt
+          if (!da || da.zeit < bild.zeit) {
+            if (da) beiseiteDatei(da.datei)
+            Object.assign(b, stufeSetzenOhneLoeschen(b, s, bild))
+          } else beiseiteDatei(bild.datei)
+          zahl.verschoben++
+        } else {
+          e.offen = [...(e.offen ?? []), { datei: bild.datei, stufe: s, wortarten: [...wa], bild }]
+          zahl.offen++
+        }
+      }
+      if (kandidaten.length === 1 && alt.ohneBild?.length) kandidaten[0].ohneBild = [...new Set([...(kandidaten[0].ohneBild ?? []), ...alt.ohneBild])]
+      const rest: MedienEintrag = { ...alt }
+      delete rest.bild
+      delete rest.bildStufen
+      delete rest.ohneBild
+      if (istLeer(rest)) delete i[f.schluessel]
+      else i[f.schluessel] = rest
+      indexGeaendert = true
+    }
+    if (e.klaeren) zahl.klaeren++
+    d.eintraege[schluessel] = e
+    zahl.lemmata++
+  }
+  if (indexGeaendert) {
+    schreibe(indexDatei(), i)
+    zwischen = null
+  }
+  sinnSchreiben(d)
+  return zahl
+}
+
+/** Bild einer Stufe setzen, ohne die vorige Datei zu löschen (Einrichten und Zusammenführen verschieben nur Verweise) */
+function stufeSetzenOhneLoeschen<E extends Pick<MedienEintrag, 'bild' | 'bildStufen' | 'ohneBild'>>(e: E, stufe: Bildstufe, bild: MedienBild): E {
+  return stufe === 's2' ? { ...e, bild } : { ...e, bildStufen: { ...(e.bildStufen ?? {}), [stufe]: bild } }
 }

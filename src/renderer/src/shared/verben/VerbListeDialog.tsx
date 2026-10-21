@@ -9,6 +9,7 @@
  *
  * Erreichbar im Grammatiktest („Unregelmäßige Verben") und in den Vokabellisten beim Lehrwerk.
  */
+import { anfrageVon, bildVon } from '@shared/medienBedeutung'
 import { ActionIcon, Alert, Badge, Button, Group, Modal, ScrollArea, Select, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconDeviceFloppy, IconPlus, IconSortAscendingLetters, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -66,9 +67,10 @@ export default function VerbListeDialog({
     klasse: buecher.find((b) => b.id === wahl)?.grade
   })
   const verbVokabeln = useMemo(() => zeilen.map((z) => alsVokabel(z, sprache)), [zeilen, sprache])
+  // Als Verb mit Bedeutung (21.10.2026): Bilder je Bedeutung und Wortart
   const medien = useMedienbank(
     sprache,
-    verbVokabeln.map((v) => v.term),
+    verbVokabeln.map((v) => anfrageVon(v)),
     medienZiel.stufe
   )
   const [bildOffen, setBildOffen] = useState<Vokabel | null>(null)
@@ -322,7 +324,7 @@ export default function VerbListeDialog({
                   </Table.Td>
                   <Table.Td>
                     <BildZelle
-                      sicht={medien.daten[verbVokabeln[i]?.term ?? '']}
+                      sicht={verbVokabeln[i] ? bildVon(medien.daten[verbVokabeln[i].term], verbVokabeln[i], sprache) : undefined}
                       wort={verbVokabeln[i]?.term ?? ''}
                       onOeffnen={() => verbVokabeln[i]?.term && setBildOffen(verbVokabeln[i])}
                       stufe={medienZiel.stufe}
@@ -399,7 +401,7 @@ export default function VerbListeDialog({
         <BildDialog
           sprache={sprache}
           v={bildOffen}
-          sicht={medien.daten[bildOffen.term]}
+          sicht={bildVon(medien.daten[bildOffen.term], bildOffen, sprache)}
           admin={medienAdmin}
           ziel={medienZiel}
           schliessen={() => setBildOffen(null)}

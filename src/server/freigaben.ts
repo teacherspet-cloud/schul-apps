@@ -75,7 +75,12 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:ton-freigeben',
   // Prüfung per Messung und Fassungen geschlechtsbezogener Beispielsätze (12.10.2026)
   'medien:ton-pruefung',
-  'medien:fassung-setzen'
+  'medien:fassung-setzen',
+  // Bedeutungen der Bilder (21.10.2026, nur Admins)
+  'medien:sinne-zuordnen',
+  'medien:sinn-festlegen',
+  'medien:sinne-zusammenfuehren',
+  'medien:altbild-zuordnen'
 ])
 
 /** Einstellungen, die eine Lehrkraft auf dem Server nicht setzen darf */

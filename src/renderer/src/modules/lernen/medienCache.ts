@@ -7,22 +7,38 @@
  */
 import type { MedienSicht } from '@shared/medienbank'
 import { satzSchluessel, stufeVon } from '@shared/medienbank'
-import { holen } from '../onlinetest/serverApi'
+import { alsAnfrage, anfrageSchluessel, istEinfach, type MedienAnfrage } from '@shared/medienBedeutung'
+import { senden } from '../onlinetest/serverApi'
 import { useDarstellung } from '../onlinetest/schuelerDarstellung'
 
 let medien: Record<string, MedienSicht> = {}
 let laeuft: HTMLAudioElement | null = null
 
+/*
+ * Anfragen mit Bedeutung und Wortart (21.10.2026, shared/medienBedeutung.ts): Der Server gibt das Bild der Bedeutung –
+ * das Verb „bear" bekommt so nicht mehr das Bild des Bären. Per POST, weil die Übersetzungen als Adresse zu lang würden.
+ * Bevorzugte Fassung der Aussprache (07.10.2026) und Bildstufe nach Klasse (07.10.2026) löst der Server auf.
+ */
+async function abrufen(sprache: string, woerter: (string | MedienAnfrage)[], klasse?: number | null): Promise<Record<string, MedienSicht>> {
+  const d = await senden<{ medien: Record<string, MedienSicht> }>('/s/api/medien', {
+    sprache,
+    lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w',
+    stufe: stufeVon(klasse),
+    woerter: woerter.slice(0, 600).map((w) => (typeof w === 'string' ? { w } : w))
+  }).catch(() => ({ medien: {} }))
+  return d.medien ?? {}
+}
+
+/** Zwei Antworten zu einem Wort zusammenlegen (Bilder je Bedeutung dazu) */
+function zusammen(a: MedienSicht | undefined, b: MedienSicht): MedienSicht {
+  return a ? { ...a, ...b, ...(a.bilder || b.bilder ? { bilder: { ...(a.bilder ?? {}), ...(b.bilder ?? {}) } } : {}) } : b
+}
+
 /** Medien zu den Wörtern einer Liste laden (am Server); liefert sie auch zurück */
-export async function medienLaden(sprache: string, woerter: string[], klasse?: number | null): Promise<Record<string, MedienSicht>> {
+export async function medienLaden(sprache: string, woerter: (string | MedienAnfrage)[], klasse?: number | null): Promise<Record<string, MedienSicht>> {
   medien = {}
   if (!woerter.length) return medien
-  // Bevorzugte Fassung der Aussprache (07.10.2026) – der Server löst sie auf, mit der anderen als Rückfall
-  // Bildstufe nach Klasse (07.10.2026) – der Server liefert das Bild dieser Stufe, sonst das der nächstliegenden
-  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe: stufeVon(klasse) })
-  for (const w of woerter.slice(0, 600)) q.append('w', w)
-  const d = await holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).catch(() => ({ medien: {} }))
-  medien = d.medien ?? {}
+  medien = await abrufen(sprache, woerter, klasse)
   return medien
 }
 
@@ -30,13 +46,25 @@ export async function medienLaden(sprache: string, woerter: string[], klasse?: n
  * Weitere Medien dazuladen, ohne die der Liste zu verwerfen (07.10.2026): Bild und Aussprache der unregelmäßigen
  * Verben liegen unter ihrer Grundform, die Formen als „Sätze".
  */
-export async function medienErgaenzen(sprache: string, woerter: string[], klasse?: number | null): Promise<void> {
-  const fehlen = [...new Set(woerter)].filter((w) => w && !medien[w]).slice(0, 600)
+export async function medienErgaenzen(sprache: string, woerter: (string | MedienAnfrage)[], klasse?: number | null): Promise<void> {
+  // Fehlt: das Wort ganz – oder bei einer Anfrage mit Bedeutung deren Bild (z. B. das Verb zum schon geladenen Nomen)
+  const gesehen = new Set<string>()
+  const fehlen = woerter
+    .map(alsAnfrage)
+    .filter((a): a is MedienAnfrage => Boolean(a))
+    .filter((a) => {
+      const k = anfrageSchluessel(a, sprache)
+      if (gesehen.has(k)) return false
+      gesehen.add(k)
+      const m = medien[a.w]
+      return !m || (!istEinfach(a) && !m.bilder?.[k])
+    })
+    .slice(0, 600)
   if (!fehlen.length) return
-  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe: stufeVon(klasse) })
-  for (const w of fehlen) q.append('w', w)
-  const d = await holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).catch(() => ({ medien: {} }))
-  medien = { ...medien, ...(d.medien ?? {}) }
+  const neu = await abrufen(sprache, fehlen, klasse)
+  const aus = { ...medien }
+  for (const [w, m] of Object.entries(neu)) aus[w] = zusammen(aus[w], m)
+  medien = aus
 }
 
 export const medium = (wort: string): MedienSicht | undefined => medien[wort]

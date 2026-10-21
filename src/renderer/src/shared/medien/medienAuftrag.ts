@@ -15,7 +15,25 @@
  */
 import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonPasst, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
-import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, MOTIVE_JE_ANFRAGE, motiveWaehlen, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
+import {
+  bildErzeugen,
+  bildKandidaten,
+  kandidatUebernehmen,
+  kiWaehltMehr,
+  MOTIVE_JE_ANFRAGE,
+  motiveWaehlen,
+  motivSchluessel,
+  motivWaehlen,
+  sinnVon,
+  stufeDer,
+  tonErzeugen,
+  vokabelZeile,
+  wortartDer,
+  type Ki,
+  type Lernende,
+  type Vokabel
+} from './medienbank'
+import { anfrageVon, bildVon, type MedienAnfrage, type SinnZuordnung } from '@shared/medienBedeutung'
 import { istBildBlockiert } from '@shared/bildBlockiert'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
 import { sprechText, sprechTextFuerWort } from '@shared/sprechtext'
@@ -197,10 +215,94 @@ export function offeneVokabeln(
   sprache = 'en'
 ): Vokabel[] {
   const woerter = vokabeln.filter((v) => v.term.trim())
-  // Bildstufen (07.10.2026): offen ist, was in DIESER Stufe kein Bild hat – außer die KI sah dafür kein eindeutiges
+  /*
+   * Bildstufen (07.10.2026): offen ist, was in DIESER Stufe kein Bild hat – außer die KI sah dafür kein eindeutiges.
+   * Bilder je Bedeutung (21.10.2026): das Bild der eigenen Bedeutung zählt; ein nur vorläufiges (andere Übersetzung
+   * derselben Wortart) oder mehrdeutiges ist offen – der Auftrag ordnet erst zu.
+   */
   if (art === 'bilder' || art === 'bildKi')
-    return woerter.filter((v) => !daten[v.term]?.bildStufenDa?.includes(stufe) && !daten[v.term]?.ohneBild?.includes(stufe))
+    return woerter.filter((v) => {
+      const t = bildVon(daten[v.term], vokabelAnfrageVon(v), sprache)
+      return Boolean(t?.vorlaeufig || t?.mehrdeutig) || (!t?.bildStufenDa?.includes(stufe) && !t?.ohneBild?.includes(stufe))
+    })
   return woerter.filter((v) => lagen.some((l) => tonFehlt(art, v, daten[v.term], l, sprache)))
+}
+
+/** Anfrage einer Vokabel an die Medienbank (Bedeutung und Wortart, 21.10.2026) */
+export const vokabelAnfrageVon = (v: Vokabel): { term: string; translation?: string; pos?: string; wortart?: Vokabel['wortart'] } => ({
+  term: v.term,
+  translation: v.translation,
+  ...(v.pos ? { pos: v.pos } : {}),
+  ...(v.wortart ? { wortart: v.wortart } : {})
+})
+
+/** Höchstens so viele Wörter je KI-Anfrage beim Zuordnen der Bedeutungen */
+const BEDEUTUNGEN_JE_ANFRAGE = 20
+
+/**
+ * Bedeutungen zuordnen (21.10.2026, erster Schritt der Bildaufträge): Die Medienbank kennt die meisten Übersetzungen
+ * schon (genau, gemeinsamer Teil) oder legt die erste Bedeutung einer Wortart an – ohne KI. Nur wo eine Übersetzung
+ * zu keiner bekannten Bedeutung passt, fragt EINE sparsame KI-Anfrage je 20 Wörter: dieselbe Bedeutung oder eine
+ * neue? Liefert je Vokabel die Bedeutung; ungeklärte (KI scheiterte) fehlen – sie bekommen in diesem Auftrag kein Bild.
+ */
+async function bedeutungenZuordnen(sp: string, liste: Vokabel[], k: AuftragsKontext): Promise<Map<Vokabel, { id: string; deutsch: string }>> {
+  const aus = new Map<Vokabel, { id: string; deutsch: string }>()
+  if (!liste.length) return aus
+  const anfragen: MedienAnfrage[] = liste.map((v) => anfrageVon(vokabelAnfrageVon(v)))
+  const z: SinnZuordnung[] = await window.api.medien.sinneZuordnen(sp, anfragen)
+  const fragen: { v: Vokabel; kandidaten: { id: string; deutsch: string }[] }[] = []
+  liste.forEach((v, i) => {
+    const x = z[i]
+    if (x && 'id' in x) aus.set(v, x)
+    else if (x && x.fragen.length) fragen.push({ v, kandidaten: x.fragen })
+  })
+  for (let i = 0; i < fragen.length && !k.signal.aborted; i += BEDEUTUNGEN_JE_ANFRAGE) {
+    const teil = fragen.slice(i, i + BEDEUTUNGEN_JE_ANFRAGE)
+    k.melde(`Bedeutungen zuordnen (${teil.length})`, 0, Math.max(1, liste.length))
+    try {
+      const antwort = await beimDienst(k, 'ki', () =>
+        k.ai<{ zuordnung: { nr: number; wahl: number }[] }>({
+          sparsam: true,
+          system: [
+            'Du ordnest Vokabeln Bedeutungen zu, damit jede Bedeutung ihr eigenes Beispielbild bekommt.',
+            'Je Nummer: Gehört die Übersetzung zu einer der genannten Bedeutungen (gleiche Sache, nur anders formuliert oder ein Synonym), antworte mit deren Nummer; ist es eine andere Bedeutung, antworte mit 0.',
+            'Ein Verb und ein Nomen sind nie dieselbe Bedeutung. Antworte für JEDE Nummer mit genau einem Eintrag.'
+          ].join('\n'),
+          user: teil
+            .map((f, j) => `${j + 1}. ${vokabelZeile(sp, f.v)}\n   Bedeutungen: ${f.kandidaten.map((c, n) => `${n + 1} = „${c.deutsch}"`).join('; ')}`)
+            .join('\n'),
+          schemaName: 'vokabel_bedeutung',
+          schema: {
+            type: 'object',
+            properties: {
+              zuordnung: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { nr: { type: 'integer' }, wahl: { type: 'integer' } },
+                  required: ['nr', 'wahl'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['zuordnung'],
+            additionalProperties: false
+          }
+        })
+      )
+      for (const a of antwort?.zuordnung ?? []) {
+        const f = teil[Number(a.nr) - 1]
+        if (!f || aus.has(f.v)) continue
+        const n = Math.round(Number(a.wahl) || 0)
+        const ziel = n >= 1 && n <= f.kandidaten.length ? f.kandidaten[n - 1].id : 'neu'
+        aus.set(f.v, await window.api.medien.sinnFestlegen(sp, f.v.term, wortartDer(sp, f.v), f.v.translation || f.v.term, ziel))
+      }
+    } catch (fehler) {
+      if (k.signal.aborted) throw fehler
+      // Ohne KI bleiben diese Wörter ungeklärt – sie bekommen in diesem Auftrag kein Bild (nächster Auftrag fragt erneut)
+    }
+  }
+  return aus
 }
 
 /** Fassungen, für die eine Standardstimme eingestellt ist */
@@ -256,7 +358,7 @@ async function eines(
   if (art === 'bildKi') {
     // Erst das Motiv (und ob es sich für diese Stufe eindeutig zeigen lässt); einzeln angefordert, wird es trotzdem versucht
     const m = geplant ?? (await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki)))
-    if (!m.eindeutig && !einzeln) return await window.api.medien.ohneBild(sp, v.term, stufe), false
+    if (!m.eindeutig && !einzeln) return await window.api.medien.ohneBild(sp, v.term, stufe, sinnVon(sp, v)), false
     /*
      * Abgelehnt (12.10.2026, abgestimmt mit der Lehrkraft): Lehnt das Sicherheitssystem das Motiv ab, wird sofort – ohne
      * Warten – einmal mit einem vorsichtigeren, kindgerechten Motiv versucht; klappt auch das nicht, kommt das Bild aus
@@ -279,15 +381,15 @@ async function eines(
     if (!ersatz.length) return false
     const wahl = await beimDienst(k, 'ki', () => kiWaehltMehr(sp, v, ersatz, lernende, ki))
     if (wahl.i < 0) return false
-    await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, ersatz[wahl.i], ersatz, stufe, true))
+    await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, ersatz[wahl.i], ersatz, stufe, true, sinnVon(sp, v)))
     return true
   }
   const kandidaten = await beimDienst(k, 'bildsuche', () => bildKandidaten(sp, v, lernende))
   if (!kandidaten.length) return false
   const w = await beimDienst(k, 'ki', () => kiWaehltMehr(sp, v, kandidaten, lernende, ki))
-  if (w.nichtZeigbar && !einzeln) await window.api.medien.ohneBild(sp, v.term, stufe)
+  if (w.nichtZeigbar && !einzeln) await window.api.medien.ohneBild(sp, v.term, stufe, sinnVon(sp, v))
   if (w.i < 0) return false
-  await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, kandidaten[w.i], kandidaten, stufe))
+  await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, kandidaten[w.i], kandidaten, stufe, false, sinnVon(sp, v)))
   return true
 }
 
@@ -361,12 +463,27 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
         const lagen = lagenVon(stimmen).filter((l) => !e.lagen || e.lagen.includes(l))
         if (ton && !lagen.length)
           throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“).')
+        const bilder = e.art === 'bilder' || e.art === 'bildKi'
+        const stufe = stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe })
+        // Bilder je Bedeutung (21.10.2026): mit Übersetzung und Wortart anfragen
+        const anfragen = (l: Vokabel[]): (string | MedienAnfrage)[] => (bilder ? l.map((v) => anfrageVon(vokabelAnfrageVon(v))) : l.map((v) => v.term))
         // Frisch nachsehen, was fehlt – inzwischen kann ein anderer Auftrag einiges erledigt haben
-        let daten = await window.api.medien.eintraege(
-          sp,
-          liste.map((v) => v.term)
-        )
-        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe }), sp)
+        let daten = await window.api.medien.eintraege(sp, anfragen(liste))
+        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufe, sp)
+        if (bilder && liste.length) {
+          // Erst die Bedeutungen zuordnen, dann frisch nachsehen: ein Teil hat danach schon sein Bild
+          k.melde('Bedeutungen zuordnen …', 0, Math.max(1, liste.length))
+          const zu = await bedeutungenZuordnen(sp, liste, k)
+          daten = await window.api.medien.eintraege(sp, anfragen(liste))
+          liste = liste
+            .filter((v) => zu.has(v))
+            .map((v) => {
+              const t = bildVon(daten[v.term], vokabelAnfrageVon(v), sp)
+              const b = zu.get(v)!
+              return { ...v, bedeutung: { id: b.id, deutsch: b.deutsch, wortart: wortartDer(sp, v) }, ...(t?.andere?.length ? { andere: t.andere.filter((x) => x.id !== b.id) } : {}) }
+            })
+          if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufe, sp)
+        }
         // Geschlechtsbezogene Beispielsätze (12.10.2026): ungeprüfte Kandidaten vorher in EINEM KI-Aufruf, dann frisch laden
         if (e.art === 'satz' && (await fassungenErmitteln(sp, liste, daten, e.figuren ?? figurenAus(e.vokabeln.map((v) => v.example)), k)))
           daten = await window.api.medien.eintraege(
@@ -391,7 +508,7 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
                 if (k.signal.aborted) throw f
                 // Ohne Bündel plant jedes Wort einzeln – wie bisher
               }
-            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), lernende, k, abgelehnt, e.neu, motive.get(v.term))) erg.erledigt++
+            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), lernende, k, abgelehnt, e.neu, motive.get(motivSchluessel(v)))) erg.erledigt++
             else erg.leer++
             medienGeaendert(sp)
           } catch (fehler) {

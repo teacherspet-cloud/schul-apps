@@ -1,4 +1,5 @@
 import { Badge, Button, Card, Group, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { anfrageVon } from '@shared/medienBedeutung'
 import { IconCheck, IconClipboard, IconDeviceFloppy, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
@@ -60,9 +61,10 @@ export default function ListEditor({
   const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
   // Ziel der Medienaufträge (06.10.2026): „Öffnen" in der Auftragsleiste führt zu dieser Liste; die Klasse steuert die Bildstufe
   const medienZiel = useMedienZiel(zielListe(list.id, name, grade || undefined))
+  // Mit Übersetzung und Wortart (21.10.2026): Bilder je Bedeutung
   const medien = useMedienbank(
     language,
-    rows.map((r) => r.term),
+    rows.map((r) => anfrageVon(r)),
     medienZiel.stufe
   )
   useEffect(() => {
@@ -279,7 +281,13 @@ export default function ListEditor({
           <MedienLeiste
             sprache={language}
             // Beispielsatz im Hinweis (12.10.2026): vorher fehlte er – „Satz-Aussprache erzeugen" zählte in Listen immer 0
-            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: satzDerZeile(r, false), aussprache: r.aussprache }))}
+            vokabeln={rows.map((r) => ({
+              term: r.term,
+              translation: r.translation,
+              example: satzDerZeile(r, false),
+              aussprache: r.aussprache,
+              ...(r.pos ? { pos: r.pos } : {})
+            }))}
             daten={medien.daten}
             bereit={medien.bereit}
             ziel={medienZiel}

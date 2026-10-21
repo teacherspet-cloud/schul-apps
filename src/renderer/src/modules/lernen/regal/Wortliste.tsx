@@ -13,12 +13,13 @@
  *    Kopfleiste, „↑ Nach oben" führt zurück; gezeichnet werden nur Blöcke in der Nähe des Bildes – auch bei Tausenden
  *    Wörtern flüssig (10.10.2026).
  */
+import { anfrageSchluessel, anfrageVon, bildVon, type BildTeil } from '@shared/medienBedeutung'
 import { ActionIcon, Badge, Button, Group, Loader, Modal, Portal, SegmentedControl, Stack, Text } from '@mantine/core'
 import { IconArrowUp, IconPhotoOff, IconVolume } from '@tabler/icons-react'
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { abcEintraege, alphabetisch, mitKoepfen, type AbcPosten, type AbcZeile, type MeinBuch } from '@shared/meineBuecher'
 import { suchform, suchindex, wortlisteFiltern, type Wortliste as Liste, type WortlisteGruppe, type WortlisteWort, type WortStatus } from '@shared/wortliste'
-import { holen } from '../../onlinetest/serverApi'
+import { holen, senden } from '../../onlinetest/serverApi'
 import { BandCover } from '../../../shared/components/BandCover'
 import { kannSprechen, sprich } from '../VokabelTrainer'
 import { beispielFuerLernende, medienErgaenzen, medium } from '../medienCache'
@@ -901,18 +902,24 @@ const aktuelleKlasse = (buecher: MeinBuch[] | undefined): number | null => {
   return alle.length ? Math.max(...alle) : null
 }
 
-/** Bilder je Sprache, Stufe und Wort – einmal geladen (auch „kein Bild") */
-const bildZwischen = new Map<string, Promise<MedienSicht | null>>()
+/** Bilder je Sprache, Stufe, Wort und Bedeutung – einmal geladen (auch „kein Bild") */
+const bildZwischen = new Map<string, Promise<BildTeil | null>>()
 
-function bildLaden(sprache: string, term: string, klasse: number | null): Promise<MedienSicht | null> {
+function bildLaden(sprache: string, z: Pick<AbcZeile, 'term' | 'translation' | 'pos'>, klasse: number | null): Promise<BildTeil | null> {
   const stufe = stufeVon(klasse)
-  const k = `${sprache}|${stufe}|${term}`
+  // Das Bild der Bedeutung (21.10.2026, shared/medienBedeutung.ts): Übersetzung und Wortart gehören zur Anfrage
+  const a = anfrageVon(z)
+  const k = `${sprache}|${stufe}|${anfrageSchluessel(a, sprache)}`
   let p = bildZwischen.get(k)
   if (!p) {
     // Wie im Vokabeltraining (medienCache.ts): der Server liefert das Bild der Stufe, sonst das der nächstliegenden
-    const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe, w: term })
-    p = holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).then(
-      (d) => d.medien?.[term] ?? null,
+    p = senden<{ medien: Record<string, MedienSicht> }>('/s/api/medien', {
+      sprache,
+      lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w',
+      stufe,
+      woerter: [a]
+    }).then(
+      (d) => bildVon(d.medien?.[z.term], z, sprache) ?? null,
       () => {
         bildZwischen.delete(k)
         return null
@@ -947,11 +954,11 @@ function WortFenster({
     if (z) setZuletzt(z)
   }, [z])
   const w = z ?? zuletzt
-  const [bild, setBild] = useState<{ term: string; m: MedienSicht | null } | null>(null)
+  const [bild, setBild] = useState<{ term: string; m: BildTeil | null } | null>(null)
   useEffect(() => {
     if (!z || !sprache) return
     let aktiv = true
-    void bildLaden(sprache, z.term, klasse).then((m) => aktiv && setBild({ term: z.term, m }))
+    void bildLaden(sprache, z, klasse).then((m) => aktiv && setBild({ term: z.term, m }))
     return () => {
       aktiv = false
     }

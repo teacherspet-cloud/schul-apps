@@ -24,6 +24,14 @@ describe('Verben in der Medienbank', () => {
     expect(sprechtext('burnt/burned')).toBe('burnt, burned')
     expect(sprechFormen(zeile('(to) be', 'was/were', 'been', 'sein'), 'en').map((f) => f.text)).toEqual(['to be', 'was, were', 'been'])
     const v = alsVokabel(zeile('go', 'went', 'gone', 'gehen', 'go home'), 'en')
-    expect(v).toEqual({ term: 'go', translation: 'gehen', formen: ['go', 'went', 'gone'], formenGesprochen: { go: 'go', went: 'went', gone: 'gone' }, hinweis: 'go home' })
+    // Ausdrücklich ein Verb (21.10.2026): Bilder je Bedeutung und Wortart
+    expect(v).toEqual({
+      term: 'go',
+      translation: 'gehen',
+      formen: ['go', 'went', 'gone'],
+      formenGesprochen: { go: 'go', went: 'went', gone: 'gone' },
+      hinweis: 'go home',
+      wortart: 'verb'
+    })
   })
 })

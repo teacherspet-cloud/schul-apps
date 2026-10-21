@@ -88,6 +88,7 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
       'grammatik-je-thema-2026-10-08',
       'grammatik-klasse10-loeschen-2026-10-09',
       'klartext-reste-2026-10-08',
+      'medien-bedeutungen-2026-10-21',
       'medien-kanon-2026-10-10',
       'namen-korrigieren-2026-10-09',
       'rekorde-zeit-2026-10-08',

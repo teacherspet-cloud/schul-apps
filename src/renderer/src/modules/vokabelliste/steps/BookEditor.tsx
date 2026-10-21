@@ -1,4 +1,5 @@
 import { Alert, Badge, Box, Button, Card, Chip, Collapse, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { anfrageVon } from '@shared/medienBedeutung'
 import { IconCheck, IconChevronRight, IconDeviceFloppy, IconListDetails, IconStack2 } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
@@ -126,9 +127,10 @@ export default function BookEditor({
   // Bildstufe (07.10.2026): aus der Klasse des Bandes, in der Medienleiste umstellbar
   const zielMitStufe = useMedienZiel(zielBuch(book?.id ?? '', book?.name ?? '', unit, section, book?.grade))
   const medienZiel = book ? zielMitStufe : null
+  // Mit Übersetzung und Wortart (21.10.2026): Bilder je Bedeutung
   const medien = useMedienbank(
     book?.language,
-    rows.map((r) => r.term),
+    rows.map((r) => anfrageVon(r)),
     zielMitStufe.stufe
   )
   // Figuren des Lehrwerks (12.10.2026): Eigennamen aus allen Beispielsätzen des Bandes – für angepasste Fassungen geschlechtsbezogener Sätze
@@ -438,7 +440,8 @@ export default function BookEditor({
               translation: r.translation,
               example: r.example,
               exampleTranslation: r.exampleTranslation,
-              aussprache: r.aussprache
+              aussprache: r.aussprache,
+              ...(r.pos ? { pos: r.pos } : {})
             }))}
             daten={medien.daten} bereit={medien.bereit}
             figuren={figuren}
@@ -465,7 +468,8 @@ export default function BookEditor({
                   translation: e.translation,
                   example: e.example,
                   exampleTranslation: e.exampleTranslation,
-                  aussprache: e.aussprache
+                  aussprache: e.aussprache,
+                  ...(e.pos ? { pos: e.pos } : {})
                 })),
                 ziel: { ...zielBuch(book.id, book.name, u.name, s.name, book.grade), stufe: zielMitStufe.stufe }
               }))

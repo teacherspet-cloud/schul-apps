@@ -11,6 +11,7 @@
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
 import type { Bildstufe, MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
+import type { MedienAnfrage, SinnAngabe, SinnStandEintrag, SinnZuordnung, Wortart } from './medienBedeutung'
 import type { TonPruefung } from './tonPruefung'
 import type { SatzFassung } from './satzFassung'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
@@ -496,7 +497,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Medienbank der Vokabeln (05.10.2026, shared/medienbank.ts) – ändern am Server nur Admins */
     medien: {
       /** `stufe`: Bildstufe der Lernenden (07.10.2026) – fehlt das Bild dieser Stufe, kommt das der nächstliegenden */
-      eintraege: (sprache: string, woerter: string[], stufe?: Bildstufe) => call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter, stufe),
+      /** Wörter oder Anfragen mit Bedeutung und Wortart (21.10.2026) – Bilder dann in `bilder`, lesen über `bildVon` */
+      eintraege: (sprache: string, woerter: (string | MedienAnfrage)[], stufe?: Bildstufe) =>
+        call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter, stufe),
       /** Datei als data-URL (Ton, Bild in voller Größe); null, wenn es sie nicht mehr gibt */
       datei: (datei: string) => call<string | null>('medien:datei', datei),
       /** Standardstimmen je Sprache: weibliche und männliche Fassung (07.10.2026) */
@@ -506,11 +509,23 @@ export function buildApi(call: Call, extras: ApiExtras) {
         sprache: string,
         wort: string,
         b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[]; kiAbgelehnt?: boolean },
-        stufe: Bildstufe = 's2'
-      ) => call<MedienBild>('medien:bild-setzen', sprache, wort, b, stufe),
-      bildLoeschen: (sprache: string, wort: string, stufe: Bildstufe = 's2') => call<void>('medien:bild-loeschen', sprache, wort, stufe),
+        stufe: Bildstufe = 's2',
+        /** Bedeutung (21.10.2026): das Bild gehört dann zu ihr statt zum Wort */
+        sinn?: SinnAngabe
+      ) => call<MedienBild>('medien:bild-setzen', sprache, wort, b, stufe, sinn),
+      bildLoeschen: (sprache: string, wort: string, stufe: Bildstufe = 's2', sinn?: SinnAngabe) =>
+        call<void>('medien:bild-loeschen', sprache, wort, stufe, sinn),
       /** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken */
-      ohneBild: (sprache: string, wort: string, stufe: Bildstufe) => call<void>('medien:ohne-bild', sprache, wort, stufe),
+      ohneBild: (sprache: string, wort: string, stufe: Bildstufe, sinn?: SinnAngabe) => call<void>('medien:ohne-bild', sprache, wort, stufe, sinn),
+      /** Bedeutungen zuordnen (21.10.2026): je Anfrage die Bedeutung – oder die Kandidaten für die KI */
+      sinneZuordnen: (sprache: string, anfragen: MedienAnfrage[]) => call<SinnZuordnung[]>('medien:sinne-zuordnen', sprache, anfragen),
+      /** Ergebnis der KI: zu Bedeutung `ziel` oder 'neu' */
+      sinnFestlegen: (sprache: string, wort: string, wortart: Wortart, deutsch: string, ziel: string) =>
+        call<{ id: string; deutsch: string }>('medien:sinn-festlegen', sprache, wort, wortart, deutsch, ziel),
+      /** Was auf die Klärung wartet (Synonyme, alte Bilder mehrdeutiger Wörter) */
+      sinnStand: () => call<{ klaeren: number; offen: number; liste: SinnStandEintrag[] }>('medien:sinn-stand'),
+      sinneZusammenfuehren: (schluessel: string, gruppen: string[][]) => call<number>('medien:sinne-zusammenfuehren', schluessel, gruppen),
+      altbildZuordnen: (schluessel: string, datei: string, id: string | null) => call<boolean>('medien:altbild-zuordnen', schluessel, datei, id),
       tonSetzen: (
         sprache: string,
         wort: string,

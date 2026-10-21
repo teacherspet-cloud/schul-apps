@@ -42,7 +42,9 @@ export function alsVokabel(e: VerbEintrag, sprache: VerbSprache): Vokabel {
     translation: (de && e.formen[de.id]) || '',
     formen: sprechFormen(e, sprache).map((f) => f.text),
     formenGesprochen: Object.fromEntries(sprechFormen(e, sprache).map((f) => [f.text, f.gesprochen])),
-    ...(e.hinweis?.trim() ? { hinweis: e.hinweis.trim() } : {})
+    ...(e.hinweis?.trim() ? { hinweis: e.hinweis.trim() } : {}),
+    // Ausdrücklich ein Verb (21.10.2026): das Bild der Verbbedeutung, nie das des gleichnamigen Nomens („bear" – Bär)
+    wortart: 'verb'
   }
 }
 

@@ -64,7 +64,9 @@ import { satzFuerLage } from '@shared/satzFassung'
 import { aufMessung, gemesseneVon, merkeMessung, pruefungVon, tonMessen } from './tonMessung'
 import { notifyError, notifySuccess } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
-import { abspielen, bildKandidaten, kandidatUebernehmen, type Vokabel } from './medienbank'
+import { abspielen, bildKandidaten, kandidatUebernehmen, sinnVon, type Vokabel } from './medienbank'
+import { WORTART_NAME, type BildTeil, type MedienAnfrage } from '@shared/medienBedeutung'
+import { bedeutungenKlaerenStarten } from './bedeutungenKlaeren'
 import { aufMedienAenderung, lagenVon, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from './medienAuftrag'
 
 let adminZwischen: Promise<boolean> | null = null
@@ -94,14 +96,20 @@ export function useMedienZiel(ziel: MedienZiel): MedienZiel & { stufe: Bildstufe
   return { ...ziel, stufe: gewaehlt ?? stufeVon(ziel.klasse) }
 }
 
-/** Einträge der Medienbank für die Wörter einer Tabelle – Bilder in der Bildstufe `stufe` */
+/**
+ * Einträge der Medienbank für die Wörter einer Tabelle – Bilder in der Bildstufe `stufe`. Anfragen mit Übersetzung und
+ * Wortart (21.10.2026, shared/medienBedeutung.ts): das Bild der Bedeutung steht dann in `bilder` (lesen über `bildVon`).
+ */
 export function useMedienbank(
   sprache: string | undefined,
-  woerter: string[],
+  woerter: (string | MedienAnfrage)[],
   stufe?: Bildstufe
 ): { daten: Record<string, MedienSicht>; laden: () => void; bereit: boolean } {
   const [daten, setDaten] = useState<Record<string, MedienSicht>>({})
-  const schluessel = woerter.filter(Boolean).join('\u0001')
+  const schluessel = woerter
+    .filter((w) => (typeof w === 'string' ? w : w.w))
+    .map((w) => (typeof w === 'string' ? w : JSON.stringify(w)))
+    .join('\u0001')
   // Für welche Wörter die Daten gelten (09.10.2026): bis sie da sind, zählen die Knöpfe nicht „alles offen" (kein Aufblinken)
   const auftrag = `${sprache ?? ''}|${stufe ?? ''}|${schluessel}`
   const [geladenFuer, setGeladenFuer] = useState('')
@@ -111,7 +119,8 @@ export function useMedienbank(
       setDaten({})
       return setGeladenFuer(fuer)
     }
-    void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001'), stufe).then(
+    const liste = schluessel.split('\u0001').map((x): string | MedienAnfrage => (x.startsWith('{') ? (JSON.parse(x) as MedienAnfrage) : x))
+    void window.api.medien.eintraege(sprachKurz(sprache), liste, stufe).then(
       (d) => {
         setDaten(d)
         setGeladenFuer(fuer)
@@ -144,18 +153,11 @@ export const spiele = (q: { datei?: string; url?: string } | undefined): void =>
   if (q) void abspielen(q).catch((e: unknown) => notifyError(e, 'Abspielen nicht möglich'))
 }
 
-/** Zelle „Beispielbild" – `stufe`: Bildstufe der Ansicht; ein Bild einer anderen Stufe erscheint blass mit deren Namen */
-export function BildZelle({
-  sicht,
-  wort,
-  onOeffnen,
-  stufe
-}: {
-  sicht?: MedienSicht
-  wort: string
-  onOeffnen: () => void
-  stufe?: Bildstufe
-}): React.JSX.Element {
+/**
+ * Zelle „Beispielbild" – `stufe`: Bildstufe der Ansicht; ein Bild einer anderen Stufe erscheint blass mit deren Namen.
+ * `sicht`: das Bild der Bedeutung (`bildVon`, 21.10.2026); ein nur vorläufiges Bild (andere Übersetzung) trägt einen Punkt.
+ */
+export function BildZelle({ sicht, wort, onOeffnen, stufe }: { sicht?: BildTeil; wort: string; onOeffnen: () => void; stufe?: Bildstufe }): React.JSX.Element {
   const b = sicht?.bild
   const fremd = Boolean(stufe && sicht?.bildStufe && sicht.bildStufe !== stufe)
   return (
@@ -171,6 +173,24 @@ export function BildZelle({
       {b?.dataUrl || b?.url ? (
         <>
           <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" style={fremd ? { opacity: 0.45 } : undefined} />
+          {/* Bild einer anderen Übersetzung derselben Wortart (21.10.2026) – der nächste Bildauftrag ordnet zu */}
+          {sicht?.vorlaeufig && !fremd && (
+            <Tooltip label={`Vorläufig: Bild der Bedeutung „${sicht.bedeutung?.deutsch ?? ''}" – der nächste Bildauftrag prüft, ob es passt`}>
+              <span
+                data-bild-vorlaeufig
+                style={{
+                  position: 'absolute',
+                  bottom: -3,
+                  right: -3,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  background: 'var(--mantine-color-yellow-5)',
+                  border: '2px solid var(--mantine-color-body)'
+                }}
+              />
+            </Tooltip>
+          )}
           {/* KI-Bild vom Sicherheitssystem abgelehnt, Ersatz aus der Bildsuche (12.10.2026) */}
           {b.kiAbgelehnt && !fremd && (
             <Tooltip label="KI-Bild wurde vom Sicherheitssystem abgelehnt – dieses Bild kommt aus der Bildsuche. Bitte prüfen.">
@@ -555,7 +575,8 @@ export function BildDialog({
 }: {
   sprache: string
   v: Vokabel
-  sicht?: MedienSicht
+  /** Das Bild der Bedeutung (`bildVon`, 21.10.2026) */
+  sicht?: BildTeil
   admin: boolean
   /** Stelle der Vokabel – Ziel von „Öffnen" in der Auftragsleiste */
   ziel: MedienZiel
@@ -570,6 +591,14 @@ export function BildDialog({
   const b = sicht?.bild
   // Bild einer anderen Stufe (Rückfall) – löschen träfe dann nicht das gezeigte
   const fremd = Boolean(b && sicht?.bildStufe && sicht.bildStufe !== stufe)
+  // Bedeutung, zu der Löschen und Übernehmen gehören (21.10.2026) – ein nur vorläufiges Bild gehört einer anderen
+  const vv: Vokabel = {
+    ...v,
+    ...(sicht?.bedeutung && !sicht.vorlaeufig ? { bedeutung: sicht.bedeutung } : {}),
+    ...(sicht?.andere ? { andere: sicht.andere } : {})
+  }
+  const sinn = sinnVon(sprache, vv)
+  const bed = sicht?.bedeutung
   const tun = async (was: string, fn: () => Promise<unknown>, meldung?: string): Promise<void> => {
     setLaeuft(was)
     try {
@@ -583,8 +612,23 @@ export function BildDialog({
     }
   }
   return (
-    <Modal opened onClose={schliessen} title={`Beispielbild – ${v.term}`} size="lg" data-bild-dialog>
+    <Modal
+      opened
+      onClose={schliessen}
+      title={`Beispielbild – ${v.term}${v.translation ? ` (${WORTART_NAME[sinn.wortart]}: ${v.translation})` : ''}`}
+      size="lg"
+      data-bild-dialog
+    >
       <Stack>
+        {(sicht?.vorlaeufig || sicht?.mehrdeutig) && (
+          <Text size="xs" c="yellow.9" ta="center" data-bild-bedeutung-hinweis>
+            {sicht.vorlaeufig
+              ? `Vorläufig: Das Bild gehört zur Bedeutung „${bed?.deutsch ?? ''}". Der nächste Bildauftrag prüft, ob „${
+                  v.translation
+                }" dasselbe meint – sonst entsteht ein eigenes Bild.`
+              : 'Mehrere Bedeutungen kommen in Frage – der nächste Bildauftrag ordnet zu.'}
+          </Text>
+        )}
         {b ? (
           <Stack gap={4} align="center">
             <Image src={b.dataUrl ?? b.url} mah={320} fit="contain" radius="sm" alt={v.term} />
@@ -611,13 +655,13 @@ export function BildDialog({
         {admin && (
           <>
             <Group justify="center" gap="xs">
-              {b && !fremd && (
+              {b && !fremd && !sicht?.vorlaeufig && (
                 <Button
                   color="red"
                   variant="light"
                   leftSection={<IconTrash size={16} />}
                   loading={laeuft === 'loeschen'}
-                  onClick={() => void tun('loeschen', () => window.api.medien.bildLoeschen(sprache, v.term, stufe), 'Bild gelöscht.')}
+                  onClick={() => void tun('loeschen', () => window.api.medien.bildLoeschen(sprache, v.term, stufe, sinn), 'Bild gelöscht.')}
                   data-bild-loeschen
                 >
                   Löschen
@@ -629,7 +673,7 @@ export function BildDialog({
                 loading={laeuft === 'suchen'}
                 onClick={() =>
                   void tun('suchen', async () => {
-                    const k = await bildKandidaten(sprache, v, { klasse: ziel.klasse, stufe })
+                    const k = await bildKandidaten(sprache, vv, { klasse: ziel.klasse, stufe })
                     setKandidaten(k)
                     if (!k.length) throw new Error('Die Bildsuche hat nichts gefunden.')
                   })
@@ -661,7 +705,9 @@ export function BildDialog({
                   {kandidaten.map((k) => (
                     <Tooltip key={k.url} label={[k.titel, k.urheber, k.lizenz].filter(Boolean).join(' · ')}>
                       <UnstyledButton
-                        onClick={() => void tun(`k:${k.url}`, () => kandidatUebernehmen(sprache, v.term, k, kandidaten, stufe), 'Bild übernommen.')}
+                        onClick={() =>
+                          void tun(`k:${k.url}`, () => kandidatUebernehmen(sprache, v.term, k, kandidaten, stufe, false, sinn), 'Bild übernommen.')
+                        }
                         style={{ position: 'relative' }}
                         data-bild-kandidat
                       >
@@ -760,6 +806,19 @@ export function MedienLeiste({
   const nurVerdacht = useNurVerdacht(ziel.docId)
   const setzeFilter = useVerdachtFilter((x) => x.setze)
   const neuLaeuft = laufend.has(medienSchluessel('aussprache')) || laufend.has(medienSchluessel('satz'))
+  // Mehrdeutige Wörter (21.10.2026, Bilder je Bedeutung): Synonyme und alte Bilder, die auf die KI warten
+  const [sinnZahl, setSinnZahl] = useState(0)
+  const klaerenLaeuft = useLaufendeSchluessel('medien-bedeutungen').has('medien:bedeutungen')
+  useEffect(() => {
+    let weg = false
+    void window.api.medien
+      .sinnStand()
+      .then((x) => !weg && setSinnZahl(x.klaeren + x.offen))
+      .catch(() => undefined)
+    return () => {
+      weg = true
+    }
+  }, [klaerenLaeuft, daten])
   const verdachtNeu = (): void => {
     for (const x of verdacht)
       void starteMedienAuftrag({
@@ -800,6 +859,24 @@ export function MedienLeiste({
           {bildKi && knopf('bildKi', 'Beispielbild von KI generieren lassen', ohneBild, <IconSparkles size={14} />, 'data-medien-bild-ki')}
           {knopf('aussprache', 'Aussprache erzeugen', ohneTon, <IconVolume size={14} />, 'data-medien-aussprache', true)}
           {knopf('satz', 'Satz-Aussprache erzeugen', ohneSatz, <IconMessage2 size={14} />, 'data-medien-satz', true)}
+          {(sinnZahl > 0 || klaerenLaeuft) && (
+            <Tooltip
+              label="Wörter mit mehreren Bedeutungen derselben Wortart (vielleicht nur Synonyme) und ältere Bilder, die noch keiner Bedeutung zugeordnet sind – die KI prüft und ordnet zu"
+              multiline
+              maw={320}
+            >
+              <Button
+                size="xs"
+                variant="light"
+                loading={klaerenLaeuft}
+                disabled={klaerenLaeuft}
+                onClick={() => void bedeutungenKlaerenStarten()}
+                data-medien-bedeutungen
+              >
+                Mehrdeutige Wörter klären ({sinnZahl})
+              </Button>
+            </Tooltip>
+          )}
           {(verdachtZahl > 0 || nurVerdacht) && (
             <Button.Group>
               <Tooltip

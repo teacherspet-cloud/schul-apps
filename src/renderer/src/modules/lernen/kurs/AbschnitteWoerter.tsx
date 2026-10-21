@@ -10,6 +10,7 @@
  *  - Oben: Suche über alle Wörter (klappt Passendes auf) und „Nur Problemwörter".
  * Auf/Zu gilt für die Sitzung (shared/sitzung.ts).
  */
+import { anfrageVon, bildVon } from '@shared/medienBedeutung'
 import {
   ActionIcon,
   Badge,
@@ -158,7 +159,9 @@ function WortZeile({
   const [form, setForm] = useState({ term: v.term, translation: v.translation, auch: (v.auchRichtig ?? []).join('; '), aussprache: v.aussprache ?? '' })
   const [laeuft, setLaeuft] = useState(false)
   const sicht = medien.sicht
-  const bild = sicht?.bild?.dataUrl ?? sicht?.bild?.url ?? v.bild
+  // Das Bild der Bedeutung (21.10.2026, shared/medienBedeutung.ts)
+  const bildTeil = bildVon(sicht, v)
+  const bild = bildTeil?.bild?.dataUrl ?? bildTeil?.bild?.url ?? v.bild
   // Aussprache: je Fassung (w/m) die Aufnahme – sonst die Gerätestimme
   const lagen = [...new Set<Stimmlage>([...medien.lagen, ...(['w', 'm'] as Stimmlage[]).filter((l) => tonVon(sicht, l))])]
   const tonKnoepfe = lagen.filter((l) => tonVon(sicht, l) || medien.admin)
@@ -339,7 +342,8 @@ export function AbschnitteWoerter({
   const sichtbar = offen ? zeilen.filter((z) => unitOffen(k(z.buch, z.unit)) && abschnittOffen(z)).flatMap((z) => z.woerter) : []
   const sprache = d.sprache || 'en'
   const ziel = useMedienZiel({ docId: `kurs:${kursId}`, titel: d.ueberschrift || d.titel })
-  const medienbank = useMedienbank(sprache, sichtbar.map((v) => v.term), ziel.stufe)
+  // Mit Übersetzung und Wortart (21.10.2026): Bilder je Bedeutung
+  const medienbank = useMedienbank(sprache, sichtbar.map((v) => anfrageVon(v)), ziel.stufe)
   const admin = useMedienAdmin()
   const stimmen = useStandardstimmen(sprache)
   const [bildFuer, setBildFuer] = useState<Wort | null>(null)
@@ -619,7 +623,7 @@ export function AbschnitteWoerter({
         <BildDialog
           sprache={sprachKurz(sprache)}
           v={{ term: bildFuer.term, translation: bildFuer.translation }}
-          sicht={medienbank.daten[bildFuer.term]}
+          sicht={bildVon(medienbank.daten[bildFuer.term], bildFuer, sprachKurz(sprache))}
           admin={admin}
           ziel={ziel}
           schliessen={() => setBildFuer(null)}

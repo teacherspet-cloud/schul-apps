@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { satzSchluessel } from '@shared/medienbank'
+import { bildVon } from '@shared/medienBedeutung'
 import { formSchluessel, formSpalten, type VerbKarte } from '@shared/verbTraining'
 import type { VerbSprache } from '@shared/verben'
 import { medienErgaenzen, medium } from './medienCache'
@@ -20,9 +21,10 @@ export function useVerbDaten(
   const schluessel = (karten ?? []).map((k) => k.schluessel).join('|')
   useEffect(() => {
     if (!karten?.length || !sprache) return
+    // Verben ausdrücklich als Verb mit ihrer Bedeutung (21.10.2026): „bear" (ertragen) bekommt nicht das Bild des Bären
     void medienErgaenzen(
       sprache,
-      karten.map((k) => k.schluessel),
+      karten.map((k) => ({ w: k.schluessel, de: k.de, art: 'verb' as const })),
       klasse
     ).then(() => setGeladen((x) => x + 1))
   }, [schluessel, sprache, klasse]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -35,7 +37,7 @@ export function useVerbDaten(
     spalten: formSpalten(sprache),
     sprache,
     tonSprache: sprache,
-    bild: (k) => medium(k.schluessel)?.bild?.url,
+    bild: (k) => bildVon(medium(k.schluessel), { term: k.schluessel, translation: k.de, wortart: 'verb' }, sprache)?.bild?.url,
     mitTon: kannSprechen(sprache) || karten.some(aufnahme),
     mitMuster: musterDer(karten, sprache).size >= 4,
     schreiben
