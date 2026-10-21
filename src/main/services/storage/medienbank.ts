@@ -1293,6 +1293,14 @@ const bedeutungVon = (e: SinnEintrag, id: string): MedienBedeutung => {
 }
 
 /** „Bild passt" (21.10.2026): die Lehrkraft hat Bedeutung und Bild geprüft; `an` = false nimmt es zurück */
+/** „Wort geklärt" (21.10.2026): von Hand abgehakt – keine Klärung mehr nötig (`an` = false nimmt es zurück) */
+export function wortGeklaert(schluessel: string, an = true): void {
+  sinnDateiAendern(schluessel, (e) => {
+    if (an) e.vonHand = Date.now()
+    else delete e.vonHand
+  })
+}
+
 export function sinnGeprueft(schluessel: string, id: string, an = true): void {
   sinnDateiAendern(schluessel, (e) => {
     const b = bedeutungVon(e, id)
@@ -1408,13 +1416,15 @@ export function mehrdeutigListe(o: {
     if (e.klaeren) gruende.push('klaeren')
     if (fundstellen.some((f) => f.wie === 'einzig')) gruende.push('vorlaeufig')
     if (fundstellen.some((f) => f.wie === 'mehrdeutig')) gruende.push('ungeklaert')
+    // Von Hand geklärt: keine Gründe mehr (21.10.2026)
+    if (e.vonHand) gruende.length = 0
     if (gruende.length) klaerung++
     const bildDa = (b: MedienBedeutung): boolean => Boolean(bildDerStufe(b, stufe)) || Boolean(b.ohneBild?.includes(stufe))
     const passt =
       o.filter === 'alle'
         ? true
         : o.filter === 'geprueft'
-          ? e.bedeutungen.length > 0 && e.bedeutungen.every((b) => b.geprueft)
+          ? Boolean(e.vonHand) || (e.bedeutungen.length > 0 && e.bedeutungen.every((b) => b.geprueft))
           : o.filter === 'ohneBild'
             ? !e.bedeutungen.length || e.bedeutungen.some((b) => !bildDa(b))
             : gruende.length > 0
@@ -1434,6 +1444,7 @@ export function mehrdeutigListe(o: {
       bedeutungen: [],
       offen: [],
       ...(e.klaeren ? { klaeren: true as const } : {}),
+      ...(e.vonHand ? { vonHand: e.vonHand } : {}),
       gruende
     })
   }

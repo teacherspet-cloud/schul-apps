@@ -53,6 +53,11 @@ export interface SinnEintrag {
   offen?: AltBild[]
   /** Zuletzt geklärt (KI) */
   geklaert?: number
+  /**
+   * Von Hand als geklärt abgehakt (21.10.2026, App „Mehrdeutig", Befund der Lehrkraft: ein Wort ließ sich nicht von der
+   * Liste nehmen) – das Wort hat dann keinen Klärungsbedarf mehr, auch wenn Gründe wie „mehrere Bedeutungen" bleiben
+   */
+  vonHand?: number
 }
 
 export interface SinnDatei {
@@ -136,6 +141,8 @@ export interface MehrdeutigZeile {
   bedeutungen: (Pick<MedienBedeutung, 'id' | 'wortart' | 'deutsch' | 'varianten' | 'geprueft'> & { bild?: BildTeil })[]
   offen: { datei: string; stufe: Bildstufe; wortarten: Wortart[]; dataUrl?: string }[]
   klaeren?: true
+  /** Von Hand als geklärt abgehakt (Zeitpunkt) */
+  vonHand?: number
   /** Warum die Zeile Klärung braucht (leer = geklärt) */
   gruende: ('mehrere' | 'offen' | 'klaeren' | 'vorlaeufig' | 'ungeklaert')[]
 }

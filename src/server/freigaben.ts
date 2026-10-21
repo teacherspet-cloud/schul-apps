@@ -83,6 +83,7 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:altbild-zuordnen',
   // App „Mehrdeutig" (21.10.2026, nur Admins)
   'medien:sinn-geprueft',
+  'medien:wort-geklaert',
   'medien:sinn-wortart',
   'medien:sinn-bezeichnung',
   'medien:variante-verschieben'

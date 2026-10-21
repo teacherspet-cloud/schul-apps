@@ -247,12 +247,33 @@ function WortKarte({
                 {GRUND[g]}
               </Badge>
             ))}
-            {!z.gruende.length && z.bedeutungen.length > 0 && z.bedeutungen.every((b) => b.geprueft) && (
+            {!z.gruende.length && (z.vonHand || (z.bedeutungen.length > 0 && z.bedeutungen.every((b) => b.geprueft))) && (
               <Badge variant="light" color="teal" leftSection={<IconCheck size={12} />}>
                 geprüft
               </Badge>
             )}
           </Group>
+          {/* Wort abhaken (21.10.2026, Befund der Lehrkraft): nimmt es aus dem Klärungsbedarf, auch ohne Bild */}
+          <Tooltip
+            label={
+              z.vonHand
+                ? 'Wieder als „zu klären" führen'
+                : 'Alles passt so – das Wort verschwindet aus „Klärungsbedarf" (bleibt unter „Alle Wörter" und „Geprüft")'
+            }
+            multiline
+            maw={300}
+          >
+            <Button
+              size="xs"
+              variant={z.vonHand ? 'filled' : 'light'}
+              color="teal"
+              leftSection={<IconCheck size={14} />}
+              onClick={() => void tun(() => window.api.medien.wortGeklaert(z.schluessel, !z.vonHand))}
+              data-mehrdeutig-geklaert={z.schluessel}
+            >
+              {z.vonHand ? 'Geklärt ✓' : 'Wort geklärt'}
+            </Button>
+          </Tooltip>
         </Group>
 
         {/* Fundstellen: wie im Buch, mit der Bedeutung, zu der die Übersetzung gehört */}
@@ -366,11 +387,11 @@ function WortKarte({
                       variant={b.geprueft ? 'filled' : 'light'}
                       color="teal"
                       leftSection={<IconCheck size={12} />}
-                      disabled={!bild}
                       onClick={() => void tun(() => window.api.medien.sinnGeprueft(z.schluessel, b.id, !b.geprueft))}
                       data-mehrdeutig-passt={b.id}
                     >
-                      {b.geprueft ? 'Bild passt ✓' : 'Bild passt'}
+                      {/* Auch ohne Bild abhakbar (21.10.2026): Bedeutung und Wortart stimmen */}
+                      {bild ? (b.geprueft ? 'Bild passt ✓' : 'Bild passt') : b.geprueft ? 'Passt ✓' : 'Passt (ohne Bild)'}
                     </Button>
                     <Button
                       size="compact-xs"

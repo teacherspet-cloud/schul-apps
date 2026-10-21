@@ -17,6 +17,7 @@ import {
   mehrdeutigListe,
   sinnBezeichnung,
   sinnGeprueft,
+  wortGeklaert,
   sinnWortart,
   varianteVerschieben,
   sinneZuordnen,
@@ -618,6 +619,7 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   ))
   // App „Mehrdeutig" (21.10.2026): Wörter aller Bücher klären – lesen und ändern nur Admins
   handle('medien:mehrdeutig-liste', (o: Parameters<typeof mehrdeutigListe>[0]) => (nurAdmin('Die Bedeutungen'), mehrdeutigListe(o && typeof o === 'object' ? o : {})))
+  handle('medien:wort-geklaert', (schluessel: string, an: boolean) => (nurAdmin('Die Bedeutungen'), wortGeklaert(String(schluessel), an !== false)))
   handle('medien:sinn-geprueft', (schluessel: string, id: string, an: boolean) => (
     nurAdmin('Die Beispielbilder'), sinnGeprueft(String(schluessel), String(id), an !== false)
   ))

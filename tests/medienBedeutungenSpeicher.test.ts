@@ -186,6 +186,14 @@ describe('App „Mehrdeutig"', () => {
     m.sinnGeprueft(bear.schluessel, bear.bedeutungen[0].id, false)
     neu()
     expect(m.mehrdeutigListe({ filter: 'geprueft' }).zeilen).toEqual([])
+    // „Wort geklärt" (21.10.2026): von Hand abgehakt – raus aus dem Klärungsbedarf, auch mit ungeprüfter Bedeutung
+    m.wortGeklaert(bear.schluessel)
+    neu()
+    expect(m.mehrdeutigListe({}).zeilen.map((z) => z.lemma)).not.toContain('bear')
+    expect(m.mehrdeutigListe({ filter: 'geprueft' }).zeilen.map((z) => z.lemma)).toEqual(['bear'])
+    m.wortGeklaert(bear.schluessel, false)
+    neu()
+    expect(m.mehrdeutigListe({}).zeilen.map((z) => z.lemma)).toContain('bear')
   })
   it('Wortart ändern, Bezeichnung ändern, Übersetzung in eine neue Bedeutung verschieben', () => {
     const pen = m.mehrdeutigListe({}).zeilen.find((z) => z.lemma === 'pen')!

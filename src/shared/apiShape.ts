@@ -531,6 +531,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
         call<{ zeilen: MehrdeutigZeile[]; gesamt: number; sprachen: string[]; klaerung: number }>('medien:mehrdeutig-liste', o),
       /** „Bild passt": Bedeutung und Bild geprüft (`an` = false nimmt es zurück) */
       sinnGeprueft: (schluessel: string, id: string, an = true) => call<void>('medien:sinn-geprueft', schluessel, id, an),
+      /** „Wort geklärt": von Hand abgehakt, fällt aus dem Klärungsbedarf (`an` = false nimmt es zurück) */
+      wortGeklaert: (schluessel: string, an = true) => call<void>('medien:wort-geklaert', schluessel, an),
       sinnWortart: (schluessel: string, id: string, wortart: Wortart) => call<void>('medien:sinn-wortart', schluessel, id, wortart),
       sinnBezeichnung: (schluessel: string, id: string, deutsch: string) => call<void>('medien:sinn-bezeichnung', schluessel, id, deutsch),
       /** Eine Übersetzung einer anderen Bedeutung zuordnen bzw. einer neuen ('neu', dann mit Wortart); liefert deren Kennung */
