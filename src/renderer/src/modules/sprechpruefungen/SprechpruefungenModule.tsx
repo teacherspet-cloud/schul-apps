@@ -63,6 +63,7 @@ import { BandCover } from '../../shared/components/BandCover'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { FachPunkt } from '../../shared/components/FachFarbe'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
+import { useDokumentOeffner } from '../../shared/navigation'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
 import { drucken, pruefungsSetHtml } from './pruefungsset'
@@ -124,13 +125,35 @@ function useEntwuerfe(): Entwurf[] {
 }
 
 const bildUrl = (datei: string): string => `/server/sprech-bank/bild/${datei}`
+
+/**
+ * Ziel für „Öffnen" in der Auftragsleiste (21.10.2026, Befund der Lehrkraft: „Öffnen" bei einem Sprechkarten-Bild öffnete
+ * weder das Bild noch die Karte): Sprache und Jahrgang, bei Bildern dazu die Karte – sie öffnet sich dann im Fenster.
+ */
+interface SprechZiel {
+  sprache: string
+  jahrgang: number
+  karteId?: string
+}
+export const sprechZiel = (z: SprechZiel): string => `sp:${encodeURIComponent(JSON.stringify(z))}`
+export function sprechZielAus(docId: string): SprechZiel | null {
+  if (!docId?.startsWith('sp:')) return null
+  try {
+    const z = JSON.parse(decodeURIComponent(docId.slice(3))) as Partial<SprechZiel>
+    return typeof z.sprache === 'string' && typeof z.jahrgang === 'number'
+      ? { sprache: z.sprache, jahrgang: z.jahrgang, ...(typeof z.karteId === 'string' && z.karteId ? { karteId: z.karteId } : {}) }
+      : null
+  } catch {
+    return null
+  }
+}
 const titelVon = (k: SprechKarte): string => (k.art === 'interview' ? k.thema : k.titel)
 
 /** Bild zur Karte erzeugen und am Server ablegen (im Hintergrund) */
 function bildErzeugen(p: PoolKarte, prompt: string, fertig: () => void): void {
   void starteAuftrag({
     moduleId: 'sprechpruefungen',
-    docId: 'sprechpruefungen',
+    docId: sprechZiel({ sprache: p.sprache, jahrgang: p.jahrgang, karteId: p.id }),
     titel: `Bild: ${titelVon(p.karte)}`,
     art: 'Sprechkarte-Bild',
     eingabe: { p, prompt },
@@ -569,7 +592,9 @@ function Jahrgang({
   pool,
   darfAlle,
   zurueck,
-  laden
+  laden,
+  zielKarte,
+  zielErledigt
 }: {
   fach: (typeof FAECHER)[number]
   jahrgang: number
@@ -577,6 +602,9 @@ function Jahrgang({
   darfAlle: boolean
   zurueck: () => void
   laden: () => void
+  /** Karte, die „Öffnen" in der Auftragsleiste zeigen soll (21.10.2026) */
+  zielKarte?: string | null
+  zielErledigt?: () => void
 }): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
   const niveau = zielNiveau(fach.sprache, jahrgang)
@@ -655,13 +683,21 @@ function Jahrgang({
   const entwuerfe = useEntwuerfe().filter((e) => e.sprache === fach.sprache && e.jahrgang === jahrgang)
   const [bearbeiten, setBearbeiten] = useState<{ p?: PoolKarte; e?: Entwurf } | null>(null)
   const [druck, setDruck] = useState(false)
+  // „Öffnen" aus der Auftragsleiste: die Karte (mit ihrem Bild) öffnen, sobald sie geladen ist
+  useEffect(() => {
+    const p = zielKarte ? pool.find((x) => x.id === zielKarte) : undefined
+    if (!p) return
+    if (p.eigene || darfAlle) setBearbeiten({ p })
+    else setAnsehen(p.karte)
+    zielErledigt?.()
+  }, [zielKarte, pool, darfAlle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rahmen: KartenRahmen = { sprache: fach.sprache, jahrgang, niveau, themen, buecher }
   const erstellen = (teil: (typeof TEILE)[number]): void => {
     const vorhanden = pool.filter((p) => p.teil === teil.id).map((p) => titelVon(p.karte))
     void starteAuftrag({
       moduleId: 'sprechpruefungen',
-      docId: 'sprechpruefungen',
+      docId: sprechZiel({ sprache: fach.sprache, jahrgang }),
       titel: `${teil.knopf.replace('+ ', '')} · ${fach.name} Jg ${jahrgang}`,
       art: 'Sprechkarten',
       eingabe: { teil: teil.id, anzahl: teil.anzahl, bandId: band?.id ?? null, unitName, abschnitt: abschnittName, stand, vorhanden },
@@ -713,7 +749,7 @@ function Jahrgang({
     for (const p of pool) titelJeTeil[p.teil]?.push(titelVon(p.karte))
     void starteAuftrag({
       moduleId: 'sprechpruefungen',
-      docId: 'sprechpruefungen',
+      docId: sprechZiel({ sprache: fach.sprache, jahrgang }),
       titel: `Ganzes Lehrwerk: ${band.name} · ${fach.name} Jg ${jahrgang}`,
       art: 'Sprechkarten',
       eingabe: { plan, bandId: band.id, bandName: band.name, titelJeTeil },
@@ -1190,6 +1226,15 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
   const programmFarbe = useProgrammFarbe()
   const [daten, setDaten] = useState<{ karten: PoolKarte[]; darfAlle: boolean } | null>(null)
   const [jahrgang, setJahrgang] = useState<number | null>(null)
+  const [zielKarte, setZielKarte] = useState<string | null>(null)
+  useDokumentOeffner('sprechpruefungen', async (docId) => {
+    const z = sprechZielAus(docId)
+    if (!z) return
+    const f = FAECHER.find((x) => x.sprache === z.sprache)
+    if (f) setFachId(f.id)
+    setJahrgang(z.jahrgang)
+    setZielKarte(z.karteId ?? null)
+  })
   const [buecher, setBuecher] = useState<TextbookMeta[]>([])
   const laden = useCallback(() => {
     void holen<{ karten: PoolKarte[]; darfAlle: boolean }>(`/server/sprech-bank?sprache=${fach.sprache}`).then(setDaten, (e: unknown) => (notifyError(e), setDaten({ karten: [], darfAlle: false })))
@@ -1227,7 +1272,16 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
       {!daten ? (
         <Loader />
       ) : jahrgang ? (
-        <Jahrgang fach={fach} jahrgang={jahrgang} pool={daten.karten.filter((k) => k.jahrgang === jahrgang)} darfAlle={daten.darfAlle} zurueck={() => setJahrgang(null)} laden={laden} />
+        <Jahrgang
+          fach={fach}
+          jahrgang={jahrgang}
+          pool={daten.karten.filter((k) => k.jahrgang === jahrgang)}
+          darfAlle={daten.darfAlle}
+          zurueck={() => setJahrgang(null)}
+          laden={laden}
+          zielKarte={zielKarte}
+          zielErledigt={() => setZielKarte(null)}
+        />
       ) : (
         <>
           <Alert variant="light" mb="md" p="xs">
