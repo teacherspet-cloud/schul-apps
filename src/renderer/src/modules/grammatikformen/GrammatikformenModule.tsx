@@ -1,6 +1,8 @@
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { BandCover } from '../../shared/components/BandCover'
-import { Button, Paper, Badge, Chip, Container, Group, Progress, ScrollArea, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { Button, Paper, Badge, Chip, Collapse, Container, Group, Progress, ScrollArea, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import { useOffenGemerkt } from '../../shared/sitzung'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { reiheTitel } from '@shared/lehrwerkReihe'
@@ -122,6 +124,21 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
     }
     return [...m.entries()]
   }, [liste])
+  /*
+   * Reihen auf- und zuklappbar (21.10.2026, Wunsch der Lehrkraft): aufgeklappt sind die Reihen, mit denen die Schule
+   * arbeitet (mindestens ein Band mit Grammatik – eingebaut oder in „Grammatikformen" bearbeitet), sonst die mit der
+   * neuesten Ausgabe. Was die Lehrkraft auf- oder zuklappt, gilt für die Sitzung.
+   */
+  const [aufZu, setAufZu] = useOffenGemerkt<Record<string, boolean>>(`grammatikformen-reihen-${sprache}`, {})
+  const vorgabeOffen = useMemo(() => {
+    const genutzt = reihen.filter(([, baende]) => baende.some((b) => punkteIn(b.name) > 0)).map(([r]) => r)
+    if (genutzt.length) return new Set(genutzt)
+    const jahr = (baende: TextbookMeta[]): number => Math.max(0, ...baende.map((b) => Number(/\d{4}/.exec(b.ausgabe ?? '')?.[0] ?? 0)))
+    const neueste = [...reihen].sort((a, b) => jahr(b[1]) - jahr(a[1]))[0]
+    return new Set(neueste ? [neueste[0]] : [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reihen, eintraege])
+  const reiheOffen = (r: string): boolean => aufZu[r] ?? vorgabeOffen.has(r)
 
   if (lehrplan)
     return (
@@ -204,35 +221,49 @@ export default function GrammatikformenModule({ active = true }: { active?: bool
             Für dieses Fach ist kein Lehrwerk hinterlegt – Lehrwerke kommen über „Vokabellisten“ dazu.
           </Text>
         )}
-        <Stack gap={36}>
+        <Stack gap={20}>
           {reihen.map(([reihe, baende]) => (
-            <section key={reihe} data-grammatikformen-reihe={reihe}>
-              <Title order={4} mb="sm">
-                {reihe}
-              </Title>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: 16,
-                  alignItems: 'end',
-                  paddingBottom: 10,
-                  borderBottom: '6px solid var(--mantine-color-default-border)',
-                  borderRadius: 2
-                }}
+            <section key={reihe} data-grammatikformen-reihe={reihe} data-offen={reiheOffen(reihe)}>
+              <UnstyledButton
+                onClick={() => setAufZu((alt) => ({ ...alt, [reihe]: !reiheOffen(reihe) }))}
+                aria-expanded={reiheOffen(reihe)}
+                aria-label={`${reihe} ${reiheOffen(reihe) ? 'zuklappen' : 'aufklappen'}`}
+                mb="sm"
+                data-grammatikformen-reihe-knopf
               >
-                {baende.map((b) => (
-                  <BandKachel
-                    key={b.id}
-                    buch={b}
-                    farbe={farbe}
-                    zahlen={bank.geladen ? bank.zahlen : null}
-                    stufen={schulStufen}
-                    bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)}
-                    onOpen={() => setOffen(b.id)}
-                  />
-                ))}
-              </div>
+                <Group gap={6} wrap="nowrap">
+                  {reiheOffen(reihe) ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
+                  <Title order={4}>{reihe}</Title>
+                  <Text size="sm" c="dimmed">
+                    {baende.length} {baende.length === 1 ? 'Band' : 'Bände'}
+                  </Text>
+                </Group>
+              </UnstyledButton>
+              <Collapse expanded={reiheOffen(reihe)}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: 16,
+                    alignItems: 'end',
+                    paddingBottom: 10,
+                    borderBottom: '6px solid var(--mantine-color-default-border)',
+                    borderRadius: 2
+                  }}
+                >
+                  {baende.map((b) => (
+                    <BandKachel
+                      key={b.id}
+                      buch={b}
+                      farbe={farbe}
+                      zahlen={bank.geladen ? bank.zahlen : null}
+                      stufen={schulStufen}
+                      bearbeitet={eintraege.some((e) => e.lehrwerkId === b.id)}
+                      onOpen={() => setOffen(b.id)}
+                    />
+                  ))}
+                </div>
+              </Collapse>
             </section>
           ))}
         </Stack>
