@@ -194,6 +194,12 @@ describe('App „Mehrdeutig"', () => {
     m.wortGeklaert(bear.schluessel, false)
     neu()
     expect(m.mehrdeutigListe({}).zeilen.map((z) => z.lemma)).toContain('bear')
+    // Alle auf einmal (21.10.2026, Wartung medien-alle-geklaert): kein Klärungsbedarf mehr, ein zweiter Lauf ändert nichts
+    expect(m.alleWoerterGeklaert()).toBeGreaterThan(0)
+    neu()
+    expect(m.mehrdeutigListe({}).zeilen).toEqual([])
+    expect(m.mehrdeutigListe({}).klaerung).toBe(0)
+    expect(m.alleWoerterGeklaert()).toBe(0)
   })
   it('Wortart ändern, Bezeichnung ändern, Übersetzung in eine neue Bedeutung verschieben', () => {
     const pen = m.mehrdeutigListe({}).zeilen.find((z) => z.lemma === 'pen')!

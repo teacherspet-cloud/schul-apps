@@ -12,7 +12,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { korpusAusOrdnern, sinneEinrichten } from '../main/services/storage/medienbank'
+import { alleWoerterGeklaert, korpusAusOrdnern, sinneEinrichten } from '../main/services/storage/medienbank'
 import type { KorpusWort } from '../shared/medienBedeutung'
 import { DATEN, RESSOURCEN } from './pfade'
 
@@ -42,3 +42,15 @@ export function medienBedeutungenWartung(): string {
 }
 
 export const MEDIEN_BEDEUTUNGEN: [string, (d: DatabaseSync) => string] = ['medien-bedeutungen-2026-10-21', () => medienBedeutungenWartung()]
+
+/** Alle Wörter mit Klärungsbedarf als geklärt abhaken (21.10.2026, Wunsch der Lehrkraft; App „Mehrdeutig" entfernt) */
+export const MEDIEN_ALLE_GEKLAERT: [string, (d: DatabaseSync) => string] = [
+  'medien-alle-geklaert-2026-10-21',
+  () => {
+    try {
+      return `${alleWoerterGeklaert()} Wörter als geklärt abgehakt (bedeutungen.json vorher gesichert)`
+    } catch (e) {
+      return `nichts geändert (${e instanceof Error ? e.name : 'Fehler'})`
+    }
+  }
+]

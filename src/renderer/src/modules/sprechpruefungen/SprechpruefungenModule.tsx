@@ -69,7 +69,7 @@ import { useDokumentOeffner } from '../../shared/navigation'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
 import { drucken, pruefungsSetHtml } from './pruefungsset'
-import { abschnittGruppen, blaettern, fuellPlan, GANZE_UNIT, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, wischRichtung, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
+import { abschnittGruppen, blaettern, fuellPlan, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, wischRichtung, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
 
 const FAECHER: { id: string; sprache: SprechSprache; name: string; ab: number }[] = [
   { id: 'englisch', sprache: 'en', name: 'Englisch', ab: 5 },
@@ -518,12 +518,12 @@ function KartenKachel({
   )
 }
 
-/** Offene Gruppen (21.10.2026) – auf diesem Gerät gemerkt */
+/** Offene Gruppen (21.10.2026) – nur für die Sitzung gemerkt; anfangs ist alles zugeklappt (Wunsch der Lehrkraft, 21.10.2026) */
 const OFFEN_SCHLUESSEL = 'sa-sprech-gruppen-offen'
 function useOffen(): [Record<string, boolean>, (k: string, v: boolean) => void] {
   const [o, setO] = useState<Record<string, boolean>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(OFFEN_SCHLUESSEL) ?? '{}') as Record<string, boolean>
+      return JSON.parse(sessionStorage.getItem(OFFEN_SCHLUESSEL) ?? '{}') as Record<string, boolean>
     } catch {
       return {}
     }
@@ -532,7 +532,7 @@ function useOffen(): [Record<string, boolean>, (k: string, v: boolean) => void] 
     setO((alt) => {
       const neu = { ...alt, [k]: v }
       try {
-        localStorage.setItem(OFFEN_SCHLUESSEL, JSON.stringify(neu))
+        sessionStorage.setItem(OFFEN_SCHLUESSEL, JSON.stringify(neu))
       } catch {
         /* ohne Speicher nur bis zum Neuladen */
       }
@@ -1088,10 +1088,6 @@ function Jahrgang({
           const eintraege = alle.filter((x) => (x.e ? x.e.teil : x.p.teil) === t.id)
           const sichtbar = eintraege.filter(passt)
           const gruppen: StandGruppe<SpaltenEintrag>[] = gruppiere(sichtbar, (x) => karteVon(x).stand, baende)
-          const standGruppen = gruppen.filter((g) => g.schluessel !== OHNE_STAND)
-          // Offen: die Gruppe des gewählten Stands, sonst die späteste – ohne Stände die Gruppe ohne Stand
-          const vorOffen = (standGruppen.find((g) => stand && g.schluessel === `${stand.band} › ${stand.unit}`) ?? standGruppen[standGruppen.length - 1] ?? gruppen[0])
-            ?.schluessel
           const offenSchluessel = (g: string): string => `${fach.sprache}|${jahrgang}|${t.id}|${g}`
           return (
             <Stack key={t.id} gap="xs" data-sprech-spalte={t.id}>
@@ -1137,19 +1133,17 @@ function Jahrgang({
                 </Tooltip>
               </Group>
               {gruppen.map((g) => {
-                const o = offen[offenSchluessel(g.schluessel)] ?? g.schluessel === vorOffen
+                const o = offen[offenSchluessel(g.schluessel)] ?? false
                 return (
                   <Gruppe key={g.schluessel} titel={g.titel} anzahl={g.eintraege.length} offen={o} umschalten={() => setOffen(offenSchluessel(g.schluessel), !o)}>
                     {g.schluessel === OHNE_STAND
                       ? g.eintraege.map(kachel)
                       : (() => {
-                          // Untergruppen je Abschnitt (21.10.2026): offen der Abschnitt des Stands, sonst der späteste
+                          // Untergruppen je Abschnitt (21.10.2026), anfangs zugeklappt wie die Gruppen
                           const unter = abschnittGruppen(g.eintraege, (x) => karteVon(x).stand, baende)
-                          const imStand = stand && g.schluessel === `${stand.band} › ${stand.unit}` ? unter.find((u) => u.schluessel === (stand.abschnitt ?? GANZE_UNIT)) : undefined
-                          const vor = (imStand ?? unter[unter.length - 1])?.schluessel
                           return unter.map((u) => {
                             const k = offenSchluessel(`${g.schluessel}|${u.schluessel}`)
-                            const uo = offen[k] ?? u.schluessel === vor
+                            const uo = offen[k] ?? false
                             return (
                               <Gruppe key={u.schluessel} klein titel={u.titel} anzahl={u.eintraege.length} offen={uo} umschalten={() => setOffen(k, !uo)}>
                                 {u.eintraege.map(kachel)}

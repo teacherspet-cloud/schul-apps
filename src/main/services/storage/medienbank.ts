@@ -1301,6 +1301,25 @@ export function wortGeklaert(schluessel: string, an = true): void {
   })
 }
 
+/**
+ * Alle Wörter mit Klärungsbedarf auf einmal als geklärt abhaken (21.10.2026, Wunsch der Lehrkraft; die App „Mehrdeutig"
+ * ist danach entfernt). bedeutungen.json wird vorher gesichert. Ergebnis: Zahl der abgehakten Wörter.
+ */
+export function alleWoerterGeklaert(sicherung = 'sicherung-geklaert-2026-10-21'): number {
+  const offen = mehrdeutigListe({ filter: 'klaerung' }, true).zeilen.map((z) => z.schluessel)
+  if (!offen.length) return 0
+  const sich = join(wurzelPfad(), sicherung)
+  const von = join(wurzelPfad(), 'bedeutungen.json')
+  if (!existsSync(sich)) mkdirSync(sich, { recursive: true })
+  if (existsSync(von) && !existsSync(join(sich, 'bedeutungen.json'))) copyFileSync(von, join(sich, 'bedeutungen.json'))
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  const jetzt = Date.now()
+  for (const s of offen) (d.eintraege[s] ??= { bedeutungen: [] }).vonHand = jetzt
+  sinnSchreiben(d)
+  return offen.length
+}
+
 export function sinnGeprueft(schluessel: string, id: string, an = true): void {
   sinnDateiAendern(schluessel, (e) => {
     const b = bedeutungVon(e, id)
@@ -1375,7 +1394,7 @@ export function mehrdeutigListe(o: {
   stufe?: Bildstufe
   seite?: number
   jeSeite?: number
-}): { zeilen: MehrdeutigZeile[]; gesamt: number; sprachen: string[]; klaerung: number } {
+}, alle = false): { zeilen: MehrdeutigZeile[]; gesamt: number; sprachen: string[]; klaerung: number } {
   const d = sinne()
   const stufe = istStufeWert(o.stufe) ? o.stufe : 's2'
   const jeSeite = Math.max(5, Math.min(100, Math.round(o.jeSeite ?? 30)))
@@ -1451,6 +1470,8 @@ export function mehrdeutigListe(o: {
   const sammler = new Intl.Collator('de', { sensitivity: 'base', numeric: true })
   zeilen.sort((a, b) => sammler.compare(a.lemma, b.lemma) || a.sprache.localeCompare(b.sprache))
   const seite = Math.max(0, Math.round(o.seite ?? 0))
+  // `alle`: jede Zeile, ohne Bilder (für „Alle geklärt")
+  if (alle) return { zeilen, gesamt: zeilen.length, sprachen, klaerung }
   const teil = zeilen.slice(seite * jeSeite, seite * jeSeite + jeSeite)
   // Bilder nur für die gezeigte Seite (als data-URL – die Exe hat keine Dateiadressen)
   for (const z of teil) {

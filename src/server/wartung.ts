@@ -28,7 +28,7 @@ import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
 import { VERBFORM_TON } from './wartungVerbformTon'
 import { MEDIEN_KANON } from './wartungMedienKanon'
-import { MEDIEN_BEDEUTUNGEN } from './wartungMedienBedeutungen'
+import { MEDIEN_ALLE_GEKLAERT, MEDIEN_BEDEUTUNGEN } from './wartungMedienBedeutungen'
 import { AUSZEICHNUNGEN_JAHRE } from './wartungAuszeichnungenJahre'
 
 /** Spiele mit 60 s Uhr, in denen Raten Punkte brachte – Bestwerte darüber gelten als unnatürlich */
@@ -166,6 +166,8 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   MEDIEN_KANON,
   // Bilder je Bedeutung und Wortart einrichten – nach den einheitlichen Schlüsseln, ohne KI, vorher gesichert (21.10.2026; wartungMedienBedeutungen.ts)
   MEDIEN_BEDEUTUNGEN,
+  // Alle Wörter mit Klärungsbedarf als geklärt abhaken – die App „Mehrdeutig“ ist entfernt (21.10.2026, Wunsch der Lehrkraft)
+  MEDIEN_ALLE_GEKLAERT,
   // Band je Vokabel-Abschnitt nachtragen (10.10.2026, mehrere Bände in einem Kurs; wartungVokabelBaende.ts)
   VOKABEL_BAENDE,
   // Medaillen der ersten Fassung als Reihe des Schuljahres 2026/27 (10.10.2026, Jahresreihen; wartungAuszeichnungenJahre.ts)

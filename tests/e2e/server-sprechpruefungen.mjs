@@ -21,6 +21,15 @@ const pruefe = (ok, text) => {
 const KOPF = { 'x-schulapps-token': 'server' }
 const KLASSE = `7p${Date.now() % 1000}`
 const TITEL = `Planning a school trip ${Date.now() % 1000}`
+// Gruppen und Untergruppen sind anfangs zugeklappt (21.10.2026): alle zugeklappten einer Spalte aufklappen
+const aufklappen = async (p, spalte) => {
+  for (let i = 0; i < 20; i++) {
+    const zu = p.locator(`[data-sprech-spalte="${spalte}"] button[aria-expanded="false"]`)
+    if (!(await zu.count())) return
+    await zu.first().click()
+    await p.waitForTimeout(150)
+  }
+}
 const da = (l, ms = 15000) =>
   l.waitFor({ timeout: ms }).then(
     () => true,
@@ -71,12 +80,16 @@ try {
   await dlg.getByLabel(/Punkte \/ Optionen/).fill('zoo\nmuseum\nbeach\nclimbing park')
   await dlg.getByLabel('Ziel').fill('Agree on one trip.')
   await dlg.locator('[data-sprechkarte-speichern]').click()
+  pruefe(await da(p.locator('[data-sprech-spalte="dialog"] [data-sprech-gruppe] button[aria-expanded="false"]').first()), 'Gruppen anfangs zugeklappt')
+  await aufklappen(p, 'dialog')
   pruefe(await da(p.locator('[data-sprech-spalte="dialog"] [data-sprechkarte="dialog"]', { hasText: TITEL })), 'Dialogkarte im Pool')
   // Interview-Set
   await p.locator('[data-sprech-spalte="interview"]').getByRole('button', { name: 'Von Hand' }).click()
   await p.getByRole('dialog').getByLabel('Thema').fill('Free time')
   await p.getByRole('dialog').getByLabel(/Fragen/).fill('What do you do after school?\nTell me about your hobby.\nWhy do you like it?\nWhat did you do last weekend?')
   await p.getByRole('dialog').locator('[data-sprechkarte-speichern]').click()
+  await p.locator('[data-sprech-spalte="interview"] [data-sprech-gruppe]').first().waitFor()
+  await aufklappen(p, 'interview')
   pruefe(await da(p.locator('[data-sprech-spalte="interview"] [data-sprechkarte="interview"]')), 'Interview-Set im Pool')
   await p.screenshot({ path: join(out, '2-jahrgang.png'), fullPage: true })
   // Blättern im Kartenfenster (21.10.2026): zweites Interview-Set, Pfeile, „x von 2", Taste →
@@ -84,6 +97,8 @@ try {
   await p.getByRole('dialog').getByLabel('Thema').fill('School life')
   await p.getByRole('dialog').getByLabel(/Fragen/).fill('What is your favourite subject?\nWhy?\nTell me about your teachers.\nWhat would you change?')
   await p.getByRole('dialog').locator('[data-sprechkarte-speichern]').click()
+  await p.waitForTimeout(400)
+  await aufklappen(p, 'interview')
   await p.locator('[data-sprech-spalte="interview"] [data-sprechkarte="interview"]', { hasText: 'Free time' }).locator('button').first().click()
   const pos = p.getByRole('dialog').locator('[data-sprech-position]')
   const vorher = (await da(pos)) ? await pos.textContent() : ''

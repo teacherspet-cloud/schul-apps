@@ -18,7 +18,6 @@ import UnterrichtsreiheModule from './unterrichtsreihe/UnterrichtsreiheModule'
 import VerwaltungModule from './verwaltung/VerwaltungModule'
 import GrammatikformenModule from './grammatikformen/GrammatikformenModule'
 import SprechpruefungenModule from './sprechpruefungen/SprechpruefungenModule'
-import MehrdeutigModule from './mehrdeutig/MehrdeutigModule'
 import { siehtLehrwerkApps } from '../shared/fachobleute'
 import { aufServer, serverIch } from '../shared/plattform'
 import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
@@ -309,26 +308,6 @@ export const modules: SchulModule[] = [
       ]
     : []),
   /*
-   * Mehrdeutig (21.10.2026, Wunsch der Lehrkraft): Wörter aller Bücher mit ihren Bedeutungen und Beispielbildern klären –
-   * nur für Admins (am PC ohne Server ist die eine Lehrkraft Admin), wie die übrigen Werkzeuge der Medienbank. Ohne eigenes
-   * Bild: das der Vokabellisten.
-   */
-  ...(!aufServer() || serverIch()?.rolle === 'admin'
-    ? [
-        {
-          id: 'mehrdeutig',
-          name: 'Mehrdeutig',
-          description: 'Wörter mit mehreren Bedeutungen klären: Verb oder kein Verb, welche Übersetzung zu welcher Bedeutung gehört und welches Beispielbild passt.',
-          icon: programmSymbol('vokabelliste', 'yellow'),
-          color: 'yellow',
-          illustration: illustration('mehrdeutig') ?? illustration('vokabelliste'),
-          leistenbild: leistenbild('mehrdeutig') ?? leistenbild('vokabelliste'),
-          faecher: SPRACH_FAECHER,
-          component: MehrdeutigModule
-        }
-      ]
-    : []),
-  /*
    * Schule & Daten – nur für Admins auf dem Server (09.10.2026, Entscheidung des Admins): Nutzer, KI-Zugänge, IServ,
    * Maskottchen, Server. Das Menü „Daten und Material" (bis dahin für Lehrkräfte die ganze App) entfällt: Freigaben der
    * Fachschaft stehen in der Bibliothek jeder App, Themenbereiche und Sicherung unter Einstellungen › Material.
@@ -370,5 +349,5 @@ export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'sprachenlernen'] },
   { id: 'planung', name: 'Planung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Tests', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'grammatikformen', 'mehrdeutig', 'sprechpruefungen', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Organisation', apps: ['elternbrief', 'vokabelliste', 'grammatikformen', 'sprechpruefungen', 'verwaltung'] }
 ]
