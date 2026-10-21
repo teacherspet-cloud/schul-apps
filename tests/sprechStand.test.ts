@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { karteBereinigt, standText } from '../src/shared/sprechen/karten'
 import {
   abschnittGruppen,
+  blaettern,
   buchAbschnitte,
   fuellPlan,
   gruppiere,
@@ -9,6 +10,7 @@ import {
   nurImBereich,
   spaetesteBis,
   standBis,
+  wischRichtung,
   zufallsSet
 } from '../src/renderer/src/modules/sprechpruefungen/stand'
 
@@ -149,5 +151,16 @@ describe('Lehrwerk-Stand der Sprechkarten', () => {
       ['Station 2', 'ad'],
       ['ganze Unit', 'b']
     ])
+  })
+  it('Blättern: Nachbarn und „3 von 12", ohne Umlauf; Wischen nur waagerecht ab der Schwelle', () => {
+    expect(blaettern(['a', 'b', 'c'], 'b')).toEqual({ nr: 2, von: 3, zurueck: 'a', weiter: 'c' })
+    expect(blaettern(['a', 'b', 'c'], 'a')).toEqual({ nr: 1, von: 3, zurueck: null, weiter: 'b' })
+    expect(blaettern(['a', 'b', 'c'], 'c').weiter).toBeNull()
+    expect(blaettern(['a'], 'x')).toEqual({ nr: 0, von: 1, zurueck: null, weiter: null })
+    expect(wischRichtung(-80, 10)).toBe('weiter')
+    expect(wischRichtung(90, -20)).toBe('zurueck')
+    expect(wischRichtung(40, 0)).toBeNull()
+    // Senkrechtes Scrollen mit etwas Seitwärtsbewegung blättert nicht
+    expect(wischRichtung(70, 60)).toBeNull()
   })
 })

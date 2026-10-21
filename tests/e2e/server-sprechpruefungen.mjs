@@ -79,6 +79,22 @@ try {
   await p.getByRole('dialog').locator('[data-sprechkarte-speichern]').click()
   pruefe(await da(p.locator('[data-sprech-spalte="interview"] [data-sprechkarte="interview"]')), 'Interview-Set im Pool')
   await p.screenshot({ path: join(out, '2-jahrgang.png'), fullPage: true })
+  // Blättern im Kartenfenster (21.10.2026): zweites Interview-Set, Pfeile, „x von 2", Taste →
+  await p.locator('[data-sprech-spalte="interview"]').getByRole('button', { name: 'Von Hand' }).click()
+  await p.getByRole('dialog').getByLabel('Thema').fill('School life')
+  await p.getByRole('dialog').getByLabel(/Fragen/).fill('What is your favourite subject?\nWhy?\nTell me about your teachers.\nWhat would you change?')
+  await p.getByRole('dialog').locator('[data-sprechkarte-speichern]').click()
+  await p.locator('[data-sprech-spalte="interview"] [data-sprechkarte="interview"]', { hasText: 'Free time' }).locator('button').first().click()
+  const pos = p.getByRole('dialog').locator('[data-sprech-position]')
+  const vorher = (await da(pos)) ? await pos.textContent() : ''
+  pruefe(/^[12] von 2$/.test(vorher ?? ''), `Kartenfenster: Position „${vorher}"`)
+  await p.screenshot({ path: join(out, '2b-blaettern.png') })
+  await pos.click()
+  await p.keyboard.press(vorher?.startsWith('1') ? 'ArrowRight' : 'ArrowLeft')
+  await p.waitForTimeout(400)
+  const nachher = await p.getByRole('dialog').locator('[data-sprech-position]').textContent()
+  pruefe(nachher !== vorher && /von 2$/.test(nachher ?? ''), `Taste blättert zur Nachbarkarte („${nachher}")`)
+  await p.keyboard.press('Escape')
   // Druckdialog
   await p.locator('[data-pruefungsset-knopf]').click()
   pruefe(await da(p.locator('[data-pruefungsset-drucken]')), 'Druckdialog für ein Prüfungsset')

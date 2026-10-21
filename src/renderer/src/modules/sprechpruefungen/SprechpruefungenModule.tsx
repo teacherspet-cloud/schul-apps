@@ -9,6 +9,7 @@
  * Grundlage wählbar: Lehrwerk bis Unit (Wortschatz, Grammatik) oder „wie eine Klasse" – dazu die Lehrplan-Themen.
  */
 import {
+  ActionIcon,
   Alert,
   Anchor,
   Badge,
@@ -36,6 +37,7 @@ import {
 import {
   IconArrowLeft,
   IconChevronDown,
+  IconChevronLeft,
   IconChevronRight,
   IconFilter,
   IconMicrophone,
@@ -67,7 +69,7 @@ import { useDokumentOeffner } from '../../shared/navigation'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
 import { drucken, pruefungsSetHtml } from './pruefungsset'
-import { abschnittGruppen, fuellPlan, GANZE_UNIT, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
+import { abschnittGruppen, blaettern, fuellPlan, GANZE_UNIT, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, wischRichtung, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
 
 const FAECHER: { id: string; sprache: SprechSprache; name: string; ab: number }[] = [
   { id: 'englisch', sprache: 'en', name: 'Englisch', ab: 5 },
@@ -179,6 +181,61 @@ function bildErzeugen(p: PoolKarte, prompt: string, fertig: () => void): void {
   })
 }
 
+/** Blättern im Kartenfenster (21.10.2026): Pfeile, „3 von 12", Tasten ←/→ und Wischen */
+interface Blaettern {
+  nr: number
+  von: number
+  zurueck?: () => void
+  weiter?: () => void
+}
+
+/** Tasten ←/→ (nicht beim Schreiben in Feldern) und Wischen auf Tablet/Handy – liefert die Touch-Handler fürs Fenster */
+function useBlaettern(b: Blaettern | undefined): { onTouchStart: (e: React.TouchEvent) => void; onTouchEnd: (e: React.TouchEvent) => void } {
+  useEffect(() => {
+    if (!b) return
+    const taste = (e: KeyboardEvent): void => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
+      const ziel = e.target as HTMLElement | null
+      if (ziel?.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      const f = e.key === 'ArrowLeft' ? b.zurueck : e.key === 'ArrowRight' ? b.weiter : undefined
+      if (!f) return
+      e.preventDefault()
+      f()
+    }
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, [b])
+  const [start, setStart] = useState<{ x: number; y: number } | null>(null)
+  return {
+    onTouchStart: (e) => setStart(e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null),
+    onTouchEnd: (e) => {
+      const t = e.changedTouches[0]
+      if (!b || !start || !t) return
+      const r = wischRichtung(t.clientX - start.x, t.clientY - start.y)
+      setStart(null)
+      if (r === 'weiter') b.weiter?.()
+      else if (r === 'zurueck') b.zurueck?.()
+    }
+  }
+}
+
+function BlaetterLeiste({ b }: { b?: Blaettern }): React.JSX.Element | null {
+  if (!b || b.von < 2) return null
+  return (
+    <Group gap="xs" justify="center" data-sprech-blaettern>
+      <ActionIcon variant="light" onClick={b.zurueck} disabled={!b.zurueck} aria-label="Vorherige Karte" data-sprech-zurueck>
+        <IconChevronLeft size={16} />
+      </ActionIcon>
+      <Text size="sm" c="dimmed" data-sprech-position>
+        {b.nr} von {b.von}
+      </Text>
+      <ActionIcon variant="light" onClick={b.weiter} disabled={!b.weiter} aria-label="Nächste Karte" data-sprech-weiter>
+        <IconChevronRight size={16} />
+      </ActionIcon>
+    </Group>
+  )
+}
+
 /** Lehrwerk-Stand einer Karte (21.10.2026) – ältere Karten ohne Angabe */
 function StandZeile({ stand }: { stand?: SprechStand }): React.JSX.Element {
   return (
@@ -193,6 +250,8 @@ function KartenEditor({
   aktuell,
   amServer,
   neuesBild,
+  blaettern: b,
+  zwischenspeichern,
   schliessen,
   speichern
 }: {
@@ -203,6 +262,10 @@ function KartenEditor({
   amServer?: SprechKarte
   /** Bild neu erzeugen (nur gespeicherte Bildkarten), mit optionalem Zusatzwunsch */
   neuesBild?: (wunsch: string) => void
+  /** Nachbarkarten der Spalte (21.10.2026) */
+  blaettern?: Blaettern
+  /** Beim Blättern mit Änderungen: automatisch speichern (wie beim Wechsel der Reihe), ohne das Fenster zu schließen */
+  zwischenspeichern?: (k: SprechKarte) => void
   schliessen: () => void
   speichern: (k: SprechKarte) => void
 }): React.JSX.Element {
@@ -212,11 +275,21 @@ function KartenEditor({
   const [wunsch, setWunsch] = useState('')
   const [zeichnet, setZeichnet] = useState(false)
   const x: SprechKarte = x0.art === 'monolog' ? versionenZusammenfuehren(x0, amServer?.art === 'monolog' ? amServer : undefined, geloescht) : x0
+  const geaendert = JSON.stringify(x0) !== JSON.stringify(k) || geloescht.length > 0
+  const mitSpeichern = (f?: () => void): (() => void) | undefined =>
+    f &&
+    (() => {
+      if (geaendert) zwischenspeichern?.(x)
+      f()
+    })
+  const nav: Blaettern | undefined = b && { ...b, zurueck: mitSpeichern(b.zurueck), weiter: mitSpeichern(b.weiter) }
+  const wisch = useBlaettern(nav)
   const zeilen = (l: string[]): string => l.join('\n')
   const aus = (s: string): string[] => s.split('\n').map((z) => z.trim()).filter(Boolean)
   return (
     <Modal opened onClose={schliessen} title="Karte bearbeiten" size="lg">
-      <Stack gap="sm">
+      <Stack gap="sm" {...wisch}>
+        <BlaetterLeiste b={nav} />
         <Group gap="xs">
           <StandZeile stand={x.stand} />
           {aktuell && standText(aktuell) !== standText(x.stand) && (
@@ -341,7 +414,8 @@ function KartenEditor({
  * Ansehen ohne Bearbeiten (21.10.2026, Wunsch der Lehrkraft): Karten ohne Bearbeitungsrecht öffnen sich mit Bild,
  * Titel, Beschreibung und Fragen – wie das Bearbeiten-Fenster, nur ohne Eingabefelder
  */
-function KartenAnsicht({ k, schliessen }: { k: SprechKarte; schliessen: () => void }): React.JSX.Element {
+function KartenAnsicht({ k, blaettern: b, schliessen }: { k: SprechKarte; blaettern?: Blaettern; schliessen: () => void }): React.JSX.Element {
+  const wisch = useBlaettern(b)
   const feld = (titel: string, inhalt: React.ReactNode): React.JSX.Element => (
     <div>
       <Text size="sm" fw={600}>
@@ -362,7 +436,8 @@ function KartenAnsicht({ k, schliessen }: { k: SprechKarte; schliessen: () => vo
   )
   return (
     <Modal opened onClose={schliessen} title={titelVon(k)} size="lg" data-sprechkarte-ansicht>
-      <Stack gap="sm">
+      <Stack gap="sm" {...wisch}>
+        <BlaetterLeiste b={b} />
         <StandZeile stand={k.stand} />
         {k.art === 'interview' && feld('Fragen', punkte(k.fragen))}
         {k.art === 'monolog' && (
@@ -631,7 +706,7 @@ function Jahrgang({
   const abschnittName = abschnitt && abschnitte.includes(abschnitt) ? abschnitt : null
   // Stand, der an neuen Karten gespeichert wird – sichtbar an jeder Karte und Grundlage der Sortierung
   const stand: SprechStand | undefined = band && unitName ? { band: band.name, unit: unitName, ...(abschnittName ? { abschnitt: abschnittName } : {}) } : undefined
-  const [ansehen, setAnsehen] = useState<SprechKarte | null>(null)
+  const [ansehen, setAnsehen] = useState<PoolKarte | null>(null)
   // Weitere Filter (21.10.2026): Suche über alle Spalten, eigene Karten, Bildkarten ohne Bild, Entwürfe
   const [suche, setSuche] = useState('')
   const [nurEigene, setNurEigene] = useState(false)
@@ -695,7 +770,7 @@ function Jahrgang({
     const p = zielKarte ? pool.find((x) => x.id === zielKarte) : undefined
     if (!p) return
     if (p.eigene || darfAlle) setBearbeiten({ p })
-    else setAnsehen(p.karte)
+    else setAnsehen(p)
     zielErledigt?.()
   }, [zielKarte, pool, darfAlle]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -855,7 +930,7 @@ function Jahrgang({
         nurAbschnitt
         key={p.id}
         k={p.karte}
-        onClick={() => (p.eigene || darfAlle ? setBearbeiten({ p }) : setAnsehen(p.karte))}
+        onClick={() => (p.eigene || darfAlle ? setBearbeiten({ p }) : setAnsehen(p))}
         aktionen={
           p.eigene || darfAlle ? (
             <>
@@ -872,6 +947,36 @@ function Jahrgang({
     )
   }
   const alle: SpaltenEintrag[] = [...entwuerfe.map((e) => ({ e })), ...pool.map((p) => ({ p }))]
+  /*
+   * Blättern (21.10.2026): Reihenfolge wie in der Spalte sichtbar – gefiltert, Band › Unit › Abschnitt, auch Karten in
+   * zugeklappten Gruppen; Entwürfe blättern unter Entwürfen, Karten unter Karten
+   */
+  const schluesselVon = (x: SpaltenEintrag): string => (x.e ? `e:${x.e.schluessel}` : `p:${x.p.id}`)
+  const reihenfolge = (teil: KartenTeil): SpaltenEintrag[] =>
+    gruppiere(
+      alle.filter((x) => (x.e ? x.e.teil : x.p.teil) === teil && passt(x)),
+      (x) => karteVon(x).stand,
+      baende
+    ).flatMap((g) => (g.schluessel === OHNE_STAND ? g.eintraege : abschnittGruppen(g.eintraege, (x) => karteVon(x).stand, baende).flatMap((u) => u.eintraege)))
+  const oeffne = (x: SpaltenEintrag): void => {
+    if (x.e) return (setAnsehen(null), setBearbeiten({ e: x.e }))
+    if (x.p.eigene || darfAlle) return (setAnsehen(null), setBearbeiten({ p: x.p }))
+    setBearbeiten(null)
+    setAnsehen(x.p)
+  }
+  const blaetternFuer = (x: SpaltenEintrag | undefined): Blaettern | undefined => {
+    if (!x) return undefined
+    const l = reihenfolge(x.e ? x.e.teil : x.p.teil).filter((y) => Boolean(y.e) === Boolean(x.e))
+    const b = blaettern(l.map(schluesselVon), schluesselVon(x))
+    const ziel = (s: string | null): (() => void) | undefined => {
+      const y = s ? l.find((z) => schluesselVon(z) === s) : undefined
+      return y && (() => oeffne(y))
+    }
+    return b.nr ? { nr: b.nr, von: b.von, zurueck: ziel(b.zurueck), weiter: ziel(b.weiter) } : undefined
+  }
+  // Entwurf beim Blättern nur hier ändern – er bleibt Entwurf, gespeichert wird weiter erst nach Durchsicht
+  const entwurfAendern = (schluessel: string, karte: SprechKarte): void =>
+    speichereEntwuerfe(ladeEntwuerfe().map((x) => (x.schluessel === schluessel ? { ...x, karte: { ...x.karte, ...karte } } : x)))
   const gesamt = alle.length
   const gezeigt = alle.filter(passt).length
   const fuerStand = standText(stand) ? `Neue Karten: ${standText(stand)}` : 'Neue Karten ohne Lehrwerk-Stand'
@@ -1066,7 +1171,13 @@ function Jahrgang({
       </SimpleGrid>
       {bearbeiten && (
         <KartenEditor
+          key={bearbeiten.e ? `e:${bearbeiten.e.schluessel}` : `p:${bearbeiten.p?.id ?? 'neu'}`}
           k={(bearbeiten.p?.karte ?? bearbeiten.e!.karte) as SprechKarte}
+          blaettern={blaetternFuer(bearbeiten.e ? { e: bearbeiten.e } : bearbeiten.p?.id ? { p: bearbeiten.p } : undefined)}
+          zwischenspeichern={(k) => {
+            if (bearbeiten.e) entwurfAendern(bearbeiten.e.schluessel, k)
+            else if (bearbeiten.p?.id) void speichern(bearbeiten.p.teil, k, bearbeiten.p.id)
+          }}
           aktuell={stand}
           amServer={pool.find((p) => p.id === bearbeiten.p?.id)?.karte}
           neuesBild={
@@ -1089,7 +1200,7 @@ function Jahrgang({
           }}
         />
       )}
-      {ansehen && <KartenAnsicht k={ansehen} schliessen={() => setAnsehen(null)} />}
+      {ansehen && <KartenAnsicht key={ansehen.id} k={ansehen.karte} blaettern={blaetternFuer({ p: ansehen })} schliessen={() => setAnsehen(null)} />}
       {fuellenFrage && band && (
         <Modal opened onClose={() => setFuellenFrage(false)} title={`Ganzes Lehrwerk füllen – ${band.name}`} data-sprech-fuellen-frage>
           <Stack gap="sm">

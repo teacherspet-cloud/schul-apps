@@ -153,3 +153,19 @@ export function abschnittGruppen<T>(l: T[], stand: (x: T) => SprechStand | undef
   }
   return aus
 }
+
+/**
+ * Blättern im Kartenfenster (21.10.2026): Nachbar in der sichtbaren Reihenfolge der Spalte und „3 von 12" – am Anfang
+ * und Ende kein Nachbar (kein Umlauf)
+ */
+export function blaettern(ids: string[], id: string): { nr: number; von: number; zurueck: string | null; weiter: string | null } {
+  const i = ids.indexOf(id)
+  if (i < 0) return { nr: 0, von: ids.length, zurueck: null, weiter: null }
+  return { nr: i + 1, von: ids.length, zurueck: ids[i - 1] ?? null, weiter: ids[i + 1] ?? null }
+}
+
+/** Wischgeste auswerten: waagerecht ab `schwelle` px und deutlich mehr als senkrecht – sonst Blättern/Scrollen nicht */
+export function wischRichtung(dx: number, dy: number, schwelle = 60): 'zurueck' | 'weiter' | null {
+  if (Math.abs(dx) < schwelle || Math.abs(dx) < 2 * Math.abs(dy)) return null
+  return dx < 0 ? 'weiter' : 'zurueck'
+}
