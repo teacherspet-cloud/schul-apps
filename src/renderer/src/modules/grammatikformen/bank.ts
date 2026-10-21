@@ -28,7 +28,7 @@ import {
   type Uebung
 } from '@shared/grammatikBank'
 import { aufgabeVorschau } from '../lernen/kurs/AufgabenEditor'
-import { erzeugeBankAufgaben, type BankAuftrag } from '../lernen/grammatikBankErzeugen'
+import { erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
 
 export const bankZahlenLaden = (sprache: string): Promise<{ zahlen: BankZahlen; darf: boolean }> =>
   holen<{ zahlen: BankZahlen; darf: boolean }>(`/server/grammatik-bank?sprache=${encodeURIComponent(sprache)}`)
@@ -158,17 +158,46 @@ export function fehlendeUebungen(zahl: BankZahlen[string] | undefined, entwurf?:
 }
 
 /**
- * Felder (Schlüssel × Stufe), an denen gerade ein Auftrag schreibt (13.10.2026, Befund der Lehrkraft): „Unit gemischt"
- * steht bei jedem Grammatikpunkt der Unit – wer nacheinander mehrere Punkte ergänzen lässt, stellt dieselbe gemischte
- * Übung mehrfach in die Warteschlange. Ein späterer Schritt wartet auf den laufenden und prüft dann neu.
+ * Schlüssel, an denen gerade ein Durchgang liest, erzeugt und speichert (13.10.2026, Befund der Lehrkraft: „Unit gemischt"
+ * steht bei jedem Grammatikpunkt der Unit). Seit 21.10.2026 je Schlüssel statt je Stufe: Das direkte Speichern ersetzt
+ * den ganzen Schlüssel – zwei Stufen desselben Schlüssels gleichzeitig hätten sich das Gespeicherte überschrieben.
  */
-const inArbeit = new Map<string, Promise<unknown>>()
+const inArbeit = new Map<string, Promise<void>>()
+
+/** Schlüssel sperren: wartet sichtbar auf einen laufenden Durchgang; Prüfen und Setzen ohne Pause dazwischen */
+async function schluesselSperren(schluessel: string, k: AuftragsKontext, warte: () => void): Promise<() => void> {
+  for (let w = inArbeit.get(schluessel); w; w = inArbeit.get(schluessel)) {
+    warte()
+    // Als Warten melden: zählt nicht als Arbeitszeit der Restzeit (19.10.2026)
+    await k.pausiere('Wartet auf einen anderen Auftrag zu diesem Bereich', w)
+  }
+  let frei = (): void => undefined
+  inArbeit.set(schluessel, new Promise<void>((r) => (frei = r)))
+  return () => {
+    inArbeit.delete(schluessel)
+    frei()
+  }
+}
+
 /**
- * Grammatik-Aufträge nacheinander (13.10.2026, Befund der Lehrkraft: mehrere KI-Läufe gleichzeitig pausierten sich
- * gegenseitig „im Kreis", und jeder prüfte, bevor der andere gespeichert hatte): Ein neuer Auftrag wartet sichtbar auf
- * den vorherigen und prüft erst danach, was noch fehlt.
+ * Höchstens so viele Grammatik-Aufträge gleichzeitig (21.10.2026, Wunsch der Lehrkraft: „Ergänzen"-Aufträge nicht nur
+ * nacheinander). Bis dahin lief immer nur einer (13.10.2026: gleichzeitige Läufe prüften, bevor der andere gespeichert
+ * hatte – das verhindert jetzt die Sperre je Schlüssel). Drei wie die KI-Plätze (main/services/ai/kiPlaetze.ts), die
+ * die Anfragen reihum auf die Aufträge verteilen.
  */
-let kette: Promise<void> = Promise.resolve()
+export const GLEICHZEITIG = 3
+let laufend = 0
+const wartend: (() => void)[] = []
+async function platzNehmen(k: AuftragsKontext): Promise<() => void> {
+  if (laufend >= GLEICHZEITIG) await k.pausiere('Wartet, bis ein anderer Grammatik-Auftrag fertig ist', new Promise<void>((r) => wartend.push(r)))
+  else laufend++
+  return () => {
+    const naechster = wartend.shift()
+    // Der Platz geht direkt an den Nächsten über
+    if (naechster) naechster()
+    else laufend--
+  }
+}
 /** So viele Aufgaben je Übungsart mehr als fehlen (die Prüfung streicht im Schnitt etwa ein Viertel) */
 const PUFFER = 2
 /**
@@ -204,20 +233,23 @@ export function bankErzeugenStarten(auftraege: BankAuftragEingabe[], titel: stri
     sperrt: false,
     fehlerTitel: 'Aufgaben konnten nicht erzeugt werden',
     arbeit: async (liste, k) => {
-      const vorher = kette
-      let fertig = (): void => undefined
-      kette = new Promise<void>((r) => (fertig = r))
+      const frei = await platzNehmen(k)
       try {
-        await k.pausiere('Wartet auf den vorherigen Grammatik-Auftrag', vorher)
         return await bankSchritte(liste, k)
       } finally {
-        fertig()
+        frei()
       }
     },
     ablegen: async (n) => {
-      notifySuccess(direkt ? `${n} Aufgaben ergänzt und gespeichert.` : `${n} Aufgaben der KI liegen in „Grammatikformen“ zum Durchsehen bereit.`)
+      // Ohne Ertrag meldet bankSchritte den Grund (21.10.2026) – kein „0 Aufgaben ergänzt" als Erfolg
+      if (n) notifySuccess(direkt ? `${n} Aufgaben ergänzt und gespeichert.` : `${n} Aufgaben der KI liegen in „Grammatikformen“ zum Durchsehen bereit.`)
     },
-    abschluss: (n) => (direkt ? `${n} Aufgaben ergänzt und gespeichert` : `${n} Aufgaben fertig – in „Grammatikformen“ durchsehen und speichern`)
+    abschluss: (n) =>
+      !n
+        ? 'Keine neuen Aufgaben – der Grund steht im Hinweis'
+        : direkt
+        ? `${n} Aufgaben ergänzt und gespeichert`
+        : `${n} Aufgaben fertig – in „Grammatikformen“ durchsehen und speichern`
   })
   notifySuccess(
     direkt
@@ -248,6 +280,30 @@ export function bankFortschritt(p: { plan: number[]; i: number; imSchritt: numbe
   return { fertig: p.anfragen, gesamt: Math.max(p.anfragen + 1, Math.round(p.anfragen + hier + danach)) }
 }
 
+/** Zusammenfassung aller Durchgänge eines Auftrags: was die KI schrieb und warum davon etwas wegfiel */
+export interface BankSumme extends BankBericht {
+  /** Gab es schon (Bank oder Entwurf) bzw. verwarf der Server beim Speichern */
+  doppelt: number
+}
+export const leereBankSumme = (): BankSumme => ({ geprueft: 0, gestrichen: 0, zuLeicht: 0, gruende: [], zeitform: 0, doppelt: 0 })
+
+/**
+ * Warum nichts dazukam (21.10.2026, Befund der Lehrkraft: „Ergänzen" meldete 0 neue Aufgaben ohne Grund). Rein
+ * rechnend, für Tests; leer, wenn die KI gar nichts geschrieben hat.
+ */
+export function bankBerichtText(s: BankSumme): string {
+  if (!s.geprueft) return ''
+  const teile = [
+    s.gestrichen ? `${s.gestrichen} strich die Prüfung${s.zuLeicht ? ` (davon ${s.zuLeicht} als zu leicht für das Niveau)` : ''}` : '',
+    s.zeitform ? `${s.zeitform} brauchten eine Zeitform, die die Lerngruppe laut Lehrwerk noch nicht kennt` : '',
+    s.doppelt ? `${s.doppelt} gab es schon` : ''
+  ].filter(Boolean)
+  const gruende = s.gruende.slice(0, 3).map((g) => `„${g}“`)
+  return `Die KI schrieb ${s.geprueft} Aufgaben, keine kam dazu${teile.length ? `: ${teile.join(', ')}` : ''}.${
+    gruende.length ? ` Gründe u. a.: ${gruende.join('; ')}.` : ''
+  }`
+}
+
 /** Die Schritte eines Auftrags: je Schlüssel und Stufe neu prüfen, dann erzeugen und als Entwurf ablegen */
 async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Promise<number> {
   let n = 0
@@ -265,66 +321,82 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
   // Bricht die KI in einem Schritt ab, laufen die übrigen Schritte trotzdem (vorher endete der ganze Auftrag)
   let fehler: unknown = null
   let fehlerZahl = 0
+  const summe = leereBankSumme()
   for (const [i, a] of liste.entries()) {
     schritt = i
     imSchritt = 0
     melde(`${i + 1} von ${liste.length}: ${a.titel} …`)
-    const feld = `${a.schluessel}|${a.niveau ?? 'm'}`
-    // Schreibt ein anderer Auftrag gerade an diesem Feld, erst sein Ergebnis abwarten
-    for (let w = inArbeit.get(feld); w; w = inArbeit.get(feld)) {
-      melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen früheren Auftrag …`)
-      // Als Warten melden: zählt nicht als Arbeitszeit der Restzeit (19.10.2026)
-      await k.pausiere('Wartet auf einen früheren Auftrag', w.catch(() => undefined))
-    }
     // Bis zu RUNDEN Durchgänge (13.10.2026, Wunsch der Lehrkraft): Streicht die Prüfung zu viel, legt die KI gezielt nach
     let ohneErtrag = 0
+    // Streicht die Prüfung einen ganzen Durchgang als „zu leicht", legt die KI ohne diese Prüfung nach (21.10.2026)
+    let ohneLeicht = false
     for (let runde = 0; runde < RUNDEN; runde++) {
-      // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
-      const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
-      // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)? Beim direkten Ergänzen zählt
-      // nur die Bank – ein ungesehener Entwurf füllt kein Feld
-      const entwurf = a.direkt ? [] : ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
-      const st = a.niveau ?? 'm'
-      const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
-      const offen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
-      // Die am weitesten zurückliegenden Übungsarten zuerst
-      const uebungen = [...offen].sort((x, y) => zahl(x) - zahl(y)).slice(0, ARTEN_JE_ANFRAGE)
-      // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
-      // Stufe noch gar nichts da ist – Auffüllen geht über „Ergänzen" bzw. „Mit KI erzeugen" im eigenen Reiter
-      if (!uebungen.length || (runde === 0 && a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
-        if (runde === 0) {
-          // Übersprungen: fällt aus dem Plan, ohne das Verhältnis der übrigen zu verfälschen
-          plan[i] = 0
-          melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
-        }
-        break
-      }
-      if (runde > 0) melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
-      // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
-      const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
-      const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
-      const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da }, k.ai, (t) => melde(`${i + 1} von ${liste.length}: ${t}`)).then((r) => {
-        if (a.direkt) return direktSpeichern(a, r)
-        bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
-        return r
-      })
-      inArbeit.set(feld, lauf)
+      // Schreibt ein anderer Auftrag gerade an diesem Schlüssel, erst sein Ergebnis abwarten – danach neu prüfen
+      const frei = await schluesselSperren(a.schluessel, k, () =>
+        melde(`${i + 1} von ${liste.length}: ${a.titel} – wartet auf einen anderen Auftrag zu diesem Bereich …`)
+      )
       try {
-        const neu = (await lauf).aufgaben.length
-        n += neu
-        // Zweimal in Folge nichts Brauchbares: nicht endlos weiterfragen
-        ohneErtrag = neu ? 0 : ohneErtrag + 1
-        if (ohneErtrag >= 2) break
-      } catch (e) {
-        // Abbruch der KI (Zeitüberschreitung, Abo): diese Stufe beenden, mit der nächsten weitermachen
-        if (k.signal.aborted) throw e
-        fehler = e
-        fehlerZahl++
-        break
+        // Vorhandenes nicht wiederholen: aus der Bank lesen (die Liste der Sätze bleibt kurz)
+        const bank = (await bankLesen([a.schluessel]).catch(() => []))[0]?.aufgaben ?? []
+        // Neu prüfen: Was liegt inzwischen in Bank und Entwurf (auch aus früheren Schritten)? Beim direkten Ergänzen zählt
+        // nur die Bank – ein ungesehener Entwurf füllt kein Feld
+        const entwurf = a.direkt ? [] : ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
+        const st = a.niveau ?? 'm'
+        const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
+        const offen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+        // Die am weitesten zurückliegenden Übungsarten zuerst
+        const uebungen = [...offen].sort((x, y) => zahl(x) - zahl(y)).slice(0, ARTEN_JE_ANFRAGE)
+        // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
+        // Stufe noch gar nichts da ist – Auffüllen geht über „Ergänzen" bzw. „Mit KI erzeugen" im eigenen Reiter
+        if (!uebungen.length || (runde === 0 && a.nurWennLeer && UEBUNGEN.some((u) => zahl(u) > 0))) {
+          if (runde === 0) {
+            // Übersprungen: fällt aus dem Plan, ohne das Verhältnis der übrigen zu verfälschen
+            plan[i] = 0
+            melde(`${i + 1} von ${liste.length}: ${a.titel} – schon vorhanden, übersprungen`)
+          }
+          break
+        }
+        if (runde > 0) melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
+        // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
+        const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
+        const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
+        const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da, ohneLeichtPruefung: ohneLeicht }, k.ai, (t) =>
+          melde(`${i + 1} von ${liste.length}: ${t}`)
+        ).then((r) => {
+          if (a.direkt) return direktSpeichern(a, r)
+          bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
+          return { ...r, doppelt: 0 }
+        })
+        try {
+          const r = await lauf
+          const neu = r.aufgaben.length
+          n += neu
+          summe.geprueft += r.bericht.geprueft
+          summe.gestrichen += r.bericht.gestrichen
+          summe.zuLeicht += r.bericht.zuLeicht
+          summe.zeitform += r.bericht.zeitform
+          summe.doppelt += r.doppelt
+          for (const g of r.bericht.gruende) if (!summe.gruende.includes(g)) summe.gruende.push(g)
+          if (!neu && !ohneLeicht && r.bericht.zuLeicht && r.bericht.zuLeicht * 2 >= r.bericht.gestrichen) {
+            ohneLeicht = true
+            melde(`${i + 1} von ${liste.length}: ${a.titel} – die Prüfung fand alles zu leicht, die KI legt ohne diese Prüfung nach`)
+            continue
+          }
+          // Zweimal in Folge nichts Brauchbares: nicht endlos weiterfragen
+          ohneErtrag = neu ? 0 : ohneErtrag + 1
+          if (ohneErtrag >= 2) break
+        } catch (e) {
+          // Abbruch der KI (Zeitüberschreitung, Abo): diese Stufe beenden, mit der nächsten weitermachen
+          if (k.signal.aborted) throw e
+          fehler = e
+          fehlerZahl++
+          break
+        } finally {
+          anfragen++
+          imSchritt++
+        }
       } finally {
-        if (inArbeit.get(feld) === lauf) inArbeit.delete(feld)
-        anfragen++
-        imSchritt++
+        frei()
       }
     }
     if (plan[i]) {
@@ -333,6 +405,8 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
     }
   }
   if (fehler && !n) throw fehler
+  // Nichts dazu, obwohl die KI geschrieben hat: sagen, woran es lag (21.10.2026)
+  if (!n && summe.geprueft) notifyError(bankBerichtText(summe))
   if (fehler)
     notifyError(`Bei ${fehlerZahl} ${fehlerZahl === 1 ? 'Schritt' : 'Schritten'} brach die KI ab – das Übrige ist gespeichert. „Ergänzen" noch einmal drücken.`)
   return n
@@ -344,15 +418,15 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
  */
 async function direktSpeichern(
   a: BankAuftragEingabe,
-  r: { regel: BankRegel; aufgaben: BankAufgabe[] }
-): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[] }> {
+  r: { regel: BankRegel; aufgaben: BankAufgabe[]; bericht: BankBericht }
+): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[]; bericht: BankBericht; doppelt: number }> {
   const da = (await bankLesen([a.schluessel]))[0]
   const neu = ohneDoppelte(r.aufgaben, new Set((da?.aufgaben ?? []).map(aufgabeKern).filter(Boolean)))
   const gespeichert = await bankSpeichern(a.sprache, a.schluessel, da?.regel?.titel ? da.regel : r.regel, [...(da?.aufgaben ?? []), ...neu])
   window.dispatchEvent(new Event(BANK_EREIGNIS))
   // Was der Server wirklich aufgenommen hat (er sortiert Unbrauchbares aus)
   const dazu = Math.max(0, gespeichert.aufgaben - (da?.aufgaben.length ?? 0))
-  return { regel: r.regel, aufgaben: neu.slice(0, dazu) }
+  return { regel: r.regel, aufgaben: neu.slice(0, dazu), bericht: r.bericht, doppelt: r.aufgaben.length - Math.min(dazu, neu.length) }
 }
 
 /**

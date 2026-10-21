@@ -20,7 +20,7 @@ import {
   type Uebung
 } from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
-import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags } from './grammatikErzeugen'
+import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
 
 type Ai = <T>(req: StructuredRequest) => Promise<T>
@@ -62,6 +62,17 @@ export interface BankAuftrag {
   regel?: BankRegel
   /** Vorhandene Sätze (gekürzt) – nichts doppelt */
   vorhanden: string[]
+  /**
+   * Ohne „trivial für das GER-Niveau" prüfen (21.10.2026): Nachlegen, wenn die Prüfung einen ganzen Durchgang als zu
+   * leicht gestrichen hat – die übrige Prüfung (richtig, eindeutig) bleibt
+   */
+  ohneLeichtPruefung?: boolean
+}
+
+/** Bericht eines Durchgangs: Prüfung plus gestrichene Zeitformen */
+export interface BankBericht extends PruefBericht {
+  /** Wegen noch unbekannter Zeitformen gestrichen */
+  zeitform: number
 }
 
 const istLatein = (a: Pick<BankAuftrag, 'sprache' | 'fach'>): boolean => a.sprache === 'la' || /latein/i.test(a.fach)
@@ -76,7 +87,7 @@ export async function erzeugeBankAufgaben(
   a: BankAuftrag,
   ai: Ai,
   melde: (t: string) => void = () => undefined
-): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[] }> {
+): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[]; bericht: BankBericht }> {
   const latein = istLatein(a)
   const ger = await niveauDesAuftrags(a)
   const sprache = sperrSprache(a.sprache, a.fach)
@@ -156,6 +167,7 @@ export async function erzeugeBankAufgaben(
     a.titel,
     BANK_GRENZEN
   )
+  const bericht: BankBericht = { geprueft: 0, gestrichen: 0, zuLeicht: 0, gruende: [], zeitform: 0 }
   const geprueft = await gepruefterPool(
     start,
     { thema: a.titel, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang },
@@ -164,10 +176,13 @@ export async function erzeugeBankAufgaben(
     gesperrt,
     // „Trivial für das GER-Niveau" nicht bei grundlegend (13.10.2026, Befund am VPS: grundlegende Stufen blieben nach
     // „Ergänzen" leer) – dort sind leichte Aufgaben gewollt
-    latein || a.niveau === 'g' ? undefined : ger
+    latein || a.niveau === 'g' || a.ohneLeichtPruefung ? undefined : ger,
+    bericht
   )
   const ohne = ohneGesperrteZeitformen(geprueft, gesperrt)
+  bericht.zeitform = geprueft.aufgaben.length - ohne.aufgaben.length
   return {
+    bericht,
     regel,
     aufgaben: ohne.aufgaben.filter((x): x is BankAufgabe => istUebung(x.uebung)).map((x, i) => ({ ...x, id: neueKennung(i), niveau: a.niveau ?? 'm' }))
   }

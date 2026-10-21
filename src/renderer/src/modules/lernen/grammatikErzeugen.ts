@@ -405,6 +405,17 @@ Zielsprache: ${a.sprache}`
 const vorhandeneSaetze = (p: GrammatikPaket): string[] =>
   p.aufgaben.map((x) => (x.satz || x.form || (x.teile ?? []).join(' ')).slice(0, 120)).filter(Boolean)
 
+/**
+ * Was die Prüfung gestrichen hat (21.10.2026, Befund der Lehrkraft: „Ergänzen" meldete 0 neue Aufgaben, ohne zu sagen
+ * warum): Zahl der geprüften und gestrichenen Aufgaben, davon „zu leicht für das GER-Niveau", und einige Gründe.
+ */
+export interface PruefBericht {
+  geprueft: number
+  gestrichen: number
+  zuLeicht: number
+  gruende: string[]
+}
+
 /** 2. Schritt: Eine zweite Anfrage prüft jede Aufgabe (korrigiert Lösungen bzw. streicht) – auch für „+ Aufgaben" */
 export async function gepruefterPool(
   start: GrammatikPaket,
@@ -412,10 +423,12 @@ export async function gepruefterPool(
   ai: Ai,
   melde: (t: string) => void,
   gesperrt: SperrbareZeitform[] = [],
-  ger?: CefrLevel
+  ger?: CefrLevel,
+  bericht?: PruefBericht
 ): Promise<GrammatikPaket> {
   const latein = istLatein(a)
   let paket = start
+  if (bericht) bericht.geprueft += start.aufgaben.length
   melde(`Die KI prüft ${paket.aufgaben.length} Aufgaben …`)
   // 2. Prüfung: Korrekturen bzw. Streichungen je Aufgabe
   try {
@@ -426,6 +439,7 @@ export async function gepruefterPool(
         loesungen: string[]
         optionen: string[]
         fehlerWort: string
+        zuLeicht?: boolean
         lesarten?: string[][]
         zellen?: string[][]
         grund: string
@@ -442,7 +456,11 @@ export async function gepruefterPool(
               .map((z) => z.name)
               .join('; ')}.`
           : '',
-        ger ? `ok = false auch für Aufgaben, die für GER-Niveau ${ger} trivial sind (ohne die Regel lösbar, Ablenker offensichtlich falsch).` : '',
+        // Eine einfache Zielform ist nicht trivial (21.10.2026, Befund am Server: „Typische Zustandsverben" – die Prüfung
+        // strich alle Aufgaben der Stufe mittel, weil „I know" für B1 leicht aussieht)
+        ger
+          ? `ok = false auch für Aufgaben, die für GER-Niveau ${ger} trivial sind (ohne Kenntnis DIESER Regel lösbar, Ablenker offensichtlich falsch) – dann zuLeicht = true. Eine einfache Zielform macht eine Aufgabe NICHT trivial, wenn man die Regel braucht, um sie zu wählen (z. B. „I know" statt „I'm knowing").`
+          : '',
         latein
           ? 'LATEIN: Prüfe JEDE lateinische Form auf Richtigkeit (Endung, Stamm, Längen). Bestimmen: Sind ALLE Lesarten genannt (bei Einzelformen) bzw. genau die im Satz passende? lesarten = vollständige, korrigierte Liste – je Lesart GENAU ein Wert pro Merkmal, in der Reihenfolge und Schreibweise der Merkmale (z. B. ["1.", "Sg.", "Präs.", "Ind.", "Akt."], nicht "1. Sg."). Tabelle: Formen in [eckigen Klammern] sind vorgegeben, die übrigen füllen die Lernenden aus – das ist eine gültige Aufgabe; zellen = NUR die korrigierten Formen je Zeile (ohne Zeilennamen), eine Zelle je Spalte. Übersetzen: alle gleichwertigen deutschen Fassungen. Umformen/Lücke/Auswahl mit mehreren möglichen Lösungen, die nicht alle genannt sind, oder mit unklarem Ziel: ok = false.'
           : ''
@@ -473,6 +491,7 @@ export async function gepruefterPool(
             loesungen: A(S()),
             optionen: A(S()),
             fehlerWort: S(),
+            ...(ger ? { zuLeicht: { type: 'boolean' } } : {}),
             ...(latein ? { lesarten: A(A(S())), zellen: A(A(S())) } : {}),
             grund: S()
           })
@@ -486,7 +505,15 @@ export async function gepruefterPool(
         aufgaben: paket.aufgaben.flatMap((x, i) => {
           const u = nachNr.get(i + 1)
           if (!u) return [x]
-          if (!u.ok) return []
+          if (!u.ok) {
+            if (bericht) {
+              bericht.gestrichen++
+              if (u.zuLeicht) bericht.zuLeicht++
+              const grund = String(u.grund ?? '').trim()
+              if (grund && bericht.gruende.length < 20 && !bericht.gruende.includes(grund)) bericht.gruende.push(grund.slice(0, 160))
+            }
+            return []
+          }
           return [
             {
               ...x,
@@ -580,7 +607,7 @@ async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string
   const schema = O({
     aufgaben: A(
       O({
-        ...((aufgabeSchema(latein) as { properties: Record<string, Record<string, unknown>> }).properties),
+        ...(aufgabeSchema(latein) as { properties: Record<string, Record<string, unknown>> }).properties,
         art: { type: 'string', enum: arten.length ? arten : latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
         regelId: { type: 'string', enum: a.regeln.map((r) => r.id) }
       })
@@ -591,7 +618,9 @@ async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string
     system: [
       `Du ergänzt einen Aufgabenpool für eine Grammatik-Lern-App (${a.fach}, Klasse ${a.jahrgang}). Die Regelkarten stehen schon fest.`,
       'Jede Aufgabe muss für sich allein verständlich und EINDEUTIG lösbar sein; „regelId" nennt die Regelkarte, die sie übt.',
-      `Aufgaben: genau ${anzahl}${arten.length ? `, nur diese Arten: ${arten.map((x) => ART_NAME[x as AufgabenArt] ?? x).join(', ')} (möglichst gleichmäßig)` : ', gemischt'}. Alle Regeln abdecken.`,
+      `Aufgaben: genau ${anzahl}${
+        arten.length ? `, nur diese Arten: ${arten.map((x) => ART_NAME[x as AufgabenArt] ?? x).join(', ')} (möglichst gleichmäßig)` : ', gemischt'
+      }. Alle Regeln abdecken.`,
       `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel} – relativ zum Niveau der Lerngruppe.`,
       latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, a.schwierigkeit) : niveauRegel(a, ger, a.schwierigkeit),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
