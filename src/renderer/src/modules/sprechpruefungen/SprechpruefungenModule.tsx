@@ -67,7 +67,7 @@ import { useDokumentOeffner } from '../../shared/navigation'
 import { collectKnownVocab, grammatikStand } from '../../shared/knownVocab'
 import { useLehrplanVorschlaege } from '../../shared/lehrplanVorschlaege'
 import { drucken, pruefungsSetHtml } from './pruefungsset'
-import { fuellPlan, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
+import { abschnittGruppen, fuellPlan, GANZE_UNIT, gruppiere, nachStand, nurImBereich, OHNE_STAND, spaetesteBis, standBis, zufallsSet, type FuellSchritt, type StandGruppe } from './stand'
 
 const FAECHER: { id: string; sprache: SprechSprache; name: string; ab: number }[] = [
   { id: 'englisch', sprache: 'en', name: 'Englisch', ab: 5 },
@@ -404,7 +404,7 @@ function KartenKachel({
   onClick?: () => void
   aktionen?: React.ReactNode
   entwurf?: boolean
-  /** In der Gruppe Band › Unit nur den Abschnitt zeigen (21.10.2026) */
+  /** In der Untergruppe Band › Unit › Abschnitt: ohne Stand-Zeile (21.10.2026) */
   nurAbschnitt?: boolean
 }): React.JSX.Element {
   return (
@@ -424,15 +424,8 @@ function KartenKachel({
         <Text fw={700} size="sm" lineClamp={2}>
           {titelVon(k)}
         </Text>
-        {nurAbschnitt ? (
-          k.stand && (
-            <Text size="xs" c="dimmed" data-sprechkarte-stand>
-              {k.stand.abschnitt ?? 'ganze Unit'}
-            </Text>
-          )
-        ) : (
-          <StandZeile stand={k.stand} />
-        )}
+        {/* In der Untergruppe je Abschnitt steht der Stand schon im Kopf (21.10.2026) */}
+        {!nurAbschnitt && <StandZeile stand={k.stand} />}
         <Text size="xs" c="dimmed" lineClamp={2}>
           {k.art === 'interview'
             ? `${k.fragen.length} Fragen · ${k.fragen[0] ?? ''}`
@@ -473,15 +466,29 @@ function useOffen(): [Record<string, boolean>, (k: string, v: boolean) => void] 
   return [o, setze]
 }
 
-/** Auf- und zuklappbare Gruppe Band › Unit mit Anzahl (21.10.2026) */
-function Gruppe({ titel, anzahl, offen, umschalten, children }: { titel: string; anzahl: number; offen: boolean; umschalten: () => void; children: React.ReactNode }): React.JSX.Element {
+/** Auf- und zuklappbare Gruppe Band › Unit mit Anzahl (21.10.2026); `klein` = Untergruppe je Abschnitt, eingerückt */
+function Gruppe({
+  titel,
+  anzahl,
+  offen,
+  umschalten,
+  klein,
+  children
+}: {
+  titel: string
+  anzahl: number
+  offen: boolean
+  umschalten: () => void
+  klein?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
-    <div data-sprech-gruppe={titel}>
+    <div {...(klein ? { 'data-sprech-abschnittgruppe': titel, style: { paddingLeft: 12 } } : { 'data-sprech-gruppe': titel })}>
       <UnstyledButton onClick={umschalten} style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }} aria-expanded={offen}>
-        {offen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-        <Text size="sm" fw={700}>
+        {offen ? <IconChevronDown size={klein ? 12 : 14} /> : <IconChevronRight size={klein ? 12 : 14} />}
+        <Text size={klein ? 'xs' : 'sm'} fw={klein ? 600 : 700}>
           {titel}{' '}
-          <Text span c="dimmed" size="sm">
+          <Text span c="dimmed" size={klein ? 'xs' : 'sm'}>
             ({anzahl})
           </Text>
         </Text>
@@ -1028,7 +1035,23 @@ function Jahrgang({
                 const o = offen[offenSchluessel(g.schluessel)] ?? g.schluessel === vorOffen
                 return (
                   <Gruppe key={g.schluessel} titel={g.titel} anzahl={g.eintraege.length} offen={o} umschalten={() => setOffen(offenSchluessel(g.schluessel), !o)}>
-                    {g.eintraege.map(kachel)}
+                    {g.schluessel === OHNE_STAND
+                      ? g.eintraege.map(kachel)
+                      : (() => {
+                          // Untergruppen je Abschnitt (21.10.2026): offen der Abschnitt des Stands, sonst der späteste
+                          const unter = abschnittGruppen(g.eintraege, (x) => karteVon(x).stand, baende)
+                          const imStand = stand && g.schluessel === `${stand.band} › ${stand.unit}` ? unter.find((u) => u.schluessel === (stand.abschnitt ?? GANZE_UNIT)) : undefined
+                          const vor = (imStand ?? unter[unter.length - 1])?.schluessel
+                          return unter.map((u) => {
+                            const k = offenSchluessel(`${g.schluessel}|${u.schluessel}`)
+                            const uo = offen[k] ?? u.schluessel === vor
+                            return (
+                              <Gruppe key={u.schluessel} klein titel={u.titel} anzahl={u.eintraege.length} offen={uo} umschalten={() => setOffen(k, !uo)}>
+                                {u.eintraege.map(kachel)}
+                              </Gruppe>
+                            )
+                          })
+                        })()}
                   </Gruppe>
                 )
               })}

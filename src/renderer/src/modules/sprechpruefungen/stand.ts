@@ -135,3 +135,21 @@ export function zufallsSet<T extends { id: string; teil: string; stand?: SprechS
 export function nurImBereich<K extends string>(wahl: Record<K, string | null>, imBereich: (id: string) => boolean): Record<K, string | null> {
   return Object.fromEntries(Object.entries(wahl).map(([k, id]) => [k, typeof id === 'string' && imBereich(id) ? id : null])) as Record<K, string | null>
 }
+
+/** Untergruppe ohne Abschnitt (die ganze Unit) */
+export const GANZE_UNIT = 'ganze Unit'
+
+/**
+ * Untergruppen je Abschnitt innerhalb einer Gruppe Band › Unit (21.10.2026): in Buchfolge des Bands, „ganze Unit" zuletzt
+ * (wie in nachStand – eine ganze Unit gilt als ihr Ende)
+ */
+export function abschnittGruppen<T>(l: T[], stand: (x: T) => SprechStand | undefined, baende: Baende): StandGruppe<T>[] {
+  const aus: StandGruppe<T>[] = []
+  for (const x of [...l].sort((a, b) => nachStand(stand(a), stand(b), baende))) {
+    const s = stand(x)?.abschnitt ?? GANZE_UNIT
+    const g = aus.find((y) => y.schluessel === s)
+    if (g) g.eintraege.push(x)
+    else aus.push({ schluessel: s, titel: s, eintraege: [x] })
+  }
+  return aus
+}

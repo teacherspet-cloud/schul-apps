@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { karteBereinigt, standText } from '../src/shared/sprechen/karten'
 import {
+  abschnittGruppen,
   buchAbschnitte,
   fuellPlan,
   gruppiere,
@@ -134,5 +135,19 @@ describe('Lehrwerk-Stand der Sprechkarten', () => {
   it('Prüfungsset: Karten außerhalb eines enger gewordenen Bereichs fallen aus der Auswahl', () => {
     const imBereich = new Set(['i1', 'm1'])
     expect(nurImBereich({ i: 'i1', a: 'm1', b: 'm2', d: null }, (id) => imBereich.has(id))).toEqual({ i: 'i1', a: 'm1', b: null, d: null })
+  })
+  it('Untergruppen je Abschnitt in Buchfolge, „ganze Unit" zuletzt', () => {
+    const st = (abschnitt?: string) => ({ band: 'Green Line 3', unit: 'Unit 1', ...(abschnitt ? { abschnitt } : {}) })
+    const l = [
+      { id: 'a', stand: st('Station 2') },
+      { id: 'b', stand: st() },
+      { id: 'c', stand: st('Check-in') },
+      { id: 'd', stand: st('Station 2') }
+    ]
+    expect(abschnittGruppen(l, (x) => x.stand, BAENDE).map((g) => [g.titel, g.eintraege.map((x) => x.id).join('')])).toEqual([
+      ['Check-in', 'c'],
+      ['Station 2', 'ad'],
+      ['ganze Unit', 'b']
+    ])
   })
 })
