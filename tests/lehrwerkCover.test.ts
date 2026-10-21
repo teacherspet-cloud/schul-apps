@@ -12,7 +12,11 @@ describe('coverAusgabe', () => {
     expect(coverAusgabe(nds('4'))?.isbn).toBe('978-3-12-864040-2')
     expect(coverAusgabe(nds('5'))?.isbn).toBe('978-3-12-874050-8')
     expect(coverAusgabe(nds('6'))?.isbn).toBe('978-3-12-874060-7')
-    expect(coverAusgabe(nds('Transition'))?.isbn).toBe('978-3-12-834260-3')
+    // Transition (21.10.2026): der mitgelieferte Band ist die Bundesausgabe ab 2024, der Band der Ausgabe 2018 zeigt deren Cover
+    expect(coverAusgabe(nds('Transition'))?.isbn).toBe('978-3-12-834391-4')
+    expect(coverAusgabe({ name: 'Green Line Transition (Ausgabe 2018)', reihe: 'Green Line', band: 'Transition', ausgabe: 'ab 2018' })?.isbn).toBe(
+      '978-3-12-834260-3'
+    )
   })
 
   it('das Land des Bands geht dem der Lerngruppe vor', () => {

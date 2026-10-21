@@ -16,6 +16,7 @@
  *   https://www.klett.de/lehrwerk/green-line-ausgabe-bayern-ab-2017/produktuebersicht
  *   https://www.klett.de/lehrwerk/green-line-transition-ausgabe-ab-2018/produktuebersicht
  *   https://www.klett.de/lehrwerk/green-line-transition-ausgabe-bayern-ab-2023/produktuebersicht
+ *   https://www.klett.de/produkt/isbn/978-3-12-834391-4 (Transition Bundesausgabe ab 2024, geprüft 21.10.2026)
  *   https://www.klett.de/lehrwerk/green-line-oberstufe-ausgabe-ab-2021/produktuebersicht
  *   https://www.klett.de/lehrwerk/green-line-oberstufe-ausgabe-bayern-ab-2024/produktuebersicht
  * Alle Adressen am 09.10.2026 geprüft (HTTP 200, image/jpeg, ohne Referrer).
@@ -140,6 +141,10 @@ export const COVER_AUSGABEN: CoverAusgabe[] = [
   ]),
   // Transition (Klasse 10 G8 / 11 G9)
   ...gl('Transition Ausgabe ab 2018', 2018, OHNE_BY, true, [['Transition', '978-3-12-834260-3', 'ddcc8ddd/Cover_834260_Rahmen_2469_200.jpg']]),
+  // Bundesausgabe ab 2024 (21.10.2026): die Vokabeln des mitgelieferten Bands „Green Line Transition" sind aus ihr
+  ...gl('Transition Bundesausgabe ab 2024', 2024, OHNE_BY, true, [
+    ['Transition', '978-3-12-834391-4', 'f2fbb903c92e8c4191e41ba845c569ad77117e27ca25a10978469c5068d791f1/Cover_834390_2469_200.jpg']
+  ]),
   ...gl('Transition Ausgabe Bayern ab 2023', 2023, ['BY'], false, [['Transition', '978-3-12-834370-9', '1cc6aa26/Cover_834370_2469_200.jpg']]),
   // Oberstufe
   ...gl('Oberstufe Ausgabe ab 2021', 2021, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'], true, [

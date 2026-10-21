@@ -51,7 +51,8 @@ describe('Reihe und Band aus dem Namen', () => {
 
   it('die mitgelieferten Green-Line-Bände tragen Reihe, Ausgabe und Band', () => {
     const dir = join(__dirname, '..', 'resources', 'lehrwerke')
-    for (const f of readdirSync(dir).filter((x) => x.startsWith('green-line'))) {
+    // Transition Ausgabe 2018 (21.10.2026): eigener Platzhalter-Band neben der Niedersachsen-Reihe
+    for (const f of readdirSync(dir).filter((x) => x.startsWith('green-line') && x !== 'green-line-transition-ausgabe-2018.json')) {
       const b = JSON.parse(readFileSync(join(dir, f), 'utf8'))
       expect(b).toMatchObject({ reihe: 'Green Line', ausgabe: 'ab 2021', publisher: 'Klett', edition: 'Niedersachsen' })
       expect(`${b.reihe} ${b.band}`).toBe(b.name)
@@ -67,8 +68,10 @@ describe('Reihe und Band aus dem Namen', () => {
     expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2024')).toHaveLength(5)
     expect(platz.filter((b) => b.reihe === 'Découvertes Série jaune')).toHaveLength(5)
     expect(platz.filter((b) => b.reihe === 'Découvertes' && b.ausgabe === 'ab 2020')).toHaveLength(5)
+    // Ein Ausgabe-Zusatz im Namen unterscheidet gleiche Bände verschiedener Ausgaben, deren Grammatik nach dem Namen geht
+    expect(platz.find((b) => b.id === 'green-line-transition-ausgabe-2018')).toMatchObject({ name: 'Green Line Transition (Ausgabe 2018)', ausgabe: 'ab 2018' })
     for (const b of platz) {
-      expect(`${b.reihe} ${b.band}`).toBe(b.name)
+      expect(`${b.reihe} ${b.band}`).toBe(b.name.replace(/\s*\([^)]*\)$/, ''))
       expect(b.units).toEqual([])
     }
     expect(new Set(platz.map((b) => b.id)).size).toBe(platz.length)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ALLE_KENNUNGEN, bekannteGrammatik, LEHRWERK_GRAMMATIK } from '../src/renderer/src/shared/lehrwerkGrammatik'
+import { ALLE_KENNUNGEN, bekannteGrammatik, fruehereBaendeDerReihe, LEHRWERK_GRAMMATIK } from '../src/renderer/src/shared/lehrwerkGrammatik'
+import { stelleImBand } from '../src/shared/lehrwerkBand'
 import { kapitelFolge, LEHRWERK_THEMEN } from '../src/renderer/src/shared/lehrwerkThemen'
 import { GRAMMAR_TOPICS, teilformenFuer } from '../src/renderer/src/modules/arbeitsblatt/didactics/grammar'
 import { unitEintraege } from '../src/renderer/src/modules/arbeitsblatt/didactics/grammatikAuswahl'
@@ -86,5 +87,39 @@ describe('Bekannte Grammatik', () => {
     expect(r).toContain('Wird gerade eingeführt: Bedingungssätze Typ 1')
     expect(r).toMatch(/Noch nicht eingeführt.*Stützwörter one \/ ones/)
     expect(knownGrammarRulesDe({ ...known, buch: 'Access 1' })).toBe('')
+  })
+})
+
+/*
+ * Green Line Transition (21.10.2026, Wunsch der Lehrkraft): Bundesausgabe ab 2024 mit den Grammatikabschnitten A–E
+ * (G1–G18) als Station unter ihrem Topic; Ausgabe ab 2018 je Topic unter „Spot on language". Die beiden Ausgaben gelten
+ * füreinander nicht als früherer Band.
+ */
+describe('Green Line Transition', () => {
+  it('ab 2024: A–E unter Topic 1–5, G1–G18 in Buchreihenfolge', () => {
+    const band = LEHRWERK_GRAMMATIK['Green Line Transition']
+    expect(Object.entries(band).map(([k, st]) => `${k}: ${Object.keys(st).join()}`)).toEqual([
+      'Topic 1: A Talking about the present and the past',
+      'Topic 2: B Talking about conditions, consequences and modality',
+      'Topic 3: C Linking ideas',
+      'Topic 4: D Talking about the future',
+      'Topic 5: E Shifting focus'
+    ])
+    const g = Object.values(band).flatMap((st) =>
+      Object.values(st)
+        .flat()
+        .map((p) => p.text.split(' ')[0])
+    )
+    expect(g).toEqual(Array.from({ length: 18 }, (_, i) => `G${i + 1}`))
+  })
+  it('frühere Bände: Green Line 1–6, nicht die andere Transition-Ausgabe', () => {
+    const baende = ['Green Line 1', 'Green Line 2', 'Green Line 3', 'Green Line 4', 'Green Line 5', 'Green Line 6']
+    expect(fruehereBaendeDerReihe('Green Line Transition')).toEqual(baende)
+    expect(fruehereBaendeDerReihe('Green Line Transition (Ausgabe 2018)')).toEqual(baende)
+  })
+  it('Spaltsätze stehen im Band unter Topic 5, Abschnitt E', () => {
+    expect(stelleImBand('Green Line Transition', ['en.focus.cleft'])).toEqual({ unit: 'Topic 5', station: 'E Shifting focus' })
+    expect(stelleImBand('green-line-transition-ausgabe-2018', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
+    expect(stelleImBand('Green Line Transition (Ausgabe 2018)', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
   })
 })

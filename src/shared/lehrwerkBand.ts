@@ -18,7 +18,7 @@
  * ersten G9-Jahrgang als G9 (Baden-Württemberg: Klasse 5 im Schuljahr 2024/25 oder später – „ab 2025/26 für Klasse 5
  * und 6"; Saarland: ab 2023/24), ältere Jahrgänge als G8.
  */
-import { ABSCHNITT_FOLGE, fruehereBaendeDerReihe, istOptional, LEHRWERK_GRAMMATIK } from '../renderer/src/shared/lehrwerkGrammatik'
+import { ABSCHNITT_FOLGE, fruehereBaendeDerReihe, istOptional, LEHRWERK_GRAMMATIK, ohneAusgabe } from '../renderer/src/shared/lehrwerkGrammatik'
 import { schulformVon } from './schulformen'
 import { schuljahrVon } from './schulkalender'
 
@@ -48,15 +48,14 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 /** „Green Line 6" → „Green Line"; „Green Line Transition" → „Green Line" */
 export function reiheAus(band: string): string {
-  return band
-    .trim()
+  return ohneAusgabe(band.trim())
     .replace(/\s+(?:\d+|transition|oberstufe)$/i, '')
     .trim()
 }
 
 /** Rang eines Bands in seiner Reihe: Bandnummer, Transition 50, Oberstufe 60, sonst 0 */
 export function bandRang(band: string): number {
-  const t = band.trim()
+  const t = ohneAusgabe(band.trim())
   const n = /(\d+)\s*$/.exec(t)
   if (n) return Number(n[1])
   if (/transition\s*$/i.test(t)) return 50

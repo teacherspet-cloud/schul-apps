@@ -14,6 +14,13 @@
  * `w` = Wiederholung (schon früher eingeführt). Ein leeres `t` ist keine Grammatik im Katalogsinn (z. B. australisches
  * Englisch) und wird nur genannt. Station '' = das ganze Kapitel (Welcome back, Trailer).
  * Green Line 5 Trailer 1–2 und Unit 3 Station 3 haben laut Liste keine Grammatik.
+ *
+ * Green Line Transition (21.10.2026, Wunsch der Lehrkraft): Die Bundesausgabe ab 2024 ordnet ihre Grammatik nicht den
+ * Topics zu, sondern Grammatikabschnitten A–E mit G1–G18 (Liste der Lehrkraft). Laut Klett-Stoffverteilungsplan
+ * Niedersachsen 2024 gehört jeder Abschnitt zur „Spot on language"-Seite eines Topics (A → Topic 1 … E → Topic 5) –
+ * abgestimmt: der Abschnitt steht als Station unter seinem Topic, so gelten Freigaben und „schon bekannt" wie bei den
+ * anderen Bänden. Die Ausgabe ab 2018 (anderes Buch, Topic 1–6) nach ihrem Inhaltsverzeichnis (Klett, 834260_IHV):
+ * Grammatik je Topic unter „Spot on language". Parallele Ausgaben eines Bands gelten füreinander nicht als früher.
  */
 
 export interface LehrwerkGrammatikPunkt {
@@ -29,6 +36,16 @@ type Band = Record<string, Record<string, LehrwerkGrammatikPunkt[]>>
 export type LehrwerkGrammatikBand = Band
 
 const P = (text: string, t: string[], w?: true): LehrwerkGrammatikPunkt => (w ? { text, t, w } : { text, t })
+
+/** Grammatikabschnitte von Green Line Transition ab 2024 (Stationen unter ihrem Topic) */
+export const TRANSITION_2024_ABSCHNITTE = [
+  'A Talking about the present and the past',
+  'B Talking about conditions, consequences and modality',
+  'C Linking ideas',
+  'D Talking about the future',
+  'E Shifting focus'
+] as const
+const [TA, TB, TC, TD, TE] = TRANSITION_2024_ABSCHNITTE
 
 export const QUELLE_NDS = 'Grammatikthemen Green Line Niedersachsen (Liste der Lehrkraft, 07.10.2026)'
 
@@ -332,6 +349,91 @@ export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
         P('Gerund with its own subject', ['en.verb.gerund/eigenes-subjekt'])
       ]
     }
+  },
+  'Green Line Transition': {
+    'Topic 1': {
+      [TA]: [
+        P('G1 Aspect', ['en.verb.tense_aspect_overview/aspekt', 'en.verb.stative_dynamic'], true),
+        P('G2 Tenses referring to the present', ['en.verb.present_contrast', 'en.verb.present_perfect', 'en.verb.present_perfect_prog'], true),
+        P(
+          'G3 Tenses referring to the past',
+          ['en.verb.past_simple', 'en.verb.past_progressive', 'en.verb.pp_vs_past', 'en.verb.past_perfect', 'en.verb.past_perfect_prog', 'en.verb.used_to'],
+          true
+        ),
+        P('G4 Modal auxiliaries and their substitute forms', ['en.verb.modals_ext', 'en.verb.modals_subst', 'en.verb.modals_adv'], true),
+        P('G5 Reported (indirect) speech', ['en.reported.backshift', 'en.syn.indirect_questions', 'en.verb.reporting_verbs'])
+      ]
+    },
+    'Topic 2': {
+      [TB]: [
+        P('G6 Conditional sentences', ['en.cond.type1', 'en.cond.type2', 'en.cond.type3', 'en.cond.wish', 'en.cond.alternatives']),
+        P('G7 Modality', ['en.verb.modals_adv', 'en.verb.modal_perfect', 'en.verb.had_better'])
+      ]
+    },
+    'Topic 3': {
+      [TC]: [
+        P('G8 Relative clauses', ['en.clause.relative_def', 'en.clause.relative_nondef', 'en.clause.relative_which']),
+        P('G9 Adverbial clauses', ['en.clause.adverbial_ext', 'en.syn.linking']),
+        P('G10 Gerund constructions', ['en.verb.gerund', 'en.verb.ger_vs_inf']),
+        P('G11 Participle constructions', ['en.verb.participle']),
+        P('G12 -ing forms with subjects of their own', ['en.verb.gerund/eigenes-subjekt', 'en.verb.participle/eigenes-subjekt'])
+      ]
+    },
+    'Topic 4': {
+      [TD]: [
+        P('G13 Tenses referring to the future', [
+          'en.verb.will_vs_goingto',
+          'en.verb.future_present',
+          'en.verb.future_prog',
+          'en.verb.future_perfect',
+          'en.verb.be_to'
+        ])
+      ]
+    },
+    'Topic 5': {
+      [TE]: [
+        P('G14 Position of adverbs and adverbials', ['en.adv.sequence', 'en.adv.sentence']),
+        P('G15 Active versus passive', ['en.verb.passive_ext', 'en.verb.passive_personal', 'en.verb.passive_prep', 'en.verb.passive_reporting']),
+        P('G16 Adding emphasis to a sentence', ['en.focus.emphasis', 'en.focus.emphatic_do']),
+        P('G17 Inversion', ['en.focus.inversion']),
+        P('G18 Cleft constructions', ['en.focus.cleft'])
+      ]
+    }
+  },
+  'Green Line Transition (Ausgabe 2018)': {
+    'Topic 1': { 'Spot on language': [P('Participle constructions', ['en.verb.participle'])] },
+    'Topic 2': {
+      'Spot on language': [
+        P('Infinitive constructions to vary your sentence structure', ['en.verb.infinitive']),
+        P('Using for or of after adjectives', ['en.verb.infinitive/it-for-sb']),
+        P('Infinitive and past participle after let, make and have', ['en.verb.make_let', 'en.verb.causative'])
+      ]
+    },
+    'Topic 3': { 'Spot on language': [P('Using gerunds', ['en.verb.gerund'])] },
+    'Topic 4': {
+      'Spot on language': [
+        P('Stative and dynamic verbs', ['en.verb.stative_dynamic']),
+        P('Simple present and present progressive with future meaning', ['en.verb.future_present']),
+        P('Future progressive and future perfect', ['en.verb.future_prog', 'en.verb.future_perfect']),
+        P('Making your point more forcefully', ['en.focus.emphasis'])
+      ]
+    },
+    'Topic 5': {
+      'Spot on language': [
+        P('Being polite', ['en.verb.modals_adv/would-hoeflich', 'en.syn.indirect_questions/hoefliche-frage']),
+        P('If-clauses', ['en.cond.type1', 'en.cond.type2', 'en.cond.type3'], true),
+        P('Expressing hopes and wishes', ['en.cond.wish']),
+        P('Giving suggestions or commands', ['en.syn.imperative', 'en.verb.had_better'])
+      ]
+    },
+    'Topic 6': {
+      'Spot on language': [
+        P('The passive to set the focus', ['en.verb.passive_basic', 'en.verb.passive_ext']),
+        P('If-clauses to express plausibility and unreality', ['en.cond.type2', 'en.cond.type3'], true),
+        P('Adjectives and adverbs to express yourself precisely', ['en.adv.formation/adjektiv-adverb', 'en.adj.perception']),
+        P('Adverbs of comment to express opinions and feelings', ['en.adv.sentence/kommentierend'])
+      ]
+    }
   }
 }
 
@@ -421,8 +523,14 @@ export function wendeGrammatikAn(eintraege: readonly LehrwerkGrammatikEintrag[])
   }
 }
 
+/** Band ohne Ausgabe-Zusatz („Green Line Transition (Ausgabe 2018)" → „Green Line Transition", 21.10.2026) */
+export const ohneAusgabe = (band: string): string => band.replace(/\s*\([^)]*\)\s*$/, '').trim() || band
+
 /** Reihe eines Bands („Green Line 3", „Green Line Transition" → „Green Line") */
-export const reiheDesBands = (band: string): string => band.replace(/\s*(\d+|transition|oberstufe)\s*$/i, '').trim() || band
+export const reiheDesBands = (band: string): string =>
+  ohneAusgabe(band)
+    .replace(/\s*(\d+|transition|oberstufe)\s*$/i, '')
+    .trim() || band
 
 /**
  * Frühere Bände DERSELBEN Reihe in der Reihenfolge der Liste (12.10.2026): Seit andere Lehrwerke hinzukommen können,
@@ -433,7 +541,8 @@ export function fruehereBaendeDerReihe(band: string): string[] {
   const baende = Object.keys(LEHRWERK_GRAMMATIK)
   const i = baende.indexOf(band)
   const reihe = reiheDesBands(band)
-  return baende.slice(0, Math.max(0, i)).filter((b) => reiheDesBands(b) === reihe)
+  // Andere Ausgabe desselben Bands (Transition ab 2018 / ab 2024) ist kein früherer Band (21.10.2026)
+  return baende.slice(0, Math.max(0, i)).filter((b) => reiheDesBands(b) === reihe && ohneAusgabe(b) !== ohneAusgabe(band))
 }
 
 /** Reihenfolge der Abschnitte innerhalb einer Unit (wie in den Lehrwerksdateien) */

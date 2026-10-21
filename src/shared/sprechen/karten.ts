@@ -7,9 +7,20 @@
  */
 import type { SprechSprache, Stufe } from './niveaus'
 
+/**
+ * Bis zu welcher Stelle im Lehrwerk eine Karte reicht (21.10.2026, Wunsch der Lehrkraft: nachvollziehbar, bis zu welchem
+ * Abschnitt ein Aufgabenpool geht): Band, Unit und – wenn gewählt – Abschnitt, z. B. Green Line 3 › Unit 1 › Station 2
+ */
+export interface SprechStand {
+  band: string
+  unit: string
+  abschnitt?: string
+}
+
 export interface InterviewKarte {
   art: 'interview'
   id: string
+  stand?: SprechStand
   thema: string
   /** Offene Einstiegsfragen zuerst, dann gezieltere */
   fragen: string[]
@@ -18,6 +29,7 @@ export interface InterviewKarte {
 export interface BildKarte {
   art: 'monolog'
   id: string
+  stand?: SprechStand
   titel: string
   /** Bilddatei im Pool (…/sprechbilder/<datei>) – Oberstufe: bis zu 3 */
   bilder: string[]
@@ -29,6 +41,7 @@ export interface BildKarte {
 export interface DialogKarte {
   art: 'dialog'
   id: string
+  stand?: SprechStand
   form: 'rollenspiel' | 'infogap' | 'diskussion'
   titel: string
   /** Lage, wie sie auf der Karte steht (Zielsprache) */
@@ -46,8 +59,26 @@ export type SprechKarte = InterviewKarte | BildKarte | DialogKarte
 const text = (x: unknown, max = 400): string => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, max) : '')
 const liste = (x: unknown, max = 12): string[] => (Array.isArray(x) ? x.map((y) => text(y, 300)).filter(Boolean).slice(0, max) : [])
 
+/** Lehrwerk-Stand bereinigen – ohne Band und Unit keiner */
+export function standBereinigt(roh: unknown): SprechStand | undefined {
+  const r = (roh ?? {}) as Record<string, unknown>
+  const band = text(r.band, 80)
+  const unit = text(r.unit, 80)
+  const abschnitt = text(r.abschnitt, 80)
+  return band && unit ? { band, unit, ...(abschnitt ? { abschnitt } : {}) } : undefined
+}
+
+/** „bis Green Line 3 › Unit 1 › Station 2" – leer ohne Stand */
+export const standText = (s: SprechStand | undefined): string => (s ? `bis ${[s.band, s.unit, s.abschnitt].filter(Boolean).join(' › ')}` : '')
+
 /** Bereinigt eine Karte aus Pool oder KI-Antwort; null = unbrauchbar */
 export function karteBereinigt(roh: unknown, id: string): SprechKarte | null {
+  const k = karteOhneStand(roh, id)
+  const stand = k && standBereinigt((roh as Record<string, unknown> | null)?.stand)
+  return k && stand ? { ...k, stand } : k
+}
+
+function karteOhneStand(roh: unknown, id: string): SprechKarte | null {
   const r = (roh ?? {}) as Record<string, unknown>
   if (r.art === 'interview') {
     const fragen = liste(r.fragen, 10)

@@ -47,6 +47,9 @@ const shot = (name) => page.screenshot({ path: join(out, `paket15-reihen-${name}
 const karten = () => sichtbar(page.locator('[data-reihe]'))
 const filter = () => sichtbar(page.locator('[data-reihen-filter]'))
 const GL = 'Green Line · Niedersachsen · Ausgabe ab 2021 · Klett'
+// Transition Ausgabe 2018 (21.10.2026): mitgelieferter Platzhalter-Band – eine zweite Green-Line-Ausgabe
+const GL18 = 'Green Line · Bundesausgabe · Ausgabe ab 2018 · Klett'
+const ENGLISCH = [GL18, GL].sort((a, b) => a.localeCompare(b, 'de')).join('|')
 
 async function vokabellisten() {
   await page.click('[aria-label="Vokabellisten"]')
@@ -62,17 +65,20 @@ const sortiere = async (label) => {
 try {
   await warteAufOberflaeche(page)
 
-  // ---------- Übersicht mit nur einer Reihe
+  // ---------- Übersicht: Green Line in zwei Ausgaben (Niedersachsen 1–6 + Transition, Transition ab 2018)
   console.log('\nNur Green Line')
   await vokabellisten()
-  pruefe((await karten().count()) === 1 && (await karten().first().getAttribute('data-reihe')) === GL, `Eine Karte „${GL}"`)
-  pruefe((await karten().first().innerText()).includes('7 Bände'), '… mit „7 Bände"')
-  pruefe((await karten().first().getAttribute('data-offen')) === 'false', '… anfangs zugeklappt')
-  pruefe((await filter().count()) === 0, 'Nur Green Line/Klett/Niedersachsen: kein Filter außer dem Fach')
+  const anfang = await karten().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihe')))
+  pruefe([...anfang].sort((a, b) => a.localeCompare(b, 'de')).join('|') === ENGLISCH, `Zwei Karten „${GL}" und „${GL18}" (${anfang.join(' / ')})`)
+  const glKarte = sichtbar(page.locator(`[data-reihe="${GL}"]`))
+  pruefe((await glKarte.innerText()).includes('7 Bände'), '… Niedersachsen mit „7 Bände"')
+  pruefe((await glKarte.getAttribute('data-offen')) === 'false', '… anfangs zugeklappt')
+  const filterAnfang = await filter().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihen-filter')))
+  pruefe(!filterAnfang.includes('verlag') && !filterAnfang.includes('reihe'), `Nur Green Line/Klett: kein Verlags- oder Reihenfilter (${filterAnfang.join(', ')})`)
   await sichtbar(page.getByLabel('Schulbücher sortieren', { exact: true })).click()
   const sortOptionen = await sichtbar(page.getByRole('option')).allTextContents()
   await page.keyboard.press('Escape')
-  pruefe(sortOptionen.join('|') === 'Reihe A–Z|Klassenstufe', `Sortierung bietet nur, was etwas bewirkt (${sortOptionen.join(', ')})`)
+  pruefe(sortOptionen.join('|') === 'Reihe A–Z|Ausgabe, neueste zuerst|Klassenstufe', `Sortierung bietet nur, was etwas bewirkt (${sortOptionen.join(', ')})`)
   await shot('eine-reihe')
   await page.getByRole('button', { name: `${GL} aufklappen` }).click()
   await page.waitForTimeout(400)
@@ -94,7 +100,7 @@ try {
   )
   await sortiere('Klassenstufe')
   pruefe((await sichtbar(page.locator('[data-reihen-flach]')).count()) === 1 && (await karten().count()) === 0, '„Klassenstufe": flache Liste')
-  pruefe((await sichtbar(page.locator('[data-reihen-kennzeichen]')).count()) === 7, '… jeder Band mit Reihen-Kennzeichen')
+  pruefe((await sichtbar(page.locator('[data-reihen-kennzeichen]')).count()) === 8, '… jeder Band mit Reihen-Kennzeichen')
   await shot('klassenstufe')
 
   // ---------- Import einer zweiten Reihe über den Vokabeltest-Picker
@@ -104,7 +110,7 @@ try {
   await page.getByRole('tab', { name: 'Schulbuch' }).click()
   await page.getByRole('combobox', { name: 'Lehrwerk' }).click()
   const gruppen = await sichtbar(page.locator('[class*="groupLabel"]')).allTextContents()
-  pruefe(gruppen.includes(GL), `Vokabeltest: Lehrwerke nach Reihe gruppiert (${gruppen.join(' | ')})`)
+  pruefe(gruppen.includes(`Englisch – ${GL}`) && gruppen.includes(`Englisch – ${GL18}`), `Vokabeltest: Lehrwerke nach Reihe gruppiert (${gruppen.join(' | ')})`)
   await page.keyboard.press('Escape')
   await sichtbar(page.getByRole('button', { name: 'Lehrwerke verwalten' }))
     .first()
@@ -144,7 +150,7 @@ try {
   pruefe((await sichtbar(page.locator('[data-reihen-flach]')).count()) === 1, 'Sortierung „Klassenstufe" ist gemerkt')
   await sortiere('Reihe A–Z')
   const titel = await karten().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihe')))
-  pruefe(titel.join('|') === `Camden Town · Bayern · Ausgabe ab 2019 · Westermann|${GL}`, `Zwei Karten, A–Z (${titel.join(' / ')})`)
+  pruefe(titel.join('|') === `Camden Town · Bayern · Ausgabe ab 2019 · Westermann|${ENGLISCH}`, `Drei Karten, A–Z (${titel.join(' / ')})`)
   const felder = await filter().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihen-filter')))
   pruefe(felder.join('|') === 'verlag|reihe|land|ausgabe', `Filterzeile nach dem Fach: Verlag – Reihe – Landesausgabe – Ausgabe (${felder.join(', ')})`)
   await sichtbar(page.getByLabel('Verlag', { exact: true })).click()
@@ -181,11 +187,10 @@ try {
   await page.reload()
   await warteAufOberflaeche(page)
   await vokabellisten()
-  pruefe((await filter().count()) === 0, 'Nach dem Entfernen der zweiten Reihe: Filter wieder ausgeblendet')
-  pruefe(
-    (await karten().count()) === 1 && (await karten().first().getAttribute('data-reihe')) === GL,
-    'Die gemerkte Wahl „Westermann" filtert nicht still weiter'
-  )
+  const filterDanach = await filter().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihen-filter')))
+  pruefe(filterDanach.join('|') === filterAnfang.join('|'), `Nach dem Entfernen der zweiten Reihe: Verlagsfilter wieder ausgeblendet (${filterDanach.join(', ')})`)
+  const danach = await karten().evaluateAll((els) => els.map((e) => e.getAttribute('data-reihe')))
+  pruefe([...danach].sort((a, b) => a.localeCompare(b, 'de')).join('|') === ENGLISCH, 'Die gemerkte Wahl „Westermann" filtert nicht still weiter')
 } catch (e) {
   problems.push(`Abbruch der Wache: ${e.message}`)
   await page.screenshot({ path: join(out, 'paket15-reihen-fehler.png') }).catch(() => undefined)
