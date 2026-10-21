@@ -33,6 +33,15 @@ const wahl = (teil: Partial<ErinnerungsWahl> = {}): ErinnerungsWahl => ({ ...STA
 // Mittwoch, 14.10.2026 (Sommerzeit), Sonntag 18.10., Montag 26.10. (Winterzeit)
 const MI = '2026-10-14'
 const um = (tag: string, h: number, m = 0): number => berlinMs(tag, h * 60 + m)
+/*
+ * Zeitplaner am Server (21.10.2026, Befund: der Test schlug ab dem 14.10. fehl): Kurs und Abschnitte entstehen mit der
+ * echten Zeit – liegt der gespielte Tag davor, gelten sie als „neu seit der letzten Meldung". Deshalb spielen diese
+ * Tests in der Woche nach heute: Mittwoch, dann Donnerstag, Samstag, Sonntag, Montag.
+ */
+const plusTage = (tag: string, n: number): string => new Date(Date.parse(`${tag}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+const heute = new Date().toISOString().slice(0, 10)
+const ZMI = plusTage(heute, (3 - new Date(`${heute}T12:00:00Z`).getUTCDay() + 7) % 7 || 7)
+const [ZDO, ZSA, ZSO, ZMO] = [1, 3, 4, 5].map((n) => plusTage(ZMI, n))
 
 describe('Zeit in Deutschland', () => {
   it('Tag, Wochentag und Uhrzeit hin und zurück – auch über die Zeitumstellung', () => {
@@ -260,34 +269,34 @@ describe('Erinnerungen auf dem Server', () => {
   })
 
   it('Zeitplaner: um 16:00 die Tagesrunde (einmal), Neues, Wochenrückblick am Sonntag', async () => {
-    // Echte Zeit liegt vor dem 14.10.: eingeschaltet am Morgen des 14.10.
+    // Eingeschaltet am Morgen des gespielten Mittwochs (nach dem Anlegen des Kurses)
     const g = lesen(lena.id)
-    g.zustand = { erledigt: '', neuSeit: um(MI, 6), termine: [], letzte: {} }
-    schreiben(lena.id, g, um(MI, 6))
+    g.zustand = { erledigt: '', neuSeit: um(ZMI, 6), termine: [], letzte: {} }
+    schreiben(lena.id, g, um(ZMI, 6))
     angekommen.length = 0
-    expect(await bearbeiten(lena.id, um(MI, 15))).toBe('spaeter')
-    expect(await durchlauf(um(MI, 16, 2))).toBe(1)
+    expect(await bearbeiten(lena.id, um(ZMI, 15))).toBe('spaeter')
+    expect(await durchlauf(um(ZMI, 16, 2))).toBe(1)
     expect(angekommen).toHaveLength(1)
     const n = JSON.parse(pushEntschluesseln(angekommen[0], ua.getPrivateKey(), auth).toString())
     expect(TEXTE.de.tagesziel.titel).toContain(n.t)
     expect(n.u).toBe(`/s/v/${kurs}`)
     expect(JSON.stringify(n)).not.toMatch(/Lena|Probe/)
     // Am selben Tag nichts mehr
-    expect(await durchlauf(um(MI, 18))).toBe(0)
+    expect(await durchlauf(um(ZMI, 18))).toBe(0)
     expect(angekommen).toHaveLength(1)
     // Neues seit der letzten Meldung: am nächsten Tag
     const g2 = lesen(lena.id)
     g2.zustand.neuSeit = 0
-    schreiben(lena.id, g2, um(MI, 20))
-    expect(await bearbeiten(lena.id, um('2026-10-15', 16, 1))).toBe('gesendet')
+    schreiben(lena.id, g2, um(ZMI, 20))
+    expect(await bearbeiten(lena.id, um(ZDO, 16, 1))).toBe('gesendet')
     const n2 = JSON.parse(pushEntschluesseln(angekommen[1], ua.getPrivateKey(), auth).toString())
     expect(TEXTE.de.neu.titel).toContain(n2.t)
-    expect(lesen(lena.id).zustand.neuSeit).toBe(um('2026-10-15', 16, 1))
+    expect(lesen(lena.id).zustand.neuSeit).toBe(um(ZDO, 16, 1))
     // Sonntag 17:00: Wochenrückblick (ersetzt die tägliche)
     const g3 = lesen(lena.id)
-    g3.zustand.erledigt = '2026-10-17'
-    schreiben(lena.id, g3, um('2026-10-17', 20))
-    expect(await bearbeiten(lena.id, um('2026-10-18', 17, 1))).toBe('gesendet')
+    g3.zustand.erledigt = ZSA
+    schreiben(lena.id, g3, um(ZSA, 20))
+    expect(await bearbeiten(lena.id, um(ZSO, 17, 1))).toBe('gesendet')
     const n3 = JSON.parse(pushEntschluesseln(angekommen[2], ua.getPrivateKey(), auth).toString())
     expect(TEXTE.de.woche.titel).toContain(n3.t)
     expect(n3.u).toBe('/s/')
@@ -297,9 +306,9 @@ describe('Erinnerungen auf dem Server', () => {
     await rufe(vok, lk, 'POST', `/server/vokabeln/${kurs}/erinnerungen`, { an: false })
     const g = lesen(lena.id)
     g.zustand.erledigt = ''
-    schreiben(lena.id, g, um('2026-10-19', 6))
+    schreiben(lena.id, g, um(ZMO, 6))
     const vorher = angekommen.length
-    expect(await bearbeiten(lena.id, um('2026-10-19', 16, 1))).toBe('nichts')
+    expect(await bearbeiten(lena.id, um(ZMO, 16, 1))).toBe('nichts')
     expect(angekommen).toHaveLength(vorher)
     expect((await rufe(vok, lk, 'GET', `/server/vokabeln/${kurs}`)).d.erinnerungen).toBe(false)
     await rufe(vok, lk, 'POST', `/server/vokabeln/${kurs}/erinnerungen`, { an: true })
