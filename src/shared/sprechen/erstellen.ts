@@ -67,6 +67,16 @@ const SCHEMA: Record<KartenTeil, Record<string, unknown>> = {
   }
 }
 
+/** Kartenfelder je Teil – auch die Prüfung (pruefen.ts) gibt sie korrigiert zurück */
+export const KARTEN_SCHEMA = SCHEMA
+
+/** Erlaubte Dialogformen je Jahrgang (wie in der Anfrage unten; 21.10.2026 für die Prüfung herausgezogen) */
+export function erlaubteDialogFormen(jahrgang: number): ('rollenspiel' | 'infogap' | 'diskussion')[] {
+  if (jahrgang >= 11) return ['diskussion']
+  if (jahrgang <= 6) return ['rollenspiel', 'infogap', 'diskussion']
+  return jahrgang <= 8 ? ['rollenspiel', 'infogap'] : ['diskussion', 'infogap']
+}
+
 export function kartenAnfrage(teil: KartenTeil, anzahl: number, g: Grundlage, vorhanden: string[]): StructuredRequest {
   const oberstufe = g.jahrgang >= 11
   return {

@@ -13,7 +13,7 @@
  *   GET  /server/sprech-bank/bild/<datei> · /s/api/sprechen/bild/<datei>   Bild (angemeldet)
  */
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { datenbank, protokolliereServer } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
@@ -21,6 +21,7 @@ import { imNutzer } from './kontext'
 import { ordner } from './pfade'
 import { darfLehrwerkSprache } from '../main/services/rolle'
 import { karteBereinigt, type SprechKarte } from '../shared/sprechen/karten'
+import { bildVersionen, entfalleneBilder } from '../shared/sprechen/bildVersionen'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sprech_bank (
@@ -80,6 +81,29 @@ export function bankKarten(sprache: string, jahrgang?: number | null, teil?: str
     .filter((k) => (jahrgang == null || k.jahrgang === jahrgang) && (!teil || k.teil === teil))
 }
 
+/**
+ * Gelöschte Bildfassungen aufräumen (21.10.2026, „Version löschen"): Gewählt wurde das Aufräumen beim Speichern statt
+ * eines eigenen Lösch-Endpunkts – gelöscht wird nur, was die Karte vorher nannte und jetzt nicht mehr, nach der
+ * Rechteprüfung des Speicherns, und nur, wenn KEINE andere Karte die Datei noch nennt.
+ */
+function bilderAufraeumen(alt: SprechKarte | undefined, neu: SprechKarte): void {
+  if (alt?.art !== 'monolog' || neu.art !== 'monolog') return
+  const weg = entfalleneBilder(alt, neu)
+  if (!weg.length) return
+  const andere = new Set(
+    (db().prepare('SELECT * FROM sprech_bank WHERE id != ?').all(neu.id) as Record<string, unknown>[])
+      .map(alsKarte)
+      .flatMap((k) => (k?.karte.art === 'monolog' ? bildVersionen(k.karte) : []))
+  )
+  for (const datei of weg)
+    if (BILD.test(datei) && !andere.has(datei))
+      try {
+        unlinkSync(join(bildOrdner(), datei))
+      } catch {
+        // schon weg
+      }
+}
+
 /** Bilddatei lesen (null = gibt es nicht) */
 export function bildLesen(datei: string): { daten: Buffer; typ: string } | null {
   if (!BILD.test(datei)) return null
@@ -132,12 +156,13 @@ export function sprechBankRoute(): (k: Anfrage) => Promise<boolean> {
       const id = typeof k0.id === 'string' && /^k[a-f0-9]{16}$/.test(k0.id) ? k0.id : `k${randomBytes(8).toString('hex')}`
       const karte = karteBereinigt({ ...(k0.karte as object), art: teil }, id)
       if (!karte) return json(res, 400, { fehler: 'Die Karte ist unvollständig.' }), true
-      const alt = db().prepare('SELECT lehrkraft_id FROM sprech_bank WHERE id = ?').get(id) as { lehrkraft_id: string } | undefined
+      const alt = db().prepare('SELECT lehrkraft_id, karte FROM sprech_bank WHERE id = ?').get(id) as { lehrkraft_id: string; karte: string } | undefined
       if (alt && alt.lehrkraft_id !== ich.id && !darfAlle(s)) return json(res, 403, { fehler: 'Nur die eigenen Karten (oder als Fachobfrau/Fachobmann alle).' }), true
       db()
         .prepare('INSERT OR REPLACE INTO sprech_bank (id, sprache, jahrgang, teil, karte, lehrkraft_id, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(id, s, jahrgang, teil, JSON.stringify(karte), alt?.lehrkraft_id ?? ich.id, new Date().toISOString())
       if (!alt) protokolliereServer('sprechen', `Sprechkarte angelegt (${s}, Jg ${jahrgang}, ${teil})`, ich.id)
+      if (alt) bilderAufraeumen(alsKarte({ ...alt, id })?.karte, karte)
       return json(res, 200, { id }), true
     }
     if (url.pathname === '/server/sprech-bank/loeschen') {

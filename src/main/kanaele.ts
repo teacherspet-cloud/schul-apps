@@ -14,6 +14,11 @@ import {
   bildLoeschen,
   bildSetzen,
   altbildZuordnen,
+  mehrdeutigListe,
+  sinnBezeichnung,
+  sinnGeprueft,
+  sinnWortart,
+  varianteVerschieben,
   sinneZuordnen,
   sinnFestlegen,
   sinneZusammenfuehren,
@@ -33,6 +38,7 @@ import {
 import type { TonPruefung } from '@shared/tonPruefung'
 import type { SatzFassung } from '@shared/satzFassung'
 import { istStufe, type Bildstufe, type Stimmlage, type TonArt } from '@shared/medienbank'
+import { mitBildRegeln } from '@shared/bildRegeln'
 import { alsAnfrage, sinnBereinigt, type MedienAnfrage } from '@shared/medienBedeutung'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
@@ -610,6 +616,20 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('medien:altbild-zuordnen', (schluessel: string, datei: string, id: string | null) => (
     nurAdmin('Die Beispielbilder'), altbildZuordnen(String(schluessel), String(datei), id ? String(id) : null)
   ))
+  // App „Mehrdeutig" (21.10.2026): Wörter aller Bücher klären – lesen und ändern nur Admins
+  handle('medien:mehrdeutig-liste', (o: Parameters<typeof mehrdeutigListe>[0]) => (nurAdmin('Die Bedeutungen'), mehrdeutigListe(o && typeof o === 'object' ? o : {})))
+  handle('medien:sinn-geprueft', (schluessel: string, id: string, an: boolean) => (
+    nurAdmin('Die Beispielbilder'), sinnGeprueft(String(schluessel), String(id), an !== false)
+  ))
+  handle('medien:sinn-wortart', (schluessel: string, id: string, wortart: string) => (
+    nurAdmin('Die Beispielbilder'), sinnWortart(String(schluessel), String(id), wortart === 'verb' ? 'verb' : 'andere')
+  ))
+  handle('medien:sinn-bezeichnung', (schluessel: string, id: string, deutsch: string) => (
+    nurAdmin('Die Beispielbilder'), sinnBezeichnung(String(schluessel), String(id), String(deutsch ?? ''))
+  ))
+  handle('medien:variante-verschieben', (schluessel: string, uebersetzung: string, ziel: string, wortart?: string) => (
+    nurAdmin('Die Beispielbilder'), varianteVerschieben(String(schluessel), String(uebersetzung ?? ''), String(ziel ?? 'neu'), wortart === 'verb' ? 'verb' : 'andere')
+  ))
   handle(
     'medien:ton-setzen',
     (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3], lage?: Stimmlage) => (
@@ -826,9 +846,11 @@ function textOptions(ai: AppSettings['ai']): AiStatus['textOptions'] {
  * Scheitert der eingestellte Weg (Abo ohne Bilder, Kontingent erschöpft …), übernimmt der nächste
  * eingerichtete (bildErsatz.ts, 03.10.2026).
  */
-async function generateImage(prompt: string, signal?: AbortSignal): Promise<string> {
+async function generateImage(auftrag: string, signal?: AbortSignal): Promise<string> {
   // Oberflächentests mit Attrappe: hinterlegtes Bild statt Bild-KI (nie im Betrieb)
-  if (attrappeBild()) return attrappeBildErzeugen(prompt)
+  if (attrappeBild()) return attrappeBildErzeugen(auftrag)
+  // Blickrichtung (21.10.2026): Bücher, Blätter, Bildschirme zeigen zur Person, nicht zur Kamera – für jeden Bildauftrag
+  const prompt = mitBildRegeln(auftrag)
   const { ai } = getSettings()
   if (ai.imageProvider === 'none') throw new Error('Es ist keine KI für Bilder ausgewählt (Einstellungen).')
   const img = ai.imageProvider

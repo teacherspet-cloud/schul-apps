@@ -11,7 +11,7 @@
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
 import type { Bildstufe, MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
-import type { MedienAnfrage, SinnAngabe, SinnStandEintrag, SinnZuordnung, Wortart } from './medienBedeutung'
+import type { MedienAnfrage, MehrdeutigFilter, MehrdeutigZeile, SinnAngabe, SinnStandEintrag, SinnZuordnung, Wortart } from './medienBedeutung'
 import type { TonPruefung } from './tonPruefung'
 import type { SatzFassung } from './satzFassung'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
@@ -526,6 +526,16 @@ export function buildApi(call: Call, extras: ApiExtras) {
       sinnStand: () => call<{ klaeren: number; offen: number; liste: SinnStandEintrag[] }>('medien:sinn-stand'),
       sinneZusammenfuehren: (schluessel: string, gruppen: string[][]) => call<number>('medien:sinne-zusammenfuehren', schluessel, gruppen),
       altbildZuordnen: (schluessel: string, datei: string, id: string | null) => call<boolean>('medien:altbild-zuordnen', schluessel, datei, id),
+      /** App „Mehrdeutig" (21.10.2026): Wörter aller Bücher mit Fundstellen und Bedeutungen, seitenweise */
+      mehrdeutigListe: (o: { filter?: MehrdeutigFilter; suche?: string; sprache?: string; stufe?: Bildstufe; seite?: number; jeSeite?: number }) =>
+        call<{ zeilen: MehrdeutigZeile[]; gesamt: number; sprachen: string[]; klaerung: number }>('medien:mehrdeutig-liste', o),
+      /** „Bild passt": Bedeutung und Bild geprüft (`an` = false nimmt es zurück) */
+      sinnGeprueft: (schluessel: string, id: string, an = true) => call<void>('medien:sinn-geprueft', schluessel, id, an),
+      sinnWortart: (schluessel: string, id: string, wortart: Wortart) => call<void>('medien:sinn-wortart', schluessel, id, wortart),
+      sinnBezeichnung: (schluessel: string, id: string, deutsch: string) => call<void>('medien:sinn-bezeichnung', schluessel, id, deutsch),
+      /** Eine Übersetzung einer anderen Bedeutung zuordnen bzw. einer neuen ('neu', dann mit Wortart); liefert deren Kennung */
+      varianteVerschieben: (schluessel: string, uebersetzung: string, ziel: string, wortart?: Wortart) =>
+        call<string>('medien:variante-verschieben', schluessel, uebersetzung, ziel, wortart),
       tonSetzen: (
         sprache: string,
         wort: string,

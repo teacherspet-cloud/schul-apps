@@ -80,7 +80,12 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:sinne-zuordnen',
   'medien:sinn-festlegen',
   'medien:sinne-zusammenfuehren',
-  'medien:altbild-zuordnen'
+  'medien:altbild-zuordnen',
+  // App „Mehrdeutig" (21.10.2026, nur Admins)
+  'medien:sinn-geprueft',
+  'medien:sinn-wortart',
+  'medien:sinn-bezeichnung',
+  'medien:variante-verschieben'
 ])
 
 /** Einstellungen, die eine Lehrkraft auf dem Server nicht setzen darf */

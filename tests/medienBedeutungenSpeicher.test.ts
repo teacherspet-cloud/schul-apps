@@ -148,3 +148,89 @@ describe('Einrichten aus dem Bestand (ohne KI)', () => {
     void e
   })
 })
+
+/*
+ * App „Mehrdeutig" (21.10.2026): Liste aller Wörter mit Fundstellen, „Bild passt", Wortart ändern, Übersetzung
+ * verschieben, Bedeutungen zusammenführen.
+ */
+describe('App „Mehrdeutig"', () => {
+  const korpus = [
+    { sprache: 'en', term: 'bear', translation: 'Bär', pos: 'noun', quelle: 'Green Line 1 › Unit 2' },
+    { sprache: 'en', term: 'to bear', translation: 'ertragen', quelle: 'Green Line 5 › Unit 1' },
+    { sprache: 'en', term: 'cat', translation: 'Katze', pos: 'noun', quelle: 'Green Line 1 › Unit 1' },
+    { sprache: 'en', term: 'pen', translation: 'Füller', pos: 'noun', quelle: 'Green Line 1 › Unit 3' },
+    { sprache: 'en', term: 'pen', translation: 'Kugelschreiber', pos: 'noun', quelle: 'Green Line 2 › Unit 1' }
+  ]
+  beforeEach(() => {
+    leeren()
+    m.medienKorpusQuelle(() => korpus)
+    m.korpusNeuLesen()
+    mkdirSync(wurzel, { recursive: true })
+    writeFileSync(join(wurzel, 'index.json'), '{}')
+    neu()
+  })
+  it('Klärungsbedarf: mehrere Bedeutungen; Fundstellen mit Buch › Unit; „Bild passt" nimmt das Wort heraus', () => {
+    const l = m.mehrdeutigListe({})
+    expect(l.zeilen.map((z) => z.lemma)).toEqual(['bear', 'pen'])
+    const bear = l.zeilen[0]
+    expect(bear.fundstellen.map((f) => `${f.quelle}: ${f.translation} (${f.wortart})`)).toEqual([
+      'Green Line 1 › Unit 2: Bär (andere)',
+      'Green Line 5 › Unit 1: ertragen (verb)'
+    ])
+    expect(m.mehrdeutigListe({ filter: 'alle' }).zeilen.map((z) => z.lemma)).toEqual(['bear', 'cat', 'pen'])
+    expect(m.mehrdeutigListe({ filter: 'alle', suche: 'katz' }).zeilen.map((z) => z.lemma)).toEqual(['cat'])
+    for (const b of bear.bedeutungen) m.sinnGeprueft(bear.schluessel, b.id)
+    neu()
+    expect(m.mehrdeutigListe({}).zeilen.map((z) => z.lemma)).toEqual(['pen'])
+    expect(m.mehrdeutigListe({ filter: 'geprueft' }).zeilen.map((z) => z.lemma)).toEqual(['bear'])
+    m.sinnGeprueft(bear.schluessel, bear.bedeutungen[0].id, false)
+    neu()
+    expect(m.mehrdeutigListe({ filter: 'geprueft' }).zeilen).toEqual([])
+  })
+  it('Wortart ändern, Bezeichnung ändern, Übersetzung in eine neue Bedeutung verschieben', () => {
+    const pen = m.mehrdeutigListe({}).zeilen.find((z) => z.lemma === 'pen')!
+    expect(pen.bedeutungen.map((b) => b.deutsch).sort()).toEqual(['Füller', 'Kugelschreiber'])
+    const kuli = pen.bedeutungen.find((b) => b.deutsch === 'Kugelschreiber')!
+    m.sinnBezeichnung(pen.schluessel, kuli.id, 'Kuli')
+    m.sinnWortart(pen.schluessel, kuli.id, 'verb')
+    neu()
+    const nach = m.mehrdeutigListe({}).zeilen.find((z) => z.lemma === 'pen')!
+    expect(nach.bedeutungen.find((b) => b.id === kuli.id)).toMatchObject({ deutsch: 'Kuli', wortart: 'verb' })
+    // „Kugelschreiber" (Nomen) passt nun zu keinem Nomen außer „Füller" – vorläufig
+    expect(nach.fundstellen.find((f) => f.translation === 'Kugelschreiber')!.wie).toBe('einzig')
+    const neuId = m.varianteVerschieben(pen.schluessel, 'Kugelschreiber', 'neu', 'andere')
+    neu()
+    const z = m.mehrdeutigListe({ filter: 'alle' }).zeilen.find((x) => x.lemma === 'pen')!
+    expect(z.fundstellen.find((f) => f.translation === 'Kugelschreiber')!.bedeutung).toBe(neuId)
+    // Die alte Bedeutung „Kuli" hat keine Übersetzung und kein Bild mehr – sie verschwindet
+    expect(z.bedeutungen.map((b) => b.deutsch).sort()).toEqual(['Füller', 'Kugelschreiber'])
+  })
+  it('Übersetzung einer vorhandenen Bedeutung zuordnen und Bedeutungen zusammenführen', () => {
+    const pen = m.mehrdeutigListe({}).zeilen.find((z) => z.lemma === 'pen')!
+    const fueller = pen.bedeutungen.find((b) => b.deutsch === 'Füller')!
+    const kuli = pen.bedeutungen.find((b) => b.deutsch === 'Kugelschreiber')!
+    expect(m.sinneZusammenfuehren(pen.schluessel, [[fueller.id, kuli.id]])).toBe(1)
+    neu()
+    const z = m.mehrdeutigListe({ filter: 'alle' }).zeilen.find((x) => x.lemma === 'pen')!
+    expect(z.bedeutungen).toHaveLength(1)
+    expect(z.fundstellen.every((f) => f.bedeutung === z.bedeutungen[0].id)).toBe(true)
+    // Wieder trennen: die Übersetzung in eine neue Bedeutung, dann zurück zur ersten
+    const id = m.varianteVerschieben(z.schluessel, 'Kugelschreiber', 'neu')
+    m.varianteVerschieben(z.schluessel, 'Kugelschreiber', z.bedeutungen[0].id)
+    neu()
+    const w = m.mehrdeutigListe({ filter: 'alle' }).zeilen.find((x) => x.lemma === 'pen')!
+    expect(w.bedeutungen.map((b) => b.id)).toEqual([z.bedeutungen[0].id])
+    expect(id).not.toBe(z.bedeutungen[0].id)
+  })
+  it('„Ohne Bild" und seitenweise', () => {
+    m.bildSetzen('en', 'cat', bild('Katze'), 's2', { wortart: 'andere', deutsch: 'Katze' })
+    neu()
+    expect(m.mehrdeutigListe({ filter: 'ohneBild' }).zeilen.map((z) => z.lemma)).toEqual(['bear', 'pen'])
+    const cat = m.mehrdeutigListe({ filter: 'alle', suche: 'cat' }).zeilen[0]
+    expect(cat.bedeutungen[0].bild?.bild?.dataUrl).toMatch(/^data:image\/png/)
+    const s1 = m.mehrdeutigListe({ filter: 'alle', jeSeite: 5, seite: 0 })
+    expect(s1.gesamt).toBe(3)
+    expect(m.mehrdeutigListe({ filter: 'alle', jeSeite: 5, seite: 1 }).zeilen).toEqual([])
+    expect(s1.sprachen).toEqual(['en'])
+  })
+})

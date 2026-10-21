@@ -35,7 +35,10 @@ import {
   type SinnEintrag,
   type SinnStandEintrag,
   type Wortart,
-  type SinnZuordnung
+  type SinnZuordnung,
+  type Fundstelle,
+  type MehrdeutigFilter,
+  type MehrdeutigZeile
 } from '@shared/medienBedeutung'
 import { resourcePath } from './paths'
 import {
@@ -906,23 +909,30 @@ export function korpusAusOrdnern(o: { lehrwerke: string[]; verben: string[] }): 
   }
   for (const d of o.lehrwerke)
     for (const f of dateien(d)) {
-      const b = lies<{ language?: string; units?: { sections?: { entries?: { term?: string; translation?: string; pos?: string }[] }[] }[] }>(f, {})
+      const b = lies<{ name?: string; language?: string; units?: { name?: string; sections?: { entries?: { term?: string; translation?: string; pos?: string }[] }[] }[] }>(f, {})
       const sprache = String(b.language ?? '')
       if (!sprache || !Array.isArray(b.units)) continue
       for (const u of b.units)
         for (const s of u.sections ?? [])
           for (const e of s.entries ?? [])
-            if (e?.term && e.translation) aus.push({ sprache, term: String(e.term), translation: String(e.translation), ...(e.pos ? { pos: String(e.pos) } : {}) })
+            if (e?.term && e.translation)
+              aus.push({
+                sprache,
+                term: String(e.term),
+                translation: String(e.translation),
+                ...(e.pos ? { pos: String(e.pos) } : {}),
+                quelle: [b.name, u.name].filter(Boolean).join(' › ')
+              })
     }
   for (const d of o.verben)
     for (const f of dateien(d)) {
-      const l = lies<{ sprache?: string; eintraege?: { formen?: Record<string, string> }[] }>(f, {})
+      const l = lies<{ name?: string; sprache?: string; eintraege?: { formen?: Record<string, string> }[] }>(f, {})
       const sprache = String(l.sprache ?? '')
       if (!sprache) continue
       for (const e of l.eintraege ?? []) {
         const inf = String(e?.formen?.inf ?? '').trim()
         const de = String(e?.formen?.de ?? '').trim()
-        if (inf && de) aus.push({ sprache, term: inf, translation: de, art: 'verb' })
+        if (inf && de) aus.push({ sprache, term: inf, translation: de, art: 'verb', quelle: `Unregelmäßige Verben${l.name ? ` › ${l.name}` : ''}` })
       }
     }
   return aus
@@ -1247,3 +1257,212 @@ export function sinneEinrichten(korpus?: KorpusWort[]): { lemmata: number; versc
 function stufeSetzenOhneLoeschen<E extends Pick<MedienEintrag, 'bild' | 'bildStufen' | 'ohneBild'>>(e: E, stufe: Bildstufe, bild: MedienBild): E {
   return stufe === 's2' ? { ...e, bild } : { ...e, bildStufen: { ...(e.bildStufen ?? {}), [stufe]: bild } }
 }
+
+// ---------------------------------------------------------------- App „Mehrdeutig" (21.10.2026)
+
+/**
+ * App „Mehrdeutig" (21.10.2026, Wunsch der Lehrkraft): Wörter aller Bücher (Lehrwerke, Verblisten – derselbe Bestand wie
+ * beim Einrichten) mit ihren Fundstellen und Bedeutungen ansehen und klären. Der Bestand wird kurz zwischengespeichert –
+ * das Blättern liest nicht jedes Mal alle Lehrwerke.
+ */
+let korpusZwischen: { zeit: number; w: KorpusWort[] } | null = null
+function korpusKurz(): KorpusWort[] {
+  if (korpusZwischen && Date.now() - korpusZwischen.zeit < 60_000) return korpusZwischen.w
+  const w = korpusQuelle()
+  korpusZwischen = { zeit: Date.now(), w }
+  return w
+}
+/** Nur für Tests */
+export const korpusNeuLesen = (): void => void (korpusZwischen = null)
+
+function sinnDateiAendern<T>(schluessel: string, fn: (e: SinnEintrag, d: SinnDatei) => T): T {
+  sinne()
+  const d = lies<SinnDatei>(sinnDatei(), { eintraege: {} })
+  d.eintraege ??= {}
+  if (!/^[a-z]{2,8}:.+/.test(schluessel)) throw new Error('Unbekanntes Wort.')
+  // Wörter ohne Einrichtung (neu nach dem Einrichten) bekommen hier ihren Eintrag
+  const e = (d.eintraege[schluessel] ??= { bedeutungen: [] })
+  const aus = fn(e, d)
+  sinnSchreiben(d)
+  return aus
+}
+const bedeutungVon = (e: SinnEintrag, id: string): MedienBedeutung => {
+  const b = e.bedeutungen.find((x) => x.id === id)
+  if (!b) throw new Error('Unbekannte Bedeutung.')
+  return b
+}
+
+/** „Bild passt" (21.10.2026): die Lehrkraft hat Bedeutung und Bild geprüft; `an` = false nimmt es zurück */
+export function sinnGeprueft(schluessel: string, id: string, an = true): void {
+  sinnDateiAendern(schluessel, (e) => {
+    const b = bedeutungVon(e, id)
+    if (an) b.geprueft = Date.now()
+    else delete b.geprueft
+  })
+}
+
+/** Wortart einer Bedeutung ändern (Verb / kein Verb) – die Prüfung gilt danach nicht mehr */
+export function sinnWortart(schluessel: string, id: string, wortart: Wortart): void {
+  sinnDateiAendern(schluessel, (e) => {
+    const b = bedeutungVon(e, id)
+    b.wortart = wortart === 'verb' ? 'verb' : 'andere'
+    delete b.geprueft
+    if (e.bedeutungen.filter((x) => x.wortart === b.wortart).length > 1) e.klaeren = true
+  })
+}
+
+/** Bezeichnung einer Bedeutung ändern („Bär" → „Bär (Tier)") – die neue Schreibweise gehört dazu */
+export function sinnBezeichnung(schluessel: string, id: string, deutsch: string): void {
+  const text = String(deutsch ?? '').trim().slice(0, 160)
+  if (!text) throw new Error('Die Bedeutung braucht einen Text.')
+  sinnDateiAendern(schluessel, (e) => {
+    const b = bedeutungVon(e, id)
+    b.deutsch = text
+    const n = bedeutungNorm(text)
+    if (n && !b.varianten.includes(n)) b.varianten.push(n)
+  })
+}
+
+/**
+ * Eine Übersetzung einer anderen Bedeutung zuordnen – oder einer neuen (`ziel` = 'neu', dann mit `wortart`). Die
+ * Übersetzung verlässt dabei ihre bisherige Bedeutung; eine Bedeutung ohne Übersetzung und ohne Bild verschwindet.
+ */
+export function varianteVerschieben(schluessel: string, uebersetzung: string, ziel: string, wortart: Wortart = 'andere'): string {
+  const n = bedeutungNorm(uebersetzung)
+  if (!n) throw new Error('Keine Übersetzung.')
+  return sinnDateiAendern(schluessel, (e) => {
+    const verlassen = new Set<MedienBedeutung>()
+    for (const b of e.bedeutungen)
+      if (b.varianten.includes(n)) {
+        b.varianten = b.varianten.filter((v) => v !== n)
+        verlassen.add(b)
+      }
+    let z = ziel !== 'neu' ? e.bedeutungen.find((x) => x.id === ziel) : undefined
+    if (!z) {
+      z = bedeutungNeu(wortart === 'verb' ? 'verb' : 'andere', uebersetzung.trim(), 'hand')
+      e.bedeutungen.push(z)
+    } else z.varianten.push(n)
+    // Leer gewordene Bedeutungen fallen weg: ohne Bild und ohne eine Übersetzung, die in einem Buch vorkommt
+    const imBuch = new Set(
+      korpusKurz()
+        .filter((k) => sinnSchluessel(k.sprache, k.term, wortartFuer({ term: k.term, pos: k.pos, art: k.art }, k.sprache)) === schluessel)
+        .map((k) => bedeutungNorm(k.translation))
+    )
+    const leer = (b: MedienBedeutung): boolean => !bildFelder(b) && !b.varianten.some((v) => imBuch.has(v))
+    e.bedeutungen = e.bedeutungen.filter((b) => b === z || !verlassen.has(b) || !leer(b))
+    if (e.bedeutungen.filter((x) => x.wortart === z!.wortart).length > 1) e.klaeren = true
+    return z.id
+  })
+}
+
+
+/**
+ * Die Liste der App: je Lemma Fundstellen und Bedeutungen, gefiltert, gesucht, A–Z, seitenweise. Klärungsbedarf: mehrere
+ * Bedeutungen (noch nicht alle geprüft), wartende alte Bilder, Synonym-Verdacht oder Fundstellen ohne sichere Bedeutung.
+ */
+export function mehrdeutigListe(o: {
+  filter?: MehrdeutigFilter
+  suche?: string
+  sprache?: string
+  stufe?: Bildstufe
+  seite?: number
+  jeSeite?: number
+}): { zeilen: MehrdeutigZeile[]; gesamt: number; sprachen: string[]; klaerung: number } {
+  const d = sinne()
+  const stufe = istStufeWert(o.stufe) ? o.stufe : 's2'
+  const jeSeite = Math.max(5, Math.min(100, Math.round(o.jeSeite ?? 30)))
+  const fund = new Map<string, { sprache: string; liste: KorpusWort[] }>()
+  for (const k of korpusKurz()) {
+    const art = wortartFuer({ term: k.term, pos: k.pos, art: k.art }, k.sprache)
+    const s = sinnSchluessel(k.sprache, k.term, art)
+    const x = fund.get(s) ?? { sprache: sprachKurz(k.sprache), liste: [] }
+    x.liste.push(k)
+    fund.set(s, x)
+  }
+  const schluessel = new Set([...fund.keys(), ...Object.keys(d.eintraege)])
+  const sprachen = [...new Set([...schluessel].map((s) => s.split(':')[0]))].sort()
+  const suche = (o.suche ?? '').trim().toLowerCase()
+  const zeilen: MehrdeutigZeile[] = []
+  let klaerung = 0
+  for (const s of schluessel) {
+    const sp = s.split(':')[0]
+    if (o.sprache && sp !== sprachKurz(o.sprache)) continue
+    const e: SinnEintrag = d.eintraege[s] ?? { bedeutungen: [] }
+    const lemma = s.slice(sp.length + 1)
+    const fundstellen: Fundstelle[] = (fund.get(s)?.liste ?? []).map((k) => {
+      const art = wortartFuer({ term: k.term, pos: k.pos, art: k.art }, k.sprache)
+      const f = bedeutungFinden(e, art, k.translation)
+      return {
+        quelle: k.quelle ?? '',
+        term: k.term,
+        translation: k.translation,
+        ...(k.pos ? { pos: k.pos } : {}),
+        wortart: art,
+        ...(f.b && f.wie !== 'einzig' ? { bedeutung: f.b.id } : {}),
+        wie: f.wie
+      }
+    })
+    const gruende: MehrdeutigZeile['gruende'] = []
+    if (e.bedeutungen.length > 1 && e.bedeutungen.some((b) => !b.geprueft)) gruende.push('mehrere')
+    if (e.offen?.length) gruende.push('offen')
+    if (e.klaeren) gruende.push('klaeren')
+    if (fundstellen.some((f) => f.wie === 'einzig')) gruende.push('vorlaeufig')
+    if (fundstellen.some((f) => f.wie === 'mehrdeutig')) gruende.push('ungeklaert')
+    if (gruende.length) klaerung++
+    const bildDa = (b: MedienBedeutung): boolean => Boolean(bildDerStufe(b, stufe)) || Boolean(b.ohneBild?.includes(stufe))
+    const passt =
+      o.filter === 'alle'
+        ? true
+        : o.filter === 'geprueft'
+          ? e.bedeutungen.length > 0 && e.bedeutungen.every((b) => b.geprueft)
+          : o.filter === 'ohneBild'
+            ? !e.bedeutungen.length || e.bedeutungen.some((b) => !bildDa(b))
+            : gruende.length > 0
+    if (!passt) continue
+    if (
+      suche &&
+      !lemma.toLowerCase().includes(suche) &&
+      !e.bedeutungen.some((b) => b.deutsch.toLowerCase().includes(suche)) &&
+      !fundstellen.some((f) => f.translation.toLowerCase().includes(suche) || f.term.toLowerCase().includes(suche))
+    )
+      continue
+    zeilen.push({
+      schluessel: s,
+      sprache: sp,
+      lemma,
+      fundstellen,
+      bedeutungen: [],
+      offen: [],
+      ...(e.klaeren ? { klaeren: true as const } : {}),
+      gruende
+    })
+  }
+  const sammler = new Intl.Collator('de', { sensitivity: 'base', numeric: true })
+  zeilen.sort((a, b) => sammler.compare(a.lemma, b.lemma) || a.sprache.localeCompare(b.sprache))
+  const seite = Math.max(0, Math.round(o.seite ?? 0))
+  const teil = zeilen.slice(seite * jeSeite, seite * jeSeite + jeSeite)
+  // Bilder nur für die gezeigte Seite (als data-URL – die Exe hat keine Dateiadressen)
+  for (const z of teil) {
+    const e: SinnEintrag = d.eintraege[z.schluessel] ?? { bedeutungen: [] }
+    z.bedeutungen = e.bedeutungen.map((b) => {
+      const gefunden = b.ohneBild?.includes(stufe) ? undefined : stufenReihe(stufe).find((x) => bildDerStufe(b, x))
+      const bild = gefunden ? bildDerStufe(b, gefunden) : undefined
+      return {
+        id: b.id,
+        wortart: b.wortart,
+        deutsch: b.deutsch,
+        varianten: b.varianten,
+        ...(b.geprueft ? { geprueft: b.geprueft } : {}),
+        bild: {
+          ...(bild ? { bild: { ...bild, dataUrl: dataUrlVon(bild.datei) }, bildStufe: gefunden } : {}),
+          ...(b.ohneBild?.length ? { ohneBild: b.ohneBild } : {}),
+          bedeutung: { id: b.id, deutsch: b.deutsch, wortart: b.wortart }
+        }
+      }
+    })
+    z.offen = (e.offen ?? []).map((x) => ({ datei: x.datei, stufe: x.stufe, wortarten: x.wortarten, dataUrl: dataUrlVon(x.datei) }))
+  }
+  return { zeilen: teil, gesamt: zeilen.length, sprachen, klaerung }
+}
+
+const istStufeWert = (s: unknown): s is Bildstufe => BILDSTUFEN.includes(s as Bildstufe)

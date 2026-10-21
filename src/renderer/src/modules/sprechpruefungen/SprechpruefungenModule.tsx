@@ -53,6 +53,9 @@ import type { Textbook, TextbookMeta } from '@shared/types'
 import { standText, type BildKarte, type DialogKarte, type InterviewKarte, type SprechKarte, type SprechStand } from '@shared/sprechen/karten'
 import { kartenAnfrage, type Grundlage, type KartenTeil } from '@shared/sprechen/erstellen'
 import { zielNiveau, type SprechSprache } from '@shared/sprechen/niveaus'
+import { pruefAnfrage, pruefBerichtText, pruefErgebnisAnwenden } from '@shared/sprechen/pruefen'
+import { AbbruchFehler } from '@shared/abbruch'
+import { bildVersionen, versionenZusammenfuehren, versionHinzu, versionLoeschen, versionWaehlen } from '@shared/sprechen/bildVersionen'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -139,8 +142,13 @@ function bildErzeugen(p: PoolKarte, prompt: string, fertig: () => void): void {
         `${e.prompt} Style: friendly realistic illustration for a school speaking exam, clear scene, no text, no logos, no real persons.`
       )
       const { datei } = await senden<{ datei: string }>('/server/sprech-bank/bild', { dataUrl })
-      const karte = e.p.karte as BildKarte
-      await senden('/server/sprech-bank/speichern', { id: e.p.id, sprache: e.p.sprache, jahrgang: e.p.jahrgang, teil: e.p.teil, karte: { ...karte, bilder: [datei] } })
+      // Als neue Fassung zur Karte, wie sie JETZT am Server steht (21.10.2026) – ältere Fassungen bleiben erhalten
+      const stand = await holen<{ karten: PoolKarte[] }>(`/server/sprech-bank?sprache=${e.p.sprache}`).then(
+        (r) => r.karten.find((x) => x.id === e.p.id)?.karte,
+        () => undefined
+      )
+      const karte = (stand?.art === 'monolog' ? stand : e.p.karte) as BildKarte
+      await senden('/server/sprech-bank/speichern', { id: e.p.id, sprache: e.p.sprache, jahrgang: e.p.jahrgang, teil: e.p.teil, karte: versionHinzu(karte, datei) })
       return datei
     },
     ablegen: async () => fertig(),
@@ -160,16 +168,27 @@ function StandZeile({ stand }: { stand?: SprechStand }): React.JSX.Element {
 function KartenEditor({
   k,
   aktuell,
+  amServer,
+  neuesBild,
   schliessen,
   speichern
 }: {
   k: SprechKarte
   /** Gewählte Stelle im Lehrwerk – für Karten ohne bzw. mit anderem Stand übernehmbar (21.10.2026) */
   aktuell?: SprechStand
+  /** Die Karte, wie sie gerade am Server steht – neue Bildfassungen aus dem Hintergrund erscheinen so gleich */
+  amServer?: SprechKarte
+  /** Bild neu erzeugen (nur gespeicherte Bildkarten), mit optionalem Zusatzwunsch */
+  neuesBild?: (wunsch: string) => void
   schliessen: () => void
   speichern: (k: SprechKarte) => void
 }): React.JSX.Element {
-  const [x, setX] = useState<SprechKarte>(k)
+  const [x0, setX] = useState<SprechKarte>(k)
+  // Bildfassungen (21.10.2026): im Fenster gelöschte merken, damit eine im Hintergrund neue nicht verloren geht
+  const [geloescht, setGeloescht] = useState<string[]>([])
+  const [wunsch, setWunsch] = useState('')
+  const [zeichnet, setZeichnet] = useState(false)
+  const x: SprechKarte = x0.art === 'monolog' ? versionenZusammenfuehren(x0, amServer?.art === 'monolog' ? amServer : undefined, geloescht) : x0
   const zeilen = (l: string[]): string => l.join('\n')
   const aus = (s: string): string[] => s.split('\n').map((z) => z.trim()).filter(Boolean)
   return (
@@ -193,6 +212,70 @@ function KartenEditor({
           <>
             {/* Das erstellte Bild auch im Fenster (21.10.2026, Wunsch der Lehrkraft) – neben Fragen und Beschreibung */}
             {x.bilder[0] && <Image src={bildUrl(x.bilder[0])} mah={320} radius="sm" fit="contain" alt="" data-sprechkarte-bild />}
+            {/* Fassungen (21.10.2026): antippen = wird die aktuelle; veraltete löschen */}
+            {bildVersionen(x).length > 1 && (
+              <Group gap="xs" data-sprechkarte-versionen>
+                {bildVersionen(x).map((d, n) => {
+                  const ist = x.bilder.includes(d)
+                  return (
+                    <Stack key={d} gap={2} align="center">
+                      <UnstyledButton
+                        onClick={() => setX(versionWaehlen(x, d))}
+                        title={ist ? 'Aktuelle Fassung' : 'Diese Fassung verwenden'}
+                        style={{ borderRadius: 6, outline: ist ? '2px solid var(--mantine-color-violet-6)' : undefined }}
+                        data-sprechkarte-version={n + 1}
+                      >
+                        <Image src={bildUrl(d)} w={72} h={54} radius="sm" fit="cover" alt="" />
+                      </UnstyledButton>
+                      {ist ? (
+                        <Text size="xs" c="dimmed">
+                          aktuell
+                        </Text>
+                      ) : (
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => (setGeloescht([...geloescht, d]), setX(versionLoeschen(x, d)))}
+                          data-sprechkarte-version-loeschen
+                        >
+                          Version löschen
+                        </Button>
+                      )}
+                    </Stack>
+                  )
+                })}
+              </Group>
+            )}
+            {neuesBild ? (
+              <Group gap="xs" align="flex-end">
+                <TextInput
+                  label="Zusatzwunsch für ein neues Bild (optional)"
+                  placeholder="z. B. mehr Personen, draußen, Winter"
+                  value={wunsch}
+                  onChange={(e) => setWunsch(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  variant="light"
+                  color="violet"
+                  leftSection={<IconPhoto size={14} />}
+                  onClick={() => (neuesBild(wunsch.trim()), setZeichnet(true), setWunsch(''))}
+                  data-sprechkarte-bild-neu
+                >
+                  Bild neu erzeugen
+                </Button>
+              </Group>
+            ) : (
+              <Text size="xs" c="dimmed">
+                Ein neues Bild lässt sich nach dem Speichern der Karte erzeugen.
+              </Text>
+            )}
+            {zeichnet && (
+              <Text size="xs" c="dimmed">
+                Das neue Bild wird im Hintergrund gezeichnet und erscheint hier als weitere Fassung; die bisherigen bleiben erhalten.
+              </Text>
+            )}
             <TextInput label="Titel" value={x.titel} onChange={(e) => setX({ ...x, titel: e.currentTarget.value })} />
             <Textarea label="Was auf dem Bild zu sehen ist (für die KI-Prüferin)" autosize minRows={2} value={x.bildBeschreibung} onChange={(e) => setX({ ...x, bildBeschreibung: e.currentTarget.value })} />
             <Textarea label="Leitfragen (eine je Zeile)" autosize minRows={3} value={zeilen(x.leitfragen)} onChange={(e) => setX({ ...x, leitfragen: aus(e.currentTarget.value) })} />
@@ -412,11 +495,24 @@ interface KartenRahmen {
   buecher: TextbookMeta[]
 }
 
+/** Was die Prüfung der Karten ergab (21.10.2026) */
+interface PruefBericht {
+  geprueft: number
+  bestanden: number
+  gruende: string[]
+}
+
 /**
  * Karten für eine Stelle im Lehrwerk erzeugen (21.10.2026 aus „erstellen" herausgelöst, auch für „Ganzes Lehrwerk
- * füllen"): Wortschatz und Grammatik bis zum Abschnitt, dazu die Lehrplan-Themen – eine KI-Anfrage
+ * füllen"): Wortschatz und Grammatik bis zum Abschnitt, dazu die Lehrplan-Themen. Danach prüft eine zweite Anfrage jede
+ * Karte gegen dieselben Vorgaben (pruefen.ts); fällt etwas durch, legt die KI einmal nach (höchstens zwei Runden).
  */
-async function kartenErzeugen(e: KartenEingabe, r: KartenRahmen, ai: AuftragsKontext['ai'], melde: (t: string) => void): Promise<Record<string, unknown>[]> {
+async function kartenErzeugen(
+  e: KartenEingabe,
+  r: KartenRahmen,
+  ai: AuftragsKontext['ai'],
+  melde: (t: string) => void
+): Promise<{ karten: Record<string, unknown>[]; bericht: PruefBericht }> {
   melde('Grundlage wird zusammengestellt …')
   let woerter: string[] = []
   let bekannt: string[] = []
@@ -434,9 +530,34 @@ async function kartenErzeugen(e: KartenEingabe, r: KartenRahmen, ai: AuftragsKon
     neu = gs?.neu ?? []
   }
   const g: Grundlage = { sprache: r.sprache, jahrgang: r.jahrgang, niveau: r.niveau, quelle, woerter, grammatikBekannt: bekannt, grammatikNeu: neu, themen: r.themen }
-  melde('Die KI schreibt die Karten …')
-  const antwort = await ai<{ karten: Record<string, unknown>[] }>(kartenAnfrage(e.teil, e.anzahl, g, e.vorhanden))
-  return (antwort.karten ?? []).map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}) }))
+  const bericht: PruefBericht = { geprueft: 0, bestanden: 0, gruende: [] }
+  const karten: Record<string, unknown>[] = []
+  for (let runde = 0; runde < 2 && karten.length < e.anzahl; runde++) {
+    const fehlt = e.anzahl - karten.length
+    const schon = [...e.vorhanden, ...karten.map((x) => String(x.titel ?? x.thema ?? ''))]
+    melde(runde ? `Die KI legt ${fehlt} Karten nach …` : 'Die KI schreibt die Karten …')
+    const antwort = await ai<{ karten: Record<string, unknown>[] }>(kartenAnfrage(e.teil, fehlt, g, schon))
+    const roh = (antwort.karten ?? []).slice(0, fehlt)
+    if (!roh.length) continue
+    melde(`Die KI prüft ${roh.length} Karten …`)
+    let urteil: Parameters<typeof pruefErgebnisAnwenden>[2] = null
+    try {
+      urteil = await ai<NonNullable<typeof urteil>>(pruefAnfrage(e.teil, roh, g, schon))
+    } catch (f) {
+      // Wie bei der Grammatik: scheitert die Prüfung, bleiben die Karten – die Lehrkraft sieht es im Bericht
+      if (f instanceof AbbruchFehler) throw f
+      bericht.gruende.push('Prüfung nicht möglich – Karten ungeprüft übernommen')
+    }
+    const erg = pruefErgebnisAnwenden(e.teil, roh, urteil, schon)
+    bericht.geprueft += roh.length
+    bericht.bestanden += erg.bestanden.length
+    bericht.gruende.push(...erg.gestrichen.map((x) => (x.titel ? `„${x.titel}“: ${x.grund}` : x.grund)))
+    karten.push(...erg.bestanden)
+  }
+  return {
+    karten: karten.map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}) })),
+    bericht
+  }
 }
 
 /** Namen der Teile in der Fortschrittsmeldung */
@@ -546,14 +667,19 @@ function Jahrgang({
       eingabe: { teil: teil.id, anzahl: teil.anzahl, bandId: band?.id ?? null, unitName, abschnitt: abschnittName, stand, vorhanden },
       sperrt: false,
       fehlerTitel: 'Karten konnten nicht erstellt werden',
-      arbeit: (e, k) => kartenErzeugen(e, rahmen, k.ai, (t) => k.melde(t)),
-      ablegen: async (karten) => {
+      arbeit: async (e, k) => {
+        const r = await kartenErzeugen(e, rahmen, k.ai, (t) => k.melde(t))
+        // Keine stille 0 (21.10.2026): ohne bestandene Karte endet der Auftrag mit dem Grund
+        if (!r.karten.length) throw new Error(r.bericht.geprueft ? pruefBerichtText(r.bericht) : 'Die KI lieferte keine Karten.')
+        return r
+      },
+      ablegen: async ({ karten }) => {
         speichereEntwuerfe([
           ...ladeEntwuerfe(),
           ...karten.map((karte) => ({ schluessel: String(karte.id), sprache: fach.sprache, jahrgang, teil: teil.id, karte: karte as unknown as Entwurf['karte'] }))
         ])
       },
-      abschluss: (karten) => `${karten.length} Karten zum Durchsehen in „Sprechprüfungen"`
+      abschluss: ({ karten, bericht }) => `${karten.length} Karten zum Durchsehen in „Sprechprüfungen" · ${pruefBerichtText(bericht)}`
     })
     notifySuccess('Die KI erstellt die Karten im Hintergrund – danach hier durchsehen und speichern.')
   }
@@ -597,17 +723,21 @@ function Jahrgang({
         let gespeichert = 0
         let fehlerZahl = 0
         let fehler: unknown = null
+        const summe: PruefBericht = { geprueft: 0, bestanden: 0, gruende: [] }
         for (const [i, x] of e.plan.entries()) {
           const vor = `${x.unit} › ${x.abschnitt} – ${TEIL_MEHRZAHL[x.teil]} (${i + 1} von ${e.plan.length})`
           k.melde(vor, i, e.plan.length)
           const stand: SprechStand = { band: e.bandName, unit: x.unit, abschnitt: x.abschnitt }
           try {
-            const karten = await kartenErzeugen(
+            const { karten, bericht } = await kartenErzeugen(
               { teil: x.teil, anzahl: x.anzahl, bandId: e.bandId, unitName: x.unit, abschnitt: x.abschnitt, stand, vorhanden: e.titelJeTeil[x.teil] },
               rahmen,
               k.ai,
               (t) => k.melde(`${vor}: ${t}`, i, e.plan.length)
             )
+            summe.geprueft += bericht.geprueft
+            summe.bestanden += bericht.bestanden
+            summe.gruende.push(...bericht.gruende)
             for (const roh of karten.slice(0, x.anzahl)) {
               const { bildPrompt, ...karte } = roh as Record<string, unknown> & { bildPrompt?: string }
               const r = await senden<{ id: string }>('/server/sprech-bank/speichern', { sprache: fach.sprache, jahrgang, teil: x.teil, karte })
@@ -625,14 +755,16 @@ function Jahrgang({
           }
         }
         if (fehler && !gespeichert) throw fehler
+        // Keine stille 0: hat nichts die Prüfung bestanden, steht der Grund in der Meldung
+        if (!gespeichert && summe.geprueft) throw new Error(pruefBerichtText(summe))
         if (fehler)
           notifyError(
             `Bei ${fehlerZahl} ${fehlerZahl === 1 ? 'Schritt' : 'Schritten'} brach die KI ab – das Übrige ist gespeichert. „Ganzes Lehrwerk füllen" noch einmal drücken füllt nur die Lücken.`
           )
-        return gespeichert
+        return { gespeichert, summe }
       },
       ablegen: async () => laden(),
-      abschluss: (n) => `${n} Karten gespeichert (${band.name})`
+      abschluss: ({ gespeichert, summe }) => `${gespeichert} Karten gespeichert (${band.name}) · ${pruefBerichtText(summe)}`
     })
     notifySuccess('Das Lehrwerk wird im Hintergrund gefüllt – die Karten erscheinen nach und nach.')
   }
@@ -877,6 +1009,16 @@ function Jahrgang({
         <KartenEditor
           k={(bearbeiten.p?.karte ?? bearbeiten.e!.karte) as SprechKarte}
           aktuell={stand}
+          amServer={pool.find((p) => p.id === bearbeiten.p?.id)?.karte}
+          neuesBild={
+            bearbeiten.p?.id && bearbeiten.p.teil === 'monolog'
+              ? (wunsch) => {
+                  const p = pool.find((q) => q.id === bearbeiten.p?.id) ?? bearbeiten.p!
+                  const b = p.karte as BildKarte
+                  bildErzeugen(p, [b.bildBeschreibung, wunsch && `Additional wish: ${wunsch}`].filter(Boolean).join(' '), laden)
+                }
+              : undefined
+          }
           schliessen={() => setBearbeiten(null)}
           speichern={(k) => {
             const teil = (bearbeiten.p?.teil ?? bearbeiten.e!.teil) as KartenTeil

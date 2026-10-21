@@ -33,6 +33,8 @@ export interface BildKarte {
   titel: string
   /** Bilddatei im Pool (…/sprechbilder/<datei>) – Oberstufe: bis zu 3 */
   bilder: string[]
+  /** Alle Fassungen des Bilds, die aktuelle eingeschlossen (21.10.2026, bildVersionen.ts) */
+  bildVersionen?: string[]
   /** Was auf dem Bild zu sehen ist (für die KI, die das Bild nicht sieht) */
   bildBeschreibung: string
   leitfragen: string[]
@@ -86,9 +88,13 @@ function karteOhneStand(roh: unknown, id: string): SprechKarte | null {
   }
   if (r.art === 'monolog') {
     const leitfragen = liste(r.leitfragen, 6)
-    const bilder = liste(r.bilder, 3).filter((b) => /^[a-f0-9]{8,40}\.(png|jpe?g|webp)$/i.test(b))
+    const datei = (b: string): boolean => /^[a-f0-9]{8,40}\.(png|jpe?g|webp)$/i.test(b)
+    const bilder = liste(r.bilder, 3).filter(datei)
+    const versionen = [...new Set([...liste(r.bildVersionen, 20).filter(datei), ...bilder])]
     const beschreibung = text(r.bildBeschreibung, 800)
-    return beschreibung && leitfragen.length ? { art: 'monolog', id, titel: text(r.titel, 80) || 'Picture', bilder, bildBeschreibung: beschreibung, leitfragen } : null
+    return beschreibung && leitfragen.length
+      ? { art: 'monolog', id, titel: text(r.titel, 80) || 'Picture', bilder, ...(versionen.length > bilder.length ? { bildVersionen: versionen } : {}), bildBeschreibung: beschreibung, leitfragen }
+      : null
   }
   if (r.art === 'dialog') {
     const form = r.form === 'infogap' || r.form === 'diskussion' ? r.form : 'rollenspiel'

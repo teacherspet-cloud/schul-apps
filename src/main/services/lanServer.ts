@@ -119,6 +119,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'medien:admin',
   // Stand der Bedeutungen (21.10.2026)
   'medien:sinn-stand',
+  'medien:mehrdeutig-liste',
   'audio:speak',
   'audio:preview',
   // ElevenLabs-Bibliothek: suchen und Stimme ins eigene Konto übernehmen (07.10.2026)

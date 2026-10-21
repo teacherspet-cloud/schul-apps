@@ -33,6 +33,8 @@ export interface MedienBedeutung {
   ohneBild?: Bildstufe[]
   quelle: 'migration' | 'ki' | 'hand' | 'neu'
   zeit: number
+  /** „Bild passt" (21.10.2026, App „Mehrdeutig"): Bedeutung und Bild von der Lehrkraft geprüft – Zeitpunkt */
+  geprueft?: number
 }
 
 /** Bild aus der Zeit vor den Bedeutungen, das noch einer Bedeutung zugeordnet werden muss (KI sieht es sich an) */
@@ -112,6 +114,33 @@ export function sinnBereinigt(x: unknown): SinnAngabe | undefined {
   if (!deutsch.trim() && typeof o.id !== 'string') return undefined
   return { ...(typeof o.id === 'string' && /^[0-9a-f]{8}$/.test(o.id) ? { id: o.id } : {}), wortart: o.wortart === 'verb' ? 'verb' : 'andere', deutsch }
 }
+
+/** Eine Fundstelle eines Wortes (Buch › Unit, wie im Buch) und welche Bedeutung sie meint */
+export interface Fundstelle {
+  quelle: string
+  term: string
+  translation: string
+  pos?: string
+  wortart: Wortart
+  /** Bedeutung, zu der die Übersetzung gehört – fehlt, wenn ungeklärt */
+  bedeutung?: string
+  wie: 'genau' | 'teil' | 'einzig' | 'mehrdeutig' | 'keine'
+}
+
+/** Eine Zeile der App: Lemma mit Fundstellen, Bedeutungen (Bild der Stufe) und alten Bildern */
+export interface MehrdeutigZeile {
+  schluessel: string
+  sprache: string
+  lemma: string
+  fundstellen: Fundstelle[]
+  bedeutungen: (Pick<MedienBedeutung, 'id' | 'wortart' | 'deutsch' | 'varianten' | 'geprueft'> & { bild?: BildTeil })[]
+  offen: { datei: string; stufe: Bildstufe; wortarten: Wortart[]; dataUrl?: string }[]
+  klaeren?: true
+  /** Warum die Zeile Klärung braucht (leer = geklärt) */
+  gruende: ('mehrere' | 'offen' | 'klaeren' | 'vorlaeufig' | 'ungeklaert')[]
+}
+
+export type MehrdeutigFilter = 'klaerung' | 'alle' | 'geprueft' | 'ohneBild'
 
 /** Eine einfache Anfrage nur mit dem Wort (ältere Seiten) */
 export const istEinfach = (a: MedienAnfrage): boolean => !a.de && !a.pos && !a.art
@@ -331,6 +360,8 @@ export interface KorpusWort {
   translation: string
   pos?: string
   art?: Wortart
+  /** Fundstelle („Green Line 3 › Unit 1", „Verbliste Green Line 4") – für die App „Mehrdeutig" */
+  quelle?: string
 }
 
 /** Bedeutungsgruppen je Lemma und Wortart (Vereinigung über gemeinsame Teile der Übersetzungen) */
