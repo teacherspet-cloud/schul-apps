@@ -1316,6 +1316,8 @@ interface AbgabeSicht {
   tagebuch?: string
   impuls?: string
   prozent?: number
+  /** Onlinetest: KI-Urteile noch unbestätigt (22.10.2026) */
+  vorlaeufig?: boolean
 }
 
 const ZWECK: Record<string, string> = { abschluss: 'Abschluss', reflexion: 'Selbsteinschätzung', einfuehrung: 'Einführung' }
@@ -1411,7 +1413,7 @@ function MaterialSeite({ d }: { d: ReiheDaten }): React.JSX.Element {
                     {ART[a.art] ?? a.art}
                     {a.zeit ? ` · ${new Date(a.zeit).toLocaleDateString('de-DE')}` : ''}
                     {a.eingereicht > 1 ? ` · ${a.eingereicht}× abgegeben` : ''}
-                    {a.prozent !== undefined ? ` · ${a.prozent} %` : ''}
+                    {a.prozent !== undefined ? ` · ${a.prozent} %${a.vorlaeufig ? ' (vorläufig)' : ''}` : ''}
                     {a.dateien ? ` · ${a.dateien} Datei${a.dateien === 1 ? '' : 'en'}` : ''}
                   </Text>
                 </div>

@@ -2,7 +2,8 @@
  * Haken der KI-Kanäle auf dem Server (22.10.2026, KI-Sicherheitsprüfung H7/M1/SSRF) – eigene Datei, damit bremse.ts
  * ohne Abhängigkeiten zu den Routen bleibt.
  */
-import { setzeAdressPruefer } from '../main/services/ai/kompatibel'
+import { setzeAbruf, setzeAdressPruefer } from '../main/services/ai/kompatibel'
+import { sichererAbruf } from './sichererAbruf'
 import { setzePlatzSchluessel, setzeSchulBudgetQuelle, setzeSchulModellPruefer } from '../main/services/ai/schulGrenzen'
 import { dnsAdressPruefer } from './bremse'
 import { aktuellerNutzer } from './kontext'
@@ -24,4 +25,6 @@ export function kiSchutzEinrichten(): void {
     return stand && stand.verbraucht > 0 ? stand : null
   })
   setzeAdressPruefer(dnsAdressPruefer)
+  // DNS-Rebinding: die Adresse der tatsächlichen Verbindung wird geprüft (sichererAbruf.ts)
+  setzeAbruf(sichererAbruf as typeof fetch)
 }

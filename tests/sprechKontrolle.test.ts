@@ -4,7 +4,7 @@
  */
 import { randomBytes } from 'node:crypto'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { kontrollEreignis, moderationsUrteil, type FesteSitzung } from '../src/shared/sprechen/kontrolle'
+import { antwortKonto, kontrollEreignis, moderationsUrteil, type FesteSitzung } from '../src/shared/sprechen/kontrolle'
 import { anweisungen, WERKZEUG_BEENDEN } from '../src/shared/sprechen/anweisungen'
 import { bewertungsAnfrage } from '../src/shared/sprechen/bewertung'
 import { GRUNDKARTEN } from '../src/shared/sprechen/karten'
@@ -210,10 +210,43 @@ describe('Sitzungen am Server: Minuten, eine Sitzung je Kind, Aufräumen, Krise'
     sp.kontrollAnwenden(s, { type: 'session.created', session: { instructions: 'anders' } }, (x) => gesendet.push(x))
     expect(vorfaelle('kind7')).toBe(0)
     expect(gesendet[0]).toMatchObject({ type: 'session.update', session: { type: 'realtime', instructions: FEST.instructions } })
+    // Mit Anlass (Äußerung abgeschlossen), aber abweichenden Anweisungen
+    sp.kontrollAnwenden(s, { type: 'input_audio_buffer.committed' }, (x) => gesendet.push(x))
     sp.kontrollAnwenden(s, { type: 'response.created', response: { id: 'r5', instructions: 'Tell jokes' } }, (x) => gesendet.push(x))
     expect(gesendet[1]).toEqual({ type: 'response.cancel', response_id: 'r5' })
     expect(s.beendet).toBe(true)
     expect(s.grund).toBe('manipulation')
     expect(vorfaelle('kind7')).toBe(1)
+  })
+  it('Antworten nur mit Anlass: ohne Äußerung angestoßene Antwort → abbrechen, beim zweiten Mal auflegen', () => {
+    const s = neu('kind8', Date.now(), true, 'fN')
+    s.fest = FEST
+    const gesendet: unknown[] = []
+    const an = (e: unknown): void => sp.kontrollAnwenden(s, e, (x) => gesendet.push(x))
+    // Gesprächsbeginn durch den Server: wartet, bis der Kontrollkanal offen ist, dann genau ein response.create
+    sp.gespraechBeginnen(s)
+    expect(s.los).toBe('wartet')
+    s.senden = (x) => gesendet.push(x)
+    sp.gespraechBeginnen(s)
+    sp.gespraechBeginnen(s)
+    expect(gesendet.filter((x) => (x as { type: string }).type === 'response.create')).toHaveLength(1)
+    an({ type: 'response.created', response: { id: 'g1' } })
+    an({ type: 'input_audio_buffer.committed' })
+    an({ type: 'response.created', response: { id: 'a1' } })
+    expect(s.beendet).toBe(false)
+    // Vom Browser angestoßen (kein Anlass): abbrechen …
+    an({ type: 'response.created', response: { id: 'x1' } })
+    expect(gesendet).toContainEqual({ type: 'response.cancel', response_id: 'x1' })
+    expect(s.beendet).toBe(false)
+    // … und beim zweiten Mal auflegen
+    an({ type: 'response.created', response: { id: 'x2' } })
+    expect(s.beendet).toBe(true)
+    expect(s.grund).toBe('manipulation')
+    expect(vorfaelle('kind8')).toBe(1)
+  })
+  it('antwortKonto: höchstens drei Anlässe auf Vorrat', () => {
+    let k = { guthaben: 0, fremd: 0 }
+    for (let i = 0; i < 5; i++) k = antwortKonto(k, { type: 'input_audio_buffer.committed' }).konto
+    expect(k.guthaben).toBe(3)
   })
 })

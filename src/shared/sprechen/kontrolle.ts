@@ -133,3 +133,30 @@ export function moderationsUrteil(r: unknown): 'krise' | 'unangemessen' | null {
   if (x.flagged === true) return 'unangemessen'
   return null
 }
+
+/**
+ * Antworten nur mit Anlass (22.10.2026, offener Punkt der KI-Sicherheitsprüfung): Ob `response.created` die Anweisungen
+ * einer vom Browser angestoßenen Antwort mitliefert, ist nicht belegt. Darum zählt der Server stattdessen die ANLÄSSE:
+ * Eine Antwort ist erlaubt nach einer abgeschlossenen Äußerung (input_audio_buffer.committed bzw. timeout_triggered der
+ * Pausenerkennung) oder nach einem response.create des Servers selbst (Gesprächsbeginn). Eine Antwort ohne Anlass hat
+ * der Browser angestoßen – vielleicht mit eigenen Anweisungen. Faustregel: die erste wird nur abgebrochen (falls die
+ * Pausenerkennung einmal anders zählt), ab der zweiten wird aufgelegt.
+ */
+export interface AntwortKonto {
+  guthaben: number
+  fremd: number
+}
+
+export type AntwortEntscheidung = 'ok' | 'abbrechen' | 'auflegen'
+
+export function antwortKonto(k: AntwortKonto, e: unknown): { konto: AntwortKonto; entscheidung: AntwortEntscheidung; antwortId?: string } {
+  const ev = obj(e)
+  const typ = String(ev?.type ?? '')
+  if (typ === 'input_audio_buffer.committed' || typ === 'input_audio_buffer.timeout_triggered')
+    return { konto: { ...k, guthaben: Math.min(k.guthaben + 1, 3) }, entscheidung: 'ok' }
+  if (typ !== 'response.created') return { konto: k, entscheidung: 'ok' }
+  const antwortId = typeof obj(ev?.response)?.id === 'string' ? String(obj(ev?.response)?.id) : undefined
+  if (k.guthaben > 0) return { konto: { ...k, guthaben: k.guthaben - 1 }, entscheidung: 'ok' }
+  const fremd = k.fremd + 1
+  return { konto: { ...k, fremd }, entscheidung: fremd >= 2 ? 'auflegen' : 'abbrechen', ...(antwortId ? { antwortId } : {}) }
+}

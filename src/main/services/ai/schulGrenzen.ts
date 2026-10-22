@@ -12,6 +12,8 @@ import type { SchulBudgetStand } from '@shared/verbrauch'
 export interface ModellWahl {
   anbieter: string
   modell: string
+  /** Bildauftrag (22.10.2026): geprüft gegen die Bildliste der Schule */
+  art?: 'bild'
 }
 
 let modellPruefer: ((w: ModellWahl) => ModellWahl) | null = null

@@ -60,8 +60,13 @@ export function vorgabeSchulModelle(): Record<string, string[]> {
     const liste = [DEFAULT_SETTINGS.ai.textModels[id], ...(BUILTIN_MODELS[id]?.text ?? []), istKompatibel(id) ? schulEndpunkt(id)?.modell?.trim() : '']
     aus[id] = [...new Set(liste.filter((m): m is string => Boolean(m)))]
   }
+  // Bildmodelle (22.10.2026, offener Punkt der KI-Sicherheitsprüfung): eigene Einträge „openai-bild“, „google-bild“
+  for (const id of BILD_ANBIETER) aus[`${id}-bild`] = [...new Set([DEFAULT_SETTINGS.ai.imageModels[id], ...(BUILTIN_MODELS[id]?.image ?? [])].filter(Boolean))]
   return aus
 }
+
+/** Anbieter mit Bildmodellen über einen API-Schlüssel */
+const BILD_ANBIETER = ['openai', 'google'] as const
 
 /** Geltende Freigabeliste je Anbieter (Admin, sonst Vorgabe) */
 export function schulModelle(): { modelle: Record<string, string[]>; eigen: boolean } {
@@ -74,7 +79,7 @@ export function schulModelle(): { modelle: Record<string, string[]>; eigen: bool
 /** Liste prüfen: bekannte Anbieter, je höchstens 20 Modellnamen */
 export function schulModelleBereinigen(roh: unknown): Record<string, string[]> | null {
   if (!roh || typeof roh !== 'object') return null
-  const erlaubt = new Set<string>(KI_ANBIETER())
+  const erlaubt = new Set<string>([...KI_ANBIETER(), ...BILD_ANBIETER.map((id) => `${id}-bild`)])
   const aus: Record<string, string[]> = {}
   for (const [k, v] of Object.entries(roh as Record<string, unknown>)) {
     if (!erlaubt.has(k)) continue
@@ -101,7 +106,8 @@ function ueberSchulSchluessel(anbieter: string): boolean {
  */
 export function schulModellPruefen(w: ModellWahl, liste: Record<string, string[]> = schulModelle().modelle, ueberSchule = ueberSchulSchluessel): ModellWahl {
   if (!ueberSchule(w.anbieter)) return w
-  const erlaubt = liste[w.anbieter] ?? []
+  // Bildaufträge gegen die Bildliste (22.10.2026)
+  const erlaubt = liste[w.art === 'bild' ? `${w.anbieter}-bild` : w.anbieter] ?? []
   if (erlaubt.includes(w.modell)) return w
   if (!erlaubt.length) throw new Error('Über den KI-Zugang der Schule ist für diesen Anbieter kein Modell freigegeben. Bitte die Verwaltung fragen.')
   return { anbieter: w.anbieter, modell: erlaubt[0] }

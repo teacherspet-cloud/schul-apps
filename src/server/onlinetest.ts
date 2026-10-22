@@ -1999,14 +1999,17 @@ export function reihenTestAnlegen(
 export const reihenTestCode = (testId: string): string | null => testNachId(testId)?.code ?? null
 
 /** Stand einer Person in einem Test: abgegeben? Prozent (sobald frei) */
-export function onlinetestStand(testId: string, schuelerId: string): { eingereicht: number; runden: number; prozent?: number } | null {
+export function onlinetestStand(testId: string, schuelerId: string): { eingereicht: number; runden: number; prozent?: number; vorlaeufig?: boolean } | null {
   const test = testNachId(testId)
   if (!test) return null
   const t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, schuelerId) as unknown as TeilnahmeZeile | undefined
   if (!t?.abgabe) return { eingereicht: 0, runden: 1 }
   const max = test.fassungen[t.variante]?.fassung.punkte ?? 0
-  const punkte = summe(json_(t.bewertung, {} as Bewertung))
-  return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}) }
+  const b = json_(t.bewertung, {} as Bewertung)
+  const punkte = summe(b)
+  // Unbestätigte KI-Urteile (22.10.2026): auch in Unterrichtsreihen als vorläufig kennzeichnen
+  const vorlaeufig = ergebnisVorlaeufig(b)
+  return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}), ...(vorlaeufig ? { vorlaeufig: true } : {}) }
 }
 
 /**

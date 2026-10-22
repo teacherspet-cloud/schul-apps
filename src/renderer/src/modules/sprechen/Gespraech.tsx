@@ -267,10 +267,25 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
         if ((e.type === 'response.output_audio_transcript.done' || e.type === 'response.audio_transcript.done') && e.transcript) setVerlauf((v) => [...v, { rolle: 'ki', text: e.transcript! }])
         if (e.type === 'response.function_call_arguments.done' && e.name === 'uebung_beenden') setTimeout(() => void beenden(), 4500)
       }
-      kanal.onopen = () => kanal.send(JSON.stringify({ type: 'response.create' }))
+      /*
+       * Gesprächsbeginn (22.10.2026, KI-Sicherheitsprüfung): Der Browser stößt keine Antwort der KI selbst an – er meldet
+       * nur „bereit“, und der Server startet das Gespräch über den Kontrollkanal. Jede Antwort ohne Anlass gilt dort als
+       * Manipulation.
+       */
+      let sitzungsId = ''
+      let kanalOffen = false
+      const bereit = (): void => {
+        if (sitzungsId && kanalOffen) void senden('/s/api/sprechen/los', { sitzung: sitzungsId }).catch(() => undefined)
+      }
+      kanal.onopen = () => {
+        kanalOffen = true
+        bereit()
+      }
       const angebot = await verbindung.createOffer()
       await verbindung.setLocalDescription(angebot)
       const r = await senden<StartAntwort>('/s/api/sprechen/start', { freigabe: f.id, teil, modus, sdp: angebot.sdp })
+      sitzungsId = r.sitzung
+      bereit()
       setStart(r)
       if (r.attrappe) {
         verbindung.close()

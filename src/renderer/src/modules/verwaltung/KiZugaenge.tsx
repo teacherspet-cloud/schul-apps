@@ -43,7 +43,9 @@ const DIENSTE: Record<string, string> = {
   pixabay: 'Pixabay (Bilder)'
 }
 
-export const anbieterName = (id: string): string => AI_PROVIDERS.find((p) => p.id === id)?.label ?? DIENSTE[id] ?? id
+export const anbieterName = (id: string): string =>
+  // Bildmodelle der Freigabeliste (22.10.2026): „openai-bild“ → „OpenAI – Bilder“
+  id.endsWith('-bild') ? `${anbieterName(id.slice(0, -5))} – Bilder` : (AI_PROVIDERS.find((p) => p.id === id)?.label ?? DIENSTE[id] ?? id)
 
 /** Kopfzeile eines Zugangs: „eingerichtet · für alle · Modell X · 3 Lehrkräfte" */
 export function standZeile(s: SchluesselEintrag, endpunkt: KompatibelEinstellung | undefined, lehrkraefte: number | undefined): string {

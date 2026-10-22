@@ -688,7 +688,15 @@ function abgabenFuer(r: Reihe, z: ZuweisungZeile, sid: string, stand: Stand): Ab
       case 'onlinetest': {
         if (!e?.eingereicht) return []
         const link = linkFuer(s, z, stand)
-        return [{ ...basis, eingereicht: e.eingereicht, ...(e.prozent !== undefined ? { prozent: e.prozent } : {}), ...(link ? { link } : {}) }]
+        return [
+          {
+            ...basis,
+            eingereicht: e.eingereicht,
+            ...(e.prozent !== undefined ? { prozent: e.prozent } : {}),
+            ...(e.vorlaeufig ? { vorlaeufig: true } : {}),
+            ...(link ? { link } : {})
+          }
+        ]
       }
       case 'aufgabe':
       case 'abschluss':

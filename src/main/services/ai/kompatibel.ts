@@ -128,8 +128,8 @@ export function istInterneIp(ip: string): boolean {
 /**
  * Auf dem Server zusätzlich den Namen auflösen und JEDE gelieferte Adresse prüfen (22.10.2026): Ein harmlos aussehender
  * Name kann auf 127.0.0.1 oder ins Container-Netz zeigen. `nachschlagen` liefert die Adressen (Server: dns.lookup) –
- * so bleibt diese Datei ohne Node-Abhängigkeit (iPad-App). Rest-Risiko (Faustregel): Ein Name, der zwischen Prüfung und
- * Abruf die Adresse wechselt (DNS-Rebinding), ist so nicht ganz ausgeschlossen.
+ * so bleibt diese Datei ohne Node-Abhängigkeit (iPad-App). DNS-Rebinding (Adresswechsel zwischen Prüfung und Abruf)
+ * schließt auf dem Server zusätzlich die prüfende Namensauflösung je Verbindung aus (server/sichererAbruf.ts).
  */
 export async function adresseAufgeloestPruefen(url: string, nachschlagen: (host: string) => Promise<string[]>): Promise<string | null> {
   const einfach = adressePruefen(url, true)
@@ -269,12 +269,21 @@ export const vergissFormate = (): void => {
 
 type Holen = typeof fetch
 
+/**
+ * Abruf für frei eingetragene Adressen (22.10.2026): auf dem Server mit prüfender Namensauflösung je Verbindung
+ * (server/sichererAbruf.ts – schließt DNS-Rebinding aus), am PC und auf dem iPad das normale fetch
+ */
+let standardAbruf: Holen = (...a) => fetch(...a)
+export const setzeAbruf = (fn: Holen | null): void => {
+  standardAbruf = fn ?? ((...a) => fetch(...a))
+}
+
 export class KompatibelProvider implements AiProvider {
   private label: string
 
   constructor(
     private ziel: KompatibelZiel,
-    private holen: Holen = (...a) => fetch(...a)
+    private holen: Holen = (...a) => standardAbruf(...a)
   ) {
     this.label = kompatibelVorgabe(ziel.id)?.label.replace(/\s*\(.*\)$/, '') ?? ziel.id
   }

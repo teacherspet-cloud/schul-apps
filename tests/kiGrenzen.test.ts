@@ -215,6 +215,12 @@ describe('Modelle über den Schulzugang', () => {
     expect(schulModellPruefen({ anbieter: 'openai', modell: 'gpt-5.5-pro' }, liste, () => false).modell).toBe('gpt-5.5-pro')
     expect(() => schulModellPruefen({ anbieter: 'anthropic', modell: 'claude-opus-5' }, liste, () => true)).toThrow(/kein Modell freigegeben/)
   })
+  it('Bildaufträge gegen die eigene Bildliste (22.10.2026)', () => {
+    const mitBild = { ...liste, 'openai-bild': ['gpt-image-2'] }
+    expect(schulModellPruefen({ anbieter: 'openai', modell: 'gpt-image-2-hd', art: 'bild' }, mitBild, () => true).modell).toBe('gpt-image-2')
+    expect(schulModellPruefen({ anbieter: 'openai', modell: 'gpt-image-2', art: 'bild' }, mitBild, () => true).modell).toBe('gpt-image-2')
+    expect(() => schulModellPruefen({ anbieter: 'google', modell: 'imagen-4', art: 'bild' }, mitBild, () => true)).toThrow(/kein Modell freigegeben/)
+  })
 })
 
 describe('Hartes Budget je Lehrkraft', () => {

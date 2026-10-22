@@ -887,10 +887,13 @@ async function generateImage(auftrag: string, signal?: AbortSignal): Promise<str
     datenordnerKennung(),
     (w) => {
       if (w.zugang === 'abo') return createCliProvider(w.provider).generateImage!(prompt, ai.subscriptionModels[w.provider], signal)
-      if (w.provider === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt, signal)
+      if (w.provider === 'anthropic')
+        return generateSvgImage(createProvider('anthropic'), erlaubteWahl({ anbieter: 'anthropic', modell: ai.textModels.anthropic }).modell, prompt, signal)
       const provider = createProvider(w.provider)
       if (!provider.generateImage) throw new Error('Dieser Anbieter kann keine Bilder erzeugen.')
-      return provider.generateImage(prompt, ai.imageModels[w.provider as 'openai' | 'google'], signal)
+      // Über den Schlüssel der Schule nur freigegebene Bildmodelle (22.10.2026, KI-Sicherheitsprüfung)
+      const bildModell = erlaubteWahl({ anbieter: w.provider, modell: ai.imageModels[w.provider as 'openai' | 'google'], art: 'bild' }).modell
+      return provider.generateImage(prompt, bildModell, signal)
     },
     istAbbruch
   )

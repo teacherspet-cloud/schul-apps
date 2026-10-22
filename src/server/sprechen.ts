@@ -50,7 +50,7 @@ import { GRUNDKARTEN, karteBereinigt, type SprechKarte } from '../shared/spreche
 import { bankKarten } from './sprechBank'
 import { punkteVon, type KriteriumId } from '../shared/sprechen/kriterien'
 import { hoechstMinuten, NIVEAUS, stufeVonNiveau, TEILE, zielNiveau, type Niveau, type SprechSprache, type Teil } from '../shared/sprechen/niveaus'
-import { kontrollEreignis, moderationsUrteil, type FesteSitzung } from '../shared/sprechen/kontrolle'
+import { antwortKonto, kontrollEreignis, moderationsUrteil, type AntwortKonto, type FesteSitzung } from '../shared/sprechen/kontrolle'
 import { LERNENDEN_FEHLER } from '../shared/kiSchutz'
 import { kiGrenzeMeldung } from '../shared/kiGrenzen'
 import { HILFETEXT, kriseMelden, kriseVerdacht } from './krise'
@@ -302,6 +302,12 @@ export interface Sitzung {
   key?: string
   /** Über den Schlüssel der Schule – nur dann wird aufs Budget gebucht (22.10.2026) */
   schule?: boolean
+  /** Antworten nur mit Anlass (kontrolle.ts › antwortKonto) */
+  konto?: AntwortKonto
+  /** Senden über den Kontrollkanal (gesetzt, sobald er offen ist) */
+  senden?: (x: unknown) => void
+  /** Gesprächsbeginn: der Browser ist bereit („los“), der Server stößt die erste Antwort an */
+  los?: 'wartet' | 'gesendet'
   ws?: WebSocket
   uhr?: ReturnType<typeof setTimeout>
 }
@@ -493,9 +499,53 @@ export function werkzeugBeenden(s: Sitzung, argumente: unknown): void {
   setTimeout(() => void beenden(s, a.grund === 'themenfremd' || a.grund === 'unangemessen' ? a.grund : 'fertig'), 4000).unref?.()
 }
 
+/** Erste Antwort durch den Server (nie durch den Browser) – mit Anlass im Antwortkonto */
+export function gespraechBeginnen(s: Sitzung): void {
+  if (s.beendet || s.los === 'gesendet') return
+  if (!s.senden) {
+    s.los = 'wartet'
+    return
+  }
+  s.los = 'gesendet'
+  s.konto = { guthaben: (s.konto?.guthaben ?? 0) + 1, fremd: s.konto?.fremd ?? 0 }
+  s.senden({ type: 'response.create' })
+}
+
+/** Ausgabe der KI moderieren: Unangemessenes beendet die Übung – ohne Vorfall für das Kind (es hat es nicht gesagt) */
+async function kiSagt(s: Sitzung, text: string): Promise<void> {
+  const t = text.trim()
+  s.transkript.push({ rolle: 'ki', text: t.slice(0, 1000) })
+  if (!t || !s.key || s.beendet) return
+  if (s.schule) fremdNutzungBuchen({ nutzerId: s.lehrkraftId, anbieter: 'openai', art: 'moderation', zeichen: t.length })
+  const r = await fetch('https://api.openai.com/v1/moderations', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${s.key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'omni-moderation-latest', input: t })
+  })
+    .then((x) => (x.ok ? x.json() : null))
+    .catch(() => null)
+  if (moderationsUrteil(r) && !s.beendet) {
+    protokolliereServer('sprechen', 'Ausgabe der Gesprächs-KI von der Moderation beanstandet – Übung beendet', s.schuelerId)
+    await beenden(s, 'unangemessen')
+  }
+}
+
 /** Kontrollkanal-Ereignis anwenden (Entscheidung: shared/sprechen/kontrolle.ts) */
 export function kontrollAnwenden(s: Sitzung, e: unknown, senden: (x: unknown) => void): void {
   if (!s.fest || s.beendet) return
+  // Antworten nur mit Anlass (22.10.2026): sonst hat der Browser sie angestoßen
+  const ak = antwortKonto(s.konto ?? { guthaben: 0, fremd: 0 }, e)
+  s.konto = ak.konto
+  if (ak.entscheidung !== 'ok') {
+    if (ak.antwortId) senden({ type: 'response.cancel', response_id: ak.antwortId })
+    else senden({ type: 'response.cancel' })
+    protokolliereServer('sprechen', `Kontrollkanal: Antwort ohne Anlass ${ak.entscheidung === 'auflegen' ? '– aufgelegt' : 'abgebrochen'}`, s.schuelerId)
+    if (ak.entscheidung === 'auflegen') {
+      vorfallMerken(s.freigabeId, s.schuelerId, 'manipulation', '')
+      void beenden(s, 'manipulation')
+    }
+    return
+  }
   const d = kontrollEreignis(e, s.fest)
   if (d.art === 'ok') return
   const typ = String((e as { type?: unknown })?.type ?? '')
@@ -524,6 +574,11 @@ function kontrollkanal(s: Sitzung): void {
   const senden = (x: unknown): void => {
     if (ws.readyState === 1) ws.send(JSON.stringify(x))
   }
+  ws.addEventListener('open', () => {
+    s.senden = senden
+    // Der Browser war schon bereit: jetzt die erste Antwort anstoßen
+    if (s.los === 'wartet') gespraechBeginnen(s)
+  })
   ws.addEventListener('message', (ev: MessageEvent) => {
     let e: { type?: string; transcript?: string; name?: string; arguments?: string }
     try {
@@ -532,14 +587,15 @@ function kontrollkanal(s: Sitzung): void {
       return
     }
     const typ = e.type ?? ''
+    // Anlässe für Antworten (abgeschlossene Äußerung) vor dem Verwerfen der Audio-Ereignisse zählen
+    if (typ === 'input_audio_buffer.committed' || typ === 'input_audio_buffer.timeout_triggered') return kontrollAnwenden(s, e, senden)
     // Audio-Ereignisse ungelesen verwerfen
     if (typ.includes('audio') && !typ.includes('transcript') && !typ.includes('transcription')) return
     // Jedes andere Ereignis gegen die festgelegte Sitzung prüfen (22.10.2026, KI-Sicherheitsprüfung)
     kontrollAnwenden(s, e, senden)
     if (s.beendet) return
     if (typ === 'conversation.item.input_audio_transcription.completed' && e.transcript) void schuelerSagt(s, e.transcript)
-    else if ((typ === 'response.output_audio_transcript.done' || typ === 'response.audio_transcript.done') && e.transcript)
-      s.transkript.push({ rolle: 'ki', text: e.transcript.slice(0, 1000) })
+    else if ((typ === 'response.output_audio_transcript.done' || typ === 'response.audio_transcript.done') && e.transcript) void kiSagt(s, e.transcript)
     else if (typ === 'response.function_call_arguments.done' && e.name === 'uebung_beenden') werkzeugBeenden(s, e.arguments)
   })
 }
@@ -763,6 +819,12 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
     if (!s || s.schuelerId !== ich.id) return json(res, 404, { fehler: 'Unbekannte Sitzung.' }), true
 
     // Attrappe (Browsertests): Gespräch ohne KI – die „KI" antwortet mit einer festen Frage
+    // Gesprächsbeginn (22.10.2026): der Browser meldet nur „bereit“, die erste Antwort stößt der Server an
+    if (url.pathname === '/s/api/sprechen/los') {
+      gespraechBeginnen(s)
+      return json(res, 200, { ok: true }), true
+    }
+
     if (url.pathname === '/s/api/sprechen/attrappe') {
       if (!s.attrappe) return json(res, 403, { fehler: 'Nicht erlaubt.' }), true
       await schuelerSagt(s, String(k0.text ?? ''))

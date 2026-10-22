@@ -507,6 +507,11 @@ export interface Extern {
   kriterien?: string[]
   /** Onlinetest: erreichte Prozent (nach Freigabe) */
   prozent?: number
+  /**
+   * Onlinetest (22.10.2026): Ergebnis noch vorläufig – KI-Urteile unbestätigt oder Antworten offen. Zur Anzeige; der Weg
+   * schaltet trotzdem frei (Übungsweg, keine Note).
+   */
+  vorlaeufig?: boolean
 }
 
 export type Status = 'gesperrt' | 'offen' | 'eingereicht' | 'geschafft' | 'nicht_geschafft' | 'uebersprungen'
