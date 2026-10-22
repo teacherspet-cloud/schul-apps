@@ -5,6 +5,9 @@ import { formatInfo } from '../formate'
 import { istLinie, istTextElement, neueId, type TbElement, type TbTafel } from '../model'
 import { kontextFuer, linienPunkte, tafelSvg, type SvgOptionen } from '../svg'
 import { sichtbareElemente } from '../varianten'
+import { werkzeugKuerzel, zeichenHilfe, type ZPunkt } from '@shared/zeichenTastatur'
+import { Fadenkreuz, useZeichenTastatur } from '../../../shared/useZeichenTastatur'
+import { ansagen } from '../../../shared/ansage'
 
 /**
  * Freie Zeichenfläche des Tafelbilds (30.09.2026): Elemente verschieben, Größe ändern, Text direkt
@@ -24,6 +27,11 @@ import { sichtbareElemente } from '../varianten'
  * Stift oder Finger (gestenLogik.ts, zeichnetZeiger): Maus und Stift zeichnen und verschieben, der
  * Finger rollt und zoomt – ein Antippen wählt aus, Doppeltippen ändert den Text. Mit „Mit dem Finger
  * zeichnen" bearbeitet auch der Finger.
+ *
+ * Tastatur (23.10.2026, Barrierefreiheit – WCAG 2.1.1, shared/zeichenTastatur.ts): Die Fläche ist per Tab erreichbar und
+ * zeigt ein Fadenkreuz. Zeichnen: Leertaste setzt den Stift auf/ab; Pfeil: Enter = Anfang, Enter = Ende; Verbinder: Enter
+ * auf dem ersten, dann auf dem zweiten Element; Auswahl: Enter wählt das Element unter dem Fadenkreuz (dann verschieben
+ * die Pfeiltasten es, Enter ändert den Text, Escape hebt die Auswahl auf). Tasten A/S/P/V wechseln das Werkzeug.
  */
 export type Werkzeug = 'auswahl' | 'zeichnen' | 'pfeil' | 'verbinder'
 
@@ -175,31 +183,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     // Der Finger (ohne „Mit dem Finger zeichnen") rollt die Fläche – das Ereignis geht weiter an den Browser
     if (zieht) ev.stopPropagation()
     if (p.werkzeug === 'verbinder' && modus === 'schieben' && !istLinie(e) && zieht) {
-      if (!verbinderVon) setVerbinderVon(id)
-      else if (verbinderVon !== id) {
-        const von = verbinderVon
-        p.aendern((t) => {
-          const a = t.elemente.find((x) => x.id === von)
-          const b = t.elemente.find((x) => x.id === id)
-          t.elemente.push({
-            id: neueId('v'),
-            typ: 'verbinder',
-            x: 0,
-            y: 0,
-            w: 0,
-            h: 0,
-            text: '',
-            farbe: 'grund',
-            schritt: Math.max(a?.schritt ?? 1, b?.schritt ?? 1),
-            von,
-            nach: id,
-            pfeilArt: 'pfeil',
-            schrift: (a?.schrift ?? f.schrift.text) * 0.85
-          })
-        })
-        setVerbinderVon(null)
-        p.setWerkzeug('auswahl')
-      }
+      verbinderWahl(id)
       return
     }
     if (p.werkzeug !== 'auswahl') return
@@ -217,6 +201,40 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     if (!zieht) return
     fange(ev.pointerId)
     zug.current = { id, modus, start: punkt(ev), orig: structuredClone(e), gruppe: `tb-zug-${id}-${jetzt}`, bewegt: false }
+  }
+
+  /** Verbinder: erstes, dann zweites Element (Zeiger und Tastatur); gibt den Stand zurück */
+  function verbinderWahl(id: string): 'erstes' | 'fertig' | null {
+    if (!verbinderVon) {
+      setVerbinderVon(id)
+      return 'erstes'
+    }
+    if (verbinderVon !== id) {
+      const von = verbinderVon
+      p.aendern((t) => {
+        const a = t.elemente.find((x) => x.id === von)
+        const b = t.elemente.find((x) => x.id === id)
+        t.elemente.push({
+          id: neueId('v'),
+          typ: 'verbinder',
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+          text: '',
+          farbe: 'grund',
+          schritt: Math.max(a?.schritt ?? 1, b?.schritt ?? 1),
+          von,
+          nach: id,
+          pfeilArt: 'pfeil',
+          schrift: (a?.schrift ?? f.schrift.text) * 0.85
+        })
+      })
+      setVerbinderVon(null)
+      p.setWerkzeug('auswahl')
+      return 'fertig'
+    }
+    return null
   }
 
   const bewege = (ev: React.PointerEvent): void => {
@@ -293,43 +311,13 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     if (striche) {
       const pts = striche
       setStriche(null)
-      if (pts.length > 2) {
-        const xs = pts.map((q) => q.x)
-        const ys = pts.map((q) => q.y)
-        const x0 = Math.min(...xs)
-        const y0 = Math.min(...ys)
-        const w = Math.max(0.01, Math.max(...xs) - x0)
-        const h = Math.max(0.01, Math.max(...ys) - y0)
-        const pfad = pts.map((q, i) => `${i ? 'L' : 'M'}${Math.round(((q.x - x0) / w) * 1000)} ${Math.round(((q.y - y0) / h) * 1000)}`).join('')
-        const id = neueId('s')
-        p.aendern((t) => {
-          // Striche kurz hintereinander an derselben Stelle gehören zu EINER Skizze
-          const letzte = t.elemente[t.elemente.length - 1]
-          if (letzte?.typ === 'skizze' && letzte.id === p.auswahl && !letzte.vorlage) {
-            const bx0 = Math.min(letzte.x, x0)
-            const by0 = Math.min(letzte.y, y0)
-            const bx1 = Math.max(letzte.x + letzte.w, x0 + w)
-            const by1 = Math.max(letzte.y + letzte.h, y0 + h)
-            const um = (px: number, py: number, ex: TbElement | { x: number; y: number; w: number; h: number }): string =>
-              `${Math.round(((ex.x + (px / 1000) * ex.w - bx0) / (bx1 - bx0)) * 1000)} ${Math.round(((ex.y + (py / 1000) * ex.h - by0) / (by1 - by0)) * 1000)}`
-            const umrechnen = (d: string, ex: { x: number; y: number; w: number; h: number }): string => d.replace(/([ML])(-?\d+) (-?\d+)/g, (_, c, a, b) => `${c}${um(Number(a), Number(b), ex)}`)
-            letzte.pfade = [...(letzte.pfade ?? []).map((d) => umrechnen(d, letzte)), umrechnen(pfad, { x: x0, y: y0, w, h })]
-            Object.assign(letzte, { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 })
-          } else t.elemente.push({ id, typ: 'skizze', x: x0, y: y0, w, h, text: '', farbe: 'grund', schritt: 1, pfade: [pfad] })
-        })
-        if (!p.auswahl || nachId.get(p.auswahl)?.typ !== 'skizze') p.setAuswahl(id)
-      }
+      skizzeAus(pts)
       return
     }
     if (pfeilNeu) {
       const { a, b } = pfeilNeu
       setPfeilNeu(null)
-      if (Math.hypot(b.x - a.x, b.y - a.y) > 0.02) {
-        const id = neueId('p')
-        p.aendern((t) => t.elemente.push({ id, typ: 'pfeil', x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y, text: '', farbe: 'grund', schritt: 1, pfeilArt: 'pfeil', schrift: f.schrift.text * 0.85 }))
-        p.setAuswahl(id)
-        p.setWerkzeug('auswahl')
-      }
+      pfeilAus(a, b)
       return
     }
     const z = zug.current
@@ -344,6 +332,48 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
       p.gruppeEnde()
       if (z.modus !== 'schieben') p.nachGeste?.(z.id)
     }
+  }
+
+  /** Striche → Skizze (Zeiger und Tastatur); false = zu kurz */
+  function skizzeAus(pts: { x: number; y: number }[]): boolean {
+    if (pts.length > 2) {
+      const xs = pts.map((q) => q.x)
+      const ys = pts.map((q) => q.y)
+      const x0 = Math.min(...xs)
+      const y0 = Math.min(...ys)
+      const w = Math.max(0.01, Math.max(...xs) - x0)
+      const h = Math.max(0.01, Math.max(...ys) - y0)
+      const pfad = pts.map((q, i) => `${i ? 'L' : 'M'}${Math.round(((q.x - x0) / w) * 1000)} ${Math.round(((q.y - y0) / h) * 1000)}`).join('')
+      const id = neueId('s')
+      p.aendern((t) => {
+        // Striche kurz hintereinander an derselben Stelle gehören zu EINER Skizze
+        const letzte = t.elemente[t.elemente.length - 1]
+        if (letzte?.typ === 'skizze' && letzte.id === p.auswahl && !letzte.vorlage) {
+          const bx0 = Math.min(letzte.x, x0)
+          const by0 = Math.min(letzte.y, y0)
+          const bx1 = Math.max(letzte.x + letzte.w, x0 + w)
+          const by1 = Math.max(letzte.y + letzte.h, y0 + h)
+          const um = (px: number, py: number, ex: TbElement | { x: number; y: number; w: number; h: number }): string =>
+            `${Math.round(((ex.x + (px / 1000) * ex.w - bx0) / (bx1 - bx0)) * 1000)} ${Math.round(((ex.y + (py / 1000) * ex.h - by0) / (by1 - by0)) * 1000)}`
+          const umrechnen = (d: string, ex: { x: number; y: number; w: number; h: number }): string => d.replace(/([ML])(-?\d+) (-?\d+)/g, (_, c, a, b) => `${c}${um(Number(a), Number(b), ex)}`)
+          letzte.pfade = [...(letzte.pfade ?? []).map((d) => umrechnen(d, letzte)), umrechnen(pfad, { x: x0, y: y0, w, h })]
+          Object.assign(letzte, { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 })
+        } else t.elemente.push({ id, typ: 'skizze', x: x0, y: y0, w, h, text: '', farbe: 'grund', schritt: 1, pfade: [pfad] })
+      })
+      if (!p.auswahl || nachId.get(p.auswahl)?.typ !== 'skizze') p.setAuswahl(id)
+      return true
+    }
+    return false
+  }
+
+  /** Pfeil von a nach b (Zeiger und Tastatur); false = zu kurz */
+  function pfeilAus(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+    if (Math.hypot(b.x - a.x, b.y - a.y) <= 0.02) return false
+    const id = neueId('p')
+    p.aendern((t) => t.elemente.push({ id, typ: 'pfeil', x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y, text: '', farbe: 'grund', schritt: 1, pfeilArt: 'pfeil', schrift: f.schrift.text * 0.85 }))
+    p.setAuswahl(id)
+    p.setWerkzeug('auswahl')
+    return true
   }
 
   const leerGedrueckt = (ev: React.PointerEvent): void => {
@@ -467,6 +497,112 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   const textEl = textId ? nachId.get(textId) : undefined
   const zeichenModus = p.werkzeug === 'zeichnen' || p.werkzeug === 'pfeil'
 
+  /*
+   * Tastatur (23.10.2026, Barrierefreiheit): Fadenkreuz in Punkten der ungezoomten Fläche, die Tafel rechnet 0 … 1.
+   * Nicht in der Präsentation (`tastatur === false`: dort blättern die Pfeiltasten).
+   */
+  const anteil = (q: ZPunkt): { x: number; y: number } => ({ x: q.x / groesse.w, y: q.y / groesse.h })
+  /** Oberstes sichtbares Element (keine Linie) unter dem Fadenkreuz */
+  const elementBei = (q: ZPunkt): TbElement | undefined => {
+    const a = anteil(q)
+    return [...sichtbar].reverse().find((e) => !istLinie(e) && a.x >= e.x && a.x <= e.x + e.w && a.y >= e.y && a.y <= e.y + e.h)
+  }
+  const tastStrich = useRef<{ x: number; y: number }[]>([])
+  const WERKZEUG_TASTE: Record<string, Werkzeug> = { a: 'auswahl', s: 'zeichnen', p: 'pfeil', v: 'verbinder' }
+  const WERKZEUG_NAME: Record<Werkzeug, string> = { auswahl: 'Auswahl', zeichnen: 'Frei zeichnen', pfeil: 'Pfeil', verbinder: 'Verbinder' }
+  const tasten = useZeichenTastatur({
+    breite: groesse.w,
+    hoehe: groesse.h,
+    modus: p.werkzeug === 'zeichnen' ? 'frei' : p.werkzeug === 'pfeil' ? 'zweiPunkte' : 'punkt',
+    aktiv: p.tastatur !== false && !textId,
+    bezeichnung: `Tafelbild: ${WERKZEUG_NAME[p.werkzeug]}`,
+    hilfe: zeichenHilfe(
+      p.werkzeug === 'zeichnen' ? 'frei' : p.werkzeug === 'pfeil' ? 'zweiPunkte' : 'punkt',
+      'Auswahl: Enter wählt das Element unter dem Fadenkreuz, dann verschieben die Pfeiltasten es, Enter ändert den Text, Entf löscht, Escape hebt die Auswahl auf. Verbinder: Enter auf dem ersten, dann auf dem zweiten Element. Werkzeuge: A Auswahl, S Zeichnen, P Pfeil, V Verbinder.'
+    ),
+    ding: 'Stift',
+    ergebnis: p.werkzeug === 'pfeil' ? 'Pfeil gezeichnet' : 'Strich gezeichnet',
+    merkSchluessel: 'tafelbild',
+    eigeneTaste: (ev) => {
+      // Strg/⌘+Z und +Y gehören dem Verlauf des Editors (ganze Gesten rückgängig)
+      if ((ev.ctrlKey || ev.metaKey) && /^[zy]$/i.test(ev.key)) return 'durchlassen'
+      const w = werkzeugKuerzel(ev, WERKZEUG_TASTE)
+      if (w) {
+        p.setWerkzeug(w)
+        setVerbinderVon(null)
+        ansagen(`${WERKZEUG_NAME[w]} gewählt`)
+        return 'erledigt'
+      }
+      // Gewähltes Element: Pfeiltasten und Entf gehören der Verschiebe-/Löschtaste der Fläche (oben)
+      if (p.werkzeug !== 'auswahl' || !p.auswahl) return
+      if (ev.key === 'Escape') {
+        p.setAuswahl(null)
+        ansagen('Auswahl aufgehoben')
+        return 'erledigt'
+      }
+      if (ev.key === 'Enter') {
+        const e = nachId.get(p.auswahl)
+        if (e && (istTextElement(e) || istLinie(e))) {
+          setTextId(e.id)
+          setTextWert(e.text)
+          return 'erledigt'
+        }
+      }
+      return 'durchlassen'
+    },
+    ausfuehren: (a, z) => {
+      if (p.werkzeug === 'zeichnen') {
+        if (a.art === 'aufsetzen') {
+          tastStrich.current = [anteil(a.punkt)]
+          setStriche([...tastStrich.current])
+        } else if (a.art === 'bewegen' && a.zeichnen) {
+          tastStrich.current = [...tastStrich.current, anteil(a.nach)]
+          setStriche(tastStrich.current)
+        } else if (a.art === 'absetzen') {
+          setStriche(null)
+          const pts = tastStrich.current
+          tastStrich.current = []
+          return skizzeAus(pts) ? 'Strich gezeichnet' : 'Stift abgesetzt – zu kurz für einen Strich'
+        } else if (a.art === 'ende') {
+          const v = anteil(a.von)
+          const n = anteil(a.nach)
+          return skizzeAus([v, { x: (v.x + n.x) / 2, y: (v.y + n.y) / 2 }, n]) ? 'Strich gezeichnet' : 'Zu kurz – nichts gezeichnet'
+        } else if (a.art === 'bewegen') return false
+      }
+      if (p.werkzeug === 'pfeil') {
+        if (a.art === 'start') setPfeilNeu({ a: anteil(a.punkt), b: anteil(a.punkt) })
+        else if (a.art === 'bewegen') {
+          if (z.start) setPfeilNeu({ a: anteil(z.start), b: anteil(a.nach) })
+          return false
+        } else if (a.art === 'ende') {
+          setPfeilNeu(null)
+          return pfeilAus(anteil(a.von), anteil(a.nach)) ? 'Pfeil gezeichnet' : 'Pfeil zu kurz – nichts gezeichnet'
+        } else if (a.art === 'abbrechen') setPfeilNeu(null)
+      }
+      if (a.art === 'punkt') {
+        const e = elementBei(a.punkt)
+        if (!e) return 'Kein Element an dieser Stelle'
+        const name = e.text?.trim() ? `„${e.text.trim().slice(0, 40)}“` : 'Element'
+        if (p.werkzeug === 'verbinder') {
+          const r = verbinderWahl(e.id)
+          return r === 'erstes' ? `${name} als Anfang gewählt – zum zweiten Element, dann Enter` : r === 'fertig' ? 'Verbinder gesetzt' : 'Bitte ein anderes Element wählen'
+        }
+        p.setAuswahl(e.id)
+        return `${name} ausgewählt – Pfeiltasten verschieben, Enter ändert den Text, Escape hebt die Auswahl auf`
+      }
+      if (a.art === 'bewegen') return false
+      if (a.art === 'loeschen') {
+        // Ohne Auswahl: das zuletzt hinzugekommene Element (ein Rückgängig-Schritt im Verlauf)
+        const letztes = p.tafel.elemente[p.tafel.elemente.length - 1]
+        if (!letztes) return 'Nichts zum Entfernen'
+        p.aendern((t) => {
+          t.elemente = t.elemente.filter((x) => x.id !== letztes.id && x.von !== letztes.id && x.nach !== letztes.id)
+        })
+        return 'Letztes Element entfernt'
+      }
+    }
+  })
+
   return (
     <div className="tb-flaechen-rahmen">
       <div className="tb-buehne" ref={buehne} data-tb-zoom={zoom} data-gezoomt={zoom > 1.001 || undefined}>
@@ -475,6 +611,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
             <div className="tb-svg" dangerouslySetInnerHTML={{ __html: svg }} />
             <svg
               ref={overlay}
+              {...tasten.flaeche}
               className={`tb-overlay${zeichenModus ? ' tb-zeichnen' : ''}${p.fingerZeichnet ? ' tb-finger' : ''}`}
               viewBox={`0 0 ${W} ${H}`}
               preserveAspectRatio="none"
@@ -520,6 +657,8 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
               )}
               {pfeilNeu && <line x1={pfeilNeu.a.x * W} y1={pfeilNeu.a.y * H} x2={pfeilNeu.b.x * W} y2={pfeilNeu.b.y * H} stroke="#fab005" strokeWidth={(3 * W) / bildschirm.w} />}
             </svg>
+            {tasten.hilfe}
+            {tasten.sichtbar && <Fadenkreuz z={tasten.zustand} />}
             {textEl && (
               <textarea
                 className="tb-textfeld"

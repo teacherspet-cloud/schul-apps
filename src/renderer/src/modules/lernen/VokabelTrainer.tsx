@@ -1423,6 +1423,8 @@ function AuswahlFs({
       <Text className="vt-frage">{mitFehlern ? 'Welche Schreibweise ist richtig?' : 'Welches Wort ist gemeint?'}</Text>
       <Group gap="xs">
         {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 44, height: 44 }} />}
+        {/* Bildnachweis als kleines ⓘ, ohne das gesuchte Wort (23.10.2026, Bildnachweise) */}
+        {v.bild && <BildNachweis kompakt ecke={false} text={v.bildNachweis} loesung={[v.term, v.translation]} />}
         <Text fw={800} size="1.8rem" c="var(--vt-tinte)">
           {v.translation}
         </Text>
@@ -1694,6 +1696,8 @@ function Schreiben({
       ) : (
         <Group gap="xs">
           {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 48, height: 48 }} />}
+          {/* Bildnachweis als kleines ⓘ, ohne das gesuchte Wort (23.10.2026, Bildnachweise) */}
+          {v.bild && <BildNachweis kompakt ecke={false} text={v.bildNachweis} loesung={[v.term, v.translation]} />}
           <Text fw={800} size="1.8rem">
             {v.translation}
           </Text>

@@ -5,13 +5,14 @@
  */
 import { abstand, aktive, ablenkerStufe, basisNeu, eines, fehlerMerken, gut, itemsZiehen, koopErgebnis, melde, mischen, rueckBlock, tx, type Basis, type Block, type Regeln, type StartKontext } from '../kern'
 import type { TextSchluessel } from '../../spielSprache'
+import { nachweisOhneLoesung } from '../../bildLizenz'
 import { ordnenGelegt, ordnenLegen, ordnenNeu, ordnenUmverteilen, type Ordnen } from './hilfen'
 import type { MehrspielId, SpielInhalt } from '../typen'
 
 export interface OrdnenRunde {
   itemIds: string[]
   hinweis: string
-  teile: { text: string; wert?: string; bild?: string; falle?: boolean }[]
+  teile: { text: string; wert?: string; bild?: string; bildNachweis?: string; falle?: boolean }[]
   /** Zeitstrahl: nach dem Ordnen je Teil die Zeitform nennen */
   benennen?: { text: string; loesung: string; optionen: string[]; itemId: string }[]
   /** Lösung als Text für die Rückmeldung */
@@ -112,7 +113,7 @@ export function ordnenSpiel(cfg: {
       b.push({
         typ: 'kacheln',
         titel: meine.length ? tx(z, 'deineTeile') : tx(z, 'keineTeile'),
-        kacheln: meine.map((k) => ({ id: k.id, text: k.text, ...(k.bild ? { bild: k.bild } : {}) })),
+        kacheln: meine.map((k) => ({ id: k.id, text: k.text, ...(k.bild ? { bild: k.bild } : {}), ...(k.bildNachweis ? { bildNachweis: k.bildNachweis } : {}) })),
         aktion: 'legen'
       })
       return b
@@ -191,7 +192,11 @@ export const bildergeschichte = ordnenSpiel({
       aus.push({
         itemIds: items.map((i) => i.id),
         hinweis: tx(z, 'dieGeschichte', items.map((i) => i.vok!.term).join(' → ')),
-        teile: items.map((i) => ({ text: '', wert: i.id, bild: i.vok!.bild })),
+        // Bildnachweis ohne das Wort (23.10.2026, Bildnachweise): die Karte zeigt nur das Bild
+        teile: items.map((i) => {
+          const nw = nachweisOhneLoesung(i.vok!.bildNachweis, [i.vok!.term, i.vok!.translation])
+          return { text: '', wert: i.id, bild: i.vok!.bild, ...(nw ? { bildNachweis: nw } : {}) }
+        }),
         loesung: items.map((i) => i.vok!.term).join(' → ')
       })
     }

@@ -22,7 +22,8 @@ import {
   IconTypography,
   IconX
 } from '@tabler/icons-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { BildNachweisListe, BildNachweisSammler, nachweiseOhneDoppelte, type NachweisEintrag } from '../../../shared/components/BildNachweis'
 import type { Vokabel, WortStand } from '@shared/vokabeltrainer'
 import { istRekord, SPIELE, spielWoerter, VERBSPIELE, type SpielId } from '@shared/vokabelSpiele'
 import { einzelBeschreibung, spielName, spielText } from '@shared/spielSprache'
@@ -243,7 +244,11 @@ export function Spielwahl({
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
+  // Bildnachweise der gezeigten Bilder (23.10.2026, Bildnachweise) – je Runde gesammelt, am Ende als kleine Liste
+  const nachweise = useRef<NachweisEintrag[]>([])
+  const sammeln = useCallback((e: NachweisEintrag) => void nachweise.current.push(e), [])
   const zeigeSpiel = (s: SpielId | null): void => {
+    if (s) nachweise.current = []
     setSpielRoh(s)
     spielt?.(Boolean(s))
     if (s && !blatt) window.scrollTo({ top: 0 })
@@ -256,7 +261,7 @@ export function Spielwahl({
     else blatt.zurueck(() => zeigeSpiel(null))
   }
   const [runde, setRunde] = useState(0)
-  const [ergebnis, setErgebnis] = useState<{ spiel: SpielId; wert: number; rekord: boolean; fehler: number } | null>(null)
+  const [ergebnis, setErgebnis] = useState<{ spiel: SpielId; wert: number; rekord: boolean; fehler: number; nachweise?: NachweisEintrag[] } | null>(null)
   // Je Spielstart einmal gemischt (06.10.2026: Mischung aus fälligen, wackeligen und sicheren Wörtern ist zufällig)
   const pool = useMemo(() => spielWoerter(woerter, staende), [woerter, staende, spiel, runde]) // eslint-disable-line react-hooks/exhaustive-deps
   const mitSatz = pool.filter((w) => w.example && w.example.split(/\s+/).length >= 3).length
@@ -274,7 +279,7 @@ export function Spielwahl({
       if (!spiel) return
       const id = spiel
       const rekord = istRekord(id, wert, rekorde[id])
-      setErgebnis({ spiel: id, wert, rekord, fehler: fehler.length })
+      setErgebnis({ spiel: id, wert, rekord, fehler: fehler.length, nachweise: nachweiseOhneDoppelte(nachweise.current) })
       ton('geschafft')
       setSpiel(null)
       void senden<{ rekorde: Record<string, number>; ansehen: string[] }>('/s/api/vokabeln/spiel', { id: listeId, spiel: id, wert, fehler }).then(
@@ -308,6 +313,7 @@ export function Spielwahl({
           </Button>
           <Text fw={800}>{spielName('vok', spiel, sprache, info(spiel).name)}</Text>
         </Group>
+        <BildNachweisSammler.Provider value={sammeln}>
         <div className="vt-buehne" key={runde}>
           {spiel === 'memory' ? (
             <Memory {...props} />
@@ -363,6 +369,7 @@ export function Spielwahl({
             <Suchsel {...props} />
           )}
         </div>
+        </BildNachweisSammler.Provider>
       </Stack>
       </FokusRahmen>
     )
@@ -402,6 +409,8 @@ export function Spielwahl({
             Nochmal
           </Button>
         </Group>
+        {/* Bildnachweise der Runde (23.10.2026): klein, aufklappbar */}
+        <BildNachweisListe eintraege={ergebnis.nachweise ?? []} />
       </Stack>
     )
   }

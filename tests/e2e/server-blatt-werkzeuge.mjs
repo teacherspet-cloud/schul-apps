@@ -5,7 +5,7 @@
 // Vorlage: das jüngste echte Arbeitsblatt mit Aufgaben aus dem lokalen Profil (nur gelesen).
 // Aufruf: node tests/e2e/server-blatt.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
-import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { expertenmodus } from './warten.mjs'
 
@@ -408,12 +408,17 @@ try {
     }
     return best?.nr
   }, ac.y)
-  // Material mit Zeilennummern geht mit (Zeilenangaben prüfbar) – und stimmt mit der gedruckten Nummer 5 überein
-  let anfrage = null
-  await s.route('**/s/api/blatt/aufgabe', async (r) => {
-    anfrage = JSON.parse(r.request().postData() ?? '{}')
-    await r.continue()
-  })
+  /*
+   * Material mit Zeilennummern geht an die KI – und stimmt mit der gedruckten Nummer 5 überein. Seit 22.10.2026 liest der
+   * SERVER das Material aus dem Blatt (das Gerät schickt keins mehr); geprüft wird darum der Auftrag an die KI über das
+   * Protokoll der Attrappe (SCHULAPPS_KI_ATTRAPPE).
+   */
+  const attrappeDatei = process.env.SCHULAPPS_KI_ATTRAPPE ?? ''
+  const protokollDatei = attrappeDatei ? join(out, 'ki-protokoll.jsonl') : ''
+  if (attrappeDatei) {
+    const a0 = JSON.parse(readFileSync(attrappeDatei, 'utf8'))
+    writeFileSync(attrappeDatei, JSON.stringify({ ...a0, protokoll: protokollDatei }))
+  }
   const fuenf = await s.evaluate(() => {
     const doc = document.querySelector('iframe').contentDocument
     const marke = [...doc.querySelectorAll('.ws-line-numbers span')].find((x) => x.textContent.trim() === '5')
@@ -436,7 +441,10 @@ try {
   await s.locator(`[data-aufgabe-pruefen="${nr}"]`).click()
   await s.locator('[data-aufgabe-pruefen-los]').click()
   await s.waitForTimeout(4000)
-  const zeile5 = /Z\. 5: (\S+)/.exec(anfrage?.material ?? '')?.[1]
+  const kiAuftrag = protokollDatei && existsSync(protokollDatei)
+    ? readFileSync(protokollDatei, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).filter((z) => z.schemaName === 'blatt_aufgabe_feedback').pop()
+    : null
+  const zeile5 = /Z\. 5: (\S+)/.exec(kiAuftrag ? `${kiAuftrag.user} ${kiAuftrag.system}` : '')?.[1]
   pruefe(Boolean(fuenf) && zeile5 === fuenf, `Material mit Zeilennummern an die KI, Z. 5 beginnt mit „${zeile5}" (gedruckt: „${fuenf}")`)
   const fehler = await s.locator('[data-pruef-fehler]').allInnerTexts()
   pruefe(fehler.length === 0 && (await s.getByText('Gelungen').count()) > 0, `KI-Prüfung der Zeitleisten-Aufgabe ${nr} liefert Feedback ${fehler.join(' ')}`)

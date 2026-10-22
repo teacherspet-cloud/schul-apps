@@ -10,8 +10,13 @@
  * - Koordinaten logisch (Breite 1000, tinte.ts) – dieselbe Tinte in Feld und Vergrößerung.
  * - `korrektur`: Die Fläche liegt über Wortkärtchen; Striche sind dann nur Korrekturzeichen
  *   (`onGeste`) und verschwinden nach dem Zeichnen.
+ * - Tastatur (23.10.2026, Barrierefreiheit – WCAG 2.1.1, shared/zeichenTastatur.ts): Tab auf die Fläche, Pfeiltasten
+ *   bewegen das Fadenkreuz, Leertaste setzt den Stift auf/ab, Entf nimmt den letzten Strich zurück. Ein Buchstabe
+ *   wechselt (mit `zurTastatur`) gleich in das Tippfeld.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { zeichenHilfe } from '@shared/zeichenTastatur'
+import { Fadenkreuz, useZeichenTastatur } from '../../shared/useZeichenTastatur'
 import { useStiftTouch } from './stiftScroll'
 import { BREITE, geste, radieren, wegkritzeln, type Geste, type Strich } from './tinte'
 
@@ -26,7 +31,9 @@ export function Schreibflaeche({
   onGeste,
   onRuhe,
   linien = true,
-  beschriftung
+  beschriftung,
+  rueckgaengig,
+  zurTastatur
 }: {
   striche: Strich[]
   onChange: (s: Strich[]) => void
@@ -39,6 +46,10 @@ export function Schreibflaeche({
   onRuhe?: () => void
   linien?: boolean
   beschriftung?: string
+  /** Entf/Rücktaste auf der Fläche (sonst: letzten Strich entfernen) */
+  rueckgaengig?: () => void
+  /** Tippen statt schreiben: ein Buchstabe auf der Fläche wechselt ins Tippfeld */
+  zurTastatur?: () => void
 }): React.JSX.Element {
   const leinwand = useRef<HTMLCanvasElement>(null)
   const huelle = useRef<HTMLDivElement>(null)
@@ -102,6 +113,70 @@ export function Schreibflaeche({
     return !(stiftGesehen.current && e.pointerType === 'touch')
   }
 
+  /** Strich beenden (Zeiger und Tastatur) */
+  function absetzen(): void {
+    const s = aktuell.current
+    aktuell.current = null
+    if (!s) return
+    if (radiert.current) {
+      radiert.current = false
+      zeichne()
+      return
+    }
+    const g = geste(s)
+    if (korrektur) {
+      // Über den Kärtchen sind Striche nur Korrekturzeichen
+      if (g) onGeste?.(g, s, breite)
+      zeichne()
+      return
+    }
+    if (g === 'kritzeln' && striche.length) onChange(wegkritzeln(striche, s))
+    else onChange([...striche, s])
+    if (onRuhe) ruhe.current = setTimeout(onRuhe, 1000)
+  }
+  // Tastatur (23.10.2026): Fadenkreuz in Bildschirmpunkten, die Tinte in logischen Koordinaten (÷ skala)
+  const logisch = (q: { x: number; y: number }): [number, number] => [q.x / skala, q.y / skala]
+  const tasten = useZeichenTastatur({
+    breite,
+    hoehe,
+    modus: 'frei',
+    aktiv: true,
+    bezeichnung: beschriftung ? `Schreibfläche: ${beschriftung}` : 'Schreibfläche',
+    hilfe: zeichenHilfe('frei', zurTastatur ? 'Lieber tippen: einfach einen Buchstaben drücken oder den Knopf „Tastatur“ wählen.' : ''),
+    ding: werkzeug === 'radierer' ? 'Radierer' : 'Stift',
+    ausfuehren: (a) => {
+      if (a.art === 'aufsetzen') {
+        if (ruhe.current) clearTimeout(ruhe.current)
+        radiert.current = werkzeug === 'radierer'
+        aktuell.current = [logisch(a.punkt)]
+        zeichne()
+      } else if (a.art === 'bewegen' && a.zeichnen && aktuell.current) {
+        aktuell.current.push(logisch(a.nach))
+        if (radiert.current) {
+          const neu = radieren(striche, aktuell.current.slice(-4), 14)
+          if (neu.length !== striche.length) onChange(neu)
+        } else zeichne()
+      } else if (a.art === 'absetzen' || a.art === 'abbrechen') absetzen()
+      else if (a.art === 'ende') {
+        radiert.current = werkzeug === 'radierer'
+        aktuell.current = [logisch(a.von), logisch(a.nach)]
+        absetzen()
+      } else if (a.art === 'loeschen') {
+        aktuell.current = null
+        if (rueckgaengig) rueckgaengig()
+        else if (striche.length) onChange(striche.slice(0, -1))
+        else return 'Nichts mehr rückgängig zu machen'
+        zeichne()
+      }
+    },
+    eigeneTaste: (e) => {
+      // Lostippen genügt: ein Buchstabe wechselt ins Tippfeld
+      if (!zurTastatur || e.ctrlKey || e.altKey || e.metaKey || e.key.length !== 1 || !/[\p{L}\p{N}]/u.test(e.key)) return
+      zurTastatur()
+      return 'erledigt'
+    }
+  })
+
   return (
     <div ref={huelle} style={{ position: 'relative', width: '100%', height: hoehe }}>
       {beschriftung && !striche.length && (
@@ -111,6 +186,7 @@ export function Schreibflaeche({
         ref={leinwand}
         data-schreibflaeche={korrektur ? 'korrektur' : 'schrift'}
         data-striche={striche.length}
+        {...tasten.flaeche}
         style={{ width: breite, height: hoehe, touchAction: beruehrung, display: 'block', cursor: werkzeug === 'radierer' ? 'cell' : 'crosshair' }}
         onPointerDown={(e) => {
           if (!nimmt(e)) return
@@ -133,31 +209,14 @@ export function Schreibflaeche({
             if (neu.length !== striche.length) onChange(neu)
           } else zeichne()
         }}
-        onPointerUp={() => {
-          const s = aktuell.current
-          aktuell.current = null
-          if (!s) return
-          if (radiert.current) {
-            radiert.current = false
-            zeichne()
-            return
-          }
-          const g = geste(s)
-          if (korrektur) {
-            // Über den Kärtchen sind Striche nur Korrekturzeichen
-            if (g) onGeste?.(g, s, breite)
-            zeichne()
-            return
-          }
-          if (g === 'kritzeln' && striche.length) onChange(wegkritzeln(striche, s))
-          else onChange([...striche, s])
-          if (onRuhe) ruhe.current = setTimeout(onRuhe, 1000)
-        }}
+        onPointerUp={absetzen}
         onPointerCancel={() => {
           aktuell.current = null
           zeichne()
         }}
       />
+      {tasten.hilfe}
+      {tasten.sichtbar && <Fadenkreuz z={tasten.zustand} farbe={werkzeug === 'radierer' ? '#e8590c' : '#d6336c'} />}
     </div>
   )
 }

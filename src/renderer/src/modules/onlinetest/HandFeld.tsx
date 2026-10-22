@@ -9,6 +9,9 @@
  *    und mit Korrekturzeichen direkt über den Kärtchen (tinte.ts):
  *      durchkritzeln oder durchstreichen → löschen · ∧ → einfügen · Kreis → ersetzen
  *  - Rückgängig, Radierer, Leeren, vergrößerte Schreibfläche, Wechsel zur Tastatur.
+ *  - Tastatur (23.10.2026, Barrierefreiheit – WCAG 2.1.1): Die Schreibfläche ist per Tab erreichbar und mit Pfeiltasten
+ *    und Leertaste bedienbar; ein Buchstabe oder der Knopf „Mit der Tastatur schreiben" wechselt ins Tippfeld (gleiche
+ *    Antwort), der Fokus springt mit und die Umstellung wird angesagt.
  *  - Keine Rechtschreibhilfe: Die Erkennung schreibt buchstabengetreu ab (handschrift.ts), die
  *    Tastatur ist ohne Autokorrektur und Rechtschreibprüfung.
  */
@@ -19,6 +22,7 @@ import { useStiftTouch } from './stiftScroll'
 import { woerterVon, type Erkennung } from './handschrift'
 import { Schreibflaeche, type Werkzeug } from './Schreibflaeche'
 import { geste, rahmen, schriftbild, type Strich } from './tinte'
+import { ansagen } from '../../shared/ansage'
 
 interface Karte {
   id: string
@@ -108,9 +112,24 @@ export function HandFeld({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const laeuftRef = useRef(false)
+  /*
+   * Zum Tippen wechseln (23.10.2026, Barrierefreiheit): ansagen und den Fokus ins neue Tippfeld an derselben Stelle legen
+   * (n-tes Hand-/Tippfeld der Seite – das Tippfeld ersetzt dieses Feld).
+   */
+  const huelle = useRef<HTMLDivElement>(null)
+  const tippen = (): void => {
+    const alle = [...document.querySelectorAll('[data-handfeld], [data-tastaturfeld]')]
+    const stelle = huelle.current ? alle.indexOf(huelle.current) : -1
+    zurTastatur()
+    ansagen('Tippfeld geöffnet – schreib deine Antwort mit der Tastatur')
+    setTimeout(() => {
+      const ziel = [...document.querySelectorAll<HTMLElement>('[data-handfeld], [data-tastaturfeld]')][stelle]
+      ziel?.querySelector<HTMLElement>('input, textarea')?.focus()
+    }, 60)
+  }
 
   return (
-    <Stack gap={4} data-handfeld={feld}>
+    <Stack gap={4} data-handfeld={feld} ref={huelle}>
       {beschriftung && (
         <Text size="sm" fw={500}>
           {beschriftung}
@@ -128,12 +147,20 @@ export function HandFeld({
           werkzeug={werkzeug}
           onRuhe={() => void erkenneHaupt()}
           beschriftung={karten.length ? 'weiterschreiben …' : 'hier schreiben …'}
+          rueckgaengig={rueckgaengig}
+          zurTastatur={tippen}
         />
       </div>
       <Group gap={4} justify="space-between" wrap="nowrap">
         <Group gap={4} wrap="nowrap">
           <Tooltip label="Stift">
-            <ActionIcon variant={werkzeug === 'stift' ? 'filled' : 'subtle'} onClick={() => setWerkzeug('stift')} aria-label="Stift" size="lg">
+            <ActionIcon
+              variant={werkzeug === 'stift' ? 'filled' : 'subtle'}
+              onClick={() => setWerkzeug('stift')}
+              aria-label="Stift"
+              aria-pressed={werkzeug === 'stift'}
+              size="lg"
+            >
               <IconPencil size={18} />
             </ActionIcon>
           </Tooltip>
@@ -142,6 +169,7 @@ export function HandFeld({
               variant={werkzeug === 'radierer' ? 'filled' : 'subtle'}
               onClick={() => setWerkzeug('radierer')}
               aria-label="Radierer"
+              aria-pressed={werkzeug === 'radierer'}
               size="lg"
               data-radierer
             >
@@ -177,7 +205,7 @@ export function HandFeld({
         <Group gap={6} wrap="nowrap">
           {laeuft && <Loader size="xs" />}
           <Tooltip label="Mit der Tastatur schreiben">
-            <ActionIcon variant="subtle" onClick={zurTastatur} aria-label="Tastatur" size="lg">
+            <ActionIcon variant="subtle" onClick={tippen} aria-label="Mit der Tastatur schreiben" size="lg" data-zur-tastatur>
               <IconKeyboard size={18} />
             </ActionIcon>
           </Tooltip>
@@ -462,15 +490,22 @@ function GrossesFeld({
             hoehe={220}
             werkzeug={werkzeug}
             onRuhe={() => void erkennen()}
+            rueckgaengig={() => setStriche(verlauf.current.pop() ?? [])}
             beschriftung="hier schreiben …"
           />
         </div>
         <Group justify="space-between">
           <Group gap={4}>
-            <ActionIcon variant={werkzeug === 'stift' ? 'filled' : 'subtle'} onClick={() => setWerkzeug('stift')} aria-label="Stift" size="lg">
+            <ActionIcon variant={werkzeug === 'stift' ? 'filled' : 'subtle'} onClick={() => setWerkzeug('stift')} aria-label="Stift" aria-pressed={werkzeug === 'stift'} size="lg">
               <IconPencil size={18} />
             </ActionIcon>
-            <ActionIcon variant={werkzeug === 'radierer' ? 'filled' : 'subtle'} onClick={() => setWerkzeug('radierer')} aria-label="Radierer" size="lg">
+            <ActionIcon
+              variant={werkzeug === 'radierer' ? 'filled' : 'subtle'}
+              onClick={() => setWerkzeug('radierer')}
+              aria-label="Radierer"
+              aria-pressed={werkzeug === 'radierer'}
+              size="lg"
+            >
               <IconEraser size={18} />
             </ActionIcon>
             <ActionIcon variant="subtle" onClick={() => setStriche(verlauf.current.pop() ?? [])} aria-label="Rückgängig" size="lg">
@@ -554,7 +589,7 @@ export function TastaturFeld({
       }
     : {}
   return (
-    <Group gap={4} align="end" wrap="nowrap">
+    <Group gap={4} align="end" wrap="nowrap" data-tastaturfeld>
       {lang ? (
         <Textarea_ value={wert} onChange={onChange} beschriftung={beschriftung} {...stift} />
       ) : (

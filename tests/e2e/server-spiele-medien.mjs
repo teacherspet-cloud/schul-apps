@@ -59,11 +59,13 @@ try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
   // ---------- Medien: Bild und Aufnahme für jedes Wort, Bild und Formen-Aufnahmen für jedes Verb
   for (const w of WOERTER) {
-    await api(verwaltung, 'medien:bild-setzen', 'en', w.term, { dataUrl: PNG, herkunft: 'ki', nachweis: 'Test' })
+    // Bilder je Bedeutung und Wortart (seit 0.4.151): wie die Medienleiste mit Wortart und Bedeutung setzen
+    const sinn = { wortart: w.term.startsWith('to ') ? 'verb' : 'andere', deutsch: w.translation }
+    await api(verwaltung, 'medien:bild-setzen', 'en', w.term, { dataUrl: PNG, herkunft: 'ki', nachweis: 'Test' }, 's2', sinn)
     await api(verwaltung, 'medien:ton-setzen', 'en', w.term, 'wort', { dataUrl: MP3, stimme: 'probe', text: w.term })
   }
-  for (const [inf, past, pp] of VERBEN) {
-    await api(verwaltung, 'medien:bild-setzen', 'en', inf, { dataUrl: PNG, herkunft: 'ki', nachweis: 'Test' })
+  for (const [inf, past, pp, de] of VERBEN) {
+    await api(verwaltung, 'medien:bild-setzen', 'en', inf, { dataUrl: PNG, herkunft: 'ki', nachweis: 'Test' }, 's2', { wortart: 'verb', deutsch: de })
     for (const f of [inf, past, pp]) await api(verwaltung, 'medien:ton-setzen', 'en', inf, 'satz', { dataUrl: MP3, stimme: 'probe', text: f })
   }
   const lehrer = await (
@@ -143,6 +145,8 @@ try {
   const spiele = async (id, fn) => {
     aktuell = id
     await alleAuf()
+    // Fehlt ein Spiel, zeigt das Bildschirmfoto, warum (23.10.2026)
+    if (!(await s.locator(`[data-spiel-wahl="${id}"]`).count())) await s.screenshot({ path: join(out, `fehlt-${id}.png`), fullPage: true })
     await s.locator(`[data-spiel-wahl="${id}"]`).click()
     await fn()
     await s.screenshot({ path: join(out, `2-${id}.png`) })

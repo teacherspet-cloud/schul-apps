@@ -17,6 +17,7 @@ import { sprich } from '../VokabelTrainer'
 import { useVtFarbe } from '../vtFarben'
 import { apostrophHinweis } from '../apostrophHinweis'
 import LoesungZeigen from '../LoesungZeigen'
+import { BildNachweis } from '../../../shared/components/BildNachweis'
 import { gemischt, useSekunden } from './SpieleErkennen'
 
 /** Was die Verbspiele brauchen */
@@ -28,6 +29,8 @@ export interface VerbDaten {
   /** Sprache für die Aussprache (wie bei den Vokabeln) */
   tonSprache: string
   bild: (k: VerbKarte) => string | undefined
+  /** Bildnachweis zum Bild (23.10.2026, Bildnachweise) – fehlt bei eigenen Bildern/OpenMoji */
+  nachweis?: (k: VerbKarte) => string | undefined
   /** Gibt es Ton (Aufnahme oder Gerätestimme)? */
   mitTon: boolean
   /** Gibt es für diese Sprache Muster? */
@@ -286,7 +289,11 @@ export function BildVerb({ verben: d, ende }: VerbSpielProps): React.JSX.Element
           {gut} richtig
         </Badge>
       </Group>
-      <img src={d.bild(k)} alt="" aria-hidden="true" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 16, background: '#fff' }} data-bildverb-bild={k.id} />
+      <div style={{ position: 'relative', width: 200, height: 200 }}>
+        <img src={d.bild(k)} alt="" aria-hidden="true" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 16, background: '#fff' }} data-bildverb-bild={k.id} />
+        {/* Bildnachweis als kleines ⓘ, ohne die gesuchten Formen (23.10.2026) */}
+        <BildNachweis kompakt text={d.nachweis?.(k)} loesung={[k.schluessel, ...Object.values(k.formen)]} label={k.schluessel} />
+      </div>
       <Text fw={700}>{k.de}</Text>
       {rueck !== null ? (
         <Badge role="status" aria-live="polite" size="xl" radius="md" color={rueck ? 'green' : 'red'} variant="light" tt="none" data-runde-urteil={rueck ? 'richtig' : 'falsch'}>

@@ -568,6 +568,11 @@ export interface TtsRequest {
   kontext?: { davor?: string; danach?: string }
   /** Sprechanweisung für OpenAI-Stimmen (`instructions`) statt der allgemeinen – z. B. für Einzelwörter */
   anweisung?: string
+  /**
+   * Skript des Hörtexts mit Sprechernamen (23.10.2026, Barrierefreiheit): Nur der Server liest es – als Transkript der
+   * Hörtext-Freigabe (src/server/hoertexte.ts); die Sprachausgabe nutzt allein `turns`.
+   */
+  skript?: string
 }
 
 export interface TtsResult {

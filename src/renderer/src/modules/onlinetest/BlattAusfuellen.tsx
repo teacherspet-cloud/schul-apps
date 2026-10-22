@@ -31,7 +31,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowBackUp, IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare } from '@tabler/icons-react'
+import { IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
@@ -42,6 +42,8 @@ import { kriseVerdacht } from '@shared/krise'
 import { KrisenHilfe } from '../../shared/KrisenHilfe'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
+// Stift-Ebene in eigener Datei – mit Tastaturbedienung (23.10.2026, Barrierefreiheit)
+import { TintenSeite } from './tintenSeite'
 import type { FormArt } from '@shared/blattObjekte'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
@@ -51,6 +53,8 @@ import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL }
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 import { KiMarke } from './KiMarke'
+import { BildNachweisListe } from '../../shared/components/BildNachweis'
+import { blattBildNachweise } from './testBildNachweise'
 import { useTouch } from '../../shared/touch/touchModus'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
@@ -582,6 +586,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const SPALTE = 0
   // Eine echte Querseite (Klassenattribut) – nicht die CSS-Regel, die in jedem Blatt steht
   const dokBreite = /class="ws-page ws-page-quer"/.test(d.html) ? QUER_BREITE : BREITE
+  // Bildnachweise der Schlussseite (23.10.2026, Bildnachweise) – für den kleinen Link am Fuß
+  const blattNachweise = useMemo(() => blattBildNachweise(d.html), [d.html])
   const massstab = Math.min(1.25, breite / dokBreite)
 
   const messe = useCallback((): void => {
@@ -1147,6 +1153,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         </Center>
       )}
 
+      {/* Bildnachweise des Blatts (23.10.2026): kleiner Link, klappt die Liste der Schlussseite auf */}
+      <BildNachweisListe eintraege={blattNachweise} />
       {meldung && <Alert color="red">{meldung}</Alert>}
       {offen && (
         <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', bottom: 8, zIndex: 5 }}>
@@ -1543,146 +1551,6 @@ function Ebene(p: {
           )
         })}
     </div>
-  )
-}
-
-/** Stift-Ebene einer Seite: Zeichnen mit Stift/Finger/Maus, Radierer, Rückgängig */
-function TintenSeite({
-  seite,
-  lage,
-  bild,
-  werkzeug,
-  farbe,
-  stil,
-  setTinte
-}: {
-  seite: number
-  lage: Seite
-  bild?: string
-  werkzeug: Werkzeug
-  farbe: string
-  /** Stärke und Linienart der nächsten Striche (Rechtsklick aufs Werkzeug, 06.10.2026) */
-  stil?: Stil
-  setTinte: (s: number, url: string) => void
-}): React.JSX.Element {
-  const leinwand = useRef<HTMLCanvasElement>(null)
-  const verlauf = useRef<string[]>([])
-  const zeichnet = useRef(false)
-  // Textmarker (03.10.2026, Befund der Lehrkraft: „übermalen … statt semitransparent"): Stand vor dem Strich
-  const vorStrich = useRef<ImageData | null>(null)
-  const strich = useRef<{ x: number; y: number }[]>([])
-  const AUFLOESUNG = 2
-  // Beim Laden und wenn die Seite wächst (neue Linien – die Leinwand wird dabei geleert): Bild in Originalgröße wieder einzeichnen
-  useEffect(() => {
-    const c = leinwand.current
-    if (!c || !bild) return
-    const img = new Image()
-    img.onload = () => c.getContext('2d')?.drawImage(img, 0, 0)
-    img.src = bild
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lage.w, lage.h])
-  const punkt = (e: React.PointerEvent): { x: number; y: number } => {
-    const r = leinwand.current!.getBoundingClientRect()
-    return { x: ((e.clientX - r.left) / r.width) * leinwand.current!.width, y: ((e.clientY - r.top) / r.height) * leinwand.current!.height }
-  }
-  const aktiv = werkzeug === 'stift' || werkzeug === 'marker' || werkzeug === 'radierer'
-  const fertig = (): void => {
-    if (!zeichnet.current) return
-    zeichnet.current = false
-    setTinte(seite, leinwand.current!.toDataURL('image/png'))
-  }
-  return (
-    <>
-      <canvas
-        ref={leinwand}
-        width={Math.round(lage.w * AUFLOESUNG)}
-        height={Math.round(lage.h * AUFLOESUNG)}
-        style={{
-          position: 'absolute',
-          left: lage.x,
-          top: lage.y,
-          width: lage.w,
-          height: lage.h,
-          pointerEvents: aktiv ? 'auto' : 'none',
-          touchAction: aktiv ? 'none' : 'auto',
-          zIndex: 10,
-          // Wie ein echter Textmarker: Farbe legt sich über den Text, der Text bleibt lesbar
-          mixBlendMode: 'multiply'
-        }}
-        data-tinte={seite}
-        onPointerDown={(e) => {
-          if (!aktiv) return
-          const ctx = leinwand.current!.getContext('2d')!
-          verlauf.current = [...verlauf.current.slice(-9), leinwand.current!.toDataURL('image/png')]
-          zeichnet.current = true
-          leinwand.current!.setPointerCapture(e.pointerId)
-          const { x, y } = punkt(e)
-          vorStrich.current = werkzeug === 'marker' ? ctx.getImageData(0, 0, leinwand.current!.width, leinwand.current!.height) : null
-          strich.current = [{ x, y }]
-          ctx.globalCompositeOperation = werkzeug === 'radierer' ? 'destination-out' : 'source-over'
-          // Textmarker: breit und durchscheinend (03.10.2026)
-          ctx.strokeStyle = werkzeug === 'marker' ? `${farbe}59` : farbe
-          const faktor = stil?.staerke === 1 ? 0.6 : stil?.staerke === 3 ? 1.7 : 1
-          ctx.lineWidth = (werkzeug === 'radierer' ? 22 : werkzeug === 'marker' ? 16 * faktor : 2.2 * faktor * (e.pressure ? 0.6 + e.pressure : 1)) * AUFLOESUNG
-          ctx.lineCap = werkzeug === 'marker' ? 'butt' : 'round'
-          // Gestrichelt/gepunktet nur beim Stift
-          const w = 2.2 * faktor * AUFLOESUNG
-          ctx.setLineDash(
-            werkzeug === 'stift' && stil?.linienArt === 'strich'
-              ? [w * 3.2, w * 2.4]
-              : werkzeug === 'stift' && stil?.linienArt === 'punkt'
-                ? [0.1, w * 2.3]
-                : []
-          )
-          ctx.lineJoin = 'round'
-          ctx.beginPath()
-          ctx.moveTo(x, y)
-          ctx.lineTo(x + 0.1, y + 0.1)
-          ctx.stroke()
-        }}
-        onPointerMove={(e) => {
-          if (!zeichnet.current) return
-          const ctx = leinwand.current!.getContext('2d')!
-          const { x, y } = punkt(e)
-          if (vorStrich.current) {
-            // Ein Strich = eine gleichmäßig durchscheinende Spur: Stand davor herstellen, Strich einmal ziehen
-            strich.current.push({ x, y })
-            ctx.putImageData(vorStrich.current, 0, 0)
-            ctx.beginPath()
-            strich.current.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-            ctx.stroke()
-            return
-          }
-          ctx.lineTo(x, y)
-          ctx.stroke()
-        }}
-        onPointerUp={fertig}
-        onPointerCancel={fertig}
-      />
-      {aktiv && (
-        <ActionIcon
-          variant="default"
-          style={{ position: 'absolute', left: lage.x + lage.w - 40, top: lage.y + 8, zIndex: 11 }}
-          aria-label="Rückgängig"
-          onClick={() => {
-            const vorher = verlauf.current.pop()
-            const c = leinwand.current!
-            const ctx = c.getContext('2d')!
-            ctx.globalCompositeOperation = 'source-over'
-            ctx.clearRect(0, 0, c.width, c.height)
-            if (!vorher) return setTinte(seite, c.toDataURL('image/png'))
-            const img = new Image()
-            img.onload = () => {
-              ctx.drawImage(img, 0, 0)
-              setTinte(seite, c.toDataURL('image/png'))
-            }
-            img.src = vorher
-          }}
-        >
-          <IconArrowBackUp size={16} />
-        </ActionIcon>
-      )}
-    </>
   )
 }
 

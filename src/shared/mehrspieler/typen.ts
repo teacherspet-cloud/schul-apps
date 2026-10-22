@@ -252,6 +252,8 @@ export interface SpielItem {
     beispiel?: string
     beispielDe?: string
     bild?: string
+    /** Bildnachweis für Lernende (23.10.2026): „KI-generiert“ bzw. Urheber · Lizenz – voll, ohne Kürzung */
+    bildNachweis?: string
   }
   /** Satz mit genau einem falschen Wort (Grammatik „Fehler finden" bzw. aus Beispielsätzen) */
   fehler?: {

@@ -19,6 +19,8 @@ export interface Kachel {
   id: string
   text?: string
   bild?: string
+  /** Bildnachweis (23.10.2026, Bildnachweise) – schon ohne Lösungswort (shared/bildLizenz.ts) */
+  bildNachweis?: string
   status?: 'gut' | 'schlecht' | 'aus' | 'markiert' | 'offen' | 'treffer' | 'wasser' | 'schiff'
   klein?: string
 }

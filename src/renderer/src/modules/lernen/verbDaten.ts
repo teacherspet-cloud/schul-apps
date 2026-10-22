@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { satzSchluessel } from '@shared/medienbank'
 import { bildVon } from '@shared/medienBedeutung'
+import { lernendenNachweis } from '@shared/bildLizenz'
 import { formSchluessel, formSpalten, type VerbKarte } from '@shared/verbTraining'
 import type { VerbSprache } from '@shared/verben'
 import { medienErgaenzen, medium } from './medienCache'
@@ -38,6 +39,11 @@ export function useVerbDaten(
     sprache,
     tonSprache: sprache,
     bild: (k) => bildVon(medium(k.schluessel), { term: k.schluessel, translation: k.de, wortart: 'verb' }, sprache)?.bild?.url,
+    // Bildnachweis für Lernende (23.10.2026, Bildnachweise): „KI-generiert“ bzw. Urheber · Lizenz
+    nachweis: (k) => {
+      const b = bildVon(medium(k.schluessel), { term: k.schluessel, translation: k.de, wortart: 'verb' }, sprache)?.bild
+      return (b?.url && lernendenNachweis(b)) || undefined
+    },
     mitTon: kannSprechen(sprache) || karten.some(aufnahme),
     mitMuster: musterDer(karten, sprache).size >= 4,
     schreiben

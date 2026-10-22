@@ -17,6 +17,7 @@
 import { anweisungFuer } from '../vokabeltest/model/blocks'
 import { mitOptionalem, teileVon } from '@shared/luecken'
 import { APOSTROPHE } from '@shared/apostroph'
+import { nachweisAusBildquelle, nachweisOhneLoesung } from '@shared/bildLizenz'
 import { abkuerzungAus, abkVergleich, auchRichtigAus, platzhalterNormal } from '@shared/abkuerzung'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
@@ -46,6 +47,8 @@ export interface OnlineEintrag {
   saetze?: { vor: string; nach: string; mitte?: string }[]
   hinweis?: string
   bild?: string
+  /** Bildnachweis für Lernende (23.10.2026, Bildnachweise): „KI-generiert“ bzw. „Bild: Urheber · Lizenz“ – ohne Lösungswort */
+  bildNachweis?: string
   /** Wörter (Odd one out, Durcheinander) */
   woerter?: string[]
   felder: Feld[]
@@ -57,6 +60,8 @@ export interface OnlineAufgabe {
   art: Block['kind'] | 'material'
   /** Material: gedrucktes HTML (ohne Lösungen) – gezeigt in einem abgeschotteten Rahmen mit `OnlineFassung.stil` */
   html?: string
+  /** Material: Bildnachweise der Bilder darin (23.10.2026, Bildnachweise) – klein unter dem Material */
+  bildnachweise?: string[]
   titel: string
   anweisung: string
   hilfe?: string
@@ -375,7 +380,14 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         if (b.wordBank) a.wortkasten = sortiertesWortkastenBild([...b.items.map((i) => i.answer), ...(b.extraBankWords ?? [])])
         for (const it of b.items) {
           const f = feldId(b.id, it.id)
-          a.eintraege.push({ einheit: f, ...(it.image?.dataUrl ? { bild: it.image.dataUrl } : {}), felder: [{ id: f, art: 'text' }] })
+          // Bildnachweis ohne das gesuchte Wort (23.10.2026, Bildnachweise) – Titel/Dateinamen verraten es sonst
+          const nachweis = it.image?.dataUrl ? nachweisOhneLoesung(nachweisAusBildquelle(it.image), [it.answer, ...(it.auchRichtig ?? [])]) : null
+          a.eintraege.push({
+            einheit: f,
+            ...(it.image?.dataUrl ? { bild: it.image.dataUrl } : {}),
+            ...(nachweis ? { bildNachweis: nachweis } : {}),
+            felder: [{ id: f, art: 'text' }]
+          })
           // Auch richtig (10.10.2026): Antworten, die zum Bild ebenso passen (KI-Prüfung bzw. Lehrkraft)
           loesungen[f] = { art: 'genau', werte: [it.answer, ...(it.auchRichtig ?? [])], artikelFrei: true }
           einheit(f, [f])

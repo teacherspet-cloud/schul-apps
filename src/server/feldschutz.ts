@@ -60,7 +60,8 @@ export const SENSIBEL: Record<string, string[]> = {
   // Achievements der Lernenden (08.10.2026)
   achievements: ['daten'],
   tafel_freigaben: ['schueler', 'titel', 'thema', 'bilder'],
-  hoertext_freigaben: ['titel'],
+  // Transkript für Lernende (23.10.2026, Barrierefreiheit): Skript und Wahl samt ausgewählter Lernender (Nachteilsausgleich)
+  hoertext_freigaben: ['titel', 'transkript', 'transkript_wahl'],
   // Schüler-Startseite (06.10.2026): Wochen-Schnappschuss und Lerntipp je Person (lernstand.ts)
   lern_wochen: ['daten'],
   // Darstellung der Lernenden (Leseschrift, Vorlesen, Zeilenabstand …) und Prüfprotokoll, 08.10.2026

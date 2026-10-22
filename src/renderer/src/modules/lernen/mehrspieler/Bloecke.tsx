@@ -9,6 +9,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { spielText, type TextSchluessel } from '@shared/spielSprache'
 import type { Block, Kachel } from '@shared/mehrspieler/kern'
 import { kannSprechen, sprich } from '../VokabelTrainer'
+import { BildNachweis } from '../../../shared/components/BildNachweis'
 
 type Senden = (aktion: string, wert?: unknown) => void
 
@@ -163,14 +164,24 @@ function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden:
               {gewaehlt && <IconCheck size={14} />}
             </Card>
           )
-          return tippbar ? (
-            <UnstyledButton key={k.id} onClick={() => klick(k)} aria-pressed={gewaehlt} data-mehr-kachel={k.id} data-status={k.status}>
+          // Bildnachweis (23.10.2026, Bildnachweise): kleines ⓘ NEBEN dem Knopf in seiner Ecke – löst die Kachel nicht aus
+          const nachweis = k.bild && k.bildNachweis ? <BildNachweis kompakt text={k.bildNachweis} /> : null
+          const kachel = tippbar ? (
+            <UnstyledButton key={k.id} onClick={() => klick(k)} aria-pressed={gewaehlt} data-mehr-kachel={k.id} data-status={k.status} w={nachweis ? '100%' : undefined}>
               {inhalt}
             </UnstyledButton>
           ) : (
             <div key={k.id} data-mehr-kachel-fest={k.id} data-status={k.status}>
               {inhalt}
             </div>
+          )
+          return nachweis ? (
+            <div key={k.id} style={{ position: 'relative' }}>
+              {kachel}
+              {nachweis}
+            </div>
+          ) : (
+            kachel
           )
         })}
       </SimpleGrid>

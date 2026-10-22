@@ -293,12 +293,16 @@ export default function Bearbeiten(): React.JSX.Element | null {
     }
   }
 
+  // Tastenkürzel auf der Zeichenfläche (23.10.2026, Barrierefreiheit): S Zeichnen, P Pfeil, V Verbinder, A Auswahl
+  const WERKZEUG_TASTE: Partial<Record<Werkzeug, string>> = { zeichnen: 'S', pfeil: 'P', verbinder: 'V' }
   const werkzeugKnopf = (w: Werkzeug, label: string, icon: React.ReactNode): React.JSX.Element => (
-    <Tooltip label={label}>
+    <Tooltip label={WERKZEUG_TASTE[w] ? `${label} (Taste ${WERKZEUG_TASTE[w]} auf der Zeichenfläche)` : label}>
       <ActionIcon
         variant={werkzeug === w ? 'filled' : 'default'}
         size="lg"
         aria-label={label}
+        aria-pressed={werkzeug === w}
+        aria-keyshortcuts={WERKZEUG_TASTE[w]}
         onClick={() => setWerkzeug(werkzeug === w ? 'auswahl' : w)}
         data-tb-werkzeug={w}
       >

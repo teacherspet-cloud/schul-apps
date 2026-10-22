@@ -21,12 +21,16 @@ import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
 import LegeEingabe from '../handschrift/LegeEingabe'
 import { useZuSchnell } from '../zuSchnell'
 import LoesungZeigen from '../LoesungZeigen'
+import { spielNachweis } from './spielNachweis'
 
 /** Ab diesem Fach wird geschrieben statt gewählt (abgestimmt 07.10.2026) */
 export const SCHREIBEN_AB_FACH = 3
 const schreibt = (v: Vokabel, staende?: Record<string, WortStand>): boolean => (staende?.[v.id]?.fach ?? 0) >= SCHREIBEN_AB_FACH
 
 const BILD: React.CSSProperties = { width: '100%', height: '100%', objectFit: 'contain', borderRadius: 12, background: '#fff' }
+
+/** Rahmen einer Karte mit Bild: das ⓘ liegt NEBEN der Karte (kein Knopf im Knopf), in ihrer Ecke */
+const ECKE: React.CSSProperties = { position: 'relative' }
 
 /** Antwort: vier Möglichkeiten oder schreiben (je nach Fach) – meldet richtig/falsch */
 function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; schreiben: boolean; fertig: (richtig: boolean) => void }): React.JSX.Element {
@@ -114,7 +118,7 @@ function PaarMemory({
   beimAufdecken
 }: {
   spiel: string
-  karten: { key: string; wid: string; seite: 'a' | 'b'; inhalt: React.ReactNode; label: string }[]
+  karten: { key: string; wid: string; seite: 'a' | 'b'; inhalt: React.ReactNode; label: string; nachweis?: React.ReactNode }[]
   hinweis: string
   ende: SpielProps['ende']
   beimAufdecken?: (k: { wid: string; seite: 'a' | 'b' }) => void
@@ -152,20 +156,24 @@ function PaarMemory({
         {karten.map((k) => {
           const sichtbar = offen.includes(k.key) || gefunden.has(k.wid)
           return (
-            <button
-              key={k.key}
-              type="button"
-              onClick={() => tippen(k)}
-              className={`vt-memory ${sichtbar ? 'auf' : ''} ${gefunden.has(k.wid) ? 'gefunden' : ''}`}
-              data-memory-karte={k.wid}
-              data-memory-seite={k.seite}
-              aria-label={sichtbar ? k.label : 'Verdeckte Karte'}
-            >
-              <span className="vt-memory-innen">
-                <span className="vt-memory-zu">?</span>
-                <span className={`vt-memory-auf ${k.seite === 'a' ? 'fs' : 'de'}`}>{k.inhalt}</span>
-              </span>
-            </button>
+            <div key={k.key} style={ECKE}>
+              <button
+                type="button"
+                onClick={() => tippen(k)}
+                className={`vt-memory ${sichtbar ? 'auf' : ''} ${gefunden.has(k.wid) ? 'gefunden' : ''}`}
+                style={{ width: '100%', display: 'block' }}
+                data-memory-karte={k.wid}
+                data-memory-seite={k.seite}
+                aria-label={sichtbar ? k.label : 'Verdeckte Karte'}
+              >
+                <span className="vt-memory-innen">
+                  <span className="vt-memory-zu">?</span>
+                  <span className={`vt-memory-auf ${k.seite === 'a' ? 'fs' : 'de'}`}>{k.inhalt}</span>
+                </span>
+              </button>
+              {/* Nachweis erst auf der offenen Bildkarte (23.10.2026) */}
+              {sichtbar && k.nachweis}
+            </div>
           )
         })}
       </SimpleGrid>
@@ -209,7 +217,7 @@ export function BildMemory({ woerter, sprache, ende }: SpielProps): React.JSX.El
         gemischt(spielBildWoerter(woerter, sprache))
           .slice(0, 6)
           .flatMap((v) => [
-            { key: `${v.id}-b`, wid: v.id, seite: 'a' as const, inhalt: <img src={v.bild} alt={v.translation} style={BILD} />, label: 'Bildkarte' },
+            { key: `${v.id}-b`, wid: v.id, seite: 'a' as const, inhalt: <img src={v.bild} alt={v.translation} style={BILD} />, label: 'Bildkarte', nachweis: spielNachweis(v) },
             { key: `${v.id}-w`, wid: v.id, seite: 'b' as const, inhalt: spielform(v.term), label: spielform(v.term) }
           ])
       ),
@@ -294,9 +302,12 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
       <ActionIcon size={64} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(runde.v.term, sprache)} aria-label="Noch einmal anhören">
         <IconVolume size={32} />
       </ActionIcon>
-      <div style={{ width: 200, height: 200, display: 'grid', placeItems: 'center' }} data-gezeigt={runde.zeige.id}>
+      <div style={{ width: 200, height: 200, display: 'grid', placeItems: 'center', position: 'relative' }} data-gezeigt={runde.zeige.id}>
         {runde.zeige.bild ? (
-          <img src={runde.zeige.bild} alt={runde.zeige.translation} style={BILD} />
+          <>
+            <img src={runde.zeige.bild} alt={runde.zeige.translation} style={BILD} />
+            {spielNachweis(runde.zeige)}
+          </>
         ) : (
           <Text fz={26} fw={800} ta="center">
             {runde.zeige.translation}
@@ -515,13 +526,14 @@ export function HoerBingo({ woerter, sprache, ende }: SpielProps): React.JSX.Ele
       </ActionIcon>
       <SimpleGrid cols={n} spacing={6} w="100%" maw={460}>
         {feld.map((w, i) => (
+          <div key={w.id} style={ECKE}>
           <button
-            key={w.id}
             type="button"
             onClick={() => tippen(i)}
             className="vt-such"
             data-bingo-feld={w.id}
             style={{
+              width: '100%',
               aspectRatio: '1',
               display: 'grid',
               placeItems: 'center',
@@ -533,6 +545,8 @@ export function HoerBingo({ woerter, sprache, ende }: SpielProps): React.JSX.Ele
           >
             {w.bild ? <img src={w.bild} alt={spielform(w.term)} style={{ ...BILD, opacity: markiert.has(i) ? 0.5 : 1 }} /> : spielform(w.term)}
           </button>
+          {spielNachweis(w)}
+          </div>
         ))}
       </SimpleGrid>
     </Stack>
@@ -599,14 +613,21 @@ export function WasFehlt({ woerter, sprache, ende, staende }: SpielProps): React
               border: '1px solid var(--vt-a-rand)',
               background: 'var(--vt-flaeche)',
               display: 'grid',
-              placeItems: 'center'
+              placeItems: 'center',
+              position: 'relative'
             }}
             data-kim-bild={w.id}
           >
             {phase === 'merken' || w.id !== runde.fehlt.id ? (
-              <img src={w.bild} alt={w.translation} style={BILD} />
+              <>
+                <img src={w.bild} alt={w.translation} style={BILD} />
+                {spielNachweis(w)}
+              </>
             ) : phase === 'rueck' ? (
-              <img src={w.bild} alt={w.translation} style={{ ...BILD, outline: `3px solid var(--vt-${ok ? 'gut' : 'schlecht'}-rand)` }} />
+              <>
+                <img src={w.bild} alt={w.translation} style={{ ...BILD, outline: `3px solid var(--vt-${ok ? 'gut' : 'schlecht'}-rand)` }} />
+                {spielNachweis(w)}
+              </>
             ) : (
               <Text fz={36} c="dimmed">
                 ?
@@ -686,6 +707,8 @@ export function BildAufdecken({ woerter, sprache, ende, staende }: SpielProps): 
             />
           ))}
         </div>
+        {/* Über den Kacheln: verrät nichts (ohne Wort und Übersetzung), deckt kaum etwas ab (23.10.2026) */}
+        {spielNachweis(v)}
       </div>
       {rueck === null ? (
         <Antwort key={v.id} v={v} alle={spielBildWoerter(woerter, sprache)} schreiben={schreibt(v, staende)} fertig={fertig} />
@@ -749,12 +772,13 @@ export function WortBild({ woerter, sprache, ende }: SpielProps): React.JSX.Elem
         {optionen.map((w) => {
           const zustand = gewaehlt ? (w.id === v.id ? 'gut' : w.id === gewaehlt ? 'schlecht' : undefined) : undefined
           return (
+            <div key={w.id} style={ECKE}>
             <button
-              key={w.id}
               type="button"
               onClick={() => waehle(w)}
               data-bild-option={w.id}
               style={{
+                width: '100%',
                 aspectRatio: '1',
                 padding: 6,
                 borderRadius: 14,
@@ -765,6 +789,8 @@ export function WortBild({ woerter, sprache, ende }: SpielProps): React.JSX.Elem
             >
               <img src={w.bild} alt={w.translation} style={BILD} />
             </button>
+            {spielNachweis(w)}
+            </div>
           )
         })}
       </SimpleGrid>

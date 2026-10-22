@@ -38,10 +38,12 @@ import { BAND_RANG, type Frage, type SpielInhalt, type SpielItem } from '../type
 import { frageItems } from './hilfen'
 import { normiert } from '../../grammatiktrainer'
 import { einfacheSprache, textSprache, wortartVon } from '../../spielSprache'
+import { nachweisOhneLoesung } from '../../bildLizenz'
 
 interface Hinweis {
   text: string
   bild?: string
+  bildNachweis?: string
 }
 interface Z extends Basis {
   /** Codewort und seine Bedeutung – nur auf dem Server */
@@ -156,7 +158,9 @@ function hinweiseFuer(z: Basis, item: SpielItem | null, wort: string, inhalt: Sp
   const artSatz: Hinweis | null = art ? { text: tx(z, art === 'nomen' ? 'hNomen' : art === 'verb' ? 'hVerb' : art === 'adj' ? 'hAdj' : 'hAdv') } : null
   const luecke: Hinweis | null = v.luecke ? { text: tx(z, 'hLuecke', `${v.luecke.vor}___${v.luecke.nach}`) } : null
   const synonym = synonymVon(inhalt, wort)
-  const bild: Hinweis | null = v.bild ? { text: tx(z, 'hBild'), bild: v.bild } : null
+  // Bildnachweis ohne das gesuchte Wort (23.10.2026, Bildnachweise)
+  const nw = v.bild ? nachweisOhneLoesung(v.bildNachweis, [v.term, v.translation]) : null
+  const bild: Hinweis | null = v.bild ? { text: tx(z, 'hBild'), bild: v.bild, ...(nw ? { bildNachweis: nw } : {}) } : null
   let aus: (Hinweis | null)[]
   if (z.jahrgang !== null && z.jahrgang <= 6) aus = [laenge, bild, artSatz, luecke]
   else if (z.jahrgang === null || z.jahrgang <= 8) aus = [laenge, artSatz, synonym ? { text: tx(z, 'hSynonym', synonym) } : null, luecke, bild]
@@ -305,7 +309,7 @@ export const fluchtraum: Regeln<Z> = {
       b.push({ typ: 'text', text: tx(z, 'hinweise'), ton: 'info' })
       for (const h of sichtbar) {
         b.push({ typ: 'text', text: h.text })
-        if (h.bild) b.push({ typ: 'kacheln', kacheln: [{ id: 'bild', bild: h.bild }], spalten: 1 })
+        if (h.bild) b.push({ typ: 'kacheln', kacheln: [{ id: 'bild', bild: h.bild, ...(h.bildNachweis ? { bildNachweis: h.bildNachweis } : {}) }], spalten: 1 })
       }
     }
     if (z.fehlversuche) b.push({ typ: 'text', text: tx(z, 'fehlversuche', z.fehlversuche), ton: 'leise' })

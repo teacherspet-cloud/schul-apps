@@ -80,7 +80,8 @@ export function vokItems(woerter: Vokabel[]): SpielItem[] {
         ...(luecke ? { luecke } : {}),
         ...(bsp ? { beispiel: bsp } : {}),
         ...(bsp && w.exampleTranslation ? { beispielDe: w.exampleTranslation.trim() } : {}),
-        ...(w.bild ? { bild: w.bild } : {})
+        ...(w.bild ? { bild: w.bild } : {}),
+        ...(w.bild && w.bildNachweis ? { bildNachweis: w.bildNachweis } : {})
       }
     }
     if (bsp && woerterVon(bsp).length >= 4) {

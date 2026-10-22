@@ -52,6 +52,7 @@ export interface OrdnenKachel {
   id: string
   text: string
   bild?: string
+  bildNachweis?: string
   /** Vergleichswert für die Reihenfolge (gleicher Wert = austauschbar) */
   wert: string
   besitzer: string
@@ -68,7 +69,7 @@ export interface Ordnen {
 /** Teile mischen, kurze Kennungen vergeben (verraten die Reihenfolge nicht) und reihum verteilen */
 export function ordnenNeu(
   z: Basis,
-  teile: { text: string; wert?: string; bild?: string; falle?: boolean }[],
+  teile: { text: string; wert?: string; bild?: string; bildNachweis?: string; falle?: boolean }[],
   spieler: string[]
 ): Ordnen {
   const mitId = teile.map((t, k) => ({ ...t, k }))
@@ -77,6 +78,7 @@ export function ordnenNeu(
     id: `k${Math.floor(zufallZ(z) * 1e6).toString(36)}${n}`,
     text: t.text,
     ...(t.bild ? { bild: t.bild } : {}),
+    ...(t.bild && t.bildNachweis ? { bildNachweis: t.bildNachweis } : {}),
     wert: t.wert ?? t.text,
     besitzer: spieler[n % spieler.length],
     gelegt: false,

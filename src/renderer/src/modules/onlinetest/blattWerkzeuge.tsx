@@ -25,6 +25,9 @@ import {
 import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react'
 import type { BlattObjekt } from '@shared/blattObjekte'
 import { pfeilVersatz } from '@shared/tastaturBedienung'
+import { linieMitziehen, verbindungsPunkte, werkzeugKuerzel, zeichenHilfe, type ZPunkt } from '@shared/zeichenTastatur'
+import { Fadenkreuz, useZeichenTastatur } from '../../shared/useZeichenTastatur'
+import { ansagen } from '../../shared/ansage'
 
 export type Werkzeug = 'tastatur' | 'stift' | 'marker' | 'radierer' | 'text' | 'linie' | 'punkt' | 'form'
 
@@ -40,6 +43,28 @@ const WERKZEUGE: { w: Werkzeug; name: string; icon: React.ReactNode }[] = [
   { w: 'linie', name: 'Verbindungslinie ziehen', icon: <IconLine size={20} /> },
   { w: 'punkt', name: 'Punkt mit Wert (Diagramm)', icon: <IconCircleDot size={20} /> }
 ]
+
+/**
+ * Tastenkürzel der Werkzeuge (23.10.2026, Barrierefreiheit): auf einer Zeichenfläche oder in der Leiste – nie in
+ * einem Eingabefeld. Formen als „form:<art>".
+ */
+export const WERKZEUG_KUERZEL: Record<string, Werkzeug | `form:${FormArt}`> = {
+  s: 'stift',
+  t: 'marker',
+  e: 'radierer',
+  b: 'text',
+  l: 'linie',
+  w: 'punkt',
+  f: 'form',
+  r: 'form:rechteck',
+  k: 'form:kreis',
+  p: 'form:pfeil'
+}
+/** Taste eines Werkzeugs für Tooltip und aria-keyshortcuts */
+const kuerzelVon = (w: string): string | undefined =>
+  Object.entries(WERKZEUG_KUERZEL)
+    .find(([, x]) => x === w)?.[0]
+    .toUpperCase()
 
 /** Bei Zeichenaufgaben ohne erlaubten Stift (05.10.2026): nur, was zum Zeichnen und Beschriften gehört */
 const ZEICHEN_WERKZEUGE = new Set<Werkzeug>(['tastatur', 'stift', 'radierer', 'text', 'linie', 'punkt'])
@@ -111,6 +136,34 @@ export function Werkzeugleiste(p: {
     farbe: art === 'stift' ? p.stiftFarbe : art === 'marker' ? p.markerFarbe : p.stiftFarbe,
     ...p.vorgaben?.[art]
   })
+  // Tastenkürzel (23.10.2026): auf einer Zeichenfläche des Blatts oder in der Leiste
+  const stand = useRef(p)
+  stand.current = p
+  useEffect(() => {
+    const taste = (e: KeyboardEvent): void => {
+      if (e.defaultPrevented || e.isComposing) return
+      const ziel = e.target as HTMLElement | null
+      if (!ziel || typeof ziel.closest !== 'function' || ziel.closest('input, textarea, select, [contenteditable="true"]')) return
+      const flaeche = ziel.closest<HTMLElement>('[data-zeichen-seite]')
+      if (!flaeche && !ziel.closest('[data-werkzeuge]')) return
+      const k = werkzeugKuerzel(e, WERKZEUG_KUERZEL)
+      if (!k) return
+      const [w, f] = k.split(':') as [Werkzeug, FormArt | undefined]
+      const q = stand.current
+      if (q.nurZeichnen && !ZEICHEN_WERKZEUGE.has(w)) return
+      e.preventDefault()
+      if (f) q.setForm(f)
+      q.setWerkzeug(w)
+      const name = f ? (FORMEN.find((x) => x.art === f)?.name ?? 'Form') : (WERKZEUGE.find((x) => x.w === w)?.name ?? 'Formen')
+      ansagen(`${name} gewählt`)
+      // Auf der Seite bleiben: die Fläche des neuen Werkzeugs übernimmt den Fokus
+      const seite = flaeche?.dataset.zeichenSeite
+      if (seite !== undefined)
+        setTimeout(() => document.querySelector<HTMLElement>(`[data-zeichen-flaeche][data-zeichen-seite="${seite}"][tabindex="0"]`)?.focus(), 40)
+    }
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, [])
   const hinweis: Record<Werkzeug, string> = {
     tastatur: 'In die Felder tippen',
     stift: 'Aufs Blatt schreiben oder zeichnen',
@@ -127,6 +180,7 @@ export function Werkzeugleiste(p: {
         {WERKZEUGE.filter((x) => !p.nurZeichnen || ZEICHEN_WERKZEUGE.has(x.w)).map((x) => {
           const aktiv = p.werkzeug === x.w
           const farbe = x.w === 'stift' ? p.stiftFarbe : x.w === 'marker' ? p.markerFarbe : undefined
+          const kuerzel = kuerzelVon(x.w)
           const knopf = (
             <ActionIcon
               size="lg"
@@ -135,6 +189,8 @@ export function Werkzeugleiste(p: {
               onClick={() => p.setWerkzeug(x.w)}
               {...optionenFuer(x.w)}
               aria-label={x.name}
+              aria-pressed={aktiv}
+              aria-keyshortcuts={kuerzel}
               data-werkzeug={x.w}
               style={farbe ? { boxShadow: `inset 0 -4px 0 ${farbe}` } : undefined}
             >
@@ -142,7 +198,7 @@ export function Werkzeugleiste(p: {
             </ActionIcon>
           )
           return (
-            <Tooltip key={x.w} label={x.name}>
+            <Tooltip key={x.w} label={kuerzel ? `${x.name} (Taste ${kuerzel})` : x.name}>
               {knopf}
             </Tooltip>
           )
@@ -150,13 +206,15 @@ export function Werkzeugleiste(p: {
         {/* Formen: Knopf mit Ausklappmenü – Symbol der gewählten Form */}
         <Menu position="bottom-start" withinPortal>
           <Menu.Target>
-            <Tooltip label="Geometrische Form auf das Blatt legen">
+            <Tooltip label="Geometrische Form auf das Blatt legen (Taste F; R Rechteck, K Kreis, P Pfeil)">
               <ActionIcon
                 {...optionenFuer('form')}
                 size="lg"
                 variant={p.werkzeug === 'form' ? 'filled' : 'subtle'}
                 color={p.werkzeug === 'form' ? 'blue' : 'gray'}
                 aria-label="Formen"
+                aria-pressed={p.werkzeug === 'form'}
+                aria-keyshortcuts="F"
                 data-werkzeug="form"
               >
                 <FormSymbol art={p.form} />
@@ -192,6 +250,7 @@ export function Werkzeugleiste(p: {
                   size={24}
                   onClick={() => (p.werkzeug === 'stift' ? p.setStiftFarbe(f) : p.setMarkerFarbe(f))}
                   aria-label={`Farbe ${f}`}
+                  aria-pressed={gewaehlt}
                   style={{ cursor: 'pointer', outline: gewaehlt ? '2px solid var(--mantine-color-text)' : undefined, outlineOffset: 2 }}
                   data-farbe={f}
                 />
@@ -543,7 +602,53 @@ export function ObjektEbene(p: {
       art === 'schieben'
         ? klemmen({ ...o, x: o.x + d.dx, y: o.y + d.dy }, hoeheVon(o))
         : { ...o, w: Math.max(60, (o.w ?? 170) + d.dx), h: Math.max(KASTEN_MIN_H, hoeheVon(o) + d.dy) }
-    setzeEigene(eigene.map((x) => (x.id === o.id ? neu : x)))
+    // Angehängte Linienenden wandern mit (23.10.2026, Befund: mit den Pfeiltasten verschoben blieben sie stehen)
+    const ddx = neu.x - o.x
+    const ddy = neu.y - o.y
+    setzeEigene(eigene.map((x) => (x.id === o.id ? neu : art === 'schieben' && x.t === 'linie' ? linieMitziehen(x, o.id, ddx, ddy) : x)))
+  }
+  /*
+   * Verbindungslinie mit der Tastatur (23.10.2026, Barrierefreiheit): am Griff „verschieben" von Kästchen A die Taste V,
+   * mit Tab zum Griff von Kästchen B, dort Enter (oder V). Die Linie hängt an beiden Kästchen und wandert mit.
+   */
+  const [verbindeVon, setVerbindeVon] = useState<string | null>(null)
+  const verbinde = (von: string, nach: string): void => {
+    const ks = kaesten()
+    const a = ks.find((k) => k.id === von)
+    const b = ks.find((k) => k.id === nach)
+    setVerbindeVon(null)
+    if (!a || !b) return
+    const l = verbindungsPunkte(a, b)
+    setzeEigene([
+      ...eigene,
+      { id: neueId(), s: p.seite, t: 'linie', x: l.von.x, y: l.von.y, x2: l.nach.x, y2: l.nach.y, v1: von, v2: nach, farbe: p.farbe, ...p.vorgabe?.linie }
+    ])
+    ansagen('Verbindungslinie gezeichnet')
+  }
+  const griffTaste = (e: React.KeyboardEvent, o: BlattObjekt): void => {
+    if (p.gesperrt) return
+    const ohne = !e.ctrlKey && !e.altKey && !e.metaKey
+    if (ohne && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (verbindeVon && verbindeVon !== o.id) return verbinde(verbindeVon, o.id)
+      setVerbindeVon(o.id)
+      ansagen('Kästchen zum Verbinden gewählt – mit Tab zum zweiten Kästchen, dort Enter drücken. Escape bricht ab.')
+      return
+    }
+    if (e.key === 'Enter' && verbindeVon && verbindeVon !== o.id) {
+      e.preventDefault()
+      e.stopPropagation()
+      return verbinde(verbindeVon, o.id)
+    }
+    if (e.key === 'Escape' && verbindeVon) {
+      e.preventDefault()
+      e.stopPropagation()
+      setVerbindeVon(null)
+      ansagen('Verbinden abgebrochen')
+      return
+    }
+    pfeilTaste(e, o, 'schieben')
   }
 
   /*
@@ -624,9 +729,134 @@ export function ObjektEbene(p: {
     setzeEigene(vorne ? [...rest, o] : [o, ...rest])
   }
   const MENUE_TITEL: Record<BlattObjekt['t'], string> = { text: 'Textkästchen', linie: 'Verbindungslinie', form: 'Form', punkt: 'Punkt' }
+
+  /** Neue Form aus Anfang und Ecke (Zeiger und Tastatur): nur angetippt = Standardgröße mittig um die Stelle */
+  function formAus(zug: { x: number; y: number; x2: number; y2: number }): BlattObjekt {
+    const f = p.form ?? 'rechteck'
+    const w0 = Math.abs(zug.x2 - zug.x)
+    const h0 = Math.abs(zug.y2 - zug.y)
+    const klein = w0 < 12 && h0 < 12
+    const { w, h } = formMasse(f, klein ? 90 : Math.max(12, w0), klein ? (f === 'quadrat' || f === 'kreis' ? 90 : 64) : Math.max(12, h0))
+    const x = klein ? zug.x - w / 2 : Math.min(zug.x, zug.x2)
+    const y = klein ? zug.y - h / 2 : Math.min(zug.y, zug.y2)
+    return {
+      id: neueId(),
+      s: p.seite,
+      t: 'form',
+      f,
+      x: Math.max(1, Math.min(p.lage.w - w - 1, x)),
+      y: Math.max(1, Math.min(p.lage.h - h - 1, y)),
+      w,
+      h,
+      farbe: p.farbe,
+      ...p.vorgabe?.form
+    }
+  }
+  /** Linie von a nach b – beide Enden rasten ein wie beim Ziehen (Tastatur) */
+  const linieVon = (a: ZPunkt, b: ZPunkt): NonNullable<typeof zieht> => {
+    const ks = kaesten()
+    const ra = einrasten(a, andocken, ks)
+    const rb = einrasten(b, andocken, ks)
+    return {
+      x: ra?.x ?? a.x,
+      y: ra?.y ?? a.y,
+      x2: rb?.x ?? b.x,
+      y2: rb?.y ?? b.y,
+      ...(ra?.kasten ? { v1: ra.kasten } : {}),
+      ...(rb?.kasten ? { v2: rb.kasten } : {}),
+      ...(ra?.wert ? { jahr1: ra.wert } : {}),
+      ...(rb?.wert ? { jahr2: rb.wert } : {})
+    }
+  }
+  /*
+   * Tastatur (23.10.2026, Barrierefreiheit – WCAG 2.1.1): Fadenkreuz statt Zeiger. Linie und Form: Enter = Anfang, Enter =
+   * Ende; Textkästchen und Punkt: Enter setzt an der Stelle (Fokus springt ins neue Feld); Entf entfernt das letzte Objekt.
+   */
+  const zweiPunkte = p.werkzeug === 'linie' || p.werkzeug === 'form'
+  const formName = FORMEN.find((x) => x.art === (p.form ?? 'rechteck'))?.name ?? 'Form'
+  const letzterWert = useRef<string | undefined>(undefined)
+  const tasten = useZeichenTastatur({
+    breite: p.lage.w,
+    hoehe: p.lage.h,
+    modus: zweiPunkte ? 'zweiPunkte' : 'punkt',
+    aktiv: linieAktiv,
+    bezeichnung: `Seite ${p.seite + 1}: ${p.werkzeug === 'linie' ? 'Verbindungslinie' : p.werkzeug === 'form' ? formName : p.werkzeug === 'text' ? 'Textkästchen' : 'Punkt mit Wert'}`,
+    hilfe: zeichenHilfe(
+      zweiPunkte ? 'zweiPunkte' : 'punkt',
+      'Linien rasten an Kästchen und Achsen ein. Kästchen verbinden: am Verschiebe-Griff eines Kästchens V, dann am zweiten Kästchen Enter. Werkzeuge: S Stift, T Textmarker, E Radierer, B Textkästchen, L Linie, W Punkt, R Rechteck, K Kreis, P Pfeil.'
+    ),
+    merkSchluessel: `blatt-${p.seite}`,
+    ausfuehren: (a, z) => {
+      if (a.art === 'bewegen') {
+        if (p.werkzeug === 'form') {
+          if (z.start) setFormZug({ x: z.start.x, y: z.start.y, x2: a.nach.x, y2: a.nach.y })
+          return false
+        }
+        if (p.werkzeug === 'text') return false
+        const r = einrasten(a.nach, andocken, p.werkzeug === 'linie' ? kaesten() : [])
+        setZiel(r ? { x: r.x, y: r.y, wert: r.wert } : null)
+        if (p.werkzeug === 'linie' && z.start) setZieht(linieVon(z.start, a.nach))
+        // Jahr auf der Zeitleiste ansagen, wenn es wechselt
+        const neu = r?.wert
+        if (neu === letzterWert.current) return false
+        letzterWert.current = neu
+        return neu ?? false
+      }
+      if (a.art === 'start') {
+        if (p.werkzeug === 'form') setFormZug({ x: a.punkt.x, y: a.punkt.y, x2: a.punkt.x, y2: a.punkt.y })
+        else setZieht(linieVon(a.punkt, a.punkt))
+        return
+      }
+      if (a.art === 'ende') {
+        if (p.werkzeug === 'form') {
+          setzeEigene([...eigene, formAus({ x: a.von.x, y: a.von.y, x2: a.nach.x, y2: a.nach.y })])
+          setFormZug(null)
+          return `${formName} gezeichnet`
+        }
+        const l = linieVon(a.von, a.nach)
+        setZieht(null)
+        setZiel(null)
+        if (Math.hypot(l.x2 - l.x, l.y2 - l.y) <= 8) return 'Linie zu kurz – nichts gezeichnet'
+        setzeEigene([...eigene, { id: neueId(), s: p.seite, t: 'linie', ...l, farbe: p.farbe, ...p.vorgabe?.linie }])
+        return `Linie gezeichnet${l.jahr1 || l.jahr2 ? ` (${[l.jahr1, l.jahr2].filter(Boolean).join(' bis ')})` : ''}`
+      }
+      if (a.art === 'punkt') {
+        const id = neueId()
+        const q = a.punkt
+        if (p.werkzeug === 'text') {
+          setzeEigene([
+            ...eigene,
+            klemmen({ id, s: p.seite, t: 'text', x: q.x, y: q.y - 12, w: 170, text: '', farbe: p.farbe, ...p.vorgabe?.text }, KASTEN_MIN_H)
+          ])
+          setFokus(id)
+          return 'Textkästchen gesetzt – schreib deinen Text, Tab führt weiter'
+        }
+        const r = einrasten(q, andocken, [])
+        setzeEigene([...eigene, { id, s: p.seite, t: 'punkt', x: r?.x ?? q.x, y: r?.y ?? q.y, text: '', farbe: p.farbe, ...p.vorgabe?.punkt }])
+        setFokus(id)
+        return 'Punkt gesetzt – trag den Wert ein'
+      }
+      if (a.art === 'abbrechen') {
+        setZieht(null)
+        setFormZug(null)
+        setZiel(null)
+        return
+      }
+      if (a.art === 'loeschen') {
+        setZieht(null)
+        setFormZug(null)
+        const letztes = eigene.at(-1)
+        if (!letztes) return 'Nichts zum Entfernen'
+        bitteLoeschen(letztes)
+        return letztes.t === 'text' && (letztes.text ?? '').trim() ? 'Rückfrage: Kästchen wirklich löschen?' : `${MENUE_TITEL[letztes.t]} entfernt`
+      }
+    }
+  })
   return (
     <div
       ref={flaeche}
+      {...tasten.flaeche}
+      data-zeichen-seite={p.seite}
       style={{
         position: 'absolute',
         left: p.lage.x,
@@ -700,29 +930,7 @@ export function ObjektEbene(p: {
       onPointerLeave={() => !zieht && setZiel(null)}
       onPointerUp={() => {
         if (formZug) {
-          const f = p.form ?? 'rechteck'
-          const w0 = Math.abs(formZug.x2 - formZug.x)
-          const h0 = Math.abs(formZug.y2 - formZug.y)
-          // Nur angetippt: Standardgröße, mittig um die Stelle
-          const klein = w0 < 12 && h0 < 12
-          const { w, h } = formMasse(f, klein ? 90 : Math.max(12, w0), klein ? (f === 'quadrat' || f === 'kreis' ? 90 : 64) : Math.max(12, h0))
-          const x = klein ? formZug.x - w / 2 : Math.min(formZug.x, formZug.x2)
-          const y = klein ? formZug.y - h / 2 : Math.min(formZug.y, formZug.y2)
-          setzeEigene([
-            ...eigene,
-            {
-              id: neueId(),
-              s: p.seite,
-              t: 'form',
-              f,
-              x: Math.max(1, Math.min(p.lage.w - w - 1, x)),
-              y: Math.max(1, Math.min(p.lage.h - h - 1, y)),
-              w,
-              h,
-              farbe: p.farbe,
-              ...p.vorgabe?.form
-            }
-          ])
+          setzeEigene([...eigene, formAus(formZug)])
           setFormZug(null)
           return
         }
@@ -843,6 +1051,8 @@ export function ObjektEbene(p: {
             />
           ))}
       </svg>
+      {tasten.hilfe}
+      {tasten.sichtbar && <Fadenkreuz z={tasten.zustand} />}
       {eigene
         .filter((o) => o.t === 'punkt')
         .map((o) => (
@@ -881,7 +1091,16 @@ export function ObjektEbene(p: {
           return (
             <div
               key={o.id}
-              style={{ position: 'absolute', left: o.x, top: o.y, width: o.w ?? 170, ...(o.h ? { height: o.h } : {}), pointerEvents: 'auto' }}
+              style={{
+                position: 'absolute',
+                left: o.x,
+                top: o.y,
+                width: o.w ?? 170,
+                ...(o.h ? { height: o.h } : {}),
+                pointerEvents: 'auto',
+                // Zum Verbinden gewählt (Tastatur, 23.10.2026)
+                ...(verbindeVon === o.id ? { outline: '3px dashed #0ca678', outlineOffset: 3 } : {})
+              }}
               data-objekt-text
               data-kasten={o.id}
               onPointerDown={(e) => {
@@ -940,9 +1159,10 @@ export function ObjektEbene(p: {
                   {/* Anfassen zum Verschieben (oben links) */}
                   <div
                     role="button"
-                    aria-label="Kästchen verschieben (Pfeiltasten)"
+                    aria-label="Kästchen verschieben (Pfeiltasten) – Taste V: mit einem anderen Kästchen verbinden"
+                    aria-pressed={verbindeVon === o.id}
                     tabIndex={0}
-                    onKeyDown={(e) => pfeilTaste(e, o, 'schieben')}
+                    onKeyDown={(e) => griffTaste(e, o)}
                     onPointerDown={(e) => anfassen(e, o, 'schieben')}
                     style={{ ...GRIFF, left: -11, top: -11, cursor: 'move', borderColor: randFarbe }}
                     data-kasten-schieben={o.id}

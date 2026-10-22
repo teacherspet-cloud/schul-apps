@@ -50,6 +50,7 @@ import type { Herkunft } from '../../../shared/voiceFilter'
 import { settingsFuerNiveau } from '@shared/voiceSettings'
 import { listeningRules } from '../didactics/listeningFormats'
 import { VoiceSettings } from './VoiceSettings'
+import { TranskriptFreigabe } from './TranskriptFreigabe'
 import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
 import type { WunschArt, WunschKontext } from '../../../shared/kiWunsch'
@@ -335,6 +336,8 @@ export function AudioPanel({
         id: block.id,
         languageCode: language,
         turns: turns.map((t) => ({ voiceId: voiceFor(block, t.name), text: t.text })),
+        // Transkript der Hörtext-Freigabe (23.10.2026, Barrierefreiheit) – nur der Server liest es
+        ...(aufServer() ? { skript: block.transcript } : {}),
         settings: block.voiceSettings ?? settingsFuerNiveau(listeningRules(ws.meta.cefrLevel).wpm, mehrereStimmen, undefined),
         /*
          * Bisherige eigene Vertonung (01.10.2026): Unveränderte Zeilen übernimmt der Hauptprozess
@@ -735,6 +738,8 @@ export function AudioPanel({
                 defaultValue={block.url ?? ''}
                 onBlur={(e) => setBlock(block.id, (b) => (b.url = e.currentTarget.value.trim() || undefined))}
               />
+              {/* Transkript für Lernende je Freigabe (23.10.2026, Barrierefreiheit) – nur an Server-Hörtexten */}
+              {aufServer() && block.url && istServerHoertext(block.url) && <TranskriptFreigabe url={block.url} skript={block.transcript} />}
             </Stack>
           </Card>
         )

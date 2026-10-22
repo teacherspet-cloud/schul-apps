@@ -82,7 +82,7 @@ import { loeschkonzeptRoute, loeschkonzeptStarten } from './loeschkonzept'
 import { datenschutzRoute } from './datenschutzSeiten'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
-import { hoertextRoute, mitFreigabe } from './hoertexte'
+import { hoertextRoute, mitFreigabe, skriptAusAnfrage } from './hoertexte'
 import { medienRoute } from './medien'
 import { dublettenMelder, dublettenPruefen, medienKorpusQuelle } from '../main/services/storage/medienbank'
 import { serverKorpus } from './wartungMedienBedeutungen'
@@ -198,7 +198,8 @@ async function main(): Promise<void> {
   const aufruf = async (kanal: string, args: unknown[]): Promise<unknown> => {
     const wert = await geschuetzt(kanal, args)
     const n = aktuellerNutzer()
-    if (n && (kanal === 'audio:speak' || kanal === 'audio:import')) return mitFreigabe(wert, n.id, adresse)
+    // Transkript für Lernende (23.10.2026): das vertonte Skript geht mit in die Freigabe
+    if (n && (kanal === 'audio:speak' || kanal === 'audio:import')) return mitFreigabe(wert, n.id, adresse, undefined, kanal === 'audio:speak' ? skriptAusAnfrage(args[0]) : undefined)
     return wert
   }
 

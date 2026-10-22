@@ -15,6 +15,8 @@
  * Punkte: die der Aufgabe, auf ihre Teile verteilt (ganze Punkte, wie im Onlinetest üblich).
  */
 import { plainText } from '../../shared/richtext/parse'
+import { formatCitation } from '../../shared/citation'
+import { nachweisAusBildquelle } from '@shared/bildLizenz'
 import type { Answer, TaskBlock, WsBlock } from '../arbeitsblatt/model/types'
 import type { Einheit, Feld, Loesung, OnlineAufgabe, OnlineEintrag, OnlineFassung } from './kern'
 
@@ -257,9 +259,27 @@ export function onlineFassungAusBloecke(
     }
     // Material: wie gedruckt (nur wenn es etwas zu zeigen gibt)
     const html = opts.materialHtml(b.id)
-    if (html.trim()) aufgaben.push({ id: b.id, art: 'material', titel: 'Material', anweisung: '', eintraege: [], punkte: 0, html })
+    const nachweise = bildNachweiseVon(b)
+    if (html.trim())
+      aufgaben.push({ id: b.id, art: 'material', titel: 'Material', anweisung: '', eintraege: [], punkte: 0, html, ...(nachweise.length ? { bildnachweise: nachweise } : {}) })
   }
   return { aufgaben, einheiten, loesungen, punkte: einheiten.reduce((s, e) => s + e.punkte, 0), stil: opts.stil }
+}
+
+/**
+ * Bildnachweise eines Material-Bausteins für Lernende (23.10.2026, Bildnachweise): je Bild „KI-generiert“ bzw.
+ * „Bild: …“ (Quellenangabe im Zitierstil, auch Bildausschnitte aus dem Schulbuch). Material verrät keine Lösung –
+ * der Nachweis bleibt vollständig. Eigene Fotos/OpenMoji ohne Angabe: nichts.
+ */
+export function bildNachweiseVon(b: WsBlock): string[] {
+  if (b.type !== 'image') return []
+  const items = b.items?.length ? b.items : [{ image: b.image }]
+  const aus: string[] = []
+  for (const it of items) {
+    const n = nachweisAusBildquelle(it.image, it.image?.citation ? formatCitation(it.image.citation) : null)
+    if (n && !aus.includes(n)) aus.push(n)
+  }
+  return aus
 }
 
 /** Material-Ausschnitte aus der Druckfassung (ohne Lösungen): je Baustein das gedruckte HTML, dazu die Stilregeln */

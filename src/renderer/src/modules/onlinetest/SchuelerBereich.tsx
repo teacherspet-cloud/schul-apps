@@ -33,6 +33,8 @@ import { usePfad } from './schuelerNavigation'
 import { useAuffrischen } from '../../shared/auffrischen'
 import { useAufsicht, useZeitraum, vorfallSender } from './aufsicht'
 import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
+import { BildNachweis, BildNachweisListe } from '../../shared/components/BildNachweis'
+import { testBildNachweise } from './testBildNachweise'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import VokabelBeitritt from '../lernen/VokabelBeitritt'
 import {
@@ -1932,7 +1934,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       <Handschrift.Provider value={hand}>
         {t.aufgaben.map((a, i) =>
           a.art === 'material' ? (
-            <MaterialKarte key={a.id} html={a.html ?? ''} stil={t.stil ?? ''} />
+            <MaterialKarte key={a.id} html={a.html ?? ''} stil={t.stil ?? ''} nachweise={a.bildnachweise} />
           ) : (
             <AufgabeKarte
               key={a.id}
@@ -1944,6 +1946,8 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
           )
         )}
       </Handschrift.Provider>
+      {/* Bildnachweise des Tests (23.10.2026): kleiner Link am Fuß, klappt eine kurze Liste auf */}
+      <BildNachweisListe eintraege={testBildNachweise(t.aufgaben)} />
       <Button
         size="lg"
         color="green"
@@ -2180,7 +2184,13 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
   return (
     <Paper withBorder p="sm" radius="md">
       <Stack gap={6}>
-        {e.bild && <Image src={e.bild} alt="Bild zur Aufgabe" h={120} w="auto" fit="contain" />}
+        {e.bild && (
+          // Bildnachweis als kleines ⓘ neben dem Bild (23.10.2026) – schon ohne Lösungswort (kern.ts)
+          <Group gap={2} align="flex-end" wrap="nowrap">
+            <Image src={e.bild} alt="Bild zur Aufgabe" h={120} w="auto" fit="contain" />
+            <BildNachweis kompakt ecke={false} text={e.bildNachweis} />
+          </Group>
+        )}
         {e.saetze?.map((s, i) => (
           <Text key={i}>
             {s.vor} <b>{s.mitte !== undefined ? '(1) _____' : '_____'}</b>{' '}
@@ -2265,7 +2275,7 @@ function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; ant
  * Material eines Grammatiktests/einer Lernzielkontrolle (05.10.2026): wie auf dem Papierblatt gezeichnet, in
  * einem abgeschotteten Rahmen ohne Skripte; die Höhe richtet sich nach dem Inhalt.
  */
-function MaterialKarte({ html, stil }: { html: string; stil: string }): React.JSX.Element {
+function MaterialKarte({ html, stil, nachweise }: { html: string; stil: string; nachweise?: string[] }): React.JSX.Element {
   const rahmen = useRef<HTMLIFrameElement>(null)
   const [hoehe, setHoehe] = useState(200)
   const messen = (): void => {
@@ -2285,6 +2295,14 @@ function MaterialKarte({ html, stil }: { html: string; stil: string }): React.JS
         }}
         style={{ width: '100%', height: hoehe, border: 0, display: 'block' }}
       />
+      {/* Bildnachweise des Materials (23.10.2026): je Bild ein kleines ⓘ rechts unter dem Material */}
+      {nachweise?.length ? (
+        <Group gap={0} justify="flex-end" data-material-nachweise>
+          {nachweise.map((n, i) => (
+            <BildNachweis key={i} kompakt ecke={false} text={n} />
+          ))}
+        </Group>
+      ) : null}
     </Card>
   )
 }

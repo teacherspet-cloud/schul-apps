@@ -15,6 +15,7 @@ import { spielBildWoerter } from '@shared/bildEindeutig'
 import { useVtFarbe } from '../vtFarben'
 import { aufnahmeSpielen, medium } from '../medienCache'
 import { gemischt, type SpielProps } from './SpieleErkennen'
+import { spielNachweis } from './spielNachweis'
 
 const RUNDEN = 10
 
@@ -115,12 +116,16 @@ export function BildRaetsel({ woerter, sprache, ende }: SpielProps): React.JSX.E
       optionenFuer={(v) => auswahlOptionen(v, mitBild, 'fs').map(spielform)}
       richtigFuer={(v) => spielform(v.term)}
       frageAnzeige={(v) => (
-        <img
-          src={v.bild}
-          alt="Welches Wort passt?"
-          style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: 16, background: '#fff' }}
-          data-bildraetsel-bild
-        />
+        // Bildnachweis als kleines ⓘ ohne das gesuchte Wort (23.10.2026, Bildnachweise)
+        <div style={{ position: 'relative', width: 220, height: 220 }}>
+          <img
+            src={v.bild}
+            alt="Welches Wort passt?"
+            style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: 16, background: '#fff' }}
+            data-bildraetsel-bild
+          />
+          {spielNachweis(v)}
+        </div>
       )}
       ende={ende}
     />
