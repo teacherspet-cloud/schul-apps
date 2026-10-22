@@ -330,7 +330,7 @@ export default function MaskottchenSettings({
                           aria-label={`Pose ${p.label}`}
                           onClick={() => setAnsicht({ figurId: m.id, poseId: p.id })}
                         >
-                          {m.posen[p.id] ? <img src={m.posen[p.id]} alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} /> : <IconPhoto size={12} />}
+                          {m.posen[p.id] ? <img src={m.posen[p.id]} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain' }} /> : <IconPhoto size={12} />}
                         </ActionIcon>
                       </Tooltip>
                     ))}

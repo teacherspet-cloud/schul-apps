@@ -24,6 +24,7 @@ import {
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react'
 import type { BlattObjekt } from '@shared/blattObjekte'
+import { pfeilVersatz } from '@shared/tastaturBedienung'
 
 export type Werkzeug = 'tastatur' | 'stift' | 'marker' | 'radierer' | 'text' | 'linie' | 'punkt' | 'form'
 
@@ -531,6 +532,19 @@ export function ObjektEbene(p: {
     window.addEventListener('pointerup', loslassen)
   }
   useEffect(() => loslassen, []) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Tastatur-Alternative zum Ziehen (22.10.2026, Barrierefreiheit): Pfeiltasten verschieben bzw. ändern die Größe */
+  const pfeilTaste = (e: React.KeyboardEvent, o: BlattObjekt, art: 'schieben' | 'groesse'): void => {
+    if (p.gesperrt) return
+    const d = pfeilVersatz(e.key, e.shiftKey)
+    if (!d) return
+    e.preventDefault()
+    e.stopPropagation()
+    const neu =
+      art === 'schieben'
+        ? klemmen({ ...o, x: o.x + d.dx, y: o.y + d.dy }, hoeheVon(o))
+        : { ...o, w: Math.max(60, (o.w ?? 170) + d.dx), h: Math.max(KASTEN_MIN_H, hoeheVon(o) + d.dy) }
+    setzeEigene(eigene.map((x) => (x.id === o.id ? neu : x)))
+  }
 
   /*
    * Rechtsklick (überall, auch über der Stift-Ebene) und langes Drücken (Touch/Stift; nicht beim Schreiben mit dem
@@ -926,7 +940,9 @@ export function ObjektEbene(p: {
                   {/* Anfassen zum Verschieben (oben links) */}
                   <div
                     role="button"
-                    aria-label="Kästchen verschieben"
+                    aria-label="Kästchen verschieben (Pfeiltasten)"
+                    tabIndex={0}
+                    onKeyDown={(e) => pfeilTaste(e, o, 'schieben')}
                     onPointerDown={(e) => anfassen(e, o, 'schieben')}
                     style={{ ...GRIFF, left: -11, top: -11, cursor: 'move', borderColor: randFarbe }}
                     data-kasten-schieben={o.id}
@@ -936,7 +952,9 @@ export function ObjektEbene(p: {
                   {/* Ziehen für Breite und Höhe (unten rechts) */}
                   <div
                     role="button"
-                    aria-label="Kästchen größer oder kleiner ziehen"
+                    aria-label="Kästchen größer oder kleiner ziehen (Pfeiltasten)"
+                    tabIndex={0}
+                    onKeyDown={(e) => pfeilTaste(e, o, 'groesse')}
                     onPointerDown={(e) => anfassen(e, o, 'groesse')}
                     style={{ ...GRIFF, right: -9, bottom: -9, width: 18, height: 18, cursor: 'nwse-resize', borderColor: randFarbe }}
                     data-kasten-groesse={o.id}

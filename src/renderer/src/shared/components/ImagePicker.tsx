@@ -74,7 +74,7 @@ export default function ImagePicker({ opened, onClose, onPick, keywords, materia
             <SimpleGrid cols={4} spacing="xs">
               {materialImages.map((m, i) => (
                 <UnstyledButton key={i} className="picker-tile" onClick={() => pick({ dataUrl: m.dataUrl, source: 'own', credit: m.name })}>
-                  <Image src={m.dataUrl} h={110} fit="contain" />
+                  <Image alt={m.name} src={m.dataUrl} h={110} fit="contain" />
                   <Text size="10px" lineClamp={1}>
                     {m.name}
                   </Text>
@@ -182,7 +182,7 @@ function OpenMojiTab({ keywords, onPick }: { keywords: string[]; onPick: (img: P
               onClick={async () => onPick({ dataUrl: await openMojiAsPng(h.hexcode), source: 'openmoji', credit: 'OpenMoji, CC BY-SA 4.0' })}
               className="picker-tile"
             >
-              <Image src={h.preview} h={64} fit="contain" />
+              <Image alt="" aria-hidden="true" src={h.preview} h={64} fit="contain" />
               <Text size="10px" ta="center" lineClamp={1}>
                 {h.annotation}
               </Text>
@@ -261,7 +261,7 @@ function OnlineTab({
               className="picker-tile"
               style={{ position: 'relative' }}
             >
-              <Image src={h.thumbnail} h={100} fit="contain" />
+              <Image alt={h.title || 'Suchtreffer'} src={h.thumbnail} h={100} fit="contain" />
               <Text size="10px" lineClamp={1}>
                 {h.license} · {h.creator}
               </Text>
@@ -328,7 +328,7 @@ function AiTab({ keywords, onPick }: { keywords: string[]; onPick: (img: PickedI
       </Group>
       {stand?.ergebnis && (
         <Group align="end">
-          <Image
+          <Image alt="Erzeugtes Bild"
             src={stand.ergebnis.dataUrl}
             h={220}
             w={220}

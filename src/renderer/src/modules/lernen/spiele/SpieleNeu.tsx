@@ -104,7 +104,7 @@ export function HoerenSchreiben({ woerter, sprache, ende }: SpielProps): React.J
         farbe={rueck ? (rueck.gut ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-red-6)') : undefined}
       />
       {rueck ? (
-        <Stack align="center" gap={4}>
+        <Stack align="center" gap={4} role="status" aria-live="polite">
           <Text fw={800} c={rueck.gut ? 'teal' : 'red'}>
             {rueck.gut ? 'Richtig!' : `Richtig wäre: ${rueck.richtig}`}
           </Text>
@@ -206,7 +206,7 @@ export function SatzLuecke({ woerter, ende }: SpielProps): React.JSX.Element {
         Gesucht: {v.translation}
       </Text>
       {rueck ? (
-        <Stack align="center" gap={4}>
+        <Stack align="center" gap={4} role="status" aria-live="polite">
           <Text fw={800} c={rueck.gut ? 'teal' : 'red'}>
             {rueck.gut ? 'Richtig!' : `Richtig wäre: ${rueck.richtig}`}
           </Text>

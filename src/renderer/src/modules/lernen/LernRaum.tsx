@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { fachFarbe } from '../../shared/fachfarben'
 import type { Uebersicht } from '@shared/vokabeltrainer'
 import { holen } from '../onlinetest/serverApi'
+import { alsKnopf } from '@shared/tastaturBedienung'
 
 interface Karteikasten {
   art: 'vokabeln' | 'merkzettel' | 'grammatik'
@@ -272,7 +273,7 @@ export function MerkKasten({ k, schliessen }: { k: Karteikasten; schliessen: () 
         </Stack>
       ) : (
         <Stack className="lr-gezogen lr-merk-buehne">
-          <div className={`lr-merk ${um ? 'um' : ''}`} onClick={() => setUm(!um)} data-merkkarte-offen>
+          <div className={`lr-merk ${um ? 'um' : ''}`} onClick={() => setUm(!um)} {...alsKnopf(() => setUm(!um))} aria-label={um ? 'Merkkarte zurückdrehen' : 'Merkkarte umdrehen'} data-merkkarte-offen>
             <div>
               <Center h="100%">
                 <Stack align="center" gap={4}>

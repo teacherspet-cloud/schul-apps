@@ -149,7 +149,7 @@ function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden:
                 color: k.status === 'markiert' || k.status === 'treffer' ? 'white' : undefined
               }}
             >
-              {k.bild && <Image src={k.bild} alt="" w={64} h={64} fit="contain" />}
+              {k.bild && <Image src={k.bild} alt={k.text ? '' : 'Bildkarte'} aria-hidden={k.text ? true : undefined} w={64} h={64} fit="contain" />}
               {k.text && (
                 <Text fw={600} size={b.spalten && b.spalten > 5 ? 'xs' : 'sm'}>
                   {k.text}

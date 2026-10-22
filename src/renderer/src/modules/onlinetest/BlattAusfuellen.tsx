@@ -50,6 +50,7 @@ import { ReiheWeiterNachBlatt } from './ReiheWeiter'
 import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL } from '@shared/blattAuswertung'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
+import { KiMarke } from './KiMarke'
 import { useTouch } from '../../shared/touch/touchModus'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
@@ -995,6 +996,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           <Text size="xs" c="dimmed" mb="xs">
             ✓ und ✗ stehen an deinen Kästchen und Lücken, die Hinweise auch direkt an jeder Aufgabe.
           </Text>
+          {/* Kennzeichnung (22.10.2026, Art. 50 KI-VO) */}
+          <div style={{ marginBottom: 8 }}>
+            <KiMarke />
+          </div>
           <Stack gap={6}>
             {abgabeErgebnis.map(({ nr, e }) => (
               <Group key={nr} gap="xs" wrap="nowrap" align="start" data-abgabe-aufgabe={nr} data-einschaetzung={e.einschaetzung}>
@@ -1176,6 +1181,7 @@ function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.El
   if (!l.gelungen && !l.fehlt && !l.schritt)
     return (
       <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback {...(l.abgabe ? { 'data-abgabe-feedback': l.einschaetzung } : {})}>
+        <KiMarke />
         {l.abgabe ? (
           <Text size="xs" fw={700} c="dimmed">
             Nach dem Einreichen{l.auto ? ` · ${l.auto.richtig} von ${l.auto.gesamt} richtig` : ''}
@@ -1187,6 +1193,10 @@ function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.El
   return (
     <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback>
       <Stack gap={4}>
+        {/* Kennzeichnung (22.10.2026, Art. 50 KI-VO) */}
+        <div>
+          <KiMarke />
+        </div>
         {l.gelungen && (
           <Text size="sm">
             <b>✓ Gelungen:</b> {l.gelungen}

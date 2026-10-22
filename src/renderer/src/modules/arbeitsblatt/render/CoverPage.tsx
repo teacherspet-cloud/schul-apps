@@ -377,7 +377,7 @@ export function CoverPage({
     ) : null;
   const maskottchen = bild ? (
     <div className="ws-cover-fox">
-      <img src={bild} alt="" />
+      <img src={bild} alt="" aria-hidden="true" />
     </div>
   ) : null;
 

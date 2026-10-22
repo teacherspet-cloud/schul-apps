@@ -15,6 +15,7 @@ import { KRITERIEN, noteSekI, stufeVon } from '@shared/sprechen/kriterien'
 import { stufeVonNiveau, TEIL_NAME, type SprechSprache, type Teil } from '@shared/sprechen/niveaus'
 import { phrasesFuerTeil, type Phrase } from '@shared/sprechen/phrases'
 import { KrisenHilfe } from '../../shared/KrisenHilfe'
+import { KiMarke } from '../onlinetest/KiMarke'
 import { passtZurPhrase } from './PhraseSpiele'
 import type { SprechFreigabe, Uebung } from './typen'
 
@@ -80,6 +81,10 @@ export function Ergebnis({ u, nochmal }: { u: Uebung; nochmal?: () => void }): R
       <Text fw={800} size="lg">
         Deine Einschätzung zum Üben
       </Text>
+      {/* Kennzeichnung (22.10.2026, Art. 50 KI-VO) */}
+      <div>
+        <KiMarke art="einschaetzung" />
+      </div>
       <Stack gap={6}>
         {KRITERIEN.map((k) => {
           const p = u.wertung[k.id] ?? 0
@@ -342,8 +347,14 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
               ? 'Wie in der echten Prüfung: ohne Hilfen. Sprich laut und deutlich – am besten mit Kopfhörern.'
               : 'Die KI hilft dir, wenn du nicht weiterweißt. Sprich laut und deutlich – am besten mit Kopfhörern.'}
           </Text>
-          <Text size="xs" c="dimmed">
-            Es wird nichts aufgenommen oder gespeichert. Nach dem Gespräch bekommst du eine Einschätzung und Tipps.
+          {/*
+           * Berichtigt (22.10.2026, Prüfung des Schulträgers): „Es wird nichts aufgenommen oder gespeichert" stimmte nicht –
+           * die Stimme geht live an OpenAI, Einschätzung und Tipps werden gespeichert (src/server/sprechen.ts).
+           */}
+          <Text size="xs" c="dimmed" data-sprech-datenschutz>
+            Dein Gesprächspartner ist eine KI, kein Mensch. Was du sagst, geht während des Gesprächs live an den KI-Dienst OpenAI in den USA,
+            damit die KI antworten kann. Unser Server speichert keine Aufnahme. Der Text eures Gesprächs wird nur für die Einschätzung benutzt
+            und danach gelöscht – gespeichert werden nur deine Punkte und Tipps. Sag keine Namen, Adressen oder Geheimnisse.
           </Text>
           <Button size="lg" radius="xl" leftSection={<IconMicrophone size={22} />} onClick={() => void los()} w="fit-content" data-sprech-start>
             Gespräch starten

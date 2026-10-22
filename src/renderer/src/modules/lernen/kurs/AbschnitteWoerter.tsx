@@ -228,7 +228,7 @@ function WortZeile({
           )}
           {bild ? (
             <UnstyledButton onClick={() => medien.bildOeffnen(v)} aria-label={`Beispielbild zu „${v.term}“`} data-beispielbild={v.term}>
-              <Image src={bild} w={28} h={28} fit="cover" radius={4} alt="" />
+              <Image src={bild} w={28} h={28} fit="cover" radius={4} alt="" aria-hidden="true" />
             </UnstyledButton>
           ) : medien.admin ? (
             <Tooltip label="Beispielbild suchen">

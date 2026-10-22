@@ -286,10 +286,10 @@ export function BildVerb({ verben: d, ende }: VerbSpielProps): React.JSX.Element
           {gut} richtig
         </Badge>
       </Group>
-      <img src={d.bild(k)} alt="" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 16, background: '#fff' }} data-bildverb-bild={k.id} />
+      <img src={d.bild(k)} alt="" aria-hidden="true" style={{ width: 200, height: 200, objectFit: 'contain', borderRadius: 16, background: '#fff' }} data-bildverb-bild={k.id} />
       <Text fw={700}>{k.de}</Text>
       {rueck !== null ? (
-        <Badge size="xl" radius="md" color={rueck ? 'green' : 'red'} variant="light" tt="none" data-runde-urteil={rueck ? 'richtig' : 'falsch'}>
+        <Badge role="status" aria-live="polite" size="xl" radius="md" color={rueck ? 'green' : 'red'} variant="light" tt="none" data-runde-urteil={rueck ? 'richtig' : 'falsch'}>
           {rueck ? 'Richtig!' : 'Richtig:'} {folge(k, d.spalten)}
         </Badge>
       ) : schreiben ? (

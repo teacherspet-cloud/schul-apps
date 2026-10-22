@@ -265,7 +265,7 @@ export default function Regal({ titel, unten, kompakt }: { titel: string; unten?
           {!kompakt && (
           <Group justify="space-between" gap="xs">
             <Text size="xs" c="dimmed">
-              Ordner verschieben: mit der Maus ziehen, am Tablet lange drücken und ziehen.
+              Ordner verschieben: mit der Maus ziehen, am Tablet lange drücken und ziehen, mit der Tastatur Umschalt + Pfeiltaste.
             </Text>
             {Boolean(wahl.regal?.length) && (
               <Button size="compact-xs" variant="subtle" leftSection={<IconSortAscendingLetters size={14} />} onClick={() => speichern(null)} data-regal-az>

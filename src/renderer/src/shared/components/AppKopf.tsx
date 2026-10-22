@@ -113,7 +113,7 @@ export function AppKopf({
       >
         <Group gap={8} wrap="nowrap">
           {info?.bild ? (
-            <img src={info.bild} alt="" width={28} height={28} style={{ borderRadius: 7, flex: '0 0 auto' }} />
+            <img src={info.bild} alt="" aria-hidden="true" width={28} height={28} style={{ borderRadius: 7, flex: '0 0 auto' }} />
           ) : Symbol ? (
             <Symbol size={26} />
           ) : null}
@@ -214,7 +214,7 @@ export function AppKopf({
           background: `linear-gradient(90deg, var(--mantine-color-${farbe}-light) 0%, transparent 60%)`
         }}
       >
-        {Symbol ? <Symbol size={20} /> : info?.bild ? <img src={info.bild} alt="" width={20} height={20} /> : null}
+        {Symbol ? <Symbol size={20} /> : info?.bild ? <img src={info.bild} alt="" aria-hidden="true" width={20} height={20} /> : null}
         <Text fw={600} size="sm" style={{ flex: 1, minWidth: 0 }} truncate>
           {name}
         </Text>
@@ -249,7 +249,7 @@ export function AppKopf({
         <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: '1 1 300px' }}>
           {(info?.bild || Symbol) && (
             <div className="app-kopf-bild" aria-hidden>
-              {info?.bild ? <img src={info.bild} alt="" width={48} height={48} /> : Symbol ? <Symbol size={kompakt ? 32 : 44} /> : null}
+              {info?.bild ? <img src={info.bild} alt="" aria-hidden="true" width={48} height={48} /> : Symbol ? <Symbol size={kompakt ? 32 : 44} /> : null}
             </div>
           )}
           <div style={{ minWidth: 0 }}>

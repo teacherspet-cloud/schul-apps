@@ -119,6 +119,8 @@ import { tagVon } from '@shared/schulkalender'
 import { fachAusName } from '@shared/faecher'
 import { kriseVerdacht } from '@shared/krise'
 import { KrisenHilfe } from '../../shared/KrisenHilfe'
+import { KiMarke } from './KiMarke'
+import { DatenschutzFuss, DatenschutzKurz } from './DatenschutzKurz'
 
 interface Beitritt {
   id: string
@@ -151,12 +153,13 @@ interface Ergebnis {
   max?: number
   note?: number
   vorlaeufig?: boolean
+  /** Noch in Prüfung (23.10.2026, Prüfung des Schulträgers): ohne Punkte, Note und Richtig/Falsch */
+  inPruefung?: boolean
   aufgaben?: OnlineAufgabe[]
   einheiten?: Einheit[]
   loesungen?: Record<string, Loesung>
   antworten?: Antworten
-  /** `vorlaeufig`: von der KI bewertet, von der Lehrkraft noch nicht bestätigt (22.10.2026) */
-  bewertung?: Record<string, Bewertung[string] & { vorlaeufig?: boolean }>
+  bewertung?: Record<string, Bewertung[string]>
 }
 
 /**
@@ -384,6 +387,8 @@ export default function SchuelerBereich(): React.JSX.Element {
       <div data-vorlese-bereich key={pfad}>
         {inhalt}
       </div>
+      {/* Datenschutz und Impressum (22.10.2026, Prüfung des Schulträgers) – nicht im laufenden Onlinetest */}
+      {!code && <DatenschutzFuss />}
       {mitTabs && (
         <>
           {/* Platz für die Leiste unten */}
@@ -393,6 +398,8 @@ export default function SchuelerBereich(): React.JSX.Element {
       )}
       {/* Willkommens-Assistent (09.10.2026): einmal je Konto, sonst über die Einstellungen */}
       <Willkommen pfad={pfad} />
+      {/* Datenschutz kurz erklärt (22.10.2026): einmal je Konto/Gast und nach jeder Textänderung, keine Einwilligung */}
+      <DatenschutzKurz pfad={pfad} />
     </Container>
   )
 }
@@ -458,7 +465,7 @@ function Kachel(props: {
     >
       <div className="sa-blase" style={{ background: `var(--mantine-color-${f}-5)` }} />
       <Group wrap="nowrap" gap="md" align="center" style={{ position: 'relative' }}>
-        {props.bild ? <Image src={props.bild} alt="" w={64} h={64} fit="contain" /> : props.symbol}
+        {props.bild ? <Image src={props.bild} alt="" aria-hidden="true" w={64} h={64} fit="contain" /> : props.symbol}
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Group gap="xs" wrap="nowrap">
             <Text fw={800} size="lg" c={`var(--mantine-color-${f}-text)`} truncate>
@@ -895,10 +902,13 @@ function ErgebnisListe(): React.JSX.Element {
               <Text fw={600}>{e.titel}</Text>
               <Text size="sm" c="dimmed">
                 {datumText(e.datum)}
-                {e.vorlaeufig ? ' · vorläufig' : ''}
               </Text>
             </div>
-            {e.frei ? (
+            {e.frei && e.vorlaeufig ? (
+              <Badge variant="light" color="yellow" data-ergebnis-in-pruefung>
+                wird noch geprüft
+              </Badge>
+            ) : e.frei ? (
               <Stack gap={0} align="end">
                 <Badge size="lg" variant="light">
                   Note {e.note}
@@ -1505,7 +1515,7 @@ function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): Re
 /** Figur des Tests (Maskottchen), falls die Lehrkraft sie eingeschaltet hat */
 function Figur({ code, posen, pose, h }: { code: string; posen: string[]; pose: 'winkend' | 'jubelnd'; h: number }): React.JSX.Element | null {
   if (!posen.includes(pose)) return null
-  return <Image src={`/s/api/figur/${code}/${pose}`} alt="" h={h} w="auto" fit="contain" data-figur={pose} />
+  return <Image src={`/s/api/figur/${code}/${pose}`} alt="" aria-hidden="true" h={h} w="auto" fit="contain" data-figur={pose} />
 }
 
 /** Ohne IServ: Vorname + Anfangsbuchstabe des Nachnamens */
@@ -1992,6 +2002,12 @@ function ErgebnisAnsicht({
               ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
               : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
           </Text>
+          {/* Menschliche Aufsicht (23.10.2026): Punkte und Note erst, wenn die Lehrkraft alles bestätigt hat */}
+          {e?.frei && e.vorlaeufig && (
+            <Alert color="yellow" variant="light" data-ergebnis-vorlaeufig data-ergebnis-in-pruefung>
+              Dein Ergebnis wird noch von deiner Lehrkraft geprüft.
+            </Alert>
+          )}
           {e && !e.frei && (
             <Text ta="center" size="sm" c="dimmed" data-ergebnis-wartet>
               Dein Ergebnis erscheint hier, sobald deine Lehrkraft den Test beendet oder das Ergebnis freigibt
@@ -2002,7 +2018,7 @@ function ErgebnisAnsicht({
       </Center>
     </Card>
   )
-  if (!e?.frei || !e.aufgaben || !e.bewertung || !e.einheiten) return kopf
+  if (!e?.frei || e.vorlaeufig || !e.aufgaben || !e.bewertung || !e.einheiten) return kopf
   const bewertung = e.bewertung
   const einheiten = e.einheiten
   return (
@@ -2018,18 +2034,10 @@ function ErgebnisAnsicht({
               {e.punkte} / {e.max} Punkte
             </Title>
           </div>
-          <Badge size="xl" variant="light" color={e.vorlaeufig ? 'yellow' : undefined} data-note-vorlaeufig={e.vorlaeufig ? '' : undefined}>
+          <Badge size="xl" variant="light">
             Note {e.note}
-            {e.vorlaeufig ? ' (vorläufig)' : ''}
           </Badge>
         </Group>
-        {e.vorlaeufig && (
-          <Alert color="yellow" mt="sm" variant="light" data-ergebnis-vorlaeufig>
-            {Object.values(bewertung).some((x) => x.vorlaeufig)
-              ? 'Vorläufig – einige Antworten hat die KI bewertet, deine Lehrkraft prüft sie noch. Punkte und Note können sich noch ändern.'
-              : 'Vorläufig – deine Lehrkraft prüft noch einzelne Antworten. Das Ergebnis kann sich noch ändern.'}
-          </Alert>
-        )}
       </Card>
       {e.aufgaben.map((a, i) => (
         <Card key={a.id} withBorder padding="md">
@@ -2064,11 +2072,6 @@ function ErgebnisAnsicht({
                               ? eintrag.saetze.map((s) => `${s.vor} ___ ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.nach}`).join(' / ')
                               : `${(eintrag.vor ?? '').slice(-80)} ___ ${eintrag.nach ?? ''}`)}
                         </Text>
-                      )}
-                      {b?.vorlaeufig && (
-                        <Badge size="xs" color="yellow" variant="light" w="fit-content" data-antwort-vorlaeufig>
-                          vorläufig (KI)
-                        </Badge>
                       )}
                       {eintrag.felder.map((f) => (
                         <Text key={f.id} size="sm">
@@ -2177,7 +2180,7 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
   return (
     <Paper withBorder p="sm" radius="md">
       <Stack gap={6}>
-        {e.bild && <Image src={e.bild} alt="" h={120} w="auto" fit="contain" />}
+        {e.bild && <Image src={e.bild} alt="Bild zur Aufgabe" h={120} w="auto" fit="contain" />}
         {e.saetze?.map((s, i) => (
           <Text key={i}>
             {s.vor} <b>{s.mitte !== undefined ? '(1) _____' : '_____'}</b>{' '}
@@ -2409,6 +2412,10 @@ const EINSCHAETZUNG: Record<string, string> = { sicher: 'sicher', teilweise: 'te
 export function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
   return (
     <Stack gap="xs">
+      {/* Kennzeichnung (22.10.2026, Art. 50 KI-VO): gilt für Rückmeldebogen, Blatt und Reihe */}
+      <div>
+        <KiMarke />
+      </div>
       {b.staerken.length > 0 && (
         <div>
           <Text fw={700} c="green">

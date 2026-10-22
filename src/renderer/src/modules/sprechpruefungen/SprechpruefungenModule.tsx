@@ -307,7 +307,7 @@ function KartenEditor({
         {x.art === 'monolog' && (
           <>
             {/* Das erstellte Bild auch im Fenster (21.10.2026, Wunsch der Lehrkraft) – neben Fragen und Beschreibung */}
-            {x.bilder[0] && <Image src={bildUrl(x.bilder[0])} mah={320} radius="sm" fit="contain" alt="" data-sprechkarte-bild />}
+            {x.bilder[0] && <Image src={bildUrl(x.bilder[0])} mah={320} radius="sm" fit="contain" alt={x.bildBeschreibung || 'Bild zur Sprechaufgabe'} data-sprechkarte-bild />}
             {/* Fassungen (21.10.2026): antippen = wird die aktuelle; veraltete löschen */}
             {bildVersionen(x).length > 1 && (
               <Group gap="xs" data-sprechkarte-versionen>
@@ -321,7 +321,7 @@ function KartenEditor({
                         style={{ borderRadius: 6, outline: ist ? '2px solid var(--mantine-color-violet-6)' : undefined }}
                         data-sprechkarte-version={n + 1}
                       >
-                        <Image src={bildUrl(d)} w={72} h={54} radius="sm" fit="cover" alt="" />
+                        <Image src={bildUrl(d)} w={72} h={54} radius="sm" fit="cover" alt={`Fassung ${n + 1}`} />
                       </UnstyledButton>
                       {ist ? (
                         <Text size="xs" c="dimmed">
@@ -442,7 +442,7 @@ function KartenAnsicht({ k, blaettern: b, schliessen }: { k: SprechKarte; blaett
         {k.art === 'interview' && feld('Fragen', punkte(k.fragen))}
         {k.art === 'monolog' && (
           <>
-            {k.bilder[0] && <Image src={bildUrl(k.bilder[0])} mah={320} radius="sm" fit="contain" alt="" data-sprechkarte-bild />}
+            {k.bilder[0] && <Image src={bildUrl(k.bilder[0])} mah={320} radius="sm" fit="contain" alt={k.bildBeschreibung || 'Bild zur Sprechaufgabe'} data-sprechkarte-bild />}
             {feld('Was auf dem Bild zu sehen ist', absatz(k.bildBeschreibung))}
             {feld('Leitfragen', punkte(k.leitfragen))}
           </>
@@ -487,7 +487,7 @@ function KartenKachel({
       <UnstyledButton onClick={onClick} style={{ display: 'block', width: '100%' }}>
         {k.art === 'monolog' &&
           (k.bilder[0] ? (
-            <Image src={bildUrl(k.bilder[0])} h={110} radius="sm" fit="cover" alt="" mb={6} />
+            <Image src={bildUrl(k.bilder[0])} h={110} radius="sm" fit="cover" alt="" aria-hidden="true" mb={6} />
           ) : (
             <Group h={60} justify="center" mb={6} style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}>
               <IconPhoto size={22} opacity={0.5} />

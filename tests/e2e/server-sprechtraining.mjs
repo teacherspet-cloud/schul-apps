@@ -166,6 +166,11 @@ try {
   pruefe(!JSON.stringify(kh).includes('want to die'), 'Hinweis ohne Wortlaut')
   await p.goto(A)
   pruefe(await da(p.locator('[data-krisen-hinweise]')), 'Startseite: Karte „Vertrauliche Hinweise"')
+  // Meldeweg (23.10.2026, Prüfung des Schulträgers): roter Zähler, „Was tun?", ohne Wortlaut in der Karte
+  pruefe(await da(p.locator('[data-krisen-zahl]')), 'Karte zeigt roten Zähler')
+  pruefe(await da(p.locator('[data-krisen-was-tun]')), 'Karte zeigt „Was tun?" (112, 116 111, § 4 KKG)')
+  pruefe(!(await p.locator('[data-krisen-hinweise]').innerText()).includes('want to die'), 'Karte ohne Wortlaut')
+  pruefe(typeof (await (await lk.request.get(`${A}/server/krisen/zahl`, { headers: KOPF })).json()).offen === 'number', 'Zahl offener Hinweise abrufbar')
   await p.screenshot({ path: join(out, '5-krisenhinweis.png'), fullPage: true })
   await p.locator('[data-krisen-gesehen]').first().click()
   pruefe(

@@ -291,7 +291,7 @@ function SchrittMaterialKarte({
       <Group gap="sm" wrap="nowrap" align="center">
         <UnstyledButton onClick={oeffnen} aria-label="Arbeitsblatt öffnen" style={{ flexShrink: 0 }}>
           {bild ? (
-            <Image src={bild} w={56} h={78} fit="cover" radius="xs" alt="" style={{ border: '1px solid var(--mantine-color-default-border)' }} />
+            <Image src={bild} w={56} h={78} fit="cover" radius="xs" alt="" aria-hidden="true" style={{ border: '1px solid var(--mantine-color-default-border)' }} />
           ) : (
             <Paper w={56} h={78} withBorder radius="xs" style={{ display: 'grid', placeItems: 'center' }}>
               {bild === undefined ? <Loader size="xs" /> : <IconFiles size={20} color="var(--mantine-color-dimmed)" />}

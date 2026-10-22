@@ -91,6 +91,8 @@ try {
         // Testserver ohne Grundbestand (19.10.2026): keine 370 MB Medienbank und keine 50.000 Grammatikaufgaben je Lauf
         SCHULAPPS_GRUNDBESTAND: '0',
         SCHULAPPS_NOTZUGANG_PASSWORT: 'test-notzugang-123',
+        // Notzugang ist ab 23.10.2026 standardmäßig aus (Prüfung des Schulträgers) – die Testserver schalten ihn ein
+        SCHULAPPS_NOTZUGANG_ERZWINGEN: '1',
         // wie auf dem Server hinter der Weiche: Besucheradresse aus X-Real-IP (server-einstellungen erfindet Adressen
         // für Fehlversuche, damit die Sperre nicht localhost für alle Tests trifft – 10.10.2026)
         SCHULAPPS_WEICHE: '1',

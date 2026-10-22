@@ -38,7 +38,7 @@ export function IllustrationDialog({
           </Text>
         )}
         <Group align="flex-start" wrap="nowrap">
-          {bild && <img src={bild} alt="" style={{ width: 90, height: 120, objectFit: 'contain' }} />}
+          {bild && <img src={bild} alt="Vorschau der Figur" style={{ width: 90, height: 120, objectFit: 'contain' }} />}
           <Stack gap="xs" style={{ flex: 1 }}>
             {liste.length > 1 && (
               <Select

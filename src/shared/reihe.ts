@@ -456,8 +456,10 @@ export interface SchrittStand {
   niveau?: number
   /**
    * KI-Vorschlag zur Bewertung eines Abschlussprodukts (08.10.2026, Plan E.6): Teilpunkte und Begründung je Kriterium
-   * des Rasters – NUR für die Lehrkraft (Lernende sehen erst die bestätigte Bewertung, `standFuerLernende`). In digitalen
-   * Reihen entscheidet er über „geschafft" (Einschätzungen wie beim KI-Bogen). `fehler`: Die KI konnte nicht prüfen.
+   * des Rasters – NUR für die Lehrkraft (Lernende sehen erst die bestätigte Bewertung, `standFuerLernende`). Seit
+   * 23.10.2026 (Prüfung des Schulträgers, menschliche Aufsicht) entscheidet er auch in digitalen Reihen NICHT mehr selbst
+   * über „geschafft": Die Abgabe wartet, bis die Lehrkraft den Vorschlag übernimmt oder selbst bewertet
+   * (`vorschlagGeschafft`). `fehler`: Die KI konnte nicht prüfen.
    */
   kiVorschlag?: AbschlussVorschlag
   /** Kurzer, freundlicher KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6) – keine Bewertung, keine Note */
@@ -508,8 +510,8 @@ export interface Extern {
   /** Onlinetest: erreichte Prozent (nach Freigabe) */
   prozent?: number
   /**
-   * Onlinetest (22.10.2026): Ergebnis noch vorläufig – KI-Urteile unbestätigt oder Antworten offen. Zur Anzeige; der Weg
-   * schaltet trotzdem frei (Übungsweg, keine Note).
+   * Onlinetest (22.10.2026): Ergebnis noch vorläufig – KI-Urteile unbestätigt oder Antworten offen. Seit 23.10.2026
+   * (Prüfung des Schulträgers) ohne `prozent`; der Schritt bleibt „eingereicht, wartet auf die Lehrkraft".
    */
   vorlaeufig?: boolean
 }
@@ -573,12 +575,16 @@ export function einzelStatus(
   if (digital && st?.bewertung) return { status: st.bewertung.geschafft ? 'geschafft' : 'nicht_geschafft' }
   const e = wirksamerErfolg(s, reiheArt)
   if (e.art === 'abgabe') return { status: 'geschafft' }
-  if (e.art === 'lehrkraft' || (!digital && (s.inhalt.art === 'abschluss' || s.inhalt.art === 'sprechen'))) {
+  /*
+   * Abschlussprodukt (23.10.2026, Prüfung des Schulträgers – Art. 22 DSGVO, § 50 NSchG): Auch digital entscheidet nie die
+   * KI allein über „geschafft"; die Abgabe wartet auf die Lehrkraft (KI-Vorschlag mit „Vorschlag übernehmen").
+   */
+  if (e.art === 'lehrkraft' || s.inhalt.art === 'abschluss' || (!digital && s.inhalt.art === 'sprechen')) {
     if (st?.bewertung) return { status: st.bewertung.geschafft ? 'geschafft' : 'nicht_geschafft' }
     return { status: 'eingereicht', wartet: true }
   }
-  // Abschlussprodukt (digital): Konnte die KI nicht prüfen, sieht es sich die Lehrkraft an
-  if (s.inhalt.art === 'abschluss' && st?.kiVorschlag?.fehler) return { status: 'eingereicht', wartet: true }
+  // Onlinetest mit unbestätigten KI-Urteilen (23.10.2026): weder geschafft noch nicht geschafft – wartet auf die Lehrkraft
+  if (s.inhalt.art === 'onlinetest' && ex?.vorlaeufig) return { status: 'eingereicht', wartet: true }
   const runden = verknuepft ? (ex?.runden ?? 1) : 2
   if (e.art === 'punkte') {
     const p = ex?.prozent
@@ -586,15 +592,21 @@ export function einzelStatus(
     return p >= e.prozent ? { status: 'geschafft' } : { status: eingereicht >= runden ? 'nicht_geschafft' : 'offen' }
   }
   // KI: alle Kriterien des letzten Bogens mindestens auf der Schwelle
-  const krit = verknuepft
-    ? ex?.kriterien
-    : s.inhalt.art === 'abschluss'
-      ? st?.kiVorschlag?.kriterien.map((k) => k.einschaetzung)
-      : st?.ki?.einschaetzungen
+  const krit = verknuepft ? ex?.kriterien : st?.ki?.einschaetzungen
   if (!krit) return { status: 'eingereicht' }
   const ok = krit.length > 0 && krit.every((k) => (RANG[k] ?? 0) >= RANG[e.schwelle])
   if (ok) return { status: 'geschafft' }
   return { status: eingereicht >= runden ? 'nicht_geschafft' : 'offen' }
+}
+
+/**
+ * „Vorschlag übernehmen" (23.10.2026, Prüfung des Schulträgers): Wäre das Abschlussprodukt nach dem KI-Vorschlag
+ * geschafft? Alle Kriterien mindestens auf der Schwelle (wie beim KI-Bogen). Entscheidet NIE selbst – nur, wenn die
+ * Lehrkraft den Vorschlag ausdrücklich übernimmt.
+ */
+export function vorschlagGeschafft(v: AbschlussVorschlag | undefined, schwelle: 'teilweise' | 'sicher' = 'teilweise'): boolean | null {
+  if (!v || v.fehler || !v.kriterien.length) return null
+  return v.kriterien.every((k) => (RANG[k.einschaetzung] ?? 0) >= RANG[schwelle])
 }
 
 /** Der ganze Weg einer Person: Freischaltungen, Haltepunkte, Wahl-, Förder- und Diagnoseregeln */

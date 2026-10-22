@@ -30,7 +30,8 @@ import {
 import { IconArrowLeft, IconCheck, IconDownload, IconHandStop, IconLock, IconPlayerPlay, IconQrcode, IconRefresh, IconUserMinus } from '@tabler/icons-react'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
-import type { Reihe, SchrittLage, Stand, Status, Weg } from '@shared/reihe'
+import { artVon, vorschlagGeschafft, wirksamerErfolg, type Reihe, type SchrittLage, type Stand, type Status, type Weg } from '@shared/reihe'
+import { BewertungsVerlauf } from '../../shared/components/BewertungsVerlauf'
 import { vorschlagSumme } from '@shared/reiheKiFeedback'
 import { notifyError } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -41,7 +42,16 @@ interface Daten {
   reihe: Reihe
   zuweisung: { id: string; lerngruppe: string; status: string; halteFrei: string[]; code?: string; link?: string; perCode?: string[] }
   lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[]
-  bedarf: { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }[]
+  bedarf: {
+    art: string
+    schueler?: string
+    name?: string
+    schritt?: string
+    text: string
+    frage?: number
+    /** KI-Vorschlag zum Abschlussprodukt, mit einem Klick übernehmbar (23.10.2026, Prüfung des Schulträgers) */
+    vorschlag?: { punkte: number; max: number; geschafft: boolean }
+  }[]
 }
 
 export const STATUS: Record<Status, { zeichen: string; farbe: string; text: string }> = {
@@ -153,6 +163,22 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
                   <Button size="xs" leftSection={<IconCheck size={14} />} onClick={() => aktion({ art: 'praesenz', schueler: b.schueler, schritt: b.schritt })}>
                     Abhaken
                   </Button>
+                )}
+                {b.art === 'bewerten' && b.vorschlag && b.schueler && b.schritt && (
+                  <Tooltip
+                    label={`Übernimmt den KI-Vorschlag: ${b.vorschlag.punkte} von ${b.vorschlag.max} Punkten, ${b.vorschlag.geschafft ? 'geschafft' : 'noch nicht geschafft'}; Begründungen als Rückmeldung`}
+                  >
+                    <Button
+                      size="xs"
+                      color="violet"
+                      variant="light"
+                      leftSection={<IconCheck size={14} />}
+                      onClick={() => aktion({ art: 'vorschlag-uebernehmen', schueler: b.schueler, schritt: b.schritt })}
+                      data-vorschlag-uebernehmen-bedarf
+                    >
+                      Vorschlag übernehmen
+                    </Button>
+                  </Tooltip>
                 )}
                 {(b.art === 'bewerten' || b.art === 'hilfe' || b.art === 'vorschlag') && b.schueler && b.schritt && (
                   <Button size="xs" variant="light" onClick={() => setDetail({ schueler: b.schueler!, schritt: b.schritt! })} data-bedarf-ansehen>
@@ -336,6 +362,9 @@ function Detail({
   const eigeneFragen = (l.stand.fragen ?? []).map((f, i) => ({ f, i })).filter(({ f }) => f.schritt === schrittId)
   const ziele = [...reihe.lernziele, ...reihe.schritte.flatMap((x) => x.lernziele)]
   const fragen = s.inhalt.art === 'aufgabe' ? s.inhalt.fragen : []
+  // Schwelle wie am Server (23.10.2026): „Vorschlag übernehmen" entscheidet nach dem wirksamen Erfolg des Schritts
+  const erfolg = wirksamerErfolg(s, artVon(reihe))
+  const schwelle = erfolg.art === 'ki' ? erfolg.schwelle : 'teilweise'
   return (
     <Modal opened onClose={schliessen} title={`${l.name} – ${s.titel}`} size="lg">
       <Stack>
@@ -398,21 +427,34 @@ function Detail({
                     {st.kiVorschlag.gesamt}
                   </Text>
                 )}
-                <Button
-                  size="xs"
-                  variant="light"
-                  w="fit-content"
-                  onClick={() => {
-                    const v = st.kiVorschlag!
-                    const sum = vorschlagSumme(v)
-                    setText(
-                      [`${sum.punkte} von ${sum.max} Punkten.`, ...v.kriterien.map((k) => `${k.kriterium}: ${k.punkte}/${k.max} – ${k.begruendung}`)].join('\n')
-                    )
-                  }}
-                  data-vorschlag-uebernehmen
-                >
-                  In die Rückmeldung übernehmen
-                </Button>
+                <Group gap="xs">
+                  {/* Ein Klick (23.10.2026, Prüfung des Schulträgers): Die KI entscheidet nie allein – die Lehrkraft übernimmt */}
+                  <Button
+                    size="xs"
+                    color="violet"
+                    w="fit-content"
+                    leftSection={<IconCheck size={14} />}
+                    onClick={() => (aktion({ art: 'vorschlag-uebernehmen', ...(text.trim() ? { text } : {}) }), schliessen())}
+                    data-vorschlag-annehmen
+                  >
+                    Vorschlag übernehmen ({vorschlagGeschafft(st.kiVorschlag, schwelle) ? 'geschafft' : 'noch nicht geschafft'})
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    w="fit-content"
+                    onClick={() => {
+                      const v = st.kiVorschlag!
+                      const sum = vorschlagSumme(v)
+                      setText(
+                        [`${sum.punkte} von ${sum.max} Punkten.`, ...v.kriterien.map((k) => `${k.kriterium}: ${k.punkte}/${k.max} – ${k.begruendung}`)].join('\n')
+                      )
+                    }}
+                    data-vorschlag-uebernehmen
+                  >
+                    In die Rückmeldung übernehmen
+                  </Button>
+                </Group>
               </Stack>
             )}
           </Alert>
@@ -465,6 +507,9 @@ function Detail({
           <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap' }} data-impuls-lehrkraft>
             <b>KI-Impuls an die Person:</b> {st.impuls.text}
           </Text>
+        )}
+        {s.inhalt.art === 'abschluss' && (
+          <BewertungsVerlauf pfad={`/server/reihen/z/${zid}/spur?schueler=${encodeURIComponent(l.id)}&schritt=${encodeURIComponent(s.id)}`} />
         )}
         {s.inhalt.art === 'abschluss' && s.inhalt.raster.length > 0 && (
           <Text size="sm" c="dimmed">

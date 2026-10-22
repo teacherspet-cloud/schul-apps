@@ -304,7 +304,7 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
         <Paper withBorder p="xs" radius="sm" data-logo-frage>
           <Group gap="xs" justify="space-between" wrap="nowrap">
             <Group gap="xs" wrap="nowrap">
-              <img src={logoFrage.png} alt="" style={{ height: 28, width: 'auto' }} />
+              <img src={logoFrage.png} alt="Gefundenes Schullogo" style={{ height: 28, width: 'auto' }} />
               <Text size="xs">Logo der Schule übernehmen? Das bisherige Logo wird dabei ersetzt.</Text>
             </Group>
             <Group gap={4} wrap="nowrap">

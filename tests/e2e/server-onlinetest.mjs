@@ -9,8 +9,10 @@
 //  - Wartebildschirm mit Figur bis zum gemeinsamen Start durch die Lehrkraft; keine Lösungen am Gerät
 //  - Abgabe selbst und durch Verlassen der Seite; danach wertet die KI automatisch aus
 //  - falsches Wort → „zu entscheiden" (0 Punkte), Lehrkraft akzeptiert → Punkt
-//  - Ergebnis erscheint erst nach Freigabe/Testende (22.10.2026; nicht mehr, sobald alle abgegeben haben) – vorläufig,
-//    mit Lösungen; KI-Urteile bleiben vorläufig bis „Alle KI-Urteile bestätigen"; danach endgültig
+//  - Ergebnis erscheint erst nach Freigabe/Testende (22.10.2026; nicht mehr, sobald alle abgegeben haben); solange
+//    KI-Urteile unbestätigt oder Antworten zu entscheiden sind, nur „Dein Ergebnis wird noch von deiner Lehrkraft
+//    geprüft." – ohne Punkte, Note, Richtig/Falsch und Lösungen (23.10.2026, Prüfung des Schulträgers); nach
+//    „Alle KI-Urteile bestätigen" das Ergebnis mit Punkten
 //  - Word partners: Lehrkraft sieht „a) heatwave", keine interne Kennung
 //  - Oberfläche: Testliste mit Sortier-/Filterknöpfen, Namensliste zugeklappt, Namen ausblendbar,
 //    Export-Menü, kein Knopf ohne Funktion neben „Test beenden"
@@ -346,14 +348,18 @@ try {
   pruefe(kim?.zuEntscheiden === 1 && kim.offen === 0, `„dgo" statt „dog": zu entscheiden (${kim?.zuEntscheiden}), nichts mehr offen (${kim?.offen})`)
   pruefe(kim?.punkte === 4 && kim.max === 5, `Punkte bis zur Entscheidung: ${kim?.punkte}/${kim?.max} (school, heatwave, Satz 2 P.)`)
 
-  // ---------- Ergebnis am Gerät: vorläufig, mit Lösung
+  // ---------- Ergebnis am Gerät: erst nach Freigabe, und erst nach der Prüfung durch die Lehrkraft
   // Seit 22.10.2026 nicht mehr, sobald alle abgegeben haben – erst nach Freigabe oder Testende
   pruefe(await s1.locator('[data-ergebnis-wartet]').isVisible(), 'alle abgegeben, Test läuft: Ergebnis wartet noch')
   pruefe(kim?.kiUnbestaetigt >= 1, `KI-Urteil über den Satz unbestätigt (${kim?.kiUnbestaetigt})`)
   await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'freigeben' } })
-  await s1.locator('[data-ergebnis]').waitFor({ timeout: 15000 })
-  pruefe(await s1.getByText(/^Vorläufig –/).first().isVisible(), 'Ergebnis erscheint nach der Freigabe – als vorläufig')
-  pruefe(await s1.getByText('→ dog').isVisible(), 'Ergebnis zeigt die richtige Lösung')
+  // Menschliche Aufsicht (23.10.2026): freigegeben, aber noch ungeprüft → nur der Hinweis, keine Punkte, keine Lösung
+  await s1.locator('[data-ergebnis-in-pruefung]').first().waitFor({ timeout: 15000 })
+  pruefe(await s1.getByText('Dein Ergebnis wird noch von deiner Lehrkraft geprüft.').isVisible(), 'nach der Freigabe: „wird noch geprüft"')
+  pruefe((await s1.locator('[data-ergebnis]').count()) === 0, 'noch ungeprüft: keine Punkte, keine Note, kein Richtig/Falsch')
+  pruefe((await s1.getByText('→ dog').count()) === 0, 'noch ungeprüft: keine Lösungen')
+  const roh = await (await s1.request.get(`${A}/s/api/ergebnis?id=${encodeURIComponent(kim.id)}`, { headers: KOPF })).json().catch(() => ({}))
+  pruefe(roh.punkte === undefined && roh.note === undefined && roh.bewertung === undefined, 'Server liefert ungeprüft weder Punkte noch Note noch Bewertung')
   pruefe(await s1.locator('[data-figur="jubelnd"]').isVisible(), 'jubelnde Figur beim Ergebnis')
   await s1.screenshot({ path: join(out, '3-ergebnis.png'), fullPage: true })
 
@@ -395,13 +401,21 @@ try {
   }
   d = await detail()
   pruefe(d.teilnahmen.find((t) => t.id === kim.id).punkte === 5, 'akzeptiert → ganzer Punkt (5/5)')
-  // Vorläufig bis Bestätigung (22.10.2026): das KI-Urteil über den Satz hält das Ergebnis vorläufig
+  // Das unbestätigte KI-Urteil über den Satz hält das Ergebnis weiter in der Prüfung (23.10.2026)
   await s1.waitForTimeout(6000)
-  pruefe(await s1.getByText(/^Vorläufig –/).first().isVisible(), 'nach der Entscheidung noch vorläufig – KI-Urteil unbestätigt')
+  pruefe(await s1.locator('[data-ergebnis-in-pruefung]').first().isVisible(), 'nach der Entscheidung noch in Prüfung – KI-Urteil unbestätigt')
   const best = await (await lk.request.post(`${A}/server/onlinetest/${neu.id}/ki-bestaetigen`, { headers: KOPF })).json()
   pruefe(best.bestaetigt >= 1, `Alle KI-Urteile bestätigt (${best.bestaetigt})`)
-  await s1.getByText(/^Vorläufig –/).first().waitFor({ state: 'detached', timeout: 15000 })
+  await s1.locator('[data-ergebnis]').waitFor({ timeout: 15000 })
+  pruefe((await s1.locator('[data-ergebnis-in-pruefung]').count()) === 0, 'nach der Bestätigung kein „wird noch geprüft" mehr')
   pruefe(await s1.getByText('5 / 5 Punkte').isVisible(), 'am Gerät endgültig: 5 / 5 Punkte')
+  await s1.screenshot({ path: join(out, '3d-ergebnis-bestaetigt.png'), fullPage: true })
+  // Verlauf der Bewertung (23.10.2026): KI-Vorschlag und Bestätigung stehen für Kim drin
+  const verlauf = await (await lk.request.get(`${A}/server/onlinetest/${neu.id}/spur?teilnahme=${encodeURIComponent(kim.id)}`, { headers: KOPF })).json()
+  pruefe(
+    verlauf.eintraege?.some((x) => x.quelle === 'ki') && verlauf.eintraege?.some((x) => x.quelle === 'bestaetigt'),
+    `Verlauf der Bewertung: KI-Vorschlag und Bestätigung (${verlauf.eintraege?.map((x) => x.quelle).join(', ')})`
+  )
 
   // ---------- Oberfläche der Lehrkraft
   const p = await lk.newPage()

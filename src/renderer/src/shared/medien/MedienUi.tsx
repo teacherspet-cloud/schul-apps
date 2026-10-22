@@ -67,6 +67,7 @@ import { useLaufendeSchluessel } from '../auftraege'
 import { abspielen, bildKandidaten, kandidatUebernehmen, sinnVon, type Vokabel } from './medienbank'
 import { WORTART_NAME, type BildTeil, type MedienAnfrage } from '@shared/medienBedeutung'
 import { bedeutungenKlaerenStarten } from './bedeutungenKlaeren'
+import { lizenzErlaubt, lizenzSperrgrund } from '@shared/bildLizenz'
 import { aufMedienAenderung, lagenVon, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from './medienAuftrag'
 
 let adminZwischen: Promise<boolean> | null = null
@@ -172,7 +173,7 @@ export function BildZelle({ sicht, wort, onOeffnen, stufe }: { sicht?: BildTeil;
     >
       {b?.dataUrl || b?.url ? (
         <>
-          <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" style={fremd ? { opacity: 0.45 } : undefined} />
+          <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" aria-hidden="true" style={fremd ? { opacity: 0.45 } : undefined} />
           {/* Bild einer anderen Übersetzung derselben Wortart (21.10.2026) – der nächste Bildauftrag ordnet zu */}
           {sicht?.vorlaeufig && !fremd && (
             <Tooltip label={`Vorläufig: Bild der Bedeutung „${sicht.bedeutung?.deutsch ?? ''}" – der nächste Bildauftrag prüft, ob es passt`}>
@@ -584,7 +585,7 @@ export function BildDialog({
   geaendert: () => void
 }): React.JSX.Element {
   const [laeuft, setLaeuft] = useState<string | null>(null)
-  const [kandidaten, setKandidaten] = useState<MedienKandidat[]>(sicht?.bild?.kandidaten ?? [])
+  const [kandidaten, setKandidaten] = useState<MedienKandidat[]>((sicht?.bild?.kandidaten ?? []).filter((k) => lizenzErlaubt(k.lizenz)))
   // „Von der KI erzeugen" läuft als Auftrag weiter, auch wenn das Pop-up zugeht
   const kiLaeuft = useLaufendeSchluessel(ziel.docId).has(medienSchluessel('bildKi', v.term))
   const stufe = ziel.stufe ?? stufeVon(ziel.klasse)
@@ -635,6 +636,12 @@ export function BildDialog({
             <Text size="xs" c="dimmed" ta="center">
               {b.herkunft === 'ki' ? 'KI-generiert' : b.nachweis}
             </Text>
+            {/* Vorhandene NC-/ND-Bilder markieren (22.10.2026, Prüfung des Schulträgers) */}
+            {b.herkunft !== 'ki' && lizenzSperrgrund(b.nachweis) && (
+              <Text size="xs" c="red.7" ta="center" data-bild-lizenz-gesperrt>
+                {lizenzSperrgrund(b.nachweis)} – bitte ein anderes Bild wählen.
+              </Text>
+            )}
             {fremd && (
               <Text size="xs" c="orange.8" ta="center" data-bild-fremde-stufe>
                 Bild der Stufe {BILDSTUFE_NAME[sicht!.bildStufe!]} – für {BILDSTUFE_NAME[stufe]} gibt es noch kein eigenes. Lernende dieser Stufe sehen bis
@@ -711,7 +718,7 @@ export function BildDialog({
                         style={{ position: 'relative' }}
                         data-bild-kandidat
                       >
-                        <Image src={k.vorschau} h={80} fit="cover" radius={4} alt="" />
+                        <Image src={k.vorschau} h={80} fit="cover" radius={4} alt="Bildvorschlag" />
                         {laeuft === `k:${k.url}` && <Loader size="xs" style={{ position: 'absolute', top: 4, right: 4 }} />}
                       </UnstyledButton>
                     </Tooltip>

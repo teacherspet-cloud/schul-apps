@@ -167,7 +167,7 @@ function BlattKarte({
         }}
       >
         {s.thumb ? (
-          <Image src={s.thumb} h={166} fit="contain" alt="" />
+          <Image src={s.thumb} h={166} fit="contain" alt={`Vorschau: ${s.name}`} />
         ) : (
           <Text size="xs" c="dimmed">
             {s.sheetCount === 0 ? 'Entwurf – noch nicht ausformuliert' : 'Keine Vorschau'}

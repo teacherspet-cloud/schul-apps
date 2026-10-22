@@ -212,17 +212,54 @@ describe('Onlinetest über die Routen (22.10.2026)', () => {
     expect((await rufe(sch(), kinder[1], 'GET', `/s/api/ergebnis?id=${teil[1].id}`)).d).toMatchObject({ frei: false })
 
     await rufe(lehr(), lk, 'POST', `/server/onlinetest/${t.id}/status`, { status: 'beendet' })
-    const e1 = (await rufe(sch(), kinder[1], 'GET', `/s/api/ergebnis?id=${teil[1].id}`)).d as { frei: boolean; vorlaeufig: boolean; bewertung: Record<string, { vorlaeufig?: boolean }> }
-    expect(e1.frei).toBe(true)
-    expect(e1.vorlaeufig).toBe(true)
-    expect(e1.bewertung.e1.vorlaeufig).toBe(true)
+    /*
+     * Menschliche Aufsicht (23.10.2026, Prüfung des Schulträgers): Solange KI-Urteile unbestätigt sind, bekommen die
+     * Lernenden weder Punkte noch Note noch Richtig/Falsch – nur „wird noch geprüft".
+     */
+    const e1 = (await rufe(sch(), kinder[1], 'GET', `/s/api/ergebnis?id=${teil[1].id}`)).d
+    expect(e1).toMatchObject({ frei: true, abgegeben: true, vorlaeufig: true, inPruefung: true })
+    for (const feld of ['punkte', 'max', 'note', 'bewertung', 'loesungen', 'aufgaben']) expect(e1).not.toHaveProperty(feld)
+    // Auch die Liste „Meine Ergebnisse" zeigt nichts
+    const liste1 = (await rufe(sch(), kinder[1], 'GET', '/s/api/ergebnisse')).d.ergebnisse as Record<string, unknown>[]
+    const eintrag1 = liste1.find((x) => x.id === teil[1].id)!
+    expect(eintrag1).toMatchObject({ frei: true, vorlaeufig: true })
+    for (const feld of ['punkte', 'max', 'note']) expect(eintrag1).not.toHaveProperty(feld)
+
+    // Verlauf der Bewertung: der Vorschlag der KI steht schon drin
+    const spur = async (i: number): Promise<{ quelle: string; kiVorschlag?: { einheiten?: Record<string, { status: string }> }; entscheidung?: unknown }[]> =>
+      (await rufe(lehr(), lk, 'GET', `/server/onlinetest/${t.id}/spur?teilnahme=${teil[i].id}`)).d.eintraege as never
+    expect((await spur(1)).map((x) => x.quelle)).toEqual(['ki'])
+    expect((await spur(1))[0].kiVorschlag?.einheiten?.e1.status).toBe('richtig')
+    // Fremde Lehrkräfte sehen nichts
+    const fremd = nutzerAnlegen({ benutzer: 'f.remd', name: 'Fritz Fremd', rolle: 'lehrkraft', quelle: 'test' })
+    expect((await rufe(lehr(), fremd, 'GET', `/server/onlinetest/${t.id}/spur?teilnahme=${teil[1].id}`)).code).toBe(404)
 
     const b = await rufe(lehr(), lk, 'POST', `/server/onlinetest/${t.id}/ki-bestaetigen`)
     expect(b.d).toMatchObject({ ok: true, bestaetigt: 4 })
-    const e2 = (await rufe(sch(), kinder[1], 'GET', `/s/api/ergebnis?id=${teil[1].id}`)).d as { vorlaeufig: boolean; punkte: number; bewertung: Record<string, { vorlaeufig?: boolean }> }
+    const e2 = (await rufe(sch(), kinder[1], 'GET', `/s/api/ergebnis?id=${teil[1].id}`)).d as { vorlaeufig: boolean; punkte: number; note: number; bewertung: Record<string, { vorlaeufig?: boolean }> }
     expect(e2.vorlaeufig).toBe(false)
     expect(e2.punkte).toBe(2)
+    expect(e2.note).toBeDefined()
     expect(e2.bewertung.e1.vorlaeufig).toBeUndefined()
+    expect((await spur(1)).map((x) => x.quelle)).toEqual(['ki', 'bestaetigt'])
+
+    // Die Lehrkraft ändert ein (bestätigtes) KI-Urteil bzw. bestätigt es einzeln: „geändert" / „bestätigt" im Verlauf
+    await rufe(lehr(), lk, 'POST', `/server/onlinetest/${t.id}/korrektur`, { teilnahme: teil[0].id, einheit: 'e2', richtig: false })
+    await rufe(lehr(), lk, 'POST', `/server/onlinetest/${t.id}/korrektur`, { teilnahme: teil[0].id, einheit: 'e1', richtig: true })
+    const s0 = await spur(0)
+    expect(s0.map((x) => x.quelle)).toEqual(['ki', 'bestaetigt', 'geaendert', 'bestaetigt'])
+    expect(s0[2].kiVorschlag?.einheiten?.e2.status).toBe('richtig')
+    expect(s0[2].entscheidung).toMatchObject({ einheiten: { e2: { status: 'falsch', punkte: 0 } } })
+    // Nochmal umentscheiden: das Urteil stammt jetzt von der Lehrkraft
+    await rufe(lehr(), lk, 'POST', `/server/onlinetest/${t.id}/korrektur`, { teilnahme: teil[0].id, einheit: 'e2', richtig: true })
+    expect((await spur(0)).at(-1)?.quelle).toBe('lehrkraft')
+    // Vorschlag und Entscheidung liegen verschlüsselt (Rohzugriff über Aliasnamen an der Entschlüsselung vorbei, wie feldschutz.test.ts)
+    const roh = datenbank().prepare('SELECT ki_vorschlag AS v, entscheidung AS e FROM bewertung_spur WHERE entscheidung IS NOT NULL').all() as { v: string | null; e: string }[]
+    expect(roh.length).toBeGreaterThan(0)
+    for (const z of roh) {
+      expect(String(z.e)).toMatch(/^v1:/)
+      if (z.v != null) expect(String(z.v)).toMatch(/^v1:/)
+    }
   })
 
   it('Handschrift: je Kind eine Anfrage, gezählt je Feld, gebremst, feste Fehlermeldung', async () => {

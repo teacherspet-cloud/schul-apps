@@ -304,7 +304,7 @@ export function Erstellen({
                     onChange={(e) => setMitFigur(e.currentTarget.checked)}
                     data-figur-wahl
                   />
-                  {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
+                  {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="Vorschau der Figur" />}
                 </Group>
               )}
             </NurExperte>

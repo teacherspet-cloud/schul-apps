@@ -41,6 +41,7 @@ import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { gastEntfernen } from './gaeste'
 import { auswerten, mitarbeitAnfrage, mitarbeitAus, type AuswertungsKontext, type MitarbeitVorschlag, type PersonRoh } from './blattAuswertung'
+import { spurEintragen } from './bewertungSpur'
 import type { Strenge } from '../shared/blattAuswertung'
 import { iservBereit } from './anmeldung'
 import { mitNamensliste, registerVergessen } from './namensschutz'
@@ -1284,6 +1285,10 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const neu: GespeicherteAuswertung = { strenge, zeit: Date.now(), personen }
         db().prepare('UPDATE blatt_freigaben SET auswertung = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
         protokolliereServer('arbeitsblatt', 'Mitarbeit und Hilfen eingeschätzt', ich.id)
+        // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers): Vorschlag der KI zur Mitarbeitsnote je Person.
+        // Eine Bestätigung gibt es hier nicht – die Note trägt die Lehrkraft selbst ein (der Vorschlag ist nur Hinweis).
+        for (const [sid, v] of Object.entries(personen))
+          spurEintragen({ art: 'mitarbeit', bezugId: z.id, schuelerId: sid, lehrkraftId: z.lehrkraft_id, quelle: 'ki', kiVorschlag: { note: v.note, begruendung: v.begruendung, strenge } })
         return (json(res, 200, { strenge, mitarbeit: personen, erstellt: neu.zeit }), true)
       } catch (err) {
         return (json(res, 503, { fehler: err instanceof Error ? err.message : String(err) }), true)

@@ -5,6 +5,7 @@ import { abrufe, politeFetch } from './politeFetch'
 import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { searchWikimedia, WIKIMEDIA_UA } from './sources'
 import { resourcePath } from '../storage/paths'
+import { nurZulaessige } from '@shared/bildLizenz'
 
 interface IndexEntry {
   h: string
@@ -69,10 +70,12 @@ export function getOpenMojiSvg(hexcode: string): string {
 }
 
 export async function searchOnline(query: string, source: OnlineImageSource, pixabayKey?: string, bildart?: string): Promise<OnlineImageHit[]> {
-  if (source === 'wikimedia') return searchWikimedia(query)
+  // Keine NC-/ND-Bilder für Schulmaterial (22.10.2026, Prüfung des Schulträgers, shared/bildLizenz.ts)
+  if (source === 'wikimedia') return nurZulaessige(await searchWikimedia(query), (h) => h.license)
   if (source === 'openverse' || source === 'clipart') {
     // Cliparts: gemeinfreie Illustrationen (v. a. rawpixel und svgsilh) – klar, freigestellt, ohne Lizenzauflagen
-    const filter = source === 'clipart' ? '&category=illustration&source=rawpixel,svgsilh,wikimedia&license=cc0,pdm' : ''
+    // Fotos: nur Lizenzen, die kommerzielle Nutzung UND Bearbeitung erlauben (ohne NC/ND, 22.10.2026)
+    const filter = source === 'clipart' ? '&category=illustration&source=rawpixel,svgsilh,wikimedia&license=cc0,pdm' : '&license_type=commercial,modification'
     // Ohne Konto erlaubt Openverse höchstens 20 Treffer je Anfrage (sonst 401, festgestellt 03.10.2026)
     const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=20&mature=false${filter}`
     const res = await politeFetch(url, { headers: { 'User-Agent': WIKIMEDIA_UA } })
@@ -89,7 +92,7 @@ export async function searchOnline(query: string, source: OnlineImageSource, pix
         license_url?: string
       }[]
     }
-    return json.results.map((r) => ({
+    const treffer = json.results.map((r) => ({
       id: r.id,
       thumbnail: r.thumbnail || r.url,
       url: r.url,
@@ -99,6 +102,7 @@ export async function searchOnline(query: string, source: OnlineImageSource, pix
       licenseUrl: r.license_url,
       source
     }))
+    return nurZulaessige(treffer, (h) => h.license)
   }
   if (!pixabayKey) throw new Error('Für die Pixabay-Suche wird ein API-Schlüssel benötigt (Einstellungen).')
   // Bildart (06.10.2026, Medienbank der Vokabeln): Cliparts für jüngere Lernende über image_type=illustration/vector

@@ -34,7 +34,7 @@ export interface NavigationsDaten {
 }
 
 function Bild({ p, groesse }: { p: Programm; groesse: number }): React.JSX.Element {
-  return p.leistenbild ? <img src={p.leistenbild} alt="" width={groesse} height={groesse} draggable={false} /> : <p.icon size={groesse - 6} />
+  return p.leistenbild ? <img src={p.leistenbild} alt="" aria-hidden="true" width={groesse} height={groesse} draggable={false} /> : <p.icon size={groesse - 6} />
 }
 
 /**

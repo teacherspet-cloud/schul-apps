@@ -56,6 +56,9 @@ const AUSNAHMEN: Record<string, string> = {
   'vorschau_konten.klasse': 'Klassenstufe des erfundenen Musterschülers',
   'vorschau_konten.anzeige': 'Anzeigename des erfundenen Musterschülers (keine echte Person)',
   'wartung.name': 'Name einer Wartungsaufgabe',
+  // Verlauf der Bewertung (23.10.2026, bewertungSpur.ts): Vorschlag und Entscheidung selbst sind verschlüsselt
+  'bewertung_spur.art': "Art der Bewertung ('onlinetest' | 'abschluss' | 'mitarbeit' | 'bogen'), keine Person",
+  'bewertung_spur.quelle': "Herkunft ('ki' | 'lehrkraft' | 'bestaetigt' | 'geaendert'), keine Person",
   // Verwaltung › Server (09.10.2026): server_messwerte (Last, Speicher) und server_tage sind reine Zahlen ohne Person
   'server_tage.wert': 'Tageszahl (Anfragen, Fehler, Zahl aktiver Konten) – nur Zahlen, keine Kennungen'
 }

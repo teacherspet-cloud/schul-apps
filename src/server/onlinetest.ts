@@ -29,6 +29,7 @@
  * der Seite): Statt der Kopfzeile schützt dort das Geheimnis der Teilnahme (nur dieses Gerät kennt es).
  */
 import { randomBytes } from 'node:crypto'
+import { codeErgebnis } from './codeBremse'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
 import {
   bewerte,
@@ -65,6 +66,7 @@ import { PULS_MS } from '../main/services/lanServer'
 import { terminBereinigt, terminSichtbar, type OnlineTermin } from '@shared/onlinetestTermin'
 import { tagVon } from '@shared/schulkalender'
 import { akzeptierteListe, alternativeEntfernen, beimUrteil, listeSortiert, schonAkzeptierteMarkieren } from './akzeptierteAlternativen'
+import { spurEintragen, spurLoeschen, spurVon } from './bewertungSpur'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS lerngruppen (
@@ -876,6 +878,18 @@ async function kiAuswerten(
   return { anfragen, bewertet }
 }
 
+/** Ein Urteil, wie es in den Verlauf der Bewertung kommt (23.10.2026): ohne Antworttext, nur Ergebnis und Begründung */
+function spurUrteil(x: Bewertung[string]): { status: string; punkte: number; pruefen?: string; hinweis?: string; knapp?: true; frage?: true } {
+  return {
+    status: x.status,
+    punkte: x.punkte,
+    ...(x.pruefen ? { pruefen: x.pruefen } : {}),
+    ...(x.hinweis ? { hinweis: x.hinweis.slice(0, 300) } : {}),
+    ...(x.knapp ? { knapp: true as const } : {}),
+    ...(x.frage ? { frage: true as const } : {})
+  }
+}
+
 /** Urteile je Teilnahme und Einheit einarbeiten – frisch gelesen, Urteile der Lehrkraft bleiben */
 function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string, KiUrteil>): number {
   let bewertet = 0
@@ -885,6 +899,7 @@ function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string,
     const t = teilnahme(tid)
     if (!t) continue
     const b = json_(t.bewertung, {} as Bewertung)
+    const vorschlaege: Record<string, ReturnType<typeof spurUrteil>> = {}
     const jeEinheit = new Map<string, Fall[]>()
     for (const f of fs) jeEinheit.set(f.einheit, [...(jeEinheit.get(f.einheit) ?? []), f])
     for (const [eid, efs] of jeEinheit) {
@@ -912,9 +927,20 @@ function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string,
       else if (us.every((u) => u!.urteil === 'richtig')) b[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis, unbestaetigt: true, ...verdacht }
       else if (us.some((u) => u!.urteil === 'falsch')) b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis, unbestaetigt: true, ...verdacht }
       else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis, ...fehler, ...verdacht }
+      if (b[eid].quelle === 'ki') vorschlaege[eid] = spurUrteil(b[eid])
       bewertet++
     }
     db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
+    // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers): was die KI vorgeschlagen hat, je Teilnahme ein Eintrag
+    if (Object.keys(vorschlaege).length)
+      spurEintragen({
+        art: 'onlinetest',
+        bezugId: t.test_id,
+        schuelerId: t.schueler_id,
+        lehrkraftId: testNachId(t.test_id)?.lehrkraft_id ?? '',
+        quelle: 'ki',
+        kiVorschlag: { einheiten: vorschlaege }
+      })
   }
   return bewertet
 }
@@ -1043,12 +1069,17 @@ function ergebnisFuer(test: Test, t: TeilnahmeZeile) {
   const b = json_(t.bewertung, {} as Bewertung)
   const punkte = summe(b)
   const ki = kiStand(test.id)
+  /*
+   * Menschliche Aufsicht (23.10.2026, Prüfung des Schulträgers, Entscheidung der Lehrkraft): Solange ein KI-Urteil
+   * unbestätigt ist oder sonst etwas offen/zu entscheiden ist, sehen die Lernenden KEINE Punkte, KEINE Note und kein
+   * Richtig/Falsch – nur „Dein Ergebnis wird noch von deiner Lehrkraft geprüft." (vorher: vorläufige Note, 22.10.2026)
+   */
+  if (ergebnisVorlaeufig(b, ki.laeuft)) return { vorlaeufig: true as const, inPruefung: true as const }
   return {
     punkte,
     max: f.punkte,
     note: noteFuer(test, punkte, f.punkte),
-    // Unbestätigte KI-Urteile machen das Ergebnis vorläufig (22.10.2026, „vorläufig bis Bestätigung")
-    vorlaeufig: ergebnisVorlaeufig(b, ki.laeuft),
+    vorlaeufig: false as const,
     aufgaben: f.aufgaben,
     einheiten: f.einheiten,
     loesungen: f.loesungen,
@@ -1060,8 +1091,7 @@ function ergebnisFuer(test: Test, t: TeilnahmeZeile) {
         {
           status: x.status,
           punkte: x.punkte,
-          ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}),
-          ...(x.quelle === 'ki' && x.unbestaetigt ? { vorlaeufig: true } : {})
+          ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {})
         }
       ])
     )
@@ -1114,6 +1144,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
     // Vor dem Beitritt: Darf man mit Namen hinein oder nur mit Konto? (ohne Anmeldung abfragbar)
     if (req.method === 'GET' && was === 'zugang') {
       const test = testNachCode(String(url.searchParams.get('code') ?? ''))
+      // Unbekannte Codes zählen für die Bremse je Adresse (23.10.2026, Prüfung des Schulträgers, codeBremse.ts)
+      codeErgebnis(k.ip, String(url.searchParams.get('code') ?? ''), Boolean(test))
       // bekannt (09.10.2026): Unbekannter Code → die Seite meldet das, statt nach dem Namen zu fragen
       return (json(res, 200, { gaeste: !test || test.einstellungen.gaeste !== false, bekannt: Boolean(test) }), true)
     }
@@ -1179,7 +1211,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
             titel: test.titel,
             datum: t.abgabe,
             frei,
-            ...(e ? { punkte: e.punkte, max: e.max, note: e.note, vorlaeufig: e.vorlaeufig } : {}),
+            // In Prüfung (23.10.2026): keine Punkte und keine Note, bis die Lehrkraft alles bestätigt hat
+            ...(e ? (e.vorlaeufig ? { vorlaeufig: true, inPruefung: true } : { punkte: e.punkte, max: e.max, note: e.note, vorlaeufig: false }) : {}),
             figur: test.einstellungen.figur ? figurPosen(test.id) : []
           }
         ]
@@ -1618,6 +1651,15 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         true
       )
     }
+    // „Verlauf der Bewertung" einer Teilnahme (23.10.2026, Prüfung des Schulträgers): KI-Vorschläge und Entscheidungen
+    if (req.method === 'GET' && teile[1] === 'spur') {
+      const t = teilnahme(String(url.searchParams.get('teilnahme') ?? ''))
+      if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      const eintraege = spurVon({ lehrkraftId: ich.id, art: 'onlinetest', bezugId: test.id, schuelerId: t.schueler_id }).map(
+        ({ schuelerId: _s, lehrkraftId: _l, bezugId: _b, ...rest }) => rest
+      )
+      return (json(res, 200, { eintraege }), true)
+    }
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
     const k0 = (await k.koerper()) as Record<string, unknown>
     if (teile[1] === 'status') {
@@ -1700,6 +1742,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       const t = teilnahme(String(k0.teilnahme ?? ''))
       if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       db().prepare('DELETE FROM teilnahmen WHERE id = ?').run(t.id)
+      spurLoeschen('onlinetest', test.id, t.schueler_id)
       return (json(res, 200, { ok: true }), true)
     }
     if (teile[1] === 'korrektur') {
@@ -1739,6 +1782,18 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       // Bereits akzeptierte Alternativen (10.10.2026): laut Lösung falsche Wort-Antwort akzeptiert → merken (ohne Person)
       b[e.id] = beimUrteil(ich.id, vokabelSprache(test), test.fassungen[t.variante].fassung, e, json_(t.antworten, {} as Antworten), alt, b[e.id])
       db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), t.id)
+      // Verlauf der Bewertung (23.10.2026): Urteil der KI übernommen oder geändert – oder ohne KI selbst entschieden
+      const vonKi = alt?.quelle === 'ki'
+      const gleich = vonKi && alt.status === b[e.id].status && alt.punkte === b[e.id].punkte
+      spurEintragen({
+        art: 'onlinetest',
+        bezugId: test.id,
+        schuelerId: t.schueler_id,
+        lehrkraftId: ich.id,
+        quelle: vonKi ? (gleich ? 'bestaetigt' : 'geaendert') : 'lehrkraft',
+        ...(vonKi ? { kiVorschlag: { einheiten: { [e.id]: spurUrteil(alt) } } } : {}),
+        entscheidung: { einheiten: { [e.id]: spurUrteil(b[e.id]) } }
+      })
       return (json(res, 200, { ok: true }), true)
     }
     /*
@@ -1749,10 +1804,26 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
     if (teile[1] === 'ki-bestaetigen') {
       let bestaetigt = 0
       for (const t of teilnahmenVon(test.id, true)) {
-        const r = kiBestaetigen(json_(t.bewertung, {} as Bewertung))
+        const vorher = json_(t.bewertung, {} as Bewertung)
+        const r = kiBestaetigen(vorher)
         if (!r.bestaetigt) continue
         bestaetigt += r.bestaetigt
         db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(r.bewertung), t.id)
+        // Verlauf der Bewertung (23.10.2026): je Teilnahme, welche KI-Urteile unverändert bestätigt wurden
+        const einheiten = Object.fromEntries(
+          Object.entries(vorher)
+            .filter(([, x]) => x.quelle === 'ki' && x.unbestaetigt)
+            .map(([k, x]) => [k, spurUrteil(x)])
+        )
+        spurEintragen({
+          art: 'onlinetest',
+          bezugId: test.id,
+          schuelerId: t.schueler_id,
+          lehrkraftId: ich.id,
+          quelle: 'bestaetigt',
+          kiVorschlag: { einheiten },
+          entscheidung: { einheiten, alle: true }
+        })
       }
       if (bestaetigt) protokolliereServer('onlinetest', `KI-Urteile bestätigt: ${bestaetigt}`, ich.id)
       return (json(res, 200, { ok: true, bestaetigt }), true)
@@ -1792,6 +1863,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
     }
     if (teile[1] === 'loeschen') {
       db().prepare('DELETE FROM onlinetests WHERE id = ?').run(test.id)
+      spurLoeschen('onlinetest', test.id)
       kiLaeufe.delete(test.id)
       protokolliereServer('onlinetest', 'Onlinetest gelöscht', ich.id)
       return (json(res, 200, { ok: true }), true)
@@ -2007,9 +2079,12 @@ export function onlinetestStand(testId: string, schuelerId: string): { eingereic
   const max = test.fassungen[t.variante]?.fassung.punkte ?? 0
   const b = json_(t.bewertung, {} as Bewertung)
   const punkte = summe(b)
-  // Unbestätigte KI-Urteile (22.10.2026): auch in Unterrichtsreihen als vorläufig kennzeichnen
-  const vorlaeufig = ergebnisVorlaeufig(b)
-  return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}), ...(vorlaeufig ? { vorlaeufig: true } : {}) }
+  /*
+   * Unbestätigte KI-Urteile oder offene Entscheidungen (23.10.2026, Prüfung des Schulträgers): keine Prozent, solange die
+   * Lehrkraft nicht alles bestätigt hat – der Schritt der Reihe bleibt „eingereicht, wartet auf die Lehrkraft"
+   */
+  if (ergebnisVorlaeufig(b, kiStand(test.id).laeuft)) return { eingereicht: 1, runden: 1, vorlaeufig: true }
+  return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}) }
 }
 
 /**

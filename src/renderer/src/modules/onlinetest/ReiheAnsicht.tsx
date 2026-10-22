@@ -55,6 +55,7 @@ import { useMediaQuery } from '@mantine/hooks'
 import type { SchrittStand, Stand, Status, Weg } from '@shared/reihe'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
+import { KiMarke } from './KiMarke'
 import { WeiterKnopf } from './ReiheWeiter'
 import { naechsterSchritt, schrittErledigt } from '@shared/reiheWeiter'
 import type { DiagnoseErgebnis } from '@shared/diagnoseAuswertung'
@@ -952,6 +953,8 @@ function Reflexion({
       {/* KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6): freundlich, ohne Bewertung */}
       {impuls && (
         <Alert color="grape" variant="light" title="Ein Gedanke zu deinem Eintrag" data-reflexion-impuls>
+          {/* Kennzeichnung (22.10.2026, Art. 50 KI-VO) */}
+          <KiMarke art="impuls" />
           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
             {impuls}
           </Text>
@@ -1056,6 +1059,12 @@ function DiagnoseErgebnisse({ fragen, ergebnis }: { fragen: { frage: string }[];
   if (!ergebnis?.length) return null
   return (
     <Stack gap="xs" data-diagnose-ergebnis>
+      {/* Kennzeichnung der KI-Hinweise (22.10.2026, Art. 50 KI-VO) – nur, wenn es Hinweise gibt */}
+      {ergebnis.some((e) => e.hinweis) && (
+        <div>
+          <KiMarke art="tipp" />
+        </div>
+      )}
       {ergebnis.map((e, n) => (
         <Card key={n} withBorder padding="sm" style={{ borderLeft: `4px solid var(--mantine-color-${e.richtig ? 'green' : 'red'}-6)` }} data-diagnose-frage={e.richtig ? 'richtig' : 'falsch'}>
           <Group gap="xs" wrap="nowrap" align="start">
@@ -1316,7 +1325,7 @@ interface AbgabeSicht {
   tagebuch?: string
   impuls?: string
   prozent?: number
-  /** Onlinetest: KI-Urteile noch unbestätigt (22.10.2026) */
+  /** Onlinetest: KI-Urteile noch unbestätigt (22.10.2026) – seit 23.10.2026 dann ohne Prozent */
   vorlaeufig?: boolean
 }
 
@@ -1413,7 +1422,7 @@ function MaterialSeite({ d }: { d: ReiheDaten }): React.JSX.Element {
                     {ART[a.art] ?? a.art}
                     {a.zeit ? ` · ${new Date(a.zeit).toLocaleDateString('de-DE')}` : ''}
                     {a.eingereicht > 1 ? ` · ${a.eingereicht}× abgegeben` : ''}
-                    {a.prozent !== undefined ? ` · ${a.prozent} %${a.vorlaeufig ? ' (vorläufig)' : ''}` : ''}
+                    {a.prozent !== undefined ? ` · ${a.prozent} %` : a.vorlaeufig ? ' · wird noch von deiner Lehrkraft geprüft' : ''}
                     {a.dateien ? ` · ${a.dateien} Datei${a.dateien === 1 ? '' : 'en'}` : ''}
                   </Text>
                 </div>

@@ -42,6 +42,8 @@ import {
   artVon,
   niveauEmpfehlung,
   standFuerLernende,
+  vorschlagGeschafft,
+  wirksamerErfolg,
   type AbschlussVorschlag
 } from '../shared/reihe'
 import {
@@ -67,6 +69,7 @@ import { HILFETEXT, kriseMelden, kriseVerdacht } from './krise'
 import { LERNENDEN_FEHLER, verraetErwartung } from '../shared/kiSchutz'
 import { kiGrenzeMeldung } from '../shared/kiGrenzen'
 import { dateiSenden, dateiTypAusBytes, istRasterbild } from './dateiTyp'
+import { spurEintragen, spurVon } from './bewertungSpur'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reihen (
@@ -515,6 +518,9 @@ async function alsLehrkraft(z: ZuweisungZeile, aufruf: Aufruf, anfrage: Structur
   return mitNamensliste({ namen, ...kontext }, () => imNutzer(alsNutzer(lk), () => aufruf('ai:structured', [anfrage])))
 }
 
+/** Bezug im Verlauf der Bewertung: Zuweisung und Schritt */
+const spurBezug = (z: Pick<ZuweisungZeile, 'id'>, s: Pick<Schritt, 'id'>): string => `${z.id}:${s.id}`
+
 /**
  * KI-Vorschlag zur Bewertung eines Abschlussprodukts (08.10.2026, Plan E.6): Teilpunkte + Begründung je Kriterium, nur
  * für die Lehrkraft. Wird gespeichert, solange inzwischen nicht neu abgegeben wurde.
@@ -558,6 +564,8 @@ async function abschlussVorschlagErzeugen(r: Reihe, z: ZuweisungZeile, s: Schrit
   nst.kiVorschlag = v
   standSpeichern(z.id, schueler.id, neu)
   protokolliereServer('reihe', v.fehler ? 'KI-Vorschlag zum Abschlussprodukt nicht möglich' : 'KI-Vorschlag zum Abschlussprodukt erstellt', schueler.id)
+  // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers): der Vorschlag der KI – entschieden hat noch niemand
+  if (!v.fehler) spurEintragen({ art: 'abschluss', bezugId: spurBezug(z, s), schuelerId: schueler.id, lehrkraftId: z.lehrkraft_id, quelle: 'ki', kiVorschlag: v })
   return v
 }
 
@@ -1142,28 +1150,15 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         delete st.kiVorschlag
         standSpeichern(z.id, ich.id, stand)
         /*
-         * Abschlussprodukt (08.10.2026, Plan E.6): KI-Vorschlag nach dem Raster für die Lehrkraft. Digital entscheidet er über
-         * „geschafft" – dort wartet die Abgabe darauf (die Lernenden sehen nur das Ergebnis, nicht die Punkte); gemischt
-         * entsteht er im Hintergrund, die Lehrkraft bestätigt wie bisher.
+         * Abschlussprodukt (08.10.2026, Plan E.6): KI-Vorschlag nach dem Raster für die Lehrkraft, im Hintergrund. Seit
+         * 23.10.2026 (Prüfung des Schulträgers, menschliche Aufsicht) entscheidet er auch digital nicht mehr über
+         * „geschafft" – die Abgabe wartet auf die Lehrkraft („Vorschlag übernehmen" oder eigene Bewertung).
+         * `geprueft: false`: Die Lernenden lesen „Deine Lehrkraft sieht sich dein Produkt an."
          */
         if (s.inhalt.art === 'abschluss') {
           const person = nutzerNachId(ich.id) ?? ich
-          if (artVon(r) !== 'digital') {
-            void abschlussVorschlagErzeugen(r, z, s, person, aufruf).catch(() => undefined)
-            return (json(res, 200, { ok: true, ...hilfe }), true)
-          }
-          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-          const puls = setInterval(() => res.write(' '), PULS_MS)
-          res.on('close', () => clearInterval(puls))
-          try {
-            const v = await abschlussVorschlagErzeugen(r, z, s, person, aufruf)
-            res.end(JSON.stringify({ ok: true, geprueft: Boolean(v && !v.fehler), ...hilfe }))
-          } catch {
-            res.end(JSON.stringify({ ok: true, geprueft: false, ...hilfe }))
-          } finally {
-            clearInterval(puls)
-          }
-          return true
+          void abschlussVorschlagErzeugen(r, z, s, person, aufruf).catch(() => undefined)
+          return (json(res, 200, { ok: true, geprueft: false, ...hilfe }), true)
         }
         const fid = json_(z.verknuepft, {} as Record<string, string>)[s.id]
         if (s.inhalt.art !== 'aufgabe' || !s.inhalt.feedback || !fid) return (json(res, 200, { ok: true, ...hilfe }), true)
@@ -1406,6 +1401,16 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         // Datei einer Schülerin für die Lehrkraft: Typ aus den Bytes, HTML/SVG/Unbekanntes nur als Download (22.10.2026)
         return (dateiSenden(res, d.daten, d.name), true)
       }
+      // „Verlauf der Bewertung" eines Abschlussprodukts (23.10.2026, Prüfung des Schulträgers): KI-Vorschlag und Entscheidungen
+      if (req.method === 'GET' && teile[2] === 'spur') {
+        const n = lernendeVon(z).find((x) => x.id === url.searchParams.get('schueler'))
+        const s = r.schritte.find((x) => x.id === url.searchParams.get('schritt'))
+        if (!n || !s) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+        const eintraege = spurVon({ lehrkraftId: ich.id, art: 'abschluss', bezugId: spurBezug(z, s), schuelerId: n.id }).map(
+          ({ schuelerId: _s, lehrkraftId: _l, bezugId: _b, ...rest }) => rest
+        )
+        return (json(res, 200, { eintraege }), true)
+      }
       if (req.method === 'POST' && teile[2] === 'aktion') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         const art = String(k0.art ?? '')
@@ -1463,9 +1468,35 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           delete st.bewertung
           delete st.praesenz
         } else if (art === 'praesenz') st.praesenz = k0.erledigt !== false
-        else if (art === 'bewerten') {
-          st.bewertung = { text: String(k0.text ?? '').slice(0, 2000), geschafft: k0.geschafft !== false, zeit: Date.now() }
+        else if (art === 'bewerten' || art === 'vorschlag-uebernehmen') {
+          /*
+           * „Vorschlag übernehmen" (23.10.2026, Prüfung des Schulträgers): ein Klick übernimmt den KI-Vorschlag zum
+           * Abschlussprodukt – geschafft nach dem Raster, Punkte und Begründungen als Rückmeldung. Bewerten ohne Vorschlag
+           * oder abweichend davon steht als „geändert" bzw. „selbst entschieden" im Verlauf der Bewertung.
+           */
+          const v = st.kiVorschlag && !st.kiVorschlag.fehler && st.kiVorschlag.kriterien.length ? st.kiVorschlag : undefined
+          const e = wirksamerErfolg(s, artVon(r))
+          const vorschlagOk = vorschlagGeschafft(v, e.art === 'ki' ? e.schwelle : 'teilweise')
+          if (art === 'vorschlag-uebernehmen') {
+            if (!v || vorschlagOk === null) return (json(res, 409, { fehler: 'Kein KI-Vorschlag zum Übernehmen.' }), true)
+            const sum = vorschlagSumme(v)
+            const text =
+              typeof k0.text === 'string' && k0.text.trim()
+                ? k0.text
+                : [`${sum.punkte} von ${sum.max} Punkten.`, ...v.kriterien.map((x) => `${x.kriterium}: ${x.punkte}/${x.max} – ${x.begruendung}`)].join('\n')
+            st.bewertung = { text: text.slice(0, 2000), geschafft: vorschlagOk, zeit: Date.now() }
+          } else st.bewertung = { text: String(k0.text ?? '').slice(0, 2000), geschafft: k0.geschafft !== false, zeit: Date.now() }
           delete st.ueberarbeiten
+          if (s.inhalt.art === 'abschluss')
+            spurEintragen({
+              art: 'abschluss',
+              bezugId: spurBezug(z, s),
+              schuelerId: n.id,
+              lehrkraftId: ich.id,
+              quelle: !v ? 'lehrkraft' : art === 'vorschlag-uebernehmen' || st.bewertung.geschafft === vorschlagOk ? 'bestaetigt' : 'geaendert',
+              ...(v ? { kiVorschlag: v } : {}),
+              entscheidung: { geschafft: st.bewertung.geschafft, text: st.bewertung.text }
+            })
         } else if (art === 'ueberarbeiten') {
           // Zur Überarbeitung zurück: wieder offen bis zur nächsten Einreichung, mit einer zusätzlichen Runde
           const id = verknuepfteId(s, z, stand)
@@ -1633,7 +1664,16 @@ export function reihenFuerLernen(ich: NutzerInfo): {
   })
 }
 
-type Bedarf = { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }
+type Bedarf = {
+  art: string
+  schueler?: string
+  name?: string
+  schritt?: string
+  text: string
+  frage?: number
+  /** KI-Vorschlag zum Abschlussprodukt, mit einem Klick übernehmbar (23.10.2026, Prüfung des Schulträgers) */
+  vorschlag?: { punkte: number; max: number; geschafft: boolean }
+}
 
 /** Handlungsbedarf einer Zuweisung (Übersicht und Korrektur-Eingang) */
 export function bedarfFuer(
@@ -1643,7 +1683,6 @@ export function bedarfFuer(
   verknuepfe(z, r)
   const halteFrei = json_(z.halte_frei, [] as string[])
   const bedarf: Bedarf[] = []
-  const digital = artVon(r) === 'digital'
   const lernende = lernendeVon(z).map((n) => {
     const stand = standVon(z.id, n.id)
     const weg = wegVon(r, z, n.id, stand)
@@ -1653,22 +1692,20 @@ export function bedarfFuer(
       const vorschlag = stand.schritte[s.id]?.kiVorschlag
       const summe = vorschlag && !vorschlag.fehler && vorschlag.kriterien.length ? vorschlagSumme(vorschlag) : null
       const vorschlagText = summe ? ` · KI-Vorschlag: ${summe.punkte} von ${summe.max} Punkten` : ''
+      /*
+       * Seit 23.10.2026 (Prüfung des Schulträgers) wartet jedes Abschlussprodukt auf die Lehrkraft – auch digital; der
+       * KI-Vorschlag steht dabei und lässt sich mit einem Klick übernehmen („Vorschlag übernehmen").
+       */
+      const e = wirksamerErfolg(s, artVon(r))
+      const ok = summe && s.inhalt.art === 'abschluss' ? vorschlagGeschafft(vorschlag, e.art === 'ki' ? e.schwelle : 'teilweise') : null
       if (l.wartet && l.status === 'eingereicht')
         bedarf.push({
           art: 'bewerten',
           schueler: n.id,
           name: n.name,
           schritt: s.id,
-          text: `${s.titel}: eingereicht – bitte ansehen und bestätigen${vorschlagText}`
-        })
-      // Digital geschafft nach dem KI-Vorschlag: Die Bewertung bestätigt die Lehrkraft bei Gelegenheit (sehen die Lernenden erst dann)
-      else if (digital && summe && s.inhalt.art === 'abschluss' && !stand.schritte[s.id]?.bewertung)
-        bedarf.push({
-          art: 'vorschlag',
-          schueler: n.id,
-          name: n.name,
-          schritt: s.id,
-          text: `${s.titel}: KI-Vorschlag zur Bewertung bereit (${summe.punkte} von ${summe.max} Punkten) – bei Gelegenheit bestätigen`
+          text: `${s.titel}: eingereicht – bitte ansehen und bestätigen${vorschlagText}`,
+          ...(summe && ok !== null ? { vorschlag: { punkte: summe.punkte, max: summe.max, geschafft: ok } } : {})
         })
       if (s.inhalt.art === 'praesenz' && l.status === 'offen')
         bedarf.push({ art: 'praesenz', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: im Unterricht abhaken` })

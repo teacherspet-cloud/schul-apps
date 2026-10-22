@@ -33,6 +33,7 @@ import { BandAngebote, BandMedailleBild, SPRACH_CSS, StandKreise, useSprachstand
 import { buecherTexte, type BuecherTexte } from './buecherTexte'
 import { ruhig, sichtbarerTeil } from './ordnerAnimation'
 import type { FachOrdner } from './regalDaten'
+import { BildNachweis } from '../../../shared/components/BildNachweis'
 
 const GRENZE = 300
 
@@ -991,6 +992,8 @@ function WortFenster({
               <Loader size="sm" />
             )}
           </div>
+          {/* Bildnachweis für Lernende (22.10.2026, Prüfung des Schulträgers) */}
+          {quelle && <BildNachweis bild={bild?.m?.bild} mt={-8} />}
           <Group gap="xs" wrap="nowrap" align="center" justify="space-between">
             <div style={{ minWidth: 0 }}>
               <Text fw={800} size="xl" lh={1.2} style={{ overflowWrap: 'anywhere' }}>

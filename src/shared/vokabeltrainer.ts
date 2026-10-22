@@ -29,6 +29,8 @@ export interface Vokabel {
   note?: string
   /** Bild (OpenMoji als data:-URL) für konkrete Wörter */
   bild?: string
+  /** Bildnachweis für Lernende (22.10.2026, shared/bildLizenz.ts): „KI-generiert“ bzw. Urheber · Lizenz */
+  bildNachweis?: string
   /** Sprechtext für die Sprachausgabe statt des Wortes (09.10.2026, von der Lehrkraft gesetzt – nur für den Ton) */
   aussprache?: string
   /** Weitere richtige Antworten, von der Lehrkraft eingetragen („auch richtig", 09.10.2026) */

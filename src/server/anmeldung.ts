@@ -7,8 +7,8 @@
  *    Voraussetzung: Der IServ-Admin trägt die App unter „System › Single-Sign-On" ein
  *    (server/IServ-Freischaltung.md); Client-ID und Geheimnis stehen danach in der Verwaltung.
  * 2. Testkonten (vom Admin angelegt, löschbar) und der Notzugang des Admins: Benutzername +
- *    Passwort (scrypt). Der Notzugang hilft, solange IServ noch nicht freigeschaltet ist, und
- *    lässt sich in der Verwaltung abschalten.
+ *    Passwort (scrypt). Der Notzugang hilft, solange IServ noch nicht freigeschaltet ist; er ist ab 23.10.2026
+ *    standardmäßig aus und lässt sich in der Verwaltung einschalten (oder per SCHULAPPS_NOTZUGANG_ERZWINGEN=1).
  *
  * Wer darf hinein (Entscheidung der Lehrkraft):
  *  - Lehrkraft: IServ-Rolle „Lehrer" UND Benutzername im Format der Schule (m.mustermann)
@@ -413,7 +413,13 @@ export function fehlversuch(schluessel: string): number {
   return neu.n
 }
 
-export const notzugangAn = (): boolean => serverWert('notzugang', true)
+/**
+ * Notzugang (23.10.2026, Prüfung des Schulträgers): standardmäßig AUS. An nur, wenn der Admin ihn in der Verwaltung
+ * einschaltet (steht im Protokoll) – oder auf dem Server SCHULAPPS_NOTZUGANG_ERZWINGEN=1 gesetzt ist (Wiederherstellung,
+ * wenn IServ ausfällt; deploy/strato/README.md). Die e2e-Testserver setzen die Variable (scripts/e2e-parallel.mjs).
+ */
+export const notzugangErzwungen = (): boolean => process.env.SCHULAPPS_NOTZUGANG_ERZWINGEN === '1'
+export const notzugangAn = (): boolean => notzugangErzwungen() || serverWert('notzugang', false)
 
 /**
  * Abgewiesene Versuche während einer Sperre (10.10.2026): je Konto und Adresse höchstens einmal je Sperrfenster

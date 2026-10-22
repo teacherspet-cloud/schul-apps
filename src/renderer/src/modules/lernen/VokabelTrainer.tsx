@@ -67,6 +67,8 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lernendenNachweis } from '@shared/bildLizenz'
+import { BildNachweis } from '../../shared/components/BildNachweis'
 import { falschschreibungen } from '@shared/vokabelFehler'
 import { abkuerzungAus } from '@shared/abkuerzung'
 import { fuerGeraetestimme, sprechTextFuerWort } from '@shared/sprechtext'
@@ -271,8 +273,11 @@ async function mitMedien(liste: Liste): Promise<Liste> {
   return {
     ...liste,
     woerter: liste.woerter.map((w) => {
-      const url = bildVon(m[w.term], w, liste.sprache)?.bild?.url
-      return w.bild || !url ? w : { ...w, bild: url }
+      const b = bildVon(m[w.term], w, liste.sprache)?.bild
+      const url = b?.url
+      // Bildnachweis für Lernende (22.10.2026, Prüfung des Schulträgers)
+      const nachweis = b ? lernendenNachweis(b) : null
+      return w.bild || !url ? w : { ...w, bild: url, ...(nachweis ? { bildNachweis: nachweis } : {}) }
     })
   }
 }
@@ -1188,7 +1193,8 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
   }
   const fremdSeite = (
     <>
-      {v.bild && <img src={v.bild} alt="" style={{ width: 72, height: 72, marginBottom: 8 }} />}
+      {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 72, height: 72, marginBottom: v.bildNachweis ? 0 : 8 }} />}
+      {v.bild && v.bildNachweis && <BildNachweis text={v.bildNachweis} mt={0} />}
       <Text fw={800} size="1.8rem">
         {v.term}
       </Text>
@@ -1416,7 +1422,7 @@ function AuswahlFs({
     <Stack align="center">
       <Text className="vt-frage">{mitFehlern ? 'Welche Schreibweise ist richtig?' : 'Welches Wort ist gemeint?'}</Text>
       <Group gap="xs">
-        {v.bild && <img src={v.bild} alt="" style={{ width: 44, height: 44 }} />}
+        {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 44, height: 44 }} />}
         <Text fw={800} size="1.8rem" c="var(--vt-tinte)">
           {v.translation}
         </Text>
@@ -1687,7 +1693,7 @@ function Schreiben({
         </Card>
       ) : (
         <Group gap="xs">
-          {v.bild && <img src={v.bild} alt="" style={{ width: 48, height: 48 }} />}
+          {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 48, height: 48 }} />}
           <Text fw={800} size="1.8rem">
             {v.translation}
           </Text>

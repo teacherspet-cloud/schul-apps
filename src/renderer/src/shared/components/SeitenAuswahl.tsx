@@ -164,7 +164,7 @@ export function SeitenRaster({
           >
             <img
               src={src}
-              alt=""
+              alt="" aria-hidden="true"
               style={{
                 width: '100%',
                 display: 'block',

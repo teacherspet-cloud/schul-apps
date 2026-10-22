@@ -98,7 +98,7 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
 /** Kurze Rückmeldung nach einer Runde */
 function Rueck({ gut, richtig }: { gut: boolean; richtig: string }): React.JSX.Element {
   return (
-    <Badge size="xl" radius="md" color={gut ? 'green' : 'red'} variant="light" tt="none" data-runde-urteil={gut ? 'richtig' : 'falsch'}>
+    <Badge role="status" aria-live="polite" size="xl" radius="md" color={gut ? 'green' : 'red'} variant="light" tt="none" data-runde-urteil={gut ? 'richtig' : 'falsch'}>
       {gut ? 'Richtig!' : `Richtig: ${richtig}`}
     </Badge>
   )
@@ -209,7 +209,7 @@ export function BildMemory({ woerter, sprache, ende }: SpielProps): React.JSX.El
         gemischt(spielBildWoerter(woerter, sprache))
           .slice(0, 6)
           .flatMap((v) => [
-            { key: `${v.id}-b`, wid: v.id, seite: 'a' as const, inhalt: <img src={v.bild} alt="" style={BILD} />, label: 'Bildkarte' },
+            { key: `${v.id}-b`, wid: v.id, seite: 'a' as const, inhalt: <img src={v.bild} alt={v.translation} style={BILD} />, label: 'Bildkarte' },
             { key: `${v.id}-w`, wid: v.id, seite: 'b' as const, inhalt: spielform(v.term), label: spielform(v.term) }
           ])
       ),
@@ -296,7 +296,7 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
       </ActionIcon>
       <div style={{ width: 200, height: 200, display: 'grid', placeItems: 'center' }} data-gezeigt={runde.zeige.id}>
         {runde.zeige.bild ? (
-          <img src={runde.zeige.bild} alt="" style={BILD} />
+          <img src={runde.zeige.bild} alt={runde.zeige.translation} style={BILD} />
         ) : (
           <Text fz={26} fw={800} ta="center">
             {runde.zeige.translation}
@@ -305,7 +305,7 @@ export function RichtigGehoert({ woerter, sprache, ende }: SpielProps): React.JS
       </div>
       {schnell.hinweis}
       {rueck !== null ? (
-        <Badge size="xl" color={rueck ? 'green' : 'red'} variant="light">
+        <Badge role="status" aria-live="polite" size="xl" color={rueck ? 'green' : 'red'} variant="light">
           {rueck ? 'Richtig!' : 'Daneben'}
         </Badge>
       ) : (
@@ -604,9 +604,9 @@ export function WasFehlt({ woerter, sprache, ende, staende }: SpielProps): React
             data-kim-bild={w.id}
           >
             {phase === 'merken' || w.id !== runde.fehlt.id ? (
-              <img src={w.bild} alt="" style={BILD} />
+              <img src={w.bild} alt={w.translation} style={BILD} />
             ) : phase === 'rueck' ? (
-              <img src={w.bild} alt="" style={{ ...BILD, outline: `3px solid var(--vt-${ok ? 'gut' : 'schlecht'}-rand)` }} />
+              <img src={w.bild} alt={w.translation} style={{ ...BILD, outline: `3px solid var(--vt-${ok ? 'gut' : 'schlecht'}-rand)` }} />
             ) : (
               <Text fz={36} c="dimmed">
                 ?
@@ -673,7 +673,7 @@ export function BildAufdecken({ woerter, sprache, ende, staende }: SpielProps): 
         </Badge>
       </Group>
       <div style={{ position: 'relative', width: 240, height: 240 }} data-aufdecken-bild={v.id}>
-        <img src={v.bild} alt="" style={BILD} />
+        <img src={v.bild} alt="Verdecktes Bild zum gesuchten Wort" style={BILD} />
         <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(3, 1fr)' }}>
           {Array.from({ length: KACHELN }, (_, k) => (
             <div
@@ -763,7 +763,7 @@ export function WortBild({ woerter, sprache, ende }: SpielProps): React.JSX.Elem
                 background: 'var(--vt-flaeche)'
               }}
             >
-              <img src={w.bild} alt="" style={BILD} />
+              <img src={w.bild} alt={w.translation} style={BILD} />
             </button>
           )
         })}

@@ -37,7 +37,8 @@ import {
   datenbank
 } from './datenbank'
 import { passwortHash, zufallsPasswort } from './geheim'
-import { iservEinstellung, ISERV_STANDARD, type IservEinstellung } from './anmeldung'
+import { iservEinstellung, ISERV_STANDARD, notzugangErzwungen, type IservEinstellung } from './anmeldung'
+import { adminAenderungPruefen } from './adminRollen'
 import { DATEN } from './pfade'
 import { offeneStroeme } from './ereignisse'
 import type { Rolle } from './kontext'
@@ -123,7 +124,9 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
           klassen: bekannteKlassen(),
           schluessel: TEILBARE_SCHLUESSEL.map((name) => ({ name, hinterlegt: verdeckt(serverGeheimnis(`schluessel:${name}`)), fuerAlle: Boolean(freigaben[name]) })),
           iserv: { ...iserv, geheimnis: Boolean(serverGeheimnis('iserv-client')), abgleichSchwelle: abgleichSchwelle() },
-          notzugang: serverWert('notzugang', true),
+          // Notzugang ab 23.10.2026 standardmäßig aus (Prüfung des Schulträgers); erzwungen über SCHULAPPS_NOTZUGANG_ERZWINGEN=1
+          notzugang: serverWert('notzugang', false),
+          notzugangErzwungen: notzugangErzwungen(),
           // Meine Klassen (06.10.2026): Ordnerstruktur für „In IServ ablegen"
           ablage: { muster: ablageMuster(), standard: ABLAGE_STANDARD },
           server: {
@@ -315,6 +318,9 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     if (!n) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     const rolle = ['admin', 'lehrkraft', 'schueler'].includes(String(k0.rolle)) ? (k0.rolle as Rolle) : undefined
     if (n.id === ich && (rolle && rolle !== 'admin')) return (json(res, 400, { fehler: 'Die eigene Admin-Rolle lässt sich nicht abgeben.' }), true)
+    // Admin-Regeln (23.10.2026, adminRollen.ts): nur Lehrkräfte, fester Admin bleibt, nie den letzten Admin entziehen/sperren
+    const adminFehler = adminAenderungPruefen(n, { rolle, gesperrt: typeof k0.gesperrt === 'boolean' ? k0.gesperrt : undefined })
+    if (adminFehler) return (json(res, 400, { fehler: adminFehler }), true)
     // Klasse eines Schülerkontos setzen oder entfernen (leer); andere Gruppen (IServ) bleiben
     const klasse = typeof k0.klasse === 'string' ? k0.klasse.trim().slice(0, 40) : undefined
     const gruppen = klasse === undefined ? undefined : [...n.gruppen.filter((g) => !g.id.startsWith('klasse:')), ...(klasse ? [klassenGruppe(klasse)] : [])]

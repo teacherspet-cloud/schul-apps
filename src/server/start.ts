@@ -12,12 +12,15 @@
  *   SCHULAPPS_DATEN         Datenordner (Docker-Volume)
  *   SCHULAPPS_SCHLUESSEL    Datei des Hauptschlüssels (Docker-Secret)
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
+ *   SCHULAPPS_NOTZUGANG_ERZWINGEN '1': Notzugang an, auch wenn er in der Verwaltung aus ist (Wiederherstellung bei
+ *                           IServ-Ausfall, e2e-Testserver) – sonst standardmäßig aus (23.10.2026, Prüfung des Schulträgers)
  */
 import { grammatikRoute } from './grammatik'
 import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { ueberthemenRoute } from './ueberthemen'
 import { sprechenRoute } from './sprechen'
-import { kriseRoute } from './krise'
+import { kriseRoute, krisenErinnerungStarten } from './krise'
+import { datenpanneRoute } from './datenpanne'
 import { sprechBankRoute } from './sprechBank'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
@@ -61,7 +64,8 @@ import { ladeLehrwerkGrammatik } from '../main/services/storage/lehrwerkGrammati
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
 import { hauptschluessel, passwortHash } from './geheim'
-import { ADMIN_BENUTZER, anmeldeHaken } from './anmeldung'
+import { ADMIN_BENUTZER, anmeldeHaken, notzugangErzwungen } from './anmeldung'
+import { adminRollenRoute } from './adminRollen'
 import { alleKursgruppenSichern, iservKurseRoute, nachIservAnmeldung } from './iservKursgruppen'
 import { serverUmgebung } from './umgebung'
 import { starteServer } from './http'
@@ -74,6 +78,8 @@ import { kiSchutzEinrichten } from './kiSchutzServer'
 import type { SecretName } from '@shared/types'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { kiZugaengeRoute, schulEndpunkt } from './kiZugaenge'
+import { loeschkonzeptRoute, loeschkonzeptStarten } from './loeschkonzept'
+import { datenschutzRoute } from './datenschutzSeiten'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
@@ -112,6 +118,8 @@ async function main(): Promise<void> {
     else nutzerAnlegen({ benutzer: ADMIN_BENUTZER, name: 'Torge Kornahrens', rolle: 'admin', quelle: 'notzugang', passwortHash: passwortHash(pw) })
     protokolliereServer('start', 'Passwort des Notzugangs gesetzt')
   }
+  // Erzwungener Notzugang steht im Protokoll (23.10.2026, Prüfung des Schulträgers)
+  if (notzugangErzwungen()) protokolliereServer('start', 'Notzugang über SCHULAPPS_NOTZUGANG_ERZWINGEN eingeschaltet')
 
   // Vom Admin für alle freigegebene Schlüssel – nur, wenn der Nutzer keinen eigenen hat
   setzeGeheimRueckfall(freigegebenerSchluessel)
@@ -238,6 +246,8 @@ async function main(): Promise<void> {
     // „Als Schüler ansehen“ (06.10.2026): Vorschau-Schlüssel nur mit der Sitzung der Lehrkraft
     vorschau: kontoZumSchluessel,
     routen: [
+      // Datenschutzerklärung, Elternfassung, Impressum ohne Anmeldung; Kurzfassung für Lernende (22.10.2026, datenschutzSeiten.ts) – vor schuelerRoute
+      datenschutzRoute(),
       // Klasse und Kurse aus IServ für Lernende (10.10.2026, iservKursgruppen.ts) – vor den Routen, die /s/api/ ganz übernehmen
       iservKurseRoute(),
       // Förder- und Fordermaterial: Lerndaten je Kind, Gruppen, Bündel „Für dich" (12.10.2026, foerdern.ts)
@@ -280,6 +290,8 @@ async function main(): Promise<void> {
       sprechenRoute(aufruf),
       // Vertrauliche Krisenhinweise an die Lehrkraft (22.10.2026, krise.ts)
       kriseRoute(),
+      // Datenpannen nach Art. 33/34 DSGVO (22.10.2026, Prüfung des Schulträgers, datenpanne.ts) – nur Admins
+      datenpanneRoute(),
       // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
       planenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)
@@ -310,6 +322,10 @@ async function main(): Promise<void> {
       fachobleuteRoute,
       // KI-Zugänge der Schule: Adressen, Verbindungstest, Nutzungsübersicht (09.10.2026, kiZugaenge.ts)
       kiZugaengeRoute,
+      // Löschkonzept und Sicherung außerhalb des Servers (23.10.2026, loeschkonzept.ts)
+      loeschkonzeptRoute,
+      // Admin-Rollen vergeben/entziehen (23.10.2026, adminRollen.ts) – vor der Verwaltung, die /server/verwaltung/ ganz übernimmt
+      adminRollenRoute,
       verwaltungsRoute
     ]
   })
@@ -321,10 +337,14 @@ async function main(): Promise<void> {
   messungenStarten()
   // Erinnerungen zum Üben (10.10.2026): Zeitplaner alle 5 Minuten, nur fällige Lernende
   erinnerungenStarten(adresse)
+  // Krisenhinweise (23.10.2026, Prüfung des Schulträgers): eine Erinnerung nach 24 h ohne „Gesehen"
+  krisenErinnerungStarten()
   // Schulkalender und Schuljahreswechsel (10.10.2026): Ferien/Feiertage des Landes, Hochstufen am ersten Schultag
   setzeLandRueckfall(() => landAusLehrkraeften(schulOrtVon))
   setzeOrtQuelle(schulOrtVon)
   schuljahrWechselStarten()
+  // Löschkonzept (23.10.2026): Nachtlauf 3–6 Uhr und kurz nach dem Start, Wiederherstellungstests des Hosts
+  loeschkonzeptStarten()
   kalenderStarten()
   // Doppelte Vokabeln in laufenden Kursen zählen (10.10.2026) – Protokollzeile nur, wenn es welche gibt
   setTimeout(() => doppeltePruefen('Start'), 20_000).unref?.()

@@ -19,7 +19,7 @@ export function MaskottchenBild({ id, pose, className, style }: { id?: string; p
   useMaskottchen((s) => s.liste.length)
   const src = maskottchenBild(id, pose)
   if (!src) return null
-  return <img className={className} src={src} alt="" style={style} draggable={false} />
+  return <img className={className} src={src} alt="" aria-hidden="true" style={style} draggable={false} />
 }
 
 /** Sprechblase mit Zeiger zur Figur. */

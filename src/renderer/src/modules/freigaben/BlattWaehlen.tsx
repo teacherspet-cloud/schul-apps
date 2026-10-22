@@ -116,7 +116,7 @@ function Auswahl({ schliessen, gewaehlt }: { schliessen: () => void; gewaehlt: (
                 >
                   <Group wrap="nowrap" gap="sm">
                     {m.thumb ? (
-                      <Image
+                      <Image alt="" aria-hidden="true"
                         src={m.thumb}
                         w={42}
                         h={58}

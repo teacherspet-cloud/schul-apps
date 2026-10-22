@@ -1,0 +1,470 @@
+{
+ "erzeugt": "2026-10-22",
+ "pakete": [
+  {
+   "name": "@anthropic-ai/sdk",
+   "version": "0.126.0",
+   "lizenz": "MIT",
+   "autor": "Anthropic <support@anthropic.com>",
+   "adresse": "https://github.com/anthropics/anthropic-sdk-typescript"
+  },
+  {
+   "name": "@capacitor/app",
+   "version": "8.1.1",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-plugins"
+  },
+  {
+   "name": "@capacitor/assets",
+   "version": "3.0.5",
+   "lizenz": "MIT",
+   "autor": "Ionic Team <hi@ionicframework.com>",
+   "adresse": "https://ionicframework.com",
+   "entwicklung": true
+  },
+  {
+   "name": "@capacitor/camera",
+   "version": "8.2.4",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-camera"
+  },
+  {
+   "name": "@capacitor/cli",
+   "version": "8.5.2",
+   "lizenz": "MIT",
+   "autor": "Ionic Team <hi@ionic.io> (https://ionic.io)",
+   "adresse": "https://capacitorjs.com",
+   "entwicklung": true
+  },
+  {
+   "name": "@capacitor/core",
+   "version": "8.5.2",
+   "lizenz": "MIT",
+   "autor": "Ionic Team <hi@ionic.io> (https://ionic.io)",
+   "adresse": "https://capacitorjs.com"
+  },
+  {
+   "name": "@capacitor/filesystem",
+   "version": "8.1.3",
+   "lizenz": "MIT",
+   "autor": "Outsystems",
+   "adresse": "https://github.com/ionic-team/capacitor-filesystem"
+  },
+  {
+   "name": "@capacitor/ios",
+   "version": "8.5.2",
+   "lizenz": "MIT",
+   "autor": "Ionic Team <hi@ionic.io> (https://ionic.io)",
+   "adresse": "https://capacitorjs.com"
+  },
+  {
+   "name": "@capacitor/keyboard",
+   "version": "8.0.5",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-keyboard"
+  },
+  {
+   "name": "@capacitor/share",
+   "version": "8.0.2",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-plugins"
+  },
+  {
+   "name": "@capacitor/splash-screen",
+   "version": "8.0.2",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-plugins"
+  },
+  {
+   "name": "@capacitor/status-bar",
+   "version": "8.0.3",
+   "lizenz": "MIT",
+   "autor": "Ionic <hi@ionicframework.com>",
+   "adresse": "https://github.com/ionic-team/capacitor-plugins"
+  },
+  {
+   "name": "@electron-toolkit/preload",
+   "version": "3.0.2",
+   "lizenz": "MIT",
+   "autor": "Alex Wei<https://github.com/alex8088>",
+   "adresse": "https://github.com/alex8088/electron-toolkit/tree/master/packages/preload#readme"
+  },
+  {
+   "name": "@electron-toolkit/utils",
+   "version": "4.0.0",
+   "lizenz": "MIT",
+   "autor": "Alex Wei<https://github.com/alex8088>",
+   "adresse": "https://github.com/alex8088/electron-toolkit/tree/master/packages/utils#readme"
+  },
+  {
+   "name": "@google/genai",
+   "version": "2.22.0",
+   "lizenz": "Apache-2.0",
+   "autor": "",
+   "adresse": "https://github.com/googleapis/js-genai#readme"
+  },
+  {
+   "name": "@mantine/core",
+   "version": "9.6.1",
+   "lizenz": "MIT",
+   "autor": "Vitaly Rtishchev <rtivital@gmail.com>",
+   "adresse": "https://mantine.dev/"
+  },
+  {
+   "name": "@mantine/dropzone",
+   "version": "9.6.1",
+   "lizenz": "MIT",
+   "autor": "Vitaly Rtishchev <rtivital@gmail.com>",
+   "adresse": "https://mantine.dev/x/dropzone/"
+  },
+  {
+   "name": "@mantine/hooks",
+   "version": "9.6.1",
+   "lizenz": "MIT",
+   "autor": "Vitaly Rtishchev <rtivital@gmail.com>",
+   "adresse": "https://mantine.dev"
+  },
+  {
+   "name": "@mantine/notifications",
+   "version": "9.6.1",
+   "lizenz": "MIT",
+   "autor": "Vitaly Rtishchev <rtivital@gmail.com>",
+   "adresse": "https://mantine.dev"
+  },
+  {
+   "name": "@signpdf/placeholder-pdf-lib",
+   "version": "3.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/vbuch/node-signpdf"
+  },
+  {
+   "name": "@signpdf/signer-p12",
+   "version": "3.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/vbuch/node-signpdf"
+  },
+  {
+   "name": "@signpdf/signpdf",
+   "version": "3.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/vbuch/node-signpdf"
+  },
+  {
+   "name": "@tabler/icons-react",
+   "version": "3.46.0",
+   "lizenz": "MIT",
+   "autor": "codecalm",
+   "adresse": "https://tabler.io/icons"
+  },
+  {
+   "name": "@types/node",
+   "version": "24.13.5",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node",
+   "entwicklung": true
+  },
+  {
+   "name": "@types/node-forge",
+   "version": "1.3.14",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node-forge",
+   "entwicklung": true
+  },
+  {
+   "name": "@types/papaparse",
+   "version": "5.5.2",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/papaparse",
+   "entwicklung": true
+  },
+  {
+   "name": "@types/qrcode",
+   "version": "1.5.6",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qrcode",
+   "entwicklung": true
+  },
+  {
+   "name": "@types/react",
+   "version": "19.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react",
+   "entwicklung": true
+  },
+  {
+   "name": "@types/react-dom",
+   "version": "19.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom",
+   "entwicklung": true
+  },
+  {
+   "name": "@vitejs/plugin-react",
+   "version": "5.2.0",
+   "lizenz": "MIT",
+   "autor": "Evan You",
+   "adresse": "https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#readme",
+   "entwicklung": true
+  },
+  {
+   "name": "buffer",
+   "version": "6.0.3",
+   "lizenz": "MIT",
+   "autor": "Feross Aboukhadijeh",
+   "adresse": "https://github.com/feross/buffer"
+  },
+  {
+   "name": "docx",
+   "version": "9.7.1",
+   "lizenz": "MIT",
+   "autor": "Dolan Miu",
+   "adresse": "https://docx.js.org"
+  },
+  {
+   "name": "electron",
+   "version": "44.4.1",
+   "lizenz": "MIT",
+   "autor": "Electron Community",
+   "adresse": "https://github.com/electron/electron"
+  },
+  {
+   "name": "electron-builder",
+   "version": "26.15.3",
+   "lizenz": "MIT",
+   "autor": "Vladimir Krivosheev",
+   "adresse": "https://github.com/electron-userland/electron-builder",
+   "entwicklung": true
+  },
+  {
+   "name": "electron-vite",
+   "version": "5.0.0",
+   "lizenz": "MIT",
+   "autor": "Alex Wei<https://github.com/alex8088>",
+   "adresse": "https://electron-vite.org",
+   "entwicklung": true
+  },
+  {
+   "name": "fflate",
+   "version": "0.8.3",
+   "lizenz": "MIT",
+   "autor": "Arjun Barrett <arjunbarrett@gmail.com>",
+   "adresse": "https://101arrowz.github.io/fflate"
+  },
+  {
+   "name": "hyphen",
+   "version": "1.14.1",
+   "lizenz": "ISC",
+   "autor": "Eugene Tiurin <yevhentiurin@gmail.com> (https://github.com/ytiurin)",
+   "adresse": "https://ytiurin.github.io/hyphen"
+  },
+  {
+   "name": "jsqr",
+   "version": "1.4.0",
+   "lizenz": "Apache-2.0",
+   "autor": "",
+   "adresse": "https://github.com/cozmo/jsQR"
+  },
+  {
+   "name": "mammoth",
+   "version": "1.12.3",
+   "lizenz": "BSD-2-Clause",
+   "autor": "Michael Williamson <mike@zwobble.org>",
+   "adresse": "https://github.com/mwilliamson/mammoth.js"
+  },
+  {
+   "name": "mathjax-full",
+   "version": "3.2.2",
+   "lizenz": "Apache-2.0",
+   "autor": "",
+   "adresse": "https://github.com/mathjax/Mathjax-src/"
+  },
+  {
+   "name": "node-forge",
+   "version": "1.4.0",
+   "lizenz": "(BSD-3-Clause OR GPL-2.0)",
+   "autor": "Digital Bazaar, Inc.",
+   "adresse": "https://github.com/digitalbazaar/forge"
+  },
+  {
+   "name": "openai",
+   "version": "7.16.0",
+   "lizenz": "Apache-2.0",
+   "autor": "OpenAI <support@openai.com>",
+   "adresse": "https://github.com/openai/openai-node"
+  },
+  {
+   "name": "openmoji",
+   "version": "17.0.0",
+   "lizenz": "CC-BY-SA-4.0",
+   "autor": "",
+   "adresse": "https://openmoji.org/"
+  },
+  {
+   "name": "papaparse",
+   "version": "5.7.0",
+   "lizenz": "MIT",
+   "autor": "Matthew Holt",
+   "adresse": "https://www.papaparse.com/"
+  },
+  {
+   "name": "path-browserify",
+   "version": "1.0.1",
+   "lizenz": "MIT",
+   "autor": "James Halliday",
+   "adresse": "https://github.com/browserify/path-browserify"
+  },
+  {
+   "name": "pdf-lib",
+   "version": "1.17.1",
+   "lizenz": "MIT",
+   "autor": "Andrew Dillon <andrew.dillon.j@gmail.com>",
+   "adresse": "https://pdf-lib.js.org"
+  },
+  {
+   "name": "pdfjs-dist",
+   "version": "6.3.289",
+   "lizenz": "Apache-2.0",
+   "autor": "",
+   "adresse": "https://mozilla.github.io/pdf.js/"
+  },
+  {
+   "name": "playwright-core",
+   "version": "1.63.0",
+   "lizenz": "Apache-2.0",
+   "autor": "Microsoft Corporation",
+   "adresse": "https://playwright.dev",
+   "entwicklung": true
+  },
+  {
+   "name": "qrcode",
+   "version": "1.5.4",
+   "lizenz": "MIT",
+   "autor": "Ryan Day <soldair@gmail.com>",
+   "adresse": "http://github.com/soldair/node-qrcode"
+  },
+  {
+   "name": "react",
+   "version": "19.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://react.dev/"
+  },
+  {
+   "name": "react-dom",
+   "version": "19.3.0",
+   "lizenz": "MIT",
+   "autor": "",
+   "adresse": "https://react.dev/"
+  },
+  {
+   "name": "read-excel-file",
+   "version": "9.3.10",
+   "lizenz": "MIT",
+   "autor": "catamphetamine <purecatamphetamine@gmail.com>",
+   "adresse": "https://gitlab.com/catamphetamine/read-excel-file#readme"
+  },
+  {
+   "name": "schulapps-nativ",
+   "version": "0.1.0",
+   "lizenz": "UNLICENSED",
+   "autor": "Torge Kornahrens",
+   "adresse": ""
+  },
+  {
+   "name": "typescript",
+   "version": "5.9.3",
+   "lizenz": "Apache-2.0",
+   "autor": "Microsoft Corp.",
+   "adresse": "https://www.typescriptlang.org/",
+   "entwicklung": true
+  },
+  {
+   "name": "vite",
+   "version": "7.3.6",
+   "lizenz": "MIT",
+   "autor": "Evan You",
+   "adresse": "https://vite.dev",
+   "entwicklung": true
+  },
+  {
+   "name": "vitest",
+   "version": "4.1.11",
+   "lizenz": "MIT",
+   "autor": "Anthony Fu <anthonyfu117@hotmail.com>",
+   "adresse": "https://vitest.dev",
+   "entwicklung": true
+  },
+  {
+   "name": "zustand",
+   "version": "5.0.15",
+   "lizenz": "MIT",
+   "autor": "Paul Henschel",
+   "adresse": "https://github.com/pmndrs/zustand"
+  }
+ ],
+ "daten": [
+  {
+   "name": "OpenMoji – Emoji-Symbole (Bildauswahl)",
+   "lizenz": "CC BY-SA 4.0",
+   "autor": "OpenMoji – HfG Schwäbisch Gmünd",
+   "adresse": "https://openmoji.org",
+   "hinweis": "Alle Symbole von OpenMoji – das offene Emoji-Projekt. Lizenz: CC BY-SA 4.0."
+  },
+  {
+   "name": "Schulverzeichnis: JedeSchule.de (Open Knowledge Foundation / Code for Germany) – Aggregation der amtlichen Schulverzeichnisse",
+   "lizenz": "Aggregat CC0; es gelten die Lizenzen der Landesquellen: BW: INSPIRE-WFS Kultusministerium BW – „Nutzungsbedingungen: Keine Einschränkungen“; BY: CC BY 4.0 – Bayerisches Staatsministerium für Unterricht und Kultus; BE: Datenlizenz Deutschland – Zero – 2.0 – Senatsverwaltung für Bildung, Jugend und Familie Berlin; BB: Datenlizenz Deutschland – Namensnennung – 2.0 – © Ministerium für Bildung, Jugend und Sport; HB: CC BY – Freie Hansestadt Bremen, Die Senatorin für Kinder und Bildung; HH: Datenlizenz Deutschland – Namensnennung – 2.0 – Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung; MV: Vervielfältigung und Verbreitung mit Quellenangabe gestattet – Land Mecklenburg-Vorpommern (GeoPortal.MV); NW: Datenlizenz Deutschland – Namensnennung – 2.0 – Ministerium für Schule und Bildung NRW; SL: CC BY 4.0 – Saarland, Ministerium für Bildung und Kultur (Geoportal Saarland); SH: CC0 – Land Schleswig-Holstein (Open-Data-Portal); TH: CC BY 4.0 – © GDI-Th",
+   "autor": "",
+   "adresse": "https://jedeschule.codefor.de/csv-data/",
+   "hinweis": "Länder: BW, BY, BE, BB, HB, HH, MV, NW, SL, SH, TH"
+  },
+  {
+   "name": "Schulverzeichnis: Hessisches Statistisches Landesamt – Verzeichnis der allgemeinbildenden Schulen (Verz-6) und der beruflichen Schulen (Verz-7), Ausgabe 2026",
+   "lizenz": "© Hessisches Statistisches Landesamt, Wiesbaden, 2026. Vervielfältigung und Verbreitung, auch auszugsweise, mit Quellenangabe gestattet.",
+   "autor": "",
+   "adresse": "https://statistik.hessen.de/publikationen/verzeichnisse",
+   "hinweis": "Länder: HE"
+  },
+  {
+   "name": "Schulverzeichnis: Landesamt für Statistik Niedersachsen (LSN) – Verzeichnis der allgemeinbildenden Schulen und der berufsbildenden Schulen",
+   "lizenz": "© Landesamt für Statistik Niedersachsen (LSN), Hannover. Vervielfältigung und Verbreitung, auch auszugsweise, mit Quellenangabe gestattet.",
+   "autor": "",
+   "adresse": "https://www.statistik.niedersachsen.de/startseite/veroffentlichungen/sonstige_veroffentlichungen/verzeichnisse/verzeichnisse-fur-niedersachsen-87729.html",
+   "hinweis": "Länder: NI"
+  },
+  {
+   "name": "Schulverzeichnis: Statistisches Landesamt Rheinland-Pfalz – Schulverzeichnis 2025/26 (Anschriften: ADD, Stand September 2025)",
+   "lizenz": "© Statistisches Landesamt Rheinland-Pfalz, Bad Ems, 2026. Vervielfältigung und Verbreitung, auch auszugsweise, mit Quellenangabe gestattet.",
+   "autor": "",
+   "adresse": "https://statistik.rlp.de/publikationen/verzeichnisse-und-adressarien",
+   "hinweis": "Länder: RP"
+  },
+  {
+   "name": "Schulverzeichnis: OpenStreetMap (amenity=school) über Overpass API; Ort ohne addr:city = OSM-Gemeinde am Schulstandort",
+   "lizenz": "Open Database License (ODbL) 1.0 – © OpenStreetMap-Mitwirkende. Die aus OSM abgeleiteten Einträge (id beginnt mit „OSM-“) stehen unter ODbL.",
+   "autor": "",
+   "adresse": "https://www.openstreetmap.org/copyright",
+   "hinweis": "Länder: SN, ST"
+  },
+  {
+   "name": "Medienbank (Vokabelbilder)",
+   "lizenz": "je Bild",
+   "autor": "",
+   "adresse": "",
+   "hinweis": "KI-erzeugte Bilder sind als „KI-generiert“ gekennzeichnet; Bilder aus Wikimedia Commons, Openverse und Pixabay tragen ihren Nachweis (Urheber, Lizenz) am Bild. Bilder mit NC- oder ND-Lizenz werden nicht verwendet."
+  }
+ ]
+}

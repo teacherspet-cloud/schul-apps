@@ -463,7 +463,7 @@ export function Spielwahl({
       >
         <Group wrap="nowrap" align="flex-start">
           {spielBild(s.id) ? (
-            <img src={spielBild(s.id)} alt="" width={56} height={56} style={{ flex: 'none', borderRadius: 14 }} data-spiel-bild={s.id} />
+            <img src={spielBild(s.id)} alt="" aria-hidden="true" width={56} height={56} style={{ flex: 'none', borderRadius: 14 }} data-spiel-bild={s.id} />
           ) : (
             <ThemeIcon size={44} radius="md" variant="light" color={FARBE[s.id]}>
               {SYMBOL[s.id]}

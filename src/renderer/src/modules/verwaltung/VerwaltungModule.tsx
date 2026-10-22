@@ -44,12 +44,18 @@ import { nutzerSuchen, QUELLEN_TEXT, SUCHE_MAX, SUCHE_MIN } from '@shared/nutzer
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlassenlisteKarte } from './Klassenliste'
+import { AdminRollen } from './AdminRollen'
 import { KiZugaenge } from './KiZugaenge'
 import { SchuleEinrichten } from './SchuleEinrichten'
 import { SchulFachfarben } from './SchulFachfarben'
 import { SchulFachobleute } from './SchulFachobleute'
+import { DatenschutzAngabenKarte } from './DatenschutzAngabenKarte'
+import { SchulKrisenhinweise } from './SchulKrisenhinweise'
+import { Datenpanne } from './Datenpanne'
+import { LizenzUebersicht } from './LizenzUebersicht'
 import { serverIch } from '../../shared/plattform'
 import { ServerReiter } from './ServerReiter'
+import { LoeschkonzeptKarten } from './Loeschkonzept'
 import MaskottchenSettings from '../../shell/MaskottchenSettings'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useZielZeiger } from '../../shared/navigation'
@@ -77,6 +83,8 @@ interface Uebersicht {
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
   iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean; abgleichSchwelle?: number }
   notzugang: boolean
+  /** Auf dem Server per SCHULAPPS_NOTZUGANG_ERZWINGEN=1 eingeschaltet (23.10.2026) */
+  notzugangErzwungen?: boolean
   ablage?: { muster: string; standard: string }
   server: {
     speicher: { frei: number; gesamt: number; prozess: number }
@@ -126,6 +134,8 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
               {/* „Hörtexte" entfernt (07.10.2026, Wunsch der Lehrkraft): eine lange, unübersichtliche Liste aller QR-Freigaben */}
               <Tabs.Tab value="maskottchen">Maskottchen</Tabs.Tab>
               <Tabs.Tab value="server">Server</Tabs.Tab>
+              {/* Lizenzen der Fremdbestandteile (22.10.2026, Prüfung des Schulträgers, LizenzUebersicht.tsx) */}
+              <Tabs.Tab value="info">Info</Tabs.Tab>
             </Tabs.List>
           }
         />
@@ -144,6 +154,12 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
                 <SchulFachfarben />
                 {/* Fachobleute je Fach (12.10.2026, SchulFachobleute.tsx): pflegen gemeinsame Lehrwerke ihres Fachs */}
                 <SchulFachobleute />
+                {/* Datenschutz und Impressum (22.10.2026, Prüfung des Schulträgers, DatenschutzAngabenKarte.tsx) */}
+                <DatenschutzAngabenKarte />
+                {/* Meldeweg für vertrauliche Hinweise (23.10.2026, Prüfung des Schulträgers, SchulKrisenhinweise.tsx) */}
+                <SchulKrisenhinweise />
+                {/* Datenpannen nach Art. 33/34 DSGVO (22.10.2026, Prüfung des Schulträgers, Datenpanne.tsx) */}
+                <Datenpanne />
               </Stack>
             </Tabs.Panel>
             <Tabs.Panel value="ki">
@@ -159,6 +175,11 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
             <Tabs.Panel value="server">
               {/* Neu gestaltet (09.10.2026): Ampel, Verlauf, Nutzung, Platz, Sicherungen, Fehler (ServerReiter.tsx) */}
               <ServerReiter sichtbar={reiter === 'server'} zuKi={() => setReiter('ki')} />
+              {/* Sicherung außerhalb des Servers und Löschkonzept (23.10.2026, Loeschkonzept.tsx) */}
+              <div style={{ marginTop: 'var(--mantine-spacing-md)' }}><LoeschkonzeptKarten sichtbar={reiter === 'server'} /></div>
+            </Tabs.Panel>
+            <Tabs.Panel value="info">
+              <LizenzUebersicht />
             </Tabs.Panel>
           </>
         )}
@@ -487,6 +508,8 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
         </Group>
       </KlappKarte>
       <KlassenlisteKarte fertig={neu} />
+      {/* Admins ernennen/entziehen (23.10.2026, Prüfung des Schulträgers, AdminRollen.tsx) */}
+      <AdminRollen fertig={neu} />
       <KlappKarte id="nutzer-testkonto" titel="Testkonto anlegen">
         <Group align="end">
           <Select
@@ -730,8 +753,13 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
       <Switch
         mt="md"
         label="Notzugang (Anmeldung des Admins mit Passwort) erlauben"
-        description="Abschalten, sobald die Anmeldung über IServ funktioniert. Testkonten gehen weiter."
-        checked={d.notzugang}
+        description={
+          d.notzugangErzwungen
+            ? 'Auf dem Server erzwungen (SCHULAPPS_NOTZUGANG_ERZWINGEN=1) – nach der Wiederherstellung dort wieder entfernen.'
+            : 'Standardmäßig aus. Nur einschalten, wenn die Anmeldung über IServ nicht funktioniert; jede Änderung steht im Protokoll. Testkonten gehen weiter.'
+        }
+        checked={d.notzugang || Boolean(d.notzugangErzwungen)}
+        disabled={Boolean(d.notzugangErzwungen)}
         onChange={(e) => void senden('/server/verwaltung/notzugang', { an: e.currentTarget.checked }).then(neu, (er: unknown) => notifyError(er))}
       />
     </Stack>

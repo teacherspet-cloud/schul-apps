@@ -44,6 +44,7 @@ import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type Naviga
 import { FachschaftFachFrage, useFachschaftNeu } from './shared/components/Fachordner'
 import { useOffenGemerkt } from './shared/sitzung'
 import RahmenKopf, { KOPF_HOEHE, KOPF_HOEHE_TELEFON } from './shell/RahmenKopf'
+import KrisenPunkt from './shell/KrisenPunkt'
 import { useKopfDatenAktuell } from './shell/kopfDaten'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
@@ -298,7 +299,10 @@ export default function App(): React.JSX.Element {
         <AppShell.Navbar p={10} className="app-leiste" withBorder={false} data-breit={breit} data-dichte={dichte || undefined}>
           <AppShell.Section>
             <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
-              <IconHome size={22} />
+              {/* Roter Punkt: offene vertrauliche Hinweise (23.10.2026, Prüfung des Schulträgers, KrisenPunkt.tsx) */}
+              <KrisenPunkt>
+                <IconHome size={22} />
+              </KrisenPunkt>
             </NavIcon>
             {/* „Materialien" in der Leiste wieder entfernt (10.10.2026, Wunsch der Lehrkraft) – am Telefon bleibt der Tab */}
           </AppShell.Section>
@@ -563,7 +567,7 @@ function GruppenKopf(props: {
   const Pfeil = props.offen ? IconChevronDown : IconChevronRight
   // Am iPad blieb der Tooltip nach dem Antippen stehen (09.10.2026) – mit dem Finger ohne Tooltips
   const touch = useTouch()
-  const symbol = props.bild ? <img src={props.bild} className="leiste-kopf-bild" alt="" draggable={false} /> : props.children
+  const symbol = props.bild ? <img src={props.bild} className="leiste-kopf-bild" alt="" aria-hidden="true" draggable={false} /> : props.children
   const knopf = (
     <UnstyledButton
       onClick={props.onClick}
@@ -622,7 +626,7 @@ function NavKnopf(props: {
         data-fachschaft-neu={props.neu || undefined}
       >
         {props.bild ? (
-          <img src={props.bild} className="nav-bild" width={props.breit ? 30 : 40} height={props.breit ? 30 : 40} alt="" draggable={false} />
+          <img src={props.bild} className="nav-bild" width={props.breit ? 30 : 40} height={props.breit ? 30 : 40} alt="" aria-hidden="true" draggable={false} />
         ) : (
           props.children
         )}

@@ -95,7 +95,11 @@ export const SENSIBEL: Record<string, string[]> = {
   sprech_stand: ['daten'],
   sprech_vorfaelle: ['satz'],
   // Krisenhinweise (22.10.2026, krise.ts): nur die Ortsangabe, nie Wortlaut
-  krisen_hinweise: ['quelle']
+  krisen_hinweise: ['quelle'],
+  // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers, bewertungSpur.ts): KI-Vorschlag und Entscheidung der Lehrkraft
+  bewertung_spur: ['ki_vorschlag', 'entscheidung'],
+  // Datenpannen (22.10.2026, Prüfung des Schulträgers, datenpanne.ts): Beschreibung, Betroffene, Maßnahmen
+  datenpannen: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

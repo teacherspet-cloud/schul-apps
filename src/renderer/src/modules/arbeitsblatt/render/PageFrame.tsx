@@ -285,7 +285,7 @@ function CompactHeader({ info }: { info: PageInfo }): React.JSX.Element {
   const u = kopfUeberthema(info)
   return (
     <header className="ws-header ws-header-compact">
-      {info.design.header.showLogo && info.logo && <img className="ws-logo" src={info.logo} alt="" style={{ height: '7mm' }} />}
+      {info.design.header.showLogo && info.logo && <img className="ws-logo" src={info.logo} alt="Schullogo" style={{ height: '7mm' }} />}
       <span className="ws-compact-text" data-ueberthema={u.stil === 'path' && u.ueber ? u.ueber : undefined}>
         {kompaktVorTitel(info)}
         <RichText value={title} inline editable={Boolean(info.onTitle) && !info.isKey} onChange={info.onTitle} />
@@ -397,7 +397,7 @@ export function PageFrame({
         {d.footer.show && (
           <footer className="ws-footer">
             <span className="ws-footer-left">
-              {d.footer.showLogoSmall && info.logo && <img className="ws-logo" src={info.logo} alt="" style={{ height: '5mm' }} />}
+              {d.footer.showLogoSmall && info.logo && <img className="ws-logo" src={info.logo} alt="" aria-hidden="true" style={{ height: '5mm' }} />}
               {footerTexts[0]}
             </span>
             <span className="ws-footer-center">{footerTexts[1]}</span>

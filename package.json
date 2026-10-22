@@ -1,13 +1,14 @@
 {
   "name": "schul-apps",
   "productName": "Schul-Apps",
-  "version": "0.4.157",
+  "version": "0.4.158",
   "description": "Werkzeuge für Unterrichtsmaterial und Organisatorisches",
   "main": "./out/main/index.js",
   "author": "Torge Kornahrens",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
+    "prebuild": "node scripts/lizenzen-erzeugen.mjs",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",

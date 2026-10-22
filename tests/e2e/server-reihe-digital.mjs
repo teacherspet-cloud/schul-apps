@@ -2,9 +2,11 @@
 //  - Lehrkraft: Platzhalter „Zwischenaufgabe" in einer DIGITALEN Reihe entsteht über die Arbeitsblatt-Pipeline als vollwertiges
 //    Blatt (Rolle bleibt, Erfolg = KI), Anfrage verlangt Erklärung mit Beispiel + Hilfekarten (selbstständig am Gerät);
 //  - Lernende am HANDY: Blatt ausfüllen, KI-Feedback je Aufgabe und nach dem Einreichen (Attrappe), Schritt automatisch
-//    geschafft; Selbsteinschätzung mit KI-Impuls; Abschlussprodukt mit KI-Vorschlag (nur die Lehrkraft sieht Punkte),
-//    geschafft ohne Lehrkraft; Materialien und „Meine Abgaben"; Hefter als Seite mit PDF; nichts ragt seitlich über;
-//  - Lehrkraft: KI-Vorschlag im Handlungsbedarf und in der Detailansicht, übernehmen und bestätigen.
+//    geschafft; Selbsteinschätzung mit KI-Impuls; Abschlussprodukt mit KI-Vorschlag (nur die Lehrkraft sieht Punkte) –
+//    seit 23.10.2026 (Prüfung des Schulträgers) NICHT mehr geschafft ohne Lehrkraft: „eingereicht, wartet";
+//    Materialien und „Meine Abgaben"; Hefter als Seite mit PDF; nichts ragt seitlich über;
+//  - Lehrkraft: KI-Vorschlag im Handlungsbedarf und in der Detailansicht, „Vorschlag übernehmen" mit einem Klick,
+//    Verlauf der Bewertung (KI-Vorschlag → bestätigt).
 //  - Einreichen (08.10.2026): ✓/✗ an Ankreuzen und Lücke ohne KI, Hinweis je offener Aufgabe aus EINER Anfrage
 //    („blatt_abgabe_aufgaben", Attrappe), „Weiter: <nächster Schritt>" führt zum nächsten offenen Schritt.
 // Vorher: Server lokal mit KI-Attrappe (SCHULAPPS_KI_ATTRAPPE; Grundantworten „rueckmeldung_bogen", „blatt_aufgabe_feedback"
@@ -385,15 +387,19 @@ try {
   pruefe(imp.length === 1 && !/Nele|Probe/.test(imp[0].user + imp[0].system), 'Impuls-Anfrage ohne Namen')
   await s.screenshot({ path: join(out, '4-handy-reflexion.png'), fullPage: true })
 
-  // Abschlussprodukt: geschafft nach dem KI-Vorschlag, Punkte nur für die Lehrkraft
+  // Abschlussprodukt: KI-Vorschlag nur für die Lehrkraft – wartet auf ihre Bestätigung (23.10.2026)
   await sm.request.post(`${A}/s/api/reihe/schritt`, { headers: KOPF, data: { id: zid, schritt: 'sp', aktion: 'datei', name: 'plakat.png', daten: PNG } })
   await s.goto(`${A}/s/r/${zid}/sp`)
   await s.locator('[data-reihe-antwort]').fill('Mein Plakat nennt Regen und Wind als Ursachen. – Nele')
   await s.locator('[data-reihe-abgeben]').click()
   await s.waitForTimeout(500)
   await s.locator('[data-reihe-abgeben]').waitFor({ state: 'detached', timeout: 90000 }).catch(() => undefined)
+  pruefe(await s.locator('[data-abschluss-lehrkraft]').isVisible().catch(() => false), 'Lernende lesen „Deine Lehrkraft sieht sich dein Produkt an."')
+  // Der Vorschlag entsteht im Hintergrund
+  for (let i = 0; i < 60 && !anfragen().some((a) => a.schemaName === 'reihe_abschluss_vorschlag'); i++) await s.waitForTimeout(1000)
+  await s.waitForTimeout(1000)
   st = await status()
-  pruefe(st[3] === 'geschafft', `Abschlussprodukt geschafft nach dem KI-Vorschlag, ohne Lehrkraft (${st.join(', ')})`)
+  pruefe(st[3] === 'eingereicht', `Abschlussprodukt wartet trotz KI-Vorschlag auf die Lehrkraft (${st.join(', ')})`)
   const vorschlagAnfrage = anfragen().find((a) => a.schemaName === 'reihe_abschluss_vorschlag')
   pruefe(
     Boolean(vorschlagAnfrage) && vorschlagAnfrage.bilder === 1 && !/Nele/.test(vorschlagAnfrage.user),
@@ -434,18 +440,22 @@ try {
   const lz = await (await lk.request.get(`${A}/server/reihen/z/${zid}`, { headers: KOPF })).json()
   const vor = lz.lernende?.[0]?.stand?.schritte?.sp?.kiVorschlag
   pruefe(vor?.kriterien?.length === 2 && vor.kriterien[0].punkte === 3, `Lehrkraft sieht den KI-Vorschlag (${vor?.kriterien?.map((k) => `${k.kriterium} ${k.punkte}/${k.max}`).join(', ')})`)
-  pruefe((lz.bedarf ?? []).some((b) => b.art === 'vorschlag' && /5 von 6 Punkten/.test(b.text)), 'Handlungsbedarf: KI-Vorschlag mit Summe')
-  pruefe(!(lz.bedarf ?? []).some((b) => b.art === 'bewerten'), 'Keine Pflicht-Bestätigung in der digitalen Reihe')
+  pruefe(
+    (lz.bedarf ?? []).some((b) => b.art === 'bewerten' && /5 von 6 Punkten/.test(b.text) && b.vorschlag?.geschafft === true),
+    'Handlungsbedarf: bestätigen, mit KI-Vorschlag und Summe'
+  )
   pruefe(lz.lernende?.[0]?.stand?.schritte?.sr?.impuls?.text === IMPULS, 'Lehrkraft sieht den Impuls zum Lerntagebuch')
   await p.locator('[data-reihe-editor] button', { hasText: 'Alle Reihen' }).click()
   await p.locator('[data-zuweisung-oeffnen]').first().click()
   await p.locator('[data-reihe-uebersicht]').waitFor()
   await p.locator('[data-bedarf-ansehen]').first().click()
   await p.locator('[data-ki-vorschlag]').waitFor({ timeout: 10000 })
-  await p.locator('[data-vorschlag-uebernehmen]').click()
   await p.screenshot({ path: join(out, '7-lehrkraft-vorschlag.png') })
-  await p.locator('[data-bewerten-geschafft]').click()
+  // Ein Klick: „Vorschlag übernehmen" (23.10.2026)
+  await p.locator('[data-vorschlag-annehmen]').click()
   await p.waitForTimeout(800)
+  const spur = await (await lk.request.get(`${A}/server/reihen/z/${zid}/spur?schueler=${encodeURIComponent(lz.lernende?.[0]?.id)}&schritt=sp`, { headers: KOPF })).json()
+  pruefe(spur.eintraege?.map((x) => x.quelle).join(',') === 'ki,bestaetigt', `Verlauf der Bewertung: KI-Vorschlag → bestätigt (${spur.eintraege?.map((x) => x.quelle).join(', ')})`)
   const danach = await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json()
   pruefe(/5 von 6 Punkten/.test(danach.stand?.schritte?.sp?.bewertung?.text ?? ''), 'Bestätigte Bewertung erreicht die Lernenden')
   const fertig = await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json()

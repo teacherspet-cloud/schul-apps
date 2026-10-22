@@ -9,7 +9,8 @@
 export const SERVICE_WORKER = `'use strict';
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
-function ziel(u) { return (typeof u === 'string' && /^\\/s\\/[\\w\\/-]*$/.test(u)) ? u : '/s/'; }
+// Ziel „/" (23.10.2026, Prüfung des Schulträgers – krise.ts): vertrauliche Hinweise öffnen die Startseite der Lehrkraft
+function ziel(u) { return (u === '/' || typeof u === 'string' &&/^\\/s\\/[\\w\\/-]*$/.test(u)) ? u : '/s/'; }
 self.addEventListener('push', function (e) {
   var d = {};
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { b: e.data ? e.data.text() : '' }; }
@@ -29,7 +30,9 @@ self.addEventListener('notificationclick', function (e) {
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (fenster) {
     for (var i = 0; i < fenster.length; i++) {
       var f = fenster[i];
-      if (f.url.indexOf(self.location.origin + '/s/') === 0 && 'focus' in f) {
+      var schueler = f.url.indexOf(self.location.origin + '/s/') === 0;
+      // Lehrkraft-Ziel („/"): ein Fenster außerhalb von /s/ nehmen (23.10.2026)
+      if ((url.indexOf(self.location.origin + '/s/') === 0 ? schueler : !schueler) && 'focus' in f) {
         return f.focus().then(function (g) { return g && 'navigate' in g ? g.navigate(url) : g; }).catch(function () { return self.clients.openWindow(url); });
       }
     }
@@ -40,9 +43,11 @@ self.addEventListener('pushsubscriptionchange', function (e) {
   var alt = e.oldSubscription;
   if (!alt || !alt.options) return;
   e.waitUntil(self.registration.pushManager.subscribe(alt.options).then(function (neu) {
-    return fetch('/s/api/erinnerungen/geraet', { method: 'POST', credentials: 'same-origin',
+    var an = function (pfad) { return fetch(pfad, { method: 'POST', credentials: 'same-origin',
       headers: { 'content-type': 'application/json', 'x-schulapps-token': 'server' },
-      body: JSON.stringify({ abo: neu.toJSON(), alt: alt.endpoint }) });
+      body: JSON.stringify({ abo: neu.toJSON(), alt: alt.endpoint }) }); };
+    // Lehrkräfte (23.10.2026, krise.ts): die Route der Lernenden lehnt ab (403) – dann die der Krisenhinweise
+    return an('/s/api/erinnerungen/geraet').then(function (r) { return r.status === 403 ? an('/server/krisen/geraet') : r; });
   }).catch(function () {}));
 });
 `

@@ -515,7 +515,7 @@ function FachschaftAbschnitt({ liste }: { liste: Freigabe[] }): React.JSX.Elemen
             return (
               <UnstyledButton key={f.id} className="mm-zeile" onClick={() => void freigabeOeffnen(f)} data-mm-freigabe={f.titel}>
                 <Group gap="sm" wrap="nowrap">
-                  {app?.leistenbild ? <img src={app.leistenbild} width={32} height={32} alt="" style={{ borderRadius: 7, flex: 'none' }} /> : null}
+                  {app?.leistenbild ? <img src={app.leistenbild} width={32} height={32} alt="" aria-hidden="true" style={{ borderRadius: 7, flex: 'none' }} /> : null}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <Text fw={600} size="sm" style={{ overflowWrap: 'anywhere' }}>
                       {f.titel}
@@ -547,7 +547,7 @@ function MaterialZeile({ m, onVerschieben, onLoeschen }: { m: Material; onVersch
         <UnstyledButton onClick={oeffnen} style={{ flex: 1, minWidth: 0 }} aria-label={`„${m.name}“ öffnen`}>
           <Group gap="sm" wrap="nowrap" align="center">
             {app?.leistenbild ? (
-              <img src={app.leistenbild} width={34} height={34} alt="" draggable={false} style={{ borderRadius: 8, flex: 'none' }} />
+              <img src={app.leistenbild} width={34} height={34} alt="" aria-hidden="true" draggable={false} style={{ borderRadius: 8, flex: 'none' }} />
             ) : (
               app && <app.icon size={28} />
             )}

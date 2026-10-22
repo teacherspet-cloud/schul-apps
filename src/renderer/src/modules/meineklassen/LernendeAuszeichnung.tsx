@@ -39,7 +39,7 @@ function MedaillenFenster({ a, name, schliessen }: { a: AuszeichnungLehrkraft; n
       <Stack gap="md">
         {(a.titel || a.avatar) && (
           <Group gap="sm">
-            {a.avatar && <img src={bildAdresse(a.avatar)} alt="" width={36} height={42} style={{ objectFit: 'contain' }} />}
+            {a.avatar && <img src={bildAdresse(a.avatar)} alt="" aria-hidden="true" width={36} height={42} style={{ objectFit: 'contain' }} />}
             {a.titel && <Text fw={600}>Titel: {a.titel}</Text>}
           </Group>
         )}
@@ -126,7 +126,7 @@ export function LernendeAuszeichnung({ a, name }: { a: AuszeichnungLehrkraft | u
           data-medaillen={a.medaillen.map((m) => m.stufe).join('')}
           data-medaillen-jahr={a.schuljahr ?? ''}
         >
-          {a.avatar && <img src={bildAdresse(a.avatar)} alt="" width={22} height={26} style={{ objectFit: 'contain' }} data-lernende-avatar={a.avatar} />}
+          {a.avatar && <img src={bildAdresse(a.avatar)} alt="" aria-hidden="true" width={22} height={26} style={{ objectFit: 'contain' }} data-lernende-avatar={a.avatar} />}
           {a.titel && (
             <Text size="xs" fw={600} style={{ whiteSpace: 'nowrap' }}>
               {a.titel}

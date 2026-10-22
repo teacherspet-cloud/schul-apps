@@ -907,7 +907,7 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
             {block.items.map((it, idx) => (
               <div key={it.id} className="vt-picture">
                 <div className="vt-picture-img">
-                  {it.image ? <img src={it.image.dataUrl} alt="" /> : <span className="vt-picture-missing">Bild fehlt</span>}
+                  {it.image ? <img src={it.image.dataUrl} alt={`Bild ${idx + 1}`} /> : <span className="vt-picture-missing">Bild fehlt</span>}
                   <span className="vt-picture-num">{idx + 1}</span>
                 </div>
                 {answers ? (

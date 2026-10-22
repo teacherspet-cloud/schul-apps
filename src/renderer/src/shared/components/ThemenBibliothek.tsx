@@ -155,7 +155,7 @@ export function VorschauBild({
   }, [schluessel, laden])
   return (
     <div ref={ref} className={klein ? 'tbib-bild tbib-zeile-bild' : 'tbib-bild'} data-vorschau={inhalt?.url ? 'bild' : inhalt?.text ? 'text' : 'symbol'}>
-      {inhalt?.url ? <img src={inhalt.url} alt="" loading="lazy" draggable={false} /> : inhalt?.text && !klein ? <div className="tbib-bild-text">{inhalt.text}</div> : symbol}
+      {inhalt?.url ? <img src={inhalt.url} alt="" aria-hidden="true" loading="lazy" draggable={false} /> : inhalt?.text && !klein ? <div className="tbib-bild-text">{inhalt.text}</div> : symbol}
     </div>
   )
 }

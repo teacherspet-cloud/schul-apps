@@ -67,6 +67,7 @@ import {
 } from '@shared/medienbank'
 import { pruefungBereinigt, type TonPruefung } from '@shared/tonPruefung'
 import { fassungBereinigt, type SatzFassung, type SatzFassungSicht } from '@shared/satzFassung'
+import { lizenzErlaubt } from '@shared/bildLizenz'
 
 const wurzelPfad = (): string =>
   process.env.SCHULAPPS_SERVER ? resolve(process.env.SCHULAPPS_DATEN || './server-daten', 'medienbank') : join(app.getPath('userData'), 'medienbank')
@@ -475,6 +476,8 @@ function bereinigeKandidaten(k: MedienKandidat[]): MedienKandidat[] {
   const t = (x: unknown, n = 300): string => String(x ?? '').slice(0, n)
   return k
     .filter((x) => /^https:\/\//.test(String(x?.url ?? '')) || (String(x?.url ?? '').startsWith('data:image/') && String(x.url).length < 4000))
+    // Keine NC-/ND-Kandidaten (22.10.2026, Prüfung des Schulträgers)
+    .filter((x) => lizenzErlaubt(x?.lizenz))
     .slice(0, 12)
     .map((x) => ({
       url: t(x.url, 4000),

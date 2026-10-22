@@ -360,7 +360,7 @@ function MaterialZeile({ material: m }: { material: Material }): React.JSX.Eleme
       <Group gap="sm" wrap="nowrap">
         {/* Das Programmbild wie in der Leiste (Paket 10a); ohne Bild das Vektorsymbol */}
         {modul?.leistenbild ? (
-          <img src={modul.leistenbild} className="home-material-bild" width={36} height={36} alt="" title={modul.name} draggable={false} />
+          <img src={modul.leistenbild} className="home-material-bild" width={36} height={36} alt="" aria-hidden="true" title={modul.name} draggable={false} />
         ) : (
           modul && (
             <ThemeIcon size={36} variant="light" color={modul.color} title={modul.name}>
@@ -446,7 +446,7 @@ function MeineKlassenKasten(): React.JSX.Element {
       <UnstyledButton onClick={umschalten} data-home-meineklassen-kopf aria-expanded={offen} className="home-mk-kopf">
         <Group gap="sm" wrap="nowrap">
           {modul?.leistenbild ? (
-            <img src={modul.leistenbild} width={36} height={36} alt="" />
+            <img src={modul.leistenbild} width={36} height={36} alt="" aria-hidden="true" />
           ) : (
             <ThemeIcon variant="light" size={36} radius="md">
               <IconUsersGroup size={20} />

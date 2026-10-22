@@ -37,6 +37,7 @@ import {
 } from '@shared/medienbank'
 import { istBegrenzung } from './medienWarten'
 import { bedeutungsHinweis, suchbegriffFuer, wortartFuer, type BedeutungKurz, type SinnAngabe, type Wortart } from '@shared/medienBedeutung'
+import { lizenzErlaubt } from '@shared/bildLizenz'
 
 export interface Vokabel {
   term: string
@@ -215,6 +216,8 @@ export async function bildKandidaten(sprache: string, v: Vokabel, lernende?: Ler
     treffer
       // https – oder kleine data-Bilder (KI-Attrappe der Tests)
       .filter((h) => (/^https:\/\//.test(h.url) || (h.url.startsWith('data:image/') && h.url.length < 4000)) && !gesehen.has(h.url) && gesehen.add(h.url))
+      // Keine NC-/ND-Bilder (22.10.2026, Prüfung des Schulträgers)
+      .filter((h) => lizenzErlaubt(h.license))
       .slice(0, 10)
       .map((h) => ({ url: h.url, vorschau: h.thumbnail || h.url, titel: h.title, urheber: h.creator, lizenz: h.license, quelle: h.source }))
   )

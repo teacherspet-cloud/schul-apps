@@ -72,7 +72,7 @@ function Lobby({ s, senden }: { s: SpielSicht; senden: (p: string, k?: Record<st
               <Group gap={6}>
                 {p.host && <IconCrown size={16} color="var(--mantine-color-yellow-6)" />}
                 {/* Profilbild und Titel (10.10.2026): „Sir Lars R." */}
-                {p.avatar && <img src={bildAdresse(p.avatar)} alt="" width={26} height={30} style={{ objectFit: 'contain' }} data-mehr-avatar={p.avatar} />}
+                {p.avatar && <img src={bildAdresse(p.avatar)} alt="" aria-hidden="true" width={26} height={30} style={{ objectFit: 'contain' }} data-mehr-avatar={p.avatar} />}
                 <Text fw={p.id === s.ich ? 700 : 400} data-mehr-anzeige={mitTitel(p.titel, p.name)}>
                   {p.titel && (
                     <Text span inherit c="dimmed" data-mehr-titel={p.titel}>

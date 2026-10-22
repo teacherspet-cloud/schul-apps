@@ -68,7 +68,7 @@ export default function RahmenKopf({
       >
         <span className="rahmen-logo-kachel" data-rahmen-logo-kachel>
           {logo ? (
-            <img src={logo} alt="" className="rahmen-logo" data-rahmen-logo draggable={false} />
+            <img src={logo} alt="Schullogo" className="rahmen-logo" data-rahmen-logo draggable={false} />
           ) : (
             <IconSchool size={telefon ? 22 : 26} className="rahmen-logo-ersatz" />
           )}

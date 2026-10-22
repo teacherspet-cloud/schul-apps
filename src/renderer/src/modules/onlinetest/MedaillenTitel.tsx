@@ -337,7 +337,7 @@ function MedaillenRaster({
                     cursor: auswahl && !erreicht ? 'default' : 'pointer'
                   }}
                 >
-                  <img src={bildAdresse(id, !erreicht)} alt="" loading="lazy" style={{ width: '100%', maxWidth: 44, height: 'auto', aspectRatio: '120 / 140', objectFit: 'contain', display: 'block' }} />
+                  <img src={bildAdresse(id, !erreicht)} alt="" aria-hidden="true" loading="lazy" style={{ width: '100%', maxWidth: 44, height: 'auto', aspectRatio: '120 / 140', objectFit: 'contain', display: 'block' }} />
                   {naechste && (
                     <span aria-hidden style={{ display: 'block', width: '80%', height: 3, borderRadius: 2, background: 'var(--mantine-color-default-border)', marginTop: 2, overflow: 'hidden' }}>
                       <span style={{ display: 'block', height: '100%', width: `${anteil}%`, background: 'var(--mantine-primary-color-filled)' }} />
@@ -533,7 +533,7 @@ function TitelStreifen({ eintraege, rahmen, label }: { eintraege: StreifenEintra
             background: e.aktuell ? 'var(--mantine-primary-color-light)' : undefined
           }}
         >
-          <img src={bildAdresse(e.bild, e.gesperrt)} alt="" loading="lazy" width={44} height={51} style={{ objectFit: 'contain', opacity: e.gesperrt ? 0.7 : 1 }} />
+          <img src={bildAdresse(e.bild, e.gesperrt)} alt="" aria-hidden="true" loading="lazy" width={44} height={51} style={{ objectFit: 'contain', opacity: e.gesperrt ? 0.7 : 1 }} />
           <Text size="11px" fw={e.aktuell ? 800 : 600} ta="center" lh={1.15} lineClamp={2} c={e.gesperrt ? 'dimmed' : undefined}>
             {e.text}
           </Text>
@@ -917,7 +917,7 @@ function SammlungAbschnitt({ s, avatar, setAvatar }: { s: SprachSicht; avatar: s
                 opacity: waehlen && !b.frei ? 0.45 : 1
               }}
             >
-              <img src={bildAdresse(b.id, !b.frei)} alt="" loading="lazy" style={{ width: '100%', maxWidth: 40, height: 'auto', aspectRatio: '120 / 140', objectFit: 'contain' }} />
+              <img src={bildAdresse(b.id, !b.frei)} alt="" aria-hidden="true" loading="lazy" style={{ width: '100%', maxWidth: 40, height: 'auto', aspectRatio: '120 / 140', objectFit: 'contain' }} />
             </UnstyledButton>
           ))}
         </SimpleGrid>

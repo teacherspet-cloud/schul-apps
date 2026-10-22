@@ -18,6 +18,7 @@ import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
 import { geschuetzt, migriere, nutzerSchreibzaehler, SENSIBEL } from './feldschutz'
 import { wartungAusfuehren } from './wartung'
+import { personenDatenEntfernen } from './personDaten'
 
 let db: DatabaseSync | null = null
 
@@ -297,7 +298,11 @@ export const istVerknuepfterGast = (id: string): boolean =>
  */
 export function nutzerLoeschen(id: string, erzwingen = false): boolean {
   if (!erzwingen && istVerknuepfterGast(id)) return false
+  const benutzer = nutzerNachId(id)?.benutzer
   datenbank().prepare('DELETE FROM nutzer WHERE id = ?').run(id)
+  // Löschkonzept (23.10.2026, Prüfung des Schulträgers): auch Tabellen ohne Fremdschlüssel, Listen und die Ablage
+  personenDatenEntfernen(datenbank(), [{ id, benutzer }])
+  if (/^[a-z0-9-]{6,64}$/.test(id)) rmSync(join(DATEN, 'nutzer', id), { recursive: true, force: true })
   return true
 }
 
@@ -419,7 +424,7 @@ export function protokolliereServer(art: string, text: string, nutzerId?: string
     datenbank()
       .prepare('INSERT INTO protokoll (zeit, nutzer_id, art, text) VALUES (?, ?, ?, ?)')
       .run(jetzt(), nutzerId ?? null, art, text.slice(0, 500))
-    // Höchstens 20 000 Einträge
+    // Höchstens 20 000 Einträge (dazu die Zeitgrenze des Löschkonzepts, loeschkonzept.ts – nachts)
     datenbank().prepare('DELETE FROM protokoll WHERE nr <= (SELECT MAX(nr) - 20000 FROM protokoll)').run()
   } catch {
     // Das Protokoll darf nie den Betrieb stören

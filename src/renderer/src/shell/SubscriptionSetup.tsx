@@ -459,7 +459,7 @@ export function ImageTestRow({ provider, note, disabled }: { provider: AiProvide
       </Group>
       {preview && (
         <Group align="end" gap="sm">
-          <Image src={preview.url} w={120} h={120} fit="contain" radius="sm" bg="white" style={{ border: '1px solid var(--mantine-color-default-border)' }} />
+          <Image alt="Testbild" src={preview.url} w={120} h={120} fit="contain" radius="sm" bg="white" style={{ border: '1px solid var(--mantine-color-default-border)' }} />
           <Text size="xs" c="dimmed">
             Testbild nach {preview.seconds} Sekunden erhalten.
           </Text>

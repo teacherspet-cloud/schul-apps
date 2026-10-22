@@ -90,7 +90,7 @@ export default function MaterialWahl({
       >
         <Group gap="sm" wrap="nowrap">
           {modul?.leistenbild ? (
-            <img src={modul.leistenbild} width={30} height={30} alt="" title={modul.name} draggable={false} />
+            <img src={modul.leistenbild} width={30} height={30} alt="" aria-hidden="true" title={modul.name} draggable={false} />
           ) : (
             modul && (
               <ThemeIcon size={30} variant="light" color={modul.color} title={modul.name}>

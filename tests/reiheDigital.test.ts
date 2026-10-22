@@ -8,6 +8,7 @@ import {
   leererInhalt,
   standardErfolg,
   standFuerLernende,
+  vorschlagGeschafft,
   wirksamerErfolg,
   type Reihe,
   type ReiheArt,
@@ -110,20 +111,38 @@ describe('Geschafft nach Ergebnis (digital)', () => {
     expect(wirksamerErfolg(schritt('s', 'sprechen'), 'digital')).toEqual({ art: 'abgabe' })
     expect(wirksamerErfolg(abschluss(), 'gemischt')).toEqual({ art: 'lehrkraft' })
   })
-  it('Abschluss: digital geschafft nach KI-Vorschlag, gemischt wartet wie bisher auf die Lehrkraft', () => {
+  it('Abschluss (23.10.2026, Prüfung des Schulträgers): auch digital entscheidet die KI nie allein – wartet auf die Lehrkraft', () => {
     const s = abschluss()
-    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('teilweise') }), undefined, 'digital')).toEqual({ status: 'geschafft' })
-    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('teilweise') }), undefined, 'gemischt')).toEqual({ status: 'eingereicht', wartet: true })
-    // noch nicht → überarbeiten (zweite Runde), danach nicht geschafft
-    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('noch nicht') }), undefined, 'digital').status).toBe('offen')
-    expect(einzelStatus(s, st({ eingereicht: 2, kiVorschlag: vorschlag('noch nicht') }), undefined, 'digital').status).toBe('nicht_geschafft')
+    const wartet = { status: 'eingereicht', wartet: true }
+    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('teilweise') }), undefined, 'digital')).toEqual(wartet)
+    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('teilweise') }), undefined, 'gemischt')).toEqual(wartet)
+    // Auch ein negativer Vorschlag entscheidet nichts (früher: offen bzw. nicht geschafft)
+    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('noch nicht') }), undefined, 'digital')).toEqual(wartet)
+    expect(einzelStatus(s, st({ eingereicht: 2, kiVorschlag: vorschlag('noch nicht') }), undefined, 'digital')).toEqual(wartet)
     // Prüfung läuft noch / KI gescheitert
-    expect(einzelStatus(s, st({}), undefined, 'digital')).toEqual({ status: 'eingereicht' })
-    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('sicher', 'kein Zugang') }), undefined, 'digital')).toEqual({ status: 'eingereicht', wartet: true })
+    expect(einzelStatus(s, st({}), undefined, 'digital')).toEqual(wartet)
+    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('sicher', 'kein Zugang') }), undefined, 'digital')).toEqual(wartet)
+    // Erst die Lehrkraft entscheidet („Vorschlag übernehmen" oder eigene Bewertung)
+    expect(einzelStatus(s, st({ kiVorschlag: vorschlag('sicher'), bewertung: { text: '', geschafft: true, zeit: 1 } }), undefined, 'digital').status).toBe('geschafft')
     // Die Lehrkraft kann immer eingreifen
     expect(einzelStatus(s, st({ kiVorschlag: vorschlag('sicher'), bewertung: { text: '', geschafft: false, zeit: 1 } }), undefined, 'digital').status).toBe(
       'nicht_geschafft'
     )
+  })
+  it('„Vorschlag übernehmen": geschafft nach dem Raster – nur als Vorschlag für die Lehrkraft', () => {
+    expect(vorschlagGeschafft(vorschlag('teilweise'))).toBe(true)
+    expect(vorschlagGeschafft(vorschlag('teilweise'), 'sicher')).toBe(false)
+    expect(vorschlagGeschafft(vorschlag('noch nicht'))).toBe(false)
+    expect(vorschlagGeschafft(vorschlag('sicher', 'kein Zugang'))).toBeNull()
+    expect(vorschlagGeschafft(undefined)).toBeNull()
+  })
+  it('Onlinetest mit unbestätigten KI-Urteilen (23.10.2026): weder geschafft noch nicht geschafft – wartet', () => {
+    const s = schritt('o', 'onlinetest', { erfolg: { art: 'punkte', prozent: 60 } })
+    expect(einzelStatus(s, undefined, { eingereicht: 1, runden: 1, vorlaeufig: true }, 'digital')).toEqual({ status: 'eingereicht', wartet: true })
+    expect(einzelStatus(s, undefined, { eingereicht: 1, runden: 1, vorlaeufig: true }, 'gemischt')).toEqual({ status: 'eingereicht', wartet: true })
+    // Bestätigt: Prozent entscheiden wie bisher
+    expect(einzelStatus(s, undefined, { eingereicht: 1, runden: 1, prozent: 80 }, 'digital').status).toBe('geschafft')
+    expect(einzelStatus(s, undefined, { eingereicht: 1, runden: 1, prozent: 40 }, 'digital').status).toBe('nicht_geschafft')
   })
   it('Sprechaufgabe digital geschafft mit der Abgabe; gemischt wartet', () => {
     const s = schritt('s', 'sprechen')
@@ -140,8 +159,11 @@ describe('Geschafft nach Ergebnis (digital)', () => {
   it('berechneWeg nimmt die Art der Reihe: der nächste Schritt öffnet sich ohne Lehrkraft', () => {
     const r = reihe('digital', [abschluss(), schritt('b', 'aufgabe')])
     const stand = { schritte: { p: st({ kiVorschlag: vorschlag('sicher') }) } }
-    expect(berechneWeg(r, stand, {}, []).schritte.map((l) => l.status)).toEqual(['geschafft', 'offen'])
+    // Abschluss mit KI-Vorschlag (23.10.2026): wartet auch digital auf die Lehrkraft; nach ihrer Bestätigung geht es weiter
+    expect(berechneWeg(r, stand, {}, []).schritte.map((l) => l.status)).toEqual(['eingereicht', 'gesperrt'])
     expect(berechneWeg({ ...r, art: 'gemischt' }, stand, {}, []).schritte.map((l) => l.status)).toEqual(['eingereicht', 'gesperrt'])
+    const bestaetigt = { schritte: { p: st({ kiVorschlag: vorschlag('sicher'), bewertung: { text: '', geschafft: true, zeit: 1 } }) } }
+    expect(berechneWeg(r, bestaetigt, {}, []).schritte.map((l) => l.status)).toEqual(['geschafft', 'offen'])
   })
   it('Lernende sehen den KI-Vorschlag nie', () => {
     const roh = { schritte: { p: st({ kiVorschlag: vorschlag('sicher'), bewertung: { text: 'gut', geschafft: true, zeit: 1 } }) } }

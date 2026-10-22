@@ -47,6 +47,7 @@ import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import type { KursReiter } from './kurs/kursDaten'
 import { grammatikVorgabe, verbenDerListe } from './kurs/KursHinzufuegen'
 import { LernstandSymbol } from './kurs/LernstandVerlauf'
+import { alsKnopf } from '@shared/tastaturBedienung'
 
 /*
  * Die Kursseite steht seit 09.10.2026 in kurs/KursSeite.tsx („Kopf + Reiter", auch eingebettet in „Meine Klassen");
@@ -215,7 +216,7 @@ export default function VokabelTraining(): React.JSX.Element {
       {liste && sichtbar.length === 0 && <Text c="dimmed">{filter === 'offen' ? 'Gerade läuft kein Vokabeltraining.' : 'Nichts abgeschlossen.'}</Text>}
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         {sichtbar.map((z) => (
-          <Card key={z.id} withBorder style={{ cursor: 'pointer' }} onClick={() => (setStartReiter(undefined), setGewaehlt(z.id))} data-vokabel-zuweisung={z.id}>
+          <Card key={z.id} withBorder style={{ cursor: 'pointer' }} onClick={() => (setStartReiter(undefined), setGewaehlt(z.id))} {...alsKnopf(() => (setStartReiter(undefined), setGewaehlt(z.id)))} data-vokabel-zuweisung={z.id}>
             <Group justify="space-between" wrap="nowrap">
               <LernstandSymbol
                 faecher={z.faecher ?? []}

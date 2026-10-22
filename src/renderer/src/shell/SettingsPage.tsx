@@ -47,6 +47,7 @@ import KorrekturzeichenSettings from './KorrekturzeichenSettings'
 import SchreibanteilSettings from './SchreibanteilSettings'
 import MaskottchenSettings from './MaskottchenSettings'
 import ProblemWoerterCard from './ProblemWoerterCard'
+import KrisenPushKarte from './KrisenPushKarte'
 import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
 import WartungCard from './WartungCard'
@@ -124,6 +125,13 @@ export default function SettingsPage(): React.JSX.Element {
               Angemeldet als {serverIch()?.name || serverIch()?.benutzer} ({serverIch()?.benutzer})
             </Text>
             <Group gap="xs">
+              {/* Datenschutz und Impressum (22.10.2026, Prüfung des Schulträgers) – öffentliche Seiten des Servers */}
+              <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs" c="dimmed" data-link-datenschutz>
+                Datenschutz
+              </Anchor>
+              <Anchor href="/impressum" target="_blank" rel="noopener" size="xs" c="dimmed" data-link-impressum>
+                Impressum
+              </Anchor>
               {serverIch()?.quelle !== 'iserv' && (
                 <Button size="xs" variant="light" leftSection={<IconKey size={14} />} onClick={() => setPasswortOffen(true)} data-passwort-knopf>
                   Passwort ändern
@@ -233,6 +241,8 @@ export default function SettingsPage(): React.JSX.Element {
               )}
               {/* Empfindlichkeit der Problemwörter (12.10.2026) – nur am Server, dort liegen die Kurse */}
               {aufServer() && serverIch()?.rolle !== 'schueler' && <ProblemWoerterCard />}
+              {/* Benachrichtigung für vertrauliche Hinweise (23.10.2026, Prüfung des Schulträgers, KrisenPushKarte.tsx) */}
+              {aufServer() && serverIch()?.rolle !== 'schueler' && <KrisenPushKarte />}
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />
               <SchreibanteilSettings settings={settings} update={update} />

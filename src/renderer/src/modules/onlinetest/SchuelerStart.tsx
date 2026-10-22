@@ -36,6 +36,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { LernstandAntwort, Strategie, Stufe, Zustand } from '@shared/lernstand'
 import { fachAusName } from '@shared/faecher'
 import { VorleseKnopf } from './SchuelerEinstellungen'
+import { KiMarke } from './KiMarke'
 import { mitTitel } from '@shared/auszeichnungen'
 import { bildAdresse } from '@shared/auszeichnungenBilder'
 
@@ -174,7 +175,7 @@ function StartFigur({ pose, groesse, fach, anfragen }: { pose: Pose; groesse: nu
   return (
     <img
       src={adresse}
-      alt=""
+      alt="" aria-hidden="true"
       width={groesse}
       height={groesse}
       style={{ objectFit: 'contain', display: 'block', visibility: lage === 'da' ? 'visible' : 'hidden' }}
@@ -257,7 +258,7 @@ export function Begruessung({
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text className="sl-datum">{heute}</Text>
           <Group gap="sm" wrap="nowrap" align="center">
-            {avatar && <img src={bildAdresse(avatar)} alt="" width={40} height={47} style={{ objectFit: 'contain', flex: 'none' }} data-gruss-avatar={avatar} />}
+            {avatar && <img src={bildAdresse(avatar)} alt="" aria-hidden="true" width={40} height={47} style={{ objectFit: 'contain', flex: 'none' }} data-gruss-avatar={avatar} />}
             <Title order={2} className="sl-gruss" data-gruss>
               {gruss}
               {name ? `, ${name}` : ''}!
@@ -391,6 +392,8 @@ export function TippKarte({ stand, gelesen }: { stand: LernstandAntwort; gelesen
             <Badge size="sm" fz={12} variant="light" color="gray">
               {STRATEGIE_NAME[t.strategie]}
             </Badge>
+            {/* Kennzeichnung des KI-Wochenrückblicks (22.10.2026, Art. 50 KI-VO) */}
+            {ki && <KiMarke art="tipp" />}
           </Group>
           <Group gap={4} wrap="nowrap" align="flex-start">
             <Text fw={500} size="sm" data-tipp-text style={{ flex: 1 }}>

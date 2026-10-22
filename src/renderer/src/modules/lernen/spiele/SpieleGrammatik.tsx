@@ -15,6 +15,8 @@ import { useVtFarbe } from '../vtFarben'
 import { gemischt } from './SpieleErkennen'
 import { useZuSchnell } from '../zuSchnell'
 import { ton } from '../../onlinetest/schuelerDarstellung'
+import { alsKnopf } from '@shared/tastaturBedienung'
+import { ansagen } from '../../../shared/ansage'
 
 type Ende = (wert: number, fehler: string[]) => void
 
@@ -199,18 +201,20 @@ export function TabellenPuzzle({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[
       setGenutzt(new Set(genutzt).add(gewaehlt))
       setGewaehlt(null)
       ton('richtig')
+      ansagen(`Richtig: ${chip.form}`)
       if (Object.keys(neu).length === zellen.length)
         setTimeout(() => ende(zellen.length - fehlversuche.current.size, fehlversuche.current.size ? [a.id] : []), 600)
     } else {
       fehlversuche.current.add(key)
       setFalsch(key)
+      ansagen(`${chip.form} passt hier nicht`)
       setTimeout(() => setFalsch(null), 700)
     }
   }
   return (
     <Stack data-spiel="tabellenpuzzle">
       <Text c="dimmed" size="sm">
-        {a.satz || a.anweisung} – Form antippen, dann das passende Feld.
+        {a.satz || a.anweisung} – Form antippen, dann das passende Feld (Tastatur: Tab, Enter).
       </Text>
       <Table withTableBorder withColumnBorders>
         <Table.Thead>
@@ -232,6 +236,8 @@ export function TabellenPuzzle({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[
                   <Table.Td
                     key={key}
                     onClick={() => !fest && setzen(key, l)}
+                    // Tastatur (22.10.2026, Barrierefreiheit): Form per Tab wählen, dann Feld mit Enter/Leertaste füllen
+                    {...(fest || belegt[key] ? {} : { ...alsKnopf(() => setzen(key, l)), 'aria-label': `${z.name}, ${(a.spalten ?? [])[j] ?? ''}: leer` })}
                     style={{
                       cursor: fest ? 'default' : 'pointer',
                       background:
@@ -257,6 +263,7 @@ export function TabellenPuzzle({ aufgaben, ende }: { aufgaben: GrammatikAufgabe[
               variant={gewaehlt === c.n ? 'filled' : 'light'}
               color={farbe.a}
               onClick={() => setGewaehlt(c.n)}
+              aria-pressed={gewaehlt === c.n}
               data-form-chip={c.form}
             >
               {c.form}

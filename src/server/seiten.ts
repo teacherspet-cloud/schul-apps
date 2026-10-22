@@ -67,6 +67,8 @@ form.code .fehler { margin: 0 0 8px; }
 .fuss { text-align: center; margin-top: 18px; }
 a.knopf2 { color: var(--leise); font-size: .88rem; text-decoration: underline; text-decoration-color: rgba(176,168,200,.4); text-underline-offset: 3px; }
 a.knopf2:hover, a.knopf2:focus-visible { color: var(--text); }
+.fuss.rechtliches { margin-top: 10px; color: var(--leise); font-size: .8rem; }
+.fuss.rechtliches a.knopf2 { font-size: .8rem; }
 /* Anmeldefenster (08.10.2026): mit Skript echtes Dialogfenster (showModal), ohne Skript per #Anker */
 dialog.fenster { width: min(400px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 0; border: 1px solid var(--karte-rand); border-radius: 20px; background: var(--grund2); color: var(--text); box-shadow: 0 30px 80px rgba(0,0,0,.45); }
 dialog.fenster::backdrop { background: rgba(5,4,12,.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
@@ -158,6 +160,8 @@ export function anmeldeSeite(o: {
   </form>
 </main>
 <div class="fuss"><a class="knopf2" id="anmelden-oeffnen" href="#anmelden-fenster" aria-haspopup="dialog" data-anmelden-oeffnen>Mit Nutzername und Passwort anmelden</a></div>
+<!-- Informationspflichten (22.10.2026, Prüfung des Schulträgers): ohne Anmeldung erreichbar (datenschutzSeiten.ts) -->
+<div class="fuss rechtliches" data-rechtliches><a class="knopf2" href="/datenschutz">Datenschutz</a> · <a class="knopf2" href="/datenschutz/eltern">Für Eltern</a> · <a class="knopf2" href="/impressum">Impressum</a></div>
 </div>
 <dialog id="anmelden-fenster" class="fenster${fensterOffen ? ' offen' : ''}" aria-labelledby="anmelden-titel" data-anmelden-fenster>
   <div class="fenster-innen">

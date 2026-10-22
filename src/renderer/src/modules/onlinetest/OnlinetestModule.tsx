@@ -18,6 +18,7 @@ import { ListenSuche } from '../../shared/components/AppSuche'
 import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFenster'
 import { buendeln, type Fall } from './entscheidungBuendeln'
 import { AkzeptierteAlternativenKnopf } from './AkzeptierteAlternativen'
+import { BewertungsVerlauf } from '../../shared/components/BewertungsVerlauf'
 import { akzeptierteVergessen } from './akzeptiertSpeicher'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useSichtbareProgramme } from '../../shell/programme'
@@ -785,6 +786,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const [listeOffen, setListeOffen] = useState(false)
   const [verdeckt, setVerdeckt] = useNamenVerdeckt()
   const [umbenennen, setUmbenennen] = useState<string | null>(null)
+  // Beenden/Freigeben mit ungeprüften KI-Urteilen (23.10.2026, Prüfung des Schulträgers): Warnung mit Anzahl
+  const [warnung, setWarnung] = useState<'beendet' | 'freigeben' | null>(null)
   const laden = useCallback(() => {
     // Entscheidungen ändern die bereits akzeptierten Alternativen (10.10.2026): Lösungsblätter holen sie danach neu
     akzeptierteVergessen()
@@ -809,10 +812,18 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const kiUnbestaetigt = d.teilnahmen.reduce((s, t) => s + (t.kiUnbestaetigt ?? 0), 0)
   const kiVerdacht = d.teilnahmen.reduce((s, t) => s + (t.kiVerdacht ?? 0), 0)
   const nameVon = (t: Teilnahme, i: number): string => (verdeckt ? `Person ${i + 1}` : t.name)
-  const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten' | 'gaeste' | 'nurKonto'): Promise<void> => {
-    if (s === 'beendet' && !window.confirm('Test beenden? Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.')) return
+  const statusSenden = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten' | 'gaeste' | 'nurKonto'): Promise<void> => {
     await senden(`/server/onlinetest/${id}/status`, { status: s }).catch((e: unknown) => notifyError(e))
     laden()
+  }
+  const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten' | 'gaeste' | 'nurKonto'): Promise<void> => {
+    /*
+     * Menschliche Aufsicht (23.10.2026, Prüfung des Schulträgers): Die Lernenden sehen Punkte und Note erst, wenn alle
+     * KI-Urteile bestätigt und alle Entscheidungen getroffen sind. Beenden/Freigeben mit Offenem → erst die Warnung.
+     */
+    if ((s === 'beendet' || s === 'freigeben') && kiUnbestaetigt + zuEntscheiden + offen > 0) return setWarnung(s)
+    if (s === 'beendet' && !window.confirm('Test beenden? Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.')) return
+    await statusSenden(s)
   }
   const auswerten = async (): Promise<void> => {
     setLaeuft(true)
@@ -827,15 +838,24 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
       laden()
     }
   }
-  const kiBestaetigen = async (): Promise<void> => {
+  const kiBestaetigen = async (): Promise<boolean> => {
     try {
       const r = await senden<{ bestaetigt: number }>(`/server/onlinetest/${id}/ki-bestaetigen`)
       notifySuccess(`${r.bestaetigt} KI-Urteil${r.bestaetigt === 1 ? '' : 'e'} bestätigt – für die Lernenden nicht mehr vorläufig.`)
+      return true
     } catch (e) {
       notifyError(e)
+      return false
     } finally {
       laden()
     }
+  }
+  /** „KI-Urteile jetzt prüfen": erst die zu entscheidenden Antworten, sonst die Durchsicht der ersten Person mit KI-Urteilen */
+  const kiPruefen = (): void => {
+    setWarnung(null)
+    if (zuEntscheiden > 0) return setEntscheiden(true)
+    const t = d.teilnahmen.find((x) => (x.kiUnbestaetigt ?? 0) > 0) ?? d.teilnahmen.find((x) => x.offen > 0)
+    if (t) setDurchsicht(t.id)
   }
   const loeschen = async (): Promise<void> => {
     if (!window.confirm(`Den Onlinetest „${d.titel}" mit allen Abgaben löschen?`)) return
@@ -953,7 +973,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                 </Text>
               )}
               {kiUnbestaetigt > 0 && (
-                <Tooltip label="Die Lernenden sehen KI-Urteile als „vorläufig“ bis zur Bestätigung. Einzelne Urteile lassen sich in der Durchsicht ändern.">
+                <Tooltip label="Bis zur Bestätigung sehen die Lernenden weder Punkte noch Note, nur den Hinweis „wird noch geprüft“. Einzelne Urteile lassen sich in der Durchsicht ändern.">
                   <Button
                     size="xs"
                     color="violet"
@@ -988,8 +1008,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
             <Group gap="xs">
               <Text size="sm" c="dimmed">
                 {d.ergebnisSichtbar
-                  ? kiUnbestaetigt > 0
-                    ? 'Ergebnisse sichtbar – mit KI-Urteilen noch vorläufig'
+                  ? kiUnbestaetigt + zuEntscheiden + offen > 0
+                    ? 'Freigegeben – Punkte und Note erst nach Bestätigung aller KI-Urteile'
                     : 'Ergebnisse für die Lernenden sichtbar'
                   : 'Ergebnisse und Lösungen erscheinen nach dem Beenden oder Freigeben des Tests'}
               </Text>
@@ -1113,6 +1133,74 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
         />
       )}
       {entscheiden && <Entscheidungen test={d} verdeckt={verdeckt} schliessen={() => setEntscheiden(false)} geaendert={laden} />}
+      {warnung && (
+        <Modal opened onClose={() => setWarnung(null)} title={warnung === 'beendet' ? 'Test beenden?' : 'Ergebnisse freigeben?'} data-ki-warnung>
+          <Stack>
+            <Alert color="orange" variant="light" icon={<IconAlertTriangle size={16} />}>
+              <Stack gap={4}>
+                {kiUnbestaetigt > 0 && (
+                  <Text size="sm" fw={600} data-warnung-ki-anzahl={kiUnbestaetigt}>
+                    {kiUnbestaetigt} KI-Urteil{kiUnbestaetigt === 1 ? '' : 'e'} noch nicht bestätigt
+                  </Text>
+                )}
+                {zuEntscheiden > 0 && (
+                  <Text size="sm" fw={600}>
+                    {zuEntscheiden} Antwort{zuEntscheiden === 1 ? '' : 'en'} noch zu entscheiden
+                  </Text>
+                )}
+                {offen > 0 && (
+                  <Text size="sm" fw={600}>
+                    {offen} Antwort{offen === 1 ? '' : 'en'} noch nicht bewertet
+                  </Text>
+                )}
+                <Text size="sm">
+                  Die Lernenden sehen Punkte, Note und Richtig/Falsch erst, wenn alle KI-Urteile bestätigt und alle Entscheidungen getroffen sind – bis
+                  dahin nur den Hinweis, dass das Ergebnis noch geprüft wird.
+                </Text>
+                {warnung === 'beendet' && (
+                  <Text size="sm" c="dimmed">
+                    Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.
+                  </Text>
+                )}
+              </Stack>
+            </Alert>
+            <Group justify="flex-end" gap="xs">
+              <Button variant="subtle" color="gray" onClick={() => setWarnung(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                variant="light"
+                onClick={() => {
+                  const w = warnung
+                  setWarnung(null)
+                  void statusSenden(w)
+                }}
+                data-warnung-trotzdem
+              >
+                {warnung === 'beendet' ? 'Trotzdem beenden' : 'Trotzdem freigeben'}
+              </Button>
+              <Button variant="light" color="orange" onClick={kiPruefen} data-warnung-pruefen>
+                KI-Urteile jetzt prüfen
+              </Button>
+              {kiUnbestaetigt > 0 && (
+                <Button
+                  color="violet"
+                  leftSection={<IconCheck size={14} />}
+                  disabled={laeuft || d.ki.laeuft}
+                  onClick={() => {
+                    const w = warnung
+                    setWarnung(null)
+                    void kiBestaetigen().then((ok) => (ok ? statusSenden(w) : undefined))
+                  }}
+                  data-warnung-bestaetigen
+                >
+                  {warnung === 'beendet' ? 'Alle bestätigen und beenden' : 'Alle bestätigen und freigeben'}
+                </Button>
+              )}
+            </Group>
+          </Stack>
+        </Modal>
+      )}
       {umbenennen != null && (
         <Modal opened onClose={() => setUmbenennen(null)} title="Test umbenennen">
           <Stack>
@@ -1273,6 +1361,10 @@ function Durchsicht({
   geaendert: () => void
 }): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
+  // Einheiten als „Aufgabe.Nummer" für den Verlauf der Bewertung
+  const einheitNamen = new Map(
+    f.aufgaben.flatMap((a, ai) => f.einheiten.filter((e) => e.aufgabe === a.id).map((e, ei) => [e.id, `${ai + 1}.${ei + 1}`] as const))
+  )
   const [blatt, setBlatt] = useState(false)
   const [tinte, setTinte] = useState<Tinte>({})
   useEffect(() => {
@@ -1344,6 +1436,8 @@ function Durchsicht({
           <Text size="xs" c="dimmed">
             Jede Antwort lässt sich nachträglich umentscheiden – auch nach dem Ende des Tests: ✓ gibt den ganzen Punkt, ✗ nimmt ihn.
           </Text>
+          {/* Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers): KI-Vorschläge und Entscheidungen dieser Person */}
+          <BewertungsVerlauf pfad={`/server/onlinetest/${test.id}/spur?teilnahme=${encodeURIComponent(t.id)}`} einheitName={(eid) => einheitNamen.get(eid) ?? eid} />
           <Tooltip
             label={
               blattMoeglich(test, t) ? 'Der ganze Test als DIN-A4-Blatt mit den Eingaben' : 'Nur für Onlinetests, die ab dem 02.10.2026 abends angelegt wurden'

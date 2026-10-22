@@ -15,6 +15,9 @@
  *  - Schülerinnen und Schüler erreichen nur ihren Bereich (/s/…), nie die Programme.
  */
 import { fruehGrund } from '../shared/schuelerFarben'
+// Härtung (23.10.2026, Prüfung des Schulträgers): Kopfzeilen und Bremse für Code-Abfragen
+import { allgemeineKoepfe, programmSeitenKoepfe, ueberHttps } from './sicherheitsKoepfe'
+import { codeBremseAnfrage } from './codeBremse'
 import { darstellungPruefen } from './darstellungFelder'
 import { fachobmannFaecher } from './fachobleute'
 import { auszeichnungenVon } from './achievementsDaten'
@@ -385,7 +388,8 @@ function statisch(res: ServerResponse, pfad: string, annahme = ''): void {
   const ziel = normalize(join(OBERFLAECHE, pfad))
   if (!ziel.startsWith(OBERFLAECHE + sep)) return void res.writeHead(403).end('verboten')
   if (!existsSync(ziel) || !statSync(ziel).isFile() || ziel.endsWith('index.html')) {
-    res.writeHead(200, { 'content-type': TYPEN['.html'], 'cache-control': 'no-store' })
+    // CSP und COOP als Kopfzeile (23.10.2026, Prüfung des Schulträgers, sicherheitsKoepfe.ts)
+    res.writeHead(200, { 'content-type': TYPEN['.html'], 'cache-control': 'no-store', ...programmSeitenKoepfe() })
     return void res.end(programmSeite(pfad.startsWith('/s/')))
   }
   const typ = TYPEN[extname(ziel)] ?? 'application/octet-stream'
@@ -439,6 +443,7 @@ function gemessen(req: IncomingMessage, res: ServerResponse, arbeit: () => Promi
 
 export function starteServer(opts: ServerOptionen): Promise<Server> {
   const sicher = Boolean(opts.tls)
+  const mitHttps = ueberHttps(opts)
   const rueckruf = `${opts.adresse.replace(/\/$/, '')}/auth/rueckruf`
   const hosts = new Set(opts.hosts.map((h) => h.toLowerCase()))
 
@@ -450,9 +455,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     // Nie über die Adresse von Gywem Aviation – und nur unter den eigenen Adressen
     if (host.includes('gywemaviation') || (hosts.size && !hosts.has(host)))
       return void res.writeHead(404, { 'content-type': 'text/plain' }).end('Nicht gefunden.')
-    res.setHeader('x-content-type-options', 'nosniff')
-    res.setHeader('referrer-policy', 'same-origin')
-    res.setHeader('x-frame-options', 'SAMEORIGIN')
+    // nosniff, Referrer, Rahmen, Permissions-Policy, CORP und – über HTTPS – HSTS (23.10.2026, sicherheitsKoepfe.ts)
+    for (const [name, wert] of Object.entries(allgemeineKoepfe(mitHttps))) res.setHeader(name, wert)
 
     const url = new URL(req.url ?? '/', 'http://x')
     // Hinter der Weiche (deploy/weiche, 05.10.2026) steht die echte Adresse in X-Real-IP – nur von dort
@@ -505,6 +509,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
     // Aufrufe mit Wirkung nur mit der eigenen Kopfzeile (siehe oben)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
+    // Bremse für unbekannte Codes je Adresse (23.10.2026, Prüfung des Schulträgers, codeBremse.ts)
+    if (codeBremseAnfrage(k)) return
 
     // ---------- Fehlerberichte aus den Browsern der Lernenden (08.10.2026) – klein, begrenzt, ohne Namen
     if (req.method === 'POST' && url.pathname === '/s/api/fehlerbericht') {
