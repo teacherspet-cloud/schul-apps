@@ -22,7 +22,7 @@ interface Ueberblick {
   personen: { id: string; name: string; uebungen: Uebung[]; gesperrt: boolean; vorfaelle: { art: string; satz: string; zeit: number; freigabe: string }[] }[]
 }
 
-const ART: Record<string, string> = { umgehung: 'Umgehungsversuch', themenfremd: 'Themenfremd', unangemessen: 'Unangemessen', manipulation: 'Anweisungen verändert' }
+const ART: Record<string, string> = { umgehung: 'Umgehungsversuch', themenfremd: 'Themenfremd', unangemessen: 'Unangemessen', manipulation: 'Manipulation (Anweisungen oder getippter Text)' }
 const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
 
 /** Ist die Gesprächs-KI eingerichtet? (Reiter nur dann) */
@@ -111,7 +111,7 @@ export function SprechLehrkraft({ vokId, lernende = [] }: { vokId: string; lerne
           )}
           <Group gap="md" align="flex-end">
             <NumberInput label="Tage" min={1} max={90} value={tage} onChange={(v) => setTage(Number(v) || 14)} w={90} />
-            <NumberInput label="Minuten je Woche und Person" min={5} max={300} value={minuten} onChange={(v) => setMinuten(Number(v) || 30)} w={210} />
+            <NumberInput label="Minuten je Woche und Person" description="Höchstens die Hälfte davon an einem Tag" min={5} max={300} value={minuten} onChange={(v) => setMinuten(Number(v) || 30)} w={210} />
             <Select
               label="Niveau"
               placeholder="nach Jahrgang"

@@ -19,6 +19,8 @@
  *    Abweichungen entscheidet die Lehrkraft (bis dahin 0 Punkte).
  *  - Das Ergebnis sehen die Lernenden, sobald alle abgegeben haben oder die Lehrkraft es
  *    freigibt – als „vorläufig", solange noch etwas offen ist; mit den Lösungen.
+ *    Seit 22.10.2026 (KI-Sicherheitsprüfung): erst nach Freigabe oder Testende; KI-Urteile über freie Antworten bleiben
+ *    vorläufig, bis die Lehrkraft sie bestätigt; je Kind eine KI-Anfrage (Bewertung und Handschrift).
  *  - Optional die Figur des Tests (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis.
  *
  * Die Lösungen bleiben auf dem Server: Die Lernenden bekommen nur die Schülerfassung
@@ -30,7 +32,10 @@ import { randomBytes } from 'node:crypto'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
 import {
   bewerte,
+  ergebnisVorlaeufig,
   felderVon,
+  kiBestaetigen,
+  kiUnbestaetigt,
   kontextVon,
   offeneEinheiten,
   onlineFassung,
@@ -42,7 +47,9 @@ import {
   type OnlineFassung
 } from '../renderer/src/modules/onlinetest/kern'
 import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/src/modules/onlinetest/kiBewertung'
-import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
+import { erkennungenAus, erkennungsAnfrage, handschriftGrenze, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
+import { injektionsVerdacht, LERNENDEN_FEHLER } from '@shared/kiSchutz'
+import { kiGrenzeMeldung } from '@shared/kiGrenzen'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER, fachSchreibweise } from '@shared/faecher'
 import { klasseAusGruppen } from '@shared/iservKurse'
@@ -50,6 +57,7 @@ import { getSettings } from '../main/services/storage/settings'
 import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, OHNE_VORSCHAU, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
 import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { iservBereit } from './anmeldung'
 import { inIservGruppe, klasseDerLerngruppe } from './klassenliste'
 import { mitNamensliste, registerVergessen } from './namensschutz'
@@ -105,6 +113,13 @@ CREATE TABLE IF NOT EXISTS onlinetest_tinte (
   erstellt INTEGER NOT NULL,
   PRIMARY KEY (teilnahme_id, feld, segment)
 );
+-- Erkennungen je Teilnahme und Feld (22.10.2026, KI-Sicherheitsprüfung): gezählt werden Aufrufe, nicht Schriftbilder
+CREATE TABLE IF NOT EXISTS onlinetest_erkennungen (
+  teilnahme_id TEXT NOT NULL REFERENCES teilnahmen(id) ON DELETE CASCADE,
+  feld TEXT NOT NULL,
+  anzahl INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (teilnahme_id, feld)
+);
 CREATE TABLE IF NOT EXISTS onlinetest_figuren (
   test_id TEXT NOT NULL REFERENCES onlinetests(id) ON DELETE CASCADE,
   pose TEXT NOT NULL,
@@ -131,6 +146,7 @@ const db = () => {
 export const onlinetestZuruecksetzen = (): void => {
   bereit = false
   kiLaeufe.clear()
+  letzteErkennung.clear()
 }
 
 const neueId = (): string => randomBytes(10).toString('hex')
@@ -656,12 +672,15 @@ function abgelaufeneAbschliessen(test: Test): void {
     if (!t.abgabe && t.beginn > 0 && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
 }
 
-/** Ergebnisse sichtbar: freigegeben, oder alle, die mitschreiben, haben abgegeben */
-function ergebnisFrei(test: Test, ts = teilnahmenVon(test.id)): boolean {
-  if (test.einstellungen.ergebnisFrei) return true
-  if (test.status === 'wartend') return false
-  return ts.length > 0 && ts.every((t) => t.abgabe)
+/**
+ * Ergebnisse (mit Lösungen) sichtbar: von der Lehrkraft freigegeben oder der Test ist beendet (22.10.2026,
+ * KI-Sicherheitsprüfung). Früher reichte „alle, die begonnen haben, haben abgegeben" – wer noch nicht begonnen hatte,
+ * konnte die Lösungen dann von anderen bekommen und noch mitschreiben.
+ */
+export function ergebnisFreiNach(test: Pick<Test, 'status' | 'einstellungen'>): boolean {
+  return Boolean(test.einstellungen.ergebnisFrei) || test.status === 'beendet'
 }
+const ergebnisFrei = (test: Test): boolean => ergebnisFreiNach(test)
 
 // ---------------------------------------------------------------- Auswertung
 
@@ -693,21 +712,59 @@ function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo
     max,
     offen: offeneEinheiten(b),
     zuEntscheiden: zuEntscheiden(b),
+    // Vorläufig bis Bestätigung (22.10.2026): unbestätigte KI-Urteile und Antworten mit Anweisungen an die KI
+    kiUnbestaetigt: kiUnbestaetigt(b),
+    kiVerdacht: Object.values(b).filter((x) => x.kiVerdacht).length,
     note: t.abgabe ? noteFuer(test, punkte, max) : null
   }
 }
 
 type Fall = KiFall & { teilnahme: string; einheit: string; feld: string; art: 'ki' | 'wort' }
 
+const PAKET_MAX = 40
+
+/**
+ * Pakete für die KI (22.10.2026, KI-Sicherheitsprüfung, „je Kind eine Anfrage"): nie Antworten verschiedener
+ * Teilnahmen in einem Paket; höchstens 40 Antworten, die Felder einer Einheit bleiben zusammen (sonst fehlt beim
+ * Einarbeiten ein Urteil). Kennungen je Paket neu ab A1.
+ */
+export function kiPakete<T extends KiFall & { teilnahme: string; einheit: string }>(faelle: T[], max = PAKET_MAX): T[][] {
+  const jeKind = new Map<string, Map<string, T[]>>()
+  for (const f of faelle) {
+    const k = jeKind.get(f.teilnahme) ?? new Map<string, T[]>()
+    jeKind.set(f.teilnahme, k)
+    k.set(f.einheit, [...(k.get(f.einheit) ?? []), f])
+  }
+  const pakete: T[][] = []
+  for (const einheiten of jeKind.values()) {
+    let paket: T[] = []
+    for (const fs of einheiten.values()) {
+      if (paket.length && paket.length + fs.length > max) {
+        pakete.push(paket)
+        paket = []
+      }
+      paket.push(...fs)
+    }
+    if (paket.length) pakete.push(paket)
+  }
+  return pakete.map((p) => p.map((f, i) => ({ ...f, id: `A${i + 1}` })))
+}
+
 /**
  * KI-Auswertung – im Namen der LEHRKRAFT (ihr Schlüssel bzw. Abo), über den Namensschutz des
- * Servers. Eine Anfrage je Aufgabe und Fassung, alle Abgaben gesammelt. Geprüft werden
+ * Servers. Seit 22.10.2026 eine Anfrage je Kind (Teilnahme) und Fassung, alle seine Aufgaben gesammelt. Geprüft werden
  *  - offene Antworten (Status „ki"): richtig / falsch / Lehrkraft entscheidet
  *  - automatisch falsche Wort-Antworten (einmal): kleiner Fehler oder im Zusammenhang sinnvoll? →
  *    Lehrkraft entscheidet, sonst bleibt es falsch
  * Urteile der Lehrkraft werden nie überschrieben.
  */
-async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): Promise<{ anfragen: number; bewertet: number }> {
+async function kiAuswerten(
+  test: Test,
+  lehrkraft: NutzerInfo,
+  aufruf: Aufruf,
+  /** Nach Abgaben der Lernenden (Budget/Schlange); false, wenn die Lehrkraft „Jetzt auswerten" drückt (22.10.2026) */
+  vonLernenden = true
+): Promise<{ anfragen: number; bewertet: number }> {
   const alle = teilnahmenVon(test.id, true).filter((t) => t.abgabe)
   const teilnehmerNamen = alle.map((t) => nutzerNachId(t.schueler_id)?.name ?? '').filter(Boolean)
   let anfragen = 0
@@ -715,6 +772,7 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
   for (let v = 0; v < test.fassungen.length; v++) {
     const { fassung } = test.fassungen[v]
     const teil = alle.filter((t) => t.variante === v)
+    const faelleDerFassung: Fall[] = []
     for (const aufgabe of fassung.aufgaben) {
       const einheiten = fassung.einheiten.filter((e) => e.aufgabe === aufgabe.id)
       const faelle: Fall[] = []
@@ -785,30 +843,33 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
         for (const eid of eids) if (b[eid] && b[eid].quelle === 'auto') b[eid] = { ...b[eid], kiGeprueft: true }
         db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
       }
-      // In Paketen zu höchstens 40 Antworten
-      for (let i = 0; i < faelle.length; i += 40) {
-        const paket = faelle.slice(i, i + 40)
-        /*
-         * Namen der Teilnehmenden (auch Gäste mit nur einem Vornamen) werden vor der KI ersetzt (08.10.2026) – auch einzeln
-         * und auch, wenn sie zugleich Wörter sind; ob in einer Antwort die Person oder das Wort gemeint ist („rose" als
-         * Vokabel), entscheidet der Server lokal (personOderWort.ts) mit Frage und Erwartung als Material.
-         */
-        const material = paket.map((f) => `${f.frage}\n${f.erwartung}`).join('\n')
-        const antwort = await mitNamensliste({ namen: teilnehmerNamen, sprache: test.einstellungen.zielsprache || test.einstellungen.fach, material }, () =>
-          imNutzer(alsNutzer(lehrkraft), () =>
-            aufruf('ai:structured', [
-              kiAnfrage(
+      faelleDerFassung.push(...faelle)
+    }
+    // Je Kind ein Paket (höchstens 40 Antworten, 22.10.2026)
+    for (const paket of kiPakete(faelleDerFassung)) {
+      /*
+       * Namen der Teilnehmenden (auch Gäste mit nur einem Vornamen) werden vor der KI ersetzt (08.10.2026) – auch einzeln
+       * und auch, wenn sie zugleich Wörter sind; ob in einer Antwort die Person oder das Wort gemeint ist („rose" als
+       * Vokabel), entscheidet der Server lokal (personOderWort.ts) mit Frage und Erwartung als Material.
+       */
+      const material = paket.map((f) => `${f.frage}\n${f.erwartung}`).join('\n')
+      const antwort = await mitNamensliste({ namen: teilnehmerNamen, sprache: test.einstellungen.zielsprache || test.einstellungen.fach, material }, () =>
+        imNutzer(alsNutzer(lehrkraft), () =>
+          aufruf('ai:structured', [
+            {
+              ...kiAnfrage(
                 test.einstellungen.zielsprache,
                 test.einstellungen.niveau,
                 paket,
                 test.einstellungen.art === 'Vokabeltest' || !test.einstellungen.art ? undefined : { art: test.einstellungen.art, fach: test.einstellungen.fach }
-              )
-            ])
-          )
+              ),
+              vonLernenden
+            }
+          ])
         )
-        anfragen++
-        bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
-      }
+      )
+      anfragen++
+      bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
     }
   }
   protokolliereServer('onlinetest', `KI-Auswertung: ${anfragen} Anfrage(n), ${bewertet} Antworten bewertet`, lehrkraft.id)
@@ -839,14 +900,18 @@ function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string,
       // Fehlerart zum Bündeln (06.10.2026): die der ersten abweichenden Antwort
       const abw = us.find((u) => u!.urteil === 'kleinerFehler' || u!.urteil === 'vertretbar')
       const fehler = { ...(abw?.fehlerGruppe ? { fehlerGruppe: abw.fehlerGruppe } : {}), ...(abw?.fehlerArt ? { fehlerArt: abw.fehlerArt } : {}) }
+      // Anweisungen an die KI in der Antwort? Nur Hinweis für die Lehrkraft (22.10.2026, KI-Sicherheitsprüfung)
+      const verdacht = efs.some((f) => injektionsVerdacht(f.antwort)) ? { kiVerdacht: true } : {}
       if (efs[0].art === 'wort') {
         // Bleibt falsch – außer die Lehrkraft akzeptiert
         b[eid] = us.some((u) => u!.urteil === 'falsch')
-          ? { ...b[eid], kiGeprueft: true, ...(hinweis ? { hinweis: [b[eid]?.hinweis, `KI: ${hinweis}`].filter(Boolean).join('; ') } : {}) }
-          : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis, ...fehler }
-      } else if (us.every((u) => u!.urteil === 'richtig')) b[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis }
-      else if (us.some((u) => u!.urteil === 'falsch')) b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis }
-      else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis, ...fehler }
+          ? { ...b[eid], kiGeprueft: true, ...verdacht, ...(hinweis ? { hinweis: [b[eid]?.hinweis, `KI: ${hinweis}`].filter(Boolean).join('; ') } : {}) }
+          : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis, ...fehler, ...verdacht }
+      }
+      // Freie Antworten: das Urteil der KI ist vorläufig, bis die Lehrkraft es bestätigt (22.10.2026)
+      else if (us.every((u) => u!.urteil === 'richtig')) b[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis, unbestaetigt: true, ...verdacht }
+      else if (us.some((u) => u!.urteil === 'falsch')) b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis, unbestaetigt: true, ...verdacht }
+      else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis, ...fehler, ...verdacht }
       bewertet++
     }
     db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
@@ -902,8 +967,9 @@ const kiStand = (testId: string): { laeuft: boolean; fehler: string | null } => 
 
 /**
  * Erkennung im Namen der Lehrkraft, die den Test angelegt und gestartet hat – mit IHREM KI-Zugang,
- * auch über ihr Abo (Wunsch der Lehrkraft, 02.10.2026). Gebündelt: Was aus einem Test innerhalb von
- * 1,2 s ankommt, geht als EINE Anfrage mit mehreren Bildern hinaus (höchstens 8 je Anfrage).
+ * auch über ihr Abo (Wunsch der Lehrkraft, 02.10.2026). Gebündelt: Was aus EINER Teilnahme innerhalb von
+ * 1,2 s ankommt, geht als eine Anfrage mit mehreren Bildern hinaus (höchstens 8 je Anfrage). Seit 22.10.2026
+ * (KI-Sicherheitsprüfung) nie Schriftproben verschiedener Kinder in einer Anfrage.
  */
 const BUENDEL_MS = 1200
 const BUENDEL_MAX = 8
@@ -911,26 +977,29 @@ const warteschlangen = new Map<
   string,
   { proben: { png: string; kontext: string; ok: (e: Erkennung) => void; fehler: (e: unknown) => void }[]; zeit: ReturnType<typeof setTimeout> | null }
 >()
+/** Letzte Erkennung je Teilnahme und Feld (Bremse: höchstens eine je Sekunde, 22.10.2026) */
+const letzteErkennung = new Map<string, number>()
 
-function handschriftErkennen(test: Test, png: string, kontext: string): Promise<Erkennung> {
+function handschriftErkennen(test: Test, teilnahmeId: string, png: string, kontext: string): Promise<Erkennung> {
   return new Promise((ok, fehler) => {
-    const w = warteschlangen.get(test.id) ?? { proben: [], zeit: null }
-    warteschlangen.set(test.id, w)
+    const w = warteschlangen.get(teilnahmeId) ?? { proben: [], zeit: null }
+    warteschlangen.set(teilnahmeId, w)
     w.proben.push({ png, kontext, ok, fehler })
     if (w.proben.length >= BUENDEL_MAX) {
       if (w.zeit) clearTimeout(w.zeit)
       w.zeit = null
-      void buendelSenden(test)
-    } else if (!w.zeit) w.zeit = setTimeout(() => void buendelSenden(test), BUENDEL_MS)
+      void buendelSenden(test, teilnahmeId)
+    } else if (!w.zeit) w.zeit = setTimeout(() => void buendelSenden(test, teilnahmeId), BUENDEL_MS)
   })
 }
 
-async function buendelSenden(test: Test): Promise<void> {
-  const w = warteschlangen.get(test.id)
+async function buendelSenden(test: Test, teilnahmeId: string): Promise<void> {
+  const w = warteschlangen.get(teilnahmeId)
   if (!w) return
   w.zeit = null
   const proben = w.proben.splice(0, BUENDEL_MAX)
-  if (w.proben.length && !w.zeit) w.zeit = setTimeout(() => void buendelSenden(test), 50)
+  if (w.proben.length && !w.zeit) w.zeit = setTimeout(() => void buendelSenden(test, teilnahmeId), 50)
+  else if (!w.proben.length && !w.zeit) warteschlangen.delete(teilnahmeId)
   if (!proben.length) return
   try {
     const lehrkraft = nutzerNachId(test.lehrkraft_id)
@@ -978,14 +1047,23 @@ function ergebnisFuer(test: Test, t: TeilnahmeZeile) {
     punkte,
     max: f.punkte,
     note: noteFuer(test, punkte, f.punkte),
-    vorlaeufig: ki.laeuft || offeneEinheiten(b) > 0 || zuEntscheiden(b) > 0,
+    // Unbestätigte KI-Urteile machen das Ergebnis vorläufig (22.10.2026, „vorläufig bis Bestätigung")
+    vorlaeufig: ergebnisVorlaeufig(b, ki.laeuft),
     aufgaben: f.aufgaben,
     einheiten: f.einheiten,
     loesungen: f.loesungen,
     antworten: json_(t.antworten, {}),
     // Für die Lernenden ohne Begründungen der KI (die richten sich an die Lehrkraft)
     bewertung: Object.fromEntries(
-      Object.entries(b).map(([k, x]) => [k, { status: x.status, punkte: x.punkte, ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}) }])
+      Object.entries(b).map(([k, x]) => [
+        k,
+        {
+          status: x.status,
+          punkte: x.punkte,
+          ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}),
+          ...(x.quelle === 'ki' && x.unbestaetigt ? { vorlaeufig: true } : {})
+        }
+      ])
     )
   }
 }
@@ -1023,6 +1101,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           true
         )
       if (ts.length >= MAX_GAESTE) return (json(res, 429, { fehler: 'Der Test ist voll.' }), true)
+      if (!gastBremse(k.ip)) return (json(res, 429, { fehler: GAST_BREMSE_MELDUNG }), true) // 22.10.2026, KI-Sicherheitsprüfung M5
       const gast = nutzerAnlegen({ benutzer: `gast-${neueId().slice(0, 12)}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       teilnahmeAnlegen(test, gast.id)
@@ -1207,10 +1286,23 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       if (!f || (f.feld.art !== 'text' && f.feld.art !== 'langtext') || !segment) return (json(res, 400, { fehler: 'Unbekanntes Feld.' }), true)
       const png = pngAus(k0.png)
       if (!png || png.length > 600 * 1024) return (json(res, 400, { fehler: 'Das Schriftbild fehlt oder ist zu groß.' }), true)
-      const anzahl = (db().prepare('SELECT COUNT(*) AS n FROM onlinetest_tinte WHERE teilnahme_id = ?').get(t.id) as { n: number }).n
-      if (anzahl >= 600) return (json(res, 429, { fehler: 'Zu viele Schriftproben in diesem Test.' }), true)
+      /*
+       * Gezählt werden Aufrufe je Teilnahme und Feld, nicht gespeicherte Schriftbilder – INSERT OR REPLACE mit demselben
+       * Segment hätte sonst endlos neue Erkennungen erlaubt (22.10.2026, KI-Sicherheitsprüfung). Dazu eine Bremse je Feld.
+       */
+      const zaehler = db()
+        .prepare('SELECT COALESCE(SUM(anzahl), 0) AS gesamt, COALESCE(SUM(CASE WHEN feld = ? THEN anzahl END), 0) AS feld FROM onlinetest_erkennungen WHERE teilnahme_id = ?')
+        .get(feld, t.id) as { gesamt: number; feld: number }
+      const schluessel = `${t.id}|${feld}`
+      const jetzt = Date.now()
+      const grenze = handschriftGrenze({ feld: zaehler.feld, teilnahme: zaehler.gesamt, lang: f.feld.art === 'langtext', letzte: letzteErkennung.get(schluessel), jetzt })
+      if (grenze) return (json(res, grenze.status, { fehler: grenze.fehler }), true)
+      letzteErkennung.set(schluessel, jetzt)
+      db()
+        .prepare('INSERT INTO onlinetest_erkennungen (teilnahme_id, feld, anzahl) VALUES (?, ?, 1) ON CONFLICT (teilnahme_id, feld) DO UPDATE SET anzahl = anzahl + 1')
+        .run(t.id, feld)
       try {
-        const e = await handschriftErkennen(test, `data:image/png;base64,${png.toString('base64')}`, kontextVon(fassung, feld))
+        const e = await handschriftErkennen(test, t.id, `data:image/png;base64,${png.toString('base64')}`, kontextVon(fassung, feld))
         db()
           .prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
           .run(t.id, feld, segment, png, e.text, e.unsicher ? 1 : 0, Date.now())
@@ -1220,7 +1312,9 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
         db()
           .prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, 1, ?)')
           .run(t.id, feld, segment, png, '', Date.now())
-        return (json(res, 503, { fehler: e instanceof Error ? e.message : String(e) }), true)
+        // Lernende sehen eine feste Meldung, Details nur im Protokoll – ohne Antworttext (22.10.2026, KI-Sicherheitsprüfung)
+        protokolliereServer('onlinetest', `Handschrift-Erkennung fehlgeschlagen: ${fehlerKurz(e)}`, test.lehrkraft_id)
+        return (json(res, 503, { fehler: kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER }), true)
       }
     }
 
@@ -1503,7 +1597,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           lerngruppe: test.lerngruppe_id ? lerngruppe(test.lerngruppe_id) : null,
           ohneIserv: !iservBereit(),
           ki: kiStand(test.id),
-          ergebnisSichtbar: ergebnisFrei(test, ts),
+          ergebnisSichtbar: ergebnisFrei(test),
           // Wer aus der Lerngruppe noch nicht begonnen hat
           fehlend: mitglieder.filter((m) => !ts.some((t) => t.schueler_id === m.id)).map((m) => ({ name: m.name, benutzer: m.benutzer })),
           fassungen: test.fassungen.map((f) => ({
@@ -1639,12 +1733,29 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         ...(alt?.fehlerArt ? { fehlerArt: alt.fehlerArt } : {}),
         ...(alt?.schonAkzeptiert ? { schonAkzeptiert: alt.schonAkzeptiert } : {}),
         ...(alt?.alsAlternativeGemerkt ? { alsAlternativeGemerkt: true } : {}),
+        ...(alt?.kiVerdacht ? { kiVerdacht: true } : {}),
         ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : alt?.hinweis ? { hinweis: alt.hinweis } : {})
       }
       // Bereits akzeptierte Alternativen (10.10.2026): laut Lösung falsche Wort-Antwort akzeptiert → merken (ohne Person)
       b[e.id] = beimUrteil(ich.id, vokabelSprache(test), test.fassungen[t.variante].fassung, e, json_(t.antworten, {} as Antworten), alt, b[e.id])
       db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), t.id)
       return (json(res, 200, { ok: true }), true)
+    }
+    /*
+     * „Alle KI-Urteile bestätigen" (22.10.2026, KI-Sicherheitsprüfung, „vorläufig bis Bestätigung"): Urteile der KI über
+     * freie Antworten bleiben, wie sie sind, gelten für die Lernenden aber erst danach als endgültig. Einzelne Urteile
+     * ändert die Lehrkraft wie bisher über die Korrektur.
+     */
+    if (teile[1] === 'ki-bestaetigen') {
+      let bestaetigt = 0
+      for (const t of teilnahmenVon(test.id, true)) {
+        const r = kiBestaetigen(json_(t.bewertung, {} as Bewertung))
+        if (!r.bestaetigt) continue
+        bestaetigt += r.bestaetigt
+        db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(r.bewertung), t.id)
+      }
+      if (bestaetigt) protokolliereServer('onlinetest', `KI-Urteile bestätigt: ${bestaetigt}`, ich.id)
+      return (json(res, 200, { ok: true, bestaetigt }), true)
     }
     if (teile[1] === 'auswerten') {
       // Von Hand anstoßen (z. B. nach einem Fehler) – lange Anfrage: Lebenszeichen wie bei /api
@@ -1659,7 +1770,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         s.zeitgeber = undefined
         s.laeuft = true
         const lehrkraft = nutzerNachId(ich.id)!
-        const r = await kiAuswerten(test, lehrkraft, aufruf)
+        const r = await kiAuswerten(test, lehrkraft, aufruf, false)
         s.fehler = undefined
         res.end(JSON.stringify({ ok: true, ...r }))
       } catch (e) {

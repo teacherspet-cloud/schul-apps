@@ -75,6 +75,7 @@ import { createCliProvider, sparModellCodex, subscriptionModels, subscriptionSta
 import { generateSvgImage } from './services/ai/svg'
 import { bildWege, mitErsatz, weg } from './services/ai/bildErsatz'
 import { KiPlaetze } from './services/ai/kiPlaetze'
+import { erlaubteWahl, platzSchluesselJetzt, platzZahlen, schulBudgetJetzt } from './services/ai/schulGrenzen'
 import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche, attrappeQuelleLaden, attrappeQuellensuche } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
 import { pdfMitSeiten } from '@shared/seitenPdf'
@@ -222,7 +223,12 @@ type PdfExtras = {
 
 export function registriereKanaele(handle: Handle, u: Umgebung): void {
   /** Höchstens drei KI-Anfragen zugleich; wer wartet, erfährt es (Auftragsleiste der Oberfläche) */
-  const kiPlaetze = new KiPlaetze(3, (id, zustand, info) => u.sende('ai:platz', { id, zustand, ...info }))
+  // Server (22.10.2026, KI-Sicherheitsprüfung H7): mehr Plätze für die ganze Schule, gerecht je Lehrkraft, eigene Spur für Lernende
+  const plaetze = platzZahlen()
+  const kiPlaetze = new KiPlaetze(plaetze.max, (id, zustand, info) => u.sende('ai:platz', { id, zustand, ...info }), {
+    wer: platzSchluesselJetzt,
+    proSchluessel: plaetze.proSchluessel
+  })
 
   /** Modelllisten im Hintergrund aktualisieren und die Oberfläche über Modellwechsel informieren. */
   const updateModelsInBackground = async (): Promise<void> => {
@@ -374,22 +380,30 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
       : undefined
     const anbieter = req.provider ?? getSettings().ai.textProvider
     // Sparsam (12.10.2026): kleine Aufgaben über das Abo mit dem sparsamsten Codex-Modell
-    const modell =
+    const gewuenscht =
       req.model || (req.sparsam && anbieter === 'openai' && getSettings().ai.access.openai === 'subscription' ? (sparModellCodex() ?? model) : model)
+    // Schlüssel der Schule (22.10.2026, KI-Sicherheitsprüfung M1): nur die vom Admin freigegebenen Modelle – sonst das Vorgabemodell
+    const modell = erlaubteWahl({ anbieter, modell: gewuenscht }).modell
     // Auftragsart für den Verbrauch je Programm (09.10.2026)
     const auftragsArt = artVonSchema(req.schemaName)
     merkeVerbrauch(anbieter, modell, { anfragen: 1 }, auftragsArt)
     // Einmal wiederholen bei kaputter, abgeschnittener oder leerer Antwort und Serverfehlern (27.09.2026)
-    return kiPlaetze.platz(id, (signal) =>
-      mitWiederholung(
-        req,
-        (r) => provider.structured(r, modell, onChunk, signal),
-        ({ art, meldung }) => {
-          if (signal.aborted) return
-          protokolliere('warnung', 'ki', `${req.schemaName ?? 'Anfrage'}: Wiederholung (${art}) – ${meldung}`)
-          merkeVerbrauch(anbieter, modell, { anfragen: 1, wiederholungen: 1 }, auftragsArt)
-        }
-      )
+    // Anfragen von Lernenden in eigener Spur mit Wartefrist (22.10.2026)
+    return kiPlaetze.platz(
+      id,
+      (signal) =>
+        mitWiederholung(
+          req,
+          (r) => provider.structured(r, modell, onChunk, signal),
+          ({ art, meldung }) => {
+            if (signal.aborted) return
+            protokolliere('warnung', 'ki', `${req.schemaName ?? 'Anfrage'}: Wiederholung (${art}) – ${meldung}`)
+            merkeVerbrauch(anbieter, modell, { anfragen: 1, wiederholungen: 1 }, auftragsArt)
+          },
+          { signal }
+        ),
+      'text',
+      Boolean(req.vonLernenden)
     ).catch((e: unknown) => {
       // Erreichte Limits für den Verbrauch merken (09.10.2026) – Abbrüche nicht
       const meldung = e instanceof Error ? e.message : String(e)
@@ -427,7 +441,11 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
       throw e
     })
   })
-  handle('verbrauch:get', () => verbrauchsDaten())
+  // Server (22.10.2026): dazu der Stand des Monatsbudgets über den Schlüssel der Schule (Warnung ab 80 %)
+  handle('verbrauch:get', () => {
+    const schulBudget = schulBudgetJetzt()
+    return schulBudget ? { ...verbrauchsDaten(), schulBudget } : verbrauchsDaten()
+  })
   // ElevenLabs-Kontingent (Zeichen) für den Ring im Verbrauch (09.10.2026) – null ohne Schlüssel oder Auskunft
   handle('verbrauch:kontingent', () => elevenlabsKontingent())
 

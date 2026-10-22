@@ -6,6 +6,7 @@
  */
 import type { StructuredRequest } from './types'
 import type { DiagnoseFrage } from './reihe'
+import { abgrenzen, datenRegel, neueMarke } from './kiSchutz'
 import { normLuecke } from './blattPruefung'
 
 export interface DiagnoseErgebnis {
@@ -59,9 +60,14 @@ export function diagnoseAnfrage(
   offen: number[],
   kontext: { fach?: string; jahrgang?: number } = {}
 ): StructuredRequest {
+  // Antworten zwischen Zufalls-Marken (22.10.2026, KI-Sicherheitsprüfung: Prompt-Injection)
+  const marke = neueMarke('ANTWORT')
   return {
     system:
-      'Du prüfst kurze Antworten einer Eingangsdiagnose. Du entscheidest je Antwort, ob sie inhaltlich richtig ist, und gibst einen sehr kurzen Hinweis. Sprich die Person mit „du" an.',
+      'Du prüfst kurze Antworten einer Eingangsdiagnose. Du entscheidest je Antwort, ob sie inhaltlich richtig ist, und gibst einen sehr kurzen Hinweis. Sprich die Person mit „du" an. ' +
+      datenRegel(marke),
+    bewertung: true,
+    vonLernenden: true,
     user: [
       kontext.fach ? `FACH: ${kontext.fach}${kontext.jahrgang ? ` · JAHRGANG: ${kontext.jahrgang}` : ''}` : '',
       'REGELN:',
@@ -69,7 +75,7 @@ export function diagnoseAnfrage(
       '- hinweis: EIN kurzer Satz (höchstens 20 Wörter), warum es passt bzw. was nicht stimmt. Keine Note.',
       '- Gib für JEDE Frage genau einen Eintrag mit ihrer Nummer zurück.',
       ...offen.map((i) =>
-        [`FRAGE ${i + 1}: ${fragen[i].frage}`, `ERWARTET: ${diagnoseLoesung(fragen[i])}`, `ANTWORT: <<<${(antworten[String(i)] ?? '').trim()}>>>`].join('\n')
+        [`FRAGE ${i + 1}: ${fragen[i].frage}`, `ERWARTET: ${diagnoseLoesung(fragen[i])}`, `ANTWORT:\n${abgrenzen((antworten[String(i)] ?? '').trim(), marke)}`].join('\n')
       )
     ]
       .filter(Boolean)

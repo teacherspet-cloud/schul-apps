@@ -11,7 +11,9 @@
  *    glätten Schreibfehler nachweislich – deshalb die ausdrückliche Vorgabe, die unsichere
  *    Stellen meldet, und die aufbewahrte Tinte als Beleg.
  *  - Erkannt wird mit dem KI-Zugang der Lehrkraft, die den Test angelegt und gestartet hat – auch
- *    über ihr Abo (Entscheidung der Lehrkraft, 02.10.2026); gebündelt je Test (server/onlinetest.ts).
+ *    über ihr Abo (Entscheidung der Lehrkraft, 02.10.2026); gebündelt je Teilnahme (server/onlinetest.ts).
+ *  - Seit 22.10.2026 (KI-Sicherheitsprüfung): nur Schriftproben EINES Kindes in einer Anfrage, gezählt und gebremst
+ *    je Teilnahme und Feld (handschriftGrenze) – sonst wäre die Erkennung ein Kosten-Hebel und Antwort-Orakel.
  */
 import type { StructuredRequest } from '@shared/types'
 
@@ -25,13 +27,16 @@ export interface Erkennung {
 const SPRACHE: Record<string, string> = { en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', de: 'Deutsch', nl: 'Niederländisch', ru: 'Russisch', pl: 'Polnisch', pt: 'Portugiesisch', tr: 'Türkisch' }
 
 /**
- * Eine Anfrage für mehrere Schriftproben (02.10.2026): Was aus einem Test kurz nacheinander
- * ankommt, geht gebündelt an die KI – über das Abo dauert jede Anfrage einige Sekunden, und der
+ * Eine Anfrage für mehrere Schriftproben (02.10.2026): Was aus EINER Teilnahme (22.10.2026: nie mehrere Kinder)
+ * kurz nacheinander ankommt, geht gebündelt an die KI – über das Abo dauert jede Anfrage einige Sekunden, und der
  * Server lässt nur wenige zugleich laufen. Bild i gehört zu `proben[i]`.
  */
 export function erkennungsAnfrage(proben: { png: string; kontext: string }[], zielsprache: string): StructuredRequest {
   return {
     schemaName: 'onlinetest_handschrift',
+    // Abschreiben ohne Spielraum (temperature 0), ausgelöst von Lernenden (Budget und Schlange) – 22.10.2026
+    bewertung: true,
+    vonLernenden: true,
     system: [
       'Du liest Handschrift von Schülerinnen und Schülern aus einem Vokabeltest und schreibst sie EXAKT ab.',
       'Buchstabe für Buchstabe, genau so, wie es geschrieben steht. Rechtschreibfehler, falsche Endungen, fehlende oder zusätzliche Buchstaben, Groß- und Kleinschreibung und Satzzeichen bleiben GENAU so stehen.',
@@ -76,6 +81,29 @@ export function erkennungenAus(antwort: unknown, anzahl: number): Erkennung[] {
         je.set(nr, { text: String(e.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 1000), unsicher: e.unsicher === true })
     }
   return Array.from({ length: anzahl }, (_, i) => je.get(i + 1) ?? { text: '', unsicher: true })
+}
+
+/**
+ * Grenzen der Erkennung (22.10.2026, KI-Sicherheitsprüfung). Faustregeln der App: je Feld höchstens 30 Erkennungen
+ * (Wortfeld) bzw. 80 (langer Text – jedes Absetzen ist eine), je Teilnahme 400, und höchstens eine Anfrage je
+ * Sekunde und Feld. Gezählt werden Aufrufe, nicht gespeicherte Schriftbilder (die ein neues Absetzen ersetzt).
+ */
+export const HANDSCHRIFT_GRENZEN = { feld: 30, feldLang: 80, teilnahme: 400, abstandMs: 1000 } as const
+
+export function handschriftGrenze(s: {
+  /** Bisherige Erkennungen dieses Feldes bzw. der ganzen Teilnahme */
+  feld: number
+  teilnahme: number
+  lang: boolean
+  /** Zeit der letzten Anfrage für dieses Feld (ms) */
+  letzte?: number
+  jetzt: number
+}): { status: 429; fehler: string } | null {
+  const g = HANDSCHRIFT_GRENZEN
+  if (s.letzte !== undefined && s.jetzt - s.letzte < g.abstandMs) return { status: 429, fehler: 'Einen Moment – dann wird weiter erkannt.' }
+  if (s.feld >= (s.lang ? g.feldLang : g.feld) || s.teilnahme >= g.teilnahme)
+    return { status: 429, fehler: 'Für dieses Feld wird nichts mehr erkannt – bitte mit der Tastatur weiterschreiben.' }
+  return null
 }
 
 /** Satz ↔ Wortkärtchen */

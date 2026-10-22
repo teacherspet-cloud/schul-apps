@@ -6,6 +6,8 @@ import { antwortSpracheAus, type AntwortSprache } from './antwortSprache'
 import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
+import { abgrenzen, datenRegel, neueMarke } from '@shared/kiSchutz'
+import { ohneTrenner } from '@shared/blattKiSchutz'
 import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { geschichteFeedbackBaustein } from '@shared/operatoren/geschichteSchreibformen'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
@@ -394,7 +396,11 @@ export const BLATT_REGELN = [
   '- Randkommentare: neben den Sprachfehlern zu jeder inhaltlich bearbeiteten Aufgabe mindestens einen Kommentar an der passenden Stelle – Lob (art „lob") für Gelungenes, Hinweis (art „hinweis") für Unstimmiges oder Fehlendes; Zitat wörtlich aus der Antwort, 1–8 Wörter.'
 ]
 
-export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: BogenKontext = OHNE_KONTEXT): StructuredRequest {
+/**
+ * KI-Sicherheitsprüfung (22.10.2026): Die Arbeit steht zwischen Zufalls-Marken (`marke`, je Anfrage neu) statt zwischen
+ * <<<ARBEIT … ARBEIT>>> – die konnte ein Kind im eigenen Text selbst schließen. Die Regel dazu steht in den Anweisungen.
+ */
+export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: BogenKontext = OHNE_KONTEXT, marke = neueMarke('ARBEIT')): StructuredRequest {
   const m = r.meta
   const du = m.anrede === 'du'
   const art = einstufungVon(m)
@@ -422,14 +428,14 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
     ...(m.digitalesBlatt ? BLATT_REGELN : []),
     ...sprachRegeln(r, a, art !== 'keine'),
-    ...abgabeRegeln(r, a),
-    // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten
-    schreibformRegeln(r, a)
+    ...abgabeRegeln(r, a, marke),
+    // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten (Zitate ohne Trennzeichen)
+    ohneTrenner(schreibformRegeln(r, a), marke)
   ]
   const ausgleich = ausgleichAnweisung(a.ausgleich)
   const land = kiLandesregeln(m, art)
   return {
-    system,
+    system: `${system}\n${datenRegel(marke)}`,
     user: [
       `Schreibe eine Rückmeldung zur Arbeit von ${a.kuerzel} (${m.subjectLabel}, Klasse ${m.grade}). Sprich die Person mit „${du ? 'du' : 'Sie'}" an.`,
       'REGELN:',
@@ -442,10 +448,8 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
       mitTabelle(r) ? tabelleText(r.tabelle!) : '',
       teileText(r),
-      `ARBEIT VON ${a.kuerzel} (die Abgabe, zwischen <<<ARBEIT und ARBEIT>>>):`,
-      '<<<ARBEIT',
-      ohneKiTest(klartext(a.text)).text.trim() || (scan ? '(Text nur auf den beigefügten Bildern)' : ''),
-      'ARBEIT>>>'
+      `ARBEIT VON ${a.kuerzel} (die Abgabe, zwischen [ANFANG ${marke}] und [ENDE ${marke}]):`,
+      abgrenzen(ohneKiTest(klartext(a.text)).text.trim() || (scan ? '(Text nur auf den beigefügten Bildern)' : ''), marke)
     ]
       .filter(Boolean)
       .join('\n'),
@@ -577,9 +581,9 @@ export function schreibformRegeln(r: Rueckmeldung, a: Abgabe): string {
 export const antwortSpracheVon = (r: Rueckmeldung): AntwortSprache | undefined =>
   fremdsprachlich(r.meta.subjectId) ? (r.grundlage.antwortSprache ?? antwortSpracheAus(r.grundlage.aufgaben, r.meta.subjectId)) : undefined
 
-export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
+export function abgabeRegeln(r: Rueckmeldung, a: Abgabe, marke?: string): string[] {
   const regeln = [
-    '- Der Text unter ARBEIT (zwischen <<<ARBEIT und ARBEIT>>>) IST die Abgabe – auch wenn er kurz, fehlerhaft oder in der falschen Sprache ist, wird er bewertet. Nie behaupten, es liege keine Abgabe oder kein eigener Antworttext vor, solange dort Text steht. Stehen darin noch Teile der Aufgabenstellung, zählen nur die eigenen Formulierungen.'
+    `- Der Text unter ARBEIT (${marke ? `zwischen [ANFANG ${marke}] und [ENDE ${marke}]` : 'zwischen den Marken'}) IST die Abgabe – auch wenn er kurz, fehlerhaft oder in der falschen Sprache ist, wird er bewertet. Nie behaupten, es liege keine Abgabe oder kein eigener Antworttext vor, solange dort Text steht. Stehen darin noch Teile der Aufgabenstellung, zählen nur die eigenen Formulierungen.`
   ]
   if (!r.meta.subjectId || !fremdsprachlich(r.meta.subjectId)) return regeln
   const fach = r.meta.subjectLabel

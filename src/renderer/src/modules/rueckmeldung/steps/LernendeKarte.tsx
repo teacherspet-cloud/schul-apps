@@ -35,6 +35,8 @@ interface FreigabeListe {
   link?: string
   /** Geplante Freischaltung (09.10.2026) */
   geplantAb?: number | null
+  /** Abgaben mit Anweisungen an die KI (22.10.2026, KI-Sicherheitsprüfung) – bitte selbst prüfen */
+  kiHinweise?: number
 }
 
 export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: (fn: (d: Rueckmeldung) => void) => void }): React.JSX.Element | null {
@@ -96,7 +98,9 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
 
   const abholen = async (id: string): Promise<void> => {
     try {
-      const d = await holen<{ abgaben: { name: string; benutzer: string; fassungen: { nr: number; text: string; bogen?: Bogen; bilder?: string[] }[] }[] }>(
+      const d = await holen<{
+        abgaben: { name: string; benutzer: string; kiHinweis?: boolean; fassungen: { nr: number; text: string; bogen?: Bogen; bilder?: string[] }[] }[]
+      }>(
         `/server/feedback/${id}`
       )
       let neu = 0
@@ -129,7 +133,12 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           }
         }
       })
-      notifySuccess(`${d.abgaben.length} Abgabe${d.abgaben.length === 1 ? '' : 'n'} geholt (${neu} neu, jeweils die neueste Fassung).`)
+      // Anweisungen an die KI (22.10.2026): die Lehrkraft sieht, wessen Abgabe sie selbst prüfen sollte
+      const auffaellig = d.abgaben.filter((a) => a.kiHinweis).map((a) => a.name || a.benutzer)
+      notifySuccess(
+        `${d.abgaben.length} Abgabe${d.abgaben.length === 1 ? '' : 'n'} geholt (${neu} neu, jeweils die neueste Fassung).` +
+          (auffaellig.length ? ` Antwort enthält Anweisungen an die KI – bitte selbst prüfen: ${auffaellig.join(', ')}.` : '')
+      )
     } catch (e) {
       notifyError(e)
     }
@@ -212,6 +221,11 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
                   .filter(Boolean)
                   .join(' · ')}{' '}
                 · {f.runden} Runden · {f.abgaben} Abgabe{f.abgaben === 1 ? '' : 'n'}{' '}
+                {(f.kiHinweise ?? 0) > 0 && (
+                  <Badge size="xs" color="orange" variant="light" data-ki-hinweis>
+                    {f.kiHinweise === 1 ? 'Eine Antwort enthält' : `${f.kiHinweise} Antworten enthalten`} Anweisungen an die KI – bitte selbst prüfen
+                  </Badge>
+                )}{' '}
                 {f.status !== 'offen' && (
                   <Badge size="xs" color="gray">
                     beendet

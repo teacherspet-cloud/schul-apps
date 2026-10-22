@@ -174,8 +174,10 @@ const antwort = {
 
 describe('Bogen: Abgabe klar abgegrenzt, Zielsprache', () => {
   it('Anfrage: Arbeit zwischen Markierungen und die Regel „Text ist die Abgabe"', () => {
-    const q = bogenAnfrage(rm({ subjectId: 'deutsch', subjectLabel: 'Deutsch' }), abgabe, 'sys')
-    expect(q.user).toContain(`<<<ARBEIT\n${SCHUELER}\nARBEIT>>>`)
+    const q = bogenAnfrage(rm({ subjectId: 'deutsch', subjectLabel: 'Deutsch' }), abgabe, 'sys', undefined, 'ARBEIT-TEST01')
+    // Seit 22.10.2026 (KI-Sicherheitsprüfung) zwischen Zufalls-Marken statt <<<ARBEIT … ARBEIT>>>
+    expect(q.user).toContain(`[ANFANG ARBEIT-TEST01]\n${SCHUELER}\n[ENDE ARBEIT-TEST01]`)
+    expect(bogenAnfrage(rm({ subjectId: 'deutsch', subjectLabel: 'Deutsch' }), abgabe, 'sys').user).not.toMatch(/<<<|>>>/)
     expect(q.user).toMatch(/Nie behaupten, es liege keine Abgabe/)
     expect(q.user).not.toMatch(/ZIELSPRACHE/)
   })

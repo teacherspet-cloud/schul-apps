@@ -15,6 +15,7 @@
 import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { imNutzer } from './kontext'
 import { pdfOhneSkripte } from './druck'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
@@ -49,6 +50,7 @@ import {
   ohneEigenenNamen,
   reflexionImpulsAnfrage,
   reflexionImpulsAus,
+  reflexionKrise,
   vorschlagSumme,
   type AbschlussEingabe
 } from '../shared/reiheKiFeedback'
@@ -61,6 +63,10 @@ import { vorschauAufsetzen, vorschauKonto, vorschauSchluessel, ZUSTAENDE, type V
 import { geplantAb, nachFreigabe, nochGeplant, planVon, planVorbei } from './freigabePlan'
 import { reiheMitPlanen, zugangPlan } from './planen'
 import { haltepunktTermine } from '../shared/startseiteKurse'
+import { HILFETEXT, kriseMelden, kriseVerdacht } from './krise'
+import { LERNENDEN_FEHLER, verraetErwartung } from '../shared/kiSchutz'
+import { kiGrenzeMeldung } from '../shared/kiGrenzen'
+import { dateiSenden, dateiTypAusBytes, istRasterbild } from './dateiTyp'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reihen (
@@ -483,6 +489,8 @@ function linkFuer(s: Schritt, z: ZuweisungZeile, stand: Stand): string | undefin
 const standKurz = (s: Stand): Stand => ({ ...s, schritte: Object.fromEntries(Object.entries(s.schritte).map(([k, v]) => [k, { ...v }])) })
 
 const MAX_DATEI = 12 * 1024 * 1024
+/** Speicher je Person und Reihe (22.10.2026, Faustregel) */
+const MAX_JE_PERSON = 60 * 1024 * 1024
 
 /** Fotos einer Abgabe als data:-URLs (höchstens 4) – für die KI */
 function fotosVon(st: SchrittStand): string[] {
@@ -491,7 +499,9 @@ function fotosVon(st: SchrittStand): string[] {
     .slice(0, 4)
     .flatMap((d) => {
       const z0 = db().prepare('SELECT typ, daten FROM reihen_dateien WHERE id = ?').get(d.id) as { typ: string; daten: Uint8Array } | undefined
-      return z0 ? [`data:${z0.typ};base64,${Buffer.from(z0.daten).toString('base64')}`] : []
+      // Nur echte Rasterbilder (Typ aus den Bytes, 22.10.2026) – nie SVG oder Umbenanntes
+      const typ = z0 ? dateiTypAusBytes(z0.daten) : null
+      return z0 && typ && istRasterbild(typ) ? [`data:${typ};base64,${Buffer.from(z0.daten).toString('base64')}`] : []
     })
 }
 
@@ -556,7 +566,14 @@ const tagebuchFrage = (s: Schritt): string =>
   s.inhalt.art === 'reflexion' ? s.inhalt.frage : s.inhalt.art === 'arbeitsblatt' && s.inhalt.zweck === 'reflexion' ? (s.inhalt.frage ?? '') : ''
 
 /** Kurzer KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6) – kein Urteil, keine Note; ohne Namen */
-async function reflexionImpulsErzeugen(r: Reihe, z: ZuweisungZeile, s: Schritt, st: SchrittStand, schueler: NutzerInfo, aufruf: Aufruf): Promise<string> {
+async function reflexionImpulsErzeugen(
+  r: Reihe,
+  z: ZuweisungZeile,
+  s: Schritt,
+  st: SchrittStand,
+  schueler: NutzerInfo,
+  aufruf: Aufruf
+): Promise<{ impuls: string; krise: boolean }> {
   const ziele = alleLernziele(r)
   const ampel = Object.entries(st.ampel ?? {}).flatMap(([k, farbe]) => {
     const z0 = ziele[Number(k)]
@@ -574,7 +591,7 @@ async function reflexionImpulsErzeugen(r: Reihe, z: ZuweisungZeile, s: Schritt, 
     }),
     { sprache: r.fachLabel, material: [tagebuchFrage(s), ...ampel.map((a) => a.ziel)].join(' ') }
   )
-  return reflexionImpulsAus(roh)
+  return { impuls: reflexionImpulsAus(roh), krise: reflexionKrise(roh) }
 }
 
 /** Ein Arbeitsblatt der Reihe für die Lernenden (Abschnitt „Materialien", 08.10.2026, Plan G.3) */
@@ -749,6 +766,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       if (gaeste.some((x) => namen.get(x.nutzer_id) === name.toLowerCase()))
         return (json(res, 409, { fehler: `„${name}“ ist schon dabei. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“` }), true)
       if (gaeste.length >= 80) return (json(res, 429, { fehler: 'Für diese Reihe sind schon zu viele Gäste angemeldet.' }), true)
+      if (!gastBremse(k.ip)) return (json(res, 429, { fehler: GAST_BREMSE_MELDUNG }), true) // 22.10.2026, KI-Sicherheitsprüfung M5
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       db().prepare('INSERT INTO reihe_gaeste (zuweisung_id, nutzer_id) VALUES (?, ?)').run(z.id, gast.id)
@@ -857,10 +875,10 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       if (req.method === 'GET' && url.pathname === '/s/api/reihe/datei') {
         const d = db()
           .prepare('SELECT * FROM reihen_dateien WHERE id = ? AND zuweisung_id = ? AND schueler_id = ?')
-          .get(String(url.searchParams.get('datei') ?? ''), z.id, ich.id) as { typ: string; daten: Uint8Array } | undefined
+          .get(String(url.searchParams.get('datei') ?? ''), z.id, ich.id) as { typ: string; name: string; daten: Uint8Array } | undefined
         if (!d) return (json(res, 404, { fehler: 'Unbekannte Datei.' }), true)
-        res.writeHead(200, { 'content-type': d.typ, 'cache-control': 'private, no-store' })
-        return (res.end(Buffer.from(d.daten)), true)
+        // Typ aus den Bytes, nosniff, keine Skripte (22.10.2026, dateiTyp.ts)
+        return (dateiSenden(res, d.daten, d.name), true)
       }
       // Materialien der Reihe und „Meine Abgaben" (08.10.2026, Plan G.3)
       if (req.method === 'GET' && url.pathname === '/s/api/reihe/materialien') {
@@ -949,14 +967,30 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         if (!m) return (json(res, 400, { fehler: 'Die Datei fehlt.' }), true)
         const daten = Buffer.from(m[2], 'base64')
         if (daten.length > MAX_DATEI) return (json(res, 413, { fehler: 'Die Datei ist zu groß (höchstens 12 MB).' }), true)
+        /*
+         * Typ aus den Bytes, nie vom Browser (22.10.2026, KI-Sicherheitsprüfung: eine hochgeladene HTML- oder SVG-Datei lief
+         * sonst beim Öffnen durch die Lehrkraft mit deren Sitzung). Erlaubt: Bilder, PDF, Audio, Video, Office/ZIP.
+         */
+        const typ = dateiTypAusBytes(daten)
+        if (!typ) return (json(res, 415, { fehler: 'Diese Dateiart geht nicht. Erlaubt sind Fotos, PDF, Audio, Video und Office-Dateien.' }), true)
+        // Speicher je Person begrenzen (Faustregel: 60 MB je Reihe) – sonst wächst die Datenbank unbegrenzt
+        const belegt = Number(
+          (db().prepare('SELECT COALESCE(SUM(LENGTH(daten)), 0) AS n FROM reihen_dateien WHERE zuweisung_id = ? AND schueler_id = ?').get(z.id, ich.id) as { n: number }).n
+        )
+        if (belegt + daten.length > MAX_JE_PERSON)
+          return (json(res, 413, { fehler: 'Du hast in dieser Reihe schon sehr viele Dateien hochgeladen. Bitte lösche zuerst alte.' }), true)
         const id = neueId()
         const name = String(k0.name ?? 'Datei').slice(0, 120)
         db()
           .prepare('INSERT INTO reihen_dateien (id, zuweisung_id, schueler_id, schritt_id, name, typ, daten, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-          .run(id, z.id, ich.id, s.id, name, m[1].slice(0, 80), daten, Date.now())
-        st.dateien = [...(st.dateien ?? []), { id, name, typ: m[1] }].slice(-10)
+          .run(id, z.id, ich.id, s.id, name, typ, daten, Date.now())
+        const vorher = st.dateien ?? []
+        st.dateien = [...vorher, { id, name, typ }].slice(-10)
+        // Herausgefallene Dateien auch aus der Datenbank löschen (vorher blieben sie für immer liegen)
+        const bleiben = new Set(st.dateien.map((d) => d.id))
+        for (const d of vorher) if (!bleiben.has(d.id)) db().prepare('DELETE FROM reihen_dateien WHERE id = ? AND schueler_id = ?').run(d.id, ich.id)
         standSpeichern(z.id, ich.id, stand)
-        return (json(res, 200, { id, name, typ: m[1] }), true)
+        return (json(res, 200, { id, name, typ }), true)
       }
       if (aktion === 'datei-weg') {
         st.dateien = (st.dateien ?? []).filter((d) => d.id !== k0.datei)
@@ -1001,7 +1035,15 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           const aus = diagnoseAbschliessen(fragen, st.antworten ?? {}, vor, kiRoh)
           // Wiederholbare Diagnose (08.10.2026): nur ✓/✗ und Hinweis, keine richtige Antwort – sonst ließe sie sich beim
           // nächsten Versuch einfach abschreiben
-          if (warten) aus.ergebnis = aus.ergebnis.map((e) => ({ ...e, loesung: '' }))
+          // Auch der KI-Hinweis darf die Lösung nicht verraten (22.10.2026, KI-Sicherheitsprüfung; Faustregel: 3 Wörter)
+          if (warten)
+            aus.ergebnis = aus.ergebnis.map((e) => ({
+              ...e,
+              loesung: '',
+              ...(e.hinweis && verraetErwartung(e.hinweis, e.loesung, e.antwort, Math.min(3, Math.max(1, e.loesung.split(/\s+/).length)))
+                ? { hinweis: e.richtig ? 'Passt.' : 'Das stimmt noch nicht – schau dir das Thema noch einmal an.' }
+                : {})
+            }))
           st.diagnose = { prozent: aus.prozent, zeit: Date.now(), ergebnis: aus.ergebnis }
           standSpeichern(z.id, ich.id, stand)
           return { prozent: aus.prozent, bestanden: aus.prozent >= (s.inhalt as { schwelle: number }).schwelle, ergebnis: aus.ergebnis }
@@ -1040,12 +1082,25 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
            * Schritt (Kontingent der Lehrkraft); kein Urteil, keine Note. Ohne Eintrag bleibt es beim schlichten „Fertig".
            */
           const eintrag = (st.tagebuch ?? '').trim()
-          if (eintrag.length < 15 || eintrag === vorher.trim() || st.eingereicht > 3) return (json(res, 200, { ok: true, ...(st.impuls ? { impuls: st.impuls.text } : {}) }), true)
+          // Krisenhinweis (22.10.2026, krise.ts): Wortliste sofort, dazu das Feld „krise“ der KI – nie eine Sperre
+          const quelle = `Lerntagebuch: ${r.titel}`
+          const krise = kriseVerdacht(eintrag)
+          if (krise) kriseMelden(z.lehrkraft_id, ich.id, quelle)
+          const hilfe = krise ? { hilfe: HILFETEXT } : {}
+          if (eintrag.length < 15 || eintrag === vorher.trim() || st.eingereicht > 3)
+            return (json(res, 200, { ok: true, ...(st.impuls && !krise ? { impuls: st.impuls.text } : {}), ...hilfe }), true)
+          if (krise) return (json(res, 200, { ok: true, ...hilfe }), true)
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
           const puls = setInterval(() => res.write(' '), PULS_MS)
           res.on('close', () => clearInterval(puls))
           try {
-            const impuls = await reflexionImpulsErzeugen(r, z, s, st, nutzerNachId(ich.id) ?? ich, aufruf)
+            const aus = await reflexionImpulsErzeugen(r, z, s, st, nutzerNachId(ich.id) ?? ich, aufruf)
+            if (aus.krise) {
+              kriseMelden(z.lehrkraft_id, ich.id, quelle)
+              res.end(JSON.stringify({ ok: true, hilfe: HILFETEXT }))
+              return true
+            }
+            const impuls = aus.impuls
             if (impuls) {
               const neu = standVon(z.id, ich.id)
               neu.schritte[s.id] = { ...(neu.schritte[s.id] ?? {}), impuls: { text: impuls, zeit: Date.now() } }
@@ -1054,8 +1109,9 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             }
             res.end(JSON.stringify({ ok: true, ...(impuls ? { impuls } : {}) }))
           } catch (e) {
-            // Ohne Impuls ist die Selbsteinschätzung trotzdem abgegeben
-            res.end(JSON.stringify({ ok: true, impulsFehler: e instanceof Error ? e.message : String(e) }))
+            // Ohne Impuls ist die Selbsteinschätzung trotzdem abgegeben; rohe Anbieter-Fehler nur ins Protokoll (22.10.2026)
+            protokolliereServer('reihe', `KI-Impuls zum Lerntagebuch nicht möglich: ${fehlerKurz(e)}`, ich.id)
+            res.end(JSON.stringify({ ok: true, impulsFehler: kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER }))
           } finally {
             clearInterval(puls)
           }
@@ -1067,6 +1123,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         const hatDatei = Boolean(st.dateien?.length)
         const text = Object.values(st.antworten).join('\n').trim()
         if (!text && !hatDatei) return (json(res, 400, { fehler: 'Bitte zuerst etwas eintragen oder hochladen.' }), true)
+        // Krisenhinweis (22.10.2026, krise.ts): fester Hilfetext für das Kind, vertraulich an die Lehrkraft – nie eine Sperre
+        const hilfe = kriseVerdacht(text) ? (kriseMelden(z.lehrkraft_id, ich.id, `Unterrichtsreihe: ${r.titel}`), { hilfe: HILFETEXT }) : {}
         if (s.inhalt.art === 'aufgabe' && (st.eingereicht ?? 0) >= 3)
           return (json(res, 409, { fehler: 'Du hast diese Aufgabe schon dreimal eingereicht.' }), true)
         st.eingereicht = (st.eingereicht ?? 0) + 1
@@ -1084,23 +1142,23 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           const person = nutzerNachId(ich.id) ?? ich
           if (artVon(r) !== 'digital') {
             void abschlussVorschlagErzeugen(r, z, s, person, aufruf).catch(() => undefined)
-            return (json(res, 200, { ok: true }), true)
+            return (json(res, 200, { ok: true, ...hilfe }), true)
           }
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
           const puls = setInterval(() => res.write(' '), PULS_MS)
           res.on('close', () => clearInterval(puls))
           try {
             const v = await abschlussVorschlagErzeugen(r, z, s, person, aufruf)
-            res.end(JSON.stringify({ ok: true, geprueft: Boolean(v && !v.fehler) }))
+            res.end(JSON.stringify({ ok: true, geprueft: Boolean(v && !v.fehler), ...hilfe }))
           } catch {
-            res.end(JSON.stringify({ ok: true, geprueft: false }))
+            res.end(JSON.stringify({ ok: true, geprueft: false, ...hilfe }))
           } finally {
             clearInterval(puls)
           }
           return true
         }
         const fid = json_(z.verknuepft, {} as Record<string, string>)[s.id]
-        if (s.inhalt.art !== 'aufgabe' || !s.inhalt.feedback || !fid) return (json(res, 200, { ok: true }), true)
+        if (s.inhalt.art !== 'aufgabe' || !s.inhalt.feedback || !fid) return (json(res, 200, { ok: true, ...hilfe }), true)
         // Zwischenaufgabe mit KI-Feedback (Bogen wie in der Rückmeldungs-App)
         const fragen = s.inhalt.fragen
         const abgabeText = fragen.length
@@ -1120,9 +1178,12 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             }
             standSpeichern(z.id, ich.id, neu)
           }
-          res.end(JSON.stringify({ ok: !f.fehler, fehler: f.fehler, bogen: f.bogen }))
+          if (f.fehler) protokolliereServer('reihe', `KI-Feedback zur Zwischenaufgabe nicht möglich: ${fehlerKurz(f.fehler)}`, ich.id)
+          res.end(JSON.stringify({ ok: !f.fehler, ...(f.fehler ? { fehler: LERNENDEN_FEHLER } : {}), bogen: f.bogen, ...hilfe }))
         } catch (e) {
-          res.end(JSON.stringify({ ok: false, fehler: e instanceof Error ? e.message : String(e) }))
+          // Rohe Anbieter-Fehler nicht an Lernende (22.10.2026, KI-Sicherheitsprüfung) – Details nur ins Protokoll
+          protokolliereServer('reihe', `KI-Feedback zur Zwischenaufgabe nicht möglich: ${fehlerKurz(e)}`, ich.id)
+          res.end(JSON.stringify({ ok: false, fehler: kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER, ...hilfe }))
         } finally {
           clearInterval(puls)
         }
@@ -1334,12 +1395,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           .prepare('SELECT * FROM reihen_dateien WHERE id = ? AND zuweisung_id = ?')
           .get(String(teile[3] ?? ''), z.id) as { typ: string; name: string; daten: Uint8Array } | undefined
         if (!d) return (json(res, 404, { fehler: 'Unbekannte Datei.' }), true)
-        res.writeHead(200, {
-          'content-type': d.typ,
-          'content-disposition': `inline; filename*=UTF-8''${encodeURIComponent(d.name)}`,
-          'cache-control': 'private, no-store'
-        })
-        return (res.end(Buffer.from(d.daten)), true)
+        // Datei einer Schülerin für die Lehrkraft: Typ aus den Bytes, HTML/SVG/Unbekanntes nur als Download (22.10.2026)
+        return (dateiSenden(res, d.daten, d.name), true)
       }
       if (req.method === 'POST' && teile[2] === 'aktion') {
         const k0 = (await k.koerper()) as Record<string, unknown>
@@ -1555,10 +1612,12 @@ export function reihenFuerLernen(ich: NutzerInfo): {
             ? (db().prepare('SELECT typ, daten, erstellt FROM reihen_dateien WHERE id = ?').get(d.id) as
                 { typ: string; daten: Uint8Array; erstellt: number } | undefined)
             : undefined
+          // Nur Rasterbilder als Bild (Typ aus den Bytes, 22.10.2026)
+          const bildTyp = z0 ? dateiTypAusBytes(z0.daten) : null
           return {
             titel: `${s.titel}: ${d.name}`,
             datum: z0?.erstellt ?? stand.schritte[s.id]?.zeit ?? 0,
-            ...(z0 ? { bild: `data:${z0.typ};base64,${Buffer.from(z0.daten).toString('base64')}` } : {})
+            ...(z0 && bildTyp && istRasterbild(bildTyp) ? { bild: `data:${bildTyp};base64,${Buffer.from(z0.daten).toString('base64')}` } : {})
           }
         })
       )

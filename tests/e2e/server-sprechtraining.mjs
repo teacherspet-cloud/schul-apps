@@ -148,6 +148,36 @@ try {
   await s.locator('[data-sprechtraining]').waitFor()
   pruefe((await s.locator('[data-sprech-gesperrt]').count()) === 0, '„Entsperren" hebt die Sperre auf')
   await p.screenshot({ path: join(out, '4-ueberblick.png'), fullPage: true })
+
+  // ---------- Krise (22.10.2026, Entscheidung der Lehrkraft): Hilfetext, kein Vorfall, vertraulicher Hinweis ohne Wortlaut
+  await s.goto(`${A}/s/ordner/Englisch?r=sprech`)
+  await s.locator('[data-sprech-ueben="interview"]').click()
+  await s.locator('[data-sprech-start]').click()
+  await s.locator('[data-sprech-eingabe]').waitFor()
+  await s.locator('[data-sprech-eingabe]').fill('Sometimes I want to die')
+  await s.locator('[data-sprech-senden]').click()
+  pruefe(await da(s.locator('[data-sprech-krise]')), 'Krise: Übung endet mit festem Hilfetext')
+  pruefe((await s.locator('[data-sprech-krise]').innerText()).includes('116 111'), 'Hilfetext nennt die Nummer gegen Kummer')
+  const u2 = await (await lk.request.get(`${A}/server/sprechen?kurs=${kurs}`, { headers: KOPF })).json()
+  const oleP = u2.personen.find((x) => x.name.includes('Ole'))
+  pruefe(!(oleP?.vorfaelle ?? []).length, 'Krise zählt nicht als Vorfall')
+  const kh = await (await lk.request.get(`${A}/server/krisen`, { headers: KOPF })).json()
+  pruefe(Boolean(kh.hinweise?.some((h) => h.name.includes('Ole') && /Sprechtraining/.test(h.quelle))), 'Lehrkraft bekommt vertraulichen Hinweis (Name, Quelle)')
+  pruefe(!JSON.stringify(kh).includes('want to die'), 'Hinweis ohne Wortlaut')
+  await p.goto(A)
+  pruefe(await da(p.locator('[data-krisen-hinweise]')), 'Startseite: Karte „Vertrauliche Hinweise"')
+  await p.screenshot({ path: join(out, '5-krisenhinweis.png'), fullPage: true })
+  await p.locator('[data-krisen-gesehen]').first().click()
+  pruefe(
+    await p
+      .locator('[data-krisen-hinweise]')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    '„Gesehen" blendet den Hinweis aus'
+  )
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split(String.fromCharCode(10)).slice(0, 6).join(' | ')}`)
 } finally {

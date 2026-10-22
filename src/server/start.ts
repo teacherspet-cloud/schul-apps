@@ -17,6 +17,7 @@ import { grammatikRoute } from './grammatik'
 import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { ueberthemenRoute } from './ueberthemen'
 import { sprechenRoute } from './sprechen'
+import { kriseRoute } from './krise'
 import { sprechBankRoute } from './sprechBank'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
@@ -69,6 +70,7 @@ import { messungenStarten, setzeKiNutzungQuelle, zaehlerSchreiben } from './serv
 import { kiNutzungJeTag, meldeTokens, merkeKiNutzung, mitKiNutzung } from './kiNutzung'
 import { setzeVerbrauchsHaken } from '../main/services/ai/verbrauch'
 import { setzeEndpunktRueckfall } from '../main/services/ai/models'
+import { kiSchutzEinrichten } from './kiSchutzServer'
 import type { SecretName } from '@shared/types'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { kiZugaengeRoute, schulEndpunkt } from './kiZugaenge'
@@ -119,6 +121,8 @@ async function main(): Promise<void> {
   setzeKiNutzungQuelle(kiNutzungJeTag)
   // Token der Aufrufe über Schlüssel der Schule für Kosten-Schätzung und Budget (10.10.2026, kiNutzung.ts › meldeTokens)
   setzeVerbrauchsHaken(meldeTokens)
+  // KI-Sicherheitsprüfung (22.10.2026, kiSchutzServer.ts): Schlange je Lehrkraft, Modelle/Budget über den Schulzugang, SSRF
+  kiSchutzEinrichten()
   // Schul-Einrichtung der Verwaltung: Bundesland/Schulform, solange die Lehrkraft keine eigenen gewählt hat (09.10.2026)
   setzeSchulRueckfall(leseSchule)
   // Fachfarben legt die Verwaltung für alle fest (09.10.2026, fachfarben.ts) – einmal die des Admins übernehmen
@@ -274,6 +278,8 @@ async function main(): Promise<void> {
       // Kartenpool und Bilder der Sprechprüfungen (19.10.2026) – vor sprechenRoute (Bildpfad unter /s/api/sprechen/)
       sprechBankRoute(),
       sprechenRoute(aufruf),
+      // Vertrauliche Krisenhinweise an die Lehrkraft (22.10.2026, krise.ts)
+      kriseRoute(),
       // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
       planenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)

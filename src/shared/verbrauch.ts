@@ -41,6 +41,18 @@ export interface VerbrauchsDaten {
   /** Tag (JJJJ-MM-TT, Ortszeit) → Zähler */
   tage: Record<string, VerbrauchsTag>
   limits: LimitEreignis[]
+  /** Nur auf dem Server (22.10.2026): Monatsbudget über den Schlüssel der Schule (main/services/ai/schulGrenzen.ts) */
+  schulBudget?: SchulBudgetStand
+}
+
+/** Stand des Monatsbudgets der Lehrkraft über den Schlüssel der Schule (22.10.2026, KI-Sicherheitsprüfung M1) */
+export interface SchulBudgetStand {
+  monat: string
+  /** Euro (geschätzt) */
+  verbraucht: number
+  grenze: number
+  anteil: number
+  stufe: 'ok' | 'warnung' | 'ueber'
 }
 
 export const leererTag = (): VerbrauchsTag => ({ anbieter: {}, arten: {} })

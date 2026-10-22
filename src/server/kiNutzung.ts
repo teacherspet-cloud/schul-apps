@@ -22,9 +22,11 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomBytes } from 'node:crypto'
 import type { StructuredRequest } from '@shared/types'
 import { istKompatibel } from '@shared/kiAnbieter'
-import { budgetStand, buchstabe, kostenSchaetzen, preisFuer, type BudgetStufe, type KiBudget, type KiPreise } from '@shared/kiKosten'
+import { budgetStand, buchstabe, kostenSchaetzen, preisFuer, type BudgetStufe, type KiBudget, type KiPreis, type KiPreise } from '@shared/kiKosten'
 import { schuljahrNachAugust } from '@shared/schulkalender'
-import { alleNutzer, datenbank } from './datenbank'
+import { KiGrenzeFehler } from '@shared/kiGrenzen'
+import type { SchulBudgetStand } from '@shared/verbrauch'
+import { alleNutzer, datenbank, serverWert } from './datenbank'
 import type { Aufruf } from './http'
 
 // Arten der Aufträge und Limit-Erkennung: gemeinsam mit dem eigenen Verbrauch der Lehrkraft (09.10.2026, shared/kiArten.ts)
@@ -60,6 +62,12 @@ interface Zahl {
   o?: number
   /** Erfolgreiche Anfragen OHNE Token-Angabe des Anbieters (Kosten dann unvollständig) */
   u?: number
+  /** Geschätzte Euro ohne Token (Sprechtraining, Vertonung – fremdNutzungBuchen, 22.10.2026) */
+  k?: number
+  /** Sekunden (Realtime) */
+  s?: number
+  /** Zeichen (Vertonung, Moderation) */
+  z?: number
 }
 /** Schlüssel „art|anbieter" bzw. seit 10.10.2026 „art|anbieter|modell" → Zahlen */
 type TagDaten = Record<string, Zahl>
@@ -115,6 +123,7 @@ export function merkeKiNutzung(f: Nutzungsfall, jetzt = new Date()): void {
     if (e) z.e = (z.e ?? 0) + e
     if (o) z.o = (z.o ?? 0) + o
     if (f.ergebnis === 'ok' && !e && !o) z.u = (z.u ?? 0) + 1
+    budgetZwischenspeicher.delete(f.nutzerId)
     if (zeile) d.prepare('UPDATE ki_nutzung SET daten = ? WHERE tag = ? AND nutzer_id = ?').run(JSON.stringify(daten), tag, f.nutzerId)
     else d.prepare('INSERT INTO ki_nutzung (tag, nutzer_id, daten) VALUES (?, ?, ?)').run(tag, f.nutzerId, JSON.stringify(daten))
     d.prepare('DELETE FROM ki_nutzung WHERE tag < ?').run(tagVon(new Date(jetzt.getTime() - HALTEN_TAGE * 864e5)))
@@ -184,6 +193,11 @@ export interface KiAnonymeLehrkraft {
   euro: number
   /** Anteil an der Gesamtnutzung (Token, ohne Token-Angaben: Anfragen) */
   anteil: number
+  /**
+   * NUR für „Missbrauch prüfen" (22.10.2026, kiZugaenge.ts): Kennung des Kontos – erst nach Angabe eines Grundes und
+   * einem Protokolleintrag, und nie in der normalen Übersicht.
+   */
+  kennung?: string
 }
 
 export interface KiNutzungDashboard {
@@ -262,7 +276,7 @@ export function zeitraumBeginn(zeitraum: KiZeitraum, jetzt: Date, schuljahrBegin
  */
 export function kiNutzungDashboard(
   zeitraum: KiZeitraum,
-  o: { jetzt?: Date; preise?: KiPreise; budget?: KiBudget | null; schuljahrBeginn?: string } = {}
+  o: { jetzt?: Date; preise?: KiPreise; budget?: KiBudget | null; schuljahrBeginn?: string; mitKennungen?: boolean } = {}
 ): KiNutzungDashboard {
   const jetzt = o.jetzt ?? new Date()
   const preise = o.preise ?? {}
@@ -303,7 +317,8 @@ export function kiNutzungDashboard(
       const e = w.e ?? 0
       const aus = w.o ?? 0
       const kosten = kostenSchaetzen(e, aus, preisFuer(preise, anbieter, modell || undefined))
-      const werte: KiWerte = { a: w.a, t: e + aus, k: kosten.euro ?? 0 }
+      // Seit 22.10.2026: dazu geschätzte Euro ohne Token (Sprechtraining, Vertonung – Faustregel, fremdNutzungBuchen)
+      const werte: KiWerte = { a: w.a, t: e + aus, k: (kosten.euro ?? 0) + (w.k ?? 0) }
       modelle.add(modell ? `${anbieter}|${modell}` : anbieter)
       if (i !== undefined) {
         plus(jeTagAnbieter[i], anbieter, werte)
@@ -345,9 +360,16 @@ export function kiNutzungDashboard(
   const kontext = `${zeitraum}|${von}`
   const lehrkraefte: KiAnonymeLehrkraft[] = [...jeLk.entries()]
     .filter(([, w]) => w.a > 0)
-    .map(([id, w]) => ({ w, o: ordnung(id, kontext) }))
+    .map(([id, w]) => ({ id, w, o: ordnung(id, kontext) }))
     .sort((x, y) => mass(y.w) - mass(x.w) || y.w.a - x.w.a || x.o.localeCompare(y.o))
-    .map(({ w }, rang) => ({ bezeichnung: `Lehrkraft ${buchstabe(rang)}`, anfragen: w.a, tokens: w.t, euro: w.k, anteil: mass(w) / gesamt }))
+    .map(({ id, w }, rang) => ({
+      bezeichnung: `Lehrkraft ${buchstabe(rang)}`,
+      anfragen: w.a,
+      tokens: w.t,
+      euro: w.k,
+      anteil: mass(w) / gesamt,
+      ...(o.mitKennungen ? { kennung: id } : {})
+    }))
 
   let budgetMonat: KiNutzungDashboard['budgetMonat'] = null
   if (o.budget) {
@@ -385,12 +407,20 @@ export function kiNutzungDashboard(
 
 /** Sammelt während eines gezählten Aufrufs die vom Anbieter gemeldeten Token (mitKiNutzung) */
 const tokenSammler = new AsyncLocalStorage<{ e: number; o: number; modell?: string }>()
+/** Sammelt während `audio:speak` die vertonten Zeichen (22.10.2026) */
+const ttsSammler = new AsyncLocalStorage<{ zeichen: number; anbieter: string }>()
 
 /**
  * Haken für main/services/ai/verbrauch.ts › merkeVerbrauch: Läuft gerade ein gezählter Aufruf über einen Schlüssel der
  * Schule, landen dessen Token (und das Modell) bei diesem Aufruf. Außerhalb (private Zugänge) passiert nichts.
  */
-export function meldeTokens(_anbieter: string, modell: string, teil: { eingabe?: number; ausgabe?: number }): void {
+export function meldeTokens(anbieter: string, modell: string, teil: { eingabe?: number; ausgabe?: number; ttsZeichen?: number }): void {
+  // Vertonung (22.10.2026): Zeichen für das Budget sammeln (mitKiNutzung › audio:speak)
+  const t = ttsSammler.getStore()
+  if (t && Number.isFinite(teil.ttsZeichen) && teil.ttsZeichen! > 0) {
+    t.zeichen += teil.ttsZeichen!
+    t.anbieter = anbieter
+  }
   const s = tokenSammler.getStore()
   if (!s) return
   if (Number.isFinite(teil.eingabe)) s.e += teil.eingabe!
@@ -415,6 +445,10 @@ export interface NutzungsUmgebung {
   /** Hat die Schule einen Schlüssel für diesen Anbieter freigegeben? */
   schulSchluessel: (anbieter: string) => boolean
   merke: (f: Nutzungsfall) => void
+  /** Hartes Budget (22.10.2026): Vorgabe `budgetErschoepft` dieser Datei – für Tests austauschbar */
+  budgetErschoepft?: (nutzerId: string) => boolean
+  /** Vertonung buchen (22.10.2026): Vorgabe `fremdNutzungBuchen` dieser Datei */
+  fremdBuchen?: typeof fremdNutzungBuchen
 }
 
 const KI_KANAELE = new Set(['ai:structured', 'ai:image', 'ai:websuche'])
@@ -432,6 +466,8 @@ const neuerAuftrag = (id: string | undefined): boolean => {
 /** Umhüllt den Aufruf der Kanäle: zählt KI-Aufrufe über Schlüssel der Schule – sonst nichts */
 export function mitKiNutzung(aufruf: Aufruf, u: NutzungsUmgebung): Aufruf {
   return async (kanal, args) => {
+    // Vertonung (22.10.2026): Zeichen über den Schlüssel der Schule zum Budget der Lehrkraft (Faustregel-Preis)
+    if (kanal === 'audio:speak') return vertonungZaehlen(aufruf, kanal, args, u)
     if (!KI_KANAELE.has(kanal)) return aufruf(kanal, args)
     let fall: Omit<Nutzungsfall, 'ergebnis'> | null = null
     try {
@@ -444,10 +480,13 @@ export function mitKiNutzung(aufruf: Aufruf, u: NutzungsUmgebung): Aufruf {
         const art = zugangsArt({ abo, eigenerSchluessel: u.eigenerSchluessel(anbieter), schulSchluessel: u.schulSchluessel(anbieter) })
         // NUR Schlüssel der Schule – private Zugänge werden nicht gezählt (Wunsch des Admins, Datenschutz)
         if (art === 'schule' && anbieter !== 'none') {
+          // Hartes Budget (22.10.2026): Ab 100 % pausieren Anfragen, die Lernende auslösen – nicht die der Lehrkraft
+          if (req?.vonLernenden && (u.budgetErschoepft ?? budgetErschoepft)(n.id)) throw new KiGrenzeFehler('budget')
           fall = { nutzerId: n.id, anbieter, art: artVonSchema(req?.schemaName, kanal), neuerAuftrag: neuerAuftrag(req?.progressId ?? (typeof args[1] === 'string' ? args[1] : undefined)) }
         }
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof KiGrenzeFehler) throw e
       fall = null
     }
     // Token des Aufrufs sammeln (meldeTokens) – nur bei gezählten Aufrufen über den Schlüssel der Schule
@@ -469,4 +508,195 @@ export function mitKiNutzung(aufruf: Aufruf, u: NutzungsUmgebung): Aufruf {
       throw e
     }
   }
+}
+
+/** `audio:speak` ausführen und – nur über den Schlüssel der Schule – die vertonten Zeichen buchen */
+async function vertonungZaehlen(aufruf: Aufruf, kanal: string, args: unknown[], u: NutzungsUmgebung): Promise<unknown> {
+  const n = (() => {
+    try {
+      return u.nutzer()
+    } catch {
+      return undefined
+    }
+  })()
+  if (!n || n.rolle === 'schueler') return aufruf(kanal, args)
+  const sammler = { zeichen: 0, anbieter: '' }
+  const wert = await ttsSammler.run(sammler, () => aufruf(kanal, args))
+  try {
+    if (sammler.zeichen > 0 && sammler.anbieter) {
+      const art = zugangsArt({ abo: false, eigenerSchluessel: u.eigenerSchluessel(sammler.anbieter), schulSchluessel: u.schulSchluessel(sammler.anbieter) })
+      if (art === 'schule') (u.fremdBuchen ?? fremdNutzungBuchen)({ nutzerId: n.id, anbieter: sammler.anbieter, art: 'tts', zeichen: sammler.zeichen })
+    }
+  } catch {
+    // Zählen ist Beiwerk
+  }
+  return wert
+}
+
+// ---------------------------------------------------------------- Hartes Budget je Lehrkraft (22.10.2026, KI-Sicherheitsprüfung M1)
+
+/*
+ * Entscheidung der Lehrkraft (22.10.2026): Je Lehrkraft und Kalendermonat ein hartes Budget in Euro über die Schlüssel
+ * der Schule, vom Admin in Verwaltung › KI-Zugänge eingestellt, Vorgabe 20 €. Ab 80 % sieht die Lehrkraft eine Warnung
+ * (Einstellungen › Verbrauch), ab 100 % hält der Server Anfragen an, die LERNENDE auslösen (`vonLernenden`; Meldung
+ * KI_PAUSIERT). Was die Lehrkraft selbst erstellt, läuft weiter. Gezählt wird – wie die ganze Übersicht – nur, was
+ * über den Schlüssel der Schule läuft.
+ *
+ * Kosten: Preise des Admins (Verwaltung › Preise), sonst die FAUSTREGEL-Preise unten. Sprechtraining (Realtime,
+ * Moderation) und Vertonung (TTS) bucht `fremdNutzungBuchen` mit Faustregel-Preisen je Minute bzw. Zeichen.
+ */
+
+/** Servereinstellung: Euro je Lehrkraft und Monat; 0 = ohne Grenze */
+export const LEHRKRAFT_BUDGET = 'ki-budget-lehrkraft'
+export const LEHRKRAFT_BUDGET_VORGABE = 20
+/** Dieselbe Servereinstellung wie in kiZugaenge.ts (Preise des Admins) */
+const PREISE_SCHLUESSEL = 'ki-preise'
+
+/**
+ * FAUSTREGEL (nicht belegt, Stand 10/2026, in Euro je 1 Mio. Token, eher großzügig gerundet): gilt nur, wenn der Admin
+ * für den Anbieter keinen Preis eingetragen hat – damit das harte Budget auch ohne Preisliste greift.
+ */
+export const FAUSTREGEL_PREISE: KiPreise = {
+  openai: { ein: 1.25, aus: 10 },
+  anthropic: { ein: 5, aus: 25 },
+  'anthropic|claude-haiku-4-5': { ein: 1, aus: 5 },
+  'anthropic|claude-sonnet-5': { ein: 2, aus: 10 },
+  google: { ein: 1.25, aus: 10 },
+  'google|gemini-2.5-flash': { ein: 0.3, aus: 2.5 },
+  /** OpenAI-kompatible Anbieter (Mistral, IONOS, STACKIT, OpenRouter …) */
+  '*': { ein: 1, aus: 4 }
+}
+
+/**
+ * FAUSTREGEL (nicht belegt) für Nutzung ohne Token: Realtime-Sprechen je Sekunde (≈ 0,30 €/Minute Ein- und Ausgabe
+ * zusammen), Moderation kostenlos (OpenAI-Moderation), Vertonung je Zeichen (ElevenLabs ≈ 0,20 € je 1 000 Zeichen,
+ * OpenAI-/Azure-Stimmen ≈ 0,015 € je 1 000 Zeichen).
+ */
+export const FAUSTREGEL_FREMD = {
+  realtimeJeSekunde: 0.3 / 60,
+  moderationJeZeichen: 0,
+  ttsJeZeichen: { elevenlabs: 0.0002, openai: 0.000015, azure_speech: 0.000015, sonst: 0.0002 } as Record<string, number>
+}
+
+export type FremdArt = 'realtime' | 'moderation' | 'tts'
+
+/** Geschätzte Euro einer Nutzung ohne Token (Faustregel, siehe oben) */
+export function fremdKosten(o: { anbieter: string; art: FremdArt; sekunden?: number; zeichen?: number }): number {
+  const s = Number.isFinite(o.sekunden) ? Math.max(0, o.sekunden!) : 0
+  const z = Number.isFinite(o.zeichen) ? Math.max(0, o.zeichen!) : 0
+  if (o.art === 'realtime') return s * FAUSTREGEL_FREMD.realtimeJeSekunde
+  if (o.art === 'moderation') return z * FAUSTREGEL_FREMD.moderationJeZeichen
+  return z * (FAUSTREGEL_FREMD.ttsJeZeichen[o.anbieter] ?? FAUSTREGEL_FREMD.ttsJeZeichen.sonst)
+}
+
+/**
+ * Nutzung ohne Token buchen (Sprechtraining: Realtime-Minuten und Moderation; Vertonung: Zeichen). Zählt wie
+ * `merkeKiNutzung` je Tag und Lehrkraft, mit geschätzten Euro (Feld `k`). Fehler werden verschluckt.
+ */
+export function fremdNutzungBuchen(o: { nutzerId: string; anbieter: string; art: 'realtime' | 'moderation' | 'tts'; sekunden?: number; zeichen?: number }): void {
+  try {
+    if (!o?.nutzerId) return
+    const jetzt = new Date()
+    const d = db()
+    const tag = tagVon(jetzt)
+    const zeile = d.prepare('SELECT daten FROM ki_nutzung WHERE tag = ? AND nutzer_id = ?').get(tag, o.nutzerId) as { daten?: string } | undefined
+    const daten = lies(zeile?.daten)
+    const art: KiArt = o.art === 'tts' ? 'hoertext' : 'sonstiges'
+    const anbieter = String(o.anbieter || '?').replace(/\|/g, '/').slice(0, 40)
+    const k = `${art}|${anbieter}|${o.art}`
+    const z = (daten[k] ??= { a: 0, j: 0, f: 0, l: 0 })
+    z.a += 1
+    z.j += 1
+    const sek = Number.isFinite(o.sekunden) ? Math.max(0, o.sekunden!) : 0
+    const zei = Number.isFinite(o.zeichen) ? Math.max(0, o.zeichen!) : 0
+    if (sek) z.s = (z.s ?? 0) + sek
+    if (zei) z.z = (z.z ?? 0) + zei
+    z.k = (z.k ?? 0) + fremdKosten({ anbieter, art: o.art, sekunden: sek, zeichen: zei })
+    if (zeile) d.prepare('UPDATE ki_nutzung SET daten = ? WHERE tag = ? AND nutzer_id = ?').run(JSON.stringify(daten), tag, o.nutzerId)
+    else d.prepare('INSERT INTO ki_nutzung (tag, nutzer_id, daten) VALUES (?, ?, ?)').run(tag, o.nutzerId, JSON.stringify(daten))
+    budgetZwischenspeicher.delete(o.nutzerId)
+  } catch {
+    // Zählen ist Beiwerk
+  }
+}
+
+/** Preis für die Budget-Rechnung: zuerst der des Admins, sonst die Faustregel */
+function budgetPreis(preise: KiPreise, anbieter: string, modell: string): KiPreis | undefined {
+  return preisFuer(preise, anbieter, modell || undefined) ?? preisFuer(FAUSTREGEL_PREISE, anbieter, modell || undefined) ?? FAUSTREGEL_PREISE['*']
+}
+
+/** Geschätzte Euro einer Lehrkraft im laufenden Kalendermonat (nur Schlüssel der Schule) */
+export function monatsKosten(nutzerId: string, jetzt = new Date(), preise: KiPreise = serverWert<KiPreise>(PREISE_SCHLUESSEL, {})): number {
+  const beginn = `${tagVon(jetzt).slice(0, 7)}-01`
+  let summe = 0
+  try {
+    const zeilen = db().prepare('SELECT daten FROM ki_nutzung WHERE nutzer_id = ? AND tag >= ?').all(nutzerId, beginn) as { daten: string }[]
+    for (const z of zeilen)
+      for (const [k, w] of Object.entries(lies(z.daten))) {
+        const { anbieter, modell } = zerlege(k)
+        summe += (kostenSchaetzen(w.e ?? 0, w.o ?? 0, budgetPreis(preise, anbieter, modell)).euro ?? 0) + (w.k ?? 0)
+      }
+  } catch {
+    return summe
+  }
+  return summe
+}
+
+/** Grenze je Lehrkraft und Monat in Euro (0 = ohne Grenze) */
+export function lehrkraftBudget(): number {
+  const w = serverWert<number>(LEHRKRAFT_BUDGET, LEHRKRAFT_BUDGET_VORGABE)
+  return typeof w === 'number' && Number.isFinite(w) && w >= 0 ? w : LEHRKRAFT_BUDGET_VORGABE
+}
+
+/** Kurz zwischengespeichert (Faustregel 20 s): Jede Anfrage von Lernenden fragt nach – das soll die Datenbank nicht spüren */
+const budgetZwischenspeicher = new Map<string, { zeit: number; euro: number }>()
+const ZWISCHEN_MS = 20_000
+
+function kostenGemerkt(nutzerId: string): number {
+  const jetzt = Date.now()
+  const g = budgetZwischenspeicher.get(nutzerId)
+  if (g && jetzt - g.zeit < ZWISCHEN_MS) return g.euro
+  const euro = monatsKosten(nutzerId)
+  budgetZwischenspeicher.set(nutzerId, { zeit: jetzt, euro })
+  if (budgetZwischenspeicher.size > 2000) budgetZwischenspeicher.clear()
+  return euro
+}
+
+/** Stand des Monatsbudgets einer Lehrkraft – null ohne Grenze */
+export function budgetStandFuer(nutzerId: string, jetzt = new Date()): SchulBudgetStand | null {
+  const grenze = lehrkraftBudget()
+  if (!grenze) return null
+  const verbraucht = kostenGemerkt(nutzerId)
+  return { monat: tagVon(jetzt).slice(0, 7), verbraucht, grenze, ...budgetStand(verbraucht, grenze) }
+}
+
+/** Ist das Monatsbudget der Lehrkraft erschöpft? (≥ 100 %; ohne Grenze nie) */
+export function budgetErschoepft(nutzerId: string): boolean {
+  try {
+    return budgetStandFuer(nutzerId)?.stufe === 'ueber'
+  } catch {
+    return false
+  }
+}
+
+/** Für Tests: Zwischenspeicher leeren */
+export const budgetVergessen = (): void => budgetZwischenspeicher.clear()
+
+/** Anonym für die Verwaltung: wie viele Lehrkräfte stehen diesen Monat über 80 % bzw. 100 %? */
+export function budgetUebersicht(jetzt = new Date()): { warnung: number; ueber: number; grenze: number } {
+  const grenze = lehrkraftBudget()
+  const aus = { warnung: 0, ueber: 0, grenze }
+  if (!grenze) return aus
+  try {
+    const beginn = `${tagVon(jetzt).slice(0, 7)}-01`
+    const ids = (db().prepare('SELECT DISTINCT nutzer_id FROM ki_nutzung WHERE tag >= ?').all(beginn) as { nutzer_id: string }[]).map((z) => z.nutzer_id)
+    for (const id of ids) {
+      const s = budgetStand(monatsKosten(id, jetzt), grenze).stufe
+      if (s === 'ueber') aus.ueber++
+      else if (s === 'warnung') aus.warnung++
+    }
+  } catch {
+    return aus
+  }
+  return aus
 }

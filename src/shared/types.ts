@@ -713,6 +713,16 @@ export interface StructuredRequest {
   teilText?: boolean
   /** Nur in der Oberfläche: bekommt den bisher gelieferten Text (wird vor dem Senden entfernt) */
   onTeilText?: (text: string) => void
+  /**
+   * Bewertung (22.10.2026, KI-Sicherheitsprüfung): gleiche Antwort → gleiches Urteil. Die Anbieter setzen dann
+   * temperature 0, soweit das Modell es zulässt (sonst ohne Wirkung).
+   */
+  bewertung?: boolean
+  /**
+   * Ausgelöst von Lernenden (22.10.2026): zählt zum harten Budget der Lehrkraft, geht in die Schülerschlange und darf
+   * bei Überlast mit „später erneut“ abgelehnt werden.
+   */
+  vonLernenden?: boolean
 }
 
 /** Fortschritt einer laufenden KI-Anfrage */

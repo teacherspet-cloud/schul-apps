@@ -38,6 +38,8 @@ interface AttrappenDatei {
    * Klassenarbeit verschiedene Inhalte, und ein Test sieht, welche Fassung er vor sich hat.
    */
   antworten?: Record<string, unknown>
+  /** Fehlt eine Antwort, eine aus dem Schema bauen (22.10.2026, für Browsertests über viele Wege) */
+  ausSchema?: boolean
   /**
    * Pfad einer Datei, an die jede Anfrage als JSON-Zeile angehängt wird (Auftragsart, Text,
    * Zahl der Bilder). Damit prüft ein Test, WAS die App der KI geschickt hätte – etwa, dass
@@ -189,6 +191,19 @@ function warte(ms: number, text: string, onChunk?: ChunkListener, signal?: Abort
   })
 }
 
+/** Kleinste gültige Antwort zu einem JSON-Schema: erster Enum-Wert, „Attrappe“, 1, false, je Liste ein Eintrag */
+export function beispielAusSchema(s: unknown): unknown {
+  const x = (s ?? {}) as { type?: string | string[]; enum?: unknown[]; properties?: Record<string, unknown>; items?: unknown; anyOf?: unknown[] }
+  if (Array.isArray(x.enum) && x.enum.length) return x.enum[0]
+  if (Array.isArray(x.anyOf) && x.anyOf.length) return beispielAusSchema(x.anyOf[0])
+  const typ = Array.isArray(x.type) ? x.type.find((t) => t !== 'null') : x.type
+  if (typ === 'object' || x.properties) return Object.fromEntries(Object.entries(x.properties ?? {}).map(([k, v]) => [k, beispielAusSchema(v)]))
+  if (typ === 'array') return [beispielAusSchema(x.items)]
+  if (typ === 'number' || typ === 'integer') return 1
+  if (typ === 'boolean') return false
+  return 'Attrappe'
+}
+
 export class AttrappeProvider implements AiProvider {
   async listModels(): Promise<RawModel[]> {
     return [{ id: 'attrappe', label: 'Attrappe (nur Tests)' }]
@@ -196,7 +211,8 @@ export class AttrappeProvider implements AiProvider {
 
   async structured<T>(req: StructuredRequest, _model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     const datei = lies()
-    const eintrag = datei.antworten?.[req.schemaName]
+    // „ausSchema“ (22.10.2026): ohne hinterlegte Antwort eine gültige Beispielantwort aus dem JSON-Schema
+    const eintrag = datei.antworten?.[req.schemaName] ?? (datei.ausSchema ? beispielAusSchema(req.schema) : undefined)
     if (eintrag === undefined) throw new Error(`Attrappe: keine Antwort für „${req.schemaName}" hinterlegt.`)
     const folge = (eintrag as { folge?: unknown[] } | null)?.folge
     const n = zaehler.get(req.schemaName) ?? 0

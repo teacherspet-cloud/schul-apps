@@ -9,6 +9,7 @@
  */
 import { digitalisieren, zusatzLinien } from '../shared/blattDigital'
 import { objekteSvg, type BlattObjekt } from '../shared/blattObjekte'
+import { materialMitZeilen } from '../renderer/src/modules/onlinetest/materialZeilen'
 import type { Browser } from 'playwright-core'
 import type { Druckmaschine } from '../main/kanaele'
 
@@ -85,6 +86,19 @@ export const serverDruck: Druckmaschine = {
     throw new Error('Gedruckt wird auf dem Gerät: Die Druckansicht öffnet sich als PDF im Browser.')
   },
   drucker: async () => []
+}
+
+/**
+ * Materialtexte eines freigegebenen Blatts mit Zeilennummern (22.10.2026, KI-Sicherheitsprüfung): vorher schickte das
+ * Gerät der Lernenden diesen Text mit (bis 24 000 Zeichen, ungeprüft „verbindlich" in der Anfrage). Jetzt liest der Server
+ * ihn selbst aus dem gespeicherten Blatt – dieselbe Funktion wie auf dem Gerät (materialZeilen.ts), ohne Netz.
+ */
+export async function materialAusBlatt(html: string): Promise<string> {
+  return mitSeite(html, async (s) => {
+    await s.setViewportSize({ width: 900, height: 1300 })
+    await s.evaluate(`(${digitalisieren.toString()})(document)`)
+    return String(await s.evaluate(`(${materialMitZeilen.toString()})(document)`))
+  })
 }
 
 export async function druckBeenden(): Promise<void> {

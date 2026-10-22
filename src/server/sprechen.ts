@@ -22,6 +22,19 @@
  *   GET  /s/api/sprechen/status?sitzung=                         → {beendet, grund}
  *   POST /s/api/sprechen/attrappe {sitzung, text}                (nur Browsertests: Gespräch ohne KI)
  *   POST /s/api/sprechen/ende {sitzung, kennzahlen}             → Einschätzung
+ *
+ * Nachgeschärft (22.10.2026, KI-Sicherheitsprüfung):
+ *  - Kontrollkanal prüft JEDES Ereignis (shared/sprechen/kontrolle.ts): getippter Text, eigene Antworten mit anderen
+ *    Anweisungen, Textausgabe, abgeschaltete Transkription → auflegen (Vorfall „manipulation“); andere Änderungen an der
+ *    Sitzung → zurücksetzen. Die Sitzung ist auf Audio-Ausgabe und eine Tokengrenze je Antwort festgelegt.
+ *  - Minuten: ab /start gezählt, abgerechnet beim Ende (Knopf, Zeitablauf, Auflegen, Aufräumen, neue Sitzung) – auch ohne
+ *    /ende. Höchstens eine laufende Sitzung je Kind (eine neue beendet die alte). Neben der Wochengrenze eine Tagesgrenze
+ *    je Freigabe (Faustregel: halbe Wochengrenze, aufgerundet). Realtime-Sekunden und Moderation zählen zum Budget der
+ *    Lehrkraft; ist es erschöpft, startet keine Übung.
+ *  - Krise (Entscheidung der Lehrkraft): Selbstgefährdung (Moderation self-harm*, Wortliste, Werkzeug grund „hilfe“) ist
+ *    NIE ein Vorfall; die Übung endet sanft, das Kind sieht den festen Hilfetext, die Lehrkraft einen vertraulichen
+ *    Hinweis ohne Wortlaut (krise.ts).
+ *  - Kein Name in den Anweisungen; rohe Fehler nur ins Protokoll, Lernende sehen LERNENDEN_FEHLER.
  */
 import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
@@ -30,13 +43,19 @@ import { imNutzer } from './kontext'
 import { lerngruppe } from './onlinetest'
 import { vokIstFuer, zeile as vokZeile } from './vokabeln'
 import { jahrgangDerGruppe } from './ueberthemen'
-import { getSecret, getSettings } from '../main/services/storage/settings'
-import { anweisungen, WERKZEUG_BEENDEN, type Gespraech } from '../shared/sprechen/anweisungen'
+import { getSecret, getSettings, hatEigenesGeheimnis } from '../main/services/storage/settings'
+import { anweisungen, SPRACHNAME, WERKZEUG_BEENDEN, type Gespraech } from '../shared/sprechen/anweisungen'
 import { ATTRAPPE_EINSCHAETZUNG, bewertungsAnfrage, einschaetzungAus, istUmgehung, type Einschaetzung, type Kennzahlen, type TranskriptZeile } from '../shared/sprechen/bewertung'
 import { GRUNDKARTEN, karteBereinigt, type SprechKarte } from '../shared/sprechen/karten'
 import { bankKarten } from './sprechBank'
 import { punkteVon, type KriteriumId } from '../shared/sprechen/kriterien'
 import { hoechstMinuten, NIVEAUS, stufeVonNiveau, TEILE, zielNiveau, type Niveau, type SprechSprache, type Teil } from '../shared/sprechen/niveaus'
+import { kontrollEreignis, moderationsUrteil, type FesteSitzung } from '../shared/sprechen/kontrolle'
+import { LERNENDEN_FEHLER } from '../shared/kiSchutz'
+import { kiGrenzeMeldung } from '../shared/kiGrenzen'
+import { HILFETEXT, kriseMelden, kriseVerdacht } from './krise'
+// Budget der Lehrkraft (22.10.2026; Abgleich mit kiNutzung.ts durch die Hauptsitzung)
+import { budgetErschoepft, fremdNutzungBuchen } from './kiNutzung'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sprech_freigaben (
@@ -122,6 +141,8 @@ export interface Uebung {
   tipps: Einschaetzung['tipps']
   proaktiv?: string
   ausspracheUnsicher: boolean
+  /** Sitzung, aus der die Minuten stammen (22.10.2026): /ende ersetzt den beim Abrechnen angelegten Eintrag */
+  sitzung?: string
 }
 
 interface StandDaten {
@@ -181,6 +202,23 @@ export function minutenDieseWoche(u: Uebung[], jetzt = Date.now()): number {
   return u.filter((x) => x.zeit >= montag).reduce((s, x) => s + x.minuten, 0)
 }
 
+/** Minuten heute (ab Mitternacht) */
+export function minutenHeute(u: Uebung[], jetzt = Date.now()): number {
+  const d = new Date(jetzt)
+  const mitternacht = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  return u.filter((x) => x.zeit >= mitternacht).reduce((s, x) => s + x.minuten, 0)
+}
+
+/** Tagesgrenze je Freigabe (22.10.2026) – Faustregel: halbe Wochengrenze, aufgerundet */
+export const tagesGrenze = (minutenWoche: number): number => Math.ceil(minutenWoche / 2)
+
+/** Restminuten: das Kleinere aus Wochen- und Tagesrest */
+export function restMinuten(minutenWoche: number, u: Uebung[], jetzt = Date.now()): { woche: number; tag: number; rest: number } {
+  const woche = minutenWoche - minutenDieseWoche(u, jetzt)
+  const tag = tagesGrenze(minutenWoche) - minutenHeute(u, jetzt)
+  return { woche, tag, rest: Math.max(0, Math.min(woche, tag)) }
+}
+
 function vorfaelleAufraeumen(jetzt = Date.now()): void {
   db().prepare('DELETE FROM sprech_vorfaelle WHERE zeit < ?').run(jetzt - VORFALL_TAGE * TAG)
 }
@@ -216,7 +254,7 @@ export function gespraechVerfuegbar(lehrkraftId: string): boolean {
   })
 }
 
-function schluesselUndModell(lehrkraftId: string, teil: Teil): { key: string; modell: string } | null {
+function schluesselUndModell(lehrkraftId: string, teil: Teil): { key: string; modell: string; schule: boolean } | null {
   const n = lehrkraftVon(lehrkraftId)
   if (!n) return null
   return imNutzer(alsNutzer(n), () => {
@@ -224,7 +262,8 @@ function schluesselUndModell(lehrkraftId: string, teil: Teil): { key: string; mo
     const key = getSecret('openai')
     if (g?.anbieter !== 'openai' || !key) return null
     const gross = g.modell === 'gross' || (teil === 'simulation' && g.simulationGross)
-    return { key, modell: gross ? 'gpt-realtime' : 'gpt-realtime-mini' }
+    // schule: läuft über den freigegebenen Schlüssel der Schule – nur dann zählt es zum Budget (22.10.2026, kiNutzung.ts)
+    return { key, modell: gross ? 'gpt-realtime' : 'gpt-realtime-mini', schule: !hatEigenesGeheimnis('openai') }
   })
 }
 
@@ -232,7 +271,7 @@ const STIMME: Record<SprechSprache, string> = { en: 'marin', fr: 'marin', es: 'm
 
 // ---------------------------------------------------------------- Sitzungen (nur im Speicher)
 
-interface Sitzung {
+export interface Sitzung {
   id: string
   freigabeId: string
   schuelerId: string
@@ -244,18 +283,121 @@ interface Sitzung {
   start: number
   maxMs: number
   anweisungen: string
+  /** Ortsangabe für einen Krisenhinweis, ohne Inhalt („Sprechtraining (Englisch)“) */
+  quelle: string
   transkript: TranskriptZeile[]
   themenfremd: number
   beendet: boolean
   grund?: string
   attrappe: boolean
+  /** Festgelegte Sitzung, gegen die der Kontrollkanal prüft */
+  fest?: FesteSitzung
+  /** Krise erkannt: nie Vorfall, Hilfetext beim Ende */
+  krise?: boolean
+  /** Minuten gebucht (einmal je Sitzung) */
+  abgerechnet?: boolean
+  endeZeit?: number
+  dauerMs?: number
   callId?: string
   key?: string
+  /** Über den Schlüssel der Schule – nur dann wird aufs Budget gebucht (22.10.2026) */
+  schule?: boolean
   ws?: WebSocket
   uhr?: ReturnType<typeof setTimeout>
 }
 
 const sitzungen = new Map<string, Sitzung>()
+
+/** Tokengrenze je Antwort der Gesprächs-KI – Faustregel: reicht für gut eine Minute Sprechen */
+export const MAX_ANTWORT_TOKENS = 1500
+/** So lange bleibt eine beendete Sitzung für /ende im Speicher (Faustregel) */
+export const NACHLAUF_MS = 10 * 60_000
+
+/** Festgelegte Sitzung (Anmeldung und Zurücksetzen): nur Audio-Ausgabe, Transkription an, ein Werkzeug */
+export function festeSitzung(anweisungenText: string, sprache: SprechSprache): FesteSitzung & { tools: (typeof WERKZEUG_BEENDEN)[] } {
+  return {
+    instructions: anweisungenText,
+    output_modalities: ['audio'],
+    max_output_tokens: MAX_ANTWORT_TOKENS,
+    audio: {
+      input: { transcription: { model: 'gpt-4o-mini-transcribe', language: sprache }, turn_detection: { type: 'semantic_vad', eagerness: 'low' } },
+      output: { voice: STIMME[sprache] }
+    },
+    tools: [WERKZEUG_BEENDEN],
+    tool_choice: 'auto'
+  }
+}
+
+/** Laufende Sitzungen einer Person beenden (höchstens eine je Kind – eine neue beendet die alte) */
+export function laufendeBeenden(schuelerId: string, jetzt = Date.now()): number {
+  let n = 0
+  for (const s of sitzungen.values())
+    if (s.schuelerId === schuelerId && !s.beendet) {
+      void beenden(s, 'neu', jetzt)
+      n++
+    }
+  return n
+}
+
+let aufraeumUhr: ReturnType<typeof setInterval> | undefined
+
+/** Neue Sitzung anmelden: alte der Person beenden, Uhr stellen, Aufräumen starten */
+export function sitzungAnlegen(p: Omit<Sitzung, 'id' | 'transkript' | 'themenfremd' | 'beendet'>): Sitzung {
+  laufendeBeenden(p.schuelerId, p.start)
+  const s: Sitzung = { ...p, id: `t${randomBytes(10).toString('hex')}`, transkript: [], themenfremd: 0, beendet: false }
+  sitzungen.set(s.id, s)
+  s.uhr = setTimeout(() => void beenden(s, 'zeit'), s.maxMs + 15000)
+  s.uhr.unref?.()
+  if (!aufraeumUhr) {
+    aufraeumUhr = setInterval(() => sitzungenAufraeumen(), 60_000)
+    aufraeumUhr.unref?.()
+  }
+  return s
+}
+
+/** Sitzung, die nie zustande kam (Anmeldung beim Anbieter fehlgeschlagen): nichts buchen */
+function verwerfen(s: Sitzung): void {
+  if (s.uhr) clearTimeout(s.uhr)
+  s.beendet = true
+  s.abgerechnet = true
+  sitzungen.delete(s.id)
+}
+
+export const sitzungVon = (id: string): Sitzung | undefined => sitzungen.get(id)
+
+/**
+ * Verwaiste Sitzungen aufräumen (jede Minute): über die Zeit hinaus offen → beenden (bucht die Minuten);
+ * beendet und ohne /ende → nach dem Nachlauf aus dem Speicher.
+ */
+export function sitzungenAufraeumen(jetzt = Date.now()): void {
+  for (const s of [...sitzungen.values()]) {
+    if (!s.beendet && jetzt > s.start + s.maxMs + 60_000) void beenden(s, 'zeit', jetzt)
+    else if (s.beendet && jetzt - (s.endeZeit ?? jetzt) > NACHLAUF_MS) {
+      s.transkript = []
+      sitzungen.delete(s.id)
+    }
+  }
+}
+
+/**
+ * Minuten buchen – genau einmal je Sitzung, egal wie sie endet. Legt einen Eintrag ohne Wertung an; /ende ersetzt ihn
+ * durch die Einschätzung. Die Dauer ist auf die erlaubte Zeit (+15 s) begrenzt.
+ */
+export function abrechnen(s: Sitzung, jetzt = Date.now()): number {
+  if (s.abgerechnet) return 0
+  s.abgerechnet = true
+  s.endeZeit = jetzt
+  const dauerMs = Math.max(0, Math.min(jetzt, s.start + s.maxMs + 15000) - s.start)
+  s.dauerMs = dauerMs
+  const minuten = Math.max(1, Math.round(dauerMs / 60000))
+  const st = standVon(s.freigabeId, s.schuelerId)
+  standSpeichern(s.freigabeId, s.schuelerId, {
+    ...st,
+    uebungen: [...st.uebungen, { zeit: jetzt, teil: s.teil, modus: s.modus, minuten, wertung: {}, punkte: 0, staerke: '', tipps: [], ausspracheUnsicher: true, sitzung: s.id }]
+  })
+  if (!s.attrappe && s.schule) fremdNutzungBuchen({ nutzerId: s.lehrkraftId, anbieter: 'openai', art: 'realtime', sekunden: Math.round(dauerMs / 1000) })
+  return minuten
+}
 
 /**
  * Karten für eine Übung: zuerst aus dem Pool der Schule für Sprache und Jahrgang (App „Sprechprüfungen",
@@ -279,11 +421,13 @@ function karteFuerAnzeige(k: SprechKarte): Record<string, unknown> {
   return { art: k.art, titel: k.titel, situation: k.situation, rolle: k.rolleSchueler, punkte: k.punkte, ziel: k.ziel }
 }
 
-async function beenden(s: Sitzung, grund: string): Promise<void> {
+export async function beenden(s: Sitzung, grund: string, jetzt = Date.now()): Promise<void> {
   if (s.beendet) return
   s.beendet = true
   s.grund = grund
   if (s.uhr) clearTimeout(s.uhr)
+  // Minuten sofort buchen – auch wenn der Browser /ende nie aufruft
+  abrechnen(s, jetzt)
   try {
     s.ws?.close()
   } catch {
@@ -295,11 +439,25 @@ async function beenden(s: Sitzung, grund: string): Promise<void> {
     )
 }
 
-/** Äußerung der/des Lernenden prüfen: Umgehung (2. Mal = Ende) */
-async function schuelerSagt(s: Sitzung, text: string): Promise<void> {
+/**
+ * Krise erkannt (22.10.2026, Entscheidung der Lehrkraft): NIE ein Vorfall, nie eine Sperre. Vertraulicher Hinweis an die
+ * Lehrkraft ohne Wortlaut; die Übung endet sanft – mit KI nach einer kurzen Pause, damit die freundliche Antwort noch
+ * zu hören ist (Faustregel 8 s); das Kind sieht beim Ende den festen Hilfetext.
+ */
+export function kriseErkannt(s: Sitzung): void {
+  if (s.krise) return
+  s.krise = true
+  kriseMelden(s.lehrkraftId, s.schuelerId, s.quelle)
+  if (s.attrappe || !s.key) void beenden(s, 'krise')
+  else setTimeout(() => void beenden(s, 'krise'), 8000).unref?.()
+}
+
+/** Äußerung der/des Lernenden prüfen: Krise zuerst (nie Vorfall), dann Umgehung (2. Mal = Ende) und Moderation */
+export async function schuelerSagt(s: Sitzung, text: string): Promise<void> {
   const t = text.trim()
-  if (!t) return
+  if (!t || s.krise || s.beendet) return
   s.transkript.push({ rolle: 'schueler', text: t.slice(0, 1000) })
+  if (kriseVerdacht(t)) return kriseErkannt(s)
   if (istUmgehung(t)) {
     s.themenfremd++
     if (s.themenfremd >= 2) {
@@ -307,23 +465,55 @@ async function schuelerSagt(s: Sitzung, text: string): Promise<void> {
       await beenden(s, 'themenfremd')
     }
   }
-  // Inhaltsfilter (Text, ohne Speicherung): Moderation des Anbieters
+  // Inhaltsfilter (Text, ohne Speicherung): Moderation des Anbieters, Kategorien getrennt ausgewertet
   if (s.key && !s.beendet) {
-    const r = (await fetch('https://api.openai.com/v1/moderations', {
+    if (s.schule) fremdNutzungBuchen({ nutzerId: s.lehrkraftId, anbieter: 'openai', art: 'moderation', zeichen: t.length })
+    const r = await fetch('https://api.openai.com/v1/moderations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${s.key}`, 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'omni-moderation-latest', input: t })
     })
       .then((x) => (x.ok ? x.json() : null))
-      .catch(() => null)) as { results?: { flagged?: boolean }[] } | null
-    if (r?.results?.[0]?.flagged) {
+      .catch(() => null)
+    const urteil = moderationsUrteil(r)
+    if (urteil === 'krise') kriseErkannt(s)
+    else if (urteil === 'unangemessen' && !s.krise && !s.beendet) {
       vorfallMerken(s.freigabeId, s.schuelerId, 'unangemessen', t)
       await beenden(s, 'unangemessen')
     }
   }
 }
 
-/** Kontrollkanal: Transkript mitlesen, Anweisungen festhalten, Werkzeugaufruf und Ende */
+/** Werkzeug `uebung_beenden` der KI: „hilfe“ (oder ein Krisensatz) ist eine Krise, kein Vorfall */
+export function werkzeugBeenden(s: Sitzung, argumente: unknown): void {
+  const a = json_<{ grund?: string; satz?: string }>(argumente, {})
+  if (s.krise) return
+  if (a.grund === 'hilfe' || kriseVerdacht(a.satz)) return kriseErkannt(s)
+  if (a.grund === 'themenfremd' || a.grund === 'unangemessen') vorfallMerken(s.freigabeId, s.schuelerId, a.grund, a.satz ?? '')
+  setTimeout(() => void beenden(s, a.grund === 'themenfremd' || a.grund === 'unangemessen' ? a.grund : 'fertig'), 4000).unref?.()
+}
+
+/** Kontrollkanal-Ereignis anwenden (Entscheidung: shared/sprechen/kontrolle.ts) */
+export function kontrollAnwenden(s: Sitzung, e: unknown, senden: (x: unknown) => void): void {
+  if (!s.fest || s.beendet) return
+  const d = kontrollEreignis(e, s.fest)
+  if (d.art === 'ok') return
+  const typ = String((e as { type?: unknown })?.type ?? '')
+  protokolliereServer('sprechen', `Kontrollkanal: ${d.art} (${d.felder.join(', ')})`, s.schuelerId)
+  if (d.art === 'auflegen') {
+    if (d.antwortId) senden({ type: 'response.cancel', response_id: d.antwortId })
+    vorfallMerken(s.freigabeId, s.schuelerId, 'manipulation', '')
+    void beenden(s, 'manipulation')
+    return
+  }
+  // Zurücksetzen auf die festgelegte Fassung; beim ersten Stand (session.created) ohne Vorfall
+  senden({ type: 'session.update', session: { type: 'realtime', ...s.fest } })
+  if (typ === 'session.created') return
+  const { gesperrt } = vorfallMerken(s.freigabeId, s.schuelerId, 'manipulation', '')
+  if (gesperrt) void beenden(s, 'manipulation')
+}
+
+/** Kontrollkanal: jedes Ereignis prüfen, Transkript mitlesen, Werkzeugaufruf und Ende */
 function kontrollkanal(s: Sitzung): void {
   if (!s.callId || !s.key) return
   const url = `wss://api.openai.com/v1/realtime?call_id=${encodeURIComponent(s.callId)}`
@@ -331,8 +521,11 @@ function kontrollkanal(s: Sitzung): void {
   const WS = WebSocket as unknown as new (u: string, o: unknown) => WebSocket
   const ws = new WS(url, { headers: { Authorization: `Bearer ${s.key}` } })
   s.ws = ws
+  const senden = (x: unknown): void => {
+    if (ws.readyState === 1) ws.send(JSON.stringify(x))
+  }
   ws.addEventListener('message', (ev: MessageEvent) => {
-    let e: { type?: string; transcript?: string; name?: string; arguments?: string; session?: { instructions?: string } }
+    let e: { type?: string; transcript?: string; name?: string; arguments?: string }
     try {
       e = JSON.parse(String(ev.data))
     } catch {
@@ -341,19 +534,13 @@ function kontrollkanal(s: Sitzung): void {
     const typ = e.type ?? ''
     // Audio-Ereignisse ungelesen verwerfen
     if (typ.includes('audio') && !typ.includes('transcript') && !typ.includes('transcription')) return
+    // Jedes andere Ereignis gegen die festgelegte Sitzung prüfen (22.10.2026, KI-Sicherheitsprüfung)
+    kontrollAnwenden(s, e, senden)
+    if (s.beendet) return
     if (typ === 'conversation.item.input_audio_transcription.completed' && e.transcript) void schuelerSagt(s, e.transcript)
     else if ((typ === 'response.output_audio_transcript.done' || typ === 'response.audio_transcript.done') && e.transcript)
       s.transkript.push({ rolle: 'ki', text: e.transcript.slice(0, 1000) })
-    else if (typ === 'response.function_call_arguments.done' && e.name === 'uebung_beenden') {
-      const a = json_<{ grund?: string; satz?: string }>(e.arguments, {})
-      if (a.grund === 'themenfremd' || a.grund === 'unangemessen') vorfallMerken(s.freigabeId, s.schuelerId, a.grund, a.satz ?? '')
-      setTimeout(() => void beenden(s, a.grund ?? 'fertig'), 4000)
-    } else if (typ === 'session.updated' && e.session?.instructions !== undefined && e.session.instructions !== s.anweisungen) {
-      // Anweisungen wurden verändert (z. B. über die Entwicklerwerkzeuge): zurücksetzen und als Umgehung werten
-      ws.send(JSON.stringify({ type: 'session.update', session: { type: 'realtime', instructions: s.anweisungen } }))
-      const { gesperrt } = vorfallMerken(s.freigabeId, s.schuelerId, 'manipulation', '')
-      if (gesperrt) void beenden(s, 'themenfremd')
-    }
+    else if (typ === 'response.function_call_arguments.done' && e.name === 'uebung_beenden') werkzeugBeenden(s, e.arguments)
   })
 }
 
@@ -388,7 +575,8 @@ export function meineFreigaben(ich: NutzerInfo, jetzt = Date.now()): MeineFreiga
         bis: f.bis,
         niveau: niveauVon(f),
         jahrgang,
-        minutenRest: Math.max(0, e.minutenWoche - minutenDieseWoche(st.uebungen, jetzt)),
+        // Wochen- und Tagesgrenze (22.10.2026)
+        minutenRest: restMinuten(e.minutenWoche, st.uebungen, jetzt).rest,
         gesperrt: Boolean(st.gesperrt),
         uebungen: st.uebungen
       }
@@ -506,24 +694,31 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
       if (!f || !sprechIstFuer(f, ich, jetzt)) return json(res, 404, { fehler: 'Dieses Sprechtraining ist nicht (mehr) für dich freigegeben.' }), true
       const teil = String(k0.teil ?? '') as Teil
       if (!teileVon(f).includes(teil)) return json(res, 400, { fehler: 'Dieser Teil ist nicht freigegeben.' }), true
+      const attrappe = Boolean(process.env.SCHULAPPS_KI_ATTRAPPE)
+      // Hartes Budget der Lehrkraft (22.10.2026): erschöpft → keine neue Übung
+      if (!attrappe && budgetErschoepft(f.lehrkraft_id)) return json(res, 403, { fehler: 'Das Sprechtraining ist gerade nicht möglich – das KI-Kontingent deiner Lehrkraft ist aufgebraucht.' }), true
+      // Höchstens eine laufende Sitzung je Kind: die alte endet (und wird abgerechnet), bevor der Rest berechnet wird
+      laufendeBeenden(ich.id, jetzt)
       const e = einstellungenVon(f)
       const st = standVon(f.id, ich.id)
       if (st.gesperrt) return json(res, 403, { fehler: 'Das Sprechtraining ist für dich gesperrt. Bitte sprich mit deiner Lehrkraft.' }), true
       const stunde = new Date(jetzt).getHours()
       if (e.nurSchulzeit && (stunde < 7 || stunde >= 21)) return json(res, 403, { fehler: 'Das Sprechtraining geht zwischen 7 und 21 Uhr.' }), true
-      const rest = e.minutenWoche - minutenDieseWoche(st.uebungen, jetzt)
-      if (rest < 1) return json(res, 403, { fehler: 'Deine Übungszeit für diese Woche ist aufgebraucht.' }), true
-      const { sprache } = sprachUndJahrgang(f)
+      const r0 = restMinuten(e.minutenWoche, st.uebungen, jetzt)
+      if (r0.woche < 1) return json(res, 403, { fehler: 'Deine Übungszeit für diese Woche ist aufgebraucht.' }), true
+      if (r0.tag < 1) return json(res, 403, { fehler: 'Deine Übungszeit für heute ist aufgebraucht. Morgen geht es weiter.' }), true
+      const { sprache, jahrgang } = sprachUndJahrgang(f)
       const niveau = niveauVon(f)
-      const oberstufe = ((sprachUndJahrgang(f).jahrgang ?? 0) >= 11)
-      const minuten = Math.min(rest, hoechstMinuten(teil, niveau, oberstufe))
-      const karten = karteWaehlen(sprache, niveau, teil, sprachUndJahrgang(f).jahrgang, e.karten ?? [])
+      const oberstufe = (jahrgang ?? 0) >= 11
+      const minuten = Math.min(r0.rest, hoechstMinuten(teil, niveau, oberstufe))
+      const karten = karteWaehlen(sprache, niveau, teil, jahrgang, e.karten ?? [])
       if (!karten.length) return json(res, 409, { fehler: 'Für diesen Teil gibt es noch keine Aufgabenkarten. Bitte die Lehrkraft, welche anzulegen.' }), true
       const modus = teil === 'simulation' || k0.modus === 'pruefung' ? 'pruefung' : 'ueben'
-      const vorname = (ich.name || '').split(/\s+/)[0] ?? ''
-      const g: Gespraech = { sprache, teil, niveau, modus, vorname, karten, minuten }
-      const s: Sitzung = {
-        id: `t${randomBytes(10).toString('hex')}`,
+      // Kein Name an den Anbieter (22.10.2026, KI-Sicherheitsprüfung) – die KI spricht neutral an
+      const g: Gespraech = { sprache, teil, niveau, modus, karten, minuten }
+      const text = anweisungen(g, oberstufe)
+      const fest = festeSitzung(text, sprache)
+      const s = sitzungAnlegen({
         freigabeId: f.id,
         schuelerId: ich.id,
         lehrkraftId: f.lehrkraft_id,
@@ -533,38 +728,27 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
         niveau,
         start: jetzt,
         maxMs: minuten * 60000,
-        anweisungen: anweisungen(g, oberstufe),
-        transkript: [],
-        themenfremd: 0,
-        beendet: false,
-        attrappe: Boolean(process.env.SCHULAPPS_KI_ATTRAPPE)
-      }
-      sitzungen.set(s.id, s)
-      s.uhr = setTimeout(() => void beenden(s, 'zeit'), s.maxMs + 15000)
+        anweisungen: text,
+        quelle: `Sprechtraining (${vokZeile(f.vok_id)?.fach || SPRACHNAME[sprache]})`,
+        attrappe,
+        fest
+      })
       const anzeige = { karten: karten.map(karteFuerAnzeige), minuten, niveau, sprache }
       if (s.attrappe) return json(res, 200, { sitzung: s.id, attrappe: true, ...anzeige }), true
       const ks = schluesselUndModell(f.lehrkraft_id, teil)
-      if (!ks) return sitzungen.delete(s.id), json(res, 409, { fehler: 'Die Gesprächs-KI ist nicht eingerichtet.' }), true
+      if (!ks) return verwerfen(s), json(res, 409, { fehler: 'Die Gesprächs-KI ist nicht eingerichtet.' }), true
       const sdp = String(k0.sdp ?? '')
-      if (!sdp.startsWith('v=')) return sitzungen.delete(s.id), json(res, 400, { fehler: 'Verbindung fehlgeschlagen.' }), true
+      if (!sdp.startsWith('v=')) return verwerfen(s), json(res, 400, { fehler: 'Verbindung fehlgeschlagen.' }), true
       s.key = ks.key
-      const sitzungKonfig = {
-        type: 'realtime',
-        model: ks.modell,
-        instructions: s.anweisungen,
-        audio: {
-          input: { transcription: { model: 'gpt-4o-mini-transcribe', language: sprache }, turn_detection: { type: 'semantic_vad', eagerness: 'low' } },
-          output: { voice: STIMME[sprache] }
-        },
-        tools: [WERKZEUG_BEENDEN],
-        tool_choice: 'auto'
-      }
+      s.schule = ks.schule
+      // Festgelegt: Anweisungen, ein Werkzeug, nur Audio-Ausgabe, Tokengrenze je Antwort, Transkription an
+      const sitzungKonfig = { type: 'realtime', model: ks.modell, ...fest }
       const form = new FormData()
       form.set('sdp', sdp)
       form.set('session', JSON.stringify(sitzungKonfig))
       const r = await fetch('https://api.openai.com/v1/realtime/calls', { method: 'POST', headers: { Authorization: `Bearer ${ks.key}` }, body: form }).catch(() => null)
       if (!r || !r.ok) {
-        sitzungen.delete(s.id)
+        verwerfen(s)
         protokolliereServer('sprechen', `Gesprächs-KI lehnt ab (${r?.status ?? 'nicht erreichbar'})`, f.lehrkraft_id)
         return json(res, 502, { fehler: 'Die Gesprächs-KI ist gerade nicht erreichbar.' }), true
       }
@@ -583,55 +767,67 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
       if (!s.attrappe) return json(res, 403, { fehler: 'Nicht erlaubt.' }), true
       await schuelerSagt(s, String(k0.text ?? ''))
       if (!s.beendet) s.transkript.push({ rolle: 'ki', text: s.themenfremd ? "Let's get back to our exam. Tell me about your family." : 'That sounds great. Why do you like it?' })
-      return json(res, 200, { antwort: s.transkript[s.transkript.length - 1]?.text ?? '', beendet: s.beendet, grund: s.grund ?? null }), true
+      return json(res, 200, { antwort: s.beendet ? '' : (s.transkript[s.transkript.length - 1]?.text ?? ''), beendet: s.beendet, grund: s.grund ?? null }), true
     }
 
     if (url.pathname === '/s/api/sprechen/ende') {
+      // Beenden bucht die Minuten (falls noch nicht geschehen); danach aus dem Speicher
       await beenden(s, s.grund ?? 'fertig')
       sitzungen.delete(s.id)
       const kn = (k0.kennzahlen ?? {}) as Partial<Kennzahlen>
       const kennzahlen: Kennzahlen = {
         sprechzeitMs: Math.max(0, Math.min(3_600_000, Number(kn.sprechzeitMs) || 0)),
-        dauerMs: Math.max(0, Math.min(3_600_000, Date.now() - s.start)),
+        dauerMs: Math.max(0, Math.min(3_600_000, s.dauerMs ?? Date.now() - s.start)),
         langePausen: Math.max(0, Math.min(500, Math.round(Number(kn.langePausen) || 0)))
       }
-      const minuten = Math.max(1, Math.round(kennzahlen.dauerMs / 60000))
-      const st = standVon(s.freigabeId, s.schuelerId)
-      // Missbrauch oder zu wenig gesprochen: zählt nicht, keine Einschätzung (die Minuten zählen)
+      // Krise: nie Vorfall, keine Einschätzung – der feste Hilfetext (Entscheidung der Lehrkraft)
+      if (s.krise || s.grund === 'krise') {
+        s.transkript = []
+        return json(res, 200, { gewertet: false, grund: 'krise', hilfe: HILFETEXT }), true
+      }
+      // Missbrauch oder zu wenig gesprochen: zählt nicht, keine Einschätzung (die Minuten zählen – schon gebucht)
       const eigene = s.transkript.filter((z) => z.rolle === 'schueler')
-      if (s.grund === 'themenfremd' || s.grund === 'unangemessen' || eigene.length < 2) {
-        standSpeichern(s.freigabeId, s.schuelerId, { ...st, uebungen: [...st.uebungen, { zeit: Date.now(), teil: s.teil, modus: s.modus, minuten, wertung: {}, punkte: 0, staerke: '', tipps: [], ausspracheUnsicher: true }] })
-        return json(res, 200, { gewertet: false, grund: s.grund === 'themenfremd' || s.grund === 'unangemessen' ? s.grund : 'zu_kurz' }), true
+      const missbrauch = s.grund === 'themenfremd' || s.grund === 'unangemessen' || s.grund === 'manipulation'
+      if (missbrauch || eigene.length < 2) {
+        s.transkript = []
+        return json(res, 200, { gewertet: false, grund: missbrauch ? (s.grund === 'manipulation' ? 'themenfremd' : s.grund) : 'zu_kurz' }), true
       }
       let ein: Einschaetzung
       if (s.attrappe) ein = ATTRAPPE_EINSCHAETZUNG
       else {
         const lk = lehrkraftVon(s.lehrkraftId)
-        if (!lk) return json(res, 500, { fehler: 'Lehrkraft nicht gefunden.' }), true
+        if (!lk) return json(res, 500, { fehler: LERNENDEN_FEHLER }), true
         try {
           const roh = await imNutzer(alsNutzer(lk), () =>
             aufruf('ai:structured', [bewertungsAnfrage({ sprache: s.sprache, teil: s.teil, niveau: s.niveau, transkript: s.transkript, kennzahlen })])
           )
           ein = einschaetzungAus(roh, true)
         } catch (e) {
-          return json(res, 502, { fehler: `Die Einschätzung ist gerade nicht möglich (${e instanceof Error ? e.message : String(e)}).` }), true
+          // Rohe Anbieterfehler nur ins Protokoll (22.10.2026, KI-Sicherheitsprüfung)
+          protokolliereServer('sprechen', `Einschätzung fehlgeschlagen (${(e instanceof Error ? e.message : String(e)).slice(0, 200)})`, s.lehrkraftId)
+          s.transkript = []
+          return json(res, 502, { fehler: kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER }), true
         }
       }
       // Transkript verwerfen – gespeichert werden nur Werte, Kennzahlen und Tipps
       s.transkript = []
+      const st = standVon(s.freigabeId, s.schuelerId)
+      const gebucht = st.uebungen.find((x) => x.sitzung === s.id)
       const u: Uebung = {
-        zeit: Date.now(),
+        zeit: gebucht?.zeit ?? Date.now(),
         teil: s.teil,
         modus: s.modus,
-        minuten,
+        minuten: gebucht?.minuten ?? Math.max(1, Math.round(kennzahlen.dauerMs / 60000)),
         wertung: ein.wertung,
         punkte: punkteVon(ein.wertung),
         staerke: ein.staerke,
         tipps: ein.tipps,
         ...(ein.proaktiv ? { proaktiv: ein.proaktiv } : {}),
-        ausspracheUnsicher: ein.ausspracheUnsicher
+        ausspracheUnsicher: ein.ausspracheUnsicher,
+        sitzung: s.id
       }
-      standSpeichern(s.freigabeId, s.schuelerId, { ...st, uebungen: [...st.uebungen, u] })
+      // Den beim Abrechnen angelegten Eintrag ersetzen (die Minuten zählen nur einmal)
+      standSpeichern(s.freigabeId, s.schuelerId, { ...st, uebungen: gebucht ? st.uebungen.map((x) => (x === gebucht ? u : x)) : [...st.uebungen, u] })
       return json(res, 200, { gewertet: true, uebung: u }), true
     }
     return json(res, 404, { fehler: 'Unbekannt.' }), true

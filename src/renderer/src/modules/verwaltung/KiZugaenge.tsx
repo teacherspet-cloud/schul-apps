@@ -23,6 +23,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlappKarte } from '../../shared/components/KlappKarte'
 import KiNutzung, { type KiNutzungDaten, type KiZeitraum } from './KiNutzung'
+import KiSchutz, { type KiSchutzDaten } from './KiSchutz'
 
 export interface SchluesselEintrag {
   name: string
@@ -33,6 +34,8 @@ export interface SchluesselEintrag {
 interface KiZugaengeDaten {
   endpunkte: Record<string, KompatibelEinstellung>
   nutzung: KiNutzungDaten
+  /** Budget je Lehrkraft, Modelle über den Schulzugang (22.10.2026, KiSchutz.tsx) */
+  schutz?: KiSchutzDaten
 }
 
 const DIENSTE: Record<string, string> = {
@@ -291,6 +294,7 @@ export function KiZugaenge({ schluessel, neu }: { schluessel: SchluesselEintrag[
       ) : (
         <Loader size="sm" />
       )}
+      {daten?.schutz && <KiSchutz daten={daten.schutz} zeitraum={zeitraum} anbieterName={anbieterName} neu={laden} />}
       <KlappKarte
         id="verwaltung-ki-zugaenge"
         titel={`KI-Zugänge der Schule (${eingerichtet})`}

@@ -38,7 +38,8 @@ import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/Fokus
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
 import type { Andock, Vorgaben, VorgabeArt } from './blattWerkzeuge'
-import { materialMitZeilen } from './materialZeilen'
+import { kriseVerdacht } from '@shared/krise'
+import { KrisenHilfe } from '../../shared/KrisenHilfe'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import type { FormArt } from '@shared/blattObjekte'
@@ -131,7 +132,7 @@ export interface BlattDaten {
   antworten: Record<string, string>
   tinte: Record<string, string>
   aufgabenFeedback: Record<string, AufgabenFb[]>
-  fassungen: { nr: number; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
+  fassungen: { nr: number; zeit: string; bogen?: FeedbackBogen; fehler?: string; krise?: boolean }[]
   /** Lösungsblatt – nur nach dem ersten Einreichen (03.10.2026) */
   loesung?: string
 }
@@ -146,6 +147,8 @@ type AufgabenFb = {
   markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string }[]
   /** Beim Einreichen entstanden (08.10.2026): Nummer der Einreichung, automatisch geprüft, ✓/✗ je Feld */
   abgabe?: number
+  /** Krisenhinweis (22.10.2026): fester Hilfetext statt Vorwurf */
+  krise?: boolean
   auto?: AbgabeFeedback['auto']
   marken?: Record<string, FeldMarke>
 }
@@ -659,12 +662,22 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [pruefHinweis, setPruefHinweis] = useState('')
 
   const [pruefFehler, setPruefFehler] = useState<Record<string, string>>({})
-  /** Materialtexte mit Zeilennummern für die KI (Zeilenangaben prüfbar) */
-  const materialAngabe = (): { material?: string } => {
-    const doc = iframe.current?.contentDocument
-    const m = doc ? materialMitZeilen(doc) : ''
-    return m ? { material: m } : {}
-  }
+  /*
+   * Das Material mit Zeilennummern liest seit 22.10.2026 der Server selbst aus dem gespeicherten Blatt
+   * (KI-Sicherheitsprüfung) – das Gerät schickt es nicht mehr mit.
+   *
+   * Krisenhinweis (22.10.2026): Deutet etwas im Eingetragenen auf Selbstgefährdung hin (Server: KI-Feld oder Wortliste;
+   * hier zusätzlich die Wortliste, damit der Hilfetext auch bei einem Ausfall der KI erscheint), steht oben der feste
+   * Hilfetext – nie eine Sperre.
+   */
+  const [hilfe, setHilfe] = useState(
+    () => d.fassungen.some((f) => f.krise) || Object.values(d.aufgabenFeedback ?? {}).some((l) => (l ?? []).some((x) => x.krise))
+  )
+  const eigeneEintraege = (): string =>
+    Object.entries(antworten)
+      .filter(([k]) => /^f\d+$/.test(k))
+      .map(([, v]) => v)
+      .join('\n')
   const aufgabePruefen = async (nr: number): Promise<void> => {
     setLaeuft(`a${nr}`)
     setMeldung('')
@@ -675,18 +688,19 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     const naechste = a ? liste.find((x) => x.seite === a.seite && x.y > a.y) : undefined
     const s0 = a ? gemessen?.seiten[a.seite] : undefined
     const bereich = a && s0 ? { seite: a.seite, von: a.y - s0.y - 10, bis: naechste ? naechste.y - s0.y - 10 : s0.h } : undefined
+    if (kriseVerdacht(eigeneEintraege())) setHilfe(true)
     try {
-      const fb = await senden<{ einschaetzung: string; text: string }>('/s/api/blatt/aufgabe', {
+      const fb = await senden<{ einschaetzung: string; text: string; krise?: boolean }>('/s/api/blatt/aufgabe', {
         id: d.id,
         nr,
         antworten,
         felder: felderAlsDaten(),
         ...(bereich ? { bereich } : {}),
         ...(a?.zeichnen ? { nurZeichenflaeche: true } : {}),
-        ...materialAngabe(),
         ...(stand.current.tinteGeaendert ? { tinte } : {})
       })
       stand.current.tinteGeaendert = false
+      if (fb.krise) setHilfe(true)
       setAufgabenFb((x) => ({ ...x, [String(nr)]: [...(x[String(nr)] ?? []), { ...fb, zeit: Date.now() }] }))
     } catch (e) {
       // Im Fenster der Aufgabe zeigen – unten unter dem Blatt sah man die Meldung nicht (Befund 03.10.2026)
@@ -700,6 +714,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     if (!window.confirm(d.feedback ? 'Blatt jetzt einreichen? Danach bekommst du ein Feedback.' : 'Blatt jetzt einreichen?')) return
     setLaeuft('abgabe')
     setMeldung('')
+    if (kriseVerdacht(eigeneEintraege())) setHilfe(true)
     try {
       const r = await senden<{
         ok: boolean
@@ -708,19 +723,22 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         fehler?: string
         aufgabenFeedback?: Record<string, AufgabenFb>
         pruefFehler?: string
+        krise?: boolean
+        rundeZurueck?: boolean
       }>('/s/api/blatt/abgeben', {
         id: d.id,
-        ...materialAngabe(),
         antworten,
         felder: felderAlsDaten(),
         tinte
       })
-      setGenutzt((g) => g + 1)
-      setFassungen((f) => [...f, { nr: r.nr, zeit: new Date().toISOString(), bogen: r.bogen, fehler: r.fehler }])
+      if (r.krise) setHilfe(true)
+      // Ist die KI ausgefallen, gibt der Server die Runde zurück (22.10.2026) – dann zählt dieses Einreichen nicht
+      if (!r.rundeZurueck) setGenutzt((g) => g + 1)
+      setFassungen((f) => [...f, { nr: r.nr, zeit: new Date().toISOString(), bogen: r.bogen, fehler: r.fehler, ...(r.krise ? { krise: true } : {}) }])
       // Alles auf einmal (08.10.2026): ✓/✗ an Kästchen und Lücken, Ampel und Hinweis an jeder Aufgabe
       const neu = r.aufgabenFeedback ?? {}
       if (Object.keys(neu).length) setAufgabenFb((x) => ({ ...x, ...Object.fromEntries(Object.entries(neu).map(([nr, e]) => [nr, [...(x[nr] ?? []), e]])) }))
-      setPruefHinweis(r.pruefFehler ? `Die Hinweise zu den offenen Aufgaben konnten nicht erstellt werden: ${r.pruefFehler}` : '')
+      setPruefHinweis(r.pruefFehler ? `Die Hinweise zu den offenen Aufgaben fehlen noch. ${r.pruefFehler}` : '')
       seiteNachOben()
     } catch (e) {
       setMeldung(e instanceof Error ? e.message : String(e))
@@ -995,10 +1013,11 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           </Stack>
         </Card>
       )}
+      {hilfe && <KrisenHilfe />}
       {pruefHinweis && <Alert color="orange">{pruefHinweis}</Alert>}
       {reiheId && genutzt > 0 && <ReiheWeiterNachBlatt zid={reiheId} blattId={d.id} stand={genutzt} />}
       {fassungen.at(-1)?.fehler && (
-        <Alert color="orange">Das Feedback konnte nicht erstellt werden: {fassungen.at(-1)!.fehler}. Deine Lehrkraft sieht dein Blatt trotzdem.</Alert>
+        <Alert color="orange">{fassungen.at(-1)!.fehler} Deine Lehrkraft sieht dein Blatt trotzdem.</Alert>
       )}
 
       {ansicht === 'blatt' && offen && werkzeugeDa && (
@@ -1015,6 +1034,12 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           vorgaben={vorgaben}
           setVorgabe={setVorgabe}
         />
+      )}
+      {/* Stift-Einträge gehen als Seitenbild an die KI – Namen in Bildern erkennt der Namensfilter nicht (22.10.2026) */}
+      {ansicht === 'blatt' && offen && werkzeugeDa && (d.feedback || d.einstellungen.aufgabenFeedback) && (
+        <Text size="xs" c="dimmed" data-bild-hinweis>
+          Bitte keine Namen oder Gesichter fotografieren oder zeichnen – was du mit dem Stift einträgst, sieht die KI als Bild.
+        </Text>
       )}
 
       {/* In der Listenansicht bleibt das Blatt unsichtbar da – sonst ließen sich die Felder nicht messen */}

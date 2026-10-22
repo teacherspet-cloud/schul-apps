@@ -10,6 +10,7 @@ import { useKopfDaten } from './kopfDaten'
 import { useStartAnzahl, useStartOffen } from './StartAnzahl'
 import { ProgrammInfo } from '../shared/components/AppKopf'
 import StartBegruessung from './StartBegruessung'
+import KrisenHinweise from './KrisenHinweise'
 import { modules } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
 import { openDocument, openSettings, openThemen } from '../shared/navigation'
@@ -250,6 +251,9 @@ export default function Home(): React.JSX.Element {
             ) : undefined
           }
         />
+        {/* Vertrauliche Hinweise (22.10.2026, Krise ohne Wortlaut) – nur wenn offen, gut sichtbar oben */}
+        {aufServer() && <KrisenHinweise />}
+
         {/* Smartphone: „Meine Klassen" über der Materialsuche (10.10.2026) – aufklappbar mit Klassen und Kursen */}
         {handy && aufServer() && modules.some((m) => m.id === 'meineklassen') && <MeineKlassenKasten />}
 

@@ -478,6 +478,14 @@ export interface EinheitBewertung {
   schonAkzeptiert?: number
   /** Diese Akzeptanz ist als Alternative gemerkt (10.10.2026) – beim Umentscheiden wird sie wieder zurückgenommen */
   alsAlternativeGemerkt?: boolean
+  /**
+   * Urteil der KI über eine freie Antwort, von der Lehrkraft noch nicht bestätigt (22.10.2026, KI-Sicherheitsprüfung,
+   * Entscheidung der Lehrkraft „vorläufig bis Bestätigung"): Die Lernenden sehen es als vorläufig. Ältere Urteile ohne
+   * das Feld gelten als bestätigt (nichts ändert sich nachträglich).
+   */
+  unbestaetigt?: boolean
+  /** Die Antwort enthält vermutlich Anweisungen an die KI (22.10.2026, kiSchutz.ts) – nur Hinweis für die Lehrkraft */
+  kiVerdacht?: boolean
 }
 
 /** Korrekturzeichen der Lehrkraft in der Blattansicht */
@@ -546,6 +554,24 @@ export const summe = (b: Bewertung): number => Object.values(b).reduce((s, x) =>
 export const offeneEinheiten = (b: Bewertung): number => Object.values(b).filter((x) => x.status === 'ki' || x.status === 'lehrkraft').length
 /** Von der KI markiert, von der Lehrkraft noch nicht entschieden */
 export const zuEntscheiden = (b: Bewertung): number => Object.values(b).filter((x) => x.pruefen && x.quelle !== 'lehrkraft').length
+/** KI-Urteile, die die Lehrkraft noch nicht bestätigt hat (22.10.2026, KI-Sicherheitsprüfung) */
+export const kiUnbestaetigt = (b: Bewertung): number => Object.values(b).filter((x) => x.quelle === 'ki' && x.unbestaetigt).length
+/** „Alle KI-Urteile bestätigen": die Urteile bleiben, sie sind nur nicht mehr vorläufig */
+export function kiBestaetigen(b: Bewertung): { bewertung: Bewertung; bestaetigt: number } {
+  let bestaetigt = 0
+  const out: Bewertung = {}
+  for (const [k, x] of Object.entries(b)) {
+    if (x.quelle === 'ki' && x.unbestaetigt) {
+      const { unbestaetigt: _, ...rest } = x
+      out[k] = rest
+      bestaetigt++
+    } else out[k] = x
+  }
+  return { bewertung: out, bestaetigt }
+}
+/** Ergebnis für die Lernenden vorläufig: KI läuft, etwas ist offen, zu entscheiden oder ein KI-Urteil unbestätigt */
+export const ergebnisVorlaeufig = (b: Bewertung, kiLaeuft = false): boolean =>
+  kiLaeuft || offeneEinheiten(b) > 0 || zuEntscheiden(b) > 0 || kiUnbestaetigt(b) > 0
 
 // ---------------------------------------------------------------- Anzeige
 

@@ -3,6 +3,13 @@ import { BILD_BLOCKIERT } from '@shared/bildBlockiert'
 import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel, splitDataUrl } from './provider'
+import { kiFehler, kontingentLeer, voruebergehenderStatus } from './kiFehler'
+
+/**
+ * Obergrenze der Ausgabe (22.10.2026, KI-Sicherheitsprüfung): Bei Gemini 2.5 zählen die Denkschritte mit.
+ * Faustregel wie bei OpenAI (openai.ts): 32 768 schneidet keinen bisherigen Auftrag ab und deckelt Ausreißer.
+ */
+export const GOOGLE_MAX_AUSGABE = 32_768
 
 export class GoogleProvider implements AiProvider {
   private client: GoogleGenAI
@@ -42,6 +49,9 @@ export class GoogleProvider implements AiProvider {
         systemInstruction: req.system,
         responseMimeType: 'application/json',
         responseJsonSchema: req.schema,
+        maxOutputTokens: GOOGLE_MAX_AUSGABE,
+        // Bewertung: gleiche Antwort → gleiches Urteil (22.10.2026; Gemini nimmt temperature bei allen Textmodellen)
+        ...(req.bewertung ? { temperature: 0 } : {}),
         abortSignal: signal
       }
     }
@@ -49,6 +59,7 @@ export class GoogleProvider implements AiProvider {
       if (!onChunk) {
         const response = await this.client.models.generateContent(params)
         merkeVerbrauch('google', model, { eingabe: response.usageMetadata?.promptTokenCount ?? 0, ausgabe: response.usageMetadata?.candidatesTokenCount ?? 0 })
+        if (response.candidates?.[0]?.finishReason === 'MAX_TOKENS') throw new Error('Die Antwort von Gemini war zu lang und wurde abgeschnitten.')
         const text = response.text
         if (!text) throw new Error('Gemini hat keine Antwort geliefert.')
         return JSON.parse(text) as T
@@ -68,7 +79,7 @@ export class GoogleProvider implements AiProvider {
       if (!text) throw new Error('Gemini hat keine Antwort geliefert.')
       return JSON.parse(text) as T
     } catch (e) {
-      throw new Error(describeError(e))
+      throw alsKiFehler(e)
     }
   }
 
@@ -93,6 +104,13 @@ export class GoogleProvider implements AiProvider {
       throw new Error(describeError(e))
     }
   }
+}
+
+/** Fehler mit Status für `mitWiederholung` (22.10.2026) – Google meldet kein Retry-After an der Fehlerklasse */
+function alsKiFehler(e: unknown): Error {
+  const meldung = describeError(e)
+  if (!(e instanceof ApiError)) return new Error(meldung)
+  return kiFehler(meldung, { status: e.status, voruebergehend: voruebergehenderStatus(e.status) && !kontingentLeer(e.message) })
 }
 
 function describeError(e: unknown): string {

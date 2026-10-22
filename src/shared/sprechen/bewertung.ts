@@ -9,6 +9,7 @@
  * Faustregel: Gesamteindruck nie mehr als 1 Punkt über dem Schnitt der vier Kriterien.
  */
 import type { StructuredRequest } from '../types'
+import { abgrenzen, datenRegel, neueMarke } from '../kiSchutz'
 import { KRITERIEN, type KriteriumId, type Wertung } from './kriterien'
 import { SPRACHNAME } from './anweisungen'
 import type { Niveau, SprechSprache, Teil } from './niveaus'
@@ -69,10 +70,13 @@ export function bewertungsAnfrage(p: {
   kennzahlen: Kennzahlen
   aussprache?: { genauigkeit: number; fluessigkeit: number } | null
 }): StructuredRequest {
+  // Schutz gegen Injektion (22.10.2026, KI-Sicherheitsprüfung): die Äußerungen stehen zwischen Zufalls-Marken
+  const marke = neueMarke('GESPRAECH')
   const kriterien = KRITERIEN.map((k) => `- ${k.id} (${k.name}): 5 = ${k.stufen[5]}; 3 = ${k.stufen[3]}; 1 = ${k.stufen[1]}`).join('\n')
   return {
     system:
-      'Du bist eine erfahrene Fremdsprachenlehrkraft in Niedersachsen und schätzt Sprechübungen nach dem Bewertungsbogen der Sprechprüfung ein. Du bist fair, eher streng als mild, und lernförderlich. Sprich die Person mit „du" an.',
+      'Du bist eine erfahrene Fremdsprachenlehrkraft in Niedersachsen und schätzt Sprechübungen nach dem Bewertungsbogen der Sprechprüfung ein. Du bist fair, eher streng als mild, und lernförderlich. Sprich die Person mit „du" an. ' +
+      datenRegel(marke),
     user: [
       `Sprache: ${SPRACHNAME[p.sprache]} · Teil: ${p.teil} · Ziel-Niveau des Jahrgangs: GER ${p.niveau}. Miss die Leistung an diesem Ziel (3 Punkte = erwartbar für den Jahrgang).`,
       'KRITERIEN (je 0–5; 4 und 2 für Leistungen zwischen den Beschreibungen; 0 nur ohne bewertbare Äußerung):',
@@ -95,11 +99,14 @@ export function bewertungsAnfrage(p: {
       kennzahlenText(p.transkript, p.kennzahlen),
       '',
       'TRANSKRIPT:',
-      ...p.transkript.map((z) => `${z.rolle === 'ki' ? 'AI' : 'STUDENT'}: ${z.text}`)
+      abgrenzen(p.transkript.map((z) => `${z.rolle === 'ki' ? 'AI' : 'STUDENT'}: ${z.text}`).join('\n'), marke)
     ]
       .filter(Boolean)
       .join('\n'),
     schemaName: 'sprechuebung_einschaetzung',
+    // Gleiche Antwort → gleiches Urteil; zählt zum Budget der Lehrkraft (22.10.2026, KI-Sicherheitsprüfung)
+    bewertung: true,
+    vonLernenden: true,
     schema: {
       type: 'object',
       additionalProperties: false,

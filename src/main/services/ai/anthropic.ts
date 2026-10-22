@@ -2,6 +2,14 @@ import Anthropic from '@anthropic-ai/sdk'
 import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel, splitDataUrl } from './provider'
+import { kiFehler, kontingentLeer, voruebergehenderStatus, wartenAusKopf } from './kiFehler'
+
+/**
+ * Nimmt das Modell `temperature`? (22.10.2026, KI-Sicherheitsprüfung) Belegt (Anthropic-Dokumentation, Stand 10/2026):
+ * Fable/Mythos, Opus 4.7/4.8/5/5.5 und Sonnet 5 lehnen Sampling-Parameter mit 400 ab, Sonnet 5.5 und Haiku 5.5 jeden
+ * Wert außer der Vorgabe. Opus/Sonnet 4.6, Haiku 4.5 und ältere nehmen sie.
+ */
+export const anthropicTemperatur = (modell: string): boolean => !/fable|mythos|opus-(4-[7-9]|[5-9])|sonnet-[5-9]|haiku-[5-9]/i.test(modell)
 
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
@@ -12,7 +20,7 @@ export class AnthropicProvider implements AiProvider {
   private client: Anthropic
 
   constructor(apiKey: string) {
-    this.client = new Anthropic({ apiKey, maxRetries: 2, dangerouslyAllowBrowser: true })
+    this.client = new Anthropic({ apiKey, maxRetries: 0, dangerouslyAllowBrowser: true })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -48,6 +56,8 @@ export class AnthropicProvider implements AiProvider {
         model,
         max_tokens: 16000,
         system: req.system,
+        // Bewertung: gleiche Antwort → gleiches Urteil, soweit das Modell es zulässt (22.10.2026)
+        ...(req.bewertung && anthropicTemperatur(model) ? { temperature: 0 } : {}),
         messages: [{ role: 'user' as const, content }],
         output_config: { format: { type: 'json_schema' as const, schema: req.schema } },
         ...(useFallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {})
@@ -79,9 +89,17 @@ export class AnthropicProvider implements AiProvider {
       if (!text) throw new Error('Claude hat keine Antwort geliefert.')
       return JSON.parse(text) as T
     } catch (e) {
-      throw new Error(describeError(e))
+      throw alsKiFehler(e)
     }
   }
+}
+
+/** Fehler mit Status und Retry-After für `mitWiederholung` (22.10.2026) */
+function alsKiFehler(e: unknown): Error {
+  const meldung = describeError(e)
+  if (!(e instanceof Anthropic.APIError)) return new Error(meldung)
+  const status = e.status
+  return kiFehler(meldung, { status, wartenMs: wartenAusKopf(e.headers), voruebergehend: voruebergehenderStatus(status) && !kontingentLeer(e.message) })
 }
 
 function describeError(e: unknown): string {

@@ -11,6 +11,7 @@
  * Arbeitsblatt, Schreibaufgabe und Test öffnen ihre eigenen Seiten (mit „Zur Reihe").
  * Abgestimmt: ganzer Weg sichtbar, Abzeichen für Abschnitte, KEINE Ranglisten oder Vergleiche.
  */
+import { KrisenHilfe } from '../../shared/KrisenHilfe'
 import {
   Alert,
   Badge,
@@ -570,6 +571,8 @@ function Abgabe({
   const [fehler, setFehler] = useState('')
   const [bogen, setBogen] = useState<FeedbackBogen | null>(null)
   const [geprueft, setGeprueft] = useState<boolean | null>(null)
+  // Krisenhinweis vom Server (22.10.2026, krise.ts)
+  const [hilfe, setHilfe] = useState('')
   // Abschlussprodukt in einer digitalen Reihe (08.10.2026): Die KI prüft nach dem Raster – die Punkte sieht nur die Lehrkraft
   const kiPrueft = Boolean(i.feedback) || (i.art === 'abschluss' && d.art === 'digital')
   const textErlaubt = i.art !== 'sprechen' && (i.art === 'abschluss' || i.antwort !== 'foto')
@@ -598,6 +601,7 @@ function Abgabe({
     setFehler('')
     try {
       const r = await schicke('abgeben', { antworten })
+      if (typeof r.hilfe === 'string') setHilfe(r.hilfe)
       if (r.bogen) setBogen(r.bogen as FeedbackBogen)
       if (typeof r.geprueft === 'boolean') setGeprueft(r.geprueft)
       neu()
@@ -676,6 +680,12 @@ function Abgabe({
             data-reihe-antwort
           />
         ))}
+      {hilfe && <KrisenHilfe text={hilfe} />}
+      {fotoErlaubt && !fertig && (
+        <Text size="xs" c="dimmed">
+          Bitte keine Namen oder Gesichter fotografieren.
+        </Text>
+      )}
       {fotoErlaubt && !fertig && (
         <FileButton onChange={(f) => f && void hochladen(f, f.name)} accept="image/*,application/pdf,video/*">
           {(p) => (
@@ -889,6 +899,7 @@ function Reflexion({
   const [tagebuch, setTagebuch] = useState(st.tagebuch ?? '')
   const [laeuft, setLaeuft] = useState(false)
   const [impuls, setImpuls] = useState(st.impuls?.text ?? '')
+  const [hilfe, setHilfe] = useState('')
   // Handy (08.10.2026): die drei Ampelstufen untereinander statt gequetscht nebeneinander
   const schmal = useMediaQuery('(max-width: 480px)') ?? false
   return (
@@ -923,6 +934,7 @@ function Reflexion({
           void schicke('abgeben', { ampel, tagebuch })
             .then((r) => {
               if (typeof r.impuls === 'string' && r.impuls) setImpuls(r.impuls)
+              if (typeof r.hilfe === 'string') setHilfe(r.hilfe)
               neu()
             })
             .finally(() => setLaeuft(false))
@@ -936,6 +948,7 @@ function Reflexion({
           Einen Moment – du bekommst gleich einen Gedanken zu deinem Eintrag.
         </Text>
       )}
+      {hilfe && <KrisenHilfe text={hilfe} />}
       {/* KI-Impuls zum Lerntagebuch (08.10.2026, Plan E.6): freundlich, ohne Bewertung */}
       {impuls && (
         <Alert color="grape" variant="light" title="Ein Gedanke zu deinem Eintrag" data-reflexion-impuls>

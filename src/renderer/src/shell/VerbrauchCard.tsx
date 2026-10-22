@@ -46,7 +46,7 @@ export default function VerbrauchCard({ elevenlabs = false }: { elevenlabs?: boo
       id="verbrauch"
       titel="Verbrauch"
       status={verbrauchStatus(auswertung ? auswertung.kennzahlen.zeitraum : null, limits)}
-      ton={limits ? 'warnung' : 'neutral'}
+      ton={limits || (daten?.schulBudget && daten.schulBudget.stufe !== 'ok') ? 'warnung' : 'neutral'}
       rahmen={{ 'data-verbrauch': true }}
     >
       {daten && auswertung ? <VerbrauchInhalt daten={daten} a={auswertung} elevenlabs={elevenlabs} /> : null}
@@ -102,6 +102,7 @@ function VerbrauchInhalt({ daten, a, elevenlabs }: { daten: VerbrauchsDaten; a: 
 
   return (
     <Stack gap="md">
+      <SchulBudgetHinweis stand={daten.schulBudget} />
       <Text size="sm" c="dimmed">
         Was die App bei den eigenen KI-Zugängen angefragt hat – eine Zählung, keine Kostenrechnung (Preise hängen am Vertrag). Token melden nur Zugänge
         mit API-Schlüssel; beim Abo zählt die App die Anfragen.
@@ -278,5 +279,28 @@ function MonatsTabelle({ monate: daten }: { monate: VerbrauchsDaten['monate'] })
         </Table>
       </Table.ScrollContainer>
     </Stack>
+  )
+}
+
+/**
+ * Monatsbudget über den KI-Zugang der Schule (22.10.2026, KI-Sicherheitsprüfung M1): ab 80 % eine Warnung, ab 100 % der
+ * Hinweis, dass KI-Rückmeldungen für Lernende pausieren (die eigene Materialerstellung läuft weiter). Nur auf dem Server.
+ */
+function SchulBudgetHinweis({ stand }: { stand: VerbrauchsDaten['schulBudget'] }): React.JSX.Element | null {
+  if (!stand || stand.stufe === 'ok') return null
+  const euro = (n: number): string => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+  const prozent = Math.round(stand.anteil * 100)
+  return (
+    <Alert color={stand.stufe === 'ueber' ? 'red' : 'orange'} variant="light" icon={<IconAlertTriangle size={18} />} data-schul-budget={stand.stufe}>
+      <Text size="sm" fw={600}>
+        {stand.stufe === 'ueber' ? 'KI-Budget der Schule für diesen Monat aufgebraucht' : `KI-Budget der Schule zu ${prozent} % genutzt`}
+      </Text>
+      <Text size="sm">
+        Geschätzt {euro(stand.verbraucht)} von {euro(stand.grenze)} in diesem Monat über den KI-Zugang der Schule.{' '}
+        {stand.stufe === 'ueber'
+          ? 'KI-Rückmeldungen für die eigenen Lernenden (Rückmeldebogen, Onlinetest, Sprechtraining …) pausieren bis zum Monatsende. Die eigene Materialerstellung läuft weiter.'
+          : 'Bei 100 % pausieren KI-Rückmeldungen für die eigenen Lernenden bis zum Monatsende; die eigene Materialerstellung läuft weiter.'}
+      </Text>
+    </Alert>
   )
 }

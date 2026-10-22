@@ -1,0 +1,15 @@
+{ "verzoegerungMs": 300, "ausSchema": true, "antworten": {
+  "onlinetest_bewertung": { "urteile": [
+    { "id": "A1", "urteil": "richtig", "begruendung": "passt", "fehlerGruppe": "andere", "fehlerArt": "" },
+    { "id": "A2", "urteil": "richtig", "begruendung": "passt", "fehlerGruppe": "andere", "fehlerArt": "" } ] },
+  "blatt_aufgabe_feedback": { "einschaetzung": "teilweise", "text": "Der Anfang stimmt.", "gelungen": "Der Anfang stimmt.", "fehlt": "Ein Beispiel fehlt.", "schritt": "Ergänze ein Beispiel.",
+    "markierungen": [ { "zitat": "My first answer", "art": "lob", "text": "Guter Anfang", "zeichen": "" } ], "krise": false },
+  "rueckmeldung_bogen": { "staerken": ["Du nennst zwei klare Gründe."], "schritte": ["Achte beim nächsten Mal auf ein Beispiel."],
+    "kriterien": [ { "kriterium": "Inhalt", "einschaetzung": "teilweise", "beleg": "football", "anteil": 60 } ],
+    "schluss": "Weiter so.", "gesamt": { "anteil": 60, "begruendung": "Solide." },
+    "rand": [ { "zitat": "My first answer", "text": "Guter Anfang", "zeichen": "", "art": "lob" }, { "zitat": "football", "text": "passt", "zeichen": "", "art": "lob" } ],
+    "aufgaben": [ { "nr": 1, "gelungen": "Der Anfang stimmt.", "fehlt": "Ein Beispiel fehlt.", "schritt": "Ergänze ein Beispiel." }, { "nr": 2, "gelungen": "Gut.", "fehlt": "", "schritt": "Weiter so." } ],
+    "fehler": [ { "kategorie": "Beispiele fehlen", "beispiel": "My first answer" } ], "krise": false },
+  "reihe_lernziele": { "lernziele": [ { "text": "Das Wetter beschreiben", "ichKann": "Ich kann das Wetter auf Englisch beschreiben." }, { "text": "Über Kleidung sprechen", "ichKann": "Ich kann sagen, was ich anziehe." } ] },
+  "schritt_lernziele": { "lernziele": [ { "text": "Wetterwörter", "ichKann": "Ich kann zehn Wetterwörter." } ] }
+} }

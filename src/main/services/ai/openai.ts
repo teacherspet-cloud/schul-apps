@@ -4,12 +4,26 @@ import { abrufe } from '../images/politeFetch'
 import { StructuredRequest } from '@shared/types'
 import { BILD_BLOCKIERT } from '@shared/bildBlockiert'
 import { AiProvider, ChunkListener, RawModel } from './provider'
+import { kiFehler, kontingentLeer, voruebergehenderStatus, wartenAusKopf } from './kiFehler'
+
+/**
+ * Obergrenze der Ausgabe (22.10.2026, KI-Sicherheitsprüfung): Bei Denkmodellen zählen die Denkschritte mit.
+ * Faustregel: Die größten Aufträge (Arbeitsblatt, Klassenarbeit) liefern unter 16 000 Token Antwort – Claude ist seit
+ * jeher auf 16 000 begrenzt –, dazu Raum für das Nachdenken. 32 000 schneidet nichts Bisheriges ab und deckelt Ausreißer.
+ */
+export const OPENAI_MAX_AUSGABE = 32_000
+
+/**
+ * Nimmt das Modell `temperature`? Denkmodelle der Responses-Schnittstelle (o-Reihe, gpt-5 …) lehnen sie mit 400 ab
+ * (belegt: OpenAI-Dokumentation „reasoning models"); nur die älteren Chat-Modelle (gpt-4o, gpt-4.1) nehmen sie.
+ */
+export const openaiTemperatur = (modell: string): boolean => /^(gpt-4o|gpt-4\.1|gpt-4-|gpt-4$|gpt-3)/i.test(modell)
 
 export class OpenAiProvider implements AiProvider {
   private client: OpenAI
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 2, dangerouslyAllowBrowser: true })
+    this.client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0, dangerouslyAllowBrowser: true })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -31,6 +45,9 @@ export class OpenAiProvider implements AiProvider {
       model,
       instructions: req.system,
       input: [{ role: 'user' as const, content }],
+      max_output_tokens: OPENAI_MAX_AUSGABE,
+      // Bewertung: gleiche Antwort → gleiches Urteil, soweit das Modell es zulässt (22.10.2026)
+      ...(req.bewertung && openaiTemperatur(model) ? { temperature: 0 } : {}),
       text: {
         format: { type: 'json_schema' as const, name: req.schemaName, schema: req.schema, strict: true }
       }
@@ -40,6 +57,7 @@ export class OpenAiProvider implements AiProvider {
       if (!onChunk) {
         const response = await this.client.responses.create(params, { signal })
         merkeVerbrauch('openai', model, { eingabe: response.usage?.input_tokens ?? 0, ausgabe: response.usage?.output_tokens ?? 0 })
+        if (response.incomplete_details?.reason === 'max_output_tokens') throw new Error('Die Antwort von OpenAI war zu lang und wurde abgeschnitten.')
         if (!response.output_text) throw new Error('Die KI hat keine Antwort geliefert.')
         return JSON.parse(response.output_text) as T
       }
@@ -51,12 +69,15 @@ export class OpenAiProvider implements AiProvider {
           onChunk(text.length, text)
         } else if (event.type === 'response.completed') {
           merkeVerbrauch('openai', model, { eingabe: event.response.usage?.input_tokens ?? 0, ausgabe: event.response.usage?.output_tokens ?? 0 })
+        } else if (event.type === 'response.incomplete') {
+          merkeVerbrauch('openai', model, { eingabe: event.response.usage?.input_tokens ?? 0, ausgabe: event.response.usage?.output_tokens ?? 0 })
+          if (event.response.incomplete_details?.reason === 'max_output_tokens') throw new Error('Die Antwort von OpenAI war zu lang und wurde abgeschnitten.')
         }
       }
       if (!text) throw new Error('Die KI hat keine Antwort geliefert.')
       return JSON.parse(text) as T
     } catch (e) {
-      throw new Error(describeError(e))
+      throw alsKiFehler(e)
     }
   }
 
@@ -77,6 +98,15 @@ export class OpenAiProvider implements AiProvider {
       throw new Error(describeError(e))
     }
   }
+}
+
+/** Fehler mit Status und Retry-After für `mitWiederholung` (22.10.2026) */
+function alsKiFehler(e: unknown): Error {
+  const meldung = describeError(e)
+  if (!(e instanceof OpenAI.APIError)) return new Error(meldung)
+  const status = e.status
+  const leer = status === 429 && (e.code === 'insufficient_quota' || kontingentLeer(e.message))
+  return kiFehler(meldung, { status, wartenMs: wartenAusKopf(e.headers), voruebergehend: voruebergehenderStatus(status) && !leer })
 }
 
 function describeError(e: unknown): string {

@@ -30,6 +30,7 @@
  * Diese Datei kennt Electron nicht, damit sie sich ohne Programm prüfen lässt.
  */
 import { AbbruchFehler } from '@shared/abbruch'
+import { KiGrenzeFehler } from '@shared/kiGrenzen'
 
 export type PlatzZustand = 'wartend' | 'laufend'
 
@@ -53,6 +54,10 @@ interface Wartender {
   id?: string
   /** Auftrag, zu dem die Anfrage gehört (Round-Robin); fehlt = vorrangig */
   gruppe?: string
+  /** Wessen Anfrage (Lehrkraft bzw. „L:" + Lehrkraft für ihre Lernenden) – Wechsel je Schlüssel (22.10.2026) */
+  schluessel: string
+  /** Ausgelöst von Lernenden: eigene Spur mit Obergrenze und Wartezeit */
+  lernend: boolean
   los: () => void
   weg: (e: Error) => void
 }
@@ -74,8 +79,37 @@ export function gruppeVon(id: string | undefined): string | undefined {
 /** So lange merkt sich der Begrenzer einen Abbruch für eine Kennung, die noch nicht angekommen ist. */
 const VORZEITIG_MS = 60_000
 
+/**
+ * Gerechte Verteilung auf dem Server (22.10.2026, KI-Sicherheitsprüfung H7). Bis dahin teilten sich ALLE Lehrkräfte
+ * und Lernenden drei Plätze, die Schlange war unbegrenzt, und Anfragen ohne Auftrag (alle von Lernenden) gingen immer
+ * vor – eine Klasse mit 30 Kindern konnte die Aufträge aller Lehrkräfte aushungern, und umgekehrt warteten Kinder
+ * minutenlang ohne Rückmeldung. Jetzt:
+ *  - Wechsel je Schlüssel (`wer`, auf dem Server die Lehrkraft): Wer am längsten nicht bedient wurde, ist dran.
+ *    Anfragen der Lernenden einer Lehrkraft zählen als eigener Schlüssel („L:<lehrkraft>"), so bekommen die Kinder
+ *    einer Klasse zusammen denselben Anteil wie eine Lehrkraft – innerhalb eines Schlüssels gilt die alte Reihenfolge.
+ *  - Je Schlüssel höchstens `proSchluessel` Plätze zugleich.
+ *  - Spur der Lernenden: höchstens `lernMax` Plätze zugleich (mindestens ein Platz bleibt für Lehrkräfte), höchstens
+ *    `lernSchlange` Wartende, und höchstens `lernWartenMs` Wartezeit – danach „bitte gleich noch einmal"
+ *    (KI_UEBERLAST). Aufträge der Lehrkräfte warten weiter ohne Frist (sie laufen im Hintergrund).
+ * Am PC bleibt alles wie bisher: ein Schlüssel, keine Lernenden.
+ */
+export interface PlatzRegeln {
+  /** Schlüssel der laufenden Anfrage (Server: Kennung der Lehrkraft); ohne = alle gleich */
+  wer?: () => string | undefined
+  /** Höchstens so viele Plätze je Schlüssel (Vorgabe: alle) */
+  proSchluessel?: number
+  /** Höchstens so viele Plätze für Lernende zugleich (Vorgabe: alle bis auf einen) */
+  lernMax?: number
+  /** Höchstens so viele wartende Anfragen von Lernenden (Vorgabe 40, Faustregel) */
+  lernSchlange?: number
+  /** Höchstens so lange wartet eine Anfrage von Lernenden (Vorgabe 60 s, Faustregel) */
+  lernWartenMs?: number
+}
+
 export class KiPlaetze {
   private laufend = 0
+  private laufendJe = new Map<string, number>()
+  private laufendLernend = 0
   private schlange: Wartender[] = []
   private steuerung = new Map<string, AbortController>()
   private vorzeitig = new Map<string, number>()
@@ -83,28 +117,34 @@ export class KiPlaetze {
   private verwaist: string[] = []
   /** Wann (laufende Nummer) ein Auftrag zuletzt bedient wurde – für den Wechsel je Auftrag */
   private bedient = new Map<string, number>()
+  /** Wann ein Schlüssel zuletzt bedient wurde – für den Wechsel je Lehrkraft (22.10.2026) */
+  private bedientSchluessel = new Map<string, number>()
   private takt = 0
+  private regeln: Required<Omit<PlatzRegeln, 'wer'>> & Pick<PlatzRegeln, 'wer'>
 
   constructor(
     readonly max: number,
-    private melde?: (id: string, zustand: PlatzZustand, info?: PlatzInfo) => void
-  ) {}
+    private melde?: (id: string, zustand: PlatzZustand, info?: PlatzInfo) => void,
+    regeln: PlatzRegeln = {}
+  ) {
+    this.regeln = {
+      wer: regeln.wer,
+      proSchluessel: Math.max(1, regeln.proSchluessel ?? max),
+      lernMax: Math.max(1, regeln.lernMax ?? Math.max(1, max - 1)),
+      lernSchlange: Math.max(0, regeln.lernSchlange ?? 40),
+      lernWartenMs: Math.max(0, regeln.lernWartenMs ?? 60_000)
+    }
+  }
 
   private info(): PlatzInfo {
     return { abgebrochen: this.verwaist.length, abgebrocheneBilder: this.verwaist.filter((a) => a === 'bild').length }
   }
 
-  /**
-   * Die Wartenden in der Reihenfolge, in der sie drankommen: erst die ohne Auftrag (der Reihe nach),
-   * dann im Wechsel je Auftrag – wer am längsten nicht bedient wurde (nie = zuerst), bei Gleichstand der
-   * zuerst Wartende.
-   */
-  private reihenfolge(): Wartender[] {
-    const ergebnis = this.schlange.filter((w) => !w.gruppe)
+  /** Reihenfolge innerhalb eines Schlüssels: erst die ohne Auftrag, dann im Wechsel je Auftrag (wie bis 22.10.2026) */
+  private reiheJe(liste: Wartender[], zuletzt: Map<string, number>, takt: { t: number }): Wartender[] {
+    const ergebnis = liste.filter((w) => !w.gruppe)
     const gruppen = new Map<string, Wartender[]>()
-    for (const w of this.schlange) if (w.gruppe) gruppen.set(w.gruppe, [...(gruppen.get(w.gruppe) ?? []), w])
-    const zuletzt = new Map(this.bedient)
-    let t = this.takt
+    for (const w of liste) if (w.gruppe) gruppen.set(w.gruppe, [...(gruppen.get(w.gruppe) ?? []), w])
     while (gruppen.size) {
       let wahl = ''
       let beste = Infinity
@@ -115,10 +155,42 @@ export class KiPlaetze {
           wahl = g
         }
       }
-      const liste = gruppen.get(wahl)!
-      ergebnis.push(liste.shift()!)
+      const l = gruppen.get(wahl)!
+      ergebnis.push(l.shift()!)
+      zuletzt.set(wahl, ++takt.t)
+      if (!l.length) gruppen.delete(wahl)
+    }
+    return ergebnis
+  }
+
+  /**
+   * Die Wartenden in der Reihenfolge, in der sie drankommen: im Wechsel je Schlüssel (wer am längsten nicht bedient
+   * wurde, zuerst), innerhalb eines Schlüssels erst die ohne Auftrag, dann im Wechsel je Auftrag.
+   */
+  private reihenfolge(): Wartender[] {
+    const takt = { t: this.takt }
+    const zuletztGruppe = new Map(this.bedient)
+    const je = new Map<string, Wartender[]>()
+    for (const w of this.schlange) je.set(w.schluessel, [...(je.get(w.schluessel) ?? []), w])
+    if (je.size <= 1) return this.reiheJe(this.schlange, zuletztGruppe, takt)
+    const reihen = new Map([...je].map(([s, l]) => [s, this.reiheJe(l, zuletztGruppe, takt)]))
+    const zuletzt = new Map(this.bedientSchluessel)
+    const ergebnis: Wartender[] = []
+    let t = this.takt
+    while (reihen.size) {
+      let wahl = ''
+      let beste = Infinity
+      for (const s of reihen.keys()) {
+        const z = zuletzt.get(s) ?? -1
+        if (z < beste) {
+          beste = z
+          wahl = s
+        }
+      }
+      const l = reihen.get(wahl)!
+      ergebnis.push(l.shift()!)
       zuletzt.set(wahl, ++t)
-      if (!liste.length) gruppen.delete(wahl)
+      if (!l.length) reihen.delete(wahl)
     }
     return ergebnis
   }
@@ -128,13 +200,44 @@ export class KiPlaetze {
     return this.reihenfolge().map((w) => w.id)
   }
 
-  /** Den Nächsten aus der Schlange nehmen und seinen Auftrag als bedient vermerken */
-  private naechster(): Wartender | undefined {
-    const w = this.reihenfolge()[0]
-    if (!w) return undefined
-    this.schlange.splice(this.schlange.indexOf(w), 1)
-    this.vermerke(w.gruppe)
-    return w
+  /** Darf eine Anfrage dieses Schlüssels bzw. dieser Spur jetzt laufen? */
+  private frei(schluessel: string, lernend: boolean): boolean {
+    if (this.laufend >= this.max) return false
+    if ((this.laufendJe.get(schluessel) ?? 0) >= this.regeln.proSchluessel) return false
+    return !lernend || this.laufendLernend < this.regeln.lernMax
+  }
+
+  /** Platz belegen und Schlüssel/Auftrag als bedient vermerken */
+  private belege(schluessel: string, lernend: boolean, gruppe: string | undefined): void {
+    this.laufend++
+    this.laufendJe.set(schluessel, (this.laufendJe.get(schluessel) ?? 0) + 1)
+    if (lernend) this.laufendLernend++
+    this.vermerke(gruppe)
+    this.bedientSchluessel.set(schluessel, ++this.takt)
+    if (this.bedientSchluessel.size > 500)
+      for (const s of [...this.bedientSchluessel.keys()]) if (!this.laufendJe.get(s) && !this.schlange.some((x) => x.schluessel === s)) this.bedientSchluessel.delete(s)
+  }
+
+  private gibFrei(schluessel: string, lernend: boolean): void {
+    this.laufend--
+    const n = (this.laufendJe.get(schluessel) ?? 1) - 1
+    if (n > 0) this.laufendJe.set(schluessel, n)
+    else this.laufendJe.delete(schluessel)
+    if (lernend) this.laufendLernend--
+  }
+
+  /** Alle Wartenden starten, für die jetzt ein Platz frei ist (in der Reihenfolge oben) */
+  private nachruecken(): boolean {
+    let gestartet = false
+    while (this.laufend < this.max) {
+      const w = this.reihenfolge().find((x) => this.frei(x.schluessel, x.lernend))
+      if (!w) break
+      this.schlange.splice(this.schlange.indexOf(w), 1)
+      this.belege(w.schluessel, w.lernend, w.gruppe)
+      w.los()
+      gestartet = true
+    }
+    return gestartet
   }
 
   /** Ein Auftrag kommt gerade dran (aus der Schlange oder sofort) – für den Wechsel je Auftrag */
@@ -171,9 +274,14 @@ export class KiPlaetze {
    *
    * `art` (z. B. „bild") erscheint in der Meldung an Wartende, falls eine abgebrochene Anfrage
    * dieser Art ihren Platz noch hält.
+   *
+   * `lernend` (22.10.2026): Anfrage von Lernenden – eigene Spur, begrenzte Schlange und Wartezeit; bei Überlast endet
+   * sie mit `KiGrenzeFehler('ueberlast')` (Meldung KI_UEBERLAST).
    */
-  async platz<T>(id: string | undefined, arbeit: (signal: AbortSignal) => Promise<T>, art = 'text'): Promise<T> {
+  async platz<T>(id: string | undefined, arbeit: (signal: AbortSignal) => Promise<T>, art = 'text', lernend = false): Promise<T> {
     const steuerung = new AbortController()
+    const wer = this.regeln.wer?.() ?? ''
+    const schluessel = lernend ? `L:${wer}` : wer
     if (id) {
       if (this.vorzeitig.has(id)) {
         this.vorzeitig.delete(id)
@@ -182,23 +290,40 @@ export class KiPlaetze {
       this.steuerung.set(id, steuerung)
     }
     try {
-      if (this.laufend >= this.max) {
-        // Beim Freiwerden belegt der Freigebende den Platz gleich für diese Anfrage (`laufend` zählt dort hoch)
+      if (!this.frei(schluessel, lernend)) {
+        if (lernend && this.schlange.filter((w) => w.lernend).length >= this.regeln.lernSchlange) throw new KiGrenzeFehler('ueberlast')
+        // Beim Freiwerden belegt der Freigebende den Platz gleich für diese Anfrage (`belege` in `nachruecken`)
         await new Promise<void>((los, weg) => {
-          const eintrag: Wartender = { id, gruppe: gruppeVon(id), los, weg }
-          this.schlange.push(eintrag)
-          this.meldeWartende()
-          steuerung.signal.addEventListener('abort', () => {
+          let frist: ReturnType<typeof setTimeout> | undefined
+          const eintrag: Wartender = {
+            id,
+            gruppe: gruppeVon(id),
+            schluessel,
+            lernend,
+            los: () => {
+              if (frist) clearTimeout(frist)
+              los()
+            },
+            weg
+          }
+          const raus = (e: Error): void => {
             const i = this.schlange.indexOf(eintrag)
             if (i < 0) return
             this.schlange.splice(i, 1)
-            weg(new AbbruchFehler())
+            if (frist) clearTimeout(frist)
+            weg(e)
             this.meldeWartende()
-          })
+          }
+          this.schlange.push(eintrag)
+          if (lernend && this.regeln.lernWartenMs > 0) {
+            frist = setTimeout(() => raus(new KiGrenzeFehler('ueberlast')), this.regeln.lernWartenMs)
+            ;(frist as { unref?: () => void }).unref?.()
+          }
+          this.meldeWartende()
+          steuerung.signal.addEventListener('abort', () => raus(new AbbruchFehler()))
         })
       } else {
-        this.laufend++
-        this.vermerke(gruppeVon(id))
+        this.belege(schluessel, lernend, gruppeVon(id))
       }
       if (id) this.melde?.(id, 'laufend')
       let lauf: Promise<T>
@@ -225,12 +350,8 @@ export class KiPlaetze {
         .then(() => {
           steuerung.signal.removeEventListener('abort', beiAbbruch)
           if (verwaist) this.verwaist.splice(this.verwaist.indexOf(art), 1)
-          this.laufend--
-          const naechster = this.naechster()
-          if (naechster) {
-            this.laufend++
-            naechster.los()
-          }
+          this.gibFrei(schluessel, lernend)
+          const naechster = this.nachruecken()
           if (verwaist || naechster) this.meldeWartende()
         })
       return await mitAbbruch(lauf, steuerung.signal)

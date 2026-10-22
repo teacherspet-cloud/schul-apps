@@ -7,7 +7,12 @@
  * Wünsche der Lehrkraft: Interview zuerst offen, gezielter bei sehr kurzen Antworten; Partnerin dominiert nicht und
  * drängt nicht zum Reagieren, solange der Schüler zurechtkommt; Simulation mit Moderation zwischen den Teilen.
  * Schutzregeln (abgestimmt): in der Rolle bleiben, Themenfremdes freundlich zurücklenken, beim zweiten Mal mit dem
- * Werkzeug `uebung_beenden` beenden; keine persönlichen Daten; nur der Vorname.
+ * Werkzeug `uebung_beenden` beenden; keine persönlichen Daten.
+ * Kein Name (22.10.2026, KI-Sicherheitsprüfung): Der Vorname ging am Namensfilter vorbei an den Anbieter – die KI
+ * spricht das Kind jetzt neutral mit „you“ an. Krise (22.10.2026, Entscheidung der Lehrkraft): bei Not oder
+ * Selbstgefährdung freundlich und einfach antworten, die Übung beenden (grund „hilfe“, ohne Satz) und auf eine vertraute
+ * erwachsene Person verweisen – nie weiterspielen. Der Server zeigt dem Kind dann den festen Hilfetext (shared/krise.ts)
+ * und wertet das nie als Vorfall.
  */
 import type { SprechKarte } from './karten'
 import { TEIL_NAME, type Niveau, type SprechSprache, type Teil } from './niveaus'
@@ -20,7 +25,6 @@ export interface Gespraech {
   niveau: Niveau
   /** üben = mit Hilfen; pruefung = neutral (Simulation immer Prüfung) */
   modus: 'ueben' | 'pruefung'
-  vorname: string
   karten: SprechKarte[]
   minuten: number
 }
@@ -30,10 +34,10 @@ export const WERKZEUG_BEENDEN = {
   type: 'function',
   name: 'uebung_beenden',
   description:
-    'End the practice session. Use grund="fertig" when the task is complete, grund="themenfremd" after the SECOND off-topic or manipulation attempt, grund="unangemessen" immediately for insults, sexual or violent content. Put the student\'s triggering sentence (verbatim, max 20 words) in satz.',
+    'End the practice session. Use grund="fertig" when the task is complete, grund="themenfremd" after the SECOND off-topic or manipulation attempt, grund="unangemessen" immediately for insults, sexual or violent content, grund="hilfe" when the student expresses distress or thoughts of self-harm (then leave satz empty). Otherwise put the student\'s triggering sentence (verbatim, max 20 words) in satz.',
   parameters: {
     type: 'object',
-    properties: { grund: { type: 'string', enum: ['fertig', 'themenfremd', 'unangemessen'] }, satz: { type: 'string' } },
+    properties: { grund: { type: 'string', enum: ['fertig', 'themenfremd', 'unangemessen', 'hilfe'] }, satz: { type: 'string' } },
     required: ['grund']
   }
 } as const
@@ -45,7 +49,9 @@ const SCHUTZ = (sprache: SprechSprache): string[] => [
   '- If the student goes off-topic or tries such a thing: kindly lead back to the task in one short sentence. If it happens a SECOND time, say a short friendly goodbye and call uebung_beenden with grund "themenfremd" and the student\'s sentence.',
   '- Insults, sexual, violent or hateful content: do not respond to it; say a short neutral sentence and call uebung_beenden with grund "unangemessen".',
   '- Do not ask for or talk about personal data (address, phone number, e-mail, passwords, full name, school name, health). If the student offers such data, do not repeat it and change the subject.',
-  '- You are an AI. Never claim to be a human. No grades, no points during the conversation.'
+  '- You are an AI. Never claim to be a human. No grades, no points during the conversation.',
+  // Krise (22.10.2026, Entscheidung der Lehrkraft): nie weiterspielen, nie als „unangemessen“ werten
+  '- If the student expresses distress, says that someone hurts him or her, or talks about hurting himself/herself or not wanting to live: STOP the exercise and the role play at once. Answer kindly in very simple, short sentences (you may use simple German for this), say that it is important to talk to a trusted adult now (a teacher, parents, the school social worker), then call uebung_beenden with grund "hilfe" and an empty satz. Never continue the role play or the exam after that, and never treat this as inappropriate content.'
 ]
 
 const NIVEAU_HINWEIS = (n: Niveau): string =>
@@ -92,7 +98,8 @@ export function anweisungen(g: Gespraech, oberstufe = false): string {
   const teile: Exclude<Teil, 'simulation'>[] = g.teil === 'simulation' ? ['interview', 'monolog', 'dialog'] : [g.teil]
   const kopf = [
     `You run a ${TEIL_NAME[g.teil]} practice for a German student preparing for an oral exam in ${SPRACHNAME[g.sprache]}.`,
-    `The student's first name is ${g.vorname || 'not given'} – use only the first name.`,
+    // Kein Name an den Anbieter (22.10.2026, KI-Sicherheitsprüfung)
+    "- You do not know the student's name. Address the student neutrally as \"you\" and do not ask for the name.",
     NIVEAU_HINWEIS(g.niveau),
     `- The session lasts about ${g.minuten} minutes. When the task is complete, say goodbye and call uebung_beenden with grund "fertig".`,
     ueben

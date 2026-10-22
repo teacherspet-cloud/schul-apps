@@ -2,7 +2,7 @@ import { AI_PROVIDERS, AiProviderId, AppSettings, DEFAULT_SETTINGS, KompatibelEi
 import { istKompatibel, kompatibelVorgabe } from '@shared/kiAnbieter'
 import { KompatibelProvider, adressePruefen, type KompatibelZiel } from './kompatibel'
 import { aufServer } from './cli'
-import { getSecret, getSettings, readJson, setSettings, writeJson } from '../storage/settings'
+import { getSecret, getSettings, hatEigenesGeheimnis, readJson, setSettings, writeJson } from '../storage/settings'
 import { AnthropicProvider } from './anthropic'
 import { createCliProvider } from './cli'
 import { builtinOptions, filterModels } from './catalog'
@@ -38,6 +38,15 @@ export function kompatibelZiel(id: KompatibelId, eigene = getSettings().ai.kompa
   if (!basisUrl) throw new Error(`Für ${label} ist keine Adresse eingetragen. Bitte in den Einstellungen ergänzen.`)
   const fehler = adressePruefen(basisUrl, server)
   if (fehler) throw new Error(fehler)
+  /*
+   * Schulschlüssel nur an die Adresse der Schule bzw. die feste Vorgabe (22.10.2026, KI-Sicherheitsprüfung): Sonst hätte eine
+   * Lehrkraft eine eigene Adresse eintragen und so den freigegebenen Schlüssel der Schule an einen fremden Server schicken
+   * können. Eine eigene Adresse verlangt einen eigenen Schlüssel.
+   */
+  const eigeneAdresse = eigene?.basisUrl?.trim()
+  const fremdeAdresse = Boolean(eigeneAdresse) && eigeneAdresse !== schule?.basisUrl?.trim() && eigeneAdresse !== vorgabe?.basisUrl
+  if (server && fremdeAdresse && !hatEigenesGeheimnis(id) && !vorgabe?.ohneSchluessel)
+    throw new Error(`Für eine eigene Adresse bei ${label} brauchst du einen eigenen API-Schlüssel – der Schlüssel der Schule gilt nur für die Adresse der Schule.`)
   const schluessel = getSecret(id)
   if (!schluessel && !vorgabe?.ohneSchluessel) throw new Error(`Kein API-Schlüssel für ${label} hinterlegt. Bitte in den Einstellungen eintragen.`)
   return {

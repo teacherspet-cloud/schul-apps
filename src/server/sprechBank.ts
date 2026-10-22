@@ -12,6 +12,7 @@
  *   POST /server/sprech-bank/bild {dataUrl}       → { datei }
  *   GET  /server/sprech-bank/bild/<datei> · /s/api/sprechen/bild/<datei>   Bild (angemeldet)
  */
+import { dateiTypAusBytes, istRasterbild } from './dateiTyp'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -122,7 +123,15 @@ export function sprechBankRoute(): (k: Anfrage) => Promise<boolean> {
     if (bildPfad && req.method === 'GET') {
       const b = bildLesen(bildPfad[1])
       if (!b) return json(res, 404, { fehler: 'Bild nicht gefunden.' }), true
-      res.writeHead(200, { 'content-type': b.typ, 'cache-control': 'private, max-age=86400', 'content-length': b.daten.length })
+      // Typ aus den Bytes, nosniff und CSP ohne Skripte – auch für Bilder von Lehrkräften (22.10.2026, KI-Sicherheitsprüfung)
+      const typ = dateiTypAusBytes(b.daten)
+      res.writeHead(200, {
+        'content-type': typ && istRasterbild(typ) ? typ : 'application/octet-stream',
+        'cache-control': 'private, max-age=86400',
+        'content-length': b.daten.length,
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "sandbox; default-src 'none'"
+      })
       res.end(b.daten)
       return true
     }

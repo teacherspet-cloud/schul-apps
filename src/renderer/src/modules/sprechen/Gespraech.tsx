@@ -14,6 +14,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { KRITERIEN, noteSekI, stufeVon } from '@shared/sprechen/kriterien'
 import { stufeVonNiveau, TEIL_NAME, type SprechSprache, type Teil } from '@shared/sprechen/niveaus'
 import { phrasesFuerTeil, type Phrase } from '@shared/sprechen/phrases'
+import { KrisenHilfe } from '../../shared/KrisenHilfe'
 import { passtZurPhrase } from './PhraseSpiele'
 import type { SprechFreigabe, Uebung } from './typen'
 
@@ -150,7 +151,7 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
   const [fehler, setFehler] = useState('')
   const [start, setStart] = useState<StartAntwort | null>(null)
   const [verlauf, setVerlauf] = useState<{ rolle: 'ki' | 'ich'; text: string }[]>([])
-  const [ergebnis, setErgebnis] = useState<{ gewertet: boolean; uebung?: Uebung; grund?: string } | null>(null)
+  const [ergebnis, setErgebnis] = useState<{ gewertet: boolean; uebung?: Uebung; grund?: string; hilfe?: string } | null>(null)
   const [eingabe, setEingabe] = useState('')
   const [sekunden, setSekunden] = useState(0)
   const bingo = useMemo<Phrase[]>(() => {
@@ -186,7 +187,7 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
     setZustand('werte')
     aufraeumen()
     try {
-      const r = await senden<{ gewertet: boolean; uebung?: Uebung; grund?: string }>('/s/api/sprechen/ende', {
+      const r = await senden<{ gewertet: boolean; uebung?: Uebung; grund?: string; hilfe?: string }>('/s/api/sprechen/ende', {
         sitzung: start.sitzung,
         kennzahlen: { sprechzeitMs: Math.round(pegel.current.sprechMs), langePausen: pegel.current.langePausen }
       })
@@ -415,7 +416,12 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
       )}
       {zustand === 'fertig' && ergebnis && (
         <>
-          {ergebnis.gewertet && ergebnis.uebung ? (
+          {ergebnis.grund === 'krise' ? (
+            // Krise (22.10.2026, Entscheidung der Lehrkraft): fester Hilfetext, kein Vorfall, keine Einschätzung
+            <div data-sprech-krise>
+              <KrisenHilfe text={ergebnis.hilfe || undefined} />
+            </div>
+          ) : ergebnis.gewertet && ergebnis.uebung ? (
             <Ergebnis u={ergebnis.uebung} nochmal={() => setZustand('bereit')} />
           ) : (
             <Alert color={ergebnis.grund === 'zu_kurz' ? 'blue' : 'orange'} data-sprech-nicht-gewertet={ergebnis.grund}>
@@ -424,7 +430,7 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
                 : 'Die Übung wurde beendet, weil sie nicht zum Sprechtraining gepasst hat. Sie zählt nicht.'}
             </Alert>
           )}
-          {abgehakt.size >= 3 && (
+          {abgehakt.size >= 3 && ergebnis.grund !== 'krise' && (
             <Text size="sm" data-bingo-ergebnis>
               Phrase-Bingo: {abgehakt.size} Wendungen benutzt{abgehakt.size >= 9 ? ' – volles Feld!' : ''}
             </Text>

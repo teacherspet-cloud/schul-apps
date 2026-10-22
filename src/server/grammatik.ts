@@ -26,6 +26,7 @@ import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand }
 import { nachSpielfehler } from '../shared/vokabelSpiele'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
+import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { imNutzer } from './kontext'
 import { getSettings } from '../main/services/storage/settings'
 import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, iservGruppeVon, lerngruppe, mitgliederVon } from './onlinetest'
@@ -1337,6 +1338,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           true
         )
       if (gaeste.length >= 120) return json(res, 429, { fehler: 'Für dieses Training sind schon zu viele Gäste angemeldet.' }), true
+      if (!gastBremse(k.ip)) return (json(res, 429, { fehler: GAST_BREMSE_MELDUNG }), true) // 22.10.2026, KI-Sicherheitsprüfung M5
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       const wieder = neuerCode(6)

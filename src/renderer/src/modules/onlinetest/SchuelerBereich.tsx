@@ -23,6 +23,8 @@
  * Zweite Runde (02.10.2026 abends): Ohne IServ geben die Lernenden „Vorname + Anfangsbuchstabe"
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
+ * Seit 22.10.2026 (KI-Sicherheitsprüfung): Ergebnis und Lösungen erst, wenn die Lehrkraft den Test beendet oder freigibt;
+ * Urteile der KI bleiben „vorläufig", bis die Lehrkraft sie bestätigt.
  */
 import { geraetAbmelden } from './erinnerungenGeraet'
 import { ErinnerungenFrage } from './ErinnerungenFrage'
@@ -115,6 +117,8 @@ import type { LernstandAntwort } from '@shared/lernstand'
 import { ankuendigungFaellig, ankuendigungText, testStatusText } from '@shared/onlinetestTermin'
 import { tagVon } from '@shared/schulkalender'
 import { fachAusName } from '@shared/faecher'
+import { kriseVerdacht } from '@shared/krise'
+import { KrisenHilfe } from '../../shared/KrisenHilfe'
 
 interface Beitritt {
   id: string
@@ -151,7 +155,8 @@ interface Ergebnis {
   einheiten?: Einheit[]
   loesungen?: Record<string, Loesung>
   antworten?: Antworten
-  bewertung?: Bewertung
+  /** `vorlaeufig`: von der KI bewertet, von der Lehrkraft noch nicht bestätigt (22.10.2026) */
+  bewertung?: Record<string, Bewertung[string] & { vorlaeufig?: boolean }>
 }
 
 /**
@@ -1989,7 +1994,8 @@ function ErgebnisAnsicht({
           </Text>
           {e && !e.frei && (
             <Text ta="center" size="sm" c="dimmed" data-ergebnis-wartet>
-              Dein Ergebnis erscheint hier, sobald alle abgegeben haben{e.alle ? ` (${e.fertig} von ${e.alle})` : ''} oder deine Lehrkraft es freigibt.
+              Dein Ergebnis erscheint hier, sobald deine Lehrkraft den Test beendet oder das Ergebnis freigibt
+              {e.alle ? ` (abgegeben: ${e.fertig} von ${e.alle})` : ''}.
             </Text>
           )}
         </Stack>
@@ -2012,13 +2018,16 @@ function ErgebnisAnsicht({
               {e.punkte} / {e.max} Punkte
             </Title>
           </div>
-          <Badge size="xl" variant="light">
+          <Badge size="xl" variant="light" color={e.vorlaeufig ? 'yellow' : undefined} data-note-vorlaeufig={e.vorlaeufig ? '' : undefined}>
             Note {e.note}
+            {e.vorlaeufig ? ' (vorläufig)' : ''}
           </Badge>
         </Group>
         {e.vorlaeufig && (
-          <Alert color="yellow" mt="sm" variant="light">
-            Vorläufig – deine Lehrkraft prüft noch einzelne Antworten. Das Ergebnis kann sich noch ändern.
+          <Alert color="yellow" mt="sm" variant="light" data-ergebnis-vorlaeufig>
+            {Object.values(bewertung).some((x) => x.vorlaeufig)
+              ? 'Vorläufig – einige Antworten hat die KI bewertet, deine Lehrkraft prüft sie noch. Punkte und Note können sich noch ändern.'
+              : 'Vorläufig – deine Lehrkraft prüft noch einzelne Antworten. Das Ergebnis kann sich noch ändern.'}
           </Alert>
         )}
       </Card>
@@ -2055,6 +2064,11 @@ function ErgebnisAnsicht({
                               ? eintrag.saetze.map((s) => `${s.vor} ___ ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.nach}`).join(' / ')
                               : `${(eintrag.vor ?? '').slice(-80)} ___ ${eintrag.nach ?? ''}`)}
                         </Text>
+                      )}
+                      {b?.vorlaeufig && (
+                        <Badge size="xs" color="yellow" variant="light" w="fit-content" data-antwort-vorlaeufig>
+                          vorläufig (KI)
+                        </Badge>
                       )}
                       {eintrag.felder.map((f) => (
                         <Text key={f.id} size="sm">
@@ -2349,7 +2363,8 @@ interface AufgabeMitFeedback {
   runden: number
   genutzt: number
   bis: number | null
-  fassungen: { nr: number; text: string; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
+  /** `krise` (22.10.2026): fester Hilfetext; `laeuft`: Bogen entsteht gerade (Runde reserviert) */
+  fassungen: { nr: number; text: string; zeit: string; bogen?: FeedbackBogen; fehler?: string; krise?: boolean; laeuft?: boolean }[]
   /** false: abgeschlossen (nur noch nachlesen) */
   offen?: boolean
   fach?: string
@@ -2489,6 +2504,8 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
   const [text, setText] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState('')
+  // Krisenhinweis (22.10.2026): fester Hilfetext – vom Server (KI-Feld/Wortliste) oder schon hier aus der Wortliste
+  const [hilfe, setHilfe] = useState(false)
   const laden = useCallback(() => {
     void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben?mit=reihe').then(
       (d) => {
@@ -2515,8 +2532,10 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
   const einreichen = async (): Promise<void> => {
     setLaeuft(true)
     setFehler('')
+    if (kriseVerdacht(text)) setHilfe(true)
     try {
-      const r = await senden<{ ok: boolean; fehler?: string }>('/s/api/aufgabe/einreichen', { id, text })
+      const r = await senden<{ ok: boolean; fehler?: string; krise?: boolean }>('/s/api/aufgabe/einreichen', { id, text })
+      if (r.krise) setHilfe(true)
       if (!r.ok && r.fehler) setFehler(r.fehler)
       laden()
     } catch (e) {
@@ -2546,6 +2565,7 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
           {a.aufgabe}
         </Text>
       </Card>
+      {(hilfe || a.fassungen.at(-1)?.krise) && <KrisenHilfe />}
       {letzte?.bogen && (
         <Card withBorder padding="lg">
           <Title order={4} mb="xs">

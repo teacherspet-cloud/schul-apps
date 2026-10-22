@@ -1,6 +1,7 @@
 // Onlinetest auf dem Schul-Apps-Server – Lehrkraft und zwei Lernende (Gäste), KI-Attrappe (02.10.2026).
 // Vorher: Server lokal mit SCHULAPPS_KI_ATTRAPPE starten (Antwort „onlinetest_bewertung" hinterlegt:
-// { urteile: [{ id: 'A1', richtig: true, … }] }). IServ NICHT eingerichtet (Beitritt mit Namen).
+// { urteile: [{ id: 'A1', richtig: true, … }, { id: 'A2', richtig: true, … }] } – seit 22.10.2026 eine Anfrage je Kind:
+// A1 = „dgo" (Wortlösung → zu entscheiden), A2 = Satz (richtig, unbestätigt)). IServ NICHT eingerichtet (Beitritt mit Namen).
 // Aufruf: node tests/e2e/server-onlinetest.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 //
 // Geprüft (zweite Runde, abgestimmt 02.10.2026):
@@ -8,7 +9,8 @@
 //  - Wartebildschirm mit Figur bis zum gemeinsamen Start durch die Lehrkraft; keine Lösungen am Gerät
 //  - Abgabe selbst und durch Verlassen der Seite; danach wertet die KI automatisch aus
 //  - falsches Wort → „zu entscheiden" (0 Punkte), Lehrkraft akzeptiert → Punkt
-//  - Ergebnis erscheint erst, wenn alle abgegeben haben – vorläufig, mit Lösungen; danach endgültig
+//  - Ergebnis erscheint erst nach Freigabe/Testende (22.10.2026; nicht mehr, sobald alle abgegeben haben) – vorläufig,
+//    mit Lösungen; KI-Urteile bleiben vorläufig bis „Alle KI-Urteile bestätigen"; danach endgültig
 //  - Word partners: Lehrkraft sieht „a) heatwave", keine interne Kennung
 //  - Oberfläche: Testliste mit Sortier-/Filterknöpfen, Namensliste zugeklappt, Namen ausblendbar,
 //    Export-Menü, kein Knopf ohne Funktion neben „Test beenden"
@@ -297,7 +299,7 @@ try {
   s1.once('dialog', (dlg) => void dlg.accept())
   await s1.getByRole('button', { name: 'Abgeben' }).click()
   await s1.locator('[data-ergebnis-wartet]').waitFor({ timeout: 10000 })
-  pruefe(true, 'abgegeben – Ergebnis wartet, bis alle abgegeben haben')
+  pruefe(true, 'abgegeben – Ergebnis wartet auf Freigabe oder Testende')
   // Zweite Person verlässt die Seite (z. B. iPad ausgeschaltet) – seit 06.10.2026 nur protokolliert, nicht abgegeben
   if (await s2.locator('[data-fenster-sperre]').isVisible()) await s2.locator('[data-fenster-sperre] [data-vollbild]').click()
   await s2.waitForTimeout(1200)
@@ -345,8 +347,12 @@ try {
   pruefe(kim?.punkte === 4 && kim.max === 5, `Punkte bis zur Entscheidung: ${kim?.punkte}/${kim?.max} (school, heatwave, Satz 2 P.)`)
 
   // ---------- Ergebnis am Gerät: vorläufig, mit Lösung
+  // Seit 22.10.2026 nicht mehr, sobald alle abgegeben haben – erst nach Freigabe oder Testende
+  pruefe(await s1.locator('[data-ergebnis-wartet]').isVisible(), 'alle abgegeben, Test läuft: Ergebnis wartet noch')
+  pruefe(kim?.kiUnbestaetigt >= 1, `KI-Urteil über den Satz unbestätigt (${kim?.kiUnbestaetigt})`)
+  await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'freigeben' } })
   await s1.locator('[data-ergebnis]').waitFor({ timeout: 15000 })
-  pruefe(await s1.getByText('Vorläufig').isVisible(), 'Ergebnis erscheint, sobald alle abgegeben haben – als vorläufig')
+  pruefe(await s1.getByText(/^Vorläufig –/).first().isVisible(), 'Ergebnis erscheint nach der Freigabe – als vorläufig')
   pruefe(await s1.getByText('→ dog').isVisible(), 'Ergebnis zeigt die richtige Lösung')
   pruefe(await s1.locator('[data-figur="jubelnd"]').isVisible(), 'jubelnde Figur beim Ergebnis')
   await s1.screenshot({ path: join(out, '3-ergebnis.png'), fullPage: true })
@@ -389,7 +395,12 @@ try {
   }
   d = await detail()
   pruefe(d.teilnahmen.find((t) => t.id === kim.id).punkte === 5, 'akzeptiert → ganzer Punkt (5/5)')
-  await s1.getByText('Vorläufig').waitFor({ state: 'detached', timeout: 15000 })
+  // Vorläufig bis Bestätigung (22.10.2026): das KI-Urteil über den Satz hält das Ergebnis vorläufig
+  await s1.waitForTimeout(6000)
+  pruefe(await s1.getByText(/^Vorläufig –/).first().isVisible(), 'nach der Entscheidung noch vorläufig – KI-Urteil unbestätigt')
+  const best = await (await lk.request.post(`${A}/server/onlinetest/${neu.id}/ki-bestaetigen`, { headers: KOPF })).json()
+  pruefe(best.bestaetigt >= 1, `Alle KI-Urteile bestätigt (${best.bestaetigt})`)
+  await s1.getByText(/^Vorläufig –/).first().waitFor({ state: 'detached', timeout: 15000 })
   pruefe(await s1.getByText('5 / 5 Punkte').isVisible(), 'am Gerät endgültig: 5 / 5 Punkte')
 
   // ---------- Oberfläche der Lehrkraft

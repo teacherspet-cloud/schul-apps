@@ -6,6 +6,7 @@
  *
  * Wo kein eigenes Fenster möglich ist (iPad-App, Pop-up-Sperre), erscheint dieselbe Ansicht als Pop-up in der Seite.
  */
+import { sicheresHtml } from '../../shared/sicheresHtml'
 import { Badge, Button, Group, Modal, Paper, Stack, Text } from '@mantine/core'
 import { IconBulb, IconChevronRight } from '@tabler/icons-react'
 import { useState } from 'react'
@@ -111,7 +112,8 @@ export function HilfeModal({
             <Badge color="yellow" variant="light" mb={6} leftSection={<IconBulb size={12} />}>
               Hilfe {i + 1} von {h.karten.length}
             </Badge>
-            <div dangerouslySetInnerHTML={{ __html: k.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '') }} />
+            {/* Feste Tag-Liste, keine fremden Bilder oder Links (22.10.2026, KI-Sicherheitsprüfung) */}
+            <div dangerouslySetInnerHTML={{ __html: sicheresHtml(k) }} />
           </Paper>
         ))}
         <Group justify="flex-end">

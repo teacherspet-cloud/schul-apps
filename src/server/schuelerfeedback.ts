@@ -23,12 +23,18 @@ import { getSettings } from '../main/services/storage/settings'
 import { bogenAnfrage, bogenAus, ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { bogenKontextAus, rueckmeldungSystem } from '../renderer/src/modules/rueckmeldung/system'
 import type { Abgabe, Bogen, Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, OHNE_VORSCHAU, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, fehlerKurz, nutzerAnlegen, nutzerNachId, OHNE_VORSCHAU, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { alleLernenden, gastInLerngruppe, gastName, gehoertZu, klasseVon, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
-import { registerVergessen } from './namensschutz'
+import { mitNamensliste, registerVergessen } from './namensschutz'
+import { injektionsVerdacht, LERNENDEN_FEHLER } from '../shared/kiSchutz'
+import { kiGrenzeMeldung } from '../shared/kiGrenzen'
+import { KRISEN_FELD, KRISEN_REGEL, kriseMelden, kriseVerdacht } from './krise'
+import { kiSperre, LAEUFT_SCHON } from './kiSperre'
+import { bogenOhneLeck } from '../shared/blattKiSchutz'
 import { PULS_MS } from '../main/services/lanServer'
 import { geplantAb, nachFreigabe, nochGeplant } from './freigabePlan'
 import { zugangPlan } from './planen'
@@ -72,6 +78,8 @@ const db = () => {
     if (!spalten.has('art')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN art TEXT NOT NULL DEFAULT ''")
     const sp2 = new Set((d.prepare('PRAGMA table_info(feedback_abgaben)').all() as { name: string }[]).map((x) => x.name))
     if (!sp2.has('extra')) d.exec('ALTER TABLE feedback_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
+    // Hinweis für die Lehrkraft (22.10.2026, KI-Sicherheitsprüfung): Zeitpunkt der letzten Abgabe mit Anweisungen an die KI
+    if (!sp2.has('ki_hinweis')) d.exec('ALTER TABLE feedback_abgaben ADD COLUMN ki_hinweis INTEGER NOT NULL DEFAULT 0')
     bereit = true
   }
   return d
@@ -82,8 +90,18 @@ interface Fassung {
   text: string
   zeit: string
   bogen?: Bogen
+  /** Seit 22.10.2026 nur noch LERNENDEN_FEHLER (Details im Protokoll) */
   fehler?: string
+  /** Krisenhinweis (22.10.2026): Die Lernenden sehen den festen Hilfetext – nie eine Sanktion */
+  krise?: boolean
+  /** Runde reserviert, die KI läuft noch (22.10.2026) – zählt als genutzt, bis Bogen oder Fehler da sind */
+  laeuft?: boolean
 }
+
+/** Genutzte Feedback-Runden: Fassungen mit Bogen und solche, deren Bogen gerade entsteht (Reservierung) */
+export const genutzteRunden = (fassungen: { bogen?: unknown; laeuft?: boolean; zeit?: string }[], jetzt = Date.now()): number =>
+  // Eine hängengebliebene Reservierung (Neustart des Servers) zählt nach 15 Minuten nicht mehr
+  fassungen.filter((x) => x.bogen || (x.laeuft && jetzt - Date.parse(x.zeit ?? '') < 15 * 60_000)).length
 
 interface Freigabe {
   id: string
@@ -177,8 +195,27 @@ const freigabeNachCode = (code: string): Freigabe | null =>
   /^[A-Z0-9]{4,12}$/.test(code) ? ((db().prepare('SELECT * FROM feedback_freigaben WHERE code = ?').get(code) as Freigabe | undefined) ?? null) : null
 const MAX_GAESTE = 80
 
+/**
+ * Namen für den Namensfilter (22.10.2026, KI-Sicherheitsprüfung): Der Rückmeldebogen lief ohne Klassenliste – ein Vorname
+ * allein („Lisa hat mich geschubst") ging im Klartext hinaus. Jetzt: die Person selbst, die Lerngruppe bzw. die
+ * Ausgewählten und per Code Beigetretene.
+ */
+function namenFuer(f: Freigabe, schueler: NutzerInfo): string[] {
+  const g = f.lerngruppe_id ? lerngruppe(f.lerngruppe_id) : null
+  const namen = new Set<string>([schueler.name, ...(g ? mitgliederVon(g).map((n) => n.name) : [])].filter(Boolean))
+  const gaeste = new Set((db().prepare('SELECT nutzer_id FROM feedback_gaeste WHERE freigabe_id = ?').all(f.id) as { nutzer_id: string }[]).map((x) => x.nutzer_id))
+  if (gaeste.size) for (const n of alleNutzer()) if (gaeste.has(n.id) && n.name) namen.add(n.name)
+  return [...namen]
+}
+
+/** Ergebnis eines Bogens für Lernende: mit Krisenhinweis (KI-Feld `krise` oder Wortliste) */
+interface BogenErgebnis {
+  bogen: Bogen
+  krise: boolean
+}
+
 /** Bogen erzeugen – im Namen der Lehrkraft, mit ihrem KI-Zugang (Schlüssel oder Abo) */
-async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf, bilder: string[] = [], material = ''): Promise<Bogen> {
+async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf, bilder: string[] = [], material = ''): Promise<BogenErgebnis> {
   const lehrkraft = nutzerNachId(f.lehrkraft_id)
   if (!lehrkraft) throw new Error('Die Lehrkraft gibt es nicht mehr.')
   const r = json_(f.vorlage, {} as Rueckmeldung)
@@ -203,10 +240,29 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
         '\nHANDSCHRIFTLICHE EINTRÄGE: Die beigefügten Seitenbilder zeigen das Blatt mit dem, was mit dem Stift eingetragen wurde – beziehe es ein.'
     }
     // Zeilenangaben prüfbar machen (03.10.2026): das Material so nummeriert, wie es gedruckt ist
+    // (Seit 22.10.2026 kommt das Material nur noch vom Server aus dem gespeicherten Blatt – arbeitsblaetter.ts materialVon)
     if (material)
       anfrage.user += `\n${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; nicht Teil der Antwort):'}\n${material}`
-    const antwort = await aufruf('ai:structured', [anfrage])
-    return bogenAus(antwort, r, anonym, ctx)
+    // Krise (22.10.2026): Regel in den Anweisungen, Feld im Schema (strict → auch in `required`)
+    anfrage.system += `\n${KRISEN_REGEL}`
+    const schema = anfrage.schema as { properties?: Record<string, unknown>; required?: string[] }
+    anfrage.schema = { ...schema, properties: { ...(schema.properties ?? {}), ...KRISEN_FELD }, required: [...(schema.required ?? []), 'krise'] }
+    // Bewertung (temperature 0) und von Lernenden ausgelöst (Budget/Schlange)
+    anfrage.bewertung = true
+    anfrage.vonLernenden = true
+    const antwort = await mitNamensliste(
+      {
+        namen: namenFuer(f, schueler),
+        sprache: r.meta?.subjectLabel,
+        material: [r.grundlage?.aufgaben ?? '', r.grundlage?.erwartung ?? '', material].join(' ')
+      },
+      () => aufruf('ai:structured', [anfrage])
+    )
+    const bogen0 = bogenAus(antwort, r, anonym, ctx)
+    // Lösungsfilter (22.10.2026): Felder, die den Erwartungshorizont verraten, werden neutral – im Protokoll nur die Zahl
+    const { bogen, ersetzt } = bogenOhneLeck(bogen0, r.grundlage?.erwartung ?? '', ohne)
+    if (ersetzt) protokolliereServer('feedback', `Lösungsfilter: ${ersetzt} Feld(er) ersetzt`, schueler.id)
+    return { bogen, krise: ((antwort ?? {}) as { krise?: unknown }).krise === true }
   })
 }
 
@@ -258,43 +314,124 @@ export async function blattFassung(
   mitFeedback: boolean,
   aufruf: Aufruf,
   material = ''
-): Promise<{ nr: number; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen }> {
+): Promise<{ nr: number; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen; krise?: boolean }> {
   const f = freigabe(freigabeId)
   if (!f) throw new Error('Die verknüpfte Rückmeldung fehlt.')
+  const neu: Fassung & { bilder?: string[] } = { nr: 0, text, zeit: new Date().toISOString(), ...(bilder.length ? { bilder } : {}) }
+  // Krise (22.10.2026): Wortliste ohne KI, dazu das Feld `krise` der KI – Hinweis an die Lehrkraft ohne Wortlaut
+  let krise = kriseVerdacht(text)
+  if (mitFeedback) {
+    try {
+      const erg = await bogenErzeugen(f, schueler, text, aufruf, bilder, material)
+      neu.bogen = erg.bogen
+      krise ||= erg.krise
+    } catch (e) {
+      // Rohe Anbieter-Fehler nur ins Protokoll; Lernende (und die gespeicherte Fassung) bekommen den festen Text
+      protokolliereServer('feedback', `Bogen fehlgeschlagen (${fehlerKurz(e)})`, schueler.id)
+      neu.fehler = kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER
+    }
+  }
+  if (krise) {
+    neu.krise = true
+    kriseMelden(f.lehrkraft_id, schueler.id, f.art === 'blatt' ? f.titel : `Rückmeldebogen: ${f.titel}`)
+  }
+  // Erst nach der KI frisch lesen und anhängen – sonst ginge eine parallel gespeicherte Fassung verloren
   const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, schueler.id) as
     { id: string; fassungen: string } | undefined
   const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
-  const neu: Fassung & { bilder?: string[] } = { nr: fassungen.length + 1, text, zeit: new Date().toISOString(), ...(bilder.length ? { bilder } : {}) }
-  if (mitFeedback) {
-    try {
-      neu.bogen = await bogenErzeugen(f, schueler, text, aufruf, bilder, material)
-    } catch (e) {
-      neu.fehler = e instanceof Error ? e.message : String(e)
-    }
-  }
+  neu.nr = fassungen.length + 1
   const alle = [...fassungen, neu]
   if (zeile) db().prepare('UPDATE feedback_abgaben SET fassungen = ?, aktualisiert = ? WHERE id = ?').run(JSON.stringify(alle), neu.zeit, zeile.id)
   else
     db()
       .prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)')
       .run(randomBytes(8).toString('hex'), f.id, schueler.id, JSON.stringify(alle), neu.zeit)
+  if (injektionsVerdacht(text)) kiHinweisMerken(f.id, schueler.id)
   protokolliereServer('feedback', neu.bogen ? 'Feedback zu einem Arbeitsblatt erzeugt' : 'Arbeitsblatt abgegeben', schueler.id)
-  return { nr: neu.nr, bogen: bogenFuerLernende(neu.bogen), fehler: neu.fehler, volleBogen: neu.bogen }
+  return { nr: neu.nr, bogen: bogenFuerLernende(neu.bogen), fehler: neu.fehler, volleBogen: neu.bogen, ...(krise ? { krise: true } : {}) }
+}
+
+/**
+ * Rückmeldebogen für eine Abgabe (22.10.2026, KI-Sicherheitsprüfung „TOCTOU"): Die Runde wird VOR der KI reserviert –
+ * Lesen, Prüfen und Schreiben der Fassung (`laeuft`) geschehen ohne `await` dazwischen, also am Stück. Danach steht dort
+ * der Bogen oder der feste Fehlertext; eine Fassung ohne Bogen zählt nicht als Runde (Ausfall der KI → Runde zurück).
+ * `start` wird erst nach der Reservierung gerufen (Kopfzeilen/Puls der Antwort) und liefert das Aufräumen.
+ */
+export async function fassungMitBogen(
+  f: Pick<Freigabe, 'id' | 'lehrkraft_id' | 'titel' | 'runden'> & Partial<Freigabe>,
+  ich: NutzerInfo,
+  text: string,
+  aufruf: Aufruf,
+  start: () => () => void = () => () => undefined,
+  erzeugen: (f: Freigabe, s: NutzerInfo, t: string, a: Aufruf) => Promise<BogenErgebnis> = bogenErzeugen
+): Promise<{ voll?: boolean; nr: number; bogen?: Partial<Bogen>; fehler?: string; krise?: boolean }> {
+  const lesen = (): { id: string; fassungen: Fassung[] } | null => {
+    const z = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as
+      { id: string; fassungen: string } | undefined
+    return z ? { id: z.id, fassungen: json_(z.fassungen, [] as Fassung[]) } : null
+  }
+  const schreiben = (id: string | null, alle: Fassung[], zeit: string): string => {
+    if (id) {
+      db().prepare('UPDATE feedback_abgaben SET fassungen = ?, aktualisiert = ? WHERE id = ?').run(JSON.stringify(alle), zeit, id)
+      return id
+    }
+    const neu = randomBytes(8).toString('hex')
+    db().prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)').run(neu, f.id, ich.id, JSON.stringify(alle), zeit)
+    return neu
+  }
+  // --- Reservierung (am Stück, ohne await)
+  const z0 = lesen()
+  const bisher = z0?.fassungen ?? []
+  if (genutzteRunden(bisher) >= f.runden + feedbackExtra(f.id, ich.id)) return { voll: true, nr: 0 }
+  const neu: Fassung = { nr: bisher.length + 1, text, zeit: new Date().toISOString(), laeuft: true }
+  const zeilenId = schreiben(z0?.id ?? null, [...bisher, neu], neu.zeit)
+  // --- KI
+  const ende = start()
+  let krise = kriseVerdacht(text)
+  if (krise) kriseMelden(f.lehrkraft_id, ich.id, `Rückmeldebogen: ${f.titel}`)
+  if (injektionsVerdacht(text)) kiHinweisMerken(f.id, ich.id)
+  const fertig: Fassung = { nr: neu.nr, text, zeit: neu.zeit }
+  try {
+    const erg = await erzeugen(f as Freigabe, nutzerNachId(ich.id) ?? ich, text, aufruf)
+    fertig.bogen = erg.bogen
+    if (erg.krise && !krise) kriseMelden(f.lehrkraft_id, ich.id, `Rückmeldebogen: ${f.titel}`)
+    krise ||= erg.krise
+  } catch (e) {
+    protokolliereServer('feedback', `Bogen fehlgeschlagen (${fehlerKurz(e)})`, ich.id)
+    fertig.fehler = kiGrenzeMeldung(e) ?? LERNENDEN_FEHLER
+  } finally {
+    ende()
+  }
+  if (krise) fertig.krise = true
+  // --- Fassung abschließen (frisch lesen, nur die eigene ersetzen)
+  const jetzt = lesen()?.fassungen ?? [neu]
+  const alle = jetzt.some((x) => x.nr === neu.nr && x.laeuft) ? jetzt.map((x) => (x.nr === neu.nr && x.laeuft ? fertig : x)) : [...jetzt, fertig]
+  schreiben(zeilenId, alle, fertig.zeit)
+  protokolliereServer('feedback', fertig.bogen ? 'Feedback für eine Abgabe erzeugt' : 'Feedback fehlgeschlagen', ich.id)
+  return { nr: fertig.nr, bogen: bogenFuerLernende(fertig.bogen), ...(fertig.fehler ? { fehler: fertig.fehler } : {}), ...(krise ? { krise: true } : {}) }
+}
+
+/** Abgabe mit Anweisungen an die KI (22.10.2026): Hinweis für die Lehrkraft („bitte selbst prüfen") – nie eine Sanktion */
+function kiHinweisMerken(freigabeId: string, schuelerId: string): void {
+  db().prepare('UPDATE feedback_abgaben SET ki_hinweis = ? WHERE freigabe_id = ? AND schueler_id = ?').run(Date.now(), freigabeId, schuelerId)
+  protokolliereServer('feedback', 'Abgabe enthält Anweisungen an die KI (Hinweis an die Lehrkraft)', schuelerId)
 }
 
 /** Die Fassungen einer Person in einer verknüpften Rückmeldung (für die Lernenden, ohne Lehrkraft-Teile) */
 export function blattFassungen(
   freigabeId: string,
   schuelerId: string
-): { nr: number; zeit: string; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen }[] {
+): { nr: number; zeit: string; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen; krise?: boolean }[] {
   const zeile = db().prepare('SELECT fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(freigabeId, schuelerId) as
     { fassungen: string } | undefined
   return json_(zeile?.fassungen ?? '[]', [] as Fassung[]).map((x) => ({
     nr: x.nr,
     zeit: x.zeit,
     bogen: bogenFuerLernende(x.bogen),
-    fehler: x.fehler,
-    volleBogen: x.bogen
+    // Ältere Fassungen trugen den rohen Anbieter-Fehler (22.10.2026): nur noch der feste Text
+    fehler: x.fehler ? (kiGrenzeMeldung(x.fehler) ?? LERNENDEN_FEHLER) : undefined,
+    volleBogen: x.bogen,
+    ...(x.krise ? { krise: true } : {})
   }))
 }
 
@@ -333,6 +470,7 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       if (gaeste.some((x) => namen.get(x.nutzer_id) === name.toLowerCase()))
         return (json(res, 409, { fehler: `„${name}“ ist schon dabei. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“` }), true)
       if (gaeste.length >= MAX_GAESTE) return (json(res, 429, { fehler: 'Für diese Aufgabe sind schon zu viele Gäste angemeldet.' }), true)
+      if (!gastBremse(k.ip)) return (json(res, 429, { fehler: GAST_BREMSE_MELDUNG }), true) // 22.10.2026, KI-Sicherheitsprüfung M5
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       db().prepare('INSERT INTO feedback_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)').run(f.id, gast.id)
@@ -383,9 +521,18 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
                 erstellt: f.erstellt,
                 aufgabe: v.grundlage?.aufgaben ?? '',
                 runden: f.runden,
-                genutzt: fassungen.filter((x) => x.bogen).length,
+                genutzt: genutzteRunden(fassungen),
                 bis: f.bis,
-                fassungen: fassungen.map((x) => ({ nr: x.nr, text: x.text, zeit: x.zeit, bogen: bogenFuerLernende(x.bogen), fehler: x.fehler }))
+                // Fehler nur als fester Text, Krise als Merkmal für den Hilfetext (22.10.2026)
+                fassungen: fassungen.map((x) => ({
+                  nr: x.nr,
+                  text: x.text,
+                  zeit: x.zeit,
+                  bogen: bogenFuerLernende(x.bogen),
+                  fehler: x.fehler ? (kiGrenzeMeldung(x.fehler) ?? LERNENDEN_FEHLER) : undefined,
+                  ...(x.laeuft ? { laeuft: true } : {}),
+                  ...(x.krise ? { krise: true } : {})
+                }))
               }
             })
           }),
@@ -401,31 +548,22 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           .trim()
           .slice(0, 20000)
         if (text.length < 20) return (json(res, 400, { fehler: 'Bitte zuerst etwas schreiben (mindestens ein paar Sätze).' }), true)
-        const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as
-          { id: string; fassungen: string } | undefined
-        const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
-        if (fassungen.filter((x) => x.bogen).length >= f.runden + feedbackExtra(f.id, ich.id))
-          return (json(res, 409, { fehler: `Alle ${f.runden} Feedback-Runden sind genutzt. Die Arbeit ist gespeichert – deine Lehrkraft sieht sie.` }), true)
-        const neu: Fassung = { nr: fassungen.length + 1, text, zeit: new Date().toISOString() }
-        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-        const puls = setInterval(() => res.write(' '), PULS_MS)
-        res.on('close', () => clearInterval(puls))
+        // Eine Anfrage je Person und Aufgabe (22.10.2026, KI-Sicherheitsprüfung): Sperre VOR dem Lesen der Runden
+        const frei = kiSperre('feedback', f.id, ich.id)
+        if (!frei) return (json(res, 429, { fehler: LAEUFT_SCHON }), true)
         try {
-          neu.bogen = await bogenErzeugen(f, nutzerNachId(ich.id)!, text, aufruf)
-        } catch (e) {
-          neu.fehler = e instanceof Error ? e.message : String(e)
+          const r = await fassungMitBogen(f, ich, text, aufruf, () => {
+            res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+            const puls = setInterval(() => res.write(' '), PULS_MS)
+            res.on('close', () => clearInterval(puls))
+            return () => clearInterval(puls)
+          })
+          if (r.voll) return (json(res, 409, { fehler: `Alle ${f.runden} Feedback-Runden sind genutzt. Die Arbeit ist gespeichert – deine Lehrkraft sieht sie.` }), true)
+          res.end(JSON.stringify({ ok: !r.fehler, fehler: r.fehler, bogen: r.bogen, nr: r.nr, ...(r.krise ? { krise: true } : {}) }))
+          return true
         } finally {
-          clearInterval(puls)
+          frei()
         }
-        const alle = [...fassungen, neu]
-        if (zeile) db().prepare('UPDATE feedback_abgaben SET fassungen = ?, aktualisiert = ? WHERE id = ?').run(JSON.stringify(alle), neu.zeit, zeile.id)
-        else
-          db()
-            .prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)')
-            .run(randomBytes(8).toString('hex'), f.id, ich.id, JSON.stringify(alle), neu.zeit)
-        protokolliereServer('feedback', neu.bogen ? 'Feedback für eine Abgabe erzeugt' : 'Feedback fehlgeschlagen', ich.id)
-        res.end(JSON.stringify({ ok: !neu.fehler, fehler: neu.fehler, bogen: bogenFuerLernende(neu.bogen), nr: neu.nr }))
-        return true
       }
       return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     }
@@ -450,6 +588,10 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             schueler: schuelerVon(f).length,
             ...(f.code ? { code: f.code, link: link(f.code) } : {}),
             abgaben: (db().prepare(`SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id ${OHNE_VORSCHAU}`).get(f.id) as { n: number }).n,
+            // Abgaben mit Anweisungen an die KI (22.10.2026) – „bitte selbst prüfen"
+            kiHinweise: (
+              db().prepare(`SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ? AND ki_hinweis > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(f.id) as { n: number }
+            ).n,
             // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
             gesamt: gesamtVon(f)
           }))
@@ -519,12 +661,15 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           schueler_id: string
           fassungen: string
           aktualisiert: string
+          ki_hinweis?: number
         }[]
       ).map((a) => ({
         name: namen.get(a.schueler_id)?.name ?? '',
         benutzer: namen.get(a.schueler_id)?.benutzer ?? '',
         aktualisiert: a.aktualisiert,
-        fassungen: json_(a.fassungen, [] as Fassung[])
+        fassungen: json_(a.fassungen, [] as Fassung[]),
+        // Abgabe mit Anweisungen an die KI (22.10.2026): kleiner Hinweis „bitte selbst prüfen"
+        kiHinweis: Number(a.ki_hinweis ?? 0) > 0
       }))
       return (json(res, 200, { id: f.id, titel: f.titel, status: f.status, runden: f.runden, bis: f.bis, abgaben }), true)
     }

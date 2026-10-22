@@ -11,8 +11,16 @@
 import type { StructuredRequest } from '@shared/types'
 import { pruefeSchema } from '@shared/schemaPruefung'
 import { protokolliere } from '../protokoll'
+import { kiAngaben } from './kiFehler'
 
-export type Fehlerart = 'json' | 'schema' | 'abgeschnitten' | 'leer' | 'server'
+/*
+ * Nachtrag 22.10.2026 (KI-Sicherheitsprüfung): Die Pakete der Anbieter wiederholen nicht mehr selbst (maxRetries: 0).
+ * Belegt: vorher bis zu 6 Versuche je Anfrage bei 429/5xx (2 Paket-Wiederholungen × 2 Aufrufe), ohne Pause. Jetzt
+ * höchstens ZWEI Versuche insgesamt; vor dem zweiten Versuch nach einem vorübergehenden Fehler (429-Tempo, 5xx) eine
+ * Pause: so lange, wie der Anbieter in Retry-After verlangt (höchstens 30 s), sonst 0,5–2 s mit Zufallsanteil
+ * (Faustregel) – damit viele gleichzeitig gescheiterte Anfragen nicht im selben Augenblick erneut anklopfen.
+ */
+export type Fehlerart = 'json' | 'schema' | 'abgeschnitten' | 'leer' | 'server' | 'limit'
 
 export class SchemaVerletzt extends Error {
   constructor(public abweichungen: string[]) {
@@ -25,6 +33,10 @@ export function wiederholbar(e: unknown): Fehlerart | null {
   if (e instanceof SchemaVerletzt) return 'schema'
   const m = e instanceof Error ? e.message : String(e)
   if (/abgebrochen|aborted|abort/i.test(m) || (e as { name?: string })?.name === 'AbortError') return null
+  // Angaben des Anbieters gehen vor (kiFehler.ts): vorübergehend → nach Pause einmal wiederholen, sonst nie
+  const ki = kiAngaben(e)
+  if (ki?.voruebergehend) return ki.status === 429 ? 'limit' : 'server'
+  if (ki?.status && ki.status >= 400 && ki.status < 500) return null
   if (e instanceof SyntaxError || /JSON|Unexpected (token|end)|Unterminated string|Expected .* after/i.test(m)) return 'json'
   if (/abgeschnitten|max_tokens|zu lang/i.test(m)) return 'abgeschnitten'
   if (/keine Antwort geliefert/i.test(m)) return 'leer'
@@ -37,8 +49,24 @@ const HINWEIS: Record<Fehlerart, string> = {
   schema: 'Deine vorige Antwort verletzte das vorgegebene Schema. Halte dich genau an alle Pflichtfelder und Datentypen.',
   abgeschnitten: 'Deine vorige Antwort wurde abgeschnitten, weil sie zu lang war. Fasse dich knapper, ohne Pflichtfelder wegzulassen.',
   leer: '',
-  server: ''
+  server: '',
+  limit: ''
 }
+
+/** Pause vor dem zweiten Versuch nach einem vorübergehenden Fehler (siehe oben) */
+export function pauseVor(e: unknown, zufall = Math.random()): number {
+  const verlangt = kiAngaben(e)?.wartenMs
+  // Verlangte Zeit plus bis zu 20 % Zufall; ohne Angabe 0,5–2 s
+  if (typeof verlangt === 'number' && verlangt >= 0) return Math.round(verlangt * (1 + 0.2 * zufall))
+  return Math.round(500 + 1500 * zufall)
+}
+
+const schlafen = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((ok) => {
+    if (signal?.aborted || ms <= 0) return ok()
+    const t = setTimeout(ok, ms)
+    signal?.addEventListener('abort', () => (clearTimeout(t), ok()), { once: true })
+  })
 
 /**
  * Welche Abweichung eine (kostenpflichtige) Wiederholung lohnt: falsche Typen und fehlende Listen
@@ -66,7 +94,8 @@ export interface WiederholungsBericht {
 export async function mitWiederholung<T>(
   req: StructuredRequest,
   aufruf: (r: StructuredRequest) => Promise<T>,
-  beiWiederholung: (b: WiederholungsBericht) => void = () => undefined
+  beiWiederholung: (b: WiederholungsBericht) => void = () => undefined,
+  o: { signal?: AbortSignal; warten?: (ms: number, signal?: AbortSignal) => Promise<void> } = {}
 ): Promise<T> {
   try {
     const antwort = await aufruf(req)
@@ -76,7 +105,10 @@ export async function mitWiederholung<T>(
   } catch (e) {
     const art = wiederholbar(e)
     if (!art) throw e
+    if (o.signal?.aborted) throw e
     beiWiederholung({ art, meldung: e instanceof Error ? e.message : String(e) })
+    if (art === 'server' || art === 'limit') await (o.warten ?? schlafen)(pauseVor(e), o.signal)
+    if (o.signal?.aborted) throw e
     const zusatz = HINWEIS[art]
     const zweite = await aufruf(zusatz ? { ...req, system: `${req.system}\n\n${zusatz}` } : req)
     /*

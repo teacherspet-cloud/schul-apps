@@ -14,7 +14,6 @@ const g = (teil: Gespraech['teil'], modus: Gespraech['modus'] = 'ueben'): Gespra
   teil,
   niveau: 'A2',
   modus,
-  vorname: 'Ida',
   karten: (GRUNDKARTEN.en!.A2 ?? []).filter((k) => teil === 'simulation' || k.art === teil),
   minuten: 5
 })
@@ -27,7 +26,9 @@ describe('Anweisungen an die Gesprächs-KI', () => {
       expect(a).toContain('uebung_beenden')
       expect(a).toMatch(/SECOND time/)
       expect(a).toMatch(/personal data/)
-      expect(a).toContain('first name is Ida')
+      // Kein Name an den Anbieter (22.10.2026, KI-Sicherheitsprüfung)
+      expect(a).toMatch(/do not know the student's name/)
+      expect(a).toMatch(/trusted adult/)
     }
   })
   it('Interview offen zuerst, gezielter bei kurzen Antworten; Dialog nicht dominieren', () => {

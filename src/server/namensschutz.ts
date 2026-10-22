@@ -13,6 +13,7 @@ import { alleNutzer, protokolliereServer } from './datenbank'
 import { aktuellerNutzer } from './kontext'
 import { musterFuer, personAus, pruefeHoertext, schuetzeAnfrage, schuetzeText, stelleWiederHer, type Muster, type Person } from './namensfilter'
 import type { Aufruf } from './http'
+import { lerngruppenVon, mitgliederVon } from './onlinetest'
 
 let schule: { zeit: number; personen: Person[] } | null = null
 
@@ -30,6 +31,32 @@ function personenDerSchule(): Person[] {
 /** Nach dem Anlegen/Ändern von Konten neu lesen */
 export const registerVergessen = (): void => {
   schule = null
+  gruppen.clear()
+}
+
+/**
+ * Vornamen der eigenen Lerngruppen (22.10.2026, KI-Sicherheitsprüfung): Ein Vorname allein („Lisa hat …") wurde bisher
+ * nur mit Klassenliste der Anfrage erkannt. Für jede Anfrage einer Lehrkraft gelten jetzt die Vornamen ihrer
+ * Lerngruppen als Klassenliste (`streng`) – ob Name oder Wort (Rose, Mark), entscheidet wie bisher personOderWort.ts.
+ * Faustregel für die Kosten: nur Vornamen, je Lehrkraft eine Minute zwischengespeichert, höchstens 400 Namen.
+ */
+const gruppen = new Map<string, { zeit: number; namen: string[] }>()
+export function vornamenDerLerngruppen(lehrkraftId: string): string[] {
+  const da = gruppen.get(lehrkraftId)
+  if (da && Date.now() - da.zeit < 60_000) return da.namen
+  const namen = new Set<string>()
+  try {
+    for (const g of lerngruppenVon(lehrkraftId))
+      for (const n of mitgliederVon(g)) {
+        const v = personAus(n.name)?.vorname.trim()
+        if (v && v.length >= 2) namen.add(v)
+      }
+  } catch {
+    // ohne Lerngruppen (z. B. Tests ohne Tabelle) nur die übrigen Namen
+  }
+  const liste = [...namen].slice(0, 400)
+  gruppen.set(lehrkraftId, { zeit: Date.now(), namen: liste })
+  return liste
 }
 
 /**
@@ -61,7 +88,16 @@ export function namensMuster(zusatz: Person[] = []): Muster[] {
     .map((n) => personAus(n))
     .filter((p): p is Person => Boolean(p))
     .map((p) => ({ ...p, streng: true }))
-  return musterFuer([...personenDerSchule(), ...eigene, ...zusatz, ...klasse], { sprache: l?.sprache, material: l?.material })
+  // Vornamen der Lerngruppen der Lehrkraft (22.10.2026) – ohne die, die schon in der Klassenliste stehen
+  const ich = aktuellerNutzer()
+  const schon = new Set(klasse.map((p) => p.vorname.toLowerCase()))
+  const gruppe: Person[] =
+    ich && ich.rolle !== 'schueler'
+      ? vornamenDerLerngruppen(ich.id)
+          .filter((v) => !schon.has(v.toLowerCase()))
+          .map((v) => ({ vorname: v, nachname: '', streng: true }))
+      : []
+  return musterFuer([...personenDerSchule(), ...eigene, ...zusatz, ...klasse, ...gruppe], { sprache: l?.sprache, material: l?.material })
 }
 
 /** Den Aufruf der Kanäle mit dem Namensschutz umhüllen */

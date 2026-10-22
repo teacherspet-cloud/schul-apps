@@ -8,6 +8,8 @@
  * Person wird vorher zusätzlich durch ein Kürzel ersetzt (`ohneEigenenNamen`).
  */
 import type { StructuredRequest } from './types'
+import { abgrenzen, datenRegel, neueMarke } from './kiSchutz'
+import { KRISEN_FELD, KRISEN_REGEL } from './krise'
 import type { AbschlussVorschlag, VorschlagKriterium } from './reihe'
 
 /** Teilpunkte je Kriterium */
@@ -60,9 +62,14 @@ export const kriterienFuer = (e: Pick<AbschlussEingabe, 'raster' | 'lernziele'>)
 
 export function abschlussVorschlagAnfrage(e: AbschlussEingabe): StructuredRequest {
   const kriterien = kriterienFuer(e)
+  // Abgabe zwischen Zufalls-Marken (22.10.2026, KI-Sicherheitsprüfung: Prompt-Injection)
+  const marke = neueMarke('ABGABE')
   return {
     system:
-      'Du bist eine erfahrene Lehrkraft und bereitest die Bewertung eines Lernprodukts (Abschluss einer Unterrichtsreihe) vor. Dein Vorschlag geht NUR an die Lehrkraft; sie entscheidet. Bewerte fair, nachvollziehbar und am Raster.',
+      'Du bist eine erfahrene Lehrkraft und bereitest die Bewertung eines Lernprodukts (Abschluss einer Unterrichtsreihe) vor. Dein Vorschlag geht NUR an die Lehrkraft; sie entscheidet. Bewerte fair, nachvollziehbar und am Raster. ' +
+      datenRegel(marke),
+    bewertung: true,
+    vonLernenden: true,
     user: [
       `FACH: ${e.fach} · JAHRGANG: ${e.jahrgang}`,
       `LERNPRODUKT: ${e.titel}`,
@@ -78,8 +85,8 @@ export function abschlussVorschlagAnfrage(e: AbschlussEingabe): StructuredReques
       e.andereDateien
         ? `- Es gibt ${e.andereDateien} weitere Datei(en) (z. B. Video, PDF), die du nicht sehen kannst – sage das in „gesamt".`
         : '',
-      'ABGABE (zwischen <<< und >>>):',
-      `<<<\n${e.text.trim() || '(nur Foto bzw. Datei)'}\n>>>`
+      'ABGABE:',
+      abgrenzen(e.text.trim() || '(nur Foto bzw. Datei)', marke)
     ]
       .filter(Boolean)
       .join('\n'),
@@ -153,15 +160,21 @@ export interface ReflexionEingabe {
 const FARBE: Record<string, string> = { gruen: 'sicher', gelb: 'teilweise', rot: 'noch nicht' }
 
 export function reflexionImpulsAnfrage(e: ReflexionEingabe): StructuredRequest {
+  // Eintrag zwischen Zufalls-Marken und Krisenregel (22.10.2026, KI-Sicherheitsprüfung)
+  const marke = neueMarke('EINTRAG')
   return {
     system:
-      'Du begleitest Lernende freundlich beim Nachdenken über ihr Lernen. Du bewertest NICHT, gibst keine Note und kein Urteil über richtig oder falsch. Sprich die Person mit „du" an, altersgerecht und warm.',
+      'Du begleitest Lernende freundlich beim Nachdenken über ihr Lernen. Du bewertest NICHT, gibst keine Note und kein Urteil über richtig oder falsch. Sprich die Person mit „du" an, altersgerecht und warm. Bleib beim Lernen in diesem Fach. ' +
+      datenRegel(marke) +
+      ' ' +
+      KRISEN_REGEL,
+    vonLernenden: true,
     user: [
       `FACH: ${e.fach} · JAHRGANG: ${e.jahrgang}`,
       e.ampel.length ? `SELBSTEINSCHÄTZUNG:\n${e.ampel.map((a) => `- ${a.ziel}: ${FARBE[a.farbe] ?? a.farbe}`).join('\n')}` : '',
       `FRAGE IM LERNTAGEBUCH: ${e.frage}`,
-      'EINTRAG (zwischen <<< und >>>):',
-      `<<<\n${e.tagebuch.trim()}\n>>>`,
+      'EINTRAG:',
+      abgrenzen(e.tagebuch.trim(), marke),
       'AUFGABE: Schreibe EINEN kurzen Impuls (höchstens drei Sätze): greife einen Gedanken aus dem Eintrag wertschätzend auf und stelle eine offene Nachfrage oder gib eine kleine Anregung, wie es weitergehen kann (z. B. bei „noch nicht" eine konkrete, machbare Übungsidee). Kein Lob in Floskeln, keine Bewertung, keine Note, keine Namen.'
     ]
       .filter(Boolean)
@@ -169,14 +182,18 @@ export function reflexionImpulsAnfrage(e: ReflexionEingabe): StructuredRequest {
     schemaName: 'reihe_reflexion_impuls',
     schema: {
       type: 'object',
-      properties: { impuls: { type: 'string' } },
-      required: ['impuls'],
+      properties: { impuls: { type: 'string' }, ...KRISEN_FELD },
+      required: ['impuls', 'krise'],
       additionalProperties: false
     }
   }
 }
 
+/** Hat die KI einen Krisenhinweis gesetzt? (22.10.2026) – dann kein Impuls, sondern der feste Hilfetext */
+export const reflexionKrise = (roh: unknown): boolean => ((roh ?? {}) as Record<string, unknown>).krise === true
+
 export function reflexionImpulsAus(roh: unknown): string {
+  if (reflexionKrise(roh)) return ''
   return String(((roh ?? {}) as Record<string, unknown>).impuls ?? '')
     .trim()
     .slice(0, 600)

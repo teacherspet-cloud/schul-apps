@@ -138,6 +138,9 @@ interface Teilnahme {
   max: number
   offen: number
   zuEntscheiden: number
+  /** KI-Urteile, die die Lehrkraft noch nicht bestätigt hat; Antworten mit Anweisungen an die KI (22.10.2026) */
+  kiUnbestaetigt?: number
+  kiVerdacht?: number
   note: number | null
   antworten: Antworten
   bewertung: Bewertung
@@ -802,6 +805,9 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const abgegeben = d.teilnahmen.filter((t) => t.abgabe)
   const offen = d.teilnahmen.reduce((s, t) => s + t.offen, 0)
   const zuEntscheiden = d.teilnahmen.reduce((s, t) => s + t.zuEntscheiden, 0)
+  // Vorläufig bis Bestätigung (22.10.2026, KI-Sicherheitsprüfung)
+  const kiUnbestaetigt = d.teilnahmen.reduce((s, t) => s + (t.kiUnbestaetigt ?? 0), 0)
+  const kiVerdacht = d.teilnahmen.reduce((s, t) => s + (t.kiVerdacht ?? 0), 0)
   const nameVon = (t: Teilnahme, i: number): string => (verdeckt ? `Person ${i + 1}` : t.name)
   const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten' | 'gaeste' | 'nurKonto'): Promise<void> => {
     if (s === 'beendet' && !window.confirm('Test beenden? Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.')) return
@@ -818,6 +824,16 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
       notifyError(e, 'Auswertung fehlgeschlagen')
     } finally {
       setLaeuft(false)
+      laden()
+    }
+  }
+  const kiBestaetigen = async (): Promise<void> => {
+    try {
+      const r = await senden<{ bestaetigt: number }>(`/server/onlinetest/${id}/ki-bestaetigen`)
+      notifySuccess(`${r.bestaetigt} KI-Urteil${r.bestaetigt === 1 ? '' : 'e'} bestätigt – für die Lernenden nicht mehr vorläufig.`)
+    } catch (e) {
+      notifyError(e)
+    } finally {
       laden()
     }
   }
@@ -936,6 +952,26 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                   Nichts zu entscheiden.
                 </Text>
               )}
+              {kiUnbestaetigt > 0 && (
+                <Tooltip label="Die Lernenden sehen KI-Urteile als „vorläufig“ bis zur Bestätigung. Einzelne Urteile lassen sich in der Durchsicht ändern.">
+                  <Button
+                    size="xs"
+                    color="violet"
+                    variant="light"
+                    leftSection={<IconCheck size={14} />}
+                    disabled={laeuft || d.ki.laeuft}
+                    onClick={() => void kiBestaetigen()}
+                    data-ki-bestaetigen
+                  >
+                    Alle KI-Urteile bestätigen ({kiUnbestaetigt})
+                  </Button>
+                </Tooltip>
+              )}
+              {kiVerdacht > 0 && (
+                <Badge color="red" variant="light" leftSection={<IconAlertTriangle size={12} />} data-ki-verdacht>
+                  {kiVerdacht} Antwort{kiVerdacht === 1 ? '' : 'en'} mit Anweisungen an die KI – bitte prüfen
+                </Badge>
+              )}
               {(d.einstellungen.art ?? 'Vokabeltest') === 'Vokabeltest' && <AkzeptierteAlternativenKnopf sprache={d.einstellungen.zielsprache ?? ''} />}
               {d.ohneIserv && d.status !== 'beendet' && (
                 <Tooltip label="Nur mit Konto: Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben nur ihren Namen ein.">
@@ -951,7 +987,11 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
             </Group>
             <Group gap="xs">
               <Text size="sm" c="dimmed">
-                {d.ergebnisSichtbar ? 'Ergebnisse für die Lernenden sichtbar' : 'Ergebnisse erscheinen, wenn alle abgegeben haben'}
+                {d.ergebnisSichtbar
+                  ? kiUnbestaetigt > 0
+                    ? 'Ergebnisse sichtbar – mit KI-Urteilen noch vorläufig'
+                    : 'Ergebnisse für die Lernenden sichtbar'
+                  : 'Ergebnisse und Lösungen erscheinen nach dem Beenden oder Freigeben des Tests'}
               </Text>
               <Button
                 size="xs"
@@ -1121,10 +1161,25 @@ function EinheitZeile({
   const farbe = offen ? 'orange' : b?.status === 'richtig' ? 'green' : b?.status === 'falsch' ? 'red' : 'orange'
   return (
     <Group align="start" wrap="nowrap" gap="sm" data-einheit={e.id}>
-      <Badge color={farbe} w={96} variant={b?.quelle === 'lehrkraft' ? 'filled' : 'light'}>
-        {b ? (b.status === 'ki' ? 'KI offen' : b.status === 'lehrkraft' ? 'prüfen' : offen ? 'entscheiden' : `${b.punkte}/${e.punkte}`) : '–'}
-      </Badge>
+      <Stack gap={2} align="center">
+        <Badge color={farbe} w={96} variant={b?.quelle === 'lehrkraft' ? 'filled' : 'light'}>
+          {b ? (b.status === 'ki' ? 'KI offen' : b.status === 'lehrkraft' ? 'prüfen' : offen ? 'entscheiden' : `${b.punkte}/${e.punkte}`) : '–'}
+        </Badge>
+        {/* Vorläufig bis Bestätigung (22.10.2026): von der KI bewertet, noch nicht bestätigt */}
+        {b?.quelle === 'ki' && b.unbestaetigt && (
+          <Tooltip label="Von der KI bewertet – für die Lernenden vorläufig bis zur Bestätigung oder Änderung.">
+            <Badge color="violet" variant="outline" size="xs" w={96} data-ki-unbestaetigt>
+              KI · unbestätigt
+            </Badge>
+          </Tooltip>
+        )}
+      </Stack>
       <Stack gap={0} style={{ flex: 1 }}>
+        {b?.kiVerdacht && (
+          <Text size="xs" c="red.8" fw={600} data-ki-verdacht-antwort>
+            Enthält Anweisungen an die KI – bitte prüfen.
+          </Text>
+        )}
         {e.felder.map((id) => {
           const x = felder.get(id)
           return (

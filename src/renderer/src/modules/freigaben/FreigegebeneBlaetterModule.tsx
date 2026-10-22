@@ -126,6 +126,8 @@ interface Detail {
     eingereicht: number
     aktualisiert: number
     fassungen: { nr: number; zeit: string; fehler?: string }[]
+    /** Eine Antwort enthielt Anweisungen an die KI (22.10.2026, KI-Sicherheitsprüfung) – bitte selbst prüfen */
+    kiHinweis?: boolean
   }[]
 }
 
@@ -455,6 +457,13 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     <Badge size="xs" variant="outline" color="gray" ml={6}>
                       {a.gast ? 'Gast per QR' : 'per Code'}
                     </Badge>
+                  )}
+                  {a.kiHinweis && (
+                    <Tooltip label="Antwort enthält Anweisungen an die KI – bitte selbst prüfen" multiline w={260}>
+                      <Badge size="xs" variant="light" color="orange" ml={6} data-ki-hinweis>
+                        Anweisung an KI?
+                      </Badge>
+                    </Tooltip>
                   )}
                 </Table.Td>
                 <Table.Td>

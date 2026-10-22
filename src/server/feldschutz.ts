@@ -93,7 +93,9 @@ export const SENSIBEL: Record<string, string[]> = {
   // Sprechprüfungstraining (19.10.2026, sprechen.ts): Auswahl Einzelner, Einschätzungen und Tipps, Satz eines Vorfalls
   sprech_freigaben: ['schueler', 'einstellungen'],
   sprech_stand: ['daten'],
-  sprech_vorfaelle: ['satz']
+  sprech_vorfaelle: ['satz'],
+  // Krisenhinweise (22.10.2026, krise.ts): nur die Ortsangabe, nie Wortlaut
+  krisen_hinweise: ['quelle']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

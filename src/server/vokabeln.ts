@@ -23,6 +23,7 @@ import { codePruefwert } from './feldschutz'
 import { ohneKlasse, ohneKlassenname } from '../shared/ohneKlasse'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { json, setzeSitzungsCookie, type Anfrage } from './http'
+import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { leseSchulFachfarben } from './fachfarben'
 import {
@@ -1177,6 +1178,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           true
         )
       if (gaeste.length >= 120) return json(res, 429, { fehler: 'Für dieses Training sind schon zu viele Gäste angemeldet.' }), true
+      if (!gastBremse(k.ip)) return (json(res, 429, { fehler: GAST_BREMSE_MELDUNG }), true) // 22.10.2026, KI-Sicherheitsprüfung M5
       const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
       const wieder = neuerCode(6)

@@ -24,6 +24,22 @@ import type { KompatibelId, StructuredRequest } from '@shared/types'
 import { kompatibelVorgabe } from '@shared/kiAnbieter'
 import { merkeVerbrauch } from './verbrauch'
 import type { AiProvider, ChunkListener, RawModel } from './provider'
+import { kiFehler, kontingentLeer, voruebergehenderStatus, wartenAusKopf } from './kiFehler'
+
+/**
+ * Obergrenze der Ausgabe (22.10.2026, KI-Sicherheitsprüfung). Faustregel wie bei Claude (anthropic.ts): 16 000 Token
+ * reichen für die größten Aufträge. Azure spricht die neuere Angabe `max_completion_tokens` (Denkmodelle lehnen
+ * `max_tokens` dort ab) – mit Raum für das Nachdenken. Lehnt ein Anbieter die Angabe ab, geht die Anfrage einmal ohne sie
+ * hinaus, und die App merkt sich das je Anbieter und Modell (wie beim Format).
+ */
+export const KOMPATIBEL_MAX_AUSGABE = 16_000
+export const AZURE_MAX_AUSGABE = 32_000
+
+/** Denkmodelle nehmen oft kein `temperature` (o-Reihe, gpt-5, „reasoner", R1, QwQ …) – Faustregel nach dem Namen */
+export const kompatibelTemperatur = (modell: string): boolean => !/(^|[/:])(o\d|gpt-5)|reason|think|(^|[-/])r1\b|qwq/i.test(modell)
+
+/** Teile der Anfrage, die ein Anbieter abgelehnt hat und die künftig wegbleiben */
+export type Weglassen = 'grenze' | 'temperatur'
 
 /** Alles, was ein Aufruf braucht */
 export interface KompatibelZiel {
@@ -73,6 +89,68 @@ export function adressePruefen(url: string, server: boolean): string | null {
   return intern ? 'Auf dem Server sind lokale oder interne Adressen nicht erlaubt.' : null
 }
 
+/**
+ * Interne Adresse? (22.10.2026, KI-Sicherheitsprüfung: SSRF) – IPv4 und IPv6 einschließlich eingebetteter IPv4.
+ * Belegt (IANA Special-Purpose Registry): 0/8, 10/8, 100.64/10, 127/8, 169.254/16, 172.16/12, 192.0.0/24, 192.168/16,
+ * 198.18/15, ab 224/4; IPv6 ::, ::1, fc00::/7, fe80::/10, ff00::/8, ::ffff:a.b.c.d, 64:ff9b::/96.
+ */
+export function istInterneIp(ip: string): boolean {
+  const a = ip.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '')
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a)
+  if (v4) {
+    const [x, y, z] = [Number(v4[1]), Number(v4[2]), Number(v4[3])]
+    return (
+      x === 0 ||
+      x === 10 ||
+      x === 127 ||
+      (x === 100 && y >= 64 && y <= 127) ||
+      (x === 169 && y === 254) ||
+      (x === 172 && y >= 16 && y <= 31) ||
+      (x === 192 && y === 168) ||
+      (x === 192 && y === 0 && z === 0) ||
+      (x === 198 && (y === 18 || y === 19)) ||
+      x >= 224
+    )
+  }
+  if (!a.includes(':')) return true // weder IPv4 noch IPv6 – im Zweifel intern
+  const eingebettet = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(a)
+  if (eingebettet) return istInterneIp(eingebettet[1])
+  // ::ffff:7f00:1 (hexadezimal eingebettet)
+  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(a)
+  if (hex) {
+    const h = parseInt(hex[1], 16)
+    const l = parseInt(hex[2], 16)
+    return istInterneIp(`${h >> 8}.${h & 255}.${l >> 8}.${l & 255}`)
+  }
+  return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a) || /^ff/.test(a)
+}
+
+/**
+ * Auf dem Server zusätzlich den Namen auflösen und JEDE gelieferte Adresse prüfen (22.10.2026): Ein harmlos aussehender
+ * Name kann auf 127.0.0.1 oder ins Container-Netz zeigen. `nachschlagen` liefert die Adressen (Server: dns.lookup) –
+ * so bleibt diese Datei ohne Node-Abhängigkeit (iPad-App). Rest-Risiko (Faustregel): Ein Name, der zwischen Prüfung und
+ * Abruf die Adresse wechselt (DNS-Rebinding), ist so nicht ganz ausgeschlossen.
+ */
+export async function adresseAufgeloestPruefen(url: string, nachschlagen: (host: string) => Promise<string[]>): Promise<string | null> {
+  const einfach = adressePruefen(url, true)
+  if (einfach) return einfach
+  const host = new URL(url).hostname.replace(/^\[|\]$/g, '')
+  let adressen: string[]
+  try {
+    adressen = /^[\d.]+$/.test(host) || host.includes(':') ? [host] : await nachschlagen(host)
+  } catch {
+    return 'Die Adresse des KI-Anbieters lässt sich nicht auflösen.'
+  }
+  if (!adressen.length) return 'Die Adresse des KI-Anbieters lässt sich nicht auflösen.'
+  return adressen.some(istInterneIp) ? 'Auf dem Server sind lokale oder interne Adressen nicht erlaubt.' : null
+}
+
+/** Prüfung vor jedem Abruf – nur auf dem Server gesetzt (server/bremse.ts › dnsAdressPruefer); am PC nichts */
+let adressPruefer: ((url: string) => Promise<string | null>) | null = null
+export const setzeAdressPruefer = (fn: typeof adressPruefer): void => {
+  adressPruefer = fn
+}
+
 /** Schema-Anweisung für den Rückfall `json_object` */
 const schemaHinweis = (req: StructuredRequest): string =>
   `\n\nAntworte ausschließlich mit EINEM JSON-Objekt (ohne Text davor oder danach, ohne Codezaun), das genau diesem JSON-Schema entspricht:\n${JSON.stringify(req.schema)}`
@@ -83,7 +161,8 @@ export function anfrageBauen(
   req: StructuredRequest,
   modell: string,
   modus: JsonModus,
-  strom: boolean
+  strom: boolean,
+  weglassen: ReadonlySet<Weglassen> = new Set()
 ): { url: string; init: { method: 'POST'; headers: Record<string, string>; body: string } } {
   const basis = basisBereinigen(ziel)
   const url =
@@ -111,6 +190,12 @@ export function anfrageBauen(
         ? { type: 'json_schema', json_schema: { name: (req.schemaName || 'antwort').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64), schema: req.schema, strict: true } }
         : { type: 'json_object' }
   }
+  // Obergrenze der Ausgabe und Bewertung mit temperature 0 (22.10.2026, siehe oben)
+  if (!weglassen.has('grenze')) {
+    if (ziel.azure) body.max_completion_tokens = AZURE_MAX_AUSGABE
+    else body.max_tokens = KOMPATIBEL_MAX_AUSGABE
+  }
+  if (req.bewertung && !weglassen.has('temperatur') && kompatibelTemperatur(modell)) body.temperature = 0
   if (strom) {
     body.stream = true
     body.stream_options = { include_usage: true }
@@ -148,6 +233,15 @@ export function formatAbgelehnt(status: number, text: string): boolean {
   return (status === 400 || status === 422 || status === 501) && /response_format|json_schema|schema|structured|strict|not supported|unsupported/i.test(text)
 }
 
+/** Lehnt der Anbieter die Obergrenze oder temperature ab? (dann ohne sie erneut) */
+export function parameterAbgelehnt(status: number, text: string): Weglassen | null {
+  if (status !== 400 && status !== 422) return null
+  const art = /unsupported|not supported|unknown|unrecognized|invalid|only the default|extra|not permitted|too large|exceed/i
+  if (/max_(completion_)?tokens/i.test(text) && art.test(text)) return 'grenze'
+  if (/temperature/i.test(text) && art.test(text)) return 'temperatur'
+  return null
+}
+
 /** Verständliche Meldung zu einer Fehlerantwort */
 export function fehlerMeldung(label: string, status: number, text: string): string {
   const detail = ((): string => {
@@ -166,7 +260,12 @@ export function fehlerMeldung(label: string, status: number, text: string): stri
 
 /** Merkt sich je Anbieter und Modell, dass nur `json_object` geht */
 const nurObjekt = new Set<string>()
-export const vergissFormate = (): void => nurObjekt.clear()
+/** Je Anbieter und Modell: abgelehnte Teile der Anfrage (22.10.2026) */
+const ohne = new Map<string, Set<Weglassen>>()
+export const vergissFormate = (): void => {
+  nurObjekt.clear()
+  ohne.clear()
+}
 
 type Holen = typeof fetch
 
@@ -201,25 +300,47 @@ export class KompatibelProvider implements AiProvider {
   async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     if (!model) throw new Error(`${this.label}: Kein Modell gewählt. Bitte in den Einstellungen ein Modell eintragen.`)
     const merk = `${this.ziel.id}|${this.ziel.basisUrl}|${model}`
-    const modus: JsonModus = nurObjekt.has(merk) ? 'objekt' : 'schema'
-    try {
-      return await this.einmal<T>(req, model, modus, onChunk, signal)
-    } catch (e) {
-      if (modus === 'schema' && e instanceof FormatFehler) {
-        nurObjekt.add(merk)
-        return this.einmal<T>(req, model, 'objekt', onChunk, signal)
+    const weg = ohne.get(merk) ?? new Set<Weglassen>()
+    // Höchstens drei Rücknahmen: Obergrenze, temperature, Format – je einmal (22.10.2026)
+    for (let anlauf = 0; ; anlauf++) {
+      const modus: JsonModus = nurObjekt.has(merk) ? 'objekt' : 'schema'
+      try {
+        return await this.einmal<T>(req, model, modus, onChunk, signal, weg)
+      } catch (e) {
+        if (anlauf < 3 && e instanceof ParameterFehler && !weg.has(e.teil)) {
+          weg.add(e.teil)
+          ohne.set(merk, weg)
+          continue
+        }
+        if (anlauf < 3 && modus === 'schema' && e instanceof FormatFehler) {
+          nurObjekt.add(merk)
+          continue
+        }
+        throw e
       }
-      throw e
     }
   }
 
-  private async einmal<T>(req: StructuredRequest, model: string, modus: JsonModus, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
-    const { url, init } = anfrageBauen(this.ziel, req, model, modus, Boolean(onChunk))
+  private async einmal<T>(
+    req: StructuredRequest,
+    model: string,
+    modus: JsonModus,
+    onChunk?: ChunkListener,
+    signal?: AbortSignal,
+    weglassen: ReadonlySet<Weglassen> = new Set()
+  ): Promise<T> {
+    const { url, init } = anfrageBauen(this.ziel, req, model, modus, Boolean(onChunk), weglassen)
     const res = await this.netz(url, { ...init, signal })
     if (!res.ok) {
       const text = await res.text()
+      const teil = parameterAbgelehnt(res.status, text)
+      if (teil) throw new ParameterFehler(teil, fehlerMeldung(this.label, res.status, text))
       if (formatAbgelehnt(res.status, text)) throw new FormatFehler(fehlerMeldung(this.label, res.status, text))
-      throw new Error(fehlerMeldung(this.label, res.status, text))
+      throw kiFehler(fehlerMeldung(this.label, res.status, text), {
+        status: res.status,
+        wartenMs: wartenAusKopf(res.headers),
+        voruebergehend: voruebergehenderStatus(res.status) && !kontingentLeer(text)
+      })
     }
     if (!onChunk || !res.body) {
       const j = (await res.json()) as {
@@ -280,6 +401,9 @@ export class KompatibelProvider implements AiProvider {
   }
 
   private async netz(url: string, init: RequestInit): Promise<Response> {
+    // Server: Namen auflösen und interne Ziele ablehnen (SSRF, 22.10.2026) – am PC ohne Wirkung
+    const verboten = adressPruefer ? await adressPruefer(url) : null
+    if (verboten) throw new Error(verboten)
     try {
       return await this.holen(url, init)
     } catch (e) {
@@ -296,3 +420,13 @@ export class KompatibelProvider implements AiProvider {
 
 /** Der Anbieter lehnt `json_schema` ab – Rückfall auf `json_object` */
 class FormatFehler extends Error {}
+
+/** Der Anbieter lehnt Obergrenze oder temperature ab – ohne sie erneut (22.10.2026) */
+class ParameterFehler extends Error {
+  constructor(
+    public teil: Weglassen,
+    meldung: string
+  ) {
+    super(meldung)
+  }
+}

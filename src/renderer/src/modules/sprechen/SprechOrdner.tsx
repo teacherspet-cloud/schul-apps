@@ -58,7 +58,7 @@ export function SprechOrdner({ freigaben, neuLaden }: { freigaben: SprechFreigab
     <Stack gap="md" data-sprechtraining={f.id}>
       <Group justify="space-between" gap="xs">
         <Text size="sm" c="dimmed">
-          Freigegeben bis {tag(f.bis)} · noch {f.minutenRest} Minuten diese Woche · Ziel: GER {f.niveau}
+          Freigegeben bis {tag(f.bis)} · noch {f.minutenRest} Minuten frei (Tages- und Wochengrenze) · Ziel: GER {f.niveau}
         </Text>
         {geuebt.length > 0 && (
           <Group gap={4}>

@@ -113,23 +113,73 @@ export const json = (res: ServerResponse, code: number, wert: unknown): void => 
   res.end(JSON.stringify(wert))
 }
 
-export function leseKoerper(req: IncomingMessage, grenze = 64 * 1024 * 1024): Promise<string> {
+/** Körper über der Grenze (22.10.2026): wird mit 413 beantwortet (siehe `gemessen`) */
+export class KoerperZuGross extends Error {
+  constructor(readonly grenze: number) {
+    super(`Die Anfrage ist zu groß (höchstens ${Math.round(grenze / (1024 * 1024)) || 1} MB).`)
+  }
+}
+
+const MB = 1024 * 1024
+
+/**
+ * Grenze des Körpers je Weg (22.10.2026, KI-Sicherheitsprüfung M3). Bis dahin galten für ALLE Wege 64 MB – im Container
+ * mit 2 GB reichten wenige gleichzeitige Anfragen von außen, um den Speicher zu füllen. Jetzt:
+ *  - Lehrkräfte (/api, /auftrag, /server/…): weiter 64 MB (Material mit Bildern, Sicherungen; nur mit Anmeldung).
+ *  - Schülerbereich (/s/…): 2 MB, ausdrücklich mehr nur für die bekannten Wege mit Uploads (belegt aus den Routen):
+ *    Arbeitsblatt speichern/abgeben mit Tinte (bis 16 Seiten × 1,2 MB, arbeitsblaetter.ts › bereinigeTinte) 20 MB,
+ *    ausgefülltes Blatt als PDF (Blatt-HTML bis 30 MB) 32 MB, Reihe › Schritt (Datei bis 12 MB als Base64 ≈ 16 MB) 18 MB.
+ *    Handschrift im Onlinetest liest onlinetest.ts selbst mit 2 MB.
+ */
+export function koerperGrenze(pfad: string): number {
+  if (!pfad.startsWith('/s/') && pfad !== '/s') return 64 * MB
+  if (pfad === '/s/api/blatt/pdf') return 32 * MB
+  if (/^\/s\/api\/blatt\/(speichern|abgeben|aufgabe|hilfe)$/.test(pfad)) return 20 * MB
+  if (pfad === '/s/api/reihe/schritt') return 18 * MB
+  return 2 * MB
+}
+
+/**
+ * Körper lesen – die Grenze gilt schon beim Empfang (22.10.2026): Eine zu große Content-Length wird gar nicht erst
+ * gelesen, und beim Überschreiten wird nichts mehr gesammelt. Die Verbindung schließt kurz danach (Zeit für die 413-Antwort).
+ */
+export function leseKoerper(req: IncomingMessage, grenze = 64 * MB): Promise<string> {
   return new Promise((ok, fehler) => {
     const teile: Buffer[] = []
     let laenge = 0
-    req.on('data', (s: Buffer) => {
+    let vorbei = false
+    const ablehnen = (): void => {
+      if (vorbei) return
+      vorbei = true
+      teile.length = 0
+      req.removeListener('data', daten)
+      req.pause()
+      fehler(new KoerperZuGross(grenze))
+      setTimeout(() => req.destroy(), 1000).unref?.()
+    }
+    const daten = (s: Buffer): void => {
+      if (vorbei) return
       laenge += s.length
-      if (laenge > grenze) {
-        req.destroy()
-        fehler(new Error('Anfrage zu groß.'))
-        return
-      }
+      if (laenge > grenze) return ablehnen()
       teile.push(s)
+    }
+    const angesagt = Number(req.headers['content-length'])
+    if (Number.isFinite(angesagt) && angesagt > grenze) return ablehnen()
+    req.on('data', daten)
+    req.on('end', () => {
+      if (!vorbei) ok(Buffer.concat(teile).toString('utf8'))
     })
-    req.on('end', () => ok(Buffer.concat(teile).toString('utf8')))
-    req.on('error', fehler)
+    req.on('error', (e) => {
+      if (!vorbei) fehler(e)
+    })
   })
 }
+
+/** Text für eine Protokollzeile: ohne Steuerzeichen (Zeilenumbrüche, ANSI, U+2028/2029), gekürzt (22.10.2026) */
+export const protokollText = (x: unknown, n: number): string =>
+  String(x ?? '')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ')
+    .slice(0, n)
 
 export function cookies(req: IncomingMessage): Record<string, string> {
   const out: Record<string, string> = {}
@@ -373,6 +423,14 @@ function gemessen(req: IncomingMessage, res: ServerResponse, arbeit: () => Promi
     anfrageGemessen(ms, res.statusCode)
   })
   arbeit().catch((e: unknown) => {
+    // Zu großer Körper (22.10.2026): 413 und Verbindung schließen – kein Eintrag als Fehler
+    if (e instanceof KoerperZuGross) {
+      if (!res.headersSent) {
+        res.setHeader('connection', 'close')
+        json(res, 413, { fehler: e.message })
+      } else res.end()
+      return
+    }
     protokoll('langsam', `FEHLER ${req.method} ${pfad}: ${e instanceof Error ? e.message : String(e)}`)
     if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
     else res.end()
@@ -442,7 +500,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       url,
       sitzung,
       ip,
-      koerper: () => (koerperCache ??= leseKoerper(req).then((t) => (t ? (JSON.parse(t) as unknown) : {})))
+      // Grenze je Weg (22.10.2026, koerperGrenze)
+      koerper: () => (koerperCache ??= leseKoerper(req, koerperGrenze(url.pathname)).then((t) => (t ? (JSON.parse(t) as unknown) : {})))
     }
     // Aufrufe mit Wirkung nur mit der eigenen Kopfzeile (siehe oben)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
@@ -450,14 +509,16 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     // ---------- Fehlerberichte aus den Browsern der Lernenden (08.10.2026) – klein, begrenzt, ohne Namen
     if (req.method === 'POST' && url.pathname === '/s/api/fehlerbericht') {
       if (!berichtErlaubt(ip)) return void res.writeHead(204).end()
-      const roh = await leseKoerper(req).catch(() => '')
+      // Höchstens 16 KB lesen; Text der Lernenden ohne Steuerzeichen und gekürzt ins Protokoll (22.10.2026) – keine
+      // gefälschten Protokollzeilen per Zeilenumbruch
+      const roh = await leseKoerper(req, 16 * 1024).catch(() => '')
       let b: Record<string, unknown> = {}
       try {
         b = JSON.parse(String(roh).slice(0, 4000)) as Record<string, unknown>
       } catch {
         /* unlesbar */
       }
-      const t = (x: unknown, n: number): string => String(x ?? '').slice(0, n)
+      const t = (x: unknown, n: number): string => protokollText(x, n)
       protokoll(
         'browser',
         `${t(b.art, 20)} ${t(b.seite, 120)} | ${t(b.meldung, 400)} | ${t(b.ort, 300)} | ${sitzung?.nutzer.rolle ?? 'ohne'} | ${t(req.headers['user-agent'], 160)}`
