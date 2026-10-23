@@ -29,7 +29,7 @@ import MaterialWahl, { MaterialZeile, ProgrammBild } from '../../../shared/compo
 import SchulortFelder from '../../../shared/components/SchulortFelder'
 import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
 import { mitLerngruppe } from '../../../shared/lerngruppe'
-import { notifyError } from '../../../shared/util'
+import { notifyError, notifySuccess } from '../../../shared/util'
 import { gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import BilingualSchalter from '../../arbeitsblatt/steps/BilingualSchalter'
@@ -38,7 +38,9 @@ import { aufgabeAusDateien, teileErkennen } from '../auftrag'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import type { Rueckmeldung } from '../model/types'
 import { ANREDE_OPTIONEN, STANDARD_ANREDE, type Anrede } from '../render/texte'
-import { useRueckmeldung } from '../store'
+import { bibliothek, useRueckmeldung } from '../store'
+import { rueckmeldungIdZu } from '../vorgabe'
+import type { SavedDokumentMeta } from '@shared/apiShape'
 import { fremdsprachlich } from '../teilbewertung'
 import AntwortSpracheZeile from './AntwortSpracheZeile'
 import ArtKarte from './ArtKarte'
@@ -80,6 +82,12 @@ function MaterialSchrittInhalt(): React.JSX.Element | null {
 
   const waehleMaterial = async (art: MaterialEintrag['art'], id: string): Promise<void> => {
     try {
+      // Je Material eine Rückmeldung (08.10.2026): gibt es schon eine (z. B. „Vorbereiten" im Editor), öffnet sie sich (23.10.2026)
+      const vorhanden = await rueckmeldungIdZu(art, id)
+      if (vorhanden && vorhanden !== docId) {
+        await bibliothek.oeffnen(vorhanden)
+        return notifySuccess('Zu diesem Material gibt es schon eine Rückmeldung – sie ist jetzt geöffnet.')
+      }
       const { grundlage, fach } = await ladeGrundlage(art, id)
       update((d) => {
         d.grundlage = grundlage
@@ -124,6 +132,7 @@ function MaterialSchrittInhalt(): React.JSX.Element | null {
           <Stack gap="md">
             {zeigeAuswahl ? (
               <MaterialStart
+                docId={docId}
                 gewaehlt={mitMaterial ? `${r.grundlage.art}:${r.grundlage.docId}` : null}
                 waehle={(art, id) => void waehleMaterial(art, id)}
                 suchen={() => setWahlOffen(true)}
@@ -162,12 +171,14 @@ function MaterialSchrittInhalt(): React.JSX.Element | null {
 
 /** Ohne Grundlage: die neuesten Materialien zum Anklicken und die beiden anderen Wege */
 function MaterialStart({
+  docId,
   gewaehlt,
   waehle,
   suchen,
   eigene,
   abbrechen
 }: {
+  docId: string
   gewaehlt: string | null
   waehle: (art: MaterialEintrag['art'], id: string) => void
   suchen: () => void
@@ -175,6 +186,21 @@ function MaterialStart({
   abbrechen?: () => void
 }): React.JSX.Element {
   const [zuletzt, setZuletzt] = useState<Material[] | null>(null)
+  // Vorbereitete Rückmeldungen (23.10.2026, Bericht der Lehrkraft: „Vorbereiten" in der Klassenarbeit – hier stand nichts)
+  const [vorbereitet, setVorbereitet] = useState<SavedDokumentMeta[]>([])
+  useEffect(() => {
+    void window.api.rueckmeldungen
+      .list()
+      .then((l) =>
+        setVorbereitet(
+          l
+            .filter((m) => m.id !== docId && !Number(m.fertig ?? 0))
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+            .slice(0, 5)
+        )
+      )
+      .catch(() => setVorbereitet([]))
+  }, [docId])
   useEffect(() => {
     void ladeMaterialien()
       .then((alle) =>
@@ -198,6 +224,39 @@ function MaterialStart({
           </Button>
         )}
       </Group>
+      {vorbereitet.length > 0 && (
+        <div data-rm-vorbereitet>
+          <Text size="sm" fw={600} mb={6}>
+            Noch ohne Bögen – weiter mit
+          </Text>
+          <Stack gap={6}>
+            {vorbereitet.map((m) => (
+              <UnstyledButton
+                key={m.id}
+                className="home-material"
+                onClick={() => void bibliothek.oeffnen(m.id).catch(notifyError)}
+                data-rm-vorbereitet-eintrag={m.id}
+              >
+                <Group gap="sm" wrap="nowrap">
+                  {typeof m.quelleArt === 'string' ? <ProgrammBild moduleId={m.quelleArt} /> : <ProgrammBild moduleId="rueckmeldung" />}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={600} size="sm" truncate>
+                      {m.name}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate>
+                      {[
+                        typeof m.quelleArt === 'string' && m.quelleArt in ART_TITEL ? ART_TITEL[m.quelleArt as keyof typeof ART_TITEL] : 'Eigene Aufgabe',
+                        Number(m.abgaben ?? 0) === 1 ? '1 Abgabe' : `${Number(m.abgaben ?? 0)} Abgaben`,
+                        new Date(m.updatedAt).toLocaleDateString('de-DE')
+                      ].join(' · ')}
+                    </Text>
+                  </div>
+                </Group>
+              </UnstyledButton>
+            ))}
+          </Stack>
+        </div>
+      )}
       {zuletzt === null ? (
         <Text size="sm" c="dimmed">
           Materialien werden geladen …

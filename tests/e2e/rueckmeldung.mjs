@@ -817,7 +817,8 @@ try {
   await page.waitForTimeout(800)
   await page.evaluate(() => window.__selftest.vtMitHinweis('[Prüfung] Zweiter Test'))
   await page.waitForTimeout(1500)
-  const vtVorher = (await zumVt()).length
+  const vtVorherIds = (await zumVt()).map((m) => m.id)
+  const vtVorher = vtVorherIds.length
   const zuKnopf = sichtbar(page.locator('[data-rueckmeldung-zu]'))
   if ((await zuKnopf.getAttribute('data-rueckmeldung-zu')) === 'neu') {
     await sichtbar(page.locator('[data-rueckmeldung-mehr]')).click()
@@ -826,6 +827,19 @@ try {
     const nachher = await zumVt()
     pruefe(nachher.length === vtVorher + 1, `„Vorbereiten“ legt die Rückmeldung an (${vtVorher} → ${nachher.length})`)
     pruefe((await page.locator('[data-rm-start], [data-rm-grundlage]').filter({ visible: true }).count()) === 0, '„Vorbereiten“ bleibt im Vokabeltest')
+    // In der Rückmeldung (23.10.2026, Bericht der Lehrkraft): steht oben unter „Vorbereitet – weiter mit“ und öffnet bei den Abgaben
+    const neueId = nachher.find((m) => !vtVorherIds.includes(m.id))?.id
+    await page.click('[aria-label="Rückmeldung"]')
+    await page.waitForTimeout(800)
+    await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+    await page.waitForTimeout(800)
+    const eintragV = sichtbar(page.locator(`[data-rm-vorbereitet-eintrag="${neueId}"]`))
+    await eintragV.waitFor({ timeout: 10000 }).catch(() => undefined)
+    pruefe((await page.locator(`[data-rm-vorbereitet-eintrag="${neueId}"]`).filter({ visible: true }).count()) === 1, 'Die vorbereitete Rückmeldung steht auf der Startseite der Rückmeldung')
+    await page.screenshot({ path: join(out, 'vorbereitet.png') })
+    await eintragV.click()
+    await sichtbar(page.locator('[data-rm-eintippen]')).waitFor({ timeout: 10000 }).catch(() => undefined)
+    pruefe((await page.evaluate(() => window.__selftest.rmJetzt()?.grundlage?.art)) === 'vokabeltest' && (await page.locator('[data-rm-eintippen]').filter({ visible: true }).count()) === 1, 'Ein Tipp öffnet sie im Schritt „Abgaben“')
   } else pruefe(false, 'Zum zweiten Vokabeltest gibt es schon eine Rückmeldung – „Vorbereiten“ nicht prüfbar')
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
