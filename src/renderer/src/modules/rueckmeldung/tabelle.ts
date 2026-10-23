@@ -12,6 +12,7 @@ import { arr, int, obj, str } from '../../shared/aiSchema'
 import { newId } from '../vokabeltest/model/random'
 import { EINSTUFUNGEN, einstufungVon } from './art'
 import { inhalt, type GeleseneDatei } from './aufgabeAusMaterial'
+import { fundstellenRegel, kiAufgaben } from './fundstellen'
 import type { Bewertungstabelle, Rueckmeldung, TabellenKriterium } from './model/types'
 import { gerNiveau, oberstufeVon, sprachfach, umfangAusText } from './sprachmassstab'
 import { fremdsprachlich, getrennt, inhaltVorgabe } from './teilbewertung'
@@ -107,8 +108,10 @@ export function tabelleEntwurfAnfrage(r: Rueckmeldung): StructuredRequest {
       `Einstufung der Lehrkraft: ${skala}.`,
       r.meta.schwerpunkt.trim() ? `SCHWERPUNKT DER LEHRKRAFT: ${r.meta.schwerpunkt.trim()}` : '',
       `AUFGABE${r.grundlage.titel ? ` (${r.grundlage.titel})` : ''}:`,
-      r.grundlage.aufgaben,
-      r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : ''
+      kiAufgaben(r.grundlage),
+      r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
+      // Konkret am Material statt allgemein (23.10.2026, Befund der Lehrkraft)
+      fundstellenRegel(r.grundlage, 'tabelle')
     ]
       .filter(Boolean)
       .join('\n'),

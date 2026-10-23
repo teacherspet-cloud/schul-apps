@@ -29,6 +29,8 @@ import type { StructuredRequest } from '@shared/types'
 import { bogenKontextAus, rueckmeldungSystem } from './system'
 import { tabelleAus, tabelleAusDateiAnfrage, tabelleEntwurfAnfrage } from './tabelle'
 import { kiTrennungAnwenden, trennAnfrage, trenneNachAufgabe, trennungAnwenden } from './abgabeTrennen'
+import { kiAufgaben } from './fundstellen'
+import { mitFrischemMaterial } from './materialFundstellen'
 
 export { bilingualeRueckmeldung, rueckmeldungSystem } from './system'
 
@@ -54,6 +56,9 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
     arbeit: async (rm, k) => {
       const fertig = new Map<string, Abgabe>()
       const fehler: string[] = []
+      // Material frisch und mit Zeilen wie auf dem Blatt (23.10.2026, fundstellen.ts) – einmal für alle Bögen
+      k.melde('Das Material wird gelesen …')
+      const frisch = await mitFrischemMaterial(rm)
       for (const [i, roh] of offen.entries()) {
         k.melde(`${roh.kuerzel}: ${roh.text.trim() ? 'Rückmeldung wird geschrieben' : 'Text wird übertragen'} (${i + 1} von ${offen.length}) …`)
         try {
@@ -66,7 +71,7 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
           // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
           const { text, pseudonyme } = ohneNamen(a)
           const anonym = { ...a, text }
-          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, anonym, rueckmeldungSystem(rm), ctx)), rm, anonym, ctx)
+          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(frisch.r, anonym, rueckmeldungSystem(rm), ctx)), rm, anonym, ctx)
           fertig.set(a.id, { ...a, pseudonyme, bogen })
           // Live-Vorschau (02.10.2026): jeder Bogen, sobald er geschrieben ist
           k.zeige({ r: { ...rm, abgaben: rm.abgaben.map((x) => fertig.get(x.id) ?? x) }, fertig: [...fertig.keys()] } satisfies RueckmeldungsStand, {
@@ -78,10 +83,10 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
         }
       }
       if (!fertig.size) throw new Error(fehler.join(' · ') || 'Keine Rückmeldung entstanden.')
-      return { fertig, fehler }
+      return { fertig, fehler, hinweis: frisch.hinweis }
     },
-    abschluss: ({ fertig, fehler }) =>
-      `${fertig.size} Rückmeldung${fertig.size === 1 ? '' : 'en'} fertig${fehler.length ? ` – nicht gelungen: ${fehler.join(' · ')}` : ''}`,
+    abschluss: ({ fertig, fehler, hinweis }) =>
+      `${fertig.size} Rückmeldung${fertig.size === 1 ? '' : 'en'} fertig${fehler.length ? ` – nicht gelungen: ${fehler.join(' · ')}` : ''}${hinweis ? ` (${hinweis})` : ''}`,
     ablegen: ({ fertig }, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, abgaben: aktuell.abgaben.map((a) => fertig.get(a.id) ?? a) }), 2)
   })
 }
@@ -264,8 +269,15 @@ export function tabelleErzeugen(r: Rueckmeldung, docId: string, dateien: Gelesen
     schluessel: `rueckmeldung-tabelle-${docId}`,
     fehlerTitel: 'Die Bewertungstabelle konnte nicht erstellt werden',
     arbeit: async (rm, k): Promise<Bewertungstabelle> => {
-      k.melde(dateien ? 'Die KI überträgt die Bewertungstabelle …' : 'Die KI entwirft eine Bewertungstabelle …')
-      return tabelleAus(await k.ai<unknown>(dateien ? tabelleAusDateiAnfrage(dateien) : tabelleEntwurfAnfrage(rm)), dateien ? 'datei' : 'ki')
+      if (dateien) {
+        k.melde('Die KI überträgt die Bewertungstabelle …')
+        return tabelleAus(await k.ai<unknown>(tabelleAusDateiAnfrage(dateien)), 'datei')
+      }
+      // Material frisch und mit Zeilen wie auf dem Blatt (23.10.2026, fundstellen.ts)
+      k.melde('Das Material wird gelesen …')
+      const { r: mitMaterial } = await mitFrischemMaterial(rm)
+      k.melde('Die KI entwirft eine Bewertungstabelle …')
+      return tabelleAus(await k.ai<unknown>(tabelleEntwurfAnfrage(mitMaterial)), 'ki')
     },
     abschluss: (t) => `Bewertungstabelle mit ${t.kriterien.length} Kriterien${t.entwurf ? ' – Entwurf der KI, bitte prüfen' : ''}.`,
     // Mit Tabelle gehört die Form „Bewertungstabelle" dazu (23.10.2026)
@@ -291,8 +303,15 @@ export function erwartungEntwerfen(r: Rueckmeldung, docId: string): void {
     schluessel: `rueckmeldung-erwartung-${docId}`,
     fehlerTitel: 'Der Erwartungshorizont konnte nicht entworfen werden',
     arbeit: async (rm, k) => {
+      // Material frisch und mit Zeilen wie auf dem Blatt (23.10.2026, fundstellen.ts); ein vorhandener Erwartungshorizont wird konkretisiert
+      k.melde('Das Material wird gelesen …')
+      const { r: mitMaterial } = await mitFrischemMaterial(rm)
       k.melde('Die KI entwirft einen Erwartungshorizont …')
-      return erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(rm.grundlage.aufgaben, rm.meta.subjectLabel, rm.meta.grade, rm.meta.subjectId)))
+      return erwartungAus(
+        await k.ai<unknown>(
+          erwartungsEntwurfAnfrage(kiAufgaben(mitMaterial.grundlage), rm.meta.subjectLabel, rm.meta.grade, rm.meta.subjectId, rm.grundlage.erwartung ?? '')
+        )
+      )
     },
     abschluss: () => 'Erwartungshorizont entworfen – bitte prüfen.',
     ablegen: (erwartung, rm) =>

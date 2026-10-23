@@ -33,6 +33,7 @@ import { ausgleichAnweisung, maxSchritte, ohneRechtschreibung } from './nachteil
 import { tabelleText } from './tabelle'
 import { begruendungMitDeckel, oberstufeVon, sprachRegeln, tabelleDeckeln, teileDeckeln, teileDeckelSatz, umfangBefund } from './sprachmassstab'
 import { klartext, ohneKiTest } from './abgabeTrennen'
+import { fundstellenRegel, kiAufgaben } from './fundstellen'
 import type { Abgabe, Bogen, BogenKriterium, Einschaetzung, Einstufungswert, Grundlage, GrundlageArt, RandKommentar, Rueckmeldung } from './model/types'
 
 // ---------- Grundlage aus gespeichertem Material ----------
@@ -429,6 +430,8 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     ...(m.digitalesBlatt ? BLATT_REGELN : []),
     ...sprachRegeln(r, a, art !== 'keine'),
     ...abgabeRegeln(r, a, marke),
+    // Fundstellen im Material (23.10.2026): Verweise auf Zeilen bzw. Kurzzitate, damit die Lernenden nachlesen können
+    r.grundlage.aufgaben.trim() ? fundstellenRegel(r.grundlage, 'bogen') : '',
     // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten (Zitate ohne Trennzeichen)
     ohneTrenner(schreibformRegeln(r, a), marke)
   ]
@@ -444,7 +447,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       ausgleich,
       m.schwerpunkt.trim() ? `SCHWERPUNKT DER LEHRKRAFT: ${m.schwerpunkt.trim()}` : '',
       `AUFGABE${r.grundlage.titel ? ` (${r.grundlage.titel})` : ''}:`,
-      r.grundlage.aufgaben,
+      kiAufgaben(r.grundlage),
       r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
       mitTabelle(r) ? tabelleText(r.tabelle!) : '',
       teileText(r),

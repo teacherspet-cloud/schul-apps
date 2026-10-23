@@ -37,7 +37,14 @@ function Messung({
 }
 
 /** Gemessene Seitenaufteilung aller Blätter (Schüler- und Lösungsteil) */
-export function messeSeiten(ws: Worksheet, logo: string | null, schule: string, hoechstensMs = 20000): Promise<Map<string, PagePlan[]>> {
+export function messeSeiten(
+  ws: Worksheet,
+  logo: string | null,
+  schule: string,
+  hoechstensMs = 20000,
+  /** Liest den fertig gesetzten Messbereich, bevor er abgebaut wird (Zeilen der Materialien, rueckmeldung/materialFundstellen.ts) */
+  lesen?: (bereich: HTMLElement) => void
+): Promise<Map<string, PagePlan[]>> {
   return new Promise((ok) => {
     const ort = document.createElement('div')
     ort.setAttribute('aria-hidden', 'true')
@@ -50,6 +57,11 @@ export function messeSeiten(ws: Worksheet, logo: string | null, schule: string, 
       if (erledigt) return
       erledigt = true
       clearTimeout(notbremse)
+      try {
+        lesen?.(ort)
+      } catch {
+        // Lesen ist eine Zugabe – die Seitenaufteilung gilt trotzdem
+      }
       // Nach dem Rendern abbauen, nicht mittendrin
       setTimeout(() => {
         root.unmount()

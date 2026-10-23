@@ -54,6 +54,11 @@ export interface Grundlage {
    * Fehlt sie, gilt die aus der Aufgabe erkannte (antwortSprache.ts).
    */
   antwortSprache?: import('../antwortSprache').AntwortSprache
+  /**
+   * NUR ZUR LAUFZEIT eines KI-Auftrags, nie gespeichert (23.10.2026, fundstellen.ts): das Material
+   * frisch gelesen, Texte mit Zeilennummern wie auf dem Blatt der Lernenden.
+   */
+  fundstellen?: string
 }
 
 export type Einschaetzung = 'sicher' | 'teilweise' | 'noch nicht'

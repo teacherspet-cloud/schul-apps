@@ -153,3 +153,21 @@ export function aufAbsaetze(it: PlacedItem, karte: readonly ZeilenStelle[]): Pla
   if (!letzte.letzte) aus.absatzBis = letzte.unten
   return aus
 }
+
+/** Lage eines Wortes im Absatz (Zeilen lesen für Fundstellen, render/zeilenLesen.ts, 23.10.2026) */
+export interface WortLage extends Streifen {
+  text: string
+}
+
+/** Wörter eines Absatzes den Zeilen zuordnen – dieselben Zeilenbänder wie beim Setzen */
+export function woerterInZeilen(woerter: readonly WortLage[]): string[] {
+  const baender = zeilenBaender(woerter)
+  const zeilen: string[][] = baender.map(() => [])
+  for (const w of woerter) {
+    const mitte = (w.top + w.bottom) / 2
+    let k = baender.findIndex((b) => mitte >= b.top - 0.5 && mitte <= b.bottom + 0.5)
+    if (k < 0) k = baender.reduce((beste, b, i) => (Math.abs((b.top + b.bottom) / 2 - mitte) < Math.abs((baender[beste].top + baender[beste].bottom) / 2 - mitte) ? i : beste), 0)
+    zeilen[k]?.push(w.text)
+  }
+  return zeilen.map((z) => z.join(' ').replace(/\s+([,.;:!?)\]»“])/g, '$1')).filter((z) => z.trim())
+}

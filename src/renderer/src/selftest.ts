@@ -1,6 +1,8 @@
 // Prüfmodus: stellt die echten Abläufe (KI, Bildsuche, KI-Prüfung, Tafelbild) für automatisierte Qualitätsprüfungen bereit.
 // Wird nur geladen, wenn die App mit SCHULAPPS_SELFTEST=1 gestartet wird.
 import { useRueckmeldung } from './modules/rueckmeldung/store'
+import { leereRueckmeldung } from './modules/rueckmeldung/leer'
+import { mitFrischemMaterial } from './modules/rueckmeldung/materialFundstellen'
 import { useElternbrief } from './modules/elternbrief/store'
 import { useTafelbild } from './modules/tafelbild/store'
 import { cleanImageBackground } from './shared/imageCleanup'
@@ -2142,6 +2144,12 @@ export function installSelftest(): void {
     lzkJetzt: () => useLernzielkontrolle.getState().test,
     // Rückmeldung (Großprogramm 0.4, F3)
     rmJetzt: () => useRueckmeldung.getState().dok,
+    // Fundstellen (23.10.2026): das Material frisch gelesen, mit Zeilen wie auf dem Blatt
+    rmFundstellen: async (art: 'arbeitsblatt' | 'klassenarbeit', docId: string): Promise<string> => {
+      const r = leereRueckmeldung()
+      r.grundlage = { art, docId, titel: 'Probe', aufgaben: '' }
+      return (await mitFrischemMaterial(r)).r.grundlage.fundstellen ?? ''
+    },
     // Elternbrief (Großprogramm 0.4, F7)
     ebJetzt: () => useElternbrief.getState().dok,
     // Tafelbilder (30.09.2026)

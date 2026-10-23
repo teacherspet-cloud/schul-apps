@@ -11,6 +11,7 @@ import { arr, enumOf, int, obj, str } from '../../shared/aiSchema'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
 import { sprachmittlungsRegel } from '../../shared/sprachmittlung'
+import { fundstellenRegel } from './fundstellen'
 
 export interface GeleseneDatei {
   fileName: string
@@ -69,7 +70,7 @@ const TEILE_REGEL = [
 const AUFGABE_SCHEMA = obj({
   titel: str('Kurzer Titel der Aufgabe (z. B. „Leserbrief zum Handyverbot“)'),
   aufgaben: str(
-    'Die Aufgabenstellung(en) WÖRTLICH, nummeriert wie im Material; darunter unter „Material:“ knapp und wörtlich, worauf sich die Aufgaben beziehen (Textauszug, Tabelle, Beschreibung eines Bildes). Ohne Deckblatt, Kopfzeilen, Punkte und Hinweise für die Lehrkraft.'
+    'Die Aufgabenstellung(en) WÖRTLICH, nummeriert wie im Material; darunter unter „Material:“ vollständig und wörtlich, worauf sich die Aufgaben beziehen (Texte ganz, bei gedruckten Zeilennummern Zeile für Zeile mit „Z. n: “; Tabelle; Beschreibung eines Bildes). Ohne Deckblatt, Kopfzeilen, Punkte und Hinweise für die Lehrkraft.'
   ),
   erwartung: str('Erwartungshorizont bzw. Lösungen, WENN sie im Material stehen (wörtlich) – sonst leer'),
   fach: enumOf(['', ...FAECHER]),
@@ -85,7 +86,12 @@ export function aufgabeAnfrage(dateien: GeleseneDatei[]): StructuredRequest {
       'Du hilfst einer Lehrkraft, eine Aufgabe für eine lernförderliche Rückmeldung vorzubereiten. Du überträgst wortgetreu (auch aus Fotos und Scans) und erfindest nichts.',
     user: [
       'Aus dem folgenden Material (Arbeitsblatt, Klausur, Aufgabenblatt):',
-      '1. Übernimm die Aufgabenstellung(en) wörtlich und darunter nur das Material, das zum Verstehen der Aufgaben nötig ist (bei langen Texten: Titel, Quelle und die ersten Sätze bzw. die Stellen, auf die sich Aufgaben beziehen).',
+      /*
+       * Fundstellen (23.10.2026, Befund der Lehrkraft): Vorher nur „Titel, Quelle und die ersten Sätze“ langer
+       * Texte – Erwartungshorizont und Tabelle konnten dann gar nicht konkret aufs Material eingehen.
+       */
+      '1. Übernimm die Aufgabenstellung(en) wörtlich und darunter das Material, auf das sich die Aufgaben beziehen, VOLLSTÄNDIG und wörtlich, mit seiner Bezeichnung (M1, Text A …). Bilder und Grafiken: kurz beschreiben.',
+      '   Hat ein Text gedruckte Zeilennummern, übertrage ihn ZEILENGENAU: jede gedruckte Zeile als eigene Zeile mit vorangestelltem „Z. n: “ – die Zählung, wie sie gedruckt ist (zwischen den gedruckten Zahlen weiterzählen). Ohne gedruckte Zeilennummern KEINE Zeilenangaben erfinden.',
       '2. Steht ein Erwartungshorizont oder eine Lösung im Material, übernimm ihn wörtlich in „erwartung“. Steht keiner drin, bleibt „erwartung“ leer.',
       '3. Erkenne Fach und Jahrgang nur, wenn es im Material steht oder eindeutig ist; sonst fach leer und jahrgang 0.',
       `4. ${TEILE_REGEL}`,
@@ -139,19 +145,26 @@ export function teileAnfrage(aufgaben: string, erwartung: string): StructuredReq
 const ERWARTUNG_SCHEMA = obj({ erwartung: str('Erwartungshorizont: je Aufgabe die erwarteten Inhalte und Kriterien, knapp in Stichpunkten') })
 
 /** Entwurf eines Erwartungshorizonts, wenn das Material keinen enthält */
-export function erwartungsEntwurfAnfrage(aufgaben: string, fach: string, jahrgang: number, subjectId = ''): StructuredRequest {
+export function erwartungsEntwurfAnfrage(aufgaben: string, fach: string, jahrgang: number, subjectId = '', bisher = ''): StructuredRequest {
   const fs = istModerneFremdsprache(subjectId)
+  const vorhanden = bisher.replace(ENTWURF_VERMERK, '').trim()
   return {
     system: 'Du bist eine erfahrene Lehrkraft und entwirfst Erwartungshorizonte für Schülerarbeiten – fachlich richtig, der Jahrgangsstufe angemessen.',
     user: [
       `Entwirf einen Erwartungshorizont für diese Aufgabe${fach ? ` (${fach}` : ''}${jahrgang ? `${fach ? ', ' : ' ('}Klasse ${jahrgang})` : fach ? ')' : ''}.`,
       '- Je Aufgabe: erwartete Inhalte bzw. Lösungsschritte und woran eine gelungene Bearbeitung zu erkennen ist.',
       '- KEINE Punkte und KEINE Noten – er dient einer Rückmeldung ohne Note.',
+      // Konkret am Material mit Fundstellen (23.10.2026, Befund der Lehrkraft: „allgemeine Lösungen")
+      fundstellenRegel({ aufgaben }, 'erwartung'),
+      vorhanden
+        ? `- BISHERIGER ERWARTUNGSHORIZONT (unten): Was darin richtig ist, bleibt erhalten; ergänze den Materialbezug und die Fundstellen und ersetze allgemeine Formulierungen durch die konkreten Inhalte.`
+        : '',
       // Fremdsprachen (23.10.2026, Wunsch der Lehrkraft): Beispielformulierungen in der Antwortsprache, Sprachmittlung im Regelfall in der Zielsprache
       fs ? `- Beispielformulierungen stehen in der Sprache, in der die Lernenden antworten – bei Schreibaufgaben auf ${fach}. Kriterien und Hinweise auf Deutsch.` : '',
       fs ? sprachmittlungsRegel(fach) : '',
       'AUFGABE:',
-      aufgaben
+      aufgaben,
+      vorhanden ? `BISHERIGER ERWARTUNGSHORIZONT:\n${vorhanden.slice(0, 8000)}` : ''
     ]
       .filter(Boolean)
       .join('\n'),

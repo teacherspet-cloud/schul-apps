@@ -464,6 +464,15 @@
 .ws-text-numbered .rt-p {
   margin: 0;
 }
+/*
+ * Auch Listen ohne Abstand (23.10.2026): Absätze, die mit „12." beginnen, werden als Liste gesetzt;
+ * deren 0,2 em oben und unten ließen die Zeilennummern (festes Raster von 1,5 em) je Absatz weiter
+ * wandern – nach vier Absätzen stand die „55" neben Zeile 54. Gefunden beim Lesen der Zeilen für die
+ * Fundstellen der Rückmeldung.
+ */
+.ws-text-numbered .rt-list {
+  margin: 0;
+}
 .ws-text-numbered .ws-paragraph + .ws-paragraph .rt-p:first-child {
   text-indent: 1.2em;
 }
