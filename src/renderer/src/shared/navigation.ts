@@ -6,6 +6,7 @@ import { sichereAlles } from './autosave'
 import { laeuft, useAuftraege } from './auftraege'
 import { notifyError } from './util'
 import { alsGeoeffnetMerken, erstesOeffnen } from './sitzung'
+import { appFreigegeben } from './plattform'
 
 /**
  * Wohin die Hauptapp gerade zeigt – und wie man von überall dorthin kommt.
@@ -67,6 +68,12 @@ export const ALIAS: Record<string, string> = { vokabeltraining: 'sprachenlernen'
 export const modulVon = (id: string): string => ALIAS[id] ?? id
 const dokumentVon = (moduleId: string, docId: string): string => (moduleId === 'grammatiktraining' ? `g:${docId}` : docId)
 const anleger = new Map<string, () => Promise<string>>()
+
+/** App-Freigaben (23.10.2026): wie „nicht freigegeben" gezeigt wird – shell/GesperrteApp.tsx meldet sich an */
+let sperrHinweis: (moduleId: string, docId?: string) => void = () => notifyError(new Error('Diese App ist für dieses Konto nicht freigegeben.'))
+export function meldeSperrHinweis(fn: (moduleId: string, docId?: string) => void): void {
+  sperrHinweis = fn
+}
 const druck = new Map<string, () => void>()
 
 export const useNavigation = create<NavigationState>((set, get) => ({
@@ -78,6 +85,8 @@ export const useNavigation = create<NavigationState>((set, get) => ({
   setRueckweg: (r) => set({ rueckweg: r ? { ...r, fuer: modulVon(r.fuer) } : r }),
   openModule: (id0) => {
     const id = modulVon(id0)
+    // App-Freigaben (23.10.2026): eine nicht freigegebene App öffnet sich auf keinem Weg (Link, Suche, eigenes Fenster)
+    if (!appFreigegeben(id)) return sperrHinweis(id)
     // Rückweg verfällt, sobald man anderswohin wechselt
     const r = get().rueckweg
     if (r && id !== r.fuer) set({ rueckweg: null })
@@ -100,6 +109,8 @@ export const useNavigation = create<NavigationState>((set, get) => ({
   openDocument: async (moduleId0, docId0) => {
     const moduleId = modulVon(moduleId0)
     const docId = dokumentVon(moduleId0, docId0)
+    // Material einer nicht freigegebenen App: nicht bearbeiten, aber als PDF sichern (shell/GesperrteApp.tsx)
+    if (!appFreigegeben(moduleId)) return sperrHinweis(moduleId, docId)
     await sichereAlles()
     get().openModule(moduleId)
     /*
@@ -204,6 +215,7 @@ export function useNeuAnleger(moduleId: string, anlegen: () => Promise<string>):
 
 /** Neues Dokument im Programm anlegen und dorthin wechseln; liefert die Kennung (null, wenn das Programm es nicht kann) */
 export async function neuAnlegen(moduleId: string): Promise<string | null> {
+  if (!appFreigegeben(modulVon(moduleId))) return sperrHinweis(modulVon(moduleId)), null
   const fn = anleger.get(moduleId)
   if (!fn) return null
   await sichereAlles()

@@ -48,6 +48,7 @@ import { AdminRollen } from './AdminRollen'
 import { KiZugaenge } from './KiZugaenge'
 import { SchuleEinrichten } from './SchuleEinrichten'
 import { SchulFachfarben } from './SchulFachfarben'
+import { AppFreigaben } from './AppFreigaben'
 import { SchulFachobleute } from './SchulFachobleute'
 import { DatenschutzAngabenKarte } from './DatenschutzAngabenKarte'
 import { SchulKrisenhinweise } from './SchulKrisenhinweise'
@@ -127,6 +128,8 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           links={
             <Tabs.List style={{ borderBottom: 0 }}>
               <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
+              {/* App-Freigaben für Gruppen von Lehrkräften (23.10.2026, AppFreigaben.tsx) */}
+              <Tabs.Tab value="appfreigaben">App-Freigaben</Tabs.Tab>
               {/* Schul-Einrichtung des Servers (09.10.2026) */}
               <Tabs.Tab value="schule">Schule</Tabs.Tab>
               <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
@@ -145,6 +148,9 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           <>
             <Tabs.Panel value="nutzer">
               <Nutzer d={d} neu={laden} zuIserv={() => setReiter('iserv')} />
+            </Tabs.Panel>
+            <Tabs.Panel value="appfreigaben">
+              <AppFreigaben />
             </Tabs.Panel>
             <Tabs.Panel value="schule">
               {/* Gleiche Breite und Abstände wie die Kästen von SchuleEinrichten (10.10.2026): Fachfarben stand breiter daneben */}

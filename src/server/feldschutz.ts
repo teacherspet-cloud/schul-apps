@@ -83,6 +83,8 @@ export const SENSIBEL: Record<string, string[]> = {
   akzeptierte_alternativen: ['daten'],
   // Fachobleute je Lehrkraft (12.10.2026, fachobleute.ts): Fächer einer Person – Angabe zur Person, verschlüsselt
   fach_obleute: ['daten'],
+  // App-Freigaben (23.10.2026, appFreigaben.ts): Gruppen mit Kennungen der Lehrkräfte – Angabe zur Person, verschlüsselt
+  app_freigaben: ['daten'],
   // Förder-/Fordermaterial (12.10.2026, foerdern.ts): Gruppen mit Kennungen der Kinder und Bündel „Für dich" je Kind
   foerder_auftraege: ['daten'],
   foerder_buendel: ['daten'],

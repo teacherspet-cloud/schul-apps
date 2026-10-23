@@ -27,6 +27,8 @@ import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
 import { collectKnownVocab } from '../../../shared/knownVocab'
 import type { KnownVocab } from '../../../shared/knownVocab'
 import { notifyError, notifySuccess } from '../../../shared/util'
+import { useAppSettings } from '../../../shared/settingsStore'
+import { fachIdVon } from '../../../shared/fachfarben'
 import { buildTextbooks, ColumnMap, ColumnRole, COLUMN_ROLES, decodeCsv, detectColumns, guessLanguage, hasHeader, parseCsvRows } from '../input/textbookCsv'
 import { newId } from '../model/random'
 import { LANGUAGES, VocabEntry } from '../model/types'
@@ -48,6 +50,18 @@ const TEMPLATE_CSV =
   ].join(String.fromCharCode(13, 10))
 
 const languageLabel = (code: string): string => LANGUAGES.find((l) => l.value === code)?.label ?? code
+
+/**
+ * Nur Lehrwerke der eigenen Sprachen (23.10.2026, Befund der Lehrkraft: „Bei Vokabeltests werden mir in der
+ * Auflistung auch Lehrwerke von Sprachen angezeigt, die ich nicht unterrichte"). Maßgeblich sind die unterrichteten
+ * Fächer aus den Einstellungen; die Sprache der Lerngruppe bleibt immer dabei. Ohne gewählte Fächer – oder wenn danach
+ * nichts übrig bliebe – alle.
+ */
+export function nachEigenenFaechern<T extends { language: string }>(alle: T[], spracheDerGruppe?: string, eigene = useAppSettings.getState().settings.eigeneFaecher ?? []): T[] {
+  if (!eigene.length) return alle
+  const passend = alle.filter((b) => b.language === spracheDerGruppe || eigene.includes(fachIdVon(b.language) ?? fachIdVon(languageLabel(b.language)) ?? ''))
+  return passend.length ? passend : alle
+}
 
 /**
  * Welche besonders gekennzeichneten Vokabeln mitkommen. Kästen und erklärte Begriffe sind
@@ -220,7 +234,7 @@ export function TextbookPicker({
       .list()
       .then((all) => {
         // Mit Lerngruppe: nur Lehrwerke der passenden Sprache und ein Vorschlag dazu
-        const list = prefer?.language && nurSprache ? all.filter((b) => b.language === prefer.language) : all
+        const list = prefer?.language && nurSprache ? all.filter((b) => b.language === prefer.language) : nachEigenenFaechern(all, prefer?.language)
         setBooks(list)
         let saved: { bookId: string; unit: string } | null = null
         try {

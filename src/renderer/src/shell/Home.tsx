@@ -1,5 +1,5 @@
 import { Schnellzugriff, SchnellzugriffTitel, StartKasten } from './Schnellzugriff'
-import { aufServer, nurPcNetz } from '../shared/plattform'
+import { appFreigegeben, aufServer, nurPcNetz } from '../shared/plattform'
 import { Alert, Badge, Button, Card, CloseButton, Container, Group, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceFloppy, IconHistory, IconHome, IconSearch } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -255,7 +255,7 @@ export default function Home(): React.JSX.Element {
         {aufServer() && <KrisenHinweise />}
 
         {/* Smartphone: „Meine Klassen" über der Materialsuche (10.10.2026) – aufklappbar mit Klassen und Kursen */}
-        {handy && aufServer() && modules.some((m) => m.id === 'meineklassen') && <MeineKlassenKasten />}
+        {handy && aufServer() && modules.some((m) => m.id === 'meineklassen') && appFreigegeben('meineklassen') && <MeineKlassenKasten />}
 
         {/* Suche ganz oben (09.10.2026, Wunsch der Lehrkraft) – Treffer seit 10.10.2026 direkt darunter */}
         {(materialien?.length ?? 0) > 0 && (

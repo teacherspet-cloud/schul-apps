@@ -31,6 +31,7 @@ import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
 import ModusSchalter from './shell/ModusSchalter'
 import AuftragsLayer from './shell/AuftragsLayer'
+import GesperrteApp from './shell/GesperrteApp'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
@@ -502,6 +503,7 @@ export default function App(): React.JSX.Element {
 
       {/* Laufende und fertige Hintergrund-Aufträge – unten rechts über allen Programmen */}
       <AuftragsLayer />
+      <GesperrteApp />
       {/* Datenschutzhinweis vor dem Hochladen an eine KI (Großprogramm 0.4) */}
       <DatenschutzDialog />
       {/* Freigabe für die Fachschaft ohne erkanntes Fach: Frage nach dem Fach (10.10.2026) */}

@@ -3,7 +3,7 @@ import type { AppSettings, DeepPartial } from '@shared/types'
 import { modules } from '../modules/registry'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
 import { programmPasst, programmSichtbar } from '../shared/programmSichtbarkeit'
-import { serverIch } from '../shared/plattform'
+import { appFreigegeben, serverIch } from '../shared/plattform'
 
 type Update = (patch: DeepPartial<AppSettings>) => Promise<void>
 
@@ -72,7 +72,7 @@ export function ProgrammeAnzeigenCard({ settings, update }: { settings: AppSetti
           : 'Ohne gewählte Fächer sind alle Programme sichtbar.'}
       </Text>
       <Stack gap="xs">
-        {modules.map((m) => {
+        {modules.filter((m) => appFreigegeben(m.id)).map((m) => {
           const passt = programmPasst(m.faecher, eigene)
           return (
             <Switch

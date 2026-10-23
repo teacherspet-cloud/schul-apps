@@ -9,37 +9,12 @@ import type { Worksheet } from '../arbeitsblatt/model/types'
 import { messeSeiten } from '../arbeitsblatt/render/seitenMessen'
 import { worksheetThumb } from '../arbeitsblatt/library'
 import { leseMaterialZeilen } from '../arbeitsblatt/render/zeilenLesen'
-import type { GrammarTest } from '../grammatiktest/model/types'
-import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
-import { normalisiereArbeit } from '../klassenarbeit/model/fassungen'
-import type { Exam } from '../klassenarbeit/model/types'
-import { examToWorksheet } from '../klassenarbeit/render/examWorksheet'
-import type { Kurztest } from '../lernzielkontrolle/model/types'
-import { kurztestToWorksheet } from '../lernzielkontrolle/render/kurztestWorksheet'
+import { materialAlsBlatt } from '../../shared/materialBlatt'
 import { fundstellenText } from './fundstellen'
 import type { Grundlage, Rueckmeldung } from './model/types'
 
-/** Das Blatt, wie die Lernenden es bekommen, mit Stand (und beim Arbeitsblatt dessen Vorschaubild) – null bei Vokabeltest und eigenem Material */
-async function materialZu(g: Grundlage): Promise<{ ws: Worksheet; stand: string; thumb?: string } | null> {
-  if (!g.docId) return null
-  if (g.art === 'arbeitsblatt') {
-    const s = await window.api.sheets.get(g.docId)
-    return { ws: s.payload as Worksheet, stand: s.updatedAt, thumb: s.thumb }
-  }
-  if (g.art === 'klassenarbeit') {
-    const s = await window.api.exams.get(g.docId)
-    return { ws: examToWorksheet(normalisiereArbeit(s.payload as Exam), 0), stand: s.updatedAt }
-  }
-  if (g.art === 'lernzielkontrolle') {
-    const s = await window.api.kurztests.get(g.docId)
-    return { ws: kurztestToWorksheet(s.payload as Kurztest, 0), stand: s.updatedAt }
-  }
-  if (g.art === 'grammatiktest') {
-    const s = await window.api.grammarTests.get(g.docId)
-    return { ws: testToWorksheet(s.payload as GrammarTest), stand: s.updatedAt }
-  }
-  return null
-}
+/** Das Blatt, wie die Lernenden es bekommen (shared/materialBlatt.ts) – null bei Vokabeltest und eigenem Material */
+const materialZu = (g: Grundlage) => materialAlsBlatt(g.art, g.docId)
 
 const blattZu = async (g: Grundlage): Promise<Worksheet | null> => (await materialZu(g))?.ws ?? null
 

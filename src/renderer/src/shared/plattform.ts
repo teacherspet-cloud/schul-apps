@@ -89,9 +89,22 @@ export interface ServerIch {
   sitzung?: string
   /** Fächer, für die die Lehrkraft Fachobfrau/-mann ist (12.10.2026, server/fachobleute.ts) */
   fachobmann?: string[]
+  /** Freigegebene Apps der Lehrkraft (23.10.2026, server/appFreigaben.ts); fehlt bei Admins = alle */
+  apps?: string[]
 }
 
-export const serverIch = (): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)
+/**
+ * Darf die angemeldete Person diese App sehen und benutzen? (App-Freigaben, 23.10.2026, shared/appFreigaben.ts)
+ * Ohne Server (Exe), für Admins und für Seiten, die keine App sind: immer.
+ */
+export function appFreigegeben(id: string): boolean {
+  const ich = serverIch()
+  if (!ich?.apps || ich.rolle === 'admin') return true
+  if (id === 'home' || id === 'settings' || id === 'themen') return true
+  return ich.apps.includes(id)
+}
+
+export const serverIch =(): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)
 
 /** IServ in der Exe „Schul-Apps Online" – gleiche Form wie window.api.iserv, dazu `ablegen` */
 export interface ClientIserv {

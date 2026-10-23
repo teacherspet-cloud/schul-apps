@@ -20,6 +20,8 @@ import { allgemeineKoepfe, programmSeitenKoepfe, ueberHttps } from './sicherheit
 import { codeBremseAnfrage } from './codeBremse'
 import { darstellungPruefen } from './darstellungFelder'
 import { fachobmannFaecher } from './fachobleute'
+import { appsFuer } from './appFreigaben'
+import { kanalErlaubt, routeErlaubt } from '@shared/appFreigaben'
 import { auszeichnungenVon } from './achievementsDaten'
 import { freigeschaltet } from '../shared/auszeichnungenBilder'
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
@@ -808,6 +810,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             sitzung: sitzungsAnzeige(sitzung.kennung),
             // Fachobleute (12.10.2026, fachobleute.ts): Fächer, deren gemeinsame Lehrwerke die Lehrkraft pflegt
             ...(sitzung.nutzer.rolle !== 'schueler' && !inVorschau ? { fachobmann: fachobmannFaecher(sitzung.nutzer.id) } : {}),
+            // App-Freigaben (23.10.2026, appFreigaben.ts): die Apps dieser Lehrkraft (Admins: keine Angabe = alle)
+            ...(sitzung.nutzer.rolle === 'lehrkraft' && !inVorschau ? { apps: appsFuer(sitzung.nutzer) ?? undefined } : {}),
             ...(inVorschau ? { vorschau: true } : {})
           }
         : { angemeldet: false, adresse: opts.adresse }
@@ -832,6 +836,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
 
     // ---------- Zusatzrouten (Verwaltung, Onlinetest, Hörtexte, Schülerbereich)
+    // App-Freigaben (23.10.2026): Änderungen in Apps, die es nur auf dem Server gibt, nur mit Freigabe
+    if (sitzung?.nutzer.rolle === 'lehrkraft' && !routeErlaubt(url.pathname, req.method ?? 'GET', appsFuer(sitzung.nutzer)))
+      return json(res, 403, { fehler: 'Diese App ist für dieses Konto nicht freigegeben.' })
     for (const route of opts.routen ?? []) if (await route(k)) return
 
     // ---------- Ab hier nur angemeldet
@@ -870,6 +877,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       const koerper = (await k.koerper()) as { channel?: string; args?: unknown[] }
       const kanal = String(koerper.channel ?? '')
       if (!SERVER_KANAELE.has(kanal)) return json(res, 403, { fehler: `„${kanal}" steht auf dem Server nicht zur Verfügung.` })
+      // App-Freigaben (23.10.2026): Änderungen nur an Ablagen, deren App freigegeben ist – Lesen bleibt
+      if (!kanalErlaubt(kanal, appsFuer(nutzer))) return json(res, 403, { fehler: 'Diese App ist für dieses Konto nicht freigegeben – Änderungen sind gesperrt.' })
       const args = kennzeichne(kanal, beschneideServer(kanal, (koerper.args ?? []).map(auspacken)), sitzung.kennung)
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       const puls = setInterval(() => res.write(' '), PULS_MS)
