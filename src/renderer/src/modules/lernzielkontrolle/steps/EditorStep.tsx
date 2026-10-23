@@ -1,4 +1,7 @@
 import { Accordion, Alert, Badge, Card, Container, Group, Menu, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { WenigerSeitenKnopf } from '../../arbeitsblatt/render/WenigerSeitenKnopf'
+import { bilderVerkleinern } from '../../arbeitsblatt/didactics/seitenAnpassung'
+import { wendeKuerzungAn } from '../../arbeitsblatt/generation/kuerzen'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
@@ -426,6 +429,23 @@ function EditorInhalt(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />
+            {/* Auf weniger Seiten (23.10.2026): App rechnet Schrift/Abstände/Bilder für alle Fassungen gleich; ein Rückgängig-Schritt */}
+            {ws && test && (
+              <WenigerSeitenKnopf
+                ws={ws}
+                layouts={layouts}
+                logo={logo}
+                schule={settings.schoolName}
+                alleFassungen={test.varianten.length > 1 ? kurztestToWorksheetAlle(test, schwellen) : undefined}
+                uebernehmen={(v) =>
+                  update((x) => {
+                    x.design = structuredClone(v.design)
+                    if (v.bilder) Object.assign(x, bilderVerkleinern({ ...x }).doc)
+                  })
+                }
+                kuerzungUebernehmen={(k) => update((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
+              />
+            )}
             {/* Als Onlinetest (05.10.2026): alle Fassungen, dieselbe Durchführung wie beim Vokabeltest */}
             <BlattOnlinetestKnopf
               quelle={() => {

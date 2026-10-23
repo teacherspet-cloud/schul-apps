@@ -1,4 +1,7 @@
 import { Button, Container, Stack, Box, Menu, ScrollArea } from '@mantine/core'
+import { WenigerSeitenKnopf } from '../../arbeitsblatt/render/WenigerSeitenKnopf'
+import { bilderVerkleinern } from '../../arbeitsblatt/didactics/seitenAnpassung'
+import { wendeKuerzungAn } from '../../arbeitsblatt/generation/kuerzen'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { IconCopy, IconTable, IconTrash } from '@tabler/icons-react'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
@@ -364,6 +367,22 @@ function TestEditorInhalt(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="grammatiktest" docId={docId} />
+            {/* Auf weniger Seiten (23.10.2026): App rechnet Schrift/Abstände/Bilder für alle Fassungen gleich; ein Rückgängig-Schritt */}
+            {ws && (
+              <WenigerSeitenKnopf
+                ws={ws}
+                layouts={layouts}
+                logo={logo}
+                schule={settings.schoolName}
+                uebernehmen={(v) =>
+                  update((x) => {
+                    x.design = structuredClone(v.design)
+                    if (v.bilder) Object.assign(x, bilderVerkleinern({ ...x }).doc)
+                  })
+                }
+                kuerzungUebernehmen={(k) => update((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
+              />
+            )}
             {/* Als Onlinetest (05.10.2026): dieselbe Durchführung wie beim Vokabeltest */}
             <BlattOnlinetestKnopf
               quelle={() => ({

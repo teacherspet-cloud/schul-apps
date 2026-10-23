@@ -1,4 +1,5 @@
 import OnlinetestKnopf from '../../onlinetest/OnlinetestKnopf'
+import { WenigerSeitenTest } from '../render/WenigerSeitenTest'
 import { AkzeptierteAlternativenKnopf } from '../../onlinetest/AkzeptierteAlternativen'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
@@ -384,6 +385,8 @@ function EditorInhalt(): React.JSX.Element {
         ausgabe={{ onWord: () => setExportOpen('docx'), onPdf: () => setExportOpen('pdf'), onDrucken: () => setExportOpen('print') }}
         extras={
           <>
+            {/* Auf weniger Seiten (23.10.2026): unsichtbar messen, dann Vorgabe „höchstens N Seiten" setzen */}
+            <WenigerSeitenTest doc={doc} layouts={layouts} uebernehmen={(n) => updateDoc((d) => (d.settings.pageLimit = { mode: 'max', pages: n }))} />
             <NurExperte>
               <LmsExport
                 titel={doc.header.title}

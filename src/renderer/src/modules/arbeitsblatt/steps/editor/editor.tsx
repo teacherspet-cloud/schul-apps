@@ -26,6 +26,9 @@ import {
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
+import { WenigerSeitenKnopf } from '../../render/WenigerSeitenKnopf'
+import { bilderVerkleinern } from '../../didactics/seitenAnpassung'
+import { wendeKuerzungAn } from '../../generation/kuerzen'
 import ImagePicker from '../../../../shared/components/ImagePicker'
 import PrintPreview from '../../../../shared/components/PrintPreview'
 import { loesungsVorgabe } from '../../../../shared/components/LoesungsWahl'
@@ -811,6 +814,20 @@ function EditorInhalt(): React.JSX.Element {
           <>
             <RueckmeldungKnopf art="arbeitsblatt" docId={docId} />
             <BlattFreigabeKnopf ws={ws} layouts={layouts} logo={logo} schoolName={schoolName} />
+            {/* Auf weniger Seiten (23.10.2026): App rechnet Schrift/Abstände/Bilder; ein Rückgängig-Schritt */}
+            <WenigerSeitenKnopf
+              ws={ws}
+              layouts={layouts}
+              logo={logo}
+              schule={schoolName}
+              uebernehmen={(v) =>
+                update((w) => {
+                  w.design = structuredClone(v.design)
+                  if (v.bilder) w.sheets = bilderVerkleinern(w.sheets).doc
+                })
+              }
+              kuerzungUebernehmen={(k) => update((w) => void (w.sheets = wendeKuerzungAn(w.sheets, k)))}
+            />
             <LmsExport titel={ws.meta.title || ws.meta.topic} bericht={() => fragenAusBlatt(ws)} ziel={ablage()} />
           </>
         }

@@ -19,6 +19,9 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { WenigerSeitenKnopf } from '../../arbeitsblatt/render/WenigerSeitenKnopf'
+import { bilderVerkleinern } from '../../arbeitsblatt/didactics/seitenAnpassung'
+import { wendeKuerzungAn } from '../../arbeitsblatt/generation/kuerzen'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
 import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
@@ -771,6 +774,22 @@ function TasksInhalt({ exam }: { exam: Exam }): React.JSX.Element {
               )}
             </NurExperte>
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
+            {/* Auf weniger Seiten (23.10.2026): App rechnet Schrift/Abstände/Bilder für alle Fassungen gleich; ein Rückgängig-Schritt */}
+            {hasContent && (
+              <WenigerSeitenKnopf
+                ws={worksheet}
+                layouts={layouts}
+                logo={logo}
+                schule={settings.schoolName}
+                uebernehmen={(v) =>
+                  updateExam((x) => {
+                    x.design = structuredClone(v.design)
+                    if (v.bilder) Object.assign(x, bilderVerkleinern({ ...x }).doc)
+                  })
+                }
+                kuerzungUebernehmen={(k) => updateExam((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
+              />
+            )}
             <NurExperte>
               {hasContent && (
                 <LmsExport

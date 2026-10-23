@@ -62,13 +62,21 @@ export function pageLimitFits(limit: PageLimit, pageCounts: number[]): boolean {
   return pageCounts.every((n) => n >= pageLimitMin(limit) && n <= limit.pages)
 }
 
+/**
+ * Kleinste Schrift beim Verkleinern (23.10.2026, abgestimmt mit „Auf weniger Seiten"): 10 pt, in Klasse 5/6 12 pt –
+ * wie im Arbeitsblatt (arbeitsblatt/didactics/seitenAnpassung.ts).
+ */
+export function mindestSchriftTest(doc: TestDocument): number {
+  return doc.settings.grade > 0 && doc.settings.grade <= 6 ? 12 : MIN_FONT_PT
+}
+
 /** Reihenfolge der Versuche: erst normale Darstellung, dann engere Abstände, dann schrittweise kleinere Schrift. */
 function candidatesFor(doc: TestDocument): Candidate[] {
   const base = doc.fontSize
   const list: Candidate[] = [{ fontSize: base, compact: false }]
   if (pageLimitOf(doc).mode === 'auto') return list
   list.push({ fontSize: base, compact: true })
-  for (let f = base - 0.5; f >= Math.min(MIN_FONT_PT, base); f -= 0.5) list.push({ fontSize: f, compact: true })
+  for (let f = base - 0.5; f >= Math.min(mindestSchriftTest(doc), base); f -= 0.5) list.push({ fontSize: f, compact: true })
   return list
 }
 
