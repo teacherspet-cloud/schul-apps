@@ -359,9 +359,17 @@ export default function BookEditor({
 
       {/* Reihe, Band, Jahrgang, Verlag, Landesausgabe, Schulform, Ausgabe (Paket 15, Jahrgang/Schulform 12.10.2026) – gespeichert wie jede Änderung, von selbst */}
       <Card withBorder>
-        <UnstyledButton onClick={() => setAngabenOffen((o) => !o)} aria-expanded={angabenOffen} style={{ width: '100%' }}>
+        {/* Leserecht (23.10.2026): ohne Bearbeitungsrecht nur die Angaben, nichts zum Aufklappen und Ändern */}
+        <UnstyledButton
+          onClick={gesperrt ? undefined : () => setAngabenOffen((o) => !o)}
+          aria-expanded={gesperrt ? undefined : angabenOffen}
+          style={{ width: '100%', cursor: gesperrt ? 'default' : undefined }}
+          data-angaben-nur-lesen={gesperrt || undefined}
+        >
           <Group gap="xs" wrap="nowrap">
-            <IconChevronRight size={14} style={{ transform: angabenOffen ? 'rotate(90deg)' : undefined, transition: 'transform 150ms' }} />
+            {!gesperrt && (
+              <IconChevronRight size={14} style={{ transform: angabenOffen ? 'rotate(90deg)' : undefined, transition: 'transform 150ms' }} />
+            )}
             <Text size="sm" fw={500}>
               Reihe und Ausgabe
             </Text>
@@ -377,7 +385,7 @@ export default function BookEditor({
             </Text>
           </Group>
         </UnstyledButton>
-        <Collapse expanded={angabenOffen}>
+        <Collapse expanded={angabenOffen && !gesperrt}>
           <Box mt="xs">
             <LehrwerkAngaben
               werte={book}

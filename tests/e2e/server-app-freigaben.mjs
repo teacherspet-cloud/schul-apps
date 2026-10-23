@@ -108,6 +108,38 @@ try {
     }
   }
   const tafel = (seite) => seite.locator('.app-leiste [aria-label^="Tafelbild"]').count()
+  // Vokabellisten (23.10.2026): gemeinsames Lehrwerk öffnen und prüfen, dass es nach reinem Lesen aussieht
+  const lehrwerkAnsehen = async (seite, wer) => {
+    await seite.goto(`${A}/?einzeln=vokabelliste`)
+    await seite.waitForTimeout(2500)
+    // Alle Reihen aufklappen, dann einen Band MIT Vokabeln öffnen (Platzhalter-Bände sind leer)
+    for (let i = 0; i < 12; i++) {
+      const zu = seite.locator('[data-reihe] button[aria-expanded="false"]').first()
+      if (!(await zu.count())) break
+      await zu.click()
+      await seite.waitForTimeout(150)
+    }
+    const ansehen = seite.locator('[data-band]').filter({ hasText: /[1-9]\d* Vokabeln/ }).locator('[data-band-ansehen]').first()
+    const da = await ansehen.waitFor({ timeout: 10000 }).then(
+      () => true,
+      () => false
+    )
+    pruefe(da && (await seite.locator('[data-band] button', { hasText: 'Vokabeln bearbeiten' }).count()) === 0, `${wer}: Schulbücher mit „Vokabeln ansehen“ statt „bearbeiten“`)
+    if (!da) return
+    await ansehen.click()
+    await seite.waitForTimeout(2500)
+    const befund = {
+      'Zeile hinzufügen': await seite.getByRole('button', { name: 'Zeile hinzufügen' }).count(),
+      Speichern: await seite.getByRole('button', { name: /^(Speichern|Gesichert)$/ }).count(),
+      'Änderungen verwerfen': await seite.getByRole('button', { name: 'Änderungen verwerfen' }).count(),
+      'Admin-Medienbank': await seite.locator('[data-medien-leiste]').count()
+    }
+    pruefe(
+      Object.values(befund).every((n) => n === 0) && (await seite.locator('[data-angaben-nur-lesen]').count()) === 1,
+      `${wer}: gemeinsames Lehrwerk nur zum Lesen (${JSON.stringify(befund)})`
+    )
+    await seite.screenshot({ path: join(out, `lehrwerk-${wer}.png`) })
+  }
   const p = await seiteAuf(lea.ctx)
   await aufklappen(p)
   pruefe((await tafel(p)) === 0 && (await p.locator('.app-leiste [aria-label^="Arbeitsbl"]').count()) > 0, 'Lea: Tafelbild fehlt in der Leiste, Arbeitsblatt steht da')
@@ -158,6 +190,8 @@ try {
   await fenster.reload()
   await fenster.waitForTimeout(2500)
   pruefe(await fenster.locator('[data-ansicht-band]').isVisible(), '… bleibt nach dem Neuladen in diesem Fenster erhalten')
+  // Der Server kennt das Fenster weiter als Admin – die Ansicht zeigt trotzdem nur, was eine Lehrkraft sieht
+  await lehrwerkAnsehen(fenster, 'Ansicht')
   // ---------- 6. Freigaben wie am Schulserver (23.10.2026): nur 8 Apps – keine Wege in gesperrte Apps
   const VPS = ['vokabeltest', 'grammatiktest', 'grammatikformen', 'elternbrief', 'vokabelliste', 'tafelbild', 'lernzielkontrolle', 'arbeitsblatt']
   await verwaltung.request.post(`${A}/server/app-freigaben`, { headers: KOPF, data: { gruppen: [{ ...vorher[0], apps: VPS }] } })
@@ -184,6 +218,9 @@ try {
   const blatt = await lea.ctx.request.post(`${A}/server/blaetter/freigeben`, { headers: KOPF, data: {} })
   pruefe(blatt.status() === 403, `Server: Blätter für Lernende freigeben gesperrt (${blatt.status()})`)
   await lea.api('sheets:delete', 'freigaben-probe')
+
+  // ---------- 7. Vokabellisten (23.10.2026): gemeinsame Lehrwerke sehen für Lehrkräfte nach reinem Lesen aus
+  await lehrwerkAnsehen(await seiteAuf(lea.ctx), 'Lehrkraft')
 
   // Das eigene Fenster des Admins bleibt die Admin-Sicht
   const admin2 = await seiteAuf(verwaltung)

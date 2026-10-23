@@ -266,9 +266,17 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   const gefuellt = zeilen.filter((v) => v.term.trim())
   const abgefragt = gefuellt.filter((v) => v.include !== false).length
 
+  // Leserecht (23.10.2026, Wunsch der Lehrkraft): nur ausgefüllte Zeilen, ohne Eingabehilfen; leer ein Satz statt einer leeren Zeile
+  const gezeigt = nurLesen ? zeilen.filter((z) => z.term.trim() || z.translation.trim()) : zeilen
+  if (nurLesen && !gezeigt.length)
+    return (
+      <Text size="sm" c="dimmed" py="sm" data-vokabeln-leer>
+        In diesem Abschnitt stehen noch keine Vokabeln.
+      </Text>
+    )
   return (
     <>
-      <SonderzeichenLeiste sprache={sprache} />
+      {!nurLesen && <SonderzeichenLeiste sprache={sprache} />}
       <Box style={{ overflowX: 'auto' }}>
         <Table verticalSpacing={4} striped highlightOnHover ref={tabelle} className="vokabel-tabelle">
           <Table.Thead>
@@ -311,13 +319,13 @@ export default function VokabelTabelle<T extends TabellenZeile>({
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {zeilen.map((z, i) =>
+            {gezeigt.map((z, i) =>
               nurVerdacht && medien && !zeileMitVerdacht(medien.daten[z.term], satzDerZeile(z, mitBeispiel)) ? null : (
                 <Zeile
                   key={z.id}
                   zeile={z}
                   nr={i + 1}
-                  letzte={i === zeilen.length - 1}
+                  letzte={i === gezeigt.length - 1}
                   abfragen={abfragen}
                   mitBeispiel={mitBeispiel}
                   mitVerlauf={mitVerlauf}
@@ -566,7 +574,8 @@ const Zeile = memo(function Zeile({
         variant="unstyled"
         {...(f === 'pos' ? {} : { autosize: true, minRows: 1 })}
         aria-label={`${label} in Zeile ${nr}`}
-        placeholder={placeholder}
+        // Leserecht (23.10.2026): ohne Beispieltexte, sonst sähe eine leere Zelle nach Eingabefeld aus
+        placeholder={nurLesen ? undefined : placeholder}
         value={(v[f] as string | undefined) ?? ''}
         readOnly={nurLesen}
         data-zeile={v.id}
@@ -682,7 +691,7 @@ const Zeile = memo(function Zeile({
             autosize
             minRows={1}
             styles={{ input: { ...UMBRUCH, color: 'var(--mantine-color-dimmed)' } }}
-            placeholder="Übersetzung des Beispielsatzes"
+            placeholder={nurLesen ? undefined : 'Übersetzung des Beispielsatzes'}
             aria-label={`Übersetzung des Beispielsatzes in Zeile ${nr}`}
             value={v.exampleTranslation ?? ''}
             readOnly={nurLesen}
@@ -699,7 +708,10 @@ const Zeile = memo(function Zeile({
         <>
           <Table.Td>
             {/* Das Bild der Bedeutung (21.10.2026, shared/medienBedeutung.ts) – Aussprache weiter je Wort */}
-            <BildZelle sicht={bildVon(sicht, v, sprache)} wort={v.term} onOeffnen={() => bildOeffnen(v)} stufe={bildStufe} />
+            {/* Leserecht: ohne Bild kein leerer Bild-Knopf */}
+            {nurLesen && !bildVon(sicht, v, sprache)?.bild ? null : (
+              <BildZelle sicht={bildVon(sicht, v, sprache)} wort={v.term} onOeffnen={() => bildOeffnen(v)} stufe={bildStufe} />
+            )}
           </Table.Td>
           <Table.Td>
             <Group gap={4} wrap="nowrap">

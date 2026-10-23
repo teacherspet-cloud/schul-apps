@@ -18,7 +18,9 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import { FachPunkt } from '../../shared/components/FachFarbe'
-import { IconBooks, IconChevronRight, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
+import { IconBooks, IconChevronRight, IconEye, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
+import { aufServer } from '../../shared/plattform'
+import { darfLehrwerkBearbeiten, siehtLehrwerkApps } from '../../shared/fachobleute'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
 import { notifyError } from '../../shared/util'
@@ -56,6 +58,13 @@ import {
 } from '@shared/lehrwerkReihe'
 // Cover je Band: gemeinsame Komponente (09.10.2026, auch Kursseite und „Meine Klassen")
 import { BandCover } from '../../shared/components/BandCover'
+
+/*
+ * Leserecht (23.10.2026, Wunsch der Lehrkraft): Gemeinsame Lehrwerke am Server bearbeiten nur Admins und die Fachobleute
+ * des Fachs (main/services/storage/textbooks.ts) – für alle anderen sieht die Ansicht nach reinem Lesen aus.
+ */
+const nurLesenBuch = (b: Pick<TextbookMeta, 'builtIn' | 'language'>): boolean => aufServer() && Boolean(b.builtIn) && !darfLehrwerkBearbeiten(b.language)
+const pflegtLehrwerke = (): boolean => !aufServer() || siehtLehrwerkApps()
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -219,7 +228,11 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
         {/* Gemeinsamer Kopf (Phase 6a) */}
         <AppKopf
           suche={false}
-          beschreibung="Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl."
+          beschreibung={
+            pflegtLehrwerke()
+              ? 'Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl.'
+              : 'Schulbuch-Vokabeln ansehen und eigene Listen anlegen. Die Schulbücher pflegen die Fachobleute; eigene Listen stehen im Vokabeltest zur Auswahl.'
+          }
           neu={{ label: 'Neue Liste', onClick: () => setWizard(true), kennung: 'vokabelliste' }}
         />
 
@@ -572,9 +585,16 @@ function Schulbuecher({
             </Text>
           </div>
         </Group>
-        <Button size="xs" onClick={() => onBearbeiten(b.id)}>
-          Vokabeln bearbeiten
-        </Button>
+        {/* Gemeinsames Lehrwerk ohne Bearbeitungsrecht (23.10.2026, Wunsch der Lehrkraft): sieht nach reinem Lesen aus */}
+        {nurLesenBuch(b) ? (
+          <Button size="xs" variant="light" leftSection={<IconEye size={14} />} onClick={() => onBearbeiten(b.id)} data-band-ansehen>
+            Vokabeln ansehen
+          </Button>
+        ) : (
+          <Button size="xs" onClick={() => onBearbeiten(b.id)}>
+            Vokabeln bearbeiten
+          </Button>
+        )}
       </Group>
     </Card>
   )

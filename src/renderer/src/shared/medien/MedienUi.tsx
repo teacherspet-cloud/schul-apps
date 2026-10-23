@@ -39,6 +39,7 @@ import {
   IconMessage2
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ansicht } from '../plattform'
 import { create } from 'zustand'
 import {
   BILDSTUFE_NAME,
@@ -78,7 +79,8 @@ export function useMedienAdmin(): boolean {
     adminZwischen ??= window.api.medien.admin().catch(() => false)
     void adminZwischen.then(setAdmin)
   }, [])
-  return admin
+  // „Ansicht zeigen" (App-Freigaben, 23.10.2026): der Server kennt das Fenster weiter als Admin – die Ansicht ist eine Lehrkraft
+  return admin && !ansicht()
 }
 
 /*

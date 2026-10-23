@@ -5,7 +5,7 @@
  *  - KI-Entwürfe: Der KI-Knopf läuft als Hintergrund-Auftrag; das Ergebnis liegt als Entwurf je Schlüssel bereit
  *    (dieses Gerät), bis die Lehrkraft es durchsieht und speichert oder verwirft – gespeichert wird nur Durchgesehenes.
  */
-import { appFreigegeben, aufServer } from '../../shared/plattform'
+import { ansicht, appFreigegeben, aufServer } from '../../shared/plattform'
 import { useEffect, useState } from 'react'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -38,7 +38,11 @@ import { erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lern
 export const kurseFreigegeben = (): boolean => aufServer() && appFreigegeben('sprachenlernen')
 
 export const bankZahlenLaden = (sprache: string): Promise<{ zahlen: BankZahlen; darf: boolean }> =>
-  holen<{ zahlen: BankZahlen; darf: boolean }>(`/server/grammatik-bank?sprache=${encodeURIComponent(sprache)}`)
+  holen<{ zahlen: BankZahlen; darf: boolean }>(`/server/grammatik-bank?sprache=${encodeURIComponent(sprache)}`).then((r) => ({
+    ...r,
+    // „Ansicht zeigen": Rechte wie eine Lehrkraft, auch wenn der Server das Fenster als Admin kennt
+    darf: r.darf && !ansicht()
+  }))
 
 export const bankLesen = async (schluessel: string[]): Promise<BankEintrag[]> =>
   (await senden<{ eintraege: BankEintrag[] }>('/server/grammatik-bank/lesen', { schluessel })).eintraege
