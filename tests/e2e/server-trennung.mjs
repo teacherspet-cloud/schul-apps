@@ -91,6 +91,12 @@ try {
   const sieht = async (wer) => ((await wer.get('/server/fachschaft')).eintraege ?? []).some((e) => e.titel === 'Leas tests')
   pruefe(await sieht(ben), 'Ben (Englisch) sieht die Freigabe der Fachschaft')
   pruefe(!(await sieht(cara)), 'Cara (Mathe) sieht sie nicht')
+  // Ohne eigene Fächer (23.10.2026): nur „allgemeine“ Freigaben – vorher alle Fachgruppen
+  await cara.api('settings:set', { eigeneFaecher: [] })
+  pruefe(!(await sieht(cara)), 'Cara ohne Fächer sieht die Englisch-Freigabe nicht')
+  const fachordner = await cara.get('/server/fach')
+  pruefe((fachordner.faecher ?? []).every((f) => f.id === 'allgemein'), `Alter Fachordner ohne Fächer: nur „Allgemein“ (${(fachordner.faecher ?? []).map((f) => f.id).join(', ')})`)
+  await cara.api('settings:set', { eigeneFaecher: ['mathematik'] })
   // Und der Inhalt selbst bleibt in Leas Ablage
   pruefe(!(await ben.api('tests:get', 'tr-tests-1')).value, 'Ben liest Leas Ablage auch nach der Freigabe nicht direkt')
 

@@ -241,15 +241,24 @@ export function describeBlock(block: Block): string {
   const lines: string[] = [`Task: ${block.title}`, `Instruction: ${block.instruction}`]
   switch (block.kind) {
     case 'gap':
-      block.items.forEach((it, i) =>
+      /*
+       * Anfangsbuchstabe IN der Lücke zeigen (23.10.2026, Befund der Lehrkraft): Vorher stand nur „(first letter given)" –
+       * die Prüfung meldete dann „The parenthetical first letter given is not shown in the items" und erfand einen
+       * Wortkasten, auf den die Anweisung angeblich verweise.
+       */
+      block.items.forEach((it, i) => {
+        const erster = block.firstLetterHint || it.firstLetter ? (it.answer.trim().charAt(0) ?? '') : ''
         lines.push(
           `${i + 1}. ${it.sentences
-            .map((s) => `${s.before} ___${it.hint ? ` (${it.hint})` : ''} ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.after}`)
-            .join(' / ')}  → answer: ${it.answer}${block.firstLetterHint || it.firstLetter ? ' (first letter given)' : ''}`
+            .map((s) => `${s.before} ${erster ? `${erster}…` : '___'}${it.hint ? ` (${it.hint})` : ''} ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.after}`)
+            .join(' / ')}  → answer: ${it.answer}`
         )
-      )
+      })
       if (block.wordBank) lines.push(`(Students get a word box: ${[...block.items.map((i) => i.bankWord || i.answer), ...block.extraBankWords].join(', ')})`)
-      else lines.push('(No word box.)')
+      else
+        lines.push(
+          `(NO word box – there is none on the sheet, so do not report one as missing.${block.firstLetterHint || block.items.some((i) => i.firstLetter) ? ' A gap written as „b…" shows the first letter students see in the gap (the gap itself has a fixed length).' : ''})`
+        )
       break
     case 'gapText': {
       let n = 0

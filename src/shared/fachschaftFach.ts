@@ -45,9 +45,12 @@ export function freigabeFach(art: string, dok: Record<string, unknown>, gewaehlt
   return { fachNoetig: true }
 }
 
-/** Darf eine Lehrkraft mit diesen Fächern die Freigabe sehen? Ohne Fächer alles; „Allgemein" nur ohne Fächer. */
+/**
+ * Darf eine Lehrkraft mit diesen Fächern die Freigabe sehen? Mit Fächern: deren Freigaben. Ohne Fächer nur „Allgemein“ –
+ * bis 23.10.2026 sah sie ALLE Fachgruppen (Prüfung „jeder sieht nur Eigenes und seine Fachgruppe“, Entscheidung der Lehrkraft).
+ */
 export function freigabeSichtbar(fach: string, eigeneFaecher: readonly string[]): boolean {
-  return !eigeneFaecher.length || eigeneFaecher.includes(fach)
+  return eigeneFaecher.length ? eigeneFaecher.includes(fach) : fach === ALLGEMEIN
 }
 
 /** Vorbelegung im Dialog: das eigene Fach, wenn es genau eines ist */

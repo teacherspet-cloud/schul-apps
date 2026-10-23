@@ -19,7 +19,7 @@ import { blaetterDerGruppe } from './arbeitsblaetter'
 import { foerderDaten } from './foerdern'
 import { grammatikDerGruppe, lehrwerkAutomatisch, lehrwerkStandVon } from './grammatik'
 import { json, type Anfrage } from './http'
-import { alleLerngruppen, historie, lerngruppe, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
+import { alleLerngruppen, gepruefteMitglieder, historie, lerngruppe, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
 import { db as vokDb, istOffen, json_, type Zeile as VokZeile } from './vokabeln'
 
@@ -105,7 +105,8 @@ function bekannteWoerter(g: Lerngruppe, jetzt = Date.now()): { woerter: string[]
 
 /** Vorwissen einer Lerngruppe aus allen Kursen der Schule */
 export function vorwissenDerGruppe(g: Lerngruppe, jetzt = Date.now()): VorwissenAntwort {
-  const ids = new Set(mitgliederVon(g).map((n) => n.id))
+  // Nur geprüfte Mitglieder (23.10.2026): frei eingetragene Namen öffnen keine Lernstände aus fremden Kursen
+  const ids = new Set(gepruefteMitglieder(g).map((n) => n.id))
   const eigen = kursDaten(g, null, jetzt)
   const andere: KursDaten[] = []
   if (ids.size >= MIN_GEMEINSAM)

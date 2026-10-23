@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS ueberthemen (
   wert TEXT NOT NULL,
   geaendert TEXT NOT NULL,
   PRIMARY KEY (lerngruppe_id, art, schluessel)
+);
+CREATE TABLE IF NOT EXISTS mitlehrkraft_einladungen (
+  lerngruppe_id TEXT NOT NULL REFERENCES lerngruppen(id) ON DELETE CASCADE,
+  lehrkraft_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  erstellt TEXT NOT NULL,
+  PRIMARY KEY (lerngruppe_id, lehrkraft_id)
 );`
 
 let bereit = false
@@ -178,14 +184,44 @@ export function kursGeschwister(g: Lerngruppe, alle: Lerngruppe[] = alleLerngrup
   )
 }
 
-/**
- * Mitlehrkraft (19.10.2026, abgestimmt): Wer im selben Kurs (gleiche IServ-Gruppe bzw. gleicher Name) dasselbe Fach
- * unterrichtet, darf Material der Lerngruppe ANSEHEN (mit Lernstand) – verwalten nur, wer es angelegt hat.
+/*
+ * Mitlehrkraft NUR PER EINLADUNG (23.10.2026, Prüfung „jeder sieht nur Eigenes“, Entscheidung der Lehrkraft): Bis dahin
+ * genügte ein gleich benannter Kurs (bzw. dieselbe, frei eintragbare IServ-Gruppe) mit gleichem Fach – jede Lehrkraft
+ * hätte sich so Material, Abgaben und Namen der Lernenden einer Kollegin anzeigen lassen können. Jetzt lädt die Lehrkraft
+ * der Lerngruppe ausdrücklich ein; der gleiche Kurs bestimmt nur noch, in welcher eigenen Lerngruppe das Material erscheint.
  */
+export function eingeladen(lerngruppeId: string, lehrkraftId: string): boolean {
+  return Boolean(db().prepare('SELECT 1 FROM mitlehrkraft_einladungen WHERE lerngruppe_id = ? AND lehrkraft_id = ?').get(lerngruppeId, lehrkraftId))
+}
+
+export function einladungen(lerngruppeId: string): string[] {
+  return (db().prepare('SELECT lehrkraft_id FROM mitlehrkraft_einladungen WHERE lerngruppe_id = ?').all(lerngruppeId) as { lehrkraft_id: string }[]).map(
+    (z) => z.lehrkraft_id
+  )
+}
+
+export function setzeEinladungen(lerngruppeId: string, ids: readonly string[]): string[] {
+  const g = lerngruppe(lerngruppeId)
+  if (!g) return []
+  const lehrkraefte = new Set(alleNutzer().filter((n) => (n.rolle === 'lehrkraft' || n.rolle === 'admin') && !n.gesperrt && n.id !== g.lehrkraft_id).map((n) => n.id))
+  const gueltig = [...new Set(ids)].filter((id) => lehrkraefte.has(id))
+  const d = db()
+  d.prepare('DELETE FROM mitlehrkraft_einladungen WHERE lerngruppe_id = ?').run(lerngruppeId)
+  const neu = d.prepare('INSERT INTO mitlehrkraft_einladungen (lerngruppe_id, lehrkraft_id, erstellt) VALUES (?, ?, ?)')
+  for (const id of gueltig) neu.run(lerngruppeId, id, new Date().toISOString())
+  return gueltig
+}
+
+/** Lerngruppen anderer Lehrkräfte im selben Kurs, die die Lehrkraft von `g` eingeladen haben */
+export function eingeladeneGeschwister(g: Lerngruppe): Lerngruppe[] {
+  return kursGeschwister(g).filter((x) => eingeladen(x.id, g.lehrkraft_id))
+}
+
+/** Mitlehrkraft darf Material der Lerngruppe ANSEHEN (mit Lernstand) – nur eingeladen; verwalten nur, wer sie angelegt hat */
 export function mitlehrkraftDarfSehen(ichId: string, lerngruppeId: string): boolean {
   const g = lerngruppe(lerngruppeId)
   if (!g || g.lehrkraft_id === ichId) return false
-  return kursGeschwister(g).some((x) => x.lehrkraft_id === ichId)
+  return eingeladen(g.id, ichId)
 }
 
 interface Roh {
@@ -471,8 +507,22 @@ export function ueberthemenRoute(): (k: Anfrage) => Promise<boolean> {
     }
     const g = lerngruppe(teile[0] ?? '')
     if (!g || g.lehrkraft_id !== ich.id) return json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true
+    // Mitlehrkräfte einladen (23.10.2026): nur die Lehrkraft der Lerngruppe
+    if (teile[1] === 'mitlehrkraefte') {
+      const lehrkraefte = (): { id: string; name: string }[] =>
+        alleNutzer()
+          .filter((n) => (n.rolle === 'lehrkraft' || n.rolle === 'admin') && !n.gesperrt && n.id !== ich.id && n.quelle !== 'vorschau' && n.quelle !== 'gast')
+          .map((n) => ({ id: n.id, name: n.name || n.benutzer }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+      if (req.method === 'GET') return json(res, 200, { eingeladen: einladungen(g.id), lehrkraefte: lehrkraefte() }), true
+      if (req.method !== 'POST' || typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nicht erlaubt.' }), true
+      const k1 = (await k.koerper()) as Record<string, unknown>
+      const ids = Array.isArray(k1.ids) ? (k1.ids as unknown[]).map(String) : []
+      return json(res, 200, { eingeladen: setzeEinladungen(g.id, ids) }), true
+    }
     if (req.method === 'GET' && teile.length === 1) {
-      const geschwister = kursGeschwister(g)
+      // Material der Mitlehrkräfte: nur aus Lerngruppen, die mich eingeladen haben (23.10.2026)
+      const geschwister = eingeladeneGeschwister(g)
       const themen = themenAus(g, [g, ...geschwister])
       return json(res, 200, { themen, kandidaten: kandidatenDerGruppe(g), schuljahr: schuljahrVon(Date.now()), fremdStand: fremdStand(geschwister) }), true
     }

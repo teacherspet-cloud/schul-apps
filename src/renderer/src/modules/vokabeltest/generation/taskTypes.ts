@@ -186,6 +186,17 @@ const UNIQUE_RULE = `Students must be able to see without doubt which word is as
 - Avoid items where a synonym, a more general word or a word from the same topic would also be correct.`
 
 /**
+ * Keine Buchstabenzahl (23.10.2026, Wunsch der Lehrkraft: „zeige ihnen nicht an, wie viele Buchstaben ein Wort hat – der
+ * Anfangsbuchstabe reicht"): Striche je Buchstabe („c _ _ _ _", „b____") und Angaben wie „(5 letters)" fallen weg.
+ */
+export function ohneLaengenHinweis(t: string): string {
+  return t
+    .replace(/\(\s*\d+\s*(letters?|Buchstaben|lettres?|letras?|lettere)\s*\)/gi, '')
+    .replace(/(^|\s)\p{L}?(?:\s?_){2,}(?=\s|[.,;:!?]|$)/gu, '$1')
+    .replace(/\s{2,}/g, ' ')
+}
+
+/**
  * Ein Lückensatz (02.10.2026): doppelte Wörter an der Lücke aus der Lösung nehmen („to ___" + „to
  * reward" → „reward"), zweiteilige Wendungen mit Mittelteil (shared/luecken.ts).
  */
@@ -195,8 +206,8 @@ export function lueckenSatz(
   after: unknown,
   middle?: unknown
 ): { sentences: { before: string; after: string; mitte?: string }[]; answer: string } {
-  const vor = String(before ?? '').trim()
-  const nach = String(after ?? '').trim()
+  const vor = ohneLaengenHinweis(String(before ?? '')).trim()
+  const nach = ohneLaengenHinweis(String(after ?? '')).trim()
   const mitte = String(middle ?? '').trim()
   const teile = teileVon(String(answer ?? ''))
   if (mitte && teile.length === 2) {
@@ -217,6 +228,7 @@ Rules for gaps:
 - "answer" is the exact form that fits the gap. Inflect only with forms the class already knows (see VORWISSEN DER KLASSE); otherwise build the sentence so that the base form fits.
 - The context must make the tested word the ONLY sensible solution among all words of the list. Add clues (collocations, typical situations) to remove ambiguity.
 - The answer must never appear in "before" or "after".
+- Never reveal the length of the answer: no underscores or dashes per letter, no "(5 letters)" – the app draws the gap and, where wanted, shows the first letter itself.
 ${UNIQUE_RULE}`
 
 /** Mindestens so viele überzählige Wörter stehen in jedem Wortkasten bzw. jeder Zuordnung */
@@ -324,8 +336,11 @@ const defs: TaskTypeDef[] = [
         return [{ id: newId(ctx.rng), vocabId: v.id, ...lueckenSatz(it.before, it.answer, it.after, it.middle), bankWord: v.term }]
       })
       // Ohne Wortkasten hilft der Anfangsbuchstabe, die gesuchte Vokabel eindeutig zu erkennen
+      const grund = base(this, data, ctx)
       return {
-        ...base(this, data, ctx),
+        ...grund,
+        // Ohne Wortkasten (23.10.2026, Wunsch der Lehrkraft): „Complete the sentences with fitting words." statt „… with words."
+        ...(!earlyLevel(ctx) && ctx.settings.targetLanguage === 'en' ? { instruction: 'Complete the sentences with fitting words.' } : {}),
         kind: 'gap',
         items,
         wordBank: earlyLevel(ctx),

@@ -75,6 +75,16 @@ try {
   const b3 = await blatt(ctxA, gA, 'Die Revolution von 1789', 'Französische Revolution')
   const b4 = await blatt(ctxB, gB, 'Kinderarbeit', 'Soziale Frage im 19. Jahrhundert')
   pruefe(Boolean(b1.id && b2.id && b3.id && b4.id), 'Vier Blätter freigegeben (eins von der Mitlehrkraft)')
+  // Mitlehrkraft nur per Einladung (23.10.2026): gleicher Kurs allein zeigt nichts
+  const ohne = await ctxB.request.get(`${A}/server/blaetter/${b1.id}`, { headers: KOPF })
+  pruefe(ohne.status() === 404, `Ohne Einladung sieht Max das Blatt der Kollegin nicht (${ohne.status()})`)
+  const ohneThemen = await (await ctxA.request.get(`${A}/server/themen/${gA.id}`, { headers: KOPF })).json()
+  pruefe(!ohneThemen.themen.some((x) => x.materialien.some((m) => m.id === b4.id)), 'Ohne Einladung kein Material der anderen Lehrkraft in den Überthemen')
+  const fremd = await ctxB.request.post(`${A}/server/themen/${gA.id}/mitlehrkraefte`, { headers: KOPF, data: { ids: [lb.id] } })
+  pruefe(fremd.status() === 404, `Max kann sich nicht selbst in Utes Lerngruppe einladen (${fremd.status()})`)
+  const einl = await post(ctxA, `/server/themen/${gA.id}/mitlehrkraefte`, { ids: [lb.id] })
+  pruefe(einl.eingeladen?.[0] === lb.id, 'Ute lädt Max ein')
+  await post(ctxB, `/server/themen/${gB.id}/mitlehrkraefte`, { ids: [la.id] })
   // Blatt 3 ins Vorjahr (Testweg): Jahrgang 7
   const vorjahr = Date.parse(`${new Date().getFullYear() - (new Date().getMonth() >= 7 ? 1 : 2)}-11-10T10:00:00Z`)
   const tz = await ctxA.request.post(`${A}/server/themen/testzeit`, { headers: KOPF, data: { id: b3.id, zeit: vorjahr } })

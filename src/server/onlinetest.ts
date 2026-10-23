@@ -91,6 +91,11 @@ CREATE TABLE IF NOT EXISTS onlinetests (
   erstellt TEXT NOT NULL,
   beendet TEXT
 );
+CREATE TABLE IF NOT EXISTS lerngruppen_bestaetigt (
+  lerngruppe_id TEXT NOT NULL REFERENCES lerngruppen(id) ON DELETE CASCADE,
+  nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  PRIMARY KEY (lerngruppe_id, nutzer_id)
+);
 CREATE TABLE IF NOT EXISTS teilnahmen (
   id TEXT PRIMARY KEY,
   test_id TEXT NOT NULL REFERENCES onlinetests(id) ON DELETE CASCADE,
@@ -283,11 +288,43 @@ export function mitgliederErgaenzen(alt: string[], neu: string[]): { mitglieder:
   return { mitglieder: [...alt, ...dazu], dazu }
 }
 
-/** Mitglieder einer Lerngruppe ergänzen (ohne Doppelte); liefert, wer neu dazukam */
+/**
+ * Mitglieder einer Lerngruppe ergänzen (ohne Doppelte); liefert, wer neu dazukam. Nur über geprüfte Wege aufgerufen
+ * (IServ-Kurs-Abgleich, Lernende eines Trainings mit Code) – sie gelten deshalb als bestätigt (23.10.2026, s. unten).
+ */
 export function lerngruppeErgaenzen(g: Lerngruppe, benutzer: string[]): string[] {
   const { mitglieder, dazu } = mitgliederErgaenzen(g.mitglieder, benutzer)
   if (dazu.length) db().prepare('UPDATE lerngruppen SET mitglieder = ? WHERE id = ?').run(JSON.stringify(mitglieder), g.id)
+  // Kontokennung statt Benutzername – kein Name in der Tabelle
+  const wer = new Set(benutzer.map((x) => x.trim().toLowerCase()).filter(Boolean))
+  const best = db().prepare('INSERT OR IGNORE INTO lerngruppen_bestaetigt (lerngruppe_id, nutzer_id) VALUES (?, ?)')
+  for (const n of alleNutzer()) if (wer.has(n.benutzer)) best.run(g.id, n.id)
   return dazu
+}
+
+/**
+ * Geprüfte Mitglieder (23.10.2026, Entscheidung der Lehrkraft nach der Prüfung „jeder sieht nur Eigenes“): Für das
+ * Vorwissen der Lerngruppe – Lernstände aus den Kursen anderer Lehrkräfte – zählen nur Kinder, die nachweislich dazugehören:
+ * - IServ-Gruppe der Lerngruppe, in der auch die Lehrkraft selbst ist (der Name der Gruppe ist frei eintragbar),
+ * - Klassenzuordnung der Verwaltung („klasse:5b") zur Klasse der Lerngruppe,
+ * - über einen Code beigetreten (Gastkonten) bzw. über einen geprüften Weg aufgenommen (lerngruppen_bestaetigt).
+ * Von Hand eingetippte Benutzernamen bleiben Mitglieder, zählen hier aber nicht.
+ */
+export function gepruefteMitglieder(g: Lerngruppe): NutzerInfo[] {
+  const lehrkraft = nutzerNachId(g.lehrkraft_id)
+  const iservGeprueft = Boolean(g.iserv_gruppe) && !g.iserv_gruppe.startsWith('klasse:') && !g.iserv_gruppe.startsWith('vorschau:') && inIservGruppe(g.iserv_gruppe, lehrkraft?.gruppen ?? [])
+  const klasse = klasseDerLerngruppe(g)
+  const bestaetigt = new Set(
+    (db().prepare('SELECT nutzer_id FROM lerngruppen_bestaetigt WHERE lerngruppe_id = ?').all(g.id) as { nutzer_id: string }[]).map((z) => z.nutzer_id)
+  )
+  return mitgliederVon(g).filter((n) => {
+    if (n.quelle === 'vorschau') return false
+    if (n.quelle === 'gast') return g.mitglieder.includes(n.benutzer)
+    if (bestaetigt.has(n.id)) return true
+    const zugeordnet = n.gruppen.find((x) => x.id.startsWith('klasse:'))?.id
+    if (klasse && zugeordnet === klasse) return true
+    return iservGeprueft && inIservGruppe(g.iserv_gruppe, n.gruppen)
+  })
 }
 
 /** Eingetragene Gäste (Benutzer „gast-…") bleiben, wenn die Mitgliederliste neu gesetzt wird – sie stehen in keiner Eingabe */

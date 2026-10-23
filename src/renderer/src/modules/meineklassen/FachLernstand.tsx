@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
 import { useFachFarbe } from '../../shared/components/FachFarbe'
+import { MitlehrkraefteKnopf } from './MitlehrkraefteKnopf'
 
 interface ReiheKurz {
   zid: string
@@ -233,9 +234,13 @@ export function FachLernstand({
       <Card withBorder radius="md" padding="md" h="100%" data-fach-lernstand-kasten>
         <Group justify="space-between" mb="xs">
           <Text fw={700}>Lernstand in Reihen & Blättern</Text>
-          <Text size="xs" c="dimmed">
-            nach Überthemen
-          </Text>
+          <Group gap={6}>
+            <Text size="xs" c="dimmed">
+              nach Überthemen
+            </Text>
+            {/* Mitlehrkräfte nur per Einladung (23.10.2026) */}
+            <MitlehrkraefteKnopf gruppeId={gruppeId} />
+          </Group>
         </Group>
         {themen.length ? (
           <Stack gap={10} data-ueberthemen>

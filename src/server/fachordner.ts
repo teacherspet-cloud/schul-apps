@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FAECHER } from '@shared/faecher'
+import { ALLGEMEIN, freigabeSichtbar } from '@shared/fachschaftFach'
 import { getSettings } from '../main/services/storage/settings'
 import { erstellePaket, lesePaketEin, WEGE } from '../main/services/paket/wege'
 import { paketVorschau, type PaketArt } from '../main/services/paket/paket'
@@ -68,7 +69,10 @@ export function fachordnerRoute(): (k: Anfrage) => Promise<boolean> {
 
     if (req.method === 'GET' && !was) {
       const eigene = imNutzer(ich, () => getSettings().eigeneFaecher ?? [])
-      const faecher = (eigene.length ? FAECHER.filter((f) => eigene.includes(f.id)) : FAECHER).map((f) => ({ id: f.id, label: f.label, eintraege: lies(f.id) }))
+      // Gleiche Regel wie die Fachschaft (23.10.2026, shared/fachschaftFach.ts): eigene Fächer, ohne Fächer nur „Allgemein“
+      const faecher = [...FAECHER, { id: ALLGEMEIN, label: 'Allgemein' }]
+        .filter((f) => freigabeSichtbar(f.id, eigene))
+        .map((f) => ({ id: f.id, label: f.label, eintraege: lies(f.id) }))
       return (json(res, 200, { faecher, teilbar: TEILBAR }), true)
     }
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
@@ -93,6 +97,9 @@ export function fachordnerRoute(): (k: Anfrage) => Promise<boolean> {
         return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
       }
     }
+    // Übernehmen nur aus dem Ordner eines eigenen Fachs (23.10.2026) – vorher genügte die Kennung aus fremdem Fach
+    if (was === 'uebernehmen' && !freigabeSichtbar(fach, imNutzer(ich, () => getSettings().eigeneFaecher ?? [])))
+      return (json(res, 404, { fehler: 'Nicht (mehr) im Fachordner.' }), true)
     const eintrag = lies(fach).find((x) => x.id === String(k0.eintrag ?? ''))
     if (!eintrag) return (json(res, 404, { fehler: 'Nicht (mehr) im Fachordner.' }), true)
     const datei = join(fachOrdner(fach), `${eintrag.id}.schulpaket`)

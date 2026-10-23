@@ -311,7 +311,9 @@ export function fachschaftRoute(): (k: Anfrage) => Promise<boolean> {
 
     if (was === 'oeffnen') {
       const f = db().prepare('SELECT * FROM fach_freigaben WHERE id = ?').get(String(k0.freigabe ?? '')) as Freigabe | undefined
-      if (!f || (f.besitzer_id !== n.id && !sichtbarFuer(f, eigeneFaecher))) return (json(res, 404, { fehler: 'Diese Freigabe gibt es nicht (mehr).' }), true)
+      // Wie in der Liste (23.10.2026): sichtbar fürs eigene Fach – und Ausgeblendetes nur für Erstellerin und Fachobleute
+      const verborgen = f && f.besitzer_id !== n.id && (!(darfOrdnen(f) || sichtbarFuer(f, eigeneFaecher)) || (metaVon(f.id)?.ausgeblendet && !darfOrdnen(f)))
+      if (!f || verborgen) return (json(res, 404, { fehler: 'Diese Freigabe gibt es nicht (mehr).' }), true)
       // Eigenes Material: das Original
       if (f.besitzer_id === n.id) return (json(res, 200, { art: f.art, id: f.doc_id }), true)
       const besitzer = nutzerNachId(f.besitzer_id)

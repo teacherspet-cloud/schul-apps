@@ -40,10 +40,10 @@ describe('Freigabe verlangt ein Fach', () => {
 })
 
 describe('Wer sieht eine Freigabe', () => {
-  it('Fach passt oder keine eigenen Fächer; „Allgemein" nur ohne eigene Fächer', () => {
+  it('Fach passt; ohne eigene Fächer nur „Allgemein“ (23.10.2026: vorher alle Fachgruppen)', () => {
     expect(freigabeSichtbar('geschichte', ['geschichte', 'mathematik'])).toBe(true)
     expect(freigabeSichtbar('geschichte', ['englisch'])).toBe(false)
-    expect(freigabeSichtbar('geschichte', [])).toBe(true)
+    expect(freigabeSichtbar('geschichte', [])).toBe(false)
     expect(freigabeSichtbar(ALLGEMEIN, ['englisch'])).toBe(false)
     expect(freigabeSichtbar(ALLGEMEIN, [])).toBe(true)
   })
