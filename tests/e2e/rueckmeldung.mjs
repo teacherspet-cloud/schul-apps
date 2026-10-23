@@ -810,6 +810,11 @@ try {
   }
 
   // ---------- „Vorbereiten – Abgaben später“ im Editor (23.10.2026): anlegen, ohne das Programm zu wechseln
+  // Die Startseite der Rückmeldung ist schon offen (Bericht der Lehrkraft: Vorbereitetes erschien erst nach Neuladen)
+  await page.click('[aria-label="Rückmeldung"]')
+  await page.waitForTimeout(800)
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
   await page.click('[aria-label="Vokabeltest"]')
   await page.waitForTimeout(500)
   // Ein zweiter, neuer Vokabeltest (eigene Kennung) – zum ersten gibt es schon eine Rückmeldung
@@ -831,11 +836,9 @@ try {
     const neueId = nachher.find((m) => !vtVorherIds.includes(m.id))?.id
     await page.click('[aria-label="Rückmeldung"]')
     await page.waitForTimeout(800)
-    await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
-    await page.waitForTimeout(800)
     const eintragV = sichtbar(page.locator(`[data-rm-vorbereitet-eintrag="${neueId}"]`))
     await eintragV.waitFor({ timeout: 10000 }).catch(() => undefined)
-    pruefe((await page.locator(`[data-rm-vorbereitet-eintrag="${neueId}"]`).filter({ visible: true }).count()) === 1, 'Die vorbereitete Rückmeldung steht auf der Startseite der Rückmeldung')
+    pruefe((await page.locator(`[data-rm-vorbereitet-eintrag="${neueId}"]`).filter({ visible: true }).count()) === 1, 'Die vorbereitete Rückmeldung steht auf der schon offenen Startseite der Rückmeldung (ohne Neuladen)')
     await page.screenshot({ path: join(out, 'vorbereitet.png') })
     await eintragV.click()
     await sichtbar(page.locator('[data-rm-eintippen]')).waitFor({ timeout: 10000 }).catch(() => undefined)

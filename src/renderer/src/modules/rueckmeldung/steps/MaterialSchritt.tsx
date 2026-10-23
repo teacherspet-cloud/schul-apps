@@ -39,7 +39,7 @@ import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import type { Rueckmeldung } from '../model/types'
 import { ANREDE_OPTIONEN, STANDARD_ANREDE, type Anrede } from '../render/texte'
 import { bibliothek, useRueckmeldung } from '../store'
-import { rueckmeldungIdZu } from '../vorgabe'
+import { horcheAufVorbereitet, rueckmeldungIdZu } from '../vorgabe'
 import type { SavedDokumentMeta } from '@shared/apiShape'
 import { fremdsprachlich } from '../teilbewertung'
 import AntwortSpracheZeile from './AntwortSpracheZeile'
@@ -189,17 +189,21 @@ function MaterialStart({
   // Vorbereitete Rückmeldungen (23.10.2026, Bericht der Lehrkraft: „Vorbereiten" in der Klassenarbeit – hier stand nichts)
   const [vorbereitet, setVorbereitet] = useState<SavedDokumentMeta[]>([])
   useEffect(() => {
-    void window.api.rueckmeldungen
-      .list()
-      .then((l) =>
-        setVorbereitet(
-          l
-            .filter((m) => m.id !== docId && !Number(m.fertig ?? 0))
-            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-            .slice(0, 5)
+    const laden = (): void =>
+      void window.api.rueckmeldungen
+        .list()
+        .then((l) =>
+          setVorbereitet(
+            l
+              .filter((m) => m.id !== docId && !Number(m.fertig ?? 0))
+              .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+              .slice(0, 5)
+          )
         )
-      )
-      .catch(() => setVorbereitet([]))
+        .catch(() => setVorbereitet([]))
+    laden()
+    // Aus einem anderen Programm vorbereitet, während die Rückmeldung schon offen war: ohne Neuladen nachziehen
+    return horcheAufVorbereitet(laden)
   }, [docId])
   useEffect(() => {
     void ladeMaterialien()

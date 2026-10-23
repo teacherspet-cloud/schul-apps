@@ -36,6 +36,17 @@ export function horcheAufVorgabe(h: () => void): () => void {
   return () => hoerer.delete(h)
 }
 
+/*
+ * Vorbereitete Rückmeldung gesichert (23.10.2026, Bericht der Lehrkraft: erschien erst nach Neuladen) – die Rückmeldung
+ * bleibt im Hintergrund eingehängt, ihre Startseite lädt die Liste also nicht von selbst neu.
+ */
+const vorbereitetHoerer = new Set<() => void>()
+
+export function horcheAufVorbereitet(h: () => void): () => void {
+  vorbereitetHoerer.add(h)
+  return () => vorbereitetHoerer.delete(h)
+}
+
 /**
  * Gespeicherte Rückmeldung zu einem Material (08.10.2026, Wunsch der Lehrkraft: „Rückmeldung …"
  * öffnet die vorhandene statt jedes Mal eine neue). Schaut nur ins Verzeichnis der Bibliothek
@@ -78,5 +89,6 @@ export async function rueckmeldungVorbereiten(art: MaterialEintrag['art'], id: s
   if (fach.id) Object.assign(r.meta, { subjectId: fach.id, subjectLabel: fach.label || subjectById(fach.id).label, grade: fach.grade || r.meta.grade })
   const neueId = newId()
   await window.api.rueckmeldungen.save({ id: neueId, name: standardName(r), stats: rueckmeldungStats(r), payload: r })
+  vorbereitetHoerer.forEach((h) => h())
   return { id: neueId, neu: true }
 }
