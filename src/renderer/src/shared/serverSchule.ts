@@ -12,6 +12,14 @@ export interface ServerSchule {
 
 let geladen: Promise<ServerSchule | null> | null = null
 
+/** Kurzer Fingerabdruck eines Logos (data:-URL) – um zu erkennen, ob die Schule es geändert hat; '' = kein Logo */
+export function logoFingerabdruck(logo: string | null | undefined): string {
+  if (!logo) return ''
+  let h = 5381
+  for (let i = 0; i < logo.length; i++) h = ((h << 5) + h + logo.charCodeAt(i)) | 0
+  return `${logo.length.toString(36)}-${(h >>> 0).toString(36)}`
+}
+
 /** Angaben der Schule (einmal je Sitzung geladen; `neu` lädt erneut, etwa nach dem Speichern in der Verwaltung) */
 export function ladeServerSchule(neu = false): Promise<ServerSchule | null> {
   if (!aufServer()) return Promise.resolve(null)

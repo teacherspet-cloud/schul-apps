@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Group, Loader, MultiSelect, Paper, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import { schulLogoAbgleich } from '../../shell/SchuldatenAngebot'
 import { IconDeviceFloppy, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { LAENDER, schulformenDes } from '@shared/schulformen'
@@ -76,7 +77,8 @@ export function SchuleEinrichten(): React.JSX.Element {
     try {
       await senden('/server/schule/logo', { logo: neu })
       setLogo(neu)
-      void ladeServerSchule(true)
+      // Das eigene Logo des Admins zieht gleich nach, wenn es von der Schule stammt (23.10.2026)
+      void ladeServerSchule(true).then(() => schulLogoAbgleich())
       notifySuccess(meldung ?? (neu ? 'Schullogo gespeichert.' : 'Schullogo entfernt.'))
     } catch (e) {
       notifyError(e)

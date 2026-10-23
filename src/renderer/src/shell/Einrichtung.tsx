@@ -13,7 +13,7 @@ import IservCard from './IservCard'
 import SicherungEinlesen from './SicherungEinlesen'
 import MehrText from '../shared/components/MehrText'
 import { useTelefon } from '../shared/touch/touchModus'
-import { SchuldatenAngebot, useSchulVorbelegung } from './SchuldatenAngebot'
+import { SchuldatenAngebot, useSchulLogoAbgleich, useSchulVorbelegung } from './SchuldatenAngebot'
 import { aufNeustartHoeren } from './einrichtungNeu'
 
 /**
@@ -106,6 +106,8 @@ export default function Einrichtung(): React.JSX.Element | null {
 
   // Server (09.10.2026): leere Schulfelder aus der Schul-Einrichtung der Verwaltung vorbelegen
   const vorbelegt = useSchulVorbelegung(offen)
+  // Logo aus der Verwaltung folgt deren Änderungen (23.10.2026)
+  useSchulLogoAbgleich()
 
   // Bereits eingerichtet, aber ohne Schuldaten: einmaliges Angebot, sie aus der Verwaltung zu übernehmen
   if (!offen) return <SchuldatenAngebot />

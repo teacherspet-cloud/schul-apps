@@ -365,6 +365,13 @@ export interface AppSettings {
   schulwahlEigen?: boolean
   /** Angebot „Schuldaten aus der Verwaltung übernehmen?" beantwortet (09.10.2026) – kommt danach nicht wieder */
   schuldatenAngebot?: 'uebernommen' | 'abgelehnt'
+  /**
+   * Schullogo der Verwaltung (23.10.2026, Befund der Lehrkraft: „das Logo wird nicht aktualisiert, wenn der Admin es
+   * ändert"): Fingerabdruck des Schullogos, von dem das eigene Logo stammt – solange gesetzt, folgt das eigene Logo dem
+   * der Schule (renderer/shell/SchuldatenAngebot.tsx › schulLogoAbgleich). `logoEigen`: selbst gewählt, folgt nicht.
+   */
+  logoVonSchule?: string
+  logoEigen?: boolean
   /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
   sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**

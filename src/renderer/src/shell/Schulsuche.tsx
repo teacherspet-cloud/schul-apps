@@ -224,6 +224,8 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
       if (logoDataUrl === png) return
       if (!logoDataUrl) {
         await setLogo(png)
+        // Aus dem Schulverzeichnis selbst gewählt: folgt nicht dem Logo der Verwaltung (23.10.2026)
+        await useAppSettings.getState().update({ logoEigen: true, logoVonSchule: undefined })
         notifySuccess(`Schullogo von „${t.name}“ übernommen.`)
       } else setLogoFrage({ schule: t.name, png })
     } catch (e) {
@@ -315,6 +317,7 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
                   void useAppSettings
                     .getState()
                     .setLogo(logoFrage.png)
+                    .then(() => useAppSettings.getState().update({ logoEigen: true, logoVonSchule: undefined }))
                     .then(() => notifySuccess('Schullogo übernommen.'))
                     .catch(notifyError)
                     .finally(() => setLogoFrage(null))

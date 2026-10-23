@@ -1405,7 +1405,7 @@ function PictogramField(): React.JSX.Element {
 }
 
 function LogoField(): React.JSX.Element {
-  const { logoDataUrl, setLogo } = useAppSettings()
+  const { logoDataUrl, setLogo, update } = useAppSettings()
   const [busy, setBusy] = useState(false)
 
   const onFiles = async (files: File[]): Promise<void> => {
@@ -1415,6 +1415,8 @@ function LogoField(): React.JSX.Element {
       // Als PNG speichern: Transparenz bleibt erhalten, SVG wird gerastert
       const png = await normalizeImage(await readFileAsDataUrl(files[0]), 800, 'png')
       await setLogo(png)
+      // Selbst gewählt: folgt nicht mehr dem Logo der Schulverwaltung (23.10.2026)
+      await update({ logoEigen: true, logoVonSchule: undefined })
       notifySuccess('Schullogo gespeichert.')
     } catch (e) {
       notifyError(e)
@@ -1435,7 +1437,7 @@ function LogoField(): React.JSX.Element {
         {logoDataUrl && (
           <Stack gap={6} align="center" justify="center" className="picker-tile" p="sm" w={180}>
             <img src={logoDataUrl} alt="Schullogo" style={{ maxWidth: 150, maxHeight: 90, objectFit: 'contain' }} />
-            <Button size="compact-xs" variant="subtle" color="red" onClick={() => setLogo(null)}>
+            <Button size="compact-xs" variant="subtle" color="red" onClick={() => void setLogo(null).then(() => update({ logoEigen: true, logoVonSchule: undefined }))}>
               Entfernen
             </Button>
           </Stack>

@@ -6,7 +6,7 @@ import { ohneSchuldaten, schulVorbelegung } from '@shared/schulEinrichtung'
 import { schuleFest } from '@shared/schulFest'
 import { useAppSettings } from '../shared/settingsStore'
 import { aufServer, serverIch } from '../shared/plattform'
-import { ladeServerSchule, type ServerSchule } from '../shared/serverSchule'
+import { ladeServerSchule, logoFingerabdruck, type ServerSchule } from '../shared/serverSchule'
 
 /**
  * Schuldaten aus der Verwaltung übernehmen (09.10.2026).
@@ -21,9 +21,41 @@ import { ladeServerSchule, type ServerSchule } from '../shared/serverSchule'
 async function uebernehmen(daten: ServerSchule, zusatz: Partial<AppSettings> = {}): Promise<boolean> {
   const { settings, update, logoDataUrl, setLogo } = useAppSettings.getState()
   const patch = schulVorbelegung(settings, daten.schule)
-  if (patch || Object.keys(zusatz).length) await update({ ...(patch ?? {}), ...zusatz })
-  if (daten.logo && !logoDataUrl) await setLogo(daten.logo)
-  return Boolean(patch) || Boolean(daten.logo && !logoDataUrl)
+  // Logo der Schule übernommen: merken, damit es künftigen Änderungen der Verwaltung folgt (23.10.2026)
+  const logoNeu = Boolean(daten.logo && !logoDataUrl)
+  const logoMarke: Partial<AppSettings> = logoNeu ? { logoVonSchule: logoFingerabdruck(daten.logo), logoEigen: false } : {}
+  if (patch || Object.keys(zusatz).length || logoNeu) await update({ ...(patch ?? {}), ...zusatz, ...logoMarke })
+  if (logoNeu) await setLogo(daten.logo)
+  return Boolean(patch) || logoNeu
+}
+
+/**
+ * Schullogo nachziehen (23.10.2026, Befund der Lehrkraft: „Das Schullogo des Einzelnutzers wird nicht aktualisiert,
+ * wenn das Schullogo vom Admin geändert wird"). Bisher wurde es einmal kopiert. Jetzt folgt ein Logo, das aus der
+ * Verwaltung stammt, jeder Änderung dort (auch dem Entfernen) – bis die Lehrkraft selbst ein Logo wählt (`logoEigen`).
+ * Wer die Schuldaten vor dieser Fassung übernommen hat, gilt als „stammt von der Schule".
+ */
+export async function schulLogoAbgleich(neu = false): Promise<void> {
+  if (!aufServer()) return
+  const { settings, update, logoDataUrl, setLogo, loaded } = useAppSettings.getState()
+  if (!loaded || settings.logoEigen) return
+  const folgt = settings.logoVonSchule !== undefined || settings.schuldatenAngebot === 'uebernommen'
+  if (!folgt) return
+  const daten = await ladeServerSchule(neu)
+  if (!daten) return
+  const fp = logoFingerabdruck(daten.logo)
+  if (fp === settings.logoVonSchule && (fp === '' ? !logoDataUrl : Boolean(logoDataUrl))) return
+  if (daten.logo) await setLogo(daten.logo)
+  else if (settings.logoVonSchule && logoDataUrl) await setLogo(null)
+  await update({ logoVonSchule: fp })
+}
+
+/** Beim Start einmal nachziehen (Einrichtung.tsx – immer eingehängt) */
+export function useSchulLogoAbgleich(): void {
+  const geladen = useAppSettings((s) => s.loaded)
+  useEffect(() => {
+    if (geladen) void schulLogoAbgleich().catch(() => undefined)
+  }, [geladen])
 }
 
 /** Assistent: einmal beim Öffnen leere Schulfelder aus der Verwaltung füllen. Liefert, ob etwas übernommen wurde. */
