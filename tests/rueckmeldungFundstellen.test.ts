@@ -53,6 +53,16 @@ describe('Material für die KI', () => {
     expect(fundstellenRegel(g, 'tabelle')).toContain('KEINE Zeilenangaben')
   })
 
+  // Befund der Lehrkraft (23.10.2026): Musterlösungen hielten Wortvorgaben ein, die nicht in der Aufgabe standen
+  it('Wortzahl der Vorgaben nur, wenn das Blatt sie nennt', () => {
+    const ws = blatt(false)
+    ;(ws.sheets[0].blocks[1] as unknown as { brief: unknown }).brief = { situation: 'Email to a friend', audience: '', textType: 'email', purpose: '', words: 200, points: [] }
+    expect(fundstellenText(ws, new Map())).not.toContain('200 Wörter')
+    ;(ws.meta as { wordLimit?: boolean }).wordLimit = true
+    expect(fundstellenText(ws, new Map())).toContain('200 Wörter')
+    expect(fundstellenRegel({ aufgaben: 'x' }, 'erwartung')).toContain('WORTZAHL')
+  })
+
   it('hinterlegter Text, wenn nichts frisch gelesen ist – übertragene Dateien tragen „Z. n:“ schon', () => {
     expect(kiAufgaben({ aufgaben: 'Aufgabe 1' })).toBe('Aufgabe 1')
     expect(mitZeilen({ aufgaben: 'Material:\nZ. 1: Once upon a time' })).toBe(true)

@@ -40,7 +40,8 @@ import type { Abgabe, Bogen, BogenKriterium, Einschaetzung, Einstufungswert, Gru
 
 /** Aufgaben und Erwartungshorizont eines Arbeitsblatts (auch umgewandelte Arbeiten und Tests) */
 export function grundlageAusBlatt(ws: Worksheet, art: GrundlageArt, docId: string, titel: string): Grundlage {
-  const aufgaben = ws.sheets.map((s) => (ws.sheets.length > 1 ? `[${s.label}]\n` : '') + describeSheet(s)).join('\n\n')
+  // Wortzahl nur, wenn das Blatt sie nennt (23.10.2026)
+  const aufgaben = ws.sheets.map((s) => (ws.sheets.length > 1 ? `[${s.label}]\n` : '') + describeSheet(s, Boolean(ws.meta.wordLimit))).join('\n\n')
   const loesungen = ws.sheets
     .flatMap((s) => s.blocks)
     .filter((b) => b.type === 'task' && b.solution?.trim())

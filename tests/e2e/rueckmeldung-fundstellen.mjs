@@ -98,6 +98,11 @@ try {
   )
   pruefe(!/\[\^f/.test(text) && !/^Z\. \d+: \d+$/m.test(text), 'Keine Fußnotenmarken oder einzelne hochgestellte Ziffern als eigene Zeile')
 
+  // Karte der Rückmeldung (23.10.2026): Miniatur der ersten Materialseite statt Textanfang
+  const bild = await page.evaluate(() => window.__selftest.rmMiniatur('arbeitsblatt', 'fund-probe'))
+  pruefe(/^data:image\/(jpeg|png)/.test(bild) && bild.length > 2000, `Miniatur der ersten Seite entsteht (${Math.round(bild.length / 1024)} KB)`)
+  if (bild) writeFileSync(join(out, 'miniatur.jpg'), Buffer.from(bild.split(',')[1], 'base64'))
+
   // Gelöschtes Material: kein Fehler, nur kein frischer Text
   const weg = await page.evaluate(() => window.__selftest.rmFundstellen('arbeitsblatt', 'gibt-es-nicht'))
   pruefe(weg === '', 'Fehlt das Material, bleibt es beim hinterlegten Text (kein Abbruch)')

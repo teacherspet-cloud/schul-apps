@@ -23,6 +23,7 @@
  */
 import { gehoertZurSekII } from "../arbeitsblatt/didactics/bildungsgang";
 import { klartext, ohneKiTest } from "./abgabeTrennen";
+import { kiAufgaben } from "./fundstellen";
 import {
   fremdsprachlich,
   getrennt,
@@ -196,7 +197,7 @@ export function umfangBefund(
   if (!ist || !hatSprachbereich(r)) return null;
   const tabelle = r.tabelle?.kriterien.map((k) => k.kriterium).join("\n");
   const verlangt = umfangAusText(
-    r.grundlage.aufgaben,
+    kiAufgaben(r.grundlage),
     r.grundlage.erwartung,
     tabelle,
   );
@@ -540,7 +541,7 @@ export function sprachRegeln(
   if (!sprachfach(r.meta.subjectId)) return [];
   const bereich = hatSprachbereich(r);
   const u = umfangBefund(r, a);
-  const verlangt = umfangAusText(r.grundlage.aufgaben, r.grundlage.erwartung);
+  const verlangt = umfangAusText(kiAufgaben(r.grundlage), r.grundlage.erwartung);
   if (!bereich && !verlangt) return [];
   const oberstufe = oberstufeVon(r.meta);
   const niveau = gerNiveau(r.meta.grade, r.meta.subjectId, oberstufe);

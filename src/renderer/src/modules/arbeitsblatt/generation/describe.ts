@@ -25,7 +25,12 @@ function describeAnswer(a: Answer): string {
 }
 
 /** Textfassung eines Bausteins für die KI-Prüfung und die gezielte Neu-Erzeugung. */
-export function describeBlock(b: WsBlock): string {
+/**
+ * `wortzahl = false` (23.10.2026, Befund der Lehrkraft): Die Wortzahl der Vorgaben dient sonst nur der
+ * Planung und steht nicht auf dem Blatt – die Rückmeldung soll keine Wortvorgabe sehen, die die
+ * Lernenden nicht bekommen haben.
+ */
+export function describeBlockMit(b: WsBlock, wortzahl: boolean): string {
   const stars = b.stars ? ` ${'★'.repeat(b.stars)}` : ''
   switch (b.type) {
     case 'learningGoals':
@@ -44,7 +49,7 @@ export function describeBlock(b: WsBlock): string {
       return [
         `Aufgabe${stars} [AFB ${b.afb ?? '?'}, ${b.operator || 'kein Operator'}, ${b.socialForm}, ${b.minutes} Min.${b.skill ? `, ${b.skill}` : ''}]: ${plainText(b.instruction)}`,
         b.brief
-          ? `  Vorgaben: ${[b.brief.situation, b.brief.audience, b.brief.textType, b.brief.purpose, b.brief.words ? `${b.brief.words} Wörter` : ''].filter(Boolean).join(' | ')}`
+          ? `  Vorgaben: ${[b.brief.situation, b.brief.audience, b.brief.textType, b.brief.purpose, wortzahl && b.brief.words ? `${b.brief.words} Wörter` : ''].filter(Boolean).join(' | ')}`
           : '',
         b.parts.length
           ? b.parts
@@ -106,6 +111,9 @@ export function describeBlock(b: WsBlock): string {
   }
 }
 
-export function describeSheet(sheet: Sheet): string {
-  return sheet.blocks.map((b, i) => `(${i + 1}) ${describeBlock(b)}`).join('\n\n')
+/** Ein Baustein als Text für die KI – mit der Wortzahl der Vorgaben (Planung) */
+export const describeBlock = (b: WsBlock): string => describeBlockMit(b, true)
+
+export function describeSheet(sheet: Sheet, wortzahl = true): string {
+  return sheet.blocks.map((b, i) => `(${i + 1}) ${describeBlockMit(b, wortzahl)}`).join('\n\n')
 }

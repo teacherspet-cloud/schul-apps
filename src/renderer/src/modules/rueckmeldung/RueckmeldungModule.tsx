@@ -14,12 +14,19 @@ import MaterialSchritt from './steps/MaterialSchritt'
 import { bibliothek, projektDatei, useRueckmeldung } from './store'
 import { leereRueckmeldung } from './leer'
 import { aeltereRueckmeldungZu, horcheAufVorgabe, nimmRueckmeldungVorgabe, rueckmeldungIdZu } from './vorgabe'
+import { materialMiniatur } from './materialFundstellen'
 
-/** Vorschau der Karte: der Anfang der Aufgabe (lädt erst, wenn die Karte sichtbar ist) */
+/**
+ * Vorschau der Karte (lädt erst, wenn die Karte sichtbar ist): die erste Seite des Materials als
+ * Miniatur (23.10.2026, Wahl der Lehrkraft – vorher der Textanfang für die KI, „(1) Kasten (wissen) …").
+ * Ohne Blatt aus der App (eigene Aufgabe, Vokabeltest) ein kurzer Textanfang.
+ */
 const aufgabenVorschau = (id: string) => async () => {
   const r = (await window.api.rueckmeldungen.get(id)).payload as Rueckmeldung
-  const t = (r.grundlage?.aufgaben || r.grundlage?.titel || '').trim()
-  return t ? { text: t.slice(0, 400) } : null
+  const bild = r.grundlage?.docId ? await materialMiniatur(r.grundlage).catch(() => undefined) : undefined
+  if (bild) return { bild }
+  const t = (r.grundlage?.titel || r.grundlage?.aufgaben || '').trim()
+  return t ? { text: t.slice(0, 200) } : null
 }
 
 /** Quelle als Themenbereich-Vorgabe: das Material, aus dem die Rückmeldung stammt */

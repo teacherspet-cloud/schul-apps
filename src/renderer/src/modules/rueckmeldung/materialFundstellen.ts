@@ -7,6 +7,7 @@
 import { useAppSettings } from '../../shared/settingsStore'
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { messeSeiten } from '../arbeitsblatt/render/seitenMessen'
+import { worksheetThumb } from '../arbeitsblatt/library'
 import { leseMaterialZeilen } from '../arbeitsblatt/render/zeilenLesen'
 import type { GrammarTest } from '../grammatiktest/model/types'
 import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
@@ -18,14 +19,51 @@ import { kurztestToWorksheet } from '../lernzielkontrolle/render/kurztestWorkshe
 import { fundstellenText } from './fundstellen'
 import type { Grundlage, Rueckmeldung } from './model/types'
 
-/** Das Blatt, wie die Lernenden es bekommen – null bei Vokabeltest und eigenem Material */
-async function blattZu(g: Grundlage): Promise<Worksheet | null> {
+/** Das Blatt, wie die Lernenden es bekommen, mit Stand (und beim Arbeitsblatt dessen Vorschaubild) – null bei Vokabeltest und eigenem Material */
+async function materialZu(g: Grundlage): Promise<{ ws: Worksheet; stand: string; thumb?: string } | null> {
   if (!g.docId) return null
-  if (g.art === 'arbeitsblatt') return (await window.api.sheets.get(g.docId)).payload as Worksheet
-  if (g.art === 'klassenarbeit') return examToWorksheet(normalisiereArbeit((await window.api.exams.get(g.docId)).payload as Exam), 0)
-  if (g.art === 'lernzielkontrolle') return kurztestToWorksheet((await window.api.kurztests.get(g.docId)).payload as Kurztest, 0)
-  if (g.art === 'grammatiktest') return testToWorksheet((await window.api.grammarTests.get(g.docId)).payload as GrammarTest)
+  if (g.art === 'arbeitsblatt') {
+    const s = await window.api.sheets.get(g.docId)
+    return { ws: s.payload as Worksheet, stand: s.updatedAt, thumb: s.thumb }
+  }
+  if (g.art === 'klassenarbeit') {
+    const s = await window.api.exams.get(g.docId)
+    return { ws: examToWorksheet(normalisiereArbeit(s.payload as Exam), 0), stand: s.updatedAt }
+  }
+  if (g.art === 'lernzielkontrolle') {
+    const s = await window.api.kurztests.get(g.docId)
+    return { ws: kurztestToWorksheet(s.payload as Kurztest, 0), stand: s.updatedAt }
+  }
+  if (g.art === 'grammatiktest') {
+    const s = await window.api.grammarTests.get(g.docId)
+    return { ws: testToWorksheet(s.payload as GrammarTest), stand: s.updatedAt }
+  }
   return null
+}
+
+const blattZu = async (g: Grundlage): Promise<Worksheet | null> => (await materialZu(g))?.ws ?? null
+
+/*
+ * Miniatur der ersten Materialseite für die Karten der Rückmeldung (23.10.2026, Wahl der Lehrkraft statt
+ * des Textanfangs „(1) Kasten (wissen) …"). Je Material und Stand einmal erzeugt; nacheinander, weil
+ * jedes Bild über die PDF-Vorschau entsteht.
+ */
+const miniaturen = new Map<string, Promise<string | undefined>>()
+let warteschlange: Promise<unknown> = Promise.resolve()
+
+export async function materialMiniatur(g: Grundlage): Promise<string | undefined> {
+  const m = await materialZu(g)
+  if (!m) return undefined
+  if (m.thumb) return m.thumb
+  const schluessel = `${g.art}:${g.docId}:${m.stand}`
+  let bild = miniaturen.get(schluessel)
+  if (!bild) {
+    const { logoDataUrl, settings } = useAppSettings.getState()
+    bild = warteschlange.then(() => worksheetThumb(m.ws, new Map(), logoDataUrl ?? null, settings.schoolName ?? ''))
+    warteschlange = bild.catch(() => undefined)
+    miniaturen.set(schluessel, bild)
+  }
+  return bild
 }
 
 /**

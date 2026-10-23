@@ -71,7 +71,7 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
           // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
           const { text, pseudonyme } = ohneNamen(a)
           const anonym = { ...a, text }
-          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(frisch.r, anonym, rueckmeldungSystem(rm), ctx)), rm, anonym, ctx)
+          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(frisch.r, anonym, rueckmeldungSystem(rm), ctx)), frisch.r, anonym, ctx)
           fertig.set(a.id, { ...a, pseudonyme, bogen })
           // Live-Vorschau (02.10.2026): jeder Bogen, sobald er geschrieben ist
           k.zeige({ r: { ...rm, abgaben: rm.abgaben.map((x) => fertig.get(x.id) ?? x) }, fertig: [...fertig.keys()] } satisfies RueckmeldungsStand, {

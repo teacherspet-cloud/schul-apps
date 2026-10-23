@@ -11,7 +11,7 @@
  *
  * Hier nur die reinen Teile (Text für die KI, Regeln); Laden und Messen in materialFundstellen.ts.
  */
-import { describeBlock } from '../arbeitsblatt/generation/describe'
+import { describeBlockMit } from '../arbeitsblatt/generation/describe'
 import { loeseMaterialverweise, materialNummern } from '../arbeitsblatt/didactics/integrity'
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { plainText } from '../../shared/richtext/parse'
@@ -33,15 +33,17 @@ export const mitZeilen = (g: Pick<Grundlage, 'aufgaben' | 'fundstellen'>): boole
 export function fundstellenText(ws: Worksheet, zeilen: ReadonlyMap<string, readonly string[]>): string {
   const alle = ws.sheets.flatMap((s) => s.blocks)
   const nummern = materialNummern(alle)
+  // Wortzahl nur, wenn das Blatt sie den Lernenden nennt (23.10.2026)
+  const wortzahl = Boolean(ws.meta.wordLimit)
   return ws.sheets
     .map((s) => {
       const bloecke = loeseMaterialverweise(s.blocks, alle)
       const teile = bloecke.map((b, i) => {
         const nr = nummern.get(b.id)
         const kopf = `(${i + 1})${nr ? ` ${nr}` : ''}`
-        if (b.type !== 'text') return `${kopf} ${describeBlock(b)}`
+        if (b.type !== 'text') return `${kopf} ${describeBlockMit(b, wortzahl)}`
         const z = zeilen.get(b.id)
-        if (!z?.length) return `${kopf} ${describeBlock(b)}${b.free ? '' : ' [auf dem Blatt OHNE Zeilennummern – Fundstellen als Kurzzitat]'}`
+        if (!z?.length) return `${kopf} ${describeBlockMit(b, wortzahl)}${b.free ? '' : ' [auf dem Blatt OHNE Zeilennummern – Fundstellen als Kurzzitat]'}`
         return [
           `${kopf} Text „${b.title}“ – MIT ZEILENNUMMERN, Zeile für Zeile wie auf dem Blatt der Lernenden:`,
           b.intro ? `[Einleitung: ${plainText(b.intro)}]` : '',
@@ -56,6 +58,10 @@ export function fundstellenText(ws: Worksheet, zeilen: ReadonlyMap<string, reado
     .join('\n\n')
 }
 
+/** Befund der Lehrkraft (23.10.2026): Musterlösungen hielten Wortvorgaben ein, die in keiner Aufgabenstellung standen */
+const KEINE_WORTZAHL =
+  '- WORTZAHL: Eine Wortzahl bzw. einen Umfang nur nennen und beachten, wenn die Aufgabenstellung oben ihn ausdrücklich nennt – sonst keinen erfinden, auch nicht für die Musterlösung.'
+
 /** Regel für die KI: Bezug aufs Material mit Fundstelle – je nachdem, was entsteht */
 export function fundstellenRegel(g: Pick<Grundlage, 'aufgaben' | 'fundstellen'>, fuer: 'erwartung' | 'tabelle' | 'bogen'): string {
   const stelle = mitZeilen(g)
@@ -65,12 +71,14 @@ export function fundstellenRegel(g: Pick<Grundlage, 'aufgaben' | 'fundstellen'>,
     return [
       '- MATERIALBEZUG: Jeder Erwartungspunkt nennt konkret, WAS aus dem Material erwartet wird – die einzelne Information, das Argument, das Beispiel, den Beleg –, nicht allgemein „wichtige Aspekte des Textes“ oder „Argumente nennen“.',
       `- ${stelle}.`,
-      '- Wo die Lernenden frei schreiben, folgt eine kurze Musterlösung, die genau diese Inhalte aus dem Material verarbeitet.'
+      '- Wo die Lernenden frei schreiben, folgt eine kurze Musterlösung, die genau diese Inhalte aus dem Material verarbeitet.',
+      KEINE_WORTZAHL
     ].join('\n')
   if (fuer === 'tabelle')
     return [
       '- MATERIALBEZUG: Die inhaltlichen Kriterien nennen die konkret erwarteten Inhalte aus dem Material; die Stufenbeschreibungen sagen, welche dieser Inhalte für die Stufe nötig sind. Keine Kriterien, die zu jeder beliebigen Aufgabe passen würden.',
-      `- ${stelle}.`
+      `- ${stelle}.`,
+      KEINE_WORTZAHL
     ].join('\n')
   return `- FUNDSTELLEN: Wo es den Lernenden hilft (übersehene Information, ungenau wiedergegebene Stelle, fehlender Beleg), auf die Stelle im Material verweisen, damit sie nachlesen können. ${stelle}. In fremdsprachigen Teilen des Bogens die dort übliche Abkürzung (Englisch „l. 12“, „ll. 12–15“).`
 }

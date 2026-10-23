@@ -21,7 +21,7 @@ export type AntwortSprache = 'deutsch' | 'zielsprache'
 
 /** Adressaten, die nur Deutsch verstehen */
 const ADRESSAT_DEUTSCH =
-  /\b(deine[nmr]?|ihre[nmr]?)\s+(eltern|oma|opa|großeltern|mutter|vater|tante|onkel|geschwister|klasse|mitschüler(in(nen)?)?)\b|\byour\s+(german|parents|grandparents|grandma|grandpa|mum|mom|dad|little (brother|sister))\b|\bwho\s+(doesn['’]t|does not|don['’]t|do not)\s+speak\s+(english|french|spanish|italian|russian)\b|\bqui ne parle pas (français|francais)\b|\bque no habla español\b/i
+  /\b(deine[nmr]?|ihre[nmr]?)\s+(eltern|oma|opa|großeltern|mutter|vater|tante|onkel|geschwister|klasse|mitschüler(in(nen)?)?)\b|\byour\s+(german\s+)?(parents|grandparents|grandma|grandpa|mum|mom|dad|little (brother|sister))\b|\bwho\s+(doesn['’]t|does not|don['’]t|do not)\s+speak\s+(english|french|spanish|italian|russian)\b|\bqui ne parle pas (français|francais)\b|\bque no habla español\b/i
 
 /** Adressaten, die nur die Fremdsprache verstehen */
 const ADRESSAT_ZIEL =
@@ -56,13 +56,39 @@ export function antwortSpracheAus(text: string, subjectId: string): AntwortSprac
  * „deine Eltern" darin macht die Aufgabe nicht zu einer ins Deutsche.
  */
 export function sprachmittlungsSprache(text: string): AntwortSprache {
-  if (deutschVerlangt(text)) return 'deutsch'
+  if (ergebnisAufDeutsch(text)) return 'deutsch'
   if (ADRESSAT_DEUTSCH.test(text) && !ADRESSAT_ZIEL.test(text)) {
     // Kurzer Auftrag („Fasse … für deine Eltern zusammen") oder fremdsprachiger Ausgangstext: Deutsch
     const b = erkenneSprache(text)
     if (b.woerter < 60 || (b.sprache && b.sprache !== 'de')) return 'deutsch'
   }
   return 'zielsprache'
+}
+
+/**
+ * Verlangt die Anweisung das Ergebnis AUF DEUTSCH? (23.10.2026, Befund der Lehrkraft: „Outline why
+ * Shakespeare's plays were adapted in German-speaking theatre" galt als „Antwort auf Deutsch".) Strenger
+ * als `deutschVerlangt`: „auf Deutsch", „ins Deutsche", „into German", „deutsche Zusammenfassung" oder
+ * ein Schreibverb mit „in German"/„en allemand"/„en alemán"/„in tedesco" – nicht „German-speaking",
+ * „a text in German" oder „deutscher Text" (das ist der Ausgangstext).
+ */
+const AUSDRUECKLICH_DEUTSCH =
+  /(?<!\p{L})(auf\s+deutsch|ins\s+deutsche|into\s+german)(?![\p{L}-])|(?<!\p{L})deutsche[nr]?\s+(zusammenfassung|fassung|wiedergabe)(?!\p{L})|[→>]\s*(deutsch|german)(?!\p{L})/iu
+const VERB_IN_DEUTSCH =
+  /(?<!\p{L})(write|explain|summari[sz]e|sum up|tell|reply|answer|respond|present|describe|give|outline|mediate|écris|explique|résume|réponds|escribe|explica|resume|responde|scrivi|spiega|riassumi|rispondi)(?!\p{L})[^.\n]{0,60}(?<!\p{L})(in\s+german|en\s+allemand|en\s+alem[aá]n|in\s+tedesco)(?![\p{L}-])/iu
+
+export function ergebnisAufDeutsch(text: string): boolean {
+  return AUSDRUECKLICH_DEUTSCH.test(text) || VERB_IN_DEUTSCH.test(text)
+}
+
+/** Nur die Arbeitsanweisungen eines Teils der Klassenarbeit – ohne Ausgangstext, Lösung und Mustertext */
+export function anweisungenAus(blocks: readonly unknown[] | undefined): string {
+  const teile: string[] = []
+  for (const b of (blocks ?? []) as { type?: string; instruction?: unknown; parts?: { instruction?: unknown }[]; brief?: Record<string, unknown> }[]) {
+    if (!b || b.type === 'text') continue
+    teile.push(textAus([b.instruction, (b.parts ?? []).map((p) => p.instruction), b.brief ? [b.brief.situation, b.brief.audience, b.brief.textType, b.brief.purpose] : []]))
+  }
+  return teile.filter(Boolean).join('\n')
 }
 
 /** Anzeige: „Englisch" bzw. „Deutsch" */

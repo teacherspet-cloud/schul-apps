@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { antwortSpracheAus, sprachmittlungsSprache } from'../src/renderer/src/modules/rueckmeldung/antwortSprache'
+import { antwortSpracheAus, ergebnisAufDeutsch, sprachmittlungsSprache } from '../src/renderer/src/modules/rueckmeldung/antwortSprache'
 import { deutschMoeglich } from '../src/renderer/src/modules/rueckmeldung/sprachErkennung'
 import { spracheErgaenzen, teileAusArbeit, teileAusKi, type BewertungsTeil } from '../src/renderer/src/modules/rueckmeldung/teilbewertung'
 import type { Exam } from '../src/renderer/src/modules/klassenarbeit/model/types'
@@ -56,7 +56,7 @@ describe('Antwortsprache je Teil', () => {
       meta: { subjectId: 'englisch' },
       parts: [
         { id: 'p1', formatId: 'en-writing', label: 'Writing', weight: 60, points: 30, blocks: [{ text: 'Write an article.' }] },
-        { id: 'p2', formatId: 'en-mediation', label: 'Mediation', weight: 40, points: 20, blocks: [{ task: 'Fasse den Text auf Deutsch für deine Eltern zusammen.' }] }
+        { id: 'p2', formatId: 'en-mediation', label: 'Mediation', weight: 40, points: 20, blocks: [{ type: 'task', instruction: 'Fasse den Text auf Deutsch für deine Eltern zusammen.' }] }
       ]
     } as unknown as Exam
     expect(teileAusArbeit(exam).teile.map((x) => x.ergebnisSprache)).toEqual(['zielsprache', 'deutsch'])
@@ -66,6 +66,44 @@ describe('Antwortsprache je Teil', () => {
       parts: [{ id: 'p1', formatId: 'en-mediation', label: 'Mediation', weight: 100, points: 20, blocks: [{ text: 'Die Stadt baut ein neues Schwimmbad.' }, { task: 'Mediation: Sum up the article.' }] }]
     } as unknown as Exam
     expect(teileAusArbeit(ohne).teile[0].ergebnisSprache).toBe('zielsprache')
+  })
+
+  // Befund der Lehrkraft (23.10.2026, Shakespeare-Klausur): „in German-speaking theatre" galt als „auf Deutsch"
+  it('Klassenarbeit: Richtung der Sprachmittlung nur aus den Arbeitsanweisungen, „German-speaking" ist keine Forderung', () => {
+    const exam = {
+      meta: { subjectId: 'englisch' },
+      parts: [
+        {
+          id: 'p1',
+          formatId: 'en-mediation',
+          label: 'Mediation',
+          weight: 100,
+          points: 20,
+          blocks: [
+            { type: 'text', title: 'Shakespeare auf deutschen Bühnen', body: 'Viele Stücke wurden auf Deutsch gespielt; die deutsche Sprache …', glossary: [] },
+            {
+              type: 'task',
+              instruction: 'Outline why Shakespeare’s plays were extensively adapted in German-speaking theatre.',
+              parts: [],
+              solution: 'Hinweis: sinngemäße Wiedergabe ins Englische, auch eine deutsche Zusammenfassung wäre falsch.',
+              brief: { situation: 'Your British pen friend asks you.', audience: 'pen friend', textType: 'email', purpose: 'inform', words: 200, model: 'Dear Sam, …' }
+            }
+          ]
+        }
+      ]
+    } as unknown as Exam
+    expect(teileAusArbeit(exam).teile[0].ergebnisSprache).toBe('zielsprache')
+  })
+
+  it('Ergebnis auf Deutsch nur bei echter Forderung', () => {
+    expect(ergebnisAufDeutsch('Outline why plays were adapted in German-speaking theatre.')).toBe(false)
+    expect(ergebnisAufDeutsch('You have found an article in German.')).toBe(false)
+    expect(ergebnisAufDeutsch('Lies den deutschen Text.')).toBe(false)
+    expect(ergebnisAufDeutsch('Fasse den Text auf Deutsch zusammen.')).toBe(true)
+    expect(ergebnisAufDeutsch('Explain the main points to your grandma in German.')).toBe(true)
+    expect(ergebnisAufDeutsch('Translate the key ideas into German.')).toBe(true)
+    expect(ergebnisAufDeutsch('Explique à ta grand-mère en allemand ce que dit l’article.')).toBe(true)
+    expect(ergebnisAufDeutsch('Un article en allemand.')).toBe(false)
   })
 
   it('KI ohne Angabe zur Richtung: Sprachmittlung in der Zielsprache, andere Teile offen', () => {

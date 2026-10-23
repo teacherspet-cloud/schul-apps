@@ -8,7 +8,7 @@
  *
  * Quellen der Voreinstellung: recherche/rueckmeldung-inhalt-sprache-gewichtung-2026-09-29.md.
  */
-import { antwortSpracheAus, sprachmittlungsSprache, textAus } from './antwortSprache'
+import { antwortSpracheAus, anweisungenAus, sprachmittlungsSprache, textAus } from './antwortSprache'
 import { formatArt } from '../klassenarbeit/model/faecher'
 import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
 import type { Exam } from '../klassenarbeit/model/types'
@@ -121,7 +121,8 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
     const produktiv = teilArt !== 'sonstig' || typeof p.contentShare === 'number'
     // Antwortsprache: Schreiben in der Zielsprache, Sprachmittlung im Regelfall auch (23.10.2026), sonst aus dem Text des Teils erkannt
     const text = textAus(p.blocks)
-    const erkannt = art === 'mediation' ? sprachmittlungsSprache(text) : antwortSpracheAus(text, exam.meta.subjectId)
+    // Sprachmittlung: nur die Arbeitsanweisungen – Ausgangstext und Lösungshinweise sagen nichts über die Richtung (23.10.2026)
+    const erkannt = art === 'mediation' ? sprachmittlungsSprache(anweisungenAus(p.blocks)) : antwortSpracheAus(text, exam.meta.subjectId)
     const ergebnisSprache = art === 'writing' && erkannt !== 'deutsch' ? 'zielsprache' : erkannt
     return {
       id: p.id,

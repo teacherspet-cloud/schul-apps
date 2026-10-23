@@ -62,7 +62,7 @@ export function sprachKriterienAnweisung(r: Rueckmeldung): string[] {
   if (!sprachfach(m.subjectId) || m.subjectId === 'latein') return []
   const oberstufe = oberstufeVon(m)
   const fremd = fremdsprachlich(m.subjectId)
-  const umfang = umfangAusText(r.grundlage.aufgaben, r.grundlage.erwartung)
+  const umfang = umfangAusText(kiAufgaben(r.grundlage), r.grundlage.erwartung)
   const art = r.grundlage.teile?.find(getrennt)?.art ?? 'schreiben'
   const inhalt = fremd ? inhaltVorgabe(m.stateId, m.grade, art, m.schoolTypeId).inhalt : 0
   const niveau = gerNiveau(m.grade, m.subjectId, oberstufe)
