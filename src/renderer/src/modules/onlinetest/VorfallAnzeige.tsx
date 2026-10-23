@@ -11,6 +11,8 @@ export interface Vorfall {
   zeit: number
   dauer?: number
   info?: string
+  /** Nach 30 Tagen verdichtet (23.10.2026, Nachprüfung des Schulträgers): Zahl je Art, ohne Uhrzeit */
+  anzahl?: number
 }
 
 const uhr = (t: number): string => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -18,13 +20,15 @@ export const dauerText = (s?: number): string => (s === undefined ? 'läuft' : s
 
 /** Ohne „Text eingefügt" (das ist oft harmlos, steht aber in der Liste) */
 export const auffaellig = (v: Vorfall[] | undefined): Vorfall[] => (v ?? []).filter((x) => x.art !== 'einfuegen')
+/** Zahl der Vorfälle (verdichtete Zeilen zählen mit ihrer Anzahl) */
+export const vorfallZahl = (v: Vorfall[]): number => v.reduce((s, x) => s + (x.anzahl ?? 1), 0)
 
 /** Kurzfassung für Export und Druck: „3× Seite verlassen (1 min 20 s), 1× Seite übersetzt" */
 export function vorfallKurz(v: Vorfall[] | undefined): string {
   const je = new Map<VorfallArt, { n: number; s: number }>()
   for (const x of v ?? []) {
     const e = je.get(x.art) ?? { n: 0, s: 0 }
-    e.n++
+    e.n += x.anzahl ?? 1
     e.s += x.dauer ?? 0
     je.set(x.art, e)
   }
@@ -34,7 +38,7 @@ export function vorfallKurz(v: Vorfall[] | undefined): string {
 export function VorfallAbzeichen({ vorfaelle }: { vorfaelle?: Vorfall[] }): React.JSX.Element | null {
   const liste = vorfaelle ?? []
   if (!liste.length) return null
-  const n = auffaellig(liste).length
+  const n = vorfallZahl(auffaellig(liste))
   return (
     <Popover width={360} position="bottom-start" withArrow shadow="md">
       <Popover.Target>
@@ -45,9 +49,9 @@ export function VorfallAbzeichen({ vorfaelle }: { vorfaelle?: Vorfall[] }): Reac
           leftSection={<IconEye size={12} />}
           style={{ cursor: 'pointer' }}
           onClick={(e) => e.stopPropagation()}
-          data-vorfaelle={liste.length}
+          data-vorfaelle={vorfallZahl(liste)}
         >
-          {n ? `${n} Auffälligkeit${n === 1 ? '' : 'en'}` : `${liste.length}× eingefügt`}
+          {n ? `${n} Auffälligkeit${n === 1 ? '' : 'en'}` : `${vorfallZahl(liste)}× eingefügt`}
         </Badge>
       </Popover.Target>
       <Popover.Dropdown onClick={(e) => e.stopPropagation()}>
@@ -59,7 +63,7 @@ export function VorfallAbzeichen({ vorfaelle }: { vorfaelle?: Vorfall[] }): Reac
             <Table.Tbody>
               {liste.map((x, i) => (
                 <Table.Tr key={i}>
-                  <Table.Td style={{ whiteSpace: 'nowrap' }}>{uhr(x.zeit)}</Table.Td>
+                  <Table.Td style={{ whiteSpace: 'nowrap' }}>{x.anzahl ? `${x.anzahl}×` : uhr(x.zeit)}</Table.Td>
                   <Table.Td>
                     {VORFALL_TEXT[x.art] ?? x.art}
                     {x.info ? ` · ${x.info}` : ''}

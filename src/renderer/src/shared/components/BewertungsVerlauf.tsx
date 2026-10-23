@@ -10,7 +10,7 @@ import { holen } from '../../modules/onlinetest/serverApi'
 
 export interface VerlaufEintrag {
   id: string
-  art: 'onlinetest' | 'abschluss' | 'mitarbeit' | 'bogen'
+  art: 'onlinetest' | 'abschluss' | 'mitarbeit'
   quelle: 'ki' | 'lehrkraft' | 'bestaetigt' | 'geaendert'
   zeit: number
   kiVorschlag?: unknown

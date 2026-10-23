@@ -10,9 +10,16 @@
  *
  * Die API-Schlüssel (secrets.json) liegen NICHT im Dateisystem, sondern im Schlüsselbund von
  * iOS: Der Träger von /userData leitet genau diese Datei zum Plugin Schluesselbund um.
+ *
+ * Schülerdaten (23.10.2026, Nachprüfung des Schulträgers): Vor dem Laden wird der Datenschlüssel
+ * geholt (vfs/ruhendIos.ts); Rückmeldungen, Elternbriefe und Nachteilsausgleiche liegen nur
+ * verschlüsselt auf dem Gerät, ihre Ordner sind von der iCloud-Sicherung ausgenommen.
  */
 import { Directory } from '@capacitor/filesystem'
-import { Schluesselbund } from '../plugins'
+import { Capacitor } from '@capacitor/core'
+import { PERSONENBEZOGENE_ORDNER } from '@shared/lokaleDaten'
+import { Dateien, Schluesselbund } from '../plugins'
+import { indexedDbQuelle, iosRuhendEinschalten, iosSchutz, schluesselbundQuelle } from './ruhendIos'
 import { vfs, type Traeger } from './speicher'
 import { CapacitorTraeger } from './traeger'
 
@@ -57,6 +64,14 @@ export async function vfsLaden(): Promise<{ dateien: number }> {
   vfs.einhaengen({ wurzel: DOKUMENTE, traeger: dokumenteTraeger })
   vfs.einhaengen({ wurzel: RESSOURCEN, nurLesen: true, laden: ladeRessource })
   vfs.einhaengen({ wurzel: '/tmp' })
+
+  // Erst der Schlüssel, dann das Laden – sonst kämen die verschlüsselten Dateien als Chiffrat in den Speicher
+  await iosRuhendEinschalten(Capacitor.isNativePlatform() ? schluesselbundQuelle(Schluesselbund) : indexedDbQuelle())
+  userDataTraeger.schutz = iosSchutz
+  // Von der iCloud-Sicherung ausnehmen (natives Plugin Dateien; ältere App ohne die Methode: null)
+  void Dateien.vonSicherungAusnehmen(PERSONENBEZOGENE_ORDNER.map((o) => `${userDataTraeger.basis}/${o}`)).then((ok) => {
+    if (ok === null && Capacitor.isNativePlatform()) console.warn('Ordner mit Schülerdaten konnten nicht von der iCloud-Sicherung ausgenommen werden')
+  })
 
   const [anzahl] = await Promise.all([
     userDataTraeger.allesLaden(vfs, USERDATA, (rel) => rel === GEHEIMNISSE),

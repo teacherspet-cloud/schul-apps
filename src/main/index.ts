@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, safeStorage, screen, shell } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -10,6 +10,7 @@ import { fangeAbstuerze, protokolliere } from './services/protokoll'
 import { lanBeimStart, stopLan } from './services/lanServer'
 import { getSettings } from './services/storage/settings'
 import { starteAutoSicherung } from './services/storage/autoSicherung'
+import { ruhendEinschalten } from './services/storage/ruhend'
 import { aktualisiereModelle, registriereKanaele } from './kanaele'
 import { electronUmgebung } from './umgebung'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, startGroesse } from './fensterStand'
@@ -290,6 +291,22 @@ if (!gotLock) {
         })
     })
     fangeAbstuerze()
+    /*
+     * Verschlüsselung ruhender Daten (23.10.2026, Nachprüfung des Schulträgers): Datenschlüssel laden
+     * (DPAPI) und alte Klartext-Dateien der Rückmeldungen, Elternbriefe und Nachteilsausgleiche an Ort
+     * und Stelle verschlüsseln – VOR den Kanälen, damit nichts mehr im Klartext geschrieben wird.
+     */
+    try {
+      const r = ruhendEinschalten(app.getPath('userData'), {
+        verfuegbar: () => safeStorage.isEncryptionAvailable(),
+        verschluesseln: (t) => new Uint8Array(safeStorage.encryptString(t)),
+        entschluesseln: (b) => safeStorage.decryptString(Buffer.from(b))
+      })
+      if (r.umgestellt) protokolliere('info', 'verschluesselung', `${r.umgestellt} Dateien mit Schülerdaten verschlüsselt`)
+      if (r.zustand !== 'an') protokolliere('warnung', 'verschluesselung', 'Verschlüsselung gesperrt – Schülerdaten werden nicht gespeichert')
+    } catch (e) {
+      protokolliere('fehler', 'verschluesselung', e instanceof Error ? e.message : String(e))
+    }
     registerIpc()
     createWindow()
     /*

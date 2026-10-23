@@ -22,6 +22,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } fr
 import { writeAtomic } from './atomar'
 import { join } from 'path'
 import { pruefeThemen, type ThemenDaten } from '@shared/themen'
+import { PERSONENBEZOGENE_ORDNER } from '@shared/lokaleDaten'
+import { entpackeSicherung, istVerschluesselteSicherung, verpackeSicherung } from '@shared/ruhendFormat'
+import { entschluesseln, klartextFuerSicherung, ruhendZustand, schreibeGeschuetzt, verschluesseln } from './ruhend'
 
 /**
  * Was das Zurücksetzen NICHT anfasst.
@@ -124,8 +127,18 @@ export function bestand(): { ordner: string; eintraege: number }[] {
  *
  * Die ZUGÄNGE bleiben draußen. `secrets.json` liegt auf der Platte verschlüsselt; in einer
  * Sicherungsdatei stünde der Schlüssel im Klartext und wanderte mit ihr auf jeden USB-Stick.
+ *
+ * VERSCHLÜSSELT (23.10.2026, Nachprüfung des Schulträgers): Die Sicherung enthält Rückmeldungen,
+ * Elternbriefe und Nachteilsausgleiche. Am PC (Verschlüsselung eingeschaltet, storage/ruhend.ts)
+ * kommt sie deshalb nur als verschlüsselter Umschlag heraus (shared/ruhendFormat.ts) – mit dem
+ * Datenschlüssel dieses Windows-Kontos. Klartext nur mit `klartext: true`, also auf ausdrücklichen
+ * Wunsch mit Warnung (WartungCard, Kanal wartung:sicherungKlartext). Ist die Verschlüsselung
+ * gesperrt, gibt es keine stille Klartext-Sicherung, sondern einen Fehler. Auf dem iPad (Zustand
+ * „aus") verschlüsselt mobil/sicherung bzw. mobil/start.ts mit dem Schlüssel aus dem Schlüsselbund.
  */
-export function sicherung(): { name: string; daten: Uint8Array } {
+export function sicherung(opt: { klartext?: boolean } = {}): { name: string; daten: Uint8Array } {
+  const { zustand, grund } = ruhendZustand()
+  if (zustand === 'gesperrt' && !opt.klartext) throw new Error(`Die Sicherung wird nur verschlüsselt angelegt – die Verschlüsselung ist gesperrt: ${grund ?? ''}`)
   const wurzel = userData()
   const inhalt: Record<string, unknown> = { version: 2, erstellt: new Date().toISOString() }
 
@@ -133,7 +146,8 @@ export function sicherung(): { name: string; daten: Uint8Array } {
     const pfad = join(wurzel, ordner)
     if (!existsSync(pfad)) continue
     const dateien: Record<string, string> = {}
-    sammle(pfad, '', dateien)
+    // Personenbezogene Ablagen: im Klartext in die Sicherung – sie wird als Ganzes verschlüsselt
+    sammle(pfad, '', dateien, PERSONENBEZOGENE_ORDNER.includes(ordner))
     if (Object.keys(dateien).length) inhalt[ordner] = dateien
   }
 
@@ -143,17 +157,22 @@ export function sicherung(): { name: string; daten: Uint8Array } {
   }
 
   const tag = new Date().toISOString().slice(0, 10)
-  return { name: `Schul-Apps Sicherung ${tag}.json`, daten: new TextEncoder().encode(JSON.stringify(inhalt)) }
+  const klar = new TextEncoder().encode(JSON.stringify(inhalt))
+  const daten = zustand === 'an' && !opt.klartext ? verpackeSicherung(verschluesseln(klar), String(inhalt.erstellt)) : klar
+  return { name: `Schul-Apps Sicherung ${tag}${opt.klartext ? ' UNVERSCHLUESSELT' : ''}.json`, daten }
 }
 
 /** Dateien eines Ordners samt Unterordnern (eine Ebene tief genügt für Maskottchen; hier allgemein) */
-function sammle(pfad: string, praefix: string, ziel: Record<string, string>): void {
+function sammle(pfad: string, praefix: string, ziel: Record<string, string>, entschluesselt = false): void {
   for (const name of readdirSync(pfad)) {
     if (name.endsWith('.tmp')) continue
     const voll = join(pfad, name)
     const st = statSync(voll)
-    if (st.isDirectory()) sammle(voll, `${praefix}${name}/`, ziel)
-    else if (st.isFile()) ziel[`${praefix}${name}`] = readFileSync(voll).toString('base64')
+    if (st.isDirectory()) sammle(voll, `${praefix}${name}/`, ziel, entschluesselt)
+    else if (st.isFile()) {
+      const roh = readFileSync(voll)
+      ziel[`${praefix}${name}`] = Buffer.from(entschluesselt ? klartextFuerSicherung(roh) : roh).toString('base64')
+    }
   }
 }
 
@@ -191,6 +210,16 @@ export function werkszustand(): { geloescht: string[] } {
 
 /** Liest eine Sicherungsdatei – und weist alles ab, was keine ist. */
 function lies(daten: Uint8Array): Record<string, unknown> {
+  // Verschlüsselte Sicherung (23.10.2026): nur mit dem Datenschlüssel dieses Geräts lesbar
+  if (istVerschluesselteSicherung(daten)) {
+    if (ruhendZustand().zustand !== 'an')
+      throw new Error('Diese Sicherung ist verschlüsselt. Sie lässt sich nur auf dem Gerät (und Windows-Konto) wiederherstellen, auf dem sie angelegt wurde.')
+    try {
+      daten = entschluesseln(entpackeSicherung(daten))
+    } catch {
+      throw new Error('Diese verschlüsselte Sicherung stammt von einem anderen Gerät oder Windows-Konto und lässt sich hier nicht öffnen.')
+    }
+  }
   let inhalt: unknown
   try {
     inhalt = JSON.parse(new TextDecoder().decode(daten))
@@ -246,7 +275,9 @@ export function wiederherstellen(daten: Uint8Array): { wiederhergestellt: string
       const teile = sichererRelPfad(name)
       if (!teile) continue
       if (teile.length > 1) mkdirSync(join(wurzel, ordner, ...teile.slice(0, -1)), { recursive: true })
-      writeAtomic(join(wurzel, ordner, ...teile), Buffer.from(base64, 'base64'))
+      // Personenbezogene Ablagen gleich wieder verschlüsselt (23.10.2026)
+      if (PERSONENBEZOGENE_ORDNER.includes(ordner)) schreibeGeschuetzt(join(wurzel, ordner, ...teile), Buffer.from(base64, 'base64'))
+      else writeAtomic(join(wurzel, ordner, ...teile), Buffer.from(base64, 'base64'))
     }
     wiederhergestellt.push(ordner)
   }

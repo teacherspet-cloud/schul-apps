@@ -6,7 +6,10 @@
  *
  * Gespräch OHNE Audio auf unserem Server: Der Browser schickt seine WebRTC-Beschreibung (SDP, Text) hierher; der Server
  * meldet die Sitzung mit dem Schlüssel der freigebenden Lehrkraft (sonst der Schule) bei OpenAI an
- * (POST /v1/realtime/calls, feste Anweisungen, `store` aus) und gibt die Antwort-SDP zurück. Das Audio fließt direkt
+ * (POST /v1/realtime/calls, feste Anweisungen, Ablauf-Aufzeichnung `tracing` aus) und gibt die Antwort-SDP zurück.
+ * Richtiggestellt (23.10.2026, Nachprüfung des Schulträgers): Die Realtime-Sitzung kennt KEIN Feld `store`; abschaltbar
+ * ist nur `tracing` (Aufzeichnung im Traces-Dashboard, null = aus). Audio und Text verarbeitet OpenAI; Missbrauchs-
+ * protokolle bei OpenAI (bis 30 Tage) richten sich nach den Bedingungen von OpenAI. Das Audio fließt direkt
  * Browser ↔ OpenAI. Der Server hängt sich als Kontrollkanal an (wss …/realtime?call_id=): Er liest das Transkript als
  * Text im Speicher mit, setzt veränderte Anweisungen zurück (Umgehungsversuch), nimmt `uebung_beenden` entgegen und
  * legt bei Zeitablauf auf. Audio-Ereignisse verwirft er ungelesen. Gespeichert werden nur Einschätzung, Kennzahlen und
@@ -56,6 +59,7 @@ import { kiGrenzeMeldung } from '../shared/kiGrenzen'
 import { HILFETEXT, kriseMelden, kriseVerdacht } from './krise'
 // Budget der Lehrkraft (22.10.2026; Abgleich mit kiNutzung.ts durch die Hauptsitzung)
 import { budgetErschoepft, fremdNutzungBuchen } from './kiNutzung'
+import { nurTag } from './ohneUhrzeit'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sprech_freigaben (
@@ -641,19 +645,39 @@ export function meineFreigaben(ich: NutzerInfo, jetzt = Date.now()): MeineFreiga
 
 // ---------------------------------------------------------------- Lehrkraft: Überblick
 
-function ueberblick(vokId: string, lehrkraftId: string) {
-  const freigaben = (db().prepare('SELECT * FROM sprech_freigaben WHERE vok_id = ? AND lehrkraft_id = ? ORDER BY erstellt DESC').all(vokId, lehrkraftId) as unknown as FreigabeZeile[]).map(
-    (f) => ({ id: f.id, teile: teileVon(f), bis: f.bis, status: f.bis < Date.now() ? 'abgelaufen' : f.status, einstellungen: einstellungenVon(f), schueler: json_<string[]>(f.schueler, []), erstellt: f.erstellt, niveau: niveauVon(f) })
+/*
+ * Übung, wie die Lehrkraft sie sieht (23.10.2026, Nachprüfung des Schulträgers, LfD-Eckpunkte):
+ * Werte, Tipps und das DATUM der Übung – keine Uhrzeit, keine Minuten, keine Sitzungskennung.
+ */
+export type LehrUebung = Omit<Uebung, 'zeit' | 'minuten' | 'sitzung'> & { datum: string }
+
+export function fuerLehrkraft(u: Uebung): LehrUebung {
+  const { zeit, minuten: _m, sitzung: _s, ...rest } = u
+  return { ...rest, datum: nurTag(zeit) }
+}
+
+export function ueberblick(vokId: string, lehrkraftId: string, jetzt = Date.now()) {
+  const zeilen = db().prepare('SELECT * FROM sprech_freigaben WHERE vok_id = ? AND lehrkraft_id = ? ORDER BY erstellt DESC').all(vokId, lehrkraftId) as unknown as FreigabeZeile[]
+  const freigaben = zeilen.map(
+    (f) => ({ id: f.id, teile: teileVon(f), bis: f.bis, status: f.bis < jetzt ? 'abgelaufen' : f.status, einstellungen: einstellungenVon(f), schueler: json_<string[]>(f.schueler, []), erstellt: f.erstellt, niveau: niveauVon(f) })
   )
   vorfaelleAufraeumen()
   const namen = new Map(alleNutzer().map((n) => [n.id, n.name || n.benutzer] as const))
-  const personen = new Map<string, { id: string; name: string; uebungen: Uebung[]; gesperrt: boolean; vorfaelle: { art: string; satz: string; zeit: number; freigabe: string }[] }>()
-  for (const f of freigaben) {
+  const personen = new Map<
+    string,
+    { id: string; name: string; uebungen: Uebung[]; gesperrt: boolean; kontingentErreicht: boolean; vorfaelle: { art: string; satz: string; datum: string; freigabe: string }[] }
+  >()
+  const neu = (id: string) => ({ id, name: namen.get(id) ?? '?', uebungen: [] as Uebung[], gesperrt: false, kontingentErreicht: false, vorfaelle: [] as { art: string; satz: string; datum: string; freigabe: string }[] })
+  for (const f of zeilen) {
+    const e = einstellungenVon(f)
+    const laeuft = f.status === 'offen' && f.bis >= jetzt
     for (const z of db().prepare('SELECT schueler_id, daten FROM sprech_stand WHERE freigabe_id = ?').all(f.id) as { schueler_id: string; daten: string }[]) {
       const d = json_<StandDaten>(z.daten, { uebungen: [] })
-      const p = personen.get(z.schueler_id) ?? { id: z.schueler_id, name: namen.get(z.schueler_id) ?? '?', uebungen: [], gesperrt: false, vorfaelle: [] }
+      const p = personen.get(z.schueler_id) ?? neu(z.schueler_id)
       p.uebungen.push(...d.uebungen)
       p.gesperrt = p.gesperrt || Boolean(d.gesperrt)
+      // Wochenminuten nur als „Kontingent erreicht ja/nein" (23.10.2026)
+      if (laeuft && restMinuten(e.minutenWoche, d.uebungen, jetzt).woche <= 0) p.kontingentErreicht = true
       personen.set(z.schueler_id, p)
     }
     for (const v of db().prepare('SELECT schueler_id, art, satz, zeit FROM sprech_vorfaelle WHERE freigabe_id = ? ORDER BY zeit DESC').all(f.id) as {
@@ -662,12 +686,15 @@ function ueberblick(vokId: string, lehrkraftId: string) {
       satz: string
       zeit: number
     }[]) {
-      const p = personen.get(v.schueler_id) ?? { id: v.schueler_id, name: namen.get(v.schueler_id) ?? '?', uebungen: [], gesperrt: false, vorfaelle: [] }
-      p.vorfaelle.push({ art: v.art, satz: v.satz, zeit: v.zeit, freigabe: f.id })
+      const p = personen.get(v.schueler_id) ?? neu(v.schueler_id)
+      p.vorfaelle.push({ art: v.art, satz: v.satz, datum: nurTag(v.zeit), freigabe: f.id })
       personen.set(v.schueler_id, p)
     }
   }
-  return { freigaben, personen: [...personen.values()].map((p) => ({ ...p, uebungen: p.uebungen.sort((a, b) => a.zeit - b.zeit) })) }
+  return {
+    freigaben,
+    personen: [...personen.values()].map((p) => ({ ...p, uebungen: p.uebungen.sort((a, b) => a.zeit - b.zeit).map(fuerLehrkraft) }))
+  }
 }
 
 // ---------------------------------------------------------------- Route
@@ -798,7 +825,8 @@ export function sprechenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
       s.key = ks.key
       s.schule = ks.schule
       // Festgelegt: Anweisungen, ein Werkzeug, nur Audio-Ausgabe, Tokengrenze je Antwort, Transkription an
-      const sitzungKonfig = { type: 'realtime', model: ks.modell, ...fest }
+      // tracing: null (23.10.2026) – keine Ablauf-Aufzeichnung bei OpenAI; nur bei der Anmeldung, nicht beim Zurücksetzen
+      const sitzungKonfig = { type: 'realtime', model: ks.modell, ...fest, tracing: null }
       const form = new FormData()
       form.set('sdp', sdp)
       form.set('session', JSON.stringify(sitzungKonfig))

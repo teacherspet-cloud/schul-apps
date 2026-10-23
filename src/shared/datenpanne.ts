@@ -122,6 +122,19 @@ export function noetigePunkte(risiko: PannenRisiko): CheckPunkt[] {
   return CHECKLISTE.map((c) => c.id).filter((id) => (id === 'betroffene' ? risiko === 'hoch' : id === 'lfd' ? risiko !== 'kein' : true))
 }
 
+/*
+ * Prüffrist (23.10.2026, Nachprüfung des Schulträgers): Abgeschlossene Vorfälle werden nicht automatisch gelöscht
+ * (Art. 33 Abs. 5 DSGVO), aber nach drei Jahren zur Prüfung vorgelegt – braucht die Schule die Dokumentation noch
+ * (laufendes Verfahren, Nachfrage der LfD)? Sonst löscht die Verwaltung den Eintrag von Hand.
+ */
+export const PRUEF_JAHRE = 3
+export const PRUEF_MS = PRUEF_JAHRE * 365 * 24 * 3600 * 1000
+
+/** Seit mehr als drei Jahren abgeschlossen → zur Prüfung bzw. Löschung vorlegen */
+export function pruefFaellig(p: Pick<Datenpanne, 'abgeschlossen'>, jetzt = Date.now()): boolean {
+  return Boolean(p.abgeschlossen && jetzt - p.abgeschlossen > PRUEF_MS)
+}
+
 /** Offen = ein nötiger Punkt fehlt noch. */
 export function offenePunkte(p: Pick<PannenDaten, 'risiko' | 'erledigt'>): CheckPunkt[] {
   return noetigePunkte(p.risiko).filter((id) => !p.erledigt[id])

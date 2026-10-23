@@ -46,6 +46,7 @@ import { useOffenGemerkt } from './shared/sitzung'
 import RahmenKopf, { KOPF_HOEHE, KOPF_HOEHE_TELEFON } from './shell/RahmenKopf'
 import KrisenPunkt from './shell/KrisenPunkt'
 import { useKopfDatenAktuell } from './shell/kopfDaten'
+import { personenbezogenesAbmelden } from '@shared/lokaleDaten'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
 const LEISTE_KEY = 'schul-apps-leiste-breit'
@@ -68,6 +69,8 @@ const leseLeisteAus = (): boolean => {
 
 /** Server: abmelden (Sitzung beenden) und zur Anmeldeseite */
 async function abmelden(): Promise<void> {
+  // Personenbezogenes dieses Kontos aus dem Gerät nehmen (23.10.2026, Nachprüfung des Schulträgers)
+  personenbezogenesAbmelden()
   await fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' }, cache: 'no-store' }).catch(() => undefined)
   window.location.assign('/anmelden')
 }

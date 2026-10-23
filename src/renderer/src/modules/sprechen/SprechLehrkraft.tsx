@@ -12,18 +12,21 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KRITERIEN } from '@shared/sprechen/kriterien'
 import { NIVEAUS, TEIL_NAME, TEILE, type Niveau, type Teil } from '@shared/sprechen/niveaus'
-import { gewertet, type Uebung } from './typen'
+import { gewertet, type LehrUebung, type Uebung } from './typen'
 
 interface Ueberblick {
   verfuegbar: boolean
   sprache: string
   jahrgang: number | null
   freigaben: { id: string; teile: Teil[]; bis: number; status: string; einstellungen: { minutenWoche: number; nurSchulzeit: boolean; niveau?: Niveau }; schueler: string[]; niveau: Niveau }[]
-  personen: { id: string; name: string; uebungen: Uebung[]; gesperrt: boolean; vorfaelle: { art: string; satz: string; zeit: number; freigabe: string }[] }[]
+  // Ohne Uhrzeiten und Minuten (23.10.2026, Nachprüfung des Schulträgers): Datum je Übung, Kontingent nur ja/nein
+  personen: { id: string; name: string; uebungen: LehrUebung[]; gesperrt: boolean; kontingentErreicht?: boolean; vorfaelle: { art: string; satz: string; datum: string; freigabe: string }[] }[]
 }
 
 const ART: Record<string, string> = { umgehung: 'Umgehungsversuch', themenfremd: 'Themenfremd', unangemessen: 'Unangemessen', manipulation: 'Manipulation (Anweisungen oder getippter Text)' }
 const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+/** „JJJJ-MM-TT" als „TT.MM." (23.10.2026: der Server schickt nur noch das Datum) */
+const datumKurz = (d: string): string => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8, 10)}.${d.slice(5, 7)}.` : '')
 
 /** Ist die Gesprächs-KI eingerichtet? (Reiter nur dann) */
 export function useSprechVerfuegbar(): boolean {
@@ -217,13 +220,18 @@ export function SprechLehrkraft({ vokId, lernende = [] }: { vokId: string; lerne
                         </Text>
                         {p.vorfaelle.map((v, i) => (
                           <Text key={i} size="xs" c="orange" data-sprech-vorfall={v.art}>
-                            {ART[v.art] ?? v.art} · {tag(v.zeit)}
+                            {ART[v.art] ?? v.art} · {datumKurz(v.datum)}
                             {v.satz ? ` · „${v.satz}“` : ''}
                           </Text>
                         ))}
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">{g.length}</Text>
+                        {p.kontingentErreicht && (
+                          <Badge size="xs" variant="light" color="gray" data-sprech-kontingent>
+                            Wochenkontingent erreicht
+                          </Badge>
+                        )}
                         <Text size="xs" c="dimmed">
                           {TEILE.filter((t) => g.some((u) => u.teil === t))
                             .map((t) => `${TEIL_NAME[t]} ${g.filter((u) => u.teil === t).length}`)

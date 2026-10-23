@@ -27,10 +27,16 @@ import {
   pruefeDatenschutzAngaben,
   type DatenschutzAngaben
 } from '@shared/datenschutzInfo'
-import { datenbank, protokolliereServer, serverGeheimnis, serverWert, setzeServerWert } from './datenbank'
-import { json, type Anfrage } from './http'
+import { alleNutzer, datenbank, protokolliereServer, serverGeheimnis, serverWert, setzeServerWert } from './datenbank'
+import { alsNutzer, json, type Anfrage } from './http'
 import { leseSchule } from './schule'
 import { iservBereit } from './anmeldung'
+// Nachprüfung des Schulträgers (23.10.2026): Abos, Gesprächs-KI und Löschfristen aus der echten Einrichtung
+import { imNutzer } from './kontext'
+import { getSecret, getSettings } from '../main/services/storage/settings'
+import { SUBSCRIPTIONS, type KernAnbieterId } from '@shared/types'
+import { einstellungBereinigen, LOESCH_STANDARD, type LoeschEinstellung } from './loeschRegeln'
+import { AUFSICHT_TAGE } from './onlinetest'
 
 const SCHLUESSEL = 'datenschutz-angaben'
 
@@ -69,6 +75,15 @@ export interface SeitenStand {
   freigegeben: string[]
   /** Anmeldung über IServ eingerichtet */
   iserv: boolean
+  /**
+   * Private Abos, die Lehrkräfte am Server über das Kommandozeilenprogramm des Anbieters nutzen (Codex CLI, Claude Code …),
+   * als Anbieter-Kennung (23.10.2026, Nachprüfung des Schulträgers). Fehlt: keine.
+   */
+  abos?: string[]
+  /** Sprechtraining nutzbar: mindestens eine Lehrkraft hat die Gesprächs-KI (OpenAI mit Schlüssel) eingerichtet */
+  gespraech?: boolean
+  /** Löschfristen der Verwaltung (Löschkonzept); fehlt: Vorgaben */
+  loesch?: LoeschEinstellung
 }
 
 /** Bekannte Dienste außerhalb der OpenAI-kompatiblen Liste */
@@ -166,6 +181,32 @@ function freigegebeneSchluessel(): string[] {
   return Object.keys(freigaben).filter((n) => freigaben[n] && Boolean(serverGeheimnis(`schluessel:${n}`)))
 }
 
+/**
+ * Zugänge der Lehrkräfte (23.10.2026, Nachprüfung des Schulträgers): Wer nutzt ein privates Abo für Text oder Bilder, und
+ * ist für mindestens eine Lehrkraft die Gesprächs-KI eingerichtet (gleiche Regel wie sprechen.ts › gespraechVerfuegbar,
+ * ohne die Attrappe der Browsertests)? Eine unlesbare Einstellung zählt nicht.
+ */
+export function lehrkraftZugaenge(): { abos: string[]; gespraech: boolean } {
+  const abos = new Set<string>()
+  let gespraech = false
+  for (const n of alleNutzer()) {
+    if (n.rolle === 'schueler') continue
+    try {
+      imNutzer(alsNutzer(n), () => {
+        const ai = getSettings().ai
+        const text = ai.textProvider as string
+        const bild = ai.imageProvider as string
+        if (text in SUBSCRIPTIONS && ai.access?.[ai.textProvider] === 'subscription') abos.add(text)
+        if (bild in SUBSCRIPTIONS && ai.imageAccess?.[bild as KernAnbieterId] === 'subscription') abos.add(bild)
+        if (ai.gespraech?.anbieter === 'openai' && getSecret('openai')) gespraech = true
+      })
+    } catch {
+      /* Einstellung nicht lesbar – zählt nicht */
+    }
+  }
+  return { abos: [...abos].sort(), gespraech }
+}
+
 /** Stand aus der Datenbank */
 export function seitenStand(): SeitenStand {
   const s = leseSchule()
@@ -173,7 +214,9 @@ export function seitenStand(): SeitenStand {
     angaben: leseAngaben(),
     schule: s?.name ? { name: s.name, strasse: s.strasse, plz: s.plz, ort: s.ort, telefon: s.telefon, email: s.email } : null,
     freigegeben: freigegebeneSchluessel(),
-    iserv: iservBereit()
+    iserv: iservBereit(),
+    ...lehrkraftZugaenge(),
+    loesch: einstellungBereinigen(serverWert('loeschkonzept', {}), LOESCH_STANDARD)
   }
 }
 
@@ -273,7 +316,7 @@ const BEREICHE: { bereich: string; zweck: string; daten: string }[] = [
   {
     bereich: 'Onlinetests',
     zweck: 'Tests im Unterricht schreiben und auswerten',
-    daten: 'Antworten, vorläufige und bestätigte Bewertung, Aufsichtsvermerke (z. B. Verlassen der Seite, Einfügen)'
+    daten: 'Antworten, vorläufige und bestätigte Bewertung, Bewertungsspur (KI-Vorschlag und Entscheidung der Lehrkraft), Aufsichtsvermerke (z. B. Verlassen der Seite, Einfügen)'
   },
   {
     bereich: 'Vokabeln und Spiele',
@@ -290,7 +333,7 @@ const BEREICHE: { bereich: string; zweck: string; daten: string }[] = [
   {
     bereich: 'Sprechtraining',
     zweck: 'Sprechprüfungen mit einer KI üben',
-    daten: 'Stimme (live, nicht gespeichert), Gesprächstext (nur bis zur Auswertung), Einschätzung, Kennzahlen, Tipps, Übungsminuten'
+    daten: 'Stimme (live an OpenAI, nicht gespeichert), Gesprächstext (nur bis zur Auswertung), Einschätzung, Kennzahlen, Tipps, Übungsminuten; bei einem Vorfall Art, Zeit und der eine Satz'
   },
   {
     bereich: 'Erinnerungen (Push)',
@@ -304,15 +347,16 @@ const BEREICHE: { bereich: string; zweck: string; daten: string }[] = [
   },
   {
     bereich: 'Krisenhinweise',
-    zweck: 'Schutz von Kindern: Deutet ein Eintrag auf Selbstgefährdung hin, sieht das Kind sofort Hilfsangebote und die Lehrkraft einen vertraulichen Hinweis',
-    daten: 'Art und Zeitpunkt des Hinweises, ohne den Wortlaut'
+    zweck: 'Schutz von Kindern: Deutet ein Eintrag auf Selbstgefährdung hin, sieht das Kind sofort Hilfsangebote, die Lehrkraft und die Vertrauenspersonen der Schule einen vertraulichen Hinweis',
+    daten: 'Name des Kindes, Ort (z. B. „Sprechtraining") und Zeitpunkt des Hinweises, ohne den Wortlaut'
   },
   { bereich: 'Darstellung und Einstellungen', zweck: 'Schrift, Farben, Vorlesen, Lernziele', daten: 'gewählte Einstellungen' }
 ]
 
 /** Empfängerliste als Tabelle */
 function empfaengerTabelle(e: Empfaenger[]): string {
-  if (!e.length) return '<p data-keine-ki>Über die Zugänge der Schule ist derzeit kein KI-, Sprach- oder Bilddienst freigegeben.</p>'
+  if (!e.length)
+    return '<p data-keine-ki>Über die Zugänge der Schule ist derzeit kein KI-, Sprach- oder Bilddienst freigegeben. Eigene Zugänge von Lehrkräften und das Sprechtraining (beides unten) können trotzdem Daten an KI-Dienste übermitteln.</p>'
   return `<div class="tabelle"><table data-empfaenger>
 <thead><tr><th>Dienst</th><th>Wofür</th><th>Ort der Verarbeitung</th></tr></thead>
 <tbody>${e
@@ -323,6 +367,37 @@ function empfaengerTabelle(e: Empfaenger[]): string {
         }</td></tr>`
     )
     .join('')}</tbody></table></div>`
+}
+
+// ---------------------------------------------------------------- Speicherdauer (23.10.2026, Nachprüfung des Schulträgers)
+
+/** Private Abos aller Kernanbieter („ChatGPT Plus/Pro über Codex CLI, …") */
+const ABO_LISTE = (): string =>
+  Object.values(SUBSCRIPTIONS)
+    .map((x) => `${esc(x.plan)} über ${esc(x.program)}`)
+    .join(', ')
+
+/** Fristen wie im Code: Löschkonzept (loeschRegeln.ts), Sicherungen (deploy/strato/schul-apps-sicherung.sh, scripts/sicherung-holen.ps1) */
+function speicherdauer(st: SeitenStand): string {
+  const e = st.loesch ?? LOESCH_STANDARD
+  return `<ul data-speicherdauer>
+<li data-frist-lernende>Daten von Lernenden bleiben bis zum Ende der Schullaufbahn. Wer länger als ${e.abgangTage} Tage weder angemeldet war noch in der
+IServ-Benutzerliste steht, wird zur Löschung vorgemerkt und nach ${e.fristTage} Tagen mit allen Daten gelöscht (aufschiebbar). Diese automatische
+Löschung läuft nur mit einer aktuellen IServ-Benutzerliste${e.an ? '' : ' und ist derzeit abgeschaltet'}; sonst löscht die Schule die Konten von Hand.</li>
+<li data-frist-lehrkraefte>Konten von Lehrkräften werden nicht automatisch gelöscht; die Verwaltung löscht sie auf Antrag bzw. nach dem Ausscheiden.</li>
+<li data-frist-gaeste>Gastzugänge (Code der Lehrkraft) werden mit ihrer Freigabe gelöscht, spätestens ${e.gastTage} Tage nach dem Ende ihrer Freigaben bzw. dem letzten Besuch.</li>
+<li data-frist-spur>Bewertungsspur (KI-Vorschlag und Entscheidung der Lehrkraft): wird mit dem Konto der Person bzw. mit dem Test oder Reihenschritt gelöscht.</li>
+<li data-frist-aufsicht>Aufsichtsvermerke im Onlinetest (z. B. Verlassen der Seite, Einfügen): mit Uhrzeit und Einzelheiten bis ${AUFSICHT_TAGE} Tage nach dem
+Ende des Tests (bei weiterlaufenden Tests mit freigegebenen Ergebnissen: nach der Abgabe); danach bleibt nur die Anzahl je Art – bis der Test bzw. das Konto gelöscht wird.</li>
+<li>Krisenhinweise: 30 Tage. Vorfälle im Sprechtraining (Art, Zeit, ein Satz): 14 Tage. Gesprächstext im Sprechtraining: nur bis zur Auswertung.</li>
+<li data-frist-protokoll>Prüfprotokoll des Servers: ${e.protokollTage} Tage.</li>
+<li data-frist-panne>Dokumentation von Datenpannen (Art. 33 Abs. 5 DSGVO): keine automatische Löschung; die Schule prüft nach drei Jahren, ob sie noch gebraucht wird.</li>
+<li data-frist-sicherung>Datensicherungen: nächtliche Kopien und Kopien vor einem Update 14 Tage auf dem Server; verschlüsselte Kopie auf dem
+Betreiber-PC: die neuesten 30 Archive im Dropbox-Ordner des Betreibers. Gelöschte Personen bleiben bis zum Ablauf dieser Fristen in den Sicherungen
+enthalten. Wird eine Sicherung zurückgespielt, löscht der Server die seit der Sicherung gelöschten Konten erneut: Er führt dazu eine Liste
+gelöschter Konten, die nur einen Prüfwert der Kennung enthält (keinen Namen), und arbeitet sie im Nachtlauf bzw. über „Löschungen nachziehen“ in der
+Verwaltung ab.</li>
+</ul>`
 }
 
 // ---------------------------------------------------------------- Datenschutzerklärung
@@ -379,15 +454,58 @@ ${pruefen(st, 'Vertrag zur Auftragsverarbeitung mit dem Hosting-Dienstleister li
 <h3>KI-, Sprach- und Bilddienste der Schule</h3>
 <p>Diese Dienste hat die Schule auf dem Server freigegeben (Stand der Einrichtung):</p>
 ${empfaengerTabelle(ki)}
-<p>Vor der Übermittlung an einen KI-Dienst ersetzt Schul-Apps Namen durch Kürzel; die Dienste erhalten keine Namen, Benutzernamen oder Klassen.
-Die Anfragen laufen über API-Zugänge, deren Daten die Anbieter nach ihren Bedingungen nicht zum Training verwenden (bei Google nur in der
-bezahlten Stufe). Lehrkräfte können außerdem eigene Zugänge nutzen
-(${MOEGLICHE_KI().map(esc).join(', ')}); dann gelten dieselben Schutzregeln.</p>
+<p data-namensschutz>Vor der Übermittlung an einen KI-Dienst ersetzt Schul-Apps Namen, Benutzernamen und Klassen im Text durch Kürzel.
+Bilder (Fotos, Seitenbilder, Handschrift) und die Stimme im Sprechtraining werden nicht verändert – sie können Namen oder Gesichter enthalten.
+Lernende werden deshalb gebeten, keine Personen zu fotografieren und keine Namen zu nennen.
+Die Zugänge der Schule sind API-Zugänge, deren Daten die Anbieter nach ihren Bedingungen nicht zum Training verwenden (bei Google nur in der
+bezahlten Stufe).</p>
+<h3>Speicherung beim Anbieter</h3>
+<p data-anbieter-speicherung>OpenAI (API): Schul-Apps verlangt bei jeder Textanfrage, dass die Antwort nicht beim Anbieter abgelegt wird („store: false“).
+Unabhängig davon bewahrt OpenAI Anfragen und Antworten nach eigener Angabe bis zu 30 Tage zur Erkennung von Missbrauch auf, sofern keine
+Vereinbarung über die Nichtspeicherung („Zero Data Retention“) besteht. Im Sprechtraining verarbeitet OpenAI Stimme und Gesprächstext live;
+die Ablaufaufzeichnung der Sitzung („Tracing“) ist abgeschaltet. Für alle anderen Anbieter gelten deren Bedingungen zu Speicherung und Löschung.</p>
+${pruefen(st, 'Speicherfristen der genutzten Anbieter (Missbrauchsprotokolle, ggf. Vereinbarung „Zero Data Retention“) in den Verträgen nachsehen.')}
+<h3>Eigene Zugänge von Lehrkräften</h3>
+<p data-eigene-zugaenge>Lehrkräfte können statt der Zugänge der Schule eigene nutzen (${MOEGLICHE_KI().map(esc).join(', ')}). Dabei ist zu unterscheiden:</p>
+<ul>
+<li data-eigener-api><strong>Eigener API-Schlüssel:</strong> Es gelten die Bedingungen des Anbieters für die Schnittstelle. Ein Vertrag zur
+Auftragsverarbeitung ist möglich; nach diesen Bedingungen werden die Daten standardmäßig nicht zum Training verwendet.</li>
+<li data-eigenes-abo><strong>Privates Abo</strong> (${ABO_LISTE()} – am Server): Es gelten die Verbraucherbedingungen des Anbieters. Es gibt
+<strong>keinen</strong> Vertrag zur Auftragsverarbeitung; der Anbieter darf die Daten nach seinen Verbraucherbedingungen verwenden, auch zur
+Verbesserung seiner Modelle, soweit im Konto nicht widersprochen wurde (Opt-out).</li>
+</ul>
+${
+  st.abos?.length
+    ? `<p data-abo-genutzt>Derzeit nutzen Lehrkräfte ein privates Abo am Server: ${st.abos
+        .map((id) => SUBSCRIPTIONS[id as KernAnbieterId])
+        .filter(Boolean)
+        .map((x) => `${esc(x.plan)} (${esc(x.program)})`)
+        .join(', ')}. Für Anfragen dieser Lehrkräfte gilt das oben zum privaten Abo Gesagte.</p>`
+    : '<p data-kein-abo>Derzeit nutzt keine Lehrkraft ein privates Abo am Server.</p>'
+}
+${pruefen(st, 'Die Schule entscheidet, ob Lehrkräfte eigene Zugänge nutzen dürfen – insbesondere private Abos (Verbraucherbedingungen, kein Vertrag zur Auftragsverarbeitung, mögliche Nutzung der Daten durch den Anbieter) –, und genehmigt sie gegebenenfalls ausdrücklich oder untersagt sie für Daten von Lernenden.')}
+<h3>Sprechtraining</h3>
+${
+  st.gespraech
+    ? '<p data-sprech-empfaenger="ja">Das Sprechtraining ist eingerichtet. Es läuft über den OpenAI-Schlüssel der freigebenden Lehrkraft bzw. den von der Schule freigegebenen.'
+    : '<p data-sprech-empfaenger="nein">Das Sprechtraining ist derzeit nicht nutzbar: Es steht nur zur Verfügung, wenn eine Lehrkraft die Gesprächs-KI von OpenAI mit einem OpenAI-Schlüssel eingerichtet hat. Dann gilt:'
+}
+Empfänger sind OpenAI (USA) für das Live-Gespräch (Stimme und Gesprächstext), die Moderation von OpenAI (prüft den Gesprächstext auf unangemessene
+Inhalte und Hinweise auf Selbstgefährdung) und die Text-KI der freigebenden Lehrkraft, die den Gesprächstext nach dem Gespräch auswertet
+(Anbieter je nach Einrichtung der Lehrkraft, Namen im Text ersetzt).</p>
 <p data-drittland-hinweis><strong>Übermittlung in Drittländer:</strong> Soweit Dienste mit Sitz oder Verarbeitung in den USA genutzt werden (Sprechtraining,
 gekennzeichnete Dienste oben, eigene Zugänge von Lehrkräften), erhalten sie Daten auf Grundlage des Angemessenheitsbeschlusses der EU-Kommission zum
 EU-US Data Privacy Framework (Art. 45 DSGVO), soweit der Anbieter zertifiziert ist, sonst auf Grundlage von Standardvertragsklauseln (Art. 46 DSGVO).
 In den USA ist ein Zugriff von Behörden nicht auszuschließen.</p>
 ${pruefen(st, 'Für jeden freigegebenen Dienst: Vertrag zur Auftragsverarbeitung, Zertifizierung nach dem Data Privacy Framework bzw. Standardvertragsklauseln, Datenschutz-Folgenabschätzung für den KI-Einsatz mit Daten von Lernenden.')}
+<h3>Innerhalb der Schule</h3>
+<p data-intern>Lehrkräfte sehen die Arbeiten ihrer Lerngruppen. Krisenhinweise erhalten die zuständige Lehrkraft und die von der Schule benannten
+Vertrauenspersonen (z. B. Beratungslehrkraft, Schulsozialarbeit) – mit Name, Ort und Zeit, nie mit dem Wortlaut.</p>
+<h3>Datensicherung</h3>
+<p data-dropbox>Die nächtliche Sicherung wird schon auf dem Server mit dem öffentlichen Schlüssel des Betreiber-PCs verschlüsselt und auf diesen PC
+geholt; sie liegt dort im Dropbox-Ordner des Betreibers (Dropbox, USA <span class="marke" data-drittland>Drittland</span>). Der Schlüssel zum
+Öffnen liegt nur auf dem PC, nicht bei Dropbox – Dropbox erhält keine lesbaren Daten.</p>
+${pruefen(st, 'Ablage der verschlüsselten Sicherungskopie im Dropbox-Ordner des Betreibers (USA) bestätigen oder einen anderen Ablageort festlegen.')}
 <h3>Erinnerungen per Push</h3>
 <p>Nur wenn Lernende Erinnerungen auf ihrem Gerät einschalten: Die Erinnerung läuft über den Push-Dienst des Browserherstellers (z. B. Apple, Google, Mozilla).
 Er erhält eine Geräteadresse und den kurzen Erinnerungstext, keinen Namen.</p>
@@ -396,18 +514,22 @@ Er erhält eine Geräteadresse und den kurzen Erinnerungstext, keinen Namen.</p>
 <p>Schul-Apps nutzt KI, um Rückmeldungen, Lerntipps und Übungen vorzuschlagen und im Sprechtraining als Gesprächspartner. Lernende erkennen
 KI-Inhalte an der Kennzeichnung „Rückmeldung der KI“ bzw. „Einschätzung der KI“; im Sprechtraining wird ausdrücklich gesagt, dass der Gesprächspartner eine KI ist
 (Art. 50 KI-Verordnung).</p>
-<p><strong>Keine automatisierte Entscheidung (Art. 22 DSGVO):</strong> Die KI macht nur Vorschläge. Noten und Entscheidungen trifft immer die Lehrkraft;
-sie kann jede Rückmeldung der KI ändern oder verwerfen.</p>
-<p><strong>Sprechtraining:</strong> Die Stimme geht während des Gesprächs live an den KI-Dienst OpenAI (USA). Der Server der Schule speichert keine
-Aufnahmen. Der Text des Gesprächs dient nur der Auswertung und wird danach gelöscht; gespeichert werden Einschätzung, Kennzahlen und Tipps.</p>
+<p data-art22><strong>Keine automatisierte Entscheidung (Art. 22 DSGVO):</strong> Noten und Bewertungen legt immer die Lehrkraft fest; sie kann jede
+Rückmeldung der KI ändern oder verwerfen. Was sie aus einem KI-Vorschlag macht (bestätigt, geändert oder selbst festgelegt), hält eine
+Bewertungsspur fest. Automatisch – ohne Note – geschieht nur Folgendes:</p>
+<ul>
+<li data-auto-sprechen>Sprechtraining: Nach drei Vorfällen (von der KI, der Moderation oder der Sitzungskontrolle gemeldet: unangemessene oder themenfremde
+Äußerungen, Umgehungsversuche) pausiert das Training für die Person, bis die Lehrkraft es wieder freigibt.</li>
+<li data-auto-reihe>Unterrichtsreihen: Eine KI-Einschätzung bzw. die erreichten Punkte können einen Schritt des Lernpfads (z. B. Arbeitsblatt oder Aufgabe) als
+geschafft markieren und den nächsten Schritt freigeben. Wann ein Schritt als geschafft gilt, legt die Lehrkraft je Schritt fest; das ist keine Note.</li>
+</ul>
+<p><strong>Sprechtraining:</strong> Die Stimme geht während des Gesprächs live an den KI-Dienst OpenAI (USA); der Text wird von der Moderation von OpenAI
+geprüft. Der Server der Schule speichert keine Aufnahmen. Der Gesprächstext wird nach dem Gespräch von einer KI ausgewertet und danach gelöscht;
+gespeichert werden Einschätzung, Kennzahlen und Tipps. Bei einem Vorfall wird der eine auslösende Satz verschlüsselt 14 Tage für die Lehrkraft
+aufbewahrt. Deutet etwas auf Selbstgefährdung hin, sieht das Kind einen Hilfetext und die Lehrkraft einen vertraulichen Hinweis.</p>
 
 <h2>8. Speicherdauer</h2>
-<ul>
-<li>Daten von Lernenden werden gelöscht, wenn die Person die Schule verlässt (Löschung am Ende der Schulzeit, nach einer von der Schule eingestellten Übergangsfrist).</li>
-<li>Gastzugänge (Code der Lehrkraft) bestehen nur, solange die zugehörige Freigabe besteht, und werden mit ihr gelöscht.</li>
-<li>Krisenhinweise: 30 Tage. Vorfälle im Sprechtraining (Art, Zeit, ein Satz): 14 Tage. Gesprächstext im Sprechtraining: nur bis zur Auswertung.</li>
-<li>Datensicherungen: 14 Tage auf dem Server, dazu eine verschlüsselte Kopie auf dem Rechner des Betreibers mit derselben Frist.</li>
-</ul>
+${speicherdauer(st)}
 ${pruefen(st, 'Speicherfristen mit den Vorgaben des Landes (Aufbewahrung von Leistungsnachweisen) abgleichen und die Übergangsfrist nach dem Verlassen der Schule festlegen.')}
 
 <h2>9. Cookies und lokaler Speicher</h2>
@@ -451,19 +573,34 @@ export function elternHtml(st: SeitenStand): string {
 Unterrichtsreihen. Verantwortlich ist die Schule; die Nutzung beruht auf dem Bildungsauftrag (§ 31 NSchG, Art. 6 Abs. 1 lit. e DSGVO).</p>
 
 <h2>Welche Daten?</h2>
-<p>Name, Klasse bzw. Kurs, Antworten und Abgaben, Ergebnisse und Lernstand. Die Lehrkräfte sehen die Arbeiten ihrer Lerngruppen, andere Kinder nicht.
+<p>Name, Klasse bzw. Kurs, Antworten und Abgaben, Ergebnisse und Lernstand, in Onlinetests auch Aufsichtsvermerke (z. B. Verlassen der Seite).
+Die Lehrkräfte sehen die Arbeiten ihrer Lerngruppen, andere Kinder nicht; bei Spielen zu zweit sehen die Mitspielenden Kurznamen, Spielzüge und Punkte.
 Namen und Klassen liegen verschlüsselt auf einem Server in Deutschland.</p>
 
 <h2>Künstliche Intelligenz</h2>
-<p>Manche Rückmeldungen und Tipps schreibt eine KI. Sie erhält keine Namen – Schul-Apps ersetzt sie vorher durch Kürzel. Die KI macht nur Vorschläge;
-Noten und Entscheidungen trifft immer die Lehrkraft. KI-Rückmeldungen sind für Ihr Kind als solche gekennzeichnet.
-${ki.length ? `Derzeit freigegeben: ${ki.map((e) => `${esc(e.name)} (${esc(e.ort)})`).join('; ')}.` : 'Über die Zugänge der Schule ist derzeit kein KI-Dienst freigegeben.'}
-Lehrkräfte können auch eigene Zugänge nutzen; es gelten dieselben Schutzregeln.</p>
-<p>Im Sprechtraining spricht Ihr Kind live mit einer KI von OpenAI (USA). Der Server der Schule speichert keine Aufnahme; der Gesprächstext wird nach der
-Auswertung gelöscht, gespeichert bleiben Einschätzung und Tipps.</p>
+<p data-eltern-ki>Manche Rückmeldungen und Tipps schreibt eine KI; sie sind für Ihr Kind als solche gekennzeichnet. Namen im Text ersetzt Schul-Apps vor
+der Übermittlung durch Kürzel. Bilder (Fotos, Seitenbilder, Handschrift) und die Stimme können aber Namen oder Gesichter enthalten – bitte besprechen Sie
+mit Ihrem Kind, keine Personen zu fotografieren und keine Namen zu nennen.
+Noten und Bewertungen legt immer die Lehrkraft fest. Automatisch geschieht nur zweierlei, ohne Note: Im Sprechtraining pausiert das Training nach drei
+gemeldeten Vorfällen, bis die Lehrkraft es freigibt; in Unterrichtsreihen kann eine KI-Einschätzung einen Schritt des Lernpfads als geschafft markieren.
+${ki.length ? `Über die Zugänge der Schule freigegeben: ${ki.map((e) => `${esc(e.name)} (${esc(e.ort)})`).join('; ')}.` : 'Über die Zugänge der Schule ist derzeit kein KI-Dienst freigegeben.'}
+Lehrkräfte können auch eigene Zugänge nutzen: mit eigenem API-Schlüssel nach den Bedingungen des Anbieters für die Schnittstelle, mit einem privaten Abo
+(z. B. ChatGPT, Claude) nach dessen Verbraucherbedingungen – ohne Vertrag zur Auftragsverarbeitung. Ob das erlaubt ist, entscheidet die Schule.${
+    st.abos?.length ? ' <span data-abo-genutzt>Derzeit nutzen Lehrkräfte ein privates Abo.</span>' : ''
+  }</p>
+<p data-eltern-sprechen>${
+    st.gespraech ? 'Im Sprechtraining' : 'Im Sprechtraining (derzeit nicht eingerichtet; nur mit einem OpenAI-Zugang einer Lehrkraft)'
+  } spricht Ihr Kind live mit einer KI von OpenAI (USA); OpenAI prüft den Text
+automatisch auf unangemessene Inhalte. Der Server der Schule speichert keine Aufnahme; der Gesprächstext wird nach der Auswertung durch eine KI gelöscht,
+gespeichert bleiben Einschätzung und Tipps. Bei einer unangemessenen Äußerung wird dieser eine Satz 14 Tage für die Lehrkraft aufbewahrt. OpenAI selbst
+bewahrt Anfragen nach eigener Angabe bis zu 30 Tage zur Missbrauchserkennung auf.</p>
+<p>Deutet ein Eintrag auf Selbstgefährdung hin, sieht Ihr Kind sofort Hilfsangebote; die Lehrkraft und die Vertrauenspersonen der Schule erhalten einen
+vertraulichen Hinweis ohne den Wortlaut.</p>
 
 <h2>Wie lange?</h2>
-<p>Bis Ihr Kind die Schule verlässt; danach werden die Daten nach einer kurzen Übergangsfrist gelöscht. Datensicherungen werden nach 14 Tagen überschrieben.</p>
+<p data-eltern-dauer>Bis Ihr Kind die Schule verlässt; danach werden die Daten nach einer Übergangsfrist gelöscht – automatisch nur mit einer aktuellen
+IServ-Benutzerliste, sonst von Hand durch die Schule. In Datensicherungen bleiben Daten noch bis zu 14 Tage auf dem Server bzw. in den neuesten 30
+verschlüsselten Archiven des Betreibers (Dropbox) erhalten.</p>
 
 <h2>Cookies, Erinnerungen</h2>
 <p>Nur technisch notwendige Speicher für die Anmeldung und Einstellungen, keine Werbung, kein Tracking. Erinnerungen per Push gibt es nur, wenn sie auf dem

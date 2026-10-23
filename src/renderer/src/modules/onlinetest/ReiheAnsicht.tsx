@@ -1442,13 +1442,18 @@ function MaterialSeite({ d }: { d: ReiheDaten }): React.JSX.Element {
                   <b>Lerntagebuch:</b> {a.tagebuch}
                 </Text>
               )}
+              {/* KI-Kennzeichnung im Reiter „Abgaben" (23.10.2026, Nachprüfung des Schulträgers, Art. 50 KI-VO) */}
               {a.impuls && (
-                <Text size="sm" mt={6} c="grape.8" style={{ whiteSpace: 'pre-wrap' }}>
-                  {a.impuls}
-                </Text>
+                <>
+                  <KiMarke art="impuls" mt={6} />
+                  <Text size="sm" mt={4} c="grape.8" style={{ whiteSpace: 'pre-wrap' }}>
+                    {a.impuls}
+                  </Text>
+                </>
               )}
               {a.feedback && (a.feedback.staerken?.length || a.feedback.schritte?.length) ? (
                 <Stack gap={2} mt={6} data-abgabe-feedback>
+                  <KiMarke art="rueckmeldung" />
                   {(a.feedback.staerken ?? []).slice(0, 3).map((x, i) => (
                     <Text key={`s${i}`} size="sm" c="green.8">
                       ✓ {x}

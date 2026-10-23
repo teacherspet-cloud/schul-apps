@@ -80,6 +80,7 @@ import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { kiZugaengeRoute, schulEndpunkt } from './kiZugaenge'
 import { loeschkonzeptRoute, loeschkonzeptStarten } from './loeschkonzept'
 import { datenschutzRoute } from './datenschutzSeiten'
+import { oeffentlicheTexteRoute } from './oeffentlicheTexte'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe, skriptAusAnfrage } from './hoertexte'
@@ -247,6 +248,8 @@ async function main(): Promise<void> {
     // „Als Schüler ansehen“ (06.10.2026): Vorschau-Schlüssel nur mit der Sitzung der Lehrkraft
     vorschau: kontoZumSchluessel,
     routen: [
+      // security.txt (RFC 9116) und robots.txt ohne Anmeldung (23.10.2026, Nachprüfung des Schulträgers, oeffentlicheTexte.ts)
+      oeffentlicheTexteRoute(adresse),
       // Datenschutzerklärung, Elternfassung, Impressum ohne Anmeldung; Kurzfassung für Lernende (22.10.2026, datenschutzSeiten.ts) – vor schuelerRoute
       datenschutzRoute(),
       // Klasse und Kurse aus IServ für Lernende (10.10.2026, iservKursgruppen.ts) – vor den Routen, die /s/api/ ganz übernehmen

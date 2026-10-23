@@ -7,7 +7,7 @@
  *  - Löschkonzept: Fristen einstellen, letzter Lauf, „Zur Löschung vorgesehen" (Aufschieben), abgegangene Lehrkräfte
  *    (nur von Hand: „Konto und Daten löschen" mit Bestätigung). Server: server/loeschkonzept.ts.
  */
-import { Alert, Badge, Button, Card, Checkbox, Group, Loader, Modal, NumberInput, SimpleGrid, Stack, Switch, Table, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Card, Checkbox, Group, Loader, Modal, NumberInput, SimpleGrid, Stack, Switch, Table, Text, Title, Tooltip } from '@mantine/core'
 import { IconAlertTriangle, IconClockPause, IconPlayerPlay, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -146,6 +146,14 @@ export function LoeschkonzeptKarten({ sichtbar }: { sichtbar: boolean }): React.
       .catch((e: unknown) => notifyError(e))
       .finally(() => setArbeitet(''))
   }
+  // Nach dem Zurückspielen einer Sicherung (23.10.2026, deploy/strato/WIEDERHERSTELLEN.md): gelöschte Konten erneut löschen
+  const nachziehen = (): void => {
+    setArbeitet('nachziehen')
+    void senden<{ nachgezogen: number }>('/server/loeschkonzept/nachziehen', {})
+      .then((r) => (notifySuccess(`Löschungen nachgezogen: ${r.nachgezogen} Konten.`), laden()))
+      .catch((e: unknown) => notifyError(e))
+      .finally(() => setArbeitet(''))
+  }
   const aufschieben = (v: Vorgemerkt): void => {
     setArbeitet(v.id)
     void senden('/server/loeschkonzept/aufschieben', { id: v.id })
@@ -179,7 +187,15 @@ export function LoeschkonzeptKarten({ sichtbar }: { sichtbar: boolean }): React.
           <Zeile
             titel="Nachtsicherung (Datenbank und Dateien)"
             ampel={s.ampel.nacht}
-            text={!s.nacht ? 'noch keine' : !s.nacht.ok ? 'fehlgeschlagen' : !s.nacht.verfahren ? 'ohne Schlüssel des PCs' : `${zeit(s.nacht.zeit)} · ${mb(s.nacht.groesse)}`}
+            text={
+              !s.nacht
+                ? 'noch keine'
+                : !s.nacht.verfahren || !s.nacht.archiv
+                  ? 'keine Kopie für den PC (Schlüssel fehlt)'
+                  : !s.nacht.ok
+                    ? 'fehlgeschlagen'
+                    : `${zeit(s.nacht.zeit)} · ${mb(s.nacht.groesse)}`
+            }
             unter={s.nacht ? `${s.nacht.archiv || '–'} · ${s.nacht.verfahren ? `verschlüsselt (${s.nacht.verfahren})` : 'nicht verschlüsselt abgelegt'} · ${s.nacht.meldung}` : 'Das Skript des Servers (schul-apps-sicherung.sh) hat noch keinen Stand gemeldet.'}
           />
           <Zeile
@@ -253,11 +269,18 @@ export function LoeschkonzeptKarten({ sichtbar }: { sichtbar: boolean }): React.
             <Button variant="light" leftSection={<IconPlayerPlay size={16} />} onClick={jetzt} loading={arbeitet === 'jetzt'}>
               Jetzt ausführen
             </Button>
+            <Tooltip label="Nach dem Zurückspielen einer Sicherung: Konten, die schon gelöscht waren, erneut löschen" multiline w={280}>
+              <Button variant="subtle" onClick={nachziehen} loading={arbeitet === 'nachziehen'} data-loeschungen-nachziehen>
+                Löschungen nachziehen
+              </Button>
+            </Tooltip>
           </Group>
           {d.stand && (
             <Text size="sm" c="dimmed" data-loeschkonzept-stand>
               Letzter Lauf {zeit(d.stand.zeit)}: {z.vorgemerkt ?? 0} vorgemerkt, {z.zurueck ?? 0} zurückgenommen, {z.geloescht ?? 0} Lernende und {z.gaeste ?? 0} Gäste gelöscht,{' '}
-              {z.krisen ?? 0} Krisenhinweise, {z.vorfaelle ?? 0} Vorfälle und {z.protokoll ?? 0} Protokollzeilen entfernt. Geprüft werden {d.lernende} Konten von Lernenden.
+              {z.krisen ?? 0} Krisenhinweise, {z.vorfaelle ?? 0} Vorfälle und {z.protokoll ?? 0} Protokollzeilen entfernt
+              {z.aufsicht ? `, ${z.aufsicht} Aufsichtsprotokolle verdichtet` : ''}
+              {z.nachgezogen ? `, ${z.nachgezogen} Löschungen nachgezogen` : ''}. Geprüft werden {d.lernende} Konten von Lernenden.
             </Text>
           )}
 

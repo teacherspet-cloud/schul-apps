@@ -8,6 +8,8 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { loescheDatei, writeAtomic } from './atomar'
+import { PERSONENBEZOGENE_ORDNER } from '@shared/lokaleDaten'
+import { liesGeschuetztText, schreibeGeschuetzt } from './ruhend'
 
 export interface DokumentMeta {
   id: string
@@ -38,13 +40,21 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
     return d
   }
   const indexFile = (): string => join(dir(), 'index.json')
+  /*
+   * Verschlüsselung ruhender Daten (23.10.2026, Nachprüfung des Schulträgers): Ablagen mit Schülerdaten
+   * (Rückmeldungen, Elternbriefe, Nachteilsausgleiche – shared/lokaleDaten.ts) lesen und schreiben über
+   * storage/ruhend.ts, auch das Verzeichnis (index.json enthält Namen). Übrige Ablagen wie bisher.
+   */
+  const geschuetzt = PERSONENBEZOGENE_ORDNER.includes(ordner)
+  const lies = (file: string): string => (geschuetzt ? liesGeschuetztText(file) : readFileSync(file, 'utf8'))
+  const schreib = (file: string, inhalt: string): void => (geschuetzt ? schreibeGeschuetzt(file, inhalt) : writeAtomic(file, inhalt))
   const checkId = (id: string): string => {
     if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) throw new Error(`Ungültige Kennung (${bezeichnung}).`)
     return id
   }
   const list = (): DokumentMeta[] => {
     try {
-      return (JSON.parse(readFileSync(indexFile(), 'utf8')) as DokumentMeta[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      return (JSON.parse(lies(indexFile())) as DokumentMeta[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     } catch {
       return []
     }
@@ -54,7 +64,7 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
     get: (id) => {
       const file = join(dir(), `${checkId(id)}.json`)
       if (!existsSync(file)) throw new Error(`${bezeichnung} wurde nicht gefunden.`)
-      return JSON.parse(readFileSync(file, 'utf8')) as DokumentMeta & { payload: unknown }
+      return JSON.parse(lies(file)) as DokumentMeta & { payload: unknown }
     },
     save: (input) => {
       const id = checkId(input.id)
@@ -63,14 +73,14 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
       const alle = list()
       const vorher = alle.find((t) => t.id === id)
       const meta: DokumentMeta = { ...(input.stats ?? {}), id, name, createdAt: vorher?.createdAt ?? now, updatedAt: now }
-      writeAtomic(join(dir(), `${id}.json`), JSON.stringify({ ...meta, payload: input.payload }))
-      writeAtomic(indexFile(), JSON.stringify([meta, ...alle.filter((t) => t.id !== id)], null, 1))
+      schreib(join(dir(), `${id}.json`), JSON.stringify({ ...meta, payload: input.payload }))
+      schreib(indexFile(), JSON.stringify([meta, ...alle.filter((t) => t.id !== id)], null, 1))
       return meta
     },
     delete: (id) => {
       loescheDatei(join(dir(), `${checkId(id)}.json`))
       const rest = list().filter((t) => t.id !== id)
-      writeAtomic(indexFile(), JSON.stringify(rest, null, 1))
+      schreib(indexFile(), JSON.stringify(rest, null, 1))
       return rest
     }
   }

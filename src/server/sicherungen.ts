@@ -2,7 +2,7 @@
  * Sicherungen der Datenbank (09.10.2026, Reiter „Server" der Verwaltung).
  *
  *   <DATEN>/sicherungen/schulapps-<Datum>.db.gz   „Sicherung jetzt anlegen" und die nächtliche Sicherung des Hosts (cron)
- *   <DATEN>/sicherung-vor-*.db                    ältere Einzelsicherungen (z. B. vor dem IServ-Abgleich) – nur gelistet
+ *   <DATEN>/sicherung-vor-*.db                    ältere Einzelsicherungen (z. B. vor dem IServ-Abgleich) – gelistet, nach 14 Tagen gelöscht (23.10.2026)
  *
  * Anlegen: VACUUM INTO eine Kopie (stimmig auch bei laufendem Betrieb), dann gestreamt mit gzip gepackt (wenig Speicher
  * – der Container hat nur 2 GB), Rechte 600, die neuesten 14 bleiben. Nie zwei gleichzeitig; vorher muss mindestens das
@@ -373,6 +373,37 @@ export function pruefungenAbarbeiten(daten: string, jetzt = new Date()): PruefEr
   return aus
 }
 
+/*
+ * Einzelsicherungen und Vor-Update-Kopien nach 14 Tagen löschen (23.10.2026, Nachprüfung des Schulträgers): wie die
+ * Archive – sonst lägen gelöschte Personen darin unbegrenzt. <DATEN>/sicherung-vor-*.db (vor IServ-Abgleich bzw.
+ * Schuljahreswechsel) und <DATEN>/sicherungen/vor-*.db. Nachtlauf des Löschkonzepts; das Skript des Hosts tut dasselbe.
+ */
+export const EINZEL_TAGE = 14
+
+export function alteEinzelsicherungenLoeschen(daten: string, jetzt = Date.now()): number {
+  let n = 0
+  const lauf = (o: string, passt: RegExp): void => {
+    let namen: string[] = []
+    try {
+      namen = readdirSync(o)
+    } catch {
+      return
+    }
+    for (const name of namen) {
+      if (!passt.test(name)) continue
+      try {
+        const st = statSync(join(o, name))
+        if (st.isFile() && jetzt - st.mtimeMs > EINZEL_TAGE * 864e5) (rmSync(join(o, name), { force: true }), n++)
+      } catch {
+        // gerade entfernt
+      }
+    }
+  }
+  lauf(daten, /^sicherung-vor-.*\.db$/)
+  lauf(join(daten, 'sicherungen'), /^vor-.*\.db$/)
+  return n
+}
+
 export type Ampel = 'ok' | 'warnung' | 'fehler'
 
 export interface SicherungAussen {
@@ -393,7 +424,11 @@ export function sicherungAussen(daten: string, jetzt = Date.now()): SicherungAus
     pruefung,
     abgeholt,
     ampel: {
-      nacht: !nacht || !nacht.ok || alt(nacht.zeit, 2) ? 'fehler' : !nacht.verfahren ? 'warnung' : 'ok',
+      /*
+       * Grün nur mit verschlüsselter Kopie für den PC (23.10.2026, Nachprüfung des Schulträgers): ohne Archiv bzw.
+       * Verfahren rot – auch für Stände älterer Skripte, die dann noch „ok" meldeten.
+       */
+      nacht: !nacht || !nacht.ok || alt(nacht.zeit, 2) || !nacht.verfahren || !nacht.archiv ? 'fehler' : 'ok',
       pruefung: !pruefung ? 'warnung' : !pruefung.ok ? 'fehler' : alt(pruefung.zeit, PRUEF_TAGE) ? 'warnung' : 'ok',
       abgeholt: !abgeholt ? 'warnung' : alt(abgeholt.zeit, ABHOL_TAGE) ? 'fehler' : 'ok'
     }

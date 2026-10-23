@@ -33,4 +33,16 @@ export function createHash(): never {
   throw new Error('createHash gibt es in der iPad-App nicht.')
 }
 
-export default { randomBytes, randomUUID, randomInt, timingSafeEqual, createHash }
+/*
+ * Verschlüsselung ruhender Daten (23.10.2026): storage/ruhend.ts (PC) importiert sie. Auf dem iPad
+ * bleibt ruhend.ts „aus" – dort verschlüsselt der Träger mit Web Crypto (vfs/ruhendIos.ts).
+ */
+export function createCipheriv(): never {
+  throw new Error('createCipheriv gibt es in der iPad-App nicht (Verschlüsselung über vfs/ruhendIos.ts).')
+}
+
+export function createDecipheriv(): never {
+  throw new Error('createDecipheriv gibt es in der iPad-App nicht (Verschlüsselung über vfs/ruhendIos.ts).')
+}
+
+export default { randomBytes, randomUUID, randomInt, timingSafeEqual, createHash, createCipheriv, createDecipheriv }

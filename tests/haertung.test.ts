@@ -173,7 +173,9 @@ describe('Admin-Rollen', () => {
     const r = await rufe(fest, '/server/verwaltung/admin-vergeben', { id: lk.id })
     expect(r.code).toBe(200)
     expect(rolle(lk)).toBe('admin')
-    expect(db.leseServerProtokoll(20).some((e) => JSON.stringify(e).includes('Admin-Rolle vergeben an m.mueller'))).toBe(true)
+    // Ohne Benutzernamen, nur mit Kennung (23.10.2026, Nachprüfung des Schulträgers)
+    expect(db.leseServerProtokoll(20).some((e) => JSON.stringify(e).includes(`Admin-Rolle vergeben (Konto ${lk.id})`))).toBe(true)
+    expect(db.leseServerProtokoll(20).some((e) => JSON.stringify(e).includes('m.mueller'))).toBe(false)
     // Der neue Admin darf die Verwaltung nutzen
     expect((await rufe(lk, '/server/verwaltung/admins', {}, 'GET')).code).toBe(200)
   })
@@ -201,7 +203,7 @@ describe('Admin-Rollen', () => {
     expect(rolle(lk2)).toBe('lehrkraft')
     expect((await rufe(fest, '/server/verwaltung/admin-entziehen', { id: lk.id })).code).toBe(200)
     expect(rolle(lk)).toBe('lehrkraft')
-    expect(db.leseServerProtokoll(30).some((e) => JSON.stringify(e).includes('Admin-Rolle entzogen: m.mueller'))).toBe(true)
+    expect(db.leseServerProtokoll(30).some((e) => JSON.stringify(e).includes(`Admin-Rolle entzogen (Konto ${lk.id})`))).toBe(true)
   })
   it('„Konto geändert" macht kein Schülerkonto zum Admin', async () => {
     expect((await rufe(fest, '/server/verwaltung/nutzer', { id: sus.id, rolle: 'admin' })).code).toBe(400)

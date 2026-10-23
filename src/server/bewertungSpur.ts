@@ -13,7 +13,8 @@ import { randomBytes } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { datenbank } from './datenbank'
 
-export type SpurArt = 'onlinetest' | 'abschluss' | 'mitarbeit' | 'bogen'
+// 'bogen' entfernt (23.10.2026, Nachprüfung des Schulträgers): Rückmeldebögen haben keinen Bestätigungsschritt der Lehrkraft
+export type SpurArt = 'onlinetest' | 'abschluss' | 'mitarbeit'
 /** ki = Vorschlag der KI; lehrkraft = selbst entschieden (ohne Vorschlag); bestaetigt = Vorschlag übernommen; geaendert = Vorschlag geändert */
 export type SpurQuelle = 'ki' | 'lehrkraft' | 'bestaetigt' | 'geaendert'
 
@@ -55,7 +56,7 @@ const db = (): DatabaseSync => {
   return d
 }
 
-const ARTEN: SpurArt[] = ['onlinetest', 'abschluss', 'mitarbeit', 'bogen']
+const ARTEN: SpurArt[] = ['onlinetest', 'abschluss', 'mitarbeit']
 const QUELLEN: SpurQuelle[] = ['ki', 'lehrkraft', 'bestaetigt', 'geaendert']
 
 /** Höchstens so viel JSON je Feld (ein Vorschlag mit Begründungen passt bequem hinein) */

@@ -1074,7 +1074,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                     <Badge color="blue">schreibt</Badge>
                   ) : t.grund === 'verlassen' ? (
                     <Tooltip label="Hat die Seite verlassen – automatisch abgegeben">
-                      <Badge color="red">verlassen {new Date(t.abgabe).toLocaleTimeString('de-DE', { timeStyle: 'short' })}</Badge>
+                      {/* Ohne Uhrzeit (23.10.2026, Nachprüfung des Schulträgers): der Zeitpunkt steht im Aufsichtsvermerk */}
+                      <Badge color="red">verlassen</Badge>
                     </Tooltip>
                   ) : (
                     <Badge color={t.grund === 'zeit' ? 'orange' : 'green'}>

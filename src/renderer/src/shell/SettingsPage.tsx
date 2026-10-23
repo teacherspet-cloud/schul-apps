@@ -75,6 +75,7 @@ import BriefkopfFelder from './BriefkopfFelder'
 import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
 import { EigeneFaecherFeld, ProgrammeAnzeigenCard } from './ProgrammeAnzeigen'
 import MeinFach from './MeinFach'
+import { personenbezogenesAbmelden } from '@shared/lokaleDaten'
 
 /**
  * Die Einstellungen in Reitern.
@@ -142,7 +143,9 @@ export default function SettingsPage(): React.JSX.Element {
                 variant="light"
                 color="gray"
                 onClick={() =>
-                  void fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } })
+                  // Personenbezogenes aus dem Gerät nehmen (23.10.2026, Nachprüfung des Schulträgers)
+                  void Promise.resolve(personenbezogenesAbmelden())
+                    .then(() => fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } }))
                     .catch(() => undefined)
                     .then(() => window.location.assign('/anmelden'))
                 }

@@ -8,6 +8,8 @@
  *  - Permissions-Policy: Mikrofon (Sprechtraining, Sprachaufnahmen in Reihen) und Kamera (QR-Codes scannen,
  *    CodeScanner.tsx) nur für die eigene Seite; Standort, Bezahlen, USB, Seriell, HID, MIDI, Bildschirmaufnahme aus.
  *  - Cross-Origin-Resource-Policy `same-site`: Fremde Seiten binden Bilder/Ton/Skripte von Schul-Apps nicht ein.
+ *  - Cross-Origin-Opener-Policy `same-origin` (seit 23.10.2026 für jede Antwort: Anmeldeseite, Datenschutz, Impressum,
+ *    Hörtexte – nicht nur die Programmseite). Die Anmeldung bei IServ läuft als Umleitung, nicht als Popup.
  *    `same-site` statt `same-origin`, weil meineschulapps.de und www.meineschulapps.de beide in Gebrauch sind.
  *
  * Programmseite (index.html der Oberfläche, http.ts › statisch):
@@ -56,6 +58,8 @@ export function allgemeineKoepfe(https: boolean): Record<string, string> {
     'x-frame-options': 'SAMEORIGIN',
     'permissions-policy': PERMISSIONS_POLICY,
     'cross-origin-resource-policy': 'same-site',
+    // COOP auch auf Anmeldeseite und öffentlichen Seiten (23.10.2026, Nachprüfung des Schulträgers) – nicht nur index.html
+    'cross-origin-opener-policy': 'same-origin',
     ...(https ? { 'strict-transport-security': HSTS } : {})
   }
 }

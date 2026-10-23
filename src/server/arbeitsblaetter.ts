@@ -21,6 +21,7 @@
 import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { randomBytes } from 'node:crypto'
+import { nurTag, tagesBeginn, verlaufOhneZeit } from './ohneUhrzeit'
 import {
   alleNutzer,
   datenbank,
@@ -41,8 +42,8 @@ import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { gastInLerngruppe, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { gastEntfernen } from './gaeste'
 import { auswerten, mitarbeitAnfrage, mitarbeitAus, type AuswertungsKontext, type MitarbeitVorschlag, type PersonRoh } from './blattAuswertung'
-import { spurEintragen } from './bewertungSpur'
-import type { Strenge } from '../shared/blattAuswertung'
+import { spurEintragen, spurVon, type SpurQuelle } from './bewertungSpur'
+import { MITARBEIT_NOTEN, type MitarbeitNote, type Strenge } from '../shared/blattAuswertung'
 import { iservBereit } from './anmeldung'
 import { mitNamensliste, registerVergessen } from './namensschutz'
 import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
@@ -1013,9 +1014,11 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             // Themen-Bibliothek (09.10.2026): Thema und von Hand gewählter Themenbereich
             thema: (z as Zeile & { thema?: string }).thema ?? '',
             themenbereich: (z as Zeile & { themenbereich?: string }).themenbereich ?? '',
-            // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite)
-            zuletzt:
-              (db().prepare(`SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { t: number | null }).t ?? 0,
+            // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite) – seit 23.10.2026
+            // nur auf den Tag genau (Tagesbeginn), keine Uhrzeit (Nachprüfung des Schulträgers)
+            zuletzt: tagesBeginn(
+              (db().prepare(`SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { t: number | null }).t ?? 0
+            ),
             lerngruppe: (z.lerngruppe_id ? lerngruppe(z.lerngruppe_id)?.name : '') ?? '',
             schueler: json_(z.schueler, [] as string[]).length,
             einstellungen: einstellungenVon(z),
@@ -1161,8 +1164,12 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         gast: namen.get(a.schueler_id)?.quelle === 'gast',
         perCode: perCode.has(a.schueler_id),
         eingereicht: a.abgaben,
-        aktualisiert: a.aktualisiert,
-        fassungen: blattFassungen(z.rueckmeldung_id, a.schueler_id).map((f) => ({ nr: f.nr, zeit: f.zeit, bogen: f.volleBogen, fehler: f.fehler })),
+        // Keine Arbeitszeiten für Lehrkräfte (23.10.2026, Nachprüfung des Schulträgers, LfD-Eckpunkte):
+        // nur Stand (begonnen/eingereicht) und das DATUM der letzten Einreichung – keine Uhrzeit,
+        // keine Zwischenspeicherungen. Intern bleibt `aktualisiert` für die Logik erhalten.
+        begonnen: a.aktualisiert > 0,
+        abgegebenAm: a.abgaben > 0 ? nurTag(blattFassungen(z.rueckmeldung_id, a.schueler_id).at(-1)?.zeit) : '',
+        fassungen: blattFassungen(z.rueckmeldung_id, a.schueler_id).map((f) => ({ nr: f.nr, zeit: nurTag(f.zeit), bogen: f.volleBogen, fehler: f.fehler })),
         // Antwort mit Anweisungen an die KI (22.10.2026): kleiner Hinweis „bitte selbst prüfen"
         kiHinweis: Number(a.ki_hinweis ?? 0) > 0
       }))
@@ -1180,7 +1187,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             gast: n.quelle === 'gast',
             perCode: true,
             eingereicht: 0,
-            aktualisiert: 0,
+            begonnen: false,
+            abgegebenAm: '',
             fassungen: [],
             kiHinweis: false
           })
@@ -1194,7 +1202,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           rueckmeldungId: z.rueckmeldung_id,
           aufgaben: nummern,
           einstellungen: einstellungenVon(z),
-          abgaben
+          // Nach Namen statt nach letzter Aktivität (23.10.2026): die Reihenfolge verrät sonst Arbeitszeiten
+          abgaben: abgaben.sort((x, y) => (x.name || x.benutzer).localeCompare(y.name || y.benutzer, 'de'))
         }),
         true
       )
@@ -1231,8 +1240,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           einstellungen: e,
           antworten: json_(a.antworten, {}),
           tinte: json_(a.tinte ?? '{}', {}),
-          aufgabenFeedback: json_(a.aufgaben_feedback ?? '{}', {}),
-          fassungen: blattFassungen(z.rueckmeldung_id, person.id).map(({ volleBogen: _v, ...rest }) => rest)
+          // Ohne Uhrzeiten der Feedback-Runden und Fassungen (23.10.2026, Nachprüfung des Schulträgers)
+          aufgabenFeedback: verlaufOhneZeit(json_(a.aufgaben_feedback ?? '{}', {} as Record<string, Record<string, unknown>[]>)),
+          fassungen: blattFassungen(z.rueckmeldung_id, person.id).map(({ volleBogen: _v, ...rest }) => ({ ...rest, zeit: nurTag(rest.zeit) }))
         }),
         true
       )
@@ -1265,6 +1275,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           aufgaben: aufgaben.map((a) => ({ nr: a.nr, anweisung: a.anweisung, ...(a.hilfekarten ? { hilfekarten: a.hilfekarten } : {}) })),
           strenge: gespeichert.strenge ?? 'normal',
           mitarbeit: gespeichert.personen ?? {},
+          entschieden: gespeichert.entschieden ?? {},
           erstellt: gespeichert.zeit ?? 0
         }),
         true
@@ -1282,17 +1293,57 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       try {
         const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [mitarbeitAnfrage(kontextVon(z), aufgaben, mitDaten, strenge)]))
         const personen = mitarbeitAus(antwort, mitDaten)
-        const neu: GespeicherteAuswertung = { strenge, zeit: Date.now(), personen }
+        // Entscheidungen der Lehrkraft bleiben bei einer neuen Einschätzung erhalten (23.10.2026)
+        const alt = json_((z as Zeile & { auswertung?: string }).auswertung ?? '{}', {} as GespeicherteAuswertung)
+        const neu: GespeicherteAuswertung = { strenge, zeit: Date.now(), personen, ...(alt.entschieden ? { entschieden: alt.entschieden } : {}) }
         db().prepare('UPDATE blatt_freigaben SET auswertung = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
         protokolliereServer('arbeitsblatt', 'Mitarbeit und Hilfen eingeschätzt', ich.id)
         // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers): Vorschlag der KI zur Mitarbeitsnote je Person.
-        // Eine Bestätigung gibt es hier nicht – die Note trägt die Lehrkraft selbst ein (der Vorschlag ist nur Hinweis).
+        // Die Entscheidung der Lehrkraft schreibt POST …/mitarbeit-note („Note übernehmen / ändern", 23.10.2026).
         for (const [sid, v] of Object.entries(personen))
           spurEintragen({ art: 'mitarbeit', bezugId: z.id, schuelerId: sid, lehrkraftId: z.lehrkraft_id, quelle: 'ki', kiVorschlag: { note: v.note, begruendung: v.begruendung, strenge } })
         return (json(res, 200, { strenge, mitarbeit: personen, erstellt: neu.zeit }), true)
       } catch (err) {
         return (json(res, 503, { fehler: err instanceof Error ? err.message : String(err) }), true)
       }
+    }
+    /*
+     * Mitarbeitsnote festlegen (23.10.2026, Nachprüfung des Schulträgers): „Note übernehmen / ändern" in der Auswertung.
+     * Die Entscheidung der Lehrkraft kommt in die Bewertungsspur – bestätigt (wie der KI-Vorschlag), geändert (anders als
+     * der Vorschlag) oder lehrkraft (ohne Vorschlag) – und wird bei der Auswertung gespeichert.
+     */
+    if (req.method === 'POST' && teile[1] === 'mitarbeit-note') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const person = nutzerNachId(String(k0.schueler ?? ''))
+      const note = String(k0.note ?? '') as MitarbeitNote
+      if (!MITARBEIT_NOTEN.includes(note)) return (json(res, 400, { fehler: 'Unbekannte Note.' }), true)
+      if (!person || (!blattIstFuer(z, person) && !abgabeVon(z.id, person.id))) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      const gespeichert = json_((z as Zeile & { auswertung?: string }).auswertung ?? '{}', {} as GespeicherteAuswertung)
+      const vorschlag = gespeichert.personen?.[person.id]
+      const quelle = mitarbeitQuelle(vorschlag?.note, note)
+      const zeit = Date.now()
+      const neu: GespeicherteAuswertung = { ...gespeichert, entschieden: { ...(gespeichert.entschieden ?? {}), [person.id]: { note, zeit, quelle } } }
+      db().prepare('UPDATE blatt_freigaben SET auswertung = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
+      spurEintragen({
+        art: 'mitarbeit',
+        bezugId: z.id,
+        schuelerId: person.id,
+        lehrkraftId: z.lehrkraft_id,
+        quelle,
+        ...(vorschlag ? { kiVorschlag: { note: vorschlag.note, begruendung: vorschlag.begruendung, strenge: gespeichert.strenge ?? 'normal' } } : {}),
+        entscheidung: { note },
+        zeit
+      })
+      protokolliereServer('arbeitsblatt', 'Mitarbeitsnote festgelegt', ich.id)
+      return (json(res, 200, { entschieden: neu.entschieden }), true)
+    }
+    // „Verlauf der Bewertung" der Mitarbeitsnote einer Person (23.10.2026)
+    if (req.method === 'GET' && teile[1] === 'spur') {
+      const sid = url.searchParams.get('schueler') ?? ''
+      const eintraege = spurVon({ lehrkraftId: ich.id, art: 'mitarbeit', bezugId: z.id, schuelerId: sid }).map(
+        ({ schuelerId: _s, lehrkraftId: _l, bezugId: _b, ...rest }) => rest
+      )
+      return (json(res, 200, { eintraege }), true)
     }
     // Lehrkraft schaltet eine Aufgabe für eine Person frei – zählt wie „teilweise" (05.10.2026)
     if (req.method === 'POST' && teile[1] === 'freischalten') {
@@ -1349,7 +1400,13 @@ interface GespeicherteAuswertung {
   strenge?: Strenge
   zeit?: number
   personen?: Record<string, MitarbeitVorschlag>
+  /** Von der Lehrkraft festgelegte Mitarbeitsnote je Person (23.10.2026) */
+  entschieden?: Record<string, { note: MitarbeitNote; zeit: number; quelle: SpurQuelle }>
 }
+
+/** Quelle der Entscheidung: wie der KI-Vorschlag = bestätigt, anders = geändert, ohne Vorschlag = lehrkraft (23.10.2026) */
+export const mitarbeitQuelle = (vorschlag: MitarbeitNote | undefined, note: MitarbeitNote): SpurQuelle =>
+  !vorschlag ? 'lehrkraft' : vorschlag === note ? 'bestaetigt' : 'geaendert'
 
 /** Alles, was die Auswertung je Person braucht – aus Abgaben, Feedback und Bogen */
 function auswertungsDaten(z: Zeile): { aufgaben: BlattAufgabe[]; roh: PersonRoh[] } {

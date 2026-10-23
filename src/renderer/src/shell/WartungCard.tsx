@@ -41,6 +41,8 @@ export default function WartungCard(): React.JSX.Element {
   const [bestand, setBestand] = useState<{ ordner: string; eintraege: number }[]>([])
   const [wort, setWort] = useState('')
   const [laeuft, setLaeuft] = useState(false)
+  // Klartext-Export nur nach ausdrücklicher Warnung (23.10.2026, Nachprüfung des Schulträgers)
+  const [klartextFrage, setKlartextFrage] = useState(false)
 
   useEffect(() => {
     if (!offen) return
@@ -48,9 +50,9 @@ export default function WartungCard(): React.JSX.Element {
     window.api.wartung.bestand().then(setBestand).catch(notifyError)
   }, [offen])
 
-  const sichern = async (): Promise<void> => {
+  const sichern = async (klartext = false): Promise<void> => {
     try {
-      const { name, daten } = await window.api.wartung.sicherung()
+      const { name, daten } = await (klartext ? window.api.wartung.sicherungKlartext() : window.api.wartung.sicherung())
       const pfad = await window.api.files.save(name, [{ name: 'Sicherung', extensions: ['json'] }], daten)
       if (pfad) {
         notifySuccess('Sicherung gespeichert.')
@@ -89,12 +91,46 @@ export default function WartungCard(): React.JSX.Element {
           Schreibt alle erstellten Materialien samt Themenbereichen, die Einstellungen und das Logo in eine einzige Datei. Die Zugänge zur KI bleiben aus
           Sicherheitsgründen draußen – sie stünden in der Datei im Klartext.
         </Text>
+        <Text size="sm" c="dimmed" mb="md">
+          Die Sicherung ist verschlüsselt, weil sie Rückmeldungen, Elternbriefe und Nachteilsausgleiche enthält. Wiederherstellen lässt sie sich nur auf
+          diesem Gerät mit diesem Benutzerkonto. Für den Umzug auf ein anderes Gerät gibt es den unverschlüsselten Export – nur mit Genehmigung und nie in
+          eine Cloud.
+        </Text>
         <Group>
           <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={() => void sichern()}>
             Sicherung speichern …
           </Button>
           <SicherungEinlesen />
+          <Button variant="subtle" color="red" leftSection={<IconAlertTriangle size={16} />} onClick={() => setKlartextFrage(true)} data-klartext-export>
+            Unverschlüsselt exportieren …
+          </Button>
         </Group>
+
+        <Modal opened={klartextFrage} onClose={() => setKlartextFrage(false)} title="Sicherung unverschlüsselt exportieren?" size="lg">
+          <Stack gap="md">
+            <Alert variant="light" color="red" icon={<IconAlertTriangle size={18} />} title="Personenbezogene Daten im Klartext">
+              <Text size="sm">
+                Die Datei enthält Namen, Schülertexte, Bewertungen, Elternbriefe und Nachteilsausgleiche – lesbar für jeden, der sie öffnet. Nach dem Erlass
+                dürfen personenbezogene Daten nicht unverschlüsselt auf private Geräte, USB-Sticks oder in Cloud-Dienste. Die Datei nach dem Einlesen auf dem
+                neuen Gerät sofort löschen.
+              </Text>
+            </Alert>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setKlartextFrage(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                color="red"
+                onClick={() => {
+                  setKlartextFrage(false)
+                  void sichern(true)
+                }}
+              >
+                Trotzdem unverschlüsselt speichern …
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       </Card>
 
       {/* Quellenvermerk der mitgelieferten Daten (Paket 13) – die Lizenzen verlangen die Namensnennung */}

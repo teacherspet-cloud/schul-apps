@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type { StructuredRequest } from '@shared/types'
 import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
 import { aktuelleKi, stempleKi } from '@shared/kiKennzeichnung'
+import { AUFTRAEGE_MIT_PERSONENBEZUG } from '@shared/lokaleDaten'
 import type { Netzfund } from '../../../main/services/ai/provider'
 import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPhase } from './aiProgress'
 import { istGeloescht, sichereAlles } from './autosave'
@@ -330,7 +331,7 @@ const UNTERBROCHEN_KEY = 'schul-apps-auftraege-unterbrochen'
 /** Höchstens so oft wird derselbe Auftrag nach Neustarts fortgesetzt – ein Auftrag, der die App abstürzen lässt, soll sie nicht dauerhaft lahmlegen */
 const MAX_FORTSETZUNGEN = 2
 
-interface GemerkterAuftrag {
+export interface GemerkterAuftrag {
   id: string
   moduleId: string
   docId: string
@@ -352,16 +353,31 @@ export function registriereFortsetzung<A extends unknown[]>(art: string, fn: (..
 
 const merkenAn = (): boolean => typeof window !== 'undefined' && window.__plattform === 'ios'
 
+/**
+ * Ohne Personenbezug merken (23.10.2026, Nachprüfung des Schulträgers): Aufträge von Rückmeldung und
+ * Elternbrief trugen Schülertexte und Namen in den Eingaben (und im Titel) in den localStorage des
+ * iPads. Sie werden nur noch mit neutralem Titel und OHNE Eingaben gemerkt – nach einem Neustart
+ * erscheinen sie als unterbrochen und lassen sich neu starten (shared/lokaleDaten.ts).
+ */
+export function ohnePersonenbezug(a: GemerkterAuftrag): GemerkterAuftrag {
+  const neutral = AUFTRAEGE_MIT_PERSONENBEZUG[a.moduleId]
+  if (!neutral) return a
+  const { fortsetzen: _f, ...rest } = a
+  void _f
+  return { ...rest, titel: neutral }
+}
+
 function leseGemerkte(): GemerkterAuftrag[] {
   try {
     const liste = JSON.parse(localStorage.getItem(UNTERBROCHEN_KEY) ?? '[]') as GemerkterAuftrag[]
-    return Array.isArray(liste) ? liste.filter((a) => a && typeof a.id === 'string') : []
+    return Array.isArray(liste) ? liste.filter((a) => a && typeof a.id === 'string').map(ohnePersonenbezug) : []
   } catch {
     return []
   }
 }
 
-function schreibeGemerkte(liste: GemerkterAuftrag[]): void {
+function schreibeGemerkte(roh: GemerkterAuftrag[]): void {
+  const liste = roh.map(ohnePersonenbezug)
   try {
     localStorage.setItem(UNTERBROCHEN_KEY, JSON.stringify(liste))
   } catch {

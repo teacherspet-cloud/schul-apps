@@ -3,10 +3,14 @@
  *
  * Gleicher Inhalt (wartung.sicherung(): ohne API-Schlüssel, mit Lehrwerken, Vokabel-Bibliothek
  * und Maskottchen), gleiche Namen, gleicher Takt (60 s nach dem Start, dann stündlich geprüft,
- * einmal am Tag). Abgelegt wird aber in Dokumente/Sicherungen: Dort sieht die Lehrkraft die
- * Dateien in der Dateien-App und kann sie in die iCloud oder auf den PC kopieren. Der Ordner wird
- * beim Start NICHT in den Speicher geladen (die Sicherungen können groß sein) – deshalb arbeitet
- * diese Fassung asynchron direkt mit @capacitor/filesystem.
+ * einmal am Tag). Abgelegt wird aber in Dokumente/Sicherungen (sichtbar in der Dateien-App). Der
+ * Ordner wird beim Start NICHT in den Speicher geladen (die Sicherungen können groß sein) – deshalb
+ * arbeitet diese Fassung asynchron direkt mit @capacitor/filesystem.
+ *
+ * NUR VERSCHLÜSSELT (23.10.2026, Nachprüfung des Schulträgers): Die Sicherung enthält Schülerdaten.
+ * Sie wird mit dem Datenschlüssel aus dem Schlüsselbund verschlüsselt (vfs/ruhendIos.ts) und lässt
+ * sich nur auf diesem iPad wiederherstellen. Der frühere Hinweis, sie in die iCloud zu kopieren, ist
+ * entfallen. Ohne Schlüssel gibt es keine Sicherung (Fehler ins Protokoll), nie eine im Klartext.
  */
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { dateiname, faellig, STANDARD_BEHALTEN, type SicherungsEintrag } from '../../main/services/storage/autoSicherung'
@@ -14,6 +18,8 @@ import { sicherung } from '../../main/services/storage/wartung'
 import { getSettings, setSettings } from '../../main/services/storage/settings'
 import { protokolliere } from '../../main/services/protokoll'
 import { ausBase64, nachBase64 } from '../base64'
+import { iosRuhendZustand, sicherungVerschluesseln } from '../vfs/ruhendIos'
+import { istVerschluesselteSicherung } from '@shared/ruhendFormat'
 
 export const ORDNER = 'Sicherungen'
 const NAME = /^Schul-Apps Sicherung \d{4}-\d{2}-\d{2} \d{2}-\d{2}\.json$/
@@ -47,7 +53,7 @@ async function raeumeAuf(behalten: number): Promise<void> {
 export async function sichereJetzt(jetzt = new Date()): Promise<SicherungsEintrag> {
   const s = getSettings()
   const name = dateiname(jetzt)
-  const { daten } = sicherung()
+  const daten = await sicherungVerschluesseln(sicherung().daten)
   await Filesystem.writeFile({ path: `${ORDNER}/${name}`, data: nachBase64(daten), recursive: true, ...ort })
   await raeumeAuf(s.sicherung?.behalten ?? STANDARD_BEHALTEN)
   setSettings({ letzteSicherung: jetzt.toISOString() })
@@ -55,8 +61,27 @@ export async function sichereJetzt(jetzt = new Date()): Promise<SicherungsEintra
   return { name, groesse: daten.byteLength, erstellt: jetzt.toISOString() }
 }
 
+/**
+ * Alte Klartext-Sicherungen in Dokumente/Sicherungen verschlüsseln (23.10.2026): an Ort und Stelle,
+ * gleicher Name, ohne Klartext-Kopie. Nur mit Datenschlüssel.
+ */
+export async function verschluesseleAlteSicherungen(): Promise<number> {
+  if (iosRuhendZustand().zustand !== 'an') return 0
+  let n = 0
+  for (const e of await listeSicherungen()) {
+    const roh = await ladeSicherung(e.name)
+    if (istVerschluesselteSicherung(roh)) continue
+    await Filesystem.writeFile({ path: `${ORDNER}/${e.name}`, data: nachBase64(await sicherungVerschluesseln(roh)), recursive: true, ...ort })
+    n++
+  }
+  return n
+}
+
 /** Beim Start einrichten: nach 60 s prüfen, dann stündlich (läuft nur, solange die App offen ist) */
 export function starteAutoSicherung(): void {
+  void verschluesseleAlteSicherungen()
+    .then((n) => n && protokolliere('info', 'sicherung', `${n} ältere Sicherungen verschlüsselt`))
+    .catch((e: unknown) => protokolliere('warnung', 'sicherung', `Ältere Sicherungen ließen sich nicht verschlüsseln: ${e instanceof Error ? e.message : String(e)}`))
   const pruefe = async (): Promise<void> => {
     try {
       const s = getSettings()

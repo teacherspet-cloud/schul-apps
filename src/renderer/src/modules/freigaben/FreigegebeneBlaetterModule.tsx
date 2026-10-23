@@ -124,7 +124,10 @@ interface Detail {
     /** Per Code/QR beigetreten – lässt sich aus dieser Freigabe entfernen (05.10.2026) */
     perCode?: boolean
     eingereicht: number
-    aktualisiert: number
+    /** Schon etwas eingetragen (23.10.2026: statt Zeitpunkt der letzten Speicherung) */
+    begonnen: boolean
+    /** Datum der letzten Einreichung („JJJJ-MM-TT", ohne Uhrzeit – Nachprüfung des Schulträgers 23.10.2026) */
+    abgegebenAm: string
     fassungen: { nr: number; zeit: string; fehler?: string }[]
     /** Eine Antwort enthielt Anweisungen an die KI (22.10.2026, KI-Sicherheitsprüfung) – bitte selbst prüfen */
     kiHinweis?: boolean
@@ -444,7 +447,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
               <Table.Th>Stand</Table.Th>
               <Table.Th>Auswertung</Table.Th>
               {(d.aufgaben?.length ?? 0) > 0 && d.einstellungen?.aufgabenFeedback && <Table.Th>Aufgaben</Table.Th>}
-              <Table.Th>Zuletzt</Table.Th>
+              <Table.Th>Eingereicht am</Table.Th>
               <Table.Th />
             </Table.Tr>
           </Table.Thead>
@@ -469,7 +472,13 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                 <Table.Td>
                   {(() => {
                     const p = auswertung.daten?.personen.find((x) => x.id === a.id)
-                    return p ? <AuswertungKnopf p={p} note={auswertung.daten?.mitarbeit[p.id]?.note} onClick={() => setAuswahl(p)} /> : null
+                    return p ? (
+                      <AuswertungKnopf
+                        p={p}
+                        note={auswertung.daten?.entschieden?.[p.id]?.note ?? auswertung.daten?.mitarbeit[p.id]?.note}
+                        onClick={() => setAuswahl(p)}
+                      />
+                    ) : null
                   })()}
                 </Table.Td>
                 <Table.Td>
@@ -477,11 +486,11 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     <Badge color="green" variant="light">
                       {a.eingereicht}× eingereicht
                     </Badge>
-                  ) : a.aktualisiert ? (
-                    <Badge variant="light">in Arbeit</Badge>
+                  ) : a.begonnen ? (
+                    <Badge variant="light">begonnen</Badge>
                   ) : (
                     <Badge variant="light" color="gray">
-                      beigetreten
+                      nicht begonnen
                     </Badge>
                   )}
                   {a.fassungen.at(-1)?.fehler ? (
@@ -503,14 +512,15 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     />
                   </Table.Td>
                 )}
-                <Table.Td>{a.aktualisiert ? new Date(a.aktualisiert).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
+                {/* Nur das Datum der Einreichung, keine Uhrzeit (23.10.2026, Nachprüfung des Schulträgers) */}
+                <Table.Td data-abgegeben-am>{a.abgegebenAm ? new Date(`${a.abgegebenAm}T12:00:00`).toLocaleDateString('de-DE') : '–'}</Table.Td>
                 <Table.Td>
                   <Button
                     size="xs"
                     variant="light"
                     leftSection={<IconEye size={14} />}
                     onClick={() => ansehen(a.benutzer)}
-                    disabled={!a.benutzer || !a.aktualisiert}
+                    disabled={!a.benutzer || !a.begonnen}
                     data-blatt-ansehen
                   >
                     Blatt ansehen
@@ -565,6 +575,10 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
         <AuswertungModal
           p={auswahl}
           vorschlag={auswertung.daten?.mitarbeit[auswahl.id]}
+          // Mitarbeitsnote festlegen – nur die eigene Freigabe (23.10.2026, Nachprüfung des Schulträgers)
+          blattId={d.nurLesen ? undefined : id}
+          entschieden={auswertung.daten?.entschieden?.[auswahl.id]}
+          gespeichert={(e) => auswertung.daten && auswertung.setDaten({ ...auswertung.daten, entschieden: e })}
           karten={Object.fromEntries((auswertung.daten?.aufgaben ?? []).filter((x) => x.hilfekarten).map((x) => [x.nr, x.hilfekarten!]))}
           schliessen={() => setAuswahl(null)}
           ansehen={() => {

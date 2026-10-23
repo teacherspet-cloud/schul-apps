@@ -1,14 +1,20 @@
 /**
  * Die dauerhafte Ablage hinter dem Speicher-Dateisystem: @capacitor/filesystem.
  *
- * Auf dem iPad liegt /userData unter Library/SchulApps (für die Lehrkraft unsichtbar, von iOS
- * mitgesichert), /documents im Dokumente-Ordner der App (sichtbar in der Dateien-App). Im
- * Browser (dev:mobil, Rauchtest) nimmt Capacitor dafür IndexedDB.
+ * Auf dem iPad liegt /userData unter Library/SchulApps (für die Lehrkraft unsichtbar), /documents
+ * im Dokumente-Ordner der App (sichtbar in der Dateien-App). Im Browser (dev:mobil, Rauchtest)
+ * nimmt Capacitor dafür IndexedDB.
+ *
+ * Schülerdaten (23.10.2026, Nachprüfung des Schulträgers): Mit `schutz` (vfs/ruhendIos.ts) gehen die
+ * personenbezogenen Ordner (Rückmeldungen, Elternbriefe, Nachteilsausgleiche) nur verschlüsselt auf
+ * das Gerät und sind von der iCloud-Sicherung ausgenommen (vfs/mounts.ts). Der übrige Inhalt von
+ * Library/SchulApps (Unterrichtsmaterial ohne Schülerbezug) wird von iOS weiter mitgesichert.
  */
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem, type FileInfo } from '@capacitor/filesystem'
 import { ausBase64, nachBase64 } from '../base64'
 import type { Traeger, Vfs } from './speicher'
+import type { RuhendSchutz } from './ruhendIos'
 
 const verbinde = (...teile: string[]): string => teile.filter(Boolean).join('/')
 
@@ -16,6 +22,9 @@ const verbinde = (...teile: string[]): string => teile.filter(Boolean).join('/')
 const fehltNur = (e: unknown): boolean => /not exist|does not exist|no such|not found|ENOENT/i.test(e instanceof Error ? e.message : String(e))
 
 export class CapacitorTraeger implements Traeger {
+  /** Verschlüsselung personenbezogener Dateien (nur /userData, gesetzt in vfs/mounts.ts) */
+  schutz: RuhendSchutz | null = null
+
   constructor(readonly verzeichnis: Directory, readonly basis: string) {}
 
   pfad(rel: string): string {
@@ -23,7 +32,8 @@ export class CapacitorTraeger implements Traeger {
   }
 
   async schreiben(rel: string, daten: Uint8Array): Promise<void> {
-    await Filesystem.writeFile({ path: this.pfad(rel), data: nachBase64(daten), directory: this.verzeichnis, recursive: true })
+    const bytes = this.schutz ? await this.schutz.vorDemSchreiben(rel, daten) : daten
+    await Filesystem.writeFile({ path: this.pfad(rel), data: nachBase64(bytes), directory: this.verzeichnis, recursive: true })
   }
 
   async loeschen(rel: string): Promise<void> {
@@ -84,7 +94,9 @@ export class CapacitorTraeger implements Traeger {
       while (naechste < dateien.length) {
         const { rel, info } = dateien[naechste++]
         try {
-          vfs.uebernehmen(`${wurzel}/${rel}`, await this.lesen(rel, info), Number(info.mtime) || Date.now())
+          const roh = await this.lesen(rel, info)
+          const daten = this.schutz ? await this.schutz.nachDemLesen(rel, roh, (klar) => this.schreiben(rel, klar)) : roh
+          vfs.uebernehmen(`${wurzel}/${rel}`, daten, Number(info.mtime) || Date.now())
         } catch (e) {
           console.warn(`Datei ${rel} ließ sich nicht laden`, e)
         }

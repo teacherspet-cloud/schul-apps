@@ -12,8 +12,12 @@ import SicherungEinlesen from './SicherungEinlesen'
  *
  * Die App sichert einmal am Tag selbst (userData/sicherungen, die neuesten sieben Stände).
  * Hier sieht die Lehrkraft die vorhandenen Stände, kann einen zurückspielen, zusätzlich in
- * einen eigenen Ordner sichern lassen (USB-Stick, Cloud-Ordner), das Fehlerprotokoll
+ * einen eigenen Ordner sichern lassen (USB-Stick, Netzlaufwerk), das Fehlerprotokoll
  * speichern und nicht mehr benutzte Hörtexte löschen.
+ *
+ * Nur verschlüsselt (23.10.2026, Nachprüfung des Schulträgers): Die Sicherungen enthalten
+ * Schülerdaten und liegen deshalb nur verschlüsselt vor – auch die Kopie im eigenen Ordner. Der
+ * frühere Hinweis, die Sicherungen des iPads in die iCloud zu kopieren, ist entfallen.
  */
 const mb = (b: number): string => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`)
 const datum = (iso: string): string => new Date(iso).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
@@ -24,6 +28,8 @@ export default function SicherungenCard(): React.JSX.Element {
   const [liste, setListe] = useState<{ name: string; groesse: number; erstellt: string }[]>([])
   const [verwaist, setVerwaist] = useState<{ dateien: string[]; bytes: number } | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  // Stand der Verschlüsselung (23.10.2026): gesperrt = Schülerdaten werden nicht gespeichert, Sicherung entfällt
+  const [verschluesselung, setVerschluesselung] = useState<{ zustand: string; grund?: string; schwach?: boolean } | null>(null)
 
   const laden = useCallback(() => {
     window.api.wartung.sicherungen().then(setListe).catch(notifyError)
@@ -33,6 +39,12 @@ export default function SicherungenCard(): React.JSX.Element {
       .catch(() => setVerwaist(null))
   }, [])
   useEffect(laden, [laden])
+  useEffect(() => {
+    window.api.wartung
+      .verschluesselung()
+      .then(setVerschluesselung)
+      .catch(() => setVerschluesselung(null))
+  }, [])
 
   const jetzt = async (): Promise<void> => {
     setLaeuft(true)
@@ -57,8 +69,8 @@ export default function SicherungenCard(): React.JSX.Element {
       <Stack gap="sm">
         <Title order={4}>Automatische Sicherung</Title>
         <Text size="sm" c="dimmed">
-          Einmal am Tag sichert die App alle Materialien, Einstellungen, Lehrwerke, Vokabellisten und Maskottchen – ohne API-Schlüssel. Die neuesten Stände
-          bleiben erhalten; ältere werden gelöscht.
+          Einmal am Tag sichert die App alle Materialien, Einstellungen, Lehrwerke, Vokabellisten und Maskottchen – ohne API-Schlüssel und immer
+          verschlüsselt (Wiederherstellen nur auf diesem Gerät). Die neuesten Stände bleiben erhalten; ältere werden gelöscht.
         </Text>
         <Group gap="lg" align="flex-end">
           <Switch
@@ -78,17 +90,26 @@ export default function SicherungenCard(): React.JSX.Element {
             Jetzt sichern
           </Button>
         </Group>
+        {verschluesselung?.zustand === 'gesperrt' && (
+          <Text size="sm" c="red" data-verschluesselung-gesperrt>
+            Verschlüsselung nicht verfügbar – Rückmeldungen, Elternbriefe und Nachteilsausgleiche werden nicht gespeichert, Sicherungen entfallen.{' '}
+            {verschluesselung.grund}
+          </Text>
+        )}
         {/* iPad: Die Sicherungen liegen schon sichtbar in der Dateien-App – ein zweiter Ordner entfällt */}
         {aufIos() ? (
           <Text size="xs" c="dimmed">
-            Die Sicherungen liegen in der Dateien-App unter „Auf meinem iPad › Schul-Apps › Sicherungen“ und lassen sich von dort in die iCloud oder auf den PC
-            kopieren.
+            Die Sicherungen liegen verschlüsselt in der Dateien-App unter „Auf meinem iPad › Schul-Apps › Sicherungen“. Sie lassen sich nur auf diesem iPad
+            wiederherstellen; der Schlüssel liegt im Schlüsselbund dieses Geräts und wandert in keine Cloud.
           </Text>
         ) : (
           <Group gap="xs">
             <Button variant="default" size="xs" leftSection={<IconFolder size={14} />} onClick={() => void ordnerWaehlen()}>
               {sicherung?.ordner ? 'Anderen Ordner wählen …' : 'Zusätzlich in einen Ordner sichern …'}
             </Button>
+            <Text size="xs" c="dimmed">
+              Die Kopie ist dieselbe verschlüsselte Datei – ein Cloud-Ordner erhält also nur verschlüsselte Sicherungen.
+            </Text>
             {sicherung?.ordner && (
               <>
                 <Text size="xs" c="dimmed">

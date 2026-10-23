@@ -94,14 +94,18 @@ export function pruefeDatenschutzAngaben(roh: unknown): DatenschutzAngaben {
 
 // ---------------------------------------------------------------- Kurzfassung für Lernende
 
-/** 6–10 kurze Sätze, kindgerecht, mit „du" */
+/**
+ * 6–10 kurze Einträge, kindgerecht, mit „du". Nachgeschärft (23.10.2026, Nachprüfung des Schulträgers): Spiele zu zweit,
+ * Aufsichtsvermerke, Bilder/Stimme trotz Namensersatz, Sprechtraining (Moderation, ein Satz 14 Tage), Krisenhinweise.
+ */
 export const KURZFASSUNG_SCHUELER: string[] = [
   'Schul-Apps ist die Lernplattform deiner Schule. Deine Schule ist dafür verantwortlich, was mit deinen Daten passiert.',
-  'Gespeichert wird nur, was du zum Lernen brauchst: dein Name, deine Klasse, deine Antworten und dein Lernstand.',
-  'Deine Lehrkräfte sehen deine Antworten und Ergebnisse. Andere Kinder sehen sie nicht.',
-  'Manche Rückmeldungen schreibt eine KI. Sie bekommt deinen Namen nicht. Die KI macht nur Vorschläge – deine Lehrkraft entscheidet.',
-  'Beim Sprechtraining sprichst du live mit einer KI von OpenAI in den USA. Eine Aufnahme wird nicht gespeichert.',
-  'Schreib keine Namen, Adressen oder Geheimnisse in deine Antworten.',
+  'Gespeichert wird, was du zum Lernen brauchst: dein Name, deine Klasse, deine Antworten und dein Lernstand. In Onlinetests merkt sich die App auch, wenn du die Seite verlässt oder etwas einfügst.',
+  'Deine Lehrkräfte sehen deine Antworten und Ergebnisse, andere Kinder nicht. Nur bei Spielen zu zweit sehen die anderen deinen Kurznamen, deine Spielzüge und Punkte.',
+  'Manche Rückmeldungen schreibt eine KI. Namen in deinem Text werden vorher ersetzt – auf Fotos und in deiner Stimme geht das nicht, also fotografiere keine Menschen und nenne keine Namen.',
+  'Noten gibt nur deine Lehrkraft. Die KI macht Vorschläge.',
+  'Beim Sprechtraining sprichst du live mit einer KI von OpenAI in den USA; OpenAI prüft dabei, ob etwas Unangemessenes gesagt wird. Eine Aufnahme wird nicht gespeichert, nur deine Punkte und Tipps – sagst du etwas Unangemessenes, bleibt genau dieser Satz 14 Tage für deine Lehrkraft.',
+  'Wenn du schreibst oder sagst, dass es dir sehr schlecht geht, zeigt dir die App, wo du Hilfe bekommst, und deine Lehrkraft bekommt einen vertraulichen Hinweis – ohne deine Worte.',
   'Wenn du die Schule verlässt, werden deine Daten gelöscht.',
   'Du darfst fragen, was über dich gespeichert ist. Frag deine Lehrkraft oder die Datenschutzbeauftragte bzw. den Datenschutzbeauftragten deiner Schule.',
   'Alles Genaue steht in der Datenschutzerklärung.'

@@ -42,6 +42,7 @@ import { starteAutoSicherung } from './sicherung/autoSicherung'
 import { mobilUmgebung } from './umgebung'
 import { vfsLaden, vorbereiten } from './vfs/mounts'
 import { vfs } from './vfs/speicher'
+import { iosRuhendZustand, sicherungOeffnen, sicherungVerschluesseln } from './vfs/ruhendIos'
 
 /** Nur im Prüf-Build (SCHULAPPS_MOBIL_TEST=1, vite.mobil.config.ts) – im Build für die Lehrkraft immer false */
 declare const __KI_ATTRAPPE_ERLAUBT__: boolean
@@ -133,6 +134,30 @@ function geraetKennung(): string {
   return neu
 }
 
+/**
+ * Sicherungen nur verschlüsselt (23.10.2026, Nachprüfung des Schulträgers): Die Dienste des PCs
+ * liefern auf dem iPad Klartext (storage/ruhend.ts bleibt hier „aus") – verschlüsselt wird mit dem
+ * Schlüssel aus dem Schlüsselbund (vfs/ruhendIos.ts). Der Klartext-Export (wartung:sicherungKlartext)
+ * bleibt unverändert: nur auf ausdrücklichen Wunsch mit Warnung (WartungCard).
+ */
+function sicherungVerschluesselt(aufrufe: Map<string, (...args: unknown[]) => unknown>): void {
+  const original = (kanal: string): ((...args: unknown[]) => unknown) => {
+    const fn = aufrufe.get(kanal)
+    if (!fn) throw new Error(`Kanal ${kanal} fehlt.`)
+    return fn
+  }
+  const sichern = original('wartung:sicherung')
+  aufrufe.set('wartung:sicherung', async () => {
+    const r = (await sichern()) as { name: string; daten: Uint8Array }
+    return { ...r, daten: await sicherungVerschluesseln(r.daten) }
+  })
+  for (const kanal of ['wartung:pruefen', 'wartung:wiederherstellen']) {
+    const fn = original(kanal)
+    aufrufe.set(kanal, async (daten: unknown) => fn(daten instanceof Uint8Array ? await sicherungOeffnen(daten) : daten))
+  }
+  aufrufe.set('wartung:verschluesselung', () => iosRuhendZustand())
+}
+
 /** Kanäle, deren Ressourcen erst bei Bedarf geladen werden (vfs/mounts.ts) */
 const MIT_RESSOURCEN = /^(lehrplan:themen|schulen:|images:openmoji-)/
 
@@ -199,6 +224,7 @@ async function starten(): Promise<void> {
   // Verbindung zum PC schon beim Start herstellen – der erste Auftrag wartet dann nicht darauf
   setTimeout(() => pcKi.vorwaermen(), 1500)
   registriereKanaele((kanal, fn) => aufrufe.set(kanal, fn as (...args: unknown[]) => unknown), mobilUmgebung(pcKi))
+  sicherungVerschluesselt(aufrufe)
 
   const call = async <T>(kanal: string, ...args: unknown[]): Promise<T> => {
     const fn = aufrufe.get(kanal)

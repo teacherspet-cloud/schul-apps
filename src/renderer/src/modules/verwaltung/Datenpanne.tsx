@@ -16,6 +16,8 @@ import {
   lfdMeldetext,
   noetigePunkte,
   offenePunkte,
+  PRUEF_JAHRE,
+  pruefFaellig,
   RISIKO_TEXT,
   type CheckPunkt,
   type Datenpanne as Panne,
@@ -101,6 +103,18 @@ export function Datenpanne(): React.JSX.Element {
   }
 
   const laufend = (liste ?? []).filter((p) => !p.abgeschlossen)
+  // Prüffrist (23.10.2026): seit mehr als drei Jahren abgeschlossen
+  const zuPruefen = (liste ?? []).filter((p) => pruefFaellig(p))
+  const loeschen = async (id: string): Promise<void> => {
+    if (!window.confirm('Diesen dokumentierten Vorfall endgültig löschen?')) return
+    try {
+      await senden('/server/datenpannen/loeschen', { id })
+      setListe((l) => (l ?? []).filter((p) => p.id !== id))
+      notifySuccess('Vorfall gelöscht.')
+    } catch (e) {
+      notifyError(e)
+    }
+  }
   const dringend = laufend.some((p) => offenePunkte(p).includes('lfd') && !fristStand(p.entdeckt).abgelaufen)
   return (
     <KlappKarte
@@ -121,6 +135,12 @@ export function Datenpanne(): React.JSX.Element {
             Risiko. Dokumentiert wird jeder Vorfall (Art. 33 Abs. 5 DSGVO). Die Angaben liegen verschlüsselt auf dem Server; sichtbar nur für die
             Verwaltung.
           </Text>
+          {zuPruefen.length > 0 && (
+            <Alert color="orange" data-datenpanne-prueffrist={zuPruefen.length}>
+              {zuPruefen.length === 1 ? 'Ein Vorfall ist' : `${zuPruefen.length} Vorfälle sind`} seit mehr als {PRUEF_JAHRE} Jahren abgeschlossen. Bitte prüfen, ob
+              die Dokumentation noch gebraucht wird (z. B. laufendes Verfahren, Nachfrage der LfD) – sonst löschen. Automatisch gelöscht wird nichts.
+            </Alert>
+          )}
           {dringend && (
             <Alert color="red" icon={<IconAlertTriangle />} data-datenpanne-dringend>
               Mindestens ein Vorfall ist noch nicht an die LfD gemeldet – Frist beachten.
@@ -135,7 +155,7 @@ export function Datenpanne(): React.JSX.Element {
               <Stack gap="xs">
                 <Textarea
                   label="Was ist passiert?"
-                  description="Art des Vorfalls, Ursache, Umstände"
+                  description="Art des Vorfalls, Ursache, Umstände – nur so viele Personenangaben wie nötig (keine Namen Betroffener, wenn es ohne geht)"
                   autosize
                   minRows={3}
                   required
@@ -209,7 +229,14 @@ export function Datenpanne(): React.JSX.Element {
             </Text>
           )}
           {liste.map((p) => (
-            <PanneKarte key={p.id} p={p} offen={offen === p.id} umschalten={() => setOffen(offen === p.id ? null : p.id)} aendern={(t) => aendern(p.id, t)} />
+            <PanneKarte
+              key={p.id}
+              p={p}
+              offen={offen === p.id}
+              umschalten={() => setOffen(offen === p.id ? null : p.id)}
+              aendern={(t) => aendern(p.id, t)}
+              loeschen={() => void loeschen(p.id)}
+            />
           ))}
         </Stack>
       )}
@@ -217,7 +244,19 @@ export function Datenpanne(): React.JSX.Element {
   )
 }
 
-function PanneKarte({ p, offen, umschalten, aendern }: { p: Panne; offen: boolean; umschalten: () => void; aendern: (t: Record<string, unknown>) => Promise<void> }): React.JSX.Element {
+function PanneKarte({
+  p,
+  offen,
+  umschalten,
+  aendern,
+  loeschen
+}: {
+  p: Panne
+  offen: boolean
+  umschalten: () => void
+  aendern: (t: Record<string, unknown>) => Promise<void>
+  loeschen: () => void
+}): React.JSX.Element {
   const f = fristStand(p.entdeckt)
   const fehlt = offenePunkte(p)
   const noetig = noetigePunkte(p.risiko)
@@ -246,7 +285,11 @@ function PanneKarte({ p, offen, umschalten, aendern }: { p: Panne; offen: boolea
             </Text>
           </div>
           <Group gap={6} wrap="nowrap">
-            {p.abgeschlossen ? (
+            {p.abgeschlossen && pruefFaellig(p) ? (
+              <Badge color="orange" variant="light" data-datenpanne-pruefen>
+                Prüffrist erreicht
+              </Badge>
+            ) : p.abgeschlossen ? (
               <Badge color="gray" variant="light">
                 abgeschlossen
               </Badge>
@@ -324,6 +367,11 @@ function PanneKarte({ p, offen, umschalten, aendern }: { p: Panne; offen: boolea
               <Button size="xs" variant="subtle" color="gray" onClick={() => void aendern({ abgeschlossen: !p.abgeschlossen })} data-datenpanne-abschliessen>
                 {p.abgeschlossen ? 'Wieder öffnen' : 'Vorfall abschließen'}
               </Button>
+              {pruefFaellig(p) && (
+                <Button size="xs" variant="subtle" color="red" onClick={loeschen} data-datenpanne-loeschen>
+                  Nach Prüfung löschen
+                </Button>
+              )}
             </Group>
           </>
         )}

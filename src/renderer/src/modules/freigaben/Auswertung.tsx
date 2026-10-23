@@ -7,12 +7,15 @@
  *  - Mitarbeit (++ … --) und Hilfestellungen schlägt die KI auf Knopfdruck vor – Strenge einstellbar und
  *    nachträglich änderbar (neu einschätzen). Ein Vorschlag, den die Lehrkraft prüft.
  *  - „Hilfestellungen": ein Dokument für alle, zum Drucken und Speichern.
+ *  - „Note übernehmen / ändern" (23.10.2026, Nachprüfung des Schulträgers): Die Mitarbeitsnote legt die Lehrkraft im
+ *    Pop-up ausdrücklich fest; die Entscheidung kommt in die Bewertungsspur (bestätigt / geändert / selbst festgelegt).
  *  - „Gleiche Abgaben": je Aufgabe, wer gleiche oder sehr ähnliche Antworten abgegeben hat.
  */
 import { Alert, Badge, Button, Group, List, Menu, Modal, SegmentedControl, Stack, Table, Text, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconBulb, IconCopy, IconEye, IconPrinter, IconSparkles, IconDownload } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
-import { farbeFuer, type MitarbeitNote, type Strenge } from '@shared/blattAuswertung'
+import { farbeFuer, MITARBEIT_NOTEN, type MitarbeitNote, type Strenge } from '@shared/blattAuswertung'
+import { BewertungsVerlauf } from '../../shared/components/BewertungsVerlauf'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { starteAuftrag } from '../../shared/auftraege'
@@ -50,7 +53,73 @@ export interface AuswertungDaten {
   aufgaben: { nr: number; anweisung: string; hilfekarten?: number }[]
   strenge: Strenge
   mitarbeit: Record<string, { note: MitarbeitNote; begruendung: string; hilfen: string[] }>
+  /** Von der Lehrkraft festgelegte Mitarbeitsnote je Person (23.10.2026) */
+  entschieden?: Record<string, MitarbeitEntschieden>
   erstellt: number
+}
+
+export interface MitarbeitEntschieden {
+  note: MitarbeitNote
+  zeit: number
+  quelle: 'bestaetigt' | 'geaendert' | 'lehrkraft' | 'ki'
+}
+
+const ENTSCHIEDEN_TEXT: Record<MitarbeitEntschieden['quelle'], string> = {
+  bestaetigt: 'Vorschlag übernommen',
+  geaendert: 'gegenüber dem Vorschlag geändert',
+  lehrkraft: 'selbst festgelegt',
+  ki: 'Vorschlag'
+}
+
+/** Mitarbeitsnote festlegen: Vorschlag übernehmen oder ändern; schreibt die Bewertungsspur (Server: …/mitarbeit-note) */
+export function MitarbeitEntscheidung({
+  blattId,
+  schuelerId,
+  vorschlag,
+  entschieden,
+  gespeichert
+}: {
+  blattId: string
+  schuelerId: string
+  vorschlag?: MitarbeitNote
+  entschieden?: MitarbeitEntschieden
+  gespeichert?: (e: Record<string, MitarbeitEntschieden>) => void
+}): React.JSX.Element {
+  const [note, setNote] = useState<MitarbeitNote | ''>(entschieden?.note ?? vorschlag ?? '')
+  const [laeuft, setLaeuft] = useState(false)
+  const speichern = (): void => {
+    if (!note) return
+    setLaeuft(true)
+    void senden<{ entschieden: Record<string, MitarbeitEntschieden> }>(`/server/blaetter/${blattId}/mitarbeit-note`, { schueler: schuelerId, note })
+      .then(
+        (r) => {
+          gespeichert?.(r.entschieden)
+          notifySuccess(`Mitarbeitsnote ${note} gespeichert.`)
+        },
+        (e: unknown) => notifyError(e)
+      )
+      .finally(() => setLaeuft(false))
+  }
+  const knopf = !note ? 'Note festlegen' : vorschlag && note === vorschlag ? 'Note übernehmen' : vorschlag ? 'Note ändern' : 'Note festlegen'
+  return (
+    <Stack gap={6} data-mitarbeit-entscheidung>
+      <Text size="sm" fw={600}>
+        Mitarbeitsnote (Entscheidung der Lehrkraft)
+      </Text>
+      <Group gap="xs" wrap="wrap">
+        <SegmentedControl size="xs" value={note} onChange={(v) => setNote(v as MitarbeitNote)} data={MITARBEIT_NOTEN.map((n) => ({ value: n, label: n }))} />
+        <Button size="xs" onClick={speichern} loading={laeuft} disabled={!note || (entschieden?.note === note)} data-mitarbeit-note-speichern>
+          {knopf}
+        </Button>
+        <BewertungsVerlauf pfad={`/server/blaetter/${blattId}/spur?schueler=${encodeURIComponent(schuelerId)}`} />
+      </Group>
+      {entschieden && (
+        <Text size="xs" c="dimmed" data-mitarbeit-entschieden={entschieden.quelle}>
+          Festgelegt: {entschieden.note} ({ENTSCHIEDEN_TEXT[entschieden.quelle]}, {new Date(entschieden.zeit).toLocaleString('de-DE')})
+        </Text>
+      )}
+    </Stack>
+  )
 }
 
 export function useAuswertung(id: string): { daten: AuswertungDaten | null; laden: () => void; setDaten: (d: AuswertungDaten) => void } {
@@ -100,7 +169,10 @@ export function AuswertungModal({
   vorschlag,
   schliessen,
   ansehen,
-  karten = {}
+  karten = {},
+  blattId,
+  entschieden,
+  gespeichert
 }: {
   p: PersonA
   vorschlag?: { note: MitarbeitNote; begruendung: string; hilfen: string[] }
@@ -108,6 +180,10 @@ export function AuswertungModal({
   ansehen: () => void
   /** Vorhandene Hilfekarten je Aufgabe (06.10.2026) */
   karten?: Record<number, number>
+  /** Für „Note übernehmen / ändern" (23.10.2026); ohne: kein Festlegen (z. B. Mitlehrkraft) */
+  blattId?: string
+  entschieden?: MitarbeitEntschieden
+  gespeichert?: (e: Record<string, MitarbeitEntschieden>) => void
 }): React.JSX.Element {
   return (
     <Modal opened onClose={schliessen} title={`Auswertung – ${p.name}`} size="lg" data-auswertung-modal>
@@ -145,6 +221,7 @@ export function AuswertungModal({
             </Text>
           </Alert>
         )}
+        {blattId && <MitarbeitEntscheidung key={p.id} blattId={blattId} schuelerId={p.id} vorschlag={vorschlag?.note} entschieden={entschieden} gespeichert={gespeichert} />}
         {p.aufgaben.map((a) => (
           <Stack key={a.nr} gap={2} style={{ borderLeft: `4px solid var(--mantine-color-${a.ampel ? AMPEL_FARBE[a.ampel] : 'gray'}-6)`, paddingLeft: 8 }}>
             <Text size="sm" fw={600}>

@@ -491,6 +491,33 @@ function linkFuer(s: Schritt, z: ZuweisungZeile, stand: Stand): string | undefin
 /** Stand für die Ansicht ohne große Daten */
 const standKurz = (s: Stand): Stand => ({ ...s, schritte: Object.fromEntries(Object.entries(s.schritte).map(([k, v]) => [k, { ...v }])) })
 
+/*
+ * Stand für die Lehrkraft ohne Zeitstempel (23.10.2026, Nachprüfung des Schulträgers, LfD-Eckpunkte): Wann eine Person
+ * eingereicht, um Hilfe gebeten, gefragt oder eine Diagnose gemacht hat, braucht die Lehrkraft nicht – Status genügt.
+ * Intern (Sperrfristen, Reihenfolge) bleiben die Zeiten im gespeicherten Stand.
+ */
+export function standOhneZeit(s: Stand): Stand {
+  const weg = <T extends object>(o: T | undefined | null): T | undefined => {
+    if (!o) return o ?? undefined
+    const { zeit: _z, antwortZeit: _a, ...rest } = o as T & { zeit?: unknown; antwortZeit?: unknown }
+    return rest as T
+  }
+  const schritte = Object.fromEntries(
+    Object.entries(s.schritte).map(([k, v]) => {
+      const x = weg(v)!
+      for (const f of ['ki', 'bewertung', 'diagnose', 'ueberarbeiten', 'impuls'] as const)
+        if (x[f]) (x as Record<string, unknown>)[f] = weg(x[f] as object)
+      return [k, x]
+    })
+  )
+  return {
+    ...s,
+    schritte,
+    ...(s.hilfe ? { hilfe: weg(s.hilfe) as Stand['hilfe'] } : {}),
+    ...(s.fragen ? { fragen: s.fragen.map((f) => weg(f) as NonNullable<Stand['fragen']>[number]) } : {})
+  }
+}
+
 const MAX_DATEI = 12 * 1024 * 1024
 /** Speicher je Person und Reihe (22.10.2026, Faustregel) */
 const MAX_JE_PERSON = 60 * 1024 * 1024
@@ -1365,7 +1392,8 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
               // Per Code beigetreten – entfernbar
               perCode: (db().prepare('SELECT nutzer_id FROM reihe_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
             },
-            lernende,
+            // Ohne Zeitstempel (23.10.2026, Nachprüfung des Schulträgers)
+            lernende: lernende.map((l) => ({ ...l, stand: standOhneZeit(l.stand) })),
             bedarf
           }),
           true

@@ -87,6 +87,7 @@ export async function adminRollenRoute(k: Anfrage): Promise<boolean> {
   const fehler = adminAenderungPruefen(ziel, { rolle: vergeben ? 'admin' : 'lehrkraft' })
   if (fehler) return (json(res, 400, { fehler }), true)
   nutzerAendern(ziel.id, { rolle: vergeben ? 'admin' : 'lehrkraft' })
-  protokolliereServer('verwaltung', `Admin-Rolle ${vergeben ? 'vergeben an' : 'entzogen:'} ${ziel.benutzer}`, sitzung.nutzer.id)
+  // Ohne Benutzernamen (23.10.2026, Nachprüfung des Schulträgers): nur die interne Kennung des Kontos
+  protokolliereServer('verwaltung', `Admin-Rolle ${vergeben ? 'vergeben' : 'entzogen'} (Konto ${ziel.id})`, sitzung.nutzer.id)
   return (json(res, 200, { ok: true }), true)
 }

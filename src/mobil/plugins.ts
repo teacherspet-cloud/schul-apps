@@ -87,6 +87,7 @@ export const Hintergrund = {
 
 interface DateienPlugin {
   exportieren(o: { name: string; base64: string }): Promise<{ gespeichert: boolean }>
+  vonSicherungAusnehmen(o: { pfade: string[] }): Promise<{ ausgenommen: string[] }>
 }
 
 const dateienNativ = registerPlugin<DateienPlugin>('Dateien')
@@ -106,6 +107,18 @@ export const Dateien = {
       const text = e instanceof Error ? e.message : String(e)
       if (/not implemented|unimplemented|nicht implementiert/i.test(text)) return null
       throw e
+    }
+  },
+  /**
+   * Ordner unter Library von der iCloud-Sicherung ausnehmen (23.10.2026, Nachprüfung des Schulträgers):
+   * die Ablagen mit Schülerdaten. null = nicht verfügbar (Browser oder ältere App ohne diese Methode).
+   */
+  vonSicherungAusnehmen: async (pfade: string[]): Promise<string[] | null> => {
+    if (!nativ()) return null
+    try {
+      return (await dateienNativ.vonSicherungAusnehmen({ pfade })).ausgenommen
+    } catch {
+      return null
     }
   }
 }

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { fachFarbe } from '../../shared/fachfarben'
 import type { Uebersicht } from '@shared/vokabeltrainer'
 import { holen } from '../onlinetest/serverApi'
+import { KiMarke } from '../onlinetest/KiMarke'
 import { alsKnopf } from '@shared/tastaturBedienung'
 
 interface Karteikasten {
@@ -407,6 +408,8 @@ function SeitenInhalt({ s }: { s: MappenSeite }): React.JSX.Element {
       )}
       {s.feedback && (
         <Stack gap={4}>
+          {/* Rückmeldebogen der KI kennzeichnen (23.10.2026, Nachprüfung des Schulträgers, Art. 50 KI-VO) */}
+          <KiMarke />
           {Boolean(s.feedback.staerken?.length) && (
             <Text size="sm">
               <b style={{ color: 'var(--mantine-color-green-7)' }}>Das gelingt dir:</b> {s.feedback.staerken!.join(' ')}

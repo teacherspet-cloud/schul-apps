@@ -15,7 +15,9 @@ process.env.SCHULAPPS_DATEN = ORDNER
 
 const { setzeSchluesselFuerTests } = await import('../src/server/geheim')
 const db = await import('../src/server/datenbank')
-const { LISTEN_SPALTEN, PERSONEN_SPALTEN, VERWEISE, ANONYMISIEREN, WAISEN, personenSpaltenVon, tabellenMitSpalten } = await import('../src/server/personDaten')
+const { LISTEN_SPALTEN, PERSONEN_SPALTEN, VERWEISE, ANONYMISIEREN, WAISEN, personenSpaltenVon, tabellenMitSpalten, kontoHmac, loeschungenNachziehen } = await import(
+  '../src/server/personDaten'
+)
 
 afterAll(() => rmSync(ORDNER, { recursive: true, force: true }))
 
@@ -188,5 +190,34 @@ describe('kontoEntfernen lässt nichts zurück', () => {
     db.kontoEntfernen(lk)
     expect(d.prepare("SELECT 1 FROM sprech_stand WHERE freigabe_id = 'sf1'").get()).toBeUndefined()
     expect(d.prepare("SELECT 1 FROM sprech_vorfaelle WHERE freigabe_id = 'sf1'").get()).toBeUndefined()
+  })
+
+  // Nachprüfung des Schulträgers (23.10.2026): Auswahl „Transkript nur für …" der Hörtexte (Benutzernamen, klein)
+  it('Hörtext-Freigabe: die Person verschwindet aus transkript_wahl, die anderen bleiben', () => {
+    const d = db.datenbank()
+    const lk = db.nutzerAnlegen({ benutzer: 'h.hoer', name: 'H. Hoer', rolle: 'lehrkraft', quelle: 'iserv' })
+    const carla = db.nutzerAnlegen({ benutzer: 'Carla.Geht', name: 'Carla Geht', rolle: 'schueler', quelle: 'iserv' })
+    d.prepare("INSERT INTO hoertext_freigaben (kennung, nutzer_id, datei, erstellt, transkript_wahl) VALUES ('hk1', ?, 'a.mp3', 'x', ?)").run(
+      lk.id,
+      JSON.stringify({ wer: 'einzelne', schueler: ['carla.geht', 'ben.bleibt'] })
+    )
+    db.kontoEntfernen(carla)
+    const z = d.prepare("SELECT transkript_wahl FROM hoertext_freigaben WHERE kennung = 'hk1'").get() as { transkript_wahl: string }
+    expect(JSON.parse(z.transkript_wahl)).toEqual({ wer: 'einzelne', schueler: ['ben.bleibt'] })
+  })
+
+  it('vermerkt gelöschte Konten nur als HMAC und zieht Löschungen nach einer Wiederherstellung nach', () => {
+    const d = db.datenbank()
+    const zeilen = d.prepare('SELECT id_hmac, datum FROM geloeschte_konten').all() as { id_hmac: string; datum: string }[]
+    expect(zeilen.some((x) => x.id_hmac === kontoHmac(anna.id))).toBe(true)
+    expect(JSON.stringify(zeilen)).not.toContain(anna.id)
+    expect(zeilen.every((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.datum))).toBe(true)
+    // „Zurückgespielt": das Konto ist wieder da (alte Sicherung) – der Nachtlauf löscht es erneut, Ben bleibt
+    d.prepare("INSERT INTO nutzer (id, benutzer, name, rolle, quelle, erstellt) VALUES (?, 'anna.zurueck', 'Anna', 'schueler', 'iserv', 'x')").run(anna.id)
+    const weg: string[] = []
+    expect(loeschungenNachziehen(d, (id) => (weg.push(id), db.kontoEntfernen({ id })))).toBe(1)
+    expect(weg).toEqual([anna.id])
+    expect(db.nutzerNachId(anna.id)).toBeNull()
+    expect(db.nutzerNachId(ben.id)).not.toBeNull()
   })
 })

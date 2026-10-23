@@ -106,7 +106,9 @@ export function Ergebnis({ u, nochmal }: { u: Uebung; nochmal?: () => void }): R
       </Stack>
       {u.teil === 'simulation' && (
         <Text size="sm" data-sprech-punkte>
-          Zusammen {u.punkte} von 30 Punkten – das entspräche etwa der Note {noteSekI(u.punkte)}. <b>Nur eine Schätzung</b>, keine Bewertung.
+          {/* Einheitlich mit der Marke „keine Note" (23.10.2026, Nachprüfung des Schulträgers): unverbindliche Schätzung */}
+          Zusammen {u.punkte} von 30 Punkten. <b>Unverbindliche Schätzung, keine Note:</b> In einer echten Prüfung läge das etwa bei {noteSekI(u.punkte)}.
+          Deine Note gibt nur deine Lehrkraft.
         </Text>
       )}
       {u.ausspracheUnsicher && (
@@ -352,9 +354,12 @@ export function Gespraech({ f, teil, modus, zurueck }: { f: SprechFreigabe; teil
            * die Stimme geht live an OpenAI, Einschätzung und Tipps werden gespeichert (src/server/sprechen.ts).
            */}
           <Text size="xs" c="dimmed" data-sprech-datenschutz>
+            {/* Nachgeschärft (23.10.2026, Nachprüfung des Schulträgers): Moderation, Auswertung, Vorfall-Satz, Krise */}
             Dein Gesprächspartner ist eine KI, kein Mensch. Was du sagst, geht während des Gesprächs live an den KI-Dienst OpenAI in den USA,
-            damit die KI antworten kann. Unser Server speichert keine Aufnahme. Der Text eures Gesprächs wird nur für die Einschätzung benutzt
-            und danach gelöscht – gespeichert werden nur deine Punkte und Tipps. Sag keine Namen, Adressen oder Geheimnisse.
+            damit die KI antworten kann. Der Text wird dabei von OpenAI automatisch auf unangemessene Inhalte geprüft. Nach dem Gespräch
+            wertet eine KI den Text aus; danach wird er gelöscht – gespeichert werden deine Punkte und Tipps. Sagst du etwas Unangemessenes,
+            wird genau dieser eine Satz 14 Tage für deine Lehrkraft aufbewahrt. Klingt etwas so, als ginge es dir nicht gut, siehst du
+            Hilfsangebote und deine Lehrkraft bekommt einen vertraulichen Hinweis (ohne deine Worte). Sag keine Namen, Adressen oder Geheimnisse.
           </Text>
           <Button size="lg" radius="xl" leftSection={<IconMicrophone size={22} />} onClick={() => void los()} w="fit-content" data-sprech-start>
             Gespräch starten

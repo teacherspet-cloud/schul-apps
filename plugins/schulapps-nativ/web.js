@@ -66,4 +66,9 @@ export class DateienWeb extends WebPlugin {
     setTimeout(() => URL.revokeObjectURL(url), 10000)
     return { gespeichert: true }
   }
+
+  /** Im Browser gibt es keine iCloud-Sicherung */
+  async vonSicherungAusnehmen() {
+    return { ausgenommen: [] }
+  }
 }

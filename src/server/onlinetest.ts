@@ -29,6 +29,7 @@
  * der Seite): Statt der Kopfzeile schützt dort das Geheimnis der Teilnahme (nur dieses Gerät kennt es).
  */
 import { randomBytes } from 'node:crypto'
+import { tagesBeginn } from './ohneUhrzeit'
 import { codeErgebnis } from './codeBremse'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
 import {
@@ -582,7 +583,8 @@ interface TeilnahmeZeile {
  * Aufsicht im Onlinetest (06.10.2026, abgestimmt mit der Lehrkraft): Verlassen der Seite gibt NICHT mehr ab
  * (ausgeschaltetes iPad galt sonst als Abgabe), sondern wird wie alles andere protokolliert – mit Uhrzeit und Dauer.
  */
-export const VORFALL_ARTEN = ['verlassen', 'fokus', 'geteilt', 'vollbild', 'uebersetzt', 'kopieren', 'einfuegen', 'markieren'] as const
+// „markieren" entfernt (23.10.2026, Nachprüfung des Schulträgers): die Seite meldet es nie (aufsicht.ts sperrt das Markieren nur)
+export const VORFALL_ARTEN = ['verlassen', 'fokus', 'geteilt', 'vollbild', 'uebersetzt', 'kopieren', 'einfuegen'] as const
 export type VorfallArt = (typeof VORFALL_ARTEN)[number]
 export interface Vorfall {
   art: VorfallArt
@@ -592,6 +594,8 @@ export interface Vorfall {
   dauer?: number
   /** Kurzer Zusatz (z. B. erkannte Sprache), höchstens 60 Zeichen */
   info?: string
+  /** Verdichtet (23.10.2026, `aufsichtVerdichten`): so viele Vorfälle dieser Art, ohne Uhrzeit (`zeit` = 0) */
+  anzahl?: number
 }
 const MAX_VORFAELLE = 300
 
@@ -612,6 +616,51 @@ function vorfallAus(roh: unknown, jetzt: number): Vorfall | null {
 
 function vorfaelleVon(t: TeilnahmeZeile): Vorfall[] {
   return json_(t.vorfaelle ?? '[]', [] as Vorfall[])
+}
+
+/*
+ * Aufbewahrung der Aufsichtsvermerke (23.10.2026, Nachprüfung des Schulträgers): 30 Tage nach dem Ende des Tests
+ * (bzw. nach der Abgabe, wenn die Ergebnisse eines weiterlaufenden Tests – Reihe, eigenes Tempo – schon frei sind)
+ * bleiben nur Zahlen je Art (samt Gesamtdauer), keine Uhrzeiten und Zusätze mehr. Nachtlauf: loeschkonzept.ts.
+ */
+export const AUFSICHT_TAGE = 30
+
+/** Vorfälle einer Teilnahme zu einer Zeile je Art verdichten (schon Verdichtetes zählt mit) */
+export function vorfaelleVerdichten(liste: Vorfall[]): Vorfall[] {
+  const je = new Map<VorfallArt, { anzahl: number; dauer: number }>()
+  for (const v of liste) {
+    const e = je.get(v.art) ?? { anzahl: 0, dauer: 0 }
+    e.anzahl += v.anzahl ?? 1
+    e.dauer += v.dauer ?? 0
+    je.set(v.art, e)
+  }
+  return [...je].map(([art, e]) => ({ art, zeit: 0, anzahl: e.anzahl, ...(e.dauer ? { dauer: e.dauer } : {}) }))
+}
+
+/** Nachtlauf: Aufsichtsvermerke älter als die Frist verdichten; Rückgabe = Zahl der verdichteten Teilnahmen */
+export function aufsichtVerdichten(jetzt = Date.now()): number {
+  const grenzeMs = jetzt - AUFSICHT_TAGE * 24 * 3600 * 1000
+  const tests = db().prepare('SELECT id, status, beendet, einstellungen FROM onlinetests').all() as {
+    id: string
+    status: string
+    beendet: string | null
+    einstellungen: string
+  }[]
+  const schreib = db().prepare('UPDATE teilnahmen SET vorfaelle = ? WHERE id = ?')
+  let n = 0
+  for (const t of tests) {
+    const beendet = t.status === 'beendet' && (Date.parse(t.beendet ?? '') || 0) > 0 && Date.parse(t.beendet!) < grenzeMs
+    const frei = Boolean(json_(t.einstellungen, {} as Einstellungen).ergebnisFrei)
+    if (!beendet && !frei) continue
+    for (const z of teilnahmenVon(t.id, true)) {
+      if (!beendet && !(z.abgabe && z.abgabe < grenzeMs)) continue
+      const liste = vorfaelleVon(z)
+      if (!liste.some((v) => !v.anzahl || v.zeit || v.info)) continue
+      schreib.run(JSON.stringify(vorfaelleVerdichten(liste)), z.id)
+      n++
+    }
+  }
+  return n
 }
 
 const NACHFRIST_MS = 30_000
@@ -704,9 +753,14 @@ function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo
     schluessel: schluesselVon(n),
     gast: n?.quelle === 'gast',
     variante: test.fassungen[t.variante]?.label ?? '',
-    beginn: t.beginn,
-    ende: t.ende,
-    abgabe: t.abgabe,
+    /*
+     * Keine Bearbeitungsdauer je Person (23.10.2026, Nachprüfung des Schulträgers, LfD-Eckpunkte): Beginn, Ende und
+     * Abgabe nur auf den Tag genau (0 = wartet, null = nicht abgegeben bleiben erhalten). Start und Ende des Tests als
+     * Ganzes (beaufsichtigte Prüfung) stehen weiter in den Einstellungen; die Aufsichtsvermerke behalten ihre Uhrzeit.
+     */
+    beginn: tagesBeginn(t.beginn),
+    ende: tagesBeginn(t.ende),
+    abgabe: t.abgabe ? tagesBeginn(t.abgabe) : null,
     grund: t.grund,
     verlassen: Boolean(t.verlassen),
     vorfaelle: vorfaelleVon(t),

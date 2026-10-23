@@ -46,6 +46,10 @@ export class OpenAiProvider implements AiProvider {
       instructions: req.system,
       input: [{ role: 'user' as const, content }],
       max_output_tokens: OPENAI_MAX_AUSGABE,
+      // Nicht beim Anbieter ablegen (23.10.2026, Nachprüfung des Schulträgers): Die Responses-Schnittstelle speichert
+      // sonst jede Antwort mindestens 30 Tage zum späteren Abruf (Standard `store: true`). Missbrauchsprotokolle bei
+      // OpenAI (bis 30 Tage) bleiben davon unberührt – siehe Datenschutzerklärung.
+      store: false,
       // Bewertung: gleiche Antwort → gleiches Urteil, soweit das Modell es zulässt (22.10.2026)
       ...(req.bewertung && openaiTemperatur(model) ? { temperature: 0 } : {}),
       text: {

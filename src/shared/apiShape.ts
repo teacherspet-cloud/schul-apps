@@ -242,6 +242,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
     wartung: {
       bestand: () => call<{ ordner: string; eintraege: number }[]>('wartung:bestand'),
       sicherung: () => call<{ name: string; daten: Uint8Array }>('wartung:sicherung'),
+      /** Unverschlüsselte Sicherung – nur auf ausdrücklichen Wunsch mit Warnung (23.10.2026) */
+      sicherungKlartext: () => call<{ name: string; daten: Uint8Array }>('wartung:sicherungKlartext'),
+      /** Stand der Verschlüsselung ruhender Daten (PC: storage/ruhend.ts; iPad: mobil/vfs/ruhendIos.ts) */
+      verschluesselung: () => call<{ zustand: 'aus' | 'an' | 'gesperrt'; grund?: string }>('wartung:verschluesselung'),
       zuruecksetzen: () => call<{ geloescht: string[] }>('wartung:zuruecksetzen'),
       pruefen: (daten: Uint8Array) => call<{ erstellt: string; ordner: { ordner: string; eintraege: number }[]; dateien: string[] }>('wartung:pruefen', daten),
       wiederherstellen: (daten: Uint8Array) => call<{ wiederhergestellt: string[] }>('wartung:wiederherstellen', daten),

@@ -19,16 +19,18 @@
  *   POST /server/loeschkonzept/aufschieben  {id}      Admin oder Lehrkraft der Person
  *   POST /server/loeschkonzept/lehrkraft-loeschen {id, bestaetigt: true}   Admin, nur abgegangene Lehrkräfte
  *   POST /server/loeschkonzept/jetzt                  Admin: Lauf sofort
+ *   POST /server/loeschkonzept/nachziehen             Admin: Löschungen nach einer Wiederherstellung nachziehen (23.10.2026)
  */
 import type { DatabaseSync } from 'node:sqlite'
 import { alleNutzer, datenbank, iservKennungen, kontoEntfernen, nutzerNachId, protokolliereServer, serverWert, setzeServerWert, type NutzerInfo } from './datenbank'
 import { ADMIN_BENUTZER, iservBereit } from './anmeldung'
 import { iservKontenLaden, type IservKonto } from './iservAbgleich'
 import { alleVerknuepfungen } from './kontoVerknuepfung'
-import { alleLerngruppen, klasseVon, lerngruppenVon, mitgliederVon } from './onlinetest'
+import { alleLerngruppen, aufsichtVerdichten, klasseVon, lerngruppenVon, mitgliederVon } from './onlinetest'
+import { loeschungenNachziehen } from './personDaten'
 import { json, type Anfrage } from './http'
 import { DATEN } from './pfade'
-import { pruefungenAbarbeiten, sicherungAussen } from './sicherungen'
+import { alteEinzelsicherungenLoeschen, pruefungenAbarbeiten, sicherungAussen } from './sicherungen'
 import { registerVergessen } from './namensschutz'
 import {
   abgangEntscheiden,
@@ -187,6 +189,29 @@ export function iservListeEintragen(konten: IservKonto[], jetzt: number): number
   return n
 }
 
+/** Ein Haken des Nachtlaufs: Fehler stoppen den übrigen Lauf nicht (beim nächsten Mal wieder) */
+function nachtHaken(f: () => number): number {
+  try {
+    return f()
+  } catch {
+    return 0
+  }
+}
+
+/** Löschungen nachziehen (nach einer Wiederherstellung): Konten mit vermerkter Kennung samt Daten löschen */
+export function loeschungenNachholen(jetzt = Date.now()): number {
+  const n = loeschungenNachziehen(
+    datenbank(),
+    (id) => {
+      const k = nutzerNachId(id)
+      if (k) kontoEntfernen(k)
+    },
+    jetzt
+  )
+  if (n) registerVergessen()
+  return n
+}
+
 let laeuft = false
 
 /** Ein Lauf des Löschkonzepts. `iservListe`: nur für Tests (statt der IDM-API) */
@@ -197,6 +222,12 @@ export async function loeschLauf(anlass: 'nacht' | 'start' | 'hand', jetzt = Dat
     const e = loeschEinstellung()
     const f = fristenLoeschen(jetzt, e)
     const zahlen: Record<string, number> = { vorgemerkt: 0, zurueck: 0, geloescht: 0, gaeste: 0, krisen: f.krisen, vorfaelle: f.vorfaelle, protokoll: f.protokoll }
+    // Haken (23.10.2026, Nachprüfung des Schulträgers): Aufsichtsvermerke der Onlinetests nach 30 Tagen nur noch als
+    // Zahl je Art; Löschungen nach dem Zurückspielen einer Sicherung nachziehen (personDaten.ts › geloeschte_konten)
+    zahlen.aufsicht = nachtHaken(() => aufsichtVerdichten(jetzt))
+    zahlen.nachgezogen = nachtHaken(() => loeschungenNachholen(jetzt))
+    // Einzelsicherungen (sicherung-vor-*.db) und Vor-Update-Kopien (vor-*.db) nach 14 Tagen (sicherungen.ts)
+    zahlen.einzelsicherungen = nachtHaken(() => alteEinzelsicherungenLoeschen(DATEN, jetzt))
     let warnung = ''
     // 2. IServ-Liste
     let iserv: LoeschStand['iserv'] = loeschStand()?.iserv ?? null
@@ -259,7 +290,8 @@ export async function loeschLauf(anlass: 'nacht' | 'start' | 'hand', jetzt = Dat
       protokolliereServer(
         'loeschkonzept',
         `Löschkonzept (${anlass}): ${zahlen.vorgemerkt} vorgemerkt, ${zahlen.zurueck} zurückgenommen, ${zahlen.geloescht} Lernende und ${zahlen.gaeste} Gäste gelöscht, ` +
-          `${zahlen.krisen} Krisenhinweise, ${zahlen.vorfaelle} Vorfälle, ${zahlen.protokoll} Protokollzeilen entfernt${warnung ? ` – ${warnung}` : ''}`
+          `${zahlen.krisen} Krisenhinweise, ${zahlen.vorfaelle} Vorfälle, ${zahlen.protokoll} Protokollzeilen entfernt, ` +
+          `${zahlen.aufsicht} Aufsichtsprotokolle verdichtet, ${zahlen.nachgezogen} Löschungen nachgezogen${warnung ? ` – ${warnung}` : ''}`
       )
     return stand
   } finally {
@@ -391,6 +423,12 @@ export async function loeschkonzeptRoute(k: Anfrage): Promise<boolean> {
   if (was === 'jetzt') {
     const stand = await loeschLauf('hand')
     return (json(res, 200, { stand }), true)
+  }
+  // „Löschungen nachziehen" (23.10.2026): nach dem Zurückspielen einer Sicherung sofort statt erst in der Nacht
+  if (was === 'nachziehen') {
+    const n = loeschungenNachholen()
+    protokolliereServer('loeschkonzept', `Löschungen nachgezogen (${n} Konten)`, ich.id)
+    return (json(res, 200, { ok: true, nachgezogen: n }), true)
   }
   if (was === 'lehrkraft-loeschen') {
     if (k0.bestaetigt !== true) return (json(res, 400, { fehler: 'Das Löschen braucht eine ausdrückliche Bestätigung.' }), true)

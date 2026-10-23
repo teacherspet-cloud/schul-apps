@@ -84,9 +84,13 @@ JS
 # 2. Archiv (unverschlüsselte Zwischenkopie, nur in $ARBEIT unter /root, Rechte 700)
 VORHANDEN=""
 for o in $ORDNER; do if [ -d "$MP/$o" ]; then VORHANDEN="$VORHANDEN $o"; fi; done
+# Laufender Server: eine Datei kann sich beim Packen ändern („file changed as we read it“, Rückgabe 1) – das ist eine
+# Warnung, kein Fehler (23.10.2026; die Datenbank selbst ist die konsistente VACUUM-Kopie). Andere Fehler brechen ab.
+TAR_RC=0
 # shellcheck disable=SC2086
-tar -czf "$ARBEIT/daten.tar.gz" --exclude='nutzer/*/ki' --exclude='system/ki' \
-  -C "$PAKET" schulapps.db inhalt.json -C "$MP" $VORHANDEN
+tar -czf "$ARBEIT/daten.tar.gz" --warning=no-file-changed --exclude='nutzer/*/ki' --exclude='system/ki' \
+  -C "$PAKET" schulapps.db inhalt.json -C "$MP" $VORHANDEN || TAR_RC=$?
+if [ "$TAR_RC" -gt 1 ]; then STAND_MELDUNG="Archiv fehlgeschlagen (tar $TAR_RC)"; exit 1; fi
 DATEIEN=$(tar -tzf "$ARBEIT/daten.tar.gz" | grep -vc '/$' || true)
 
 # 3. Für den PC verschlüsseln
@@ -145,9 +149,19 @@ fi
 # Aufräumen: 14 Tage (verschlüsselte Archive und die früheren .db.gz-Kopien)
 find "$ZIEL" -maxdepth 1 \( -name 'schulapps-*.sicherung.tar' -o -name 'schulapps-*.db.gz' \) -mtime +$BEHALTEN_TAGE -delete
 find "$ZIEL" -maxdepth 1 -name '*.teil' -mtime +1 -delete
-# Vor-Update-Kopien im Datenvolume (vor-<Version>.db) nach 30 Tagen löschen (23.10.2026, Löschkonzept)
-find "$SICH" -maxdepth 1 -name 'vor-*.db' -mtime +30 -delete
+# Vor-Update-Kopien im Datenvolume (vor-<Version>.db) nach 14 Tagen löschen – wie die Archive (23.10.2026, Löschkonzept,
+# Nachprüfung des Schulträgers: vorher 30 Tage)
+find "$SICH" -maxdepth 1 -name 'vor-*.db' -mtime +$BEHALTEN_TAGE -delete
+# Einzelsicherungen des Servers (sicherung-vor-iserv-abgleich-*.db, sicherung-vor-schuljahreswechsel-*.db) ebenso
+find "$MP" -maxdepth 1 -name 'sicherung-vor-*.db' -mtime +$BEHALTEN_TAGE -delete
 
-STAND_OK=true
-[ -n "$STAND_MELDUNG" ] || STAND_MELDUNG="Datenbank und $DATEIEN Dateien gesichert"
+# Ehrlicher Stand (23.10.2026, Nachprüfung des Schulträgers): „ok" nur mit verschlüsselter Kopie für den PC. Ohne Schlüssel
+# des PCs liegt nur die Datenbank-Kopie im Datenvolume – bei Verlust des Servers wäre sie mit weg → ok=false (rot).
+if [ -n "$ARCHIV" ]; then
+  STAND_OK=true
+  [ -n "$STAND_MELDUNG" ] || STAND_MELDUNG="Datenbank und $DATEIEN Dateien gesichert"
+else
+  STAND_OK=false
+  STAND_MELDUNG="${STAND_MELDUNG:-Keine Kopie für den PC erzeugt}. Nur die Datenbank-Kopie im Datenvolume des Servers ($NAME-nacht.db.gz) - keine Sicherung außerhalb des Servers"
+fi
 stand

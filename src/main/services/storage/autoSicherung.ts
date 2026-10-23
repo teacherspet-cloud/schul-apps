@@ -5,19 +5,26 @@
  * übersah, hatte nach einem Plattendefekt oder versehentlichem Zurücksetzen nichts. Jetzt legt
  * die App einmal am Tag (60 s nach dem Start, dann stündlich geprüft) eine Sicherung unter
  * `userData/sicherungen` an und behält die neuesten sieben. Auf Wunsch geht eine Kopie zusätzlich
- * in einen selbst gewählten Ordner (USB-Stick, Netzlaufwerk, Cloud-Ordner).
+ * in einen selbst gewählten Ordner (USB-Stick, Netzlaufwerk).
+ *
+ * NUR VERSCHLÜSSELT (23.10.2026, Nachprüfung des Schulträgers): `wartung.sicherung()` liefert am PC
+ * einen verschlüsselten Umschlag (storage/ruhend.ts, Datenschlüssel per DPAPI) – in `sicherungen/`
+ * und im Kopie-Ordner liegt also nie Klartext. Ein Cloud-Ordner ist damit nur für verschlüsselte
+ * Sicherungen möglich; Klartext gibt es nur über den ausdrücklichen Export (WartungCard).
  *
  * Die Sicherung ist dieselbe wie beim Knopf (`wartung.sicherung()`): ohne API-Schlüssel, mit
  * Lehrwerken, Vokabel-Bibliothek und Maskottchen. `sicherungen/` ist vor dem Zurücksetzen
  * geschützt (wartung.GESCHUETZT).
  */
 import { app } from 'electron'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { getSettings, setSettings } from './settings'
 import { writeAtomic } from './atomar'
 import { sicherung } from './wartung'
 import { protokolliere } from '../protokoll'
+import { istVerschluesselteSicherung, verpackeSicherung } from '@shared/ruhendFormat'
+import { ruhendZustand, verschluesseln } from './ruhend'
 
 const TAG = 24 * 60 * 60 * 1000
 export const STANDARD_BEHALTEN = 7
@@ -96,8 +103,37 @@ export function sichereJetzt(jetzt = new Date()): SicherungsEintrag {
   return { name, groesse: daten.byteLength, erstellt: jetzt.toISOString() }
 }
 
+/**
+ * Alte Klartext-Sicherungen verschlüsseln (23.10.2026, Nachprüfung des Schulträgers): an Ort und
+ * Stelle (atomar, gleicher Name, gleiche Änderungszeit), ohne Klartext-Kopie. Nur mit Datenschlüssel.
+ */
+export function verschluesseleAlteSicherungen(dir = sicherungsOrdner()): number {
+  if (ruhendZustand().zustand !== 'an' || !existsSync(dir)) return 0
+  let n = 0
+  for (const e of listeSicherungen(dir)) {
+    const pfad = join(dir, e.name)
+    const roh = readFileSync(pfad)
+    if (istVerschluesselteSicherung(roh)) continue
+    const zeit = statSync(pfad).mtime
+    writeAtomic(pfad, verpackeSicherung(verschluesseln(roh), zeit.toISOString()))
+    utimesSync(pfad, zeit, zeit)
+    n++
+  }
+  return n
+}
+
 /** Beim Start einrichten: nach 60 s prüfen, dann stündlich */
 export function starteAutoSicherung(): void {
+  // Vorhandene Klartext-Sicherungen (auch im Kopie-Ordner) gleich verschlüsseln
+  for (const dir of [undefined, getSettings().sicherung?.ordner]) {
+    if (dir === '') continue
+    try {
+      const n = verschluesseleAlteSicherungen(dir)
+      if (n) protokolliere('info', 'sicherung', `${n} ältere Sicherungen verschlüsselt`)
+    } catch (e) {
+      protokolliere('warnung', 'sicherung', `Ältere Sicherungen ließen sich nicht verschlüsseln: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
   const pruefe = (): void => {
     try {
       const s = getSettings()

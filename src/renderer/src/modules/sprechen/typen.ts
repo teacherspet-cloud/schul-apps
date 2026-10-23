@@ -29,5 +29,11 @@ export interface SprechFreigabe {
   uebungen: Uebung[]
 }
 
+/**
+ * Übung in der Lehrkraft-Ansicht (23.10.2026, Nachprüfung des Schulträgers): nur Werte, Tipps und
+ * das Datum – keine Uhrzeit, keine Minuten (server/sprechen.ts, fuerLehrkraft)
+ */
+export type LehrUebung = Omit<Uebung, 'zeit' | 'minuten'> & { datum: string }
+
 /** Gewertete Übungen (ohne abgebrochene) */
-export const gewertet = (u: Uebung[]): Uebung[] => u.filter((x) => Object.keys(x.wertung).length > 0)
+export const gewertet = <T extends Pick<Uebung, 'wertung'>>(u: T[]): T[] => u.filter((x) => Object.keys(x.wertung).length > 0)

@@ -39,6 +39,8 @@ export interface SchluesselbundPlugin extends Plugin {
 export interface DateienPlugin extends Plugin {
   /** Dokumentauswahl-Dialog von iOS im Exportmodus; gespeichert false = abgebrochen */
   exportieren(optionen: { name: string; base64: string }): Promise<{ gespeichert: boolean }>
+  /** Ordner unter Library von der iCloud-Sicherung ausnehmen (23.10.2026); liefert die ausgenommenen Pfade */
+  vonSicherungAusnehmen(optionen: { pfade: string[] }): Promise<{ ausgenommen: string[] }>
 }
 
 export interface ScannerPlugin extends Plugin {

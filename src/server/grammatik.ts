@@ -10,6 +10,7 @@
  * keine KI-Anfragen aus – der Aufgabenpool entsteht einmal beim Freigeben.
  */
 import { ohneKlasse } from '../shared/ohneKlasse'
+import { tagesBeginn } from './ohneUhrzeit'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
 import {
@@ -779,6 +780,8 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
   const alle = [...jeRegel.values()].filter((e) => e.ampel !== 'wenig')
   const ohne = ({ fachSumme, geuebt, liste: _l, staende: _s, ...rest }: Sammel): ProfilPunkt => ({
     ...rest,
+    // „Zuletzt geübt" nur auf den Tag genau (23.10.2026, Nachprüfung des Schulträgers: keine Arbeitszeiten für Lehrkräfte)
+    zuletzt: tagesBeginn(rest.zuletzt ?? 0),
     fach: geuebt ? Math.round((fachSumme / geuebt) * 10) / 10 : 0
   })
   return {

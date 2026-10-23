@@ -126,6 +126,7 @@ import type { SuchOptionen } from '@shared/schulsuche'
 import { schulenSuchen, schulLogo, schulQuellen } from './services/storage/schulen'
 import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
+import { ruhendZustand } from './services/storage/ruhend'
 import { raeumeHoertexteAuf, verwaisteHoertexte } from './services/storage/hoertexteAufraeumen'
 import { erstellePaket, leseGeoeffnetesPaketEin, oeffnePaket } from './services/paket/wege'
 import { leseZertifikat, signierePdf } from './services/export/pdfSignatur'
@@ -295,6 +296,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    */
   handle('wartung:bestand', () => bestand())
   handle('wartung:sicherung', () => sicherung())
+  // Klartext nur ausdrücklich, mit Warnung in der Oberfläche (23.10.2026, Nachprüfung des Schulträgers)
+  handle('wartung:sicherungKlartext', () => sicherung({ klartext: true }))
+  handle('wartung:verschluesselung', () => ruhendZustand())
   handle('wartung:zuruecksetzen', () => werkszustand())
   handle('wartung:pruefen', (daten: Uint8Array) => pruefeSicherung(daten))
   handle('wartung:wiederherstellen', (daten: Uint8Array) => wiederherstellen(daten))
