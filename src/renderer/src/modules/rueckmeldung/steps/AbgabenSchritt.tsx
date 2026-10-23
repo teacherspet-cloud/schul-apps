@@ -171,7 +171,7 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
             {weg === 'online' && server ? (
               <Card withBorder>
                 {/* Server (02.10.2026): Lernende reichen selbst ein und bekommen Feedback */}
-                <LernendeKarte r={r} update={(fn) => update(fn)} />
+                <LernendeKarte r={r} docId={docId} update={(fn) => update(fn)} />
               </Card>
             ) : (
               <Stack gap="xs">
@@ -189,6 +189,12 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
                   </Button>
                 </Group>
               </Stack>
+            )}
+            {!r.abgaben.length && r.grundlage.aufgaben.trim() && (
+              <Text size="sm" c="dimmed" data-rm-spaeter-hinweis>
+                Die Rückmeldung ist gespeichert und steht in „Meine Rückmeldungen“. Abgaben lassen sich jederzeit hier oder unter „Bögen & Export“ › „Weitere
+                Abgabe“ ergänzen.
+              </Text>
             )}
             {r.abgaben.length > 0 && (
               <div>
@@ -390,6 +396,12 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
           </Button>
         }
       >
+        {!r.abgaben.length && r.grundlage.aufgaben.trim() && (
+          // Ohne Abgabe weiter (23.10.2026): die Rückmeldung ist gespeichert, Abgaben kommen später
+          <Button variant="default" rightSection={<IconArrowRight size={16} />} onClick={() => setStep(2)} data-rm-ohne-abgaben>
+            Abgaben später
+          </Button>
+        )}
         {fertig ? (
           <Button rightSection={<IconArrowRight size={16} />} onClick={() => setStep(2)} data-rm-zu-boegen>
             Zu den Bögen

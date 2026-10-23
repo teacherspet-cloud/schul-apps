@@ -429,7 +429,13 @@ export default function Boegen(): React.JSX.Element | null {
                 </Button>
               </Group>
             </Group>
-            {!fertige.length && <Text c="dimmed">Noch kein Bogen fertig.</Text>}
+            {!fertige.length && (
+              <Text c="dimmed" data-rm-noch-leer>
+                {r.abgaben.length
+                  ? 'Noch kein Bogen fertig.'
+                  : 'Noch keine Abgabe – oben über „Weitere Abgabe“ hinzufügen oder in Schritt „Abgaben“ hochladen bzw. online einreichen lassen.'}
+              </Text>
+            )}
             {suche.trim() && !sichtbar.length && (
               <Text c="dimmed" size="sm">
                 Kein Name passt zu „{suche.trim()}“.

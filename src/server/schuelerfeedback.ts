@@ -76,6 +76,8 @@ const db = () => {
     if (!spalten.has('code')) d.exec('ALTER TABLE feedback_freigaben ADD COLUMN code TEXT')
     // Etappe 5: verknüpfte Rückmeldung eines freigegebenen Arbeitsblatts (art 'blatt') – erscheint nicht in der Aufgabenliste der Lernenden
     if (!spalten.has('art')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN art TEXT NOT NULL DEFAULT ''")
+    // Zu welcher Rückmeldung der Lehrkraft (23.10.2026): die App zeigt nur die Freigaben der offenen Rückmeldung
+    if (!spalten.has('rueckmeldung_id')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN rueckmeldung_id TEXT NOT NULL DEFAULT ''")
     const sp2 = new Set((d.prepare('PRAGMA table_info(feedback_abgaben)').all() as { name: string }[]).map((x) => x.name))
     if (!sp2.has('extra')) d.exec('ALTER TABLE feedback_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     // Hinweis für die Lehrkraft (22.10.2026, KI-Sicherheitsprüfung): Zeitpunkt der letzten Abgabe mit Anweisungen an die KI
@@ -119,6 +121,8 @@ interface Freigabe {
   code: string | null
   /** '' = Rückmeldungsaufgabe, 'blatt' = gehört zu einem freigegebenen Arbeitsblatt (src/server/arbeitsblaetter.ts) */
   art?: string
+  /** Kennung der Rückmeldung in der App (23.10.2026); '' = ältere Freigabe */
+  rueckmeldung_id?: string
 }
 
 const json_ = <T>(s: string, r: T): T => {
@@ -572,7 +576,19 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
     if (req.method === 'GET' && teile.length === 0) {
-      const liste = db().prepare('SELECT * FROM feedback_freigaben WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Freigabe[]
+      /*
+       * ?rueckmeldung=<Kennung> (23.10.2026, Bericht der Lehrkraft): die Rückmeldungs-App listete ALLE Freigaben – auch
+       * die verknüpften Rückmeldungen freigegebener Arbeitsblätter (art 'blatt') und die anderer Rückmeldungen. Jetzt nur
+       * eigene Rückmeldungsaufgaben dieser Rückmeldung; ältere Freigaben ohne Kennung bleiben sichtbar.
+       */
+      const rmId = url.searchParams.get('rueckmeldung')
+      const liste = (
+        rmId !== null
+          ? db()
+              .prepare("SELECT * FROM feedback_freigaben WHERE lehrkraft_id = ? AND art = '' AND (rueckmeldung_id = ? OR rueckmeldung_id = '') ORDER BY erstellt DESC")
+              .all(ich.id, rmId)
+          : db().prepare('SELECT * FROM feedback_freigaben WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id)
+      ) as unknown as Freigabe[]
       return (
         json(res, 200, {
           freigaben: liste.map((f) => ({
@@ -632,7 +648,7 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const id = randomBytes(8).toString('hex')
       db()
         .prepare(
-          'INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code, rueckmeldung_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .run(
           id,
@@ -645,7 +661,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           'offen',
           new Date().toISOString(),
           JSON.stringify(einzelne),
-          mitGaesten ? neuerCode() : null
+          mitGaesten ? neuerCode() : null,
+          String(k0.rueckmeldungId ?? '').slice(0, 64)
         )
       const neu = freigabe(id)!
       // „Planen …" (09.10.2026): sichtbar erst ab dem Zeitpunkt; das Ende ist `bis` der Freigabe

@@ -7,7 +7,7 @@ import { ThemenBibliothek, type VorschauInhalt } from '../components/ThemenBibli
 import { fachIdVon } from '../fachfarben'
 import { nurPcNetz } from '../plattform'
 import { ReiheMarke } from '../reiheZuordnung'
-import type { ThemenEintrag } from '../themenBibliothek'
+import { bereichFelder, type ThemenEintrag } from '../themenBibliothek'
 import { ladeThemen, themenbereichVon, themenbereichVonHand, useThemen } from '../themenbereiche'
 import { fachSchluessel } from '../../shell/materialien'
 import { obersterBereich } from '@shared/themen'
@@ -116,9 +116,8 @@ export default function ThemenDokumentBibliothek({
         thema: text(m.thema),
         ueberthema: text(m.ueberthema),
         updatedAt: m.updatedAt,
-        themenbereich: text(m.themenbereich),
-        // Bereich aus den Themenbereichen der App: das Dokument selbst, sonst das Material, aus dem es stammt
-        bereichVorgabe: bereich(moduleId, m.id) || (q ? bereich(q.moduleId, q.id) : ''),
+        // Aus einem Material: derselbe Bereich wie das Material (23.10.2026); sonst von Hand, Bereich der App, Lehrplankatalog
+        ...bereichFelder({ hand: text(m.themenbereich), bereich: bereich(moduleId, m.id) }, q ? { bereich: bereich(q.moduleId, q.id) } : null),
         land: text(m.stateId),
         schulform: text(m.schoolTypeId),
         meta: m
@@ -162,6 +161,14 @@ export default function ThemenDokumentBibliothek({
           symbol={symbol}
           oeffnen={auf}
           themenbereichSetzen={async (e, name) => {
+            // Aus einem Material: das Material zieht mit um – beide bleiben im selben Bereich (23.10.2026)
+            const q = quelleBereich?.(e.meta)
+            if (q) {
+              if (text(e.meta.themenbereich)) await themenbereichSpeichern(api, e.id, null, imOffenen)
+              await themenbereichVonHand(q.moduleId, q.id, fachSchluessel(text(e.meta.subjectId) || text(e.meta.subjectLabel)), name)
+              await ladeThemen(true).catch(() => undefined)
+              return bib.neuLaden()
+            }
             await themenbereichSpeichern(api, e.id, name, imOffenen)
             // Auch in den Themenbereichen der App (Startseite, Themenübersicht) – sonst zeigten sie den alten Bereich
             await themenbereichVonHand(moduleId, e.id, fachSchluessel(text(e.meta.subjectId) || text(e.meta.subjectLabel)), name).catch(() => undefined)

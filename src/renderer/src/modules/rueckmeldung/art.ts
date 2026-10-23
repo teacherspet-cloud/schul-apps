@@ -72,6 +72,13 @@ export const formenVon = (m: Pick<RueckmeldungMeta, 'formen'>): FormArt[] => (m.
 export const einstufungVon = (m: Pick<RueckmeldungMeta, 'einstufung'>): EinstufungsArt => m.einstufung ?? 'keine'
 export const ebeneVon = (m: Pick<RueckmeldungMeta, 'ebene'>): EinstufungsEbene => m.ebene ?? 'gesamt'
 export const hatForm = (m: Pick<RueckmeldungMeta, 'formen'>, f: FormArt): boolean => formenVon(m).includes(f)
+/** Form an- oder abschalten (23.10.2026: Bewertungstabelle anlegen schaltet „Bewertungstabelle" mit an); mindestens eine bleibt */
+export function setzeForm(m: Pick<RueckmeldungMeta, 'formen'>, f: FormArt, an: boolean): void {
+  const alt = formenVon(m)
+  const neu = an ? [...alt.filter((x) => x !== f), f] : alt.filter((x) => x !== f)
+  m.formen = FORMEN.map((x) => x.id).filter((id) => neu.includes(id))
+  if (!m.formen.length) m.formen = ['schriftlich']
+}
 export const mitEinstufung = (m: Pick<RueckmeldungMeta, 'einstufung'>): boolean => einstufungVon(m) !== 'keine'
 export const gesamtEinstufen = (m: Pick<RueckmeldungMeta, 'einstufung' | 'ebene'>): boolean => mitEinstufung(m) && ebeneVon(m) !== 'kriterien'
 export const kriterienEinstufen = (m: Pick<RueckmeldungMeta, 'einstufung' | 'ebene'>): boolean => mitEinstufung(m) && ebeneVon(m) !== 'gesamt'

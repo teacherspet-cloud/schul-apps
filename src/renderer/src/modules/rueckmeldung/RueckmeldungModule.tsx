@@ -1,43 +1,19 @@
 import { useEffect } from 'react'
 import type { SavedDokumentMeta } from '@shared/apiShape'
-import { STANDARD_ANREDE } from './render/texte'
-import { useAppSettings } from '../../shared/settingsStore'
 import { ProgrammSymbol } from '../../shared/components/ProgrammSymbol'
 import ThemenDokumentBibliothek from '../../shared/testmodul/ThemenDokumentBibliothek'
 import { RueckmeldungVorschau } from './steps/RueckmeldungVorschau'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { notifyError } from '../../shared/util'
 import { subjectById } from '../arbeitsblatt/model/subjects'
-import { schulformVon } from '@shared/schulformen'
 import { ladeGrundlage } from './generation'
-import { hatInhalt, standardName, type Rueckmeldung } from './model/types'
+import { bereit, standardName, type Rueckmeldung } from './model/types'
 import Boegen from './steps/Boegen'
 import AbgabenSchritt from './steps/AbgabenSchritt'
 import MaterialSchritt from './steps/MaterialSchritt'
 import { bibliothek, projektDatei, useRueckmeldung } from './store'
+import { leereRueckmeldung } from './leer'
 import { aeltereRueckmeldungZu, horcheAufVorgabe, nimmRueckmeldungVorgabe, rueckmeldungIdZu } from './vorgabe'
-
-/** Eine leere Rückmeldung mit den Voreinstellungen der Schule */
-export function leereRueckmeldung(): Rueckmeldung {
-  const { defaults } = useAppSettings.getState().settings
-  return {
-    version: 1,
-    meta: {
-      title: '',
-      subjectId: 'deutsch',
-      subjectLabel: subjectById('deutsch').label,
-      grade: 7,
-      stateId: defaults.stateId,
-      schoolTypeId: defaults.schoolTypeId,
-      schoolTypeName: schulformVon(defaults.stateId, defaults.schoolTypeId)?.name ?? '',
-      anrede: STANDARD_ANREDE,
-      schwerpunkt: ''
-    },
-    grundlage: { art: 'frei', titel: '', aufgaben: '' },
-    abgaben: [],
-    createdAt: new Date().toISOString()
-  }
-}
 
 /** Vorschau der Karte: der Anfang der Aufgabe (lädt erst, wenn die Karte sichtbar ist) */
 const aufgabenVorschau = (id: string) => async () => {
@@ -125,7 +101,8 @@ export default function RueckmeldungModule({ active }: { active: boolean }): Rea
       modulId="rueckmeldung"
       useStore={useRueckmeldung}
       dokument={(s) => s.dok}
-      hatInhalt={hatInhalt}
+      // Bögen & Export auch ohne Abgaben (23.10.2026): vorbereiten, Abgaben später über „Weitere Abgabe“
+      hatInhalt={bereit}
       bibliothek={bibliothek}
       projekt={projektDatei}
       standardName={standardName}

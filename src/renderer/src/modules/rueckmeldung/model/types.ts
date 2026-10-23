@@ -281,6 +281,8 @@ export interface Rueckmeldung {
 }
 
 export const hatInhalt = (r: Rueckmeldung | null): boolean => Boolean(r?.abgaben.some((a) => a.bogen))
+/** Aufgabe steht – „Bögen & Export" ist erreichbar, auch ohne Abgaben (23.10.2026: vorbereiten, Abgaben später) */
+export const bereit = (r: Rueckmeldung | null): boolean => Boolean(r?.grundlage.aufgaben.trim())
 export const lohntSicherung = (r: Rueckmeldung | null): boolean => Boolean(r && (r.abgaben.length || r.grundlage.aufgaben.trim() || r.meta.title.trim()))
 
 export const standardName = (r: Rueckmeldung): string =>

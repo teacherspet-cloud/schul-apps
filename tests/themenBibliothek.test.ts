@@ -5,6 +5,7 @@ import { pruefeLehrplan } from '../src/shared/lehrplan'
 import { katalogFuer } from '../src/renderer/src/shared/themenKatalog'
 import type { KatalogThema } from '../src/renderer/src/shared/themenVorschlag'
 import {
+  bereichFelder,
   gruppiereNachThema,
   klassenSpanne,
   OHNE_FACH,
@@ -143,5 +144,23 @@ describe('Kleinigkeiten', () => {
   it('Auswahl: benutzte Bereiche zuerst, dann die obersten Katalogthemen (passende Klasse vorn), ohne Doppelte', () => {
     const a = themenAuswahl(KLEIN, ['Wiederholung', 'der erste weltkrieg', OHNE_THEMENBEREICH], 6)
     expect(a).toEqual(['Wiederholung', 'der erste weltkrieg', 'Das Römische Reich', 'Die Weimarer Republik'])
+  })
+})
+
+describe('Dokument aus einem Material (23.10.2026)', () => {
+  // Eine Rückmeldung zu einem Arbeitsblatt über den Ersten Weltkrieg – Titel und Thema passten auch zur Weimarer Republik
+  const rm = (felder: ReturnType<typeof bereichFelder>) =>
+    eintrag({ titel: 'Folgen des Krieges für die Weimarer Republik', thema: 'Weimarer Republik', grade: 9, land: 'NI', schulform: 'gymnasium', ...felder })
+
+  it('Der Bereich des Materials gilt – auch gegen eine frühere Handwahl und gegen den Katalog', () => {
+    const z = themenbereichFuer(rm(bereichFelder({ hand: 'Alte Wahl', bereich: '' }, { bereich: 'Der Erste Weltkrieg' })), KLEIN)
+    expect(z).toEqual({ name: 'Der Erste Weltkrieg', herkunft: 'bereich' })
+  })
+  it('Liegt das Material in keinem Bereich, dann auch die Rückmeldung nicht – kein eigener Katalogtreffer', () => {
+    expect(themenbereichFuer(rm(bereichFelder({ hand: '', bereich: '' }, { bereich: '' })), KLEIN).name).toBe(OHNE_THEMENBEREICH)
+  })
+  it('Ohne Material: von Hand, sonst Lehrplankatalog mit Fach, Klasse, Land und Schulform', () => {
+    expect(themenbereichFuer(rm(bereichFelder({ hand: 'Eigene Einheit', bereich: '' }, null)), KLEIN)).toEqual({ name: 'Eigene Einheit', herkunft: 'hand' })
+    expect(themenbereichFuer(rm(bereichFelder({ hand: '', bereich: '' }, null)), KLEIN)).toEqual({ name: 'Die Weimarer Republik', herkunft: 'katalog' })
   })
 })

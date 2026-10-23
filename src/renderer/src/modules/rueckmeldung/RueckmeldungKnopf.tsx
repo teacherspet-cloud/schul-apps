@@ -1,15 +1,18 @@
-import { Button, Tooltip } from '@mantine/core'
-import { IconMessageCheck } from '@tabler/icons-react'
+import { Button, Menu, Tooltip } from '@mantine/core'
+import { IconChevronDown, IconClockPlus, IconMessageCheck } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { notifyError } from '../../shared/util'
+import { notifyError, notifySuccess } from '../../shared/util'
 import type { MaterialEintrag } from './generation'
-import { rueckmeldungIdZu, rueckmeldungZu } from './vorgabe'
+import { rueckmeldungIdZu, rueckmeldungVorbereiten, rueckmeldungZu } from './vorgabe'
 
 /**
  * „Rückmeldung …" in der Leiste der Editoren (Großprogramm 0.4, F3): öffnet das Programm
  * „Rückmeldung" mit diesem Material als Grundlage – die Aufgaben und der Erwartungshorizont
  * gehen mit, Abgaben kommen dort dazu. Gibt es zu diesem Material schon eine Rückmeldung,
  * heißt der Knopf „Rückmeldung öffnen" und öffnet sie (08.10.2026).
+ *
+ * Daneben (23.10.2026, Wunsch der Lehrkraft) „Vorbereiten – Abgaben später": legt die
+ * Rückmeldung nur an und speichert sie, ohne das Programm zu wechseln.
  */
 export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag['art']; docId: string }): React.JSX.Element {
   const [vorhanden, setVorhanden] = useState(false)
@@ -23,9 +26,9 @@ export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag
       aktuell = false
     }
   }, [art, docId])
-  return (
+  const knopf = (
     <Tooltip
-      label={vorhanden ? 'Die Rückmeldung zu diesem Material öffnen' : 'Rückmeldung ohne Note zu Schülerarbeiten – mit diesem Material als Grundlage'}
+      label={vorhanden ? 'Die Rückmeldung zu diesem Material öffnen' : 'Rückmeldung zu Schülerarbeiten – mit diesem Material als Grundlage'}
       multiline
       w={260}
     >
@@ -43,5 +46,34 @@ export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag
         {vorhanden ? 'Rückmeldung öffnen' : 'Rückmeldung …'}
       </Button>
     </Tooltip>
+  )
+  if (vorhanden) return knopf
+  return (
+    <Button.Group>
+      {knopf}
+      <Menu position="bottom-end" withinPortal>
+        <Menu.Target>
+          <Button size="xs" variant="default" px={6} aria-label="Weitere Wege zur Rückmeldung" data-rueckmeldung-mehr>
+            <IconChevronDown size={14} />
+          </Button>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Item
+            leftSection={<IconClockPlus size={16} />}
+            onClick={() =>
+              rueckmeldungVorbereiten(art, docId)
+                .then(() => {
+                  setVorhanden(true)
+                  notifySuccess('Rückmeldung vorbereitet – sie steht in „Meine Rückmeldungen“. Abgaben kommen später dazu.')
+                })
+                .catch(notifyError)
+            }
+            data-rueckmeldung-vorbereiten
+          >
+            Vorbereiten – Abgaben später
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+    </Button.Group>
   )
 }

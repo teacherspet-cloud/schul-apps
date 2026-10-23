@@ -1,10 +1,11 @@
 import { erzeugeBibliothek } from '../../shared/testmodul/bibliothek'
 import { erzeugeDokumentStore } from '../../shared/testmodul/dokumentStore'
 import { erzeugeProjektDatei } from '../../shared/testmodul/projekt'
-import { hatInhalt, lohntSicherung, standardName, type Rueckmeldung } from './model/types'
+import { bereit, hatInhalt, lohntSicherung, standardName, type Rueckmeldung } from './model/types'
 
 /** Store, Bibliothek und Projektdatei des Programms „Rückmeldung" (Großprogramm 0.4, F3) */
-export const useRueckmeldung = erzeugeDokumentStore<Rueckmeldung>({ startSchritt: (r) => (hatInhalt(r) ? 2 : 0) })
+// Mit Bögen zu den Bögen; vorbereitet (Aufgabe, noch ohne Bogen) zu den Abgaben (23.10.2026); sonst zum Material
+export const useRueckmeldung = erzeugeDokumentStore<Rueckmeldung>({ startSchritt: (r) => (hatInhalt(r) ? 2 : bereit(r) ? 1 : 0) })
 
 export const rueckmeldungStats = (r: Rueckmeldung): Record<string, unknown> => ({
   subjectLabel: r.meta.subjectLabel,

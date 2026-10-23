@@ -34,7 +34,7 @@ import { gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import BilingualSchalter from '../../arbeitsblatt/steps/BilingualSchalter'
 import { hatForm } from '../art'
-import { aufgabeAusDateien, erwartungAusDateien, teileErkennen } from '../auftrag'
+import { aufgabeAusDateien, teileErkennen } from '../auftrag'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import type { Rueckmeldung } from '../model/types'
 import { ANREDE_OPTIONEN, STANDARD_ANREDE, type Anrede } from '../render/texte'
@@ -42,7 +42,7 @@ import { useRueckmeldung } from '../store'
 import { fremdsprachlich } from '../teilbewertung'
 import AntwortSpracheZeile from './AntwortSpracheZeile'
 import ArtKarte from './ArtKarte'
-import TabelleKarte from './TabelleKarte'
+import BewertungKarte from './BewertungKarte'
 import TeileKarte from './TeileKarte'
 import './einrichten.css'
 
@@ -143,7 +143,8 @@ function MaterialSchrittInhalt(): React.JSX.Element | null {
             {!zeigeAuswahl && (
               <>
                 <ArtKarte />
-                {hatForm(r.meta, 'tabelle') && <TabelleKarte />}
+                {/* Musterlösung und Bewertungstabelle – immer sichtbar, auch im Standardmodus (23.10.2026) */}
+                <BewertungKarte r={r} update={update} docId={docId} />
                 <Feinheiten r={r} update={update} docId={docId} />
               </>
             )}
@@ -412,15 +413,13 @@ function GrundlageKarte({
   )
 }
 
-/** Seltenes, eingeklappt: Erwartung, Schwerpunkt, Schulort, Anrede, Bilingual, Antwortsprache, Teile */
+/** Seltenes, eingeklappt: Schwerpunkt, Schulort, Anrede, Bilingual, Antwortsprache, Teile (Erwartung: BewertungKarte) */
 function Feinheiten({ r, update, docId }: { r: Rueckmeldung; update: Update; docId: string }): React.JSX.Element {
   const [offen, setOffen] = useState(useExperte())
-  const [leseErwartung, setLeseErwartung] = useState<string | null>(null)
   const { defaults } = useAppSettings((s) => s.settings)
   const fs = fremdsprachlich(r.meta.subjectId)
   // Was vom Standard abweicht – steht im Kopf, auch zugeklappt
   const geaendert = [
-    r.grundlage.erwartung?.trim() && 'Erwartungshorizont',
     r.meta.schwerpunkt?.trim() && 'Schwerpunkt',
     (r.meta.stateId !== defaults.stateId || r.meta.schoolTypeId !== defaults.schoolTypeId) && 'Schulform',
     r.meta.anrede !== STANDARD_ANREDE && 'Anrede',
@@ -429,25 +428,6 @@ function Feinheiten({ r, update, docId }: { r: Rueckmeldung; update: Update; doc
     r.grundlage.teile?.length && `${r.grundlage.teile.length} Teile`
   ].filter((x): x is string => Boolean(x))
 
-  const erwartungLesen = async (files: File[]): Promise<void> => {
-    try {
-      const gelesen: HochladeInhalt[] = []
-      for (const f of files) {
-        setLeseErwartung(`${f.name} wird gelesen …`)
-        const c = await extractContent(f, (m) => setLeseErwartung(`${f.name}: ${m}`), { renderPages: false, maxRenderedPages: 6 })
-        gelesen.push({ fileName: c.fileName, text: c.kind === 'image' ? '' : c.text, kind: c.kind, pageImages: c.pageImages })
-      }
-      setLeseErwartung(null)
-      const geprueft = await pruefeHochladen(gelesen)
-      const aktuell = useRueckmeldung.getState().dok
-      if (geprueft && aktuell) erwartungAusDateien(aktuell, docId, geprueft)
-    } catch (e) {
-      notifyError(e, 'Die Datei konnte nicht gelesen werden')
-    } finally {
-      setLeseErwartung(null)
-    }
-  }
-
   return (
     <Card withBorder padding={0} data-rm-feinheiten>
       <UnstyledButton onClick={() => setOffen((o) => !o)} aria-expanded={offen} px="md" py="sm" w="100%" className="rm-aufklapper">
@@ -455,7 +435,7 @@ function Feinheiten({ r, update, docId }: { r: Rueckmeldung; update: Update; doc
           {offen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
           <Text fw={600}>Feinheiten (optional)</Text>
           <Text size="sm" c="dimmed" truncate>
-            {geaendert.length ? `angepasst: ${geaendert.join(', ')}` : 'Erwartungshorizont, Schwerpunkt, Schulform, Anrede …'}
+            {geaendert.length ? `angepasst: ${geaendert.join(', ')}` : 'Schwerpunkt, Schulform, Anrede, Bilingual …'}
           </Text>
           {geaendert.length > 0 && (
             <Badge size="sm" variant="light" ml="auto">
@@ -466,28 +446,6 @@ function Feinheiten({ r, update, docId }: { r: Rueckmeldung; update: Update; doc
       </UnstyledButton>
       <Collapse expanded={offen}>
         <Stack gap="sm" px="md" pb="md">
-          {r.grundlage.art === 'frei' && (
-            <DropZone
-              onFiles={(f) => void erwartungLesen(f)}
-              sammeln
-              accept={MATERIAL_ACCEPT}
-              title={leseErwartung ?? 'Lösung oder Erwartungshorizont hierher ziehen'}
-              hint="Wird übertragen und ersetzt den Text darunter"
-              loading={Boolean(leseErwartung)}
-              minHeight={50}
-            />
-          )}
-          <Textarea
-            label="Erwartungshorizont"
-            autosize
-            minRows={2}
-            maxRows={8}
-            value={r.grundlage.erwartung ?? ''}
-            onChange={(e) => {
-              const x = e.currentTarget.value
-              update((d) => (d.grundlage.erwartung = x), 'rm-erwartung')
-            }}
-          />
           <Textarea
             label="Schwerpunkt der Rückmeldung"
             placeholder="z. B. Aufbau der Argumentation, Zeitformen, Belege aus dem Text"

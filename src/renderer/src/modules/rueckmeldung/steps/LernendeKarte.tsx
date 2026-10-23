@@ -39,7 +39,16 @@ interface FreigabeListe {
   kiHinweise?: number
 }
 
-export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: (fn: (d: Rueckmeldung) => void) => void }): React.JSX.Element | null {
+export default function LernendeKarte({
+  r,
+  docId,
+  update
+}: {
+  r: Rueckmeldung
+  /** Kennung dieser Rückmeldung – die Liste zeigt nur ihre Freigaben (23.10.2026) */
+  docId: string
+  update: (fn: (d: Rueckmeldung) => void) => void
+}): React.JSX.Element | null {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [liste, setListe] = useState<FreigabeListe[]>([])
   // „Planen …" und Ende (09.10.2026)
@@ -59,11 +68,11 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
     )
   }, [gruppe])
   const laden = useCallback(() => {
-    void holen<{ freigaben: FreigabeListe[] }>('/server/feedback').then(
+    void holen<{ freigaben: FreigabeListe[] }>(`/server/feedback?rueckmeldung=${encodeURIComponent(docId)}`).then(
       (d) => setListe(d.freigaben),
       () => setListe([])
     )
-  }, [])
+  }, [docId])
   useEffect(() => {
     if (!aufServer()) return
     void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
@@ -79,6 +88,7 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
       const titel = r.meta.title || r.grundlage.titel
       const neu = await senden<{ id: string; code?: string; link?: string }>('/server/feedback/freigeben', {
         rueckmeldung: r,
+        rueckmeldungId: docId,
         lerngruppeId: gruppe ?? '',
         schueler: einzelne,
         gaeste,

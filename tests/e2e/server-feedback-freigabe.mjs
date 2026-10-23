@@ -77,6 +77,13 @@ try {
   pruefe(mitglieder.mitglieder?.length === 2, `Mitglieder zur Auswahl: ${mitglieder.mitglieder?.map((m) => m.name).join(', ')}`)
   const fr = await (await lk.request.post(`${A}/server/feedback/freigeben`, { headers: KOPF, data: { rueckmeldung: R, lerngruppeId: gruppe.id, schueler: [mia.benutzer], gaeste: true, runden: 2, titel: 'Mein Hobby' } })).json()
   pruefe(Boolean(fr.code && fr.link?.includes('/s/f/')), `Freigabe mit Gast-Code ${fr.code}`)
+  // Je Rückmeldung nur ihre Freigaben (23.10.2026): mit Kennung gespeichert, in einer anderen Rückmeldung nicht zu sehen
+  const fr2 = await (await lk.request.post(`${A}/server/feedback/freigeben`, { headers: KOPF, data: { rueckmeldung: R, rueckmeldungId: 'rm-a', lerngruppeId: gruppe.id, runden: 1, titel: 'Nur in A' } })).json()
+  const inA = (await (await lk.request.get(`${A}/server/feedback?rueckmeldung=rm-a`, { headers: KOPF })).json()).freigaben.map((f) => f.id)
+  const inB = (await (await lk.request.get(`${A}/server/feedback?rueckmeldung=rm-b`, { headers: KOPF })).json()).freigaben.map((f) => f.id)
+  pruefe(inA.includes(fr2.id) && !inB.includes(fr2.id), 'Freigabe steht nur bei ihrer Rückmeldung')
+  pruefe(inA.includes(fr.id) && inB.includes(fr.id), 'Ältere Freigabe ohne Kennung bleibt überall sichtbar')
+  await lk.request.post(`${A}/server/feedback/${fr2.id}/status`, { headers: KOPF, data: { status: 'beendet' } })
 
   const sm = await browser.newContext()
   await schuelerAnmelden(sm, mia)

@@ -56,6 +56,19 @@ const gleich = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de
 const oberstes = (k: KatalogThema): string => k.pfad?.[0] ?? k.name
 const erster = (s: string): string => s.split('›')[0].trim()
 
+/**
+ * Bereichsfelder eines Dokuments (23.10.2026, Wunsch der Lehrkraft): Stammt es aus einem Material (Rückmeldung zu einem
+ * Arbeitsblatt …), ist sein Themenbereich DERSELBE wie der des Materials – kein eigener von Hand, keine eigene
+ * Katalogsuche; liegt das Material in keinem Bereich, dann auch das Dokument nicht. Sonst: von Hand, dann der Bereich der App.
+ */
+export function bereichFelder(
+  eigen: { hand: string; bereich: string },
+  material: { bereich: string } | null
+): Pick<ThemenEintrag, 'themenbereich' | 'bereichVorgabe'> {
+  if (material) return { themenbereich: '', bereichVorgabe: material.bereich || OHNE_THEMENBEREICH }
+  return { themenbereich: eigen.hand, bereichVorgabe: eigen.bereich }
+}
+
 /** Themenbereich eines Eintrags nach den sechs Stufen oben */
 export function themenbereichFuer(e: ThemenEintrag, katalog: KatalogThema[]): Zuordnung {
   if (e.themenbereich?.trim()) return { name: e.themenbereich.trim(), herkunft: 'hand' }

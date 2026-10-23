@@ -241,6 +241,9 @@ try {
     fb.some((f) => f.art === 'blatt' && f.abgaben === 1),
     'Verknüpfte Rückmeldung mit 1 Abgabe (Rückmeldungs-App)'
   )
+  // 23.10.2026 (Bericht der Lehrkraft): Die Rückmeldungs-App selbst listet die Rückmeldungen der Blätter NICHT
+  const fbApp = (await (await lk.request.get(`${A}/server/feedback?rueckmeldung=irgendeine`, { headers: KOPF })).json()).freigaben
+  pruefe(!fbApp.some((f) => f.art === 'blatt'), 'Rückmeldungs-App: keine Rückmeldungen freigegebener Arbeitsblätter in der Liste')
   const miaAufgaben = (await (await sm.request.get(`${A}/s/api/aufgaben`, { headers: KOPF })).json()).aufgaben ?? []
   pruefe(miaAufgaben.length === 0, 'Die verknüpfte Rückmeldung erscheint nicht doppelt bei den Aufgaben der Lernenden')
   await lk.request.post(`${A}/server/blaetter/${fr.id}/loeschen`, { headers: KOPF, data: {} })

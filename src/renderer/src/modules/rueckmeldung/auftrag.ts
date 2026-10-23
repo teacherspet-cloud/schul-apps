@@ -21,6 +21,7 @@ import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUeberne
 import type { Abgabe, Bewertungstabelle, Rueckmeldung } from './model/types'
 import type { RueckmeldungsStand } from './steps/RueckmeldungVorschau'
 import { bibliothek } from './store'
+import { setzeForm } from './art'
 import { useAppSettings } from '../../shared/settingsStore'
 import { spracheNach } from '../../shared/familiensprachen'
 import { obj, str } from '../../shared/aiSchema'
@@ -267,7 +268,35 @@ export function tabelleErzeugen(r: Rueckmeldung, docId: string, dateien: Gelesen
       return tabelleAus(await k.ai<unknown>(dateien ? tabelleAusDateiAnfrage(dateien) : tabelleEntwurfAnfrage(rm)), dateien ? 'datei' : 'ki')
     },
     abschluss: (t) => `Bewertungstabelle mit ${t.kriterien.length} Kriterien${t.entwurf ? ' – Entwurf der KI, bitte prüfen' : ''}.`,
-    ablegen: (tabelle, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, tabelle }))
+    // Mit Tabelle gehört die Form „Bewertungstabelle" dazu (23.10.2026)
+    ablegen: (tabelle, rm) =>
+      bibliothek.legeAb(docId, rm, (aktuell) => {
+        const meta = { ...aktuell.meta }
+        setzeForm(meta, 'tabelle', true)
+        return { ...aktuell, meta, tabelle }
+      })
+  })
+}
+
+/** Musterlösung / Erwartungshorizont von der KI entwerfen (23.10.2026, Karte „Bewertungsgrundlage") – gekennzeichnet als Entwurf */
+export function erwartungEntwerfen(r: Rueckmeldung, docId: string): void {
+  void starteAuftrag({
+    moduleId: 'rueckmeldung',
+    docId,
+    titel: r.meta.title || r.grundlage.titel || 'Rückmeldung',
+    art: 'Erwartungshorizont entwerfen',
+    eingabe: r,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `rueckmeldung-erwartung-${docId}`,
+    fehlerTitel: 'Der Erwartungshorizont konnte nicht entworfen werden',
+    arbeit: async (rm, k) => {
+      k.melde('Die KI entwirft einen Erwartungshorizont …')
+      return erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(rm.grundlage.aufgaben, rm.meta.subjectLabel, rm.meta.grade)))
+    },
+    abschluss: () => 'Erwartungshorizont entworfen – bitte prüfen.',
+    ablegen: (erwartung, rm) =>
+      bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, grundlage: { ...aktuell.grundlage, erwartung: `${ENTWURF_VERMERK}\n${erwartung}` } }))
   })
 }
 

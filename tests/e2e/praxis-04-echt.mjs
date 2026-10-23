@@ -321,7 +321,7 @@ try {
         ].join('\n')
       )
     })
-    const hochladen = page.getByRole('button', { name: 'Hochladen', exact: true })
+    const hochladen = page.locator('.mantine-Modal-content').getByRole('button', { name: 'Hochladen', exact: true })
     await hochladen.waitFor({ timeout: 10000 }).catch(() => undefined)
     if (await hochladen.count()) await hochladen.click()
     const rm = await warte(() => {

@@ -408,7 +408,24 @@ try {
   await page.waitForTimeout(800)
   await sichtbar(page.locator('[data-rm-eigene]')).click()
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief.')
+  // Bewertungsgrundlage (23.10.2026): Musterlösung von der KI, auch im Standardmodus sichtbar
+  await sichtbar(page.locator('[data-rm-loesung-ki]')).click()
+  const ende12 = Date.now() + 15000
+  let erw = ''
+  while (Date.now() < ende12 && !erw) {
+    erw = await page.evaluate(() => window.__selftest.rmJetzt()?.grundlage?.erwartung ?? '')
+    if (!erw) await page.waitForTimeout(300)
+  }
+  pruefe(erw.startsWith('[Entwurf der KI – bitte prüfen]'), 'Bewertungsgrundlage: die KI entwirft die Musterlösung, gekennzeichnet')
+  await sichtbar(page.locator('[data-rm-loesung-stand]')).waitFor({ timeout: 5000 })
+  pruefe((await sichtbar(page.locator('[data-rm-loesung-stand]')).textContent())?.includes('Entwurf'), 'Der Stand zeigt „Entwurf der KI – bitte prüfen“')
+  await page.locator('[data-rm-bewertung]').filter({ visible: true }).first().screenshot({ path: join(out, 'bewertungsgrundlage.png') })
   await weiter()
+  // Ohne Abgabe weiter (23.10.2026): „Bögen & Export“ ist auch leer erreichbar
+  await sichtbar(page.locator('[data-rm-ohne-abgaben]')).click()
+  await sichtbar(page.locator('[data-rm-noch-leer]')).waitFor({ timeout: 10000 })
+  pruefe((await page.locator('[data-rm-noch-leer]').filter({ visible: true }).count()) === 1, '„Abgaben später“ führt zu „Bögen & Export“ – mit Hinweis auf „Weitere Abgabe“')
+  await sichtbar(page.locator('.mantine-Stepper-step', { hasText: 'Abgaben' })).click()
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('lea schmidt')
   await page.locator('[data-rm-ausgleich-uebernehmen]').filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => undefined)
@@ -483,7 +500,7 @@ try {
     buffer: Buffer.from('Deutsch 9a – Klassenarbeit\n1. Erörtere, ob an eurer Schule eine Schuluniform eingeführt werden sollte.')
   })
   // Datenschutzhinweis vor dem Hochladen bestätigen
-  const hochladen = page.getByRole('button', { name: 'Hochladen', exact: true })
+  const hochladen = page.locator('.mantine-Modal-content').getByRole('button', { name: 'Hochladen', exact: true })
   await hochladen.waitFor({ timeout: 10000 }).catch(() => undefined)
   if (await hochladen.count()) await hochladen.click()
   const ende3 = Date.now() + 20000
@@ -640,7 +657,7 @@ try {
     mimeType: 'text/plain',
     buffer: Buffer.from('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.\nIch finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht.')
   })
-  const hochladen2 = page.getByRole('button', { name: 'Hochladen', exact: true })
+  const hochladen2 = page.locator('.mantine-Modal-content').getByRole('button', { name: 'Hochladen', exact: true })
   await hochladen2.waitFor({ timeout: 4000 }).catch(() => undefined)
   if (await hochladen2.count()) await hochladen2.click()
   await page.waitForFunction(() => [...document.querySelectorAll('textarea')].some((t) => t.value.includes('Handyverbot ist falsch')), null, { timeout: 10000 }).catch(() => undefined)
@@ -791,6 +808,25 @@ try {
     await page.waitForTimeout(200)
     await page.screenshot({ path: join(out, `englisch-seite${k + 1}.png`) })
   }
+
+  // ---------- „Vorbereiten – Abgaben später“ im Editor (23.10.2026): anlegen, ohne das Programm zu wechseln
+  await page.click('[aria-label="Vokabeltest"]')
+  await page.waitForTimeout(500)
+  // Ein zweiter, neuer Vokabeltest (eigene Kennung) – zum ersten gibt es schon eine Rückmeldung
+  await sichtbar(page.locator('[data-app-neu="vokabeltest"]')).click()
+  await page.waitForTimeout(800)
+  await page.evaluate(() => window.__selftest.vtMitHinweis('[Prüfung] Zweiter Test'))
+  await page.waitForTimeout(1500)
+  const vtVorher = (await zumVt()).length
+  const zuKnopf = sichtbar(page.locator('[data-rueckmeldung-zu]'))
+  if ((await zuKnopf.getAttribute('data-rueckmeldung-zu')) === 'neu') {
+    await sichtbar(page.locator('[data-rueckmeldung-mehr]')).click()
+    await sichtbar(page.locator('[data-rueckmeldung-vorbereiten]')).click()
+    await sichtbar(page.locator('[data-rueckmeldung-zu="vorhanden"]')).waitFor({ timeout: 10000 })
+    const nachher = await zumVt()
+    pruefe(nachher.length === vtVorher + 1, `„Vorbereiten“ legt die Rückmeldung an (${vtVorher} → ${nachher.length})`)
+    pruefe((await page.locator('[data-rm-start], [data-rm-grundlage]').filter({ visible: true }).count()) === 0, '„Vorbereiten“ bleibt im Vokabeltest')
+  } else pruefe(false, 'Zum zweiten Vokabeltest gibt es schon eine Rückmeldung – „Vorbereiten“ nicht prüfbar')
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
   await page.screenshot({ path: join(out, 'fehler.png') }).catch(() => undefined)
