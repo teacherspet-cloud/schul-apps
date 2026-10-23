@@ -1372,6 +1372,133 @@ html:not([data-touch]) .app-leiste[data-dichte='2'] .leiste-umschalter {
   font-size: 1.15rem;
 }
 
+/*
+ * Kompakter Kopf (23.10.2026, AppKopf.tsx EngerKopf): eine Zeile „Titel · Schritte · Aktionen"; passen die Schritte
+ * nicht daneben (iPad hochkant), stehen sie in einer zweiten Zeile. Geschrumpft (beim Scrollen) bleiben Titel,
+ * Schritte und Hauptknopf in einer Zeile.
+ */
+.app-kopf-eng {
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  transition: padding 0.15s ease;
+}
+.app-kopf-eng-raster {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'titel schritte aktionen';
+  align-items: center;
+  gap: 6px 14px;
+}
+.app-kopf-eng-ohne-schritte {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'titel aktionen';
+}
+.app-kopf-eng-titel {
+  grid-area: titel;
+  /* nur so breit wie der Inhalt – sonst misst AppKopf.tsx in der zweizeiligen Anordnung die volle Breite */
+  justify-self: start;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.app-kopf-eng-bild {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--mantine-color-body);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.app-kopf-eng-name {
+  min-width: 0;
+}
+/* geschrumpft ist der Titel ein Knopf – fingergroß */
+button.app-kopf-eng-name {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.app-kopf-eng .app-kopf-titel {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+}
+.app-kopf-eng-schritte {
+  grid-area: schritte;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.app-kopf-eng-links {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.app-kopf-eng-aktionen {
+  grid-area: aktionen;
+  justify-self: end;
+}
+/* Schritte: Nummer und Kurzname, ohne Untertitel, in einer Zeile */
+.app-kopf-eng .mantine-Stepper-root {
+  --stepper-icon-size: 28px;
+}
+.app-kopf-eng .mantine-Stepper-steps {
+  flex-wrap: nowrap;
+}
+.app-kopf-eng .mantine-Stepper-stepDescription {
+  display: none;
+}
+.app-kopf-eng .mantine-Stepper-stepLabel {
+  white-space: nowrap;
+  font-size: var(--mantine-font-size-sm);
+}
+.app-kopf-eng .mantine-Stepper-stepBody {
+  margin-inline-start: 6px;
+}
+.app-kopf-eng .mantine-Stepper-separator {
+  min-width: 12px;
+  margin-inline: 8px;
+}
+.app-kopf-eng-suche {
+  margin-top: 6px;
+}
+/* Natürliche Breite der Schritte (Messung in AppKopf.tsx) */
+.app-kopf-eng-links > * {
+  width: max-content;
+}
+.app-kopf-eng-raster[data-zweizeilig] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'titel aktionen' 'schritte schritte';
+}
+/* Geschrumpft: ohne Bild, ⓘ, Suche und „Meine …" – Titel, Schritte und Hauptknopf in einer Zeile */
+.app-kopf-eng[data-geschrumpft] {
+  padding-block: 3px;
+}
+.app-kopf-eng[data-geschrumpft] .app-kopf-eng-raster:not(.app-kopf-eng-ohne-schritte) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'titel schritte aktionen';
+}
+.app-kopf-eng[data-geschrumpft] :is(.app-kopf-eng-bild, .app-kopf-eng-neben, [data-app-kopf-info]) {
+  display: none;
+}
+.app-kopf-eng[data-geschrumpft] .app-kopf-titel {
+  font-size: 1rem;
+}
+.app-kopf-eng[data-geschrumpft] .app-kopf-eng-titel {
+  max-width: 28vw;
+}
+/* Geschrumpft und eigentlich zu breit: nur die Nummern der Schritte (der aktuelle ist hervorgehoben) */
+.app-kopf-eng[data-geschrumpft] [data-zweizeilig] .mantine-Stepper-stepBody {
+  display: none;
+}
+
 /* Freigegebene Blätter (06.10.2026): der Titel ist ein Knopf zum Öffnen */
 .freigabe-titel {
   background: none;

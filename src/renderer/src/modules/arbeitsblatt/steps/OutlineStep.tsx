@@ -15,7 +15,6 @@ import {
   Text,
   Textarea,
   TextInput,
-  Title,
   Tooltip,
   Popover
 } from '@mantine/core'
@@ -40,6 +39,7 @@ import { subjectOperators } from '../didactics/subjectOperators'
 import { subjectById } from '../model/subjects'
 import type { WorksheetMeta } from '../model/types'
 import { wahlEintraege, wahlGruppen, type WahlQuelle } from '../../../shared/operatorenWahl'
+import { SchrittHinweis } from '../../../shared/components/SchrittHinweis'
 
 /**
  * Operatoren für das Feld „Operator" der Gliederung (30.09.2026): dieselbe Aufbereitung wie
@@ -199,10 +199,9 @@ export default function OutlineStep(): React.JSX.Element {
       <Container size="lg" py="lg">
         <Group justify="space-between" mb="md">
           <div>
-            <Title order={2}>Gliederung prüfen</Title>
-            <Text c="dimmed" size="sm">
+            <SchrittHinweis titel="Gliederung prüfen">
               Bausteine umsortieren, ändern oder ergänzen – danach formuliert die KI das Arbeitsblatt aus.
-            </Text>
+            </SchrittHinweis>
           </div>
           <Group>
             <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />

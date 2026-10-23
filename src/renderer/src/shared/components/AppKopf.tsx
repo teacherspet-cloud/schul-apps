@@ -14,10 +14,11 @@
  * mal gefüllt, „Eigenes Fenster" mal da, mal nicht.
  */
 import { DokumentSuche } from './AppSuche'
-import { ActionIcon, Badge, Button, Drawer, Group, Paper, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconChevronDown, IconChevronUp, IconDotsVertical, IconFolder, IconPlus } from '@tabler/icons-react'
-import { useTelefon } from '../touch/touchModus'
-import { createContext, useContext, useState } from 'react'
+import { ActionIcon, Badge, Button, Drawer, Group, Paper, Popover, Stack, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
+import { IconChevronDown, IconChevronUp, IconDotsVertical, IconFolder, IconInfoCircle, IconPlus, IconSearch, IconX } from '@tabler/icons-react'
+import { useTelefon, useTouch } from '../touch/touchModus'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import type { ProgrammIcon } from './ProgrammSymbol'
 import { useAppSettings, useExperte } from '../settingsStore'
@@ -75,6 +76,7 @@ export function AppKopf({
 }): React.JSX.Element {
   const info = useContext(ProgrammInfo)
   const telefon = useTelefon()
+  const eng = useKopfEng()
   const [blatt, setBlatt] = useState(false)
   const name = titel ?? info?.name ?? ''
   const text = beschreibung ?? info?.description ?? ''
@@ -192,6 +194,8 @@ export function AppKopf({
       </Paper>
     )
   }
+  if (eng)
+    return <EngerKopf {...{ name, text, farbe, Symbol, bild: info?.bild, meine, neu, zusaetze, hauptknopf, links, rechts, suche }} />
   if (zu)
     return (
       <UnstyledButton
@@ -322,6 +326,279 @@ export function AppKopf({
         </Group>
       )}
     </Paper>
+  )
+}
+
+/*
+ * Kompakter Kopf (23.10.2026, Entscheidung der Lehrkraft): Auf dem iPad mini begann der Inhalt erst bei 42–48 % der
+ * Höhe (Arbeitsblatt, Vokabeltest) – man musste den Kopf jedes Mal einklappen. Auf Touch-Geräten und in kleinen Fenstern
+ * (bis 1180 px breit oder 800 px hoch, also auch Notebooks mit 1366 × 768) steht deshalb alles in EINER Zeile:
+ *
+ *   [▣] Titel ⓘ   ① Schritt ─ ② Schritt            🔍 📁 [＋ Neu]
+ *
+ * Beschreibung, Modus („Standard") und „Eigenes Fenster" liegen hinter ⓘ, Suche und „Meine …" sind Symbole. Passen die
+ * Schritte nicht daneben (iPad hochkant), stehen sie in einer zweiten, schmalen Zeile. Beim Scrollen nach unten schrumpft
+ * der Kopf auf Titel, Schritte und Hauptknopf; beim Hochwischen kommt er zurück. Der große PC-Bildschirm bleibt wie bisher.
+ */
+const ENG = '(max-width: 1180px), (max-height: 800px)'
+
+function useKopfEng(): boolean {
+  const touch = useTouch()
+  const klein = useMediaQuery(ENG) ?? false
+  return touch || klein
+}
+
+/**
+ * Schrumpfen beim Scrollen: horcht auf jedes Scrollen auf der Seite (Programme scrollen in eigenen Bereichen) und zählt
+ * die Richtung. Kleine Bereiche (Auswahllisten) und Dialoge zählen nicht; nach dem Umschalten kurz Ruhe, weil die
+ * geänderte Kopfhöhe selbst die Scrollposition verschiebt.
+ */
+function useSchrumpfen(kopf: React.RefObject<HTMLElement | null>): [boolean, (g: boolean) => void] {
+  const [geschrumpft, setGeschrumpft] = useState(false)
+  const setzenRef = useRef<(g: boolean) => void>(setGeschrumpft)
+  useEffect(() => {
+    const stand = new WeakMap<EventTarget, number>()
+    let summe = 0
+    let ruheBis = 0
+    let jetzt = false
+    const setzen = (g: boolean): void => {
+      if (g === jetzt) return
+      jetzt = g
+      summe = 0
+      ruheBis = Date.now() + 350
+      setGeschrumpft(g)
+    }
+    setzenRef.current = setzen
+    const beiScroll = (e: Event): void => {
+      const k = kopf.current
+      if (!k || !k.offsetParent) return
+      const ziel = e.target === document ? document.scrollingElement : e.target
+      if (!(ziel instanceof HTMLElement) || k.contains(ziel) || ziel.closest('[role="dialog"]')) return
+      if (ziel.clientHeight < window.innerHeight * 0.4) return
+      const y = ziel.scrollTop
+      const d = y - (stand.get(ziel) ?? y)
+      stand.set(ziel, y)
+      if (y < 8) return setzen(false)
+      if (Date.now() < ruheBis) return
+      summe = d > 0 ? Math.max(0, summe) + d : Math.min(0, summe) + d
+      if (summe > 24 && y > 60) setzen(true)
+      else if (summe < -48) setzen(false)
+    }
+    document.addEventListener('scroll', beiScroll, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', beiScroll, { capture: true })
+  }, [kopf])
+  return [geschrumpft, (g) => setzenRef.current(g)]
+}
+
+function EngerKopf({
+  name,
+  text,
+  farbe,
+  Symbol,
+  bild,
+  meine,
+  neu,
+  zusaetze,
+  hauptknopf,
+  links,
+  rechts,
+  suche
+}: {
+  name: string
+  text: React.ReactNode
+  farbe: string
+  Symbol?: ProgrammIcon
+  bild?: string
+  meine?: AppKopfKnopf
+  neu?: AppKopfKnopf & { icon?: React.ReactNode }
+  zusaetze?: React.ReactNode
+  hauptknopf?: React.ReactNode
+  links?: React.ReactNode
+  rechts?: React.ReactNode
+  suche?: React.ReactNode | false
+}): React.JSX.Element {
+  const kopf = useRef<HTMLDivElement>(null)
+  const [geschrumpft, setGeschrumpft] = useSchrumpfen(kopf)
+  const [sucheOffen, setSucheOffen] = useState(false)
+  const sucheZeile = useRef<HTMLDivElement>(null)
+  // Die aufgeklappte Suche gleich zum Tippen bereit
+  useEffect(() => {
+    if (sucheOffen) sucheZeile.current?.querySelector('input')?.focus()
+  }, [sucheOffen])
+  const schritte = Boolean(links || rechts)
+  /*
+   * Zweizeilig nur, wenn die Schritte wirklich nicht neben Titel und Knöpfe passen – gemessen an ihrer natürlichen
+   * Breite (CSS: max-content), damit das Umschalten die Messung nicht selbst verändert.
+   */
+  const raster = useRef<HTMLDivElement>(null)
+  const [zweizeilig, setZweizeilig] = useState(false)
+  useLayoutEffect(() => {
+    const r = raster.current
+    // Geschrumpft steht ohnehin alles in einer Zeile – die Messung von vorher gilt weiter
+    if (!r || !schritte || geschrumpft) return
+    const pruefe = (): void => {
+      const teil = (k: string): number => (r.querySelector<HTMLElement>(k)?.offsetWidth ?? 0)
+      const schrittInhalt = [...(r.querySelector('.app-kopf-eng-schritte')?.children ?? [])].reduce(
+        (summe, k) => summe + ((k.classList.contains('app-kopf-eng-links') ? (k.firstElementChild as HTMLElement | null) : (k as HTMLElement))?.offsetWidth ?? 0) + 10,
+        0
+      )
+      setZweizeilig(teil('.app-kopf-eng-titel') + schrittInhalt + teil('.app-kopf-eng-aktionen') + 28 > r.clientWidth)
+    }
+    pruefe()
+    const beob = new ResizeObserver(pruefe)
+    beob.observe(r)
+    return () => beob.disconnect()
+  }, [schritte, geschrumpft])
+  return (
+    <Paper
+      ref={kopf}
+      radius="md"
+      withBorder
+      className="app-kopf app-kopf-eng"
+      data-app-kopf
+      data-app-kopf-eng
+      data-geschrumpft={geschrumpft || undefined}
+      style={{
+        background: `linear-gradient(135deg, var(--mantine-color-${farbe}-light) 0%, transparent 70%)`,
+        borderColor: 'var(--mantine-color-default-border)',
+        ...({
+          '--mantine-primary-color-filled': `var(--mantine-color-${farbe}-filled)`,
+          '--mantine-primary-color-filled-hover': `var(--mantine-color-${farbe}-filled-hover)`,
+          '--mantine-primary-color-light': `var(--mantine-color-${farbe}-light)`,
+          '--mantine-primary-color-light-hover': `var(--mantine-color-${farbe}-light-hover)`,
+          '--mantine-primary-color-light-color': `var(--mantine-color-${farbe}-light-color)`
+        } as React.CSSProperties)
+      }}
+    >
+      <div ref={raster} className={`app-kopf-eng-raster${schritte ? '' : ' app-kopf-eng-ohne-schritte'}`} data-zweizeilig={zweizeilig || undefined}>
+        <div className="app-kopf-eng-titel">
+          {(bild || Symbol) && (
+            <span className="app-kopf-eng-bild" aria-hidden>
+              {bild ? <img src={bild} alt="" aria-hidden="true" width={28} height={28} /> : Symbol ? <Symbol size={24} /> : null}
+            </span>
+          )}
+          {/* Geschrumpft: ein Tipp auf den Titel holt den ganzen Kopf zurück */}
+          {geschrumpft ? (
+            <UnstyledButton className="app-kopf-eng-name" onClick={() => setGeschrumpft(false)} aria-label={`${name} – Kopfbereich ganz zeigen`}>
+              <Text component="h2" fw={700} truncate className="app-kopf-titel">
+                {name}
+              </Text>
+            </UnstyledButton>
+          ) : (
+            <Text component="h2" fw={700} truncate className="app-kopf-titel app-kopf-eng-name">
+              {name}
+            </Text>
+          )}
+          <KopfInfo name={name} text={text} />
+        </div>
+        {schritte && (
+          <div className="app-kopf-eng-schritte">
+            {links && <div className="app-kopf-eng-links">{links}</div>}
+            {rechts && (
+              <Group gap="xs" wrap="nowrap">
+                {rechts}
+              </Group>
+            )}
+          </div>
+        )}
+        <Group gap={6} wrap="nowrap" className="app-kopf-eng-aktionen">
+          <Group gap={6} wrap="nowrap" className="app-kopf-eng-neben">
+            {suche !== false && (
+              <Tooltip label={sucheOffen ? 'Suche schließen' : 'Suchen'}>
+                <ActionIcon
+                  variant={sucheOffen ? 'light' : 'default'}
+                  size="lg"
+                  radius="md"
+                  onClick={() => setSucheOffen((o) => !o)}
+                  aria-label={sucheOffen ? 'Suche schließen' : 'Suchen'}
+                  aria-expanded={sucheOffen}
+                  data-app-kopf-suche
+                >
+                  {sucheOffen ? <IconX size={18} /> : <IconSearch size={18} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {zusaetze}
+            {meine && (
+              <Tooltip label={meine.label}>
+                <ActionIcon
+                  variant="default"
+                  size="lg"
+                  radius="md"
+                  onClick={meine.onClick}
+                  disabled={meine.disabled}
+                  aria-label={meine.label}
+                  data-app-meine={meine.kennung ?? ''}
+                >
+                  <IconFolder size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </Group>
+          {neu && (
+            <Button
+              color={farbe}
+              radius="md"
+              leftSection={neu.icon ?? <IconPlus size={16} />}
+              onClick={neu.onClick}
+              disabled={neu.disabled}
+              aria-label={neu.label}
+              title={neu.label}
+              data-app-neu={neu.kennung ?? ''}
+            >
+              Neu
+            </Button>
+          )}
+          {hauptknopf}
+        </Group>
+      </div>
+      {sucheOffen && !geschrumpft && (
+        <div className="app-kopf-eng-suche" ref={sucheZeile}>
+          {suche ?? <DokumentSuche />}
+        </div>
+      )}
+    </Paper>
+  )
+}
+
+/** ⓘ im kompakten Kopf: Beschreibung des Programms, Modus und „Eigenes Fenster" */
+function KopfInfo({ name, text }: { name: string; text: React.ReactNode }): React.JSX.Element {
+  const experte = useExperte()
+  const update = useAppSettings((s) => s.update)
+  return (
+    <Popover position="bottom-start" shadow="md" withArrow width={320}>
+      <Popover.Target>
+        <ActionIcon variant="subtle" color="gray" size="lg" radius="md" aria-label={`Über „${name}"`} data-app-kopf-info>
+          <IconInfoCircle size={18} />
+        </ActionIcon>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Stack gap="sm">
+          {text && (
+            <Text size="sm" className="app-kopf-beschreibung">
+              {text}
+            </Text>
+          )}
+          <Group gap="xs" justify="space-between" wrap="nowrap">
+            {experte ? (
+              <Text size="xs" c="dimmed">
+                Expertenmodus: alle Optionen sichtbar
+              </Text>
+            ) : (
+              <Stack gap={4}>
+                <Text size="xs" c="dimmed">
+                  Standardmodus: nur das Wichtigste
+                </Text>
+                <Button size="xs" variant="light" color="gray" onClick={() => void update({ oberflaeche: 'experte' })} data-modus-abzeichen>
+                  Alle Optionen zeigen
+                </Button>
+              </Stack>
+            )}
+            <EigenesFensterKnopf name={name} />
+          </Group>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   )
 }
 

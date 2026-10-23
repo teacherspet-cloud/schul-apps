@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, Text, TextInput } from '@mantine/core'
 import { useAppSettings, useExperte } from '../../../shared/settingsStore'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import { IconArrowRight, IconBook2, IconClipboard, IconDeviceFloppy, IconFileUpload, IconList } from '@tabler/icons-react'
@@ -23,6 +23,7 @@ import { TextbookPicker } from './TextbookPicker'
 import type { BookSelection } from './TextbookPicker'
 import VokabelTabelle from './VokabelTabelle'
 import { AuswahlLeiste, EinfuegenFenster, PruefFenster } from './VokabelUebernahme'
+import { SchrittHinweis } from '../../../shared/components/SchrittHinweis'
 
 type Quelle = 'datei' | 'schulbuch' | 'tabelle' | 'listen'
 // Schlüssel mit „-2“: Seit dem Wunsch der Lehrkraft (01.10.2026) ist „Schulbuch“ der Standard –
@@ -144,11 +145,10 @@ export default function VocabStep(): React.JSX.Element {
     <FormularSeite fuss={fuss}>
       <ScrollArea h="100%">
         <Container size="lg" py="lg">
-          <Title order={2}>Vokabelliste</Title>
-          <Text c="dimmed" size="sm" mb="md">
+          <SchrittHinweis titel="Vokabelliste" mb="md">
             Vokabeln aus dem Schulbuch, einer Datei, einer Tabelle oder einer gespeicherten Liste übernehmen – oder direkt eintippen. Das Häkchen legt fest,
             welche Vokabeln abgefragt werden.
-          </Text>
+          </SchrittHinweis>
 
           <Card withBorder padding="md" mb="lg">
             <Tabs value={quelle} onChange={waehleQuelle} keepMounted>

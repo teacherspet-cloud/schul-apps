@@ -54,6 +54,7 @@ import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 import { pageLimitText } from '../render/useTestLayout'
 import SeitenVorgabe from './SeitenVorgabe'
+import { SchrittHinweis } from '../../../shared/components/SchrittHinweis'
 
 export default function SettingsStep(): React.JSX.Element {
   const { vocab, settings: stored, setSettings, setStep, doc, updateDoc, listContext, listName } = useVokabeltest()
@@ -242,9 +243,7 @@ export default function SettingsStep(): React.JSX.Element {
       <FormularSeite fuss={fuss}>
         <ScrollArea h="100%">
           <Container size="xl" py="lg">
-            <Title order={2} mb="md">
-              Test einstellen
-            </Title>
+            <SchrittHinweis titel="Test einstellen" />
 
             {!hasKey && (
               <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">

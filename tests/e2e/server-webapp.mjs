@@ -19,6 +19,16 @@ const pruefe = (ok, text) => {
   if (!ok) problems.push(text)
   console.log(`${ok ? '  ok  ' : '  !!  '} ${text}`)
 }
+// Kompakter Kopf (kleines Fenster, 23.10.2026): „Eigenes Fenster" liegt hinter ⓘ im Kopf einer App
+const infoAuf = async (seite) => {
+  await seite.locator('.app-leiste [aria-label="Meine Klassen"]').first().click()
+  await seite.waitForTimeout(800)
+  const info = seite.locator('[data-app-kopf-info]').filter({ visible: true })
+  if (await info.count()) {
+    await info.first().click()
+    await seite.waitForTimeout(300)
+  }
+}
 const KOPF = { 'x-schulapps-token': 'server' }
 const browser = await chromium.launch({ channel: 'msedge', args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] })
 const zuLoeschen = []
@@ -87,6 +97,7 @@ try {
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
   await expertenmodus(p)
   await p.locator('[data-schnellzugriff-raster]').first().waitFor({ timeout: 10000 })
+  await infoAuf(p)
   pruefe((await p.locator('[data-eigenes-fenster]').count()) === 0, 'Lehrkraft als Web-App: kein „In eigenem Fenster öffnen"')
   const lb = await browser.newContext({ viewport: { width: 1180, height: 820 } })
   await anmelden(lb, lehrer.benutzer, lehrer.passwort)
@@ -96,6 +107,7 @@ try {
   const sp2 = b.getByRole('button', { name: 'Später einrichten' })
   if (await sp2.isVisible().catch(() => false)) await sp2.click()
   await expertenmodus(b)
+  await infoAuf(b)
   pruefe(
     await b
       .locator('[data-eigenes-fenster]')

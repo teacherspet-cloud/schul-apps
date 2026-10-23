@@ -80,6 +80,7 @@ import GradeScaleModal from '../../../shared/components/GradeScaleModal'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import StoffQuellen from '../../../shared/components/StoffQuellen'
 import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
+import { SchrittHinweis } from '../../../shared/components/SchrittHinweis'
 
 // Die Fächer der Klassenarbeit stehen im Fachprofil (model/faecher.ts, Großprogramm 0.4)
 const SUBJECTS: { value: ExamSubjectId; label: string }[] = KLASSENARBEIT_FAECHER.map((f) => ({ value: f.id, label: f.label }))
@@ -300,10 +301,9 @@ export default function FrameStep(): React.JSX.Element {
           <Container size="xl" py="lg">
             <Group justify="space-between" align="flex-start" mb="md">
               <div>
-                <Title order={2}>Rahmen der Arbeit</Title>
-                <Text c="dimmed" size="sm">
+                <SchrittHinweis titel="Rahmen der Arbeit">
                   Fach, Jahrgang und Dauer bestimmen die Aufgabenformate, die Punkteverteilung und die Anforderungsbereiche.
-                </Text>
+                </SchrittHinweis>
               </div>
             </Group>
 

@@ -352,11 +352,13 @@ async function lauf(name, breite, hoehe) {
   const telefon = breite <= 700
   const bild = (n) => page.screenshot({ path: join(out, `${name}-${n}.png`) })
   const sichtbar = (sel) => page.locator(sel).filter({ visible: true }).first()
-  // Telefon (07.10.2026): „Meine …" liegt im Blatt hinter ⋮ des Programmkopfs
+  // Telefon (07.10.2026): „Meine …" liegt im Blatt hinter ⋮ des Programmkopfs; im kompakten Kopf des iPads
+  // (23.10.2026) ist es ein Symbolknopf mit dem Namen als Beschriftung
   const meineOeffnen = async (text) => {
-    const knopf = page.locator(`button:has-text("${text}")`).filter({ visible: true })
+    const wahl = `button:has-text("${text}"), button[aria-label="${text}"]`
+    const knopf = page.locator(wahl).filter({ visible: true })
     if (!(await knopf.count())) await sichtbar('[data-app-kopf-mehr]').tap()
-    await sichtbar(`button:has-text("${text}")`).tap()
+    await sichtbar(wahl).tap()
   }
 
   // Finger über CDP (Playwright kennt nur das einfache Tippen)

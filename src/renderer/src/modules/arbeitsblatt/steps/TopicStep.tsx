@@ -135,6 +135,7 @@ import {
   type VideoKind,
   type ViewingDuring
 } from '../didactics/videoTasks'
+import { SchrittHinweis } from '../../../shared/components/SchrittHinweis'
 
 /** Ein noch leerer Videoauftrag – Lernvideo, weil das im Alltag am häufigsten vorkommt. */
 const EMPTY_VIDEO: VideoSetup = { title: '', url: '', kind: 'lernvideo', platform: '', minutes: 0, section: '', summary: '', during: 'auto', groups: 0 }
@@ -431,10 +432,9 @@ export default function TopicStep(): React.JSX.Element {
           <Container size="xl" py="lg">
             <Group justify="space-between" mb="md">
               <div>
-                <Title order={2}>Thema &amp; Lerngruppe</Title>
-                <Text c="dimmed" size="sm">
+                <SchrittHinweis titel="Thema & Lerngruppe">
                   Jahrgang, Schulform und Bundesland bestimmen Sprache, Anforderungen, Aufgabenformate und Layout.
-                </Text>
+                </SchrittHinweis>
               </div>
             </Group>
 

@@ -227,7 +227,14 @@ pruefe((await page.getByRole('button', { name: 'Namen einklappen' }).count()) ==
   pruefe((await schalter.getAttribute('data-modus')) === 'standard', 'Der Schalter stellt auf Standardmodus')
   pruefe((await page.getByLabel('Zahl der Aufgaben').count()) === 0, 'Standardmodus: Zahl der Aufgaben ausgeblendet')
   pruefe(await page.locator('[data-direkt-erstellen]').filter({ visible: true }).first().isVisible(), 'Standardmodus: „Arbeitsblatt erstellen" ohne Gliederungsschritt')
-  pruefe(await page.locator('[data-modus-abzeichen]').filter({ visible: true }).first().isVisible(), 'Standardmodus: Abzeichen „Standard" im Kopf')
+  // Kompakter Kopf (kleines Fenster, 23.10.2026): der Modus steht hinter ⓘ
+  const info = page.locator('[data-app-kopf-info]').filter({ visible: true })
+  if (await info.count()) {
+    await info.first().click()
+    await page.waitForTimeout(300)
+  }
+  pruefe(await page.locator('[data-modus-abzeichen]').filter({ visible: true }).first().isVisible(), 'Standardmodus: Abzeichen „Standard" im Kopf (bzw. hinter ⓘ)')
+  if (await info.count()) await page.keyboard.press('Escape')
   const schritte = await page.locator('.mantine-Stepper-stepLabel').filter({ visible: true }).allTextContents()
   pruefe(!schritte.includes('Gliederung') && schritte.includes('Bearbeiten & Export'), `Standardmodus: Schrittanzeige ohne Gliederung (${schritte.join(' · ')})`)
   await page.locator('[data-alle-optionen] .weitere-optionen-kopf').filter({ visible: true }).first().click()
