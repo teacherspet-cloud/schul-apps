@@ -10,6 +10,7 @@
  * - **Jede Aufgabe zielt auf eine benannte Stolperstelle** und trägt sie mit. Daraus entsteht
  *   das Fehlerprofil im Lösungsteil.
  */
+import { alternativenAnfrage, alternativenEinarbeiten } from './lueckenAlternativen'
 import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { AiCall } from '../../../shared/imageChoice'
@@ -125,6 +126,8 @@ export function testPrompt(test: GrammarTest): string {
     '- Es wird GEPRÜFT, nicht erarbeitet: kein Merkkasten, keine Regelherleitung, keine Hilfekarten, keine Tippkästen.',
     '- Die Arbeitsanweisung sagt knapp und eindeutig, was zu tun ist, und nennt die Punktzahl nicht (die vergibt die App).',
     '- Jede Aufgabe hat eine eindeutig richtige Lösung. Wo mehrere Formen möglich sind, nenne sie in der Lösung alle.',
+    // Mehrere richtige Lösungen in einer Lücke (23.10.2026): alle in die Lücke – Lösungsblatt und Onlinetest werten jede davon
+    '- Lässt eine Lücke mehrere gleichwertig richtige Antworten zu (z. B. who/that, Kurz- und Langform), stehen alle in der Lücke, getrennt durch „ / “: [[who / that]].',
     m.embedded
       ? '- EINGEBETTET: Die Aufgaben hängen an EINEM zusammenhängenden Text (Nachricht, Bericht, kurze Geschichte, Dialog). Stelle ihn als Baustein „text" voran; die Aufgaben beziehen sich darauf. Keine Reihe unverbundener Einzelsätze.'
       : '- Einzelsätze sind zulässig, aber jeder Satz muss für sich verständlich sein und eine Mitteilung enthalten – keine sinnlosen Übungssätze.',
@@ -283,6 +286,7 @@ export async function generateTest(
   blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   spreadPoints(blocks, test.meta.points)
   zwischenstand?.(blocks)
+  await weitereLoesungen(blocks, test, ai, onStep)
   // Ankreuzfragen zu einem Lese- oder Hörtext (01.10.2026): Blindprobe ohne Text – nur ausgewiesene Verstehensaufgaben, Grammatikfragen nie
   if (blindprobeAktiv()) {
     const probe = await blindprobeBloecke(blocks, ai, { melde: onStep, streng: true }).catch(() => null)
@@ -372,6 +376,7 @@ export async function generateTestFassungen(
     wieA(a, bloecke)
     out.push(bloecke)
   }
+  for (const f of out) await weitereLoesungen(f, test, ai, onStep)
   // Ankreuzfragen zu einem Text: Blindprobe wie in Fassung A (nur ausgewiesene Verstehensaufgaben)
   if (blindprobeAktiv()) {
     for (let i = 0; i < out.length; i++) {
@@ -380,6 +385,22 @@ export async function generateTestFassungen(
     }
   }
   return out
+}
+
+/**
+ * Weitere richtige Lösungen in Lücken ergänzen (23.10.2026, lueckenAlternativen.ts) – eine Anfrage je Fassung. Scheitert sie,
+ * bleibt es bei den Lösungen des Entwurfs.
+ */
+async function weitereLoesungen(blocks: WsBlock[], test: GrammarTest, ai: AiCall, onStep: (message: string) => void): Promise<void> {
+  const anfrage = alternativenAnfrage(blocks, test.meta.subjectLabel)
+  if (!anfrage) return
+  onStep('Lücken werden auf weitere richtige Lösungen geprüft …')
+  try {
+    const neu = alternativenEinarbeiten(blocks, await ai<unknown>({ ...anfrage, ...(test.meta.provider ? { provider: test.meta.provider } : {}), ...(test.meta.model ? { model: test.meta.model } : {}) }))
+    if (neu) markiere(blocks, `${neu === 1 ? 'Eine Lücke lässt' : `${neu} Lücken lassen`} mehrere richtige Antworten zu – im Lösungsblatt mit „/“ genannt, im Onlinetest richtig.`)
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') throw e
+  }
 }
 
 /** Hinweis an die erste Aufgabe einer Fassung hängen (steht am Baustein, „Hinweise") */

@@ -143,6 +143,11 @@ export interface GapItem {
   bankWord?: string
   /** Anfangsbuchstabe nur für dieses Item vorgeben (z. B. weil es sonst mehrdeutig wäre) */
   firstLetter?: boolean
+  /**
+   * Auch richtig (23.10.2026, Befund der Lehrkraft): andere Wörter des Wortkastens, die in diese Lücke ebenso passen –
+   * in der Form, die die Lücke verlangt. Lösungsblatt „(auch: …)“, im Onlinetest richtig; jede Lücke zählt für sich.
+   */
+  auchRichtig?: string[]
 }
 
 export interface GapBlock extends BlockBase {
@@ -156,7 +161,7 @@ export interface GapBlock extends BlockBase {
 export type TextPart =
   | { type: 'text'; text: string }
   /** `folge`: zweiter Teil einer zweiteiligen Wendung – zählt mit der Lücke davor als EIN Punkt (02.10.2026) */
-  | { type: 'gap'; id: string; answer: string; bankWord?: string; vocabId?: string; firstLetter?: boolean; folge?: boolean }
+  | { type: 'gap'; id: string; answer: string; bankWord?: string; vocabId?: string; firstLetter?: boolean; folge?: boolean; auchRichtig?: string[] }
 
 export interface GapTextBlock extends BlockBase {
   kind: 'gapText'

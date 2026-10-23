@@ -230,7 +230,11 @@ export function onlineFassung(variante: Variant): OnlineFassung {
             ...(it.hint ? { hinweis: it.hint } : {}),
             felder: [{ id: f, art: 'text', ...(b.firstLetterHint || it.firstLetter ? { anfang: it.answer.trim().charAt(0) } : {}) }]
           })
-          loesungen[f] = { art: 'genau', werte: it.sentences.length === 1 ? mitVorwort(it.sentences[0].before, it.answer) : [it.answer] }
+          // Auch richtig (23.10.2026): weitere passende Wörter des Wortkastens zählen in dieser Lücke ebenso
+          loesungen[f] = {
+            art: 'genau',
+            werte: [it.answer, ...(it.auchRichtig ?? [])].flatMap((w) => (it.sentences.length === 1 ? mitVorwort(it.sentences[0].before, w) : [w]))
+          }
           einheit(f, [f])
         }
         break
@@ -252,7 +256,7 @@ export function onlineFassung(variante: Variant): OnlineFassung {
             vor,
             felder: [{ id: f, art: 'text', ...(b.firstLetterHint || p.firstLetter ? { anfang: p.answer.trim().charAt(0) } : {}) }]
           })
-          loesungen[f] = { art: 'genau', werte: mitVorwort(vor, p.answer) }
+          loesungen[f] = { art: 'genau', werte: [p.answer, ...(p.auchRichtig ?? [])].flatMap((w) => mitVorwort(vor, w)) }
           if (p.folge && letzteEinheit) {
             // Zweiter Teil einer zweiteiligen Wendung: gehört zur Einheit davor (ein Punkt für beide)
             letzteEinheit.felder.push(f)

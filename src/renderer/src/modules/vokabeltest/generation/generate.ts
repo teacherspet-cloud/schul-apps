@@ -7,6 +7,7 @@ import type { Block, ImageRef, PictureItem, TestDocument, TestHeader, TestSettin
 import { LANGUAGES } from '../model/types'
 import { planVariants } from './distribute'
 import { checkBlock, describeBlock, Issue } from './quality'
+import { alternativenAnfrage, alternativenUebernehmen, hatWortkasten } from './lueckenAlternativen'
 import { arr, bool, int, obj, str } from '../../../shared/aiSchema'
 import { bildVorpruefung } from '@shared/bildEindeutig'
 import { baseForm } from '../render/helpTexts'
@@ -244,12 +245,33 @@ export async function generateBlock(
     block = await produce(issues.map(formatIssue).join('\n'))
     issues = checkBlock(block, vocab, ctx.settings.targetLanguage, ctx.allVocab)
     if (aiReview) {
-      // Zweite Prüfung: Was dann noch mehrdeutig ist, bekommt den Anfangsbuchstaben als Hilfe
+      // Zweite Prüfung: Was dann noch mehrdeutig ist, bekommt den Anfangsbuchstaben als Hilfe – mit Wortkasten nicht:
+      // dort gelten passende andere Wörter als „auch richtig" (23.10.2026, s. unten)
       const remaining = await reviewBlock(block, ctx.settings, opts.ai, words, ctx.known)
       issues = [
         ...issues,
-        ...remaining.map((i) => (addFirstLetterHint(block, i.item) ? { ...i, message: `${i.message} → Anfangsbuchstabe als Hilfe ergänzt.` } : i))
+        ...remaining.map((i) =>
+          !hatWortkasten(block) && addFirstLetterHint(block, i.item) ? { ...i, message: `${i.message} → Anfangsbuchstabe als Hilfe ergänzt.` } : i
+        )
       ]
+    }
+  }
+
+  /*
+   * Auch richtig (23.10.2026, Befund der Lehrkraft): Passen in eine Lücke mehrere Wörter des Wortkastens, gelten alle –
+   * eine eigene Prüfung nennt sie je Lücke (lueckenAlternativen.ts). Hinweise zur Mehrdeutigkeit sind damit erledigt.
+   */
+  if (aiReview && hatWortkasten(block)) {
+    try {
+      const mit = alternativenUebernehmen(block, await opts.ai(alternativenAnfrage(block, system)))
+      if (mit.length) {
+        // Hinweise der Prüfung zu genau diesen Lücken sind beantwortet; andere Hinweise bleiben
+        issues = issues.filter((i) => !(i.item && mit.includes(i.item)))
+        issues.push({ message: `${mit.length === 1 ? 'Eine Lücke' : `${mit.length} Lücken`} mit weiteren passenden Wörtern aus dem Wortkasten – im Lösungsblatt als „auch“ genannt, im Onlinetest richtig.` })
+      }
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'AbortError') throw e
+      // Ohne diese Prüfung bleibt es bei der einen Lösung
     }
   }
 

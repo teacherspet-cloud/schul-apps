@@ -309,24 +309,58 @@ function Gap({ answer, hintFirstLetter, width }: { answer: string; hintFirstLett
   )
 }
 
+/** „a; b“ aus dem Editor → [a, b] */
+const auchListe = (text: string): string[] => text.split(';').map((x) => x.trim()).filter(Boolean)
+
 /** Lösung nur im Lösungsblatt sichtbar (dort im Editor bearbeitbar), auf dem Schülerblatt eine leere Lücke. */
-function EditableGap({ answer, onChange, hintFirstLetter }: { answer: string; onChange?: (v: string) => void; hintFirstLetter?: boolean }): React.JSX.Element {
+function EditableGap({
+  answer,
+  onChange,
+  hintFirstLetter,
+  auch,
+  onAuch
+}: {
+  answer: string
+  onChange?: (v: string) => void
+  hintFirstLetter?: boolean
+  /** Auch richtig (23.10.2026): andere Wörter des Wortkastens, die hier ebenso passen */
+  auch?: string[]
+  /** Rohtext aus dem Editor („a; b“) – der Aufrufer zerlegt ihn (auchListe) */
+  onAuch?: (text: string) => void
+}): React.JSX.Element {
   const { mode } = useRender()
+  // Im Lösungsblatt „(auch: …)“ – im Editor als Text bearbeitbar (Trennzeichen „;“, leer löscht); nur, wenn es welche gibt
+  const auchText = (auch ?? []).join('; ')
+  const auchZeile =
+    showsAnswers(mode) && auchText ? (
+      <span className="vt-gap-auch" data-luecke-auch style={{ fontSize: '0.8em', fontWeight: 'normal' }}>
+        {' '}
+        {mode === 'editKey' ? (
+          <>
+            (auch: <T value={auchText} onChange={onAuch} />)
+          </>
+        ) : (
+          `(auch: ${auchText})`
+        )}
+      </span>
+    ) : null
   if (mode === 'editKey') {
     return (
       <>
         <span className="vt-gap vt-gap-answer vt-gap-edit">
           <T value={answer} onChange={onChange} />
         </span>
+        {auchZeile}
         {/* Bereits akzeptierte Alternativen aus Onlinetests (10.10.2026) */}
-        <SchonAkzeptiert loesung={answer} />
+        <SchonAkzeptiert loesung={answer} auch={auch} />
       </>
     )
   }
   return (
     <>
       <Gap answer={answer} hintFirstLetter={hintFirstLetter} />
-      <SchonAkzeptiert loesung={answer} />
+      {auchZeile}
+      <SchonAkzeptiert loesung={answer} auch={auch} />
     </>
   )
 }
@@ -481,6 +515,13 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                       answer={it.answer}
                       hintFirstLetter={block.firstLetterHint || it.firstLetter}
                       onChange={set((d, v) => ((d as typeof block).items[idx].answer = v))}
+                      auch={it.auchRichtig}
+                      onAuch={set((d, v) => {
+                        const item = (d as typeof block).items[idx]
+                        const liste = auchListe(v)
+                        if (liste.length) item.auchRichtig = liste
+                        else delete item.auchRichtig
+                      })}
                     />
                   )
                   const glued =
@@ -585,6 +626,13 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                     answer={p.answer}
                     hintFirstLetter={block.firstLetterHint || p.firstLetter}
                     onChange={set((d, v) => (((d as typeof block).parts[idx] as { answer: string }).answer = v))}
+                    auch={p.auchRichtig}
+                    onAuch={set((d, v) => {
+                      const teil = (d as typeof block).parts[idx] as { auchRichtig?: string[] }
+                      const liste = auchListe(v)
+                      if (liste.length) teil.auchRichtig = liste
+                      else delete teil.auchRichtig
+                    })}
                   />
                   {punct && (
                     <T

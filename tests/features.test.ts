@@ -123,7 +123,8 @@ describe('Eindeutigkeit für Schüler', () => {
     expect(b2).toMatchObject({ wordBank: false, firstLetterHint: true })
   })
 
-  it('bleibt eine Lücke nach der Korrektur mehrdeutig, wird der Anfangsbuchstabe ergänzt', async () => {
+  // Ohne Wortkasten: Was mehrdeutig bleibt, bekommt den Anfangsbuchstaben (B1: keine Wortkästen)
+  it('bleibt eine Lücke ohne Wortkasten nach der Korrektur mehrdeutig, wird der Anfangsbuchstabe ergänzt', async () => {
     const base = mockAi()
     let reviews = 0
     const calls: StructuredRequest[] = []
@@ -135,13 +136,34 @@ describe('Eindeutigkeit für Schüler', () => {
       }
       return base<T>(req)
     }
-    const block = (await generateBlock('gapSentences', vocab, ctx('A2'), { ai, review: true })) as GapBlock
+    const block = (await generateBlock('gapSentences', vocab, ctx('B1'), { ai, review: true })) as GapBlock
+    expect(block.wordBank).toBe(false)
     expect(reviews).toBe(2)
     // Die Wortliste wird der Prüfung mitgegeben
     expect(calls.find((c) => c.schemaName === 'review')!.user).toContain('Words tested in this task: to explore, castle, brave')
     expect(block.items[1].firstLetter).toBe(true)
     expect(block.items[0].firstLetter).toBeUndefined()
     expect(block.warnings?.join(' ')).toContain('Anfangsbuchstabe als Hilfe ergänzt')
+    expect(calls.some((c) => c.schemaName === 'luecken_alternativen')).toBe(false)
+  })
+
+  // Mit Wortkasten (23.10.2026, abgestimmt): passende andere Wörter des Kastens gelten als „auch richtig“, kein Anfangsbuchstabe
+  it('mit Wortkasten: weitere passende Wörter als „auch richtig“ statt Anfangsbuchstabe', async () => {
+    const base = mockAi()
+    const ai = async <T>(req: StructuredRequest): Promise<T> => {
+      if (req.schemaName === 'review') return { problems: [{ itemNumber: 2, problem: '"brave" would also fit.' }] } as T
+      if (req.schemaName === 'luecken_alternativen') return { gaps: [{ itemNumber: 2, alsoCorrect: ['brave', 'castle', 'to explore', 'wizard'] }] } as T
+      return base<T>(req)
+    }
+    const block = (await generateBlock('gapSentences', vocab, ctx('A2'), { ai, review: true })) as GapBlock
+    expect(block.wordBank).toBe(true)
+    expect(block.items[1].firstLetter).toBeUndefined()
+    const auch = block.items[1].auchRichtig ?? []
+    expect(auch.length).toBeGreaterThan(0)
+    expect(auch).not.toContain('wizard')
+    expect(auch).not.toContain(block.items[1].answer)
+    expect(block.warnings?.join(' ')).toContain('auch')
+    expect(block.warnings?.join(' ')).not.toContain('would also fit')
   })
 
   it('doppelt gesuchte Wörter werden gemeldet', () => {

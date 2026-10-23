@@ -370,6 +370,11 @@ function gapRuns(answer: string, mode: Mode, firstLetter = false): TextRun[] {
   return firstLetter ? [run(firstLetterOf(answer), { bold: true }), run(blanks.slice(1))] : [run(blanks)]
 }
 
+/** Auch richtig (23.10.2026): weitere passende Wörter des Wortkastens – nur im Lösungsteil */
+function auchRuns(auch: string[] | undefined, mode: Mode): TextRun[] {
+  return mode === 'key' && auch?.length ? [run(` (auch: ${auch.join('; ')})`, { color: RED, size: 18 })] : []
+}
+
 const numbered = (n: number | string, children: ParagraphChild[], extra: object = {}): Paragraph =>
   new Paragraph({
     children: [run(`${n}.\t`, { bold: true }), ...children],
@@ -444,7 +449,7 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
           // Zweiteilige Wendung (02.10.2026): zwei Lücken mit dem Mittelteil dazwischen
           else if (s.mitte !== undefined && teile.length === 2)
             children.push(...gapRuns(teile[0], mode, firstLetter), run(` ${s.mitte} `), ...gapRuns(teile[1], mode, firstLetter))
-          else children.push(...gapRuns(it.answer, mode, firstLetter))
+          else children.push(...gapRuns(it.answer, mode, firstLetter), ...auchRuns(it.auchRichtig, mode))
           if (!wrong && !twoSentences && it.hint) children.push(run(` (${it.hint})`))
           children.push(run(` ${s.after}`))
           if (si === 0) out.push(numbered(i + 1, children))
@@ -467,7 +472,11 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
       }
       for (const p of block.parts) {
         if (p.type === 'gap') {
-          children.push(run(`(${++gapNo})`, { bold: true, size: ctx.size - 6 }), ...gapRuns(p.answer, mode, block.firstLetterHint || Boolean(p.firstLetter)))
+          children.push(
+            run(`(${++gapNo})`, { bold: true, size: ctx.size - 6 }),
+            ...gapRuns(p.answer, mode, block.firstLetterHint || Boolean(p.firstLetter)),
+            ...auchRuns(p.auchRichtig, mode)
+          )
           continue
         }
         const lines = p.text.split('\n')
