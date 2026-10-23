@@ -9,6 +9,7 @@
  * deutscher Sätze. Kurze Texte ohne genug Belege gelten als unklar – dann keine Warnung.
  */
 import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
+import { SPRACHMITTLUNG } from '../../shared/sprachmittlung'
 
 export type SprachCode = 'de' | 'en' | 'fr' | 'es' | 'it' | 'la' | 'ru'
 
@@ -133,8 +134,6 @@ export function deutschVerlangt(aufgaben: string): boolean {
   )
 }
 
-/** Aufgabe sieht nach Sprachmittlung aus (Richtung unbekannt) */
-const SPRACHMITTLUNG = /sprachmittlung|\bmediation\b|m[ée]diation|mediaci[oó]n|mediazione|медиаци|\bmediate\b/i
 
 /**
  * Darf die Abgabe (auch) auf Deutsch sein? (29.09.2026, Wunsch der Lehrkraft: keine 0 %, wenn eine

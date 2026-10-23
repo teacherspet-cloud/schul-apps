@@ -40,6 +40,8 @@ export default function TeileKarte({
       Object.assign(t, p, { quelle: 'lehrkraft' })
       if (p.art && getrennt(t) && typeof t.inhalt !== 'number') t.inhalt = inhaltVorgabe(d.meta.stateId, d.meta.grade, t.art, d.meta.schoolTypeId).inhalt
       if (p.art === 'sonstig') delete t.inhalt
+      // Zur Sprachmittlung gemacht: Ergebnis im Regelfall in der Zielsprache (23.10.2026)
+      if (p.art === 'sprachmittlung' && fs && !t.ergebnisSprache) t.ergebnisSprache = 'zielsprache'
     }, `rm-teil-${i}`)
   const neu = (): void =>
     update((d) => {

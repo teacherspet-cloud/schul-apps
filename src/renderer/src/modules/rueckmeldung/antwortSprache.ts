@@ -10,10 +10,12 @@
  *   correspondant, intercambio …) → Zielsprache;
  * - Arbeitsanweisung in der Zielsprache (Write …, Écris …, Escribe …, Scrivi …, Напиши …) →
  *   Zielsprache.
+ * - Sprachmittlung ohne ausdrückliches Deutsch → Zielsprache (23.10.2026, shared/sprachmittlung.ts).
  * Die KI (Teile erkennen, Aufgabe aus Datei) liefert dasselbe je Teil; die Lehrkraft kann es in
  * „Bewertung nach Teilen" bzw. unter der Aufgabe ändern.
  */
-import { deutschVerlangt } from './sprachErkennung'
+import { SPRACHMITTLUNG } from '../../shared/sprachmittlung'
+import { deutschVerlangt, erkenneSprache } from './sprachErkennung'
 
 export type AntwortSprache = 'deutsch' | 'zielsprache'
 
@@ -41,9 +43,26 @@ export function antwortSpracheAus(text: string, subjectId: string): AntwortSprac
   const deutsch = ADRESSAT_DEUTSCH.test(text)
   const ziel = ADRESSAT_ZIEL.test(text)
   if (ziel && !deutsch) return 'zielsprache'
+  if (SPRACHMITTLUNG.test(text)) return sprachmittlungsSprache(text)
   if (deutsch && !ziel) return 'deutsch'
   if (ANWEISUNG_ZIEL[subjectId]?.test(text)) return 'zielsprache'
   return undefined
+}
+
+/**
+ * Ergebnissprache einer Sprachmittlung (23.10.2026, Wunsch der Lehrkraft): im Regelfall die
+ * Zielsprache. Deutsch nur, wenn die Aufgabe es ausdrücklich verlangt oder der Ausgangstext
+ * fremdsprachig ist und der Adressat nur Deutsch versteht – ein deutscher Ausgangstext mit
+ * „deine Eltern" darin macht die Aufgabe nicht zu einer ins Deutsche.
+ */
+export function sprachmittlungsSprache(text: string): AntwortSprache {
+  if (deutschVerlangt(text)) return 'deutsch'
+  if (ADRESSAT_DEUTSCH.test(text) && !ADRESSAT_ZIEL.test(text)) {
+    // Kurzer Auftrag („Fasse … für deine Eltern zusammen") oder fremdsprachiger Ausgangstext: Deutsch
+    const b = erkenneSprache(text)
+    if (b.woerter < 60 || (b.sprache && b.sprache !== 'de')) return 'deutsch'
+  }
+  return 'zielsprache'
 }
 
 /** Anzeige: „Englisch" bzw. „Deutsch" */

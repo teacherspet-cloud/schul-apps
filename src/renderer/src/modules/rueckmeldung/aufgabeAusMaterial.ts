@@ -9,6 +9,8 @@ import type { StructuredRequest } from '@shared/types'
 import { ohneKiTest } from './abgabeTrennen'
 import { arr, enumOf, int, obj, str } from '../../shared/aiSchema'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
+import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
+import { sprachmittlungsRegel } from '../../shared/sprachmittlung'
 
 export interface GeleseneDatei {
   fileName: string
@@ -60,7 +62,7 @@ const TEILE_REGEL = [
   '- „schreiben": freie Textproduktion in der Fremdsprache (Write an email/article/story…, Rédige…, Escribe…, Scrivi…, Напиши…, Comment, Discuss, Describe your…), bei der Inhalt und Sprache bewertet werden;',
   '- „sprachmittlung": Mediation – Inhalte eines Textes für jemanden in die andere Sprache übertragen (Explain to your German friend…, Fasse auf Deutsch zusammen…, Explique à ton ami…);',
   '- „sonstig": alles andere (Hör-/Leseverstehen mit geschlossenen oder kurzen Antworten, Wortschatz, Grammatik, Übersetzung einzelner Sätze).',
-  'Für JEDEN Teil (Fremdsprachen): ergebnisSprache = in welcher Sprache die Antwort verlangt ist. Schreibaufgaben mit Anweisung in der Fremdsprache („Write …", „Écris …") = „zielsprache"; Antworten, die ausdrücklich auf Deutsch verlangt sind = „deutsch". Bei Sprachmittlung: „deutsch", wenn das Ergebnis auf Deutsch verlangt ist (Quelltext in der Fremdsprache, Adressat versteht nur Deutsch, „auf Deutsch", „für deine Eltern/Oma", „Fasse … zusammen" in deutscher Aufgabe zu fremdsprachigem Material); „zielsprache", wenn es in der Fremdsprache verlangt ist (deutscher Quelltext, Adressat spricht nur die Fremdsprache: „Explain to your exchange partner…", „Explique à ton corres…"); leer, wenn es nicht eindeutig ist.',
+  'Für JEDEN Teil (Fremdsprachen): ergebnisSprache = in welcher Sprache die Antwort verlangt ist. Schreibaufgaben mit Anweisung in der Fremdsprache („Write …", „Écris …") = „zielsprache"; Antworten, die ausdrücklich auf Deutsch verlangt sind = „deutsch". Bei Sprachmittlung: „deutsch", wenn das Ergebnis auf Deutsch verlangt ist (Quelltext in der Fremdsprache, Adressat versteht nur Deutsch, „auf Deutsch", „für deine Eltern/Oma", „Fasse … zusammen" in deutscher Aufgabe zu fremdsprachigem Material); „zielsprache", wenn es in der Fremdsprache verlangt ist (deutscher Quelltext, Adressat spricht nur die Fremdsprache: „Explain to your exchange partner…", „Explique à ton corres…"). Ohne eindeutige Angabe zur Richtung „zielsprache" – das ist bei der Sprachmittlung der Regelfall.',
   'Gewichte, Punkte und Inhalt/Sprache-Anteile NUR übernehmen, wenn sie im Material stehen – nichts schätzen. Besteht die Arbeit aus nur einer Aufgabe, ist die Liste ein Eintrag.'
 ].join('\n')
 
@@ -137,16 +139,22 @@ export function teileAnfrage(aufgaben: string, erwartung: string): StructuredReq
 const ERWARTUNG_SCHEMA = obj({ erwartung: str('Erwartungshorizont: je Aufgabe die erwarteten Inhalte und Kriterien, knapp in Stichpunkten') })
 
 /** Entwurf eines Erwartungshorizonts, wenn das Material keinen enthält */
-export function erwartungsEntwurfAnfrage(aufgaben: string, fach: string, jahrgang: number): StructuredRequest {
+export function erwartungsEntwurfAnfrage(aufgaben: string, fach: string, jahrgang: number, subjectId = ''): StructuredRequest {
+  const fs = istModerneFremdsprache(subjectId)
   return {
     system: 'Du bist eine erfahrene Lehrkraft und entwirfst Erwartungshorizonte für Schülerarbeiten – fachlich richtig, der Jahrgangsstufe angemessen.',
     user: [
       `Entwirf einen Erwartungshorizont für diese Aufgabe${fach ? ` (${fach}` : ''}${jahrgang ? `${fach ? ', ' : ' ('}Klasse ${jahrgang})` : fach ? ')' : ''}.`,
       '- Je Aufgabe: erwartete Inhalte bzw. Lösungsschritte und woran eine gelungene Bearbeitung zu erkennen ist.',
       '- KEINE Punkte und KEINE Noten – er dient einer Rückmeldung ohne Note.',
+      // Fremdsprachen (23.10.2026, Wunsch der Lehrkraft): Beispielformulierungen in der Antwortsprache, Sprachmittlung im Regelfall in der Zielsprache
+      fs ? `- Beispielformulierungen stehen in der Sprache, in der die Lernenden antworten – bei Schreibaufgaben auf ${fach}. Kriterien und Hinweise auf Deutsch.` : '',
+      fs ? sprachmittlungsRegel(fach) : '',
       'AUFGABE:',
       aufgaben
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     schemaName: 'rueckmeldung_erwartung',
     schema: ERWARTUNG_SCHEMA
   }

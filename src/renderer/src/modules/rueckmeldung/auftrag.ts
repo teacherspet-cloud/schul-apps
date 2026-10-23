@@ -154,7 +154,7 @@ export function aufgabeAusDateien(r: Rueckmeldung, docId: string, dateien: Geles
       if (!erwartung && !rm.grundlage.erwartung?.trim()) {
         k.melde('Kein Erwartungshorizont im Material – die KI entwirft einen …')
         const fach = erkannt.fach ? subjectById(erkannt.fach).label : rm.meta.subjectLabel
-        erwartung = erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(erkannt.aufgaben, fach, erkannt.jahrgang || rm.meta.grade)))
+        erwartung = erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(erkannt.aufgaben, fach, erkannt.jahrgang || rm.meta.grade, erkannt.fach || rm.meta.subjectId)))
         entwurf = true
       }
       return { erkannt, erwartung, entwurf }
@@ -292,7 +292,7 @@ export function erwartungEntwerfen(r: Rueckmeldung, docId: string): void {
     fehlerTitel: 'Der Erwartungshorizont konnte nicht entworfen werden',
     arbeit: async (rm, k) => {
       k.melde('Die KI entwirft einen Erwartungshorizont …')
-      return erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(rm.grundlage.aufgaben, rm.meta.subjectLabel, rm.meta.grade)))
+      return erwartungAus(await k.ai<unknown>(erwartungsEntwurfAnfrage(rm.grundlage.aufgaben, rm.meta.subjectLabel, rm.meta.grade, rm.meta.subjectId)))
     },
     abschluss: () => 'Erwartungshorizont entworfen – bitte prüfen.',
     ablegen: (erwartung, rm) =>

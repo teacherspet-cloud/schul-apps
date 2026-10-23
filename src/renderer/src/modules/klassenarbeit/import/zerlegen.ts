@@ -22,6 +22,8 @@ import { inhalt, type GeleseneDatei } from '../../rueckmeldung/aufgabeAusMateria
 import { stufenRaster } from '../../../shared/verstehen/regeln'
 import { stufeAus, type VerstehensStufe } from '../../../shared/verstehen/stufen'
 import type { Exam } from '../model/types'
+import { istModerneFremdsprache } from '../model/nachweise'
+import { sprachmittlungsRegel } from '../../../shared/sprachmittlung'
 
 export type { GeleseneDatei }
 
@@ -181,6 +183,8 @@ export function zerlegenAnfrage(exam: Pick<Exam, 'meta'>, material: GeleseneDate
       '5. Lösungen: Stehen sie im Material, übernimm sie wörtlich (loesungQuelle = material). Stehen sie im beigefügten LÖSUNGSBLATT, ordne sie der passenden Aufgabe und dem passenden Item zu (loesungQuelle = loesungsblatt; bei multipleChoice auch correct, bei trueFalse isTrue, bei gapText die Lücken, bei matching pairs). Fehlen sie, entwirf einen knappen Erwartungshorizont (loesungQuelle = entwurf).',
       '6. Stufe: Stufe jedes Verstehensitem (Hören, Lesen, Hör-Seh-Verstehen) nach dem Raster unten ein; andere Aufgaben bekommen Stufe 0.',
       '7. Hörverstehen: Liegt ein Transkript vor, gehört es als Material (art hoertext) zur Aufgabe. Fehlt es, bleibt material leer und hinweis nennt das.',
+      // Entworfener Erwartungshorizont einer Sprachmittlung (23.10.2026, Wunsch der Lehrkraft): im Regelfall in der Zielsprache
+      istModerneFremdsprache(exam.meta.subjectId) ? sprachmittlungsRegel(exam.meta.subjectLabel) : '',
       '',
       stufenRaster(),
       '',

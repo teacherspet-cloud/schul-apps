@@ -27,6 +27,8 @@ import { materialText } from './prompts'
 import { diagramDrawing } from '../render/diagramSvg'
 import { geschichteLoesungsRegeln, geschichtsStufe, schreibformenIn } from '@shared/operatoren/geschichteSchreibformen'
 import { gehoertZurSekII } from '../didactics/bildungsgang'
+import { istModerneFremdsprache } from '../../klassenarbeit/model/nachweise'
+import { sprachmittlungsRegel } from '../../../shared/sprachmittlung'
 
 const TEIL = obj({
   solution: str('Erwartungshorizont der Teilaufgabe: knappe Stichpunkte, was eine vollständige und richtige Antwort enthält'),
@@ -147,6 +149,8 @@ export async function generateSolution(block: TaskBlock, sheet: Sheet, ws: Works
             schulform: meta.schoolTypeId
           })
         : '',
+      // Sprachmittlung (23.10.2026, Wunsch der Lehrkraft): Musterlösung im Regelfall in der Zielsprache, nicht auf Deutsch
+      block.skill === 'mediation' && istModerneFremdsprache(meta.subjectId) ? sprachmittlungsRegel(meta.subjectLabel) : '',
       materialText(ws.sources)
     ]
       .filter(Boolean)

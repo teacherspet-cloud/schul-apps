@@ -8,7 +8,7 @@
  *
  * Quellen der Voreinstellung: recherche/rueckmeldung-inhalt-sprache-gewichtung-2026-09-29.md.
  */
-import { antwortSpracheAus, textAus } from './antwortSprache'
+import { antwortSpracheAus, sprachmittlungsSprache, textAus } from './antwortSprache'
 import { formatArt } from '../klassenarbeit/model/faecher'
 import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
 import type { Exam } from '../klassenarbeit/model/types'
@@ -33,9 +33,9 @@ export interface BewertungsTeil {
   /**
    * In welcher Sprache die Antwort verlangt ist (29.09.2026) – für jeden Teil, erkannt aus der
    * Aufgabe (antwortSprache.ts), von der KI oder von der Lehrkraft. 'deutsch' = Deutsch ist richtig
-   * (Sprachmittlung ins Deutsche, Antworten auf Deutsch), 'zielsprache' = in der Fremdsprache. Fehlt
-   * die Angabe bei einer Sprachmittlung, ist die Richtung unklar – dann setzt die App bei deutschem
-   * Text nichts automatisch auf 0 %, sondern weist nur hin.
+   * (Sprachmittlung ins Deutsche, Antworten auf Deutsch), 'zielsprache' = in der Fremdsprache. Eine
+   * Sprachmittlung bekommt im Regelfall 'zielsprache' (23.10.2026); stellt die Lehrkraft „unklar" ein,
+   * setzt die App bei deutschem Text nichts automatisch auf 0 %, sondern weist nur hin.
    */
   ergebnisSprache?: 'deutsch' | 'zielsprache'
   quelle: TeilQuelle
@@ -119,8 +119,9 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
     const titel = p.label || formatById(p.formatId)?.label || `Teil ${i + 1}`
     // Andere produktive Teile mit Inhaltsanteil (z. B. Sprechen) werden wie Schreiben getrennt bewertet
     const produktiv = teilArt !== 'sonstig' || typeof p.contentShare === 'number'
-    // Antwortsprache: Schreiben in der Zielsprache, sonst aus dem Text des Teils erkannt
-    const erkannt = antwortSpracheAus(textAus(p.blocks), exam.meta.subjectId)
+    // Antwortsprache: Schreiben in der Zielsprache, Sprachmittlung im Regelfall auch (23.10.2026), sonst aus dem Text des Teils erkannt
+    const text = textAus(p.blocks)
+    const erkannt = art === 'mediation' ? sprachmittlungsSprache(text) : antwortSpracheAus(text, exam.meta.subjectId)
     const ergebnisSprache = art === 'writing' && erkannt !== 'deutsch' ? 'zielsprache' : erkannt
     return {
       id: p.id,
@@ -229,7 +230,9 @@ export function teileAusKi(
       const titel = String(d.titel ?? '').trim()
       if (!titel) return null
       const art: TeilArt = d.art === 'schreiben' || d.art === 'sprachmittlung' ? d.art : 'sonstig'
-      const ergebnisSprache = d.ergebnisSprache === 'deutsch' || d.ergebnisSprache === 'zielsprache' ? d.ergebnisSprache : undefined
+      // Sprachmittlung ohne Angabe: im Regelfall in der Zielsprache (23.10.2026, Wunsch der Lehrkraft)
+      const ergebnisSprache =
+        d.ergebnisSprache === 'deutsch' || d.ergebnisSprache === 'zielsprache' ? d.ergebnisSprache : art === 'sprachmittlung' ? 'zielsprache' : undefined
       const gewicht = begrenze(d.gewichtProzent)
       const punkte = begrenze(d.punkte, 1000)
       const inhalt = begrenze(d.inhaltProzent)

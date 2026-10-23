@@ -257,7 +257,7 @@ export function teileText(r: Rueckmeldung): string {
             : t.ergebnisSprache === 'zielsprache'
               ? ` – Antwort auf ${r.meta.subjectLabel} verlangt (Deutsch ist hier falsch)`
               : t.art === 'sprachmittlung'
-                ? ' – Richtung laut Aufgabenstellung prüfen (ins Deutsche: Deutsch ist richtig)'
+                ? ` – Richtung laut Aufgabenstellung prüfen (Regelfall: Ergebnis auf ${r.meta.subjectLabel}; Deutsch nur, wenn die Aufgabe es verlangt)`
                 : ''
         }`
     )

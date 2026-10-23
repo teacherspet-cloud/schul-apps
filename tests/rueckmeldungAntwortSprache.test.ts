@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { antwortSpracheAus } from '../src/renderer/src/modules/rueckmeldung/antwortSprache'
+import { antwortSpracheAus, sprachmittlungsSprache } from'../src/renderer/src/modules/rueckmeldung/antwortSprache'
 import { deutschMoeglich } from '../src/renderer/src/modules/rueckmeldung/sprachErkennung'
-import { spracheErgaenzen, teileAusArbeit, type BewertungsTeil } from '../src/renderer/src/modules/rueckmeldung/teilbewertung'
+import { spracheErgaenzen, teileAusArbeit, teileAusKi, type BewertungsTeil } from '../src/renderer/src/modules/rueckmeldung/teilbewertung'
 import type { Exam } from '../src/renderer/src/modules/klassenarbeit/model/types'
 
 /*
@@ -26,7 +26,19 @@ describe('Antwortsprache aus der Aufgabe', () => {
   })
 
   it('unklar bleibt unklar', () => {
-    expect(antwortSpracheAus('Mediation: Your friend Paul asks you about the text.', 'englisch')).toBeUndefined()
+    expect(antwortSpracheAus('Your friend Paul asks you about the text.', 'englisch')).toBeUndefined()
+  })
+
+  // 23.10.2026, Wunsch der Lehrkraft: Eine Sprachmittlung verlangt das Ergebnis in der Regel in der Zielsprache
+  it('Sprachmittlung ohne Angabe zur Richtung: Zielsprache', () => {
+    expect(antwortSpracheAus('Mediation: Your friend Paul asks you about the text.', 'englisch')).toBe('zielsprache')
+    expect(antwortSpracheAus('Médiation : Ton ami Paul te pose des questions sur le texte.', 'franzoesisch')).toBe('zielsprache')
+    expect(antwortSpracheAus('Mediación: Tu amigo Pablo te pregunta por el artículo.', 'spanisch')).toBe('zielsprache')
+    // Deutscher Ausgangstext mit „deine Eltern" darin macht daraus keine Sprachmittlung ins Deutsche
+    const quelle = Array(12).fill('Viele Jugendliche besprechen mit deinen Eltern und Lehrern, wie die neue Regel an der Schule umgesetzt wird.').join(' ')
+    expect(antwortSpracheAus(`Mediation\n${quelle}\nYour partner school asks about the new rule.`, 'englisch')).toBe('zielsprache')
+    expect(sprachmittlungsSprache(quelle)).toBe('zielsprache')
+    expect(sprachmittlungsSprache('Fasse den Text auf Deutsch zusammen.')).toBe('deutsch')
   })
 })
 
@@ -48,6 +60,17 @@ describe('Antwortsprache je Teil', () => {
       ]
     } as unknown as Exam
     expect(teileAusArbeit(exam).teile.map((x) => x.ergebnisSprache)).toEqual(['zielsprache', 'deutsch'])
+    // Ohne Angabe zur Richtung (deutscher Ausgangstext, englische Aufgabe ohne Adressat): Zielsprache (23.10.2026)
+    const ohne = {
+      meta: { subjectId: 'englisch' },
+      parts: [{ id: 'p1', formatId: 'en-mediation', label: 'Mediation', weight: 100, points: 20, blocks: [{ text: 'Die Stadt baut ein neues Schwimmbad.' }, { task: 'Mediation: Sum up the article.' }] }]
+    } as unknown as Exam
+    expect(teileAusArbeit(ohne).teile[0].ergebnisSprache).toBe('zielsprache')
+  })
+
+  it('KI ohne Angabe zur Richtung: Sprachmittlung in der Zielsprache, andere Teile offen', () => {
+    const k = teileAusKi([{ titel: 'Mediation', art: 'sprachmittlung' }, { titel: 'Reading', art: 'sonstig' }], { stateId: 'NI', grade: 10, schoolTypeId: 'gymnasium' })
+    expect(k?.teile.map((x) => x.ergebnisSprache)).toEqual(['zielsprache', undefined])
   })
 
   it('mit Teilen: Deutsch nur möglich, wenn ein Teil Deutsch verlangt oder eine Sprachmittlung offen ist', () => {
