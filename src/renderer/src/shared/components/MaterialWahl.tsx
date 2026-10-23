@@ -7,6 +7,49 @@ import { fachAnzeige, ladeMaterialien, suche, type Material } from '../../shell/
 import { ladeThemen, useThemen } from '../themenbereiche'
 import { FachPunkt } from './FachFarbe'
 
+/** Bild des Programms (Leistenbild oder Symbol) – in der Materialzeile und auf Karten mit gewähltem Material */
+export function ProgrammBild({ moduleId, size = 30 }: { moduleId: string; size?: number }): React.JSX.Element | null {
+  const modul = modules.find((x) => x.id === moduleId)
+  if (!modul) return null
+  return modul.leistenbild ? (
+    <img src={modul.leistenbild} width={size} height={size} alt="" aria-hidden="true" title={modul.name} draggable={false} />
+  ) : (
+    <ThemeIcon size={size} variant="light" color={modul.color} title={modul.name}>
+      <modul.icon size={Math.round(size * 0.6)} />
+    </ThemeIcon>
+  )
+}
+
+/** Eine Zeile „Bild · Name · Programm, Fach, Datum" (im Auswahlfenster und in „Zuletzt bearbeitet" der Rückmeldung) */
+export function MaterialZeile({
+  m,
+  aktiv,
+  onClick,
+  ...rest
+}: { m: Material; aktiv?: boolean; onClick: () => void } & Record<`data-${string}`, string>): React.JSX.Element {
+  const modul = modules.find((x) => x.id === m.moduleId)
+  return (
+    <UnstyledButton
+      className="home-material"
+      onClick={onClick}
+      style={aktiv ? { outline: '2px solid var(--mantine-primary-color-filled)' } : undefined}
+      {...rest}
+    >
+      <Group gap="sm" wrap="nowrap">
+        <ProgrammBild moduleId={m.moduleId} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Text fw={600} size="sm" truncate>
+            {m.name}
+          </Text>
+          <Text size="xs" c="dimmed" truncate>
+            {[modul?.name, m.detail, new Date(m.updatedAt).toLocaleDateString('de-DE')].filter(Boolean).join(' · ')}
+          </Text>
+        </div>
+      </Group>
+    </UnstyledButton>
+  )
+}
+
 /**
  * Material wählen wie in den Themenbereichen (29.09.2026, Wunsch der Lehrkraft): gegliedert nach
  * Fach und Themenbereich, mit Suche und Filter nach Programm – statt einer langen Auswahlliste.
@@ -74,42 +117,18 @@ export default function MaterialWahl({
       }))
   }, [sichtbar, themen])
 
-  const zeile = (m: Material): React.JSX.Element => {
-    const modul = modules.find((x) => x.id === m.moduleId)
-    const aktiv = gewaehlt === `${m.moduleId}:${m.id}`
-    return (
-      <UnstyledButton
-        key={`${m.moduleId}:${m.id}`}
-        className="home-material"
-        onClick={() => {
-          onWahl(m.moduleId, m.id)
-          schliessen()
-        }}
-        data-material-wahl={`${m.moduleId}:${m.id}`}
-        style={aktiv ? { outline: '2px solid var(--mantine-primary-color-filled)' } : undefined}
-      >
-        <Group gap="sm" wrap="nowrap">
-          {modul?.leistenbild ? (
-            <img src={modul.leistenbild} width={30} height={30} alt="" aria-hidden="true" title={modul.name} draggable={false} />
-          ) : (
-            modul && (
-              <ThemeIcon size={30} variant="light" color={modul.color} title={modul.name}>
-                <modul.icon size={18} />
-              </ThemeIcon>
-            )
-          )}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <Text fw={600} size="sm" truncate>
-              {m.name}
-            </Text>
-            <Text size="xs" c="dimmed" truncate>
-              {[modul?.name, m.detail, new Date(m.updatedAt).toLocaleDateString('de-DE')].filter(Boolean).join(' · ')}
-            </Text>
-          </div>
-        </Group>
-      </UnstyledButton>
-    )
-  }
+  const zeile = (m: Material): React.JSX.Element => (
+    <MaterialZeile
+      key={`${m.moduleId}:${m.id}`}
+      m={m}
+      aktiv={gewaehlt === `${m.moduleId}:${m.id}`}
+      onClick={() => {
+        onWahl(m.moduleId, m.id)
+        schliessen()
+      }}
+      data-material-wahl={`${m.moduleId}:${m.id}`}
+    />
+  )
 
   const programmDaten = [{ value: 'alle', label: 'Alle' }, ...programme.map((p) => ({ value: p, label: modules.find((x) => x.id === p)?.name ?? p }))]
 

@@ -63,8 +63,13 @@ export interface ZweiSchrittModulProps<D, S extends Zustand<D>> {
   BibliotheksSeite: ComponentType<BibliotheksSeiteProps>
   /** Live-Vorschau eines laufenden Auftrags (02.10.2026, siehe AuftragsHinweis) */
   vorschau?: (z: Zwischenstand) => ReactNode
-  schritte: [{ label: string; description: string }, { label: string; description: string }]
-  einstellen: ReactNode
+  /**
+   * Zwei Schritte (Einstellen, Bearbeiten) oder drei (23.10.2026, Rückmeldung: Material, Abgaben, Bögen) – der letzte ist
+   * immer das Bearbeiten, die übrigen sind Einstellschritte. `gesperrt` sperrt einen mittleren Schritt.
+   */
+  schritte: { label: string; description: string; gesperrt?: boolean }[]
+  /** Inhalt der Einstellschritte – bei drei Schritten einer je Einstellschritt */
+  einstellen: ReactNode | ReactNode[]
   bearbeiten: (d: D) => ReactNode
   texte: { meine: string; neu: string }
   /** Weiteres über dem Programm, nur solange es vorn liegt (Dialoge eines Auftrags) */
@@ -76,6 +81,9 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
   const { step, setStep, docId, docName, undo, redo, verlauf } = state
   const dok = p.dokument(state)
   const hatAufgaben = p.hatInhalt(dok)
+  // Der letzte Schritt ist das Bearbeiten (bei zwei Schritten also 1)
+  const letzter = p.schritte.length - 1
+  const einstellen = Array.isArray(p.einstellen) ? p.einstellen : [p.einstellen]
   const [library, setLibrary] = useState(false)
   // Läuft für dieses Dokument ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(docId)
@@ -127,7 +135,7 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
   useZielZeiger(p.modulId, (ziel) => {
     setLibrary(false)
     const s = p.useStore.getState()
-    if (ziel.baustein && p.hatInhalt(p.dokument(s))) s.setStep(1)
+    if (ziel.baustein && p.hatInhalt(p.dokument(s))) s.setStep(letzter)
   })
 
   useEffect(() => {
@@ -166,9 +174,9 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
         Bildschirme (auf dem Tablet sonst mehrere Zeilen hoch).
       */}
       {/* Gemeinsamer Kopf (Phase 6a): Titel links, „Meine …" und „Neu" rechts, darunter die Schritte */}
-      <Box px="lg" pt="sm" pb={step === 1 ? 'xs' : 0}>
+      <Box px="lg" pt="sm" pb={step === letzter ? 'xs' : 0}>
         <AppKopf
-          kompakt={step === 1}
+          kompakt={step === letzter}
           meine={{ label: p.texte.meine, onClick: () => setLibrary(true), kennung: p.modulId }}
           neu={{ label: p.texte.neu, onClick: startNew, kennung: p.modulId }}
           // Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt)
@@ -176,13 +184,15 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
             <>
               {/* Rückweg, z. B. „Zurück zur Reihe" nach „Test hier erstellen" (06.10.2026) */}
               <RueckwegKnopf modul={p.modulId} />
-              {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
+              {step !== letzter && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
             </>
           }
           links={
-            <Stepper active={step} onStepClick={setStep} size="sm" allowNextStepsSelect={false}>
-              <Stepper.Step label={p.schritte[0].label} description={p.schritte[0].description} />
-              <Stepper.Step label={p.schritte[1].label} description={p.schritte[1].description} disabled={!hatAufgaben} />
+            // Bei drei Schritten auch nach vorn wählbar, solange der Schritt nicht gesperrt ist
+            <Stepper active={step} onStepClick={setStep} size="sm" allowNextStepsSelect={letzter > 1}>
+              {p.schritte.map((s, i) => (
+                <Stepper.Step key={i} label={s.label} description={s.description} disabled={i === letzter ? !hatAufgaben : Boolean(s.gesperrt)} />
+              ))}
             </Stepper>
           }
         />
@@ -196,11 +206,11 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
           <AuftragsHinweisMitVorschau auftrag={auftrag} neuLabel={p.texte.neu} onNeu={startNew} vorschau={p.vorschau} />
         ) : zeigeLive ? (
           <AuftragsHinweis auftrag={zeigeLive} vorschau={p.vorschau} onAusblenden={() => setAusgeblendet(zeigeLive.id)} />
-        ) : step === 0 ? (
+        ) : step < letzter ? (
           // Standardmodus (07.10.2026): „Alle Optionen" gilt für den Einstellschritt dieses Vorgangs
-          <OptionenBereich>{p.einstellen}</OptionenBereich>
+          <OptionenBereich key={step}>{einstellen[step]}</OptionenBereich>
         ) : (
-          step === 1 && hatAufgaben && dok && p.bearbeiten(dok)
+          step === letzter && hatAufgaben && dok && p.bearbeiten(dok)
         )}
       </Box>
       {/* Nur im vorderen Programm – ein Dialog aus einem Programm im Hintergrund käme ungefragt nach vorn */}

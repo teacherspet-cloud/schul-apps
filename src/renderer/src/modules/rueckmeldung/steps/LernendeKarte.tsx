@@ -11,7 +11,7 @@
  * QR-Code und Namen (solange IServ nicht eingerichtet ist). KI: Zugang der Lehrkraft, auch Abo.
  */
 import { NurExperte } from '../../../shared/components/NurExperte'
-import { Alert, Badge, Button, Card, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text } from '@mantine/core'
 import { IconDownload, IconQrcode, IconSend } from '@tabler/icons-react'
 import { Zugang } from '../../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
@@ -145,10 +145,8 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
   }
 
   return (
-    <Card withBorder data-lernende-karte>
-      <Title order={4} mb="xs">
-        Lernende reichen selbst ein
-      </Title>
+    // Ohne eigenen Rahmen und Titel (23.10.2026): steht unter der Kachel „Lernende reichen online ein" (AbgabenSchritt.tsx)
+    <div data-lernende-karte>
       <Text size="sm" c="dimmed" mb="sm">
         Die Lernenden schreiben ihre Lösung im Schülerbereich und bekommen sofort Feedback – ohne Notenvorschlag. Danach können sie überarbeiten und erneut
         Feedback anfordern. Die Anfragen laufen über den KI-Zugang der Lehrkraft (Schlüssel oder Abo), ohne Namen.
@@ -268,6 +266,6 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           <Zugang code={qr.code} link={qr.link} />
         </Modal>
       )}
-    </Card>
+    </div>
   )
 }

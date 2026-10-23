@@ -137,12 +137,13 @@ try {
 
   await schritt('rueckmeldung', async () => {
     await page.click('[aria-label="Rückmeldung"]')
-    await page.getByText('Rückmeldung ohne Note', { exact: true }).waitFor({ timeout: 10000 })
-    await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+    await page.getByText('Woran soll Rückmeldung gegeben werden?', { exact: true }).waitFor({ timeout: 10000 })
+    await sichtbar(page.locator('[data-rm-eigene]')).click()
     await sichtbar(page.getByLabel('Titel der Aufgabe')).fill('Leserbrief zum Handyverbot')
     await sichtbar(page.locator('[data-rm-aufgaben]')).fill(
       'Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot an unserer Schule. Nenne mindestens zwei Argumente mit Beispielen und formuliere eine eigene Forderung. Klasse 8.'
     )
+    await sichtbar(page.locator('[data-rm-weiter]')).click() // Schritt „Abgaben“ (23.10.2026)
     await sichtbar(page.locator('[data-rm-eintippen]')).click()
     await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
     await sichtbar(page.getByLabel('Text von S1')).fill(
@@ -301,7 +302,7 @@ try {
     await page.waitForTimeout(800)
     await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
     await page.waitForTimeout(800)
-    await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+    await sichtbar(page.locator('[data-rm-eigene]')).click()
     const ablage = page.locator('.mantine-Dropzone-root', { hasText: 'Aufgabenblatt hierher ziehen' }).filter({ visible: true }).first()
     await ablage.locator('input[type=file]').setInputFiles({
       name: 'klassenarbeit-deutsch-9.txt',

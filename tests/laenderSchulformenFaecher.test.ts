@@ -211,7 +211,7 @@ describe('Fächer', () => {
     for (const datei of [
       'src/renderer/src/modules/arbeitsblatt/steps/TopicStep.tsx',
       'src/renderer/src/modules/lernzielkontrolle/steps/SetupStep.tsx',
-      'src/renderer/src/modules/rueckmeldung/steps/Einrichten.tsx'
+      'src/renderer/src/modules/rueckmeldung/steps/MaterialSchritt.tsx'
     ])
       expect(readFileSync(datei, 'utf8'), datei).toMatch(/data=\{SUBJECTS\.map\(/)
   })
@@ -260,7 +260,7 @@ describe('Bilingualer Sachfachunterricht', () => {
     for (const datei of [
       'src/renderer/src/modules/arbeitsblatt/steps/TopicStep.tsx',
       'src/renderer/src/modules/klassenarbeit/steps/FrameStep.tsx',
-      'src/renderer/src/modules/rueckmeldung/steps/Einrichten.tsx'
+      'src/renderer/src/modules/rueckmeldung/steps/MaterialSchritt.tsx'
     ])
       expect(readFileSync(datei, 'utf8'), datei).toContain('<BilingualSchalter')
     expect(readFileSync('src/renderer/src/modules/lernzielkontrolle/steps/SetupStep.tsx', 'utf8')).toContain('bilingualMoeglich(')

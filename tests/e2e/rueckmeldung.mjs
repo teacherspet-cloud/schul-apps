@@ -82,6 +82,21 @@ page.on('pageerror', (e) => problems.push(`Fehler im Fenster: ${e.message}`))
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1500, 1050))
 await warteAufOberflaeche(page)
 const sichtbar = (l) => l.filter({ visible: true }).first()
+/** Neugestaltung 23.10.2026: Schritt 1 „Material" → „Weiter: Abgaben" */
+const weiter = async () => {
+  await sichtbar(page.locator('[data-rm-weiter]')).click()
+  await sichtbar(page.locator('[data-rm-eintippen]')).waitFor({ timeout: 10000 })
+}
+/** Art der Rückmeldung aufklappen (zugeklappt steht nur eine Zeile) */
+const artAuf = async () => {
+  const k = sichtbar(page.locator('[data-rm-art-aendern]'))
+  if ((await k.getAttribute('aria-expanded')) !== 'true') await k.click()
+}
+/** Einstufung in der Auswahlliste wählen */
+const einstufung = async (id) => {
+  await sichtbar(page.locator('[data-rm-einstufung]')).click()
+  await sichtbar(page.locator(`[role=option]:has([data-einstufung="${id}"])`)).click()
+}
 /** Zeile einer Abgabe in „Bögen & Export" (29.09.2026: auf- und zuklappbar, standardmäßig zu) */
 const zeile = (kuerzel) => page.locator(`[data-rm-zeile="${kuerzel}"]`).filter({ visible: true }).first()
 const aufklappen = async (kuerzel) => {
@@ -154,11 +169,14 @@ const pdfSpeichern = async (z, datei) => {
 }
 try {
   await page.click('[aria-label="Rückmeldung"]')
-  await page.getByText('Rückmeldung ohne Note', { exact: true }).waitFor({ timeout: 10000 })
+  await page.getByText('Woran soll Rückmeldung gegeben werden?', { exact: true }).waitFor({ timeout: 10000 })
   pruefe(true, 'Das Programm „Rückmeldung" öffnet sich')
-  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
   await sichtbar(page.getByLabel('Titel der Aufgabe')).fill('Leserbrief zum Handyverbot')
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
+  pruefe((await sichtbar(page.locator('[data-rm-art-zeile]')).textContent())?.includes('ohne Note'), 'Die Art steht als eine Zeile da („… · ohne Note")')
+  await page.screenshot({ path: join(out, 'material.png') })
+  await weiter()
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
   await sichtbar(page.getByLabel('Text von S1')).fill(
@@ -195,15 +213,21 @@ try {
   // ---------- Rückmeldung 2.0 (29.09.2026): Formen, Einstufung, Nachteilsausgleich, Gedächtnis
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
-  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
+  await artAuf()
   await sichtbar(page.locator('[data-form="rand"]')).check()
-  await sichtbar(page.locator('[data-einstufung="noteTendenz"]')).check()
-  pruefe((await page.getByText('Rückmeldung mit Einstufung', { exact: true }).count()) === 1, 'Mit Einstufung heißt der Schritt „Rückmeldung mit Einstufung"')
-  pruefe((await page.locator('[data-einstufung="notenpunkte"]').filter({ visible: true }).isDisabled()), 'Notenpunkte sind in Klasse 7 gesperrt (nur Oberstufe)')
+  await sichtbar(page.locator('[data-rm-einstufung]')).click()
+  pruefe(
+    (await sichtbar(page.locator('[role=option]:has([data-einstufung="notenpunkte"])')).getAttribute('data-combobox-disabled')) !== null,
+    'Notenpunkte sind in Klasse 7 gesperrt (nur Oberstufe)'
+  )
+  await sichtbar(page.locator('[role=option]:has([data-einstufung="noteTendenz"])')).click()
+  pruefe((await sichtbar(page.locator('[data-rm-art-zeile]')).textContent())?.includes('Korrekturrand') && (await sichtbar(page.locator('[data-rm-art-zeile]')).textContent())?.includes('Note mit + und −'), 'Die Zeile nennt Formen und Einstufung')
   pruefe((await page.locator('[data-rm-landeshinweis]').filter({ visible: true }).count()) > 0, 'Hinweise des Landes mit Fundstelle stehen bei der Einstufung')
   await page.locator('[data-rm-art]').filter({ visible: true }).first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(out, 'art-der-rueckmeldung.png') })
+  await weiter()
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
   await sichtbar(page.getByLabel('Text von S1')).fill('Ich finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht.')
@@ -382,6 +406,9 @@ try {
   // Gedächtnis: gleicher Name in einer neuen Rückmeldung
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
+  await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief.')
+  await weiter()
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('lea schmidt')
   await page.locator('[data-rm-ausgleich-uebernehmen]').filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => undefined)
@@ -421,6 +448,10 @@ try {
   // ---------- Material über das Auswahlfenster (wie Themenbereiche)
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
+  // Neugestaltung 23.10.2026: das neueste Material steht gleich unter „Zuletzt bearbeitet"
+  await sichtbar(page.locator('[data-rm-zuletzt^="vokabeltest:"]')).waitFor({ timeout: 10000 }).catch(() => undefined)
+  pruefe((await page.locator('[data-rm-zuletzt^="vokabeltest:"]').filter({ visible: true }).count()) === 1, '„Zuletzt bearbeitet" zeigt den Vokabeltest zum Anklicken')
+  await page.screenshot({ path: join(out, 'start-zuletzt.png') })
   await sichtbar(page.locator('[data-rm-material]')).click()
   const fenster = page.locator('.mantine-Modal-content', { hasText: 'Material wählen' })
   await fenster.waitFor({ timeout: 10000 })
@@ -444,7 +475,7 @@ try {
   await page.evaluate(() => window.api.settings.set({ datenschutz: { hinweisBestaetigt: new Date().toISOString(), namenErsetzen: true } }))
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
-  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
   const ablage = page.locator('.mantine-Dropzone-root', { hasText: 'Aufgabenblatt hierher ziehen' }).filter({ visible: true }).first()
   await ablage.locator('input[type=file]').setInputFiles({
     name: 'aufgabe.txt',
@@ -479,10 +510,12 @@ try {
   // und lief über die Seitenränder. Drei Abgaben: Suche, Aufklappen, Seitengrenzen.
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
-  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
+  await artAuf()
   await sichtbar(page.locator('[data-form="rand"]')).check()
-  await sichtbar(page.locator('[data-einstufung="noteTendenz"]')).check()
+  await einstufung('noteTendenz')
+  await weiter()
   const satz = 'Wir brauchen das Handy für den Unterricht, weil man damit schnell etwas nachschlagen kann. '
   const langerText = `Ich finde, das Handyverbot ist falsch. ${satz.repeat(55)}${'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo'.repeat(50)} ${satz.repeat(35)}`
   const schueler = [
@@ -653,17 +686,21 @@ try {
   // ---------- Englisch mit Bewertungsraster, Teilen und hohen Randnotizen (29.09.2026 nachts, PDF der Lehrkraft)
   await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
   await page.waitForTimeout(800)
-  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-eigene]')).click()
   await sichtbar(page.getByLabel('Titel der Aufgabe')).fill('Exam no. 4')
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Write an e-mail to the student coordinator about the film review (about 200 words).')
+  await sichtbar(page.locator('[data-rm-fach-aendern]')).click()
   const fachFeld = sichtbar(page.getByLabel('Fach', { exact: true }))
   await fachFeld.click()
   await fachFeld.fill('Englisch')
   await page.getByRole('option', { name: 'Englisch', exact: true }).first().click()
   await page.waitForTimeout(300)
+  await artAuf()
   await sichtbar(page.locator('[data-form="rand"]')).check()
   await sichtbar(page.locator('[data-form="tabelle"]')).check()
-  await sichtbar(page.locator('[data-einstufung="noteTendenz"]')).check()
+  await einstufung('noteTendenz')
+  const fein = sichtbar(page.locator('[data-rm-feinheiten] > button'))
+  if ((await fein.getAttribute('aria-expanded')) !== 'true') await fein.click()
   await sichtbar(page.locator('[data-teile]').getByRole('button', { name: 'Teil', exact: true })).click()
   setzeAttrappe((x) => {
     x.antworten.rueckmeldung_tabelle = {
@@ -711,6 +748,7 @@ try {
       fehler: [{ kategorie: 'Wortwahl', beispiel: 'the staging shown here' }]
     }
   })
+  await weiter()
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('Kim Weber')
   await sichtbar(page.getByLabel('Text von S1')).fill(englisch)

@@ -4,7 +4,7 @@ import { erzeugeProjektDatei } from '../../shared/testmodul/projekt'
 import { hatInhalt, lohntSicherung, standardName, type Rueckmeldung } from './model/types'
 
 /** Store, Bibliothek und Projektdatei des Programms „Rückmeldung" (Großprogramm 0.4, F3) */
-export const useRueckmeldung = erzeugeDokumentStore<Rueckmeldung>({ startSchritt: (r) => (hatInhalt(r) ? 1 : 0) })
+export const useRueckmeldung = erzeugeDokumentStore<Rueckmeldung>({ startSchritt: (r) => (hatInhalt(r) ? 2 : 0) })
 
 export const rueckmeldungStats = (r: Rueckmeldung): Record<string, unknown> => ({
   subjectLabel: r.meta.subjectLabel,

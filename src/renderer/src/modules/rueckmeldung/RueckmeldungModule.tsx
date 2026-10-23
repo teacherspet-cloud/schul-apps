@@ -12,7 +12,8 @@ import { schulformVon } from '@shared/schulformen'
 import { ladeGrundlage } from './generation'
 import { hatInhalt, standardName, type Rueckmeldung } from './model/types'
 import Boegen from './steps/Boegen'
-import Einrichten from './steps/Einrichten'
+import AbgabenSchritt from './steps/AbgabenSchritt'
+import MaterialSchritt from './steps/MaterialSchritt'
 import { bibliothek, projektDatei, useRueckmeldung } from './store'
 import { aeltereRueckmeldungZu, horcheAufVorgabe, nimmRueckmeldungVorgabe, rueckmeldungIdZu } from './vorgabe'
 
@@ -130,11 +131,13 @@ export default function RueckmeldungModule({ active }: { active: boolean }): Rea
       standardName={standardName}
       liste={() => window.api.rueckmeldungen.list()}
       BibliotheksSeite={RueckmeldungBibliothek}
+      // Drei Schritte (23.10.2026, Multiple Choice mit der Lehrkraft): vorher „Grundlage & Abgaben" auf einer Seite
       schritte={[
-        { label: 'Grundlage & Abgaben', description: 'Aufgabe, Lerngruppe, Arbeiten' },
+        { label: 'Material', description: 'Aufgabe, Art' },
+        { label: 'Abgaben', description: 'Arbeiten der Lernenden', gesperrt: !dok?.grundlage.aufgaben.trim() },
         { label: 'Bögen & Export', description: 'Durchsehen, Word, PDF' }
       ]}
-      einstellen={<Einrichten />}
+      einstellen={[<MaterialSchritt key="material" />, <AbgabenSchritt key="abgaben" />]}
       bearbeiten={() => <Boegen />}
       texte={{ meine: 'Meine Rückmeldungen', neu: 'Neue Rückmeldung' }}
       // Live-Vorschau (02.10.2026): jeder Bogen, sobald er geschrieben ist

@@ -1,22 +1,36 @@
-import { Alert, Card, Checkbox, Radio, SegmentedControl, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core'
-import { NurExperte } from '../../../shared/components/NurExperte'
+import { Alert, Button, Card, Checkbox, Collapse, Group, SegmentedControl, Select, SimpleGrid, Stack, Text } from '@mantine/core'
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react'
+import { useState } from 'react'
+import { useExperte } from '../../../shared/settingsStore'
 import { EBENEN, EINSTUFUNGEN, einstufungGesperrt, einstufungVon, ebeneVon, formenVon, FORMEN } from '../art'
 import { einstufungsHinweise } from '../laenderRegeln'
-import type { EinstufungsArt, EinstufungsEbene, FormArt } from '../model/types'
+import type { EinstufungsArt, EinstufungsEbene, FormArt, RueckmeldungMeta } from '../model/types'
 import { useRueckmeldung } from '../store'
 
+/** „Schriftlich + Verbesserungstipps · ohne Note" – die Zeile der zugeklappten Karte */
+export function artZusammenfassung(m: RueckmeldungMeta): string {
+  const formen = formenVon(m).map((f) => FORMEN.find((x) => x.id === f)?.label ?? f)
+  const art = einstufungVon(m)
+  return `${formen.join(' + ')} · ${art === 'keine' ? 'ohne Note' : (EINSTUFUNGEN.find((e) => e.id === art)?.label ?? art)}`
+}
+
 /**
- * Art der Rückmeldung (29.09.2026, Wunsch der Lehrkraft): links unter der Lerngruppe. Zwei
- * Gruppen – Formen (mehrere) und Einstufung (eine oder keine) –, dazu die Ebene der Einstufung,
- * die Elternfassung und die Hinweise des Landes mit Fundstelle.
+ * Art der Rückmeldung (29.09.2026, Wunsch der Lehrkraft): Formen (mehrere) und Einstufung (eine
+ * oder keine), dazu die Ebene der Einstufung, die Elternfassung und die Hinweise des Landes.
+ *
+ * Neu gestaltet (23.10.2026, Multiple Choice): zugeklappt nur eine Zeile „Schriftlich + Tipps ·
+ * ohne Note" mit „Ändern"; aufgeklappt die Formen als Kacheln und die Einstufung als
+ * Auswahlliste. Hinweise des Landes stehen zugeklappt nur, wenn sie warnen.
  */
 export default function ArtKarte(): React.JSX.Element | null {
   const { dok: r, update } = useRueckmeldung()
+  // Im Expertenmodus gleich offen – dort steht alles da
+  const [offen, setOffen] = useState(useExperte())
   if (!r) return null
   const formen = formenVon(r.meta)
   const art = einstufungVon(r.meta)
   const hinweise = einstufungsHinweise(r.meta, art)
+  const gesperrt = einstufungGesperrt(art, r.meta)
 
   const setzeForm = (f: FormArt, an: boolean): void =>
     update((d) => {
@@ -29,82 +43,28 @@ export default function ArtKarte(): React.JSX.Element | null {
 
   return (
     <Card withBorder data-rm-art>
-      <Title order={4} mb="sm">
-        Art der Rückmeldung
-      </Title>
-      <Stack gap="md">
-        <div>
-          <Text size="sm" fw={600} mb={4}>
-            Form (mehrere möglich)
+      <Group justify="space-between" wrap="nowrap" gap="sm">
+        <div style={{ minWidth: 0 }}>
+          <Text fw={600}>Art der Rückmeldung</Text>
+          <Text size="sm" c="dimmed" data-rm-art-zeile>
+            {artZusammenfassung(r.meta)}
           </Text>
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6} verticalSpacing={6}>
-            {FORMEN.map((f) => (
-              <Checkbox
-                key={f.id}
-                checked={formen.includes(f.id)}
-                onChange={(e) => setzeForm(f.id, e.currentTarget.checked)}
-                label={f.label}
-                description={f.beschreibung}
-                data-form={f.id}
-              />
-            ))}
-          </SimpleGrid>
         </div>
-        <div>
-          <Text size="sm" fw={600} mb={4}>
-            Einstufung (eine oder keine)
-          </Text>
-          <Radio.Group value={art} onChange={(v) => update((d) => (d.meta.einstufung = v as EinstufungsArt))}>
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6} verticalSpacing={6}>
-              {EINSTUFUNGEN.map((e) => {
-                const gesperrt = einstufungGesperrt(e.id, r.meta)
-                const knopf = (
-                  <Radio value={e.id} label={e.label} description={e.beispiel} disabled={Boolean(gesperrt) && art !== e.id} data-einstufung={e.id} />
-                )
-                return gesperrt ? (
-                  <Tooltip key={e.id} label={gesperrt} multiline w={260}>
-                    <div>{knopf}</div>
-                  </Tooltip>
-                ) : (
-                  <div key={e.id}>{knopf}</div>
-                )
-              })}
-            </SimpleGrid>
-          </Radio.Group>
-        </div>
-        <NurExperte>
-          {art !== 'keine' && (
-            <div>
-              <Text size="sm" fw={600} mb={4}>
-                Einstufung gilt für
-              </Text>
-              <SegmentedControl size="xs" data={EBENEN} value={ebeneVon(r.meta)} onChange={(v) => update((d) => (d.meta.ebene = v as EinstufungsEbene))} />
-              <Text size="xs" c="dimmed" mt={6}>
-                Die KI schlägt nur vor (mit Begründung); die Einstufung wird vor dem Export bestätigt. Noten folgen dem Notenschlüssel aus den Einstellungen.
-              </Text>
-            </div>
-          )}
-        </NurExperte>
-        <NurExperte geaendert={Boolean(r.meta.elternfassung) && 'Elternfassung'}>
-          <Checkbox
-            checked={Boolean(r.meta.elternfassung)}
-            onChange={(e) => {
-              const an = e.currentTarget.checked
-              update((d) => (d.meta.elternfassung = an))
-            }}
-            label="Elternfassung"
-            description="Kurze Fassung in einfacher Sprache für die Eltern, übersetzbar in die Familiensprache"
-            data-rm-eltern
-          />
-        </NurExperte>
-        {einstufungGesperrt(art, r.meta) && (
-          <Alert color="orange" variant="light" p="xs" icon={<IconAlertTriangle size={16} />}>
-            <Text size="xs">{einstufungGesperrt(art, r.meta)}</Text>
-          </Alert>
-        )}
-        {hinweise.map((h, i) => (
+        <Button variant="light" size="xs" onClick={() => setOffen((o) => !o)} aria-expanded={offen} data-rm-art-aendern>
+          {offen ? 'Fertig' : 'Ändern'}
+        </Button>
+      </Group>
+      {gesperrt && (
+        <Alert color="orange" variant="light" p="xs" mt="sm" icon={<IconAlertTriangle size={16} />}>
+          <Text size="xs">{gesperrt}</Text>
+        </Alert>
+      )}
+      {hinweise
+        .filter((h) => offen || h.warnung)
+        .map((h, i) => (
           <Alert
             key={i}
+            mt="sm"
             variant="light"
             color={h.warnung ? 'orange' : 'gray'}
             icon={h.warnung ? <IconAlertTriangle size={16} /> : <IconInfoCircle size={16} />}
@@ -119,7 +79,80 @@ export default function ArtKarte(): React.JSX.Element | null {
             )}
           </Alert>
         ))}
-      </Stack>
+      <Collapse expanded={offen}>
+        <Stack gap="md" mt="md">
+          <div>
+            <Text size="sm" fw={600} mb={6}>
+              Form (mehrere möglich)
+            </Text>
+            <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={8} verticalSpacing={8}>
+              {FORMEN.map((f) => (
+                <Checkbox.Card
+                  key={f.id}
+                  className="rm-kachel"
+                  checked={formen.includes(f.id)}
+                  onClick={() => setzeForm(f.id, !formen.includes(f.id))}
+                  data-form={f.id}
+                >
+                  <Group wrap="nowrap" align="flex-start" gap="sm">
+                    <Checkbox.Indicator mt={2} />
+                    <div>
+                      <Text size="sm" fw={600}>
+                        {f.label}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {f.beschreibung}
+                      </Text>
+                    </div>
+                  </Group>
+                </Checkbox.Card>
+              ))}
+            </SimpleGrid>
+          </div>
+          <Select
+            label="Einstufung"
+            maw={360}
+            data={EINSTUFUNGEN.map((e) => ({ value: e.id, label: e.label, disabled: Boolean(einstufungGesperrt(e.id, r.meta)) && art !== e.id }))}
+            value={art}
+            onChange={(v) => v && update((d) => (d.meta.einstufung = v as EinstufungsArt))}
+            allowDeselect={false}
+            // Gesperrte Stufen nennen ihren Grund gleich in der Liste (vorher im Tooltip)
+            renderOption={({ option }) => {
+              const sperre = einstufungGesperrt(option.value as EinstufungsArt, r.meta)
+              return (
+                <div data-einstufung={option.value}>
+                  <Text size="sm">{option.label}</Text>
+                  <Text size="xs" c="dimmed">
+                    {sperre && art !== option.value ? sperre : EINSTUFUNGEN.find((x) => x.id === option.value)?.beispiel}
+                  </Text>
+                </div>
+              )
+            }}
+            data-rm-einstufung
+          />
+          {art !== 'keine' && (
+            <div>
+              <Text size="sm" fw={600} mb={4}>
+                Einstufung gilt für
+              </Text>
+              <SegmentedControl size="xs" data={EBENEN} value={ebeneVon(r.meta)} onChange={(v) => update((d) => (d.meta.ebene = v as EinstufungsEbene))} />
+              <Text size="xs" c="dimmed" mt={6}>
+                Die KI schlägt nur vor (mit Begründung); die Einstufung wird vor dem Export bestätigt. Noten folgen dem Notenschlüssel aus den Einstellungen.
+              </Text>
+            </div>
+          )}
+          <Checkbox
+            checked={Boolean(r.meta.elternfassung)}
+            onChange={(e) => {
+              const an = e.currentTarget.checked
+              update((d) => (d.meta.elternfassung = an))
+            }}
+            label="Elternfassung"
+            description="Kurze Fassung in einfacher Sprache für die Eltern, übersetzbar in die Familiensprache"
+            data-rm-eltern
+          />
+        </Stack>
+      </Collapse>
     </Card>
   )
 }

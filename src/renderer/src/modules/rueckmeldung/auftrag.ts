@@ -81,7 +81,7 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
     },
     abschluss: ({ fertig, fehler }) =>
       `${fertig.size} Rückmeldung${fertig.size === 1 ? '' : 'en'} fertig${fehler.length ? ` – nicht gelungen: ${fehler.join(' · ')}` : ''}`,
-    ablegen: ({ fertig }, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, abgaben: aktuell.abgaben.map((a) => fertig.get(a.id) ?? a) }), 1)
+    ablegen: ({ fertig }, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, abgaben: aktuell.abgaben.map((a) => fertig.get(a.id) ?? a) }), 2)
   })
 }
 
