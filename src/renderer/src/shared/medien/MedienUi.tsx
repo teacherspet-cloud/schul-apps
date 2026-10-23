@@ -263,7 +263,8 @@ export function TonZelle({
   gesprochen,
   stimmlage,
   lagenDa,
-  neuErzeugen
+  neuErzeugen,
+  nurLesen = false
 }: {
   ton?: { datei: string; url?: string; text: string; gesprochen?: string; pruefung?: TonPruefung; vorher?: { datei: string } }
   text: string
@@ -280,6 +281,8 @@ export function TonZelle({
   lagenDa?: Stimmlage[]
   /** Nur Admins (12.10.2026): Rechtsklick bzw. langer Druck auf das Symbol – neu erzeugen, die bisherige bleibt als Rückfall */
   neuErzeugen?: (lagen: Stimmlage[], grund: string) => Promise<void>
+  /** Reine Ansicht ohne Bearbeiten (23.10.2026, Wunsch der Lehrkraft): unsichere Aufnahmen nicht hervorheben */
+  nurLesen?: boolean
 }): React.JSX.Element | null {
   const [laeuft, setLaeuft] = useState(false)
   // Prüfung per Messung (12.10.2026): gespeichert oder in dieser Sitzung nachgeprüft
@@ -306,7 +309,7 @@ export function TonZelle({
      * Verdacht (12.10.2026, shared/tonPruefung.ts): orangefarbener Rand und Warnzeichen, im Tooltip die gemessenen Gründe.
      * Admins öffnen mit Rechtsklick (Tablet: langer Druck) das Menü „Neue Aussprache erzeugen".
      */
-    const verdacht = pruefung?.stufe === 'verdacht'
+    const verdacht = pruefung?.stufe === 'verdacht' && !nurLesen
     const hinweis = (art === 'wort' ? 'Aussprache anhören' : 'Beispielsatz anhören') + fassung
     const knopf = (
       <Tooltip label={verdacht ? `${verdachtText(pruefung)}${fassung}` : hinweis} multiline maw={320}>

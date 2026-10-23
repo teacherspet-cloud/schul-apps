@@ -14,6 +14,7 @@ import SicherungEinlesen from './SicherungEinlesen'
 import MehrText from '../shared/components/MehrText'
 import { useTelefon } from '../shared/touch/touchModus'
 import { SchuldatenAngebot, useSchulVorbelegung } from './SchuldatenAngebot'
+import { aufNeustartHoeren } from './einrichtungNeu'
 
 /**
  * Der Einrichtungsassistent nach dem ersten Start oder nach dem Zurücksetzen.
@@ -85,6 +86,18 @@ export default function Einrichtung(): React.JSX.Element | null {
       abgebrochen = true
     }
   }, [settings.schoolName, geprueft])
+
+  // „Einrichtung neu starten" aus den Einstellungen (23.10.2026, shell/einrichtungNeu.ts): von vorn, mit allen Angaben
+  useEffect(
+    () =>
+      aufNeustartHoeren(() => {
+        iservAmAnfang.current = null
+        setSchritt(0)
+        setGeprueft(true)
+        setOffen(true)
+      }),
+    []
+  )
 
   // Neue Nutzer beginnen im Standardmodus (07.10.2026); wer schon gewählt hat, behält seine Wahl
   useEffect(() => {

@@ -539,7 +539,13 @@ const Zeile = memo(function Zeile({
   fassungSpeichern
 }: ZeilenProps): React.JSX.Element {
   // Fassungen der Aussprache (07.10.2026): ohne eingestellte Stimme eine Zelle wie bisher (weiblich = bisherige Felder)
-  const lagen: Stimmlage[] = lagenText ? (lagenText.split(',') as Stimmlage[]) : ['w']
+  const eingestellt: Stimmlage[] = lagenText ? (lagenText.split(',') as Stimmlage[]) : ['w']
+  /*
+   * Ohne Admin-Recht (23.10.2026, Befund der Lehrkraft: „nur die weiblichen Aussprachedateien werden angezeigt"): Die
+   * eingestellten Stimmen lädt nur der Admin – alle anderen sehen die Fassungen, zu denen es eine Aufnahme gibt.
+   */
+  const vorhanden = (['w', 'm'] as Stimmlage[]).filter((l) => tonVon(sicht, l) || satzTonVon(sicht, satzDerZeile(v, mitBeispiel), l))
+  const lagen: Stimmlage[] = medienAdmin || !vorhanden.length ? eingestellt : vorhanden
   const zwei = lagen.length > 1
   const name = v.term.trim() || `Zeile ${nr}`
   /*
@@ -725,6 +731,7 @@ const Zeile = memo(function Zeile({
                   stimmlage={l}
                   lagenDa={lagenText ? lagen : undefined}
                   admin={medienAdmin}
+                  nurLesen={nurLesen}
                   gesprochen={sprechtext}
                   erzeugen={() => tonFuer(v.term, 'wort', v.term, l)}
                   neuErzeugen={medienAdmin && lagenText ? (ls, grund) => neuFuer(v.term, 'wort', undefined, ls, grund) : undefined}
@@ -745,6 +752,7 @@ const Zeile = memo(function Zeile({
                   stimmlage={l}
                   lagenDa={lagenText ? lagen : undefined}
                   admin={medienAdmin}
+                  nurLesen={nurLesen}
                   erzeugen={() => tonFuer(v.term, 'satz', satz ?? '', l)}
                   neuErzeugen={medienAdmin && lagenText ? (ls, grund) => neuFuer(v.term, 'satz', satz, ls, grund) : undefined}
                 />

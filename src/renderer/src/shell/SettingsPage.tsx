@@ -1,4 +1,5 @@
 import { VokabelStimmenCard } from '../shared/medien/VokabelStimmen'
+import { einrichtungNeuStarten } from './einrichtungNeu'
 import { ActionIcon, Anchor, Badge, Box, Button, Card, Checkbox, Container, Divider, Group, Modal, PasswordInput, ScrollArea, SegmentedControl, Select, SimpleGrid, Stack, Switch, Tabs, Text, Title, Tooltip, UnstyledButton, useComputedColorScheme, Alert } from '@mantine/core'
 import {
   IconCheck,
@@ -13,6 +14,7 @@ import {
   IconPhoto,
   IconRefresh,
   IconKey,
+  IconWand,
   IconSchool,
   IconSparkles,
   IconSun
@@ -122,9 +124,15 @@ export default function SettingsPage(): React.JSX.Element {
         {/* Server: Konto und Abmelden – auch auf dem Telefon, wo die Leiste fehlt (02.10.2026) */}
         {aufServer() && (
           <Group justify="space-between" mb="md" data-konto>
-            <Text size="sm" c="dimmed">
-              Angemeldet als {serverIch()?.name || serverIch()?.benutzer} ({serverIch()?.benutzer})
-            </Text>
+            <Group gap="xs" wrap="wrap">
+              <Text size="sm" c="dimmed">
+                Angemeldet als {serverIch()?.name || serverIch()?.benutzer} ({serverIch()?.benutzer})
+              </Text>
+              {/* Einrichtung neu starten (23.10.2026, Wunsch der Lehrkraft): mit allen eingetragenen Angaben zum Ändern */}
+              <Button size="xs" variant="subtle" leftSection={<IconWand size={14} />} onClick={einrichtungNeuStarten} data-einrichtung-neu>
+                Einrichtung neu starten
+              </Button>
+            </Group>
             <Group gap="xs">
               {/* Datenschutz und Impressum (22.10.2026, Prüfung des Schulträgers) – öffentliche Seiten des Servers */}
               <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs" c="dimmed" data-link-datenschutz>

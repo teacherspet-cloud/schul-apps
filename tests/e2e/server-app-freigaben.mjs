@@ -132,7 +132,8 @@ try {
       'Zeile hinzufügen': await seite.getByRole('button', { name: 'Zeile hinzufügen' }).count(),
       Speichern: await seite.getByRole('button', { name: /^(Speichern|Gesichert)$/ }).count(),
       'Änderungen verwerfen': await seite.getByRole('button', { name: 'Änderungen verwerfen' }).count(),
-      'Admin-Medienbank': await seite.locator('[data-medien-leiste]').count()
+      'Admin-Medienbank': await seite.locator('[data-medien-leiste]').count(),
+      'unsichere Aufnahmen hervorgehoben': await seite.locator('[data-aussprache-verdacht]').count()
     }
     pruefe(
       Object.values(befund).every((n) => n === 0) && (await seite.locator('[data-angaben-nur-lesen]').count()) === 1,
@@ -221,6 +222,41 @@ try {
 
   // ---------- 7. Vokabellisten (23.10.2026): gemeinsame Lehrwerke sehen für Lehrkräfte nach reinem Lesen aus
   await lehrwerkAnsehen(await seiteAuf(lea.ctx), 'Lehrkraft')
+
+  // ---------- 8. Einstellungen: „Einrichtung neu starten“ (23.10.2026) – Assistent mit den vorhandenen Angaben
+  await lea.api('settings:set', { schoolName: 'Probeschule am See' })
+  const einst = await seiteAuf(lea.ctx)
+  await einst.locator('.app-leiste [aria-label^="Einstellungen"], [aria-label="Einstellungen"]').first().click()
+  await einst.waitForTimeout(1200)
+  const neuKnopf = einst.locator('[data-einrichtung-neu]')
+  pruefe(await neuKnopf.isVisible().catch(() => false), 'Einstellungen: „Einrichtung neu starten“ neben „Angemeldet als …“')
+  if (await neuKnopf.isVisible().catch(() => false)) {
+    await neuKnopf.click()
+    const titel = einst.getByText('Willkommen bei Schul-Apps', { exact: true })
+    const auf = await titel.waitFor({ timeout: 8000 }).then(
+      () => true,
+      () => false
+    )
+    pruefe(auf, '… der Einrichtungsassistent öffnet sich')
+    // Bis zum Schritt „Schule“ blättern und dort den eingetragenen Schulnamen finden
+    let gefunden = false
+    for (let i = 0; i < 4 && auf && !gefunden; i++) {
+      // Im Feld – oder als Text, wenn die Schulverwaltung die Schule festlegt
+      gefunden = await einst.evaluate(() => {
+        const box = [...document.querySelectorAll('.mantine-Modal-content')].pop()
+        if (!box) return false
+        return [...box.querySelectorAll('input')].some((e) => e.value === 'Probeschule am See') || /Probeschule am See|von der Schulverwaltung festgelegt/.test(box.textContent ?? '')
+      })
+      if (!gefunden) {
+        const weiter = einst.locator('.mantine-Modal-content').last().getByRole('button', { name: /^(Weiter|Überspringen)/ }).first()
+        if (!(await weiter.count())) break
+        await weiter.click()
+        await einst.waitForTimeout(500)
+      }
+    }
+    pruefe(gefunden, '… mit den vorhandenen Angaben (Schulname steht im Feld)')
+    await einst.screenshot({ path: join(out, 'einrichtung-neu.png') })
+  }
 
   // Das eigene Fenster des Admins bleibt die Admin-Sicht
   const admin2 = await seiteAuf(verwaltung)
