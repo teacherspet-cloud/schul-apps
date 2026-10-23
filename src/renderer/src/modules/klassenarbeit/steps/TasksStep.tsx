@@ -787,7 +787,8 @@ function TasksInhalt({ exam }: { exam: Exam }): React.JSX.Element {
                     if (v.bilder) Object.assign(x, bilderVerkleinern({ ...x }).doc)
                   })
                 }
-                kuerzungUebernehmen={(k) => updateExam((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
+                quelle={exam}
+              kuerzungUebernehmen={(k) => updateExam((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
               />
             )}
             <NurExperte>

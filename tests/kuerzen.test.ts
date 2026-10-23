@@ -67,3 +67,41 @@ describe('KI-Kürzung', () => {
     expect(doc.parts[0].blocks.length).toBe(3)
   })
 })
+
+describe('Probelauf mit echter KI (23.10.2026)', () => {
+  it('von der App ergänzte Bausteine (Kopf, Operatorenliste) sind unveränderlich; Hilfen und Infokästen bleiben', () => {
+    const blatt = {
+      sheets: [
+        {
+          id: 'a',
+          label: 'A',
+          blocks: [
+            { id: 'exam-head', type: 'infoBox', title: 'Exam – Group A', body: 'Name …' },
+            { id: 'h1', type: 'scaffold', title: 'Hilfekarten', items: ['x'] },
+            { id: 'i1', type: 'selfCheck', title: 'Wie gut kann ich das?', statements: ['x'] }
+          ]
+        },
+        {
+          id: 'b',
+          label: 'B',
+          blocks: [
+            { id: 'exam-b-head', type: 'infoBox', title: 'Exam – Group B', body: 'Name …' },
+            { id: 'div', type: 'divider', title: 'Gruppe B' },
+            { id: 'h1-b', type: 'scaffold', title: 'Hilfekarten', items: ['x'] },
+            { id: 'i1-b', type: 'selfCheck', title: 'Wie gut kann ich das?', statements: ['x'] }
+          ]
+        }
+      ]
+    } as unknown as Worksheet
+    // Gespeichert sind nur die eigenen Bausteine – Kopf und Gruppenzeile setzt die App
+    const quelle = {
+      parts: [{ blocks: [blatt.sheets[0].blocks[1], blatt.sheets[0].blocks[2]], weitereFassungen: [[blatt.sheets[1].blocks[2], blatt.sheets[1].blocks[3]]] }]
+    }
+    expect(kuerzAnfrage(blatt, 3, quelle).user).toContain('[exam-head] Infokasten – unveränderlich')
+    const k = kuerzungAus(blatt, { aenderungen: [{ blockId: 'exam-head', feld: 'body', text: 'N' }], weglassen: ['exam-head', 'h1', 'i1'] }, quelle)
+    expect(k.aenderungen).toEqual([])
+    // Entsprechung in B über „n-te Selbsteinschätzung“, nicht über die Stelle (B hat davor eine Zeile mehr)
+    expect(k.weglassen.map((w) => w.blockId).sort()).toEqual(['i1', 'i1-b'])
+    expect(kuerzungAus(blatt, { aenderungen: [], weglassen: ['exam-head'] }).weglassen).toEqual([])
+  })
+})

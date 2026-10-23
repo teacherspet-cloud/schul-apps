@@ -95,10 +95,13 @@ try {
       JSON.stringify({
         verzoegerungMs: 300,
         antworten: {
-          material_kuerzen: {
-            aenderungen: [{ blockId: aufgabe.id, feld: 'instruction', text: 'KURZ: ' + aufgabe.instruction.slice(0, 20) }],
-            weglassen: [zugabe.id, aufgabe.id]
-          }
+          // ANTWORT=<Bericht aus tests/redteam/kuerzen.redteam.ts>: die echte KI-Antwort einspielen
+          material_kuerzen: process.env.ANTWORT
+            ? JSON.parse(readFileSync(process.env.ANTWORT, 'utf8')).rohAntwort
+            : {
+                aenderungen: [{ blockId: aufgabe.id, feld: 'instruction', text: 'KURZ: ' + aufgabe.instruction.slice(0, 20) }],
+                weglassen: [zugabe.id, aufgabe.id]
+              }
         }
       })
     )
@@ -117,7 +120,8 @@ try {
     await p.screenshot({ path: join(out, '3-kuerzung.png') })
     await p.locator('[data-weniger-seiten-kuerzung-uebernehmen]').click()
     await p.waitForTimeout(3000)
-    pruefe(await p.locator('.editor-canvas').getByText('KURZ:').first().isVisible(), 'Gekürzte Aufgabenstellung steht im Blatt')
+    if (!process.env.ANTWORT) pruefe(await p.locator('.editor-canvas').getByText('KURZ:').first().isVisible(), 'Gekürzte Aufgabenstellung steht im Blatt')
+    else pruefe((await p.locator('.editor-canvas').getByText('Expectation grid').count()) === 0, 'Weggelassene Selbsteinschätzung ist fort')
     writeFileSync(process.env.ATTRAPPE, '{}')
   }
   if (await vorschlag.isVisible()) {

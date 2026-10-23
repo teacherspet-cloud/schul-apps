@@ -380,7 +380,8 @@ function TestEditorInhalt(): React.JSX.Element {
                     if (v.bilder) Object.assign(x, bilderVerkleinern({ ...x }).doc)
                   })
                 }
-                kuerzungUebernehmen={(k) => update((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
+                quelle={test}
+              kuerzungUebernehmen={(k) => update((x) => void Object.assign(x, wendeKuerzungAn({ ...x }, k)))}
               />
             )}
             {/* Als Onlinetest (05.10.2026): dieselbe Durchführung wie beim Vokabeltest */}

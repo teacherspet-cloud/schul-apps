@@ -8,8 +8,8 @@ import type { Worksheet, WsBlock } from '../model/types'
  * Nachtrag der Lehrkraft: „wenn inhalte gestrichen werden, muss dies bei A/B, A/B/C, A/B/C/D Tests beachtet werden,
  * damit alle Tests die gleichen Anforderungen und Punktzahlen haben." Deshalb:
  * - Bewertete Aufgaben werden NIE gestrichen und ihre Punkte nie angefasst – nur ihre Aufgabenstellung kürzer gefasst.
- * - Weglassen lassen sich nur unbewertete Zugaben (Lernziele, Selbsteinschätzung, Infokasten, Hilfen, Redemittel,
- *   Schmuckbild) – und dann in ALLEN Fassungen (die App ergänzt die Entsprechung, wenn die KI eine vergisst).
+ * - Weglassen lassen sich nur unbewertete Zugaben (Lernziele, Selbsteinschätzung, Schmuckbild) – und dann
+ *   in ALLEN Fassungen (die App ergänzt die Entsprechung, wenn die KI eine vergisst).
  * - Bei mehreren Fassungen bekommt die KI alle zugleich und kürzt Entsprechendes gleich.
  * - Materialtexte mit Zeilennummern oder Quellenangabe bleiben wörtlich (Zitate, Zeilenverweise der Aufgaben).
  */
@@ -22,16 +22,55 @@ export interface Kuerzung {
   weglassen: { blockId: string; wo: string; gruppe: string }[]
 }
 
-/** Unbewertete Zugaben, die wegfallen dürfen */
-const WEGLASSBAR = new Set<WsBlock['type']>(['learningGoals', 'selfCheck', 'infoBox', 'scaffold', 'phrases'])
+/**
+ * Unbewertete Zugaben, die wegfallen dürfen. NICHT Hilfen und Redemittel (Probelauf mit echter KI, 23.10.2026: sie
+ * strich die Hilfekarten – das macht die Aufgabe schwerer, ist also keine Kürzung) und NICHT Infokästen (zweiter
+ * Probelauf: sie strich eine Begriffsklärung, die eine Aufgabe braucht; Merke/Definition/Regel sind Inhalt).
+ */
+const WEGLASSBAR = new Set<WsBlock['type']>(['learningGoals', 'selfCheck'])
+
+/**
+ * Kennungen aller Bausteine im gespeicherten Dokument. Was die App beim Setzen selbst ergänzt (Kopf der Klassenarbeit,
+ * Operatorenliste, Lösungsschlüssel), steht dort nicht – das bleibt unveränderlich (Probelauf: die KI wollte Kopf und
+ * Operatorenliste einer Klassenarbeit weglassen; ins Dokument geschrieben hätte das nichts bewirkt).
+ */
+export function bausteinIds(doc: unknown): Set<string> {
+  const ids = new Set<string>()
+  const gehe = (x: unknown): void => {
+    if (Array.isArray(x)) return x.forEach(gehe)
+    if (!x || typeof x !== 'object') return
+    const o = x as Record<string, unknown>
+    if (typeof o.type === 'string' && typeof o.id === 'string') ids.add(o.id)
+    Object.values(o).forEach(gehe)
+  }
+  gehe(doc)
+  return ids
+}
+
+/** Darf `b` geändert werden – steht er im gespeicherten Dokument? (ohne Angabe: ja) */
+let imDokument: (b: WsBlock) => boolean = () => true
+function mitQuelle<T>(quelle: unknown, fn: () => T): T {
+  const vorher = imDokument
+  if (quelle !== undefined) {
+    const ids = bausteinIds(quelle)
+    imDokument = (b) => ids.has(b.id)
+  }
+  try {
+    return fn()
+  } finally {
+    imDokument = vorher
+  }
+}
 
 function weglassbar(b: WsBlock): boolean {
+  if (!imDokument(b)) return false
   if (b.type === 'image') return b.role === 'motivation' || b.fn === 'schmuck'
   return WEGLASSBAR.has(b.type)
 }
 
 /** Welche Texte eines Bausteins gekürzt werden dürfen */
 function kuerzbareFelder(b: WsBlock): KuerzFeld[] {
+  if (!imDokument(b)) return []
   if (b.type === 'task') return ['instruction']
   if (b.type === 'infoBox') return ['body']
   // Quellentexte und Texte mit Zeilennummern bleiben wörtlich
@@ -61,7 +100,12 @@ function kurzBeschreibung(b: WsBlock): string {
     .slice(0, 60)
 }
 
-export function kuerzAnfrage(ws: Worksheet, seiten: number): StructuredRequest {
+/** `quelle`: das gespeicherte Dokument (Klassenarbeit, Lernzielkontrolle …), wenn das Blatt daraus erst gesetzt wird */
+export function kuerzAnfrage(ws: Worksheet, seiten: number, quelle?: unknown): StructuredRequest {
+  return mitQuelle(quelle, () => anfrage(ws, seiten))
+}
+
+function anfrage(ws: Worksheet, seiten: number): StructuredRequest {
   const fassungen = ws.sheets.length > 1
   const zeilen: string[] = []
   ws.sheets.forEach((s) => {
@@ -87,7 +131,7 @@ export function kuerzAnfrage(ws: Worksheet, seiten: number): StructuredRequest {
     user: [
       `Das Material braucht jetzt ${seiten} Seiten; Ziel sind ${seiten - 1}. Schrift, Abstände und Bilder sind schon so klein wie erlaubt.`,
       'REGELN:',
-      '- Kürze Aufgabenstellungen (instruction) und Texte (body, intro) knapper: Füllwörter, Wiederholungen, umständliche Einleitungen weg. Operator, Arbeitsauftrag, verlangte Menge und Bedingungen (z. B. „zwei Beispiele“, „mit Belegen“) bleiben VOLLSTÄNDIG erhalten – gleiche Anforderung, gleiche Punkte.',
+      '- Kürze Aufgabenstellungen (instruction) und Texte (body, intro) knapper: Füllwörter, Wiederholungen, umständliche Einleitungen weg. Operator, Arbeitsauftrag, verlangte Menge und Bedingungen bleiben VOLLSTÄNDIG erhalten – gleiche Anforderung, gleiche Punkte. Bedingungen sind auch Zeitpunkt und Art der Bearbeitung („while watching“, „während des Hörens“, „in zwei Sätzen“, „mit Belegen“, „in eigenen Worten“).',
       '- Verweise, Markierungen und Platzhalter bleiben wörtlich: M1/M2, M{…}, [[…]], **…**, Zeilenangaben, Formeln, Zahlen.',
       '- Weglassen (weglassen) nur Bausteine, die mit „darf wegfallen“ gekennzeichnet sind, und nur, wenn Kürzen allein nicht reicht. Aufgaben werden nie weggelassen.',
       fassungen
@@ -130,7 +174,11 @@ const wo = (ws: Worksheet, sheetIndex: number, b: WsBlock): string =>
   }`
 
 /** Die Antwort prüfen: nur erlaubte Felder, nur Kürzeres, Weglassen nur Zugaben und in allen Fassungen gleich */
-export function kuerzungAus(ws: Worksheet, daten: unknown): Kuerzung {
+export function kuerzungAus(ws: Worksheet, daten: unknown, quelle?: unknown): Kuerzung {
+  return mitQuelle(quelle, () => auswerten(ws, daten))
+}
+
+function auswerten(ws: Worksheet, daten: unknown): Kuerzung {
   const d = (daten ?? {}) as { aenderungen?: unknown; weglassen?: unknown }
   const finde = (id: string): { b: WsBlock; i: number; k: number } | null => {
     for (const [i, s] of ws.sheets.entries()) {
@@ -155,13 +203,19 @@ export function kuerzungAus(ws: Worksheet, daten: unknown): Kuerzung {
   for (const id of Array.isArray(d.weglassen) ? d.weglassen : []) {
     const f = finde(String(id))
     if (!f || !weglassbar(f.b)) continue
-    const gruppe = `${f.b.type}@${f.k}`
+    /*
+     * Entsprechung in den anderen Fassungen: der n-te Baustein derselben Art (nicht dieselbe Stelle – eine Fassung kann
+     * davor einen Baustein mehr haben, Probelauf 23.10.2026: Kopf der Fassung B)
+     */
+    const nte = (s: Worksheet['sheets'][number], k: number): number => s.blocks.slice(0, k).filter((x) => x.type === f.b.type).length
+    const n = nte(ws.sheets[f.i], f.k)
+    const gruppe = `${f.b.type}#${n}`
     if (weg.has(f.b.id)) continue
     weg.set(f.b.id, { wo: wo(ws, f.i, f.b), gruppe })
     // Gleiche Anforderungen in allen Fassungen: die Entsprechung (gleiche Art an gleicher Stelle) fällt ebenfalls weg
     ws.sheets.forEach((s, i) => {
       if (i === f.i) return
-      const gegen = s.blocks[f.k]
+      const gegen = s.blocks.filter((x) => x.type === f.b.type)[n]
       if (gegen && gegen.type === f.b.type && weglassbar(gegen) && !weg.has(gegen.id)) weg.set(gegen.id, { wo: wo(ws, i, gegen), gruppe })
     })
   }

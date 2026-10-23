@@ -34,6 +34,7 @@ export function WenigerSeitenKnopf({
   logo,
   schule,
   alleFassungen,
+  quelle,
   uebernehmen,
   kuerzungUebernehmen
 }: {
@@ -43,6 +44,8 @@ export function WenigerSeitenKnopf({
   schule: string
   /** Zeigt der Editor nur eine Fassung, wird mit allen gemessen – sie ändern sich gleich (Lernzielkontrolle) */
   alleFassungen?: Worksheet
+  /** Das gespeicherte Dokument, aus dem das Blatt gesetzt wird (Klassenarbeit …) – nur dessen Bausteine sind änderbar */
+  quelle?: unknown
   uebernehmen: (v: SeitenVorschlag) => void
   /** Kürzung der KI ins Dokument schreiben (wendeKuerzungAn) */
   kuerzungUebernehmen: (k: Kuerzung) => void
@@ -70,7 +73,7 @@ export function WenigerSeitenKnopf({
     const nr = ++lauf.current
     setZ({ art: 'ki' })
     try {
-      const k = kuerzungAus(alle, await window.api.ai.structured<unknown>(kuerzAnfrage(alle, vorher)))
+      const k = kuerzungAus(alle, await window.api.ai.structured<unknown>(kuerzAnfrage(alle, vorher, quelle)), quelle)
       if (lauf.current !== nr) return
       if (!k.aenderungen.length && !k.weglassen.length) {
         setZ({ art: 'fehler', text: 'Die KI hat keine Kürzung gefunden, die die Anforderungen gleich lässt.' })
@@ -142,7 +145,7 @@ export function WenigerSeitenKnopf({
               Bilder werden dafür nicht unter ihre Mindestgröße gesetzt.
             </Alert>
             <Text size="sm">
-              Die KI kann Aufgabenstellungen und eigene Texte knapper fassen und unbewertete Zugaben (Lernziele, Selbsteinschätzung, Hilfen) weglassen. Aufgaben
+              Die KI kann Aufgabenstellungen und eigene Texte knapper fassen und unbewertete Zugaben (Lernziele, Selbsteinschätzung) weglassen. Aufgaben
               und Punkte bleiben{fassungen ? ', und alle Fassungen ändern sich gleich' : ''}. Jede Kürzung ist vor dem Übernehmen zu sehen.
             </Text>
             <Group justify="flex-end">
