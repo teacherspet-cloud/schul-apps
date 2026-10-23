@@ -104,7 +104,63 @@ export function appFreigegeben(id: string): boolean {
   return ich.apps.includes(id)
 }
 
-export const serverIch =(): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)
+/**
+ * „Ansicht zeigen" (App-Freigaben, 23.10.2026, Wunsch der Lehrkraft): Ein Admin öffnet die App in einem eigenen Fenster
+ * so, wie eine Lehrkraft der gewählten Gruppe sie sieht – ohne Verwaltung, nur mit deren Apps. Gilt nur in diesem
+ * Fenster (sessionStorage) und nur für ein Admin-Konto; der Server behandelt es weiter als Admin.
+ */
+export interface Ansicht {
+  name: string
+  apps: string[]
+}
+const ANSICHT_SCHLUESSEL = 'schulapps-ansicht'
+let ansichtGelesen: Ansicht | null | undefined
+
+export function ansicht(): Ansicht | null {
+  if (typeof window === 'undefined' || window.__schulappsServer?.rolle !== 'admin') return null
+  if (ansichtGelesen !== undefined) return ansichtGelesen
+  ansichtGelesen = null
+  try {
+    const q = new URLSearchParams(window.location.search)
+    if (q.has('ansicht')) {
+      const a: Ansicht = { name: (q.get('ansicht') ?? '').slice(0, 80) || 'Gruppe', apps: (q.get('apps') ?? '').split(',').filter((x) => /^[a-z0-9-]{1,40}$/.test(x)) }
+      sessionStorage.setItem(ANSICHT_SCHLUESSEL, JSON.stringify(a))
+      // Die Angaben gehören nicht in die Adresse, die man weitergibt oder neu lädt
+      q.delete('ansicht')
+      q.delete('apps')
+      window.history.replaceState(null, '', `${window.location.pathname}${q.size ? `?${q}` : ''}${window.location.hash}`)
+    }
+    const roh = sessionStorage.getItem(ANSICHT_SCHLUESSEL)
+    if (roh) {
+      const a = JSON.parse(roh) as Ansicht
+      if (typeof a?.name === 'string' && Array.isArray(a.apps)) ansichtGelesen = { name: a.name, apps: a.apps.map(String) }
+    }
+  } catch {
+    ansichtGelesen = null
+  }
+  return ansichtGelesen
+}
+
+export function ansichtBeenden(): void {
+  try {
+    sessionStorage.removeItem(ANSICHT_SCHLUESSEL)
+  } catch {
+    // ohne Speicher gab es auch keine Ansicht
+  }
+  window.close()
+  // Ließ sich das Fenster nicht schließen (selbst geöffnet): normal neu laden
+  window.location.href = '/'
+}
+
+let alsAnsicht: { von: ServerIch; ich: ServerIch } | null = null
+export const serverIch = (): ServerIch | null => {
+  if (typeof window === 'undefined') return null
+  const ich = window.__schulappsServer ?? null
+  const a = ich ? ansicht() : null
+  if (!ich || !a) return ich
+  if (alsAnsicht?.von !== ich) alsAnsicht = { von: ich, ich: { ...ich, rolle: 'lehrkraft', apps: a.apps, fachobmann: [] } }
+  return alsAnsicht.ich
+}
 
 /** IServ in der Exe „Schul-Apps Online" – gleiche Form wie window.api.iserv, dazu `ablegen` */
 export interface ClientIserv {

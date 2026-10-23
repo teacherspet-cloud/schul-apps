@@ -14,10 +14,9 @@ import type { GrammatikPaket } from '@shared/grammatiktrainer'
 import { fachVon } from '@shared/faecher'
 import { fachDerSprache } from '@shared/fachobleute'
 import type { LehrwerkGrammatikPunkt } from '../../shared/lehrwerkGrammatik'
-import { aufServer } from '../../shared/plattform'
 import { notifyError } from '../../shared/util'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
-import { bankLesen } from './bank'
+import { bankLesen, kurseFreigegeben } from './bank'
 import { teilbereicheVon } from './grammatikformen'
 
 export interface VorschauPunkt {
@@ -62,7 +61,7 @@ export function SchuelerAnsichtKnopf({
   klein?: boolean
 }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
-  if (!aufServer()) return null
+  if (!kurseFreigegeben()) return null
   return (
     <>
       <Button

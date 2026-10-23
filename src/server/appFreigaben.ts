@@ -54,7 +54,11 @@ export function appsFuer(n: { id: string; rolle: string } | undefined): string[]
 }
 
 export function setzeAppGruppen(roh: unknown): AppGruppe[] {
-  const lehrkraefte = new Set(alleNutzer().filter((n) => n.rolle === 'lehrkraft').map((n) => n.id))
+  const lehrkraefte = new Set(
+    alleNutzer()
+      .filter((n) => n.rolle === 'lehrkraft')
+      .map((n) => n.id)
+  )
   const gruppen = pruefeGruppen(roh).map((g) => ({ ...g, mitglieder: g.mitglieder.filter((m) => lehrkraefte.has(m)) }))
   db()
     .prepare(

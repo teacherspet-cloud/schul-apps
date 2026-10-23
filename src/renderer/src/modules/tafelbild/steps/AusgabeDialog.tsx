@@ -1,5 +1,5 @@
 import { Button, Checkbox, Group, Modal, Stack, Text } from '@mantine/core'
-import { aufServer } from '../../../shared/plattform'
+import { appFreigegeben, aufServer } from '../../../shared/plattform'
 import { senden } from '../../onlinetest/serverApi'
 import { LernendeWahl, type LernendeAuswahl } from '../../lernen/LernendeWahl'
 import { tafelSvg } from '../svg'
@@ -161,7 +161,8 @@ export default function AusgabeDialog({
             </Button>
           </Group>
           {/* Lern-App (03.10.2026): Tafelbild in die Mappen der Lernenden (nur mit Server) */}
-          {aufServer() && <TafelFreigabe t={t} />}
+          {/* App-Freigaben (23.10.2026): die Mappen der Lernenden verwaltet „Meine Klassen“ */}
+          {aufServer() && (appFreigegeben('meineklassen') || appFreigegeben('freigaben')) && <TafelFreigabe t={t} />}
         </Stack>
       </Modal>
     </>

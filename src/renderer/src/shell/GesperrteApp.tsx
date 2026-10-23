@@ -49,13 +49,13 @@ export default function GesperrteApp(): React.JSX.Element | null {
       <Stack gap="sm" data-gesperrte-app={ziel.moduleId}>
         <Group gap="xs" wrap="nowrap" align="start">
           <IconLock size={18} style={{ flex: 'none', marginTop: 2 }} />
-          <Text size="sm">
-            Die Schulverwaltung hat „{name}“ für dieses Konto nicht freigegeben. Eine Freigabe erteilen die Admins der Schule.
-          </Text>
+          <Text size="sm">Die Schulverwaltung hat „{name}“ für dieses Konto nicht freigegeben. Eine Freigabe erteilen die Admins der Schule.</Text>
         </Group>
         {ziel.docId && (
           <Text size="sm" c="dimmed">
-            {alsBlatt ? 'Das Material bleibt erhalten. Bearbeiten ist gesperrt, als PDF speichern geht weiterhin.' : 'Das Material bleibt erhalten, lässt sich aber ohne Freigabe nicht öffnen.'}
+            {alsBlatt
+              ? 'Das Material bleibt erhalten. Bearbeiten ist gesperrt, als PDF speichern geht weiterhin.'
+              : 'Das Material bleibt erhalten, lässt sich aber ohne Freigabe nicht öffnen.'}
           </Text>
         )}
         <Group justify="flex-end">

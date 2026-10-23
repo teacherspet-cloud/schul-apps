@@ -13,7 +13,7 @@ import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput,
 import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { BlattAufgabe } from '@shared/blattFreigabe'
-import { aufServer } from '../../shared/plattform'
+import { appFreigegeben, aufServer } from '../../shared/plattform'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
@@ -131,7 +131,8 @@ export default function BlattFreigabeKnopf(props: {
   schoolName: string
 }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
-  if (!aufServer()) return null
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
+  if (!aufServer() || !appFreigegeben('freigaben')) return null
   return (
     <>
       <Button variant="light" leftSection={<IconUsersGroup size={16} />} onClick={() => setOffen(true)} data-blatt-freigeben-knopf>

@@ -12,7 +12,7 @@ import { IconRoute } from '@tabler/icons-react'
 import { create } from 'zustand'
 import { zuordnungAus, type ReiheMitMaterial, type ReiheVerweis, type ReiheZuordnung } from '@shared/reiheMaterial'
 import { holen } from '../modules/onlinetest/serverApi'
-import { aufServer } from './plattform'
+import { appFreigegeben, aufServer } from './plattform'
 import { openDocument } from './navigation'
 
 const SCHLUESSEL = 'schulapps-reihe-material-einblenden'
@@ -50,7 +50,8 @@ export const useReiheZuordnung = create<ReiheZuordnungZustand>((set) => ({
     set({ einblenden: an })
   },
   laden: () => {
-    if (!aufServer()) return Promise.resolve()
+    // App-Freigaben (23.10.2026): ohne Unterrichtsreihe keine Reihen-Kennzeichen, -Schalter und -Hinweise
+    if (!aufServer() || !(appFreigegeben('unterrichtsreihe') || appFreigegeben('laufendereihen'))) return Promise.resolve()
     // Mehrere Bibliotheken bzw. Startseite und Suche zugleich: ein Aufruf genügt
     laufend ??= holen<{ reihen: ReiheMitMaterial[] }>('/server/reihen')
       .then((d) => set({ reihen: d.reihen ?? [], zuordnung: zuordnungAus(d.reihen ?? []) }))

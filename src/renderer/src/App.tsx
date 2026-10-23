@@ -1,7 +1,7 @@
 import { ProgrammInfo } from './shared/components/AppKopf'
 import { fachVorgabenLaden } from './shared/fachvorgaben'
 import { ActionIcon, Anchor, AppShell, Button, Indicator, Tooltip, UnstyledButton } from '@mantine/core'
-import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
+import { appFreigegeben, aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import {
@@ -32,6 +32,7 @@ import Einrichtung from './shell/Einrichtung'
 import ModusSchalter from './shell/ModusSchalter'
 import AuftragsLayer from './shell/AuftragsLayer'
 import GesperrteApp from './shell/GesperrteApp'
+import AnsichtBand from './shell/AnsichtBand'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
@@ -466,6 +467,8 @@ export default function App(): React.JSX.Element {
         {modules
           // Im eigenen Fenster nur dieses eine Programm
           .filter((m) => !einzeln || m.id === einzeln)
+          // App-Freigaben (23.10.2026): gesperrte Apps gar nicht erst einhängen – sonst liefen sie im Hintergrund mit
+          .filter((m) => appFreigegeben(m.id))
           .map((m) => (
             // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
             <div key={m.id} hidden={m.id !== current?.id} className="module-container">
@@ -504,6 +507,7 @@ export default function App(): React.JSX.Element {
       {/* Laufende und fertige Hintergrund-Aufträge – unten rechts über allen Programmen */}
       <AuftragsLayer />
       <GesperrteApp />
+      <AnsichtBand />
       {/* Datenschutzhinweis vor dem Hochladen an eine KI (Großprogramm 0.4) */}
       <DatenschutzDialog />
       {/* Freigabe für die Fachschaft ohne erkanntes Fach: Frage nach dem Fach (10.10.2026) */}

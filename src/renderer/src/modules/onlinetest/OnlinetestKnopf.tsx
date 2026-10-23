@@ -9,7 +9,7 @@ import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stac
 import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
-import { aufServer } from '../../shared/plattform'
+import { appFreigegeben, aufServer } from '../../shared/plattform'
 import { openDocument, openModule } from '../../shared/navigation'
 import { notifyError } from '../../shared/util'
 import { abschnitteAusName } from '../../shared/ueberthema'
@@ -83,7 +83,8 @@ const blattTestName = (q: BlattQuelleOnline, gruppe: string): string =>
 
 export function BlattOnlinetestKnopf({ quelle }: { quelle: () => BlattQuelleOnline }): React.JSX.Element | null {
   const [offen, setOffen] = useState<BlattQuelleOnline | null>(null)
-  if (!aufServer()) return null
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
+  if (!aufServer() || !appFreigegeben('onlinetest')) return null
   return (
     <>
       <Button
@@ -107,7 +108,8 @@ export function BlattOnlinetestKnopf({ quelle }: { quelle: () => BlattQuelleOnli
 
 export default function OnlinetestKnopf({ doc, listName }: { doc: TestDocument; listName?: string }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
-  if (!aufServer()) return null
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
+  if (!aufServer() || !appFreigegeben('onlinetest')) return null
   return (
     <>
       <Button variant="light" leftSection={<IconDeviceLaptop size={16} />} onClick={() => setOffen(true)} data-onlinetest-knopf>

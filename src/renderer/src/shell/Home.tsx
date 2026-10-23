@@ -1,4 +1,6 @@
 import { Schnellzugriff, SchnellzugriffTitel, StartKasten } from './Schnellzugriff'
+import { useSichtbareProgramme } from './programme'
+import { startKarten } from '../shared/programmSichtbarkeit'
 import { appFreigegeben, aufServer, nurPcNetz } from '../shared/plattform'
 import { Alert, Badge, Button, Card, CloseButton, Container, Group, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceFloppy, IconHistory, IconHome, IconSearch } from '@tabler/icons-react'
@@ -79,6 +81,8 @@ const START_INFO = {
  * (zunächst zu, dauerhaft gemerkt) und zeigt auf allen Geräten zunächst 5 Einträge (Anzahl wählbar, dauerhaft).
  */
 export default function Home(): React.JSX.Element {
+  // App-Freigaben (23.10.2026): Karten „Auf einen Blick“ nur zu sichtbaren Apps
+  const sichtbareIds = useSichtbareProgramme().map((m) => m.id)
   /*
    * Kopf (10.10.2026): Logo, „Schul-Apps", Schulname, Datum und Info-Chips stehen seit der Entscheidung der Lehrkraft im
    * Rahmen über ALLEN Seiten (shell/RahmenKopf.tsx). Seit 12.10.2026 darunter wieder ein Kopf-Kasten wie in den Apps
@@ -125,7 +129,7 @@ export default function Home(): React.JSX.Element {
       neueste(
         // Startseite (09.10.2026, Wunsch der Lehrkraft): immer nur die Reihe als Ganzes – ihr Material nie, auch nicht eingeblendet.
         // Seit 10.10.2026: nur, was für die Reihe entstanden ist; in eine Reihe geholtes eigenes Material bleibt stehen
-        [...(materialien ?? []).filter((m) => !istReiheMaterial(reiheZuordnung.get(m.id), m.name)), ...reihenListe.map(reiheAlsMaterial)],
+        [...(materialien ?? []).filter((m) => !istReiheMaterial(reiheZuordnung.get(m.id), m.name)), ...(appFreigegeben('unterrichtsreihe') ? reihenListe.map(reiheAlsMaterial) : [])],
         // Anzahl wählbar (bis „alle") – erst beim Zeigen gekürzt (StartKasten)
         Number.MAX_SAFE_INTEGER
       ),
@@ -318,7 +322,8 @@ export default function Home(): React.JSX.Element {
         )}
 
         {/* Server (03.10.2026): das Wichtigste auf einen Blick – Reihen, Tests, Freigaben, Termine */}
-        {aufServer() && (
+        {/* App-Freigaben (23.10.2026): ohne eine einzige Karte auch keine Überschrift „Auf einen Blick“ */}
+        {aufServer() && Object.values(startKarten(sichtbareIds)).some(Boolean) && (
           <>
             <SchnellzugriffTitel />
             <Schnellzugriff />

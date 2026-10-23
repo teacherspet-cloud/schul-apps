@@ -2,6 +2,7 @@ import { Button, Menu, Tooltip } from '@mantine/core'
 import { IconChevronDown, IconClockPlus, IconMessageCheck } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { appFreigegeben } from '../../shared/plattform'
 import type { MaterialEintrag } from './generation'
 import { rueckmeldungIdZu, rueckmeldungVorbereiten, rueckmeldungZu } from './vorgabe'
 
@@ -14,7 +15,7 @@ import { rueckmeldungIdZu, rueckmeldungVorbereiten, rueckmeldungZu } from './vor
  * Daneben (23.10.2026, Wunsch der Lehrkraft) „Vorbereiten – Abgaben später": legt die
  * Rückmeldung nur an und speichert sie, ohne das Programm zu wechseln.
  */
-export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag['art']; docId: string }): React.JSX.Element {
+export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag['art']; docId: string }): React.JSX.Element | null {
   const [vorhanden, setVorhanden] = useState(false)
   useEffect(() => {
     let aktuell = true
@@ -48,6 +49,8 @@ export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag
     </Tooltip>
   )
   if (vorhanden) return knopf
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
+  if (!appFreigegeben('rueckmeldung')) return null
   return (
     <Button.Group>
       {knopf}

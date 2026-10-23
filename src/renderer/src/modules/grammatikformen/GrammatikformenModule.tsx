@@ -18,7 +18,7 @@ import LehrplanAnsicht from './LehrplanAnsicht'
 import { tonVoll, tonZart } from './farbton'
 import { useGrammatikFarbe } from './farbton'
 import { useBankZahlen } from './GrammatikBank'
-import { aufgabenAmpel, entwuerfeBereinigen, useSchulStufen } from './bank'
+import { aufgabenAmpel, entwuerfeBereinigen, kurseFreigegeben, useSchulStufen } from './bank'
 import { teilbereicheVon } from './grammatikformen'
 import type { BankZahlen, Stufe } from '@shared/grammatikBank'
 import { lateinBaende, zielAusDocId, type GrammatikformenZiel } from './grammatikformen'
@@ -318,7 +318,7 @@ function BandKachel({
       <Text size="xs" c={zahl ? undefined : 'dimmed'}>
         {zahl ? `${zahl} ${zahl === 1 ? 'Grammatikpunkt' : 'Grammatikpunkte'}` : 'noch keine Grammatik'}
       </Text>
-      {zahlen && zahl > 0 && (
+      {zahlen && zahl > 0 && kurseFreigegeben() && (
         <div title="Formen mit Übungsaufgaben">
           <Progress
             value={(punkteListe.filter((p) => aufgabenAmpel(teilbereicheVon(p.t), zahlen, stufen) !== 'keine').length / zahl) * 100}

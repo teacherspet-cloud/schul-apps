@@ -6,7 +6,7 @@
 //     Reiter „App-Freigaben" mit der Grundgruppe.
 // Ohne KI. Aufruf: node tests/e2e/server-app-freigaben.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
-import { mkdirSync } from 'fs'
+import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-app-freigaben')
@@ -19,6 +19,20 @@ const pruefe = (ok, text) => {
   console.log(`${ok ? '  ok  ' : '  !!  '} ${text}`)
 }
 const KOPF = { 'x-schulapps-token': 'server' }
+// Jüngstes Arbeitsblatt des Profils als Vorlage (wie server-blatt.mjs)
+const ordner = join(process.env.APPDATA ?? '', 'schul-apps', 'arbeitsblaetter')
+const vorlage = (() => {
+  try {
+    return readdirSync(ordner)
+      .filter((f) => f.endsWith('.json') && f !== 'index.json')
+      .map((f) => join(ordner, f))
+      .sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs)
+      .map((f) => JSON.parse(readFileSync(f, 'utf8')))
+      .find((w) => (w.payload?.sheets?.[0]?.blocks ?? []).some((b) => b.type === 'task'))
+  } catch {
+    return null
+  }
+})()
 
 const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
@@ -125,6 +139,55 @@ try {
   const reiter = await v.getByRole('tab').allTextContents()
   pruefe(reiter.indexOf('App-Freigaben') === reiter.indexOf('Nutzer') + 1, `… rechts neben „Nutzer“ (${reiter.join(' | ')})`)
   await v.screenshot({ path: join(out, 'admin-freigaben.png'), fullPage: true })
+
+  // ---------- 5. „Ansicht zeigen“: neues Fenster mit der Sicht der Gruppe (Grundgruppe + Gruppe)
+  const [fenster] = await Promise.all([verwaltung.waitForEvent('page'), v.locator('[data-app-ansicht="alle"]').click()])
+  await fenster.waitForLoadState()
+  await fenster.waitForTimeout(2500)
+  const sp = fenster.getByRole('button', { name: 'Später einrichten' })
+  if (await sp.isVisible().catch(() => false)) await sp.click()
+  pruefe(await fenster.locator('[data-ansicht-band]').isVisible(), 'Ansicht: Band „Ansicht als Lehrkraft der Gruppe …“ erscheint')
+  pruefe(!/ansicht=|apps=/.test(fenster.url()), `… die Angaben stehen nicht mehr in der Adresse (${fenster.url()})`)
+  await aufklappen(fenster)
+  pruefe(
+    (await fenster.locator('.app-leiste [aria-label^="Schule & Daten"]').count()) === 0 && (await tafel(fenster)) === 0,
+    '… ohne „Schule & Daten“ und ohne das gesperrte Tafelbild'
+  )
+  pruefe((await fenster.locator('.app-leiste [aria-label^="Arbeitsbl"]').count()) > 0, '… mit den freigegebenen Apps')
+  await fenster.screenshot({ path: join(out, 'ansicht-alle.png') })
+  await fenster.reload()
+  await fenster.waitForTimeout(2500)
+  pruefe(await fenster.locator('[data-ansicht-band]').isVisible(), '… bleibt nach dem Neuladen in diesem Fenster erhalten')
+  // ---------- 6. Freigaben wie am Schulserver (23.10.2026): nur 8 Apps – keine Wege in gesperrte Apps
+  const VPS = ['vokabeltest', 'grammatiktest', 'grammatikformen', 'elternbrief', 'vokabelliste', 'tafelbild', 'lernzielkontrolle', 'arbeitsblatt']
+  await verwaltung.request.post(`${A}/server/app-freigaben`, { headers: KOPF, data: { gruppen: [{ ...vorher[0], apps: VPS }] } })
+  if (vorlage) {
+    const ab = await lea.api('sheets:save', { id: 'freigaben-probe', name: 'Freigaben-Probe', stats: { sheetCount: 1 }, payload: vorlage.payload })
+    pruefe(ab.ok === true, 'Lea legt ein Arbeitsblatt an (erlaubt)')
+    const ed = await seiteAuf(lea.ctx, '/?einzeln=arbeitsblatt&dok=freigaben-probe')
+    await ed.waitForTimeout(3000)
+    await ed.screenshot({ path: join(out, 'vps-editor.png') })
+    const knoepfe = {
+      'Rückmeldung …': await ed.locator('[data-rueckmeldung-zu]').count(),
+      Onlinetest: await ed.locator('[data-onlinetest-knopf]').count(),
+      'Für Lernende': await ed.locator('[data-blatt-freigeben-knopf]').count()
+    }
+    pruefe(
+      Object.values(knoepfe).every((n) => n === 0) && (await ed.locator('.ws-page').count()) > 0,
+      `Arbeitsblatt-Editor ohne Wege in gesperrte Apps (${JSON.stringify(knoepfe)})`
+    )
+  } else pruefe(false, 'Keine Arbeitsblatt-Vorlage im Profil gefunden – Editor nicht prüfbar')
+  const start = await seiteAuf(lea.ctx)
+  await start.waitForTimeout(1500)
+  pruefe((await start.getByText('Auf einen Blick', { exact: true }).count()) === 0, 'Startseite: ohne leere „Auf einen Blick“-Kästen')
+  await start.screenshot({ path: join(out, 'vps-start.png') })
+  const blatt = await lea.ctx.request.post(`${A}/server/blaetter/freigeben`, { headers: KOPF, data: {} })
+  pruefe(blatt.status() === 403, `Server: Blätter für Lernende freigeben gesperrt (${blatt.status()})`)
+  await lea.api('sheets:delete', 'freigaben-probe')
+
+  // Das eigene Fenster des Admins bleibt die Admin-Sicht
+  const admin2 = await seiteAuf(verwaltung)
+  pruefe((await admin2.locator('[data-ansicht-band]').count()) === 0, '… andere Fenster des Admins bleiben unverändert')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n')[0]}`)
   for (const [i, seite] of browser

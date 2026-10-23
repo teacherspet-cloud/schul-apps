@@ -6,13 +6,14 @@
 import { ActionIcon, Badge, Button, Group, Modal, Stack, Text, Tooltip } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { aufServer } from '../../shared/plattform'
+import { appFreigegeben, aufServer } from '../../shared/plattform'
 import { notifyError } from '../../shared/util'
 import { akzeptierteEntfernen, akzeptierteLaden, useAkzeptierte } from './akzeptiertSpeicher'
 
 export function AkzeptierteAlternativenKnopf({ sprache }: { sprache: string }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
-  if (!aufServer() || !sprache) return null
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
+  if (!aufServer() || !sprache || !appFreigegeben('onlinetest')) return null
   return (
     <>
       <Button size="xs" variant="subtle" onClick={() => setOffen(true)} data-akzeptierte-alternativen>

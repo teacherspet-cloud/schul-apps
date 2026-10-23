@@ -18,6 +18,7 @@
  *    (shared/materialienMobil.ts). Vokabellisten mit passender Quelle („Green Line 2 – Unit 3") stehen in ihrer Unit.
  *  - Material, das FÜR eine Unterrichtsreihe entstanden ist, bleibt ausgeblendet (Regel vom 10.10.2026).
  */
+import { appFreigegeben } from '../plattform'
 import { ActionIcon, Badge, Button, Collapse, Group, Menu, Modal, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconChevronLeft, IconChevronRight, IconDots, IconFolder, IconFolderOpen, IconFolderShare, IconPlus, IconSearch, IconShare, IconTrash, IconUsers, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -540,7 +541,8 @@ function MaterialZeile({ m, onVerschieben, onLoeschen }: { m: Material; onVersch
   const oeffnen = (): void => void openDocument(m.moduleId, m.id)
   const { menue, weiter } = useMenueFokus()
   const freigegeben = useFreigegeben(m.moduleId, m.id)
-  const loeschbar = ['arbeitsblatt', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'vokabeltest'].includes(m.moduleId)
+  // App-Freigaben (23.10.2026): Material einer gesperrten App lässt sich nicht löschen (der Server lehnt es ab)
+  const loeschbar = ['arbeitsblatt', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'vokabeltest'].includes(m.moduleId) && appFreigegeben(m.moduleId)
   return (
     <div className="mm-zeile mm-material" data-mm-material={m.name} data-art={m.moduleId}>
       <Group gap="sm" wrap="nowrap" align="center">

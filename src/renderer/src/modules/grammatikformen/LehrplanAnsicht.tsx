@@ -17,8 +17,7 @@ import { GRAMMAR_TOPICS, einfuehrungsStufe } from '../arbeitsblatt/didactics/gra
 import type { GrammarTopic } from '../arbeitsblatt/didactics/grammarTopics'
 import type { LehrwerkGrammatikPunkt } from '../../shared/lehrwerkGrammatik'
 import { useAppSettings } from '../../shared/settingsStore'
-import { aufServer } from '../../shared/plattform'
-import { aufgabenAmpel, useSchulStufen } from './bank'
+import { aufgabenAmpel, kurseFreigegeben, useSchulStufen } from './bank'
 import { useBankZahlen } from './GrammatikBank'
 import { PunktFenster } from './GrammatikformenEditor'
 import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
@@ -136,7 +135,7 @@ export default function LehrplanAnsicht({ sprache, onBack }: { sprache: string; 
                     <Text size="sm" c="dimmed">
                       {g.themen.length} {g.themen.length === 1 ? 'Form' : 'Formen'}
                     </Text>
-                    {aufServer() && (
+                    {kurseFreigegeben() && (
                       <Tooltip label={`Übungsaufgaben: ${mit} von ${g.themen.length} Formen`}>
                         <Progress value={(mit / g.themen.length) * 100} w={80} size="sm" color="teal" radius="xl" visibleFrom="xs" />
                       </Tooltip>
@@ -147,7 +146,7 @@ export default function LehrplanAnsicht({ sprache, onBack }: { sprache: string; 
               <Collapse expanded={!zu}>
                 <Group gap={6} px="md" py="sm" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
                   {g.themen.map((t) => {
-                    const a = aufServer() ? ampel(t) : undefined
+                    const a = kurseFreigegeben() ? ampel(t) : undefined
                     return (
                       <Tooltip key={t.id} label={a ? AMPEL_TEXT[a] : t.label} openDelay={300}>
                         <UnstyledButton

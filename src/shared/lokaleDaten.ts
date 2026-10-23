@@ -191,6 +191,15 @@ export const BROWSER_SPEICHER: LokalerSpeicher[] = [
     ]
   },
   {
+    id: 'schulapps-ansicht',
+    art: 'sessionStorage',
+    geraete: ['browser', 'online'],
+    personenbezug: 'keiner',
+    inhalt: '„Ansicht zeigen" der App-Freigaben: Gruppenname und Kennungen der freigegebenen Apps (nur Admin, nur dieses Fenster)',
+    schutz: 'nur Sitzung',
+    quellen: ['src/renderer/src/shared/plattform.ts']
+  },
+  {
     id: 'Aufklappzustände und Rücksprünge der Sitzung',
     art: 'sessionStorage',
     geraete: ['pc', 'ipad', 'browser', 'online'],

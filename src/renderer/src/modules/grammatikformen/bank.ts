@@ -5,6 +5,7 @@
  *  - KI-Entwürfe: Der KI-Knopf läuft als Hintergrund-Auftrag; das Ergebnis liegt als Entwurf je Schlüssel bereit
  *    (dieses Gerät), bis die Lehrkraft es durchsieht und speichert oder verwirft – gespeichert wird nur Durchgesehenes.
  */
+import { appFreigegeben, aufServer } from '../../shared/plattform'
 import { useEffect, useState } from 'react'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -29,6 +30,12 @@ import {
 } from '@shared/grammatikBank'
 import { aufgabeVorschau } from '../lernen/kurs/AufgabenEditor'
 import { erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
+
+/**
+ * Übungsaufgaben und Schüleransicht gehören zu den Kursen im Sprachenlernen (App-Freigaben, 23.10.2026): ohne diese
+ * App bleibt Grammatikformen ein Nachschlagewerk der Lehrwerke – ohne Aufgabenbank und Schülersicht.
+ */
+export const kurseFreigegeben = (): boolean => aufServer() && appFreigegeben('sprachenlernen')
 
 export const bankZahlenLaden = (sprache: string): Promise<{ zahlen: BankZahlen; darf: boolean }> =>
   holen<{ zahlen: BankZahlen; darf: boolean }>(`/server/grammatik-bank?sprache=${encodeURIComponent(sprache)}`)

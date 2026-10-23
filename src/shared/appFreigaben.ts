@@ -63,9 +63,13 @@ export function pruefeGruppen(roh: unknown): AppGruppe[] {
     const id = String(g.id ?? '')
     if (!kennung.test(id) || gesehen.has(id)) continue
     gesehen.add(id)
-    const name = String(g.name ?? '').trim().slice(0, 80) || (id === ALLE_GRUPPE ? 'Alle Lehrkräfte' : 'Gruppe')
+    const name =
+      String(g.name ?? '')
+        .trim()
+        .slice(0, 80) || (id === ALLE_GRUPPE ? 'Alle Lehrkräfte' : 'Gruppe')
     const apps = [...new Set((Array.isArray(g.apps) ? g.apps : []).map(String).filter((a) => kennung.test(a)))]
-    const mitglieder = id === ALLE_GRUPPE ? [] : [...new Set((Array.isArray(g.mitglieder) ? g.mitglieder : []).map(String).filter((m) => m.length > 0 && m.length < 80))]
+    const mitglieder =
+      id === ALLE_GRUPPE ? [] : [...new Set((Array.isArray(g.mitglieder) ? g.mitglieder : []).map(String).filter((m) => m.length > 0 && m.length < 80))]
     aus.push({ id, name, apps, mitglieder })
   }
   const alle = aus.find((g) => g.id === ALLE_GRUPPE)
@@ -120,7 +124,12 @@ export const ROUTEN_APPS: Record<string, readonly string[]> = {
   '/server/onlinetest': ['onlinetest'],
   '/server/reihen': ['unterrichtsreihe', 'laufendereihen'],
   '/server/sprech-bank': ['sprechpruefungen'],
-  '/server/sprechen': ['sprechpruefungen']
+  '/server/sprechen': ['sprechpruefungen'],
+  // Prüfung der Freigaben am VPS (23.10.2026): Wege, die nur Apps für Lernende und Auswertung nutzen
+  '/server/blaetter': ['freigaben', 'meineklassen', 'onlinetest', 'unterrichtsreihe', 'laufendereihen'],
+  '/server/tafeln': ['meineklassen', 'freigaben'],
+  '/server/feedback': ['rueckmeldung', 'freigaben', 'sprachenlernen', 'unterrichtsreihe', 'laufendereihen', 'meineklassen'],
+  '/server/vokabeln': ['sprachenlernen', 'meineklassen', 'sprechpruefungen']
 }
 
 export function routeErlaubt(pfad: string, methode: string, apps: readonly string[] | null): boolean {

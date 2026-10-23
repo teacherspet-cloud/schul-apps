@@ -20,6 +20,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { appFreigegeben } from '../../../shared/plattform'
 import { AlleOptionen, NurExperte } from '../../../shared/components/NurExperte'
 import { IconChalkboard, IconFolderOpen, IconInfoCircle, IconX } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
@@ -539,7 +540,7 @@ export default function Einrichten(): React.JSX.Element | null {
       <MaterialWahl
         offen={materialWahl}
         schliessen={() => setMaterialWahl(false)}
-        programme={['arbeitsblatt', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'vokabeltest', 'tafelbild']}
+        programme={['arbeitsblatt', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'vokabeltest', 'tafelbild'].filter((p) => appFreigegeben(p))}
         onWahl={(mod, id) => void appMaterialWaehlen(mod, id)}
       />
     </FormularSeite>

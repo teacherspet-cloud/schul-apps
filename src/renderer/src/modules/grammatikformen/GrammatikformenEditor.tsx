@@ -50,8 +50,7 @@ import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import { useExperte } from '../../shared/settingsStore'
 import { BankKarte, useBankZahlen } from './GrammatikBank'
 import { AMPEL_FARBE, AMPEL_TEXT, tonHell, tonText, tonVoll, tonZart, useGrammatikFarbe, type AufgabenAmpel } from './farbton'
-import { aufgabenAmpel, useSchulStufen } from './bank'
-import { aufServer } from '../../shared/plattform'
+import { aufgabenAmpel, kurseFreigegeben, useSchulStufen } from './bank'
 import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
 import type { BankZahlen } from '@shared/grammatikBank'
 import {
@@ -396,7 +395,7 @@ export default function GrammatikformenEditor({
    */
   const ziehbar = darf && experte
   const ampelVon = (p: LehrwerkGrammatikPunkt): AufgabenAmpel => aufgabenAmpel(teilbereicheVon(p.t), bank.zahlen, schulStufen)
-  const mitAmpel = aufServer()
+  const mitAmpel = kurseFreigegeben()
   const unitKarten = (
     <Stack gap="sm" data-grammatikformen-units>
       {unitNamen.map((u) => {
@@ -1050,6 +1049,7 @@ export function PunktFenster({
           </Badge>
         )}
       </div>
+      {kurseFreigegeben() && (
       <FensterKarte
         titel="Übungsaufgaben"
         icon={
@@ -1060,6 +1060,7 @@ export function PunktFenster({
       >
         {bankKarte(true)}
       </FensterKarte>
+      )}
     </Stack>
   )
   const einordnung = (
@@ -1146,9 +1147,11 @@ export function PunktFenster({
         <Tabs value={reiter} onChange={setReiter} color={farbe}>
           <Tabs.List mb="md">
             <Tabs.Tab value="ueberblick">Überblick</Tabs.Tab>
-            <Tabs.Tab value="aufgaben" data-reiter-aufgaben>
-              Übungsaufgaben
-            </Tabs.Tab>
+            {kurseFreigegeben() && (
+              <Tabs.Tab value="aufgaben" data-reiter-aufgaben>
+                Übungsaufgaben
+              </Tabs.Tab>
+            )}
             <Tabs.Tab value="einordnung" data-reiter-einordnung>
               Einordnung
             </Tabs.Tab>

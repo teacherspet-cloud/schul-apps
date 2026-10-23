@@ -1,5 +1,5 @@
 import { ActionIcon, Alert, Badge, Button, Card, Checkbox, Group, Loader, MultiSelect, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
-import { IconInfoCircle, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconEye, IconInfoCircle, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { ALLE_GRUPPE, STAND_APPS, type AppGruppe } from '@shared/appFreigaben'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -56,6 +56,15 @@ export function AppFreigaben(): React.JSX.Element {
     setGruppen([...gruppen, { id, name: 'Neue Gruppe', apps: [], mitglieder: [] }])
     setGeaendert(true)
   }
+  /*
+   * „Ansicht zeigen" (23.10.2026, Wunsch der Lehrkraft): die Sicht einer Lehrkraft dieser Gruppe in einem neuen
+   * Fenster – Grundgruppe plus Gruppe, mit dem Stand der Häkchen hier (auch ungespeichert). shared/plattform.ts `ansicht`.
+   */
+  const ansichtZeigen = (g: AppGruppe): void => {
+    const grund = gruppen.find((x) => x.id === ALLE_GRUPPE)?.apps ?? []
+    const q = new URLSearchParams({ ansicht: g.name, apps: [...new Set([...grund, ...g.apps])].join(',') })
+    window.open(`/?${q}`, '_blank', 'noopener')
+  }
   const speichern = async (): Promise<void> => {
     setSpeichert(true)
     try {
@@ -77,9 +86,8 @@ export function AppFreigaben(): React.JSX.Element {
         <div>
           <Title order={3}>App-Freigaben</Title>
           <Text size="sm" c="dimmed" maw={680}>
-            Welche Apps Lehrkräfte sehen und benutzen. Jede Lehrkraft gehört zu „Alle Lehrkräfte“ und darf zusätzlich alles, was eine ihrer
-            Gruppen darf. Admins sehen immer alle Apps. Ohne Freigabe ist eine App gesperrt; eigenes Material daraus bleibt erhalten und
-            lässt sich als PDF speichern.
+            Welche Apps Lehrkräfte sehen und benutzen. Jede Lehrkraft gehört zu „Alle Lehrkräfte“ und darf zusätzlich alles, was eine ihrer Gruppen darf. Admins
+            sehen immer alle Apps. Ohne Freigabe ist eine App gesperrt; eigenes Material daraus bleibt erhalten und lässt sich als PDF speichern.
           </Text>
         </div>
         <Group gap="xs">
@@ -135,19 +143,31 @@ export function AppFreigaben(): React.JSX.Element {
                   />
                 </Group>
               )}
-              {!alle && (
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  aria-label={`Gruppe „${g.name}“ löschen`}
-                  onClick={() => {
-                    setGruppen(gruppen.filter((x) => x.id !== g.id))
-                    setGeaendert(true)
-                  }}
+              <Group gap="xs" wrap="nowrap">
+                <Button
+                  size="xs"
+                  variant="light"
+                  leftSection={<IconEye size={14} />}
+                  onClick={() => ansichtZeigen(g)}
+                  title="Die App in einem neuen Fenster so öffnen, wie eine Lehrkraft dieser Gruppe sie sieht (auch mit noch nicht gespeicherten Häkchen)"
+                  data-app-ansicht={g.id}
                 >
-                  <IconTrash size={18} />
-                </ActionIcon>
-              )}
+                  Ansicht zeigen
+                </Button>
+                {!alle && (
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    aria-label={`Gruppe „${g.name}“ löschen`}
+                    onClick={() => {
+                      setGruppen(gruppen.filter((x) => x.id !== g.id))
+                      setGeaendert(true)
+                    }}
+                  >
+                    <IconTrash size={18} />
+                  </ActionIcon>
+                )}
+              </Group>
             </Group>
             <Group gap={6} mb={6}>
               <Text size="sm" fw={600}>

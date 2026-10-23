@@ -62,7 +62,7 @@ import { meldeKiStatus, useKiStatus, useSchluesselDa } from './kiStatus'
 import { verbrauchSichtbar } from '@shared/verbrauch'
 import { bildKiStatus, bildsucheStatus, hoertextStatus, textKiStatus } from '@shared/einstellungsStatus'
 import { imNetz } from '../shared/netzZugang'
-import { amPc, aufIos, aufServer, hatClient, nurPcNetz, serverIch } from '../shared/plattform'
+import { amPc, appFreigegeben, aufIos, aufServer, hatClient, nurPcNetz, serverIch } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
 import { PcKiVerbindung, PcKiWahl } from './PcKiZugang'
 import AblageCard from './AblageCard'
@@ -243,12 +243,13 @@ export default function SettingsPage(): React.JSX.Element {
                 <FachfarbenSettings settings={settings} update={update} />
               )}
               {/* Empfindlichkeit der Problemwörter (12.10.2026) – nur am Server, dort liegen die Kurse */}
-              {aufServer() && serverIch()?.rolle !== 'schueler' && <ProblemWoerterCard />}
+              {aufServer() && serverIch()?.rolle !== 'schueler' && (appFreigegeben('sprachenlernen') || appFreigegeben('meineklassen')) && <ProblemWoerterCard />}
               {/* Benachrichtigung für vertrauliche Hinweise (23.10.2026, Prüfung des Schulträgers, KrisenPushKarte.tsx) */}
               {aufServer() && serverIch()?.rolle !== 'schueler' && <KrisenPushKarte />}
               <GradeScaleSettings settings={settings} update={update} />
-              <KorrekturzeichenSettings settings={settings} update={update} />
-              <SchreibanteilSettings settings={settings} update={update} />
+              {/* App-Freigaben (23.10.2026): Einstellungen nur zu Apps, die freigegeben sind */}
+              {(appFreigegeben('rueckmeldung') || appFreigegeben('onlinetest')) && <KorrekturzeichenSettings settings={settings} update={update} />}
+              {appFreigegeben('klassenarbeit') && <SchreibanteilSettings settings={settings} update={update} />}
               <MaskottchenSettings settings={settings} update={update} />
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">
@@ -351,7 +352,7 @@ export default function SettingsPage(): React.JSX.Element {
 
               <HoertextCard settings={settings} update={update} klappbar />
               {/* Gesprächs-KI für das Sprechprüfungstraining (19.10.2026) – getrennt von der Hörtexte-KI */}
-              <GespraechCard settings={settings} update={update} />
+              {(appFreigegeben('sprechpruefungen') || appFreigegeben('sprachenlernen') || appFreigegeben('meineklassen')) && <GespraechCard settings={settings} update={update} />}
               {/* Standardstimme je Sprache für die Vokabel-Aussprache (05.10.2026) */}
               <VokabelStimmenCard klappbar />
             </Stack>

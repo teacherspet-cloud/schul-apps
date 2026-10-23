@@ -11,7 +11,7 @@ import { holen } from '../modules/onlinetest/serverApi'
 import type { LaufendeReihe } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import type { Freigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { demnaechst, kopfZahlen, type KopfZahl, type StartseiteDaten } from '@shared/startseiteKurse'
-import { aufServer } from '../shared/plattform'
+import { appFreigegeben, aufServer } from '../shared/plattform'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useSichtbareProgramme } from './programme'
 
@@ -71,12 +71,14 @@ export const useKopfDaten = create<KopfDaten>((set, get) => ({
     const { laufend, stand } = get()
     if (laufend) return laufend
     if (!frisch && Date.now() - stand < KOPF_NEU_NACH_MS) return Promise.resolve()
+    // App-Freigaben (23.10.2026): nur abfragen, was eine freigegebene App zeigt
+    const nurMit = <T,>(apps: string[], laden: () => Promise<T>, leer: T): Promise<T> => (apps.some((a) => appFreigegeben(a)) ? oderLeer(laden(), leer) : Promise.resolve(leer))
     const p = Promise.all([
-      oderLeer(holen<{ tests: TestKurz[] }>('/server/onlinetest').then((d) => d.tests), []),
-      oderLeer(holen<{ freigaben: RueckmeldungKurz[] }>('/server/feedback').then((d) => d.freigaben), []),
+      nurMit(['onlinetest'], () => holen<{ tests: TestKurz[] }>('/server/onlinetest').then((d) => d.tests), []),
+      nurMit(['freigaben', 'rueckmeldung'], () => holen<{ freigaben: RueckmeldungKurz[] }>('/server/feedback').then((d) => d.freigaben), []),
       oderLeer(holen<StartseiteDaten>('/server/startseite'), { kurse: [], klassen: [] }),
-      oderLeer(holen<{ reihen: LaufendeReihe[] }>('/server/reihen/laufend').then((d) => d.reihen), []),
-      oderLeer(holen<{ blaetter: Freigabe[] }>('/server/blaetter').then((d) => d.blaetter), [])
+      nurMit(['laufendereihen', 'unterrichtsreihe'], () => holen<{ reihen: LaufendeReihe[] }>('/server/reihen/laufend').then((d) => d.reihen), []),
+      nurMit(['freigaben'], () => holen<{ blaetter: Freigabe[] }>('/server/blaetter').then((d) => d.blaetter), [])
     ]).then(([tests, rueck, start, reihen, blaetter]) => {
       set({ tests, rueck, start, reihen, blaetter, stand: Date.now(), laufend: null })
     })
