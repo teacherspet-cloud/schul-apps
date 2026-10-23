@@ -63,8 +63,14 @@ export interface Elternbrief {
     ruecklauf: boolean
     /** Termin des Anlasses (29.09.2026): Datum JJJJ-MM-TT und Uhrzeit HH:MM – die KI übernimmt beides wörtlich */
     termin?: { datum?: string; uhrzeit?: string }
-    /** Rückgabe des Rücklaufzettels bis (JJJJ-MM-TT) */
+    /** Rückgabe des Rücklaufzettels bzw. Frist der IServ-Rückmeldung bis (JJJJ-MM-TT) */
     rueckgabeBis?: string
+    /**
+     * IServ-Rückmeldung (23.10.2026, Wunsch der Lehrkraft): Der Brief geht über das IServ-Elternbriefmodul; die Eltern
+     * antworten dort mit „Gelesen" bzw. „Ja, zusagen" / „Nein, ablehnen", auf Wunsch mit Freitext. Der Brief nennt das
+     * (iservRegel). Unabhängig vom Rücklaufzettel – mit beidem nennt er beide Wege.
+     */
+    iserv?: { art: 'gelesen' | 'zustimmung'; freitext?: boolean }
     /** Anlass für die Bibliothek (09.10.2026, bibliothekInfo.ts) – im Menü gewählt; fehlt er, wird er erkannt */
     anlassArt?: string
     subjectLabel?: string
@@ -118,7 +124,27 @@ export function festeAngaben(m: Elternbrief['meta']): string[] {
   if (tag) zeilen.push(`TERMIN: ${tag}${m.termin?.uhrzeit ? `, ${m.termin.uhrzeit} Uhr` : ''}`)
   const frist = datumLang(m.rueckgabeBis)
   if (m.ruecklauf && frist) zeilen.push(`RÜCKGABE DES RÜCKLAUFZETTELS BIS: ${frist}`)
+  else if (m.iserv && frist) zeilen.push(`RÜCKMELDUNG ÜBER ISERV BIS: ${frist}`)
   return zeilen
+}
+
+/**
+ * IServ-Rückmeldung im Brieftext (23.10.2026, abgestimmt; Knopf-Namen nach hilfe.iserv.de und Elternanleitungen 2026 –
+ * „Gelesen", „Ja, zusagen" / „Nein, ablehnen"). Die KI formuliert aus dem Anlass, WAS die Eltern bestätigen.
+ */
+export function iservRegel(m: Pick<Elternbrief['meta'], 'iserv' | 'ruecklauf' | 'rueckgabeBis'>): string {
+  const i = m.iserv
+  if (!i) return ''
+  const bis = datumLang(m.rueckgabeBis) ? ` bis **${fristKurz(m.rueckgabeBis)}**` : ''
+  const weg =
+    i.art === 'gelesen'
+      ? `Die Eltern bestätigen in IServ (Elternbriefe), dass sie den Brief gelesen haben – mit dem Knopf „Gelesen"${bis}. Formuliere die Bitte konkret zum Anlass, z. B. „Bitte bestätigen Sie in IServ mit „Gelesen", dass Sie über den Ausflug am … informiert sind."`
+      : `Die Eltern antworten in IServ (Elternbriefe) mit „Ja, zusagen" oder „Nein, ablehnen" und drücken „Senden"${bis}. Formuliere KONKRET aus Anlass und Stichpunkten, was ein „Ja, zusagen" bedeutet (z. B. Teilnahme, Einverständnis, Übernahme der Kosten mit Betrag), und was bei „Nein, ablehnen" geschieht, falls das aus den Stichpunkten hervorgeht. Vorbild: „Bitte bestätigen Sie, dass Sie über den Ausflug „Auswandererhaus" am 10.11.2026 informiert sind und die Kosten von 10,25 € übernehmen, indem Sie den Elternbrief in IServ mit „Ja, zusagen" beantworten und „Senden" drücken."`
+  const frei = i.freitext
+    ? ' Zusätzlich steht in IServ ein Textfeld für eine Antwort: Sage, wofür es gedacht ist (aus dem Anlass, z. B. Allergien, Abholung, Fragen), sonst allgemein „Anmerkungen oder Fragen können Sie im Textfeld ergänzen".'
+    : ''
+  const beide = m.ruecklauf ? ' Es gibt ZUSÄTZLICH den Rücklaufzettel: Nenne beide Wege („über IServ oder mit dem Abschnitt unten") – eins von beiden genügt.' : ''
+  return `- ISERV-RÜCKMELDUNG (eigener Satz im letzten inhaltlichen Absatz, Knopfnamen in „…"): ${weg}${frei}${beide}`
 }
 
 export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest {
@@ -136,6 +162,7 @@ export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest 
       m.ruecklauf
         ? '- Mit Rücklaufzettel: Überschrift und Zeilen zum Ankreuzen bzw. Ausfüllen (Name des Kindes, Unterschrift eines Erziehungsberechtigten, Datum).'
         : '- Ohne Rücklaufzettel: ruecklaufTitel leer, ruecklaufZeilen leer.',
+      iservRegel(m),
       FETT_REGEL,
       fest.length
         ? '- FESTE ANGABEN (unten): Datum, Uhrzeit und Frist stehen im Brief GENAU in dieser Schreibweise (z. B. „Freitag, 12.12.2026"); kein Platzhalter dafür. Die Rückgabefrist steht im Brief und auf dem Rücklaufzettel.'

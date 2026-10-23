@@ -116,6 +116,9 @@ export function pruefeBrief(b: Elternbrief, t: BriefText, verloren: string[] = [
   const offen = offenePlatzhalter(t)
   if (offen.length) befunde.push(`Noch auszufüllen: ${offen.join(', ')}`)
   if (b.meta.ruecklauf && !b.meta.rueckgabeBis && t.ruecklauf) befunde.push('Für den Rücklaufzettel ist keine Rückgabefrist eingetragen.')
+  // IServ-Rückmeldung (23.10.2026): der Brief muss sagen, was in IServ zu tun ist
+  if (b.meta.iserv && !t.absaetze.some((a) => /iserv/i.test(a)))
+    befunde.push('Im Brief fehlt der Hinweis zur Rückmeldung über IServ – neu schreiben lassen oder einen Satz ergänzen.')
   if (verloren.length) befunde.push(`Nach der Änderung fehlen: ${verloren.join(', ')} – bitte prüfen oder Rückgängig (Strg+Z).`)
   return befunde
 }
@@ -133,7 +136,7 @@ export const AKTIONEN: { value: Aktion; label: string; auftrag: string }[] = [
 ]
 
 const FEST_REGEL =
-  'FESTE ANGABEN: Datumsangaben, Uhrzeiten, Beträge, Fristen, Orte und Platzhalter in eckigen Klammern bleiben inhaltlich gleich und in derselben Schreibweise (12.12.2026 bleibt 12.12.2026, 8:00 Uhr bleibt 8:00 Uhr, 5 € bleibt 5 €). Umformuliert wird nur der Satz drumherum. Nichts dazuerfinden. Fettmarkierungen **…** um wichtige Angaben bleiben erhalten.'
+  'FESTE ANGABEN: Datumsangaben, Uhrzeiten, Beträge, Fristen, Orte und Platzhalter in eckigen Klammern bleiben inhaltlich gleich und in derselben Schreibweise (12.12.2026 bleibt 12.12.2026, 8:00 Uhr bleibt 8:00 Uhr, 5 € bleibt 5 €). Umformuliert wird nur der Satz drumherum. Nichts dazuerfinden. Fettmarkierungen **…** um wichtige Angaben bleiben erhalten. Knopfnamen von IServ („Gelesen", „Ja, zusagen", „Nein, ablehnen", „Senden") bleiben wörtlich.'
 
 const TEIL_SCHEMA = obj({ text: str('Der neu formulierte Teil') })
 

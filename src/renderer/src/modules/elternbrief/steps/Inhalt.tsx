@@ -1,4 +1,4 @@
-import { Button, Card, Container, Group, ScrollArea, Select, SimpleGrid, Stack, Switch, Text, Textarea, TextInput, Title } from '@mantine/core'
+import { Button, Card, Checkbox, Container, Group, ScrollArea, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { IconMail } from '@tabler/icons-react'
 import Formularfuss from '../../../shared/components/Formularfuss'
 import KalenderHinweis from '../../../shared/components/KalenderHinweis'
@@ -81,9 +81,47 @@ export default function Inhalt(): React.JSX.Element | null {
                     setze((d) => (d.meta.ruecklauf = x))
                   }}
                 />
-                {m.ruecklauf && (
+                {/* IServ-Rückmeldung (23.10.2026, Wunsch der Lehrkraft): unabhängig vom Zettel; der Brief nennt, was in IServ zu tun ist */}
+                <Switch
+                  label="IServ-Rückmeldung"
+                  description="Der Brief geht über die Elternbriefe in IServ; der Text sagt den Eltern, was sie dort anklicken."
+                  checked={Boolean(m.iserv)}
+                  onChange={(e) => {
+                    const x = e.currentTarget.checked
+                    setze((d) => {
+                      if (x) d.meta.iserv = d.meta.iserv ?? { art: 'zustimmung' }
+                      else delete d.meta.iserv
+                    })
+                  }}
+                  data-eb-iserv
+                />
+                {m.iserv && (
+                  <Stack gap={6} pl="xl">
+                    <SegmentedControl
+                      size="xs"
+                      value={m.iserv.art}
+                      data={[
+                        { value: 'gelesen', label: 'Als gelesen markieren' },
+                        { value: 'zustimmung', label: 'Zustimmen / Ablehnen' }
+                      ]}
+                      onChange={(v) => setze((d) => d.meta.iserv && (d.meta.iserv.art = v as 'gelesen' | 'zustimmung'))}
+                      data-eb-iserv-art
+                    />
+                    <Checkbox
+                      size="xs"
+                      label="Freitextantwort"
+                      checked={Boolean(m.iserv.freitext)}
+                      onChange={(e) => {
+                        const x = e.currentTarget.checked
+                        setze((d) => d.meta.iserv && (d.meta.iserv.freitext = x))
+                      }}
+                      data-eb-iserv-freitext
+                    />
+                  </Stack>
+                )}
+                {(m.ruecklauf || m.iserv) && (
                   <TextInput
-                    label="Rückgabe des Rücklaufzettels bis"
+                    label={m.ruecklauf ? 'Rückgabe des Rücklaufzettels bis' : 'Rückmeldung über IServ bis'}
                     type="date"
                     value={m.rueckgabeBis ?? ''}
                     error={ohneFrist ? 'Ohne Frist steht im Brief nur ein Platzhalter.' : undefined}
@@ -94,7 +132,7 @@ export default function Inhalt(): React.JSX.Element | null {
                     data-eb-frist
                   />
                 )}
-                {m.ruecklauf && <KalenderHinweis wert={m.rueckgabeBis} />}
+                {(m.ruecklauf || m.iserv) && <KalenderHinweis wert={m.rueckgabeBis} />}
               </Stack>
             </Card>
             <Card withBorder>
