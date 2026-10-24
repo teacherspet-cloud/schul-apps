@@ -34,7 +34,7 @@ writeFileSync(join(dest, 'svgs.json'), JSON.stringify(svgs))
 // src/shared/partnerarbeit/symbole.ts – der Server liefert sie an Lernende und Lehrkräfte aus (server/partnerarbeit.ts)
 const symbole = readFileSync('src/shared/partnerarbeit/symbole.ts', 'utf8')
 const farbe = {}
-for (const [, hex] of symbole.matchAll(/hex: '([0-9A-F]+)'/g)) {
+for (const [, hex] of symbole.matchAll(/(?:hex: |s\()'([0-9A-F]{4,5})'/g)) {
   const file = join(src, 'color/svg', `${hex}.svg`)
   if (existsSync(file)) farbe[hex] = readFileSync(file, 'utf8').replace(/\s+/g, ' ').trim()
 }

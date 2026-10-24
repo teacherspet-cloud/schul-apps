@@ -59,7 +59,7 @@ import {
   type Partnerarbeit,
   type Rolle
 } from '../shared/partnerarbeit/typen'
-import { istSymbol, symboleVergeben, symbolTeile } from '../shared/partnerarbeit/symbole'
+import { istSymbol, symboleFuer, symboleVergeben, symbolTeile } from '../shared/partnerarbeit/symbole'
 import {
   aufloesen,
   einstufungVorschlag,
@@ -291,7 +291,8 @@ const mischer = (): ((l: string[]) => string[]) => {
 
 function symboleSicherstellen(pa: Partnerarbeit, ids: string[]): void {
   const fehlen = ids.filter((id) => !pa.symbole[id])
-  if (fehlen.length) pa.symbole = symboleVergeben(fehlen, pa.symbole, mischer())
+  // Altersgerechte Liste je Jahrgang der Lerngruppe (24.10.2026)
+  if (fehlen.length) pa.symbole = symboleVergeben(fehlen, pa.symbole, mischer(), symboleFuer(kursKopf(pa).jahrgang))
 }
 
 const gruppeVon = (pa: Partnerarbeit, id: string): PaGruppe | undefined => pa.gruppen.find((g) => g.mitglieder.includes(id))

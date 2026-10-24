@@ -139,8 +139,18 @@ describe('Zuteilung', () => {
 
 describe('Bildsymbole', () => {
   it('40 Symbole reichen für Klassen bis 34 – jede Person ein eigenes Bild ohne Zahl', async () => {
-    const { symboleVergeben, SYMBOLE } = await import('../src/shared/partnerarbeit/symbole')
-    expect(SYMBOLE.length).toBe(40)
+    const { symboleVergeben, symboleFuer, SYMBOLE_UNTER, SYMBOLE_MITTEL, SYMBOLE_OBER } = await import('../src/shared/partnerarbeit/symbole')
+    for (const l of [SYMBOLE_UNTER, SYMBOLE_MITTEL, SYMBOLE_OBER]) {
+      expect(l.length).toBe(40)
+      expect(new Set(l.map((x) => x.hex)).size).toBe(40)
+    }
+    // altersgerecht: 5–7 Tiere/Früchte, 8–10 Sport/Musik, ab 11 neutral
+    expect(symboleFuer(5)).toBe(SYMBOLE_UNTER)
+    expect(symboleFuer(7)).toBe(SYMBOLE_UNTER)
+    expect(symboleFuer(8)).toBe(SYMBOLE_MITTEL)
+    expect(symboleFuer(10)).toBe(SYMBOLE_MITTEL)
+    expect(symboleFuer(11)).toBe(SYMBOLE_OBER)
+    expect(symboleFuer(null)).toBe(SYMBOLE_MITTEL)
     const mischen = (l: string[]): string[] => [...l].reverse()
     const v = symboleVergeben(ids(34), {}, mischen)
     const werte = Object.values(v)
