@@ -475,16 +475,18 @@ function istFuer(pa: Partnerarbeit, ich: NutzerInfo, jetzt: number): boolean {
 // ---------------------------------------------------------------- Symbole (SVG)
 
 let svgs: Map<string, string> | null = null
+/** Farbige Fassung (partner.json, scripts/prepare-openmoji.mjs), sonst die schwarze Linienzeichnung aus svgs.json */
 function symbolSvg(hex: string): string | null {
   if (!istSymbol(hex)) return null
   if (!svgs) {
     svgs = new Map()
-    try {
-      const alle = JSON.parse(readFileSync(join(RESSOURCEN, 'openmoji', 'svgs.json'), 'utf8')) as Record<string, string>
-      for (const [h, s] of Object.entries(alle)) if (istSymbol(h)) svgs.set(h, s)
-    } catch {
-      // ohne Ressourcen keine Bilder – der Browser zeigt den Namen
-    }
+    for (const datei of ['svgs.json', 'partner.json'])
+      try {
+        const alle = JSON.parse(readFileSync(join(RESSOURCEN, 'openmoji', datei), 'utf8')) as Record<string, string>
+        for (const [h, s] of Object.entries(alle)) if (istSymbol(h)) svgs.set(h, s)
+      } catch {
+        // ohne Ressourcen keine Bilder – der Browser zeigt den Namen
+      }
   }
   return svgs.get(hex) ?? null
 }

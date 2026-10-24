@@ -136,3 +136,24 @@ describe('Zuteilung', () => {
     expect(einstufungVorschlag({ sicher: 5, gesamt: 5 }, [{ ampel: 'sicher' }, { ampel: 'sicher' }])).toBe('stark')
   })
 })
+
+describe('Bildsymbole', () => {
+  it('40 Symbole reichen für Klassen bis 34 – jede Person ein eigenes Bild ohne Zahl', async () => {
+    const { symboleVergeben, SYMBOLE } = await import('../src/shared/partnerarbeit/symbole')
+    expect(SYMBOLE.length).toBe(40)
+    const mischen = (l: string[]): string[] => [...l].reverse()
+    const v = symboleVergeben(ids(34), {}, mischen)
+    const werte = Object.values(v)
+    expect(werte).toHaveLength(34)
+    expect(new Set(werte).size).toBe(34)
+    expect(werte.some((s) => s.includes('#'))).toBe(false)
+    // ab der 41. Person: Wiederholung mit Zahl
+    const gross = Object.values(symboleVergeben(ids(45), {}, mischen))
+    expect(new Set(gross).size).toBe(45)
+    expect(gross.filter((s) => s.endsWith('#2'))).toHaveLength(5)
+    // schon vergebene bleiben, neue kommen dazu
+    const nach = symboleVergeben(['neu'], v, mischen)
+    expect(nach.s1).toBe(v.s1)
+    expect(new Set(Object.values(nach)).size).toBe(35)
+  })
+})

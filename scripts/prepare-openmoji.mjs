@@ -30,5 +30,15 @@ for (const e of data) {
 }
 writeFileSync(join(dest, 'index.json'), JSON.stringify(index))
 writeFileSync(join(dest, 'svgs.json'), JSON.stringify(svgs))
+// Farbige Fassungen der Bildsymbole der Partnerarbeit (24.10.2026, Wunsch der Lehrkraft): nur die ~40 aus
+// src/shared/partnerarbeit/symbole.ts – der Server liefert sie an Lernende und Lehrkräfte aus (server/partnerarbeit.ts)
+const symbole = readFileSync('src/shared/partnerarbeit/symbole.ts', 'utf8')
+const farbe = {}
+for (const [, hex] of symbole.matchAll(/hex: '([0-9A-F]+)'/g)) {
+  const file = join(src, 'color/svg', `${hex}.svg`)
+  if (existsSync(file)) farbe[hex] = readFileSync(file, 'utf8').replace(/\s+/g, ' ').trim()
+}
+writeFileSync(join(dest, 'partner.json'), JSON.stringify(farbe))
+console.log(`OpenMoji: ${Object.keys(farbe).length} farbige Partnerarbeit-Symbole in partner.json.`)
 copyFileSync(join(src, 'LICENSE.txt'), join(dest, 'LICENSE.txt'))
 console.log(`OpenMoji: ${index.length} Symbole in svgs.json gebündelt.`)
