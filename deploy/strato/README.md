@@ -13,7 +13,19 @@
   monatlicher Wiederherstellungstest; Wiederherstellen: `WIEDERHERSTELLEN.md`.
 - Firewall ufw: 22, 80, 443.
 
-Aufspielen: `scp dist/schul-apps-server.tgz schul-neu:/tmp/` → `cd /opt/schul-apps && tar xzf /tmp/schul-apps-server.tgz && chmod -R go-w . && docker compose up -d --build`.
+Aufspielen (seit 24.10.2026 NUR so): `scp dist/schul-apps-server.tgz schul-neu:/tmp/ && ssh schul-neu schul-apps-aufspielen.sh`
+(`--jetzt` anhängen, um die Unterrichtszeit-Sperre Mo–Fr 7:30–14:00 zu übergehen). Das Skript `schul-apps-aufspielen.sh`
+(hier im Ordner, auf dem Server unter `/usr/local/bin/`) macht alles in einem Schritt: Vor-Update-Kopie der Datenbank nach
+`/root/sicherung-vor-update-<Zeit>.db`, `server/`, `oberflaeche/`, `resources/` löschen und frisch entpacken, `docker compose
+up -d --build`, auf „healthy“ warten, dann aufräumen: Build-Cache auf 4 GB begrenzen, alte Images, Paket in /tmp und ältere
+Vor-Update-Kopien löschen (nur die eben erzeugte bleibt). Nach Änderungen am Skript: `scp deploy/strato/schul-apps-aufspielen.sh
+schul-neu:/usr/local/bin/ && ssh schul-neu chmod 700 /usr/local/bin/schul-apps-aufspielen.sh`.
+
+Warum (24.10.2026): `tar xzf` legt nur dazu, löscht nichts. Dadurch sammelten sich in `oberflaeche/assets` 2.400 alte
+Bündel (1,6 GB) – jede Fassung ging als eigene Schicht in den Docker-Build-Cache, der auf 76 GB anwuchs (Platte 80 % voll);
+dazu 52 Vor-Update-Kopien (6,9 GB) in `/root`. `server`, `oberflaeche` und `resources` kommen vollständig aus dem Paket;
+`geheim/` und die Override-Datei bleiben unberührt. Das Paket selbst ist sauber (ein Bau = 56 Dateien in `assets`; die
+vielen `index-*.js` darin sind die dynamisch nachgeladenen Teilbündel EINES Baus, keine Reste).
 
 Übergang: Der alte Server (217.154.120.64) reicht meineschulapps.de und :8443 an diesen Server weiter
 (`/opt/schul-weiche/nginx.conf`, Sicherung der alten Fassung: `nginx.conf.vor-umzug`); sein Schul-Apps-Container ist

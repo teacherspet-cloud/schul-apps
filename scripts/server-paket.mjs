@@ -23,7 +23,8 @@ mkdirSync(bau, { recursive: true })
 
 if (!process.argv.includes('--ohne-oberflaeche')) {
   console.log('1/3 Oberfläche bauen …')
-  lauf(process.execPath, [join(wurzel, 'scripts', 'bauen.mjs')])
+  // „node“ statt process.execPath: Mit shell unter Windows zerreißt cmd.exe den Pfad „C:\Program Files\…“ am Leerzeichen
+  lauf('node', [join(wurzel, 'scripts', 'bauen.mjs')])
 }
 if (!existsSync(join(wurzel, 'out', 'renderer', 'index.html'))) throw new Error('out/renderer fehlt – erst bauen.')
 
