@@ -5,7 +5,7 @@
  * Bewertungsbereich (gleitender Mittelwert, „stabil" bei kleinen Schwankungen; Aussprache nur grob eingeschätzt).
  */
 import { Accordion, Alert, Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, UnstyledButton } from '@mantine/core'
-import { IconArrowDownRight, IconArrowRight, IconArrowUpRight, IconMicrophone, IconPuzzle, IconVolume } from '@tabler/icons-react'
+import { IconArrowDownRight, IconArrowRight, IconArrowUpRight, IconMicrophone, IconPuzzle, IconUsers, IconVolume } from '@tabler/icons-react'
 import { useState } from 'react'
 import { KRITERIEN, verlauf } from '@shared/sprechen/kriterien'
 import { stufeVonNiveau, TEIL_BESCHREIBUNG, TEIL_NAME, type Teil } from '@shared/sprechen/niveaus'
@@ -13,6 +13,7 @@ import { GRUPPEN, phrasesBis, type Phrase } from '@shared/sprechen/phrases'
 import { Gespraech, Ergebnis } from './Gespraech'
 import { PhraseSpiel, SPIEL_NAME, type SpielId } from './PhraseSpiele'
 import { gewertet, type SprechFreigabe } from './typen'
+import type { MeinePartnerarbeit } from '@shared/partnerarbeit/typen'
 
 const BCP = { en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as const
 
@@ -29,13 +30,42 @@ function vorlesen(text: string, sprache: keyof typeof BCP): void {
 
 const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
 
-export function SprechOrdner({ freigaben, neuLaden }: { freigaben: SprechFreigabe[]; neuLaden: () => void }): React.JSX.Element {
+/** Laufende Partnerarbeit im Unterricht (24.10.2026): oben im Register, mit „Beitreten" */
+function PartnerarbeitKarte({ p }: { p: MeinePartnerarbeit }): React.JSX.Element {
+  return (
+    <Card withBorder radius="md" padding="md" style={{ borderColor: 'var(--mantine-color-orange-5)' }} data-pa-ordner-karte={p.id}>
+      <Group justify="space-between" wrap="wrap" gap="xs">
+        <Group gap="xs">
+          <IconUsers size={20} />
+          <div>
+            <Text fw={700}>Partnerarbeit läuft</Text>
+            <Text size="sm" c="dimmed">
+              Sprechen {p.gruppengroesse === 3 ? 'zu dritt' : 'zu zweit'} · {p.modus === 'code' ? 'Partner per Code wählen' : 'Lehrkraft teilt ein'} · bis{' '}
+              {new Date(p.ende).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+            </Text>
+          </div>
+        </Group>
+        <Button component="a" href={`/s/pa/${p.id}`} color="orange" data-pa-beitreten>
+          Beitreten
+        </Button>
+      </Group>
+    </Card>
+  )
+}
+
+export function SprechOrdner({ freigaben, partnerarbeiten = [], neuLaden }: { freigaben: SprechFreigabe[]; partnerarbeiten?: MeinePartnerarbeit[]; neuLaden: () => void }): React.JSX.Element {
   // Mehrere Freigaben im Fach: die mit dem spätesten Ende zuerst
   const f = [...freigaben].sort((a, b) => b.bis - a.bis)[0]
   const [gespraech, setGespraech] = useState<{ teil: Teil; modus: 'ueben' | 'pruefung' } | null>(null)
   const [spiel, setSpiel] = useState<SpielId | null>(null)
   const [ansicht, setAnsicht] = useState<'start' | 'tipps'>('start')
-  if (!f) return <Text c="dimmed">Gerade ist kein Sprechtraining freigegeben.</Text>
+  const partner = partnerarbeiten.map((p) => <PartnerarbeitKarte key={p.id} p={p} />)
+  if (!f)
+    return partner.length ? (
+      <Stack gap="md">{partner}</Stack>
+    ) : (
+      <Text c="dimmed">Gerade ist kein Sprechtraining freigegeben.</Text>
+    )
   const stufe = stufeVonNiveau(f.niveau)
   const phrases: Phrase[] = phrasesBis(stufe)
   const geuebt = gewertet(f.uebungen)
@@ -56,6 +86,7 @@ export function SprechOrdner({ freigaben, neuLaden }: { freigaben: SprechFreigab
 
   return (
     <Stack gap="md" data-sprechtraining={f.id}>
+      {partner}
       <Group justify="space-between" gap="xs">
         <Text size="sm" c="dimmed">
           Freigegeben bis {tag(f.bis)} · noch {f.minutenRest} Minuten frei (Tages- und Wochengrenze) · Ziel: GER {f.niveau}

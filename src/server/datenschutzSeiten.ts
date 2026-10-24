@@ -37,6 +37,7 @@ import { getSecret, getSettings } from '../main/services/storage/settings'
 import { SUBSCRIPTIONS, type KernAnbieterId } from '@shared/types'
 import { einstellungBereinigen, LOESCH_STANDARD, type LoeschEinstellung } from './loeschRegeln'
 import { AUFSICHT_TAGE } from './onlinetest'
+import { PARTNERARBEIT_TAGE } from './loeschkonzept'
 
 const SCHLUESSEL = 'datenschutz-angaben'
 
@@ -336,6 +337,12 @@ const BEREICHE: { bereich: string; zweck: string; daten: string }[] = [
     daten: 'Stimme (live an OpenAI, nicht gespeichert), Gesprächstext (nur bis zur Auswertung), Einschätzung, Kennzahlen, Tipps, Übungsminuten; bei einem Vorfall Art, Zeit und der eine Satz'
   },
   {
+    bereich: 'Partnerarbeit Sprechen',
+    zweck: 'Sprechübungen zu zweit oder zu dritt im Unterricht mit Karten des schulweiten Pools; die Lehrkraft teilt die Gruppen zu',
+    daten:
+      'Anwesenheit, Gruppeneinteilung und Bildsymbol, bearbeitete Karten, Zeitpunkte; Zuteilungsregeln der Lehrkraft (Einschätzung stark/mittel/schwach, „nicht mit") nur für diese Lehrkraft sichtbar; Rückmeldungen unter den Partnern werden nicht gespeichert'
+  },
+  {
     bereich: 'Erinnerungen (Push)',
     zweck: 'Erinnerungen zum Üben – nur, wenn sie auf dem Gerät ausdrücklich eingeschaltet werden',
     daten: 'Push-Adresse des Geräts, gewählte Zeiten'
@@ -390,6 +397,7 @@ Löschung läuft nur mit einer aktuellen IServ-Benutzerliste${e.an ? '' : ' und 
 <li data-frist-aufsicht>Aufsichtsvermerke im Onlinetest (z. B. Verlassen der Seite, Einfügen): mit Uhrzeit und Einzelheiten bis ${AUFSICHT_TAGE} Tage nach dem
 Ende des Tests (bei weiterlaufenden Tests mit freigegebenen Ergebnissen: nach der Abgabe); danach bleibt nur die Anzahl je Art – bis der Test bzw. das Konto gelöscht wird.</li>
 <li>Krisenhinweise: 30 Tage. Vorfälle im Sprechtraining (Art, Zeit, ein Satz): 14 Tage. Gesprächstext im Sprechtraining: nur bis zur Auswertung.</li>
+<li data-frist-partner>Partnerarbeit Sprechen: Einteilung und Verlauf ${PARTNERARBEIT_TAGE} Tage nach dem Ende; Zuteilungsregeln der Lehrkraft bis zum Löschen des Kurses.</li>
 <li data-frist-protokoll>Prüfprotokoll des Servers: ${e.protokollTage} Tage.</li>
 <li data-frist-panne>Dokumentation von Datenpannen (Art. 33 Abs. 5 DSGVO): keine automatische Löschung; die Schule prüft nach drei Jahren, ob sie noch gebraucht wird.</li>
 <li data-frist-sicherung>Datensicherungen: nächtliche Kopien und Kopien vor einem Update 14 Tage auf dem Server; verschlüsselte Kopie auf dem

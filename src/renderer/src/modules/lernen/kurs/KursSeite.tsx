@@ -14,7 +14,7 @@
  *  - Eingebettet (`nurReiter`): nur der Inhalt dieses Reiters – plus die Lernenden-Tabelle des Bereichs (Vokabeln bzw.
  *    Grammatik), damit „Meine Klassen" ohne Wechsel in Sprachenlernen auskommt.
  */
-import { SprechLehrkraft, useSprechVerfuegbar } from '../../sprechen/SprechLehrkraft'
+import { istSprechSprache, SprechenReiter } from '../../sprechen/SprechenReiter'
 import {
   ActionIcon,
   Alert,
@@ -567,8 +567,8 @@ export function KursSeite({
   }, [id])
   const [eintragen, setEintragen] = useState(false)
   const [klasse, setKlasse] = useState(false)
-  // Sprechprüfungstraining (19.10.2026): Reiter nur mit eingerichteter Gesprächs-KI
-  const sprechDa = useSprechVerfuegbar()
+  // Reiter „Sprechen" (19.10.2026 KI-Training; 24.10.2026 Partnerarbeit ohne KI): immer bei en/fr/es
+  const sprechDa = istSprechSprache(d?.sprache)
   // „+ Grammatik hinzufügen" am Kasten „Units" (17.10.2026): wie bei den Vokabeln auch aus „Meine Klassen" heraus
   const [grammatik, setGrammatik] = useState(() => grammatikHinzuOffen.kurs === id && (grammatikHinzuOffen.kurs = null, true))
   useEffect(() => {
@@ -1106,9 +1106,9 @@ export function KursSeite({
           >
             Grammatik
           </Tabs.Tab>
-          {sprechDa && ['en', 'fr', 'es'].includes(d.sprache ?? '') && (
+          {sprechDa && (
             <Tabs.Tab value="sprechen" leftSection={<IconMicrophone size={16} />} data-kurs-reiter="sprechen">
-              Sprechprüfungstraining
+              Sprechen
             </Tabs.Tab>
           )}
           <Tabs.Tab value="lernende" leftSection={<IconUsers size={16} />} data-kurs-reiter="lernende">
@@ -1129,7 +1129,7 @@ export function KursSeite({
         </Tabs.Panel>
         {sprechDa && (
           <Tabs.Panel value="sprechen" pt="md">
-            <SprechLehrkraft vokId={id} />
+            <SprechenReiter vokId={id} />
           </Tabs.Panel>
         )}
         <Tabs.Panel value="lernende" pt="md">

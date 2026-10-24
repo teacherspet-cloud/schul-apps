@@ -73,8 +73,7 @@ import {
   IconLogout,
   IconPlayerPlay,
   IconSettings,
-  IconX
-} from '@tabler/icons-react'
+  IconX, IconUsers } from '@tabler/icons-react'
 import bildOnlinetest from '../../assets/programme/onlinetest.webp'
 import bildRueckmeldung from '../../assets/programme/rueckmeldung.webp'
 import bildArbeitsblatt from '../../assets/programme/arbeitsblatt.webp'
@@ -112,6 +111,8 @@ import VokabelTrainer from '../lernen/VokabelTrainer'
 import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
+import { PartnerarbeitSeite } from '../partnerarbeit/PartnerarbeitSeite'
+import type { MeinePartnerarbeit } from '@shared/partnerarbeit/typen'
 import { holen, senden } from './serverApi'
 import { Begruessung, Lernstand, MeinLernraum, TippKarte, type NeuesMaterial } from './SchuelerStart'
 import { TitelFormDialog, type TitelKurz } from './MedaillenTitel'
@@ -210,6 +211,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const gramCode = /^\/s\/gt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   // Zusammen spielen (08.10.2026): Einladungscode aus sechs Ziffern
   const spielCode = /^\/s\/sp\/(\d{6})\/?$/.exec(pfad)?.[1]
+  // Partnerarbeit Sprechen im Unterricht (24.10.2026)
+  const paId = /^\/s\/pa\/(p[a-f0-9]{16})\/?$/.exec(pfad)?.[1]
   // Vokabelweg (03.10.2026) einer Lehrwerksreihe – seit 09.10.2026 der Fortschrittspfad (geübt wird im Kurs)
   const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
@@ -230,7 +233,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const telefon = useSchuelerTelefon()
   // Regal oder bisherige Liste (08.10.2026, Wahl der Lernenden in den Einstellungen)
   const regalAn = useDarstellung((s) => s.d.materialien) !== 'liste'
-  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln || spielCode)
+  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln || spielCode || paId)
   const mitTabs = telefon && !gast && !fokus
   // Kopfzeile: Startseite erkennen; Gäste sehen, wo sie sind (vorher „Schul-Apps · Vokabeltraining")
   const aufStart = pfad === '/s/' || pfad === '/s'
@@ -245,6 +248,8 @@ export default function SchuelerBereich(): React.JSX.Element {
       ? 'Grammatiktraining'
       : spielCode
       ? 'Zusammen spielen'
+      : paId
+      ? 'Partnerarbeit'
       : code
       ? 'Onlinetest'
       : ''
@@ -263,6 +268,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <VokabelBeitritt code={gramCode.toUpperCase()} art="grammatik" />
   ) : spielCode && ich?.angemeldet ? (
     <MehrspielerSeite code={spielCode} />
+  ) : paId && ich?.angemeldet ? (
+    <PartnerarbeitSeite id={paId} />
   ) : grammatik ? (
     <GrammatikTrainer id={grammatik} />
   ) : blatt ? (
@@ -522,6 +529,8 @@ function Startseite(): React.JSX.Element {
     { id: string; titel: string; fach?: string; erstellt?: string; alt?: boolean; uebersicht: { faellig: number; sicher: number; gesamt: number; heuteOffen?: number } }[] | null
   >(null)
   const [gram, setGram] = useState<{ id: string; titel: string; fach?: string; erstellt?: string }[] | null>(null)
+  // Partnerarbeit Sprechen (24.10.2026): nur, solange eine läuft
+  const [partner, setPartner] = useState<MeinePartnerarbeit[]>([])
   // Lernstand, Begrüßung und Lerntipp (06.10.2026, SchuelerStart.tsx / server/lernstand.ts)
   const [stand, setStand] = useState<LernstandAntwort | null>(null)
   const [standFehlt, setStandFehlt] = useState(false)
@@ -573,6 +582,10 @@ function Startseite(): React.JSX.Element {
     void holen<{ reihen: NonNullable<typeof reihen> }>('/s/api/reihen').then(
       (d) => setReihen(d.reihen ?? []),
       () => setReihen([])
+    )
+    void holen<{ partnerarbeiten: MeinePartnerarbeit[] }>('/s/api/partnerarbeit').then(
+      (d) => setPartner(d.partnerarbeiten ?? []),
+      () => setPartner([])
     )
   }, [])
   useEffect(alleLaden, [alleLaden])
@@ -631,7 +644,17 @@ function Startseite(): React.JSX.Element {
     if (fach && (t.art === 'Vokabeltest' || t.art === 'Grammatiktest')) return { href: `/s/ordner/${encodeURIComponent(fach)}`, knopf: 'Jetzt üben' }
     return { href: '/s/tests', knopf: 'Ansehen' }
   }
-  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = jetztTests[0]
+  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = partner[0]
+    ? {
+        // Partnerarbeit läuft gerade im Unterricht (24.10.2026) – vor allem anderen
+        fach: partner[0].fach,
+        titel: `Partnerarbeit ${partner[0].fach}`,
+        text: partner[0].modus === 'code' ? 'Sprechen zu zweit – hol dir den Code deines Partners.' : 'Sprechen zu zweit – deine Lehrkraft teilt gleich ein.',
+        href: `/s/pa/${partner[0].id}`,
+        knopf: 'Beitreten',
+        farbe: 'orange'
+      }
+    : jetztTests[0]
     ? {
         fach: jetztTests[0].fach,
         titel: jetztTests[0].titel,
@@ -782,6 +805,18 @@ function Startseite(): React.JSX.Element {
               : 'Code eingeben oder QR-Code scannen'
           }
         />
+        {partner.map((p) => (
+          <Kachel
+            key={p.id}
+            href={`/s/pa/${p.id}`}
+            symbol={<IconUsers size={56} stroke={1.4} />}
+            farbe="orange"
+            titel={`Partnerarbeit ${p.fach}`}
+            daten="partnerarbeit"
+            zahl={1}
+            text={p.gruppengroesse === 3 ? 'Sprechen zu dritt – jetzt beitreten' : 'Sprechen zu zweit – jetzt beitreten'}
+          />
+        ))}
         {Boolean(reihen?.length) && (
           <Kachel
             href="/s/reihen"

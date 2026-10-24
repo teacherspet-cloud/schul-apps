@@ -42,7 +42,7 @@ describe('Hilfen an Sprechkarten', () => {
       auftrag: 'Describe the picture.'
     })
     expect(hilfenBereinigt('dialog', { rollen: [rolle('A', 'a')] })).toBeUndefined()
-    expect(hilfenBereinigt('dialog', { rollen: [rolle('A', 'a'), rolle('B', 'b'), rolle('C', 'c'), rolle('D', 'd')] })?.rollen).toHaveLength(3)
+    expect((hilfenBereinigt('dialog', { rollen: [rolle('A', 'a'), rolle('B', 'b'), rolle('C', 'c'), rolle('D', 'd')] }) as { rollen: unknown[] }).rollen).toHaveLength(3)
   })
 
   it('karteBereinigt behält Hilfen und Status; die Rollenliste ist die Quelle der zwei festen Dialogfelder', () => {

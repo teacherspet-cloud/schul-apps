@@ -58,6 +58,9 @@ describe('Regeln', () => {
     expect(routeErlaubt('/server/onlinetest', 'GET', ['arbeitsblatt'])).toBe(true)
     expect(routeErlaubt('/server/onlinetests-andere', 'POST', ['arbeitsblatt'])).toBe(true)
     expect(routeErlaubt('/server/reihen/x', 'POST', ['laufendereihen'])).toBe(true)
+    // Partnerarbeit (24.10.2026): aus Meine Klassen oder Sprachenlernen, nicht aus der Pool-App allein
+    expect(routeErlaubt('/server/partnerarbeit/anlegen', 'POST', ['sprachenlernen'])).toBe(true)
+    expect(routeErlaubt('/server/partnerarbeit/anlegen', 'POST', ['sprechpruefungen'])).toBe(false)
   })
 })
 

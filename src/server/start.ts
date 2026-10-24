@@ -19,6 +19,7 @@ import { grammatikRoute } from './grammatik'
 import { bankGrundbestand, grammatikBankRoute } from './grammatikBank'
 import { ueberthemenRoute } from './ueberthemen'
 import { sprechenRoute } from './sprechen'
+import { partnerarbeitRoute } from './partnerarbeit'
 import { kriseRoute, krisenErinnerungStarten } from './krise'
 import { datenpanneRoute } from './datenpanne'
 import { sprechBankRoute } from './sprechBank'
@@ -293,6 +294,8 @@ async function main(): Promise<void> {
       // Kartenpool und Bilder der Sprechprüfungen (19.10.2026) – vor sprechenRoute (Bildpfad unter /s/api/sprechen/)
       sprechBankRoute(),
       sprechenRoute(aufruf),
+      // Partnerarbeit Sprechen im Unterricht (24.10.2026, partnerarbeit.ts) – vor schuelerRoute
+      partnerarbeitRoute(),
       // Vertrauliche Krisenhinweise an die Lehrkraft (22.10.2026, krise.ts)
       kriseRoute(),
       // Datenpannen nach Art. 33/34 DSGVO (22.10.2026, Prüfung des Schulträgers, datenpanne.ts) – nur Admins

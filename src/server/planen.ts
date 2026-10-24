@@ -62,7 +62,9 @@ const TABELLE: Record<Exclude<PlanTyp, 'vok'>, { tabelle: string; gaeste?: [stri
   gram: { tabelle: 'gram_zuweisungen', gaeste: ['gram_gaeste', 'zuweisung_id'] },
   tafel: { tabelle: 'tafel_freigaben' },
   feedback: { tabelle: 'feedback_freigaben', gaeste: ['feedback_gaeste', 'freigabe_id'] },
-  reihe: { tabelle: 'reihen_zuweisungen', gaeste: ['reihe_gaeste', 'zuweisung_id'] }
+  reihe: { tabelle: 'reihen_zuweisungen', gaeste: ['reihe_gaeste', 'zuweisung_id'] },
+  // Partnerarbeit Sprechen (24.10.2026): gehört zum Vokabelkurs der Klasse, Mitglied wie bei der Grammatik
+  partner: { tabelle: 'partner_arbeiten' }
 }
 
 /** Material zu einer Planzeile – mit einheitlichem Titel und Fach */
@@ -77,6 +79,10 @@ export function materialVon(typ: Exclude<PlanTyp, 'vok'>, id: string): Material 
       const r = planDb().prepare('SELECT titel, daten FROM reihen WHERE id = ?').get(String(z.reihe_id ?? '')) as { titel: string; daten: string } | undefined
       titel = r?.titel ?? 'Unterrichtsreihe'
       fach = json_(r?.daten, {} as { fachLabel?: string }).fachLabel ?? ''
+    }
+    if (typ === 'partner') {
+      titel = 'Partnerarbeit Sprechen'
+      fach = (planDb().prepare('SELECT fach FROM vok_zuweisungen WHERE id = ?').get(String(z.vok_id ?? '')) as { fach: string } | undefined)?.fach ?? ''
     }
     return {
       id,
@@ -99,9 +105,10 @@ export function mitglied(typ: Exclude<PlanTyp, 'vok'>, m: Material, ich: NutzerI
   const g0 = TABELLE[typ].gaeste
   if (g0 && sicher(() => Boolean(planDb().prepare(`SELECT 1 FROM ${g0[0]} WHERE ${g0[1]} = ? AND nutzer_id = ?`).get(m.id, ich.id)), false)) return true
   if (typ === 'tafel' && ich.quelle === 'gast') return false
-  if (typ === 'gram' && m.vok_id) {
+  if ((typ === 'gram' || typ === 'partner') && m.vok_id) {
     const v = sicher(() => planDb().prepare('SELECT id, lerngruppe_id, schueler FROM vok_zuweisungen WHERE id = ?').get(m.vok_id ?? '') as Material | undefined, undefined)
     if (v && vokIstFuer(v, ich)) return true
+    if (typ === 'partner') return false
   }
   if (ich.quelle === 'gast' && !gastInLerngruppe(m.lerngruppe_id, ich)) return false
   const nur = json_(m.schueler, [] as string[])
@@ -242,6 +249,7 @@ function absagen(p: PlanZeile): void {
   } else if (p.typ === 'gram') d.prepare('DELETE FROM gram_zuweisungen WHERE id = ?').run(id)
   else if (p.typ === 'tafel') d.prepare('DELETE FROM tafel_freigaben WHERE id = ?').run(id)
   else if (p.typ === 'feedback') d.prepare('DELETE FROM feedback_freigaben WHERE id = ?').run(id)
+  else if (p.typ === 'partner') d.prepare("DELETE FROM partner_arbeiten WHERE id = ? AND status = 'vorbereitet'").run(id)
   else if (p.typ === 'reihe') {
     // Verknüpfte Schritte, die nur für diese Zuweisung entstanden (geplant wie sie), gehen mit
     const z = d.prepare('SELECT verknuepft FROM reihen_zuweisungen WHERE id = ?').get(id) as { verknuepft: string } | undefined

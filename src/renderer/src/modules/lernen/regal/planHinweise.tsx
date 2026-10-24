@@ -38,7 +38,7 @@ function useGeplant(): Daten | null {
 }
 
 /** Register des Fachordners, in dem das Material erscheinen wird */
-const REGISTER: Record<PlanTyp, Register> = { vok: 'vok', gram: 'gram', blatt: 'mat', tafel: 'mat', feedback: 'mat', reihe: 'mat' }
+const REGISTER: Record<PlanTyp, Register> = { vok: 'vok', gram: 'gram', blatt: 'mat', tafel: 'mat', feedback: 'mat', reihe: 'mat', partner: 'sprech' }
 
 /**
  * Grauer Hinweis „Demnächst" im Fachordner (ohne Register: alles des Fachs). Im Regal (`ausser` = vorhandene Ordner): was

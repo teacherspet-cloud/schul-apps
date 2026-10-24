@@ -125,6 +125,8 @@ export const ROUTEN_APPS: Record<string, readonly string[]> = {
   '/server/reihen': ['unterrichtsreihe', 'laufendereihen'],
   '/server/sprech-bank': ['sprechpruefungen'],
   '/server/sprechen': ['sprechpruefungen'],
+  // Partnerarbeit Sprechen (24.10.2026): Reiter „Sprechen" in Meine Klassen und Sprachenlernen
+  '/server/partnerarbeit': ['meineklassen', 'sprachenlernen'],
   // Prüfung der Freigaben am VPS (23.10.2026): Wege, die nur Apps für Lernende und Auswertung nutzen
   '/server/blaetter': ['freigaben', 'meineklassen', 'onlinetest', 'unterrichtsreihe', 'laufendereihen'],
   '/server/tafeln': ['meineklassen', 'freigaben'],

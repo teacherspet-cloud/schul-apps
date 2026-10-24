@@ -19,6 +19,7 @@
 import type { ServerResponse } from 'node:http'
 import { randomInt } from 'node:crypto'
 import { json, type Anfrage } from './http'
+import { sechsstelligerCode } from './codes'
 import { nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import {
   json_,
@@ -333,12 +334,8 @@ function schliessen(r: Raum): void {
 
 // ---------------------------------------------------------------- Ablauf
 
-function neuerCode(): string {
-  for (;;) {
-    const c = String(randomInt(0, 1_000_000)).padStart(6, '0')
-    if (!raeume.has(c)) return c
-  }
-}
+// Sechsstelliger Code (24.10.2026 in codes.ts herausgezogen, auch für die Partnerarbeit)
+const neuerCode = (): string => sechsstelligerCode((c) => raeume.has(c))
 
 /**
  * Reiseplaner (09.10.2026, Lehrkraft): Wörter aus ALLEN Units und Bänden des Lehrwerks der Klasse bis zu ihrem Stand –

@@ -15,7 +15,7 @@
  *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
-import { SprechLehrkraft, useSprechVerfuegbar } from '../sprechen/SprechLehrkraft'
+import { istSprechSprache, SprechenReiter } from '../sprechen/SprechenReiter'
 import { problemWoerterText } from '@shared/problemWoerter'
 import { SchuljahrHinweis } from './SchuljahrHinweis'
 import { LerngruppeAnlegenKnoepfe } from './LerngruppeAnlegen'
@@ -819,7 +819,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   const { logoDataUrl, settings } = useAppSettings()
   // Grammatik-Entwürfe der Kurse (nur in diesem Gerät, 09.10.2026) – wie auf der Kursseite vorne im Handlungsbedarf
   const entwurfBedarf = useEntwurfBedarf(d?.vokabeln ?? [])
-  const sprechDa = useSprechVerfuegbar()
+  // Reiter „Sprechen" (24.10.2026): Partnerarbeit ohne KI immer bei en/fr/es, KI-Training darin nur mit Gesprächs-KI
+  const sprechSprache = istSprechSprache(fachAusName(d?.fach ?? '')?.sprache)
   // Suche im Reiter „Unterrichtsreihen & Blätter" (19.10.2026) – vor dem frühen Rücksprung (Hook-Reihenfolge)
   const [reihenSuche, setReihenSuche] = useState('')
   if (!d)
@@ -1041,8 +1042,8 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
           {/* Zahl nur Kurse mit Wörtern (19.10.2026, Befund 9c: der leere Klassenkurs zählte als „Vokabeln (1)") */}
           {d.sprachfach && d.vokabelfach !== false && <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.filter((v) => v.woerter > 0).length})</Tabs.Tab>}
           {d.sprachfach && <Tabs.Tab value="grammatik">Grammatik ({d.grammatik.length})</Tabs.Tab>}
-          {/* Sprechprüfungstraining (19.10.2026): nur mit Gesprächs-KI, zwischen Grammatik und Tests & Noten */}
-          {d.sprachfach && sprechDa && d.klassenKurs && <Tabs.Tab value="sprechen">Sprechprüfungstraining</Tabs.Tab>}
+          {/* Sprechen (19.10.2026 KI-Training, 24.10.2026 Partnerarbeit): zwischen Grammatik und Tests & Noten */}
+          {d.sprachfach && sprechSprache && d.klassenKurs && <Tabs.Tab value="sprechen">Sprechen</Tabs.Tab>}
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
         </Tabs.List>
@@ -1123,9 +1124,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
             </Stack>
           </Tabs.Panel>
         )}
-        {d.sprachfach && sprechDa && d.klassenKurs && (
+        {d.sprachfach && sprechSprache && d.klassenKurs && (
           <Tabs.Panel value="sprechen" pt="sm">
-            <SprechLehrkraft vokId={d.klassenKurs} lernende={d.lernende.filter((l) => !l.gast).map((l) => ({ benutzer: l.benutzer, name: l.name }))} />
+            <SprechenReiter vokId={d.klassenKurs} lernende={d.lernende.filter((l) => !l.gast).map((l) => ({ benutzer: l.benutzer, name: l.name }))} />
           </Tabs.Panel>
         )}
         <Tabs.Panel value="tests" pt="sm">

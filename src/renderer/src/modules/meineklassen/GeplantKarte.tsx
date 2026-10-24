@@ -6,7 +6,7 @@
  */
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { ActionIcon, Button, Card, Group, Menu, Modal, Stack, Text, TextInput, ThemeIcon, Tooltip } from '@mantine/core'
-import { IconAbc, IconBook2, IconCalendarTime, IconChalkboard, IconClock, IconDots, IconFileText, IconPencil, IconRoute } from '@tabler/icons-react'
+import { IconAbc, IconBook2, IconCalendarTime, IconChalkboard, IconClock, IconDots, IconFileText, IconPencil, IconRoute, IconUsers } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { kurzDatum, PLAN_NAME, type PlanTyp } from '@shared/freigabePlan'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -29,7 +29,9 @@ const SYMBOL: Record<PlanTyp, React.ReactNode> = {
   blatt: <IconFileText size={14} />,
   tafel: <IconChalkboard size={14} />,
   feedback: <IconPencil size={14} />,
-  reihe: <IconRoute size={14} />
+  reihe: <IconRoute size={14} />,
+  // Partnerarbeit Sprechen (24.10.2026)
+  partner: <IconUsers size={14} />
 }
 
 export default function GeplantKarte({ gruppeId, neuLaden }: { gruppeId: string; neuLaden?: () => void }): React.JSX.Element | null {

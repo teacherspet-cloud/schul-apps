@@ -99,6 +99,10 @@ export const SENSIBEL: Record<string, string[]> = {
   sprech_vorfaelle: ['satz'],
   // Krisenhinweise (22.10.2026, krise.ts): nur die Ortsangabe, nie Wortlaut
   krisen_hinweise: ['quelle'],
+  // Partnerarbeit Sprechen (24.10.2026, partnerarbeit.ts): Einstellungen samt Kartenwahl, Gruppen (wer mit wem), Anwesenheit;
+  // Zuteilungsregeln der Lehrkraft (Einstufung, „nicht mit") – sensible Angaben zur Person, nie für Lernende
+  partner_arbeiten: ['einstellungen', 'daten'],
+  partner_regeln: ['daten'],
   // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers, bewertungSpur.ts): KI-Vorschlag und Entscheidung der Lehrkraft
   bewertung_spur: ['ki_vorschlag', 'entscheidung'],
   // Datenpannen (22.10.2026, Prüfung des Schulträgers, datenpanne.ts): Beschreibung, Betroffene, Maßnahmen

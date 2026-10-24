@@ -20,6 +20,7 @@ import { hauptschluessel } from './geheim'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { systemOrdner } from './pfade'
+import { partnerPersonEntfernen } from '../shared/partnerarbeit/entfernen'
 
 /** Spalten, die eine Person (Konto) bezeichnen */
 export const PERSONEN_SPALTEN = ['nutzer_id', 'schueler_id', 'lehrkraft_id', 'besitzer_id', 'iserv_id', 'gast_id'] as const
@@ -30,6 +31,14 @@ export const LISTEN_SPALTEN = ['schueler', 'mitglieder'] as const
  * Hörtext-Freigaben = { wer, schueler: [Benutzernamen in Kleinschreibung] } (hoertexte.ts)
  */
 export const JSON_LISTEN: { spalte: string; feld: string }[] = [{ spalte: 'transkript_wahl', feld: 'schueler' }]
+/**
+ * Verschachtelte Kennungen in einem JSON-Objekt (24.10.2026, Partnerarbeit): Gruppen, Anwesenheit, Symbole und
+ * Zuteilungsregeln – eine Funktion je Tabelle nimmt die Person heraus (shared/partnerarbeit/entfernen.ts)
+ */
+export const JSON_OBJEKTE: { tabelle: string; spalte: string; entfernen: (daten: unknown, ids: Set<string>) => unknown }[] = [
+  { tabelle: 'partner_arbeiten', spalte: 'daten', entfernen: partnerPersonEntfernen },
+  { tabelle: 'partner_regeln', spalte: 'daten', entfernen: partnerPersonEntfernen }
+]
 /**
  * Tabellen, deren Zeilen bleiben – nur die Personenspalte wird geleert: das Prüfprotokoll (Nachweis, nur Zahlen) und
  * der schulweite Kartenpool der Sprechprüfungen (Material der Schule, nicht der Person)
@@ -46,7 +55,10 @@ export const VERWEISE: Record<string, string[]> = { krisen_hinweise: ['erst_gese
 /** Kinder ohne Fremdschlüssel: Zeilen ohne Eltern löschen */
 export const WAISEN: { tabelle: string; spalte: string; eltern: string; elternSpalte: string }[] = [
   { tabelle: 'sprech_stand', spalte: 'freigabe_id', eltern: 'sprech_freigaben', elternSpalte: 'id' },
-  { tabelle: 'sprech_vorfaelle', spalte: 'freigabe_id', eltern: 'sprech_freigaben', elternSpalte: 'id' }
+  { tabelle: 'sprech_vorfaelle', spalte: 'freigabe_id', eltern: 'sprech_freigaben', elternSpalte: 'id' },
+  // Partnerarbeit (24.10.2026): Regeln und Partnerarbeiten leben mit dem Kurs
+  { tabelle: 'partner_regeln', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' },
+  { tabelle: 'partner_arbeiten', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' }
 ]
 
 const q = (name: string): string => `"${name.replace(/"/g, '""')}"`
@@ -128,6 +140,22 @@ export function personenDatenEntfernen(d: DatabaseSync, personen: PersonZiel[]):
         d.prepare(`UPDATE ${q(tabelle)} SET ${q(j.spalte)} = ? WHERE rowid = ?`).run(JSON.stringify(neu), Number(z.zeile))
         zeilen++
       }
+    }
+  }
+  for (const j of JSON_OBJEKTE) {
+    if (!tabellen.get(j.tabelle)?.includes(j.spalte)) continue
+    const alle = d.prepare(`SELECT rowid AS zeile, ${q(j.spalte)} AS ${j.spalte} FROM ${q(j.tabelle)}`).all() as Record<string, unknown>[]
+    for (const z of alle) {
+      let obj: unknown
+      try {
+        obj = JSON.parse(String(z[j.spalte] || '{}'))
+      } catch {
+        continue
+      }
+      const neu = j.entfernen(obj, merkmale)
+      if (JSON.stringify(neu) === JSON.stringify(obj)) continue
+      d.prepare(`UPDATE ${q(j.tabelle)} SET ${q(j.spalte)} = ? WHERE rowid = ?`).run(JSON.stringify(neu), Number(z.zeile))
+      zeilen++
     }
   }
   for (const [tabelle, spalten] of Object.entries(VERWEISE)) {

@@ -52,6 +52,8 @@ import {
 /** Wie krise.ts (AUFBEWAHREN) und sprechen.ts (VORFALL_TAGE) */
 export const KRISEN_TAGE = 30
 export const VORFALL_TAGE = 14
+/** Partnerarbeiten (24.10.2026, partnerarbeit.ts): 90 Tage nach dem Ende */
+export const PARTNERARBEIT_TAGE = 90
 
 // ---------------------------------------------------------------- Ablage
 
@@ -158,13 +160,14 @@ export function abgegangeneLehrkraefte(jetzt = Date.now(), e = loeschEinstellung
 // ---------------------------------------------------------------- Lauf
 
 /** Zeitfristen (laufen immer, auch wenn das automatische Löschen von Konten aus ist) */
-export function fristenLoeschen(jetzt: number, e: LoeschEinstellung): { krisen: number; vorfaelle: number; protokoll: number } {
+export function fristenLoeschen(jetzt: number, e: LoeschEinstellung): { krisen: number; vorfaelle: number; protokoll: number; partnerarbeiten: number } {
   const d = db()
   const weg = (t: string, sql: string, wert: number | string): number => (vorhanden(d, t) ? Number(d.prepare(sql).run(wert).changes) : 0)
   return {
     krisen: weg('krisen_hinweise', 'DELETE FROM krisen_hinweise WHERE zeit < ?', grenze(jetzt, KRISEN_TAGE)),
     vorfaelle: weg('sprech_vorfaelle', 'DELETE FROM sprech_vorfaelle WHERE zeit < ?', grenze(jetzt, VORFALL_TAGE)),
-    protokoll: weg('protokoll', 'DELETE FROM protokoll WHERE zeit < ?', new Date(grenze(jetzt, e.protokollTage)).toISOString())
+    protokoll: weg('protokoll', 'DELETE FROM protokoll WHERE zeit < ?', new Date(grenze(jetzt, e.protokollTage)).toISOString()),
+    partnerarbeiten: weg('partner_arbeiten', 'DELETE FROM partner_arbeiten WHERE ende < ?', grenze(jetzt, PARTNERARBEIT_TAGE))
   }
 }
 

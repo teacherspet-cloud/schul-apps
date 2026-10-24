@@ -232,7 +232,7 @@ export default function Ordner({ fach }: { fach: string }): React.JSX.Element {
                     ) : (
                       <Kurse o={o} grammatik setSeite={setSeite} />
                     ))}
-                  {aktiv === 'sprech' && <SprechOrdner freigaben={o.sprechen ?? []} neuLaden={neuLaden} />}
+                  {aktiv === 'sprech' && <SprechOrdner freigaben={o.sprechen ?? []} partnerarbeiten={o.partnerarbeit ?? []} neuLaden={neuLaden} />}
                   {(aktiv === 'mat' || aktiv === 'jahre') &&
                     (seite?.art === 'blatt' ? (
                       <div data-ordner-unterseite="blatt">

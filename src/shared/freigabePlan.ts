@@ -13,15 +13,17 @@ import { verbSchluesselVonWort } from './verbTraining'
 import { istSchultag } from './schulkalender'
 
 /** Was sich planen lässt. Onlinetests startet die Lehrkraft live – sie werden nicht geplant. */
-export type PlanTyp = 'vok' | 'gram' | 'blatt' | 'tafel' | 'feedback' | 'reihe'
-export const PLAN_TYPEN: PlanTyp[] = ['vok', 'gram', 'blatt', 'tafel', 'feedback', 'reihe']
+export type PlanTyp = 'vok' | 'gram' | 'blatt' | 'tafel' | 'feedback' | 'reihe' | 'partner'
+export const PLAN_TYPEN: PlanTyp[] = ['vok', 'gram', 'blatt', 'tafel', 'feedback', 'reihe', 'partner']
 export const PLAN_NAME: Record<PlanTyp, string> = {
   vok: 'Vokabeln',
   gram: 'Grammatik',
   blatt: 'Arbeitsblatt',
   tafel: 'Tafelbild',
   feedback: 'Schreibaufgabe',
-  reihe: 'Unterrichtsreihe'
+  reihe: 'Unterrichtsreihe',
+  // Partnerarbeit Sprechen (24.10.2026, server/partnerarbeit.ts): geplanter Beginn öffnet den Warteraum
+  partner: 'Partnerarbeit Sprechen'
 }
 
 const TAG = 86_400_000

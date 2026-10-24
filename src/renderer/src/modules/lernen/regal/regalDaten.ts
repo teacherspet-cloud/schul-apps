@@ -4,6 +4,7 @@
  * Lernraum (/s/api/lernen).
  */
 import type { SprechFreigabe } from '../../sprechen/typen'
+import type { MeinePartnerarbeit } from '@shared/partnerarbeit/typen'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuffrischen } from '../../../shared/auffrischen'
 import { fachFarbeAus } from '../../../shared/fachfarben'
@@ -113,6 +114,8 @@ export interface FachOrdner {
   fuerDich?: FuerDichBuendel[]
   /** Sprechtraining (19.10.2026): laufende Freigaben des Fachs */
   sprechen?: SprechFreigabe[]
+  /** Partnerarbeit Sprechen (24.10.2026): nur solange sie läuft */
+  partnerarbeit?: MeinePartnerarbeit[]
 }
 
 const leer = <T>(): Promise<T[]> => Promise.resolve([])
@@ -159,8 +162,10 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
       // Bündel „Für dich" (12.10.2026): nur die eigenen, freigegebenen
       holen<{ buendel: FuerDichBuendel[] }>('/s/api/fuerdich').then((d) => d.buendel ?? [], leer<FuerDichBuendel>),
       // Sprechtraining (19.10.2026): nur während einer Freigabe
-      holen<{ freigaben: SprechFreigabe[] }>('/s/api/sprechen').then((d) => d.freigaben ?? [], leer<SprechFreigabe>)
-    ]).then(([vok, gram, blaetter, tests, aufgaben, reihen, farben, raeume, buendel, sprechen]) => {
+      holen<{ freigaben: SprechFreigabe[] }>('/s/api/sprechen').then((d) => d.freigaben ?? [], leer<SprechFreigabe>),
+      // Partnerarbeit Sprechen (24.10.2026): nur solange sie läuft
+      holen<{ partnerarbeiten: MeinePartnerarbeit[] }>('/s/api/partnerarbeit').then((d) => d.partnerarbeiten ?? [], leer<MeinePartnerarbeit>)
+    ]).then(([vok, gram, blaetter, tests, aufgaben, reihen, farben, raeume, buendel, sprechen, partner]) => {
       const nach = new Map<string, FachOrdner>()
       const o = (f: string | undefined): FachOrdner => {
         const n = fachName(f ?? '')
@@ -191,6 +196,7 @@ export function useRegal(): { ordner: FachOrdner[] | null; neuLaden: () => void 
       for (const r of reihen) o(r.fach).reihen.push(r)
       for (const b of buendel) (o(b.fach).fuerDich ??= []).push(b)
       for (const f of sprechen) (o(f.fach).sprechen ??= []).push(f)
+      for (const p of partner) (o(p.fach).partnerarbeit ??= []).push(p)
       for (const r of raeume) {
         const mappen = r.mappen
           .map((m) => ({ ...m, seiten: m.seiten.filter((s) => s.art !== 'blatt' && s.art !== 'schreiben') }))
