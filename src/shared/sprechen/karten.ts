@@ -17,6 +17,46 @@ export interface SprechStand {
   abschnitt?: string
 }
 
+/**
+ * Hilfen für die Partnerarbeit im Unterricht (24.10.2026, abgestimmt): hängen an der Pool-Karte, einmal von der KI
+ * ergänzt (App „Sprechprüfungen", Knopf „Fehlende Inhalte ergänzen") – Partner A schaltet sie Partner B frei bzw. jede
+ * Rolle sich selbst. Das KI-Sprechtraining und das Druckset nutzen sie nicht.
+ */
+export interface Wortschatz {
+  wort: string
+  deutsch: string
+}
+export interface InterviewHilfen {
+  /** Je Frage eine Nachfrage für den Interviewer (gleiche Reihenfolge wie `fragen`) */
+  nachfragen: string[]
+  wortschatz: Wortschatz[]
+  /** 2–3 Musterantworten als letzte Hilfe */
+  beispiele: string[]
+}
+export interface MonologHilfen {
+  /** Arbeitsauftrag in der Zielsprache, den Partner A vorliest */
+  auftrag: string
+  /** Zusatzfragen, wenn die/der Sprechende stockt */
+  zusatzfragen: string[]
+  wortschatz: Wortschatz[]
+  beispiele: string[]
+}
+export interface DialogRolle {
+  name: string
+  /** Text der Rollenkarte – bei Info-Gap mit der Information dieser Rolle */
+  karte: string
+  /** Konkrete Vorschläge (Argumente, Fragen, Ideen) für diese Rolle */
+  vorschlaege: string[]
+  wortschatz: Wortschatz[]
+  beispiele: string[]
+}
+export interface DialogHilfen {
+  /** 2–3 Rollen; [0] und [1] bilden allein ein vollständiges Zweier-Set, [2] ist die dritte Person */
+  rollen: DialogRolle[]
+}
+/** 'ki' = von der KI ergänzt/überarbeitet, noch nicht durchgesehen; 'geprueft' = eine Lehrkraft hat bestätigt */
+export type HilfenStatus = 'ki' | 'geprueft'
+
 export interface InterviewKarte {
   art: 'interview'
   id: string
@@ -24,6 +64,8 @@ export interface InterviewKarte {
   thema: string
   /** Offene Einstiegsfragen zuerst, dann gezieltere */
   fragen: string[]
+  hilfen?: InterviewHilfen
+  hilfenStatus?: HilfenStatus
 }
 
 export interface BildKarte {
@@ -38,6 +80,8 @@ export interface BildKarte {
   /** Was auf dem Bild zu sehen ist (für die KI, die das Bild nicht sieht) */
   bildBeschreibung: string
   leitfragen: string[]
+  hilfen?: MonologHilfen
+  hilfenStatus?: HilfenStatus
 }
 
 export interface DialogKarte {
@@ -54,6 +98,9 @@ export interface DialogKarte {
   punkte: string[]
   /** Woran das Gespräch endet (Einigung, alle Infos …) */
   ziel: string
+  /** Mit Hilfen sind `rollen[0].karte`/`rollen[1].karte` die Quelle von rolleSchueler/rolleKi (karteBereinigt gleicht ab) */
+  hilfen?: DialogHilfen
+  hilfenStatus?: HilfenStatus
 }
 
 export type SprechKarte = InterviewKarte | BildKarte | DialogKarte
@@ -80,11 +127,51 @@ export function karteBereinigt(roh: unknown, id: string): SprechKarte | null {
   return k && stand ? { ...k, stand } : k
 }
 
+const woerter = (x: unknown, max = 15): Wortschatz[] =>
+  Array.isArray(x)
+    ? x
+        .map((w) => {
+          const r = (w ?? {}) as Record<string, unknown>
+          return { wort: text(r.wort, 80), deutsch: text(r.deutsch, 80) }
+        })
+        .filter((w) => w.wort)
+        .slice(0, max)
+    : []
+
+/** Hilfen einer Karte bereinigen – undefined, wenn nichts Brauchbares da ist */
+export function hilfenBereinigt(art: SprechKarte['art'], roh: unknown): InterviewHilfen | MonologHilfen | DialogHilfen | undefined {
+  const r = (roh ?? {}) as Record<string, unknown>
+  if (art === 'interview') {
+    const h: InterviewHilfen = { nachfragen: liste(r.nachfragen, 10), wortschatz: woerter(r.wortschatz), beispiele: liste(r.beispiele, 3) }
+    return h.nachfragen.length || h.wortschatz.length || h.beispiele.length ? h : undefined
+  }
+  if (art === 'monolog') {
+    const h: MonologHilfen = { auftrag: text(r.auftrag, 400), zusatzfragen: liste(r.zusatzfragen, 6), wortschatz: woerter(r.wortschatz), beispiele: liste(r.beispiele, 3) }
+    return h.auftrag || h.zusatzfragen.length || h.wortschatz.length || h.beispiele.length ? h : undefined
+  }
+  const rollen: DialogRolle[] = (Array.isArray(r.rollen) ? r.rollen : [])
+    .map((x) => {
+      const q = (x ?? {}) as Record<string, unknown>
+      return { name: text(q.name, 80), karte: text(q.karte, 600), vorschlaege: liste(q.vorschlaege, 6), wortschatz: woerter(q.wortschatz, 10), beispiele: liste(q.beispiele, 3) }
+    })
+    .filter((x) => x.karte || x.name)
+    .slice(0, 3)
+  return rollen.length >= 2 ? { rollen } : undefined
+}
+
+const status = (x: unknown): HilfenStatus | undefined => (x === 'ki' || x === 'geprueft' ? x : undefined)
+const mitHilfen = <K extends SprechKarte>(k: K, roh: Record<string, unknown>): K => {
+  const hilfen = hilfenBereinigt(k.art, roh.hilfen)
+  if (!hilfen) return k
+  const st = status(roh.hilfenStatus)
+  return { ...k, hilfen, ...(st ? { hilfenStatus: st } : {}) }
+}
+
 function karteOhneStand(roh: unknown, id: string): SprechKarte | null {
   const r = (roh ?? {}) as Record<string, unknown>
   if (r.art === 'interview') {
     const fragen = liste(r.fragen, 10)
-    return fragen.length >= 3 ? { art: 'interview', id, thema: text(r.thema, 80) || 'About you', fragen } : null
+    return fragen.length >= 3 ? mitHilfen({ art: 'interview', id, thema: text(r.thema, 80) || 'About you', fragen }, r) : null
   }
   if (r.art === 'monolog') {
     const leitfragen = liste(r.leitfragen, 6)
@@ -93,29 +180,74 @@ function karteOhneStand(roh: unknown, id: string): SprechKarte | null {
     const versionen = [...new Set([...liste(r.bildVersionen, 20).filter(datei), ...bilder])]
     const beschreibung = text(r.bildBeschreibung, 800)
     return beschreibung && leitfragen.length
-      ? { art: 'monolog', id, titel: text(r.titel, 80) || 'Picture', bilder, ...(versionen.length > bilder.length ? { bildVersionen: versionen } : {}), bildBeschreibung: beschreibung, leitfragen }
+      ? mitHilfen({ art: 'monolog', id, titel: text(r.titel, 80) || 'Picture', bilder, ...(versionen.length > bilder.length ? { bildVersionen: versionen } : {}), bildBeschreibung: beschreibung, leitfragen }, r)
       : null
   }
   if (r.art === 'dialog') {
     const form = r.form === 'infogap' || r.form === 'diskussion' ? r.form : 'rollenspiel'
     const punkte = liste(r.punkte, 8)
     const situation = text(r.situation, 600)
-    return situation && punkte.length >= 2
-      ? {
-          art: 'dialog',
-          id,
-          form,
-          titel: text(r.titel, 80) || 'Dialogue',
-          situation,
-          rolleSchueler: text(r.rolleSchueler, 200),
-          rolleKi: text(r.rolleKi, 200),
-          punkte,
-          ziel: text(r.ziel, 200) || 'Agree on a decision.'
-        }
-      : null
+    if (!situation || punkte.length < 2) return null
+    const basis: DialogKarte = {
+      art: 'dialog',
+      id,
+      form,
+      titel: text(r.titel, 80) || 'Dialogue',
+      situation,
+      rolleSchueler: text(r.rolleSchueler, 600),
+      rolleKi: text(r.rolleKi, 600),
+      punkte,
+      ziel: text(r.ziel, 200) || 'Agree on a decision.'
+    }
+    const k = mitHilfen(basis, r)
+    // Mit Rollenliste sind deren Karten die Quelle – so bleiben KI-Training und Druckset (rolleSchueler/rolleKi) im Takt
+    const rollen = k.hilfen?.rollen
+    return rollen ? { ...k, rolleSchueler: rollen[0].karte || k.rolleSchueler, rolleKi: rollen[1].karte || k.rolleKi } : k
   }
   return null
 }
+
+/** Rollen eines Dialogs: aus den Hilfen, sonst aus den zwei festen Feldern (ohne Vorschläge) */
+export function dialogRollen(k: DialogKarte): DialogRolle[] {
+  if (k.hilfen?.rollen && k.hilfen.rollen.length >= 2) return k.hilfen.rollen
+  const leer = { vorschlaege: [], wortschatz: [], beispiele: [] }
+  return [
+    { name: 'A', karte: k.rolleSchueler, ...leer },
+    { name: 'B', karte: k.rolleKi, ...leer }
+  ]
+}
+
+/** Dialogkarte mit eigener dritter Rolle (für Dreiergruppen) */
+export const karteFuer3 = (k: SprechKarte): boolean => k.art === 'dialog' && dialogRollen(k).length >= 3
+
+export type FehlenderInhalt = 'hilfen' | 'beispiele' | 'dritteRolle' | 'bild'
+
+/**
+ * Was einer Karte für die Partnerarbeit noch fehlt (24.10.2026) – Grundlage für den Knopf „Fehlende Inhalte ergänzen",
+ * den Abdeckungshinweis beim Vorbereiten und die Tests. 'bild' lässt sich nicht per Text-KI beheben (nur zählen).
+ */
+export function fehlendeInhalte(k: SprechKarte): FehlenderInhalt[] {
+  const aus: FehlenderInhalt[] = []
+  if (k.art === 'interview') {
+    const h = k.hilfen
+    if (!h || !h.nachfragen.length || !h.wortschatz.length) aus.push('hilfen')
+    if (!h?.beispiele.length) aus.push('beispiele')
+  } else if (k.art === 'monolog') {
+    if (!k.bilder[0]) aus.push('bild')
+    const h = k.hilfen
+    if (!h || !h.auftrag || !h.zusatzfragen.length || !h.wortschatz.length) aus.push('hilfen')
+    if (!h?.beispiele.length) aus.push('beispiele')
+  } else {
+    const rollen = k.hilfen?.rollen ?? []
+    if (rollen.length < 2 || rollen.some((r) => !r.karte || !r.vorschlaege.length || !r.wortschatz.length)) aus.push('hilfen')
+    if (rollen.length < 2 || rollen.some((r) => !r.beispiele.length)) aus.push('beispiele')
+    if (rollen.length < 3) aus.push('dritteRolle')
+  }
+  return aus
+}
+
+/** Fehlendes, das die Text-KI ergänzen kann */
+export const ergaenzbar = (k: SprechKarte): FehlenderInhalt[] => fehlendeInhalte(k).filter((x) => x !== 'bild')
 
 /** Eingebauter Grundbestand (Englisch) – Interview und Dialog je Stufe */
 export const GRUNDKARTEN: Partial<Record<SprechSprache, Partial<Record<Stufe, SprechKarte[]>>>> = {

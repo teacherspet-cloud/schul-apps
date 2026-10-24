@@ -53,8 +53,9 @@ export function pruefRegeln(teil: KartenTeil, g: Grundlage): string[] {
   ].filter(Boolean)
 }
 
-/** Felder, die die Prüfung korrigiert zurückgibt (dieselben wie beim Erzeugen) */
-const FELDER = (teil: KartenTeil): Record<string, unknown> => (KARTEN_SCHEMA[teil].properties ?? {}) as Record<string, unknown>
+/** Felder, die die Prüfung korrigiert zurückgibt (die des Erzeugers ohne die Hilfen – geprüft wird der Kerninhalt, 24.10.2026) */
+const FELDER = (teil: KartenTeil): Record<string, unknown> =>
+  Object.fromEntries(Object.entries((KARTEN_SCHEMA[teil].properties ?? {}) as Record<string, unknown>).filter(([f]) => f !== 'hilfen'))
 
 /** Die Prüfanfrage: Karten nummeriert, Regeln, Grundlage; Antwort je Karte ok, Grund und korrigierte Felder */
 export function pruefAnfrage(teil: KartenTeil, karten: Record<string, unknown>[], g: Grundlage, vorhanden: string[]): StructuredRequest {

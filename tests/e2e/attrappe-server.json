@@ -139,6 +139,193 @@
      ]
     }
    ]
+  },
+  "sprechkarten_ergaenzung_interview": {
+   "hilfen": {
+    "nachfragen": [
+     "Why do you like it?",
+     "How often do you do that?",
+     "Who do you do it with?",
+     "What did you do then?"
+    ],
+    "wortschatz": [
+     {
+      "wort": "hobby",
+      "deutsch": "Hobby"
+     },
+     {
+      "wort": "after school",
+      "deutsch": "nach der Schule"
+     },
+     {
+      "wort": "at the weekend",
+      "deutsch": "am Wochenende"
+     },
+     {
+      "wort": "my best friend",
+      "deutsch": "mein bester Freund / meine beste Freundin"
+     },
+     {
+      "wort": "usually",
+      "deutsch": "normalerweise"
+     }
+    ],
+    "beispiele": [
+     "After school I usually play football with my friends.",
+     "Last weekend I visited my grandparents and we baked a cake."
+    ]
+   }
+  },
+  "sprechkarten_ergaenzung_monolog": {
+   "hilfen": {
+    "auftrag": "Describe the picture. Say who you can see, where they are and what they are doing. What do you think happened before?",
+    "zusatzfragen": [
+     "What is the weather like?",
+     "How do the people feel?",
+     "Would you like to be there? Why?"
+    ],
+    "wortschatz": [
+     {
+      "wort": "in the foreground",
+      "deutsch": "im Vordergrund"
+     },
+     {
+      "wort": "in the background",
+      "deutsch": "im Hintergrund"
+     },
+     {
+      "wort": "on the left",
+      "deutsch": "links"
+     },
+     {
+      "wort": "on the right",
+      "deutsch": "rechts"
+     },
+     {
+      "wort": "a market stall",
+      "deutsch": "ein Marktstand"
+     },
+     {
+      "wort": "to wave",
+      "deutsch": "winken"
+     }
+    ],
+    "beispiele": [
+     "In the foreground I can see two children who are buying apples.",
+     "In the background there is a big tree and some houses."
+    ]
+   }
+  },
+  "sprechkarten_ergaenzung_dialog": {
+   "form": "diskussion",
+   "titel": "Planning a school trip",
+   "situation": "Your class wants to go on a trip. Talk about the ideas and agree on one.",
+   "rolleSchueler": "You like being outdoors and want to do something active.",
+   "rolleKi": "You prefer museums and quiet places.",
+   "punkte": [
+    "zoo",
+    "museum",
+    "beach",
+    "climbing park"
+   ],
+   "ziel": "Agree on one trip.",
+   "hilfen": {
+    "rollen": [
+     {
+      "name": "Active student",
+      "karte": "You like being outdoors and want to do something active.",
+      "vorschlaege": [
+       "Suggest the climbing park.",
+       "Say the zoo is fun for everyone.",
+       "Ask what the others think."
+      ],
+      "wortschatz": [
+       {
+        "wort": "outdoors",
+        "deutsch": "im Freien"
+       },
+       {
+        "wort": "exciting",
+        "deutsch": "aufregend"
+       },
+       {
+        "wort": "to agree",
+        "deutsch": "zustimmen"
+       },
+       {
+        "wort": "a compromise",
+        "deutsch": "ein Kompromiss"
+       }
+      ],
+      "beispiele": [
+       "I think the climbing park is the best idea because it is exciting.",
+       "What do you think about the zoo?"
+      ]
+     },
+     {
+      "name": "Quiet student",
+      "karte": "You prefer museums and quiet places.",
+      "vorschlaege": [
+       "Suggest the museum.",
+       "Say the beach is too crowded.",
+       "Offer a compromise."
+      ],
+      "wortschatz": [
+       {
+        "wort": "crowded",
+        "deutsch": "überfüllt"
+       },
+       {
+        "wort": "boring",
+        "deutsch": "langweilig"
+       },
+       {
+        "wort": "interesting",
+        "deutsch": "interessant"
+       },
+       {
+        "wort": "to prefer",
+        "deutsch": "bevorzugen"
+       }
+      ],
+      "beispiele": [
+       "I'd prefer the museum because it is interesting.",
+       "Maybe we could go to the beach in the afternoon?"
+      ]
+     },
+     {
+      "name": "Practical student",
+      "karte": "You think about money and time. The trip must be cheap and not too far away.",
+      "vorschlaege": [
+       "Ask how much each idea costs.",
+       "Say the beach is free.",
+       "Remind the others of the time."
+      ],
+      "wortschatz": [
+       {
+        "wort": "cheap",
+        "deutsch": "billig"
+       },
+       {
+        "wort": "expensive",
+        "deutsch": "teuer"
+       },
+       {
+        "wort": "far away",
+        "deutsch": "weit weg"
+       },
+       {
+        "wort": "to cost",
+        "deutsch": "kosten"
+       }
+      ],
+      "beispiele": [
+       "How much does the climbing park cost?",
+       "The beach is free and not far away."
+      ]
+     }
+    ]
+   }
   }
  }
 }

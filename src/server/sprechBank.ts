@@ -6,9 +6,17 @@
  * (main/services/rolle.ts `darfLehrwerkSprache`). Bilder liegen als Dateien unter <DATEN>/sprechbilder (ohne
  * Personenbezug, wie die Medienbank).
  *
- *   GET  /server/sprech-bank?sprache=en         → { karten, darfAlle }
+ *   GET  /server/sprech-bank?sprache=en         → { karten (mit eigene, vorher), darfAlle }
  *   POST /server/sprech-bank/speichern {id?, sprache, jahrgang, teil, karte} → { id }
  *   POST /server/sprech-bank/loeschen {id}
+ *   POST /server/sprech-bank/ergaenzen {id, karte}   KI-Ergänzung übernehmen (Hilfen, dritte Rolle; Status 'ki', alte Fassung in `vorher`)
+ *   POST /server/sprech-bank/bestaetigen {id}        Hilfen als durchgesehen markieren
+ *   POST /server/sprech-bank/zurueck {id}            vorherige Fassung wiederherstellen (eine Stufe)
+ *
+ * Ergänzen (24.10.2026, Partnerarbeit): Hilfen darf jede Lehrkraft mit der App an jede Karte ihrer Sprache anfügen,
+ * solange die Karte keine durchgesehenen Hilfen hat – die Ergänzung ist für die ganze Fachschaft gedacht. Durchgesehene
+ * Hilfen ändern nur Besitzer, Admin und Fachobleute. Die KI darf Dialogkarten dabei umarbeiten; deshalb bleibt die
+ * vorherige Fassung in `vorher` (bis Bestätigen oder Zurück).
  *   POST /server/sprech-bank/bild {dataUrl}       → { datei }
  *   GET  /server/sprech-bank/bild/<datei> · /s/api/sprechen/bild/<datei>   Bild (angemeldet)
  */
@@ -32,7 +40,8 @@ CREATE TABLE IF NOT EXISTS sprech_bank (
   teil TEXT NOT NULL,
   karte TEXT NOT NULL,
   lehrkraft_id TEXT NOT NULL DEFAULT '',
-  geaendert TEXT NOT NULL
+  geaendert TEXT NOT NULL,
+  vorher TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS sprech_bank_sj ON sprech_bank(sprache, jahrgang);`
 
@@ -41,6 +50,9 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Bestehende Tabellen (vor 0.4.179): Spalte für die vorherige Fassung nachziehen
+    const spalten = new Set((d.prepare('PRAGMA table_info(sprech_bank)').all() as { name: string }[]).map((x) => x.name))
+    if (!spalten.has('vorher')) d.exec("ALTER TABLE sprech_bank ADD COLUMN vorher TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -58,6 +70,8 @@ export interface BankKarte {
   karte: SprechKarte
   lehrkraftId: string
   geaendert: string
+  /** Es gibt eine vorherige Fassung (vor der letzten KI-Überarbeitung) */
+  vorher: boolean
 }
 
 const alsKarte = (z: Record<string, unknown>): BankKarte | null => {
@@ -69,7 +83,16 @@ const alsKarte = (z: Record<string, unknown>): BankKarte | null => {
   }
   const k = karteBereinigt(roh, String(z.id))
   return k
-    ? { id: String(z.id), sprache: String(z.sprache), jahrgang: Number(z.jahrgang), teil: String(z.teil), karte: k, lehrkraftId: String(z.lehrkraft_id ?? ''), geaendert: String(z.geaendert) }
+    ? {
+        id: String(z.id),
+        sprache: String(z.sprache),
+        jahrgang: Number(z.jahrgang),
+        teil: String(z.teil),
+        karte: k,
+        lehrkraftId: String(z.lehrkraft_id ?? ''),
+        geaendert: String(z.geaendert),
+        vorher: Boolean(z.vorher)
+      }
     : null
 }
 
@@ -165,14 +188,66 @@ export function sprechBankRoute(): (k: Anfrage) => Promise<boolean> {
       const id = typeof k0.id === 'string' && /^k[a-f0-9]{16}$/.test(k0.id) ? k0.id : `k${randomBytes(8).toString('hex')}`
       const karte = karteBereinigt({ ...(k0.karte as object), art: teil }, id)
       if (!karte) return json(res, 400, { fehler: 'Die Karte ist unvollständig.' }), true
-      const alt = db().prepare('SELECT lehrkraft_id, karte FROM sprech_bank WHERE id = ?').get(id) as { lehrkraft_id: string; karte: string } | undefined
+      const alt = db().prepare('SELECT lehrkraft_id, karte, vorher FROM sprech_bank WHERE id = ?').get(id) as { lehrkraft_id: string; karte: string; vorher: string } | undefined
       if (alt && alt.lehrkraft_id !== ich.id && !darfAlle(s)) return json(res, 403, { fehler: 'Nur die eigenen Karten (oder als Fachobfrau/Fachobmann alle).' }), true
       db()
-        .prepare('INSERT OR REPLACE INTO sprech_bank (id, sprache, jahrgang, teil, karte, lehrkraft_id, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(id, s, jahrgang, teil, JSON.stringify(karte), alt?.lehrkraft_id ?? ich.id, new Date().toISOString())
+        .prepare('INSERT OR REPLACE INTO sprech_bank (id, sprache, jahrgang, teil, karte, lehrkraft_id, geaendert, vorher) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, s, jahrgang, teil, JSON.stringify(karte), alt?.lehrkraft_id ?? ich.id, new Date().toISOString(), alt?.vorher ?? '')
       if (!alt) protokolliereServer('sprechen', `Sprechkarte angelegt (${s}, Jg ${jahrgang}, ${teil})`, ich.id)
       if (alt) bilderAufraeumen(alsKarte({ ...alt, id })?.karte, karte)
       return json(res, 200, { id }), true
+    }
+    // ---------------------------------------------------------------- Ergänzen, Bestätigen, Zurück (24.10.2026)
+    const zeile = (id: unknown): (Record<string, unknown> & { karteAlt: SprechKarte }) | null => {
+      const z = db().prepare('SELECT * FROM sprech_bank WHERE id = ?').get(String(id ?? '')) as Record<string, unknown> | undefined
+      const k = z && alsKarte(z)
+      return z && k ? { ...z, karteAlt: k.karte } : null
+    }
+    // Hilfen darf jede Lehrkraft der Sprache anfügen; durchgesehene nur Besitzer/Fachobleute
+    const darfHilfen = (z: Record<string, unknown> & { karteAlt: SprechKarte }): boolean =>
+      z.karteAlt.hilfenStatus !== 'geprueft' || z.lehrkraft_id === ich.id || darfAlle(String(z.sprache))
+    if (url.pathname === '/server/sprech-bank/ergaenzen') {
+      const z = zeile(k0.id)
+      if (!z) return json(res, 404, { fehler: 'Unbekannte Karte.' }), true
+      if (!darfHilfen(z)) return json(res, 403, { fehler: 'Die Hilfen dieser Karte wurden schon durchgesehen – nur Besitzer oder Fachobleute ändern sie.' }), true
+      const alt = z.karteAlt
+      const roh = (k0.karte ?? {}) as Record<string, unknown>
+      // Kennung, Stand und Bilder bleiben immer die der vorhandenen Karte
+      const neu = karteBereinigt(
+        { ...roh, art: alt.art, stand: alt.stand, ...(alt.art === 'monolog' ? { bilder: alt.bilder, bildVersionen: alt.bildVersionen } : {}), hilfenStatus: 'ki' },
+        alt.id
+      )
+      if (!neu || !neu.hilfen) return json(res, 400, { fehler: 'Die Ergänzung ist unvollständig.' }), true
+      db()
+        .prepare('UPDATE sprech_bank SET karte = ?, vorher = ?, geaendert = ? WHERE id = ?')
+        .run(JSON.stringify(neu), JSON.stringify(alt), new Date().toISOString(), alt.id)
+      protokolliereServer('sprechen', `Sprechkarte von der KI ergänzt (${z.sprache}, Jg ${z.jahrgang}, ${z.teil})`, ich.id)
+      return json(res, 200, { id: alt.id }), true
+    }
+    if (url.pathname === '/server/sprech-bank/bestaetigen') {
+      const z = zeile(k0.id)
+      if (!z) return json(res, 404, { fehler: 'Unbekannte Karte.' }), true
+      if (!z.karteAlt.hilfen) return json(res, 400, { fehler: 'Die Karte hat keine Hilfen.' }), true
+      const neu = { ...z.karteAlt, hilfenStatus: 'geprueft' as const }
+      db().prepare('UPDATE sprech_bank SET karte = ?, vorher = ?, geaendert = ? WHERE id = ?').run(JSON.stringify(neu), '', new Date().toISOString(), z.karteAlt.id)
+      return json(res, 200, { id: z.karteAlt.id }), true
+    }
+    if (url.pathname === '/server/sprech-bank/zurueck') {
+      const z = zeile(k0.id)
+      if (!z) return json(res, 404, { fehler: 'Unbekannte Karte.' }), true
+      if (!darfHilfen(z)) return json(res, 403, { fehler: 'Nur Besitzer oder Fachobleute.' }), true
+      let vorher: SprechKarte | null = null
+      try {
+        vorher = karteBereinigt(JSON.parse(String(z.vorher || 'null')), z.karteAlt.id)
+      } catch {
+        vorher = null
+      }
+      if (!vorher) return json(res, 400, { fehler: 'Es gibt keine vorherige Fassung.' }), true
+      // Bilder bleiben die aktuellen (sie gehören nicht zur Überarbeitung)
+      const alt = z.karteAlt
+      const neu = alt.art === 'monolog' && vorher.art === 'monolog' ? { ...vorher, bilder: alt.bilder, bildVersionen: alt.bildVersionen } : vorher
+      db().prepare('UPDATE sprech_bank SET karte = ?, vorher = ?, geaendert = ? WHERE id = ?').run(JSON.stringify(neu), '', new Date().toISOString(), alt.id)
+      return json(res, 200, { id: alt.id }), true
     }
     if (url.pathname === '/server/sprech-bank/loeschen') {
       const z = db().prepare('SELECT sprache, lehrkraft_id FROM sprech_bank WHERE id = ?').get(String(k0.id ?? '')) as { sprache: string; lehrkraft_id: string } | undefined

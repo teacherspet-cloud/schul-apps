@@ -1,8 +1,10 @@
 // App „Sprechprüfungen" (19.10.2026, Organisation): Karten je Jahrgang im schulweiten Pool – ohne KI:
 //  1. Lehrkraft öffnet die App, Jahrgang 7 › „Von Hand" eine Dialogkarte und ein Interview-Set anlegen.
-//  2. Kachel zeigt die Ampel je Teil; Druckdialog für ein Prüfungsset.
-//  3. Sprechtraining der Lernenden (Klasse 7…) nutzt die Pool-Karte des Jahrgangs.
-//  4. Karte löschen.
+//  2. „Fehlende Inhalte ergänzen" (24.10.2026, KI-Attrappe): Hilfen + dritte Dialogrolle, Marke „nicht durchgesehen",
+//     vorherige Fassung wiederherstellen, einzelne Karte ergänzen, „Geprüft".
+//  3. Kachel zeigt die Ampel je Teil; Druckdialog für ein Prüfungsset.
+//  4. Sprechtraining der Lernenden (Klasse 7…) nutzt die Pool-Karte des Jahrgangs.
+//  5. Karte löschen.
 // Aufruf: node tests/e2e/server-sprechpruefungen.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
@@ -110,6 +112,55 @@ try {
   const nachher = await p.getByRole('dialog').locator('[data-sprech-position]').textContent()
   pruefe(nachher !== vorher && /von 2$/.test(nachher ?? ''), `Taste blättert zur Nachbarkarte („${nachher}")`)
   await p.keyboard.press('Escape')
+
+  // ---------- Fehlende Inhalte ergänzen (24.10.2026): ein Knopf für alle Karten der Sprache, KI-Attrappe
+  const poolKarte = async () => (await (await lk.request.get(`${A}/server/sprech-bank?sprache=en`)).json()).karten.find((x) => x.karte.titel === TITEL)
+  const warteStatus = async (status, ms = 60000) => {
+    for (let t = 0; t < ms; t += 1000) {
+      const x = await poolKarte()
+      if ((x?.karte.hilfenStatus ?? '') === status) return x
+      await p.waitForTimeout(1000)
+    }
+    return null
+  }
+  pruefe(await da(p.locator('[data-sprech-ergaenzen-alle]')), 'Knopf „Fehlende Inhalte ergänzen" je Sprache')
+  await p.locator('[data-sprech-ergaenzen-alle]').click()
+  await p.locator('[data-sprech-ergaenzen-start]').click()
+  let k = await warteStatus('ki')
+  pruefe(Boolean(k), 'Karten von der KI ergänzt (Marke „noch nicht durchgesehen")')
+  pruefe(k?.karte.hilfen?.rollen?.length === 3 && k?.vorher === true, 'Dialogkarte hat drei Rollen, vorherige Fassung gesichert')
+  pruefe(k?.karte.titel === TITEL && k?.karte.rolleSchueler === k?.karte.hilfen?.rollen?.[0]?.karte, 'Titel bleibt; Rolle 1 ist die Schülerrolle')
+  const inter = (await (await lk.request.get(`${A}/server/sprech-bank?sprache=en`)).json()).karten.filter((x) => x.teil === 'interview')
+  for (let t = 0; t < 30 && !inter.every((x) => x.karte.hilfen); t++) {
+    await p.waitForTimeout(1000)
+    inter.splice(0, inter.length, ...(await (await lk.request.get(`${A}/server/sprech-bank?sprache=en`)).json()).karten.filter((x) => x.teil === 'interview'))
+  }
+  pruefe(inter.length === 2 && inter.every((x) => x.karte.hilfen?.nachfragen?.length && x.karte.hilfen?.wortschatz?.length), 'Beide Interview-Sets haben Nachfragen und Wortschatz')
+  await p.waitForTimeout(1200)
+  await aufklappen(p, 'dialog')
+  const dk = p.locator('[data-sprech-spalte="dialog"] [data-sprechkarte="dialog"]', { hasText: TITEL })
+  pruefe(await da(dk.locator('[data-sprech-hilfen-ki]')), 'Kachel zeigt „KI, nicht durchgesehen"')
+  await dk.locator('button').first().click()
+  pruefe(await da(p.getByRole('dialog').locator('[data-sprech-rolle-feld="3"]')), 'Editor: dritte Rolle als Feld, Vorschläge und Wortschatz')
+  await p.screenshot({ path: join(out, '2c-hilfen.png') })
+  await p.getByRole('dialog').locator('[data-sprech-hilfen-zurueck]').click()
+  k = await warteStatus('')
+  pruefe(Boolean(k) && !k.karte.hilfen && k.vorher === false, 'Vorherige Fassung wiederhergestellt (zwei Rollen, ohne Hilfen)')
+  // Einzelne Karte per KI ergänzen und bestätigen
+  await p.waitForTimeout(1200)
+  await aufklappen(p, 'dialog')
+  await dk.locator('button').first().click()
+  await p.getByRole('dialog').locator('[data-sprech-hilfen-ergaenzen]').click()
+  k = await warteStatus('ki')
+  pruefe(k?.karte.hilfen?.rollen?.length === 3, 'Einzelne Karte per KI ergänzt')
+  await p.waitForTimeout(1200)
+  await aufklappen(p, 'dialog')
+  await dk.locator('button').first().click()
+  await p.getByRole('dialog').locator('[data-sprech-hilfen-geprueft]').click()
+  k = await warteStatus('geprueft')
+  pruefe(Boolean(k) && k.vorher === false, 'Hilfen als durchgesehen bestätigt')
+  await p.waitForTimeout(1200)
+  pruefe(((await p.locator('[data-sprech-inhalte-stand]').textContent()) ?? '').includes('Alle Karten vollständig'), 'Stand: alle Karten vollständig')
   // Druckdialog
   await p.locator('[data-pruefungsset-knopf]').click()
   pruefe(await da(p.locator('[data-pruefungsset-drucken]')), 'Druckdialog für ein Prüfungsset')

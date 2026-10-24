@@ -47,13 +47,27 @@ import {
   IconPrinter,
   IconSearch,
   IconSparkles,
+  IconListCheck,
+  IconArrowBackUp,
   IconTrash,
   IconUsers
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Textbook, TextbookMeta } from '@shared/types'
-import { standText, type BildKarte, type DialogKarte, type InterviewKarte, type SprechKarte, type SprechStand } from '@shared/sprechen/karten'
-import { kartenAnfrage, type Grundlage, type KartenTeil } from '@shared/sprechen/erstellen'
+import {
+  dialogRollen,
+  ergaenzbar,
+  fehlendeInhalte,
+  standText,
+  type BildKarte,
+  type DialogKarte,
+  type DialogRolle,
+  type InterviewKarte,
+  type SprechKarte,
+  type SprechStand,
+  type Wortschatz
+} from '@shared/sprechen/karten'
+import { ergaenzungAnwenden, ergaenzungsAnfrage, kartenAnfrage, type Grundlage, type KartenTeil } from '@shared/sprechen/erstellen'
 import { zielNiveau, type SprechSprache } from '@shared/sprechen/niveaus'
 import { pruefAnfrage, pruefBerichtText, pruefErgebnisAnwenden } from '@shared/sprechen/pruefen'
 import { AbbruchFehler } from '@shared/abbruch'
@@ -89,6 +103,8 @@ interface PoolKarte {
   teil: KartenTeil
   karte: SprechKarte
   eigene: boolean
+  /** Es gibt eine vorherige Fassung (vor der letzten KI-Überarbeitung, 24.10.2026) */
+  vorher?: boolean
 }
 
 /** Entwürfe der KI zum Durchsehen (nur auf diesem Gerät, bis gespeichert oder verworfen) */
@@ -181,6 +197,308 @@ function bildErzeugen(p: PoolKarte, prompt: string, fertig: () => void): void {
   })
 }
 
+// ---------------------------------------------------------------- Hilfen für die Partnerarbeit (24.10.2026)
+
+/** Grundlage für die Ergänzung: Jahrgang, Niveau und der Lehrwerk-Stand der Karte – ohne Wortlisten (die Karte steht ja) */
+const grundlageFuer = (sprache: SprechSprache, jahrgang: number, k: SprechKarte): Grundlage => ({
+  sprache,
+  jahrgang,
+  niveau: zielNiveau(sprache, jahrgang),
+  quelle: standText(k.stand),
+  woerter: [],
+  grammatikBekannt: [],
+  grammatikNeu: [],
+  themen: []
+})
+
+/** Eine Karte ergänzen: KI fragen, Antwort anwenden, am Server übernehmen. false = die Karte war schon vollständig */
+async function karteErgaenzen(p: PoolKarte, ai: AuftragsKontext['ai']): Promise<boolean> {
+  const fehlt = ergaenzbar(p.karte)
+  if (!fehlt.length) return false
+  const antwort = await ai<Record<string, unknown>>(ergaenzungsAnfrage(p.teil, p.karte, fehlt, grundlageFuer(p.sprache as SprechSprache, p.jahrgang, p.karte)))
+  const neu = ergaenzungAnwenden(p.karte, antwort)
+  if (!neu) throw new Error('Die KI lieferte keine brauchbaren Hilfen.')
+  await senden('/server/sprech-bank/ergaenzen', { id: p.id, karte: neu })
+  return true
+}
+
+/**
+ * „Fehlende Inhalte ergänzen" (ein Knopf je Sprache, Wunsch der Lehrkraft): alle Karten der Sprache nacheinander –
+ * Hilfen, Beispielsätze, dritte Dialogrolle. Gespeichert wird sofort mit der Marke „von der KI, noch nicht durchgesehen";
+ * ein Fehler bei einer Karte hält die übrigen nicht auf, Abbruch über die Auftragsleiste.
+ */
+function alleErgaenzen(fach: (typeof FAECHER)[number], karten: PoolKarte[], fertig: () => void): void {
+  const offen = karten.filter((p) => ergaenzbar(p.karte).length)
+  if (!offen.length) return
+  void starteAuftrag({
+    moduleId: 'sprechpruefungen',
+    docId: sprechZiel({ sprache: fach.sprache, jahrgang: offen[0].jahrgang }),
+    titel: `Fehlende Inhalte ergänzen · ${fach.name} (${offen.length} Karten)`,
+    art: 'Sprechkarten',
+    eingabe: { offen },
+    sperrt: false,
+    fehlerTitel: 'Inhalte konnten nicht ergänzt werden',
+    arbeit: async (e, k) => {
+      let ergaenzt = 0
+      let fehlerZahl = 0
+      let fehler: unknown = null
+      for (const [i, p] of e.offen.entries()) {
+        k.melde(`${i + 1} von ${e.offen.length}: ${titelVon(p.karte)} (Jg ${p.jahrgang})`, i, e.offen.length)
+        try {
+          if (await karteErgaenzen(p, k.ai)) ergaenzt++
+        } catch (f) {
+          if (k.signal.aborted) throw f
+          fehler = f
+          fehlerZahl++
+        }
+        if (i % 3 === 2) fertig()
+      }
+      if (fehler && !ergaenzt) throw fehler
+      if (fehler) notifyError(`Bei ${fehlerZahl} Karten brach die KI ab – das Übrige ist gespeichert. Der Knopf ergänzt beim nächsten Mal nur noch die Lücken.`)
+      return { ergaenzt, fehlerZahl }
+    },
+    ablegen: async () => fertig(),
+    abschluss: ({ ergaenzt, fehlerZahl }) => `${ergaenzt} Karten ergänzt${fehlerZahl ? `, ${fehlerZahl} mit Fehler` : ''} – in der App durchsehen und bestätigen`
+  })
+  notifySuccess('Die KI ergänzt die Karten im Hintergrund – sie tragen danach die Marke „noch nicht durchgesehen".')
+}
+
+/** Kurztext, was einer Karte fehlt (Kachel, Vorbereiten) */
+const fehltText = (k: SprechKarte): string => {
+  const f = fehlendeInhalte(k)
+  const t: string[] = []
+  if (f.includes('hilfen')) t.push('ohne Hilfen')
+  else if (f.includes('beispiele')) t.push('ohne Beispielsätze')
+  if (f.includes('dritteRolle')) t.push('2 Rollen')
+  return t.join(' · ')
+}
+
+/** Marken an der Kachel: Hilfen da/fehlen, dritte Rolle, KI-Fassung noch nicht durchgesehen */
+function HilfenMarke({ k }: { k: SprechKarte }): React.JSX.Element {
+  const f = fehlendeInhalte(k).filter((x) => x !== 'bild')
+  return (
+    <Group gap={4} mt={4} wrap="wrap" data-sprech-hilfen-marke={f.length ? 'fehlt' : 'da'}>
+      {f.length ? (
+        <Badge size="xs" variant="light" color="gray">
+          {fehltText(k)}
+        </Badge>
+      ) : (
+        <Badge size="xs" variant="light" color="teal">
+          Hilfen{k.art === 'dialog' ? ' · 3 Rollen' : ''} ✓
+        </Badge>
+      )}
+      {k.hilfenStatus === 'ki' && (
+        <Badge size="xs" variant="light" color="yellow" data-sprech-hilfen-ki>
+          KI, nicht durchgesehen
+        </Badge>
+      )}
+    </Group>
+  )
+}
+
+const wortZeilen = (w: Wortschatz[]): string => w.map((x) => (x.deutsch ? `${x.wort} – ${x.deutsch}` : x.wort)).join('\n')
+const wortAus = (t: string): Wortschatz[] =>
+  t
+    .split('\n')
+    .map((z) => z.trim())
+    .filter(Boolean)
+    .map((z) => {
+      const m = /^(.*?)\s+(?:–|-|—|:)\s+(.*)$/.exec(z)
+      return m ? { wort: m[1].trim(), deutsch: m[2].trim() } : { wort: z, deutsch: '' }
+    })
+
+/** Hilfen nur zum Lesen (Ansicht) */
+function HilfenBlock({ k }: { k: SprechKarte }): React.JSX.Element | null {
+  const h = k.hilfen
+  if (!h) return null
+  const feld = (titel: string, inhalt: React.ReactNode): React.JSX.Element => (
+    <div>
+      <Text size="sm" fw={600}>
+        {titel}
+      </Text>
+      {inhalt}
+    </div>
+  )
+  const punkte = (l: string[]): React.JSX.Element => (
+    <Stack gap={2}>
+      {l.map((z, i) => (
+        <Text key={i} size="sm">
+          • {z}
+        </Text>
+      ))}
+    </Stack>
+  )
+  const woerter = (w: Wortschatz[]): React.JSX.Element => <Text size="sm">{w.map((x) => (x.deutsch ? `${x.wort} (${x.deutsch})` : x.wort)).join(' · ')}</Text>
+  return (
+    <Stack gap="xs" data-sprech-hilfen>
+      <Text size="sm" fw={700} c="dimmed">
+        Hilfen für die Partnerarbeit
+      </Text>
+      {k.art === 'interview' && 'nachfragen' in h && (
+        <>
+          {h.nachfragen.length > 0 && feld('Nachfragen', punkte(h.nachfragen))}
+          {h.wortschatz.length > 0 && feld('Wortschatz', woerter(h.wortschatz))}
+          {h.beispiele.length > 0 && feld('Beispielsätze', punkte(h.beispiele))}
+        </>
+      )}
+      {k.art === 'monolog' && 'auftrag' in h && (
+        <>
+          {h.auftrag && feld('Arbeitsauftrag', <Text size="sm">{h.auftrag}</Text>)}
+          {h.zusatzfragen.length > 0 && feld('Zusatzfragen', punkte(h.zusatzfragen))}
+          {h.wortschatz.length > 0 && feld('Bildwortschatz', woerter(h.wortschatz))}
+          {h.beispiele.length > 0 && feld('Beispielsätze', punkte(h.beispiele))}
+        </>
+      )}
+      {k.art === 'dialog' &&
+        'rollen' in h &&
+        h.rollen.map((r, i) => (
+          <Card key={i} withBorder radius="sm" padding="xs" data-sprech-rolle={i + 1}>
+            <Text size="sm" fw={600}>
+              Rolle {i + 1}: {r.name}
+            </Text>
+            <Text size="sm">{r.karte}</Text>
+            {r.vorschlaege.length > 0 && feld('Vorschläge', punkte(r.vorschlaege))}
+            {r.wortschatz.length > 0 && feld('Wortschatz', woerter(r.wortschatz))}
+            {r.beispiele.length > 0 && feld('Beispielsätze', punkte(r.beispiele))}
+          </Card>
+        ))}
+    </Stack>
+  )
+}
+
+/** Hilfen bearbeiten (Editor) – Listen eine je Zeile, Wortschatz „wort – deutsch" */
+function HilfenFelder({ x, setX }: { x: SprechKarte; setX: (k: SprechKarte) => void }): React.JSX.Element {
+  const zeilen = (l: string[]): string => l.join('\n')
+  const aus = (t: string): string[] => t.split('\n').map((z) => z.trim()).filter(Boolean)
+  const leer = { vorschlaege: [], wortschatz: [], beispiele: [] }
+  if (!x.hilfen) {
+    const anlegen = (): void => {
+      if (x.art === 'interview') setX({ ...x, hilfen: { nachfragen: [], wortschatz: [], beispiele: [] } })
+      else if (x.art === 'monolog') setX({ ...x, hilfen: { auftrag: '', zusatzfragen: [], wortschatz: [], beispiele: [] } })
+      else setX({ ...x, hilfen: { rollen: dialogRollen(x).map((r) => ({ ...r, ...leer })) } })
+    }
+    return (
+      <Group gap="xs">
+        <Text size="xs" c="dimmed">
+          Noch keine Hilfen für die Partnerarbeit – per KI ergänzen (Knopf „Fehlende Inhalte ergänzen") oder von Hand anlegen.
+        </Text>
+        <Button size="compact-xs" variant="subtle" onClick={anlegen} data-sprech-hilfen-anlegen>
+          Von Hand anlegen
+        </Button>
+      </Group>
+    )
+  }
+  if (x.art === 'interview') {
+    const h = x.hilfen
+    const set = (t: Partial<typeof h>): void => setX({ ...x, hilfen: { ...h, ...t } })
+    return (
+      <Stack gap="xs">
+        <Textarea label="Nachfragen (eine je Frage, gleiche Reihenfolge)" autosize minRows={2} value={zeilen(h.nachfragen)} onChange={(e) => set({ nachfragen: aus(e.currentTarget.value) })} />
+        <Textarea label="Wortschatz (eine Zeile je Wort: wort – deutsch)" autosize minRows={2} value={wortZeilen(h.wortschatz)} onChange={(e) => set({ wortschatz: wortAus(e.currentTarget.value) })} />
+        <Textarea label="Beispielsätze (2–3)" autosize minRows={2} value={zeilen(h.beispiele)} onChange={(e) => set({ beispiele: aus(e.currentTarget.value) })} />
+      </Stack>
+    )
+  }
+  if (x.art === 'monolog') {
+    const h = x.hilfen
+    const set = (t: Partial<typeof h>): void => setX({ ...x, hilfen: { ...h, ...t } })
+    return (
+      <Stack gap="xs">
+        <Textarea label="Arbeitsauftrag (liest Partner A vor)" autosize minRows={2} value={h.auftrag} onChange={(e) => set({ auftrag: e.currentTarget.value })} />
+        <Textarea label="Zusatzfragen, wenn es stockt (eine je Zeile)" autosize minRows={2} value={zeilen(h.zusatzfragen)} onChange={(e) => set({ zusatzfragen: aus(e.currentTarget.value) })} />
+        <Textarea label="Bildwortschatz (wort – deutsch)" autosize minRows={2} value={wortZeilen(h.wortschatz)} onChange={(e) => set({ wortschatz: wortAus(e.currentTarget.value) })} />
+        <Textarea label="Beispielsätze (2–3)" autosize minRows={2} value={zeilen(h.beispiele)} onChange={(e) => set({ beispiele: aus(e.currentTarget.value) })} />
+      </Stack>
+    )
+  }
+  const rollen = x.hilfen.rollen
+  const setRolle = (i: number, t: Partial<DialogRolle>): void => setX({ ...x, hilfen: { rollen: rollen.map((r, j) => (j === i ? { ...r, ...t } : r)) } })
+  return (
+    <Stack gap="xs">
+      {rollen.map((r, i) => (
+        <Card key={i} withBorder radius="sm" padding="xs" data-sprech-rolle-feld={i + 1}>
+          <Group justify="space-between" gap="xs">
+            <Text size="sm" fw={600}>
+              Rolle {i + 1}
+              {i === 0 ? ' (Schüler/in, Partner A)' : i === 1 ? ' (Partner B)' : ' (dritte Person)'}
+            </Text>
+            {i === 2 && (
+              <Button size="compact-xs" variant="subtle" color="red" onClick={() => setX({ ...x, hilfen: { rollen: rollen.slice(0, 2) } })}>
+                Dritte Rolle entfernen
+              </Button>
+            )}
+          </Group>
+          <TextInput label="Name der Rolle" value={r.name} onChange={(e) => setRolle(i, { name: e.currentTarget.value })} />
+          <Textarea label={`Rollenkarte${x.form === 'infogap' ? ' (mit den Informationen dieser Rolle)' : ''}`} autosize minRows={2} value={r.karte} onChange={(e) => setRolle(i, { karte: e.currentTarget.value })} />
+          <Textarea label="Vorschläge (eine je Zeile)" autosize minRows={2} value={zeilen(r.vorschlaege)} onChange={(e) => setRolle(i, { vorschlaege: aus(e.currentTarget.value) })} />
+          <Textarea label="Wortschatz (wort – deutsch)" autosize minRows={1} value={wortZeilen(r.wortschatz)} onChange={(e) => setRolle(i, { wortschatz: wortAus(e.currentTarget.value) })} />
+          <Textarea label="Beispielsätze" autosize minRows={1} value={zeilen(r.beispiele)} onChange={(e) => setRolle(i, { beispiele: aus(e.currentTarget.value) })} />
+        </Card>
+      ))}
+      {rollen.length < 3 && (
+        <Button size="compact-xs" variant="subtle" leftSection={<IconPlus size={12} />} onClick={() => setX({ ...x, hilfen: { rollen: [...rollen, { name: '', karte: '', ...leer }] } })} data-sprech-dritte-rolle>
+          Dritte Rolle hinzufügen (für Dreiergruppen)
+        </Button>
+      )}
+    </Stack>
+  )
+}
+
+/**
+ * Leiste unter einer Pool-Karte: Marke „von der KI, noch nicht durchgesehen" mit „Geprüft", „Vorherige Fassung" und
+ * „Hilfen ergänzen (KI)" für eine einzelne Karte. Jede Aktion lädt neu und schließt das Fenster (sonst wäre es veraltet).
+ */
+function HilfenLeiste({ p, laden, schliessen }: { p: PoolKarte; laden: () => void; schliessen: () => void }): React.JSX.Element | null {
+  const k = p.karte
+  const fehlt = ergaenzbar(k)
+  const aktion = (pfad: string): void => void senden(pfad, { id: p.id }).then(() => (laden(), schliessen()), (e: unknown) => notifyError(e))
+  const ergaenzen = (): void => {
+    void starteAuftrag({
+      moduleId: 'sprechpruefungen',
+      docId: sprechZiel({ sprache: p.sprache, jahrgang: p.jahrgang, karteId: p.id }),
+      titel: `Hilfen ergänzen: ${titelVon(k)}`,
+      art: 'Sprechkarten',
+      eingabe: { p },
+      sperrt: false,
+      fehlerTitel: 'Hilfen konnten nicht ergänzt werden',
+      arbeit: async (e, kk) => {
+        kk.melde('Die KI ergänzt die Karte …')
+        await karteErgaenzen(e.p, kk.ai)
+        return true
+      },
+      ablegen: async () => laden(),
+      abschluss: () => 'Hilfen ergänzt – bitte durchsehen und bestätigen'
+    })
+    notifySuccess('Die KI ergänzt die Karte im Hintergrund.')
+    schliessen()
+  }
+  if (!k.hilfen && !fehlt.length) return null
+  return (
+    <Group gap="xs" wrap="wrap" data-sprech-hilfen-leiste>
+      {k.hilfenStatus === 'ki' && (
+        <>
+          <Badge variant="light" color="yellow" data-sprech-hilfen-ki>
+            Von der KI {k.art === 'dialog' ? 'überarbeitet' : 'ergänzt'}, noch nicht durchgesehen
+          </Badge>
+          <Button size="compact-xs" variant="light" color="teal" leftSection={<IconListCheck size={12} />} onClick={() => aktion('/server/sprech-bank/bestaetigen')} data-sprech-hilfen-geprueft>
+            Geprüft
+          </Button>
+        </>
+      )}
+      {p.vorher && (
+        <Button size="compact-xs" variant="subtle" leftSection={<IconArrowBackUp size={12} />} onClick={() => aktion('/server/sprech-bank/zurueck')} data-sprech-hilfen-zurueck>
+          Vorherige Fassung wiederherstellen
+        </Button>
+      )}
+      {fehlt.length > 0 && (
+        <Button size="compact-xs" variant="light" color="violet" leftSection={<IconSparkles size={12} />} onClick={ergaenzen} data-sprech-hilfen-ergaenzen>
+          {fehlt.includes('hilfen') ? 'Hilfen ergänzen (KI)' : fehlt.includes('dritteRolle') ? 'Dritte Rolle ergänzen (KI)' : 'Beispielsätze ergänzen (KI)'}
+        </Button>
+      )}
+    </Group>
+  )
+}
+
 /** Blättern im Kartenfenster (21.10.2026): Pfeile, „3 von 12", Tasten ←/→ und Wischen */
 interface Blaettern {
   nr: number
@@ -253,9 +571,14 @@ function KartenEditor({
   blaettern: b,
   zwischenspeichern,
   schliessen,
-  speichern
+  speichern,
+  pool,
+  laden
 }: {
   k: SprechKarte
+  /** Die gespeicherte Pool-Karte (für Geprüft/Zurück/Ergänzen, 24.10.2026) */
+  pool?: PoolKarte
+  laden?: () => void
   /** Gewählte Stelle im Lehrwerk – für Karten ohne bzw. mit anderem Stand übernehmbar (21.10.2026) */
   aktuell?: SprechStand
   /** Die Karte, wie sie gerade am Server steht – neue Bildfassungen aus dem Hintergrund erscheinen so gleich */
@@ -391,17 +714,30 @@ function KartenEditor({
             />
             <TextInput label="Titel" value={x.titel} onChange={(e) => setX({ ...x, titel: e.currentTarget.value })} />
             <Textarea label="Situation (Text der Karte)" autosize minRows={2} value={x.situation} onChange={(e) => setX({ ...x, situation: e.currentTarget.value })} />
-            <TextInput label="Rolle Schüler/in" value={x.rolleSchueler} onChange={(e) => setX({ ...x, rolleSchueler: e.currentTarget.value })} />
-            <Textarea label="Rolle der Partnerin (bei Info-Gap: ihre Infos)" autosize minRows={2} value={x.rolleKi} onChange={(e) => setX({ ...x, rolleKi: e.currentTarget.value })} />
+            {/* Mit Rollenliste (Hilfen) stehen die Rollenkarten dort – die zwei festen Felder folgen ihnen beim Speichern */}
+            {!x.hilfen && (
+              <>
+                <TextInput label="Rolle Schüler/in" value={x.rolleSchueler} onChange={(e) => setX({ ...x, rolleSchueler: e.currentTarget.value })} />
+                <Textarea label="Rolle der Partnerin (bei Info-Gap: ihre Infos)" autosize minRows={2} value={x.rolleKi} onChange={(e) => setX({ ...x, rolleKi: e.currentTarget.value })} />
+              </>
+            )}
             <Textarea label="Punkte / Optionen (eine je Zeile)" autosize minRows={3} value={zeilen(x.punkte)} onChange={(e) => setX({ ...x, punkte: aus(e.currentTarget.value) })} />
             <TextInput label="Ziel" value={x.ziel} onChange={(e) => setX({ ...x, ziel: e.currentTarget.value })} />
           </>
         )}
+        {/* Hilfen für die Partnerarbeit (24.10.2026): beim Dialog die Rollen mit Vorschlägen, sonst Nachfragen/Auftrag, Wortschatz, Beispiele */}
+        <Card withBorder radius="md" padding="sm" data-sprech-hilfen-felder>
+          <Text size="sm" fw={700} mb={6}>
+            {x.art === 'dialog' ? 'Rollen und Hilfen für die Partnerarbeit' : 'Hilfen für die Partnerarbeit'}
+          </Text>
+          <HilfenFelder x={x} setX={setX} />
+        </Card>
+        {pool && laden && <HilfenLeiste p={pool} laden={laden} schliessen={schliessen} />}
         <Group justify="flex-end">
           <Button variant="default" onClick={schliessen}>
             Abbrechen
           </Button>
-          <Button onClick={() => speichern(x)} data-sprechkarte-speichern>
+          <Button onClick={() => speichern(x.hilfen ? { ...x, hilfenStatus: 'geprueft' } : x)} data-sprechkarte-speichern>
             Speichern
           </Button>
         </Group>
@@ -414,7 +750,7 @@ function KartenEditor({
  * Ansehen ohne Bearbeiten (21.10.2026, Wunsch der Lehrkraft): Karten ohne Bearbeitungsrecht öffnen sich mit Bild,
  * Titel, Beschreibung und Fragen – wie das Bearbeiten-Fenster, nur ohne Eingabefelder
  */
-function KartenAnsicht({ k, blaettern: b, schliessen }: { k: SprechKarte; blaettern?: Blaettern; schliessen: () => void }): React.JSX.Element {
+function KartenAnsicht({ k, blaettern: b, schliessen, pool, laden }: { k: SprechKarte; blaettern?: Blaettern; schliessen: () => void; pool?: PoolKarte; laden?: () => void }): React.JSX.Element {
   const wisch = useBlaettern(b)
   const feld = (titel: string, inhalt: React.ReactNode): React.JSX.Element => (
     <div>
@@ -451,12 +787,14 @@ function KartenAnsicht({ k, blaettern: b, schliessen }: { k: SprechKarte; blaett
           <>
             {feld('Form', absatz(k.form === 'infogap' ? 'Info-Gap (Info- und Fragekarte)' : k.form === 'diskussion' ? 'Diskussion mit Einigung' : 'Rollenspiel'))}
             {feld('Situation', absatz(k.situation))}
-            {k.rolleSchueler && feld('Rolle Schüler/in', absatz(k.rolleSchueler))}
-            {k.rolleKi && feld('Rolle der Partnerin', absatz(k.rolleKi))}
+            {!k.hilfen && k.rolleSchueler && feld('Rolle Schüler/in', absatz(k.rolleSchueler))}
+            {!k.hilfen && k.rolleKi && feld('Rolle der Partnerin', absatz(k.rolleKi))}
             {feld('Punkte / Optionen', punkte(k.punkte))}
             {k.ziel && feld('Ziel', absatz(k.ziel))}
           </>
         )}
+        <HilfenBlock k={k} />
+        {pool && laden && <HilfenLeiste p={pool} laden={laden} schliessen={schliessen} />}
         <Group justify="flex-end">
           <Button variant="default" onClick={schliessen}>
             Schließen
@@ -508,6 +846,7 @@ function KartenKachel({
               ? k.leitfragen.join(' · ')
               : `${k.form === 'infogap' ? 'Info-Gap' : k.form === 'diskussion' ? 'Diskussion' : 'Rollenspiel'} · ${k.situation}`}
         </Text>
+        {!entwurf && <HilfenMarke k={k} />}
       </UnstyledButton>
       {aktionen && (
         <Group gap={4} mt={6} justify="flex-end">
@@ -660,7 +999,7 @@ async function kartenErzeugen(
     karten.push(...erg.bestanden)
   }
   return {
-    karten: karten.map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}) })),
+    karten: karten.map((x, i) => ({ ...x, art: e.teil, id: `e${Date.now().toString(36)}${i}`, bilder: [], ...(e.stand ? { stand: e.stand } : {}), ...(x.hilfen ? { hilfenStatus: 'ki' } : {}) })),
     bericht
   }
 }
@@ -976,7 +1315,7 @@ function Jahrgang({
   }
   // Entwurf beim Blättern nur hier ändern – er bleibt Entwurf, gespeichert wird weiter erst nach Durchsicht
   const entwurfAendern = (schluessel: string, karte: SprechKarte): void =>
-    speichereEntwuerfe(ladeEntwuerfe().map((x) => (x.schluessel === schluessel ? { ...x, karte: { ...x.karte, ...karte } } : x)))
+    speichereEntwuerfe(ladeEntwuerfe().map((x) => (x.schluessel === schluessel ? { ...x, karte: { ...x.karte, ...karte } as Entwurf['karte'] } : x)))
   const gesamt = alle.length
   const gezeigt = alle.filter(passt).length
   const fuerStand = standText(stand) ? `Neue Karten: ${standText(stand)}` : 'Neue Karten ohne Lehrwerk-Stand'
@@ -1173,6 +1512,8 @@ function Jahrgang({
             else if (bearbeiten.p?.id) void speichern(bearbeiten.p.teil, k, bearbeiten.p.id)
           }}
           aktuell={stand}
+          pool={bearbeiten.p?.id ? (pool.find((p) => p.id === bearbeiten.p?.id) ?? bearbeiten.p) : undefined}
+          laden={laden}
           amServer={pool.find((p) => p.id === bearbeiten.p?.id)?.karte}
           neuesBild={
             bearbeiten.p?.id && bearbeiten.p.teil === 'monolog'
@@ -1194,7 +1535,7 @@ function Jahrgang({
           }}
         />
       )}
-      {ansehen && <KartenAnsicht key={ansehen.id} k={ansehen.karte} blaettern={blaetternFuer({ p: ansehen })} schliessen={() => setAnsehen(null)} />}
+      {ansehen && <KartenAnsicht key={ansehen.id} k={ansehen.karte} pool={ansehen} laden={laden} blaettern={blaetternFuer({ p: ansehen })} schliessen={() => setAnsehen(null)} />}
       {fuellenFrage && band && (
         <Modal opened onClose={() => setFuellenFrage(false)} title={`Ganzes Lehrwerk füllen – ${band.name}`} data-sprech-fuellen-frage>
           <Stack gap="sm">
@@ -1364,9 +1705,13 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
     setZielKarte(z.karteId ?? null)
   })
   const [buecher, setBuecher] = useState<TextbookMeta[]>([])
+  const [ergaenzenFrage, setErgaenzenFrage] = useState(false)
   const laden = useCallback(() => {
     void holen<{ karten: PoolKarte[]; darfAlle: boolean }>(`/server/sprech-bank?sprache=${fach.sprache}`).then(setDaten, (e: unknown) => (notifyError(e), setDaten({ karten: [], darfAlle: false })))
   }, [fach.sprache])
+  // Fehlende Inhalte (24.10.2026): Hilfen, Beispielsätze, dritte Dialogrolle – ein Knopf für alle Karten der Sprache
+  const offen = (daten?.karten ?? []).filter((p) => ergaenzbar(p.karte).length)
+  const ungeprueft = (daten?.karten ?? []).filter((p) => p.karte.hilfenStatus === 'ki').length
   useEffect(() => {
     if (active) laden()
   }, [active, laden])
@@ -1396,6 +1741,47 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
             ))}
           </Group>
         </Chip.Group>
+      )}
+      {daten && daten.karten.length > 0 && (
+        <Group gap="sm" mb="md" wrap="wrap" data-sprech-inhalte>
+          <Tooltip label="Hilfen für die Partnerarbeit (Nachfragen, Wortschatz, Beispielsätze), Arbeitsaufträge und die dritte Dialogrolle – für alle Karten der Sprache auf einmal">
+            <Button
+              variant="light"
+              color="violet"
+              leftSection={<IconSparkles size={16} />}
+              disabled={!offen.length}
+              onClick={() => setErgaenzenFrage(true)}
+              data-sprech-ergaenzen-alle
+            >
+              Fehlende Inhalte ergänzen{offen.length ? ` (${offen.length} Karten)` : ''}
+            </Button>
+          </Tooltip>
+          <Text size="sm" c="dimmed" data-sprech-inhalte-stand>
+            {offen.length ? `${daten.karten.length - offen.length} von ${daten.karten.length} Karten vollständig` : 'Alle Karten vollständig'}
+            {ungeprueft ? ` · ${ungeprueft} von der KI ergänzt, noch nicht durchgesehen` : ''}
+          </Text>
+        </Group>
+      )}
+      {ergaenzenFrage && daten && (
+        <Modal opened onClose={() => setErgaenzenFrage(false)} title={`Fehlende Inhalte ergänzen – ${fach.name}`} data-sprech-ergaenzen-frage>
+          <Stack gap="sm">
+            <Text size="sm">
+              Die KI ergänzt bei {offen.length} Karten, was für die Partnerarbeit fehlt: Nachfragen, Wortschatz und Beispielsätze, bei Bildkarten den Arbeitsauftrag und Zusatzfragen, bei Dialogkarten
+              die Rollen mit Vorschlägen und eine dritte Rolle für Dreiergruppen. Dialogkarten darf sie dabei umarbeiten – die vorherige Fassung bleibt wiederherstellbar.
+            </Text>
+            <Text size="sm" c="dimmed">
+              Eine KI-Anfrage je Karte ({offen.length} Anfragen). Die Karten werden sofort gespeichert und tragen die Marke „noch nicht durchgesehen", bis jemand sie bestätigt.
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setErgaenzenFrage(false)}>
+                Abbrechen
+              </Button>
+              <Button color="violet" onClick={() => (setErgaenzenFrage(false), alleErgaenzen(fach, offen, laden))} data-sprech-ergaenzen-start>
+                Ergänzen starten
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       )}
       {!daten ? (
         <Loader />
