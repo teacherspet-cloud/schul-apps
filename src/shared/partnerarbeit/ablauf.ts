@@ -21,8 +21,21 @@ import type { PaEinstellungen, PaGruppe, PaSchritt, PaTeil, Rolle } from './type
 export type Karten = Map<string, SprechKarte>
 export type Zufall = () => number
 
-export type HilfeArt = 'wortschatz' | 'phrases' | 'beispiele' | 'vorschlaege'
-export const HILFE_NAME: Record<HilfeArt, string> = { wortschatz: 'Wortschatz', phrases: 'Phrases', beispiele: 'Beispielsätze', vorschlaege: 'Vorschläge' }
+export type HilfeArt = 'wortschatz' | 'phrases' | 'beispiele' | 'vorschlaege' | 'leitfragen'
+export const HILFE_NAME: Record<HilfeArt, string> = {
+  wortschatz: 'Wortschatz',
+  phrases: 'Phrases',
+  beispiele: 'Beispielsätze',
+  vorschlaege: 'Vorschläge',
+  leitfragen: 'Leitfragen'
+}
+
+/** Arbeitsauftrag zum Bild, wenn die Karte keinen eigenen hat (statt die Leitfragen aufzuzählen – Befund 24.10.2026) */
+const AUFTRAG_ALLGEMEIN: Record<SprechSprache, string> = {
+  en: 'Describe the picture: who can you see, where are they and what is happening? What do you think about it?',
+  fr: "Décris l'image : qui vois-tu, où sont-ils et que se passe-t-il ? Qu'en penses-tu ?",
+  es: 'Describe la imagen: ¿a quién ves, dónde están y qué pasa? ¿Qué opinas?'
+}
 
 // ---------------------------------------------------------------- Karten wählen
 
@@ -212,7 +225,10 @@ export interface PhraseSicht {
 }
 export interface HilfenSicht {
   wortschatz?: Wortschatz[]
+  /** Zur Karte passende Phrases (KI) – sonst der allgemeine Bestand */
   phrases?: PhraseSicht[]
+  /** Allgemeiner Bestand, wenn die Karte eigene Phrases hat (ausklappbar „mehr Phrases") */
+  mehrPhrases?: PhraseSicht[]
   beispiele?: string[]
   vorschlaege?: string[]
 }
@@ -227,7 +243,11 @@ export interface SchrittSicht {
   dranId?: string
   titel: string
   interview?: { fragen: { text: string; nachfrage?: string; haken: boolean }[] }
-  monolog?: { bilder: string[]; auftrag: string; leitfragen: string[]; zusatzfragen?: string[]; beschreibung?: string }
+  /**
+   * Monolog: der Sprechende sieht Bild und Auftrag; `leitfragen` nur, wenn A sie freischaltet. A sieht statt der
+   * Leitfragen die zusammengeführten `impulse` (Leitfragen + Zusatzfragen, ohne Doppelung) als „Wenn es stockt".
+   */
+  monolog?: { bilder: string[]; auftrag: string; leitfragen: string[]; impulse?: string[]; beschreibung?: string }
   dialog?: { form: string; situation: string; ziel: string; punkte: string[]; rolle: DialogRolle | null; alleRollen?: DialogRolle[] }
   /** Was ich selbst sehe (A: alles; B/C: Freigeschaltetes; Dialog: eigene freigeschaltete) */
   hilfen: HilfenSicht
@@ -261,7 +281,15 @@ function phrasesFuer(teil: PaTeil, u: Umfeld, form?: string): PhraseSicht[] {
     .map((p) => ({ text: p.text[u.sprache], deutsch: p.situation }))
 }
 
-const nurFrei = (alle: HilfenSicht, frei: string[]): HilfenSicht => Object.fromEntries(Object.entries(alle).filter(([k]) => frei.includes(k))) as HilfenSicht
+const nurFrei = (alle: HilfenSicht, frei: string[]): HilfenSicht =>
+  Object.fromEntries(Object.entries(alle).filter(([k]) => frei.includes(k === 'mehrPhrases' ? 'phrases' : k))) as HilfenSicht
+
+/** Phrases der Karte zuerst, der Bestand als „mehr" */
+function phrasesVon(k: SprechKarte, teil: PaTeil, u: Umfeld, form?: string): Pick<HilfenSicht, 'phrases' | 'mehrPhrases'> {
+  const eigene = k.hilfen?.phrases ?? []
+  const bestand = phrasesFuer(teil, u, form)
+  return eigene.length ? { phrases: eigene.map((p) => ({ text: p.text, deutsch: p.wann })), mehrPhrases: bestand } : { phrases: bestand }
+}
 
 /** Sicht einer Person auf den laufenden Schritt – nie fremde Rollenkarten (Info-Gap), nie Namen */
 export function sichtSchritt(
@@ -306,7 +334,7 @@ export function sichtSchritt(
   }
 
   if (k.art === 'interview' && s.teil === 'interview') {
-    const alle: HilfenSicht = { wortschatz: k.hilfen?.wortschatz ?? [], phrases: phrasesFuer('interview', u), beispiele: k.hilfen?.beispiele ?? [] }
+    const alle: HilfenSicht = { wortschatz: k.hilfen?.wortschatz ?? [], ...phrasesVon(k, 'interview', u), beispiele: k.hilfen?.beispiele ?? [] }
     if (istA) {
       basis.interview = { fragen: k.fragen.map((f, i) => ({ text: f, nachfrage: k.hilfen?.nachfragen[i], haken: s.haken.includes(i) })) }
       basis.hilfen = alle
@@ -327,30 +355,30 @@ export function sichtSchritt(
       if (zweite?.art === 'monolog') return { karte: zweite, bilder: zweite.bilder }
       return { karte: k, bilder: k.bilder.length >= 2 ? [k.bilder[1]] : k.bilder }
     }
-    const auftrag = (kk: SprechKarte & { art: 'monolog' }): string => kk.hilfen?.auftrag || kk.leitfragen.join(' ')
+    const auftrag = (kk: SprechKarte & { art: 'monolog' }): string => kk.hilfen?.auftrag || AUFTRAG_ALLGEMEIN[u.sprache]
     const alleFuer = (kk: SprechKarte & { art: 'monolog' }): HilfenSicht => ({
       wortschatz: kk.hilfen?.wortschatz ?? [],
-      phrases: phrasesFuer('monolog', u),
+      ...phrasesVon(kk, 'monolog', u),
       beispiele: kk.hilfen?.beispiele ?? []
     })
     if (istA) {
       const wen = s.dran ?? antwortende[0]
       const { karte: kk, bilder } = bilderVon(wen)
       basis.titel = kk.titel
-      basis.monolog = {
-        bilder,
-        auftrag: auftrag(kk),
-        leitfragen: kk.leitfragen,
-        zusatzfragen: kk.hilfen?.zusatzfragen ?? [],
-        beschreibung: kk.bildBeschreibung
-      }
+      // Leitfragen der Karte und Zusatzfragen der KI zusammen als Impulse, ohne Doppelung
+      const impulse = [...new Set([...kk.leitfragen, ...(kk.hilfen?.zusatzfragen ?? [])].map((x) => x.trim()).filter(Boolean))]
+      basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: [], impulse, beschreibung: kk.bildBeschreibung }
       basis.hilfen = alleFuer(kk)
-      basis.schalter = (['wortschatz', 'phrases', 'beispiele'] as HilfeArt[]).map((was) => ({ was, an: Boolean(wen && s.frei[wen]?.includes(was)) }))
+      basis.schalter = (['leitfragen', 'wortschatz', 'phrases', 'beispiele'] as HilfeArt[]).map((was) => ({
+        was,
+        an: Boolean(wen && s.frei[wen]?.includes(was))
+      }))
       basis.kann = { ...basis.kann, naechste: Boolean(s.dran) && phase === 'arbeit', wechsel: phase === 'arbeit' }
     } else {
       const { karte: kk, bilder } = bilderVon(wer)
       basis.titel = kk.titel
-      basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: [] }
+      // Der Sprechende sieht nur Bild und Auftrag; die Leitfragen erst, wenn A sie freischaltet
+      basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: frei.includes('leitfragen') ? kk.leitfragen : [] }
       basis.hilfen = nurFrei(alleFuer(kk), frei)
     }
     uhr()
@@ -363,7 +391,7 @@ export function sichtSchritt(
     const alleFuer = (r: DialogRolle | null): HilfenSicht => ({
       vorschlaege: r?.vorschlaege ?? [],
       wortschatz: r?.wortschatz ?? [],
-      phrases: phrasesFuer('dialog', u, k.form),
+      ...phrasesVon(k, 'dialog', u, k.form),
       beispiele: r?.beispiele ?? []
     })
     const arten: HilfeArt[] = ['vorschlaege', 'wortschatz', 'phrases', 'beispiele']
@@ -372,7 +400,7 @@ export function sichtSchritt(
       const sprechende = Object.keys(s.rollen).filter((id) => s.rollen[id] !== 'helfer')
       basis.dialog = { form: k.form, situation: k.situation, ziel: k.ziel, punkte: k.punkte, rolle: null, alleRollen: rollen.slice(0, 2) }
       basis.hilfen = {
-        phrases: phrasesFuer('dialog', u, k.form),
+        ...phrasesVon(k, 'dialog', u, k.form),
         vorschlaege: rollen.slice(0, 2).flatMap((r) => r.vorschlaege),
         wortschatz: rollen.slice(0, 2).flatMap((r) => r.wortschatz),
         beispiele: rollen.slice(0, 2).flatMap((r) => r.beispiele)

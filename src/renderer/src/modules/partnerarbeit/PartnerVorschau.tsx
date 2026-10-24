@@ -10,7 +10,7 @@ import type { SprechKarte } from '@shared/sprechen/karten'
 import { zielNiveau, type Niveau, type SprechSprache } from '@shared/sprechen/niveaus'
 import { gruppeStarten, probeGruppe, schrittAktion, sichtSchritt, type Karten } from '@shared/partnerarbeit/ablauf'
 import { einstellungenBereinigt, type PaGruppe, type PaTeil } from '@shared/partnerarbeit/typen'
-import { SchrittAnsicht } from './SchrittAnsicht'
+import { SchrittAnsicht, stufeVon } from './SchrittAnsicht'
 
 const SYMBOLE = ['1F98A', '1F422', '1F427']
 const bildUrl = (datei: string): string => `/server/sprech-bank/bild/${datei}`
@@ -132,6 +132,7 @@ export function PartnerVorschau({
                     mitglieder={mitglieder.map((m, j) => ({ ...m, ich: j === i }))}
                     dranSymbol={dran && s.rolle === 'A' ? SYMBOLE[gruppe.mitglieder.indexOf(dran)] : undefined}
                     lehrkraft
+                    stufe={stufeVon(jahrgang)}
                   />
                 ) : null}
               </Stack>

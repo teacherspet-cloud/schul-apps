@@ -51,6 +51,7 @@ import { anweisungen, SPRACHNAME, WERKZEUG_BEENDEN, type Gespraech } from '../sh
 import { ATTRAPPE_EINSCHAETZUNG, bewertungsAnfrage, einschaetzungAus, istUmgehung, type Einschaetzung, type Kennzahlen, type TranskriptZeile } from '../shared/sprechen/bewertung'
 import { GRUNDKARTEN, karteBereinigt, type SprechKarte } from '../shared/sprechen/karten'
 import { bankKarten } from './sprechBank'
+import { schulOrtVon } from './grammatik'
 import { punkteVon, type KriteriumId } from '../shared/sprechen/kriterien'
 import { hoechstMinuten, NIVEAUS, stufeVonNiveau, TEILE, zielNiveau, type Niveau, type SprechSprache, type Teil } from '../shared/sprechen/niveaus'
 import { antwortKonto, kontrollEreignis, moderationsUrteil, type AntwortKonto, type FesteSitzung } from '../shared/sprechen/kontrolle'
@@ -183,7 +184,8 @@ function niveauVon(f: FreigabeZeile): Niveau {
   const e = einstellungenVon(f)
   if (e.niveau && NIVEAUS.includes(e.niveau)) return e.niveau
   const { sprache, jahrgang } = sprachUndJahrgang(f)
-  return zielNiveau(sprache, jahrgang)
+  // Schulform der Lehrkraft (24.10.2026): andere Schulformen erreichen die Niveaus später
+  return zielNiveau(sprache, jahrgang, schulOrtVon(f.lehrkraft_id).schulform)
 }
 
 // ---------------------------------------------------------------- Stand und Vorfälle

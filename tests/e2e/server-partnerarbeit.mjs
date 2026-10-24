@@ -91,7 +91,8 @@ try {
         { wort: 'hobby', deutsch: 'Hobby' },
         { wort: 'after school', deutsch: 'nach der Schule' }
       ],
-      beispiele: ['I play football after school.']
+      beispiele: ['I play football after school.'],
+      phrases: [{ text: 'In my free time I usually …', wann: 'Du erzählst von deiner Freizeit.' }]
     },
     hilfenStatus: 'geprueft'
   })
@@ -104,7 +105,8 @@ try {
       auftrag: 'Describe the picture. Who can you see and what are they doing?',
       zusatzfragen: ['What is the weather like?'],
       wortschatz: [{ wort: 'market stall', deutsch: 'Marktstand' }],
-      beispiele: ['In the foreground I can see …']
+      beispiele: ['In the foreground I can see …'],
+      phrases: [{ text: 'In the foreground I can see …', wann: 'Du beginnst die Beschreibung.' }]
     },
     hilfenStatus: 'geprueft'
   })
@@ -121,7 +123,8 @@ try {
         rolle('Active', 'You want to do something active.'),
         rolle('Quiet', 'You prefer quiet places.'),
         rolle('Practical', 'You think about money and time.')
-      ]
+      ],
+      phrases: [{ text: 'What do you think about …?', wann: 'Du fragst nach der Meinung.' }]
     },
     hilfenStatus: 'geprueft'
   })
@@ -140,13 +143,32 @@ try {
   await reiter.click()
   pruefe(await da(p.locator('[data-pa-vorbereiten]')), 'Partnerarbeit vorbereiten')
   pruefe((await p.locator('[data-pa-abdeckung]').getAttribute('data-pa-abdeckung')) === 'voll', 'Abdeckung: alle Karten vollständig')
+  // Lehrwerk-Stand als Unit-Leiste (24.10.2026) und Kartenwahl in drei Spalten mit Vorschau
+  pruefe(await da(p.locator('[data-lehrwerk-wahl]')), 'Unit-Leiste „Bis Lehrwerk-Stand"')
+  pruefe(await da(p.locator('[data-pa-kartenwahl]')), 'Kartenwahl in drei Spalten')
+  pruefe(((await p.locator('[data-pa-kartenwahl-zahl]').textContent()) ?? '').includes('3 von 3'), 'Anfangs alle Karten gewählt')
+  await p.locator('[data-pa-kartenwahl-keine="interview"]').click()
+  pruefe(((await p.locator('[data-pa-kartenwahl-zahl]').textContent()) ?? '').includes('2 von 3'), 'Spalte „keine" wählt ab')
+  await p.locator('[data-pa-kartenwahl-alle="interview"]').click()
+  await p.locator('[data-pa-karte-auge]').first().click()
+  // Das Fenster-Wurzelelement von Mantine gilt nicht als sichtbar – auf den Umschalter darin warten
+  pruefe(await da(p.locator('[data-pa-kartenvorschau] [data-pa-vorschau-sicht]')), 'Vorschau einer Karte')
+  pruefe(await da(p.locator('[data-pa-kartenvorschau] [data-sprechkarte-inhalt]')), 'Vorschau zeigt die Karte wie in der Pool-App')
+  await p.locator('[data-pa-vorschau-sicht]').getByText('So sehen es die Lernenden').click()
+  pruefe(await da(p.locator('[data-pa-kartenvorschau] [data-pa-vorschau]')), 'Umschalter: Partnersicht in der Kartenvorschau')
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(300)
+  // Ende im Planen-Block: Dauer-Chips
+  await p.locator('[data-pa-ende-wahl]').getByText('45 Min.').click()
+  pruefe(((await p.locator('[data-pa-zeitraum]').textContent()) ?? '').includes('bis'), 'Ende über Dauer-Chip (45 Min.)')
   await p.locator('[data-pa-groesse]').getByText('Zu dritt').click()
   await p.locator('[data-pa-vorschau-knopf]').click()
   const vorschau = p.locator('[data-pa-vorschau]')
   pruefe(await da(vorschau), 'Vorschau „So sehen es die Lernenden"')
   pruefe((await p.locator('[data-pa-vorschau-spalte]').count()) === 3, 'Vorschau zu dritt: drei Spalten')
   const spalteA = p.locator('[data-pa-vorschau-spalte]').filter({ has: p.locator('[data-pa-rolle="A"]') })
-  pruefe((await spalteA.count()) === 1 && (await spalteA.locator('[data-pa-frage]').count()) === 3, 'Vorschau: A sieht die Fragen')
+  // Jahrgang 6 = Unterstufe: eine Frage auf einmal mit „Nächste Frage" (24.10.2026)
+  pruefe((await spalteA.count()) === 1 && (await spalteA.locator('[data-pa-frage]').count()) >= 1 && (await spalteA.locator('[data-pa-frage-einzeln]').count()) === 1, 'Vorschau: A sieht die Fragen (Unterstufe: einzeln)')
   await schalten(spalteA.locator('[data-pa-frei="wortschatz"]'))
   await p.waitForTimeout(200)
   pruefe(
@@ -215,7 +237,10 @@ try {
   pruefe(rollen.filter((r) => r === 'A').length === 1 && rollen.includes('B') && rollen.includes('C'), `Interview: Rollen A, B, C (${rollen.join(',')})`)
   const sA = [m, b, l][rollen.indexOf('A')]
   const sB = [m, b, l][rollen.indexOf('B')]
-  pruefe((await sA.locator('[data-pa-frage]').count()) === 3 && (await sB.locator('[data-pa-frage]').count()) === 0, 'A sieht die Fragen, B nicht')
+  pruefe((await sA.locator('[data-pa-schritt]').getAttribute('data-pa-stufe')) === 'unter', 'Jahrgang 6: Unterstufen-Gestaltung')
+  pruefe((await sA.locator('[data-pa-frage]').count()) >= 1 && (await sB.locator('[data-pa-frage]').count()) === 0, 'A sieht die Fragen, B nicht')
+  await sA.locator('[data-pa-naechste-frage]').click()
+  pruefe((await sA.locator('[data-pa-frage-einzeln]').getAttribute('data-pa-frage-einzeln')) === '1', 'Unterstufe: „Nächste Frage" blättert weiter und hakt ab')
   pruefe((await sA.locator('[data-pa-uhr]').count()) === 0, 'Uhr aus (Option nicht gesetzt)')
   await schalten(sA.locator('[data-pa-frei="wortschatz"]'))
   pruefe(await da(sB.locator('[data-pa-hilfe="wortschatz"]')), 'A schaltet Wortschatz frei → B sieht ihn')

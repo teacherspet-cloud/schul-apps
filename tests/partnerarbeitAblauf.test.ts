@@ -136,6 +136,18 @@ describe('Ablauf der Partnerarbeit', () => {
     expect(sc.monolog!.bilder).toEqual([bild2.art === 'monolog' ? bild2.bilder[1] : ''])
     expect(sb.dran).toBe(true)
     expect(sc.dran).toBe(false)
+    // Bildkarte (Befund 24.10.2026): der Sprechende sieht keine Leitfragen, A sieht Impulse (Leitfragen + Zusatzfragen ohne Doppelung)
+    expect(sb.monolog!.leitfragen).toEqual([])
+    expect(sa.monolog!.impulse).toEqual(['Compare.', 'Weather?'])
+    expect(sa.schalter.some((x) => x.was === 'leitfragen')).toBe(true)
+    const a3 = mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'A')!
+    expect(schrittAktion(mono, a3, 'freischalten', { was: 'leitfragen' }, e({ teile: ['monolog'] }), karten([bild2]), 1)).toBeNull()
+    expect(sichtSchritt(mono, mono.mitglieder[1], karten([bild2]), umfeld, [])!.monolog!.leitfragen).toEqual(['Compare.'])
+    // Karte ohne eigenen Auftrag: allgemeiner Auftrag statt aufgezählter Leitfragen
+    const ohne = gruppeStarten(probeGruppe(2), e({ teile: ['monolog'] }), karten([bild1]), 0)
+    const sOhne = sichtSchritt(ohne, ohne.mitglieder[1], karten([bild1]), umfeld, [])!
+    expect(sOhne.monolog!.auftrag).toMatch(/^Describe the picture/)
+    expect(sOhne.monolog!.auftrag).not.toContain('Who?')
     // zwei Karten, wenn keine Karte zwei Bilder hat
     const zwei = kartenWaehlen('monolog', 3, karten([bild1, { ...bild1, id: 'b1b' }]), [])
     expect(zwei).toHaveLength(2)

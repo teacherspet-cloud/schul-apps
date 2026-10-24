@@ -13,7 +13,7 @@ import type { PaSicht } from '@shared/partnerarbeit/typen'
 import type { SchrittSicht } from '@shared/partnerarbeit/ablauf'
 import { symbolName } from '@shared/partnerarbeit/symbole'
 import { SymbolBild } from './SymbolBild'
-import { SchrittAnsicht } from './SchrittAnsicht'
+import { SchrittAnsicht, stufeVon } from './SchrittAnsicht'
 
 const bildUrl = (datei: string): string => `/s/api/sprechen/bild/${datei}`
 
@@ -181,6 +181,7 @@ export function PartnerarbeitSeite({ id }: { id: string }): React.JSX.Element {
                 bildUrl={bildUrl}
                 mitglieder={g.mitglieder}
                 dranSymbol={dranSymbol}
+                stufe={stufeVon(s.jahrgang)}
               />
             ) : null}
           </>

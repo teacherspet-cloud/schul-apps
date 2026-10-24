@@ -16,11 +16,50 @@ const ZIELE: Record<SprechSprache, Record<number, Niveau>> = {
   es: { 6: 'A1', 7: 'A1', 8: 'A1+', 9: 'A2+', 10: 'B1', 11: 'B1', 12: 'B1+', 13: 'B2' }
 }
 
-export function zielNiveau(sprache: SprechSprache, jahrgang: number | null | undefined): Niveau {
+/**
+ * Andere Schulformen (24.10.2026, Wunsch der Lehrkraft: alle Schulformen): Englisch nach KC Sek I 2026 bzw. IGS-Erlass
+ * 2017 Anlage 1 – erweitertes Niveau (Realschule, Oberschule, IGS/KGS E-Kurs): 5 A1 · 6 A1+ · 7 A1+ · 8 A2 · 9 A2+ ·
+ * 10 B1; grundlegendes Niveau (Hauptschule, G-Kurs): 5–7 A1 · 8 A1+ · 9 A2 · 10 A2+. Zweite Fremdsprache (KC 2025, alle
+ * Schulformen): Jg 7 A1 · 9 A2 · 10 A2/B1 – eine Stufe unter dem Gymnasium ab Jg 9.
+ */
+const ZIELE_ERWEITERT: Record<number, Niveau> = { 5: 'A1', 6: 'A1+', 7: 'A1+', 8: 'A2', 9: 'A2+', 10: 'B1' }
+const ZIELE_GRUNDLEGEND: Record<number, Niveau> = { 5: 'A1', 6: 'A1', 7: 'A1', 8: 'A1+', 9: 'A2', 10: 'A2+' }
+export type NiveauProfil = 'gymnasial' | 'erweitert' | 'grundlegend'
+
+/** Profil aus der Schulform-Kennung (shared/schulformen.ts), unbekannt = gymnasial */
+export function niveauProfil(schulform: string | null | undefined): NiveauProfil {
+  const s = (schulform ?? '').toLowerCase()
+  if (!s) return 'gymnasial'
+  if (s.includes('haupt')) return 'grundlegend'
+  if (
+    s.includes('real') ||
+    s.includes('ober') ||
+    s.includes('gesamt') ||
+    s.includes('igs') ||
+    s.includes('kgs') ||
+    s.includes('sekundar') ||
+    s.includes('gemeinschaft') ||
+    s.includes('stadtteil') ||
+    s.includes('regional') ||
+    s.includes('mittel') ||
+    s.includes('werkreal')
+  )
+    return 'erweitert'
+  return 'gymnasial'
+}
+
+const eineStufeTiefer = (n: Niveau): Niveau => NIVEAUS[Math.max(0, NIVEAUS.indexOf(n) - 1)]
+
+export function zielNiveau(sprache: SprechSprache, jahrgang: number | null | undefined, schulform?: string | null): Niveau {
   const z = ZIELE[sprache]
   if (!jahrgang) return 'A2'
   const j = Math.max(Math.min(...Object.keys(z).map(Number)), Math.min(13, jahrgang))
-  return z[j] ?? 'A2'
+  const gym = z[j] ?? 'A2'
+  const profil = niveauProfil(schulform)
+  if (profil === 'gymnasial' || j >= 11) return gym
+  if (sprache === 'en') return (profil === 'erweitert' ? ZIELE_ERWEITERT : ZIELE_GRUNDLEGEND)[j] ?? gym
+  // 2. Fremdsprache: ab Jg 9 eine Stufe unter dem Gymnasium (grundlegend: ab Jg 8)
+  return j >= (profil === 'erweitert' ? 9 : 8) ? eineStufeTiefer(gym) : gym
 }
 
 /** Grobe Stufe für Phrases und Aufgaben */

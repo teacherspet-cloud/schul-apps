@@ -37,6 +37,9 @@ import { lerngruppe } from './onlinetest'
 import { lernendeVon, vokIstFuer, zeile as vokZeile } from './vokabeln'
 import { jahrgangDerGruppe } from './ueberthemen'
 import { foerderDaten } from './foerdern'
+import { lehrwerkAutomatisch, lehrwerkStandVon, schulOrtVon } from './grammatik'
+import { LEHRWERK_GRAMMATIK, ABSCHNITT_FOLGE } from '../renderer/src/shared/lehrwerkGrammatik'
+import { bandRang } from '../shared/lehrwerkBand'
 import { bankKarten } from './sprechBank'
 import { nachFreigabe, nochGeplant, planLoeschen } from './freigabePlan'
 import { RESSOURCEN } from './pfade'
@@ -44,7 +47,7 @@ import { Stroeme, PULS_MS } from './stroeme'
 import { istSechsstellig, sechsstelligerCode } from './codes'
 import { kurzNamen } from '../shared/namenListe'
 import { mischen } from '../shared/mehrspieler/kern'
-import { fehlendeInhalte, karteFuer3, type SprechKarte } from '../shared/sprechen/karten'
+import { fehlendeInhalte, karteFuer3, type SprechKarte, type SprechStand } from '../shared/sprechen/karten'
 import { zielNiveau, type SprechSprache } from '../shared/sprechen/niveaus'
 import {
   einstellungenBereinigt,
@@ -268,6 +271,72 @@ const lernendeDes = (pa: Partnerarbeit): NutzerInfo[] => {
   return vok ? lernendeVon(vok).filter((n) => n.quelle !== 'vorschau') : []
 }
 
+/**
+ * Vorschlag für „Bis Lehrwerk-Stand" (24.10.2026, abgestimmt): 1. höchste freigegebene Unit/Station der Vokabelkurse der
+ * Lerngruppe, 2. höchste Unit, zu der freigegebene Grammatik laut Lehrwerk-Katalog gehört, 3. der von Hand gesetzte
+ * Lehrwerk-Stand (Meine Klassen). Rang: Band (bandRang), Unit (Katalogfolge, sonst Nummer im Namen), Abschnitt (ABSCHNITT_FOLGE).
+ */
+export interface StandVorschlag {
+  stand: SprechStand
+  quelle: 'vokabeln' | 'grammatik' | 'hand'
+}
+function unitRang(buch: string, unit: string): number {
+  const i = Object.keys(LEHRWERK_GRAMMATIK[buch] ?? {}).indexOf(unit)
+  if (i >= 0) return i
+  const n = /(\d+)/.exec(unit)
+  return n ? Number(n[1]) - 1 : 999
+}
+const standRangVon = (s: SprechStand): number[] => [bandRang(s.band), unitRang(s.band, s.unit), s.abschnitt ? ABSCHNITT_FOLGE.indexOf(s.abschnitt) : 1000]
+const spaeter = (a: SprechStand, b: SprechStand): boolean => {
+  const ra = standRangVon(a)
+  const rb = standRangVon(b)
+  for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] > rb[i]
+  return false
+}
+export function standVorschlag(lerngruppeId: string): StandVorschlag | null {
+  if (!lerngruppeId) return null
+  let auto: ReturnType<typeof lehrwerkAutomatisch> = null
+  try {
+    auto = lehrwerkAutomatisch(lerngruppeId)
+  } catch {
+    auto = null
+  }
+  // 1. Vokabeln: höchste freigegebene Unit (mit Abschnitt, wenn bekannt)
+  let best: SprechStand | null = null
+  for (const f of auto?.freigegeben ?? []) {
+    const kandidaten: SprechStand[] = f.abschnitte.length
+      ? f.abschnitte.map((a) => ({ band: f.buch, unit: f.unit, abschnitt: a }))
+      : [{ band: f.buch, unit: f.unit }]
+    for (const k of kandidaten) if (!best || spaeter(k, best)) best = k
+  }
+  if (best) return { stand: best, quelle: 'vokabeln' }
+  // 2. Grammatik: freigegebene Themen der Lerngruppe → Unit laut Katalog des erkannten/gesetzten Bands
+  const hand = lehrwerkStandVon(lerngruppeId)
+  const buch = auto?.buch ?? hand?.buch
+  if (buch && LEHRWERK_GRAMMATIK[buch]) {
+    const themen = new Set<string>()
+    try {
+      for (const z of db().prepare("SELECT info FROM gram_zuweisungen WHERE lerngruppe_id = ? AND status = 'offen'").all(lerngruppeId) as { info: string }[]) {
+        const i = json_<{ themen?: string[]; teilformen?: string[] }>(z.info, {})
+        for (const t of [...(i.themen ?? []), ...(i.teilformen ?? [])]) themen.add(t.split('/')[0])
+      }
+    } catch {
+      // ohne Grammatik-Tabelle
+    }
+    let bestG: SprechStand | null = null
+    for (const [unit, stationen] of Object.entries(LEHRWERK_GRAMMATIK[buch]))
+      for (const [station, punkte] of Object.entries(stationen))
+        if (punkte.some((p) => p.t.some((t) => themen.has(t.split('/')[0])))) {
+          const k: SprechStand = { band: buch, unit, ...(station ? { abschnitt: station } : {}) }
+          if (!bestG || spaeter(k, bestG)) bestG = k
+        }
+    if (bestG) return { stand: bestG, quelle: 'grammatik' }
+  }
+  // 3. Von Hand gesetzter Stand
+  if (hand) return { stand: { band: hand.buch, unit: hand.unit }, quelle: 'hand' }
+  return null
+}
+
 /** Abdeckung des Pools für den Hinweis beim Vorbereiten */
 function abdeckung(pa: Partnerarbeit): Record<string, { gesamt: number; fehlt: number; ohneDritte: number; ohneBild: number }> {
   const aus: Record<string, { gesamt: number; fehlt: number; ohneDritte: number; ohneBild: number }> = {}
@@ -386,7 +455,7 @@ function sichtFuer(l: Live, ich: string, jetzt: number): PaSicht {
                 g,
                 ich,
                 kartenVon(l),
-                { sprache, niveau: zielNiveau(sprache, jahrgang), uhr: pa.einstellungen.uhr, jetzt },
+                { sprache, niveau: zielNiveau(sprache, jahrgang, schulOrtVon(pa.lehrkraftId).schulform), uhr: pa.einstellungen.uhr, jetzt },
                 l.rueckmeldungen.get(g.id) ?? []
               )
             : null
@@ -643,6 +712,7 @@ export function partnerarbeitRoute(): (k: Anfrage) => Promise<boolean> {
         json(res, 200, {
           sprache: vok.sprache,
           jahrgang: g ? jahrgangDerGruppe(g) : null,
+          schulform: schulOrtVon(ich.id).schulform ?? '',
           lernende: nutzer.map((n) => ({ id: n.id, name: n.name || n.benutzer, benutzer: n.benutzer, online: online.includes(n.id) })),
           namen: kurzNamenVon(nutzer),
           aktuelle,
@@ -650,6 +720,7 @@ export function partnerarbeitRoute(): (k: Anfrage) => Promise<boolean> {
           fruehere: alle.filter((p) => p !== aktuelle).slice(0, 20),
           regeln: regelnVon(vok.id),
           vorschlag,
+          standVorschlag: standVorschlag(vok.lerngruppe_id ?? ''),
           abdeckung: abdeckung(probe),
           karten: [...kartenFuer({ ...probe, einstellungen: { ...probe.einstellungen, karten: [], bisStand: undefined } }).values()].map((kk) => ({
             id: kk.id,

@@ -26,12 +26,19 @@ export interface Wortschatz {
   wort: string
   deutsch: string
 }
+/** Zur Karte passende Wendung (24.10.2026): Text in der Zielsprache, `wann` = wann man sie braucht (deutsch, kurz) */
+export interface KartenPhrase {
+  text: string
+  wann: string
+}
 export interface InterviewHilfen {
   /** Je Frage eine Nachfrage für den Interviewer (gleiche Reihenfolge wie `fragen`) */
   nachfragen: string[]
   wortschatz: Wortschatz[]
   /** 2–3 Musterantworten als letzte Hilfe */
   beispiele: string[]
+  /** 5–8 Phrases, die zu DIESEN Fragen passen (der allgemeine Bestand bleibt ausklappbar) */
+  phrases: KartenPhrase[]
 }
 export interface MonologHilfen {
   /** Arbeitsauftrag in der Zielsprache, den Partner A vorliest */
@@ -40,6 +47,7 @@ export interface MonologHilfen {
   zusatzfragen: string[]
   wortschatz: Wortschatz[]
   beispiele: string[]
+  phrases: KartenPhrase[]
 }
 export interface DialogRolle {
   name: string
@@ -53,6 +61,8 @@ export interface DialogRolle {
 export interface DialogHilfen {
   /** 2–3 Rollen; [0] und [1] bilden allein ein vollständiges Zweier-Set, [2] ist die dritte Person */
   rollen: DialogRolle[]
+  /** Phrases zur Gesprächsführung dieser Karte (für alle Rollen) */
+  phrases: KartenPhrase[]
 }
 /** 'ki' = von der KI ergänzt/überarbeitet, noch nicht durchgesehen; 'geprueft' = eine Lehrkraft hat bestätigt */
 export type HilfenStatus = 'ki' | 'geprueft'
@@ -138,16 +148,33 @@ const woerter = (x: unknown, max = 15): Wortschatz[] =>
         .slice(0, max)
     : []
 
+const phrasen = (x: unknown, max = 10): KartenPhrase[] =>
+  Array.isArray(x)
+    ? x
+        .map((p) => {
+          const r = (p ?? {}) as Record<string, unknown>
+          return { text: text(r.text, 160), wann: text(r.wann, 80) }
+        })
+        .filter((p) => p.text)
+        .slice(0, max)
+    : []
+
 /** Hilfen einer Karte bereinigen – undefined, wenn nichts Brauchbares da ist */
 export function hilfenBereinigt(art: SprechKarte['art'], roh: unknown): InterviewHilfen | MonologHilfen | DialogHilfen | undefined {
   const r = (roh ?? {}) as Record<string, unknown>
   if (art === 'interview') {
-    const h: InterviewHilfen = { nachfragen: liste(r.nachfragen, 10), wortschatz: woerter(r.wortschatz), beispiele: liste(r.beispiele, 3) }
-    return h.nachfragen.length || h.wortschatz.length || h.beispiele.length ? h : undefined
+    const h: InterviewHilfen = { nachfragen: liste(r.nachfragen, 10), wortschatz: woerter(r.wortschatz), beispiele: liste(r.beispiele, 3), phrases: phrasen(r.phrases) }
+    return h.nachfragen.length || h.wortschatz.length || h.beispiele.length || h.phrases.length ? h : undefined
   }
   if (art === 'monolog') {
-    const h: MonologHilfen = { auftrag: text(r.auftrag, 400), zusatzfragen: liste(r.zusatzfragen, 6), wortschatz: woerter(r.wortschatz), beispiele: liste(r.beispiele, 3) }
-    return h.auftrag || h.zusatzfragen.length || h.wortschatz.length || h.beispiele.length ? h : undefined
+    const h: MonologHilfen = {
+      auftrag: text(r.auftrag, 400),
+      zusatzfragen: liste(r.zusatzfragen, 6),
+      wortschatz: woerter(r.wortschatz),
+      beispiele: liste(r.beispiele, 3),
+      phrases: phrasen(r.phrases)
+    }
+    return h.auftrag || h.zusatzfragen.length || h.wortschatz.length || h.beispiele.length || h.phrases.length ? h : undefined
   }
   const rollen: DialogRolle[] = (Array.isArray(r.rollen) ? r.rollen : [])
     .map((x) => {
@@ -156,7 +183,7 @@ export function hilfenBereinigt(art: SprechKarte['art'], roh: unknown): Intervie
     })
     .filter((x) => x.karte || x.name)
     .slice(0, 3)
-  return rollen.length >= 2 ? { rollen } : undefined
+  return rollen.length >= 2 ? { rollen, phrases: phrasen(r.phrases) } : undefined
 }
 
 const status = (x: unknown): HilfenStatus | undefined => (x === 'ki' || x === 'geprueft' ? x : undefined)
@@ -223,6 +250,18 @@ export const karteFuer3 = (k: SprechKarte): boolean => k.art === 'dialog' && dia
 export type FehlenderInhalt = 'hilfen' | 'beispiele' | 'dritteRolle' | 'bild'
 
 /**
+ * Reicht der Arbeitsauftrag einer Bildkarte für einen Monolog in Prüfungslänge (24.10.2026, Wunsch der Lehrkraft)?
+ * Mindestens zwei Sätze (Beschreiben + Vermuten/Meinung) und nicht nur ein Halbsatz – sonst gilt die Hilfe als fehlend
+ * und der Knopf „Fehlende Inhalte ergänzen" lässt die KI nachbessern.
+ */
+export function auftragReicht(auftrag: string | undefined): boolean {
+  const t = (auftrag ?? '').trim()
+  if (t.length < 60) return false
+  const saetze = t.split(/[.!?]+(?:\s|$)/).filter((x) => x.trim().length > 2).length
+  return saetze >= 2
+}
+
+/**
  * Was einer Karte für die Partnerarbeit noch fehlt (24.10.2026) – Grundlage für den Knopf „Fehlende Inhalte ergänzen",
  * den Abdeckungshinweis beim Vorbereiten und die Tests. 'bild' lässt sich nicht per Text-KI beheben (nur zählen).
  */
@@ -230,16 +269,16 @@ export function fehlendeInhalte(k: SprechKarte): FehlenderInhalt[] {
   const aus: FehlenderInhalt[] = []
   if (k.art === 'interview') {
     const h = k.hilfen
-    if (!h || !h.nachfragen.length || !h.wortschatz.length) aus.push('hilfen')
+    if (!h || !h.nachfragen.length || !h.wortschatz.length || !h.phrases.length) aus.push('hilfen')
     if (!h?.beispiele.length) aus.push('beispiele')
   } else if (k.art === 'monolog') {
     if (!k.bilder[0]) aus.push('bild')
     const h = k.hilfen
-    if (!h || !h.auftrag || !h.zusatzfragen.length || !h.wortschatz.length) aus.push('hilfen')
+    if (!h || !auftragReicht(h.auftrag) || !h.zusatzfragen.length || !h.wortschatz.length || !h.phrases.length) aus.push('hilfen')
     if (!h?.beispiele.length) aus.push('beispiele')
   } else {
     const rollen = k.hilfen?.rollen ?? []
-    if (rollen.length < 2 || rollen.some((r) => !r.karte || !r.vorschlaege.length || !r.wortschatz.length)) aus.push('hilfen')
+    if (rollen.length < 2 || rollen.some((r) => !r.karte || !r.vorschlaege.length || !r.wortschatz.length) || !k.hilfen?.phrases.length) aus.push('hilfen')
     if (rollen.length < 2 || rollen.some((r) => !r.beispiele.length)) aus.push('beispiele')
     if (rollen.length < 3) aus.push('dritteRolle')
   }

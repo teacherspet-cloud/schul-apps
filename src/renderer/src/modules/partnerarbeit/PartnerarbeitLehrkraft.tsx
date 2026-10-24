@@ -12,11 +12,11 @@ import {
   Button,
   Card,
   Checkbox,
+  Chip,
   Collapse,
   Group,
   Loader,
   Modal,
-  MultiSelect,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -39,15 +39,19 @@ import {
   IconUsers,
   IconX
 } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useLiveSicht } from '../../shared/liveSicht'
 import { useAuffrischen } from '../../shared/auffrischen'
-import FreigabePlanen, { GeplantMarke, planGeaendert, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
+import FreigabePlanen, { GeplantMarke, planAb, planGeaendert, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
+import { LehrwerkStandWahl, type StandZahlen } from '../../shared/components/LehrwerkStandWahl'
+import { kurzDatum } from '@shared/freigabePlan'
+import { standBis } from '../sprechpruefungen/stand'
+import { KartenWahl } from './KartenWahl'
 import { openDocument } from '../../shared/navigation'
-import { standText, type SprechKarte, type SprechStand } from '@shared/sprechen/karten'
+import { type SprechKarte, type SprechStand } from '@shared/sprechen/karten'
 import { zielNiveau, type SprechSprache } from '@shared/sprechen/niveaus'
 import {
   EINSTUFUNGEN,
@@ -62,7 +66,6 @@ import {
   type Strategie
 } from '@shared/partnerarbeit/typen'
 import type { Warnung } from '@shared/partnerarbeit/zuteilung'
-import { nachStand } from '../sprechpruefungen/stand'
 import { sprechZiel } from '../sprechpruefungen/SprechpruefungenModule'
 import { SymbolBild } from './SymbolBild'
 import { PartnerVorschau } from './PartnerVorschau'
@@ -85,13 +88,13 @@ interface Daten {
   vorschlag: Record<string, string>
   abdeckung: Record<string, { gesamt: number; fehlt: number; ohneDritte: number; ohneBild: number }>
   karten: KarteKurz[]
+  /** Schulform der Lehrkraft (Niveau je Schulform, 24.10.2026) */
+  schulform?: string
+  /** Vorwahl „Bis Lehrwerk-Stand": zuletzt freigeschaltete Vokabeln → Grammatik → Hand-Stand */
+  standVorschlag?: { stand: SprechStand; quelle: 'vokabeln' | 'grammatik' | 'hand' } | null
 }
 
 const uhrzeit = (ms: number): string => new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-const zeitFeld = (ms: number): string => {
-  const d = new Date(ms)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
 const SPRACHEN = ['en', 'fr', 'es']
 
 /** Volle Karten des Pools für Vorschau (Lehrkraft) */
@@ -157,14 +160,16 @@ function Abdeckung({ d, vokId }: { d: Daten; vokId: string }): React.JSX.Element
 }
 
 function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: () => void }): React.JSX.Element {
+  const sprache = (SPRACHEN.includes(d.sprache) ? d.sprache : 'en') as SprechSprache
+  const niveau = zielNiveau(sprache, d.jahrgang, d.schulform)
   const [teile, setTeile] = useState<PaTeil[]>([...PA_TEILE])
   const [groesse, setGroesse] = useState<'2' | '3'>('2')
   const [modus, setModus] = useState<'zufall' | 'code'>('zufall')
   const [uhr, setUhr] = useState(false)
-  const [ende, setEnde] = useState(() => zeitFeld(Date.now() + 45 * 60_000))
-  const [karten, setKarten] = useState<string[]>([])
-  const [bisStand, setBisStand] = useState<string | null>(null)
   const [plan, setPlan] = useState<PlanWahl>(planStart)
+  // Ende (24.10.2026, abgestimmt): Dauer-Chips oder Uhrzeit – bei „Jetzt" ab jetzt, bei „Planen" ab dem Beginn
+  const [dauer, setDauer] = useState<number | null>(90)
+  const [bisZeit, setBisZeit] = useState('')
   const [vorschau, setVorschau] = useState(false)
   const [baende, setBaende] = useState<TextbookMeta[]>([])
   useEffect(() => {
@@ -174,36 +179,47 @@ function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: ()
       setBaende([])
     }
   }, [])
-  // Stände im Pool (Band › Unit › Abschnitt), nach Buchfolge
-  const staende = useMemo(() => {
-    const m = new Map<string, SprechStand>()
-    for (const k of d.karten) if (k.stand) m.set(standText(k.stand), k.stand)
-    return [...m.values()].sort((a, b) => nachStand(a, b, baende))
-  }, [d.karten, baende])
-  const ziel = bisStand ? staende.find((s) => standText(s) === bisStand) : undefined
-  const imStand = (k: KarteKurz): boolean => !ziel || !k.stand || nachStand(k.stand, ziel, baende) <= 0
-  const erlaubte = d.karten.filter(imStand)
-  const gewaehlt = karten.length ? karten.filter((id) => erlaubte.some((k) => k.id === id)) : erlaubte.map((k) => k.id)
-  const endeMs = (): number => {
-    const [h, m] = ende.split(':').map(Number)
-    const t = new Date()
-    t.setHours(h || 0, m || 0, 0, 0)
-    // Vor jetzt → morgen (bzw. am geplanten Tag)
-    if (plan.modus === 'planen' && plan.datum) {
-      const p = new Date(`${plan.datum}T${ende || '13:00'}:00`)
-      return p.getTime()
+  const baendeSprache = baende.filter((b) => b.language === sprache && !b.platzhalter)
+  const bandJahrgang = baendeSprache.find((b) => b.grade === d.jahrgang)
+  // Lehrwerk-Stand: vorbelegt mit dem Stand der Klasse (undefined = alle Karten)
+  const [stand, setStand] = useState<SprechStand | undefined>(() => d.standVorschlag?.stand)
+  const alleKarten = usePoolKarten(sprache, d.jahrgang, true)
+  const imStand = (k: { stand?: SprechStand }): boolean => standBis(k.stand, stand, baendeSprache)
+  const kartenImStand = alleKarten.filter(imStand)
+  const zaehlen = (z: SprechStand | undefined): StandZahlen => {
+    const l = alleKarten.filter((k) => standBis(k.stand, z, baendeSprache))
+    return {
+      gesamt: l.length,
+      interview: l.filter((k) => k.art === 'interview').length,
+      monolog: l.filter((k) => k.art === 'monolog').length,
+      dialog: l.filter((k) => k.art === 'dialog').length
     }
-    if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1)
+  }
+  // Kartenwahl: anfangs alle im Stand; Abwahl merken, damit ein Standwechsel die Wahl nicht verliert
+  const [abgewaehlt, setAbgewaehlt] = useState<Set<string>>(new Set())
+  const gewaehlt = new Set(kartenImStand.filter((k) => !abgewaehlt.has(k.id)).map((k) => k.id))
+  const kartenAendern = (neu: Set<string>): void => setAbgewaehlt(new Set(kartenImStand.filter((k) => !neu.has(k.id)).map((k) => k.id)))
+  const gewaehlteKarten = kartenImStand.filter((k) => gewaehlt.has(k.id))
+  // Beginn und Ende
+  const beginn = (): number => planAb(plan) ?? Date.now()
+  const endeMs = (): number => {
+    const b = beginn()
+    if (dauer) return b + dauer * 60_000
+    const [h, m] = (bisZeit || '00:00').split(':').map(Number)
+    const t = new Date(b)
+    t.setHours(h || 0, m || 0, 0, 0)
+    if (t.getTime() <= b) t.setDate(t.getDate() + 1)
     return t.getTime()
   }
-  const poolKarten = usePoolKarten(d.sprache, d.jahrgang, vorschau)
+  const endeText = uhrzeit(endeMs())
   const anlegen = async (): Promise<void> => {
     try {
+      const alle = gewaehlteKarten.length === alleKarten.length
       const r = await senden<{ id: string; geplant: boolean }>('/server/partnerarbeit/anlegen', {
         kurs: vokId,
         teile,
-        karten: karten.length || ziel ? gewaehlt : [],
-        bisStand: ziel,
+        karten: alle ? [] : gewaehlteKarten.map((k) => k.id),
+        bisStand: stand,
         gruppengroesse: Number(groesse),
         modus,
         uhr,
@@ -223,18 +239,13 @@ function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: ()
       notifyError(e)
     }
   }
-  const kartenDaten = PA_TEILE.flatMap((t) =>
-    erlaubte
-      .filter((k) => k.art === t)
-      .map((k) => ({ value: k.id, label: `${PA_TEIL_NAME[t]}: ${k.titel}${k.stand ? ` (${standText(k.stand).replace(/^bis /, '')})` : ''}` }))
-  )
   return (
     <Card withBorder radius="md" padding="md" data-pa-vorbereiten>
       <Group gap="xs" mb="xs">
         <IconUsers size={18} />
         <Text fw={700}>Partnerarbeit im Unterricht</Text>
       </Group>
-      <Stack gap="sm">
+      <Stack gap="md">
         <Text size="sm" c="dimmed">
           Zu zweit oder zu dritt mit den Karten des Pools üben – ohne KI. Lernende sehen die Partnerarbeit nur, solange sie läuft.
         </Text>
@@ -250,30 +261,52 @@ function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: ()
           ))}
         </Group>
         <Abdeckung d={d} vokId={vokId} />
-        <Group gap="md" align="flex-end" wrap="wrap">
-          {staende.length > 0 && (
-            <Select
-              label="Bis Lehrwerk-Stand"
-              data={staende.map((s) => standText(s))}
-              value={bisStand}
-              onChange={setBisStand}
-              clearable
-              placeholder="alle Karten"
-              w={260}
-              data-pa-bis-stand
+
+        <Card withBorder radius="md" padding="sm" data-pa-stand>
+          <Text fw={700} size="sm" mb={6}>
+            Bis Lehrwerk-Stand
+          </Text>
+          <LehrwerkStandWahl
+            baende={baendeSprache}
+            wert={stand}
+            aendern={(st) => setStand(st)}
+            vorschlag={d.standVorschlag ?? null}
+            zaehlen={zaehlen}
+            bandVorgabe={bandJahrgang}
+          />
+        </Card>
+
+        <Card withBorder radius="md" padding="sm" data-pa-karten>
+          <Group justify="space-between" mb={6}>
+            <Text fw={700} size="sm">
+              Karten
+            </Text>
+            <Button
+              variant="light"
+              size="compact-sm"
+              leftSection={<IconEye size={14} />}
+              onClick={() => setVorschau(true)}
+              disabled={!gewaehlteKarten.length}
+              data-pa-vorschau-knopf
+            >
+              So sehen es die Lernenden
+            </Button>
+          </Group>
+          {!alleKarten.length ? (
+            <Loader size="sm" />
+          ) : (
+            <KartenWahl
+              karten={kartenImStand}
+              gewaehlt={gewaehlt}
+              aendern={kartenAendern}
+              sprache={sprache}
+              jahrgang={d.jahrgang}
+              niveau={niveau}
+              groesse={groesse === '3' ? 3 : 2}
             />
           )}
-          <MultiSelect
-            label="Karten vorgeben (leer = alle passenden)"
-            data={kartenDaten}
-            value={karten}
-            onChange={setKarten}
-            searchable
-            clearable
-            w={360}
-            data-pa-karten
-          />
-        </Group>
+        </Card>
+
         <Group gap="lg" align="flex-end" wrap="wrap">
           <div>
             <Text size="sm" fw={500} mb={4}>
@@ -303,7 +336,6 @@ function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: ()
               data-pa-modus
             />
           </div>
-          <TextInput type="time" label="Ende" value={ende} onChange={(e) => setEnde(e.currentTarget.value)} w={120} data-pa-ende />
           <Switch label="Prüfungszeiten anzeigen (Uhr beim Fragenden)" checked={uhr} onChange={(e) => setUhr(e.currentTarget.checked)} data-pa-uhr-schalter />
         </Group>
         <Text size="xs" c="dimmed">
@@ -311,31 +343,67 @@ function Vorbereiten({ d, vokId, fertig }: { d: Daten; vokId: string; fertig: ()
             ? 'Zufall: Nach dem Aktivieren hakst du die Anwesenden ab, siehst den Vorschlag und startest. Lernende sehen nur Bildsymbole.'
             : 'Code: Jede Person bekommt einen Code und gibt den Code des Partners ein. Wer übrig bleibt, siehst du hier und ordnest ihn zu.'}
         </Text>
-        <FreigabePlanen wert={plan} aendern={setPlan} />
+
+        <Card withBorder radius="md" padding="sm" data-pa-planen>
+          <FreigabePlanen wert={plan} aendern={setPlan} />
+          <Group gap="sm" align="center" wrap="wrap" mt="sm" data-pa-ende-wahl>
+            <Text size="sm" fw={500}>
+              Ende
+            </Text>
+            <Chip.Group
+              value={dauer ? String(dauer) : 'zeit'}
+              onChange={(v) => (typeof v === 'string' && v !== 'zeit' ? (setDauer(Number(v)), setBisZeit('')) : setDauer(null))}
+            >
+              <Chip value="45" size="sm" variant="light" data-pa-dauer="45">
+                45 Min.
+              </Chip>
+              <Chip value="90" size="sm" variant="light" data-pa-dauer="90">
+                90 Min. (Doppelstunde)
+              </Chip>
+              <Chip value="zeit" size="sm" variant="light" data-pa-dauer="zeit">
+                bis Uhrzeit
+              </Chip>
+            </Chip.Group>
+            {!dauer && (
+              <TextInput
+                type="time"
+                size="xs"
+                value={bisZeit}
+                onChange={(e) => setBisZeit(e.currentTarget.value)}
+                w={110}
+                aria-label="Ende (Uhrzeit)"
+                data-pa-ende
+              />
+            )}
+          </Group>
+          <Text size="xs" c="dimmed" mt={4} data-pa-zeitraum>
+            Die Lernenden sehen die Partnerarbeit {plan.modus === 'planen' ? `ab ${kurzDatum(beginn())}, ${uhrzeit(beginn())} Uhr` : 'ab jetzt'} bis {endeText}{' '}
+            Uhr.
+          </Text>
+        </Card>
+
         <Group gap="sm">
-          <Button leftSection={<IconPlayerPlay size={16} />} onClick={() => void anlegen()} disabled={!teile.length || !gewaehlt.length} data-pa-aktivieren>
+          <Button
+            leftSection={<IconPlayerPlay size={16} />}
+            onClick={() => void anlegen()}
+            disabled={!teile.length || !gewaehlteKarten.length || (!dauer && !bisZeit)}
+            data-pa-aktivieren
+          >
             {plan.modus === 'planen' ? 'Planen' : 'Jetzt aktivieren'}
-          </Button>
-          <Button variant="light" leftSection={<IconEye size={16} />} onClick={() => setVorschau(true)} disabled={!gewaehlt.length} data-pa-vorschau-knopf>
-            So sehen es die Lernenden
           </Button>
         </Group>
       </Stack>
       {vorschau && (
-        <Modal opened onClose={() => setVorschau(false)} title="Vorschau: Partner A | Partner B" size="100%" data-pa-vorschau-fenster>
-          {!poolKarten.length ? (
-            <Loader size="sm" />
-          ) : (
-            <PartnerVorschau
-              karten={poolKarten.filter((k) => gewaehlt.includes(k.id))}
-              sprache={(SPRACHEN.includes(d.sprache) ? d.sprache : 'en') as SprechSprache}
-              jahrgang={d.jahrgang}
-              teile={teile}
-              groesse={groesse === '3' ? 3 : 2}
-              uhr={uhr}
-              niveau={zielNiveau((SPRACHEN.includes(d.sprache) ? d.sprache : 'en') as SprechSprache, d.jahrgang)}
-            />
-          )}
+        <Modal opened onClose={() => setVorschau(false)} title={`Vorschau: Partner A | Partner B${groesse === '3' ? ' | Partner C' : ''}`} size="100%" data-pa-vorschau-fenster>
+          <PartnerVorschau
+            karten={gewaehlteKarten}
+            sprache={sprache}
+            jahrgang={d.jahrgang}
+            teile={teile}
+            groesse={groesse === '3' ? 3 : 2}
+            uhr={uhr}
+            niveau={niveau}
+          />
         </Modal>
       )}
     </Card>

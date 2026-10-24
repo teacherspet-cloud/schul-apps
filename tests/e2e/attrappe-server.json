@@ -173,6 +173,28 @@
     "beispiele": [
      "After school I usually play football with my friends.",
      "Last weekend I visited my grandparents and we baked a cake."
+    ],
+    "phrases": [
+     {
+      "text": "In my free time I usually …",
+      "wann": "Du erzählst von deiner Freizeit."
+     },
+     {
+      "text": "My favourite hobby is … because …",
+      "wann": "Du nennst dein Hobby mit Grund."
+     },
+     {
+      "text": "Last weekend I …",
+      "wann": "Du erzählst von letztem Wochenende."
+     },
+     {
+      "text": "I'm not sure, let me think …",
+      "wann": "Du brauchst Zeit."
+     },
+     {
+      "text": "Could you repeat the question, please?",
+      "wann": "Du hast nicht verstanden."
+     }
     ]
    }
   },
@@ -213,6 +235,28 @@
     "beispiele": [
      "In the foreground I can see two children who are buying apples.",
      "In the background there is a big tree and some houses."
+    ],
+    "phrases": [
+     {
+      "text": "In the foreground I can see …",
+      "wann": "Du beginnst die Beschreibung."
+     },
+     {
+      "text": "In the background there is / are …",
+      "wann": "Du beschreibst den Hintergrund."
+     },
+     {
+      "text": "The people look …",
+      "wann": "Du beschreibst Gefühle."
+     },
+     {
+      "text": "I think they are … because …",
+      "wann": "Du vermutest etwas."
+     },
+     {
+      "text": "Maybe before that …",
+      "wann": "Du erzählst, was vorher war."
+     }
     ]
    }
   },
@@ -323,6 +367,28 @@
        "How much does the climbing park cost?",
        "The beach is free and not far away."
       ]
+     }
+    ],
+    "phrases": [
+     {
+      "text": "What do you think about …?",
+      "wann": "Du fragst nach der Meinung."
+     },
+     {
+      "text": "I agree with you, but …",
+      "wann": "Du stimmst teilweise zu."
+     },
+     {
+      "text": "That's a good idea, however …",
+      "wann": "Du widersprichst höflich."
+     },
+     {
+      "text": "Let's decide: …",
+      "wann": "Du führst zur Einigung."
+     },
+     {
+      "text": "How much does it cost?",
+      "wann": "Du fragst nach dem Preis."
      }
     ]
    }

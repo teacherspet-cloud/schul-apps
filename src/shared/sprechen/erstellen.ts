@@ -9,7 +9,8 @@
 import type { StructuredRequest } from '../types'
 import { SPRACHNAME } from './anweisungen'
 import { dialogRollen, hilfenBereinigt, type DialogHilfen, type FehlenderInhalt, type SprechKarte } from './karten'
-import type { Niveau, SprechSprache } from './niveaus'
+import { minutenJeTeil, stufeVonNiveau, type Niveau, type SprechSprache } from './niveaus'
+import { phrasesFuerTeil } from './phrases'
 
 export type KartenTeil = 'interview' | 'monolog' | 'dialog'
 
@@ -41,6 +42,12 @@ const WORTSCHATZ = (min: number, max: number): Record<string, unknown> => ({
   maxItems: max,
   items: { type: 'object', additionalProperties: false, required: ['wort', 'deutsch'], properties: { wort: { type: 'string' }, deutsch: { type: 'string' } } }
 })
+const PHRASES = (min: number, max: number): Record<string, unknown> => ({
+  type: 'array',
+  minItems: min,
+  maxItems: max,
+  items: { type: 'object', additionalProperties: false, required: ['text', 'wann'], properties: { text: { type: 'string' }, wann: { type: 'string' } } }
+})
 const ROLLE: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
@@ -56,16 +63,80 @@ export const HILFEN_SCHEMA: Record<KartenTeil, Record<string, unknown>> = {
   interview: {
     type: 'object',
     additionalProperties: false,
-    required: ['nachfragen', 'wortschatz', 'beispiele'],
-    properties: { nachfragen: texte(3, 10), wortschatz: WORTSCHATZ(5, 12), beispiele: texte(2, 3) }
+    required: ['nachfragen', 'wortschatz', 'beispiele', 'phrases'],
+    properties: { nachfragen: texte(3, 10), wortschatz: WORTSCHATZ(5, 12), beispiele: texte(2, 3), phrases: PHRASES(5, 8) }
   },
   monolog: {
     type: 'object',
     additionalProperties: false,
-    required: ['auftrag', 'zusatzfragen', 'wortschatz', 'beispiele'],
-    properties: { auftrag: { type: 'string' }, zusatzfragen: texte(3, 4), wortschatz: WORTSCHATZ(6, 12), beispiele: texte(2, 3) }
+    required: ['auftrag', 'zusatzfragen', 'wortschatz', 'beispiele', 'phrases'],
+    properties: { auftrag: { type: 'string' }, zusatzfragen: texte(3, 4), wortschatz: WORTSCHATZ(6, 12), beispiele: texte(2, 3), phrases: PHRASES(5, 8) }
   },
-  dialog: { type: 'object', additionalProperties: false, required: ['rollen'], properties: { rollen: { type: 'array', minItems: 2, maxItems: 3, items: ROLLE } } }
+  dialog: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['rollen', 'phrases'],
+    properties: { rollen: { type: 'array', minItems: 2, maxItems: 3, items: ROLLE }, phrases: PHRASES(5, 8) }
+  }
+}
+
+/** Phrases-Regel (24.10.2026, Wunsch der Lehrkraft: passend zur Karte) mit dem Bestand der Stufe als Vorrat */
+/**
+ * Arbeitsauftrag der Bildkarte nach dem Kerncurriculum Niedersachsen (24.10.2026, Wunsch der Lehrkraft):
+ *  - Operatoren „Sprechen" aus KC Englisch Sek I 2026 (Anhang A1): describe, talk, tell, explain, comment on, compare /
+ *    compare and contrast, discuss, agree on, ask, introduce, present; Oberstufe: Operatoren Englisch Abitur ab 2024
+ *    (describe I, compare II, comment on / assess III).
+ *  - Erwartete Kompetenzen zusammenhängendes Sprechen (KC Sek I): A1 Menschen, Dinge, Orte in einfacher Weise
+ *    beschreiben, kurz berichten; A2 zusammenhängend beschreiben, Meinung in einfachen Worten äußern und begründen;
+ *    B1 detailliert über Einzelheiten, Erfahrungen, Gefühle und Reaktionen berichten, Ansichten begründen.
+ *  - Oberstufe (Materialband Sprechprüfung GO 2014): über die Bilder sprechen, dann abstrahieren und Stellung nehmen –
+ *    reine Bildbeschreibung reicht nicht.
+ * Französisch/Spanisch: entsprechende Operatoren (KC Spanisch GO: describir, comparar, comentar, explicar, expresar la
+ * opinión; Französisch als Entsprechung – Faustregel). Die Stufe folgt Jahrgang UND Niveau – so stimmt sie für alle
+ * Schulformen (niveaus.ts zielNiveau mit Schulform).
+ */
+const OPERATOREN_MONOLOG: Record<SprechSprache, Record<'unter' | 'mittel' | 'ober', string>> = {
+  en: {
+    unter: 'describe (people, things, places in a simple way), talk about, tell (what is happening, what you like and why)',
+    mittel: 'describe (coherently), tell (what happened before / what might happen next), explain (why), give your opinion and reasons (comment on), compare with your own experience',
+    ober: 'describe (AFB I), compare / compare and contrast (AFB II), comment on / assess (AFB III): what do the pictures suggest about …?'
+  },
+  fr: {
+    unter: 'décris (les personnes, les choses, les lieux, simplement), parle de, raconte (ce qui se passe, ce que tu aimes et pourquoi)',
+    mittel: "décris (de façon cohérente), raconte (ce qui s'est passé avant / ce qui va se passer), explique (pourquoi), donne ton avis et justifie-le, compare avec ta propre expérience",
+    ober: 'décris (I), compare (II), commente / prends position (III) : que suggèrent les photos sur … ?'
+  },
+  es: {
+    unter: 'describe (personas, cosas, lugares de manera sencilla), habla de, cuenta (qué pasa, qué te gusta y por qué)',
+    mittel: 'describe (de forma coherente), cuenta (qué pasó antes / qué pasará después), explica (por qué), expresa tu opinión y justifícala, compara con tu propia experiencia',
+    ober: 'describe (I), compara / contrasta (II), comenta / valora (III): ¿qué idea nos dan las fotos sobre …?'
+  }
+}
+/** Anforderungsstufe aus Jahrgang UND Niveau (andere Schulformen erreichen A2 später) */
+const stufeVonJahrgang = (jahrgang: number, niveau: Niveau): 'unter' | 'mittel' | 'ober' => (jahrgang >= 11 ? 'ober' : niveau.startsWith('A1') ? 'unter' : 'mittel')
+
+/** Dauer und Operatoren für den Arbeitsauftrag (Bildkarte) */
+function dauerRegel(teil: KartenTeil, g: Grundlage): string {
+  if (teil !== 'monolog') return ''
+  const min = minutenJeTeil(g.niveau, g.jahrgang >= 11).monolog
+  const stufe = stufeVonJahrgang(g.jahrgang, g.niveau)
+  const erwartung =
+    stufe === 'unter'
+      ? 'describe people, things and places in a simple way and report briefly (core curriculum, A1)'
+      : stufe === 'mittel'
+        ? 'give coherent descriptions, report on events and experiences, express and justify an opinion (core curriculum, A2–B1)'
+        : 'talk about the pictures, then go beyond them: compare, generalise and take a stand – a mere description is not enough (upper secondary, B1+–B2)'
+  return [
+    `- Duration: the student must be able to talk about the picture for about ${min} minute${min === 1 ? '' : 's'} using the auftrag alone – make it rich enough for that.`,
+    `- auftrag: write it ENTIRELY in the target language, start every step with an operator from the Lower Saxony core curriculum (${OPERATOREN_MONOLOG[g.sprache][stufe]}); 2–4 short task sentences in that order (describe → tell/explain → opinion${stufe === 'ober' ? '/compare/comment' : ''}). Competence expectation: ${erwartung}. Address the student directly, no German.`
+  ].join('\n')
+}
+
+function phrasesRegel(teil: KartenTeil, g: Grundlage): string {
+  const vorrat = phrasesFuerTeil(teil, stufeVonNiveau(g.niveau))
+    .map((p) => p.text[g.sprache])
+    .slice(0, 30)
+  return `- hilfen.phrases = 5–8 useful phrases in the target language that fit THIS card (sentence starters, ways to react or ask back, how to keep going); each with "wann" = when to use it, in German, at most 8 words. Prefer phrases from this stock, adapt or add only where the card needs it: ${vorrat.join(' | ')}`
 }
 
 const SCHEMA: Record<KartenTeil, Record<string, unknown>> = {
@@ -109,7 +180,7 @@ const HILFEN_REGELN: Record<KartenTeil, string> = {
   interview:
     '- hilfen: nachfragen = one short follow-up question per question (same order as fragen); wortschatz = 5–12 useful words or phrases for the answers, each with its German translation; beispiele = 2–3 model answers of one or two sentences.',
   monolog:
-    '- hilfen: auftrag = the task the examiner reads out (e.g. "Describe the picture. Say who …"); zusatzfragen = 3–4 extra prompts if the student gets stuck; wortschatz = 6–12 words for the picture with German translation; beispiele = 2–3 model sentences.',
+    '- hilfen: auftrag = the task the examiner reads out, 2–4 sentences that carry a monologue of the FULL exam length (see duration below): first describe (who, where, what is happening), then go beyond the picture (what happened before/after, how the people feel, a personal opinion or comparison – years 11–13: compare and generalise); zusatzfragen = 3–4 extra prompts if the student gets stuck (different from the guiding questions); wortschatz = 6–12 words for the picture with German translation; beispiele = 2–3 model sentences.',
   dialog:
     '- hilfen.rollen = 2 or 3 roles. rollen[0] is the student role (its karte = rolleSchueler), rollen[1] the partner role (its karte = rolleKi); these two MUST form a complete two-person task on their own. rollen[2] is a third participant for groups of three: rollenspiel = a third character in the situation; infogap = a second information holder with its own complementary info card (role 1 asks both); diskussion = a third opinion or third proposer. Each role: name, karte (the role card text, for infogap including all its information), vorschlaege = 3–5 concrete ideas, arguments or questions for this role, wortschatz = 4–10 words with German translation, beispiele = 2–3 model sentences for this role.'
 }
@@ -148,7 +219,9 @@ export function kartenAnfrage(teil: KartenTeil, anzahl: number, g: Grundlage, vo
         ? `- Each card: form (${g.jahrgang <= 8 ? 'rollenspiel or infogap; for years 5–6 also diskussion with six options' : oberstufe ? 'diskussion only' : 'diskussion or infogap'}), title, situation (what the card says), student role, the AI partner's role (for infogap: the full information the partner has), 3–6 points/options, goal.`
         : '',
       HILFEN_REGELN[teil],
-      '- All card texts in the target language (German only in the wortschatz translations); keep them short and clear for the level.'
+      dauerRegel(teil, g),
+      phrasesRegel(teil, g),
+      '- All card texts in the target language (German only in the wortschatz translations and the "wann" of phrases); keep them short and clear for the level.'
     ]
       .filter(Boolean)
       .join('\n'),
@@ -171,7 +244,7 @@ function kartenKern(k: SprechKarte): Record<string, unknown> {
  */
 export function ergaenzungsAnfrage(teil: KartenTeil, karte: SprechKarte, fehlt: FehlenderInhalt[], g: Grundlage): StructuredRequest {
   const dialog = teil === 'dialog'
-  const was = fehlt.includes('hilfen') ? 'the helps' : fehlt.includes('beispiele') ? 'the model sentences (beispiele)' : 'the third role'
+  const was = fehlt.includes('hilfen') ? 'the helps (including the phrases)' : fehlt.includes('beispiele') ? 'the model sentences (beispiele)' : 'the third role'
   return {
     system:
       'You are an experienced foreign-language teacher in Lower Saxony (Germany) who completes speaking-exam materials for partner work in class. You write in the target language, at the right level, age-appropriate, inclusive and free of stereotypes.',
@@ -180,6 +253,8 @@ export function ergaenzungsAnfrage(teil: KartenTeil, karte: SprechKarte, fehlt: 
       JSON.stringify(kartenKern(karte)),
       `Add ${was}. In class two (or three) students work with this card without a teacher: one asks or moderates and can unlock helps for the other.`,
       HILFEN_REGELN[teil],
+      dauerRegel(teil, g),
+      phrasesRegel(teil, g),
       dialog
         ? `- Return the WHOLE revised card (form stays ${karte.art === 'dialog' ? karte.form : 'the same'}, keep title and topic). You may rephrase, rebalance the roles and redistribute information so the task works for two AND for three speakers. rollen[0] and rollen[1] must remain a complete two-person task; rollen[2] is the third participant. rolleSchueler = rollen[0].karte, rolleKi = rollen[1].karte.`
         : '- Keep the card itself as it is; only the helps are needed.',

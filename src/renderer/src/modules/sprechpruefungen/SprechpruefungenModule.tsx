@@ -10,6 +10,7 @@
  */
 import {
   ActionIcon,
+  Box,
   Alert,
   Anchor,
   Badge,
@@ -76,6 +77,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { useAppSettings } from '../../shared/settingsStore'
 import { BandCover } from '../../shared/components/BandCover'
+import { bandZuName, LehrwerkStandWahl } from '../../shared/components/LehrwerkStandWahl'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { FachPunkt } from '../../shared/components/FachFarbe'
 import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
@@ -274,7 +276,7 @@ const fehltText = (k: SprechKarte): string => {
 }
 
 /** Marken an der Kachel: Hilfen da/fehlen, dritte Rolle, KI-Fassung noch nicht durchgesehen */
-function HilfenMarke({ k }: { k: SprechKarte }): React.JSX.Element {
+export function HilfenMarke({ k }: { k: SprechKarte }): React.JSX.Element {
   const f = fehlendeInhalte(k).filter((x) => x !== 'bild')
   return (
     <Group gap={4} mt={4} wrap="wrap" data-sprech-hilfen-marke={f.length ? 'fehlt' : 'da'}>
@@ -373,9 +375,9 @@ function HilfenFelder({ x, setX }: { x: SprechKarte; setX: (k: SprechKarte) => v
   const leer = { vorschlaege: [], wortschatz: [], beispiele: [] }
   if (!x.hilfen) {
     const anlegen = (): void => {
-      if (x.art === 'interview') setX({ ...x, hilfen: { nachfragen: [], wortschatz: [], beispiele: [] } })
-      else if (x.art === 'monolog') setX({ ...x, hilfen: { auftrag: '', zusatzfragen: [], wortschatz: [], beispiele: [] } })
-      else setX({ ...x, hilfen: { rollen: dialogRollen(x).map((r) => ({ ...r, ...leer })) } })
+      if (x.art === 'interview') setX({ ...x, hilfen: { nachfragen: [], wortschatz: [], beispiele: [], phrases: [] } })
+      else if (x.art === 'monolog') setX({ ...x, hilfen: { auftrag: '', zusatzfragen: [], wortschatz: [], beispiele: [], phrases: [] } })
+      else setX({ ...x, hilfen: { rollen: dialogRollen(x).map((r) => ({ ...r, ...leer })), phrases: [] } })
     }
     return (
       <Group gap="xs">
@@ -412,7 +414,7 @@ function HilfenFelder({ x, setX }: { x: SprechKarte; setX: (k: SprechKarte) => v
     )
   }
   const rollen = x.hilfen.rollen
-  const setRolle = (i: number, t: Partial<DialogRolle>): void => setX({ ...x, hilfen: { rollen: rollen.map((r, j) => (j === i ? { ...r, ...t } : r)) } })
+  const setRolle = (i: number, t: Partial<DialogRolle>): void => setX({ ...x, hilfen: { ...x.hilfen!, rollen: rollen.map((r, j) => (j === i ? { ...r, ...t } : r)) } })
   return (
     <Stack gap="xs">
       {rollen.map((r, i) => (
@@ -423,7 +425,7 @@ function HilfenFelder({ x, setX }: { x: SprechKarte; setX: (k: SprechKarte) => v
               {i === 0 ? ' (Schüler/in, Partner A)' : i === 1 ? ' (Partner B)' : ' (dritte Person)'}
             </Text>
             {i === 2 && (
-              <Button size="compact-xs" variant="subtle" color="red" onClick={() => setX({ ...x, hilfen: { rollen: rollen.slice(0, 2) } })}>
+              <Button size="compact-xs" variant="subtle" color="red" onClick={() => setX({ ...x, hilfen: { ...x.hilfen!, rollen: rollen.slice(0, 2) } })}>
                 Dritte Rolle entfernen
               </Button>
             )}
@@ -436,7 +438,7 @@ function HilfenFelder({ x, setX }: { x: SprechKarte; setX: (k: SprechKarte) => v
         </Card>
       ))}
       {rollen.length < 3 && (
-        <Button size="compact-xs" variant="subtle" leftSection={<IconPlus size={12} />} onClick={() => setX({ ...x, hilfen: { rollen: [...rollen, { name: '', karte: '', ...leer }] } })} data-sprech-dritte-rolle>
+        <Button size="compact-xs" variant="subtle" leftSection={<IconPlus size={12} />} onClick={() => setX({ ...x, hilfen: { ...x.hilfen!, rollen: [...rollen, { name: '', karte: '', ...leer }] } })} data-sprech-dritte-rolle>
           Dritte Rolle hinzufügen (für Dreiergruppen)
         </Button>
       )}
@@ -500,7 +502,7 @@ function HilfenLeiste({ p, laden, schliessen }: { p: PoolKarte; laden: () => voi
 }
 
 /** Blättern im Kartenfenster (21.10.2026): Pfeile, „3 von 12", Tasten ←/→ und Wischen */
-interface Blaettern {
+export interface Blaettern {
   nr: number
   von: number
   zurueck?: () => void
@@ -750,7 +752,7 @@ function KartenEditor({
  * Ansehen ohne Bearbeiten (21.10.2026, Wunsch der Lehrkraft): Karten ohne Bearbeitungsrecht öffnen sich mit Bild,
  * Titel, Beschreibung und Fragen – wie das Bearbeiten-Fenster, nur ohne Eingabefelder
  */
-function KartenAnsicht({ k, blaettern: b, schliessen, pool, laden }: { k: SprechKarte; blaettern?: Blaettern; schliessen: () => void; pool?: PoolKarte; laden?: () => void }): React.JSX.Element {
+export function KartenAnsicht({ k, blaettern: b, schliessen, pool, laden, eingebettet = false }: { k: SprechKarte; blaettern?: Blaettern; schliessen: () => void; pool?: PoolKarte; laden?: () => void; eingebettet?: boolean }): React.JSX.Element {
   const wisch = useBlaettern(b)
   const feld = (titel: string, inhalt: React.ReactNode): React.JSX.Element => (
     <div>
@@ -770,9 +772,8 @@ function KartenAnsicht({ k, blaettern: b, schliessen, pool, laden }: { k: Sprech
       ))}
     </Stack>
   )
-  return (
-    <Modal opened onClose={schliessen} title={titelVon(k)} size="lg" data-sprechkarte-ansicht>
-      <Stack gap="sm" {...wisch}>
+  const inhalt = (
+      <Stack gap="sm" {...wisch} data-sprechkarte-inhalt>
         <BlaetterLeiste b={b} />
         <StandZeile stand={k.stand} />
         {k.art === 'interview' && feld('Fragen', punkte(k.fragen))}
@@ -795,12 +796,20 @@ function KartenAnsicht({ k, blaettern: b, schliessen, pool, laden }: { k: Sprech
         )}
         <HilfenBlock k={k} />
         {pool && laden && <HilfenLeiste p={pool} laden={laden} schliessen={schliessen} />}
-        <Group justify="flex-end">
-          <Button variant="default" onClick={schliessen}>
-            Schließen
-          </Button>
-        </Group>
+        {!eingebettet && (
+          <Group justify="flex-end">
+            <Button variant="default" onClick={schliessen}>
+              Schließen
+            </Button>
+          </Group>
+        )}
       </Stack>
+  )
+  // Eingebettet (24.10.2026): im Vorschaufenster der Partnerarbeit ohne eigenes Fenster
+  if (eingebettet) return inhalt
+  return (
+    <Modal opened onClose={schliessen} title={titelVon(k)} size="lg" data-sprechkarte-ansicht>
+      {inhalt}
     </Modal>
   )
 }
@@ -1028,7 +1037,8 @@ function Jahrgang({
   zielErledigt?: () => void
 }): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
-  const niveau = zielNiveau(fach.sprache, jahrgang)
+  // Niveau je Schulform (24.10.2026): Realschule/Oberschule/Gesamtschule und Hauptschule erreichen A2/B1 später
+  const niveau = zielNiveau(fach.sprache, jahrgang, settings.defaults.schoolTypeId)
   const [buecher, setBuecher] = useState<TextbookMeta[]>([])
   useEffect(() => void window.api.textbooks.list().then(setBuecher, () => setBuecher([])), [])
   const baende = buecher.filter((b) => b.language === fach.sprache && !b.platzhalter)
@@ -1356,34 +1366,6 @@ function Jahrgang({
           {modus === 'klasse' && (
             <Select label="Klasse" leftSection={<IconUsers size={14} />} data={klassen} value={klasse} onChange={setKlasse} placeholder="wählen …" w={200} />
           )}
-          <Select
-            label="Band"
-            data={baende.map((b) => ({ value: b.id, label: b.name }))}
-            value={band?.id ?? null}
-            onChange={(v) => (setBandId(v), setUnit(null), setAbschnitt(null))}
-            w={200}
-            clearable
-            placeholder={baende.length ? 'alle Karten' : 'kein Lehrwerk'}
-          />
-          <Select
-            label="bis"
-            data={(band?.units ?? []).map((u) => u.name)}
-            value={band ? unitName : null}
-            onChange={(v) => (setUnit(v), setAbschnitt(null))}
-            w={140}
-            disabled={!band}
-          />
-          <Select
-            label="Abschnitt"
-            data={abschnitte}
-            value={abschnittName}
-            onChange={setAbschnitt}
-            placeholder="ganze Unit"
-            clearable
-            w={170}
-            disabled={!abschnitte.length}
-            data-sprech-abschnitt
-          />
           <Tooltip label={band ? `Je Abschnitt von ${band.name} fehlende Karten ergänzen` : 'Erst einen Band wählen'}>
             <Button
               variant="light"
@@ -1397,6 +1379,22 @@ function Jahrgang({
             </Button>
           </Tooltip>
         </Group>
+        {/* Unit-Leiste mit Cover (24.10.2026, abgestimmt): statt der drei Listen Band/Unit/Abschnitt – gemeinsames Bauteil mit der Partnerarbeit */}
+        <Box mt="sm">
+          <LehrwerkStandWahl
+            baende={baende}
+            wert={stand}
+            aendern={(st) => {
+              if (!st) return (setBandId(null), setUnit(null), setAbschnitt(null))
+              const b = bandZuName(baende, st.band)
+              setBandId(b?.id ?? null)
+              setUnit(st.unit)
+              setAbschnitt(st.abschnitt ?? null)
+            }}
+            zaehlen={(z) => ({ gesamt: pool.filter((p) => standBis(p.karte.stand, z, baende)).length })}
+            bandVorgabe={vorschlag}
+          />
+        </Box>
         <Group gap="md" align="center" wrap="wrap" mt="sm">
           <TextInput
             leftSection={<IconSearch size={14} />}
@@ -1689,6 +1687,7 @@ function DruckDialog({
 
 export default function SprechpruefungenModule({ active }: { active: boolean }): React.JSX.Element | null {
   const eigene = useAppSettings((s) => s.settings.eigeneFaecher)
+  const eigeneSchulform = useAppSettings((s) => s.settings.defaults?.schoolTypeId ?? '')
   const faecher = FAECHER.filter((f) => !eigene?.length || eigene.includes(f.id))
   const [fachId, setFachId] = useState<string>(faecher[0]?.id ?? 'englisch')
   const fach = FAECHER.find((f) => f.id === fachId) ?? FAECHER[0]
@@ -1813,7 +1812,7 @@ export default function SprechpruefungenModule({ active }: { active: boolean }):
                     <Stack gap={6} align="center">
                       {band ? <BandCover band={band} land={band.stateId ?? ''} breite={56} /> : <IconMicrophone size={40} opacity={0.4} />}
                       <Text fw={800}>Jahrgang {j}</Text>
-                      <Badge variant="light">GER {zielNiveau(fach.sprache, j)}</Badge>
+                      <Badge variant="light">GER {zielNiveau(fach.sprache, j, eigeneSchulform)}</Badge>
                       <Group gap={6}>
                         {TEILE.map((t) => {
                           const n = k.filter((x) => x.teil === t.id).length
