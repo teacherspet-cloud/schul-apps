@@ -125,9 +125,9 @@ export const BROWSER_SPEICHER: LokalerSpeicher[] = [
   {
     id: 'schul-apps-auftraege-unterbrochen',
     art: 'localStorage',
-    geraete: ['ipad'],
+    geraete: ['ipad', 'browser'],
     personenbezug: 'keiner',
-    inhalt: 'laufende KI-Aufträge zum Fortsetzen nach einem Neustart',
+    inhalt: 'laufende KI-Aufträge zum Fortsetzen nach einem Neustart bzw. Neuladen (Web-App seit 25.10.2026, an die Anmeldesitzung gebunden)',
     schutz: 'Rückmeldung/Elternbrief ENTSCHÄRFT: ohne Eingaben und ohne Titel (shared/auftraege.ts); beim Abmelden gelöscht',
     quellen: ['src/renderer/src/shared/auftraege.ts']
   },

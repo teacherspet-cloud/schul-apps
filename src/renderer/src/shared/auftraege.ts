@@ -9,7 +9,8 @@ import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPh
 import { istGeloescht, sichereAlles } from './autosave'
 import { kiKennung, merkeAnfrage, merkeAuftrag, ruhigesZiel, schaetzeRest } from './restzeit'
 import { useAppSettings } from './settingsStore'
-import { offenLesen, offenMerken } from './sitzung'
+import { offenLesen, offenMerken, sitzungsKennung } from './sitzung'
+import { imNetz } from './netzZugang'
 import { useZwischenstaende, zwischenstandsMelder } from './zwischenstand'
 
 /**
@@ -326,6 +327,13 @@ function horchePlatz(): void {
  * laufende laufen weiter, fertige kommen sofort, nichts wird doppelt berechnet. Das Ergebnis
  * landet über `ablegen` wie immer im Dokument `docId`. Aufträge ohne Fortsetzung erscheinen in
  * der Leiste als unterbrochen.
+ *
+ * Auch in der Web-App und der Exe „Schul-Apps Online" (25.10.2026, Befund der Lehrkraft: zwei Arbeitsblatt-Erstellungen
+ * gingen verloren, weil die Seite nach einem Server-Update neu lud). Dort gehört jeder gemerkte Auftrag zur
+ * Anmeldesitzung (shared/sitzung.ts, gleich über ein Neuladen hinweg, neu je Anmeldung): Ein Browser, den mehrere
+ * Lehrkräfte nutzen, setzt nie den Auftrag einer anderen Anmeldung fort – fremde Einträge werden beim Start verworfen.
+ * Die KI-Anfragen laufen im Auftragsregister des Servers weiter (Gerätekennung bleibt im localStorage), fertige
+ * Teile werden übernommen.
  */
 const UNTERBROCHEN_KEY = 'schul-apps-auftraege-unterbrochen'
 /** Höchstens so oft wird derselbe Auftrag nach Neustarts fortgesetzt – ein Auftrag, der die App abstürzen lässt, soll sie nicht dauerhaft lahmlegen */
@@ -340,6 +348,8 @@ export interface GemerkterAuftrag {
   start: number
   fortsetzen?: Fortsetzung
   versuche: number
+  /** Web-App: Anmeldesitzung, zu der der Auftrag gehört (25.10.2026) – fehlt in der iPad-App */
+  sitzung?: string
 }
 
 const fortsetzer = new Map<string, (...args: never[]) => unknown>()
@@ -351,7 +361,10 @@ export function registriereFortsetzung<A extends unknown[]>(art: string, fn: (..
   fortsetzer.set(art, fn as unknown as (...args: never[]) => unknown)
 }
 
-const merkenAn = (): boolean => typeof window !== 'undefined' && window.__plattform === 'ios'
+/** iPad-App und Web-App (Browser, Exe „Schul-Apps Online") merken laufende Aufträge; die Exe am PC braucht es nicht */
+const merkenAn = (): boolean => typeof window !== 'undefined' && (window.__plattform === 'ios' || imNetz())
+/** Web-App: Kennung der Anmeldesitzung, an der ein gemerkter Auftrag hängt */
+const merkSitzung = (): string | undefined => (typeof window !== 'undefined' && imNetz() ? sitzungsKennung() : undefined)
 
 /**
  * Ohne Personenbezug merken (23.10.2026, Nachprüfung des Schulträgers): Aufträge von Rückmeldung und
@@ -410,9 +423,12 @@ export function nimmUnterbrocheneAuf(): number {
   // Nur einmal je Start – sonst fände ein zweiter Aufruf die eben fortgesetzten Aufträge und startete sie doppelt
   if (!merkenAn() || aufgenommen) return 0
   aufgenommen = true
-  const liste = leseGemerkte()
-  if (!liste.length) return 0
+  const alle = leseGemerkte()
+  if (!alle.length) return 0
   schreibeGemerkte([])
+  // Web-App: nur Aufträge dieser Anmeldesitzung – was eine andere Anmeldung hinterließ, wird still verworfen
+  const sitzung = merkSitzung()
+  const liste = alle.filter((g) => !g.sitzung || g.sitzung === sitzung)
   let fortgesetzt = 0
   for (const g of liste) {
     const fn = g.fortsetzen ? fortsetzer.get(g.fortsetzen.art) : undefined
@@ -440,8 +456,10 @@ export function nimmUnterbrocheneAuf(): number {
           art: g.art,
           status: 'fehler',
           anteil: 0,
-          meldung: 'Durch Beenden der App unterbrochen',
-          fehler: 'Die App wurde beendet, während der Auftrag lief. Ein erneuter Start mit denselben Eingaben übernimmt, was der PC davon schon fertig hat.',
+          meldung: imNetz() ? 'Durch Neuladen der Seite unterbrochen' : 'Durch Beenden der App unterbrochen',
+          fehler: imNetz()
+            ? 'Die Seite wurde neu geladen, während der Auftrag lief. Ein erneuter Start mit denselben Eingaben übernimmt, was der Server davon schon fertig hat.'
+            : 'Die App wurde beendet, während der Auftrag lief. Ein erneuter Start mit denselben Eingaben übernimmt, was der PC davon schon fertig hat.',
           start: g.start,
           ende: Date.now(),
           sperrt: false,
@@ -571,7 +589,8 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     art: start.art,
     start: jetzt,
     fortsetzen: start.fortsetzen,
-    versuche: laufendeFortsetzung
+    versuche: laufendeFortsetzung,
+    ...(merkSitzung() ? { sitzung: merkSitzung() } : {})
   })
 
   // Fortschritt: erledigte Schritte plus Anteil der laufenden Antwort, nie rückwärts
