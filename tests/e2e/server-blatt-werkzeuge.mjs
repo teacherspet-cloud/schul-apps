@@ -411,34 +411,6 @@ try {
     return max
   })
   pruefe(alpha > 0 && alpha < 120, `Textmarker bleibt durchscheinend (höchste Deckkraft ${alpha}/255)`)
-  // Bild vergrößern und markieren (25.10.2026): Lupe am Bild, Vollbild mit Werkzeugen, Stift und Kästchen, gespeichert je Bild
-  const lupe = s.locator('[data-bild-zoom]').first()
-  pruefe(await da(lupe, 10000), 'Lupe am Bild des Blatts')
-  await lupe.scrollIntoViewIfNeeded()
-  await lupe.click()
-  const voll = s.locator('[data-bild-vollbild]')
-  pruefe(await da(voll), 'Bild bildschirmfüllend mit Werkzeugen')
-  await voll.locator('[data-werkzeug="stift"]').click()
-  const lw = await voll.locator('[data-tinte]').boundingBox()
-  await s.mouse.move(lw.x + lw.width * 0.3, lw.y + lw.height * 0.3)
-  await s.mouse.down()
-  await s.mouse.move(lw.x + lw.width * 0.6, lw.y + lw.height * 0.5, { steps: 8 })
-  await s.mouse.up()
-  await voll.locator('[data-werkzeug="text"]').click()
-  await s.mouse.click(lw.x + lw.width * 0.65, lw.y + lw.height * 0.7)
-  await voll.locator('[data-kaestchen]').last().fill('Markiert')
-  await s.screenshot({ path: join(out, '5-bild-vollbild.png') })
-  await voll.locator('[data-bild-schliessen]').click()
-  pruefe(!(await voll.isVisible().catch(() => false)), '„Schließen" beendet das Vollbild')
-  await s.waitForTimeout(2600)
-  const abgabeBild = await (await sm.request.get(`${A}/s/api/blatt?id=${fr.id}`, { headers: KOPF })).json()
-  const bildObjekte = JSON.parse(abgabeBild.antworten.objekte ?? '[]').filter((o) => o.s >= 20)
-  const bildTinte = abgabeBild.tinte?.['bild:b0']
-  pruefe(
-    typeof bildTinte === 'string' && bildTinte.startsWith('data:image/png') && bildObjekte.length === 1,
-    `Markierungen am Bild gespeichert (Tinte ${bildTinte ? 'ja' : 'nein'}, ${bildObjekte.length} Kästchen)`
-  )
-  pruefe(await s.locator('[data-bild-zoom][data-bild-markiert]').first().isVisible(), 'Lupe zeigt an, dass das Bild Markierungen trägt')
   // KI-Prüfung der Aufgabe mit der Zeitleiste (nur Kästchen, keine Schreibfelder)
   await s.locator('[data-werkzeug="text"]').click()
   // Knapp über der Achse – sicher im Bereich der Aufgabe (im Vollbild ist das Blatt schmaler, die Aufgabenzeile liegt näher an der Achse)
@@ -530,6 +502,36 @@ try {
   await s.mouse.click(ac2.x + 120, ac2.y + 95)
   await s.waitForTimeout(300)
   pruefe((await s.locator('[data-kasten]').count()) === vorKlick, 'Leeres Kästchen verschwindet beim Verlassen')
+  // ---------- Bild vergrößern und markieren (25.10.2026) – ganz zuletzt: das Rollen zum Bild verschiebt die Lage der übrigen Prüfungen
+  const lupe = s.locator('[data-bild-zoom]').first()
+  pruefe(await da(lupe, 10000), 'Lupe am Bild des Blatts')
+  await lupe.scrollIntoViewIfNeeded()
+  await lupe.click()
+  // Das Mantine-Fenster selbst hat keine Ausdehnung – sichtbar ist sein Inhalt
+  const voll = s.locator('[data-bild-vollbild]')
+  pruefe(await da(voll.locator('[data-bild-schliessen]')), 'Bild bildschirmfüllend mit Werkzeugen')
+  await voll.locator('[data-werkzeug="stift"]').click()
+  const lw = await voll.locator('[data-tinte]').boundingBox()
+  await s.mouse.move(lw.x + lw.width * 0.3, lw.y + lw.height * 0.3)
+  await s.mouse.down()
+  await s.mouse.move(lw.x + lw.width * 0.6, lw.y + lw.height * 0.5, { steps: 8 })
+  await s.mouse.up()
+  await voll.locator('[data-werkzeug="text"]').click()
+  await s.mouse.click(lw.x + lw.width * 0.65, lw.y + lw.height * 0.7)
+  await voll.locator('[data-kaestchen]').last().fill('Markiert')
+  await s.screenshot({ path: join(out, '5-bild-vollbild.png') })
+  await voll.locator('[data-bild-schliessen]').click()
+  await voll.waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
+  pruefe((await voll.count()) === 0, '„Schließen" beendet das Vollbild')
+  await s.waitForTimeout(2600)
+  const abgabeBild = await (await sm.request.get(`${A}/s/api/blatt?id=${fr.id}`, { headers: KOPF })).json()
+  const bildObjekte = JSON.parse(abgabeBild.antworten.objekte ?? '[]').filter((o) => o.s >= 20)
+  const bildTinte = abgabeBild.tinte?.['bild:b0']
+  pruefe(
+    typeof bildTinte === 'string' && bildTinte.startsWith('data:image/png') && bildObjekte.length === 1,
+    `Markierungen am Bild gespeichert (Tinte ${bildTinte ? 'ja' : 'nein'}, ${bildObjekte.length} Kästchen)`
+  )
+  pruefe((await s.locator('[data-bild-zoom][data-bild-markiert]').count()) === 1, 'Lupe zeigt an, dass das Bild Markierungen trägt')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
 } finally {
