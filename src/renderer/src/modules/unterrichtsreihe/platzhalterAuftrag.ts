@@ -15,6 +15,7 @@
  * - das Blatt heißt „<Reihe> – <Schritt>" und liegt im Themenbereich des Oberthemas;
  * - KI-Inhalte tragen die Marke „KI-Entwurf" (`Schritt.kiEntwurf`), bis die Lehrkraft sie öffnet oder bestätigt.
  */
+import { create } from 'zustand'
 import {
   SCHRITT_ARTEN,
   alsBlattSchritt,
@@ -106,6 +107,19 @@ export function schrittAendernUeberall(reiheId: string, schrittId: string, patch
 }
 
 export const platzhalterSchluessel = (reiheId: string, schrittId: string): string => `reihe:${reiheId}:${schrittId}`
+/** Reihe und Schritt aus dem Schlüssel eines Platzhalter-Auftrags (für „Öffnen" in der Leiste, 25.10.2026) */
+export function schrittAusSchluessel(schluessel: string | undefined): { reiheId: string; schrittId: string } | null {
+  const m = /^reihe:([^:]+):(.+)$/.exec(schluessel ?? '')
+  return m ? { reiheId: m[1], schrittId: m[2] } : null
+}
+
+/**
+ * „Öffnen" in der Auftragsleiste bei einem fertigen Schritt ohne eigenes Dokument (Zwischenaufgabe, Lernkarten …;
+ * 25.10.2026, Befund der Lehrkraft: es passierte nichts): Der Editor öffnet den Schritt mit seiner Vorschau.
+ */
+export const useSchrittZiel = create<{ ziel: { reiheId: string; schrittId: string } | null; setze: (z: { reiheId: string; schrittId: string } | null) => void }>(
+  (set) => ({ ziel: null, setze: (ziel) => set({ ziel }) })
+)
 
 /** Läuft (oder wartet) für diesen Schritt gerade eine Erzeugung? */
 export const useErzeugtGerade = (reiheId: string | undefined, schrittId: string): boolean =>

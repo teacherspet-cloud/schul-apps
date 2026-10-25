@@ -659,11 +659,10 @@ export function DruckMenue({ schritt, reihe }: { schritt?: Schritt; reihe?: Reih
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         {schritt ? (
-          <Tooltip label="Drucken / speichern">
-            <ActionIcon variant="subtle" loading={laeuft} aria-label="drucken" data-schritt-drucken onClick={(e) => e.stopPropagation()}>
-              <IconPrinter size={16} />
-            </ActionIcon>
-          </Tooltip>
+          // Ohne Tooltip um das Menü-Ziel (25.10.2026, Befund der Lehrkraft: Klick auf das Drucksymbol tat nichts)
+          <ActionIcon variant="subtle" loading={laeuft} aria-label="Drucken / speichern" title="Drucken / speichern" data-schritt-drucken onClick={(e) => e.stopPropagation()}>
+            <IconPrinter size={16} />
+          </ActionIcon>
         ) : (
           <Button variant="default" leftSection={<IconPrinter size={16} />} loading={laeuft} data-reihe-drucken>
             Drucken

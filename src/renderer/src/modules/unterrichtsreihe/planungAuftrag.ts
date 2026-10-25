@@ -27,6 +27,12 @@ export interface PlanErgebnis {
   plan: ReihenPlan
   eingaben: PlanEingaben
   fertig: number
+  /**
+   * Direkt in den Stunden (25.10.2026, Wunsch der Lehrkraft): Der fertige Plan steht sofort in der Reihe – hier der Stand
+   * davor für „Rückgängig" und ob ersetzt oder angehängt wurde. `zurueck`: die Lehrkraft hat ihn wieder herausgenommen,
+   * der Plan liegt weiter bereit (Ansehen, anders übernehmen).
+   */
+  eingetragen?: { am: number; ersetzen: boolean; vorher: Reihe; zurueck?: boolean }
 }
 
 interface PlaeneState {
@@ -36,6 +42,7 @@ interface PlaeneState {
   zeigen: string | null
   setzeZeigen: (reiheId: string | null) => void
   verwerfe: (reiheId: string) => void
+  setzeEingetragen: (reiheId: string, eingetragen: PlanErgebnis['eingetragen']) => void
 }
 
 /*
@@ -70,6 +77,15 @@ export const usePlaene = create<PlaeneState>((set) => ({
       const { [reiheId]: _weg, ...rest } = s.plaene
       schreibePlaene(rest)
       return { plaene: rest, zeigen: s.zeigen === reiheId ? null : s.zeigen }
+    }),
+  setzeEingetragen: (reiheId, eingetragen) =>
+    set((s) => {
+      const p = s.plaene[reiheId]
+      if (!p) return {}
+      const plaene = { ...s.plaene, [reiheId]: { ...p, ...(eingetragen ? { eingetragen } : {}) } }
+      if (!eingetragen) delete plaene[reiheId].eingetragen
+      schreibePlaene(plaene)
+      return { plaene }
     })
 }))
 

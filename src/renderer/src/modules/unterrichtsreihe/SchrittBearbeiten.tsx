@@ -31,6 +31,7 @@ import type { Erfolg, Reihe, Schritt, SchrittInhalt } from '@shared/reihe'
 import { artVon, BLATT_FAEHIG, blattZweckFuer, SCHRITT_ARTEN } from '@shared/reihe'
 import { notifyError } from '../../shared/util'
 import { ladeBlattAlsSchritt } from './schrittAusBlatt'
+import { auftragsSeite } from './reiheDruck'
 import { AuswahlFeld } from './AuswahlFeld'
 import { LernzieleFeld } from './Lernziele'
 import { schrittLernziele } from './lernzieleKi'
@@ -58,6 +59,15 @@ function beschreibung(i: SchrittInhalt): string {
       return i.text
     default:
       return ''
+  }
+}
+
+/** Schülersicht eines Schritts ohne Arbeitsblatt – dieselbe Fassung wie beim Drucken (reiheDruck.ts); leer, wenn es nichts zu zeigen gibt */
+const vorschauHtml = (s: Schritt): string => {
+  try {
+    return auftragsSeite(s, 1, false)
+  } catch {
+    return ''
   }
 }
 
@@ -101,6 +111,15 @@ export function SchrittBearbeiten({
         <Stack>
           <TextInput label="Titel (sehen die Lernenden)" value={s.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-schritt-titel />
           {s.platzhalter && <KiErstellung reihe={reihe} s={s} setze={setze} />}
+          {/* Vorschau (25.10.2026, Befund der Lehrkraft: „Fertig – ansehen" zeigte nur Textfelder, nicht das Material) */}
+          {!s.platzhalter && s.inhalt.art !== 'arbeitsblatt' && vorschauHtml(s) && (
+            <Paper withBorder p="sm" radius="md" data-schritt-vorschau>
+              <Text size="xs" c="dimmed" fw={700} mb={4}>
+                So sehen es die Lernenden
+              </Text>
+              <div className="schritt-vorschau" style={{ fontSize: 14, lineHeight: 1.45 }} dangerouslySetInnerHTML={{ __html: vorschauHtml(s) }} />
+            </Paper>
+          )}
           <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} beschaeftigt={beschaeftigt} />
           <Divider />
           <LernzieleFeld

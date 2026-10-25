@@ -72,7 +72,7 @@ import { ichKannFormulieren, reihenLernziele } from './lernzieleKi'
 import { SchrittBearbeiten } from './SchrittBearbeiten'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { DruckMenue, PlanenFenster, StundenLeiste } from './ReiheKi'
-import { horcheReihe } from './platzhalterAuftrag'
+import { horcheReihe, useSchrittZiel } from './platzhalterAuftrag'
 import { AllePlatzhalterKnopf, ReiheMaterialien, ZuweisenHinweis } from './SchrittStatus'
 import { meldeOffeneReihe, usePlaene, usePlantGerade } from './planungAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
@@ -371,32 +371,67 @@ export function ReiheEditor({
   useEffect(() => {
     if (!r.id || zeigePlan !== r.id) return
     usePlaene.getState().setzeZeigen(null)
-    if (planBereit) setPlanen(true)
-  }, [zeigePlan, r.id, planBereit])
+    // Seit 25.10.2026 steht der Plan schon in den Stunden – kein Fenster mehr beim Öffnen aus der Leiste
+  }, [zeigePlan, r.id])
+  /*
+   * KI-Plan direkt in den Stunden (25.10.2026, Wunsch der Lehrkraft: „Zeige sie direkt schon in den Stunden an"): Sobald
+   * der Plan fertig ist und diese Reihe offen ist, wird er eingetragen – an vorhandene Schritte angehängt, in eine leere
+   * Reihe als Ganzes. Der Stand davor bleibt für „Rückgängig"; „Ansehen" zeigt die Vorschau und erlaubt Ersetzen statt Anhängen.
+   */
+  useEffect(() => {
+    if (!r.id || !planBereit || planBereit.eingetragen) return
+    const ersetzen = r.schritte.length === 0
+    const vorher = r
+    planAnwendenAuf(vorher, planBereit.plan, ersetzen, true)
+    usePlaene.getState().setzeEingetragen(r.id, { am: Date.now(), ersetzen, vorher })
+  }, [planBereit, r.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // „Öffnen" in der Leiste bei einem fertigen Schritt ohne eigenes Dokument (25.10.2026): den Schritt zeigen
+  const schrittZiel = useSchrittZiel((st) => st.ziel)
+  useEffect(() => {
+    if (!schrittZiel || schrittZiel.reiheId !== r.id) return
+    const s = r.schritte.find((x) => x.id === schrittZiel.schrittId)
+    useSchrittZiel.getState().setze(null)
+    if (s) setBearbeiten(s)
+  }, [schrittZiel, r.id, r.schritte])
   const schrittAendern = (id: string, patch: Partial<Schritt>): void => {
     setR((x) => ({ ...x, schritte: x.schritte.map((s) => (s.id === id ? { ...s, ...patch } : s)) }))
     setGeaendert(true)
   }
-  /** KI-Plan übernehmen: ersetzen oder an die vorhandenen Schritte anhängen */
-  const planUebernehmen = (plan: ReihenPlan, ersetzen: boolean): void => {
-    const alteTeile = ersetzen ? [] : teileVon(r)
+  /**
+   * KI-Plan auf einen Stand der Reihe anwenden: ersetzen oder an die vorhandenen Schritte anhängen. `basis` ist der Stand
+   * vor dem Plan – beim Übernehmen aus der Vorschau der gesicherte Stand von vor dem direkten Eintragen (25.10.2026).
+   */
+  const planAnwendenAuf = (basis: Reihe, plan: ReihenPlan, ersetzen: boolean, still = false): void => {
+    const alteTeile = ersetzen ? [] : teileVon(basis)
     const neueTeile = [...alteTeile, ...plan.teile.filter((t) => !alteTeile.includes(t))]
     // Hinweis der Planung und Begründungen in der Reihe sichern (08.10.2026, B5) – der Platzhalter entfällt beim Erstellen
     // Stunden wie geplant (08.10.2026): auf das Raster, für das die KI geplant hat – auch wenn es sich seitdem geändert hat
-    const raster = planAufRaster(r.stunden, plan.stunden, mitBegruendung(plan.schritte), ersetzen)
-    const n = nachArt(ersetzen ? [] : r.schritte, raster.schritte, raster.stunden, ersetzen ? {} : r.verlauf)
-    setze({
+    const raster = planAufRaster(basis.stunden, plan.stunden, mitBegruendung(plan.schritte), ersetzen)
+    const n = nachArt(ersetzen ? [] : basis.schritte, raster.schritte, raster.stunden, ersetzen ? {} : basis.verlauf)
+    setR({
+      ...basis,
       stunden: raster.stunden,
       schritte: ordneNachTeilen(n.schritte, neueTeile),
       ...(n.verlauf ? { verlauf: n.verlauf } : {}),
       teile: neueTeile,
       ...(plan.hinweis.trim() ? { planHinweis: plan.hinweis.trim() } : {}),
       // Reihenmuster (08.10.2026): Leitfrage der KI nur, wo die Lehrkraft keine hat (oder beim Ersetzen); Reihentyp wie geplant
-      ...(plan.leitfrage && (ersetzen || !r.leitfrage?.trim()) ? { leitfrage: plan.leitfrage } : {}),
+      ...(plan.leitfrage && (ersetzen || !basis.leitfrage?.trim()) ? { leitfrage: plan.leitfrage } : {}),
       ...(plan.reihentyp ? { reihentyp: plan.reihentyp } : {})
     })
+    setGeaendert(true)
     setKopfOffen(false)
-    notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
+    if (!still) notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
+  }
+  /** Aus der Vorschau übernehmen: auf den Stand vor dem direkten Eintragen, sonst auf den aktuellen */
+  const planUebernehmen = (plan: ReihenPlan, ersetzen: boolean): void => planAnwendenAuf(planBereit?.eingetragen?.vorher ?? r, plan, ersetzen)
+  /** Direkt eingetragenen Plan wieder herausnehmen – der Plan liegt weiter bereit */
+  const planZurueck = (): void => {
+    const e = planBereit?.eingetragen
+    if (!e || !r.id) return
+    setR(e.vorher)
+    setGeaendert(true)
+    usePlaene.getState().setzeEingetragen(r.id, { ...e, zurueck: true })
   }
   /** Reihe aus Schulbuchseiten (06.10.2026): Stundenraster, ggf. Lernziele und Schritte übernehmen */
   const buchUebernehmen = (b: BuchReihe, ersetzen: boolean): void => {
@@ -740,7 +775,30 @@ export function ReiheEditor({
             </Group>
           </Alert>
         )}
-        {planBereit && !planen && (
+        {/* Plan steht in den Stunden (25.10.2026): behalten, zurücknehmen oder in der Vorschau anders übernehmen */}
+        {planBereit?.eingetragen && !planBereit.eingetragen.zurueck && !planen && (
+          <Alert variant="light" color="grape" data-plan-eingetragen>
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="sm">
+                Der KI-Plan steht in den Stunden: {planBereit.plan.schritte.length} Schritte in {planBereit.plan.teile.length} Teilen,{' '}
+                {planBereit.eingetragen.ersetzen ? 'die Reihe war leer' : 'an die vorhandenen Schritte angehängt'}. Passt es? Sonst zurücknehmen oder in der
+                Vorschau anders übernehmen.
+              </Text>
+              <Group gap="xs" wrap="nowrap">
+                <Button size="xs" variant="subtle" color="gray" onClick={planZurueck} data-plan-zurueck>
+                  Rückgängig
+                </Button>
+                <Button size="xs" variant="light" color="grape" onClick={() => setPlanen(true)} data-plan-ansehen>
+                  Ansehen
+                </Button>
+                <Button size="xs" color="grape" onClick={() => r.id && usePlaene.getState().verwerfe(r.id)} data-plan-behalten>
+                  Behalten
+                </Button>
+              </Group>
+            </Group>
+          </Alert>
+        )}
+        {planBereit && (!planBereit.eingetragen || planBereit.eingetragen.zurueck) && !planen && (
           <Alert variant="light" color="grape" data-plan-bereit>
             <Group justify="space-between" wrap="nowrap">
               <Text size="sm">

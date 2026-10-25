@@ -243,6 +243,14 @@ try {
   if (await einklappen.isVisible().catch(() => false)) await einklappen.evaluate((el) => el.click())
   await p.waitForTimeout(400)
   await p.locator('[data-reihe-editor]').waitFor({ timeout: 15000 })
+  // Plan steht sofort in den Stunden (25.10.2026), Rückgängig möglich; „Ansehen" öffnet die Vorschau mit Übernehmen
+  await p.locator('[data-plan-eingetragen]').waitFor({ timeout: 15000 })
+  const schritteSofort = await p.locator('[data-schritt]').count()
+  pruefe(schritteSofort === 3, `KI-Plan steht ohne Bestätigung in den Stunden (${schritteSofort} Schritte)`)
+  await p.locator('[data-plan-zurueck]').click()
+  await p.waitForTimeout(300)
+  pruefe((await p.locator('[data-schritt]').count()) === 0 && (await p.locator('[data-plan-bereit]').count()) === 1, 'Rückgängig: Stunden wieder leer, Plan liegt weiter bereit')
+  await p.locator('[data-plan-ansehen]').click()
   await p.locator('[data-plan-uebernehmen]').waitFor({ timeout: 15000 })
   pruefe((await p.locator('[data-reihe-titel]').inputValue()) === 'KI-Reihe Probe', 'Öffnen führt in die geplante Reihe mit Plan-Vorschau')
   await p.screenshot({ path: join(out, '1-plan.png'), fullPage: true })
@@ -260,7 +268,10 @@ try {
   pruefe(await p.locator('[data-plan-leitfrage]').isVisible(), 'Plan-Vorschau zeigt die Leitfrage')
   await p.locator('[data-plan-uebernehmen]').click()
   await p.waitForTimeout(500)
-  pruefe((await p.locator('[data-plan-bereit]').count()) === 0, 'Nach dem Übernehmen kein bereitliegender Plan mehr')
+  pruefe(
+    (await p.locator('[data-plan-bereit]').count()) === 0 && (await p.locator('[data-plan-eingetragen]').count()) === 0,
+    'Nach dem Übernehmen kein bereitliegender Plan mehr'
+  )
   // Übersicht (08.10.2026): Kopf eingeklappt zu einer Zeile, Stundenansicht, Hinweis der Planung gespeichert, Grundlage-Chips
   const kopf = (await p.locator('[data-reihe-kopf-zeile]').textContent().catch(() => '')) ?? ''
   pruefe(kopf.includes('2 Stunden') && kopf.includes('1 Lernziel'), `Kopf nach dem Übernehmen eingeklappt („${kopf.trim()}")`)
@@ -308,6 +319,19 @@ try {
   await p.screenshot({ path: join(out, '1-platzhalter.png'), fullPage: true })
   pruefe((await p.locator('[data-platzhalter]').count()) === 0, 'Beide Platzhalter gefüllt')
   pruefe((await p.locator('[data-ki-entwurf]').count()) === 2, `Marke „KI-Entwurf“ an beiden (${await p.locator('[data-ki-entwurf]').count()})`)
+  // „Öffnen" in der Leiste beim fertigen Zwischenschritt (25.10.2026): öffnet den Schritt mit Schülersicht statt nichts zu tun
+  if (await p.locator('.auftrags-pille').isVisible().catch(() => false)) await p.locator('.auftrags-pille').click()
+  const zwischenZeile = p.locator('.auftrags-zeile[data-status="fertig"]').filter({ hasText: 'für die Reihe' }).filter({ hasNotText: 'Arbeitsblatt' }).first()
+  await zwischenZeile.getByRole('button', { name: 'Öffnen', exact: true }).click()
+  pruefe(await da(p.locator('[data-schritt-vorschau]'), 10000), '„Öffnen" zeigt den Zwischenschritt mit „So sehen es die Lernenden"')
+  await p.keyboard.press('Escape')
+  await p.locator('[data-schritt-vorschau]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
+  const einklappen2 = p.getByRole('button', { name: 'Aufträge einklappen' })
+  if (await einklappen2.isVisible().catch(() => false)) await einklappen2.evaluate((el) => el.click())
+  // Druckmenü am Schritt (25.10.2026, Befund: Klick tat nichts)
+  await ersteKarte.locator('[data-schritt-drucken]').click()
+  pruefe(await da(p.locator('[data-druck-art="vorschau"]'), 5000), 'Druckmenü am Schritt öffnet sich')
+  await p.keyboard.press('Escape')
   // Verknüpfung sofort gespeichert – ohne „Speichern“ zu drücken
   const sofort = (await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()).reihe
   const neuSchritt = sofort.schritte.find((x) => x.titel === 'Neues Übungsblatt')

@@ -20,8 +20,9 @@ import { loescheReihe } from './reiheLoeschen'
 import { ladeMaterialien } from '../../shell/materialien'
 import { holen, senden } from '../onlinetest/serverApi'
 import { ReiheEditor } from './ReiheEditor'
-import { useDokumentOeffner, useZielZeiger } from '../../shared/navigation'
+import { useDokumentOeffner, useZielZeiger, useNavigation } from '../../shared/navigation'
 import { reiheAusPlanSchluessel, usePlaene } from './planungAuftrag'
+import { schrittAusSchluessel, useSchrittZiel } from './platzhalterAuftrag'
 import { Uebersicht } from './Uebersicht'
 import { sichereAlles } from '../../shared/autosave'
 
@@ -127,6 +128,12 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
   useZielZeiger('unterrichtsreihe', (z) => {
     const reiheId = reiheAusPlanSchluessel(z.baustein)
     if (reiheId) usePlaene.getState().setzeZeigen(reiheId)
+    // Fertiger Platzhalter ohne eigenes Dokument (25.10.2026): zum Schritt – der Editor öffnet ihn mit Vorschau
+    const schritt = schrittAusSchluessel(z.baustein)
+    if (schritt) {
+      useSchrittZiel.getState().setze(schritt)
+      void useNavigation.getState().openDocument('unterrichtsreihe', schritt.reiheId)
+    }
   })
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
   const [loeschen, setLoeschen] = useState<ReiheKurz | null>(null)
