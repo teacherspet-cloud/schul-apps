@@ -123,6 +123,8 @@ try {
         ergebnisse.push({ t, gut, probleme, s: Math.round((Date.now() - t0) / 1000) })
         console.log(`${gut ? 'ok ' : '!! '} ${t} (${Math.round((Date.now() - t0) / 1000)} s, Port ${s.port})`)
         for (const z of probleme) console.log(`     ${z.trim()}`)
+        // Abbruch ohne „!!"-Zeilen (25.10.2026): die letzten Zeilen der Ausgabe zeigen den Fehler (Stack, Playwright-Meldung)
+        if (!gut && !probleme.length) for (const z of r.text.trim().split(String.fromCharCode(10)).slice(-12)) console.log(`     | ${z.slice(0, 220)}`)
       }
     })
   )

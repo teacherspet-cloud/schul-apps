@@ -420,7 +420,8 @@ export function ReiheEditor({
       ...(plan.reihentyp ? { reihentyp: plan.reihentyp } : {})
     })
     setGeaendert(true)
-    setKopfOffen(false)
+    // Beim stillen Eintragen bleibt der Kopf, wie er ist – nur das bewusste Übernehmen klappt ihn ein
+    if (!still) setKopfOffen(false)
     if (!still) notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
   }
   /** Aus der Vorschau übernehmen: auf den Stand vor dem direkten Eintragen, sonst auf den aktuellen */

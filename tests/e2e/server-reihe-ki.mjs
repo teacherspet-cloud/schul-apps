@@ -323,14 +323,14 @@ try {
   if (await p.locator('.auftrags-pille').isVisible().catch(() => false)) await p.locator('.auftrags-pille').click()
   const zwischenZeile = p.locator('.auftrags-zeile[data-status="fertig"]').filter({ hasText: 'für die Reihe' }).filter({ hasNotText: 'Arbeitsblatt' }).first()
   await zwischenZeile.getByRole('button', { name: 'Öffnen', exact: true }).click()
-  pruefe(await da(p.locator('[data-schritt-vorschau]'), 10000), '„Öffnen" zeigt den Zwischenschritt mit „So sehen es die Lernenden"')
+  pruefe(await p.locator('[data-schritt-vorschau]').waitFor({ timeout: 10000 }).then(() => true, () => false), '„Öffnen" zeigt den Zwischenschritt mit „So sehen es die Lernenden"')
   await p.keyboard.press('Escape')
   await p.locator('[data-schritt-vorschau]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
   const einklappen2 = p.getByRole('button', { name: 'Aufträge einklappen' })
   if (await einklappen2.isVisible().catch(() => false)) await einklappen2.evaluate((el) => el.click())
   // Druckmenü am Schritt (25.10.2026, Befund: Klick tat nichts)
   await ersteKarte.locator('[data-schritt-drucken]').click()
-  pruefe(await da(p.locator('[data-druck-art="vorschau"]'), 5000), 'Druckmenü am Schritt öffnet sich')
+  pruefe(await p.locator('[data-druck-art="vorschau"]').waitFor({ timeout: 5000 }).then(() => true, () => false), 'Druckmenü am Schritt öffnet sich')
   await p.keyboard.press('Escape')
   // Verknüpfung sofort gespeichert – ohne „Speichern“ zu drücken
   const sofort = (await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()).reihe
