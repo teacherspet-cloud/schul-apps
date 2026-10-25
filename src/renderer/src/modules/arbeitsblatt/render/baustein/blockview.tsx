@@ -235,14 +235,16 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           )}
         </>
       ) : null
+      // Schilder am Rand: volle Breite, sonst bleibt zwischen den 26-mm-Spalten kaum Bild (25.10.2026, auch für gespeicherte Blätter)
+      const breite = block.labels?.some((l) => !l.inline) ? 100 : block.widthPercent
       return (
-        <figure className="ws-block ws-image" style={{ width: `${block.widthPercent}%` }}>
+        <figure className="ws-block ws-image" style={{ width: `${breite}%` }}>
           {block.labels?.length ? (
             <ImageLabelLayer
               labels={block.labels}
               showAnswers={isKeyMode(mode)}
               // Für den Setzer der Schilder (26.09.2026): Blockbreite in mm und das Bild (Seitenverhältnis)
-              widthMm={((ctx.contentWidthMm ?? 170) * block.widthPercent) / 100}
+              widthMm={((ctx.contentWidthMm ?? 170) * breite) / 100}
               imageDataUrl={block.image?.dataUrl}
               // Punkt und Schild frei nachjustieren – in jedem Editor, der Bausteine bearbeiten lässt (ein Zug = ein Rückgängig-Schritt)
               onChange={

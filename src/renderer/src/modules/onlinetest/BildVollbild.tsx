@@ -113,7 +113,7 @@ export function BildVollbild(p: {
         >
           <div style={{ width: w * massstab, height: h * massstab, position: 'relative', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,.5)' }}>
             <div style={{ width: w, height: h, transform: `scale(${massstab})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
-              <img src={p.bild.src} alt="" style={{ width: w, height: h, display: 'block', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
+              <img src={p.bild.src} alt="Bild aus dem Arbeitsblatt, zum Markieren vergrößert" style={{ width: w, height: h, display: 'block', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
               <TintenSeite
                 seite={seite}
                 lage={lage}

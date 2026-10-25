@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StructuredRequest } from '../src/shared/types'
 import {
+  bereinigeKennung,
   checkIntegrity,
   loeseMaterialverweise,
   materialNummern,
@@ -18,6 +19,9 @@ import {
 } from '../src/renderer/src/modules/arbeitsblatt/generation/worksheetImages'
 import { setzeMaterialEin } from '../src/renderer/src/modules/arbeitsblatt/generation/originalmaterial'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
+import { convertBlock } from '../src/renderer/src/modules/arbeitsblatt/generation/convert'
+import { createRng } from '../src/renderer/src/modules/vokabeltest/model/random'
+import { seiteVon } from '../src/renderer/src/modules/arbeitsblatt/render/SheetPages'
 import { newBlock } from '../src/renderer/src/modules/arbeitsblatt/model/factory'
 import type { ImageBlock, Sheet, TaskBlock, TextBlock, Worksheet, WsBlock } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import { contextFor, profileFromMeta, zurAnzeige } from '../src/renderer/src/modules/arbeitsblatt/render/SheetPages'
@@ -50,6 +54,38 @@ const aufgabe = (id: string, instruction: string, teil?: string): TaskBlock => (
 })
 
 describe('Materialverweise über Kennungen', () => {
+  // 25.10.2026, Befund „Erster Weltkrieg": „M{kräfteverhältnis}" in der Aufgabe, „kraefteverhaeltnis" an der Tabelle
+  it('löst Verweise mit Umlauten und anderer Schreibweise auf dieselbe Kennung auf', () => {
+    expect(bereinigeKennung(' Kräfteverhältnis 1917/18 ')).toBe('kraefteverhaeltnis-1917-18')
+    expect(bereinigeKennung('Straße')).toBe('strasse')
+    const blocks = [
+      { id: 't', type: 'table', ref: 'kraefteverhaeltnis', title: 'Kräfteverhältnis', headers: ['a'], rows: [['1']] },
+      {
+        id: 'a',
+        type: 'task',
+        instruction: 'Erkläre mithilfe von M{kräfteverhältnis}.',
+        parts: [],
+        operator: '',
+        afbReason: '',
+        socialForm: 'EA',
+        answer: {},
+        solution: ''
+      }
+    ] as unknown as WsBlock[]
+    expect((loeseMaterialverweise(blocks)[1] as { instruction: string }).instruction).toBe('Erkläre mithilfe von M1.')
+    expect(checkIntegrity({ id: 's', label: '', blocks } as Sheet).filter((f) => f.severity === 'hoch')).toEqual([])
+    // Falsche Kennung bleibt ein toter Verweis – jetzt auch mit Umlaut erkannt
+    const falsch = [blocks[0], { ...blocks[1], instruction: 'Erkläre mithilfe von M{kräfte}.' }] as WsBlock[]
+    expect(checkIntegrity({ id: 's', label: '', blocks: falsch } as Sheet).some((f) => f.message.includes('M{kräfte}'))).toBe(true)
+  })
+  it('meldet eine Tabelle ohne Kopf und Zeilen als leeres Material', () => {
+    const blocks = [{ id: 't', type: 'table', ref: 'x', title: 'Kräfteverhältnis 1917/18', headers: [], rows: [] }] as unknown as WsBlock[]
+    expect(checkIntegrity({ id: 's', label: '', blocks } as Sheet).map((f) => f.message)).toContain(
+      'Die Tabelle „Kräfteverhältnis 1917/18“ ist leer – weder Spaltenköpfe noch Zeilen.'
+    )
+    const kopf = [{ id: 't', type: 'table', ref: 'x', title: 'Zum Ausfüllen', headers: ['Jahr', 'Ereignis'], rows: [] }] as unknown as WsBlock[]
+    expect(checkIntegrity({ id: 's', label: '', blocks: kopf } as Sheet)).toEqual([])
+  })
   it('ersetzt M{kennung} überall durch die Nummer, die die App vergibt', () => {
     const blocks: WsBlock[] = [
       text('rede', 'quelle'),
@@ -158,6 +194,37 @@ describe('Materialverweise über Kennungen', () => {
 })
 
 describe('Bilder: Breite, Auflösung, echtes Material', () => {
+  it('ein Bild mit Schildern am Rand bekommt die volle Breite und steht nie neben der Aufgabe (25.10.2026)', () => {
+    const b = convertBlock(
+      {
+        type: 'image',
+        title: 'Stellungskrieg',
+        imageDescription: 'Schema',
+        imageRole: 'material',
+        imageFunction: 'organisation',
+        blockSide: 'left',
+        imageLabels: [
+          { text: 'deutsche Stellung', x: 18, y: 56 },
+          { text: 'Niemandsland', x: 50, y: 38 }
+        ]
+      },
+      createRng(1),
+      [],
+      'du'
+    ) as { widthPercent: number; side?: string; labels: unknown[] }
+    expect(b.widthPercent).toBe(100)
+    expect(b.side).toBeUndefined()
+    expect(b.labels).toHaveLength(2)
+    expect(seiteVon(b as unknown as WsBlock)).toBeUndefined()
+    // Verweise in den Texten werden mit den Kennungen bereinigt
+    const t = convertBlock(
+      { type: 'task', instruction: 'Erkläre mithilfe von M{kräfteverhältnis}.', afb: 'II', operator: 'erklären' },
+      createRng(2),
+      [],
+      'du'
+    ) as { instruction: string }
+    expect(t.instruction).toContain('M{kraefteverhaeltnis}')
+  })
   it('gibt ordnenden Bildern die ganze Breite, Fotos weniger, Schmuck wenig', () => {
     expect(standardBildbreite('organisation', 'material')).toBe(100)
     expect(standardBildbreite('repraesentation', 'material')).toBe(80)

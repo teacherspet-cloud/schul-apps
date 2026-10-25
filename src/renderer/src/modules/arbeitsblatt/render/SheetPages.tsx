@@ -257,6 +257,8 @@ export function seiteVon(b: WsBlock): 'left' | 'right' | undefined {
   if (b.type === 'image') {
     // Bildreihen nie: Ihre Einzelbilder brauchen die volle Breite nebeneinander
     if (b.items?.length) return undefined
+    // Schilder am Rand brauchen 2 × 26 mm Spalten – daneben bliebe das Bild ein Daumennagel (25.10.2026)
+    if (b.labels?.some((l) => !l.inline)) return undefined
     if (b.side) return b.side
     return b.role === 'illustration' || b.role === 'motivation' ? 'right' : undefined
   }

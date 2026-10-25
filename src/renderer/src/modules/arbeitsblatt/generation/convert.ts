@@ -37,7 +37,7 @@ import {
   VIEWING_PHASE_IDS
 } from './schemas'
 import { standardBildbreite, type ImageFunction } from '../didactics/imageDesign'
-import { MATERIAL_TYPES } from '../didactics/integrity'
+import { bereinigeKennung, bereinigeVerweise, MATERIAL_TYPES, wandleTexte } from '../didactics/integrity'
 import type { VideoKind, ViewingPhase } from '../didactics/videoTasks'
 
 /** Wörter je Minute beim Vorlesen eines Hörtextes (deutlich artikulierte Standardsprache). */
@@ -214,17 +214,28 @@ export function convertBlock(
   /** Anrede der Lernenden – nur für feste Texte, die die App selbst einsetzt (Paket 8b) */
   anrede: Anrede = 'du'
 ): WsBlock | null {
+  const roh = convertBlockRoh(b, rng, images, anrede)
+  if (!roh) return null
+  // Verweise in allen Texten in derselben Schreibweise wie die Kennungen (25.10.2026): „M{kräfteverhältnis}" → „M{kraefteverhaeltnis}"
+  const block = wandleTexte(roh, bereinigeVerweise) as WsBlock
+  /*
+   * Bild mit Schildern am Rand (25.10.2026, Befund „Stellungskrieg": 48 px breit neben der Aufgabe): Die Schilderspalten
+   * brauchen 2 × 26 mm – neben der Aufgabe oder bei 45 % Breite bleibt vom Bild nichts übrig. Deshalb volle Breite,
+   * nie daneben.
+   */
+  if (block.type === 'image' && block.labels?.some((l) => !l.inline)) {
+    const { side: _s, ...ohneSeite } = block
+    return { ...ohneSeite, widthPercent: 100 }
+  }
+  return block
+}
+
+function convertBlockRoh(b: any, rng: Rng, images: { index: number; dataUrl: string; fileName: string }[], anrede: Anrede): WsBlock | null {
   const id = newId(rng)
   const type = pick<WsBlockType>(b?.type, BLOCK_TYPES, 'task')
   const stars = starsOf(b?.stars)
   // Kennung für Verweise („M{zeitleiste}") – nur bei Material, bereinigt auf Kleinbuchstaben, Ziffern und Bindestrich
-  const ref = MATERIAL_TYPES.includes(type)
-    ? String(b?.ref ?? '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-    : ''
+  const ref = MATERIAL_TYPES.includes(type) ? bereinigeKennung(String(b?.ref ?? '')) : ''
   // Seitenformat ab diesem Baustein (06.10.2026) – die Prüfung nach Maßen (model/seitenformat.ts) korrigiert offensichtliche Fehlgriffe
   const seitenFormat = b?.pageFormat === 'landscape' ? 'quer' : b?.pageFormat === 'portrait' ? 'hoch' : undefined
   const base = { id, ...(stars ? { stars } : {}), ...(ref ? { ref } : {}), ...(seitenFormat ? { seitenFormat: seitenFormat as 'quer' | 'hoch' } : {}) }

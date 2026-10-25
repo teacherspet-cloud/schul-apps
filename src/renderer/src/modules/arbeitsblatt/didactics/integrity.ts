@@ -158,8 +158,31 @@ export const MATERIAL_TYPES: WsBlock['type'][] = ['text', 'image', 'table', 'gri
 /** Bausteine, die als Material gelten und von der App eine Nummer bekommen (render/SheetPages.tsx nummeriert genauso). */
 export const isMaterial = (block: WsBlock): boolean => MATERIAL_TYPES.includes(block.type) && !block.nurLoesung
 
-/** Verweis über die Kennung eines Materials, wie er GESPEICHERT wird: „M{zeitleiste}" (siehe `ref` in model/types.ts) */
-export const MATERIAL_VERWEIS = /M\{([a-z0-9-]+)\}/g
+/**
+ * Verweis über die Kennung eines Materials, wie er GESPEICHERT wird: „M{zeitleiste}" (siehe `ref` in model/types.ts).
+ * Die Klammer nimmt jede Schreibweise auf (25.10.2026, Befund „Erster Weltkrieg": die KI schrieb „M{kräfteverhältnis}"
+ * in die Aufgabe, aber „kraefteverhaeltnis" als Kennung der Tabelle – der alte Ausdruck [a-z0-9-] übersah den Verweis
+ * samt Fehlermeldung, die Aufgabe zeigte „M{kräfteverhältnis}" im Druck). Verglichen wird über `bereinigeKennung`.
+ */
+export const MATERIAL_VERWEIS = /M\{([^{}\s]+)\}/g
+
+/** Kennung vergleichbar machen: klein, Umlaute umschreiben, Akzente weg, Rest zu Bindestrichen */
+export function bereinigeKennung(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/** Gespeicherte Verweise in einem Text auf die bereinigte Schreibweise bringen – „M{kräfteverhältnis}" → „M{kraefteverhaeltnis}" */
+export const bereinigeVerweise = (s: string): string => (s.includes('M{') ? s.replace(MATERIAL_VERWEIS, (_g, k: string) => `M{${bereinigeKennung(k)}}`) : s)
 /** Verweis, wie er auf dem Blatt STEHT: „M3" */
 const MATERIAL_NUMMER = /\bM(\d+)\b/g
 
@@ -224,7 +247,7 @@ function kennungen(dokument: WsBlock[]): { nachKennung: Map<string, string>; nac
   for (const b of dokument) {
     const n = nummern.get(b.id)
     if (!n) continue
-    const r = refOf(b)
+    const r = bereinigeKennung(refOf(b))
     if (!nachKennung.has(r)) nachKennung.set(r, n)
     if (!nachNummer.has(n)) nachNummer.set(n, r)
   }
@@ -242,7 +265,7 @@ function kennungen(dokument: WsBlock[]): { nachKennung: Map<string, string>; nac
 export function loeseMaterialverweise<T extends WsBlock>(blocks: T[], dokument: WsBlock[] = blocks): T[] {
   const { nachKennung } = kennungen(dokument)
   if (!nachKennung.size) return blocks
-  const ersetze = (s: string): string => (s.includes('M{') ? s.replace(MATERIAL_VERWEIS, (ganz, kennung: string) => nachKennung.get(kennung) ?? ganz) : s)
+  const ersetze = (s: string): string => (s.includes('M{') ? s.replace(MATERIAL_VERWEIS, (ganz, kennung: string) => nachKennung.get(bereinigeKennung(kennung)) ?? ganz) : s)
   return gleichWennUnveraendert(blocks, ersetze)
 }
 
@@ -339,6 +362,11 @@ export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks)
     if (block.type === 'text' && !(block.body ?? '').trim()) {
       findings.push({ blockId: block.id, severity: 'hoch', message: 'Der Materialtext ist leer.' })
     }
+    // 3b. Leere Tabelle (25.10.2026, Befund „Kräfteverhältnis 1917/18": nur ein Titel, kein Kopf, keine Zeile) –
+    // eine Ausfülltabelle hat wenigstens Spaltenköpfe (antworttabellen.ts wandelt sie vorher um)
+    if (block.type === 'table' && !(block.headers ?? []).some((h) => String(h ?? '').trim()) && !(block.rows ?? []).some((r) => r.some((z) => String(z ?? '').trim()))) {
+      findings.push({ blockId: block.id, severity: 'hoch', message: `Die Tabelle${block.title ? ` „${block.title}“` : ''} ist leer – weder Spaltenköpfe noch Zeilen.` })
+    }
 
     // 4. Gleiche Reihenfolge in zwei Aufzählungen (Vergleichsaufgaben)
     if (block.type === 'text') {
@@ -408,7 +436,8 @@ function verwieseneMaterialien(task: WsBlock, blocks: WsBlock[], nummern: Map<st
   const nachNummer = new Map([...nummern].map(([id, nr]) => [nr, id]))
   const ids = new Set<string>()
   for (const m of texte.matchAll(MATERIAL_VERWEIS)) {
-    const b = blocks.find((x) => isMaterial(x) && refOf(x) === m[1])
+    const kennung = bereinigeKennung(m[1])
+    const b = blocks.find((x) => isMaterial(x) && bereinigeKennung(refOf(x)) === kennung)
     if (b) ids.add(b.id)
   }
   for (const m of texte.matchAll(MATERIAL_NUMMER)) {
@@ -517,9 +546,20 @@ export function aufgabenNaheAmMaterial(sheet: Sheet, seiten: Map<string, Baustei
     while (von - 1 > m && blocks[von - 1].type === 'scaffold' && !blocks[von - 1].free && JSON.stringify(blocks[von - 1]).includes(`Aufgabe ${nr}`)) von--
     let bis = i + 1
     while (bis < blocks.length && BEGLEITER.has(blocks[bis].type) && !blocks[bis].free) bis++
-    // Einfügestelle: hinter dem Material und den Aufgaben (mit Begleitern), die direkt darauf folgen
+    /*
+     * Einfügestelle (25.10.2026, Befund „Erster Weltkrieg"): hinter dem Material und allem, was bis zum nächsten Material
+     * folgt – Einstiegskasten, Aufgaben mit Begleitern. Vorher stoppte ein Infokasten die Suche, und die Aufgabe sprang
+     * vor den Einstieg und vor die erste Aufgabe zum selben Material (AFB II vor AFB I). Außerdem nie vor eine Aufgabe,
+     * die dasselbe Material nutzt – die Reihenfolge der Aufgaben zu einem Material bleibt.
+     */
     let k = m + 1
-    while (k < von && (blocks[k].type === 'task' || BEGLEITER.has(blocks[k].type))) k++
+    while (k < von && !isMaterial(blocks[k])) k++
+    for (let j = k; j < von; j++) {
+      if (blocks[j].type !== 'task' || !verwieseneMaterialien(blocks[j], blocks, nummern).some((x) => x.id === blocks[m].id)) continue
+      let e = j + 1
+      while (e < von && BEGLEITER.has(blocks[e].type) && !blocks[e].free) e++
+      k = e
+    }
     if (k >= von) continue
     // Nur, wenn es den Abstand wirklich verkürzt
     const davor = seiten.get(blocks[k - 1].id)

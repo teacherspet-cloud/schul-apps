@@ -656,7 +656,7 @@ function Materialien({
             aria-hidden="true"
           >
             {r.titelbild ? (
-              <img src={r.titelbild} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={r.titelbild} alt="" aria-hidden="true" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : (
               <IconRoute size={40} color="#fff" style={{ opacity: 0.9 }} />
             )}

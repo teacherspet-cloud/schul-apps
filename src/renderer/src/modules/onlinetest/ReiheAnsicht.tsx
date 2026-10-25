@@ -138,7 +138,7 @@ export function ReihenListe(): React.JSX.Element {
           <Group justify="space-between" wrap="nowrap">
             <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
               {/* Titelbild (25.10.2026) */}
-              {r.titelbild && <img src={r.titelbild} alt="" style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
+              {r.titelbild && <img src={r.titelbild} alt="" aria-hidden="true" style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
               <div style={{ minWidth: 0 }}>
                 <Text fw={700}>{r.titel}</Text>
                 <Text size="sm" c="dimmed">
@@ -204,7 +204,7 @@ function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
         {/* Titelbild (25.10.2026): oben in der Reihe, wie auf der Kachel im Fachordner */}
         {d.titelbild && (
           <Card.Section mb="sm">
-            <img src={d.titelbild} alt="" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} data-reihe-titelbild />
+            <img src={d.titelbild} alt="" aria-hidden="true" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} data-reihe-titelbild />
           </Card.Section>
         )}
         <Text size="sm" c="dimmed">

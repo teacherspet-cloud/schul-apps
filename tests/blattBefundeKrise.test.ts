@@ -196,6 +196,36 @@ describe('Aufgabe nah am Material', () => {
     expect(umgestellt[0]).toContain('direkt hinter M1')
   })
 
+  // 25.10.2026, Befund „Erster Weltkrieg": ein Einstiegskasten zwischen Material und erster Aufgabe – die ferne Aufgabe
+  // sprang davor (AFB II vor AFB I); jetzt hinter alles, was bis zum nächsten Material folgt, nie vor eine Aufgabe zum selben Material
+  it('überspringt Einstiegskasten und Aufgaben zum selben Material, statt davor zu landen', () => {
+    const b: WsBlock[] = [
+      text('m1', 'quelle'),
+      { id: 'ein', type: 'infoBox', variant: 'wissen', title: 'Einstieg', body: 'Erinnere dich …' } as WsBlock,
+      task('a0', 'Fasse M{quelle} zusammen.'),
+      { id: 'ph', type: 'phrases', title: 'Sprachhilfe zu Aufgabe 1', groups: [] } as unknown as WsBlock,
+      text('m2', 'rede'),
+      task('a1', 'Erkläre die Absicht der Rede M{rede}.'),
+      task('a2', 'Erkläre mithilfe von M{quelle}, wie es weiterging.')
+    ]
+    const p = [{ items: [{ id: 'm1' }, { id: 'ein' }, { id: 'a0' }, { id: 'ph' }] }, { items: [{ id: 'm2' }, { id: 'a1' }] }, { items: [{ id: 'a2' }] }].map((x) => ({ ...x, overflow: false }))
+    const { sheet, umgestellt } = aufgabenNaheAmMaterial(blatt(b), seitenJeBaustein(p))
+    expect(sheet.blocks.map((x) => x.id)).toEqual(['m1', 'ein', 'a0', 'ph', 'a2', 'm2', 'a1'])
+    expect(umgestellt).toHaveLength(1)
+  })
+  it('rückt nicht, wenn die Aufgabe auch ein späteres Material braucht', () => {
+    const b: WsBlock[] = [
+      text('m1', 'quelle'),
+      task('a0', 'Fasse M{quelle} zusammen.'),
+      text('m2', 'rede'),
+      task('a1', 'Erkläre M{rede}.'),
+      { id: 't', type: 'table', ref: 'kraefteverhaeltnis', title: 'Kräfteverhältnis', headers: ['a'], rows: [['1']] } as unknown as WsBlock,
+      task('a2', 'Erkläre mithilfe von M{quelle} und M{kräfteverhältnis}, wie der Krieg ausging.')
+    ]
+    const p = [{ items: [{ id: 'm1' }, { id: 'a0' }] }, { items: [{ id: 'm2' }, { id: 'a1' }] }, { items: [{ id: 't' }, { id: 'a2' }] }].map((x) => ({ ...x, overflow: false }))
+    expect(aufgabenNaheAmMaterial(blatt(b), seitenJeBaustein(p)).umgestellt).toEqual([])
+  })
+
   it('auch im erzeugten Blatt (gemessene Seitenaufteilung)', () => {
     const ws = { sheets: [blatt(blocks())] } as unknown as Parameters<typeof aufgabenZumMaterial>[0]
     expect(aufgabenZumMaterial(ws, () => plaene)).toHaveLength(1)
