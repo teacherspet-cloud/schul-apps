@@ -427,14 +427,16 @@ try {
   pruefe(String(vs.adresse ?? '').includes('ziel=%2Fs%2Fr%2F'), `Musterschüler-Vorschau der Reihe (${vs.adresse ?? vs.fehler})`)
   // „Vollständig bearbeitet" (25.10.2026): jeder Schritt von Hand geschafft, Blätter eingereicht mit grüner Ampel
   const vsVoll = await (await lk.request.post(`${A}/server/reihen/${gesp.id}/vorschau`, { headers: KOPF, data: { zustand: 'vollstaendig' } })).json()
-  const vollZid = decodeURIComponent(String(vsVoll.adresse ?? '')).split('/s/r/').pop() ?? ''
-  const lzVoll = await (await lk.request.get(`${A}/server/reihen/z/${vollZid}`, { headers: KOPF })).json()
-  const vollStand = (lzVoll.lernende ?? []).map((l) => l.stand?.schritte ?? {}).find((st) => Object.keys(st).length)
-  const reiheVoll = (await (await lk.request.get(`${A}/server/reihen/${gesp.id}`, { headers: KOPF })).json()).reihe
-  pruefe(
-    Boolean(vollStand) && (reiheVoll?.schritte ?? []).every((x) => vollStand[x.id]?.hand === 'geschafft'),
-    `Vorschau „vollständig bearbeitet": alle Schritte geschafft (${vollStand ? Object.keys(vollStand).length : 0} von ${reiheVoll?.schritte?.length})`
-  )
+  // Das Vorschaukonto zählt für die Lehrkraft-Übersicht nicht als Lernender – also die Schülersicht selbst öffnen
+  const pv = await lk.newPage()
+  await pv.goto(A + vsVoll.adresse)
+  const fv = pv.frameLocator('#ansicht')
+  await fv.locator('[data-station]').first().waitFor({ timeout: 25000 }).catch(() => undefined)
+  const stationen = await fv.locator('[data-station]').count()
+  const geschafft = await fv.locator('[data-station="geschafft"]').count()
+  pruefe(stationen > 0 && geschafft === stationen, `Vorschau „vollständig bearbeitet": alle Stationen geschafft (${geschafft} von ${stationen})`)
+  await pv.screenshot({ path: join(out, '9-vorschau-vollstaendig.png') })
+  await pv.close()
   const ohneVorschau = (await (await lk.request.get(`${A}/server/reihen`, { headers: KOPF })).json()).reihen.find((x) => x.id === gesp.id)
   pruefe((ohneVorschau?.zuweisungen ?? []).length === 0, 'Vorschau-Zuweisung erscheint in keiner Liste')
   const z = await (await lk.request.post(`${A}/server/reihen/${gesp.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: gruppe.id } })).json()

@@ -20,6 +20,7 @@
  */
 import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
+import { BILD_TINTE_MUSTER } from '../shared/blattBilder'
 import { randomBytes } from 'node:crypto'
 import { nurTag, tagesBeginn, verlaufOhneZeit } from './ohneUhrzeit'
 import {
@@ -306,8 +307,10 @@ function bereinigeTinte(roh: unknown, seiten = 16): Record<string, string> {
   const aus: Record<string, string> = {}
   if (!roh || typeof roh !== 'object') return aus
   let summe = 0
-  for (const [k, v] of Object.entries(roh as Record<string, unknown>).slice(0, 16)) {
-    if (!/^\d{1,2}$/.test(k) || Number(k) >= seiten || typeof v !== 'string' || !v.startsWith('data:image/png;base64,') || v.length >= 1_200_000) continue
+  // Seiten „0", „1", … und Bilder „bild:b0", … (Vollbild mit Werkzeugen, 25.10.2026, shared/blattBilder.ts)
+  for (const [k, v] of Object.entries(roh as Record<string, unknown>).slice(0, 40)) {
+    const seite = /^\d{1,2}$/.test(k) ? Number(k) : BILD_TINTE_MUSTER.test(k) ? -1 : null
+    if (seite === null || seite >= seiten || typeof v !== 'string' || !v.startsWith('data:image/png;base64,') || v.length >= 1_200_000) continue
     if (summe + v.length > TINTE_GESAMT) break
     summe += v.length
     aus[k] = v

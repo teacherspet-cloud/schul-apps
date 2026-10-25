@@ -31,7 +31,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare } from '@tabler/icons-react'
+import { IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
@@ -44,6 +44,8 @@ import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattO
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 // Stift-Ebene in eigener Datei – mit Tastaturbedienung (23.10.2026, Barrierefreiheit)
 import { TintenSeite } from './tintenSeite'
+import { BildVollbild, type BildLage } from './BildVollbild'
+import { BILD_SEITE, bildTinteSchluessel, blattBilder } from '@shared/blattBilder'
 import type { FormArt } from '@shared/blattObjekte'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
@@ -286,7 +288,7 @@ function ohneFangNebenSkala(aus: Andock[]): Andock[] {
   return aus.filter((a) => (a.art === 'punkt' ? !nahe(a.x, a.y) : a.art === 'strecke' ? !(nahe(a.x1, a.y1) && nahe(a.x2, a.y2)) : true))
 }
 
-function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[] } {
+function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; bilder: BildLage[] } {
   const seiten: Seite[] = []
   const roh: Omit<Feld, 'id'>[] = []
   const aufgaben: AufgabeInfo[] = []
@@ -463,7 +465,12 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
     const h = hilfen.get(a.nr)
     if (h) a.hilfe = h
   }
-  return { felder: ohneDoppelte, seiten, aufgaben }
+  // Bilder zum Vergrößern und Markieren (25.10.2026, shared/blattBilder.ts – dieselbe Auswahl wie am Server)
+  const bilder: BildLage[] = blattBilder(doc).map((b, i) => {
+    const r = b.el.getBoundingClientRect()
+    return { id: `b${i}`, seite: b.seite, x: r.left, y: r.top, w: r.width, h: r.height, src: b.el.currentSrc || b.el.src, natW: b.el.naturalWidth, natH: b.el.naturalHeight }
+  })
+  return { felder: ohneDoppelte, seiten, aufgaben, bilder }
 }
 
 export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Element {
@@ -495,7 +502,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const ordnerBlatt = useBlaettern()
   const imOrdner = Boolean(ordnerBlatt)
   const [tinte, setTinte] = useState<Record<string, string>>(d.tinte)
-  const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; hoehe: number } | null>(null)
+  const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; bilder: BildLage[]; hoehe: number } | null>(null)
+  // Bild bildschirmfüllend mit Werkzeugen (25.10.2026): Nummer des geöffneten Bilds
+  const [bildOffen, setBildOffen] = useState<number | null>(null)
   const [breite, setBreite] = useState(BREITE)
   const [ansicht, setAnsicht] = useState<'blatt' | 'liste'>(() => (window.innerWidth < 640 ? 'liste' : 'blatt'))
   const [werkzeug, setWerkzeug] = useState<Werkzeug>('tastatur')
@@ -1116,6 +1125,31 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 runden={d.einstellungen.aufgabenRunden}
                 hilfen={hilfen}
                 hilfeOeffnen={hilfeOeffnen}
+                bilder={gemessen.bilder}
+                bildOeffnen={setBildOffen}
+                bildMarkiert={(b, i) => Boolean(tinte[bildTinteSchluessel(b.id)]) || objekte.some((o) => o.s === BILD_SEITE + i)}
+              />
+            )}
+            {bildOffen !== null && gemessen?.bilder[bildOffen] && (
+              <BildVollbild
+                bild={gemessen.bilder[bildOffen]}
+                index={bildOffen}
+                tinte={tinte[bildTinteSchluessel(gemessen.bilder[bildOffen].id)]}
+                setTinte={(url) => {
+                  const k = bildTinteSchluessel(gemessen.bilder[bildOffen].id)
+                  stand.current.tinteGeaendert = true
+                  setTinte((t) => ({ ...t, [k]: url }))
+                }}
+                objekte={objekte}
+                setObjekte={setObjekte}
+                stiftFarbe={stiftFarbe}
+                setStiftFarbe={setStiftFarbe}
+                markerFarbe={markerFarbe}
+                setMarkerFarbe={setMarkerFarbe}
+                vorgaben={vorgaben}
+                setVorgabe={setVorgabe}
+                gesperrt={!offen}
+                schliessen={() => setBildOffen(null)}
               />
             )}
             {hilfeModal && (
@@ -1258,6 +1292,10 @@ function Ebene(p: {
   tinte: Record<string, string>
   setTinte: (seite: number, url: string) => void
   pruefen?: (nr: number) => Promise<void>
+  /** Bilder zum Vergrößern und Markieren (25.10.2026): Lupe unten rechts am Bild */
+  bilder?: BildLage[]
+  bildOeffnen?: (i: number) => void
+  bildMarkiert?: (b: BildLage, i: number) => boolean
   /** ✓/✗ der letzten Einreichung je Feld (08.10.2026) */
   marken?: Record<string, FeldMarke>
   pruefFehler: Record<string, string>
@@ -1506,6 +1544,28 @@ function Ebene(p: {
               </Tooltip>
             )
           })}
+      {/* Bild vergrößern und markieren (25.10.2026): Lupe unten rechts am Bild, grün sobald es Markierungen trägt */}
+      {p.bildOeffnen &&
+        (p.bilder ?? []).map((b, i) => {
+          const markiert = p.bildMarkiert?.(b, i) ?? false
+          return (
+            <Tooltip key={`bild-${b.id}`} label={markiert ? 'Bild mit Markierungen vergrößern' : 'Bild vergrößern und markieren'}>
+              <ActionIcon
+                variant="filled"
+                color={markiert ? 'teal' : 'dark'}
+                radius="xl"
+                size="lg"
+                style={{ position: 'absolute', left: b.x + b.w - 40, top: b.y + b.h - 40, zIndex: 20, boxShadow: '0 1px 4px rgba(0,0,0,.25)', opacity: 0.92 }}
+                onClick={() => p.bildOeffnen!(i)}
+                aria-label="Bild vergrößern"
+                data-bild-zoom={b.id}
+                data-bild-markiert={markiert || undefined}
+              >
+                <IconZoomIn size={20} />
+              </ActionIcon>
+            </Tooltip>
+          )
+        })}
       {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}
       {p.ampeln &&
         p.aufgaben.map((a) => (

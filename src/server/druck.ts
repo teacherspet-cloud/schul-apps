@@ -8,6 +8,7 @@
  * Drucken heißt im Browser: Seitenbilder des PDFs im aktuellen Dokument drucken, ohne neuen Tab (renderer/shared/export/druckImDokument.ts).
  */
 import { digitalisieren, zusatzLinien } from '../shared/blattDigital'
+import { BILD_SEITE, blattBilder } from '../shared/blattBilder'
 import { objekteSvg, type BlattObjekt } from '../shared/blattObjekte'
 import { materialMitZeilen } from '../renderer/src/modules/onlinetest/materialZeilen'
 import type { Browser } from 'playwright-core'
@@ -117,11 +118,33 @@ export async function seitenMitTinte(
   tinte: Record<string, string>,
   extra: { objekte?: BlattObjekt[]; zusatz?: Record<string, number>; seiten?: number[] } = {}
 ): Promise<string[]> {
-  const objekte = extra.objekte ?? []
-  const seiten = [...new Set([...Object.keys(tinte).map(Number), ...objekte.map((o) => o.s), ...(extra.seiten ?? [])])]
+  // Markierungen auf Bildern (25.10.2026, shared/blattBilder.ts): Tinte „bild:b0" und Objekte auf „Seite" BILD_SEITE + n
+  const bildTinte = Object.fromEntries(
+    Object.entries(tinte)
+      .filter(([k]) => k.startsWith('bild:'))
+      .map(([k, v]) => [k.slice(5), v])
+  )
+  const bildObjekte = (extra.objekte ?? []).filter((o) => o.s >= BILD_SEITE)
+  const objekte = (extra.objekte ?? []).filter((o) => o.s < BILD_SEITE)
+  let seiten = [
+    ...new Set([
+      ...Object.keys(tinte)
+        .filter((k) => !k.startsWith('bild:'))
+        .map(Number),
+      ...objekte.map((o) => o.s),
+      ...(extra.seiten ?? [])
+    ])
+  ]
     .filter((n) => Number.isInteger(n) && n >= 0)
     .sort((a, b) => a - b)
-  if (!seiten.length) return []
+  if (!seiten.length && !Object.keys(bildTinte).length && !bildObjekte.length) return []
+  const bildSvg: Record<string, string> = {}
+  for (const n of new Set(bildObjekte.map((o) => o.s)))
+    bildSvg[`b${n - BILD_SEITE}`] = objekteSvg(
+      bildObjekte.filter((o) => o.s === n),
+      1000,
+      1000
+    )
   return mitSeite(html, async (s) => {
     await s.setViewportSize({ width: 900, height: 1300 })
     // Dieselbe digitale Fassung wie bei den Lernenden (blattDigital.ts) – sonst lägen Stift und Kästchen daneben
@@ -142,9 +165,48 @@ export async function seitenMitTinte(
         seite.insertAdjacentHTML('beforeend', inhalt)
       }
     }, svg)
+    // Bilder mit Markierungen: Tinte und Kästchen über das Bild gelegt (Zeichenfläche 1000 px breit, Maßstab = Bildbreite/1000)
+    if (Object.keys(bildTinte).length || Object.keys(bildSvg).length) {
+      const bildSeiten = await s.evaluate<number[]>(
+        `((x) => {
+          const bilder = (${blattBilder.toString()})(document)
+          const alle = [...document.querySelectorAll('.ws-page')]
+          const aus = []
+          bilder.forEach((b, i) => {
+            const id = 'b' + i
+            if (!x.tinte[id] && !x.svg[id]) return
+            const seite = alle[b.seite]
+            if (!seite) return
+            if (getComputedStyle(seite).position === 'static') seite.style.position = 'relative'
+            const p = seite.getBoundingClientRect()
+            const r = b.el.getBoundingClientRect()
+            const k = r.width / 1000
+            const h = document.createElement('div')
+            h.style.cssText = 'position:absolute;left:' + (r.left - p.left) + 'px;top:' + (r.top - p.top) + 'px;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;z-index:55;overflow:hidden'
+            if (x.tinte[id]) {
+              const img = document.createElement('img')
+              img.src = x.tinte[id]
+              img.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%'
+              h.appendChild(img)
+            }
+            if (x.svg[id]) {
+              const w = document.createElement('div')
+              w.style.cssText = 'position:absolute;left:0;top:0;width:1000px;height:' + r.height / k + 'px;transform:scale(' + k + ');transform-origin:top left'
+              w.innerHTML = x.svg[id]
+              h.appendChild(w)
+            }
+            seite.appendChild(h)
+            aus.push(b.seite)
+          })
+          return aus
+        })(${JSON.stringify({ tinte: bildTinte, svg: bildSvg })})`
+      )
+      seiten = [...new Set([...seiten, ...bildSeiten])].sort((a, b) => a - b)
+    }
     await s.evaluate((t) => {
       const alle = [...document.querySelectorAll<HTMLElement>('.ws-page')]
       for (const [k, url] of Object.entries(t)) {
+        if (k.startsWith('bild:')) continue
         const seite = alle[Number(k)]
         if (!seite) continue
         if (getComputedStyle(seite).position === 'static') seite.style.position = 'relative'
