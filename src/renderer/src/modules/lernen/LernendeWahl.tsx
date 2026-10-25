@@ -5,6 +5,7 @@
 import { MultiSelect, SegmentedControl, Select, Stack } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { holen } from '../onlinetest/serverApi'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 export interface LernendeAuswahl {
   lerngruppeId: string
@@ -40,11 +41,11 @@ export function useAlleLernenden(): { daten: { group: string; items: { value: st
 
 export function LernendeWahl({ wahl }: { wahl: (a: LernendeAuswahl | null) => void }): React.JSX.Element {
   const [art, setArt] = useState<'gruppe' | 'einzeln'>('gruppe')
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [einzelne, setEinzelne] = useState<string[]>([])
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen').then(
       (d) => setGruppen(d.gruppen),
       () => setGruppen([])
     )
@@ -66,14 +67,7 @@ export function LernendeWahl({ wahl }: { wahl: (a: LernendeAuswahl | null) => vo
         ]}
       />
       {art === 'gruppe' ? (
-        <Select
-          label="Lerngruppe"
-          data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
-          value={gruppe}
-          onChange={setGruppe}
-          placeholder="wählen …"
-          data-lernende-gruppe
-        />
+        <Select label="Lerngruppe" data={gruppenAuswahl(gruppen)} value={gruppe} onChange={setGruppe} placeholder="wählen …" data-lernende-gruppe />
       ) : (
         <MultiSelect
           label="Lernende"

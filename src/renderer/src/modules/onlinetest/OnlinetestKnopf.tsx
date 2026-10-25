@@ -20,6 +20,7 @@ import type { OnlineFassung } from './kern'
 import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
 import { nameMitTermin } from '@shared/onlinetestTermin'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 /** Thema des Tests (Unit, Themenbereich, Thema) – macht gleichnamige Tests unterscheidbar */
 export function testThema(doc: Pick<TestDocument, 'header' | 'settings'>): string {
@@ -131,7 +132,7 @@ export function Erstellen({
   listName?: string
   schliessen: () => void
 }): React.JSX.Element {
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   /*
    * Termin (10.10.2026, Entscheidung der Lehrkraft): optionaler Tag für alle Testarten. Er steht im Namen an der Stelle des
    * Datums („10b Fr 17.10. - Green Line 6 - Unit 3"), die Lernenden sehen ihn als Ankündigung (außer „Für Lernende
@@ -162,7 +163,7 @@ export function Erstellen({
   // Fertig: Detailansicht in der App „Onlinetest“ (die frühere Code-Ansicht hier bleibt ungenutzt)
   const [fertig] = useState<{ code: string; link: string } | null>(null)
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen')
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen')
       .then((d) => setGruppen(d.gruppen))
       .catch(() => setGruppen([]))
   }, [])
@@ -225,7 +226,7 @@ export function Erstellen({
             <Select
               label="Lerngruppe"
               description="Nur Mitglieder dieser Lerngruppe können teilnehmen; die Ergebnisse stehen in ihrer Historie. Ohne Lerngruppe: jeder mit Code."
-              data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+              data={gruppenAuswahl(gruppen)}
               value={gruppe}
               onChange={(g) => {
                 setGruppe(g)

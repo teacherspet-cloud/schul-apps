@@ -534,6 +534,44 @@ try {
     `Markierungen am Bild gespeichert (Tinte ${bildTinte ? 'ja' : 'nein'}, ${bildObjekte.length} Kästchen)`
   )
   pruefe((await s.locator('[data-bild-zoom][data-bild-markiert]').count()) === 1, 'Lupe zeigt an, dass das Bild Markierungen trägt')
+  // ---------- Zwei-Finger-Zoom am Handy (25.10.2026, Wunsch der Lehrkraft: am Handy an das Blatt heranzoomen) – eigener
+  // Handy-Kontext (mobil, Touch), Blattansicht, zwei Finger auseinander per CDP
+  const hm = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 })
+  await anmelden(hm, mia.benutzer, 'NeuesPasswort-99')
+  const h = await hm.newPage()
+  await h.goto(`${A}/s/`)
+  await h.locator('[data-kachel="blaetter"]').click()
+  await h.locator('[data-blatt-oeffnen]').first().click()
+  await h.locator('[data-ansicht]').waitFor({ timeout: 20000 })
+  pruefe(await h.evaluate(() => document.documentElement.hasAttribute('data-touch')), 'Handy: Touch-Modus an')
+  await h.locator('[data-ansicht] label', { hasText: 'Blatt' }).click()
+  const zf = h.locator('.zoom-flaeche.blatt-zoom')
+  pruefe(await da(zf, 10000), 'Handy, Blattansicht: Fläche mit Zwei-Finger-Zoom')
+  await h.locator('[data-feld]').first().waitFor({ timeout: 20000 })
+  await h.waitForTimeout(800)
+  const zb = await zf.boundingBox()
+  const cdp = await hm.newCDPSession(h)
+  const mx = zb.x + zb.width / 2
+  const my = zb.y + Math.min(200, zb.height / 2)
+  const zwei = (d) => [
+    { x: mx - d, y: my, id: 1, radiusX: 6, radiusY: 6, force: 1 },
+    { x: mx + d, y: my, id: 2, radiusX: 6, radiusY: 6, force: 1 }
+  ]
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: zwei(30) })
+  for (let i = 1; i <= 12; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: zwei(30 + i * 10) })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+  await h.waitForTimeout(400)
+  const zoomWert = await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))
+  pruefe(zoomWert > 1.3 && (await zf.getAttribute('data-gezoomt')) !== null, `Zwei Finger auseinander: Blatt vergrößert (Zoom ${zoomWert.toFixed(2)}), Fläche rollt seitwärts`)
+  const breiter = await zf.evaluate((el) => el.scrollWidth > el.clientWidth + 10)
+  pruefe(breiter, 'Gezoomtes Blatt ist breiter als der Bildschirm und lässt sich seitwärts rollen')
+  await h.screenshot({ path: join(out, '6-handy-zoom.png') })
+  // Zurück auf 100 % über den Prozent-Knopf
+  await h.locator('[data-zoom-wert]').first().click()
+  await h.waitForTimeout(300)
+  pruefe((await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))) === 1, 'Prozent-Knopf setzt den Zoom zurück')
+  await hm.close()
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
 } finally {

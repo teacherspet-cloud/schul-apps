@@ -256,6 +256,11 @@ export function useBlattAnsicht(opts: {
   obergrenze?: number
   /** Eigener Zustand statt des Programm-Zooms (Druckvorschau) */
   lokal?: [BlattZoom, (teil: Partial<BlattZoom>) => void]
+  /**
+   * Fläche gerade da? (25.10.2026, ZoomFlaeche `aktiv`): Die Hörer hängen sich an `flaeche.current` – war sie beim
+   * ersten Lauf noch nicht gerendert (Schülerblatt erst in der Listenansicht), müssen sie beim Umschalten nachziehen.
+   */
+  aktiv?: boolean
 }): BlattAnsicht {
   const programmZoom = useProgrammZoom()
   const [zustand, setzen] = opts.lokal ?? programmZoom
@@ -286,7 +291,7 @@ export function useBlattAnsicht(opts: {
     const beobachter = new ResizeObserver(messen)
     beobachter.observe(el)
     return () => beobachter.disconnect()
-  }, [opts.flaeche, randPx])
+  }, [opts.flaeche, randPx, opts.aktiv])
 
   // Zoomen um einen festen Punkt (Mauszeiger, Knopf): nach dem Zeichnen zurückrollen
   const anker = useRef<{ ix: number; iy: number; mx: number; my: number } | null>(null)
@@ -342,7 +347,7 @@ export function useBlattAnsicht(opts: {
     }
     // zoomAuf liest alles über `aktuell` – die Verbindung bleibt stehen
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.flaeche])
+  }, [opts.flaeche, opts.aktiv])
 
   // Tastenkürzel
   useEffect(() => {
@@ -363,11 +368,11 @@ export function useBlattAnsicht(opts: {
       if (i >= 0) tastenZiele.splice(i, 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.flaeche])
+  }, [opts.flaeche, opts.aktiv])
 
   // Zwei Finger
   useZweiFingerZoom({
-    aktiv: true,
+    aktiv: opts.aktiv ?? true,
     flaeche: opts.flaeche,
     inhalt: opts.inhalt,
     basis: 1,
@@ -464,7 +469,16 @@ export function ZoomKnoepfe({
  * Eine Fläche mit Zoom (Knöpfe, Strg + Mausrad, zwei Finger) für Vorschauen, die sich selbst
  * einpassen (Druckvorschau): „Einpassen" = 100 %, so wie der Inhalt sich setzt. Der Zoom gilt nur hier.
  */
-export function ZoomFlaeche({ children, className }: { children: React.ReactNode; className?: string }): React.JSX.Element {
+export function ZoomFlaeche({
+  children,
+  className,
+  aktiv = true
+}: {
+  children: React.ReactNode
+  className?: string
+  /** false: Inhalt unverändert, ohne Knöpfe und Gesten (Schülerblatt am PC, 25.10.2026) */
+  aktiv?: boolean
+}): React.JSX.Element {
   const flaeche = useRef<HTMLDivElement>(null)
   const inhalt = useRef<HTMLDivElement>(null)
   const [lokal, setLokal] = useState<BlattZoom>(STANDARD)
@@ -474,8 +488,10 @@ export function ZoomFlaeche({ children, className }: { children: React.ReactNode
     breitePx: 1,
     minEinpassen: 1,
     obergrenze: 1,
-    lokal: [lokal, (teil) => setLokal((z) => ({ ...z, ...teil }))]
+    lokal: [lokal, (teil) => setLokal((z) => ({ ...z, ...teil }))],
+    aktiv
   })
+  if (!aktiv) return <>{children}</>
   return (
     <>
       <div

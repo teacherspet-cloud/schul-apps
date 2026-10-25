@@ -132,6 +132,8 @@ const db = () => {
     // Lern-App (03.10.2026): Fach, Thema und Merkkästen des Blattes für Mappen und Karteikästen
     if (!spalten.has('fach')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN fach TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('thema')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN thema TEXT NOT NULL DEFAULT ''")
+    // Überthema des Blatts (Lehrplan-Thema, 25.10.2026) – für die Zuordnung in den Fachordnern der Lernenden (ueberthemen.ts)
+    if (!spalten.has('ueberthema')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN ueberthema TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('merk')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN merk TEXT NOT NULL DEFAULT '[]'")
     // Lösungsblatt nach dem Einreichen und Zusatzrunden („zur Überarbeitung", 03.10.2026)
     if (!spalten.has('loesung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN loesung TEXT NOT NULL DEFAULT ''")
@@ -1127,8 +1129,15 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           new Date().toISOString()
         )
       db()
-        .prepare('UPDATE blatt_freigaben SET fach = ?, thema = ?, merk = ?, loesung = ? WHERE id = ?')
-        .run(String(k0.fach ?? '').slice(0, 60), String(k0.thema ?? '').slice(0, 160), JSON.stringify(merkBereinigt(k0.merk)), loesungBereinigt(k0.loesung), id)
+        .prepare('UPDATE blatt_freigaben SET fach = ?, thema = ?, ueberthema = ?, merk = ?, loesung = ? WHERE id = ?')
+        .run(
+          String(k0.fach ?? '').slice(0, 60),
+          String(k0.thema ?? '').slice(0, 160),
+          String(k0.ueberthema ?? '').slice(0, 160),
+          JSON.stringify(merkBereinigt(k0.merk)),
+          loesungBereinigt(k0.loesung),
+          id
+        )
       // „Planen …" (09.10.2026): sichtbar erst ab dem gewählten Zeitpunkt
       const geplant = nachFreigabe('blatt', [id], k0, ich.id, g?.id ?? '')
       protokolliereServer('arbeitsblatt', geplant ? 'Arbeitsblatt-Freigabe geplant' : 'Arbeitsblatt für Lernende freigegeben', ich.id)

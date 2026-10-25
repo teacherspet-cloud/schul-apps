@@ -256,14 +256,15 @@ function rohMaterial(gruppen: string[]): Roh[] {
       : 0
   for (const z of zeilen<Z>(
     'blatt_freigaben',
-    `SELECT id, titel, thema, erstellt, status, lerngruppe_id, lehrkraft_id, rueckmeldung_id FROM blatt_freigaben WHERE reihe = '' AND lerngruppe_id IN (${platz})`
+    `SELECT id, titel, thema, ueberthema, erstellt, status, lerngruppe_id, lehrkraft_id, rueckmeldung_id FROM blatt_freigaben WHERE reihe = '' AND lerngruppe_id IN (${platz})`
   ))
     aus.push({
       art: 'blatt',
       id: String(z.id),
       titel: String(z.titel ?? ''),
       thema: String(z.thema ?? ''),
-      oberthema: '',
+      // Überthema des Blatts (25.10.2026): nennt es ein Lehrplan-Thema beim Wortlaut, zählt das vor allen Stichwörtern
+      oberthema: String(z.ueberthema ?? ''),
       erstellt: String(z.erstellt),
       status: String(z.status),
       lerngruppeId: String(z.lerngruppe_id),

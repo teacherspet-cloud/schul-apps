@@ -66,6 +66,33 @@ describe('Materialien der Lernenden nach Überthemen', () => {
   })
 })
 
+describe('Überthemen: Thema eines anderen Jahrgangs (Befund 9c, 25.10.2026)', () => {
+  const k9 = kandidatenFuer({ lehrplan: ni.eintraege, fachId: 'geschichte', schulformen: ['gymnasium'], jahrgang: 9 })
+  it('„Der Erste Weltkrieg …" in Klasse 9 landet beim Thema „Erster Weltkrieg" (Jg. 7/8), nicht beim Zweiten Weltkrieg', () => {
+    const z = zuordnen({ titel: 'Der Erste Weltkrieg: Stellungskrieg, USA und Niederlage', thema: 'Verlauf, Wendepunkte und Ausgang des Ersten Weltkriegs' }, k9)
+    expect(z?.kandidat.name).toMatch(/Erster Weltkrieg/)
+    expect(z?.kandidat.fallback).toBe(true)
+  })
+  it('das Überthema des Blatts beim Wortlaut zählt zuerst', () => {
+    const z = zuordnen({ titel: 'Stellungskrieg', oberthema: 'Erster Weltkrieg' }, k9)
+    expect(z?.kandidat.name).toBe('Erster Weltkrieg')
+  })
+  it('Material zum eigenen Jahrgang bleibt dort', () => {
+    const z = zuordnen({ titel: 'Hiroshima und der Beginn des Kalten Krieges', thema: 'Die Welt nach dem Ende des Zweiten Weltkrieges' }, k9)
+    expect(z?.kandidat.name).toBe('Deutsche und globale politische Situation nach dem Ende des Zweiten Weltkrieges')
+    expect(z?.kandidat.fallback).toBeUndefined()
+  })
+  it('der nächste Jahrgang geht vor der Q-Phase („Der Erste Weltkrieg: nationale und internationale Perspektiven")', () => {
+    const z = zuordnen({ titel: 'Der Erste Weltkrieg: Stellungskrieg, USA und Niederlage', thema: 'Verlauf, Wendepunkte und Ausgang des Ersten Weltkriegs' }, k9)
+    expect(z?.kandidat.abstand).toBe(1)
+  })
+  it('ein Thema des Jahrgangs mit zwei Stämmen bleibt – kein Rückfall', () => {
+    const k8 = kandidatenFuer({ lehrplan: ni.eintraege, fachId: 'geschichte', schulformen: ['gymnasium'], jahrgang: 8 })
+    const z = zuordnen({ titel: 'Arbeitsbedingungen in der Fabrik', thema: 'Industrialisierung in England' }, k8)
+    expect(z?.kandidat.fallback).toBeUndefined()
+  })
+})
+
 describe('Überthemen: zusammengesetzte Wörter (Befund 6e, 19.10.2026)', () => {
   it('„Warum zerfiel das Weströmische Reich?" landet bei einem Rom-Thema, nicht unter „Weitere"', () => {
     const k = kandidatenFuer({ lehrplan: ni.eintraege, fachId: 'geschichte', schulformen: ['gymnasium'], jahrgang: 6 })

@@ -48,6 +48,7 @@ import type { KursReiter } from './kurs/kursDaten'
 import { grammatikVorgabe, verbenDerListe } from './kurs/KursHinzufuegen'
 import { LernstandSymbol } from './kurs/LernstandVerlauf'
 import { alsKnopf } from '@shared/tastaturBedienung'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 /*
  * Die Kursseite steht seit 09.10.2026 in kurs/KursSeite.tsx („Kopf + Reiter", auch eingebettet in „Meine Klassen");
@@ -310,11 +311,11 @@ export default function VokabelTraining(): React.JSX.Element {
 }
 
 /** Gruppen + Mitglieder aller eigenen Lerngruppen (wie beim Zuweisen der Reihen) */
-export function useLerngruppen(): { gruppen: { id: string; name: string }[]; alle: { gruppeId: string; gruppe: string; benutzer: string; name: string }[] } {
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+export function useLerngruppen(): { gruppen: { id: string; name: string; fach?: string }[]; alle: { gruppeId: string; gruppe: string; benutzer: string; name: string }[] } {
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   const [alle, setAlle] = useState<{ gruppeId: string; gruppe: string; benutzer: string; name: string }[]>([])
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(async (d) => {
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen').then(async (d) => {
       setGruppen(d.gruppen)
       const l = await Promise.all(
         d.gruppen.map((g) =>
@@ -463,7 +464,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         ) : art === 'gruppe' ? (
           <Select
             label="Lerngruppe"
-            data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+            data={gruppenAuswahl(gruppen)}
             value={gruppe}
             onChange={setGruppe}
             placeholder="wählen …"

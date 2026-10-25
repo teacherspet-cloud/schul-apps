@@ -29,6 +29,7 @@ import { messeSeiten } from './render/seitenMessen'
 import { taskNumbersFor } from './render/SheetPages'
 import { aufgabenSchluessel } from './blattSchluessel'
 import FreigabePlanen, { GeplantMarke, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
 export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
@@ -192,7 +193,7 @@ export function BlattFreigabeDialog({
   const [fristHart, setFristHart] = useState(false)
   const [titel, setTitel] = useState(ws.meta.title || ws.meta.topic || 'Arbeitsblatt')
   const [blatt, setBlatt] = useState(ws.sheets[0]?.id ?? '')
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(gruppeVorwahl ?? null)
   const [mitglieder, setMitglieder] = useState<{ benutzer: string; name: string }[]>([])
   const [einzelne, setEinzelne] = useState<string[]>(einzelneVorwahl ?? [])
@@ -217,7 +218,7 @@ export function BlattFreigabeDialog({
       () => setListe([])
     )
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen').then(
       (d) => setGruppen(d.gruppen),
       () => setGruppen([])
     )
@@ -254,6 +255,8 @@ export function BlattFreigabeDialog({
         rueckmeldung: blattRueckmeldung(ws, sheet, titel),
         fach: ws.meta.subjectLabel,
         thema: ws.meta.topic,
+        // Lehrplan-Thema (25.10.2026): Fachordner der Lernenden ordnen danach zu
+        ueberthema: ws.meta.ueberthema ?? ws.outline?.ueberthema ?? '',
         merk: blattMerkkaesten(sheet),
         ...(loesung ? { loesung } : {}),
         lerngruppeId: gruppe ?? '',
@@ -309,7 +312,7 @@ export function BlattFreigabeDialog({
         <Group align="end">
           <Select
             label="Lerngruppe"
-            data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+            data={gruppenAuswahl(gruppen, ws.meta.subjectLabel)}
             value={gruppe}
             onChange={setGruppe}
             clearable

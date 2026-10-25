@@ -32,6 +32,14 @@ export interface UeberthemaKandidat {
   semester?: string
   /** Q-Phase: Module des Rahmenthemas (Name → Art) */
   module?: { name: string; art: string; worte: string[] }[]
+  /**
+   * Thema eines anderen Jahrgangs desselben Fachs (25.10.2026): nur Rückfall für Material, das zu keinem Thema des
+   * Jahrgangs passt – Schulen verschieben Themen (Befund: „Erster Weltkrieg" in Klasse 9, laut KC Jg. 7/8 – das Blatt
+   * landete bei „… nach dem Ende des Zweiten Weltkrieges", weil beide „Weltkrieg" enthalten).
+   */
+  fallback?: boolean
+  /** Rückfall: Abstand zum Jahrgang in Jahren (nächster Jahrgang zuerst) */
+  abstand?: number
 }
 
 /** Ein Fach der Q-Phase-Daten (Recherche, gekürzt) */
@@ -68,7 +76,15 @@ export const stamme = (text: string): string[] => [...new Set(woerter(text).map(
  * Trifft ein Stamm ein Wort? Gleich, oder – bei zusammengesetzten Wörtern (19.10.2026, Befund 6e: „Weströmisches
  * Reich" fand „Römische Republik" nicht) – ein Stamm ab 5 Zeichen steckt im längeren Wort.
  */
-const trifft = (stamm: string, wort: string): boolean => wort.startsWith(stamm) || (stamm.length >= 5 && wort.length > stamm.length + 2 && wort.includes(stamm))
+// Wortteil nur bei vollen Stämmen (25.10.2026): „krieg" in „weltkriegs" machte jedes Weltkriegs-Thema zum Treffer
+const trifft = (stamm: string, wort: string): boolean => wort.startsWith(stamm) || (stamm.length >= 6 && wort.length > stamm.length + 2 && wort.includes(stamm))
+/** Gebeugte Formen desselben Worts: „ersten"/„erster", „zweite"/„zweiten" – gemeinsamer Anfang, höchstens zwei Zeichen Unterschied */
+const gleicherStamm = (a: string, b: string): boolean => {
+  if (a === b) return true
+  let p = 0
+  while (p < a.length && p < b.length && a[p] === b[p]) p++
+  return p >= 5 && a.length - p <= 2 && b.length - p <= 2
+}
 
 const norm = (s: string): string => stamme(s).join(' ')
 
@@ -136,12 +152,11 @@ export function kandidatenFuer(p: {
     }
     if (aus.length) return aus
   }
-  const passend = p.lehrplan.filter(
-    (e) =>
-      e.fach === p.fachId &&
-      (!p.jahrgang || !e.jahrgaenge?.length || e.jahrgaenge.includes(p.jahrgang)) &&
-      (!e.schulformen?.length || !p.schulformen.length || e.schulformen.some((s) => p.schulformen.includes(s)))
-  )
+  const fachUndSchulform = (e: LehrplanEintrag): boolean =>
+    e.fach === p.fachId && (!e.schulformen?.length || !p.schulformen.length || e.schulformen.some((s) => p.schulformen.includes(s)))
+  const passend = p.lehrplan.filter((e) => fachUndSchulform(e) && (!p.jahrgang || !e.jahrgaenge?.length || e.jahrgaenge.includes(p.jahrgang)))
+  // Rückfall (25.10.2026): Themen anderer Jahrgänge – nur, wenn nichts aus dem Jahrgang passt (zuordnen)
+  const andere = p.jahrgang ? p.lehrplan.filter((e) => fachUndSchulform(e) && e.jahrgaenge?.length && !e.jahrgaenge.includes(p.jahrgang!)) : []
   const rangV = (e: LehrplanEintrag): number => (e.verbindlichkeit === 'verbindlich' ? 0 : e.verbindlichkeit === 'wahlpflicht' ? 1 : 2)
   passend
     .map((e, i) => ({ e, i }))
@@ -155,6 +170,17 @@ export function kandidatenFuer(p: {
         namensWorte: stamme(e.thema)
       })
     )
+  andere.forEach((e, i) =>
+    dazu({
+      schluessel: `kc:${e.thema}`,
+      name: e.thema,
+      rang: 5000 + i,
+      worte: stamme([e.thema, ...(e.stichwoerter ?? []), ...unterNamen(e.unterthemen)].join(' ')),
+      namensWorte: stamme(e.thema),
+      fallback: true,
+      abstand: Math.min(...(e.jahrgaenge ?? []).map((j) => Math.abs(j - p.jahrgang!)))
+    })
+  )
   return aus
 }
 
@@ -179,18 +205,40 @@ export function zuordnen(m: MaterialText, kandidaten: UeberthemaKandidat[]): { k
       if (mod) return { kandidat: k, modul: mod.name }
     }
   }
-  // 2) Stichwörter: Namenswörter zählen doppelt, mindestens 2 Punkte; Wortteile zählen mit
+  /*
+   * 2) Stichwörter: Namenswörter zählen doppelt, mindestens 2 Punkte. Ein Thema eines anderen Jahrgangs (fallback,
+   * 25.10.2026) kommt nur zum Zug, wenn das beste Thema des Jahrgangs schwach ist (ein einziger gemeinsamer Stamm, etwa
+   * „Weltkrieg") und das andere mit mindestens zwei Stämmen, darunter ein Namenswort, deutlich besser passt – der
+   * nächste Jahrgang zuerst.
+   */
   const voll = woerter([m.titel, m.thema ?? '', m.oberthema ?? ''].join(' '))
   const mw = new Set(voll.map((w) => w.slice(0, 6)))
   if (!mw.size) return null
-  const hat = (stamm: string): boolean => mw.has(stamm) || voll.some((w) => trifft(stamm, w))
-  let best: { k: UeberthemaKandidat; punkte: number } | null = null
+  const hat = (stamm: string): boolean => mw.has(stamm) || [...mw].some((x) => gleicherStamm(x, stamm)) || voll.some((w) => trifft(stamm, w))
+  type Treffer = { k: UeberthemaKandidat; punkte: number; staemme: number; name: number }
+  const besser = (a: Treffer, b: Treffer | null): boolean => !b || a.punkte > b.punkte || (a.punkte === b.punkte && a.k.rang < b.k.rang)
+  const naeher = (a: Treffer, b: Treffer | null): boolean =>
+    !b || (a.k.abstand ?? 99) < (b.k.abstand ?? 99) || ((a.k.abstand ?? 99) === (b.k.abstand ?? 99) && besser(a, b))
+  let best: Treffer | null = null
+  let rueckfall: Treffer | null = null
   for (const k of kandidaten) {
     const name = new Set(k.namensWorte)
     let punkte = 0
-    for (const w of new Set(k.worte)) if (hat(w)) punkte += name.has(w) ? 2 : 1
-    if (punkte >= 2 && (!best || punkte > best.punkte || (punkte === best.punkte && k.rang < best.k.rang))) best = { k, punkte }
+    let staemme = 0
+    let namensTreffer = 0
+    for (const w of new Set(k.worte))
+      if (hat(w)) {
+        staemme++
+        if (name.has(w)) namensTreffer++
+        punkte += name.has(w) ? 2 : 1
+      }
+    if (punkte < 2) continue
+    const t: Treffer = { k, punkte, staemme, name: namensTreffer }
+    if (k.fallback) {
+      if (staemme >= 2 && namensTreffer >= 1 && naeher(t, rueckfall)) rueckfall = t
+    } else if (besser(t, best)) best = t
   }
+  if (rueckfall && (!best || (best.staemme < 2 && rueckfall.punkte > best.punkte))) best = rueckfall
   if (!best) return null
   // Modul der Q-Phase: das mit den meisten gemeinsamen Wörtern
   const mod = best.k.module

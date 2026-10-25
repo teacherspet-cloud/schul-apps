@@ -21,6 +21,7 @@ import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import FreigabePlanen, { GeplantMarke, planBis, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../../shared/components/FreigabePlanen'
+import { gruppenAuswahl } from '../../../shared/lerngruppenWahl'
 
 interface FreigabeListe {
   id: string
@@ -49,7 +50,7 @@ export default function LernendeKarte({
   docId: string
   update: (fn: (d: Rueckmeldung) => void) => void
 }): React.JSX.Element | null {
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   const [liste, setListe] = useState<FreigabeListe[]>([])
   // „Planen …" und Ende (09.10.2026)
   const [plan, setPlan] = useState<PlanWahl>(planStart)
@@ -75,7 +76,7 @@ export default function LernendeKarte({
   }, [docId])
   useEffect(() => {
     if (!aufServer()) return
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen').then(
       (d) => setGruppen(d.gruppen),
       () => setGruppen([])
     )
@@ -167,7 +168,7 @@ export default function LernendeKarte({
       <Group align="end" mb="md">
         <Select
           label="Lerngruppe"
-          data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+          data={gruppenAuswahl(gruppen)}
           value={gruppe}
           onChange={setGruppe}
           clearable

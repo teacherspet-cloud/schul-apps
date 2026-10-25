@@ -72,6 +72,7 @@ import { grammatikUnits, naechsteGrammatik, normName, vorwahlBuch, type VorwahlD
 import { grammatikKapitel, lehrwerkeMitGrammatik, unitEintraege } from '../arbeitsblatt/didactics/grammatikAuswahl'
 import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 interface Zuweisung {
   id: string
@@ -847,14 +848,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                   data-grammatik-vok
                 />
               ) : art === 'gruppe' ? (
-                <Select
-                  label="Lerngruppe"
-                  data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
-                  value={gruppe}
-                  onChange={setGruppe}
-                  placeholder="wählen …"
-                  data-grammatik-gruppe
-                />
+                <Select label="Lerngruppe" data={gruppenAuswahl(gruppen)} value={gruppe} onChange={setGruppe} placeholder="wählen …" data-grammatik-gruppe />
               ) : art === 'einzeln' ? (
                 <MultiSelect
                   label="Lernende"

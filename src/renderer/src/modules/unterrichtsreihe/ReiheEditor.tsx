@@ -101,6 +101,7 @@ import { useFachVorgaben } from '../../shared/fachvorgaben'
 import { feldMitVorwissen, ladeVorwissen, LerngruppeWahl, type LerngruppeBezug, type VorwissenAntwort } from '../../shared/lerngruppeVorwissen'
 import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
+import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
 
 /**
  * Lohnt sich das automatische Speichern? (08.10.2026) Gespeicherte Reihen immer; neue erst, wenn mehr als die Art gewählt
@@ -1126,14 +1127,14 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
   // Planen mit optionalem Ende (09.10.2026)
   const [plan, setPlan] = useState<PlanWahl>(planStart)
   const [qr, setQr] = useState<{ code: string; link: string } | null>(null)
-  const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
+  const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
   // Mitglieder aller eigenen Lerngruppen (für „einzelne Lernende" – auch aus verschiedenen Gruppen)
   const [alle, setAlle] = useState<{ gruppe: string; gruppeId: string; benutzer: string; name: string }[]>([])
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [laeuft, setLaeuft] = useState(false)
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+    void holen<{ gruppen: { id: string; name: string; fach?: string }[] }>('/server/lerngruppen').then(
       async (d) => {
         setGruppen(d.gruppen)
         const listen = await Promise.all(
@@ -1191,7 +1192,7 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
           <>
             <Select
               label="Lerngruppe"
-              data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+              data={gruppenAuswahl(gruppen, reihe.fachLabel)}
               value={gruppe}
               onChange={(v) => (setGruppe(v), setEinzelne([]))}
               placeholder="wählen …"

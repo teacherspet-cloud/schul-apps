@@ -58,6 +58,7 @@ import { KiMarke } from './KiMarke'
 import { BildNachweisListe } from '../../shared/components/BildNachweis'
 import { blattBildNachweise } from './testBildNachweise'
 import { useTouch } from '../../shared/touch/touchModus'
+import { ZoomFlaeche } from '../../shared/touch/zoom'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
@@ -501,6 +502,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   // Im Fachordner geöffnet (09.10.2026): dessen „Zurück" blättert zurück – kein eigener Rückweg
   const ordnerBlatt = useBlaettern()
   const imOrdner = Boolean(ordnerBlatt)
+  // Zwei-Finger-Zoom und Zoom-Knöpfe am Handy/iPad (25.10.2026, Wunsch der Lehrkraft) – shared/touch/zoom.tsx
+  const touch = useTouch()
   const [tinte, setTinte] = useState<Record<string, string>>(d.tinte)
   const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; bilder: BildLage[]; hoehe: number } | null>(null)
   // Bild bildschirmfüllend mit Werkzeugen (25.10.2026): Nummer des geöffneten Bilds
@@ -547,6 +550,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     if (d?.loesung && d.antworten?._vorschau === 'vollstaendig') setLoesungOffen(true)
   }, [d?.loesung, d?.antworten])
   const rahmen = useRef<HTMLDivElement>(null)
+  // Breite AUSSERHALB der Zoomfläche messen (25.10.2026): innerhalb von CSS-`zoom` schrumpft die gemessene Breite mit dem
+  // Zoom, das Blatt passte sich neu ein und blieb optisch gleich groß
+  const messRahmen = useRef<HTMLDivElement>(null)
   const iframe = useRef<HTMLIFrameElement>(null)
   const stand = useRef({ antworten, tinte, tinteGeaendert: false })
   stand.current.antworten = antworten
@@ -568,7 +574,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
 
   // Breite des Geräts → Maßstab
   useEffect(() => {
-    const el = rahmen.current
+    const el = ansicht === 'blatt' ? (messRahmen.current ?? rahmen.current) : rahmen.current
     if (!el) return
     const ro = new ResizeObserver(() => setBreite(el.clientWidth))
     ro.observe(el)
@@ -1070,6 +1076,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       )}
 
       {/* In der Listenansicht bleibt das Blatt unsichtbar da – sonst ließen sich die Felder nicht messen */}
+      {/* Mit dem Finger: Zwei-Finger-Zoom und Zoom-Knöpfe, das Blatt rollt dann seitwärts; am PC unverändert */}
+      <div ref={messRahmen} style={{ width: '100%' }}>
+      <ZoomFlaeche aktiv={touch && ansicht === 'blatt'} className="blatt-zoom">
       <div
         ref={rahmen}
         style={ansicht === 'blatt' ? { width: '100%' } : { width: dokBreite, position: 'absolute', left: -20000, top: 0, visibility: 'hidden' }}
@@ -1162,6 +1171,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             )}
           </div>
         </div>
+      </div>
+      </ZoomFlaeche>
       </div>
 
       {ansicht === 'liste' && gemessen && (
