@@ -489,7 +489,7 @@ export function UnitsKompakt({
         {frage && (
           <Stack gap="sm">
             <Text size="sm">
-              „{frage.titel}“ wird aus dem Kurs genommen. Der Lernstand bleibt gespeichert und gilt wieder, wenn du es zurückholst (Reiter{' '}
+              „{frage.titel}“ wird aus dem Kurs genommen. Der Lernstand bleibt gespeichert und gilt wieder, sobald es zurückgeholt wird (Reiter{' '}
               {frage.art === 'vok' ? '„Vokabeln“' : '„Grammatik“'}, Abschnitt „Entfernt“).
             </Text>
             <Group justify="flex-end">

@@ -457,7 +457,7 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
               </Button>
             </Group>
             <Text size="xs" c="dimmed">
-              Später lässt sich beides ändern: Seiten einzeln machen oder eine Abgabe an die vorherige anhängen. Quer liegende Fotos drehst du an der Abgabe.
+              Später lässt sich beides ändern: Seiten einzeln machen oder eine Abgabe an die vorherige anhängen. Quer liegende Fotos lassen sich an der Abgabe drehen.
             </Text>
           </Stack>
         )}

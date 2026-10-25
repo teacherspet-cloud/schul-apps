@@ -420,7 +420,10 @@ try {
     (await p.locator('[data-kurs="Weather"]').getAttribute('data-kurs-name')) === 'Vokabeln Englisch · Green Line 1',
     'Kurs heißt „Vokabeln Englisch · Green Line 1“'
   )
-  pruefe(await da(p.locator('[data-kurs="Weather"] [data-vokabel-kurzinfo]', { hasText: /3 Abschnitten/ })), 'Kurzzeile: Zahl der Abschnitte')
+  // Zahl der Abschnitte vom Server (25.10.2026): weiter oben wurde im Kasten „Units" ein Abschnitt entfernt
+  const dKz = await (await lk.request.get(`${A}/server/klassen/${gEn.id}`, { headers: KOPF })).json()
+  const nAb = (dKz.vokabeln.find((v) => v.id === vok.id)?.abschnitte ?? []).length
+  pruefe(await da(p.locator('[data-kurs="Weather"] [data-vokabel-kurzinfo]', { hasText: new RegExp(`${nAb} Abschnitten`) })), `Kurzzeile: Zahl der Abschnitte (${nAb})`)
   pruefe(
     (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Unit 1"][data-offen]').count()) === 1 &&
       (await p.locator('[data-kurs="Weather"] [data-abschnitt-gruppe="Weitere Vokabeln"][data-offen]').count()) === 0,
