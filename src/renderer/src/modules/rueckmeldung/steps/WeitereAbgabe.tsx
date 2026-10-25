@@ -5,7 +5,7 @@ import DropZone from '../../../shared/components/DropZone'
 import type { HochladeInhalt } from '../../../shared/datenschutz'
 import { MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
 import { notifyError } from '../../../shared/util'
-import { abgabenLesen, aufgabentextAbtrennen, neueAbgabe, trennSchluessel, warteAufAuftrag } from '../abgabeAnlegen'
+import { abgabenLesen, aufgabentextAbtrennen, neueAbgabe, trennSchluessel, warteAufAuftrag, bilderZusammenfassen } from '../abgabeAnlegen'
 import { ladeGedaechtnis, speichereGedaechtnis } from '../ablagen'
 import { rueckmeldungenErzeugen } from '../auftrag'
 import { ausgleichKurz, gemerkterAusgleich, hatAusgleich, merkeAusgleich, type AusgleichGedaechtnis } from '../nachteilsausgleich'
@@ -53,9 +53,10 @@ export default function WeitereAbgabe({
 
   const lesen = async (files: File[]): Promise<void> => {
     try {
-      const geprueft = await abgabenLesen(files.slice(0, 1), setLese)
+      // Hier geht es um EINE weitere Abgabe: mehrere Fotos sind ihre Seiten (25.10.2026)
+      const geprueft = await abgabenLesen(files.slice(0, 20), setLese)
       if (!geprueft?.length) return
-      const g = geprueft[0]
+      const g = bilderZusammenfassen(geprueft)[0]
       setDatei(g)
       setText(g.text.trim())
     } catch (e) {

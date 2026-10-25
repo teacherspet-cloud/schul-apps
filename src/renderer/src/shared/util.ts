@@ -82,6 +82,27 @@ export async function normalizeImage(src: string, maxSize = 1024, format: 'png' 
   return canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.9)
 }
 
+/**
+ * Bild um 90°-Schritte drehen (25.10.2026, Rückmeldung: Fotos von Abgaben liegen oft quer). Das Ergebnis ist ein neues
+ * JPEG – Drehung wird eingebrannt, weil KI und Export die Daten-URLs direkt lesen.
+ */
+export async function rotateImage(src: string, grad: 90 | -90 | 180): Promise<string> {
+  const img = await loadImage(src)
+  const w = img.naturalWidth
+  const h = img.naturalHeight
+  const quer = grad !== 180
+  const canvas = document.createElement('canvas')
+  canvas.width = quer ? h : w
+  canvas.height = quer ? w : h
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.translate(canvas.width / 2, canvas.height / 2)
+  ctx.rotate((grad * Math.PI) / 180)
+  ctx.drawImage(img, -w / 2, -h / 2)
+  return canvas.toDataURL('image/jpeg', 0.9)
+}
+
 export function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
 }

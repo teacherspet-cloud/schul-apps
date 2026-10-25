@@ -177,6 +177,40 @@ try {
   pruefe((await sichtbar(page.locator('[data-rm-art-zeile]')).textContent())?.includes('ohne Note'), 'Die Art steht als eine Zeile da („… · ohne Note")')
   await page.screenshot({ path: join(out, 'material.png') })
   await weiter()
+
+  // ---------- Mehrere Fotos auf einmal (25.10.2026): eine Abgabe mit Seiten, drehen, trennen, anhängen
+  // Ein echtes, nicht quadratisches Bild – ein 1×1-Pixel sähe gedreht gleich aus
+  const PNG = readFileSync(resolve('resources/schulen/logos/NI-67052.png'))
+  const abgabenAblage = page.locator('.mantine-Dropzone-root', { hasText: 'Abgaben hierher ziehen' }).filter({ visible: true }).first()
+  await abgabenAblage.locator('input[type=file]').setInputFiles([
+    { name: 'seite1.png', mimeType: 'image/png', buffer: PNG },
+    { name: 'seite2.png', mimeType: 'image/png', buffer: PNG }
+  ])
+  const hochladenFotos = page.locator('.mantine-Modal-content').getByRole('button', { name: 'Hochladen', exact: true })
+  await hochladenFotos.waitFor({ timeout: 10000 }).catch(() => undefined)
+  if (await hochladenFotos.count()) await hochladenFotos.click()
+  // Die Fenster-Wurzel von Mantine gilt nicht als sichtbar – auf den Knopf darin warten
+  pruefe(await sichtbar(page.locator('[data-rm-bilder-eine]')).isVisible(), 'Zwei Fotos: Nachfrage „einzelne Abgaben oder eine Abgabe?"')
+  await page.locator('[data-rm-bilder-eine]').click()
+  await page.waitForTimeout(500)
+  pruefe((await page.locator('[data-rm-abgabe]').count()) === 1 && (await page.locator('[data-rm-abgabe="S1"]').textContent())?.includes('2 Seiten'), 'Eine Abgabe mit zwei Seiten')
+  await page.locator('[data-rm-abgabe="S1"] [data-rm-abgabe-auf]').click()
+  pruefe(await page.locator('[data-rm-seite="2"]').waitFor({ timeout: 10000 }).then(() => true, () => false), 'Seitenbilder der Abgabe sichtbar')
+  const vorDrehen = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bilder?.[0] ?? '')
+  await page.locator('[data-rm-seite="1"] [data-rm-seite-drehen="rechts"]').click()
+  await page.waitForTimeout(800)
+  const nachDrehen = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bilder?.[0] ?? '')
+  pruefe(Boolean(vorDrehen) && nachDrehen !== vorDrehen && nachDrehen.startsWith('data:image/jpeg'), 'Seite gedreht (neues Bild eingebrannt)')
+  await page.locator('[data-rm-seiten-trennen]').click()
+  await page.waitForTimeout(400)
+  pruefe((await page.locator('[data-rm-abgabe]').count()) === 2 && (await page.locator('[data-rm-abgabe="S2"]').count()) === 1, 'Seiten als einzelne Abgaben S1 und S2')
+  await page.locator('[data-rm-abgabe="S2"] [data-rm-zusammenlegen]').click()
+  await page.waitForTimeout(400)
+  pruefe((await page.locator('[data-rm-abgabe]').count()) === 1 && (await page.locator('[data-rm-abgabe="S1"]').textContent())?.includes('2 Seiten'), 'S2 wieder an S1 angehängt')
+  await page.locator('[data-rm-abgabe="S1"]').getByRole('button', { name: 'Abgabe entfernen' }).click()
+  await page.waitForTimeout(300)
+  pruefe((await page.locator('[data-rm-abgabe]').count()) === 0, 'Foto-Abgabe entfernt – weiter mit der eingetippten')
+
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
   await sichtbar(page.getByLabel('Text von S1')).fill(

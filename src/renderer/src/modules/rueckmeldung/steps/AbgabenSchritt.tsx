@@ -5,11 +5,14 @@
  * Abgaben. Jede Abgabe ist eine Zeile; ihr Text klappt erst beim Antippen auf (eingetippte
  * Abgaben stehen offen, dort wird ja geschrieben).
  */
-import { ActionIcon, Badge, Button, Card, Collapse, Container, Group, ScrollArea, Select, SimpleGrid, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Collapse, Container, Group, Image, Modal, ScrollArea, Select, SimpleGrid, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
 import {
   IconArrowBackUp,
   IconArrowLeft,
+  IconArrowMerge,
   IconArrowRight,
+  IconRotate,
+  IconRotateClockwise,
   IconChevronDown,
   IconChevronRight,
   IconDeviceMobile,
@@ -32,7 +35,8 @@ import { MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
 import { aufServer } from '../../../shared/plattform'
 import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
-import { abgabenAnlegen, abgabenLesen, aufgabentextAbtrennen } from '../abgabeAnlegen'
+import { abgabenAnlegen, abgabenLesen, aufgabentextAbtrennen, mitVorherigerZusammenlegen, nurBilder, seiteDrehen, seitenTrennen } from '../abgabeAnlegen'
+import type { HochladeInhalt } from '../../../shared/datenschutz'
 import { klartext, ohneKiTest, trennHinweis, trennungZurueck } from '../abgabeTrennen'
 import { ladeGedaechtnis, speichereGedaechtnis } from '../ablagen'
 import { hatForm } from '../art'
@@ -103,20 +107,27 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
   /** Schülertext vom Aufgabentext trennen – Abgleich, bei Verdacht die KI (abgabeAnlegen.ts) */
   const abtrennen = (ids: string[], erneut = false): void => void aufgabentextAbtrennen(update, docId, ids, erneut)
 
+  // Mehrere Bilder auf einmal (25.10.2026, Wunsch der Lehrkraft): einzelne Abgaben oder die Seiten EINER Arbeit?
+  const [bilderFrage, setBilderFrage] = useState<HochladeInhalt[] | null>(null)
+  const anlegen = (geprueft: HochladeInhalt[], zusammen: boolean): void => {
+    const { mitText } = abgabenAnlegen(update, geprueft, {}, zusammen)
+    // Aufgabenblatt und Material aus Word/PDF-Abgaben abtrennen – rückgängig machbar
+    if (mitText.length) abtrennen(mitText)
+  }
   /** Abgaben lesen, Datenschutz prüfen, anlegen – derselbe Weg wie „Weitere Abgabe" in „Bögen & Export" (abgabeAnlegen.ts) */
   const dateienLesen = async (files: File[]): Promise<void> => {
     try {
       const geprueft = await abgabenLesen(files, setLese)
       if (!geprueft) return
-      const { mitText } = abgabenAnlegen(update, geprueft)
-      // Aufgabenblatt und Material aus Word/PDF-Abgaben abtrennen – rückgängig machbar
-      if (mitText.length) abtrennen(mitText)
+      if (geprueft.filter(nurBilder).length >= 2) setBilderFrage(geprueft)
+      else anlegen(geprueft, false)
     } catch (e) {
       notifyError(e, 'Die Datei konnte nicht gelesen werden')
     } finally {
       setLese(null)
     }
   }
+  const drehen = (id: string, seite: number, grad: 90 | -90): void => void seiteDrehen(update, id, seite, grad).catch((e: unknown) => notifyError(e, 'Das Bild konnte nicht gedreht werden'))
 
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length)).length
   const mitText = r.abgaben.filter((a) => a.text.trim() && !a.bilder.length)
@@ -152,7 +163,7 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
                   <Kachel
                     icon={<IconUpload size={22} />}
                     titel="Hochladen / eintippen"
-                    text="Fotos, Scans, PDF oder Word – je Datei eine Arbeit"
+                    text="Fotos, Scans, PDF oder Word – mehrere Fotos wahlweise als eine Arbeit"
                     aktiv={weg === 'hochladen'}
                     onClick={() => setWeg('hochladen')}
                     data-rm-weg="hochladen"
@@ -179,7 +190,7 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
                   onFiles={(f) => void dateienLesen(f)}
                   accept={MATERIAL_ACCEPT}
                   title={lese ?? 'Abgaben hierher ziehen'}
-                  hint="Foto, Scan, PDF, Word oder Textdatei – je Datei eine Schülerin oder ein Schüler. Namen auf Fotos vorher schwärzen."
+                  hint="Foto, Scan, PDF, Word oder Textdatei. Bei mehreren Fotos fragt die App, ob sie einzelne Arbeiten oder die Seiten einer Arbeit sind. Namen auf Fotos vorher schwärzen."
                   loading={Boolean(lese)}
                   minHeight={90}
                 />
@@ -279,6 +290,14 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
                             </ActionIcon>
                           </Tooltip>
                         )}
+                        {/* Seiten einer Arbeit versehentlich getrennt: an die vorherige Abgabe anhängen (25.10.2026) */}
+                        {i > 0 && a.bilder.length > 0 && !a.text.trim() && r.abgaben[i - 1].bilder.length > 0 && !r.abgaben[i - 1].text.trim() && (
+                          <Tooltip label={`Als weitere Seite zu ${r.abgaben[i - 1].kuerzel} anhängen`}>
+                            <ActionIcon variant="subtle" color="gray" aria-label={`${a.kuerzel} an ${r.abgaben[i - 1].kuerzel} anhängen`} onClick={() => mitVorherigerZusammenlegen(update, a.id)} data-rm-zusammenlegen>
+                              <IconArrowMerge size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
                         <Tooltip label="Abgabe entfernen">
                           <ActionIcon variant="subtle" color="red" aria-label="Abgabe entfernen" onClick={() => update((d) => d.abgaben.splice(i, 1))}>
                             <IconTrash size={16} />
@@ -352,9 +371,39 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
                             />
                           )}
                           {a.bilder.length > 0 ? (
-                            <Text size="xs" c="dimmed">
-                              {a.bilder.length} Seite{a.bilder.length > 1 ? 'n' : ''} – der Text wird beim Schreiben der Rückmeldung übertragen.
-                            </Text>
+                            <Stack gap={6} data-rm-seiten>
+                              <Text size="xs" c="dimmed">
+                                {a.bilder.length} Seite{a.bilder.length > 1 ? 'n' : ''} – der Text wird beim Schreiben der Rückmeldung übertragen. Liegt ein Foto quer, hier drehen.
+                              </Text>
+                              {/* Seitenbilder mit Drehen (25.10.2026): „oben" muss oben sein, sonst liest die KI schlechter */}
+                              <Group gap="sm" wrap="wrap" align="flex-start">
+                                {a.bilder.map((b, n) => (
+                                  <Stack key={n} gap={2} align="center" data-rm-seite={n + 1}>
+                                    <Image src={b} w={96} h={128} fit="contain" radius="sm" alt={`Seite ${n + 1}`} style={{ background: 'var(--mantine-color-default-hover)' }} />
+                                    <Group gap={2}>
+                                      <Tooltip label="Nach links drehen">
+                                        <ActionIcon size="sm" variant="subtle" aria-label={`Seite ${n + 1} nach links drehen`} onClick={() => drehen(a.id, n, -90)} data-rm-seite-drehen="links">
+                                          <IconRotate size={14} />
+                                        </ActionIcon>
+                                      </Tooltip>
+                                      <Text size="xs" c="dimmed">
+                                        {n + 1}
+                                      </Text>
+                                      <Tooltip label="Nach rechts drehen">
+                                        <ActionIcon size="sm" variant="subtle" aria-label={`Seite ${n + 1} nach rechts drehen`} onClick={() => drehen(a.id, n, 90)} data-rm-seite-drehen="rechts">
+                                          <IconRotateClockwise size={14} />
+                                        </ActionIcon>
+                                      </Tooltip>
+                                    </Group>
+                                  </Stack>
+                                ))}
+                              </Group>
+                              {a.bilder.length > 1 && !a.text.trim() && (
+                                <Button size="compact-xs" variant="subtle" leftSection={<IconScissors size={12} />} onClick={() => seitenTrennen(update, a.id)} w="fit-content" data-rm-seiten-trennen>
+                                  Seiten als einzelne Abgaben
+                                </Button>
+                              )}
+                            </Stack>
                           ) : (
                             <Textarea
                               size="xs"
@@ -381,6 +430,38 @@ function AbgabenSchrittInhalt(): React.JSX.Element | null {
           </Stack>
         </Container>
       </ScrollArea>
+      {/* Mehrere Bilder auf einmal: einzelne Abgaben oder eine Arbeit mit mehreren Seiten? */}
+      <Modal opened={Boolean(bilderFrage)} onClose={() => setBilderFrage(null)} title="Mehrere Bilder hochgeladen" size="md" centered data-rm-bilder-frage>
+        {bilderFrage && (
+          <Stack gap="sm">
+            <Text size="sm">
+              {bilderFrage.filter(nurBilder).length} Bilder. Sind das einzelne Arbeiten oder die Seiten einer Arbeit?
+            </Text>
+            <Group gap="sm" grow>
+              <Button
+                variant="light"
+                leftSection={<IconPhoto size={16} />}
+                onClick={() => (anlegen(bilderFrage, false), setBilderFrage(null))}
+                data-rm-bilder-einzeln
+              >
+                Einzelne Abgaben
+                <Text span size="xs" c="dimmed" ml={6}>
+                  je Bild eine Person
+                </Text>
+              </Button>
+              <Button leftSection={<IconFileText size={16} />} onClick={() => (anlegen(bilderFrage, true), setBilderFrage(null))} data-rm-bilder-eine>
+                Eine Abgabe
+                <Text span size="xs" c="dimmed" ml={6}>
+                  {bilderFrage.filter(nurBilder).length} Seiten einer Person
+                </Text>
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Später lässt sich beides ändern: Seiten einzeln machen oder eine Abgabe an die vorherige anhängen. Quer liegende Fotos drehst du an der Abgabe.
+            </Text>
+          </Stack>
+        )}
+      </Modal>
       <AusgleichFenster
         abgabe={r.abgaben.find((a) => a.id === ausgleichFuer) ?? null}
         meta={r.meta}
