@@ -408,6 +408,12 @@ export interface Reihe {
    * Die Lehrkraft wählt ihn im Fenster „Mit KI planen", die KI meldet den gewählten im Plan zurück.
    */
   reihentyp?: string
+  /**
+   * Titelbild der Reihe (25.10.2026, Wunsch der Lehrkraft): Lernende sehen es als Kachel im Fachordner und oben in der
+   * Reihe. Von der Bild-KI („Titelbild mit KI erstellen") oder hochgeladen; klein gehalten (JPEG, längste Seite 640 px).
+   * Ohne Bild zeigt die Kachel Fachfarbe und Reihen-Symbol.
+   */
+  titelbild?: { dataUrl: string; quelle: 'ki' | 'upload' }
 }
 
 /** Stufe relativ zum Jahrgang – gleiche Bedeutung wie `Schwierigkeit` im Arbeitsblatt */

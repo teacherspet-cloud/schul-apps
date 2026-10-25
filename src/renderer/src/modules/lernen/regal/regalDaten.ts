@@ -90,6 +90,13 @@ export interface ReiheMaterialien {
   oberthema: string
   offen: boolean
   materialien: { schritt: string; titel: string; zweck?: string; gesperrt: boolean; link?: string; stufeWaehlen?: boolean; eingereicht: number; loesung: boolean }[]
+  /** Kachel (25.10.2026): Fortschritt, nächster Schritt, Leitfrage und Titelbild der Reihe */
+  fortschritt?: number
+  fertig?: boolean
+  schritte?: number
+  naechster?: { id: string; titel: string }
+  leitfrage?: string
+  titelbild?: string
 }
 export interface Merkkasten {
   art: 'merkzettel'

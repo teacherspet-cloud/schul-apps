@@ -533,6 +533,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
   const [loesungOffen, setLoesungOffen] = useState(false)
+  // Vorschau „vollständig bearbeitet" (25.10.2026): das Lösungsblatt gleich aufgeklappt
+  useEffect(() => {
+    if (d?.loesung && d.antworten?._vorschau === 'vollstaendig') setLoesungOffen(true)
+  }, [d?.loesung, d?.antworten])
   const rahmen = useRef<HTMLDivElement>(null)
   const iframe = useRef<HTMLIFrameElement>(null)
   const stand = useRef({ antworten, tinte, tinteGeaendert: false })

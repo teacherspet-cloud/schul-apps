@@ -434,6 +434,8 @@ try {
       () => false
     )
   pruefe(ordnerBlatt, 'Fachordner zeigt das Blatt der Reihe')
+  // Reihe als Kachel (25.10.2026): Fortschritt und „Weiter mit …" statt bloßer Liste
+  pruefe((await s.locator('[data-ordner-reihe-kachel]').count()) >= 1, 'Fachordner: Reihe als Kachel mit Fortschritt')
   await s.screenshot({ path: join(out, '6-handy-ordner.png'), fullPage: true })
 
   // ---------- Lehrkraft: KI-Vorschlag ansehen, übernehmen, bestätigen

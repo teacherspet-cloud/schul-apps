@@ -15,7 +15,9 @@ import { senden } from '../onlinetest/serverApi'
 
 const WAHL = [
   { wert: 'neu', text: 'Von vorn – noch nichts bearbeitet' },
-  { wert: 'behalten', text: 'Stand von zuletzt behalten' }
+  { wert: 'behalten', text: 'Stand von zuletzt behalten' },
+  // 25.10.2026, Wunsch der Lehrkraft: alles freigeschaltet und geschafft, Lösungsblätter und Musterlösungen sichtbar
+  { wert: 'vollstaendig', text: 'Vollständig bearbeitet – alles frei, Musterlösungen sichtbar' }
 ] as const
 
 export function ReiheAlsSchueler({

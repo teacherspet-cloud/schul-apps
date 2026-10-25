@@ -23,7 +23,7 @@ import { iservBereit } from './anmeldung'
 import { mitNamensliste, registerVergessen } from './namensschutz'
 import { gastEntfernen } from './gaeste'
 import { blattFassung, blattFassungen, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
-import { blattFreigabe, blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
+import { blattFreigabe, blattStand, blattVorschauAbgabe, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
 import { vokabelnZuweisen, vokabelStand } from './vokabeln'
 import { PULS_MS } from '../main/services/lanServer'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
@@ -474,6 +474,38 @@ function wegVon(r: Reihe, z: ZuweisungZeile, sid: string, stand = standVon(z.id,
   return berechneWeg(r, stand, externVon(r, z, sid, stand), json_(z.halte_frei, [] as string[]))
 }
 
+/**
+ * Musterschüler „vollständig bearbeitet" (25.10.2026, Wunsch der Lehrkraft): jeder Schritt gilt als geschafft (auch hinter
+ * Haltepunkten – `hand: 'geschafft'` öffnet den Weg), Zwischenaufgaben tragen ihre Musterlösung als Antwort, Diagnosen
+ * 100 %, Lernkarten gewusst; verknüpfte Arbeitsblätter sind einmal eingereicht mit grüner Ampel überall, sodass das
+ * Lösungsblatt erscheint (arbeitsblaetter.ts `blattVorschauAbgabe`). Nichts davon berührt echte Lernende.
+ */
+function vorschauVollstaendig(z: ZuweisungZeile, r: Reihe, konto: NutzerInfo): void {
+  const jetzt = Date.now()
+  const stand: Stand = { schritte: {} }
+  for (const s of r.schritte) {
+    const st: SchrittStand = { hand: 'geschafft', zeit: jetzt }
+    const i = s.inhalt
+    if (i.art === 'aufgabe') {
+      st.eingereicht = 1
+      st.antworten = { '0': i.musterloesung?.trim() || 'Musterlösung (Vorschau)' }
+    } else if (i.art === 'abschluss' || i.art === 'sprechen' || i.art === 'reflexion') {
+      st.eingereicht = 1
+      if (i.art === 'reflexion') st.tagebuch = 'Vorschau: So sähe ein Eintrag der Lernenden aus.'
+    } else if (i.art === 'lernkarten') st.gewusst = true
+    else if (i.art === 'diagnose') st.diagnose = { prozent: 100, zeit: jetzt }
+    else if (i.art === 'praesenz') st.praesenz = true
+    stand.schritte[s.id] = st
+  }
+  standSpeichern(z.id, konto.id, stand)
+  const v = json_(z.verknuepft, {} as Record<string, string>)
+  for (const s of r.schritte) {
+    if (s.inhalt.art !== 'arbeitsblatt') continue
+    const ids = v[s.id] === '*' ? Object.keys(v).filter((k) => k.startsWith(`${s.id}:`)).map((k) => v[k]) : v[s.id] ? [v[s.id]] : []
+    for (const fid of ids) blattVorschauAbgabe(fid, konto.id)
+  }
+}
+
 /** Link zu einer verknüpften Aufgabe (für die Lernenden) */
 function linkFuer(s: Schritt, z: ZuweisungZeile, stand: Stand): string | undefined {
   const id = verknuepfteId(s, z, stand)
@@ -834,7 +866,19 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           const r = reiheVon(z.reihe_id)
           if (!r) return []
           const w = wegVon(r, z, ich.id)
-          return [{ id: z.id, titel: r.titel, oberthema: r.oberthema, fach: r.fachLabel, fortschritt: w.fortschritt, abzeichen: w.abzeichen, fertig: w.fertig }]
+          return [
+            {
+              id: z.id,
+              titel: r.titel,
+              oberthema: r.oberthema,
+              fach: r.fachLabel,
+              fortschritt: w.fortschritt,
+              abzeichen: w.abzeichen,
+              fertig: w.fertig,
+              ...(r.leitfrage?.trim() ? { leitfrage: r.leitfrage.trim() } : {}),
+              ...(r.titelbild?.dataUrl ? { titelbild: r.titelbild.dataUrl } : {})
+            }
+          ]
         })
         return (json(res, 200, { reihen }), true)
       }
@@ -850,8 +894,29 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
           const r = reiheVon(z.reihe_id)
           if (!r) return []
           const stand = standVon(z.id, ich.id)
-          const materialien = materialienFuer(r, z, ich.id, stand, wegVon(r, z, ich.id, stand))
-          return materialien.length ? [{ zid: z.id, titel: r.titel, fach: r.fachLabel, oberthema: r.oberthema, offen: z.status === 'offen', materialien }] : []
+          const weg = wegVon(r, z, ich.id, stand)
+          const materialien = materialienFuer(r, z, ich.id, stand, weg)
+          const offen = z.status === 'offen'
+          // Kachel im Fachordner (25.10.2026): auch Reihen ohne Arbeitsblatt, solange sie offen sind; dazu Fortschritt und nächster Schritt
+          if (!materialien.length && !offen) return []
+          const lage = new Map(weg.schritte.map((l) => [l.id, l]))
+          const naechster = r.schritte.find((x) => lage.get(x.id)?.status === 'offen' && x.rolle !== 'foerder')
+          return [
+            {
+              zid: z.id,
+              titel: r.titel,
+              fach: r.fachLabel,
+              oberthema: r.oberthema,
+              offen,
+              materialien,
+              fortschritt: weg.fortschritt,
+              fertig: weg.fertig,
+              schritte: r.schritte.filter((x) => x.rolle !== 'foerder' || lage.get(x.id)?.status !== 'gesperrt').length,
+              ...(naechster ? { naechster: { id: naechster.id, titel: naechster.titel } } : {}),
+              ...(r.leitfrage?.trim() ? { leitfrage: r.leitfrage.trim() } : {}),
+              ...(r.titelbild?.dataUrl ? { titelbild: r.titelbild.dataUrl } : {})
+            }
+          ]
         })
         return (json(res, 200, { reihen }), true)
       }
@@ -879,6 +944,7 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
             // Leitfrage der Reihe (08.10.2026, Reihenmuster) – oben in der Reihe
             ...(r.leitfrage?.trim() ? { leitfrage: r.leitfrage.trim() } : {}),
             fach: r.fachLabel,
+            ...(r.titelbild?.dataUrl ? { titelbild: r.titelbild.dataUrl } : {}),
             // Digital: alles am Gerät, geschafft nach Ergebnis (08.10.2026)
             art: artVon(r),
             lernziele: r.lernziele.map((l) => ({ ichKann: l.ichKann || l.text })),
@@ -1328,6 +1394,9 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
       if (!r || typeof r.titel !== 'string' || !Array.isArray(r.schritte)) return (json(res, 400, { fehler: 'Die Reihe ist unvollständig.' }), true)
       const roh = JSON.stringify(r)
       if (roh.length > 40 * 1024 * 1024) return (json(res, 413, { fehler: 'Die Reihe ist zu groß.' }), true)
+      // Titelbild (25.10.2026): nur kleine Bilder (die App verkleinert auf 640 px), sonst weg
+      if (r.titelbild && (typeof r.titelbild.dataUrl !== 'string' || !r.titelbild.dataUrl.startsWith('data:image/') || r.titelbild.dataUrl.length > 700_000))
+        delete (r as Partial<Reihe>).titelbild
       const jetzt = new Date().toISOString()
       const alt = r.id ? reiheVon(r.id, true) : null
       if (alt && alt.lehrkraftId !== ich.id) return (json(res, 403, { fehler: 'Diese Reihe gehört einer anderen Lehrkraft.' }), true)
@@ -1627,7 +1696,11 @@ export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promi
         // Immer der jetzige Stand der Reihe (neue Schritte verknüpfen; Haltepunkte bleiben wie bei Lernenden)
         verknuepfe(z, reiheVon(r.id)!)
       }
-      if (zustand) vorschauAufsetzen(konto, zustand)
+      // „Vollständig bearbeitet" (25.10.2026, Wunsch der Lehrkraft): alles frei, geschafft, Lösungen sichtbar
+      if (k0.zustand === 'vollstaendig') {
+        vorschauAufsetzen(konto, 'neu')
+        vorschauVollstaendig(z, reiheVon(r.id) ?? r, konto)
+      } else if (zustand) vorschauAufsetzen(konto, zustand)
       const schluessel = vorschauSchluessel(konto.id, ich.id)
       protokolliereServer('vorschau', `Reihe als Musterschüler geöffnet (${g ? 'Klasse' : 'ohne Zuweisung'})`, ich.id)
       return (

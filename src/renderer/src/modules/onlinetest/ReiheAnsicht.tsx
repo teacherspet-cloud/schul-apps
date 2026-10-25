@@ -46,7 +46,8 @@ import {
   IconPlayerTrackNext,
   IconSend,
   IconStar,
-  IconTrash
+  IconTrash,
+  IconBarrierBlock
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMediaQuery } from '@mantine/hooks'
@@ -80,6 +81,8 @@ interface ReiheDaten {
   /** Leitfrage der Reihe (08.10.2026, Reihenmuster) */
   leitfrage?: string
   fach: string
+  /** Titelbild der Reihe (25.10.2026) */
+  titelbild?: string
   /** Reihenart (08.10.2026): digital = alles am Gerät, geschafft nach Ergebnis */
   art?: 'digital' | 'gemischt' | 'planung'
   lernziele: { ichKann: string }[]
@@ -114,7 +117,7 @@ const mitReihe = (link: string, zid: string): string => `${link}${link.includes(
 /** Liste meiner Reihen */
 export function ReihenListe(): React.JSX.Element {
   const [liste, setListe] = useState<
-    { id: string; titel: string; oberthema: string; fach: string; fortschritt: number; abzeichen: string[]; fertig: boolean }[] | null
+    { id: string; titel: string; oberthema: string; fach: string; fortschritt: number; abzeichen: string[]; fertig: boolean; leitfrage?: string; titelbild?: string }[] | null
   >(null)
   useEffect(() => {
     void holen<{ reihen: NonNullable<typeof liste> }>('/s/api/reihen').then(
@@ -133,12 +136,21 @@ export function ReihenListe(): React.JSX.Element {
       {liste?.map((r) => (
         <Card key={r.id} withBorder padding="md" component="a" href={`/s/r/${r.id}`} style={{ textDecoration: 'none', color: 'inherit' }} data-reihe-eintrag>
           <Group justify="space-between" wrap="nowrap">
-            <div style={{ minWidth: 0 }}>
-              <Text fw={700}>{r.titel}</Text>
-              <Text size="sm" c="dimmed">
-                {r.fach} · {r.oberthema}
-              </Text>
-            </div>
+            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+              {/* Titelbild (25.10.2026) */}
+              {r.titelbild && <img src={r.titelbild} alt="" style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
+              <div style={{ minWidth: 0 }}>
+                <Text fw={700}>{r.titel}</Text>
+                <Text size="sm" c="dimmed">
+                  {r.fach} · {r.oberthema}
+                </Text>
+                {r.leitfrage && (
+                  <Text size="xs" c="dimmed" fs="italic" lineClamp={1}>
+                    {r.leitfrage}
+                  </Text>
+                )}
+              </div>
+            </Group>
             {r.fertig ? (
               <Badge color="green" leftSection={<IconMedal size={12} />}>
                 geschafft
@@ -188,7 +200,13 @@ function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
       <Button variant="subtle" component="a" href="/s/reihen" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
         Unterrichtsreihen
       </Button>
-      <Card withBorder padding="lg">
+      <Card withBorder padding="lg" data-reihe-kopf>
+        {/* Titelbild (25.10.2026): oben in der Reihe, wie auf der Kachel im Fachordner */}
+        {d.titelbild && (
+          <Card.Section mb="sm">
+            <img src={d.titelbild} alt="" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} data-reihe-titelbild />
+          </Card.Section>
+        )}
         <Text size="sm" c="dimmed">
           {d.fach} · {d.oberthema}
         </Text>
@@ -266,41 +284,50 @@ function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
         </Paper>
       )}
 
-      {d.schritte.map((s, i) => {
+      {/*
+        Lernweg (25.10.2026, Wunsch der Lehrkraft): Stationen untereinander mit Verbindungslinie statt einer bloßen Liste –
+        geschaffte grün, die aktuelle groß mit blauem Rahmen, gesperrte grau mit „was fehlt noch", Haltepunkte als Schranke.
+      */}
+      {(() => {
+        const sichtbare = d.schritte.filter((s) => !(s.rolle === 'foerder' && lage.get(s.id)?.status === 'gesperrt'))
+        const aktuell = sichtbare.find((s) => lage.get(s.id)?.status === 'offen')?.id
+        return sichtbare.map((s, i) => {
         const l = lage.get(s.id)!
-        const neuerAbschnitt = s.abschnitt && s.abschnitt !== d.schritte[i - 1]?.abschnitt
+        const neuerAbschnitt = s.abschnitt && s.abschnitt !== sichtbare[i - 1]?.abschnitt
         const gesperrt = l.status === 'gesperrt'
-        // Förderschritte zeigen sich nur, wenn sie gebraucht werden
-        if (s.rolle === 'foerder' && gesperrt) return null
+        const letzte = i === sichtbare.length - 1
+        const istAktuell = s.id === aktuell
+        const schranke = gesperrt && /^(Wartet|Geht ab)/.test(l.hinweis ?? '')
         // Blatt als Selbsteinschätzung oder Abschluss (08.10.2026): erst die Schrittseite (Ampel bzw. Raster), von dort zum Blatt
         const ueberSchritt = s.inhalt?.zweck === 'reflexion' || s.inhalt?.zweck === 'abschluss'
         const href = !gesperrt ? (s.link && !ueberSchritt ? mitReihe(s.link, d.id) : `/s/r/${d.id}/${s.id}`) : undefined
         return (
-          <Stack key={s.id} gap={4}>
+          <Stack key={s.id} gap={0} data-lernweg-station>
             {neuerAbschnitt && (
-              <Group gap={6} mt="xs">
+              <Group gap={6} mt="xs" mb={4} pl={48}>
                 <Text size="sm" fw={700} c="dimmed" tt="uppercase">
                   {s.abschnitt}
                 </Text>
                 {d.weg.abzeichen.includes(s.abschnitt!) && <IconMedal size={16} color="var(--mantine-color-yellow-6)" />}
               </Group>
             )}
-            <Paper
-              withBorder
-              p={{ base: 'sm', xs: 'md' }}
-              radius="lg"
-              component={href ? 'a' : 'div'}
-              {...(href ? { href } : {})}
-              style={{
-                textDecoration: 'none',
-                color: 'inherit',
-                opacity: gesperrt ? 0.6 : 1,
-                borderColor: l.status === 'offen' ? 'var(--mantine-color-blue-5)' : undefined
-              }}
-              data-station={l.status}
-            >
-              <Group wrap="nowrap" align="start">
-                <ThemeIcon size={36} radius="xl" color={FARBE[l.status]} variant={l.status === 'geschafft' ? 'filled' : 'light'}>
+            {schranke && (
+              <Group gap={6} wrap="nowrap" pl={48} mb={4} data-lernweg-schranke>
+                <IconBarrierBlock size={16} color="var(--mantine-color-orange-6)" />
+                <Text size="xs" c="orange.7">
+                  {l.hinweis}
+                </Text>
+              </Group>
+            )}
+            <Group wrap="nowrap" align="stretch" gap="sm">
+              <Stack gap={0} align="center" style={{ width: 36, flexShrink: 0 }}>
+                <ThemeIcon
+                  size={istAktuell ? 44 : 36}
+                  radius="xl"
+                  color={FARBE[l.status]}
+                  variant={l.status === 'geschafft' || istAktuell ? 'filled' : 'light'}
+                  style={{ opacity: gesperrt ? 0.6 : 1, boxShadow: istAktuell ? '0 0 0 4px var(--mantine-color-blue-1)' : undefined }}
+                >
                   {l.status === 'geschafft' ? (
                     <IconCheck size={20} />
                   ) : gesperrt ? (
@@ -311,6 +338,29 @@ function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
                     <Text fw={700}>{i + 1}</Text>
                   )}
                 </ThemeIcon>
+                {!letzte && <div style={{ flex: 1, width: 3, minHeight: 18, borderRadius: 2, background: l.status === 'geschafft' ? 'var(--mantine-color-green-4)' : 'var(--mantine-color-gray-3)' }} />}
+              </Stack>
+            <Paper
+              withBorder
+              p={{ base: 'sm', xs: 'md' }}
+              mb={letzte ? 0 : 10}
+              radius="lg"
+              shadow={istAktuell ? 'md' : undefined}
+              component={href ? 'a' : 'div'}
+              {...(href ? { href } : {})}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                textDecoration: 'none',
+                color: 'inherit',
+                opacity: gesperrt ? 0.6 : 1,
+                borderColor: istAktuell ? 'var(--mantine-color-blue-5)' : undefined,
+                borderWidth: istAktuell ? 2 : undefined
+              }}
+              data-station={l.status}
+              data-station-aktuell={istAktuell || undefined}
+            >
+              <Group wrap="nowrap" align="start">
                 <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                   {/* Schmale Schirme (08.10.2026): Titel und Marken brechen um statt überzulaufen */}
                   <Group gap={6} wrap="wrap" style={{ rowGap: 2 }}>
@@ -348,13 +398,19 @@ function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
                       {alsSatz(z.ichKann)}
                     </Text>
                   ))}
+                  {istAktuell && href && (
+                    <Text size="sm" fw={600} c="blue.7" mt={4} data-station-los>
+                      Hier geht es weiter →
+                    </Text>
+                  )}
                 </Stack>
               </Group>
             </Paper>
+            </Group>
           </Stack>
         )
-      })}
-
+        })
+      })()}
     </Stack>
   )
 }

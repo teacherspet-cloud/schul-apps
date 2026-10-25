@@ -49,17 +49,19 @@ import { blattAlsSchrittGemessen } from './schrittAusBlatt'
 import { blattZiele, grundlageEingabe, kcAuszugFuer } from './grundlage'
 
 type Aenderung = (schrittId: string, patch: Partial<Schritt>) => void
+/** Änderung an der Reihe selbst (25.10.2026, Titelbild) */
+type ReiheAenderung = (patch: Partial<Reihe>) => void
 /** Speichert den Stand des offenen Editors (mit allen übernommenen Änderungen) */
 type Speichern = () => Promise<unknown>
-const horcher = new Map<string, { fn: Aenderung; speichern?: Speichern }>()
+const horcher = new Map<string, { fn: Aenderung; speichern?: Speichern; reihe?: ReiheAenderung }>()
 
 /**
  * Der offene Editor meldet sich für seine Reihe an (Rückgabe: abmelden). `speichern` (08.10.2026): Danach wird die
  * Änderung gleich gespeichert – sonst ginge eine Verknüpfung mit „nicht speichern" verloren. `fn` muss den Stand,
  * den `speichern` sichert, sofort ändern (nicht erst beim nächsten Zeichnen).
  */
-export function horcheReihe(reiheId: string, fn: Aenderung, speichern?: Speichern): () => void {
-  const eintrag = { fn, speichern }
+export function horcheReihe(reiheId: string, fn: Aenderung, speichern?: Speichern, reihe?: ReiheAenderung): () => void {
+  const eintrag = { fn, speichern, reihe }
   horcher.set(reiheId, eintrag)
   return () => {
     if (horcher.get(reiheId) === eintrag) horcher.delete(reiheId)
@@ -103,6 +105,23 @@ export function schrittAendernUeberall(reiheId: string, schrittId: string, patch
       reihe: { ...reihe, schritte: reihe.schritte.map((x) => (x.id === schrittId ? { ...x, ...patch } : x)) },
       auftrag: true
     })
+  })
+}
+
+/**
+ * Änderung an der Reihe selbst ablegen (25.10.2026, Titelbild aus der Bild-KI): im offenen Editor (und dort gleich
+ * gespeichert), sonst in der gespeicherten Reihe am Server.
+ */
+export function reiheAendernUeberall(reiheId: string, patch: Partial<Reihe>): Promise<void> {
+  return nacheinander(reiheId, async () => {
+    const offen = horcher.get(reiheId)
+    if (offen?.reihe) {
+      offen.reihe(patch)
+      await offen.speichern?.()
+      return
+    }
+    const { reihe } = await holen<{ reihe: Reihe }>(`/server/reihen/${reiheId}`)
+    await senden('/server/reihen/speichern', { reihe: { ...reihe, ...patch }, auftrag: true })
   })
 }
 

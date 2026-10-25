@@ -73,6 +73,7 @@ import { SchrittBearbeiten } from './SchrittBearbeiten'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { DruckMenue, PlanenFenster, StundenLeiste } from './ReiheKi'
 import { horcheReihe, useSchrittZiel } from './platzhalterAuftrag'
+import { TitelbildFeld } from './Titelbild'
 import { AllePlatzhalterKnopf, ReiheMaterialien, ZuweisenHinweis } from './SchrittStatus'
 import { meldeOffeneReihe, usePlaene, usePlantGerade } from './planungAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
@@ -317,7 +318,14 @@ export function ReiheEditor({
         setR(neu)
         setGeaendert(true)
       },
-      () => speichern(rAktuell.current)
+      () => speichern(rAktuell.current),
+      // Titelbild aus der Bild-KI (25.10.2026)
+      (patch) => {
+        const neu = { ...rAktuell.current, ...patch }
+        rAktuell.current = neu
+        setR(neu)
+        setGeaendert(true)
+      }
     )
   }, [r.id])
   // Stundenverlauf-Vorschläge der KI (Planungsreihe, verlaufAuftrag.ts) ebenso übernehmen und gleich speichern
@@ -644,6 +652,8 @@ export function ReiheEditor({
               </Text>
               <ArtPlakette reihe={r} wechseln={(a) => void artWechseln(a)} />
             </Group>
+            {/* Titelbild (25.10.2026): Kachel im Fachordner und Kopf der Reihe für Lernende */}
+            <TitelbildFeld reihe={r} setze={setze} speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)} />
             <Group grow align="start">
               <TextInput label="Titel der Reihe" value={r.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-reihe-titel />
               <HaeufigSelect

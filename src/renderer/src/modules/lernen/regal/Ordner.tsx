@@ -12,8 +12,21 @@
  * Vokabelrunde und Spiele, Arbeitsblätter öffnen sich als nächste Seite IM Ordner – die Seite schlägt nach links um,
  * „Zurück" (Knopf, Browser, Wischen) blättert zurück. Die Adresse nennt die Ebene (?r=gram&g=<ID>, ?r=mat&b=<ID>).
  */
-import { Badge, Button, Group, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
-import { IconAbc, IconArrowLeft, IconBook2, IconBooks, IconChevronDown, IconChevronRight, IconFileText, IconHistory, IconMicrophone, IconSortAscendingLetters } from '@tabler/icons-react'
+import { Badge, Button, Group, Loader, Progress, Stack, Text, useComputedColorScheme } from '@mantine/core'
+import {
+  IconAbc,
+  IconArrowLeft,
+  IconBook2,
+  IconBooks,
+  IconChevronDown,
+  IconChevronRight,
+  IconFileText,
+  IconHistory,
+  IconMedal,
+  IconMicrophone,
+  IconRoute,
+  IconSortAscendingLetters
+} from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import GrammatikTrainer from '../GrammatikTrainer'
 import BlattAusfuellen from '../../onlinetest/BlattAusfuellen'
@@ -620,51 +633,99 @@ function Materialien({
       </Text>
     </a>
   )
-  // Unterrichtsreihen (08.10.2026, Plan G.3): ihre Arbeitsblätter – mit Weg zu „Meine Abgaben"
-  const reiheBlock = (r: (typeof o.reihen)[number]): React.JSX.Element => (
-    <div key={r.zid} className="og-karte" data-ordner-reihe={r.titel}>
-      <Text fw={700} mb={4}>
-        Reihe: {r.titel}
-      </Text>
-      <Stack gap={4}>
-        {r.materialien.map((m) => {
-          const href = m.link ? `${m.link}${m.link.includes('?') ? '&' : '?'}reihe=${r.zid}` : m.stufeWaehlen ? `/s/r/${r.zid}/${m.schritt}` : undefined
-          return (
-            <a
-              key={m.schritt}
-              {...(href ? { href } : {})}
-              style={{ opacity: m.gesperrt ? 0.6 : 1, cursor: href ? undefined : 'default', color: 'inherit', textDecoration: 'none' }}
-              data-ordner-reihe-blatt
-            >
-              <Group justify="space-between" wrap="nowrap">
-                <div style={{ minWidth: 0 }}>
-                  <Text size="sm" fw={600}>
-                    {m.titel}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {m.gesperrt ? 'noch gesperrt' : m.eingereicht ? `eingereicht${m.loesung ? ' · Lösung im Blatt' : ''}` : 'noch offen'}
-                  </Text>
-                </div>
-                {href && (
-                  <Badge variant="light" size="sm" style={{ flex: 'none' }}>
-                    {m.eingereicht ? 'Ansehen' : 'Öffnen'}
-                  </Badge>
-                )}
-              </Group>
-            </a>
-          )
-        })}
-      </Stack>
-      <Group gap="xs" mt={4}>
-        <Button component="a" href={`/s/r/${r.zid}`} size="xs" variant="subtle">
-          Zur Reihe
-        </Button>
-        <Button component="a" href={`/s/r/${r.zid}/materialien?reiter=abgaben`} size="xs" variant="subtle" data-ordner-reihe-abgaben>
-          Meine Abgaben
-        </Button>
-      </Group>
-    </div>
-  )
+  /*
+   * Unterrichtsreihe als Kachel (25.10.2026, Wunsch der Lehrkraft): klar als Reihe erkennbar – Titelbild (sonst Fachfarbe
+   * mit Reihen-Symbol), Titel, Leitfrage, Fortschritt und „Weiter mit …“. Die Blätter der Reihe stehen als kleine Chips
+   * darunter; „Materialien und Abgaben" führt zur vollen Liste.
+   */
+  const reiheKachel = (r: (typeof o.reihen)[number]): React.JSX.Element => {
+    const prozent = Math.round((r.fortschritt ?? 0) * 100)
+    const chips = r.materialien.slice(0, 4)
+    return (
+      <div key={r.zid} className="og-karte og-reihe" data-ordner-reihe={r.titel} data-ordner-reihe-kachel style={{ padding: 0, overflow: 'hidden' }}>
+        <a href={`/s/r/${r.zid}`} style={{ display: 'flex', gap: 12, color: 'inherit', textDecoration: 'none', alignItems: 'stretch' }} data-ordner-reihe-oeffnen>
+          <div
+            style={{
+              flex: '0 0 108px',
+              minHeight: 96,
+              background: r.titelbild ? undefined : `linear-gradient(135deg, ${o.farbe} 0%, ${o.farbe}66 100%)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            aria-hidden="true"
+          >
+            {r.titelbild ? (
+              <img src={r.titelbild} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <IconRoute size={40} color="#fff" style={{ opacity: 0.9 }} />
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, padding: '10px 12px 8px 0' }}>
+            <Group gap={6} wrap="nowrap">
+              <Badge size="xs" variant="light" leftSection={<IconRoute size={10} />} tt="none">
+                Unterrichtsreihe
+              </Badge>
+              {r.fertig && (
+                <Badge size="xs" color="green" variant="light" leftSection={<IconMedal size={10} />} tt="none">
+                  geschafft
+                </Badge>
+              )}
+              {!r.offen && (
+                <Badge size="xs" color="gray" variant="light" tt="none">
+                  beendet
+                </Badge>
+              )}
+            </Group>
+            <Text fw={700} mt={4} style={{ overflowWrap: 'anywhere' }}>
+              {r.titel}
+            </Text>
+            {r.leitfrage && (
+              <Text size="xs" c="dimmed" fs="italic" lineClamp={2}>
+                {r.leitfrage}
+              </Text>
+            )}
+            <Group gap="xs" mt={6} wrap="nowrap" align="center">
+              <Progress value={prozent} size="sm" radius="xl" color={r.fertig ? 'green' : 'blue'} style={{ flex: 1 }} aria-label="Fortschritt" />
+              <Text size="xs" fw={600} style={{ flexShrink: 0 }}>
+                {prozent} %{r.schritte ? ` · ${r.schritte} Schritte` : ''}
+              </Text>
+            </Group>
+            {r.naechster && !r.fertig && (
+              <Text size="xs" c="blue.7" mt={4} data-ordner-reihe-weiter>
+                Weiter mit: {r.naechster.titel}
+              </Text>
+            )}
+          </div>
+        </a>
+        {(chips.length > 0 || true) && (
+          <Group gap={6} px={12} pb={8} wrap="wrap">
+            {chips.map((m) => {
+              const href = m.link ? `${m.link}${m.link.includes('?') ? '&' : '?'}reihe=${r.zid}` : m.stufeWaehlen ? `/s/r/${r.zid}/${m.schritt}` : undefined
+              return (
+                <Badge
+                  key={m.schritt}
+                  component={href ? 'a' : 'span'}
+                  {...(href ? { href } : {})}
+                  size="sm"
+                  variant="outline"
+                  color={m.gesperrt ? 'gray' : m.eingereicht ? 'green' : 'blue'}
+                  tt="none"
+                  style={{ cursor: href ? 'pointer' : 'default', opacity: m.gesperrt ? 0.6 : 1 }}
+                  data-ordner-reihe-blatt
+                >
+                  {m.titel}
+                </Badge>
+              )
+            })}
+            <Button component="a" href={`/s/r/${r.zid}/materialien?reiter=abgaben`} size="compact-xs" variant="subtle" data-ordner-reihe-abgaben>
+              Materialien und Abgaben
+            </Button>
+          </Group>
+        )}
+      </div>
+    )
+  }
   const aufgabeKarte = (a: (typeof o.aufgaben)[number]): React.JSX.Element => (
     <a key={a.id} className="og-karte" href={`/s/a/${a.id}`} data-ordner-aufgabe>
       <Group justify="space-between" wrap="nowrap">
@@ -684,7 +745,7 @@ function Materialien({
   // Alles, was einem Überthema zugeordnet wird (in „Alle Jahrgänge" auch „Für dich" und offene Tests)
   const eintraege = [
     ...(alle ? [...fuerDich, ...andere] : andere).map((b) => ({ key: `blatt:${b.id}`, titel: b.titel, knoten: blattKarte(b) })),
-    ...o.reihen.map((r) => ({ key: `reihe:${r.zid}`, titel: `${r.titel} ${r.materialien.map((m) => m.titel).join(' ')}`, knoten: reiheBlock(r) })),
+    ...o.reihen.map((r) => ({ key: `reihe:${r.zid}`, titel: `${r.titel} ${r.materialien.map((m) => m.titel).join(' ')}`, knoten: reiheKachel(r) })),
     ...o.aufgaben.map((a) => ({ key: `rueckmeldung:${a.id}`, titel: a.titel, knoten: aufgabeKarte(a) })),
     ...(alle ? o.tests : fertigeTests).map((t) => ({ key: `test:${t.code}`, titel: t.titel, knoten: testKarte(t) }))
   ]

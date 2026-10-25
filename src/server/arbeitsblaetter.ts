@@ -1489,6 +1489,32 @@ export { freigabe as blattFreigabe }
 export { kurz as blattKurz }
 
 /** Blatt für einen Schritt einer Unterrichtsreihe freigeben (gleiche Ablage, nicht in der Liste „Arbeitsblätter") */
+/**
+ * Vorschau „vollständig bearbeitet" (25.10.2026): das Blatt gilt als einmal eingereicht, jede Aufgabe ist „sicher" –
+ * so erscheinen Lösungsblatt, grüne Ampeln und Merkkästen. Die Antworten selbst lassen sich am Server nicht ausfüllen
+ * (die Felder entstehen erst beim Messen am Gerät); die Marke `_vorschau` öffnet das Lösungsblatt gleich.
+ */
+export function blattVorschauAbgabe(fid: string, sid: string): void {
+  const z = freigabe(fid)
+  if (!z) return
+  const jetzt = Date.now()
+  const feedback = Object.fromEntries(
+    json_(z.aufgaben, [] as BlattAufgabe[]).map((a) => [
+      String(a.nr),
+      [{ text: 'Musterlösung – Vorschau „vollständig bearbeitet“', einschaetzung: 'sicher', zeit: jetzt, abgabe: true }]
+    ])
+  )
+  const antworten = JSON.stringify({ _vorschau: 'vollstaendig' })
+  if (!abgabeVon(fid, sid))
+    db()
+      .prepare('INSERT INTO blatt_abgaben (freigabe_id, schueler_id, antworten, tinte, aufgaben_feedback, abgaben, aktualisiert) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(fid, sid, antworten, '{}', JSON.stringify(feedback), 1, jetzt)
+  else
+    db()
+      .prepare('UPDATE blatt_abgaben SET antworten = ?, tinte = ?, aufgaben_feedback = ?, abgaben = ?, aktualisiert = ? WHERE freigabe_id = ? AND schueler_id = ?')
+      .run(antworten, '{}', JSON.stringify(feedback), 1, jetzt, fid, sid)
+}
+
 export function reihenBlattAnlegen(e: {
   lehrkraftId: string
   lerngruppeId: string
