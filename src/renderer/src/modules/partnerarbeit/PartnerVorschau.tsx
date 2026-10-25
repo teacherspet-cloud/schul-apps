@@ -130,7 +130,7 @@ export function PartnerVorschau({
                     aktion={aktion(id)}
                     bildUrl={bildUrl}
                     mitglieder={mitglieder.map((m, j) => ({ ...m, ich: j === i }))}
-                    dranSymbol={dran && s.rolle === 'A' ? SYMBOLE[gruppe.mitglieder.indexOf(dran)] : undefined}
+                    dranSymbol={dran ? SYMBOLE[gruppe.mitglieder.indexOf(dran)] : undefined}
                     lehrkraft
                     stufe={stufeVon(jahrgang)}
                   />

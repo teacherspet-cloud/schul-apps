@@ -255,7 +255,9 @@ try {
   await sA.locator('[data-pa-satz]').fill('Great answers!')
   await sA.locator('[data-pa-rueckmeldung-senden]').click()
   pruefe(await da(sB.locator('[data-pa-erhalten]')), 'B sieht die Rückmeldung')
-  await sB.locator('[data-pa-weiter]').click()
+  // „Weiter" nur bei A (25.10.2026): B kann die Rückmeldung nicht für alle überspringen
+  pruefe((await sB.locator('[data-pa-weiter]').count()) === 0 && (await da(sB.locator('[data-pa-warte-weiter]'))), 'B hat kein „Weiter" – nur A geht weiter')
+  await sA.locator('[data-pa-weiter]').click()
   await m.waitForTimeout(500)
   const rollen2 = await Promise.all([m, b, l].map(rolleVon))
   pruefe(rollen2.indexOf('A') !== rollen.indexOf('A'), 'Nächste Runde: eine andere Person fragt')
@@ -274,9 +276,10 @@ try {
   const mB = [m, b, l][r3.indexOf('B')]
   pruefe(await da(mB.locator('[data-pa-bild]')), 'Monolog: B sieht das Bild')
   pruefe((await mB.locator('[data-pa-auftrag]').innerText()).includes('Describe'), 'Monolog: Arbeitsauftrag beim Sprechenden')
-  // Zu dritt (25.10.2026): C wartet ohne Bild, bis es selbst dran ist
+  // Zu dritt (25.10.2026): C sieht Bild und Auftrag mit, dazu deutlich, wer gerade spricht; B hat „Du bist dran"
   const mC = [m, b, l][r3.indexOf('C')]
-  pruefe((await da(mC.locator('[data-pa-zuhoeren]'))) && (await mC.locator('[data-pa-bild]').count()) === 0, 'Monolog: C sieht kein Bild, nur den Hinweis zuzuhören')
+  pruefe((await da(mC.locator('[data-pa-zuhoeren]'))) && (await da(mC.locator('[data-pa-bild]'))), 'Monolog: C sieht das Bild und den Hinweis, wer spricht')
+  pruefe(await da(mB.locator('[data-pa-dran]')), 'Monolog: B sieht „Du bist dran"')
   await weiter()
   await weiter()
   await weiter()

@@ -79,6 +79,8 @@ type Schluessel =
   | 'interviewt'
   | 'gleichDran'
   | 'zuhoeren'
+  | 'zuhoerenMehr'
+  | 'warteRueckmeldung'
   | 'stockt'
   | 'leitfragen'
   | 'deineRolle'
@@ -109,7 +111,9 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Frage',
     interviewt: 'Du wirst interviewt. Antworte in ganzen Sätzen und frag nach, wenn du etwas nicht verstehst.',
     gleichDran: 'Gleich bist du dran – hör gut zu.',
-    zuhoeren: 'Jetzt spricht dein Partner. Hör gut zu – gleich bist du dran. Dein Bild siehst du erst dann.',
+    zuhoeren: 'Jetzt spricht:',
+    zuhoerenMehr: 'Hör gut zu – gleich bist du dran.',
+    warteRueckmeldung: 'Weiter geht es, wenn dein Partner die Rückmeldung abgeschickt hat.',
     stockt: 'Wenn es stockt – Fragen zum Weiterhelfen',
     leitfragen: 'Leitfragen',
     deineRolle: 'Deine Rolle',
@@ -140,7 +144,9 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Question',
     interviewt: 'You are being interviewed. Answer in full sentences and ask if you do not understand.',
     gleichDran: 'Your turn is next – listen carefully.',
-    zuhoeren: 'Your partner is speaking now. Listen carefully – your turn is next. You will see your picture then.',
+    zuhoeren: 'Now speaking:',
+    zuhoerenMehr: 'Listen carefully – your turn is next.',
+    warteRueckmeldung: 'You will continue once your partner has sent the feedback.',
     stockt: 'If your partner gets stuck – prompts',
     leitfragen: 'Guiding questions',
     deineRolle: 'Your role',
@@ -171,7 +177,9 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Question',
     interviewt: 'On t’interroge. Réponds par des phrases complètes et demande si tu ne comprends pas.',
     gleichDran: "C'est bientôt à toi – écoute bien.",
-    zuhoeren: "Ton partenaire parle. Écoute bien – c'est bientôt à toi. Tu verras ton image à ce moment-là.",
+    zuhoeren: "Maintenant, c'est le tour de :",
+    zuhoerenMehr: "Écoute bien – c'est bientôt à toi.",
+    warteRueckmeldung: 'Vous continuerez dès que ton partenaire aura envoyé son retour.',
     stockt: 'En cas de blocage – questions pour aider',
     leitfragen: 'Questions-guides',
     deineRolle: 'Ton rôle',
@@ -202,7 +210,9 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Pregunta',
     interviewt: 'Te entrevistan. Responde con frases completas y pregunta si no entiendes algo.',
     gleichDran: 'Pronto te toca – escucha bien.',
-    zuhoeren: 'Ahora habla tu compañero. Escucha bien – pronto te toca. Verás tu imagen en ese momento.',
+    zuhoeren: 'Ahora habla:',
+    zuhoerenMehr: 'Escucha bien – pronto te toca.',
+    warteRueckmeldung: 'Seguiréis cuando tu compañero haya enviado su comentario.',
     stockt: 'Si se atasca – preguntas para ayudar',
     leitfragen: 'Preguntas guía',
     deineRolle: 'Tu papel',
@@ -480,9 +490,16 @@ function Rueckmeldung({ s, aktion, t }: { s: SchrittSicht; aktion: (a: string, w
               Dein Partner gibt dir gleich eine kurze Rückmeldung.
             </Text>
           )}
-          <Button leftSection={<IconPlayerTrackNext size={16} />} onClick={() => aktion('weiter')} data-pa-weiter>
-            {t.weiter}
-          </Button>
+          {/* „Weiter" nur, wer darf (Interview/Monolog: A) – sonst überspränge ein Partner die Rückmeldung für alle (25.10.2026) */}
+          {s.kann.weiter ? (
+            <Button leftSection={<IconPlayerTrackNext size={16} />} onClick={() => aktion('weiter')} data-pa-weiter>
+              {t.weiter}
+            </Button>
+          ) : (
+            <Text size="sm" c="dimmed" data-pa-warte-weiter>
+              {t.warteRueckmeldung}
+            </Text>
+          )}
         </Stack>
       )}
     </Card>
@@ -686,6 +703,20 @@ export function SchrittAnsicht({
 
       {s.phase === 'arbeit' && s.teil === 'monolog' && s.monolog && (
         <Card withBorder radius="md" padding={stufe === 'unter' ? 'lg' : 'md'} data-pa-monolog>
+          {/* Zu dritt: wer nicht dran ist, sieht Bild und Auftrag mit – aber deutlich, wer gerade spricht (25.10.2026) */}
+          {s.dran === false && (
+            <Paper withBorder p="sm" radius="md" mb="sm" bg="var(--mantine-color-orange-light)" data-pa-zuhoeren>
+              <Group gap="sm" wrap="nowrap" align="center">
+                <Text fw={700} size={stufe === 'unter' ? 'lg' : 'md'}>
+                  {t.zuhoeren}
+                </Text>
+                {dranSymbol && <SymbolBild symbol={dranSymbol} groesse={stufe === 'unter' ? 44 : 32} lehrkraft={lehrkraft} />}
+                <Text size={stufe === 'unter' ? 'md' : 'sm'} c="dimmed">
+                  {t.zuhoerenMehr}
+                </Text>
+              </Group>
+            </Paper>
+          )}
           <Group align="flex-start" wrap="wrap" gap="md">
             <Stack gap={4} style={{ flex: '1 1 260px', minWidth: 220 }}>
               {s.monolog.bilder.map((b) => (
@@ -745,15 +776,6 @@ export function SchrittAnsicht({
               )}
             </Stack>
           </Group>
-        </Card>
-      )}
-
-      {/* Monolog zu dritt: C wartet ohne Bild (25.10.2026) – sonst hätte C mehr Vorbereitungszeit als B */}
-      {s.phase === 'arbeit' && s.teil === 'monolog' && !s.monolog && (
-        <Card withBorder radius="md" padding={stufe === 'unter' ? 'lg' : 'md'} data-pa-zuhoeren>
-          <Text size={stufe === 'unter' ? 'lg' : 'md'} c="dimmed">
-            {t.zuhoeren}
-          </Text>
         </Card>
       )}
 

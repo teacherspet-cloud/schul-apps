@@ -100,11 +100,7 @@ describe('Ablauf der Partnerarbeit', () => {
             if (s!.rolle === 'A') expect(s!.interview?.fragen.length).toBeGreaterThan(0)
             else expect(s!.interview).toBeUndefined()
           }
-          // Monolog zu dritt (25.10.2026): C wartet ohne Bild
-          if (teil === 'monolog') {
-            if (s!.rolle === 'C') expect(s!.monolog).toBeUndefined()
-            else expect(s!.monolog?.bilder.length).toBeGreaterThan(0)
-          }
+          if (teil === 'monolog') expect(s!.monolog?.bilder.length).toBeGreaterThan(0)
           if (teil === 'dialog') expect(s!.dialog?.situation).toBeTruthy()
           expect(text(s)).not.toContain('pa"') // keine Kennungen anderer außer dranId bei A
         }
@@ -136,15 +132,20 @@ describe('Ablauf der Partnerarbeit', () => {
     const mono = gruppeStarten(probeGruppe(3), e({ teile: ['monolog'] }), karten([bild2]), 0)
     const [sa, sb, sc] = mono.mitglieder.map((m) => sichtSchritt(mono, m, karten([bild2]), umfeld, [])!)
     expect(sa.rolle).toBe('A')
-    // Zu dritt (25.10.2026): nur B spricht und sieht das Bild; C wartet ohne Bild, kein „dran"-Wechsel
+    // Zu dritt (25.10.2026): nur B spricht; C sieht dasselbe Bild mit Auftrag, aber ohne Hilfen, und wer dran ist
     expect(sb.monolog!.bilder).toEqual(bild2.art === 'monolog' ? bild2.bilder : [])
     expect(sa.monolog!.bilder).toEqual(sb.monolog!.bilder)
     expect(sc.rolle).toBe('C')
-    expect(sc.monolog).toBeUndefined()
+    expect(sc.monolog!.bilder).toEqual(sb.monolog!.bilder)
+    expect(sc.monolog!.auftrag).toBe(sb.monolog!.auftrag)
     expect(sc.hilfen).toEqual({})
-    expect(sb.dran).toBeUndefined()
+    expect(sb.dran).toBe(true)
+    expect(sc.dran).toBe(false)
+    expect(sa.dranId).toBe(mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'B'))
     expect(sa.kann.naechste).toBe(false)
-    expect(mono.schritt!.dran).toBeUndefined()
+    expect(
+      schrittAktion(mono, mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'A')!, 'naechste', {}, e({ teile: ['monolog'] }), karten([bild2]), 1)
+    ).toMatch(/Interview/)
     // Freischalten erreicht nur B, nicht C
     const aMono = mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'A')!
     expect(schrittAktion(mono, aMono, 'freischalten', { was: 'wortschatz' }, e({ teile: ['monolog'] }), karten([bild2]), 1)).toBeNull()
@@ -156,6 +157,8 @@ describe('Ablauf der Partnerarbeit', () => {
     const a3 = mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'A')!
     expect(schrittAktion(mono, a3, 'freischalten', { was: 'leitfragen' }, e({ teile: ['monolog'] }), karten([bild2]), 1)).toBeNull()
     expect(sichtSchritt(mono, mono.mitglieder[1], karten([bild2]), umfeld, [])!.monolog!.leitfragen).toEqual(['Compare.'])
+    // C bekommt die freigeschalteten Leitfragen nicht
+    expect(sichtSchritt(mono, mono.mitglieder[2], karten([bild2]), umfeld, [])!.monolog!.leitfragen).toEqual([])
     // Karte ohne eigenen Auftrag: allgemeiner Auftrag statt aufgezählter Leitfragen
     const ohne = gruppeStarten(probeGruppe(2), e({ teile: ['monolog'] }), karten([bild1]), 0)
     const sOhne = sichtSchritt(ohne, ohne.mitglieder[1], karten([bild1]), umfeld, [])!
@@ -174,6 +177,11 @@ describe('Ablauf der Partnerarbeit', () => {
       warA.push(a)
       expect(schrittAktion(g, a, 'wechsel', {}, e(), k, 5)).toBeNull()
       expect(g.schritt!.rueckmeldung).toBe(true)
+      // „Weiter" nur A (25.10.2026): ein Partner könnte sonst die Rückmeldung für alle überspringen
+      const nichtA = g.mitglieder.find((m) => m !== a)!
+      expect(schrittAktion(g, nichtA, 'weiter', {}, e(), k, 6)).toMatch(/Rückmeldung/)
+      expect(sichtSchritt(g, nichtA, k, umfeld, [])!.kann.weiter).toBe(false)
+      expect(sichtSchritt(g, a, k, umfeld, [])!.kann.weiter).toBe(true)
       expect(schrittAktion(g, a, 'weiter', {}, e(), k, 6)).toBeNull()
     }
     expect(g.schritt!.teil).toBe('interview')

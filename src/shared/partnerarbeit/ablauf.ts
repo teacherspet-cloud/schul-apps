@@ -5,9 +5,11 @@
  *    („dran"). Nach jeder Unterrunde gibt A eine kurze Rückmeldung (3 Smileys, ein Satz – nur für die Gruppe), dann
  *    wechseln die Rollen mit neuer Karte, bis jede Person einmal A war.
  *  - Monolog: A liest den Arbeitsauftrag vor, sieht Zusatzfragen und schaltet B den Bildwortschatz, Phrases und
- *    Beispielsätze frei; B sieht nur Bild und Auftrag. Zu dritt spricht je Unterrunde nur EINE Person (B); C wartet ohne
- *    Bild und hört zu (Befund 25.10.2026: C sah sein Bild schon während B sprach und hatte so mehr Vorbereitungszeit).
+ *    Beispielsätze frei; B sieht nur Bild und Auftrag. Zu dritt spricht je Unterrunde nur EINE Person (B); C sieht dasselbe
+ *    Bild mit Auftrag (ohne Hilfen) und einen deutlichen Hinweis, wer gerade spricht (Wunsch 25.10.2026, zweite Fassung).
  *    Über drei Unterrunden ist jede Person einmal A, einmal B, einmal C. Uhr (Prüfungszeit) nur bei A, nur wenn eingeschaltet.
+ *  - „Weiter" nach der Rückmeldung: im Interview und Monolog nur A (gibt die Rückmeldung oder überspringt sie bewusst),
+ *    sonst könnte ein Partner die Rückmeldung für alle überspringen (Frage der Lehrkraft 25.10.2026). Im Dialog jede Person.
  *  - Dialog: Rollen getrennt wie im Druckset (A = Rolle 1, B = Rolle 2, C = Rolle 3); jede Person schaltet sich eigene
  *    Vorschläge, Wortschatz, Phrases und Beispiele frei. Zu dritt ohne dritte Rolle: C ist „Helfer", sieht beide
  *    Rollenkarten mit Hilfen und schaltet sie den Sprechenden frei. Info-Gap: fremde Informationen bleiben verborgen.
@@ -86,8 +88,8 @@ export function schrittNeu(teil: PaTeil, g: PaGruppe, unterrunde: number, karten
     teil,
     karten: k.map((x) => x.id),
     rollen,
-    // Nur im Interview antworten zu dritt B und C abwechselnd; im Monolog spricht nur B
-    ...(teil === 'interview' && antwortende.length > 1 ? { dran: antwortende[0] } : {}),
+    // Zu dritt: im Interview antworten B und C abwechselnd, im Monolog spricht nur B – „dran" zeigt allen, wer spricht
+    ...(teil !== 'dialog' && g.mitglieder.length > 2 ? { dran: antwortende[0] } : {}),
     unterrunde,
     haken: [],
     frei: {},
@@ -188,7 +190,7 @@ export function schrittAktion(
       return null
     }
     case 'naechste': {
-      if (rolle !== 'A' || !s.dran) return 'Nur zu dritt wechselt, wer antwortet.'
+      if (rolle !== 'A' || !s.dran || s.teil === 'monolog') return 'Nur zu dritt im Interview wechselt, wer antwortet.'
       const a = antwortendeVon(s)
       s.dran = a[(a.indexOf(s.dran) + 1) % a.length]
       return null
@@ -203,6 +205,7 @@ export function schrittAktion(
     }
     case 'weiter': {
       if (!s.rueckmeldung) return 'Erst die Runde beenden.'
+      if (s.teil !== 'dialog' && rolle !== 'A') return 'Weiter geht es, wenn die Rückmeldung gegeben ist.'
       weiterNachTeil(g, e, karten, jetzt, zufall)
       return null
     }
@@ -310,7 +313,7 @@ export function sichtSchritt(
     titel: k ? (k.art === 'interview' ? k.thema : k.titel) : '',
     hilfen: {},
     schalter: [],
-    kann: { haken: false, naechste: false, wechsel: false, fertig: false, weiter: Boolean(s.rueckmeldung) }
+    kann: { haken: false, naechste: false, wechsel: false, fertig: false, weiter: Boolean(s.rueckmeldung) && (s.teil === 'dialog' || istA) }
   }
   if (s.dran) {
     basis.dran = s.dran === wer
@@ -355,12 +358,12 @@ export function sichtSchritt(
         an: Boolean(wen && s.frei[wen]?.includes(was))
       }))
       basis.kann = { ...basis.kann, wechsel: phase === 'arbeit' }
-    } else if (rolle === 'B') {
-      // Der Sprechende sieht nur Bild und Auftrag; die Leitfragen erst, wenn A sie freischaltet
-      basis.monolog = { bilder: k.bilder, auftrag, leitfragen: frei.includes('leitfragen') ? k.leitfragen : [] }
-      basis.hilfen = nurFrei(alle, frei)
+    } else {
+      // Der Sprechende sieht nur Bild und Auftrag; die Leitfragen erst, wenn A sie freischaltet.
+      // C (zu dritt) sieht dasselbe Bild mit Auftrag, aber keine Hilfen – und über `dran` den Hinweis, wer spricht
+      basis.monolog = { bilder: k.bilder, auftrag, leitfragen: rolle === 'B' && frei.includes('leitfragen') ? k.leitfragen : [] }
+      basis.hilfen = rolle === 'B' ? nurFrei(alle, frei) : {}
     }
-    // C (zu dritt): kein Bild, kein Auftrag – wartet und hört zu; die Ansicht zeigt den Hinweis (25.10.2026)
     uhr()
     return basis
   }
