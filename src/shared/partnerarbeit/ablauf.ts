@@ -5,8 +5,9 @@
  *    („dran"). Nach jeder Unterrunde gibt A eine kurze Rückmeldung (3 Smileys, ein Satz – nur für die Gruppe), dann
  *    wechseln die Rollen mit neuer Karte, bis jede Person einmal A war.
  *  - Monolog: A liest den Arbeitsauftrag vor, sieht Zusatzfragen und schaltet B den Bildwortschatz, Phrases und
- *    Beispielsätze frei; B sieht nur Bild und Auftrag. Zu dritt beschreiben B und C je ein Bild (zwei Bilder einer Karte
- *    oder zwei Karten). Uhr (Prüfungszeit) nur bei A, nur wenn eingeschaltet.
+ *    Beispielsätze frei; B sieht nur Bild und Auftrag. Zu dritt spricht je Unterrunde nur EINE Person (B); C wartet ohne
+ *    Bild und hört zu (Befund 25.10.2026: C sah sein Bild schon während B sprach und hatte so mehr Vorbereitungszeit).
+ *    Über drei Unterrunden ist jede Person einmal A, einmal B, einmal C. Uhr (Prüfungszeit) nur bei A, nur wenn eingeschaltet.
  *  - Dialog: Rollen getrennt wie im Druckset (A = Rolle 1, B = Rolle 2, C = Rolle 3); jede Person schaltet sich eigene
  *    Vorschläge, Wortschatz, Phrases und Beispiele frei. Zu dritt ohne dritte Rolle: C ist „Helfer", sieht beide
  *    Rollenkarten mit Hilfen und schaltet sie den Sprechenden frei. Info-Gap: fremde Informationen bleiben verborgen.
@@ -46,8 +47,8 @@ const nutzbar = (karten: Karten, teil: PaTeil): SprechKarte[] =>
 const wahl = <T>(l: T[], zufall: Zufall): T | undefined => (l.length ? l[Math.min(l.length - 1, Math.floor(zufall() * l.length))] : undefined)
 
 /**
- * Karte(n) für einen Schritt nach Gruppengröße: Zweier jede Karte; Dreier-Dialog bevorzugt Karten mit dritter Rolle;
- * Dreier-Monolog bevorzugt Karten mit zwei Bildern, sonst zwei Karten. Nicht aus `benutzt`; ist alles benutzt, von vorn.
+ * Karte für einen Schritt nach Gruppengröße: Zweier jede Karte; Dreier-Dialog bevorzugt Karten mit dritter Rolle; Monolog
+ * immer eine Karte (zu dritt spricht je Unterrunde eine Person). Nicht aus `benutzt`; ist alles benutzt, von vorn.
  */
 export function kartenWaehlen(teil: PaTeil, groesse: number, karten: Karten, benutzt: string[], zufall: Zufall = Math.random): SprechKarte[] {
   const alle = nutzbar(karten, teil)
@@ -57,14 +58,6 @@ export function kartenWaehlen(teil: PaTeil, groesse: number, karten: Karten, ben
   if (teil === 'dialog' && groesse >= 3) {
     const mitDritter = vorrat.filter(karteFuer3)
     return [wahl(mitDritter.length ? mitDritter : vorrat, zufall)!]
-  }
-  if (teil === 'monolog' && groesse >= 3) {
-    const zwei = vorrat.filter((k) => k.art === 'monolog' && k.bilder.length >= 2)
-    if (zwei.length) return [wahl(zwei, zufall)!]
-    const erste = wahl(vorrat, zufall)!
-    const rest = (frisch.length > 1 ? frisch : alle).filter((k) => k.id !== erste.id)
-    const zweite = wahl(rest, zufall)
-    return zweite ? [erste, zweite] : [erste]
   }
   return [wahl(vorrat, zufall)!]
 }
@@ -93,7 +86,8 @@ export function schrittNeu(teil: PaTeil, g: PaGruppe, unterrunde: number, karten
     teil,
     karten: k.map((x) => x.id),
     rollen,
-    ...(teil !== 'dialog' && antwortende.length > 1 ? { dran: antwortende[0] } : {}),
+    // Nur im Interview antworten zu dritt B und C abwechselnd; im Monolog spricht nur B
+    ...(teil === 'interview' && antwortende.length > 1 ? { dran: antwortende[0] } : {}),
     unterrunde,
     haken: [],
     frei: {},
@@ -140,7 +134,7 @@ export function weiterNachTeil(g: PaGruppe, e: PaEinstellungen, karten: Karten, 
 
 const antwortendeVon = (s: PaSchritt): string[] =>
   Object.entries(s.rollen)
-    .filter(([, r]) => r !== 'A' && r !== 'helfer')
+    .filter(([, r]) => r !== 'A' && r !== 'helfer' && (s.teil !== 'monolog' || r === 'B'))
     .map(([id]) => id)
 
 /**
@@ -346,44 +340,27 @@ export function sichtSchritt(
     return basis
   }
   if (k.art === 'monolog' && s.teil === 'monolog') {
-    // Zu dritt: B das erste Bild, C das zweite (zweite Karte oder zweites Bild)
-    const antwortende = antwortendeVon(s)
-    const zweite = karten.get(s.karten[1])
-    const bilderVon = (id: string): { karte: SprechKarte & { art: 'monolog' }; bilder: string[] } => {
-      const i = antwortende.indexOf(id)
-      if (i <= 0) return { karte: k, bilder: k.bilder.length >= 2 && antwortende.length > 1 ? [k.bilder[0]] : k.bilder }
-      if (zweite?.art === 'monolog') return { karte: zweite, bilder: zweite.bilder }
-      return { karte: k, bilder: k.bilder.length >= 2 ? [k.bilder[1]] : k.bilder }
-    }
     // Der Sprechende bekommt höchstens drei knappe Schritte; abgetrennte Teilsätze langer Aufträge werden Impulse bei A
-    const kurz = (kk: SprechKarte & { art: 'monolog' }): { schritte: string[]; impulse: string[] } =>
-      auftragKurz(kk.hilfen?.auftrag || AUFTRAG_ALLGEMEIN[u.sprache])
-    const auftrag = (kk: SprechKarte & { art: 'monolog' }): string => kurz(kk).schritte.join(' ')
-    const alleFuer = (kk: SprechKarte & { art: 'monolog' }): HilfenSicht => ({
-      wortschatz: kk.hilfen?.wortschatz ?? [],
-      ...phrasesVon(kk, 'monolog', u),
-      beispiele: kk.hilfen?.beispiele ?? []
-    })
+    const kurz = auftragKurz(k.hilfen?.auftrag || AUFTRAG_ALLGEMEIN[u.sprache])
+    const auftrag = kurz.schritte.join(' ')
+    const alle: HilfenSicht = { wortschatz: k.hilfen?.wortschatz ?? [], ...phrasesVon(k, 'monolog', u), beispiele: k.hilfen?.beispiele ?? [] }
+    const wen = antwortendeVon(s)[0]
     if (istA) {
-      const wen = s.dran ?? antwortende[0]
-      const { karte: kk, bilder } = bilderVon(wen)
-      basis.titel = kk.titel
       // Leitfragen der Karte und Zusatzfragen der KI zusammen als Impulse, ohne Doppelung
-      const impulse = [...new Set([...kurz(kk).impulse, ...kk.leitfragen, ...(kk.hilfen?.zusatzfragen ?? [])].map((x) => x.trim()).filter(Boolean))]
-      basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: [], impulse, beschreibung: kk.bildBeschreibung }
-      basis.hilfen = alleFuer(kk)
+      const impulse = [...new Set([...kurz.impulse, ...k.leitfragen, ...(k.hilfen?.zusatzfragen ?? [])].map((x) => x.trim()).filter(Boolean))]
+      basis.monolog = { bilder: k.bilder, auftrag, leitfragen: [], impulse, beschreibung: k.bildBeschreibung }
+      basis.hilfen = alle
       basis.schalter = (['leitfragen', 'wortschatz', 'phrases', 'beispiele'] as HilfeArt[]).map((was) => ({
         was,
         an: Boolean(wen && s.frei[wen]?.includes(was))
       }))
-      basis.kann = { ...basis.kann, naechste: Boolean(s.dran) && phase === 'arbeit', wechsel: phase === 'arbeit' }
-    } else {
-      const { karte: kk, bilder } = bilderVon(wer)
-      basis.titel = kk.titel
+      basis.kann = { ...basis.kann, wechsel: phase === 'arbeit' }
+    } else if (rolle === 'B') {
       // Der Sprechende sieht nur Bild und Auftrag; die Leitfragen erst, wenn A sie freischaltet
-      basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: frei.includes('leitfragen') ? kk.leitfragen : [] }
-      basis.hilfen = nurFrei(alleFuer(kk), frei)
+      basis.monolog = { bilder: k.bilder, auftrag, leitfragen: frei.includes('leitfragen') ? k.leitfragen : [] }
+      basis.hilfen = nurFrei(alle, frei)
     }
+    // C (zu dritt): kein Bild, kein Auftrag – wartet und hört zu; die Ansicht zeigt den Hinweis (25.10.2026)
     uhr()
     return basis
   }

@@ -100,7 +100,11 @@ describe('Ablauf der Partnerarbeit', () => {
             if (s!.rolle === 'A') expect(s!.interview?.fragen.length).toBeGreaterThan(0)
             else expect(s!.interview).toBeUndefined()
           }
-          if (teil === 'monolog') expect(s!.monolog?.bilder.length).toBeGreaterThan(0)
+          // Monolog zu dritt (25.10.2026): C wartet ohne Bild
+          if (teil === 'monolog') {
+            if (s!.rolle === 'C') expect(s!.monolog).toBeUndefined()
+            else expect(s!.monolog?.bilder.length).toBeGreaterThan(0)
+          }
           if (teil === 'dialog') expect(s!.dialog?.situation).toBeTruthy()
           expect(text(s)).not.toContain('pa"') // keine Kennungen anderer außer dranId bei A
         }
@@ -132,10 +136,19 @@ describe('Ablauf der Partnerarbeit', () => {
     const mono = gruppeStarten(probeGruppe(3), e({ teile: ['monolog'] }), karten([bild2]), 0)
     const [sa, sb, sc] = mono.mitglieder.map((m) => sichtSchritt(mono, m, karten([bild2]), umfeld, [])!)
     expect(sa.rolle).toBe('A')
-    expect(sb.monolog!.bilder).toEqual([bild2.art === 'monolog' ? bild2.bilder[0] : ''])
-    expect(sc.monolog!.bilder).toEqual([bild2.art === 'monolog' ? bild2.bilder[1] : ''])
-    expect(sb.dran).toBe(true)
-    expect(sc.dran).toBe(false)
+    // Zu dritt (25.10.2026): nur B spricht und sieht das Bild; C wartet ohne Bild, kein „dran"-Wechsel
+    expect(sb.monolog!.bilder).toEqual(bild2.art === 'monolog' ? bild2.bilder : [])
+    expect(sa.monolog!.bilder).toEqual(sb.monolog!.bilder)
+    expect(sc.rolle).toBe('C')
+    expect(sc.monolog).toBeUndefined()
+    expect(sc.hilfen).toEqual({})
+    expect(sb.dran).toBeUndefined()
+    expect(sa.kann.naechste).toBe(false)
+    expect(mono.schritt!.dran).toBeUndefined()
+    // Freischalten erreicht nur B, nicht C
+    const aMono = mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'A')!
+    expect(schrittAktion(mono, aMono, 'freischalten', { was: 'wortschatz' }, e({ teile: ['monolog'] }), karten([bild2]), 1)).toBeNull()
+    expect(Object.keys(mono.schritt!.frei)).toEqual([mono.mitglieder.find((m) => mono.schritt!.rollen[m] === 'B')])
     // Bildkarte (Befund 24.10.2026): der Sprechende sieht keine Leitfragen, A sieht Impulse (Leitfragen + Zusatzfragen ohne Doppelung)
     expect(sb.monolog!.leitfragen).toEqual([])
     expect(sa.monolog!.impulse).toEqual(['Compare.', 'Weather?'])
@@ -148,9 +161,8 @@ describe('Ablauf der Partnerarbeit', () => {
     const sOhne = sichtSchritt(ohne, ohne.mitglieder[1], karten([bild1]), umfeld, [])!
     expect(sOhne.monolog!.auftrag).toMatch(/^Describe the picture/)
     expect(sOhne.monolog!.auftrag).not.toContain('Who?')
-    // zwei Karten, wenn keine Karte zwei Bilder hat
-    const zwei = kartenWaehlen('monolog', 3, karten([bild1, { ...bild1, id: 'b1b' }]), [])
-    expect(zwei).toHaveLength(2)
+    // Monolog zu dritt: immer EINE Karte je Unterrunde (25.10.2026)
+    expect(kartenWaehlen('monolog', 3, karten([bild1, { ...bild1, id: 'b1b' }]), [])).toHaveLength(1)
   })
 
   it('Rotation: jede Person einmal A, dann der nächste Teil, dann eine neue Runde', () => {
@@ -170,7 +182,13 @@ describe('Ablauf der Partnerarbeit', () => {
     durch()
     expect(new Set(warA).size).toBe(3)
     expect(g.schritt!.teil).toBe('monolog')
-    for (let i = 0; i < 3; i++) durch()
+    // Monolog zu dritt: über die drei Unterrunden ist jede Person genau einmal A, einmal B (spricht) und einmal C (hört zu)
+    const monoRollen: Record<string, string[]> = {}
+    for (let i = 0; i < 3; i++) {
+      for (const [id, r] of Object.entries(g.schritt!.rollen)) (monoRollen[id] ??= []).push(r)
+      durch()
+    }
+    for (const id of g.mitglieder) expect([...monoRollen[id]].sort()).toEqual(['A', 'B', 'C'])
     expect(g.schritt!.teil).toBe('dialog')
     const irgendwer = g.mitglieder[1]
     expect(schrittAktion(g, irgendwer, 'fertig', {}, e(), k, 7)).toBeNull()

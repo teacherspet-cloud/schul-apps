@@ -274,6 +274,9 @@ try {
   const mB = [m, b, l][r3.indexOf('B')]
   pruefe(await da(mB.locator('[data-pa-bild]')), 'Monolog: B sieht das Bild')
   pruefe((await mB.locator('[data-pa-auftrag]').innerText()).includes('Describe'), 'Monolog: Arbeitsauftrag beim Sprechenden')
+  // Zu dritt (25.10.2026): C wartet ohne Bild, bis es selbst dran ist
+  const mC = [m, b, l][r3.indexOf('C')]
+  pruefe((await da(mC.locator('[data-pa-zuhoeren]'))) && (await mC.locator('[data-pa-bild]').count()) === 0, 'Monolog: C sieht kein Bild, nur den Hinweis zuzuhören')
   await weiter()
   await weiter()
   await weiter()

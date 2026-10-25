@@ -78,6 +78,7 @@ type Schluessel =
   | 'frageVon'
   | 'interviewt'
   | 'gleichDran'
+  | 'zuhoeren'
   | 'stockt'
   | 'leitfragen'
   | 'deineRolle'
@@ -108,6 +109,7 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Frage',
     interviewt: 'Du wirst interviewt. Antworte in ganzen Sätzen und frag nach, wenn du etwas nicht verstehst.',
     gleichDran: 'Gleich bist du dran – hör gut zu.',
+    zuhoeren: 'Jetzt spricht dein Partner. Hör gut zu – gleich bist du dran. Dein Bild siehst du erst dann.',
     stockt: 'Wenn es stockt – Fragen zum Weiterhelfen',
     leitfragen: 'Leitfragen',
     deineRolle: 'Deine Rolle',
@@ -138,6 +140,7 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Question',
     interviewt: 'You are being interviewed. Answer in full sentences and ask if you do not understand.',
     gleichDran: 'Your turn is next – listen carefully.',
+    zuhoeren: 'Your partner is speaking now. Listen carefully – your turn is next. You will see your picture then.',
     stockt: 'If your partner gets stuck – prompts',
     leitfragen: 'Guiding questions',
     deineRolle: 'Your role',
@@ -168,6 +171,7 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Question',
     interviewt: 'On t’interroge. Réponds par des phrases complètes et demande si tu ne comprends pas.',
     gleichDran: "C'est bientôt à toi – écoute bien.",
+    zuhoeren: "Ton partenaire parle. Écoute bien – c'est bientôt à toi. Tu verras ton image à ce moment-là.",
     stockt: 'En cas de blocage – questions pour aider',
     leitfragen: 'Questions-guides',
     deineRolle: 'Ton rôle',
@@ -198,6 +202,7 @@ const TEXTE: Record<string, Record<Schluessel, string>> = {
     frageVon: 'Pregunta',
     interviewt: 'Te entrevistan. Responde con frases completas y pregunta si no entiendes algo.',
     gleichDran: 'Pronto te toca – escucha bien.',
+    zuhoeren: 'Ahora habla tu compañero. Escucha bien – pronto te toca. Verás tu imagen en ese momento.',
     stockt: 'Si se atasca – preguntas para ayudar',
     leitfragen: 'Preguntas guía',
     deineRolle: 'Tu papel',
@@ -740,6 +745,15 @@ export function SchrittAnsicht({
               )}
             </Stack>
           </Group>
+        </Card>
+      )}
+
+      {/* Monolog zu dritt: C wartet ohne Bild (25.10.2026) – sonst hätte C mehr Vorbereitungszeit als B */}
+      {s.phase === 'arbeit' && s.teil === 'monolog' && !s.monolog && (
+        <Card withBorder radius="md" padding={stufe === 'unter' ? 'lg' : 'md'} data-pa-zuhoeren>
+          <Text size={stufe === 'unter' ? 'lg' : 'md'} c="dimmed">
+            {t.zuhoeren}
+          </Text>
         </Card>
       )}
 
