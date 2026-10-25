@@ -97,6 +97,12 @@ export class AuftragsRegister {
     e.warter.clear()
   }
 
+  /** Zahl der laufenden Aufträge aller Geräte – für die Aufspiel-Sperre (server/aktivitaet.ts, 25.10.2026) */
+  laufende(): number {
+    this.aufraeumen()
+    return [...this.eintraege.values()].filter((e) => e.zustand === 'laeuft').length
+  }
+
   /** Abgelaufenes entfernen: beendet und älter als die TTL, oder verwaist */
   aufraeumen(): void {
     const jetzt = this.uhr()

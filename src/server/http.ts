@@ -65,6 +65,7 @@ import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
 import { ANMELDE_CSP, anmeldeSeite, passwortSeite } from './seiten'
 import { rechtlichesBereit } from './datenschutzSeiten'
+import { aktivitaet, vonInnen } from './aktivitaet'
 import { SERVICE_WORKER } from './serviceWorker'
 
 export type Aufruf = (kanal: string, args: unknown[]) => Promise<unknown>
@@ -454,7 +455,13 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     const host = String(req.headers.host ?? '').toLowerCase()
     // Gesundheit (Docker prüft im Container über 127.0.0.1) – ohne Inhalte, vor der Adressprüfung
     if (req.method === 'GET' && req.url === '/gesundheit' && !host.includes('gywemaviation'))
-      return json(res, 200, { name: 'Schul-Apps', server: true, laeuft: true })
+      return json(res, 200, {
+        name: 'Schul-Apps',
+        server: true,
+        laeuft: true,
+        // Aufspiel-Sperre (25.10.2026, aktivitaet.ts): nur aus dem Container heraus – arbeitet gerade jemand?
+        ...(vonInnen(req.socket.remoteAddress) ? { aktiv: aktivitaet.bild(auftragsRegister.laufende()) } : {})
+      })
     // Nie über die Adresse von Gywem Aviation – und nur unter den eigenen Adressen
     if (host.includes('gywemaviation') || (hosts.size && !hosts.has(host)))
       return void res.writeHead(404, { 'content-type': 'text/plain' }).end('Nicht gefunden.')
@@ -864,6 +871,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
     const nutzer = sitzung.nutzer
     const istSchueler = nutzer.rolle === 'schueler'
+    // Handlung einer Lehrkraft (25.10.2026, Aufspiel-Sperre): nur Schreibzugriffe, nicht das Offenhalten einer Seite
+    if (!istSchueler && req.method === 'POST') aktivitaet.merkeLehrkraft()
     const b = buendel(sitzung.kennung, nutzer.id)
     const geraet = req.headers['x-schulapps-geraet']
     const geraetSchluessel = gueltigesGeraet(geraet) ? `${nutzer.id}_${geraet}` : null
@@ -886,6 +895,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       const puls = setInterval(() => res.write(' '), PULS_MS)
       res.on('close', () => clearInterval(puls))
+      aktivitaet.anfrageBeginnt()
       try {
         const wert = await imNutzer(alsNutzer(nutzer, sitzung.kennung), () => opts.aufruf(kanal, args))
         res.end(JSON.stringify({ ok: true, value: packen(wert) }))
@@ -893,6 +903,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       } finally {
         clearInterval(puls)
+        aktivitaet.anfrageEndet()
       }
       return
     }
