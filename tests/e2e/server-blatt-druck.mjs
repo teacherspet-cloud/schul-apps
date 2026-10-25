@@ -4,7 +4,7 @@
 // Vorlage: das jüngste echte Arbeitsblatt mit Aufgaben aus dem lokalen Profil (nur gelesen).
 // Aufruf: node tests/e2e/server-blatt.mjs <Ausgabeordner> [adresse] [admin] [passwort]
 import { chromium } from 'playwright-core'
-import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { expertenmodus } from './warten.mjs'
 
@@ -33,6 +33,27 @@ const vorlage = readdirSync(ordner)
   .sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs)
   .map((f) => JSON.parse(readFileSync(f, 'utf8')))
   .find((w) => w.id === '0vyazzx' || (w.payload?.sheets?.[0]?.blocks ?? []).filter((b) => b.type === 'task').length >= 2)
+
+// Attrappe ergänzen (und am Ende wiederherstellen): Feedback mit Markierungen, deren Zitate im getippten Text vorkommen
+// (25.10.2026 – die allgemeine Antwort „My first answer" seit 0.4.156 fand im deutschen Text keine Stelle, kein Randkommentar)
+const attrappePfad = process.env.SCHULAPPS_KI_ATTRAPPE ?? join(process.env.TEMP ?? '', 'attrappe.json')
+const attrappeAlt = readFileSync(attrappePfad, 'utf8')
+const attrappe = JSON.parse(attrappeAlt)
+attrappe.antworten ??= {}
+attrappe.antworten.blatt_aufgabe_feedback = {
+  einschaetzung: 'teilweise',
+  text: 'Der Aufbau stimmt, Belege fehlen.',
+  gelungen: 'Die Stationen sind richtig geordnet.',
+  fehlt: 'Begründe, warum die Marne der Wendepunkt war.',
+  schritt: 'Ergänze zu jeder Station eine Folge.',
+  markierungen: [
+    { zitat: 'an der Marne', art: 'lob', text: 'Treffend: der Wendepunkt 1914', zeichen: '' },
+    { zitat: 'Stellungskrieg', art: 'hinweis', text: 'Hier fehlt die Folge für die Soldaten', zeichen: 'A' },
+    { zitat: 'Widerstandskraft', art: 'fehler', text: 'Besser: Widerstandskraft erlahmte', zeichen: 'W' }
+  ],
+  krise: false
+}
+writeFileSync(attrappePfad, JSON.stringify(attrappe, null, 2))
 
 const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
@@ -130,7 +151,11 @@ try {
   // kein Esc: im Vollbild beim Lernen beendet Esc die Übung (09.10.2026) – Klick daneben genügt
   await s.mouse.click(5, 300)
   const rand = s.locator('[data-rand-kommentar]')
-  pruefe(await da(rand.first()), `Randkommentare im Korrekturrand (${await rand.count()})`)
+  const randDa = await da(rand.first())
+  // Bei Ausbleiben: Bild und Fehlertexte festhalten (25.10.2026)
+  if (!randDa) await s.screenshot({ path: join(out, '1a-kein-rand.png') })
+  const pruefFehler = randDa ? [] : await s.locator('[data-pruef-fehler], .mantine-Alert-root').allInnerTexts()
+  pruefe(randDa, `Randkommentare im Korrekturrand (${await rand.count()})${pruefFehler.length ? ` – ${pruefFehler.join(' | ').slice(0, 300)}` : ''}`)
   if (await rand.count()) {
     const lage = await rand.first().evaluate((el) => el.getBoundingClientRect())
     const feld = await t.evaluate((el) => el.getBoundingClientRect())
@@ -185,6 +210,7 @@ try {
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
 } finally {
+  writeFileSync(attrappePfad, attrappeAlt)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   await browser.close()
 }
