@@ -210,7 +210,17 @@ export function setSettings(patch: DeepPartial<AppSettings>): AppSettings {
   }
   // Gespeichert wird ohne Rückfall – außer die Lehrkraft macht erstmals eigene Schulangaben: dann bleibt, was sie sah
   const basis = vorSchulAenderung(gespeicherteEinstellungen(), patch, schule)
-  const next = mergeSettings(basis, patch as DeepPartial<AppSettings> & { ai?: Record<string, unknown> })
+  /*
+   * Einmal-Umstellungen (dunkel 05.10., Abendrot 20.10.2026) nicht bei jedem Speichern erneut anwenden (Befund der
+   * Lehrkraft 25.10.2026: „Wie Windows" sprang auf „Dunkel", „Frisch" auf „Abendrot"): `mergeSettings` liest die Marken
+   * aus dem zweiten Argument – beim Speichern ist das der Patch, der sie nie enthält. Die Marken der gespeicherten
+   * Einstellungen gelten weiter.
+   */
+  const mitMarken = {
+    ...patch,
+    appearance: { dunkelVorgabe: basis.appearance.dunkelVorgabe, abendrotVorgabe: basis.appearance.abendrotVorgabe, ...patch.appearance }
+  } as DeepPartial<AppSettings> & { ai?: Record<string, unknown> }
+  const next = mergeSettings(basis, mitMarken)
   writeJson('settings.json', next)
   return wirksam(next, schule)
 }

@@ -1,4 +1,5 @@
 import { genugFuerVarianten } from '../generation/distribute'
+import { zuordnungNeuWennAuto } from '../../../shared/themenbereiche'
 import { Alert, Button, Checkbox, Group, Loader, Modal, Popover, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconChevronDown, IconSparkles } from '@tabler/icons-react'
@@ -43,7 +44,7 @@ async function baseSettings(previous: TestSettings | null, context: VocabListCon
  */
 /** `haupt`: als Hauptknopf (Standardmodus, 07.10.2026 – dort der übliche Weg nach der Vokabelwahl) */
 export function AutoCreateButton({ selection, haupt }: { selection?: BookSelection | null; haupt?: boolean }): React.JSX.Element {
-  const { vocab, setVocab, listName, setListName, setListContext } = useVokabeltest()
+  const { vocab, setVocab, listName, setListName, setListContext, nameVonHand } = useVokabeltest()
   const [opened, setOpened] = useState(false)
   const [loading, setLoading] = useState(false)
   const usable = includedVocab(vocab)
@@ -58,13 +59,15 @@ export function AutoCreateButton({ selection, haupt }: { selection?: BookSelecti
         const book = await window.api.textbooks.get(selection.bookId)
         const entries = textbookEntries(book, selection.unit, selection.sections, selection.filter)
         setVocab(entries)
-        if (!listName.trim()) setListName(selection.name)
+        // Name folgt der Auswahl, solange er nicht von Hand stammt (25.10.2026: zuerst gewähltes Lehrwerk blieb stehen)
+        if (!listName.trim() || !nameVonHand) setListName(selection.name)
         // Wortschatz der früheren Units und Bände mitnehmen: Die Aufgaben bleiben in dem, was die Klasse kennt
         const books = await window.api.textbooks.list()
         const known = await collectKnownVocab(book, selection.unit, selection.sections, selection.context.grade ?? 99, books, (id) =>
           window.api.textbooks.get(id)
         )
         setListContext({ ...selection.context, known: known ?? undefined })
+        void zuordnungNeuWennAuto('vokabeltest', useVokabeltest.getState().testId)
       } catch (e) {
         notifyError(e)
         setLoading(false)

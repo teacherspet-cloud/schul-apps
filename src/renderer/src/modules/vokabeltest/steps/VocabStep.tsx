@@ -2,7 +2,7 @@ import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, 
 import { useAppSettings, useExperte } from '../../../shared/settingsStore'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import { IconArrowRight, IconBook2, IconClipboard, IconDeviceFloppy, IconFileUpload, IconList } from '@tabler/icons-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
 import Formularfuss, { FormularSeite } from '../../../shared/components/Formularfuss'
@@ -17,6 +17,7 @@ import { newId } from '../model/random'
 import { LANGUAGES, type VocabEntry } from '../model/types'
 import { alsListenEintrag, ausListe, includedVocab } from '../model/vocab'
 import { aiCall, useVokabeltest } from '../store'
+import { zuordnungNeuWennAuto } from '../../../shared/themenbereiche'
 import { AutoCreateButton } from './AutoCreate'
 import { SaveTestButton } from './TestLibrary'
 import { TextbookPicker } from './TextbookPicker'
@@ -52,7 +53,9 @@ export default function VocabStep(): React.JSX.Element {
   const [importing, setImporting] = useState<string | null>(null)
   const [review, setReview] = useState<{ entries: VocabEntry[]; herkunft?: () => void } | null>(null)
   /** Name von Hand geändert? Dann folgt er der Schulbuch-Auswahl nicht mehr. */
-  const nameEdited = useRef(false)
+  // „Name von Hand“ liegt seit 25.10.2026 im Store – vorher ein Ref dieser Ansicht, das beim Wechsel des Schritts verloren ging
+  const nameVonHand = useVokabeltest((st) => st.nameVonHand)
+  const setNameVonHand = useVokabeltest((st) => st.setNameVonHand)
   // Aktuelle Auswahl im Reiter „Schulbuch“ – „Test automatisch erstellen“ kann sie schon nutzen
   const [bookSelection, setBookSelection] = useState<BookSelection | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
@@ -184,7 +187,7 @@ export default function VocabStep(): React.JSX.Element {
                   onSelection={(selection) => {
                     setBookSelection(selection)
                     // Der Listenname zeigt, was gerade gewählt ist – bis er von Hand geändert wird
-                    if (!nameEdited.current && selection) setListName(selection.name)
+                    if (!nameVonHand && selection) setListName(selection.name)
                   }}
                   onEntries={(entries, name, context) => {
                     if (!entries.length) {
@@ -195,8 +198,10 @@ export default function VocabStep(): React.JSX.Element {
                     setReview({
                       entries,
                       herkunft: () => {
-                        if (!nameEdited.current) setListName(name)
+                        if (!nameVonHand) setListName(name)
                         setListContext(context)
+                        // Neues Lehrwerk → Themenbereich neu bestimmen (25.10.2026)
+                        void zuordnungNeuWennAuto('vokabeltest', useVokabeltest.getState().testId)
                       }
                     })
                   }}
@@ -222,8 +227,9 @@ export default function VocabStep(): React.JSX.Element {
                       setReview({
                         entries: ausListe(l.entries),
                         herkunft: () => {
-                          if (!nameEdited.current) setListName(l.name)
+                          if (!nameVonHand) setListName(l.name)
                           setListContext({ bookName: l.source || l.name, language: l.language, grade: l.grade })
+                          void zuordnungNeuWennAuto('vokabeltest', useVokabeltest.getState().testId)
                         }
                       })
                     }
@@ -240,7 +246,7 @@ export default function VocabStep(): React.JSX.Element {
                 aria-label="Name des Vokabeltests"
                 value={listName}
                 onChange={(e) => {
-                  nameEdited.current = true
+                  setNameVonHand(true)
                   setListName(e.currentTarget.value)
                 }}
                 style={{ flex: 1, minWidth: 240, maxWidth: 420 }}

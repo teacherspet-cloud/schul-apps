@@ -572,11 +572,16 @@ export default function SettingsStep(): React.JSX.Element {
                                   size="xs"
                                   label="Punkte je Form"
                                   min={0}
-                                  step={0.5}
-                                  decimalScale={1}
+                                  step={1}
+                                  decimalScale={0}
+                                  allowDecimal={false}
                                   value={sel.pointsPerItem}
                                   onChange={(v) =>
-                                    patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })
+                                    patch({
+                                      tasks: settings.tasks.map((t) =>
+                                        t.type === def.id ? { ...t, pointsPerItem: Math.max(0, Math.round(Number(v) || 0)) } : t
+                                      )
+                                    })
                                   }
                                 />
                               </Stack>
@@ -597,11 +602,16 @@ export default function SettingsStep(): React.JSX.Element {
                                   size="xs"
                                   label="Punkte je Vokabel"
                                   min={0}
-                                  step={0.5}
-                                  decimalScale={1}
+                                  step={1}
+                                  decimalScale={0}
+                                  allowDecimal={false}
                                   value={sel.pointsPerItem}
                                   onChange={(v) =>
-                                    patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })
+                                    patch({
+                                      tasks: settings.tasks.map((t) =>
+                                        t.type === def.id ? { ...t, pointsPerItem: Math.max(0, Math.round(Number(v) || 0)) } : t
+                                      )
+                                    })
                                   }
                                 />
                               </Group>

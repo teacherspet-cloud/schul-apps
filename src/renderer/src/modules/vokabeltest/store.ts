@@ -38,6 +38,8 @@ interface VokabeltestState {
   vocab: VocabEntry[]
   /** Name des Vokabeltests bzw. der Liste, z. B. „Green Line 5 – Unit 1, Station 1" */
   listName: string
+  /** Name von Hand eingegeben (25.10.2026): dann folgt er nicht mehr der Lehrwerk-Auswahl */
+  nameVonHand: boolean
   /** Herkunft der Liste (Schulbuch), falls bekannt */
   listContext: VocabListContext | null
   settings: TestSettings | null
@@ -62,6 +64,7 @@ interface VokabeltestState {
   undoVocab: () => void
   redoVocab: () => void
   setListName: (name: string) => void
+  setNameVonHand: (ja: boolean) => void
   setListContext: (context: VocabListContext | null) => void
   setSettings: (settings: TestSettings) => void
   loadDocument: (doc: TestDocument) => void
@@ -83,6 +86,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   step: 0,
   vocab: [],
   listName: '',
+  nameVonHand: false,
   listContext: null,
   settings: null,
   doc: null,
@@ -103,6 +107,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
     if (r) set({ vocab: r.stand, vokabelVerlauf: r.verlauf })
   },
   setListName: (listName) => set({ listName }),
+  setNameVonHand: (nameVonHand) => set({ nameVonHand }),
   setListContext: (listContext) => set({ listContext }),
   setSettings: (settings) => set({ settings }),
 
@@ -159,6 +164,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       step: 0,
       vocab: [],
       listName: '',
+      nameVonHand: false,
       listContext: null,
       settings: null,
       doc: null,
@@ -174,6 +180,8 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       testId: id,
       lastSavedAt: savedAt,
       listName: name,
+      // Ein gespeicherter Name bleibt – auch wenn danach anderes Lehrwerk-Material hinzukommt
+      nameVonHand: true,
       vocab: payload.vocab ?? payload.doc?.vocab ?? [],
       settings: payload.settings ?? payload.doc?.settings ?? null,
       doc: payload.doc,

@@ -47,7 +47,8 @@ describe('Test automatisch erstellen', () => {
     const open = result.find((t) => t.type === 'writeSentences')!
     const closed = result.find((t) => t.type === 'gapSentences')!
     expect(open.pointsPerItem).toBeGreaterThan(closed.pointsPerItem)
-    expect(result.every((t) => t.pointsPerItem >= 0.5 && (t.pointsPerItem * 2) % 1 === 0)).toBe(true)
+    // Ganze Punkte (25.10.2026)
+    expect(result.every((t) => t.pointsPerItem >= 1 && Number.isInteger(t.pointsPerItem))).toBe(true)
   })
 
   it('hält Summe und Mindestanzahlen der Formate ein', () => {
@@ -75,7 +76,9 @@ describe('Test automatisch erstellen', () => {
     expect(planned.vocabCount).toBe(14)
     expect(count(planned.tasks)).toBe(14)
     expect(planned.tasks.map((t) => t.type).sort()).toEqual(['gapSentences', 'matchDefinitions'])
-    expect(total(planned.tasks)).toBe(15)
+    // Ganze Punkte (25.10.2026): 14 Vokabeln auf zwei Aufgaben ergeben 15 Punkte nicht genau – nächstliegend 14
+    expect(Math.abs(total(planned.tasks) - 15)).toBeLessThanOrEqual(1)
+    expect(planned.tasks.every((t) => Number.isInteger(t.pointsPerItem) && t.pointsPerItem >= 1)).toBe(true)
 
     const failing = async <T>(): Promise<T> => {
       throw new Error('keine KI')

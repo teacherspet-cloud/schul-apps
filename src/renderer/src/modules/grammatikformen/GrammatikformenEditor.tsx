@@ -347,12 +347,17 @@ export default function GrammatikformenEditor({
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
-        {bank.darf && experte && altKandidaten.length > 0 && (
+        {bank.darf && altKandidaten.length > 0 && (
           <>
-            <Button variant="subtle" color="teal" leftSection={<IconListCheck size={16} />} onClick={() => setAltOffen(true)} data-grammatikformen-alternativen visibleFrom="sm">
-              Alternativlösungen
-            </Button>
-            <Modal opened={altOffen} onClose={() => setAltOffen(false)} title="Alternativlösungen nachtragen" centered data-grammatikformen-alternativen-frage>
+            <Tooltip label="Weitere richtige Lösungen zu allen Aufgaben dieses Bands von der KI nachtragen lassen">
+              <Button variant="subtle" color="teal" leftSection={<IconListCheck size={16} />} onClick={() => setAltOffen(true)} data-grammatikformen-alternativen visibleFrom="sm">
+                Weitere Lösungen (KI)
+              </Button>
+            </Tooltip>
+            <ActionIcon variant="subtle" color="teal" size="lg" hiddenFrom="sm" aria-label="Weitere richtige Lösungen nachtragen" onClick={() => setAltOffen(true)}>
+              <IconListCheck size={18} />
+            </ActionIcon>
+            <Modal opened={altOffen} onClose={() => setAltOffen(false)} title="Weitere richtige Lösungen nachtragen" centered data-grammatikformen-alternativen-frage>
               <Stack gap="sm">
                 <Text size="sm">
                   Die KI geht alle hinterlegten Aufgaben dieses Bands durch und trägt weitere gleichwertig richtige Antworten nach – Kurzformen, gleichwertige

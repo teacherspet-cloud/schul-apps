@@ -368,6 +368,20 @@ export function BankKarte({
             Fehlende Aufgaben mit KI ergänzen
           </Button>
         )}
+        {/* Alternativlösungen (25.10.2026) auch im Standardmodus – die Lehrkraft fand den Knopf sonst nicht */}
+        {altKandidaten.length > 0 && (
+          <Tooltip
+            label={`Die KI prüft jede Aufgabe auf weitere richtige Antworten (Kurzformen, gleichwertige Umformungen, passende Formen des vorgegebenen Worts) und trägt sie nach – etwa ${alternativenAnfragen(
+              altKandidaten
+            )} KI-Anfragen für ${altKandidaten.reduce((n, x) => n + x.aufgaben, 0)} Aufgaben. Die Aufgaben selbst bleiben unverändert.`}
+            multiline
+            w={340}
+          >
+            <Button variant="light" color="teal" leftSection={<IconListCheck size={16} />} onClick={alternativen} data-bank-ki-alternativen>
+              Weitere richtige Lösungen nachtragen (KI)
+            </Button>
+          </Tooltip>
+        )}
         <Text size="xs" c="dimmed">
           Lernende bekommen diese Aufgaben, sobald die Form einem Kurs hinzugefügt wird.
         </Text>
@@ -535,7 +549,7 @@ export function BankKarte({
             style={{ alignSelf: 'flex-start' }}
             data-bank-ki-alternativen
           >
-            Alternativlösungen nachtragen (KI, {altKandidaten.length} Bereiche)
+            Weitere richtige Lösungen nachtragen (KI, {altKandidaten.length} Bereiche)
           </Button>
         </Tooltip>
       )}

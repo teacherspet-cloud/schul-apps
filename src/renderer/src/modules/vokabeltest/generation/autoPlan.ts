@@ -59,22 +59,23 @@ export function vocabCountFor(totalPoints: number, available: number): number {
 /**
  * Punkte je Item so festlegen, dass die Summe möglichst genau der Vorgabe entspricht.
  * Offene Formate (Standardpunkte 2) bekommen dabei mehr Punkte als geschlossene.
+ * Nur GANZE Punkte (25.10.2026, Wunsch der Lehrkraft) – die Planung verschiebt notfalls Vokabeln zwischen den Aufgaben.
  */
 export function assignPoints(tasks: TaskSelection[], totalPoints: number): TaskSelection[] {
   const active = tasks.filter((t) => t.count > 0 && TASK_TYPES[t.type].usesVocab)
-  const weight = active.reduce((s, t) => s + t.count * Math.max(0.5, TASK_TYPES[t.type].defaultPoints), 0)
+  const weight = active.reduce((s, t) => s + t.count * Math.max(1, TASK_TYPES[t.type].defaultPoints), 0)
   if (!weight) return tasks
   const factor = totalPoints / weight
-  const half = (x: number): number => Math.max(0.5, Math.round(x * 2) / 2)
-  const ideal = active.map((t) => Math.max(0.5, TASK_TYPES[t.type].defaultPoints) * factor)
-  const points = new Map(active.map((t, i) => [t.type, half(ideal[i])]))
+  const ganz = (x: number): number => Math.max(1, Math.round(x))
+  const ideal = active.map((t) => Math.max(1, TASK_TYPES[t.type].defaultPoints) * factor)
+  const points = new Map(active.map((t, i) => [t.type, ganz(ideal[i])]))
   const sum = (): number => active.reduce((s, t) => s + t.count * points.get(t.type)!, 0)
 
-  // Bei wenigen Aufgaben alle Kombinationen halber Punkte prüfen: genaue Summe, möglichst nah an der Gewichtung
+  // Bei wenigen Aufgaben alle Kombinationen ganzer Punkte prüfen: genaue Summe, möglichst nah an der Gewichtung
   if (active.length <= 5) {
     const options = active.map((_, i) => {
-      const center = half(ideal[i])
-      return [-1.5, -1, -0.5, 0, 0.5, 1, 1.5].map((d) => center + d).filter((p) => p >= 0.5)
+      const center = ganz(ideal[i])
+      return [-2, -1, 0, 1, 2].map((d) => center + d).filter((p) => p >= 1)
     })
     let bestCombo: number[] | null = null
     let bestCost = Infinity
@@ -98,13 +99,13 @@ export function assignPoints(tasks: TaskSelection[], totalPoints: number): TaskS
     }
   }
 
-  // In halben Punkten nachjustieren, ohne über das Ziel hinauszuschießen
+  // In ganzen Punkten nachjustieren, ohne über das Ziel hinauszuschießen
   for (let guard = 0; guard < 200; guard++) {
     const diff = totalPoints - sum()
     if (Math.abs(diff) < 0.01) break
-    const step = diff > 0 ? 0.5 : -0.5
+    const step = diff > 0 ? 1 : -1
     const candidates = active
-      .filter((t) => Math.abs(step * t.count) <= Math.abs(diff) + 0.001 && points.get(t.type)! + step >= 0.5)
+      .filter((t) => Math.abs(step * t.count) <= Math.abs(diff) + 0.001 && points.get(t.type)! + step >= 1)
       .sort((a, b) => b.count - a.count)
     if (!candidates.length) break
     const t = candidates[0]

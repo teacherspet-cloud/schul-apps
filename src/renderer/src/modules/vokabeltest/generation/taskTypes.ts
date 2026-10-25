@@ -829,7 +829,8 @@ ${vocabLines(vocab)}`,
     minLevel: 'Pre-A1',
     usesVocab: true,
     minItems: 4,
-    defaultPoints: 0.5,
+    // Ganze Punkte (25.10.2026): je Wort ein Punkt
+    defaultPoints: 1,
     defaultTitle: 'Sort the words',
     defaultInstruction: 'Put the words into the correct groups.',
     schema: obj({

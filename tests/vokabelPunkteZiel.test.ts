@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { halbePunkteAufSumme, punkteAufZiel } from '../src/renderer/src/modules/vokabeltest/generation/punkteZiel'
+import { ganzePunkteAufSumme, punkteAufZiel } from '../src/renderer/src/modules/vokabeltest/generation/punkteZiel'
 import { variantPoints } from '../src/renderer/src/modules/vokabeltest/model/blocks'
 import type { Block } from '../src/renderer/src/modules/vokabeltest/model/types'
 
@@ -19,16 +19,24 @@ describe('Gesamtpunkte nach der Erzeugung', () => {
     const variante = { id: 'v', label: 'A', blocks: vorher }
     expect(variantPoints(variante)).toBe(25)
     const nachher = punkteAufZiel(vorher, 21)
-    expect(variantPoints({ ...variante, blocks: nachher })).toBe(21)
-    // in halben Punkten, nie unter einem halben
-    for (const b of nachher) expect(b.pointsPerItem * 2).toBe(Math.round(b.pointsPerItem * 2))
-    for (const b of nachher) expect(b.pointsPerItem).toBeGreaterThanOrEqual(0.5)
+    // Ganze Punkte (25.10.2026): 9·a + 6·b + 5·c = 21 geht mit ganzen Punkten nicht, auch nach dem Kürzen nicht –
+    // dann die nächstliegende Summe (20) statt 25
+    expect(Math.abs(variantPoints({ ...variante, blocks: nachher }) - 21)).toBeLessThanOrEqual(1)
+    // Trifft es genau, wenn die Zahlen es hergeben
+    const genau = punkteAufZiel([block('gapSentences', 'gap', 8, 1), block('matchTranslation', 'match', 6, 1), block('writeSentences', 'open', 4, 2)], 22)
+    expect(variantPoints({ id: 'v', label: 'A', blocks: genau })).toBe(22)
+    for (const b of nachher) expect(b.pointsPerItem).toBeGreaterThanOrEqual(1)
+    for (const b of nachher) expect(Number.isInteger(b.pointsPerItem)).toBe(true)
   })
 
   it('findet die genaue Summe auch bei vielen Aufgaben und meldet die nächstliegende, wenn halbe Punkte nicht reichen', () => {
-    const p = halbePunkteAufSumme([3, 4, 2, 5, 3, 2], [1, 1, 2, 1, 2, 1], 24)!
+    const p = ganzePunkteAufSumme([3, 4, 2, 5, 3, 2], [1, 1, 2, 1, 2, 1], 24)!
     expect(p.reduce((s, x, i) => s + x * [3, 4, 2, 5, 3, 2][i], 0)).toBe(24)
     // 3 Items, 2 Punkte: genau ginge nur mit 2/3 Punkt – nächstliegend 1,5 (3 × 0,5)
-    expect(halbePunkteAufSumme([3], [1], 2)).toEqual([0.5])
+    // Ganze Punkte (25.10.2026): nie unter 1, auch wenn die Summe kleiner ist
+    expect(ganzePunkteAufSumme([3], [1], 2)).toEqual([1])
+    // Eine Aufgabe mit nur einem Bild behält ihren Regelwert – die Summe holen die größeren Aufgaben
+    expect(ganzePunkteAufSumme([1, 4, 4], [1, 1, 2], 14)).toEqual([1, 1, 2])
+    expect(ganzePunkteAufSumme([1, 4, 4], [1, 1, 2], 17)).toEqual([1, 1, 3])
   })
 })

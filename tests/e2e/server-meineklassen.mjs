@@ -310,6 +310,20 @@ try {
   // Lernstand der Sprachklasse wie im Überblick der Kursseite (09.10.2026): Karteikasten-Säulen und Units je Band
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-stufen-diagramm]')), 'Sprachklasse: „Lernstand im Karteikasten"')
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-kurs-units] [data-band-gruppe]').first()), 'Sprachklasse: „Units" je Band (mit Cover/Kachel)')
+  // Entfernen im Kasten „Units" (25.10.2026): der Abschnitt verschwindet ohne Neuladen der Seite
+  {
+    const kasten = p.locator('[data-sprach-lernstand] [data-kurs-units]')
+    const zeilen = kasten.locator('[data-unit-abschnitt]').filter({ has: p.locator('[data-unit-abschnitt-aktionen]') })
+    const vorher = await zeilen.count()
+    if (vorher > 0) {
+      await zeilen.first().locator('[data-unit-abschnitt-aktionen]').click()
+      await p.locator('[data-unit-vokabeln-entfernen], [data-unit-grammatik-entfernen]').first().click()
+      await p.locator('[data-unit-entfernen-bestaetigen]').click()
+      const ende = Date.now() + 8000
+      while (Date.now() < ende && (await zeilen.count()) >= vorher) await p.waitForTimeout(300)
+      pruefe((await zeilen.count()) < vorher, `„Units": Entfernt – Kasten aktualisiert sich ohne Neuladen (${vorher} → ${await zeilen.count()})`)
+    } else pruefe(false, 'Kein Abschnitt mit Menü im Kasten „Units"')
+  }
   // Bedarfszahl am Fach (08.10.2026): oranges Abzeichen mit Warnzeichen, Erklärung als Bezeichnung des Reiters
   const mitBedarf = p.locator('[data-fach-leiste] [data-fach]:has([data-bedarf-zahl])').first()
   if (await mitBedarf.count()) {

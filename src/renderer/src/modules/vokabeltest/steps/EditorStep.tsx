@@ -517,10 +517,11 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
             size="xs"
             label={block.kind === 'freeText' ? 'Punkte' : 'Punkte je Item'}
             min={0}
-            step={0.5}
-            decimalScale={1}
+            step={1}
+            decimalScale={0}
+            allowDecimal={false}
             value={block.pointsPerItem}
-            onChange={(v) => apply((b) => (b.pointsPerItem = Number(v) || 0))}
+            onChange={(v) => apply((b) => (b.pointsPerItem = Math.max(0, Math.round(Number(v) || 0))))}
             description={`Summe: ${formatPoints(blockPoints(block))}`}
           />
           {'wordBank' in block && (

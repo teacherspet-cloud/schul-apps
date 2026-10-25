@@ -343,6 +343,22 @@ export async function zuordnungVergessen(moduleId: string, id: string): Promise<
   }
 }
 
+/**
+ * Herkunft eines Materials hat sich geändert (25.10.2026, Befund: ein Vokabeltest blieb bei „Green Line 6", obwohl die
+ * Vokabeln inzwischen aus Green Line 3 kamen): eine automatische Zuordnung vergessen, damit die Automatik nach dem
+ * nächsten Speichern neu einsortiert. Eine Zuordnung von Hand bleibt.
+ */
+export async function zuordnungNeuWennAuto(moduleId: string, id: string): Promise<void> {
+  const k = materialSchluessel(moduleId, id)
+  const z = useThemen.getState().daten.zuordnungen[k]
+  if (!z || z.von === 'hand') return
+  try {
+    setze(await window.api.themen.zuordnen({ [k]: null }))
+  } catch {
+    // dann sortiert die Automatik beim nächsten Abgleich
+  }
+}
+
 /** „Neu in diesem Bereich": das eben angelegte Material gehört von Hand in den Bereich */
 export async function neuImBereich(moduleId: string, docId: string, bereich: Themenbereich): Promise<void> {
   try {
