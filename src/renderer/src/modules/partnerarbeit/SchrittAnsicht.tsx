@@ -48,6 +48,7 @@ import { useEffect, useState } from 'react'
 import { HILFE_NAME, type HilfeArt, type SchrittSicht } from '@shared/partnerarbeit/ablauf'
 import { PA_TEIL_NAME } from '@shared/partnerarbeit/typen'
 import { symbolName } from '@shared/partnerarbeit/symbole'
+import { auftragSchritte } from '@shared/sprechen/karten'
 import { SymbolBild } from './SymbolBild'
 
 export type Stufe = 'unter' | 'mittel' | 'ober'
@@ -690,9 +691,19 @@ export function SchrittAnsicht({
               <Text fw={700} size={stufe === 'unter' ? 'lg' : 'md'} lang={sprache}>
                 {s.titel}
               </Text>
-              <Text size={stufe === 'unter' ? 'lg' : 'sm'} lang={sprache} data-pa-auftrag>
-                {s.monolog.auftrag}
-              </Text>
+              {/* Arbeitsauftrag als nummerierte Schritte (Befund 25.10.2026: ein Fließtext mit vielen Aufforderungen war unlesbar) */}
+              <Stack gap={stufe === 'unter' ? 8 : 4} data-pa-auftrag>
+                {auftragSchritte(s.monolog.auftrag).map((z, i) => (
+                  <Group key={i} gap={8} wrap="nowrap" align="flex-start">
+                    <Badge circle size={stufe === 'unter' ? 'lg' : 'md'} variant="filled" color={farbe}>
+                      {i + 1}
+                    </Badge>
+                    <Text size={stufe === 'unter' ? 'lg' : 'md'} lang={sprache} style={{ flex: 1 }}>
+                      {z}
+                    </Text>
+                  </Group>
+                ))}
+              </Stack>
               {istA && dranSymbol && (
                 <Group gap={6} data-pa-dran-symbol>
                   <Text size="sm" c="dimmed">

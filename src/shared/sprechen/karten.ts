@@ -168,7 +168,7 @@ export function hilfenBereinigt(art: SprechKarte['art'], roh: unknown): Intervie
   }
   if (art === 'monolog') {
     const h: MonologHilfen = {
-      auftrag: text(r.auftrag, 400),
+      auftrag: text(r.auftrag, 600),
       zusatzfragen: liste(r.zusatzfragen, 6),
       wortschatz: woerter(r.wortschatz),
       beispiele: liste(r.beispiele, 3),
@@ -257,8 +257,17 @@ export type FehlenderInhalt = 'hilfen' | 'beispiele' | 'dritteRolle' | 'bild'
 export function auftragReicht(auftrag: string | undefined): boolean {
   const t = (auftrag ?? '').trim()
   if (t.length < 60) return false
-  const saetze = t.split(/[.!?]+(?:\s|$)/).filter((x) => x.trim().length > 2).length
-  return saetze >= 2
+  const schritte = auftragSchritte(t)
+  // Zu viele Aufforderungen überfordern (Befund 25.10.2026): höchstens 3 Sätze und etwa 45 Wörter
+  return schritte.length >= 2 && schritte.length <= 3 && t.split(/\s+/).length <= 45
+}
+
+/** Arbeitsauftrag als einzelne Schritte (Sätze) – für die nummerierte Anzeige unter dem Bild */
+export function auftragSchritte(auftrag: string | undefined): string[] {
+  return (auftrag ?? '')
+    .split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ¿¡])/)
+    .map((x) => x.trim())
+    .filter((x) => x.length > 2)
 }
 
 /**

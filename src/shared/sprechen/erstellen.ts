@@ -128,7 +128,7 @@ function dauerRegel(teil: KartenTeil, g: Grundlage): string {
         : 'talk about the pictures, then go beyond them: compare, generalise and take a stand – a mere description is not enough (upper secondary, B1+–B2)'
   return [
     `- Duration: the student must be able to talk about the picture for about ${min} minute${min === 1 ? '' : 's'} using the auftrag alone – make it rich enough for that.`,
-    `- auftrag: write it ENTIRELY in the target language, start every step with an operator from the Lower Saxony core curriculum (${OPERATOREN_MONOLOG[g.sprache][stufe]}); 2–4 short task sentences in that order (describe → tell/explain → opinion${stufe === 'ober' ? '/compare/comment' : ''}). Competence expectation: ${erwartung}. Address the student directly, no German.`
+    `- auftrag: write it ENTIRELY in the target language. ${stufe === 'unter' ? '2' : '3'} SHORT sentences, at most 45 words in total, one task per sentence, each starting with an operator from the Lower Saxony core curriculum (${OPERATOREN_MONOLOG[g.sprache][stufe]}) in this order: describe → ${stufe === 'unter' ? 'tell what you like/think' : `tell or explain → ${stufe === 'ober' ? 'compare or comment' : 'give your opinion'}`}. NO chains like "say who …, where … and what …" – name ONE aspect per sentence (e.g. "Describe the people and the place."). Competence expectation: ${erwartung}. Address the student directly, no German.`
   ].join('\n')
 }
 

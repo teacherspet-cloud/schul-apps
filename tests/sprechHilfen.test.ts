@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   auftragReicht,
+  auftragSchritte,
   dialogRollen,
   ergaenzbar,
   fehlendeInhalte,
@@ -79,6 +80,17 @@ describe('Hilfen an Sprechkarten', () => {
     expect(auftragReicht('')).toBe(false)
     expect(auftragReicht('Describe the picture.')).toBe(false)
     expect(auftragReicht('Describe the picture. Say who you can see, where they are and what they are doing. What do you think happened before?')).toBe(true)
+    // Zu viele Aufforderungen (Befund 25.10.2026): mehr als drei Sätze oder über 45 Wörter → neu schreiben lassen
+    expect(
+      auftragReicht(
+        'Describe the picture coherently: say who you can see, where they are and what is happening during the interview. Tell what might have happened before and what might happen after the interview; explain how the student and the manager might feel. Comment on the situation: give your opinion about work experience in a bookshop and reasons, and compare it with your own preferred place for work experience.'
+      )
+    ).toBe(false)
+    expect(auftragSchritte('Describe the people and the place. Tell what happened before. Give your opinion!')).toEqual([
+      'Describe the people and the place.',
+      'Tell what happened before.',
+      'Give your opinion!'
+    ])
     const knapp = karteBereinigt(
       {
         art: 'monolog',
@@ -94,6 +106,7 @@ describe('Hilfen an Sprechkarten', () => {
     expect(fehlendeInhalte(knapp)).toEqual(['hilfen'])
     const u = ergaenzungsAnfrage('monolog', knapp, ['hilfen'], g).user
     expect(u).toMatch(/Duration: .* minute/)
+    expect(u).toContain('at most 45 words')
     // Operatoren des Kerncurriculums Niedersachsen (Sprechen, Sek I 2026) und Zielsprache
     expect(u).toContain('describe')
     expect(u).toContain('core curriculum')
