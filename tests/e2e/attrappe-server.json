@@ -2,6 +2,551 @@
  "verzoegerungMs": 300,
  "ausSchema": true,
  "antworten": {
+  "grammatik_pool": {
+   "regeln": [
+    {
+     "id": "r1",
+     "titel": "Simple past: Bildung",
+     "erklaerung": "Regelmäßige Verben bekommen -ed, unregelmäßige haben eigene Formen.",
+     "beispiele": [
+      "I played football.",
+      "She went home."
+     ]
+    },
+    {
+     "id": "r2",
+     "titel": "Simple past: Gebrauch",
+     "erklaerung": "Für abgeschlossene Handlungen in der Vergangenheit, oft mit Zeitangabe.",
+     "beispiele": [
+      "Yesterday we visited Berlin."
+     ]
+    }
+   ],
+   "aufgaben": [
+    {
+     "id": "l1",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (play) with my friends.",
+     "vorgabe": "(play)",
+     "loesungen": [
+      "played"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l2",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (visit) with my friends.",
+     "vorgabe": "(visit)",
+     "loesungen": [
+      "visited"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l3",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (watch) with my friends.",
+     "vorgabe": "(watch)",
+     "loesungen": [
+      "watched"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l4",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (cook) with my friends.",
+     "vorgabe": "(cook)",
+     "loesungen": [
+      "cooked"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l5",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (clean) with my friends.",
+     "vorgabe": "(clean)",
+     "loesungen": [
+      "cleaned"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l6",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (walk) with my friends.",
+     "vorgabe": "(walk)",
+     "loesungen": [
+      "walked"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l7",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (help) with my friends.",
+     "vorgabe": "(help)",
+     "loesungen": [
+      "helped"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "l8",
+     "art": "luecke",
+     "regelId": "r1",
+     "anweisung": "Setze die Form des simple past ein.",
+     "satz": "Yesterday I ___ (open) with my friends.",
+     "vorgabe": "(open)",
+     "loesungen": [
+      "opened"
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Regelmäßige Verben bekommen -ed."
+    },
+    {
+     "id": "a1",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Tom ___ a letter yesterday.",
+     "vorgabe": "",
+     "loesungen": [
+      "wrote"
+     ],
+     "optionen": [
+      "wrote",
+      "writes",
+      "writed"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a2",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Anna ___ to Berlin last year.",
+     "vorgabe": "",
+     "loesungen": [
+      "went"
+     ],
+     "optionen": [
+      "went",
+      "goes",
+      "goed"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a3",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Ben ___ a film on Sunday.",
+     "vorgabe": "",
+     "loesungen": [
+      "saw"
+     ],
+     "optionen": [
+      "saw",
+      "sees",
+      "seed"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a4",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Lea ___ pizza last night.",
+     "vorgabe": "",
+     "loesungen": [
+      "ate"
+     ],
+     "optionen": [
+      "ate",
+      "eats",
+      "eated"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a5",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Max ___ home after school.",
+     "vorgabe": "",
+     "loesungen": [
+      "ran"
+     ],
+     "optionen": [
+      "ran",
+      "runs",
+      "runned"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a6",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Mia ___ a new bike in May.",
+     "vorgabe": "",
+     "loesungen": [
+      "bought"
+     ],
+     "optionen": [
+      "bought",
+      "buys",
+      "buyed"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a7",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Paul ___ the bus to town.",
+     "vorgabe": "",
+     "loesungen": [
+      "took"
+     ],
+     "optionen": [
+      "took",
+      "takes",
+      "taked"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "a8",
+     "art": "auswahl",
+     "regelId": "r1",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "Emma ___ a book last week.",
+     "vorgabe": "",
+     "loesungen": [
+      "read"
+     ],
+     "optionen": [
+      "read",
+      "reads",
+      "readed"
+     ],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Unregelmäßiges Verb im simple past."
+    },
+    {
+     "id": "u1",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "We go to the park.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "We went to the park."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "u2",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "She eats an apple.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "She ate an apple."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "u3",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "They drink tea.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "They drank tea."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "u4",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "He writes a story.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "He wrote a story."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "u5",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "I swim in the lake.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "I swam in the lake."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "u6",
+     "art": "umformen",
+     "regelId": "r1",
+     "anweisung": "Setze den Satz ins simple past.",
+     "satz": "You sing a song.",
+     "vorgabe": "Vergangenheit",
+     "loesungen": [
+      "You sang a song."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "erklaerung": "Das Verb steht im simple past."
+    },
+    {
+     "id": "f1",
+     "art": "fehler",
+     "regelId": "r2",
+     "anweisung": "Finde den Fehler und verbessere ihn.",
+     "satz": "Last week Tim goed to London.",
+     "vorgabe": "",
+     "loesungen": [
+      "went"
+     ],
+     "optionen": [],
+     "fehlerWort": "goed",
+     "teile": [],
+     "erklaerung": "Unregelmäßige Verben bekommen kein -ed."
+    },
+    {
+     "id": "f2",
+     "art": "fehler",
+     "regelId": "r2",
+     "anweisung": "Finde den Fehler und verbessere ihn.",
+     "satz": "My sister buyed a cake.",
+     "vorgabe": "",
+     "loesungen": [
+      "bought"
+     ],
+     "optionen": [],
+     "fehlerWort": "buyed",
+     "teile": [],
+     "erklaerung": "Unregelmäßige Verben bekommen kein -ed."
+    },
+    {
+     "id": "f3",
+     "art": "fehler",
+     "regelId": "r2",
+     "anweisung": "Finde den Fehler und verbessere ihn.",
+     "satz": "The dog runned away.",
+     "vorgabe": "",
+     "loesungen": [
+      "ran"
+     ],
+     "optionen": [],
+     "fehlerWort": "runned",
+     "teile": [],
+     "erklaerung": "Unregelmäßige Verben bekommen kein -ed."
+    },
+    {
+     "id": "f4",
+     "art": "fehler",
+     "regelId": "r2",
+     "anweisung": "Finde den Fehler und verbessere ihn.",
+     "satz": "We seed a rainbow.",
+     "vorgabe": "",
+     "loesungen": [
+      "saw"
+     ],
+     "optionen": [],
+     "fehlerWort": "seed",
+     "teile": [],
+     "erklaerung": "Unregelmäßige Verben bekommen kein -ed."
+    },
+    {
+     "id": "s1",
+     "art": "satzbau",
+     "regelId": "r2",
+     "anweisung": "Bringe die Teile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "",
+     "loesungen": [
+      "Yesterday we played tennis."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [
+      "Yesterday",
+      "we",
+      "played",
+      "tennis."
+     ],
+     "erklaerung": "Zeitangabe, Subjekt, Verb, Objekt."
+    },
+    {
+     "id": "s2",
+     "art": "satzbau",
+     "regelId": "r2",
+     "anweisung": "Bringe die Teile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "",
+     "loesungen": [
+      "Last night they watched a film."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [
+      "Last",
+      "night",
+      "they",
+      "watched",
+      "a",
+      "film."
+     ],
+     "erklaerung": "Zeitangabe, Subjekt, Verb, Objekt."
+    },
+    {
+     "id": "s3",
+     "art": "satzbau",
+     "regelId": "r2",
+     "anweisung": "Bringe die Teile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "",
+     "loesungen": [
+      "On Monday she visited her uncle."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [
+      "On",
+      "Monday",
+      "she",
+      "visited",
+      "her",
+      "uncle."
+     ],
+     "erklaerung": "Zeitangabe, Subjekt, Verb, Objekt."
+    },
+    {
+     "id": "s4",
+     "art": "satzbau",
+     "regelId": "r2",
+     "anweisung": "Bringe die Teile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "",
+     "loesungen": [
+      "In July I swam in the sea."
+     ],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [
+      "In",
+      "July",
+      "I",
+      "swam",
+      "in",
+      "the",
+      "sea."
+     ],
+     "erklaerung": "Zeitangabe, Subjekt, Verb, Objekt."
+    }
+   ]
+  },
+  "grammatik_pruefung": {
+   "urteile": [
+    {
+     "nr": 1,
+     "ok": false,
+     "loesungen": [],
+     "optionen": [],
+     "fehlerWort": "",
+     "zuLeicht": false,
+     "grund": "Satz zu nah an Aufgabe 2."
+    }
+   ]
+  },
   "grammatik_alternativen": {
    "aufgaben": [
     {
