@@ -64,6 +64,7 @@ import { auftragsRegister, buendel, oeffneStrom, sitzungVergessen } from './erei
 import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
 import { ANMELDE_CSP, anmeldeSeite, passwortSeite } from './seiten'
+import { rechtlichesBereit } from './datenschutzSeiten'
 import { SERVICE_WORKER } from './serviceWorker'
 
 export type Aufruf = (kanal: string, args: unknown[]) => Promise<unknown>
@@ -573,7 +574,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           konto: url.searchParams.get('konto') === '1',
           // Unbekannter Code vom Feld „Mit Code öffnen" (09.10.2026, SchuelerBereich.tsx)
           code: url.searchParams.get('code') ?? '',
-          codeUnbekannt: url.searchParams.get('unbekannt') === '1'
+          codeUnbekannt: url.searchParams.get('unbekannt') === '1',
+          // Datenschutz/Impressum erst verweisen, wenn die Angaben vollständig sind (25.10.2026)
+          rechtliches: rechtlichesBereit()
         })
       )
     }

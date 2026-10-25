@@ -73,6 +73,11 @@ export function DatenschutzAngabenKarte(): React.JSX.Element {
         <Loader size="sm" />
       ) : (
         <Stack gap="sm">
+          {/* Anmeldeseite (25.10.2026): Verweise auf Datenschutz und Impressum erst, wenn alles vollständig ist */}
+          <Text size="xs" c="dimmed">
+            Die Verweise auf Datenschutz, Elternfassung und Impressum erscheinen auf der Anmeldeseite erst, wenn alle Pflichtangaben eingetragen sind (hier sowie Anschrift,
+            Telefon und E-Mail der Schule in der Schul-Einrichtung) und die Angaben als geprüft markiert wurden. Die Seiten selbst sind über ihre Adresse immer erreichbar.
+          </Text>
           <Text size="sm" c="dimmed">
             Diese Angaben erscheinen auf den öffentlichen Seiten (ohne Anmeldung), die auf der Anmeldeseite und in den Einstellungen verlinkt sind. Leere
             Felder stehen dort als markierte Platzhalter.

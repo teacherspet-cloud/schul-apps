@@ -221,6 +221,27 @@ export function seitenStand(): SeitenStand {
   }
 }
 
+/**
+ * Sind Datenschutzerklärung, Elternfassung und Impressum vollständig (25.10.2026, Wunsch der Lehrkraft)? Dann zeigt die
+ * Anmeldeseite die Verweise darauf; vorher stünden dort Seiten mit „[von der Schule einzutragen: …]“. Vollständig heißt:
+ * kein Platzhalter auf einer der drei Seiten UND die Schule hat die markierten Stellen als geprüft bestätigt (sonst
+ * stehen noch die gelben Prüfhinweise darin). Die Seiten selbst bleiben erreichbar – wer die Adresse kennt, soll die
+ * Pflichtangaben prüfen können.
+ */
+export function rechtlichesVollstaendig(st: SeitenStand): boolean {
+  if (!st.angaben.geprueft) return false
+  return ![datenschutzHtml(st), elternHtml(st), impressumHtml(st)].some((html) => html.includes('data-platzhalter'))
+}
+
+/** Wie `rechtlichesVollstaendig`, aus der Datenbank – für die Anmeldeseite (http.ts) */
+export function rechtlichesBereit(): boolean {
+  try {
+    return rechtlichesVollstaendig(seitenStand())
+  } catch {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------- HTML-Bausteine
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

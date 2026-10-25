@@ -17,8 +17,10 @@ import {
   impressumHtml,
   INFO_CSP,
   kenntnisMerken,
+  rechtlichesVollstaendig,
   type SeitenStand
 } from '../src/server/datenschutzSeiten'
+import { anmeldeSeite } from '../src/server/seiten'
 import {
   AUFSICHT_NIEDERSACHSEN,
   KURZFASSUNG_SCHUELER,
@@ -105,6 +107,43 @@ describe('Datenschutzerklärung', () => {
     expect(i).toContain('§ 18 Abs. 2 MStV')
     expect(i).toContain('[von der Schule einzutragen: Name der Schulleitung]')
     expect(i).toContain('[von der Schule einzutragen: Telefon und E-Mail der Schule]')
+  })
+})
+
+// Anmeldeseite (25.10.2026, Wunsch der Lehrkraft): Verweise erst, wenn die Angaben vollständig sind
+describe('Rechtsseiten vollständig', () => {
+  const voll = (): SeitenStand =>
+    stand({
+      angaben: {
+        ...LEERE_ANGABEN,
+        verantwortlich: 'OStD’ Erika Muster, Schulleiterin',
+        datenschutzbeauftragte: 'Datenschutz-Team, datenschutz@schule.example',
+        betreiber: 'IT-Team der Schule, it@schule.example',
+        geprueft: true
+      },
+      schule: { name: 'Gymnasium Musterstadt', strasse: 'Schulstraße 1', plz: '30159', ort: 'Hannover', telefon: '0511 123456', email: 'info@schule.example' }
+    })
+  it('ohne Angaben unvollständig, mit allen Pflichtangaben und Prüfung vollständig', () => {
+    expect(rechtlichesVollstaendig(stand())).toBe(false)
+    expect(rechtlichesVollstaendig(voll())).toBe(true)
+  })
+  it('ohne Prüfung oder ohne Telefon/E-Mail der Schule noch nicht', () => {
+    const ohnePruefung = voll()
+    ohnePruefung.angaben.geprueft = false
+    expect(rechtlichesVollstaendig(ohnePruefung)).toBe(false)
+    const ohneKontakt = voll()
+    ohneKontakt.schule = { ...ohneKontakt.schule!, telefon: '', email: '' }
+    expect(rechtlichesVollstaendig(ohneKontakt)).toBe(false)
+    const ohneLeitung = voll()
+    ohneLeitung.angaben.verantwortlich = ''
+    expect(rechtlichesVollstaendig(ohneLeitung)).toBe(false)
+  })
+  it('Anmeldeseite zeigt die Verweise nur bei vollständigen Angaben', () => {
+    const o = { iserv: true, notzugang: true, fehler: '', ziel: '/' }
+    expect(anmeldeSeite({ ...o, rechtliches: false })).not.toContain('data-rechtliches')
+    expect(anmeldeSeite({ ...o, rechtliches: false })).not.toContain('/impressum')
+    expect(anmeldeSeite({ ...o, rechtliches: true })).toContain('data-rechtliches')
+    expect(anmeldeSeite(o)).toContain('data-rechtliches')
   })
 })
 

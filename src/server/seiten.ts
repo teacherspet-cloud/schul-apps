@@ -112,6 +112,11 @@ export function anmeldeSeite(o: {
   /** Unbekannter Code (09.10.2026): Meldung am Codefeld, eingegebener Code steht wieder darin */
   code?: string
   codeUnbekannt?: boolean
+  /**
+   * Verweise auf Datenschutz, Elternfassung und Impressum (25.10.2026, Wunsch der Lehrkraft): erst, wenn die Angaben in
+   * „Schule & Daten“ vollständig sind (datenschutzSeiten.ts `rechtlichesVollstaendig`); fehlt die Angabe, werden sie gezeigt
+   */
+  rechtliches?: boolean
 }): string {
   const code = (o.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
   const ziel = /^\/[a-zA-Z0-9/_-]*$/.test(o.ziel) ? o.ziel : '/'
@@ -160,8 +165,8 @@ export function anmeldeSeite(o: {
   </form>
 </main>
 <div class="fuss"><a class="knopf2" id="anmelden-oeffnen" href="#anmelden-fenster" aria-haspopup="dialog" data-anmelden-oeffnen>Mit Nutzername und Passwort anmelden</a></div>
-<!-- Informationspflichten (22.10.2026, Prüfung des Schulträgers): ohne Anmeldung erreichbar (datenschutzSeiten.ts) -->
-<div class="fuss rechtliches" data-rechtliches><a class="knopf2" href="/datenschutz">Datenschutz</a> · <a class="knopf2" href="/datenschutz/eltern">Für Eltern</a> · <a class="knopf2" href="/impressum">Impressum</a></div>
+<!-- Informationspflichten (22.10.2026, Prüfung des Schulträgers): ohne Anmeldung erreichbar (datenschutzSeiten.ts); erst nach vollständiger Einrichtung (25.10.2026) -->
+${o.rechtliches === false ? '' : '<div class="fuss rechtliches" data-rechtliches><a class="knopf2" href="/datenschutz">Datenschutz</a> · <a class="knopf2" href="/datenschutz/eltern">Für Eltern</a> · <a class="knopf2" href="/impressum">Impressum</a></div>'}
 </div>
 <dialog id="anmelden-fenster" class="fenster${fensterOffen ? ' offen' : ''}" aria-labelledby="anmelden-titel" data-anmelden-fenster>
   <div class="fenster-innen">
