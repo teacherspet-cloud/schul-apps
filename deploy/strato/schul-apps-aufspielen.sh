@@ -54,13 +54,14 @@ fi
 
 # 0b. Auf eine ruhige Lücke warten
 aktivitaet() {
-  docker exec "$CONTAINER" node -e "fetch((process.env.SCHULAPPS_TLS_CERT?'https':'http')+'://127.0.0.1:8443/gesundheit').then(r=>r.json()).then(j=>{const a=j.aktiv;if(!a){console.log('UNBEKANNT');return}console.log((a.ruhig?'RUHIG':'AKTIV')+' '+a.laufend+' '+(a.lehrkraftVorMinuten===null?'-':a.lehrkraftVorMinuten))}).catch(()=>console.log('UNBEKANNT'))" 2>/dev/null || echo UNBEKANNT
+  # NODE_TLS_REJECT_UNAUTHORIZED muss IN den Container (eigenes Zertifikat) – sonst „unbekannt“ (Befund beim ersten Lauf, 25.10.2026)
+  docker exec -e NODE_TLS_REJECT_UNAUTHORIZED=0 "$CONTAINER" node -e "fetch((process.env.SCHULAPPS_TLS_CERT?'https':'http')+'://127.0.0.1:8443/gesundheit').then(r=>r.json()).then(j=>{const a=j.aktiv;if(!a){console.log('UNBEKANNT');return}console.log((a.ruhig?'RUHIG':'AKTIV')+' '+a.laufend+' '+(a.lehrkraftVorMinuten===null?'-':a.lehrkraftVorMinuten))}).catch(()=>console.log('UNBEKANNT'))" 2>/dev/null || echo UNBEKANNT
 }
 if [ "$JETZT" = false ]; then
   START=$(date +%s)
   LUECKE=0
   while :; do
-    A=$(NODE_TLS_REJECT_UNAUTHORIZED=0 aktivitaet)
+    A=$(aktivitaet)
     set -- $A
     ZUSTAND_A=${1:-UNBEKANNT}; LAUFEND=${2:-0}; VOR=${3:--}
     VERGANGEN=$(( $(date +%s) - START ))
