@@ -385,6 +385,8 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
    * (shared/lehrwerkVorwahl.ts). undefined = lädt noch; null = nichts Passendes (dann wie bisher die Vorgabe des Kurses).
    */
   const [kursLehrwerk, setKursLehrwerk] = useState<{ buch?: string; unit?: string; units?: string[] } | null | undefined>(vorgabe ? undefined : null)
+  // Band/Unit, aus denen die Lehrkraft die Themen gewählt hat (GrammatikAuswahl, 25.10.2026)
+  const [lehrwerkWahl, setLehrwerkWahl] = useState<{ buch: string; unit?: string } | undefined>(undefined)
   /*
    * Schon für Kurs bzw. Klasse freigegebene Grammatik (10.10.2026, Wunsch der Lehrkraft): standardmäßig ausgeblendet –
    * nur, was für die GANZE Gruppe gilt; Einzel-Freigaben bleiben sichtbar mit Hinweis. Dazu der Vorschlag „als Nächstes"
@@ -446,6 +448,21 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
     )
   }, [vorgabe?.vokId, fach?.sprache]) // eslint-disable-line react-hooks/exhaustive-deps
   const lehrwerkVorwahl = kursLehrwerk ?? vorgabe?.lehrwerk
+  /*
+   * Lehrwerk der Zuweisung (25.10.2026, Befund der Lehrkraft in der 10b: aus dem Buch gewählte Grammatik stand nicht
+   * unter dem Buch): zuerst die Leiste der Auswahl, sonst die Vorwahl des Kurses mit seiner höchsten Unit, sonst die
+   * Angabe des Kurses. Gilt für Bank-Zuweisung, KI-Entwurf und Verben gleichermaßen.
+   */
+  const lehrwerkInfo: { buch: string; unit?: string } | undefined = lehrwerkWahl?.buch
+    ? lehrwerkWahl
+    : lehrwerkVorwahl?.buch
+    ? {
+        buch: lehrwerkVorwahl.buch,
+        ...(kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit ? { unit: kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit } : {})
+      }
+    : vorgabe?.lehrwerk?.buch
+    ? { buch: vorgabe.lehrwerk.buch, ...(vorgabe.lehrwerk.unit ? { unit: vorgabe.lehrwerk.unit } : {}) }
+    : undefined
   const abgleich = vorgabe && !eigenesAn ? freigabeAbgleich(themenIds, bestehend ?? []) : null
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
   const gruppenName =
@@ -554,7 +571,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
       if (!neueIds.length) return schliessen()
     }
     const titel = kursAbgleich ? neueThemen.map((t) => t.label).join(' · ') : `${thema}`
-    const info = { themen: neueIds, teilformen: neueTeile, jahrgang, ...(vorgabe?.lehrwerk?.buch ? { lehrwerk: vorgabe.lehrwerk } : {}) }
+    const info = { themen: neueIds, teilformen: neueTeile, jahrgang, ...(lehrwerkInfo ? { lehrwerk: lehrwerkInfo } : {}) }
     /*
      * Aufgabenbank (13.10.2026, abgestimmt): Im Kurs bekommt jede Form ihre hinterlegten Aufgaben – sofort freigeschaltet,
      * ohne KI. Formen ohne hinterlegte Aufgaben: die KI erzeugt sie je Teilbereich (Durchsicht, dann an der Form gespeichert).
@@ -613,7 +630,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                 anzahl: AUFGABEN_JE_FELD,
                 themenIds: [teil.split('/')[0]],
                 hinweise: teilHinweise(teil),
-                ...(lehrwerkVorwahl?.buch ? { lehrwerk: { buch: lehrwerkVorwahl.buch, unit: kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit } } : {}),
+                ...(lehrwerkInfo ? { lehrwerk: lehrwerkInfo } : {}),
                 vorhanden: []
               },
               k.ai,
@@ -678,13 +695,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
          * Bekannte Grammatik (09.10.2026, Befund „There was/were" in Klasse 5): Lehrwerk-Stand des Kurses (sonst der
          * Jahrgang) und die im Kurs schon freigegebenen Themen – unbekannte Zeitformen sperrt grammatikErzeugen.ts.
          */
-        bekannt: [
-          ...bekanntNachStand(
-            lehrwerkVorwahl?.buch ? { buch: lehrwerkVorwahl.buch, unit: kursLehrwerk?.units?.at(-1) ?? lehrwerkVorwahl.unit } : undefined,
-            jahrgang
-          ),
-          ...(bestehend ?? []).filter((b) => b.status !== 'entfernt').flatMap((b) => b.themen)
-        ],
+        bekannt: [...bekanntNachStand(lehrwerkInfo, jahrgang), ...(bestehend ?? []).filter((b) => b.status !== 'entfernt').flatMap((b) => b.themen)],
         themenIds: neueIds,
         // Maßstab für das Niveau (09.10.2026): Land und Schulform aus den Einstellungen, Klasse oben
         land: settings.defaults?.stateId || undefined,
@@ -753,7 +764,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
                 lehrwerk={lehrwerkVorwahl}
                 query={query}
                 wahl={{ themen: themenIds, teilformen: teilWahl }}
-                onChange={(w) => (setThemenIds(w.themen), setTeilWahl(w.teilformen))}
+                onChange={(w) => (setThemenIds(w.themen), setTeilWahl(w.teilformen), setLehrwerkWahl(w.lehrwerk))}
                 beschreibung={
                   vorgabe
                     ? 'Schon freigegebene Grammatik steht nicht mehr zur Wahl – sie steht in der Grammatik-Tabelle des Kurses (dort „+ Aufgaben"). Neu Angehaktes bekommt Aufgaben von der KI; früher Entferntes kommt mit seinem Lernstand zurück.'

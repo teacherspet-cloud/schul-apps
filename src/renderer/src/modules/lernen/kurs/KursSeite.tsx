@@ -25,6 +25,7 @@ import {
   Collapse,
   Group,
   Loader,
+  Menu,
   Modal,
   NumberInput,
   Progress,
@@ -51,6 +52,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconClock,
+  IconDots,
   IconEye,
   IconEyeOff,
   IconLayoutDashboard,
@@ -247,6 +249,9 @@ function HinweisListe({
  * „Grammatik", aufgeklappt je Station hinter den Vokabel-Abschnitten die Grammatik mit eigenem Balken; Units nur mit
  * Grammatik erscheinen ebenfalls (kursAnsicht.ts `unitsMitGrammatik`).
  */
+/** Nach „Entfernen" im Kasten „Units" (25.10.2026): Kursseite und „Meine Klassen" laden neu */
+export const KURS_GEAENDERT = 'schulapps:kurs-geaendert'
+
 export function UnitsKompakt({
   abschnitte,
   grammatik = KEINE_GRAMMATIK,
@@ -264,6 +269,28 @@ export function UnitsKompakt({
   const [unitAuf, setUnitAuf] = useAufZu<Record<string, boolean>>(`units-auf-${kursSchluessel}`, {})
   // Mehrere Bände (10.10.2026): je Band aufklappbar, der neueste offen
   const bandAuf = useBaendeOffen(`units-${kursSchluessel}`, baende.map((b) => b.buch))
+  /*
+   * Entfernen direkt im Kasten (25.10.2026, Wunsch der Lehrkraft: „Vokabeln und Grammatik wieder entfernen" – in Kursen
+   * und Klassen): sanft wie in den Reitern „Vokabeln" und „Grammatik", der Lernstand bleibt und kommt beim Zurückholen wieder.
+   */
+  const [frage, setFrage] = useState<{ art: 'vok'; index: number; titel: string } | { art: 'gram'; id: string; titel: string } | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const entfernen = async (): Promise<void> => {
+    if (!frage || !kursSchluessel) return
+    setLaeuft(true)
+    try {
+      if (frage.art === 'vok') await senden(`/server/vokabeln/${kursSchluessel}/abschnitt-entfernen`, { index: frage.index, titel: frage.titel })
+      else await senden(`/server/grammatik/${frage.id}/entfernen`, {})
+      notifySuccess(`„${frage.titel}“ entfernt – der Lernstand bleibt gespeichert.`)
+      setFrage(null)
+      window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT))
+      window.dispatchEvent(new Event(KURS_GEAENDERT))
+    } catch (e) {
+      notifyError(e, 'Nicht entfernt')
+    } finally {
+      setLaeuft(false)
+    }
+  }
   if (!baende.length)
     return (
       <Text size="sm" c="dimmed">
@@ -375,9 +402,37 @@ export function UnitsKompakt({
                           const mitGram = a.gram.length > 0
                           const umschalten = (): void => setUnitAuf((m) => ({ ...m, [ak]: !m[ak] }))
                           const name = a.vok?.name ?? (a.gram[0]?.station || 'Grammatik')
+                          const vok = a.vok
+                          const menue = kursSchluessel && (vok || a.gram.length > 0) && (
+                            <Menu position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon size="xs" variant="subtle" color="gray" aria-label={`${name}: Aktionen`} data-unit-abschnitt-aktionen={name}>
+                                  <IconDots size={13} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                {vok && (
+                                  <Menu.Item leftSection={<IconX size={14} />} onClick={() => setFrage({ art: 'vok', index: vok.index, titel: vok.name })} data-unit-vokabeln-entfernen>
+                                    Vokabeln „{vok.name}“ entfernen
+                                  </Menu.Item>
+                                )}
+                                {a.gram.map((x) => (
+                                  <Menu.Item
+                                    key={x.id}
+                                    leftSection={<IconX size={14} />}
+                                    onClick={() => setFrage({ art: 'gram', id: x.id, titel: x.titel })}
+                                    data-unit-grammatik-entfernen={x.titel}
+                                  >
+                                    Grammatik „{x.titel}“ entfernen
+                                  </Menu.Item>
+                                ))}
+                              </Menu.Dropdown>
+                            </Menu>
+                          )
                           return (
                             <div key={ak} data-unit-abschnitt={name} data-offen={(mitGram && aAuf) || undefined}>
-                              <UnstyledButton w="100%" onClick={mitGram ? umschalten : undefined} aria-expanded={mitGram ? aAuf : undefined} style={{ cursor: mitGram ? 'pointer' : 'default' }}>
+                              <Group gap={2} wrap="nowrap" align="center">
+                              <UnstyledButton style={{ flex: 1, minWidth: 0, cursor: mitGram ? 'pointer' : 'default' }} onClick={mitGram ? umschalten : undefined} aria-expanded={mitGram ? aAuf : undefined}>
                                 <Group gap={6} wrap="nowrap">
                                   <Group gap={2} wrap="nowrap" w={{ base: 80, sm: 98 }} style={{ flexShrink: 0, minWidth: 0 }}>
                                     {mitGram &&
@@ -396,6 +451,8 @@ export function UnitsKompakt({
                                   </Text>
                                 </Group>
                               </UnstyledButton>
+                              {menue}
+                              </Group>
                               {mitGram && aAuf && (
                                 <Stack gap={4} mt={4} pl={14}>
                                   {a.gram.map((x) => (
@@ -428,6 +485,24 @@ export function UnitsKompakt({
           </BandGruppe>
         )
       })}
+      <Modal opened={Boolean(frage)} onClose={() => setFrage(null)} title={frage?.art === 'vok' ? 'Vokabeln entfernen?' : 'Grammatik entfernen?'} data-unit-entfernen-frage>
+        {frage && (
+          <Stack gap="sm">
+            <Text size="sm">
+              „{frage.titel}“ wird aus dem Kurs genommen. Der Lernstand bleibt gespeichert und gilt wieder, wenn du es zurückholst (Reiter{' '}
+              {frage.art === 'vok' ? '„Vokabeln“' : '„Grammatik“'}, Abschnitt „Entfernt“).
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setFrage(null)}>
+                Abbrechen
+              </Button>
+              <Button color="red" loading={laeuft} onClick={() => void entfernen()} data-unit-entfernen-bestaetigen>
+                Entfernen
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       <Group gap="md" mt={2}>
         {[
           ['teal', 'sicher'],
@@ -591,6 +666,12 @@ export function KursSeite({
     [id]
   )
   useEffect(laden, [laden])
+  // Abschnitt oder Grammatik im Kasten „Units" entfernt (25.10.2026): Kurs neu laden
+  useEffect(() => {
+    const auf = (): void => (laden(), geaendert?.())
+    window.addEventListener(KURS_GEAENDERT, auf)
+    return () => window.removeEventListener(KURS_GEAENDERT, auf)
+  }, [laden]) // eslint-disable-line react-hooks/exhaustive-deps
   const neuLaden = (): void => (laden(), geaendert?.())
   const [bedarfStand, setBedarfStand] = useState(0)
   const vorgabe = abschnitteVorgabe ?? (d?.abschnitte ? { abschnitte: d.abschnitte, namen: d.lernendeNamen ?? [] } : undefined)

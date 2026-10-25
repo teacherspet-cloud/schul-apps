@@ -27,7 +27,7 @@ import {
   ThemeIcon,
   Tooltip
 } from '@mantine/core'
-import { IconCheck, IconChecks, IconCircleDashed, IconCircleHalf2, IconPencil, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconCheck, IconChecks, IconCircleDashed, IconCircleHalf2, IconPencil, IconSparkles, IconTrash, IconListCheck } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import {
@@ -70,7 +70,10 @@ import {
   feldZahl,
   useSchulStufen,
   useBankEntwuerfe,
-  type BankEntwurf
+  type BankEntwurf,
+  alternativenAnfragen,
+  alternativenKandidaten,
+  bankAlternativenStarten
 } from './bank'
 import { aufServer } from '../../shared/plattform'
 import { fachVon } from '@shared/faecher'
@@ -219,6 +222,20 @@ export function BankKarte({
         )
       : felderVon(r)
   const offeneReiter = reiter.filter((r) => darfReiter(r) && felderFuerAlle(r).length)
+  // Alternativlösungen (25.10.2026): zu allen vorhandenen Aufgaben dieses Punkts weitere richtige Antworten nachtragen
+  const altKandidaten = darf
+    ? alternativenKandidaten(
+        reiter.map((r) => r.schluessel),
+        zahlen
+      )
+    : []
+  const alternativen = (): void =>
+    bankAlternativenStarten(
+      altKandidaten.map((x) => ({ schluessel: x.schluessel, titel: reiter.find((r) => r.schluessel === x.schluessel)?.titel ?? x.schluessel })),
+      { sprache: buch.language, fach: fachVon(fach)?.label ?? fach, jahrgang: buch.grade ?? themaZu(reiter[0]?.themen[0] ?? '')?.from ?? 7 },
+      `Alternativlösungen: ${punkt.text}`,
+      ziel
+    )
   const alleFehlenden = (): void =>
     bankErzeugenStarten(
       offeneReiter.flatMap((r) =>
@@ -500,6 +517,27 @@ export function BankKarte({
         >
           Alle fehlenden mit KI erzeugen ({offeneReiter.length} Bereiche)
         </Button>
+      )}
+      {altKandidaten.length > 0 && (
+        <Tooltip
+          label={`Die KI nennt zu jeder Aufgabe weitere gleichwertig richtige Antworten (Kurzformen, gleichwertige Umformungen) – etwa ${alternativenAnfragen(
+            altKandidaten
+          )} KI-Anfragen für ${altKandidaten.reduce((n, x) => n + x.aufgaben, 0)} Aufgaben. Vorhandene Aufgaben bleiben unverändert.`}
+          multiline
+          w={320}
+        >
+          <Button
+            size="xs"
+            variant="subtle"
+            color="teal"
+            leftSection={<IconListCheck size={14} />}
+            onClick={alternativen}
+            style={{ alignSelf: 'flex-start' }}
+            data-bank-ki-alternativen
+          >
+            Alternativlösungen nachtragen (KI, {altKandidaten.length} Bereiche)
+          </Button>
+        </Tooltip>
       )}
       {editor}
     </Stack>

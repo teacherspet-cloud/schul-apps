@@ -14,7 +14,7 @@
  *
  * Reine Regeln ohne Datenbank und ohne Katalog (den kennt nur die Oberfläche) – für Server, Oberfläche und Tests.
  */
-import type { GrammatikAufgabe, GrammatikPaket, GrammatikRegel } from './grammatiktrainer'
+import { normiert, type GrammatikAufgabe, type GrammatikPaket, type GrammatikRegel } from './grammatiktrainer'
 
 export type Uebung = 'erkennen' | 'bilden' | 'anwenden' | 'unterscheiden' | 'fehler'
 export const UEBUNGEN: Uebung[] = ['erkennen', 'bilden', 'anwenden', 'unterscheiden', 'fehler']
@@ -214,3 +214,53 @@ export const MIN_JE_UEBUNG = 5
 export const SPAETER_FEHLER_AB = 2
 /** Form sicher: so viele ihrer Teilbereiche sicher (und keiner schwach) */
 export const FORM_TEILE_SICHER_AB = 0.8
+
+// ---------------------------------------------------------------- Alternativlösungen (25.10.2026)
+
+/**
+ * Regel für jeden KI-Auftrag, der Grammatikaufgaben schreibt (25.10.2026, Befund der Lehrkraft: bei „It is said /
+ * believed / thought that …" galt nur eine Fassung). Die App wertet eine Antwort nur als richtig, wenn sie GENAU einer
+ * hinterlegten Lösung entspricht – deshalb müssen alle gleichwertigen Antworten in `loesungen` stehen.
+ */
+export const LOESUNGEN_REGEL =
+  'LÖSUNGEN („loesungen"): Die App zählt eine Antwort nur als richtig, wenn sie GENAU einer hinterlegten Lösung entspricht. Nenne deshalb ALLE gleichwertig richtigen Antworten: Kurz- und Langformen (it is / it\'s, do not / don\'t), gleichwertige Umformungen (People say that he is rich → „It is said that he is rich" UND „He is said to be rich"), alle passenden Formen des vorgegebenen Worts, gleichwertige Wortstellung. Lässt eine Aufgabe sonst mehrere verschiedene richtige Antworten zu, mache sie durch „vorgabe" eindeutig. Antworten, die die geübte Grammatik umgehen, gehören nicht dazu.'
+
+/** Aufgabenarten, bei denen die Lernenden frei tippen – nur dort helfen weitere Lösungen (Auswahl hat ihre Möglichkeiten) */
+export const ALTERNATIVEN_ARTEN: readonly string[] = ['luecke', 'umformen', 'fehler', 'satzbau', 'uebersetzen']
+
+/**
+ * Weitere Lösungen aufnehmen: ohne Doppelte (verglichen wie beim Prüfen der Antwort, `normiert`), leer und zu lange
+ * Fassungen fallen weg, die bisherige Reihenfolge bleibt (die erste Lösung ist die angezeigte Musterlösung).
+ */
+export function loesungenZusammenfuehren(alt: readonly string[], neu: readonly unknown[], hoechstens = 8): string[] {
+  const aus = alt.map((x) => String(x ?? '').trim()).filter(Boolean)
+  const da = new Set(aus.map(normiert))
+  for (const x of neu) {
+    const t = String(x ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!t || t.length > 200 || t.includes('___')) continue
+    const n = normiert(t)
+    if (!n || da.has(n)) continue
+    da.add(n)
+    aus.push(t)
+    if (aus.length >= hoechstens) break
+  }
+  return aus
+}
+
+/**
+ * Passt eine weitere Lösung zur Aufgabe? Bei Lücken darf sie nicht viel länger sein als die bekannten Lösungen (sonst
+ * hat die KI den ganzen Satz geliefert); Umformen und Satzbau verlangen ganze Sätze.
+ */
+export function alternativePasst(a: { art: string; loesungen: string[] }, weitere: string): boolean {
+  const woerter = (x: string): number => x.trim().split(/\s+/).filter(Boolean).length
+  const w = woerter(weitere)
+  if (!w) return false
+  if (a.art === 'luecke' || a.art === 'fehler') {
+    const max = Math.max(1, ...a.loesungen.map(woerter))
+    return w <= max + 3
+  }
+  if (a.art === 'umformen' || a.art === 'satzbau') return w >= 2
+  return true
+}

@@ -12,6 +12,7 @@
  * prima). Die Formen bildet weiter die KI – die Prüfung schaut deshalb gezielt auf Formen und Lesarten.
  */
 import { CEFR_SCALE, type CefrLevel, type CefrTable, type StructuredRequest } from '@shared/types'
+import { LOESUNGEN_REGEL } from '@shared/grammatikBank'
 import {
   bekanntNachLernjahr,
   katalogFormenRegel,
@@ -337,7 +338,8 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
         : `Aufgaben: genau 40, gemischt – ${niveauMischung(ger, stufe)}. Alle Regeln abdecken, innerhalb des Niveaus vom Leichteren zum Schwereren.`,
       latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, stufe) : niveauRegel(a, ger, stufe),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an (z. B. Kurz- und Langform).',
+      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
@@ -448,7 +450,7 @@ export async function gepruefterPool(
       schemaName: 'grammatik_pruefung',
       system: [
         `Du prüfst Grammatikaufgaben (${a.fach}, Klasse ${a.jahrgang}) sorgfältig wie eine erfahrene Lehrkraft.`,
-        'Für jede Aufgabe: Ist sie eindeutig lösbar? Stimmt die Lösung? Fehlen gültige Varianten (z. B. Kurzform)? Bei „Fehler finden": genau ein Fehler, fehlerWort exakt im Satz?',
+        'Für jede Aufgabe: Ist sie eindeutig lösbar? Stimmt die Lösung? Fehlen gültige Varianten – Kurz-/Langform, gleichwertige Umformungen („It is said that he is …" und „He is said to be …"), weitere passende Formen des vorgegebenen Worts? Dann ergänze sie in „loesungen" (25.10.2026: die App zählt nur GENAU hinterlegte Antworten als richtig). Bei „Fehler finden": genau ein Fehler, fehlerWort exakt im Satz?',
         'ok = false, wenn die Aufgabe mehrdeutig oder falsch ist und sich nicht durch die Lösungen reparieren lässt.',
         'loesungen/optionen/fehlerWort: die korrigierte Fassung (oder unverändert); grund: kurz, deutsch.',
         gesperrt.length
@@ -624,7 +626,8 @@ async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string
       `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel} – relativ zum Niveau der Lerngruppe.`,
       latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, a.schwierigkeit) : niveauRegel(a, ger, a.schwierigkeit),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an.',
+      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler, „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
       'Übersetzen: satz = deutscher Satz, loesungen = alle richtigen Übersetzungen in die Zielsprache.',

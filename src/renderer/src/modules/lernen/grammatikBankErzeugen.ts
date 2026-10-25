@@ -17,7 +17,11 @@ import {
   type BankAufgabe,
   type BankRegel,
   type Stufe,
-  type Uebung
+  type Uebung,
+  ALTERNATIVEN_ARTEN,
+  alternativePasst,
+  loesungenZusammenfuehren,
+  LOESUNGEN_REGEL
 } from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
@@ -113,7 +117,8 @@ export async function erzeugeBankAufgaben(
         ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
         : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an (z. B. Kurz- und Langform).',
+      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      LOESUNGEN_REGEL,
       'Auswahl: 3–4 Möglichkeiten in „optionen", die richtige dabei, die anderen typische Fehlformen.',
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge (4–9 Teile); Satzzeichen hängen am letzten Teil.',
@@ -186,4 +191,73 @@ export async function erzeugeBankAufgaben(
     regel,
     aufgaben: ohne.aufgaben.filter((x): x is BankAufgabe => istUebung(x.uebung)).map((x, i) => ({ ...x, id: neueKennung(i), niveau: a.niveau ?? 'm' }))
   }
+}
+
+// ---------------------------------------------------------------- Alternativlösungen nachtragen (25.10.2026)
+
+/** Je Anfrage so viele Aufgaben – kurze Listen, damit die KI jede Aufgabe wirklich durchgeht */
+export const ALTERNATIVEN_JE_ANFRAGE = 25
+
+/**
+ * Weitere richtige Lösungen zu vorhandenen Aufgaben eines Schlüssels nachtragen (25.10.2026, Befund der Lehrkraft: bei
+ * „It is said / believed / thought that …" galt nur eine Fassung). Die Aufgaben bleiben, wie sie sind – Kennungen, Sätze,
+ * Vorgaben –, nur `loesungen` wächst. Auswahl- und Mehrfachaufgaben haben ihre Möglichkeiten und bleiben außen vor.
+ * Rein additiv und ohne Durchsicht speicherbar: Eine zusätzliche richtige Antwort kann keine Lernende benachteiligen.
+ */
+export async function ergaenzeAlternativen(
+  e: { fach: string; sprache: string; jahrgang: number; titel: string; regel?: BankRegel; aufgaben: BankAufgabe[] },
+  ai: Ai,
+  melde: (t: string) => void = () => undefined
+): Promise<{ aufgaben: BankAufgabe[]; betroffen: number; ergaenzt: number; geprueft: number }> {
+  const offen = e.aufgaben.map((a, i) => ({ a, i })).filter(({ a }) => ALTERNATIVEN_ARTEN.includes(a.art))
+  const aus = e.aufgaben.map((a) => ({ ...a, loesungen: [...a.loesungen] }))
+  let betroffen = 0
+  let ergaenzt = 0
+  for (let von = 0; von < offen.length; von += ALTERNATIVEN_JE_ANFRAGE) {
+    const stueck = offen.slice(von, von + ALTERNATIVEN_JE_ANFRAGE)
+    melde(`Die KI prüft weitere Lösungen zu „${e.titel}" (${Math.min(von + stueck.length, offen.length)} von ${offen.length} Aufgaben) …`)
+    const roh = await ai<{ aufgaben: { nr: number; weitere: string[] }[] }>({
+      schemaName: 'grammatik_alternativen',
+      system: [
+        `Du prüfst die Lösungen von Grammatikaufgaben (${e.fach}, etwa Klasse ${e.jahrgang}) wie eine erfahrene Lehrkraft.`,
+        'Die App wertet eine Antwort nur als richtig, wenn sie GENAU einer hinterlegten Lösung entspricht (Groß-/Kleinschreibung und Satzzeichen am Ende zählen nicht).',
+        'Nenne je Aufgabe in „weitere" ALLE zusätzlichen Antworten, die ebenso richtig sind und die Aufgabe genauso erfüllen: Kurz- und Langformen (it is / it\'s, do not / don\'t), gleichwertige Umformungen (People say that he is rich → „It is said that he is rich" und „He is said to be rich"), bei Lücken mit Vorgabe alle passenden Formen des vorgegebenen Worts, gleichwertige Wortstellung (bei Satzbau nur mit denselben Teilen).',
+        'NICHT aufnehmen: Antworten mit einem anderen Wort als in der Vorgabe, Antworten, die die geübte Grammatik umgehen, umgangssprachliche oder stilistisch fragwürdige Fassungen, bloße Rechtschreibvarianten der Lösung.',
+        'Lücke und Fehler finden: nur den Text für die Lücke bzw. das berichtigte Wort, nie den ganzen Satz. Umformen und Satzbau: ganze Sätze mit Satzzeichen wie die Lösung.',
+        '„weitere" bleibt leer, wenn es nichts Gleichwertiges gibt. Im Zweifel weglassen – eine falsche „richtige" Antwort schadet mehr als eine fehlende.'
+      ].join('\n'),
+      user: [
+        `Grammatik: ${e.titel}`,
+        `Zielsprache: ${e.sprache}`,
+        e.regel ? `Regelkarte: ${e.regel.titel} – ${e.regel.erklaerung}` : '',
+        '',
+        ...stueck.map(
+          ({ a }, j) =>
+            `${j + 1}. [${a.art}] ${a.anweisung}\nSatz: ${a.satz}${a.vorgabe ? `\nVorgabe: ${a.vorgabe}` : ''}${
+              a.teile?.length ? `\nTeile: ${a.teile.join(' | ')}` : ''
+            }${a.fehlerWort ? `\nFehlerwort: ${a.fehlerWort}` : ''}\nLösungen: ${a.loesungen.join(' | ')}`
+        )
+      ]
+        .filter((x) => x !== '')
+        .join('\n'),
+      schema: O({
+        aufgaben: A(O({ nr: { type: 'integer' }, weitere: A(S(), 'zusätzliche richtige Antworten; leer, wenn es keine gibt') }))
+      })
+    })
+    for (const u of roh.aufgaben ?? []) {
+      const ziel = stueck[Number(u.nr) - 1]
+      if (!ziel || !Array.isArray(u.weitere)) continue
+      const alt = aus[ziel.i].loesungen
+      const neu = loesungenZusammenfuehren(
+        alt,
+        u.weitere.filter((w) => alternativePasst({ art: ziel.a.art, loesungen: alt }, String(w ?? '')))
+      )
+      if (neu.length > alt.length) {
+        betroffen++
+        ergaenzt += neu.length - alt.length
+        aus[ziel.i] = { ...aus[ziel.i], loesungen: neu }
+      }
+    }
+  }
+  return { aufgaben: aus, betroffen, ergaenzt, geprueft: offen.length }
 }

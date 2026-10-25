@@ -29,7 +29,7 @@ import {
   type Uebung
 } from '@shared/grammatikBank'
 import { aufgabeVorschau } from '../lernen/kurs/AufgabenEditor'
-import { erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
+import { ergaenzeAlternativen, erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
 
 /**
  * Übungsaufgaben und Schüleransicht gehören zu den Kursen im Sprachenlernen (App-Freigaben, 23.10.2026): ohne diese
@@ -438,6 +438,87 @@ async function direktSpeichern(
   // Was der Server wirklich aufgenommen hat (er sortiert Unbrauchbares aus)
   const dazu = Math.max(0, gespeichert.aufgaben - (da?.aufgaben.length ?? 0))
   return { regel: r.regel, aufgaben: neu.slice(0, dazu), bericht: r.bericht, doppelt: r.aufgaben.length - Math.min(dazu, neu.length) }
+}
+
+/** Schlüssel mit Aufgaben, bei denen Alternativlösungen nachgetragen werden können – mit Zahl der Aufgaben */
+export function alternativenKandidaten(schluessel: readonly string[], zahlen: BankZahlen): { schluessel: string; aufgaben: number }[] {
+  return [...new Set(schluessel)]
+    .map((k) => ({ schluessel: k, aufgaben: UEBUNGEN.reduce((n, u) => n + (zahlen[k]?.[u] ?? 0), 0) }))
+    .filter((x) => x.aufgaben > 0)
+}
+
+/** Geschätzte KI-Anfragen für das Nachtragen (eine je 25 Aufgaben und Schlüssel, Auswahlaufgaben zählen mit) */
+export const alternativenAnfragen = (k: readonly { aufgaben: number }[]): number => k.reduce((n, x) => n + Math.max(1, Math.ceil(x.aufgaben / 25)), 0)
+
+/**
+ * Alternativlösungen nachtragen (25.10.2026, Befund der Lehrkraft: „It is said / believed / thought that …" – nur eine
+ * Fassung galt): je Schlüssel die Aufgaben aus der Bank lesen, die KI nennt weitere gleichwertige Antworten, die
+ * Aufgaben werden mit erweiterten `loesungen` direkt gespeichert (Kennungen bleiben, der Lernstand hängt weiter an ihnen;
+ * die Kurse bauen ihre Pakete am Server neu). Nur für Admins bzw. Fachobleute – der Server prüft das beim Speichern.
+ */
+export function bankAlternativenStarten(
+  liste: { schluessel: string; titel: string }[],
+  rahmen: { sprache: string; fach: string; jahrgang: number },
+  titel: string,
+  docId = 'grammatikformen'
+): void {
+  if (!liste.length) return
+  void starteAuftrag({
+    moduleId: 'grammatikformen',
+    docId,
+    titel,
+    art: 'Alternativlösungen',
+    eingabe: { liste, rahmen },
+    sperrt: false,
+    fehlerTitel: 'Alternativlösungen konnten nicht ergänzt werden',
+    arbeit: async (e, k) => {
+      const frei = await platzNehmen(k)
+      try {
+        let betroffen = 0
+        let ergaenzt = 0
+        let geprueft = 0
+        let fehler: unknown = null
+        const n = e.liste.length
+        for (const [i, s] of e.liste.entries()) {
+          k.melde(`${i + 1} von ${n}: ${s.titel} …`, i, n)
+          const sperre = await schluesselSperren(s.schluessel, k, () => k.melde(`${i + 1} von ${n}: ${s.titel} – wartet auf einen anderen Auftrag …`, i, n))
+          try {
+            const da = (await bankLesen([s.schluessel]))[0]
+            if (!da?.aufgaben.length) continue
+            const r = await ergaenzeAlternativen({ ...e.rahmen, titel: s.titel, regel: da.regel, aufgaben: da.aufgaben }, k.ai, (t) =>
+              k.melde(`${i + 1} von ${n}: ${t}`, i, n)
+            )
+            geprueft += r.geprueft
+            if (r.ergaenzt) {
+              await bankSpeichern(e.rahmen.sprache, s.schluessel, da.regel, r.aufgaben)
+              betroffen += r.betroffen
+              ergaenzt += r.ergaenzt
+            }
+          } catch (er) {
+            // Abbruch der KI bei einem Schlüssel: die übrigen laufen weiter
+            if (k.signal.aborted) throw er
+            fehler = er
+          } finally {
+            sperre()
+          }
+        }
+        window.dispatchEvent(new Event(BANK_EREIGNIS))
+        if (fehler && !ergaenzt) throw fehler
+        return { betroffen, ergaenzt, geprueft }
+      } finally {
+        frei()
+      }
+    },
+    ablegen: async (r) => {
+      notifySuccess(
+        r.ergaenzt
+          ? `${r.ergaenzt} weitere Lösungen bei ${r.betroffen} von ${r.geprueft} Aufgaben ergänzt – sie gelten sofort in allen Kursen.`
+          : `Keine weiteren Lösungen nötig – die KI fand bei ${r.geprueft} Aufgaben nichts Gleichwertiges.`
+      )
+    },
+    abschluss: (r) => (r.ergaenzt ? `${r.ergaenzt} Lösungen bei ${r.betroffen} Aufgaben ergänzt` : `Keine weiteren Lösungen (${r.geprueft} Aufgaben geprüft)`)
+  })
+  notifySuccess('Die KI prüft im Hintergrund, welche weiteren Antworten richtig sind, und trägt sie nach.')
 }
 
 /**

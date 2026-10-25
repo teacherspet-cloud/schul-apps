@@ -56,6 +56,8 @@ import { CEFR_SCALE, type CefrLevel } from '@shared/types'
 export interface GrammatikWahl {
   themen: string[]
   teilformen: string[]
+  /** Band und (höchste) Unit der Leiste, aus der die Themen stammen (25.10.2026) – damit der Kurs sie dem Buch zuordnet */
+  lehrwerk?: { buch: string; unit?: string }
 }
 
 /**
@@ -194,7 +196,9 @@ export default function GrammatikAuswahl({
 
   // ---------- Auswahl ändern
   const setze = (neu: GrammatikWahl, dazu?: string): void => {
-    onChange(neu)
+    // Lehrwerk der Auswahl mitgeben (25.10.2026, Befund 10b: Grammatik aus dem Buch landete unter „Weitere Grammatik")
+    const unitWahl = kurs ? kapitel.filter((u) => units.includes(u)).at(-1) ?? unit : unit
+    onChange({ ...neu, ...(buch ? { lehrwerk: { buch, ...(unitWahl ? { unit: unitWahl } : {}) } } : {}) })
     if (dazu) setGemerkt((g) => ({ ...g, zuletzt: { ...g.zuletzt, [fach]: merkeZuletzt(fach, dazu) } }))
   }
   const ohneTeile = (id: string): string[] => teilformen.filter((k) => !k.startsWith(`${id}/`))

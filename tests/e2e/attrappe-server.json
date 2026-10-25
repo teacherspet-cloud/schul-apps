@@ -2,6 +2,16 @@
  "verzoegerungMs": 300,
  "ausSchema": true,
  "antworten": {
+  "grammatik_alternativen": {
+   "aufgaben": [
+    {
+     "nr": 1,
+     "weitere": [
+      "It's said"
+     ]
+    }
+   ]
+  },
   "onlinetest_bewertung": {
    "urteile": [
     {

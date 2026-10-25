@@ -1,3 +1,4 @@
+import { mixSchluessel } from '@shared/grammatikBank'
 import {
   ActionIcon,
   Alert,
@@ -35,7 +36,8 @@ import {
   IconPlus,
   IconRepeat,
   IconSparkles,
-  IconTrash
+  IconTrash,
+  IconListCheck
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
@@ -50,7 +52,7 @@ import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import { useExperte } from '../../shared/settingsStore'
 import { BankKarte, useBankZahlen } from './GrammatikBank'
 import { AMPEL_FARBE, AMPEL_TEXT, tonHell, tonText, tonVoll, tonZart, useGrammatikFarbe, type AufgabenAmpel } from './farbton'
-import { aufgabenAmpel, kurseFreigegeben, useSchulStufen } from './bank'
+import { aufgabenAmpel, kurseFreigegeben, useSchulStufen, alternativenAnfragen, alternativenKandidaten, bankAlternativenStarten } from './bank'
 import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
 import type { BankZahlen } from '@shared/grammatikBank'
 import {
@@ -297,6 +299,25 @@ export default function GrammatikformenEditor({
   }
 
   const offenPunkt = offen ? punkteVon(offen.unit, offen.abschnitt)[offen.index] : undefined
+  // Alternativlösungen für den ganzen Band (25.10.2026): alle Teilbereiche und gemischten Übungen seiner Punkte mit Aufgaben
+  const [altOffen, setAltOffen] = useState(false)
+  const bandPunkte = Object.values(band).flatMap((k) => Object.values(k).flat())
+  const altKandidaten = alternativenKandidaten(
+    bandPunkte.flatMap((p) => {
+      const teile = teilbereicheVon(p.t)
+      return teile.length >= 2 ? [...teile, mixSchluessel(p.t)] : teile
+    }),
+    bank.zahlen
+  )
+  const altAufgaben = altKandidaten.reduce((n, x) => n + x.aufgaben, 0)
+  const alternativenBand = (): void => {
+    setAltOffen(false)
+    bankAlternativenStarten(
+      altKandidaten.map((x) => ({ schluessel: x.schluessel, titel: kennungLabel(x.schluessel) })),
+      { sprache: buch.language, fach: fachVon(fach)?.label ?? fach, jahrgang: buch.grade ?? 7 },
+      `Alternativlösungen: ${buch.name}`
+    )
+  }
   const offenListe = offen ? punkteVon(offen.unit, offen.abschnitt) : []
 
   const kopf = (
@@ -326,6 +347,34 @@ export default function GrammatikformenEditor({
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
+        {bank.darf && experte && altKandidaten.length > 0 && (
+          <>
+            <Button variant="subtle" color="teal" leftSection={<IconListCheck size={16} />} onClick={() => setAltOffen(true)} data-grammatikformen-alternativen visibleFrom="sm">
+              Alternativlösungen
+            </Button>
+            <Modal opened={altOffen} onClose={() => setAltOffen(false)} title="Alternativlösungen nachtragen" centered data-grammatikformen-alternativen-frage>
+              <Stack gap="sm">
+                <Text size="sm">
+                  Die KI geht alle hinterlegten Aufgaben dieses Bands durch und trägt weitere gleichwertig richtige Antworten nach – Kurzformen, gleichwertige
+                  Umformungen wie „It is said that …“ neben „He is said to …“, weitere Formen des vorgegebenen Worts. Die Aufgaben selbst bleiben unverändert,
+                  die zusätzlichen Lösungen gelten sofort in allen Kursen.
+                </Text>
+                <Text size="sm">
+                  {altKandidaten.length} Bereiche mit {altAufgaben} Aufgaben, etwa {alternativenAnfragen(altKandidaten)} KI-Anfragen. Das läuft im Hintergrund,
+                  einzelne Punkte gehen auch über „Übungsaufgaben“ am Grammatikpunkt.
+                </Text>
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => setAltOffen(false)}>
+                    Abbrechen
+                  </Button>
+                  <Button color="teal" onClick={alternativenBand} data-grammatikformen-alternativen-start>
+                    Starten
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
+          </>
+        )}
         {darf && experte && (
           <Button
             variant="light"

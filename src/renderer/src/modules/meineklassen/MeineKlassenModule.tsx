@@ -80,6 +80,7 @@ import { FoerderDialog } from './FoerderDialog'
 import { FoerderBuendel } from './FoerderBuendel'
 import { ProblemWoerterFenster } from './ProblemWoerterFenster'
 import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
+import { KURS_GEAENDERT } from '../lernen/kurs/KursSeite'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
@@ -810,7 +811,12 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
   // „+ Aufgaben" fertig, Grammatik zurückgeholt … → neu laden
   useEffect(() => {
     window.addEventListener(GRAMMATIK_GEAENDERT, laden)
-    return () => window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
+    // Vokabeln oder Grammatik im Kasten „Units" entfernt (25.10.2026)
+    window.addEventListener(KURS_GEAENDERT, laden)
+    return () => {
+      window.removeEventListener(GRAMMATIK_GEAENDERT, laden)
+      window.removeEventListener(KURS_GEAENDERT, laden)
+    }
   }, [laden])
   const fertige = useFertigeBlaetter(id)
   const bedarfFenster = useBedarfFenster((s) => s.gruppe)
