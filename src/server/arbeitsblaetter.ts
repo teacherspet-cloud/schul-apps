@@ -805,7 +805,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
                 aufgaben.filter((x) => !x.freiwillig).map((x) => x.nr),
                 bisher,
                 json_(a1?.freigeschaltet ?? '[]', [] as number[]),
-                true
+                true,
+                e.aufgabenRunden
               )
           )
             return (json(res, 403, { fehler: 'Diese Aufgabe ist noch nicht freigeschaltet.' }), true)

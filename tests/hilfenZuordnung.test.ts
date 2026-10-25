@@ -23,4 +23,12 @@ describe('hilfenZuordnung', () => {
     expect(m.get('satz1')).toBe(1)
     expect(m.get('karten')).toBe(2)
   })
+
+  it('Formulierungshilfen zwischen zwei Aufgaben gehören zur Aufgabe davor, hinter der letzten gelten sie fürs Blatt (25.10.2026)', () => {
+    const phrases = (id: string, title: string): WsBlock => ({ id, type: 'phrases', title, hint: '', groups: [{ label: '', items: [{ text: 'I think …', german: '' }] }] }) as unknown as WsBlock
+    const m = hilfenZuordnung({ blocks: [aufgabe('a1'), phrases('p1', 'Useful phrases'), aufgabe('a2'), phrases('p2', 'Useful phrases for task 1'), aufgabe('a3'), phrases('ende', 'Useful phrases')] })
+    expect(m.get('p1')).toBe(1)
+    expect(m.get('p2')).toBe(1)
+    expect(m.get('ende')).toBeUndefined()
+  })
 })

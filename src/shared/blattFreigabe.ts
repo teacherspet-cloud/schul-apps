@@ -240,8 +240,15 @@ export function aufgabenFeedbackAus(roh: unknown): AufgabenFeedback {
  */
 export type Ampel = 'rot' | 'gelb' | 'gruen'
 
-/** Feedback-Verlauf je Aufgabe, wie er gespeichert wird */
-export type AufgabenVerlauf = Record<string, { einschaetzung: string }[] | undefined>
+/** Feedback-Verlauf je Aufgabe, wie er gespeichert wird (`abgabe`: Eintrag vom Einreichen, zählt nicht als Runde) */
+export type AufgabenVerlauf = Record<string, { einschaetzung: string; abgabe?: unknown }[] | undefined>
+
+/**
+ * Alle Feedback-Runden einer Aufgabe verbraucht (25.10.2026, Wunsch der Lehrkraft: auch mit nur 2 Rückmeldungen muss es
+ * weitergehen)? Dann zählt die Aufgabe fürs Freischalten wie „teilweise" – die Lernenden hängen nicht fest.
+ */
+export const rundenErschoepft = (verlauf: { abgabe?: unknown }[] | undefined, runden: number | undefined): boolean =>
+  typeof runden === 'number' && runden > 0 && (verlauf ?? []).filter((x) => !x.abgabe).length >= runden
 
 /** Ampel einer Aufgabe: das BESTE Urteil zählt (Fortschritt geht nicht verloren); Freigabe der Lehrkraft = mindestens gelb */
 export function ampelVon(verlauf: { einschaetzung: string }[] | undefined, vonLehrkraft = false): Ampel {
@@ -255,11 +262,12 @@ export function ampelVon(verlauf: { einschaetzung: string }[] | undefined, vonLe
  * Bis zu welcher Aufgabe (Nummer, einschließlich) ist das Blatt sichtbar? Die erste immer; jede weitere,
  * sobald die vorige mindestens gelb ist. `nummern` in Blattreihenfolge. Ohne Schrittweise: alle.
  */
-export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], schrittweise: boolean): number {
+export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], schrittweise: boolean, runden?: number): number {
   const liste = [...nummern].sort((a, b) => a - b)
   if (!schrittweise || !liste.length) return Number.POSITIVE_INFINITY
   for (let i = 0; i < liste.length - 1; i++) {
-    if (ampelVon(verlauf[String(liste[i])], freigeschaltet.includes(liste[i])) === 'rot') return liste[i]
+    const v = verlauf[String(liste[i])]
+    if (ampelVon(v, freigeschaltet.includes(liste[i])) === 'rot' && !rundenErschoepft(v, runden)) return liste[i]
   }
   // Keine offene mehr: alles sichtbar (auch freiwillige Aufgaben nach der letzten, die hier nicht mitzählen)
   return Number.POSITIVE_INFINITY
@@ -269,6 +277,9 @@ export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freiges
  * „Vollständig bearbeitet" (Merkkästen erscheinen): ALLE Aufgaben mindestens gelb. Einreichen allein genügt
  * nicht (05.10.2026, Entscheidung der Lehrkraft).
  */
-export function vollstaendigBearbeitet(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[]): boolean {
-  return nummern.length > 0 && nummern.every((nr) => ampelVon(verlauf[String(nr)], freigeschaltet.includes(nr)) !== 'rot')
+export function vollstaendigBearbeitet(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], runden?: number): boolean {
+  return (
+    nummern.length > 0 &&
+    nummern.every((nr) => ampelVon(verlauf[String(nr)], freigeschaltet.includes(nr)) !== 'rot' || rundenErschoepft(verlauf[String(nr)], runden))
+  )
 }

@@ -55,19 +55,30 @@ const texte = (wert: unknown): string => {
  * Hilfen und Lernhilfen (Tipps, Satzanfänge, Wortspeicher, Hilfekarten) → Nummer ihrer Aufgabe (06.10.2026).
  * Grundlage: ein Verweis im Text („help cards for task 4"), sonst die Aufgabe direkt davor im Blatt. Vor der
  * ersten Aufgabe ohne Verweis: keine Zuordnung (gilt fürs ganze Blatt).
+ * Seit 25.10.2026 (Befund der Lehrkraft: Satzanfänge späterer Aufgaben waren von Anfang an sichtbar) auch die
+ * Formulierungshilfen (`phrases`) zwischen zwei Aufgaben – ein Kasten hinter der letzten Aufgabe gilt fürs ganze Blatt.
  */
 export function hilfenZuordnung(sheet: Pick<Sheet, 'blocks'>): Map<string, number> {
   const aus = new Map<string, number>()
+  const letzteAufgabe = sheet.blocks.map((b) => b.type).lastIndexOf('task')
   let nr = 0
-  for (const b of sheet.blocks) {
+  sheet.blocks.forEach((b, i) => {
     if (b.type === 'task') {
       nr++
-      continue
+      return
     }
-    if (b.type !== 'scaffold') continue
-    const verweis = aufgabenVerweise(texte({ title: b.title, items: b.items }))[0]
-    const ziel = verweis ?? (nr > 0 ? nr : undefined)
-    if (ziel) aus.set(b.id, ziel)
-  }
+    if (b.type === 'scaffold') {
+      const verweis = aufgabenVerweise(texte({ title: b.title, items: b.items }))[0]
+      const ziel = verweis ?? (nr > 0 ? nr : undefined)
+      if (ziel) aus.set(b.id, ziel)
+      return
+    }
+    if (b.type === 'phrases') {
+      const verweis = aufgabenVerweise(texte({ title: b.title, hint: b.hint, groups: b.groups }))[0]
+      // Ohne Verweis nur zwischen zwei Aufgaben: zur Aufgabe davor; hinter der letzten Aufgabe gilt der Kasten fürs ganze Blatt
+      const ziel = verweis ?? (nr > 0 && i < letzteAufgabe ? nr : undefined)
+      if (ziel) aus.set(b.id, ziel)
+    }
+  })
   return aus
 }

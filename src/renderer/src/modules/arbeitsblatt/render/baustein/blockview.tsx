@@ -275,7 +275,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
 
     case 'phrases':
       return (
-        <div className="ws-block ws-phrases">
+        // Zu welcher Aufgabe die Formulierungshilfen gehören (25.10.2026): digital gesperrt bis zur Freischaltung
+        <div className="ws-block ws-phrases" data-hilfe-fuer={ctx.hilfeFuer?.get(block.id)} data-hilfe-block={block.id}>
           <div className="ws-phrases-head">
             <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} placeholder="Useful phrases" />
           </div>

@@ -3,7 +3,7 @@
  *
  *  /s/reihen          meine Reihen mit Fortschritt
  *  /s/r/<ZID>         der ganze Weg: Lernziele der Reihe, Fortschritt, Abzeichen, Stationen
- *                     (gesperrte grau mit „was fehlt noch"), Hefter, „Ich brauche Hilfe"
+ *                     (gesperrte grau mit „was fehlt noch"), Hefter
  *  /s/r/<ZID>/<SID>   ein Schritt, der hier bearbeitet wird (Zwischenaufgabe, Lernkarten,
  *                     Selbsteinschätzung, Diagnose, Abschlussprodukt, Sprechaufgabe …)
  *  /s/r/<ZID>/hefter        Hefter als eigene Seite, mit PDF (08.10.2026 – am Handy statt Fenster und Druckdialog)
@@ -21,7 +21,6 @@ import {
   FileButton,
   Group,
   Loader,
-  Modal,
   Paper,
   Progress,
   Radio,
@@ -39,7 +38,6 @@ import {
   IconCheck,
   IconDownload,
   IconFileText,
-  IconHandStop,
   IconLock,
   IconMedal,
   IconMicrophone,
@@ -180,11 +178,10 @@ export function ReiheWeg({ zid, schritt }: { zid: string; schritt?: string }): R
   if (schritt === 'materialien') return <MaterialSeite d={d} />
   const s = schritt ? d.schritte.find((x) => x.id === schritt) : undefined
   if (s) return <SchrittSeite d={d} s={s} neu={laden} />
-  return <Weg d={d} neu={laden} />
+  return <Weg d={d} />
 }
 
-function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element {
-  const [hilfe, setHilfe] = useState(false)
+function Weg({ d }: { d: ReiheDaten }): React.JSX.Element {
   const lage = new Map(d.weg.schritte.map((l) => [l.id, l]))
   return (
     <Stack data-reihe-weg>
@@ -245,7 +242,7 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
         {d.art === 'digital' && (
           <Text size="sm" c="dimmed" mt="sm" data-reihe-digital>
             Du arbeitest alles am Gerät. Ein Schritt ist geschafft, sobald dein Ergebnis passt – sonst überarbeitest du ihn oder bekommst
-            eine Übung dazu. Kommst du nicht weiter, tippe auf „Ich brauche Hilfe".
+            eine Übung dazu.
           </Text>
         )}
         <Group mt="md" gap="xs">
@@ -258,20 +255,7 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
           <Button component="a" href={`/s/r/${d.id}/materialien`} variant="light" leftSection={<IconFileText size={16} />} data-materialien-knopf>
             Materialien und Abgaben
           </Button>
-          {d.stand.hilfe ? (
-            <Button
-              variant="light"
-              color="orange"
-              leftSection={<IconHandStop size={16} />}
-              onClick={() => void senden('/s/api/reihe/schritt', { id: d.id, aktion: 'hilfe', an: false }).then(neu)}
-            >
-              Hilfe angefragt – zurücknehmen
-            </Button>
-          ) : (
-            <Button variant="subtle" color="orange" leftSection={<IconHandStop size={16} />} onClick={() => setHilfe(true)} data-hilfe-knopf>
-              Ich brauche Hilfe
-            </Button>
-          )}
+          {/* „Ich brauche Hilfe" entfernt (25.10.2026, Wunsch der Lehrkraft) – die Bitte landete nur still im Handlungsbedarf */}
         </Group>
       </Card>
 
@@ -371,35 +355,7 @@ function Weg({ d, neu }: { d: ReiheDaten; neu: () => void }): React.JSX.Element 
         )
       })}
 
-      {hilfe && <HilfeDialog d={d} schliessen={() => setHilfe(false)} fertig={neu} />}
     </Stack>
-  )
-}
-
-function HilfeDialog({ d, schliessen, fertig }: { d: ReiheDaten; schliessen: () => void; fertig: () => void }): React.JSX.Element {
-  const [text, setText] = useState('')
-  const offen = d.weg.schritte.find((l) => l.status === 'offen' || l.status === 'nicht_geschafft')
-  return (
-    <Modal opened onClose={schliessen} title="Ich brauche Hilfe">
-      <Stack>
-        <Text size="sm" c="dimmed">
-          Deine Lehrkraft sieht deine Bitte in ihrer Übersicht – sonst niemand.
-        </Text>
-        <Textarea label="Wobei? (freiwillig)" autosize minRows={2} value={text} onChange={(e) => setText(e.currentTarget.value)} />
-        <Button
-          leftSection={<IconHandStop size={16} />}
-          onClick={() =>
-            void senden('/s/api/reihe/schritt', { id: d.id, aktion: 'hilfe', text, ...(offen ? { schritt: offen.id } : {}) }).then(() => {
-              schliessen()
-              fertig()
-            })
-          }
-          data-hilfe-senden
-        >
-          Bitte senden
-        </Button>
-      </Stack>
-    </Modal>
   )
 }
 

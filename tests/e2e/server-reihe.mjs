@@ -273,15 +273,12 @@ try {
   pruefe(await s.locator('[data-hefter-knopf]').isVisible(), 'Hefter-Eintrag freigeschaltet')
   // Haltepunkt vor der Selbsteinschätzung
   pruefe(st[4] === 'gesperrt', 'Haltepunkt: Selbsteinschätzung wartet auf die Besprechung')
-  // Hilfe anfordern
-  await s.locator('[data-hilfe-knopf]').click()
-  await s.locator('[data-hilfe-senden]').click()
-  await s.waitForTimeout(800)
+  // „Ich brauche Hilfe" entfernt (25.10.2026, Wunsch der Lehrkraft) – die Bitte kam nur still im Handlungsbedarf an
+  pruefe((await s.locator('[data-hilfe-knopf]').count()) === 0, 'Kein Knopf „Ich brauche Hilfe" mehr')
   // ---------- Lehrkraft: Übersicht
   await p.locator('[data-reihe-editor] button', { hasText: 'Alle Reihen' }).click()
   await p.locator('[data-zuweisung-oeffnen]').first().click()
   await p.locator('[data-reihe-uebersicht]').waitFor()
-  pruefe(await p.getByText('bittet um Hilfe').isVisible(), 'Übersicht: Hilferuf im Handlungsbedarf')
   await p.screenshot({ path: join(out, '4-uebersicht.png'), fullPage: true })
   // Lehrkraft gibt den Haltepunkt frei (Mia wartet dort)
   await p.locator('[data-halt-freigeben]').first().waitFor({ timeout: 10000 })

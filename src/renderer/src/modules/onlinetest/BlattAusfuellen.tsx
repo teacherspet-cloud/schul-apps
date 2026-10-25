@@ -857,8 +857,11 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   // Freiwillige Aufgaben halten weder das Freischalten auf noch zählen sie für „vollständig bearbeitet"
   const nummern = alleAufgaben.filter((a) => !a.freiwillig).map((a) => a.nr)
   const frei = d.freigeschaltet ?? []
-  const bis = lehrkraftSicht ? Number.POSITIVE_INFINITY : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise))
-  const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei)
+  // Verbrauchte Feedback-Runden halten nicht mehr auf (25.10.2026)
+  const bis = lehrkraftSicht
+    ? Number.POSITIVE_INFINITY
+    : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise), d.einstellungen.aufgabenRunden)
+  const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei, d.einstellungen.aufgabenRunden)
   const aufgaben = alleAufgaben.filter((a) => a.nr <= bis)
   const felderSichtbar = (gemessen?.felder ?? []).filter((f) => f.nr <= bis)
   // Ampel auch ohne „prüfen lassen", sobald es Hinweise vom Einreichen gibt (08.10.2026)
@@ -1540,8 +1543,8 @@ function Ebene(p: {
                         {liste?.length ? 'Noch einmal prüfen lassen' : `Aufgabe ${a.nr} prüfen lassen`}
                       </Button>
                     ) : p.pruefen ? (
-                      <Text size="xs" c="dimmed">
-                        Für diese Aufgabe gibt es kein weiteres Feedback mehr.
+                      <Text size="xs" c="dimmed" data-aufgabe-runden-aus>
+                        Kein weiteres Feedback mehr zu dieser Aufgabe – mach mit der nächsten weiter oder reiche das Blatt ein.
                       </Text>
                     ) : null}
                   </Stack>
