@@ -15,7 +15,11 @@
 #       laufende Aufträge; nach Ablauf der Wartezeit geht es weiter, sobald nichts läuft – läuft dann immer noch etwas,
 #       Abbruch (Code 3). --jetzt überspringt das Warten.
 #   1. Vor-Update-Kopie der Datenbank (VACUUM INTO im laufenden Container) nach /root/sicherung-vor-update-<Zeit>.db
-#   2. server/, oberflaeche/, resources/ löschen und das Paket frisch entpacken (geheim/ und die Override-Datei bleiben)
+#   2. server/, oberflaeche/, resources/ löschen und das Paket frisch entpacken (geheim/ und die Override-Datei bleiben).
+#      Die Programmdateien der BISHERIGEN Oberfläche (oberflaeche/assets, Namen mit Prüfsumme) bleiben eine Fassung lang
+#      erhalten (25.10.2026): Ein offenes Fenster lädt noch Minuten nach dem Update Teile seiner alten Fassung nach –
+#      fehlen sie, lädt die Seite neu und laufende Aufträge (Arbeitsblatt-Erstellung) gehen verloren. Welche Dateien von
+#      der Vorfassung stammen, steht in vorherige-fassung.txt; beim nächsten Aufspielen fallen genau diese weg.
 #   3. docker compose up -d --build, bis zu 90 s auf „healthy“ warten
 #   4. Aufräumen: Build-Cache auf 4 GB begrenzen (Grundschichten apt/npm bleiben für schnelle Bauten), alte Images
 #      weg, Paket in /tmp weg, ältere Vor-Update-Kopien weg (nur die eben erzeugte bleibt bis zum nächsten Mal)
@@ -37,10 +41,11 @@ for a in "$@"; do
     *) PAKET=$a ;;
   esac
 done
-ZIEL=/opt/schul-apps
+ZIEL=${SCHULAPPS_ZIEL:-/opt/schul-apps}
 CONTAINER=schul-apps
+SICHERUNGEN=${SCHULAPPS_SICHERUNGEN:-/root}
 STEMPEL=$(date +%Y%m%d-%H%M)
-KOPIE="/root/sicherung-vor-update-$STEMPEL.db"
+KOPIE="$SICHERUNGEN/sicherung-vor-update-$STEMPEL.db"
 
 [ -s "$PAKET" ] || { echo "Paket fehlt oder leer: $PAKET"; exit 1; }
 tar tzf "$PAKET" ./server/start.mjs ./oberflaeche/index.html ./Dockerfile >/dev/null 2>&1 || { echo "Kein Schul-Apps-Paket: $PAKET"; exit 1; }
@@ -90,11 +95,35 @@ mv "$MP/sicherungen/.vor-update-$STEMPEL.db" "$KOPIE"
 chmod 600 "$KOPIE"
 ls -lh "$KOPIE"
 
-# 2. Frisch entpacken
+# 2. Frisch entpacken – die Programmdateien der bisherigen Oberfläche eine Fassung lang behalten
 echo "2/4 Entpacken …"
 cd "$ZIEL"
+LISTE="$ZIEL/vorherige-fassung.txt"
+ALT=$(mktemp -d)
+if [ -d "$ZIEL/oberflaeche/assets" ]; then
+  for f in "$ZIEL"/oberflaeche/assets/*; do
+    [ -f "$f" ] || continue
+    n=$(basename "$f")
+    # Dateien der VORLETZTEN Fassung (in der Liste) fallen jetzt weg, die der bisherigen bleiben
+    if [ -f "$LISTE" ] && grep -qxF "$n" "$LISTE"; then continue; fi
+    cp -p "$f" "$ALT/"
+  done
+fi
 rm -rf "$ZIEL/server" "$ZIEL/oberflaeche" "$ZIEL/resources"
 tar xzf "$PAKET" -C "$ZIEL"
+: > "$LISTE"
+BEHALTEN=0
+for f in "$ALT"/*; do
+  [ -f "$f" ] || continue
+  n=$(basename "$f")
+  if [ ! -e "$ZIEL/oberflaeche/assets/$n" ]; then
+    cp -p "$f" "$ZIEL/oberflaeche/assets/$n"
+    echo "$n" >> "$LISTE"
+    BEHALTEN=$((BEHALTEN + 1))
+  fi
+done
+rm -rf "$ALT"
+echo "Programmdateien der bisherigen Fassung behalten: $BEHALTEN (für noch offene Fenster)"
 chmod -R go-w "$ZIEL"
 du -sh server oberflaeche resources
 
@@ -117,7 +146,7 @@ echo "4/4 Aufräumen …"
 docker builder prune -f --keep-storage 4GB >/dev/null
 docker image prune -f >/dev/null
 rm -f "$PAKET"
-find /root -maxdepth 1 -name 'sicherung-vor-*.db' ! -name "$(basename "$KOPIE")" -delete
+find "$SICHERUNGEN" -maxdepth 1 -name 'sicherung-vor-*.db' ! -name "$(basename "$KOPIE")" -delete
 echo "Behalten: $KOPIE (Rückfall bis zum nächsten Aufspielen)"
 df -h / | tail -1
 docker system df
