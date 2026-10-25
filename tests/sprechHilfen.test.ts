@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  auftragKurz,
   auftragReicht,
   auftragSchritte,
   dialogRollen,
@@ -79,13 +80,31 @@ describe('Hilfen an Sprechkarten', () => {
   it('Arbeitsauftrag einer Bildkarte muss einen Monolog in Prüfungslänge tragen', () => {
     expect(auftragReicht('')).toBe(false)
     expect(auftragReicht('Describe the picture.')).toBe(false)
-    expect(auftragReicht('Describe the picture. Say who you can see, where they are and what they are doing. What do you think happened before?')).toBe(true)
-    // Zu viele Aufforderungen (Befund 25.10.2026): mehr als drei Sätze oder über 45 Wörter → neu schreiben lassen
-    expect(
-      auftragReicht(
-        'Describe the picture coherently: say who you can see, where they are and what is happening during the interview. Tell what might have happened before and what might happen after the interview; explain how the student and the manager might feel. Comment on the situation: give your opinion about work experience in a bookshop and reasons, and compare it with your own preferred place for work experience.'
-      )
-    ).toBe(false)
+    expect(auftragReicht('Describe the people and the place. Tell what happened before. Give your opinion on the job.')).toBe(true)
+    // Ketten mit mehreren Aspekten je Satz gelten nicht mehr (25.10.2026, zweiter Anlauf): der Partner fragt nach
+    expect(auftragReicht('Describe the picture. Say who you can see, where they are and what they are doing. What do you think happened before?')).toBe(false)
+    expect(auftragReicht('Describe the picture: the people and the place. Tell what happened before.')).toBe(false)
+    // Zu viele Aufforderungen (Befund 25.10.2026): mehr als drei Sätze oder über 30 Wörter → neu schreiben lassen
+    const lang =
+      'Describe the picture coherently: say who you can see, where they are and what is happening during the interview. Tell what might have happened before and what might happen after the interview; explain how the student and the manager might feel. Comment on the situation: give your opinion about work experience in a bookshop and reasons, and compare it with your own preferred place for work experience.'
+    expect(auftragReicht(lang)).toBe(false)
+    // Kürzung für den Sprechenden: drei knappe Schritte, abgetrennte Teilsätze werden Impulse des Partners
+    expect(auftragKurz(lang)).toEqual({
+      schritte: [
+        'Describe the picture coherently.',
+        'Tell what might have happened before and what might happen after the interview.',
+        'Comment on the situation.'
+      ],
+      impulse: [
+        'Say who you can see, where they are and what is happening during the interview.',
+        'Explain how the student and the manager might feel.',
+        'Give your opinion about work experience in a bookshop and reasons, and compare it with your own preferred place for work experience.'
+      ]
+    })
+    expect(auftragKurz('Describe it. Tell more. Give your opinion. Compare it! Sum up.')).toEqual({
+      schritte: ['Describe it.', 'Tell more.', 'Give your opinion.'],
+      impulse: ['Compare it!', 'Sum up.']
+    })
     expect(auftragSchritte('Describe the people and the place. Tell what happened before. Give your opinion!')).toEqual([
       'Describe the people and the place.',
       'Tell what happened before.',
@@ -106,7 +125,8 @@ describe('Hilfen an Sprechkarten', () => {
     expect(fehlendeInhalte(knapp)).toEqual(['hilfen'])
     const u = ergaenzungsAnfrage('monolog', knapp, ['hilfen'], g).user
     expect(u).toMatch(/Duration: .* minute/)
-    expect(u).toContain('at most 45 words')
+    expect(u).toContain('max 30 words in total')
+    expect(u).not.toContain('rich enough for that.')
     // Operatoren des Kerncurriculums Niedersachsen (Sprechen, Sek I 2026) und Zielsprache
     expect(u).toContain('describe')
     expect(u).toContain('core curriculum')

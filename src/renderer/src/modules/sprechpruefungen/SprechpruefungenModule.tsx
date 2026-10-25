@@ -57,6 +57,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import {
   dialogRollen,
+  auftragSchritte,
   ergaenzbar,
   fehlendeInhalte,
   standText,
@@ -345,7 +346,7 @@ function HilfenBlock({ k }: { k: SprechKarte }): React.JSX.Element | null {
       )}
       {k.art === 'monolog' && 'auftrag' in h && (
         <>
-          {h.auftrag && feld('Arbeitsauftrag', <Text size="sm">{h.auftrag}</Text>)}
+          {h.auftrag && feld('Arbeitsauftrag', punkte(auftragSchritte(h.auftrag)))}
           {h.zusatzfragen.length > 0 && feld('Zusatzfragen', punkte(h.zusatzfragen))}
           {h.wortschatz.length > 0 && feld('Bildwortschatz', woerter(h.wortschatz))}
           {h.beispiele.length > 0 && feld('Beispielsätze', punkte(h.beispiele))}

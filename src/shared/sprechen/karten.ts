@@ -256,10 +256,50 @@ export type FehlenderInhalt = 'hilfen' | 'beispiele' | 'dritteRolle' | 'bild'
  */
 export function auftragReicht(auftrag: string | undefined): boolean {
   const t = (auftrag ?? '').trim()
-  if (t.length < 60) return false
+  if (t.length < 40) return false
   const schritte = auftragSchritte(t)
-  // Zu viele Aufforderungen überfordern (Befund 25.10.2026): höchstens 3 Sätze und etwa 45 Wörter
-  return schritte.length >= 2 && schritte.length <= 3 && t.split(/\s+/).length <= 45
+  // Zu viele Aufforderungen überfordern (Befund 25.10.2026, zweiter Anlauf): höchstens 3 kurze Sätze mit je einer
+  // Aufforderung, zusammen etwa 30 Wörter, keine Ketten mit Doppelpunkt oder Semikolon – alles Weitere gehört zu den
+  // Impulsen des Partners, nicht auf die Karte des Sprechenden
+  const woerter = (x: string): number => x.split(/\s+/).filter(Boolean).length
+  return (
+    schritte.length >= 2 &&
+    schritte.length <= AUFTRAG_SCHRITTE &&
+    woerter(t) <= AUFTRAG_WOERTER &&
+    schritte.every((x) => woerter(x) <= AUFTRAG_WOERTER_JE_SCHRITT && !/[:;]/.test(x))
+  )
+}
+
+/** Grenzen für den Arbeitsauftrag auf der Karte des Sprechenden */
+export const AUFTRAG_SCHRITTE = 3
+export const AUFTRAG_WOERTER = 30
+export const AUFTRAG_WOERTER_JE_SCHRITT = 12
+
+/**
+ * Arbeitsauftrag für die Karte des Sprechenden kürzen (25.10.2026): höchstens drei knappe Schritte; Teilsätze hinter
+ * Doppelpunkt/Semikolon und weitere Sätze wandern als Impulse zum Partner. So bleiben auch alte, lange Aufträge aus dem
+ * Pool lesbar, bis die KI sie neu geschrieben hat.
+ */
+export function auftragKurz(auftrag: string | undefined): { schritte: string[]; impulse: string[] } {
+  const schritte: string[] = []
+  const impulse: string[] = []
+  const satz = (x: string): string => {
+    const t = x.trim().replace(/^[,;:\s]+/, '')
+    if (!t) return ''
+    const gross = t.charAt(0).toUpperCase() + t.slice(1)
+    return /[.!?…]$/.test(gross) ? gross : `${gross}.`
+  }
+  for (const roh of auftragSchritte(auftrag)) {
+    // „Describe the picture coherently: say who …; explain how …" → Schritt „Describe the picture coherently." + Impulse
+    const [kopf, ...rest] = roh.split(/[:;]/)
+    const teile = [satz(kopf), ...rest.map(satz)].filter(Boolean)
+    if (!teile.length) continue
+    if (schritte.length < AUFTRAG_SCHRITTE) {
+      schritte.push(teile[0])
+      impulse.push(...teile.slice(1))
+    } else impulse.push(...teile)
+  }
+  return { schritte, impulse }
 }
 
 /** Arbeitsauftrag als einzelne Schritte (Sätze) – für die nummerierte Anzeige unter dem Bild */

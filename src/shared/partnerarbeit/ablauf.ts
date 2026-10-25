@@ -13,7 +13,7 @@
  *  - Jedes Set funktioniert zu zweit UND zu dritt (Wahl der Karte nach Gruppengröße).
  * Sichten enthalten nie Namen. Die Lehrkraft nutzt dieselben Funktionen für die Vorschau A|B(|C) im Browser.
  */
-import { dialogRollen, karteFuer3, type DialogRolle, type SprechKarte, type Wortschatz } from '../sprechen/karten'
+import { auftragKurz, dialogRollen, karteFuer3, type DialogRolle, type SprechKarte, type Wortschatz } from '../sprechen/karten'
 import { minutenJeTeil, stufeVonNiveau, type Niveau, type SprechSprache } from '../sprechen/niveaus'
 import { phrasesBis, GRUPPEN, type GruppeId } from '../sprechen/phrases'
 import type { PaEinstellungen, PaGruppe, PaSchritt, PaTeil, Rolle } from './typen'
@@ -32,9 +32,9 @@ export const HILFE_NAME: Record<HilfeArt, string> = {
 
 /** Arbeitsauftrag zum Bild, wenn die Karte keinen eigenen hat (statt die Leitfragen aufzuzählen – Befund 24.10.2026) */
 const AUFTRAG_ALLGEMEIN: Record<SprechSprache, string> = {
-  en: 'Describe the picture: who can you see, where are they and what is happening? What do you think about it?',
-  fr: "Décris l'image : qui vois-tu, où sont-ils et que se passe-t-il ? Qu'en penses-tu ?",
-  es: 'Describe la imagen: ¿a quién ves, dónde están y qué pasa? ¿Qué opinas?'
+  en: 'Describe the picture. Tell what is happening. Say what you think about it.',
+  fr: "Décris l'image. Dis ce qui se passe. Dis ce que tu en penses.",
+  es: 'Describe la imagen. Di qué pasa. Di qué opinas.'
 }
 
 // ---------------------------------------------------------------- Karten wählen
@@ -355,7 +355,10 @@ export function sichtSchritt(
       if (zweite?.art === 'monolog') return { karte: zweite, bilder: zweite.bilder }
       return { karte: k, bilder: k.bilder.length >= 2 ? [k.bilder[1]] : k.bilder }
     }
-    const auftrag = (kk: SprechKarte & { art: 'monolog' }): string => kk.hilfen?.auftrag || AUFTRAG_ALLGEMEIN[u.sprache]
+    // Der Sprechende bekommt höchstens drei knappe Schritte; abgetrennte Teilsätze langer Aufträge werden Impulse bei A
+    const kurz = (kk: SprechKarte & { art: 'monolog' }): { schritte: string[]; impulse: string[] } =>
+      auftragKurz(kk.hilfen?.auftrag || AUFTRAG_ALLGEMEIN[u.sprache])
+    const auftrag = (kk: SprechKarte & { art: 'monolog' }): string => kurz(kk).schritte.join(' ')
     const alleFuer = (kk: SprechKarte & { art: 'monolog' }): HilfenSicht => ({
       wortschatz: kk.hilfen?.wortschatz ?? [],
       ...phrasesVon(kk, 'monolog', u),
@@ -366,7 +369,7 @@ export function sichtSchritt(
       const { karte: kk, bilder } = bilderVon(wen)
       basis.titel = kk.titel
       // Leitfragen der Karte und Zusatzfragen der KI zusammen als Impulse, ohne Doppelung
-      const impulse = [...new Set([...kk.leitfragen, ...(kk.hilfen?.zusatzfragen ?? [])].map((x) => x.trim()).filter(Boolean))]
+      const impulse = [...new Set([...kurz(kk).impulse, ...kk.leitfragen, ...(kk.hilfen?.zusatzfragen ?? [])].map((x) => x.trim()).filter(Boolean))]
       basis.monolog = { bilder, auftrag: auftrag(kk), leitfragen: [], impulse, beschreibung: kk.bildBeschreibung }
       basis.hilfen = alleFuer(kk)
       basis.schalter = (['leitfragen', 'wortschatz', 'phrases', 'beispiele'] as HilfeArt[]).map((was) => ({
