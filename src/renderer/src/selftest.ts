@@ -43,7 +43,7 @@ import { pdfTexte, renderPages } from './shared/components/PrintPreview'
 import { bereichAnlegen, neuImBereich, themenbereichName } from './shared/themenbereiche'
 import { mitThemenbereich } from './shared/ueberthema'
 import { deckblattBilder } from './modules/arbeitsblatt/render/deckblattBilder'
-import { buildWorksheetHtml } from './modules/arbeitsblatt/render/printHtml'
+import { buildWorksheetHtml, type WorksheetPrintSelection } from './modules/arbeitsblatt/render/printHtml'
 import { useLernzielkontrolle } from './modules/lernzielkontrolle/store'
 import { emptyKurztest } from './modules/lernzielkontrolle/model/defaults'
 import type { Kurztest } from './modules/lernzielkontrolle/model/types'
@@ -1503,6 +1503,15 @@ function printHtmlNow(): string {
   return buildWorksheetHtml(ws, gemessen ?? new Map(), { sheetIds: ws.sheets.map((s) => s.id), includeKey: false }, null, '')
 }
 
+/** Druck-HTML mit frei wählbaren Teilen (Lösungen, Tafelbild …) – für Prüfungen der Seitenauswahl (25.10.2026) */
+function printHtmlAuswahl(sel: Partial<WorksheetPrintSelection>): string {
+  const state = useArbeitsblatt.getState()
+  const ws = state.worksheet && mitThemenbereich(state.worksheet, themenbereichName('arbeitsblatt', state.docId))
+  if (!ws) throw new Error('Kein Arbeitsblatt geladen.')
+  const gemessen = (window as unknown as { __selftest?: { layouts?: Map<string, PagePlan[]> } }).__selftest?.layouts
+  return buildWorksheetHtml(ws, gemessen ?? new Map(), { sheetIds: ws.sheets.map((s) => s.id), includeKey: false, ...sel }, null, '')
+}
+
 /**
  * Legt ein Arbeitsblatt mit einer Reihe von Ankreuzfragen in den Zustand – ohne KI.
  *
@@ -2186,6 +2195,7 @@ export function installSelftest(): void {
       return { fertig: () => fertig() }
     },
     printHtml: printHtmlNow,
+    printHtmlAuswahl,
     renderPdf,
     pdfFlaeche,
     audioPdfInput

@@ -260,6 +260,91 @@ try {
     console.log(`   Word: ganz ${ganz.length} Zeichen, Seiten 1-2: ${teil.length} Zeichen`)
     pruefe(teil.length > 50 && teil.length < ganz.length * 0.6, `Word mit Seiten 1-2 enthält deutlich weniger (${teil.length} von ${ganz.length} Zeichen)`)
   } else pruefe(false, 'Beide Word-Dateien wurden gespeichert')
+
+  // ---------- 4) Lösungen angehängt + Tafelbild (25.10.2026, Befund der Lehrkraft: „S. 1 / 7" blieb stehen)
+  // Das Tafelbild ist EINE Seite im HTML, im PDF aber zwei (langer Ablauf) – die Zählung muss trotzdem stimmen.
+  console.log('\nLösungen + Tafelbild')
+  const board = await page.evaluate(() => {
+    window.__selftest.wsMitTafelbild()
+    const b = structuredClone(window.__selftest.worksheetJetzt().board)
+    // Ablauf so lang, dass er sicher auf eine zweite PDF-Seite läuft (wie bei echten Tafelbildern mit 5 Schritten)
+    const schritt = b.steps[0] ?? { phase: 'Sichern', impulse: 'Which checks guide a precise choice?', expected: 'Meaning, collocation, register, effect' }
+    b.steps = Array.from({ length: 12 }, (_, i) => ({ ...schritt, phase: `${i + 1}. ${schritt.phase}` }))
+    return b
+  })
+  await page.evaluate(
+    ([b, bl]) => {
+      const ws = structuredClone(window.__selftest.worksheetJetzt())
+      ws.meta.coverPage = false
+      ws.meta.boardPlan = true
+      ws.board = b
+      ws.sheets = [{ ...ws.sheets[0], blocks: bl }]
+      const f = ws.design.footer
+      f.show = true
+      if (![f.left, f.center, f.right].includes('pageNumber')) f.right = 'pageNumber'
+      window.__selftest.setWorksheet(ws)
+    },
+    [board, bloecke]
+  )
+  const n2 = await warteSeiten()
+  pruefe(n2 >= 6, `Prüfblatt mit Tafelbild hat ${n2} Schülerseiten`)
+  await app.evaluate(() => void (globalThis.__drucke = []))
+  await page.getByRole('button', { name: 'Drucken', exact: true }).first().click()
+  const druckDialog2 = page.locator('.mantine-Modal-content', { hasText: 'Weiter zur Druckvorschau' })
+  await druckDialog2.locator('input[type=radio][value="append"]').check()
+  await druckDialog2.getByRole('checkbox', { name: /Tafelbild/ }).check()
+  await druckDialog2.getByRole('button', { name: 'Weiter zur Druckvorschau' }).click()
+  await page.waitForSelector(`[data-print-page="${n2 + 2}"]`, { timeout: 90000 })
+  await page.waitForTimeout(800)
+  const gesamt2 = await page.locator('[data-print-page]').count()
+  const angabe2 = page.locator('.pv-seite [data-seitenangabe]')
+  pruefe((await angabe2.inputValue()) === `1-${gesamt2}`, `Alle ${gesamt2} Seiten gewählt (Blatt ${n2}, Lösungen, Tafelbild)`)
+  const unter2 = async (s) => page.locator(`[data-seite-unterschrift="${s}"]`).innerText()
+  // Welche PDF-Seiten gehören zum Tafelbild? Die Schnellauswahl „Nur Tafelbild" weiß es
+  await page.locator('.pv-seite').getByText('Nur Tafelbild', { exact: true }).click()
+  await page.waitForTimeout(300)
+  const tafelAngabe = await angabe2.inputValue()
+  // „15, 16" oder „14-16" (seitenText schreibt den Strich erst ab drei Seiten)
+  const tafelSeiten = tafelAngabe.split(/\s*,\s*/).flatMap((t) => {
+    const [a, b] = t.split('-').map(Number)
+    return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]
+  })
+  pruefe(tafelSeiten.length >= 2 && tafelSeiten.at(-1) === gesamt2, `Das Tafelbild ist im PDF ${tafelSeiten.length} Seiten lang („${tafelAngabe}")`)
+  await angabe2.fill(`1-4, 6-${gesamt2}`)
+  await page.waitForTimeout(400)
+  pruefe((await unter2(5)).includes('wird nicht gedruckt'), `Seite 5 wird nicht gedruckt („${await unter2(5)}")`)
+  pruefe((await unter2(1)).includes(`Seite 1 / ${n2 - 1}`), `Mit Lösungen und Tafelbild: Seite 1 wird als „Seite 1 / ${n2 - 1}" gedruckt („${await unter2(1)}")`)
+  pruefe((await unter2(6)).includes(`Seite 5 / ${n2 - 1}`), `Seite 6 wird als „Seite 5 / ${n2 - 1}" gedruckt („${await unter2(6)}")`)
+  pruefe(/Seite 1 \/ \d+/.test(await unter2(n2 + 1)), `Erste Lösungsseite zählt für sich („${await unter2(n2 + 1)}")`)
+  // Tafelbild: mehrere PDF-Seiten, eine Marke – ein Tipp nimmt alle heraus und wieder hinein
+  await page.locator(`[data-print-page="${gesamt2}"]`).click()
+  await page.waitForTimeout(300)
+  const alleDraussen = (await Promise.all(tafelSeiten.map((t) => unter2(t)))).every((u) => u.includes('wird nicht gedruckt'))
+  pruefe(alleDraussen && (await angabe2.inputValue()) === `1-4, 6-${tafelSeiten[0] - 1}`, `Tafelbild abgewählt: alle seine PDF-Seiten sind draußen („${await angabe2.inputValue()}")`)
+  await page.locator(`[data-print-page="${tafelSeiten[0]}"]`).click()
+  await page.waitForTimeout(300)
+  pruefe((await angabe2.inputValue()) === `1-4, 6-${gesamt2}`, `Tafelbild wieder dabei („${await angabe2.inputValue()}")`)
+  await shot('6-loesungen-tafelbild')
+  await page.locator('.pv-drucken').click()
+  await page.waitForTimeout(1500)
+  const drucke2 = await app.evaluate(() => globalThis.__drucke)
+  pruefe(drucke2.length === 1 && !drucke2[0].opts?.pages, `Ein gekürzter Druckauftrag (${drucke2.length})`)
+  if (drucke2[0]) {
+    const pdf2 = await page.evaluate(async (h) => Array.from(await window.api.exporter.preview(h)), drucke2[0].html)
+    const zeilen2 = await fusszeilen(pdf2)
+    console.log('   Druckauftrag:', zeilen2.join(' | '))
+    const blattZeilen = zeilen2.slice(0, n2 - 1)
+    pruefe(
+      blattZeilen.join(',') === Array.from({ length: n2 - 1 }, (_, i) => `${i + 1}/${n2 - 1}`).join(','),
+      `Schülerseiten „1 / ${n2 - 1}" … „${n2 - 1} / ${n2 - 1}" (${blattZeilen.join(', ')})`
+    )
+    const rest = zeilen2.slice(n2 - 1)
+    pruefe(
+      rest.length > tafelSeiten.length && rest.slice(-tafelSeiten.length).every((z) => z === '–') && /^1\/\d+$/.test(rest[0]),
+      `Dahinter Lösungen ab „1 / n" und das Tafelbild ohne Zahl (${rest.join(', ')})`
+    )
+    pruefe(zeilen2.length === gesamt2 - 1, `Der Druckauftrag hat ${gesamt2 - 1} Seiten (${zeilen2.length})`)
+  }
 } catch (e) {
   problems.push(`Abbruch der Wache: ${e.message}`)
   await shot('fehler').catch(() => undefined)

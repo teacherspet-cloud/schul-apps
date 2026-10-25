@@ -9,7 +9,7 @@ import { useAppSettings } from '../settingsStore'
 import { notifyError, notifySuccess } from '../util'
 import { frageSeitenWahl, nimmSeitenWunsch, useSeitenWahl, type SeitenDokument } from '../components/SeitenAuswahl'
 import { renderPages } from '../components/PrintPreview'
-import { seitenMarken, waehleSeitenImHtml, type SeitenMarke } from './seitenAuswahl'
+import { markenJeSeite, markenSeiten, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from './seitenAuswahl'
 import { istIservPfad, iservAnzeige } from '@shared/iserv'
 import { mitOrt } from './ausgabeOrt'
 import { frageVorhanden, vorhandenRunde } from './vorhandenFrage'
@@ -178,6 +178,8 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
         dok: {
           name: d.name,
           teile: marken.map((m) => m.teil),
+          // Teil je PDF-Seite – auch wenn das Tafelbild im PDF zwei Seiten lang wurde (25.10.2026)
+          teileFuer: (n) => markenJeSeite(marken, n)?.map((k) => marken[k].teil) ?? [],
           bilder: async () => {
             const b = await vorschauVon(d.html)
             anzahl = b.length
@@ -187,9 +189,15 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
         anwenden: (seiten) => {
           if (!seiten.length) ergebnis[i] = null
           else if (seiten.length === anzahl) ergebnis[i] = d
-          // Seiten mit Marken: vor dem Umrechnen wählen und neu zählen; passt die Zahl nicht (Überlauf), im PDF schneiden
-          else if (marken.length && marken.length === anzahl) ergebnis[i] = { ...d, html: waehleSeitenImHtml(d.html, seiten) }
-          else ergebnis[i] = { ...d, pdf: { ...d.pdf, seiten } }
+          else {
+            // Seiten mit Marken: vor dem Umrechnen wählen und neu zählen (eine ungezählte Seite wie das Tafelbild darf
+            // im PDF länger sein, markenJeSeite); lässt sich nichts zuordnen, im PDF schneiden
+            const zu = markenJeSeite(marken, anzahl)
+            const ms = zu ? markenSeiten(zu, seiten) : []
+            if (zu && ms.length === marken.length) ergebnis[i] = d
+            else if (zu) ergebnis[i] = { ...d, html: waehleSeitenImHtml(d.html, ms) }
+            else ergebnis[i] = { ...d, pdf: { ...d.pdf, seiten } }
+          }
         }
       })
     } else if (d.seiten) {
@@ -201,6 +209,7 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
         dok: {
           name: d.name,
           teile: marken.map((m) => m.teil),
+          teileFuer: (n) => markenJeSeite(marken, n)?.map((k) => marken[k].teil) ?? [],
           bilder: async () => {
             const b = await vorschauVon(html)
             anzahl = b.length
@@ -209,11 +218,13 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
           hinweis: q.hinweis ?? WORD_SEITEN_HINWEIS
         },
         anwenden: (seiten) => {
-          if (!seiten.length) ergebnis[i] = null
+          if (!seiten.length) return void (ergebnis[i] = null)
+          const zu = marken.length ? markenJeSeite(marken, anzahl) : null
+          const ms = zu ? markenSeiten(zu, seiten) : seiten
           // Passen Marken und Seiten nicht zusammen (Überlauf), lässt sich nichts zuordnen – dann die ganze Datei
-          else if ((marken.length && marken.length !== anzahl) || seiten.length === anzahl) ergebnis[i] = d
+          if ((marken.length && !zu) || seiten.length === anzahl || (zu && ms.length === marken.length)) ergebnis[i] = d
           else
-            ergebnis[i] = { name: d.name, filter: d.filter, daten: () => q.mitAuswahl(seiten, marken.length ? seiten.map((s) => marken[s - 1]) : [], anzahl) }
+            ergebnis[i] = { name: d.name, filter: d.filter, daten: () => q.mitAuswahl(ms, zu ? ms.map((s) => marken[s - 1]) : [], zu ? marken.length : anzahl) }
         }
       })
     }

@@ -1455,6 +1455,14 @@
   font-weight: 700;
   color: var(--ws-accent);
 }
+/* Ablauf (Überschrift + Tabelle) bleibt beim Seitenumbruch zusammen (25.10.2026) */
+.ws-board-steps-block {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 .ws-board-steps-title {
   font-weight: 700;
   font-size: 1.05em;

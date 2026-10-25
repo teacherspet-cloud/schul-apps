@@ -195,8 +195,16 @@ export function BoardPage({ board, meta, accent, fontFamily, onChange }: BoardPr
         <span>{[meta.subjectLabel, meta.grade ? `Klasse ${meta.grade}` : '', meta.title || meta.topic].filter(Boolean).join(' · ')}</span>
       </div>
       <BoardCanvas board={board} onChange={onChange} />
-      {board.steps.length > 0 && <div className="ws-board-steps-title">So entsteht das Tafelbild</div>}
-      <BoardSteps board={board} onChange={onChange} />
+      {/*
+        Überschrift und Tabelle als EIN Block (25.10.2026): Passt der Ablauf nicht mehr unter die Tafel, wandert er
+        geschlossen auf die nächste Seite – vorher blieb oft eine einzelne Zeile auf Seite 2 zurück (ws.css).
+      */}
+      {board.steps.length > 0 && (
+        <div className="ws-board-steps-block">
+          <div className="ws-board-steps-title">So entsteht das Tafelbild</div>
+          <BoardSteps board={board} onChange={onChange} />
+        </div>
+      )}
     </div>
   )
 }

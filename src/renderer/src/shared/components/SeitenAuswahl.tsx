@@ -196,6 +196,8 @@ export interface SeitenDokument {
   bilder: string[] | (() => Promise<string[]>)
   /** Teil je Seite (Schnellauswahl); fehlt, gibt es nur „Alle" */
   teile?: (string | undefined)[]
+  /** Teile für die tatsächliche Seitenzahl des PDFs (25.10.2026): das Tafelbild kann dort länger als eine Seite sein */
+  teileFuer?: (anzahl: number) => (string | undefined)[]
   /** Hinweis unter der Überschrift, z. B. zu Word */
   hinweis?: string
   loesungsBegriff?: string
@@ -271,6 +273,12 @@ export function SeitenWahlSchalter({
   )
 }
 
+/** Teil je Seite – passend zur Zahl der erzeugten Seiten, sonst ohne Teile (nur „Alle") */
+function teileFuerSeiten(dok: SeitenDokument, anzahl: number): (string | undefined)[] {
+  const passend = (t?: (string | undefined)[]): (string | undefined)[] | null => (t && t.length === anzahl ? t : null)
+  return passend(dok.teile) ?? passend(dok.teileFuer?.(anzahl)) ?? Array.from({ length: anzahl }, () => undefined)
+}
+
 /** Ein Dokument im Auswahl-Dialog */
 function DokumentWahl({
   dok,
@@ -305,7 +313,7 @@ function DokumentWahl({
       weg = true
     }
   }, [dok]) // eslint-disable-line react-hooks/exhaustive-deps
-  const teile = bilder ? (dok.teile && dok.teile.length === bilder.length ? dok.teile : bilder.map(() => undefined)) : []
+  const teile = bilder ? teileFuerSeiten(dok, bilder.length) : []
   return (
     <Stack gap="xs" data-seitenwahl-dokument={dok.name}>
       <Group gap="xs">

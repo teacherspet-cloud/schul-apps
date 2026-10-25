@@ -4,8 +4,11 @@ import { describe, expect, it } from 'vitest'
 import {
   auswahlHinweis,
   leseSeitenAngabe,
+  markenJeSeite,
+  markenSeiten,
   markiereSeiten,
   neueNummern,
+  seitenDerMarke,
   schnellAuswahl,
   seitenMarken,
   seitenText,
@@ -257,5 +260,50 @@ describe('Programme ohne Seitenzahlen', () => {
     const neu = await PDFDocument.load(await pdfMitSeiten(bytes, [1, 2, 3, 4, 6]))
     expect(neu.getPageCount()).toBe(5)
     expect(neu.getPages().map((p) => p.getWidth())).toEqual([100, 101, 102, 103, 105])
+  })
+})
+
+// Tafelbild länger als eine PDF-Seite (25.10.2026, Befund der Lehrkraft: „S. 1 / 7" blieb trotz Auswahl stehen)
+describe('PDF-Seiten den Marken zuordnen', () => {
+  const m = (teil: string, nummeriert = true, gruppe = 'g'): { teil: string; gruppe: string; nummeriert: boolean } => ({ teil, gruppe, nummeriert })
+  const marken = [m('blatt'), m('blatt'), m('blatt'), m('loesung', true, 'l'), m('loesung', true, 'l'), m('tafel', false, 'tafel')]
+  it('gleiche Zahl: eins zu eins', () => {
+    expect(markenJeSeite(marken, 6)).toEqual([0, 1, 2, 3, 4, 5])
+  })
+  it('eine PDF-Seite mehr: sie gehört zum Tafelbild', () => {
+    expect(markenJeSeite(marken, 7)).toEqual([0, 1, 2, 3, 4, 5, 5])
+    expect(markenJeSeite(marken, 8)).toEqual([0, 1, 2, 3, 4, 5, 5, 5])
+  })
+  it('ohne Tafelbild, aber eine ungezählte Seite (Deckblatt): dorthin', () => {
+    const mitDeckblatt = [m('deckblatt', false, 'deckblatt'), m('blatt'), m('blatt')]
+    expect(markenJeSeite(mitDeckblatt, 4)).toEqual([0, 0, 1, 2])
+  })
+  it('nichts zuzuordnen: weniger Seiten als Marken, keine oder mehrere ungezählte Seiten', () => {
+    expect(markenJeSeite(marken, 5)).toBeNull()
+    expect(markenJeSeite([m('blatt'), m('blatt')], 3)).toBeNull()
+    expect(markenJeSeite([m('tafel', false, 'tafel'), m('tafel', false, 'tafel')], 3)).toBeNull()
+    expect(markenJeSeite([], 2)).toBeNull()
+  })
+  it('gewählte PDF-Seiten werden zu Marken-Seiten, Tafelbild-Seiten fallen zusammen', () => {
+    const zu = markenJeSeite(marken, 7)!
+    expect(markenSeiten(zu, [1, 2, 6, 7])).toEqual([1, 2, 6])
+    expect(markenSeiten(zu, [7])).toEqual([6])
+    expect(seitenDerMarke(zu, 6)).toEqual([6, 7])
+    expect(seitenDerMarke(zu, 2)).toEqual([2])
+    expect(seitenDerMarke(null, 4)).toEqual([4])
+  })
+  it('Blatt mit Lösungen und Tafelbild: Seiten 6 und 7 abgewählt → „1 / 5", Lösungen zählen für sich', () => {
+    const seite = (teil: string, gruppe: string, nr: number, von: number, zahl = true): string =>
+      `<div class="ws-page" data-sa-seite="${teil}" data-sa-gruppe="${gruppe}">${zahl ? `<span data-sa-zahl="">Seite <span data-sa-nr="">${nr}</span> / <span data-sa-von="">${von}</span></span>` : 'Tafel'}</div>`
+    const html =
+      [1, 2, 3, 4, 5, 6, 7].map((n) => seite('blatt', 'b', n, 7)).join('') + [1, 2].map((n) => seite('loesung', 'l', n, 2)).join('') + seite('tafel', 'tafel', 0, 0, false)
+    const marken = seitenMarken(html)
+    expect(marken).toHaveLength(10)
+    // Das PDF hat 11 Seiten (Tafelbild zweiseitig); abgewählt: 6 und 7
+    const zu = markenJeSeite(marken, 11)!
+    const gewaehlt = [1, 2, 3, 4, 5, 8, 9, 10, 11]
+    const neu = waehleSeitenImHtml(html, markenSeiten(zu, gewaehlt))
+    expect([...neu.matchAll(/data-sa-von="">(\d+)</g)].map((x) => x[1])).toEqual(['5', '5', '5', '5', '5', '2', '2'])
+    expect(seitenMarken(neu)).toHaveLength(8)
   })
 })

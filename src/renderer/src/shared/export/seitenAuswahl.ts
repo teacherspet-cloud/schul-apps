@@ -215,6 +215,48 @@ export function markiereSeiten(stueck: string, marke: (i: number, anzahl: number
   return aus + stueck.slice(pos)
 }
 
+// ---------- PDF-Seiten den Marken zuordnen ----------
+
+/**
+ * Welche Marke jede PDF-Seite trägt (0-basiert), nachdem das HTML zu Seiten gerechnet wurde.
+ *
+ * Befund der Lehrkraft (25.10.2026): Mit Lösungen UND Tafelbild blieb „S. 1 / 7" stehen, obwohl Seiten abgewählt
+ * waren. Ursache: Die Tafelbild-Seite ist eine Marke, wird im PDF aber oft ZWEI Seiten lang (die Schritt-Tabelle läuft
+ * über). Marken (n) und PDF-Seiten (n + 1) passten nicht mehr zusammen, und die Auswahl fiel auf das Schneiden im
+ * fertigen PDF zurück – ohne Neuzählung. Hier bekommen die überzähligen PDF-Seiten die eine ungezählte Marke (das
+ * Tafelbild), die gewachsen sein kann. Gleiche Zahl → 1:1. null, wenn sich nichts zuordnen lässt: weniger PDF-Seiten
+ * als Marken, oder mehrere ungezählte Seiten, von denen jede gewachsen sein könnte.
+ */
+export function markenJeSeite(marken: SeitenMarke[], anzahl: number): number[] | null {
+  if (!marken.length || anzahl < marken.length) return null
+  if (anzahl === marken.length) return marken.map((_, i) => i)
+  const tafeln = marken.flatMap((m, i) => (m.teil === 'tafel' ? [i] : []))
+  const ungezaehlt = marken.flatMap((m, i) => (!m.nummeriert ? [i] : []))
+  const dehnbar = tafeln.length === 1 ? tafeln[0] : ungezaehlt.length === 1 ? ungezaehlt[0] : -1
+  if (dehnbar < 0) return null
+  const extra = anzahl - marken.length
+  const aus: number[] = []
+  marken.forEach((_, i) => {
+    aus.push(i)
+    if (i === dehnbar) for (let k = 0; k < extra; k++) aus.push(i)
+  })
+  return aus
+}
+
+/** Gewählte PDF-Seiten (1-basiert) → Seiten der Marken (1-basiert, aufsteigend, ohne Doppelte) */
+export function markenSeiten(zuordnung: number[], seiten: number[]): number[] {
+  const marken = new Set<number>()
+  for (const s of seiten) if (zuordnung[s - 1] !== undefined) marken.add(zuordnung[s - 1] + 1)
+  return [...marken].sort((a, b) => a - b)
+}
+
+/** Alle PDF-Seiten (1-basiert), die zur selben Marke gehören wie `seite` – ohne Zuordnung nur die Seite selbst */
+export function seitenDerMarke(zuordnung: number[] | null, seite: number): number[] {
+  if (!zuordnung || zuordnung[seite - 1] === undefined) return [seite]
+  const m = zuordnung[seite - 1]
+  return zuordnung.flatMap((z, i) => (z === m ? [i + 1] : []))
+}
+
 // ---------- Neu zählen ----------
 
 /** Neue Seitenzahlen der gewählten Seiten: je Gruppe 1 … n, n = gewählte nummerierte Seiten der Gruppe */

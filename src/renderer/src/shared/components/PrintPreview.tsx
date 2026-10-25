@@ -5,13 +5,13 @@ import * as pdfjs from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
-import { alleSeiten, neueNummern, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from '../export/seitenAuswahl'
+import { alleSeiten, markenJeSeite, markenSeiten, neueNummern, seitenDerMarke, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from '../export/seitenAuswahl'
 import { imNetz, vereinePdfs } from '../netzZugang'
 import { aufIos, druckerWaehlbar } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 import { ZoomFlaeche } from '../touch/zoom'
 import { druckVorbereiten, type DruckVorlage } from '../export/druckImDokument'
-import { SeitenAuswahlFelder, SeitenHaken, umschalten } from './SeitenAuswahl'
+import { SeitenAuswahlFelder, SeitenHaken } from './SeitenAuswahl'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -175,17 +175,19 @@ export default function PrintPreview({
   const bereit = Boolean(pages) && (!loesung || Boolean(loesungPages))
   const gesamt = pageCount + loesungSeiten
 
-  // Marken der Seiten (Teil, Zählgruppe) – nur, wenn sie zu den erzeugten Seiten passen
+  // Marken der Seiten (Teil, Zählgruppe), je PDF-Seite zugeordnet – das Tafelbild darf im PDF länger als eine Seite sein (25.10.2026)
   const blattMarken = useMemo(() => (html ? seitenMarken(html) : []), [html])
   const loesungMarken = useMemo(() => (loesung ? seitenMarken(loesung.html) : []), [loesung])
-  const blattMarkiert = blattMarken.length > 0 && blattMarken.length === pageCount
-  const loesungMarkiert = loesungMarken.length > 0 && loesungMarken.length === loesungSeiten
+  const blattZuordnung = useMemo(() => markenJeSeite(blattMarken, pageCount), [blattMarken, pageCount])
+  const loesungZuordnung = useMemo(() => markenJeSeite(loesungMarken, loesungSeiten), [loesungMarken, loesungSeiten])
+  const blattMarkiert = Boolean(blattZuordnung)
+  const loesungMarkiert = Boolean(loesungZuordnung)
   const teile = useMemo(
     () => [
-      ...Array.from({ length: pageCount }, (_, i) => (blattMarkiert ? blattMarken[i].teil : undefined)),
-      ...Array.from({ length: loesungSeiten }, (_, i) => (loesungMarkiert ? loesungMarken[i].teil : 'loesung'))
+      ...Array.from({ length: pageCount }, (_, i) => (blattZuordnung ? blattMarken[blattZuordnung[i]].teil : undefined)),
+      ...Array.from({ length: loesungSeiten }, (_, i) => (loesungZuordnung ? loesungMarken[loesungZuordnung[i]].teil : 'loesung'))
     ],
-    [pageCount, loesungSeiten, blattMarkiert, loesungMarkiert, blattMarken, loesungMarken]
+    [pageCount, loesungSeiten, blattZuordnung, loesungZuordnung, blattMarken, loesungMarken]
   )
   // Sobald alle Seiten da sind: alles gewählt
   useEffect(() => {
@@ -200,11 +202,26 @@ export default function PrintPreview({
   // Ohne Marken lässt sich nur am PC (Seitenbereiche des Druckers) auswählen
   const auswahlMoeglich = (blattMarkiert && (!loesung || loesungMarkiert)) || direkt
   const gewaehlt = (seite: number): boolean => auswahl.includes(seite)
-  // Neue Seitenzahlen der gewählten Seiten – zur Anzeige unter den Seitenbildern
+  // Neue Seitenzahlen der gewählten Seiten – zur Anzeige unter den Seitenbildern (je PDF-Seite, über die Marke gezählt)
   const nummern = useMemo(() => {
-    const zahlen = (marken: SeitenMarke[], ok: boolean, wahl: number[]): Map<number, { nr: number; von: number }> => (ok ? neueNummern(marken, wahl) : new Map())
-    return { blatt: zahlen(blattMarken, blattMarkiert, blattAuswahl), loesung: zahlen(loesungMarken, loesungMarkiert, loesungAuswahl) }
-  }, [auswahl.join(','), blattMarkiert, loesungMarkiert]) // eslint-disable-line react-hooks/exhaustive-deps
+    const zahlen = (marken: SeitenMarke[], zu: number[] | null, wahl: number[]): Map<number, { nr: number; von: number }> => {
+      if (!zu) return new Map()
+      const jeMarke = neueNummern(marken, markenSeiten(zu, wahl))
+      return new Map(
+        wahl.flatMap((s) => {
+          const n = jeMarke.get(zu[s - 1] + 1)
+          return n ? [[s, n] as const] : []
+        })
+      )
+    }
+    return { blatt: zahlen(blattMarken, blattZuordnung, blattAuswahl), loesung: zahlen(loesungMarken, loesungZuordnung, loesungAuswahl) }
+  }, [auswahl.join(','), blattZuordnung, loesungZuordnung]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Eine Seite antippen: läuft ihre Marke über mehrere PDF-Seiten (Tafelbild), schalten alle zusammen um */
+  const umschaltenSeite = (a: number[], seite: number): number[] => {
+    const gruppe = seite <= pageCount ? seitenDerMarke(blattZuordnung, seite) : seitenDerMarke(loesungZuordnung, seite - pageCount).map((s) => s + pageCount)
+    const ohne = a.filter((s) => !gruppe.includes(s))
+    return a.includes(seite) ? ohne : [...ohne, ...gruppe].sort((x, y) => x - y)
+  }
 
   const mitBlatt = blattAuswahl.length > 0
   const mitLoesung = Boolean(loesung) && loesungExemplare > 0 && loesungAuswahl.length > 0
@@ -212,9 +229,10 @@ export default function PrintPreview({
   const loesungBlaetter = duplex === 'simplex' ? loesungAuswahl.length : Math.ceil(loesungAuswahl.length / 2)
 
   /** Das Druck-HTML der Auswahl – mit Marken gekürzt und neu gezählt, sonst unverändert */
-  const blattHtml = (): string | null => (!html || !mitBlatt ? null : blattMarkiert && !alleBlatt ? waehleSeitenImHtml(html, blattAuswahl) : html)
+  const blattHtml = (): string | null =>
+    !html || !mitBlatt ? null : blattZuordnung && !alleBlatt ? waehleSeitenImHtml(html, markenSeiten(blattZuordnung, blattAuswahl)) : html
   const loesungHtml = (): string | null =>
-    !loesung || !mitLoesung ? null : loesungMarkiert && !alleLoesung ? waehleSeitenImHtml(loesung.html, loesungAuswahl) : loesung.html
+    !loesung || !mitLoesung ? null : loesungZuordnung && !alleLoesung ? waehleSeitenImHtml(loesung.html, markenSeiten(loesungZuordnung, loesungAuswahl)) : loesung.html
   /** Seitenbereiche für den Drucker – nur ohne Marken (sonst ist das HTML schon gekürzt) */
   const bereiche = (wahl: number[], markiert: boolean, anzahl: number): { from: number; to: number }[] | undefined =>
     markiert || wahl.length === anzahl ? undefined : bereicheVon(wahl)
@@ -354,7 +372,7 @@ export default function PrintPreview({
     <Box
       component="button"
       type="button"
-      onClick={() => auswahlMoeglich && setAuswahl((a) => umschalten(a, seite))}
+      onClick={() => auswahlMoeglich && setAuswahl((a) => umschaltenSeite(a, seite))}
       aria-pressed={an}
       aria-label={`${alt} ${an ? 'abwählen' : 'wählen'}`}
       style={{
