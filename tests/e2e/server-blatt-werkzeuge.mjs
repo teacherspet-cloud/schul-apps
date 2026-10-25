@@ -512,6 +512,8 @@ try {
   pruefe(await da(voll.locator('[data-bild-schliessen]')), 'Bild bildschirmfüllend mit Werkzeugen')
   await voll.locator('[data-werkzeug="stift"]').click()
   const lw = await voll.locator('[data-tinte]').boundingBox()
+  // Das Bild füllt die Breite (1024 px breites iPad): vorher blieb es beim Startmaßstab 0,5 stehen
+  pruefe(lw.width > 900, `Bild nutzt die Bildschirmbreite (${Math.round(lw.width)} px)`)
   await s.mouse.move(lw.x + lw.width * 0.3, lw.y + lw.height * 0.3)
   await s.mouse.down()
   await s.mouse.move(lw.x + lw.width * 0.6, lw.y + lw.height * 0.5, { steps: 8 })

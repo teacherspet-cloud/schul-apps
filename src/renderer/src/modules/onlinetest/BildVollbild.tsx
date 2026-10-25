@@ -13,7 +13,7 @@
  */
 import { Button, Group, Modal, Stack, Text } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BILD_SEITE } from '@shared/blattBilder'
 import type { BlattObjekt, FormArt } from '@shared/blattObjekte'
 import { ObjektEbene, Werkzeugleiste, type Vorgaben, type VorgabeArt, type Werkzeug } from './blattWerkzeuge'
@@ -57,19 +57,22 @@ export function BildVollbild(p: {
   const [form, setForm] = useState<FormArt>('dreieck')
   const w = BILD_LOGISCH
   const h = Math.max(200, Math.round((BILD_LOGISCH * (p.bild.natH || p.bild.h)) / (p.bild.natW || p.bild.w || 1)))
-  const rahmen = useRef<HTMLDivElement>(null)
+  // Der Rahmen entsteht erst mit dem Einblenden des Fensters (Mantine Transition) – deshalb Callback-Ref und
+  // ResizeObserver statt einmaliger Messung (Befund im Browsertest: Bild blieb halb so groß)
+  const [rahmen, setRahmen] = useState<HTMLDivElement | null>(null)
   const [massstab, setMassstab] = useState(0.5)
   useEffect(() => {
+    if (!rahmen) return
     const rechne = (): void => {
-      const el = rahmen.current
-      if (!el) return
-      const b = el.getBoundingClientRect()
+      const b = rahmen.getBoundingClientRect()
+      if (b.width < 50 || b.height < 50) return
       setMassstab(Math.max(0.1, Math.min((b.width - 16) / w, (b.height - 16) / h, 2)))
     }
     rechne()
-    window.addEventListener('resize', rechne)
-    return () => window.removeEventListener('resize', rechne)
-  }, [w, h])
+    const beobachter = new ResizeObserver(rechne)
+    beobachter.observe(rahmen)
+    return () => beobachter.disconnect()
+  }, [rahmen, w, h])
   const lage = { x: 0, y: 0, w, h }
   const seite = BILD_SEITE + p.index
   const aktiv: Werkzeug = p.gesperrt ? 'tastatur' : werkzeug
@@ -95,12 +98,12 @@ export function BildVollbild(p: {
               setVorgabe={p.setVorgabe}
             />
           )}
-          <Button variant="default" leftSection={<IconX size={16} />} onClick={p.schliessen} data-bild-schliessen>
+          <Button variant="default" leftSection={<IconX size={16} />} onClick={p.schliessen} style={{ flexShrink: 0 }} data-bild-schliessen>
             Schließen
           </Button>
         </Group>
         <div
-          ref={rahmen}
+          ref={setRahmen}
           onClick={(e) => {
             // Tipp auf den dunklen Rand schließt – wie man es von Bildansichten kennt
             if (e.target === e.currentTarget) p.schliessen()
