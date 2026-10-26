@@ -61,6 +61,7 @@ import { useTouch } from '../../shared/touch/touchModus'
 import { ZoomFlaeche } from '../../shared/touch/zoom'
 import { StiftDiagnose, stiftDiagnoseAktiv } from './StiftDiagnose'
 import { loesungenJeAufgabe } from './loesungJeAufgabe'
+import { stiftAutomatikEinrichten, type TintenApi } from './stiftAutomatik'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
@@ -513,6 +514,23 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [breite, setBreite] = useState(BREITE)
   const [ansicht, setAnsicht] = useState<'blatt' | 'liste'>(() => (window.innerWidth < 640 ? 'liste' : 'blatt'))
   const [werkzeug, setWerkzeug] = useState<Werkzeug>('tastatur')
+  /*
+   * Stift-Automatik (26.10.2026, Wunsch der Lehrkraft; stiftAutomatik.ts): Ein Stift schaltet von selbst auf den Stift
+   * bzw. Radierer und beginnt den Strich schon beim Aufsetzen. Nur aus der Tastatur-Stellung; wer die Tastatur nach einem
+   * Stift wieder gewählt hat, wird vom Schweben nicht mehr umgeschaltet.
+   */
+  const werkzeugRef = useRef(werkzeug)
+  werkzeugRef.current = werkzeug
+  const manuellTastatur = useRef(false)
+  const werkzeugWaehlen = useCallback((w: Werkzeug): void => {
+    manuellTastatur.current = w === 'tastatur'
+    setWerkzeug(w)
+  }, [])
+  const tintenApis = useRef<Record<number, TintenApi>>({})
+  const tinteAnmelden = useCallback((seite: number, api: TintenApi | null): void => {
+    if (api) tintenApis.current[seite] = api
+    else delete tintenApis.current[seite]
+  }, [])
   // Werkzeug „Formen“ (05.10.2026): zuletzt gewählte Form
   const [form, setForm] = useState<FormArt>('dreieck')
   const [stiftFarbe, setStiftFarbe] = useState(STIFT_FARBEN[0])
@@ -881,6 +899,20 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * Lehrkraft den Stift nicht freigegeben hat (dann ohne Textmarker).
    */
   const werkzeugeDa = d.einstellungen.stift || alleAufgaben.some((a) => a.zeichnen)
+  useEffect(() => {
+    if (!schreibbar || !werkzeugeDa) return
+    return stiftAutomatikEinrichten({
+      ziele: () => [window, iframe.current?.contentDocument],
+      darf: (kontakt) => werkzeugRef.current === 'tastatur' && (kontakt || !manuellTastatur.current),
+      aktivieren: (art) => {
+        manuellTastatur.current = false
+        setWerkzeug(art)
+      },
+      beginne: (cx, cy, druck, art) => Object.values(tintenApis.current).some((api) => api.beginneWenn(cx, cy, druck, art)),
+      weiter: (cx, cy) => Object.values(tintenApis.current).forEach((api) => api.weiter(cx, cy))
+    })
+    // `gemessen` dabei: dann ist das Dokument des Rahmens geladen und bekommt seine Horcher
+  }, [schreibbar, werkzeugeDa, gemessen])
   // Freiwillige Aufgaben halten weder das Freischalten auf noch zählen sie für „vollständig bearbeitet"
   const nummern = alleAufgaben.filter((a) => !a.freiwillig).map((a) => a.nr)
   const frei = d.freigeschaltet ?? []
@@ -1064,7 +1096,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           setForm={setForm}
           nurZeichnen={!d.einstellungen.stift}
           werkzeug={werkzeug}
-          setWerkzeug={setWerkzeug}
+          setWerkzeug={werkzeugWaehlen}
           stiftFarbe={stiftFarbe}
           setStiftFarbe={setStiftFarbe}
           markerFarbe={markerFarbe}
@@ -1138,6 +1170,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 fb={aufgabenFb}
                 loesungen={loesungen}
                 loesungenAuf={loesungenAuf}
+                anmelden={tinteAnmelden}
                 runden={d.einstellungen.aufgabenRunden}
                 hilfen={hilfen}
                 hilfeOeffnen={hilfeOeffnen}
@@ -1366,6 +1399,8 @@ function Ebene(p: {
   /** Lösung je Aufgabe (26.10.2026): kleines Dokument je Aufgabe aus dem Lösungsblatt; `loesungenAuf`: gleich aufgeklappt */
   loesungen?: Record<number, string>
   loesungenAuf?: boolean
+  /** Stift-Automatik (26.10.2026, stiftAutomatik.ts): Tintenseiten melden sich an */
+  anmelden?: (seite: number, api: TintenApi | null) => void
   /** Ampel je Aufgabe (nur mit Feedback je Aufgabe) */
   ampeln?: Record<number, Ampel> | null
   /** Gewählte Form (Werkzeug „Formen“) */
@@ -1563,6 +1598,7 @@ function Ebene(p: {
           farbe={p.werkzeug === 'marker' ? p.markerFarbe : p.stiftFarbe}
           stil={p.werkzeug === 'marker' ? p.vorgaben?.marker : p.vorgaben?.stift}
           setTinte={p.setTinte}
+          anmelden={p.anmelden}
         />
       ))}
       {p.seiten.map((s, i) => (

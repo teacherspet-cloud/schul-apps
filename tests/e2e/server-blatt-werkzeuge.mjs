@@ -369,6 +369,28 @@ try {
     l2.x > linie.x + 20 && Math.abs(l2.x2 - linie.x2) < 1,
     `Angehängtes Linienende wandert mit, das Ende an der Achse bleibt (${Math.round(linie.x)} → ${Math.round(l2.x)})`
   )
+  // Stift-Automatik (26.10.2026, Wunsch der Lehrkraft): ein Stift (pointerType „pen") wählt den Stift von selbst und
+  // schreibt schon mit dem ersten Strich – ohne vorher das Werkzeug anzutippen
+  await s.locator('[data-werkzeug="tastatur"]').click()
+  const zaehlTinte = () =>
+    s.locator('[data-tinte]').evaluateAll((cs) =>
+      cs.reduce((n, c) => {
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+        let k = 0
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 20) k++
+        return n + k
+      }, 0)
+    )
+  const tinteOhneStift = await zaehlTinte()
+  const cdpS = await s.context().newCDPSession(s)
+  const stift = (type, x, extra = {}) => cdpS.send('Input.dispatchMouseEvent', { type, x, y: ac.y - 60, pointerType: 'pen', ...extra })
+  await stift('mousePressed', ac.x + 20, { button: 'left', buttons: 1, clickCount: 1, force: 0.5 })
+  for (let i = 1; i <= 6; i++) await stift('mouseMoved', ac.x + 20 + i * 15, { button: 'left', buttons: 1, force: 0.5 })
+  await stift('mouseReleased', ac.x + 110, { button: 'left', clickCount: 1 })
+  await cdpS.detach()
+  await s.waitForTimeout(300)
+  pruefe((await s.locator('[data-werkzeug="stift"]').getAttribute('aria-pressed')) === 'true', 'Stift-Automatik: Stift gewählt, sobald ein Stift aufsetzt')
+  pruefe((await zaehlTinte()) > tinteOhneStift, 'Stift-Automatik: der erste Strich ist schon Tinte')
   // Stift-Strich, dann radieren – links neben der Verbindungslinie (deren Radier-Fläche fängt sonst den Radierer)
   await s.locator('[data-werkzeug="stift"]').click()
   await s.mouse.move(ac.x + 20, ac.y - 60)

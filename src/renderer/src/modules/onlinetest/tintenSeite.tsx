@@ -15,6 +15,8 @@ import { Fadenkreuz, useZeichenTastatur } from '../../shared/useZeichenTastatur'
 import { ansagen } from '../../shared/ansage'
 import type { Werkzeug } from './blattWerkzeuge'
 import type { Stil } from './objektOptionen'
+import { useStiftTouch } from './stiftScroll'
+import type { TintenApi } from './stiftAutomatik'
 
 const NAME: Partial<Record<Werkzeug, string>> = { stift: 'Stift', marker: 'Textmarker', radierer: 'Radierer' }
 
@@ -25,7 +27,8 @@ export function TintenSeite({
   werkzeug,
   farbe,
   stil,
-  setTinte
+  setTinte,
+  anmelden
 }: {
   seite: number
   lage: { x: number; y: number; w: number; h: number }
@@ -35,8 +38,13 @@ export function TintenSeite({
   /** Stärke und Linienart der nächsten Striche (Rechtsklick aufs Werkzeug, 06.10.2026) */
   stil?: Stil
   setTinte: (s: number, url: string) => void
+  /** Stift-Automatik (26.10.2026, stiftAutomatik.ts): Strich schon beim Aufsetzen übernehmen, auch bevor das Werkzeug umgestellt ist */
+  anmelden?: (seite: number, api: TintenApi | null) => void
 }): React.JSX.Element {
   const leinwand = useRef<HTMLCanvasElement>(null)
+  // Mit bekanntem Stift schreibt nur der Stift – der Finger rollt und zoomt (wie in den Handschrift-Feldern)
+  const beruehrung = useStiftTouch(leinwand)
+  const stiftBekannt = beruehrung !== 'none'
   const verlauf = useRef<string[]>([])
   const zeichnet = useRef(false)
   // Textmarker (03.10.2026, Befund der Lehrkraft: „übermalen … statt semitransparent"): Stand vor dem Strich
@@ -62,24 +70,22 @@ export function TintenSeite({
     zeichnet.current = false
     setTinte(seite, leinwand.current!.toDataURL('image/png'))
   }
-  /** Strich beginnen – Leinwandpixel (Zeiger und Tastatur, 23.10.2026) */
-  const beginne = (x: number, y: number, druck?: number): void => {
+  /** Strich beginnen – Leinwandpixel (Zeiger und Tastatur, 23.10.2026); `art`: Werkzeug schon vor der Umstellung (Stift-Automatik) */
+  const beginne = (x: number, y: number, druck?: number, art: Werkzeug = werkzeug): void => {
     const ctx = leinwand.current!.getContext('2d')!
     verlauf.current = [...verlauf.current.slice(-9), leinwand.current!.toDataURL('image/png')]
     zeichnet.current = true
-    vorStrich.current = werkzeug === 'marker' ? ctx.getImageData(0, 0, leinwand.current!.width, leinwand.current!.height) : null
+    vorStrich.current = art === 'marker' ? ctx.getImageData(0, 0, leinwand.current!.width, leinwand.current!.height) : null
     strich.current = [{ x, y }]
-    ctx.globalCompositeOperation = werkzeug === 'radierer' ? 'destination-out' : 'source-over'
+    ctx.globalCompositeOperation = art === 'radierer' ? 'destination-out' : 'source-over'
     // Textmarker: breit und durchscheinend (03.10.2026)
-    ctx.strokeStyle = werkzeug === 'marker' ? `${farbe}59` : farbe
+    ctx.strokeStyle = art === 'marker' ? `${farbe}59` : farbe
     const faktor = stil?.staerke === 1 ? 0.6 : stil?.staerke === 3 ? 1.7 : 1
-    ctx.lineWidth = (werkzeug === 'radierer' ? 22 : werkzeug === 'marker' ? 16 * faktor : 2.2 * faktor * (druck ? 0.6 + druck : 1)) * AUFLOESUNG
-    ctx.lineCap = werkzeug === 'marker' ? 'butt' : 'round'
+    ctx.lineWidth = (art === 'radierer' ? 22 : art === 'marker' ? 16 * faktor : 2.2 * faktor * (druck ? 0.6 + druck : 1)) * AUFLOESUNG
+    ctx.lineCap = art === 'marker' ? 'butt' : 'round'
     // Gestrichelt/gepunktet nur beim Stift
     const w = 2.2 * faktor * AUFLOESUNG
-    ctx.setLineDash(
-      werkzeug === 'stift' && stil?.linienArt === 'strich' ? [w * 3.2, w * 2.4] : werkzeug === 'stift' && stil?.linienArt === 'punkt' ? [0.1, w * 2.3] : []
-    )
+    ctx.setLineDash(art === 'stift' && stil?.linienArt === 'strich' ? [w * 3.2, w * 2.4] : art === 'stift' && stil?.linienArt === 'punkt' ? [0.1, w * 2.3] : [])
     ctx.lineJoin = 'round'
     ctx.beginPath()
     ctx.moveTo(x, y)
@@ -102,6 +108,46 @@ export function TintenSeite({
     ctx.lineTo(x, y)
     ctx.stroke()
   }
+  /*
+   * Stift-Automatik (26.10.2026, stiftAutomatik.ts): Strich beim Aufsetzen übernehmen, solange die Leinwand noch nicht
+   * aktiv ist (pointer-events none) – die Bewegungen bis zum nächsten Zeichnen kommen dann über `weiter`. Loslassen
+   * außerhalb der Leinwand beendet den Strich trotzdem (Fensterebene).
+   */
+  const stand = useRef({ beginne, weiter, fertig, aktiv })
+  stand.current = { beginne, weiter, fertig, aktiv }
+  useEffect(() => {
+    if (!anmelden) return
+    const koordinaten = (cx: number, cy: number): { x: number; y: number } | null => {
+      const c = leinwand.current
+      if (!c) return null
+      const r = c.getBoundingClientRect()
+      if (!r.width || cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null
+      return { x: ((cx - r.left) / r.width) * c.width, y: ((cy - r.top) / r.height) * c.height }
+    }
+    anmelden(seite, {
+      beginneWenn: (cx, cy, druck, art) => {
+        const q = koordinaten(cx, cy)
+        if (!q) return false
+        stand.current.beginne(q.x, q.y, druck, art)
+        return true
+      },
+      weiter: (cx, cy) => {
+        if (stand.current.aktiv || !zeichnet.current) return
+        const q = koordinaten(cx, cy)
+        if (q) stand.current.weiter(q.x, q.y)
+      }
+    })
+    const los = (e: PointerEvent): void => {
+      if (e.pointerType === 'pen') stand.current.fertig()
+    }
+    window.addEventListener('pointerup', los, true)
+    window.addEventListener('pointercancel', los, true)
+    return () => {
+      anmelden(seite, null)
+      window.removeEventListener('pointerup', los, true)
+      window.removeEventListener('pointercancel', los, true)
+    }
+  }, [anmelden, seite])
   const rueckgaengig = (): boolean => {
     const vorher = verlauf.current.pop()
     const c = leinwand.current!
@@ -161,7 +207,8 @@ export function TintenSeite({
           width: lage.w,
           height: lage.h,
           pointerEvents: aktiv ? 'auto' : 'none',
-          touchAction: aktiv ? 'none' : 'auto',
+          // Mit bekanntem Stift darf der Finger über der Tinte rollen und zoomen (26.10.2026, Stift-Automatik)
+          touchAction: aktiv ? (stiftBekannt ? 'pan-x pan-y pinch-zoom' : 'none') : 'auto',
           zIndex: 10,
           // Wie ein echter Textmarker: Farbe legt sich über den Text, der Text bleibt lesbar
           mixBlendMode: 'multiply'
@@ -171,6 +218,10 @@ export function TintenSeite({
         data-zeichen-seite={seite}
         onPointerDown={(e) => {
           if (!aktiv) return
+          // Stift bekannt: der Finger rollt und zoomt, nur der Stift (oder die Maus) schreibt
+          if (e.pointerType === 'touch' && stiftBekannt) return
+          // Die Automatik hat den Strich beim Aufsetzen schon begonnen (dann nicht noch einmal)
+          if (zeichnet.current) return
           leinwand.current!.setPointerCapture(e.pointerId)
           const { x, y } = punkt(e)
           beginne(x, y, e.pressure)
