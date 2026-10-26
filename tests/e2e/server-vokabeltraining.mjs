@@ -173,6 +173,7 @@ try {
   let buchstabenOk = true
   let karteGeprueft = false
   let tastaturGeprueft = false
+  let legenGeprueft = false
   for (let i = 0; i < 40; i++) {
     if (await h.locator('[data-sitzung-fertig]').isVisible()) break
     await h.waitForTimeout(250)
@@ -239,6 +240,8 @@ try {
       await h.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
       await h.keyboard.type(w.term.replace(/\s*\[.*\]/, ''))
       pruefe(await da(h.locator('[data-lege-tippen]'), 3000), 'Lostippen schaltet „Lege das Wort" auf Tippen')
+      // Wort steht vollständig da (26.10.2026, Befund 10b „quota"): „Lösung zeigen" würde jetzt prüfen statt aufgeben
+      pruefe((await h.locator('[data-loesung-zeigen]').getAttribute('data-loesung-zeigen')) === 'prueft', '„Lösung zeigen" prüft, sobald das Wort vollständig gelegt ist')
       await h.keyboard.press('Enter')
       pruefe((await h.locator('[data-urteil]').getAttribute('data-urteil', { timeout: 8000 })) === 'richtig', `Getippt und mit Enter geprüft: richtig (${w.term})`)
     } else if ((await h.locator('[data-buchstabe]').count()) > 0) {
@@ -249,7 +252,15 @@ try {
       if (texte.some((t) => /[\[\]]/.test(t))) buchstabenOk = false
       if (await k.first().isDisabled()) sauber = false
       for (let j = 0; j < n; j++) await k.nth(j).click()
-      await h.locator('[data-pruefen]').click()
+      if (!legenGeprueft) {
+        // Alles gelegt, dann „Lösung zeigen" statt „Prüfen" (Befund 26.10.2026, 10b „quota"): das Gelegte wird geprüft,
+        // nicht als „nicht gewusst" verworfen – in Kachelreihenfolge gelegt ist es meist falsch, aber nie „aufgegeben"
+        legenGeprueft = true
+        pruefe((await h.locator('[data-loesung-zeigen]').getAttribute('data-loesung-zeigen')) === 'prueft', '„Lösung zeigen" prüft, sobald alles gelegt ist')
+        await h.locator('[data-loesung-zeigen]').click()
+        await h.locator('[data-urteil]').waitFor({ timeout: 8000 })
+        pruefe(!(await h.getByText('Hier ist die Lösung').isVisible()), 'Gelegtes wird geprüft, nicht als Aufgeben gewertet')
+      } else await h.locator('[data-pruefen]').click()
     } else if ((await h.locator('[data-eingabe]').count()) > 0) {
       arten.add('schreiben')
       if (await h.locator('[data-eingabe]').isDisabled()) sauber = false

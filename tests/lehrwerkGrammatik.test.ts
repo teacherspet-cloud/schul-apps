@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALLE_KENNUNGEN, bekannteGrammatik, fruehereBaendeDerReihe, LEHRWERK_GRAMMATIK } from '../src/renderer/src/shared/lehrwerkGrammatik'
-import { stelleImBand } from '../src/shared/lehrwerkBand'
+import { stelleImBand, stelleImLehrwerk } from '../src/shared/lehrwerkBand'
 import { kapitelFolge, LEHRWERK_THEMEN } from '../src/renderer/src/shared/lehrwerkThemen'
 import { GRAMMAR_TOPICS, teilformenFuer } from '../src/renderer/src/modules/arbeitsblatt/didactics/grammar'
 import { unitEintraege } from '../src/renderer/src/modules/arbeitsblatt/didactics/grammatikAuswahl'
@@ -121,5 +121,19 @@ describe('Green Line Transition', () => {
     expect(stelleImBand('Green Line Transition', ['en.focus.cleft'])).toEqual({ unit: 'Topic 5', station: 'E Shifting focus' })
     expect(stelleImBand('green-line-transition-ausgabe-2018', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
     expect(stelleImBand('Green Line Transition (Ausgabe 2018)', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
+  })
+  // Befund 26.10.2026 (10b): „Tense revision" steht im Katalog nur als Wiederholung – im Band des Kurses zählt sie,
+  // im Katalog aller Bände zuletzt (vorher nie → „Weitere Grammatik")
+  it('Wiederholungsstationen finden ihre Stelle: im Band des Kurses und zuletzt im Katalog', () => {
+    expect(stelleImBand('green-line-6', ['en.verb.tense_aspect_overview'])).toEqual({ unit: 'Unit 1', station: 'Station 1' })
+    expect(
+      stelleImBand('Green Line 6', ['en.verb.passive_reporting', 'en.verb.passive_ext', 'en.syn.nominal_style'], ['en.syn.nominal_style/unpersoenlich'])
+    ).toEqual({
+      unit: 'Unit 1',
+      station: 'Station 2'
+    })
+    expect(stelleImLehrwerk(['en.verb.tense_aspect_overview'])).not.toBeNull()
+    // Einführungen behalten den Vorrang vor Wiederholungen
+    expect(stelleImLehrwerk(['en.verb.passive_basic'])?.buch).not.toBe('Green Line 6')
   })
 })

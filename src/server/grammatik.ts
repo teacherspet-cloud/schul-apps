@@ -614,16 +614,42 @@ export function lehrwerkDerGrammatik(z: Zeile): { buch?: string; unit?: string; 
    * Kurzformen" standen unter „Weitere Grammatik"): Die App weist sie selbst zu (`mixeZuweisen`) – ohne Themen. Ihre
    * Stelle kommt aus den Formen, aus denen sie gemischt sind, bzw. aus Band und Unit des Unit-Mixes.
    */
-  if (!info.themen.length && info.bank?.length) {
-    for (const k of info.bank) {
+  const kandidaten: { themen: string[]; teilformen: string[] }[] = []
+  if (info.themen.length) kandidaten.push({ themen: info.themen, teilformen: info.teilformen })
+  else
+    for (const k of info.bank ?? []) {
       const u = k.startsWith('unit:') ? unitVon(k) : null
       if (u) return { buch: u.band, unit: u.unit }
       const kennungen = mixKennungen(k)
-      const stelle = kennungen.length ? stelleImLehrwerk([...new Set(kennungen.map(formVon))], kennungen.filter((x) => x.includes('/'))) : null
-      if (stelle) return stelle
+      if (kennungen.length) kandidaten.push({ themen: [...new Set(kennungen.map(formVon))], teilformen: kennungen.filter((x) => x.includes('/')) })
     }
+  /*
+   * Bände des Kurses zuerst (26.10.2026, Befund der Lehrkraft in 10b: „Tense revision: Zeit und Aspekt" aus Green Line 6
+   * Unit 1 Station 1 stand bei den Lernenden unter „Weitere Grammatik", „Passive forms in formal texts" wäre in Green
+   * Line 5 gelandet): Der Katalog führt die Station „Tense revision" als Wiederholung, und der Durchlauf über alle Bände
+   * (`stelleImLehrwerk`) nimmt Wiederholungen erst zuletzt. Im Band des Kurses zählt eine Wiederholung (`stelleImBand`) –
+   * wie bei den Lernenden gehört eine Wiederholung aus Band 1 in einer Klasse mit Band 3 zu Band 3. Neuester Band zuerst.
+   */
+  for (const band of kursBaende(z))
+    for (const k of kandidaten) {
+      const s = stelleImBand(band, k.themen, k.teilformen)
+      if (s) return { buch: grammatikBand(band) ?? band, ...s }
+    }
+  for (const k of kandidaten) {
+    const s = stelleImLehrwerk(k.themen, k.teilformen)
+    if (s) return s
   }
-  return stelleImLehrwerk(info.themen, info.teilformen) ?? {}
+  return {}
+}
+
+/** Bände der Vokabel-Abschnitte des Kurses (Lehrwerk-Kennungen), neuester Abschnitt zuerst – leer ohne Kurs oder Kennungen */
+function kursBaende(z: Zeile): string[] {
+  const v = vokVon(z)
+  if (!v) return []
+  const teile = teileVon(v)
+    .filter((t) => t.lehrwerk)
+    .sort((a, b) => b.zeit - a.zeit)
+  return [...new Set(teile.map((t) => t.lehrwerk!))]
 }
 
 /**

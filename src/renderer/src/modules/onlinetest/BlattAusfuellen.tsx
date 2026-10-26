@@ -557,7 +557,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const stand = useRef({ antworten, tinte, tinteGeaendert: false })
   stand.current.antworten = antworten
   stand.current.tinte = tinte
+  /*
+   * Einreichen und Weiterarbeiten getrennt (26.10.2026, Wunsch der Lehrkraft): `offen` = das Blatt kann noch eingereicht
+   * werden (Runden übrig); `schreibbar` = die Lernenden dürfen eintragen, solange die Lehrkraft das Blatt nicht
+   * abgeschlossen hat – auch nach der letzten Einreichung (Überarbeiten nach dem Feedback, Hefteintrag vervollständigen).
+   * Gespeichert wird weiter; was die Lehrkraft sieht, ist der aktuelle Stand.
+   */
   const offen = d.offen && genutzt < d.runden
+  const schreibbar = d.offen
 
   // Kästchen, Linien, Punkte (blattWerkzeuge.tsx) und zusätzliche Schreiblinien (blattDigital.ts) stehen bei den Antworten
   const objekte = useMemo(() => objekteAus(antworten[OBJEKTE_SCHLUESSEL] ?? '[]'), [antworten])
@@ -646,10 +653,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     s.tinteGeaendert = false
   }, [d.id])
   useEffect(() => {
-    if (!offen) return
+    if (!schreibbar) return
     const t = setTimeout(() => void sichern(), 2000)
     return () => clearTimeout(t)
-  }, [antworten, tinte, offen, sichern])
+  }, [antworten, tinte, schreibbar, sichern])
 
   /*
    * Plausibilität (05.10.2026, shared/blattAuswertung.ts): je Feld getippte und auf einmal eingefügte
@@ -905,15 +912,15 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       aktiv={!lehrkraft}
       // Erst den letzten Stand sichern (sonst gingen die letzten 2 s Eingaben verloren), dann zurück
       onEnde={() =>
-        void (offen ? sichern() : Promise.resolve()).finally(() =>
+        void (schreibbar ? sichern() : Promise.resolve()).finally(() =>
           ordnerBlatt ? ordnerBlatt.zurueck() : window.location.assign(reiheId ? `/s/r/${reiheId}` : '/s/blaetter')
         )
       }
     >
     <Stack data-blatt-ausfuellen>
       {lehrkraft ? (
-        <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck}>
-          Zur Übersicht
+        <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck} data-blatt-lehrkraft-zurueck>
+          {d.id === 'vorschau' ? 'Zurück zum Blatt' : 'Zur Übersicht'}
         </Button>
       ) : reiheId ? (
         // Blatt einer Unterrichtsreihe (08.10.2026): zurück zur Reihe statt zur Liste der Arbeitsblätter
@@ -1053,7 +1060,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         <Alert color="orange">{fassungen.at(-1)!.fehler} Deine Lehrkraft sieht dein Blatt trotzdem.</Alert>
       )}
 
-      {ansicht === 'blatt' && offen && werkzeugeDa && (
+      {ansicht === 'blatt' && schreibbar && werkzeugeDa && (
         <Werkzeugleiste
           form={form}
           setForm={setForm}
@@ -1069,7 +1076,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         />
       )}
       {/* Stift-Einträge gehen als Seitenbild an die KI – Namen in Bildern erkennt der Namensfilter nicht (22.10.2026) */}
-      {ansicht === 'blatt' && offen && werkzeugeDa && (d.feedback || d.einstellungen.aufgabenFeedback) && (
+      {ansicht === 'blatt' && schreibbar && werkzeugeDa && (d.feedback || d.einstellungen.aufgabenFeedback) && (
         <Text size="xs" c="dimmed" data-bild-hinweis>
           Bitte keine Namen oder Gesichter fotografieren oder zeichnen – was du mit dem Stift einträgst, sieht die KI als Bild.
         </Text>
@@ -1111,8 +1118,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 aufgaben={aufgaben}
                 antworten={antworten}
                 setze={setze}
-                gesperrt={!offen}
-                werkzeug={offen && werkzeugeDa ? werkzeug : 'tastatur'}
+                gesperrt={!schreibbar}
+                werkzeug={schreibbar && werkzeugeDa ? werkzeug : 'tastatur'}
                 form={form}
                 stiftFarbe={stiftFarbe}
                 markerFarbe={markerFarbe}
@@ -1126,7 +1133,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                   stand.current.tinteGeaendert = true
                   setTinte((t) => ({ ...t, [String(s)]: url }))
                 }}
-                pruefen={offen && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
+                pruefen={schreibbar && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
                 marken={marken}
                 pruefFehler={pruefFehler}
                 laeuft={laeuft}
@@ -1157,7 +1164,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 setMarkerFarbe={setMarkerFarbe}
                 vorgaben={vorgaben}
                 setVorgabe={setVorgabe}
-                gesperrt={!offen}
+                gesperrt={!schreibbar}
                 schliessen={() => setBildOffen(null)}
               />
             )}
@@ -1181,8 +1188,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           aufgaben={aufgaben}
           antworten={antworten}
           setze={setze}
-          gesperrt={!offen}
-          pruefen={offen && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
+          gesperrt={!schreibbar}
+          pruefen={schreibbar && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
           marken={marken}
           laeuft={laeuft}
           fb={aufgabenFb}
@@ -1208,15 +1215,27 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       {/* Bildnachweise des Blatts (23.10.2026): kleiner Link, klappt die Liste der Schlussseite auf */}
       <BildNachweisListe eintraege={blattNachweise} />
       {meldung && <Alert color="red">{meldung}</Alert>}
-      {offen && (
-        <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', bottom: 8, zIndex: 5 }}>
+      {/*
+       * Leiste unten (26.10.2026, Wunsch der Lehrkraft): erst, wenn das Blatt steht (gemessen) – vorher stand „Einreichen"
+       * unter einem noch leeren Blatt. Schrittweise: solange eine Aufgabe das Weitere noch aufhält, heißt der Hauptknopf
+       * „Aufgabe N prüfen" (das ist der nächste Schritt), „Einreichen" erst, wenn alle Aufgaben offen sind. Sind die
+       * Einreichungen verbraucht, bleibt die Leiste als Hinweis: Weiterarbeiten geht, Einreichen nicht mehr.
+       */}
+      {schreibbar && gemessen && (offen || !lehrkraftSicht) && (
+        <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', bottom: 8, zIndex: 5 }} data-blatt-leiste={offen ? (Number.isFinite(bis) ? 'pruefen' : 'einreichen') : 'verbraucht'}>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Wird automatisch gespeichert.
+              {offen ? 'Wird automatisch gespeichert.' : `Alle ${d.runden} Einreichungen sind verbraucht – du kannst weiterarbeiten, es wird gespeichert.`}
             </Text>
-            <Button leftSection={<IconSend size={16} />} loading={laeuft === 'abgabe'} onClick={() => void einreichen()} data-blatt-einreichen>
-              Einreichen
-            </Button>
+            {offen && Number.isFinite(bis) && d.einstellungen.aufgabenFeedback ? (
+              <Button leftSection={<IconSend size={16} />} loading={laeuft === `a${bis}`} onClick={() => void aufgabePruefen(bis)} data-blatt-aufgabe-pruefen={bis}>
+                Aufgabe {bis} prüfen
+              </Button>
+            ) : offen ? (
+              <Button leftSection={<IconSend size={16} />} loading={laeuft === 'abgabe'} onClick={() => void einreichen()} data-blatt-einreichen>
+                Einreichen
+              </Button>
+            ) : null}
           </Group>
           {laeuft === 'abgabe' && d.feedback && (
             <Text size="sm" c="dimmed" mt={4}>

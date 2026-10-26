@@ -6,6 +6,7 @@ import { fragenAusBlatt } from '../../../../shared/export/lms/fragen'
 import LmsExport from '../../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../../rueckmeldung/RueckmeldungKnopf'
 import BlattFreigabeKnopf from '../../BlattFreigabeKnopf'
+import SchuelerVorschauKnopf from '../../SchuelerVorschauKnopf'
 import { rasterAuftrag } from '../../auftraege'
 import { StundenverlaufPanel } from '../StundenverlaufPanel'
 import BlattLeveln from '../BlattLeveln'
@@ -813,6 +814,8 @@ function EditorInhalt(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="arbeitsblatt" docId={docId} />
+            {/* Schüleransicht (26.10.2026): das Blatt wie bei den Lernenden, ohne Server */}
+            <SchuelerVorschauKnopf ws={ws} layouts={layouts} logo={logo} schoolName={schoolName} sheetId={sheet.id} />
             <BlattFreigabeKnopf ws={ws} layouts={layouts} logo={logo} schoolName={schoolName} />
             {/* Auf weniger Seiten (23.10.2026): App rechnet Schrift/Abstände/Bilder; ein Rückgängig-Schritt */}
             <WenigerSeitenKnopf

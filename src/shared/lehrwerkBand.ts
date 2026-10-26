@@ -171,6 +171,10 @@ export const abschnitteAusName = (name: string): string[] =>
  * eine andere Teilform desselben Themas („en.noun.articles/the" statt „…/a-an") –, zählt das Thema vor dem Schrägstrich.
  * Freigaben ganz ohne Katalog-Themen (eigenes Thema, ältere Freigaben) ordnet die Kursseite nach der Freigabezeit in die
  * Unit ein (kursAnsicht.ts `grammatikNachLehrwerk`), nicht mehr nach Schuljahr.
+ *
+ * Wiederholungen zuletzt statt nie (26.10.2026, Befund der Lehrkraft: „Tense revision" aus Green Line 6 steht im Katalog
+ * NUR als Wiederholung – ohne Treffer fiel die Grammatik bei den Lernenden unter „Weitere Grammatik"): Kommt eine Form in
+ * keinem Band als Einführung vor, zählt die erste Wiederholung. Den Band des Kurses prüft der Server vorher (`stelleImBand`).
  */
 export function stelleImLehrwerk(themen: string[], teilformen: string[] = []): { buch: string; unit: string; station?: string } | null {
   const teile = new Set([...teilformen, ...themen.filter((t) => t.includes('/'))])
@@ -180,14 +184,15 @@ export function stelleImLehrwerk(themen: string[], teilformen: string[] = []): {
   const grob = new Set([...ganze, ...[...teile].map(themaVon)])
   const passt: ((t: string) => boolean)[] = [(t) => teile.has(t) || ganze.has(themaVon(t)), (t) => grob.has(themaVon(t))]
   for (const treffer of passt)
-    // Erst ohne die optionalen Trailer (09.10.2026, abgestimmt), ein Trailer nur, wenn das Thema sonst nirgends vorkommt
-    for (const mitTrailer of [false, true])
-      for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK))
-        for (const [unit, stationen] of Object.entries(kapitel)) {
-          if (istOptional(unit) !== mitTrailer) continue
-          for (const [station, punkte] of Object.entries(stationen))
-            for (const p of punkte) if (!p.w && p.t.some(treffer)) return station ? { buch, unit, station } : { buch, unit }
-        }
+    for (const wiederholung of [false, true])
+      // Erst ohne die optionalen Trailer (09.10.2026, abgestimmt), ein Trailer nur, wenn das Thema sonst nirgends vorkommt
+      for (const mitTrailer of [false, true])
+        for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK))
+          for (const [unit, stationen] of Object.entries(kapitel)) {
+            if (istOptional(unit) !== mitTrailer) continue
+            for (const [station, punkte] of Object.entries(stationen))
+              for (const p of punkte) if (Boolean(p.w) === wiederholung && p.t.some(treffer)) return station ? { buch, unit, station } : { buch, unit }
+          }
   return null
 }
 

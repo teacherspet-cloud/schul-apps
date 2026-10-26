@@ -362,7 +362,12 @@ export function BlattFreigabeDialog({
             <NumberInput label="Einreichungen je Person" min={1} max={5} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={170} />
           </Group>
         )}
-        <Checkbox label="Stift erlauben (Handschriftliches geht als Bild an die KI)" checked={stift} onChange={(e) => setStift(e.currentTarget.checked)} />
+        {/* Hinweis nur, wenn Handschrift wirklich an die KI geht: bei Rückmeldung oder Aufgaben-Feedback (26.10.2026) */}
+        <Checkbox
+          label={feedback || aufgabenFeedback || schrittweise || merkAmEnde ? 'Stift erlauben (Handschriftliches geht als Bild an die KI)' : 'Stift erlauben'}
+          checked={stift}
+          onChange={(e) => setStift(e.currentTarget.checked)}
+        />
         <TextInput
           type="date"
           label="Bearbeiten bis (optional)"

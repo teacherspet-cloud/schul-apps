@@ -38,15 +38,18 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const optionen = useMemo(() => auswahlOptionen(v, alle, 'fs').map(spielform), [v]) // eslint-disable-line react-hooks/exhaustive-deps
   const richtig = spielform(v.term)
+  const absenden = (): void => {
+    if (!text.trim()) return
+    const gut = bewerteMitAuchRichtig(text, v.term, v.auchRichtig).urteil !== 'falsch'
+    if (gut) apostrophHinweis(text)
+    fertig(gut)
+  }
   if (schreiben)
     return (
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (!text.trim()) return
-          const gut = bewerteMitAuchRichtig(text, v.term, v.auchRichtig).urteil !== 'falsch'
-          if (gut) apostrophHinweis(text)
-          fertig(gut)
+          absenden()
         }}
         style={{ width: '100%', maxWidth: 520 }}
       >
@@ -68,9 +71,9 @@ function Antwort({ v, alle, schreiben, fertig }: { v: Vokabel; alle: Vokabel[]; 
             OK
           </Button>
         </Group>
-        {/* Nicht gewusst (09.10.2026): zählt als falsch, die Runde zeigt die Lösung */}
+        {/* Nicht gewusst (09.10.2026): zählt als falsch, die Runde zeigt die Lösung; steht schon etwas da, wird es geprüft (26.10.2026) */}
         <Group justify="center" mt={4}>
-          <LoesungZeigen zeigen={() => fertig(false)} />
+          <LoesungZeigen zeigen={() => fertig(false)} antwortDa={Boolean(text.trim())} pruefen={absenden} />
         </Group>
       </form>
     )
@@ -458,7 +461,8 @@ export function BuchstabenPuzzle({ woerter, sprache, ende }: SpielProps): React.
           Prüfen
         </Button>
       </Group>
-      <LoesungZeigen zeigen={() => abschliessen(false, true)} gesperrt={rueck !== null} />
+      {/* Alles gelegt (26.10.2026): „Lösung zeigen" prüft das Gelegte statt es als Fehler zu zählen */}
+      <LoesungZeigen zeigen={() => abschliessen(false, true)} gesperrt={rueck !== null} antwortDa={gelegt.length === ziel.length} pruefen={pruefen} />
     </Stack>
   )
 }

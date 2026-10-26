@@ -1073,6 +1073,15 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
   // Angetipptes Wort (12.10.2026): kleines Fenster auf der Seite, kein Seitenwechsel
   const [wahl, setWahl] = useState<AbcZeile | null>(null)
   const oeffnen = useCallback((z: AbcZeile) => setWahl(z), [])
+  /*
+   * Oben beginnen (26.10.2026, Befund der Lehrkraft: die Liste „startete bei F", Suchfeld und Umschalter oben waren
+   * außer Sicht): Die Seite stand noch an der Stelle des vorigen Registers, und beim Messen der zunächst geschätzten
+   * Blöcke verschob der Browser die Ansicht mit (Scroll-Verankerung). Beim Öffnen nach oben; die Liste selbst ohne
+   * Verankerung (overflow-anchor), damit Nachmessen die Sicht nicht verschiebt.
+   */
+  useLayoutEffect(() => {
+    if (window.scrollY > 0) window.scrollTo({ top: 0 })
+  }, [])
 
   // Höhen: geschätzt, bis der erste gezeichnete Block gemessen ist (dann stimmen auch die Platzhalter darunter)
   const [mass, setMass] = useState<{ kopf: number; zeile: number; schmal: boolean } | null>(null)
@@ -1258,7 +1267,7 @@ export function Alphabetisch({ o }: { o: FachOrdner }): React.JSX.Element {
           </nav>
         )}
       </div>
-      <div ref={liste} className="ab-liste" data-abc-liste={posten.length} data-abc-gezeichnet={gezeichneteZeilen}>
+      <div ref={liste} className="ab-liste" data-abc-liste={posten.length} data-abc-gezeichnet={gezeichneteZeilen} style={{ overflowAnchor: 'none' }}>
         {teile.map((b, i) => (
           <AbcBlock
             key={`${lauf}|${b.nr}`}

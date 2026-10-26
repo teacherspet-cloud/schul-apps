@@ -117,12 +117,14 @@ export function HoerenSchreiben({ woerter, sprache, ende }: SpielProps): React.J
           <Button radius="xl" onClick={pruefen} disabled={!text.trim()} data-pruefen>
             Prüfen
           </Button>
-          {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler */}
+          {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler; Getipptes wird geprüft (26.10.2026) */}
           <LoesungZeigen
             zeigen={() => {
               fehler.current.add(v.id)
               setRueck({ gut: false, richtig: spielform(v.term) })
             }}
+            antwortDa={Boolean(text.trim())}
+            pruefen={pruefen}
           />
         </Group>
       )}
@@ -244,12 +246,14 @@ export function SatzLuecke({ woerter, ende }: SpielProps): React.JSX.Element {
             <Button radius="xl" onClick={() => loesen(text)} disabled={!text.trim()} data-pruefen>
               Prüfen
             </Button>
-            {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler */}
+            {/* Nicht gewusst (09.10.2026): Lösung ansehen, zählt als Fehler; Getipptes wird geprüft (26.10.2026) */}
             <LoesungZeigen
               zeigen={() => {
                 fehler.current.add(v.id)
                 setRueck({ gut: false, richtig: luecke.loesung })
               }}
+              antwortDa={Boolean(text.trim())}
+              pruefen={() => loesen(text)}
             />
           </Group>
         </>

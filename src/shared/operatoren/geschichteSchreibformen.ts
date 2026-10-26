@@ -91,7 +91,7 @@ export const MERKBLATT_ZUSAMMENFASSEN = {
   ],
   attika: ['A – Autor', 'T – Textsorte/Quellenart', 'T – Titel/Thema', 'I – Intention', 'K – Kontext/Entstehungszeit', 'A – Adressaten'],
   einleitungsmuster:
-    'Die (Quellenart) „(Titel)" von (Autor), veröffentlicht (Datum) in (Ort), ist eine (Textsorte), die sich an (Adressat) mit der Intention (Intention) richtet. Sie behandelt das Thema (Thema) und fällt in die Zeit (Kontext).',
+    'Die (Quellenart) „(Titel)" von (Autor), veröffentlicht bzw. entstanden (Datum) in (Entstehungsort), ist eine (Textsorte), die sich an (Adressat) mit der Intention (Intention) richtet. Sie behandelt das Thema (Thema) und fällt in die Zeit (Kontext).',
   regeln: [
     'Anforderungen an den Operator beachten',
     'keine eigene Meinung zum Material',
@@ -337,6 +337,14 @@ const liste = (xs: readonly string[]): string => xs.join(', ')
 const kriterienText = (ks: Pruefkriterium[]): string => ks.map((k) => `${k.text} (${k.gewicht} %${k.verstoss === 'hinweis' ? ', nur Hinweis' : ''})`).join('; ')
 
 /**
+ * Ort in der Einleitung (26.10.2026, Befund der Lehrkraft, Blatt „Augusterlebnis": Die Musterlösung nannte den
+ * Tagebucheintrag „aus dem Deutschen Historischen Museum" – das ist der Fundort aus der Quellenangabe, nicht der Ort der
+ * Entstehung). Gilt für Erzeugung (Musterlösung, Erwartungshorizont) und Feedback gleichermaßen.
+ */
+export const ORT_REGEL =
+  '- ORT in Einleitungssatz und ATTIKA ist der ENTSTEHUNGS- bzw. Erscheinungsort der Quelle („in Berlin", „an der Westfront", „in der Vossischen Zeitung"). Der Aufbewahrungs- oder Fundort (Museum, Archiv, LeMO, Website, Sammlung) gehört NUR in die Quellenangabe – nie in Einleitung, Musterlösung oder Erwartungshorizont. Ist der Entstehungsort nicht belegt, wird er weggelassen, nicht durch den Fundort ersetzt.'
+
+/**
  * Regeln für die KI beim Erzeugen von Blättern in Geschichte: Wie Aufgaben mit „zusammenfassen" und „beurteilen"
  * gestellt werden, welche Hilfen dazugehören und was in Lösung/Erwartungshorizont steht. Nur für Geschichte.
  */
@@ -379,6 +387,8 @@ export function geschichteErzeugungsRegeln(k: ErzeugungsKontext): string {
           })`
     }, dazu die Kriterienliste mit Gewichtung: ${kriterienText(kriterienFuer('zusammenfassen', stufe))}.`,
     stufe === 'kl910' || sek2 ? `- ATTIKA-Einleitung nach dem Muster: ${z.einleitungsmuster}` : '',
+    // Ort der Quelle (26.10.2026, Befund der Lehrkraft: Musterlösung nannte „aus dem Deutschen Historischen Museum" als Ort)
+    stufe === 'kl56' ? '' : ORT_REGEL,
     sek2 ? `- Regeln des Merkblatts: ${liste(z.regeln)}. „Der Verfasser sagt …" vermeiden – stattdessen: ${liste(z.verben)}.` : '',
     sek2 || stufe === 'kl910' ? `- Vorgehen: ${liste(z.vorbereitung)}; Arbeitsschritte ${z.arbeitsschritte.join(' → ')}.` : '',
     'BEURTEILEN:',
@@ -918,7 +928,7 @@ export function geschichteFeedbackRegeln(form: Schreibform, k: FeedbackKontext):
                 stufe === 'kl78'
                   ? 'Autor, Textsorte, Titel, Thema, Zeit'
                   : 'ATTIKA – Autor, Textsorte/Quellenart, Titel/Thema, Intention, Kontext/Entstehungszeit, Adressaten (die Intention gehört in die Einleitung)'
-              }; fehlende Teile einzeln nennen.`
+              }; fehlende Teile einzeln nennen. Ort = Entstehungs- bzw. Erscheinungsort; Museum, Archiv oder Website (Fundort) als Ort ist ein Fehler – kurz erklären.`
             : '- W-FRAGEN: Welche W-Frage bleibt offen? Konkret nennen.',
           `- „Der Verfasser sagt …" → Verben aus der Liste vorschlagen: ${liste(MERKBLATT_ZUSAMMENFASSEN.verben)}.`,
           '- Eigene Meinung zum Material gehört nicht in eine Zusammenfassung.'

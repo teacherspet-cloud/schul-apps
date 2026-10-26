@@ -3,6 +3,7 @@ import { IconShieldLock } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { KURZFASSUNG_SCHUELER, kurzfassungVersion, kurzfassungZeigen } from '@shared/datenschutzInfo'
 import { holen, senden } from './serverApi'
+import { rechtlichesSichtbar } from '../../shared/plattform'
 
 /**
  * Datenschutz kurz erklärt (22.10.2026, Prüfung des Schulträgers, Art. 13 DSGVO): Kurzfassung für Lernende, einmal beim
@@ -96,14 +97,20 @@ export function DatenschutzKurz({ pfad }: { pfad: string }): React.JSX.Element |
           ))}
         </List>
         <Text size="xs" c="dimmed">
-          Das ist eine Information für dich. Du musst nichts erlauben.{' '}
-          <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs">
-            Datenschutzerklärung
-          </Anchor>
-          {' · '}
-          <Anchor href="/datenschutz/eltern" target="_blank" rel="noopener" size="xs">
-            Für deine Eltern
-          </Anchor>
+          Das ist eine Information für dich. Du musst nichts erlauben.
+          {/* Verweise nur, wenn die Seiten fertig sind (26.10.2026, wie die Anmeldeseite) – sonst stünden dort Platzhalter */}
+          {rechtlichesSichtbar() && (
+            <>
+              {' '}
+              <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs">
+                Datenschutzerklärung
+              </Anchor>
+              {' · '}
+              <Anchor href="/datenschutz/eltern" target="_blank" rel="noopener" size="xs">
+                Für deine Eltern
+              </Anchor>
+            </>
+          )}
         </Text>
         <Button size="md" radius="xl" onClick={verstanden} data-datenschutz-verstanden>
           Verstanden
@@ -113,25 +120,34 @@ export function DatenschutzKurz({ pfad }: { pfad: string }): React.JSX.Element |
   )
 }
 
-/** Kleine Zeile unten im Schülerbereich: Kurzfassung, Datenschutzerklärung, Impressum */
+/**
+ * Kleine Zeile unten im Schülerbereich: Kurzfassung, Datenschutzerklärung, Impressum. Die beiden Seiten nur, wenn sie
+ * vollständig sind (26.10.2026, Befund der Lehrkraft: Verweise standen trotz Platzhaltern da – wie die Anmeldeseite seit
+ * 0.4.197 gilt `rechtlichesBereit` des Servers, hier über /server/ich.js).
+ */
 export function DatenschutzFuss(): React.JSX.Element {
+  const seiten = rechtlichesSichtbar()
   return (
-    <Group justify="center" gap="xs" mt="xl" mb="xs" data-datenschutz-fuss>
+    <Group justify="center" gap="xs" mt="xl" mb="xs" data-datenschutz-fuss={seiten ? 'vollstaendig' : 'kurz'}>
       <Anchor component="button" type="button" size="xs" c="dimmed" onClick={datenschutzKurzOeffnen}>
         Datenschutz kurz
       </Anchor>
-      <Text size="xs" c="dimmed">
-        ·
-      </Text>
-      <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs" c="dimmed">
-        Datenschutzerklärung
-      </Anchor>
-      <Text size="xs" c="dimmed">
-        ·
-      </Text>
-      <Anchor href="/impressum" target="_blank" rel="noopener" size="xs" c="dimmed">
-        Impressum
-      </Anchor>
+      {seiten && (
+        <>
+          <Text size="xs" c="dimmed">
+            ·
+          </Text>
+          <Anchor href="/datenschutz" target="_blank" rel="noopener" size="xs" c="dimmed">
+            Datenschutzerklärung
+          </Anchor>
+          <Text size="xs" c="dimmed">
+            ·
+          </Text>
+          <Anchor href="/impressum" target="_blank" rel="noopener" size="xs" c="dimmed">
+            Impressum
+          </Anchor>
+        </>
+      )}
     </Group>
   )
 }

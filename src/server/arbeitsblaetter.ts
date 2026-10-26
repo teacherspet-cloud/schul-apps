@@ -73,7 +73,8 @@ import {
   type Ampel,
   type AufgabenVerlauf,
   type BlattAufgabe,
-  type BlattFeld
+  type BlattFeld,
+  type FeedbackZusatz
 } from '../shared/blattFreigabe'
 import { eingabenAus, PLAUS_SCHLUESSEL, zuordnungAus, ZUORDNUNG_SCHLUESSEL } from '../shared/blattAuswertung'
 import {
@@ -874,7 +875,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}),
               ...(material ? { material } : {}),
               ...(befund ? { abschrift: befund } : {}),
-              ...(gs ? { schreibform: gs.text } : {})
+              ...(gs ? { schreibform: gs.text } : {}),
+              // Früheres Feedback zu dieser Aufgabe (26.10.2026): die KI schließt an ihr eigenes Urteil an
+              ...(liste.length ? { vorher: liste.slice(-3) as NonNullable<FeedbackZusatz['vorher']> } : {})
             }
             const antwort = await mitNamensliste(
               { namen: namenFuerKi(z, ich), sprache: e.sprache, material: `${material} ${aufgabe.anweisung ?? ''} ${aufgabe.erwartung ?? ''}` },

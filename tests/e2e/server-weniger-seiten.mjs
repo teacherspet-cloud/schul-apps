@@ -70,6 +70,23 @@ try {
   const seiten = () => p.locator('.editor-canvas .ws-page:not(.ws-cover)').count()
   const vorher = await seiten()
   pruefe(vorher >= 2, `Blatt hat ${vorher} Seiten (mit großzügigem Satz)`)
+  // Schüleransicht (26.10.2026): das Blatt wie bei den Lernenden, ohne Freigabe und ohne Server-Daten; Rückweg schließt sie
+  await p.locator('[data-schueleransicht-knopf]').click()
+  const vorschau = p.locator('[data-schueleransicht]')
+  pruefe(
+    await vorschau
+      .locator('[data-zeichen-seite]')
+      .first()
+      .waitFor({ timeout: 15000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Schüleransicht: Blatt erscheint in der Schüler-Oberfläche'
+  )
+  pruefe((await vorschau.locator('[data-blatt-einreichen], [data-blatt-leiste]').count()) === 0, 'Schüleransicht: kein Einreichen')
+  await vorschau.locator('[data-blatt-lehrkraft-zurueck]').click()
+  pruefe(!(await vorschau.isVisible().catch(() => false)), 'Schüleransicht: Zurück schließt sie')
   const t0 = Date.now()
   await knopf.click()
   const vorschlag = p.locator('[data-weniger-seiten-vorschlag]')

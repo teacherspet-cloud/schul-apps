@@ -886,6 +886,9 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   const [tippFuer, setTippFuer] = useState<string | null>(null)
   // „Lösung zeigen" (09.10.2026): leere Antwort = falsch; die Rückmeldung nennt nur die Lösung
   const [aufgegeben, setAufgegeben] = useState(false)
+  // Eingabe der aktuellen Aufgabe (26.10.2026): „Lösung zeigen" prüft eine vorhandene Antwort statt aufzugeben.
+  // Als Ref, weil nur die Aufgabe beim Tippen neu zeichnet – der Knopf fragt beim Klick nach.
+  const eingabe = useRef<EingabeStand | null>(null)
   const a = schlange[0]
   /*
    * Zählen nach Aufgaben, nicht nach Fragen (17.10.2026, Befund der Lehrkraft: 20 Übungen, aber über 40 Fragen, weil
@@ -1020,11 +1023,17 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
           </Alert>
         )}
         <div key={`${a.id}-${frage}`} className="vt-rein vt-buehne">
-          <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} />
+          <Aufgabe a={a} gesperrt={Boolean(ergebnis) || laeuft} antworten={(x, w, s) => void antworten(x, w, s)} ergebnis={ergebnis} eingabeStand={eingabe} />
         </div>
+        {/* Steht schon eine Antwort im Feld (26.10.2026): „Lösung zeigen" prüft sie statt aufzugeben */}
         {!ergebnis && MIT_LOESUNG_ZEIGEN.includes(a.art) && (
           <Group justify="center">
-            <LoesungZeigen zeigen={() => void antworten('', undefined, undefined, true)} gesperrt={laeuft} />
+            <LoesungZeigen
+              zeigen={() => void antworten('', undefined, undefined, true)}
+              gesperrt={laeuft}
+              antwortDa={() => eingabe.current?.da ?? false}
+              pruefen={() => eingabe.current?.absenden()}
+            />
           </Group>
         )}
         {a.tipp && !ergebnis && (
@@ -1054,7 +1063,7 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
         )}
         {r && (regel || (ergebnis && ergebnis.urteil !== 'richtig')) && <RegelKarte r={r} />}
         {ergebnis && (
-          <Alert color={ergebnis.urteil === 'richtig' ? 'green' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
+          <Alert color={ergebnis.urteil === 'richtig' ? 'green' : aufgegeben ? 'gray' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
             <Text fw={700}>
               {ergebnis.urteil === 'richtig'
                 ? 'Richtig!'
@@ -1087,16 +1096,21 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
 }
 
 /** Eine Aufgabe je nach Art – auch von den Spielen genutzt */
+/** Stand der Eingabe für „Lösung zeigen" (26.10.2026): Ist etwas eingetragen, und wie wird es abgeschickt? */
+type EingabeStand = { da: boolean; absenden: () => void }
+
 function Aufgabe({
   a,
   gesperrt,
   antworten,
-  ergebnis
+  ergebnis,
+  eingabeStand
 }: {
   a: GrammatikAufgabe
   gesperrt: boolean
   antworten: (antwort: string, wort?: string, selbst?: Urteil) => void
   ergebnis?: { urteil: Urteil } | null
+  eingabeStand?: React.MutableRefObject<EingabeStand | null>
 }): React.JSX.Element {
   // Latein (07.10.2026): eigene Bedienelemente
   if (a.art === 'bestimmen')
@@ -1123,7 +1137,7 @@ function Aufgabe({
         <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
       </AufgabenRahmen>
     )
-  return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} />
+  return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} eingabeStand={eingabeStand} />
 }
 
 /** Anweisung über der Aufgabe */
@@ -1142,12 +1156,14 @@ function AufgabeAllgemein({
   a,
   gesperrt,
   antworten,
-  ergebnis
+  ergebnis,
+  eingabeStand
 }: {
   a: GrammatikAufgabe
   gesperrt: boolean
   antworten: (antwort: string, wort?: string) => void
   ergebnis?: { urteil: Urteil } | null
+  eingabeStand?: React.MutableRefObject<EingabeStand | null>
 }): React.JSX.Element {
   const [text, setText] = useState('')
   const [wort, setWort] = useState<number | null>(null)
@@ -1169,6 +1185,8 @@ function AufgabeAllgemein({
     }
     if (text.trim()) antworten(text)
   }
+  // Für „Lösung zeigen" im Rahmen (26.10.2026): getippte Antwort da → prüfen statt aufgeben
+  if (eingabeStand) eingabeStand.current = { da: Boolean(text.trim()) && (a.art !== 'fehler' || wort !== null), absenden }
   const [vor, nach] = a.satz.split('___')
   return (
     <Stack gap="sm" data-aufgabe={a.art}>

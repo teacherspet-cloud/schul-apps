@@ -91,7 +91,15 @@ export interface ServerIch {
   fachobmann?: string[]
   /** Freigegebene Apps der Lehrkraft (23.10.2026, server/appFreigaben.ts); fehlt bei Admins = alle */
   apps?: string[]
+  /**
+   * Datenschutzerklärung, Elternfassung und Impressum vollständig (26.10.2026, server/datenschutzSeiten.ts
+   * `rechtlichesBereit`)? Bei `false` zeigt der Schülerbereich keine Verweise darauf; fehlt die Angabe (älterer Server), schon.
+   */
+  rechtliches?: boolean
 }
+
+/** Verweise auf Datenschutzerklärung, Elternfassung und Impressum zeigen? (26.10.2026, siehe `ServerIch.rechtliches`) */
+export const rechtlichesSichtbar = (): boolean => serverIch()?.rechtliches !== false
 
 /**
  * Darf die angemeldete Person diese App sehen und benutzen? (App-Freigaben, 23.10.2026, shared/appFreigaben.ts)

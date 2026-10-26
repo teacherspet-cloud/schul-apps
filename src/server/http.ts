@@ -815,6 +815,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             quelle: sitzung.nutzer.quelle,
             eingerichtet: sitzung.nutzer.eingerichtet,
             adresse: opts.adresse,
+            // Rechtliches vollständig (26.10.2026, wie die Anmeldeseite): sonst zeigt der Schülerbereich keine Verweise
+            // auf Datenschutzerklärung, Elternfassung und Impressum – dort stünden noch Platzhalter
+            rechtliches: rechtlichesBereit(),
             // Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): neue Anmeldung = Übersichten und
             // eingeklappte Kästen wie vorgegeben. Nur ein Fingerabdruck der Kennung, nicht die Kennung selbst.
             sitzung: sitzungsAnzeige(sitzung.kennung),
@@ -824,7 +827,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             ...(sitzung.nutzer.rolle === 'lehrkraft' && !inVorschau ? { apps: appsFuer(sitzung.nutzer) ?? undefined } : {}),
             ...(inVorschau ? { vorschau: true } : {})
           }
-        : { angemeldet: false, adresse: opts.adresse }
+        : { angemeldet: false, adresse: opts.adresse, rechtliches: rechtlichesBereit() }
       /*
        * Schülerbereich im Dunkelmodus (03.10.2026, Befund der Lehrkraft: beim Wechsel der Seite „hellt das
        * Fenster sehr hell auf"): Die Seite war weiß, bis das Programm geladen hatte. Dieses Skript läuft

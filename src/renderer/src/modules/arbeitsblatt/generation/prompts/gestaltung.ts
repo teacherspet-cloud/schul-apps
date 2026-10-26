@@ -88,6 +88,8 @@ export function scaffoldRules(meta: WorksheetMeta): string {
     // Artikel und Plural nur in Sprachfächern und im sprachsensiblen/DaZ-Modus (08.10.2026, didactics/language.ts)
     wortspeicherRegel(meta),
     '- Zu Schreib- und Sprechaufgaben drei bis fünf Satzanfänge anbieten, die zum Operator passen (erklären: „Das liegt daran, dass …"; begründen: „Dafür spricht, dass …"; vergleichen: „Beide … haben gemeinsam, dass …").',
+    // Befund 26.10.2026: „Er schildere, …", „Er betone, …" – das einleitende Verb war im Konjunktiv
+    '- Satzanfänge zur Redewiedergabe (zusammenfassen, Inhalt wiedergeben): Das redeeinleitende Verb steht im Indikativ Präsens („Er betont, dass …", „Die Autorin führt an, …"); der Konjunktiv I gehört NUR in den wiedergegebenen Inhalt („… die USA hätten …"). Nie „Er betone", „Er schildere", „Er führe an".',
     '- Jeder Wortspeicher und jede Satzanfang-Hilfe (scaffold oder phrases) gehört zu EINER Aufgabe: Der Baustein steht DIREKT hinter dieser Aufgabe (oder direkt davor), der Titel oder der Hinweistext (phrases: body) nennt sie („Wortspeicher zu Aufgabe 2", „Für Aufgabe 2: …"). Eine Hilfe ohne erkennbaren Aufgabenbezug gehört nicht aufs Blatt.',
     '- Für Textsorten ein Gerüst vorgeben: Versuchsprotokoll (Frage, Vermutung, Material, Durchführung, Beobachtung, Ergebnis), Quelleninterpretation (Einordnung, Inhalt, Deutung, Bewertung), Erörterung (These, Argument, Beleg, Beispiel, Schluss).',
     '- Aktiv statt Passiv, Verben statt Nominalisierungen, keine doppelten Verneinungen, keine Redewendungen.',
@@ -166,6 +168,8 @@ export function subjectMethodRules(meta: WorksheetMeta): string {
   const rules: Record<string, string[]> = {
     geschichte: [
       'Jede Quelle bekommt eine vollständige Angabe (Urheber, Jahr, Quellenart, Adressat, Fundort); Quelle und Darstellung sind klar unterschieden.',
+      // 26.10.2026: Fundort (Museum, Archiv, Website) ist kein Entstehungsort – Befund „aus dem Deutschen Historischen Museum" in einer Musterlösung
+      'Der Fundort (Museum, Archiv, LeMO, Website) steht NUR in der Quellenangabe. In Einleitungssätzen, Musterlösungen und Erwartungshorizonten ist der Ort einer Quelle immer ihr Entstehungs- oder Erscheinungsort; ist er nicht belegt, entfällt er.',
       'Reihenfolge der Quellenaufgaben: W-Fragen (Wer? Wann? Für wen? Warum?) – Inhalt – Einordnung – Beurteilung der Absicht.',
       'Bildquellen und Karikaturen: erst genau beschreiben, dann Symbole deuten, zuletzt Wirkung und Absicht beurteilen.'
     ],

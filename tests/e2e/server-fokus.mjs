@@ -193,7 +193,9 @@ try {
     await s.locator('[data-spiel-laeuft]').waitFor()
     await s.waitForTimeout(300)
     l = await lage(s)
-    pruefe(l.fokus === 'spiel' && !l.kopf && l.vollbild, 'Spiel: im Vollbild')
+    // Seit 26.10.2026: Das echte Vollbild wurde oben vom Browser verlassen (wie ein Wischen am iPad) – danach fordert
+    // keine Übung dieser Sitzung es mehr von selbst an (iPadOS fragte sonst jedes Mal nach); die Fokusansicht bleibt
+    pruefe(l.fokus === 'spiel' && !l.kopf && !l.vollbild, 'Spiel: Fokusansicht, aber kein neues Vollbild nach eigenem Verlassen')
     await s.screenshot({ path: join(out, '4-spiel.png') })
     await s.locator('[data-fokus-beenden]').click()
     await s.waitForTimeout(500)

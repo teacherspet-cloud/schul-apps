@@ -38,6 +38,7 @@ import {
 } from './schemas'
 import { standardBildbreite, type ImageFunction } from '../didactics/imageDesign'
 import { bereinigeKennung, bereinigeVerweise, MATERIAL_TYPES, wandleTexte } from '../didactics/integrity'
+import { satzanfaengeNachbessern } from '../didactics/redeeinleitung'
 import type { VideoKind, ViewingPhase } from '../didactics/videoTasks'
 
 /** Wörter je Minute beim Vorlesen eines Hörtextes (deutlich artikulierte Standardsprache). */
@@ -227,6 +228,8 @@ export function convertBlock(
     const { side: _s, ...ohneSeite } = block
     return { ...ohneSeite, widthPercent: 100 }
   }
+  // Satzanfänge: redeeinleitendes Verb im Indikativ (26.10.2026, didactics/redeeinleitung.ts)
+  if (block.type === 'phrases') return satzanfaengeNachbessern(block)
   return block
 }
 

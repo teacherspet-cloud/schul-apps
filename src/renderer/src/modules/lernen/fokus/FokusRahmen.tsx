@@ -62,6 +62,12 @@ const Verschachtelt = createContext(false)
 const gezeigt = new Set<string>()
 /** Wurde das echte Vollbild von hier angefordert? Nur dann wird es auch wieder verlassen */
 let vonHierVollbild = false
+/**
+ * Hat die Person das echte Vollbild selbst verlassen (26.10.2026, Befund der Lehrkraft am iPad: beim Vokabel- und
+ * Grammatiküben störte die wiederkehrende Frage nach dem Vollbild)? Jede Übung forderte es neu an – iPadOS fragt dann
+ * jedes Mal nach. Nach einem Verlassen fordert diese Sitzung es nicht mehr von selbst an; „Vollbild an" tut es wieder.
+ */
+let vomNutzerVerlassen = false
 let laufendeNr = 0
 
 /** Die Ebene, die gerade rollt (für Seiten, die sonst `window.scrollTo` nutzen) – sonst null */
@@ -138,7 +144,7 @@ function FokusEbene({ children, onEnde, aktiv = true, name, breit = false, escNu
     document.documentElement.classList.add('sa-fokus-aktiv')
     const vorher = document.activeElement instanceof HTMLElement ? document.activeElement : null
     if (!ebene.current?.contains(document.activeElement)) ebene.current?.focus({ preventScroll: true })
-    if (!schonAngefordert.current && vollbildAnfordern(document)) vonHierVollbild = true
+    if (!schonAngefordert.current && !vomNutzerVerlassen && vollbildAnfordern(document)) vonHierVollbild = true
     schonAngefordert.current = false
     if (!ordnerSeite && !istEigenerEintrag(window.history.state, fid)) window.history.pushState(mitFokus(window.history.state, fid), '', window.location.href)
 
@@ -171,7 +177,14 @@ function FokusEbene({ children, onEnde, aktiv = true, name, breit = false, escNu
     }
     const wechsel = (): void => {
       const jetzt = imVollbild(document)
-      if (!jetzt) vollbildEnde.current = Date.now()
+      if (!jetzt) {
+        vollbildEnde.current = Date.now()
+        // Während die Übung läuft verlassen (Wischen, Esc, „Vollbild aus"): nicht wieder von selbst anfordern
+        if (vonHierVollbild) {
+          vomNutzerVerlassen = true
+          vonHierVollbild = false
+        }
+      }
       setEcht(jetzt)
     }
     window.addEventListener('popstate', zurueck)
@@ -201,11 +214,13 @@ function FokusEbene({ children, onEnde, aktiv = true, name, breit = false, escNu
 
   const einschalten = (): void => {
     // Im Klick: nur so erlaubt der Browser das echte Vollbild
+    vomNutzerVerlassen = false
     if (vollbildAnfordern(document)) vonHierVollbild = true
     schonAngefordert.current = true
     setAn(true)
   }
   const ganzerBildschirm = (): void => {
+    vomNutzerVerlassen = false
     if (vollbildAnfordern(document)) vonHierVollbild = true
   }
 

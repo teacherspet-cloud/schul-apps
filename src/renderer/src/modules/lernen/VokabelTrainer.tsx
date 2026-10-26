@@ -57,6 +57,7 @@ import {
   IconBackspace,
   IconCalendarEvent,
   IconCheck,
+  IconEye,
   IconFlame,
   IconMicrophone,
   IconPlayerPlay,
@@ -1101,10 +1102,11 @@ function StammformenNachfrage({ karte, sprache, tonSprache }: { karte: VerbKarte
 }
 
 function Rueckmeldung({ e, v, sprache, aufgegeben = false }: { e: Ergebnis; v: Vokabel; sprache: string; aufgegeben?: boolean }): React.JSX.Element {
-  const farbe = e.urteil === 'richtig' ? 'green' : e.urteil === 'fast' ? 'yellow' : 'red'
+  // Angesehene Lösung (26.10.2026): grau mit Auge statt rot mit Kreuz – kein Urteil über eine Antwort, es gab keine
+  const farbe = e.urteil === 'richtig' ? 'green' : aufgegeben ? 'gray' : e.urteil === 'fast' ? 'yellow' : 'red'
   useEffect(() => sprich(v.term, sprache), [v.term, sprache])
   return (
-    <Alert color={farbe} variant="light" icon={e.urteil === 'falsch' ? <IconX /> : <IconCheck />} data-urteil={e.urteil} className="vt-rein">
+    <Alert color={farbe} variant="light" icon={aufgegeben ? <IconEye /> : e.urteil === 'falsch' ? <IconX /> : <IconCheck />} data-urteil={e.urteil} className="vt-rein">
       <Text fw={700}>
         {e.urteil === 'richtig'
           ? e.sicher
@@ -1606,7 +1608,8 @@ function Buchstaben({
           Prüfen
         </Button>
       </Group>
-      {zeigen && <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} />}
+      {/* Alles gelegt und dann „Lösung zeigen" gedrückt (Befund 26.10.2026): prüfen statt aufgeben */}
+      {zeigen && <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} antwortDa={alleGelegt} pruefen={() => pruefen(wort)} />}
     </Stack>
   )
 }
@@ -1737,7 +1740,7 @@ function Schreiben({
         </Button>
         {zeigen && (
           <Group justify="center" mt={4}>
-            <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} />
+            <LoesungZeigen zeigen={zeigen} gesperrt={gesperrt} antwortDa={Boolean(text.trim())} pruefen={() => pruefen(text)} />
           </Group>
         )}
       </form>
