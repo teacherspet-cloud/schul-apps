@@ -238,7 +238,12 @@ export function zuordnen(m: MaterialText, kandidaten: UeberthemaKandidat[]): { k
       if (staemme >= 2 && namensTreffer >= 1 && naeher(t, rueckfall)) rueckfall = t
     } else if (besser(t, best)) best = t
   }
-  if (rueckfall && (!best || (best.staemme < 2 && rueckfall.punkte > best.punkte))) best = rueckfall
+  /*
+   * Rückfall auch bei deutlich besserem Treffer (26.10.2026, Befund 9c: „1914–1918 … Ausgang des Ersten Weltkriegs" blieb
+   * beim Nach-1945-Thema, weil das mit „Weltkrieg" und „Krieg" zwei Stämme traf, obwohl „Erster Weltkrieg" aus Klasse 8
+   * mit Namen und Jahreszahlen doppelt so viele Punkte hatte): mindestens zwei Punkte mehr als das beste Thema des Jahrgangs.
+   */
+  if (rueckfall && (!best || (best.staemme < 2 && rueckfall.punkte > best.punkte) || rueckfall.punkte >= best.punkte + 2)) best = rueckfall
   if (!best) return null
   // Modul der Q-Phase: das mit den meisten gemeinsamen Wörtern
   const mod = best.k.module

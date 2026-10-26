@@ -586,6 +586,34 @@ try {
   await h.waitForTimeout(400)
   const zoomWert = await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))
   pruefe(zoomWert > 1.3 && (await zf.getAttribute('data-gezoomt')) !== null, `Zwei Finger auseinander: Blatt vergrößert (Zoom ${zoomWert.toFixed(2)}), Fläche rollt seitwärts`)
+  // Noch einmal mit zwei Fingern oben auf dem Blatt (26.10.2026, Befund „zoomt an den Hintergrund"): nach „Breite einpassen" wieder vergrößern;
+  // der Inhalt des Blattrahmens zieht mit (rahmenZoomAngleichen – Chromium gibt den Zoom weiter, WebKit bekommt ihn gesetzt)
+  // Erst zurück auf „Breite einpassen“ (der erste Zoom stand schon am Anschlag), dann im Rahmen aufziehen
+  await h.locator('[data-zoom-einpassen]').first().click()
+  await h.waitForTimeout(400)
+  const rahmenBox = await h.locator('.zoom-flaeche.blatt-zoom iframe').first().boundingBox()
+  const cdp2 = await hm.newCDPSession(h)
+  const rx = rahmenBox.x + rahmenBox.width * 0.5
+  const ry = rahmenBox.y + rahmenBox.height * 0.08
+  const zweiImRahmen = (d) => [
+    { x: rx - d, y: ry, id: 1, radiusX: 6, radiusY: 6, force: 1 },
+    { x: rx + d, y: ry, id: 2, radiusX: 6, radiusY: 6, force: 1 }
+  ]
+  await cdp2.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: zweiImRahmen(20) })
+  for (let i = 1; i <= 10; i++) await cdp2.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: zweiImRahmen(20 + i * 8) })
+  await cdp2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp2.detach()
+  await h.waitForTimeout(400)
+  const zoomWert2 = await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))
+  pruefe(zoomWert2 > 1.3, `Zwei Finger auf dem Blatt: wieder vergrößert (Zoom ${zoomWert2.toFixed(2)})`)
+  const rahmenInnen = await h.evaluate(() => {
+    const f = document.querySelector('.zoom-flaeche.blatt-zoom iframe')
+    return { innen: f?.contentWindow?.innerWidth ?? 0, breite: f?.clientWidth ?? 0, zoomInnen: f?.contentDocument?.documentElement.style.zoom ?? '' }
+  })
+  pruefe(
+    Math.abs(rahmenInnen.innen - rahmenInnen.breite) < 4 || rahmenInnen.zoomInnen !== '',
+    `Blattinhalt im Rahmen zieht mit dem Zoom mit (innen ${rahmenInnen.innen}, Breite ${rahmenInnen.breite}, eigener Zoom „${rahmenInnen.zoomInnen}")`
+  )
   const breiter = await zf.evaluate((el) => el.scrollWidth > el.clientWidth + 10)
   pruefe(breiter, 'Gezoomtes Blatt ist breiter als der Bildschirm und lässt sich seitwärts rollen')
   await h.screenshot({ path: join(out, '6-handy-zoom.png') })

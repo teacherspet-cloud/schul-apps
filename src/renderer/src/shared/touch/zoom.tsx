@@ -131,6 +131,32 @@ function senkrechtRollend(el: HTMLElement | null): HTMLElement | null {
 }
 
 /**
+ * CSS-`zoom` in Rahmen gleichen Ursprungs nachziehen (26.10.2026, Befund der Lehrkraft am iPad: „das Zoomen zoomt an den
+ * Hintergrund"): Das Schülerblatt liegt in einem iframe. Chromium gibt das `zoom` eines Vorfahren an den Inhalt des
+ * Rahmens weiter, WebKit (Safari, iPad-App) nicht – dort wuchs nur der weiße Kasten des Rahmens, das Blatt darin blieb
+ * klein. Erkennbar am Rahmen selbst: Ist sein inneres Fenster so breit wie der gezoomte Kasten (statt wie seine
+ * CSS-Breite), hat der Inhalt den Zoom nicht bekommen – dann setzt er ihn an seinem Wurzelelement selbst.
+ */
+export function rahmenZoomAngleichen(innen: HTMLElement | null, zoom: number): void {
+  if (!innen) return
+  for (const f of Array.from(innen.querySelectorAll('iframe'))) {
+    let doc: Document | null = null
+    try {
+      doc = f.contentDocument
+    } catch {
+      doc = null
+    }
+    const wurzel = doc?.documentElement
+    if (!wurzel || !f.contentWindow) continue
+    const breite = f.clientWidth
+    const innenBreite = f.contentWindow.innerWidth
+    const bekommtZoom = zoom <= 1.02 || Math.abs(innenBreite - breite) < 4
+    const soll = !bekommtZoom && zoom !== 1 ? String(zoom) : ''
+    if (wurzel.style.zoom !== soll) wurzel.style.zoom = soll
+  }
+}
+
+/**
  * Hängt den Zwei-Finger-Zoom an `flaeche`. `inhalt` ist das Element mit CSS-`zoom`;
  * `basis` der Zoom ohne Zutun der Lehrkraft, `faktor` ihr eigener darauf.
  */
@@ -153,11 +179,19 @@ export function useZweiFingerZoom(opts: {
     let start: { abstand: number; faktor: number } | null = null
     let letzter = opts.faktor
 
-    const mitte = (t: TouchList): Punkt => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 })
-    const punkte = (t: TouchList): [Punkt, Punkt] => [
-      { x: t[0].clientX, y: t[0].clientY },
-      { x: t[1].clientX, y: t[1].clientY }
-    ]
+    /*
+     * Berührungen im Blattrahmen (26.10.2026, Befund der Lehrkraft: „das Zoomen zoomt an den Hintergrund"): Das Schülerblatt
+     * liegt in einem iframe – Touch-Ereignisse darin erreichen weder die Fläche noch das Dokument außen, Safari zoomte
+     * dann die ganze Seite. Darum hängen die Horcher auch an jedem Rahmen gleichen Ursprungs in der Fläche; seine
+     * Koordinaten werden über Lage und Skalierung des Rahmens ins Fenster umgerechnet (`abbilden`).
+     */
+    type Abbilden = (t: Touch) => Punkt
+    const direkt: Abbilden = (t) => ({ x: t.clientX, y: t.clientY })
+    const mitte = (t: TouchList, ab: Abbilden): Punkt => {
+      const [a, b] = [ab(t[0]), ab(t[1])]
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    }
+    const punkte = (t: TouchList, ab: Abbilden): [Punkt, Punkt] => [ab(t[0]), ab(t[1])]
 
     /** Zoom setzen und den Punkt unter den Fingern festhalten */
     const anwenden = (faktor: number, m: Punkt): void => {
@@ -170,6 +204,7 @@ export function useZweiFingerZoom(opts: {
       const ix = (m.x - vorher.left) / zAlt
       const iy = (m.y - vorher.top) / zAlt
       innen.style.zoom = String(zNeu)
+      rahmenZoomAngleichen(innen, zNeu)
       letzter = faktor
       const nachher = innen.getBoundingClientRect()
       el.scrollLeft += nachher.left - (m.x - ix * zNeu)
@@ -177,9 +212,9 @@ export function useZweiFingerZoom(opts: {
       if (senk) senk.scrollTop += nachher.top - (m.y - iy * zNeu)
     }
 
-    const beginn = (e: TouchEvent): void => {
+    const beginn = (e: TouchEvent, ab: Abbilden = direkt): void => {
       if (e.touches.length !== 2) return
-      const [a, b] = punkte(e.touches)
+      const [a, b] = punkte(e.touches, ab)
       letzter = aktuell.current.faktor
       start = { abstand: abstand(a, b), faktor: letzter }
       /*
@@ -189,14 +224,14 @@ export function useZweiFingerZoom(opts: {
        */
       e.touches[0].target.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch', isPrimary: true }))
     }
-    const bewegung = (e: TouchEvent): void => {
+    const bewegung = (e: TouchEvent, ab: Abbilden = direkt): void => {
       if (!start || e.touches.length !== 2) return
       // Zwei Finger gehören dem Zoom – nicht dem Rollen und nicht dem Zoom der ganzen Seite
       e.preventDefault()
-      const [a, b] = punkte(e.touches)
+      const [a, b] = punkte(e.touches, ab)
       const { min, max } = aktuell.current
       const f = pinchZoom(start.faktor, start.abstand, abstand(a, b), min, max)
-      if (Math.abs(f - letzter) >= 0.01) anwenden(f, mitte(e.touches))
+      if (Math.abs(f - letzter) >= 0.01) anwenden(f, mitte(e.touches, ab))
     }
     const ende = (e: TouchEvent): void => {
       if (!start || e.touches.length >= 2) return
@@ -212,11 +247,52 @@ export function useZweiFingerZoom(opts: {
     document.addEventListener('touchmove', bewegung, { passive: false })
     document.addEventListener('touchend', ende, { passive: true })
     document.addEventListener('touchcancel', ende, { passive: true })
+    // Rahmen gleichen Ursprungs in der Fläche (Schülerblatt): jetzt vorhandene, später geladene, später eingehängte
+    const rahmen = new Map<Document, () => void>()
+    const rahmenAnhaengen = (f: HTMLIFrameElement): void => {
+      let doc: Document | null = null
+      try {
+        doc = f.contentDocument
+      } catch {
+        doc = null
+      }
+      if (!doc || rahmen.has(doc)) return
+      const ab: Abbilden = (t) => {
+        const r = f.getBoundingClientRect()
+        const sx = f.clientWidth ? r.width / f.clientWidth : 1
+        const sy = f.clientHeight ? r.height / f.clientHeight : 1
+        return { x: r.left + t.clientX * sx, y: r.top + t.clientY * sy }
+      }
+      const b = (e: TouchEvent): void => beginn(e, ab)
+      const m = (e: TouchEvent): void => bewegung(e, ab)
+      doc.addEventListener('touchstart', b, { passive: true })
+      doc.addEventListener('touchmove', m, { passive: false })
+      doc.addEventListener('touchend', ende, { passive: true })
+      doc.addEventListener('touchcancel', ende, { passive: true })
+      const d = doc
+      rahmen.set(d, () => {
+        d.removeEventListener('touchstart', b)
+        d.removeEventListener('touchmove', m)
+        d.removeEventListener('touchend', ende)
+        d.removeEventListener('touchcancel', ende)
+      })
+    }
+    const alleRahmen = (): void => {
+      for (const f of Array.from(el.querySelectorAll('iframe'))) {
+        rahmenAnhaengen(f)
+        f.addEventListener('load', () => rahmenAnhaengen(f))
+      }
+    }
+    alleRahmen()
+    const beobachter = new MutationObserver(alleRahmen)
+    beobachter.observe(el, { childList: true, subtree: true })
     return () => {
       el.removeEventListener('touchstart', beginn)
       document.removeEventListener('touchmove', bewegung)
       document.removeEventListener('touchend', ende)
       document.removeEventListener('touchcancel', ende)
+      beobachter.disconnect()
+      for (const ab of rahmen.values()) ab()
     }
   }, [opts.aktiv, opts.flaeche, opts.inhalt])
 }
@@ -491,6 +567,28 @@ export function ZoomFlaeche({
     lokal: [lokal, (teil) => setLokal((z) => ({ ...z, ...teil }))],
     aktiv
   })
+  // Rahmen (iframe) im Inhalt: Zoom nachziehen, wo der Browser ihn nicht weitergibt – auch nach dem (Neu-)Laden
+  useLayoutEffect(() => {
+    const innen = inhalt.current
+    if (!aktiv || !innen) return
+    const angleichen = (): void => rahmenZoomAngleichen(innen, Number(innen.style.zoom || 1))
+    angleichen()
+    const rahmen = new Set<HTMLIFrameElement>()
+    const hoeren = (): void => {
+      for (const f of Array.from(innen.querySelectorAll('iframe')))
+        if (!rahmen.has(f)) {
+          rahmen.add(f)
+          f.addEventListener('load', angleichen)
+        }
+    }
+    hoeren()
+    const beobachter = new MutationObserver(hoeren)
+    beobachter.observe(innen, { childList: true, subtree: true })
+    return () => {
+      beobachter.disconnect()
+      for (const f of rahmen) f.removeEventListener('load', angleichen)
+    }
+  }, [aktiv, zoom])
   if (!aktiv) return <>{children}</>
   return (
     <>

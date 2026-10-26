@@ -73,6 +73,10 @@ describe('Überthemen: Thema eines anderen Jahrgangs (Befund 9c, 25.10.2026)', (
     expect(z?.kandidat.name).toMatch(/Erster Weltkrieg/)
     expect(z?.kandidat.fallback).toBe(true)
   })
+  it('„1914–1918: Begeisterung, Krieg und neue Grenzen" (Befund 26.10.2026): Rückfall gewinnt mit deutlich mehr Punkten', () => {
+    const z = zuordnen({ titel: '1914–1918: Begeisterung, Krieg und neue Grenzen', thema: 'Augusterlebnis, Verlauf und Ausgang des Ersten Weltkriegs' }, k9)
+    expect(z?.kandidat.name).toBe('Erster Weltkrieg')
+  })
   it('das Überthema des Blatts beim Wortlaut zählt zuerst', () => {
     const z = zuordnen({ titel: 'Stellungskrieg', oberthema: 'Erster Weltkrieg' }, k9)
     expect(z?.kandidat.name).toBe('Erster Weltkrieg')
