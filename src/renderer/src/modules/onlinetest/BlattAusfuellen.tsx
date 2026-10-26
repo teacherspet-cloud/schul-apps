@@ -59,6 +59,7 @@ import { BildNachweisListe } from '../../shared/components/BildNachweis'
 import { blattBildNachweise } from './testBildNachweise'
 import { useTouch } from '../../shared/touch/touchModus'
 import { ZoomFlaeche } from '../../shared/touch/zoom'
+import { StiftDiagnose, stiftDiagnoseAktiv } from './StiftDiagnose'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
@@ -918,6 +919,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       }
     >
     <Stack data-blatt-ausfuellen>
+      {/* Stift-Diagnose (26.10.2026): nur mit ?diagnose=stift in der Adresse */}
+      {stiftDiagnoseAktiv() && <StiftDiagnose />}
       {lehrkraft ? (
         <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck} data-blatt-lehrkraft-zurueck>
           {d.id === 'vorschau' ? 'Zurück zum Blatt' : 'Zur Übersicht'}
