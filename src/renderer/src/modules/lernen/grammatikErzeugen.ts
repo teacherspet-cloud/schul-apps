@@ -38,8 +38,8 @@ const O = (properties: Record<string, Record<string, unknown>>): Record<string, 
   additionalProperties: false
 })
 
-const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau']
-const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'tabelle', 'umformen', 'luecke', 'uebersetzen', 'auswahl']
+const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'zuordnen', 'richtigfalsch']
+const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'tabelle', 'umformen', 'luecke', 'uebersetzen', 'auswahl', 'zuordnen', 'richtigfalsch']
 
 /** Zusätzliche Felder der Latein-Aufgaben (bei den übrigen Arten leer) */
 const LATEIN_FELDER = {
@@ -80,6 +80,12 @@ const aufgabeSchema = (latein: boolean, extra = false): Record<string, unknown> 
     optionen: A(S(), 'auswahl: 3–4 Möglichkeiten, die richtige dabei, die anderen typische Fehlformen; sonst leer'),
     fehlerWort: S('fehler: das falsche Wort GENAU wie im Satz; sonst leer'),
     teile: A(S(), 'satzbau: die Wörter bzw. Satzteile in RICHTIGER Reihenfolge (4–9 Teile); sonst leer'),
+    // Zuordnen und Richtig/Falsch (26.10.2026, Entscheidung der Lehrkraft)
+    paare: A(
+      O({ links: S('linke Hälfte, z. B. Satzanfang oder Signalwort'), rechts: S('die passende rechte Hälfte') }),
+      'zuordnen: 3–5 Paare in richtiger Zuordnung, jede rechte Hälfte passt NUR zu ihrer linken; sonst leer'
+    ),
+    korrekt: { type: 'boolean', description: 'richtigfalsch: true = der Satz ist richtig; false = er enthält GENAU EINEN Grammatikfehler (fehlerWort, loesungen); sonst false' },
     erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form'),
     ...(latein ? LATEIN_FELDER : {}),
     ...(extra ? EXTRA_FELDER : {})
@@ -342,6 +348,8 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
       LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
+      'Zuordnen: 3–5 „paare" (links Satzanfang bzw. Signalwort, rechts die passende Fortsetzung bzw. Form) – jede rechte Hälfte passt NUR zu ihrer linken; „satz" leer.',
+      'Richtig oder falsch: „satz" ein Satz; „korrekt" true, wenn er richtig ist – sonst false mit GENAU EINEM Grammatikfehler, „fehlerWort" exakt wie im Satz und „loesungen" die richtige Form. Etwa die Hälfte richtig.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
       latein ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}` : '',
       zeitformRegel(a, gesperrt),
@@ -630,6 +638,8 @@ async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string
       LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler, „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
+      'Zuordnen: 3–5 „paare" (links Satzanfang bzw. Signalwort, rechts die passende Fortsetzung bzw. Form) – jede rechte Hälfte passt NUR zu ihrer linken; „satz" leer.',
+      'Richtig oder falsch: „satz" ein Satz; „korrekt" true, wenn er richtig ist – sonst false mit GENAU EINEM Grammatikfehler, „fehlerWort" exakt wie im Satz und „loesungen" die richtige Form. Etwa die Hälfte richtig.',
       'Übersetzen: satz = deutscher Satz, loesungen = alle richtigen Übersetzungen in die Zielsprache.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
       'Keine Sätze, die schon im Pool stehen (Liste unten).',

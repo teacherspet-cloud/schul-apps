@@ -31,7 +31,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
+import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
@@ -60,6 +60,7 @@ import { blattBildNachweise } from './testBildNachweise'
 import { useTouch } from '../../shared/touch/touchModus'
 import { ZoomFlaeche } from '../../shared/touch/zoom'
 import { StiftDiagnose, stiftDiagnoseAktiv } from './StiftDiagnose'
+import { loesungenJeAufgabe } from './loesungJeAufgabe'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
@@ -545,11 +546,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   }
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
-  const [loesungOffen, setLoesungOffen] = useState(false)
-  // Vorschau „vollständig bearbeitet" (25.10.2026): das Lösungsblatt gleich aufgeklappt
-  useEffect(() => {
-    if (d?.loesung && d.antworten?._vorschau === 'vollstaendig') setLoesungOffen(true)
-  }, [d?.loesung, d?.antworten])
+  // Lösung je Aufgabe (26.10.2026, Entscheidung der Lehrkraft): aus dem Lösungsblatt der Freigabe, aufklappbar an jeder Aufgabe
+  const loesungen = useMemo(() => (d.loesung ? loesungenJeAufgabe(d.loesung) : undefined), [d.loesung])
+  // Vorschau „vollständig bearbeitet" (25.10.2026): die Lösungen gleich aufgeklappt
+  const loesungenAuf = d.antworten?._vorschau === 'vollstaendig'
   const rahmen = useRef<HTMLDivElement>(null)
   // Breite AUSSERHALB der Zoomfläche messen (25.10.2026): innerhalb von CSS-`zoom` schrumpft die gemessene Breite mit dem
   // Zoom, das Blatt passte sich neu ein und blieb optisch gleich groß
@@ -1003,15 +1003,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           </Stack>
         </Modal>
       )}
-      {d.loesung && (
-        <Button variant="light" color="green" w="fit-content" onClick={() => setLoesungOffen(true)} data-loesung-knopf>
-          Lösung ansehen
-        </Button>
-      )}
-      {loesungOffen && d.loesung && (
-        <Modal opened onClose={() => setLoesungOffen(false)} title="Lösung" size="xl">
-          <iframe title="Lösung" srcDoc={d.loesung} sandbox="" style={{ width: '100%', height: '75vh', border: 0, background: '#fff' }} />
-        </Modal>
+      {loesungen && (
+        <Text size="sm" c="dimmed" data-loesung-hinweis>
+          Die Lösung steht jetzt an jeder Aufgabe – über das Sprechblasen-Symbol neben der Aufgabe bzw. in der Liste.
+        </Text>
       )}
       {letzte?.bogen && (
         <Card withBorder padding="lg" data-blatt-bogen>
@@ -1141,6 +1136,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 pruefFehler={pruefFehler}
                 laeuft={laeuft}
                 fb={aufgabenFb}
+                loesungen={loesungen}
+                loesungenAuf={loesungenAuf}
                 runden={d.einstellungen.aufgabenRunden}
                 hilfen={hilfen}
                 hilfeOeffnen={hilfeOeffnen}
@@ -1196,6 +1193,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           marken={marken}
           laeuft={laeuft}
           fb={aufgabenFb}
+          loesungen={loesungen}
+          loesungenAuf={loesungenAuf}
           runden={d.einstellungen.aufgabenRunden}
           tinte={Object.keys(tinte).length > 0}
           hilfeOeffnen={hilfeOeffnen}
@@ -1255,6 +1254,35 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
 const FARBE = STIFT_FARBEN[0]
 
 /** Feedback-Verlauf zu einer Aufgabe */
+/**
+ * Lösung zu einer Aufgabe (26.10.2026, Entscheidung der Lehrkraft): aufklappbar an der Aufgabe, als Rahmen ohne Skripte
+ * mit der Höhe des Inhalts – im Fenster neben dem Blatt und in der Liste.
+ */
+function LoesungTeil({ nr, html, offenVorgabe = false }: { nr: number; html: string; offenVorgabe?: boolean }): React.JSX.Element {
+  const [offen, setOffen] = useState(offenVorgabe)
+  const [hoehe, setHoehe] = useState(140)
+  return (
+    <Stack gap={4}>
+      <Button size="xs" variant="light" color="green" w="fit-content" leftSection={<IconEye size={14} />} onClick={() => setOffen((o) => !o)} data-aufgabe-loesung={nr}>
+        {offen ? 'Lösung ausblenden' : `Lösung zu Aufgabe ${nr}`}
+      </Button>
+      {offen && (
+        <iframe
+          title={`Lösung zu Aufgabe ${nr}`}
+          srcDoc={html}
+          sandbox="allow-same-origin"
+          style={{ width: '100%', height: hoehe, border: '1px solid var(--mantine-color-default-border)', borderRadius: 6, background: '#fff' }}
+          onLoad={(e) => {
+            const h = e.currentTarget.contentDocument?.documentElement.scrollHeight
+            if (h) setHoehe(Math.min(900, h + 4))
+          }}
+          data-aufgabe-loesung-frame={nr}
+        />
+      )}
+    </Stack>
+  )
+}
+
 function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.Element | null {
   const l = liste?.at(-1)
   if (!l) return null
@@ -1335,6 +1363,9 @@ function Ebene(p: {
   laeuft: string | null
   fb: BlattDaten['aufgabenFeedback']
   runden: number
+  /** Lösung je Aufgabe (26.10.2026): kleines Dokument je Aufgabe aus dem Lösungsblatt; `loesungenAuf`: gleich aufgeklappt */
+  loesungen?: Record<number, string>
+  loesungenAuf?: boolean
   /** Ampel je Aufgabe (nur mit Feedback je Aufgabe) */
   ampeln?: Record<number, Ampel> | null
   /** Gewählte Form (Werkzeug „Formen“) */
@@ -1345,7 +1376,7 @@ function Ebene(p: {
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   // Feedback-Knopf an der Aufgabe: zum Prüfen lassen oder um vorhandenes Feedback zu lesen
-  const knopfDa = (nr: number): boolean => Boolean(p.pruefen) || Boolean(p.fb[String(nr)]?.length)
+  const knopfDa = (nr: number): boolean => Boolean(p.pruefen) || Boolean(p.fb[String(nr)]?.length) || Boolean(p.loesungen?.[nr])
   // Mit dem Finger ist der Knopf 44 statt 28 Punkte breit – Knopf und Ampel rücken entsprechend weiter nach links,
   // sonst lagen sie am iPad auf der Aufgabennummer (09.10.2026)
   const knopfBreite = useTouch() ? 44 : 28
@@ -1627,9 +1658,10 @@ function Ebene(p: {
                 </ActionIcon>
               </Tooltip>
               {offenesFb === a.nr && (
-                <Paper withBorder shadow="md" p="xs" w={300} style={{ position: 'absolute', left: knopfBreite + 8, top: 0 }}>
+                <Paper withBorder shadow="md" p="xs" w={p.loesungen?.[a.nr] ? 'min(560px, 80vw)' : 300} style={{ position: 'absolute', left: knopfBreite + 8, top: 0 }}>
                   <Stack gap={6}>
                     <AufgabenFeedbackText liste={liste} />
+                    {p.loesungen?.[a.nr] && <LoesungTeil nr={a.nr} html={p.loesungen[a.nr]} offenVorgabe={p.loesungenAuf} />}
                     {p.pruefFehler[String(a.nr)] && (
                       <Alert color="red" p="xs" data-pruef-fehler>
                         {p.pruefFehler[String(a.nr)]}
@@ -1668,6 +1700,9 @@ function Liste(p: {
   fb: BlattDaten['aufgabenFeedback']
   runden: number
   tinte: boolean
+  /** Lösung je Aufgabe (26.10.2026) */
+  loesungen?: Record<number, string>
+  loesungenAuf?: boolean
   zumBlatt: (a: AufgabeInfo) => void
   /** Hilfekarten öffnen (06.10.2026) */
   hilfeOeffnen?: (a: AufgabeInfo) => void
@@ -1807,6 +1842,7 @@ function Liste(p: {
                   )
                 )}
               <AufgabenFeedbackText liste={liste} />
+              {p.loesungen?.[g.nr] && <LoesungTeil nr={g.nr} html={p.loesungen[g.nr]} offenVorgabe={p.loesungenAuf} />}
               {liste?.length ? (
                 <Badge variant="light" size="sm">
                   noch {Math.max(0, rest)}× Feedback

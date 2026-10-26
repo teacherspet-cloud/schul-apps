@@ -1,6 +1,6 @@
 import { ProgrammInfo } from './shared/components/AppKopf'
 import { fachVorgabenLaden } from './shared/fachvorgaben'
-import { ActionIcon, Anchor, AppShell, Button, Indicator, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Anchor, AppShell, Button, Center, Indicator, Loader, Tooltip, UnstyledButton } from '@mantine/core'
 import { appFreigegeben, aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
@@ -20,7 +20,7 @@ import {
   IconSettings
 } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { useMaskottchen } from './shared/maskottchenStore'
 import { modules, LEISTE_OBEN, MODUL_GRUPPEN, gruppenBild } from './modules/registry'
@@ -91,6 +91,11 @@ export default function App(): React.JSX.Element {
   // Noch nicht angesehene Freigaben der Fachschaft je App (09.10.2026) – Zahl am Symbol in der Leiste
   const fachschaftNeu = useFachschaftNeu()
   const current = modules.find((m) => m.id === active)
+  // Schon geöffnete Programme (26.10.2026, Ladezeiten): nach dem ersten Öffnen bleiben sie eingehängt wie bisher
+  const [geoeffnet, setGeoeffnet] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    if (current) setGeoeffnet((s) => (s.has(current.id) ? s : new Set([...s, current.id])))
+  }, [current])
   // Nur die Programme zu den eigenen Fächern (Paket 12) – geladen bleiben trotzdem alle
   const sichtbar = useSichtbareProgramme()
   /*
@@ -469,6 +474,9 @@ export default function App(): React.JSX.Element {
           .filter((m) => !einzeln || m.id === einzeln)
           // App-Freigaben (23.10.2026): gesperrte Apps gar nicht erst einhängen – sonst liefen sie im Hintergrund mit
           .filter((m) => appFreigegeben(m.id))
+          // Erst nach dem ersten Öffnen (26.10.2026, Ladezeiten): jedes Programm ist ein eigenes Bündel (registry.ts) und
+          // wird erst geladen, wenn es dran ist – danach bleibt es wie bisher im Hintergrund erhalten
+          .filter((m) => m.id === current?.id || geoeffnet.has(m.id))
           .map((m) => (
             // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
             <div key={m.id} hidden={m.id !== current?.id} className="module-container">
@@ -477,7 +485,15 @@ export default function App(): React.JSX.Element {
                 <AktuellesProgramm.Provider value={m.id}>
                   {/* Gemeinsamer Kopf (Phase 6a): Name, Beschreibung, Farbe und Bild aus der Registry */}
                   <ProgrammInfo.Provider value={{ name: m.name, description: m.description, color: m.color, icon: m.icon, bild: m.leistenbild }}>
-                    <m.component active={m.id === current?.id} />
+                    <Suspense
+                      fallback={
+                        <Center py="xl" data-programm-laedt={m.id}>
+                          <Loader />
+                        </Center>
+                      }
+                    >
+                      <m.component active={m.id === current?.id} />
+                    </Suspense>
                   </ProgrammInfo.Provider>
                 </AktuellesProgramm.Provider>
               </ZoomProgramm.Provider>

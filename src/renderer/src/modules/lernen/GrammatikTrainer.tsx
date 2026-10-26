@@ -50,7 +50,7 @@ import {
   type GrammatikPaket,
   type GrammatikSpielId
 } from '@shared/grammatiktrainer'
-import { alsKarten, grammatikSpielPasst, pruefeGrammatik } from '@shared/grammatiktrainer'
+import { alsKarten, grammatikSpielPasst, pruefeGrammatik, regelnVorab } from '@shared/grammatiktrainer'
 import { einzelBeschreibung, spielName } from '@shared/spielSprache'
 import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
 import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from './spiele/SpieleGrammatik'
@@ -889,6 +889,9 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   // Eingabe der aktuellen Aufgabe (26.10.2026): „Lösung zeigen" prüft eine vorhandene Antwort statt aufzugeben.
   // Als Ref, weil nur die Aufgabe beim Tippen neu zeichnet – der Knopf fragt beim Klick nach.
   const eingabe = useRef<EingabeStand | null>(null)
+  // Regeln vor der Runde (26.10.2026, Entscheidung der Lehrkraft): beim ersten Üben einer Form und nach Fehlern
+  const vorab = useMemo(() => regelnVorab(aufgaben, d.paket.aufgaben, d.staende, d.paket.regeln), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const [regelnGelesen, setRegelnGelesen] = useState(false)
   const a = schlange[0]
   /*
    * Zählen nach Aufgaben, nicht nach Fragen (17.10.2026, Befund der Lehrkraft: 20 Übungen, aber über 40 Fragen, weil
@@ -988,6 +991,36 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
   }
   const r = d.paket.regeln.find((x) => x.id === a.regelId)
   const st = staende[a.id]
+  if (vorab.length && !regelnGelesen)
+    return (
+      <FokusRahmen name="grammatikrunde" onEnde={() => fertig(staende)}>
+        <Stack className="vt" data-sitzung data-regel-vorab={vorab.length}>
+          <style>{CSS}</style>
+          <Group justify="space-between">
+            <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4} data-eigenes-beenden>
+              Beenden
+            </Button>
+          </Group>
+          <Text fw={800} size="lg">
+            Bevor es losgeht: {vorab.length === 1 ? 'die Regel' : 'die Regeln'}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {vorab.length === 1 ? 'Diese Form ist' : 'Diese Formen sind'} zum ersten Mal dran oder waren zuletzt noch nicht sicher – kurz lesen, dann üben.
+          </Text>
+          {vorab.map((x) => (
+            <RegelKarte key={x.id} r={x} />
+          ))}
+          <Group>
+            <Button size="lg" radius="xl" className="vt-los" onClick={() => setRegelnGelesen(true)} data-regel-vorab-los>
+              Verstanden, los
+            </Button>
+            <Button variant="subtle" color="gray" onClick={() => setRegelnGelesen(true)} data-regel-vorab-weg>
+              Regel überspringen
+            </Button>
+          </Group>
+        </Stack>
+      </FokusRahmen>
+    )
   return (
     // Vollbild beim Lernen (09.10.2026): die laufende Runde füllt den Bildschirm
     <FokusRahmen name="grammatikrunde" onEnde={() => fertig(staende)}>
@@ -1173,8 +1206,24 @@ function AufgabeAllgemein({
   const optionen = useMemo(() => (a.art === 'auswahl' ? mische(a.optionen ?? []) : []), [a])
   const eingabe = useRef<HTMLInputElement>(null)
   useEffect(() => eingabe.current?.focus(), [a.id, wort])
+  // Zuordnen (26.10.2026): rechte Hälften gemischt, je linker Hälfte die gewählte rechte (Nummer im Original)
+  const rechts = useMemo(() => (a.art === 'zuordnen' ? mische((a.paare ?? []).map((p, i) => ({ text: p.rechts, i }))) : []), [a])
+  const [zuordnung, setZuordnung] = useState<Record<number, number>>({})
+  const [aktivLinks, setAktivLinks] = useState<number | null>(null)
+  const zuordnungVoll = (a.paare ?? []).length > 0 && (a.paare ?? []).every((_, i) => zuordnung[i] !== undefined)
+  // Richtig oder falsch (26.10.2026): Urteil, bei „falsch" das Wort und die Korrektur
+  const [entscheidung, setEntscheidung] = useState<'richtig' | 'falsch' | null>(null)
   const absenden = (): void => {
     if (gesperrt) return
+    if (a.art === 'zuordnen') {
+      if (!zuordnungVoll) return
+      return antworten(JSON.stringify((a.paare ?? []).map((_, i) => zuordnung[i])))
+    }
+    if (a.art === 'richtigfalsch') {
+      if (entscheidung === 'richtig') return antworten(JSON.stringify({ richtig: true }))
+      if (entscheidung !== 'falsch' || wort === null || !text.trim()) return
+      return antworten(JSON.stringify({ richtig: false, wort: woerterVon(a.satz)[wort], korrektur: text.trim() }))
+    }
     if (a.art === 'fehler') {
       if (wort === null || !text.trim()) return
       return antworten(text, woerterVon(a.satz)[wort])
@@ -1186,7 +1235,16 @@ function AufgabeAllgemein({
     if (text.trim()) antworten(text)
   }
   // Für „Lösung zeigen" im Rahmen (26.10.2026): getippte Antwort da → prüfen statt aufgeben
-  if (eingabeStand) eingabeStand.current = { da: Boolean(text.trim()) && (a.art !== 'fehler' || wort !== null), absenden }
+  if (eingabeStand)
+    eingabeStand.current = {
+      da:
+        a.art === 'zuordnen'
+          ? zuordnungVoll
+          : a.art === 'richtigfalsch'
+          ? entscheidung === 'falsch' && wort !== null && Boolean(text.trim())
+          : Boolean(text.trim()) && (a.art !== 'fehler' || wort !== null),
+      absenden
+    }
   const [vor, nach] = a.satz.split('___')
   return (
     <Stack gap="sm" data-aufgabe={a.art}>
@@ -1337,6 +1395,116 @@ function AufgabeAllgemein({
             Prüfen
           </Button>
         </>
+      )}
+      {a.art === 'zuordnen' && (
+        <>
+          {/* Links antippen, dann rechts (26.10.2026); zugeordnete Paare stehen oben, antippen löst sie wieder */}
+          <Stack gap={4} data-zuordnen-paare>
+            {(a.paare ?? []).map((p, i) =>
+              zuordnung[i] === undefined ? null : (
+                <Button
+                  key={i}
+                  variant="light"
+                  justify="flex-start"
+                  disabled={gesperrt}
+                  onClick={() => setZuordnung(({ [i]: _weg, ...rest }) => rest)}
+                  data-zuordnen-paar={i}
+                >
+                  {p.links} → {(a.paare ?? [])[zuordnung[i]]?.rechts}
+                </Button>
+              )
+            )}
+          </Stack>
+          <SimpleGrid cols={2} spacing="xs">
+            <Stack gap={6}>
+              {(a.paare ?? []).map((p, i) =>
+                zuordnung[i] !== undefined ? null : (
+                  <Button key={i} variant={aktivLinks === i ? 'filled' : 'default'} disabled={gesperrt} onClick={() => setAktivLinks(i)} data-zuordnen-links={i}>
+                    {p.links}
+                  </Button>
+                )
+              )}
+            </Stack>
+            <Stack gap={6}>
+              {rechts
+                .filter((r) => !Object.values(zuordnung).includes(r.i))
+                .map((r) => (
+                  <Button
+                    key={r.i}
+                    variant="default"
+                    disabled={gesperrt || aktivLinks === null}
+                    onClick={() => {
+                      if (aktivLinks === null) return
+                      setZuordnung((z) => ({ ...z, [aktivLinks]: r.i }))
+                      setAktivLinks(null)
+                    }}
+                    data-zuordnen-rechts={r.text}
+                  >
+                    {r.text}
+                  </Button>
+                ))}
+            </Stack>
+          </SimpleGrid>
+          <Button disabled={gesperrt || !zuordnungVoll} onClick={absenden} w="fit-content" data-pruefen>
+            Prüfen
+          </Button>
+        </>
+      )}
+      {a.art === 'richtigfalsch' && (
+        <form onSubmit={(e) => (e.preventDefault(), absenden())}>
+          <Text fz={20} fw={600}>
+            {a.satz}
+          </Text>
+          <Group mt="sm">
+            <Button
+              variant={entscheidung === 'richtig' ? 'filled' : 'default'}
+              color="green"
+              disabled={gesperrt}
+              onClick={() => {
+                setEntscheidung('richtig')
+                if (!gesperrt) antworten(JSON.stringify({ richtig: true }))
+              }}
+              data-rf="richtig"
+            >
+              Richtig
+            </Button>
+            <Button variant={entscheidung === 'falsch' ? 'filled' : 'default'} color="red" disabled={gesperrt} onClick={() => setEntscheidung('falsch')} data-rf="falsch">
+              Falsch
+            </Button>
+          </Group>
+          {entscheidung === 'falsch' && (
+            <>
+              <Text size="sm" c="dimmed" mt="sm">
+                Tippe das falsche Wort an:
+              </Text>
+              <Group gap={6} mt={4}>
+                {woerterVon(a.satz).map((w, i) => (
+                  <Button key={i} size="md" variant={wort === i ? 'filled' : 'default'} color={wort === i ? 'red' : undefined} disabled={gesperrt} onClick={() => setWort(i)} data-fehlerwort={w}>
+                    {w}
+                  </Button>
+                ))}
+              </Group>
+              {wort !== null && (
+                <Group mt="sm" align="flex-end">
+                  <TextInput
+                    ref={eingabe}
+                    label={`Statt „${woerterVon(a.satz)[wort]}" richtig:`}
+                    value={text}
+                    onChange={(e) => setText(e.currentTarget.value)}
+                    disabled={gesperrt}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-korrektur-eingabe
+                  />
+                  <Button type="submit" disabled={gesperrt || !text.trim()} data-pruefen>
+                    Prüfen
+                  </Button>
+                </Group>
+              )}
+            </>
+          )}
+        </form>
       )}
     </Stack>
   )

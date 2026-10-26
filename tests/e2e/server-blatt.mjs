@@ -205,20 +205,27 @@ try {
   // Lösungsblatt erst nach dem ersten Einreichen (03.10.2026)
   await s.reload()
   await s.locator('[data-blatt-bogen]').waitFor({ timeout: 20000 })
-  await s.locator('[data-loesung-knopf]').click()
+  // Lösung je Aufgabe (26.10.2026): aufklappbar an der Aufgabe statt Lösungsblatt am Ende
+  pruefe(await s.locator('[data-loesung-hinweis]').isVisible(), 'Nach dem Einreichen: Hinweis auf die Lösung je Aufgabe')
+  await s.locator('[data-aufgabe-pruefen="1"]').first().click()
+  await s.locator('[data-aufgabe-loesung="1"]').click()
   pruefe(
     await s
-      .locator('.mantine-Modal-body iframe')
+      .locator('[data-aufgabe-loesung-frame="1"]')
       .waitFor({ timeout: 10000 })
       .then(
         () => true,
         () => false
       ),
-    'Nach dem Einreichen: Lösung ansehen'
+    'Nach dem Einreichen: Lösung zu Aufgabe 1 aufgeklappt'
   )
   await s.waitForTimeout(1500)
+  pruefe(
+    (await s.locator('[data-aufgabe-loesung-frame="1"]').evaluate((f) => f.contentDocument?.querySelectorAll('.ws-task').length ?? 0)) >= 1,
+    'Die Lösung zeigt die Aufgabe mit eingesetzten Antworten'
+  )
   await s.screenshot({ path: join(out, '3b-loesung.png') })
-  await s.keyboard.press('Escape')
+  await s.locator('[data-aufgabe-loesung="1"]').click()
 
   // ---------- Gast am Telefon: Liste
   const g = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })

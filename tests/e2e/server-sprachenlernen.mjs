@@ -290,6 +290,7 @@ try {
   await sb.locator('[data-regel-kopf="r2"]').click()
   await sb.screenshot({ path: join(out, '6-regeln.png'), fullPage: true })
   await sb.locator('[data-regel-ueben="r2"]').click()
+  await sb.locator('[data-regel-vorab-los]').click({ timeout: 2500 }).catch(() => undefined)
   pruefe(await da(sb.locator('.vt-buehne', { hasText: /see yesterday|eat yesterday|go to school last Sunday/ })), '„Diese Regel üben": Aufgaben der Regel')
   const st = await tom.newPage()
   await st.goto(`${A}/s/g/${gram}`)

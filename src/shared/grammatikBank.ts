@@ -40,11 +40,12 @@ export const UEBUNG_TEXT: Record<Uebung, string> = {
 }
 /** Aufgabenarten, die zur Übungsart passen (Englisch, Französisch, Spanisch …) */
 export const UEBUNG_ARTEN: Record<Uebung, string[]> = {
-  erkennen: ['auswahl', 'luecke'],
+  // zuordnen und richtigfalsch seit 26.10.2026 (Entscheidung der Lehrkraft, ohne KI prüfbar)
+  erkennen: ['auswahl', 'luecke', 'zuordnen', 'richtigfalsch'],
   bilden: ['luecke', 'umformen'],
-  anwenden: ['umformen', 'satzbau', 'luecke'],
-  unterscheiden: ['auswahl', 'luecke'],
-  fehler: ['fehler']
+  anwenden: ['umformen', 'satzbau', 'luecke', 'zuordnen'],
+  unterscheiden: ['auswahl', 'luecke', 'richtigfalsch', 'zuordnen'],
+  fehler: ['fehler', 'richtigfalsch']
 }
 /** Stufe für Reihenfolge und ältere Ansichten: Erkennen 1, Bilden 2, sonst 3 */
 export const uebungStufe = (u: Uebung): 1 | 2 | 3 => (u === 'erkennen' ? 1 : u === 'bilden' ? 2 : 3)

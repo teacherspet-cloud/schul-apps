@@ -80,8 +80,8 @@ export interface BankBericht extends PruefBericht {
 }
 
 const istLatein = (a: Pick<BankAuftrag, 'sprache' | 'fach'>): boolean => a.sprache === 'la' || /latein/i.test(a.fach)
-const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau']
-const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetzen', 'auswahl']
+const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'zuordnen', 'richtigfalsch']
+const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetzen', 'auswahl', 'zuordnen', 'richtigfalsch']
 
 /** Vorläufige Kennung neuer Aufgaben (der Server vergibt beim Speichern die feste „b…") */
 export const neueKennung = (i: number): string => `n${Date.now().toString(36)}${i}`
@@ -122,7 +122,9 @@ export async function erzeugeBankAufgaben(
       'Auswahl: 3–4 Möglichkeiten in „optionen", die richtige dabei, die anderen typische Fehlformen.',
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge (4–9 Teile); Satzzeichen hängen am letzten Teil.',
-      'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.',
+      'Zuordnen: 3–5 „paare" (links Satzanfang bzw. Signalwort/Situation, rechts die passende Fortsetzung bzw. Form) – jede rechte Hälfte passt NUR zu ihrer linken; „satz" leer.',
+      'Richtig oder falsch: „satz" ein Satz; „korrekt" true, wenn er richtig ist – sonst false mit GENAU EINEM Grammatikfehler, „fehlerWort" exakt wie im Satz und „loesungen" die richtige Form. Etwa die Hälfte richtig.',
+      'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste (korrekt dann false).',
       sprache ? sperrRegel(gesperrt) : katalogFormenRegel(a, a.themenIds)
     ]
       .filter(Boolean)
@@ -153,6 +155,8 @@ export async function erzeugeBankAufgaben(
           optionen: A(S(), 'auswahl: 3–4 Möglichkeiten; sonst leer'),
           fehlerWort: S('fehler: das falsche Wort GENAU wie im Satz; sonst leer'),
           teile: A(S(), 'satzbau: Teile in RICHTIGER Reihenfolge; sonst leer'),
+          paare: A(O({ links: S('linke Hälfte'), rechts: S('passende rechte Hälfte') }), 'zuordnen: 3–5 Paare in richtiger Zuordnung; sonst leer'),
+          korrekt: { type: 'boolean', description: 'richtigfalsch: true = der Satz ist richtig; sonst false' },
           erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form')
         })
       )

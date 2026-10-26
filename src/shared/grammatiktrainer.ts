@@ -16,7 +16,28 @@ import { istVerbSprache, type VerbSprache } from './verben'
 import { APOSTROPHE } from './apostroph'
 import type { Uebung } from './grammatikBank'
 
-export type AufgabenArt = 'luecke' | 'auswahl' | 'umformen' | 'fehler' | 'satzbau' | 'bestimmen' | 'mehrfach' | 'tabelle' | 'uebersetzen'
+export type AufgabenArt =
+  | 'luecke'
+  | 'auswahl'
+  | 'umformen'
+  | 'fehler'
+  | 'satzbau'
+  | 'bestimmen'
+  | 'mehrfach'
+  | 'tabelle'
+  | 'uebersetzen'
+  | 'zuordnen'
+  | 'richtigfalsch'
+
+/*
+ * Zwei weitere Arten ohne KI (26.10.2026, Entscheidung der Lehrkraft):
+ *  - zuordnen: Satzhälften (oder Form ↔ Verwendung) per Antippen verbinden – `paare` (3–6), die rechten Hälften erscheinen
+ *    gemischt. Antwort: JSON-Liste, je linker Hälfte die Nummer der gewählten rechten. Alle richtig = richtig, mindestens
+ *    die Hälfte = fast.
+ *  - richtigfalsch: einen Satz beurteilen; ist er falsch (`korrekt: false`), das falsche Wort antippen (`fehlerWort`) und
+ *    die richtige Form tippen (`loesungen`). Antwort: JSON {richtig, wort?, korrektur?}. Falsche Beurteilung = falsch;
+ *    Fehler erkannt, aber Wort oder Korrektur daneben = fast.
+ */
 
 /*
  * Aufgabenarten für Latein (07.10.2026, abgestimmt mit der Lehrkraft nach Recherche – KC Niedersachsen 2017,
@@ -88,6 +109,10 @@ export interface GrammatikAufgabe {
   spalten?: string[]
   /** tabelle: Zeilen mit Namen (z. B. „Nom."), Lösungen je Spalte und vorgegebenen Zellen */
   zeilen?: { name: string; loesungen: string[]; vorgabe?: boolean[] }[]
+  /** zuordnen (26.10.2026): die Paare in richtiger Zuordnung, 3–6 */
+  paare?: { links: string; rechts: string }[]
+  /** richtigfalsch (26.10.2026): der Satz ist richtig (true) oder enthält den Fehler `fehlerWort` (false) */
+  korrekt?: boolean
 }
 
 export interface GrammatikPaket {
@@ -105,7 +130,19 @@ export interface GrammatikPaket {
   verbSprache?: VerbSprache
 }
 
-export const ARTEN: AufgabenArt[] = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'bestimmen', 'mehrfach', 'tabelle', 'uebersetzen']
+export const ARTEN: AufgabenArt[] = [
+  'luecke',
+  'auswahl',
+  'umformen',
+  'fehler',
+  'satzbau',
+  'bestimmen',
+  'mehrfach',
+  'tabelle',
+  'uebersetzen',
+  'zuordnen',
+  'richtigfalsch'
+]
 export const ART_NAME: Record<AufgabenArt, string> = {
   luecke: 'Lücke',
   auswahl: 'Auswahl',
@@ -115,7 +152,9 @@ export const ART_NAME: Record<AufgabenArt, string> = {
   bestimmen: 'Bestimmen',
   mehrfach: 'Mehrfachauswahl',
   tabelle: 'Tabelle',
-  uebersetzen: 'Übersetzen'
+  uebersetzen: 'Übersetzen',
+  zuordnen: 'Zuordnen',
+  richtigfalsch: 'Richtig oder falsch'
 }
 
 const text = (x: unknown, n = 400): string =>
@@ -250,8 +289,30 @@ export function paketBereinigt(
         continue
       a.loesungen = [offen.join(' | ')]
     }
+    if (art === 'zuordnen') {
+      // Paare (26.10.2026): links und rechts gefüllt, keine doppelte rechte Hälfte (sonst wäre die Zuordnung mehrdeutig)
+      const roh = (Array.isArray(y.paare) ? y.paare : []).map((p) => {
+        const q = (p ?? {}) as Record<string, unknown>
+        return { links: text(q.links, 160), rechts: text(q.rechts, 160) }
+      })
+      const rechts = new Set<string>()
+      a.paare = roh.filter((p) => p.links && p.rechts && !rechts.has(normiert(p.rechts)) && rechts.add(normiert(p.rechts))).slice(0, 6)
+      if (a.paare.length < 3) continue
+      a.loesungen = [a.paare.map((p) => `${p.links} ${p.rechts}`).join(' | ')]
+    }
+    if (art === 'richtigfalsch') {
+      a.korrekt = y.korrekt === true || y.korrekt === 'true'
+      if (!a.satz) continue
+      if (a.korrekt) {
+        delete a.fehlerWort
+        a.loesungen = [a.satz]
+      } else {
+        a.fehlerWort = text(y.fehlerWort, 80)
+        if (!a.fehlerWort || !woerterVon(a.satz).some((w) => gleich(w, a.fehlerWort!)) || !a.loesungen.length) continue
+      }
+    }
     if (art === 'uebersetzen' && !a.satz) continue
-    if (!a.satz && art !== 'satzbau' && art !== 'bestimmen' && art !== 'tabelle' && art !== 'mehrfach') continue
+    if (!a.satz && art !== 'satzbau' && art !== 'bestimmen' && art !== 'tabelle' && art !== 'mehrfach' && art !== 'zuordnen') continue
     if (!a.loesungen.length) continue
     if ((art === 'luecke' || art === 'auswahl') && !a.satz.includes('___')) continue
     if (art === 'auswahl' && (!a.optionen || a.optionen.length < 2 || !a.optionen.some((o) => gleich(o, a.loesungen[0])))) continue
@@ -353,6 +414,15 @@ function jsonListe(s: string): unknown[] {
     return []
   }
 }
+/** Antwort als Objekt (richtigfalsch, 26.10.2026) – sonst leer */
+function jsonObjekt(s: string): Record<string, unknown> {
+  try {
+    const x = JSON.parse(s)
+    return x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
 
 /**
  * Bestimmung bewerten (Teilpunkte): Anteil der richtigen Lesarten, falsche ziehen ab.
@@ -422,6 +492,24 @@ export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltes
     // Wörtlich wie eine Musterlösung = richtig; sonst entscheidet der Vergleich der Lernenden (`selbst`)
     if (a.loesungen.some((l) => gleich(l, antwort))) return { urteil: 'richtig', richtig }
     return { urteil: selbst ?? 'falsch', richtig }
+  }
+  if (a.art === 'zuordnen') {
+    // Antwort: je linker Hälfte die Nummer der gewählten rechten (Reihenfolge von `paare`)
+    const wahl = jsonListe(antwort).map((x) => Number(x))
+    const paare = a.paare ?? []
+    const treffer = paare.filter((_, i) => wahl[i] === i).length
+    const alle = paare.map((p) => `${p.links} ${p.rechts}`).join(' | ')
+    return { urteil: treffer === paare.length ? 'richtig' : treffer * 2 >= paare.length ? 'fast' : 'falsch', richtig: alle }
+  }
+  if (a.art === 'richtigfalsch') {
+    const w = jsonObjekt(antwort)
+    const sagtRichtig = w.richtig === true || w.richtig === 'true'
+    const soll = a.korrekt ? 'Der Satz ist richtig.' : `${a.fehlerWort ?? ''} → ${richtig}`
+    if (sagtRichtig !== Boolean(a.korrekt)) return { urteil: 'falsch', richtig: soll }
+    if (a.korrekt) return { urteil: 'richtig', richtig: soll }
+    const wortPasst = Boolean(a.fehlerWort) && gleich(String(w.wort ?? ''), a.fehlerWort!)
+    const korrekturPasst = a.loesungen.some((l) => gleich(l, String(w.korrektur ?? '')))
+    return { urteil: wortPasst && korrekturPasst ? 'richtig' : 'fast', richtig: soll }
   }
   if (a.art === 'fehler' && gewaehltesWort !== undefined && a.fehlerWort && !gleich(gewaehltesWort, a.fehlerWort)) return { urteil: 'falsch', richtig }
   const ant = normiert(antwort)
@@ -583,6 +671,8 @@ export function richtigFalschSaetze(aufgaben: GrammatikAufgabe[], zufall: () => 
       aus.push({ satz: a.satz, stimmt: false, aufgabeId: a.id })
       aus.push({ satz: a.satz.replace(a.fehlerWort, a.loesungen[0]), stimmt: true, aufgabeId: a.id })
     } else if (a.art === 'luecke' && a.satz.includes('___')) aus.push({ satz: eingesetzt(a.satz, a.loesungen[0]), stimmt: true, aufgabeId: a.id })
+    // Richtig/Falsch-Aufgaben (26.10.2026) passen unmittelbar ins Spiel
+    else if (a.art === 'richtigfalsch') aus.push({ satz: a.satz, stimmt: Boolean(a.korrekt), aufgabeId: a.id })
   }
   return aus
 }
@@ -643,5 +733,32 @@ export function regelBeispiele(p: GrammatikPaket): { satz: string; regelId: stri
   const aus = p.regeln.flatMap((r) => r.beispiele.map((b) => ({ satz: b, regelId: r.id })))
   for (const a of p.aufgaben)
     if ((a.art === 'luecke' || a.art === 'auswahl') && a.satz.includes('___')) aus.push({ satz: a.satz.replace('___', a.loesungen[0]), regelId: a.regelId })
+  return aus
+}
+
+/**
+ * Regeln, die vor einer Runde gezeigt werden (26.10.2026, Entscheidung der Lehrkraft: Regelkarte beim ersten Üben einer
+ * Form und nach Fehlern): je Regel der Runde, wenn noch KEINE Aufgabe dieser Regel geübt wurde (erstes Mal) oder die
+ * zuletzt beantwortete Aufgabe der Regel falsch war (nach einer falschen Antwort ist die Aufgabe sofort wieder fällig –
+ * `faellig` liegt dann nicht hinter `zuletzt`). Reihenfolge wie die Aufgaben der Runde.
+ */
+export function regelnVorab(
+  runde: Pick<GrammatikAufgabe, 'id' | 'regelId'>[],
+  alle: Pick<GrammatikAufgabe, 'id' | 'regelId'>[],
+  staende: Record<string, { versuche: number; zuletzt: number; faellig: number }>,
+  regeln: GrammatikRegel[]
+): GrammatikRegel[] {
+  const aus: GrammatikRegel[] = []
+  for (const regelId of [...new Set(runde.map((a) => a.regelId))]) {
+    const regel = regeln.find((r) => r.id === regelId)
+    if (!regel || aus.includes(regel)) continue
+    const geuebt = alle.filter((a) => a.regelId === regelId && (staende[a.id]?.versuche ?? 0) > 0)
+    if (!geuebt.length) {
+      aus.push(regel)
+      continue
+    }
+    const letzte = geuebt.map((a) => staende[a.id]).sort((x, y) => y.zuletzt - x.zuletzt)[0]
+    if (letzte.faellig <= letzte.zuletzt) aus.push(regel)
+  }
   return aus
 }

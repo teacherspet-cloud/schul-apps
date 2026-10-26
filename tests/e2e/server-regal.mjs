@@ -273,6 +273,7 @@ try {
   await p.screenshot({ path: join(out, '3b-ordner-grammatik.png') })
   // Übung als weitere Seite
   await p.locator('[data-grammatik-start]').click()
+  await p.locator('[data-regel-vorab-los]').click({ timeout: 2500 }).catch(() => undefined)
   pruefe((await umblaettern()) && (await da(p.locator('[data-ordner] [data-sitzung]'))) && (await tiefe()) === 2, 'Übung: noch eine Seite weiter (Ebene 2)')
   // Vollbild beim Lernen (09.10.2026): die Übung verdeckt den Ordner – „× Beenden" blättert zurück wie „Zurück"
   await p.locator((await p.locator('[data-fokus-beenden]').isVisible()) ? '[data-fokus-beenden]' : '[data-ordner-zurueck]').click()

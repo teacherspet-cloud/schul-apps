@@ -29,13 +29,17 @@ const zeilen = (s: string): string[] =>
 export function aufgabeVorschau(a: GrammatikAufgabe): { aufgabe: string; loesung: string } {
   const latein = lateinVorschau(a)
   if (latein) return latein
+  // Zuordnen und Richtig/Falsch (26.10.2026)
+  if (a.art === 'zuordnen')
+    return { aufgabe: (a.paare ?? []).map((p) => p.links).join(' / '), loesung: (a.paare ?? []).map((p) => `${p.links} → ${p.rechts}`).join(' | ') }
+  if (a.art === 'richtigfalsch') return { aufgabe: a.satz, loesung: a.korrekt ? 'richtig' : `falsch: ${a.fehlerWort ?? '?'} → ${a.loesungen.join(' | ')}` }
   return {
     aufgabe: `${a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz}${a.vorgabe ? ` ${a.vorgabe}` : ''}`,
     loesung: `${a.loesungen.join(' | ')}${a.art === 'fehler' && a.fehlerWort ? ` (statt „${a.fehlerWort}")` : ''}`
   }
 }
 
-const EINFACH = new Set(['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'mehrfach', 'uebersetzen'])
+const EINFACH = new Set(['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'mehrfach', 'uebersetzen', 'zuordnen', 'richtigfalsch'])
 
 function AufgabeFelder({ a, regeln, aendern }: { a: GrammatikAufgabe; regeln: GrammatikRegel[]; aendern: (a: GrammatikAufgabe) => void }): React.JSX.Element {
   const setze = (teil: Partial<GrammatikAufgabe>): void => aendern({ ...a, ...teil })
@@ -61,6 +65,22 @@ function AufgabeFelder({ a, regeln, aendern }: { a: GrammatikAufgabe; regeln: Gr
             const teile = alsListe(e.currentTarget.value, /\s*\/\s*/)
             setze({ teile, loesungen: [teile.join(' ')] })
           }}
+        />
+      ) : a.art === 'zuordnen' ? (
+        <Textarea
+          label="Paare, je Zeile „links = rechts“ (3–6, in richtiger Zuordnung)"
+          autosize
+          minRows={3}
+          value={(a.paare ?? []).map((p) => `${p.links} = ${p.rechts}`).join('\n')}
+          onChange={(e) => {
+            const paare = e.currentTarget.value
+              .split('\n')
+              .map((z) => z.split(/\s*=\s*/))
+              .filter((t) => t.length >= 2 && t[0].trim())
+              .map((t) => ({ links: t[0].trim(), rechts: t.slice(1).join(' = ').trim() }))
+            setze({ paare, loesungen: [paare.map((p) => `${p.links} ${p.rechts}`).join(' | ')] })
+          }}
+          data-feld-paare
         />
       ) : a.art !== 'mehrfach' ? (
         <Textarea
@@ -88,10 +108,21 @@ function AufgabeFelder({ a, regeln, aendern }: { a: GrammatikAufgabe; regeln: Gr
           onChange={(e) => setze({ optionen: alsListe(e.currentTarget.value) })}
         />
       )}
-      {a.art === 'fehler' && (
+      {a.art === 'richtigfalsch' && (
+        <SegmentedControl
+          data={[
+            { value: 'richtig', label: 'Der Satz ist richtig' },
+            { value: 'falsch', label: 'Der Satz hat einen Fehler' }
+          ]}
+          value={a.korrekt ? 'richtig' : 'falsch'}
+          onChange={(v) => setze(v === 'richtig' ? { korrekt: true, fehlerWort: undefined, loesungen: [a.satz] } : { korrekt: false })}
+          data-feld-korrekt
+        />
+      )}
+      {(a.art === 'fehler' || (a.art === 'richtigfalsch' && !a.korrekt)) && (
         <TextInput label="Falsches Wort (wie im Satz)" value={a.fehlerWort ?? ''} onChange={(e) => setze({ fehlerWort: e.currentTarget.value })} />
       )}
-      {a.art !== 'satzbau' && (
+      {a.art !== 'satzbau' && a.art !== 'zuordnen' && !(a.art === 'richtigfalsch' && a.korrekt) && (
         <TextInput
           label={a.art === 'mehrfach' ? 'Richtige Möglichkeiten (mit | getrennt)' : 'Richtige Lösung(en) (mit | getrennt)'}
           value={alsText(a.loesungen)}

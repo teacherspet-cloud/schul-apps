@@ -531,6 +531,66 @@
       "sea."
      ],
      "erklaerung": "Zeitangabe, Subjekt, Verb, Objekt."
+    },
+    {
+     "id": "z1",
+     "art": "zuordnen",
+     "regelId": "r2",
+     "anweisung": "Verbinde die Satzhälften.",
+     "satz": "",
+     "vorgabe": "",
+     "loesungen": [],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "paare": [
+      {
+       "links": "Yesterday we",
+       "rechts": "visited Berlin."
+      },
+      {
+       "links": "Last week she",
+       "rechts": "went home early."
+      },
+      {
+       "links": "In 2010 they",
+       "rechts": "played football every day."
+      }
+     ],
+     "korrekt": false,
+     "erklaerung": "Simple past mit Zeitangabe."
+    },
+    {
+     "id": "rf1",
+     "art": "richtigfalsch",
+     "regelId": "r1",
+     "anweisung": "Richtig oder falsch?",
+     "satz": "Last year we visited London.",
+     "vorgabe": "",
+     "loesungen": [],
+     "optionen": [],
+     "fehlerWort": "",
+     "teile": [],
+     "paare": [],
+     "korrekt": true,
+     "erklaerung": "Regelmäßiges Verb mit -ed."
+    },
+    {
+     "id": "rf2",
+     "art": "richtigfalsch",
+     "regelId": "r1",
+     "anweisung": "Richtig oder falsch?",
+     "satz": "Yesterday she goed to school.",
+     "vorgabe": "",
+     "loesungen": [
+      "went"
+     ],
+     "optionen": [],
+     "fehlerWort": "goed",
+     "teile": [],
+     "paare": [],
+     "korrekt": false,
+     "erklaerung": "go ist unregelmäßig: went."
     }
    ]
   },

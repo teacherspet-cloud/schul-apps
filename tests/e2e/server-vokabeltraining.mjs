@@ -86,6 +86,8 @@ try {
   await p.locator('[data-vokabeln-freigeben]').click()
   const lehrwerk = p.locator('[data-vokabel-buch]')
   await lehrwerk.waitFor({ timeout: 8000 })
+  // Die Lehrwerkliste kommt vom Server – unter Last (mehrere Tests parallel) erst nach einigen Sekunden freigeschaltet
+  await p.locator('[data-vokabel-buch]:not([disabled])').waitFor({ timeout: 30000 }).catch(() => undefined)
   if (await p.locator('[data-vokabel-fach]').count()) {
     await p.locator('[data-vokabel-fach]').click()
     await p.getByRole('option', { name: 'Englisch' }).click()

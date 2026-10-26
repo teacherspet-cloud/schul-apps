@@ -103,10 +103,11 @@ try {
   pruefe(await da(p.locator('[data-grammatik-entwurf]'), 40000), 'Entwurf erscheint in der Grammatik-Tabelle des Kurses')
   await p.locator('[data-grammatik-entwurf]').click()
   const anzahl = await p.locator('[data-entwurf-aufgabe]').count()
-  pruefe(anzahl === 29, `Pool geprüft: eine Aufgabe vom Prüfschritt gestrichen (${anzahl} von 30)`)
+  // 33 Aufgaben in der Attrappe (seit 26.10.2026 mit Zuordnen und Richtig/Falsch), eine streicht der Prüfschritt
+  pruefe(anzahl === 32, `Pool geprüft: eine Aufgabe vom Prüfschritt gestrichen (${anzahl} von 33)`)
   await p.screenshot({ path: join(out, '2-entwurf.png') })
   await p.locator('[data-entwurf-aufgabe]').first().getByRole('button', { name: 'Aufgabe streichen' }).click()
-  pruefe((await p.locator('[data-entwurf-aufgabe]').count()) === 28, 'Lehrkraft streicht eine Aufgabe')
+  pruefe((await p.locator('[data-entwurf-aufgabe]').count()) === 31, 'Lehrkraft streicht eine Aufgabe')
   await p.locator('[data-entwurf-freigeben]').click()
   await p.waitForTimeout(1500)
   const liste = (await (await lk.request.get(`${A}/server/grammatik`, { headers: KOPF })).json()).zuweisungen
@@ -115,7 +116,7 @@ try {
   await kursKaestenAuf(p)
   pruefe(await da(p.locator(`[data-grammatik-zeile="${zid}"]`)), 'Freigegeben und in der Grammatik-Tabelle')
   pruefe((await p.locator('[data-grammatik-entwurf]').count()) === 0, 'Entwurf danach weg')
-  pruefe(z?.vokId === kurs && z.aufgaben === 28, `Am Kurs, 28 Aufgaben (${z?.aufgaben})`)
+  pruefe(z?.vokId === kurs && z.aufgaben === 31, `Am Kurs, 31 Aufgaben (${z?.aufgaben})`)
 
   // ---------- Gast am Handy
   const g = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
@@ -134,6 +135,10 @@ try {
   const paket = (await (await g.request.get(`${A}/s/api/grammatik/liste?id=${zid}`)).json()).paket
   const nachSatz = (t) => paket.aufgaben.find((a) => a.satz && t.includes(a.satz.split('___')[0].trim()))
   await h.locator('[data-grammatik-start]').click()
+  await h
+    .locator('[data-regel-vorab-los]')
+    .click({ timeout: 2500 })
+    .catch(() => undefined)
   await h.locator('[data-sitzung]').waitFor()
   const arten = new Set()
   let falsch = false
@@ -171,6 +176,25 @@ try {
       const a = paket.aufgaben.find((x) => x.art === 'satzbau' && [...x.teile].sort().join('|') === [...teile].sort().join('|'))
       for (const t of a.teile) await h.locator(`[data-satzteil="${t}"]`).first().click()
       await h.locator('[data-pruefen]').click()
+    } else if (art === 'zuordnen') {
+      // Satzhälften zuordnen (26.10.2026): links antippen, dann die passende rechte Hälfte
+      const a = paket.aufgaben.find((x) => x.art === 'zuordnen')
+      for (const [k, p] of a.paare.entries()) {
+        await h.locator(`[data-zuordnen-links="${k}"]`).click()
+        await h.locator(`[data-zuordnen-rechts="${p.rechts}"]`).click()
+      }
+      pruefe((await h.locator('[data-zuordnen-paar]').count()) === a.paare.length, 'Zuordnen: alle Paare gebildet')
+      await h.locator('[data-pruefen]').click()
+    } else if (art === 'richtigfalsch') {
+      // Richtig oder falsch (26.10.2026): richtiger Satz → „Richtig"; falscher → Wort antippen und berichtigen
+      const a = paket.aufgaben.find((x) => x.art === 'richtigfalsch' && text.includes(x.satz))
+      if (a.korrekt) await h.locator('[data-rf="richtig"]').click()
+      else {
+        await h.locator('[data-rf="falsch"]').click()
+        await h.locator(`[data-fehlerwort="${a.fehlerWort}"]`).click()
+        await h.locator('[data-korrektur-eingabe]').fill(a.loesungen[0])
+        await h.locator('[data-pruefen]').click()
+      }
     }
     await h.locator('[data-weiter]').waitFor({ timeout: 8000 })
     if (art !== 'luecke' || i > 0) {
@@ -188,7 +212,18 @@ try {
     for (const a of paket.aufgaben)
       await g.request.post(`${A}/s/api/grammatik/antwort`, {
         headers: KOPF,
-        data: { id: zid, aufgabeId: a.id, antwort: a.loesungen[0], ...(a.art === 'fehler' ? { wort: a.fehlerWort } : {}) }
+        data: {
+          id: zid,
+          aufgabeId: a.id,
+          // Zuordnen und Richtig/Falsch (26.10.2026) antworten als JSON
+          antwort:
+            a.art === 'zuordnen'
+              ? JSON.stringify(a.paare.map((_, k) => k))
+              : a.art === 'richtigfalsch'
+              ? JSON.stringify(a.korrekt ? { richtig: true } : { richtig: false, wort: a.fehlerWort, korrektur: a.loesungen[0] })
+              : a.loesungen[0],
+          ...(a.art === 'fehler' ? { wort: a.fehlerWort } : {})
+        }
       })
   await h.goto(`${A}/s/g/${zid}`)
   pruefe(await da(h.locator('[data-grammatik-geschafft]')), 'Ration leer: „Für heute ist alles geübt"')

@@ -1,23 +1,23 @@
-import type { ComponentType } from 'react'
-import MeineKlassenModule from './meineklassen/MeineKlassenModule'
-import { SprachenlernenModule } from './lernen/VokabelTraining'
-import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
-import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
+import { lazy, type ComponentType } from 'react'
+const MeineKlassenModule = lazy(() => import('./meineklassen/MeineKlassenModule'))
+const SprachenlernenModule = lazy(() => import('./lernen/VokabelTraining').then((m) => ({ default: m.SprachenlernenModule })))
+const LaufendeReihenModule = lazy(() => import('./unterrichtsreihe/LaufendeReihenModule'))
+const FreigegebeneBlaetterModule = lazy(() => import('./freigaben/FreigegebeneBlaetterModule'))
 import { programmSymbol, type ProgrammIcon } from '../shared/components/ProgrammSymbol'
-import ArbeitsblattModule from './arbeitsblatt/ArbeitsblattModule'
-import GrammatiktestModule from './grammatiktest/GrammatiktestModule'
-import KlassenarbeitModule from './klassenarbeit/KlassenarbeitModule'
-import LernzielkontrolleModule from './lernzielkontrolle/LernzielkontrolleModule'
-import VokabellisteModule from './vokabelliste/VokabellisteModule'
-import VokabeltestModule from './vokabeltest/VokabeltestModule'
-import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
-import ElternbriefModule from './elternbrief/ElternbriefModule'
-import TafelbildModule from './tafelbild/TafelbildModule'
-import OnlinetestModule from './onlinetest/OnlinetestModule'
-import UnterrichtsreiheModule from './unterrichtsreihe/UnterrichtsreiheModule'
-import VerwaltungModule from './verwaltung/VerwaltungModule'
-import GrammatikformenModule from './grammatikformen/GrammatikformenModule'
-import SprechpruefungenModule from './sprechpruefungen/SprechpruefungenModule'
+const ArbeitsblattModule = lazy(() => import('./arbeitsblatt/ArbeitsblattModule'))
+const GrammatiktestModule = lazy(() => import('./grammatiktest/GrammatiktestModule'))
+const KlassenarbeitModule = lazy(() => import('./klassenarbeit/KlassenarbeitModule'))
+const LernzielkontrolleModule = lazy(() => import('./lernzielkontrolle/LernzielkontrolleModule'))
+const VokabellisteModule = lazy(() => import('./vokabelliste/VokabellisteModule'))
+const VokabeltestModule = lazy(() => import('./vokabeltest/VokabeltestModule'))
+const RueckmeldungModule = lazy(() => import('./rueckmeldung/RueckmeldungModule'))
+const ElternbriefModule = lazy(() => import('./elternbrief/ElternbriefModule'))
+const TafelbildModule = lazy(() => import('./tafelbild/TafelbildModule'))
+const OnlinetestModule = lazy(() => import('./onlinetest/OnlinetestModule'))
+const UnterrichtsreiheModule = lazy(() => import('./unterrichtsreihe/UnterrichtsreiheModule'))
+const VerwaltungModule = lazy(() => import('./verwaltung/VerwaltungModule'))
+const GrammatikformenModule = lazy(() => import('./grammatikformen/GrammatikformenModule'))
+const SprechpruefungenModule = lazy(() => import('./sprechpruefungen/SprechpruefungenModule'))
 import { siehtLehrwerkApps } from '../shared/fachobleute'
 import { aufServer, serverIch } from '../shared/plattform'
 import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'

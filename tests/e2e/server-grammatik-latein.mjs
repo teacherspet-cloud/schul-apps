@@ -103,6 +103,7 @@ try {
   await h.getByRole('button', { name: 'Mitlernen' }).click()
   await h.locator('[data-vokabeln-los]').click()
   await h.locator('[data-grammatik-start]').click()
+  await h.locator('[data-regel-vorab-los]').click({ timeout: 2500 }).catch(() => undefined)
   await h.locator('[data-sitzung]').waitFor()
   const paket = (await (await g.request.get(`${A}/s/api/grammatik/liste?id=${zid}`)).json()).paket
   const urteile = {}
