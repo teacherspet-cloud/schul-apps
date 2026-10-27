@@ -19,6 +19,9 @@ export default defineConfig({
       }
     },
     plugins: [react()],
+    // Namen der Bausteine behalten (27.10.2026): der Komponentenstapel eines Fehlerberichts (Fehlergrenze.tsx) nennt sonst
+    // nur verkürzte Namen – ohne sie ist ein Fehler aus dem Unterricht nicht zu finden
+    esbuild: { keepNames: true },
     // Oberfläche verkleinern (09.10.2026, Befund Ladezeiten): electron-vite lässt den Renderer sonst unverkleinert –
     // 20 MB statt ~8 MB, über die Leitung (Brotli) etwa 3,4 statt ~2 MB
     build: {

@@ -7,7 +7,7 @@
  *     (`import()`) schlägt fehl. → einmal von selbst neu laden (gesperrt gegen Schleifen).
  *  2. Ein Fehler beim Zeichnen riss ohne Fehlergrenze die ganze Oberfläche ab. → Hinweis mit „Neu laden" statt Leere.
  */
-import { Component, type ReactNode } from 'react'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 const SPERRE = 'schulapps-neu-geladen'
 
@@ -41,20 +41,46 @@ export function nachladeFehlerAbfangen(): void {
   })
 }
 
-export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: Error | null }> {
-  state = { fehler: null as Error | null }
+/**
+ * Fehlerbericht an den Server (27.10.2026, Befund „Blatt ansehen“ hing mit React-Fehler #185, Ursache nicht reproduzierbar):
+ * Meldung und Komponentenstapel landen in browser.log (Verwaltung › Diagnose) – ohne Namen, ohne Inhalte; die Seite zeigt
+ * beides zum Kopieren. Die Bausteinnamen bleiben im gebauten Programm erhalten (keepNames in electron.vite.config.ts).
+ */
+export function fehlerBerichten(art: string, meldung: string, ort: string): void {
+  try {
+    const daten = JSON.stringify({ art, seite: window.location.pathname, meldung: meldung.slice(0, 400), ort: ort.slice(0, 900) })
+    if (!navigator.sendBeacon?.('/s/api/fehlerbericht', new Blob([daten], { type: 'application/json' })))
+      void fetch('/s/api/fehlerbericht', { method: 'POST', body: daten, keepalive: true }).catch(() => undefined)
+  } catch {
+    /* Diagnose darf nichts stören */
+  }
+}
+
+/** Komponentenstapel von React kompakt: nur die Namen, von innen nach außen */
+export const stapelKurz = (stapel: string | null | undefined): string =>
+  (stapel ?? '')
+    .split('\n')
+    .map((z) => /\bat ([A-Za-z0-9_$]+)/.exec(z)?.[1] ?? '')
+    .filter(Boolean)
+    .join(' < ')
+
+export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: Error | null; stapel: string }> {
+  state = { fehler: null as Error | null, stapel: '' }
 
   static getDerivedStateFromError(fehler: Error): { fehler: Error } {
     return { fehler }
   }
 
-  componentDidCatch(fehler: Error): void {
-    console.error('Oberfläche abgefangen:', fehler)
+  componentDidCatch(fehler: Error, info: ErrorInfo): void {
+    console.error('Oberfläche abgefangen:', fehler, info.componentStack)
+    const stapel = stapelKurz(info.componentStack)
+    this.setState({ stapel })
     if (istNachladeFehler(fehler)) einmalNeuLaden()
+    else fehlerBerichten('oberflaeche', `${fehler.name}: ${fehler.message}`, stapel)
   }
 
   render(): ReactNode {
-    const { fehler } = this.state
+    const { fehler, stapel } = this.state
     if (!fehler) return this.props.children
     // Ohne Mantine-Abhängigkeit: auch dann sichtbar, wenn das Thema selbst nicht geladen ist
     return (
@@ -93,6 +119,11 @@ export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: E
             Neu laden
           </button>
           <p style={{ marginTop: 16, fontSize: 12, color: '#6b7c87', wordBreak: 'break-word' }}>{fehler.message}</p>
+          {stapel && (
+            <p style={{ marginTop: 8, fontSize: 11, color: '#56656f', wordBreak: 'break-word', textAlign: 'left' }} data-fehler-stapel>
+              Stelle: {stapel}
+            </p>
+          )}
         </div>
       </div>
     )

@@ -68,6 +68,9 @@ try {
   const dlg = p.getByRole('dialog', { name: 'Arbeitsblatt für Lernende freigeben' })
   await dlg.getByPlaceholder('wählen …').click()
   await p.getByRole('option', { name: KLASSE }).click()
+  // Wie die Freigabe der Lehrkraft (Befund): schrittweise mit Feedback je Aufgabe, Merkkasten am Ende
+  await dlg.locator('[data-blatt-schrittweise]').check()
+  await dlg.getByLabel('Merkkästen erst nach vollständiger Bearbeitung zeigen').check()
   await dlg.locator('[data-blatt-freigeben]').click()
   let fr = null
   for (let i = 0; i < 40 && !fr; i++) {
@@ -92,13 +95,94 @@ try {
   await s.locator('[data-blatt-oeffnen]').first().click()
   await s.locator('[data-feld]').first().waitFor({ timeout: 20000 })
   await s.waitForTimeout(800)
-  // Sehr langer Text: die Schreiblinien wachsen bis zur Obergrenze (60) mit – dort hing die Lehrkraft-Ansicht (27.10.2026)
-  const lang = Array.from({ length: 90 }, (_, i) => `Zeile ${i + 1}: Das ist ein ziemlich langer Satz, der die Schreiblinie füllt und umbricht.`).join('\n')
-  const feld = s.locator('textarea[data-feld], [data-feld] textarea').first()
-  pruefe((await feld.count()) > 0, 'Ein Schreibfeld ist da')
-  if (await feld.count()) await feld.fill(lang)
-  await s.waitForTimeout(3500)
-  pruefe(true, 'Mia hat das Blatt begonnen (langer Text)')
+  // Antwort mit dem Zitat der Attrappe („My first answer“) und viel Text, dann Feedback zu Aufgabe 1 und zweimal einreichen –
+  // so entstehen Markierungen, Randkommentare und Bögen wie beim Blatt der Lehrkraft (Befund 27.10.2026)
+  const lang = [
+    'My first answer.',
+    ...Array.from({ length: 7 }, (_, i) => `Zeile ${i + 1}: Das ist ein ziemlich langer Satz, der die Schreiblinie füllt und umbricht.`)
+  ].join('\n')
+  // Alle Felder füllen (jedes mit dem Zitat), zu jeder Aufgabe Feedback holen – erst dann lässt die schrittweise Freigabe einreichen
+  const felder = s.locator('textarea[data-feld], input[data-feld]')
+  pruefe((await felder.count()) > 0, `Schreibfelder: ${await felder.count()}`)
+  const aufgaben = await s.locator('[data-aufgabe-pruefen]').evaluateAll((e) => e.map((x) => Number(x.getAttribute('data-aufgabe-pruefen'))))
+  for (let nr = 1; nr <= Math.max(1, ...aufgaben, 6); nr++) {
+    const knopf = s.locator(`[data-aufgabe-pruefen="${nr}"]`)
+    // Schrittweise: die nächste Aufgabe erscheint erst nach dem Feedback zur vorigen
+    if (
+      !(await knopf.waitFor({ timeout: 8000 }).then(
+        () => true,
+        () => false
+      ))
+    )
+      continue
+    await s.waitForTimeout(1200)
+    const n = await felder.count()
+    for (let k = 0; k < n; k++) {
+      const f = felder.nth(k)
+      if (!(await f.isVisible().catch(() => false)) || !(await f.isEditable().catch(() => false))) continue
+      const art = await f.evaluate((e) => e.tagName)
+      if ((await f.inputValue()) === '') await f.fill(art === 'TEXTAREA' ? lang : 'My first answer')
+    }
+    await s.waitForTimeout(600)
+    await knopf.click()
+    await s.locator('[data-aufgabe-pruefen-los]').click()
+    const gelb = await s
+      .locator(`[data-ampel-nr="${nr}"][data-ampel="gelb"]`)
+      .waitFor({ timeout: 30000 })
+      .then(
+        () => true,
+        () => false
+      )
+    if (!gelb) {
+      const ampeln = await s.locator('[data-ampel-nr]').evaluateAll((e) => e.map((x) => `${x.getAttribute('data-ampel-nr')}:${x.getAttribute('data-ampel')}`))
+      const meldung = await s
+        .locator('.mantine-Alert-root, [role="alert"]')
+        .allInnerTexts()
+        .catch(() => [])
+      await s.screenshot({ path: join(out, `fehler-aufgabe-${nr}.png`) })
+      console.log(`     Ampeln: ${ampeln.join(' ')} | Meldungen: ${meldung.join(' / ').slice(0, 300)}`)
+    }
+    pruefe(gelb, `Feedback zu Aufgabe ${nr}`)
+    await s.keyboard.press('Escape').catch(() => undefined)
+    await s.waitForTimeout(800)
+  }
+  s.on('dialog', (d) => void d.accept())
+  // Antwort des Servers auf das Einreichen mitlesen (Fehlersuche)
+  s.on('response', (r) => {
+    if (/\/s\/api\/blatt\/(abgeben|abgabe)/.test(r.url()))
+      void r
+        .text()
+        .then((x) => console.log(`     Einreichen ${r.status()}: ${x.slice(0, 300)}`))
+        .catch(() => undefined)
+  })
+  for (let runde = 1; runde <= 2; runde++) {
+    const knopf = s.locator('[data-blatt-einreichen]')
+    pruefe((await knopf.count()) > 0, `Einreichen ${runde} möglich`)
+    if (!(await knopf.count())) break
+    await s.mouse.click(5, 5)
+    await s.waitForTimeout(400)
+    await knopf.click()
+    const bogen = await s
+      .locator('[data-blatt-bogen], [data-abgabe-ergebnis]')
+      .first()
+      .waitFor({ timeout: 90000 })
+      .then(
+        () => true,
+        () => false
+      )
+    if (!bogen) {
+      const meldung = await s
+        .locator('.mantine-Alert-root, [role="alert"], .mantine-Notification-root')
+        .allInnerTexts()
+        .catch(() => [])
+      await s.screenshot({ path: join(out, `fehler-einreichen-${runde}.png`), fullPage: true })
+      console.log(`     Meldungen: ${meldung.join(' / ').slice(0, 400)}`)
+    }
+    pruefe(bogen, `Einreichung ${runde}: Feedback-Bogen`)
+    await s.waitForTimeout(2000)
+    await s.keyboard.press('Escape').catch(() => undefined)
+  }
+  pruefe(true, 'Mia hat das Blatt bearbeitet (Feedback, Bögen)')
 
   // ---------- Lehrkraft: Freigabe öffnen, „Blatt ansehen“, dann abwarten
   await p.reload()

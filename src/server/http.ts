@@ -537,7 +537,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       const t = (x: unknown, n: number): string => protokollText(x, n)
       protokoll(
         'browser',
-        `${t(b.art, 20)} ${t(b.seite, 120)} | ${t(b.meldung, 400)} | ${t(b.ort, 300)} | ${sitzung?.nutzer.rolle ?? 'ohne'} | ${t(req.headers['user-agent'], 160)}`
+        `${t(b.art, 20)} ${t(b.seite, 120)} | ${t(b.meldung, 400)} | ${t(b.ort, 900)} | ${sitzung?.nutzer.rolle ?? 'ohne'} | ${t(req.headers['user-agent'], 160)}`
       )
       return void res.writeHead(204).end()
     }
