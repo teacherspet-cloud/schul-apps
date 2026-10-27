@@ -62,6 +62,7 @@ import { schulOrtVon } from './grammatik'
 import { setzeFachobmannQuelle, setzeRolleQuelle } from '../main/services/rolle'
 import { fachobleuteRoute, fachobmannFaecher } from './fachobleute'
 import { appFreigabenRoute } from './appFreigaben'
+import { schulbuecherRoute } from './schulbuecher'
 import { ladeLehrwerkGrammatik } from '../main/services/storage/lehrwerkGrammatik'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, fehlerKurz, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
@@ -329,6 +330,8 @@ async function main(): Promise<void> {
       // Fachobleute: Admin ernennt, Lehrkräfte lesen die eigenen Fächer (12.10.2026)
       fachobleuteRoute,
       appFreigabenRoute,
+      // Fächer und Schulbücher der Schule (27.10.2026, schulbuecher.ts): lesen alle Lehrkräfte, pflegen Admins und Fachobleute
+      schulbuecherRoute,
       // KI-Zugänge der Schule: Adressen, Verbindungstest, Nutzungsübersicht (09.10.2026, kiZugaenge.ts)
       kiZugaengeRoute,
       // Löschkonzept und Sicherung außerhalb des Servers (23.10.2026, loeschkonzept.ts)

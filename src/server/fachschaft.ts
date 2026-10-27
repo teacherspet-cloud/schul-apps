@@ -142,7 +142,7 @@ function sichtbarFuer(f: Freigabe, eigeneFaecher: string[]): boolean {
 
 
 /** Gespeicherte Fächer aus IServ je Lehrkraft (die Exe „Schul-Apps Online" liest die Gruppenordner) */
-const iservFaecher = (nutzerId: string): string[] => {
+export const iservFaecher = (nutzerId: string): string[] => {
   const z = db().prepare('SELECT faecher FROM fach_iserv WHERE nutzer_id = ?').get(nutzerId) as { faecher: string } | undefined
   try {
     return z ? (JSON.parse(z.faecher) as string[]) : []

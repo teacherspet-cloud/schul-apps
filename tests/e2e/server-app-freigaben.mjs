@@ -170,7 +170,8 @@ try {
   pruefe(!(await haken('tafelbild')) && (await haken('arbeitsblatt')), '… dort ist Tafelbild abgewählt, Arbeitsblatt angehakt')
   pruefe((await v.locator('[data-app-gruppe="erprobung"]').count()) === 1, '… und die Gruppe „Erprobung“ steht darunter')
   const reiter = await v.getByRole('tab').allTextContents()
-  pruefe(reiter.indexOf('App-Freigaben') === reiter.indexOf('Nutzer') + 1, `… rechts neben „Nutzer“ (${reiter.join(' | ')})`)
+  // Seit 27.10.2026 steht „Fächer" direkt neben „Nutzer", „App-Freigaben" danach
+  pruefe(reiter.indexOf('App-Freigaben') === reiter.indexOf('Nutzer') + 2 && reiter.indexOf('Fächer') === reiter.indexOf('Nutzer') + 1, `… nach „Nutzer“ und „Fächer“ (${reiter.join(' | ')})`)
   await v.screenshot({ path: join(out, 'admin-freigaben.png'), fullPage: true })
 
   // ---------- 5. „Ansicht zeigen“: neues Fenster mit der Sicht der Gruppe (Grundgruppe + Gruppe)

@@ -24,12 +24,20 @@
  *    Herkunft und behalten ihre Verbindung; fremde Seiten bekommen keinen Griff auf das Fenster.
  */
 
+import { BILD_HOSTS } from '@shared/schulbuecher'
+
 export const HSTS = 'max-age=31536000; includeSubDomains'
 
 export const PERMISSIONS_POLICY = 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), serial=(), hid=(), midi=(), display-capture=()'
 
 /** Bilddienste, deren Bilder die Oberfläche direkt (ohne Umweg über den Server) anzeigt */
-export const BILD_QUELLEN = ['https://api.openverse.org', 'https://upload.wikimedia.org', 'https://cdn.pixabay.com', 'https://assets.klett.de', 'https://static.cornelsen.de']
+export const BILD_QUELLEN = [
+  'https://api.openverse.org',
+  'https://upload.wikimedia.org',
+  'https://cdn.pixabay.com',
+  // Schulbuch-Cover der Verlage (27.10.2026, shared/schulbuecher.ts BILD_HOSTS – auch Klett und Cornelsen stehen dort)
+  ...BILD_HOSTS.map((h) => `https://${h}`)
+]
 
 export const APP_CSP = [
   "default-src 'self'",

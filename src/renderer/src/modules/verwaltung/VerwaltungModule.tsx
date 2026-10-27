@@ -13,6 +13,7 @@
  */
 import { DokumentSuche } from '../../shared/components/AppSuche'
 import { AppKopf } from '../../shared/components/AppKopf'
+import { Faecher } from './Faecher'
 import {
   ActionIcon,
   Alert,
@@ -128,6 +129,8 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           links={
             <Tabs.List style={{ borderBottom: 0 }}>
               <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
+              {/* Fächer der Schule mit Schulbüchern (27.10.2026, Faecher.tsx) – direkt neben „Nutzer" (Wunsch der Lehrkraft) */}
+              <Tabs.Tab value="faecher">Fächer</Tabs.Tab>
               {/* App-Freigaben für Gruppen von Lehrkräften (23.10.2026, AppFreigaben.tsx) */}
               <Tabs.Tab value="appfreigaben">App-Freigaben</Tabs.Tab>
               {/* Schul-Einrichtung des Servers (09.10.2026) */}
@@ -148,6 +151,9 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
           <>
             <Tabs.Panel value="nutzer">
               <Nutzer d={d} neu={laden} zuIserv={() => setReiter('iserv')} />
+            </Tabs.Panel>
+            <Tabs.Panel value="faecher">
+              <Faecher />
             </Tabs.Panel>
             <Tabs.Panel value="appfreigaben">
               <AppFreigaben />

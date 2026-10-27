@@ -34,6 +34,8 @@ import { PROBLEM_STUFE_NAME, PROBLEM_STUFEN } from '@shared/problemWoerter'
 import { operatorenAuswahl } from '@shared/operatoren/zugriff'
 import { fachVorgabenSpeichern, useFachVorgaben } from '../shared/fachvorgaben'
 import { LEHRWERK_GRAMMATIK } from '../shared/lehrwerkGrammatik'
+import { FachSchulbuecher, useSchulbuchKatalog } from '../shared/components/Schulbuecher'
+import { buchName, buecherDesFachs } from '@shared/schulbuecher'
 import { useAppSettings } from '../shared/settingsStore'
 import { senden } from '../modules/onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../shared/util'
@@ -58,7 +60,15 @@ export default function MeinFach(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fach, geladen])
   const [laeuft, setLaeuft] = useState(false)
-  const baende = useMemo(() => Object.keys(LEHRWERK_GRAMMATIK).sort((a, b) => a.localeCompare(b, 'de', { numeric: true })), [])
+  // Bände für das Curriculum (27.10.2026): die Schulbücher des Fachs aus dem Katalog, dazu die Bände mit Grammatik
+  const { katalog } = useSchulbuchKatalog()
+  const baende = useMemo(
+    () =>
+      [...new Set([...(fach && katalog ? buecherDesFachs(katalog.buecher, fach).map(buchName) : []), ...Object.keys(LEHRWERK_GRAMMATIK)])].sort((a, b) =>
+        a.localeCompare(b, 'de', { numeric: true })
+      ),
+    [fach, katalog]
+  )
   // Operatoren der amtlichen Liste des Landes (Vorschläge zum Weglassen)
   const amtlich = useMemo(() => {
     if (!fach) return []
@@ -109,6 +119,9 @@ export default function MeinFach(): React.JSX.Element {
           </Text>
         </Group>
       </Card>
+
+      {/* Schulbücher des Fachs (27.10.2026, shared/components/Schulbuecher.tsx) – Fachobleute pflegen hier, Admins auch in Schule & Daten › Fächer */}
+      {fach && <FachSchulbuecher fach={fach} />}
 
       <Card withBorder data-mein-fach-curriculum>
         <Title order={4}>Schulinternes Curriculum</Title>
