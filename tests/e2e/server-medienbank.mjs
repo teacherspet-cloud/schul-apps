@@ -52,7 +52,7 @@ async function lehrwerkOeffnen(p) {
   await p.locator('.app-leiste [aria-label="Vokabellisten"]').click()
   await p.waitForTimeout(1200)
   // Schulbuchreihen sind anfangs zugeklappt (Reihe aufklappen, dann die Bände)
-  // Die Niedersachsen-Reihe (21.10.2026: daneben steht der Platzhalter-Band „Green Line Transition (Ausgabe 2018)")
+  // Die Niedersachsen-Reihe
   const reihe = p.locator('.module-container:not([hidden]) [data-reihe*="Green Line · Niedersachsen"] button[aria-expanded="false"]').first()
   if (await reihe.isVisible().catch(() => false)) await reihe.click().catch(() => undefined)
   await p.waitForTimeout(400)

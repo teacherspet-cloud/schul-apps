@@ -232,18 +232,6 @@ export const LEHRWERK_THEMEN: Record<
       'Topic 4': { titel: 'Taking on responsibility' },
       'Topic 5': { titel: 'Living and working abroad', thema: 'Auslandsaufenthalt, Bewerbung, Lebenslauf' }
     }
-  },
-  // Ausgabe ab 2018 (21.10.2026): anderes Buch, Titel aus dem Inhaltsverzeichnis (Klett, 834260_IHV)
-  'Green Line Transition (Ausgabe 2018)': {
-    quelle: 'Klett, Inhaltsverzeichnis Green Line Transition Ausgabe ab 2018 (ISBN 978-3-12-834260-3)',
-    kapitel: {
-      'Topic 1': { titel: 'Free choice?' },
-      'Topic 2': { titel: 'The digital age' },
-      'Topic 3': { titel: 'Diversity in the UK and US' },
-      'Topic 4': { titel: 'Think globally, act locally' },
-      'Topic 5': { titel: 'Crossing borders' },
-      'Topic 6': { titel: 'South Africa' }
-    }
   }
 }
 

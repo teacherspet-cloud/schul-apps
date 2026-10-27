@@ -112,15 +112,12 @@ describe('Green Line Transition', () => {
     )
     expect(g).toEqual(Array.from({ length: 18 }, (_, i) => `G${i + 1}`))
   })
-  it('frühere Bände: Green Line 1–6, nicht die andere Transition-Ausgabe', () => {
+  it('frühere Bände: Green Line 1–6', () => {
     const baende = ['Green Line 1', 'Green Line 2', 'Green Line 3', 'Green Line 4', 'Green Line 5', 'Green Line 6']
     expect(fruehereBaendeDerReihe('Green Line Transition')).toEqual(baende)
-    expect(fruehereBaendeDerReihe('Green Line Transition (Ausgabe 2018)')).toEqual(baende)
   })
   it('Spaltsätze stehen im Band unter Topic 5, Abschnitt E', () => {
     expect(stelleImBand('Green Line Transition', ['en.focus.cleft'])).toEqual({ unit: 'Topic 5', station: 'E Shifting focus' })
-    expect(stelleImBand('green-line-transition-ausgabe-2018', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
-    expect(stelleImBand('Green Line Transition (Ausgabe 2018)', ['en.verb.gerund'])).toEqual({ unit: 'Topic 3', station: 'Spot on language' })
   })
   // Befund 26.10.2026 (10b): „Tense revision" steht im Katalog nur als Wiederholung – im Band des Kurses zählt sie,
   // im Katalog aller Bände zuletzt (vorher nie → „Weitere Grammatik")

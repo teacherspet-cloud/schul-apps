@@ -19,8 +19,9 @@
  * Topics zu, sondern Grammatikabschnitten A–E mit G1–G18 (Liste der Lehrkraft). Laut Klett-Stoffverteilungsplan
  * Niedersachsen 2024 gehört jeder Abschnitt zur „Spot on language"-Seite eines Topics (A → Topic 1 … E → Topic 5) –
  * abgestimmt: der Abschnitt steht als Station unter seinem Topic, so gelten Freigaben und „schon bekannt" wie bei den
- * anderen Bänden. Die Ausgabe ab 2018 (anderes Buch, Topic 1–6) nach ihrem Inhaltsverzeichnis (Klett, 834260_IHV):
- * Grammatik je Topic unter „Spot on language". Parallele Ausgaben eines Bands gelten füreinander nicht als früher.
+ * anderen Bänden. Parallele Ausgaben eines Bands (Ausgabe-Zusatz im Namen, z. B. „… (Ausgabe 2018)") gelten
+ * füreinander nicht als früher. Der mitgelieferte Platzhalter-Band „Green Line Transition (Ausgabe 2018)" wurde am
+ * 27.10.2026 auf Wunsch der Lehrkraft wieder entfernt (ein anderes Buch mit Topic 1–6, ohne Wortschatz).
  */
 
 export interface LehrwerkGrammatikPunkt {
@@ -399,41 +400,6 @@ export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
         P('G18 Cleft constructions', ['en.focus.cleft'])
       ]
     }
-  },
-  'Green Line Transition (Ausgabe 2018)': {
-    'Topic 1': { 'Spot on language': [P('Participle constructions', ['en.verb.participle'])] },
-    'Topic 2': {
-      'Spot on language': [
-        P('Infinitive constructions to vary your sentence structure', ['en.verb.infinitive']),
-        P('Using for or of after adjectives', ['en.verb.infinitive/it-for-sb']),
-        P('Infinitive and past participle after let, make and have', ['en.verb.make_let', 'en.verb.causative'])
-      ]
-    },
-    'Topic 3': { 'Spot on language': [P('Using gerunds', ['en.verb.gerund'])] },
-    'Topic 4': {
-      'Spot on language': [
-        P('Stative and dynamic verbs', ['en.verb.stative_dynamic']),
-        P('Simple present and present progressive with future meaning', ['en.verb.future_present']),
-        P('Future progressive and future perfect', ['en.verb.future_prog', 'en.verb.future_perfect']),
-        P('Making your point more forcefully', ['en.focus.emphasis'])
-      ]
-    },
-    'Topic 5': {
-      'Spot on language': [
-        P('Being polite', ['en.verb.modals_adv/would-hoeflich', 'en.syn.indirect_questions/hoefliche-frage']),
-        P('If-clauses', ['en.cond.type1', 'en.cond.type2', 'en.cond.type3'], true),
-        P('Expressing hopes and wishes', ['en.cond.wish']),
-        P('Giving suggestions or commands', ['en.syn.imperative', 'en.verb.had_better'])
-      ]
-    },
-    'Topic 6': {
-      'Spot on language': [
-        P('The passive to set the focus', ['en.verb.passive_basic', 'en.verb.passive_ext']),
-        P('If-clauses to express plausibility and unreality', ['en.cond.type2', 'en.cond.type3'], true),
-        P('Adjectives and adverbs to express yourself precisely', ['en.adv.formation/adjektiv-adverb', 'en.adj.perception']),
-        P('Adverbs of comment to express opinions and feelings', ['en.adv.sentence/kommentierend'])
-      ]
-    }
   }
 }
 
@@ -523,7 +489,7 @@ export function wendeGrammatikAn(eintraege: readonly LehrwerkGrammatikEintrag[])
   }
 }
 
-/** Band ohne Ausgabe-Zusatz („Green Line Transition (Ausgabe 2018)" → „Green Line Transition", 21.10.2026) */
+/** Band ohne Ausgabe-Zusatz („Green Line 3 (Ausgabe 2014)" → „Green Line 3", 21.10.2026) */
 export const ohneAusgabe = (band: string): string => band.replace(/\s*\([^)]*\)\s*$/, '').trim() || band
 
 /** Reihe eines Bands („Green Line 3", „Green Line Transition" → „Green Line") */
@@ -541,7 +507,7 @@ export function fruehereBaendeDerReihe(band: string): string[] {
   const baende = Object.keys(LEHRWERK_GRAMMATIK)
   const i = baende.indexOf(band)
   const reihe = reiheDesBands(band)
-  // Andere Ausgabe desselben Bands (Transition ab 2018 / ab 2024) ist kein früherer Band (21.10.2026)
+  // Andere Ausgabe desselben Bands (Ausgabe-Zusatz im Namen) ist kein früherer Band (21.10.2026)
   return baende.slice(0, Math.max(0, i)).filter((b) => reiheDesBands(b) === reihe && ohneAusgabe(b) !== ohneAusgabe(band))
 }
 
