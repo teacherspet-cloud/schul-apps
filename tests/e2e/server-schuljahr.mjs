@@ -193,6 +193,10 @@ try {
   pruefe(begriffe(tomListe) === 'dog', `Tom übt nur, was die neue Klasse freigegeben hat (${begriffe(tomListe)}) – cat ruht`)
   const dog = (tomListe.woerter ?? []).find((w) => w.term === 'dog')
   pruefe((tomListe.staende?.[dog?.id]?.fach ?? 0) > 0, 'Sein Stand für „dog" kam mit')
+  // Zusammen spielen im Sprachkasten (27.10.2026, Befund aller Klassen „Nicht für dich freigegeben"): der Kasten nennt den Kurs der Gruppenspiele
+  pruefe(tomListe.koopKurs === neuKurs.id, `Sprachkasten nennt den offenen Kurs für Kooperativ/Versus (${tomListe.koopKurs})`)
+  const angebot = await (await tomCtx.request.get(`${A}/s/api/spiel/angebot?bereich=vok&kurs=${tomListe.koopKurs}&stimme=1`, { headers: KOPF })).json()
+  pruefe(Array.isArray(angebot.spiele), `Gruppenspiele über diesen Kurs erreichbar (${angebot.fehler ?? angebot.spiele?.length + ' Spiele'})`)
   const tomKurse = await (await tomCtx.request.get(`${A}/s/api/vokabeln`, { headers: KOPF })).json()
   pruefe(!JSON.stringify(tomKurse).includes(einzeln.id), 'Einzel-Freigabe ruht (Tom sieht sie nicht)')
   const ed = await (await lk.request.get(`${A}/server/vokabeln/${einzeln.id}`, { headers: KOPF })).json()

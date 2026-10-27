@@ -373,6 +373,14 @@ interface Kasten {
   wsSchluessel: string
 }
 
+/** Kurs für Kooperativ/Versus (27.10.2026): der offene Kurs mit den meisten Wörtern im Kasten, sonst der häufigste */
+function koopKursVon(kasten: Kasten): string | null {
+  const zahl = new Map<string, number>()
+  for (const h of kasten.herkunft.values()) if (h.art === 'z') zahl.set(h.kurs, (zahl.get(h.kurs) ?? 0) + 1)
+  const ids = [...zahl.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)
+  return ids.find((id) => zeile(id)?.status === 'offen') ?? ids[0] ?? null
+}
+
 /** Herkunftstext eines Wortes aus einem früheren Band: „aus Green Line 1 · Unit 2" */
 const herkunftText = (buchName: string, unit: string): string => `aus ${[buchName, unit].filter(Boolean).join(' · ')}`
 
@@ -572,7 +580,10 @@ export function sprachstandRoute(): (k: Anfrage) => Promise<boolean> {
           spieleFrei: kasten.spieleFrei,
           tagesziel: kasten.tagesziel,
           klasse,
-          verben: standardVerben(kasten.woerter, sprache)
+          verben: standardVerben(kasten.woerter, sprache),
+          // Zusammen spielen (27.10.2026, Befund aller Klassen: „Co-op / Versus: Nicht für dich freigegeben“): Die Sprach-Kennung
+          // „sp:en“ ist kein Kurs – die Gruppenspiele laufen über den Kurs, aus dem die meisten Wörter des Kastens stammen
+          koopKurs: koopKursVon(kasten)
         }),
         true
       )

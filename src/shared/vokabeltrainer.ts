@@ -140,7 +140,29 @@ export type Uebung =
   /** Abkürzungen (09.10.2026): „YA" → Langform schreiben bzw. „young adults" → Abkürzung schreiben */
   | 'abkLang'
   | 'abkKurz'
-export const UEBUNGEN: Uebung[] = ['karte', 'auswahl', 'hoeren', 'buchstaben', 'frei', 'diktat', 'luecke', 'auswahlFs', 'paar', 'luecken', 'abkLang', 'abkKurz']
+  /** Fremdsprache → Deutsch (27.10.2026): das Wort steht da, die Bedeutung wird geschrieben */
+  | 'freiDe'
+export const UEBUNGEN: Uebung[] = [
+  'karte',
+  'auswahl',
+  'hoeren',
+  'buchstaben',
+  'frei',
+  'diktat',
+  'luecke',
+  'auswahlFs',
+  'paar',
+  'luecken',
+  'abkLang',
+  'abkKurz',
+  'freiDe'
+]
+/**
+ * Lernrichtung (27.10.2026, Wunsch der Lehrkraft, Einstellung der Lernenden): Deutsch → Fremdsprache (nur Übungen, in denen
+ * die Vokabel entsteht), Fremdsprache → Deutsch (erkennen, dann die Bedeutung schreiben) oder beide (die bisherige Mischung).
+ */
+export type Lernrichtung = 'defs' | 'fsde' | 'beide'
+export const LERNRICHTUNGEN: Lernrichtung[] = ['defs', 'fsde', 'beide']
 /** Erkennen (nicht selbst schreiben): bringt höchstens bis Fach 2 */
 export const ERKENNEN: Uebung[] = ['auswahl', 'hoeren', 'auswahlFs', 'paar']
 
@@ -162,10 +184,18 @@ export function abkUebungFuer(st: WortStand, v: Vokabel, zufall: number): Uebung
 }
 
 /** Welche Übung als Nächstes für dieses Wort (je nach Fach) – Erstkontakt mit Karte, dann steigend */
-export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random()): Uebung {
+export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random(), richtung: Lernrichtung = 'beide'): Uebung {
   if (st.fach === 0 && st.versuche === 0) return 'karte'
   const abk = abkUebungFuer(st, v, zufall2)
   if (abk) return abk
+  if (richtung === 'fsde') {
+    // Fremdsprache → Deutsch: erst erkennen (Auswahl, Hören, Paar), ab Fach 2 die Bedeutung schreiben
+    if (st.fach <= 1) return zufall < 0.4 ? 'auswahl' : zufall < 0.6 ? 'hoeren' : zufall < 0.8 ? 'paar' : 'freiDe'
+    if (st.fach === 2) return zufall < 0.3 ? 'auswahl' : 'freiDe'
+    return zufall > 0.85 ? 'hoeren' : 'freiDe'
+  }
+  // Deutsch → Fremdsprache: kein Erkennen der Bedeutung (Auswahl/Hören zeigen das fremde Wort und fragen Deutsch)
+  if (richtung === 'defs' && st.fach <= 1) return zufall < 0.3 ? 'paar' : zufall < 0.6 ? 'auswahlFs' : 'buchstaben'
   // Fach 0–1: erkennen in mehreren Formen, dazu Buchstaben legen
   if (st.fach <= 1) return zufall < 0.28 ? 'auswahl' : zufall < 0.46 ? 'paar' : zufall < 0.7 ? 'auswahlFs' : 'buchstaben'
   // Fach 2: Schreibweise festigen
@@ -182,13 +212,15 @@ export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zu
  * Neue Wörter bleiben beim ersten Kontakt Lernkarte; Fach 0–1 legt Buchstaben, Fach 2 schreibt (auch mit Lücken),
  * ab Fach 3 wie gewohnt (frei, Lückensatz, Diktat).
  */
-export function abrufUebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random()): Uebung {
+export function abrufUebungFuer(st: WortStand, v: Vokabel, zufall = Math.random(), zufall2 = Math.random(), richtung: Lernrichtung = 'beide'): Uebung {
   if (st.fach === 0 && st.versuche === 0) return 'karte'
   const abk = abkUebungFuer(st, v, zufall2)
   if (abk) return abk
+  // Fremdsprache → Deutsch (27.10.2026): die Bedeutung schreiben, ganz am Anfang auswählen
+  if (richtung === 'fsde') return st.fach <= 0 ? 'auswahl' : 'freiDe'
   if (st.fach <= 1) return 'buchstaben'
   if (st.fach === 2) return zufall < 0.35 ? 'luecken' : 'frei'
-  return uebungFuer(st, v, zufall, 0)
+  return uebungFuer(st, v, zufall, 0, richtung)
 }
 
 /**
@@ -469,7 +501,7 @@ export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antw
     return st
   }
   // richtig
-  if ((uebung === 'frei' || uebung === 'diktat' || uebung === 'luecke') && st.fach >= 2) st.frei = [...st.frei, jetzt].slice(-6)
+  if ((uebung === 'frei' || uebung === 'diktat' || uebung === 'luecke' || uebung === 'freiDe') && st.fach >= 2) st.frei = [...st.frei, jetzt].slice(-6)
   const ziel = erkennen ? Math.min(Math.max(st.fach, 0) + 1, 2) : Math.min(st.fach + 1, 6)
   const vorher = st.fach
   st.fach = Math.max(st.fach === 0 ? 1 : st.fach, ziel)

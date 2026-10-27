@@ -202,6 +202,7 @@ export function BlattFreigabeDialog({
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
   const [runden, setRunden] = useState(2)
   const [stift, setStift] = useState(true)
+  const [grossKlein, setGrossKlein] = useState(true)
   // Korrekturrand (05.10.2026): Vorgabe an – digital steht dort das KI-Feedback, gedruckt bleibt er leer
   const [korrekturrand, setKorrekturrand] = useState(true)
   // Lösungsblatt nach dem ersten Einreichen (03.10.2026, Idee aus LearningView)
@@ -269,6 +270,8 @@ export function BlattFreigabeDialog({
           runden,
           aufgabenRunden: 2,
           stift,
+          // Groß-/Kleinschreibung automatisch (27.10.2026): Vorgabe an, nur das Abschalten wird gespeichert
+          ...(grossKlein ? {} : { grossKlein: false }),
           ...(schrittweise ? { schrittweise: true } : {}),
           ...(merkAmEnde ? { merkAmEnde: true } : {}),
           // „Für dich" im Fachordner (12.10.2026) – der Server setzt es nur bei Einzel-Freigabe
@@ -367,6 +370,13 @@ export function BlattFreigabeDialog({
           label={feedback || aufgabenFeedback || schrittweise || merkAmEnde ? 'Stift erlauben (Handschriftliches geht als Bild an die KI)' : 'Stift erlauben'}
           checked={stift}
           onChange={(e) => setStift(e.currentTarget.checked)}
+        />
+        <Checkbox
+          label="Groß- und Kleinschreibung automatisch"
+          description="Satzanfänge in Textfeldern werden beim Tippen großgeschrieben, auf dem iPad hilft zusätzlich die Tastatur. In Onlinetests ist das immer aus."
+          checked={grossKlein}
+          onChange={(e) => setGrossKlein(e.currentTarget.checked)}
+          data-blatt-grossklein
         />
         <TextInput
           type="date"

@@ -669,6 +669,22 @@ export function SchuelerEinstellungen(): React.JSX.Element {
             {d.wochenziel} {d.wochenziel === 1 ? 'Übungstag' : 'Übungstage'} pro Woche – eine Woche Pause beendet deine Serie nicht.
           </Text>
         </Zeile>
+        <Zeile
+          titel="Lernrichtung im Vokabeltraining"
+          text="Deutsch → Fremdsprache: du schreibst die Vokabel. Fremdsprache → Deutsch: du schreibst die Bedeutung. Beide: abwechselnd. Auch im Karteikasten umstellbar."
+        >
+          <SegmentedControl
+            fullWidth
+            value={d.richtung ?? 'beide'}
+            onChange={(v) => aendern({ richtung: v as NonNullable<Darstellung['richtung']> })}
+            data={[
+              { value: 'defs', label: 'Deutsch → Fremdsprache' },
+              { value: 'fsde', label: 'Fremdsprache → Deutsch' },
+              { value: 'beide', label: 'Beide Richtungen' }
+            ]}
+            data-lernrichtung
+          />
+        </Zeile>
         <Switch
           checked={d.tipps}
           onChange={(e) => aendern({ tipps: e.currentTarget.checked })}

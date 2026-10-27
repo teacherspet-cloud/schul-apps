@@ -590,7 +590,14 @@ export function spielRoute(): (k: Anfrage) => Promise<boolean> {
     if (req.method === 'GET' && aktion === 'angebot') {
       const bereich: Bereich = url.searchParams.get('bereich') === 'gram' ? 'gram' : 'vok'
       const kurs = String(url.searchParams.get('kurs') ?? '')
-      if (!darf(bereich, kurs, ich)) return json(res, 404, { fehler: 'Nicht für dich freigegeben.' }), true
+      // Unterscheidbar (27.10.2026): keine Kurskennung (Sprachkasten, Band, Vokabelweg ohne Kurs) oder kein Zugang
+      if (!darf(bereich, kurs, ich))
+        return (
+          json(res, 404, {
+            fehler: bereich === 'vok' && !vokZeile(kurs) ? 'Zusammen spielen gibt es nur in einem Kurs der Lehrkraft.' : 'Nicht für dich freigegeben.'
+          }),
+          true
+        )
       const kopf = kursKopf(bereich, kurs, ich)
       const { inhalt } = inhaltFuer(bereich, kurs, undefined, [ich])
       const frei = spieleFrei(bereich, kurs, ich, jetzt)

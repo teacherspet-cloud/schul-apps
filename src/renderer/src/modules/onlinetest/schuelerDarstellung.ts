@@ -50,6 +50,8 @@ export interface Darstellung {
   /** Spiele mit Uhr (Blitzrunde, fallende Wörter …) */
   zeitdruck: boolean
   toene: boolean
+  /** Lernrichtung im Vokabeltraining (27.10.2026): Deutsch → Fremdsprache, Fremdsprache → Deutsch, beide; fehlt sie: beide */
+  richtung?: 'defs' | 'fsde' | 'beide'
   /** Spielauswahl: Bereich → aufgeklappt (08.10.2026); fehlt ein Bereich, gilt die Vorgabe */
   spielGruppen?: Record<string, boolean>
   /** „Lege das Wort": mit Buchstaben legen, tippen oder mit Finger/Stift schreiben (08.10.2026) */

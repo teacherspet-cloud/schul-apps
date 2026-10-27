@@ -1085,7 +1085,8 @@ function abkErgebnis(antwort: string, v: Vokabel, uebung: Uebung): { urteil: Urt
 
 /** Was eine Übung als Lösung erwartet */
 function loesungFuer(v: Vokabel, uebung: Uebung): string {
-  if (uebung === 'auswahl' || uebung === 'hoeren') return v.translation
+  // Fremdsprache → Deutsch (27.10.2026, Lernrichtung): die Bedeutung zählt, jede Angabe daraus
+  if (uebung === 'auswahl' || uebung === 'hoeren' || uebung === 'freiDe') return v.translation
   if (uebung === 'luecke' && v.example) return satzMitLuecke(v.example, v.term)?.loesung ?? v.term
   return v.term
 }

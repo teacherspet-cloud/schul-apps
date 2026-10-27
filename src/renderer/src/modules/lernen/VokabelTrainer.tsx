@@ -29,7 +29,8 @@ import { FokusRahmen } from './fokus/FokusRahmen'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
-import { tempoFaktor, ton } from '../onlinetest/schuelerDarstellung'
+import { fuerServer, tempoFaktor, ton, type Darstellung } from '../onlinetest/schuelerDarstellung'
+import { SPRACHNAMEN } from '@shared/faecher'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import {
   ActionIcon,
@@ -43,6 +44,7 @@ import {
   Modal,
   Popover,
   Progress,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
@@ -131,6 +133,8 @@ interface Liste {
   weg?: WegKurz
   /** Nur ein Abschnitt des Vokabelwegs (08.10.2026, Fenster aus dem Pfad) – geht bei jeder Antwort mit */
   abschnitt?: string
+  /** Vokabelweg (27.10.2026): Kurs, über den die Gruppenspiele (Kooperativ/Versus) laufen */
+  koopKurs?: string | null
 }
 
 const STIMME: Record<string, string> = {
@@ -734,6 +738,7 @@ function Kasten({
           </div>
         </>
       )}
+ {!spielt && !ohneKopf && d.sprache !== 'de' && <RichtungWahl sprache={d.sprache} />}
  {heute.length > 0 && !spielt && !ohneKopf && (
         <Button size="xl" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={22} />} onClick={() => starten(schritt)} data-vokabel-start>
           Jetzt üben · {schritt.length} {schritt.length === 1 ? 'Wort' : 'Wörter'}
@@ -787,6 +792,7 @@ function Kasten({
             rekorde={d.rekorde ?? {}}
             ansehen={d.ansehen ?? []}
             listeId={d.id}
+            koopKurs={d.koopKurs ?? null}
             aktualisieren={aktualisieren}
             spielt={setSpielt}
             verben={verbDaten}
@@ -852,7 +858,12 @@ function Sitzung({
    * desselben Worts (z. B. Lernkarte → Buchstaben legen). Die neue Übung stand schon gesperrt da, darunter
    * „Richtig". Deshalb wird die Übung nur beim Wechsel der Frage bestimmt.
    */
-  const uebung = useMemo<Uebung>(() => (v && st ? (abfragen ? abrufUebungFuer : uebungFuer)(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Lernrichtung (27.10.2026, Wunsch der Lehrkraft): Deutsch → Fremdsprache, Fremdsprache → Deutsch oder beide – gilt ab dem nächsten Wort
+  const richtung = useDarstellung((s) => s.d.richtung ?? 'beide')
+  const uebung = useMemo<Uebung>(
+    () => (v && st ? (abfragen ? abrufUebungFuer : uebungFuer)(st, v, Math.random(), Math.random(), richtung) : 'karte'),
+    [v?.id, frage, richtung] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const verbKarte = v ? d.verben?.karten.find((k) => k.schluessel.toLowerCase() === verbSchluesselVonWort(v.term)) : undefined
   // Fach VOR der Antwort (die Nachfrage gilt dem Stand des Wortes, nicht dem Ergebnis dieser Abfrage)
   const fachVorher = useMemo(() => st?.fach ?? 0, [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1661,6 +1672,8 @@ function Schreiben({
           ? 'Ergänze den Satz'
           : muster
           ? 'Ergänze die fehlenden Buchstaben'
+          : uebung === 'freiDe'
+          ? 'Was bedeutet das Wort? Schreib es auf Deutsch'
           : 'Schreib das Wort in der Fremdsprache'}
       </Text>
       {uebung === 'diktat' ? (
@@ -1701,8 +1714,8 @@ function Schreiben({
           {v.bild && <img src={v.bild} alt="" aria-hidden="true" style={{ width: 48, height: 48 }} />}
           {/* Bildnachweis als kleines ⓘ, ohne das gesuchte Wort (23.10.2026, Bildnachweise) */}
           {v.bild && <BildNachweis kompakt ecke={false} text={v.bildNachweis} loesung={[v.term, v.translation]} />}
-          <Text fw={800} size="1.8rem">
-            {v.translation}
+          <Text fw={800} size="1.8rem" data-schreiben-vorgabe={uebung === 'freiDe' ? 'fs' : 'de'}>
+            {uebung === 'freiDe' ? v.term : v.translation}
           </Text>
         </Group>
       )}
@@ -1723,10 +1736,10 @@ function Schreiben({
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={muster ? 'ganzes Wort' : abkUebung === 'abkLang' ? 'Langform' : abkUebung === 'abkKurz' ? 'Abkürzung' : '…'}
+          placeholder={muster ? 'ganzes Wort' : abkUebung === 'abkLang' ? 'Langform' : abkUebung === 'abkKurz' ? 'Abkürzung' : uebung === 'freiDe' ? 'auf Deutsch' : '…'}
           data-eingabe
         />
-        {AKZENTE[sprache] && (
+        {AKZENTE[sprache] && uebung !== 'freiDe' && (
           <Group gap={4} mt={6} justify="center">
             {AKZENTE[sprache].map((z) => (
               <Button key={z} size="compact-sm" variant="default" onClick={() => zeichen(z)} disabled={gesperrt}>
@@ -1749,3 +1762,37 @@ function Schreiben({
 }
 
 export { istSicher }
+
+/**
+ * Lernrichtung (27.10.2026, Wunsch der Lehrkraft): Deutsch → Fremdsprache (die Vokabel schreiben), Fremdsprache → Deutsch
+ * (die Bedeutung schreiben) oder beide Richtungen – jederzeit umstellbar, hier im Karteikasten und in den Einstellungen.
+ * Gilt für alle Kurse der Person; Lernkarte und Abkürzungen bleiben, wie sie sind.
+ */
+function RichtungWahl({ sprache }: { sprache: string }): React.JSX.Element {
+  const { d, setze } = useDarstellung()
+  const name = SPRACHNAMEN[sprache] ?? sprache.toUpperCase()
+  const wert = d.richtung ?? 'beide'
+  const waehle = (r: string): void => {
+    const neu: Darstellung = { ...d, richtung: r as NonNullable<Darstellung['richtung']> }
+    setze(neu)
+    if (window.__schulappsServer?.angemeldet) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
+  }
+  return (
+    <Group justify="center" gap="xs" wrap="wrap" data-lernrichtung={wert}>
+      <Text size="sm" c="dimmed">
+        Lernrichtung
+      </Text>
+      <SegmentedControl
+        size="xs"
+        radius="xl"
+        value={wert}
+        onChange={waehle}
+        data={[
+          { value: 'defs', label: `Deutsch → ${name}` },
+          { value: 'fsde', label: `${name} → Deutsch` },
+          { value: 'beide', label: 'Beide' }
+        ]}
+      />
+    </Group>
+  )
+}

@@ -220,7 +220,8 @@ export function Spielwahl({
   verben,
   nurVerben,
   vorDerRunde,
-  klasse
+  klasse,
+  koopKurs
 }: {
   woerter: Vokabel[]
   staende: Record<string, WortStand>
@@ -239,8 +240,13 @@ export function Spielwahl({
   vorDerRunde?: boolean
   /** Klasse der Lernenden (Tempo der Spiele) */
   klasse?: number | null
+  /** Vokabelweg (27.10.2026): Kurs, über den Kooperativ/Versus laufen – der Weg selbst ist kein Kurs */
+  koopKurs?: string | null
 }): React.JSX.Element {
   const farbe = useVtFarbe()
+  // Gruppenspiele brauchen einen Kurs (27.10.2026, Befund aller Klassen: „Nicht für dich freigegeben“): Sprachkasten „sp:en“,
+  // früherer Band „bd:…“ und Vokabelweg „lb:…“ sind keine Kurse – dort gilt der vom Server mitgegebene Kurs der Person
+  const mehrKurs = /^[a-z]{2}:/.test(listeId) ? (koopKurs ?? '') : listeId
   // Einstellungen der Lernenden: Spiele an/aus, Zeitdruck an/aus
   const { d: wahl, setze: setzeWahl } = useDarstellung()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
@@ -513,7 +519,7 @@ export function Spielwahl({
         </Text>
       </div>
       {/* Einladungscode für Kooperativ/Versus ganz oben (09.10.2026, Wunsch der Lehrkraft) */}
-      {!nurVerben && !listeId.startsWith('lb:') && <EinladungsCode sprache={sprache} />}
+      {!nurVerben && mehrKurs && <EinladungsCode sprache={sprache} />}
       {/* Nochmal ansehen (08.10.2026, Befund im Unterricht: lange Liste, schwer verständlich) – nur auf Nachfrage */}
       {ansehen.length > 0 && <NochmalAnsehen ids={ansehen} woerter={woerter} />}
       {GRUPPEN.map((g) => {
@@ -559,8 +565,8 @@ export function Spielwahl({
           </div>
         )
       })}
-      {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) – nicht im Vokabelweg und nicht bei den reinen Verbspielen */}
-      {!nurVerben && !listeId.startsWith('lb:') && <ZusammenSpielen bereich="vok" kurs={listeId} sprache={sprache} mitCode={false} />}
+      {/* Zusammen spielen: Kooperativ und Versus (08.10.2026) – nicht bei den reinen Verbspielen; im Vokabelweg über den Kurs der Person (27.10.2026) */}
+      {!nurVerben && mehrKurs && <ZusammenSpielen bereich="vok" kurs={mehrKurs} sprache={sprache} mitCode={false} />}
     </Stack>
   )
 }

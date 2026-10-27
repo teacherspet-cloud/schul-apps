@@ -36,6 +36,8 @@ export function darstellungPruefen(
     tipps: k0.tipps !== false,
     spiele: k0.spiele !== false,
     zeitdruck: k0.zeitdruck !== false,
+    // Lernrichtung im Vokabeltraining (27.10.2026)
+    richtung: wahl(k0.richtung, ['defs', 'fsde', 'beide'], 'beide'),
     toene: k0.toene !== false,
     // Neue Vorgaben vom 08.10.2026 (Töne an, männliche Stimme) schon übernommen – sonst würden sie die eigene Wahl überschreiben
     vorgabe0810: k0.vorgabe0810 === true,

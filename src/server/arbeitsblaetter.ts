@@ -175,6 +175,8 @@ export interface BlattEinstellungen {
   aufgabenRunden: number
   /** Stift erlaubt */
   stift: boolean
+  /** Groß- und Kleinschreibung in Textfeldern automatisch (Satzanfänge, 27.10.2026) – fehlt es: an; false = von der Lehrkraft abgeschaltet */
+  grossKlein?: boolean
   /** Zielsprache des Blattes (Fremdsprachen) – für die Ansprache im Feedback */
   sprache?: string
   /** Aufgaben schrittweise freischalten: die nächste erst, wenn die vorige mindestens „teilweise" ist (05.10.2026) */
@@ -703,6 +705,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               aufgabenFeedback: e.aufgabenFeedback,
               aufgabenRunden: e.aufgabenRunden,
               stift: e.stift,
+              ...(e.grossKlein === false ? { grossKlein: false } : {}),
               ...(e.schrittweise ? { schrittweise: true } : {}),
               ...(e.merkAmEnde ? { merkAmEnde: true } : {})
             },
@@ -1080,6 +1083,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         runden: Math.max(1, Math.min(5, Math.round(Number(e0.runden) || 2))),
         aufgabenRunden: Math.max(1, Math.min(5, Math.round(Number(e0.aufgabenRunden) || 2))),
         stift: e0.stift !== false,
+        ...(e0.grossKlein === false ? { grossKlein: false } : {}),
         ...(typeof e0.sprache === 'string' ? { sprache: e0.sprache.slice(0, 8) } : {}),
         ...(e0.schrittweise === true ? { schrittweise: true } : {}),
         ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {}),

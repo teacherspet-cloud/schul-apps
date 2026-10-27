@@ -9,6 +9,7 @@
  * Das Blatt steht in einem iframe ohne Skripte (sandbox, nur same-origin zum Messen); darüber
  * liegen die Eingabefelder, beides gemeinsam auf die Breite des Geräts skaliert.
  */
+import { grossAmSatzanfang } from '@shared/grossKlein'
 import type { Stil } from './objektOptionen'
 import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
 import {
@@ -131,6 +132,8 @@ export interface BlattDaten {
     aufgabenFeedback: boolean
     aufgabenRunden: number
     stift: boolean
+    /** Groß-/Kleinschreibung automatisch (27.10.2026); fehlt es: an */
+    grossKlein?: boolean
     /** Aufgaben schrittweise freischalten (05.10.2026) */
     schrittweise?: boolean
     /** Merkkästen erst nach vollständiger Bearbeitung */
@@ -899,6 +902,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * Lehrkraft den Stift nicht freigegeben hat (dann ohne Textmarker).
    */
   const werkzeugeDa = d.einstellungen.stift || alleAufgaben.some((a) => a.zeichnen)
+  // Groß-/Kleinschreibung automatisch (27.10.2026, Wunsch der Lehrkraft): Vorgabe an, je Freigabe abschaltbar; Onlinetests haben eigene Felder (HandFeld, immer aus)
+  const grossKlein = d.einstellungen.grossKlein !== false
   useEffect(() => {
     if (!schreibbar || !werkzeugeDa) return
     return stiftAutomatikEinrichten({
@@ -1141,6 +1146,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             />
             {gemessen && (
               <Ebene
+                grossKlein={grossKlein}
                 breite={dokBreite}
                 felder={felderSichtbar}
                 ampeln={ampeln}
@@ -1217,6 +1223,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
 
       {ansicht === 'liste' && gemessen && (
         <Liste
+          grossKlein={grossKlein}
           felder={felderSichtbar}
           aufgaben={aufgaben}
           antworten={antworten}
@@ -1375,6 +1382,8 @@ function Ebene(p: {
   antworten: Record<string, string>
   setze: (f: string, w: string) => void
   gesperrt: boolean
+  /** Satzanfänge beim Tippen großschreiben (27.10.2026) */
+  grossKlein?: boolean
   werkzeug: Werkzeug
   stiftFarbe: string
   markerFarbe: string
@@ -1514,10 +1523,10 @@ function Ebene(p: {
               key={f.id}
               value={wert}
               disabled={p.gesperrt}
-              onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+              onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
               autoComplete="off"
               autoCorrect="off"
-              autoCapitalize="none"
+              autoCapitalize={p.grossKlein ? 'sentences' : 'none'}
               spellCheck={false}
               style={{ ...eingabeStil, ...(treffer.length ? { background: 'transparent' } : {}) }}
               data-feld={f.id}
@@ -1554,10 +1563,10 @@ function Ebene(p: {
             }}
             value={wert}
             disabled={p.gesperrt}
-            onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+            onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
             autoComplete="off"
             autoCorrect="off"
-            autoCapitalize="none"
+            autoCapitalize={p.grossKlein ? 'sentences' : 'none'}
             spellCheck={false}
             style={{ ...flaechenStil, ...(treffer.length ? { background: 'transparent' } : {}) }}
             data-feld={f.id}
@@ -1729,6 +1738,8 @@ function Liste(p: {
   antworten: Record<string, string>
   setze: (f: string, w: string) => void
   gesperrt: boolean
+  /** Satzanfänge beim Tippen großschreiben (27.10.2026) */
+  grossKlein?: boolean
   pruefen?: (nr: number) => Promise<void>
   /** ✓/✗ der letzten Einreichung je Feld (08.10.2026) */
   marken?: Record<string, FeldMarke>
@@ -1837,7 +1848,7 @@ function Liste(p: {
                       label={`${i + 1}`}
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
-                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
                       data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
@@ -1851,7 +1862,7 @@ function Liste(p: {
                       label={f.text ? `${i + 1}. ${f.text}` : `${i + 1}`}
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
-                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
                       data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
@@ -1868,11 +1879,11 @@ function Liste(p: {
                       }
                       value={p.antworten[f.id] ?? ''}
                       disabled={p.gesperrt}
-                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
                       data-listen-feld={f.id}
                       autoComplete="off"
                       autoCorrect="off"
-                      autoCapitalize="none"
+                      autoCapitalize={p.grossKlein ? 'sentences' : 'none'}
                       spellCheck={false}
                     />
                   )
@@ -1895,6 +1906,24 @@ function Liste(p: {
 const MARKE_TEXT: Record<FeldMarke['m'], string> = { r: 'richtig', f: 'falsch', fehlt: 'Hier wäre richtig gewesen' }
 
 /** ✓ (grün), ✗ (rot) bzw. Hinweis auf das Fehlende (orange) an einem geprüften Feld (08.10.2026) */
+/**
+ * Wert eines Textfelds nach dem Tippen (27.10.2026): mit Groß-/Kleinschreibung automatisch wird ein eben getippter Kleinbuchstabe
+ * am Satzanfang groß (shared/grossKlein.ts); der Wert wird direkt im Feld gesetzt, damit die Schreibmarke stehen bleibt.
+ */
+function eingabeWert(el: HTMLInputElement | HTMLTextAreaElement, grossKlein?: boolean): string {
+  if (!grossKlein) return el.value
+  const pos = el.selectionStart ?? el.value.length
+  const neu = grossAmSatzanfang(el.value, pos)
+  if (neu === null) return el.value
+  el.value = neu
+  try {
+    el.setSelectionRange(pos, pos)
+  } catch {
+    /* Feldart ohne Auswahl */
+  }
+  return neu
+}
+
 function PruefZeichen({ marke, stil, feld }: { marke: FeldMarke['m']; stil?: React.CSSProperties; feld: string }): React.JSX.Element {
   const farbe = marke === 'r' ? '#2f9e44' : marke === 'f' ? '#e03131' : '#f08c00'
   return (

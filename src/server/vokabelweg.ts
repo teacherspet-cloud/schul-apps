@@ -297,6 +297,9 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
           rekorde: ws.rekorde ?? {},
           ansehen: ws.ansehen ?? [],
           weg: leiterKurz(w),
+          // Zusammen spielen im Vokabelweg (27.10.2026, Befund: Lernende mit Schülerkonto üben im Vokabelweg und sahen dort
+          // keine Koop-/Versus-Spiele): die Gruppenspiele laufen über einen offenen Kurs der Person aus diesem Weg
+          koopKurs: w.zuweisungen.find((z) => z.status === 'offen' && z.lerngruppe_id)?.id ?? w.zuweisungen.find((z) => z.status === 'offen')?.id ?? null,
           ...(abschnitt ? { abschnitt } : {}),
           // Spiele heute frei, wenn eine Freigabe dieses Wegs sie freigeschaltet hat (08.10.2026)
           spieleFrei: w.zuweisungen.some((z) => istOffen(z) && spieleHeuteFrei(z)),
