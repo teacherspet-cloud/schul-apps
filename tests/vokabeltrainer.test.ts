@@ -50,10 +50,10 @@ describe('Vokabeltrainer', () => {
     const s = nachAbfrage({ ...neuerStand(), fach: 3 }, 'frei', 'richtig', '', t0, t0 + 10 * TAG)
     expect(s.faellig).toBe(t0 + 8 * TAG)
   })
-  it('Sitzung: Fälliges zuerst, dann neue Wörter; Übersicht', () => {
+  it('Sitzung: neue Wörter zuerst (27.10.2026), dann Fälliges; Übersicht', () => {
     const liste: Vokabel[] = ['a', 'b', 'c'].map((id) => ({ id, term: id, translation: id }))
     const st = { a: { ...neuerStand(), fach: 2, faellig: 0 }, b: { ...neuerStand(), fach: 3, faellig: Date.now() + TAG } }
-    expect(sitzungsWoerter(liste, st).map((v) => v.id)).toEqual(['a', 'c'])
+    expect(sitzungsWoerter(liste, st).map((v) => v.id)).toEqual(['c', 'a'])
     const u = uebersicht(liste, st)
     expect(u.neu).toBe(1)
     expect(u.faellig).toBe(1)

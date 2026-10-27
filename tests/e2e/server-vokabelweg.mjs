@@ -200,7 +200,12 @@ try {
   pruefe(nOrdner === sTom.heute.anzahl, `Knopf „Heute üben · ${nOrdner} Wörter" = Server (${sTom.heute.anzahl})`)
   await p.locator('[data-heute-ueben]').first().click()
   pruefe(await da(p.locator('[data-sitzung]')), 'Heute üben startet die Runde gleich')
-  pruefe(await da(p.locator('[data-herkunft="aus Green Line 5 · Unit 1"], [data-herkunft="aus Green Line 5 · Across cultures 1"]'), 5000), 'Wort aus einem früheren Band trägt seine Herkunft')
+  // Neue Wörter zuerst (27.10.2026): die Wiederholungen aus dem früheren Band kommen nach den neuen Wörtern (bei vollem Tagesziel
+  // als „extra" bzw. morgen) – geprüft wird der Kasten: die Wörter des früheren Bands stehen mit ihrer Herkunft darin
+  const kastenTom = await (await tom.request.get(`${A}/s/api/vokabeln/liste?id=sp:en`, { headers: KOPF })).json()
+  const mitHerkunft = (kastenTom.woerter ?? []).filter((w) => /^aus Green Line 5 · (Unit 1|Across cultures 1)$/.test(w.herkunft ?? ''))
+  pruefe(mitHerkunft.length > 0, `Wörter aus einem früheren Band tragen ihre Herkunft im Kasten (${mitHerkunft.length})`)
+  pruefe((kastenTom.woerter ?? []).findIndex((w) => w.herkunft) > 0, 'Sie stehen hinter den neuen Wörtern des aktuellen Bands')
   await p.screenshot({ path: join(out, 'tom-runde-herkunft.png') })
   await beenden(p)
   // Ruhiges Angebot im früheren Band (seit 12.10.2026 unter „Meine Bücher")

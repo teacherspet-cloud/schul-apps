@@ -34,6 +34,7 @@ import {
   summe,
   testPause,
   zahlenAus,
+  WEITERE_KEY,
   abschnittSchluessel,
   abschnitteDesTeils,
   freieAbschnitte,
@@ -299,6 +300,31 @@ const ansicht = (b: BuchMeta, klasse: number | null, schuljahr: number | null, z
   zahlen
 })
 
+/** Suchformen aller Wörter des Buchs (alle Abschnitte) */
+const buchSuchformen = (buch: BuchMeta): Set<string> => new Set(abschnitteAus(buch).flatMap((x) => x.woerter.map((v) => suchform(v.term))))
+
+/** Kurswörter dieses Schuljahrs aus offenen Kursen, die in keinem Abschnitt des Buchs stehen (27.10.2026, Ring „Weitere“) */
+function ohneAbschnitt(a: SprachAnalyse, buch: BuchMeta): KursWort[] {
+  const imBuch = buchSuchformen(buch)
+  return a.kurse.filter((k) => k.offen).flatMap((k) => k.woerter).filter((w) => w.jahr >= a.schuljahr && !imBuch.has(suchform(w.v.term)))
+}
+
+/**
+ * Abschnitt antippen (27.10.2026, abgestimmt): Welche Kastenwörter gehören zum Buchabschnitt `key`? Zuordnung über die
+ * Suchform des Begriffs (wie der Stand je Abschnitt); „weitere“ = Wörter ohne Abschnitt. Unbekannter Schlüssel: null.
+ */
+function abschnittFilter(buch: BuchMeta | null, key: string): ((v: Vokabel) => boolean) | null {
+  if (!buch) return null
+  if (key === WEITERE_KEY) {
+    const imBuch = buchSuchformen(buch)
+    return (v) => !imBuch.has(suchform(v.term))
+  }
+  const x = abschnitteAus(buch).find((x) => x.key === key)
+  if (!x) return null
+  const terme = new Set(x.woerter.map((v) => suchform(v.term)))
+  return (v) => terme.has(suchform(v.term))
+}
+
 async function sprachStandAus(a: SprachAnalyse, jetzt: number): Promise<SprachStand> {
   let aktuell: AktuellerBand | null = null
   const reiheWeg = new Map<string, Record<string, WortStand>>()
@@ -319,13 +345,17 @@ async function sprachStandAus(a: SprachAnalyse, jetzt: number): Promise<SprachSt
       )
       const alleUnits = [...new Set(abschnitteAus(buch).map((x) => x.unit))]
       const letzte = units[units.length - 1]?.unit ?? ''
+      // „Weitere" (27.10.2026): Kurswörter dieses Schuljahrs, die in keinem Abschnitt des Buchs stehen (von Hand nachgetragen)
+      const weitereWoerter = ohneAbschnitt(a, buch)
+      const weitere = weitereWoerter.length ? { key: WEITERE_KEY, name: 'Weitere', zahlen: zahlenAus(weitereWoerter.map((w) => wortStatus(w.st))) } : null
       aktuell = {
         ...ansicht(buch, a.aktuell.klasse, a.aktuell.schuljahr, summe(units.map((u) => u.zahlen))),
         units,
         abschnitte: abschnitte.length,
         abschnitteKennen: units.reduce((n, u) => n + u.abschnitte.filter((x) => abschnittKennen(x.zahlen)).length, 0),
         aktuelleUnit: letzte,
-        weitereUnits: Math.max(0, alleUnits.length - 1 - alleUnits.indexOf(letzte))
+        weitereUnits: Math.max(0, alleUnits.length - 1 - alleUnits.indexOf(letzte)),
+        ...(weitere ? { weitere } : {})
       }
     }
   }
@@ -561,6 +591,13 @@ export function sprachstandRoute(): (k: Anfrage) => Promise<boolean> {
       }
     }
     if (!a || !kasten) return (json(res, 404, { fehler: 'Diese Vokabeln gibt es (noch) nicht für dich.' }), true)
+    // Abschnitt antippen (27.10.2026): nur die Wörter dieses Buchabschnitts – derselbe Stand, dieselbe Antwort-Route
+    const abschnitt = req.method === 'GET' && id.startsWith('sp:') ? String(url.searchParams.get('abschnitt') ?? '') : ''
+    if (abschnitt) {
+      const filter = abschnittFilter(a.aktuell ? await bandLaden(a, a.aktuell.id) : null, abschnitt)
+      if (!filter) return (json(res, 404, { fehler: 'Diesen Abschnitt gibt es nicht.' }), true)
+      kasten = { ...kasten, woerter: kasten.woerter.filter(filter) }
+    }
     const ws: VokStand = wegStand(ich.id, kasten.wsSchluessel)
     const sprache = a.sprache
     const klasse = a.jahrgang
@@ -581,6 +618,7 @@ export function sprachstandRoute(): (k: Anfrage) => Promise<boolean> {
           tagesziel: kasten.tagesziel,
           klasse,
           verben: standardVerben(kasten.woerter, sprache),
+          ...(abschnitt ? { abschnitt } : {}),
           // Zusammen spielen (27.10.2026, Befund aller Klassen: „Co-op / Versus: Nicht für dich freigegeben“): Die Sprach-Kennung
           // „sp:en“ ist kein Kurs – die Gruppenspiele laufen über den Kurs, aus dem die meisten Wörter des Kastens stammen
           koopKurs: koopKursVon(kasten)

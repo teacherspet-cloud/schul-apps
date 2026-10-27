@@ -15,11 +15,11 @@ import { Button, Group, Loader, SegmentedControl, Stack, Text } from '@mantine/c
 import { IconCheck, IconPlayerPlay } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { kursReiterNamen } from '@shared/ohneKlasse'
-import { type AktuellerBand, type BandMedaille, type FruehererBand, type SprachStand, type StandZahlen } from '@shared/sprachstand'
+import { WEITERE_KEY, type AktuellerBand, type BandMedaille, type FruehererBand, type SprachStand, type StandZahlen } from '@shared/sprachstand'
 import { holen } from '../../onlinetest/serverApi'
 import { useAuffrischen } from '../../../shared/auffrischen'
 import { BandCover } from '../../../shared/components/BandCover'
-import VokabelTrainer from '../VokabelTrainer'
+import VokabelTrainer, { StationFenster } from '../VokabelTrainer'
 import { BUECHER_DEUTSCH, type BuecherTexte } from './buecherTexte'
 import type { FachOrdner } from './regalDaten'
 
@@ -54,6 +54,9 @@ html[data-touch] .sk-unit { min-height: 44px; padding: 4px 14px; }
 .sk-abschnitte { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 2px; min-width: 0; }
 .sk-abschnitt-balken { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .sk-abschnitt { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; text-align: center; }
+button.sk-abschnitt { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 10px; }
+button.sk-abschnitt:hover, button.sk-abschnitt:focus-visible { background: rgba(127,127,127,.12); outline: none; }
+.sk-abschnitt[data-abschnitt='weitere'] { opacity: .85; }
 .sk-ring { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; }
 .sk-ring > span { width: 20px; height: 20px; border-radius: 50%; background: var(--og-karte, var(--mantine-color-body)); display: grid; place-items: center; }
 .sk-abschnitt-name { font-size: .66rem; line-height: 1.15; opacity: .8; overflow-wrap: anywhere; }
@@ -135,7 +138,10 @@ const unitFertig = (u: UnitStandT): boolean => u.abschnitte.length > 0 && u.absc
  * Bildschirm). Die Units stehen in einem waagerecht rollbaren Streifen (Einrasten, weiche Ränder, die aktuelle Unit
  * ist sichtbar); Antippen zeigt die Abschnitte dieser Unit. Bis 8 Abschnitte als Ringe, mehr als Balken „5 von 12".
  */
-function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): React.JSX.Element {
+/** Ein Abschnitt zum Antippen (Übung nur mit seinen Wörtern, 27.10.2026) */
+export type AbschnittWahl = { key: string; unit: string; section: string }
+
+function UnitLeiste({ b, aktuell, oeffne }: { b: AktuellerBand; aktuell: string; oeffne?: (s: AbschnittWahl) => void }): React.JSX.Element {
   const [wahl, setWahl] = useState(aktuell)
   const streifen = useRef<HTMLDivElement>(null)
   const u = b.units.find((x) => x.unit === wahl) ?? b.units.find((x) => x.unit === aktuell) ?? b.units[b.units.length - 1]
@@ -185,16 +191,32 @@ function UnitLeiste({ b, aktuell }: { b: AktuellerBand; aktuell: string }): Reac
       )}
       {u && u.abschnitte.length <= MAX_PUNKTE && (
         <div className="sk-abschnitte" data-abschnitt-punkte={u.abschnitte.length} data-abschnitte-unit={u.unit}>
-          {u.abschnitte.map((x) => (
-            <div
-              key={x.key}
-              className="sk-abschnitt"
-              title={`${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`}
-            >
-              <AbschnittRing z={x.zahlen} />
-              <span className="sk-abschnitt-name">{kurz(x.name)}</span>
-            </div>
-          ))}
+          {/* Ringe antippen (27.10.2026, abgestimmt): Übung nur mit den Wörtern des Abschnitts; „Weitere" = nachgetragene Wörter ohne Buchabschnitt */}
+          {[...u.abschnitte, ...(b.weitere && u.unit === aktuell ? [b.weitere] : [])].map((x) => {
+            const titel = `${x.name}: ${x.zahlen.kennengelernt} von ${x.zahlen.gesamt} kennengelernt, ${x.zahlen.sicher} sicher`
+            const inhalt = (
+              <>
+                <AbschnittRing z={x.zahlen} />
+                <span className="sk-abschnitt-name">{kurz(x.name)}</span>
+              </>
+            )
+            return oeffne ? (
+              <button
+                key={x.key}
+                type="button"
+                className="sk-abschnitt"
+                title={`${titel} – antippen zum Üben`}
+                onClick={() => oeffne({ key: x.key, unit: x.key === WEITERE_KEY ? '' : u.unit, section: x.name })}
+                data-abschnitt={x.key}
+              >
+                {inhalt}
+              </button>
+            ) : (
+              <div key={x.key} className="sk-abschnitt" title={titel} data-abschnitt={x.key}>
+                {inhalt}
+              </div>
+            )
+          })}
         </div>
       )}
       {u && u.abschnitte.length > MAX_PUNKTE && (
@@ -235,12 +257,15 @@ export function AktuellerBandKarte({
   start,
   href,
   kompakt = false,
-  ohneKnopf = false
+  ohneKnopf = false,
+  oeffneAbschnitt
 }: {
   s: SprachStand
   start?: () => void
   href?: string
   kompakt?: boolean
+  /** Ring eines Abschnitts angetippt (27.10.2026): Übung nur dazu */
+  oeffneAbschnitt?: (s: AbschnittWahl) => void
   /** Startseite (10.10.2026): steht dieselbe Runde schon unter „Als Nächstes", nur die Zahl zeigen – EIN Knopf */
   ohneKnopf?: boolean
 }): React.JSX.Element {
@@ -289,7 +314,7 @@ export function AktuellerBandKarte({
           )}
         </div>
       </Group>
-      {b && !kompakt && aktUnit && <UnitLeiste b={b} aktuell={aktUnit.unit} />}
+      {b && !kompakt && aktUnit && <UnitLeiste b={b} aktuell={aktUnit.unit} oeffne={oeffneAbschnitt} />}
       {b && !kompakt && (
         <div style={{ marginTop: 8 }}>
           <StandKreise z={b.zahlen} t={t} balken />
@@ -419,6 +444,8 @@ export function KursRegister({ o, oben, startUebung = null }: { o: FachOrdner; o
 export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: boolean; startUebung: string | null }): React.JSX.Element {
   const { sprachen, laden } = useSprachstand(o.fach)
   const [lauf, setLauf] = useState<{ n: number; uebung: string | null }>({ n: 0, uebung: startUebung })
+  // Abschnitt angetippt (27.10.2026): Fenster mit der Übung nur zu diesem Abschnitt; danach Stand und Kasten neu laden
+  const [station, setStation] = useState<AbschnittWahl | null>(null)
   if (!sprachen) return <Loader size="sm" />
   const s = sprachen[0]
   // Ohne Lehrwerk mit Wörtern: wie bisher die Kurse (kein Weg, kein „Alles gelernt 0/0")
@@ -429,7 +456,21 @@ export function SprachRegister({ o, oben, startUebung }: { o: FachOrdner; oben: 
   }
   return (
     <Stack gap="md" data-sprach-register={s.sprache}>
-      {oben && s.aktuell && <AktuellerBandKarte s={s} start={starten} />}
+      {oben && s.aktuell && <AktuellerBandKarte s={s} start={starten} oeffneAbschnitt={setStation} />}
+      {station && (
+        <StationFenster
+          id={`sp:${s.sprache}`}
+          stufe={station}
+          fach={o.fach}
+          farbe={s.farbe}
+          zurueckText="Zurück zum Buch"
+          schliessen={() => {
+            setStation(null)
+            laden()
+            setLauf((l) => ({ n: l.n + 1, uebung: null }))
+          }}
+        />
+      )}
       {oben && !s.aktuell && (
         <Text size="sm" c="dimmed" data-kein-aktueller-band>
           In diesem Schuljahr ist noch nichts aus dem Buch freigegeben.

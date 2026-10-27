@@ -17,7 +17,7 @@ const w = (id: string): Vokabel => ({ id, term: id, translation: id })
 const ids = (l: { id: string }[]): string[] => l.map((x) => x.id)
 
 describe('Abschnitte ordnen', () => {
-  it('neueste Freigabe zuerst, zusammen freigeschaltete in Buchreihenfolge, ohne Zeit rückwärts', () => {
+  it('neueste Freigabe zuerst, zusammen freigeschaltete vom im Buch spätesten rückwärts (27.10.2026), ohne Zeit rückwärts', () => {
     const a: VorrangAbschnitt[] = [
       { ids: ['a1'], zeit: JETZT - 20 * TAG, stelle: 0 },
       { ids: ['b1'], zeit: JETZT - 2 * TAG, stelle: 1 },
@@ -26,8 +26,8 @@ describe('Abschnitte ordnen', () => {
       { ids: ['y1'], zeit: 0, stelle: 4 }
     ]
     const { reihe, neu } = abschnitteOrdnen(a)
-    expect(reihe.map((x) => x.ids[0])).toEqual(['b1', 'c1', 'a1', 'y1', 'x1'])
-    expect([...neu].map((x) => x.ids[0])).toEqual(['b1', 'c1'])
+    expect(reihe.map((x) => x.ids[0])).toEqual(['c1', 'b1', 'a1', 'y1', 'x1'])
+    expect([...neu].map((x) => x.ids[0])).toEqual(['c1', 'b1'])
   })
 
   it('Testabschnitte vor allen anderen', () => {
@@ -59,6 +59,14 @@ describe('neue Wörter und fällige Wiederholungen', () => {
     const roh = [w('a'), w('b'), w('c'), w('d')]
     expect(ids(neueWoerter(roh, {}, JETZT)).sort()).toEqual(['a', 'b', 'c', 'd'])
     expect(ids(neueWoerter(roh, {}, JETZT))).toEqual(ids(neueWoerter(roh, {}, JETZT)))
+  })
+
+  it('neue Wörter vor fälligen Wiederholungen (27.10.2026, Entscheidung der Lehrkraft)', () => {
+    const st = (faellig: number): WortStand => ({ ...neuerStand(), fach: 3, versuche: 3, faellig, zuletzt: JETZT - 10 * TAG })
+    const staende = { a1: st(JETZT - 5 * TAG), a2: st(JETZT - 4 * TAG) }
+    expect(ids(sitzungsWoerter(liste, staende, JETZT, 2))).toEqual(['b1', 'b2', 'a1', 'a2'])
+    // Tagesrunde mit Ziel 2: die beiden neuen, dann eine Wiederholung bis zur Zehner-Grenze
+    expect(ids(tagesRunde(liste, staende, JETZT, 2).woerter)).toEqual(['b1', 'b2', 'a1', 'a2'])
   })
 
   it('fällige aus der neuesten Freigabe vor älteren fälligen', () => {

@@ -303,18 +303,21 @@ export function abschnittsRunde(woerter: Vokabel[], staende: Record<string, Wort
  * Fenster eines Abschnitts (08.10.2026, abgestimmt): genau dessen Wörter lernen und abfragen – dieselbe Runde wie
  * im Kasten, derselbe Lernstand (der Server schränkt nur die Wortauswahl ein). Am Telefon bildschirmfüllend.
  */
-function StationFenster({
+export function StationFenster({
   id,
   stufe,
   fach,
   farbe,
-  schliessen
+  schliessen,
+  zurueckText = 'Zurück zum Vokabelweg'
 }: {
   id: string
-  stufe: Stufe
+  /** Vokabelweg-Stufe oder ein Buchabschnitt des Sprachkastens (27.10.2026, Ring im Fachordner angetippt) */
+  stufe: Pick<Stufe, 'key' | 'unit' | 'section'>
   fach: string
   farbe?: string | null
   schliessen: () => void
+  zurueckText?: string
 }): React.JSX.Element {
   const klein = useMediaQuery('(max-width: 640px)')
   const [d, setD] = useState<Liste | null | undefined>(undefined)
@@ -342,10 +345,10 @@ function StationFenster({
       radius={klein ? 0 : 'lg'}
       title={
         <Text fw={800}>
-          {stufe.unit} · {stufe.section}
+          {[stufe.unit, stufe.section].filter(Boolean).join(' · ')}
         </Text>
       }
-      closeButtonProps={{ 'aria-label': 'Zurück zum Vokabelweg' }}
+      closeButtonProps={{ 'aria-label': zurueckText }}
     >
       <div data-vw-fenster={stufe.key}>
       <TrainerFarben fach={fach} fachFarbe={farbe}>
@@ -359,11 +362,11 @@ function StationFenster({
           <Stack align="center" py="lg">
             <Text c="dimmed">In diesem Abschnitt gibt es keine Wörter zum Üben.</Text>
             <Button radius="xl" onClick={schliessen}>
-              Zurück zum Vokabelweg
+              {zurueckText}
             </Button>
           </Stack>
         ) : (
-          <Sitzung d={d} woerter={runde} fertig={schliessen} fertigText="Zurück zum Vokabelweg" />
+          <Sitzung d={d} woerter={runde} fertig={schliessen} fertigText={zurueckText} />
         )}
       </TrainerFarben>
       </div>

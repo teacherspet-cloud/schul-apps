@@ -135,7 +135,19 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     const key = `${listName}|${base.targetLanguage}|${base.stateId}|${base.schoolTypeId}|${usable.map((v) => v.term).join('|')}`
     const apply = (result: VocabLevelSuggestion | null): void => {
       setAnalysis({ running: false, result, failed: !result })
-      if (result && !touched.current) setBase((b) => (b ? { ...b, grade: result.grade, level: result.level } : b))
+      // Jahrgang aus dem Lehrwerk bleibt (27.10.2026, Befund der Lehrkraft: „Green Line Transition“ wurde zu Klasse 10 statt 11,
+      // weil die Vokabelanalyse den Jahrgang des Buchs überschrieb): mit Buchangabe nur das Niveau zur Klasse, sonst wie bisher
+      const buchKlasse = listContext?.grade
+      if (result && !touched.current)
+        setBase((b) =>
+          b
+            ? {
+                ...b,
+                grade: buchKlasse ?? result.grade,
+                level: buchKlasse ? (suggestLevel(table, b.stateId, b.schoolTypeId, b.languageOrder, buchKlasse)?.level ?? result.level) : result.level
+              }
+            : b
+        )
     }
     if (analysisCache.has(key)) {
       apply(analysisCache.get(key) ?? null)

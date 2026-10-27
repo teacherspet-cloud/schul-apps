@@ -169,7 +169,8 @@ describe('Tagesrunde einer Sprache', () => {
     for (let i = 0; i < 40; i++) staende[`w${i}`] = st({ fach: 2, versuche: 2, faellig: JETZT - TAG, zuletzt: JETZT - 3 * TAG })
     const r = tagesRunde(liste, staende, JETZT, 10)
     expect(r.woerter.length).toBe(10)
-    expect(r.extra).toBe(30)
+    // Neue Wörter zuerst (27.10.2026): die Runde besteht aus den neuen, alle 40 fälligen Wiederholungen sind „extra"
+    expect(r.extra).toBe(40)
     expect(rundenGrenze(20)).toBe(20)
     expect(rundenGrenze(3)).toBe(10)
     // Die Startseite (linkRunde „runde") startet genau den ersten Schritt dieser Runde

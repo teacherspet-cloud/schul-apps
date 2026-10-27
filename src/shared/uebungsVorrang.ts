@@ -4,7 +4,8 @@
  *
  *  - Neue Wörter in Freigabe-Reihenfolge: der zuletzt freigeschaltete Abschnitt zuerst, darin Lehrwerk-Reihenfolge (statt
  *    zufällig). Abschnitte, die zusammen freigeschaltet wurden (höchstens eine Stunde auseinander), gelten als EINE
- *    Freigabe und kommen in Buchreihenfolge. Ohne Zeitpunkt: Lehrwerk-Reihenfolge rückwärts (nach der Stelle).
+ *    Freigabe; darin kommt der im Buch späteste Abschnitt zuerst (27.10.2026, Entscheidung der Lehrkraft: bei einer
+ *    Sammel-Freigabe ist die Klasse am letzten Abschnitt). Ohne Zeitpunkt: Lehrwerk-Reihenfolge rückwärts (nach der Stelle).
  *  - Fällige Wiederholungen aus den Test- bzw. neuesten Abschnitten stehen vor älteren fälligen (`vorrang` am Wort,
  *    shared/vokabeltrainer.ts `sitzungsWoerter`).
  *  - Test-Vorlauf: Ab der Ankündigung (Termin gesetzt) haben die gewählten Abschnitte des Tests Vorrang; das Tagesziel
@@ -48,7 +49,8 @@ export function abschnitteOrdnen<A extends VorrangAbschnitt>(abschnitte: A[]): {
     if (g && g[0].zeit - a.zeit <= GLEICHE_FREIGABE_MS) g.push(a)
     else gruppen.push([a])
   }
-  for (const g of gruppen) g.sort((a, b) => a.stelle - b.stelle)
+  // Innerhalb einer Sammel-Freigabe der im Buch späteste Abschnitt zuerst (27.10.2026)
+  for (const g of gruppen) g.sort((a, b) => b.stelle - a.stelle)
   for (const a of abschnitte.filter((x) => !(x.zeit > 0)).sort((a, b) => b.stelle - a.stelle)) gruppen.push([a])
   const neu = new Set<A>(gruppen[0] ?? [])
   const alle = gruppen.flat()

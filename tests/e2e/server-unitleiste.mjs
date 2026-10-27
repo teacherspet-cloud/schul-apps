@@ -89,6 +89,18 @@ try {
   const farbe = await p.locator('[data-units] [data-unit="Hello"]').evaluate((e) => getComputedStyle(e).backgroundColor)
   pruefe(farbe !== 'rgba(0, 0, 0, 0)' && farbe !== 'transparent', `„Hello“ gefüllt (${farbe})`)
   pruefe((await p.locator('[data-units] [data-unit="Unit 1"] .sk-unit-punkt').count()) === 1, '„Unit 1“ trägt den Punkt „aktuelle Unit“')
+  // Abschnitt antippen (27.10.2026, abgestimmt): Übung nur mit den Wörtern dieses Abschnitts im Fenster
+  const ring = p.locator('[data-abschnitte-unit] button.sk-abschnitt').first()
+  const ringKey = await ring.getAttribute('data-abschnitt')
+  await ring.click()
+  pruefe(await da(p.locator('[data-vw-fenster]')), `Abschnitt antippen öffnet das Übungsfenster (${ringKey})`)
+  await p.locator('[data-vw-fenster] [data-sitzung], [data-vw-fenster] .vt-buehne, [data-vw-fenster] [data-eingabe]').first().waitFor({ timeout: 10000 }).catch(() => undefined)
+  const fensterText = await p.locator('[data-vw-fenster]').innerText()
+  pruefe((await p.locator('[data-vw-fenster] [data-sitzung]').count()) > 0 || /keine Wörter/.test(fensterText), 'Fenster zeigt die Übung zum Abschnitt')
+  await p.screenshot({ path: join(out, '3-abschnitt-fenster.png') })
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(500)
+  pruefe((await p.locator('[data-vw-fenster]').count()) === 0, 'Fenster schließt, zurück zum Buch')
 } finally {
   for (const k of kurse) if (lk) await lk.request.post(`${A}/server/vokabeln/${k}/loeschen`, { headers: KOPF, data: { klassenkurs: true } }).catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)

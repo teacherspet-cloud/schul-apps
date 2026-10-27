@@ -623,7 +623,9 @@ export function sitzungsWoerter(liste: Vokabel[], staende: Record<string, WortSt
     .sort((a, b) => vorrangStufe(a) - vorrangStufe(b) || st(a).faellig - st(b).faellig)
   const schonNeu = liste.filter((v) => heuteNeu(st(v), heute)).length
   const neue = neueWoerter(liste, staende, jetzt).slice(0, Math.max(0, neu - schonNeu))
-  return [...faellig, ...neue].slice(0, max)
+  // Neue Wörter zuerst (27.10.2026, Entscheidung der Lehrkraft: „neu hinzugefügte Vokabeln priorisieren“) – vorher kamen alle
+  // fälligen Wiederholungen davor, und bei großen Kursen erreichte die Runde die neue Freigabe gar nicht mehr
+  return [...neue, ...faellig].slice(0, max)
 }
 
 /** Schrittgröße beim Üben: die Tagesration kommt in Zehnerschritten (der letzte Schritt ggf. kleiner) */
@@ -631,8 +633,9 @@ export const SCHRITT = 10
 
 /**
  * Die Tagesrunde (10.10.2026, Befund der Lehrkraft: die Startseite nannte „88 Vokabeln sind heute dran", der Ordner
- * „heute noch 45" – drei verschiedene Rechnungen). EINE Zahl überall: fällige Wiederholungen (älteste zuerst), dann neue
- * Wörter bis zum Tagesziel – höchstens so viele wie das Tagesziel (mindestens ein Zehnerschritt). Weitere fällige
+ * „heute noch 45" – drei verschiedene Rechnungen). EINE Zahl überall: neue Wörter bis zum Tagesziel (neueste Freigabe zuerst,
+ * seit 27.10.2026 vor den Wiederholungen), dann fällige Wiederholungen – höchstens so viele wie das Tagesziel (mindestens
+ * ein Zehnerschritt). Weitere fällige
  * Wiederholungen nennt `extra`: freiwillig, ruhig erwähnt, sie kommen sonst morgen zuerst.
  */
 export const rundenGrenze = (ziel: number): number => Math.max(SCHRITT, Math.round(ziel) || 0)

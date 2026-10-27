@@ -240,6 +240,9 @@ export interface AbschnittStand {
   zahlen: StandZahlen
 }
 
+/** Kennung des Rings „Weitere“ (27.10.2026): Kurswörter, die in keinem Abschnitt des Buchs stehen (von Hand nachgetragen) */
+export const WEITERE_KEY = 'weitere'
+
 export interface UnitStand {
   unit: string
   abschnitte: AbschnittStand[]
@@ -286,6 +289,8 @@ export interface AktuellerBand extends BandAnsicht {
   aktuelleUnit: string
   /** Units des Bandes nach der aktuellen (noch nicht freigegeben) */
   weitereUnits: number
+  /** Kurswörter dieses Schuljahrs ohne Buchabschnitt (27.10.2026) – eigener Ring, antippbar wie die Abschnitte */
+  weitere?: AbschnittStand
 }
 
 export interface FruehererBand extends BandAnsicht {
