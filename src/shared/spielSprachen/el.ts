@@ -425,6 +425,7 @@ export const el: SprachPaket = {
     uiNochmal: 'Ξανά',
     uiVerlassen: 'Έξοδος',
     uiKooperativ: 'Μαζί',
+    uiKeinSpielPasst: 'Προς το παρόν κανένα ομαδικό παιχνίδι δεν ταιριάζει σε αυτό το μάθημα.',
     uiVersus: 'Αντίπαλοι',
     uiAntwortSchreiben: 'Γράψε την απάντησή σου',
     uiKeineAntwort: 'Τώρα δεν υπάρχει απάντηση στη συσκευή σου.',

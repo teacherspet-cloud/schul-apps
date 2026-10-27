@@ -425,6 +425,7 @@ export const da: SprachPaket = {
     uiNochmal: 'Igen',
     uiVerlassen: 'Forlad',
     uiKooperativ: 'Sammen',
+    uiKeinSpielPasst: 'Lige nu passer intet gruppespil til dette kursus.',
     uiVersus: 'Mod hinanden',
     uiAntwortSchreiben: 'Skriv dit svar',
     uiKeineAntwort: 'Der er ikke noget svar på din skærm lige nu.',

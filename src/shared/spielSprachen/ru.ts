@@ -355,6 +355,7 @@ export const ru: SprachPaket = {
     uiNochmal: 'Ещё раз',
     uiVerlassen: 'Выйти',
     uiKooperativ: 'Вместе',
+    uiKeinSpielPasst: 'Сейчас для этого курса не подходит ни одна групповая игра.',
     uiVersus: 'Против',
     uiAntwortSchreiben: 'Напиши ответ',
     uiKeineAntwort: 'Сейчас на твоём устройстве нет ответа.',

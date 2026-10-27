@@ -440,6 +440,7 @@ export const grc: SprachPaket = {
     uiNochmal: 'Αὖθις',
     uiVerlassen: 'Ἄπιθι',
     uiKooperativ: 'Κοινῇ',
+    uiKeinSpielPasst: 'Οὐδεὶς κοινὸς ἀγὼν τούτῳ τῷ μαθήματι νῦν πρέπει.',
     uiVersus: 'Ἀγών',
     uiAntwortSchreiben: 'Γράφε τὴν ἀπόκρισιν',
     uiKeineAntwort: 'Νῦν οὐδεμία ἀπόκρισις ἐν τῷ σῷ ὀργάνῳ ἐστίν.',

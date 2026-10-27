@@ -425,6 +425,7 @@ export const zh: SprachPaket = {
     uiNochmal: '再来一次',
     uiVerlassen: '离开',
     uiKooperativ: '合作',
+    uiKeinSpielPasst: '目前没有适合这门课程的小组游戏。',
     uiVersus: '对战',
     uiAntwortSchreiben: '写下你的答案',
     uiKeineAntwort: '现在你的设备上没有答案。',

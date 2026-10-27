@@ -425,6 +425,7 @@ export const tr: SprachPaket = {
     uiNochmal: 'Tekrar',
     uiVerlassen: 'Çık',
     uiKooperativ: 'Birlikte',
+    uiKeinSpielPasst: 'Şu anda bu kursa uygun grup oyunu yok.',
     uiVersus: 'Karşı karşıya',
     uiAntwortSchreiben: 'Cevabını yaz',
     uiKeineAntwort: 'Şu an cihazında cevap yok.',

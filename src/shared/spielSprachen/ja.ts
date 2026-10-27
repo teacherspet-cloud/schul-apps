@@ -425,6 +425,7 @@ export const ja: SprachPaket = {
     uiNochmal: 'もう一回',
     uiVerlassen: '退出',
     uiKooperativ: '協力',
+    uiKeinSpielPasst: '今はこのコースに合うグループゲームがありません。',
     uiVersus: '対戦',
     uiAntwortSchreiben: '答えを書こう',
     uiKeineAntwort: '今あなたの端末には答えがありません。',

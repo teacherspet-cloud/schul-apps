@@ -355,6 +355,7 @@ export const nl: SprachPaket = {
     uiNochmal: 'Nog een keer',
     uiVerlassen: 'Verlaten',
     uiKooperativ: 'Samen',
+    uiKeinSpielPasst: 'Op dit moment past er geen groepsspel bij deze cursus.',
     uiVersus: 'Tegen elkaar',
     uiAntwortSchreiben: 'Typ je antwoord',
     uiKeineAntwort: 'Op jouw apparaat staat nu geen antwoord.',

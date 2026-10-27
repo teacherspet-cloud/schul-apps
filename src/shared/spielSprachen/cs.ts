@@ -425,6 +425,7 @@ export const cs: SprachPaket = {
     uiNochmal: 'Ještě jednou',
     uiVerlassen: 'Odejít',
     uiKooperativ: 'Spolu',
+    uiKeinSpielPasst: 'Pro tento kurz se teď nehodí žádná skupinová hra.',
     uiVersus: 'Proti sobě',
     uiAntwortSchreiben: 'Napiš odpověď',
     uiKeineAntwort: 'Na tvém zařízení teď není žádná odpověď.',

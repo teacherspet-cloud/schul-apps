@@ -382,6 +382,15 @@ const TEXTE1 = {
   wieHeisst: { de: 'Wie heißt das Wort?', en: "What's the word?", fr: 'Quel est le mot ?', es: '¿Cuál es la palabra?', it: 'Qual è la parola?', la: 'Quod est verbum?' },
   welchesFehlt: { de: 'Welches Wort fehlt?', en: 'Which word is missing?', fr: 'Quel mot manque ?', es: '¿Qué palabra falta?', it: 'Quale parola manca?', la: 'Quod verbum deest?' },
   richtigIst: { de: 'Richtig ist: {0}', en: 'Right answer: {0}', fr: 'Bonne réponse : {0}', es: 'Respuesta correcta: {0}', it: 'Risposta giusta: {0}', la: 'Recte: {0}' },
+  // Zusammen spielen: Laden fehlgeschlagen / kein Spiel passt (27.10.2026, Befund 9c)
+  uiKeinSpielPasst: {
+    de: 'Für diesen Kurs passt zurzeit kein Gruppenspiel.',
+    en: 'No group game fits this course right now.',
+    fr: 'Aucun jeu de groupe ne convient à ce cours pour le moment.',
+    es: 'Ahora mismo ningún juego de grupo encaja con este curso.',
+    it: 'Al momento nessun gioco di gruppo è adatto a questo corso.',
+    la: 'Nullus ludus communis huic cursui nunc convenit.'
+  },
   jemand: { de: 'Jemand', en: 'Someone', fr: "Quelqu'un", es: 'Alguien', it: 'Qualcuno', la: 'Aliquis' },
   duBistDran: { de: 'Du bist dran!', en: "It's your turn!", fr: "C'est ton tour !", es: '¡Te toca!', it: 'Tocca a te!', la: 'Tuae partes sunt!' },
   istDran: { de: '{0} ist dran.', en: "It's {0}'s turn.", fr: "C'est le tour de {0}.", es: 'Le toca a {0}.', it: 'Tocca a {0}.', la: 'Partes sunt {0}.' },

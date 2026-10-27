@@ -425,6 +425,7 @@ export const pl: SprachPaket = {
     uiNochmal: 'Jeszcze raz',
     uiVerlassen: 'Wyjdź',
     uiKooperativ: 'Razem',
+    uiKeinSpielPasst: 'Obecnie żadna gra grupowa nie pasuje do tego kursu.',
     uiVersus: 'Przeciw',
     uiAntwortSchreiben: 'Napisz odpowiedź',
     uiKeineAntwort: 'Teraz na twoim urządzeniu nie ma odpowiedzi.',

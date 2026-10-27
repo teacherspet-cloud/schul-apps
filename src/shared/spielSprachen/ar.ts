@@ -425,6 +425,7 @@ export const ar: SprachPaket = {
     uiNochmal: 'مرة أخرى',
     uiVerlassen: 'خروج',
     uiKooperativ: 'معًا',
+    uiKeinSpielPasst: 'لا توجد حاليًا لعبة جماعية مناسبة لهذه الدورة.',
     uiVersus: 'ضد بعض',
     uiAntwortSchreiben: 'اكتب جوابك',
     uiKeineAntwort: 'لا يوجد جواب على جهازك الآن.',

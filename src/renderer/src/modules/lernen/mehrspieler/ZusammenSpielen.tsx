@@ -94,21 +94,47 @@ export default function ZusammenSpielen({
   const [code, setCode] = useState('')
   const [fehler, setFehler] = useState('')
   const [laeuft, setLaeuft] = useState('')
+  // Laden fehlgeschlagen (27.10.2026, Befund 9c: „keine Koop- und Versus-Spiele" – bisher blieb der Bereich dann stumm
+  // leer, niemand sah den Grund): Fehlertext anzeigen und noch einmal versuchen lassen
+  const [ladeFehler, setLadeFehler] = useState('')
+  const [versuch, setVersuch] = useState(0)
   const gast = !window.__schulappsServer?.angemeldet
   useEffect(() => {
     if (gast) return
     let aus = false
+    setLadeFehler('')
     void holen<{ frei: boolean; spiele: Angebot[] }>(
       `/s/api/spiel/angebot?bereich=${bereich}&kurs=${encodeURIComponent(kurs)}&stimme=${kannSprechen(sprache) ? 1 : 0}`
     ).then(
-      (a) => !aus && setAngebot(a),
-      () => undefined
+      (a) => !aus && setAngebot(Array.isArray(a?.spiele) ? a : { frei: false, spiele: [] }),
+      (e) => !aus && setLadeFehler(e instanceof Error ? e.message : String(e))
     )
     return () => {
       aus = true
     }
-  }, [bereich, kurs, sprache, gast])
-  if (gast || !angebot || !angebot.spiele.length) return null
+  }, [bereich, kurs, sprache, gast, versuch])
+  if (gast) return null
+  if (!angebot) {
+    if (!ladeFehler) return null
+    return (
+      <Alert color="yellow" radius="md" py={6} data-mehr-fehler>
+        <Group justify="space-between" wrap="nowrap">
+          <Text size="sm">
+            {t('uiKooperativ')} / {t('uiVersus')}: {ladeFehler}
+          </Text>
+          <Button size="xs" variant="light" onClick={() => setVersuch((v) => v + 1)} data-mehr-nochmal>
+            {t('uiNochmal')}
+          </Button>
+        </Group>
+      </Alert>
+    )
+  }
+  if (!angebot.spiele.length)
+    return (
+      <Text size="sm" c="dimmed" data-mehr-leer>
+        {t('uiKooperativ')} / {t('uiVersus')}: {t('uiKeinSpielPasst')}
+      </Text>
+    )
 
   const klappen = (id: string, offen: boolean): void => {
     const neu = { ...wahl, spielGruppen: { ...(wahl.spielGruppen ?? {}), [id]: offen } }
