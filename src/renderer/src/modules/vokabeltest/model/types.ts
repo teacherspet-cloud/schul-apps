@@ -75,6 +75,8 @@ export type TaskTypeId =
   | 'wordFamily'
   | 'writeSentences'
   | 'mediation'
+  // Sätze übersetzen (27.10.2026, Wunsch der Lehrkraft): deutscher Satz mit der Vokabel → Zielsprache, ohne Hinweis
+  | 'translateSentences'
   | 'crossword'
   | 'scrambled'
   | 'wrongWord'

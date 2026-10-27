@@ -123,7 +123,7 @@ export function useKopfZahlen(): KopfZahl[] {
       zuPruefen: karten.tests ? t.filter((x) => x.status === 'beendet' && (x.offen > 0 || x.zuEntscheiden > 0)).length : 0,
       neueAbgaben:
         karten.freigaben && ids.includes('freigaben')
-          ? (blaetter ?? []).filter((b) => b.status === 'offen' && b.zuletzt > jetzt - 2 * 864e5 && b.abgaben > 0).length
+          ? (blaetter ?? []).filter((b) => b.status === 'offen' && b.zuletzt > jetzt - 2 * 864e5 && (b.neu ?? b.abgaben) > 0).length
           : 0,
       bedarf: karten.reihen ? (reihen ?? []).reduce((s, r) => s + r.bedarf, 0) : 0,
       bald: karten.termine ? demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? t : []) : []

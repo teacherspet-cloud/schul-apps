@@ -23,7 +23,7 @@
  */
 import { STOPPWOERTER } from '@shared/stoppwoerter'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
-import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon } from '@shared/themen'
+import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
 import { doppelteEinheiten, einheitSchluessel, einheitZuText } from '@shared/materialienMobil'
 
 /*
@@ -261,8 +261,19 @@ export function besterBereich(m: ThemenMaterial, bereiche: Themenbereich[], mitg
   let wert: Bewertung = [0, 0, 0]
   for (const b of bereiche) {
     if (b.fachId !== m.fachId) continue
-    // Anderer Band/andere Einheit im Namen des Bereichs: nie dorthin, auch wenn Materialien darin ähnlich heißen
-    if (widersprechen(w, stichwoerter(b.name))) continue
+    // Anderer Band/andere Einheit im Namen des Bereichs ODER seiner Oberbereiche: nie dorthin, auch wenn Materialien darin
+    // ähnlich heißen (27.10.2026, Befund: „Green Line 2 – Unit 1" landete in „Green Line 6" › „Unit 1")
+    if (
+      widersprechen(
+        w,
+        stichwoerter(
+          pfadVon({ bereiche }, b.id)
+            .map((x) => x.name)
+            .join(' ')
+        )
+      )
+    )
+      continue
     const s = [stichwoerter(b.name), ...(mitglieder.get(b.id) ?? [])]
       .filter((x) => !widersprechen(w, x))
       .map((x) => bewertung(w, x))

@@ -45,12 +45,12 @@ export function akzeptiertSchluessel(s: string): string {
  */
 export function abweichendeWoerter(
   fassung: Pick<OnlineFassung, 'loesungen'>,
-  einheit: Pick<Einheit, 'felder'>,
+  einheit: Pick<Einheit, 'felder' | 'loesung'>,
   antworten: Antworten
 ): { feld: string; wort: string; antwort: string }[] | null {
   const aus: { feld: string; wort: string; antwort: string }[] = []
   for (const feld of einheit.felder) {
-    const l = fassung.loesungen[feld]
+    const l = fassung.loesungen[einheit.loesung ?? feld]
     if (!l) continue
     const a = antworten[feld] ?? ''
     if (l.art === 'genau') {

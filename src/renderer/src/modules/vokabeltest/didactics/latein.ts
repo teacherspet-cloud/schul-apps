@@ -74,7 +74,7 @@ export const nennformLabel = (v: VocabEntry, targetLanguage = 'la'): string =>
  * oder einsprachig in der Zielsprache arbeitet. Der Lateinunterricht zielt auf das Verstehen
  * und Übersetzen, nicht auf das Sprechen und Schreiben.
  */
-export const NICHT_IN_LATEIN: TaskTypeId[] = ['dialogue', 'writeSentences', 'mediation', 'twoSentences', 'writeDefinitions', 'freeText']
+export const NICHT_IN_LATEIN: TaskTypeId[] = ['dialogue', 'writeSentences', 'mediation', 'translateSentences', 'twoSentences', 'writeDefinitions', 'freeText']
 
 /** Aufgabenarten, die es NUR im Lateinischen gibt. */
 export const NUR_LATEIN: TaskTypeId[] = ['latinForms', 'latinLoanWords', 'latinWordFormation', 'latinContext']
@@ -83,6 +83,8 @@ export const NUR_LATEIN: TaskTypeId[] = ['latinForms', 'latinLoanWords', 'latinW
 export function passtZurSprache(id: TaskTypeId, targetLanguage: string): boolean {
   // Unregelmäßige Verben (30.09.2026): nur in Sprachen mit Verbliste (nicht Niederländisch)
   if (id === 'irregularVerbs') return istVerbSprache(targetLanguage)
+  // Sätze übersetzen (27.10.2026): aus dem Deutschen – bei Deutsch als Zielsprache gäbe es nichts zu übersetzen
+  if (id === 'translateSentences' && targetLanguage === 'de') return false
   // Sprachbesondere Aufgaben (Aspektpaare, Lesung, Wurzel …) und Schriftgrenzen (30.09.2026)
   const besonders = sprachAufgabePasst(id, targetLanguage)
   if (besonders !== undefined) return besonders

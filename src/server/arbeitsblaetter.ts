@@ -140,6 +140,8 @@ const db = () => {
     if (!spalten.has('loesung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN loesung TEXT NOT NULL DEFAULT ''")
     // Mitarbeitsvorschläge und Hilfen der KI samt Strenge (05.10.2026; verschlüsselt, feldschutz.ts)
     if (!spalten.has('auswertung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN auswertung TEXT NOT NULL DEFAULT '{}'")
+    // Zuletzt von der Lehrkraft geöffnet (27.10.2026, Befund: „1 Blatt mit neuen Abgaben" blieb zwei Tage stehen) – nur Abgaben danach gelten als neu
+    if (!spalten.has('gesehen')) d.exec('ALTER TABLE blatt_freigaben ADD COLUMN gesehen INTEGER NOT NULL DEFAULT 0')
     const sp2 = new Set((d.prepare('PRAGMA table_info(blatt_abgaben)').all() as { name: string }[]).map((x) => x.name))
     if (!sp2.has('extra')) d.exec('ALTER TABLE blatt_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     // Von der Lehrkraft freigeschaltete Aufgaben (schrittweise Freischaltung, 05.10.2026)
@@ -1036,6 +1038,12 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             einstellungen: einstellungenVon(z),
             ...(z.code ? { code: z.code, link: link(z.code) } : {}),
             abgaben: (db().prepare(`SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { n: number }).n,
+            // Abgaben seit dem letzten Öffnen durch die Lehrkraft (27.10.2026) – nur eine Zahl, keine Zeiten
+            neu: (
+              db()
+                .prepare(`SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0 AND aktualisiert > ? AND schueler_id ${OHNE_VORSCHAU}`)
+                .get(z.id, Number((z as Zeile & { gesehen?: number }).gesehen ?? 0)) as { n: number }
+            ).n,
             begonnen: (db().prepare(`SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND aktualisiert > 0 AND schueler_id ${OHNE_VORSCHAU}`).get(z.id) as { n: number }).n,
             // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
             gesamt: gesamtVon(z)
@@ -1163,6 +1171,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     const nurLesen = Boolean(z && z.lehrkraft_id !== ich.id && req.method === 'GET' && mitlehrkraftDarfSehen(ich.id, z.lerngruppe_id))
     if (!z || (z.lehrkraft_id !== ich.id && !nurLesen)) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
+      // Abgaben gesehen (27.10.2026): ab jetzt zählen nur spätere Abgaben als „neu" (Startseite, Schnellzugriff)
+      db().prepare('UPDATE blatt_freigaben SET gesehen = ? WHERE id = ?').run(Date.now(), z.id)
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
       // Per Code beigetreten (Gäste mit Namen, auch IServ-Konten) – entfernbar (05.10.2026)
       const perCode = new Set(

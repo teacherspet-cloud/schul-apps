@@ -43,7 +43,8 @@ describe('Eignung der Aufgabenformate nach Klasse und Niveau', () => {
       expect(f.geeignet, id).toBe(false)
       expect(f.hinweis).toBe('ab B1 / Kl. 8')
     }
-    for (const id of ['pictureLabel', 'scrambled', 'trueFalse', 'gapSentences', 'multipleChoice', 'matchDefinitions'] as const) {
+    // Sätze übersetzen (27.10.2026): schon ab A1 / Klasse 5 – anders als die Mediation
+    for (const id of ['pictureLabel', 'scrambled', 'trueFalse', 'gapSentences', 'multipleChoice', 'matchDefinitions', 'translateSentences'] as const) {
       expect(liste.find((x) => x.id === id)?.geeignet, id).toBe(true)
     }
   })
@@ -63,6 +64,9 @@ describe('Eignung der Aufgabenformate nach Klasse und Niveau', () => {
     const la = formatListe(klasse(7, 'A1', 'la')).map((f) => f.id)
     expect(la).toContain('latinForms')
     expect(la).not.toContain('mediation')
+    expect(la).not.toContain('translateSentences')
+    // Deutsch als Zielsprache: nichts zu übersetzen (27.10.2026)
+    expect(formatListe(klasse(7, 'A2', 'de')).map((f) => f.id)).not.toContain('translateSentences')
   })
 })
 

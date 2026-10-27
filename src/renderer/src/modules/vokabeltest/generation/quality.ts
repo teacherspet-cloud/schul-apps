@@ -108,6 +108,16 @@ export function checkBlock(
       coverage(block.items.map((i) => i.vocabId))
       break
     case 'open':
+      // Sätze übersetzen (27.10.2026): der deutsche Satz darf das Wort nicht verraten, die Musterlösung muss es enthalten
+      if (block.taskType === 'translateSentences')
+        block.items.forEach((it, i) => {
+          const v = it.vocabId ? vocabById.get(it.vocabId) : undefined
+          if (!v) return
+          const kern = grundwort(v.term)
+          if (kern && containsWord(it.prompt, kern)) issues.push({ item: i + 1, message: `Der deutsche Satz nennt das gesuchte Wort „${v.term}".` })
+          if (kern && it.modelAnswer && !containsWord(it.modelAnswer, kern) && !it.modelAnswer.toLowerCase().includes(kern.toLowerCase().slice(0, Math.max(4, kern.length - 2))))
+            issues.push({ item: i + 1, message: `Die Musterlösung enthält „${v.term}" nicht.` })
+        })
       coverage(block.items.map((i) => i.vocabId))
       break
     case 'trueFalse':
@@ -322,4 +332,13 @@ export function describeBlock(block: Block): string {
       break
   }
   return lines.join('\n')
+}
+
+/** Kern eines Vokabeleintrags für die Prüfung (27.10.2026): ohne „to"/Artikel, bei Wendungen das erste Wort, ohne Klammerzusatz */
+export function grundwort(term: string): string {
+  const ohne = term
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/^(to|a|an|the|le|la|les|l'|un|une|des|el|los|las|il|lo|gli|i|der|die|das|ein|eine|de|het)\s+/i, '')
+    .trim()
+  return ohne.split(/[\s,/]+/)[0] ?? ''
 }

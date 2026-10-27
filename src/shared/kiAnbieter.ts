@@ -92,8 +92,8 @@ export const KOMPATIBLE_ANBIETER: KompatibelVorgabe[] = [
     keyUrl: 'aistudio.google.com',
     keyPlaceholder: 'AIza…',
     // 27.10.2026: die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei
-    modelle: ['gemini-4-argon', 'gemini-3.8-flash'],
-    bildEingabe: ['gemini-4-argon', 'gemini-3.8-flash']
+    modelle: ['gemini-3.8-flash', 'gemini-4-argon'],
+    bildEingabe: ['gemini-3.8-flash', 'gemini-4-argon']
   },
   {
     id: 'openrouter',

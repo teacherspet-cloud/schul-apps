@@ -228,3 +228,32 @@ describe('Handschrift gebündelt (02.10.2026)', () => {
     ])
   })
 })
+
+describe('Teilpunkte „Sätze übersetzen" (27.10.2026)', () => {
+  const v: Variant = {
+    id: 'A',
+    label: 'A',
+    blocks: [bl({ kind: 'open', taskType: 'translateSentences', pointsPerItem: 2, items: [{ id: 'o1', prompt: 'Ich brauche ein Lineal.', modelAnswer: 'I need a ruler.', lines: 2 }] })]
+  }
+  const f = onlineFassung(v)
+  it('zwei Einheiten auf einem Feld: Vokabel und Satz, je ein Punkt, eigene KI-Fragen', () => {
+    const e = f.einheiten.filter((x) => x.aufgabe === 'b-open')
+    expect(e).toHaveLength(2)
+    expect(e.map((x) => x.punkte)).toEqual([1, 1])
+    expect(e[0].felder).toEqual(e[1].felder)
+    expect(e[1].loesung).toBe(e[1].id)
+    const l1 = f.loesungen[e[0].felder[0]]
+    const l2 = f.loesungen[e[1].loesung!]
+    expect(l1.art === 'ki' && /TEIL 1/.test(l1.frage)).toBe(true)
+    expect(l2.art === 'ki' && /TEIL 2/.test(l2.frage)).toBe(true)
+    expect(f.punkte).toBe(2)
+    expect(f.aufgaben[0].eintraege).toHaveLength(1)
+    const b = bewerte(f, { [e[0].felder[0]]: 'I need a ruler.' })
+    expect(Object.values(b).map((x) => x.status)).toEqual(['ki', 'ki'])
+  })
+  it('bei einem Punkt je Satz keine Teilung', () => {
+    const f1 = onlineFassung({ ...v, blocks: [{ ...v.blocks[0], pointsPerItem: 1 } as Block] })
+    expect(f1.einheiten).toHaveLength(1)
+    expect(f1.einheiten[0].loesung).toBeUndefined()
+  })
+})

@@ -121,6 +121,8 @@ export function kiAnfrage(
       'Die Erwartung ist EINE mögliche Lösung: Andere Formulierungen sind richtig, wenn sie dasselbe leisten. Sei fair, aber nicht großzügig: Ein falsch geschriebenes Zielwort oder ein falscher Satzbau ist falsch.',
       'Bei Begründungen (Odd one out, Korrekturen): richtig, wenn die Begründung sachlich stimmt und das Gemeinte klar wird – auch kurz.',
       'Leere oder sinnlose Antworten sind falsch.',
+      // Teilpunkte „Sätze übersetzen" (27.10.2026): dieselbe Antwort kommt zweimal, je Teil ein Urteil
+      'Aufgaben mit „TEIL 1 von 2" oder „TEIL 2 von 2": Dieselbe Antwort wird in zwei Fällen geprüft – beurteile in jedem Fall NUR den genannten Teil (Teil 1: nur das gesuchte Wort; Teil 2: nur der übrige Satz, ein falsches oder fehlendes gesuchtes Wort zählt dort nicht).',
       'Urteile (urteil):',
       '- "richtig": erfüllt die Aufgabe vollständig und ist korrekt.',
       '- "kleinerFehler": im Kern richtig, aber mit einem kleinen sprachlichen Fehler – Rechtschreibfehler (ein Buchstabe vertauscht/fehlt), falsche Präposition, fehlender/falscher Artikel, falsche Endung. Die Lehrkraft entscheidet, ob es trotzdem den Punkt gibt.',

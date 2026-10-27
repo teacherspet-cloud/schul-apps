@@ -2090,9 +2090,10 @@ function ErgebnisAnsicht({
           </Group>
           <Stack gap={6}>
             {a.eintraege.map((eintrag) => {
-              const b = bewertung[eintrag.einheit]
-              const richtig = b?.status === 'richtig'
-              const offen = !b || b.status === 'ki' || b.status === 'lehrkraft' || Boolean(b.pruefen)
+              // Teilpunkte (27.10.2026): Einheiten „<feld>:satz" gehören zum selben Eintrag – richtig nur, wenn alle Teile richtig sind
+              const teile = [bewertung[eintrag.einheit], ...einheiten.filter((x) => x.id.startsWith(`${eintrag.einheit}:`)).map((x) => bewertung[x.id])]
+              const richtig = teile.every((x) => x?.status === 'richtig')
+              const offen = teile.some((x) => !x || x.status === 'ki' || x.status === 'lehrkraft' || Boolean(x.pruefen))
               return (
                 <Paper key={eintrag.einheit} withBorder p="xs" radius="sm">
                   <Group gap="xs" align="start" wrap="nowrap">

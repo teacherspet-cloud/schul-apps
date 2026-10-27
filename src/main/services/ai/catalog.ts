@@ -26,7 +26,7 @@ export const BUILTIN_MODELS: Record<AiProviderId, Record<ModelKind, string[]>> =
     openai: { text: ['gpt-5.5', 'gpt-5.4-mini'], image: ['gpt-image-2'] },
     anthropic: { text: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'], image: [] },
     // Google (27.10.2026): die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei; Bilder nur noch über Gemini-Bildmodelle
-    google: { text: ['gemini-4-argon', 'gemini-3.8-flash'], image: ['gemini-3.1-flash-image'] }
+    google: { text: ['gemini-3.8-flash', 'gemini-4-argon'], image: ['gemini-3.1-flash-image'] }
   } satisfies Record<KernAnbieterId, Record<ModelKind, string[]>>),
   // OpenAI-kompatible Anbieter (09.10.2026): Modelle aus den Voreinstellungen, Bilder vorerst nicht
   ...(Object.fromEntries(KOMPATIBLE_ANBIETER.map((a) => [a.id, { text: a.modelle, image: [] }])) as Record<string, Record<ModelKind, string[]>>)
@@ -97,13 +97,14 @@ function pickRecommended(provider: AiProviderId, kind: ModelKind, sorted: RawMod
   /*
    * Google (27.10.2026, Befund der Lehrkraft): Empfohlen war das neueste stabile „Pro" – das war „gemini-2.5-pro", und genau
    * die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei (404 „no longer available to new users"); die Modellliste
-   * führt sie trotzdem weiter. Empfohlen wird jetzt das neueste stabile Modell überhaupt; bei gleicher Version Pro vor
-   * Flash, Lite-Modelle nie.
+   * führt sie trotzdem weiter. Zweiter Befund am selben Tag: Pro-Klasse (gemini-4-argon, 3.1-pro) hat in der Gratisstufe
+   * KEIN Kontingent (429, limit: 0) – ohne hinterlegte Abrechnung läuft nur Flash. Empfohlen wird deshalb das neueste
+   * stabile Flash-Modell (ohne Lite); gibt es keins, das neueste stabile Modell. Wer Abrechnung hat, wählt Pro/Argon selbst.
    */
   const stable = sorted.filter((m) => !m.id.includes('preview'))
   const ohneLite = stable.filter((m) => !m.id.includes('lite'))
-  const pool = ohneLite.length ? ohneLite : stable.length ? stable : sorted
+  const flash = ohneLite.filter((m) => m.id.includes('flash'))
+  const pool = flash.length ? flash : ohneLite.length ? ohneLite : stable.length ? stable : sorted
   const top = Math.max(0, ...pool.map((m) => modelVersion(m.id)))
-  const neueste = pool.filter((m) => modelVersion(m.id) === top)
-  return neueste.find((m) => m.id.includes('pro')) ?? neueste[0] ?? sorted[0]
+  return pool.find((m) => modelVersion(m.id) === top) ?? sorted[0]
 }

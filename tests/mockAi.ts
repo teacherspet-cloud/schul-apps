@@ -93,6 +93,10 @@ export function mockAi(calls: StructuredRequest[] = []) {
         instruction: 'Say it in English.',
         items: items((e) => ({ vocabId: e.id, prompt: `Ich brauche ${e.german}. (${e.term})`, modelAnswer: `I need ${e.base}.` }))
       },
+      translateSentences: {
+        instruction: 'Translate the sentences.',
+        items: items((e) => ({ vocabId: e.id, prompt: `Ich brauche ${e.german}.`, modelAnswer: `I need ${e.base}.` }))
+      },
       crossword: { instruction: 'Solve the crossword.', items: items((e, i) => ({ vocabId: e.id, clue: `clue number ${i + 1}` })) },
       scrambled: { instruction: 'Unscramble the words.', items: items((e, i) => ({ vocabId: e.id, hint: `Hint sentence ${i + 1} with ___ .` })) },
       wrongWord: {

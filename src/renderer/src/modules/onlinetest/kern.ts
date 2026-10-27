@@ -90,6 +90,11 @@ export interface Einheit {
   aufgabe: string
   felder: string[]
   punkte: number
+  /**
+   * Schlüssel der Lösung, wenn nicht das Feld selbst (27.10.2026, Teilpunkte „Sätze übersetzen"): zwei Einheiten teilen
+   * sich ein Feld, jede mit eigener KI-Frage – Teil 1 die Vokabel, Teil 2 der übrige Satz. Fehlt: Lösung = Feld.
+   */
+  loesung?: string
 }
 
 export interface OnlineFassung {
@@ -195,8 +200,8 @@ export function onlineFassung(variante: Variant): OnlineFassung {
       eintraege: [],
       punkte: 0
     }
-    const einheit = (id: string, felder: string[], punkte = ppi): void => {
-      einheiten.push({ id, aufgabe: b.id, felder, punkte })
+    const einheit = (id: string, felder: string[], punkte = ppi, loesung?: string): void => {
+      einheiten.push({ id, aufgabe: b.id, felder, punkte, ...(loesung ? { loesung } : {}) })
       a.punkte += punkte
     }
     const frage = (...teile: (string | undefined)[]): string => [anweisungFuer(b), ...teile].filter(Boolean).join(' – ')
@@ -297,6 +302,27 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         for (const it of b.items) {
           const f = feldId(b.id, it.id)
           a.eintraege.push({ einheit: f, text: it.prompt, felder: [{ id: f, art: it.lines > 1 ? 'langtext' : 'text' }] })
+          if (b.taskType === 'translateSentences' && ppi >= 2) {
+            /*
+             * Teilpunkte (27.10.2026, abgestimmt): Vokabel und Satz getrennt bewertet – zwei Einheiten auf demselben Feld,
+             * jede mit eigener KI-Frage; die Vokabel bekommt die größere Hälfte der Punkte. Ganze Punkte je Einheit bleiben.
+             */
+            const wort = Math.ceil(ppi / 2)
+            const satz = `${f}:satz`
+            loesungen[f] = {
+              art: 'ki',
+              frage: frage(it.prompt, 'TEIL 1 von 2 – nur die geprüfte Vokabel: Ist das gesuchte Wort richtig gewählt und richtig geschrieben? Fehler im übrigen Satz zählen hier nicht.'),
+              erwartung: it.modelAnswer
+            }
+            loesungen[satz] = {
+              art: 'ki',
+              frage: frage(it.prompt, 'TEIL 2 von 2 – der übrige Satz: Ist die Übersetzung abgesehen von der geprüften Vokabel sprachlich korrekt und vollständig?'),
+              erwartung: it.modelAnswer
+            }
+            einheit(f, [f], wort)
+            einheit(satz, [f], ppi - wort, satz)
+            continue
+          }
           loesungen[f] = { art: 'ki', frage: frage(it.prompt), erwartung: it.modelAnswer }
           einheit(f, [f])
         }
@@ -551,7 +577,7 @@ export function bewerte(f: Pick<OnlineFassung, 'einheiten' | 'loesungen'>, antwo
     let falsch = false
     const hinweise: string[] = []
     for (const id of e.felder) {
-      const l = f.loesungen[id]
+      const l = f.loesungen[e.loesung ?? id]
       if (!l) continue
       const r = feldAutomatisch(l, antworten[id] ?? '', gezaehlt)
       if (r.hinweis) hinweise.push(r.hinweis)

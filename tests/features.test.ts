@@ -54,7 +54,8 @@ describe('Modellliste der Anbieter', () => {
       { id: 'imagen-4.0-generate-001', meta: { actions: ['predict'] } }
     ]
     const text = filterModels('google', 'text', raw)
-    expect(text[0]).toMatchObject({ id: 'gemini-3.0-pro', recommended: true })
+    // 27.10.2026: Flash vor Pro (Gratisstufe) – vorher war hier das neueste stabile „Pro" empfohlen
+    expect(text[0]).toMatchObject({ id: 'gemini-3.0-flash', recommended: true })
     expect(text.map((m) => m.id)).not.toContain('gemini-2.5-flash-image')
     expect(
       filterModels('google', 'image', raw)
@@ -65,7 +66,7 @@ describe('Modellliste der Anbieter', () => {
 
   // Befund der Lehrkraft (27.10.2026): Google führt die 2.5er-Modelle noch in der Liste, gibt sie neuen Konten aber nicht
   // mehr frei – empfohlen wird das neueste stabile Modell, nicht das neueste stabile „Pro"
-  it('Google: das neueste stabile Modell ist empfohlen, auch wenn es kein „Pro" ist', () => {
+  it('Google: das neueste stabile Flash-Modell ist empfohlen (Gratisstufe), nicht Pro/Argon', () => {
     const gen = { actions: ['generateContent'] }
     const raw = [
       { id: 'gemini-2.5-pro', meta: gen },
@@ -77,7 +78,7 @@ describe('Modellliste der Anbieter', () => {
       { id: 'gemini-3.1-flash-image', meta: gen }
     ]
     const text = filterModels('google', 'text', raw)
-    expect(text[0]).toMatchObject({ id: 'gemini-4-argon', recommended: true })
+    expect(text[0]).toMatchObject({ id: 'gemini-3.8-flash', recommended: true })
     expect(filterModels('google', 'image', raw)[0]).toMatchObject({ id: 'gemini-3.1-flash-image', recommended: true })
   })
 })

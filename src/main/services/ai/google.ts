@@ -110,7 +110,45 @@ export class GoogleProvider implements AiProvider {
 function alsKiFehler(e: unknown): Error {
   const meldung = describeError(e)
   if (!(e instanceof ApiError)) return new Error(meldung)
+  // 429 (27.10.2026): nur das Minuten-Tempo der Gratisstufe ist vorübergehend – dann so lange warten, wie Google verlangt
+  if (e.status === 429) {
+    const k = googleKontingent(e.message)
+    return kiFehler(meldung, {
+      status: 429,
+      voruebergehend: k.art === 'minute',
+      ...(k.art === 'minute' && k.wartenMs ? { wartenMs: Math.min(k.wartenMs, GOOGLE_MAX_WARTEN_MS) } : {})
+    })
+  }
   return kiFehler(meldung, { status: e.status, voruebergehend: voruebergehenderStatus(e.status) && !kontingentLeer(e.message) })
+}
+
+/** Wartezeit auf das Minuten-Tempo der Gratisstufe (Google nennt meist 20–60 s) – länger blockiert den Platz zu lange */
+export const GOOGLE_MAX_WARTEN_MS = 65_000
+
+export interface GoogleKontingent {
+  /** ohne = Modell hat in der Gratisstufe kein Kontingent (limit: 0); tag = Tageskontingent erschöpft; minute = Tempo */
+  art: 'ohne' | 'tag' | 'minute' | 'unbekannt'
+  model?: string
+  wartenMs?: number
+}
+
+/**
+ * Googles 429-Meldung lesen (27.10.2026, Befund der Lehrkraft: „Kontingent erschöpft" nach zwei Aufgaben). Die Meldung
+ * nennt je Verstoß Metrik, Grenze und Modell („Quota exceeded for metric: …, limit: 0, model: gemini-4-argon, description:
+ * Generate content requests per day limit exceeded on Free Tier") und zum Schluss „Please retry in 41.3s" bzw. „13h40m35s".
+ * limit: 0 heißt: das Modell gibt es in der Gratisstufe gar nicht (Pro-Klasse, Bildmodelle) – nur mit Abrechnung.
+ */
+export function googleKontingent(message: string): GoogleKontingent {
+  const model = /model:\s*([\w.-]+)/.exec(message)?.[1]
+  const retry = /retry in\s*(?:(\d+)h)?(?:(\d+)m)?([\d.]+)s/i.exec(message)
+  const wartenMs = retry ? Math.round(((Number(retry[1]) || 0) * 3600 + (Number(retry[2]) || 0) * 60 + Number(retry[3])) * 1000) : undefined
+  const treffer = [...message.matchAll(/limit:\s*(\d+)[^\n]*?description:\s*([^\n.]*)/g)]
+  if (!treffer.length) return { art: /quota|billing/i.test(message) ? 'unbekannt' : 'minute', model, wartenMs }
+  if (treffer.every((m) => Number(m[1]) === 0)) return { art: 'ohne', model, wartenMs }
+  const wirksam = treffer.filter((m) => Number(m[1]) > 0)
+  if (wirksam.some((m) => /per day/i.test(m[2]))) return { art: 'tag', model, wartenMs }
+  if (wirksam.some((m) => /per minute/i.test(m[2]))) return { art: 'minute', model, wartenMs }
+  return { art: 'unbekannt', model, wartenMs }
 }
 
 function describeError(e: unknown): string {
@@ -129,6 +167,18 @@ function describeError(e: unknown): string {
       }Bitte in den Einstellungen die Modellliste aktualisieren und das empfohlene Modell wählen.`
     }
     if (e.status === 429) {
+      const k = googleKontingent(e.message)
+      const wen = k.model ? `„${k.model}"` : 'dieses Modell'
+      if (k.art === 'ohne')
+        return `Google: ${wen} hat in der Gratisstufe kein Kontingent – es läuft nur mit hinterlegter Abrechnung in Google AI Studio. Ohne Abrechnung ein Flash-Modell wählen (z. B. gemini-3.8-flash oder gemini-3.5-flash-lite).`
+      if (k.art === 'tag')
+        return `Google: Das Tageskontingent der Gratisstufe für ${wen} ist erschöpft${
+          k.wartenMs ? ` (frei in etwa ${Math.ceil(k.wartenMs / 3_600_000)} Stunden)` : ''
+        }. Morgen weiter, ein anderes Flash-Modell wählen oder in Google AI Studio eine Abrechnung hinterlegen.`
+      if (k.art === 'minute')
+        return `Google: Zu viele Anfragen pro Minute für ${wen} (Gratisstufe)${
+          k.wartenMs ? ` – Google verlangt ${Math.ceil(k.wartenMs / 1000)} s Pause` : ''
+        }. Die App wartet und versucht es einmal erneut; sonst kurz warten oder den Sparmodus nutzen.`
       return 'Google: Kontingent erschöpft oder zu viele Anfragen (429). Ein Gemini-Abo enthält keine API-Nutzung – bitte in Google AI Studio die Abrechnung bzw. das Kontingent prüfen oder kurz warten.'
     }
     return `Google-Fehler ${e.status}: ${e.message}`

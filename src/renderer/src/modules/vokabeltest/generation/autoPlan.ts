@@ -27,6 +27,7 @@ const AUTO_CANDIDATES: TaskTypeId[] = [
   'writeDefinitions',
   'writeSentences',
   'mediation',
+  'translateSentences',
   'scrambled',
   'wrongWord',
   'twoSentences',
@@ -120,7 +121,8 @@ export function assignPoints(tasks: TaskSelection[], totalPoints: number): TaskS
  */
 const AUTO_GROUPS = {
   erkennen: ['multipleChoice', 'matchDefinitions', 'oddOneOut', 'trueFalse', 'categorize', 'scrambled'],
-  anwenden: ['gapSentences', 'gapText', 'dialogue', 'collocations', 'wordFormation', 'wrongWord'],
+  // Sätze übersetzen (27.10.2026) zählt zum Anwenden: schon ab A1 in der Mischung, nicht erst mit dem Produzieren ab B1
+  anwenden: ['gapSentences', 'gapText', 'dialogue', 'collocations', 'wordFormation', 'wrongWord', 'translateSentences'],
   produzieren: ['writeSentences', 'writeDefinitions', 'mediation', 'twoSentences', 'synonymsAntonyms', 'wordFamily', 'mindmap']
 } satisfies Record<string, TaskTypeId[]>
 

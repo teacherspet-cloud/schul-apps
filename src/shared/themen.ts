@@ -93,6 +93,8 @@ export const automatikAn = (d: Pick<ThemenDaten, 'automatik'>, fachId: string): 
 
 export const materialSchluessel = (moduleId: string, id: string): string => `${moduleId}:${id}`
 
+import { einheitSchluessel } from './materialienMobil'
+
 /** Ein Vorschlag, den die Lehrkraft mit einem Klick übernimmt (siehe renderer/shared/themenVorschlag.ts) */
 export interface BereichsUebernahme {
   fachId: string
@@ -153,7 +155,68 @@ export function pruefeThemen(roh: unknown): ThemenDaten {
   if (r.reihenfolge && typeof r.reihenfolge === 'object')
     for (const [k, v] of Object.entries(r.reihenfolge)) if (Array.isArray(v)) d.reihenfolge[k] = v.filter((s) => typeof s === 'string')
   if (r.automatik && typeof r.automatik === 'object') for (const [k, v] of Object.entries(r.automatik)) if (typeof v === 'boolean') d.automatik[k] = v
-  return d
+  return doppelteZusammenfuehren(d)
+}
+
+/** Name eines Bereichs mit seinen Oberbereichen („Green Line 6 › Unit 1: …") – für die Einheiten-Erkennung */
+const pfadName = (d: Pick<ThemenDaten, 'bereiche'>, id: string): string =>
+  pfadVon(d, id)
+    .map((b) => b.name)
+    .join(' › ')
+
+/**
+ * Meinen zwei Geschwister dasselbe? Gleicher Name – oder dieselbe Lehrwerks-Einheit („Unit 1" neben „Unit 1: Singapore – The Lion
+ * City" unter demselben Band, shared/materialienMobil.ts `einheitSchluessel` über den Pfad). 27.10.2026.
+ */
+export function gleicheBereiche(d: Pick<ThemenDaten, 'bereiche'>, a: Themenbereich, b: Themenbereich): boolean {
+  if (a.fachId !== b.fachId || (a.elternId ?? null) !== (b.elternId ?? null)) return false
+  if (gleicherName(a.name, b.name)) return true
+  const ka = einheitSchluessel(pfadName(d, a.id))
+  return ka !== null && ka === einheitSchluessel(pfadName(d, b.id))
+}
+
+/**
+ * Doppelte Bereiche zusammenführen (27.10.2026, Befund der Lehrkraft am Schulserver: „Green Line 6" und „Green Line 1" standen
+ * je zweimal in „Meine Vokabeltests" – einmal von Hand angelegt, einmal von der Automatik aus dem Lehrwerk, dazu „Unit 1"
+ * neben „Unit 1: Singapore – The Lion City"). Zwei Geschwister (`gleicheBereiche`) werden zu einem: Es bleibt der ältere,
+ * bei verschiedenen Namen der mit dem längeren (dem Unit-Titel); Unterbereiche, Zuordnungen und Reihenfolgen des anderen
+ * wandern hinüber. Läuft beim Lesen (`pruefeThemen`), die Datei ist beim nächsten Schreiben bereinigt. Nach einem Schritt
+ * können Unterbereiche zu Geschwistern geworden sein – deshalb so lange, bis nichts mehr zusammenfällt.
+ */
+export function doppelteZusammenfuehren(d: ThemenDaten): ThemenDaten {
+  let neu = d
+  for (let runde = 0; runde < 50; runde++) {
+    let paar: [Themenbereich, Themenbereich] | null = null
+    for (let i = 0; i < neu.bereiche.length && !paar; i++)
+      for (let j = i + 1; j < neu.bereiche.length; j++)
+        if (gleicheBereiche(neu, neu.bereiche[i], neu.bereiche[j])) {
+          paar = [neu.bereiche[i], neu.bereiche[j]]
+          break
+        }
+    if (!paar) return neu
+    const [a, b] = paar
+    const laenger = b.name.trim().length > a.name.trim().length
+    const aelter = (b.angelegt ?? '') < (a.angelegt ?? '')
+    const bleibt = gleicherName(a.name, b.name) ? (aelter ? b : a) : laenger ? b : a
+    const weg = bleibt === a ? b : a
+    const zuordnungen: Record<string, Zuordnung> = {}
+    for (const [k, z] of Object.entries(neu.zuordnungen)) zuordnungen[k] = z.bereichId === weg.id ? { ...z, bereichId: bleibt.id } : z
+    const reihenfolge = { ...neu.reihenfolge }
+    if (reihenfolge[weg.id]) {
+      reihenfolge[bleibt.id] = [...new Set([...(reihenfolge[bleibt.id] ?? []), ...reihenfolge[weg.id]])]
+      delete reihenfolge[weg.id]
+    }
+    neu = {
+      ...neu,
+      bereiche: neu.bereiche
+        .filter((x) => x.id !== weg.id)
+        .map((x) => (x.elternId === weg.id ? { ...x, elternId: bleibt.id } : x))
+        .map((x) => (x.id === bleibt.id ? { ...x, ...(x.herkunft ? {} : weg.herkunft ? { herkunft: weg.herkunft } : {}) } : x)),
+      zuordnungen,
+      reihenfolge
+    }
+  }
+  return neu
 }
 
 // ---------- Hierarchie (Paket 12) ----------
@@ -220,7 +283,9 @@ export function obersterBereich(d: Pick<ThemenDaten, 'bereiche'>, id: string): T
   return pfadVon(d, id)[0] ?? null
 }
 
-const gleicherName = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de') === b.trim().toLocaleLowerCase('de')
+/** Gleicher Name – ohne Rücksicht auf Groß-/Kleinschreibung, Unicode-Form und doppelte Leerzeichen (27.10.2026) */
+const gleicherName = (a: string, b: string): boolean => namenForm(a) === namenForm(b)
+const namenForm = (s: string): string => s.normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('de')
 
 /** Legt einen Bereich an oder benennt ihn um. Zwei gleichnamige Bereiche in einem Fach wären nicht auseinanderzuhalten. */
 export function bereichSetzen(d: ThemenDaten, b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>): ThemenDaten {
@@ -235,6 +300,13 @@ export function bereichSetzen(d: ThemenDaten, b: Pick<Themenbereich, 'id' | 'fac
   // Gleiche Namen nur unter verschiedenen Oberbereichen – „Quellen" darf es in zwei Einheiten geben
   if (d.bereiche.some((x) => x.id !== b.id && x.fachId === fachId && (x.elternId ?? null) === (elternId ?? null) && gleicherName(x.name, name)))
     throw new Error(elternId ? `Einen Unterbereich „${name}“ gibt es dort schon.` : `Einen Themenbereich „${name}“ gibt es in diesem Fach schon.`)
+  // Dieselbe Lehrwerks-Einheit unter anderem Namen („Unit 1" neben „Unit 1: Singapore …", 27.10.2026) – nur beim Anlegen
+  if (!alt) {
+    const probe: Themenbereich = { id: b.id, fachId, name, ...(elternId ? { elternId } : {}), reihenfolge: 0, angelegt: '' }
+    const mitProbe = { bereiche: [...d.bereiche, probe] }
+    const gleich = d.bereiche.find((x) => x.id !== b.id && gleicheBereiche(mitProbe, x, probe))
+    if (gleich) throw new Error(`Diese Einheit gibt es dort schon als „${gleich.name}“.`)
+  }
   const reihenfolge = alt?.reihenfolge ?? b.reihenfolge ?? Math.max(0, ...kinderVon(d, fachId, elternId ?? null).map((x) => x.reihenfolge + 1))
   const herkunft = alt?.herkunft ?? b.herkunft
   const wortlautRoh = alt?.wortlaut ?? b.wortlaut
@@ -311,7 +383,10 @@ export function uebernehmen(d: ThemenDaten, vorschlaege: BereichsUebernahme[], a
   let neu = d
   /** Bereich dieses Namens unter `elternId` – vorhanden oder neu angelegt */
   const bereichFuer = (fachId: string, name: string, elternId: string | undefined, quelle?: string, wortlaut?: string): string => {
-    const da = neu.bereiche.find((b) => b.fachId === fachId && b.elternId === elternId && gleicherName(b.name, name))
+    // Gleicher Name ODER dieselbe Lehrwerks-Einheit (27.10.2026) – sonst entstand „Unit 1" neben „Unit 1: …"
+    const probe: Themenbereich = { id: '_probe_', fachId, name, ...(elternId ? { elternId } : {}), reihenfolge: 0, angelegt: '' }
+    const mitProbe = { bereiche: [...neu.bereiche, probe] }
+    const da = neu.bereiche.find((b) => gleicheBereiche(mitProbe, b, probe))
     if (da) return da.id
     const id = neueId()
     const herkunft = HERKUNFT.find((h) => h === quelle)

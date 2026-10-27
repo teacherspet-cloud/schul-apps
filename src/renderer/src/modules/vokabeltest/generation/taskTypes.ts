@@ -903,6 +903,36 @@ ${vocabLines(vocab)}`,
     }
   },
   {
+    /*
+     * Sätze übersetzen (27.10.2026, abgestimmt mit der Lehrkraft): Ein deutscher Satz, der die Bedeutung der Vokabel enthält,
+     * wird wörtlich in die Zielsprache übersetzt – anders als die Mediation (sinngemäß, ab B1/Kl. 8, Vokabel in Klammern)
+     * schon ab A1/Klasse 5 und OHNE Hinweis auf das Wort: Der Abruf ist Teil der Prüfung. Die Sätze dürfen außer der
+     * Vokabel nur bekannten Wortschatz und bekannte Grammatik voraussetzen (knownVocabRules, formVorwissen, bekannte
+     * Formen – alles schon im Systemprompt). Bewertung im Onlinetest mit Teilpunkten: Vokabel und Satz getrennt
+     * (onlinetest/kern.ts). Immer KI-Sätze, keine Lehrwerkssätze (Entscheidung der Lehrkraft).
+     */
+    id: 'translateSentences',
+    label: 'Sätze übersetzen',
+    description: 'Einen deutschen Satz mit der Vokabel in die Zielsprache übersetzen – ohne Hinweis auf das Wort; nur bekannter Wortschatz und bekannte Grammatik.',
+    kind: 'open',
+    minLevel: 'Pre-A1',
+    ab: { niveau: 'A1', klasse: 5 },
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Translate the sentences',
+    defaultInstruction: 'Translate the sentences into English.',
+    schema: itemSchema({
+      vocabId: str(),
+      prompt: str('The GERMAN sentence only – it contains the German meaning of the tested word; no target word, no brackets, no hint'),
+      modelAnswer: str('The translation in the target language, using the tested word')
+    }),
+    prompt: (vocab) =>
+      `Task type: translation into the target language. For each word write ONE short, natural GERMAN sentence (6–12 words) that students translate into the target language. The sentence contains the German meaning of the tested word so that a correct translation needs exactly this word. Apart from the tested word, the translation must only require vocabulary and grammar the students already know (see the rules above): simple statements, no idioms, no word play, no proper names that need explanation. "prompt" = the German sentence ONLY – never add the target word, brackets or a hint. "modelAnswer" = the translation in the target language.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
     id: 'crossword',
     label: 'Kreuzworträtsel',
     description: 'Kreuzworträtsel mit einsprachigen Hinweisen (nur Einzelwörter).',

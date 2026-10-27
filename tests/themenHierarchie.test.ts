@@ -4,6 +4,7 @@ import {
   bereichLoeschen,
   bereichSetzen,
   bereichVerschieben,
+  doppelteZusammenfuehren,
   kinderVon,
   leereThemen,
   materialSchluessel,
@@ -284,5 +285,75 @@ describe('Lehrwerksbände werden unterschieden', () => {
     expect(besterBereich(mat('Green Line 3 – Unit 2', 'englisch', 7), d.bereiche, new Map())?.id).toBe('band3')
     const nurBand1 = bereichSetzen(leereThemen(), { id: 'band1', fachId: 'englisch', name: 'Green Line 1' })
     expect(besterBereich(mat('Green Line 6 – Unit 1', 'englisch', 10), nurBand1.bereiche, new Map([['band1', [stichwoerter('Green Line 1 – Unit 1')]]]))).toBeNull()
+  })
+})
+
+/*
+ * Doppelte Bereiche (27.10.2026, Befund der Lehrkraft am Schulserver): „Green Line 6" von Hand (mit „Unit 1") und von der
+ * Automatik (mit „Unit 1: Singapore – The Lion City"), „Green Line 1" zweimal von der Automatik – in „Meine Vokabeltests"
+ * stand jeder Band doppelt.
+ */
+describe('Doppelte Themenbereiche (27.10.2026)', () => {
+  const vorhanden = (): ThemenDaten => ({
+    ...leereThemen(),
+    bereiche: [
+      { id: 'gl6hand', fachId: 'englisch', name: 'Green Line 6', reihenfolge: 2, angelegt: '2026-09-28T11:41:45.415Z' },
+      { id: 'u1hand', fachId: 'englisch', name: 'Unit 1', elternId: 'gl6hand', reihenfolge: 0, angelegt: '2026-09-28T11:42:10.467Z' },
+      { id: 'gl6auto', fachId: 'englisch', name: 'Green Line 6', herkunft: 'lehrwerk', reihenfolge: 2, angelegt: '2026-10-06T09:12:53.421Z' },
+      { id: 'u1auto', fachId: 'englisch', name: 'Unit 1: Singapore – The Lion City', elternId: 'gl6auto', herkunft: 'lehrwerk', reihenfolge: 0, angelegt: '2026-10-06T09:12:53.421Z' },
+      { id: 'gl1a', fachId: 'englisch', name: 'Green Line 1', herkunft: 'lehrwerk', reihenfolge: 0, angelegt: '2026-09-26T18:09:40.784Z' },
+      { id: 'gl1b', fachId: 'englisch', name: 'Green Line 1', herkunft: 'lehrwerk', reihenfolge: 1, angelegt: '2026-10-03T07:01:48.251Z' },
+      { id: 'quellen1', fachId: 'geschichte', name: 'Quellen', elternId: 'ww1', reihenfolge: 0, angelegt: '2026-10-01T00:00:00Z' },
+      { id: 'ww1', fachId: 'geschichte', name: 'Erster Weltkrieg', reihenfolge: 0, angelegt: '2026-10-01T00:00:00Z' },
+      { id: 'quellen2', fachId: 'geschichte', name: 'Quellen', elternId: 'weimar', reihenfolge: 0, angelegt: '2026-10-01T00:00:00Z' },
+      { id: 'weimar', fachId: 'geschichte', name: 'Weimarer Republik', reihenfolge: 1, angelegt: '2026-10-01T00:00:00Z' }
+    ],
+    zuordnungen: {
+      'vokabeltest:a': { bereichId: 'u1hand', von: 'auto', am: '2026-10-27T16:48:27.364Z' },
+      'vokabeltest:b': { bereichId: 'u1auto', von: 'auto', am: '2026-10-25T13:31:01.703Z' },
+      'vokabeltest:c': { bereichId: 'gl1b', von: 'hand', am: '2026-10-25T13:31:01.703Z' }
+    },
+    reihenfolge: { u1hand: ['vokabeltest:a'], u1auto: ['vokabeltest:b'] }
+  })
+  it('führt gleichnamige Bände und gleiche Units zusammen – der ältere Band, der längere Unit-Name bleibt', () => {
+    const d = doppelteZusammenfuehren(vorhanden())
+    const namen = (fach: string): string[] => kinderVon(d, fach, null).map((b) => b.name)
+    expect(namen('englisch').sort()).toEqual(['Green Line 1', 'Green Line 6'])
+    const gl6 = d.bereiche.find((b) => b.name === 'Green Line 6')!
+    expect(gl6.id).toBe('gl6hand')
+    expect(gl6.herkunft).toBe('lehrwerk')
+    expect(kinderVon(d, 'englisch', gl6.id).map((b) => b.name)).toEqual(['Unit 1: Singapore – The Lion City'])
+    expect(d.zuordnungen['vokabeltest:a'].bereichId).toBe('u1auto')
+    expect(d.zuordnungen['vokabeltest:b'].bereichId).toBe('u1auto')
+    expect(d.reihenfolge.u1auto).toEqual(['vokabeltest:b', 'vokabeltest:a'])
+    expect(d.bereiche.find((b) => b.name === 'Green Line 1')!.id).toBe('gl1a')
+    expect(d.zuordnungen['vokabeltest:c']).toMatchObject({ bereichId: 'gl1a', von: 'hand' })
+    // „Quellen" unter zwei Einheiten bleibt zweimal – das ist gewollt
+    expect(d.bereiche.filter((b) => b.name === 'Quellen')).toHaveLength(2)
+  })
+  it('pruefeThemen bereinigt beim Lesen', () => {
+    expect(pruefeThemen(vorhanden()).bereiche.filter((b) => b.name === 'Green Line 6')).toHaveLength(1)
+  })
+  it('die Automatik legt keinen zweiten Band und keine zweite Unit an', () => {
+    const d = pruefeThemen(vorhanden())
+    const neu = uebernehmen(
+      d,
+      [{ fachId: 'englisch', name: 'Unit 1', pfad: ['Green Line 6'], herkunft: 'lehrwerk', schluessel: ['vokabeltest:x'] }],
+      [],
+      neueId
+    )
+    expect(neu.bereiche.filter((b) => b.fachId === 'englisch')).toHaveLength(3)
+    expect(neu.zuordnungen['vokabeltest:x'].bereichId).toBe('u1auto')
+  })
+  it('von Hand: „Unit 1" unter einem Band mit „Unit 1: …" wird abgewiesen', () => {
+    const d = pruefeThemen(vorhanden())
+    expect(() => bereichSetzen(d, { id: 'neu1', fachId: 'englisch', name: 'Unit 1', elternId: 'gl6hand' })).toThrow(/gibt es dort schon als/)
+    // Umbenennen des vorhandenen bleibt möglich
+    expect(bereichSetzen(d, { id: 'u1auto', fachId: 'englisch', name: 'Unit 1: Singapore' }).bereiche.find((b) => b.id === 'u1auto')?.name).toBe('Unit 1: Singapore')
+  })
+  it('einsortieren: „Green Line 2 – Unit 1" kommt nicht in „Green Line 6" › „Unit 1"', () => {
+    const d = pruefeThemen(vorhanden())
+    const m = mat('Green Line 2 – Unit 1, Station 3 + Station 2', 'englisch', 6)
+    expect(besterBereich(m, d.bereiche, new Map())).toBeNull()
   })
 })

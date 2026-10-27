@@ -880,7 +880,8 @@ async function kiAuswerten(
           if (!be || be.quelle === 'lehrkraft') continue
           if (be.status === 'ki') {
             for (const feld of e.felder) {
-              const l = fassung.loesungen[feld]
+              // Teilpunkte (27.10.2026): eigene Lösung je Einheit, sonst die des Feldes
+              const l = fassung.loesungen[e.loesung ?? feld]
               if (!l || (l.art !== 'ki' && l.art !== 'menge')) continue
               faelle.push({
                 id: `A${++nr}`,
@@ -898,7 +899,7 @@ async function kiAuswerten(
             const falscheWoerter: string[] = []
             let andererFehler = false
             for (const feld of e.felder) {
-              const l = fassung.loesungen[feld]
+              const l = fassung.loesungen[e.loesung ?? feld]
               if (!l) continue
               const a = antworten[feld] ?? ''
               if (l.art === 'genau') {

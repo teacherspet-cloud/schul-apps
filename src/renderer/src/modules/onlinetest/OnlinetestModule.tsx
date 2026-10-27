@@ -1320,7 +1320,7 @@ function EinheitZeile({
           </Text>
         )}
       </Stack>
-      {e.punkte > 1 && f.loesungen[e.felder[0]]?.art === 'lehrkraft' ? (
+      {e.punkte > 1 && f.loesungen[e.loesung ?? e.felder[0]]?.art === 'lehrkraft' ? (
         <NumberInput
           size="xs"
           w={80}

@@ -4,6 +4,7 @@
  * Stand, je Freigabe die Lernenden; jedes ausgefüllte Blatt lässt sich ansehen – mit Stift,
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
+import { useKopfDaten } from '../../shell/kopfDaten'
 import { AppKopf } from '../../shared/components/AppKopf'
 import {
   Badge,
@@ -54,6 +55,8 @@ export interface Freigabe {
   code?: string
   link?: string
   abgaben: number
+  /** Abgaben seit dem letzten Öffnen durch die Lehrkraft (27.10.2026) – „neu" nur, wenn > 0 */
+  neu?: number
   begonnen: number
   /** Für wie viele Personen (Fortschrittsbalken, 05.10.2026) */
   gesamt?: number
@@ -377,7 +380,14 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
   // Mit jedem Neuladen der Liste (Freischalten, Entfernen …) auch die Auswertung
   useEffect(() => auswertungLaden(), [d, auswertungLaden])
   const laden = useCallback(() => {
-    void holen<Detail>(`/server/blaetter/${id}`).then(setD, (e: unknown) => notifyError(e))
+    // Öffnen gilt als gesehen (27.10.2026): Kopfzahlen gleich nachladen, damit „mit neuen Abgaben" verschwindet
+    void holen<Detail>(`/server/blaetter/${id}`).then(
+      (d) => {
+        setD(d)
+        void useKopfDaten.getState().laden(true)
+      },
+      (e: unknown) => notifyError(e)
+    )
     void holen<{ blaetter: Freigabe[] }>('/server/blaetter').then((x) => setKurz(x.blaetter.find((f) => f.id === id) ?? null))
   }, [id])
   useEffect(() => laden(), [laden])

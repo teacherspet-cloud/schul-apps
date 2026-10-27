@@ -222,7 +222,8 @@ export function Schnellzugriff(): React.JSX.Element {
       onClick={() => (oeffneFreigabe(b.id), openModule('freigaben'))}
       unten={b.gesamt ? <FortschrittsBalken gesamt={b.gesamt} teile={abgabeTeile(b.gesamt, b.begonnen, b.abgaben)} /> : undefined}
     >
-      {b.zuletzt > jetzt - 2 * 864e5 && b.abgaben > 0 ? <Badge color="green">neu</Badge> : <Badge variant="light">Arbeitsblatt</Badge>}
+      {/* „neu" nur für Abgaben seit dem letzten Öffnen (27.10.2026) */}
+      {b.zuletzt > jetzt - 2 * 864e5 && (b.neu ?? b.abgaben) > 0 ? <Badge color="green">neu</Badge> : <Badge variant="light">Arbeitsblatt</Badge>}
     </Zeile>
   )
   const rueckZeile = (r: RueckmeldungKurz): React.ReactNode => (
