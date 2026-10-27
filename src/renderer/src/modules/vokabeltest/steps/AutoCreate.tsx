@@ -57,7 +57,7 @@ export function AutoCreateButton({ selection, haupt }: { selection?: BookSelecti
       setLoading(true)
       try {
         const book = await window.api.textbooks.get(selection.bookId)
-        const entries = textbookEntries(book, selection.unit, selection.sections, selection.filter)
+        const entries = textbookEntries(book, selection.unit, selection.sections, selection.filter, selection.greyAbfragen)
         setVocab(entries)
         // Name folgt der Auswahl, solange er nicht von Hand stammt (25.10.2026: zuerst gewähltes Lehrwerk blieb stehen)
         if (!listName.trim() || !nameVonHand) setListName(selection.name)

@@ -617,9 +617,10 @@ export interface TtsResult {
 export const DEFAULT_SETTINGS: AppSettings = {
   ai: {
     textProvider: 'openai',
-    textModels: jeAnbieter({ openai: 'gpt-5.5', anthropic: 'claude-opus-5', google: 'gemini-2.5-pro' }, (id) => KOMPATIBLE_ANBIETER.find((a) => a.id === id)?.modelle[0] ?? ''),
+    textModels: jeAnbieter({ openai: 'gpt-5.5', anthropic: 'claude-opus-5', google: 'gemini-4-argon' }, (id) => KOMPATIBLE_ANBIETER.find((a) => a.id === id)?.modelle[0] ?? ''),
     imageProvider: 'openai',
-    imageModels: { openai: 'gpt-image-2', google: 'imagen-4.0-generate-001' },
+    // Google-Vorgaben 27.10.2026: 2.5er-Modelle für neue Konten gesperrt, Imagen nicht mehr in der AI-Studio-Liste
+    imageModels: { openai: 'gpt-image-2', google: 'gemini-3.1-flash-image' },
     imageAccess: { openai: 'api', google: 'api', anthropic: 'api' },
     autoLatest: true,
     access: jeAnbieter<AiAccess>({ openai: 'api', anthropic: 'api', google: 'api' }, () => 'api'),

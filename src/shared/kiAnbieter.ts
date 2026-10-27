@@ -91,8 +91,9 @@ export const KOMPATIBLE_ANBIETER: KompatibelVorgabe[] = [
     basisUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     keyUrl: 'aistudio.google.com',
     keyPlaceholder: 'AIza…',
-    modelle: ['gemini-2.5-pro', 'gemini-2.5-flash'],
-    bildEingabe: ['gemini-2.5-pro', 'gemini-2.5-flash']
+    // 27.10.2026: die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei
+    modelle: ['gemini-4-argon', 'gemini-3.8-flash'],
+    bildEingabe: ['gemini-4-argon', 'gemini-3.8-flash']
   },
   {
     id: 'openrouter',

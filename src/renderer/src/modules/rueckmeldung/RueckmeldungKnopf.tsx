@@ -27,6 +27,9 @@ export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag
       aktuell = false
     }
   }, [art, docId])
+  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin – seit 27.10.2026 auch nicht „Rückmeldung öffnen"
+  // zu einer schon vorhandenen Rückmeldung (Befund der Lehrkraft: der Knopf stand trotz gesperrter App im Vokabeltest)
+  if (!appFreigegeben('rueckmeldung')) return null
   const knopf = (
     <Tooltip
       label={vorhanden ? 'Die Rückmeldung zu diesem Material öffnen' : 'Rückmeldung zu Schülerarbeiten – mit diesem Material als Grundlage'}
@@ -49,8 +52,6 @@ export default function RueckmeldungKnopf({ art, docId }: { art: MaterialEintrag
     </Tooltip>
   )
   if (vorhanden) return knopf
-  // App-Freigaben (23.10.2026): ohne Freigabe der Ziel-App kein Weg dorthin
-  if (!appFreigegeben('rueckmeldung')) return null
   return (
     <Button.Group>
       {knopf}

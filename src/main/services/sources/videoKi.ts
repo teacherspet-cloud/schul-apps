@@ -30,7 +30,7 @@ export async function videoInhaltUeberGemini(url: string): Promise<{ protokoll: 
   if (!schluessel) return { fehler: 'Kein Google-Schlüssel hinterlegt (Einstellungen → KI).' }
   const eingestellt = getSettings().ai.textModels.google
   // Ein Gemini-Modell mit Videoverständnis; die eingestellte Wahl, sonst ein schnelles
-  const model = eingestellt && /gemini/i.test(eingestellt) ? eingestellt : 'gemini-2.5-flash'
+  const model = eingestellt && /gemini/i.test(eingestellt) ? eingestellt : 'gemini-3.8-flash'
   const client = new GoogleGenAI({ apiKey: schluessel })
   const antwort = await client.models.generateContent({
     model,

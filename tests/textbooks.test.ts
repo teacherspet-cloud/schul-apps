@@ -83,6 +83,13 @@ describe('Schulbuch-Vokabeln: CSV-Import', () => {
     expect(terms(false, true)).toEqual(['castle', 'moat'])
     expect(terms(true, false)).toEqual(['castle', 'knight'])
     expect(terms(false, false)).toEqual(['castle'])
+    // Zusatzwortschatz abfragen (27.10.2026): mit Schalter werden graue Wörter abgefragt, sonst nur gekennzeichnet übernommen
+    const include = (greyAbfragen: boolean): Record<string, boolean | undefined> =>
+      Object.fromEntries(
+        textbookEntries(book, 'Unit 1', ['Station 1'], { boxes: true, grey: true, explained: true }, greyAbfragen).map((e) => [e.term, e.include])
+      )
+    expect(include(false)).toEqual({ castle: true, moat: false, knight: true, drawbridge: false })
+    expect(include(true)).toEqual({ castle: true, moat: true, knight: true, drawbridge: true })
 
     // Die angezeigte Zahl stimmt mit der Auswahl überein, auch wenn mehrere Kennzeichnungen zusammenfallen:
     // 1 ohne Kennzeichnung, 1 nur Kasten, 1 nur grau, 1 Kasten+grau, 1 erklärt

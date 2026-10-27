@@ -62,6 +62,24 @@ describe('Modellliste der Anbieter', () => {
         .sort()
     ).toEqual(['gemini-2.5-flash-image', 'imagen-4.0-generate-001'])
   })
+
+  // Befund der Lehrkraft (27.10.2026): Google führt die 2.5er-Modelle noch in der Liste, gibt sie neuen Konten aber nicht
+  // mehr frei – empfohlen wird das neueste stabile Modell, nicht das neueste stabile „Pro"
+  it('Google: das neueste stabile Modell ist empfohlen, auch wenn es kein „Pro" ist', () => {
+    const gen = { actions: ['generateContent'] }
+    const raw = [
+      { id: 'gemini-2.5-pro', meta: gen },
+      { id: 'gemini-2.5-flash', meta: gen },
+      { id: 'gemini-3.1-pro-preview', meta: gen },
+      { id: 'gemini-3.8-flash', meta: gen },
+      { id: 'gemini-3.8-flash-lite', meta: gen },
+      { id: 'gemini-4-argon', meta: gen },
+      { id: 'gemini-3.1-flash-image', meta: gen }
+    ]
+    const text = filterModels('google', 'text', raw)
+    expect(text[0]).toMatchObject({ id: 'gemini-4-argon', recommended: true })
+    expect(filterModels('google', 'image', raw)[0]).toMatchObject({ id: 'gemini-3.1-flash-image', recommended: true })
+  })
 })
 
 const vocab: VocabEntry[] = [

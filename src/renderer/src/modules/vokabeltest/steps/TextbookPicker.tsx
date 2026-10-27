@@ -98,7 +98,14 @@ export const markCount = (section: TextbookSectionMeta, bit: number): number => 
  * Schulbuch-Vokabeln wie aus einer hineingezogenen Datei übernehmen.
  * Vokabeln aus Kästen und grau gedruckte kommen nur mit, wenn der Filter sie zulässt.
  */
-export function textbookEntries(book: Textbook, unitName: string, sectionNames: string[], filter: TextbookFilter = NO_MARKS): VocabEntry[] {
+export function textbookEntries(
+  book: Textbook,
+  unitName: string,
+  sectionNames: string[],
+  filter: TextbookFilter = NO_MARKS,
+  /** Zusatzwortschatz (grau) gleich abfragen statt nur gekennzeichnet zu übernehmen (Schalter, 27.10.2026) */
+  greyAbfragen = false
+): VocabEntry[] {
   const unit = book.units.find((u) => u.name === unitName)
   if (!unit) return []
   return unit.sections
@@ -116,8 +123,8 @@ export function textbookEntries(book: Textbook, unitName: string, sectionNames: 
           ...(e.grey ? { grey: true } : {}),
           ...(e.inBox ? { inBox: true } : {}),
           ...(e.explained ? { explained: true } : {}),
-          // Abgefragt wird alles außer dem Zusatzwortschatz (im Buch grau) – einzeln einschaltbar
-          include: !e.grey
+          // Abgefragt wird alles außer dem Zusatzwortschatz (im Buch grau) – einzeln einschaltbar oder über den Schalter (27.10.2026)
+          include: !e.grey || greyAbfragen
         }))
     )
 }
@@ -154,6 +161,8 @@ export interface BookSelection {
   unit: string
   sections: string[]
   filter: TextbookFilter
+  /** Zusatzwortschatz (grau) wird abgefragt (Schalter im Auswähler, 27.10.2026) */
+  greyAbfragen?: boolean
   count: number
   context: BookContext
 }
@@ -225,6 +234,12 @@ export function TextbookPicker({
   const [filterWahl, setFilter] = useState<TextbookFilter>(NO_MARKS)
   // Graue Wörter kommen beim Kennzeichnen immer mit – der Schalter dafür entfällt
   const filter: TextbookFilter = grau === 'kennzeichnen' ? { ...filterWahl, grey: true } : filterWahl
+  /*
+   * Zusatzwortschatz abfragen (27.10.2026, Wunsch der Lehrkraft): Die grauen Wörter kommen beim Kennzeichnen immer mit,
+   * waren aber nur einzeln (⋯-Menü der Zeile) oder über das Menü der Prüfansicht einschaltbar. Jetzt gibt es wie bei den
+   * Kästen einen Schalter im Auswähler – an: alle grauen Wörter werden abgefragt, aus: wie bisher nur gekennzeichnet.
+   */
+  const [greyAbfragen, setGreyAbfragen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
@@ -334,13 +349,14 @@ export function TextbookPicker({
             unit: unitMeta.name,
             sections: sectionsOf(unitMeta.name),
             filter,
+            greyAbfragen: grau === 'kennzeichnen' && greyAbfragen,
             count,
             context: bookContext(book)
           }
         : null
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book?.id, units.join('|'), JSON.stringify(sectionsByUnit), filter.boxes, filter.grey, count])
+  }, [book?.id, units.join('|'), JSON.stringify(sectionsByUnit), filter.boxes, filter.grey, greyAbfragen, count])
   // Gruppiert nach Schulbuchreihe wie in den Vokabellisten (Paket 15): „Green Line · Niedersachsen · Ausgabe ab 2021 · Klett"
   const bookOptions = useMemo(() => lehrwerkOptionen(books, languageLabel), [books])
 
@@ -350,7 +366,7 @@ export function TextbookPicker({
     try {
       const full = await window.api.textbooks.get(book.id)
       // Je Unit ihre eigenen Abschnitte – gleichnamige Abschnitte anderer Units bleiben unberührt
-      const entries = unitMetas.flatMap((u) => textbookEntries(full, u.name, sectionsOf(u.name), filter))
+      const entries = unitMetas.flatMap((u) => textbookEntries(full, u.name, sectionsOf(u.name), filter, grau === 'kennzeichnen' && greyAbfragen))
       /*
        * Die Obergrenze richtet sich nach der SPÄTESTEN gewählten Unit.
        *
@@ -511,10 +527,22 @@ export function TextbookPicker({
               />
             ))}
           {grau === 'kennzeichnen' && greyInSelection > 0 && (
-            <Text size="xs" c="dimmed" data-testid="zusatzwortschatz-hinweis">
-              Darunter {greyInSelection} {greyInSelection === 1 ? 'Wort' : 'Wörter'} Zusatzwortschatz (im Buch grau): übernommen und gekennzeichnet, aber
-              zunächst nicht abgefragt.
-            </Text>
+            <>
+              {/* Schalter wie bei den Kästen (27.10.2026): alle grauen Wörter abfragen oder nur gekennzeichnet übernehmen */}
+              <Switch
+                size="xs"
+                label={`Zusatzwortschatz (im Buch grau) abfragen (${greyInSelection})`}
+                description="Im Buch grau gedruckt – muss nicht unbedingt gelernt werden; wird immer übernommen und gekennzeichnet"
+                checked={greyAbfragen}
+                onChange={(e) => setGreyAbfragen(e.currentTarget.checked)}
+                data-zusatz-abfragen
+              />
+              <Text size="xs" c="dimmed" data-testid="zusatzwortschatz-hinweis">
+                {greyAbfragen
+                  ? `${greyInSelection} ${greyInSelection === 1 ? 'Wort' : 'Wörter'} Zusatzwortschatz (im Buch grau): übernommen, gekennzeichnet und abgefragt.`
+                  : `Darunter ${greyInSelection} ${greyInSelection === 1 ? 'Wort' : 'Wörter'} Zusatzwortschatz (im Buch grau): übernommen und gekennzeichnet, aber zunächst nicht abgefragt.`}
+              </Text>
+            </>
           )}
           <Button leftSection={<IconBook2 size={16} />} disabled={!count} loading={loading} onClick={take}>
             {count ? `${count} Vokabeln anzeigen und auswählen` : 'Unit und Abschnitte wählen'}

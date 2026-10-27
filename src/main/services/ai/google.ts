@@ -117,7 +117,17 @@ function describeError(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 400 && /api key/i.test(e.message)) return 'Der Google-API-Schlüssel ist ungültig.'
     if (e.status === 403) return 'Google: Zugriff verweigert. Bitte den API-Schlüssel prüfen.'
-    if (e.status === 404) return 'Google: Modell nicht gefunden. Bitte in den Einstellungen die Modellliste aktualisieren.'
+    // 404 (27.10.2026): Google nennt in der Meldung den Grund und das Ersatzmodell („no longer available to new users …
+    // use gemini-3.8-flash") – ohne ihn hieß es nur „Modell nicht gefunden", obwohl die Liste das Modell noch führte
+    if (e.status === 404) {
+      const grund = e.message
+        .replace(/\s*Call ModelService\.ListModels.*$/i, '')
+        .replace(/\s*We recommend you to use the Interactions API.*$/i, '')
+        .trim()
+      return `Google: Modell nicht verfügbar. ${
+        grund ? `${grund} ` : ''
+      }Bitte in den Einstellungen die Modellliste aktualisieren und das empfohlene Modell wählen.`
+    }
     if (e.status === 429) {
       return 'Google: Kontingent erschöpft oder zu viele Anfragen (429). Ein Gemini-Abo enthält keine API-Nutzung – bitte in Google AI Studio die Abrechnung bzw. das Kontingent prüfen oder kurz warten.'
     }

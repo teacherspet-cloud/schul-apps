@@ -52,6 +52,10 @@ console.log('„Test automatisch erstellen" wird durch die Schulbuch-Auswahl fre
 const hinweis = page.locator('[data-testid="zusatzwortschatz-hinweis"]')
 if (!(await hinweis.count())) throw new Error('Hinweis auf den Zusatzwortschatz (grau) fehlt im Reiter „Schulbuch“')
 console.log('Hinweis:', (await hinweis.innerText()).trim())
+// Schalter „Zusatzwortschatz abfragen" (27.10.2026) – aus: wie bisher nur gekennzeichnet
+const grauSchalter = page.locator('[data-zusatz-abfragen]')
+if (!(await grauSchalter.count())) throw new Error('Schalter „Zusatzwortschatz (im Buch grau) abfragen" fehlt im Reiter „Schulbuch"')
+if (await grauSchalter.isChecked()) throw new Error('Der Schalter „Zusatzwortschatz abfragen" muss anfangs aus sein')
 
 // Vokabeln übernehmen: Alles außer dem Zusatzwortschatz wird abgefragt
 await page.getByRole('button', { name: /Vokabeln anzeigen und auswählen/ }).click()

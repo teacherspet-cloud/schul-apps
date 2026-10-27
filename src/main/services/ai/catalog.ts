@@ -25,7 +25,8 @@ export const BUILTIN_MODELS: Record<AiProviderId, Record<ModelKind, string[]>> =
   ...({
     openai: { text: ['gpt-5.5', 'gpt-5.4-mini'], image: ['gpt-image-2'] },
     anthropic: { text: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'], image: [] },
-    google: { text: ['gemini-2.5-pro', 'gemini-2.5-flash'], image: ['imagen-4.0-generate-001'] }
+    // Google (27.10.2026): die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei; Bilder nur noch über Gemini-Bildmodelle
+    google: { text: ['gemini-4-argon', 'gemini-3.8-flash'], image: ['gemini-3.1-flash-image'] }
   } satisfies Record<KernAnbieterId, Record<ModelKind, string[]>>),
   // OpenAI-kompatible Anbieter (09.10.2026): Modelle aus den Voreinstellungen, Bilder vorerst nicht
   ...(Object.fromEntries(KOMPATIBLE_ANBIETER.map((a) => [a.id, { text: a.modelle, image: [] }])) as Record<string, Record<ModelKind, string[]>>)
@@ -93,6 +94,16 @@ function pickRecommended(provider: AiProviderId, kind: ModelKind, sorted: RawMod
     return sorted.find((m) => m.id.includes('opus')) ?? sorted[0]
   }
   if (kind === 'image') return byVersion(sorted.filter((m) => /^imagen-.*generate/.test(m.id) && !m.id.includes('fast'))) ?? sorted[0]
+  /*
+   * Google (27.10.2026, Befund der Lehrkraft): Empfohlen war das neueste stabile „Pro" – das war „gemini-2.5-pro", und genau
+   * die 2.5er-Modelle gibt Google für neue Konten nicht mehr frei (404 „no longer available to new users"); die Modellliste
+   * führt sie trotzdem weiter. Empfohlen wird jetzt das neueste stabile Modell überhaupt; bei gleicher Version Pro vor
+   * Flash, Lite-Modelle nie.
+   */
   const stable = sorted.filter((m) => !m.id.includes('preview'))
-  return byVersion(stable.filter((m) => m.id.includes('pro'))) ?? byVersion(sorted.filter((m) => m.id.includes('pro'))) ?? sorted[0]
+  const ohneLite = stable.filter((m) => !m.id.includes('lite'))
+  const pool = ohneLite.length ? ohneLite : stable.length ? stable : sorted
+  const top = Math.max(0, ...pool.map((m) => modelVersion(m.id)))
+  const neueste = pool.filter((m) => modelVersion(m.id) === top)
+  return neueste.find((m) => m.id.includes('pro')) ?? neueste[0] ?? sorted[0]
 }

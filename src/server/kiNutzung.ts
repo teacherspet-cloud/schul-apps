@@ -563,6 +563,9 @@ export const FAUSTREGEL_PREISE: KiPreise = {
   'anthropic|claude-sonnet-5': { ein: 2, aus: 10 },
   google: { ein: 1.25, aus: 10 },
   'google|gemini-2.5-flash': { ein: 0.3, aus: 2.5 },
+  // Listenpreise je Mio. Token, Stand 27.10.2026 (Gemini 3.8 Flash Aktionspreis bis Ende 2026)
+  'google|gemini-3.8-flash': { ein: 0.75, aus: 3.75 },
+  'google|gemini-4-argon': { ein: 2, aus: 10 },
   /** OpenAI-kompatible Anbieter (Mistral, IONOS, STACKIT, OpenRouter …) */
   '*': { ein: 1, aus: 4 }
 }
