@@ -149,7 +149,10 @@ export function spieleFrei(bereich: Bereich, kurs: string, n: NutzerInfo, jetzt 
     return tagesRunde(json_(z.woerter, [] as Vokabel[]), vokStand(z.id, n.id).woerter, jetzt, ziel).woerter.length === 0
   }
   const vokId = G.kopf(kurs)?.vokId
-  if (vokId && vokZeile(vokId)?.zusammen === 'aus') return false
+  const vok = vokId ? vokZeile(vokId) : null
+  if (vok?.zusammen === 'aus') return false
+  // „Spiele heute schon freischalten“ am Kurs gilt auch für die Grammatik (27.10.2026, Befund der Lehrkraft)
+  if (vok && spieleHeuteFrei(vok)) return true
   const p = G.paket(kurs)
   if (!p) return false
   // Wie im Grammatiktrainer (12.10.2026, shared/grammatikVorrang.ts – vor einem Test mehr neue je Tag)

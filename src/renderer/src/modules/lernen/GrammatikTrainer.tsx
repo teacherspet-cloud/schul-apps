@@ -120,6 +120,8 @@ interface Daten {
   /** Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag (vor einem Test mehr) und Teststoff */
   neuJeTag?: number
   test?: boolean
+  /** Spiele heute schon frei (Schalter der Lehrkraft am verbundenen Kurs, 27.10.2026) */
+  spieleFrei?: boolean
   /**
    * Vorschau der Lehrkraft (13.10.2026, „Schüleransicht zeigen" in Grammatikformen): ohne Kurs und ohne Server – Antworten
    * werden hier geprüft, nichts wird gespeichert (`sende`).
@@ -421,6 +423,8 @@ function Kasten({
     setzeWahl(neu)
     if (window.__schulappsServer?.angemeldet && !d.vorschau) void senden('/s/api/darstellung', fuerServer(neu)).catch(() => undefined)
   }
+  // Spiele nach der Tagesrunde – oder schon vorher, wenn die Lehrkraft sie am Kurs für heute freigeschaltet hat (27.10.2026)
+  const spieleGesperrt = heute.length > 0 && !d.spieleFrei
   const spiele = GRAMMATIK_SPIELE.filter(
     (s) => (wahl.zeitdruck || !MIT_ZEITDRUCK.includes(s.id)) && Boolean(s.verben) === Boolean(d.paket.verben?.length) && spielPasst(s.id)
   )
@@ -728,8 +732,8 @@ function Kasten({
               )}
               <SimpleGrid cols={{ base: 2, sm: 4 }} mt="xs">
                 {spiele.map((s) => (
-                  <UnstyledButton key={s.id} disabled={heute.length > 0} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
-                    <Card withBorder radius="lg" padding="sm" style={{ opacity: heute.length > 0 ? 0.5 : 1, height: '100%' }}>
+                  <UnstyledButton key={s.id} disabled={spieleGesperrt} onClick={() => setSpiel(s.id)} data-grammatik-spiel={s.id}>
+                    <Card withBorder radius="lg" padding="sm" style={{ opacity: spieleGesperrt ? 0.5 : 1, height: '100%' }}>
                       <Text fw={700}>{spielName('gram', s.id, d.sprache, s.name)}</Text>
                       <Text size="xs" c="dimmed">
                         {einzelBeschreibung('gram', s.id, s.beschreibung, d.sprache)}

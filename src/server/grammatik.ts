@@ -44,6 +44,7 @@ import {
   vokIstFuer,
   vokStatusSetzen,
   zeile as vokZeile,
+  spieleHeuteFrei,
   ausgeblendetFiltern,
   sprachfaecherDerGruppe,
   teileVon,
@@ -1422,7 +1423,9 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             erstellt: z.erstellt,
             bekannt: bekannteGrammatikFuer(ich),
             // Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag – vor einem Test mehr
-            ...((u) => ({ neuJeTag: u.neuJeTag, test: u.test }))(grammatikUebung(z, p, st.aufgaben, ich))
+            ...((u) => ({ neuJeTag: u.neuJeTag, test: u.test }))(grammatikUebung(z, p, st.aufgaben, ich)),
+            // „Spiele heute schon freischalten“ des verbundenen Kurses gilt auch für die Grammatikspiele (27.10.2026, Befund der Lehrkraft)
+            spieleFrei: ((v) => Boolean(v && spieleHeuteFrei(v)))(vokVon(z))
           }),
           true
         )

@@ -1388,7 +1388,7 @@ function Einstellungen({
               />
               <Switch
                 label="Spiele heute schon freischalten"
-                description="gilt nur für heute – ohne erst die Tagesvokabeln zu üben"
+                description="gilt nur für heute – Vokabel- und Grammatikspiele, ohne erst die Tagesübung zu machen"
                 checked={Boolean(d.spieleFrei)}
                 onChange={(e) => aendern('spiele', { frei: e.currentTarget.checked })}
                 data-vokabel-spiele-frei
