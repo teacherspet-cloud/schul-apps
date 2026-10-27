@@ -594,6 +594,13 @@
     }
    ]
   },
+  "onlinetest_handschrift": {
+    "folge": [
+      { "ergebnisse": [{ "nr": 1, "text": "New pupils integrate more easy", "unsicher": false }] },
+      { "ergebnisse": [{ "nr": 1, "text": "easily", "unsicher": false }] },
+      { "ergebnisse": [{ "nr": 1, "text": "verry", "unsicher": true }] }
+    ]
+  },
   "grammatik_pruefung": {
    "urteile": [
     {

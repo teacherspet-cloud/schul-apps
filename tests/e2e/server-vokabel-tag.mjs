@@ -136,7 +136,11 @@ try {
   // Vorab-Hintergrund (kein weißer Blitz): Skript da, nach dem Aufbau wieder entfernt
   pruefe((await ctx.request.get(`${A}/server/vorab.js`)).status() === 200, 'Vorab-Skript wird ausgeliefert')
   await s.waitForTimeout(500)
-  pruefe((await s.evaluate(() => document.documentElement.style.background)) === '', 'Vorab-Hintergrund nach dem Aufbau entfernt')
+  // Seit 10.10.2026 setzt der Schülerrahmen den Grund selbst (data-sa-grund) – dann bleibt er; sonst räumt das Vorab-Skript auf
+  pruefe(
+    await s.evaluate(() => document.documentElement.hasAttribute('data-sa-grund') || document.documentElement.style.background === ''),
+    'Vorab-Hintergrund nach dem Aufbau vom Schülerrahmen übernommen oder entfernt'
+  )
   pruefe(await da(s.locator('[data-vokabel-start]', { hasText: '10 Wörter' })), '„Jetzt üben · 10 Wörter"')
   const seite = await s.locator('body').innerText()
   pruefe(seite.includes('Englisch') && !seite.includes(`${new Date().getFullYear()} - Englisch`) && !seite.includes('Unit 1 Wörter'), 'Lernende sehen die Überschrift (ohne Jahr), nicht den Quellentitel')

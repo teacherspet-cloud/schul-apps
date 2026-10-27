@@ -108,8 +108,14 @@ try {
   await dlg.getByLabel('Merkkästen erst nach vollständiger Bearbeitung zeigen').check()
   await p.screenshot({ path: join(out, '1-freigabe.png') })
   await dlg.locator('[data-blatt-freigeben]').click()
-  await dlg.waitFor({ state: 'hidden', timeout: 20000 })
-  const fr = ((await (await lk.request.get(`${A}/server/blaetter`, { headers: KOPF })).json()).blaetter ?? [])[0]
+  // Der Dialog aus „Freigegebene Blätter" bleibt nach der Freigabe offen (Liste der Freigaben) – auf die Freigabe warten, dann schließen
+  let fr = null
+  for (let i = 0; i < 40 && !fr; i++) {
+    await p.waitForTimeout(500)
+    fr = ((await (await lk.request.get(`${A}/server/blaetter`, { headers: KOPF })).json()).blaetter ?? [])[0] ?? null
+  }
+  await p.keyboard.press('Escape')
+  await dlg.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => undefined)
   pruefe(fr?.einstellungen?.schrittweise === true && fr?.einstellungen?.aufgabenFeedback === true, 'Freigabe ist schrittweise (mit Feedback je Aufgabe)')
 
   // ---------- Mia: nur Aufgabe 1

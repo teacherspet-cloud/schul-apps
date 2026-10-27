@@ -83,7 +83,8 @@ try {
 
   // ---------- Farbkonzept (09.10.2026)
   await s.goto(`${A}/s/einstellungen`)
-  pruefe((await s.locator('[data-farbe]').count()) === 10, `Zehn Farben zur Wahl (${await s.locator('[data-farbe]').count()})`)
+  // Elf Farben seit Abendrot (20.10.2026, shared/schuelerFarben.ts)
+  pruefe((await s.locator('[data-farbe]').count()) === 11, `Elf Farben zur Wahl (${await s.locator('[data-farbe]').count()})`)
   for (const w of ['lavendel', 'koralle', 'salbei', 'ozean']) pruefe((await s.locator(`[data-farbe="${w}"]`).count()) === 1, `Neue Farbe ${w}`)
   const farben = async () =>
     s.evaluate(() => {

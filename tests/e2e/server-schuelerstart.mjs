@@ -152,6 +152,7 @@ try {
     await p.screenshot({ path: join(out, 'handy-start.png') })
     await p.setViewportSize({ width: 820, height: 1180 })
   }
+  await p.locator('[data-naechstes]').waitFor({ timeout: 15000 }).catch(() => undefined)
   pruefe(await p.locator('[data-naechstes]').isVisible(), '„Als Nächstes": der offene Test')
   const kacheln = await p.locator('[data-kachel]').evaluateAll((k) => k.map((x) => x.getAttribute('data-kachel')))
   pruefe(
@@ -197,10 +198,20 @@ try {
     await bestaetigen.first().click()
   await p.waitForTimeout(1500)
 
-  // ---------- Meine Ergebnisse
+  // ---------- Meine Ergebnisse – Note erst nach Freigabe durch die Lehrkraft (23.10.2026, Prüfung des Schulträgers)
+  await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'freigeben' } })
   await p.goto(`${A}/s/ergebnisse`)
   await p.locator('[data-ergebnis-eintrag]').first().waitFor({ timeout: 15000 })
-  const eintrag = await p.locator('[data-ergebnis-eintrag]').first().textContent()
+  // Die KI-Prüfung (Attrappe mit Verzögerung) läuft nach der Abgabe – bis zur Note kurz „wird noch geprüft"
+  let eintrag = ''
+  for (let i = 0; i < 30 && !/Note/.test(eintrag); i++) {
+    if (i) {
+      await p.waitForTimeout(1000)
+      await p.reload()
+      await p.locator('[data-ergebnis-eintrag]').first().waitFor({ timeout: 15000 })
+    }
+    eintrag = await p.locator('[data-ergebnis-eintrag]').first().textContent()
+  }
   pruefe(/Weather Test/.test(eintrag) && /Note 1/.test(eintrag) && /2 \/ 2/.test(eintrag), `Ergebnisliste: ${eintrag}`)
   await p.locator('[data-ergebnis-eintrag]').first().click()
   await p.locator('[data-ergebnis]').waitFor({ timeout: 15000 })
