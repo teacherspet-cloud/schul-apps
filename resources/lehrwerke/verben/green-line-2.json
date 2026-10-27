@@ -1,0 +1,248 @@
+{
+ "id": "green-line-2",
+ "lehrwerkId": "green-line-2",
+ "name": "Green Line 2",
+ "reihe": "Green Line",
+ "band": "2",
+ "sprache": "en",
+ "eintraege": [
+  {
+   "id": "v1",
+   "formen": {
+    "inf": "to fly",
+    "past": "flew",
+    "de": "fliegen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v2",
+   "formen": {
+    "inf": "to set up",
+    "past": "set up",
+    "de": "einrichten; aufbauen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v3",
+   "formen": {
+    "inf": "to break",
+    "past": "broke",
+    "de": "brechen; zerbrechen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v4",
+   "formen": {
+    "inf": "to steal",
+    "past": "stole",
+    "de": "stehlen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v5",
+   "formen": {
+    "inf": "to fight",
+    "past": "fought",
+    "de": "(sich) streiten; kämpfen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v6",
+   "formen": {
+    "inf": "to get off",
+    "past": "got off (a bus/train)",
+    "de": "aussteigen (aus einem Bus/Zug)"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v7",
+   "formen": {
+    "inf": "to become",
+    "past": "became",
+    "de": "werden"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v8",
+   "formen": {
+    "inf": "to cut (off)",
+    "past": "cut (off)",
+    "de": "schneiden; abschneiden"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v9",
+   "formen": {
+    "inf": "to wake up",
+    "past": "woke up",
+    "de": "aufwachen; aufwecken"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v10",
+   "formen": {
+    "inf": "to build",
+    "past": "built",
+    "de": "bauen; aufbauen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v11",
+   "formen": {
+    "inf": "to take off",
+    "past": "took off",
+    "de": "abnehmen; herunternehmen; ausziehen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v12",
+   "formen": {
+    "inf": "to hold",
+    "past": "held",
+    "de": "halten; festhalten"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v13",
+   "formen": {
+    "inf": "to feed",
+    "past": "fed",
+    "de": "füttern; ernähren"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v14",
+   "formen": {
+    "inf": "to spend",
+    "past": "spent",
+    "pp": "spent",
+    "de": "verbringen [Zeit]"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v15",
+   "formen": {
+    "inf": "to hurt",
+    "past": "hurt",
+    "pp": "hurt",
+    "de": "verletzen; wehtun"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v16",
+   "formen": {
+    "inf": "to see",
+    "past": "saw",
+    "pp": "seen",
+    "de": "besuchen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v17",
+   "formen": {
+    "inf": "to bite",
+    "past": "bit",
+    "pp": "bitten",
+    "de": "beißen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v18",
+   "formen": {
+    "inf": "to dream",
+    "past": "dreamt",
+    "pp": "dreamt",
+    "de": "träumen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v19",
+   "formen": {
+    "inf": "to meet",
+    "past": "met",
+    "pp": "met",
+    "de": "kennenlernen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v20",
+   "formen": {
+    "inf": "to burst",
+    "past": "burst",
+    "pp": "burst",
+    "de": "bersten; platzen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v21",
+   "formen": {
+    "inf": "to keep",
+    "past": "kept",
+    "pp": "kept",
+    "de": "behalten; aufbewahren; halten"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v22",
+   "formen": {
+    "inf": "to catch",
+    "past": "caught",
+    "pp": "caught",
+    "de": "fangen"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v23",
+   "formen": {
+    "inf": "to stick with sth",
+    "past": "stuck with sth",
+    "pp": "stuck with sth",
+    "de": "an etw. dranbleiben"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v24",
+   "formen": {
+    "inf": "to shoot",
+    "past": "shot",
+    "pp": "shot (at)",
+    "de": "schießen (auf)"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v25",
+   "formen": {
+    "inf": "to drive",
+    "past": "drove",
+    "pp": "driven",
+    "de": "fahren"
+   },
+   "hinweis": "Unit 5"
+  }
+ ],
+ "aktualisiert": "2026-10-27T18:00:00.000Z"
+}

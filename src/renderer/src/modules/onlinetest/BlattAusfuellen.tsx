@@ -660,7 +660,15 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       const doc = iframe.current?.contentDocument
       if (!doc || mehr <= 0) return
       const k = String(anker)
-      zusatz.current = { ...zusatz.current, e: 1, [k]: Math.min(60, (zusatz.current[k] ?? 0) + mehr) }
+      const alt = zusatz.current[k] ?? 0
+      const neu = Math.min(60, alt + mehr)
+      /*
+       * Obergrenze erreicht (27.10.2026, Befund der Lehrkraft: „Blatt ansehen“ hing nach kurzer Zeit mit React-Fehler #185):
+       * Die Linienautomatik läuft nach jedem Rendern; wuchs der Bereich nicht mehr, setzte sie trotzdem Antworten und Maße
+       * neu und löste damit das nächste Rendern aus – eine Endlosschleife. Ohne Änderung passiert jetzt nichts mehr.
+       */
+      if (neu === alt) return
+      zusatz.current = { ...zusatz.current, e: 1, [k]: neu }
       zusatzLinien(doc, zusatz.current)
       setAntworten((a) => ({ ...a, linien: JSON.stringify(zusatz.current) }))
       messe()

@@ -1,0 +1,251 @@
+{
+ "id": "green-line-3",
+ "lehrwerkId": "green-line-3",
+ "name": "Green Line 3",
+ "reihe": "Green Line",
+ "band": "3",
+ "sprache": "en",
+ "eintraege": [
+  {
+   "id": "v1",
+   "formen": {
+    "inf": "to hang out (with)",
+    "past": "hung out (with)",
+    "pp": "hung out (with)",
+    "de": "sich herumtreiben (mit); rumhängen (mit); sich treffen (mit)"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v2",
+   "formen": {
+    "inf": "to catch",
+    "past": "caught",
+    "pp": "caught",
+    "de": "nehmen [Zug, Bus]"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v3",
+   "formen": {
+    "inf": "to get",
+    "past": "got",
+    "pp": "got",
+    "de": "verstehen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v4",
+   "formen": {
+    "inf": "to smell",
+    "past": "smelt/smelled",
+    "pp": "smelt/smelled",
+    "de": "riechen; duften"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v5",
+   "formen": {
+    "inf": "to grow up",
+    "past": "grew up",
+    "pp": "grown up",
+    "de": "aufwachsen; erwachsen werden"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v6",
+   "formen": {
+    "inf": "to shine",
+    "past": "shone",
+    "pp": "shone",
+    "de": "scheinen; glänzen"
+   },
+   "hinweis": "Text smart 1"
+  },
+  {
+   "id": "v7",
+   "formen": {
+    "inf": "to forgive",
+    "past": "forgave",
+    "pp": "forgiven",
+    "de": "vergeben; verzeihen"
+   },
+   "hinweis": "Text smart 1"
+  },
+  {
+   "id": "v8",
+   "formen": {
+    "inf": "to burn",
+    "past": "burnt",
+    "pp": "burnt",
+    "de": "brennen; verbrennen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v9",
+   "formen": {
+    "inf": "to wake",
+    "past": "woke",
+    "pp": "woken",
+    "de": "aufwachen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v10",
+   "formen": {
+    "inf": "to rise",
+    "past": "rose",
+    "pp": "risen",
+    "de": "sich erheben; aufstehen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v11",
+   "formen": {
+    "inf": "to grow",
+    "past": "grew",
+    "pp": "grown",
+    "de": "werden"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v12",
+   "formen": {
+    "inf": "to lead",
+    "past": "led",
+    "pp": "led",
+    "de": "führen; anführen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v13",
+   "formen": {
+    "inf": "to hold",
+    "past": "held",
+    "pp": "held",
+    "de": "abhalten"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v14",
+   "formen": {
+    "inf": "to lie",
+    "past": "lay",
+    "pp": "lain",
+    "de": "liegen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v15",
+   "formen": {
+    "inf": "to hang",
+    "past": "hung",
+    "pp": "hung",
+    "de": "hängen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v16",
+   "formen": {
+    "inf": "to shut",
+    "past": "shut",
+    "pp": "shut",
+    "de": "zumachen; schließen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v17",
+   "formen": {
+    "inf": "to beat sb up",
+    "past": "beat sb up",
+    "pp": "beaten sb up",
+    "de": "jmdn. zusammenschlagen"
+   },
+   "hinweis": "Unit 3"
+  },
+  {
+   "id": "v18",
+   "formen": {
+    "inf": "to beat",
+    "past": "beat",
+    "pp": "beaten",
+    "de": "schlagen; besiegen"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v19",
+   "formen": {
+    "inf": "to weave",
+    "past": "wove",
+    "pp": "woven",
+    "de": "weben"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v20",
+   "formen": {
+    "inf": "to fly",
+    "past": "flew",
+    "pp": "flown",
+    "de": "hissen"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v21",
+   "formen": {
+    "inf": "to deal in",
+    "past": "dealt in",
+    "pp": "dealt in",
+    "de": "handeln mit"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v22",
+   "formen": {
+    "inf": "to rebuild",
+    "past": "rebuilt",
+    "pp": "rebuilt",
+    "de": "wieder aufbauen"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v23",
+   "formen": {
+    "inf": "to shake",
+    "past": "shook",
+    "pp": "shaken",
+    "de": "schütteln"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v24",
+   "formen": {
+    "inf": "to upset",
+    "past": "upset",
+    "pp": "upset",
+    "de": "aus der Fassung bringen"
+   },
+   "hinweis": "Unit 4"
+  }
+ ],
+ "aktualisiert": "2026-10-27T18:00:00.000Z"
+}

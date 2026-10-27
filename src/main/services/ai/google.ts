@@ -10,12 +10,15 @@ import { kiFehler, kontingentLeer, voruebergehenderStatus } from './kiFehler'
  * Faustregel wie bei OpenAI (openai.ts): 32 768 schneidet keinen bisherigen Auftrag ab und deckelt Ausreißer.
  */
 export const GOOGLE_MAX_AUSGABE = 32_768
+/** Höchstdauer einer Anfrage an Google (ms) – danach gilt sie als vorübergehender Fehler */
+export const GOOGLE_ZEITGRENZE_MS = 240_000
 
 export class GoogleProvider implements AiProvider {
   private client: GoogleGenAI
 
   constructor(apiKey: string) {
-    this.client = new GoogleGenAI({ apiKey })
+    // Zeitgrenze (27.10.2026, Befund: neue Modelle antworten zeitweise gar nicht, der Testknopf drehte endlos): 4 Minuten je Anfrage
+    this.client = new GoogleGenAI({ apiKey, httpOptions: { timeout: GOOGLE_ZEITGRENZE_MS } })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -183,6 +186,13 @@ function describeError(e: unknown): string {
     }
     return `Google-Fehler ${e.status}: ${e.message}`
   }
-  if (e instanceof Error) return e.message
+  if (e instanceof Error) {
+    // Netzfehler des Node-fetch (27.10.2026): „fetch failed“ sagt der Lehrkraft nichts
+    if (/fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|UND_ERR|terminated/i.test(e.message))
+      return `Google: Verbindung unterbrochen oder keine Antwort (${e.message.slice(0, 60)}). Die Anfrage wird einmal wiederholt.`
+    if (/abort/i.test(e.name) || /aborted|timeout/i.test(e.message))
+      return 'Google: Das Modell hat innerhalb der Zeitgrenze nicht geantwortet – kurz warten oder ein anderes Modell (z. B. gemini-3.8-flash) wählen.'
+    return e.message
+  }
   return String(e)
 }

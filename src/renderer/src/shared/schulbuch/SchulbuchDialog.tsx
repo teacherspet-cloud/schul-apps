@@ -4,11 +4,12 @@
  */
 import { extractContent, type ExtractedContent } from '../files/extractContent'
 import { pruefeHochladen } from '../datenschutz'
-import { Alert, Badge, Button, Group, Modal, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
+import { Alert, Autocomplete, Badge, Button, Group, Modal, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconBook } from '@tabler/icons-react'
 import { useState } from 'react'
 import { create } from 'zustand'
 import { erkenneSchulbuch, GESAMTVERTRAG_HINWEIS, schulbuchText, type AbschnittWahl, type Schulbuch } from './schulbuch'
+import { useBuchVorschlaege } from '../components/Schulbuecher'
 
 interface Frage {
   sb: Schulbuch
@@ -32,6 +33,8 @@ export function SchulbuchDialog(): React.JSX.Element | null {
 
 function Inhalt({ frage }: { frage: Frage }): React.JSX.Element {
   const [sb, setSb] = useState<Schulbuch>(frage.sb)
+  // Bücherkatalog der Schule (27.10.2026): die Bücher als Vorschläge, der Verlag wird mitgesetzt
+  const vorschlaege = useBuchVorschlaege()
   const fertig = (x: Schulbuch | null): void => {
     useFrage.setState({ offen: null })
     frage.antwort(x)
@@ -47,7 +50,14 @@ function Inhalt({ frage }: { frage: Frage }): React.JSX.Element {
           <b>Text übernehmen</b> (als Material mit Quellenangabe) oder <b>weglassen</b>.
         </Text>
         <Group grow>
-          <TextInput label="Buch" value={sb.titel} onChange={(e) => setSb({ ...sb, titel: e.currentTarget.value })} placeholder="z. B. Geschichte und Geschehen 2" data-schulbuch-titel />
+          <Autocomplete
+            label="Buch"
+            value={sb.titel}
+            onChange={(v) => setSb({ ...sb, titel: v, verlag: vorschlaege.verlagVon(v) || sb.verlag })}
+            data={vorschlaege.namen}
+            placeholder="z. B. Geschichte und Geschehen 2"
+            data-schulbuch-titel
+          />
           <TextInput label="Verlag" value={sb.verlag} onChange={(e) => setSb({ ...sb, verlag: e.currentTarget.value })} />
           <TextInput label="Seiten" value={sb.seiten} onChange={(e) => setSb({ ...sb, seiten: e.currentTarget.value })} w={120} />
         </Group>

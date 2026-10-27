@@ -48,10 +48,18 @@ const tabelle = async () =>
     [...document.querySelectorAll('.vt-latin-forms tr')]
       .filter((tr) => !tr.closest('[aria-hidden="true"]') && tr.getBoundingClientRect().height > 0)
       .map((tr) => ({
-        wort: tr.querySelector('.vt-latin-term')?.textContent?.trim() ?? '',
-        ansage: tr.querySelector('.vt-latin-label')?.textContent?.trim() ?? '',
+        wort:
+          tr
+            .querySelector('.vt-latin-term')
+            ?.textContent?.replace(/\u00AD/g, '')
+            .trim() ?? '',
+        ansage:
+          tr
+            .querySelector('.vt-latin-label')
+            ?.textContent?.replace(/\u00AD/g, '')
+            .trim() ?? '',
         leer: tr.querySelectorAll('.vt-latin-blank').length,
-        loesung: [...tr.querySelectorAll('.vt-key-text')].map((e) => e.textContent?.trim() ?? '')
+        loesung: [...tr.querySelectorAll('.vt-key-text')].map((e) => e.textContent?.replace(/\u00AD/g, '').trim() ?? '')
       }))
   )
 

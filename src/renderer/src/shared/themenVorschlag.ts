@@ -24,7 +24,8 @@
 import { STOPPWOERTER } from '@shared/stoppwoerter'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
-import { doppelteEinheiten, einheitSchluessel, einheitZuText } from '@shared/materialienMobil'
+import { doppelteEinheiten, einheitSchluessel, einheitZuText, pfadText } from '@shared/materialienMobil'
+import { LEHRWERK_THEMEN } from './lehrwerkThemen'
 
 /*
  * SCHWELLEN – was belegt ist und was nicht:
@@ -73,9 +74,17 @@ const gleich = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de
  * Bereich, den das Überthema des Materials nennt – im Fach, nach Name (auch als letzter Teil
  * eines Pfads „Oberbereich › Bereich"); null, wenn es keinen gibt.
  */
-export function bereichZumUeberthema(m: Pick<ThemenMaterial, 'fachId' | 'ueberthema'>, bereiche: Themenbereich[]): Themenbereich | null {
+export function bereichZumUeberthema(m: Pick<ThemenMaterial, 'fachId' | 'ueberthema' | 'name'>, bereiche: Themenbereich[]): Themenbereich | null {
   const ue = (m.ueberthema ?? '').trim()
-  if (!ue) return null
+  /*
+   * Vokabeltests nennen die Unit im NAMEN („Green Line 3 – Unit 2, Station 2“), nicht im Überthema (27.10.2026, Befund am
+   * Schulserver: solche Tests lagen im Band-Ordner „Green Line 3“ statt in „Unit 2: Welcome to Wales“ – die Wortähnlichkeit
+   * fand den Band, weil dessen Name vollständig im Testnamen steckt).
+   */
+  if (!ue) {
+    const unit = einheitZuText(bereiche, m.fachId, m.name)
+    return unit ? bereiche.find((b) => b.id === unit.id) ?? null : null
+  }
   /*
    * Lehrwerks-Unit zuerst (10.10.2026, Befund der Analyse): „Green Line 2 Unit 1" als Überthema gehört in den Bereich
    * „Green Line 2 › Unit 1: The new boy" aus dem Lehrwerk – vorher entstand daneben ein zweiter Ordner mit dem Wortlaut
@@ -296,6 +305,47 @@ export function besterBereich(m: ThemenMaterial, bereiche: Themenbereich[], mitg
   return tiefster ?? null
 }
 
+/** Welche Lehrwerks-Einheit ein Material nennt – im Überthema oder im Namen („Green Line 3 – Unit 1, Story“) */
+const nenntEinheit = (m: Pick<ThemenMaterial, 'ueberthema' | 'name'>): string | null => einheitSchluessel(m.ueberthema) ?? einheitSchluessel(m.name)
+
+/**
+ * Schon zugeordnet – außer: automatisch in den Band-Ordner gelegt, obwohl das Material eine Unit nennt (27.10.2026, Befund
+ * am Schulserver: „Green Line 3 – Unit 1, Story“ lag unter „Green Line 3“). Das wird neu einsortiert; von Hand Zugeordnetes nie.
+ */
+function bleibtWoEsIst(daten: ThemenDaten, m: ThemenMaterial): boolean {
+  const z = daten.zuordnungen[schluesselVon(m)]
+  if (!z) return false
+  if (z.von !== 'auto' || !z.bereichId || !nenntEinheit(m)) return true
+  const b = daten.bereiche.find((x) => x.id === z.bereichId)
+  return !b || einheitSchluessel(pfadText(daten.bereiche, b)) !== null
+}
+
+/**
+ * Vorschlag für eine Unit, die es noch nicht gibt: Band aus dem Lehrwerk-Katalog (Schreibweise), Unit mit Titel aus
+ * lehrwerkThemen.ts („Unit 1: Welcome to Wales“), sonst „Unit N“.
+ */
+function unitVorschlag(einheit: string): { band: string; name: string } | null {
+  const [bandKlein, unitKlein] = einheit.split('|')
+  if (!bandKlein || !unitKlein) return null
+  const band =
+    Object.keys(LEHRWERK_THEMEN).find((b) => b.toLocaleLowerCase('de') === bandKlein) ??
+    bandKlein.replace(/\p{L}+/gu, (w) => w.charAt(0).toLocaleUpperCase('de') + w.slice(1))
+  const nr = Number(/\d+/.exec(unitKlein)?.[0] ?? 0)
+  const kapitel = LEHRWERK_THEMEN[band]?.kapitel ?? {}
+  const schluessel = Object.keys(kapitel).find((k) => new RegExp(`^(unit|topic|lektion|kapitel|unidad|module|lesson)\\s*${nr}$`, 'i').test(k))
+  const titel = schluessel ? kapitel[schluessel].titel : ''
+  const art = /^topic/i.test(unitKlein)
+    ? 'Topic'
+    : /^lektion/i.test(unitKlein)
+    ? 'Lektion'
+    : /^kapitel/i.test(unitKlein)
+    ? 'Kapitel'
+    : /^unidad/i.test(unitKlein)
+    ? 'Unidad'
+    : 'Unit'
+  return { band, name: `${schluessel ?? `${art} ${nr}`}${titel ? `: ${titel}` : ''}` }
+}
+
 /** Stichwörter der Materialien je Bereich (nur, was einsortiert ist) */
 function mitgliederWoerter(materialien: ThemenMaterial[], daten: ThemenDaten): Map<string, string[][]> {
   const map = new Map<string, string[][]>()
@@ -318,7 +368,7 @@ export function einsortieren(materialien: ThemenMaterial[], daten: ThemenDaten, 
   const doppelt = doppelteEinheiten(daten.bereiche)
   for (const m of materialien) {
     const k = schluesselVon(m)
-    if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
+    if (bleibtWoEsIst(daten, m) || !automatikAn(daten, m.fachId)) continue
     const b = stattDoppel(bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder), daten.bereiche, doppelt)
     if (b) neu[k] = { bereichId: b.id, von: 'auto', am: heute }
   }
@@ -439,14 +489,17 @@ export function automatischEinsortieren(
   const doppelt = doppelteEinheiten(daten.bereiche)
   for (const m of materialien) {
     const k = schluesselVon(m)
-    if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
+    if (bleibtWoEsIst(daten, m) || !automatikAn(daten, m.fachId)) continue
     /*
      * Zuerst das Überthema (27.09.2026): Nennt das Material einen Bereich des Fachs beim Namen,
      * kommt es dorthin – ohne Raten. Nennt es einen neuen Namen, entsteht der Bereich mit diesem
      * einen Material (die Mindestgruppe gilt hier nicht: Die Lehrkraft bzw. die Planung hat den
      * Namen ausdrücklich genannt). Erst danach Wortähnlichkeit und Lehrplan.
      */
-    const b = stattDoppel(bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder), daten.bereiche, doppelt)
+    const einheit = nenntEinheit(m)
+    // Nennt das Material eine Lehrwerks-Unit, die es als Ordner noch nicht gibt: nicht per Wortähnlichkeit in den Band legen,
+    // sondern die Unit anlegen (Katalog unten, sonst „Unit N“ unter dem Band) – 27.10.2026
+    const b = stattDoppel(bereichZumUeberthema(m, daten.bereiche) ?? (einheit ? null : besterBereich(m, daten.bereiche, mitglieder)), daten.bereiche, doppelt)
     if (b) {
       zuordnungen[k] = { bereichId: b.id, von: 'auto', am: heute }
       continue
@@ -463,7 +516,16 @@ export function automatischEinsortieren(
     if (!kataloge.has(art)) kataloge.set(art, katalogWoerter(katalogFuer(m.fachId, m)))
     const katalog = kataloge.get(art)!
     const i = besterKatalogIndex(m, katalog)
-    if (i < 0) continue
+    if (i < 0) {
+      const v = einheit ? unitVorschlag(einheit) : null
+      if (v) {
+        const schluessel = `${m.fachId}|${v.band}|${v.name}`
+        const da = gruppen.get(schluessel)
+        if (da) da.schluessel.push(k)
+        else gruppen.set(schluessel, { fachId: m.fachId, name: v.name, pfad: [v.band], herkunft: 'lehrwerk', schluessel: [k] })
+      }
+      continue
+    }
     const thema = katalog[i].k
     const lehrplanNamen = [...(thema.pfad ?? []), thema.name].map(kurzName)
     const pfad = passendePfadnamen(daten, m.fachId, lehrplanNamen)

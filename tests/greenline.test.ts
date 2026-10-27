@@ -193,16 +193,18 @@ describe('mitgeliefertes Lehrwerk Green Line 1', () => {
     expect(book.name).toBe('Green Line 1')
     expect(book.language).toBe('en')
     const entries = book.units.flatMap((u) => u.sections.flatMap((s) => s.entries))
-    expect(entries).toHaveLength(1282)
+    // 27.10.2026: Navigium-Export vollstaendig eingearbeitet (Festtage, Poems, Lektuere, Diff pool als graue Zusatz-Units)
+    expect(entries).toHaveLength(1504)
     // Kennzeichnungen aus der bearbeiteten Fassung der Lehrkraft (scripts/apply-textbook-marks.mjs)
-    expect(entries.filter((e) => e.inBox)).toHaveLength(414)
+    expect(entries.filter((e) => e.inBox)).toHaveLength(426)
     /*
      * 227 grau: die von Hand gesetzten Markierungen der Lehrkraft plus die Wörter ohne
      * Kontextsatz, die NICHT in einem Kasten stehen. Vorher waren es 507 – die zusätzlichen
      * 280 waren Kastenwörter, die die Regel zu Unrecht erfasst hatte
      * (scripts/grey-without-example.mjs --kaesten hat sie zurückgenommen).
      */
-    expect(entries.filter((e) => e.grey)).toHaveLength(227)
+    // 227 wie bisher plus die Zusatz-Units (Festtage, Poems, Lektuere, Diff pool – alle grau) und fakultative neue Woerter
+    expect(entries.filter((e) => e.grey)).toHaveLength(448)
     // Kein Kastenwort ist über die Beispielsatz-Regel grau geworden
     expect(entries.filter((e) => e.inBox && e.greyBy === 'ohne-beispiel')).toHaveLength(0)
     // Nur noch 25: Von den 305 standen 280 in einem Kasten und sind damit zu Unrecht erfasst gewesen
@@ -221,7 +223,12 @@ describe('mitgeliefertes Lehrwerk Green Line 1', () => {
       'Unit 3',
       'Across cultures 2',
       'Unit 4',
-      'Trailer'
+      'Trailer',
+      'Merry Christmas!',
+      'Happy Halloween!',
+      'Poems, rhymes and activities',
+      'The end of world time',
+      'Diff pool'
     ])
     // Jede Vokabel hat Wort, Übersetzung und eine erschlossene Wortart
     expect(entries.every((e) => e.term.trim() && e.translation.trim() && e.pos)).toBe(true)

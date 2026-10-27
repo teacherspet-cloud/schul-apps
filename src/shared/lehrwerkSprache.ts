@@ -40,7 +40,7 @@ const REIHEN: Reihe[] = [
   // Französisch
   { muster: /^(découvertes|decouvertes|à plus|a plus|tous ensemble|(le )?cours intensif|génération pro|generation pro|réalités|realites|ensemble|pas de problème|horizons|parcours plus)/i, language: 'fr' },
   // Spanisch
-  { muster: /^(¡?vamos!? ¡?adelante!?|encuentros|¡?apúntate!?|apuntate|línea verde|linea verde|línea amarilla|linea amarilla|caminos|puente al español|con gusto|perspectivas|eñe|bachillerato)/i, language: 'es' },
+  { muster: /^(¡?vamos!? ¡?adelante!?|encuentros|¡?apúntate!?|apuntate|línea verde|linea verde|línea amarilla|linea amarilla|caminos|puente al español|con gusto|perspectivas|eñe|bachillerato|a tope|a_tope)/i, language: 'es' },
   // Latein
   { muster: /^(prima|pontes|roma|cursus|campus|agite|via mea|actio|salvete|adeamus|intra|lumina|felix|iter romanum)/i, language: 'la' },
   // Italienisch

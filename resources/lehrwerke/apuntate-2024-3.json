@@ -10,6 +10,3237 @@
   "band": "3",
   "stateId": "NI",
   "schoolTypeId": "gymnasium",
-  "platzhalter": true,
-  "units": []
+  "units": [
+    {
+      "name": "Unidad 1",
+      "sections": [
+        {
+          "name": "Vocabulario",
+          "entries": [
+            {
+              "term": "México",
+              "translation": "Mexiko",
+              "pos": "noun",
+              "example": "En México hay muchos volcanes.",
+              "exampleTranslation": "In Mexiko gibt es viele Vulkane."
+            },
+            { "term": "lindo/linda [lat. am.]", "translation": "schön", "pos": "phrase" },
+            {
+              "term": "la artesanía",
+              "translation": "das Kunsthandwerk",
+              "pos": "noun",
+              "example": "Las artesanías de México son lindas.",
+              "exampleTranslation": "Die Kunsthandwerke Mexikos sind wunderschön."
+            },
+            {
+              "term": "el pueblo",
+              "translation": "das Volk",
+              "pos": "noun",
+              "example": "Cada pueblo tiene sus tradiciones.",
+              "exampleTranslation": "Jedes Volk hat seine Traditionen."
+            },
+            {
+              "term": "indígena",
+              "translation": "einheimisch; indigen",
+              "pos": "adjective",
+              "example": "Los mayas son un pueblo indígena.",
+              "exampleTranslation": "Die Mayas sind ein indigenes Volk."
+            },
+            {
+              "term": "mexicano/mexicana",
+              "translation": "mexikanisch",
+              "pos": "noun",
+              "example": "Me encanta la comida mexicana.",
+              "exampleTranslation": "Ich liebe mexikanisches Essen."
+            },
+            { "term": "la identidad", "translation": "die Identität", "pos": "noun" },
+            { "term": "el elemento", "translation": "das Element", "pos": "noun" },
+            {
+              "term": "tener su origen en",
+              "translation": "seinen/ihren Ursprung haben in",
+              "pos": "phrase",
+              "example": "El cacao tiene su origen en América.",
+              "exampleTranslation": "Kakao hat seinen Ursprung in Amerika."
+            },
+            {
+              "term": "el origen, los orígenes [pl.]",
+              "translation": "der Ursprung",
+              "pos": "noun",
+              "example": "Mi familia es de origen mexicano.",
+              "exampleTranslation": "Meine Familie ist mexikanischen Ursprungs."
+            },
+            { "term": "la civilización", "translation": "die Zivilisation; die Kultur", "pos": "noun" },
+            {
+              "term": "maya",
+              "translation": "Maya-",
+              "pos": "noun",
+              "example": "Hay que cuidar los textos mayas.",
+              "exampleTranslation": "Die Maya-Texte müssen beschützt/bewahrt werden."
+            },
+            {
+              "term": "azteca",
+              "translation": "aztekisch",
+              "pos": "adjective",
+              "example": "¿Qué sabes de la cultura azteca?",
+              "exampleTranslation": "Was weißt du über die aztekische Kultur?"
+            },
+            {
+              "term": "por ejemplo",
+              "translation": "zum Beispiel",
+              "pos": "phrase",
+              "example": "¡Escucha música! Por ejemplo, salsa.",
+              "exampleTranslation": "Hör Musik! Zum Beispiel Salsa."
+            },
+            {
+              "term": "el chocolate",
+              "translation": "die Schokolade",
+              "pos": "noun",
+              "example": "¡Me gusta mucho tomar chocolate!",
+              "exampleTranslation": "Ich trinke wirklich gerne Schokolade!"
+            },
+            {
+              "term": "tener lugar",
+              "translation": "stattfinden",
+              "pos": "phrase",
+              "example": "La fiesta tiene lugar en el aula.",
+              "exampleTranslation": "Die Party findet im Klassenzimmer statt."
+            },
+            { "term": "la conquista", "translation": "die Eroberung", "pos": "noun" },
+            {
+              "term": "el/la azteca",
+              "translation": "der Azteke/die Aztekin",
+              "pos": "noun",
+              "example": "Los aztecas fundaron Tenochtitlán.",
+              "exampleTranslation": "Die Azteken gründeten Tenochtitlan."
+            },
+            { "term": "la variedad", "translation": "die Vielfalt", "pos": "noun" },
+            {
+              "term": "ser conocido/conocida (por algo)",
+              "translation": "bekannt sein (für etw.)",
+              "pos": "phrase",
+              "example": "México es conocido por su comida.",
+              "exampleTranslation": "Mexiko ist bekannt für sein Essen."
+            },
+            {
+              "term": "la elaboración",
+              "translation": "die Herstellung",
+              "pos": "noun",
+              "example": "La elaboración de pan es fácil.",
+              "exampleTranslation": "Brotbacken ist einfach."
+            },
+            {
+              "term": "el campo",
+              "translation": "der Bereich",
+              "pos": "noun",
+              "example": "Él trabaja en el campo de la ciencia.",
+              "exampleTranslation": "Er arbeitet im Bereich der Wissenschaft."
+            },
+            {
+              "term": "sobresalir por algo",
+              "translation": "durch etw. überragen",
+              "pos": "phrase",
+              "example": "México sobresale por sus artesanías.",
+              "exampleTranslation": "Mexiko überragt durch sein Kunsthandwerk."
+            },
+            { "term": "urbano/urbana", "translation": "städtisch", "pos": "noun" },
+            { "term": "el cantautor/la cantautora", "translation": "der Liedmacher/die Liedermacherin", "pos": "noun" },
+            {
+              "term": "la arquitectura [sg.]",
+              "translation": "die Architektur",
+              "pos": "noun",
+              "example": "La arquitectura puede ser un arte.",
+              "exampleTranslation": "Architektur kann eine Kunst sein."
+            },
+            {
+              "term": "en todo el mundo",
+              "translation": "auf der ganzen Welt",
+              "pos": "phrase",
+              "example": "En todo el mundo tomamos café.",
+              "exampleTranslation": "Auf der ganzen Welt trinken wir Kaffee."
+            },
+            {
+              "term": "el sabor",
+              "translation": "der Geschmack",
+              "pos": "noun",
+              "example": "¿Te gusta el sabor del chocolate?",
+              "exampleTranslation": "Magst du den Geschmack von Schokolade?"
+            },
+            { "term": "único/única", "translation": "einzigartig", "pos": "adjective" },
+            { "term": "el actor/la actriz", "translation": "der Schauspieler/die Schauspielerin", "pos": "noun", "grey": true },
+            { "term": "la canciòn", "translation": "das Lied", "pos": "noun", "grey": true },
+            { "term": "el castillo", "translation": "die Burg", "pos": "noun", "grey": true },
+            { "term": "el compositor/la compositora", "translation": "der Komponist/die Komponistin", "pos": "noun", "grey": true },
+            { "term": "la costumbre", "translation": "der Brauch", "pos": "noun", "grey": true },
+            { "term": "el cuadro", "translation": "das Gemälde", "pos": "noun", "grey": true },
+            { "term": "la danza", "translation": "der Tanz", "pos": "noun", "grey": true },
+            { "term": "el dialecto", "translation": "der Dialekt", "pos": "noun", "grey": true },
+            { "term": "el edificio", "translation": "das Gebäude", "pos": "noun", "grey": true },
+            { "term": "el escritor/la escritora", "translation": "der Schriftsteller/die Schriftstellerin", "pos": "noun", "grey": true },
+            { "term": "la estatua", "translation": "die Statue", "pos": "noun", "grey": true },
+            { "term": "la fiesta popular", "translation": "das Volksfest", "pos": "noun", "grey": true },
+            { "term": "el palacio", "translation": "das Schloss; der Palast", "pos": "noun", "grey": true },
+            { "term": "el rey/la reina", "translation": "der König/die Königin", "pos": "noun", "grey": true }
+          ]
+        },
+        {
+          "name": "Texto A",
+          "entries": [
+            {
+              "term": "el pasado",
+              "translation": "die Vergangenheit",
+              "pos": "noun",
+              "example": "Es importante aprender del pasado.",
+              "exampleTranslation": "Es ist wichtig, aus der Vergangenheit zu lernen."
+            },
+            { "term": "el presente", "translation": "die Gegenwart", "pos": "noun" },
+            {
+              "term": "el chicle",
+              "translation": "das Kaugummi",
+              "pos": "noun",
+              "example": "El chicle viene de la cultura maya.",
+              "exampleTranslation": "Kaugummi stammt aus der Maya-Kultur."
+            },
+            {
+              "term": "relacionar algo con algo",
+              "translation": "in Verbindung bringen mit etw.",
+              "pos": "phrase",
+              "example": "Relaciono verano con playa y helado.",
+              "exampleTranslation": "Ich verbinde den Sommer mit dem Strand und Eis."
+            },
+            {
+              "term": "los Estados Unidos (de América), los EE.UU.",
+              "translation": "die Vereinigten Staaten (von Amerika); die USA",
+              "pos": "noun",
+              "example": "Nueva York está en Estados Unidos.",
+              "exampleTranslation": "New York liegt in den Vereinigten Staaten."
+            },
+            {
+              "term": "el símbolo",
+              "translation": "das Symbol",
+              "pos": "noun",
+              "example": "Muchas artesanías tienen símbolos.",
+              "exampleTranslation": "Viele Kunsthandwerke haben Symbole."
+            },
+            { "term": "el/la maya", "translation": "der/die Maya", "pos": "phrase" },
+            {
+              "term": "masticar algo",
+              "translation": "etw. kauen",
+              "pos": "phrase",
+              "example": "Los mayas masticaban chicle.",
+              "exampleTranslation": "Die Mayas kauten Kaugummi."
+            },
+            {
+              "term": "quitar el hambre",
+              "translation": "den Hunger stillen",
+              "pos": "phrase",
+              "example": "Masticar chicle quita el hambre.",
+              "exampleTranslation": "Kaugummi stillt den Hunger."
+            },
+            {
+              "term": "la sed",
+              "translation": "der Durst",
+              "pos": "phrase",
+              "example": "El calor me da sed.",
+              "exampleTranslation": "Die Hitze macht mich durstig."
+            },
+            {
+              "term": "la goma",
+              "translation": "das Gummi",
+              "pos": "noun",
+              "example": "El chicle es una goma para masticar.",
+              "exampleTranslation": "Kaugummi ist eine Kaumasse zum Kauen."
+            },
+            { "term": "extraer algo", "translation": "etw. gewinnen", "pos": "verb" },
+            {
+              "term": "el calendario",
+              "translation": "der Kalender",
+              "pos": "noun",
+              "example": "En mi calendario escribo mis citas.",
+              "exampleTranslation": "In meinem Kalender notiere ich meine Termine."
+            },
+            {
+              "term": "observar las estrellas",
+              "translation": "die Sterne beobachten",
+              "pos": "phrase",
+              "example": "De noche observo las estrellas.",
+              "exampleTranslation": "Nachts beobachte ich die Sterne."
+            },
+            { "term": "observar algo", "translation": "etw. beobachten", "pos": "phrase" },
+            {
+              "term": "la estrella",
+              "translation": "der Stern",
+              "pos": "noun",
+              "example": "Esa estrella es muy grande.",
+              "exampleTranslation": "Dieser Stern ist sehr groß."
+            },
+            {
+              "term": "la posición",
+              "translation": "die Position",
+              "pos": "noun",
+              "example": "¿Cuál es la posición de la estrella?",
+              "exampleTranslation": "Wie ist die Position des Sterns?"
+            },
+            { "term": "calcular algo", "translation": "etw. berechnen", "pos": "phrase" },
+            { "term": "solar", "translation": "Sonnen-; solar", "pos": "adjective" },
+            {
+              "term": "la astronomía",
+              "translation": "die Astronomie",
+              "pos": "noun",
+              "example": "La astronomía es una ciencia.",
+              "exampleTranslation": "Astronomie ist eine Wissenschaft."
+            },
+            {
+              "term": "el cacao",
+              "translation": "der Kakao",
+              "pos": "noun",
+              "example": "Los aztecas pagaban con cacao.",
+              "exampleTranslation": "Die Azteken haben mit Kakao bezahlt."
+            },
+            { "term": "pagar", "translation": "(be-)zahlen", "pos": "verb" },
+            {
+              "term": "el maíz",
+              "translation": "der Mais",
+              "pos": "noun",
+              "example": "El maíz es un alimento importante.",
+              "exampleTranslation": "Mais ist ein wichtiges Lebensmittel."
+            },
+            {
+              "term": "América",
+              "translation": "Amerika",
+              "pos": "noun",
+              "example": "México es un país de América.",
+              "exampleTranslation": "Mexiko ist ein Land Amerikas."
+            },
+            {
+              "term": "mientras",
+              "translation": "während",
+              "pos": "conjunction",
+              "example": "Leo mientras mi hermana juega.",
+              "exampleTranslation": "Ich lese, während meine Schwester spielt."
+            },
+            {
+              "term": "el producto",
+              "translation": "das Produkt",
+              "pos": "noun",
+              "example": "El cacao es un producto de América.",
+              "exampleTranslation": "Kakao ist ein Produkt Amerikas."
+            },
+            { "term": "cultivar algo", "translation": "etw. anbauen", "pos": "phrase" },
+            {
+              "term": "consumir algo",
+              "translation": "etw. verzehren; etw. verbrauchen",
+              "pos": "verb",
+              "example": "Consumimos mucho maíz.",
+              "exampleTranslation": "Wir verzehren viel Mais."
+            },
+            {
+              "term": "en aquella época",
+              "translation": "damals",
+              "pos": "phrase",
+              "example": "En aquella época no había móviles.",
+              "exampleTranslation": "Damals gab es keine Handys."
+            },
+            {
+              "term": "la época",
+              "translation": "die Epoche",
+              "pos": "phrase",
+              "example": "Cada época tiene sus tradiciones.",
+              "exampleTranslation": "Jede Epoche hat ihre Traditionen."
+            },
+            {
+              "term": "la base",
+              "translation": "die Grundlage",
+              "pos": "noun",
+              "example": "La base de la receta es el maíz.",
+              "exampleTranslation": "Die Grundlage des Rezepts ist Mais."
+            },
+            {
+              "term": "adorar a alguien",
+              "translation": "jmdn. anbeten",
+              "pos": "phrase",
+              "example": "Los aztecas adoraban a sus dioses.",
+              "exampleTranslation": "Die Azteken beteten ihre Götter an."
+            },
+            {
+              "term": "el dios/la diosa",
+              "translation": "der Gott/die Göttin",
+              "pos": "noun",
+              "example": "Los mayas adoraban a más de un dios.",
+              "exampleTranslation": "Die Mayas verehrten mehr als einen Gott."
+            },
+            {
+              "term": "el altar",
+              "translation": "der Altar",
+              "pos": "noun",
+              "example": "Los altares mayas eran importantes.",
+              "exampleTranslation": "Maya-Altäre waren wichtig."
+            },
+            { "term": "la celebración", "translation": "die Feier", "pos": "noun" },
+            {
+              "term": "alegre",
+              "translation": "fröhlich",
+              "pos": "adjective",
+              "example": "La música de la fiesta era alegre.",
+              "exampleTranslation": "Die Musik der Party war fröhlich."
+            },
+            {
+              "term": "recordar a alguien [o → ue]",
+              "translation": "(sich) an jmdn. erinnern",
+              "pos": "phrase",
+              "example": "Cuando cocino, recuerdo a mi abuela.",
+              "exampleTranslation": "Wenn ich koche, erinnere ich mich an meine Großmutter."
+            },
+            {
+              "term": "el muerto/la muerta",
+              "translation": "der/die Tote",
+              "pos": "noun",
+              "example": "El Día de Muertos es una gran fiesta.",
+              "exampleTranslation": "Der Tag der Toten ist ein großer Feiertag."
+            },
+            {
+              "term": "antes",
+              "translation": "früher",
+              "pos": "adverb",
+              "example": "Antes hacía la compra en el mercado.",
+              "exampleTranslation": "Ich habe früher auf dem Markt eingekauft."
+            },
+            {
+              "term": "la alegría",
+              "translation": "die Freude",
+              "pos": "noun",
+              "example": "La gente celebra con alegría.",
+              "exampleTranslation": "Die Leute feiern voller Freude."
+            },
+            {
+              "term": "el templo",
+              "translation": "der Tempel",
+              "pos": "noun",
+              "example": "En Tenochtitlán había templos.",
+              "exampleTranslation": "In Tenochtitlan gab es Tempel."
+            },
+            {
+              "term": "decorar algo",
+              "translation": "etw. schmücken",
+              "pos": "verb",
+              "example": "Decoramos el altar del Día de Muertos.",
+              "exampleTranslation": "Wir schmückten den Altar des Totentags."
+            }
+          ]
+        },
+        {
+          "name": "Texto B",
+          "entries": [
+            {
+              "term": "la mujer",
+              "translation": "die Frau",
+              "pos": "noun",
+              "example": "Frida Kahlo fue una mujer mexicana.",
+              "exampleTranslation": "Frida Kahlo war eine mexikanische Frau."
+            },
+            {
+              "term": "la generación",
+              "translation": "die Generation",
+              "pos": "noun",
+              "example": "¿Cuántas generaciones viven en tu casa?",
+              "exampleTranslation": "Wie viele Generationen leben in Ihrem Haus?"
+            },
+            { "term": "la perspectiva", "translation": "die Sichtweise", "pos": "noun" },
+            {
+              "term": "personal",
+              "translation": "persönlich",
+              "pos": "adjective",
+              "example": "Esta es mi perspectiva personal.",
+              "exampleTranslation": "Das ist meine persönliche Perspektive."
+            },
+            {
+              "term": "la actualidad",
+              "translation": "die Gegenwart",
+              "pos": "noun",
+              "example": "En la actualidad usamos móviles.",
+              "exampleTranslation": "Wir nutzen in der Gegenwart Mobiltelefone."
+            },
+            {
+              "term": "entonces",
+              "translation": "damals",
+              "pos": "adverb",
+              "example": "Entonces iba mucho al cine, pero ya no.",
+              "exampleTranslation": "Damals bin ich oft ins Kino gegangen, aber heute nicht mehr."
+            },
+            {
+              "term": "elegante",
+              "translation": "elegant",
+              "pos": "adjective",
+              "example": "Ese vestido es muy elegante.",
+              "exampleTranslation": "Dieses Kleid ist sehr elegant."
+            },
+            {
+              "term": "en la década de 1970",
+              "translation": "in den 1970er Jahren",
+              "pos": "phrase",
+              "example": "En la década de 1970 no había móviles.",
+              "exampleTranslation": "In den 1970er Jahren gab es keine Mobiltelefone."
+            },
+            { "term": "la década", "translation": "das Jahrzehnt; die Dekade", "pos": "noun" },
+            {
+              "term": "el arquitecto/la arquitecta",
+              "translation": "der Architekt/die Architektin",
+              "pos": "noun",
+              "example": "La arquitecta sobresale por sus ideas.",
+              "exampleTranslation": "Die Architektin sticht durch ihre Ideen hervor."
+            },
+            { "term": "construir algo", "translation": "etw. bauen", "pos": "verb" },
+            {
+              "term": "el camión [mex.]",
+              "translation": "der Bus",
+              "pos": "noun",
+              "example": "¿Vas en camión al instituto?",
+              "exampleTranslation": "Fährst du mit dem Bus zur Schule?"
+            },
+            {
+              "term": "la universidad",
+              "translation": "die Universität",
+              "pos": "noun",
+              "example": "Mi primo estudia en la universidad.",
+              "exampleTranslation": "Mein Cousin studiert an der Universität."
+            },
+            {
+              "term": "el año de carrera",
+              "translation": "das Studienjahr",
+              "pos": "noun",
+              "example": "Estoy en mi segundo año de carrera.",
+              "exampleTranslation": "Ich bin im zweiten Studienjahr."
+            },
+            { "term": "increíble", "translation": "unglaublich", "pos": "adjective" },
+            { "term": "ser el centro de atención", "translation": "im Mittelpunkt stehen", "pos": "phrase" },
+            {
+              "term": "el camarero/la camarera",
+              "translation": "der Kellner/die Kellnerin",
+              "pos": "noun",
+              "example": "El camarero trae nuestra comida.",
+              "exampleTranslation": "Der Kellner bringt unser Essen."
+            },
+            {
+              "term": "el mesero/la mesera [mex.]",
+              "translation": "der Kellner/die Kellnerin",
+              "pos": "noun",
+              "example": "El mesero trae nuestra comida.",
+              "exampleTranslation": "Der Kellner bringt unser Essen."
+            },
+            {
+              "term": "el pastel",
+              "translation": "die Torte; der Kuchen",
+              "pos": "noun",
+              "example": "¿Te gusta el pastel de chocolate?",
+              "exampleTranslation": "Magst du Schokoladenkuchen?"
+            },
+            {
+              "term": "la vela",
+              "translation": "die Kerze",
+              "pos": "noun",
+              "example": "En el pastel hay catorce velas.",
+              "exampleTranslation": "Auf der Torte stehen vierzehn Kerzen."
+            },
+            {
+              "term": "el caos",
+              "translation": "das Chaos",
+              "pos": "noun",
+              "example": "El tráfico en CDMX es un caos.",
+              "exampleTranslation": "Der Verkehr in Mexiko-Stadt ist ein Chaos."
+            },
+            { "term": "caótico/caótica", "translation": "chaotisch", "pos": "noun" },
+            {
+              "term": "ecológico/ecológica",
+              "translation": "ökologisch",
+              "pos": "noun",
+              "example": "Hay proyectos ecológicos en México.",
+              "exampleTranslation": "Es gibt ökologische Projekte in Mexiko."
+            },
+            {
+              "term": "el carril-bici",
+              "translation": "der Fahrradweg",
+              "pos": "noun",
+              "example": "Muchas familias usan el carril-bici.",
+              "exampleTranslation": "Viele Familien nutzen den Fahrradweg."
+            },
+            { "term": "en general", "translation": "im Allgemeinen", "pos": "phrase" },
+            {
+              "term": "platicar [mex.]",
+              "translation": "sich unterhalten",
+              "pos": "phrase",
+              "example": "Me gusta platicar con amigas.",
+              "exampleTranslation": "Ich unterhalte mich gerne mit Freunden."
+            },
+            { "term": "el príncipe/la princesa", "translation": "der Prinz/die Prinzessin", "pos": "noun" },
+            {
+              "term": "¡Ándale! [mex.]",
+              "translation": "Na, los!",
+              "pos": "phrase",
+              "example": "¡Ándale! Vamos tarde al cine.",
+              "exampleTranslation": "Nur zu! Wir sind zu spät zum Kino."
+            },
+            { "term": "aceptar algo", "translation": "etw. akzeptieren", "pos": "phrase" },
+            {
+              "term": "el/la familiar",
+              "translation": "der/die Familienangehörige; der/die Verwandte",
+              "pos": "noun",
+              "example": "Mis familiares vienen para mi fiesta.",
+              "exampleTranslation": "Meine Verwandten kommen zu meiner Feier."
+            },
+            {
+              "term": "reunirse",
+              "translation": "sich versammeln",
+              "pos": "verb",
+              "example": "Nos reunimos para comer y celebrar.",
+              "exampleTranslation": "Wir versammeln uns, um zu essen und zu feiern."
+            },
+            {
+              "term": "con más frecuencia",
+              "translation": "häufiger",
+              "pos": "phrase",
+              "example": "Quiero viajar con más frecuencia.",
+              "exampleTranslation": "Ich möchte häufiger reisen."
+            },
+            {
+              "term": "comprarse algo",
+              "translation": "sich etw. kaufen",
+              "pos": "phrase",
+              "example": "Ella se compra zapatos nuevos.",
+              "exampleTranslation": "Sie kauft sich neue Schuhe."
+            },
+            {
+              "term": "super- [+ adj.]",
+              "translation": "total [+Adj.]; super- [+ Adj.]",
+              "pos": "phrase",
+              "example": "¡Este libro es superinteresante!",
+              "exampleTranslation": "Dieses Buch ist super-interessant!"
+            },
+            {
+              "term": "el paseo",
+              "translation": "die Spazierfahrt",
+              "pos": "noun",
+              "example": "Me gusta el paseo por la playa.",
+              "exampleTranslation": "Ich mag die Spazierfahrt am Strand."
+            },
+            {
+              "term": "contra",
+              "translation": "gegen",
+              "pos": "preposition",
+              "example": "Hacemos algo contra la contaminación.",
+              "exampleTranslation": "Wir tun etwas gegen die Verschmutzung."
+            },
+            { "term": "la contaminación", "translation": "die (Luft-)Verschmutzung", "pos": "noun" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Módulo 1",
+      "sections": [
+        {
+          "name": "Wortschatz",
+          "entries": [
+            {
+              "term": "la lengua materna",
+              "translation": "die Muttersprache",
+              "pos": "noun",
+              "example": "Mi lengua materna es el alemán.",
+              "exampleTranslation": "Meine Muttersprache ist Deutsch."
+            },
+            {
+              "term": "la lengua extranjera",
+              "translation": "die Fremdsprache",
+              "pos": "noun",
+              "example": "¿Qué lenguas extranjeras hablas?",
+              "exampleTranslation": "Welche Fremdsprachen sprichst du?"
+            },
+            {
+              "term": "extranjero/extranjera",
+              "translation": "ausländisch",
+              "pos": "noun",
+              "example": "Vienen muchos turistas extranjeros.",
+              "exampleTranslation": "Viele ausländische Touristen kommen."
+            },
+            {
+              "term": "el por ciento (%)",
+              "translation": "das Prozent",
+              "pos": "noun",
+              "example": "El 90 % de la población usa Internet.",
+              "exampleTranslation": "90 % der Bevölkerung nutzen das Internet."
+            },
+            {
+              "term": "la población mundial",
+              "translation": "die Weltbevölkerung",
+              "pos": "noun",
+              "example": "La población mundial es muy diversa.",
+              "exampleTranslation": "Die Weltbevölkerung ist sehr vielfältig."
+            },
+            { "term": "la población", "translation": "die Bevölkerung", "pos": "noun" },
+            { "term": "mundial", "translation": "weltweit; Welt-[+S.]", "pos": "adjective" },
+            {
+              "term": "convertir algo en algo [e → ie]",
+              "translation": "etw. zu etw. machen; etw. umwandeln in etw.",
+              "pos": "phrase",
+              "example": "Convierte la frase en una pregunta.",
+              "exampleTranslation": "Mach aus dem Satz eine Frage."
+            },
+            {
+              "term": "hablado/hablada",
+              "translation": "gesprochen",
+              "pos": "phrase",
+              "example": "El español es una lengua muy hablada.",
+              "exampleTranslation": "Spanisch ist eine weit verbreitete Sprache."
+            },
+            {
+              "term": "el alemán",
+              "translation": "Deutsch [Sprache]",
+              "pos": "adjective",
+              "example": "El alemán es muy diferente al español.",
+              "exampleTranslation": "Deutsch unterscheidet sich stark von Spanisch.",
+              "grey": true
+            },
+            {
+              "term": "el árabe",
+              "translation": "Arabisch [Sprache]",
+              "pos": "adjective",
+              "example": "El árabe tiene un alfabeto diferente.",
+              "exampleTranslation": "Arabisch hat ein anderes Alphabet.",
+              "grey": true
+            },
+            {
+              "term": "el castellano, el español",
+              "translation": "Spanisch [Sprache]",
+              "pos": "noun",
+              "example": "Estudiamos castellano en el instituto.",
+              "exampleTranslation": "Wir lernen Spanisch in der Schule.",
+              "grey": true
+            },
+            {
+              "term": "el francés",
+              "translation": "Französisch [Sprache]",
+              "pos": "noun",
+              "example": "Laurence habla francés muy bien.",
+              "exampleTranslation": "Laurence spricht sehr gut Französisch.",
+              "grey": true
+            },
+            {
+              "term": "el hindi",
+              "translation": "Hindi [Sprache]",
+              "pos": "noun",
+              "example": "El hindi es un idioma oficial en la India.",
+              "exampleTranslation": "Hindi ist eine Amtssprache in Indien.",
+              "grey": true
+            },
+            {
+              "term": "el inglés",
+              "translation": "Englisch [Sprache]",
+              "pos": "noun",
+              "example": "El inglés es el idioma del mundo.",
+              "exampleTranslation": "Englisch ist die Weltsprache.",
+              "grey": true
+            },
+            {
+              "term": "el italiano",
+              "translation": "Italienisch [Sprache]",
+              "pos": "noun",
+              "example": "Voy a tomar un curso de italiano este verano.",
+              "exampleTranslation": "Ich werde diesen Sommer einen Italienischkurs belegen.",
+              "grey": true
+            },
+            {
+              "term": "el mandarín",
+              "translation": "Mandarin [Sprache]",
+              "pos": "noun",
+              "example": "Aprender mandarín puede ser difícil.",
+              "exampleTranslation": "Mandarin zu lernen kann schwierig sein.",
+              "grey": true
+            },
+            { "term": "el quechua", "translation": "Quechua [indigene Sprache in Südamerika]", "pos": "noun", "grey": true },
+            {
+              "term": "el rumano",
+              "translation": "Rumänisch [Sprache]",
+              "pos": "noun",
+              "example": "Hay cursos de rumano online.",
+              "exampleTranslation": "Es gibt Online-Rumänischkurse.",
+              "grey": true
+            },
+            {
+              "term": "uno/una [pron.]",
+              "translation": "eine/einer/eines",
+              "pos": "phrase",
+              "example": "Uno de los libros está en inglés.",
+              "exampleTranslation": "Eines der Bücher ist auf Englisch."
+            },
+            {
+              "term": "la lengua de signos",
+              "translation": "die Gebärdensprache",
+              "pos": "noun",
+              "example": "¿Sabes hablar lengua de signos?",
+              "exampleTranslation": "Kannst du Gebärdensprache sprechen?"
+            },
+            {
+              "term": "el signo",
+              "translation": "das Zeichen",
+              "pos": "phrase",
+              "example": "No poder dormir es signo de estrés.",
+              "exampleTranslation": "Schlaflosigkeit ist ein Zeichen von Stress."
+            },
+            {
+              "term": "costarricense",
+              "translation": "costa-ricanisch",
+              "pos": "noun",
+              "example": "Ana y Davíd son costarricenses.",
+              "exampleTranslation": "Ana und Davíd sind Costa-Ricaner."
+            },
+            { "term": "existir", "translation": "existieren", "pos": "verb" },
+            {
+              "term": "el catalán, el català [cat.]",
+              "translation": "Katalanisch [Sprache]",
+              "pos": "noun",
+              "example": "El catalán es una lengua cooficial en Cataluña.",
+              "exampleTranslation": "Katalanisch ist eine kooffizielle Sprache in Katalonien.",
+              "grey": true
+            },
+            { "term": "el gallego, o galego [gal.]", "translation": "Galicisch [Sprache]", "pos": "noun", "grey": true },
+            {
+              "term": "el vasco, el euskera [vas.]",
+              "translation": "Baskisch [Sprache]",
+              "pos": "noun",
+              "example": "El vasco es una lengua muy antigua.",
+              "exampleTranslation": "Baskisch ist eine sehr alte Sprache.",
+              "grey": true
+            },
+            {
+              "term": "el valenciano, el valencià [val.]",
+              "translation": "Valencianisch [Sprache]",
+              "pos": "noun",
+              "example": "Muchos niños en Valencia hablan valenciano.",
+              "exampleTranslation": "Viele Kinder in Valencia sprechen Valencianisch.",
+              "grey": true
+            },
+            {
+              "term": "el aranés",
+              "translation": "Aranesisch [Sprache]",
+              "pos": "noun",
+              "example": "El aranés es una lengua pequeña pero importante.",
+              "exampleTranslation": "Aranesisch ist eine kleine, aber wichtige Sprache.",
+              "grey": true
+            },
+            {
+              "term": "el hablante nativo/la hablante nativa",
+              "translation": "der Muttersprachler/die Muttersprachlerin",
+              "pos": "noun",
+              "example": "¿Eres hablante nativo del español?",
+              "exampleTranslation": "Bist du ein spanischer Muttersprachler?"
+            },
+            { "term": "el/la hablante", "translation": "der Sprecher/die Sprecherin", "pos": "noun" },
+            {
+              "term": "nativo/nativa",
+              "translation": "einheimisch; gebürtig",
+              "pos": "noun",
+              "example": "Ese animal es nativo de Perú.",
+              "exampleTranslation": "Dieses Tier ist in Peru heimisch."
+            },
+            {
+              "term": "Colombia",
+              "translation": "Kolumbien",
+              "pos": "noun",
+              "example": "Bogotá es la capital de Colombia.",
+              "exampleTranslation": "Bogotá ist die Hauptstadt Kolumbiens."
+            },
+            {
+              "term": "Perú",
+              "translation": "Peru",
+              "pos": "noun",
+              "example": "Perú está en América del Sur.",
+              "exampleTranslation": "Peru liegt in Südamerika."
+            },
+            {
+              "term": "el/la hispanohablante",
+              "translation": "die spanischsprachige Person",
+              "pos": "noun",
+              "example": "¿Conoces a hispanohablantes?",
+              "exampleTranslation": "Kennst du spanischsprachige Personen?"
+            },
+            {
+              "term": "diverso/diversa",
+              "translation": "verschiedene/verschiedener; vielseitige/vielseitiger",
+              "pos": "noun",
+              "example": "Tengo intereses diversos.",
+              "exampleTranslation": "Ich habe verschiedene Interessen."
+            },
+            {
+              "term": "Bolivia",
+              "translation": "Bolivien",
+              "pos": "noun",
+              "example": "Bolivia tiene muchas montañas y lagos.",
+              "exampleTranslation": "Bolivien hat viele Berge und Seen."
+            },
+            { "term": "la mayoría", "translation": "die Mehrheit", "pos": "noun" },
+            { "term": "la minoría", "translation": "die Minderheit", "pos": "noun" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Unidad 2",
+      "sections": [
+        {
+          "name": "Vocabulario",
+          "entries": [
+            {
+              "term": "la primaria",
+              "translation": "die Grundschule",
+              "pos": "noun",
+              "example": "Mi amigo y yo estamos en la primaria.",
+              "exampleTranslation": "Mein Freund und ich sind in der Grundschule."
+            },
+            {
+              "term": "el bombero/la bombera",
+              "translation": "der Feuerwehrmann/die Feuerwehrfrau",
+              "pos": "noun",
+              "example": "Quiero ser bombera y ayudar a otros.",
+              "exampleTranslation": "Ich möchte Feuerwehrfrau werden und anderen helfen."
+            },
+            { "term": "el pintor/la pintora", "translation": "der Maler/die Malerin", "pos": "noun" },
+            {
+              "term": "el médico/la médica",
+              "translation": "der Arzt/die Ärztin",
+              "pos": "noun",
+              "example": "La médica cuida de los alumnos.",
+              "exampleTranslation": "Die Ärztin kümmert sich um die Schüler."
+            },
+            {
+              "term": "el diseñador (gráfico)/la diseñadora (gráfica)",
+              "translation": "der(Grafik-)Designer/die (Grafik-)Designerin",
+              "pos": "noun",
+              "example": "El diseñador usa mucho el ordenador.",
+              "exampleTranslation": "Der Designer benutzt den Computer viel."
+            },
+            {
+              "term": "el ingeniero/la ingeniera",
+              "translation": "der Ingenieur/die Ingenieurin",
+              "pos": "noun",
+              "example": "Mi padre es un buen ingeniero.",
+              "exampleTranslation": "Mein Vater ist ein guter Ingenieur."
+            },
+            {
+              "term": "la energía renovable",
+              "translation": "die erneuerbare Energie",
+              "pos": "noun",
+              "example": "Las energías renovables son el futuro.",
+              "exampleTranslation": "Erneuerbare Energien sind die Zukunft."
+            },
+            { "term": "la energía", "translation": "die Energie", "pos": "phrase" },
+            {
+              "term": "el propietario/la propietaria",
+              "translation": "der Besitzer/die Besitzerin",
+              "pos": "noun",
+              "example": "Mi madre es la propietaria de la casa.",
+              "exampleTranslation": "Meine Mutter besitzt das Haus."
+            },
+            {
+              "term": "la profesión",
+              "translation": "der Beruf",
+              "pos": "noun",
+              "example": "La profesión de mi madre es médica.",
+              "exampleTranslation": "Der Beruf meiner Mutter ist Ärztin."
+            },
+            {
+              "term": "el sueño",
+              "translation": "der Traum",
+              "pos": "noun",
+              "example": "Mi sueño es tener una librería.",
+              "exampleTranslation": "Mein Traum ist es, eine Buchhandlung zu haben."
+            },
+            {
+              "term": "el formulario",
+              "translation": "das Formular",
+              "pos": "noun",
+              "example": "Este es el formulario para la clase.",
+              "exampleTranslation": "Das ist das Formular für den Kurs."
+            },
+            {
+              "term": "la orientación vocacional",
+              "translation": "die Berufsorientierung",
+              "pos": "noun",
+              "example": "Hoy tenemos orientación vocacional.",
+              "exampleTranslation": "Heute haben wir Berufsorientierung."
+            },
+            {
+              "term": "la formación profesional",
+              "translation": "die Berufsausbildung",
+              "pos": "noun",
+              "example": "Quiero hacer una formación profesional.",
+              "exampleTranslation": "Ich möchte eine Berufsausbildung machen."
+            },
+            { "term": "profesional", "translation": "Berufs-; beruflich", "pos": "adjective" },
+            {
+              "term": "el jefe/la jefa",
+              "translation": "der Chef/die Chefin",
+              "pos": "noun",
+              "example": "Mi madre es la jefa de la empresa.",
+              "exampleTranslation": "Meine Mutter ist die Chefin der Firma."
+            },
+            { "term": "autónomo/autónoma", "translation": "selbstständig; freiberuflich", "pos": "noun" },
+            {
+              "term": "propio/propia",
+              "translation": "eigene",
+              "pos": "noun",
+              "example": "Mi tía tiene su propia tienda de ropa.",
+              "exampleTranslation": "Meine Tante hat ihr eigenes Bekleidungsgeschäft."
+            },
+            { "term": "(ser) empleado/empleada", "translation": "angestellt (sein)", "pos": "phrase" },
+            {
+              "term": "la empresa",
+              "translation": "die Firma; das Unternehmen",
+              "pos": "noun",
+              "example": "Voy a trabajar en una empresa grande.",
+              "exampleTranslation": "Ich werde in einem großen Unternehmen arbeiten."
+            },
+            {
+              "term": "al aire libre",
+              "translation": "im Freien; draußen",
+              "pos": "phrase",
+              "example": "Jugamos baloncesto al aire libre.",
+              "exampleTranslation": "Wir spielen draußen Basketball."
+            },
+            {
+              "term": "los horarios",
+              "translation": "die Arbeitszeiten",
+              "pos": "noun",
+              "example": "La empresa ofrece horarios flexibles.",
+              "exampleTranslation": "Das Unternehmen bietet flexible Arbeitszeiten an."
+            },
+            {
+              "term": "flexible",
+              "translation": "flexibel",
+              "pos": "adjective",
+              "example": "El horario de las clases no es flexible.",
+              "exampleTranslation": "Der Stundenplan ist nicht flexibel."
+            },
+            {
+              "term": "fijo/fija",
+              "translation": "fest",
+              "pos": "noun",
+              "example": "Los deportes no tienen horario fijo.",
+              "exampleTranslation": "Sport hat keinen festen Zeitplan."
+            },
+            {
+              "term": "tomar una decisión",
+              "translation": "eine Entscheidung treffen",
+              "pos": "phrase",
+              "example": "Ya tomé una decisión sobre mi futuro.",
+              "exampleTranslation": "Ich habe bereits eine Entscheidung über meine Zukunft getroffen."
+            },
+            { "term": "en público", "translation": "öffentlich; vor anderen", "pos": "phrase" },
+            { "term": "el experimento", "translation": "das Experiment", "pos": "noun" },
+            {
+              "term": "analizar algo",
+              "translation": "etw. analysieren",
+              "pos": "phrase",
+              "example": "Vamos a analizar el problema.",
+              "exampleTranslation": "Lass uns das Problem analysieren."
+            },
+            {
+              "term": "ganar dinero",
+              "translation": "Geld verdienen",
+              "pos": "phrase",
+              "example": "Voy a ganar mucho dinero en el futuro.",
+              "exampleTranslation": "Ich werde in Zukunft viel Geld verdienen."
+            },
+            {
+              "term": "cambiar (algo/a alguien)",
+              "translation": "(etw./jmdn.) (ver-)ändern",
+              "pos": "verb",
+              "example": "Mi trabajo va a cambiar el mundo.",
+              "exampleTranslation": "Meine Arbeit wird die Welt verändern."
+            },
+            {
+              "term": "para mejor",
+              "translation": "zum Besseren",
+              "pos": "phrase",
+              "example": "Podemos cambiar el mundo para mejor.",
+              "exampleTranslation": "Wir können die Welt zum Besseren verändern."
+            },
+            {
+              "term": "apasionante",
+              "translation": "spannend",
+              "pos": "noun",
+              "example": "Esta película es apasionante.",
+              "exampleTranslation": "Dieser Film ist spannend."
+            },
+            {
+              "term": "peligroso/peligrosa",
+              "translation": "gefährlich",
+              "pos": "noun",
+              "example": "Cruzar la calle sin mirar es peligroso.",
+              "exampleTranslation": "Die Straße zu überqueren, ohne hinzusehen, ist gefährlich."
+            },
+            {
+              "term": "imaginarse algo",
+              "translation": "sich etw. vorstellen",
+              "pos": "verb",
+              "example": "¿Te puedes imaginar vivir en México?",
+              "exampleTranslation": "Kannst du dir vorstellen, in Mexiko zu leben?"
+            },
+            { "term": "el abogado/la abogada", "translation": "der Anwalt/die Anwältin", "pos": "noun", "grey": true },
+            { "term": "el carpintero/la carpintera", "translation": "der Tischler/die Tischlerin", "pos": "noun", "grey": true },
+            { "term": "el cocinero/la cocinera", "translation": "der Koch/die Köchin", "pos": "noun", "grey": true },
+            { "term": "el/la dentista", "translation": "der Zahnarzt/die Zahnärztin", "pos": "noun", "grey": true },
+            { "term": "el diseñador/la diseñadora de juegos", "translation": "der Gamedesigner/die Gamedesignerin", "pos": "noun", "grey": true },
+            { "term": "el educador/la educadora", "translation": "der Erzieher/die Erzieherin", "pos": "noun", "grey": true },
+            { "term": "el enfermero/la enfermera", "translation": "der Krankenpfleger/die Krankenpflegerin", "pos": "noun", "grey": true },
+            { "term": "el farmacéutico/la farmacéutica", "translation": "der Apotheker/die Apothekerin", "pos": "noun", "grey": true },
+            { "term": "el informático/la informática", "translation": "der Informatiker/die Informatikerin", "pos": "noun", "grey": true },
+            { "term": "el/la periodista", "translation": "der Journalist/die Journalistin", "pos": "noun", "grey": true },
+            { "term": "el/la piloto", "translation": "der Pilot/die Pilotin", "pos": "phrase", "grey": true },
+            { "term": "el/la policía", "translation": "der Polizist/die Polizistin", "pos": "noun", "grey": true },
+            { "term": "el psicólogo/la psicóloga", "translation": "der Psychologe/die Psychologin", "pos": "noun", "grey": true }
+          ]
+        },
+        {
+          "name": "Texto A",
+          "entries": [
+            {
+              "term": "a la semana",
+              "translation": "pro Woche",
+              "pos": "phrase",
+              "example": "Hago deporte tres veces a la semana.",
+              "exampleTranslation": "Ich mache dreimal pro Woche Sport."
+            },
+            {
+              "term": "algún/alguna",
+              "translation": "einige; irgendein/irgendeine",
+              "pos": "phrase",
+              "example": "¿Conoces alguna película española?",
+              "exampleTranslation": "Kennst du einige spanische Filme?"
+            },
+            {
+              "term": "algunos/algunas",
+              "translation": "einige",
+              "pos": "noun",
+              "example": "Tengo algunas preguntas.",
+              "exampleTranslation": "Ich habe ein paar Fragen."
+            },
+            {
+              "term": "por la noche",
+              "translation": "am Abend; in der Nacht",
+              "pos": "phrase",
+              "example": "Por la noche hago los deberes.",
+              "exampleTranslation": "Abends mache ich meine Hausaufgaben."
+            },
+            {
+              "term": "hacer de canguro",
+              "translation": "babysitten",
+              "pos": "phrase",
+              "example": "¿Tu trabajillo es hacer de canguro?",
+              "exampleTranslation": "Ist es deine Aufgabe zu babysitten?"
+            },
+            { "term": "el/la canguro", "translation": "der Babysitter/die Babysitterin", "pos": "phrase" },
+            { "term": "el canguro", "translation": "das Känguru", "pos": "noun" },
+            { "term": "el dinerillo [fam.]", "translation": "ein wenig Geld", "pos": "noun" },
+            {
+              "term": "el mecánico/la mecánica",
+              "translation": "der Mechaniker/die Mechanikerin",
+              "pos": "noun",
+              "example": "En verano trabajo como mecánica.",
+              "exampleTranslation": "Im Sommer arbeite ich als Mechanikerin."
+            },
+            {
+              "term": "ningún/ninguno/ninguna",
+              "translation": "kein/keine/keiner",
+              "pos": "noun",
+              "example": "No hay ninguna tienda abierta hoy.",
+              "exampleTranslation": "Heute ist kein Geschäft geöffnet."
+            },
+            {
+              "term": "la moto",
+              "translation": "das Motorrad",
+              "pos": "noun",
+              "example": "¿Quieres esta moto o esa?",
+              "exampleTranslation": "Willst du dieses Motorad oder das andere?"
+            },
+            {
+              "term": "el trabajillo [fam.]",
+              "translation": "der Nebenjob; der Minijob; die kleine Arbeit",
+              "pos": "noun",
+              "example": "¿Tienes un trabajillo para el verano?",
+              "exampleTranslation": "Hast du einen Nebenjob für den Sommer?"
+            },
+            { "term": "la experiencia", "translation": "die Erfahrung", "pos": "noun" },
+            {
+              "term": "el anuncio",
+              "translation": "die Anzeige",
+              "pos": "noun",
+              "example": "Hay un anuncio para un trabajillo.",
+              "exampleTranslation": "Es gibt eine Anzeige für einen Nebenjob."
+            },
+            {
+              "term": "ahorrar algo",
+              "translation": "etw. sparen",
+              "pos": "verb",
+              "example": "Ahorro mi dinerillo para la moto.",
+              "exampleTranslation": "Ich spare mein Geld für das Motorrad."
+            },
+            { "term": "la sorpresita [fam.]", "translation": "die kleine Überraschung", "pos": "noun" },
+            {
+              "term": "el material",
+              "translation": "das Material",
+              "pos": "noun",
+              "example": "Ya tengo el material para el insti.",
+              "exampleTranslation": "Ich habe das Material für die Schule bereits."
+            },
+            { "term": "la subscipción", "translation": "das Abonnement", "pos": "noun" },
+            {
+              "term": "el monitor/la monitora",
+              "translation": "der Betreuer/die Betreuerin",
+              "pos": "noun",
+              "example": "La monitora enseña a los niños a nadar.",
+              "exampleTranslation": "Die Betreuerin bringt den Kindern das Schwimmen bei."
+            },
+            {
+              "term": "el bachillerato",
+              "translation": "die Oberstufe; das Abitur",
+              "pos": "noun",
+              "example": "Mi hermano está en el bachillerato.",
+              "exampleTranslation": "Mein Bruder ist in der Oberstufe."
+            },
+            {
+              "term": "de vez en cuando",
+              "translation": "ab und zu",
+              "pos": "phrase",
+              "example": "De vez en cuando voy al cine sola.",
+              "exampleTranslation": "Ab und zu gehe ich alleine ins Kino."
+            },
+            {
+              "term": "el recado",
+              "translation": "die Besorgung",
+              "pos": "phrase",
+              "example": "Hoy ayudo a mi abuela con recados.",
+              "exampleTranslation": "Heute helfe ich meiner Großmutter bei Besorgungen."
+            },
+            {
+              "term": "la queja",
+              "translation": "die Beschwerde",
+              "pos": "noun",
+              "example": "¿Tienes quejas de tu trabajillo?",
+              "exampleTranslation": "Hast du Beschwerden über deinen Minijob?"
+            },
+            {
+              "term": "las salidas [pl.]",
+              "translation": "die Unternehmungen; die Treffen",
+              "pos": "noun",
+              "example": "Gasto mi dinero en salidas con Álex.",
+              "exampleTranslation": "Ich gebe mein Geld für Unternehmungen mit Álex aus."
+            },
+            {
+              "term": "la edad",
+              "translation": "das Alter",
+              "pos": "noun",
+              "example": "No tengo edad para un trabajillo.",
+              "exampleTranslation": "Ich bin nicht alt genug für einen Job."
+            },
+            {
+              "term": "pedir algo a alguien [e → i]",
+              "translation": "jmdn. um etw. bitten",
+              "pos": "phrase",
+              "example": "Pedí a mi madre libros para el insti.",
+              "exampleTranslation": "Ich habe meine Mutter um Bücher für die Schule gebeten."
+            },
+            { "term": "la recomendación", "translation": "die Empfehlung", "pos": "noun" },
+            { "term": "adecuado/adecuada", "translation": "angemessen", "pos": "noun" },
+            { "term": "la ayuda", "translation": "die Hilfe", "pos": "interjection" },
+            { "term": "ofrecer algo a alguien [c → zc]", "translation": "jmdm. etw. anbieten", "pos": "phrase" },
+            { "term": "el currículum", "translation": "der Lebenslauf", "pos": "noun" },
+            {
+              "term": "entregar algo (a alguien)",
+              "translation": "etw. abgeben; (jmdm.) etw. überreichen",
+              "pos": "phrase",
+              "example": "¿Ya entregaste tu currículum?",
+              "exampleTranslation": "Hast du deinen Lebenslauf bereits abgegeben?"
+            },
+            {
+              "term": "subir algo",
+              "translation": "etw. hochladen",
+              "pos": "verb",
+              "example": "Voy a subir la foto.",
+              "exampleTranslation": "Ich werde das Foto hochladen."
+            },
+            {
+              "term": "la plataforma de empleo",
+              "translation": "die Stellenplattform",
+              "pos": "noun",
+              "example": "¿Qué plataformas de empleo conoces?",
+              "exampleTranslation": "Welche Stellenplattformen kennst du?"
+            },
+            {
+              "term": "el empleo",
+              "translation": "die (Arbeits-)Stelle",
+              "pos": "noun",
+              "example": "Encontré un empleo en una tienda.",
+              "exampleTranslation": "Ich habe eine Arbeitsstelle in einem Laden gefunden."
+            }
+          ]
+        },
+        {
+          "name": "Texto B",
+          "entries": [
+            { "term": "entrevistar a alguien", "translation": "jmdn. interviewen", "pos": "phrase" },
+            {
+              "term": "el/la trotamundos [m./f.]",
+              "translation": "der Weltenbummler/die Weltembummlerin",
+              "pos": "phrase",
+              "example": "Mi tío es un trotamundos y es feliz.",
+              "exampleTranslation": "Mein Onkel ist ein Weltenbummler und er ist glücklich."
+            },
+            {
+              "term": "el periódico escolar",
+              "translation": "die Schülerzeitung",
+              "pos": "noun",
+              "example": "¿Quién está en el periódico escolar?",
+              "exampleTranslation": "Wer steht in der Schülerzeitung?"
+            },
+            {
+              "term": "el periódico",
+              "translation": "die Zeitung",
+              "pos": "noun",
+              "example": "Ella lee el periódico por la mañana.",
+              "exampleTranslation": "Sie liest morgens die Zeitung."
+            },
+            {
+              "term": "usted, ustedes",
+              "translation": "Sie [höfliche Anrede]",
+              "pos": "phrase",
+              "example": "¿Es usted la doctora Jiménez?",
+              "exampleTranslation": "Sind Sie Dr. Jiménez?"
+            },
+            { "term": "la organización", "translation": "die Organisation", "pos": "noun" },
+            {
+              "term": "tutear a alguien",
+              "translation": "jmdn. duzen",
+              "pos": "phrase",
+              "example": "Doctora Jiménez, ¿la puedo tutear?",
+              "exampleTranslation": "Dr. Jiménez, darf ich Sie duzen?"
+            },
+            { "term": "mayor", "translation": "alt", "pos": "adjective", "example": "Mi abuelo es mayor.", "exampleTranslation": "Mein Großvater ist alt." },
+            {
+              "term": "la estancia",
+              "translation": "der Aufenthalt",
+              "pos": "noun",
+              "example": "La estancia en Alemania es cara.",
+              "exampleTranslation": "Der Aufenthalt in Deutschland ist teuer."
+            },
+            {
+              "term": "el extranjero",
+              "translation": "das Ausland",
+              "pos": "phrase",
+              "example": "Quiero ir a estudiar al extranjero.",
+              "exampleTranslation": "Ich möchte im Ausland studieren."
+            },
+            {
+              "term": "principal",
+              "translation": "wesentlich; hauptsächlich",
+              "pos": "adjective",
+              "example": "Mi principal interés es ahorrar.",
+              "exampleTranslation": "Mein wesentliches Interesse ist das Sparen."
+            },
+            {
+              "term": "el/la adolescente",
+              "translation": "der/die Jugendliche",
+              "pos": "noun",
+              "example": "¿Desde qué edad somos adolescentes?",
+              "exampleTranslation": "Ab welchem Alter sind wir Jugendliche?"
+            },
+            {
+              "term": "mejorar algo",
+              "translation": "etw. verbessern",
+              "pos": "phrase",
+              "example": "Quiero mejorar mi español.",
+              "exampleTranslation": "Ich möchte mein Spanisch verbessern."
+            },
+            {
+              "term": "lo que",
+              "translation": "(das,) was",
+              "pos": "phrase",
+              "example": "Lo que dices es verdad.",
+              "exampleTranslation": "Das, was du sagst, stimmt."
+            },
+            {
+              "term": "pedir una beca",
+              "translation": "ein Stipendium beantragen",
+              "pos": "phrase",
+              "example": "Pedí una beca para estudiar.",
+              "exampleTranslation": "Ich habe ein Stipendium beantragt, um zu studieren."
+            },
+            {
+              "term": "la beca",
+              "translation": "das Stipendium",
+              "pos": "noun",
+              "example": "Mi prima tiene una beca para España.",
+              "exampleTranslation": "Mein Cousin hat ein Stipendium für Spanien."
+            },
+            {
+              "term": "la carpeta",
+              "translation": "die Mappe; der Ordner",
+              "pos": "noun",
+              "example": "La carpeta está en la mesa.",
+              "exampleTranslation": "Der Ordner liegt auf dem Tisch."
+            },
+            {
+              "term": "el documento",
+              "translation": "das Dokument",
+              "pos": "noun",
+              "example": "¿Dónde está el documento de la beca?",
+              "exampleTranslation": "Wo ist das Stipendiendokument?"
+            },
+            {
+              "term": "el compromiso social",
+              "translation": "das soziale Engagement",
+              "pos": "phrase",
+              "example": "¿Haces actividades de compromiso social?",
+              "exampleTranslation": "Machst du soziale Engagement-Aktivitäten?"
+            },
+            {
+              "term": "la situación financiera",
+              "translation": "die finanzielle Situation",
+              "pos": "noun",
+              "example": "Mi situación financiera es difícil.",
+              "exampleTranslation": "Meine finanzielle Situation ist schwierig."
+            },
+            {
+              "term": "cambiando de tema",
+              "translation": "um das Thema zu wechseln; apropos",
+              "pos": "phrase",
+              "example": "Cambiando de tema, ¿vamos a cenar?",
+              "exampleTranslation": "Wechseln wir das Thema, sollen wir zu Abend essen?"
+            },
+            {
+              "term": "el tema",
+              "translation": "das Thema",
+              "pos": "noun",
+              "example": "¿Cuál es el tema de la clase de hoy?",
+              "exampleTranslation": "Was ist das Thema des heutigen Kurses?"
+            },
+            { "term": "recomendar algo a alguien [e → ie]", "translation": "jmdm. etw. empfehlen", "pos": "phrase" },
+            {
+              "term": "la familia de acogida",
+              "translation": "die Gastfamilie",
+              "pos": "noun",
+              "example": "Aquí vivo con una familia de acogida.",
+              "exampleTranslation": "Hier wohne ich bei einer Gastfamilie."
+            },
+            { "term": "la posibilidad", "translation": "die Möglichkeit", "pos": "noun" },
+            {
+              "term": "o sea",
+              "translation": "das heißt",
+              "pos": "phrase",
+              "example": "Eso fue el viernes. O sea, anteayer.",
+              "exampleTranslation": "Das war am Freitag. Das heißt, vorgestern."
+            },
+            {
+              "term": "alemán/alemana",
+              "translation": "deutsch",
+              "pos": "noun",
+              "example": "Mi amiga tiene familia alemana.",
+              "exampleTranslation": "Meine Freundin hat deutsche Verwandte."
+            },
+            {
+              "term": "tener algo en cuenta",
+              "translation": "etw. beachten; etw. berücksichtigen",
+              "pos": "phrase",
+              "example": "Ten en cuenta el horario del cine.",
+              "exampleTranslation": "Beachte die Spielzeiten des Kinos."
+            },
+            {
+              "term": "acoger a alguien",
+              "translation": "jmdn. aufnehmen",
+              "pos": "phrase",
+              "example": "Vamos a acoger a alguien en casa.",
+              "exampleTranslation": "Wir werden jemanden in unser Zuhause aufnehmen."
+            },
+            { "term": "el/la estudiante", "translation": "der Schüler/die Schülerin", "pos": "noun" },
+            {
+              "term": "el recurso",
+              "translation": "die Ressource; das Mittel",
+              "pos": "noun",
+              "example": "Tengo recursos para ir al extranjero.",
+              "exampleTranslation": "Ich habe Ressourcen, um ins Ausland zu gehen."
+            },
+            {
+              "term": "cierto/cierta",
+              "translation": "richtig",
+              "pos": "noun",
+              "example": "Eso es cierto, lo aprendí en clase.",
+              "exampleTranslation": "Richtig, ich habe es im Unterricht gelernt."
+            },
+            {
+              "term": "las prácticas [pl.]",
+              "translation": "das Praktikum",
+              "pos": "noun",
+              "example": "Hago prácticas en una empresa.",
+              "exampleTranslation": "Ich mache ein Praktikum in einem Unternehmen."
+            },
+            {
+              "term": "el voluntariado",
+              "translation": "der Freiwilligendienst",
+              "pos": "noun",
+              "example": "El voluntariado es una buena opción.",
+              "exampleTranslation": "Freiwilligendienst ist eine gute Option."
+            },
+            {
+              "term": "yo que tú",
+              "translation": "ich an deiner Stelle",
+              "pos": "phrase",
+              "example": "Yo que tú, hago un voluntariado aquí.",
+              "exampleTranslation": "An deiner Stelle würde ich hier Freiwilligendienst machen."
+            },
+            {
+              "term": "estupendo/estupenda",
+              "translation": "großartig",
+              "pos": "noun",
+              "example": "¡Me encanta! Es una idea estupenda.",
+              "exampleTranslation": "Ich liebe es! Das ist eine großartige Idee."
+            },
+            { "term": "tal vez", "translation": "vielleicht", "pos": "adverb" },
+            {
+              "term": "tener miedo (de algo)",
+              "translation": "Angst haben (vor etw.)",
+              "pos": "phrase",
+              "example": "Tengo miedo de saltar desde aquí.",
+              "exampleTranslation": "Ich habe Angst, von hier aus zu springen."
+            },
+            { "term": "el miedo", "translation": "die Angst", "pos": "noun", "example": "¿De qué tienes miedo?", "exampleTranslation": "Wovor hast du Angst?" },
+            {
+              "term": "no … ni …",
+              "translation": "weder ... noch ...",
+              "pos": "phrase",
+              "example": "No hice prácticas, ni voluntariado.",
+              "exampleTranslation": "Ich habe weder Praktika gemacht noch ehrenamtlich gearbeitet."
+            },
+            {
+              "term": "por, para",
+              "translation": "für",
+              "pos": "phrase",
+              "example": "Gracias por tus consejos.",
+              "exampleTranslation": "Danke für deinen Rat."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Módulo 2",
+      "sections": [
+        {
+          "name": "Wortschatz",
+          "entries": [
+            { "term": "la actividad", "translation": "die Aktivität", "pos": "noun" },
+            {
+              "term": "dejar algo/un lugar",
+              "translation": "etw./einen Ort verlassen",
+              "pos": "phrase",
+              "example": "Mi familia y yo dejamos Madrid ayer.",
+              "exampleTranslation": "Meine Familie und ich haben gestern Madrid verlassen."
+            },
+            { "term": "decidido/decidida", "translation": "entschieden", "pos": "noun" },
+            {
+              "term": "demasiado [adv.]",
+              "translation": "zu (sehr)",
+              "pos": "phrase",
+              "example": "Hay demasiado ruido en el parque hoy.",
+              "exampleTranslation": "Heute gibt es im Park zu viel Lärm."
+            },
+            {
+              "term": "demasiado/demasiada [adj., pron.]",
+              "translation": "zu viel/viele [+ S.]",
+              "pos": "phrase",
+              "example": "Tengo demasiadas tareas para mañana.",
+              "exampleTranslation": "Ich habe zu viele Aufgaben für morgen."
+            },
+            {
+              "term": "lo bueno",
+              "translation": "das Gute",
+              "pos": "phrase",
+              "example": "Lo bueno es que hoy hace sol.",
+              "exampleTranslation": "Das Gute ist, dass es heute sonnig ist."
+            },
+            {
+              "term": "lo malo",
+              "translation": "das Schlechte",
+              "pos": "phrase",
+              "example": "Lo malo es que luego va a llover.",
+              "exampleTranslation": "Das Schlechte ist, dass es später regnen wird."
+            },
+            {
+              "term": "pasarlo bien/genial",
+              "translation": "viel Spaß haben",
+              "pos": "phrase",
+              "example": "¡Vamos a pasarlo genial en la fiesta!",
+              "exampleTranslation": "Wir werden viel Spaß auf der Party haben!"
+            },
+            {
+              "term": "tener dudas",
+              "translation": "Zweifel haben",
+              "pos": "phrase",
+              "example": "De vez en cuando tengo dudas en clase.",
+              "exampleTranslation": "Von Zeit zu Zeit habe ich im Unterricht Zweifel."
+            },
+            {
+              "term": "la duda",
+              "translation": "der Zweifel",
+              "pos": "phrase",
+              "example": "Tengo una duda. ¿Me ayudas?",
+              "exampleTranslation": "Ich habe Zweifel. Hilfst du mir?"
+            },
+            {
+              "term": "quien, quienes",
+              "translation": "der/die [Relativpronomen]; welche/welcher [Relativpronomen]",
+              "pos": "phrase",
+              "example": "Es Irene quien vive en Bocairent.",
+              "exampleTranslation": "Es ist Irene, die in Bocairent lebt."
+            },
+            {
+              "term": "estar a favor de algo",
+              "translation": "für etw. sein",
+              "pos": "phrase",
+              "example": "Estoy a favor de un voluntariado.",
+              "exampleTranslation": "Ich bin für Freiwilligendienst."
+            },
+            {
+              "term": "mudarse",
+              "translation": "umziehen",
+              "pos": "verb",
+              "example": "Mi tía va a mudarse a Valencia.",
+              "exampleTranslation": "Meine Tante zieht nach Valencia."
+            },
+            { "term": "estar en contra de algo", "translation": "gegen etw. sein", "pos": "phrase" },
+            {
+              "term": "el aspecto",
+              "translation": "der Aspekt",
+              "pos": "phrase",
+              "example": "¿Cuál es el aspecto importante aquí?",
+              "exampleTranslation": "Was ist hier der wichtige Aspekt?"
+            },
+            { "term": "positivo/positiva", "translation": "positiv", "pos": "noun" },
+            {
+              "term": "el lado",
+              "translation": "die Seite",
+              "pos": "noun",
+              "example": "Hay que ver el lado bueno de mudarse.",
+              "exampleTranslation": "Man muss die positive Seite eines Umzugs sehen."
+            },
+            { "term": "la opinión", "translation": "die Meinung", "pos": "noun" },
+            {
+              "term": "fuerte",
+              "translation": "stark",
+              "pos": "adjective",
+              "example": "Soy una persona de opiniones fuertes.",
+              "exampleTranslation": "Ich bin ein Mensch mit starken Meinungen."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Unidad 3",
+      "sections": [
+        {
+          "name": "Vocabulario",
+          "entries": [
+            {
+              "term": "Cataluña",
+              "translation": "Katalonien",
+              "pos": "noun",
+              "example": "Hace un año nos mudamos a Cataluña.",
+              "exampleTranslation": "Vor einem Jahr sind wir nach Katalonien gezogen."
+            },
+            {
+              "term": "el parque de skate",
+              "translation": "der Skatepark",
+              "pos": "noun",
+              "example": "¿Dónde está el parque de skate?",
+              "exampleTranslation": "Wo ist der Skatepark?"
+            },
+            {
+              "term": "la estación de esquí",
+              "translation": "das Skigebiet",
+              "pos": "noun",
+              "example": "En la estación de esquí hace frío.",
+              "exampleTranslation": "Im Skigebiet ist es kalt."
+            },
+            { "term": "humano/humana", "translation": "menschlich", "pos": "noun" },
+            {
+              "term": "el viaje de estudios",
+              "translation": "die Studienreise",
+              "pos": "noun",
+              "example": "Mi viaje de estudios es a Galicia.",
+              "exampleTranslation": "Meine Studienreise führt nach Galicien."
+            },
+            {
+              "term": "tocar a alguien",
+              "translation": "an der Reihe sein, etw. tun müssen",
+              "pos": "verb",
+              "example": "Ahora le toca a Elena.",
+              "exampleTranslation": "Jetzt ist Elena an der Reihe."
+            },
+            {
+              "term": "definir algo",
+              "translation": "etw. definieren; etw. festlegen",
+              "pos": "phrase",
+              "example": "¿Definieron las fechas del viaje?",
+              "exampleTranslation": "Haben Sie die Daten der Reise festgelegt?"
+            },
+            {
+              "term": "hacer un presupuesto",
+              "translation": "ein Budget erstellen",
+              "pos": "phrase",
+              "example": "Ya hay un presupuesto para el viaje.",
+              "exampleTranslation": "Für die Reise wurde bereits ein Budget erstellt."
+            },
+            {
+              "term": "el presupuesto",
+              "translation": "das Budget",
+              "pos": "noun",
+              "example": "El presupuesto para el viaje es bajo.",
+              "exampleTranslation": "Das Budget für die Reise ist gering."
+            },
+            { "term": "comparar algo", "translation": "etw. vergleichen", "pos": "phrase" },
+            {
+              "term": "el precio",
+              "translation": "der Preis",
+              "pos": "noun",
+              "example": "¿Cuál es el precio de la moto?",
+              "exampleTranslation": "Wie ist der Preis des Motorrads?"
+            },
+            { "term": "hacer una reserva (de hotel)", "translation": "eine (Hotel-)Reservierung machen", "pos": "phrase" },
+            {
+              "term": "la reserva",
+              "translation": "die Reservierung",
+              "pos": "noun",
+              "example": "Hice la reserva para el restaurante.",
+              "exampleTranslation": "Ich habe eine Reservierung für das Restaurant gemacht."
+            },
+            {
+              "term": "el billete",
+              "translation": "das Ticket",
+              "pos": "noun",
+              "example": "El billete de bus cuesta trece euros.",
+              "exampleTranslation": "Das Busticket kostet dreizehn Euro."
+            },
+            { "term": "planear algo", "translation": "etw. planen", "pos": "phrase" },
+            {
+              "term": "reservar algo",
+              "translation": "etw. reservieren",
+              "pos": "phrase",
+              "example": "Ya reservé el hotel para el viaje.",
+              "exampleTranslation": "Ich habe das Hotel für die Reise bereits reserviert."
+            },
+            {
+              "term": "el pronóstico del tiempo",
+              "translation": "die Wettervorhersage",
+              "pos": "phrase",
+              "example": "¿Ya viste el pronóstico del tiempo?",
+              "exampleTranslation": "Hast du die Wettervorhersage schon gesehen?"
+            },
+            {
+              "term": "hacer la maleta",
+              "translation": "packen",
+              "pos": "phrase",
+              "example": "¡Hay que hacer la maleta hoy!",
+              "exampleTranslation": "Wir müssen heute den Koffer packen!"
+            },
+            {
+              "term": "la maleta",
+              "translation": "der Koffer",
+              "pos": "noun",
+              "example": "Mi maleta es la roja.",
+              "exampleTranslation": "Mein Koffer ist der rote."
+            },
+            { "term": "el pasaporte", "translation": "der Reisepass", "pos": "noun" },
+            {
+              "term": "el cargador",
+              "translation": "das Ladegerät",
+              "pos": "noun",
+              "example": "¿Necesitas un cargador?",
+              "exampleTranslation": "Brauchst du ein Ladegerät?"
+            },
+            { "term": "activar algo", "translation": "etw. aktivieren", "pos": "phrase" },
+            {
+              "term": "el roaming",
+              "translation": "das Roaming",
+              "pos": "noun",
+              "example": "No olvides activar el roaming.",
+              "exampleTranslation": "Vergiss nicht, das Roaming einzuschalten."
+            }
+          ]
+        },
+        {
+          "name": "Texto A",
+          "entries": [
+            {
+              "term": "el post",
+              "translation": "der Post; der Beitrag",
+              "pos": "noun",
+              "example": "¿Te gusta mi post sobre el viaje?",
+              "exampleTranslation": "Gefällt dir mein Beitrag über die Reise?"
+            },
+            {
+              "term": "digital",
+              "translation": "digital",
+              "pos": "noun",
+              "example": "Mi diario digital tiene muchas fotos.",
+              "exampleTranslation": "Mein digitales Tagebuch enthält viele Fotos."
+            },
+            {
+              "term": "la visita guiada",
+              "translation": "die Führung",
+              "pos": "phrase",
+              "example": "¿La visita guiada es mañana?",
+              "exampleTranslation": "Ist die Führung morgen?"
+            },
+            {
+              "term": "navegar (por)",
+              "translation": "segeln (durch)",
+              "pos": "phrase",
+              "example": "Quiero aprender a navegar.",
+              "exampleTranslation": "Ich möchte Segeln lernen."
+            },
+            {
+              "term": "el museo marítimo",
+              "translation": "das Schifffahrtsmuseum",
+              "pos": "noun",
+              "example": "El museo marítimo abre a las 9:30.",
+              "exampleTranslation": "Das Schifffahrtsmuseum öffnet um 9:30 Uhr."
+            },
+            { "term": "encontrarse (en) [o → ue]", "translation": "sich treffen (in)", "pos": "phrase" },
+            {
+              "term": "el emblema",
+              "translation": "das Emblem; das Wahrzeichen",
+              "pos": "noun",
+              "example": "¿Cuál es el emblema de tu ciudad?",
+              "exampleTranslation": "Was ist das Wahrzeichen deiner Stadt?"
+            },
+            { "term": "usualmente", "translation": "üblicherweise; gewöhnlich", "pos": "noun" },
+            { "term": "sin embargo", "translation": "trotzdem; jedoch", "pos": "phrase" },
+            {
+              "term": "merecer la pena",
+              "translation": "sich lohnen",
+              "pos": "phrase",
+              "example": "Visitar Barcelona merece la pena.",
+              "exampleTranslation": "Ein Besuch in Barcelona lohnt sich."
+            },
+            { "term": "completamente", "translation": "vollständig", "pos": "noun" },
+            { "term": "la columna", "translation": "die Säule", "pos": "noun" },
+            {
+              "term": "la piedra",
+              "translation": "der Stein",
+              "pos": "noun",
+              "example": "Estas columnas son de piedra.",
+              "exampleTranslation": "Diese Säulen bestehen aus Stein."
+            },
+            {
+              "term": "hasta ahora",
+              "translation": "bis jetzt",
+              "pos": "phrase",
+              "example": "Hasta ahora todo va perfecto.",
+              "exampleTranslation": "Bis jetzt ist alles perfekt."
+            },
+            {
+              "term": "llevarse bien/mal",
+              "translation": "sich gut/schlecht verstehen",
+              "pos": "phrase",
+              "example": "¿Te llevas bien con tu hermana?",
+              "exampleTranslation": "Verstehst du dich gut mit deiner Schwester?"
+            },
+            {
+              "term": "el barco",
+              "translation": "das Schiff",
+              "pos": "noun",
+              "example": "Los barcos están en el puerto.",
+              "exampleTranslation": "Die Schiffe sind im Hafen."
+            },
+            {
+              "term": "el nudo",
+              "translation": "der Knoten",
+              "pos": "noun",
+              "example": "¿Cuántos tipos de nudos sabes hacer?",
+              "exampleTranslation": "Wie viele Arten von Knoten kannst du machen?"
+            },
+            {
+              "term": "las aguas [pl.]",
+              "translation": "die Gewässer",
+              "pos": "noun",
+              "example": "Quiero navegar por aguas tranquilas.",
+              "exampleTranslation": "Ich will auf ruhigem Gewässer segeln."
+            },
+            {
+              "term": "el crucero",
+              "translation": "das Kreuzfahrtschiff",
+              "pos": "noun",
+              "example": "Nunca he estado en un crucero.",
+              "exampleTranslation": "Ich war noch nie auf einem Kreuzfahrtschiff."
+            },
+            { "term": "patearse (la ciudad) [fam.]", "translation": "(die Stadt) durchstreifen", "pos": "phrase" },
+            {
+              "term": "el callejón",
+              "translation": "die Gasse",
+              "pos": "noun",
+              "example": "No me gustan los callejones oscuros.",
+              "exampleTranslation": "Ich mag keine dunklen Gassen."
+            },
+            {
+              "term": "antiguo/antigua",
+              "translation": "alt; antik",
+              "pos": "noun",
+              "example": "En el museo había barcos antiguos.",
+              "exampleTranslation": "Im Museum gab es alte Schiffe."
+            },
+            {
+              "term": "prácticamente",
+              "translation": "praktisch; so ziemlich",
+              "pos": "adverb",
+              "example": "Prácticamente caminamos todo el día.",
+              "exampleTranslation": "Wir sind praktisch den ganzen Tag spazieren gegangen."
+            },
+            {
+              "term": "ser una pasada [fam.]",
+              "translation": "fantastisch sein",
+              "pos": "phrase",
+              "example": "Me encanta Barcelona. Es una pasada.",
+              "exampleTranslation": "Ich liebe Barcelona. Es ist fantastisch."
+            },
+            {
+              "term": "sinceramente",
+              "translation": "offen gestanden",
+              "pos": "noun",
+              "example": "Sinceramente, no lo entiendo.",
+              "exampleTranslation": "Offen gestanden verstehe ich es nicht."
+            },
+            { "term": "en cambio", "translation": "hingegen", "pos": "phrase" },
+            { "term": "el acuario", "translation": "das Aquarium", "pos": "noun", "grey": true },
+            { "term": "el ayuntamiento", "translation": "das Rathaus", "pos": "noun", "grey": true },
+            { "term": "el estanque", "translation": "der Teich", "pos": "noun", "grey": true },
+            { "term": "el jardín botánico", "translation": "der botanische Garten", "pos": "noun", "grey": true },
+            { "term": "el palacio", "translation": "der Palast; das Schloss", "pos": "noun", "grey": true },
+            { "term": "el paseo marítimo", "translation": "die Strandpromenade", "pos": "phrase", "grey": true },
+            { "term": "la plaza mayor", "translation": "der Marktplatz", "pos": "noun", "grey": true },
+            { "term": "el puente", "translation": "die Brücke", "pos": "noun", "grey": true },
+            { "term": "la torre", "translation": "der Turm", "pos": "noun", "grey": true },
+            { "term": "el zoológico", "translation": "der Zoo", "pos": "noun", "grey": true }
+          ]
+        },
+        {
+          "name": "Texto B",
+          "entries": [
+            {
+              "term": "saltar",
+              "translation": "springen",
+              "pos": "verb",
+              "example": "A mí me gusta saltar en la cama.",
+              "exampleTranslation": "Ich springe gerne ins Bett."
+            },
+            {
+              "term": "de hecho",
+              "translation": "tatsächlich",
+              "pos": "phrase",
+              "example": "Es muy tarde, de hecho, ya son las 10.",
+              "exampleTranslation": "Es ist schon sehr spät, tatsächlich ist es schon zehn Uhr."
+            },
+            {
+              "term": "conocerse",
+              "translation": "sich kennenlernen",
+              "pos": "verb",
+              "example": "¿Desde hace cuánto se conocen?",
+              "exampleTranslation": "Wie lange kennt ihr euch schon?"
+            },
+            {
+              "term": "el colegio, el cole [fam.]",
+              "translation": "[hier:] die Grundschule",
+              "pos": "noun",
+              "example": "Nos conocimos en el colegio.",
+              "exampleTranslation": "Wir haben uns in der Grundschule kennengelernt."
+            },
+            {
+              "term": "donde",
+              "translation": "wo",
+              "pos": "adverb",
+              "example": "Aquí es donde vengo a patinar.",
+              "exampleTranslation": "Hier komme ich zum Skaten her."
+            },
+            {
+              "term": "los/las dos",
+              "translation": "[hier:] wir beide",
+              "pos": "phrase",
+              "example": "Quiero los dos sabores de helado.",
+              "exampleTranslation": "Ich möchte beide Eissorten."
+            },
+            {
+              "term": "por los años (2000)",
+              "translation": "in den (2000er) Jahren",
+              "pos": "phrase",
+              "example": "Por los años 2000 vivíamos en Madrid.",
+              "exampleTranslation": "In den 2000er Jahren lebten wir in Madrid."
+            },
+            {
+              "term": "poner juntos/ juntas",
+              "translation": "[hier:] nebeneinander sitzen",
+              "pos": "phrase",
+              "example": "¡Nos pusieron juntas en clase, amiga!",
+              "exampleTranslation": "Man hat uns in der Klasse zusammengesetzt, Freundin!"
+            },
+            {
+              "term": "el apellido",
+              "translation": "der Nachname",
+              "pos": "noun",
+              "example": "¿Cuál es tu apellido?",
+              "exampleTranslation": "Wie ist dein Nachname?"
+            },
+            {
+              "term": "la casualidad",
+              "translation": "der Zufall",
+              "pos": "phrase",
+              "example": "Encontrarnos aquí fue una casualidad.",
+              "exampleTranslation": "Uns hier zu treffen, war ein Zufall."
+            },
+            {
+              "term": "marcar a alguien",
+              "translation": "jmdn. prägen",
+              "pos": "phrase",
+              "example": "¿Qué experiencias te han marcado?",
+              "exampleTranslation": "Welche Erfahrungen haben dich geprägt?"
+            },
+            {
+              "term": "a partir de [+ tiempo]",
+              "translation": "ab [+ Zeit]",
+              "pos": "phrase",
+              "example": "A partier de las 3 pm tengo deportes.",
+              "exampleTranslation": "Ab 15 Uhr habe ich Sport."
+            },
+            { "term": "inseparable", "translation": "unzertrennlich", "pos": "noun" },
+            { "term": "la amistad", "translation": "die Freundschaft", "pos": "noun" },
+            { "term": "som com carn i ungla [cat.]", "translation": "[etwa:] ein Herz und eine Seele sein", "pos": "phrase", "grey": true },
+            {
+              "term": "el club",
+              "translation": "der Klub; der Verein",
+              "pos": "noun",
+              "example": "¿Eres parte de algún club?",
+              "exampleTranslation": "Bist du Teil eines Klubs?"
+            },
+            {
+              "term": "llorar",
+              "translation": "weinen",
+              "pos": "verb",
+              "example": "Estoy triste, tengo ganas de llorar.",
+              "exampleTranslation": "Ich bin traurig, ich möchte weinen."
+            },
+            {
+              "term": "reír",
+              "translation": "lachen",
+              "pos": "phrase",
+              "example": "Hoy quiero reír y no llorar.",
+              "exampleTranslation": "Heute möchte ich lachen und nicht weinen."
+            },
+            {
+              "term": "el fin de curso",
+              "translation": "das Schuljahresende",
+              "pos": "noun",
+              "example": "¿Vas a la excursión de fin de curso?",
+              "exampleTranslation": "Kommst du zum Ausflug am Ende des Schuljahres mit?"
+            },
+            {
+              "term": "el pantano",
+              "translation": "der Sumpf; [hier:] der Stausee",
+              "pos": "noun",
+              "example": "Nunca he ido a un pantano, ¿es bonito?",
+              "exampleTranslation": "Ich war noch nie an einem Stausee, ist es schön?"
+            },
+            {
+              "term": "por lo cual",
+              "translation": "weshalb",
+              "pos": "phrase",
+              "example": "Hace calor, por lo cual voy a bañarme.",
+              "exampleTranslation": "Es ist heiß, weshalb ich baden gehe."
+            },
+            {
+              "term": "bañarse",
+              "translation": "baden (gehen)",
+              "pos": "verb",
+              "example": "¡Me encanta bañarme en el mar!",
+              "exampleTranslation": "Ich liebe es, im Meer zu baden!"
+            },
+            { "term": "repetir (algo a alguien) [e → i]", "translation": "(etw. jmdm.) wiederholen", "pos": "phrase" },
+            { "term": "los nervios [pl.]", "translation": "die Nervosität", "pos": "noun" },
+            {
+              "term": "el resumen",
+              "translation": "die Zusammenfassung",
+              "pos": "noun",
+              "example": "El resumen es: ¡la pasamos genial!",
+              "exampleTranslation": "Die Zusammenfassung ist: Wir hatten eine großartige Zeit!"
+            },
+            {
+              "term": "el ritual",
+              "translation": "das Ritual",
+              "pos": "noun",
+              "example": "Viajar al pantano es nuestro ritual.",
+              "exampleTranslation": "An den Stausee zu reisen ist unser Ritual."
+            },
+            {
+              "term": "el nivel del agua",
+              "translation": "der Wasserstand",
+              "pos": "noun",
+              "example": "El nivel del agua está muy alto hoy.",
+              "exampleTranslation": "Der Wasserstand ist heute sehr hoch."
+            },
+            {
+              "term": "el nivel",
+              "translation": "der Stand; das Niveau",
+              "pos": "noun",
+              "example": "¿Qué nivel de español tienes?",
+              "exampleTranslation": "Welches Niveau hast du in Spanisch?"
+            },
+            { "term": "bajo/baja", "translation": "niedrig", "pos": "noun" },
+            {
+              "term": "la sequía",
+              "translation": "die Dürre; die Trockenheit",
+              "pos": "noun",
+              "example": "Este mes llovió y ya no hay sequía.",
+              "exampleTranslation": "Diesen Monat hat es geregnet und es gibt keine Dürre mehr."
+            },
+            { "term": "por lo tanto", "translation": "daher", "pos": "phrase" },
+            { "term": "no obstante", "translation": "dennoch", "pos": "phrase" },
+            {
+              "term": "suceder",
+              "translation": "geschehen",
+              "pos": "verb",
+              "example": "¡Ayer sucedió algo fantástico!",
+              "exampleTranslation": "Gestern ist etwas Fantastisches geschehen!"
+            },
+            {
+              "term": "el milagro",
+              "translation": "das Wunder",
+              "pos": "noun",
+              "example": "Espero que mañana suceda un milagro.",
+              "exampleTranslation": "Ich hoffe, dass morgen ein Wunder geschieht."
+            },
+            {
+              "term": "las noticias [pl.]",
+              "translation": "die Nachrichten [Pl.]",
+              "pos": "noun",
+              "example": "Las noticias de hoy son muy buenas.",
+              "exampleTranslation": "Die heutigen Nachrichten sind sehr gut."
+            },
+            {
+              "term": "el bikini",
+              "translation": "der Bikini",
+              "pos": "noun",
+              "example": "No olvides traer tu bikini al viaje.",
+              "exampleTranslation": "Vergiss nicht, deinen Bikini mit auf die Reise zu nehmen."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Módulo 3",
+      "sections": [
+        {
+          "name": "Wortschatz",
+          "entries": [
+            {
+              "term": "centroamericano / centroamericana",
+              "translation": "mittelamerikanisch",
+              "pos": "phrase",
+              "example": "Honduras es un país centroamericano.",
+              "exampleTranslation": "Honduras ist ein mittelamerikanisches Land."
+            },
+            {
+              "term": "Suiza",
+              "translation": "die Schweiz",
+              "pos": "noun",
+              "example": "Suiza limita con Alemania.",
+              "exampleTranslation": "Die Schweiz grenzt an Deutschland."
+            },
+            {
+              "term": "el ejemplo",
+              "translation": "das Beispiel",
+              "pos": "noun",
+              "example": "Dame un buen ejemplo, por favor.",
+              "exampleTranslation": "Gib mir bitte ein gutes Beispiel."
+            },
+            {
+              "term": "el desarrollo",
+              "translation": "die Entwicklung",
+              "pos": "noun",
+              "example": "El desarrollo del país es sostenible.",
+              "exampleTranslation": "Die Entwicklung des Landes ist nachhaltig."
+            },
+            { "term": "sostenible", "translation": "nachhaltig", "pos": "noun" },
+            {
+              "term": "el parque nacional",
+              "translation": "der Nationalpark",
+              "pos": "noun",
+              "example": "¿Cuántos parques nacionales hay aquí?",
+              "exampleTranslation": "Wie viele Nationalparks gibt es hier?"
+            },
+            {
+              "term": "el modelo",
+              "translation": "das Modell",
+              "pos": "noun",
+              "example": "El país usó un modelo más ecológico.",
+              "exampleTranslation": "Das Land verwendete ein umweltfreundlicheres Modell."
+            },
+            {
+              "term": "agrícola [m./f.]",
+              "translation": "landwirtschaftlich",
+              "pos": "phrase",
+              "example": "¿Hay aquí un buen modelo agrícola?",
+              "exampleTranslation": "Gibt es hier ein gutes landwirtschaftliches Modell?"
+            },
+            { "term": "la deforestación", "translation": "die Entwaldung", "pos": "noun" },
+            {
+              "term": "la finca",
+              "translation": "der landwirtschaftliche Betrieb",
+              "pos": "noun",
+              "example": "Esta finca protege la naturaleza.",
+              "exampleTranslation": "Dieser landwirtschaftliche Betrieb schützt die Natur."
+            },
+            { "term": "privado/privada", "translation": "privat", "pos": "noun" },
+            {
+              "term": "el ecoturismo",
+              "translation": "der Ökotourismus",
+              "pos": "noun",
+              "example": "¿El ecoturismo sí es más sostenible?",
+              "exampleTranslation": "Ist Ökotourismus nachhaltiger?"
+            },
+            {
+              "term": "tropical",
+              "translation": "tropisch",
+              "pos": "adjective",
+              "example": "¿Hay animales en el bosque tropical?",
+              "exampleTranslation": "Gibt es Tiere im tropischen Wald?"
+            },
+            {
+              "term": "máximo/máxima",
+              "translation": "maximal",
+              "pos": "noun",
+              "example": "La playa está en su máximo esplendor.",
+              "exampleTranslation": "Der Strand zeigt sich in seiner ganzen Pracht."
+            },
+            { "term": "el esplendor", "translation": "die Pracht", "pos": "noun" },
+            {
+              "term": "caribe",
+              "translation": "karibisch",
+              "pos": "noun",
+              "example": "¿Qué países tienen costa caribe?",
+              "exampleTranslation": "Welche Länder haben eine Karibikküste?"
+            },
+            { "term": "la protección", "translation": "der Schutz", "pos": "noun" },
+            {
+              "term": "ir de la mano",
+              "translation": "Hand in Hand gehen",
+              "pos": "phrase",
+              "example": "Amar y proteger el mar van de la mano.",
+              "exampleTranslation": "Liebe und Schutz des Meeres gehen Hand in Hand."
+            },
+            {
+              "term": "el novio/la novia",
+              "translation": "der Freund/die Freundin",
+              "pos": "noun",
+              "example": "María es la novia de Daniela.",
+              "exampleTranslation": "María ist Danielas Freundin."
+            },
+            {
+              "term": "el grillo",
+              "translation": "die Grille",
+              "pos": "noun",
+              "example": "¿Qué sonido hacen los grillos?",
+              "exampleTranslation": "Welches Geräusch machen Grillen?"
+            },
+            {
+              "term": "el mono/la mona",
+              "translation": "der Affe/die Äffin",
+              "pos": "noun",
+              "example": "El mono es mi animal favorito.",
+              "exampleTranslation": "Der Affe ist mein Lieblingstier."
+            },
+            {
+              "term": "respetar algo/a alguien",
+              "translation": "jmdn./etw. respektieren",
+              "pos": "phrase",
+              "example": "Hay que respetar a la naturaleza.",
+              "exampleTranslation": "Man muss die Natur respektieren."
+            },
+            {
+              "term": "el plástico",
+              "translation": "das Plastik",
+              "pos": "noun",
+              "example": "¡No dejes plástico en el bosque!",
+              "exampleTranslation": "Lass kein Plastik im Wald liegen!"
+            },
+            { "term": "húmedo/húmeda", "translation": "feucht", "pos": "noun" },
+            {
+              "term": "tanto/tanta",
+              "translation": "so viele",
+              "pos": "noun",
+              "example": "Estoy feliz de ver tantos animales.",
+              "exampleTranslation": "Ich freue mich, so viele Tiere zu sehen."
+            },
+            {
+              "term": "el pescador/la pescadora",
+              "translation": "der Fischer/die Fischerin",
+              "pos": "noun",
+              "example": "Antes de trabajar aquí fui pescador.",
+              "exampleTranslation": "Bevor ich hier gearbeitet habe, war ich Fischer."
+            },
+            { "term": "el guía turístico/la guía turística", "translation": "der Reiseführer/die Reiseführerin", "pos": "noun" },
+            {
+              "term": "el paraíso",
+              "translation": "das Paradies",
+              "pos": "noun",
+              "example": "Este bosque tropical es un paraíso.",
+              "exampleTranslation": "Dieser tropische Wald ist ein Paradies."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Unidad 4",
+      "sections": [
+        {
+          "name": "Vocabulario",
+          "entries": [
+            { "term": "la relación", "translation": "die Beziehung", "pos": "noun" },
+            { "term": "importar (a alguien)", "translation": "jmdm. wichtig sein; jmdm. von Bedeutung sein", "pos": "verb" },
+            { "term": "la emoción", "translation": "das Gefühl", "pos": "noun" },
+            { "term": "estar contento/contenta", "translation": "zufrieden sein", "pos": "phrase" },
+            {
+              "term": "orgulloso/orgullosa",
+              "translation": "stolz",
+              "pos": "noun",
+              "example": "Estoy orgullosa de mi trabajo en clase.",
+              "exampleTranslation": "Ich bin stolz auf meine Arbeit in der Klasse."
+            },
+            {
+              "term": "estar enamorado/enamorada",
+              "translation": "verliebt sein",
+              "pos": "phrase",
+              "example": "Estoy muy enamorada de mi novia.",
+              "exampleTranslation": "Ich bin sehr in meine Freundin verliebt."
+            },
+            { "term": "estar relajado/relajada", "translation": "entspannt sein", "pos": "phrase" },
+            {
+              "term": "estar emocionado/emocionada",
+              "translation": "aufgeregt sein",
+              "pos": "phrase",
+              "example": "Estoy emocionado por la excursión.",
+              "exampleTranslation": "Ich bin sehr aufgeregt wegen des Ausflugs."
+            },
+            {
+              "term": "estar agradecido/agradecida",
+              "translation": "dankbar sein",
+              "pos": "phrase",
+              "example": "Estoy muy agradecida por tu ayuda.",
+              "exampleTranslation": "Ich bin so dankbar für deine Hilfe."
+            },
+            {
+              "term": "estar sorprendido/sorprendida",
+              "translation": "überrascht sein",
+              "pos": "phrase",
+              "example": "¡Estoy sorprendida con esta noticia!",
+              "exampleTranslation": "Ich bin überrascht von dieser Nachricht!"
+            },
+            {
+              "term": "estar preocupado/preocupada",
+              "translation": "besorgt sein",
+              "pos": "phrase",
+              "example": "Ella está preocupada por el examen.",
+              "exampleTranslation": "Sie ist wegen der Prüfung sehr besorgt."
+            },
+            { "term": "estar nervioso/nerviosa", "translation": "nervös sein", "pos": "phrase" },
+            {
+              "term": "estar enfadado/enfadada",
+              "translation": "wütend sein; sauer sein",
+              "pos": "phrase",
+              "example": "Estoy enfadado porque perdí mi libro.",
+              "exampleTranslation": "Ich bin wütend, weil ich mein Buch verloren habe."
+            },
+            {
+              "term": "estar molesto/molesta",
+              "translation": "gekränkt sein",
+              "pos": "phrase",
+              "example": "¿Estás molesto por nuestra discusión?",
+              "exampleTranslation": "Bist du wegen unserer Diskussion verärgert?"
+            },
+            {
+              "term": "celoso/celosa",
+              "translation": "eifersüchtig",
+              "pos": "noun",
+              "example": "No quiero ser una persona celosa.",
+              "exampleTranslation": "Ich möchte kein eifersüchtiger Mensch sein."
+            },
+            {
+              "term": "estar decepcionado/decepcionada",
+              "translation": "enttäuscht sein",
+              "pos": "phrase",
+              "example": "Ella está decepcionada por su nota.",
+              "exampleTranslation": "Sie ist enttäuscht von ihrer Note."
+            },
+            { "term": "estar confundido/confundida", "translation": "verwirrt sein", "pos": "phrase" },
+            {
+              "term": "¿Qué te pasa?",
+              "translation": "Was ist mit dir los?",
+              "pos": "phrase",
+              "example": "¿Qué te pasa? Te veo triste hoy.",
+              "exampleTranslation": "Was ist los mit dir? Du wirkst heute traurig."
+            },
+            {
+              "term": "la sonrisa",
+              "translation": "das Lächeln",
+              "pos": "noun",
+              "example": "Él tiene una sonrisa linda, ¿verdad?",
+              "exampleTranslation": "Er hat ein schönes Lächeln, oder?"
+            },
+            { "term": "enorme", "translation": "riesig; enorm", "pos": "adjective" },
+            {
+              "term": "estar callado/callada",
+              "translation": "schweigsam sein",
+              "pos": "phrase",
+              "example": "Están muy calladas hoy.",
+              "exampleTranslation": "Sie sind heute sehr ruhig."
+            },
+            {
+              "term": "parecer [+ adj.] [c → zc]",
+              "translation": "scheinen [+Adj.]; wirken [+ Adj.]",
+              "pos": "phrase",
+              "example": "¿Son novios? Parecen felices juntos.",
+              "exampleTranslation": "Sind sie ein Paar? Sie wirken zusammen glücklich."
+            },
+            { "term": "estar tenso/tensa", "translation": "angespannt sein", "pos": "phrase" }
+          ]
+        },
+        {
+          "name": "Texto A",
+          "entries": [
+            { "term": "de verdad", "translation": "wirklich; echt", "pos": "phrase" },
+            {
+              "term": "esperar que [+ subj.]",
+              "translation": "hoffen, dass",
+              "pos": "phrase",
+              "example": "Espero que te guste mucho la ciudad.",
+              "exampleTranslation": "Ich hoffe, dir gefällt die Stadt sehr."
+            },
+            {
+              "term": "las locuras",
+              "translation": "die verrückten Sachen",
+              "pos": "noun",
+              "example": "¿Qué locuras vamos a hacer hoy?",
+              "exampleTranslation": "Was für verrückte Sachen werden wir heute machen?"
+            },
+            {
+              "term": "vivir algo",
+              "translation": "etw. erleben",
+              "pos": "phrase",
+              "example": "¡Espero que vivas nuevas locuras allí!",
+              "exampleTranslation": "Ich hoffe, dass du dort neue verrückte Dinge erlebst!"
+            },
+            { "term": "la risa", "translation": "das Lachen", "pos": "phrase" },
+            { "term": "el secreto", "translation": "das Geheimnis", "pos": "noun" },
+            {
+              "term": "compartido/compartida",
+              "translation": "geteilte/geteilter/geteiltes",
+              "pos": "adjective",
+              "example": "Gracias por la información compartida.",
+              "exampleTranslation": "Danke für die geteilten Informationen."
+            },
+            {
+              "term": "tonto/tonta",
+              "translation": "dumm",
+              "pos": "noun",
+              "example": "La actividad de hoy me pareció tonta.",
+              "exampleTranslation": "Die heutige Aktivität erschien mir dumm."
+            },
+            {
+              "term": "por lo menos",
+              "translation": "zumindest",
+              "pos": "phrase",
+              "example": "Por lo menos no llueve hoy.",
+              "exampleTranslation": "Zumindest regnet es heute nicht."
+            },
+            { "term": "ganar a alguien", "translation": "jmdn. besiegen", "pos": "phrase" },
+            {
+              "term": "por supuesto",
+              "translation": "natürlich; selbstverständlich",
+              "pos": "phrase",
+              "example": "Por supuesto, mañana te llamo.",
+              "exampleTranslation": "Natürlich, morgen rufe ich dich an."
+            },
+            {
+              "term": "estar lleno/llena",
+              "translation": "voll sein",
+              "pos": "phrase",
+              "example": "No puedo comer más, ¡estoy lleno!",
+              "exampleTranslation": "Ich kann nicht mehr essen, ich bin voll!"
+            },
+            { "term": "el amor", "translation": "die Liebe", "pos": "noun" },
+            {
+              "term": "ojalá (que) [+ subj.]",
+              "translation": "hoffentlich ...",
+              "pos": "phrase",
+              "example": "¡Ojalá que te sientas mejor mañana!",
+              "exampleTranslation": "Hoffentlich fühlst du dich morgen besser!"
+            },
+            {
+              "term": "hacer amigos/amigas",
+              "translation": "Freunde finden",
+              "pos": "phrase",
+              "example": "Hacer amigos no es mi fuerte.",
+              "exampleTranslation": "Freunde zu finden ist nicht meine Stärke."
+            },
+            {
+              "term": "pronto",
+              "translation": "bald",
+              "pos": "adverb",
+              "example": "Espero que vuelvas pronto a la clase.",
+              "exampleTranslation": "Ich hoffe, du bist bald wieder im Unterricht."
+            },
+            {
+              "term": "querer a alguien [e → ie]",
+              "translation": "jmdn. lieben",
+              "pos": "phrase",
+              "example": "Quiero mucho a mis amigas del insti.",
+              "exampleTranslation": "Ich liebe meine Freunde von der Schule sehr."
+            },
+            {
+              "term": "la caja",
+              "translation": "die Kiste",
+              "pos": "noun",
+              "example": "Los materiales están en la caja.",
+              "exampleTranslation": "Die Materialien sind in der Kiste."
+            },
+            {
+              "term": "la pesadilla",
+              "translation": "der Albtraum",
+              "pos": "noun",
+              "example": "Tuve una pesadilla antes del examen.",
+              "exampleTranslation": "Ich hatte vor der Prüfung einen Albtraum."
+            },
+            {
+              "term": "el paquete",
+              "translation": "das Paket",
+              "pos": "noun",
+              "example": "Recibí un paquete con libros nuevos.",
+              "exampleTranslation": "Ich habe ein Paket mit neuen Büchern erhalten."
+            },
+            {
+              "term": "alegrar el día a alguien [fam.]",
+              "translation": "jmdm. den Tag versüßen",
+              "pos": "phrase",
+              "example": "¡Esta buena sorpresa me alegró el día!",
+              "exampleTranslation": "Diese schöne Überraschung hat mir den Tag versüßt!"
+            },
+            { "term": "aún", "translation": "noch; immer noch", "pos": "adverb" },
+            {
+              "term": "flipar [fam.]",
+              "translation": "ausflippen",
+              "pos": "phrase",
+              "example": "Mi padre flipó con mi buena nota.",
+              "exampleTranslation": "Mein Vater ist wegen meiner guten Note ausgeflippt."
+            },
+            {
+              "term": "Sois lo más. [fam.]",
+              "translation": "Ihr seid der Hammer.",
+              "pos": "phrase",
+              "example": "¡Me encanta el regalo! Sois lo más.",
+              "exampleTranslation": "Ich liebe das Geschenk! Ihr seid der Hammer."
+            },
+            {
+              "term": "quedar",
+              "translation": "passen [Kleidung]",
+              "pos": "phrase",
+              "example": "¡Te quedan muy bien esos vaqueros!",
+              "exampleTranslation": "Diese Jeans stehen dir sehr gut!"
+            },
+            {
+              "term": "la despedida",
+              "translation": "der Abschied",
+              "pos": "noun",
+              "example": "Mi despedida es mañana a las 7.",
+              "exampleTranslation": "Mein Abschied ist morgen um 7."
+            },
+            {
+              "term": "¡Que te vaya bien!",
+              "translation": "Machs gut!",
+              "pos": "phrase",
+              "example": "Al final él dijo: ¡Que te vaya bien!",
+              "exampleTranslation": "Zum Schluss sagte er: Mach's gut!"
+            },
+            { "term": "la aventura", "translation": "das Abenteuer", "pos": "noun" },
+            {
+              "term": "desear a alguien que [+ subj.]",
+              "translation": "jmdm. wünschen, dass",
+              "pos": "phrase",
+              "example": "Deseo que tengas mucha suerte hoy.",
+              "exampleTranslation": "Ich wünsche dir heute viel Glück."
+            },
+            {
+              "term": "el éxito",
+              "translation": "der Erfolg",
+              "pos": "noun",
+              "example": "¡Mucho éxito en esta nueva aventura!",
+              "exampleTranslation": "Viel Erfolg bei diesem neuen Abenteuer!"
+            },
+            {
+              "term": "de visita",
+              "translation": "zu Besuch",
+              "pos": "phrase",
+              "example": "Mis abuelos están de visita este mes.",
+              "exampleTranslation": "Meine Großeltern kommen diesen Monat zu Besuch."
+            },
+            { "term": "la curiosidad", "translation": "die Neugier", "pos": "noun" },
+            {
+              "term": "la creatividad",
+              "translation": "die Kreativität",
+              "pos": "noun",
+              "example": "La creatividad me parece importante.",
+              "exampleTranslation": "Kreativität scheint mir wichtig zu sein."
+            },
+            { "term": "cambiar algo", "translation": "etw. wechseln", "pos": "verb" },
+            { "term": "la oportunidad", "translation": "die Chance", "pos": "noun" },
+            {
+              "term": "crecer [c → zc]",
+              "translation": "wachsen",
+              "pos": "phrase",
+              "example": "En mi jardín crecen muchos árboles.",
+              "exampleTranslation": "In meinem Garten wachsen viele Bäume."
+            },
+            {
+              "term": "dejar de [+ inf.]",
+              "translation": "aufhören, etw. zu tun",
+              "pos": "phrase",
+              "example": "Quiero dejar de usar tanto el móvil.",
+              "exampleTranslation": "Ich möchte aufhören, so viel das Handy zu benutzen."
+            },
+            { "term": "soñar (con algo)", "translation": "(von etw.) träumen", "pos": "verb" }
+          ]
+        },
+        {
+          "name": "Texto B",
+          "entries": [
+            { "term": "el cambio", "translation": "die Veränderung; [hier:] der Wechsel", "pos": "noun" },
+            { "term": "la fiesta de graduación", "translation": "die Abschlussfeier", "pos": "noun" },
+            {
+              "term": "perderse algo [e → ie]",
+              "translation": "etw. verpassen",
+              "pos": "phrase",
+              "example": "Él se pierde la fiesta de graduación.",
+              "exampleTranslation": "Er verpasst den Abschlussball."
+            },
+            {
+              "term": "el profesorado",
+              "translation": "das Kollegium",
+              "pos": "noun",
+              "example": "El profesorado organiza la excursión.",
+              "exampleTranslation": "Das Kollegium organisiert den Ausflug."
+            },
+            {
+              "term": "el exalumno/la exalumna",
+              "translation": "der ehemalige Schüler/die ehemalige Schülerin",
+              "pos": "noun",
+              "example": "Pronto vamos a ser exalumnos.",
+              "exampleTranslation": "Bald werden wir ehemalige Schüler sein."
+            },
+            {
+              "term": "el pabellón",
+              "translation": "der Pavillon; [hier:] die Sporthalle",
+              "pos": "noun",
+              "example": "¿Dónde queda el pabellón del insti?",
+              "exampleTranslation": "Wo ist die Sporthalle der Schule?"
+            },
+            {
+              "term": "tratar a alguien como algo",
+              "translation": "jmdn. wie etw. behandeln",
+              "pos": "phrase",
+              "example": "Ella me trata como a un desconocido.",
+              "exampleTranslation": "Sie behandelt mich wie einen Fremden."
+            },
+            {
+              "term": "el bicho raro",
+              "translation": "der Außenseiter/die Außenseiterin",
+              "pos": "noun",
+              "example": "A veces me siento como un bicho raro.",
+              "exampleTranslation": "Manchmal fühle ich mich wie ein Außenseiter."
+            },
+            {
+              "term": "raro/rara",
+              "translation": "seltsam",
+              "pos": "noun",
+              "example": "Anoche tuve una pesadilla rara y fea.",
+              "exampleTranslation": "Letzte Nacht hatte ich einen seltsamen und schlimmen Albtraum."
+            },
+            {
+              "term": "temblar [e → ie]",
+              "translation": "zittern",
+              "pos": "phrase",
+              "example": "¿Tienes miedo? ¡Estás temblando!",
+              "exampleTranslation": "Hast du Angst? Du zitterst!"
+            },
+            {
+              "term": "la pierna",
+              "translation": "das Bein",
+              "pos": "noun",
+              "example": "La pierna me tiembla de los nervios.",
+              "exampleTranslation": "Mein Bein zittert vor Nervosität."
+            },
+            {
+              "term": "llamar a alguien",
+              "translation": "jmdn. nennen",
+              "pos": "phrase",
+              "example": "Él me llamó Juan, pero yo soy José.",
+              "exampleTranslation": "Er nannte mich Juan, aber ich bin José."
+            },
+            {
+              "term": "las zapatillas de casa",
+              "translation": "die Hausschuhe",
+              "pos": "noun",
+              "example": "Aquí siempre uso zapatillas de casa.",
+              "exampleTranslation": "Hier trage ich immer Hausschuhe."
+            },
+            {
+              "term": "acercarse",
+              "translation": "näher kommen",
+              "pos": "verb",
+              "example": "¿Puedes acercarte? No te escucho.",
+              "exampleTranslation": "Kannst du näher kommen? Ich höre dich nicht."
+            },
+            {
+              "term": "la pista de baile",
+              "translation": "die Tanzfläche",
+              "pos": "noun",
+              "example": "No me acercaré a la pista de baile.",
+              "exampleTranslation": "Ich gehe nicht in die Nähe der Tanzfläche."
+            },
+            {
+              "term": "prestar atención a alguien/algo",
+              "translation": "jmdn./etw. beachten",
+              "pos": "phrase",
+              "example": "No presto atención a las pesadillas.",
+              "exampleTranslation": "Ich beachte Albträume nicht."
+            },
+            { "term": "invisible", "translation": "unsichtbar", "pos": "adjective" },
+            { "term": "aparecer [c → zc]", "translation": "auftauchen", "pos": "phrase" },
+            {
+              "term": "hacia",
+              "translation": "in Richtung",
+              "pos": "preposition",
+              "example": "¿Vas hacia el instituto? Voy contigo.",
+              "exampleTranslation": "Gehst du in Richtung Schule? Ich komme mit dir."
+            },
+            {
+              "term": "el alivio",
+              "translation": "die Erleichterung",
+              "pos": "noun",
+              "example": "¡Qué alivio que estemos aquí juntas!",
+              "exampleTranslation": "Was für eine Erleichterung, dass wir zusammen hier sind!"
+            },
+            { "term": "reaccionar", "translation": "reagieren", "pos": "verb" },
+            {
+              "term": "acordarse [o → ue]",
+              "translation": "sich erinnern",
+              "pos": "phrase",
+              "example": "Me acuerdo de todas nuestras locuras.",
+              "exampleTranslation": "Ich erinnere mich an all unsere verrückten Dinge."
+            },
+            { "term": "Me da igual.", "translation": "Das ist mir egal.", "pos": "phrase" },
+            {
+              "term": "¿En serio?",
+              "translation": "Im Ernst?",
+              "pos": "phrase",
+              "example": "¿En serio? A mí esa banda me encanta.",
+              "exampleTranslation": "Wirklich? Ich liebe diese Band."
+            },
+            { "term": "alegrarse (de algo)", "translation": "sich (über etw.) freuen", "pos": "verb" },
+            {
+              "term": "irse",
+              "translation": "weggehen",
+              "pos": "verb",
+              "example": "¿Nos vamos ahora? No me siento bien.",
+              "exampleTranslation": "Wollen wir jetzt gehen? Ich fühle mich nicht wohl."
+            },
+            {
+              "term": "la boca",
+              "translation": "der Mund",
+              "pos": "noun",
+              "example": "Ayer me quedé con la boca abierta.",
+              "exampleTranslation": "Gestern blieb ich mit offenem Mund zurück."
+            },
+            {
+              "term": "comportarse",
+              "translation": "sich verhalten",
+              "pos": "verb",
+              "example": "Te comportas raro. ¿Estás triste?",
+              "exampleTranslation": "Du verhältst dich seltsam. Bist du traurig?"
+            },
+            {
+              "term": "el escenario",
+              "translation": "die Bühne",
+              "pos": "noun",
+              "example": "La banda toca en el escenario.",
+              "exampleTranslation": "Die Band spielt auf der Bühne."
+            },
+            {
+              "term": "sonar [+ adv.] [o → ue]",
+              "translation": "[Adv. +] klingen",
+              "pos": "phrase",
+              "example": "¡Esa canción suena genial!",
+              "exampleTranslation": "Das Lied klingt großartig!"
+            },
+            {
+              "term": "el director/la directora",
+              "translation": "der Direktor/die Direktorin",
+              "pos": "noun",
+              "example": "La directora del insti no viene hoy.",
+              "exampleTranslation": "Der Direktor der Schule kommt heute nicht."
+            },
+            {
+              "term": "el/la cantante",
+              "translation": "der Sänger/die Sängerin",
+              "pos": "noun",
+              "example": "El cantante de la banda es mi amigo.",
+              "exampleTranslation": "Der Sänger der Band ist mein Freund."
+            },
+            {
+              "term": "sino",
+              "translation": "sondern",
+              "pos": "conjunction",
+              "example": "Hoy no quiero pizza, sino ensalada.",
+              "exampleTranslation": "Heute will ich keine Pizza, sondern Salat."
+            },
+            {
+              "term": "la oreja",
+              "translation": "das Ohr",
+              "pos": "noun",
+              "example": "Mis orejas están muy frías.",
+              "exampleTranslation": "Meine Ohren sind sehr kalt."
+            },
+            {
+              "term": "atreverse",
+              "translation": "sich trauen",
+              "pos": "verb",
+              "example": "¿Te atreves a cantar conmigo?",
+              "exampleTranslation": "Traust du dich, mit mir zu singen?"
+            },
+            {
+              "term": "la garganta",
+              "translation": "der Hals",
+              "pos": "phrase",
+              "example": "En el concierto me dolió la garganta.",
+              "exampleTranslation": "Beim Konzert tat mir der Hals weh."
+            },
+            {
+              "term": "la mariposa",
+              "translation": "der Schmetterling",
+              "pos": "noun",
+              "example": "Vimos una mariposa en el parque ayer.",
+              "exampleTranslation": "Wir haben gestern einen Schmetterling im Park gesehen."
+            },
+            {
+              "term": "el estómago",
+              "translation": "der Magen",
+              "pos": "phrase",
+              "example": "Me duele el estómago de tanto comer.",
+              "exampleTranslation": "Mein Magen tut weh vom vielen Essen."
+            },
+            {
+              "term": "la canción",
+              "translation": "das Lied",
+              "pos": "noun",
+              "example": "¡Esta es mi canción favorita!",
+              "exampleTranslation": "Das ist mein Lieblingslied!"
+            },
+            {
+              "term": "el despertador",
+              "translation": "der Wecker",
+              "pos": "noun",
+              "example": "Mi despertador suena a las siete.",
+              "exampleTranslation": "Mein Wecker klingelt um sieben."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Módulo 4",
+      "sections": [
+        {
+          "name": "Wortschatz",
+          "entries": [
+            {
+              "term": "el foro",
+              "translation": "das Forum",
+              "pos": "noun",
+              "example": "Escribí mi opinión en el foro escolar.",
+              "exampleTranslation": "Ich habe meine Meinung im Schulforum geschrieben."
+            },
+            { "term": "la comunidad", "translation": "die Gemeinschaft; die Community", "pos": "noun" },
+            { "term": "educativo/educativa", "translation": "Bildungs-", "pos": "noun" },
+            {
+              "term": "el alumnado",
+              "translation": "die Schülerschaft",
+              "pos": "noun",
+              "example": "Todo el alumnado escribe en el foro.",
+              "exampleTranslation": "Die gesamte Schülerschaft schreibt im Forum."
+            },
+            {
+              "term": "el canal",
+              "translation": "der Kanal",
+              "pos": "noun",
+              "example": "El canal de diálogo me parece útil.",
+              "exampleTranslation": "Der Dialogkanal erscheint mir nützlich."
+            },
+            {
+              "term": "el diálogo",
+              "translation": "der Dialog",
+              "pos": "noun",
+              "example": "Yo solucioné un problema con diálogo.",
+              "exampleTranslation": "Ich habe ein Problem durch Dialog gelöst."
+            },
+            {
+              "term": "el compañero/la compañera",
+              "translation": "[hier:] der Kollege/die Kollegin",
+              "pos": "phrase",
+              "example": "Al viaje va mi compañera de Inglés.",
+              "exampleTranslation": "Meine Englisch-Kollegin fährt mit auf die Reise."
+            },
+            {
+              "term": "acompañar a alguien",
+              "translation": "jmdn. begleiten",
+              "pos": "verb",
+              "example": "Voy a acompañar a mi amiga al cine.",
+              "exampleTranslation": "Ich werde meine Freundin ins Kino begleiten."
+            },
+            {
+              "term": "tratar algo",
+              "translation": "etw. behandeln",
+              "pos": "phrase",
+              "example": "Tratemos el tema del viaje en clase.",
+              "exampleTranslation": "Lasst uns das Thema der Klassenreise ansprechen."
+            },
+            {
+              "term": "concreto/concreta",
+              "translation": "konkret; bestimmt",
+              "pos": "noun",
+              "example": "¿Quieres hablar de una idea concreta?",
+              "exampleTranslation": "Möchtest du über eine bestimmte Idee sprechen?"
+            },
+            { "term": "el uso", "translation": "die Verwendung; die Benutzung", "pos": "noun" },
+            {
+              "term": "el debate",
+              "translation": "die Debatte",
+              "pos": "noun",
+              "example": "¿Sobre qué tema es el debate de hoy?",
+              "exampleTranslation": "Was ist das Thema der heutigen Debatte?"
+            },
+            {
+              "term": "los medios digitales",
+              "translation": "die digitalen Medien",
+              "pos": "noun",
+              "example": "No quiero usar solo medios digitales.",
+              "exampleTranslation": "Ich möchte nicht nur digitale Medien verwenden."
+            },
+            { "term": "complejo/compleja", "translation": "komplex", "pos": "noun" },
+            {
+              "term": "reflexionar sobre algo",
+              "translation": "nachdenken",
+              "pos": "phrase",
+              "example": "Reflexiona sobre cómo usas tu tiempo.",
+              "exampleTranslation": "Reflektiere darüber, wie du deine Zeit verwendest."
+            },
+            {
+              "term": "el papel",
+              "translation": "die Rolle",
+              "pos": "phrase",
+              "example": "¿Qué papel tiene el móvil en tu vida?",
+              "exampleTranslation": "Welche Rolle spielt das Mobiltelefon in deinem Leben?"
+            },
+            { "term": "tras", "translation": "nach", "pos": "preposition" },
+            { "term": "la conversación", "translation": "das Gespräch; die Konversation", "pos": "noun" },
+            { "term": "el efecto", "translation": "die Wirkung; der Effekt", "pos": "noun" },
+            {
+              "term": "el consumo",
+              "translation": "der Konsum",
+              "pos": "noun",
+              "example": "Hoy el consumo de internet es enorme.",
+              "exampleTranslation": "Heute ist der Internetkonsum enorm."
+            },
+            {
+              "term": "ignorar algo",
+              "translation": "etw. ignorieren",
+              "pos": "phrase",
+              "example": "No ignores los efectos de dormir mal.",
+              "exampleTranslation": "Ignoriere die Auswirkungen von schlechtem Schlaf nicht."
+            },
+            {
+              "term": "el contexto",
+              "translation": "der Kontext; der Zusammenhang",
+              "pos": "noun",
+              "example": "Conocer el contexto histórico es útil.",
+              "exampleTranslation": "Den historischen Kontext zu kennen, ist hilfreich."
+            },
+            { "term": "reducir algo [c → zc]", "translation": "etw. reduzieren; etw. verringern", "pos": "phrase" },
+            {
+              "term": "el permiso",
+              "translation": "die Erlaubnis",
+              "pos": "noun",
+              "example": "No tienen permiso para usar móvil aquí.",
+              "exampleTranslation": "Sie haben hier keine Erlaubnis, das Handy zu nutzen."
+            },
+            {
+              "term": "el resto",
+              "translation": "der Rest",
+              "pos": "noun",
+              "example": "El resto del grupo llegó más tarde.",
+              "exampleTranslation": "Der Rest der Gruppe kam später."
+            },
+            { "term": "comunicar(se) con alguien", "translation": "mit jmdm. kommunizieren", "pos": "phrase" },
+            {
+              "term": "el caso de urgencia",
+              "translation": "der Notfall",
+              "pos": "noun",
+              "example": "En caso de urgencia, llama al profe.",
+              "exampleTranslation": "Im Notfall rufe den Lehrer an."
+            },
+            {
+              "term": "la medida",
+              "translation": "die Maßnahme",
+              "pos": "noun",
+              "example": "Esta medida ayuda en caso de urgencia.",
+              "exampleTranslation": "Diese Maßnahme hilft im Notfall."
+            },
+            {
+              "term": "la convivencia",
+              "translation": "das Zusammenleben",
+              "pos": "noun",
+              "example": "Una buena convivencia es importante.",
+              "exampleTranslation": "Ein gutes Zusammenleben ist wichtig."
+            },
+            { "term": "dudar algo", "translation": "etw. bezweifeln", "pos": "verb" },
+            { "term": "la votación", "translation": "die Abstimmung", "pos": "noun" },
+            { "term": "la sugerencia", "translation": "die Anregung; der Vorschlag", "pos": "noun" },
+            {
+              "term": "Un cordial saludo",
+              "translation": "Herzliche Grüße",
+              "pos": "noun",
+              "example": "Al final escribí: Un cordial saludo.",
+              "exampleTranslation": "Zum Schluss schrieb ich: Mit freundlichen Grüßen."
+            },
+            { "term": "permitir algo", "translation": "etw. erlauben", "pos": "phrase" },
+            { "term": "limitar algo", "translation": "etw. einschränken", "pos": "phrase" },
+            {
+              "term": "la libertad",
+              "translation": "die Freiheit",
+              "pos": "noun",
+              "example": "Me gusta tener la libertad de elegir.",
+              "exampleTranslation": "Ich mag es, die Freiheit zu haben, zu wählen."
+            },
+            {
+              "term": "total",
+              "translation": "total; völlig",
+              "pos": "noun",
+              "example": "¿Quisieras tener una libertad total?",
+              "exampleTranslation": "Möchtest du völlige Freiheit haben?"
+            },
+            {
+              "term": "funcionar",
+              "translation": "funktionieren",
+              "pos": "verb",
+              "example": "Ojalá que funcione la nueva medida.",
+              "exampleTranslation": "Hoffentlich wird die neue Maßnahme funktionieren."
+            },
+            { "term": "considerar algo", "translation": "etw. berücksichtigen", "pos": "verb" },
+            {
+              "term": "Estimado/Estimada",
+              "translation": "Sehr geehrte/geehrter",
+              "pos": "noun",
+              "example": "Estimado Mario, no estoy de acuerdo.",
+              "exampleTranslation": "Sehr geehrter Mario, ich bin nicht einverstanden."
+            },
+            { "term": "la propuesta", "translation": "der Vorschlag", "pos": "noun" },
+            { "term": "deber", "translation": "müssen", "pos": "verb" },
+            {
+              "term": "a través de",
+              "translation": "durch",
+              "pos": "phrase",
+              "example": "Vimos el mar a través de la ventana.",
+              "exampleTranslation": "Wir sahen das Meer durch das Fenster."
+            },
+            {
+              "term": "la pantalla",
+              "translation": "der Bildschirm; das Display",
+              "pos": "noun",
+              "example": "¡La pantalla de mi móvil no funciona!",
+              "exampleTranslation": "Mein Bildschirm des Handys funktioniert nicht!"
+            },
+            {
+              "term": "el rato",
+              "translation": "die Weile",
+              "pos": "noun",
+              "example": "¿Podemos usar el móvil un rato?",
+              "exampleTranslation": "Können wir unser Handy eine Weile benutzen?"
+            },
+            { "term": "rápidamente", "translation": "schnell", "pos": "adverb" },
+            {
+              "term": "igualmente",
+              "translation": "ebenfalls",
+              "pos": "noun",
+              "example": "No es fácil, pero igualmente lo hago.",
+              "exampleTranslation": "Es ist nicht einfach, aber ich mache es trotzdem."
+            },
+            { "term": "controlar algo", "translation": "etw. kontrollieren", "pos": "phrase" },
+            { "term": "complicado/complicada", "translation": "kompliziert", "pos": "noun" },
+            { "term": "comprender algo/a alguien", "translation": "etw./jmdn. verstehen", "pos": "phrase" },
+            { "term": "la comunicación", "translation": "die Kommunikation", "pos": "noun", "grey": true },
+            { "term": "la dependencia", "translation": "die Abhängigkeit", "pos": "noun", "grey": true },
+            { "term": "las distracción", "translation": "die Ablenkung", "pos": "noun", "grey": true },
+            { "term": "la diversíon", "translation": "der Spaß", "pos": "noun", "grey": true },
+            { "term": "la falta de atencíon/concentración", "translation": "die Unaufmerksamkeit", "pos": "noun", "grey": true },
+            { "term": "la pérdida de tiempo", "translation": "die Zeitverschwendung", "pos": "noun", "grey": true },
+            { "term": "la rapidez", "translation": "die Schnelligkeit", "pos": "noun", "grey": true },
+            { "term": "la seguridad", "translation": "die Sicherheit", "pos": "noun", "grey": true }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Módulo 5",
+      "sections": [
+        {
+          "name": "Wortschatz",
+          "entries": [
+            { "term": "apuntarse a algo", "translation": "bei etw. mitmachen", "pos": "verb" },
+            { "term": "responsable", "translation": "verantwortlich", "pos": "adjective" },
+            {
+              "term": "la aplicación",
+              "translation": "die App",
+              "pos": "noun",
+              "example": "Uso una aplicación para ver noticias.",
+              "exampleTranslation": "Ich benutze eine App, um Nachrichten zu schauen."
+            },
+            {
+              "term": "salvar algo",
+              "translation": "etw. retten",
+              "pos": "phrase",
+              "example": "Con esta aplicación salvamos comida.",
+              "exampleTranslation": "Mit dieser App retten wir Lebensmittel."
+            },
+            {
+              "term": "descargar algo",
+              "translation": "etw. herunterladen",
+              "pos": "phrase",
+              "example": "No descargué la foto en el ordenador.",
+              "exampleTranslation": "Ich habe das Foto nicht auf meinen Computer heruntergeladen."
+            },
+            {
+              "term": "indicar algo",
+              "translation": "etw. zeigen",
+              "pos": "phrase",
+              "example": "¿Me indicas dónde está el restaurante?",
+              "exampleTranslation": "Können Sie mir zeigen, wo das Restaurant ist?"
+            },
+            {
+              "term": "la bolsa",
+              "translation": "die Tasche; die Tragetasche",
+              "pos": "noun",
+              "example": "¿Traes la bolsa para hacer la compra?",
+              "exampleTranslation": "Bringst du die Tasche zum Einkaufen mit?"
+            },
+            {
+              "term": "además de",
+              "translation": "zusätzlich zu",
+              "pos": "phrase",
+              "example": "Además de estudiar, quedo con amigos.",
+              "exampleTranslation": "Zusätzlich zum Lernen verbringe ich Zeit mit Freunden."
+            },
+            {
+              "term": "¡Ojo!",
+              "translation": "Achtung!; Vorsicht!",
+              "pos": "phrase",
+              "example": "¡Ojo! Mañana hay examen de historia.",
+              "exampleTranslation": "Achtung! Morgen gibt es eine Geschichtsprüfung."
+            },
+            {
+              "term": "la manera",
+              "translation": "die (Art und) Weise",
+              "pos": "noun",
+              "example": "Cada uno tiene su manera de aprender.",
+              "exampleTranslation": "Jeder hat seine eigene Weise zu lernen."
+            },
+            { "term": "vender algo", "translation": "etw. verkaufen", "pos": "verb" },
+            { "term": "usado/usada", "translation": "gebraucht", "pos": "noun" },
+            {
+              "term": "útil",
+              "translation": "nützlich; hilfreich",
+              "pos": "adjective",
+              "example": "La aplicación del diccionario es muy útil.",
+              "exampleTranslation": "Die Wörterbuch-App ist sehr hilfreich."
+            },
+            {
+              "term": "la moda",
+              "translation": "die Mode",
+              "pos": "noun",
+              "example": "La moda cambia cada vez más rápido.",
+              "exampleTranslation": "Die Mode verändert sich immer schneller."
+            },
+            {
+              "term": "la plataforma",
+              "translation": "die Plattform",
+              "pos": "noun",
+              "example": "¿Qué plataforma digital te gusta más?",
+              "exampleTranslation": "Welche digitale Plattform gefällt dir am meisten?"
+            },
+            {
+              "term": "acumular",
+              "translation": "sammeln",
+              "pos": "verb",
+              "example": "Acumulo mucha experiencia en el trabajo.",
+              "exampleTranslation": "Ich sammle viel Berufserfahrung."
+            },
+            {
+              "term": "desagradable",
+              "translation": "unangenehm",
+              "pos": "adjective",
+              "example": "Es desagradable discutir con amigos.",
+              "exampleTranslation": "Es ist unangenehm, mit Freunden zu streiten."
+            },
+            { "term": "la descripción", "translation": "die Beschreibung", "pos": "noun" },
+            {
+              "term": "¡No te cortes!",
+              "translation": "Hab keine Angst!",
+              "pos": "phrase",
+              "example": "¡No te cortes! Participa en el debate.",
+              "exampleTranslation": "Hab keine Angst! Nimm an der Diskussion teil."
+            },
+            { "term": "malgastar agua", "translation": "Wasser verschwenden", "pos": "phrase", "grey": true },
+            { "term": "dejar las luces encendidas", "translation": "das Licht brennen lassen", "pos": "phrase", "grey": true },
+            {
+              "term": "apoyar empresas que no respetan el planeta",
+              "translation": "Firmen unterstützen, die den Planeten nicht respektieren",
+              "pos": "phrase",
+              "grey": true
+            },
+            {
+              "term": "consumir sin pensar en las consecuencias",
+              "translation": "konsumieren, ohne an die Konsequenzen zu denken",
+              "pos": "phrase",
+              "grey": true
+            },
+            { "term": "desperdiciar energía/papel", "translation": "Energie/Papier verschwenden", "pos": "phrase", "grey": true },
+            { "term": "usar botellas/envases desechables", "translation": "Einwegflaschen/-verpackungen verwenden", "pos": "phrase", "grey": true },
+            { "term": "ignorar la importancia del comercio justo", "translation": "die Bedeutung von fairem Handel ignorieren", "pos": "phrase", "grey": true }
+          ]
+        }
+      ]
+    }
+  ],
+  "importedAt": "2026-10-27T18:00:00.000Z"
 }

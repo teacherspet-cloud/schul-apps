@@ -7,6 +7,7 @@ import { extractContent, MATERIAL_ACCEPT } from '../../shared/files/extractConte
 import DropZone from '../../shared/components/DropZone'
 import { pruefeHochladen } from '../../shared/datenschutz'
 import { erkenneSchulbuch } from '../../shared/schulbuch/schulbuch'
+import { useBuchVorschlaege } from '../../shared/components/Schulbuecher'
 import {
   Alert,
   Autocomplete,
@@ -144,6 +145,8 @@ export function ReiheAusSchulbuch({
   const vorgaben = schulformVorgaben(reihe.stateId, reihe.schoolTypeId)
   const budget = phasenBudget(n, vorgaben, mitKa)
   const faustwert = dauerFaustwert(reihe.fachId)
+  // Bücherkatalog der Schule (27.10.2026): Bücher des Fachs als Vorschläge, Verlag wird mitgesetzt
+  const vorschlaege = useBuchVorschlaege(reihe.fachId)
 
   const seitenNeu = buch ? vervielfaeltigteSeiten(buch, wahl) : []
   const schluessel = zaehlerSchluessel(lerngruppe || 'ohne Lerngruppe', buch?.titel || 'Schulbuch', schuljahr)
@@ -251,7 +254,13 @@ export function ReiheAusSchulbuch({
             {buch && (
               <Card withBorder p="sm" data-buch-erkannt>
                 <Group grow>
-                  <TextInput label="Buch" value={buch.titel} onChange={(e) => setBuch({ ...buch, titel: e.currentTarget.value })} data-buch-titel />
+                  <Autocomplete
+                    label="Buch"
+                    value={buch.titel}
+                    onChange={(v) => setBuch({ ...buch, titel: v, verlag: vorschlaege.verlagVon(v) || buch.verlag })}
+                    data={vorschlaege.namen}
+                    data-buch-titel
+                  />
                   <TextInput label="Verlag" value={buch.verlag} onChange={(e) => setBuch({ ...buch, verlag: e.currentTarget.value })} />
                 </Group>
                 <Group gap={6} mt="xs">

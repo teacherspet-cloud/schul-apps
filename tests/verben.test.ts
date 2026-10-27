@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest'
  * Form – und derselbe Erzeuger in Grammatiktest, Arbeitsblatt und Vokabeltest.
  */
 const ablage = mkdtempSync(join(tmpdir(), 'verben-'))
-vi.mock('electron', () => ({ app: { getPath: () => ablage } }))
+// getAppPath (27.10.2026): mitgelieferte Verblisten liegen unter resources/lehrwerke/verben – im Test ein leerer Ordner
+vi.mock('electron', () => ({ app: { getPath: () => ablage, getAppPath: () => ablage } }))
 
 const { bereinigeVerbListe, grundformVon, listenIdAusName, varianten, verbSchluessel, VERB_SPALTEN } = await import('../src/shared/verben')
 const { deleteVerbList, getVerbList, listVerbLists, saveVerbList } = await import('../src/main/services/storage/verbListen')

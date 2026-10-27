@@ -135,6 +135,8 @@ export interface VerbListe {
   /** Fundstelle im Buch, z. B. „S. 212–214" */
   seite?: string
   aktualisiert: string
+  /** Mitgelieferte bzw. gemeinsame Liste (27.10.2026) – am Server nur von Admins und Fachobleuten änderbar */
+  gemeinsam?: boolean
 }
 
 /** Übersicht ohne Einträge – für Auswahllisten */
@@ -148,6 +150,7 @@ export interface VerbListeMeta {
   anzahl: number
   seite?: string
   aktualisiert: string
+  gemeinsam?: boolean
 }
 
 export const alsMeta = (l: VerbListe): VerbListeMeta => ({
@@ -159,7 +162,8 @@ export const alsMeta = (l: VerbListe): VerbListeMeta => ({
   sprache: l.sprache,
   anzahl: l.eintraege.length,
   ...(l.seite ? { seite: l.seite } : {}),
-  aktualisiert: l.aktualisiert
+  aktualisiert: l.aktualisiert,
+  ...(l.gemeinsam ? { gemeinsam: true } : {})
 })
 
 export const pruefeListenId = (id: string): string => {

@@ -81,7 +81,18 @@ const gl = (ausgabe: string, jahr: number, laender: string[], allgemein: boolean
 const cornelsen = (reihe: string, ausgabe: string, jahr: number, laender: string[], baende: [string, string][]): CoverAusgabe[] =>
   baende.map(([band, isbn]) => {
     const nr = isbn.replace(/-/g, '')
-    return { reihe, ausgabe, jahr, band, isbn, laender, allgemein: true, nurEigeneAusgabe: true, verlag: 'Cornelsen', url: `${CORNELSEN}${nr}/${nr}_COVER_STD_B110_X2.png` }
+    return {
+      reihe,
+      ausgabe,
+      jahr,
+      band,
+      isbn,
+      laender,
+      allgemein: true,
+      nurEigeneAusgabe: true,
+      verlag: 'Cornelsen',
+      url: `${CORNELSEN}${nr}/${nr}_COVER_STD_B110_X2.png`
+    }
   })
 
 export const COVER_AUSGABEN: CoverAusgabe[] = [
@@ -150,7 +161,9 @@ export const COVER_AUSGABEN: CoverAusgabe[] = [
   ...gl('Oberstufe Ausgabe ab 2021', 2021, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'], true, [
     ['Oberstufe', '978-3-12-550004-4', '4dbb4e04/Cover_550004_Rahmen_2469_200.jpg']
   ]),
-  ...gl('Oberstufe Ausgabe Nordrhein-Westfalen ab 2021', 2021, ['NW'], false, [['Oberstufe', '978-3-12-550002-0', '480b8794/Cover_550002_Rahmen_2469_200.jpg']]),
+  ...gl('Oberstufe Ausgabe Nordrhein-Westfalen ab 2021', 2021, ['NW'], false, [
+    ['Oberstufe', '978-3-12-550002-0', '480b8794/Cover_550002_Rahmen_2469_200.jpg']
+  ]),
   ...gl('Oberstufe Ausgabe Baden-Württemberg ab 2021', 2021, ['BW'], false, [['Oberstufe', '978-3-12-550003-7', 'a99d334/Cover_550003_Rahmen_2469_200.jpg']]),
   ...gl('Oberstufe Ausgabe Bayern ab 2024', 2024, ['BY'], false, [
     ['Oberstufe', '978-3-12-550000-6', '1217077a365771d663525842827c7fe3d5e6ee0b65f9804000b5e9efed970995/Cover_550000_2469_200.jpg']
@@ -158,13 +171,20 @@ export const COVER_AUSGABEN: CoverAusgabe[] = [
 
   // Französisch (10.10.2026): Découvertes Série jaune (ab Klasse 6), Ausgabe ab 2012 – laut Verlag BW, HB, HH, HE, NI, NW,
   // RP, SL, SN, SH, TH; als einzige Ausgabe der Reihe auch der Rückfall
-  ...klett('Découvertes Série jaune', 'Série jaune (ab Klasse 6) Ausgabe ab 2012', 2012, ['BW', 'HB', 'HH', 'HE', 'NI', 'NW', 'RP', 'SL', 'SN', 'SH', 'TH'], true, [
-    ['1', '978-3-12-622011-8', '296c1976/Cover_622011_Rahmen_2469_200.jpg'],
-    ['2', '978-3-12-622021-7', '360cb0ee/Cover_622021_Rahmen_2469_200.jpg'],
-    ['3', '978-3-12-622031-6', 'e839abe/Cover_622031_Rahmen_2469_200.jpg'],
-    ['4', '978-3-12-622041-5', '7d1ecb75/Cover_622041_Rahmen_2469_200.jpg'],
-    ['5', '978-3-12-622051-4', '9687fa95/Cover_622051_Rahmen_2469_200.jpg']
-  ]),
+  ...klett(
+    'Découvertes Série jaune',
+    'Série jaune (ab Klasse 6) Ausgabe ab 2012',
+    2012,
+    ['BW', 'HB', 'HH', 'HE', 'NI', 'NW', 'RP', 'SL', 'SN', 'SH', 'TH'],
+    true,
+    [
+      ['1', '978-3-12-622011-8', '296c1976/Cover_622011_Rahmen_2469_200.jpg'],
+      ['2', '978-3-12-622021-7', '360cb0ee/Cover_622021_Rahmen_2469_200.jpg'],
+      ['3', '978-3-12-622031-6', 'e839abe/Cover_622031_Rahmen_2469_200.jpg'],
+      ['4', '978-3-12-622041-5', '7d1ecb75/Cover_622041_Rahmen_2469_200.jpg'],
+      ['5', '978-3-12-622051-4', '9687fa95/Cover_622051_Rahmen_2469_200.jpg']
+    ]
+  ),
   // Découvertes, Ausgabe 1. oder 2. Fremdsprache ab 2020 – alle Länder außer Bayern
   ...klett('Découvertes', 'Ausgabe 1. oder 2. Fremdsprache ab 2020', 2020, OHNE_BY, true, [
     ['1', '978-3-12-624011-6', 'dd5d80b2/Cover_624011_Rahmen_2469_200.jpg'],
@@ -175,20 +195,40 @@ export const COVER_AUSGABEN: CoverAusgabe[] = [
   ]),
 
   // Spanisch (10.10.2026): ¡Apúntate! Spanisch als 2. Fremdsprache – Ausgabe 2016 (Länder laut Verlag ohne BW, BY)
-  ...cornelsen('¡Apúntate!', 'Spanisch als 2. Fremdsprache – Ausgabe 2016', 2016, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'], [
-    ['1', '978-3-06-024837-7'],
-    ['2', '978-3-06-121118-9'],
-    ['3', '978-3-06-121196-7'],
-    ['4', '978-3-06-121197-4'],
-    ['5', '978-3-06-121198-1']
-  ]),
+  ...cornelsen(
+    '¡Apúntate!',
+    'Spanisch als 2. Fremdsprache – Ausgabe 2016',
+    2016,
+    ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'],
+    [
+      ['1', '978-3-06-024837-7'],
+      ['2', '978-3-06-121118-9'],
+      ['3', '978-3-06-121196-7'],
+      ['4', '978-3-06-121197-4'],
+      ['5', '978-3-06-121198-1']
+    ]
+  ),
   // Ausgabe 2024 (Länder laut Verlag ohne BW, BY, RP, SL); Band 5 noch nicht erschienen
-  ...cornelsen('¡Apúntate!', 'Spanisch als 2. Fremdsprache – Ausgabe 2024', 2024, ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'SN', 'ST', 'SH', 'TH'], [
-    ['1', '978-3-06-122987-0'],
-    ['2', '978-3-06-123052-4'],
-    ['3', '978-3-06-123053-1'],
-    ['4', '978-3-06-123054-8']
-  ])
+  ...cornelsen(
+    '¡Apúntate!',
+    'Spanisch als 2. Fremdsprache – Ausgabe 2024',
+    2024,
+    ['BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'SN', 'ST', 'SH', 'TH'],
+    [
+      ['1', '978-3-06-122987-0'],
+      ['2', '978-3-06-123052-4'],
+      ['3', '978-3-06-123053-1'],
+      ['4', '978-3-06-123054-8']
+    ]
+  ),
+  // Spanisch neu beginnend in der Oberstufe (27.10.2026): A tope, Ausgabe 2026 – ein Band (Länder laut Verlag ohne BY)
+  ...cornelsen(
+    'A tope',
+    'Spanisch als neu beginnende Fremdsprache – Ausgabe 2026',
+    2026,
+    ['BW', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH'],
+    [['', '978-3-06-123165-1']]
+  )
 ]
 
 /** Was ein Band über sich weiß (Auszug aus TextbookMeta) */
@@ -238,9 +278,7 @@ export function coverAusgabe(b: CoverBand, land?: string): CoverAusgabe | null {
   const rb = reiheUndBand(b)
   if (!rb) return null
   const jahr = Number(/\d{4}/.exec(b.ausgabe ?? '')?.[0] ?? 0)
-  const kandidaten = COVER_AUSGABEN.filter(
-    (a) => a.reihe === rb.reihe && a.band === rb.band && !(a.nurEigeneAusgabe && jahr && a.jahr !== jahr)
-  )
+  const kandidaten = COVER_AUSGABEN.filter((a) => a.reihe === rb.reihe && a.band === rb.band && !(a.nurEigeneAusgabe && jahr && a.jahr !== jahr))
   const ziel = b.stateId || land
   const reihenfolge = (x: CoverAusgabe, y: CoverAusgabe): number =>
     Number(y.jahr === jahr) - Number(x.jahr === jahr) || y.jahr - x.jahr || x.laender.length - y.laender.length

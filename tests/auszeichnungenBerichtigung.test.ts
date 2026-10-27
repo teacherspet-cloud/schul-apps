@@ -73,8 +73,8 @@ const stand = (w: WortStand['fach'], x: Partial<WortStand> = {}): WortStand => (
 })
 
 describe('Wortschatz gestuft (Klasse 5, Green Line 1)', () => {
-  it('Band: rund 1.089 Wörter, Schwellen aus 4 × Wörter', () => {
-    expect(W).toBeGreaterThan(1000)
+  it('Band: rund 920 Pflichtwörter (ohne Zusatzwortschatz, 27.10.2026), Schwellen aus 4 × Wörter', () => {
+    expect(W).toBeGreaterThan(850)
     expect(W).toBeLessThan(1200)
     const s = jahresSchwellen(grundlage).wortschatz
     expect(s[0]).toBeLessThanOrEqual(50)

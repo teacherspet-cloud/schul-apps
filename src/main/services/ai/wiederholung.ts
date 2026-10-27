@@ -40,7 +40,13 @@ export function wiederholbar(e: unknown): Fehlerart | null {
   if (e instanceof SyntaxError || /JSON|Unexpected (token|end)|Unterminated string|Expected .* after/i.test(m)) return 'json'
   if (/abgeschnitten|max_tokens|zu lang/i.test(m)) return 'abgeschnitten'
   if (/keine Antwort geliefert/i.test(m)) return 'leer'
-  if (/\b(500|502|503|504|529)\b|overloaded|internal server error|bad gateway|service unavailable/i.test(m)) return 'server'
+  // Netzfehler (27.10.2026, Befund „fetch failed“ bei Gemini): Verbindung abgerissen oder Zeitüberschreitung – einmal wiederholen
+  if (
+    /\b(500|502|503|504|529)\b|overloaded|internal server error|bad gateway|service unavailable|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|UND_ERR|network error|terminated/i.test(
+      m
+    )
+  )
+    return 'server'
   return null
 }
 

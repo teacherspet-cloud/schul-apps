@@ -327,7 +327,14 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     await updateModelsInBackground()
     // Die Modellliste funktioniert auch ohne Guthaben – deshalb eine winzige echte Anfrage mit dem gewählten Modell
     const { ai } = getSettings()
-    await createProvider(provider).structured(PING, istKompatibel(provider) ? kompatibelModell(provider, ai) : ai.textModels[provider])
+    // Zeitgrenze (27.10.2026, Befund: bei Gemini 3.6/3.7 drehte der Knopf endlos): 60 s, dann ein klarer Hinweis
+    try {
+      await createProvider(provider).structured(PING, istKompatibel(provider) ? kompatibelModell(provider, ai) : ai.textModels[provider], undefined, AbortSignal.timeout(60_000))
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'TimeoutError' || /timeout|abort/i.test(e instanceof Error ? e.message : String(e)))
+        throw new Error('Keine Antwort innerhalb von 60 Sekunden – dieses Modell antwortet derzeit nicht. Ein anderes Modell wählen (z. B. das empfohlene) oder später erneut testen.')
+      throw e
+    }
     return models.length
   })
   handle('ai:subscription-status', (provider: AiProviderId) => subscriptionStatus(provider))

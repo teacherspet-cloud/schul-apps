@@ -81,3 +81,42 @@ describe('Nennform aus der eingelesenen Zeile holen', () => {
     expect(e.nennform).toBeUndefined()
   })
 })
+
+/*
+ * Lehrwerksdateien (27.10.2026, Cursus A aus dem Navigium-Export): `pos` ist ein Wortart-Code, die Nennform steht hinter
+ * dem Lemma – mit Stammformen, Genus und Numerus. Bisher galt der Code als Nennform und die Formabfrage fiel aus.
+ */
+describe('Vokabeln aus Lehrwerksdateien (27.10.2026)', () => {
+  const v = (term: string, pos: string): VocabEntry => ({ id: term, term, translation: 'x', pos })
+  it('nimmt den Wortart-Code nicht als Nennform, sondern trennt sie vom Lemma', () => {
+    const s = mitNennform(v('servus, servi m.', 'noun'))
+    expect(s.term).toBe('servus')
+    expect(s.nennform).toBe('servi m.')
+    expect(s.wordClass).toBe('substantiv')
+    const st = mitNennform(v('stare, sto, steti, statum', 'verb'))
+    expect(st.term).toBe('stare')
+    expect(st.nennform).toBe('sto, steti, statum')
+    expect(st.wordClass).toBe('verb')
+  })
+  it('kennt Numerus und doppeltes Genus', () => {
+    expect(mitNennform(v('castra, castrorum n. Pl.', 'noun')).wordClass).toBe('substantiv')
+    expect(mitNennform(v('canis, canis m./f.', 'noun')).wordClass).toBe('substantiv')
+    expect(erkenneWortart('castrōrum n. Pl.', 'castra')).toBe('substantiv')
+  })
+  it('erkennt Verben ohne Längenzeichen und Deponentien', () => {
+    expect(erkenneWortart('venio, veni, ventum', 'venire')).toBe('verb')
+    expect(erkenneWortart('patior, passus sum', 'pati')).toBe('verb')
+    expect(erkenneWortart('hortor, hortatus sum', 'hortari')).toBe('verb')
+  })
+  it('nutzt den Wortart-Code, wo die Nennform allein nicht reicht', () => {
+    expect(mitNennform(v('pulcher, pulchra, pulchrum', 'adjective')).wordClass).toBe('adjektiv')
+    expect(mitNennform(v('gravis, grave', 'adjective')).wordClass).toBe('adjektiv')
+    expect(mitNennform(v('felix, felicis', 'adjective')).wordClass).toBe('adjektiv')
+    expect(mitNennform(v('quis, quis, quid', 'pronoun')).wordClass).toBe('pronomen')
+    // Präposition ohne Kasusangabe: nichts abzufragen
+    expect(mitNennform(v('in', 'preposition')).wordClass).toBe('sonstiges')
+    expect(mitNennform(v('cum, Präp. + Abl.', 'preposition')).wordClass).toBe('praeposition')
+    // Adverb ohne Zusatz bleibt ohne Nennform
+    expect(mitNennform(v('etiam', 'adverb')).wordClass).toBe('sonstiges')
+  })
+})

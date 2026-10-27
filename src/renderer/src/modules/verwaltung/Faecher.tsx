@@ -4,13 +4,14 @@
  * IServ-Fachschaften, eigenen Fächern der Lehrkräfte und Fachobleuten vorbelegt; der Admin ergänzt oder entfernt Fächer
  * aus dem Katalog (shared/faecher.ts). Bücher pflegen hier Admins, in „Mein Fach“ die Fachobleute ihres Fachs.
  */
-import { ActionIcon, Alert, Button, Card, Group, Loader, Select, Stack, Text, Title, Tooltip } from '@mantine/core'
+import { Alert, Button, Group, Loader, Select, Stack, Text, Title, Tooltip } from '@mantine/core'
 import { IconInfoCircle, IconPlus, IconRefresh, IconX } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { FAECHER, fachVon } from '@shared/faecher'
 import { senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { FachPunkt } from '../../shared/components/FachFarbe'
+import { KlappKarte } from '../../shared/components/KlappKarte'
 import { SchulbuchListe, useSchulbuchKatalog, type Katalog } from '../../shared/components/Schulbuecher'
 
 export function Faecher(): React.JSX.Element {
@@ -89,30 +90,39 @@ export function Faecher(): React.JSX.Element {
         </Alert>
       )}
       {liste.length === 0 && <Text c="dimmed">Noch kein Fach – oben ein Fach aus dem Katalog hinzufügen.</Text>}
+      {/* Auf-/zuklappbar je Fach (27.10.2026, Wunsch der Lehrkraft) – Stand dauerhaft gemerkt wie in Schule & Daten › Schule */}
       {liste.map((fach) => (
-        <Card key={fach} withBorder data-fach-karte={fach}>
-          <Group justify="space-between" mb="xs" wrap="nowrap">
+        <KlappKarte
+          key={fach}
+          id={`faecher-${fach}`}
+          dauerhaft
+          titel={
             <Group gap="sm" wrap="nowrap">
               <FachPunkt fach={fach} groesse={16} />
-              <Title order={4}>{fachVon(fach)?.label ?? fach}</Title>
-              <Text size="sm" c="dimmed">
-                {buecherJe(fach) === 1 ? '1 Buch' : `${buecherJe(fach)} Bücher`}
-              </Text>
+              <span>{fachVon(fach)?.label ?? fach}</span>
             </Group>
-            <Tooltip label="Fach aus der Liste entfernen (Bücher und Materialien bleiben)">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label={`${fachVon(fach)?.label ?? fach} entfernen`}
-                onClick={() => void faecherSpeichern(liste.filter((f) => f !== fach))}
-                data-fach-entfernen={fach}
-              >
-                <IconX size={16} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-          <SchulbuchListe fach={fach} katalog={katalog} aendern={aendern} />
-        </Card>
+          }
+          status={buecherJe(fach) === 1 ? '1 Buch' : `${buecherJe(fach)} Bücher`}
+          rahmen={{ 'data-fach-karte': fach }}
+        >
+          <Stack gap="xs">
+            <Group justify="flex-end">
+              <Tooltip label="Fach aus der Liste entfernen (Bücher und Materialien bleiben)">
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  color="gray"
+                  leftSection={<IconX size={14} />}
+                  onClick={() => void faecherSpeichern(liste.filter((f) => f !== fach))}
+                  data-fach-entfernen={fach}
+                >
+                  Fach aus der Liste entfernen
+                </Button>
+              </Tooltip>
+            </Group>
+            <SchulbuchListe fach={fach} katalog={katalog} aendern={aendern} />
+          </Stack>
+        </KlappKarte>
       ))}
     </Stack>
   )

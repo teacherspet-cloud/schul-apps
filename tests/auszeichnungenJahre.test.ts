@@ -84,9 +84,11 @@ describe('Umfang eines Bands', () => {
   it('Green Line 3: Wörter, Kapitel, Grammatik', () => {
     const gl3 = lehrwerk('green-line-3')
     const w = bandWoerter(gl3)!
-    expect(w).toBeGreaterThan(1000)
+    // ohne Zusatzwortschatz (27.10.2026)
+    expect(w).toBeGreaterThan(850)
     expect(w).toBeLessThan(1300)
-    expect(bandKapitel(gl3)).toBe(11)
+    // Zusatz-Units zaehlen nicht (27.10.2026): Across cultures 1+2, Unit 1-4, Text smart 1+2, Media smart, Trailer
+    expect(bandKapitel(gl3)).toBe(10)
     expect(grammatikBandZu('green-line-3', 'Green Line 3')).toBe('Green Line 3')
     expect(grammatikBandZu('green-line-3-nds')).toBe('Green Line 3')
     const g = grammatikImBand('Green Line 3')!
@@ -96,7 +98,7 @@ describe('Umfang eines Bands', () => {
   })
   it('Platzhalter ohne Wörter (Découvertes, ¡Apúntate!) liefern nichts – dann Jahrgangstabellen', () => {
     expect(bandWoerter(lehrwerk('decouvertes-2020-2'))).toBeNull()
-    expect(bandKapitel(lehrwerk('apuntate-2024-1'))).toBeNull()
+    expect(bandKapitel(lehrwerk('apuntate-2024-4'))).toBeNull()
     expect(grammatikBandZu('decouvertes-2020-2', 'Découvertes 2')).toBeUndefined()
   })
   it('Latein: Grammatik der Lektionen des Lernjahres (ab Klasse 6)', () => {

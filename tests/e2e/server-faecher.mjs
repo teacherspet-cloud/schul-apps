@@ -50,7 +50,11 @@ try {
   await v.getByRole('tab', { name: 'Fächer', exact: true }).click()
   await v.locator('[data-faecher]').waitFor({ timeout: 10000 })
   pruefe((await v.locator('[data-fach-karte="englisch"]').count()) === 1, 'Karte „Englisch“ steht da')
+  // Karten starten zugeklappt (27.10.2026) – zum Prüfen öffnen
+  await v.locator('[data-fach-karte="englisch"] [data-klappkopf]').click()
+  await v.waitForTimeout(400)
   pruefe((await v.locator('[data-fach-karte="englisch"] [data-buch]').count()) >= 7, 'Englisch zeigt die Green-Line-Bände')
+  pruefe((await v.locator('[data-fach-karte="englisch"] [data-buch-reihe]').count()) >= 1, '… nach Schulbuchreihen gruppiert')
   pruefe((await v.locator('[data-fach-karte="englisch"] [data-buch-bild]').count()) >= 1, '… mit Cover-Bild vom Verlag')
   await v.screenshot({ path: join(out, '1-faecher.png'), fullPage: true })
 
@@ -73,6 +77,8 @@ try {
   await v.getByRole('option', { name: fachName, exact: true }).click()
   await v.locator('[data-fach-hinzufuegen]').click()
   await v.locator(`[data-fach-karte="${neuesFach}"]`).waitFor({ timeout: 10000 })
+  await v.locator(`[data-fach-karte="${neuesFach}"] [data-klappkopf]`).click()
+  await v.waitForTimeout(400)
   pruefe(true, `Fach „${fachName}“ hinzugefügt – Liste gilt jetzt als gespeichert`)
   const nachFach = await (await verwaltung.request.get(`${A}/server/schulbuecher`, { headers: KOPF })).json()
   pruefe(nachFach.faecher.gespeichert === true && nachFach.faecher.liste.includes(neuesFach), '… Server: Liste gespeichert')

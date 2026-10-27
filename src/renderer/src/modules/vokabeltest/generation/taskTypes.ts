@@ -97,7 +97,9 @@ const vocabLines = (vocab: VocabEntry[]): string =>
   vocab
     .map(
       (v) =>
-        `- id="${v.id}" | ${v.term} | German: ${v.translation}${v.lesung ? ` | reading: ${v.lesung}` : ''}${v.pos ? ` | ${v.pos}` : ''}${v.note ? ` | note: ${v.note}` : ''}`
+        `- id="${v.id}" | ${v.term} | German: ${v.translation}${v.lesung ? ` | reading: ${v.lesung}` : ''}${v.pos ? ` | ${v.pos}` : ''}${
+          v.note ? ` | note: ${v.note}` : ''
+        }`
     )
     .join('\n')
 
@@ -328,7 +330,9 @@ const defs: TaskTypeDef[] = [
       extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
     }),
     prompt: (vocab, ctx) =>
-      `Task type: gap-fill sentences. Write exactly one sentence for each word below.\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: gap-fill sentences. Write exactly one sentence for each word below.\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -367,7 +371,12 @@ const defs: TaskTypeDef[] = [
       extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
     }),
     prompt: (vocab, ctx) =>
-      `Task type: coherent gap text (a short story, e-mail, diary or blog entry${ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''}). Use every word below exactly once as a gap. Mark each gap in "text" with [[vocabId]] and give the fitting form in "gaps".\n${GAP_RULES}\nUse paragraphs (\\n) where natural. Length: about ${Math.max(60, vocab.length * 18)} words.\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: coherent gap text (a short story, e-mail, diary or blog entry${
+        ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''
+      }). Use every word below exactly once as a gap. Mark each gap in "text" with [[vocabId]] and give the fitting form in "gaps".\n${GAP_RULES}\nUse paragraphs (\\n) where natural. Length: about ${Math.max(
+        60,
+        vocab.length * 18
+      )} words.\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
       return {
         ...base(this, data, ctx),
@@ -397,7 +406,11 @@ const defs: TaskTypeDef[] = [
       extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
     }),
     prompt: (vocab, ctx) =>
-      `Task type: dialogue completion. Write a natural dialogue between two teenagers${ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''} (8–14 turns). Use every word below exactly once as a gap marked with [[vocabId]].\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: dialogue completion. Write a natural dialogue between two teenagers${
+        ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''
+      } (8–14 turns). Use every word below exactly once as a gap marked with [[vocabId]].\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       return {
         ...base(this, data, ctx),
@@ -426,7 +439,9 @@ const defs: TaskTypeDef[] = [
       extraWords: arr(str(), 'Exactly 2 plausible extra words (same level, same word class) that match none of the explanations')
     }),
     prompt: (vocab) =>
-      `Task type: match explanations to words. Write a simple monolingual explanation (dictionary style for learners) for each word. The explanation must fit only this word – not any other word of the list and not the extra words – and must not contain the word itself or words of its family.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: match explanations to words. Write a simple monolingual explanation (dictionary style for learners) for each word. The explanation must fit only this word – not any other word of the list and not the extra words – and must not contain the word itself or words of its family.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), definition: p.definition })).filter((p: any) => p.v)
       const right = shuffle(
@@ -469,7 +484,9 @@ const defs: TaskTypeDef[] = [
       modelAnswer: str()
     }),
     prompt: (vocab) =>
-      `Task type: students write their own explanation of each word in the target language. Give the word as "prompt" (add a short context in brackets only if the word has several meanings) and a model answer at the students' level.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: students write their own explanation of each word in the target language. Give the word as "prompt" (add a short context in brackets only if the word has several meanings) and a model answer at the students' level.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
     }
@@ -500,7 +517,13 @@ const defs: TaskTypeDef[] = [
         items: vocab.map((v) => {
           // Nie ein anderes Wort der Aufgabe oder des Wortkastens (überzählige Wörter)
           const auch = bildAuchRichtig(v, [...vocab, ...extra.map((t, i) => ({ id: `extra${i}`, term: t }))])
-          return { id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term], ...(auch.length ? { auchRichtig: auch } : {}) }
+          return {
+            id: newId(ctx.rng),
+            vocabId: v.id,
+            answer: v.term,
+            imageKeywords: v.imageKeywords ?? [v.term],
+            ...(auch.length ? { auchRichtig: auch } : {})
+          }
         }),
         // Wortkasten nur, wenn die Lehrkraft ihn will: Die Wörter wären sonst eine Hilfe,
         // die am Gymnasium nicht vorgesehen ist. Mit Kasten kommen überzählige Wörter dazu,
@@ -532,7 +555,9 @@ const defs: TaskTypeDef[] = [
       correctIndex: int('0-based index of the correct option')
     }),
     prompt: (vocab, ctx) =>
-      `Task type: multiple choice in context. One sentence per word with a gap and 4 options.\n${MC_DISTRACTOR_RULES(ctx)}\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: multiple choice in context. One sentence per word with a gap and 4 options.\n${MC_DISTRACTOR_RULES(
+        ctx
+      )}\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
       const items = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -640,7 +665,9 @@ const defs: TaskTypeDef[] = [
       extraWords: arr(str(), '2 or 3 extra endings that do not fit any beginning')
     }),
     prompt: (vocab) =>
-      `Task type: collocation matching. For each word create a strong, typical collocation (verb + noun, adjective + noun, verb + preposition …) and split it into "first" and "second". Every "second" part may fit only its own "first" part (check all combinations, including the extra endings).\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: collocation matching. For each word create a strong, typical collocation (verb + noun, adjective + noun, verb + preposition …) and split it into "first" and "second". Every "second" part may fit only its own "first" part (check all combinations, including the extra endings).\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), first: p.first, second: p.second })).filter((p: any) => p.v)
       const right = shuffle(
@@ -677,7 +704,9 @@ const defs: TaskTypeDef[] = [
     defaultInstruction: 'Use the word in brackets to form a word that fits the gap.',
     schema: itemSchema({ vocabId: str(), before: str(), stem: str('Related word from the same family shown in brackets'), answer: str(), after: str() }),
     prompt: (vocab) =>
-      `Task type: word formation. For each word write a sentence with a gap; "stem" is a different member of the word family (e.g. answer "decision", stem "decide"). The answer is the tested word (or its needed form).\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: word formation. For each word write a sentence with a gap; "stem" is a different member of the word family (e.g. answer "decision", stem "decide"). The answer is the tested word (or its needed form).\n${GAP_RULES}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -812,7 +841,9 @@ ${vocabLines(vocab)}`,
       reason: str("Short reason at the students' level")
     }),
     prompt: (vocab) =>
-      `Task type: odd one out. Create a group of 4 words for each tested word (the tested word must be in the group, either as odd word or as a member). There must be exactly one word that does not belong, for one clear, meaning-based reason (not spelling or grammar); no other word may be arguable.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: odd one out. Create a group of 4 words for each tested word (the tested word must be in the group, either as odd word or as a member). There must be exactly one word that does not belong, for one clear, meaning-based reason (not spelling or grammar); no other word may be arguable.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -839,7 +870,9 @@ ${vocabLines(vocab)}`,
       words: arr(obj({ vocabId: str(), category: str('Exactly one of the category names') }))
     }),
     prompt: (vocab) =>
-      `Task type: sorting words into categories (word fields). Find 2–4 clear, meaning-based categories so that every word belongs to exactly one category without doubt (no word may fit two categories).\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: sorting words into categories (word fields). Find 2–4 clear, meaning-based categories so that every word belongs to exactly one category without doubt (no word may fit two categories).\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const categories = (data.categories ?? []).map((name: string) => ({ id: newId(ctx.rng), name }))
       const words = shuffle<CategorizeBlock['words'][number]>(
@@ -867,8 +900,12 @@ ${vocabLines(vocab)}`,
     schema: itemSchema({ vocabId: str(), prompt: str('The word plus a short situation, e.g. "to explore – your last holiday"'), modelAnswer: str() }),
     prompt: (vocab, ctx) =>
       mitSituation(ctx.settings)
-        ? `Task type: students write one meaningful sentence with each word. "prompt" shows the word and a short situation that helps them show the meaning. Give a model answer.\n\nWords:\n${vocabLines(vocab)}`
-        : `Task type: students write one meaningful sentence with each word. "prompt" is ONLY the word itself – no situation, no example, no hint. Do not write any example or "possible answer" into the instruction. Give a model answer (for the answer key only).\n\nWords:\n${vocabLines(vocab)}`,
+        ? `Task type: students write one meaningful sentence with each word. "prompt" shows the word and a short situation that helps them show the meaning. Give a model answer.\n\nWords:\n${vocabLines(
+            vocab
+          )}`
+        : `Task type: students write one meaningful sentence with each word. "prompt" is ONLY the word itself – no situation, no example, no hint. Do not write any example or "possible answer" into the instruction. Give a model answer (for the answer key only).\n\nWords:\n${vocabLines(
+            vocab
+          )}`,
     build(vocab, data, ctx) {
       const b = base(this, data, ctx)
       if (mitSituation(ctx.settings)) return { ...b, kind: 'open', items: openItems(vocab, data, ctx, 2) }
@@ -897,7 +934,9 @@ ${vocabLines(vocab)}`,
     defaultInstruction: 'Say it in English. Use the word in brackets.',
     schema: itemSchema({ vocabId: str(), prompt: str('German sentence followed by the target word in brackets'), modelAnswer: str() }),
     prompt: (vocab) =>
-      `Task type: mediation. For each word write a natural GERMAN sentence from everyday life that students should render in the target language using the tested word. "prompt" = German sentence + " (" + word + ")". Keep the German simple so the difficulty lies in the vocabulary.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: mediation. For each word write a natural GERMAN sentence from everyday life that students should render in the target language using the tested word. "prompt" = German sentence + " (" + word + ")". Keep the German simple so the difficulty lies in the vocabulary.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
     }
@@ -913,7 +952,8 @@ ${vocabLines(vocab)}`,
      */
     id: 'translateSentences',
     label: 'Sätze übersetzen',
-    description: 'Einen deutschen Satz mit der Vokabel in die Zielsprache übersetzen – ohne Hinweis auf das Wort; nur bekannter Wortschatz und bekannte Grammatik.',
+    description:
+      'Einen deutschen Satz mit der Vokabel in die Zielsprache übersetzen – ohne Hinweis auf das Wort; nur bekannter Wortschatz und bekannte Grammatik.',
     kind: 'open',
     minLevel: 'Pre-A1',
     ab: { niveau: 'A1', klasse: 5 },
@@ -927,9 +967,11 @@ ${vocabLines(vocab)}`,
       modelAnswer: str('The translation in the target language, using the tested word')
     }),
     prompt: (vocab) =>
-      `Task type: translation into the target language. For each word write ONE short, natural GERMAN sentence (6–12 words) that students translate into the target language. The sentence contains the German meaning of the tested word so that a correct translation needs exactly this word. Apart from the tested word, the translation must only require vocabulary and grammar the students already know (see the rules above): simple statements, no idioms, no word play, no proper names that need explanation. "prompt" = the German sentence ONLY – never add the target word, brackets or a hint. "modelAnswer" = the translation in the target language.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: translation into the target language. For each word write ONE short, natural GERMAN sentence (6–12 words) that students translate into the target language. The sentence contains the German meaning of the tested word so that a correct translation needs exactly this word. Apart from the tested word, the translation must only require vocabulary and grammar the students already know (see the rules above): simple statements, no idioms, no word play, no proper names that need explanation. "prompt" = the German sentence ONLY – never add the target word, brackets or a hint. Proper names (people, places) keep their capital letter in BOTH sentences, also after a comma or at the end ("…, Will."). "modelAnswer" = the translation in the target language.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
-      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+      return { ...base(this, data, ctx), kind: 'open', items: eigennamenAngleichen(openItems(vocab, data, ctx, 2)) }
     }
   },
   {
@@ -946,7 +988,9 @@ ${vocabLines(vocab)}`,
     accepts: (v) => isCrosswordWord(v.term),
     schema: itemSchema({ vocabId: str(), clue: str('Monolingual clue: short explanation or sentence with a gap (___); must not contain the word') }),
     prompt: (vocab) =>
-      `Task type: crossword clues. Write one clear clue for each word (a short explanation or a sentence with ___). The clue must lead to exactly this word in its given form and must not fit any other word of the list.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: crossword clues. Write one clear clue for each word (a short explanation or a sentence with ___). The clue must lead to exactly this word in its given form and must not fit any other word of the list.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const clues = new Map<string, string>((data.items ?? []).map((it: any) => [it.vocabId, it.clue]))
       const layout = buildCrossword(
@@ -986,7 +1030,9 @@ ${vocabLines(vocab)}`,
     accepts: (v) => isCrosswordWord(v.term),
     schema: itemSchema({ vocabId: str(), hint: str('Sentence with ___ where the word fits') }),
     prompt: (vocab) =>
-      `Task type: scrambled letters with context. Write a short sentence with ___ for each word so that only this word (in its given base form) fits.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: scrambled letters with context. Write a short sentence with ___ for each word so that only this word (in its given base form) fits.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const hints = new Map<string, string>((data.items ?? []).map((it: any) => [it.vocabId, it.hint]))
       const items = vocab.map((v) => {
@@ -1015,7 +1061,9 @@ ${vocabLines(vocab)}`,
       answer: str()
     }),
     prompt: (vocab) =>
-      `Task type: wrong word. For each tested word write a sentence where the tested word is replaced by a wrong but plausible word (false friend, confusable word, wrong word of the same field). "answer" is the correct form. The wrong word must be clearly wrong, and only one word in the sentence may be wrong.\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: wrong word. For each tested word write a sentence where the tested word is replaced by a wrong but plausible word (false friend, confusable word, wrong word of the same field). "answer" is the correct form. The wrong word must be clearly wrong, and only one word in the sentence may be wrong.\n${GAP_RULES}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -1037,7 +1085,9 @@ ${vocabLines(vocab)}`,
     defaultInstruction: 'Find one word that fits both sentences.',
     schema: itemSchema({ vocabId: str(), before1: str(), after1: str(), before2: str(), after2: str(), answer: str('Same form in both sentences') }),
     prompt: (vocab) =>
-      `Task type: one word fits two sentences. For each word write two different sentences (ideally using different meanings or typical collocations) where exactly the same form fits both gaps and no other word (from the list or in general) fits both.\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: one word fits two sentences. For each word write two different sentences (ideally using different meanings or typical collocations) where exactly the same form fits both gaps and no other word (from the list or in general) fits both.\n${GAP_RULES}\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -1076,7 +1126,9 @@ ${vocabLines(vocab)}`,
       correction: str('Corrected statement if false, otherwise empty string')
     }),
     prompt: (vocab) =>
-      `Task type: true/false statements about word meaning (e.g. "You use a ladder to climb up."). About half of the statements should be false in a way that shows whether students understand the word. Never make statements false through trivial details.\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: true/false statements about word meaning (e.g. "You use a ladder to climb up."). About half of the statements should be false in a way that shows whether students understand the word. Never make statements false through trivial details.\n\nWords:\n${vocabLines(
+        vocab
+      )}`,
     build(vocab, data, ctx) {
       const items = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -1166,7 +1218,9 @@ ${vocabLines(vocab)}`,
       modelAnswer: str('Deutsches Fremd- oder Lehnwort und in einem Satz der Bedeutungszusammenhang')
     }),
     prompt: (vocab, ctx) =>
-      `Aufgabentyp: Zu jedem ${alteSpracheAdjektiv(ctx.settings.targetLanguage)}en Wort sollen die Lernenden ein deutsches Fremd- oder Lehnwort nennen und den Bedeutungszusammenhang erklären.\n` +
+      `Aufgabentyp: Zu jedem ${alteSpracheAdjektiv(
+        ctx.settings.targetLanguage
+      )}en Wort sollen die Lernenden ein deutsches Fremd- oder Lehnwort nennen und den Bedeutungszusammenhang erklären.\n` +
       'Nimm nur Wörter, zu denen es wirklich ein gebräuchliches deutsches Fremd- oder Lehnwort gibt; erfinde keine Verwandtschaft. Gibt es keines, lass das Wort weg.\n\n' +
       `Wörter:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
@@ -1218,7 +1272,9 @@ ${vocabLines(vocab)}`,
       correct: int('Index der passenden Bedeutung, beginnend bei 0')
     }),
     prompt: (vocab, ctx) =>
-      `Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer ${alteSpracheAdjektiv(ctx.settings.targetLanguage)}er Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n` +
+      `Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer ${alteSpracheAdjektiv(
+        ctx.settings.targetLanguage
+      )}er Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n` +
       'Die falschen Bedeutungen sind ECHTE Bedeutungen des Wortes, die hier nur nicht passen – keine erfundenen.\n' +
       // Ablenker nicht schon an der Form erkennbar (02.10.2026): gleiche Wortart und Form im Deutschen
       'Alle drei Bedeutungen stehen in derselben Wortart und Form (z. B. alle als Infinitiv, alle als Nomen mit bzw. ohne Artikel), sind auf den ersten Blick plausibel, und nur eine passt nach Sinn und Zusammenhang des Satzes.\n' +
@@ -1563,6 +1619,34 @@ function openItems(vocab: VocabEntry[], data: any, ctx: GenContext, lines: numbe
   return (data.items ?? []).flatMap((it: any) => {
     const v = findVocab(vocab, it.vocabId)
     return v ? [{ id: newId(ctx.rng), vocabId: v.id, prompt: it.prompt || v.term, modelAnswer: it.modelAnswer ?? '', lines }] : []
+  })
+}
+
+/**
+ * Eigennamen groß (27.10.2026, Befund der Lehrkraft: „Du hast einen wirklich vornehmen Akzent, will.“ und „will entdeckte zu
+ * spät …“ zu „… posh accent, Will.“): Was in der Musterlösung mitten im Satz großgeschrieben steht (außer „I“), ist ein
+ * Eigenname und bleibt auch im deutschen Satz groß – ersetzt wird nur die exakt kleingeschriebene Form, und nur, wenn sie
+ * im deutschen Satz nicht öfter vorkommt als der Name in der Lösung (sonst könnte „will“ das Verb sein).
+ */
+export function eigennamenAngleichen<T extends { prompt: string; modelAnswer: string }>(items: T[]): T[] {
+  return items.map((it) => {
+    const woerter = it.modelAnswer.split(/\s+/)
+    const namen = new Set(
+      woerter
+        .slice(1)
+        .map((w) => w.replace(/^[("']+|[)".,!?;:']+$/g, ''))
+        .filter((w) => /^[A-Z][a-zà-ÿ'-]+$/.test(w) && w !== 'I')
+    )
+    let prompt = it.prompt
+    // Ein deutscher Satz beginnt groß – „will entdeckte …“ war ein kleingeschriebener Name am Satzanfang
+    if (/^\p{Ll}/u.test(prompt)) prompt = prompt.charAt(0).toLocaleUpperCase('de') + prompt.slice(1)
+    for (const n of namen) {
+      const klein = new RegExp(`(^|[^\\p{L}])${n.toLowerCase()}(?=[^\\p{L}]|$)`, 'gu')
+      const treffer = prompt.match(klein)?.length ?? 0
+      const imSatz = woerter.filter((w) => w.replace(/^[("']+|[)".,!?;:']+$/g, '') === n).length
+      if (treffer && treffer <= imSatz && !new RegExp(`(^|[^\\p{L}])${n}(?=[^\\p{L}]|$)`, 'u').test(prompt)) prompt = prompt.replace(klein, `$1${n}`)
+    }
+    return prompt === it.prompt ? it : { ...it, prompt }
   })
 }
 

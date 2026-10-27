@@ -118,13 +118,14 @@ export const FAECHER: Fach[] = [
   { id: 'erdkunde', label: 'Erdkunde / Geographie', kuerzel: 'Ek', art: 'gesellschaft', farbe: 'Olivgrün', auch: ['Erdkunde', 'Geographie', 'Geografie'] },
   {
     id: 'politik',
-    label: 'Politik / Wirtschaft / Sozialkunde',
+    // Anzeigename seit 27.10.2026 „Politik-Wirtschaft“ (Niedersachsen, Wunsch der Lehrkraft) – die anderen Landesnamen stehen in `auch`
+    label: 'Politik-Wirtschaft',
     kuerzel: 'Pol',
     art: 'gesellschaft',
     farbe: 'Ocker',
     auch: [
+      'Politik / Wirtschaft / Sozialkunde',
       'Politik',
-      'Politik-Wirtschaft',
       'Politik und Wirtschaft',
       'Sozialkunde',
       'Gemeinschaftskunde',

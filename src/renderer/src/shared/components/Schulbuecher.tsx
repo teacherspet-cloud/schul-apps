@@ -22,6 +22,7 @@ import {
 } from '@shared/schulbuecher'
 import { schulformenDes } from '@shared/schulformen'
 import { holen, senden } from '../../modules/onlinetest/serverApi'
+import { aufServer } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 import { notifyError, notifySuccess } from '../util'
 import { BandCover } from './BandCover'
@@ -40,6 +41,8 @@ export const darfFach = (k: Pick<Katalog, 'darf'> | null, fach: string): boolean
 export function useSchulbuchKatalog(): { katalog: Katalog | null; setKatalog: (k: Katalog) => void; neu: () => Promise<void> } {
   const [katalog, setKatalog] = useState<Katalog | null>(null)
   const neu = useCallback(async () => {
+    // Nur mit dem Schul-Apps-Server (27.10.2026): die Exe ohne Server hat keinen Katalog – dann bleibt es bei der Eingabe von Hand
+    if (!aufServer()) return
     try {
       setKatalog(await holen<Katalog>('/server/schulbuecher'))
     } catch (e) {
@@ -265,6 +268,30 @@ export function SchulbuchListe({ fach, katalog, aendern }: { fach: string; katal
   const [offen, setOffen] = useState<Schulbuch | null>(null)
   const darf = darfFach(katalog, fach)
   const buecher = useMemo(() => buecherDesFachs(katalog.buecher, fach), [katalog.buecher, fach])
+  /*
+   * Nach Schulbuchreihen gruppiert (27.10.2026, Wunsch der Lehrkraft): „Green Line (ab 2021)“, „¡Apúntate! (ab 2024)“ … –
+   * dieselbe Reihe in anderer Ausgabe, Landesausgabe oder bei anderem Verlag ist eine eigene Gruppe; Einzelbände ohne Reihe
+   * stehen unter ihrem Titel. Reihen alphabetisch, neueste Ausgabe zuerst.
+   */
+  const gruppen = useMemo(() => {
+    const c = new Intl.Collator('de', { numeric: true })
+    const jahr = (a: string): number => Number(/(\d{4})/.exec(a)?.[1] ?? 0)
+    const map = new Map<string, { titel: string; reihe: string; zusatz: string; jahr: number; buecher: Schulbuch[] }>()
+    for (const b of buecher) {
+      const reihe = b.reihe.trim() || b.titel.trim() || buchName(b)
+      const key = [reihe, b.ausgabe, b.edition, b.verlag].map((x) => x.trim().toLocaleLowerCase('de')).join('|')
+      const g = map.get(key) ?? {
+        titel: `${reihe}${b.ausgabe ? ` (${b.ausgabe})` : ''}`,
+        reihe,
+        zusatz: [b.edition, b.verlag].filter(Boolean).join(' · '),
+        jahr: jahr(b.ausgabe),
+        buecher: []
+      }
+      g.buecher.push(b)
+      map.set(key, g)
+    }
+    return [...map.values()].sort((a, b) => c.compare(a.reihe, b.reihe) || b.jahr - a.jahr)
+  }, [buecher])
   // Lehrwerksdateien dieses Fachs, die noch kein Buch des Katalogs kennt
   const ohneBuch = useMemo(
     () => katalog.lehrwerke.filter((l) => fachDerLehrwerkSprache(l.language) === fach && !katalog.buecher.some((b) => b.lehrwerkId === l.id)),
@@ -294,56 +321,70 @@ export function SchulbuchListe({ fach, katalog, aendern }: { fach: string; katal
           Noch kein Schulbuch eingetragen.
         </Text>
       )}
-      {buecher.map((b) => (
-        <Group key={b.id} wrap="nowrap" align="center" gap="sm" data-buch={b.id}>
-          <SchulbuchBild buch={b} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Group gap={6} wrap="wrap">
-              <Text fw={600} size="sm">
-                {buchName(b)}
-              </Text>
-              {b.titel && b.reihe ? (
-                <Text size="sm" c="dimmed">
-                  {b.titel}
-                </Text>
-              ) : null}
-              {b.lehrwerkId && (
-                <Tooltip label="Mit Lehrwerksdatei verknüpft – Vokabeln in der App „Vokabellisten“">
-                  <Badge size="xs" variant="light" color="teal" leftSection={<IconBook2 size={10} />}>
-                    Vokabeln
-                  </Badge>
-                </Tooltip>
-              )}
-              {b.faecher.length > 1 && (
-                <Badge size="xs" variant="outline" color="gray">
-                  {b.faecher.map((f) => fachVon(f)?.label ?? f).join(' · ')}
-                </Badge>
-              )}
-            </Group>
-            <Text size="xs" c="dimmed">
-              {[
-                jahrgangsText(b.jahrgaenge),
-                b.verlag,
-                b.ausgabe ? `Ausgabe ${b.ausgabe}` : '',
-                b.edition,
-                b.isbn ? `ISBN ${b.isbn}` : '',
-                b.kapitel.length ? `${b.kapitel.length} Kapitel` : ''
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+      {gruppen.map((g) => (
+        <Stack key={g.titel + g.zusatz} gap={6} data-buch-reihe={g.titel}>
+          <Group gap={6} align="baseline">
+            <Text fw={600} size="sm">
+              {g.titel}
             </Text>
-          </div>
-          {darf && (
-            <Group gap={4} wrap="nowrap">
-              <ActionIcon variant="subtle" aria-label={`${buchName(b)} bearbeiten`} onClick={() => setOffen(b)} data-buch-bearbeiten>
-                <IconPencil size={16} />
-              </ActionIcon>
-              <ActionIcon variant="subtle" color="red" aria-label={`${buchName(b)} entfernen`} onClick={() => void loeschen(b)} data-buch-loeschen>
-                <IconTrash size={16} />
-              </ActionIcon>
+            {g.zusatz && (
+              <Text size="xs" c="dimmed">
+                {g.zusatz}
+              </Text>
+            )}
+          </Group>
+          {g.buecher.map((b) => (
+            <Group key={b.id} wrap="nowrap" align="center" gap="sm" pl="sm" data-buch={b.id}>
+              <SchulbuchBild buch={b} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <Group gap={6} wrap="wrap">
+                  <Text fw={600} size="sm">
+                    {buchName(b)}
+                  </Text>
+                  {b.titel && b.reihe ? (
+                    <Text size="sm" c="dimmed">
+                      {b.titel}
+                    </Text>
+                  ) : null}
+                  {b.lehrwerkId && (
+                    <Tooltip label="Mit Lehrwerksdatei verknüpft – Vokabeln in der App „Vokabellisten“">
+                      <Badge size="xs" variant="light" color="teal" leftSection={<IconBook2 size={10} />}>
+                        Vokabeln
+                      </Badge>
+                    </Tooltip>
+                  )}
+                  {b.faecher.length > 1 && (
+                    <Badge size="xs" variant="outline" color="gray">
+                      {b.faecher.map((f) => fachVon(f)?.label ?? f).join(' · ')}
+                    </Badge>
+                  )}
+                </Group>
+                <Text size="xs" c="dimmed">
+                  {[
+                    jahrgangsText(b.jahrgaenge),
+                    b.verlag,
+                    b.ausgabe ? `Ausgabe ${b.ausgabe}` : '',
+                    b.edition,
+                    b.isbn ? `ISBN ${b.isbn}` : '',
+                    b.kapitel.length ? `${b.kapitel.length} Kapitel` : ''
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </div>
+              {darf && (
+                <Group gap={4} wrap="nowrap">
+                  <ActionIcon variant="subtle" aria-label={`${buchName(b)} bearbeiten`} onClick={() => setOffen(b)} data-buch-bearbeiten>
+                    <IconPencil size={16} />
+                  </ActionIcon>
+                  <ActionIcon variant="subtle" color="red" aria-label={`${buchName(b)} entfernen`} onClick={() => void loeschen(b)} data-buch-loeschen>
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              )}
             </Group>
-          )}
-        </Group>
+          ))}
+        </Stack>
       ))}
       {darf && (
         <Group gap="xs" mt={4}>
@@ -384,4 +425,18 @@ export function FachSchulbuecher({ fach }: { fach: string }): React.JSX.Element 
       <SchulbuchListe fach={fach} katalog={katalog} aendern={(buecher) => setKatalog({ ...katalog, buecher })} />
     </Card>
   )
+}
+
+/**
+ * Vorschläge für ein Freitextfeld „Buch“ (27.10.2026, Stufe 2 des Bücherkatalogs): die Katalogbücher – eines Fachs oder alle –
+ * als Namen, dazu der Verlag zum Vorbelegen. Ohne Server oder ohne Katalog leer; das Feld bleibt frei beschreibbar.
+ */
+export function useBuchVorschlaege(fach?: string): { namen: string[]; verlagVon: (name: string) => string } {
+  const { katalog } = useSchulbuchKatalog()
+  return useMemo(() => {
+    const buecher = katalog ? (fach && fachVon(fach) ? buecherDesFachs(katalog.buecher, fach) : katalog.buecher) : []
+    const namen = [...new Set(buecher.map((b) => (b.titel && !b.reihe ? b.titel : buchName(b))))]
+    const verlagVon = (name: string): string => buecher.find((b) => buchName(b) === name || b.titel === name)?.verlag ?? ''
+    return { namen, verlagVon }
+  }, [katalog, fach])
 }

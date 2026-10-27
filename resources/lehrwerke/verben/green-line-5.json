@@ -1,0 +1,41 @@
+{
+ "id": "green-line-5",
+ "lehrwerkId": "green-line-5",
+ "name": "Green Line 5",
+ "reihe": "Green Line",
+ "band": "5",
+ "sprache": "en",
+ "eintraege": [
+  {
+   "id": "v1",
+   "formen": {
+    "inf": "to spread",
+    "past": "spread",
+    "pp": "spread",
+    "de": "(sich) verbreiten"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v2",
+   "formen": {
+    "inf": "to light up",
+    "past": "lit up",
+    "pp": "lit up",
+    "de": "erhellen; beleuchten"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v3",
+   "formen": {
+    "inf": "to lend",
+    "past": "lent",
+    "pp": "lent (to)",
+    "de": "leihen; verleihen"
+   },
+   "hinweis": "Unit 3"
+  }
+ ],
+ "aktualisiert": "2026-10-27T18:00:00.000Z"
+}

@@ -17,7 +17,7 @@ import { kernform } from './vokabeltrainer'
 export interface BandFuerZahlen {
   id: string
   name: string
-  units: { name: string; sections: { name: string; entries: { term: string }[] }[] }[]
+  units: { name: string; sections: { name: string; entries: { term: string; grey?: boolean }[] }[] }[]
 }
 
 const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -26,14 +26,17 @@ const begriff = (t: string): string => kernform(String(t ?? '')).toLowerCase()
 /** Verschiedene Wörter eines Bands (null ohne Wörter) */
 export function bandWoerter(b: BandFuerZahlen): number | null {
   const s = new Set<string>()
-  for (const u of b.units ?? []) for (const a of u.sections ?? []) for (const e of a.entries ?? []) if (e?.term && begriff(e.term)) s.add(begriff(e.term))
+  // Zusatzwortschatz (grau: Lektueren, Diff pool, Kaesten-Ergaenzungen) zaehlt seit 27.10.2026 nicht mit – die Baende tragen jetzt die vollstaendigen Navigium-Listen
+  for (const u of b.units ?? [])
+    for (const a of u.sections ?? []) for (const e of a.entries ?? []) if (e?.term && !e.grey && begriff(e.term)) s.add(begriff(e.term))
   return s.size || null
 }
 
 /** Kapitel eines Bands mit Wörtern (null ohne) */
 export function bandKapitel(b: BandFuerZahlen): number | null {
   const s = new Set<string>()
-  for (const u of b.units ?? []) if ((u.sections ?? []).some((a) => (a.entries ?? []).some((e) => e?.term))) s.add(u.name)
+  // Units, die nur Zusatzwortschatz tragen (Lektueren, Diff pool – 27.10.2026), sind keine Kapitel des Lernwegs
+  for (const u of b.units ?? []) if (u?.name && (u.sections ?? []).some((a) => (a.entries ?? []).some((e) => e?.term && !e.grey))) s.add(norm(u.name))
   return s.size || null
 }
 
@@ -93,9 +96,7 @@ export function grammatikLatein(buch: string, lernjahr: number | null): { gramma
   const kap = Object.values(LEHRWERK_THEMEN[b].kapitel).filter((k) => k.lernjahr === lernjahr)
   if (!kap.length) return null
   const s = new Set<string>()
-  for (const k of kap)
-    for (const teil of String(k.grammatik ?? '').split(/\s*;\s*/))
-      if (norm(teil)) s.add(norm(teil))
+  for (const k of kap) for (const teil of String(k.grammatik ?? '').split(/\s*;\s*/)) if (norm(teil)) s.add(norm(teil))
   return s.size ? { grammatik: s.size, lektionen: kap.length } : null
 }
 

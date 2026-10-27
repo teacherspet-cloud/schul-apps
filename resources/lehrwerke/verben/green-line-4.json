@@ -1,0 +1,111 @@
+{
+ "id": "green-line-4",
+ "lehrwerkId": "green-line-4",
+ "name": "Green Line 4",
+ "reihe": "Green Line",
+ "band": "4",
+ "sprache": "en",
+ "eintraege": [
+  {
+   "id": "v1",
+   "formen": {
+    "inf": "to cast",
+    "past": "cast",
+    "pp": "cast",
+    "de": "jmdm. eine Rolle (in einem Film) geben"
+   },
+   "hinweis": "Across cultures 1"
+  },
+  {
+   "id": "v2",
+   "formen": {
+    "inf": "to take",
+    "past": "took",
+    "pp": "taken",
+    "de": "dauern; (Zeit) brauchen"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v3",
+   "formen": {
+    "inf": "to shake",
+    "past": "shook",
+    "pp": "shaken",
+    "de": "schütteln"
+   },
+   "hinweis": "Unit 1"
+  },
+  {
+   "id": "v4",
+   "formen": {
+    "inf": "to leap",
+    "past": "leapt",
+    "pp": "leapt",
+    "de": "springen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v5",
+   "formen": {
+    "inf": "to burst",
+    "past": "burst",
+    "pp": "burst",
+    "de": "bersten; platzen"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v6",
+   "formen": {
+    "inf": "to light",
+    "past": "lit",
+    "pp": "lit",
+    "de": "anzünden"
+   },
+   "hinweis": "Unit 2"
+  },
+  {
+   "id": "v7",
+   "formen": {
+    "inf": "to forbid",
+    "past": "forbade",
+    "pp": "forbidden",
+    "de": "verbieten"
+   },
+   "hinweis": "Across cultures 3"
+  },
+  {
+   "id": "v8",
+   "formen": {
+    "inf": "to spit",
+    "past": "spat",
+    "pp": "spat",
+    "de": "spucken"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v9",
+   "formen": {
+    "inf": "to slide",
+    "past": "slid",
+    "pp": "slid",
+    "de": "rutschen"
+   },
+   "hinweis": "Unit 4"
+  },
+  {
+   "id": "v10",
+   "formen": {
+    "inf": "to bleed",
+    "past": "bled",
+    "pp": "bled",
+    "de": "bluten"
+   },
+   "hinweis": "Unit 4"
+  }
+ ],
+ "aktualisiert": "2026-10-27T18:00:00.000Z"
+}
