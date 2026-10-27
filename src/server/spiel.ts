@@ -151,8 +151,10 @@ export function spieleFrei(bereich: Bereich, kurs: string, n: NutzerInfo, jetzt 
   const vokId = G.kopf(kurs)?.vokId
   const vok = vokId ? vokZeile(vokId) : null
   if (vok?.zusammen === 'aus') return false
-  // „Spiele heute schon freischalten“ am Kurs gilt auch für die Grammatik (27.10.2026, Befund der Lehrkraft)
-  if (vok && spieleHeuteFrei(vok)) return true
+  // „Spiele heute schon freischalten“ am Kurs gilt auch für die Grammatik (27.10.2026, Befund der Lehrkraft) – nur für den
+  // Tag (Europe/Berlin, spieleHeuteFrei) und nur, wenn Kurs und Grammatik dasselbe Fach haben
+  const gramFach = G.kopf(kurs)?.fach ?? ''
+  if (vok && spieleHeuteFrei(vok) && (!gramFach || !vok.fach || gramFach === vok.fach)) return true
   const p = G.paket(kurs)
   if (!p) return false
   // Wie im Grammatiktrainer (12.10.2026, shared/grammatikVorrang.ts – vor einem Test mehr neue je Tag)

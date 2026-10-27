@@ -1425,7 +1425,8 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             // Übungsvorrang (12.10.2026, shared/grammatikVorrang.ts): neue Aufgaben je Tag – vor einem Test mehr
             ...((u) => ({ neuJeTag: u.neuJeTag, test: u.test }))(grammatikUebung(z, p, st.aufgaben, ich)),
             // „Spiele heute schon freischalten“ des verbundenen Kurses gilt auch für die Grammatikspiele (27.10.2026, Befund der Lehrkraft)
-            spieleFrei: ((v) => Boolean(v && spieleHeuteFrei(v)))(vokVon(z))
+            // – nur für den Tag (Europe/Berlin) und nur im selben Fach wie der Kurs
+            spieleFrei: ((v) => Boolean(v && (!z.fach || !v.fach || v.fach === z.fach) && spieleHeuteFrei(v)))(vokVon(z))
           }),
           true
         )
@@ -2002,9 +2003,9 @@ export const grammatikFuerSpiel = {
     const z = zeile(id)
     return z ? infoVon(z) : null
   },
-  kopf: (id: string): { id: string; titel: string; thema: string; sprache: string; vokId: string; lerngruppe: string } | null => {
+  kopf: (id: string): { id: string; titel: string; thema: string; sprache: string; fach: string; vokId: string; lerngruppe: string } | null => {
     const z = zeile(id)
-    return z ? { id: z.id, titel: z.titel, thema: z.thema, sprache: z.sprache, vokId: z.vok_id ?? '', lerngruppe: z.lerngruppe_id } : null
+    return z ? { id: z.id, titel: z.titel, thema: z.thema, sprache: z.sprache, fach: z.fach, vokId: z.vok_id ?? '', lerngruppe: z.lerngruppe_id } : null
   },
   stand: (id: string, sid: string): { aufgaben: Record<string, WortStand>; tage: string[]; ansehen?: string[] } => standVon(id, sid),
   speichern: (id: string, sid: string, s: { aufgaben: Record<string, WortStand>; tage: string[]; ansehen?: string[] }): void =>
