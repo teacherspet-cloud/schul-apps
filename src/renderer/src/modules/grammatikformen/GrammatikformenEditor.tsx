@@ -1,4 +1,4 @@
-import { mixSchluessel } from '@shared/grammatikBank'
+import { mixSchluessel, unitSchluessel } from '@shared/grammatikBank'
 import {
   ActionIcon,
   Alert,
@@ -52,7 +52,17 @@ import { darfLehrwerkBearbeiten } from '../../shared/fachobleute'
 import { useExperte } from '../../shared/settingsStore'
 import { BankKarte, useBankZahlen } from './GrammatikBank'
 import { AMPEL_FARBE, AMPEL_TEXT, tonHell, tonText, tonVoll, tonZart, useGrammatikFarbe, type AufgabenAmpel } from './farbton'
-import { aufgabenAmpel, kurseFreigegeben, useSchulStufen, alternativenAnfragen, alternativenKandidaten, bankAlternativenStarten } from './bank'
+import {
+  aufgabenAmpel,
+  kurseFreigegeben,
+  useSchulStufen,
+  alternativenAnfragen,
+  alternativenKandidaten,
+  bankAlternativenStarten,
+  bankReparaturStarten,
+  reparaturAnfragen,
+  reparaturKandidaten
+} from './bank'
 import { SchuelerAnsichtKnopf } from './SchuelerAnsicht'
 import type { BankZahlen } from '@shared/grammatikBank'
 import {
@@ -318,6 +328,27 @@ export default function GrammatikformenEditor({
       `Alternativlösungen: ${buch.name}`
     )
   }
+  // Zurückgestellte Aufgaben des Bands überarbeiten (28.10.2026): Teilbereiche, gemischte Übungen und Unit-Wiederholungen
+  const [repOffen, setRepOffen] = useState(false)
+  const repKandidaten = reparaturKandidaten(
+    [
+      ...bandPunkte.flatMap((p) => {
+        const teile = teilbereicheVon(p.t)
+        return teile.length >= 2 ? [...teile, mixSchluessel(p.t)] : teile
+      }),
+      ...Object.keys(band).map((u) => unitSchluessel(buch.name, u))
+    ],
+    bank.zahlen
+  )
+  const repAufgaben = repKandidaten.reduce((n, x) => n + x.aufgaben, 0)
+  const reparaturBand = (): void => {
+    setRepOffen(false)
+    bankReparaturStarten(
+      repKandidaten.map((x) => ({ schluessel: x.schluessel, titel: kennungLabel(x.schluessel) })),
+      { sprache: buch.language, fach: fachVon(fach)?.label ?? fach, jahrgang: buch.grade ?? 7 },
+      `Aufgaben überarbeiten: ${buch.name}`
+    )
+  }
   const offenListe = offen ? punkteVon(offen.unit, offen.abschnitt) : []
 
   const kopf = (
@@ -347,6 +378,38 @@ export default function GrammatikformenEditor({
         </div>
       </Group>
       <Group gap="xs" wrap="nowrap">
+        {bank.darf && repKandidaten.length > 0 && (
+          <>
+            <Tooltip label="Aufgaben mit Mängeln sind für die Lernenden zurückgestellt – die KI schreibt sie nach den Regeln neu">
+              <Button variant="subtle" color="orange" leftSection={<IconListCheck size={16} />} onClick={() => setRepOffen(true)} data-grammatikformen-reparatur visibleFrom="sm">
+                Überarbeiten ({repAufgaben})
+              </Button>
+            </Tooltip>
+            <ActionIcon variant="subtle" color="orange" size="lg" hiddenFrom="sm" aria-label="Zurückgestellte Aufgaben überarbeiten" onClick={() => setRepOffen(true)}>
+              <IconListCheck size={18} />
+            </ActionIcon>
+            <Modal opened={repOffen} onClose={() => setRepOffen(false)} title="Zurückgestellte Aufgaben überarbeiten" centered data-grammatikformen-reparatur-frage>
+              <Stack gap="sm">
+                <Text size="sm">
+                  {repAufgaben} Aufgaben dieses Bands haben einen Mangel – etwa eine freie Lücke beim Erkennen, die Lösung schon in der Klammer oder einen Fehler, der
+                  sich nicht durch ein Wort beheben lässt. Die Lernenden bekommen sie nicht, bis sie überarbeitet sind.
+                </Text>
+                <Text size="sm">
+                  Die KI schreibt sie nach den Regeln neu – gleiche Grammatik, Übungsart und Stufe; der Lernstand bleibt. Etwa {reparaturAnfragen(repKandidaten)}{' '}
+                  KI-Anfragen in {repKandidaten.length} Bereichen, im Hintergrund.
+                </Text>
+                <Group justify="flex-end">
+                  <Button variant="default" onClick={() => setRepOffen(false)}>
+                    Abbrechen
+                  </Button>
+                  <Button color="orange" onClick={reparaturBand} data-grammatikformen-reparatur-start>
+                    Starten
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
+          </>
+        )}
         {bank.darf && altKandidaten.length > 0 && (
           <>
             <Tooltip label="Weitere richtige Lösungen zu allen Aufgaben dieses Bands von der KI nachtragen lassen">

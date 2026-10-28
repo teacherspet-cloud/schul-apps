@@ -32,19 +32,20 @@ export const UEBUNG_NAME: Record<Uebung, string> = {
 }
 /** Kurz, was die Übungsart verlangt – für die Oberfläche und den Auftrag an die KI */
 export const UEBUNG_TEXT: Record<Uebung, string> = {
-  erkennen: 'die Form im Satz erkennen bzw. aus Möglichkeiten die richtige wählen (Auswahl, Lücke mit Auswahl)',
+  // 28.10.2026 (Prüfung der Bank): Erkennen und Unterscheiden nie als freie Lücke – dort musste geraten werden
+  erkennen: 'die Form erkennen bzw. aus Möglichkeiten die richtige wählen (Auswahl, Zuordnen, Richtig oder falsch) – nie als freie Lücke zum Tippen',
   bilden: 'die Form aus einer Vorgabe selbst bilden (Lücke mit Grundform, Umformen eines kurzen Satzes)',
   anwenden: 'die Form in einem ganzen Satz anwenden (Umformen mit Ziel, Satzbau, kurzer Satz nach Vorgabe)',
-  unterscheiden: 'die Form von ähnlichen Formen abgrenzen (Auswahl zwischen verwechselbaren Formen, Signalwörter)',
+  unterscheiden: 'die Form von einer verwechselbaren Form abgrenzen (Auswahl, bei der die verwechselbare Form unter den Möglichkeiten steht; Zuordnen von Signalwörtern; Richtig oder falsch) – nie als freie Lücke',
   fehler: 'einen Fehler mit der Form im Satz finden und berichtigen'
 }
 /** Aufgabenarten, die zur Übungsart passen (Englisch, Französisch, Spanisch …) */
 export const UEBUNG_ARTEN: Record<Uebung, string[]> = {
   // zuordnen und richtigfalsch seit 26.10.2026 (Entscheidung der Lehrkraft, ohne KI prüfbar)
-  erkennen: ['auswahl', 'luecke', 'zuordnen', 'richtigfalsch'],
+  erkennen: ['auswahl', 'zuordnen', 'richtigfalsch'],
   bilden: ['luecke', 'umformen'],
   anwenden: ['umformen', 'satzbau', 'luecke', 'zuordnen'],
-  unterscheiden: ['auswahl', 'luecke', 'richtigfalsch', 'zuordnen'],
+  unterscheiden: ['auswahl', 'richtigfalsch', 'zuordnen'],
   fehler: ['fehler', 'richtigfalsch']
 }
 /** Stufe für Reihenfolge und ältere Ansichten: Erkennen 1, Bilden 2, sonst 3 */
@@ -170,7 +171,14 @@ export interface BankEintrag {
 }
 
 /** Zahlen je Schlüssel und Übungsart (Übersicht im Pop-up), dazu je Übungsart und Stufe */
-export type BankZahlen = Record<string, Partial<Record<Uebung, number>> & { stufen?: Partial<Record<Uebung, Partial<Record<Stufe, number>>>> }>
+export type BankZahlen = Record<
+  string,
+  Partial<Record<Uebung, number>> & {
+    stufen?: Partial<Record<Uebung, Partial<Record<Stufe, number>>>>
+    /** Zurückgestellt (28.10.2026): Aufgaben mit Mangel oder Befund – zählen nirgends mit, bis sie überarbeitet sind */
+    zurueck?: number
+  }
+>
 
 /** Kern-Aufgaben eines Eintrags */
 export const kernZahl = (z: Partial<Record<Uebung, number>> | undefined): number => KERN_UEBUNGEN.reduce((n, u) => n + (z?.[u] ?? 0), 0)
@@ -186,10 +194,12 @@ export function bankPaket(thema: string, eintraege: readonly BankEintrag[], stuf
   // Förderreserve (13.10.2026): Übt der Kurs nicht „grundlegend", liegen die grundlegenden Aufgaben als Reserve bereit
   const mitReserve = Boolean(stufen?.length && !stufen.includes('g'))
   for (const e of eintraege) {
-    const passend = stufen?.length ? e.aufgaben.filter((a) => stufen.includes(stufeVon(a))) : e.aufgaben
+    // Zurückgestellte Aufgaben (28.10.2026, Mangel oder Befund) bekommen die Lernenden nicht – bis sie überarbeitet sind
+    const brauchbar = e.aufgaben.filter((a) => !a.pruefen)
+    const passend = stufen?.length ? brauchbar.filter((a) => stufen.includes(stufeVon(a))) : brauchbar
     if (!passend.length) continue
     if (mitReserve)
-      for (const a of e.aufgaben.filter((x) => stufeVon(x) === 'g')) reserve.push({ ...a, regelId: regelIdVon(e.schluessel), stufe: uebungStufe(a.uebung) })
+      for (const a of brauchbar.filter((x) => stufeVon(x) === 'g')) reserve.push({ ...a, regelId: regelIdVon(e.schluessel), stufe: uebungStufe(a.uebung) })
     const regelId = regelIdVon(e.schluessel)
     regeln.push({
       id: regelId,

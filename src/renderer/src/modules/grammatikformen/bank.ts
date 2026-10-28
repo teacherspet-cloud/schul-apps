@@ -29,7 +29,7 @@ import {
   type Uebung
 } from '@shared/grammatikBank'
 import { aufgabeVorschau } from '../lernen/kurs/AufgabenEditor'
-import { ergaenzeAlternativen, erzeugeBankAufgaben, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
+import { ergaenzeAlternativen, erzeugeBankAufgaben, repariereAufgaben, REPARATUR_JE_ANFRAGE, type BankAuftrag, type BankBericht } from '../lernen/grammatikBankErzeugen'
 
 /**
  * Übungsaufgaben und Schüleransicht gehören zu den Kursen im Sprachenlernen (App-Freigaben, 23.10.2026): ohne diese
@@ -557,4 +557,85 @@ export function bankStand(zahl: BankZahlen[string] | undefined, stufen: readonly
   if (!n) return 'keine'
   if (!fehlendeFelder(zahl, stufen).length) return 'voll'
   return stufen.every((st) => UEBUNGEN.filter(istKern).every((u) => feldZahl(zahl, u, st) >= MIN_JE_UEBUNG)) ? 'genug' : 'wenig'
+}
+
+
+// ---------------------------------------------------------------- Zurückgestellte überarbeiten (28.10.2026)
+
+/** Schlüssel mit zurückgestellten Aufgaben – mit ihrer Zahl */
+export function reparaturKandidaten(schluessel: readonly string[], zahlen: BankZahlen): { schluessel: string; aufgaben: number }[] {
+  return [...new Set(schluessel)].map((k) => ({ schluessel: k, aufgaben: zahlen[k]?.zurueck ?? 0 })).filter((x) => x.aufgaben > 0)
+}
+
+/** Geschätzte KI-Anfragen (eine je 20 zurückgestellte Aufgaben und Schlüssel) */
+export const reparaturAnfragen = (k: readonly { aufgaben: number }[]): number =>
+  k.reduce((n, x) => n + Math.max(1, Math.ceil(x.aufgaben / REPARATUR_JE_ANFRAGE)), 0)
+
+/**
+ * Zurückgestellte Aufgaben überarbeiten (28.10.2026): je Schlüssel die Aufgaben lesen, die KI schreibt die mangelhaften
+ * nach den Regeln neu (grammatikBankErzeugen.ts `repariereAufgaben`), gespeichert wird direkt – Kennungen bleiben, die
+ * Kurse bauen ihre Pakete am Server neu. Nur für Admins bzw. Fachobleute (der Server prüft beim Speichern).
+ */
+export function bankReparaturStarten(
+  liste: { schluessel: string; titel: string }[],
+  rahmen: { sprache: string; fach: string; jahrgang: number },
+  titel: string,
+  docId = 'grammatikformen'
+): void {
+  if (!liste.length) return
+  void starteAuftrag({
+    moduleId: 'grammatikformen',
+    docId,
+    titel,
+    art: 'Aufgaben überarbeiten',
+    eingabe: { liste, rahmen },
+    sperrt: false,
+    fehlerTitel: 'Aufgaben konnten nicht überarbeitet werden',
+    arbeit: async (e, k) => {
+      const frei = await platzNehmen(k)
+      try {
+        let repariert = 0
+        let verworfen = 0
+        let geprueft = 0
+        let fehler: unknown = null
+        const n = e.liste.length
+        for (const [i, s] of e.liste.entries()) {
+          k.melde(`${i + 1} von ${n}: ${s.titel} …`, i, n)
+          const sperre = await schluesselSperren(s.schluessel, k, () => k.melde(`${i + 1} von ${n}: ${s.titel} – wartet auf einen anderen Auftrag …`, i, n))
+          try {
+            const da = (await bankLesen([s.schluessel]))[0]
+            if (!da?.aufgaben.some((a) => a.pruefen)) continue
+            const r = await repariereAufgaben({ ...e.rahmen, titel: s.titel, regel: da.regel, aufgaben: da.aufgaben }, k.ai, (t) =>
+              k.melde(`${i + 1} von ${n}: ${t}`, i, n)
+            )
+            geprueft += r.geprueft
+            if (r.repariert || r.verworfen) {
+              await bankSpeichern(e.rahmen.sprache, s.schluessel, da.regel, r.aufgaben)
+              repariert += r.repariert
+              verworfen += r.verworfen
+            }
+          } catch (er) {
+            if (k.signal.aborted) throw er
+            fehler = er
+          } finally {
+            sperre()
+          }
+        }
+        window.dispatchEvent(new Event(BANK_EREIGNIS))
+        if (fehler && !repariert) throw fehler
+        return { repariert, verworfen, geprueft }
+      } finally {
+        frei()
+      }
+    },
+    ablegen: async (r) => {
+      notifySuccess(
+        `${r.repariert} von ${r.geprueft} zurückgestellten Aufgaben überarbeitet – sie gelten sofort in allen Kursen.${
+          r.verworfen ? ` ${r.verworfen} ließen sich nicht retten und sind entfernt.` : ''
+        }${r.geprueft - r.repariert - r.verworfen > 0 ? ` ${r.geprueft - r.repariert - r.verworfen} bleiben zurückgestellt.` : ''}`
+      )
+    },
+    abschluss: (r) => `${r.repariert} von ${r.geprueft} Aufgaben überarbeitet`
+  })
+  notifySuccess('Die KI überarbeitet die zurückgestellten Aufgaben im Hintergrund.')
 }

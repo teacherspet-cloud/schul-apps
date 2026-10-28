@@ -18,12 +18,14 @@ import {
   type BankRegel,
   type Stufe,
   type Uebung,
+  UEBUNGEN,
   ALTERNATIVEN_ARTEN,
   alternativePasst,
   loesungenZusammenfuehren,
   LOESUNGEN_REGEL
 } from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
+import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
 import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
 
@@ -117,10 +119,10 @@ export async function erzeugeBankAufgaben(
         ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
         : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      // Regeln für eindeutige Aufgaben (28.10.2026, nach der Prüfung der ganzen Bank – shared/grammatikAufgabenRegeln.ts)
+      AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
-      'Auswahl: 3–4 Möglichkeiten in „optionen", die richtige dabei, die anderen typische Fehlformen.',
-      'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
+      'Fehler finden: „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge (4–9 Teile); Satzzeichen hängen am letzten Teil.',
       'Zuordnen: 3–5 „paare" (links Satzanfang bzw. Signalwort/Situation, rechts die passende Fortsetzung bzw. Form) – jede rechte Hälfte passt NUR zu ihrer linken; „satz" leer.',
       'Richtig oder falsch: „satz" ein Satz; „korrekt" true, wenn er richtig ist – sonst false mit GENAU EINEM Grammatikfehler, „fehlerWort" exakt wie im Satz und „loesungen" die richtige Form. Etwa die Hälfte richtig.',
@@ -149,8 +151,8 @@ export async function erzeugeBankAufgaben(
           uebung: { type: 'string', enum: uebungen },
           art: { type: 'string', enum: latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
           anweisung: S('kurze Arbeitsanweisung auf Deutsch'),
-          satz: S('luecke/auswahl: Satz mit genau einer Lücke „___"; umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; satzbau: leer'),
-          vorgabe: S('luecke: Grundform in Klammern; umformen: was zu tun ist; sonst leer'),
+          satz: S('luecke/auswahl: Satz mit genau einer Lücke „___" (Auswahl zwischen ganzen Sätzen: nur „___"); umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; satzbau: leer'),
+          vorgabe: S('luecke: das Grundwort in Klammern, aus dem die Lösung gebildet wird – nie die Lösung selbst; umformen: die Zielform bzw. was zu tun ist; sonst leer'),
           loesungen: A(S(), 'alle richtigen Antworten'),
           optionen: A(S(), 'auswahl: 3–4 Möglichkeiten; sonst leer'),
           fehlerWort: S('fehler: das falsche Wort GENAU wie im Satz; sonst leer'),
@@ -190,6 +192,12 @@ export async function erzeugeBankAufgaben(
   )
   const ohne = ohneGesperrteZeitformen(geprueft, gesperrt)
   bericht.zeitform = geprueft.aufgaben.length - ohne.aufgaben.length
+  // Regeln (28.10.2026): richten, was ohne KI geht; mit Mangel fällt eine Aufgabe weg (gepruefterPool prüft das schon –
+  // hier mit Übungsart, die erst jetzt feststeht)
+  const regelGeprueft = aufgabenGeprueft(ohne.aufgaben)
+  bericht.gestrichen += regelGeprueft.gestrichen.length
+  for (const g of regelGeprueft.gestrichen) if (bericht.gruende.length < 20 && !bericht.gruende.includes(g.grund)) bericht.gruende.push(g.grund)
+  ohne.aufgaben = regelGeprueft.aufgaben
   return {
     bericht,
     regel,
@@ -264,4 +272,112 @@ export async function ergaenzeAlternativen(
     }
   }
   return { aufgaben: aus, betroffen, ergaenzt, geprueft: offen.length }
+}
+
+
+// ---------------------------------------------------------------- Zurückgestellte Aufgaben überarbeiten (28.10.2026)
+
+/** Je Anfrage so viele Aufgaben */
+export const REPARATUR_JE_ANFRAGE = 20
+
+/**
+ * Zurückgestellte Aufgaben überarbeiten (28.10.2026, nach der Prüfung der Bank; shared/grammatikAufgabenRegeln.ts): Die KI
+ * bekommt jede Aufgabe mit ihrem Mangel bzw. Befund und schreibt sie nach den Regeln neu – dieselbe Grammatik, dieselbe
+ * Übungsart und Stufe, möglichst dieselbe Satzidee. Kennung, Übungsart und Stufe bleiben (Lernstand). Was die KI verwirft
+ * oder was danach noch einen Mangel hat, bleibt zurückgestellt; Verworfenes wird entfernt.
+ */
+export async function repariereAufgaben(
+  e: { fach: string; sprache: string; jahrgang: number; titel: string; regel?: BankRegel; aufgaben: BankAufgabe[] },
+  ai: Ai,
+  melde: (t: string) => void = () => undefined
+): Promise<{ aufgaben: BankAufgabe[]; repariert: number; verworfen: number; geprueft: number }> {
+  const latein = istLatein(e)
+  const offen = e.aufgaben.map((a, i) => ({ a, i })).filter(({ a }) => a.pruefen)
+  const aus: (BankAufgabe | null)[] = [...e.aufgaben]
+  let repariert = 0
+  let verworfen = 0
+  for (let von = 0; von < offen.length; von += REPARATUR_JE_ANFRAGE) {
+    const stueck = offen.slice(von, von + REPARATUR_JE_ANFRAGE)
+    melde(`Die KI überarbeitet „${e.titel}" (${Math.min(von + stueck.length, offen.length)} von ${offen.length} Aufgaben) …`)
+    const roh = await ai<{ aufgaben: Record<string, unknown>[] }>({
+      schemaName: 'grammatik_reparatur',
+      system: [
+        `Du überarbeitest fehlerhafte Übungsaufgaben einer Grammatik-Lern-App (${e.fach}, etwa Klasse ${e.jahrgang}) wie eine erfahrene Lehrkraft.`,
+        'Zu jeder Aufgabe steht, was an ihr falsch ist („Mangel"). Schreibe sie so neu, dass sie alle Regeln erfüllt: dieselbe Grammatik, dieselbe Übungsart, dieselbe Schwierigkeit, möglichst dieselbe Satzidee.',
+        'Übungsarten: ' + UEBUNGEN.map((u) => `${UEBUNG_NAME[u]} = ${UEBUNG_TEXT[u]}`).join('; ') + '.',
+        latein ? '' : 'Erlaubte Aufgabenarten je Übungsart: ' + UEBUNGEN.map((u) => `${UEBUNG_NAME[u]}: ${UEBUNG_ARTEN[u].join(', ')}`).join('; ') + '.',
+        AUFGABEN_REGELN,
+        LOESUNGEN_REGEL,
+        'Satzbau: „teile" in RICHTIGER Reihenfolge (4–9 Teile); Satzzeichen hängen am letzten Teil. Zuordnen: 3–5 „paare", jede rechte Hälfte passt NUR zu ihrer linken; „satz" leer. Richtig oder falsch: „korrekt" true, wenn der Satz richtig ist – sonst false mit GENAU EINEM Fehler, „fehlerWort" exakt wie im Satz und „loesungen" die richtige Form.',
+        latein ? LATEIN_REGELN : '',
+        'Lässt sich eine Aufgabe nicht sinnvoll retten (z. B. weil die Grammatik so nicht abfragbar ist), setze verwerfen = true.',
+        'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste (korrekt dann false).'
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      user: [
+        `Grammatik: ${e.titel}`,
+        `Zielsprache: ${e.sprache}`,
+        e.regel ? `Regelkarte: ${e.regel.titel} – ${e.regel.erklaerung}` : '',
+        '',
+        ...stueck.map(
+          ({ a }, j) =>
+            `${j + 1}. Übungsart: ${UEBUNG_NAME[a.uebung]} · bisher [${a.art}] ${a.anweisung}\nSatz: ${a.satz}${a.vorgabe ? `\nVorgabe: ${a.vorgabe}` : ''}${
+              a.optionen?.length ? `\nMöglichkeiten: ${a.optionen.join(' | ')}` : ''
+            }${a.teile?.length ? `\nTeile: ${a.teile.join(' | ')}` : ''}${a.fehlerWort ? `\nFehlerwort: ${a.fehlerWort}` : ''}\nLösungen: ${a.loesungen.join(' | ')}\nMangel: ${String(
+              a.pruefen
+            ).replace(/^Befund:\s*/, '')}`
+        )
+      ]
+        .filter((x) => x !== '')
+        .join('\n'),
+      schema: O({
+        aufgaben: A(
+          O({
+            nr: { type: 'integer' },
+            verwerfen: { type: 'boolean' },
+            art: { type: 'string', enum: latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
+            anweisung: S('kurze Arbeitsanweisung auf Deutsch'),
+            satz: S('luecke/auswahl: Satz mit genau einer Lücke „___"; umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; satzbau/zuordnen: leer'),
+            vorgabe: S('luecke: das Grundwort in Klammern – nie die Lösung selbst; umformen: Zielform; sonst leer'),
+            loesungen: A(S(), 'alle richtigen Antworten'),
+            optionen: A(S(), 'auswahl: 3–4 Möglichkeiten; sonst leer'),
+            fehlerWort: S('fehler/richtigfalsch: das falsche Wort GENAU wie im Satz; sonst leer'),
+            teile: A(S(), 'satzbau: Teile in RICHTIGER Reihenfolge; sonst leer'),
+            paare: A(O({ links: S(), rechts: S() }), 'zuordnen: 3–5 Paare; sonst leer'),
+            korrekt: { type: 'boolean' }
+          })
+        )
+      })
+    })
+    for (const u of roh.aufgaben ?? []) {
+      const ziel = stueck[Number(u.nr) - 1]
+      if (!ziel) continue
+      if (u.verwerfen === true) {
+        aus[ziel.i] = null
+        verworfen++
+        continue
+      }
+      const { a } = ziel
+      // Form prüfen wie jede neue Aufgabe (paketBereinigt), dann die Regeln
+      const geprueft = paketBereinigt(
+        {
+          thema: e.titel,
+          regeln: [{ id: 'r', titel: e.titel, erklaerung: e.titel, beispiele: [] }],
+          aufgaben: [{ ...u, id: 'x', regelId: 'r', uebung: a.uebung, niveau: a.niveau, erklaerung: a.erklaerung, tipp: a.tipp }]
+        },
+        e.titel,
+        BANK_GRENZEN
+      ).aufgaben[0]
+      if (!geprueft) continue
+      const neu = aufgabeNormalisiert({ ...geprueft, id: a.id, uebung: a.uebung, niveau: a.niveau } as BankAufgabe)
+      if (aufgabeMangel(neu)) continue
+      const { pruefen: _p, regelId: _r, ...ohne } = neu
+      void _p
+      void _r
+      aus[ziel.i] = { ...(ohne as BankAufgabe), regelId: a.regelId }
+      repariert++
+    }
+  }
+  return { aufgaben: aus.filter((x): x is BankAufgabe => x !== null), repariert, verworfen, geprueft: offen.length }
 }

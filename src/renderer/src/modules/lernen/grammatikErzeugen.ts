@@ -13,6 +13,7 @@
  */
 import { CEFR_SCALE, type CefrLevel, type CefrTable, type StructuredRequest } from '@shared/types'
 import { LOESUNGEN_REGEL } from '@shared/grammatikBank'
+import { AUFGABEN_REGELN, aufgabenGeprueft, PRUEF_REGELN } from '@shared/grammatikAufgabenRegeln'
 import {
   bekanntNachLernjahr,
   katalogFormenRegel,
@@ -72,7 +73,7 @@ const aufgabeSchema = (latein: boolean, extra = false): Record<string, unknown> 
     satz: S(
       'luecke/auswahl: Satz in der Zielsprache mit genau einer Lücke „___"; umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; satzbau: leer'
     ),
-    vorgabe: S('luecke: Grundform in Klammern, z. B. „(to go)"; umformen: was zu tun ist, z. B. „Verneine den Satz."; sonst leer'),
+    vorgabe: S('luecke: das Grundwort in Klammern, aus dem die Lösung gebildet wird, z. B. „(go)" – nie die Lösung selbst; umformen: die Zielform bzw. was zu tun ist, z. B. „Verneine den Satz."; sonst leer'),
     loesungen: A(
       S(),
       'alle richtigen Antworten: luecke/auswahl die Form; umformen der ganze neue Satz (Kurz- und Langform, falls beide richtig); fehler das richtige Wort; satzbau der ganze Satz'
@@ -344,7 +345,8 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
         : `Aufgaben: genau 40, gemischt – ${niveauMischung(ger, stufe)}. Alle Regeln abdecken, innerhalb des Niveaus vom Leichteren zum Schwereren.`,
       latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, stufe) : niveauRegel(a, ger, stufe),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      // Regeln für eindeutige Aufgaben (28.10.2026, shared/grammatikAufgabenRegeln.ts)
+      AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler (kein Rechtschreibfehler), „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
@@ -460,6 +462,9 @@ export async function gepruefterPool(
         `Du prüfst Grammatikaufgaben (${a.fach}, Klasse ${a.jahrgang}) sorgfältig wie eine erfahrene Lehrkraft.`,
         'Für jede Aufgabe: Ist sie eindeutig lösbar? Stimmt die Lösung? Fehlen gültige Varianten – Kurz-/Langform, gleichwertige Umformungen („It is said that he is …" und „He is said to be …"), weitere passende Formen des vorgegebenen Worts? Dann ergänze sie in „loesungen" (25.10.2026: die App zählt nur GENAU hinterlegte Antworten als richtig). Bei „Fehler finden": genau ein Fehler, fehlerWort exakt im Satz?',
         'ok = false, wenn die Aufgabe mehrdeutig oder falsch ist und sich nicht durch die Lösungen reparieren lässt.',
+        // Regeln (28.10.2026): dieselben Maßstäbe wie beim Schreiben
+        AUFGABEN_REGELN,
+        PRUEF_REGELN,
         'loesungen/optionen/fehlerWort: die korrigierte Fassung (oder unverändert); grund: kurz, deutsch.',
         gesperrt.length
           ? `ok = false auch, wenn Satz, Lösung oder Möglichkeiten eine Zeitform brauchen, die die Lerngruppe noch nicht kennt: ${gesperrt
@@ -547,7 +552,13 @@ export async function gepruefterPool(
   } catch {
     // Prüfung fehlgeschlagen: der bereinigte Pool bleibt – die Lehrkraft sieht ihn vor dem Freigeben
   }
-  return paket
+  // Regeln (28.10.2026): richten, was ohne KI geht; was einen Mangel behält, fällt weg
+  const regel = aufgabenGeprueft(paket.aufgaben)
+  if (bericht) {
+    bericht.gestrichen += regel.gestrichen.length
+    for (const g of regel.gestrichen) if (bericht.gruende.length < 20 && !bericht.gruende.includes(g.grund)) bericht.gruende.push(g.grund)
+  }
+  return regel.gestrichen.length ? { ...paket, aufgaben: regel.aufgaben } : paket
 }
 
 /** Auftrag „+ Aufgaben" (08.10.2026): weitere Aufgaben zu einer freigegebenen Grammatik */
@@ -634,7 +645,8 @@ async function mehrAufgabenRoh(a: MehrAufgabenAuftrag, ai: Ai, melde: (t: string
       `Schwierigkeit: ${SCHWIERIGKEIT_TEXT[a.schwierigkeit] ?? SCHWIERIGKEIT_TEXT.mittel} – relativ zum Niveau der Lerngruppe.`,
       latein ? lateinNiveauRegel({ ...a, fach: a.fach || 'Latein' }, a.schwierigkeit) : niveauRegel(a, ger, a.schwierigkeit),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      'Lücke: genau eine Lücke „___", die Grundform in „vorgabe".',
+      // Regeln für eindeutige Aufgaben (28.10.2026, shared/grammatikAufgabenRegeln.ts)
+      AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
       'Fehler finden: genau EIN Grammatikfehler, „fehlerWort" exakt wie im Satz, „loesungen" das richtige Wort.',
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',

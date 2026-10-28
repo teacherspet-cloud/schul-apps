@@ -73,7 +73,9 @@ import {
   type BankEntwurf,
   alternativenAnfragen,
   alternativenKandidaten,
-  bankAlternativenStarten
+  bankAlternativenStarten,
+  bankReparaturStarten,
+  reparaturKandidaten
 } from './bank'
 import { aufServer } from '../../shared/plattform'
 import { fachVon } from '@shared/faecher'
@@ -234,6 +236,20 @@ export function BankKarte({
       altKandidaten.map((x) => ({ schluessel: x.schluessel, titel: reiter.find((r) => r.schluessel === x.schluessel)?.titel ?? x.schluessel })),
       { sprache: buch.language, fach: fachVon(fach)?.label ?? fach, jahrgang: buch.grade ?? themaZu(reiter[0]?.themen[0] ?? '')?.from ?? 7 },
       `Alternativlösungen: ${punkt.text}`,
+      ziel
+    )
+  // Zurückgestellte Aufgaben dieses Punkts überarbeiten (28.10.2026)
+  const repKandidaten = darf
+    ? reparaturKandidaten(
+        reiter.map((r) => r.schluessel),
+        zahlen
+      )
+    : []
+  const reparatur = (): void =>
+    bankReparaturStarten(
+      repKandidaten.map((x) => ({ schluessel: x.schluessel, titel: reiter.find((r) => r.schluessel === x.schluessel)?.titel ?? x.schluessel })),
+      { sprache: buch.language, fach: fachVon(fach)?.label ?? fach, jahrgang: buch.grade ?? themaZu(reiter[0]?.themen[0] ?? '')?.from ?? 7 },
+      `Aufgaben überarbeiten: ${punkt.text}`,
       ziel
     )
   const alleFehlenden = (): void =>
@@ -532,6 +548,25 @@ export function BankKarte({
           Alle fehlenden mit KI erzeugen ({offeneReiter.length} Bereiche)
         </Button>
       )}
+      {repKandidaten.length > 0 && (
+        <Tooltip
+          label="Aufgaben mit Mängeln (freie Lücke beim Erkennen, Lösung in der Klammer, Fehler nicht durch ein Wort behebbar, gemeldete falsche Lösung) bekommen die Lernenden nicht – die KI schreibt sie nach den Regeln neu."
+          multiline
+          w={320}
+        >
+          <Button
+            size="xs"
+            variant="subtle"
+            color="orange"
+            leftSection={<IconListCheck size={14} />}
+            onClick={reparatur}
+            style={{ alignSelf: 'flex-start' }}
+            data-bank-ki-reparatur
+          >
+            Zurückgestellte überarbeiten (KI, {repKandidaten.reduce((n, x) => n + x.aufgaben, 0)} Aufgaben)
+          </Button>
+        </Tooltip>
+      )}
       {altKandidaten.length > 0 && (
         <Tooltip
           label={`Die KI nennt zu jeder Aufgabe weitere gleichwertig richtige Antworten (Kurzformen, gleichwertige Umformungen) – etwa ${alternativenAnfragen(
@@ -610,7 +645,14 @@ function BankEditor({
   }
   // Gefilterte Liste zurück in die ganze: Reihenfolge der übrigen bleibt
   const aendern = (p: GrammatikPaket): void => {
-    const geaendert = p.aufgaben as BankAufgabe[]
+    // Von Hand bearbeitet (28.10.2026): ein Befund der Prüfung gilt als erledigt – Mängel nach den Regeln prüft der Server neu
+    const vorher = new Map(aufgaben.map((a) => [a.id, JSON.stringify({ ...a, pruefen: undefined })]))
+    const geaendert = (p.aufgaben as BankAufgabe[]).map((a) => {
+      if (!a.pruefen || vorher.get(a.id) === JSON.stringify({ ...a, pruefen: undefined })) return a
+      const { pruefen: _p, ...rest } = a
+      void _p
+      return rest as BankAufgabe
+    })
     if (filter === 'alle' && stufe === 'alle') return setAufgaben(geaendert)
     const rest = aufgaben.filter((a) => !passt(a))
     setAufgaben([...rest, ...geaendert])

@@ -113,6 +113,11 @@ export interface GrammatikAufgabe {
   paare?: { links: string; rechts: string }[]
   /** richtigfalsch (26.10.2026): der Satz ist richtig (true) oder enthält den Fehler `fehlerWort` (false) */
   korrekt?: boolean
+  /**
+   * Aufgabenbank (28.10.2026, shared/grammatikAufgabenRegeln.ts): Grund, warum die Aufgabe für die Lernenden
+   * zurückgestellt ist (Mangel nach den Regeln oder Befund der Prüfung) – bis sie überarbeitet ist
+   */
+  pruefen?: string
 }
 
 export interface GrammatikPaket {
@@ -239,7 +244,8 @@ export function paketBereinigt(
       ...(y.stufe === 1 || y.stufe === 2 || y.stufe === 3 ? { stufe: y.stufe } : {}),
       ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {}),
       ...(UEBUNG_WERTE.includes(String(y.uebung)) ? { uebung: y.uebung as Uebung } : {}),
-      ...(y.niveau === 'g' || y.niveau === 'm' || y.niveau === 'a' ? { niveau: y.niveau } : {})
+      ...(y.niveau === 'g' || y.niveau === 'm' || y.niveau === 'a' ? { niveau: y.niveau } : {}),
+      ...(text(y.pruefen, 300) ? { pruefen: text(y.pruefen, 300) } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
     if (art === 'bestimmen') {

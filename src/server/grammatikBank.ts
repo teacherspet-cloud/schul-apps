@@ -21,6 +21,7 @@ import { alsNutzer, json, type Anfrage } from './http'
 import { imNutzer } from './kontext'
 import { darfLehrwerkSprache } from '../main/services/rolle'
 import { BANK_GRENZEN, paketBereinigt } from '../shared/grammatiktrainer'
+import { aufgabeMangel, aufgabeNormalisiert } from '../shared/grammatikAufgabenRegeln'
 import {
   formVon,
   istStufe,
@@ -62,8 +63,11 @@ const db = () => {
     // Stufe je Aufgabe (13.10.2026): g grundlegend, m mittel, a anspruchsvoll – Bisheriges gilt als mittel
     const spalten = new Set((d.prepare('PRAGMA table_info(gram_bank)').all() as { name: string }[]).map((s) => s.name))
     if (!spalten.has('niveau')) d.exec("ALTER TABLE gram_bank ADD COLUMN niveau TEXT NOT NULL DEFAULT 'm'")
+    // Zurückgestellt (28.10.2026): Grund als Klartext-Spalte (keine Personendaten) – Zahlen und Pakete filtern danach
+    if (!spalten.has('pruefen')) d.exec("ALTER TABLE gram_bank ADD COLUMN pruefen TEXT NOT NULL DEFAULT ''")
     bereit = true
     doppelteEinmal(d)
+    maengelEinmal(d)
   }
   return d
 }
@@ -99,6 +103,9 @@ export function grundbestandEinmal(d: ReturnType<typeof datenbank>, datei = join
         )
         for (const a of g.aufgaben) n += Number(rein.run(a.id, a.sprache, a.schluessel, a.form, a.uebung, a.niveau, a.pos, JSON.stringify(a.bank_aufgabe), a.geaendert).changes)
         d.exec('COMMIT')
+        // Der Grundbestand stammt vom 19.10.2026 – die Regeln vom 28.10.2026 gleich darauf anwenden
+        d.prepare('DELETE FROM wartung WHERE name = ?').run(MAENGEL_WARTUNG)
+        maengelEinmal(d)
       } catch (e) {
         d.exec('ROLLBACK')
         throw e
@@ -163,10 +170,11 @@ export function bankEintraege(schluessel: readonly string[]): BankEintrag[] {
   const aus: BankEintrag[] = []
   for (const s of [...new Set(schluessel)]) {
     const r = db().prepare('SELECT bank_regel FROM gram_bank_regel WHERE schluessel = ?').get(s) as { bank_regel: string } | undefined
-    const zeilen = db().prepare('SELECT id, uebung, niveau, bank_aufgabe FROM gram_bank WHERE schluessel = ? ORDER BY pos, rowid').all(s) as {
+    const zeilen = db().prepare('SELECT id, uebung, niveau, pruefen, bank_aufgabe FROM gram_bank WHERE schluessel = ? ORDER BY pos, rowid').all(s) as {
       id: string
       uebung: string
       niveau: string
+      pruefen: string
       bank_aufgabe: string
     }[]
     if (!r && !zeilen.length) continue
@@ -176,7 +184,8 @@ export function bankEintraege(schluessel: readonly string[]): BankEintrag[] {
         ...json_(z.bank_aufgabe, {} as BankAufgabe),
         id: z.id,
         uebung: z.uebung as Uebung,
-        niveau: istStufe(z.niveau) ? z.niveau : ('m' as const)
+        niveau: istStufe(z.niveau) ? z.niveau : ('m' as const),
+        ...(z.pruefen ? { pruefen: z.pruefen } : {})
       }))
       .filter((a) => istUebung(a.uebung) && a.art)
     aus.push({ schluessel: s, regel, aufgaben })
@@ -188,7 +197,7 @@ export function bankEintraege(schluessel: readonly string[]): BankEintrag[] {
 export function bankZahlen(sprache: string): BankZahlen {
   const aus: BankZahlen = {}
   for (const z of db()
-    .prepare('SELECT schluessel, uebung, niveau, COUNT(*) AS n FROM gram_bank WHERE sprache = ? GROUP BY schluessel, uebung, niveau')
+    .prepare("SELECT schluessel, uebung, niveau, COUNT(*) AS n FROM gram_bank WHERE sprache = ? AND pruefen = '' GROUP BY schluessel, uebung, niveau")
     .all(sprache) as {
     schluessel: string
     uebung: string
@@ -201,6 +210,11 @@ export function bankZahlen(sprache: string): BankZahlen {
     const st = istStufe(z.niveau) ? z.niveau : 'm'
     ;((e.stufen ??= {})[z.uebung] ??= {})[st] = Number(z.n)
   }
+  // Zurückgestellte je Schlüssel (28.10.2026)
+  for (const z of db()
+    .prepare("SELECT schluessel, COUNT(*) AS n FROM gram_bank WHERE sprache = ? AND pruefen != '' GROUP BY schluessel")
+    .all(sprache) as { schluessel: string; n: number }[])
+    (aus[z.schluessel] ??= {}).zurueck = Number(z.n)
   // Schlüssel mit Regelkarte, aber (noch) ohne Aufgaben
   for (const z of db().prepare('SELECT schluessel FROM gram_bank_regel WHERE sprache = ?').all(sprache) as { schluessel: string }[]) aus[z.schluessel] ??= {}
   return aus
@@ -210,7 +224,7 @@ export function bankZahlen(sprache: string): BankZahlen {
 export function bankKernJeForm(sprache: string): Record<string, number> {
   const aus: Record<string, number> = {}
   for (const z of db()
-    .prepare("SELECT form, COUNT(*) AS n FROM gram_bank WHERE sprache = ? AND form != '' AND uebung IN ('erkennen', 'bilden', 'anwenden') GROUP BY form")
+    .prepare("SELECT form, COUNT(*) AS n FROM gram_bank WHERE sprache = ? AND form != '' AND pruefen = '' AND uebung IN ('erkennen', 'bilden', 'anwenden') GROUP BY form")
     .all(sprache) as { form: string; n: number }[])
     aus[z.form] = Number(z.n)
   return aus
@@ -269,7 +283,18 @@ export function bankSpeichern(sprache: string, schluessel: string, regelRoh: unk
     regel.titel,
     BANK_GRENZEN
   )
-  const aufgaben = paket.aufgaben.filter((a): a is BankAufgabe => istUebung(a.uebung))
+  // Regeln (28.10.2026): ohne KI richten, verbleibende Mängel als „zurückgestellt“ festhalten; ein Befund der Prüfung bleibt,
+  // bis die Überarbeitung ihn ausdrücklich löscht (dann fehlt `pruefen`)
+  const aufgaben = paket.aufgaben
+    .filter((a): a is BankAufgabe => istUebung(a.uebung))
+    .map((roh) => {
+      const a = aufgabeNormalisiert(roh)
+      const mangel = aufgabeMangel(a)
+      const befund = roh.pruefen?.startsWith(BEFUND) ? roh.pruefen : ''
+      const { pruefen: _p, ...ohne } = a
+      void _p
+      return { ...ohne, ...(mangel || befund ? { pruefen: mangel || befund } : {}) } as BankAufgabe
+    })
   const jetzt = new Date().toISOString()
   const d = db()
   d.exec('BEGIN')
@@ -282,14 +307,14 @@ export function bankSpeichern(sprache: string, schluessel: string, regelRoh: unk
       jetzt
     )
     const rein = d.prepare(
-      'INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert, pruefen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     aufgaben.forEach((a, i) => {
       // Ohne Kennung, Regel und Stufe gespeichert – die vergibt das Paket des Kurses
-      const { id, regelId: _r, stufe: _s, uebung, niveau, ...rest } = a
+      const { id, regelId: _r, stufe: _s, uebung, niveau, pruefen, ...rest } = a
       void _r
       void _s
-      rein.run(id, sprache, schluessel, formVon(schluessel), uebung, istStufe(niveau) ? niveau : 'm', i, JSON.stringify(rest), jetzt)
+      rein.run(id, sprache, schluessel, formVon(schluessel), uebung, istStufe(niveau) ? niveau : 'm', i, JSON.stringify(rest), jetzt, pruefen ?? '')
     })
     d.exec('COMMIT')
   } catch (e) {
@@ -340,5 +365,72 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
       return json(res, 200, { aufgaben, kurse, zahlen: bankZahlen(s) }), true
     }
     return json(res, 404, { fehler: 'Unbekannt.' }), true
+  }
+}
+
+
+// ---------------------------------------------------------------- Mängel (28.10.2026)
+
+/** Befund aus der Prüfung der Bank (Kennung → was falsch ist) – beginnt mit diesem Wort, damit Speichern ihn erhält */
+export const BEFUND = 'Befund: '
+const MAENGEL_WARTUNG = 'grammatik-bank-maengel-2026-10-28'
+
+/**
+ * Einmal (28.10.2026, nach der Prüfung der ganzen Bank): jede Aufgabe nach den Regeln richten (shared/
+ * grammatikAufgabenRegeln.ts) und, was einen Mangel behält oder in der Prüfung als falsch gemeldet wurde
+ * (resources/grammatik-bank/befunde-2026-10-28.json), für die Lernenden zurückstellen. Danach bauen die Kurse ihre
+ * Pakete neu. Kennungen bleiben – der Lernstand hängt weiter an den Aufgaben.
+ */
+export function maengelEinmal(d: ReturnType<typeof datenbank>): { geaendert: number; zurueck: number } {
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(MAENGEL_WARTUNG)) return { geaendert: 0, zurueck: 0 }
+    const datei = join(RESSOURCEN, 'grammatik-bank', 'befunde-2026-10-28.json')
+    const befunde = existsSync(datei) ? json_(readFileSync(datei, 'utf8'), {} as Record<string, string>) : {}
+    const zeilen = d.prepare('SELECT id, schluessel, uebung, niveau, pruefen, bank_aufgabe FROM gram_bank').all() as {
+      id: string
+      schluessel: string
+      uebung: string
+      niveau: string
+      pruefen: string
+      bank_aufgabe: string
+    }[]
+    let geaendert = 0
+    let zurueck = 0
+    const schluessel = new Set<string>()
+    const setzen = d.prepare('UPDATE gram_bank SET uebung = ?, pruefen = ?, bank_aufgabe = ? WHERE id = ?')
+    d.exec('BEGIN')
+    try {
+      for (const z of zeilen) {
+        const roh = json_(z.bank_aufgabe, {} as BankAufgabe)
+        if (!roh.art || !istUebung(z.uebung)) continue
+        const vorher = { ...roh, id: z.id, regelId: '', uebung: z.uebung as Uebung }
+        const a = aufgabeNormalisiert(vorher)
+        const befund = befunde[z.id] ? `${BEFUND}${String(befunde[z.id]).slice(0, 280)}` : ''
+        const pruefen = aufgabeMangel(a) || befund
+        const { id: _i, regelId: _r, uebung, pruefen: _p, ...rest } = a
+        void _i
+        void _r
+        void _p
+        const text = JSON.stringify(rest)
+        if (uebung === z.uebung && pruefen === z.pruefen && text === JSON.stringify(roh)) continue
+        setzen.run(uebung, pruefen, text, z.id)
+        geaendert++
+        if (pruefen) zurueck++
+        schluessel.add(z.schluessel)
+      }
+      d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(MAENGEL_WARTUNG, new Date().toISOString())
+      d.exec('COMMIT')
+    } catch (e) {
+      d.exec('ROLLBACK')
+      throw e
+    }
+    protokolliereServer('grammatik', `WARTUNG ${MAENGEL_WARTUNG}: ${geaendert} Aufgaben gerichtet, davon ${zurueck} zurückgestellt`)
+    // Kurse neu bauen, sobald die Grammatik-Route geladen ist (beiBankAenderung trägt sie ein)
+    if (schluessel.size) setTimeout(() => void Promise.resolve().then(() => kurseNeu([...schluessel])).catch(() => undefined), 0)
+    return { geaendert, zurueck }
+  } catch {
+    // Beim nächsten Start erneut
+    return { geaendert: 0, zurueck: 0 }
   }
 }

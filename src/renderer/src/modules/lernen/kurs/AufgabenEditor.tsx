@@ -316,8 +316,21 @@ export function AufgabenEditor({
                       neu
                     </Badge>
                   )}
+                  {/* Zurückgestellt (28.10.2026): Lernende bekommen die Aufgabe nicht, bis sie überarbeitet ist */}
+                  {a.pruefen && (
+                    <Tooltip label={a.pruefen} multiline w={280}>
+                      <Badge size="xs" color="orange" variant="filled" tt="none" data-aufgabe-zurueck>
+                        zurückgestellt
+                      </Badge>
+                    </Tooltip>
+                  )}
                 </Stack>
                 <div style={{ flex: 1, minWidth: 0 }}>
+                  {a.pruefen && (
+                    <Text size="xs" c="orange">
+                      Zurückgestellt: {a.pruefen}
+                    </Text>
+                  )}
                   <Text size="sm">{v.aufgabe}</Text>
                   <Text size="xs" c="teal">
                     → {v.loesung}
