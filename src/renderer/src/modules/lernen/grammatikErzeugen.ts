@@ -25,7 +25,17 @@ import {
   zielNiveau,
   type Schwierigkeit
 } from './grammatikNiveau'
-import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
+import { ART_NAME, paketBereinigt, woerterVon, type AufgabenArt, type GrammatikAufgabe, type GrammatikPaket } from '@shared/grammatiktrainer'
+import {
+  blindMehrdeutig,
+  blindSicht,
+  blindTauglich,
+  blindText,
+  blindUrteil,
+  blindWeitere,
+  TIPP_ARTEN,
+  type BlindAntwort
+} from '@shared/grammatikBlindprobe'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache, type SperrbareZeitform } from '@shared/zeitformSperre'
 
 type Ai = <T>(req: StructuredRequest) => Promise<T>
@@ -572,7 +582,246 @@ export async function gepruefterPool(
     bericht.gestrichen += regel.gestrichen.length
     for (const g of regel.gestrichen) if (bericht.gruende.length < 20 && !bericht.gruende.includes(g.grund)) bericht.gruende.push(g.grund)
   }
-  return regel.gestrichen.length ? { ...paket, aufgaben: regel.aufgaben } : paket
+  const nachRegel = regel.gestrichen.length ? { ...paket, aufgaben: regel.aufgaben } : paket
+  // 3. Blindprobe mit Überarbeitung (28.10.2026, Wunsch der Lehrkraft)
+  return blindGeprueft(nachRegel, a, ai, melde, bericht)
+}
+
+/** Überarbeitung nach der Blindprobe: Entscheidung und ggf. die neue Fassung der Aufgabe */
+interface BlindUeberarbeitung {
+  nr: number
+  aktion: 'ueberarbeiten' | 'ergaenzen' | 'streichen'
+  grund: string
+  anweisung: string
+  kontext: string
+  satz: string
+  vorgabe: string
+  anfang: string
+  loesungen: string[]
+  optionen: string[]
+  fehlerWort: string
+  teile: string[]
+  paare: { links: string; rechts: string }[]
+  korrekt: boolean
+  luecken: { vorgabe: string; loesungen: string[]; optionen: string[] }[]
+  wortkasten: string[]
+  zielWoerter: string[]
+  gruppen: string[]
+  elemente: { text: string; gruppe: number }[]
+  erklaerung: string
+}
+
+/** Lösbar ohne Lösung? Höchstens so viele Blindproben je Paket (die letzte streicht, was noch nicht passt) */
+const BLIND_RUNDEN = 3
+
+/**
+ * 3. Schritt – Blindprobe (28.10.2026, Wunsch der Lehrkraft): Eine KI löst jede Aufgabe nur mit dem, was Lernende sehen
+ * (shared/grammatikBlindprobe.ts). Trifft sie die hinterlegte Lösung nicht oder hält sie eine weitere Antwort für ebenso
+ * richtig, entscheidet eine Überarbeitung: weitere richtige Antwort als Lösung ergänzen (nur Tipp-Formate), die Aufgabe so
+ * umschreiben, dass die Lösung eindeutig folgt – sie geht dann erneut in die Blindprobe –, oder streichen. Was nach der
+ * letzten Probe noch abweicht, fällt weg. Schlägt eine Anfrage fehl, bleibt das bis dahin Geprüfte.
+ */
+export async function blindGeprueft(
+  start: GrammatikPaket,
+  a: Pick<GrammatikAuftrag, 'fach' | 'jahrgang' | 'thema'>,
+  ai: Ai,
+  melde: (t: string) => void,
+  bericht?: PruefBericht
+): Promise<GrammatikPaket> {
+  let aufgaben = start.aufgaben
+  const fertig = new Set(aufgaben.filter((x) => !blindTauglich(x)).map((x) => x.id))
+  const regelVon = (x: GrammatikAufgabe): GrammatikPaket['regeln'][number] | undefined => start.regeln.find((r) => r.id === x.regelId)
+  const streiche = (x: GrammatikAufgabe, grund: string): void => {
+    aufgaben = aufgaben.filter((y) => y.id !== x.id)
+    if (!bericht) return
+    bericht.gestrichen++
+    const g = `Blindprobe: ${grund}`.slice(0, 160)
+    if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)
+  }
+  for (let runde = 0; runde < BLIND_RUNDEN; runde++) {
+    const offen = aufgaben.filter((x) => !fertig.has(x.id))
+    if (!offen.length) break
+    melde(
+      runde
+        ? `Blindprobe: ${offen.length} überarbeitete Aufgaben werden erneut gelöst …`
+        : `Blindprobe: eine zweite KI löst ${offen.length} Aufgaben nur mit dem, was Lernende sehen …`
+    )
+    let antworten: BlindAntwort[]
+    try {
+      antworten =
+        (
+          await ai<{ antworten: BlindAntwort[] }>({
+            schemaName: 'grammatik_blindprobe',
+            system: [
+              `Du bist eine Schülerin bzw. ein Schüler mit sicheren Kenntnissen (${a.fach}, Klasse ${a.jahrgang}) und löst Aufgaben in einer Grammatik-Lern-App.`,
+              'Du siehst je Aufgabe NUR, was in der App steht (Anweisung, Kontext, Satz bzw. Text, Vorgaben, Möglichkeiten, Wortkasten, Satzanfang) und die abrufbare Regelkarte. Löse jede Aufgabe so, wie es der Zusammenhang am klarsten verlangt.',
+              'Antwortfelder: text, liste, wort, richtig – je nach Format (steht bei jeder Aufgabe); nicht benötigte Felder leer bzw. false. Beim Tippen ganzer Sätze den ganzen Satz (mit Satzanfang).',
+              '„auch": weitere Antworten, die nach Aufgabe und Kontext EBENSO richtig wären – bei Auswahl bzw. Zuordnen eine zweite passende Möglichkeit, beim Tippen eine andere grammatisch richtige Form (auch Kurz-/Langform). Nur echte Alternativen, sonst leer.'
+            ].join('\n'),
+            user: [`Grammatik: ${start.thema || a.thema}`, '', ...offen.map((x, i) => blindSicht(x, i + 1, regelVon(x)))].join('\n\n'),
+            schema: O({
+              antworten: A(
+                O({
+                  nr: { type: 'integer' },
+                  text: S(),
+                  liste: A(S()),
+                  wort: S(),
+                  richtig: { type: 'boolean' },
+                  auch: A(S(), 'weitere ebenso richtige Antworten; sonst leer')
+                })
+              )
+            })
+          })
+        ).antworten ?? []
+    } catch {
+      break
+    }
+    const nachNr = new Map(antworten.map((b) => [Number(b.nr), b]))
+    const probleme: { x: GrammatikAufgabe; b: BlindAntwort; urteil: string; weitere: string[] }[] = []
+    offen.forEach((x, i) => {
+      const b = nachNr.get(i + 1)
+      // Ohne Antwort der Probe: nicht beurteilbar, bleibt
+      if (!b) return fertig.add(x.id)
+      const urteil = blindUrteil(x, b)
+      const weitere = blindWeitere(x, b)
+      if (urteil === 'richtig' && !weitere.length && !blindMehrdeutig(x, b)) return fertig.add(x.id)
+      probleme.push({ x, b, urteil, weitere })
+    })
+    if (!probleme.length) break
+    // Letzte Probe: was jetzt noch abweicht, fällt weg
+    if (runde === BLIND_RUNDEN - 1) {
+      for (const p of probleme) streiche(p.x, 'auch nach Überarbeitung nicht eindeutig lösbar')
+      break
+    }
+    melde(`Blindprobe: ${probleme.length} Aufgaben ${probleme.length === 1 ? 'wird' : 'werden'} überarbeitet …`)
+    let urteile: BlindUeberarbeitung[]
+    try {
+      urteile =
+        (
+          await ai<{ urteile: BlindUeberarbeitung[] }>({
+            schemaName: 'grammatik_ueberarbeitung',
+            system: [
+              `Du überarbeitest Grammatikaufgaben (${a.fach}, Klasse ${a.jahrgang}) wie eine erfahrene Lehrkraft.`,
+              'Eine Probe-KI hat jede Aufgabe NUR mit dem gelöst, was Lernende sehen, und kam zu einem anderen Ergebnis als die hinterlegte Lösung – oder hält weitere Antworten für ebenso richtig. Entscheide je Aufgabe („aktion"):',
+              '- ergaenzen: Die Antwort der Probe (bzw. ihre weiteren Antworten) ist ebenso richtig UND übt die Grammatik – NUR bei getippten Antworten (Lücke, Umformen, Sätze verbinden, Frage bilden, Satzbau, Lückentext). Gib dann die VOLLSTÄNDIGE Liste in „loesungen" (Lückentext: „luecken" mit allen Lücken); die übrigen Felder unverändert.',
+              '- ueberarbeiten: Aus der Schüleransicht folgt die Lösung nicht eindeutig (fehlender Kontext, fehlendes Signalwort, zwei richtige Möglichkeiten, unklare Anweisung) oder die Aufgabe ist fehlerhaft. Schreibe sie so um, dass GENAU die Lösung folgt – gleiche Übungsart, gleiches Format, alle Felder vollständig ausgefüllt. Bei Auswahl, Mehrfachauswahl, Zuordnen, Sortieren und Markieren: Ablenker bzw. Text so ändern, dass nur die Lösung passt.',
+              '- streichen: nicht zu retten.',
+              AUFGABEN_REGELN,
+              'grund: kurz, deutsch.'
+            ].join('\n'),
+            user: probleme
+              .map(
+                (p, i) =>
+                  `${blindSicht(p.x, i + 1, regelVon(p.x))}\nHinterlegte Lösung: ${hinterlegt(p.x)}\nAntwort der Probe: ${blindText(p.x, p.b)} (${
+                    p.urteil === 'richtig' ? 'trifft die Lösung' : 'weicht ab'
+                  })${p.weitere.length ? `\nWeitere Antworten der Probe, nicht hinterlegt: ${p.weitere.join(' | ')}` : ''}\nAlle Felder: ${JSON.stringify(felderVon(p.x))}`
+              )
+              .join('\n\n'),
+            schema: O({
+              urteile: A(
+                O({
+                  nr: { type: 'integer' },
+                  aktion: { type: 'string', enum: ['ueberarbeiten', 'ergaenzen', 'streichen'] },
+                  grund: S(),
+                  anweisung: S(),
+                  kontext: S(),
+                  satz: S(),
+                  vorgabe: S(),
+                  anfang: S(),
+                  loesungen: A(S()),
+                  optionen: A(S()),
+                  fehlerWort: S(),
+                  teile: A(S()),
+                  paare: A(O({ links: S(), rechts: S() })),
+                  korrekt: { type: 'boolean' },
+                  luecken: A(O({ vorgabe: S(), loesungen: A(S()), optionen: A(S()) })),
+                  wortkasten: A(S()),
+                  zielWoerter: A(S()),
+                  gruppen: A(S()),
+                  elemente: A(O({ text: S(), gruppe: { type: 'integer' } })),
+                  erklaerung: S()
+                })
+              )
+            })
+          })
+        ).urteile ?? []
+    } catch {
+      // Ohne Überarbeitung: Abweichendes streichen, statt es ungeprüft zu den Lernenden zu geben
+      for (const p of probleme) streiche(p.x, 'nicht eindeutig lösbar')
+      break
+    }
+    const nachNr2 = new Map(urteile.map((u) => [Number(u.nr), u]))
+    probleme.forEach((p, i) => {
+      const u = nachNr2.get(i + 1)
+      if (!u || u.aktion === 'streichen') return streiche(p.x, String(u?.grund || 'nicht eindeutig lösbar'))
+      if (u.aktion === 'ergaenzen') {
+        if (!(TIPP_ARTEN as readonly string[]).includes(p.x.art)) return streiche(p.x, String(u.grund || 'zwei richtige Möglichkeiten'))
+        const dazu = (alt: string[], neu: string[] | undefined): string[] => [...new Set([...alt, ...(neu ?? []).map(String).filter((l) => l.trim())])]
+        const neu: GrammatikAufgabe =
+          p.x.art === 'lueckentext'
+            ? {
+                ...p.x,
+                luecken: (p.x.luecken ?? []).map((l, j) => ({
+                  ...l,
+                  loesungen: u.luecken?.length === p.x.luecken?.length ? dazu(l.loesungen, u.luecken[j]?.loesungen) : l.loesungen
+                }))
+              }
+            : { ...p.x, loesungen: dazu(p.x.loesungen, u.loesungen) }
+        // Trifft die Probe jetzt? Sonst war die Ergänzung keine – dann erneut prüfen lassen
+        aufgaben = aufgaben.map((y) => (y.id === p.x.id ? neu : y))
+        if (blindUrteil(neu, p.b) === 'richtig' && !blindWeitere(neu, p.b).length) fertig.add(neu.id)
+        return
+      }
+      // ueberarbeiten: neue Fassung bereinigen und nach den Regeln prüfen; Kennung, Übungsart, Stufe und Regel bleiben
+      const roh = {
+        ...p.x,
+        anweisung: u.anweisung || p.x.anweisung,
+        kontext: u.kontext,
+        satz: u.satz,
+        vorgabe: u.vorgabe,
+        anfang: u.anfang,
+        loesungen: u.loesungen,
+        optionen: u.optionen,
+        fehlerWort: u.fehlerWort,
+        teile: u.teile,
+        paare: u.paare,
+        korrekt: u.korrekt,
+        luecken: u.luecken,
+        wortkasten: u.wortkasten,
+        zielWoerter: u.zielWoerter,
+        ziele: [],
+        gruppen: u.gruppen,
+        elemente: u.elemente,
+        erklaerung: u.erklaerung || p.x.erklaerung
+      }
+      const [neu] = paketBereinigt({ ...start, aufgaben: [roh] } as unknown as GrammatikPaket, start.thema).aufgaben
+      const geprueft = neu ? aufgabenGeprueft([{ ...neu, id: p.x.id }]) : null
+      if (!geprueft || !geprueft.aufgaben.length) return streiche(p.x, geprueft?.gestrichen[0]?.grund ?? 'Überarbeitung unbrauchbar')
+      aufgaben = aufgaben.map((y) => (y.id === p.x.id ? geprueft.aufgaben[0] : y))
+    })
+  }
+  return { ...start, aufgaben }
+}
+
+/** Hinterlegte Lösung als Text (für die Überarbeitung) */
+function hinterlegt(x: GrammatikAufgabe): string {
+  if (x.art === 'lueckentext') return (x.luecken ?? []).map((l, i) => `(${i + 1}) ${l.loesungen.join(' / ')}`).join('; ')
+  if (x.art === 'zuordnen') return (x.paare ?? []).map((p) => `${p.links} → ${p.rechts}`).join('; ')
+  if (x.art === 'sortieren') return (x.elemente ?? []).map((e) => `${e.text} → ${x.gruppen?.[e.gruppe] ?? e.gruppe}`).join('; ')
+  if (x.art === 'markieren') {
+    const w = woerterVon(x.satz)
+    return (x.ziele ?? []).map((i) => w[i] ?? '').join(', ')
+  }
+  if (x.art === 'richtigfalsch') return x.korrekt ? 'richtig' : `falsch: „${x.fehlerWort}“ → ${x.loesungen.join(' / ')}`
+  if (x.art === 'fehler') return `„${x.fehlerWort}“ → ${x.loesungen.join(' / ')}`
+  if (x.art === 'satzbau') return x.loesungen.length ? x.loesungen.join(' / ') : (x.teile ?? []).join(' ')
+  return x.loesungen.join(' / ')
+}
+
+/** Felder einer Aufgabe für die Überarbeitung (ohne Kennungen) */
+function felderVon(x: GrammatikAufgabe): Record<string, unknown> {
+  const { id: _id, regelId: _r, ...rest } = x
+  return rest
 }
 
 /** Auftrag „+ Aufgaben" (08.10.2026): weitere Aufgaben zu einer freigegebenen Grammatik */

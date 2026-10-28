@@ -2,6 +2,9 @@
  "verzoegerungMs": 300,
  "ausSchema": true,
  "antworten": {
+  "grammatik_blindprobe": {
+    "antworten": []
+  },
   "grammatik_pool": {
    "regeln": [
     {
