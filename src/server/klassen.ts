@@ -38,6 +38,7 @@ import {
 } from './onlinetest'
 import { onlinetestBaldBedarf } from '../shared/onlinetestTermin'
 import { reihenDerGruppe } from './reihen'
+import { alleVerknuepfungen } from './kontoVerknuepfung'
 import {
   db as vokDb,
   json_,
@@ -471,6 +472,24 @@ export function abschnitteVon(z: Zeile): FreiAbschnitt[] {
   return aus
 }
 
+/** Klassenkarte (28.10.2026): Schnitt sicher/im Aufbau/neu je Kind und wie viele diese Woche geübt haben */
+export function vokabelSchnitt(
+  lernende: { vokabeln?: { sicher: number; aufbau: number; neu: number } | null; zuletztGeuebt: string | null }[],
+  jetzt = Date.now()
+): { sicher: number; aufbau: number; neu: number; aktiv7: number; lernende: number } | null {
+  const mit = lernende.filter((l) => l.vokabeln)
+  if (!mit.length) return null
+  const vor7 = new Date(jetzt - 7 * 864e5).toISOString().slice(0, 10)
+  const summe = (f: (v: { sicher: number; aufbau: number; neu: number }) => number): number => mit.reduce((a, l) => a + f(l.vokabeln!), 0) / mit.length
+  return {
+    sicher: summe((v) => v.sicher),
+    aufbau: summe((v) => v.aufbau),
+    neu: summe((v) => v.neu),
+    aktiv7: mit.filter((l) => l.zuletztGeuebt && l.zuletztGeuebt >= vor7).length,
+    lernende: mit.length
+  }
+}
+
 /**
  * Eine Lerngruppe im Detail. `leicht` (09.10.2026, Leistung): für die Übersicht aller Klassen ohne die Übersicht je
  * Abschnitt und ohne Test-Einzelheiten – Zahlen, Handlungsbedarf und Vorschläge bleiben gleich.
@@ -486,6 +505,8 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
   const blaetter = blaetterDerGruppe(lehrkraftId, g.id)
   const fehler = fehlerSchwerpunkte(g)
   const offeneVok = vok.trainings.filter((t) => t.status === 'offen')
+  // Gäste, die sich inzwischen über IServ anmelden (Konten zusammengeführt, 28.10.2026: „IServ" statt „Code")
+  const mitIserv = new Set(alleVerknuepfungen().map((v) => v.nutzerId))
 
   const lernende = mitglieder
     .map((n) => {
@@ -502,7 +523,23 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
         // Interne Kennung der Gäste („gast-…") ist kein IServ-Name – nicht anzeigen
         benutzer: gast ? '' : n.benutzer,
         gast,
+        iserv: gast && mitIserv.has(n.id),
         vokabelnSicher: v && v.gesamt ? v.sicher / v.gesamt : null,
+        // Übersicht (28.10.2026, abgestimmt): dreiteiliger Balken, Tagesziel, Trefferquote, Ampel nach Regelmäßigkeit
+        vokabeln:
+          v && v.gesamt
+            ? {
+                sicher: v.sicher,
+                aufbau: v.aufbau,
+                neu: v.neu,
+                gesamt: v.gesamt,
+                faellig: v.faellig,
+                zielTage7: v.zielTage.length,
+                verlaufSeit: v.verlaufSeit,
+                treffer14: v.v14 ? v.r14 / v.v14 : null,
+                antworten14: v.v14
+              }
+            : null,
         grammatikSicher: gr && gr.gesamt ? gr.sicher / gr.gesamt : null,
         zuletztGeuebt: v?.zuletzt ?? null,
         testSchnitt: t?.durchschnitt ?? null,
@@ -782,6 +819,8 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
             bedarf: number
             vorschlaege: number
             vokabelnSicher: number | null
+            /** Schnitt je Kind (28.10.2026): sicher/im Aufbau/neu für den dreiteiligen Balken, aktiv diese Woche */
+            vokabeln: { sicher: number; aufbau: number; neu: number; aktiv7: number; lernende: number } | null
             testSchnitt: number | null
             tests: number
             reihen: number
@@ -826,6 +865,7 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
           bedarf: d.bedarf.length,
           vorschlaege: d.vorschlaege.length,
           vokabelnSicher: werte.length ? werte.reduce((a, b) => a + b, 0) / werte.length : null,
+          vokabeln: vokabelSchnitt(d.lernende),
           testSchnitt: noten.length ? noten.reduce((a, b) => a + b, 0) / noten.length : null,
           tests: d.tests.length,
           reihen: d.reihen.filter((r) => r.status === 'offen').length,

@@ -54,6 +54,10 @@ export interface StartKurs {
   woerter: number
   /** Anteil sicher im Schnitt der Lernenden (0–1); null ohne Wörter */
   sicher: number | null
+  /** 28.10.2026 (abgestimmt): Anteile aller Wörter aller Lernenden – sicher, im Aufbau, neu (0–1) */
+  anteil?: { sicher: number; aufbau: number; neu: number }
+  /** Lernende, die in den letzten 7 Tagen geübt haben */
+  aktiv7?: number
   lernende: number
   testTermin: number | null
   abzeichen: StartAbzeichen

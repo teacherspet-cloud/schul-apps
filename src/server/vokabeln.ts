@@ -507,6 +507,26 @@ const gaesteVon = (zid: string): NutzerInfo[] =>
 /** Gäste lernen über Wochen: Sitzung bis zum Ende des Zeitraums (höchstens 120 Tage, mindestens 1 Tag) */
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 
+/** Vokabelstand je Person über alle laufenden Kurse einer Lerngruppe (Meine Klassen) */
+export interface VokPerson {
+  sicher: number
+  gesamt: number
+  zuletzt: string | null
+  reifSicher: number
+  reifGesamt: number
+  /** 28.10.2026: kennengelernt, aber noch nicht sicher / noch nie geübt / heute zur Wiederholung fällig */
+  aufbau: number
+  neu: number
+  faellig: number
+  /** Tage der letzten 7, an denen in einem Kurs das Tagesziel erreicht wurde */
+  zielTage: string[]
+  /** Ältester Tag im Tagesverlauf (vorher wurde nicht gezählt) */
+  verlaufSeit: string | null
+  /** Richtige Antworten / Antworten der letzten 14 Tage */
+  r14: number
+  v14: number
+}
+
 /** Lernstand einer Person in einer Liste: je Wort + Übungstage (für „aktiv in den letzten 7 Tagen") */
 export interface VokStand {
   woerter: Record<string, WortStand>
@@ -514,6 +534,23 @@ export interface VokStand {
   /** Spiele (03.10.2026): eigener Rekord je Spiel; Wörter, die im Spiel danebengingen („nochmal ansehen") */
   rekorde?: Record<string, number>
   ansehen?: string[]
+  /**
+   * Tagesverlauf (28.10.2026, Übersicht in „Meine Klassen"): je Tag (ISO) geübte Wörter `w`, richtige Antworten `r` und
+   * Antworten `v` – für „Tagesziel erreicht" und die Trefferquote. Höchstens 30 Tage; fehlt bei älteren Ständen.
+   */
+  verlauf?: Record<string, { w: number; r: number; v: number }>
+}
+
+/** Antwort in den Tagesverlauf eintragen */
+export function verlaufEintragen(stand: VokStand, heute: string, richtig: boolean): void {
+  const tagStart = Date.parse(`${heute}T00:00:00Z`)
+  const w = Object.values(stand.woerter).filter((x) => x.zuletzt >= tagStart && x.zuletzt < tagStart + 864e5).length
+  const alt = stand.verlauf?.[heute] ?? { w: 0, r: 0, v: 0 }
+  const tage = Object.keys(stand.verlauf ?? {})
+    .filter((t) => t !== heute)
+    .sort()
+    .slice(-29)
+  stand.verlauf = { ...Object.fromEntries(tage.map((t) => [t, stand.verlauf![t]])), [heute]: { w: Math.max(alt.w, w), r: alt.r + (richtig ? 1 : 0), v: alt.v + 1 } }
 }
 
 export const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM vok_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
@@ -1048,6 +1085,7 @@ export function abfrageAuswerten(
   if (ergebnis.urteil === 'richtig' && stand.ansehen?.includes(v.id)) stand.ansehen = stand.ansehen.filter((x) => x !== v.id)
   const heute = new Date(jetzt).toISOString().slice(0, 10)
   if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
+  verlaufEintragen(stand, heute, ergebnis.urteil === 'richtig')
   return { ergebnis, neu }
 }
 
@@ -1933,7 +1971,7 @@ export function vokabelnDerGruppe(
     /** Namen der Lernenden in der Reihenfolge von `abschnitte[].jeLernende` */
     lernendeNamen?: string[]
   }[]
-  jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }>
+  jePerson: Record<string, VokPerson>
   /** `kurs` und `id`: wo das Wort steht (erster offener Kurs) – „Im Kurs wiederholen" in „Meine Klassen" (09.10.2026) */
   wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string; betroffen: number; kurs: string; id: string }[]
   /** Alle Problemwörter der laufenden Kurse (je Sprache und Wort einmal) – `wackelig` zeigt höchstens 20 davon */
@@ -1947,7 +1985,7 @@ export function vokabelnDerGruppe(
   const zs = db()
     .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
-  const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null; reifSicher: number; reifGesamt: number }> = {}
+  const jePerson: Record<string, VokPerson> = {}
   // Problemwörter der Klasse (10.10.2026, früher „Wackelige Wörter" mit eigener Regel): die Problemwörter der laufenden
   // Kurse nach shared/problemWoerter.ts, je Sprache und Wort einmal. Rang: Test in den nächsten 14 Tagen → bei wie vielen
   // Kindern aktuell wackelig → wie oft falsch → Fehlerquote; für Vorschlag/Wiederholen höchstens 20, `problemZahl` = alle
@@ -1956,6 +1994,7 @@ export function vokabelnDerGruppe(
     { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string; betroffen: number; testBald: boolean; kurs: string }
   >()
   const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
+  const vor14 = new Date(jetzt - 14 * TAG).toISOString().slice(0, 10)
   const hinweisDaten: Record<string, { eingabe: KursHinweisEingabe; sprache: string; nutzer: NutzerInfo[]; quelle?: string; einzeln?: boolean }> = {}
   const trainings = zs.map((zVoll) => {
     // Kennzahlen nur über freigeschaltete Abschnitte (09.10.2026); die Abschnitts-Übersicht zeigt auch geplante
@@ -1999,9 +2038,35 @@ export function vokabelnDerGruppe(
       for (const t of st.tage) if (!ersterTag || t < ersterTag) ersterTag = t
       // Leerer Kurs (automatisch für die Klasse angelegt, 08.10.2026): kein Lernstand, kein „nicht geübt"
       if (offen && woerter.length) {
-        const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null, reifSicher: 0, reifGesamt: 0 })
+        const p = (jePerson[n.id] ??= {
+          sicher: 0,
+          gesamt: 0,
+          zuletzt: null,
+          reifSicher: 0,
+          reifGesamt: 0,
+          aufbau: 0,
+          neu: 0,
+          faellig: 0,
+          zielTage: [],
+          verlaufSeit: null,
+          r14: 0,
+          v14: 0
+        })
         p.sicher += u.sicher
         p.gesamt += u.gesamt
+        // Übersicht in „Meine Klassen" (28.10.2026, abgestimmt): im Aufbau, neu, fällig, Tagesziel-Tage, Trefferquote
+        p.aufbau += u.imAufbau
+        p.neu += u.neu
+        p.faellig += u.faellig
+        const ziel = tageszielVon(z)
+        for (const [tag, x] of Object.entries(st.verlauf ?? {})) {
+          if (!p.verlaufSeit || tag < p.verlaufSeit) p.verlaufSeit = tag
+          if (tag >= vor7 && x.w >= ziel && !p.zielTage.includes(tag)) p.zielTage.push(tag)
+          if (tag >= vor14) {
+            p.r14 += x.r
+            p.v14 += x.v
+          }
+        }
         if (reif.length) {
           p.reifSicher += reif.filter((v) => st.woerter[v.id] && istSicher(st.woerter[v.id])).length
           p.reifGesamt += reif.length

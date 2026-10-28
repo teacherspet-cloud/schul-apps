@@ -74,6 +74,7 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
         }),
         woerter: t.woerter,
         sicher: t.woerter ? t.sicherSchnitt : null,
+        ...(t.woerter ? { anteil: t.anteil, aktiv7: t.aktiv7 } : {}),
         lernende: t.lernende,
         testTermin,
         // Problemwörter (10.10.2026): dieselbe Zahl wie Kursseite und „Meine Klassen" (shared/problemWoerter.ts)

@@ -11,11 +11,14 @@ import { holen } from '../onlinetest/serverApi'
 import { notifyError } from '../../shared/util'
 import { LernendeAuszeichnung, type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
 import { ampel } from './MaterialListe'
+import type { VokabelStandZeile } from './LernendeTabelle'
+import { VokabelBalken } from '../../shared/components/VokabelBalken'
 
 interface Zeile {
   id: string
   name: string
   vokabelnSicher: number | null
+  vokabeln?: VokabelStandZeile | null
   grammatikSicher?: number | null
   zuletztGeuebt: string | null
   testSchnitt: number | null
@@ -96,12 +99,37 @@ export function LernendeDetails({
           )}
           <Table withRowBorders={false} verticalSpacing={4} data-lernende-details-stand>
             <Table.Tbody>
-              <Table.Tr>
-                <Table.Td fw={600}>Vokabeln sicher</Table.Td>
-                <Table.Td>
-                  <Anteil x={l.vokabelnSicher} />
-                </Table.Td>
-              </Table.Tr>
+              {l.vokabeln ? (
+                <>
+                  <Table.Tr>
+                    <Table.Td fw={600}>Vokabeln</Table.Td>
+                    <Table.Td>
+                      <VokabelBalken a={l.vokabeln} breite={120} />
+                    </Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={600}>Wiederholungen offen</Table.Td>
+                    <Table.Td>{l.vokabeln.faellig}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={600}>Tagesziel (7 Tage)</Table.Td>
+                    <Table.Td>{l.vokabeln.verlaufSeit ? `an ${l.vokabeln.zielTage7} Tagen erreicht` : 'wird ab dem nächsten Üben gezählt'}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={600}>Trefferquote (14 Tage)</Table.Td>
+                    <Table.Td>
+                      {l.vokabeln.treffer14 == null ? '–' : `${Math.round(l.vokabeln.treffer14 * 100)} % bei ${l.vokabeln.antworten14} Antworten`}
+                    </Table.Td>
+                  </Table.Tr>
+                </>
+              ) : (
+                <Table.Tr>
+                  <Table.Td fw={600}>Vokabeln sicher</Table.Td>
+                  <Table.Td>
+                    <Anteil x={l.vokabelnSicher} />
+                  </Table.Td>
+                </Table.Tr>
+              )}
               <Table.Tr>
                 <Table.Td fw={600}>Zuletzt geübt</Table.Td>
                 <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>

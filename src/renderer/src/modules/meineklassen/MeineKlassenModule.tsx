@@ -94,7 +94,8 @@ import { FachLernstand } from './FachLernstand'
 import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
-import { LernendeTabelle } from './LernendeTabelle'
+import { LernendeTabelle, type VokabelStandZeile } from './LernendeTabelle'
+import { VokabelBalken } from '../../shared/components/VokabelBalken'
 import { IservVorschlaege } from './IservVorschlaege'
 import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
 import { useEntwurfBedarf } from './kursBedarf'
@@ -109,6 +110,8 @@ interface FachKurz {
   bedarf: number
   vorschlaege: number
   vokabelnSicher: number | null
+  /** 28.10.2026: Schnitt je Kind für den dreiteiligen Balken */
+  vokabeln?: { sicher: number; aufbau: number; neu: number; aktiv7: number; lernende: number } | null
   testSchnitt: number | null
   tests: number
   reihen: number
@@ -151,7 +154,9 @@ interface KlasseDetail {
     benutzer: string
     /** Gast mit persönlichem Anmeldecode (Vokabeltraining), der Klasse zugeordnet (08.10.2026) */
     gast?: boolean
+    iserv?: boolean
     vokabelnSicher: number | null
+    vokabeln?: VokabelStandZeile | null
     grammatikSicher?: number | null
     zuletztGeuebt: string | null
     testSchnitt: number | null
@@ -487,10 +492,14 @@ function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): R
               <Badge variant="light" style={{ flexShrink: 0 }}>
                 {fachSchreibweise(f.fach)}
               </Badge>
-              {f.vokabelnSicher !== null && (
-                <Tooltip label={`Vokabeln ${prozent(f.vokabelnSicher)} sicher`}>
-                  <Progress value={f.vokabelnSicher * 100} size="sm" radius="xl" color={ampel(f.vokabelnSicher)} w={60} />
-                </Tooltip>
+              {f.vokabeln ? (
+                <VokabelBalken a={f.vokabeln} breite={60} schnitt titel="Vokabeln" rechts={<></>} />
+              ) : (
+                f.vokabelnSicher !== null && (
+                  <Tooltip label={`Vokabeln ${prozent(f.vokabelnSicher)} sicher`}>
+                    <Progress value={f.vokabelnSicher * 100} size="sm" radius="xl" color={ampel(f.vokabelnSicher)} w={60} />
+                  </Tooltip>
+                )
               )}
               <Text size="xs" c="dimmed" truncate>
                 {[

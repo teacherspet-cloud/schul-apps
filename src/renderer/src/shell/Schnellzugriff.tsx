@@ -38,6 +38,7 @@ import { AnzahlWahl, startKastenId, useStartAnzahl, useStartOffen } from './Star
 import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
+import { VokabelBalken } from '../shared/components/VokabelBalken'
 import { senden } from '../modules/onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../shared/util'
 
@@ -493,7 +494,27 @@ function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
               )}
             </Text>
           )}
-          {k.sicher !== null ? (
+          {k.anteil && k.woerter ? (
+            // Dreiteiliger Balken + „18/24 diese Woche geübt" (28.10.2026, abgestimmt) – statt nur „% sicher"
+            <Group gap={6} wrap="nowrap" mt={4} data-start-lernstand>
+              <VokabelBalken
+                a={{ sicher: k.anteil.sicher * k.woerter, aufbau: k.anteil.aufbau * k.woerter, neu: k.anteil.neu * k.woerter }}
+                breite="100%"
+                schnitt
+                titel={`${k.woerter} Wörter`}
+                rechts={<></>}
+              />
+              <Text
+                size="xs"
+                c={!k.lernende ? 'dimmed' : (k.aktiv7 ?? 0) * 2 >= k.lernende ? 'teal' : (k.aktiv7 ?? 0) ? 'yellow.8' : 'red'}
+                style={{ flex: 'none', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
+                title="Lernende, die in den letzten 7 Tagen Vokabeln geübt haben"
+                data-start-aktiv={k.aktiv7 ?? 0}
+              >
+                {k.aktiv7 ?? 0}/{k.lernende} diese Woche geübt
+              </Text>
+            </Group>
+          ) : k.sicher !== null ? (
             <Group gap={6} wrap="nowrap" mt={4}>
               <Progress value={k.sicher * 100} size="xs" color={ampelFarbe(k.sicher)} style={{ flex: 1 }} aria-label="sicher" />
               <Text size="xs" c="dimmed" w={36} ta="right" style={{ flex: 'none' }} data-start-sicher>

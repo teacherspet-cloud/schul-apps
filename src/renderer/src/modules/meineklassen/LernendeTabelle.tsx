@@ -12,14 +12,46 @@ import { IconArrowDown, IconArrowUp, IconBook2, IconClipboardCheck, IconFileText
 import { useMemo, useState } from 'react'
 import { AktiveFilter, NamenFolgeKnopf, SortKopf, useSortierTabelle, type Spalte } from '../../shared/components/SortierTabelle'
 import { CodezettelKnopf, GastFenster, useGaesteMitCode, type GastMitCode } from './LernendeCodes'
+import { begonnenAnteil, VokabelBalken } from '../../shared/components/VokabelBalken'
 import { LernendeAuszeichnung, type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
 import { ampel } from './MaterialListe'
+
+export interface VokabelStandZeile {
+  sicher: number
+  aufbau: number
+  neu: number
+  gesamt: number
+  /** Heute zur Wiederholung fällig */
+  faellig: number
+  /** Tage der letzten 7 mit erreichtem Tagesziel */
+  zielTage7: number
+  /** Seit wann der Tagesverlauf zählt (ISO-Tag; null = noch nichts gezählt) */
+  verlaufSeit: string | null
+  treffer14: number | null
+  antworten14: number
+}
+
+/** Viele offene Wiederholungen: ab so vielen gelb, ab doppelt so vielen rot (28.10.2026) */
+export const FAELLIG_VIELE = 15
+
+/** Ampel nach Regelmäßigkeit (28.10.2026, Entscheidung der Lehrkraft): Tage seit dem Üben und offene Wiederholungen */
+export function regelAmpel(tage: number | null, faellig = 0): string {
+  const nachTagen = uebenAmpel(tage)
+  if (nachTagen === 'gray') return 'gray'
+  if (nachTagen === 'red' || faellig >= 2 * FAELLIG_VIELE) return 'red'
+  if (nachTagen === 'yellow' || faellig >= FAELLIG_VIELE) return 'yellow'
+  return 'teal'
+}
 
 export interface LernendeZeile {
   id: string
   name: string
   gast?: boolean
+  /** Früher mit Code, jetzt über IServ angemeldet (Konten zusammengeführt) */
+  iserv?: boolean
   vokabelnSicher: number | null
+  /** Übersicht (28.10.2026, abgestimmt): Balken, Tagesziel, Trefferquote, Ampel nach Regelmäßigkeit */
+  vokabeln?: VokabelStandZeile | null
   grammatikSicher?: number | null
   zuletztGeuebt: string | null
   testSchnitt: number | null
@@ -104,6 +136,47 @@ function Punkt({ farbe, text, titel }: { farbe: string; text: string; titel?: st
   )
 }
 
+/** „5 von 7" Tage mit erreichtem Tagesziel (28.10.2026) – gezählt erst seit dem Tagesverlauf */
+function TageszielPille({ v }: { v?: VokabelStandZeile | null }): React.JSX.Element {
+  if (!v || !v.verlaufSeit)
+    return (
+      <Tooltip label="Wird ab dem nächsten Üben gezählt (seit 28.10.2026)" withinPortal>
+        <Text size="xs" c="dimmed">
+          –
+        </Text>
+      </Tooltip>
+    )
+  const tage = Math.min(7, Math.max(1, Math.floor((Date.now() - Date.parse(`${v.verlaufSeit}T00:00:00Z`)) / 864e5) + 1))
+  const farbe = v.zielTage7 * 2 >= tage ? 'teal' : v.zielTage7 ? 'yellow' : 'red'
+  return (
+    <Tooltip label={`Tagesziel an ${v.zielTage7} der letzten ${tage} Tage erreicht`} withinPortal>
+      <Badge size="sm" variant="light" color={farbe} style={{ fontVariantNumeric: 'tabular-nums' }} data-tagesziel={v.zielTage7}>
+        {v.zielTage7}/{tage}
+      </Badge>
+    </Tooltip>
+  )
+}
+
+/** Trefferquote der letzten 14 Tage (28.10.2026) */
+function TrefferPille({ v }: { v?: VokabelStandZeile | null }): React.JSX.Element {
+  if (!v || v.treffer14 == null)
+    return (
+      <Tooltip label="In den letzten 14 Tagen keine Antworten (gezählt seit 28.10.2026)" withinPortal>
+        <Text size="xs" c="dimmed">
+          –
+        </Text>
+      </Tooltip>
+    )
+  const q = v.treffer14
+  return (
+    <Tooltip label={`${Math.round(q * 100)} % richtig bei ${v.antworten14} Antworten in den letzten 14 Tagen`} withinPortal>
+      <Text size="xs" fw={600} c={q >= 0.8 ? 'teal' : q >= 0.6 ? 'yellow.8' : 'red'} style={{ fontVariantNumeric: 'tabular-nums' }} data-treffer={Math.round(q * 100)}>
+        {Math.round(q * 100)} %
+      </Text>
+    </Tooltip>
+  )
+}
+
 function TestPille({ l }: { l: LernendeZeile }): React.JSX.Element {
   if (!l.tests || l.testSchnitt == null)
     return (
@@ -161,7 +234,12 @@ export function LernendeTabelle({
     () =>
       [
         { id: 'name', label: 'Name', wert: (l: LernendeZeile) => l.name, namen: true, filter: 'text' as const },
-        zeigtVokabeln && { id: 'vokabeln', label: 'Vokabeln', wert: (l: LernendeZeile) => l.vokabelnSicher ?? -1, absteigend: true },
+        zeigtVokabeln && {
+          id: 'vokabeln',
+          label: 'Vokabeln',
+          wert: (l: LernendeZeile) => (l.vokabeln ? begonnenAnteil(l.vokabeln) + l.vokabeln.sicher / Math.max(1, l.vokabeln.gesamt) / 1000 : (l.vokabelnSicher ?? -1)),
+          absteigend: true
+        },
         zeigtVokabeln && {
           id: 'geuebt',
           label: 'Zuletzt geübt',
@@ -170,6 +248,8 @@ export function LernendeTabelle({
           filter: 'auswahl' as const,
           filterWert: (l: LernendeZeile) => uebenGruppe(tageSeit(l.zuletztGeuebt))
         },
+        zeigtVokabeln && { id: 'tagesziel', label: 'Tagesziel', wert: (l: LernendeZeile) => l.vokabeln?.zielTage7 ?? -1, absteigend: true },
+        zeigtVokabeln && { id: 'treffer', label: 'Treffer', wert: (l: LernendeZeile) => l.vokabeln?.treffer14 ?? -1, absteigend: true },
         zeigtGrammatik && { id: 'grammatik', label: 'Grammatik', wert: (l: LernendeZeile) => l.grammatikSicher ?? -1, absteigend: true },
         { id: 'tests', label: 'Tests', wert: (l: LernendeZeile) => (l.tests && l.testSchnitt != null ? l.testSchnitt : 99) },
         {
@@ -203,7 +283,14 @@ export function LernendeTabelle({
           {l.name}
         </Text>
       )}
-      {l.gast && (
+      {l.gast && l.iserv && (
+        <Tooltip label="Meldet sich über IServ an (früher mit Code – der Code gilt weiter)" withinPortal>
+          <Badge size="xs" variant="light" color="blue" data-mit-iserv>
+            IServ
+          </Badge>
+        </Tooltip>
+      )}
+      {l.gast && !l.iserv && (
         <Tooltip label="Meldet sich mit dem persönlichen Code vom Zettel an" withinPortal>
           <Badge size="xs" variant="light" color="gray" data-mit-anmeldecode>
             Code
@@ -214,8 +301,19 @@ export function LernendeTabelle({
   )
   const geuebt = (l: LernendeZeile): React.JSX.Element => {
     const tage = tageSeit(l.zuletztGeuebt)
-    return <Punkt farbe={uebenAmpel(tage)} text={uebenText(l.zuletztGeuebt)} titel={`Vokabeln zuletzt geübt: ${uebenText(l.zuletztGeuebt)}`} />
+    const f = l.vokabeln?.faellig ?? 0
+    return (
+      <Punkt
+        farbe={regelAmpel(tage, f)}
+        text={uebenText(l.zuletztGeuebt)}
+        titel={`Vokabeln zuletzt geübt: ${uebenText(l.zuletztGeuebt)}${f ? ` · ${f} Wiederholung${f === 1 ? '' : 'en'} offen` : ''}`}
+      />
+    )
   }
+  const vokabelZelle = (l: LernendeZeile): React.JSX.Element =>
+    l.vokabeln ? <VokabelBalken a={l.vokabeln} breite={72} titel="Vokabeln" /> : <MiniBalken x={l.vokabelnSicher} titel="Vokabeln" />
+  const tageszielZelle = (l: LernendeZeile): React.JSX.Element => <TageszielPille v={l.vokabeln} />
+  const trefferZelle = (l: LernendeZeile): React.JSX.Element => <TrefferPille v={l.vokabeln} />
   const reihenBlaetter = (l: LernendeZeile): React.JSX.Element => (
     <Group gap="sm" wrap="nowrap">
       {zeigtReihen && <MiniBalken x={l.reihenFortschritt} titel="Unterrichtsreihen" />}
@@ -270,7 +368,13 @@ export function LernendeTabelle({
               {zeigtVokabeln && (
                 <Group gap={4} wrap="nowrap">
                   <IconLanguage size={14} color="var(--mantine-color-dimmed)" />
-                  <MiniBalken x={l.vokabelnSicher} titel="Vokabeln" />
+                  {vokabelZelle(l)}
+                </Group>
+              )}
+              {zeigtVokabeln && (
+                <Group gap={8} wrap="nowrap">
+                  {tageszielZelle(l)}
+                  {trefferZelle(l)}
                 </Group>
               )}
               {zeigtGrammatik && (
@@ -322,12 +426,10 @@ export function LernendeTabelle({
             {t.sichtbar.map((l) => (
               <Table.Tr key={l.id} data-lernende-zeile={l.name}>
                 <Table.Td>{name(l)}</Table.Td>
-                {zeigtVokabeln && (
-                  <Table.Td>
-                    <MiniBalken x={l.vokabelnSicher} titel="Vokabeln" />
-                  </Table.Td>
-                )}
+                {zeigtVokabeln && <Table.Td>{vokabelZelle(l)}</Table.Td>}
                 {zeigtVokabeln && <Table.Td>{geuebt(l)}</Table.Td>}
+                {zeigtVokabeln && <Table.Td>{tageszielZelle(l)}</Table.Td>}
+                {zeigtVokabeln && <Table.Td>{trefferZelle(l)}</Table.Td>}
                 {zeigtGrammatik && (
                   <Table.Td>
                     <MiniBalken x={l.grammatikSicher} titel="Grammatik" />

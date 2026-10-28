@@ -230,7 +230,8 @@ try {
   pruefe(abschnittEn.includes('Green Line 1 · Unit 2 (Abschnitt 3 von 7)'), `Kurszeile: weitester Abschnitt „Green Line 1 · Unit 2 (Abschnitt 3 von 7)" (${abschnittEn})`)
   const abschnittFr = (await termineP.locator(`[data-start-kurs="${kursOhneTermin}"]`).innerText()).replace(/\s+/g, ' ')
   pruefe(abschnittFr.includes('Découvertes 2 · Unité 1') && !abschnittFr.includes('Abschnitt'), `Kurszeile Platzhalter-Lehrwerk ohne Fortschritt (${abschnittFr})`)
-  pruefe(/\d+ %/.test(await zeileEn.innerText()), 'Kurszeile mit „n %" (sicher)')
+  // Seit 28.10.2026 (abgestimmt): dreiteiliger Balken + „x/y diese Woche geübt" statt „% sicher"
+  pruefe(/\d+\/\d+ diese Woche geübt/.test(await zeileEn.innerText()) && (await zeileEn.locator('[data-vokabel-balken]').count()) === 1, 'Kurszeile mit Balken und „x/y diese Woche geübt"')
   const badgeEn = (await zeileEn.locator('[data-start-badge]').allInnerTexts()).map((x) => x.trim())
   pruefe(badgeEn.length === 1 && /^Test (heute|morgen|Mo|Di|Mi|Do|Fr|Sa|So)$/.test(badgeEn[0]), `Genau ein Abzeichen „Test …" (${badgeEn.join(' | ')})`)
   const zeilenAnzahl = await termineP.locator('[data-start-kurs]').count()
@@ -405,7 +406,10 @@ try {
   pruefe(await da(termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)), 'Smartphone: Kurs ohne Testtermin in „Termine & Vokabeltraining"')
   const zeileFr = termine.locator(`[data-start-kurs="${kursOhneTermin}"]`)
   const textFr = await zeileFr.innerText()
-  pruefe(textFr.includes(`${KLASSE} · Französisch`) && /\d+ %/.test(textFr) && !/heute geübt/.test(textFr), `Smartphone: Kurszeile „${KLASSE} · Französisch" mit „n %", ohne „heute geübt"`)
+  pruefe(
+    textFr.includes(`${KLASSE} · Französisch`) && /diese Woche geübt/.test(textFr) && !/heute geübt/.test(textFr),
+    `Smartphone: Kurszeile „${KLASSE} · Französisch" mit „diese Woche geübt", ohne „heute geübt"`
+  )
   pruefe((await zeileFr.locator('[data-start-badge]').count()) === 1, `Smartphone: Kurszeile mit genau einem Abzeichen (${await zeileFr.getAttribute('data-start-abzeichen')})`)
   pruefe((await termine.locator('[data-start-demnaechst]').count()) >= 1, 'Smartphone: „Demnächst" unter den Kursen')
   // Weitester Abschnitt (10.10.2026): auch am Smartphone in EINER Zeile (gekürzt mit „…"), voller Text im Tooltip
