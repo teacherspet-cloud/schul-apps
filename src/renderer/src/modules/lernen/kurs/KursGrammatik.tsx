@@ -1036,7 +1036,7 @@ export function UnterthemenFenster({ g, schliessen, fertig }: { g: GrammatikZeil
           anhaken, der Lernstand gilt dann weiter.
         </Text>
         <Group gap={6}>
-          <Button size="compact-xs" variant="light" onClick={() => setWahl(alle.filter((k) => !zahlen || anzahl(k) > 0))} data-unterthemen-alle>
+          <Button size="compact-xs" variant="light" onClick={() => setWahl(alle)} data-unterthemen-alle>
             Alle
           </Button>
           <Button size="compact-xs" variant="light" color="gray" onClick={() => setWahl([])} data-unterthemen-keine>
@@ -1054,7 +1054,6 @@ export function UnterthemenFenster({ g, schliessen, fertig }: { g: GrammatikZeil
                 <Checkbox
                   key={k}
                   checked={wahl.includes(k)}
-                  disabled={!n && !wahl.includes(k)}
                   onChange={() => setWahl((w) => (w.includes(k) ? w.filter((x) => x !== k) : [...w, k]))}
                   data-unterthema={k}
                   label={
@@ -1063,7 +1062,7 @@ export function UnterthemenFenster({ g, schliessen, fertig }: { g: GrammatikZeil
                         {name.includes(': ') ? name.slice(name.indexOf(': ') + 2) : name}
                       </Text>
                       <Text size="xs" span c="dimmed">
-                        {n ? `${n} Aufgaben` : 'keine Aufgaben hinterlegt'}
+                        {n ? `${n} Aufgaben` : 'noch keine Aufgaben hinterlegt – kommen automatisch dazu, sobald welche hinterlegt sind'}
                       </Text>
                     </Group>
                   }
