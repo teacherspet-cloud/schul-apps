@@ -546,7 +546,8 @@ export function freiwilligeWoerter(liste: Vokabel[], staende: Record<string, Wor
     const s = st(v)
     // Heute daneben: heute geübt und danach noch fällig (richtig Beantwortete sind erst morgen wieder dran)
     const heuteDaneben = tagVon(s.zuletzt) === heute && s.faellig <= jetzt
-    return heuteDaneben ? 0 : s.fach <= 2 ? 1 : 2
+    // Danach fällige Wiederholungen (28.10.2026: was nach dem Tagesziel noch fällig ist, kommt freiwillig zuerst dran)
+    return heuteDaneben ? 0 : s.faellig <= jetzt ? 1 : s.fach <= 2 ? 2 : 3
   }
   return geuebt
     .map((v) => ({ v, r: rang(v), z: streu(`${heute}|${v.id}|frei`) }))
@@ -641,7 +642,15 @@ export const SCHRITT = 10
 export const rundenGrenze = (ziel: number): number => Math.max(SCHRITT, Math.round(ziel) || 0)
 export function tagesRunde(liste: Vokabel[], staende: Record<string, WortStand>, jetzt = Date.now(), ziel = NEU_JE_TAG): { woerter: Vokabel[]; extra: number } {
   const alle = sitzungsWoerter(liste, staende, jetzt, ziel, Number.MAX_SAFE_INTEGER)
-  const grenze = rundenGrenze(ziel)
+  /*
+   * Heute schon Geübtes zählt auf das Tagesziel (28.10.2026, Befund der Lehrkraft: „Heute üben · 20 Wörter“ blieb nach dem
+   * Üben bei 20 – bei allen Lernenden). Bisher füllte sich die Runde aus den übrigen fälligen Wiederholungen immer wieder
+   * auf das Tagesziel auf (am Schulserver hatten viele noch 30–110 fällige Wörter aus den Vortagen). Jetzt ist die Ration
+   * nach so vielen geübten Wörtern geschafft; die übrigen Wiederholungen bleiben freiwillig („extra“) und kommen morgen zuerst.
+   */
+  const heute = tagVon(jetzt)
+  const schonGeuebt = liste.filter((v) => (staende[v.id]?.zuletzt ?? 0) > 0 && tagVon(staende[v.id].zuletzt) === heute).length
+  const grenze = Math.max(0, rundenGrenze(ziel) - schonGeuebt)
   const woerter = alle.slice(0, grenze)
   const neuIds = new Set(neueWoerter(liste, staende, jetzt).map((v) => v.id))
   return { woerter, extra: alle.slice(grenze).filter((v) => !neuIds.has(v.id)).length }

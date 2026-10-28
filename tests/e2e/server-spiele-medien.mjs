@@ -281,7 +281,8 @@ try {
   const r2 = await ant('v5', 'frei', 'to täke')
   pruefe(r1.stand?.fach === 2 && r2.urteil === 'fast' && r2.stand?.fach === 2, `„to take" in Fach 2 und fällig (${r1.stand?.fach}, ${r2.urteil})`)
   await s.goto(`${A}/s/v/${vok.id}`)
-  await s.locator('[data-vokabel-start]').click()
+  // Seit 28.10.2026 zählt heute Geübtes auf das Tagesziel – ist die Runde geschafft, kommt das Fällige über „Freiwillig weiter üben“ (zuerst)
+  await s.locator('[data-vokabel-start], [data-freiwillig-ueben]').first().click()
   await s.locator('[data-sitzung]').waitFor()
   let nachfrage = false
   for (let i = 0; i < 80 && !nachfrage; i++) {
