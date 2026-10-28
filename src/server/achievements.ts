@@ -482,6 +482,8 @@ export function achievementsAuswerten(ich: NutzerInfo, jetzt = Date.now()): Prom
     if ((d.ausz.regel ?? 0) < AUSZ_REGEL) phantomEntfernen(d, kurse)
     // Regelstand 3 (13.10.2026): die alten Grammatik-Trainings sind gelöscht – ihre Achievements fallen still weg
     if ((d.ausz.regel ?? 0) < 3) grammatikAltEntfernen(d)
+    // Regelstand 4 (28.10.2026): Grammatik-Neubeginn – Aufgabenbank und Kurs-Trainings gelöscht, Grammatik-Achievements still weg
+    if ((d.ausz.regel ?? 0) < 4) grammatikAltEntfernen(d)
     const eingaben = sprachEingaben(kurse, ws, gr, d, schuljahr, baende)
     const frischUebernommen = !d.uebernommen
     if (!d.uebernommen) uebernehmen(d, eingaben, spiele, jetzt, schuljahr)

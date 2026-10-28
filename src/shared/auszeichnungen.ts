@@ -995,7 +995,7 @@ export function zaehlerAusAlt(
  * 3 (13.10.2026, Entscheidung der Lehrkraft): Grammatik in Prozent des ganzen Bands (Aufgabenbank); die alten
  * Grammatik-Trainings wurden gelöscht – Grammatik-Medaillen und -Achievements still auf den neuen Stand (meist null).
  */
-export const AUSZ_REGEL = 3
+export const AUSZ_REGEL = 4
 
 /**
  * Einmalige, stille Berichtigung (12.10.2026, Entscheidung der Lehrkraft): Medaillen der Reihe des laufenden

@@ -7,18 +7,13 @@ import { bankEintraege, bankGrundbestand } from '../src/server/grammatikBank'
 import { bankFortschritt, geplanteAnfragen } from '../src/renderer/src/modules/grammatikformen/bank'
 
 describe('Grammatik-Aufgabenbank: Grundbestand', () => {
-  it('spielt die mitgelieferte Bank in eine leere Datenbank ein – nur einmal', () => {
+  // Grammatik-Neubeginn (28.10.2026): der Grundbestand vom 19.10.2026 ist nicht mehr dabei – neue Server starten leer
+  it('ohne mitgelieferte Bank bleibt eine neue Datenbank leer', () => {
     setzeSchluesselFuerTests(randomBytes(32))
     const d = datenbankFuerTests()
-    const n = bankGrundbestand()
-    expect(n).toBeGreaterThan(40000)
-    expect((d.prepare('SELECT COUNT(*) AS n FROM gram_bank').get() as { n: number }).n).toBe(n)
-    // verschlüsselt gespeichert, entschlüsselt gelesen
-    const roh = d.prepare('SELECT schluessel FROM gram_bank_regel LIMIT 1').get() as { schluessel: string }
-    expect(bankEintraege([roh.schluessel]).length).toBe(1)
-    d.prepare('DELETE FROM gram_bank').run()
-    d.prepare('DELETE FROM gram_bank_regel').run()
     expect(bankGrundbestand()).toBe(0)
+    expect((d.prepare('SELECT COUNT(*) AS n FROM gram_bank').get() as { n: number }).n).toBe(0)
+    expect(bankEintraege(['en.verb.modals_basic/can'])).toEqual([])
   })
 })
 

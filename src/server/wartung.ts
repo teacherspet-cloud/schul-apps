@@ -23,6 +23,7 @@ import { NAMEN_KORRIGIEREN } from './wartungGastname'
 import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { GRAMMATIK_BANK_LOESCHEN } from './wartungBankLoeschen'
+import { GRAMMATIK_NEUBEGINN } from './wartungGrammatikNeubeginn'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
@@ -175,7 +176,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Alle bisherigen Grammatik-Trainings samt Lernstand löschen – Aufgabenbank statt Pools je Kurs (13.10.2026, von der Lehrkraft gewünscht; wartungGrammatikAlle.ts)
   GRAMMATIK_ALLE,
   // Aufgabenbank der Grammatik und die Kurs-Trainings daraus löschen (13.10.2026, von der Lehrkraft gewünscht; wartungBankLoeschen.ts)
-  GRAMMATIK_BANK_LOESCHEN
+  GRAMMATIK_BANK_LOESCHEN,
+  // Grammatik-Neubeginn: Aufgabenbank und alle Kurs-Trainings samt Lernstand löschen (28.10.2026, von der Lehrkraft gewünscht; Sicherung vorher heruntergeladen)
+  GRAMMATIK_NEUBEGINN
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {
