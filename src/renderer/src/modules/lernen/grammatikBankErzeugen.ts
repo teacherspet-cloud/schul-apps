@@ -19,6 +19,7 @@ import {
   type Stufe,
   type Uebung,
   UEBUNGEN,
+  zielJeFeld,
   ALTERNATIVEN_ARTEN,
   alternativePasst,
   loesungenZusammenfuehren,
@@ -26,6 +27,7 @@ import {
 } from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
+import { designFuer, designText } from '@shared/grammatikDesign'
 import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
 
@@ -54,6 +56,8 @@ export interface BankAuftrag {
   /** Welche Übungsarten und wie viele je Art */
   uebungen: Uebung[]
   anzahl: number
+  /** Je Übungsart, wie viele noch fehlen (28.10.2026) – sonst höchstens das Ziel der Übungsart plus eine */
+  jeUebung?: Partial<Record<Uebung, number>>
   /** Stufe der Aufgaben (13.10.2026): grundlegend, mittel, anspruchsvoll – ohne Angabe mittel */
   niveau?: Stufe
   /** Gemischt: die Formen, die zusammen geübt werden (Bezeichnungen) */
@@ -82,7 +86,8 @@ export interface BankBericht extends PruefBericht {
 }
 
 const istLatein = (a: Pick<BankAuftrag, 'sprache' | 'fach'>): boolean => a.sprache === 'la' || /latein/i.test(a.fach)
-const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'zuordnen', 'richtigfalsch']
+// Neubeginn 28.10.2026: dazu Lückentext, Sätze verbinden, Frage bilden, Markieren, Sortieren, Mehrfachauswahl
+const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'zuordnen', 'richtigfalsch', 'lueckentext', 'verbinden', 'frage', 'markieren', 'sortieren', 'mehrfach']
 const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetzen', 'auswahl', 'zuordnen', 'richtigfalsch']
 
 /** Vorläufige Kennung neuer Aufgaben (der Server vergibt beim Speichern die feste „b…") */
@@ -100,9 +105,13 @@ export async function erzeugeBankAufgaben(
   const bekannt = bekanntNachStand(a.lehrwerk?.buch ? a.lehrwerk : undefined, a.jahrgang)
   const gesperrt = sprache ? sperreFuer({ bekannt, themen: a.themenIds, thema: a.titel, sprache }) : []
   const uebungen = a.uebungen.length ? a.uebungen : (['erkennen', 'bilden', 'anwenden'] as Uebung[])
-  const anzahl = Math.max(2, Math.min(12, Math.round(a.anzahl)))
+  const anzahl = Math.max(1, Math.min(12, Math.round(a.anzahl)))
+  // Je Übungsart (28.10.2026, weniger Übungen): was ihr fehlt, sonst ihr Ziel (4/4/3/1/1) plus eine als Puffer für die Prüfung
+  const zahlVon = (u: Uebung): number => Math.max(1, Math.min(8, a.jeUebung?.[u] ?? Math.min(anzahl, zielJeFeld(u) + 1)))
   const regelId = regelIdVon(a.schluessel)
-  melde(`Die KI schreibt ${uebungen.length * anzahl} Aufgaben zu „${a.titel}" …`)
+  // Übungsdesign der Form aus der Recherche (nur Englisch, nur bei einer einzelnen Form)
+  const design = latein || a.formen?.length ? null : await designFuer(a.schluessel).catch(() => null)
+  melde(`Die KI schreibt ${uebungen.reduce((n, u) => n + zahlVon(u), 0)} Aufgaben zu „${a.titel}" …`)
   const roh = await ai<{ regel: BankRegel; aufgaben: Record<string, unknown>[] }>({
     schemaName: 'grammatik_bank',
     system: [
@@ -111,8 +120,11 @@ export async function erzeugeBankAufgaben(
       a.regel
         ? 'Die Regelkarte steht schon fest (unten) – gib sie unverändert zurück.'
         : 'Regelkarte: EINE kurze Karte – Titel, Erklärung in 2–4 Sätzen auf Deutsch (altersgerecht), 2–3 Beispiele in der Zielsprache.',
-      `Aufgaben: je Übungsart GENAU ${anzahl}, jede mit „uebung":`,
-      ...uebungen.map((u) => `- ${u} (${UEBUNG_NAME[u]}): ${UEBUNG_TEXT[u]}${latein ? '' : `; Aufgabenarten: ${UEBUNG_ARTEN[u].join(', ')}`}`),
+      'Aufgaben, jede mit „uebung“ (genaue Zahl je Übungsart):',
+      ...uebungen.map((u) => `- ${u} (${UEBUNG_NAME[u]}): GENAU ${zahlVon(u)} – ${UEBUNG_TEXT[u]}${latein ? '' : `; Aufgabenarten: ${UEBUNG_ARTEN[u].join(', ')}`}`),
+      a.formen?.length
+        ? 'Gemischte Übung: vor allem Lückentexte und Dialoge („lueckentext“), in denen die Formen nebeneinander vorkommen und der Zusammenhang jede Lücke festlegt; beim Unterscheiden die Formen gegeneinander.'
+        : '',
       `SCHWIERIGKEIT dieser Aufgaben: ${STUFE_TEXT[a.niveau ?? 'm']} – relativ zum Niveau der Klasse.`,
       'Innerhalb jeder Übungsart vom Leichteren zum Schwereren.',
       latein
@@ -140,6 +152,7 @@ export async function erzeugeBankAufgaben(
       `Zielsprache: ${a.sprache}`,
       a.hinweise ? `\nAngaben aus dem Katalog:\n${a.hinweise}` : '',
       a.regel ? `\nRegelkarte: ${a.regel.titel} – ${a.regel.erklaerung} (z. B. ${a.regel.beispiele.slice(0, 3).join('; ')})` : '',
+      design ? `\n${designText(design)}` : '',
       a.vorhanden.length ? `\nSchon hinterlegt (nicht wiederholen):\n${a.vorhanden.slice(0, 80).join('\n')}` : ''
     ]
       .filter(Boolean)
@@ -151,15 +164,28 @@ export async function erzeugeBankAufgaben(
           uebung: { type: 'string', enum: uebungen },
           art: { type: 'string', enum: latein ? ARTEN_LATEIN : ARTEN_ALLGEMEIN },
           anweisung: S('kurze Arbeitsanweisung auf Deutsch'),
-          satz: S('luecke/auswahl: Satz mit genau einer Lücke „___" (Auswahl zwischen ganzen Sätzen: nur „___"); umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; satzbau: leer'),
+          satz: S(
+            'luecke/auswahl: Satz mit genau einer Lücke „___" (Auswahl zwischen ganzen Sätzen: nur „___"); umformen: Ausgangssatz; fehler: Satz mit GENAU EINEM Grammatikfehler; lueckentext: der Text mit 3–6 „___“ (Dialog: Zeilen „A: …“, „B: …“); verbinden: die zwei Sätze; frage: die Antwort; markieren: der Text; satzbau/zuordnen/sortieren: leer'
+          ),
+          kontext: S('1–3 Sätze Vorlauf (Situation, Zeit), wenn der Satz allein die Form nicht festlegt; sonst leer'),
+          anfang: S('umformen/verbinden/frage: vorgegebener Satzanfang; sonst leer'),
+          kommaPruefen: { type: 'boolean', description: 'true nur, wenn die geübte Grammatik eine Kommaregel ist' },
+          luecken: A(
+            O({ vorgabe: S('Grundwort in Klammern bzw. leer'), loesungen: A(S(), 'alle richtigen'), optionen: A(S(), 'Auswahl für diese Lücke bzw. leer') }),
+            'lueckentext: je „___“ eine Lücke in Reihenfolge; sonst leer'
+          ),
+          wortkasten: A(S(), 'lueckentext: Wörter zum Einsetzen, jedes passt genau einmal; sonst leer'),
+          zielWoerter: A(S(), 'markieren: die zu markierenden Wörter genau wie im Text; sonst leer'),
+          gruppen: A(S(), 'sortieren: 2–3 Gruppennamen; sonst leer'),
+          elemente: A(O({ text: S(), gruppe: { type: 'integer' } }), 'sortieren: 6–8 Elemente mit Gruppennummer (0 = erste); sonst leer'),
           vorgabe: S('luecke: das Grundwort in Klammern, aus dem die Lösung gebildet wird – nie die Lösung selbst; umformen: die Zielform bzw. was zu tun ist; sonst leer'),
           loesungen: A(S(), 'alle richtigen Antworten'),
-          optionen: A(S(), 'auswahl: 3–4 Möglichkeiten; sonst leer'),
+          optionen: A(S(), 'auswahl: 3–4 Möglichkeiten; mehrfach: 4–5 Möglichkeiten; sonst leer'),
           fehlerWort: S('fehler: das falsche Wort GENAU wie im Satz; sonst leer'),
           teile: A(S(), 'satzbau: Teile in RICHTIGER Reihenfolge; sonst leer'),
           paare: A(O({ links: S('linke Hälfte'), rechts: S('passende rechte Hälfte') }), 'zuordnen: 3–5 Paare in richtiger Zuordnung; sonst leer'),
           korrekt: { type: 'boolean', description: 'richtigfalsch: true = der Satz ist richtig; sonst false' },
-          erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form')
+          erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form – die Lernenden sehen ihn nach der Antwort')
         })
       )
     })

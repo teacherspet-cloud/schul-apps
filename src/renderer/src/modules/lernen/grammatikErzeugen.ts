@@ -451,6 +451,7 @@ export async function gepruefterPool(
         loesungen: string[]
         optionen: string[]
         fehlerWort: string
+        luecken?: string[][]
         zuLeicht?: boolean
         lesarten?: string[][]
         zellen?: string[][]
@@ -493,7 +494,15 @@ export async function gepruefterPool(
                     .map((z) => `${z.name}: ${z.loesungen.map((l, j) => (z.vorgabe?.[j] ? `[${l}]` : l)).join(' | ')}`)
                     .join('; ')}`
                 : ''
-            }${x.vorgabe ? `\nVorgabe: ${x.vorgabe}` : ''}${x.optionen?.length ? `\nMöglichkeiten: ${x.optionen.join(' | ')}` : ''}${
+            }${x.kontext ? `\nKontext: ${x.kontext}` : ''}${x.anfang ? `\nSatzanfang: ${x.anfang}` : ''}${
+              x.luecken?.length
+                ? `\nLücken: ${x.luecken
+                    .map((l, j) => `(${j + 1}) ${l.vorgabe ?? ''}${l.optionen?.length ? ` [${l.optionen.join(' / ')}]` : ''} → ${l.loesungen.join(' | ')}`)
+                    .join('; ')}`
+                : ''
+            }${x.elemente?.length ? `\nGruppen: ${(x.gruppen ?? []).map((g, j) => `${j}=${g}`).join(', ')}; Elemente: ${x.elemente.map((e) => `${e.text}→${e.gruppe}`).join(', ')}` : ''}${
+              x.vorgabe ? `\nVorgabe: ${x.vorgabe}` : ''
+            }${x.optionen?.length ? `\nMöglichkeiten: ${x.optionen.join(' | ')}` : ''}${
               x.fehlerWort ? `\nFehlerwort: ${x.fehlerWort}` : ''
             }${x.teile?.length ? `\nTeile: ${x.teile.join(' | ')}` : ''}\nLösungen: ${x.loesungen.join(' | ')}`
         )
@@ -506,6 +515,7 @@ export async function gepruefterPool(
             loesungen: A(S()),
             optionen: A(S()),
             fehlerWort: S(),
+            luecken: A(A(S()), 'lueckentext: je Lücke die korrigierte Liste aller richtigen Antworten; sonst leer'),
             ...(ger ? { zuLeicht: { type: 'boolean' } } : {}),
             ...(latein ? { lesarten: A(A(S())), zellen: A(A(S())) } : {}),
             grund: S()
@@ -535,6 +545,10 @@ export async function gepruefterPool(
               loesungen: u.loesungen?.length ? u.loesungen : x.loesungen,
               ...(x.art === 'auswahl' && u.optionen?.length ? { optionen: u.optionen } : {}),
               ...(x.art === 'fehler' && u.fehlerWort ? { fehlerWort: u.fehlerWort } : {}),
+              // Lückentext (28.10.2026): je Lücke korrigierte Lösungen, nur wenn die Zahl der Lücken stimmt
+              ...(x.art === 'lueckentext' && x.luecken && u.luecken?.length === x.luecken.length && u.luecken.every((l) => Array.isArray(l) && l.length)
+                ? { luecken: x.luecken.map((l, j) => ({ ...l, loesungen: u.luecken![j].map(String) })) }
+                : {}),
               ...(x.art === 'mehrfach' && u.optionen?.length ? { optionen: u.optionen } : {}),
               // Nur übernehmen, wenn jede Lesart je Merkmal einen Wert hat (Praxislauf 07.10.2026: „1. Sg." zusammengezogen)
               ...(x.art === 'bestimmen' && u.lesarten?.length && u.lesarten.every((l) => l.length === (x.merkmale?.length ?? 0))

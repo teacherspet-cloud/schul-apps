@@ -32,7 +32,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import {
   AUFGABEN_JE_FELD,
-  MIN_JE_UEBUNG,
+  zielJeFeld,
   istKern,
   istMix,
   aufgabeKern,
@@ -312,7 +312,7 @@ export function BankKarte({
                         <Stack gap={2}>
                           <Text size="xs" fw={600}>
                             {stand === 'genug' ? 'Genug zum Üben. Für „vollständig“' : 'Für Lernende noch zu wenig. Für „vollständig“'} fehlen (Ziel je
-                            Übungsart und Stufe: {AUFGABEN_JE_FELD}; zum Üben reichen je Stufe {MIN_JE_UEBUNG} in Erkennen, Bilden und Anwenden):
+                            Stufe: 4 Erkennen, 4 Bilden, 3 Anwenden, je 1 Unterscheiden und Fehler finden; zum Üben reicht je Kern-Übungsart höchstens eine weniger):
                           </Text>
                           {fehlt.map((z0) => (
                             <Text key={z0} size="xs">
@@ -477,10 +477,10 @@ export function BankKarte({
                       return (
                         <Tooltip
                           key={st}
-                          label={`${UEBUNG_NAME[u]}, ${STUFE_NAME[st]}: ${n} von ${AUFGABEN_JE_FELD}${dazu ? ` (+${dazu} zum Durchsehen)` : ''}`}
+                          label={`${UEBUNG_NAME[u]}, ${STUFE_NAME[st]}: ${n} von ${zielJeFeld(u)}${dazu ? ` (+${dazu} zum Durchsehen)` : ''}`}
                         >
                           <div style={{ flex: 1 }} data-bank-feld={`${u}-${st}`}>
-                            <Progress value={Math.min(100, (n / AUFGABEN_JE_FELD) * 100)} color={istKern(u) ? farbe : 'orange'} size="sm" />
+                            <Progress value={Math.min(100, (n / zielJeFeld(u)) * 100)} color={istKern(u) ? farbe : 'orange'} size="sm" />
                             <Text size="10px" c="dimmed" ta="center">
                               {n}
                               {dazu ? ` +${dazu}` : ''}
@@ -512,7 +512,7 @@ export function BankKarte({
                     <Tooltip
                       label={
                         fehlend.length
-                          ? `Füllt fehlende Felder auf je ${AUFGABEN_JE_FELD} Aufgaben auf (${fehlend.map((f) => STUFE_NAME[f.stufe]).join(', ')})`
+                          ? `Füllt fehlende Felder auf (je Stufe 4 Erkennen, 4 Bilden, 3 Anwenden, je 1 Unterscheiden und Fehler finden; ${fehlend.map((f) => STUFE_NAME[f.stufe]).join(', ')})`
                           : 'Alle Übungsarten haben genug Aufgaben'
                       }
                     >

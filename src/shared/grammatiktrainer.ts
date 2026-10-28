@@ -28,6 +28,12 @@ export type AufgabenArt =
   | 'uebersetzen'
   | 'zuordnen'
   | 'richtigfalsch'
+  // Grammatik-Neubeginn (28.10.2026, abgestimmt nach Recherche): Kontext statt Einzelsatz, Sätze verbinden, Erkennen-Formate
+  | 'lueckentext'
+  | 'verbinden'
+  | 'frage'
+  | 'markieren'
+  | 'sortieren'
 
 /*
  * Zwei weitere Arten ohne KI (26.10.2026, Entscheidung der Lehrkraft):
@@ -118,6 +124,24 @@ export interface GrammatikAufgabe {
    * zurückgestellt ist (Mangel nach den Regeln oder Befund der Prüfung) – bis sie überarbeitet ist
    */
   pruefen?: string
+  /**
+   * Neue Formate (28.10.2026, Grammatik-Neubeginn – shared/grammatikAufgabenRegeln.ts):
+   *  - kontext: 1–3 Sätze Vorlauf vor der eigentlichen Aufgabe (Situation, Zeit) – legt die Form fest
+   *  - anfang: vorgegebener Satzanfang beim Tippen ganzer Sätze (umformen, verbinden, frage)
+   *  - kommaPruefen: Kommas zählen (nur, wenn die geübte Grammatik eine Kommaregel ist) – sonst tolerant
+   *  - lueckentext: `satz` ist ein kurzer Text (auch Dialog mit Zeilen) mit mehreren „___“, je Lücke `luecken[i]`
+   *  - wortkasten: Wörter zum Einsetzen (jedes passt genau einmal)
+   *  - markieren: in `satz` die Wörter mit den Nummern `ziele` (woerterVon) antippen
+   *  - sortieren: `elemente` in `gruppen` ziehen
+   */
+  kontext?: string
+  anfang?: string
+  kommaPruefen?: boolean
+  luecken?: { vorgabe?: string; loesungen: string[]; optionen?: string[] }[]
+  wortkasten?: string[]
+  ziele?: number[]
+  gruppen?: string[]
+  elemente?: { text: string; gruppe: number }[]
 }
 
 export interface GrammatikPaket {
@@ -146,7 +170,12 @@ export const ARTEN: AufgabenArt[] = [
   'tabelle',
   'uebersetzen',
   'zuordnen',
-  'richtigfalsch'
+  'richtigfalsch',
+  'lueckentext',
+  'verbinden',
+  'frage',
+  'markieren',
+  'sortieren'
 ]
 export const ART_NAME: Record<AufgabenArt, string> = {
   luecke: 'Lücke',
@@ -159,8 +188,16 @@ export const ART_NAME: Record<AufgabenArt, string> = {
   tabelle: 'Tabelle',
   uebersetzen: 'Übersetzen',
   zuordnen: 'Zuordnen',
-  richtigfalsch: 'Richtig oder falsch'
+  richtigfalsch: 'Richtig oder falsch',
+  lueckentext: 'Lückentext',
+  verbinden: 'Sätze verbinden',
+  frage: 'Frage bilden',
+  markieren: 'Markieren',
+  sortieren: 'Sortieren'
 }
+
+/** Arten, bei denen ganze Sätze getippt werden – dort gilt die Komma-Toleranz (28.10.2026, Entscheidung der Lehrkraft) */
+export const SATZ_ARTEN: readonly AufgabenArt[] = ['umformen', 'verbinden', 'frage']
 
 const text = (x: unknown, n = 400): string =>
   String(x ?? '')
@@ -245,7 +282,10 @@ export function paketBereinigt(
       ...(text(y.tipp, 300) ? { tipp: text(y.tipp, 300) } : {}),
       ...(UEBUNG_WERTE.includes(String(y.uebung)) ? { uebung: y.uebung as Uebung } : {}),
       ...(y.niveau === 'g' || y.niveau === 'm' || y.niveau === 'a' ? { niveau: y.niveau } : {}),
-      ...(text(y.pruefen, 300) ? { pruefen: text(y.pruefen, 300) } : {})
+      ...(text(y.pruefen, 300) ? { pruefen: text(y.pruefen, 300) } : {}),
+      ...(text(y.kontext, 600) ? { kontext: text(y.kontext, 600) } : {}),
+      ...(text(y.anfang, 160) ? { anfang: text(y.anfang, 160) } : {}),
+      ...(y.kommaPruefen === true ? { kommaPruefen: true } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
     if (art === 'bestimmen') {
@@ -317,8 +357,47 @@ export function paketBereinigt(
         if (!a.fehlerWort || !woerterVon(a.satz).some((w) => gleich(w, a.fehlerWort!)) || !a.loesungen.length) continue
       }
     }
+    // Neue Formate (28.10.2026)
+    if (art === 'lueckentext') {
+      a.satz = text(y.satz, 1600)
+      a.luecken = (Array.isArray(y.luecken) ? y.luecken : []).slice(0, 10).map((l) => {
+        const q = (l ?? {}) as Record<string, unknown>
+        return {
+          ...(text(q.vorgabe, 80) ? { vorgabe: text(q.vorgabe, 80) } : {}),
+          loesungen: liste(q.loesungen, 6, 120),
+          ...(liste(q.optionen, 5, 80).length >= 2 ? { optionen: liste(q.optionen, 5, 80) } : {})
+        }
+      })
+      const wk = liste(y.wortkasten, 12, 60)
+      if (wk.length) a.wortkasten = wk
+      const n = (a.satz.match(/___/g) ?? []).length
+      if (n < 2 || n !== a.luecken.length || a.luecken.some((l) => !l.loesungen.length)) continue
+      a.loesungen = [a.luecken.map((l) => l.loesungen[0]).join(' | ')]
+    }
+    if (art === 'verbinden' || art === 'frage') a.satz = text(y.satz, 600)
+    if (art === 'markieren') {
+      const n = woerterVon(a.satz).length
+      a.ziele = [...new Set((Array.isArray(y.ziele) ? y.ziele : []).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < n))].slice(0, 12)
+      // Die KI nennt die Wörter selbst („zielWoerter“) – sicherer als Nummern; jedes Vorkommen im Text zählt
+      const zw = liste(y.zielWoerter, 12, 60).map(normiert)
+      if (!a.ziele.length && zw.length) a.ziele = woerterVon(a.satz).flatMap((w, i) => (zw.includes(normiert(w)) ? [i] : [])).slice(0, 12)
+      if (!a.ziele.length) continue
+      a.loesungen = [a.ziele.map((i) => woerterVon(a.satz)[i]).join(' | ')]
+    }
+    if (art === 'sortieren') {
+      a.gruppen = liste(y.gruppen, 4, 40)
+      a.elemente = (Array.isArray(y.elemente) ? y.elemente : [])
+        .map((e) => {
+          const q = (e ?? {}) as Record<string, unknown>
+          return { text: text(q.text, 80), gruppe: Number(q.gruppe) }
+        })
+        .filter((e) => e.text && Number.isInteger(e.gruppe) && e.gruppe >= 0 && e.gruppe < (a.gruppen?.length ?? 0))
+        .slice(0, 10)
+      if (a.gruppen.length < 2 || a.elemente.length < 4) continue
+      a.loesungen = [a.gruppen.map((g, i) => `${g}: ${a.elemente!.filter((e) => e.gruppe === i).map((e) => e.text).join(', ')}`).join(' | ')]
+    }
     if (art === 'uebersetzen' && !a.satz) continue
-    if (!a.satz && art !== 'satzbau' && art !== 'bestimmen' && art !== 'tabelle' && art !== 'mehrfach' && art !== 'zuordnen') continue
+    if (!a.satz && art !== 'satzbau' && art !== 'bestimmen' && art !== 'tabelle' && art !== 'mehrfach' && art !== 'zuordnen' && art !== 'sortieren') continue
     if (!a.loesungen.length) continue
     if ((art === 'luecke' || art === 'auswahl') && !a.satz.includes('___')) continue
     if (art === 'auswahl' && (!a.optionen || a.optionen.length < 2 || !a.optionen.some((o) => gleich(o, a.loesungen[0])))) continue
@@ -516,6 +595,39 @@ export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltes
     const wortPasst = Boolean(a.fehlerWort) && gleich(String(w.wort ?? ''), a.fehlerWort!)
     const korrekturPasst = a.loesungen.some((l) => gleich(l, String(w.korrektur ?? '')))
     return { urteil: wortPasst && korrekturPasst ? 'richtig' : 'fast', richtig: soll }
+  }
+  // Neue Formate (28.10.2026)
+  if (a.art === 'lueckentext') {
+    const eingaben = jsonListe(antwort).map((x) => String(x ?? ''))
+    const luecken = a.luecken ?? []
+    const treffer = luecken.filter((l, i) => l.loesungen.some((s) => gleich(s, eingaben[i] ?? ''))).length
+    const alle = luecken.map((l, i) => `${i + 1}) ${l.loesungen[0]}`).join(' · ')
+    return { urteil: treffer === luecken.length ? 'richtig' : treffer * 2 >= luecken.length ? 'fast' : 'falsch', richtig: alle }
+  }
+  if (a.art === 'markieren') {
+    const gewaehlt = new Set(jsonListe(antwort).map(Number))
+    const soll = new Set(a.ziele ?? [])
+    const treffer = [...soll].filter((i) => gewaehlt.has(i)).length
+    const zuviel = [...gewaehlt].filter((i) => !soll.has(i)).length
+    const woerter = woerterVon(a.satz)
+    const alle = [...soll].map((i) => woerter[i]).join(', ')
+    return { urteil: treffer === soll.size && !zuviel ? 'richtig' : treffer > 0 && soll.size - treffer + zuviel <= 1 ? 'fast' : 'falsch', richtig: alle }
+  }
+  if (a.art === 'sortieren') {
+    const wahl = jsonListe(antwort).map(Number)
+    const el = a.elemente ?? []
+    const treffer = el.filter((e, i) => wahl[i] === e.gruppe).length
+    return { urteil: treffer === el.length ? 'richtig' : treffer * 4 >= el.length * 3 ? 'fast' : 'falsch', richtig }
+  }
+  if (SATZ_ARTEN.includes(a.art)) {
+    // Satzanfang gehört zur Antwort; Kommas zählen nur bei Kommaregeln (28.10.2026, Entscheidung der Lehrkraft)
+    const voll = a.anfang && !normiert(antwort).startsWith(normiert(a.anfang)) ? `${a.anfang} ${antwort}` : antwort
+    const ohne = (x: string): string => (a.kommaPruefen ? normiert(x) : normiert(x).replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ').trim())
+    const ant = ohne(voll)
+    if (!normiert(antwort)) return { urteil: 'falsch', richtig }
+    if (a.loesungen.some((l) => ohne(l) === ant)) return { urteil: 'richtig', richtig }
+    if (ant.length > 12 && a.loesungen.some((l) => abstand(ohne(l), ant) === 1)) return { urteil: 'fast', richtig }
+    return { urteil: 'falsch', richtig }
   }
   if (a.art === 'fehler' && gewaehltesWort !== undefined && a.fehlerWort && !gleich(gewaehltesWort, a.fehlerWort)) return { urteil: 'falsch', richtig }
   const ant = normiert(antwort)

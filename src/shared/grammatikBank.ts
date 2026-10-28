@@ -33,26 +33,35 @@ export const UEBUNG_NAME: Record<Uebung, string> = {
 /** Kurz, was die Übungsart verlangt – für die Oberfläche und den Auftrag an die KI */
 export const UEBUNG_TEXT: Record<Uebung, string> = {
   // 28.10.2026 (Prüfung der Bank): Erkennen und Unterscheiden nie als freie Lücke – dort musste geraten werden
-  erkennen: 'die Form erkennen bzw. aus Möglichkeiten die richtige wählen (Auswahl, Zuordnen, Richtig oder falsch) – nie als freie Lücke zum Tippen',
-  bilden: 'die Form aus einer Vorgabe selbst bilden (Lücke mit Grundform, Umformen eines kurzen Satzes)',
-  anwenden: 'die Form in einem ganzen Satz anwenden (Umformen mit Ziel, Satzbau, kurzer Satz nach Vorgabe)',
-  unterscheiden: 'die Form von einer verwechselbaren Form abgrenzen (Auswahl, bei der die verwechselbare Form unter den Möglichkeiten steht; Zuordnen von Signalwörtern; Richtig oder falsch) – nie als freie Lücke',
-  fehler: 'einen Fehler mit der Form im Satz finden und berichtigen'
+  erkennen: 'die Form erkennen bzw. aus Möglichkeiten die richtige wählen (Auswahl, Zuordnen, Sortieren, Markieren im Text, Mehrfachauswahl, Richtig oder falsch) – nie Tippen; die Form entscheidet über die Bedeutung',
+  bilden: 'die Form aus einem Grundwort selbst bilden (Lücke mit Grundwort, ggf. mit Signalwort oder Zielform-Etikett; Umformen mit Satzanfang; Satzbau; Frage zur gegebenen Antwort)',
+  anwenden: 'die Form im Zusammenhang verwenden (Lücke mit Kontext-Vorlauf, kurzer Lückentext oder Dialog, Sätze verbinden mit Bindewort, Frage bilden, Umformen mit Satzanfang)',
+  unterscheiden: 'die Form von einer verwechselbaren Form abgrenzen (Auswahl mit beiden Formen und Kontext, Kontrastpaar, Sortieren, „alle richtigen ankreuzen“, Richtig oder falsch) – nie als freie Lücke',
+  fehler: 'einen Fehler mit der Form im Satz finden und durch EIN Wort berichtigen (oder Richtig oder falsch)'
 }
 /** Aufgabenarten, die zur Übungsart passen (Englisch, Französisch, Spanisch …) */
 export const UEBUNG_ARTEN: Record<Uebung, string[]> = {
   // zuordnen und richtigfalsch seit 26.10.2026 (Entscheidung der Lehrkraft, ohne KI prüfbar)
-  erkennen: ['auswahl', 'zuordnen', 'richtigfalsch'],
-  bilden: ['luecke', 'umformen'],
-  anwenden: ['umformen', 'satzbau', 'luecke', 'zuordnen'],
-  unterscheiden: ['auswahl', 'richtigfalsch', 'zuordnen'],
+  // Neubeginn 28.10.2026: neue Formate je Etappe (Recherche + Abstimmung)
+  erkennen: ['auswahl', 'zuordnen', 'sortieren', 'markieren', 'mehrfach', 'richtigfalsch'],
+  bilden: ['luecke', 'umformen', 'satzbau', 'frage'],
+  anwenden: ['luecke', 'lueckentext', 'verbinden', 'frage', 'umformen', 'auswahl'],
+  unterscheiden: ['auswahl', 'mehrfach', 'sortieren', 'richtigfalsch', 'zuordnen'],
   fehler: ['fehler', 'richtigfalsch']
 }
 /** Stufe für Reihenfolge und ältere Ansichten: Erkennen 1, Bilden 2, sonst 3 */
 export const uebungStufe = (u: Uebung): 1 | 2 | 3 => (u === 'erkennen' ? 1 : u === 'bilden' ? 2 : 3)
 
-/** Aufgaben je Feld (Teilbereich × Übungsart × Stufe), die der KI-Knopf schreibt (abgestimmt: rund 8) */
-export const AUFGABEN_JE_FELD = 8
+/**
+ * Aufgaben je Feld (Teilbereich × Übungsart × Stufe) – Neubeginn 28.10.2026 (Wunsch der Lehrkraft: deutlich weniger,
+ * Stufen bleiben): je Stufe 4 Erkennen, 4 Bilden, 3 Anwenden, je 1 Unterscheiden und Fehler finden = 13 (bisher je 8).
+ * Ein Lückentext zählt als eine Aufgabe.
+ */
+export const AUFGABEN_JE_UEBUNG: Record<Uebung, number> = { erkennen: 4, bilden: 4, anwenden: 3, unterscheiden: 1, fehler: 1 }
+/** Höchstes Ziel eines Felds (für Stellen ohne bestimmte Übungsart) */
+export const AUFGABEN_JE_FELD = 4
+/** Ziel eines Felds dieser Übungsart */
+export const zielJeFeld = (u: Uebung): number => AUFGABEN_JE_UEBUNG[u]
 
 // ---------------------------------------------------------------- Stufen (13.10.2026, abgestimmt)
 

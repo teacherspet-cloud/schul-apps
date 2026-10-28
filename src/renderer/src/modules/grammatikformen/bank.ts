@@ -11,11 +11,10 @@ import { starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import {
-  AUFGABEN_JE_FELD,
+  zielJeFeld,
   stufeVon,
   STUFEN,
   STUFE_NAME,
-  MIN_JE_UEBUNG,
   istKern,
   UEBUNG_NAME,
   aufgabeKern,
@@ -156,7 +155,7 @@ export function fehlendeFelder(zahl: BankZahlen[string] | undefined, stufen: rea
     .map((st) => ({
       stufe: st,
       uebungen: UEBUNGEN.filter(
-        (u) => feldZahl(zahl, u, st) + (entwurf?.aufgaben.filter((a) => a.uebung === u && stufeVon(a) === st).length ?? 0) < AUFGABEN_JE_FELD
+        (u) => feldZahl(zahl, u, st) + (entwurf?.aufgaben.filter((a) => a.uebung === u && stufeVon(a) === st).length ?? 0) < zielJeFeld(u)
       )
     }))
     .filter((f) => f.uebungen.length)
@@ -354,7 +353,7 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
         const entwurf = a.direkt ? [] : ladeBankEntwuerfe().find((e) => e.schluessel === a.schluessel)?.aufgaben ?? []
         const st = a.niveau ?? 'm'
         const zahl = (u: Uebung): number => [...bank, ...entwurf].filter((x) => x.uebung === u && stufeVon(x) === st).length
-        const offen = a.uebungen.filter((u) => zahl(u) < AUFGABEN_JE_FELD)
+        const offen = a.uebungen.filter((u) => zahl(u) < zielJeFeld(u))
         // Die am weitesten zurückliegenden Übungsarten zuerst
         const uebungen = [...offen].sort((x, y) => zahl(x) - zahl(y)).slice(0, ARTEN_JE_ANFRAGE)
         // Gemischtes bei „Alle fehlenden" (13.10.2026, Befund am VPS: „Unit 1 gemischt" mehrfach): nur, wenn in dieser
@@ -369,9 +368,11 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
         }
         if (runde > 0) melde(`${i + 1} von ${liste.length}: ${a.titel} – noch nicht vollständig, die KI legt nach (Durchgang ${runde + 1})`)
         // Puffer: Die Prüfung streicht Fehlerhaftes – ohne Puffer bleiben Felder unter dem Ziel und gelten als „fehlend"
-        const anzahl = Math.min(12, Math.max(...uebungen.map((u) => AUFGABEN_JE_FELD - zahl(u))) + PUFFER)
+        const anzahl = Math.min(12, Math.max(...uebungen.map((u) => zielJeFeld(u) - zahl(u))) + PUFFER)
+        // Je Übungsart nur, was ihr fehlt (28.10.2026: Ziele 4/4/3/1/1 je Stufe)
+        const jeUebung = Object.fromEntries(uebungen.map((u) => [u, Math.min(8, Math.max(1, zielJeFeld(u) - zahl(u)) + PUFFER)]))
         const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
-        const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, vorhanden: da, ohneLeichtPruefung: ohneLeicht }, k.ai, (t) =>
+        const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, jeUebung, vorhanden: da, ohneLeichtPruefung: ohneLeicht }, k.ai, (t) =>
           melde(`${i + 1} von ${liste.length}: ${t}`)
         ).then((r) => {
           if (a.direkt) return direktSpeichern(a, r)
@@ -527,8 +528,8 @@ export function bankAlternativenStarten(
  */
 export function fehltText(zahl: BankZahlen[string] | undefined, stufen: readonly Stufe[], entwurf?: BankEntwurf): string[] {
   const zeilen = stufen.flatMap((st) => {
-    const fehlt = UEBUNGEN.filter((u) => feldZahl(zahl, u, st) < AUFGABEN_JE_FELD)
-    return fehlt.length ? [`${STUFE_NAME[st]}: ${fehlt.map((u) => `${UEBUNG_NAME[u]} ${feldZahl(zahl, u, st)} von ${AUFGABEN_JE_FELD}`).join(', ')}`] : []
+    const fehlt = UEBUNGEN.filter((u) => feldZahl(zahl, u, st) < zielJeFeld(u))
+    return fehlt.length ? [`${STUFE_NAME[st]}: ${fehlt.map((u) => `${UEBUNG_NAME[u]} ${feldZahl(zahl, u, st)} von ${zielJeFeld(u)}`).join(', ')}`] : []
   })
   if (entwurf?.aufgaben.length) zeilen.push(`${entwurf.aufgaben.length} Aufgaben der KI warten aufs Durchsehen – sie zählen erst nach dem Speichern.`)
   return zeilen
@@ -556,7 +557,8 @@ export function bankStand(zahl: BankZahlen[string] | undefined, stufen: readonly
   const n = UEBUNGEN.reduce((m, u) => m + (zahl?.[u] ?? 0), 0)
   if (!n) return 'keine'
   if (!fehlendeFelder(zahl, stufen).length) return 'voll'
-  return stufen.every((st) => UEBUNGEN.filter(istKern).every((u) => feldZahl(zahl, u, st) >= MIN_JE_UEBUNG)) ? 'genug' : 'wenig'
+  // Genug zum Üben (28.10.2026, kleinere Ziele 4/4/3): je Stufe jede Kern-Übungsart mit höchstens einer Aufgabe unter dem Ziel
+  return stufen.every((st) => UEBUNGEN.filter(istKern).every((u) => feldZahl(zahl, u, st) >= Math.max(2, zielJeFeld(u) - 1))) ? 'genug' : 'wenig'
 }
 
 

@@ -33,8 +33,19 @@ export function aufgabeVorschau(a: GrammatikAufgabe): { aufgabe: string; loesung
   if (a.art === 'zuordnen')
     return { aufgabe: (a.paare ?? []).map((p) => p.links).join(' / '), loesung: (a.paare ?? []).map((p) => `${p.links} → ${p.rechts}`).join(' | ') }
   if (a.art === 'richtigfalsch') return { aufgabe: a.satz, loesung: a.korrekt ? 'richtig' : `falsch: ${a.fehlerWort ?? '?'} → ${a.loesungen.join(' | ')}` }
+  // Neue Formate (28.10.2026)
+  const vorlauf = a.kontext ? `${a.kontext} ▸ ` : ''
+  if (a.art === 'lueckentext') {
+    let n = 0
+    return {
+      aufgabe: `${vorlauf}${a.satz.replace(/___/g, () => `___(${++n}${a.luecken?.[n - 1]?.vorgabe ? ` ${a.luecken[n - 1].vorgabe}` : ''})`)}`,
+      loesung: (a.luecken ?? []).map((l, i) => `${i + 1}) ${l.loesungen.join(' / ')}`).join(' · ')
+    }
+  }
+  if (a.art === 'sortieren') return { aufgabe: `${(a.gruppen ?? []).join(' | ')}: ${(a.elemente ?? []).map((e) => e.text).join(', ')}`, loesung: a.loesungen.join(' | ') }
+  if (a.art === 'markieren') return { aufgabe: a.satz, loesung: `markieren: ${a.loesungen.join(' | ')}` }
   return {
-    aufgabe: `${a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz}${a.vorgabe ? ` ${a.vorgabe}` : ''}`,
+    aufgabe: `${vorlauf}${a.art === 'satzbau' ? (a.teile ?? []).join(' / ') : a.satz}${a.vorgabe ? ` ${a.vorgabe}` : ''}${a.anfang ? ` → ${a.anfang} …` : ''}`,
     loesung: `${a.loesungen.join(' | ')}${a.art === 'fehler' && a.fehlerWort ? ` (statt „${a.fehlerWort}")` : ''}`
   }
 }
@@ -379,7 +390,7 @@ export function AufgabenEditor({
       </Stack>
       {aufgaben.some((a) => !EINFACH.has(a.art)) && (
         <Text size="xs" c="dimmed">
-          Bestimmen- und Tabellenaufgaben lassen sich hier verschieben und streichen, aber nicht im Einzelnen ändern.
+          Bestimmen-, Tabellen-, Lückentext-, Verbinden-, Frage-, Markier- und Sortieraufgaben lassen sich hier verschieben und streichen, aber nicht im Einzelnen ändern.
         </Text>
       )}
       <Button variant="subtle" size="xs" w="fit-content" onClick={() => setOffen(null)} display={offen ? undefined : 'none'}>

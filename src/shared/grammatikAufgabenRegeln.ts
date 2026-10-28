@@ -31,12 +31,20 @@ export const AUFGABEN_REGELN = [
   '- Zeichensetzung und Wortstellung (Komma bei Relativsätzen, Stellung von Adverbien, Inversion, Fragen): nie als Lücke mit einem Satzzeichen oder „—“ als Lösung; stattdessen Auswahl zwischen ganzen Sätzen (satz = „___“, optionen = vollständige Sätze), Satzbau oder Umformen.',
   '- UMFORMEN: Anweisung oder vorgabe nennt die Zielform; die Lösung ist ein anderer Satz als der Ausgangssatz; alle gleichwertigen Fassungen in „loesungen“.',
   '- SATZBAU: genau eine sinnvolle Reihenfolge; die geübte Form steht nicht schon fertig in einem einzigen Teil.',
-  '- Lösungen sind tippbare Wörter der Zielsprache – keine Erklärungen („streichen“, „nichts“), keine Platzhalter („—“), kein „/“ zwischen Varianten (jede Variante einzeln in „loesungen“).'
+  '- Lösungen sind tippbare Wörter der Zielsprache – keine Erklärungen („streichen“, „nichts“), keine Platzhalter („—“), kein „/“ zwischen Varianten (jede Variante einzeln in „loesungen“).',
+  // Neubeginn 28.10.2026 – Recherche (Fachdidaktik, Übungsseiten, Ausarbeitung je Form) und Abstimmung mit der Lehrkraft
+  'KONTEXT statt Einzelsatz: Legt ein Satz allein die Form nicht fest (Zeitform/Aspekt, will/going to, Modalverb nach Bedeutung, indirekte Rede, Artikel bei Erstnennung …), schreibe 1–3 kurze Sätze Vorlauf in „kontext“ (Situation, Zeit, Beleg) oder nutze Lückentext bzw. Dialog. Kontext sprachlich einfacher als die geübte Grammatik.',
+  'Mittel für Eindeutigkeit: Verb UND Signalwort in die Klammer („(tidy / already)“); beim Bilden die Zielform als Etikett („Passiv, Past Perfect:“) – nie beim Erkennen; Kontrastpaar im selben Satz („often …, but today …“); vorgegebener Teilsatz (if-Satz, Zeitsatz); vorgegebene Antwort beim Fragenbilden; Wortkasten, in dem jedes Wort genau einmal passt.',
+  'Gleichwertige Formen (might/may/could, must/have to, who/that, somebody/someone, Kurz- und Langform) nie als richtige und falsche Möglichkeit gegeneinander; beim Tippen alle in „loesungen“. Norm ist britisches Schulenglisch („If I were you“, „I have just bought“).',
+  'Formate: LÜCKENTEXT („lueckentext“): 60–120 Wörter (oder Dialog mit Zeilen „A: …“/„B: …“), 3–6 Lücken „___“, je Lücke in „luecken“ das Grundwort als „vorgabe“ bzw. „optionen“ und alle „loesungen“; jede Lücke ohne die anderen lösbar, Lücken nicht direkt hintereinander, eine Verbform in genau eine Lücke. SÄTZE VERBINDEN („verbinden“): zwei kurze Sätze in „satz“, Bindewort in „vorgabe“ (z. B. „(who)“), möglichst Satzanfang in „anfang“; „loesungen“ = ganze Sätze mit allen Varianten (Stellung, who/that, mit und ohne weglassbares Pronomen). FRAGE BILDEN („frage“): die Antwort in „satz“, Fragewort bzw. Hilfe in „vorgabe“, „loesungen“ = ganze Fragen. MARKIEREN („markieren“): 1–3 Sätze in „satz“, die zu markierenden Wörter genau wie im Text in „zielWoerter“. SORTIEREN („sortieren“): 2–3 „gruppen“, 6–8 „elemente“ mit Gruppennummer (0 = erste Gruppe). MEHRFACHAUSWAHL („mehrfach“): 4–5 „optionen“, alle richtigen in „loesungen“ – für gleichwertige Varianten.',
+  'Kommas: „kommaPruefen“ nur true, wenn die geübte Grammatik selbst eine Kommaregel ist (Relativsätze, if-Satz vorne, Satzadverbien) – sonst zählt ein Komma mehr oder weniger beim Tippen ganzer Sätze nicht.',
+  'Zu JEDER Aufgabe eine „erklaerung“: ein kurzer Satz auf Deutsch, warum diese Form (z. B. „Signal: yet → present perfect“) – die Lernenden sehen ihn nach der Antwort.'
 ].join('\n')
 
 /** Zusatz für die Prüfung durch die KI: dieselben Regeln als Prüfpunkte */
 export const PRUEF_REGELN =
-  'ok = false auch, wenn eine Regel aus QUALITÄT verletzt ist und sich nicht über Lösungen, Möglichkeiten oder Fehlerwort reparieren lässt – besonders: Lücke ohne Grundwort, deren Lösung man raten muss; Vorgabe gleich Lösung; mehrere Lücken; Fehler, der sich nicht durch EIN Wort beheben lässt; Auswahl mit zwei richtigen Möglichkeiten; nicht tippbare Lösung.'
+  'ok = false auch, wenn eine Regel aus QUALITÄT verletzt ist und sich nicht über Lösungen, Möglichkeiten oder Fehlerwort reparieren lässt – besonders: Lücke ohne Grundwort, deren Lösung man raten muss; Vorgabe gleich Lösung; mehrere Lücken; Fehler, der sich nicht durch EIN Wort beheben lässt; Auswahl mit zwei richtigen Möglichkeiten; nicht tippbare Lösung. ' +
+  'Prüfe JEDE Aufgabe mit der Frage: „Wäre mit diesem Satz bzw. Kontext auch eine andere Form richtig?“ Wenn ja: gleichwertige Alternative in die Lösungen aufnehmen – sonst ok = false (der Kontext legt die Form nicht fest).'
 
 // ---------------------------------------------------------------- ohne KI richten
 
@@ -135,6 +143,25 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
     if (l.length && l.every((x) => wortzahl(x) > 2)) return 'Fehler lässt sich nicht durch ein Wort beheben'
   }
   if (a.art === 'umformen' && l.length && enthalten(l, a.satz)) return 'Lösung gleich Ausgangssatz'
+  // Neue Formate (28.10.2026)
+  const produktion = ['luecke', 'umformen', 'lueckentext', 'verbinden', 'frage', 'satzbau']
+  if ((a.uebung === 'erkennen') && produktion.includes(a.art)) return 'Erkennen verlangt Auswahl, nicht Tippen'
+  if (a.art === 'lueckentext') {
+    const n = (a.satz.match(/___/g) ?? []).length
+    if (!a.luecken?.length || n !== a.luecken.length) return 'Lückenzahl passt nicht zum Text'
+    for (const g of a.luecken) {
+      const v = klammerInhalt(g.vorgabe)
+      if (v && !wahlAusVorgabe(g.vorgabe).length && enthalten(g.loesungen, v)) return 'Vorgabe ist schon die Lösung (Lückentext)'
+      if (g.loesungen.some((x) => UNTIPPBAR.test(x) || /\s\/\s/.test(x))) return 'Lösung nicht tippbar (Lückentext)'
+    }
+  }
+  if (a.art === 'verbinden') {
+    if (!a.vorgabe && !a.anfang) return 'Bindewort bzw. Satzanfang fehlt'
+    if (l.length && enthalten(l, a.satz)) return 'Lösung gleich Ausgangssätzen'
+  }
+  if ((a.art === 'verbinden' || a.art === 'frage') && l.some((x) => UNTIPPBAR.test(x))) return 'Lösung nicht tippbar'
+  if (a.art === 'markieren' && !a.ziele?.length) return 'nichts zu markieren'
+  if (a.art === 'sortieren' && ((a.gruppen?.length ?? 0) < 2 || (a.elemente?.length ?? 0) < 4)) return 'zu wenig zum Sortieren'
   if (a.art === 'satzbau' && a.teile?.length && l.length) {
     const nur = (s: string): string => normiert(s).replace(/[^\p{L}\p{N}]/gu, '')
     if (!l.some((x) => nur(x) === nur(a.teile!.join(' ')))) return 'Teile ergeben nicht die Lösung'

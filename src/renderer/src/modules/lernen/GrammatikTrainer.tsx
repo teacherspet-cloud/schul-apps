@@ -62,6 +62,7 @@ import { STUFE_NAME, UEBUNG_NAME, stufeVon } from '@shared/grammatikBank'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
+import { KontextZeile, LueckentextAufgabe, MarkierenAufgabe, SatzAufgabe, SortierenAufgabe } from './GrammatikFormate'
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './spiele/SpieleVerben'
 import { SPIELE_CSS } from './spiele/Spiele'
 import ZusammenSpielen, { EinladungsCode } from './mehrspieler/ZusammenSpielen'
@@ -97,9 +98,9 @@ function useOffeneBereiche(id: string): [Set<string>, (b: string) => void] {
 /** Spiele mit ablaufender Uhr – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (Einstellungen der Lernenden, 06.10.2026) */
 const MIT_ZEITDRUCK: readonly GrammatikSpielId[] = ['formenblitz', 'satzbaupuzzle', 'richtigfalsch']
 /** Aufgabenarten mit getippter Antwort – nur dort der Apostroph-Hinweis (08.10.2026) */
-const GETIPPT: readonly string[] = ['luecke', 'umformen', 'fehler']
+const GETIPPT: readonly string[] = ['luecke', 'umformen', 'fehler', 'verbinden', 'frage']
 /** „Lösung zeigen" (09.10.2026): alle Arten, in denen getippt wird – auch Übersetzen und Tabellen (Latein) */
-const MIT_LOESUNG_ZEIGEN: readonly string[] = [...GETIPPT, 'uebersetzen', 'tabelle']
+const MIT_LOESUNG_ZEIGEN: readonly string[] = [...GETIPPT, 'uebersetzen', 'tabelle', 'lueckentext']
 /** Neue Spiele (08.10.2026) – laufen im Rahmen der Verbspiele */
 const NEUE_SPIELE: readonly GrammatikSpielId[] = ['richtigfalsch', 'formenmemory', 'tabellenpuzzle', 'signalwort']
 
@@ -1178,6 +1179,31 @@ function Aufgabe({
         <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
       </AufgabenRahmen>
     )
+  // Neue Formate (28.10.2026, GrammatikFormate.tsx)
+  if (a.art === 'lueckentext')
+    return (
+      <AufgabenRahmen a={a}>
+        <LueckentextAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'verbinden' || a.art === 'frage')
+    return (
+      <AufgabenRahmen a={a}>
+        <SatzAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'markieren')
+    return (
+      <AufgabenRahmen a={a}>
+        <MarkierenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
+  if (a.art === 'sortieren')
+    return (
+      <AufgabenRahmen a={a}>
+        <SortierenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+      </AufgabenRahmen>
+    )
   return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} eingabeStand={eingabeStand} ohneFokus={ohneFokus} />
 }
 
@@ -1188,6 +1214,7 @@ function AufgabenRahmen({ a, children }: { a: GrammatikAufgabe; children: React.
       <Text c="dimmed" size="sm">
         {a.anweisung || ART_NAME[a.art]}
       </Text>
+      <KontextZeile a={a} />
       {children}
     </Stack>
   )
@@ -1261,6 +1288,7 @@ function AufgabeAllgemein({
       <Text c="dimmed" size="sm">
         {a.anweisung || ART_NAME[a.art]}
       </Text>
+      <KontextZeile a={a} />
       {a.art === 'luecke' && (
         <form onSubmit={(e) => (e.preventDefault(), absenden())}>
           <Text fz={22} fw={600} style={{ lineHeight: 1.9 }}>
@@ -1327,6 +1355,11 @@ function AufgabeAllgemein({
             {a.satz}
           </Text>
           {a.vorgabe && <Text c="var(--vt-a)">{a.vorgabe}</Text>}
+          {a.anfang && (
+            <Text mt="sm" fz={18} fw={600} data-satzanfang>
+              {a.anfang} …
+            </Text>
+          )}
           <TextInput
             ref={eingabe}
             mt="sm"
