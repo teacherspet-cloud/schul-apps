@@ -1478,15 +1478,19 @@ function Ebene(p: {
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
   const [lagen, setLagen] = useState<Record<number, { y: number; feld: string; ende: { x: number; y: number } }>>({})
-  const meldeLage = useCallback(
-    (nr: number, y: number, feld: string, ende: { x: number; y: number }): void =>
-      setLagen((l) =>
-        l[nr] && Math.abs(l[nr].y - y) < 0.5 && l[nr].feld === feld && Math.abs(l[nr].ende.x - ende.x) < 0.5 && Math.abs(l[nr].ende.y - ende.y) < 0.5
-          ? l
-          : { ...l, [nr]: { y, feld, ende } }
-      ),
-    []
-  )
+  // Pendeln abfangen (28.10.2026, Fehler #185): je Kommentar höchstens 20 neue Lagen in kurzer Folge, danach erst wieder nach 1 s
+  const lageZaehler = useRef<Record<number, { n: number; seit: number }>>({})
+  const meldeLage = useCallback((nr: number, y: number, feld: string, ende: { x: number; y: number }): void => {
+    const jetzt = Date.now()
+    const z = lageZaehler.current[nr]
+    if (z && jetzt - z.seit < 1000 && z.n >= 20) return
+    setLagen((l) => {
+      if (l[nr] && Math.abs(l[nr].y - y) < 1 && l[nr].feld === feld && Math.abs(l[nr].ende.x - ende.x) < 1 && Math.abs(l[nr].ende.y - ende.y) < 1) return l
+      const alt = lageZaehler.current[nr]
+      lageZaehler.current[nr] = alt && jetzt - alt.seit < 1000 ? { n: alt.n + 1, seit: alt.seit } : { n: 1, seit: jetzt }
+      return { ...l, [nr]: { y, feld, ende } }
+    })
+  }, [])
   // Kommentar und Stelle gemeinsam hervorheben
   const [aktivAnm, setAktivAnm] = useState<number | null>(null)
   // Jede Anmerkung höchstens einmal markieren – im ersten Feld, in dem ihr Zitat steht
@@ -1504,15 +1508,34 @@ function Ebene(p: {
    * Mitwachsende Schreiblinien (03.10.2026): Reicht der Platz nicht, kommen Linien dazu – der Text
    * scrollt nie in seinem Feld, sondern steht immer auf Linien, und das Blatt wird länger.
    */
+  /*
+   * Absicherung (28.10.2026, Befund „Blatt ansehen“ in Firefox, React-Fehler #185): Brachte das letzte Wachsen eines Felds
+   * nichts (gleicher Überstand), wächst es nicht weiter – sonst konnte jede Zeichnung eine weitere Linie anfordern, bis React
+   * nach 50 verschachtelten Aktualisierungen abbricht. Gewachsen wird im nächsten Bild, nicht mitten im Zeichnen.
+   */
+  const ueberstand = useRef<Record<string, number>>({})
   useLayoutEffect(() => {
     if (!p.wachsen) return
+    const wachsen = p.wachsen
+    const auftraege: [number, number][] = []
     for (const f of p.felder) {
       if (f.art !== 'zeilen' || (f.zeilen ?? 1) < 2 || f.anker === undefined) continue
       const t = flaechen.current.get(f.id)
       if (!t) continue
       const zuViel = t.scrollHeight - t.clientHeight
-      if (zuViel > 2) p.wachsen(f.anker, Math.ceil(zuViel / (f.abstand ?? 24)))
+      if (zuViel <= 2) {
+        delete ueberstand.current[f.id]
+        continue
+      }
+      if (ueberstand.current[f.id] !== undefined && Math.abs(ueberstand.current[f.id] - zuViel) < 2) continue
+      ueberstand.current[f.id] = zuViel
+      auftraege.push([f.anker, Math.ceil(zuViel / (f.abstand ?? 24))])
     }
+    if (!auftraege.length) return
+    const id = requestAnimationFrame(() => {
+      for (const [anker, mehr] of auftraege) wachsen(anker, mehr)
+    })
+    return () => cancelAnimationFrame(id)
   })
   return (
     <div

@@ -3,7 +3,7 @@
 // nach und wartet, bis ein solcher Fehler aufgetreten wäre.
 // Vorher: Server lokal mit KI-Attrappe. Vorlage: jüngstes Arbeitsblatt mit Aufgaben aus dem lokalen Profil (nur gelesen).
 // Aufruf: node tests/e2e/server-blatt-ansehen.mjs <Ausgabeordner> [adresse] [admin] [passwort]
-import { chromium } from 'playwright-core'
+import { chromium, firefox } from 'playwright-core'
 import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { expertenmodus } from './warten.mjs'
@@ -97,6 +97,8 @@ try {
   await s.waitForTimeout(800)
   // Antwort mit dem Zitat der Attrappe („My first answer“) und viel Text, dann Feedback zu Aufgabe 1 und zweimal einreichen –
   // so entstehen Markierungen, Randkommentare und Bögen wie beim Blatt der Lehrkraft (Befund 27.10.2026)
+  // Befund 28.10.2026 (Firefox): eine Abgabe mit 56 zusätzlichen Schreiblinien – ein Feld bekommt rund 70 Zeilen
+  const sehrLang = Array.from({ length: 70 }, (_, i) => `Absatz ${i + 1}: Ein langer Gedanke zum Krieg, der eine ganze Zeile füllt und umbricht.`).join(String.fromCharCode(10))
   const lang = [
     'My first answer.',
     ...Array.from({ length: 7 }, (_, i) => `Zeile ${i + 1}: Das ist ein ziemlich langer Satz, der die Schreiblinie füllt und umbricht.`)
@@ -121,7 +123,7 @@ try {
       const f = felder.nth(k)
       if (!(await f.isVisible().catch(() => false)) || !(await f.isEditable().catch(() => false))) continue
       const art = await f.evaluate((e) => e.tagName)
-      if ((await f.inputValue()) === '') await f.fill(art === 'TEXTAREA' ? lang : 'My first answer')
+      if ((await f.inputValue()) === '') await f.fill(art === 'TEXTAREA' ? (k === 0 ? sehrLang : lang) : 'My first answer')
     }
     await s.waitForTimeout(600)
     await knopf.click()
@@ -227,6 +229,36 @@ try {
     .locator('[data-blatt-lehrkraft-zurueck]')
     .click()
     .catch(() => undefined)
+
+  // ---------- Dasselbe in Firefox (Befund der Lehrkraft 28.10.2026: Fehler #185 in Firefox, Weg über „Meine Klassen“)
+  const ff = await firefox.launch()
+  try {
+    const fc = await ff.newContext({ viewport: { width: 1400, height: 950 } })
+    await fc.request.post(`${A}/auth/lokal`, { form: { benutzer: lehrer.benutzer, passwort: lehrer.passwort, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
+    const q = await fc.newPage()
+    const ffFehler = []
+    q.on('pageerror', (e) => ffFehler.push(e.message.slice(0, 200)))
+    await q.goto(A)
+    await q.waitForTimeout(2500)
+    const sp2 = q.getByRole('button', { name: 'Später einrichten' })
+    if (await sp2.isVisible().catch(() => false)) await sp2.click()
+    const zu = q.locator('.app-leiste [data-leiste-gruppe-kopf][data-offen="false"]').filter({ visible: true })
+    for (let i = 0; i < 10 && (await zu.count()); i++) await zu.first().click()
+    await q.locator('.app-leiste [aria-label="Freigegebene Blätter"]').click()
+    await q.locator('[data-freigabe-oeffnen]').first().click()
+    await q.locator('[data-freigabe-detail]').waitFor({ timeout: 15000 })
+    await q.locator('[data-blatt-ansehen]:not([disabled])').first().click()
+    await q.locator('[data-blatt-lehrkraft-zurueck]').waitFor({ timeout: 30000 })
+    for (let i = 0; i < 15; i++) {
+      await q.waitForTimeout(1000)
+      if (await q.getByText('Die Seite ist hängen geblieben').isVisible().catch(() => false)) break
+    }
+    await q.screenshot({ path: join(out, '3-firefox.png') })
+    const hFF = await q.getByText('Die Seite ist hängen geblieben').isVisible().catch(() => false)
+    pruefe(!hFF && !ffFehler.some((f) => /#185|Maximum update depth/i.test(f)), `Firefox: keine Fehlerseite, kein #185 (${ffFehler.slice(0, 2).join(' | ')})`)
+  } finally {
+    await ff.close()
+  }
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
 } finally {

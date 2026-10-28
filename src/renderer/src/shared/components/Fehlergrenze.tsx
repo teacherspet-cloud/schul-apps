@@ -56,12 +56,16 @@ export function fehlerBerichten(art: string, meldung: string, ort: string): void
   }
 }
 
-/** Komponentenstapel von React kompakt: nur die Namen, von innen nach außen */
+/**
+ * Komponentenstapel von React kompakt: nur die Namen, von innen nach außen. Chrome/Edge schreiben „at Name (…)“, Firefox und
+ * Safari „Name@…“ (28.10.2026: in Firefox blieb die Stelle im Bericht deshalb leer).
+ */
 export const stapelKurz = (stapel: string | null | undefined): string =>
   (stapel ?? '')
     .split('\n')
-    .map((z) => /\bat ([A-Za-z0-9_$]+)/.exec(z)?.[1] ?? '')
+    .map((z) => /^\s*at ([A-Za-z0-9_$.]+)/.exec(z)?.[1] ?? /^\s*([A-Za-z0-9_$.]+)@/.exec(z)?.[1] ?? '')
     .filter(Boolean)
+    .slice(0, 25)
     .join(' < ')
 
 export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: Error | null; stapel: string }> {
@@ -75,8 +79,10 @@ export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: E
     console.error('Oberfläche abgefangen:', fehler, info.componentStack)
     const stapel = stapelKurz(info.componentStack)
     this.setState({ stapel })
+    // Dazu die Funktionen aus dem Fehlerstapel (28.10.2026): bei Fehler #185 steht dort, wer den Zustand immer wieder setzt
+    const aufrufe = stapelKurz(fehler.stack)
     if (istNachladeFehler(fehler)) einmalNeuLaden()
-    else fehlerBerichten('oberflaeche', `${fehler.name}: ${fehler.message}`, stapel)
+    else fehlerBerichten('oberflaeche', `${fehler.name}: ${fehler.message}`, `${stapel}${aufrufe ? ` || ${aufrufe}` : ''}`)
   }
 
   render(): ReactNode {

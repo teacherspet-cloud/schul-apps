@@ -466,7 +466,10 @@ export function ObjektEbene(p: {
       return Boolean(t && t.scrollHeight > t.clientHeight + 2)
     })
     if (!zuKlein.length) return
-    setzeEigene(eigene.map((o) => (zuKlein.some((z) => z.id === o.id) ? { ...o, h: Math.min(900, textHoehe(o.id, o.w ?? 170)) } : o)))
+    // Nur wenn ein Kästchen wirklich höher wird (28.10.2026, Fehler #185: gleiche Höhe neu gesetzt → jedes Zeichnen von vorn)
+    const neu = eigene.map((o) => (zuKlein.some((z) => z.id === o.id) ? { ...o, h: Math.min(900, textHoehe(o.id, o.w ?? 170)) } : o))
+    if (!neu.some((o, i) => (o.h ?? 0) > (eigene[i].h ?? 0) + 1)) return
+    setzeEigene(neu)
   })
   const punkt = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const r = flaeche.current!.getBoundingClientRect()
