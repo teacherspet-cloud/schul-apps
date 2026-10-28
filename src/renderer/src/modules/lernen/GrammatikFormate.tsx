@@ -10,7 +10,7 @@
  */
 import { Badge, Button, Group, NativeSelect, Paper, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { useMemo, useState } from 'react'
-import { woerterVon, type GrammatikAufgabe } from '@shared/grammatiktrainer'
+import { woerterVon, type GrammatikAufgabe, satzanfang } from '@shared/grammatiktrainer'
 import type { Urteil } from '@shared/vokabeltrainer'
 
 type Antworten = (antwort: string, wort?: string, selbst?: Urteil) => void
@@ -101,7 +101,7 @@ export function SatzAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; g
   const [text, setText] = useState('')
   const absenden = (): void => {
     if (gesperrt || !text.trim()) return
-    antworten(a.anfang ? `${a.anfang} ${text.trim()}` : text.trim())
+    antworten(satzanfang(a.anfang) ? `${satzanfang(a.anfang)} ${text.trim()}` : text.trim())
   }
   return (
     <form onSubmit={(e) => (e.preventDefault(), absenden())} data-satzaufgabe={a.art}>
@@ -116,7 +116,7 @@ export function SatzAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; g
       <Group mt="sm" gap={6} wrap="nowrap" align="center">
         {a.anfang && (
           <Text fz={18} fw={600} style={{ whiteSpace: 'nowrap' }} data-satzanfang>
-            {a.anfang}
+            {satzanfang(a.anfang)}
           </Text>
         )}
         <TextInput
@@ -169,6 +169,15 @@ export function MarkierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
   )
 }
 
+/**
+ * Lange Elemente (ganze Sätze, Durchlauf der Bank 28.10.2026): Knöpfe brechen um statt über den Rand zu ragen – sonst
+ * ließen sie sich am Telefon nicht antippen
+ */
+const UMBRUCH = {
+  root: { height: 'auto', minHeight: 36, maxWidth: '100%', paddingTop: 6, paddingBottom: 6 },
+  label: { whiteSpace: 'normal' as const, textAlign: 'left' as const, lineHeight: 1.3 }
+}
+
 export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
   const elemente = a.elemente ?? []
   const gruppen = a.gruppen ?? []
@@ -188,7 +197,14 @@ export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
       </Text>
       <Group gap={6}>
         {offen.map((i) => (
-          <Button key={i} variant={aktiv === i ? 'filled' : 'default'} disabled={gesperrt} onClick={() => setAktiv(aktiv === i ? null : i)} data-sortier-element={elemente[i].text}>
+          <Button
+            key={i}
+            variant={aktiv === i ? 'filled' : 'default'}
+            disabled={gesperrt}
+            onClick={() => setAktiv(aktiv === i ? null : i)}
+            styles={UMBRUCH}
+            data-sortier-element={elemente[i].text}
+          >
             {elemente[i].text}
           </Button>
         ))}
@@ -218,6 +234,7 @@ export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
                     color={gesperrt ? (elemente[i].gruppe === k ? 'green' : 'red') : undefined}
                     disabled={gesperrt}
                     onClick={(e) => (e.stopPropagation(), setWahl((w) => w.map((x, j) => (j === i ? null : x))))}
+                    styles={UMBRUCH}
                   >
                     {elemente[i].text}
                   </Button>

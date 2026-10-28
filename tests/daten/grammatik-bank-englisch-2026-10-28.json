@@ -1,0 +1,2707 @@
+{
+ "eintraege": [
+  {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "regel": {
+    "titel": "x",
+    "erklaerung": "x",
+    "beispiele": []
+   },
+   "aufgaben": [
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle das passende Wort.",
+     "satz": "We have lived in this house ___ three years.",
+     "loesungen": [
+      "for"
+     ],
+     "optionen": [
+      "since",
+      "for",
+      "from"
+     ],
+     "erklaerung": "Three years ist ein Zeitraum, deshalb steht for.",
+     "id": "bdd8c785e415f",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Zeitangaben zu since oder for.",
+     "satz": "",
+     "loesungen": [
+      "since: Monday, 2021, my birthday | for: two weeks, an hour, five months"
+     ],
+     "erklaerung": "Since steht vor einem Zeitpunkt, for vor einer Zeitdauer.",
+     "gruppen": [
+      "since",
+      "for"
+     ],
+     "elemente": [
+      {
+       "text": "Monday",
+       "gruppe": 0
+      },
+      {
+       "text": "2021",
+       "gruppe": 0
+      },
+      {
+       "text": "two weeks",
+       "gruppe": 1
+      },
+      {
+       "text": "an hour",
+       "gruppe": 1
+      },
+      {
+       "text": "my birthday",
+       "gruppe": 0
+      },
+      {
+       "text": "five months",
+       "gruppe": 1
+      }
+     ],
+     "id": "b9b0a9c1b18b9",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Entscheide: richtig oder falsch? Wenn der Satz falsch ist, nenne das falsche Wort und die Berichtigung.",
+     "satz": "I have had my phone since two years.",
+     "loesungen": [
+      "falsch",
+      "for"
+     ],
+     "erklaerung": "Two years ist eine Dauer; dafür verwendet man for.",
+     "korrekt": false,
+     "fehlerWort": "since",
+     "id": "b7b81382bc3c1",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle richtigen Sätze.",
+     "satz": "___",
+     "loesungen": [
+      "We have been friends since 2020.",
+      "Ella has worked here for six months."
+     ],
+     "erklaerung": "Since steht vor einem Startpunkt wie 2020, for vor einer Dauer wie six months.",
+     "optionen": [
+      "We have been friends since 2020.",
+      "Ella has worked here for six months.",
+      "I have lived here since three years.",
+      "My dad has had this car for 2018."
+     ],
+     "id": "b11cb450fdc1a",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im present perfect ein.",
+     "satz": "I ___ this book for two weeks.",
+     "vorgabe": "(read)",
+     "loesungen": [
+      "have read",
+      "'ve read",
+      "have been reading",
+      "'ve been reading"
+     ],
+     "erklaerung": "For two weeks zeigt eine Dauer bis jetzt; daher steht have read.",
+     "id": "be36160c1996f",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im present perfect ein.",
+     "satz": "Ben ___ his bike since his birthday.",
+     "vorgabe": "(have)",
+     "loesungen": [
+      "has had",
+      "'s had"
+     ],
+     "erklaerung": "Since his birthday zeigt den Startpunkt; mit Ben steht has had.",
+     "id": "b1f855ce69e4d",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "loesungen": [
+      "She has known him for years."
+     ],
+     "teile": [
+      "She",
+      "has",
+      "known",
+      "him",
+      "for years."
+     ],
+     "erklaerung": "Mit she steht has; for years beschreibt die Dauer bis jetzt.",
+     "id": "bca3512c900dc",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im present perfect. Nutze die Hilfe.",
+     "satz": "For three months.",
+     "vorgabe": "How long / Tom / be in the film club?",
+     "loesungen": [
+      "How long has Tom been in the film club?",
+      "How long's Tom been in the film club?"
+     ],
+     "erklaerung": "Bei how long steht die Frageform has Tom been.",
+     "kontext": "Die Antwort beschreibt, wie lange Tom schon in der Film-AG ist.",
+     "id": "b846279cfa31f",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Lies den Vorsatz und setze das Verb im present perfect ein.",
+     "satz": "We ___ the same teacher since September.",
+     "vorgabe": "(have)",
+     "loesungen": [
+      "have had",
+      "'ve had"
+     ],
+     "erklaerung": "Die Lehrerin ist noch immer eure Lehrerin; deshalb steht have had mit since.",
+     "kontext": "September ist vorbei, aber ihr habt die Lehrerin immer noch.",
+     "id": "b52a5f7733cea",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im present perfect. Nutze die Hilfe.",
+     "satz": "Since 2023.",
+     "vorgabe": "How long / Maya / have her dog?",
+     "loesungen": [
+      "How long has Maya had her dog?",
+      "How long's Maya had her dog?"
+     ],
+     "erklaerung": "Die Frage nach einer Dauer lautet How long has Maya had ...?",
+     "kontext": "Die Antwort beschreibt, seit wann Maya ihren Hund hat.",
+     "id": "b24b9c6a3f817",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme den Satz um. Verwende since 2021 und beginne mit dem vorgegebenen Satzanfang.",
+     "satz": "Leo started playing the guitar in 2021 and still plays it.",
+     "vorgabe": "present perfect mit since 2021",
+     "loesungen": [
+      "Leo has played the guitar since 2021.",
+      "Leo has been playing the guitar since 2021."
+     ],
+     "erklaerung": "Der Beginn liegt 2021 und Leo spielt noch immer; deshalb passt das present perfect mit since.",
+     "anfang": "Leo has",
+     "id": "b984a073e8382",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle since oder for.",
+     "satz": "My cousins have lived in York ___ 2022.",
+     "loesungen": [
+      "since"
+     ],
+     "optionen": [
+      "since",
+      "for",
+      "during"
+     ],
+     "erklaerung": "2022 ist ein Zeitpunkt, deshalb steht since.",
+     "id": "b345db34e76e7",
+     "uebung": "unterscheiden",
+     "niveau": "g"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "I have lived near the park since four months.",
+     "loesungen": [
+      "for"
+     ],
+     "fehlerWort": "since",
+     "erklaerung": "Four months ist ein Zeitraum, deshalb benutzt man for.",
+     "id": "b7ebe0c2f23ef",
+     "uebung": "fehler",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den richtigen Satz.",
+     "satz": "___",
+     "loesungen": [
+      "[Person-3] has had this laptop for six months."
+     ],
+     "optionen": [
+      "[Person-3] has had this laptop since six months.",
+      "[Person-3] has had this laptop for six months.",
+      "[Person-3] have had this laptop for six months."
+     ],
+     "erklaerung": "For steht bei einem Zeitraum wie six months.",
+     "id": "bb0bc7cdb5e6d",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "zuordnen",
+     "anweisung": "Ordne jedem Ausdruck den passenden Satz zu.",
+     "satz": "",
+     "loesungen": [
+      "since last summer Our neighbours have lived here since last summer. | for three weeks I have used these trainers for three weeks. | since Friday We have had no music lesson since Friday."
+     ],
+     "erklaerung": "Since nennt einen Beginn, for nennt eine Dauer.",
+     "paare": [
+      {
+       "links": "since last summer",
+       "rechts": "Our neighbours have lived here since last summer."
+      },
+      {
+       "links": "for three weeks",
+       "rechts": "I have used these trainers for three weeks."
+      },
+      {
+       "links": "since Friday",
+       "rechts": "We have had no music lesson since Friday."
+      }
+     ],
+     "id": "bffe8f79e8be1",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Zeitangaben nach since und for.",
+     "satz": "",
+     "loesungen": [
+      "since: 2018, Tuesday, the holidays | for: half an hour, four days, a long time"
+     ],
+     "erklaerung": "Zeitpunkte gehören zu since, Zeiträume zu for.",
+     "gruppen": [
+      "since",
+      "for"
+     ],
+     "elemente": [
+      {
+       "text": "2018",
+       "gruppe": 0
+      },
+      {
+       "text": "half an hour",
+       "gruppe": 1
+      },
+      {
+       "text": "Tuesday",
+       "gruppe": 0
+      },
+      {
+       "text": "four days",
+       "gruppe": 1
+      },
+      {
+       "text": "the holidays",
+       "gruppe": 0
+      },
+      {
+       "text": "a long time",
+       "gruppe": 1
+      }
+     ],
+     "id": "bd503227676f5",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle richtigen Sätze.",
+     "satz": "___",
+     "loesungen": [
+      "We have been in this queue for ten minutes.",
+      "My aunt has worked there since January."
+     ],
+     "erklaerung": "Richtig sind die Sätze mit present perfect und der passenden Zeitangabe.",
+     "optionen": [
+      "We have been in this queue for ten minutes.",
+      "My aunt has worked there since January.",
+      "I have known this song since three weeks.",
+      "[Person-5] has stay at home for two days."
+     ],
+     "id": "b5e5993d1bdb4",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im present perfect ein.",
+     "satz": "I ___ my best friend since primary school.",
+     "vorgabe": "(know)",
+     "loesungen": [
+      "have known",
+      "'ve known"
+     ],
+     "erklaerung": "Since primary school zeigt: Die Freundschaft dauert bis jetzt.",
+     "id": "b8504109ffdd7",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Bilde eine Frage nach der Dauer.",
+     "satz": "Your grandparents have lived in Bristol since 2018.",
+     "vorgabe": "Frage mit How long",
+     "loesungen": [
+      "How long have your grandparents lived in Bristol?"
+     ],
+     "erklaerung": "Bei Fragen mit How long steht have vor dem Subjekt.",
+     "anfang": "How long",
+     "id": "bc93a60db35bb",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "loesungen": [
+      "[Person-8] has known this café for years."
+     ],
+     "teile": [
+      "[Person-8]",
+      "has",
+      "known",
+      "this café",
+      "for years."
+     ],
+     "erklaerung": "Nach has folgt die dritte Verbform known.",
+     "id": "b5e64a0aca232",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage. Die Antwort beschreibt die Dauer.",
+     "satz": "[Person-9] has had the tablet for eight months.",
+     "vorgabe": "Frage nach der Dauer",
+     "loesungen": [
+      "How long has [Person-9] had the tablet?"
+     ],
+     "erklaerung": "Has steht vor [Person-9], weil die Frage nach der Dauer fragt.",
+     "anfang": "How long",
+     "id": "b13c788012ace",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Lies den Kontext und setze das Verb passend ein.",
+     "satz": "We ___ in the same street since then.",
+     "vorgabe": "(live)",
+     "loesungen": [
+      "have lived",
+      "'ve lived"
+     ],
+     "erklaerung": "Der Umzug begann früher, aber das Wohnen dauert noch an.",
+     "kontext": "Our family moved here in 2021. We still live here now.",
+     "id": "b629902260b82",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit since.",
+     "satz": "[Person-11] joined the chess club in September. [Person-11] is still a member.",
+     "vorgabe": "(since)",
+     "loesungen": [
+      "[Person-11] has been a member of the chess club since September.",
+      "[Person-11] has been in the chess club since September."
+     ],
+     "erklaerung": "September ist der Startzeitpunkt, deshalb steht since.",
+     "anfang": "[Person-11] has",
+     "id": "b33a89d028080",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage an eine andere Person. Die Antwort beschreibt die Dauer.",
+     "satz": "We have known our new coach for two months.",
+     "vorgabe": "Frage nach der Dauer",
+     "loesungen": [
+      "How long have you known your new coach?"
+     ],
+     "erklaerung": "In der Frage an deinen Freund wird aus we die Anrede you.",
+     "kontext": "Dein Freund erzählt dir: „We have known our new coach for two months.“ Du möchtest wissen, wie lange das schon so ist.",
+     "anfang": "How long",
+     "id": "b5eff420aaedd",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle since oder for.",
+     "satz": "My brother has had that jacket ___ last winter.",
+     "loesungen": [
+      "since"
+     ],
+     "optionen": [
+      "since",
+      "for",
+      "during"
+     ],
+     "erklaerung": "Last winter ist ein Zeitpunkt, deshalb steht since.",
+     "id": "b357ba1ed1815",
+     "uebung": "unterscheiden",
+     "niveau": "m"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "I have lived here since five months.",
+     "loesungen": [
+      "for"
+     ],
+     "fehlerWort": "since",
+     "erklaerung": "Five months ist ein Zeitraum, deshalb heißt es for.",
+     "id": "b9384105ce950",
+     "uebung": "fehler",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle since oder for.",
+     "satz": "Our team has trained together ___ nearly six months.",
+     "loesungen": [
+      "for"
+     ],
+     "optionen": [
+      "since",
+      "for",
+      "during"
+     ],
+     "erklaerung": "Nearly six months ist eine Zeitspanne, deshalb steht for.",
+     "id": "bce3fc1fd3237",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Entscheide: richtig oder falsch?",
+     "satz": "Our neighbours have owned their small café since 2017.",
+     "loesungen": [
+      "Our neighbours have owned their small café since 2017."
+     ],
+     "erklaerung": "Since 2017 nennt einen Beginn in der Vergangenheit; die Situation dauert noch an.",
+     "korrekt": true,
+     "id": "b4cd64bd54118",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "markieren",
+     "anweisung": "Markiere die Wörter, die zeigen, dass die Situationen bis jetzt dauern.",
+     "satz": "My uncle has taught at this school since 2016. We have used the same map for a long time.",
+     "loesungen": [
+      "since | for"
+     ],
+     "erklaerung": "Have/has + 3. Form zusammen mit since oder for zeigt eine Dauer bis jetzt.",
+     "ziele": [
+      7,
+      15
+     ],
+     "id": "bf186378dfdf8",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Angaben: Beginn oder Zeitspanne?",
+     "satz": "",
+     "loesungen": [
+      "Beginn: since: the first school day, 2020, my tenth birthday | Zeitspanne: for: half an hour, several weeks, a very long time"
+     ],
+     "erklaerung": "Since nennt den Startpunkt, for nennt die Länge einer Zeit.",
+     "gruppen": [
+      "Beginn: since",
+      "Zeitspanne: for"
+     ],
+     "elemente": [
+      {
+       "text": "the first school day",
+       "gruppe": 0
+      },
+      {
+       "text": "half an hour",
+       "gruppe": 1
+      },
+      {
+       "text": "2020",
+       "gruppe": 0
+      },
+      {
+       "text": "several weeks",
+       "gruppe": 1
+      },
+      {
+       "text": "my tenth birthday",
+       "gruppe": 0
+      },
+      {
+       "text": "a very long time",
+       "gruppe": 1
+      }
+     ],
+     "id": "b38e17e8cca03",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im present perfect ein.",
+     "satz": "The science club ___ every Thursday since October.",
+     "vorgabe": "(meet)",
+     "loesungen": [
+      "has met",
+      "'s met"
+     ],
+     "erklaerung": "Since October zeigt eine Dauer bis jetzt; meet wird zu has met.",
+     "id": "b66f5b29200df",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im present perfect ein.",
+     "satz": "My cousin ___ this old helmet for every bike ride since spring.",
+     "vorgabe": "(keep)",
+     "loesungen": [
+      "has kept",
+      "'s kept"
+     ],
+     "erklaerung": "Die Situation begann im Frühling und dauert an; keep wird zu has kept.",
+     "id": "be145cc26b9b4",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "loesungen": [
+      "My parents have known the new neighbour since the street party."
+     ],
+     "teile": [
+      "My parents",
+      "have known",
+      "the new neighbour",
+      "since the street party."
+     ],
+     "erklaerung": "Die Dauer bis jetzt wird mit have known und since ausgedrückt.",
+     "id": "b1318d08cd062",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage nach der Dauer.",
+     "satz": "For nearly two months.",
+     "vorgabe": "How long / you / have your new glasses",
+     "loesungen": [
+      "How long have you had your new glasses?"
+     ],
+     "erklaerung": "Bei einer Dauerfrage steht How long und danach das present perfect.",
+     "kontext": "Die Antwort beschreibt, wie lange du deine neuen Brillengläser schon hast.",
+     "id": "be4fef8a9c334",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Lies den Kontext und setze das Verb im present perfect ein.",
+     "satz": "I ___ the same bus route to school since we moved to this area.",
+     "vorgabe": "(take)",
+     "loesungen": [
+      "have taken",
+      "'ve taken"
+     ],
+     "erklaerung": "Die Busroute nutze ich seit dem Umzug noch immer; take wird zu have taken.",
+     "kontext": "Meine Familie zog in dieses Gebiet. Ich fahre noch immer jeden Morgen zur Schule.",
+     "id": "b10a3086f242a",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "lueckentext",
+     "anweisung": "Ergänze die Verben im present perfect.",
+     "satz": "Hi! We moved to a flat near the river in May, and we still enjoy living here. Since then, our class ___ a garden behind the sports centre. I ___ in the garden group for four months, and we meet every Friday. Our teacher ___ the project since the beginning of the term, so she knows which plants need water. We still have many jobs to do!",
+     "loesungen": [
+      "has organised | have been | has supported"
+     ],
+     "erklaerung": "Since und for zeigen jeweils, dass die Handlung oder Situation bis jetzt andauert.",
+     "luecken": [
+      {
+       "vorgabe": "(organise)",
+       "loesungen": [
+        "has organised",
+        "'s organised"
+       ]
+      },
+      {
+       "vorgabe": "(be)",
+       "loesungen": [
+        "have been",
+        "'ve been"
+       ]
+      },
+      {
+       "vorgabe": "(support)",
+       "loesungen": [
+        "has supported",
+        "'s supported"
+       ]
+      }
+     ],
+     "id": "b3e039a28fdb8",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage nach der Dauer.",
+     "satz": "Since the first day of the holidays.",
+     "vorgabe": "How long / your family / be at your grandparents' house",
+     "loesungen": [
+      "How long has your family been at your grandparents' house?"
+     ],
+     "erklaerung": "Die Familie ist noch dort; deshalb fragt man mit has been nach der Dauer.",
+     "kontext": "Dein Freund erzählt, dass seine Familie noch immer bei seinen Grosseltern zu Besuch ist.",
+     "id": "bff9913dbedc1",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle since oder for.",
+     "satz": "We have worked on the class podcast ___ 8 January.",
+     "loesungen": [
+      "since"
+     ],
+     "optionen": [
+      "since",
+      "for",
+      "until"
+     ],
+     "erklaerung": "8 January ist ein genauer Anfangspunkt, deshalb steht since.",
+     "kontext": "Heute ist der 1. April. Das Projekt läuft noch.",
+     "id": "b870d62d920e7",
+     "uebung": "unterscheiden",
+     "niveau": "a"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "We have waited since twenty minutes, so the bus must come soon.",
+     "loesungen": [
+      "for"
+     ],
+     "fehlerWort": "since",
+     "erklaerung": "Twenty minutes ist ein Zeitraum, deshalb braucht man for.",
+     "id": "bcd02ca0bfeae",
+     "uebung": "fehler",
+     "niveau": "a"
+    }
+   ]
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "regel": {
+    "titel": "x",
+    "erklaerung": "x",
+    "beispiele": []
+   },
+   "aufgaben": [
+    {
+     "art": "zuordnen",
+     "anweisung": "Ordne jedem Satz die passende Bedeutung zu.",
+     "satz": "",
+     "loesungen": [
+      "I think our team will win. Meinungsvorhersage | Look at the dark clouds! It is going to rain. Anzeichen | Mia has bought the tickets. She is going to see the show. Plan"
+     ],
+     "erklaerung": "I think zeigt eine Meinungsvorhersage mit will.",
+     "paare": [
+      {
+       "links": "I think our team will win.",
+       "rechts": "Meinungsvorhersage"
+      },
+      {
+       "links": "Look at the dark clouds! It is going to rain.",
+       "rechts": "Anzeichen"
+      },
+      {
+       "links": "Mia has bought the tickets. She is going to see the show.",
+       "rechts": "Plan"
+      }
+     ],
+     "id": "b7c4397e0928a",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze nach will und going to.",
+     "satz": "",
+     "loesungen": [
+      "will: I think Ben will like the game., Dad will probably cook pasta., I am sure it will be fun. | going to: Look out! You are going to drop it., We have the map. We are going to walk home., Ella has her boots on. She is going to play football."
+     ],
+     "erklaerung": "I think, probably und I am sure zeigen hier Meinungsvorhersagen mit will.",
+     "gruppen": [
+      "will",
+      "going to"
+     ],
+     "elemente": [
+      {
+       "text": "I think Ben will like the game.",
+       "gruppe": 0
+      },
+      {
+       "text": "Dad will probably cook pasta.",
+       "gruppe": 0
+      },
+      {
+       "text": "I am sure it will be fun.",
+       "gruppe": 0
+      },
+      {
+       "text": "Look out! You are going to drop it.",
+       "gruppe": 1
+      },
+      {
+       "text": "We have the map. We are going to walk home.",
+       "gruppe": 1
+      },
+      {
+       "text": "Ella has her boots on. She is going to play football.",
+       "gruppe": 1
+      }
+     ],
+     "id": "bbcbc0a6917c8",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "markieren",
+     "anweisung": "Markiere die Signalwörter und Signalphrasen für eine Meinungsvorhersage mit will.",
+     "satz": "I think the test will be easy. Our teacher will probably give us homework.",
+     "loesungen": [
+      "probably"
+     ],
+     "erklaerung": "I think und probably zeigen eine Meinungsvorhersage mit will an.",
+     "ziele": [
+      10
+     ],
+     "id": "bdb3e4771dd0f",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Richtig oder falsch?",
+     "satz": "I think the film will be funny.",
+     "loesungen": [
+      "I think the film will be funny."
+     ],
+     "erklaerung": "Nach I think passt für eine Meinungsvorhersage will.",
+     "korrekt": true,
+     "id": "b97ea57a19487",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze will mit dem Verb ein.",
+     "satz": "I think our teacher ___ us a short test.",
+     "vorgabe": "(give)",
+     "loesungen": [
+      "will give",
+      "'ll give"
+     ],
+     "erklaerung": "I think zeigt eine Meinungsvorhersage mit will.",
+     "kontext": "Du sagst deine Meinung über morgen.",
+     "id": "b4fccfc3dfe86",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze will mit dem Verb ein.",
+     "satz": "I think Leo ___ his new bike.",
+     "vorgabe": "(like)",
+     "loesungen": [
+      "will like",
+      "'ll like"
+     ],
+     "erklaerung": "I think verlangt hier will für deine Meinung.",
+     "kontext": "Leo has just got a new bike. Du sagst deine Meinung.",
+     "id": "b7fe9bf19495c",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "Stellung von probably",
+     "loesungen": [
+      "He will probably be late."
+     ],
+     "teile": [
+      "He",
+      "will",
+      "probably",
+      "be",
+      "late."
+     ],
+     "erklaerung": "Probably steht nach will und vor dem Vollverb.",
+     "id": "befd4232629d1",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme in eine Meinungsvorhersage mit I think und will um.",
+     "satz": "The new pupil is nice.",
+     "vorgabe": "I think + will",
+     "loesungen": [
+      "I think the new pupil will be nice.",
+      "I think the new pupil'll be nice."
+     ],
+     "erklaerung": "Für eine Meinung über die Zukunft nutzt du I think mit will.",
+     "kontext": "Du kennst den neuen Schüler noch nicht.",
+     "anfang": "I think",
+     "id": "b738094bbfbe5",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze die passende Zukunftsform mit dem Verb ein.",
+     "satz": "I think we ___ the train.",
+     "vorgabe": "(catch)",
+     "loesungen": [
+      "will catch",
+      "'ll catch"
+     ],
+     "erklaerung": "I think macht die Zukunftsform will eindeutig.",
+     "kontext": "Der Bahnhof ist ganz nah. Du sagst nur deine Meinung.",
+     "id": "becba64511dff",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz.",
+     "satz": "___",
+     "loesungen": [
+      "It is going to rain."
+     ],
+     "optionen": [
+      "It will probably rain.",
+      "It is going to rain.",
+      "I think it will rain."
+     ],
+     "erklaerung": "Dunkle Wolken und Donner sind Anzeichen, deshalb passt going to.",
+     "kontext": "Nora sieht sehr dunkle Wolken und hört Donner.",
+     "id": "b1a13703eee77",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "lueckentext",
+     "anweisung": "Setze will oder going to mit den Verben aus den Klammern ein.",
+     "satz": "On Saturday, Sam has a plan. He has got his boots and his map ready. He ___ to the lake with his cousin. At the door, Sam sees very dark clouds. “Oh no, it ___ soon!” he says. His cousin smiles: “I think the weather ___ better later.” Then Sam’s phone rings. His mum says, “Your bus is here.” Sam says, “Great, I ___ now!”",
+     "loesungen": [
+      "is going to walk | is going to rain | will get | will go"
+     ],
+     "erklaerung": "Plan und sichtbare Anzeichen brauchen going to; I think und eine spontane Reaktion brauchen will.",
+     "luecken": [
+      {
+       "vorgabe": "(walk)",
+       "loesungen": [
+        "is going to walk",
+        "'s going to walk"
+       ]
+      },
+      {
+       "vorgabe": "(rain)",
+       "loesungen": [
+        "is going to rain",
+        "'s going to rain"
+       ]
+      },
+      {
+       "vorgabe": "(get)",
+       "loesungen": [
+        "will get",
+        "'ll get"
+       ]
+      },
+      {
+       "vorgabe": "(go)",
+       "loesungen": [
+        "will go",
+        "'ll go"
+       ]
+      }
+     ],
+     "id": "bbe456783d821",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze: will-Vorhersage oder going-to-Vorhersage/Plan?",
+     "satz": "",
+     "loesungen": [
+      "will: Meinung mit I think/probably: I think Ben will like this comic., The bus will probably be late., I am sure it will be sunny. | going to: Plan oder Anzeichen: Kim has packed her bag. She is going to visit her aunt., Look at the dark sky! It is going to rain., The plate is near the edge. It is going to fall."
+     ],
+     "erklaerung": "I think, probably und I am sure zeigen eine Meinung; Pläne und sichtbare Anzeichen zeigen going to.",
+     "gruppen": [
+      "will: Meinung mit I think/probably",
+      "going to: Plan oder Anzeichen"
+     ],
+     "elemente": [
+      {
+       "text": "I think Ben will like this comic.",
+       "gruppe": 0
+      },
+      {
+       "text": "The bus will probably be late.",
+       "gruppe": 0
+      },
+      {
+       "text": "I am sure it will be sunny.",
+       "gruppe": 0
+      },
+      {
+       "text": "Kim has packed her bag. She is going to visit her aunt.",
+       "gruppe": 1
+      },
+      {
+       "text": "Look at the dark sky! It is going to rain.",
+       "gruppe": 1
+      },
+      {
+       "text": "The plate is near the edge. It is going to fall.",
+       "gruppe": 1
+      }
+     ],
+     "id": "b02bc771b7399",
+     "uebung": "unterscheiden",
+     "niveau": "g"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "I think the game would be exciting.",
+     "loesungen": [
+      "will"
+     ],
+     "fehlerWort": "would",
+     "erklaerung": "Nach I think benutzt du für eine Vorhersage will, nicht would.",
+     "id": "b8df7cb4b3910",
+     "uebung": "fehler",
+     "niveau": "g"
+    },
+    {
+     "art": "zuordnen",
+     "anweisung": "Ordne jeder Situation die passende Bedeutung zu.",
+     "satz": "",
+     "loesungen": [
+      "I think the school trip will be great. Meinungsvorhersage | Look at the full glass! It is going to fall. Vorhersage durch ein Anzeichen | We have packed our bags. We are going to visit Grandma. Plan | The doorbell is ringing. I’ll open it. spontane Entscheidung"
+     ],
+     "erklaerung": "I think zeigt eine Meinungsvorhersage mit will.",
+     "paare": [
+      {
+       "links": "I think the school trip will be great.",
+       "rechts": "Meinungsvorhersage"
+      },
+      {
+       "links": "Look at the full glass! It is going to fall.",
+       "rechts": "Vorhersage durch ein Anzeichen"
+      },
+      {
+       "links": "We have packed our bags. We are going to visit Grandma.",
+       "rechts": "Plan"
+      },
+      {
+       "links": "The doorbell is ringing. I’ll open it.",
+       "rechts": "spontane Entscheidung"
+      }
+     ],
+     "id": "bcbc2576506b1",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze nach der Bedeutung.",
+     "satz": "",
+     "loesungen": [
+      "Meinungsvorhersage mit will: I think the new café will be popular., Our neighbour will probably get a dog., I’m sure the puzzle will be difficult. | Plan oder Anzeichen mit going to: Look at those wet shoes! It is going to rain., We have chosen a recipe. We are going to cook soup., The baby is near the paint. She is going to make a mess."
+     ],
+     "erklaerung": "Meinungen haben oft I think, I’m sure oder probably; Pläne und Anzeichen brauchen going to.",
+     "gruppen": [
+      "Meinungsvorhersage mit will",
+      "Plan oder Anzeichen mit going to"
+     ],
+     "elemente": [
+      {
+       "text": "I think the new café will be popular.",
+       "gruppe": 0
+      },
+      {
+       "text": "Our neighbour will probably get a dog.",
+       "gruppe": 0
+      },
+      {
+       "text": "I’m sure the puzzle will be difficult.",
+       "gruppe": 0
+      },
+      {
+       "text": "Look at those wet shoes! It is going to rain.",
+       "gruppe": 1
+      },
+      {
+       "text": "We have chosen a recipe. We are going to cook soup.",
+       "gruppe": 1
+      },
+      {
+       "text": "The baby is near the paint. She is going to make a mess.",
+       "gruppe": 1
+      }
+     ],
+     "id": "b1a57ffbfdfa8",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle Sätze mit einer Meinungsvorhersage mit will.",
+     "satz": "",
+     "loesungen": [
+      "I think the museum will close early.",
+      "The film will probably start at eight.",
+      "I’m sure you’ll find your keys."
+     ],
+     "erklaerung": "I think, probably und I’m sure können eine Meinungsvorhersage mit will begleiten.",
+     "optionen": [
+      "I think the museum will close early.",
+      "The film will probably start at eight.",
+      "Look at the ice! Someone is going to fall.",
+      "I’m sure you’ll find your keys.",
+      "We are going to play volleyball on Friday."
+     ],
+     "id": "b2ab23a6f6631",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Ergänze die Vorhersage mit will.",
+     "satz": "I think the quiz ___ easy.",
+     "vorgabe": "(be)",
+     "loesungen": [
+      "will be",
+      "'ll be"
+     ],
+     "erklaerung": "I think zeigt eine Meinungsvorhersage mit will.",
+     "kontext": "Du sagst deine Meinung vor dem Quiz.",
+     "id": "b0344c6a658c0",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Ergänze die Vorhersage mit will.",
+     "satz": "I’m sure our team ___ well.",
+     "vorgabe": "(play)",
+     "loesungen": [
+      "will play",
+      "'ll play"
+     ],
+     "erklaerung": "I’m sure leitet hier eine Meinung über die Zukunft ein.",
+     "kontext": "Das Spiel beginnt gleich.",
+     "id": "ba62c74002e6f",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme mit probably um.",
+     "satz": "I think the train will arrive soon.",
+     "vorgabe": "Benutze will probably.",
+     "loesungen": [
+      "The train will probably arrive soon.",
+      "The train'll probably arrive soon."
+     ],
+     "erklaerung": "Bei probably steht will vor probably.",
+     "anfang": "The train",
+     "id": "be45875298dac",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage danach, wie deine Freundin das Wetter für morgen vorhersagt.",
+     "satz": "I think it will be warm tomorrow.",
+     "vorgabe": "Frage deine Freundin nach ihrer Wettervorhersage für morgen.",
+     "loesungen": [
+      "What do you think the weather will be like tomorrow?"
+     ],
+     "erklaerung": "Nach „What do you think“ folgt die Vorhersage mit will.",
+     "kontext": "Deine Freundin sagt: „I think it will be warm tomorrow.“ Du fragst sie nach ihrer Wettervorhersage.",
+     "anfang": "What",
+     "id": "b363409c7d7e0",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze die passende Form ein.",
+     "satz": "I think I ___ the bus on time.",
+     "vorgabe": "(catch)",
+     "loesungen": [
+      "will catch",
+      "'ll catch"
+     ],
+     "erklaerung": "I think macht die Aussage zu einer Meinungsvorhersage mit will.",
+     "kontext": "Der Bus kommt in fünf Minuten. Du siehst keinen Grund zur Sorge und sagst deine Meinung.",
+     "id": "bc1ab03bce2d8",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "lueckentext",
+     "anweisung": "Ergänze will oder going to mit dem Verb in Klammern. Achte auf Plan, Anzeichen und Meinung.",
+     "satz": "On Friday our class has a science afternoon. We have already chosen the experiments, so we ___ (make) a model volcano. Ben looks at the table and says, “I think it ___ (be) exciting.” Then Ben sees the bottles near the edge: “Careful! They ___ (fall)!” The teacher smiles: “Don’t worry. I ___ (move) them now.”",
+     "loesungen": [
+      "are going to make | will be | are going to fall | will move"
+     ],
+     "erklaerung": "Der Plan und das sichtbare Anzeichen brauchen going to; Meinung und spontane Reaktion brauchen will.",
+     "luecken": [
+      {
+       "vorgabe": "(make)",
+       "loesungen": [
+        "are going to make",
+        "'re going to make"
+       ]
+      },
+      {
+       "vorgabe": "(be)",
+       "loesungen": [
+        "will be",
+        "'ll be"
+       ]
+      },
+      {
+       "vorgabe": "(fall)",
+       "loesungen": [
+        "are going to fall",
+        "'re going to fall"
+       ]
+      },
+      {
+       "vorgabe": "(move)",
+       "loesungen": [
+        "will move",
+        "'ll move"
+       ]
+      }
+     ],
+     "id": "b258df90f5adc",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einer Aussage mit probably.",
+     "satz": "The café is new. It will be busy.",
+     "vorgabe": "(probably)",
+     "loesungen": [
+      "The new café will probably be busy.",
+      "The new café'll probably be busy."
+     ],
+     "erklaerung": "Probably steht nach will und vor dem Verb be.",
+     "kontext": "Du vermutest etwas über das neue Café.",
+     "anfang": "The new café",
+     "id": "ba794263446e7",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze: Meinungsvorhersage mit will oder Plan/Anzeichen mit going to?",
+     "satz": "",
+     "loesungen": [
+      "Meinungsvorhersage mit will: I think the new library will be useful., Our class will probably enjoy the trip., The film will probably be exciting. | Plan oder Anzeichen mit going to: Look at that bike! It is going to fall., We have chosen the game. We are going to play it., The bag is very full. It is going to break."
+     ],
+     "erklaerung": "„I think“ und „probably“ zeigen hier eine Meinungsvorhersage mit will.",
+     "gruppen": [
+      "Meinungsvorhersage mit will",
+      "Plan oder Anzeichen mit going to"
+     ],
+     "elemente": [
+      {
+       "text": "I think the new library will be useful.",
+       "gruppe": 0
+      },
+      {
+       "text": "Our class will probably enjoy the trip.",
+       "gruppe": 0
+      },
+      {
+       "text": "The film will probably be exciting.",
+       "gruppe": 0
+      },
+      {
+       "text": "Look at that bike! It is going to fall.",
+       "gruppe": 1
+      },
+      {
+       "text": "We have chosen the game. We are going to play it.",
+       "gruppe": 1
+      },
+      {
+       "text": "The bag is very full. It is going to break.",
+       "gruppe": 1
+      }
+     ],
+     "id": "bff919cca63a6",
+     "uebung": "unterscheiden",
+     "niveau": "m"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "I think our class will visits the museum.",
+     "loesungen": [
+      "visit"
+     ],
+     "fehlerWort": "visits",
+     "erklaerung": "Nach will steht immer die Grundform des Verbs.",
+     "id": "b35bc721e6ec4",
+     "uebung": "fehler",
+     "niveau": "m"
+    },
+    {
+     "art": "markieren",
+     "anweisung": "Markiere die will-Formen für Meinungsvorhersagen.",
+     "satz": "I think the new café will be popular. The bus will probably arrive soon.",
+     "loesungen": [
+      "will | will"
+     ],
+     "erklaerung": "In beiden Sätzen zeigen „I think“ oder „probably“ eine Vorhersage mit will.",
+     "ziele": [
+      5,
+      10
+     ],
+     "id": "b2518aa783c63",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze: Meinungsvorhersage mit will oder Plan/Anzeichen mit going to.",
+     "satz": "",
+     "loesungen": [
+      "Meinungsvorhersage mit will: I think the school concert will be exciting., Our neighbour will probably buy a new car., I’m sure the quiz will not be difficult. | Plan oder Anzeichen mit going to: Look at that cyclist! He is going to hit the gate., We have packed our lunch, so we’re going to walk to the lake., The cake is leaning over the table edge. It’s going to fall."
+     ],
+     "erklaerung": "Meinungen ohne sichtbaren Beleg brauchen will; Pläne und sichtbare Anzeichen brauchen going to.",
+     "gruppen": [
+      "Meinungsvorhersage mit will",
+      "Plan oder Anzeichen mit going to"
+     ],
+     "elemente": [
+      {
+       "text": "I think the school concert will be exciting.",
+       "gruppe": 0
+      },
+      {
+       "text": "Our neighbour will probably buy a new car.",
+       "gruppe": 0
+      },
+      {
+       "text": "I’m sure the quiz will not be difficult.",
+       "gruppe": 0
+      },
+      {
+       "text": "Look at that cyclist! He is going to hit the gate.",
+       "gruppe": 1
+      },
+      {
+       "text": "We have packed our lunch, so we’re going to walk to the lake.",
+       "gruppe": 1
+      },
+      {
+       "text": "The cake is leaning over the table edge. It’s going to fall.",
+       "gruppe": 1
+      }
+     ],
+     "id": "bfb185a381696",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle Sätze mit einer Meinungsvorhersage.",
+     "satz": "___",
+     "loesungen": [
+      "I think the café will be busy.",
+      "The train will probably arrive soon.",
+      "I’m sure our class will enjoy the visit."
+     ],
+     "erklaerung": "I think, probably und I’m sure zeigen hier eine Meinung an und stehen mit will.",
+     "optionen": [
+      "I think the café will be busy.",
+      "Look at the wet floor! Someone is going to slip.",
+      "The train will probably arrive soon.",
+      "We have booked the court, so we’re going to play tennis.",
+      "I’m sure our class will enjoy the visit."
+     ],
+     "id": "b1b2227061228",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze die passende will-Form ein.",
+     "satz": "I think the new computer game ___ very popular.",
+     "vorgabe": "(be)",
+     "loesungen": [
+      "will be",
+      "'ll be"
+     ],
+     "erklaerung": "I think zeigt eine Meinungsvorhersage, deshalb benutzt du will be.",
+     "kontext": "Du kennst das Spiel noch nicht und sagst nur deine Meinung.",
+     "id": "b5453cf4f2d52",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze die passende will-Form mit probably ein.",
+     "satz": "The library ___ after school.",
+     "vorgabe": "(be / probably)",
+     "loesungen": [
+      "will probably be",
+      "'ll probably be"
+     ],
+     "erklaerung": "Bei einer Vermutung steht probably nach will.",
+     "kontext": "Du vermutest, dass viele Schülerinnen und Schüler wegen eines Projekts dorthin gehen.",
+     "id": "bdf3bc6a45788",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme mit probably und will um.",
+     "satz": "I think the match will start late because of the rain.",
+     "vorgabe": "Benutze probably und will.",
+     "loesungen": [
+      "The match will probably start late because of the rain.",
+      "The match'll probably start late because of the rain."
+     ],
+     "erklaerung": "Probably steht nach will und vor dem Vollverb start.",
+     "anfang": "The match",
+     "id": "be9d1711184ac",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "vorgabe": "Stellung von probably mit will",
+     "loesungen": [
+      "The train will probably be late.",
+      "The train'll probably be late."
+     ],
+     "teile": [
+      "The train",
+      "will",
+      "probably",
+      "be",
+      "late."
+     ],
+     "erklaerung": "Probably steht nach will und vor be.",
+     "kontext": "Du vermutest, dass der Zug Verspätung hat.",
+     "id": "b593877dd9e79",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze will oder going to mit dem Verb ein.",
+     "satz": "I think I ___ the blue jacket; it looks better than the red one.",
+     "vorgabe": "(choose)",
+     "loesungen": [
+      "will choose",
+      "'ll choose"
+     ],
+     "erklaerung": "I think zeigt hier deine Meinung bei der Entscheidung, deshalb passt will.",
+     "kontext": "Du bist in einem Geschäft und vergleichst zwei Jacken. Du hast noch keine Entscheidung getroffen.",
+     "id": "bfedeb57c7820",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "lueckentext",
+     "anweisung": "Setze will oder going to mit dem Verb ein. Achte auf Plan, Anzeichen und spontane Entscheidung.",
+     "satz": "On Saturday, Mira has a clear plan: she has packed her swimming things and booked a place at the pool. She ___ there with her cousin. At the bus stop, Mira sees that her cousin has forgotten a towel. “Don’t worry,” Mira says, “I ___ you mine.” Then dark clouds suddenly cover the sky. Mira looks outside and says, “It ___ heavily.” Her cousin smiles: “I am sure the indoor pool ___ crowded, but we can still have fun.”",
+     "loesungen": [
+      "is going to go | will lend | is going to rain | will be"
+     ],
+     "erklaerung": "Der gebuchte Platz zeigt einen Plan, die Wolken sind ein Anzeichen, und „I am sure“ zeigt eine Vorhersage mit will.",
+     "luecken": [
+      {
+       "vorgabe": "(go)",
+       "loesungen": [
+        "is going to go",
+        "'s going to go"
+       ]
+      },
+      {
+       "vorgabe": "(lend)",
+       "loesungen": [
+        "will lend",
+        "'ll lend"
+       ]
+      },
+      {
+       "vorgabe": "(rain)",
+       "loesungen": [
+        "is going to rain",
+        "'s going to rain"
+       ]
+      },
+      {
+       "vorgabe": "(be)",
+       "loesungen": [
+        "will be",
+        "'ll be"
+       ]
+      }
+     ],
+     "id": "be63e27a2e8aa",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz für die Situation.",
+     "satz": "___",
+     "loesungen": [
+      "Look at the glass! It is going to fall.",
+      "Look at the glass! It's going to fall."
+     ],
+     "optionen": [
+      "I think the glass will probably fall.",
+      "Look at the glass! It is going to fall.",
+      "The glass will probably fall because I think so."
+     ],
+     "erklaerung": "Das Glas liefert ein sichtbares Anzeichen, deshalb benutzt man going to.",
+     "kontext": "Du siehst, dass das Wasserglas fast über die Tischkante rutscht. Du warnst deine Freundin.",
+     "id": "b532907ce4949",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Sätze: Meinungsvorhersage oder Plan/Anzeichen?",
+     "satz": "",
+     "loesungen": [
+      "Meinungsvorhersage mit will: I think the new pupil will enjoy our class., The robot will probably win the race., I am sure the website will be popular. | Plan oder Anzeichen mit going to: We are going to make posters; the paper is ready., Look at that full bag! It is going to tear., My cousin is going to bake a cake; the ingredients are on the table."
+     ],
+     "erklaerung": "I think, I am sure und probably zeigen hier eine Meinung; Vorbereitungen oder sichtbare Zeichen passen zu going to.",
+     "gruppen": [
+      "Meinungsvorhersage mit will",
+      "Plan oder Anzeichen mit going to"
+     ],
+     "elemente": [
+      {
+       "text": "I think the new pupil will enjoy our class.",
+       "gruppe": 0
+      },
+      {
+       "text": "The robot will probably win the race.",
+       "gruppe": 0
+      },
+      {
+       "text": "We are going to make posters; the paper is ready.",
+       "gruppe": 1
+      },
+      {
+       "text": "Look at that full bag! It is going to tear.",
+       "gruppe": 1
+      },
+      {
+       "text": "I am sure the website will be popular.",
+       "gruppe": 0
+      },
+      {
+       "text": "My cousin is going to bake a cake; the ingredients are on the table.",
+       "gruppe": 1
+      }
+     ],
+     "id": "b50d572d146bc",
+     "uebung": "unterscheiden",
+     "niveau": "a"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und schreibe es richtig.",
+     "satz": "I think the school band will plays at the summer festival.",
+     "loesungen": [
+      "play"
+     ],
+     "fehlerWort": "plays",
+     "erklaerung": "Nach will steht immer die Grundform des Verbs.",
+     "id": "bb637dd211bee",
+     "uebung": "fehler",
+     "niveau": "a"
+    },
+    {
+     "art": "markieren",
+     "anweisung": "Markiere alle Formen von will, die hier eine Meinungsvorhersage ausdrücken.",
+     "satz": "I think the new library will be busy after school. The lights are off, so it is going to close soon. Our teacher will probably visit it too.",
+     "loesungen": [
+      "will | will"
+     ],
+     "erklaerung": "Die beiden will-Formen stehen bei I think und probably; das sichtbare Zeichen passt zu going to.",
+     "ziele": [
+      5,
+      23
+     ],
+     "id": "b7077d3315c3f",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle die passende Vorhersage.",
+     "satz": "___",
+     "loesungen": [
+      "I think the new break room will probably be crowded."
+     ],
+     "optionen": [
+      "I think the new break room will probably be crowded.",
+      "Look at the queue! The new break room will probably be crowded.",
+      "I think the new break room is going to be crowded.",
+      "The new break room is going to be crowded because we have booked it."
+     ],
+     "erklaerung": "Ohne Plan oder sichtbares Anzeichen ist I think ... will probably die Meinungsvorhersage.",
+     "kontext": "Du weißt nichts Genaues über den neuen Pausenraum. Du sagst nur, was du erwartest.",
+     "id": "ba395e308db63",
+     "uebung": "erkennen",
+     "niveau": "a"
+    }
+   ]
+  },
+  {
+   "schluessel": "en.clause.relative_nondef/kommas",
+   "regel": {
+    "titel": "x",
+    "erklaerung": "x",
+    "beispiele": []
+   },
+   "aufgaben": [
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz mit der richtigen Zeichensetzung.",
+     "satz": "___",
+     "loesungen": [
+      "Jack, who is our class captain, will speak first."
+     ],
+     "optionen": [
+      "Jack who is our class captain will speak first.",
+      "Jack, who is our class captain will speak first.",
+      "Jack, who is our class captain, will speak first."
+     ],
+     "erklaerung": "Der Name ist schon eindeutig; der Relativsatz ist Zusatzinformation und braucht zwei Kommas.",
+     "kontext": "Jack ist die Klassensprecherin. Die Information über ihre Aufgabe ist nur eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "b7a9dab70ec2d",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz mit der richtigen Zeichensetzung.",
+     "satz": "___",
+     "loesungen": [
+      "Lake Windermere, which is in north-west England, is popular with tourists."
+     ],
+     "optionen": [
+      "Lake Windermere which is in north-west England is popular with tourists.",
+      "Lake Windermere, which is in north-west England is popular with tourists.",
+      "Lake Windermere, which is in north-west England, is popular with tourists."
+     ],
+     "erklaerung": "Der See ist eindeutig gemeint; die Zusatzinformation steht zwischen Kommas.",
+     "kontext": "Lake Windermere ist ein bestimmter See. Seine Lage ist eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "bdf7e14c74bc6",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den richtigen Satz.",
+     "satz": "___",
+     "loesungen": [
+      "Ms Green, whose dog is very friendly, teaches art."
+     ],
+     "optionen": [
+      "Ms Green whose dog is very friendly teaches art.",
+      "Ms Green, whose dog is very friendly teaches art.",
+      "Ms Green, whose dog is very friendly, teaches art."
+     ],
+     "erklaerung": "„Ms Green“ ist bereits klar. Deshalb steht der Zusatz mit „whose“ zwischen Kommas.",
+     "kontext": "Ms Green ist eine bestimmte Lehrerin. Der Hund ist nur eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "be0326c1f5941",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz.",
+     "satz": "___",
+     "loesungen": [
+      "My uncle, who lives in Cardiff, is a chef."
+     ],
+     "optionen": [
+      "My uncle who lives in Cardiff is a chef.",
+      "My uncle, who lives in Cardiff is a chef.",
+      "My uncle, who lives in Cardiff, is a chef."
+     ],
+     "erklaerung": "Es gibt nur einen Onkel; wo er wohnt, ist eine Zusatzinformation zwischen Kommas.",
+     "kontext": "Ich habe nur einen Onkel. Er wohnt in Cardiff.",
+     "kommaPruefen": true,
+     "id": "b30cd7a084683",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „who“. Denk an die Kommas.",
+     "satz": "My aunt is a chef. She lives in York.",
+     "vorgabe": "(who)",
+     "loesungen": [
+      "My aunt, who lives in York, is a chef.",
+      "My aunt, who is a chef, lives in York."
+     ],
+     "erklaerung": "„My aunt“ ist schon klar; „who lives in York“ ist eine Zusatzinformation zwischen Kommas.",
+     "anfang": "My aunt,",
+     "kommaPruefen": true,
+     "id": "bdaa3177ffa5a",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "Our school library is quiet. It opens at eight.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "Our school library, which opens at eight, is quiet.",
+      "Our school library, which is quiet, opens at eight."
+     ],
+     "erklaerung": "Die Bibliothek ist eindeutig; die Öffnungszeit ist eine Zusatzinformation mit zwei Kommas.",
+     "anfang": "Our school library,",
+     "kommaPruefen": true,
+     "id": "bdf35635ba2d7",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „whose“. Denk an die Kommas.",
+     "satz": "Mr Lee is our neighbour. His garden has roses.",
+     "vorgabe": "(whose)",
+     "loesungen": [
+      "Mr Lee, whose garden has roses, is our neighbour."
+     ],
+     "erklaerung": "„Whose“ zeigt Besitz an. Die Information über den Garten steht als Zusatz zwischen Kommas.",
+     "anfang": "Mr Lee,",
+     "kommaPruefen": true,
+     "id": "be3ad20061163",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "This tablet is new. I got it yesterday.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "This tablet, which I got yesterday, is new."
+     ],
+     "erklaerung": "Das Tablet ist schon genannt; wann es gekauft wurde, ist Zusatzinformation zwischen Kommas.",
+     "anfang": "This tablet,",
+     "kommaPruefen": true,
+     "id": "be3a139c10470",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz. Die zweite Information ist eine Zusatzinformation.",
+     "satz": "Sofia is my best friend. She plays the guitar.",
+     "loesungen": [
+      "Sofia, who plays the guitar, is my best friend.",
+      "Sofia, who is my best friend, plays the guitar."
+     ],
+     "erklaerung": "Sofia ist durch ihren Namen eindeutig; die Information über die Gitarre steht zwischen Kommas.",
+     "kontext": "Sofia ist für die sprechende Person eindeutig.",
+     "anfang": "Sofia,",
+     "kommaPruefen": true,
+     "id": "bb356e87aad7d",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz. Die zweite Information ist eine Zusatzinformation.",
+     "satz": "Edinburgh is in Scotland. It has a famous castle.",
+     "loesungen": [
+      "Edinburgh, which has a famous castle, is in Scotland.",
+      "Edinburgh, which is in Scotland, has a famous castle."
+     ],
+     "erklaerung": "Die Stadt ist eindeutig; die Information über das Schloss ist ein Zusatz zwischen Kommas.",
+     "kontext": "Edinburgh ist eine bestimmte Stadt.",
+     "anfang": "Edinburgh,",
+     "kommaPruefen": true,
+     "id": "ba5f5566354f7",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz. Die zweite Information ist eine Zusatzinformation.",
+     "satz": "Mrs Patel is our head teacher. Her office is near the hall.",
+     "loesungen": [
+      "Mrs Patel, whose office is near the hall, is our head teacher."
+     ],
+     "erklaerung": "Das Büro gehört zu Mrs Patel. Mit „whose“ wird diese Zusatzinformation zwischen Kommas eingefügt.",
+     "kontext": "Mrs Patel ist eine bestimmte Person an der Schule.",
+     "anfang": "Mrs Patel,",
+     "kommaPruefen": true,
+     "id": "b6c1f75acab13",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Richtig oder falsch? Achte auf die Kommas.",
+     "satz": "My only sister, who loves skateboarding, is thirteen.",
+     "loesungen": [
+      "My only sister, who loves skateboarding, is thirteen."
+     ],
+     "erklaerung": "Es gibt nur eine Schwester, deshalb ist die Information Zusatzinformation und steht zwischen Kommas.",
+     "kontext": "Die sprechende Person hat nur eine Schwester.",
+     "kommaPruefen": true,
+     "korrekt": true,
+     "id": "b1b37e2c11cd7",
+     "uebung": "unterscheiden",
+     "niveau": "g"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Richtig oder falsch?",
+     "satz": "Mr Carter, that teaches science, is very friendly.",
+     "loesungen": [
+      "who"
+     ],
+     "erklaerung": "In einem nicht-bestimmenden Relativsatz für Personen steht „who“, nicht „that“.",
+     "kommaPruefen": true,
+     "korrekt": false,
+     "fehlerWort": "that",
+     "id": "bd4f3da0b9364",
+     "uebung": "fehler",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz mit der passenden Zeichensetzung.",
+     "satz": "___",
+     "loesungen": [
+      "Sofia, whose bike is outside, is waiting for us."
+     ],
+     "optionen": [
+      "Sofia whose bike is outside is waiting for us.",
+      "Sofia, whose bike is outside, is waiting for us.",
+      "Sofia, whose bike is outside is waiting for us.",
+      "Sofia whose bike is outside, is waiting for us."
+     ],
+     "erklaerung": "Sofia ist eindeutig; die Zusatzinformation steht deshalb zwischen zwei Kommas.",
+     "kontext": "Sofia ist für die sprechende Person eindeutig. Die Information über das Fahrrad ist nur eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "b9c9ab7855df4",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz.",
+     "satz": "___",
+     "loesungen": [
+      "The Empire State Building, which is in New York, attracts many visitors."
+     ],
+     "optionen": [
+      "The Empire State Building which is in New York attracts many visitors.",
+      "The Empire State Building, that is in New York, attracts many visitors.",
+      "The Empire State Building, which is in New York, attracts many visitors.",
+      "The Empire State Building, which is in New York attracts many visitors."
+     ],
+     "erklaerung": "Bei einer Zusatzinformation zu einem eindeutigen Gebäude brauchst du „which“ und zwei Kommas.",
+     "kontext": "Das Empire State Building ist ein bestimmtes Gebäude. Der Relativsatz ergänzt nur eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "b5b98222debdd",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz.",
+     "satz": "___",
+     "loesungen": [
+      "Mr Harris, whose daughter plays volleyball, coaches our team."
+     ],
+     "optionen": [
+      "Mr Harris whose daughter plays volleyball coaches our team.",
+      "Mr Harris, who daughter plays volleyball, coaches our team.",
+      "Mr Harris, whose daughter plays volleyball, coaches our team.",
+      "Mr Harris, whose daughter plays volleyball coaches our team."
+     ],
+     "erklaerung": "„Whose“ zeigt Besitz an; der Zusatz über Mr Harris steht zwischen Kommas.",
+     "kontext": "Mr Harris ist der eindeutige Trainer des Schulteams. Die Information über seine Tochter ist zusätzlich.",
+     "kommaPruefen": true,
+     "id": "b088d58ee73d5",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der zur Situation passt.",
+     "satz": "___",
+     "loesungen": [
+      "The neighbour who has a dog often walks in the park."
+     ],
+     "optionen": [
+      "The neighbour, who has a dog, often walks in the park.",
+      "The neighbour who has a dog often walks in the park.",
+      "The neighbour, that has a dog, often walks in the park.",
+      "The neighbour, who has a dog often walks in the park."
+     ],
+     "erklaerung": "Hier bestimmt der Relativsatz, welche der zwei Nachbarinnen gemeint ist; deshalb stehen keine Kommas.",
+     "kontext": "Noah hat zwei Nachbarinnen. Nur eine von ihnen besitzt einen Hund.",
+     "kommaPruefen": true,
+     "id": "b74a9b1b5a1ed",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „who“. Denk an die Kommas.",
+     "satz": "Our drama teacher is very patient. She directs the school play.",
+     "vorgabe": "(who)",
+     "loesungen": [
+      "Our drama teacher, who directs the school play, is very patient.",
+      "Our drama teacher, who is very patient, directs the school play."
+     ],
+     "erklaerung": "Die Lehrerin ist eindeutig; „who directs the school play“ ist Zusatzinformation zwischen Kommas.",
+     "anfang": "Our drama teacher,",
+     "kommaPruefen": true,
+     "id": "b509a88b4e4fc",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "The school concert was successful. It took place on Friday.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "The school concert, which took place on Friday, was successful.",
+      "The school concert, which was successful, took place on Friday."
+     ],
+     "erklaerung": "Das Konzert ist eindeutig; die Information über den Termin ist ein Zusatz und steht zwischen Kommas.",
+     "anfang": "The school concert,",
+     "kommaPruefen": true,
+     "id": "b7c13348aa102",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „whose“. Denk an die Kommas.",
+     "satz": "Lena is in our chess club. Her brother won the competition.",
+     "vorgabe": "(whose)",
+     "loesungen": [
+      "Lena, whose brother won the competition, is in our chess club."
+     ],
+     "erklaerung": "Mit „whose“ ergänzt du eine Besitzinformation über die eindeutige Person Lena.",
+     "anfang": "Lena,",
+     "kommaPruefen": true,
+     "id": "bfcc2e4f21b7e",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "Our new sports hall is near the river. It has a climbing wall.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "Our new sports hall, which has a climbing wall, is near the river.",
+      "Our new sports hall, which is near the river, has a climbing wall."
+     ],
+     "erklaerung": "Die Sporthalle ist eindeutig; ihre Ausstattung ist eine Zusatzinformation zwischen Kommas.",
+     "anfang": "Our new sports hall,",
+     "kommaPruefen": true,
+     "id": "b0abcf76b05a7",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der zur Situation passt.",
+     "satz": "___",
+     "loesungen": [
+      "The museum, which was built in the nineteenth century, has an art exhibition."
+     ],
+     "optionen": [
+      "The museum which was built in the nineteenth century has an art exhibition.",
+      "The museum, which was built in the nineteenth century, has an art exhibition.",
+      "The museum, that was built in the nineteenth century, has an art exhibition.",
+      "The museum, which was built in the nineteenth century has an art exhibition."
+     ],
+     "erklaerung": "Es gibt nur ein gemeintes Museum; das Baujahr ist Zusatzinformation und wird mit Kommas abgetrennt.",
+     "kontext": "Die Klasse besucht nur ein Museum. Es wurde im 19. Jahrhundert gebaut.",
+     "kommaPruefen": true,
+     "id": "b8e066c58fcc9",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz mit einem nicht-bestimmenden Relativsatz.",
+     "satz": "___",
+     "loesungen": [
+      "Bristol, which is in the south-west of England, has a busy harbour."
+     ],
+     "optionen": [
+      "Bristol, which is in the south-west of England, has a busy harbour.",
+      "Bristol which is in the south-west of England has a busy harbour.",
+      "Bristol, that is in the south-west of England, has a busy harbour."
+     ],
+     "erklaerung": "Bristol ist eindeutig; die Zusatzinformation steht deshalb zwischen Kommas und beginnt mit „which“.",
+     "kommaPruefen": true,
+     "id": "bdfcaf3659090",
+     "uebung": "unterscheiden",
+     "niveau": "m"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "Mr Evans, which coaches our football team, also teaches PE.",
+     "loesungen": [
+      "who"
+     ],
+     "fehlerWort": "which",
+     "erklaerung": "Für eine Person verwendet man im nicht-bestimmenden Relativsatz „who“.",
+     "kommaPruefen": true,
+     "id": "b12162f679b6b",
+     "uebung": "fehler",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der zur Situation passt.",
+     "satz": "___",
+     "loesungen": [
+      "My cousin, who lives in Manchester, is learning Spanish."
+     ],
+     "optionen": [
+      "My cousin who lives in Manchester is learning Spanish.",
+      "My cousin, who lives in Manchester, is learning Spanish.",
+      "My cousin, that lives in Manchester, is learning Spanish."
+     ],
+     "erklaerung": "Es gibt nur eine Cousine, deshalb ist die Information über Manchester zusätzlich und wird durch Kommas abgetrennt.",
+     "kontext": "I have only one cousin. She lives in Manchester and is learning Spanish.",
+     "kommaPruefen": true,
+     "id": "b3a3966965130",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der die Zusatzinformation richtig mit Kommas kennzeichnet.",
+     "satz": "___",
+     "loesungen": [
+      "Our exchange students, both of whom come from Ireland, joined the class in September."
+     ],
+     "optionen": [
+      "Our exchange students both of whom come from Ireland joined the class in September.",
+      "Our exchange students, both of whom come from Ireland, joined the class in September.",
+      "Our exchange students, both of that come from Ireland, joined the class in September."
+     ],
+     "erklaerung": "„Both of whom come from Ireland“ ist eine Zusatzinformation und muss zwischen Kommas stehen.",
+     "kontext": "Our class has exactly two exchange students. Both of them come from Ireland.",
+     "kommaPruefen": true,
+     "id": "bac1a016742da",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz mit der passenden Zeichensetzung.",
+     "satz": "___",
+     "loesungen": [
+      "Our art teacher, who has a studio near the station, sells paintings."
+     ],
+     "optionen": [
+      "Our art teacher who has a studio near the station sells paintings.",
+      "Our art teacher, who has a studio near the station, sells paintings.",
+      "Our art teacher, that has a studio near the station, sells paintings."
+     ],
+     "erklaerung": "Der Kunstlehrer ist schon eindeutig; die Zusatzinformation steht deshalb zwischen Kommas.",
+     "kontext": "Die Klasse hat nur einen Kunstlehrer. Die Information über sein Atelier ist nur zusätzlich.",
+     "kommaPruefen": true,
+     "id": "b72065eec1032",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den passenden Satz.",
+     "satz": "___",
+     "loesungen": [
+      "The old sports hall, which was built in 1968, needs new windows."
+     ],
+     "optionen": [
+      "The old sports hall which was built in 1968 needs new windows.",
+      "The old sports hall, which was built in 1968, needs new windows.",
+      "The old sports hall, that was built in 1968, needs new windows.",
+      "The old sports hall, was built in 1968, needs new windows."
+     ],
+     "erklaerung": "Bei einer eindeutigen Sache kennzeichnen zwei Kommas die Zusatzinformation.",
+     "kontext": "Die Schule besitzt genau eine alte Sporthalle. Ihr Baujahr ist eine Zusatzinformation.",
+     "kommaPruefen": true,
+     "id": "b1030957b667d",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der zur Situation passt.",
+     "satz": "___",
+     "loesungen": [
+      "My cousin, who has started work at an animal shelter, loves animals."
+     ],
+     "optionen": [
+      "My cousin who has started work at an animal shelter loves animals.",
+      "My cousin, who has started work at an animal shelter, loves animals.",
+      "My cousin, that has started work at an animal shelter, loves animals."
+     ],
+     "erklaerung": "Weil es nur eine Cousine gibt, ist der Relativsatz nicht bestimmend und braucht Kommas.",
+     "kontext": "Ich habe nur eine Cousine. Sie hat vor Kurzem ein Praktikum in einem Tierheim begonnen.",
+     "kommaPruefen": true,
+     "id": "bf5f2facbb502",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den richtigen Satz.",
+     "satz": "___",
+     "loesungen": [
+      "The head teacher, whose daughter plays volleyball, congratulated our team."
+     ],
+     "optionen": [
+      "The head teacher whose daughter plays volleyball congratulated our team.",
+      "The head teacher, whose daughter plays volleyball, congratulated our team.",
+      "The head teacher, that daughter plays volleyball, congratulated our team.",
+      "The head teacher, daughter plays volleyball, congratulated our team."
+     ],
+     "erklaerung": "„Whose“ zeigt Besitz an; der gesamte Zusatz steht zwischen Kommas.",
+     "kontext": "Der Schulleiter ist für alle an der Schule eindeutig. Die Information über seine Tochter ist nur zusätzlich.",
+     "kommaPruefen": true,
+     "id": "bf71ccde9aee9",
+     "uebung": "erkennen",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „who“. Denk an die Kommas.",
+     "satz": "Our neighbour works at the museum. She speaks three languages.",
+     "vorgabe": "(who)",
+     "loesungen": [
+      "Our neighbour, who speaks three languages, works at the museum.",
+      "Our neighbour, who works at the museum, speaks three languages."
+     ],
+     "erklaerung": "„Our neighbour“ ist eindeutig; die Information über die Sprachen ist ein Zusatz zwischen Kommas.",
+     "anfang": "Our neighbour,",
+     "kommaPruefen": true,
+     "id": "b2988e820b130",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "The school website has been updated. It now includes bus times.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "The school website, which now includes bus times, has been updated.",
+      "The school website, which has been updated, now includes bus times."
+     ],
+     "erklaerung": "Die Website ist eindeutig; ihr neues Angebot ist eine Zusatzinformation zwischen Kommas.",
+     "anfang": "The school website,",
+     "kommaPruefen": true,
+     "id": "bae4774263b19",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „whose“. Denk an die Kommas.",
+     "satz": "Our drama teacher thanked the audience. Her play was performed twice.",
+     "vorgabe": "(whose)",
+     "loesungen": [
+      "Our drama teacher, whose play was performed twice, thanked the audience."
+     ],
+     "erklaerung": "„Whose“ verbindet die Lehrerin mit ihrem Stück; der Zusatz steht zwischen Kommas.",
+     "anfang": "Our drama teacher,",
+     "kommaPruefen": true,
+     "id": "bb8ad0ca46c22",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit „which“. Denk an die Kommas.",
+     "satz": "The science exhibition attracted many visitors. It opened after the holidays.",
+     "vorgabe": "(which)",
+     "loesungen": [
+      "The science exhibition, which opened after the holidays, attracted many visitors.",
+      "The science exhibition, which attracted many visitors, opened after the holidays."
+     ],
+     "erklaerung": "Das Eröffnungsdatum ist eine Zusatzinformation zur bereits genannten Ausstellung.",
+     "anfang": "The science exhibition,",
+     "kommaPruefen": true,
+     "id": "bc67cb2eae62f",
+     "uebung": "bilden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz mit einem nicht-bestimmenden Relativsatz. Denk an die Kommas.",
+     "satz": "The River Thames flows through London. It is over 300 kilometres long.",
+     "loesungen": [
+      "The River Thames, which is over 300 kilometres long, flows through London."
+     ],
+     "erklaerung": "Die Themse ist eindeutig; die Länge ist nur eine Zusatzinformation zwischen Kommas.",
+     "anfang": "The River Thames,",
+     "kommaPruefen": true,
+     "id": "b8bf72a97f824",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz mit einem nicht-bestimmenden Relativsatz. Denk an die Kommas.",
+     "satz": "Mrs Jones leads the debate club. Her daughter won the regional speaking competition.",
+     "loesungen": [
+      "Mrs Jones, whose daughter won the regional speaking competition, leads the debate club."
+     ],
+     "erklaerung": "Mrs Jones ist eindeutig; „whose“ zeigt, dass die Tochter zu ihr gehört.",
+     "anfang": "Mrs Jones,",
+     "kommaPruefen": true,
+     "id": "b070e246a922a",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze zu einem Satz mit einem nicht-bestimmenden Relativsatz. Denk an die Kommas.",
+     "satz": "The class visited the Eden Project. It contains huge indoor gardens.",
+     "loesungen": [
+      "The class visited the Eden Project, which contains huge indoor gardens."
+     ],
+     "erklaerung": "Das Eden Project ist bereits eindeutig; der Relativsatz ergänzt nur eine Information.",
+     "kontext": "Die Klasse besuchte genau dieses bekannte Ausflugsziel.",
+     "anfang": "The class visited the Eden Project,",
+     "kommaPruefen": true,
+     "id": "b1687bdbc934f",
+     "uebung": "anwenden",
+     "niveau": "a"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle den Satz, der zur Situation passt.",
+     "satz": "___",
+     "loesungen": [
+      "My sister, who is studying in Bristol, is called Ella."
+     ],
+     "optionen": [
+      "My sister who is studying in Bristol is called Ella.",
+      "My sister, who is studying in Bristol, is called Ella.",
+      "My sister that is studying in Bristol is called Ella."
+     ],
+     "erklaerung": "Noah hat nur eine Schwester, deshalb ist die Information über Bristol zusätzlich und steht zwischen Kommas.",
+     "kontext": "Noah has only one sister. Her name is Ella, and she is studying in Bristol.",
+     "kommaPruefen": true,
+     "id": "b93c16b33de79",
+     "uebung": "unterscheiden",
+     "niveau": "a"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "Liverpool, that is famous for its music scene, attracts many visitors every year.",
+     "loesungen": [
+      "which"
+     ],
+     "fehlerWort": "that",
+     "erklaerung": "Bei einem nicht-bestimmenden Relativsatz über eine Sache steht „which“, nicht „that“.",
+     "kommaPruefen": true,
+     "id": "b219f393d0e33",
+     "uebung": "fehler",
+     "niveau": "a"
+    }
+   ]
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "regel": {
+    "titel": "x",
+    "erklaerung": "x",
+    "beispiele": []
+   },
+   "aufgaben": [
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "At eight o'clock last night, Mia ___ her teeth.",
+     "loesungen": [
+      "was brushing"
+     ],
+     "optionen": [
+      "was brushing",
+      "is brushing",
+      "were brushing"
+     ],
+     "erklaerung": "Der Zeitpunkt in der Vergangenheit zeigt: Mia war gerade dabei.",
+     "id": "b372ac70b6fef",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "At seven o'clock last night, the boys ___ in the garden.",
+     "loesungen": [
+      "were playing"
+     ],
+     "optionen": [
+      "were playing",
+      "was playing",
+      "are playing"
+     ],
+     "erklaerung": "The boys ist Mehrzahl, deshalb steht were playing.",
+     "id": "b7c6ab41119ce",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Entscheide: richtig oder falsch?",
+     "satz": "While Leo was drawing, his sister was singing.",
+     "loesungen": [
+      "While Leo was drawing, his sister was singing."
+     ],
+     "erklaerung": "Beide Handlungen liefen gleichzeitig, deshalb stehen beide im past progressive.",
+     "korrekt": true,
+     "id": "b8354c95361b5",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle richtigen Sätze.",
+     "satz": "___",
+     "loesungen": [
+      "At eight o'clock last night, I was reading.",
+      "While Sam was cooking, I was setting the table.",
+      "The girls were chatting while we were walking home."
+     ],
+     "erklaerung": "Die richtigen Sätze haben was oder were plus Verb-ing für vergangene Handlungen.",
+     "kontext": "Es ist acht Uhr abends in der Vergangenheit.",
+     "optionen": [
+      "At eight o'clock last night, I was reading.",
+      "While Sam was cooking, I was setting the table.",
+      "The girls were chatting while we were walking home.",
+      "While Ben were swimming, I was watching.",
+      "At eight o'clock last night, we are playing cards."
+     ],
+     "id": "b7f6e9555712f",
+     "uebung": "erkennen",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im past progressive ein.",
+     "satz": "I ___ when the doorbell rang.",
+     "vorgabe": "(read)",
+     "loesungen": [
+      "was reading"
+     ],
+     "erklaerung": "Das Klingeln unterbricht die Handlung, die gerade lief.",
+     "id": "b1c95b3c3c09d",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme den Satz in eine Frage im past progressive um.",
+     "satz": "You were waiting for the bus.",
+     "vorgabe": "Frage im past progressive",
+     "loesungen": [
+      "Were you waiting for the bus?"
+     ],
+     "erklaerung": "In Fragen steht were vor dem Subjekt.",
+     "anfang": "Were you",
+     "id": "b2bacd8c0509c",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im past progressive.",
+     "satz": "No, I wasn't. I was reading.",
+     "vorgabe": "sleep",
+     "loesungen": [
+      "Were you sleeping?"
+     ],
+     "erklaerung": "Die Antwort beginnt mit No, I wasn't, daher lautet die Frage Were you ...?",
+     "kontext": "Du möchtest wissen, ob dein Freund gerade schlief.",
+     "id": "b4160a7d7dadd",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "loesungen": [
+      "While I was doing my homework, my brother was watching TV."
+     ],
+     "teile": [
+      "While",
+      "I",
+      "was doing",
+      "my homework,",
+      "my brother",
+      "was watching TV."
+     ],
+     "erklaerung": "Während I was doing lief, lief auch die andere Handlung.",
+     "id": "bc705154ff537",
+     "uebung": "bilden",
+     "niveau": "g"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die Sätze mit while.",
+     "satz": "Nora was painting a picture. Her brother was building a model plane.",
+     "vorgabe": "(while)",
+     "loesungen": [
+      "While Nora was painting a picture, her brother was building a model plane."
+     ],
+     "erklaerung": "While verbindet zwei Handlungen, die gleichzeitig liefen.",
+     "kontext": "Beide Handlungen passierten gleichzeitig.",
+     "anfang": "While Nora was painting a picture,",
+     "id": "bb51ee4c8927c",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im past progressive ein.",
+     "satz": "The children ___ when their dad opened the door.",
+     "vorgabe": "(play)",
+     "loesungen": [
+      "were playing"
+     ],
+     "erklaerung": "Das Öffnen der Tür geschah, während die Kinder gerade spielten.",
+     "kontext": "Es war sechs Uhr abends. Die Kinder waren schon mitten in ihrem Spiel.",
+     "id": "ba466f9a76776",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im past progressive.",
+     "satz": "Yes, they were. They were playing football.",
+     "vorgabe": "play football",
+     "loesungen": [
+      "Were they playing football?"
+     ],
+     "erklaerung": "Die Antwort Yes, they were zeigt: Die Frage beginnt mit Were they ...?",
+     "kontext": "Du siehst zwei Kinder auf dem Sportplatz und fragst nach ihrer Handlung.",
+     "id": "b080e6c6054bd",
+     "uebung": "anwenden",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle die richtige Verbform.",
+     "satz": "At nine o'clock last night, Kim ___ a comic while her brother was drawing.",
+     "loesungen": [
+      "was reading"
+     ],
+     "optionen": [
+      "was reading",
+      "is reading",
+      "were reading"
+     ],
+     "erklaerung": "„At nine o'clock last night“ zeigt eine Handlung, die damals gerade lief: was reading.",
+     "id": "b927d6bb7a4bf",
+     "uebung": "unterscheiden",
+     "niveau": "g"
+    },
+    {
+     "art": "fehler",
+     "anweisung": "Finde das falsche Wort und verbessere es.",
+     "satz": "While Ella was drawing, her friends was making posters.",
+     "loesungen": [
+      "were"
+     ],
+     "fehlerWort": "was",
+     "erklaerung": "Zu „her friends“ gehört im past progressive were.",
+     "id": "bb12d141a7cdd",
+     "uebung": "fehler",
+     "niveau": "g"
+    },
+    {
+     "art": "auswahl",
+     "anweisung": "Wähle die richtige Form.",
+     "satz": "While the dog ___ in the garden, the cat was sleeping.",
+     "loesungen": [
+      "was running"
+     ],
+     "optionen": [
+      "was running",
+      "were running",
+      "is running"
+     ],
+     "erklaerung": "Das Subjekt the dog ist Einzahl, deshalb steht was running.",
+     "id": "bf1b4403c8561",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "richtigfalsch",
+     "anweisung": "Entscheide: Richtig oder falsch?",
+     "satz": "While we were eating lunch, the rain was falling outside.",
+     "loesungen": [
+      "While we were eating lunch, the rain was falling outside."
+     ],
+     "erklaerung": "Beide Handlungen liefen gleichzeitig ab und stehen im past progressive.",
+     "korrekt": true,
+     "id": "b67a2c1e504e6",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "mehrfach",
+     "anweisung": "Wähle alle Sätze, in denen zwei Handlungen gleichzeitig abliefen.",
+     "satz": "___",
+     "loesungen": [
+      "While Ben was swimming, Ava was counting the laps.",
+      "The players were warming up while the coach was talking."
+     ],
+     "erklaerung": "Nur die richtigen Sätze haben auf beiden Seiten von while eine Handlung im past progressive.",
+     "optionen": [
+      "While Ben was swimming, Ava was counting the laps.",
+      "The players were warming up while the coach was talking.",
+      "While my aunt cooks, I set the table.",
+      "While we are walking home, it starts to rain."
+     ],
+     "id": "bea60d7d741ef",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "sortieren",
+     "anweisung": "Sortiere die Formen in die richtige Gruppe.",
+     "satz": "",
+     "loesungen": [
+      "was + Verb-ing: was painting, was washing, was carrying | were + Verb-ing: were dancing, were listening, were skating"
+     ],
+     "erklaerung": "Was gehört zu I und Einzahl, were zu you und Mehrzahl.",
+     "gruppen": [
+      "was + Verb-ing",
+      "were + Verb-ing"
+     ],
+     "elemente": [
+      {
+       "text": "was painting",
+       "gruppe": 0
+      },
+      {
+       "text": "were dancing",
+       "gruppe": 1
+      },
+      {
+       "text": "was washing",
+       "gruppe": 0
+      },
+      {
+       "text": "were listening",
+       "gruppe": 1
+      },
+      {
+       "text": "was carrying",
+       "gruppe": 0
+      },
+      {
+       "text": "were skating",
+       "gruppe": 1
+      }
+     ],
+     "id": "b5fff0b94f74e",
+     "uebung": "erkennen",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im past progressive ein.",
+     "satz": "While the teacher was speaking, Amir ___ to the board.",
+     "vorgabe": "(walk)",
+     "loesungen": [
+      "was walking"
+     ],
+     "erklaerung": "Amir ist eine Person; deshalb heißt es was walking.",
+     "id": "b1d246d47c937",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "umformen",
+     "anweisung": "Forme mit while um. Beginne mit dem vorgegebenen Satzanfang.",
+     "satz": "Maya was decorating the room. Her cousins were blowing up balloons.",
+     "vorgabe": "Verbinde die gleichzeitigen Handlungen mit while.",
+     "loesungen": [
+      "While Maya was decorating the room, her cousins were blowing up balloons."
+     ],
+     "erklaerung": "Die beiden Handlungen liefen gleichzeitig ab, daher stehen beide im past progressive.",
+     "anfang": "While Maya was decorating the room, ...",
+     "id": "bca7228b01056",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "satzbau",
+     "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+     "satz": "",
+     "loesungen": [
+      "While the twins were drawing, their cousin was taking photos."
+     ],
+     "teile": [
+      "While the twins",
+      "were",
+      "drawing,",
+      "their cousin",
+      "was",
+      "taking",
+      "photos."
+     ],
+     "erklaerung": "Nach while stehen die Zwillinge mit were drawing; die zweite gleichzeitige Handlung ist was taking.",
+     "id": "bab66ac0bb502",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im past progressive zur Antwort.",
+     "satz": "Yes, we were. We were putting up balloons while the music was playing.",
+     "vorgabe": "Frage nach: putting up balloons",
+     "loesungen": [
+      "Were you putting up balloons while the music was playing?"
+     ],
+     "erklaerung": "Bei einer Frage mit you steht were am Satzanfang.",
+     "id": "b498c3f151257",
+     "uebung": "bilden",
+     "niveau": "m"
+    },
+    {
+     "art": "verbinden",
+     "anweisung": "Verbinde die beiden Sätze mit while. Beginne mit dem vorgegebenen Satzanfang.",
+     "satz": "The neighbours were talking. Ella was watering the plants.",
+     "vorgabe": "(while)",
+     "loesungen": [
+      "While the neighbours were talking, Ella was watering the plants."
+     ],
+     "erklaerung": "While verbindet zwei Handlungen, die zur gleichen Zeit abliefen.",
+     "anfang": "While the neighbours were talking, ...",
+     "id": "b5e0383990e5d",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "luecke",
+     "anweisung": "Setze das Verb im past progressive ein.",
+     "satz": "At six o'clock, the family ___ a board game while the soup was cooking.",
+     "vorgabe": "(play)",
+     "loesungen": [
+      "was playing",
+      "were playing"
+     ],
+     "erklaerung": "The family wird hier als eine Gruppe gesehen; deshalb steht was playing.",
+     "kontext": "Es ist Abend. Alle sind bereits in der Küche.",
+     "id": "b99f3e9341a3d",
+     "uebung": "anwenden",
+     "niveau": "m"
+    },
+    {
+     "art": "frage",
+     "anweisung": "Bilde eine Frage im past progressive zur Antwort.",
+     "satz": "No, I wasn't. I was reading while my brother was drawing.",
+     "vorgabe": "Frage nach: sleeping",
+     "loesungen": [
+      "Were you sleeping while your brother was drawing?"
+     ],
+     "erklaerung": "Die Antwort No, I wasn't zeigt: Die Frage beginnt mit Were you.",
+     "kontext": "Du möchtest wissen, ob dein Freund gerade schlief.",
+     "id": "baa2b34eaac24",
+     "uebung": "anwenden",
+     "niveau": "m"
+    }
+   ]
+  }
+ ]
+}

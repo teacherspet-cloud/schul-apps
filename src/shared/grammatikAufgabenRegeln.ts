@@ -16,7 +16,8 @@
  *  - `aufgabeMangel`: was übrig bleibt und eine Aufgabe unbrauchbar macht – neue Aufgaben mit Mangel fallen weg,
  *    vorhandene in der Bank werden für die Lernenden zurückgestellt, bis sie überarbeitet sind.
  */
-import { normiert, woerterVon, type GrammatikAufgabe } from './grammatiktrainer'
+import { selbsttest } from './grammatikSelbsttest'
+import { normiert, satzanfang, woerterVon, type GrammatikAufgabe } from './grammatiktrainer'
 
 /** Auftrag an die KI: Regeln, die für jede Aufgabe gelten (alle Sprachen) */
 export const AUFGABEN_REGELN = [
@@ -36,8 +37,9 @@ export const AUFGABEN_REGELN = [
   'KONTEXT statt Einzelsatz: Legt ein Satz allein die Form nicht fest (Zeitform/Aspekt, will/going to, Modalverb nach Bedeutung, indirekte Rede, Artikel bei Erstnennung …), schreibe 1–3 kurze Sätze Vorlauf in „kontext“ (Situation, Zeit, Beleg) oder nutze Lückentext bzw. Dialog. Kontext sprachlich einfacher als die geübte Grammatik.',
   'Mittel für Eindeutigkeit: Verb UND Signalwort in die Klammer („(tidy / already)“); beim Bilden die Zielform als Etikett („Passiv, Past Perfect:“) – nie beim Erkennen; Kontrastpaar im selben Satz („often …, but today …“); vorgegebener Teilsatz (if-Satz, Zeitsatz); vorgegebene Antwort beim Fragenbilden; Wortkasten, in dem jedes Wort genau einmal passt.',
   'Gleichwertige Formen (might/may/could, must/have to, who/that, somebody/someone, Kurz- und Langform) nie als richtige und falsche Möglichkeit gegeneinander; beim Tippen alle in „loesungen“. Norm ist britisches Schulenglisch („If I were you“, „I have just bought“).',
-  'Formate: LÜCKENTEXT („lueckentext“): 60–120 Wörter (oder Dialog mit Zeilen „A: …“/„B: …“), 3–6 Lücken „___“, je Lücke in „luecken“ das Grundwort als „vorgabe“ bzw. „optionen“ und alle „loesungen“; jede Lücke ohne die anderen lösbar, Lücken nicht direkt hintereinander, eine Verbform in genau eine Lücke. SÄTZE VERBINDEN („verbinden“): zwei kurze Sätze in „satz“, Bindewort in „vorgabe“ (z. B. „(who)“), möglichst Satzanfang in „anfang“; „loesungen“ = ganze Sätze mit allen Varianten (Stellung, who/that, mit und ohne weglassbares Pronomen). FRAGE BILDEN („frage“): die Antwort in „satz“, Fragewort bzw. Hilfe in „vorgabe“, „loesungen“ = ganze Fragen. MARKIEREN („markieren“): 1–3 Sätze in „satz“, die zu markierenden Wörter genau wie im Text in „zielWoerter“. SORTIEREN („sortieren“): 2–3 „gruppen“, 6–8 „elemente“ mit Gruppennummer (0 = erste Gruppe). MEHRFACHAUSWAHL („mehrfach“): 4–5 „optionen“, alle richtigen in „loesungen“ – für gleichwertige Varianten.',
+  'Formate: LÜCKENTEXT („lueckentext“): 60–120 Wörter (oder Dialog mit Zeilen „A: …“/„B: …“), 3–6 Lücken „___“, je Lücke in „luecken“ das Grundwort als „vorgabe“ bzw. „optionen“ und alle „loesungen“; jede Lücke ohne die anderen lösbar, Lücken nicht direkt hintereinander, eine Verbform in genau eine Lücke. SÄTZE VERBINDEN („verbinden“): zwei kurze Sätze in „satz“, Bindewort in „vorgabe“ (z. B. „(who)“); „anfang“ höchstens der Satzgegenstand bzw. die ersten Wörter VOR der geübten Stelle (z. B. „I have a friend“ bei who) – nie das Bindewort samt ganzem Teilsatz und nie so viel, dass der Rest wörtlich in den Ausgangssätzen steht (sonst üben die Lernenden nur Abschreiben); ohne „…“; „loesungen“ = ganze Sätze mit allen Varianten (Stellung, who/that, mit und ohne weglassbares Pronomen). FRAGE BILDEN („frage“): die Antwort in „satz“, Fragewort bzw. Hilfe in „vorgabe“, „loesungen“ = ganze Fragen. MARKIEREN („markieren“): 1–3 Sätze in „satz“, die zu markierenden Wörter genau wie im Text in „zielWoerter“. SORTIEREN („sortieren“): 2–3 „gruppen“, 6–8 „elemente“ mit Gruppennummer (0 = erste Gruppe). MEHRFACHAUSWAHL („mehrfach“): 4–5 „optionen“, alle richtigen in „loesungen“ – für gleichwertige Varianten.',
   'Kommas: „kommaPruefen“ nur true, wenn die geübte Grammatik selbst eine Kommaregel ist (Relativsätze, if-Satz vorne, Satzadverbien) – sonst zählt ein Komma mehr oder weniger beim Tippen ganzer Sätze nicht.',
+  'Personen in Aufgaben: erfundene, gewöhnliche englische Vornamen – NIE Platzhalter wie „[Person-1]“ (die stehen nur für echte Namen im Auftrag und dürfen nicht in Aufgaben erscheinen).',
   'Zu JEDER Aufgabe eine „erklaerung“: ein kurzer Satz auf Deutsch, warum diese Form (z. B. „Signal: yet → present perfect“) – die Lernenden sehen ihn nach der Antwort.'
 ].join('\n')
 
@@ -108,6 +110,11 @@ export function aufgabeNormalisiert<T extends GrammatikAufgabe>(a: T): T {
     const satz = x.satz.replace(x.vorgabe.trim(), '').replace(/\s{2,}/g, ' ').replace(/\s+([.,!?;:])/g, '$1').trim()
     if (satz.includes('___')) x = { ...x, satz }
   }
+  // Richtig-falsch (28.10.2026, Durchsicht der Bank: Lösungen ["falsch", "for"]): das Urteil gehört nicht in die Lösungen
+  if (x.art === 'richtigfalsch' && x.loesungen.some((l) => /^(richtig|falsch|true|false)$/i.test(l.trim()))) {
+    const rest = x.loesungen.filter((l) => !/^(richtig|falsch|true|false)$/i.test(l.trim()))
+    if (rest.length) x = { ...x, loesungen: rest }
+  }
   if (x.art === 'auswahl' && x.optionen) {
     const ohne: string[] = []
     for (const o of x.optionen) if (!enthalten(ohne, o)) ohne.push(o)
@@ -165,6 +172,13 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
     if (!a.vorgabe && !a.anfang) return 'Bindewort bzw. Satzanfang fehlt'
     if (l.length && enthalten(l, a.satz)) return 'Lösung gleich Ausgangssätzen'
   }
+  // Platzhalter des Namensschutzes statt eines Namens (28.10.2026, Durchsicht der Bank: „[Person-3] has had this laptop …"
+  // – die KI ahmte die Platzhalter für erfundene Personen nach, sie lassen sich nicht zurückübersetzen)
+  if (PLATZHALTER.test(JSON.stringify([a.anweisung, a.kontext, a.satz, a.anfang, a.vorgabe, a.loesungen, a.optionen, a.teile, a.paare, a.elemente, a.luecken, a.wortkasten])))
+    return 'Platzhalter statt Name ([Person-…])'
+  // Satzanfang verrät die Lösung (28.10.2026, Frage der Lehrkraft: „Woher wissen die Schüler, dass ‚Ella was watering the
+  // plants' kommen müsste?" – Anfang „While the neighbours were talking," ließ nur das Abschreiben des zweiten Satzes übrig)
+  if (satzanfangVerraet(a)) return 'Satzanfang verrät die Lösung (Rest steht wörtlich in der Vorgabe)'
   if ((a.art === 'verbinden' || a.art === 'frage') && l.some((x) => UNTIPPBAR.test(x))) return 'Lösung nicht tippbar'
   if (a.art === 'markieren' && !a.ziele?.length) return 'nichts zu markieren'
   if (a.art === 'sortieren' && ((a.gruppen?.length ?? 0) < 2 || (a.elemente?.length ?? 0) < 4)) return 'zu wenig zum Sortieren'
@@ -172,7 +186,34 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
     const nur = (s: string): string => normiert(s).replace(/[^\p{L}\p{N}]/gu, '')
     if (!l.some((x) => nur(x) === nur(a.teile!.join(' ')))) return 'Teile ergeben nicht die Lösung'
   }
+  // Selbsttest (28.10.2026): eigene Lösung gilt, falsche Möglichkeiten nicht, Aufbau passt zum Format
+  const st = selbsttest(a)
+  if (st.length) return `Selbsttest: ${st[0]}`
   return ''
+}
+
+/** Platzhalter des Namensschutzes („[Person-3]", auch ohne Klammern) */
+export const PLATZHALTER = /\[?Person-\d+\]?/
+
+/**
+ * Verrät der Satzanfang die Lösung? Beim Umformen bzw. Sätzeverbinden: Was nach dem Anfang zu tippen bleibt, steht
+ * wörtlich (ohne Satzzeichen, Groß-/Kleinschreibung) im Ausgangstext – dann übt die Aufgabe nur das Abschreiben.
+ */
+export function satzanfangVerraet(a: Pick<GrammatikAufgabe, 'art' | 'anfang' | 'satz' | 'loesungen'>): boolean {
+  if ((a.art !== 'umformen' && a.art !== 'verbinden') || !a.anfang || !a.loesungen?.length) return false
+  const nur = (s: string): string =>
+    normiert(s)
+      .replace(/[^\p{L}\p{N}' ]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const anfang = nur(satzanfang(a.anfang))
+  const vorlage = ` ${nur(a.satz)} `
+  return a.loesungen.every((x) => {
+    const l = nur(x)
+    if (!l.startsWith(anfang)) return false
+    const rest = l.slice(anfang.length).trim()
+    return rest.split(' ').length >= 2 && vorlage.includes(` ${rest} `)
+  })
 }
 
 /** Neue Aufgaben (KI): erst richten, dann alles mit Mangel weglassen – mit Gründen für den Bericht */

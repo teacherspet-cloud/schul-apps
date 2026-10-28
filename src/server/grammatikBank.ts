@@ -104,7 +104,7 @@ export function grundbestandEinmal(d: ReturnType<typeof datenbank>, datei = join
         for (const a of g.aufgaben) n += Number(rein.run(a.id, a.sprache, a.schluessel, a.form, a.uebung, a.niveau, a.pos, JSON.stringify(a.bank_aufgabe), a.geaendert).changes)
         d.exec('COMMIT')
         // Der Grundbestand stammt vom 19.10.2026 – die Regeln vom 28.10.2026 gleich darauf anwenden
-        d.prepare('DELETE FROM wartung WHERE name = ?').run(MAENGEL_WARTUNG)
+        for (const name of MAENGEL_WARTUNGEN) d.prepare('DELETE FROM wartung WHERE name = ?').run(name)
         maengelEinmal(d)
       } catch (e) {
         d.exec('ROLLBACK')
@@ -373,7 +373,11 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 
 /** Befund aus der Prüfung der Bank (Kennung → was falsch ist) – beginnt mit diesem Wort, damit Speichern ihn erhält */
 export const BEFUND = 'Befund: '
-const MAENGEL_WARTUNG = 'grammatik-bank-maengel-2026-10-28'
+/**
+ * Läufe der Mängelprüfung über die ganze Bank – ein neuer Name, wenn die Regeln strenger werden. 28.10.2026 abends:
+ * Selbsttest (shared/grammatikSelbsttest.ts) und „Satzanfang verrät die Lösung" (Frage der Lehrkraft).
+ */
+const MAENGEL_WARTUNGEN = ['grammatik-bank-maengel-2026-10-28', 'grammatik-bank-selbsttest-2026-10-28']
 
 /**
  * Einmal (28.10.2026, nach der Prüfung der ganzen Bank): jede Aufgabe nach den Regeln richten (shared/
@@ -382,6 +386,16 @@ const MAENGEL_WARTUNG = 'grammatik-bank-maengel-2026-10-28'
  * Pakete neu. Kennungen bleiben – der Lernstand hängt weiter an den Aufgaben.
  */
 export function maengelEinmal(d: ReturnType<typeof datenbank>): { geaendert: number; zurueck: number } {
+  const summe = { geaendert: 0, zurueck: 0 }
+  for (const name of MAENGEL_WARTUNGEN) {
+    const r = maengelLauf(d, name)
+    summe.geaendert += r.geaendert
+    summe.zurueck += r.zurueck
+  }
+  return summe
+}
+
+function maengelLauf(d: ReturnType<typeof datenbank>, MAENGEL_WARTUNG: string): { geaendert: number; zurueck: number } {
   try {
     d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
     if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(MAENGEL_WARTUNG)) return { geaendert: 0, zurueck: 0 }

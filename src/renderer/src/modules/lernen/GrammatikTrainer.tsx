@@ -23,7 +23,8 @@ import {
   Text,
   TextInput,
   Title,
-  UnstyledButton
+  UnstyledButton,
+  Switch
 } from '@mantine/core'
 import {
   IconArrowLeft,
@@ -48,8 +49,7 @@ import {
   woerterVon,
   type GrammatikAufgabe,
   type GrammatikPaket,
-  type GrammatikSpielId
-} from '@shared/grammatiktrainer'
+  type GrammatikSpielId, satzanfang } from '@shared/grammatiktrainer'
 import { alsKarten, grammatikSpielPasst, pruefeGrammatik, regelnVorab } from '@shared/grammatiktrainer'
 import { einzelBeschreibung, spielName } from '@shared/spielSprache'
 import { bekannteZeitformen, type Zeitform } from '@shared/signalwoerter'
@@ -1210,7 +1210,7 @@ function Aufgabe({
 /** Anweisung über der Aufgabe */
 function AufgabenRahmen({ a, children }: { a: GrammatikAufgabe; children: React.ReactNode }): React.JSX.Element {
   return (
-    <Stack gap="sm" data-aufgabe={a.art}>
+    <Stack gap="sm" data-aufgabe={a.art} data-aufgabe-id={a.id}>
       <Text c="dimmed" size="sm">
         {a.anweisung || ART_NAME[a.art]}
       </Text>
@@ -1284,7 +1284,7 @@ function AufgabeAllgemein({
     }
   const [vor, nach] = a.satz.split('___')
   return (
-    <Stack gap="sm" data-aufgabe={a.art}>
+    <Stack gap="sm" data-aufgabe={a.art} data-aufgabe-id={a.id}>
       <Text c="dimmed" size="sm">
         {a.anweisung || ART_NAME[a.art]}
       </Text>
@@ -1357,7 +1357,7 @@ function AufgabeAllgemein({
           {a.vorgabe && <Text c="var(--vt-a)">{a.vorgabe}</Text>}
           {a.anfang && (
             <Text mt="sm" fz={18} fw={600} data-satzanfang>
-              {a.anfang} …
+              {satzanfang(a.anfang)} …
             </Text>
           )}
           <TextInput
@@ -1783,6 +1783,12 @@ const ANSICHT_CSS = '.ga-ansicht [data-pruefen] { display: none !important; }'
 export function AufgabenAnsicht({ paket, fach }: { paket: GrammatikPaket; fach: string }): React.JSX.Element {
   const [reserveAuf, setReserveAuf] = useState(false)
   const nichts = (): void => undefined
+  /*
+   * Selbst ausprobieren (28.10.2026, Prüfung „lösbar und sinnvoll"): Schalter, zunächst aus – dann hat jede Aufgabe
+   * „Prüfen" wie bei den Lernenden und zeigt richtig/falsch; nichts wird gespeichert.
+   */
+  const [probieren, setProbieren] = useState(false)
+  const [urteile, setUrteile] = useState<Record<string, Urteil>>({})
   const karte = (a: GrammatikAufgabe, nr: number): React.JSX.Element => (
     <div key={a.id} className="vt-buehne" data-ansicht-aufgabe={a.id}>
       <Group gap={6} mb={8}>
@@ -1800,7 +1806,19 @@ export function AufgabenAnsicht({ paket, fach }: { paket: GrammatikPaket; fach: 
           </Badge>
         )}
       </Group>
-      <Aufgabe a={a} gesperrt={false} antworten={nichts} ohneFokus />
+      <Aufgabe
+        a={a}
+        gesperrt={false}
+        antworten={
+          probieren ? (antwort, wort, selbst) => setUrteile((u) => ({ ...u, [a.id]: pruefeGrammatik(a, antwort, wort, selbst).urteil })) : nichts
+        }
+        ohneFokus
+      />
+      {probieren && urteile[a.id] && (
+        <Badge mt={6} color={urteile[a.id] === 'richtig' ? 'teal' : urteile[a.id] === 'fast' ? 'yellow' : 'red'} data-ansicht-urteil={urteile[a.id]}>
+          {urteile[a.id] === 'richtig' ? 'Richtig' : urteile[a.id] === 'fast' ? 'Fast richtig' : 'Falsch'}
+        </Badge>
+      )}
       {a.tipp && (
         <Text size="xs" c="dimmed" mt={6}>
           Tipp: {a.tipp}
@@ -1821,7 +1839,13 @@ export function AufgabenAnsicht({ paket, fach }: { paket: GrammatikPaket; fach: 
     <TrainerFarben fach={fach}>
       <Stack className="vt ga-ansicht" gap="lg" data-aufgaben-ansicht>
         <style>{CSS}</style>
-        <style>{ANSICHT_CSS}</style>
+        {!probieren && <style>{ANSICHT_CSS}</style>}
+        <Switch
+          label="Selbst ausprobieren (mit „Prüfen“, nichts wird gespeichert)"
+          checked={probieren}
+          onChange={(e) => (setProbieren(e.currentTarget.checked), setUrteile({}))}
+          data-ansicht-probieren
+        />
         {paket.regeln.map((r) => {
           const aufgaben = paket.aufgaben.filter((a) => a.regelId === r.id)
           if (!aufgaben.length) return null

@@ -81,7 +81,7 @@ const FORMAT_TEXT: Partial<Record<string, string>> = {
 }
 
 /** Angezeigte Reihenfolge der Elemente beim Sortieren (Indizes in `elemente`) */
-const sortierFolge = (a: GrammatikAufgabe): number[] => gemischt((a.elemente ?? []).map((_, i) => i), a.id)
+export const sortierFolge = (a: GrammatikAufgabe): number[] => gemischt((a.elemente ?? []).map((_, i) => i), a.id)
 
 /** Was Lernende zu dieser Aufgabe sehen – ohne Lösung, Erklärung oder Fehlerwort */
 export function blindSicht(a: GrammatikAufgabe, nr: number, regel?: BlindRegel): string {

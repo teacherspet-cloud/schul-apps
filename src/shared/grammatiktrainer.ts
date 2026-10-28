@@ -284,7 +284,7 @@ export function paketBereinigt(
       ...(y.niveau === 'g' || y.niveau === 'm' || y.niveau === 'a' ? { niveau: y.niveau } : {}),
       ...(text(y.pruefen, 300) ? { pruefen: text(y.pruefen, 300) } : {}),
       ...(text(y.kontext, 600) ? { kontext: text(y.kontext, 600) } : {}),
-      ...(text(y.anfang, 160) ? { anfang: text(y.anfang, 160) } : {}),
+      ...(satzanfang(text(y.anfang, 160)) ? { anfang: satzanfang(text(y.anfang, 160)) } : {}),
       ...(y.kommaPruefen === true ? { kommaPruefen: true } : {})
     }
     if (art === 'satzbau' && !a.loesungen.length && a.teile?.length) a.loesungen = [a.teile.join(' ')]
@@ -538,6 +538,12 @@ export function tabellenAnteil(a: GrammatikAufgabe, zellen: string[][]): number 
 }
 
 /** Wörter eines Satzes (Satzzeichen ab) – für „Fehler finden" */
+/**
+ * Satzanfang ohne Auslassungspunkte (28.10.2026, Selbsttest der Bank: „While Maya was decorating the room, ..." – die
+ * Punkte stehen nicht in der Lösung, keine Eingabe passte). Die App zeigt selbst „…" dahinter.
+ */
+export const satzanfang = (s: string | undefined): string => String(s ?? '').replace(/\s*(?:\.{2,}|…)\s*$/, '').trim()
+
 export function woerterVon(satz: string): string[] {
   return satz
     .split(/\s+/)
@@ -621,7 +627,8 @@ export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltes
   }
   if (SATZ_ARTEN.includes(a.art)) {
     // Satzanfang gehört zur Antwort; Kommas zählen nur bei Kommaregeln (28.10.2026, Entscheidung der Lehrkraft)
-    const voll = a.anfang && !normiert(antwort).startsWith(normiert(a.anfang)) ? `${a.anfang} ${antwort}` : antwort
+    const anfang = satzanfang(a.anfang)
+    const voll = anfang && !normiert(antwort).startsWith(normiert(anfang)) ? `${anfang} ${antwort}` : antwort
     const ohne = (x: string): string => (a.kommaPruefen ? normiert(x) : normiert(x).replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ').trim())
     const ant = ohne(voll)
     if (!normiert(antwort)) return { urteil: 'falsch', richtig }
