@@ -14,6 +14,30 @@ const aufAppleMobil = (): boolean =>
 const alsWebApp = (): boolean =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true
 
+/**
+ * Wie ist die App geöffnet? (28.10.2026) Home-Bildschirm (Web-App, auch per Schul-Verwaltung als Vollbild-Link) – dort
+ * kommen auf iPad/iPhone Erinnerungen an; eingebettete Web-Ansicht einer anderen App (ohne „Safari“ in der Kennung bzw.
+ * Android-WebView); sonst Browser.
+ */
+export function zugangDiesesGeraets(): 'homescreen' | 'webview' | 'browser' {
+  if (alsWebApp()) return 'homescreen'
+  const ua = navigator.userAgent
+  if (aufAppleMobil() && !/Safari\//.test(ua)) return 'webview'
+  if (/; wv\)/.test(ua)) return 'webview'
+  return 'browser'
+}
+
+/** Einmal je Sitzung melden, wie die App geöffnet ist – für die Zahl in den Kurseinstellungen der Lehrkraft */
+export function zugangMelden(): void {
+  try {
+    if (sessionStorage.getItem('sa-zugang-gemeldet')) return
+    sessionStorage.setItem('sa-zugang-gemeldet', '1')
+  } catch {
+    // ohne Speicher: trotzdem melden
+  }
+  void senden('/s/api/erinnerungen/zugang', { zugang: zugangDiesesGeraets() }).catch(() => undefined)
+}
+
 /** Kann dieses Gerät Erinnerungen bekommen – und wenn nicht, warum? */
 export function pushUnterstuetzung(): PushUnterstuetzung {
   const da = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window

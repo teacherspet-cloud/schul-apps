@@ -1436,6 +1436,20 @@ function Einstellungen({
               {d.erinnerungenAktiv === 1 ? '1 Lernende/r hat' : `${d.erinnerungenAktiv ?? 0} Lernende haben`} Erinnerungen eingeschaltet.
             </Text>
           )}
+          {/* Zugang (28.10.2026, Wunsch der Lehrkraft): auf iPad/iPhone kommen Erinnerungen nur in der Web-App vom Home-Bildschirm an */}
+          {d.erinnerungen !== false && (
+            <Text
+              size="sm"
+              c="dimmed"
+              mt={4}
+              data-kurs-zugang-homescreen={d.zugang?.homescreen ?? 0}
+              data-kurs-zugang-webview={d.zugang?.webview ?? 0}
+            >
+              Vom Home-Bildschirm (Web-App) geöffnet: {d.zugang?.homescreen ?? 0}
+              {(d.zugang?.webview ?? 0) > 0 ? ` · in einer Web-Ansicht einer anderen App: ${d.zugang?.webview}` : ''} (letzte 30 Tage). Auf iPad und iPhone kommen
+              Erinnerungen nur dort an, wo die App vom Home-Bildschirm geöffnet wird.
+            </Text>
+          )}
         </Card>
         <NurExperte>
           <Card withBorder radius="md" padding="md" data-kurs-darstellung>

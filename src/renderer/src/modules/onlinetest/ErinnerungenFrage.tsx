@@ -3,7 +3,7 @@ import { Anchor, Button, Group, Paper, Text } from '@mantine/core'
 import { IconBell } from '@tabler/icons-react'
 import type { ErinnerungsWahl } from '@shared/erinnerungen'
 import { holen, senden } from './serverApi'
-import { geraetAnmelden, pushUnterstuetzung, vorhandeneAnmeldung } from './erinnerungenGeraet'
+import { geraetAnmelden, pushUnterstuetzung, vorhandeneAnmeldung, zugangMelden } from './erinnerungenGeraet'
 
 /**
  * Einmalige, freundliche Frage auf der Schüler-Startseite (10.10.2026, Entscheidung der Lehrkraft: Erinnerungen sind
@@ -44,6 +44,11 @@ export function ErinnerungenFrage(): React.JSX.Element | null {
   const [schluessel, setSchluessel] = useState('')
   const [arbeitet, setArbeitet] = useState(false)
 
+  // Zugang melden (28.10.2026): Home-Bildschirm, Web-Ansicht oder Browser – für die Zahl in den Kurseinstellungen
+  useEffect(() => {
+    const ich = window.__schulappsServer
+    if (ich?.angemeldet && ich.rolle === 'schueler' && !ich.vorschau && ich.quelle !== 'vorschau') zugangMelden()
+  }, [])
   useEffect(() => {
     const ich = window.__schulappsServer
     if (!ich?.angemeldet || ich.rolle !== 'schueler' || ich.vorschau || ich.quelle === 'vorschau') return

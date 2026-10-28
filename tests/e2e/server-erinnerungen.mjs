@@ -224,7 +224,10 @@ try {
   pruefe(Boolean(klar) && !/Paula|Pushprobe|Erik|Erinnerer/.test(klar) && !klar.includes(kind.benutzer) && !a0.koerper.toString('latin1').includes('Reminders'), 'Kein Name in der Nachricht, Klartext nur nach dem Öffnen')
 
   // ---------- Lehrkraft sieht die Zahl
+  // Zugang (28.10.2026): das Gerät meldet „vom Home-Bildschirm“ – die Lehrkraft sieht nur die Zahl
+  await s.request.post(`${A}/s/api/erinnerungen/zugang`, { headers: KOPF, data: { zugang: 'homescreen' } })
   const k2 = await (await lk.request.get(`${A}/server/vokabeln/${vid}`, { headers: KOPF })).json()
+  pruefe(k2.zugang?.homescreen === 1, `Zugang vom Home-Bildschirm gezählt (${JSON.stringify(k2.zugang)})`)
   pruefe(k2.erinnerungenAktiv === 1 && !JSON.stringify(k2).includes('erinnerungenGeraete'), `Lehrkraft bekommt nur die Zahl (${k2.erinnerungenAktiv})`)
   await l.reload()
   await l.waitForTimeout(1500)
@@ -232,6 +235,7 @@ try {
   await l.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursReiter(l, 'einstellungen')
   pruefe(await da(l.locator('[data-kurs-erinnerungen-aktiv="1"]')), 'Lehrkraft: „1 Lernende/r hat Erinnerungen eingeschaltet"')
+  pruefe(await da(l.locator('[data-kurs-zugang-homescreen="1"]')), 'Lehrkraft: „Vom Home-Bildschirm (Web-App) geöffnet: 1“')
   await l.screenshot({ path: join(out, '2-lehrkraft.png') })
 
   // ---------- Ausschalten

@@ -360,6 +360,25 @@ try {
   const alt = await (await browser.newContext()).request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: benCode } })
   const neuAn = await (await browser.newContext()).request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: nc } })
   pruefe(alt.status() === 404 && neuAn.status() === 200 && nc !== benCode, 'Neuer Code gilt, der alte nicht mehr')
+
+  // ---------- Tagesziel erreicht → Spiele frei, ohne Freischaltung der Lehrkraft (Wunsch der Lehrkraft 28.10.2026)
+  await post(`${vid}/spiele`, { frei: false })
+  const eva = (await post(`${vid}/eintragen`, { namen: ['Eva Z.'] })).eingetragen[0]
+  const ec = await browser.newContext({ viewport: { width: 420, height: 900 }, hasTouch: true })
+  await ec.request.post(`${A}/s/api/vokabeln/anmelden`, { headers: KOPF, data: { code: eva.zugang } })
+  const ev = await ec.newPage()
+  await ev.goto(`${A}/s/v/${vid}`)
+  pruefe((await ev.locator('[data-spielwahl]').count()) === 0 && (await da(ev.locator('[data-vokabel-start]'))), 'Eva: vor dem Tagesziel keine Spiele')
+  const evaListe = await (await ec.request.get(`${A}/s/api/vokabeln/liste?id=${vid}`, { headers: KOPF })).json()
+  // Genau so viele Wörter wie das Tagesziel der Klasse (25): kennenlernen und einmal frei schreiben
+  for (const w of evaListe.woerter.slice(0, 25)) {
+    await ec.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vid, wortId: w.id, uebung: 'karte', gewusst: true } })
+    await ec.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vid, wortId: w.id, uebung: 'frei', antwort: w.term } })
+  }
+  await ev.reload()
+  pruefe(await da(ev.locator('[data-spielwahl]').first()), 'Eva: nach 25 geübten Wörtern (Tagesziel) sind die Spiele frei')
+  pruefe((await ev.locator('[data-vokabel-start]').count()) === 0, 'Eva: keine weitere Pflichtrunde')
+  await ev.screenshot({ path: join(out, '11-tagesziel-spiele.png'), fullPage: true })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

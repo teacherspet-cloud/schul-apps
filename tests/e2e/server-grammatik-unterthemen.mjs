@@ -7,7 +7,8 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { kursKaestenAuf, leisteApp } from './warten.mjs'
+import { readFileSync } from 'fs'
+import { kursKaestenAuf, kursReiter, leisteApp } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-grammatik-unterthemen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -82,6 +83,21 @@ try {
       })
     ).json()
   ).id
+  // Ein Vokabelabschnitt aus Green Line 1, Unit 1 – damit der Kasten „Units“ im Überblick die Unit (mit der Grammatik) zeigt
+  {
+    const gl1 = JSON.parse(readFileSync('resources/lehrwerke/green-line-1.json', 'utf8'))
+    const u1 = gl1.units.find((u) => u.name === 'Unit 1') ?? gl1.units[1]
+    const sec = u1.sections.find((x) => x.entries.length)
+    await lk.request.post(`${A}/server/vokabeln/${kurs}/woerter`, {
+      headers: KOPF,
+      data: {
+        titel: sec.name,
+        woerter: sec.entries.slice(0, 8).map((e, i) => ({ id: `u${i}`, term: e.term, translation: e.translation })),
+        teile: [{ titel: sec.name, anzahl: Math.min(8, sec.entries.length) }],
+        quelle: { lehrwerk: 'green-line-1', unit: u1.name, abschnitte: [sec.name] }
+      }
+    })
+  }
   const r = await (
     await lk.request.post(`${A}/server/grammatik/aus-bank`, {
       headers: KOPF,
@@ -151,6 +167,32 @@ try {
   await p.screenshot({ path: join(out, '1b-ansehen.png') })
   await p.keyboard.press('Escape')
   await p.waitForTimeout(400)
+
+  // ---------- Entfernen aktualisiert den Kasten „Units“ ohne Neuladen (Befund der Lehrkraft 28.10.2026)
+  await kursReiter(p, 'ueberblick')
+  const imUnitMenue = async () => {
+    const knopf = p.locator('[data-kurs-units] [data-unit-abschnitt-aktionen]').first()
+    if (!(await da(knopf, 8000))) return false
+    await knopf.click()
+    const da2 = await da(p.locator('[data-unit-grammatik-entfernen="Modalverben (Grundinventar)"]'), 2000)
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(300)
+    return da2
+  }
+  const warDa = await imUnitMenue()
+  await kursReiter(p, 'grammatik')
+  await p.locator(`[data-grammatik-aktionen="${zid}"]`).click()
+  await p.locator('[data-grammatik-entfernen]').click()
+  await p.locator('[data-grammatik-bestaetigen="entfernen"]').click()
+  await p.waitForTimeout(1200)
+  await kursReiter(p, 'ueberblick')
+  await p.waitForTimeout(800)
+  const nochDa = await imUnitMenue()
+  pruefe(warDa && !nochDa, `„Units“: entfernte Grammatik verschwindet ohne Neuladen (vorher ${warDa}, danach ${nochDa})`)
+  await p.screenshot({ path: join(out, '1c-units-nach-entfernen.png') })
+  // Wieder in den Kurs holen (für die folgenden Schritte)
+  await lk.request.post(`${A}/server/grammatik/${zid}/wiederherstellen`, { headers: KOPF, data: {} })
+  await kursReiter(p, 'grammatik')
 
   // ---------- „Grammatik hinzufügen": Teilformen auch im Standardmodus
   await p.locator('[data-vokabel-grammatik]').first().click()

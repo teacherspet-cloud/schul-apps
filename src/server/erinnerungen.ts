@@ -73,6 +73,11 @@ CREATE TABLE IF NOT EXISTS push_wahl (
   naechste INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS push_wahl_faellig ON push_wahl(aktiv, naechste);
+CREATE TABLE IF NOT EXISTS geraet_zugang (
+  nutzer_id TEXT PRIMARY KEY REFERENCES nutzer(id) ON DELETE CASCADE,
+  zugang TEXT NOT NULL,
+  zuletzt INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS push_geraete (
   endpunkt_k TEXT PRIMARY KEY,
   nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
@@ -256,6 +261,29 @@ export function wahlSetzen(nid: string, roh: unknown, jetzt = Date.now()): Erinn
   if (t && t.ms <= jetzt + 5 * 60_000) g.zustand.erledigt = t.tag
   schreiben(nid, g, jetzt)
   return wahl
+}
+
+/**
+ * Wie die Lernenden die App öffnen (28.10.2026, Wunsch der Lehrkraft): vom Home-Bildschirm (Web-App) bzw. in einer
+ * eingebetteten Web-Ansicht – nur dort kommen auf iPad/iPhone Erinnerungen an. Gespeichert wird nur die Art und der Tag.
+ */
+export type Zugang = 'homescreen' | 'webview' | 'browser'
+export const ZUGANG_TAGE = 30
+export function zugangMerken(nid: string, zugang: unknown, jetzt = Date.now()): void {
+  const z: Zugang = zugang === 'homescreen' || zugang === 'webview' ? zugang : 'browser'
+  db().prepare('INSERT INTO geraet_zugang (nutzer_id, zugang, zuletzt) VALUES (?, ?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET zugang = excluded.zugang, zuletzt = excluded.zuletzt').run(nid, z, jetzt)
+}
+/** Wie viele dieser Personen die App in den letzten 30 Tagen vom Home-Bildschirm bzw. in einer Web-Ansicht geöffnet haben */
+export function zugangZahlen(nutzerIds: string[], jetzt = Date.now()): { homescreen: number; webview: number } {
+  const aus = { homescreen: 0, webview: 0 }
+  if (!nutzerIds.length) return aus
+  const ids = new Set(nutzerIds)
+  for (const z of db().prepare('SELECT nutzer_id, zugang FROM geraet_zugang WHERE zuletzt >= ?').all(jetzt - ZUGANG_TAGE * 86_400_000) as {
+    nutzer_id: string
+    zugang: string
+  }[])
+    if (ids.has(z.nutzer_id) && (z.zugang === 'homescreen' || z.zugang === 'webview')) aus[z.zugang]++
+  return aus
 }
 
 /** Wie viele dieser Personen Erinnerungen eingeschaltet und mindestens ein Gerät haben – nur die Zahl (Lehrkraft) */
@@ -446,6 +474,14 @@ kursHaken.erinnerungenAktiv = (ids) => {
     return 0
   }
 }
+// Lehrkraft: Zugang der Lernenden je Kurs (vokabeln.ts, 28.10.2026)
+kursHaken.zugang = (ids) => {
+  try {
+    return zugangZahlen(ids)
+  } catch {
+    return { homescreen: 0, webview: 0 }
+  }
+}
 // Abmelden: Geräte dieser Sitzung entfernen (http.ts)
 beimAbmelden.push((nid, kennung) => void db().prepare('DELETE FROM push_geraete WHERE nutzer_id = ? AND sitzung = ?').run(nid, kennung))
 
@@ -482,6 +518,7 @@ export function erinnerungenRoute(adresse = ''): (k: Anfrage) => Promise<boolean
     if (typeof req.headers['x-schulapps-token'] !== 'string') return json(res, 403, { fehler: 'Nur aus der App.' }), true
     const k0 = (await k.koerper()) as Record<string, unknown>
     if (teil === 'wahl') return json(res, 200, { wahl: wahlSetzen(ich.id, k0.wahl) }), true
+    if (teil === 'zugang') return zugangMerken(ich.id, k0.zugang), json(res, 200, { ok: true }), true
     if (teil === 'geraet') {
       if (!angeboteneKurse(ich).length) return json(res, 403, { fehler: 'Für deine Kurse sind Erinnerungen gerade nicht eingeschaltet.' }), true
       const abo = aboPruefen(k0.abo)

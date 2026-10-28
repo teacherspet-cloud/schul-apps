@@ -12,13 +12,15 @@
  * die letzte Karte nur „Termine" und zeigt nur „Demnächst".
  * Nur mit dem Schul-Apps-Server (die Exe ohne Server hat diese Dinge nicht).
  */
-import { Badge, Button, Card, Group, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Menu, Progress, SimpleGrid, Stack, Text, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import {
   IconAlertCircle,
   IconCalendarEvent,
   IconChalkboard,
   IconChevronRight,
   IconDeviceLaptop,
+  IconDots,
+  IconSquareCheck,
   IconShare,
   IconFlag,
   IconPlayerPlay
@@ -36,6 +38,8 @@ import { AnzahlWahl, startKastenId, useStartAnzahl, useStartOffen } from './Star
 import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
+import { senden } from '../modules/onlinetest/serverApi'
+import { notifyError, notifySuccess } from '../shared/util'
 
 /** Anzahl je Kasten wählbar (StartAnzahl.tsx) – seit 12.10.2026 auf allen Geräten */
 export interface Begrenzung {
@@ -214,9 +218,21 @@ export function Schnellzugriff(): React.JSX.Element {
       </Zeile>
     ))
   ]
+  /*
+   * Beenden direkt hier (28.10.2026, Befund der Lehrkraft: eine Freigabe ließ sich nicht beenden, damit sie nicht mehr als
+   * laufend erscheint): Blätter wie in „Freigegebene Blätter“, Rückmeldungen wie in der App „Rückmeldung“ – danach lädt der
+   * Kasten neu, Lernende können nicht mehr einreichen. „Wieder öffnen“ geht in der jeweiligen App.
+   */
+  const beenden = (pfad: string, titel: string): void =>
+    void senden(pfad, { status: 'beendet' }).then(
+      () => (notifySuccess(`„${titel}“ beendet – wieder öffnen geht in der App.`), void useKopfDaten.getState().laden(true)),
+      (e: unknown) => notifyError(e, 'Nicht beendet')
+    )
   const blattZeile = (b: (typeof blattOffen)[number]): React.ReactNode => (
     <Zeile
       key={b.id}
+      beenden={() => beenden(`/server/blaetter/${b.id}/status`, b.titel)}
+      daten={{ 'data-start-freigabe': b.id }}
       titel={b.titel}
       unter={`${b.lerngruppe || 'Gäste'}${b.gesamt ? ` · ${b.gesamt} Lernende` : ''}`}
       onClick={() => (oeffneFreigabe(b.id), openModule('freigaben'))}
@@ -229,6 +245,8 @@ export function Schnellzugriff(): React.JSX.Element {
   const rueckZeile = (r: RueckmeldungKurz): React.ReactNode => (
     <Zeile
       key={r.id}
+      beenden={() => beenden(`/server/feedback/${r.id}/status`, r.titel)}
+      daten={{ 'data-start-rueckmeldung': r.id }}
       titel={r.titel}
       unter={`${r.lerngruppe || 'Gäste'} · ${r.abgaben} Abgaben`}
       onClick={() => openModule('rueckmeldung')}
@@ -544,7 +562,44 @@ function Zeile(p: {
   children?: React.ReactNode
   unten?: React.ReactNode
   daten?: Record<string, string>
+  /** Freigaben (28.10.2026): Menü „⋯“ mit „Beenden“ */
+  beenden?: () => void
 }): React.JSX.Element {
+  if (p.beenden) {
+    const beenden = p.beenden
+    return (
+      <Card withBorder padding={8} radius="md" style={{ width: '100%' }} {...p.daten}>
+        <Group wrap="nowrap" gap={4} align="flex-start">
+          <UnstyledButton onClick={p.onClick} style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <Group justify="space-between" wrap="nowrap" gap="xs">
+              <div style={{ minWidth: 0 }}>
+                <Text size="sm" fw={600} truncate>
+                  {p.titel}
+                </Text>
+                <Text size="xs" c="dimmed" truncate>
+                  {p.unter}
+                </Text>
+              </div>
+              {p.children && <div style={{ flex: 'none' }}>{p.children}</div>}
+            </Group>
+            {p.unten && <div style={{ marginTop: 6 }}>{p.unten}</div>}
+          </UnstyledButton>
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon size="sm" variant="subtle" color="gray" aria-label={`${p.titel}: weitere Aktionen`} data-start-aktionen>
+                <IconDots size={15} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconSquareCheck size={14} />} onClick={beenden} data-start-beenden>
+                Beenden
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Card>
+    )
+  }
   return (
     <Card
       withBorder

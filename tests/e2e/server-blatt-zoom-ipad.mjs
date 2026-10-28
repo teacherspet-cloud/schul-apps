@@ -192,6 +192,19 @@ try {
   pruefe(schlecht === 0, `Eingabefelder bleiben beim Zoomen an ihrer Stelle im Blatt (${schlecht} verschoben)`)
   // Inhalt des Rahmens wächst mit: die Aufgabennummern liegen beim Zoom an derselben Stelle im Blatt
   console.log(`     innen vorher ${JSON.stringify(vorher.innen.slice(0, 2))} nachher ${JSON.stringify(nachher.innen.slice(0, 2))}`)
+
+  // ---------- Startseite: Freigabe direkt beenden (Befund der Lehrkraft 28.10.2026)
+  await p.goto(A)
+  await p.waitForTimeout(2000)
+  const kasten = p.locator('[data-klappkarte="start-freigaben"]')
+  if ((await kasten.getAttribute('data-offen').catch(() => 'true')) === 'false') await p.locator('[data-klappkopf="start-freigaben"]').click()
+  const zeile = p.locator(`[data-start-freigabe="${fr.id}"]`)
+  pruefe(await zeile.waitFor({ timeout: 15000 }).then(() => true, () => false), 'Startseite: Freigabe läuft im Kasten „Freigaben & Rückmeldungen“')
+  await zeile.locator('[data-start-aktionen]').click()
+  await p.locator('[data-start-beenden]').click()
+  const weg = await zeile.waitFor({ state: 'detached', timeout: 10000 }).then(() => true, () => false)
+  const status = ((await (await lk.request.get(`${A}/server/blaetter`, { headers: KOPF })).json()).blaetter ?? []).find((b) => b.id === fr.id)?.status
+  pruefe(weg && status === 'beendet', `Startseite: „Beenden“ nimmt die Freigabe aus den laufenden (${status})`)
 } catch (e) {
   problems.push(String(e?.stack ?? e))
   console.log(e)

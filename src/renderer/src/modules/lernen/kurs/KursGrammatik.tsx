@@ -539,7 +539,10 @@ export function KursGrammatik({
             : `„${g.titel}" ist wieder im Kurs.`
         ),
         setFrage(null),
-        laden()
+        laden(),
+        // Live (28.10.2026, Befund der Lehrkraft: in „Meine Klassen“ stand Entferntes bis zum Neuladen noch bei „Units“) –
+        // der Kasten „Units“ und die Kopfzahlen hören auf dieses Ereignis
+        window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT))
       ),
       (e: unknown) => notifyError(e)
     )

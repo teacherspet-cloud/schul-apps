@@ -328,6 +328,8 @@ export const kursHaken: {
   bekannt?: (n: NutzerInfo) => string[]
   /** Wie viele dieser Lernenden Erinnerungen eingeschaltet haben (erinnerungen.ts, 10.10.2026) – nur die Zahl */
   erinnerungenAktiv?: (nutzerIds: string[]) => number
+  /** Zugang der Lernenden (28.10.2026): Home-Bildschirm bzw. Web-Ansicht in den letzten 30 Tagen */
+  zugang?: (nutzerIds: string[]) => { homescreen: number; webview: number }
   /** Nach einer Freigabe (10.10.2026, wortliste.ts): doppelte Vokabeln zählen, nur die Zahl ins Protokoll */
   nachFreigabe?: (kursId: string) => void
   /** Verbundene Grammatik eines Kurses für die Auswahl der Testabschnitte (12.10.2026, grammatik.ts) */
@@ -1423,6 +1425,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           // Erinnerungen zum Üben (10.10.2026): angeboten? und wie viele sie eingeschaltet haben (nur die Zahl)
           erinnerungen: erinnerungenAngeboten(z),
           erinnerungenAktiv: kursHaken.erinnerungenAktiv?.(lernende.map((l) => l.id)) ?? 0,
+          zugang: kursHaken.zugang?.(lernende.map((l) => l.id)) ?? { homescreen: 0, webview: 0 },
           tagesziel: tageszielVon(z),
           // Freigegebene Abschnitte (08.10.2026) – mit Band und Unit (10.10.2026: Wortliste je Band gruppiert)
           teile: (() => {

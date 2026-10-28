@@ -27,6 +27,8 @@ export interface Lernstanddaten {
   /** Erinnerungen zum Üben angeboten (Vorgabe an, fehlt = an) und wie viele Lernende sie eingeschaltet haben – nur die Zahl (10.10.2026) */
   erinnerungen?: boolean
   erinnerungenAktiv?: number
+  /** Zugang der Lernenden in den letzten 30 Tagen (28.10.2026): Web-App vom Home-Bildschirm bzw. Web-Ansicht */
+  zugang?: { homescreen: number; webview: number }
   tagesziel?: number
   adresse?: string
   ueberschrift?: string
