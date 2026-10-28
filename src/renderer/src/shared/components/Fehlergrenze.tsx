@@ -121,7 +121,7 @@ export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: E
           <p style={{ marginTop: 16, fontSize: 12, color: '#6b7c87', wordBreak: 'break-word' }}>{fehler.message}</p>
           {stapel && (
             <p style={{ marginTop: 8, fontSize: 11, color: '#56656f', wordBreak: 'break-word', textAlign: 'left' }} data-fehler-stapel>
-              Stelle: {stapel}
+              Fundort: {stapel}
             </p>
           )}
         </div>

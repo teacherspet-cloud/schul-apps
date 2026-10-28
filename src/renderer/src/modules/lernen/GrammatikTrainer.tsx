@@ -57,7 +57,8 @@ import { FormenMemory, RichtigFalsch, SignalwortSortierer, TabellenPuzzle } from
 import { nachAbfrage, STUFEN, type Urteil, type Vokabel, type WortStand } from '@shared/vokabeltrainer'
 import { grammatikHeute } from '@shared/grammatikVorrang'
 import { formSicher, mitErstemVersuch } from '@shared/grammatikSicher'
-import { aktuelleEtappe, etappenDesPakets, type Etappe } from '@shared/grammatikEtappen'
+import { aktuelleEtappe, etappenDerRegel, etappenDesPakets, type Etappe } from '@shared/grammatikEtappen'
+import { STUFE_NAME, UEBUNG_NAME, stufeVon } from '@shared/grammatikBank'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
@@ -1141,13 +1142,16 @@ function Aufgabe({
   gesperrt,
   antworten,
   ergebnis,
-  eingabeStand
+  eingabeStand,
+  ohneFokus = false
 }: {
   a: GrammatikAufgabe
   gesperrt: boolean
   antworten: (antwort: string, wort?: string, selbst?: Urteil) => void
   ergebnis?: { urteil: Urteil } | null
   eingabeStand?: React.MutableRefObject<EingabeStand | null>
+  /** Ansicht der Lehrkraft (28.10.2026): viele Aufgaben untereinander – keine holt sich den Eingabefokus */
+  ohneFokus?: boolean
 }): React.JSX.Element {
   // Latein (07.10.2026): eigene Bedienelemente
   if (a.art === 'bestimmen')
@@ -1174,7 +1178,7 @@ function Aufgabe({
         <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
       </AufgabenRahmen>
     )
-  return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} eingabeStand={eingabeStand} />
+  return <AufgabeAllgemein a={a} gesperrt={gesperrt} antworten={antworten} ergebnis={ergebnis} eingabeStand={eingabeStand} ohneFokus={ohneFokus} />
 }
 
 /** Anweisung über der Aufgabe */
@@ -1194,13 +1198,15 @@ function AufgabeAllgemein({
   gesperrt,
   antworten,
   ergebnis,
-  eingabeStand
+  eingabeStand,
+  ohneFokus = false
 }: {
   a: GrammatikAufgabe
   gesperrt: boolean
   antworten: (antwort: string, wort?: string) => void
   ergebnis?: { urteil: Urteil } | null
   eingabeStand?: React.MutableRefObject<EingabeStand | null>
+  ohneFokus?: boolean
 }): React.JSX.Element {
   const [text, setText] = useState('')
   const [wort, setWort] = useState<number | null>(null)
@@ -1209,7 +1215,7 @@ function AufgabeAllgemein({
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const optionen = useMemo(() => (a.art === 'auswahl' ? mische(a.optionen ?? []) : []), [a])
   const eingabe = useRef<HTMLInputElement>(null)
-  useEffect(() => eingabe.current?.focus(), [a.id, wort])
+  useEffect(() => void (ohneFokus || eingabe.current?.focus()), [a.id, wort]) // eslint-disable-line react-hooks/exhaustive-deps
   // Zuordnen (26.10.2026): rechte Hälften gemischt, je linker Hälfte die gewählte rechte (Nummer im Original)
   const rechts = useMemo(() => (a.art === 'zuordnen' ? mische((a.paare ?? []).map((p, i) => ({ text: p.rechts, i }))) : []), [a])
   const [zuordnung, setZuordnung] = useState<Record<number, number>>({})
@@ -1719,5 +1725,100 @@ function EtappenListe({ etappen, aktuell, farbe }: { etappen: Etappe[]; aktuell:
         </Group>
       ))}
     </Stack>
+  )
+}
+
+// ---------------------------------------------------------------- Ansicht der Lehrkraft (28.10.2026)
+
+/** Lösung einer Aufgabe in einer Zeile – für die Ansicht der Lehrkraft */
+function loesungText(a: GrammatikAufgabe): string {
+  if (a.art === 'zuordnen') return (a.paare ?? []).map((p) => `${p.links} → ${p.rechts}`).join(' · ')
+  if (a.art === 'richtigfalsch') return a.korrekt ? 'Der Satz ist richtig.' : `Falsch: „${a.fehlerWort ?? ''}“ → ${a.loesungen.join(' / ')}`
+  if (a.art === 'fehler') return `„${a.fehlerWort ?? ''}“ → ${a.loesungen.join(' / ')}`
+  if (a.art === 'bestimmen') return (a.lesarten ?? []).map((l) => l.join(' ')).join(' / ')
+  if (a.art === 'tabelle') return (a.zeilen ?? []).map((z) => `${z.name}: ${z.loesungen.join(' | ')}`).join(' · ')
+  return a.loesungen.join(' / ')
+}
+
+const ANSICHT_CSS = '.ga-ansicht [data-pruefen] { display: none !important; }'
+
+/**
+ * „Aufgaben ansehen“ (28.10.2026, abgestimmt mit der Lehrkraft): alle Aufgaben, die der Kurs bekommt, untereinander –
+ * im Aussehen der Schüler-App, je Regel nach Etappen gegliedert (Erkennen … Bonus), darunter klein die Lösungen.
+ * Nur ansehen: „Prüfen“ fehlt, nichts wird gespeichert. Die Förderreserve steht zugeklappt am Ende.
+ */
+export function AufgabenAnsicht({ paket, fach }: { paket: GrammatikPaket; fach: string }): React.JSX.Element {
+  const [reserveAuf, setReserveAuf] = useState(false)
+  const nichts = (): void => undefined
+  const karte = (a: GrammatikAufgabe, nr: number): React.JSX.Element => (
+    <div key={a.id} className="vt-buehne" data-ansicht-aufgabe={a.id}>
+      <Group gap={6} mb={8}>
+        <Badge size="sm" variant="light" tt="none">
+          {nr}. {ART_NAME[a.art]}
+        </Badge>
+        {a.uebung && (
+          <Badge size="sm" variant="outline" tt="none">
+            {UEBUNG_NAME[a.uebung]}
+          </Badge>
+        )}
+        {a.uebung && (
+          <Badge size="sm" variant="outline" color="gray" tt="none">
+            {STUFE_NAME[stufeVon(a)]}
+          </Badge>
+        )}
+      </Group>
+      <Aufgabe a={a} gesperrt={false} antworten={nichts} ohneFokus />
+      {a.tipp && (
+        <Text size="xs" c="dimmed" mt={6}>
+          Tipp: {a.tipp}
+        </Text>
+      )}
+      <Text size="sm" mt={8} c="teal" fw={600} data-ansicht-loesung>
+        Lösung: {loesungText(a)}
+      </Text>
+      {a.erklaerung && (
+        <Text size="xs" c="dimmed">
+          {a.erklaerung}
+        </Text>
+      )}
+    </div>
+  )
+  let nr = 0
+  return (
+    <TrainerFarben fach={fach}>
+      <Stack className="vt ga-ansicht" gap="lg" data-aufgaben-ansicht>
+        <style>{CSS}</style>
+        <style>{ANSICHT_CSS}</style>
+        {paket.regeln.map((r) => {
+          const aufgaben = paket.aufgaben.filter((a) => a.regelId === r.id)
+          if (!aufgaben.length) return null
+          const etappen = etappenDerRegel(aufgaben, {})
+          return (
+            <Stack key={r.id} gap="sm" data-ansicht-regel={r.id}>
+              <RegelKarte r={r} />
+              {etappen.map((e, i) => (
+                <Stack key={e.id} gap="sm" data-ansicht-etappe={e.id}>
+                  <Text fw={700} size="sm">
+                    {e.id === 'alle' ? `Übungen (${e.aufgaben.length})` : `Etappe ${i + 1} von ${etappen.length}: ${e.name} (${e.aufgaben.length})`}
+                  </Text>
+                  {e.aufgaben.map((id) => {
+                    const a = aufgaben.find((x) => x.id === id)
+                    return a ? karte(a, ++nr) : null
+                  })}
+                </Stack>
+              ))}
+            </Stack>
+          )
+        })}
+        {(paket.reserve?.length ?? 0) > 0 && (
+          <Stack gap="sm" data-ansicht-reserve>
+            <Button variant="subtle" w="fit-content" onClick={() => setReserveAuf((x) => !x)} leftSection={<IconChevronDown size={14} />}>
+              Förderreserve ({paket.reserve!.length}) – nur bei Schwierigkeiten sichtbar
+            </Button>
+            {reserveAuf && paket.reserve!.map((a, i) => karte(a, i + 1))}
+          </Stack>
+        )}
+      </Stack>
+    </TrainerFarben>
   )
 }

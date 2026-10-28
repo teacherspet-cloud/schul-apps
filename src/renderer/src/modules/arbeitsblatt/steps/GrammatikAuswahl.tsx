@@ -136,6 +136,11 @@ export default function GrammatikAuswahl({
   const { ref, width } = useElementSize()
   const schmal = width > 0 && width < 560
   const voll = useAlleOptionen()
+  /*
+   * Im Kurs (28.10.2026, Wunsch der Lehrkraft: z. B. bei den Modalverben nur can/can't freischalten) stehen die Teilformen
+   * auch im Standardmodus rechts zur Wahl – sonst nur mit „Alle Optionen".
+   */
+  const teileZeigen = voll || kurs
 
   // Lehrwerk: das der Lerngruppe, sonst das zuletzt gewählte (nur Bände mit hinterlegter Unit-Grammatik)
   // Lehrwerke je Fach und Land (Englisch: Green Line; Latein: Pontes, Campus, prima – 07.10.2026)
@@ -546,7 +551,7 @@ export default function GrammatikAuswahl({
           data-frei-zeigen={versteckt}
         />
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: schmal || !voll ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 1fr)', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: schmal || !teileZeigen ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 1fr)', gap: 8 }}>
         <Paper withBorder radius="sm" p={4}>
           <ScrollArea.Autosize mah={schmal ? 280 : 380} type="auto">
             <Stack gap={0} data-themenliste>
@@ -603,7 +608,7 @@ export default function GrammatikAuswahl({
             </Stack>
           </ScrollArea.Autosize>
         </Paper>
-        <NurExperte geaendert={teilformen.length > 0 && 'Teilformen eingeschränkt'}>
+        <NurExperte geaendert={teilformen.length > 0 && 'Teilformen eingeschränkt'} immer={kurs}>
           <Paper withBorder radius="sm" p="xs" data-thema-detail>
             <ScrollArea.Autosize mah={schmal ? undefined : 380} type="auto">
               {fokusThema ? (

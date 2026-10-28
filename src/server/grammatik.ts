@@ -1540,7 +1540,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
               // Katalog-Themen der Freigabe (08.10.2026): im Dialog „Grammatik hinzufügen" vorab angehakt
               themen: infoVon(z).themen,
               // Aus der Aufgabenbank (13.10.2026): Aufgaben werden in „Grammatikformen" gepflegt
-              ...(infoVon(z).bank?.length ? { bank: true } : {}),
+              ...(infoVon(z).bank?.length ? { bank: true, teile: infoVon(z).bank } : {}),
               erstellt: z.erstellt,
               jahrgang: jahre[i].jahrgang,
               stelle: jahre[i].stelle,
@@ -1775,6 +1775,28 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           .run(teile[1] === 'entfernen' ? 'entfernt' : 'offen', z.id)
         protokolliereServer('grammatik', teile[1] === 'entfernen' ? 'Grammatik aus dem Kurs entfernt' : 'Grammatik wiederhergestellt', ich.id)
         return json(res, 200, { ok: true }), true
+      }
+      /*
+       * Unterthemen (Teilbereiche) einer Bank-Form im Kurs wählen (28.10.2026, Wunsch der Lehrkraft: bei den Modalverben
+       * z. B. nur can/can't freischalten). Ändert nur, welche hinterlegten Aufgaben dieser Kurs bekommt – die Aufgabenbank
+       * bleibt unberührt. Kennungen bleiben, der Lernstand abgewählter Teilbereiche gilt wieder, wenn sie zurückkommen.
+       */
+      if (teile[1] === 'teilbereiche') {
+        const info = infoVon(z)
+        const thema = info.themen.length === 1 ? info.themen[0] : ''
+        if (!info.bank?.length || !thema) return json(res, 400, { fehler: 'Unterthemen lassen sich nur bei hinterlegter Grammatik einer Form wählen.' }), true
+        const gewaehlt = [...new Set((Array.isArray(k0.teile) ? k0.teile : []).map(String))]
+          .filter((x) => schluesselGueltig(x) && (x === thema || x.startsWith(`${thema}/`)))
+          .slice(0, 40)
+        if (!gewaehlt.length) return json(res, 400, { fehler: 'Bitte mindestens ein Unterthema wählen – sonst die Grammatik entfernen.' }), true
+        const stufen = info.stufen ?? kursStufen(z.lehrkraft_id, z.vok_id ?? '')
+        const paket = paketAusBank(z.thema || z.titel, gewaehlt, stufen)
+        if (!paket.aufgaben.length) return json(res, 400, { fehler: 'Zu den gewählten Unterthemen sind keine Aufgaben hinterlegt.' }), true
+        db()
+          .prepare('UPDATE gram_zuweisungen SET paket = ?, info = ? WHERE id = ?')
+          .run(JSON.stringify(paket), JSON.stringify(infoBereinigt({ ...info, bank: gewaehlt, teilformen: gewaehlt.filter((x) => x.includes('/')) })), z.id)
+        protokolliereServer('grammatik', `Unterthemen der Grammatik geändert (${gewaehlt.length})`, ich.id)
+        return json(res, 200, { teile: gewaehlt, aufgaben: paket.aufgaben.length }), true
       }
       if (teile[1] === 'status') {
         db()

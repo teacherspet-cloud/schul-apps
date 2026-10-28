@@ -56,11 +56,20 @@ export function useAlleOptionen(): boolean {
  * Feineinstellung: nur im Expertenmodus bzw. bei aufgeklapptem „Alle Optionen".
  * `geaendert`: kurze Beschreibung, wenn der Wert vom Standard abweicht (sonst weglassen/false).
  */
-export function NurExperte({ geaendert, children }: { geaendert?: string | false | null; children: React.ReactNode }): React.JSX.Element | null {
-  const sichtbar = useAlleOptionen()
+export function NurExperte({
+  geaendert,
+  immer = false,
+  children
+}: {
+  geaendert?: string | false | null
+  /** true = auch im Standardmodus zeigen (z. B. Teilformen im Kurs, 28.10.2026) – meldet dann keine Abweichung */
+  immer?: boolean
+  children: React.ReactNode
+}): React.JSX.Element | null {
+  const sichtbar = useAlleOptionen() || immer
   const bereich = useContext(BereichContext)
   const id = useId()
-  const text = geaendert || null
+  const text = (!immer && geaendert) || null
   const melde = bereich?.melde
   useEffect(() => {
     if (!melde) return

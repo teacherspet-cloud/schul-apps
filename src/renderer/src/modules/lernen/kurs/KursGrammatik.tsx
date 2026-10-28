@@ -27,14 +27,17 @@ import {
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconChevronDown, IconChevronRight, IconDots, IconPencil, IconPlus, IconSearch, IconSparkles, IconTrash, IconX } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconDots, IconEye, IconListCheck, IconPencil, IconPlus, IconSearch, IconSparkles, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { ART_NAME, paketBereinigt, type AufgabenArt, type GrammatikPaket } from '@shared/grammatiktrainer'
-import { STUFE_NAME, STUFEN, type Stufe } from '@shared/grammatikBank'
+import { kernZahl, STUFE_NAME, STUFEN, type BankZahlen, type Stufe } from '@shared/grammatikBank'
+import { bankZahlenLaden } from '../../grammatikformen/bank'
+import { kennungLabel, teilbereicheVon } from '../../grammatikformen/grammatikformen'
 import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { starteAuftrag } from '../../../shared/auftraege'
 import { useSortierTabelle, type Spalte } from '../../../shared/components/SortierTabelle'
+import { AufgabenAnsicht } from '../GrammatikTrainer'
 import { EntwurfAnsehen, ladeEntwuerfe, Lernstand, speichereEntwuerfe, useEntwuerfe, type Entwurf } from '../GrammatikTraining'
 import { erzeugeGrammatikPaket, erzeugeMehrAufgaben, mehrAnzahl, waehlbareArten, erzeugungsHinweis, type MehrAufgabenAuftrag } from '../grammatikErzeugen'
 import { bekanntNachStand } from '@shared/zeitformSperre'
@@ -74,6 +77,8 @@ export interface GrammatikZeile {
   regeln?: string[]
   /** Katalog-Themen der Freigabe (Dialog „Grammatik hinzufügen") */
   themen?: string[]
+  /** Aufgabenbank: die Teilbereiche (Unterthemen), die dieser Kurs bekommt (28.10.2026) */
+  teile?: string[]
   /** Band und Unit (09.10.2026, Server: lehrwerkDerGrammatik) – Gliederung nach Lehrwerk */
   buch?: string
   unit?: string
@@ -447,6 +452,8 @@ export function KursGrammatik({
   const [jahre, setJahre] = useOffenGemerkt<Record<string, boolean>>(JAHRE_SCHLUESSEL(vokId), {})
   const [frage, setFrage] = useState<{ was: 'entfernen' | 'loeschen'; g: GrammatikZeile } | null>(null)
   const [mehr, setMehr] = useState<GrammatikZeile | null>(null)
+  const [unterthemen, setUnterthemen] = useState<GrammatikZeile | null>(null)
+  const [ansehen, setAnsehen] = useState<GrammatikZeile | null>(null)
   const [bearbeiten, setBearbeiten] = useState<string | null>(null)
   const entwuerfe = useEntwuerfe().filter((e) => e.empfaenger.vokId === vokId)
   const laden = useCallback(
@@ -635,11 +642,19 @@ export function KursGrammatik({
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
+              {/* Aufgaben ansehen (28.10.2026): alle Aufgaben des Kurses so, wie Lernende sie sehen, mit Lösungen */}
+              <Menu.Item leftSection={<IconEye size={14} />} onClick={() => setAnsehen(g)} data-grammatik-ansehen={g.id}>
+                Aufgaben ansehen
+              </Menu.Item>
+              {/* Unterthemen (28.10.2026): welche Teilbereiche der Form der Kurs bekommt – die Aufgabenbank bleibt unberührt */}
+              {g.bank && g.themen?.length === 1 && (
+                <Menu.Item leftSection={<IconListCheck size={14} />} onClick={() => setUnterthemen(g)} data-grammatik-unterthemen={g.id}>
+                  Unterthemen wählen …
+                </Menu.Item>
+              )}
+              {/* Nur „Entfernen" (28.10.2026, Wunsch der Lehrkraft): „Endgültig löschen" steht nur noch bei den Entfernten */}
               <Menu.Item leftSection={<IconX size={14} />} onClick={() => setFrage({ was: 'entfernen', g })} data-grammatik-entfernen>
                 Entfernen
-              </Menu.Item>
-              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => setFrage({ was: 'loeschen', g })} data-grammatik-loeschen>
-                Endgültig löschen …
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -877,6 +892,8 @@ export function KursGrammatik({
       {geoeffnet && <GrammatikFenster id={geoeffnet} schliessen={() => (oeffnen(null), laden())} />}
       {bearbeiten && <GrammatikFenster id={bearbeiten} nurAufgaben schliessen={() => (setBearbeiten(null), laden())} />}
       {mehr && <MehrAufgabenFenster g={mehr} schliessen={() => setMehr(null)} />}
+      {ansehen && <AnsehenFenster g={ansehen} schliessen={() => setAnsehen(null)} />}
+      {unterthemen && <UnterthemenFenster g={unterthemen} schliessen={() => setUnterthemen(null)} fertig={() => (setUnterthemen(null), laden())} />}
       {entwurf && <EntwurfAnsehen e={entwurf} schliessen={() => setEntwurf(null)} fertig={() => (setEntwurf(null), laden())} />}
     </Card>
   )
@@ -973,5 +990,123 @@ export function extraStarten(k: {
   })
   notifySuccess(
     `Die KI erstellt ${k.art === 'foerder' ? 'Förderaufgaben' : 'Forderaufgaben'} für ${k.fuer.name} – sie erscheinen gleich als Entwurf beim Kurs.`
+  )
+}
+
+/**
+ * Unterthemen einer hinterlegten Grammatikform im Kurs wählen (28.10.2026, Wunsch der Lehrkraft: z. B. bei den
+ * Modalverben in Klasse 5 nur can/can't freischalten). Ändert nur, was dieser Kurs bekommt – an der Aufgabenbank
+ * ändert sich nichts. Abgewähltes kommt mit seinem Lernstand zurück, wenn es wieder angehakt wird.
+ */
+export function UnterthemenFenster({ g, schliessen, fertig }: { g: GrammatikZeile; schliessen: () => void; fertig: () => void }): React.JSX.Element {
+  const thema = g.themen?.[0] ?? ''
+  const alle = teilbereicheVon([thema])
+  const [wahl, setWahl] = useState<string[]>(() => {
+    const t = g.teile ?? []
+    // Steht die ganze Form in der Liste (Thema ohne Teilformen bzw. alle), sind alle angehakt
+    return t.includes(thema) ? alle : alle.filter((k) => t.includes(k))
+  })
+  const [zahlen, setZahlen] = useState<BankZahlen | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  useEffect(() => {
+    void bankZahlenLaden(thema.split('.')[0]).then(
+      (r) => setZahlen(r.zahlen),
+      () => setZahlen({})
+    )
+  }, [thema])
+  const anzahl = (k: string): number => kernZahl(zahlen?.[k])
+  const speichern = async (): Promise<void> => {
+    setLaeuft(true)
+    try {
+      const r = await senden<{ teile: string[]; aufgaben: number }>(`/server/grammatik/${g.id}/teilbereiche`, { teile: wahl })
+      notifySuccess(`„${g.titel}“: ${r.teile.length} ${r.teile.length === 1 ? 'Unterthema' : 'Unterthemen'} freigeschaltet (${r.aufgaben} Aufgaben).`)
+      window.dispatchEvent(new Event(GRAMMATIK_GEAENDERT))
+      fertig()
+    } catch (e) {
+      notifyError(e, 'Nicht gespeichert')
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Modal opened onClose={schliessen} title={`Unterthemen: ${g.titel}`} size="lg">
+      <Stack gap="sm" data-unterthemen-fenster>
+        <Text size="sm" c="dimmed">
+          Die Lernenden üben nur die angehakten Unterthemen. Die hinterlegten Aufgaben bleiben erhalten – Abgewähltes lässt sich jederzeit wieder
+          anhaken, der Lernstand gilt dann weiter.
+        </Text>
+        <Group gap={6}>
+          <Button size="compact-xs" variant="light" onClick={() => setWahl(alle.filter((k) => !zahlen || anzahl(k) > 0))} data-unterthemen-alle>
+            Alle
+          </Button>
+          <Button size="compact-xs" variant="light" color="gray" onClick={() => setWahl([])} data-unterthemen-keine>
+            Keine
+          </Button>
+        </Group>
+        {!zahlen ? (
+          <Loader size="sm" />
+        ) : (
+          <Stack gap={4}>
+            {alle.map((k) => {
+              const n = anzahl(k)
+              const name = kennungLabel(k)
+              return (
+                <Checkbox
+                  key={k}
+                  checked={wahl.includes(k)}
+                  disabled={!n && !wahl.includes(k)}
+                  onChange={() => setWahl((w) => (w.includes(k) ? w.filter((x) => x !== k) : [...w, k]))}
+                  data-unterthema={k}
+                  label={
+                    <Group gap={6} wrap="wrap">
+                      <Text size="sm" span>
+                        {name.includes(': ') ? name.slice(name.indexOf(': ') + 2) : name}
+                      </Text>
+                      <Text size="xs" span c="dimmed">
+                        {n ? `${n} Aufgaben` : 'keine Aufgaben hinterlegt'}
+                      </Text>
+                    </Group>
+                  }
+                />
+              )
+            })}
+          </Stack>
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={schliessen}>
+            Abbrechen
+          </Button>
+          <Button onClick={() => void speichern()} loading={laeuft} disabled={!wahl.length || !zahlen} data-unterthemen-speichern>
+            Speichern
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+/** „Aufgaben ansehen“ (28.10.2026): lädt das Paket der Kurs-Grammatik und zeigt es wie bei den Lernenden */
+function AnsehenFenster({ g, schliessen }: { g: GrammatikZeile; schliessen: () => void }): React.JSX.Element {
+  const [d, setD] = useState<{ paket: GrammatikPaket; fach: string } | null>(null)
+  useEffect(() => {
+    void holen<{ paket: GrammatikPaket; fach: string }>(`/server/grammatik/${g.id}`).then(
+      (r) => setD({ paket: r.paket, fach: r.fach }),
+      (e: unknown) => (notifyError(e, 'Aufgaben nicht geladen'), schliessen())
+    )
+  }, [g.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Modal opened onClose={schliessen} title={`So sehen Lernende: ${g.titel}`} size="xl" data-ansehen-fenster>
+      {!d ? (
+        <Loader size="sm" />
+      ) : (
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {d.paket.aufgaben.length} Aufgaben, je Regel in Etappen – Lernende sehen jeweils nur ihre aktuelle Etappe. Nur zum Ansehen: Antworten werden nicht
+            geprüft oder gespeichert.
+          </Text>
+          <AufgabenAnsicht paket={d.paket} fach={d.fach} />
+        </Stack>
+      )}
+    </Modal>
   )
 }
