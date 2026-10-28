@@ -66,6 +66,7 @@ import {
   type AbschnittStatistik
 } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
+import { TEST_VORLAUF_TAGE, type AnstehenderTest } from '../shared/testVorbereitung'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen, woerterEintragen } from './rekordbuch'
@@ -334,6 +335,8 @@ export const kursHaken: {
   nachFreigabe?: (kursId: string) => void
   /** Verbundene Grammatik eines Kurses für die Auswahl der Testabschnitte (12.10.2026, grammatik.ts) */
   grammatikTeile?: (vokId: string) => { id: string; titel: string; zeit: number }[]
+  /** Testvorbereitung (28.10.2026): Stand einer Person in einer Grammatik des Tests */
+  grammatikTestStand?: (gramId: string, schuelerId: string) => { titel: string; sicher: number; gesamt: number } | null
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -990,6 +993,59 @@ function kursUebersicht(
   if (aktuell.length === woerter.length) return { uebersicht: ganz, alt: false }
   const jetztTeil = uebersicht(aktuell, staende, jetzt, ziel)
   return { uebersicht: { ...ganz, faellig: jetztTeil.faellig, heuteOffen: jetztTeil.heuteOffen }, alt: aktuell.length === 0 }
+}
+
+/**
+ * Anstehende Tests einer Person (28.10.2026, Entscheidung der Lehrkraft): Testtermine der Kurse und angekündigte
+ * Onlinetests, ab 14 Tage vorher. Ein Vokabel-Onlinetest der Lerngruppe, der zu einem Kurs gehört, steht beim Kurs (mit
+ * dessen Abschnitten); andere Onlinetests stehen für sich (ohne Übungen).
+ */
+export function anstehendeTestsFuer(ich: NutzerInfo, jetzt = Date.now()): AnstehenderTest[] {
+  if (ich.rolle !== 'schueler') return []
+  const online = onlineTermineVon(ich, jetzt)
+  const grenze = jetzt + TEST_VORLAUF_TAGE * TAG
+  const genutzt = new Set<string>()
+  const aus: AnstehenderTest[] = []
+  const zs = (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
+    .map((z) => kursFuerLernende(z))
+    .filter((z) => istOffen(z) && vokIstFuer(z, ich))
+  for (const z of zs) {
+    const t = kursTestMitOnlinetests(z, online, jetzt)
+    const test = kursTest(z, online, jetzt)
+    if (!t || !test || test.termin > grenze) continue
+    if (t.online) genutzt.add(t.online.id)
+    const woerter = json_(z.woerter, [] as Vokabel[])
+    const keys = new Set(test.keys)
+    const imTest = new Set(kursAbschnitteFuerVorrang(z, test).flatMap((a) => (a.test ? a.ids : [])))
+    const testWoerter = woerter.filter((v) => imTest.has(v.id))
+    const st = standVon(z.id, ich.id).woerter
+    const u = testWoerter.length ? uebersicht(testWoerter, st, jetzt) : null
+    const gram = [...keys]
+      .filter((k) => k.startsWith(GRAM_PRAEFIX))
+      .flatMap((k) => {
+        const g = kursHaken.grammatikTestStand?.(k.slice(GRAM_PRAEFIX.length), ich.id)
+        return g ? [{ id: k.slice(GRAM_PRAEFIX.length), ...g }] : []
+      })
+    if (!u && !gram.length) continue
+    aus.push({
+      id: z.id,
+      art: 'kurs',
+      titel: t.online ? t.online.titel : `Test ${fachAusName(z.fach)?.label ?? z.fach}`.trim(),
+      fach: z.fach,
+      termin: test.termin,
+      kursId: z.id,
+      ...(t.online ? { onlineId: t.online.id } : {}),
+      abschnitte: (json_(z.woerter, [] as unknown[]).length ? teileVon(z) : []).filter((x) => keys.has(teilSchluessel(x))).map((x) => x.titel),
+      vok: u ? { sicher: u.sicher, aufbau: u.imAufbau, neu: u.neu, gesamt: u.gesamt } : null,
+      gram
+    })
+  }
+  for (const o of online) {
+    const termin = Date.parse(`${o.termin}T08:00:00`)
+    if (genutzt.has(o.id) || o.verborgen || !Number.isFinite(termin) || termin < jetzt - TAG || termin > grenze) continue
+    aus.push({ id: `online:${o.id}`, art: 'online', titel: o.titel, fach: o.fach, termin, onlineId: o.id, abschnitte: [], vok: null, gram: [] })
+  }
+  return aus.sort((a, b) => a.termin - b.termin)
 }
 
 /** Kurzfassung für die Lernenden (auch für die Lern-App) */

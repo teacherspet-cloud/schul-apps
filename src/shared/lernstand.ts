@@ -13,6 +13,7 @@
  *  - feste Lerntipps aus einer Regel-Liste (ohne KI) und die Prüfung von KI-Tipps
  */
 
+import type { AnstehenderTest } from './testVorbereitung'
 import { istFerienOderFeiertag } from './schulkalender'
 
 export type Stufe = 'grund' | 'unter' | 'mittel' | 'ober' | 'neutral'
@@ -193,6 +194,8 @@ export interface LernstandAntwort {
   }
   /** Stand je Bereich: Stufen neu / in Arbeit / sicher (bei Blättern: offen / angefangen / bearbeitet) */
   bereiche: Bereich[]
+  /** Anstehende Tests ab 14 Tage vorher (28.10.2026, shared/testVorbereitung.ts) */
+  anstehend?: AnstehenderTest[]
   tipp: Tipp | null
   /** Tipp ist der Wochenrückblick der KI */
   wochenrueckblick: boolean

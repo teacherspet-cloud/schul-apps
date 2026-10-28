@@ -13,6 +13,7 @@
  *  - „Mein Lernraum" (08.10.2026, Befund der Lehrkraft: die wachsende Liste der Themenbereiche unter „Mein Stand" war
  *    zu lang): Link zum Regal und die fünf neuesten Materialien, jedes mit einem Tipp direkt geöffnet.
  */
+import { AnstehenderTestZeile } from '../lernen/TestVorbereitung'
 import Regal from '../lernen/regal/Regal'
 import { Badge, Button, Group, Paper, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip } from '@mantine/core'
 import {
@@ -514,6 +515,14 @@ export function Lernstand({ stand, neueste }: { stand: LernstandAntwort; neueste
           </ThemeIcon>
           <Title order={4}>{symbole ? 'So weit bist du gekommen' : 'Mein Fortschritt'}</Title>
         </Group>
+        {/* Anstehende Tests (28.10.2026, abgestimmt): ab 14 Tage vorher, Klick führt zu „Für den Test üben" */}
+        {(stand.anstehend ?? []).length > 0 && (
+          <Stack gap={4} mb="sm" data-anstehende-tests>
+            {(stand.anstehend ?? []).map((t) => (
+              <AnstehenderTestZeile key={t.id} t={t} />
+            ))}
+          </Stack>
+        )}
         <Text size="sm" fw={600} mb={6}>
           Diese Woche
           {!symbole && (

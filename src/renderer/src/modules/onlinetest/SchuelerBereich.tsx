@@ -110,6 +110,7 @@ import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
+import TestVorbereitung from '../lernen/TestVorbereitung'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
 import { PartnerarbeitSeite } from '../partnerarbeit/PartnerarbeitSeite'
 import type { MeinePartnerarbeit } from '@shared/partnerarbeit/typen'
@@ -209,6 +210,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const grammatik = /^\/s\/g\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const gramCode = /^\/s\/gt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  // Für den Test üben (28.10.2026): Kurs-Kennung bzw. „online:<id>"
+  const fuerTest = /^\/s\/fuer-test\/([A-Za-z0-9:%_-]{4,80})\/?$/.exec(pfad)?.[1]
   // Zusammen spielen (08.10.2026): Einladungscode aus sechs Ziffern
   const spielCode = /^\/s\/sp\/(\d{6})\/?$/.exec(pfad)?.[1]
   // Partnerarbeit Sprechen im Unterricht (24.10.2026)
@@ -270,6 +273,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <MehrspielerSeite code={spielCode} />
   ) : paId && ich?.angemeldet ? (
     <PartnerarbeitSeite id={paId} />
+  ) : fuerTest && !gast ? (
+    <TestVorbereitung id={decodeURIComponent(fuerTest)} />
   ) : grammatik ? (
     <GrammatikTrainer id={grammatik} />
   ) : blatt ? (

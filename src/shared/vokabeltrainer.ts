@@ -860,8 +860,8 @@ export const loesungsBuchstaben = (term: string): string =>
 export const istWackelig = (s: WortStand, jetzt = Date.now()): boolean => s.fach >= 1 && s.fach <= 2 && s.falsch > 0 && jetzt - (s.zuletzt || 0) < 14 * TAG
 
 /** Übungen, die ein Link direkt startet (`/s/v/<ID>?uebung=…`, Tipps der Startseite, 09.10.2026) */
-export type LinkUebung = 'runde' | 'abfragen' | 'wackelig' | 'neu'
-export const LINK_UEBUNGEN: readonly LinkUebung[] = ['runde', 'abfragen', 'wackelig', 'neu']
+export type LinkUebung = 'runde' | 'abfragen' | 'wackelig' | 'neu' | 'test'
+export const LINK_UEBUNGEN: readonly LinkUebung[] = ['runde', 'abfragen', 'wackelig', 'neu', 'test']
 
 /**
  * Welche Runde ein Link startet (09.10.2026, Befund der Lehrkraft: „Abfrage ohne Hinschauen starten" öffnete nur die
@@ -883,6 +883,22 @@ export function linkRunde(
   if (art === 'neu') {
     const w = weitereNeue(liste, staende, jetzt, SCHRITT)
     if (w.length) return { woerter: w, abfragen: false, freiwillig: false }
+    art = 'runde'
+  }
+  // Für den Test üben (28.10.2026, abgestimmt): zuerst die heutigen Wörter des Tests (zählen aufs Tagesziel), danach die
+  // noch nicht sicheren Wörter des Tests – die unsichersten zuerst, freiwillig (rücken nur eingeschränkt vor)
+  if (art === 'test') {
+    const imTest = (v: Vokabel): boolean => v.vorrang === 'test'
+    const h = heute.filter(imTest)
+    if (h.length) return { woerter: h.slice(0, SCHRITT), abfragen: false, freiwillig: false }
+    const offen = liste
+      .filter((v) => imTest(v) && !(staende[v.id] && istSicher(staende[v.id])))
+      .sort((a, b) => (staende[a.id]?.fach ?? 0) - (staende[b.id]?.fach ?? 0) || (staende[b.id]?.falsch ?? 0) - (staende[a.id]?.falsch ?? 0))
+      .slice(0, SCHRITT)
+    // Noch nie gesehene Wörter wie „neu" (erster Kontakt im Kasten), bekannte freiwillig
+    const neue = offen.filter((v) => !(staende[v.id]?.fach ?? 0))
+    if (neue.length) return { woerter: neue, abfragen: false, freiwillig: false }
+    if (offen.length) return { woerter: offen, abfragen: false, freiwillig: true }
     art = 'runde'
   }
   if (art === 'wackelig') {

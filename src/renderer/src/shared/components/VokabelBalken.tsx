@@ -52,7 +52,7 @@ export function VokabelBalken({
         <Progress.Root w={breite} size={8} radius="xl" style={{ flex: typeof breite === 'string' ? 1 : 'none' }} aria-label={anteileText(a, schnitt)}>
           <Progress.Section value={p(a.sicher)} color="teal.7" />
           <Progress.Section value={p(a.aufbau)} color="teal.3" />
-          <Progress.Section value={p(a.neu)} color="gray.3" />
+          <Progress.Section value={p(a.neu)} color="var(--mantine-color-default-border)" />
         </Progress.Root>
         {rechts ?? (
           <Text size="xs" c={begonnen ? undefined : 'dimmed'} style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>

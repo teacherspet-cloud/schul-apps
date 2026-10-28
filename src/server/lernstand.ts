@@ -20,7 +20,7 @@ import { datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from '.
 import { imNutzer } from './kontext'
 import { alsNutzer, json, type Anfrage, type Aufruf } from './http'
 import { gehoertZu, klasseVon, lerngruppe, onlinetestStand } from './onlinetest'
-import { vokabelListenFuer, standVon as vokStandVon, zeile as vokZeile } from './vokabeln'
+import { anstehendeTestsFuer, vokabelListenFuer, standVon as vokStandVon, zeile as vokZeile } from './vokabeln'
 import { grammatikFuer } from './grammatik'
 import { sprachStaende } from './sprachstand'
 import type { SprachStand } from '../shared/sprachstand'
@@ -651,6 +651,12 @@ export function lernstandRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean>
         const datenDa = g.antwort.fleiss.tage14 > 0
         // Vorschaukonto (Musterschüler): nur der Regel-Tipp – keine KI-Anfrage im Namen der Lehrkraft
         if (ich.rolle === 'schueler' && ich.quelle !== 'vorschau' && datenDa) void wochenrueckblick(ich, g, aufruf).catch(() => undefined)
+      }
+      // Anstehende Tests (28.10.2026): Fehler dort bremsen den Lernstand nicht
+      try {
+        g.antwort.anstehend = anstehendeTestsFuer(ich)
+      } catch {
+        g.antwort.anstehend = []
       }
       return (json(res, 200, g.antwort), true)
     }
