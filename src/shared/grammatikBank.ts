@@ -63,6 +63,25 @@ export const AUFGABEN_JE_FELD = 4
 /** Ziel eines Felds dieser Übungsart */
 export const zielJeFeld = (u: Uebung): number => AUFGABEN_JE_UEBUNG[u]
 
+/**
+ * Nur bis zum Ziel behalten (Probelauf 28.10.2026: mit Puffer und Blindprobe kamen je Feld 6 statt 4 Aufgaben an).
+ * Je Übungsart höchstens `frei(u)` Aufgaben – zuerst je Aufgabenart eine, damit die Formate gemischt bleiben, dann in der
+ * Reihenfolge der KI (leicht → schwer). Die Reihenfolge der behaltenen Aufgaben bleibt.
+ */
+export function aufZielGekuerzt<T extends { uebung?: Uebung; art: string }>(aufgaben: readonly T[], frei: (u: Uebung) => number): T[] {
+  const behalten = new Set<number>()
+  for (const u of UEBUNGEN) {
+    const idx = aufgaben.flatMap((a, i) => (a.uebung === u ? [i] : []))
+    const n = Math.max(0, frei(u))
+    const arten = new Set<string>()
+    const wahl: number[] = []
+    for (const i of idx) if (wahl.length < n && !arten.has(aufgaben[i].art)) (arten.add(aufgaben[i].art), wahl.push(i))
+    for (const i of idx) if (wahl.length < n && !wahl.includes(i)) wahl.push(i)
+    for (const i of wahl) behalten.add(i)
+  }
+  return aufgaben.filter((a, i) => !a.uebung || behalten.has(i))
+}
+
 // ---------------------------------------------------------------- Stufen (13.10.2026, abgestimmt)
 
 /**

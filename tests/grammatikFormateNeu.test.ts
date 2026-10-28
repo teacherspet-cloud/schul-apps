@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { paketBereinigt, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
 import { aufgabeMangel } from '../src/shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '../src/shared/grammatikDesign'
-import { AUFGABEN_JE_UEBUNG, UEBUNG_ARTEN } from '../src/shared/grammatikBank'
+import { AUFGABEN_JE_UEBUNG, aufZielGekuerzt, UEBUNG_ARTEN } from '../src/shared/grammatikBank'
 
 // Grammatik-Neubeginn (28.10.2026): neue Formate nach Recherche und Abstimmung mit der Lehrkraft
 const lies = (aufgaben: Record<string, unknown>[]): GrammatikAufgabe[] =>
@@ -88,5 +88,17 @@ describe('Neue Grammatikformate', () => {
     expect(d).not.toBeNull()
     expect(designText(d!)).toMatch(/ÜBUNGSDESIGN/)
     expect(await designFuer('fr.verb.passe_compose')).toBeNull()
+  })
+
+  it('Gespeichert wird nur bis zum Ziel, mit gemischten Formaten', () => {
+    const l = [
+      { uebung: 'erkennen' as const, art: 'auswahl', n: 1 },
+      { uebung: 'erkennen' as const, art: 'auswahl', n: 2 },
+      { uebung: 'erkennen' as const, art: 'auswahl', n: 3 },
+      { uebung: 'erkennen' as const, art: 'sortieren', n: 4 },
+      { uebung: 'fehler' as const, art: 'fehler', n: 5 },
+      { uebung: 'fehler' as const, art: 'fehler', n: 6 }
+    ]
+    expect(aufZielGekuerzt(l, (u) => (u === 'erkennen' ? 2 : 1)).map((x) => x.n)).toEqual([1, 4, 5])
   })
 })

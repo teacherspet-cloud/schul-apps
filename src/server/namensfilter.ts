@@ -105,7 +105,15 @@ export function musterFuer(personen: Person[], kontext: WortKontext = {}): Muste
     if (nn && nn.length >= 3 && !nurInitiale) {
       varianten.push(`(?:Herrn?|Frau|Hr\\.|Fr\\.|Mr\\.?|Mrs\\.?|Ms\\.?|Monsieur|Madame|Señora?)\\s+${esc(nn)}`)
       // Klassenliste: der Nachname allein läuft oben über die Prüfung Person/Wort
-      if (!p.streng && !GEWOEHNLICHE_WOERTER.has(nn.toLowerCase()) && nn.length >= 4) varianten.push(esc(nn))
+      // Nachname allein (28.10.2026, Befund am Server: ein Konto „… Will" machte in JEDER englischen Anfrage aus „will" einen
+      // Platzhalter – die KI schrieb dann „[Person-1] has had …"): nur großgeschrieben und nach der Prüfung Person/Wort
+      if (!p.streng && !GEWOEHNLICHE_WOERTER.has(nn.toLowerCase()) && nn.length >= 4)
+        out.push({
+          person: i,
+          quelle: esc(nn),
+          laenge: nn.length,
+          pruefe: (text, index) => /\p{Lu}/u.test(text[index] ?? '') && personOderWort(text, index, nn, { ...kontext, namen: liste }).person
+        })
     }
     if (p.benutzer && p.benutzer.length >= 4) varianten.push(esc(p.benutzer))
     for (const v of varianten) out.push({ person: i, quelle: v, laenge: v.length })

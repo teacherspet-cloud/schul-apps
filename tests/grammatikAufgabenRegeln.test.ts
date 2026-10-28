@@ -82,3 +82,11 @@ describe('Regeln für Grammatikaufgaben (28.10.2026)', () => {
     expect(p.aufgaben.map((a) => a.id)).toEqual(['b000000000001'])
   })
 })
+
+describe('Grundwort nicht doppelt (Probelauf 28.10.2026)', () => {
+  it('nimmt die Vorgabe aus dem Satz', () => {
+    const a = aufgabeNormalisiert(auf({ uebung: 'bilden', anweisung: 'Setze ein.', satz: 'We ___ (have) this computer for three years.', vorgabe: '(have)', loesungen: ['have had'] }))
+    expect(a.satz).toBe('We ___ this computer for three years.')
+    expect(a.vorgabe).toBe('(have)')
+  })
+})

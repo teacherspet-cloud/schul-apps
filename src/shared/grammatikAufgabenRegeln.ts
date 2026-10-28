@@ -102,6 +102,12 @@ export function aufgabeNormalisiert<T extends GrammatikAufgabe>(a: T): T {
     }
   }
   if (x.art === 'luecke' && /^\s*w[äa]hle\b/i.test(x.anweisung)) x = { ...x, anweisung: x.vorgabe ? 'Setze die passende Form ein.' : 'Ergänze die Lücke.' }
+  // Grundwort doppelt (Probelauf 28.10.2026: „We ___ (have) this computer" UND Vorgabe „(have)") – die App zeigt die Vorgabe
+  // selbst hinter der Lücke, im Satz fällt sie weg
+  if (x.art === 'luecke' && x.vorgabe && x.satz.includes(x.vorgabe.trim())) {
+    const satz = x.satz.replace(x.vorgabe.trim(), '').replace(/\s{2,}/g, ' ').replace(/\s+([.,!?;:])/g, '$1').trim()
+    if (satz.includes('___')) x = { ...x, satz }
+  }
   if (x.art === 'auswahl' && x.optionen) {
     const ohne: string[] = []
     for (const o of x.optionen) if (!enthalten(ohne, o)) ohne.push(o)

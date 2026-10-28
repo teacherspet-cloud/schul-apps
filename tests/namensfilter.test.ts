@@ -125,3 +125,15 @@ describe('Klassenliste: Person oder Wort, Ersetzen und Wiederherstellen', () => 
     expect(() => pruefeHoertext(tts('Hallo Rose, wie geht es dir?'), m)).toThrow()
   })
 })
+
+// Befund am Server (28.10.2026): ein Konto mit dem Nachnamen „Will" machte aus jedem englischen „will" einen Platzhalter
+describe('Nachname allein, der zugleich ein Wort ist', () => {
+  const m = musterFuer([{ vorname: 'Anna', nachname: 'Will' }], { sprache: 'en' })
+  it('lässt das kleingeschriebene Wort stehen', () => {
+    expect(schuetzeText('I think it will rain. Will you help me?', m).text).toBe('I think it will rain. Will you help me?')
+  })
+  it('schützt die Person weiterhin', () => {
+    expect(schuetzeText('Frau Will kommt morgen.', m).text).toBe('[Person-1] kommt morgen.')
+    expect(schuetzeText('Morgen kommt Will zur Konferenz.', m).text).toBe('Morgen kommt [Person-1] zur Konferenz.')
+  })
+})

@@ -12,6 +12,7 @@ import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import {
   zielJeFeld,
+  aufZielGekuerzt,
   stufeVon,
   STUFEN,
   STUFE_NAME,
@@ -374,7 +375,9 @@ async function bankSchritte(liste: BankAuftragEingabe[], k: AuftragsKontext): Pr
         const da = a.vorhanden ?? [...bank, ...entwurf].map((x) => aufgabeVorschau(x).aufgabe.slice(0, 120))
         const lauf = erzeugeBankAufgaben({ ...a, uebungen, anzahl, jeUebung, vorhanden: da, ohneLeichtPruefung: ohneLeicht }, k.ai, (t) =>
           melde(`${i + 1} von ${liste.length}: ${t}`)
-        ).then((r) => {
+        ).then((r0) => {
+          // Nur bis zum Ziel je Übungsart (Probelauf 28.10.2026) – der Puffer ist für Streichungen, nicht zum Speichern
+          const r = { ...r0, aufgaben: aufZielGekuerzt(r0.aufgaben, (u) => zielJeFeld(u) - zahl(u)) }
           if (a.direkt) return direktSpeichern(a, r)
           bankEntwurfAblegen({ schluessel: a.schluessel, sprache: a.sprache, regel: r.regel, aufgaben: r.aufgaben, am: Date.now() })
           return { ...r, doppelt: 0 }
