@@ -21,7 +21,7 @@
 import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { BILD_TINTE_MUSTER } from '../shared/blattBilder'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { nurTag, tagesBeginn, verlaufOhneZeit } from './ohneUhrzeit'
 import {
   alleNutzer,
@@ -1258,15 +1258,19 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const a = person ? abgabeVon(z.id, person.id) : null
       if (!person || !a) return (json(res, 404, { fehler: 'Diese Person hat das Blatt noch nicht bearbeitet.' }), true)
       const e = einstellungenVon(z)
+      // Kennung des Blatts (28.10.2026): kennt die Oberfläche das Blatt schon, geht es nicht noch einmal über die Leitung
+      const htmlKennung = createHash('sha1').update(z.html).digest('hex').slice(0, 16)
+      const htmlDa = url.searchParams.get('html') === htmlKennung
       return (
         json(res, 200, {
           id: z.id,
           titel: `${z.titel} – ${person.name || person.benutzer}`,
+          htmlKennung,
           offen: false,
           feedback: e.feedback,
           runden: e.runden,
           genutzt: a.abgaben,
-          html: z.html,
+          html: htmlDa ? '' : z.html,
           einstellungen: e,
           antworten: json_(a.antworten, {}),
           tinte: json_(a.tinte ?? '{}', {}),

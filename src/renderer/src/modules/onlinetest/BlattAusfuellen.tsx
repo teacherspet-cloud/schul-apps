@@ -295,6 +295,40 @@ function ohneFangNebenSkala(aus: Andock[]): Andock[] {
   return aus.filter((a) => (a.art === 'punkt' ? !nahe(a.x, a.y) : a.art === 'strecke' ? !(nahe(a.x1, a.y1) && nahe(a.x2, a.y2)) : true))
 }
 
+/**
+ * Messen ohne Zoom (28.10.2026, Befund der Lehrkraft am iPad: beim Zoomen lagen die Eingaben in alter Größe neben ihren
+ * Linien). Safari gibt den Zoom der Zoomfläche an das Blatt im Rahmen weiter; Lagen im Rahmen kommen dann um den
+ * Zoomfaktor verkleinert zurück. Wurde im gezoomten Zustand neu gemessen (wachsende Linien, nächstes Blatt mit gemerktem
+ * Zoom), passten die Felder nicht mehr. Der Faktor ergibt sich aus der Breite der Wurzel (gemessen ÷ gelayoutet) und wird
+ * für die Dauer der Messung aus getBoundingClientRect und getScreenCTM herausgerechnet.
+ */
+function ohneZoom<T>(doc: Document, messung: () => T): T {
+  const wurzel = doc.documentElement
+  const breite = wurzel.offsetWidth
+  const k = breite > 0 ? wurzel.getBoundingClientRect().width / breite : 1
+  const win = doc.defaultView as (Window & typeof globalThis) | null
+  if (!win || !Number.isFinite(k) || k <= 0 || Math.abs(k - 1) < 0.01) return messung()
+  const el = win.Element.prototype
+  const svg = win.SVGGraphicsElement?.prototype
+  const rechteck = el.getBoundingClientRect
+  const ctm = svg?.getScreenCTM
+  el.getBoundingClientRect = function (this: Element): DOMRect {
+    const r = rechteck.call(this)
+    return new win.DOMRect(r.x / k, r.y / k, r.width / k, r.height / k)
+  }
+  if (svg && ctm)
+    svg.getScreenCTM = function (this: SVGGraphicsElement): DOMMatrix | null {
+      const m = ctm.call(this)
+      return m ? new win.DOMMatrix().scale(1 / k).multiply(m) : m
+    }
+  try {
+    return messung()
+  } finally {
+    el.getBoundingClientRect = rechteck
+    if (svg && ctm) svg.getScreenCTM = ctm
+  }
+}
+
 function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; bilder: BildLage[] } {
   const seiten: Seite[] = []
   const roh: Omit<Feld, 'id'>[] = []
@@ -643,7 +677,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     if (!doc) return
     const hoehe = doc.documentElement.scrollHeight
     if (iframe.current) iframe.current.style.height = `${hoehe}px`
-    setGemessen({ ...messen(doc), hoehe })
+    setGemessen({ ...ohneZoom(doc, () => messen(doc)), hoehe })
   }, [])
   const geladen = useCallback(() => {
     const doc = iframe.current?.contentDocument
@@ -1127,6 +1161,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
 
       {/* In der Listenansicht bleibt das Blatt unsichtbar da – sonst ließen sich die Felder nicht messen */}
       {/* Mit dem Finger: Zwei-Finger-Zoom und Zoom-Knöpfe, das Blatt rollt dann seitwärts; am PC unverändert */}
+      {!gemessen && ansicht === 'blatt' && (
+        <Group gap="xs" c="dimmed" data-blatt-laedt>
+          <Loader size="sm" />
+          <Text size="sm" c="dimmed">
+            Blatt wird aufgebaut …
+          </Text>
+        </Group>
+      )}
       <div ref={messRahmen} style={{ width: '100%' }}>
       <ZoomFlaeche aktiv={touch && ansicht === 'blatt'} className="blatt-zoom">
       <div

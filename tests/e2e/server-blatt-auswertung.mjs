@@ -110,6 +110,9 @@ try {
   await dlg.getByPlaceholder('wählen …').click()
   await p.getByRole('option', { name: KLASSE }).click()
   await dlg.locator('[data-blatt-freigeben]').click()
+  // Das Fenster bleibt nach dem Freigeben offen (Zugang/QR) – schließen wie in server-blatt-ansehen
+  await p.waitForTimeout(2500)
+  await p.keyboard.press('Escape')
   await dlg.waitFor({ state: 'hidden', timeout: 20000 })
 
   await bearbeiten(mia, true)

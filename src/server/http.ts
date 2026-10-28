@@ -30,6 +30,7 @@ import { berichtErlaubt, protokoll } from './diagnose'
 import { anfrageGemessen, kontoAktiv } from './serverZustand'
 import { createSecureContext, type SecureContext } from 'node:tls'
 import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { createReadStream, existsSync, readFileSync, statSync, watchFile } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
 import { AUFTRAGS_KANAELE, AuftragsFehler, gueltigeAuftragsId, gueltigesGeraet, kennungDesAuftrags, MAX_WARTEN_MS } from '../main/services/lanAuftraege'
@@ -116,8 +117,19 @@ export const beimAbmelden: ((nutzerId: string, kennung: string) => void)[] = []
 // ---------------------------------------------------------------- Hilfen
 
 export const json = (res: ServerResponse, code: number, wert: unknown): void => {
+  const text = JSON.stringify(wert)
+  /*
+   * Große Antworten gepackt (28.10.2026, Befund „Blatt ansehen“ lädt lange: Blätter mit Bildern sind mehrere MB groß).
+   * Nur ab 256 KB und wenn der Browser es annimmt – kleine Antworten bleiben ungepackt (spart Rechenzeit).
+   */
+  if (text.length > 256 * 1024 && /\bgzip\b/.test(String(res.req?.headers['accept-encoding'] ?? ''))) {
+    const gepackt = gzipSync(text, { level: 5 })
+    res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-encoding': 'gzip', vary: 'accept-encoding' })
+    res.end(gepackt)
+    return
+  }
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-  res.end(JSON.stringify(wert))
+  res.end(text)
 }
 
 /** Körper über der Grenze (22.10.2026): wird mit 413 beantwortet (siehe `gemessen`) */

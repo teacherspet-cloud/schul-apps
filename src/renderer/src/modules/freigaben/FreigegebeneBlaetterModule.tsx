@@ -366,11 +366,16 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
   )
 }
 
+/** Blatt-HTML je Freigabe (28.10.2026): nur einmal laden, solange das Programm offen ist */
+const blattZwischenspeicher = new Map<string, { kennung: string; html: string }>()
+
 function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
   const rueck = useRueckweg('freigaben', zurueck, 'Alle Freigaben')
   const [d, setD] = useState<Detail | null>(null)
   const [kurz, setKurz] = useState<Freigabe | null>(null)
   const [blatt, setBlatt] = useState<BlattDaten | null>(null)
+  // Ladeanzeige am Knopf „Blatt ansehen“ (28.10.2026)
+  const [laedt, setLaedt] = useState<string | null>(null)
   const [qr, setQr] = useState(false)
   const [entfernen, setEntfernen] = useState<Detail['abgaben'][number] | null>(null)
   // Auswertung je Person (05.10.2026, Auswertung.tsx)
@@ -403,8 +408,26 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
         <Loader />
       </Center>
     )
-  const ansehen = (benutzer: string): void =>
-    void holen<BlattDaten>(`/server/blaetter/${id}/abgabe?schueler=${encodeURIComponent(benutzer)}`).then(setBlatt, (e: unknown) => notifyError(e))
+  /*
+   * „Blatt ansehen“ (28.10.2026, Befund der Lehrkraft: lädt lange, ohne dass etwas passiert): Ladeanzeige am Knopf, und das
+   * Blatt selbst (im Schnitt mehrere MB mit Bildern) kommt nur beim ersten Ansehen dieser Freigabe über die Leitung –
+   * danach schickt der Server nur noch Eintragungen und Feedback (Kennung des Blatts, blattZwischenspeicher).
+   */
+  const ansehen = (benutzer: string): void => {
+    setLaedt(benutzer)
+    const schon = blattZwischenspeicher.get(id)
+    void holen<BlattDaten & { htmlKennung?: string }>(
+      `/server/blaetter/${id}/abgabe?schueler=${encodeURIComponent(benutzer)}${schon ? `&html=${schon.kennung}` : ''}`
+    )
+      .then(
+        (b) => {
+          if (b.html && b.htmlKennung) blattZwischenspeicher.set(id, { kennung: b.htmlKennung, html: b.html })
+          setBlatt({ ...b, html: b.html || schon?.html || '' })
+        },
+        (e: unknown) => notifyError(e)
+      )
+      .finally(() => setLaedt(null))
+  }
   return (
     <Container size="lg" py="lg" data-freigabe-detail>
       <Button
@@ -531,7 +554,9 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     leftSection={<IconEye size={14} />}
                     onClick={() => ansehen(a.benutzer)}
                     disabled={!a.benutzer || !a.begonnen}
+                    loading={laedt === a.benutzer}
                     data-blatt-ansehen
+                    data-blatt-laedt={laedt === a.benutzer || undefined}
                   >
                     Blatt ansehen
                   </Button>
