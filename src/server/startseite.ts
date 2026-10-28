@@ -18,7 +18,7 @@
  */
 import { json, type Anfrage } from './http'
 import { lerngruppenVon } from './onlinetest'
-import { vokabelnDerGruppe } from './vokabeln'
+import { testAbschnitteFuerLehrkraft, vokabelnDerGruppe, zeile as vokZeile } from './vokabeln'
 import { grammatikDerGruppe } from './grammatik'
 import { ausgeblendetVon, bedarfAufteilen, kursBedarfDerGruppe, klassenSchluessel, nachKlasse, type Bedarf } from './klassen'
 import { verborgeneGruppen } from './iservKursgruppen'
@@ -77,6 +77,7 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
         ...(t.woerter ? { anteil: t.anteil, aktiv7: t.aktiv7 } : {}),
         lernende: t.lernende,
         testTermin,
+        ...(testTermin ? testZumTermin(t.id) : {}),
         // Problemwörter (10.10.2026): dieselbe Zahl wie Kursseite und „Meine Klassen" (shared/problemWoerter.ts)
         abzeichen: kursAbzeichen({ testTermin, inaktiv, problem: t.problemZahl, lernende: t.lernende }, jetzt)
       })
@@ -85,6 +86,18 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
   return {
     kurse,
     klassen: [...klassen.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
+  }
+}
+
+/** Test zum Termin (28.10.2026): verknüpfter Test und die gewählten Abschnitte bzw. Grammatik des Termins */
+function testZumTermin(kursId: string): Pick<StartKurs, 'testMaterial' | 'testInhalt'> {
+  const z = vokZeile(kursId)
+  if (!z) return {}
+  const t = testAbschnitteFuerLehrkraft(z)
+  const gewaehlt = new Set(t.gewaehlt)
+  return {
+    testMaterial: t.material,
+    testInhalt: t.eintraege.filter((e) => gewaehlt.has(e.key)).map((e) => ({ key: e.key, titel: e.titel, art: e.art }))
   }
 }
 

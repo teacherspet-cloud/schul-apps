@@ -10,6 +10,7 @@
  * Rein rechnend; der Server (server/startseite.ts) liefert die Kurse mit EINER Anfrage, die Haltepunkte kommen mit den
  * laufenden Reihen (server/reihen.ts › laufend).
  */
+import type { TestMaterial } from './testMaterial'
 import { problemWoerterText } from './problemWoerter'
 import { abschnitteEinordnen, abschnittStelle, mitBaenden, unitZahl, type KursTeil } from './kursAbschnitte'
 import { bandRang } from './lehrwerkBand'
@@ -60,6 +61,9 @@ export interface StartKurs {
   aktiv7?: number
   lernende: number
   testTermin: number | null
+  /** Test zum Termin (28.10.2026): verknüpfter Test und die Abschnitte bzw. Grammatik des Termins */
+  testMaterial?: TestMaterial | null
+  testInhalt?: { key: string; titel: string; art: 'vok' | 'gram' }[]
   abzeichen: StartAbzeichen
 }
 

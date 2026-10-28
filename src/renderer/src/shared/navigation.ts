@@ -216,7 +216,13 @@ export function useNeuAnleger(moduleId: string, anlegen: () => Promise<string>):
 /** Neues Dokument im Programm anlegen und dorthin wechseln; liefert die Kennung (null, wenn das Programm es nicht kann) */
 export async function neuAnlegen(moduleId: string): Promise<string | null> {
   if (!appFreigegeben(modulVon(moduleId))) return sperrHinweis(modulVon(moduleId)), null
-  const fn = anleger.get(moduleId)
+  let fn = anleger.get(moduleId)
+  // Programm noch nie geöffnet (28.10.2026, „Test zum Termin" auf der Startseite): erst öffnen, dann meldet es sich an
+  if (!fn) {
+    useNavigation.getState().openModule(moduleId)
+    for (let i = 0; i < 40 && !anleger.has(moduleId); i++) await new Promise((r) => setTimeout(r, 125))
+    fn = anleger.get(moduleId)
+  }
   if (!fn) return null
   await sichereAlles()
   const id = await fn()

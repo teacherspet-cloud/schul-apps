@@ -67,6 +67,7 @@ import {
 } from '../shared/kursAbschnitte'
 import { fachAusName } from '../shared/faecher'
 import { TEST_VORLAUF_TAGE, type AnstehenderTest } from '../shared/testVorbereitung'
+import { testMaterialAus, type TestMaterial } from '../shared/testMaterial'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import { rekordEintragen, woerterEintragen } from './rekordbuch'
@@ -165,6 +166,8 @@ export const db = () => {
     if (!spalten.has('erinnerungen')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN erinnerungen TEXT NOT NULL DEFAULT ''")
     // Abschnitte des angekündigten Tests (12.10.2026, shared/testAbschnitte.ts): JSON {keys, letzter} – verschlüsselt
     if (!spalten.has('test_abschnitte')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN test_abschnitte TEXT NOT NULL DEFAULT ''")
+    // Test zum Termin (28.10.2026, shared/testMaterial.ts): JSON {moduleId, docId, titel} – vorhandener oder erstellter Test
+    if (!spalten.has('test_material')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN test_material TEXT NOT NULL DEFAULT ''")
     const gSpalten = new Set((d.prepare('PRAGMA table_info(vok_gaeste)').all() as { name: string }[]).map((s) => s.name))
     if (!gSpalten.has('code_v')) d.exec("ALTER TABLE vok_gaeste ADD COLUMN code_v TEXT NOT NULL DEFAULT ''")
     // Persönlicher Anmeldecode (08.10.2026: von der Lehrkraft eingetragene Lernende) – nur als Prüfwert, eindeutig
@@ -225,6 +228,8 @@ export interface Zeile {
   entfernt?: string
   /** JSON TestAuswahl {keys, letzter} – Abschnitte des angekündigten Tests (12.10.2026, shared/testAbschnitte.ts) */
   test_abschnitte?: string
+  /** JSON TestMaterial – der mit dem Termin verknüpfte Test (28.10.2026, shared/testMaterial.ts) */
+  test_material?: string
 }
 
 // Problemwörter (10.10.2026): eine Definition für alle Stellen – shared/problemWoerter.ts; `ausgeblendetFiltern`
@@ -337,6 +342,8 @@ export const kursHaken: {
   grammatikTeile?: (vokId: string) => { id: string; titel: string; zeit: number }[]
   /** Testvorbereitung (28.10.2026): Stand einer Person in einer Grammatik des Tests */
   grammatikTestStand?: (gramId: string, schuelerId: string) => { titel: string; sicher: number; gesamt: number } | null
+  /** Test zum Termin (28.10.2026): Katalog-Kennungen einer Grammatik des Kurses */
+  grammatikThemen?: (gramId: string) => string[]
 } = {}
 
 /** Status eines Kurses setzen (Überführung beendeter Grammatiktrainings) */
@@ -449,9 +456,16 @@ export function testAbschnitteFuerLehrkraft(z: Zeile): {
   gewaehlt: string[]
   eigeneWahl: boolean
   letzter: number | null
+  material: TestMaterial | null
 } {
   const a = testAuswahlVon(z)
-  return { eintraege: testEintraege(z), gewaehlt: testKeysVon(z), eigeneWahl: Boolean(a.keys), letzter: a.letzter ?? null }
+  return {
+    eintraege: testEintraege(z),
+    gewaehlt: testKeysVon(z),
+    eigeneWahl: Boolean(a.keys),
+    letzter: a.letzter ?? null,
+    material: testMaterialAus(z.test_material)
+  }
 }
 
 /** Angekündigte Onlinetests einer Person (nur Lernende); Fehler halten nichts auf */
@@ -1595,6 +1609,29 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       )
     }
     // Lernende einer Klasse zuordnen (08.10.2026): Vorschau für den Dialog – je eigene Lerngruppe, wer schon dazugehört
+    // Inhalt des Termins zum Erstellen eines Tests (28.10.2026, Startseite „Test zum Termin"): Wörter der gewählten
+    // Abschnitte und die Katalog-Kennungen der gewählten Grammatik
+    if (req.method === 'GET' && teile[1] === 'testinhalt') {
+      const woerter = json_(z.woerter, [] as Vokabel[])
+      const keys = new Set(testKeysVon(z))
+      const test = { keys: [...keys] }
+      const ids = new Set(kursAbschnitteFuerVorrang(z, test).flatMap((a) => (a.test ? a.ids : [])))
+      const gram = [...keys].filter((x) => x.startsWith(GRAM_PRAEFIX)).map((x) => x.slice(GRAM_PRAEFIX.length))
+      const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+      return (
+        json(res, 200, {
+          sprache: z.sprache,
+          fach: z.fach,
+          lerngruppeId: z.lerngruppe_id ?? '',
+          gruppe: g?.name ?? '',
+          termin: z.test_termin ?? null,
+          abschnitte: (woerter.length ? teileVon(z) : []).filter((t) => keys.has(teilSchluessel(t))).map((t) => t.titel),
+          woerter: woerter.filter((v) => ids.has(v.id)).map((v) => ({ term: v.term, translation: v.translation })),
+          grammatik: [...new Set(gram.flatMap((id) => kursHaken.grammatikThemen?.(id) ?? []))]
+        }),
+        true
+      )
+    }
     if (req.method === 'GET' && teile[1] === 'klasse-zuordnen') {
       const lernende = zuordenbareLernende(z)
       return (
@@ -1645,6 +1682,12 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         protokolliereServer('vokabeln', 'Ruhende Einzel-Freigabe wieder aufgenommen', ich.id)
         return json(res, 200, { ok: true }), true
       }
+      // Test zum Termin verknüpfen bzw. lösen (28.10.2026, Startseite „Termine & Vokabeltraining")
+      if (teile[1] === 'testmaterial') {
+        const m = testMaterialAus(JSON.stringify(k0.material ?? null))
+        db().prepare('UPDATE vok_zuweisungen SET test_material = ? WHERE id = ?').run(m ? JSON.stringify(m) : '', z.id)
+        return json(res, 200, { ok: true, material: m }), true
+      }
       if (teile[1] === 'termin') {
         const termin = typeof k0.testTermin === 'number' ? k0.testTermin : null
         /*
@@ -1657,6 +1700,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const keys = testKeysBereinigt(k0.testAbschnitte, new Set(testEintraege(z).map((e) => e.key)))
         if (keys !== undefined) auswahl = { ...auswahl, keys }
         db().prepare('UPDATE vok_zuweisungen SET test_termin = ?, test_abschnitte = ? WHERE id = ?').run(termin, JSON.stringify(auswahl), z.id)
+        // Neuer Termin nach einem vergangenen: der verknüpfte Test gehörte zum alten (28.10.2026)
+        if (vorbei || termin === null) db().prepare("UPDATE vok_zuweisungen SET test_material = '' WHERE id = ?").run(z.id)
         const neu = zeile(z.id)
         return json(res, 200, { ok: true, testAbschnitte: neu ? testAbschnitteFuerLehrkraft(neu) : null }), true
       }

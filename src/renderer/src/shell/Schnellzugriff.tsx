@@ -25,7 +25,7 @@ import {
   IconFlag,
   IconPlayerPlay
 } from '@tabler/icons-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
@@ -39,6 +39,8 @@ import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
 import { VokabelBalken } from '../shared/components/VokabelBalken'
+import { TestZumTermin } from './TestZumTermin'
+import { starteTerminWaechter } from './TestErstellen'
 import { senden } from '../modules/onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../shared/util'
 
@@ -169,7 +171,11 @@ export function Schnellzugriff(): React.JSX.Element {
   const vokabeln = karten.termine === 'voll'
   useEffect(() => {
     void useKopfDaten.getState().laden(true)
+    // Onlinetests zu Terminen anlegen, sobald ihr Vokabeltest fertig ist (28.10.2026, TestErstellen.tsx)
+    starteTerminWaechter()
   }, [])
+  // Test zum Termin (28.10.2026): Fenster für den angeklickten Kurstermin
+  const [terminKurs, setTerminKurs] = useState<StartKurs | null>(null)
 
   const bedarf = (reihen ?? []).reduce((s, r) => s + r.bedarf, 0)
   const geplant = (tests ?? []).filter((t) => t.status === 'wartend')
@@ -290,7 +296,20 @@ export function Schnellzugriff(): React.JSX.Element {
         </Text>
       )}
       {begrenzt(bald, nTermine).map((e) => (
-        <DemnaechstZeile key={`${e.art}-${e.ziel}-${e.text}`} e={e} />
+        <DemnaechstZeile
+          key={`${e.art}-${e.ziel}-${e.text}`}
+          e={e}
+          testOeffnen={(id) => {
+            const kurs = kurse.find((x) => x.id === id)
+            if (kurs?.testMaterial) void openDocument(kurs.testMaterial.moduleId, kurs.testMaterial.docId)
+            else if (kurs) setTerminKurs(kurs)
+          }}
+          verknuepft={e.art === 'test' ? kurse.find((x) => x.id === e.ziel)?.testMaterial?.titel || (kurse.find((x) => x.id === e.ziel)?.testMaterial ? 'Test' : undefined) : undefined}
+          aendern={(id) => {
+            const kurs = kurse.find((x) => x.id === id)
+            if (kurs) setTerminKurs(kurs)
+          }}
+        />
       ))}
       {nTermine > 0 && bald.length > nTermine && (
         <Text size="xs" c="dimmed" data-start-demnaechst-weitere={bald.length - nTermine}>
@@ -345,6 +364,7 @@ export function Schnellzugriff(): React.JSX.Element {
 
   return (
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb={40} data-schnellzugriff-raster>
+      {terminKurs && <TestZumTermin k={terminKurs} schliessen={() => setTerminKurs(null)} geaendert={() => void useKopfDaten.getState().laden(true)} />}
       {karten.reihen && (
         <StartKasten
           id="reihen"
@@ -544,11 +564,25 @@ function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
 }
 
 /** „Fr 17.10.  Vokabeltest 7b – Unit 2" – ein Eintrag unter „Demnächst" */
-function DemnaechstZeile({ e }: { e: DemnaechstEintrag }): React.JSX.Element {
-  return (
+function DemnaechstZeile({
+  e,
+  testOeffnen,
+  verknuepft,
+  aendern
+}: {
+  e: DemnaechstEintrag
+  testOeffnen?: (kursId: string) => void
+  verknuepft?: string
+  /** Verknüpften Test ändern bzw. lösen (28.10.2026) */
+  aendern?: (kursId: string) => void
+}): React.JSX.Element {
+  const zeile = (
     <UnstyledButton
       onClick={() =>
-        e.art === 'test'
+        // Test zum Termin (28.10.2026): verknüpften Test öffnen bzw. wählen oder erstellen lassen
+        e.art === 'test' && testOeffnen
+          ? testOeffnen(e.ziel)
+          : e.art === 'test'
           ? void openDocument('sprachenlernen', kursReiterDocId(e.ziel, 'vokabeln'))
           : e.art === 'onlinetest'
           ? void openDocument('onlinetest', e.ziel)
@@ -568,11 +602,25 @@ function DemnaechstZeile({ e }: { e: DemnaechstEintrag }): React.JSX.Element {
         <Text size="sm" fw={600} w={72} style={{ flex: 'none', fontVariantNumeric: 'tabular-nums' }} c={e.tag ? undefined : 'dimmed'}>
           {e.tag ? tagKurz(e.tag) : 'offen'}
         </Text>
-        <Text size="sm" truncate>
+        <Text size="sm" truncate style={{ flex: 1 }}>
           {e.text}
         </Text>
+        {e.art === 'test' && (
+          <Badge size="xs" variant="light" color={verknuepft ? 'teal' : 'gray'} style={{ flex: 'none' }} data-termin-test={verknuepft ? 'verknuepft' : 'offen'}>
+            {verknuepft ? 'Test öffnen' : 'Test wählen'}
+          </Badge>
+        )}
       </Group>
     </UnstyledButton>
+  )
+  if (!(e.art === 'test' && verknuepft && aendern)) return zeile
+  return (
+    <Group gap={4} wrap="nowrap">
+      <div style={{ flex: 1, minWidth: 0 }}>{zeile}</div>
+      <ActionIcon variant="subtle" size="sm" onClick={() => aendern(e.ziel)} aria-label="Test zum Termin ändern" title={`Verknüpft: ${verknuepft} – ändern`} data-termin-aendern>
+        <IconDots size={14} />
+      </ActionIcon>
+    </Group>
   )
 }
 

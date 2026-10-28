@@ -897,6 +897,13 @@ kursHaken.bekannt = bekannteGrammatikFuer
 kursHaken.vorListe = grammatikKurseAnlegen
 kursHaken.grammatikZahl = (vokId) =>
   (db().prepare("SELECT art FROM gram_zuweisungen WHERE vok_id = ? AND status != 'entfernt'").all(vokId) as { art: string }[]).filter((z) => !z.art).length
+// Test zum Termin (28.10.2026): Katalog-Kennungen (Teilformen, sonst Themen) einer Grammatik des Kurses
+kursHaken.grammatikThemen = (gramId) => {
+  const z = zeile(gramId)
+  if (!z) return []
+  const info = infoVon(z)
+  return info.bank?.length ? info.bank : info.themen ?? []
+}
 // Testvorbereitung der Lernenden (28.10.2026): Anteil sicherer Aufgaben einer Grammatik des Tests
 kursHaken.grammatikTestStand = (gramId, schuelerId) => {
   const z = zeile(gramId)
