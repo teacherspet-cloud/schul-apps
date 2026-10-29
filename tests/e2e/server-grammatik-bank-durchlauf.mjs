@@ -24,6 +24,7 @@ const norm = (s) => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 const anfangOhne = (s) => String(s ?? '').replace(/\s*(?:\.{2,}|…)\s*$/, '').trim()
 const woerter = (satz) => (String(satz).match(/[\p{L}\p{N}'’-]+/gu) ?? [])
 
+let abgeschnittenZahl = 0
 /** Die Aufgabe in ihrer Karte über die Bedienelemente lösen */
 async function loesen(karte, a) {
   const l0 = a.loesungen?.[0] ?? ''
@@ -35,8 +36,14 @@ async function loesen(karte, a) {
     case 'luecke':
       await karte.locator('[data-luecke-eingabe]').fill(l0)
       return pruefen()
-    case 'auswahl':
+    case 'auswahl': {
+      // Lange Sätze (Befund der Lehrkraft 29.10.2026: „Jack, who is our class captain will speak firs"): nichts abgeschnitten
+      const abgeschnitten = await karte
+        .locator('[data-option]')
+        .evaluateAll((l) => l.filter((e) => e.scrollWidth > e.clientWidth + 1 || [...e.querySelectorAll('*')].some((k) => k.scrollWidth > k.clientWidth + 1)).length)
+      if (abgeschnitten) abgeschnittenZahl += abgeschnitten
       return karte.locator(`[data-option="${l0.replace(/"/g, '\\"')}"]`).first().click()
+    }
     case 'mehrfach':
       for (const x of a.loesungen) await karte.locator(`[data-option="${x.replace(/"/g, '\\"')}"]`).first().click()
       return pruefen()
@@ -190,6 +197,7 @@ try {
     await p.waitForTimeout(400)
   }
   for (const [art, z] of Object.entries(jeArt)) console.log(`   ${art}: ${z.richtig} von ${z.gesamt} richtig`)
+  pruefe(abgeschnittenZahl === 0, `Auswahl: kein Satz abgeschnitten (${abgeschnittenZahl} abgeschnitten)`)
   pruefe(geloest === imKurs, `Alle Aufgaben über die Oberfläche gelöst (${geloest} von ${imKurs})`)
 } catch (e) {
   for (const pg of lk?.pages() ?? []) await pg.screenshot({ path: join(out, 'fehler.png'), fullPage: true }).catch(() => undefined)

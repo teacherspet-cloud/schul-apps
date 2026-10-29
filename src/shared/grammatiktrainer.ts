@@ -557,7 +557,45 @@ export function woerterVon(satz: string): string[] {
  * `antwort` je Art: luecke/umformen/fehler = Text (bei fehler die Korrektur), auswahl = gewählte Möglichkeit,
  * satzbau = Teile in gelegter Reihenfolge, mit Leerzeichen verbunden.
  */
-export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltesWort?: string, selbst?: Urteil): { urteil: Urteil; richtig: string } {
+/**
+ * Hinweis bei richtiger Antwort ohne Satzzeichen am Ende (29.10.2026, Wunsch der Lehrkraft: „Weise die Schüler darauf hin,
+ * aber halte die Antwort richtig") – nur bei ganzen Sätzen
+ */
+export function satzzeichenHinweis(a: Pick<GrammatikAufgabe, 'art' | 'loesungen'>, antwort: string): string {
+  if (!(SATZ_ARTEN as readonly string[]).includes(a.art) && a.art !== 'satzbau') return ''
+  const ende = (a.loesungen[0] ?? '').trim().slice(-1)
+  if (!/[.?!]/.test(ende) || /[.?!]\s*$/.test(antwort)) return ''
+  return ende === '?' ? 'Vergiss das Fragezeichen am Ende nicht.' : ende === '!' ? 'Vergiss das Ausrufezeichen am Ende nicht.' : 'Vergiss den Punkt am Ende nicht.'
+}
+
+/** Den vorgegebenen Satzanfang nicht doppelt zählen, wenn die Eingabe ihn schon enthält */
+export function ohneDoppeltenAnfang(antwort: string, anfang: string | undefined): string {
+  const an = normiert(satzanfang(anfang))
+  if (!an) return antwort
+  let a = antwort.trim()
+  // „Our school library, Our school library, which …" – den überlesenen Anfang einmal entfernen
+  for (let i = 0; i < 2; i++) {
+    const n = normiert(a)
+    if (!n.startsWith(an)) break
+    const rest = a.slice(satzanfang(anfang).length).trim()
+    if (!normiert(rest).startsWith(an)) break
+    a = rest
+  }
+  return a
+}
+
+export function pruefeGrammatik(
+  a: GrammatikAufgabe,
+  antwort: string,
+  gewaehltesWort?: string,
+  selbst?: Urteil
+): { urteil: Urteil; richtig: string; hinweis?: string } {
+  const e = pruefeGrammatikOhneHinweis(a, antwort, gewaehltesWort, selbst)
+  const hinweis = e.urteil === 'richtig' ? satzzeichenHinweis(a, antwort) : ''
+  return hinweis ? { ...e, hinweis } : e
+}
+
+function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaehltesWort?: string, selbst?: Urteil): { urteil: Urteil; richtig: string } {
   const richtig = a.loesungen[0] ?? ''
   if (a.art === 'bestimmen') {
     const angegeben = jsonListe(antwort)
@@ -628,6 +666,8 @@ export function pruefeGrammatik(a: GrammatikAufgabe, antwort: string, gewaehltes
   if (SATZ_ARTEN.includes(a.art)) {
     // Satzanfang gehört zur Antwort; Kommas zählen nur bei Kommaregeln (28.10.2026, Entscheidung der Lehrkraft)
     const anfang = satzanfang(a.anfang)
+    // Überlesener Satzanfang (29.10.2026, Befund der Lehrkraft): steht er doppelt da, zählt er einmal
+    antwort = ohneDoppeltenAnfang(antwort, a.anfang)
     const voll = anfang && !normiert(antwort).startsWith(normiert(anfang)) ? `${anfang} ${antwort}` : antwort
     const ohne = (x: string): string => (a.kommaPruefen ? normiert(x) : normiert(x).replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ').trim())
     const ant = ohne(voll)

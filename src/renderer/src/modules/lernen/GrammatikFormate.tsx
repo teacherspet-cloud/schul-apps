@@ -10,7 +10,7 @@
  */
 import { Badge, Button, Group, NativeSelect, Paper, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { useMemo, useState } from 'react'
-import { woerterVon, type GrammatikAufgabe, satzanfang } from '@shared/grammatiktrainer'
+import { normiert, woerterVon, type GrammatikAufgabe, satzanfang } from '@shared/grammatiktrainer'
 import type { Urteil } from '@shared/vokabeltrainer'
 
 type Antworten = (antwort: string, wort?: string, selbst?: Urteil) => void
@@ -101,7 +101,9 @@ export function SatzAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; g
   const [text, setText] = useState('')
   const absenden = (): void => {
     if (gesperrt || !text.trim()) return
-    antworten(satzanfang(a.anfang) ? `${satzanfang(a.anfang)} ${text.trim()}` : text.trim())
+    // Hat das Kind den vorgegebenen Anfang überlesen und mitgetippt, nicht noch einmal davorsetzen (29.10.2026)
+    const anfang = satzanfang(a.anfang)
+    antworten(anfang && !normiert(text).startsWith(normiert(anfang)) ? `${anfang} ${text.trim()}` : text.trim())
   }
   return (
     <form onSubmit={(e) => (e.preventDefault(), absenden())} data-satzaufgabe={a.art}>
@@ -173,10 +175,16 @@ export function MarkierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
  * Lange Elemente (ganze Sätze, Durchlauf der Bank 28.10.2026): Knöpfe brechen um statt über den Rand zu ragen – sonst
  * ließen sie sich am Telefon nicht antippen
  */
-const UMBRUCH = {
+export const UMBRUCH = {
   root: { height: 'auto', minHeight: 36, maxWidth: '100%', paddingTop: 6, paddingBottom: 6 },
   label: { whiteSpace: 'normal' as const, textAlign: 'left' as const, lineHeight: 1.3 }
 }
+
+/**
+ * Spalten für Auswahlknöpfe (29.10.2026, Befund der Lehrkraft: „Jack, who is our class captain will speak firs" – der Rest
+ * des Satzes war abgeschnitten): ganze Sätze untereinander in voller Breite, kurze Formen nebeneinander
+ */
+export const auswahlSpalten = (optionen: readonly string[]): number => (optionen.some((o) => o.length > 24) ? 1 : 2)
 
 export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
   const elemente = a.elemente ?? []

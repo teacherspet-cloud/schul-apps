@@ -190,6 +190,9 @@ export interface BankRegel {
   erklaerung: string
   beispiele: string[]
 }
+/** Platzhalter statt Regelkarte (29.10.2026, „x"): kein Titel oder Titel/Erklärung von höchstens zwei Zeichen */
+export const istRegelPlatzhalter = (r: Partial<BankRegel> | null | undefined): boolean =>
+  !r || String(r.titel ?? '').trim().length <= 2 || String(r.erklaerung ?? '').trim().length <= 2
 /** Eine Aufgabe der Bank: wie im Training, dazu die Übungsart (und die Stufe); `id` ist die feste Kennung der Bank („b…") */
 export type BankAufgabe = GrammatikAufgabe & { uebung: Uebung }
 export interface BankEintrag {

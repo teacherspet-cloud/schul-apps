@@ -11,6 +11,7 @@
  *   POST /server/grammatik-bank/lesen   {schluessel[]} → { eintraege }
  *   POST /server/grammatik-bank/speichern {sprache, schluessel, regel, aufgaben} → { zahlen, kurse }
  */
+import { NEUE_REGELN, REGEL_PLATZHALTER_WARTUNG, istRegelPlatzhalter } from './grammatikRegelPlatzhalter'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -68,6 +69,7 @@ const db = () => {
     bereit = true
     doppelteEinmal(d)
     maengelEinmal(d)
+    regelPlatzhalterEinmal(d)
   }
   return d
 }
@@ -372,6 +374,26 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // ---------------------------------------------------------------- Mängel (28.10.2026)
 
 /** Befund aus der Prüfung der Bank (Kennung → was falsch ist) – beginnt mit diesem Wort, damit Speichern ihn erhält */
+/** Regelkarten „x" einmal durch geschriebene ersetzen (29.10.2026, grammatikRegelPlatzhalter.ts) */
+function regelPlatzhalterEinmal(d: ReturnType<typeof datenbank>): void {
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(REGEL_PLATZHALTER_WARTUNG)) return
+    const geaendert: string[] = []
+    for (const [schluessel, regel] of Object.entries(NEUE_REGELN)) {
+      const z = d.prepare('SELECT bank_regel FROM gram_bank_regel WHERE schluessel = ?').get(schluessel) as { bank_regel: string } | undefined
+      if (!z || !istRegelPlatzhalter(json_(z.bank_regel, {} as BankRegel))) continue
+      d.prepare('UPDATE gram_bank_regel SET bank_regel = ?, geaendert = ? WHERE schluessel = ?').run(JSON.stringify(regel), new Date().toISOString(), schluessel)
+      geaendert.push(schluessel)
+    }
+    d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(REGEL_PLATZHALTER_WARTUNG, new Date().toISOString())
+    protokolliereServer('grammatik', `WARTUNG ${REGEL_PLATZHALTER_WARTUNG}: ${geaendert.length} Regelkarten ersetzt`)
+    if (geaendert.length) setTimeout(() => void Promise.resolve().then(() => kurseNeu(geaendert)).catch(() => undefined), 0)
+  } catch {
+    // Beim nächsten Start erneut
+  }
+}
+
 export const BEFUND = 'Befund: '
 /**
  * Läufe der Mängelprüfung über die ganze Bank – ein neuer Name, wenn die Regeln strenger werden. 28.10.2026 abends:

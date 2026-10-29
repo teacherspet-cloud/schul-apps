@@ -3,6 +3,7 @@
  * shared/grammatiktrainer.ts): Bestimmen (alle Lesarten, Teilpunkte), Mehrfachauswahl, Paradigma-Tabelle, Übersetzen
  * mit Selbstvergleich. Groß und antippbar (Handy, iPad); Längenzeichen werden angezeigt, bei der Eingabe nicht verlangt.
  */
+import { auswahlSpalten, UMBRUCH } from './GrammatikFormate'
 import { Button, Chip, Group, Paper, SimpleGrid, Stack, Table, Text, Textarea, TextInput } from '@mantine/core'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
@@ -117,7 +118,8 @@ export function MehrfachAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
   const richtig = new Set(a.loesungen.map(normiert))
   return (
     <Stack gap="sm" data-mehrfach>
-      {a.satz && (
+      {/* Nur „___" (ganze Sätze als Möglichkeiten) zeigt nichts an */}
+      {a.satz && a.satz.trim() !== '___' && (
         <Text fz={20} fw={600}>
           {a.satz}
         </Text>
@@ -125,7 +127,7 @@ export function MehrfachAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
       <Text size="xs" c="dimmed">
         Mehrere Antworten können richtig sein.
       </Text>
-      <SimpleGrid cols={2}>
+      <SimpleGrid cols={auswahlSpalten(optionen)}>
         {optionen.map((o) => {
           const an = gewaehlt.includes(o)
           const farbe = gesperrt ? (richtig.has(normiert(o)) ? 'green' : an ? 'red' : undefined) : undefined
@@ -136,6 +138,7 @@ export function MehrfachAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
               variant={an || (gesperrt && farbe === 'green') ? 'filled' : 'default'}
               color={farbe}
               onClick={() => !gesperrt && setGewaehlt(an ? gewaehlt.filter((x) => x !== o) : [...gewaehlt, o])}
+              styles={UMBRUCH}
               data-option={o}
               data-an={an || undefined}
             >

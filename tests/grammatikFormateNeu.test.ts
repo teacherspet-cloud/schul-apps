@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { paketBereinigt, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
+import { ohneDoppeltenAnfang, paketBereinigt, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
 import { aufgabeMangel } from '../src/shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '../src/shared/grammatikDesign'
-import { AUFGABEN_JE_UEBUNG, aufZielGekuerzt, UEBUNG_ARTEN } from '../src/shared/grammatikBank'
+import { AUFGABEN_JE_UEBUNG, aufZielGekuerzt, istRegelPlatzhalter, UEBUNG_ARTEN } from '../src/shared/grammatikBank'
 
 // Grammatik-Neubeginn (28.10.2026): neue Formate nach Recherche und Abstimmung mit der Lehrkraft
 const lies = (aufgaben: Record<string, unknown>[]): GrammatikAufgabe[] =>
@@ -100,5 +100,45 @@ describe('Neue Grammatikformate', () => {
       { uebung: 'fehler' as const, art: 'fehler', n: 6 }
     ]
     expect(aufZielGekuerzt(l, (u) => (u === 'erkennen' ? 2 : 1)).map((x) => x.n)).toEqual([1, 4, 5])
+  })
+})
+
+describe('Befunde der Lehrkraft 29.10.2026', () => {
+  const [v] = paketBereinigt(
+    {
+      thema: 't',
+      regeln: [{ id: 'r', titel: 'R', erklaerung: 'E', beispiele: [] }],
+      aufgaben: [
+        {
+          id: 'v',
+          regelId: 'r',
+          anweisung: 'A',
+          art: 'verbinden',
+          satz: 'Our school library is quiet. It opens at eight.',
+          vorgabe: '(which)',
+          anfang: 'Our school library,',
+          kommaPruefen: true,
+          loesungen: ['Our school library, which opens at eight, is quiet.']
+        }
+      ]
+    },
+    't'
+  ).aufgaben
+  it('überlesener Satzanfang: ganzer Satz getippt gilt als richtig', () => {
+    // So setzte die App die Antwort bisher zusammen: Anfang + Eingabe
+    expect(pruefeGrammatik(v, 'Our school library, Our school library, which opens at eight, is quiet.').urteil).toBe('richtig')
+    expect(ohneDoppeltenAnfang('Our school library, Our school library, which opens at eight, is quiet.', v.anfang)).toBe(
+      'Our school library, which opens at eight, is quiet.'
+    )
+  })
+  it('fehlender Punkt: richtig mit Hinweis', () => {
+    const e = pruefeGrammatik(v, 'Our school library, which opens at eight, is quiet')
+    expect(e.urteil).toBe('richtig')
+    expect(e.hinweis).toBe('Vergiss den Punkt am Ende nicht.')
+    expect(pruefeGrammatik(v, 'Our school library, which opens at eight, is quiet.').hinweis).toBeUndefined()
+  })
+  it('Platzhalter-Regelkarte wird erkannt', () => {
+    expect(istRegelPlatzhalter({ titel: 'x', erklaerung: 'x', beispiele: [] })).toBe(true)
+    expect(istRegelPlatzhalter({ titel: 'Past progressive', erklaerung: 'Mit dem past progressive …', beispiele: [] })).toBe(false)
   })
 })

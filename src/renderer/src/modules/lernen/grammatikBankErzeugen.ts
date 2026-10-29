@@ -20,6 +20,7 @@ import {
   type Uebung,
   UEBUNGEN,
   zielJeFeld,
+  istRegelPlatzhalter,
   ALTERNATIVEN_ARTEN,
   alternativePasst,
   loesungenZusammenfuehren,
@@ -95,10 +96,12 @@ export const neueKennung = (i: number): string => `n${Date.now().toString(36)}${
 
 /** Erzeugt Regelkarte und Aufgaben für einen Schlüssel – die Aufgaben tragen ihre Übungsart, noch ohne Bank-Kennung */
 export async function erzeugeBankAufgaben(
-  a: BankAuftrag,
+  a0: BankAuftrag,
   ai: Ai,
   melde: (t: string) => void = () => undefined
 ): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[]; bericht: BankBericht }> {
+  // Platzhalter-Regelkarte („x", 29.10.2026) gilt als nicht vorhanden – die KI schreibt eine neue
+  const a: BankAuftrag = a0.regel && istRegelPlatzhalter(a0.regel) ? { ...a0, regel: undefined } : a0
   const latein = istLatein(a)
   const ger = await niveauDesAuftrags(a)
   const sprache = sperrSprache(a.sprache, a.fach)

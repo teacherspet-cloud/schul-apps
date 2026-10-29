@@ -62,7 +62,7 @@ import { STUFE_NAME, UEBUNG_NAME, stufeVon } from '@shared/grammatikBank'
 import { holen, senden } from '../onlinetest/serverApi'
 import { CSS, TrainerFarben } from './VokabelTrainer'
 import { BestimmenAufgabe, MehrfachAufgabe, TabellenAufgabe, UebersetzenAufgabe } from './LateinAufgaben'
-import { KontextZeile, LueckentextAufgabe, MarkierenAufgabe, SatzAufgabe, SortierenAufgabe } from './GrammatikFormate'
+import { KontextZeile, LueckentextAufgabe, MarkierenAufgabe, SatzAufgabe, SortierenAufgabe, auswahlSpalten, UMBRUCH } from './GrammatikFormate'
 import { BildVerb, FormenBlitz, MusterSortieren, StammformenTrio, type VerbDaten } from './spiele/SpieleVerben'
 import { SPIELE_CSS } from './spiele/Spiele'
 import ZusammenSpielen, { EinladungsCode } from './mehrspieler/ZusammenSpielen'
@@ -134,6 +134,8 @@ interface Ergebnis {
   urteil: Urteil
   richtig: string
   erklaerung: string
+  /** Richtig, aber z. B. Punkt am Ende vergessen (29.10.2026) */
+  hinweis?: string
   stand: WortStand
 }
 
@@ -159,7 +161,7 @@ function sende<T>(d: Daten, pfad: string, k: Record<string, unknown>): Promise<T
       zuletzt: 0
     } as unknown as WortStand
     const stand = mitErstemVersuch(alt, nachAbfrage(alt ?? leer, 'frei', e.urteil, antwort, Date.now()), e.urteil)
-    return Promise.resolve({ urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', stand } as T)
+    return Promise.resolve({ urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', ...(e.hinweis ? { hinweis: e.hinweis } : {}), stand } as T)
   }
   if (pfad === '/s/api/grammatik/spiel') return Promise.resolve({ rekord: false, rekorde: d.rekorde, ansehen: d.ansehen } as T)
   return Promise.resolve({} as T)
@@ -1102,10 +1104,16 @@ function Sitzung({ d, aufgaben, fertig }: { d: Daten; aufgaben: GrammatikAufgabe
         )}
         {r && (regel || (ergebnis && ergebnis.urteil !== 'richtig')) && <RegelKarte r={r} />}
         {ergebnis && (
-          <Alert color={ergebnis.urteil === 'richtig' ? 'green' : aufgegeben ? 'gray' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'} data-urteil={ergebnis.urteil}>
+          <Alert
+            color={ergebnis.urteil === 'richtig' ? (ergebnis.hinweis ? 'orange' : 'green') : aufgegeben ? 'gray' : ergebnis.urteil === 'fast' ? 'yellow' : 'red'}
+            data-urteil={ergebnis.urteil}
+            data-hinweis={ergebnis.hinweis || undefined}
+          >
             <Text fw={700}>
               {ergebnis.urteil === 'richtig'
-                ? 'Richtig!'
+                ? ergebnis.hinweis
+                  ? `Richtig! ${ergebnis.hinweis}`
+                  : 'Richtig!'
                 : aufgegeben
                 ? 'Hier ist die Lösung – die Aufgabe kommt bald wieder.'
                 : ergebnis.urteil === 'fast'
@@ -1328,10 +1336,11 @@ function AufgabeAllgemein({
             </Text>
             {nach}
           </Text>
-          <SimpleGrid cols={2}>
+          <SimpleGrid cols={auswahlSpalten(optionen)}>
             {optionen.map((o) => (
               <Button
                 key={o}
+                styles={UMBRUCH}
                 size="lg"
                 variant={gewaehlt === o ? 'filled' : 'default'}
                 color={gewaehlt === o ? (ergebnis?.urteil === 'richtig' ? 'green' : ergebnis ? 'red' : undefined) : undefined}
@@ -1428,7 +1437,7 @@ function AufgabeAllgemein({
           <Group gap={6}>
             {teile.map((t, i) =>
               gelegt.includes(i) ? null : (
-                <Button key={i} variant="default" disabled={gesperrt} onClick={() => setGelegt([...gelegt, i])} data-satzteil={t}>
+                <Button key={i} variant="default" disabled={gesperrt} onClick={() => setGelegt([...gelegt, i])} styles={UMBRUCH} data-satzteil={t}>
                   {t}
                 </Button>
               )
@@ -1462,7 +1471,7 @@ function AufgabeAllgemein({
             <Stack gap={6}>
               {(a.paare ?? []).map((p, i) =>
                 zuordnung[i] !== undefined ? null : (
-                  <Button key={i} variant={aktivLinks === i ? 'filled' : 'default'} disabled={gesperrt} onClick={() => setAktivLinks(i)} data-zuordnen-links={i}>
+                  <Button key={i} variant={aktivLinks === i ? 'filled' : 'default'} disabled={gesperrt} onClick={() => setAktivLinks(i)} styles={UMBRUCH} data-zuordnen-links={i}>
                     {p.links}
                   </Button>
                 )
@@ -1481,6 +1490,7 @@ function AufgabeAllgemein({
                       setZuordnung((z) => ({ ...z, [aktivLinks]: r.i }))
                       setAktivLinks(null)
                     }}
+                    styles={UMBRUCH}
                     data-zuordnen-rechts={r.text}
                   >
                     {r.text}

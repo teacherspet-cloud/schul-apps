@@ -1474,7 +1474,7 @@ export function grammatikRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const heute = new Date(jetzt).toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
         standSpeichern(z.id, ich.id, st)
-        return json(res, 200, { urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', stand: neu, sicher: istSicher(neu) }), true
+        return json(res, 200, { urteil: e.urteil, richtig: e.richtig, erklaerung: a.erklaerung ?? '', ...(e.hinweis ? { hinweis: e.hinweis } : {}), stand: neu, sicher: istSicher(neu) }), true
       }
       if (req.method === 'POST' && url.pathname === '/s/api/grammatik/spiel') {
         const spiel = String(k0.spiel ?? '') as GrammatikSpielId
