@@ -395,7 +395,20 @@ const WORTSCHATZ_STELLEN: [string, string][] = [
 ]
 
 /** Wortschatz-Stand einer Bank-Kennung aus den mitgelieferten Lehrwerken (wie wortschatzStand in der Oberfläche) */
-export function wortschatzStandServer(schluessel: string, sprache: string): { stelle: Einfuehrung; bekannt: Set<string>; jahrgang?: number; lexikon: Lexikon } | null {
+type WortschatzStand = { stelle: Einfuehrung; bekannt: Set<string>; jahrgang?: number; lexikon: Lexikon }
+/**
+ * Gemerkt je Schlüssel und Sprache (29.10.2026, Befund beim Aufspielen: das Einspielen von 2000 Aufgaben las die
+ * Lehrwerksdateien für JEDE Aufgabe neu – der Server brauchte zum Start länger als die Gesundheitsprüfung wartet).
+ * Die Dateien liegen fest im Paket; Aufrufer verändern den Stand nicht.
+ */
+const wortschatzMerk = new Map<string, WortschatzStand | null>()
+export function wortschatzStandServer(schluessel: string, sprache: string): WortschatzStand | null {
+  const k = `${sprache}|${schluessel}`
+  if (!wortschatzMerk.has(k)) wortschatzMerk.set(k, wortschatzStandNeu(schluessel, sprache))
+  return wortschatzMerk.get(k)!
+}
+
+function wortschatzStandNeu(schluessel: string, sprache: string): WortschatzStand | null {
   const ordner = join(RESSOURCEN, 'lehrwerke')
   if (!existsSync(ordner)) return null
   const baende = readdirSync(ordner)
