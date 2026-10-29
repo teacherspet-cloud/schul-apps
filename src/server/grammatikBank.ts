@@ -516,7 +516,8 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-nachtrag-2026-10-29', 'nachtrag-2026-10-29.json'],
   // Green Line 5 Unit 1 und will/going to (Vorhersage, Klasse 6) – Handbetrieb mit Prüfung, Blindprobe, Überarbeitung,
   // zweiter Blindprobe und Schlussdurchsicht (29.10.2026)
-  ['grammatik-bank-greenline5-unit1-2026-10-29', 'greenline5-unit1-2026-10-29.json']
+  // „-2": der erste Lauf übersprang neue Formen (Regelkarten wurden nicht angelegt) – vorhandene Aufgaben zählen nicht doppelt
+  ['grammatik-bank-greenline5-unit1-2-2026-10-29', 'greenline5-unit1-2026-10-29.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
@@ -577,9 +578,37 @@ function einspielen(d: ReturnType<typeof datenbank>, wartungsName: string, datei
         if (b.pruefen) zurueck++
         schluessel.add(z.schluessel)
       }
+      // Regelkarten neuer Schlüssel (29.10.2026, Befund Green Line 5: die Datei brachte sie mit, gespeichert wurden sie nie –
+      // Aufgaben zu ganz neuen Formen fielen deshalb unten still weg). Vorhandene Karten bleiben.
+      for (const [k, regel] of Object.entries(u.regeln ?? {})) {
+        if (d.prepare('SELECT 1 FROM gram_bank_regel WHERE schluessel = ?').get(k)) continue
+        d.prepare('INSERT INTO gram_bank_regel (schluessel, sprache, bank_regel, geaendert) VALUES (?, ?, ?, ?)').run(
+          k,
+          k.replace(/^mix:/, '').split('.')[0],
+          JSON.stringify(regel),
+          jetzt
+        )
+      }
       const rein = d.prepare(
         'INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert, pruefen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
+      // Schon vorhandene Aufgaben (gleicher Inhalt) nicht doppelt – ein Einspielen unter neuem Namen wiederholt sonst
+      const vorhanden = new Map<string, Set<string>>()
+      const schonDa = (k: string, a: Record<string, unknown>): boolean => {
+        if (!vorhanden.has(k))
+          vorhanden.set(
+            k,
+            new Set(
+              (d.prepare('SELECT bank_aufgabe FROM gram_bank WHERE schluessel = ?').all(k) as { bank_aufgabe: string }[]).map((z) =>
+                fingerabdruck(json_(z.bank_aufgabe, {} as Record<string, unknown>))
+              )
+            )
+          )
+        const f = fingerabdruck(a)
+        if (vorhanden.get(k)!.has(f)) return true
+        vorhanden.get(k)!.add(f)
+        return false
+      }
       for (const e of u.neu ?? []) {
         // Nur zu Schlüsseln, die die Bank kennt (Aufgaben oder Regelkarte)
         if (!d.prepare('SELECT 1 FROM gram_bank WHERE schluessel = ? LIMIT 1').get(e.schluessel) && !d.prepare('SELECT 1 FROM gram_bank_regel WHERE schluessel = ?').get(e.schluessel))
@@ -587,6 +616,7 @@ function einspielen(d: ReturnType<typeof datenbank>, wartungsName: string, datei
         const id = `b${randomBytes(6).toString('hex')}`
         const b = bankAufgabeBereinigt(e.aufgabe, id, e.schluessel)
         if (!b) continue
+        if (schonDa(e.schluessel, b.a as unknown as Record<string, unknown>)) continue
         // Wortschatz nach Lehrwerksstand als Sicherung (29.10.2026)
         const ws = wortschatzStandServer(e.schluessel, e.schluessel.replace(/^mix:/, '').split('.')[0])
         const unbekannt = ws ? unbekannteWoerter(b.a, ws.bekannt, formWoerter(e.schluessel), ws.lexikon) : []
