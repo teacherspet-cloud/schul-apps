@@ -1627,7 +1627,10 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           termin: z.test_termin ?? null,
           abschnitte: (woerter.length ? teileVon(z) : []).filter((t) => keys.has(teilSchluessel(t))).map((t) => t.titel),
           woerter: woerter.filter((v) => ids.has(v.id)).map((v) => ({ term: v.term, translation: v.translation })),
-          grammatik: [...new Set(gram.flatMap((id) => kursHaken.grammatikThemen?.(id) ?? []))]
+          grammatik: [...new Set(gram.flatMap((id) => kursHaken.grammatikThemen?.(id) ?? []))],
+          // Alle für die Lerngruppe freigeschalteten Wörter (29.10.2026, Befund der Lehrkraft: „passende" Vokabeltests aus
+          // anderen Bänden) – die Auswahl misst, wie viele Wörter eines Tests die Gruppe schon hat
+          freigeschaltet: json_(kursFuerLernende(z, Date.now()).woerter, [] as Vokabel[]).map((v) => v.term)
         }),
         true
       )

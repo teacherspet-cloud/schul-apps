@@ -59,14 +59,19 @@ try {
   const spat = p.getByRole('button', { name: 'Später einrichten' })
   if (await spat.isVisible().catch(() => false)) await spat.click()
   // Einen vorhandenen Vokabeltest anlegen (wie die App beim Sichern)
-  const testId = await p.evaluate(async () => {
-    const meta = await window.api.tests.save({
-      id: `t${Date.now().toString(36)}`,
-      name: 'Unit 2 Weather – Test',
-      stats: { vocabCount: 3, taskCount: 0, hasTest: false, variantCount: 0, totalPoints: 0 },
-      payload: { vocab: [{ id: 'a', term: 'weather', translation: 'Wetter' }], settings: {}, doc: null }
-    })
-    return meta.id
+  // Ein passender Test (Wörter der Lerngruppe) und ein fremder (anderer Band, gleicher Titelteil „Unit 2") – Befund der
+  // Lehrkraft 29.10.2026: Empfohlen wurden Tests, die weder zur Lerngruppe noch zu den freigeschalteten Vokabeln passten
+  const [testId, fremdId] = await p.evaluate(async () => {
+    const speichern = async (name, woerter) =>
+      (
+        await window.api.tests.save({
+          id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+          name,
+          stats: { vocabCount: woerter.length, taskCount: 0, hasTest: false, variantCount: 0, totalPoints: 0 },
+          payload: { vocab: woerter.map((t, i) => ({ id: `w${i}`, term: t, translation: t })), settings: {}, doc: null }
+        })
+      ).id
+    return [await speichern('Unit 2 Weather – Test', ['weather', 'sunny', 'cloud']), await speichern('Green Line 2 – Unit 2 Test', ['castle', 'knight', 'dragon', 'tower'])]
   })
   await p.reload()
   await p.waitForTimeout(2000)
@@ -80,7 +85,9 @@ try {
   await termin.click()
   pruefe(await da(p.locator('[data-test-modus]')), 'Klick öffnet „Test zum Termin"')
   pruefe(await da(p.locator(`[data-test-kandidat="${testId}"]`)), 'Vorhandener Vokabeltest in der Liste')
-  pruefe((await p.getByText('Passend zum Termin').count()) > 0, 'Passender Test steht unter „Passend zum Termin"')
+  pruefe((await p.locator('[data-test-passend]').getAttribute('data-test-passend')) === '1', 'Genau ein Test gilt als passend')
+  const reihe = await p.locator('[data-test-kandidat]').evaluateAll((l) => l.map((e) => e.getAttribute('data-test-kandidat')))
+  pruefe(reihe[0] === testId && reihe.indexOf(fremdId) > 0, 'Passender Test oben, fremder Band („Green Line 2 – Unit 2") nicht unter den passenden')
   await p.locator(`[data-test-kandidat="${testId}"]`).click()
   pruefe(await da(p.locator('[data-test-vorschau-inhalt]')), 'Vorschau zeigt den Inhalt')
   await p.screenshot({ path: join(out, '1-waehlen.png') })

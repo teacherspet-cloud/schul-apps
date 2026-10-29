@@ -15,7 +15,8 @@ import { holen, senden } from '../modules/onlinetest/serverApi'
 import { openDocument } from '../shared/navigation'
 import { notifyError, notifySuccess } from '../shared/util'
 import { ladeMaterialien } from './materialien'
-import { passtZuTermin, TEST_APP_NAME, TEST_APPS, type TestApp, type TestMaterial } from '@shared/testMaterial'
+import { TEST_APP_NAME, TEST_APPS, type TestApp, type TestMaterial } from '@shared/testMaterial'
+import { bewerteTests, type Passung } from './testPassung'
 import { tagKurz, type StartKurs } from '@shared/startseiteKurse'
 import { TestErstellen } from './TestErstellen'
 import { testVorschauZeilen } from './testVorschau'
@@ -27,6 +28,8 @@ export interface TestKandidat {
   detail: string
   suchtext: string
   zeit: string
+  /** Onlinetest: Name der Lerngruppe */
+  gruppe?: string
 }
 
 /** Alle Tests der Lehrkraft aus den drei Apps */
@@ -47,7 +50,8 @@ export async function testKandidaten(): Promise<TestKandidat[]> {
       titel: t.titel,
       detail: [t.art, t.thema, t.lerngruppe].filter(Boolean).join(' · '),
       suchtext: [t.titel, t.art, t.thema, t.lerngruppe].join(' ').toLocaleLowerCase('de'),
-      zeit: t.erstellt
+      zeit: t.erstellt,
+      gruppe: t.lerngruppe
     })
   return aus
 }
@@ -74,19 +78,35 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
   const [app, setApp] = useState<TestApp | 'alle'>('alle')
   const [vorschau, setVorschau] = useState<TestKandidat | null>(null)
   const [andere, setAndere] = useState(false)
+  // Passung nach Inhalt (29.10.2026, Befund der Lehrkraft): Wörter der Lerngruppe, Grammatik des Termins, Lerngruppe
+  const [passung, setPassung] = useState<Map<string, Passung> | null>(null)
   useEffect(() => {
-    void testKandidaten().then(setListe)
-  }, [])
+    void Promise.all([
+      testKandidaten(),
+      holen<{ woerter: { term: string }[]; freigeschaltet?: string[]; grammatik: string[]; gruppe: string }>(`/server/vokabeln/${k.id}/testinhalt`).catch(() => null)
+    ]).then(async ([l, inhalt]) => {
+      setListe(l)
+      setPassung(
+        inhalt
+          ? await bewerteTests(l, { woerter: inhalt.woerter, freigeschaltet: inhalt.freigeschaltet ?? [], grammatik: inhalt.grammatik, gruppe: inhalt.gruppe || k.gruppe })
+          : new Map()
+      )
+    })
+  }, [k.id, k.gruppe])
   const stich = useMemo(() => terminStichwoerter(k), [k])
   const sortiert = useMemo(() => {
     const q = suche.trim().toLocaleLowerCase('de')
     return (liste ?? [])
       .filter((x) => (app === 'alle' || x.moduleId === app) && (!q || x.suchtext.includes(q)))
-      .map((x) => ({ x, passt: passtZuTermin(`${x.titel} ${x.detail} ${x.suchtext}`, stich) }))
+      .map((x) => {
+        const p = passung?.get(`${x.moduleId}:${x.docId}`)
+        return { x, passt: p?.passt ? p.wert : 0, grund: p?.grund ?? '' }
+      })
       .sort((a, b) => b.passt - a.passt || (a.x.zeit < b.x.zeit ? 1 : -1))
-  }, [liste, suche, app, stich])
+  }, [liste, suche, app, passung])
   const passend = sortiert.filter((s) => s.passt > 0)
   const weitere = sortiert.filter((s) => s.passt === 0)
+  void stich
   const wahl = async (x: TestKandidat): Promise<void> => {
     try {
       await verknuepfen(k.id, { moduleId: x.moduleId, docId: x.docId, titel: x.titel })
@@ -98,7 +118,7 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
     }
   }
   const titel = `Test am ${k.testTermin ? tagKurz(new Date(k.testTermin).toISOString().slice(0, 10)) : ''} · ${k.gruppe}${k.fach ? ` ${k.fach}` : ''}`
-  const zeile = (s: { x: TestKandidat; passt: number }): React.JSX.Element => (
+  const zeile = (s: { x: TestKandidat; passt: number; grund: string }): React.JSX.Element => (
     <UnstyledButton
       key={`${s.x.moduleId}-${s.x.docId}`}
       onClick={() => setVorschau(s.x)}
@@ -119,9 +139,9 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
           {s.x.titel}
         </Text>
       </Group>
-      {s.x.detail && (
+      {(s.x.detail || (s.passt > 0 && s.grund)) && (
         <Text size="xs" c="dimmed" truncate>
-          {s.x.detail}
+          {[s.passt > 0 ? s.grund : '', s.x.detail].filter(Boolean).join(' · ')}
         </Text>
       )}
     </UnstyledButton>
@@ -194,21 +214,21 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
                     />
                   </Group>
                   <ScrollArea h={380} type="auto">
-                    {liste === null ? (
+                    {liste === null || passung === null ? (
                       <Text size="sm" c="dimmed">
                         Lädt …
                       </Text>
                     ) : (
                       <Stack gap={2}>
                         {passend.length > 0 && (
-                          <Text size="xs" fw={700} c="dimmed" tt="uppercase" mt={4}>
-                            Passend zum Termin
+                          <Text size="xs" fw={700} c="dimmed" tt="uppercase" mt={4} data-test-passend={passend.length}>
+                            Passend zur Lerngruppe und zum Termin
                           </Text>
                         )}
                         {passend.map(zeile)}
                         {weitere.length > 0 && (
                           <Text size="xs" fw={700} c="dimmed" tt="uppercase" mt={8}>
-                            {passend.length ? 'Weitere Tests' : 'Alle Tests'}
+                            {passend.length ? 'Weitere Tests' : 'Kein Test passt – alle Tests'}
                           </Text>
                         )}
                         {weitere.map(zeile)}

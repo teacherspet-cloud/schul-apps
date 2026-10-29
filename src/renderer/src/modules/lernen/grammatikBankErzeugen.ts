@@ -28,7 +28,7 @@ import {
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '@shared/grammatikDesign'
-import { gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
+import { blindGeprueft, gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
 
 type Ai = <T>(req: StructuredRequest) => Promise<T>
@@ -322,6 +322,7 @@ export async function repariereAufgaben(
   const aus: (BankAufgabe | null)[] = [...e.aufgaben]
   let repariert = 0
   let verworfen = 0
+  const kandidaten: { i: number; neu: BankAufgabe; regelId?: string }[] = []
   for (let von = 0; von < offen.length; von += REPARATUR_JE_ANFRAGE) {
     const stueck = offen.slice(von, von + REPARATUR_JE_ANFRAGE)
     melde(`Die KI überarbeitet „${e.titel}" (${Math.min(von + stueck.length, offen.length)} von ${offen.length} Aufgaben) …`)
@@ -346,14 +347,16 @@ export async function repariereAufgaben(
         `Zielsprache: ${e.sprache}`,
         e.regel ? `Regelkarte: ${e.regel.titel} – ${e.regel.erklaerung}` : '',
         '',
-        ...stueck.map(
-          ({ a }, j) =>
-            `${j + 1}. Übungsart: ${UEBUNG_NAME[a.uebung]} · bisher [${a.art}] ${a.anweisung}\nSatz: ${a.satz}${a.vorgabe ? `\nVorgabe: ${a.vorgabe}` : ''}${
-              a.optionen?.length ? `\nMöglichkeiten: ${a.optionen.join(' | ')}` : ''
-            }${a.teile?.length ? `\nTeile: ${a.teile.join(' | ')}` : ''}${a.fehlerWort ? `\nFehlerwort: ${a.fehlerWort}` : ''}\nLösungen: ${a.loesungen.join(' | ')}\nMangel: ${String(
-              a.pruefen
-            ).replace(/^Befund:\s*/, '')}`
-        )
+        // Alle Felder (29.10.2026: auch Kontext, Satzanfang, Lücken, Gruppen … der neuen Formate)
+        ...stueck.map(({ a }, j) => {
+          const { id: _i, regelId: _r, pruefen: _p, uebung: _u, niveau: _n, ...felder } = a as BankAufgabe & { regelId?: string }
+          void _i
+          void _r
+          void _p
+          void _u
+          void _n
+          return `${j + 1}. Übungsart: ${UEBUNG_NAME[a.uebung]} · bisher [${a.art}]\nAufgabe: ${JSON.stringify(felder)}\nMangel: ${String(a.pruefen).replace(/^Befund:\s*/, '')}`
+        })
       ]
         .filter((x) => x !== '')
         .join('\n'),
@@ -371,7 +374,17 @@ export async function repariereAufgaben(
             fehlerWort: S('fehler/richtigfalsch: das falsche Wort GENAU wie im Satz; sonst leer'),
             teile: A(S(), 'satzbau: Teile in RICHTIGER Reihenfolge; sonst leer'),
             paare: A(O({ links: S(), rechts: S() }), 'zuordnen: 3–5 Paare; sonst leer'),
-            korrekt: { type: 'boolean' }
+            korrekt: { type: 'boolean' },
+            // Neue Formate (29.10.2026)
+            kontext: S('1–3 Sätze Vorlauf, wenn der Satz allein die Form nicht festlegt; sonst leer'),
+            anfang: S('umformen/verbinden/frage: Satzanfang (ohne „…“, nie Bindewort samt Teilsatz); sonst leer'),
+            kommaPruefen: { type: 'boolean' },
+            luecken: A(O({ vorgabe: S(), loesungen: A(S()), optionen: A(S()) }), 'lueckentext: je „___“ eine Lücke; sonst leer'),
+            wortkasten: A(S(), 'lueckentext: Wörter zum Einsetzen; sonst leer'),
+            zielWoerter: A(S(), 'markieren: die zu markierenden Wörter genau wie im Text; sonst leer'),
+            gruppen: A(S(), 'sortieren: 2–3 Gruppennamen; sonst leer'),
+            elemente: A(O({ text: S(), gruppe: { type: 'integer' } }), 'sortieren: Elemente mit Gruppennummer (0 = erste); sonst leer'),
+            erklaerung: S('ein kurzer Satz auf Deutsch: warum diese Form')
           })
         )
       })
@@ -390,7 +403,7 @@ export async function repariereAufgaben(
         {
           thema: e.titel,
           regeln: [{ id: 'r', titel: e.titel, erklaerung: e.titel, beispiele: [] }],
-          aufgaben: [{ ...u, id: 'x', regelId: 'r', uebung: a.uebung, niveau: a.niveau, erklaerung: a.erklaerung, tipp: a.tipp }]
+          aufgaben: [{ ...u, id: 'x', regelId: 'r', uebung: a.uebung, niveau: a.niveau, erklaerung: String(u.erklaerung ?? '') || a.erklaerung, tipp: a.tipp }]
         },
         e.titel,
         BANK_GRENZEN
@@ -401,7 +414,30 @@ export async function repariereAufgaben(
       const { pruefen: _p, regelId: _r, ...ohne } = neu
       void _p
       void _r
-      aus[ziel.i] = { ...(ohne as BankAufgabe), regelId: a.regelId }
+      kandidaten.push({ i: ziel.i, neu: ohne as BankAufgabe, regelId: a.regelId })
+    }
+  }
+  // Blindprobe (29.10.2026): Überarbeitetes muss aus der Schüleransicht lösbar sein – sonst bleibt die Aufgabe zurückgestellt
+  if (kandidaten.length) {
+    const probe = await blindGeprueft(
+      {
+        thema: e.titel,
+        regeln: [{ id: 'r', titel: e.regel?.titel ?? e.titel, erklaerung: e.regel?.erklaerung ?? '', beispiele: e.regel?.beispiele ?? [] }],
+        aufgaben: kandidaten.map((k) => ({ ...k.neu, regelId: 'r' }))
+      } as GrammatikPaket,
+      { fach: e.fach, jahrgang: e.jahrgang, thema: e.titel },
+      ai,
+      melde
+    ).catch(() => null)
+    const besteht = new Map((probe?.aufgaben ?? []).map((x) => [x.id, x]))
+    for (const k of kandidaten) {
+      const x = besteht.get(k.neu.id)
+      if (!x) continue
+      const neu = aufgabeNormalisiert({ ...k.neu, ...x, id: k.neu.id, uebung: k.neu.uebung, niveau: k.neu.niveau } as BankAufgabe)
+      if (aufgabeMangel(neu)) continue
+      const { pruefen: _p, ...ohne } = neu as BankAufgabe
+      void _p
+      aus[k.i] = { ...ohne, regelId: k.regelId } as BankAufgabe
       repariert++
     }
   }
