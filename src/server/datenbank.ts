@@ -23,6 +23,10 @@ import { personenDatenEntfernen } from './personDaten'
 let db: DatabaseSync | null = null
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS testkonten (
+  nutzer_id TEXT PRIMARY KEY,
+  erstellt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS nutzer (
   id TEXT PRIMARY KEY,
   benutzer TEXT NOT NULL UNIQUE,
@@ -184,6 +188,9 @@ export const passwortHashVon = (benutzer: string): string | null =>
 /**
  * Alle Konten – OHNE die Vorschaukonten („Als Schüler ansehen", vorschau.ts): Die zählen nie in
  * Listen, Auswertungen, Lerngruppen oder im Namensschutz. `mitVorschau` nur für vorschau.ts selbst.
+ * Testkonten (29.10.2026, Wunsch der Lehrkraft: „Max Mustermann" und „Torge K." standen in der Schülerliste der 5b)
+ * behandelt die App genauso: anmelden und üben geht (die Prüfungen laufen über die Sitzung), in Listen, Zahlen und
+ * Handlungsbedarf zählen sie nicht. Gesetzt in der Verwaltung (`testkontoSetzen`).
  */
 export function alleNutzer(mitVorschau = false): NutzerInfo[] {
   /*
@@ -196,7 +203,11 @@ export function alleNutzer(mitVorschau = false): NutzerInfo[] {
   let liste = m && m.d === d && m.stand === nutzerSchreibzaehler.stand && Date.now() - m.zeit < 30_000 ? m.liste : null
   if (!liste) {
     // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
-    liste = (d.prepare(mitVorschau ? 'SELECT * FROM nutzer' : "SELECT * FROM nutzer WHERE quelle != 'vorschau'").all() as unknown as NutzerZeile[])
+    liste = (
+      d
+        .prepare(mitVorschau ? 'SELECT * FROM nutzer' : "SELECT * FROM nutzer WHERE quelle != 'vorschau' AND id NOT IN (SELECT nutzer_id FROM testkonten)")
+        .all() as unknown as NutzerZeile[]
+    )
       .map(alsInfo)
       .sort((a, b) => a.rolle.localeCompare(b.rolle) || a.benutzer.localeCompare(b.benutzer))
     nutzerMerk[mitVorschau ? 1 : 0] = { d, stand: nutzerSchreibzaehler.stand, zeit: Date.now(), liste }
@@ -206,11 +217,32 @@ export function alleNutzer(mitVorschau = false): NutzerInfo[] {
 const nutzerMerk: ({ d: DatabaseSync; stand: number; zeit: number; liste: NutzerInfo[] } | undefined)[] = []
 
 /** SQL-Bedingung für Auswertungen, z. B. `schueler_id ${OHNE_VORSCHAU}`: Abgaben der Vorschaukonten zählen nie */
-export const OHNE_VORSCHAU = "NOT IN (SELECT id FROM nutzer WHERE quelle = 'vorschau')"
+export const OHNE_VORSCHAU = "NOT IN (SELECT id FROM nutzer WHERE quelle = 'vorschau' UNION SELECT nutzer_id FROM testkonten)"
 
 /** Kennungen der Vorschaukonten (zum Herausfiltern von Zeilen, die nach Person gehen) */
 export const vorschauIds = (): Set<string> =>
-  new Set((datenbank().prepare("SELECT id FROM nutzer WHERE quelle = 'vorschau'").all() as { id: string }[]).map((z) => z.id))
+  new Set(
+    (datenbank().prepare("SELECT id FROM nutzer WHERE quelle = 'vorschau' UNION SELECT nutzer_id FROM testkonten").all() as { id: string }[]).map(
+      (z) => z.id
+    )
+  )
+
+/** Kennungen der Testkonten (Verwaltung) */
+export const testkontoIds = (): Set<string> =>
+  new Set((datenbank().prepare('SELECT nutzer_id FROM testkonten').all() as { nutzer_id: string }[]).map((z) => z.nutzer_id))
+
+/** Zählt das Konto in Listen und Auswertungen? (nicht Vorschau, nicht Testkonto) */
+export const zaehltMit = (n: Pick<NutzerInfo, 'id' | 'quelle'>): boolean =>
+  n.quelle !== 'vorschau' && !datenbank().prepare('SELECT 1 FROM testkonten WHERE nutzer_id = ?').get(n.id)
+
+/** Konto als Testkonto kennzeichnen bzw. die Kennzeichnung aufheben */
+export function testkontoSetzen(nutzerId: string, an: boolean): void {
+  const d = datenbank()
+  if (an) d.prepare('INSERT OR IGNORE INTO testkonten (nutzer_id, erstellt) VALUES (?, ?)').run(nutzerId, new Date().toISOString())
+  else d.prepare('DELETE FROM testkonten WHERE nutzer_id = ?').run(nutzerId)
+  // Gemerkte Kontenliste neu rechnen
+  nutzerSchreibzaehler.stand++
+}
 
 /** Zeilen ohne die der Vorschaukonten */
 export function ohneVorschau<T>(zeilen: T[], id: (z: T) => string): T[] {

@@ -38,7 +38,7 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
-import { IconAlertTriangle, IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconCopy, IconEye, IconEyeOff, IconKey, IconLock, IconLockOpen, IconRefresh, IconSearch, IconTrash, IconUserPlus, IconUsersMinus } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDebouncedValue } from '@mantine/hooks'
 import { nutzerSuchen, QUELLEN_TEXT, SUCHE_MAX, SUCHE_MIN } from '@shared/nutzerSuche'
@@ -79,6 +79,8 @@ interface Uebersicht {
     klasse?: string
     /** Aus den IServ-Gruppen erkannte Klasse (20.10.2026) */
     iservKlasse?: string
+    /** Testkonto (29.10.2026): übt wie alle, zählt in keiner Liste und Auswertung */
+    testkonto?: boolean
   }[]
   /** Bekannte Klassen (Schülerkonten und Lerngruppen) für die Zuordnung */
   klassen?: string[]
@@ -388,7 +390,14 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
             {konten.map((n) => (
               <Table.Tr key={n.id} opacity={n.gesperrt ? 0.5 : 1}>
                 <Table.Td>
-                  <Text fw={600}>{n.name}</Text>
+                  <Text fw={600}>
+                    {n.name}
+                    {n.testkonto && (
+                      <Badge ml={6} size="xs" variant="light" color="gray" data-testkonto-badge>
+                        Testkonto
+                      </Badge>
+                    )}
+                  </Text>
                   <Text size="xs" c="dimmed">
                     {n.benutzer}
                   </Text>
@@ -431,6 +440,20 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
                 <Table.Td>
                   {n.benutzer !== ich && (
                     <Group gap={4} justify="flex-end">
+                      {/* Testkonto (29.10.2026, Wunsch der Lehrkraft): aus Listen, Zahlen und Handlungsbedarf heraushalten */}
+                      {n.rolle === 'schueler' && (
+                        <Tooltip label={n.testkonto ? 'Wieder als Lernende/r zählen' : 'Als Testkonto ausblenden – kann weiter üben, zählt aber in keiner Liste und Auswertung'}>
+                          <ActionIcon
+                            variant={n.testkonto ? 'light' : 'subtle'}
+                            color="gray"
+                            onClick={() => aendern(n.id, { testkonto: !n.testkonto })}
+                            aria-label={n.testkonto ? 'Testkonto aufheben' : 'Als Testkonto ausblenden'}
+                            data-testkonto={n.benutzer}
+                          >
+                            {n.testkonto ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
                       <Tooltip label={n.gesperrt ? 'Entsperren' : 'Sperren'}>
                         <ActionIcon variant="subtle" onClick={() => aendern(n.id, { gesperrt: !n.gesperrt })}>
                           {n.gesperrt ? <IconLockOpen size={16} /> : <IconLock size={16} />}

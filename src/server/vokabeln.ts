@@ -21,7 +21,7 @@ import { istRekord, nachSpielfehler, SPIELE, type SpielId } from '../shared/voka
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { codePruefwert } from './feldschutz'
 import { ohneKlasse, ohneKlassenname } from '../shared/ohneKlasse'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, zaehltMit, type NutzerInfo } from './datenbank'
 import { json, setzeSitzungsCookie, type Anfrage } from './http'
 import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
@@ -519,8 +519,8 @@ const nachCode = (code: string): Zeile | null =>
 const gaesteVon = (zid: string): NutzerInfo[] =>
   (db().prepare('SELECT nutzer_id FROM vok_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
     .map((g) => nutzerNachId(g.nutzer_id))
-    // Vorschaukonten (vorschau.ts) zählen nie mit
-    .filter((n): n is NutzerInfo => Boolean(n && n.quelle !== 'vorschau'))
+    // Vorschaukonten (vorschau.ts) und Testkonten (29.10.2026) zählen nie mit
+    .filter((n): n is NutzerInfo => Boolean(n && zaehltMit(n)))
 /** Gäste lernen über Wochen: Sitzung bis zum Ende des Zeitraums (höchstens 120 Tage, mindestens 1 Tag) */
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 

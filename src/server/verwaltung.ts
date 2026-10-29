@@ -33,6 +33,8 @@ import {
   serverWert,
   setzeServerGeheimnis,
   setzeServerWert,
+  testkontoIds,
+  testkontoSetzen,
   sitzungenDesNutzersBeenden,
   datenbank
 } from './datenbank'
@@ -110,12 +112,17 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
         platte = null
       }
       const freigaben = serverWert<Record<string, boolean>>('freigaben', {})
+      const testkonten = testkontoIds()
       const iserv = iservEinstellung()
       return (
         json(res, 200, {
           // Klasse: von Hand zugeordnet („klasse:…"); iservKlasse: aus den IServ-Gruppen erkannt (20.10.2026, Anzeige in der Spalte)
-          nutzer: alleNutzer().map(({ gruppen, ...n }) => ({
+          // Mit den Testkonten (29.10.2026) – sonst ließe sich die Kennzeichnung nicht mehr aufheben
+          nutzer: alleNutzer(true)
+            .filter((n) => n.quelle !== 'vorschau')
+            .map(({ gruppen, ...n }) => ({
             ...n,
+            testkonto: testkonten.has(n.id),
             gruppen: gruppen.length,
             klasse: gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? '',
             iservKlasse: n.rolle === 'schueler' ? klasseAusGruppen(gruppen.filter((g) => !g.id.startsWith('klasse:'))) : ''
@@ -325,10 +332,12 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     const klasse = typeof k0.klasse === 'string' ? k0.klasse.trim().slice(0, 40) : undefined
     const gruppen = klasse === undefined ? undefined : [...n.gruppen.filter((g) => !g.id.startsWith('klasse:')), ...(klasse ? [klassenGruppe(klasse)] : [])]
     nutzerAendern(n.id, { ...(rolle ? { rolle } : {}), ...(typeof k0.gesperrt === 'boolean' ? { gesperrt: k0.gesperrt } : {}), ...(gruppen ? { gruppen } : {}) })
+    // Testkonto (29.10.2026): übt wie alle, zählt aber in keiner Liste und Auswertung (datenbank.ts alleNutzer)
+    if (typeof k0.testkonto === 'boolean' && n.rolle === 'schueler') testkontoSetzen(n.id, k0.testkonto)
     if (k0.gesperrt === true) sitzungenDesNutzersBeenden(n.id)
     protokolliereServer(
       'verwaltung',
-      `Konto geändert${rolle ? ` (Rolle ${rolle})` : ''}${typeof k0.gesperrt === 'boolean' ? ` (${k0.gesperrt ? 'gesperrt' : 'entsperrt'})` : ''}${klasse !== undefined ? ` (Klasse ${klasse || 'entfernt'})` : ''}`,
+      `Konto geändert${rolle ? ` (Rolle ${rolle})` : ''}${typeof k0.gesperrt === 'boolean' ? ` (${k0.gesperrt ? 'gesperrt' : 'entsperrt'})` : ''}${klasse !== undefined ? ` (Klasse ${klasse || 'entfernt'})` : ''}${typeof k0.testkonto === 'boolean' ? ` (Testkonto ${k0.testkonto ? 'an' : 'aus'})` : ''}`,
       ich
     )
     return (json(res, 200, { ok: true }), true)

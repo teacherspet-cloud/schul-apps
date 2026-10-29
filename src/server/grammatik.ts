@@ -25,7 +25,7 @@ import {
 } from '../shared/grammatiktrainer'
 import { istSicher, nachAbfrage, TAG, uebersicht, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, zaehltMit, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
 import { GAST_BREMSE_MELDUNG, gastBremse } from './bremse'
 import { imNutzer } from './kontext'
@@ -441,8 +441,8 @@ const nachCode = (code: string): Zeile | null =>
 const gaesteVon = (zid: string): NutzerInfo[] =>
   (db().prepare('SELECT nutzer_id FROM gram_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
     .map((g) => nutzerNachId(g.nutzer_id))
-    // Vorschaukonten (vorschau.ts) zählen nie mit
-    .filter((n): n is NutzerInfo => Boolean(n && n.quelle !== 'vorschau'))
+    // Vorschaukonten (vorschau.ts) und Testkonten (29.10.2026) zählen nie mit
+    .filter((n): n is NutzerInfo => Boolean(n && zaehltMit(n)))
 const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 
 /** `kurse`: Merkliste der Kurse (Vokabeltrainings) für viele Prüfungen hintereinander – die Zeile samt Wortliste zu entschlüsseln kostet */
