@@ -155,7 +155,10 @@ export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
       'Station 3': [P('Vergleich: present perfect und simple past', ['en.verb.pp_vs_past']), P('Zusammensetzungen mit some und any', ['en.pron.indefinite'])]
     },
     'Unit 4': {
-      'Station 1': [P('will-future: Aussagen, Fragen', ['en.verb.will_future'])],
+      // Vergleich will / going to (29.10.2026, Befund der Lehrkraft: „Transition klingt mit der 11. Klasse zu spät"): Die Liste
+      // nennt hier nur das will-future, going to ist seit Unit 2 bekannt – ab hier lassen sich beide gegeneinander üben (der
+      // Katalog führt den Vergleich im 2. Lernjahr). Transition G13 wiederholt ihn nur.
+      'Station 1': [P('will-future: Aussagen, Fragen', ['en.verb.will_future']), P('will-future oder going to-future?', ['en.verb.will_vs_goingto'])],
       'Station 2': [P('Bedingungssätze Typ 1', ['en.cond.type1']), P('Vergleich present perfect und simple past', ['en.verb.pp_vs_past'], true)],
       'Station 3': [
         P('Linking words (and, but, so, when, whenever, because, so that, although / though / even though)', [

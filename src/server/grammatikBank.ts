@@ -381,7 +381,17 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 /** Befund aus der Prüfung der Bank (Kennung → was falsch ist) – beginnt mit diesem Wort, damit Speichern ihn erhält */
 // Zweiter Lauf (29.10.2026 abends): Wörter der geübten Form und weitere gleichwertige Lösungen zählen nicht mehr – fälschlich
 // Zurückgestellte kommen zurück, neu Betroffene werden zurückgestellt
-const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-3-2026-10-29'
+// Vierter Lauf (29.10.2026, Green Line 5 Unit 1 und will/going to ab Green Line 2 Unit 4): auch diese Stellen
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-4-2026-10-29'
+/** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
+const WORTSCHATZ_STELLEN: [string, string][] = [
+  ['Green Line 1', 'Unit 1'],
+  ['Green Line 2', 'Unit 4'],
+  // Wiederholungen in Green Line 5 Unit 1: Passiv (eingeführt Green Line 3 Unit 3), indirekte Rede (Green Line 4 Unit 1)
+  ['Green Line 3', 'Unit 3'],
+  ['Green Line 4', 'Unit 1'],
+  ['Green Line 5', 'Unit 1']
+]
 
 /** Wortschatz-Stand einer Bank-Kennung aus den mitgelieferten Lehrwerken (wie wortschatzStand in der Oberfläche) */
 export function wortschatzStandServer(schluessel: string, sprache: string): { stelle: Einfuehrung; bekannt: Set<string>; jahrgang?: number; lexikon: Lexikon } | null {
@@ -421,7 +431,7 @@ export function wortschatzStandServer(schluessel: string, sprache: string): { st
 
 /**
  * Wortschatz der vorhandenen Aufgaben (29.10.2026, Auftrag der Lehrkraft für Green Line 1 Unit 1): Aufgaben der Formen,
- * die in Green Line 1, Unit 1 eingeführt werden, mit Wörtern, die an der Station der Form noch unbekannt sind, für die
+ * die an einer der WORTSCHATZ_STELLEN eingeführt werden (zuerst Green Line 1, Unit 1), mit Wörtern, die an der Station der Form noch unbekannt sind, für die
  * Lernenden zurückstellen (Grund mit den Wörtern). Neue Aufgaben prüft die Erzeugung selbst.
  */
 function wortschatzEinmal(d: ReturnType<typeof datenbank>): void {
@@ -449,7 +459,7 @@ function wortschatzEinmal(d: ReturnType<typeof datenbank>): void {
       for (const z of zeilen) {
         if (!stand.has(z.schluessel)) stand.set(z.schluessel, wortschatzStandServer(z.schluessel, z.sprache))
         const ws = stand.get(z.schluessel)
-        if (!ws || ws.stelle.buch !== 'Green Line 1' || ws.stelle.unit !== 'Unit 1') continue
+        if (!ws || !WORTSCHATZ_STELLEN.some(([b, u]) => ws.stelle.buch === b && ws.stelle.unit === u)) continue
         const b = bankAufgabeBereinigt({ ...json_(z.bank_aufgabe, {} as Record<string, unknown>), uebung: z.uebung, niveau: z.niveau }, z.id, z.schluessel)
         if (!b) continue
         const u = unbekannteWoerter(b.a, ws.bekannt, formWoerter(z.schluessel), ws.lexikon)

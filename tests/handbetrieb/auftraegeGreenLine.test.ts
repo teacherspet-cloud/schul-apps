@@ -2,7 +2,8 @@
  * Aufträge für den Handbetrieb (29.10.2026): wie „Grammatikformen" › Green Line 1 › Unit 1 › „Fehlende Aufgaben mit KI
  * ergänzen" (GrammatikBank.tsx `auftrag`, bank.ts `bankSchritte`): je Teilbereich bzw. gemischter Übung und Stufe nur die
  * Übungsarten, denen Aufgaben fehlen (Stand am Server: <Ordner>/zaehler.json), je Anfrage höchstens drei Übungsarten, je
- * Übungsart das Fehlende plus Puffer. Dazu weitere Schlüssel aus HANDBETRIEB_EXTRA (Komma-Liste).
+ * Übungsart das Fehlende plus Puffer. Dazu weitere Schlüssel aus HANDBETRIEB_EXTRA (Komma-Liste). Band und Unit aus
+ * HANDBETRIEB_BAND / HANDBETRIEB_UNIT (Vorgabe Green Line 1 / Unit 1; 29.10.2026 auch Green Line 5 / Unit 1).
  * Nur mit HANDBETRIEB=<Ordner>.
  */
 import { describe, it } from 'vitest'
@@ -18,12 +19,15 @@ const ORDNER = process.env.HANDBETRIEB ?? ''
 const PUFFER = 2
 const ARTEN_JE_ANFRAGE = 3
 
-describe.skipIf(!ORDNER)('Aufträge Green Line 1 Unit 1', () => {
+const BAND = process.env.HANDBETRIEB_BAND ?? 'Green Line 1'
+const UNIT = process.env.HANDBETRIEB_UNIT ?? 'Unit 1'
+
+describe.skipIf(!ORDNER)('Aufträge Green Line (Band/Unit)', () => {
   it('schreiben', () => {
     const zaehler = existsSync(join(ORDNER, 'zaehler.json'))
       ? (JSON.parse(readFileSync(join(ORDNER, 'zaehler.json'), 'utf8')) as Record<string, Record<string, Record<string, number>>>)
       : {}
-    const unit = LEHRWERK_GRAMMATIK['Green Line 1']['Unit 1']
+    const unit = LEHRWERK_GRAMMATIK[BAND][UNIT]
     const reiter: { schluessel: string; titel: string; themen: string[]; hinweise?: string; formen?: string[] }[] = []
     for (const punkte of Object.values(unit))
       for (const punkt of punkte) {
@@ -32,7 +36,7 @@ describe.skipIf(!ORDNER)('Aufträge Green Line 1 Unit 1', () => {
         if (teile.length >= 2)
           reiter.push({ schluessel: mixSchluessel(punkt.t), titel: `Gemischt: ${punkt.text}`, themen: [...new Set(punkt.t.map((k) => k.split('/')[0]))], formen: teile.map(kennungLabel) })
       }
-    // Nur bestimmte Schlüssel (Nachtrag): HANDBETRIEB_NUR=<Komma-Liste> – Green Line 1 Unit 1 dann nicht
+    // Nur bestimmte Schlüssel (Nachtrag): HANDBETRIEB_NUR=<Komma-Liste> – die übrigen der Unit dann nicht
     const nur = (process.env.HANDBETRIEB_NUR ?? '').split(',').filter(Boolean)
     if (nur.length) reiter.splice(0, reiter.length, ...reiter.filter((r) => nur.includes(r.schluessel)))
     for (const k of (process.env.HANDBETRIEB_EXTRA ?? '').split(',').filter(Boolean))
@@ -43,7 +47,7 @@ describe.skipIf(!ORDNER)('Aufträge Green Line 1 Unit 1', () => {
       // Past Progressive liefen mit „Klasse 5, Green Line 1 Unit 1" – sie stehen dort nicht)
       const ws = wortschatzStandServer(r.schluessel, 'en')
       const jahrgang = ws?.jahrgang ?? 5
-      const lehrwerk = ws ? { buch: ws.stelle.buch, unit: ws.stelle.unit } : { buch: 'Green Line 1', unit: 'Unit 1' }
+      const lehrwerk = ws ? { buch: ws.stelle.buch, unit: ws.stelle.unit } : { buch: BAND, unit: UNIT }
       for (const st of ['g', 'm', 'a'] as Stufe[]) {
         const da = (u: Uebung): number => zaehler[r.schluessel]?.[st]?.[u] ?? 0
         const offen = UEBUNGEN.filter((u) => da(u) < zielJeFeld(u))
