@@ -311,7 +311,8 @@ function Nutzer({ d, neu, zuIserv }: { d: Uebersicht; neu: () => void; zuIserv: 
   const [suche, setSuche] = useState('')
   const [frage] = useDebouncedValue(suche, 250)
   const ohneGaeste = useMemo(() => d.nutzer.filter((n) => n.quelle !== 'gast'), [d.nutzer])
-  const { treffer: konten, gesamt } = useMemo(() => nutzerSuchen(ohneGaeste, frage), [ohneGaeste, frage])
+  // Gäste nur in der Suche (29.10.2026): ein Gast der Lehrkraft (Anmeldecode) lässt sich so als Testkonto ausblenden
+  const { treffer: konten, gesamt } = useMemo(() => nutzerSuchen(d.nutzer, frage), [d.nutzer, frage])
   const zuKurz = frage.trim().length < SUCHE_MIN
   const anlegen = async (): Promise<void> => {
     try {
