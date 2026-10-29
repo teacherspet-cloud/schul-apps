@@ -8,7 +8,7 @@
  *    verknüpft (TestErstellen in diesem Fenster).
  * Gespeichert am Kurs (POST /server/vokabeln/<id>/testmaterial, shared/testMaterial.ts).
  */
-import { Badge, Button, Group, Modal, Paper, ScrollArea, SegmentedControl, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { Alert, Badge, Button, Group, Modal, Paper, ScrollArea, SegmentedControl, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { IconExternalLink, IconLink, IconLinkOff, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { holen, senden } from '../modules/onlinetest/serverApi'
@@ -67,6 +67,24 @@ export function terminStichwoerter(k: Pick<StartKurs, 'testInhalt' | 'einheit' |
   return [...w]
 }
 
+/**
+ * Gibt es den verknüpften Test noch? (29.10.2026, Befund der Lehrkraft: „Mi 11.11. Vokabeltest 5b – Unit 1" meldete beim
+ * Klick nur „ließ sich nicht öffnen" – verknüpft war ein Test, der gelöscht oder nie gespeichert wurde.) Lässt sich die
+ * Liste nicht laden, gilt er als vorhanden (dann versucht das Öffnen es wie bisher).
+ */
+export async function testVorhanden(m: TestMaterial): Promise<boolean> {
+  try {
+    if (m.moduleId === 'onlinetest') {
+      const r = await holen<{ tests: { id: string }[] }>('/server/onlinetest')
+      return r.tests.some((t) => t.id === m.docId)
+    }
+    const liste = m.moduleId === 'vokabeltest' ? await window.api.tests.list() : await window.api.grammarTests.list()
+    return (liste as { id: string }[]).some((t) => t.id === m.docId)
+  } catch {
+    return true
+  }
+}
+
 export const verknuepfen = async (kursId: string, material: TestMaterial | null): Promise<void> => {
   await senden(`/server/vokabeln/${kursId}/testmaterial`, { material })
 }
@@ -78,6 +96,11 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
   const [app, setApp] = useState<TestApp | 'alle'>('alle')
   const [vorschau, setVorschau] = useState<TestKandidat | null>(null)
   const [andere, setAndere] = useState(false)
+  // Verknüpfter Test nicht mehr da: Hinweis statt „Öffnen" – anderen wählen, neu erstellen oder lösen
+  const [fehlt, setFehlt] = useState(false)
+  useEffect(() => {
+    if (k.testMaterial) void testVorhanden(k.testMaterial).then((da) => setFehlt(!da))
+  }, [k.testMaterial])
   // Passung nach Inhalt (29.10.2026, Befund der Lehrkraft): Wörter der Lerngruppe, Grammatik des Termins, Lerngruppe
   const [passung, setPassung] = useState<Map<string, Passung> | null>(null)
   useEffect(() => {
@@ -161,15 +184,22 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
               Verknüpfter Test ({TEST_APP_NAME[k.testMaterial.moduleId]})
             </Text>
             <Text fw={700}>{k.testMaterial.titel || 'Ohne Namen'}</Text>
+            {fehlt && (
+              <Alert color="orange" radius="md" mt="xs" py={6} data-test-fehlt>
+                Diesen Test gibt es nicht mehr – er wurde gelöscht oder nie fertig gespeichert. Bitte einen anderen wählen, einen
+                neuen erstellen lassen oder die Verknüpfung lösen.
+              </Alert>
+            )}
             <Group gap="xs" mt="sm">
               <Button
+                disabled={fehlt}
                 leftSection={<IconExternalLink size={16} />}
                 onClick={() => (schliessen(), void openDocument(k.testMaterial!.moduleId, k.testMaterial!.docId))}
                 data-test-oeffnen
               >
                 Öffnen
               </Button>
-              <Button variant="light" leftSection={<IconLink size={16} />} onClick={() => setAndere(true)}>
+              <Button variant={fehlt ? 'filled' : 'light'} leftSection={<IconLink size={16} />} onClick={() => setAndere(true)} data-test-andere>
                 Anderen Test wählen
               </Button>
               <Button

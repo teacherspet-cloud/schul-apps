@@ -1565,7 +1565,9 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
                     woerter,
                     lernende.map((l) => l.stand),
                     teileEingeordnet(z, tl),
-                    jetzt
+                    jetzt,
+                    json_(z.problem_aus, {} as Record<string, number>),
+                    kursProblemStufe(z)
                   ),
                   lernendeNamen: lernende.map((l) => l.name)
                 }
@@ -2240,7 +2242,15 @@ export function vokabelnDerGruppe(
             abschnitte: (() => {
               const wVoll = json_(zVoll.woerter, [] as Vokabel[])
               const tVoll = wVoll.length ? teileVon(zVoll) : []
-              return abschnittStatistik(tVoll, wVoll, staende, teileEingeordnet(z, tVoll), jetzt)
+              return abschnittStatistik(
+                tVoll,
+                wVoll,
+                staende,
+                teileEingeordnet(z, tVoll),
+                jetzt,
+                json_(zVoll.problem_aus, {} as Record<string, number>),
+                kursProblemStufe(zVoll)
+              )
             })(),
             lernendeNamen: lernende.map((n) => n.name || n.benutzer)
           }

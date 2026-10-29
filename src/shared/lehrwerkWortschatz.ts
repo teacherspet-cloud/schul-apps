@@ -83,7 +83,13 @@ const stamme = (w: string): string[] => [
   w.replace(/es$/, ''),
   w.replace(/s$/, ''),
   ...(/..ing$/.test(w) ? [w.slice(0, -3), `${w.slice(0, -3)}e`, w.slice(0, -4)] : []),
-  ...(/..ed$/.test(w) ? [w.slice(0, -2), w.slice(0, -1), w.slice(0, -3), w.replace(/ied$/, 'y')] : [])
+  ...(/..ed$/.test(w) ? [w.slice(0, -2), w.slice(0, -1), w.slice(0, -3), w.replace(/ied$/, 'y')] : []),
+  // Adverbien auf -ly und Steigerung (29.10.2026, Handbetrieb Green Line 5: „quickly", „younger", „oldest" galten bei
+  // bekanntem quick/young/old als unbekannt – die Listen führen nur die Grundform): quickly → quick, happily → happy,
+  // gently → gentle, bigger → big, nicer → nice, easiest → easy
+  ...(/...ly$/.test(w) ? [w.slice(0, -2), w.replace(/ily$/, 'y'), w.replace(/ly$/, 'le')] : []),
+  ...(/...er$/.test(w) ? [w.slice(0, -2), w.slice(0, -1), w.slice(0, -3), w.replace(/ier$/, 'y')] : []),
+  ...(/...est$/.test(w) ? [w.slice(0, -3), w.slice(0, -2), w.slice(0, -4), w.replace(/iest$/, 'y')] : [])
 ]
 
 export const istBekanntesWort = (w: string, bekannt: ReadonlySet<string>): boolean => /^\d/.test(w) || stamme(w).some((x) => bekannt.has(x))

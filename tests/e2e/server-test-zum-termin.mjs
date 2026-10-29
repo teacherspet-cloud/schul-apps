@@ -122,6 +122,21 @@ try {
   await p.screenshot({ path: join(out, '3-vokabeltest.png') })
   const st2 = await (await lk.request.get(`${A}/server/vokabeln/${kurs.id}`, { headers: KOPF })).json()
   pruefe(st2.testAbschnitte?.material?.moduleId === 'vokabeltest' && st2.testAbschnitte.material.docId !== testId, 'Neuer Test gleich mit dem Termin verknüpft')
+  // Verknüpfter Test gelöscht bzw. nie gespeichert (29.10.2026, Befund „Vokabeltest 5b – Unit 1 lässt sich nicht öffnen"):
+  // Klick zeigt das Fenster mit Hinweis statt einer Fehlermeldung
+  await lk.request.post(`${A}/server/vokabeln/${kurs.id}/testmaterial`, {
+    headers: KOPF,
+    data: { material: { moduleId: 'vokabeltest', docId: 'gibt-es-nicht-123', titel: 'Gelöschter Test' } }
+  })
+  await p.goto(A)
+  await p.waitForTimeout(2000)
+  if ((await kopf.count()) && (await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click()
+  await p.locator('[data-start-demnaechst="test"]').first().click()
+  pruefe(await da(p.locator('[data-test-fehlt]')), 'Gelöschter Test: Hinweis im Fenster statt „ließ sich nicht öffnen"')
+  pruefe(await p.locator('[data-test-oeffnen]').isDisabled(), 'Gelöschter Test: „Öffnen" gesperrt')
+  await p.locator('[data-test-andere]').click()
+  pruefe(await da(p.locator('[data-test-modus]')), 'Gelöschter Test: anderen Test wählen möglich')
+  await p.screenshot({ path: join(out, '4-geloescht.png') })
   void kasten
 } catch (e) {
   problems.push(String(e?.stack ?? e))

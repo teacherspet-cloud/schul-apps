@@ -50,16 +50,18 @@ export const useBedarfFenster = create<{ gruppe: string | null; oeffne: (gruppe:
 }))
 
 /** Gruppen im Fenster, in dieser Reihenfolge */
-export type BedarfGruppe = 'inaktiv' | 'wackelig' | 'grammatik' | 'abgaben' | 'pruefen' | 'test' | 'entwurf' | 'leer' | 'sonst'
-const REIHENFOLGE: BedarfGruppe[] = ['inaktiv', 'wackelig', 'grammatik', 'abgaben', 'pruefen', 'test', 'entwurf', 'leer', 'sonst']
+export type BedarfGruppe = 'inaktiv' | 'schwach' | 'wackelig' | 'grammatik' | 'abgaben' | 'pruefen' | 'test' | 'entwurf' | 'leer' | 'sonst'
+const REIHENFOLGE: BedarfGruppe[] = ['inaktiv', 'schwach', 'wackelig', 'grammatik', 'abgaben', 'pruefen', 'test', 'entwurf', 'leer', 'sonst']
 
 /** Zu welcher Gruppe ein Eintrag gehört (rein rechnend, auch für Tests) */
 export function bedarfGruppeVon(b: Pick<Bedarf, 'art' | 'hinweis'>): BedarfGruppe {
   switch (b.hinweis) {
     case 'inaktiv':
       return 'inaktiv'
+    // Eigene Gruppe (29.10.2026, Befund der Lehrkraft 5b: „Problemwörter & schwache Vokabeln" nannte Lernende unter 30 %
+    // sicher, die Liste der Problemwörter war aber leer – zwei verschiedene Dinge unter einem Titel)
     case 'schwach':
-      return 'wackelig'
+      return 'schwach'
     case 'foerdern':
       return 'grammatik'
     case 'termin':
@@ -87,7 +89,8 @@ export function bedarfGruppiert<T extends Pick<Bedarf, 'art' | 'hinweis'>>(liste
 
 const GRUPPE: Record<BedarfGruppe, { titel: string; farbe: string; symbol: React.ReactNode }> = {
   inaktiv: { titel: 'Nicht geübt', farbe: 'gray', symbol: <IconZzz size={16} /> },
-  wackelig: { titel: 'Problemwörter & schwache Vokabeln', farbe: 'red', symbol: <IconBook2 size={16} /> },
+  schwach: { titel: 'Vokabeln unter 30 % sicher', farbe: 'red', symbol: <IconBook2 size={16} /> },
+  wackelig: { titel: 'Problemwörter der Klasse', farbe: 'orange', symbol: <IconBook2 size={16} /> },
   grammatik: { titel: 'Grammatik schwach', farbe: 'orange', symbol: <IconUserExclamation size={16} /> },
   abgaben: { titel: 'Abgaben & Reihen', farbe: 'cyan', symbol: <IconFileText size={16} /> },
   pruefen: { titel: 'Antworten prüfen', farbe: 'orange', symbol: <IconClipboardCheck size={16} /> },
@@ -102,6 +105,7 @@ function aktionVon(b: Bedarf): { text: string; symbol: React.ReactNode } {
   switch (bedarfGruppeVon(b)) {
     case 'inaktiv':
       return { text: 'Im Kurs ansehen', symbol: <IconArrowRight size={14} /> }
+    case 'schwach':
     case 'wackelig':
       return { text: 'Zu den Lernenden', symbol: <IconArrowRight size={14} /> }
     case 'grammatik':

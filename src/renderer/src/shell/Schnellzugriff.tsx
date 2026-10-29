@@ -39,7 +39,7 @@ import { useSichtbareProgramme } from './programme'
 import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
 import { VokabelBalken } from '../shared/components/VokabelBalken'
-import { TestZumTermin } from './TestZumTermin'
+import { TestZumTermin, testVorhanden } from './TestZumTermin'
 import { starteTerminWaechter } from './TestErstellen'
 import { senden } from '../modules/onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../shared/util'
@@ -301,8 +301,11 @@ export function Schnellzugriff(): React.JSX.Element {
           e={e}
           testOeffnen={(id) => {
             const kurs = kurse.find((x) => x.id === id)
-            if (kurs?.testMaterial) void openDocument(kurs.testMaterial.moduleId, kurs.testMaterial.docId)
-            else if (kurs) setTerminKurs(kurs)
+            if (!kurs) return
+            const m = kurs.testMaterial
+            // Verknüpfter Test gelöscht oder nie gespeichert (29.10.2026): das Fenster mit Hinweis statt „ließ sich nicht öffnen"
+            if (m) void testVorhanden(m).then((da) => (da ? void openDocument(m.moduleId, m.docId) : setTerminKurs(kurs)))
+            else setTerminKurs(kurs)
           }}
           verknuepft={e.art === 'test' ? kurse.find((x) => x.id === e.ziel)?.testMaterial?.titel || (kurse.find((x) => x.id === e.ziel)?.testMaterial ? 'Test' : undefined) : undefined}
           aendern={(id) => {

@@ -10,7 +10,7 @@
  * Rein rechnend, ohne Datenbank – der Server reicht Wörter und Lernstände herein.
  */
 import { istSicher, type Vokabel, type WortStand } from './vokabeltrainer'
-import { problemWoerter } from './problemWoerter'
+import { problemWoerter, PROBLEM_STUFE_STANDARD, type ProblemStufe } from './problemWoerter'
 import { quelleUnits, type Quelle } from './vokabelLaufbahn'
 import { bandRang } from './lehrwerkBand'
 import { ABSCHNITT_FOLGE } from '../renderer/src/shared/lehrwerkGrammatik'
@@ -286,7 +286,11 @@ export function abschnittStatistik(
   woerter: Pick<Vokabel, 'id' | 'term' | 'translation'>[],
   staende: Record<string, WortStand>[],
   einordnung: AbschnittEinordnung[],
-  jetzt = Date.now()
+  jetzt = Date.now(),
+  // Wie der Kurs (29.10.2026, Befund der Lehrkraft: Zahlen der Problemwörter wichen voneinander ab): Ausgeblendete und
+  // Empfindlichkeit des Kurses – sonst nannte ein Abschnitt Wörter, die die Kursliste nicht führt
+  ausgeblendet: Record<string, number> = {},
+  stufe: ProblemStufe = PROBLEM_STUFE_STANDARD
 ): AbschnittStatistik[] {
   const bereiche = wortBereiche(teile, woerter.length)
   return teile.map((t, i) => {
@@ -328,7 +332,7 @@ export function abschnittStatistik(
       neu: ges ? neu / ges : 1,
       schwach: reif ? schwach : null,
       // Dieselbe Definition wie überall (10.10.2026, shared/problemWoerter.ts) – hier die wichtigsten 5 des Abschnitts
-      probleme: problemWoerter(liste, staende, {}, jetzt)
+      probleme: problemWoerter(liste, staende, ausgeblendet, jetzt, stufe)
         .slice(0, 5)
         .map((p) => ({ term: p.term, translation: p.translation, quote: p.quote })),
       jeLernende
