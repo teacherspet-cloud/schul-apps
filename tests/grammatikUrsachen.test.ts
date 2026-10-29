@@ -169,3 +169,21 @@ describe('Nie stumm kürzen', () => {
     expect(q.aufgaben).toHaveLength(0)
   })
 })
+
+describe('Beispiel der Regelkarte verrät die Lösung (Blindprobe 29.10.2026)', () => {
+  it('Aufgabe mit eingesetzter Lösung = Beispiel → verraten; anderer Satz nicht', async () => {
+    const { beispielVerraten } = await import('../src/shared/grammatikAufgabenRegeln')
+    const bsp = ['Suddenly the window opened by itself.']
+    expect(beispielVerraten({ id: 'x', art: 'luecke', anweisung: '', satz: 'Suddenly the window opened ___.', loesungen: ['by itself'] } as never, bsp)).toBe(true)
+    expect(beispielVerraten({ id: 'y', art: 'luecke', anweisung: '', satz: 'The door closed ___ in the night.', loesungen: ['by itself'] } as never, bsp)).toBe(false)
+  })
+})
+
+describe('Beispiel der Regelkarte = berichtigter Fehlersatz', () => {
+  it('Fehler finden: berichtigter Satz gleich Beispiel → verraten', async () => {
+    const { beispielVerraten } = await import('../src/shared/grammatikAufgabenRegeln')
+    expect(
+      beispielVerraten({ id: 'f', art: 'fehler', anweisung: '', satz: 'Our school is built in 1972.', fehlerWort: 'is', loesungen: ['was'] } as never, ['Our school was built in 1972.'])
+    ).toBe(true)
+  })
+})

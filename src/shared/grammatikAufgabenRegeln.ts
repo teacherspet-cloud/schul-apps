@@ -304,3 +304,33 @@ export function aufgabenGeprueft<T extends GrammatikAufgabe>(liste: readonly T[]
   }
   return { aufgaben, gestrichen }
 }
+
+/**
+ * Beispiel der Regelkarte = Aufgabe (29.10.2026, Blindprobe Green Line 5: Beispielsätze der Karte standen fast wörtlich als
+ * Aufgabe da – wer die Karte liest, hat die Lösung). Verglichen wird der Aufgabensatz mit eingesetzter Lösung bzw. jedes
+ * Element, jede Möglichkeit und jede Lösung mit jedem Beispiel (ab vier Wörtern, ohne Groß-/Kleinschreibung und Satzzeichen).
+ */
+export function beispielVerraten(a: GrammatikAufgabe, beispiele: readonly string[]): boolean {
+  const norm = (t: string): string =>
+    t
+      .toLowerCase()
+      .replace(/[’`]/g, "'")
+      .replace(/[^a-z0-9' ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const bsp = new Set(beispiele.filter((b) => typeof b === 'string').map(norm).filter((b) => b.split(' ').length >= 4))
+  if (!bsp.size) return false
+  const x = a as GrammatikAufgabe & { elemente?: string[]; optionen?: string[]; loesungen?: string[]; satz?: string; fehlerWort?: string }
+  const loes = x.loesungen ?? []
+  const kandidaten = [
+    ...(x.elemente ?? []),
+    ...(x.optionen ?? []),
+    ...loes,
+    x.satz ?? '',
+    ...(x.satz?.includes('___') && loes[0] ? [x.satz.replace(/_{3,}/, loes[0])] : []),
+    // Fehler finden: der berichtigte Satz (Blindprobe: „Our school is built in 1972" ↔ Beispiel „… was built in 1972")
+    ...(x.fehlerWort && x.satz && loes[0] ? [x.satz.replace(x.fehlerWort, loes[0])] : [])
+  ]
+  // Elemente/Möglichkeiten können auch Objekte sein (Zuordnen, Sortieren) – nur Texte vergleichen
+  return kandidaten.some((k) => typeof k === 'string' && bsp.has(norm(k)))
+}

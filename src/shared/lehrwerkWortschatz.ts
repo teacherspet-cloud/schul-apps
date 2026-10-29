@@ -206,8 +206,27 @@ export function bekannteGrammatik(baende: readonly { name: string; grammatik: Gr
  */
 export function formWoerter(schluessel: string): string[] {
   const teile = schluessel.replace(/^mix:/, '').split('+')
-  return [...new Set(teile.flatMap((k) => (k.split('/')[1] ?? '').split(/[-_]/)).filter((w) => /^[a-z]+$/.test(w)))]
+  const zusatz = Object.entries(FORM_ZUSATZ)
+    .filter(([k]) => teile.some((t) => t.startsWith(k)))
+    .flatMap(([, w]) => w)
+  return [...new Set([...teile.flatMap((k) => (k.split('/')[1] ?? '').split(/[-_]/)).filter((w) => /^[a-z]+$/.test(w)), ...zusatz])]
 }
+
+/**
+ * Wörter, die zur geübten Form gehören, auch wenn die Vokabelliste sie nicht führt (29.10.2026, Handbetrieb Green Line 5:
+ * „myself", „yourselves" fehlen in der Liste, obwohl -self-Pronomen geübt werden; „probably" ist das Signal der Vorhersage)
+ */
+const SELF = ['myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'yourselves', 'themselves', 'oneself']
+const FORM_ZUSATZ: Record<string, string[]> = {
+  'en.pron.emphatic': SELF,
+  'en.pron.reflexive': SELF,
+  'en.focus.emphasis': SELF,
+  'en.focus.inversion': ['seldom', 'scarcely', 'sooner', 'circumstances', 'account'],
+  'en.verb.will_vs_goingto': ['probably', 'perhaps', 'maybe', 'sure']
+}
+
+/** Typische Fehlformen, die als Fehlerwort oder Ablenker absichtlich vorkommen – keine Vokabeln */
+const FEHLFORMEN = new Set(['hisself', 'theirself', 'theirselves', 'ourself', 'themself', 'themselfs', 'yourselfs', 'myselves', 'hisselves'])
 
 /**
  * Deutsche Wörter, die in Aufgaben neben Englischem stehen (29.10.2026, Handbetrieb: „Emma statt Tom", „unter dem Tisch",
@@ -228,9 +247,19 @@ const DEUTSCHE_WOERTER = new Set(
   ).split(' ')
 )
 
+const KURZ_ENDUNGEN = new Set(['ll', 're', 've'])
+
+/**
+ * Typisch deutsche Wortformen (29.10.2026, Handbetrieb Green Line 5: „reflexiv", „indirekte", „emphatisches", „gebacken",
+ * „angeschnitten" in Gruppen- und Zuordnungstexten galten als unbekannte englische Wörter): -isch, -ung, -keit, -heit, -iv,
+ * -kt(e), Partizip ge…en/ge…t – nur für Wörter, die kein englischer Eintrag der Reihe kennt
+ */
+const DEUTSCHE_FORM = /(isch|ische[nrs]?|ung|ungen|keit|heit|iv|kte[nrs]?|kt)$|^[a-z]{0,4}ge[a-z]{3,}(en|t)$/
+
 /** Ein deutsches Wort (auch gebeugt: „sichtbaren" ← „sichtbar"), das in keinem englischen Eintrag der Reihe vorkommt */
 export function istDeutschesWort(w: string, lex: Lexikon): boolean {
   if (istBekanntesWort(w, lex.englisch)) return false
+  if (DEUTSCHE_FORM.test(w)) return true
   return [w, w.slice(0, -1), w.slice(0, -2), w.slice(0, -3)].some((x) => x.length >= 4 && lex.deutsch.has(x)) || (w.length < 4 && lex.deutsch.has(w))
 }
 
@@ -247,7 +276,7 @@ export function englischeTexte(a: GrammatikAufgabe): string[] {
   for (const e of a.elemente ?? []) t.push(e.text)
   for (const l of a.luecken ?? []) t.push(l.vorgabe ?? '', l.loesungen[0] ?? '', ...(l.optionen ?? []))
   if (a.kontext && !istDeutsch(a.kontext)) t.push(a.kontext)
-  if (a.art === 'sortieren') t.push(...(a.gruppen ?? []).filter((g) => !istDeutsch(g)))
+  // Gruppen beim Sortieren sind Beschriftungen („Passiv-Infinitiv", „reflexiv") – keine Vokabeln (29.10.2026)
   return t.filter((x) => x && x.trim() && !istDeutsch(x))
 }
 
@@ -266,7 +295,8 @@ export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<stri
       for (const w of wortformen(r)) {
         if (istBekanntesWort(w, erlaubt)) continue
         // Einzelne Buchstaben (Sprecher „A:"/„B:", Aufzählungen) und deutsche Wörter neben dem Englischen
-        if (w.length < 2 || DEUTSCHE_WOERTER.has(w) || (lexikon && istDeutschesWort(w, lexikon))) continue
+        // Kurzformen-Endungen („'ll", „'re", „'ve" – 29.10.2026) und absichtliche Fehlformen zählen nicht
+        if (w.length < 2 || KURZ_ENDUNGEN.has(w) || FEHLFORMEN.has(w) || DEUTSCHE_WOERTER.has(w) || (lexikon && istDeutschesWort(w, lexikon))) continue
         if (gross && w === klein(r).split("'")[0]) continue
         aus.add(w)
       }

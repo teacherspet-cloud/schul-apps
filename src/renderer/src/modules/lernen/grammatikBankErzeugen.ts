@@ -27,7 +27,7 @@ import {
   LOESUNGEN_REGEL
 } from '@shared/grammatikBank'
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
-import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
+import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft, beispielVerraten } from '@shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '@shared/grammatikDesign'
 import { formWoerter, unbekannteWoerter } from '@shared/lehrwerkWortschatz'
 import { wortschatzStand, type WortschatzStand } from './wortschatzStand'
@@ -261,6 +261,13 @@ export async function erzeugeBankAufgaben(
       if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)
       return false
     })
+    bericht.gestrichen += vorher - ohne.aufgaben.length
+  }
+  // Beispiel der Regelkarte als Aufgabe (29.10.2026, Blindprobe): verrät die Lösung – fällt weg
+  {
+    const vorher = ohne.aufgaben.length
+    ohne.aufgaben = ohne.aufgaben.filter((x) => !beispielVerraten(x, regel.beispiele ?? []))
+    if (ohne.aufgaben.length < vorher && bericht.gruende.length < 20) bericht.gruende.push('Beispiel der Regelkarte als Aufgabe')
     bericht.gestrichen += vorher - ohne.aufgaben.length
   }
   return {

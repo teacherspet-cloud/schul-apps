@@ -382,7 +382,8 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // Zweiter Lauf (29.10.2026 abends): Wörter der geübten Form und weitere gleichwertige Lösungen zählen nicht mehr – fälschlich
 // Zurückgestellte kommen zurück, neu Betroffene werden zurückgestellt
 // Vierter Lauf (29.10.2026, Green Line 5 Unit 1 und will/going to ab Green Line 2 Unit 4): auch diese Stellen
-const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-4-2026-10-29'
+// Fünfter Lauf: -ly/Steigerung, Formwörter (-self, probably), Fehlformen, Kurzform-Endungen, deutsche Wortformen
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-5-2026-10-29'
 /** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
 const WORTSCHATZ_STELLEN: [string, string][] = [
   ['Green Line 1', 'Unit 1'],
@@ -512,7 +513,10 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-greenline1-unit1-2026-10-29', 'greenline1-unit1-2026-10-29.json'],
   // Nachtrag (29.10.2026, Befund der Lehrkraft): 6 Zusatzaufgaben zu Past Progressive und will/going to waren mit
   // „Klasse 5" erzeugt (sie stehen nicht in Green Line 1) – entfernt und mit der Klasse ihrer Einführung neu erzeugt
-  ['grammatik-bank-nachtrag-2026-10-29', 'nachtrag-2026-10-29.json']
+  ['grammatik-bank-nachtrag-2026-10-29', 'nachtrag-2026-10-29.json'],
+  // Green Line 5 Unit 1 und will/going to (Vorhersage, Klasse 6) – Handbetrieb mit Prüfung, Blindprobe, Überarbeitung,
+  // zweiter Blindprobe und Schlussdurchsicht (29.10.2026)
+  ['grammatik-bank-greenline5-unit1-2026-10-29', 'greenline5-unit1-2026-10-29.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
