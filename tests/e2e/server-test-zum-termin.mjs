@@ -51,6 +51,28 @@ try {
   ).json()
   const inhalt = await (await lk.request.get(`${A}/server/vokabeln/${kurs.id}/testinhalt`, { headers: KOPF })).json()
   pruefe(inhalt.woerter?.length === 3, `Inhalt des Termins: drei Wörter (${inhalt.woerter?.length})`)
+  // Vorwahl im Lehrwerk-Auswähler (29.10.2026, Befund der Lehrkraft): Band, Unit und Abschnitte des Termins
+  const kursLw = await (
+    await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+      headers: KOPF,
+      data: {
+        lerngruppeId: gruppe.id,
+        titel: 'Green Line 1 - Unit 1: Check-in, Station 1',
+        sprache: 'en',
+        fach: 'Englisch',
+        woerter: WOERTER,
+        teile: [
+          { titel: 'Check-in', anzahl: 1 },
+          { titel: 'Station 1', anzahl: 2 }
+        ],
+        quelle: { lehrwerk: 'green-line-1', unit: 'Unit 1', abschnitte: ['Check-in', 'Station 1'] },
+        testTermin: Date.now() + 5 * 86400000
+      }
+    })
+  ).json()
+  const inhaltLw = await (await lk.request.get(`${A}/server/vokabeln/${kursLw.id}/testinhalt`, { headers: KOPF })).json()
+  const vw = inhaltLw.lehrwerkVorwahl
+  pruefe(vw?.bookId === 'green-line-1' && vw?.unit === 'Unit 1' && vw?.sections?.length >= 1, `Termin nennt Band, Unit und Abschnitte (${JSON.stringify(vw)})`)
 
   const p = await lk.newPage()
   p.on('dialog', (d) => void d.accept())
@@ -137,6 +159,24 @@ try {
   await p.locator('[data-test-andere]').click()
   pruefe(await da(p.locator('[data-test-modus]')), 'Gelöschter Test: anderen Test wählen möglich')
   await p.screenshot({ path: join(out, '4-geloescht.png') })
+  // Vorwahl in der Oberfläche: Termin des Green-Line-Kurses → „Test erstellen lassen" → Vokabeltest mit Band, Unit, Abschnitten
+  await p.goto(A)
+  await p.waitForTimeout(2000)
+  if ((await kopf.count()) && (await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click()
+  await p.locator('[data-start-demnaechst="test"]').nth(1).click()
+  await p.locator('[data-test-modus]').getByText('Test erstellen lassen').click()
+  await p.locator('[data-test-erstellen-los]').click()
+  await p.waitForTimeout(3500)
+  const auswahl = await p.evaluate(() => ({
+    werte: [...document.querySelectorAll('input')].map((i) => i.value),
+    abschnitte: [...document.querySelectorAll('input[type=checkbox]:checked')].map((i) => i.value)
+  }))
+  pruefe(
+    auswahl.werte.some((w) => /Green Line 1/.test(w)) && auswahl.werte.includes('Unit 1') && auswahl.abschnitte.includes('Station 1'),
+    `Vokabeltest: Green Line 1, Unit 1 und die Abschnitte des Termins vorgewählt (${auswahl.abschnitte.join(', ')})`
+  )
+  await p.screenshot({ path: join(out, '5-vorwahl.png') })
+  await lk.request.post(`${A}/server/vokabeln/${kursLw.id}/loeschen`, { headers: KOPF, data: {} }).catch(() => undefined)
   void kasten
 } catch (e) {
   problems.push(String(e?.stack ?? e))

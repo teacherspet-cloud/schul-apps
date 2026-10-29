@@ -75,3 +75,10 @@ describe('Unregelmäßige Formen erst ab der Einführung der Zeitform', () => {
     expect(frueh.bekannt.has('went')).toBe(false)
   })
 })
+
+describe('Grundwortschatz (Alltagswörter, 29.10.2026)', () => {
+  it('weekend, party, pizza, London, myself gelten schon in Green Line 1 Unit 1 als bekannt', () => {
+    const ws = wortschatzStandServer('en.verb.there_is/fragen', 'en')!
+    for (const w of ['weekend', 'party', 'pizza', 'london', 'myself', 'baby']) expect(ws.bekannt.has(w)).toBe(true)
+  })
+})

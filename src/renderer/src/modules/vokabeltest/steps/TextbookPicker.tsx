@@ -191,6 +191,7 @@ export function TextbookPicker({
   onEntries,
   onSelection,
   prefer,
+  vorwahl,
   title,
   multiUnit,
   grau = 'kennzeichnen',
@@ -202,6 +203,8 @@ export function TextbookPicker({
   onSelection?: (selection: BookSelection | null) => void
   /** Lehrwerk zur Lerngruppe vorschlagen (statt der zuletzt genutzten Auswahl) */
   prefer?: BookPreference
+  /** Feste Vorwahl (Termin, 29.10.2026): genau dieser Band, diese Unit und diese Abschnitte – geht allem anderen vor */
+  vorwahl?: { bookId: string; unit: string; sections: string[] } | null
   title?: string
   /**
    * Mehrere Units zugleich zulassen.
@@ -249,8 +252,20 @@ export function TextbookPicker({
       .list()
       .then((all) => {
         // Mit Lerngruppe: nur Lehrwerke der passenden Sprache und ein Vorschlag dazu
-        const list = prefer?.language && nurSprache ? all.filter((b) => b.language === prefer.language) : nachEigenenFaechern(all, prefer?.language)
+        const list0 = prefer?.language && nurSprache ? all.filter((b) => b.language === prefer.language) : nachEigenenFaechern(all, prefer?.language)
+        // Der Band der Vorwahl gehört immer in die Liste, auch wenn das Fach sonst ausgeblendet wäre
+        const fest = vorwahl ? all.find((b) => b.id === vorwahl.bookId) : undefined
+        const list = fest && !list0.some((b) => b.id === fest.id) ? [fest, ...list0] : list0
         setBooks(list)
+        if (fest && vorwahl) {
+          const u = fest.units.find((x) => x.name === vorwahl.unit)
+          setBookId(fest.id)
+          if (u) {
+            setUnits([u.name])
+            setSectionsByUnit({ [u.name]: u.sections.map((s) => s.name).filter((n) => vorwahl.sections.includes(n)) })
+          }
+          return
+        }
         let saved: { bookId: string; unit: string } | null = null
         try {
           saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as { bookId: string; unit: string } | null
@@ -271,7 +286,7 @@ export function TextbookPicker({
       })
       .catch(notifyError)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefer?.language, prefer?.stateId, prefer?.schoolTypeId, prefer?.grade])
+  }, [prefer?.language, prefer?.stateId, prefer?.schoolTypeId, prefer?.grade, vorwahl?.bookId, vorwahl?.unit, vorwahl?.sections.join('|')])
 
   const book = books.find((b) => b.id === bookId)
   // Die gewählten Units in der Reihenfolge des Buches – daraus ergibt sich, welche die späteste ist

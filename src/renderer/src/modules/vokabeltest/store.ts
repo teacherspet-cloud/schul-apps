@@ -33,8 +33,18 @@ export interface TestPayload {
   herkunft?: VocabListContext | null
 }
 
+/** Vorwahl im Lehrwerk-Auswähler (29.10.2026, „Test erstellen lassen" am Termin): Band, Unit und Abschnitte des Termins */
+export interface LehrwerkVorwahl {
+  bookId: string
+  unit: string
+  sections: string[]
+}
+
 interface VokabeltestState {
   step: number
+  /** Einmalige Vorwahl für den Lehrwerk-Auswähler (Termin) – nicht gespeichert */
+  lehrwerkVorwahl: LehrwerkVorwahl | null
+  setLehrwerkVorwahl: (v: LehrwerkVorwahl | null) => void
   vocab: VocabEntry[]
   /** Name des Vokabeltests bzw. der Liste, z. B. „Green Line 5 – Unit 1, Station 1" */
   listName: string
@@ -84,6 +94,8 @@ interface VokabeltestState {
 
 export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   step: 0,
+  lehrwerkVorwahl: null,
+  setLehrwerkVorwahl: (lehrwerkVorwahl) => set({ lehrwerkVorwahl }),
   vocab: [],
   listName: '',
   nameVonHand: false,
@@ -162,6 +174,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   newTest: () =>
     set({
       step: 0,
+      lehrwerkVorwahl: null,
       vocab: [],
       listName: '',
       nameVonHand: false,

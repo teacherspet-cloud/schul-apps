@@ -33,6 +33,8 @@ interface TerminInhalt {
   gruppe: string
   termin: number | null
   abschnitte: string[]
+  /** Band, Unit und Abschnitte des Termins im Lehrwerk (29.10.2026) – Vorwahl im Lehrwerk-Auswähler */
+  lehrwerkVorwahl?: { bookId: string; unit: string; sections: string[] } | null
   woerter: { term: string; translation: string }[]
   grammatik: string[]
 }
@@ -155,6 +157,8 @@ export function TestErstellen({ k, fertig }: { k: StartKurs; stichwoerter: strin
     v.setVocab(inhalt.woerter.map((w) => ({ id: newId(), term: w.term, translation: w.translation })))
     v.setListName(titel)
     v.setListContext({ bookName: inhalt.abschnitte.join(' · ') || titel, language: inhalt.sprache })
+    // Lehrwerk, Band, Unit und Abschnitte des Termins vorwählen (29.10.2026, Befund der Lehrkraft)
+    v.setLehrwerkVorwahl(inhalt.lehrwerkVorwahl ?? null)
     return id
   }
   const los = async (): Promise<void> => {

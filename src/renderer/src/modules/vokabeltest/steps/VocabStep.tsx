@@ -50,6 +50,7 @@ const gemerkteQuelle = (): Quelle => {
  */
 export default function VocabStep(): React.JSX.Element {
   const { vocab, setVocab, listName, setListName, listContext, setListContext, setStep, settings, vokabelVerlauf, undoVocab, redoVocab } = useVokabeltest()
+  const lehrwerkVorwahl = useVokabeltest((st) => st.lehrwerkVorwahl)
   const [importing, setImporting] = useState<string | null>(null)
   const [review, setReview] = useState<{ entries: VocabEntry[]; herkunft?: () => void } | null>(null)
   /** Name von Hand geändert? Dann folgt er der Schulbuch-Auswahl nicht mehr. */
@@ -183,6 +184,7 @@ export default function VocabStep(): React.JSX.Element {
                 <TextbookPicker
                   rahmen={false}
                   prefer={lehrwerkWunsch}
+                  vorwahl={lehrwerkVorwahl}
                   nurSprache={false}
                   onSelection={(selection) => {
                     setBookSelection(selection)

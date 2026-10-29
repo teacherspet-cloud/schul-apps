@@ -15,6 +15,7 @@ import {
   type Lexikon
 } from '@shared/lehrwerkWortschatz'
 import { standardListe } from '../../shared/verben/standard'
+import { mitGrundwortschatz } from '@shared/grundwortschatz'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import { LEHRWERK_GRAMMATIK, reiheDesBands } from '../../shared/lehrwerkGrammatik'
 
@@ -63,9 +64,13 @@ async function laden(schluessel: string, sprache: string): Promise<WortschatzSta
   return {
     stelle: best.stelle,
     bekannt: mitUnregelmaessigenFormen(
-      bekannterWortschatz(
-        voll.map((b) => ({ name: b.name, grade: b.grade, units: b.units.map((u) => ({ name: u.name, sections: u.sections.map((s) => ({ name: s.name, entries: s.entries })) })) })),
-        best.stelle
+      // Grundwortschatz (29.10.2026): Alltagswörter, die die Listen nicht führen
+      mitGrundwortschatz(
+        bekannterWortschatz(
+          voll.map((b) => ({ name: b.name, grade: b.grade, units: b.units.map((u) => ({ name: u.name, sections: u.sections.map((s) => ({ name: s.name, entries: s.entries })) })) })),
+          best.stelle
+        ),
+        sprache
       ),
       sprache === 'en' ? standardListe('en') : [],
       bekannteKennungen(g, best.stelle)

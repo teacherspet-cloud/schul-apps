@@ -1628,6 +1628,27 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           gruppe: g?.name ?? '',
           termin: z.test_termin ?? null,
           abschnitte: (woerter.length ? teileVon(z) : []).filter((t) => keys.has(teilSchluessel(t))).map((t) => t.titel),
+          // Vorwahl im Lehrwerk-Auswähler der Test-Apps (29.10.2026, Befund der Lehrkraft: „Test erstellen lassen" hatte
+          // weder Lehrwerk/Band noch die Abschnitte des Termins vorausgewählt): Band und Unit mit den meisten gewählten
+          // Abschnitten, dazu deren Namen
+          lehrwerkVorwahl: (() => {
+            const tl = woerter.length ? teileVon(z) : []
+            const ein = teileEingeordnet(z, tl)
+            const q = json_(z.quelle || '{}', {} as { lehrwerk?: string })
+            const zaehl = new Map<string, { buch: string; unit: string; abschnitte: string[] }>()
+            tl.forEach((t, i) => {
+              if (!keys.has(teilSchluessel(t))) return
+              const buch = t.lehrwerk || q.lehrwerk || ''
+              const unit = ein[i]?.unit || t.unit || ''
+              if (!buch || !unit) return
+              const k2 = `${buch}|${unit}`
+              const e = zaehl.get(k2) ?? { buch, unit, abschnitte: [] }
+              for (const n of (ein[i]?.name || t.titel).split(/\s*,\s*/)) if (n && !e.abschnitte.includes(n)) e.abschnitte.push(n)
+              zaehl.set(k2, e)
+            })
+            const best = [...zaehl.values()].sort((a2, b2) => b2.abschnitte.length - a2.abschnitte.length)[0]
+            return best ? { bookId: best.buch, unit: best.unit, sections: best.abschnitte } : null
+          })(),
           woerter: woerter.filter((v) => ids.has(v.id)).map((v) => ({ term: v.term, translation: v.translation })),
           grammatik: [...new Set(gram.flatMap((id) => kursHaken.grammatikThemen?.(id) ?? []))],
           // Alle für die Lerngruppe freigeschalteten Wörter (29.10.2026, Befund der Lehrkraft: „passende" Vokabeltests aus

@@ -11,11 +11,14 @@ import { pruefeGrammatik } from '../src/shared/grammatiktrainer'
  * zweite Blindprobe. Dazu will/going to (Vorhersage) neu für Klasse 6. Jede Aufgabe muss wie beim Einspielen ohne Mangel
  * bleiben, den Selbsttest bestehen, ihre eigene Lösung als richtig werten und nur Wortschatz der Station ihrer Form nutzen.
  */
-const d = JSON.parse(readFileSync('resources/grammatik-bank/greenline5-unit1-2026-10-29.json', 'utf8')) as {
+const d0 = JSON.parse(readFileSync('resources/grammatik-bank/greenline5-unit1-2026-10-29.json', 'utf8')) as {
   regeln: Record<string, { titel: string; erklaerung: string; beispiele: string[] }>
   neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
   entfernen?: unknown[]
 }
+// Nachtrag (29.10.2026): fehlende Felder – dieselben Prüfungen
+const nachtrag = JSON.parse(readFileSync('resources/grammatik-bank/greenline5-unit1-nachtrag-2026-10-29.json', 'utf8')) as typeof d0
+const d = { ...d0, neu: [...d0.neu, ...nachtrag.neu] }
 
 describe('Green Line 5, Unit 1 (Handbetrieb)', () => {
   it('jede Aufgabe ohne Mangel, Selbsttest bestanden, eigene Lösung richtig, Wortschatz der Station', () => {

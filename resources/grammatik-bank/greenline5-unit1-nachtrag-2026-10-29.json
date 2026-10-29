@@ -1,0 +1,311 @@
+{
+ "hinweis": "Erzeugt über den App-Weg im Handbetrieb (29.10.2026, tests/handbetrieb) – alle Absicherungen der App",
+ "regeln": {
+  "en.focus.emphasis/betonung": {
+   "titel": "Verstärker: so, such, really, at all",
+   "erklaerung": "Verstärker machen eine Aussage stärker. So steht vor einem Adjektiv allein (so nice), such vor einem Nomen, oft mit a/an und Adjektiv (such a nice day). Really steht vor dem Verb oder Adjektiv, at all am Ende eines verneinten Satzes.",
+   "beispiele": [
+    "It was such a nice day that we went to the beach.",
+    "I really love this song.",
+    "Tom doesn't like football at all."
+   ]
+  },
+  "en.focus.emphasis/spaltsatz": {
+   "titel": "Spaltsätze: It was … who/that …",
+   "erklaerung": "Mit einem Spaltsatz hebst du einen Satzteil besonders hervor: Er steht nach It is/It was, der Rest folgt in einem Relativsatz. Bei Personen steht who oder that, bei Dingen which oder that; bei Orts- und Zeitangaben steht that. Der hervorgehobene Teil ist die Antwort auf eine Frage oder ein Gegensatz zu einer anderen Aussage.",
+   "beispiele": [
+    "It was my brother who broke the window.",
+    "It was the noise that kept me awake, not the heat.",
+    "It was in the garden that Leo found the keys."
+   ]
+  },
+  "en.focus.emphasis/inversion": {
+   "titel": "Inversion zur Betonung",
+   "erklaerung": "Steht ein verneinendes oder einschränkendes Wort wie never, rarely oder not only am Satzanfang, wird es besonders betont. Dann kommt das Hilfsverb vor das Subjekt – wie in einer Frage. Gibt es kein Hilfsverb, setzt du do, does oder did ein.",
+   "beispiele": [
+    "Never have I seen such a mess.",
+    "Rarely does my brother tidy his room.",
+    "Not only did Sam forget his homework, but he also lost his bag."
+   ]
+  },
+  "en.focus.inversion/never-rarely": {
+   "titel": "Never / Rarely / Seldom + Inversion",
+   "erklaerung": "Stehen never, rarely oder seldom zur Betonung am Satzanfang, kommt das Hilfsverb vor das Subjekt – wie bei einer Frage. Gibt es kein Hilfsverb, nimmst du do, does oder did und danach die Grundform. Ob have oder had passt, entscheidet die Zeit der Situation. Steht das Adverb im Satz (I have never …), bleibt die normale Wortstellung.",
+   "beispiele": [
+    "Never have I seen such a beautiful beach.",
+    "Rarely does my brother get up before ten at the weekend.",
+    "Seldom had we been so happy as on that day."
+   ]
+  },
+  "en.focus.inversion/under-no-circumstances": {
+   "titel": "Under no circumstances / On no account + Inversion",
+   "erklaerung": "Mit Under no circumstances oder On no account am Satzanfang betonst du ein strenges Verbot. Danach kommt das Modalverb (should, must, can) vor das Subjekt – wie bei einer Frage. Das Verbot steckt schon in no, deshalb steht kein zweites not im Satz. In der normalen Wortstellung sagt man dagegen: You must not … under any circumstances.",
+   "beispiele": [
+    "Under no circumstances should you open this door.",
+    "On no account must students leave the school without a teacher.",
+    "You must not touch the wires under any circumstances."
+   ]
+  },
+  "en.focus.inversion/so-such-inversion": {
+   "titel": "So … / Such … that mit Inversion",
+   "erklaerung": "Zur Betonung kann ein Satz mit So + Adjektiv oder mit Such beginnen. Danach kommt zuerst die Form von be und dann das Subjekt: So cold was the water that … Bei Such folgt be direkt: Such was the noise that … Der that-Satz sagt, was daraus folgte.",
+   "beispiele": [
+    "So loud was the music that we couldn't hear each other.",
+    "So tired were the players that they slept on the bus.",
+    "Such was the noise that the baby woke up."
+   ]
+  },
+  "en.verb.passive_ext/progressive": {
+   "titel": "Passiv in der Verlaufsform (is being done)",
+   "erklaerung": "Mit dem Passiv in der Verlaufsform sagst du, dass gerade etwas mit einer Sache gemacht wird. Du bildest es mit am/is/are + being + 3. Form des Verbs; in der Vergangenheit mit was/were + being + 3. Form. Typische Signale sind right now, at the moment oder Look!. Achtung: being, nicht been.",
+   "beispiele": [
+    "Look! The old bridge is being repaired.",
+    "The classrooms are being cleaned at the moment.",
+    "When we arrived, the hall was still being decorated."
+   ]
+  },
+  "en.reported.backshift/ohne-backshift-faelle": {
+   "titel": "Kein Backshift bei allgemeingültigen Aussagen",
+   "erklaerung": "Nach said oder told wird die Zeit in der indirekten Rede meist zurückverschoben (is → was). Ist die Aussage aber immer wahr, zum Beispiel eine Naturtatsache, darf die Zeit bleiben – beide Formen sind dann richtig. Ist das Gesagte dagegen vorbei, brauchst du die zurückverschobene Form.",
+   "beispiele": [
+    "She said that the earth is round.",
+    "She said that the earth was round.",
+    "Yesterday Tom said that he was hungry."
+   ]
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "en.focus.emphasis/betonung",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Vor welche Wörter gehört so, vor welche such? Sortiere.",
+    "satz": "",
+    "loesungen": [
+     "so: nice, funny, carefully, expensive | such: a nice teacher, funny people, an old house, expensive shoes"
+    ],
+    "erklaerung": "so vor einem Adjektiv oder Adverb allein, such vor einem Nomen (mit Adjektiv).",
+    "uebung": "erkennen",
+    "gruppen": [
+     "so",
+     "such"
+    ],
+    "elemente": [
+     {
+      "text": "nice",
+      "gruppe": 0
+     },
+     {
+      "text": "a nice teacher",
+      "gruppe": 1
+     },
+     {
+      "text": "funny",
+      "gruppe": 0
+     },
+     {
+      "text": "funny people",
+      "gruppe": 1
+     },
+     {
+      "text": "carefully",
+      "gruppe": 0
+     },
+     {
+      "text": "an old house",
+      "gruppe": 1
+     },
+     {
+      "text": "expensive",
+      "gruppe": 0
+     },
+     {
+      "text": "expensive shoes",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.focus.emphasis/betonung",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle Sätze, die richtig sind.",
+    "satz": "",
+    "loesungen": [
+     "I like this new computer game very much.",
+     "I really like this new computer game.",
+     "My sister doesn't like this new computer game at all."
+    ],
+    "erklaerung": "very allein kann ein Verb nicht verstärken: richtig sind very much am Ende, really vor dem Verb oder at all im verneinten Satz.",
+    "uebung": "erkennen",
+    "optionen": [
+     "I like this new computer game very much.",
+     "I really like this new computer game.",
+     "I like this new computer game very.",
+     "I very like this new computer game.",
+     "My sister doesn't like this new computer game at all."
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.focus.emphasis/betonung",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere im Text alle Wörter, die etwas verstärken (Verstärker).",
+    "satz": "Last weekend our class went on a trip to the coast. The weather was so bad that we spent most of the day in a museum, but it was such an interesting place that nobody complained. I really didn't expect to enjoy it.",
+    "loesungen": [
+     "so | such | really"
+    ],
+    "erklaerung": "so verstärkt das Adjektiv bad, such die Wendung an interesting place, really das Verb – most ist hier kein Verstärker.",
+    "uebung": "erkennen",
+    "ziele": [
+     14,
+     29,
+     37
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.focus.emphasis/spaltsatz",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle das Wort, das in die Lücke passt.",
+    "satz": "Everybody thought the heat was the problem, but it was actually the noise from the building next door ___ kept the whole family awake.",
+    "loesungen": [
+     "which"
+    ],
+    "optionen": [
+     "who",
+     "which",
+     "what",
+     "whose"
+    ],
+    "erklaerung": "Hervorgehoben wird eine Sache (the noise) – im Spaltsatz steht dann which (oder that), nicht who.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.focus.emphasis/inversion",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde einen betonten Satz mit Inversion. Beginne mit dem großgeschriebenen Wort.",
+    "satz": "",
+    "loesungen": [
+     "Rarely does my brother tidy his room at the weekend."
+    ],
+    "teile": [
+     "Rarely",
+     "does",
+     "my brother",
+     "tidy",
+     "his room at the weekend."
+    ],
+    "erklaerung": "Nach Rarely am Satzanfang steht das Hilfsverb does vor dem Subjekt my brother.",
+    "uebung": "bilden",
+    "kontext": "Emma's brother is fifteen, but his room always looks terrible.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.focus.inversion/never-rarely",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation. Wähle den richtigen Satz.",
+    "satz": "___",
+    "loesungen": [
+     "Never had she heard such a great band live."
+    ],
+    "optionen": [
+     "Never had she heard such a great band live.",
+     "Never she had heard such a great band live.",
+     "Never has she heard such a great band live.",
+     "Never had heard she such a great band live."
+    ],
+    "erklaerung": "Nach Never am Satzanfang steht das Hilfsverb vor dem Subjekt; die Situation liegt vor jenem Abend in der Vergangenheit, also had.",
+    "uebung": "unterscheiden",
+    "kontext": "Last summer, Mia went to her first big concert in London. Before that night, she only knew the band from the radio.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.focus.inversion/under-no-circumstances",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation. Wähle den richtigen Satz.",
+    "satz": "___",
+    "loesungen": [
+     "Under no circumstances should children swim without an adult."
+    ],
+    "optionen": [
+     "Under no circumstances should children swim without an adult.",
+     "Under no circumstances children should swim without an adult.",
+     "Under no circumstances shouldn't children swim without an adult.",
+     "Under any circumstances should children swim without an adult."
+    ],
+    "erklaerung": "Nach Under no circumstances steht das Modalverb vor dem Subjekt; ein zweites not ist falsch, und any statt no hebt das Verbot auf.",
+    "uebung": "unterscheiden",
+    "kontext": "The swimming pool has got new rules for the summer. One rule is very strict.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.focus.inversion/so-such-inversion",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle den richtigen Satz.",
+    "satz": "___",
+    "loesungen": [
+     "So cold was the water that nobody wanted to swim."
+    ],
+    "optionen": [
+     "So cold was the water that nobody wanted to swim.",
+     "So cold the water was that nobody wanted to swim.",
+     "Such cold was the water that nobody wanted to swim."
+    ],
+    "erklaerung": "Nach So + Adjektiv am Satzanfang steht was vor dem Subjekt the water; Such passt nicht vor ein Adjektiv allein.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_ext/progressive",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im Passiv (Verlaufsform) ein.",
+    "satz": "Sorry, you can't use the computer room at the moment because new software ___ on all the computers.",
+    "vorgabe": "(install)",
+    "loesungen": [
+     "is being installed"
+    ],
+    "erklaerung": "at the moment → Verlaufsform; software ist unzählbar und steht im Singular: is being installed.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.reported.backshift/ohne-backshift-faelle",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation. Wähle die passende Form.",
+    "satz": "Emma said that she ___ terrible.",
+    "loesungen": [
+     "felt"
+    ],
+    "optionen": [
+     "felt",
+     "feels",
+     "has felt"
+    ],
+    "erklaerung": "Emma geht es heute wieder gut – die Aussage gilt nicht mehr, also Backshift: feel → felt.",
+    "uebung": "unterscheiden",
+    "kontext": "Yesterday Emma was ill and stayed at home. In the evening she phoned me and said: “I feel terrible.” Today she is back at school and feels fine again.",
+    "niveau": "m"
+   }
+  }
+ ]
+}

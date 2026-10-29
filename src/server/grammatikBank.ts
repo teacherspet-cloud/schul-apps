@@ -13,6 +13,7 @@
  */
 import { bekannterWortschatz, formWoerter, fruehesteEinfuehrung, unbekannteWoerter, type Einfuehrung, type GrammatikBand, type WortschatzBand, lexikonAus, type Lexikon, bekannteKennungen, mitUnregelmaessigenFormen } from '../shared/lehrwerkWortschatz'
 import { standardListe } from '../renderer/src/shared/verben/standard'
+import { mitGrundwortschatz } from '../shared/grundwortschatz'
 import { LEHRWERK_GRAMMATIK, reiheDesBands } from '../renderer/src/shared/lehrwerkGrammatik'
 import { NEUE_REGELN, REGEL_PLATZHALTER_WARTUNG, istRegelPlatzhalter } from './grammatikRegelPlatzhalter'
 import { randomBytes } from 'node:crypto'
@@ -383,7 +384,8 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // Zurückgestellte kommen zurück, neu Betroffene werden zurückgestellt
 // Vierter Lauf (29.10.2026, Green Line 5 Unit 1 und will/going to ab Green Line 2 Unit 4): auch diese Stellen
 // Fünfter Lauf: -ly/Steigerung, Formwörter (-self, probably), Fehlformen, Kurzform-Endungen, deutsche Wortformen
-const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-5-2026-10-29'
+// Sechster Lauf: Grundwortschatz (Alltagswörter) gilt als bekannt
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-6-2026-10-29'
 /** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
 const WORTSCHATZ_STELLEN: [string, string][] = [
   ['Green Line 1', 'Unit 1'],
@@ -430,7 +432,8 @@ function wortschatzStandNeu(schluessel: string, sprache: string): WortschatzStan
     ? {
         stelle: best.stelle,
         bekannt: mitUnregelmaessigenFormen(
-          bekannterWortschatz(best.baende, best.stelle),
+          // Grundwortschatz (29.10.2026): Alltagswörter, die die Listen nicht führen
+          mitGrundwortschatz(bekannterWortschatz(best.baende, best.stelle), sprache),
           sprache === 'en' ? standardListe('en') : [],
           bekannteKennungen(
             best.baende.map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand })),
@@ -530,7 +533,9 @@ const EINSPIELEN: [string, string][] = [
   // Green Line 5 Unit 1 und will/going to (Vorhersage, Klasse 6) – Handbetrieb mit Prüfung, Blindprobe, Überarbeitung,
   // zweiter Blindprobe und Schlussdurchsicht (29.10.2026)
   // „-2": der erste Lauf übersprang neue Formen (Regelkarten wurden nicht angelegt) – vorhandene Aufgaben zählen nicht doppelt
-  ['grammatik-bank-greenline5-unit1-2-2026-10-29', 'greenline5-unit1-2026-10-29.json']
+  ['grammatik-bank-greenline5-unit1-2-2026-10-29', 'greenline5-unit1-2026-10-29.json'],
+  // Nachtrag (29.10.2026, Auftrag der Lehrkraft): Felder, denen nach der Schlussdurchsicht eine Aufgabe fehlte
+  ['grammatik-bank-greenline5-unit1-nachtrag-2026-10-29', 'greenline5-unit1-nachtrag-2026-10-29.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
