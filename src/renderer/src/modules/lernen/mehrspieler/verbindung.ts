@@ -62,7 +62,9 @@ export function useSpielSicht(code: string): {
   })
   const sendenFn = useCallback(
     async (pfad: string, k: Record<string, unknown> = {}): Promise<void> => {
-      await liveSenden<SpielSicht>(`/s/api/spiel/${pfad}`, { lobby: code, ...k }, setSicht, setFehler)
+      // Kurze Zeitgrenze (29.10.2026): ein Zug wartet nicht die 3 Minuten einer Blatt-Abgabe – hängt die Leitung, kommt
+      // nach 15 s ein Hinweis, und die Sicht holt der Strom bzw. die Abfrage
+      await liveSenden<SpielSicht>(`/s/api/spiel/${pfad}`, { lobby: code, ...k }, setSicht, setFehler, 15000)
     },
     [code, setSicht, setFehler]
   )

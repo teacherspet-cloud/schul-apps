@@ -22,6 +22,15 @@ export function zerlege(puffer: string): { daten: string[]; rest: string } {
   return { daten, rest }
 }
 
+/**
+ * Wächter (29.10.2026, Befund der Lehrkraft: „der Bildschirm hängt sich auf, Lernende können nichts mehr anklicken"):
+ * Ein Strom, der still abreißt (iPad im Ruhezustand, WLAN-Wechsel), meldet kein Ende – `read()` wartete dann ewig, der
+ * Abfrage-Rückfall schwieg (Strom gilt als offen), und die Sicht blieb auf „warte auf die anderen" mit gesperrten
+ * Knöpfen stehen. Der Server schickt mindestens alle 5 s etwas (Puls, im Spiel jede Sekunde die Sicht) – kommt so lange
+ * nichts, ist der Strom tot und wird neu aufgebaut.
+ */
+export const STILLE_MS = 15000
+
 export interface LiveSicht<T> {
   sicht: T | null
   fehler: string
@@ -55,6 +64,8 @@ export function useLiveSicht<T>(o: {
     if (!aktiv) return
     let aus = false
     const steuerung = new AbortController()
+    // Je Verbindungsversuch eigener Abbruch: Wächter und Rückkehr zur Seite beenden nur den Versuch, nicht alles
+    let versuch: AbortController | null = null
     let abfrage: ReturnType<typeof setInterval> | undefined
     const abfragen = (): void => {
       if (abfrage) return
@@ -69,8 +80,18 @@ export function useLiveSicht<T>(o: {
     const verbinden = async (): Promise<void> => {
       let warte = 1000
       while (!aus) {
+        const dieser = new AbortController()
+        versuch = dieser
+        const weg = (): void => dieser.abort()
+        steuerung.signal.addEventListener('abort', weg)
+        let waechter: ReturnType<typeof setTimeout> | undefined
+        const wach = (): void => {
+          clearTimeout(waechter)
+          waechter = setTimeout(() => dieser.abort(), STILLE_MS)
+        }
         try {
-          const res = await fetch(stromPfad, { headers: { 'x-schulapps-token': 'server' }, cache: 'no-store', signal: steuerung.signal })
+          wach()
+          const res = await fetch(stromPfad, { headers: { 'x-schulapps-token': 'server' }, cache: 'no-store', signal: dieser.signal })
           if (res.status === 404 || res.status === 403 || res.status === 401) {
             const d = (await res.json().catch(() => ({}))) as { fehler?: string }
             setFehler(d.fehler ?? 'Das gibt es nicht (mehr).')
@@ -86,6 +107,7 @@ export function useLiveSicht<T>(o: {
           for (;;) {
             const { done, value } = await leser.read()
             if (done) break
+            wach()
             puffer += dec.decode(value, { stream: true })
             const { daten, rest } = zerlege(puffer)
             puffer = rest
@@ -99,16 +121,39 @@ export function useLiveSicht<T>(o: {
             }
           }
         } catch {
-          /* abgerissen – unten neu verbinden, inzwischen abfragen */
+          /* abgerissen oder still (Wächter) – unten neu verbinden, inzwischen abfragen */
+        } finally {
+          clearTimeout(waechter)
+          steuerung.signal.removeEventListener('abort', weg)
+          if (versuch === dieser) versuch = null
         }
         strom.current = false
         setVerbunden(false)
         if (aus) break
         abfragen()
-        await new Promise((r) => setTimeout(r, warte))
+        await new Promise<void>((r) => {
+          const t = setTimeout(r, warte)
+          sofort = () => (clearTimeout(t), r())
+        })
+        sofort = null
         warte = Math.min(8000, warte * 2)
       }
     }
+    // Zurück auf der Seite (iPad aufgeweckt, Tab wieder vorn, Netz wieder da): gleich frisch holen und neu verbinden –
+    // nicht erst nach Wächter oder Wartezeit
+    let sofort: (() => void) | null = null
+    const zurueck = (): void => {
+      if (aus || document.visibilityState === 'hidden') return
+      void holen<{ sicht: T }>(zustand).then(
+        (r) => !aus && (setSicht(r.sicht), setFehler('')),
+        () => undefined
+      )
+      versuch?.abort()
+      sofort?.()
+    }
+    document.addEventListener('visibilitychange', zurueck)
+    window.addEventListener('online', zurueck)
+    window.addEventListener('pageshow', zurueck)
     const start = (): void => {
       if (aus) return
       void verbinden()
@@ -126,6 +171,9 @@ export function useLiveSicht<T>(o: {
     else start()
     return () => {
       aus = true
+      document.removeEventListener('visibilitychange', zurueck)
+      window.removeEventListener('online', zurueck)
+      window.removeEventListener('pageshow', zurueck)
       steuerung.abort()
       if (abfrage) clearInterval(abfrage)
     }
@@ -141,10 +189,11 @@ export async function liveSenden<T>(
   pfad: string,
   koerper: Record<string, unknown>,
   uebernehmen: (s: T) => void,
-  fehler: (f: string) => void
+  fehler: (f: string) => void,
+  zeitgrenze?: number
 ): Promise<boolean> {
   try {
-    const r = await senden<{ sicht?: T }>(pfad, koerper)
+    const r = await senden<{ sicht?: T }>(pfad, koerper, zeitgrenze)
     if (r.sicht) uebernehmen(r.sicht)
     fehler('')
     return true

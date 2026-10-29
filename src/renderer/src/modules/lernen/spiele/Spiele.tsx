@@ -41,6 +41,7 @@ import { FokusRahmen } from '../fokus/FokusRahmen'
 import { hatSatzAufnahme } from '../medienCache'
 import { fuerServer, ton, useDarstellung } from '../../onlinetest/schuelerDarstellung'
 import ZusammenSpielen, { EinladungsCode } from '../mehrspieler/ZusammenSpielen'
+import { SPIEL_OHNE_MARKIEREN } from '../mehrspieler/Bloecke'
 
 /** Spiele mit ablaufender Uhr oder Bestzeit – aus, wenn „Spiele mit Zeitdruck“ abgeschaltet ist (06.10.2026) */
 export const MIT_ZEITDRUCK: readonly SpielId[] = ['zuordnen', 'blitz', 'fallend', 'duell', 'richtiggehoert', 'aufdecken', 'formenblitz']
@@ -106,7 +107,7 @@ const FARBE: Record<SpielId, string> = {
   muster: 'cyan'
 }
 
-export const SPIELE_CSS = `
+export const SPIELE_CSS = `${SPIEL_OHNE_MARKIEREN}
 .vt-memory { aspect-ratio: 4 / 3; border: 0; padding: 0; background: none; perspective: 700px; cursor: pointer; }
 .vt-memory-innen { position: relative; display: block; width: 100%; height: 100%; transition: transform .4s; transform-style: preserve-3d; }
 .vt-memory.auf .vt-memory-innen { transform: rotateY(180deg); }

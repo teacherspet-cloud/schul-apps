@@ -119,6 +119,10 @@ function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Sen
 function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden: Senden }): React.JSX.Element {
   const t = useT()
   const [wahl, setWahl] = useState<string[]>([])
+  // Neue Kacheln (nächste Runde, 29.10.2026): alte Auswahl verwerfen – sonst blieb das Limit mit Kacheln der vorigen
+  // Runde belegt, nichts ließ sich mehr wählen, und „Abschicken" schickte Kennungen, die es nicht mehr gibt
+  const schluessel = b.kacheln.map((k) => k.id).join()
+  useEffect(() => setWahl([]), [schluessel])
   const mehr = Boolean(b.mehrfach && b.senden)
   const klick = (k: Kachel): void => {
     if (mehr) return setWahl((w) => (w.includes(k.id) ? w.filter((x) => x !== k.id) : w.length < b.mehrfach! ? [...w, k.id] : w))
@@ -150,7 +154,7 @@ function Kacheln({ b, senden }: { b: Extract<Block, { typ: 'kacheln' }>; senden:
                 color: k.status === 'markiert' || k.status === 'treffer' ? 'white' : undefined
               }}
             >
-              {k.bild && <Image src={k.bild} alt={k.text ? '' : 'Bildkarte'} aria-hidden={k.text ? true : undefined} w={64} h={64} fit="contain" />}
+              {k.bild && <Image src={k.bild} alt={k.text ? '' : 'Bildkarte'} aria-hidden={k.text ? true : undefined} w={64} h={64} fit="contain" draggable={false} />}
               {k.text && (
                 <Text fw={600} size={b.spalten && b.spalten > 5 ? 'xs' : 'sm'}>
                   {k.text}
@@ -278,6 +282,18 @@ function Eingaben({ b, senden }: { b: Extract<Block, { typ: 'eingaben' }>; sende
     </Stack>
   )
 }
+
+/**
+ * Nichts markieren im Spiel (29.10.2026, Befund der Lehrkraft: Lernende tippen nebenbei herum, Texte werden markiert,
+ * danach reagiert der Bildschirm nicht mehr): Am iPad schluckt eine Markierung samt Menü den nächsten Tipp, am PC startet
+ * ein Ziehen über Text eine Markierung statt eines Klicks, Bilder lassen sich wegziehen. Eingabefelder bleiben normal.
+ */
+export const SPIEL_OHNE_MARKIEREN = `
+[data-mehr-seite], [data-spiel], [data-verbspiel] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+:is([data-mehr-seite], [data-spiel], [data-verbspiel]) img { -webkit-user-drag: none; }
+:is([data-mehr-seite], [data-spiel], [data-verbspiel]) :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+`
 
 export function Bloecke({
   bloecke,

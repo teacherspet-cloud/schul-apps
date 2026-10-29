@@ -173,6 +173,9 @@ try {
   pruefe(await da(mia.locator('[data-mehr-frage]')), 'Spiel startet bei allen')
   pruefe(await da(ben.locator('[data-mehr-frage]')), 'Ben sieht dieselbe Frage')
   await mia.screenshot({ path: join(out, '2-teammatch.png') })
+  // Nichts markieren im Spiel (29.10.2026): Texte nicht markierbar, Eingabefelder schon
+  const markierbar = await mia.locator('[data-mehr-frage-text]').evaluate((e) => getComputedStyle(e).userSelect)
+  pruefe(markierbar === 'none', `Spieltext nicht markierbar (user-select: ${markierbar})`)
   let einmalig = true
   for (let i = 0; i < 20 && !(await mia.locator('[data-mehr-ergebnis]').isVisible()); i++) {
     const frage = (await mia.locator('[data-mehr-frage-text]').innerText().catch(() => '')).trim()
@@ -199,6 +202,42 @@ try {
   await mia.waitForTimeout(6500)
   pruefe((await mia.locator('[data-mehr-spieler="Ben T."] [data-mehr-getrennt]').count()) === 1, 'Verbindungsabbruch wird angezeigt (Platz bleibt)')
   await api(Mia).post('/s/api/spiel/verlassen', { lobby: code })
+
+  // ---------- Stiller Strom (29.10.2026, „Bildschirm hängt sich auf"): Der Strom bleibt offen, schickt aber nichts mehr
+  // (iPad im Ruhezustand, WLAN-Wechsel). Ohne Wächter blieb die Seite in der Lobby stehen, obwohl das Spiel lief.
+  const still = await Ben.newPage()
+  await still.addInitScript(() => {
+    const echt = window.fetch.bind(window)
+    window.fetch = (adresse, init) => {
+      if (!String(adresse).includes('/s/api/spiel/strom')) return echt(adresse, init)
+      window.__stilleStroeme = (window.__stilleStroeme ?? 0) + 1
+      const body = new ReadableStream({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(': verbunden' + String.fromCharCode(10, 10)))
+          init?.signal?.addEventListener('abort', () => c.error(new DOMException('abgebrochen', 'AbortError')))
+        }
+      })
+      return Promise.resolve(new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }))
+    }
+  })
+  const s2 = await api(Mia).post('/s/api/spiel/neu', { bereich: 'vok', kurs: vok.id, spiel: 'teammatch' })
+  await still.goto(`${A}/s/sp/${s2.code}`)
+  // Die erste Sicht kommt nur über den Strom – ohne Wächter drehte sich hier der Ladekreis für immer
+  pruefe(await da(still.locator('[data-mehr-lobby]'), 30000), 'Stiller Strom: Lobby erscheint (Wächter, Abfrage)')
+  // Der stille Strom erreicht den Server nie – Ben meldet sich für den Start einmal per Abfrage
+  await api(Ben).get(`/s/api/spiel/zustand?lobby=${s2.code}`)
+  await api(Mia).get(`/s/api/spiel/zustand?lobby=${s2.code}`)
+  const st2 = await api(Mia).post('/s/api/spiel/start', { lobby: s2.code })
+  pruefe(st2.status === 200, `Stiller Strom: Spiel gestartet (${st2.status} ${st2.fehler ?? ''})`)
+  // Mia hält die Runde am Leben (Abfrage statt Strom)
+  const halten = setInterval(() => void api(Mia).get(`/s/api/spiel/zustand?lobby=${s2.code}`).catch(() => undefined), 1500)
+  const angekommen = await still.locator('[data-mehr-frage]').waitFor({ timeout: 30000 }).then(() => true, () => false)
+  clearInterval(halten)
+  const versuche = await still.evaluate(() => window.__stilleStroeme ?? 0)
+  pruefe(angekommen && versuche >= 2, `Stiller Strom: Wächter baut neu auf, das Spiel kommt an (${versuche} Verbindungen)`)
+  await still.close()
+  await api(Ben).post('/s/api/spiel/verlassen', { lobby: s2.code })
+  await api(Mia).post('/s/api/spiel/verlassen', { lobby: s2.code })
 
   // ---------- Tauziehen über die Schnittstelle (Versus): niemand sieht die Lösung vorab
   const sicht = async (c, lobby) => (await api(c).get(`/s/api/spiel/zustand?lobby=${lobby}`)).sicht

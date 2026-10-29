@@ -7,7 +7,7 @@ import { bildAdresse } from '@shared/auszeichnungenBilder'
 import { mitTitel } from '@shared/auszeichnungen'
 import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconCrown, IconDoorExit, IconPlayerPlay, IconTrophy, IconUsers, IconWifiOff, IconX } from '@tabler/icons-react'
-import { Bloecke } from './Bloecke'
+import { Bloecke, SPIEL_OHNE_MARKIEREN } from './Bloecke'
 import { FokusRahmen } from '../fokus/FokusRahmen'
 import { useSpielSicht, type SpielSicht } from './verbindung'
 import { ton } from '../../onlinetest/schuelerDarstellung'
@@ -242,6 +242,7 @@ export default function MehrspielerSeite({ code }: { code: string }): React.JSX.
     // Vollbild beim Lernen (09.10.2026): nur das laufende Spiel (Warteraum und Ergebnis normal); Esc verlässt nur das Vollbild
     <FokusRahmen name="mehrspieler" aktiv={s.phase === 'spiel'} onEnde={() => void senden('verlassen').then(() => window.history.back())} escNurAnsicht>
     <Stack data-mehr-seite={s.phase} data-mehr-spiel={s.spiel}>
+      <style>{SPIEL_OHNE_MARKIEREN}</style>
       <Group justify="space-between" wrap="nowrap">
         <div style={{ minWidth: 0 }}>
           <Title order={3}>{s.spielName}</Title>
