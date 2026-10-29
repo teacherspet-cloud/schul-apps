@@ -38,3 +38,40 @@ describe('Deutsches und Verbformen (Handbetrieb 29.10.2026)', () => {
     expect(unbekannteWoerter(auf({ satz: 'The phone is ringing. Mum is singing, making …, running, played, liked.' }), bekannt)).toEqual([])
   })
 })
+
+describe('Klasse der frühesten Einführung (Befund der Lehrkraft 29.10.2026)', () => {
+  it('Past Progressive gehört nicht zu Green Line 1', () => {
+    const ws = wortschatzStandServer('en.verb.past_progressive/gleichzeitig', 'en')!
+    expect(ws.stelle.buch).toBe('Green Line 2')
+    expect(ws.jahrgang).toBe(6)
+    expect(wortschatzStandServer('en.prep.basic/ort', 'en')!.jahrgang).toBe(5)
+  })
+})
+
+describe('Deutsche Wörter über die Übersetzungen der Reihe (Nachtrag 29.10.2026)', () => {
+  it('gebeugte deutsche Wörter zählen nicht, englische weiter', () => {
+    const ws = wortschatzStandServer('en.verb.will_vs_goingto/vorhersage-signal', 'en')!
+    const a = {
+      id: 'x',
+      art: 'zuordnen',
+      anweisung: '',
+      satz: '',
+      loesungen: [],
+      paare: [
+        { links: 'Plan (vorher gefasster Entschluss)', rechts: "I'm going to visit my aunt." },
+        { links: 'sichtbares Anzeichen', rechts: "Look! It's going to rain." },
+        { links: 'Meinung', rechts: 'I think the critics will love it.' }
+      ]
+    } as never
+    expect(unbekannteWoerter(a, ws.bekannt, [], ws.lexikon)).toEqual(['critics'])
+  })
+})
+
+describe('Unregelmäßige Formen erst ab der Einführung der Zeitform', () => {
+  it('Klasse 11: told/came bekannt; Green Line 1 Unit 1: went unbekannt', () => {
+    const spaet = wortschatzStandServer('en.verb.will_vs_goingto/vorhersage-signal', 'en')!
+    expect(spaet.bekannt.has('told') && spaet.bekannt.has('came')).toBe(true)
+    const frueh = wortschatzStandServer('en.verb.there_is/fragen', 'en')!
+    expect(frueh.bekannt.has('went')).toBe(false)
+  })
+})

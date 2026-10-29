@@ -3,7 +3,18 @@
  * früheste Einführung der Form in einem Lehrwerk mit Wortschatz (Reihe, Band, Unit, Abschnitt) und was dort bekannt ist.
  * Die Bände kommen über window.api.textbooks (PC, Server und Handbetrieb gleich).
  */
-import { bekannteGrammatik, bekannterWortschatz, fruehesteEinfuehrung, type Einfuehrung, type GrammatikBand } from '@shared/lehrwerkWortschatz'
+import {
+  bekannteGrammatik,
+  bekannteKennungen,
+  bekannterWortschatz,
+  fruehesteEinfuehrung,
+  lexikonAus,
+  mitUnregelmaessigenFormen,
+  type Einfuehrung,
+  type GrammatikBand,
+  type Lexikon
+} from '@shared/lehrwerkWortschatz'
+import { standardListe } from '../../shared/verben/standard'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import { LEHRWERK_GRAMMATIK, reiheDesBands } from '../../shared/lehrwerkGrammatik'
 
@@ -13,6 +24,8 @@ export interface WortschatzStand {
   grammatik: string[]
   /** Jahrgang des Bands der Einführung (Satzbau-Regel für die ersten Lernjahre) */
   jahrgang?: number
+  /** Deutsch und Englisch der ganzen Reihe – deutsche Wörter in Aufgaben zählen nicht als unbekannt */
+  lexikon?: Lexikon
 }
 
 const cache = new Map<string, Promise<WortschatzStand | null>>()
@@ -44,15 +57,21 @@ async function laden(schluessel: string, sprache: string): Promise<WortschatzSta
   }
   if (!best) return null
   const bis = best.baende.findIndex((b) => b.name === best!.stelle.buch)
-  const voll = await Promise.all(best.baende.slice(0, bis + 1).map((b) => api.get(b.id)))
+  const alle = await Promise.all(best.baende.map((b) => api.get(b.id)))
+  const voll = alle.slice(0, bis + 1)
   const g = best.baende.slice(0, bis + 1).map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand }))
   return {
     stelle: best.stelle,
-    bekannt: bekannterWortschatz(
-      voll.map((b) => ({ name: b.name, grade: b.grade, units: b.units.map((u) => ({ name: u.name, sections: u.sections.map((s) => ({ name: s.name, entries: s.entries })) })) })),
-      best.stelle
+    bekannt: mitUnregelmaessigenFormen(
+      bekannterWortschatz(
+        voll.map((b) => ({ name: b.name, grade: b.grade, units: b.units.map((u) => ({ name: u.name, sections: u.sections.map((s) => ({ name: s.name, entries: s.entries })) })) })),
+        best.stelle
+      ),
+      sprache === 'en' ? standardListe('en') : [],
+      bekannteKennungen(g, best.stelle)
     ),
     grammatik: bekannteGrammatik(g, best.stelle),
+    lexikon: lexikonAus(alle.map((b) => ({ name: b.name, grade: b.grade, units: b.units.map((u) => ({ name: u.name, sections: u.sections.map((s) => ({ name: s.name, entries: s.entries })) })) }))),
     ...(best.grade < 99 ? { jahrgang: best.grade } : {})
   }
 }

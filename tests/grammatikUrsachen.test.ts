@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { aufgabeMangel, aufgabeNormalisiert, fehlerWortMehrfach, moeglichkeitenVerraten, vorgabeZusammengesetzt } from '../src/shared/grammatikAufgabenRegeln'
 import { blindMehrdeutig, gruppeZurAntwort } from '../src/shared/grammatikBlindprobe'
-import { kurzformTolerant, ohneKurzformen, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
+import { kurzformTolerant, ohneKurzformen, paketBereinigt, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
 
 const auf = (x: Partial<GrammatikAufgabe>): GrammatikAufgabe => ({ id: 'x', art: 'luecke', anweisung: 'Setze ein.', satz: '', loesungen: [], ...x }) as GrammatikAufgabe
 
@@ -156,5 +156,16 @@ describe('Lückentext: Nummern vor den Lücken', () => {
   it('fallen weg – die App nummeriert selbst', () => {
     const a = auf({ art: 'lueckentext', satz: 'There (1) ___ a cat. There (2) ___ two dogs.', luecken: [{ vorgabe: '(be)', loesungen: ['is'] }, { vorgabe: '(be)', loesungen: ['are'] }] })
     expect(aufgabeNormalisiert(a).satz).toBe('There ___ a cat. There ___ two dogs.')
+  })
+})
+
+describe('Nie stumm kürzen', () => {
+  it('lange Sortier-Elemente bleiben ganz; zu lange lassen die Aufgabe wegfallen', () => {
+    const lang = 'Du siehst schwarze Wolken am Himmel und hörst schon den Donner – es regnet aber noch nicht.'
+    const sort = (t: string) => ({ id: 's', art: 'sortieren', regelId: 'r', anweisung: 'Sortiere.', satz: '', loesungen: [], gruppen: ['will', 'going to'], elemente: [{ text: t, gruppe: 1 }, { text: 'Ich glaube, er kommt.', gruppe: 0 }, { text: 'Sicher gewinnt sie.', gruppe: 0 }, { text: 'Der Bus ist schon weg.', gruppe: 1 }] })
+    const p = paketBereinigt({ thema: 'x', regeln: [{ id: 'r', titel: 'R', erklaerung: 'E', beispiele: [] }], aufgaben: [sort(lang)] } as never, 'x')
+    expect(p.aufgaben[0].elemente![0].text).toBe(lang)
+    const q = paketBereinigt({ thema: 'x', regeln: [{ id: 'r', titel: 'R', erklaerung: 'E', beispiele: [] }], aufgaben: [sort(lang.repeat(3))] } as never, 'x')
+    expect(q.aufgaben).toHaveLength(0)
   })
 })

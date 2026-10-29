@@ -102,7 +102,7 @@ export function wortschatzRegel(ws: WortschatzStand, formWorte: readonly string[
     `Bekannte Grammatik bis hier: ${ws.grammatik.join('; ')}. Verwende KEINE anderen Formen und Strukturen – z. B. kein has/have als Vollverb, kein does/did, keine Vergangenheit, kein will, kein -ing, wenn es oben nicht steht. Jedes englische Wort in Sätzen, Möglichkeiten, Lösungen und Kontexten muss aus der Liste stammen; Anweisungen und Erklärungen sind deutsch.`,
     // Wortstellung in den ersten Lernjahren (29.10.2026, Hinweis der Lehrkraft zu „Ella has an hour for lunch.")
     ws.jahrgang !== undefined && ws.jahrgang <= 6
-      ? 'SATZBAU (Anfangsunterricht): kurze Hauptsätze in der gelernten Reihenfolge Subjekt – Verb – Objekt – Ort – Zeit; Orts- und Zeitangaben am Satzende, nie mitten im Satz; keine Einschübe, keine Nebensätze, keine vorangestellten Satzteile (außer Fragen und Imperativ).'
+      ? 'SATZBAU (Anfangsunterricht): kurze Hauptsätze in der gelernten Reihenfolge Subjekt – Verb – Objekt – Ort – Zeit; Orts- und Zeitangaben am Satzende, nie mitten im Satz; keine Einschübe, keine Nebensätze, keine vorangestellten Satzteile (außer Fragen und Imperativ) – es sei denn, die geübte Form verlangt den Nebensatz (z. B. while-/when-Satz beim Past Progressive); dann nur dieser eine, kurz.'
       : ''
   ]
     .filter(Boolean)
@@ -119,8 +119,13 @@ export async function erzeugeBankAufgaben(
   melde: (t: string) => void = () => undefined
 ): Promise<{ regel: BankRegel; aufgaben: BankAufgabe[]; bericht: BankBericht }> {
   // Platzhalter-Regelkarte („x", 29.10.2026) gilt als nicht vorhanden – die KI schreibt eine neue
-  const a: BankAuftrag = a0.regel && istRegelPlatzhalter(a0.regel) ? { ...a0, regel: undefined } : a0
-  const latein = istLatein(a)
+  const a1: BankAuftrag = a0.regel && istRegelPlatzhalter(a0.regel) ? { ...a0, regel: undefined } : a0
+  const latein = istLatein(a1)
+  // Wortschatz- und Grammatikstand der frühesten Einführung (29.10.2026, Auftrag der Lehrkraft: nur Bekanntes verwenden)
+  const ws = latein ? null : await wortschatzStand(a1.schluessel, a1.sprache)
+  // Klasse und Lehrwerksstelle ebenfalls der frühesten Einführung (29.10.2026, Befund der Lehrkraft: Past Progressive lief mit
+  // „Klasse 5" – die Bank gilt für alle Lehrwerke, Niveau und Wortschatz müssen zur selben Stelle passen)
+  const a: BankAuftrag = ws?.jahrgang ? { ...a1, jahrgang: ws.jahrgang, lehrwerk: { buch: ws.stelle.buch, unit: ws.stelle.unit } } : a1
   const ger = await niveauDesAuftrags(a)
   const sprache = sperrSprache(a.sprache, a.fach)
   const bekannt = bekanntNachStand(a.lehrwerk?.buch ? a.lehrwerk : undefined, a.jahrgang)
@@ -132,8 +137,6 @@ export async function erzeugeBankAufgaben(
   const regelId = regelIdVon(a.schluessel)
   // Übungsdesign der Form aus der Recherche (nur Englisch, nur bei einer einzelnen Form)
   const design = latein || a.formen?.length ? null : await designFuer(a.schluessel).catch(() => null)
-  // Wortschatz- und Grammatikstand der frühesten Einführung (29.10.2026, Auftrag der Lehrkraft: nur Bekanntes verwenden)
-  const ws = latein ? null : await wortschatzStand(a.schluessel, a.sprache)
   melde(`Die KI schreibt ${uebungen.reduce((n, u) => n + zahlVon(u), 0)} Aufgaben zu „${a.titel}" …`)
   const roh = await ai<{ regel: BankRegel; aufgaben: Record<string, unknown>[] }>({
     schemaName: 'grammatik_bank',
@@ -252,7 +255,7 @@ export async function erzeugeBankAufgaben(
   if (ws) {
     const vorher = ohne.aufgaben.length
     ohne.aufgaben = ohne.aufgaben.filter((x) => {
-      const u = unbekannteWoerter(x, ws.bekannt, formWoerter(a.schluessel))
+      const u = unbekannteWoerter(x, ws.bekannt, formWoerter(a.schluessel), ws.lexikon)
       if (!u.length) return true
       const g = `Wortschatz (${stelleText(ws)}): ${u.slice(0, 4).join(', ')}`
       if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)

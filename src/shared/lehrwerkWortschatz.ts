@@ -13,7 +13,29 @@ import type { GrammatikAufgabe } from './grammatiktrainer'
 export interface WortschatzBand {
   name: string
   grade?: number
-  units: { name: string; sections: { name: string; entries: { term: string }[] }[] }[]
+  units: { name: string; sections: { name: string; entries: { term: string; translation?: string; example?: string; exampleTranslation?: string }[] }[] }[]
+}
+
+/**
+ * Deutsch und Englisch einer Lehrwerksreihe (29.10.2026, Nachtrag: „sichtbaren", „vorher", „gefasster" in deutschen
+ * Situationen galten als unbekannte englische Wörter – eine feste Liste reicht nicht): alle deutschen Wörter aus Übersetzungen
+ * und Beispielübersetzungen, alle englischen aus Begriffen und Beispielen
+ */
+export interface Lexikon {
+  deutsch: ReadonlySet<string>
+  englisch: ReadonlySet<string>
+}
+export function lexikonAus(baende: readonly WortschatzBand[]): Lexikon {
+  const deutsch = new Set<string>()
+  const englisch = new Set<string>()
+  for (const b of baende)
+    for (const u of b.units)
+      for (const s of u.sections)
+        for (const e of s.entries) {
+          for (const t of `${e.term} ${e.example ?? ''}`.toLowerCase().match(/[a-z]+/g) ?? []) englisch.add(t)
+          for (const t of `${e.translation ?? ''} ${e.exampleTranslation ?? ''}`.toLowerCase().match(/[a-zäöüß]+/g) ?? []) deutsch.add(t)
+        }
+  return { deutsch, englisch }
 }
 
 /** Grammatik eines Bands: Unit → Abschnitt → Punkte mit Katalog-Kennungen (wie LEHRWERK_GRAMMATIK) */
@@ -117,6 +139,45 @@ export function fruehesteEinfuehrung(schluessel: string, baende: readonly { name
   return null
 }
 
+/** Katalog-Kennungen der Grammatik, die bis zu einer Stelle eingeführt ist */
+export function bekannteKennungen(baende: readonly { name: string; grammatik: GrammatikBand }[], stelle: Einfuehrung): string[] {
+  const aus: string[] = []
+  for (const b of baende) {
+    for (const [unit, abschnitte] of Object.entries(b.grammatik)) {
+      for (const [abschnitt, punkte] of Object.entries(abschnitte)) {
+        aus.push(...punkte.flatMap((p) => p.t))
+        if (b.name === stelle.buch && unit === stelle.unit && abschnitt === stelle.abschnitt) return aus
+      }
+      if (b.name === stelle.buch && unit === stelle.unit) return aus
+    }
+    if (b.name === stelle.buch) return aus
+  }
+  return aus
+}
+
+/**
+ * Unregelmäßige Formen bekannter Verben (29.10.2026, Nachtrag: „told", „came" galten in Klasse 11 als unbekannt – die
+ * Vokabellisten führen nur die Grundform): Vergangenheitsformen, sobald das simple past eingeführt ist, Partizipien ab
+ * present perfect bzw. Passiv. Vorher bleiben sie unbekannt (in Green Line 1, Unit 1 also kein „went").
+ */
+export function mitUnregelmaessigenFormen(
+  bekannt: ReadonlySet<string>,
+  verben: readonly { formen: Record<string, string> }[],
+  kennungen: readonly string[]
+): Set<string> {
+  const aus = new Set(bekannt)
+  const past = kennungen.some((k) => k.startsWith('en.verb.past_simple'))
+  const pp = kennungen.some((k) => /^en\.verb\.(present_perfect|past_perfect|passive)/.test(k))
+  if (!past && !pp) return aus
+  const woerter = (s: string | undefined): string[] => (s ?? '').toLowerCase().match(/[a-z]+/g) ?? []
+  for (const v of verben) {
+    if (!woerter(v.formen.inf).some((w) => w !== 'to' && bekannt.has(w))) continue
+    if (past) woerter(v.formen.past).forEach((w) => aus.add(w))
+    if (pp) woerter(v.formen.pp).forEach((w) => aus.add(w))
+  }
+  return aus
+}
+
 /** Grammatik, die bis zu einer Stelle eingeführt ist (Bezeichnungen der Punkte) */
 export function bekannteGrammatik(baende: readonly { name: string; grammatik: GrammatikBand }[], stelle: Einfuehrung): string[] {
   const aus: string[] = []
@@ -161,6 +222,12 @@ const DEUTSCHE_WOERTER = new Set(
   ).split(' ')
 )
 
+/** Ein deutsches Wort (auch gebeugt: „sichtbaren" ← „sichtbar"), das in keinem englischen Eintrag der Reihe vorkommt */
+export function istDeutschesWort(w: string, lex: Lexikon): boolean {
+  if (istBekanntesWort(w, lex.englisch)) return false
+  return [w, w.slice(0, -1), w.slice(0, -2), w.slice(0, -3)].some((x) => x.length >= 4 && lex.deutsch.has(x)) || (w.length < 4 && lex.deutsch.has(w))
+}
+
 /** Deutsch statt Englisch? (Kontexte und Anweisungen sind oft deutsch – die werden nicht geprüft) */
 const DEUTSCH = /\b(der|die|das|und|ist|du|ich|nicht|ein|eine|mit|für|zu|auf|im|wie|was|wird|sind|gestern|heute)\b|[äöüß]/i
 export const istDeutsch = (s: string): boolean => DEUTSCH.test(s)
@@ -182,7 +249,7 @@ export function englischeTexte(a: GrammatikAufgabe): string[] {
  * Unbekannte Wörter einer Aufgabe. Namen: groß geschriebene Wörter, die nicht am Satzanfang stehen bzw. als Name in einer
  * Liste stehen (Wörter, die mit Großbuchstaben bekannt sind, bleiben Wörter). `extra`: zusätzlich erlaubte Wörter.
  */
-export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<string>, extra: readonly string[] = []): string[] {
+export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<string>, extra: readonly string[] = [], lexikon?: Lexikon): string[] {
   const erlaubt = new Set([...bekannt, ...extra.map(klein)])
   const aus = new Set<string>()
   for (const text of englischeTexte(a)) {
@@ -193,7 +260,7 @@ export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<stri
       for (const w of wortformen(r)) {
         if (istBekanntesWort(w, erlaubt)) continue
         // Einzelne Buchstaben (Sprecher „A:"/„B:", Aufzählungen) und deutsche Wörter neben dem Englischen
-        if (w.length < 2 || DEUTSCHE_WOERTER.has(w)) continue
+        if (w.length < 2 || DEUTSCHE_WOERTER.has(w) || (lexikon && istDeutschesWort(w, lexikon))) continue
         if (gross && w === klein(r).split("'")[0]) continue
         aus.add(w)
       }

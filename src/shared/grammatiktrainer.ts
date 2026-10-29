@@ -203,6 +203,20 @@ const text = (x: unknown, n = 400): string =>
   String(x ?? '')
     .trim()
     .slice(0, n)
+/** Längen für sichtbare Teile – darüber wäre der Text abgeschnitten */
+const LAENGE = { satz: 400, option: 160, teil: 80, paar: 200, element: 200, gruppe: 80 }
+const laenger = (x: unknown, n: number): boolean => Array.isArray(x) && x.some((v) => String(v ?? '').trim().length > n)
+function zuLang(y: Record<string, unknown>): boolean {
+  const feld = (k: string): unknown[] => (Array.isArray(y[k]) ? (y[k] as unknown[]) : [])
+  return (
+    (y.art !== 'lueckentext' && String(y.satz ?? '').trim().length > LAENGE.satz) ||
+    laenger(y.optionen, LAENGE.option) ||
+    laenger(y.teile, LAENGE.teil) ||
+    laenger(y.gruppen, LAENGE.gruppe) ||
+    laenger(feld('elemente').map((e) => (e as { text?: unknown } | null)?.text), LAENGE.element) ||
+    laenger(feld('paare').flatMap((p) => [(p as { links?: unknown } | null)?.links, (p as { rechts?: unknown } | null)?.rechts]), LAENGE.paar)
+  )
+}
 const liste = (x: unknown, n = 12, m = 200): string[] =>
   Array.isArray(x)
     ? x
@@ -266,6 +280,9 @@ export function paketBereinigt(
     const y = (x ?? {}) as Record<string, unknown>
     const art = String(y.art ?? '') as AufgabenArt
     if (!ARTEN.includes(art)) continue
+    // Nie stumm kürzen (29.10.2026, Prüfung: Sortier-Elemente endeten in „… noch nic") – was Lernende sehen und zu lang ist,
+    // lässt die Aufgabe wegfallen
+    if (zuLang(y)) continue
     const a: GrammatikAufgabe = {
       id: kennung(y.id, i),
       art,
@@ -274,7 +291,7 @@ export function paketBereinigt(
       satz: text(y.satz, 400),
       ...(text(y.vorgabe, 200) ? { vorgabe: text(y.vorgabe, 200) } : {}),
       loesungen: liste(y.loesungen, 6, 400),
-      ...(art === 'auswahl' ? { optionen: liste(y.optionen, 5, 120) } : {}),
+      ...(art === 'auswahl' ? { optionen: liste(y.optionen, 5, LAENGE.option) } : {}),
       ...(art === 'fehler' && text(y.fehlerWort, 80) ? { fehlerWort: text(y.fehlerWort, 80) } : {}),
       ...(art === 'satzbau' ? { teile: liste(y.teile, 16, 80) } : {}),
       ...(text(y.erklaerung, 400) ? { erklaerung: text(y.erklaerung, 400) } : {}),
@@ -314,7 +331,7 @@ export function paketBereinigt(
       a.loesungen = a.lesarten.map((l) => l.join(' '))
     }
     if (art === 'mehrfach') {
-      a.optionen = liste(y.optionen, 8, 120)
+      a.optionen = liste(y.optionen, 8, LAENGE.option)
       a.loesungen = a.loesungen.filter((l) => a.optionen!.some((o) => gleich(o, l)))
       if (a.optionen.length < 3 || !a.loesungen.length) continue
     }
@@ -339,7 +356,7 @@ export function paketBereinigt(
       // Paare (26.10.2026): links und rechts gefüllt, keine doppelte rechte Hälfte (sonst wäre die Zuordnung mehrdeutig)
       const roh = (Array.isArray(y.paare) ? y.paare : []).map((p) => {
         const q = (p ?? {}) as Record<string, unknown>
-        return { links: text(q.links, 160), rechts: text(q.rechts, 160) }
+        return { links: text(q.links, LAENGE.paar), rechts: text(q.rechts, LAENGE.paar) }
       })
       const rechts = new Set<string>()
       a.paare = roh.filter((p) => p.links && p.rechts && !rechts.has(normiert(p.rechts)) && rechts.add(normiert(p.rechts))).slice(0, 6)
@@ -385,11 +402,11 @@ export function paketBereinigt(
       a.loesungen = [a.ziele.map((i) => woerterVon(a.satz)[i]).join(' | ')]
     }
     if (art === 'sortieren') {
-      a.gruppen = liste(y.gruppen, 4, 40)
+      a.gruppen = liste(y.gruppen, 4, LAENGE.gruppe)
       a.elemente = (Array.isArray(y.elemente) ? y.elemente : [])
         .map((e) => {
           const q = (e ?? {}) as Record<string, unknown>
-          return { text: text(q.text, 80), gruppe: Number(q.gruppe) }
+          return { text: text(q.text, LAENGE.element), gruppe: Number(q.gruppe) }
         })
         .filter((e) => e.text && Number.isInteger(e.gruppe) && e.gruppe >= 0 && e.gruppe < (a.gruppen?.length ?? 0))
         .slice(0, 10)

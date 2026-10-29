@@ -1,0 +1,469 @@
+{
+ "hinweis": "Nachtrag 29.10.2026 (Befund der Lehrkraft): Zusatzformen mit der Klasse ihrer frühesten Einführung neu erzeugt (App-Weg im Handbetrieb); die 6 mit „Klasse 5“ erzeugten Aufgaben werden entfernt",
+ "regeln": {},
+ "entfernen": [
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wo steht probably richtig? Wähle alle richtigen Sätze.",
+    "satz": "",
+    "loesungen": [
+     "He'll probably be late.",
+     "He will probably be late."
+    ],
+    "erklaerung": "probably steht nach will ('ll) und vor dem Verb be – Kurz- und Langform sind beide richtig.",
+    "uebung": "erkennen",
+    "kontext": "Ben's bus is always slow.",
+    "optionen": [
+     "He'll probably be late.",
+     "He will probably be late.",
+     "He'll be probably late.",
+     "He probably'll be late."
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation. Wähle die passende Form.",
+    "satz": "It ___ rain.",
+    "loesungen": [
+     "is going to"
+    ],
+    "optionen": [
+     "is going to",
+     "will"
+    ],
+    "erklaerung": "Man sieht ein Anzeichen (dunkle Wolken) → going to.",
+    "uebung": "unterscheiden",
+    "kontext": "Look at those dark clouds in the sky!",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satz die passende Bedeutung zu.",
+    "satz": "",
+    "loesungen": [
+     "Look at those black clouds! It's going to rain. Anzeichen | I think our team will win on Saturday. Meinung | We're going to visit Grandma next week. The tickets are on the table. Plan | \"The phone is ringing.\" – \"I'll answer it.\" spontane Entscheidung"
+    ],
+    "erklaerung": "Meinung ohne Beweis → will; spontane Entscheidung → will; Anzeichen und fester Plan → going to.",
+    "uebung": "unterscheiden",
+    "paare": [
+     {
+      "links": "Look at those black clouds! It's going to rain.",
+      "rechts": "Anzeichen"
+     },
+     {
+      "links": "I think our team will win on Saturday.",
+      "rechts": "Meinung"
+     },
+     {
+      "links": "We're going to visit Grandma next week. The tickets are on the table.",
+      "rechts": "Plan"
+     },
+     {
+      "links": "\"The phone is ringing.\" – \"I'll answer it.\"",
+      "rechts": "spontane Entscheidung"
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satz die passende Bedeutung zu.",
+    "satz": "",
+    "loesungen": [
+     "I think our team will win the match on Saturday. Meinung | Look at those black clouds! It's going to rain. Anzeichen | The phone is ringing. – I'll answer it. spontane Entscheidung | We're going to visit Grandma on Sunday. The tickets are on the table. Plan"
+    ],
+    "erklaerung": "Meinung und Spontanes → will; sichtbares Anzeichen und fester Plan → going to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "I think our team will win the match on Saturday.",
+      "rechts": "Meinung"
+     },
+     {
+      "links": "Look at those black clouds! It's going to rain.",
+      "rechts": "Anzeichen"
+     },
+     {
+      "links": "The phone is ringing. – I'll answer it.",
+      "rechts": "spontane Entscheidung"
+     },
+     {
+      "links": "We're going to visit Grandma on Sunday. The tickets are on the table.",
+      "rechts": "Plan"
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Was passt in die Lücke: will oder going to? Sortiere die Sätze.",
+    "satz": "",
+    "loesungen": [
+     "will: I think the film ___ be good., Ben ___ probably be late again., I'm sure you ___ pass the test. | going to: Look at the clouds! It's ___ rain., Watch out! The cat is ___ fall., Look at the clock! We're ___ miss the bus."
+    ],
+    "erklaerung": "Meinung (I think, I'm sure, probably) → will; Anzeichen (Look!, Watch out!) → going to.",
+    "uebung": "unterscheiden",
+    "gruppen": [
+     "will",
+     "going to"
+    ],
+    "elemente": [
+     {
+      "text": "I think the film ___ be good.",
+      "gruppe": 0
+     },
+     {
+      "text": "Ben ___ probably be late again.",
+      "gruppe": 0
+     },
+     {
+      "text": "I'm sure you ___ pass the test.",
+      "gruppe": 0
+     },
+     {
+      "text": "Look at the clouds! It's ___ rain.",
+      "gruppe": 1
+     },
+     {
+      "text": "Watch out! The cat is ___ fall.",
+      "gruppe": 1
+     },
+     {
+      "text": "Look at the clock! We're ___ miss the bus.",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die -ing-Formen der Handlungen, die gleichzeitig im Gange waren.",
+    "satz": "While Mum was cooking, Dad was reading a book. The dog was sleeping on the sofa. Then the phone rang.",
+    "loesungen": [
+     "cooking | reading | sleeping"
+    ],
+    "erklaerung": "was cooking, was reading und was sleeping laufen gleichzeitig ab (past progressive); rang ist simple past.",
+    "uebung": "erkennen",
+    "ziele": [
+     3,
+     6,
+     12
+    ],
+    "niveau": "m"
+   }
+  }
+ ],
+ "neu": [
+  {
+   "schluessel": "en.prep.basic/ort",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreibe den Satz neu. Die Katze ist jetzt an der genau entgegengesetzten Stelle: nicht auf dem Bett, sondern unter dem Bett.",
+    "satz": "The cat is on the bed.",
+    "vorgabe": "unter dem Bett",
+    "loesungen": [
+     "The cat is under the bed.",
+     "The cat's under the bed."
+    ],
+    "erklaerung": "„unter“ heißt under: The cat is under the bed.",
+    "uebung": "bilden",
+    "anfang": "The cat",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und schreibe das richtige Wort auf.",
+    "satz": "Mia was eating an apple while her brother was drink milk.",
+    "loesungen": [
+     "drinking"
+    ],
+    "fehlerWort": "drink",
+    "erklaerung": "Nach was steht im past progressive das Verb mit -ing: was drinking.",
+    "uebung": "fehler",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "While Mum was cooking dinner, the children were play in the garden.",
+    "loesungen": [
+     "playing"
+    ],
+    "erklaerung": "Past progressive = was/were + -ing-Form: the children were playing.",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "play",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "I think you'll really like our new teacher because she is very friendly.",
+    "loesungen": [
+     "I think you'll really like our new teacher because she is very friendly."
+    ],
+    "erklaerung": "Richtig: I think + will ('ll) drückt eine Meinung über die Zukunft aus.",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die Hilfsverben, mit denen der Schreiber nur eine Meinung oder Vermutung über die Zukunft ausdrückt (nicht den Plan).",
+    "satz": "I think the weather will be sunny on Saturday. My brother is going to drive us to the lake because he booked a boat last week. The water probably won't be warm, though.",
+    "loesungen": [
+     "will | won't"
+    ],
+    "erklaerung": "I think … will und probably won't sind Vermutungen; is going to drive ist ein fester Plan (das Boot ist schon gebucht).",
+    "uebung": "erkennen",
+    "ziele": [
+     4,
+     29
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation. Wähle die passende Form.",
+    "satz": "Mia: „Take an umbrella – it ___ rain any minute.“",
+    "loesungen": [
+     "'s going to"
+    ],
+    "optionen": [
+     "'s going to",
+     "will probably",
+     "rains"
+    ],
+    "erklaerung": "Mia sieht ein klares Anzeichen (schwarzer Himmel, Donner) → going to, keine bloße Vermutung mit will probably.",
+    "uebung": "unterscheiden",
+    "kontext": "Mia is standing at the window. The sky is black, and she can already hear thunder.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "I don't know much about the new coach yet, but I think he'll bring some fresh ideas to our team.",
+    "loesungen": [
+     "I don't know much about the new coach yet, but I think he'll bring some fresh ideas to our team."
+    ],
+    "erklaerung": "Richtig: Die Vorhersage beruht nur auf einer Meinung (I think) – deshalb will (he'll bring).",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde aus den Wörtern eine Vorhersage.",
+    "satz": "",
+    "loesungen": [
+     "My brother will probably be late for dinner again."
+    ],
+    "teile": [
+     "My",
+     "brother",
+     "will",
+     "probably",
+     "be",
+     "late",
+     "for",
+     "dinner",
+     "again."
+    ],
+    "erklaerung": "probably steht zwischen will und dem Verb: will probably be.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Welche Form passt in die Lücke? Ordne jeden Satz der passenden Gruppe zu.",
+    "satz": "",
+    "loesungen": [
+     "will – Meinung oder Erfahrung: I'm sure you ___ love the new Italian restaurant in town – everybody likes it., My brother never tidies his room, so I expect it ___ look terrible again., In my opinion, more people ___ probably work from home in the future. | going to – sichtbares Anzeichen: Watch out! That glass is right at the edge of the table – it ___ fall., The bus is still at the stop, but the doors are closing – we ___ miss it!, Listen to that thunder over the hills – there ___ be a storm soon."
+    ],
+    "erklaerung": "Meinung oder Erfahrung (I'm sure, I expect, in my opinion) → will; was man gerade sieht oder hört (Watch out, the doors are closing, thunder) → going to.",
+    "uebung": "unterscheiden",
+    "gruppen": [
+     "will – Meinung oder Erfahrung",
+     "going to – sichtbares Anzeichen"
+    ],
+    "elemente": [
+     {
+      "text": "I'm sure you ___ love the new Italian restaurant in town – everybody likes it.",
+      "gruppe": 0
+     },
+     {
+      "text": "My brother never tidies his room, so I expect it ___ look terrible again.",
+      "gruppe": 0
+     },
+     {
+      "text": "In my opinion, more people ___ probably work from home in the future.",
+      "gruppe": 0
+     },
+     {
+      "text": "Watch out! That glass is right at the edge of the table – it ___ fall.",
+      "gruppe": 1
+     },
+     {
+      "text": "The bus is still at the stop, but the doors are closing – we ___ miss it!",
+      "gruppe": 1
+     },
+     {
+      "text": "Listen to that thunder over the hills – there ___ be a storm soon.",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jeder Äußerung die passende Funktion zu.",
+    "satz": "",
+    "loesungen": [
+     "I honestly think the new climate laws will change very little in the next ten years. Meinung ohne sichtbaren Beleg | Look at the score: we're three goals behind with two minutes left – we're going to lose this match. Vorhersage aus einem Anzeichen | We've already booked the flights, so we're going to spend the summer holidays in Scotland. vorher gefasster Plan | \"This box is far too heavy for me.\" – \"Don't worry, I'll carry it to the car for you.\" spontane Entscheidung bzw. Angebot"
+    ],
+    "erklaerung": "will: Meinung (I think) und spontaner Entschluss; going to: sichtbares Anzeichen (Look at the score) und Plan mit Beleg (already booked).",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "I honestly think the new climate laws will change very little in the next ten years.",
+      "rechts": "Meinung ohne sichtbaren Beleg"
+     },
+     {
+      "links": "Look at the score: we're three goals behind with two minutes left – we're going to lose this match.",
+      "rechts": "Vorhersage aus einem Anzeichen"
+     },
+     {
+      "links": "We've already booked the flights, so we're going to spend the summer holidays in Scotland.",
+      "rechts": "vorher gefasster Plan"
+     },
+     {
+      "links": "\"This box is far too heavy for me.\" – \"Don't worry, I'll carry it to the car for you.\"",
+      "rechts": "spontane Entscheidung bzw. Angebot"
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Welche Form passt in die Lücke? Ordne jeden Satz der passenden Gruppe zu.",
+    "satz": "",
+    "loesungen": [
+     "will – Meinung oder Vermutung: I've got no real evidence, but I believe this young band ___ become famous one day., Knowing my sister as well as I do, she ___ probably forget her keys again tomorrow., In my opinion, robots ___ never completely replace good teachers in our schools. | going to – sichtbares Anzeichen: Look at that huge queue at the entrance! We ___ miss the start of the film., The ice on the lake is already cracking under his feet – he ___ fall in!, With only one percent left on my phone, it ___ switch off any second now."
+    ],
+    "erklaerung": "Meinung, Erfahrung oder Vermutung (I believe, probably, in my opinion) → will; was man gerade sieht (Look, already cracking, one percent left) → going to.",
+    "uebung": "unterscheiden",
+    "gruppen": [
+     "will – Meinung oder Vermutung",
+     "going to – sichtbares Anzeichen"
+    ],
+    "elemente": [
+     {
+      "text": "I've got no real evidence, but I believe this young band ___ become famous one day.",
+      "gruppe": 0
+     },
+     {
+      "text": "Knowing my sister as well as I do, she ___ probably forget her keys again tomorrow.",
+      "gruppe": 0
+     },
+     {
+      "text": "In my opinion, robots ___ never completely replace good teachers in our schools.",
+      "gruppe": 0
+     },
+     {
+      "text": "Look at that huge queue at the entrance! We ___ miss the start of the film.",
+      "gruppe": 1
+     },
+     {
+      "text": "The ice on the lake is already cracking under his feet – he ___ fall in!",
+      "gruppe": 1
+     },
+     {
+      "text": "With only one percent left on my phone, it ___ switch off any second now.",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jeder Situation die passende Vorhersage zu. Achte darauf, ob es einen Beleg gibt.",
+    "satz": "",
+    "loesungen": [
+     "Ella is checking the sky: huge black clouds are coming over the hills towards her house. It's going to rain. | Ella is planning a trip to Scotland next summer. She has no information about the weather there, but she guesses: It'll rain. | Ten minutes before the end of the match, the Lions are winning 4–0 and the other team looks exhausted. They're going to win. | The Lions' season starts in two months. Nobody has seen the new players yet, but Max is optimistic: They'll win."
+    ],
+    "erklaerung": "Wolken und Spielstand sind Belege in der Situation → going to; Vermutungen ohne Beleg (guesses, optimistic) → will.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "Ella is checking the sky: huge black clouds are coming over the hills towards her house.",
+      "rechts": "It's going to rain."
+     },
+     {
+      "links": "Ella is planning a trip to Scotland next summer. She has no information about the weather there, but she guesses:",
+      "rechts": "It'll rain."
+     },
+     {
+      "links": "Ten minutes before the end of the match, the Lions are winning 4–0 and the other team looks exhausted.",
+      "rechts": "They're going to win."
+     },
+     {
+      "links": "The Lions' season starts in two months. Nobody has seen the new players yet, but Max is optimistic:",
+      "rechts": "They'll win."
+     }
+    ],
+    "niveau": "a"
+   }
+  }
+ ]
+}

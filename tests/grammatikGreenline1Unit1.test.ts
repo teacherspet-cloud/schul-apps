@@ -10,10 +10,16 @@ import { pruefeGrammatik } from '../src/shared/grammatiktrainer'
  * Überarbeitung wie in der App. Jede Aufgabe muss wie beim Einspielen ohne Mangel bleiben, den Selbsttest bestehen, ihre
  * eigene Lösung als richtig werten und nur Wortschatz der Station ihrer Form verwenden.
  */
-const d = JSON.parse(readFileSync('resources/grammatik-bank/greenline1-unit1-2026-10-29.json', 'utf8')) as {
+const nachtrag = JSON.parse(readFileSync('resources/grammatik-bank/nachtrag-2026-10-29.json', 'utf8')) as {
+  neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
+  entfernen: { schluessel: string; aufgabe: Record<string, unknown> }[]
+}
+const d0 = JSON.parse(readFileSync('resources/grammatik-bank/greenline1-unit1-2026-10-29.json', 'utf8')) as {
   regeln: Record<string, { titel: string; erklaerung: string; beispiele: string[] }>
   neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
 }
+// Nachtrag (29.10.2026): Zusatzformen mit der Klasse ihrer Einführung – dieselben Prüfungen
+const d = { ...d0, neu: [...d0.neu, ...nachtrag.neu] }
 
 describe('Green Line 1, Unit 1 (Handbetrieb)', () => {
   it('jede Aufgabe ohne Mangel, Selbsttest bestanden, eigene Lösung richtig, Wortschatz der Station', () => {
@@ -32,12 +38,18 @@ describe('Green Line 1, Unit 1 (Handbetrieb)', () => {
       if (!stand.has(k)) stand.set(k, wortschatzStandServer(k, 'en'))
       const ws = stand.get(k)
       if (ws) {
-        const u = unbekannteWoerter(b.a, ws.bekannt, formWoerter(k))
+        const u = unbekannteWoerter(b.a, ws.bekannt, formWoerter(k), ws.lexikon)
         if (u.length) befunde.push(`${k} „${satz}": Wortschatz ${u.join(', ')}`)
       }
     })
     expect(d.neu.length).toBeGreaterThan(500)
     expect(befunde).toEqual([])
+  })
+
+  it('Nachtrag: nur Formen außerhalb von Green Line 1 Unit 1 werden entfernt, und nichts davon steht noch in der Green-Line-Datei', () => {
+    expect(nachtrag.entfernen).toHaveLength(6)
+    for (const e of nachtrag.entfernen) expect(e.schluessel).toMatch(/past_progressive|will_vs_goingto/)
+    expect(d0.neu.some((e) => /past_progressive|will_vs_goingto/.test(e.schluessel))).toBe(false)
   })
 
   it('Regelkarten ohne Platzhalter', () => {
