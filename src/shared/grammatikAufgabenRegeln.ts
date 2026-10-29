@@ -39,6 +39,7 @@ export const AUFGABEN_REGELN = [
   'Gleichwertige Formen (might/may/could, must/have to, who/that, somebody/someone, Kurz- und Langform) nie als richtige und falsche Möglichkeit gegeneinander; beim Tippen alle in „loesungen“. Norm ist britisches Schulenglisch („If I were you“, „I have just bought“).',
   'Formate: LÜCKENTEXT („lueckentext“): 60–120 Wörter (oder Dialog mit Zeilen „A: …“/„B: …“), 3–6 Lücken „___“, je Lücke in „luecken“ das Grundwort als „vorgabe“ bzw. „optionen“ und alle „loesungen“; jede Lücke ohne die anderen lösbar, Lücken nicht direkt hintereinander, eine Verbform in genau eine Lücke. SÄTZE VERBINDEN („verbinden“): zwei kurze Sätze in „satz“, Bindewort in „vorgabe“ (z. B. „(who)“); „anfang“ höchstens der Satzgegenstand bzw. die ersten Wörter VOR der geübten Stelle (z. B. „I have a friend“ bei who) – nie das Bindewort samt ganzem Teilsatz und nie so viel, dass der Rest wörtlich in den Ausgangssätzen steht (sonst üben die Lernenden nur Abschreiben); ohne „…“; „loesungen“ = ganze Sätze mit allen Varianten (Stellung, who/that, mit und ohne weglassbares Pronomen). FRAGE BILDEN („frage“): die Antwort in „satz“, Fragewort bzw. Hilfe in „vorgabe“, „loesungen“ = ganze Fragen. MARKIEREN („markieren“): 1–3 Sätze in „satz“, die zu markierenden Wörter genau wie im Text in „zielWoerter“. SORTIEREN („sortieren“): 2–3 „gruppen“, 6–8 „elemente“ mit Gruppennummer (0 = erste Gruppe). MEHRFACHAUSWAHL („mehrfach“): 4–5 „optionen“, alle richtigen in „loesungen“ – für gleichwertige Varianten.',
   'Kommas: „kommaPruefen“ nur true, wenn die geübte Grammatik selbst eine Kommaregel ist (Relativsätze, if-Satz vorne, Satzadverbien) – sonst zählt ein Komma mehr oder weniger beim Tippen ganzer Sätze nicht.',
+  'Möglichkeiten dürfen die Lösung nicht an der Oberfläche verraten: Fragt die Anweisung nach einer Form („Wähle alle Wörter mit an“), steht diese Form NICHT schon in den Möglichkeiten (also „apple, dog, hour“ statt „an apple, a dog“); beim Sortieren tragen die Elemente nicht schon das Gruppenwort.',
   'Personen in Aufgaben: erfundene, gewöhnliche englische Vornamen – NIE Platzhalter wie „[Person-1]“ (die stehen nur für echte Namen im Auftrag und dürfen nicht in Aufgaben erscheinen).',
   'Zu JEDER Aufgabe eine „erklaerung“: ein kurzer Satz auf Deutsch, warum diese Form (z. B. „Signal: yet → present perfect“) – die Lernenden sehen ihn nach der Antwort.'
 ].join('\n')
@@ -176,6 +177,7 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
   // – die KI ahmte die Platzhalter für erfundene Personen nach, sie lassen sich nicht zurückübersetzen)
   if (PLATZHALTER.test(JSON.stringify([a.anweisung, a.kontext, a.satz, a.anfang, a.vorgabe, a.loesungen, a.optionen, a.teile, a.paare, a.elemente, a.luecken, a.wortkasten])))
     return 'Platzhalter statt Name ([Person-…])'
+  if (moeglichkeitenVerraten(a)) return 'Möglichkeiten verraten die Lösung (das gesuchte Wort steht schon darin)'
   // Satzanfang verrät die Lösung (28.10.2026, Frage der Lehrkraft: „Woher wissen die Schüler, dass ‚Ella was watering the
   // plants' kommen müsste?" – Anfang „While the neighbours were talking," ließ nur das Abschreiben des zweiten Satzes übrig)
   if (satzanfangVerraet(a)) return 'Satzanfang verrät die Lösung (Rest steht wörtlich in der Vorgabe)'
@@ -190,6 +192,34 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
   const st = selbsttest(a)
   if (st.length) return `Selbsttest: ${st[0]}`
   return ''
+}
+
+/**
+ * Verraten die Möglichkeiten die Lösung? (29.10.2026, Befund der Lehrkraft: „Wähle alle Wortgruppen mit an" – die
+ * Möglichkeiten „an apple", „a dog" … zeigten die Lösung schon an) Auswahl/Mehrfachauswahl: ein Wort aus der Anweisung
+ * steht in allen richtigen und in keiner falschen Möglichkeit. Sortieren: jedes Element trägt das Wort seiner Gruppe.
+ */
+export function moeglichkeitenVerraten(a: Pick<GrammatikAufgabe, 'art' | 'anweisung' | 'optionen' | 'loesungen' | 'gruppen' | 'elemente'>): boolean {
+  const w = (s: string): Set<string> => new Set(woerterVon(s).map((x) => normiert(x)))
+  if (a.art === 'mehrfach' || a.art === 'auswahl') {
+    const o = a.optionen ?? []
+    const richtig = o.filter((x) => (a.loesungen ?? []).some((l) => normiert(l) === normiert(x)))
+    const falsch = o.filter((x) => !richtig.includes(x))
+    // Einzelwörter („since / for / from") sind selbst die Antwort – verraten nur Wortgruppen und Sätze etwas
+    if (!richtig.length || !falsch.length || o.some((x) => woerterVon(x).length < 2)) return false
+    const anweisung = w(a.anweisung)
+    return [...w(richtig[0])].some((t) => anweisung.has(t) && richtig.every((x) => w(x).has(t)) && falsch.every((x) => !w(x).has(t)))
+  }
+  if (a.art === 'sortieren') {
+    const g = (a.gruppen ?? []).map((x) => woerterVon(x).map(normiert))
+    const e = a.elemente ?? []
+    if (g.length < 2 || !e.length) return false
+    // Ein Gruppenwort (z. B. „an"), das genau in den Elementen dieser Gruppe vorkommt
+    return g.some((gw, k) =>
+      gw.some((t) => e.filter((x) => x.gruppe === k).every((x) => w(x.text).has(t)) && e.filter((x) => x.gruppe !== k).every((x) => !w(x.text).has(t)))
+    )
+  }
+  return false
 }
 
 /** Platzhalter des Namensschutzes („[Person-3]", auch ohne Klammern) */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ohneDoppeltenAnfang, paketBereinigt, pruefeGrammatik, type GrammatikAufgabe } from '../src/shared/grammatiktrainer'
-import { aufgabeMangel } from '../src/shared/grammatikAufgabenRegeln'
+import { aufgabeMangel, moeglichkeitenVerraten } from '../src/shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '../src/shared/grammatikDesign'
 import { AUFGABEN_JE_UEBUNG, aufZielGekuerzt, istRegelPlatzhalter, UEBUNG_ARTEN } from '../src/shared/grammatikBank'
 
@@ -140,5 +140,25 @@ describe('Befunde der Lehrkraft 29.10.2026', () => {
   it('Platzhalter-Regelkarte wird erkannt', () => {
     expect(istRegelPlatzhalter({ titel: 'x', erklaerung: 'x', beispiele: [] })).toBe(true)
     expect(istRegelPlatzhalter({ titel: 'Past progressive', erklaerung: 'Mit dem past progressive …', beispiele: [] })).toBe(false)
+  })
+})
+
+describe('Möglichkeiten verraten die Lösung (Befund der Lehrkraft 29.10.2026)', () => {
+  it('„Wähle alle Wortgruppen mit an" mit „an apple" als Möglichkeit', () => {
+    expect(
+      moeglichkeitenVerraten({ art: 'mehrfach', anweisung: 'Wähle alle Wortgruppen mit an.', optionen: ['an apple', 'a dog', 'an hour', 'a uniform'], loesungen: ['an apple', 'an hour'] })
+    ).toBe(true)
+    expect(
+      moeglichkeitenVerraten({ art: 'sortieren', anweisung: 'Sortiere.', gruppen: ['a', 'an'], elemente: [{ text: 'a dog', gruppe: 0 }, { text: 'an apple', gruppe: 1 }], loesungen: [] })
+    ).toBe(true)
+  })
+  it('ohne das gesuchte Wort in den Möglichkeiten in Ordnung', () => {
+    expect(
+      moeglichkeitenVerraten({ art: 'mehrfach', anweisung: 'Wähle alle Wörter, vor denen an steht.', optionen: ['apple', 'dog', 'hour', 'uniform'], loesungen: ['apple', 'hour'] })
+    ).toBe(false)
+    // Sätze mit since/for: die Anweisung nennt das Unterscheidungswort nicht
+    expect(
+      moeglichkeitenVerraten({ art: 'mehrfach', anweisung: 'Wähle alle richtigen Sätze.', optionen: ['I have lived here for two years.', 'I have lived here since two years.'], loesungen: ['I have lived here for two years.'] })
+    ).toBe(false)
   })
 })

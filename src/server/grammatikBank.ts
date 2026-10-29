@@ -11,9 +11,11 @@
  *   POST /server/grammatik-bank/lesen   {schluessel[]} → { eintraege }
  *   POST /server/grammatik-bank/speichern {sprache, schluessel, regel, aufgaben} → { zahlen, kurse }
  */
+import { bekannterWortschatz, fruehesteEinfuehrung, unbekannteWoerter, type Einfuehrung, type GrammatikBand, type WortschatzBand } from '../shared/lehrwerkWortschatz'
+import { LEHRWERK_GRAMMATIK, reiheDesBands } from '../renderer/src/shared/lehrwerkGrammatik'
 import { NEUE_REGELN, REGEL_PLATZHALTER_WARTUNG, istRegelPlatzhalter } from './grammatikRegelPlatzhalter'
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { RESSOURCEN } from './pfade'
@@ -70,6 +72,8 @@ const db = () => {
     doppelteEinmal(d)
     maengelEinmal(d)
     regelPlatzhalterEinmal(d)
+    ueberarbeitungEinmal(d)
+    wortschatzEinmal(d)
   }
   return d
 }
@@ -374,6 +378,157 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // ---------------------------------------------------------------- Mängel (28.10.2026)
 
 /** Befund aus der Prüfung der Bank (Kennung → was falsch ist) – beginnt mit diesem Wort, damit Speichern ihn erhält */
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-2026-10-29'
+
+/** Wortschatz-Stand einer Bank-Kennung aus den mitgelieferten Lehrwerken (wie wortschatzStand in der Oberfläche) */
+export function wortschatzStandServer(schluessel: string, sprache: string): { stelle: Einfuehrung; bekannt: Set<string> } | null {
+  const ordner = join(RESSOURCEN, 'lehrwerke')
+  if (!existsSync(ordner)) return null
+  const baende = readdirSync(ordner)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => json_(readFileSync(join(ordner, f), 'utf8'), null as unknown as (WortschatzBand & { language?: string; reihe?: string }) | null))
+    .filter((b): b is WortschatzBand & { language?: string; reihe?: string } => Boolean(b && b.language === sprache && LEHRWERK_GRAMMATIK[b.name] && b.units?.length))
+  const reihen = new Map<string, typeof baende>()
+  for (const b of baende) reihen.set(b.reihe || reiheDesBands(b.name), [...(reihen.get(b.reihe || reiheDesBands(b.name)) ?? []), b])
+  let best: { stelle: Einfuehrung; baende: typeof baende; grade: number } | null = null
+  for (const r0 of reihen.values()) {
+    const r = [...r0].sort((x, y) => (x.grade ?? 99) - (y.grade ?? 99))
+    const stelle = fruehesteEinfuehrung(schluessel, r.map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand })))
+    if (!stelle) continue
+    const grade = r.find((b) => b.name === stelle.buch)?.grade ?? 99
+    if (!best || grade < best.grade) best = { stelle, baende: r, grade }
+  }
+  return best ? { stelle: best.stelle, bekannt: bekannterWortschatz(best.baende, best.stelle) } : null
+}
+
+/**
+ * Wortschatz der vorhandenen Aufgaben (29.10.2026, Auftrag der Lehrkraft für Green Line 1 Unit 1): Aufgaben der Formen,
+ * die in Green Line 1, Unit 1 eingeführt werden, mit Wörtern, die an der Station der Form noch unbekannt sind, für die
+ * Lernenden zurückstellen (Grund mit den Wörtern). Neue Aufgaben prüft die Erzeugung selbst.
+ */
+function wortschatzEinmal(d: ReturnType<typeof datenbank>): void {
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(WORTSCHATZ_WARTUNG)) return
+    const zeilen = d.prepare("SELECT id, sprache, schluessel, uebung, niveau, bank_aufgabe FROM gram_bank WHERE pruefen = ''").all() as {
+      id: string
+      sprache: string
+      schluessel: string
+      uebung: string
+      niveau: string
+      bank_aufgabe: string
+    }[]
+    const stand = new Map<string, ReturnType<typeof wortschatzStandServer>>()
+    const setzen = d.prepare('UPDATE gram_bank SET pruefen = ? WHERE id = ?')
+    const schluessel = new Set<string>()
+    let zurueck = 0
+    d.exec('BEGIN')
+    try {
+      for (const z of zeilen) {
+        if (!stand.has(z.schluessel)) stand.set(z.schluessel, wortschatzStandServer(z.schluessel, z.sprache))
+        const ws = stand.get(z.schluessel)
+        if (!ws || ws.stelle.buch !== 'Green Line 1' || ws.stelle.unit !== 'Unit 1') continue
+        const b = bankAufgabeBereinigt({ ...json_(z.bank_aufgabe, {} as Record<string, unknown>), uebung: z.uebung, niveau: z.niveau }, z.id, z.schluessel)
+        if (!b) continue
+        const u = unbekannteWoerter(b.a, ws.bekannt)
+        if (!u.length) continue
+        setzen.run(`Wortschatz (${ws.stelle.buch}, ${ws.stelle.unit}, ${ws.stelle.abschnitt}): ${u.slice(0, 6).join(', ')}`, z.id)
+        zurueck++
+        schluessel.add(z.schluessel)
+      }
+      d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(WORTSCHATZ_WARTUNG, new Date().toISOString())
+      d.exec('COMMIT')
+    } catch (e) {
+      d.exec('ROLLBACK')
+      throw e
+    }
+    protokolliereServer('grammatik', `WARTUNG ${WORTSCHATZ_WARTUNG}: ${zurueck} Aufgaben mit unbekanntem Wortschatz zurückgestellt`)
+    if (schluessel.size) setTimeout(() => void Promise.resolve().then(() => kurseNeu([...schluessel])).catch(() => undefined), 0)
+  } catch {
+    // Beim nächsten Start erneut
+  }
+}
+
+const UEBERARBEITUNG_WARTUNG = 'grammatik-bank-ueberarbeitung-2026-10-29'
+
+/** Eine Aufgabe so bereinigen wie beim Speichern; Mangel als `pruefen` */
+export function bankAufgabeBereinigt(roh: Record<string, unknown>, id: string, schluessel: string): { a: BankAufgabe; pruefen: string } | null {
+  const regelId = regelIdVon(schluessel)
+  const [x] = paketBereinigt(
+    { thema: schluessel, regeln: [{ id: regelId, titel: schluessel, erklaerung: schluessel, beispiele: [] }], aufgaben: [{ ...roh, id, regelId }] },
+    schluessel,
+    BANK_GRENZEN
+  ).aufgaben
+  if (!x || !istUebung(x.uebung)) return null
+  const a = aufgabeNormalisiert(x as BankAufgabe)
+  return { a, pruefen: aufgabeMangel(a) }
+}
+
+/**
+ * Neufassung und Ergänzung von Hand (29.10.2026, Auftrag der Lehrkraft: „Kannst du die zurückgestellten Grammatikformen
+ * überarbeiten und fehlende Stufen ergänzen – selber, ohne den Umweg über ChatGPT?"): resources/grammatik-bank/
+ * ueberarbeitung-2026-10-29.json – „ersetzen" (Kennung → neue Fassung; Kennung, Übungsart und Stufe bleiben, der Lernstand
+ * hängt daran) und „neu" (fehlende Stufen). Bereinigt und geprüft wie beim Speichern; ein verbleibender Mangel stellt zurück.
+ */
+function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
+  try {
+    d.exec('CREATE TABLE IF NOT EXISTS wartung (name TEXT PRIMARY KEY, erledigt TEXT NOT NULL)')
+    if (d.prepare('SELECT 1 FROM wartung WHERE name = ?').get(UEBERARBEITUNG_WARTUNG)) return
+    const datei = join(RESSOURCEN, 'grammatik-bank', 'ueberarbeitung-2026-10-29.json')
+    if (!existsSync(datei)) return
+    const u = json_(readFileSync(datei, 'utf8'), { ersetzen: {}, neu: [] } as {
+      ersetzen: Record<string, { schluessel: string; aufgabe: Record<string, unknown> }>
+      neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
+    })
+    const jetzt = new Date().toISOString()
+    const schluessel = new Set<string>()
+    let ersetzt = 0
+    let neu = 0
+    let zurueck = 0
+    d.exec('BEGIN')
+    try {
+      const setzen = d.prepare('UPDATE gram_bank SET bank_aufgabe = ?, pruefen = ?, geaendert = ? WHERE id = ?')
+      for (const [id, e] of Object.entries(u.ersetzen)) {
+        const z = d.prepare('SELECT schluessel, uebung, niveau FROM gram_bank WHERE id = ?').get(id) as { schluessel: string; uebung: string; niveau: string } | undefined
+        if (!z || z.schluessel !== e.schluessel) continue
+        const b = bankAufgabeBereinigt({ ...e.aufgabe, uebung: z.uebung, niveau: z.niveau }, id, z.schluessel)
+        if (!b) continue
+        const { id: _i, regelId: _r, stufe: _s, uebung: _u, niveau: _n, pruefen: _p, ...rest } = b.a as BankAufgabe & { regelId?: string; stufe?: unknown }
+        void [_i, _r, _s, _u, _n, _p]
+        setzen.run(JSON.stringify(rest), b.pruefen, jetzt, id)
+        ersetzt++
+        if (b.pruefen) zurueck++
+        schluessel.add(z.schluessel)
+      }
+      const rein = d.prepare(
+        'INSERT INTO gram_bank (id, sprache, schluessel, form, uebung, niveau, pos, bank_aufgabe, geaendert, pruefen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+      for (const e of u.neu) {
+        if (!d.prepare('SELECT 1 FROM gram_bank WHERE schluessel = ? LIMIT 1').get(e.schluessel)) continue
+        const id = `b${randomBytes(6).toString('hex')}`
+        const b = bankAufgabeBereinigt(e.aufgabe, id, e.schluessel)
+        if (!b) continue
+        const pos = ((d.prepare('SELECT MAX(pos) AS p FROM gram_bank WHERE schluessel = ?').get(e.schluessel) as { p: number | null }).p ?? 0) + 1
+        const { id: _i, regelId: _r, stufe: _s, uebung, niveau, pruefen: _p, ...rest } = b.a as BankAufgabe & { regelId?: string; stufe?: unknown }
+        void [_i, _r, _s, _p]
+        rein.run(id, e.schluessel.split('.')[0], e.schluessel, formVon(e.schluessel), uebung, istStufe(niveau) ? niveau : 'm', pos, JSON.stringify(rest), jetzt, b.pruefen)
+        neu++
+        if (b.pruefen) zurueck++
+        schluessel.add(e.schluessel)
+      }
+      d.prepare('INSERT OR REPLACE INTO wartung (name, erledigt) VALUES (?, ?)').run(UEBERARBEITUNG_WARTUNG, jetzt)
+      d.exec('COMMIT')
+    } catch (e) {
+      d.exec('ROLLBACK')
+      throw e
+    }
+    protokolliereServer('grammatik', `WARTUNG ${UEBERARBEITUNG_WARTUNG}: ${ersetzt} ersetzt, ${neu} neu, davon ${zurueck} mit Mangel zurückgestellt`)
+    if (schluessel.size) setTimeout(() => void Promise.resolve().then(() => kurseNeu([...schluessel])).catch(() => undefined), 0)
+  } catch {
+    // Beim nächsten Start erneut
+  }
+}
+
 /** Regelkarten „x" einmal durch geschriebene ersetzen (29.10.2026, grammatikRegelPlatzhalter.ts) */
 function regelPlatzhalterEinmal(d: ReturnType<typeof datenbank>): void {
   try {
@@ -399,7 +554,8 @@ export const BEFUND = 'Befund: '
  * Läufe der Mängelprüfung über die ganze Bank – ein neuer Name, wenn die Regeln strenger werden. 28.10.2026 abends:
  * Selbsttest (shared/grammatikSelbsttest.ts) und „Satzanfang verrät die Lösung" (Frage der Lehrkraft).
  */
-const MAENGEL_WARTUNGEN = ['grammatik-bank-maengel-2026-10-28', 'grammatik-bank-selbsttest-2026-10-28']
+// 29.10.2026: „Möglichkeiten verraten die Lösung" (Befund der Lehrkraft: „Wähle alle Wortgruppen mit an")
+const MAENGEL_WARTUNGEN = ['grammatik-bank-maengel-2026-10-28', 'grammatik-bank-selbsttest-2026-10-28', 'grammatik-bank-verraten-2026-10-29']
 
 /**
  * Einmal (28.10.2026, nach der Prüfung der ganzen Bank): jede Aufgabe nach den Regeln richten (shared/

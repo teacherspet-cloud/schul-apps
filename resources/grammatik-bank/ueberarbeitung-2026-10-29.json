@@ -1,0 +1,571 @@
+{
+ "hinweis": "Neufassung und Ergänzung von Hand (29.10.2026, Auftrag der Lehrkraft: ohne KI-Abo); eingespielt durch die Wartung grammatik-bank-ueberarbeitung-2026-10-29",
+ "ersetzen": {
+  "bb0bc7cdb5e6d": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle den richtigen Satz.",
+    "satz": "___",
+    "optionen": [
+     "Sophie has had this laptop since six months.",
+     "Sophie has had this laptop for six months.",
+     "Sophie have had this laptop for six months."
+    ],
+    "loesungen": [
+     "Sophie has had this laptop for six months."
+    ],
+    "erklaerung": "Six months ist eine Zeitspanne – deshalb for; bei Sophie (she) heißt es has."
+   }
+  },
+  "b5e5993d1bdb4": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle richtigen Sätze.",
+    "satz": "___",
+    "optionen": [
+     "We have been in this queue for ten minutes.",
+     "My aunt has worked there since January.",
+     "I have known this song since three weeks.",
+     "Jake has lived in Leeds for 2019."
+    ],
+    "loesungen": [
+     "We have been in this queue for ten minutes.",
+     "My aunt has worked there since January."
+    ],
+    "erklaerung": "for steht vor einer Zeitspanne (ten minutes, three weeks), since vor einem Zeitpunkt (January, 2019)."
+   }
+  },
+  "b5e64a0aca232": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bringe die Satzteile in die richtige Reihenfolge.",
+    "satz": "",
+    "teile": [
+     "Grace",
+     "has",
+     "had",
+     "her guitar",
+     "for years."
+    ],
+    "loesungen": [
+     "Grace has had her guitar for years."
+    ],
+    "erklaerung": "Present perfect: has + 3. Form (had); for years nennt die Zeitspanne."
+   }
+  },
+  "b13c788012ace": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde eine Frage nach der Dauer.",
+    "satz": "Oliver has had the tablet for eight months.",
+    "vorgabe": "Frage nach der Dauer",
+    "anfang": "How long",
+    "loesungen": [
+     "How long has Oliver had the tablet?"
+    ],
+    "erklaerung": "Nach How long steht has vor dem Subjekt: How long has Oliver had …?"
+   }
+  },
+  "be145cc26b9b4": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im present perfect ein.",
+    "satz": "My cousin ___ the same bike helmet since she started cycling to school.",
+    "vorgabe": "(have)",
+    "loesungen": [
+     "has had",
+     "'s had"
+    ],
+    "erklaerung": "Seit dem Zeitpunkt, an dem sie anfing, bis jetzt: present perfect mit since."
+   }
+  },
+  "b33a89d028080": {
+   "schluessel": "en.verb.present_perfect/dauer",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde die Sätze mit since zu einem Satz im present perfect.",
+    "satz": "Noah joined the chess club in September. He is still a member.",
+    "vorgabe": "(since)",
+    "anfang": "Noah",
+    "loesungen": [
+     "Noah has been a member of the chess club since September.",
+     "Noah has been in the chess club since September."
+    ],
+    "erklaerung": "Beginn im September, Mitglied bis jetzt: has been … since September."
+   }
+  },
+  "bdb3e4771dd0f": {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die Wörter, die zeigen, dass der Sprecher nur vermutet.",
+    "satz": "The test will probably be easy. Maybe we will get our results on Friday.",
+    "zielWoerter": [
+     "probably",
+     "Maybe"
+    ],
+    "loesungen": [],
+    "erklaerung": "probably und maybe drücken eine Vermutung aus – dazu passt will."
+   }
+  },
+  "b1a57ffbfdfa8": {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Wie geht der Satz weiter – mit will oder mit going to? Sortiere die Satzanfänge.",
+    "satz": "",
+    "gruppen": [
+     "will",
+     "going to"
+    ],
+    "elemente": [
+     {
+      "text": "I think our team …",
+      "gruppe": 0
+     },
+     {
+      "text": "Maybe the bus …",
+      "gruppe": 0
+     },
+     {
+      "text": "I’m sure the puzzle …",
+      "gruppe": 0
+     },
+     {
+      "text": "Look at those dark clouds! It …",
+      "gruppe": 1
+     },
+     {
+      "text": "We have bought the tickets. We …",
+      "gruppe": 1
+     },
+     {
+      "text": "The baby is near the paint. She …",
+      "gruppe": 1
+     }
+    ],
+    "loesungen": [],
+    "erklaerung": "Meinung oder Vermutung (I think, maybe, I’m sure) → will; Plan oder sichtbares Anzeichen → going to."
+   }
+  },
+  "ba395e308db63": {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die passende Vorhersage.",
+    "satz": "___",
+    "kontext": "Du weißt nichts Genaues über den neuen Pausenraum und siehst keine Anzeichen. Du sagst nur, was du vermutest.",
+    "optionen": [
+     "I think the new break room will probably be crowded.",
+     "Look at the long queue! The new break room is going to be crowded.",
+     "The new break room is going to be crowded because we have booked it."
+    ],
+    "loesungen": [
+     "I think the new break room will probably be crowded."
+    ],
+    "erklaerung": "Ohne Anzeichen und ohne Plan nur eine Vermutung: I think … will probably …"
+   }
+  },
+  "b363409c7d7e0": {
+   "schluessel": "en.verb.will_vs_goingto/vorhersage-signal",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Frag deine Freundin nach ihrer Vermutung über das Wetter morgen. Verwende will.",
+    "kontext": "Deine Freundin sagt: „I think it will be warm tomorrow.“",
+    "satz": "I think it will be warm tomorrow.",
+    "vorgabe": "Frage mit What … like … will",
+    "anfang": "What",
+    "loesungen": [
+     "What do you think the weather will be like tomorrow?",
+     "What will the weather be like tomorrow?"
+    ],
+    "erklaerung": "Nach einer Vermutung fragt man mit will: What will the weather be like …?"
+   }
+  },
+  "b2bacd8c0509c": {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Forme den Satz in eine Frage im past progressive um.",
+    "satz": "You were waiting for the bus.",
+    "vorgabe": "Frage im past progressive",
+    "loesungen": [
+     "Were you waiting for the bus?"
+    ],
+    "erklaerung": "In der Frage steht were vor dem Subjekt: Were you waiting …?"
+   }
+  },
+  "bca7228b01056": {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Bilde einen Satz im past progressive mit while.",
+    "satz": "Maya / decorate the room – her cousins / blow up balloons",
+    "vorgabe": "(while)",
+    "loesungen": [
+     "While Maya was decorating the room, her cousins were blowing up balloons.",
+     "Maya was decorating the room while her cousins were blowing up balloons.",
+     "While her cousins were blowing up balloons, Maya was decorating the room.",
+     "Her cousins were blowing up balloons while Maya was decorating the room."
+    ],
+    "erklaerung": "Zwei Handlungen liefen gleichzeitig: beide im past progressive, verbunden mit while."
+   }
+  },
+  "bb51ee4c8927c": {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde zu einem Satz im past progressive mit while.",
+    "kontext": "Gestern um vier Uhr nachmittags – beides geschah gleichzeitig.",
+    "satz": "Nora / paint a picture – her brother / build a model plane",
+    "vorgabe": "(while)",
+    "loesungen": [
+     "While Nora was painting a picture, her brother was building a model plane.",
+     "Nora was painting a picture while her brother was building a model plane.",
+     "While her brother was building a model plane, Nora was painting a picture.",
+     "Her brother was building a model plane while Nora was painting a picture."
+    ],
+    "erklaerung": "Gleichzeitige Handlungen: beide im past progressive, verbunden mit while."
+   }
+  },
+  "b5e0383990e5d": {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde zu einem Satz im past progressive mit while.",
+    "kontext": "Gestern Abend um sieben – beides geschah gleichzeitig.",
+    "satz": "The neighbours / talk – Ella / water the plants",
+    "vorgabe": "(while)",
+    "loesungen": [
+     "While the neighbours were talking, Ella was watering the plants.",
+     "The neighbours were talking while Ella was watering the plants.",
+     "While Ella was watering the plants, the neighbours were talking.",
+     "Ella was watering the plants while the neighbours were talking."
+    ],
+    "erklaerung": "Gleichzeitige Handlungen: beide im past progressive, verbunden mit while."
+   }
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die passende Form.",
+    "kontext": "Yesterday at eight o’clock:",
+    "satz": "While Tom ___ the dishes, his sister was hoovering.",
+    "optionen": [
+     "was washing",
+     "is washing",
+     "has washed"
+    ],
+    "loesungen": [
+     "was washing"
+    ],
+    "erklaerung": "Gestern, gleichzeitig im Gange: past progressive (was washing).",
+    "uebung": "unterscheiden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und verbessere es.",
+    "satz": "While the girls was dancing, the boys were singing.",
+    "fehlerWort": "was",
+    "loesungen": [
+     "were"
+    ],
+    "erklaerung": "Bei the girls (they) heißt es were dancing.",
+    "uebung": "fehler",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere alle Wörter, die zu einer Verbform im past progressive gehören.",
+    "satz": "While the guests were arriving, my father was still cooking and my sister set the table.",
+    "zielWoerter": [
+     "were",
+     "arriving",
+     "was",
+     "cooking"
+    ],
+    "loesungen": [],
+    "erklaerung": "past progressive = was/were + -ing: were arriving, was cooking; set ist simple past.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Sortiere: Liefen beide Handlungen gleichzeitig, oder unterbricht eine kurze Handlung eine andere?",
+    "satz": "",
+    "gruppen": [
+     "beide gleichzeitig im Gange",
+     "eine kurze Handlung unterbricht"
+    ],
+    "elemente": [
+     {
+      "text": "While I was studying, my brother was playing video games.",
+      "gruppe": 0
+     },
+     {
+      "text": "The children were singing while their mum was driving.",
+      "gruppe": 0
+     },
+     {
+      "text": "While we were waiting, the rain was getting heavier.",
+      "gruppe": 0
+     },
+     {
+      "text": "I was reading when the lights went out.",
+      "gruppe": 1
+     },
+     {
+      "text": "When the teacher came in, we were talking.",
+      "gruppe": 1
+     },
+     {
+      "text": "She was crossing the street when she saw her friend.",
+      "gruppe": 1
+     }
+    ],
+    "loesungen": [],
+    "erklaerung": "Zweimal past progressive: gleichzeitig; past progressive + simple past: eine kurze Handlung unterbricht.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle Sätze, in denen zwei Handlungen gleichzeitig im Gange waren.",
+    "satz": "___",
+    "optionen": [
+     "While Lucy was practising the piano, her parents were cooking dinner.",
+     "When the bell rang, the students left the classroom.",
+     "The dogs were barking while the postman was walking up the path.",
+     "Ben was taking a shower when somebody knocked at the door."
+    ],
+    "loesungen": [
+     "While Lucy was practising the piano, her parents were cooking dinner.",
+     "The dogs were barking while the postman was walking up the path."
+    ],
+    "erklaerung": "Gleichzeitig im Gange: beide Handlungen im past progressive.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Richtig oder falsch? Ist der Satz falsch, tippe das falsche Wort an und verbessere es.",
+    "satz": "While my friends were swimming, I was sit on the beach.",
+    "korrekt": false,
+    "fehlerWort": "sit",
+    "loesungen": [
+     "sitting"
+    ],
+    "erklaerung": "past progressive braucht die -ing-Form: I was sitting.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im past progressive ein.",
+    "kontext": "Last Saturday at three o’clock the whole family was busy.",
+    "satz": "My grandparents ___ in the garden while my uncle was fixing the car.",
+    "vorgabe": "(work)",
+    "loesungen": [
+     "were working"
+    ],
+    "erklaerung": "Gleichzeitig mit was fixing: were working (they).",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im past progressive ein.",
+    "satz": "While the band ___ on stage, the fans were dancing in front of it.",
+    "vorgabe": "(play)",
+    "loesungen": [
+     "was playing",
+     "were playing"
+    ],
+    "erklaerung": "Gleichzeitig im Gange: past progressive; band kann im britischen Englisch mit was oder were stehen.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die Frage im past progressive zu dieser Antwort.",
+    "kontext": "Du willst wissen, ob Amy mit dem Trainer sprach, während sich die anderen aufwärmten.",
+    "satz": "Yes, she was. She was talking to the coach while the others were warming up.",
+    "vorgabe": "Frage nach: Amy / talk to the coach",
+    "loesungen": [
+     "Was Amy talking to the coach while the others were warming up?",
+     "Was Amy talking to the coach?"
+    ],
+    "erklaerung": "Ja/Nein-Frage im past progressive: Was + Subjekt + -ing?",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Bilde einen Satz im past progressive mit while.",
+    "satz": "Leo / repair his bike – his sister / clean the windows",
+    "vorgabe": "(while)",
+    "loesungen": [
+     "While Leo was repairing his bike, his sister was cleaning the windows.",
+     "Leo was repairing his bike while his sister was cleaning the windows.",
+     "While his sister was cleaning the windows, Leo was repairing his bike.",
+     "His sister was cleaning the windows while Leo was repairing his bike."
+    ],
+    "erklaerung": "Zwei gleichzeitige Handlungen: beide im past progressive, verbunden mit while.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze die Verben im past progressive ein.",
+    "satz": "Yesterday at six o’clock our house was very busy. Mum ___ in the kitchen while Dad ___ the dog. My little brothers ___ with their toy cars, and I ___ my homework at the table. Suddenly the doorbell rang.",
+    "luecken": [
+     {
+      "vorgabe": "(cook)",
+      "loesungen": [
+       "was cooking"
+      ],
+      "optionen": []
+     },
+     {
+      "vorgabe": "(walk)",
+      "loesungen": [
+       "was walking"
+      ],
+      "optionen": []
+     },
+     {
+      "vorgabe": "(play)",
+      "loesungen": [
+       "were playing"
+      ],
+      "optionen": []
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "was doing"
+      ],
+      "optionen": []
+     }
+    ],
+    "loesungen": [],
+    "erklaerung": "Um sechs Uhr war alles gleichzeitig im Gange: past progressive; die Klingel unterbricht (simple past).",
+    "uebung": "anwenden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde zu einem Satz im past progressive mit while.",
+    "kontext": "Gestern Nachmittag – beides geschah gleichzeitig.",
+    "satz": "Max / read a comic – his friends / play football",
+    "vorgabe": "(while)",
+    "loesungen": [
+     "While Max was reading a comic, his friends were playing football.",
+     "Max was reading a comic while his friends were playing football.",
+     "While his friends were playing football, Max was reading a comic.",
+     "His friends were playing football while Max was reading a comic."
+    ],
+    "erklaerung": "Gleichzeitige Handlungen: beide im past progressive, verbunden mit while.",
+    "uebung": "anwenden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle den passenden Satz.",
+    "kontext": "Gestern um 21 Uhr: Du beschreibst, was in deiner Familie gleichzeitig los war.",
+    "satz": "___",
+    "optionen": [
+     "While my mum was reading, my dad was watching the news.",
+     "While my mum read, my dad watches the news.",
+     "While my mum is reading, my dad was watching the news."
+    ],
+    "loesungen": [
+     "While my mum was reading, my dad was watching the news."
+    ],
+    "erklaerung": "Beides gestern gleichzeitig im Gange: zweimal past progressive.",
+    "uebung": "anwenden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die passende Form.",
+    "kontext": "Gestern Abend: Das Essen war gerade im Gange, als plötzlich das Licht ausging.",
+    "satz": "We ___ dinner when the lights suddenly went out.",
+    "optionen": [
+     "were having",
+     "had",
+     "are having"
+    ],
+    "loesungen": [
+     "were having"
+    ],
+    "erklaerung": "Die längere Handlung im Gange: past progressive; die kurze Unterbrechung: simple past.",
+    "uebung": "unterscheiden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/gleichzeitig",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und verbessere es.",
+    "satz": "While Mia was writing an email, her brothers were argue about the TV.",
+    "fehlerWort": "argue",
+    "loesungen": [
+     "arguing"
+    ],
+    "erklaerung": "past progressive: were + -ing (were arguing).",
+    "uebung": "fehler",
+    "niveau": "a"
+   }
+  }
+ ]
+}

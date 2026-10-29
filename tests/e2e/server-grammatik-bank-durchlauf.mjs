@@ -19,7 +19,7 @@ const pruefe = (ok, text) => {
   if (!ok) problems.push(text)
 }
 const KOPF = { 'x-schulapps-token': 'server' }
-const daten = JSON.parse(readFileSync(resolve('tests/daten/grammatik-bank-englisch-2026-10-28.json'), 'utf8'))
+const daten = JSON.parse(readFileSync(resolve('tests/daten/grammatik-bank-englisch-2026-10-29.json'), 'utf8'))
 const norm = (s) => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 const anfangOhne = (s) => String(s ?? '').replace(/\s*(?:\.{2,}|…)\s*$/, '').trim()
 const woerter = (satz) => (String(satz).match(/[\p{L}\p{N}'’-]+/gu) ?? [])
@@ -124,7 +124,7 @@ try {
     ).json()
     gespeichert += r.aufgaben ?? 0
   }
-  pruefe(gespeichert === 141, `Bank: 141 Aufgaben gespeichert (${gespeichert})`)
+  pruefe(gespeichert === 156, `Bank: 156 Aufgaben gespeichert (${gespeichert})`)
   const lehrer = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Dora Durchlauf' } })).json()
   zuLoeschen.push(lehrer.id)
   lk = await browser.newContext({ viewport: { width: 1300, height: 950 } })
@@ -144,7 +144,7 @@ try {
     pakete[id] = (await (await lk.request.get(`${A}/server/grammatik/${id}`, { headers: KOPF })).json()).paket
     imKurs += pakete[id]?.aufgaben?.length ?? 0
   }
-  pruefe(imKurs === 132, `Im Kurs 132 Aufgaben – zurückgestellt: 4 mit verräterischem Satzanfang, 5 mit Platzhalter statt Name (${imKurs})`)
+  pruefe(imKurs === 150, `Im Kurs 150 Aufgaben – zurückgestellt nur die 6 Sortieraufgaben mit sichtbarem Gruppenwort (${imKurs})`)
 
   // ---------- Lehrkraft: Aufgaben ansehen › Selbst ausprobieren
   const p = await lk.newPage()

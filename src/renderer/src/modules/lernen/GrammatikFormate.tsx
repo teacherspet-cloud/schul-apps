@@ -9,7 +9,7 @@
  * Groß und antippbar (Handy, iPad). Die Prüfung steht in shared/grammatiktrainer.ts `pruefeGrammatik`.
  */
 import { Badge, Button, Group, NativeSelect, Paper, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { normiert, woerterVon, type GrammatikAufgabe, satzanfang } from '@shared/grammatiktrainer'
 import type { Urteil } from '@shared/vokabeltrainer'
 
@@ -186,32 +186,87 @@ export const UMBRUCH = {
  */
 export const auswahlSpalten = (optionen: readonly string[]): number => (optionen.some((o) => o.length > 24) ? 1 : 2)
 
+/**
+ * Sortieren (28.10.2026) – seit 29.10.2026 (Wunsch der Lehrkraft) auch per Drag-and-drop: Wort mit Maus oder Finger
+ * festhalten und in eine Gruppe ziehen; über der Wortleiste losgelassen, kommt es zurück. Antippen und dann die Gruppe
+ * wählen geht weiter. Pointer-Ereignisse – gleich für Maus, Stift und Finger; die Wörter selbst scrollen nicht mit
+ * (touch-action: none), die Seite daneben schon.
+ */
+const ZIEH_SCHWELLE = 6
+
 export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
   const elemente = a.elemente ?? []
   const gruppen = a.gruppen ?? []
   const reihenfolge = useMemo(() => mische(elemente.map((_, i) => i)), [a]) // eslint-disable-line react-hooks/exhaustive-deps
   const [wahl, setWahl] = useState<(number | null)[]>(() => elemente.map(() => null))
   const [aktiv, setAktiv] = useState<number | null>(null)
+  // Ziehen: welches Element, wo der Zeiger ist, über welcher Gruppe (-1 = Wortleiste, null = nirgends)
+  const [zug, setZug] = useState<{ i: number; x: number; y: number; ueber: number | null } | null>(null)
+  const start = useRef<{ i: number; x: number; y: number; id: number; zieht: boolean } | null>(null)
+  const nachZug = useRef(false)
+  const setze = (i: number, g: number | null): void => setWahl((w) => w.map((x, j) => (j === i ? g : x)))
   const zuteilen = (g: number): void => {
     if (aktiv === null || gesperrt) return
-    setWahl((w) => w.map((x, i) => (i === aktiv ? g : x)))
+    setze(aktiv, g)
     setAktiv(null)
   }
+  /** Gruppe unter dem Zeiger: Index, -1 für die Wortleiste, null für nichts */
+  const ziel = (x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-sortier-gruppe], [data-sortier-leiste]')
+    if (!el) return null
+    if (el.hasAttribute('data-sortier-leiste')) return -1
+    const k = gruppen.indexOf(el.getAttribute('data-sortier-gruppe') ?? '')
+    return k >= 0 ? k : null
+  }
+  const ziehbar = (i: number): React.HTMLAttributes<HTMLElement> => ({
+    onPointerDown: (e) => {
+      if (gesperrt || e.button > 0) return
+      start.current = { i, x: e.clientX, y: e.clientY, id: e.pointerId, zieht: false }
+      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+    },
+    onPointerMove: (e) => {
+      const s = start.current
+      if (!s || s.id !== e.pointerId) return
+      if (!s.zieht && Math.hypot(e.clientX - s.x, e.clientY - s.y) < ZIEH_SCHWELLE) return
+      s.zieht = true
+      setZug({ i: s.i, x: e.clientX, y: e.clientY, ueber: ziel(e.clientX, e.clientY) })
+    },
+    onPointerUp: (e) => {
+      const s = start.current
+      start.current = null
+      if (!s || !s.zieht) return
+      const k = ziel(e.clientX, e.clientY)
+      if (k !== null) setze(s.i, k >= 0 ? k : null)
+      setZug(null)
+      setAktiv(null)
+      // Den folgenden Klick (Antippen) nach einem Zug nicht werten
+      nachZug.current = true
+      setTimeout(() => (nachZug.current = false), 0)
+    },
+    onPointerCancel: () => {
+      start.current = null
+      setZug(null)
+    },
+    style: { touchAction: 'none', cursor: gesperrt ? undefined : 'grab', opacity: zug?.i === i ? 0.4 : undefined }
+  })
   const offen = reihenfolge.filter((i) => wahl[i] === null)
+  const hell = (k: number): React.CSSProperties =>
+    zug?.ueber === k ? { outline: '2px solid var(--mantine-primary-color-filled)', background: 'var(--mantine-primary-color-light)' } : {}
   return (
     <Stack gap="sm" data-sortieren>
       <Text size="sm" c="dimmed">
-        Antippen, dann die Gruppe wählen.
+        Wörter in die passende Gruppe ziehen – oder antippen und dann die Gruppe wählen.
       </Text>
-      <Group gap={6}>
+      <Group gap={6} mih={40} p={4} style={{ borderRadius: 8, ...hell(-1) }} data-sortier-leiste>
         {offen.map((i) => (
           <Button
             key={i}
             variant={aktiv === i ? 'filled' : 'default'}
             disabled={gesperrt}
-            onClick={() => setAktiv(aktiv === i ? null : i)}
+            onClick={() => !nachZug.current && setAktiv(aktiv === i ? null : i)}
             styles={UMBRUCH}
             data-sortier-element={elemente[i].text}
+            {...ziehbar(i)}
           >
             {elemente[i].text}
           </Button>
@@ -225,7 +280,7 @@ export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
             radius="md"
             p="sm"
             onClick={() => zuteilen(k)}
-            style={{ cursor: aktiv !== null ? 'pointer' : 'default', minHeight: 80 }}
+            style={{ cursor: aktiv !== null ? 'pointer' : 'default', minHeight: 80, ...hell(k) }}
             data-sortier-gruppe={g}
           >
             <Text fw={700} mb={6}>
@@ -241,8 +296,10 @@ export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
                     variant="light"
                     color={gesperrt ? (elemente[i].gruppe === k ? 'green' : 'red') : undefined}
                     disabled={gesperrt}
-                    onClick={(e) => (e.stopPropagation(), setWahl((w) => w.map((x, j) => (j === i ? null : x))))}
+                    onClick={(e) => (e.stopPropagation(), !nachZug.current && setze(i, null))}
                     styles={UMBRUCH}
+                    data-sortier-eingeordnet={elemente[i].text}
+                    {...ziehbar(i)}
                   >
                     {elemente[i].text}
                   </Button>
@@ -251,6 +308,30 @@ export function SortierenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufga
           </Paper>
         ))}
       </SimpleGrid>
+      {/* Das gezogene Wort folgt dem Zeiger */}
+      {zug && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            left: zug.x,
+            top: zug.y,
+            transform: 'translate(-50%, -60%)',
+            pointerEvents: 'none',
+            zIndex: 1000,
+            padding: '6px 12px',
+            borderRadius: 999,
+            background: 'var(--mantine-primary-color-filled)',
+            color: 'var(--mantine-primary-color-contrast)',
+            fontWeight: 600,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+            maxWidth: 320
+          }}
+          data-sortier-zug
+        >
+          {elemente[zug.i].text}
+        </div>
+      )}
       <Button w="fit-content" disabled={gesperrt || offen.length > 0} onClick={() => antworten(JSON.stringify(wahl))} data-pruefen>
         Prüfen
       </Button>

@@ -29,6 +29,8 @@ import {
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '@shared/grammatikDesign'
+import { unbekannteWoerter } from '@shared/lehrwerkWortschatz'
+import { wortschatzStand, type WortschatzStand } from './wortschatzStand'
 import { blindGeprueft, gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
 
@@ -91,6 +93,22 @@ const istLatein = (a: Pick<BankAuftrag, 'sprache' | 'fach'>): boolean => a.sprac
 const ARTEN_ALLGEMEIN = ['luecke', 'auswahl', 'umformen', 'fehler', 'satzbau', 'zuordnen', 'richtigfalsch', 'lueckentext', 'verbinden', 'frage', 'markieren', 'sortieren', 'mehrfach']
 const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetzen', 'auswahl', 'zuordnen', 'richtigfalsch']
 
+const stelleText = (ws: WortschatzStand): string => `${ws.stelle.buch}, ${ws.stelle.unit}, ${ws.stelle.abschnitt}`
+
+/** Auftrag an die KI: nur Wörter und Grammatik, die an der Einführungsstelle bekannt sind */
+export function wortschatzRegel(ws: WortschatzStand): string {
+  return [
+    `WORTSCHATZ UND GRAMMATIK (eingeführt in ${stelleText(ws)} – verbindlich): Die Lernenden kennen NUR diese englischen Wörter (dazu erfundene Vornamen, Zahlen, Plural-s und Kurzformen wie I'm, isn't, can't): ${[...ws.bekannt].sort().join(', ')}.`,
+    `Bekannte Grammatik bis hier: ${ws.grammatik.join('; ')}. Verwende KEINE anderen Formen und Strukturen – z. B. kein has/have als Vollverb, kein does/did, keine Vergangenheit, kein will, kein -ing, wenn es oben nicht steht. Jedes englische Wort in Sätzen, Möglichkeiten, Lösungen und Kontexten muss aus der Liste stammen; Anweisungen und Erklärungen sind deutsch.`,
+    // Wortstellung in den ersten Lernjahren (29.10.2026, Hinweis der Lehrkraft zu „Ella has an hour for lunch.")
+    ws.jahrgang !== undefined && ws.jahrgang <= 6
+      ? 'SATZBAU (Anfangsunterricht): kurze Hauptsätze in der gelernten Reihenfolge Subjekt – Verb – Objekt – Ort – Zeit; Orts- und Zeitangaben am Satzende, nie mitten im Satz; keine Einschübe, keine Nebensätze, keine vorangestellten Satzteile (außer Fragen und Imperativ).'
+      : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 /** Vorläufige Kennung neuer Aufgaben (der Server vergibt beim Speichern die feste „b…") */
 export const neueKennung = (i: number): string => `n${Date.now().toString(36)}${i}`
 
@@ -114,6 +132,8 @@ export async function erzeugeBankAufgaben(
   const regelId = regelIdVon(a.schluessel)
   // Übungsdesign der Form aus der Recherche (nur Englisch, nur bei einer einzelnen Form)
   const design = latein || a.formen?.length ? null : await designFuer(a.schluessel).catch(() => null)
+  // Wortschatz- und Grammatikstand der frühesten Einführung (29.10.2026, Auftrag der Lehrkraft: nur Bekanntes verwenden)
+  const ws = latein ? null : await wortschatzStand(a.schluessel, a.sprache)
   melde(`Die KI schreibt ${uebungen.reduce((n, u) => n + zahlVon(u), 0)} Aufgaben zu „${a.titel}" …`)
   const roh = await ai<{ regel: BankRegel; aufgaben: Record<string, unknown>[] }>({
     schemaName: 'grammatik_bank',
@@ -134,6 +154,7 @@ export async function erzeugeBankAufgaben(
         ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
         : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
+      ws ? wortschatzRegel(ws) : '',
       // Regeln für eindeutige Aufgaben (28.10.2026, nach der Prüfung der ganzen Bank – shared/grammatikAufgabenRegeln.ts)
       AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
@@ -227,6 +248,18 @@ export async function erzeugeBankAufgaben(
   bericht.gestrichen += regelGeprueft.gestrichen.length
   for (const g of regelGeprueft.gestrichen) if (bericht.gruende.length < 20 && !bericht.gruende.includes(g.grund)) bericht.gruende.push(g.grund)
   ohne.aufgaben = regelGeprueft.aufgaben
+  // Wortschatz (29.10.2026): Aufgaben mit Wörtern, die an der Einführungsstelle noch nicht bekannt sind, fallen weg
+  if (ws) {
+    const vorher = ohne.aufgaben.length
+    ohne.aufgaben = ohne.aufgaben.filter((x) => {
+      const u = unbekannteWoerter(x, ws.bekannt)
+      if (!u.length) return true
+      const g = `Wortschatz (${stelleText(ws)}): ${u.slice(0, 4).join(', ')}`
+      if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)
+      return false
+    })
+    bericht.gestrichen += vorher - ohne.aufgaben.length
+  }
   return {
     bericht,
     regel,

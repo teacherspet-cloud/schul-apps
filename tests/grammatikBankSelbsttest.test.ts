@@ -26,10 +26,14 @@ describe('Echte Bank-Aufgaben (Probelauf 28.10.2026)', () => {
       if (m.length) befunde.push(`${e.schluessel} · ${a.uebung ?? ''} · ${a.art} · „${(a.satz || a.anweisung).slice(0, 70)}“: ${m.join('; ')}`)
     }
   }
-  it('alle Aufgaben lösbar; zurückgestellt nur die mit verräterischem Satzanfang (4) bzw. Platzhalter statt Name (5)', () => {
+  it('alle Aufgaben lösbar; zurückgestellt nur: verräterischer Satzanfang (4), Platzhalter statt Name (5), verräterische Möglichkeiten (7)', () => {
     expect(geprueft).toBeGreaterThan(100)
     // Frage der Lehrkraft (28.10.2026): „Woher wissen die Schüler, dass ‚Ella was watering the plants' kommen müsste?"
-    expect(befunde.filter((b) => !b.includes('Satzanfang verrät die Lösung') && !b.includes('Platzhalter statt Name'))).toEqual([])
+    expect(
+      befunde.filter((b) => !b.includes('Satzanfang verrät die Lösung') && !b.includes('Platzhalter statt Name') && !b.includes('Möglichkeiten verraten'))
+    ).toEqual([])
+    // Befund der Lehrkraft 29.10.2026 („Wähle alle Wortgruppen mit an"): Sortieren nach sichtbarem will/going to bzw. was/were
+    expect(befunde.filter((b) => b.includes('Möglichkeiten verraten'))).toHaveLength(7)
     expect(befunde.filter((b) => b.includes('Satzanfang verrät die Lösung'))).toHaveLength(4)
     expect(befunde.filter((b) => b.includes('Platzhalter statt Name'))).toHaveLength(5)
   })

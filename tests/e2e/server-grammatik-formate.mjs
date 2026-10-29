@@ -174,9 +174,24 @@ try {
         await h.locator('[data-markier-wort="was"]').nth(1).click()
         await h.locator('[data-markier-wort="cooking"]').click()
       } else if (art === 'sortieren') {
-        for (const [t, gr] of [['was playing', 'past progressive'], ['played', 'simple past'], ['were running', 'past progressive'], ['ran', 'simple past']]) {
+        // Drag-and-drop (29.10.2026, Wunsch der Lehrkraft): festhalten und in die Gruppe ziehen
+        const ziehe = async (von, nach) => {
+          const a = await von.boundingBox()
+          const b = await nach.boundingBox()
+          await h.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+          await h.mouse.down()
+          await h.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 10, { steps: 3 })
+          await h.mouse.move(b.x + 20, b.y + 20, { steps: 8 })
+          await h.mouse.up()
+        }
+        await ziehe(h.locator('[data-sortier-element="was playing"]'), h.locator('[data-sortier-gruppe="simple past"]'))
+        pruefe((await h.locator('[data-sortier-gruppe="simple past"] [data-sortier-eingeordnet="was playing"]').count()) === 1, 'Sortieren: Wort in eine Gruppe gezogen')
+        // … und von dort in die richtige Gruppe umgezogen
+        await ziehe(h.locator('[data-sortier-eingeordnet="was playing"]'), h.locator('[data-sortier-gruppe="past progressive"]'))
+        pruefe((await h.locator('[data-sortier-gruppe="past progressive"] [data-sortier-eingeordnet="was playing"]').count()) === 1, 'Sortieren: zwischen Gruppen umgezogen')
+        for (const [t, gr] of [['played', 'simple past'], ['were running', 'past progressive'], ['ran', 'simple past']]) {
           await h.locator(`[data-sortier-element="${t}"]`).click()
-          await h.locator(`[data-sortier-gruppe="${gr}"]`).click()
+          await h.locator(`[data-sortier-gruppe="${gr}"]`).click({ position: { x: 8, y: 8 } })
         }
       } else if (art === 'mehrfach') {
         await h.locator('[data-option="They were swimming."]').click()
