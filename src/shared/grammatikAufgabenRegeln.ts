@@ -28,10 +28,15 @@ export const AUFGABEN_REGELN = [
   '- Genau EINE Lücke „___“ je Satz. Die Lösung ist nur der Text für die Lücke – ohne Wörter, die schon im Satz stehen (kein doppeltes Subjekt oder Verb).',
   '- AUSWAHL: 3–4 Möglichkeiten, genau EINE davon ist im Satz richtig; keine zwei gleichwertigen; Ablenker sind typische Fehlformen bzw. die verwechselbare Nachbarform.',
   '- Die Anweisung passt zur Aufgabenart: „Wähle …“ nur bei Auswahl; bei Lücken „Setze … ein“ bzw. „Ergänze …“.',
+  '- FEHLER FINDEN und RICHTIG ODER FALSCH: Der Fehlersatz ist in JEDER Lesart falsch – nicht nur in der gemeinten. Hängt der Fehler am Bezug (his/her, our/their, Pronomen, Person, Zeit), legt der Kontext den Bezug fest („Anna has a dog. She is here with ___ dog." statt „Anna is here with his dog.", denn der Hund kann einem Jungen gehören). Das Fehlerwort steht nur EINMAL im Satz, und der Satz lässt sich nur auf EINE Weise mit einem Wort berichtigen.',
+  '- BEZUG eindeutig: Bei Possessivbegleitern, Pronomen und Personenformen steht der Bezug (Besitzer, Person) im Satz oder Kontext und ist der einzige mögliche – nicht zwei Personen verschiedenen Geschlechts oder ein Paar, aus dem einer gemeint sein könnte („Max and Lily are twins. ___ dog …" lässt Their, His und Her zu). Tiere mit Namen: it UND he/she gelten – beide in „loesungen" oder Tier ohne Namen.',
   '- FEHLER FINDEN und RICHTIG ODER FALSCH: nur Fehler, die sich durch Ersetzen GENAU EINES Wortes durch EIN anderes Wort beheben lassen (eine Kurzform zählt als ein Wort) – keine Fehler durch ein überflüssiges oder fehlendes Wort und keine Wortstellungsfehler. Der Fehler betrifft die geübte Grammatik, nicht Rechtschreibung oder anderes.',
   '- Zeichensetzung und Wortstellung (Komma bei Relativsätzen, Stellung von Adverbien, Inversion, Fragen): nie als Lücke mit einem Satzzeichen oder „—“ als Lösung; stattdessen Auswahl zwischen ganzen Sätzen (satz = „___“, optionen = vollständige Sätze), Satzbau oder Umformen.',
   '- UMFORMEN: Anweisung oder vorgabe nennt die Zielform; die Lösung ist ein anderer Satz als der Ausgangssatz; alle gleichwertigen Fassungen in „loesungen“.',
   '- SATZBAU: genau eine sinnvolle Reihenfolge; die geübte Form steht nicht schon fertig in einem einzigen Teil.',
+  '- Satzanfang („anfang") beim Umformen, Verbinden und Fragenbilden: nie das Wort, das die Lernenden bilden sollen (Umformen „My hair …" über Ryan: kein Anfang „His").',
+  '- Vorgabe beim Bilden: nie alle Wörter der Lösung („(can / ride)" → „can ride" ist Abschreiben); stattdessen Grundform plus Signal bzw. Verneinung („(ride)" mit Kontext, „(not / dance)" → „can\'t dance") oder Auswahl.',
+  '- SORTIEREN und ZUORDNEN: Die Zuordnung verlangt die Regel, nicht ein äußeres Merkmal – nicht alle Elemente einer Gruppe mit demselben Anfangswort, das die anderen nicht haben („Don\'t …" gegen alles andere). Beim Zuordnen passt jede rechte Seite zu GENAU EINER linken: keine zwei Paare desselben Musters, die man vertauschen könnte (zwei „Is there …?"-Fragen mit „Yes, there is." und „No, there isn\'t." nur, wenn der Kontext die Antwort festlegt).',
   '- Lösungen sind tippbare Wörter der Zielsprache – keine Erklärungen („streichen“, „nichts“), keine Platzhalter („—“), kein „/“ zwischen Varianten (jede Variante einzeln in „loesungen“).',
   // Neubeginn 28.10.2026 – Recherche (Fachdidaktik, Übungsseiten, Ausarbeitung je Form) und Abstimmung mit der Lehrkraft
   'KONTEXT statt Einzelsatz: Legt ein Satz allein die Form nicht fest (Zeitform/Aspekt, will/going to, Modalverb nach Bedeutung, indirekte Rede, Artikel bei Erstnennung …), schreibe 1–3 kurze Sätze Vorlauf in „kontext“ (Situation, Zeit, Beleg) oder nutze Lückentext bzw. Dialog. Kontext sprachlich einfacher als die geübte Grammatik.',
@@ -47,6 +52,7 @@ export const AUFGABEN_REGELN = [
 /** Zusatz für die Prüfung durch die KI: dieselben Regeln als Prüfpunkte */
 export const PRUEF_REGELN =
   'ok = false auch, wenn eine Regel aus QUALITÄT verletzt ist und sich nicht über Lösungen, Möglichkeiten oder Fehlerwort reparieren lässt – besonders: Lücke ohne Grundwort, deren Lösung man raten muss; Vorgabe gleich Lösung; mehrere Lücken; Fehler, der sich nicht durch EIN Wort beheben lässt; Auswahl mit zwei richtigen Möglichkeiten; nicht tippbare Lösung. ' +
+  'Bei Fehler finden und Richtig oder falsch zusätzlich: „Gibt es eine Lesart (anderer Besitzer, andere Person, andere Situation), in der der Satz RICHTIG wäre?“ Wenn ja: ok = false. Beim Zuordnen: „Ließen sich zwei Paare vertauschen?“ Wenn ja: ok = false. ' +
   'Prüfe JEDE Aufgabe mit der Frage: „Wäre mit diesem Satz bzw. Kontext auch eine andere Form richtig?“ Wenn ja: gleichwertige Alternative in die Lösungen aufnehmen – sonst ok = false (der Kontext legt die Form nicht fest).'
 
 // ---------------------------------------------------------------- ohne KI richten
@@ -116,6 +122,8 @@ export function aufgabeNormalisiert<T extends GrammatikAufgabe>(a: T): T {
     const rest = x.loesungen.filter((l) => !/^(richtig|falsch|true|false)$/i.test(l.trim()))
     if (rest.length) x = { ...x, loesungen: rest }
   }
+  // Nummern vor den Lücken (29.10.2026, Blindprobe: „(1) (1) ___") – die App nummeriert die Lücken selbst
+  if (x.art === 'lueckentext' && /\(\d+\)\s*_{3,}/.test(x.satz)) x = { ...x, satz: x.satz.replace(/\(\d+\)\s*(?=_{3,})/g, '') }
   if (x.art === 'auswahl' && x.optionen) {
     const ohne: string[] = []
     for (const o of x.optionen) if (!enthalten(ohne, o)) ohne.push(o)
@@ -143,9 +151,11 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
   if (a.art === 'luecke') {
     const v = klammerInhalt(a.vorgabe)
     if (v && !wahlAusVorgabe(a.vorgabe).length && enthalten(l, v)) return 'Vorgabe ist schon die Lösung'
+    if (vorgabeZusammengesetzt(a.vorgabe, l)) return 'Vorgabe ist schon die Lösung (nur abschreiben)'
     if (a.uebung === 'erkennen' || a.uebung === 'unterscheiden') return 'freie Lücke beim Erkennen bzw. Unterscheiden (braucht Auswahl)'
-    // Bilden heißt: aus einem Grundwort – ohne Vorgabe und ohne genannte Wahl muss geraten werden
-    if (a.uebung === 'bilden' && !a.vorgabe && !wahlAusAnweisung(a.anweisung).length) return 'Lücke ohne Grundwort beim Bilden'
+    // Eine Lücke heißt: aus einem Grundwort bilden – ohne Vorgabe und ohne genannte Wahl muss geraten werden (29.10.2026:
+    // auch beim Anwenden, „Tom is ___ bed." mit „in" – die Präposition wird gewählt, nicht gebildet)
+    if (!a.vorgabe && !wahlAusAnweisung(a.anweisung).length) return 'Lücke ohne Grundwort (gewähltes Wort braucht Auswahl)'
   }
   if (['luecke', 'umformen', 'fehler'].includes(a.art) && l.some((x) => UNTIPPBAR.test(x) || /\s\/\s/.test(x))) return 'Lösung nicht tippbar'
   if (a.art === 'auswahl') {
@@ -154,6 +164,7 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
   if (a.art === 'fehler') {
     if (!a.fehlerWort || !woerterVon(a.satz).some((w) => normiert(w) === normiert(a.fehlerWort!))) return 'Fehlerwort steht nicht im Satz'
     if (enthalten(l, a.fehlerWort)) return 'Korrektur gleich Fehlerwort'
+    if (fehlerWortMehrfach(a)) return 'Fehlerwort steht mehrmals im Satz'
     if (l.length && l.every((x) => wortzahl(x) > 2)) return 'Fehler lässt sich nicht durch ein Wort beheben'
   }
   if (a.art === 'umformen' && l.length && enthalten(l, a.satz)) return 'Lösung gleich Ausgangssatz'
@@ -166,6 +177,8 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
     for (const g of a.luecken) {
       const v = klammerInhalt(g.vorgabe)
       if (v && !wahlAusVorgabe(g.vorgabe).length && enthalten(g.loesungen, v)) return 'Vorgabe ist schon die Lösung (Lückentext)'
+      if (vorgabeZusammengesetzt(g.vorgabe, g.loesungen)) return 'Vorgabe ist schon die Lösung (Lückentext, nur abschreiben)'
+      if (!g.vorgabe?.trim() && !g.optionen?.length && !a.wortkasten?.length) return 'Lücke ohne Grundwort (Lückentext)'
       if (g.loesungen.some((x) => UNTIPPBAR.test(x) || /\s\/\s/.test(x))) return 'Lösung nicht tippbar (Lückentext)'
     }
   }
@@ -182,6 +195,7 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
   // plants' kommen müsste?" – Anfang „While the neighbours were talking," ließ nur das Abschreiben des zweiten Satzes übrig)
   if (satzanfangVerraet(a)) return 'Satzanfang verrät die Lösung (Rest steht wörtlich in der Vorgabe)'
   if ((a.art === 'verbinden' || a.art === 'frage') && l.some((x) => UNTIPPBAR.test(x))) return 'Lösung nicht tippbar'
+  if (a.art === 'richtigfalsch' && fehlerWortMehrfach(a)) return 'Fehlerwort steht mehrmals im Satz'
   if (a.art === 'markieren' && !a.ziele?.length) return 'nichts zu markieren'
   if (a.art === 'sortieren' && ((a.gruppen?.length ?? 0) < 2 || (a.elemente?.length ?? 0) < 4)) return 'zu wenig zum Sortieren'
   if (a.art === 'satzbau' && a.teile?.length && l.length) {
@@ -215,11 +229,43 @@ export function moeglichkeitenVerraten(a: Pick<GrammatikAufgabe, 'art' | 'anweis
     const e = a.elemente ?? []
     if (g.length < 2 || !e.length) return false
     // Ein Gruppenwort (z. B. „an"), das genau in den Elementen dieser Gruppe vorkommt
-    return g.some((gw, k) =>
-      gw.some((t) => e.filter((x) => x.gruppe === k).every((x) => w(x.text).has(t)) && e.filter((x) => x.gruppe !== k).every((x) => !w(x.text).has(t)))
+    if (
+      g.some((gw, k) =>
+        gw.some((t) => e.filter((x) => x.gruppe === k).every((x) => w(x.text).has(t)) && e.filter((x) => x.gruppe !== k).every((x) => !w(x.text).has(t)))
+      )
     )
+      return true
+    // Alle Elemente einer Gruppe beginnen mit demselben Wort, das sonst kein Element trägt (29.10.2026, Prüfung: „Don't sit …",
+    // „Don't forget …" gegen „Sit …", „Bring …" – sortierbar ohne die Regel, nur am ersten Wort)
+    const erstes = (x: { text: string }): string => normiert(woerterVon(x.text)[0] ?? '')
+    return g.some((_, k) => {
+      const drin = e.filter((x) => x.gruppe === k)
+      const t = drin.length >= 3 ? erstes(drin[0]) : ''
+      return !!t && drin.every((x) => erstes(x) === t) && e.filter((x) => x.gruppe !== k).every((x) => !w(x.text).has(t))
+    })
   }
   return false
+}
+
+/**
+ * Vorgabe nur zusammengesetzt (29.10.2026, Prüfung: „(can / ride)" → „can ride", „(can't / dance)" → „can't dance"): Jedes
+ * Wort jeder Lösung steht schon in der Vorgabe – die Lernenden schreiben ab, statt eine Form zu bilden. Eine echte Wahl
+ * („(since / for)" → „for") ist eine einzelne Möglichkeit und fällt nicht darunter.
+ */
+export function vorgabeZusammengesetzt(vorgabe: string | undefined, loesungen: readonly string[]): boolean {
+  const v = new Set(woerterVon(klammerInhalt(vorgabe).replace(/\//g, ' ')).map((x) => normiert(x)))
+  if (v.size < 2 || !loesungen.length) return false
+  return loesungen.every((l) => {
+    const t = woerterVon(l).map((x) => normiert(x))
+    return t.length >= 2 && t.every((x) => v.has(x))
+  })
+}
+
+/** Fehlerwort mehrmals im Satz (29.10.2026, Prüfung: „While my sister was reading, my brothers was …") – welches ist gemeint? */
+export function fehlerWortMehrfach(a: Pick<GrammatikAufgabe, 'satz' | 'fehlerWort'>): boolean {
+  if (!a.fehlerWort?.trim()) return false
+  const f = normiert(a.fehlerWort)
+  return woerterVon(a.satz).filter((w) => normiert(w) === f).length > 1
 }
 
 /** Platzhalter des Namensschutzes („[Person-3]", auch ohne Klammern) */

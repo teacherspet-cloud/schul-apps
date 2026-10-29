@@ -123,6 +123,11 @@ const paketSchema = (latein: boolean, extra = false, themen: string[] = []): Rec
 
 export interface GrammatikAuftrag {
   thema: string
+  /**
+   * Zusatzregel für Prüfung und Überarbeitung (29.10.2026, Handbetrieb: die Wortschatzregel des Lehrwerksstands kannten
+   * nur die Erzeugung, nicht Prüfung und Überarbeitung – eine Überarbeitung brachte so neue, unbekannte Wörter)
+   */
+  zusatzRegel?: string
   fach: string
   sprache: string
   jahrgang: number
@@ -476,6 +481,8 @@ export async function gepruefterPool(
         // Regeln (28.10.2026): dieselben Maßstäbe wie beim Schreiben
         AUFGABEN_REGELN,
         PRUEF_REGELN,
+        a.zusatzRegel ? `${a.zusatzRegel}
+ok = false auch bei Wörtern außerhalb dieses Wortschatzes, die sich nicht durch Lösungen ersetzen lassen.` : '',
         'loesungen/optionen/fehlerWort: die korrigierte Fassung (oder unverändert); grund: kurz, deutsch.',
         gesperrt.length
           ? `ok = false auch, wenn Satz, Lösung oder Möglichkeiten eine Zeitform brauchen, die die Lerngruppe noch nicht kennt: ${gesperrt
@@ -623,7 +630,7 @@ const BLIND_RUNDEN = 3
  */
 export async function blindGeprueft(
   start: GrammatikPaket,
-  a: Pick<GrammatikAuftrag, 'fach' | 'jahrgang' | 'thema'>,
+  a: Pick<GrammatikAuftrag, 'fach' | 'jahrgang' | 'thema' | 'zusatzRegel'>,
   ai: Ai,
   melde: (t: string) => void,
   bericht?: PruefBericht
@@ -707,6 +714,7 @@ export async function blindGeprueft(
               '- ueberarbeiten: Aus der Schüleransicht folgt die Lösung nicht eindeutig (fehlender Kontext, fehlendes Signalwort, zwei richtige Möglichkeiten, unklare Anweisung) oder die Aufgabe ist fehlerhaft. Schreibe sie so um, dass GENAU die Lösung folgt – gleiche Übungsart, gleiches Format, alle Felder vollständig ausgefüllt. Bei Auswahl, Mehrfachauswahl, Zuordnen, Sortieren und Markieren: Ablenker bzw. Text so ändern, dass nur die Lösung passt.',
               '- streichen: nicht zu retten.',
               AUFGABEN_REGELN,
+              a.zusatzRegel ?? '',
               'grund: kurz, deutsch.'
             ].join('\n'),
             user: probleme

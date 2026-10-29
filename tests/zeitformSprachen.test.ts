@@ -169,7 +169,8 @@ describe('Auftrag an die KI', () => {
     }
     return { ai, anfragen }
   }
-  const A = (satz: string, loesung: string) => ({ art: 'luecke', regelId: 'r1', anweisung: 'Setze ein.', satz, loesungen: [loesung] })
+  // Grundwort in der Vorgabe (29.10.2026: Lücken ohne Grundwort fallen weg)
+  const A = (satz: string, loesung: string, vorgabe = '(x)') => ({ art: 'luecke', regelId: 'r1', anweisung: 'Setze ein.', satz, vorgabe, loesungen: [loesung] })
 
   it('Französisch Klasse 6: Regel mit Basis und Verboten, Niveau nach GER-Faustregel, passé composé gestrichen', async () => {
     const { ai, anfragen } = attrappe([A('___ chat est noir.', 'Le'), A("Hier, j'___ mangé.", 'ai'), A('Je ___ une pomme.', 'mange')])

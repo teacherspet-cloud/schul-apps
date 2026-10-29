@@ -29,7 +29,7 @@ import {
 import { bekanntNachStand, ohneGesperrteZeitformen, sperreFuer, sperrRegel, sperrSprache } from '@shared/zeitformSperre'
 import { AUFGABEN_REGELN, aufgabeMangel, aufgabeNormalisiert, aufgabenGeprueft } from '@shared/grammatikAufgabenRegeln'
 import { designFuer, designText } from '@shared/grammatikDesign'
-import { unbekannteWoerter } from '@shared/lehrwerkWortschatz'
+import { formWoerter, unbekannteWoerter } from '@shared/lehrwerkWortschatz'
 import { wortschatzStand, type WortschatzStand } from './wortschatzStand'
 import { blindGeprueft, gepruefterPool, LATEIN_REGELN, lateinLernjahr, niveauDesAuftrags, type PruefBericht } from './grammatikErzeugen'
 import { katalogFormenRegel, niveauRegel } from './grammatikNiveau'
@@ -96,9 +96,9 @@ const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetze
 const stelleText = (ws: WortschatzStand): string => `${ws.stelle.buch}, ${ws.stelle.unit}, ${ws.stelle.abschnitt}`
 
 /** Auftrag an die KI: nur Wörter und Grammatik, die an der Einführungsstelle bekannt sind */
-export function wortschatzRegel(ws: WortschatzStand): string {
+export function wortschatzRegel(ws: WortschatzStand, formWorte: readonly string[] = []): string {
   return [
-    `WORTSCHATZ UND GRAMMATIK (eingeführt in ${stelleText(ws)} – verbindlich): Die Lernenden kennen NUR diese englischen Wörter (dazu erfundene Vornamen, Zahlen, Plural-s und Kurzformen wie I'm, isn't, can't): ${[...ws.bekannt].sort().join(', ')}.`,
+    `WORTSCHATZ UND GRAMMATIK (eingeführt in ${stelleText(ws)} – verbindlich): Die Lernenden kennen NUR diese englischen Wörter (dazu erfundene Vornamen, Zahlen, Plural-s und Kurzformen wie I'm, isn't, can't${formWorte.length ? ` sowie die Wörter der geübten Form: ${formWorte.join(', ')}` : ''}): ${[...ws.bekannt].sort().join(', ')}.`,
     `Bekannte Grammatik bis hier: ${ws.grammatik.join('; ')}. Verwende KEINE anderen Formen und Strukturen – z. B. kein has/have als Vollverb, kein does/did, keine Vergangenheit, kein will, kein -ing, wenn es oben nicht steht. Jedes englische Wort in Sätzen, Möglichkeiten, Lösungen und Kontexten muss aus der Liste stammen; Anweisungen und Erklärungen sind deutsch.`,
     // Wortstellung in den ersten Lernjahren (29.10.2026, Hinweis der Lehrkraft zu „Ella has an hour for lunch.")
     ws.jahrgang !== undefined && ws.jahrgang <= 6
@@ -154,7 +154,7 @@ export async function erzeugeBankAufgaben(
         ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
         : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      ws ? wortschatzRegel(ws) : '',
+      ws ? wortschatzRegel(ws, formWoerter(a.schluessel)) : '',
       // Regeln für eindeutige Aufgaben (28.10.2026, nach der Prüfung der ganzen Bank – shared/grammatikAufgabenRegeln.ts)
       AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
@@ -231,7 +231,7 @@ export async function erzeugeBankAufgaben(
   const bericht: BankBericht = { geprueft: 0, gestrichen: 0, zuLeicht: 0, gruende: [], zeitform: 0 }
   const geprueft = await gepruefterPool(
     start,
-    { thema: a.titel, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang },
+    { thema: a.titel, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang, ...(ws ? { zusatzRegel: wortschatzRegel(ws, formWoerter(a.schluessel)) } : {}) },
     ai,
     melde,
     gesperrt,
@@ -252,7 +252,7 @@ export async function erzeugeBankAufgaben(
   if (ws) {
     const vorher = ohne.aufgaben.length
     ohne.aufgaben = ohne.aufgaben.filter((x) => {
-      const u = unbekannteWoerter(x, ws.bekannt)
+      const u = unbekannteWoerter(x, ws.bekannt, formWoerter(a.schluessel))
       if (!u.length) return true
       const g = `Wortschatz (${stelleText(ws)}): ${u.slice(0, 4).join(', ')}`
       if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)

@@ -568,6 +568,35 @@ export function satzzeichenHinweis(a: Pick<GrammatikAufgabe, 'art' | 'loesungen'
   return ende === '?' ? 'Vergiss das Fragezeichen am Ende nicht.' : ende === '!' ? 'Vergiss das Ausrufezeichen am Ende nicht.' : 'Vergiss den Punkt am Ende nicht.'
 }
 
+
+/**
+ * Englische Kurzformen ausgeschrieben (29.10.2026) – für den Vergleich: „isn't" = „is not", „don't" = „do not", „can't" =
+ * „cannot", „I'm" = „I am", „'s not" = „is not". „'s" nur nach Pronomen bzw. Fragewort und nicht vor einem Partizip
+ * („she's been" = has), damit kein Besitz-s und kein „has" als „is" gilt. Erwartet einen normierten Text.
+ */
+export function ohneKurzformen(s: string): string {
+  return s
+    .replace(/\bcan't\b|\bcan not\b/g, 'cannot')
+    .replace(/\bwon't\b/g, 'will not')
+    .replace(/\bshan't\b/g, 'shall not')
+    .replace(/(\w)n't\b/g, '$1 not')
+    .replace(/'m\b/g, ' am')
+    .replace(/'re\b/g, ' are')
+    .replace(/'ve\b/g, ' have')
+    .replace(/'ll\b/g, ' will')
+    .replace(/(^|\s)'s not\b/g, '$1is not')
+    .replace(/\b(it|he|she|that|there|what|where|who|here|how)'s\b(?!\s+(?:been|got|gone|had|done|\w+ed)\b)/g, '$1 is')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Gilt die Kurz- gleich der Langform? Nicht, wenn die Aufgabe genau das übt (Anweisung bzw. Vorgabe nennt Kurz-/Langform, oder der Ausgangssatz unterscheidet sich nur darin) */
+export function kurzformTolerant(a: Pick<GrammatikAufgabe, 'art' | 'anweisung' | 'vorgabe' | 'satz' | 'loesungen'>): boolean {
+  if (/kurz-? ?form|lang-? ?form|short form|long form|contract/i.test(`${a.anweisung ?? ''} ${a.vorgabe ?? ''}`)) return false
+  if (a.art === 'umformen' && a.loesungen?.length && ohneKurzformen(normiert(a.satz)) === ohneKurzformen(normiert(a.loesungen[0]))) return false
+  return true
+}
+
 /** Den vorgegebenen Satzanfang nicht doppelt zählen, wenn die Eingabe ihn schon enthält */
 export function ohneDoppeltenAnfang(antwort: string, anfang: string | undefined): string {
   const an = normiert(satzanfang(anfang))
@@ -597,6 +626,11 @@ export function pruefeGrammatik(
 
 function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaehltesWort?: string, selbst?: Urteil): { urteil: Urteil; richtig: string } {
   const richtig = a.loesungen[0] ?? ''
+  // Kurz- und Langform gleichwertig (29.10.2026, Blindprobe: „isn't" ohne „is not", „Don't" ohne „Do not") – außer die
+  // Aufgabe übt gerade die Kurz- bzw. Langform
+  const kt = kurzformTolerant(a)
+  const nv = (x: string): string => (kt ? ohneKurzformen(normiert(x)) : normiert(x))
+  const gl = (x: string, y: string): boolean => nv(x) === nv(y)
   if (a.art === 'bestimmen') {
     const angegeben = jsonListe(antwort)
       .filter(Array.isArray)
@@ -608,8 +642,8 @@ function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaeh
   if (a.art === 'mehrfach') {
     const gewaehlt = jsonListe(antwort).map(String)
     const soll = a.loesungen
-    const treffer = soll.filter((s) => gewaehlt.some((g) => gleich(g, s))).length
-    const falsch = gewaehlt.filter((g) => !soll.some((s) => gleich(g, s))).length
+    const treffer = soll.filter((s) => gewaehlt.some((g) => gl(g, s))).length
+    const falsch = gewaehlt.filter((g) => !soll.some((s) => gl(g, s))).length
     return { urteil: treffer === soll.length && !falsch ? 'richtig' : treffer > falsch ? 'fast' : 'falsch', richtig: soll.join(' / ') }
   }
   if (a.art === 'tabelle') {
@@ -619,7 +653,7 @@ function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaeh
   }
   if (a.art === 'uebersetzen') {
     // Wörtlich wie eine Musterlösung = richtig; sonst entscheidet der Vergleich der Lernenden (`selbst`)
-    if (a.loesungen.some((l) => gleich(l, antwort))) return { urteil: 'richtig', richtig }
+    if (a.loesungen.some((l) => gl(l, antwort))) return { urteil: 'richtig', richtig }
     return { urteil: selbst ?? 'falsch', richtig }
   }
   if (a.art === 'zuordnen') {
@@ -636,15 +670,15 @@ function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaeh
     const soll = a.korrekt ? 'Der Satz ist richtig.' : `${a.fehlerWort ?? ''} → ${richtig}`
     if (sagtRichtig !== Boolean(a.korrekt)) return { urteil: 'falsch', richtig: soll }
     if (a.korrekt) return { urteil: 'richtig', richtig: soll }
-    const wortPasst = Boolean(a.fehlerWort) && gleich(String(w.wort ?? ''), a.fehlerWort!)
-    const korrekturPasst = a.loesungen.some((l) => gleich(l, String(w.korrektur ?? '')))
+    const wortPasst = Boolean(a.fehlerWort) && gl(String(w.wort ?? ''), a.fehlerWort!)
+    const korrekturPasst = a.loesungen.some((l) => gl(l, String(w.korrektur ?? '')))
     return { urteil: wortPasst && korrekturPasst ? 'richtig' : 'fast', richtig: soll }
   }
   // Neue Formate (28.10.2026)
   if (a.art === 'lueckentext') {
     const eingaben = jsonListe(antwort).map((x) => String(x ?? ''))
     const luecken = a.luecken ?? []
-    const treffer = luecken.filter((l, i) => l.loesungen.some((s) => gleich(s, eingaben[i] ?? ''))).length
+    const treffer = luecken.filter((l, i) => l.loesungen.some((s) => gl(s, eingaben[i] ?? ''))).length
     const alle = luecken.map((l, i) => `${i + 1}) ${l.loesungen[0]}`).join(' · ')
     return { urteil: treffer === luecken.length ? 'richtig' : treffer * 2 >= luecken.length ? 'fast' : 'falsch', richtig: alle }
   }
@@ -669,17 +703,17 @@ function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaeh
     // Überlesener Satzanfang (29.10.2026, Befund der Lehrkraft): steht er doppelt da, zählt er einmal
     antwort = ohneDoppeltenAnfang(antwort, a.anfang)
     const voll = anfang && !normiert(antwort).startsWith(normiert(anfang)) ? `${anfang} ${antwort}` : antwort
-    const ohne = (x: string): string => (a.kommaPruefen ? normiert(x) : normiert(x).replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ').trim())
+    const ohne = (x: string): string => (a.kommaPruefen ? nv(x) : nv(x).replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ').trim())
     const ant = ohne(voll)
     if (!normiert(antwort)) return { urteil: 'falsch', richtig }
     if (a.loesungen.some((l) => ohne(l) === ant)) return { urteil: 'richtig', richtig }
     if (ant.length > 12 && a.loesungen.some((l) => abstand(ohne(l), ant) === 1)) return { urteil: 'fast', richtig }
     return { urteil: 'falsch', richtig }
   }
-  if (a.art === 'fehler' && gewaehltesWort !== undefined && a.fehlerWort && !gleich(gewaehltesWort, a.fehlerWort)) return { urteil: 'falsch', richtig }
-  const ant = normiert(antwort)
+  if (a.art === 'fehler' && gewaehltesWort !== undefined && a.fehlerWort && !gl(gewaehltesWort, a.fehlerWort)) return { urteil: 'falsch', richtig }
+  const ant = nv(antwort)
   if (!ant) return { urteil: 'falsch', richtig }
-  if (a.loesungen.some((l) => normiert(l) === ant)) return { urteil: 'richtig', richtig }
+  if (a.loesungen.some((l) => nv(l) === ant)) return { urteil: 'richtig', richtig }
   if (a.art === 'umformen' && ant.length > 12 && a.loesungen.some((l) => abstand(normiert(l), ant) === 1)) return { urteil: 'fast', richtig }
   return { urteil: 'falsch', richtig }
 }

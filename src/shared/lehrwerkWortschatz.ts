@@ -32,7 +32,7 @@ export function wortformen(text: string): string[] {
   const aus: string[] = []
   for (const roh of klein(text).match(/[a-z]+(?:'[a-z]+)?/g) ?? []) {
     const [w, k] = roh.split("'")
-    if (k === undefined) aus.push(w)
+    if (k === undefined) aus.push(...(w === 'cannot' ? ['can', 'not'] : [w]))
     else if (k === 't' && w.endsWith('n')) aus.push(w === 'can' ? 'can' : w === 'won' ? 'will' : w.slice(0, -1), 'not')
     else if (k === 'm') aus.push(w, 'am')
     else if (k === 're') aus.push(w, 'are')
@@ -53,7 +53,16 @@ export function wortschatzAus(eintraege: readonly { term: string }[]): Set<strin
 }
 
 /** Grundformen eines Wortes für den Abgleich: Plural-/3.-Person-s, -es, -ies → -y */
-const stamme = (w: string): string[] => [w, w.replace(/ies$/, 'y'), w.replace(/es$/, ''), w.replace(/s$/, '')]
+// -ing und -ed (29.10.2026, Handbetrieb: „singing", „ringing" bei bekanntem sing/ring galten als unbekannt): making → make,
+// running → run, played → play, liked → like, studied → study
+const stamme = (w: string): string[] => [
+  w,
+  w.replace(/ies$/, 'y'),
+  w.replace(/es$/, ''),
+  w.replace(/s$/, ''),
+  ...(/..ing$/.test(w) ? [w.slice(0, -3), `${w.slice(0, -3)}e`, w.slice(0, -4)] : []),
+  ...(/..ed$/.test(w) ? [w.slice(0, -2), w.slice(0, -1), w.slice(0, -3), w.replace(/ied$/, 'y')] : [])
+]
 
 export const istBekanntesWort = (w: string, bekannt: ReadonlySet<string>): boolean => /^\d/.test(w) || stamme(w).some((x) => bekannt.has(x))
 
@@ -124,16 +133,46 @@ export function bekannteGrammatik(baende: readonly { name: string; grammatik: Gr
   return aus
 }
 
+/**
+ * Wörter der geübten Form selbst sind immer erlaubt (29.10.2026: „own" steht bei der Teilform „own" nicht in der Liste
+ * bis Station 3 – es ist der Lernstoff): englische Teile der Kennungen hinter „/" („his-her" → his, her)
+ */
+export function formWoerter(schluessel: string): string[] {
+  const teile = schluessel.replace(/^mix:/, '').split('+')
+  return [...new Set(teile.flatMap((k) => (k.split('/')[1] ?? '').split(/[-_]/)).filter((w) => /^[a-z]+$/.test(w)))]
+}
+
+/**
+ * Deutsche Wörter, die in Aufgaben neben Englischem stehen (29.10.2026, Handbetrieb: „Emma statt Tom", „unter dem Tisch",
+ * „richtig / falsch", „Verbot (tu es nicht)" zählten als unbekannte englische Wörter – 54 gute Aufgaben fielen weg).
+ * Ohne Wörter, die es auch im Englischen gibt (hat, war, will, also, so, man, kind, art …).
+ */
+const DEUTSCHE_WOERTER = new Set(
+  (
+    'der die das den dem des ein eine einen einem einer eines kein keine keinen keinem keiner und oder aber nicht ist sind sein ' +
+    'seine seinen seinem seiner ihr ihre ihren ihrem ihrer unser unsere euer eure mein meine dein deine ich du er sie es wir ' +
+    'mich dich sich uns euch mir dir ihm ihnen wer wen wem wessen wie wo wann warum wieso welche welcher welches mit ohne ' +
+    'für gegen von vom zu zum zur bei beim nach aus auf unter über hinter vor neben zwischen gegenüber statt anstatt im ins am an ' +
+    'als auch noch schon nur jetzt heute gestern morgen hier dort ja nein bitte danke richtig falsch gleich ganz sehr viel ' +
+    'satz sätze wort wörter frage fragen antwort antworten aufforderung verbot verbote besitz besitzer form formen lücke ' +
+    'verneinen verneint verneinte verneinter verneinung kurzform langform kurzantwort zeitform signal signalwort gruppe ' +
+    'tu tue tun mach macht machen hast habe haben darf dürfen kann können muss müssen soll sollen schief spontan spontane ' +
+    'singt sitzen sitzt steht stehen liegt liegen geht gehen gibt ort zeit person personen ding dinge tier tiere jemand etwas'
+  ).split(' ')
+)
+
 /** Deutsch statt Englisch? (Kontexte und Anweisungen sind oft deutsch – die werden nicht geprüft) */
 const DEUTSCH = /\b(der|die|das|und|ist|du|ich|nicht|ein|eine|mit|für|zu|auf|im|wie|was|wird|sind|gestern|heute)\b|[äöüß]/i
 export const istDeutsch = (s: string): boolean => DEUTSCH.test(s)
 
 /** Englische Texte einer Aufgabe (ohne Anweisung, Erklärung und deutschen Kontext) */
 export function englischeTexte(a: GrammatikAufgabe): string[] {
-  const t: string[] = [a.satz, a.anfang ?? '', a.vorgabe ?? '', ...(a.loesungen ?? []), ...(a.optionen ?? []), ...(a.teile ?? []), ...(a.wortkasten ?? [])]
+  // Was Lernende sehen, dazu die Hauptlösung – weitere gleichwertige Lösungen (z. B. „Are there any …?") erweitern nur,
+  // was als richtig zählt, und lassen eine Aufgabe nicht wegfallen
+  const t: string[] = [a.satz, a.anfang ?? '', a.vorgabe ?? '', a.loesungen?.[0] ?? '', ...(a.optionen ?? []), ...(a.teile ?? []), ...(a.wortkasten ?? [])]
   for (const p of a.paare ?? []) t.push(p.links, p.rechts)
   for (const e of a.elemente ?? []) t.push(e.text)
-  for (const l of a.luecken ?? []) t.push(l.vorgabe ?? '', ...l.loesungen, ...(l.optionen ?? []))
+  for (const l of a.luecken ?? []) t.push(l.vorgabe ?? '', l.loesungen[0] ?? '', ...(l.optionen ?? []))
   if (a.kontext && !istDeutsch(a.kontext)) t.push(a.kontext)
   if (a.art === 'sortieren') t.push(...(a.gruppen ?? []).filter((g) => !istDeutsch(g)))
   return t.filter((x) => x && x.trim() && !istDeutsch(x))
@@ -153,6 +192,8 @@ export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<stri
       const gross = /^[A-Z]/.test(r)
       for (const w of wortformen(r)) {
         if (istBekanntesWort(w, erlaubt)) continue
+        // Einzelne Buchstaben (Sprecher „A:"/„B:", Aufzählungen) und deutsche Wörter neben dem Englischen
+        if (w.length < 2 || DEUTSCHE_WOERTER.has(w)) continue
         if (gross && w === klein(r).split("'")[0]) continue
         aus.add(w)
       }

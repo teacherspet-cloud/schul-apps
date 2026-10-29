@@ -25,3 +25,16 @@ describe('Wortschatz nach Lehrwerksstand', () => {
     expect(wortschatzStandServer('en.verb.there_is/fragen', 'en')!.stelle.abschnitt).toBe('Station 2')
   })
 })
+
+describe('Deutsches und Verbformen (Handbetrieb 29.10.2026)', () => {
+  const bekannt = new Set(['the', 'desk', 'is', 'my', 'sing', 'ring', 'make', 'play', 'run', 'like', 'phone', 'mum', 'a', 'b'])
+  const auf = (x: Record<string, unknown>) => ({ id: 'x', art: 'luecke', anweisung: '', satz: '', loesungen: [], ...x }) as never
+  it('deutsche Wörter neben dem Englischen zählen nicht', () => {
+    expect(unbekannteWoerter(auf({ art: 'zuordnen', paare: [{ links: 'unter dem Tisch', rechts: 'under the desk' }] }), bekannt)).toEqual(['under'])
+    expect(unbekannteWoerter(auf({ art: 'umformen', satz: 'My phone is …', vorgabe: 'Emma statt Tom', loesungen: ['x'] }), bekannt)).not.toContain('statt')
+    expect(unbekannteWoerter(auf({ art: 'lueckentext', satz: 'A: Mum! B: My phone …', luecken: [] }), bekannt)).toEqual([])
+  })
+  it('-ing und -ed bekannter Verben sind bekannt', () => {
+    expect(unbekannteWoerter(auf({ satz: 'The phone is ringing. Mum is singing, making …, running, played, liked.' }), bekannt)).toEqual([])
+  })
+})

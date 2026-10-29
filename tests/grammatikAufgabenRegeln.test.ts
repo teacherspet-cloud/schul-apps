@@ -48,7 +48,7 @@ describe('Regeln für Grammatikaufgaben (28.10.2026)', () => {
 
   it('erkennt die Mängel aus der Prüfung', () => {
     expect(aufgabeMangel(auf({ uebung: 'erkennen', satz: 'Leo often ___ his room.', vorgabe: undefined, loesungen: ['tidies'] }))).toMatch(/Erkennen/)
-    expect(aufgabeMangel(auf({ satz: 'The pupil ___ sits there.', vorgabe: undefined, loesungen: ['who'] }))).toBe('Lücke ohne Grundwort beim Bilden')
+    expect(aufgabeMangel(auf({ satz: 'The pupil ___ sits there.', vorgabe: undefined, loesungen: ['who'] }))).toBe('Lücke ohne Grundwort (gewähltes Wort braucht Auswahl)')
     expect(aufgabeMangel(auf({ satz: 'Why ___ this ___ like a message?', vorgabe: '(sound like)', loesungen: ['does / sound like'] }))).toBe('mehrere Lücken in einem Satz')
     expect(aufgabeMangel(auf({ satz: 'I ___ the concert.', vorgabe: '(look forward to)', loesungen: ['look forward to'] }))).toBe('Vorgabe ist schon die Lösung')
     expect(aufgabeMangel(auf({ art: 'fehler', satz: 'Although it rains, but we go.', fehlerWort: 'but', loesungen: ['but streichen'] }))).toBe('Lösung nicht tippbar')

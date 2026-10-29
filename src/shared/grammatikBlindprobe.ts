@@ -9,6 +9,8 @@
 import { normiert, pruefeGrammatik, SATZ_ARTEN, woerterVon, type GrammatikAufgabe } from './grammatiktrainer'
 import type { Urteil } from './vokabeltrainer'
 
+const gleichText = (x: string, y: string): boolean => normiert(x) === normiert(y)
+
 /** Antwort der blinden KI – einheitlich für alle Formate */
 export interface BlindAntwort {
   nr: number
@@ -132,7 +134,7 @@ export function blindUrteil(a: GrammatikAufgabe, b: BlindAntwort): Urteil {
     case 'sortieren': {
       const folge = sortierFolge(a)
       const wahl: number[] = []
-      folge.forEach((i, k) => (wahl[i] = (a.gruppen ?? []).findIndex((g) => gleich(g, liste[k] ?? ''))))
+      folge.forEach((i, k) => (wahl[i] = gruppeZurAntwort(a.gruppen ?? [], liste[k] ?? '')))
       return pruefeGrammatik(a, JSON.stringify(wahl)).urteil
     }
     case 'zuordnen':
@@ -154,9 +156,45 @@ export function blindWeitere(a: GrammatikAufgabe, b: BlindAntwort): string[] {
   return [...new Set((b.auch ?? []).map(String).filter((x) => x.trim() && moeglich(x) && pruefeGrammatik(a, x).urteil !== 'richtig'))]
 }
 
-/** Meldet die blinde KI bei Auswahlformaten eine zweite richtige Möglichkeit, ist die Aufgabe mehrdeutig */
+/**
+ * Meldet die blinde KI bei Auswahlformaten eine zweite richtige Möglichkeit, ist die Aufgabe mehrdeutig – außer bei Richtig
+ * oder falsch eine weitere Berichtigung, die ohnehin gilt (29.10.2026: „Don't" mit „Do not" daneben)
+ */
 export const blindMehrdeutig = (a: GrammatikAufgabe, b: BlindAntwort): boolean =>
-  !(TIPP_ARTEN as readonly string[]).includes(a.art) && (b.auch ?? []).some((x) => String(x).trim())
+  !(TIPP_ARTEN as readonly string[]).includes(a.art) &&
+  (b.auch ?? []).some((x) => String(x).trim() && !berichtigungGilt(a, b, String(x)))
+
+/**
+ * Fehler finden bzw. Richtig oder falsch: Eine weitere Berichtigung der Probe ist keine zweite Lösung, wenn sie ohnehin gilt
+ * („Don't" mit „Do not" daneben) oder nur der ganze berichtigte Satz ist („I want my own phone.")
+ */
+function berichtigungGilt(a: GrammatikAufgabe, b: BlindAntwort, x: string): boolean {
+  if (a.art !== 'richtigfalsch' && a.art !== 'fehler') return false
+  const gilt =
+    a.art === 'fehler'
+      ? pruefeGrammatik(a, x, b.wort || a.fehlerWort).urteil === 'richtig'
+      : pruefeGrammatik(a, JSON.stringify({ richtig: false, wort: b.wort || a.fehlerWort, korrektur: x })).urteil === 'richtig'
+  if (gilt || !a.fehlerWort) return gilt
+  const f = normiert(a.fehlerWort)
+  const berichtigt = (l: string): string =>
+    woerterVon(a.satz)
+      .map((w) => (normiert(w) === f ? l : w))
+      .join(' ')
+  const nur = (t: string): string => normiert(t).replace(/[^\p{L}\p{N}' ]/gu, ' ').replace(/\s+/g, ' ').trim()
+  return a.loesungen.some((l) => nur(berichtigt(l)) === nur(x))
+}
+
+/**
+ * Gruppe zu einer Antwort beim Sortieren (29.10.2026, Blindprobe: „its" für die Gruppe „its (Besitz)"): genau der Name,
+ * sonst die eine Gruppe, deren Name ohne Erläuterung in Klammern bzw. nach „=" so lautet
+ */
+export function gruppeZurAntwort(gruppen: readonly string[], antwort: string): number {
+  const genau = gruppen.findIndex((g) => gleichText(g, antwort))
+  if (genau >= 0) return genau
+  const kern = (g: string): string => g.replace(/\(.*?\)/g, ' ').split(/\s[=–-]\s/)[0].trim()
+  const k = gruppen.map((g, i) => (gleichText(kern(g), antwort) ? i : -1)).filter((i) => i >= 0)
+  return k.length === 1 ? k[0] : -1
+}
 
 /** Die Antwort der blinden KI als lesbarer Text (für die Überarbeitung) */
 export function blindText(a: GrammatikAufgabe, b: BlindAntwort): string {
