@@ -438,6 +438,9 @@ function gemessen(req: IncomingMessage, res: ServerResponse, arbeit: () => Promi
   res.on('finish', () => {
     const ms = Date.now() - ab
     if (/^\/(ereignisse|auftrag\/)/.test(pfad)) return
+    // Dauerhafte Ströme (Server-Sent Events: Spielrunden, Partnerarbeit …) sind gewollt lang – kein „langsam" (30.10.2026,
+    // Fehlerprotokoll: 196 Einträge /s/api/spiel/strom verdeckten die echten Ausreißer)
+    if (/\/strom$/.test(pfad) || String(res.getHeader('content-type') ?? '').startsWith('text/event-stream')) return
     if (ms > 1000) protokoll('langsam', `${ms} ms ${req.method} ${pfad} ${res.statusCode}`)
     // Tageszahlen für Verwaltung › Server (09.10.2026): nur Zähler im Speicher
     anfrageGemessen(ms, res.statusCode)

@@ -87,6 +87,10 @@ export default function App(): React.JSX.Element {
   const [angemeldet, setAngemeldet] = useState(() => !imNetz() || aufServer() || !abgemeldet())
   // Wohin die App zeigt, steht im Navigations-Store – so können auch Hinweise und die Startseite dorthin führen
   const active = useNavigation((s) => s.active)
+  // Für Fehlerberichte (30.10.2026, Fehlergrenze.tsx): welche App gerade offen ist
+  useEffect(() => {
+    document.documentElement.dataset.modul = active ?? ''
+  }, [active])
   const laufpunkte = useNavigation((s) => s.laufpunkte)
   // Noch nicht angesehene Freigaben der Fachschaft je App (09.10.2026) – Zahl am Symbol in der Leiste
   const fachschaftNeu = useFachschaftNeu()

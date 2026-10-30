@@ -6,6 +6,7 @@
  * Im Fachordner (09.10.2026, regal/blaettern.tsx): Übungsrunde, Spiele und „Extra für dich" als nächste Seite im
  * Ordner – mit Umblättern; „Zurück" blättert zurück. Der eigene Rückweg-Knopf entfällt dort (der Ordner hat einen).
  */
+import { TeilFehlergrenze } from '../../shared/components/Fehlergrenze'
 import { useAuffrischen } from '../../shared/auffrischen'
 import {
   Alert,
@@ -222,7 +223,9 @@ export default function GrammatikTrainer({ id, vorschau }: { id: string; vorscha
       {sitzung ? (
         <Sitzung d={d} aufgaben={sitzung} fertig={(st) => (setD({ ...d, staende: st }), setSitzung(null))} />
       ) : (
-        <Kasten d={d} starten={setSitzung} aktualisieren={(r) => setD({ ...d, ...r })} />
+        <TeilFehlergrenze name="Grammatikkasten">
+          <Kasten d={d} starten={setSitzung} aktualisieren={(r) => setD({ ...d, ...r })} />
+        </TeilFehlergrenze>
       )}
     </TrainerFarben>
   )

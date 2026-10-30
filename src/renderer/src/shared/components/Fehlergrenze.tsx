@@ -7,7 +7,7 @@
  *     (`import()`) schlägt fehl. → einmal von selbst neu laden (gesperrt gegen Schleifen).
  *  2. Ein Fehler beim Zeichnen riss ohne Fehlergrenze die ganze Oberfläche ab. → Hinweis mit „Neu laden" statt Leere.
  */
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react'
 
 const SPERRE = 'schulapps-neu-geladen'
 
@@ -48,7 +48,10 @@ export function nachladeFehlerAbfangen(): void {
  */
 export function fehlerBerichten(art: string, meldung: string, ort: string): void {
   try {
-    const daten = JSON.stringify({ art, seite: window.location.pathname, meldung: meldung.slice(0, 400), ort: ort.slice(0, 900) })
+    // Geöffnete App dazu (30.10.2026): in der Lehrkräfte-App ist die Adresse immer „/" – der Bericht sagte nicht, wo es war
+    const modul = document.documentElement.dataset.modul
+    const seite = `${window.location.pathname}${modul ? ` [${modul}]` : ''}`
+    const daten = JSON.stringify({ art, seite, meldung: meldung.slice(0, 400), ort: ort.slice(0, 900) })
     if (!navigator.sendBeacon?.('/s/api/fehlerbericht', new Blob([daten], { type: 'application/json' })))
       void fetch('/s/api/fehlerbericht', { method: 'POST', body: daten, keepalive: true }).catch(() => undefined)
   } catch {
@@ -133,5 +136,36 @@ export class Fehlergrenze extends Component<{ children: ReactNode }, { fehler: E
         </div>
       </div>
     )
+  }
+}
+
+/**
+ * Örtliche Fehlergrenze mit einem Neuaufbau (30.10.2026, Fehlerprotokoll des Servers: im Vokabelkasten der Lernenden warf
+ * die Sprechblase der Bedienbibliothek beim Aufbau „Cannot read properties of null" – die ganze Seite stand still). Ein
+ * Fehler in einem Teil baut nur diesen Teil einmal neu auf; scheitert auch das, bleibt der Teil leer statt die Seite.
+ * Gemeldet wird wie bei der großen Fehlergrenze, mit Teilname.
+ */
+export class TeilFehlergrenze extends Component<{ children: ReactNode; name: string }, { fehler: number; kaputt: boolean }> {
+  state = { fehler: 0, kaputt: false }
+
+  static getDerivedStateFromError(): Partial<{ kaputt: boolean }> {
+    return { kaputt: true }
+  }
+
+  componentDidCatch(fehler: Error, info: ErrorInfo): void {
+    if (istNachladeFehler(fehler)) {
+      einmalNeuLaden()
+      return
+    }
+    fehlerBerichten('teil', `${this.props.name}: ${fehler.name}: ${fehler.message}`, stapelKurz(info.componentStack))
+    const n = this.state.fehler + 1
+    // Einmal neu aufbauen (neuer Schlüssel, nach dem Zeichnen); beim zweiten Fehler bleibt der Teil leer
+    if (n < 2) setTimeout(() => this.setState({ fehler: n, kaputt: false }), 0)
+    else this.setState({ fehler: n })
+  }
+
+  render(): ReactNode {
+    if (this.state.kaputt) return null
+    return <Fragment key={this.state.fehler}>{this.props.children}</Fragment>
   }
 }

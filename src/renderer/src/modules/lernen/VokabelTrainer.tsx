@@ -7,6 +7,7 @@
  * legen, frei schreiben (mit Akzentleiste), Diktat, Lückensatz. Falsches kommt in der Sitzung wieder.
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
+import { TeilFehlergrenze } from '../../shared/components/Fehlergrenze'
 import { anfrageVon, bildVon } from '@shared/medienBedeutung'
 import { useAuffrischen } from '../../shared/auffrischen'
 import { aufnahmeSpielen, beispielFuerLernende, hatSatzAufnahme, medienLaden } from './medienCache'
@@ -473,6 +474,7 @@ export default function VokabelTrainer({
           fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), nachRunde?.(), blatt ? blatt.zurueck(() => setSitzung(null)) : setSitzung(null))}
         />
       ) : (
+        <TeilFehlergrenze name="Vokabelkasten">
         <Kasten
           d={d}
           starten={(w, frei) => {
@@ -489,6 +491,7 @@ export default function VokabelTrainer({
           eingebettet={eingebettet}
           ohneKopf={ohneKopf}
         />
+        </TeilFehlergrenze>
       )}
       {/* Abschnitt des Vokabelwegs angetippt (08.10.2026): seine Wörter im Fenster, danach zurück zum Pfad */}
       {station && (
