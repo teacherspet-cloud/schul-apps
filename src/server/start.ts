@@ -82,6 +82,7 @@ import type { SecretName } from '@shared/types'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { kiZugaengeRoute, schulEndpunkt } from './kiZugaenge'
 import { loeschkonzeptRoute, loeschkonzeptStarten } from './loeschkonzept'
+import { entwuerfeAufraeumenStarten } from './entwuerfe'
 import { datenschutzRoute } from './datenschutzSeiten'
 import { oeffentlicheTexteRoute } from './oeffentlicheTexte'
 import { druckBeenden } from './druck'
@@ -357,6 +358,8 @@ async function main(): Promise<void> {
   schuljahrWechselStarten()
   // Löschkonzept (23.10.2026): Nachtlauf 3–6 Uhr und kurz nach dem Start, Wiederherstellungstests des Hosts
   loeschkonzeptStarten()
+  // Nicht angefertigte Tests nach 24 h ohne Änderung löschen (30.10.2026, Auftrag der Lehrkraft): kurz nach dem Start, dann stündlich
+  entwuerfeAufraeumenStarten()
   kalenderStarten()
   // Doppelte Vokabeln in laufenden Kursen zählen (10.10.2026) – Protokollzeile nur, wenn es welche gibt
   setTimeout(() => doppeltePruefen('Start'), 20_000).unref?.()
