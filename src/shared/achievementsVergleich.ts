@@ -2,7 +2,9 @@
  * Vergleich bei den Achievements (09.10.2026, Wunsch der Lehrkraft) – reine Rechnung, ohne Datenbank:
  *  - Anteil der Lernenden der Schule, die ein Achievement haben – erst ab 10 Lernenden im Vergleich.
  *  - Eigener Platz in der Klasse („Platz 4 von 26") nach Übungstagen der letzten 4 Wochen – erst ab 5 Lernenden;
- *    gleich viele Tage = gleicher Platz. Keine Namen, keine Plätze anderer.
+ *    jeder Platz nur einmal (30.10.2026, Lehrkraft: „keine doppelten Platzbelegungen"): bei gleich vielen Tagen
+ *    entscheiden die Übungstage der letzten 7 Tage, dann alle Übungstage, zuletzt eine feste Reihenfolge. Keine Namen,
+ *    keine Plätze anderer.
  * Der Server (server/achievementsVergleich.ts) sammelt die Daten und gibt nur diese Zahlen heraus.
  */
 
@@ -38,14 +40,28 @@ export function tageImZeitraum(tage: Iterable<string>, jetzt: number, zeitraum =
   return da.size
 }
 
+/** Wert für den Platz: Übungstage, bei Gleichstand die weiteren Zahlen der Reihe nach (z. B. letzte 7 Tage, alle Tage) */
+export type PlatzWert = number | readonly number[]
+
+const vergleiche = (a: PlatzWert, b: PlatzWert): number => {
+  const x = typeof a === 'number' ? [a] : a
+  const y = typeof b === 'number' ? [b] : b
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0)
+  return 0
+}
+
 /**
- * Platz von `ich` unter `werte` (Kennung → Übungstage): 1 + Zahl derer mit MEHR Tagen – gleich viele teilen sich den
- * Platz. null, wenn `ich` nicht dabei ist oder weniger als `mindest` verglichen werden.
+ * Platz von `ich` unter `werte` (Kennung → Übungstage bzw. [Übungstage, Gleichstand-Zahlen …]): 1 + Zahl derer, die
+ * vorn liegen. Jeder Platz wird nur einmal vergeben – bei völligem Gleichstand entscheidet die Kennung (fest, ohne Bezug
+ * zur Person). null, wenn `ich` nicht dabei ist oder weniger als `mindest` verglichen werden.
  */
-export function platzVon(werte: ReadonlyMap<string, number>, ich: string, mindest = MINDEST_KLASSE): { platz: number; von: number } | null {
+export function platzVon(werte: ReadonlyMap<string, PlatzWert>, ich: string, mindest = MINDEST_KLASSE): { platz: number; von: number } | null {
   const meins = werte.get(ich)
   if (meins === undefined || werte.size < mindest) return null
   let besser = 0
-  for (const w of werte.values()) if (w > meins) besser++
+  for (const [id, w] of werte) {
+    const v = vergleiche(w, meins)
+    if (v > 0 || (v === 0 && id < ich)) besser++
+  }
   return { platz: besser + 1, von: werte.size }
 }

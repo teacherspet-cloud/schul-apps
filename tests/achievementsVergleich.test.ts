@@ -77,17 +77,24 @@ describe('Vergleich (reine Rechnung)', () => {
     const jetzt = Date.parse('2026-10-09T12:00:00Z')
     expect(tageImZeitraum(['2026-10-09', '2026-10-09', '2026-09-12', '2026-09-11', '2026-10-10', 'kaputt'], jetzt)).toBe(2)
   })
-  it('Platz: gleiche Werte teilen sich den Platz; unter 5 kein Platz', () => {
-    const w = new Map([
+  it('Platz: jeder Platz nur einmal (Gleichstand nach weiteren Zahlen, dann fest); unter 5 kein Platz', () => {
+    const w = new Map<string, number | number[]>([
       ['a', 10],
       ['b', 7],
       ['c', 7],
       ['ich', 7],
       ['e', 2]
     ])
-    expect(platzVon(w, 'ich')).toEqual({ platz: 2, von: 5 })
+    // b, c und ich gleich: feste Reihenfolge – drei verschiedene Plätze
+    const plaetze = ['a', 'b', 'c', 'ich', 'e'].map((k) => platzVon(w, k)!.platz)
+    expect([...plaetze].sort()).toEqual([1, 2, 3, 4, 5])
     expect(platzVon(w, 'e')).toEqual({ platz: 5, von: 5 })
     expect(platzVon(w, 'a')).toEqual({ platz: 1, von: 5 })
+    // Gleichstand bei den Tagen: mehr Tage in der letzten Woche liegt vorn
+    w.set('b', [7, 1]).set('c', [7, 3]).set('ich', [7, 2])
+    expect(platzVon(w, 'c')!.platz).toBe(2)
+    expect(platzVon(w, 'ich')!.platz).toBe(3)
+    expect(platzVon(w, 'b')!.platz).toBe(4)
     w.delete('e')
     expect(platzVon(w, 'ich')).toBeNull()
     expect(platzVon(new Map([['x', 1]]), 'fremd', 1)).toBeNull()
@@ -157,15 +164,15 @@ describe('Vergleich am Server', () => {
     vergleichVergessen()
   })
 
-  it('Klasse: Lerngruppe mit dem Klassennamen bzw. die größte; Gast zählt mit; gleiche Tage = gleicher Platz', () => {
+  it('Klasse: Lerngruppe mit dem Klassennamen bzw. die größte; Gast zählt mit; jeder Platz nur einmal', () => {
     vergleichVergessen()
     // Kind 0 ist in 7a (6 Mitglieder) und in der AG (2) → 7a
     const gruppen = (datenbank().prepare('SELECT id FROM lerngruppen').all() as { id: string }[]).length
     expect(gruppen).toBe(2)
-    // Tage: Kind0 0, Kind1 1, Kind2 2, Kind3 3, Kind4 4, Gast 3 → Kind 3 und Gast teilen sich Platz 2
+    // Tage: Kind0 0, Kind1 1, Kind2 2, Kind3 3, Kind4 4, Gast 3 → Kind 3 und Gast bekommen Platz 2 und 3 (nicht beide 2)
     expect(klassenPlatz(kinder[4])).toEqual({ platz: 1, von: 6, tage: 4 })
-    expect(klassenPlatz(kinder[3])).toEqual({ platz: 2, von: 6, tage: 3 })
-    expect(klassenPlatz(gast)).toEqual({ platz: 2, von: 6, tage: 3 })
+    expect([klassenPlatz(kinder[3])!.platz, klassenPlatz(gast)!.platz].sort()).toEqual([2, 3])
+    expect(klassenPlatz(gast)!.tage).toBe(3)
     expect(klassenPlatz(kinder[0])).toEqual({ platz: 6, von: 6, tage: 0 })
     // Ohne Klasse kein Platz
     expect(klassenPlatz(kinder[8])).toBeNull()

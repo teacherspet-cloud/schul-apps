@@ -15,7 +15,7 @@ import { alleNutzer, datenbank, type NutzerInfo } from './datenbank'
 import { gehoertZu, klasseVon, lerngruppe, type Lerngruppe } from './onlinetest'
 import { db as vokDb } from './vokabeln'
 import { alleAchievementDaten, achDatenLesen } from './achievementsDaten'
-import { anteileAus, platzVon, tageImZeitraum } from '../shared/achievementsVergleich'
+import { anteileAus, platzVon, tageImZeitraum, type PlatzWert } from '../shared/achievementsVergleich'
 
 const FRISCH_MS = 10 * 60_000
 
@@ -74,7 +74,10 @@ export function uebungsTage(nutzerId: string): string[] {
 }
 
 let gruppenStand: { t: number; gruppen: Lerngruppe[]; lernende: NutzerInfo[] } | null = null
-const klassen = new Map<string, { t: number; werte: Map<string, number> }>()
+const klassen = new Map<string, { t: number; werte: Map<string, PlatzWert> }>()
+
+/** Wert für den Platz: Übungstage der letzten 4 Wochen, bei Gleichstand der letzten 7 Tage, dann aller Tage */
+const platzWert = (tage: string[], jetzt: number): number[] => [tageImZeitraum(tage, jetzt), tageImZeitraum(tage, jetzt, 7), new Set(tage).size]
 
 const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ')
 const istMitglied = (g: Lerngruppe, n: NutzerInfo): boolean => (n.quelle === 'gast' ? g.mitglieder.includes(n.benutzer) : gehoertZu(g, n))
@@ -123,15 +126,17 @@ export function klassenPlatz(ich: NutzerInfo, jetzt = Date.now()): { platz: numb
     if (alt && alt.werte.size !== k.mitglieder.length) klassen.delete(k.g.id)
     let c = klassen.get(k.g.id)
     if (!c || jetzt - c.t >= FRISCH_MS) {
-      c = { t: jetzt, werte: new Map(k.mitglieder.map((n) => [n.id, tageImZeitraum(uebungsTage(n.id), jetzt)])) }
+      c = { t: jetzt, werte: new Map(k.mitglieder.map((n) => [n.id, platzWert(uebungsTage(n.id), jetzt)])) }
       klassen.set(k.g.id, c)
     }
-    // Der eigene Wert immer frisch (eben geübt → sofort sichtbar)
+    // Der eigene Wert immer frisch (eben geübt → sofort sichtbar) und zurück in den Zwischenspeicher, damit alle
+    // dieselben Werte sehen und kein Platz doppelt erscheint (30.10.2026)
+    const meine = platzWert(uebungsTage(ich.id), jetzt)
+    if (c.werte.has(ich.id)) c.werte.set(ich.id, meine)
     const werte = new Map(c.werte)
-    const meine = tageImZeitraum(uebungsTage(ich.id), jetzt)
     werte.set(ich.id, meine)
     const p = platzVon(werte, ich.id)
-    return p ? { ...p, tage: meine } : null
+    return p ? { ...p, tage: meine[0] } : null
   } catch {
     return null
   }
