@@ -41,9 +41,10 @@ describe('Deutsches und Verbformen (Handbetrieb 29.10.2026)', () => {
 
 describe('Klasse der frühesten Einführung (Befund der Lehrkraft 29.10.2026)', () => {
   it('Past Progressive gehört nicht zu Green Line 1', () => {
+    // Seit 30.10.2026 zählt der optionale Trailer 2 von Green Line 2 nicht mehr: eingeführt in Green Line 3 Unit 3
     const ws = wortschatzStandServer('en.verb.past_progressive/gleichzeitig', 'en')!
-    expect(ws.stelle.buch).toBe('Green Line 2')
-    expect(ws.jahrgang).toBe(6)
+    expect(ws.stelle).toMatchObject({ buch: 'Green Line 3', unit: 'Unit 3' })
+    expect(ws.jahrgang).toBe(7)
     expect(wortschatzStandServer('en.prep.basic/ort', 'en')!.jahrgang).toBe(5)
   })
 })

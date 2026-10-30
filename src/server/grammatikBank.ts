@@ -385,7 +385,7 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // Vierter Lauf (29.10.2026, Green Line 5 Unit 1 und will/going to ab Green Line 2 Unit 4): auch diese Stellen
 // Fünfter Lauf: -ly/Steigerung, Formwörter (-self, probably), Fehlformen, Kurzform-Endungen, deutsche Wortformen
 // Sechster Lauf: Grundwortschatz (Alltagswörter) gilt als bekannt
-// Siebter Lauf (30.10.2026): Green Line 6 Unit 1 und Zukunft mit Präsensformen (Green Line 4 Trailer 1), Formwörter Passiv/Nominalstil
+// Siebter Lauf (30.10.2026): Green Line 6 Unit 1, Formwörter Passiv/Nominalstil; Trailer zählen nicht mehr als Einführung
 const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-7-2026-10-30'
 /** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
 const WORTSCHATZ_STELLEN: [string, string][] = [
@@ -395,9 +395,9 @@ const WORTSCHATZ_STELLEN: [string, string][] = [
   ['Green Line 3', 'Unit 3'],
   ['Green Line 4', 'Unit 1'],
   ['Green Line 5', 'Unit 1'],
-  // Green Line 6 Unit 1 (30.10.2026); Zukunft mit Präsensformen wird schon im Trailer 1 von Green Line 4 eingeführt
-  ['Green Line 6', 'Unit 1'],
-  ['Green Line 4', 'Trailer 1']
+  // Green Line 6 Unit 1 (30.10.2026) – optionale Trailer zählen nicht als Einführung, auch die Zukunft mit Präsensformen
+  // (Trailer 1 von Green Line 4) gilt erst hier
+  ['Green Line 6', 'Unit 1']
 ]
 
 /** Wortschatz-Stand einer Bank-Kennung aus den mitgelieferten Lehrwerken (wie wortschatzStand in der Oberfläche) */

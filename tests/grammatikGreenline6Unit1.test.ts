@@ -46,8 +46,11 @@ describe('Green Line 6, Unit 1 (Handbetrieb)', () => {
     expect(text).not.toMatch(/will have been \w+ing/i)
   })
 
-  it('Klasse aus der frühesten Einführung: Zukunft mit Präsensformen Klasse 8 (Green Line 4 Trailer 1), Passiv in Berichten Klasse 10', () => {
-    expect(wortschatzStandServer('en.verb.future_present/fahrplan', 'en')?.jahrgang).toBe(8)
+  // Optionale Trailer zählen nicht als Einführung (30.10.2026): Zukunft mit Präsensformen erst Green Line 6 Unit 1
+  it('Klasse aus der frühesten Einführung: Zukunft mit Präsensformen Klasse 10 (Trailer 1 von Green Line 4 zählt nicht), Passiv in Berichten Klasse 10', () => {
+    expect(wortschatzStandServer('en.verb.future_present/fahrplan', 'en')?.stelle.buch).toBe('Green Line 6')
+    expect(wortschatzStandServer('en.verb.future_present/fahrplan', 'en')?.jahrgang).toBe(10)
+    expect(wortschatzStandServer('en.verb.going_to/bildung', 'en')?.stelle).toMatchObject({ buch: 'Green Line 2', unit: 'Unit 2' })
     expect(wortschatzStandServer('en.verb.passive_reporting/it-is-said', 'en')?.jahrgang).toBe(10)
   })
 })

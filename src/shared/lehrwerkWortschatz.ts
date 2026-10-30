@@ -139,11 +139,19 @@ export function fruehesteEinfuehrung(schluessel: string, baende: readonly { name
     }
     return (stellen as Einfuehrung[]).reduce((a, b) => (rang(b).join('.').localeCompare(rang(a).join('.'), 'en', { numeric: true }) > 0 ? b : a))
   }
-  for (const b of baende)
-    for (const [unit, abschnitte] of Object.entries(b.grammatik))
-      for (const [abschnitt, punkte] of Object.entries(abschnitte)) if (punkte.some((p) => passt(schluessel, p.t))) return { buch: b.name, unit, abschnitt }
+  // Optionale Kapitel (Trailer) zählen nicht als Einführung (30.10.2026, Lehrkraft: „ein optionaler Trailer soll nicht als
+  // Einführung zählen") – nur wenn eine Form ausschließlich in einem Trailer steht, gilt dieser
+  for (const optional of [false, true])
+    for (const b of baende)
+      for (const [unit, abschnitte] of Object.entries(b.grammatik)) {
+        if (OPTIONAL.test(unit) !== optional) continue
+        for (const [abschnitt, punkte] of Object.entries(abschnitte)) if (punkte.some((p) => passt(schluessel, p.t))) return { buch: b.name, unit, abschnitt }
+      }
   return null
 }
+
+/** Optionale Kapitel des Lehrwerks (wie istOptional in der Oberfläche) */
+const OPTIONAL = /^trailer\b/i
 
 /** Katalog-Kennungen der Grammatik, die bis zu einer Stelle eingeführt ist */
 export function bekannteKennungen(baende: readonly { name: string; grammatik: GrammatikBand }[], stelle: Einfuehrung): string[] {
