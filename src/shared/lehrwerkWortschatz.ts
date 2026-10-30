@@ -222,7 +222,11 @@ const FORM_ZUSATZ: Record<string, string[]> = {
   'en.pron.reflexive': SELF,
   'en.focus.emphasis': SELF,
   'en.focus.inversion': ['seldom', 'scarcely', 'sooner', 'circumstances', 'account'],
-  'en.verb.will_vs_goingto': ['probably', 'perhaps', 'maybe', 'sure']
+  'en.verb.will_vs_goingto': ['probably', 'perhaps', 'maybe', 'sure'],
+  // Green Line 6 Unit 1 (30.10.2026): „be supposed / likely / sure / certain to" – certain, unlikely fehlen in der Liste
+  'en.verb.passive_reporting': ['supposed', 'likely', 'unlikely', 'sure', 'certain', 'said', 'believed', 'thought', 'reported', 'expected', 'known'],
+  // Unpersönlicher Stil (Green Line 6 Unit 1): Kernwendungen „There is evidence/concern that …", „It is argued/claimed …"
+  'en.syn.nominal_style': ['evidence', 'concern', 'argued', 'claimed', 'assumed', 'estimated', 'considered', 'suggested', 'agreed', 'widely', 'generally']
 }
 
 /** Typische Fehlformen, die als Fehlerwort oder Ablenker absichtlich vorkommen – keine Vokabeln */

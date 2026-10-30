@@ -385,7 +385,8 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // Vierter Lauf (29.10.2026, Green Line 5 Unit 1 und will/going to ab Green Line 2 Unit 4): auch diese Stellen
 // Fünfter Lauf: -ly/Steigerung, Formwörter (-self, probably), Fehlformen, Kurzform-Endungen, deutsche Wortformen
 // Sechster Lauf: Grundwortschatz (Alltagswörter) gilt als bekannt
-const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-6-2026-10-29'
+// Siebter Lauf (30.10.2026): Green Line 6 Unit 1 und Zukunft mit Präsensformen (Green Line 4 Trailer 1), Formwörter Passiv/Nominalstil
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-7-2026-10-30'
 /** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
 const WORTSCHATZ_STELLEN: [string, string][] = [
   ['Green Line 1', 'Unit 1'],
@@ -393,7 +394,10 @@ const WORTSCHATZ_STELLEN: [string, string][] = [
   // Wiederholungen in Green Line 5 Unit 1: Passiv (eingeführt Green Line 3 Unit 3), indirekte Rede (Green Line 4 Unit 1)
   ['Green Line 3', 'Unit 3'],
   ['Green Line 4', 'Unit 1'],
-  ['Green Line 5', 'Unit 1']
+  ['Green Line 5', 'Unit 1'],
+  // Green Line 6 Unit 1 (30.10.2026); Zukunft mit Präsensformen wird schon im Trailer 1 von Green Line 4 eingeführt
+  ['Green Line 6', 'Unit 1'],
+  ['Green Line 4', 'Trailer 1']
 ]
 
 /** Wortschatz-Stand einer Bank-Kennung aus den mitgelieferten Lehrwerken (wie wortschatzStand in der Oberfläche) */
@@ -535,7 +539,9 @@ const EINSPIELEN: [string, string][] = [
   // „-2": der erste Lauf übersprang neue Formen (Regelkarten wurden nicht angelegt) – vorhandene Aufgaben zählen nicht doppelt
   ['grammatik-bank-greenline5-unit1-2-2026-10-29', 'greenline5-unit1-2026-10-29.json'],
   // Nachtrag (29.10.2026, Auftrag der Lehrkraft): Felder, denen nach der Schlussdurchsicht eine Aufgabe fehlte
-  ['grammatik-bank-greenline5-unit1-nachtrag-2026-10-29', 'greenline5-unit1-nachtrag-2026-10-29.json']
+  ['grammatik-bank-greenline5-unit1-nachtrag-2026-10-29', 'greenline5-unit1-nachtrag-2026-10-29.json'],
+  // Green Line 6 Unit 1 (30.10.2026): Zeitenüberblick, Passiv in Berichten, Nominalstil, Zukunft mit Präsensformen – gleicher Ablauf
+  ['grammatik-bank-greenline6-unit1-2026-10-30', 'greenline6-unit1-2026-10-30.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
