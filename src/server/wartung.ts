@@ -24,6 +24,7 @@ import { THERE_WAS_KLASSE5 } from './wartungThereWas'
 import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { GRAMMATIK_BANK_LOESCHEN } from './wartungBankLoeschen'
 import { GRAMMATIK_NEUBEGINN } from './wartungGrammatikNeubeginn'
+import { APUNTATE_2016 } from './wartungApuntate2016'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
@@ -178,7 +179,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // Aufgabenbank der Grammatik und die Kurs-Trainings daraus löschen (13.10.2026, von der Lehrkraft gewünscht; wartungBankLoeschen.ts)
   GRAMMATIK_BANK_LOESCHEN,
   // Grammatik-Neubeginn: Aufgabenbank und alle Kurs-Trainings samt Lernstand löschen (28.10.2026, von der Lehrkraft gewünscht; Sicherung vorher heruntergeladen)
-  GRAMMATIK_NEUBEGINN
+  GRAMMATIK_NEUBEGINN,
+  // ¡Apúntate! Ausgabe 2016 aus dem Bücherkatalog nehmen (30.10.2026, von der Lehrkraft gewünscht; wartungApuntate2016.ts)
+  APUNTATE_2016
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {

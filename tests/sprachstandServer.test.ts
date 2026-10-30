@@ -166,23 +166,23 @@ describe('Vokabeln je Sprache am Server', () => {
     const g = randomBytes(6).toString('hex')
     datenbank()
       .prepare('INSERT INTO lerngruppen (id, lehrkraft_id, name, fach, iserv_gruppe, mitglieder, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(g, lk.id, '7b', 'Spanisch', '', JSON.stringify([ana.benutzer]), new Date().toISOString())
+      .run(g, lk.id, '7b', 'Französisch', '', JSON.stringify([ana.benutzer]), new Date().toISOString())
     vokabelnZuweisen({
       lehrkraftId: lk.id,
       lerngruppeId: g,
       schueler: [],
-      titel: '¡Apúntate! 1 - Unidad 1 - A',
-      sprache: 'es',
-      fach: 'Spanisch',
-      woerter: [{ id: 'w1', term: 'hola', translation: 'hallo' }],
-      quelle: { lehrwerk: 'apuntate-2016-1', unit: 'Unidad 1', abschnitte: ['A'] }
+      titel: 'Découvertes Série jaune 1 - Unité 1 - A',
+      sprache: 'fr',
+      fach: 'Französisch',
+      woerter: [{ id: 'w1', term: 'bonjour', translation: 'hallo' }],
+      quelle: { lehrwerk: 'decouvertes-serie-jaune-1', unit: 'Unité 1', abschnitte: ['A'] }
     })
     const [s] = await sprachStaende(ana)
     expect(s.nurKurse).toBe(true)
     expect(s.aktuell).toBeNull()
-    const w = await wortlisteFuer(ana, 'Spanisch')
+    const w = await wortlisteFuer(ana, 'Französisch')
     expect(w.buecher).toEqual([])
-    expect(w.gruppen.flatMap((x) => x.woerter.map((y) => y.term))).toEqual(['hola'])
+    expect(w.gruppen.flatMap((x) => x.woerter.map((y) => y.term))).toEqual(['bonjour'])
   })
 
   it('Doppelte zählen: nur Zahlen, eine Protokollzeile nur bei Doppelten (ohne Namen)', () => {

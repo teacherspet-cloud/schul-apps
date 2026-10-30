@@ -65,7 +65,8 @@ describe('Reihe und Band aus dem Namen', () => {
       .filter((f) => f.endsWith('.json'))
       .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))
       .filter((b) => b.platzhalter)
-    expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2016')).toHaveLength(5)
+    // Ausgabe 2016 am 30.10.2026 auf Wunsch der Lehrkraft entfernt
+    expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2016')).toHaveLength(0)
     // Bände 1–3 der Ausgabe 2024 haben seit 27.10.2026 Wortschatz (Navigium-Export) – Platzhalter sind nur noch 4 und 5
     expect(platz.filter((b) => b.reihe === '¡Apúntate!' && b.ausgabe === 'ab 2024')).toHaveLength(2)
     expect(platz.filter((b) => b.reihe === 'Découvertes Série jaune')).toHaveLength(5)

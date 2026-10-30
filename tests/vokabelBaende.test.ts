@@ -88,18 +88,18 @@ describe('Bände je Abschnitt', () => {
 
   it('Namen der Lehrwerke aus den Dateien – auch Platzhalter', () => {
     expect(lehrwerkName('green-line-2')).toBe('Green Line 2')
-    expect(lehrwerkName('apuntate-2016-1')).toBe('¡Apúntate! 1')
+    expect(lehrwerkName('apuntate-2024-4')).toBe('¡Apúntate! 4')
     expect(lehrwerkName('gibt-es-nicht-9')).toBe('')
     const teile = [
-      { titel: 'Lección 1', anzahl: 1, zeit: 1, lehrwerk: 'apuntate-2016-1' },
-      { titel: 'Lección 1', anzahl: 1, zeit: 2, lehrwerk: 'apuntate-2016-2' }
+      { titel: 'Lección 1', anzahl: 1, zeit: 1, lehrwerk: 'apuntate-2024-4' },
+      { titel: 'Lección 1', anzahl: 1, zeit: 2, lehrwerk: 'apuntate-2024-5' }
     ]
     const e = mitBaenden(teile, abschnitteEinordnen(teile, null), null, '', lehrwerkName)
     // ohne erkannte Unit: der Band kommt aus der Kennung
-    expect(e.map((x) => x.buch)).toEqual(['¡Apúntate! 1', '¡Apúntate! 2'])
+    expect(e.map((x) => x.buch)).toEqual(['¡Apúntate! 4', '¡Apúntate! 5'])
     expect(nachBaenden(abschnittStatistik(teile, [{ id: 'a', term: 'a', translation: 'a' }, { id: 'b', term: 'b', translation: 'b' }], [], e)).map((g) => g.buch)).toEqual([
-      '¡Apúntate! 2',
-      '¡Apúntate! 1'
+      '¡Apúntate! 5',
+      '¡Apúntate! 4'
     ])
   })
 

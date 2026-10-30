@@ -80,6 +80,7 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
     expect(erledigt).toEqual([
       'abkuerzung-ton-2026-10-09',
       'abschnitte-teilen-2026-10-09',
+      'apuntate-2016-entfernen-2026-10-30',
       'auszeichnungen-jahre-2026-10-10',
       'codes-hmac-2026-10-08',
       'faecher-schreibweise-2026-10-08',
