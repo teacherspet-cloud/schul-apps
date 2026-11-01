@@ -280,7 +280,7 @@
               "example": "¿Qué tal el tiempo por ahí?",
               "exampleTranslation": "Wie ist das Wetter dort?"
             },
-            { "term": "despúes de [+ sust.]", "translation": "nach [+ S.]", "pos": "phrase" },
+            { "term": "después de [+ sust.]", "translation": "nach [+ S.]", "pos": "phrase" },
             { "term": "Mira …", "translation": "Schau mal ...", "pos": "phrase" },
             { "term": "hacer plogging", "translation": "Plogging machen", "pos": "phrase" },
             {
@@ -877,7 +877,7 @@
             },
             { "term": "las manualidades [pl.]", "translation": "die Bastelarbeit; die Handarbeit", "pos": "noun" },
             { "term": "la robótica", "translation": "die Robotertechnik; die Robotik", "pos": "noun" },
-            { "term": "el badminton", "translation": "Badminton", "pos": "noun", "grey": true },
+            { "term": "el bádminton", "translation": "Badminton", "pos": "noun", "grey": true },
             { "term": "navegar", "translation": "Segeln", "pos": "verb", "grey": true },
             { "term": "jugar al ajedrez", "translation": "Schach spielen", "pos": "phrase", "grey": true },
             { "term": "el boxeo", "translation": "Boxen", "pos": "noun", "grey": true }
@@ -1350,7 +1350,7 @@
               "term": "la Comunidad Autónoma",
               "translation": "die Autonome Region",
               "pos": "noun",
-              "example": "España tiene dieciesiete Comunidades Autónomas.",
+              "example": "España tiene diecisiete Comunidades Autónomas.",
               "exampleTranslation": "Spanien hat siebzehn autonome Regionen."
             },
             { "term": "el acceso", "translation": "der Zugang", "pos": "noun" },
@@ -2727,7 +2727,7 @@
             },
             { "term": "la batería", "translation": "der Akku", "pos": "noun" },
             {
-              "term": "inmenso/immensa",
+              "term": "inmenso/inmensa",
               "translation": "sehr groß; riesig",
               "pos": "noun",
               "example": "La estación es inmensa.",
@@ -3073,7 +3073,7 @@
               "exampleTranslation": "Hilf mir, das Regal hochzuheben!"
             },
             { "term": "el trofeo", "translation": "die Trophäe; der Pokal", "pos": "noun" },
-            { "term": "el campeón/la campeóna del mundo", "translation": "der Weltmeister/die Weltmeisterin", "pos": "noun" },
+            { "term": "el campeón/la campeona del mundo", "translation": "der Weltmeister/die Weltmeisterin", "pos": "noun" },
             { "term": "la ciencia", "translation": "die Wissenschaft", "pos": "noun" },
             { "term": "varios/varias [pl.]", "translation": "einige; mehrere", "pos": "phrase" },
             { "term": "el científico/la científica", "translation": "der Wissenschaftler/die Wissenschaftlerin", "pos": "noun" },
@@ -3333,7 +3333,7 @@
               "term": "en aquella época",
               "translation": "damals",
               "pos": "phrase",
-              "example": "En aquella época íba mucho al teatro.",
+              "example": "En aquella época iba mucho al teatro.",
               "exampleTranslation": "Damals bin ich oft ins Theater gegangen."
             },
             { "term": "pagar", "translation": "(be-)zahlen", "pos": "verb" },

@@ -3,11 +3,12 @@
  * und hier in TABELLEN eintragen – mehr ist nicht nötig. Gesucht wird über alle Tabellen nach dem genauen Eintrag.
  */
 import { GREEN_LINE } from './greenLine'
+import { SPANISCH } from './spanisch'
 import type { AbkEintrag, AbkTabelle } from './typen'
 
 export type { AbkArt, AbkEintrag, AbkTabelle, AbkUeben } from './typen'
 
-export const TABELLEN: AbkTabelle[] = [GREEN_LINE]
+export const TABELLEN: AbkTabelle[] = [GREEN_LINE, SPANISCH]
 
 /** Schlüssel: Leerraum zusammengefasst, Apostroph-Zeichen vereinheitlicht, Groß-/Kleinschreibung bleibt („US" ≠ „us") */
 export const tabellenSchluessel = (term: string): string =>

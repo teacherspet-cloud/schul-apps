@@ -167,7 +167,7 @@
             },
             { "term": "único/única", "translation": "einzigartig", "pos": "adjective" },
             { "term": "el actor/la actriz", "translation": "der Schauspieler/die Schauspielerin", "pos": "noun", "grey": true },
-            { "term": "la canciòn", "translation": "das Lied", "pos": "noun", "grey": true },
+            { "term": "la canción", "translation": "das Lied", "pos": "noun", "grey": true },
             { "term": "el castillo", "translation": "die Burg", "pos": "noun", "grey": true },
             { "term": "el compositor/la compositora", "translation": "der Komponist/die Komponistin", "pos": "noun", "grey": true },
             { "term": "la costumbre", "translation": "der Brauch", "pos": "noun", "grey": true },
@@ -788,8 +788,8 @@
               "term": "costarricense",
               "translation": "costa-ricanisch",
               "pos": "noun",
-              "example": "Ana y Davíd son costarricenses.",
-              "exampleTranslation": "Ana und Davíd sind Costa-Ricaner."
+              "example": "Ana y David son costarricenses.",
+              "exampleTranslation": "Ana und David sind Costa-Ricaner."
             },
             { "term": "existir", "translation": "existieren", "pos": "verb" },
             {
@@ -1190,7 +1190,7 @@
               "example": "Ya tengo el material para el insti.",
               "exampleTranslation": "Ich habe das Material für die Schule bereits."
             },
-            { "term": "la subscipción", "translation": "das Abonnement", "pos": "noun" },
+            { "term": "la suscripción", "translation": "das Abonnement", "pos": "noun" },
             {
               "term": "el monitor/la monitora",
               "translation": "der Betreuer/die Betreuerin",
@@ -2013,7 +2013,7 @@
               "term": "a partir de [+ tiempo]",
               "translation": "ab [+ Zeit]",
               "pos": "phrase",
-              "example": "A partier de las 3 pm tengo deportes.",
+              "example": "A partir de las 3 pm tengo deportes.",
               "exampleTranslation": "Ab 15 Uhr habe ich Sport."
             },
             { "term": "inseparable", "translation": "unzertrennlich", "pos": "noun" },
@@ -3101,9 +3101,9 @@
             { "term": "comprender algo/a alguien", "translation": "etw./jmdn. verstehen", "pos": "phrase" },
             { "term": "la comunicación", "translation": "die Kommunikation", "pos": "noun", "grey": true },
             { "term": "la dependencia", "translation": "die Abhängigkeit", "pos": "noun", "grey": true },
-            { "term": "las distracción", "translation": "die Ablenkung", "pos": "noun", "grey": true },
-            { "term": "la diversíon", "translation": "der Spaß", "pos": "noun", "grey": true },
-            { "term": "la falta de atencíon/concentración", "translation": "die Unaufmerksamkeit", "pos": "noun", "grey": true },
+            { "term": "la distracción", "translation": "die Ablenkung", "pos": "noun", "grey": true },
+            { "term": "la diversión", "translation": "der Spaß", "pos": "noun", "grey": true },
+            { "term": "la falta de atención/concentración", "translation": "die Unaufmerksamkeit", "pos": "noun", "grey": true },
             { "term": "la pérdida de tiempo", "translation": "die Zeitverschwendung", "pos": "noun", "grey": true },
             { "term": "la rapidez", "translation": "die Schnelligkeit", "pos": "noun", "grey": true },
             { "term": "la seguridad", "translation": "die Sicherheit", "pos": "noun", "grey": true }

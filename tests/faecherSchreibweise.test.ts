@@ -95,6 +95,7 @@ describe('Wartung: Fachnamen vereinheitlichen', () => {
       'medien-kanon-2026-10-10',
       'namen-korrigieren-2026-10-09',
       'rekorde-zeit-2026-10-08',
+      'spanisch-ton-2026-11-01',
       'there-was-klasse5-2026-10-09',
       'verbform-ton-2026-10-09',
       'vokabel-baende-2026-10-10'

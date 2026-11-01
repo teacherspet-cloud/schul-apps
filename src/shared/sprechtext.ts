@@ -15,6 +15,10 @@
  * Zeilen unverändert bleibt; klappt das nicht, wird der Text wie oben vorbereitet (main/services/audio/elevenlabs.ts).
  *
  * Inhalte in Klammern („[AE]", „(n)") bleiben, wie sie sind – das sind Angaben, keine Abkürzungen zum Sprechen.
+ *
+ * Spanisch (01.11.2026, recherche/aussprache-spanisch.md): Buchstabieren mit spanischen Buchstabennamen („ge pe ese"),
+ * „EE. UU." als „Estados Unidos", Ordnungszahlen, Jahrhunderte, Einheiten nach Zahlen, „algo/a alguien" mit Präposition
+ * (`spanischVorbereiten`, `ohneSchraegstrich`); Tabelle der Lehrwerke in shared/abkuerzungen/spanisch.ts.
  */
 import { abkuerzungAus } from './abkuerzung'
 import { abkEintrag } from './abkuerzungen'
@@ -28,6 +32,11 @@ interface SprachRegeln {
   und: string
   /** Großgeschriebene gewöhnliche Wörter (Betonung im Satz: „look at ME!") – nie buchstabieren */
   woerter?: string[]
+  /**
+   * Buchstabennamen zum Buchstabieren (01.11.2026, Spanisch): „GPS" → „ge pe ese", „QR" → „cu erre". Ausgeschrieben
+   * statt „G. P. S.", damit die Stimme nicht englische Buchstabennamen nimmt. Ohne Angabe: Buchstabe mit Punkt.
+   */
+  buchstaben?: Record<string, string>
 }
 
 const REGELN: Record<string, SprachRegeln> = {
@@ -123,13 +132,60 @@ const REGELN: Record<string, SprachRegeln> = {
       'Srta.': 'señorita',
       'Ud.': 'usted',
       'Uds.': 'ustedes',
+      // Doppelte Buchstaben = Mehrzahl, gesprochen wird die Langform (01.11.2026, ¡Apúntate!/A tope)
+      'EE. UU.': 'Estados Unidos',
+      'EE.UU.': 'Estados Unidos',
+      EEUU: 'Estados Unidos',
+      // Sonst als römische Zahl übergangen (nur I, V, X, L, C, D, M)
+      CDMX: 'Ciudad de México',
+      'a. C.': 'antes de Cristo',
+      'a.C.': 'antes de Cristo',
+      'd. C.': 'después de Cristo',
+      'd.C.': 'después de Cristo',
+      'aprox.': 'aproximadamente',
+      'pág.': 'página',
+      'n.º': 'número',
       '°C': 'grados Celsius',
       'km/h': 'kilómetros por hora',
-      km: 'kilómetros'
+      'km²': 'kilómetros cuadrados',
+      'm²': 'metros cuadrados',
+      km: 'kilómetros',
+      kg: 'kilos',
+      cm: 'centímetros'
     },
-    alsWort: ['OTAN', 'ONU', 'SIDA', 'OVNI', 'UNESCO', 'RENFE', 'NASA'],
+    alsWort: ['OTAN', 'ONU', 'SIDA', 'OVNI', 'UNESCO', 'RENFE', 'NASA', 'ESO', 'AVE', 'IVA', 'UNICEF', 'FIFA', 'UEFA', 'COVID'],
     und: 'y',
-    woerter: ['NO', 'SÍ', 'YO', 'TU', 'TÚ', 'MÍ', 'EL', 'LA', 'Y']
+    woerter: ['NO', 'SÍ', 'YO', 'TU', 'TÚ', 'MÍ', 'EL', 'LA', 'Y', 'YA', 'MUY', 'QUÉ', 'MÁS', 'NADA', 'TODO', 'HOLA', 'VALE', 'AY'],
+    // Spanische Buchstabennamen (01.11.2026)
+    buchstaben: {
+      A: 'a',
+      B: 'be',
+      C: 'ce',
+      D: 'de',
+      E: 'e',
+      F: 'efe',
+      G: 'ge',
+      H: 'hache',
+      I: 'i',
+      J: 'jota',
+      K: 'ka',
+      L: 'ele',
+      M: 'eme',
+      N: 'ene',
+      Ñ: 'eñe',
+      O: 'o',
+      P: 'pe',
+      Q: 'cu',
+      R: 'erre',
+      S: 'ese',
+      T: 'te',
+      U: 'u',
+      V: 'uve',
+      W: 'uve doble',
+      X: 'equis',
+      Y: 'i griega',
+      Z: 'zeta'
+    }
   },
   it: {
     kuerzel: { qc: 'qualcosa', qn: 'qualcuno', 'p. es.': 'per esempio', 'ecc.': 'eccetera', 'Sig.': 'signor', 'Sig.ra': 'signora', '°C': 'gradi Celsius' },
@@ -146,12 +202,12 @@ const NICHT_BUCHSTABIEREN = /^(?:[IVXLCDM]+|OK)$/
 
 /** Buchstabiert für die Sprachausgabe: „YA" → „Y. A.", „B&B" → „B and B", „CO2" → „C. O. 2" */
 export function buchstabiert(kurz: string, sprache = 'en'): string {
-  const und = regelnFuer(sprache).und
+  const { und, buchstaben } = regelnFuer(sprache)
   return String(kurz ?? '')
     .split('&')
     .map((teil) =>
       [...teil.replace(/[.\s]/g, '')]
-        .map((z) => (/\p{L}/u.test(z) ? `${z}.` : z))
+        .map((z) => (/\p{L}/u.test(z) ? (buchstaben?.[z.toUpperCase()] ?? `${z}.`) : z))
         .join(' ')
     )
     .join(` ${und} `)
@@ -212,12 +268,70 @@ const ADRESSE = /(\S*(?:\/\/|www\.)\S*)/
 /** Schrägstrich zwischen Wörtern (nicht „1/2", nicht „km/h") */
 const STRICH_ZWISCHEN_WOERTERN = /([\p{L}\p{M}.)\]'’])[ \t]*\/[ \t]*(?=[\p{L}\p{M}]{2}|[(\['’])/gu
 
+/*
+ * Kein Endungs-Schrägstrich, sondern zwei Wörter (01.11.2026, Befund ¡Apúntate!/A tope): In „encontrar algo/a alguien"
+ * und „subir el volumen de/a algo" ist „a" die Präposition – vorher fiel sie weg („encontrar algo alguien"). Erkennbar
+ * am Wort davor (kein Wort mit Endung) oder am Platzhalter danach.
+ */
+const VOR_PRAEPOSITION = new Set(['algo', 'de', 'en', 'con', 'por', 'para', 'sin', 'desde', 'hacia', 'hasta', 'entre', 'sobre', 'que'])
+const NACH_PRAEPOSITION = /^\s+(?:alguien|algn\.?|algo|un|una|uno|unos|unas|alguno|alguna|\p{Lu})/u
+/** Ein-Buchstaben-Wörter mit Schrägstrich: „y/e", „o/u" (Spanisch) */
+const EINZEL_STRICH = /(^|[^\p{L}\p{M}])(\p{L})[ \t]*\/[ \t]*(\p{L})(?![\p{L}\p{M}])/gu
+
 /** Schrägstriche zwischen Wörtern als kurze Pause: „was/were" → „was … were", „il/elle" → „il … elle" */
 export function ohneSchraegstrich(text: string): string {
   return String(text ?? '')
     .split(ADRESSE)
-    .map((teil, i) => (i % 2 ? teil : teil.replace(ENDUNG_NACH_STRICH, '$1').replace(STRICH_ZWISCHEN_WOERTERN, `$1${VARIANTEN_PAUSE}`)))
+    .map((teil, i) =>
+      i % 2
+        ? teil
+        : teil
+            .replace(ENDUNG_NACH_STRICH, (m: string, wort: string, pos: number, ganz: string) => {
+              if (!VOR_PRAEPOSITION.has(wort.toLowerCase()) && !NACH_PRAEPOSITION.test(ganz.slice(pos + m.length))) return wort
+              return `${wort}${VARIANTEN_PAUSE}${m.slice(wort.length + 1).replace(/^-/, '')}`
+            })
+            .replace(EINZEL_STRICH, `$1$2${VARIANTEN_PAUSE}$3`)
+            .replace(STRICH_ZWISCHEN_WOERTERN, `$1${VARIANTEN_PAUSE}`)
+    )
     .join('')
+}
+
+/*
+ * Spanisch (01.11.2026, Durchsicht ¡Apúntate! 1–3 und A tope): was die Stimme sonst falsch liest.
+ *  - Endung in Klammern am Wort gehört dazu: „primer(o)" → „primero", „comunicar(se)" → „comunicarse", „bici(cleta)"
+ *  - Ordnungszahl: „2.º"/„2º"/„1.ª" → „segundo"/„primera"; „2° de ESO" (Gradzeichen statt º) nur vor „de" und Wörtern
+ *    der Reihenfolge, sonst bleibt „°" ein Grad („45°" → „45 grados")
+ *  - Jahrhundert in römischen Zahlen: „siglo XX" → „siglo 20" (gesprochen „veinte", nicht „equis equis")
+ *  - Einheit nach Zahl: „250 g" → „250 gramos", „90 %" → „90 por ciento", „3 pm" → „3 de la tarde"
+ */
+const ORDINAL_M = ['', 'primero', 'segundo', 'tercero', 'cuarto', 'quinto', 'sexto', 'séptimo', 'octavo', 'noveno', 'décimo']
+const ORDINAL_F = ['', 'primera', 'segunda', 'tercera', 'cuarta', 'quinta', 'sexta', 'séptima', 'octava', 'novena', 'décima']
+const ROEMISCH: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }
+/** „XX" → 20, „XIV" → 14; null, wenn es keine römische Zahl ist */
+export function roemischAlsZahl(r: string): number | null {
+  if (!/^[IVXLCDM]{1,8}$/.test(r)) return null
+  let n = 0
+  for (let i = 0; i < r.length; i++) {
+    const w = ROEMISCH[r[i]]
+    n += i + 1 < r.length && w < ROEMISCH[r[i + 1]] ? -w : w
+  }
+  return n > 0 && n < 4000 ? n : null
+}
+export function spanischVorbereiten(text: string): string {
+  return String(text ?? '')
+    .replace(/(\p{L})\((\p{Ll}{1,7})\)(?!\p{L})/gu, '$1$2')
+    .replace(/(?<![\d.,])(\d{1,2})\.?\s?([ºª])(?!\p{L})/gu, (m, z: string, a: string) => (a === 'ª' ? ORDINAL_F : ORDINAL_M)[Number(z)] || m)
+    .replace(/(?<![\d.,])(\d{1,2})\.?\s?°(?=\s+(?:de|curso|piso|lugar|puesto|premio)(?!\p{L}))/gu, (m, z: string) => ORDINAL_M[Number(z)] || m)
+    .replace(/(?<![\d.,])(\d+)\s?°(?![CF\p{L}])/gu, '$1 grados')
+    .replace(/(?<!\p{L})(siglos?)\s+([IVXLC]{1,7})(?!\p{L})/gu, (m, s: string, r: string) => {
+      const n = roemischAlsZahl(r)
+      return n ? `${s} ${n}` : m
+    })
+    .replace(/(?<!\p{L})(tallas?)\s+(X{0,3}[SML]|XX?L)(?!\p{L})/gu, (_m, w: string, t: string) => `${w} ${buchstabiert(t, 'es')}`)
+    .replace(/(\d)\s?%/gu, '$1 por ciento')
+    .replace(/(\d)\s?g(?![\p{L}\d])/gu, '$1 gramos')
+    .replace(/(\d)\s?(?:pm|p\.\s?m\.)(?!\p{L})/giu, '$1 de la tarde')
+    .replace(/(\d)\s?(?:am|a\.\s?m\.)(?!\p{L})/giu, '$1 de la mañana')
 }
 
 /** Für eleven_multilingual_v2 (kurze Einzeltexte): Auslassungspunkte zwischen Wörtern als echte Pause von 0,4 s */
@@ -319,6 +433,7 @@ export function sprechText(text: string, sprache = 'en', nurKuerzel = false): st
   // Längere Kürzel zuerst („Mrs" vor „Mr", „z. B." vor „B.")
   const kuerzel = Object.keys(r.kuerzel).sort((a, b) => b.length - a.length)
   const muster = kuerzel.length ? new RegExp(`(^|[^\\p{L}\\d°])(${kuerzel.map(escape).join('|')})(?![\\p{L}\\d])`, 'gu') : null
+  if (r === REGELN.es) text = spanischVorbereiten(text)
   const vorbereitet = ausserhalbKlammern(text, (teil) => {
     let t = muster ? teil.replace(muster, (_m, vor: string, k: string) => `${vor}${r.kuerzel[k]}`) : teil
     // „No. 5" → „number 5" – nur vor einer Zahl (sonst ist „No." das Wort „nein")
