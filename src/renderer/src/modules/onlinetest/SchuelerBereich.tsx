@@ -113,6 +113,7 @@ import { FokusRahmen } from '../lernen/fokus/FokusRahmen'
 import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import TestVorbereitung from '../lernen/TestVorbereitung'
 import MehrspielerSeite from '../lernen/mehrspieler/MehrspielerSeite'
+import { KlassenspielSeite } from '../lernen/klassenspiel/KlassenspielSeite'
 import { PartnerarbeitSeite } from '../partnerarbeit/PartnerarbeitSeite'
 import type { MeinePartnerarbeit } from '@shared/partnerarbeit/typen'
 import { holen, senden } from './serverApi'
@@ -217,6 +218,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const fuerTest = /^\/s\/fuer-test\/([A-Za-z0-9:%_-]{4,80})\/?$/.exec(pfad)?.[1]
   // Zusammen spielen (08.10.2026): Einladungscode aus sechs Ziffern
   const spielCode = /^\/s\/sp\/(\d{6})\/?$/.exec(pfad)?.[1]
+  // Klassenspiel der Lehrkraft (02.11.2026): sechs Ziffern wie die Spielrunden
+  const klassenCode = /^\/s\/ks\/(\d{6})\/?$/.exec(pfad)?.[1]
   // Partnerarbeit Sprechen im Unterricht (24.10.2026)
   const paId = /^\/s\/pa\/(p[a-f0-9]{16})\/?$/.exec(pfad)?.[1]
   // Vokabelweg (03.10.2026) einer Lehrwerksreihe – seit 09.10.2026 der Fortschrittspfad (geübt wird im Kurs)
@@ -239,7 +242,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const telefon = useSchuelerTelefon()
   // Regal oder bisherige Liste (08.10.2026, Wahl der Lernenden in den Einstellungen)
   const regalAn = useDarstellung((s) => s.d.materialien) !== 'liste'
-  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln || spielCode || paId)
+  const fokus = Boolean(code || fbCode || blattCode || reiheCode || vokCode || gramCode || grammatik || blatt || vokWeg || vokabeln || spielCode || klassenCode || paId)
   const mitTabs = telefon && !gast && !fokus
   // Kopfzeile: Startseite erkennen; Gäste sehen, wo sie sind (vorher „Schul-Apps · Vokabeltraining")
   const aufStart = pfad === '/s/' || pfad === '/s'
@@ -254,6 +257,8 @@ export default function SchuelerBereich(): React.JSX.Element {
       ? 'Grammatiktraining'
       : spielCode
       ? 'Zusammen spielen'
+      : klassenCode
+      ? 'Klassenspiel'
       : paId
       ? 'Partnerarbeit'
       : code
@@ -274,6 +279,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <VokabelBeitritt code={gramCode.toUpperCase()} art="grammatik" />
   ) : spielCode && ich?.angemeldet ? (
     <MehrspielerSeite code={spielCode} />
+  ) : klassenCode && ich?.angemeldet ? (
+    <KlassenspielSeite code={klassenCode} />
   ) : paId && ich?.angemeldet ? (
     <PartnerarbeitSeite id={paId} />
   ) : fuerTest && !gast ? (
@@ -539,6 +546,8 @@ function Startseite(): React.JSX.Element {
   const [gram, setGram] = useState<{ id: string; titel: string; fach?: string; erstellt?: string }[] | null>(null)
   // Partnerarbeit Sprechen (24.10.2026): nur, solange eine läuft
   const [partner, setPartner] = useState<MeinePartnerarbeit[]>([])
+  // Klassenspiel der Lehrkraft (02.11.2026): nur, solange eins offen ist – vor allem anderen
+  const [klassenspiele, setKlassenspiele] = useState<{ code: string; titel: string; spiel: string; fach: string }[]>([])
   // Lernstand, Begrüßung und Lerntipp (06.10.2026, SchuelerStart.tsx / server/lernstand.ts)
   const [stand, setStand] = useState<LernstandAntwort | null>(null)
   const [standFehlt, setStandFehlt] = useState(false)
@@ -595,9 +604,25 @@ function Startseite(): React.JSX.Element {
       (d) => setPartner(d.partnerarbeiten ?? []),
       () => setPartner([])
     )
+    void holen<{ klassenspiele: { code: string; titel: string; spiel: string; fach: string }[] }>('/s/api/klassenspiel/offen').then(
+      (d) => setKlassenspiele(d.klassenspiele ?? []),
+      () => setKlassenspiele([])
+    )
   }, [])
   useEffect(alleLaden, [alleLaden])
   useAuffrischen(() => (alleLaden(), standLaden()))
+  // Klassenspiel (02.11.2026): Die Lehrkraft startet es im Unterricht – die Startseite schaut alle 10 s nach, damit das
+  // Banner „Mitspielen" ohne Neuladen erscheint
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void holen<{ klassenspiele: { code: string; titel: string; spiel: string; fach: string }[] }>('/s/api/klassenspiel/offen').then(
+        (d) => setKlassenspiele(d.klassenspiele ?? []),
+        () => undefined
+      )
+    }, 10_000)
+    return () => clearInterval(t)
+  }, [])
   // Vokabeln je Sprache (10.10.2026, Option A): aktueller Band und die EINE Runde – gleiche Zahl wie im Ordner und im Tipp
   const konto = ich?.rolle === 'schueler' && ich.quelle !== 'gast'
   const { sprachen } = useSprachstand(undefined, konto)
@@ -652,7 +677,17 @@ function Startseite(): React.JSX.Element {
     if (fach && (t.art === 'Vokabeltest' || t.art === 'Grammatiktest')) return { href: `/s/ordner/${encodeURIComponent(fach)}`, knopf: 'Jetzt üben' }
     return { href: '/s/tests', knopf: 'Ansehen' }
   }
-  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = partner[0]
+  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string; fach?: string } | null = klassenspiele[0]
+    ? {
+        // Klassenspiel läuft gerade im Unterricht (02.11.2026) – vor allem anderen
+        fach: klassenspiele[0].fach || undefined,
+        titel: `Klassenspiel: ${klassenspiele[0].spiel}`,
+        text: 'Deine Lehrkraft hat ein Spiel für die ganze Klasse gestartet.',
+        href: `/s/ks/${klassenspiele[0].code}`,
+        knopf: 'Mitspielen',
+        farbe: 'grape'
+      }
+    : partner[0]
     ? {
         // Partnerarbeit läuft gerade im Unterricht (24.10.2026) – vor allem anderen
         fach: partner[0].fach,
@@ -1128,6 +1163,9 @@ async function oeffneCode(roh: string): Promise<boolean> {
   if (/^\d{6}$/.test(code)) {
     const spiel = await holen<{ code: string }>(`/s/api/spiel/zugang?code=${code}`).catch(() => null)
     if (spiel?.code) return geh(`/s/sp/${spiel.code}`)
+    // Klassenspiel der Lehrkraft (02.11.2026)
+    const klasse = await holen<{ code: string }>(`/s/api/klassenspiel/zugang?code=${code}`).catch(() => null)
+    if (klasse?.code) return geh(`/s/ks/${klasse.code}`)
   }
   // Persönlicher Anmeldecode vom Zettel der Lehrkraft (8 Zeichen, 08.10.2026): meldet an und öffnet die Vokabeln
   if (code.length === 8) {

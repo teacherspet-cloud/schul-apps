@@ -58,7 +58,10 @@ export const WAISEN: { tabelle: string; spalte: string; eltern: string; elternSp
   { tabelle: 'sprech_vorfaelle', spalte: 'freigabe_id', eltern: 'sprech_freigaben', elternSpalte: 'id' },
   // Partnerarbeit (24.10.2026): Regeln und Partnerarbeiten leben mit dem Kurs
   { tabelle: 'partner_regeln', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' },
-  { tabelle: 'partner_arbeiten', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' }
+  { tabelle: 'partner_arbeiten', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' },
+  // Klassenspiele (02.11.2026): Rekorde und Auswertungen leben mit dem Kurs
+  { tabelle: 'klassen_rekorde', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' },
+  { tabelle: 'klassenspiel_personen', spalte: 'vok_id', eltern: 'vok_zuweisungen', elternSpalte: 'id' }
 ]
 
 const q = (name: string): string => `"${name.replace(/"/g, '""')}"`

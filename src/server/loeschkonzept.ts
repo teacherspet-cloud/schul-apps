@@ -54,6 +54,8 @@ export const KRISEN_TAGE = 30
 export const VORFALL_TAGE = 14
 /** Partnerarbeiten (24.10.2026, partnerarbeit.ts): 90 Tage nach dem Ende */
 export const PARTNERARBEIT_TAGE = 90
+/** Auswertung der Klassenspiele je Person (02.11.2026, klassenspiel.ts): 400 Tage wie die Testpläne */
+export const KLASSENSPIEL_TAGE = 400
 
 // ---------------------------------------------------------------- Ablage
 
@@ -231,6 +233,11 @@ export async function loeschLauf(anlass: 'nacht' | 'start' | 'hand', jetzt = Dat
     zahlen.nachgezogen = nachtHaken(() => loeschungenNachholen(jetzt))
     // Einzelsicherungen (sicherung-vor-*.db) und Vor-Update-Kopien (vor-*.db) nach 14 Tagen (sicherungen.ts)
     zahlen.einzelsicherungen = nachtHaken(() => alteEinzelsicherungenLoeschen(DATEN, jetzt))
+    // Klassenspiele (02.11.2026): Auswertung je Person nach 400 Tagen
+    zahlen.klassenspiele = nachtHaken(() => {
+      const d = db()
+      return vorhanden(d, 'klassenspiel_personen') ? Number(d.prepare('DELETE FROM klassenspiel_personen WHERE zeit < ?').run(grenze(jetzt, KLASSENSPIEL_TAGE)).changes) : 0
+    })
     let warnung = ''
     // 2. IServ-Liste
     let iserv: LoeschStand['iserv'] = loeschStand()?.iserv ?? null

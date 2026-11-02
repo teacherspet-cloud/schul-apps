@@ -92,6 +92,7 @@ import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
 import KalenderHinweis from '../../../shared/components/KalenderHinweis'
 import { TESTPLAN_GEAENDERT, TestPlanenKnopf } from './TestPlanen'
+import { KlassenspielKnopf } from '../klassenspiel/KlassenspielLehrkraft'
 import { alsFeld, ausFeld, type KursReiter, type Lernende, type Lernstanddaten } from './kursDaten'
 import { entwurfHinweis, geplanteAbschnitte, HINWEIS_FARBE, kursHinweise, kursKennzahlen, type KursBedarf, type KursHinweis } from './kursHinweise'
 import { zumHinweis } from './kursFokus'
@@ -1160,6 +1161,8 @@ export function KursSeite({
               <AlsSchuelerAnsehen kursId={id} gruppe={d.lerngruppeId || undefined} klasse={d.lerngruppeId && d.lerngruppe ? d.lerngruppe : titel} />
               {/* „Test planen" (02.11.2026): ersetzt „Zeitraum und Test" der Kurseinstellungen */}
               <TestPlanenKnopf kursId={id} termin={d.testTermin} klasse={titel} />
+              {/* Klassenspiel (02.11.2026): Lehrkraft hostet ein Spiel für die ganze Klasse */}
+              <KlassenspielKnopf kursId={id} />
               {d.code && d.link && !d.iservGruppe && (
                 <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
                   QR-Code

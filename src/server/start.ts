@@ -102,6 +102,7 @@ import { reihenRoute } from './reihen'
 import { vokabelRoute } from './vokabeln'
 import { lernenRoute } from './lernen'
 import { spielRoute } from './spiel'
+import { klassenspielRoute } from './klassenspiel'
 import { planenRoute } from './planen'
 import { aktuellerNutzer } from './kontext'
 import { OBERFLAECHE } from './pfade'
@@ -296,6 +297,8 @@ async function main(): Promise<void> {
       erinnerungenRoute(adresse),
       // Zusammen spielen: Kooperativ und Versus (08.10.2026)
       spielRoute(),
+      // Klassenspiele der Lehrkraft (02.11.2026, klassenspiel.ts) – vor schuelerRoute
+      klassenspielRoute(adresse),
       lernenRoute(),
       // Überthemen (19.10.2026): /s/api/themen – vor schuelerRoute, die /s/api/ ganz übernimmt
       ueberthemenRoute(),

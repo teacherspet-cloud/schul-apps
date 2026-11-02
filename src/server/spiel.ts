@@ -20,6 +20,7 @@ import type { ServerResponse } from 'node:http'
 import { randomInt } from 'node:crypto'
 import { json, type Anfrage } from './http'
 import { sechsstelligerCode } from './codes'
+import { klassenCodeBelegt } from './klassenspiel'
 import { nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import {
   json_,
@@ -339,8 +340,10 @@ function schliessen(r: Raum): void {
 
 // ---------------------------------------------------------------- Ablauf
 
-// Sechsstelliger Code (24.10.2026 in codes.ts herausgezogen, auch für die Partnerarbeit)
-const neuerCode = (): string => sechsstelligerCode((c) => raeume.has(c))
+// Sechsstelliger Code (24.10.2026 in codes.ts herausgezogen, auch für die Partnerarbeit); Klassenspiele (02.11.2026)
+// teilen den Vorrat – derselbe Code darf nie zwei Runden meinen
+const neuerCode = (): string => sechsstelligerCode((c) => raeume.has(c) || klassenCodeBelegt(c))
+export const spielCodeBelegt = (c: string): boolean => raeume.has(c)
 
 /**
  * Reiseplaner (09.10.2026, Lehrkraft): Wörter aus ALLEN Units und Bänden des Lehrwerks der Klasse bis zu ihrem Stand –

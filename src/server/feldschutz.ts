@@ -108,7 +108,10 @@ export const SENSIBEL: Record<string, string[]> = {
   // Datenpannen (22.10.2026, Prüfung des Schulträgers, datenpanne.ts): Beschreibung, Betroffene, Maßnahmen
   datenpannen: ['daten'],
   // Geplante Tests in Fächern ohne Sprachkurs (02.11.2026, testplaene.ts): Thema, Buchseiten, gewähltes Material
-  testplaene: ['daten']
+  testplaene: ['daten'],
+  // Klassenspiele (02.11.2026, klassenspiel.ts): Ergebnis und Fehler je Person (nur für die Lehrkraft), Klassenrekorde
+  klassenspiel_personen: ['daten'],
+  klassen_rekorde: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

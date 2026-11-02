@@ -89,6 +89,7 @@ import { AblegenKnopf } from './AblegenKnopf'
 import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
 import { AlsSchuelerAnsehen } from './SchuelerVorschau'
 import { TESTPLAN_GEAENDERT, TestPlanenKnopf } from '../lernen/kurs/TestPlanen'
+import { KlassenspielKnopf } from '../lernen/klassenspiel/KlassenspielLehrkraft'
 import { FachKopf } from './FachKopf'
 import { KlassenKurs } from './KlassenKurs'
 import { FachLernstand } from './FachLernstand'
@@ -692,6 +693,8 @@ function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zu
           {k.gruppen.length > 0 && <AlsSchuelerAnsehen gruppe={aktiv?.id ?? k.gruppen[0]} klasse={k.name} />}
           {/* „Test planen" (02.11.2026): Sprachfach → Termin und Inhalt des Kurses der Klasse, sonst Thema/Seiten/Material */}
           {aktiv && <TestPlanenKnopf key={aktiv.id} gruppeId={aktiv.id} klasse={`${klasse} · ${fachSchreibweise(aktiv.fach)}`} />}
+          {/* Klassenspiel (02.11.2026): nur mit Sprachkurs der Lerngruppe */}
+          {aktiv && <KlassenspielKnopf key={`ks-${aktiv.id}`} gruppeId={aktiv.id} />}
         </Group>
       </Group>
 
