@@ -246,6 +246,18 @@ export function onlineFassung(variante: Variant): OnlineFassung {
             const falschW = woerter(it.hint ?? '')
             const alle = [...vorW, ...falschW, ...woerter(s0.after)]
             const fx = feldId(b.id, it.id, 'x')
+            /*
+             * Kern der Abweichung (02.11.2026, Befund der Lehrkraft: „in times of design" → Lösung „in terms of"; „times"
+             * streichen und „terms" schreiben bekam keinen Punkt): Gleiche Wörter am Anfang und Ende von falscher Wendung
+             * und Lösung gehören zum Satz. Gestrichen werden muss mindestens der Kern, höchstens die ganze Wendung; richtig
+             * ist der Kern ebenso wie die ganze Lösung.
+             */
+            const kern = falschesWortKern(it.hint ?? '', it.answer)
+            const von = vorW.length + kern.vorne
+            const bis = vorW.length + falschW.length - 1 - kern.hinten
+            const bereiche: string[] = []
+            for (let i = vorW.length; i <= von; i++)
+              for (let j = bis; j <= vorW.length + falschW.length - 1; j++) bereiche.push(Array.from({ length: j - i + 1 }, (_, k) => String(i + k)).join(','))
             a.eintraege.push({
               einheit: f,
               felder: [
@@ -253,8 +265,8 @@ export function onlineFassung(variante: Variant): OnlineFassung {
                 { id: f, art: 'text', beschriftung: 'richtiges Wort' }
               ]
             })
-            loesungen[fx] = { art: 'genau', werte: [falschW.map((_, i) => String(vorW.length + i)).join(',')] }
-            loesungen[f] = { art: 'genau', werte: [it.answer, ...(it.auchRichtig ?? [])] }
+            loesungen[fx] = { art: 'genau', werte: bereiche.length ? bereiche : [falschW.map((_, i) => String(vorW.length + i)).join(',')] }
+            loesungen[f] = { art: 'genau', werte: [...new Set([kern.richtig || it.answer, it.answer, ...(it.auchRichtig ?? [])].filter(Boolean))] }
             einheit(f, falschW.length ? [fx, f] : [f])
             continue
           }
@@ -655,9 +667,31 @@ export function antwortAlsText(antwort: string | undefined, optionen?: { wert: s
   return optionen?.find((o) => o.wert === a)?.text ?? a
 }
 
+/**
+ * Kern der Abweichung bei „Correct the mistakes" (02.11.2026): gleiche Wörter am Anfang und Ende von falscher Wendung
+ * und Lösung („in times of" / „in terms of" → vorne 1, hinten 1, falsch „times", richtig „terms"). Mindestens ein Wort
+ * bleibt auf beiden Seiten; Groß-/Kleinschreibung und Satzzeichen am Rand zählen beim Vergleich nicht.
+ */
+export function falschesWortKern(falsch: string, richtig: string): { vorne: number; hinten: number; falsch: string; richtig: string } {
+  const f = String(falsch ?? '').split(/\s+/).filter(Boolean)
+  const r = String(richtig ?? '').split(/\s+/).filter(Boolean)
+  const gleich = (a: string, b: string): boolean => normalisiere(a).replace(/[.,;:!?]+$/, '') === normalisiere(b).replace(/[.,;:!?]+$/, '')
+  let vorne = 0
+  while (vorne < f.length - 1 && vorne < r.length - 1 && gleich(f[vorne], r[vorne])) vorne++
+  let hinten = 0
+  while (hinten < f.length - 1 - vorne && hinten < r.length - 1 - vorne && gleich(f[f.length - 1 - hinten], r[r.length - 1 - hinten])) hinten++
+  return { vorne, hinten, falsch: f.slice(vorne, f.length - hinten).join(' '), richtig: r.slice(vorne, r.length - hinten).join(' ') }
+}
+
 /** Die Lösung eines Feldes als Text für Lehrkraft und Ergebnisseite */
 export function loesungAlsText(l: Loesung | undefined, optionen?: { wert: string; text: string }[]): string {
   if (!l) return ''
+  // Durchstreichen (02.11.2026): Stellen als Wörter („7" → „times"), kürzeste Wahl zuerst
+  if (l.art === 'genau' && optionen?.length && l.werte.every((w) => /^\d+(,\d+)*$/.test(w)))
+    return [...l.werte]
+      .sort((a, b) => a.split(',').length - b.split(',').length)
+      .map((w) => antwortAlsText(w, optionen))
+      .join(' / ')
   if (l.art === 'genau') return l.werte.join(' / ')
   if (l.art === 'auswahl') return antwortAlsText(l.wert, optionen) || l.wert
   if (l.art === 'ki') return l.erwartung ? `z. B. ${l.erwartung}` : ''

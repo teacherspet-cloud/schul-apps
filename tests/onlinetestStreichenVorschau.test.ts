@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { antwortAlsText, bewerte, onlineFassung, summe } from '../src/renderer/src/modules/onlinetest/kern'
+import { antwortAlsText, bewerte, falschesWortKern, loesungAlsText, onlineFassung, summe } from '../src/renderer/src/modules/onlinetest/kern'
 import { blattBereinigt, vorschauEinarbeiten, vorschauFaelle } from '../src/server/onlinetest'
 import type { Block, Variant } from '../src/renderer/src/modules/vokabeltest/model/types'
 
@@ -81,5 +81,50 @@ describe('KI-Prüfung der Vorschau', () => {
     const neu = vorschauEinarbeiten(f, b, faelle, urteile)
     expect(summe(neu)).toBe(2)
     expect(Object.values(neu).some((x) => x.pruefen === 'kleinerFehler')).toBe(true)
+  })
+})
+
+describe('Correct the mistakes: Kern der Abweichung', () => {
+  const v: Variant = {
+    id: 'A',
+    label: 'A',
+    blocks: [
+      {
+        id: 'w',
+        kind: 'gap',
+        taskType: 'wrongWord',
+        title: 'Correct the mistakes',
+        instruction: 'Find it.',
+        pointsPerItem: 1,
+        items: [{ id: 'i1', sentences: [{ before: 'The two phones are very similar', after: 'design, but the second one has a much better camera.' }], answer: 'in terms of', hint: 'in times of' }],
+        wordBank: false,
+        firstLetterHint: false,
+        extraBankWords: []
+      }
+    ] as Block[]
+  }
+  const f = onlineFassung(v)
+  const [fx, fw] = f.aufgaben[0].eintraege[0].felder
+  const einheit = f.einheiten[0].id
+  const idx = (wort: string): string => fx.optionen!.find((o) => o.text === wort)!.wert
+  it('„times" streichen und „terms" schreiben genügt (Befund 02.11.2026)', () => {
+    expect(falschesWortKern('in times of', 'in terms of')).toMatchObject({ vorne: 1, hinten: 1, falsch: 'times', richtig: 'terms' })
+    expect(bewerte(f, { [fx.id]: idx('times'), [fw.id]: 'terms' })[einheit].status).toBe('richtig')
+  })
+  it('die ganze Wendung zu streichen und zu schreiben bleibt richtig, zu wenig/falsch gestrichen nicht', () => {
+    const ganz = [idx('in'), idx('times'), idx('of')].join(',')
+    expect(bewerte(f, { [fx.id]: ganz, [fw.id]: 'in terms of' })[einheit].status).toBe('richtig')
+    // Die komplette Korrektur gilt in jeder Kombination (Wunsch der Lehrkraft 02.11.2026)
+    expect(bewerte(f, { [fx.id]: idx('times'), [fw.id]: 'in terms of' })[einheit].status).toBe('richtig')
+    expect(bewerte(f, { [fx.id]: ganz, [fw.id]: 'terms' })[einheit].status).toBe('richtig')
+    expect(bewerte(f, { [fx.id]: `${idx('in')},${idx('times')}`, [fw.id]: 'terms' })[einheit].status).toBe('richtig')
+    expect(bewerte(f, { [fx.id]: idx('in'), [fw.id]: 'terms' })[einheit].status).toBe('falsch')
+    expect(bewerte(f, { [fx.id]: idx('similar'), [fw.id]: 'terms' })[einheit].status).toBe('falsch')
+    expect(loesungAlsText(f.loesungen[fx.id], fx.optionen).split(' / ')[0]).toBe('times')
+  })
+  it('Kern bei gleichen Rändern sonst unverändert, nie leer', () => {
+    expect(falschesWortKern('take up', 'take off')).toMatchObject({ falsch: 'up', richtig: 'off' })
+    expect(falschesWortKern('make', 'do')).toMatchObject({ vorne: 0, hinten: 0, falsch: 'make', richtig: 'do' })
+    expect(falschesWortKern('a', 'a')).toMatchObject({ falsch: 'a', richtig: 'a' })
   })
 })
