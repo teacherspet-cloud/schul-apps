@@ -16,7 +16,8 @@ import { holen, senden } from '../modules/onlinetest/serverApi'
 import { neuAnlegen, useNavigation } from '../shared/navigation'
 import { notifyError, notifySuccess } from '../shared/util'
 import { useAuftraege } from '../shared/auftraege'
-import { useVokabeltest, type TestPayload } from '../modules/vokabeltest/store'
+import { useVokabeltest, type TestPayload, type VocabListContext } from '../modules/vokabeltest/store'
+import { collectKnownVocab } from '../shared/knownVocab'
 import { newId } from '../modules/vokabeltest/model/random'
 import { useGrammatiktest } from '../modules/grammatiktest/store'
 import { kennungLabel } from '../modules/grammatikformen/grammatikformen'
@@ -37,6 +38,12 @@ interface TerminInhalt {
   lehrwerkVorwahl?: { bookId: string; unit: string; sections: string[] } | null
   woerter: { term: string; translation: string }[]
   grammatik: string[]
+}
+
+/** Jahrgang aus dem Klassennamen („7b" → 7, „10" → 10; „Q1" → keiner) – wie in „Meine Klassen" */
+const jahrgangAusKlasse = (name: string): number | undefined => {
+  const n = Number(/^\s*(\d{1,2})(?!\d)/.exec(name)?.[1])
+  return Number.isInteger(n) && n >= 1 && n <= 13 ? n : undefined
 }
 
 const warte = async (bedingung: () => boolean, ms = 8000): Promise<boolean> => {
@@ -156,7 +163,34 @@ export function TestErstellen({ k, fertig }: { k: StartKurs; stichwoerter: strin
     const v = useVokabeltest.getState()
     v.setVocab(inhalt.woerter.map((w) => ({ id: newId(), term: w.term, translation: w.translation })))
     v.setListName(titel)
-    v.setListContext({ bookName: inhalt.abschnitte.join(' · ') || titel, language: inhalt.sprache })
+    /*
+     * Klassenstufe gleich mitgeben (02.11.2026, Befund der Lehrkraft: „Test automatisch erstellen" trug Klasse und Niveau
+     * erst ein, nachdem die KI die Vokabeln analysiert hatte): Jahrgang aus dem Namen der Lerngruppe („9c" → 9), sonst aus
+     * dem Band des Termins; Bundesland/Schulform und der bekannte Wortschatz früherer Units ebenfalls aus dem Band.
+     */
+    const kontext: VocabListContext = { bookName: inhalt.abschnitte.join(' · ') || titel, language: inhalt.sprache }
+    const jahrgang = jahrgangAusKlasse(inhalt.gruppe)
+    const vw = inhalt.lehrwerkVorwahl
+    if (vw?.bookId)
+      try {
+        const book = await window.api.textbooks.get(vw.bookId)
+        if (book) {
+          Object.assign(kontext, {
+            ...(book.grade ? { grade: book.grade } : {}),
+            ...(book.stateId ? { stateId: book.stateId } : {}),
+            ...(book.schoolTypeId ? { schoolTypeId: book.schoolTypeId } : {}),
+            language: inhalt.sprache || book.language
+          })
+          const known = await collectKnownVocab(book, vw.unit, vw.sections, jahrgang ?? book.grade ?? 99, await window.api.textbooks.list(), (id) =>
+            window.api.textbooks.get(id)
+          )
+          if (known) kontext.known = known
+        }
+      } catch {
+        /* ohne Band: nur der Jahrgang der Lerngruppe */
+      }
+    if (jahrgang) kontext.grade = jahrgang
+    v.setListContext(kontext)
     // Lehrwerk, Band, Unit und Abschnitte des Termins vorwählen (29.10.2026, Befund der Lehrkraft)
     v.setLehrwerkVorwahl(inhalt.lehrwerkVorwahl ?? null)
     return id

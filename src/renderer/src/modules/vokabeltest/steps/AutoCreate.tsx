@@ -267,14 +267,15 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                 allowDeselect={false}
               />
             </SimpleGrid>
-            {analysis.running ? (
+            {/* Klasse aus Lehrwerk/Lerngruppe (02.11.2026): dann steht sie sofort fest – die Analyse sucht nur noch einen Themenvorschlag */}
+            {analysis.running && !listContext?.grade ? (
               <Group gap={6} mt={-8}>
                 <Loader size={12} />
                 <Text size="xs" c="dimmed">
                   Vokabeln werden analysiert: Für welche Klasse und welches Niveau ist die Liste gedacht?
                 </Text>
               </Group>
-            ) : analysis.result ? (
+            ) : analysis.result && !listContext?.grade ? (
               experte && (
                 <Text size="xs" c="dimmed" mt={-8}>
                   Vorschlag aus der Vokabelanalyse: Klasse {analysis.result.grade} · {analysis.result.level}

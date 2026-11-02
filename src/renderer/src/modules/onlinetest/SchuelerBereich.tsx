@@ -2316,7 +2316,7 @@ function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; ant
  * Material eines Grammatiktests/einer Lernzielkontrolle (05.10.2026): wie auf dem Papierblatt gezeichnet, in
  * einem abgeschotteten Rahmen ohne Skripte; die Höhe richtet sich nach dem Inhalt.
  */
-function MaterialKarte({ html, stil, nachweise }: { html: string; stil: string; nachweise?: string[] }): React.JSX.Element {
+export function MaterialKarte({ html, stil, nachweise }: { html: string; stil: string; nachweise?: string[] }): React.JSX.Element {
   const rahmen = useRef<HTMLIFrameElement>(null)
   const [hoehe, setHoehe] = useState(200)
   const messen = (): void => {
@@ -2348,7 +2348,7 @@ function MaterialKarte({ html, stil, nachweise }: { html: string; stil: string; 
   )
 }
 
-function AufgabeKarte({
+export function AufgabeKarte({
   nr,
   aufgabe,
   antworten,

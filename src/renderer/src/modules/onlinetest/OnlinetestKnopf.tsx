@@ -6,8 +6,8 @@
  */
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
-import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { IconAlertTriangle, IconDeviceLaptop, IconEye } from '@tabler/icons-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
 import { appFreigegeben, aufServer } from '../../shared/plattform'
 import { openDocument, openModule } from '../../shared/navigation'
@@ -16,7 +16,11 @@ import { abschnitteAusName } from '../../shared/ueberthema'
 import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
 import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
-import type { OnlineFassung } from './kern'
+import { onlineFassung, type OnlineFassung } from './kern'
+import type { VorschauFassung } from './TestVorschau'
+
+// Vorschau lädt die Schüler-Bausteine erst bei Bedarf (02.11.2026)
+const TestVorschau = lazy(() => import('./TestVorschau'))
 import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
 import { nameMitTermin } from '@shared/onlinetestTermin'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
@@ -160,6 +164,7 @@ export function Erstellen({
   const [zeit, setZeit] = useState<number>(20)
   const [zuteilung, setZuteilung] = useState<string>('zufall')
   const [laeuft, setLaeuft] = useState(false)
+  const [vorschau, setVorschau] = useState<VorschauFassung[] | null>(null)
   // Fertig: Detailansicht in der App „Onlinetest“ (die frühere Code-Ansicht hier bleibt ungenutzt)
   const [fertig] = useState<{ code: string; link: string } | null>(null)
   useEffect(() => {
@@ -190,7 +195,22 @@ export function Erstellen({
       setLaeuft(false)
     }
   }
+  const vorschauOeffnen = (): void => {
+    try {
+      const f = doc ? doc.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v) })) : blatt!.fassungen()
+      if (!f.length) throw new Error('Der Test hat noch keine Fassung.')
+      setVorschau(f)
+    } catch (e) {
+      notifyError(e, 'Vorschau nicht möglich')
+    }
+  }
   return (
+    <>
+      {vorschau && (
+        <Suspense fallback={null}>
+          <TestVorschau fassungen={vorschau} titel={titel} zeitMin={zeit} schliessen={() => setVorschau(null)} />
+        </Suspense>
+      )}
     <Modal opened onClose={schliessen} title="Als Onlinetest durchführen" size="lg">
       {fertig ? (
         <Stack>
@@ -326,6 +346,10 @@ export function Erstellen({
               ohne Namen); kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
             </Alert>
             <Group justify="flex-end">
+              {/* Vorschau (02.11.2026, Wunsch der Lehrkraft): den Test selbst durchführen wie die Lernenden – ohne Anlegen */}
+              <Button variant="default" leftSection={<IconEye size={16} />} onClick={vorschauOeffnen} data-onlinetest-vorschau-knopf>
+                Als Vorschau durchführen
+              </Button>
               <Button loading={laeuft} onClick={() => void erstellen()}>
                 Onlinetest erstellen
               </Button>
@@ -334,5 +358,6 @@ export function Erstellen({
         </OptionenBereich>
       )}
     </Modal>
+    </>
   )
 }

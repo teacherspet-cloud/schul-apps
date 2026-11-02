@@ -71,6 +71,21 @@ try {
   await dlg.getByPlaceholder('wählen …').click()
   await p.getByRole('option', { name: KLASSE }).click()
   await dlg.getByLabel('auch Gäste mit Namen').check()
+  // Vorschau (02.11.2026): Test als Lehrkraft durchführen – ohne Anlegen
+  const vorherZahl = ((await (await lk.request.get(`${A}/server/onlinetest`, { headers: KOPF })).json()).tests ?? []).length
+  await dlg.locator('[data-onlinetest-vorschau-knopf]').click()
+  const vs = p.locator('[data-onlinetest-vorschau]')
+  pruefe(await da(vs.locator('[data-vorschau-abgeben]'), 15000), 'Vorschau öffnet sich mit „Abgeben (Probe)"')
+  pruefe(await da(vs.locator('[data-material-karte]').first(), 5000), 'Vorschau zeigt Material wie bei den Lernenden')
+  await p.screenshot({ path: join(out, '0-vorschau.png') })
+  await vs.locator('[data-vorschau-abgeben]').click()
+  pruefe(await da(vs.locator('[data-vorschau-ergebnis]'), 5000), 'Vorschau zeigt nach der Probe-Abgabe das Ergebnis')
+  pruefe((await vs.locator('[data-vorschau-einheit]').count()) > 0, 'Ergebnis je Teilaufgabe mit Lösung')
+  await p.screenshot({ path: join(out, '0-vorschau-ergebnis.png') })
+  await vs.getByRole('button', { name: 'Vorschau beenden' }).click()
+  await vs.waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
+  const nachherZahl = ((await (await lk.request.get(`${A}/server/onlinetest`, { headers: KOPF })).json()).tests ?? []).length
+  pruefe(nachherZahl === vorherZahl && (await dlg.isVisible()), `Vorschau legt keinen Test an, Dialog bleibt offen (${vorherZahl} → ${nachherZahl})`)
   await p.screenshot({ path: join(out, '1-dialog.png') })
   await dlg.getByRole('button', { name: 'Onlinetest erstellen' }).click()
   await dlg.waitFor({ state: 'hidden', timeout: 30000 })
